@@ -1,0 +1,897 @@
+#!/usr/bin/python2.4
+#
+# Copyright 2011 Google Inc. All Rights Reserved.
+
+"""Test Request Manager.
+
+A Test Request is a request to install and run some arbitrary binaries and data
+files on a set of remote computers for testing purposes.  The Test Request
+Manager accepts these requests, acquires remote machines to run them, and posts
+back the results of those tests to a given URL.
+
+Test Requests are described using strings formatted as a subset of the python
+syntax to a dictionary object.  See
+http://code.google.com/p/swarming/wiki/SwarmFileFormat for
+complete details.
+
+The TRM is the main component of the Test Request Server.  The TRS accepts
+Test Requests through HTTP POST requests and forwards them to the TRM.  The TRS
+also provides a UI for canceling Test Requests.
+"""
+
+
+import datetime
+import logging
+import os.path
+import urllib
+import urllib2
+
+from google.appengine.api import mail
+from google.appengine.api import urlfetch
+from google.appengine.ext import db
+from common import test_request_message
+from server import base_machine_provider
+from test_runner import remote_test_runner
+
+# Fudge factor added to a runner's timeout before we consider it to have run
+# for too long.  Runners that run for too long will be aborted automatically.
+# Specified in number of seconds.
+_TIMEOUT_FUDGE_FACTOR = 600
+
+# Default Test Run Swarm filename.  This file provides parameters
+# for the instance running tests.
+_TEST_RUN_SWARM_FILE_NAME = 'test_run.swarm'
+
+# Name of python script to execute on the remote machine to run a test.
+_TEST_RUNNER_SCRIPT = 'local_test_runner.py'
+
+# Name of directories in source tree and/or on remote machine.
+_TEST_RUNNER_DIR = 'test_runner'
+_COMMON_DIR = 'common'
+
+
+class TestRequest(db.Model):
+  """A test request.
+
+  Test Request objects represent one test request from one client.  The client
+  can be a build machine requesting a test after a build or it could be a
+  developer requesting a test from their own build.
+  """
+
+  # The message received from the caller, formatted as a Test Case as
+  # specified in
+  # http://code.google.com/p/swarming/wiki/SwarmFileFormat.
+  message = db.TextProperty()
+
+  # The time at which this request was received.
+  requested_time = db.DateTimeProperty(auto_now_add=True)
+
+  def GetTestCase(self):
+    """Returns a TestCase object representing this Test Request.
+
+    Returns:
+      A TestCase object representing this Test Request.
+
+    Raises:
+      test_request_message.Error: If the request's message isn't valid.
+    """
+    # NOTE: because _request_object is not declared with db.Property, it will
+    # not be persisted to the data store.  This is used as a transient cache of
+    # the test request message to keep from evaluating it all the time
+    request_object = getattr(self, '_request_object', None)
+    if not request_object:
+      request_object = test_request_message.TestCase()
+      errors = []
+      if not request_object.ParseTestRequestMessageText(self.message, errors):
+        raise test_request_message.Error('\n'.join(errors))
+
+      self._request_object = request_object
+
+    return request_object
+
+  def GetName(self):
+    """Gets a name for this test.
+
+    Returns:
+      The  name for this test.
+
+    Raises:
+      test_request_message.Error: If the request's message isn't valid.
+    """
+    return self.GetTestCase().test_case_name
+
+  def GetConfiguration(self, config_name):
+    """Gets the named configuration.
+
+    Args:
+      config_name: The name of the configuration to get.
+
+    Returns:
+      A configuration dictionary for the named configuration, or None if the
+      name is not found.
+    """
+    for configuration in self.GetTestCase().configurations:
+      if configuration.config_name == config_name:
+        return configuration
+
+    return None
+
+
+class TestRunner(db.Model):
+  """Represents one instance of a test runner.
+
+  A test runner represents a given configuration of a given test request running
+  on a given machine.
+  """
+  # The test being run.
+  test_request = db.ReferenceProperty(TestRequest, required=True,
+                                      collection_name='runners')
+
+  # The name of the request's configuration being tested.
+  config_name = db.StringProperty()
+
+  # The 0 based instance index of the request's configuration being tested.
+  config_instance_index = db.IntegerProperty()
+
+  # The number of instances running on the same configuration as ours.
+  num_config_instances = db.IntegerProperty()
+
+  # The machine running the test.  The meaning of this field also tells us
+  # about the state of the runner, to make it easier to run queries below.
+  #
+  # If the machine_id is 0, then this runner has never been executed on a
+  # remote test runner.
+  #
+  # If the machine_id is > 0, this means that the runner has been assigned to
+  # a machine is currently running.  The 'started' attribute records the time at
+  # which test started.
+  #
+  # If the machine_id is < 0, the runner has finished, either successfully or
+  # not.  The 'ended' attribute records the time at which the runner ended.
+  machine_id = db.IntegerProperty()
+
+  # The time at which this runner was created.  The runner may not have
+  # started executing yet.
+  created = db.DateTimeProperty(auto_now_add=True)
+
+  # The time at which this runner was executed on a remote machine.  This
+  # attribute is valid only when the runner is executing or ended (i.e.
+  # machine_id is != 0).  Otherwise the value is None and we use the
+  # fact that it is None to identify if a test was started or not.
+  started = db.DateTimeProperty()
+
+  # The time at which this runner ended.  This attribute is valid only when
+  # the runner has ended (i.e. machine_id is < 0).  Until then, the value is
+  # unspecified.
+  ended = db.DateTimeProperty(auto_now=True)
+
+  # True if the test run finished and succeeded.  This attribute is valid only
+  # when the runner has ended (i.e. machine_id is < 0).  Until then, the value
+  # is unspecified.
+  ran_successfully = db.BooleanProperty()
+
+  # Full output of the test.  This attribute is valid only when the runner has
+  # ended (i.e. machine_id is < 0).  Until then, the value is unspecified.
+  result_string = db.TextProperty()
+
+  def GetName(self):
+    """Gets a name for this runner.
+
+    Returns:
+      The  name for this runner.
+
+    Raises:
+      test_request_message.Error: If the request's message isn't valid.
+    """
+    return '%s:%s' % (self.test_request.GetName(), self.config_name)
+
+  def GetConfiguration(self):
+    """Gets the configuration associated with this runner.
+
+    Returns:
+      A configuration dictionary for this runner.
+    """
+    config = self.test_request.GetConfiguration(self.config_name)
+    assert config is not None
+    return config
+
+  def GetTimeout(self):
+    """Get the timeout for this runner in seconds.
+
+    The timeout applicable to this runner is the sum of the timeouts of each
+    test that it will run.  The set of tests run is the union of the tests
+    specified in the TestCase object of the request plus the tests specified
+    in the Configuration object associated with this runner.
+
+    Returns:
+      The timeout value for this runner in seconds.
+    """
+    test_case = self.test_request.GetTestCase()
+    config = self.GetConfiguration()
+    return (sum([test.time_out for test in test_case.tests]) +
+            sum([test.time_out for test in config.tests]))
+
+  def RequiresVirginMachine(self):
+    """Get the virgin machine flag for this runner.
+
+    Returns:
+      True iff this runner's test case requested a virgin machine.
+    """
+    return self.test_request.GetTestCase().virgin
+
+
+class IdleMachine(db.Model):
+  """An idle machine.
+
+  Idle machines are those that have been previously acquired and are finished
+  running tests. As new tests arrive, machines are taken from the idle pool
+  before acquiring new ones unless we need a fresh machine (e.g., explicit
+  requests for virgin machines or sharded tests need new machines).
+  """
+  # The Id of the machine.
+  id = db.IntegerProperty()
+
+
+class TestRequestManager(object):
+  """The Test Request Manager."""
+
+  def __init__(self, machine_manager):
+    """Initializes the TRM.
+
+    Initializes the TRM to use the given machine manager to acquire and release
+    test machines, as well as validating the persisted state of test requests,
+    test runners, and idle machines.
+
+    Args:
+      machine_manager: An instance of machine_manager.MachineManager that is
+          used to acquire machines for running tests.
+    """
+    logging.info('TRM starting')
+
+    self._machine_manager = machine_manager
+    self._machine_manager.RegisterStatusChangeListener(self)
+
+    # Make sure that all acquired machines are either idle or assigned to a
+    # test runner.
+    self._CheckAllAcquiredMachines()
+
+    # Load idle machines and validate.
+    machines_to_del = []
+    for machine in IdleMachine.all():
+      info = self._machine_manager.GetMachineInfo(machine.id)
+      # "info" can be None if the machine ID is stale and doesn't reference a
+      # valid machine anymore. Idle Machines MUST be READY!
+      if not info or info.status != base_machine_provider.MachineStatus.READY:
+        machines_to_del.append(machine)
+        continue
+
+    # Load test runners and validate.
+    for runner in TestRunner.gql('WHERE machine_id > 0'):
+      info = self._machine_manager.GetMachineInfo(runner.machine_id)
+      if not info or info.status not in (
+          base_machine_provider.MachineStatus.WAITING,
+          base_machine_provider.MachineStatus.READY):
+        # The machine running the test has failed (either stopped or done).
+        # Tell the user about it.
+        r_str = 'Tests aborted. The machine running the test has failed. '
+        r_str += ('Machine status: %d' % info.status if info else
+                  'Status undefined.')
+        self._UpdateTestResult(runner, result_string=r_str)
+
+    # Delete all objects that were stale.
+    for machine in machines_to_del:
+      machine.delete()
+
+    logging.info('TRM created')
+
+  def _CheckAllAcquiredMachines(self):
+    """Ensure acquired machines are either idle or assigned to a runner."""
+    logging.info('TRM._CheckAllAcquiredMachines')
+
+    machines_to_release = []
+
+    for info in self._machine_manager.ListAcquiredMachines():
+      idle_machine = IdleMachine.gql('WHERE id = :1', info.id).get()
+      runner = TestRunner.gql('WHERE machine_id = :1', info.id).get()
+
+      logging.debug('Checking machine id=%d', info.id)
+
+      # If a machine is assigned to a runner, then it should not be idle.
+      # Remove it from the idle pool if it is there.
+      if idle_machine and runner:
+        logging.error('Machine id=%d idle and running', info.id)
+        idle_machine.delete()
+      elif not runner and not idle_machine:
+        # If a machine is neither idle nor assigned to a test runner, then put
+        # it in the idle pool if its READY. Otherwise, release it.
+        logging.debug('Machine id=%d is idle and unassigned', info.id)
+
+        if info.status == base_machine_provider.MachineStatus.READY:
+          logging.debug('Machine id=%d put back on idle list', info.id)
+          idle_machine = IdleMachine(id=info.id)
+          idle_machine.put()
+        else:
+          if info.status == base_machine_provider.MachineStatus.WAITING:
+            # WAITING machines should ALWAYS be assigned a runner.
+            # Since we don't know what to do with it, might as well release it.
+            logging.error('Machine %s, should not be in WAITING state without'
+                          'a runner!', info.id)
+          else:
+            logging.debug('Machine id=%d will be released', info.id)
+          machines_to_release.append(info.id)
+      else:
+        # If there is a machine that is ready and assigned a runner that is
+        # not started, we can't start it here because of thread safety, we
+        # must wait for the next call to AssignPendingRequests().
+        pass
+
+    for machine_id in machines_to_release:
+      self._machine_manager.ReleaseMachine(machine_id)
+      logging.debug('Machine id=%d released', machine_id)
+
+  def MachineStatusChanged(self, info):
+    """Handles a status change of an acquired machine.
+
+    When machines are initially acquired in _EnsureMachineAvailable()
+    below, they are in the waiting state.
+
+    If the machine whose state has changed is idle, then we only expect to
+    see state changes to stopped, or done.
+
+    If the machine whose state has changed is currently running a test, then
+    we only expect to see state changes to stopped or done.  In both cases
+    though, this signals an error on the machine, and this is handled as
+    needed in the _RunnerMachineStateChanged() function.
+
+    Otherwise, a WAITING machine has changed to READY and we can now start
+    the associated test runner on it.
+
+    Args:
+      info: A machine information object from the Machine Manager.
+    """
+    logging.info('TRM.MachineStatusChanged')
+
+    idle_machine = IdleMachine.gql('WHERE id = :1', info.id).get()
+    if idle_machine:
+      # We can't have idle machines assigned to a test runner.
+      assert TestRunner.gql('WHERE machine_id = :1', info.id).get() is None
+      self._IdleMachineStateChanged(info, idle_machine)
+    else:
+      # If the machine is currently assigned to a running a test, run/abort it.
+      runner = TestRunner.gql('WHERE machine_id = :1', info.id).get()
+      if runner:
+        self._RunnerMachineStateChanged(info, runner)
+      else:
+        logging.error('Machine %s is not running nor Idle. Wazzup?', info.id)
+        # Next call to _CheckAllAcquiredMachines should fix that!
+
+  def _IdleMachineStateChanged(self, info, idle_machine):
+    """Handles a status change for a machine on the idle list.
+
+    Args:
+      info: A machine information object from the Machine Manager.
+      idle_machine: An instance of machine_manager.Machine representing the
+          machine whose state has changed.
+    """
+    logging.info('TRM._IdleMachineStateChanged id=%d status=%d', info.id,
+                 info.status)
+
+    # An idle machine should already be ready so can't transition to it.
+    assert info.status != base_machine_provider.MachineStatus.READY
+
+    # If the machine is stopped or done, it can't be reused for another test
+    # run, so forget about it.
+    if info.status == base_machine_provider.MachineStatus.STOPPED:
+      # No need to delete the idle_machine in this case.  The listener will
+      # eventually be notified that that the machine has gone into the DONE
+      # state, and this will trigger the case below.
+      self._machine_manager.ReleaseMachine(idle_machine.id)
+    elif info.status == base_machine_provider.MachineStatus.DONE:
+      idle_machine.delete()
+    else:
+      logging.error('Invalid status change for idle machine_id=%d status=%d',
+                    info.id, info.status)
+
+  def _RunnerMachineStateChanged(self, info, runner):
+    """Handles a status change for a machine running a test.
+
+    Args:
+      info: A machine information object from the Machine Manager.
+      runner: An instance of TestRunner representing a running test whose
+          machine state has changed.
+    """
+    logging.info('TRM._RunnerMachineStateChanged id=%d status=%d runner=%s',
+                 info.id, info.status, runner.GetName())
+
+    # If the machine is switching to the READY state, we will start the test
+    # associated to it in the next call to AssignPendingRequests.
+    if info.status != base_machine_provider.MachineStatus.READY:
+      # The machine running the test has failed.  Tell the user about it.
+      r_str = ('Tests aborted. The machine (%d) running the test (%s) '
+               'experienced a state change. Machine status: %d' %
+               (info.id, str(runner.key()), info.status))
+      self._UpdateTestResult(runner, result_string=r_str)
+
+      if info.status == base_machine_provider.MachineStatus.STOPPED:
+        self._machine_manager.ReleaseMachine(info.id)
+      elif info.status != base_machine_provider.MachineStatus.DONE:
+        logging.error('Invalid status change for machine_id=%d status=%d',
+                      info.id, info.status)
+
+  def HandleTestResults(self, web_request):
+    """Handle a response from the remote script.
+
+    Args:
+      web_request: a google.appengine.ext.webapp.Request object containing the
+          results of a test run.  The URL will contain a k= CGI parameter
+          holding the persistent key for the runner.
+    """
+    if not web_request:
+      return
+
+    runner = None
+
+    key = web_request.get('k')
+    if key:
+      runner = TestRunner.get(db.Key(key))
+
+    if runner:
+      # Find the high level success/failure from the URL.
+      # TODO(user): if we can't find it here, should we scrape the result
+      # string?
+      success = web_request.get('s', 'False') == 'True'
+      result_string = urllib.unquote_plus(web_request.get('r'))
+      self._UpdateTestResult(runner, success, result_string, True)
+    else:
+      logging.error('No runner associated to web request, ignoring test result')
+
+  def _UpdateTestResult(self, runner, success=False,
+                        result_string='Tests aborted', reuse_machine=False):
+    """Update the runner with results of a test run.
+
+    Args:
+      runner: a TestRunner object pointing to the test request to which to
+          send the results.  This argument must not be None.
+      success: a boolean indicating whether the test run succeeded or not.
+      result_string: a string containing the output of the test run.
+      reuse_machine: a boolean indicating whether the machine that ran this
+          test should be reused for another test.
+    """
+    if not runner:
+      logging.error('runner argument must be given')
+      return
+
+    # If the machine id of this runner is -1, this means the machine finished
+    # running this test.  Don't try to process another response for this
+    # runner object.
+    if runner.machine_id == -1:
+      logging.error('Got a second response for runner=%s, not good',
+                    runner.GetName())
+      return
+
+    # Put the machine back onto the idle list if needed. In some cases,
+    # such as when running a debugging test request server,
+    # the machine id of this runner can be 0.  Since id 0 does not
+    # refer to a valid assigned machine, then this id should not be put onto
+    # the idle list.
+    if reuse_machine and runner.machine_id != 0:
+      machine = IdleMachine(id=runner.machine_id)
+      machine.put()
+
+    runner.ran_successfully = success
+    runner.result_string = result_string
+    runner.machine_id = -1
+    runner.put()
+
+    # If the test didn't run successfully, we send an email if one was
+    # requested via the test request.
+    test_case = runner.test_request.GetTestCase()
+    if not runner.ran_successfully and test_case.failure_email:
+      # TODO(user): provide better info for failure. E.g., if we don't have a
+      # web_request.body, we should have info like: Failed to upload files.
+      mail.send_mail(sender='Test Request Server <no_reply@google.com>',
+                     to=test_case.failure_email,
+                     subject='%s failed.' % runner.GetName(),
+                     body=runner.result_string,
+                     html='<pre>%s</pre>' % runner.result_string)
+
+    # TODO(user): test result objects, and hence their test request objects,
+    # are currently not deleted from the data store.  This allows someone to
+    # go back to the TRS web UI and see the results of any test that has run.
+    # Eventually we will want to see how to delete old requests as the apps
+    # storage quota will be exceeded.
+    if test_case.result_url:
+      # Send the result to the requested destination.
+      try:
+        # Encode the result string so that it's backwards-compatible with ASCII.
+        # Without this, the call to "urllib.urlencode" below can throw a
+        # UnicodeEncodeError if the result string contains non-ASCII characters.
+        encoded_result_string = runner.result_string.encode('utf-8')
+        urllib2.urlopen(test_case.result_url,
+                        urllib.urlencode((('n', runner.test_request.GetName()),
+                                          ('c', runner.config_name),
+                                          ('i', runner.config_instance_index),
+                                          ('m', runner.num_config_instances),
+                                          ('s', runner.ran_successfully),
+                                          ('r', encoded_result_string))))
+      except urllib2.URLError:
+        logging.info('Could not send results back to sender at %s',
+                     test_case.result_url)
+      except urlfetch.Error:
+        # The docs for urllib2.urlopen() say it only raises urllib2.URLError.
+        # However, in the appengine environment urlfetch.Error may also be
+        # raised. This is normal, see the "Fetching URLs in Python" section of
+        # http://code.google.com/appengine/docs/python/urlfetch/overview.html
+        # for more details.
+        logging.info('Could not send results back to sender at %s',
+                     test_case.result_url)
+
+  def ExecuteTestRequest(self, request_message):
+    """Attempts to execute a test request.
+
+    If machines are available for running any of the test's configurations,
+    they will be started immediately.  The other test configurations will be
+    queued up for testing at a later time potentially requesting new machines.
+
+    Args:
+      request_message: A string representing a test request.
+
+    Raises:
+      test_request_message.Error: If the request's message isn't valid.
+
+    Returns:
+      A dictionary containing the test_case_name field and an array of
+      dictionaries containing the config_name and test_id_key fields.
+    """
+    logging.info('TRM.ExecuteTestRequest msg=%s', request_message)
+
+    # Will raise an exception on error.
+    request = TestRequest(message=request_message)
+    test_case = request.GetTestCase()  # Will raise on invalid request.
+    request.put()
+
+    test_keys = {'test_case_name': test_case.test_case_name,
+                 'test_keys': []}
+
+    for config in test_case.configurations:
+      # TODO(user): deal with max_instances later!!!
+      for instance_index in range(config.min_instances):
+        config.instance_index = instance_index
+        config.num_instances = config.min_instances
+        test_key = self._QueueTestRequestConfig(request, config)
+        test_keys['test_keys'].append({'config_name': config.config_name,
+                                       'instance_index': instance_index,
+                                       'num_instances': config.num_instances,
+                                       'test_key': str(test_key)})
+    return test_keys
+
+  def _QueueTestRequestConfig(self, request, config):
+    """Queue a given request's configuration for execution.
+
+    Args:
+      request: A TestRequest object to execute.
+      config: A TestConfiguration object representing the machine on which to
+          run the test.
+
+    Returns:
+      The id key of the test runner that was created and saved.
+    """
+    logging.info('TRM._QueueTestRequestConfig request=%s config=%s',
+                 request.GetName(), config.config_name)
+
+    # Create a runner entity to record this request/config pair that needs
+    # to be run.  Use a machine id of zero to indicate it has not yet been
+    # executed.  The runner will eventually be scheduled at a later time.
+    runner = TestRunner(test_request=request, config_name=config.config_name,
+                        config_instance_index=config.instance_index,
+                        num_config_instances=config.num_instances,
+                        machine_id=0)
+    return runner.put()
+
+  def _FindMatchingMachineInList(self, obj_list, config):
+    """Find first object in obj_list whose machine matches the given config.
+
+    Args:
+      obj_list: a list of objects with a numeric attribute 'id' that
+          corresponds to the id of a machine as returned by
+          machine_manager.AcquireMachine().
+      config: a TestConfiguration object as specified for TRS requests.
+          See go/gforce/test-request-format for details.
+
+    Returns:
+      An object from the list, or None if a matching machine is not found.
+    """
+    for obj in obj_list:
+      info = self._machine_manager.GetMachineInfo(obj.id)
+      if info.MatchDimensions(config.dimensions):
+        return obj
+
+    return None
+
+  def _FindMatchingIdleMachine(self, runner):
+    """Find an idle machine that is a match for the given runner.
+
+    Args:
+      runner: a TestRunner object for which we want to find a machine.
+
+    Returns:
+      An instance of IdleMachine, or None if a matching machine is not found.
+    """
+    # We can't return an idle machine if we need a virgin one
+    if runner.RequiresVirginMachine():
+      return None
+    machines = IdleMachine.all()
+    return self._FindMatchingMachineInList(machines, runner.GetConfiguration())
+
+  def _FindMatchingAcquiredMachine(self, config):
+    """Find an acquired machine that is a match for the given config.
+
+    Args:
+      config: a TestConfiguration object as specified for TRS requests.
+          See go/gforce/test-request-format for details.
+
+    Returns:
+      An instance of machine_manager.Machine, or None if a matching machine
+      is not found.
+    """
+    # Get an idle machine.
+    machines = self._machine_manager.ListAcquiredMachines()
+    return self._FindMatchingMachineInList(machines, config)
+
+  def _EnsureMachineAvailable(self, runner):
+    """Ensures that a machine instance for the given runner is available.
+
+    Makes sure that a machine with the needed configuration and freshness is
+    available for running tests.  If a machine that matches the runner
+    configuration is already acquired but busy running an existing test,
+    then no new machine is acquired, unless the runner requires a virgin
+    machine or it is sharded across many machines.
+
+    If we need to force a new machine or there is none with the given
+    configuration that is already acquired and we decide that a new machine
+    can be requested (actual heuristic TBD) then one will be acquired using
+    the machine manager.
+
+    Args:
+      runner: The runner we want to ensure a machine is available for.
+    """
+    # TODO(user): implement some kind of upper limit for machines.
+
+    # If we have already acquired a machine with required dimensions, then
+    # simply wait for it to become available unless we need a fresh new one.
+    config = runner.GetConfiguration()
+    if (not runner.RequiresVirginMachine() and
+        runner.num_config_instances == 1 and
+        self._FindMatchingAcquiredMachine(config)):
+      return
+
+    # If we can't acquire the machine right now, the caller will try again
+    # later when assigning runners.  See AssignPendingRequests.
+    machine_id = self._machine_manager.AcquireMachine(None, config.dimensions)
+    if machine_id is not -1:
+      logging.info('New machine acquired with id=%d', machine_id)
+      runner.machine_id = machine_id
+      runner.put()
+
+  def _ExecuteTestRunnerOnIdleMachine(self, runner, idle_machine, server_url):
+    """Execute a given runner on the specified idle machine.
+
+    Args:
+      runner: A TestRunner object to execute.
+      idle_machine: An instance of IdleMachine representing the machine to run
+          the test on.
+      server_url: The URL to the Swarm server so that we can set the
+          result_url in the Swarm file we upload to the machines.
+    """
+    logging.info('TRM._ExecuteTestRunnerOnIdleMachine '
+                 'runner=%s config=%s instance=%d num_instances=%d machine=%d',
+                 runner.GetName(), runner.config_name,
+                 runner.config_instance_index, runner.num_config_instances,
+                 idle_machine.id)
+    config = runner.GetConfiguration()
+    assert runner.config_instance_index < runner.num_config_instances
+    assert (runner.num_config_instances >= config.min_instances and
+            runner.num_config_instances <= config.max_instances)
+
+    runner.machine_id = idle_machine.id
+    # TODO(user): make the next two lines atomic?  If we crash in the
+    # middle, the data store will be inconsistent, although this will be
+    # checked for and corrected then next time the test manager starts up.
+    runner.put()
+    idle_machine.delete()
+    self._ExecuteTestRunner(runner, server_url)
+
+  def _ExecuteTestRunner(self, runner, server_url):
+    """Execute a given runner on it's assigned machine.
+
+    Args:
+      runner: A TestRunner object to execute.
+      server_url: The URL to the Swarm server so that we can set the
+          result_url in the Swarm file we upload to the machines.
+    """
+
+    # TODO(user): At the moment, we only run a single instance of the server
+    # and thus everything is serialized. So for now, there is no contention with
+    # concurrent requests. But eventually we may want to have multiple schedule
+    # tasks or tasks queues doing the assignments, in which case this would
+    # become an issue.
+    assert runner.started is None
+    runner.started = datetime.datetime.now()
+    runner.put()
+
+    # TODO(user): many of the path names below assume Windows syntax.  Will
+    # need to generalize this when we want to support other platforms.
+    info = self._machine_manager.GetMachineInfo(runner.machine_id)
+    test_run = self._BuildTestRun(runner, server_url)
+
+    # We need to run the local_test_runner script from the remote root because
+    # we can't easily set the python path of the remote machine, so we make sure
+    # the root is in the python path by running the script from there.
+    root = os.path.join(os.path.dirname(__file__), '..')
+    local_script = os.path.join(root, _TEST_RUNNER_DIR, _TEST_RUNNER_SCRIPT)
+    file_pairs_to_upload = [(local_script, _TEST_RUNNER_SCRIPT)]
+
+    downloader_file = os.path.join(_TEST_RUNNER_DIR, 'downloader.py')
+    trm_file = os.path.join(_COMMON_DIR, 'test_request_message.py')
+    test_runner_init = os.path.join(_TEST_RUNNER_DIR, '__init__.py')
+    common_init = os.path.join(_COMMON_DIR, '__init__.py')
+
+    files = [downloader_file, trm_file, test_runner_init, common_init]
+    file_pairs_to_upload.extend((os.path.join(root, file), file)
+                                for file in files)
+    command_to_execute = [r'c:\python26\python.exe',
+                          r'%s\%s' % (test_run.working_dir,
+                                      _TEST_RUNNER_SCRIPT),
+                          '-f', r'%s\%s' % (test_run.working_dir,
+                                            _TEST_RUN_SWARM_FILE_NAME)]
+    commands_to_execute = [command_to_execute]
+
+    test_case = runner.test_request.GetTestCase()
+    if test_case.verbose:
+      command_to_execute.append('-v')
+    if test_case.admin:
+      port = 7400
+    else:
+      port = 7399
+
+    test_runner = remote_test_runner.RemoteTestRunner(
+        server_url='http://%s:%d' % (info.host, port),
+        remote_root=test_run.working_dir,
+        text_to_upload=[(_TEST_RUN_SWARM_FILE_NAME, str(test_run))],
+        file_pairs_to_upload=file_pairs_to_upload,
+        commands_to_execute=commands_to_execute)
+
+    succeeded = test_runner.UploadFiles()
+    if succeeded:
+      run_results = test_runner.RunCommands()
+      logging.info('RunCommands returned: %s', run_results)
+      if run_results:
+        assert len(run_results) == len(commands_to_execute)
+        for result in run_results:
+          if result == -1:
+            logging.error('Failed to run all commands.')
+            succeeded = False
+            break
+      else:
+        succeeded = False
+    else:
+      logging.error('Failed to upload files.')
+
+    if not succeeded:
+      self._UpdateTestResult(runner,
+                             result_string=('Tests aborted. Upload to the '
+                                            'remote server failed.'))
+
+  def _BuildTestRun(self, runner, server_url):
+    """Build a Test Run message for the remote test script.
+
+    Args:
+      runner: A TestRunner object for this test run.
+      server_url: The URL to the Swarm server so that we can set the
+          result_url in the Swarm file we upload to the machines.
+
+
+    Raises:
+      test_request_message.Error: If the request's message isn't valid.
+
+    Returns:
+      A Test Run message for the remote test script.
+    """
+    test_request = runner.test_request.GetTestCase()
+    config = runner.GetConfiguration()
+    test_run = test_request_message.TestRun(
+        test_run_name=test_request.test_case_name,
+        env_vars=test_request.env_vars,
+        configuration=config,
+        result_url=('%s/result?k=%s' % (server_url, str(runner.key()))),
+        data=(test_request.data + test_request.binaries +
+              config.data + config.binaries),
+        tests=test_request.tests + config.tests,
+        working_dir=test_request.working_dir)
+    test_run.ExpandVariables({
+        'instance_index': runner.config_instance_index,
+        'num_instances': runner.num_config_instances,
+    })
+    return test_run
+
+  def AssignPendingRequests(self, server_url):
+    """Assign test requests to available machines.
+
+    Args:
+      server_url: The URL to the Swarm server so that we can set the
+          result_url in the Swarm file we upload to the machines.
+
+    Raises:
+      test_request_message.Error: If the request's message isn't valid.
+    """
+    logging.info('TRM.AssignPendingRequests')
+
+    # Assign test runners from earliest to latest.
+    # We use a format argument for None, because putting None in the string
+    # doesn't work.
+    query = TestRunner.gql('WHERE started = :1 ORDER BY created', None)
+    for runner in query:
+      if runner.machine_id:
+        # TODO(user): I would like to filter this in the query above, but it
+        # asks me to use the != property, i.e., machine_id to be used for ORDER.
+        if runner.machine_id != -1:
+          # We already have a machine for this test run, so check if it's
+          # ready to execute.
+          info = self._machine_manager.GetMachineInfo(runner.machine_id)
+          if info and info.status == base_machine_provider.MachineStatus.READY:
+            self._ExecuteTestRunner(runner, server_url)
+      else:
+        machine = self._FindMatchingIdleMachine(runner)
+        if machine:
+          logging.info('Found machine id=%d to runner=%s',
+                       machine.id, runner.GetName())
+          self._ExecuteTestRunnerOnIdleMachine(runner, machine, server_url)
+        else:
+          # If we didn't already have a machine for this test and we couldn't
+          # get an idle one, make sure we will eventually have one available.
+          self._EnsureMachineAvailable(runner)
+
+  def _GetCurrentTime(self):
+    """Gets the current time.
+
+    This function is defined so that it can be mocked out in tests.
+
+    Returns:
+      The current time as a datetime.datetime object.
+    """
+    return datetime.datetime.now()
+
+  def AbortStaleRunners(self):
+    """Abort any runners that have been running longer than expected."""
+    logging.info('TRM.AbortStaleRunners starting')
+    now = self._GetCurrentTime()
+
+    query = TestRunner.gql('WHERE machine_id > 0')
+    for runner in query:
+      # Determine how long the runner should have taken.
+      runner_timeout = runner.GetTimeout() + _TIMEOUT_FUDGE_FACTOR
+
+      # Determine if too much time has expired since the runner began.
+      delta = datetime.timedelta(seconds=runner_timeout)
+      if runner.started and now > runner.started + delta:
+        # Runner has been going for too long, abort it.
+        logging.info('TRM.AbortStaleRunners aborting runner=%s',
+                     runner.GetName())
+        self.AbortRunner(runner, reason='Runner has become stale.')
+
+    logging.info('TRM.AbortStaleRunners done')
+
+  def AbortRunner(self, runner, reason='Not specified.'):
+    """Abort the given test runner.
+
+    Args:
+      runner: An instance of TestRunner to be aborted.
+      reason: A string message indicating why the TestRunner is being aborted.
+    """
+    machine_id = runner.machine_id
+    r_str = 'Tests aborted. AbortRunner() called. Reason: %s' % reason
+    self._UpdateTestResult(runner, result_string=r_str)
+
+    # Consider the runner's machine dead.  Release it.
+    if machine_id > 0:
+      self._machine_manager.ReleaseMachine(machine_id)

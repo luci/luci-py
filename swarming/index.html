@@ -1,0 +1,104 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html>
+<head>
+<title>Test Request Server</title>
+<style type="text/css">
+th {
+  color: #fff;
+  background-color: #000;
+  padding-left: 1em;
+  padding-right: 1em;
+}
+
+td {
+  padding-left: 1em;
+  padding-right: 1em;
+}
+
+.request {
+  border-top-style: solid;
+  border-top-color: black;
+  border-top-width: 1px;
+  border-bottom-style: solid;
+  border-bottom-color: black;
+  border-bottom-width: 1px;
+}
+
+.even {
+}
+
+.odd {
+  background-color: #eeeeee;
+}
+
+.failed_test {
+  background-color: #ffdddd;
+}
+
+table {
+  border: 1;
+  border-color: black;
+  border-collapse: collapse;
+}
+</style>
+</head>
+<body>
+
+<div style="text-align: right;"><p>{{topbar}}</p></div>
+
+<h1>Acquired Machines</h1>
+<table id="machine-table"
+    summary="This table lists Hive machine acquired by the TRS">
+<tr>
+<th>ID</th>
+<th>Status</th>
+<th>Action</th>
+<th>Host</th>
+<th>VNC Password</th>
+<th>Dimensions</th>
+</tr>
+{% for machine in machines %}
+<tr class="request {% cycle even,odd %}">
+<td><a name="machine_{{machine.id}}">{{machine.id}}</a></td>
+<td>{{machine.status_name}}</td>
+<td>{{machine.action_name}}</td>
+<td>{{machine.host}}</td>
+<td>{{machine.vnc_password}}</td>
+<td>{{machine.dimensions}}</td>
+</tr>
+{% endfor %}
+</table>
+
+<h1>Test Requests</h1>
+<table id="request-table" summary="This table lists all test requests">
+<tr>
+<th>Name</th>
+<th>Status</th>
+<th>Requested (UTC)</th>
+<th>Started (UTC)</th>
+<th>Ended (UTC)</th>
+<th>&nbsp;</th>
+</tr>
+{% for runner in runners %}
+<tr class="request {% cycle even,odd %} {{ runner.failed_test_class_string }}">
+<td><a name="runner_{{runner.key_string}}"><a title="Click to see full message"
+    href="show_message?r={{runner.key_string}}">{{runner.name_string}}</a></a>
+</td>
+<td>{{runner.status_string}}</td>
+<td>{{runner.requested_on_string}}</td>
+<td>{{runner.started_string}}</td>
+<td>{{runner.ended_string}}</td>
+<td>{{runner.command_string}}</td>
+</tr>
+{% endfor %}
+</table>
+<p>{{ enable_success_message }}</p>
+
+<div style="float: left;"><p> 
+  <a target="_blank" href="http://code.google.com/appengine/"><img border="0"
+   src="http://code.google.com/appengine/images/appengine-noborder-120x30.gif"
+   alt="Powered by Google App Engine" /></a></p>
+</p></div>
+
+</body>
+</html>
