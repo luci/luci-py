@@ -29,7 +29,7 @@ class SwarmGeneratorTest(unittest.TestCase):
       self.data_files_to_zip = []
       self.other_local_data_files = []
       self.other_data_file_urls = []
-      self.config_names = dimensions.HIVE_DIMENSIONS.keys()
+      self.config_names = dimensions.DIMENSIONS.keys()
 
       class Options(object):
         pass
@@ -157,7 +157,7 @@ class SwarmGeneratorTest(unittest.TestCase):
         self.temp_file_name)
     # If we don't specify any files to zip, this should return None.
     self.assertEqual(None,
-                     self.derived_swarm_generator.CreateAndUploadZipFile(None))
+                     self.derived_swarm_generator.CreateAndUploadZipFile())
 
     # Now give it something to chew on...
     temp_file_name = os.path.basename(self.temp_file_name)
@@ -166,14 +166,14 @@ class SwarmGeneratorTest(unittest.TestCase):
     # An invalid unc path should convert the os.error into an IOError.
     self.derived_swarm_generator.options.unc_base_path = self.invalid_path_value
     self.assertRaises(IOError,
-                      self.derived_swarm_generator.CreateAndUploadZipFile, None)
+                      self.derived_swarm_generator.CreateAndUploadZipFile)
 
     # Now, specify a valid folder for the zip destination.
     # We can't use the temp folder since it is used to copy the zip file from.
     unc_base_path = tempfile.mkdtemp()
     self.derived_swarm_generator.options.unc_base_path = unc_base_path
 
-    zip_file_name = self.derived_swarm_generator.CreateAndUploadZipFile(None)
+    zip_file_name = self.derived_swarm_generator.CreateAndUploadZipFile()
     self.assertNotEqual(None, zip_file_name)
 
     zip_file = zipfile.ZipFile(os.path.join(unc_base_path, zip_file_name))
@@ -218,7 +218,7 @@ class SwarmGeneratorTest(unittest.TestCase):
   def testCreateTestRequest(self):
     # Most basic test_run case.
     self.derived_swarm_generator.options.single_config = True
-    config_names = dimensions.HIVE_DIMENSIONS.keys()
+    config_names = dimensions.DIMENSIONS.keys()
     self.derived_swarm_generator.options.config = [config_names[0]]
     self.assertEqual(
         {'test_run_name': self.derived_swarm_generator.default_test_name,
@@ -228,7 +228,7 @@ class SwarmGeneratorTest(unittest.TestCase):
          'failure_email': None,
          'configuration': {
              'config_name': config_names[0],
-             'dimensions': dimensions.HIVE_DIMENSIONS[config_names[0]]},
+             'dimensions': dimensions.DIMENSIONS[config_names[0]]},
          'virgin': False,
          'verbose': False},
         self.derived_swarm_generator.CreateTestRequest([0]))
@@ -245,7 +245,7 @@ class SwarmGeneratorTest(unittest.TestCase):
          'failure_email': None,
          'configuration': {
              'config_name': config_names[3],
-             'dimensions': dimensions.HIVE_DIMENSIONS[config_names[3]]},
+             'dimensions': dimensions.DIMENSIONS[config_names[3]]},
          'virgin': False,
          'verbose': False},
         self.derived_swarm_generator.CreateTestRequest([7]))
@@ -268,9 +268,9 @@ class SwarmGeneratorTest(unittest.TestCase):
          'failure_email': None,
          'configurations': [
              {'config_name': config_names[1],
-              'dimensions': dimensions.HIVE_DIMENSIONS[config_names[1]]},
+              'dimensions': dimensions.DIMENSIONS[config_names[1]]},
              {'config_name': config_names[2],
-              'dimensions': dimensions.HIVE_DIMENSIONS[config_names[2]]}],
+              'dimensions': dimensions.DIMENSIONS[config_names[2]]}],
          'virgin': False,
          'verbose': False},
         self.derived_swarm_generator.CreateTestRequest(self.valid_test_array))
@@ -285,7 +285,7 @@ class SwarmGeneratorTest(unittest.TestCase):
          'failure_email': None,
          'configurations': [{
              'config_name': config_names[0],
-             'dimensions': dimensions.HIVE_DIMENSIONS[config_names[0]]}],
+             'dimensions': dimensions.DIMENSIONS[config_names[0]]}],
          'virgin': False,
          'verbose': False},
         self.derived_swarm_generator.CreateTestRequest(
