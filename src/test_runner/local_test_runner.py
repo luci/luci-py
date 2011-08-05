@@ -1,4 +1,4 @@
-#!/usr/bin/python2.4
+#!/usr/bin/python2.5
 #
 # Copyright 2011 Google Inc. All Rights Reserved.
 
@@ -44,17 +44,13 @@ Some tests may identify that they don't want their output to be decorated since
 they already follow the gtest format.
 
 Running this file from the command line, you must specify the request file name
-using the -f or --request_file_name command line argument. You can also specify
-the path to the executable to use to unzip the downloaded data files with the
--z or --unzipper command line argument. If the unzipper isn't specified, the
-default is c:\7zip\7z.exe.
+using the -f or --request_file_name command line argument.
 
 You can also import this file as a module and use the LocalTestRunner class
 on its own. You must initialize it with a valid request file name (otherwise it
-will raise an Error exception) and potentially set the unzipper to use. After
-that, you can simply ask it to download and exploded the data specified in
-the test format file and then execute the commands, also found within the
-test request file.
+will raise an Error exception). After that, you can simply ask it to download
+and exploded the data specified in the test format file and then execute the
+commands, also found within the test request file.
 
 Since the most common usage of this file is to upload it on a remote server to
 execute tests on a given configuration, we try to minimize its dependencies on
@@ -89,6 +85,7 @@ import time
 import urllib
 import urllib2
 import urlparse
+import zipfile
 
 
 # We need this so that we can run this script when we upload it to a VM.
@@ -125,13 +122,11 @@ class LocalTestRunner(object):
   _SUCCESS_STRING = [' FAILED ',
                      '      OK']
 
-  def __init__(self, request_file_name, unzipper=r'c:\7zip\7z.exe',
-               verbose=False, data_folder_name=None):
-    """Inits LocalTestRunner with a request file and optional unzipper path.
+  def __init__(self, request_file_name, verbose=False, data_folder_name=None):
+    """Inits LocalTestRunner with a request file.
 
     Args:
       request_file_name: The path to the file containing the request.
-      unzipper: The path to the executable to use to unzip.
       verbose: True to get INFO level logging, False to get ERROR level.
       data_folder_name: The name of an optional subfolder where to explode the
           downloaded zip data so that they can be cleaned by the 'data' option
@@ -163,8 +158,6 @@ class LocalTestRunner(object):
 
     if not self._ParseRequestFile(request_file_name):
       raise Error('Invalid Request File: %s' % request_file_name)
-    self.unzipper = None
-    self.SetUnzipper(unzipper)
 
     if not data_folder_name and self.test_run.cleanup == 'data':
       raise Error('You must specify a data folder name if you want to cleanup '
@@ -363,28 +356,12 @@ class LocalTestRunner(object):
     logging.error(error_string)
     return (1, error_string)
 
-  def SetUnzipper(self, unzipper):
-    """Specify the path to use for the unzipper application.
-
-    The data member is only set if the argument is a valid absolute path to an
-    existing file.
-
-    Args:
-      unzipper: The full path to the executable to use to unzip files.
-    """
-    if path.exists(unzipper) and path.isabs(unzipper):
-      self.unzipper = unzipper
-
   def DownloadAndExplodeData(self):
     """Download and explode the zip files enumerated in the test run data.
 
     Returns:
       True if we succeeded, False otherwise.
     """
-    if self.test_run.data and not self.unzipper:
-      logging.error('Can\'t explode data without a valid unzipper!')
-      return False
-
     logging.info('Test case: %s starting to download data',
                  self.test_run.test_run_name)
     for data_url in self.test_run.data:
@@ -398,18 +375,22 @@ class LocalTestRunner(object):
                           'Exception: %s', data_url, e)
         return False
 
-      logging.info('Exploding: %s with %s', local_file, self.unzipper)
-      (exit_code, stdout_string) = self._RunCommand([self.unzipper, 'x',
-                                                     local_file, '-aoa'], 0)
+      zip_file = None
+      try:
+        zip_file = zipfile.ZipFile(local_file)
+        zip_file.extractall(self.data_dir)
+      except (zipfile.error, IOError, RuntimeError), e:
+        logging.exception('Failed to unzip %s\nException: %s', local_file, e)
+        return False
+      if zip_file:
+        zip_file.close()
+
       if self.test_run.cleanup == 'zip':  # Implied by cleanup data.
         try:
           os.remove(local_file)
         except OSError, e:
           logging.exception('Couldn\'t remove %s.\nException: %s',
                             local_file, e)
-      if exit_code:  # 0 is SUCCESS
-        logging.error('Explode error %d: %s', exit_code, stdout_string)
-        return False
     return True
 
   def RunTests(self):
@@ -570,8 +551,6 @@ def main():
                     help='The name of a subfolder to create in the directory '
                     'containing the test runner to use for setting up and '
                     'running the tests. Defaults to None.')
-  parser.add_option('-z', '--unzipper', dest='unzipper',
-                    help='The absolute path to the program to use to unzip.')
   parser.add_option('-v', '--verbose', action='store_true',
                     help='Set logging level to INFO. Optional. Defaults to '
                     'ERROR level.', default=False)
@@ -592,8 +571,6 @@ def main():
     return 1
 
   try:
-    if options.unzipper:
-      runner.SetUnzipper(options.unzipper)
     if runner.DownloadAndExplodeData():
       (success, result_string) = runner.RunTests()
       if result_string:
