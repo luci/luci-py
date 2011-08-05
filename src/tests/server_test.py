@@ -226,12 +226,12 @@ class _SwarmTestProgram(unittest.TestProgram):
     parser.add_option('-o', '--swarm_server_start_timeout',
                       dest='swarm_server_start_timeout', type=int,
                       help='How long should we wait (in seconds) for the '
-                      'Swarm server to start? Defaults to 60 seconds.')
+                      'Swarm server to start? Defaults to 90 seconds.')
     parser.add_option('-v', '--verbose', action='store_true',
                       help='Set logging level to INFO. Optional. Defaults to '
                       'ERROR level.')
     parser.set_default('swarm_path', '..')
-    parser.set_default('swarm_server_start_timeout', 60)
+    parser.set_default('swarm_server_start_timeout', 90)
     parser.set_default('tests_path', 'test_files')
 
     (_SwarmTestProgram.options, other_args) = parser.parse_args(args=argv[1:])

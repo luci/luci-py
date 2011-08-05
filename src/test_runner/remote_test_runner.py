@@ -20,7 +20,7 @@ class RemoteTestRunner(object):
   server.
   """
 
-  def __init__(self, server_url='', remote_root=r'c:\swarm_tests',
+  def __init__(self, server_url='', remote_root=r'swarm_tests',
                text_to_upload=None, file_pairs_to_upload=None,
                commands_to_execute=None):
     """Inits RemoteTestRunner with a a set of attributes."""
@@ -267,7 +267,7 @@ class RemoteTestRunner(object):
     """Sets the array of text to upload tuple.
 
     A text to upload tuple consist of a remote file path and the text to fill
-    it with. E.g., ('folder\hello.txt', 'Hello World! Wherever you are...').
+    it with. E.g., ('folder/hello.txt', 'Hello World! Wherever you are...').
 
     Args:
       text_to_upload: An array of text to upload tuple.
@@ -326,6 +326,27 @@ class RemoteTestRunner(object):
       return
     self._remote_root = remote_root
 
+  def RemotePython26Path(self):
+    """Returns the path of python2.6 on the remote machine.
+
+    Currently only tries /python26, and it it's there, will return
+    /python26/python, and if it's not there, simply returns python, hoping
+    that the python executable on the path is python 2.6.
+
+    TODO(user): Validate that the python executable on the path is indeed 2.6
+    by executing python --version using start and capture output.
+
+    Returns:
+      A string containing the path to the python 2.6 executable.
+    """
+    if not self._EnsureValidServer():
+      return False
+
+    if self._xml_rpc_server.exists(r'/python26'):
+      return r'/python26/python'
+    else:
+      return 'python'
+
   def _EnsureRemoteFolderCreated(self, remote_folder):
     try:
       if not self._xml_rpc_server.exists(remote_folder):
@@ -347,7 +368,7 @@ class RemoteTestRunner(object):
     Returns:
       True on success, False otherwise.
     """
-    last_sep = remote_path.replace('/', '\\').rfind('\\')
+    last_sep = remote_path.replace('\\', '/').rfind('/')
     if last_sep is not -1:
       self._EnsureRemoteFolderCreated(remote_path[:last_sep])
     try:
@@ -359,7 +380,7 @@ class RemoteTestRunner(object):
       return False
 
     def NormalizedPath(path):
-      return os.path.normpath(path).replace('/', '\\').replace('\\\\', '\\')
+      return os.path.normpath(path).replace('\\\\', '\\').replace('\\', '/')
 
     if NormalizedPath(result_path) != NormalizedPath(remote_path):
       logging.error('upload returned "%s" instead of "%s"', result_path,
@@ -469,7 +490,7 @@ def main():
                     help='The URL to the xml rpc server.')
   parser.add_option('-r', '--remote_root', dest='remote_root',
                     help='The optional remote folder root.\nDefaults to '
-                    r'c:\swarm_tests.')
+                    r'swarm_tests.')
   parser.add_option('-f', '--file_pairs_to_upload', dest='file_pairs_to_upload',
                     help='An optional ; separated list of relative paths '
                     'to files to upload. To use different paths for the local '

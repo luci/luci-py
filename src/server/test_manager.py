@@ -718,11 +718,18 @@ class TestRequestManager(object):
     assert runner.started is None
     runner.started = datetime.datetime.now()
     runner.put()
-
-    # TODO(user): many of the path names below assume Windows syntax.  Will
-    # need to generalize this when we want to support other platforms.
     info = self._machine_manager.GetMachineInfo(runner.machine_id)
-    test_run = self._BuildTestRun(runner, server_url)
+
+    test_case = runner.test_request.GetTestCase()
+    if test_case.admin:
+      port = 7400
+    else:
+      port = 7399
+
+    remote_runner = remote_test_runner.RemoteTestRunner(
+        server_url='http://%s:%d' % (info.host, port))
+
+    remote_python26_path = remote_runner.RemotePython26Path()
 
     # We need to run the local_test_runner script from the remote root because
     # we can't easily set the python path of the remote machine, so we make sure
@@ -739,31 +746,25 @@ class TestRequestManager(object):
     files = [downloader_file, trm_file, test_runner_init, common_init]
     file_pairs_to_upload.extend((os.path.join(root, file), file)
                                 for file in files)
-    command_to_execute = [r'c:\python26\python.exe',
-                          r'%s\%s' % (test_run.working_dir,
-                                      _TEST_RUNNER_SCRIPT),
-                          '-f', r'%s\%s' % (test_run.working_dir,
-                                            _TEST_RUN_SWARM_FILE_NAME)]
-    commands_to_execute = [command_to_execute]
 
-    test_case = runner.test_request.GetTestCase()
+    test_run = self._BuildTestRun(runner, server_url)
+    command_to_execute = [remote_python26_path,
+                          r'%s/%s' % (test_run.working_dir,
+                                      _TEST_RUNNER_SCRIPT),
+                          '-f', r'%s/%s' % (test_run.working_dir,
+                                            _TEST_RUN_SWARM_FILE_NAME)]
     if test_case.verbose:
       command_to_execute.append('-v')
-    if test_case.admin:
-      port = 7400
-    else:
-      port = 7399
+    commands_to_execute = [command_to_execute]
 
-    test_runner = remote_test_runner.RemoteTestRunner(
-        server_url='http://%s:%d' % (info.host, port),
-        remote_root=test_run.working_dir,
-        text_to_upload=[(_TEST_RUN_SWARM_FILE_NAME, str(test_run))],
-        file_pairs_to_upload=file_pairs_to_upload,
-        commands_to_execute=commands_to_execute)
-
-    succeeded = test_runner.UploadFiles()
+    # TODO(user): Find a way to make the working dir platform independent.
+    remote_runner.SetRemoteRoot(test_run.working_dir)
+    remote_runner.SetTextToUpload([(_TEST_RUN_SWARM_FILE_NAME, str(test_run))])
+    remote_runner.SetFilePairsToUpload(file_pairs_to_upload)
+    remote_runner.SetCommandsToExecute(commands_to_execute)
+    succeeded = remote_runner.UploadFiles()
     if succeeded:
-      run_results = test_runner.RunCommands()
+      run_results = remote_runner.RunCommands()
       logging.info('RunCommands returned: %s', run_results)
       if run_results:
         assert len(run_results) == len(commands_to_execute)
@@ -789,7 +790,6 @@ class TestRequestManager(object):
       runner: A TestRunner object for this test run.
       server_url: The URL to the Swarm server so that we can set the
           result_url in the Swarm file we upload to the machines.
-
 
     Raises:
       test_request_message.Error: If the request's message isn't valid.

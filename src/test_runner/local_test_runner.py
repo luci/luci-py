@@ -1,4 +1,4 @@
-#!/usr/bin/python2.5
+#!/usr/bin/python2.6
 #
 # Copyright 2011 Google Inc. All Rights Reserved.
 
@@ -249,15 +249,14 @@ class LocalTestRunner(object):
     Returns:
       True if the parsed request file was validated, False othewise.
     """
+    request_file = None
     try:
-      request_file = None
-      try:
-        request_file = open(request_file_name, 'r')
-        request_data = request_file.read()
-      except IOError, e:
-        logging.exception('Failed to open file %s.\nException: %s',
-                          request_file_name, e)
-        return False
+      request_file = open(request_file_name, 'r')
+      request_data = request_file.read()
+    except IOError, e:
+      logging.exception('Failed to open file %s.\nException: %s',
+                        request_file_name, e)
+      return False
     finally:
       if request_file:
         request_file.close()
@@ -332,13 +331,12 @@ class LocalTestRunner(object):
 
       if exit_code is not None:
         try:
-          try:
-            stdout.seek(0)
-            stdout_string = stdout.read()
-          except IOError, e:
-            logging.exception('Reading output of execution of %s raised '
-                              'exception: %s.', parsed_command, e)
-            return (1, e)
+          stdout.seek(0)
+          stdout_string = stdout.read()
+        except IOError, e:
+          logging.exception('Reading output of execution of %s raised '
+                            'exception: %s.', parsed_command, e)
+          return (1, e)
         finally:
           stdout.close()
 
@@ -507,15 +505,14 @@ class LocalTestRunner(object):
         return False
     elif result_url_parts[0] == 'file':
       file_path = '%s%s' % (result_url_parts[1], result_url_parts[2])
+      output_file = None
       try:
-        output_file = None
-        try:
-          output_file = open(file_path, 'w')
-          output_file.write(result_string)
-        except IOError, e:
-          logging.exception('Can\'t write result to file %s.\nException: %s',
-                            file_path, e)
-          return False
+        output_file = open(file_path, 'w')
+        output_file.write(result_string)
+      except IOError, e:
+        logging.exception('Can\'t write result to file %s.\nException: %s',
+                          file_path, e)
+        return False
       finally:
         if output_file:
           output_file.close()
