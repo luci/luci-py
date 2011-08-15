@@ -490,11 +490,11 @@ class TestConfiguration(TestRequestMessageBase):
     binaries: An optional binaries list for this configuration.
     tests: An optional tests list for this configuration.
     min_instances: An optional integer specifying the minimum number of
-                   instances of this configuration we want. Defaults to 1.
-                   Must be greater than 0.
+        instances of this configuration we want. Defaults to 1.
+        Must be greater than 0.
     max_instances: An optional integer specifying the maximum number of
-                   instances of this configuration we want. Defaults to
-                   min_instances. Must be greater or equal to min_instances.
+        instances of this configuration we want. Defaults to min_instances.
+        Must be greater or equal to min_instances.
     dimensions: A dictionary of strings or list of strings for dimensions.
   """
 
@@ -602,7 +602,11 @@ class TestCase(TestRequestMessageBase):
     virgin: An optional boolean value that specifies if the tests must be run on
         virgin machines or not.
     tests: An optional tests list for this test case.
-    result_url: The URL where to post the results of this test case.
+    result_url: An optional URL where to post the results of this test case.
+    output_destination: An optional dictionary with a URL where to post the
+        output of this test case as well as the size of the chunks to use.
+        The key for the URL is 'url' and the value must be a valid URL string.
+        The key for the chunk size is 'size' and must be an int.
     failure_email: An optional email where to broadcast failures for this test
         case.
     verbose: An optional boolean value that specifies if logging should be
@@ -611,8 +615,8 @@ class TestCase(TestRequestMessageBase):
 
   def __init__(self, test_case_name=None, env_vars=None, configurations=None,
                data=None, binaries=None, working_dir=None, admin=False,
-               virgin=False, tests=None, result_url=None, failure_email=None,
-               verbose=False):
+               virgin=False, tests=None, result_url=None,
+               output_destination=None, failure_email=None, verbose=False):
     super(TestCase, self).__init__()
     self.test_case_name = test_case_name
     self.env_vars = env_vars
@@ -639,6 +643,7 @@ class TestCase(TestRequestMessageBase):
     else:
       self.tests = []
     self.result_url = result_url
+    self.output_destination = output_destination
     self.failure_email = failure_email
     self.verbose = verbose
 
@@ -662,6 +667,8 @@ class TestCase(TestRequestMessageBase):
         not self.AreValidObjectLists(['tests'], TestObject,
                                      unique_value_keys=['test_name'],
                                      errors=errors) or
+        not self.AreValidDicts(['output_destination'], str, (str, int),
+                               errors=errors) or
         not self.AreValidValues(['working_dir', 'failure_email', 'result_url'],
                                 str, errors=errors) or
         (self.result_url and not self.AreValidUrls(['result_url'], errors))):
@@ -712,15 +719,26 @@ class TestRun(TestRequestMessageBase):
         path. Defaults to c:\swarm_tests.
         TODO(user): Also support other platforms.
     tests: An optional tests list for this test run.
-    result_url: The key to access the URL where to post the results of
-        the test run.
+    instance_index: An optional integer specifying the zero based index of this
+        test run instance of the given configuration. Defaults to None.
+        Must be specified if num_instances is specified.
+    num_instances: An optional integer specifying the number of test run
+        instances of this configuration that have been shared. Defaults to None.
+        Must be greater than instance_index.
+        Must be specified if instance_index is specified.
+    result_url: An optional URL where to post the results of this test run.
+    output_destination: An optional dictionary with a URL where to post the
+        output of this test case as well as the size of the chunks to use.
+        The key for the URL is 'url' and the value must be a valid URL string.
+        The key for the chunk size is 'size' and must be an int.
     cleanup: The key to access the test run's cleanup string.
   """
   VALID_CLEANUP_VALUES = [None, '', 'zip', 'data', 'root']
 
   def __init__(self, test_run_name=None, env_vars=None,
                configuration=TestConfiguration(), data=None, working_dir=None,
-               tests=None, result_url=None, cleanup=None):
+               tests=None, instance_index=None, num_instances=None,
+               result_url=None, output_destination=None, cleanup=None):
     super(TestRun, self).__init__()
     self.test_run_name = test_run_name
     self.env_vars = env_vars
@@ -737,7 +755,10 @@ class TestRun(TestRequestMessageBase):
       self.tests = tests
     else:
       self.tests = []
+    self.instance_index = instance_index
+    self.num_instances = num_instances
     self.result_url = result_url
+    self.output_destination = output_destination
     self.cleanup = cleanup
 
   def IsValid(self, errors=None):
@@ -759,10 +780,18 @@ class TestRun(TestRequestMessageBase):
         not self.AreValidObjectLists(['tests'], TestObject,
                                      unique_value_keys=['test_name'],
                                      errors=errors) or
+        not self.AreValidDicts(['output_destination'], str, (str, int, float),
+                               errors=errors) or
         not self.AreValidValues(['working_dir', 'result_url'], str,
                                 errors=errors) or
         (self.result_url and not self.AreValidUrls(['result_url'], errors)) or
-        self.cleanup not in TestRun.VALID_CLEANUP_VALUES):
+        self.cleanup not in TestRun.VALID_CLEANUP_VALUES or
+        not self.AreValidValues(['instance_index', 'num_instances'], int,
+                                errors=errors) or
+        (self.instance_index is not None and self.num_instances is None) or
+        (self.num_instances is not None and self.instance_index is None) or
+        (self.num_instances is not None and
+         self.instance_index >= self.num_instances)):  # zero based index.
       self.LogError('Invalid TestRun: %s' % self.__dict__, errors)
       return False
 

@@ -118,9 +118,12 @@ class LocalTestRunner(object):
   # A cached regular expresion used to find environment variables.
   _ENV_VAR_RE = re.compile(r'%(\S+)%')
 
-  # An array to properly index based on not exit_code.
-  _SUCCESS_STRING = [' FAILED ',
-                     '      OK']
+  # An array to properly index the success/failure decorated text based on
+  # "not exit_code".
+  _SUCCESS_DISPLAY_STRING = [' FAILED ', '      OK']
+
+  # An array to properly index the pending/success/failure CGI strings.
+  _SUCCESS_CGI_STRING = ['success', 'failure', 'pending']
 
   def __init__(self, request_file_name, verbose=False, data_folder_name=None):
     """Inits LocalTestRunner with a request file.
@@ -272,6 +275,32 @@ class LocalTestRunner(object):
       return False
     return True
 
+  def _PostOutput(self, upload_url, output, result):
+    """Posts incremental output.
+
+    Args:
+      upload_url: Where to post the output.
+      output: the output to be posted.
+      result: the value of the CGI param 'r' which should be from the
+          self._SUCCESS_CGI_STRING array.
+    """
+    try:
+      data = {'n': self.test_run.test_run_name,
+              'c': self.test_run.configuration.config_name,
+              'r': output, 's': result}
+      if (hasattr(self.test_run, 'instance_index') and
+          self.test_run.instance_index is not None):
+        assert hasattr(self.test_run, 'num_instances')
+        assert self.test_run['num_instances'] is not None
+        data['i'] = self.test_run.instance_index
+        data['m'] = self.test_run.num_instances
+
+      # Simply specifying data to urlopen makes it a POST.
+      urllib2.urlopen(upload_url, urllib.urlencode(data))
+    except (urllib2.URLError, Error), e:  # Error for testing purposes.
+      logging.exception('Can\'t post result to url %s.\nException: %s',
+                        upload_url, e)
+
   def _RunCommand(self, command, time_out, env=None):
     """Runs the given command.
 
@@ -290,7 +319,17 @@ class LocalTestRunner(object):
     """
     assert isinstance(time_out, (int, float))
     parsed_command = [self._ExpandEnv(arg, env) for arg in command]
-    stdout = tempfile.TemporaryFile()
+
+    # Use a temporary file descriptor for the stdout pipe out of Popen so that
+    # we can read that file with another file object and not interfere. Also
+    # avoiding the known deadlock bugs with subprocess default PIPE.
+    (stdout_file_descriptor, stdout_file_name) = tempfile.mkstemp(text=True)
+    stdout_file = open(stdout_file_name)
+
+    def CleanupTempFiles():
+      os.close(stdout_file_descriptor)
+      stdout_file.close()
+      os.remove(stdout_file_name)
 
     # Temporarily change to the specified data directory in order to run
     # the command, then change back afterward.  We cannot use the "cwd"
@@ -302,46 +341,59 @@ class LocalTestRunner(object):
     orig_dir = os.getcwd()
     os.chdir(self.data_dir)
     try:
-      proc = subprocess.Popen(parsed_command, stdout=stdout, env=env,
-                              stderr=subprocess.STDOUT, stdin=subprocess.PIPE)
+      proc = subprocess.Popen(parsed_command, stdout=stdout_file_descriptor,
+                              env=env, bufsize=1, stderr=subprocess.STDOUT,
+                              stdin=subprocess.PIPE)
     except OSError, e:
       logging.exception('Execution of %s raised exception: %s.',
                         parsed_command, e)
+      CleanupTempFiles()
       return (1, e)
     finally:
       os.chdir(orig_dir)
 
     start_time = time.time()
-    previous_seek = 0
+    stdout_string = ''
+    current_chunk_to_upload = ''
+    upload_chunk_size = 0
+    upload_url = None
+    if (self.test_run.output_destination and
+        'url' in self.test_run.output_destination):
+      upload_url = self.test_run.output_destination['url']
+      if 'size' in self.test_run.output_destination:
+        upload_chunk_size = self.test_run.output_destination['size']
     while time_out == 0 or start_time + time_out > time.time():
       try:
         exit_code = proc.poll()
       except OSError, e:
         logging.exception('Polling execution of %s raised exception: %s.',
                           parsed_command, e)
+        CleanupTempFiles()
         return (1, e)
 
-      # Give some local feedback of progress
-      current_seek = stdout.tell()
-      if current_seek != previous_seek:
-        stdout.seek(previous_seek)
-        print stdout.read(current_seek - previous_seek),
-        stdout.seek(current_seek)
-        previous_seek = current_seek
+      current_content = stdout_file.read()
+      stdout_string += current_content
+      # Give some local feedback of progress and potentially upload to
+      # output_destination if any.
+      if current_content:
+        print current_content,
+
+      if upload_url and upload_chunk_size > 0:
+        current_chunk_to_upload += current_content
+        if ((exit_code is not None) or
+            len(current_chunk_to_upload) >= upload_chunk_size):
+          self._PostOutput(upload_url, current_chunk_to_upload,
+                           self._SUCCESS_CGI_STRING[2])
+          current_chunk_to_upload = ''
 
       if exit_code is not None:
-        try:
-          stdout.seek(0)
-          stdout_string = stdout.read()
-        except IOError, e:
-          logging.exception('Reading output of execution of %s raised '
-                            'exception: %s.', parsed_command, e)
-          return (1, e)
-        finally:
-          stdout.close()
+        CleanupTempFiles()
 
         if not stdout_string:
           stdout_string = 'No output!'
+        if upload_url and upload_chunk_size <= 0:
+          self._PostOutput(upload_url, stdout_string,
+                           self._SUCCESS_CGI_STRING[2])
         return (exit_code, stdout_string)
 
       # We sleep a little to give the child process a chance to move forward
@@ -441,7 +493,8 @@ class LocalTestRunner(object):
       if test.decorate_output:
         test_case_timing = time.time() - test_case_start_time
         result_string = ('%s\n[ %s ] %s.%s (%d ms)' %
-                         (result_string, self._SUCCESS_STRING[not exit_code],
+                         (result_string,
+                          self._SUCCESS_DISPLAY_STRING[not exit_code],
                           self.test_run.test_run_name,
                           test.test_name, test_case_timing * 1000))
 
@@ -480,15 +533,21 @@ class LocalTestRunner(object):
             '%s\n\n %d FAILED TESTS\n' % (result_string, num_failures))
 
   def PublishResults(self, success, result_string):
-    """Publish the given result string to the result_url.
+    """Publish the given result string to the result_url if any.
 
     Args:
       success: True if we must specify [?|&]s=true. False otherwise.
       result_string: The result to be published.
 
     Returns:
-      True if we succeeded, False otherwise.
+      True if we succeeded or had nothing to do, False otherwise.
     """
+    if (self.test_run.output_destination and
+        'url' in self.test_run.output_destination):
+      self._PostOutput(self.test_run.output_destination['url'], '',
+                       self._SUCCESS_CGI_STRING[not success])
+    if not self.test_run.result_url:
+      return True
     result_url_parts = urlparse.urlsplit(self.test_run.result_url)
     if result_url_parts[0] == 'http':
       try:

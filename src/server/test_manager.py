@@ -802,8 +802,11 @@ class TestRequestManager(object):
     test_run = test_request_message.TestRun(
         test_run_name=test_request.test_case_name,
         env_vars=test_request.env_vars,
+        instance_index=runner.config_instance_index,
+        num_instances=runner.num_config_instances,
         configuration=config,
         result_url=('%s/result?k=%s' % (server_url, str(runner.key()))),
+        output_destination=test_request.output_destination,
         data=(test_request.data + test_request.binaries +
               config.data + config.binaries),
         tests=test_request.tests + config.tests,

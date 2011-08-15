@@ -276,8 +276,12 @@ class TestHelper(unittest.TestCase):
   VALID_OPTIONAL_URL_VALUES = VALID_URL_VALUES + EXTRA_OPTIONAL_STRING_VALUES
   INVALID_URL_VALUES = ['httpx://a.com', 'shttps://safe.a.com', 'nfile://here',
                         'mailtoo://me@there.com'] + INVALID_STRING_VALUES
-  INVALID_REQUIRED_URL_VALUES = (INVALID_URL_VALUES +
-                                 EXTRA_OPTIONAL_STRING_VALUES)
+
+  VALID_OPTIONAL_OUTPUT_DESTINATION_VALUES = [{}, None, {'a': 'b'}, {'a': 1},
+                                              {'url': 'http://a.b.com',
+                                               'size': 1024}]
+  INVALID_OUTPUT_DESTINATION_VALUES = ['', 1, 'a', [], {'a': ['b']},
+                                       {'a': {1: 2}}, {1: 2}]
 
   INVALID_STRING_LIST_VALUES = [[1], ['str', 1], 1, {}]
   INVALID_REQUIRED_STRING_LIST_VALUES = (INVALID_STRING_LIST_VALUES +
@@ -288,8 +292,10 @@ class TestHelper(unittest.TestCase):
 
   VALID_BOOLEAN_VALUES = [True, False, 1.1, None, '0', [], '']
 
-  VALID_INT_VALUES = [1, 2, 4, 8, 13, 42, 1234567890]
-  INVALID_INT_VALUES = [None, 0, '', 3.14159, [], (1,)]
+  NON_ZERO_VALID_INT_VALUES = [1, 2, 4, 8, 13, 42, 1234567890]
+  VALID_INT_VALUES = NON_ZERO_VALID_INT_VALUES + [0]
+  INVALID_INT_VALUES = [None, '', 3.14159, [], (1,)]
+  NON_ZERO_INVALID_INT_VALUES = INVALID_INT_VALUES + [0]
 
   VALID_ENV_VARS = [{'a': 'b'}, {'a': 'b', '1': 'b'}, {}, None]
   INVALID_ENV_VARS = [{1: 2}, {'a': 'b', 1: 'b'}, {'a': 1},
@@ -385,10 +391,13 @@ class TestConfigurationTest(TestHelper):
                                      [test_object1]])
 
     # We must make sure max will always be greater than or equal to min.
-    self.test_request.max_instances = max(TestHelper.VALID_INT_VALUES)
-    self.AssertValidValues('min_instances', TestHelper.VALID_INT_VALUES)
+    self.test_request.max_instances = max(TestHelper.NON_ZERO_VALID_INT_VALUES)
+    self.AssertValidValues('min_instances',
+                           TestHelper.NON_ZERO_VALID_INT_VALUES)
     self.test_request.min_instances = 1
-    self.AssertValidValues('max_instances', TestHelper.VALID_INT_VALUES)
+    self.AssertValidValues('max_instances',
+                           TestHelper.NON_ZERO_VALID_INT_VALUES)
+
     self.AssertValidValues('env_vars', TestHelper.VALID_ENV_VARS)
 
     for value in TestHelper.VALID_STRING_VALUES:
@@ -425,10 +434,12 @@ class TestConfigurationTest(TestHelper):
                                        [test_object1]])
     self.test_request.tests = []
 
-    self.test_request.max_instances = max(TestHelper.VALID_INT_VALUES)
-    self.AssertInvalidValues('min_instances', TestHelper.INVALID_INT_VALUES)
+    self.test_request.max_instances = max(TestHelper.NON_ZERO_VALID_INT_VALUES)
+    self.AssertInvalidValues('min_instances',
+                             TestHelper.NON_ZERO_INVALID_INT_VALUES)
     self.test_request.min_instances = 1
-    self.AssertInvalidValues('max_instances', TestHelper.INVALID_INT_VALUES)
+    self.AssertInvalidValues('max_instances',
+                             TestHelper.NON_ZERO_INVALID_INT_VALUES)
 
     self.test_request.min_instances = 2
     self.test_request.max_instances = 1
@@ -458,8 +469,7 @@ class TestCaseTest(TestHelper):
     self.test_request = test_request_message.TestCase(
         test_case_name='a',
         configurations=[test_request_message.TestConfiguration(
-            config_name='a', os='a', browser='a', cpu='a')],
-        result_url=TestHelper.VALID_URL_VALUES[0])
+            config_name='a', os='a', browser='a', cpu='a')])
 
   def testIsValid(self):
     # Start with default success.
@@ -496,6 +506,8 @@ class TestCaseTest(TestHelper):
                                               [test_config1]])
 
     self.AssertValidValues('result_url', TestHelper.VALID_OPTIONAL_URL_VALUES)
+    self.AssertValidValues('output_destination',
+                           TestHelper.VALID_OPTIONAL_OUTPUT_DESTINATION_VALUES)
     self.AssertValidValues('failure_email',
                            TestHelper.VALID_OPTIONAL_STRING_VALUES)
     self.AssertValidValues('working_dir',
@@ -531,6 +543,8 @@ class TestCaseTest(TestHelper):
     self.test_request.configurations = []
 
     self.AssertInvalidValues('result_url', TestHelper.INVALID_URL_VALUES)
+    self.AssertInvalidValues('output_destination',
+                             TestHelper.INVALID_OUTPUT_DESTINATION_VALUES)
     self.test_request.result_url = TestHelper.VALID_URL_VALUES[0]
 
     self.AssertInvalidValues('failure_email', TestHelper.INVALID_STRING_VALUES)
@@ -578,12 +592,20 @@ class TestRunTest(TestHelper):
     self.AssertValidValues('tests', [[test_object1, test_object2],
                                      [test_object1]])
 
+    self.test_request.num_instances = max(TestHelper.VALID_INT_VALUES) + 1
+    self.AssertValidValues('instance_index', TestHelper.VALID_INT_VALUES)
+    self.test_request.instance_index = 0
+    self.AssertValidValues('num_instances',
+                           TestHelper.NON_ZERO_VALID_INT_VALUES)
+
     test_config = test_request_message.TestConfiguration(
         config_name='a', os='a', browser='a', cpu='a')
     self.assertTrue(test_config.IsValid())
     self.AssertValidValues('configuration', [test_config])
 
     self.AssertValidValues('result_url', TestHelper.VALID_OPTIONAL_URL_VALUES)
+    self.AssertValidValues('output_destination',
+                           TestHelper.VALID_OPTIONAL_OUTPUT_DESTINATION_VALUES)
     self.AssertValidValues('working_dir',
                            TestHelper.VALID_OPTIONAL_STRING_VALUES)
 
@@ -607,12 +629,31 @@ class TestRunTest(TestHelper):
                                        [test_object1]])
     self.test_request.tests = []
 
+    self.test_request.num_instances = max(TestHelper.VALID_INT_VALUES) + 1
+    self.AssertInvalidValues('instance_index', TestHelper.INVALID_INT_VALUES)
+    self.test_request.instance_index = 0
+    self.AssertInvalidValues('num_instances',
+                             TestHelper.NON_ZERO_INVALID_INT_VALUES)
+
+    self.test_request.instance_index = 2
+    self.test_request.num_instances = 1
+    self.assertFalse(self.test_request.IsValid(), 'Validating num < index')
+
+    self.test_request.instance_index = 2
+    self.test_request.num_instances = 2
+    self.assertFalse(self.test_request.IsValid(), 'Validating num == index')
+
+    self.test_request.min_instances = None
+    self.test_request.max_instances = None
+
     test_config.dimensions = [42]
     self.assertFalse(test_config.IsValid())
     self.AssertInvalidValues('configurations', [test_config])
     self.test_request.configurations = []
 
     self.AssertInvalidValues('result_url', TestHelper.INVALID_URL_VALUES)
+    self.AssertInvalidValues('output_destination',
+                             TestHelper.INVALID_OUTPUT_DESTINATION_VALUES)
     self.test_request.result_url = TestHelper.VALID_URL_VALUES[0]
 
     self.AssertInvalidValues('working_dir', TestHelper.INVALID_STRING_VALUES)
