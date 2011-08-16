@@ -5,11 +5,59 @@
 
 
 
+import httplib
 import logging
 import os.path
 import sys
 import time
 import xmlrpclib
+
+
+# Global scope so we can mock it for testing...
+class Transport(xmlrpclib.Transport):
+  """Use our own transport so that we can set the connection timeout."""
+
+  def __init__(self, use_datetime=0):
+    xmlrpclib.Transport.__init__(self, use_datetime)
+
+  def make_connection(self, host):  # pylint: disable-msg=C6409
+    """Override the creation of the connection.
+
+    Args:
+      host: The host to connect to.
+    Returns:
+      A connection HTTP object.
+    """
+
+    class MyHTTP(httplib.HTTP):
+      """Override the HTTP to specify a timeout on the connection."""
+
+      # We explicitly bypass the base class __init__ method so that we can
+      # add our timeout. Thus the pylint disabling...
+      # pylint: disable-msg=W0231
+      def __init__(self, host='', port=None, strict=None):
+        """Everythin is copied from base class, except for the added timeout.
+
+        Args:
+          host: The host to connect to.
+          port: The port to use.
+          strict: To be strict about valid HTTP/1.0 or 1.1 status line.
+        """
+
+        # some joker passed 0 explicitly, meaning default port
+        if port == 0:
+          port = None
+
+        # Note that we may pass an empty string as the host; this will throw
+        # an error when we attempt to connect. Presumably, the client code
+        # will call connect before then, with a proper host.
+        self._setup(self._connection_class(host, port, strict, timeout=60))
+      # pylint: enable-msg=W0231
+
+    # Same thing as base class, except for using MyHTTP and anonymizing the
+    # unused return values with _.
+    host, _, _ = self.get_host_info(host)
+    return MyHTTP(host)
 
 
 class RemoteTestRunner(object):
@@ -223,7 +271,8 @@ class RemoteTestRunner(object):
     if server_url:
       try:
         logging.info('Creating XMLRPC server proxy to: %s', server_url)
-        self._xml_rpc_server = xmlrpclib.ServerProxy(server_url)
+        self._xml_rpc_server = xmlrpclib.ServerProxy(server_url,
+                                                     transport=Transport())
       except IOError, e:
         logging.exception('%s is not a valid XmlRpc Server URL.\nException: %s',
                           server_url, e)

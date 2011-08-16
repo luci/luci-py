@@ -764,9 +764,6 @@ class TestRequestManager(object):
     remote_runner.SetFilePairsToUpload(file_pairs_to_upload)
     remote_runner.SetCommandsToExecute(commands_to_execute)
 
-    # The xmlrpc may be slow on some remote machines, so we must boost up the
-    # deadline used by the urlfetcher for RPC calls.
-    urlfetch.set_default_fetch_deadline(60)
     succeeded = remote_runner.UploadFiles()
     if succeeded:
       run_results = remote_runner.RunCommands()
