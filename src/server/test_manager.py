@@ -555,6 +555,7 @@ class TestRequestManager(object):
 
     for config in test_case.configurations:
       # TODO(user): deal with max_instances later!!!
+      assert config.min_instances > 0
       for instance_index in range(config.min_instances):
         config.instance_index = instance_index
         config.num_instances = config.min_instances
@@ -762,6 +763,10 @@ class TestRequestManager(object):
     remote_runner.SetTextToUpload([(_TEST_RUN_SWARM_FILE_NAME, str(test_run))])
     remote_runner.SetFilePairsToUpload(file_pairs_to_upload)
     remote_runner.SetCommandsToExecute(commands_to_execute)
+
+    # The xmlrpc may be slow on some remote machines, so we must boost up the
+    # deadline used by the urlfetcher for RPC calls.
+    urlfetch.set_default_fetch_deadline(60)
     succeeded = remote_runner.UploadFiles()
     if succeeded:
       run_results = remote_runner.RunCommands()
@@ -815,6 +820,8 @@ class TestRequestManager(object):
         'instance_index': runner.config_instance_index,
         'num_instances': runner.num_config_instances,
     })
+    errors = []
+    assert test_run.IsValid(errors), errors
     return test_run
 
   def AssignPendingRequests(self, server_url):

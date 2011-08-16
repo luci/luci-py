@@ -436,7 +436,7 @@ class TestObject(TestRequestMessageBase):
   """The object to hold on and validate attributes for a test.
 
   Attributes:
-    name: The name of this test object.
+    test_name: The name of this test object.
     env_vars: An optional dictionary for environment variables.
     action: The action list of this test object.
     decorate_output: The output decoration flag of this test object.
@@ -469,7 +469,8 @@ class TestObject(TestRequestMessageBase):
                                 required=True, errors=errors) or
         not self.AreValidDicts(['env_vars'], str, str, errors=errors) or
         not self.AreValidLists(['action'], str, required=True, errors=errors) or
-        not self.AreValidValues(['time_out'], (int, float), errors=errors)):
+        not self.AreValidValues(['time_out'], (int, long, float),
+                                errors=errors)):
       self.LogError('Invalid TestObject: %s' % self.__dict__, errors)
       return False
 
@@ -542,7 +543,7 @@ class TestConfiguration(TestRequestMessageBase):
                                      unique_value_keys=['test_name'],
                                      errors=errors) or
         # required=True to make sure the caller doesn't set it to None.
-        not self.AreValidValues(['min_instances', 'max_instances'], int,
+        not self.AreValidValues(['min_instances', 'max_instances'], (int, long),
                                 required=True, errors=errors) or
         self.min_instances < 1 or self.min_instances > self.max_instances):
       self.LogError('Invalid TestConfiguration: %s' % self.__dict__, errors)
@@ -667,7 +668,7 @@ class TestCase(TestRequestMessageBase):
         not self.AreValidObjectLists(['tests'], TestObject,
                                      unique_value_keys=['test_name'],
                                      errors=errors) or
-        not self.AreValidDicts(['output_destination'], str, (str, int),
+        not self.AreValidDicts(['output_destination'], str, (str, int, long),
                                errors=errors) or
         not self.AreValidValues(['working_dir', 'failure_email', 'result_url'],
                                 str, errors=errors) or
@@ -780,14 +781,14 @@ class TestRun(TestRequestMessageBase):
         not self.AreValidObjectLists(['tests'], TestObject,
                                      unique_value_keys=['test_name'],
                                      errors=errors) or
-        not self.AreValidDicts(['output_destination'], str, (str, int, float),
+        not self.AreValidDicts(['output_destination'], str, (str, int, long),
                                errors=errors) or
         not self.AreValidValues(['working_dir', 'result_url'], str,
                                 errors=errors) or
         (self.result_url and not self.AreValidUrls(['result_url'], errors)) or
         self.cleanup not in TestRun.VALID_CLEANUP_VALUES or
-        not self.AreValidValues(['instance_index', 'num_instances'], int,
-                                errors=errors) or
+        not self.AreValidValues(['instance_index', 'num_instances'],
+                                (int, long), errors=errors) or
         (self.instance_index is not None and self.num_instances is None) or
         (self.num_instances is not None and self.instance_index is None) or
         (self.num_instances is not None and

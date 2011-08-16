@@ -148,9 +148,22 @@ class _SwarmTestCase(unittest.TestCase):
         opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cj))
         opener.open(self.GetAdminURl(urlparse.urljoin(self._swarm_server_url,
                                                       'tasks/poll')))
+        # We need to poll twice, once for assigning the machine and a second
+        # one to start the test. TODO(user): This should be fixed in the server.
+        # No need for admin URL the second time...
         opener.open(urlparse.urljoin(self._swarm_server_url, 'tasks/poll'))
       except urllib2.URLError, ex:
         self.fail('Error: %s' % str(ex))
+
+      # Make sure the machines got the Swarm file correctly, since there once
+      # was a bug that broke the string conversion of the test request by
+      # creating and invalid test run because AppEngine's db.IntegerProper() is
+      # actually a long and not an int, and the test request message was
+      # validating for int's and thus the test run wasn't created and the
+      # uploaded file was empty...
+      test_run_content = self._xmlrpc_server.UploadedContent(
+          'c:\swarm_tests/test_run.swarm')  # TODO(user): Fix path thingy...
+      self.assertNotEqual(test_run_content, '')
 
       for test_key in test_keys['test_keys']:
         running_test_keys.append(test_key)
@@ -172,11 +185,13 @@ class _SwarmTestCase(unittest.TestCase):
       try:
         result_url = urlparse.urljoin(
             self._swarm_server_url, 'result?k=' + running_test_key['test_key'])
+        logging.info('Opening URL %s', result_url)
         urllib2.urlopen(result_url, urllib.urlencode((('s', True),
                                                       ('r', '0 FAILED TESTS'))))
         key_url = urlparse.urljoin(
             self._swarm_server_url,
             'get_result?r=' + running_test_key['test_key'])
+        logging.info('Opening URL %s', key_url)
         output = urllib2.urlopen(key_url).read()
         assert output
         if _SwarmTestProgram.options.verbose:

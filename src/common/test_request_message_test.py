@@ -292,10 +292,10 @@ class TestHelper(unittest.TestCase):
 
   VALID_BOOLEAN_VALUES = [True, False, 1.1, None, '0', [], '']
 
-  NON_ZERO_VALID_INT_VALUES = [1, 2, 4, 8, 13, 42, 1234567890]
-  VALID_INT_VALUES = NON_ZERO_VALID_INT_VALUES + [0]
+  NON_ZERO_VALID_INT_VALUES = [1, 2L, 4, 8, 13, 42, 1234567890L]
+  VALID_INT_VALUES = NON_ZERO_VALID_INT_VALUES + [0L, 0]
   INVALID_INT_VALUES = [None, '', 3.14159, [], (1,)]
-  NON_ZERO_INVALID_INT_VALUES = INVALID_INT_VALUES + [0]
+  NON_ZERO_INVALID_INT_VALUES = INVALID_INT_VALUES + [0, 0L]
 
   VALID_ENV_VARS = [{'a': 'b'}, {'a': 'b', '1': 'b'}, {}, None]
   INVALID_ENV_VARS = [{1: 2}, {'a': 'b', 1: 'b'}, {'a': 1},
@@ -327,6 +327,15 @@ class TestObjectTest(TestHelper):
         test_name=TestHelper.VALID_STRING_VALUES[0],
         action=TestHelper.VALID_REQUIRED_STRING_LIST_VALUES[0])
 
+  @staticmethod
+  def GetFullObject():
+    return test_request_message.TestObject(
+        test_name=TestHelper.VALID_STRING_VALUES[-1],
+        action=TestHelper.VALID_REQUIRED_STRING_LIST_VALUES[-1],
+        env_vars=TestHelper.VALID_ENV_VARS[-1],
+        decorate_output=TestHelper.VALID_BOOLEAN_VALUES[-1],
+        time_out=42)
+
   def testIsValid(self):
     # Start with default success.
     self.assertTrue(self.test_request.IsValid())
@@ -356,9 +365,19 @@ class TestObjectTest(TestHelper):
     self.test_request.env_vars = None
 
   def testStringize(self):
-    self.assertTrue(
-        test_request_message.TestObject().ParseTestRequestMessageText(
-            str(self.test_request)), 'Bad string: %s' % str(self.test_request))
+    # Vanilla object.
+    new_object = test_request_message.TestObject()
+    self.assertTrue(new_object.ParseTestRequestMessageText(
+        str(self.test_request)), 'Bad string: %s' % str(self.test_request))
+    self.assertEqual(new_object, self.test_request)
+
+    # Full object
+    full_object = TestObjectTest.GetFullObject()
+    self.assertTrue(full_object.IsValid())
+    new_object = test_request_message.TestObject()
+    self.assertTrue(new_object.ParseTestRequestMessageText(
+        str(full_object)), 'Bad string: %s' % str(full_object))
+    self.assertEqual(new_object, full_object)
 
 
 class TestConfigurationTest(TestHelper):
@@ -366,6 +385,17 @@ class TestConfigurationTest(TestHelper):
     # Always start with a valid case, and make it explicitly invalid as needed.
     self.test_request = test_request_message.TestConfiguration(
         config_name='a', os='a', browser='a', cpu='a')
+
+  @staticmethod
+  def GetFullObject():
+    return test_request_message.TestConfiguration(
+        config_name='a', os='a', browser='a', cpu='a',
+        env_vars=TestHelper.VALID_ENV_VARS[-1],
+        data=TestHelper.VALID_REQUIRED_STRING_LIST_VALUES[-1],
+        binaries=TestHelper.VALID_REQUIRED_STRING_LIST_VALUES[-1],
+        tests=[TestObjectTest.GetFullObject()],
+        max_instances=2,
+        min_instances=1)
 
   def testIsValid(self):
     # Start with default success.
@@ -458,9 +488,19 @@ class TestConfigurationTest(TestHelper):
     self.assertTrue(errors, message)
 
   def testStringize(self):
-    self.assertTrue(
-        test_request_message.TestConfiguration().ParseTestRequestMessageText(
-            str(self.test_request)), 'Bad string: %s' % str(self.test_request))
+    # Vanilla object.
+    new_object = test_request_message.TestConfiguration()
+    self.assertTrue(new_object.ParseTestRequestMessageText(
+        str(self.test_request)), 'Bad string: %s' % str(self.test_request))
+    self.assertEqual(new_object, self.test_request)
+
+    # Full object
+    full_object = TestConfigurationTest.GetFullObject()
+    self.assertTrue(full_object.IsValid())
+    new_object = test_request_message.TestConfiguration()
+    self.assertTrue(new_object.ParseTestRequestMessageText(
+        str(full_object)), 'Bad string: %s' % str(full_object))
+    self.assertEqual(new_object, full_object)
 
 
 class TestCaseTest(TestHelper):
@@ -470,6 +510,24 @@ class TestCaseTest(TestHelper):
         test_case_name='a',
         configurations=[test_request_message.TestConfiguration(
             config_name='a', os='a', browser='a', cpu='a')])
+
+  @staticmethod
+  def GetFullObject():
+    return test_request_message.TestCase(
+        test_case_name='a',
+        env_vars=TestHelper.VALID_ENV_VARS[-1],
+        data=TestHelper.VALID_REQUIRED_STRING_LIST_VALUES[-1],
+        binaries=TestHelper.VALID_REQUIRED_STRING_LIST_VALUES[-1],
+        working_dir=TestHelper.VALID_STRING_VALUES[-1],
+        admin=TestHelper.VALID_BOOLEAN_VALUES[-1],
+        virgin=TestHelper.VALID_BOOLEAN_VALUES[-1],
+        tests=[TestObjectTest.GetFullObject()],
+        result_url=TestHelper.VALID_URL_VALUES[-1],
+        output_destination=
+        TestHelper.VALID_OPTIONAL_OUTPUT_DESTINATION_VALUES[-1],
+        failure_email=TestHelper.VALID_OPTIONAL_STRING_VALUES[-1],
+        verbose=TestHelper.VALID_BOOLEAN_VALUES[-1],
+        configurations=[TestConfigurationTest.GetFullObject()])
 
   def testIsValid(self):
     # Start with default success.
@@ -557,9 +615,19 @@ class TestCaseTest(TestHelper):
     self.test_request.env_vars = None
 
   def testStringize(self):
-    self.assertTrue(
-        test_request_message.TestCase().ParseTestRequestMessageText(
-            str(self.test_request)), 'Bad string: %s' % str(self.test_request))
+    # Vanilla object.
+    new_object = test_request_message.TestCase()
+    self.assertTrue(new_object.ParseTestRequestMessageText(
+        str(self.test_request)), 'Bad string: %s' % str(self.test_request))
+    self.assertEqual(new_object, self.test_request)
+
+    # Full object
+    full_object = TestCaseTest.GetFullObject()
+    self.assertTrue(full_object.IsValid())
+    new_object = test_request_message.TestCase()
+    self.assertTrue(new_object.ParseTestRequestMessageText(
+        str(full_object)), 'Bad string: %s' % str(full_object))
+    self.assertEqual(new_object, full_object)
 
 
 class TestRunTest(TestHelper):
@@ -570,6 +638,22 @@ class TestRunTest(TestHelper):
         configuration=test_request_message.TestConfiguration(
             config_name='a', os='a', browser='a', cpu='a'),
         result_url=TestHelper.VALID_URL_VALUES[0])
+
+  @staticmethod
+  def GetFullObject():
+    return test_request_message.TestRun(
+        test_run_name='a',
+        configuration=TestConfigurationTest.GetFullObject(),
+        result_url=TestHelper.VALID_URL_VALUES[-1],
+        env_vars=TestHelper.VALID_ENV_VARS[-1],
+        data=TestHelper.VALID_REQUIRED_STRING_LIST_VALUES[-1],
+        working_dir=TestHelper.VALID_STRING_VALUES[-1],
+        tests=[TestObjectTest.GetFullObject()],
+        instance_index=1,
+        num_instances=2,
+        output_destination=
+        TestHelper.VALID_OPTIONAL_OUTPUT_DESTINATION_VALUES[-1],
+        cleanup=test_request_message.TestRun.VALID_CLEANUP_VALUES[-1])
 
   def testIsValid(self):
     # Start with default success.
@@ -668,9 +752,20 @@ class TestRunTest(TestHelper):
     self.test_request.env_vars = None
 
   def testStringize(self):
-    self.assertTrue(
-        test_request_message.TestRun().ParseTestRequestMessageText(
-            str(self.test_request)), 'Bad string: %s' % str(self.test_request))
+    # Vanilla object.
+    new_object = test_request_message.TestRun()
+    self.assertTrue(new_object.ParseTestRequestMessageText(
+        str(self.test_request)), 'Bad string: %s' % str(self.test_request))
+    self.assertEqual(new_object, self.test_request)
+
+    # Full object
+    full_object = TestRunTest.GetFullObject()
+    self.assertTrue(full_object.IsValid())
+
+    new_object = test_request_message.TestRun()
+    self.assertTrue(new_object.ParseTestRequestMessageText(
+        str(full_object)), 'Bad string: %s' % str(full_object))
+    self.assertEqual(new_object, full_object)
 
 
 if __name__ == '__main__':

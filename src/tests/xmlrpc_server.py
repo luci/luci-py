@@ -12,6 +12,7 @@ import optparse
 from SimpleXMLRPCServer import SimpleXMLRPCRequestHandler
 from SimpleXMLRPCServer import SimpleXMLRPCServer
 import threading
+import xmlrpclib
 
 
 class _MockMachine(object):
@@ -74,7 +75,10 @@ class _MockMachine(object):
     return self._uploaded_content[os_path]
 
   def upload(self, os_path, content):  # pylint: disable-msg=C6409
-    self._uploaded_content[os_path] = content
+    if isinstance(content, xmlrpclib.Binary):
+      self._uploaded_content[os_path] = content.data
+    else:
+      self._uploaded_content[os_path] = content.encode('utf8')
     if self._fail_upload:
       raise OSError(1, 'Failed!')
     if self._upload_return_empty:

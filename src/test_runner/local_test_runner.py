@@ -291,7 +291,7 @@ class LocalTestRunner(object):
       if (hasattr(self.test_run, 'instance_index') and
           self.test_run.instance_index is not None):
         assert hasattr(self.test_run, 'num_instances')
-        assert self.test_run['num_instances'] is not None
+        assert self.test_run.num_instances is not None
         data['i'] = self.test_run.instance_index
         data['m'] = self.test_run.num_instances
 
