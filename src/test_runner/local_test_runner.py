@@ -372,7 +372,6 @@ class LocalTestRunner(object):
         return (1, e)
 
       current_content = stdout_file.read()
-      stdout_string += current_content
       # Give some local feedback of progress and potentially upload to
       # output_destination if any.
       if current_content:
@@ -385,6 +384,8 @@ class LocalTestRunner(object):
           self._PostOutput(upload_url, current_chunk_to_upload,
                            self._SUCCESS_CGI_STRING[2])
           current_chunk_to_upload = ''
+      else:
+        stdout_string += current_content
 
       if exit_code is not None:
         CleanupTempFiles()
@@ -394,6 +395,8 @@ class LocalTestRunner(object):
         if upload_url and upload_chunk_size <= 0:
           self._PostOutput(upload_url, stdout_string,
                            self._SUCCESS_CGI_STRING[2])
+          stdout_string = 'No output!'
+
         return (exit_code, stdout_string)
 
       # We sleep a little to give the child process a chance to move forward
