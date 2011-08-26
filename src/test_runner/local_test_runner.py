@@ -532,14 +532,15 @@ class LocalTestRunner(object):
                           tests_to_run[index].test_name))
 
     # And append their total number before returning the result string.
-    return (num_failures == 0,
+    return (num_failures == 0, result_codes,
             '%s\n\n %d FAILED TESTS\n' % (result_string, num_failures))
 
-  def PublishResults(self, success, result_string):
+  def PublishResults(self, success, result_codes, result_string):
     """Publish the given result string to the result_url if any.
 
     Args:
       success: True if we must specify [?|&]s=true. False otherwise.
+      result_codes: The array of exit codes to be published, one per action.
       result_string: The result to be published.
 
     Returns:
@@ -559,6 +560,7 @@ class LocalTestRunner(object):
             self.test_run.result_url, urllib.urlencode(
                 (('n', self.test_run.test_run_name),
                  ('c', self.test_run.configuration.config_name),
+                 ('x', ', '.join([str(i) for i in result_codes])),
                  ('s', success),
                  ('r', result_string))))
       except (urllib2.URLError, Error), e:  # Error for testing purposes.
@@ -593,7 +595,7 @@ class LocalTestRunner(object):
     self.logging_file_handler.close()
     # We let exceptions go through since there isn't much we can do with them.
     log_file = open(self.log_file_name)
-    self.PublishResults(False, log_file.read())
+    self.PublishResults(False, [], log_file.read())
     log_file.close()
 
 
@@ -631,10 +633,9 @@ def main():
 
   try:
     if runner.DownloadAndExplodeData():
-      (success, result_string) = runner.RunTests()
-      if result_string:
-        if runner.PublishResults(success, result_string):
-          return 0
+      (success, result_codes, result_string) = runner.RunTests()
+      if runner.PublishResults(success, result_codes, result_string):
+        return 0
   except Exception, e:  # pylint: disable-msg=W0703
     # We want to catch all so that we can report all errors, even internal ones.
     logging.exception(e)

@@ -170,6 +170,9 @@ class TestRunner(db.Model):
   # is unspecified.
   ran_successfully = db.BooleanProperty()
 
+  # The stringized array of exit_codes for each actions of the test.
+  exit_codes = db.StringProperty()
+
   # Full output of the test.  This attribute is valid only when the runner has
   # ended (i.e. machine_id is < 0).  Until then, the value is unspecified.
   result_string = db.TextProperty()
@@ -441,11 +444,12 @@ class TestRequestManager(object):
       # string?
       success = web_request.get('s', 'False') == 'True'
       result_string = urllib.unquote_plus(web_request.get('r'))
-      self._UpdateTestResult(runner, success, result_string, True)
+      exit_codes = urllib.unquote_plus(web_request.get('x'))
+      self._UpdateTestResult(runner, success, exit_codes, result_string, True)
     else:
       logging.error('No runner associated to web request, ignoring test result')
 
-  def _UpdateTestResult(self, runner, success=False,
+  def _UpdateTestResult(self, runner, success=False, exit_codes='',
                         result_string='Tests aborted', reuse_machine=False):
     """Update the runner with results of a test run.
 
@@ -453,6 +457,7 @@ class TestRequestManager(object):
       runner: a TestRunner object pointing to the test request to which to
           send the results.  This argument must not be None.
       success: a boolean indicating whether the test run succeeded or not.
+      exit_codes: a string containing the array of exit codes of the test run.
       result_string: a string containing the output of the test run.
       reuse_machine: a boolean indicating whether the machine that ran this
           test should be reused for another test.
@@ -479,6 +484,7 @@ class TestRequestManager(object):
       machine.put()
 
     runner.ran_successfully = success
+    runner.exit_codes = exit_codes
     runner.result_string = result_string
     runner.machine_id = -1
     runner.put()
@@ -512,6 +518,7 @@ class TestRequestManager(object):
                                           ('c', runner.config_name),
                                           ('i', runner.config_instance_index),
                                           ('m', runner.num_config_instances),
+                                          ('x', runner.exit_codes),
                                           ('s', runner.ran_successfully),
                                           ('r', encoded_result_string))))
       except urllib2.URLError:
