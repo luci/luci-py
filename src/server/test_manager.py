@@ -249,7 +249,7 @@ class TestRequestManager(object):
       machine_manager: An instance of machine_manager.MachineManager that is
           used to acquire machines for running tests.
     """
-    logging.info('TRM starting')
+    logging.debug('TRM starting')
 
     self._machine_manager = machine_manager
     self._machine_manager.RegisterStatusChangeListener(self)
@@ -285,11 +285,11 @@ class TestRequestManager(object):
     for machine in machines_to_del:
       machine.delete()
 
-    logging.info('TRM created')
+    logging.debug('TRM created')
 
   def _CheckAllAcquiredMachines(self):
     """Ensure acquired machines are either idle or assigned to a runner."""
-    logging.info('TRM._CheckAllAcquiredMachines')
+    logging.debug('TRM._CheckAllAcquiredMachines')
 
     machines_to_release = []
 
@@ -352,7 +352,7 @@ class TestRequestManager(object):
     Args:
       info: A machine information object from the Machine Manager.
     """
-    logging.info('TRM.MachineStatusChanged')
+    logging.debug('TRM.MachineStatusChanged')
 
     idle_machine = IdleMachine.gql('WHERE id = :1', info.id).get()
     if idle_machine:
@@ -376,8 +376,8 @@ class TestRequestManager(object):
       idle_machine: An instance of machine_manager.Machine representing the
           machine whose state has changed.
     """
-    logging.info('TRM._IdleMachineStateChanged id=%d status=%d', info.id,
-                 info.status)
+    logging.debug('TRM._IdleMachineStateChanged id=%d status=%d', info.id,
+                  info.status)
 
     # An idle machine should already be ready so can't transition to it.
     assert info.status != base_machine_provider.MachineStatus.READY
@@ -403,8 +403,8 @@ class TestRequestManager(object):
       runner: An instance of TestRunner representing a running test whose
           machine state has changed.
     """
-    logging.info('TRM._RunnerMachineStateChanged id=%d status=%d runner=%s',
-                 info.id, info.status, runner.GetName())
+    logging.debug('TRM._RunnerMachineStateChanged id=%d status=%d runner=%s',
+                  info.id, info.status, runner.GetName())
 
     # If the machine is switching to the READY state, we will start the test
     # associated to it in the next call to AssignPendingRequests.
@@ -522,16 +522,16 @@ class TestRequestManager(object):
                                           ('s', runner.ran_successfully),
                                           ('r', encoded_result_string))))
       except urllib2.URLError:
-        logging.info('Could not send results back to sender at %s',
-                     test_case.result_url)
+        logging.exception('Could not send results back to sender at %s',
+                          test_case.result_url)
       except urlfetch.Error:
         # The docs for urllib2.urlopen() say it only raises urllib2.URLError.
         # However, in the appengine environment urlfetch.Error may also be
         # raised. This is normal, see the "Fetching URLs in Python" section of
         # http://code.google.com/appengine/docs/python/urlfetch/overview.html
         # for more details.
-        logging.info('Could not send results back to sender at %s',
-                     test_case.result_url)
+        logging.exception('Could not send results back to sender at %s',
+                          test_case.result_url)
 
   def ExecuteTestRequest(self, request_message):
     """Attempts to execute a test request.
@@ -550,7 +550,7 @@ class TestRequestManager(object):
       A dictionary containing the test_case_name field and an array of
       dictionaries containing the config_name and test_id_key fields.
     """
-    logging.info('TRM.ExecuteTestRequest msg=%s', request_message)
+    logging.debug('TRM.ExecuteTestRequest msg=%s', request_message)
 
     # Will raise an exception on error.
     request = TestRequest(message=request_message)
@@ -584,8 +584,8 @@ class TestRequestManager(object):
     Returns:
       The id key of the test runner that was created and saved.
     """
-    logging.info('TRM._QueueTestRequestConfig request=%s config=%s',
-                 request.GetName(), config.config_name)
+    logging.debug('TRM._QueueTestRequestConfig request=%s config=%s',
+                  request.GetName(), config.config_name)
 
     # Create a runner entity to record this request/config pair that needs
     # to be run.  Use a machine id of zero to indicate it has not yet been
@@ -691,11 +691,11 @@ class TestRequestManager(object):
       server_url: The URL to the Swarm server so that we can set the
           result_url in the Swarm file we upload to the machines.
     """
-    logging.info('TRM._ExecuteTestRunnerOnIdleMachine '
-                 'runner=%s config=%s instance=%d num_instances=%d machine=%d',
-                 runner.GetName(), runner.config_name,
-                 runner.config_instance_index, runner.num_config_instances,
-                 idle_machine.id)
+    logging.debug('TRM._ExecuteTestRunnerOnIdleMachine '
+                  'runner=%s config=%s instance=%d num_instances=%d machine=%d',
+                  runner.GetName(), runner.config_name,
+                  runner.config_instance_index, runner.num_config_instances,
+                  idle_machine.id)
     config = runner.GetConfiguration()
     assert runner.config_instance_index < runner.num_config_instances
     assert (runner.num_config_instances >= config.min_instances and
@@ -774,7 +774,7 @@ class TestRequestManager(object):
     succeeded = remote_runner.UploadFiles()
     if succeeded:
       run_results = remote_runner.RunCommands()
-      logging.info('RunCommands returned: %s', run_results)
+      logging.debug('RunCommands returned: %s', run_results)
       if run_results:
         assert len(run_results) == len(commands_to_execute)
         for result in run_results:
@@ -838,7 +838,7 @@ class TestRequestManager(object):
     Raises:
       test_request_message.Error: If the request's message isn't valid.
     """
-    logging.info('TRM.AssignPendingRequests')
+    logging.debug('TRM.AssignPendingRequests')
 
     # Assign test runners from earliest to latest.
     # We use a format argument for None, because putting None in the string
@@ -854,11 +854,13 @@ class TestRequestManager(object):
           info = self._machine_manager.GetMachineInfo(runner.machine_id)
           if info and info.status == base_machine_provider.MachineStatus.READY:
             self._ExecuteTestRunner(runner, server_url)
+          else:
+            logging.warning('Machine %s, returned no info', runner.machine_id)
       else:
         machine = self._FindMatchingIdleMachine(runner)
         if machine:
-          logging.info('Found machine id=%d to runner=%s',
-                       machine.id, runner.GetName())
+          logging.debug('Found machine id=%d to runner=%s',
+                        machine.id, runner.GetName())
           self._ExecuteTestRunnerOnIdleMachine(runner, machine, server_url)
         else:
           # If we didn't already have a machine for this test and we couldn't
@@ -877,7 +879,7 @@ class TestRequestManager(object):
 
   def AbortStaleRunners(self):
     """Abort any runners that have been running longer than expected."""
-    logging.info('TRM.AbortStaleRunners starting')
+    logging.debug('TRM.AbortStaleRunners starting')
     now = self._GetCurrentTime()
 
     query = TestRunner.gql('WHERE machine_id > 0')
@@ -893,7 +895,7 @@ class TestRequestManager(object):
                      runner.GetName())
         self.AbortRunner(runner, reason='Runner has become stale.')
 
-    logging.info('TRM.AbortStaleRunners done')
+    logging.debug('TRM.AbortStaleRunners done')
 
   def AbortRunner(self, runner, reason='Not specified.'):
     """Abort the given test runner.

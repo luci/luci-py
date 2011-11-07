@@ -123,14 +123,14 @@ class MachineManager(object):
           of the machine manager can choose to use its own provider or
           the one in Chrome Golo, or even a mock one for testing.
     """
-    logging.info('MM starting')
+    logging.debug('MM starting')
 
     assert machine_provider is not None
     self._machine_provider = machine_provider
     self._listeners = set()
 
     self.ValidateMachines()
-    logging.info('MM created')
+    logging.debug('MM created')
 
   def ValidateMachines(self):
     """Validate all known machines.
@@ -145,7 +145,7 @@ class MachineManager(object):
     expected that an appengine cron job (or something similar) has been setup
     for the periodic calls.
     """
-    logging.info('MM: Start validation')
+    logging.debug('MM: Start validation')
 
     query = Machine.all()
     for machine in query:
@@ -182,14 +182,15 @@ class MachineManager(object):
       # transient errors here and we will check again later.  For non-transient
       # errors we want to forget about this machine.
       if not self._IsTransientError(e):
+        logging.exception('MachineProviderException: %s', e)
         if machine.status == base_machine_provider.MachineStatus.DONE:
           machine.delete()
           return False
 
         new_status = base_machine_provider.MachineStatus.DONE
       else:
-        logging.info('MM: Provider error while validating id=%d: %s (%d)',
-                     machine.id, e.message, e.error_code)
+        logging.exception('MM: Provider error while validating id=%d: %s (%d)',
+                          machine.id, e.message, e.error_code)
         return False
 
     # If the status is READY, transfer the configuration properties to
@@ -314,8 +315,8 @@ class MachineManager(object):
     machine.id = machine_id
     machine.put()
 
-    logging.info('MM instance created id=%d dim=%s',
-                 machine_id, str(config_dimensions))
+    logging.debug('MM instance created id=%d dim=%s',
+                  machine_id, str(config_dimensions))
     self._SendNotification(machine)
     return machine_id
 

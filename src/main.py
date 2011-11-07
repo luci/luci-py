@@ -205,7 +205,7 @@ class ResultHandler(webapp.RequestHandler):
 
   def post(self):  # pylint: disable-msg=C6409
     """Handles HTTP POST requests for this handler's URL."""
-    logging.info('Received Result: %s', self.request.url)
+    logging.debug('Received Result: %s', self.request.url)
     _test_manager.HandleTestResults(self.request)
 
 
@@ -214,7 +214,7 @@ class PollHandler(webapp.RequestHandler):
 
   def get(self):  # pylint: disable-msg=C6409
     """Handles HTTP GET requests for this handler's URL."""
-    logging.info('Polling')
+    logging.debug('Polling')
     _machine_manager.ValidateMachines()
     _test_manager.AssignPendingRequests(self.request.host_url)
     _test_manager.AbortStaleRunners()
