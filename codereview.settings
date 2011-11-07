@@ -1,0 +1,4 @@
+# This file is used by gcl to get repository specific information.
+CODE_REVIEW_SERVER: codereview.appspot.com
+VIEW_VC: http://code.google.com/p/swarming/source/detail?r=
+CC_LIST: swarming-changes@googlegroups.com
