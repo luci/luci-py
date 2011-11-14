@@ -628,7 +628,8 @@ def main():
   except Error, e:
     logging.exception('Can\'t create TestRunner with file: %s.\nException: %s',
                       options.request_file_name, e)
-    runner.PublishInternalErrors()
+    if runner:
+      runner.PublishInternalErrors()
     return 1
 
   try:
