@@ -25,6 +25,7 @@ import logging
 import os.path
 import urllib
 import urllib2
+import urlparse
 
 from google.appengine.api import mail
 from google.appengine.api import urlfetch
@@ -495,11 +496,7 @@ class TestRequestManager(object):
     if not runner.ran_successfully and test_case.failure_email:
       # TODO(user): provide better info for failure. E.g., if we don't have a
       # web_request.body, we should have info like: Failed to upload files.
-      mail.send_mail(sender='Test Request Server <no_reply@google.com>',
-                     to=test_case.failure_email,
-                     subject='%s failed.' % runner.GetName(),
-                     body=runner.result_string,
-                     html='<pre>%s</pre>' % runner.result_string)
+      self._EmailTestResults(runner, test_case.failure_email)
 
     # TODO(user): test result objects, and hence their test request objects,
     # are currently not deleted from the data store.  This allows someone to
@@ -507,31 +504,88 @@ class TestRequestManager(object):
     # Eventually we will want to see how to delete old requests as the apps
     # storage quota will be exceeded.
     if test_case.result_url:
-      # Send the result to the requested destination.
-      try:
-        # Encode the result string so that it's backwards-compatible with ASCII.
-        # Without this, the call to "urllib.urlencode" below can throw a
-        # UnicodeEncodeError if the result string contains non-ASCII characters.
-        encoded_result_string = runner.result_string.encode('utf-8')
-        urllib2.urlopen(test_case.result_url,
-                        urllib.urlencode((('n', runner.test_request.GetName()),
-                                          ('c', runner.config_name),
-                                          ('i', runner.config_instance_index),
-                                          ('m', runner.num_config_instances),
-                                          ('x', runner.exit_codes),
-                                          ('s', runner.ran_successfully),
-                                          ('r', encoded_result_string))))
-      except urllib2.URLError:
-        logging.exception('Could not send results back to sender at %s',
+      result_url_parts = urlparse.urlsplit(test_case.result_url)
+      if result_url_parts[0] == 'http':
+        # Send the result to the requested destination.
+        try:
+          # Encode the result string so that it's backwards-compatible with
+          # ASCII. Without this, the call to "urllib.urlencode" below can
+          # throw a UnicodeEncodeError if the result string contains non-ASCII
+          # characters.
+          encoded_result_string = runner.result_string.encode('utf-8')
+          urllib2.urlopen(test_case.result_url,
+                          urllib.urlencode((
+                              ('n', runner.test_request.GetName()),
+                              ('c', runner.config_name),
+                              ('i', runner.config_instance_index),
+                              ('m', runner.num_config_instances),
+                              ('x', runner.exit_codes),
+                              ('s', runner.ran_successfully),
+                              ('r', encoded_result_string))))
+        except urllib2.URLError:
+          logging.exception('Could not send results back to sender at %s',
+                            test_case.result_url)
+        except urlfetch.Error:
+          # The docs for urllib2.urlopen() say it only raises urllib2.URLError.
+          # However, in the appengine environment urlfetch.Error may also be
+          # raised. This is normal, see the "Fetching URLs in Python" section of
+          # http://code.google.com/appengine/docs/python/urlfetch/overview.html
+          # for more details.
+          logging.exception('Could not send results back to sender at %s',
+                            test_case.result_url)
+      elif result_url_parts[0] == 'mailto':
+        # Only send an email if we didn't send a failure email earlier to
+        # prevent repeats.
+        if runner.ran_successfully or not test_case.failure_email:
+          self._EmailTestResults(runner, result_url_parts[1])
+      else:
+        logging.exception('Unknown url given as result url, %s',
                           test_case.result_url)
-      except urlfetch.Error:
-        # The docs for urllib2.urlopen() say it only raises urllib2.URLError.
-        # However, in the appengine environment urlfetch.Error may also be
-        # raised. This is normal, see the "Fetching URLs in Python" section of
-        # http://code.google.com/appengine/docs/python/urlfetch/overview.html
-        # for more details.
-        logging.exception('Could not send results back to sender at %s',
-                          test_case.result_url)
+
+  def _EmailTestResults(self, runner, send_to):
+    """Emails the test result.
+
+    Args:
+      runner: a TestRunner object containing values relating to the the test
+          run.
+      send_to: the email address to send the result to. This must be a valid
+          email address.
+    """
+    if not runner:
+      logging.error('runner argument must be given')
+      return
+
+    if not mail.is_email_valid(send_to):
+      logging.error('Invalid email passed to result_url, %s', send_to)
+      return
+
+    if runner.ran_successfully:
+      subject = '%s succeeded.' % runner.GetName()
+    else:
+      subject = '%s failed.' % runner.GetName()
+
+    message_body_parts = [
+        'Test Request Name: ' + runner.test_request.GetName(),
+        'Configuration Name: ' + runner.config_name,
+        'Configuration Instance Index: ' + str(runner.config_instance_index),
+        'Number of Configurations: ' + str(runner.num_config_instances),
+        'Exit Code: ' + str(runner.exit_codes),
+        'Success: ' + str(runner.ran_successfully),
+        'Result Output: ' + runner.result_string]
+    message_body = '\n'.join(message_body_parts)
+
+    try:
+      mail.send_mail(sender='Test Request Server <no_reply@google.com>',
+                     to=send_to,
+                     subject=subject,
+                     body=message_body,
+                     html='<pre>%s</pre>' % message_body)
+    except Exception, e:  # pylint: disable-msg=W0703
+      # We catch all errors thrown because mail.send_mail can throw errors
+      # that it doesn't list in its description, but that are caused by our
+      # inputs (such as unauthorized sender).
+      logging.exception(
+          'An exception was thrown when attemping to send mail\n%s', e)
 
   def ExecuteTestRequest(self, request_message):
     """Attempts to execute a test request.
