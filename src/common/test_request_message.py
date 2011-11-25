@@ -267,6 +267,28 @@ class TestRequestMessageBase(object):
           return False
     return True
 
+  def IsValidUrl(self, value, errors=None):
+    """Checks if the given value is a valid URL.
+
+    Args:
+      value: The potential URL to validate.
+      errors: An array where we can append error messages.
+
+    Returns:
+      True if the URL is valid, false otherwise.
+    """
+    if not isinstance(value, str):
+      self.LogError('Unsupported url scheme, %s, must be a string' % value,
+                    errors)
+      return False
+
+    url_parts = urlparse.urlsplit(value)
+    if url_parts[0] not in TestRequestMessageBase.VALID_URL_SCHEMES:
+      self.LogError('Unsupported url scheme, %s' % url_parts[0], errors)
+      return False
+
+    return True
+
   def AreValidUrls(self, value_keys, errors=None):
     """Checks if the value at value_key is a valid URL.
 
@@ -278,10 +300,75 @@ class TestRequestMessageBase(object):
       True if the URL is valid, False othewise.
     """
     for value_key in value_keys:
-      url_parts = urlparse.urlsplit(self.__dict__[value_key])
-      if url_parts[0] not in TestRequestMessageBase.VALID_URL_SCHEMES:
-        self.LogError('Unssupported url scheme %s' % url_parts[0], errors)
+      if not self.IsValidUrl(self.__dict__[value_key], errors=errors):
         return False
+    return True
+
+  def IsValidInteger(self, value, errors=None):
+    """Checks if the given value is castable to a valid integer.
+
+      It value must not only be castable to a valid integer, but it
+      must also be a whole number (i.e. 8.0 is valid but 8.5 is not).
+
+    Args:
+      value: The potential integer to validate.
+      errors: An array where we can append error messages.
+
+    Returns:
+      True if the value is castable to valid integer, false otherwise.
+    """
+    try:
+      long(value)
+    except ValueError:
+      self.LogError('Invalid value for size, %s, must be int castable'
+                    % value, errors)
+      return False
+
+    if isinstance(value, float) and int(value) != value:
+      self.LogError('Size in output destination must be a whole number, '
+                    'was given %s'% value, errors)
+      return False
+
+    return True
+
+  def AreValidOutputDestinations(self, value_keys, errors=None):
+    """Checks if the values at value_keys are valid output_destinations.
+
+    Args:
+      value_keys: The key names of the values to validate.
+      errors: An array where we can append error messages.
+
+    Returns:
+      True if the output_destinations are value, False otherwise.
+    """
+    for value_key in value_keys:
+      output_destination = self.__dict__[value_key]
+      if output_destination is None:
+        continue
+      if not isinstance(output_destination, dict):
+        self.LogError('Output destination must be a dictionary, was given: %s'
+                      % output_destination, errors)
+        return False
+
+      for key, value in output_destination.iteritems():
+        if key == 'size':
+          if not self.IsValidInteger(value, errors):
+            self.LogError('Invalid size in output destination, %s' % value,
+                          errors)
+            return False
+          if isinstance(value, str):
+            # If we reach here then value is a valid integer, just in string
+            # form, so we convert it to an int to prevent problems with later
+            # code not using it correctly.
+            output_destination[key] = int(value)
+        elif key == 'url':
+          if not self.IsValidUrl(value, errors=errors):
+            self.LogError('Invalid url in output destination, %s' % value,
+                          errors)
+            return False
+        else:
+          self.LogError('Invalid key, %s, in output destination' % key, errors)
+          return False
     return True
 
   def IsValid(self, errors=None):
@@ -607,7 +694,7 @@ class TestCase(TestRequestMessageBase):
     output_destination: An optional dictionary with a URL where to post the
         output of this test case as well as the size of the chunks to use.
         The key for the URL is 'url' and the value must be a valid URL string.
-        The key for the chunk size is 'size' and must be an int.
+        The key for the chunk size is 'size'. It must be a whole number.
     failure_email: An optional email where to broadcast failures for this test
         case.
     verbose: An optional boolean value that specifies if logging should be
@@ -668,8 +755,8 @@ class TestCase(TestRequestMessageBase):
         not self.AreValidObjectLists(['tests'], TestObject,
                                      unique_value_keys=['test_name'],
                                      errors=errors) or
-        not self.AreValidDicts(['output_destination'], str, (str, int, long),
-                               errors=errors) or
+        not self.AreValidOutputDestinations(['output_destination'],
+                                            errors=errors) or
         not self.AreValidValues(['working_dir', 'failure_email', 'result_url'],
                                 str, errors=errors) or
         (self.result_url and not self.AreValidUrls(['result_url'], errors))):
@@ -731,7 +818,7 @@ class TestRun(TestRequestMessageBase):
     output_destination: An optional dictionary with a URL where to post the
         output of this test case as well as the size of the chunks to use.
         The key for the URL is 'url' and the value must be a valid URL string.
-        The key for the chunk size is 'size' and must be an int.
+        The key for the chunk size is 'size'. It must be a whole number.
     cleanup: The key to access the test run's cleanup string.
   """
   VALID_CLEANUP_VALUES = [None, '', 'zip', 'data', 'root']
@@ -781,8 +868,8 @@ class TestRun(TestRequestMessageBase):
         not self.AreValidObjectLists(['tests'], TestObject,
                                      unique_value_keys=['test_name'],
                                      errors=errors) or
-        not self.AreValidDicts(['output_destination'], str, (str, int, long),
-                               errors=errors) or
+        not self.AreValidOutputDestinations(['output_destination'],
+                                            errors=errors) or
         not self.AreValidValues(['working_dir', 'result_url'], str,
                                 errors=errors) or
         (self.result_url and not self.AreValidUrls(['result_url'], errors)) or

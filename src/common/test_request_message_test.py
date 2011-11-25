@@ -277,11 +277,18 @@ class TestHelper(unittest.TestCase):
   INVALID_URL_VALUES = ['httpx://a.com', 'shttps://safe.a.com', 'nfile://here',
                         'mailtoo://me@there.com'] + INVALID_STRING_VALUES
 
-  VALID_OPTIONAL_OUTPUT_DESTINATION_VALUES = [{}, None, {'a': 'b'}, {'a': 1},
+  VALID_OPTIONAL_OUTPUT_DESTINATION_VALUES = [{}, None, {'size': 10.0},
+                                              {'size': 5}, {'size': '12'},
+                                              {'size': -5}, {'size': '0'},
+                                              {'size': '-5'},
+                                              {'url': 'mailto:joe@doe.com'},
                                               {'url': 'http://a.b.com',
                                                'size': 1024}]
   INVALID_OUTPUT_DESTINATION_VALUES = ['', 1, 'a', [], {'a': ['b']},
-                                       {'a': {1: 2}}, {1: 2}]
+                                       {'a': {1: 2}}, {1: 2}, {'size': 0.5},
+                                       {'size': 'size'},
+                                       {'url': 'svn://c/test'},
+                                       {'url': 5}, {'url': 'invalid'}]
 
   INVALID_STRING_LIST_VALUES = [[1], ['str', 1], 1, {}]
   INVALID_REQUIRED_STRING_LIST_VALUES = (INVALID_STRING_LIST_VALUES +
@@ -598,12 +605,17 @@ class TestCaseTest(TestHelper):
     self.assertFalse(test_config2.IsValid())
     self.AssertInvalidValues('configurations', [[test_config1, test_config2],
                                                 [test_config1]])
-    self.test_request.configurations = []
+    # Put the value back to a valid value, to test invalidity of other values.
+    valid_config = test_request_message.TestConfiguration(
+        config_name='a', os='a', browser='a', cpu='a')
+    self.test_request.configurations = [valid_config]
 
     self.AssertInvalidValues('result_url', TestHelper.INVALID_URL_VALUES)
+    self.test_request.result_url = TestHelper.VALID_URL_VALUES[0]
+
     self.AssertInvalidValues('output_destination',
                              TestHelper.INVALID_OUTPUT_DESTINATION_VALUES)
-    self.test_request.result_url = TestHelper.VALID_URL_VALUES[0]
+    self.output_destination = None
 
     self.AssertInvalidValues('failure_email', TestHelper.INVALID_STRING_VALUES)
     self.test_request.failure_email = None
