@@ -278,7 +278,7 @@ class TestRequestManager(object):
         # The machine running the test has failed (either stopped or done).
         # Tell the user about it.
         r_str = 'Tests aborted. The machine running the test has failed. '
-        r_str += ('Machine status: %d' % info.status if info else
+        r_str += ('Machine status: %s' % str(info.status) if info else
                   'Status undefined.')
         self._UpdateTestResult(runner, result_string=r_str)
 
@@ -298,20 +298,20 @@ class TestRequestManager(object):
       idle_machine = IdleMachine.gql('WHERE id = :1', info.id).get()
       runner = TestRunner.gql('WHERE machine_id = :1', info.id).get()
 
-      logging.debug('Checking machine id=%d', info.id)
+      logging.debug('Checking machine id=%d', int(info.id))
 
       # If a machine is assigned to a runner, then it should not be idle.
       # Remove it from the idle pool if it is there.
       if idle_machine and runner:
-        logging.error('Machine id=%d idle and running', info.id)
+        logging.error('Machine id=%d idle and running', int(info.id))
         idle_machine.delete()
       elif not runner and not idle_machine:
         # If a machine is neither idle nor assigned to a test runner, then put
         # it in the idle pool if its READY. Otherwise, release it.
-        logging.debug('Machine id=%d is idle and unassigned', info.id)
+        logging.debug('Machine id=%d is idle and unassigned', int(info.id))
 
         if info.status == base_machine_provider.MachineStatus.READY:
-          logging.debug('Machine id=%d put back on idle list', info.id)
+          logging.debug('Machine id=%d put back on idle list', int(info.id))
           idle_machine = IdleMachine(id=info.id)
           idle_machine.put()
         else:
@@ -321,7 +321,7 @@ class TestRequestManager(object):
             logging.error('Machine %s, should not be in WAITING state without'
                           'a runner!', info.id)
           else:
-            logging.debug('Machine id=%d will be released', info.id)
+            logging.debug('Machine id=%d will be released', int(info.id))
           machines_to_release.append(info.id)
       else:
         # If there is a machine that is ready and assigned a runner that is
@@ -331,7 +331,7 @@ class TestRequestManager(object):
 
     for machine_id in machines_to_release:
       self._machine_manager.ReleaseMachine(machine_id)
-      logging.debug('Machine id=%d released', machine_id)
+      logging.debug('Machine id=%d released', int(machine_id))
 
   def MachineStatusChanged(self, info):
     """Handles a status change of an acquired machine.
@@ -377,7 +377,7 @@ class TestRequestManager(object):
       idle_machine: An instance of machine_manager.Machine representing the
           machine whose state has changed.
     """
-    logging.debug('TRM._IdleMachineStateChanged id=%d status=%d', info.id,
+    logging.debug('TRM._IdleMachineStateChanged id=%d status=%d', int(info.id),
                   info.status)
 
     # An idle machine should already be ready so can't transition to it.
@@ -394,7 +394,7 @@ class TestRequestManager(object):
       idle_machine.delete()
     else:
       logging.error('Invalid status change for idle machine_id=%d status=%d',
-                    info.id, info.status)
+                    int(info.id), info.status)
 
   def _RunnerMachineStateChanged(self, info, runner):
     """Handles a status change for a machine running a test.
@@ -405,7 +405,7 @@ class TestRequestManager(object):
           machine state has changed.
     """
     logging.debug('TRM._RunnerMachineStateChanged id=%d status=%d runner=%s',
-                  info.id, info.status, runner.GetName())
+                  int(info.id), int(info.status), runner.GetName())
 
     # If the machine is switching to the READY state, we will start the test
     # associated to it in the next call to AssignPendingRequests.
@@ -413,14 +413,14 @@ class TestRequestManager(object):
       # The machine running the test has failed.  Tell the user about it.
       r_str = ('Tests aborted. The machine (%d) running the test (%s) '
                'experienced a state change. Machine status: %d' %
-               (info.id, str(runner.key()), info.status))
+               (int(info.id), str(runner.key()), int(info.status)))
       self._UpdateTestResult(runner, result_string=r_str)
 
       if info.status == base_machine_provider.MachineStatus.STOPPED:
         self._machine_manager.ReleaseMachine(info.id)
       elif info.status != base_machine_provider.MachineStatus.DONE:
         logging.error('Invalid status change for machine_id=%d status=%d',
-                      info.id, info.status)
+                      int(info.id), int(info.status))
 
   def HandleTestResults(self, web_request):
     """Handle a response from the remote script.
@@ -731,7 +731,7 @@ class TestRequestManager(object):
     # later when assigning runners.  See AssignPendingRequests.
     machine_id = self._machine_manager.AcquireMachine(None, config.dimensions)
     if machine_id is not -1:
-      logging.info('New machine acquired with id=%d', machine_id)
+      logging.info('New machine acquired with id=%d', int(machine_id))
       runner.machine_id = machine_id
       runner.put()
 
@@ -748,8 +748,9 @@ class TestRequestManager(object):
     logging.debug('TRM._ExecuteTestRunnerOnIdleMachine '
                   'runner=%s config=%s instance=%d num_instances=%d machine=%d',
                   runner.GetName(), runner.config_name,
-                  runner.config_instance_index, runner.num_config_instances,
-                  idle_machine.id)
+                  int(runner.config_instance_index),
+                  int(runner.num_config_instances),
+                  int(idle_machine.id))
     config = runner.GetConfiguration()
     assert runner.config_instance_index < runner.num_config_instances
     assert (runner.num_config_instances >= config.min_instances and
@@ -914,7 +915,7 @@ class TestRequestManager(object):
         machine = self._FindMatchingIdleMachine(runner)
         if machine:
           logging.debug('Found machine id=%d to runner=%s',
-                        machine.id, runner.GetName())
+                        int(machine.id), runner.GetName())
           self._ExecuteTestRunnerOnIdleMachine(runner, machine, server_url)
         else:
           # If we didn't already have a machine for this test and we couldn't
@@ -965,3 +966,4 @@ class TestRequestManager(object):
     # Consider the runner's machine dead.  Release it.
     if machine_id > 0:
       self._machine_manager.ReleaseMachine(machine_id)
+
