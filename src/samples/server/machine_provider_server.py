@@ -91,7 +91,7 @@ class MachineProviderServer(BaseHTTPServer.BaseHTTPRequestHandler):
       # Dimension names must be strings... Our machine dimensions are unicode.
       if (not isinstance(dimension_name, (str, unicode)) or
           unicode(dimension_name) not in machine_dimensions):
-        self.log_message('% not in %s', dimension_name, machine_dimensions)
+        self.log_message('%s not in %s', dimension_name, machine_dimensions)
         return False
       # Now that we know the dimension is there, we must confirm it has
       # all the requested values, if there are more than one.
