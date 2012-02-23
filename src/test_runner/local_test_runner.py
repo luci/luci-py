@@ -375,7 +375,7 @@ class LocalTestRunner(object):
       # Give some local feedback of progress and potentially upload to
       # output_destination if any.
       if current_content:
-        print current_content,
+        logging.info(current_content)
 
       if upload_url and upload_chunk_size > 0:
         current_chunk_to_upload += current_content
