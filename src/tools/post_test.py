@@ -23,6 +23,42 @@ The results of the test will be visible on the TRS web interface.
 """
 
 
+def WaitForResults(running_test_keys, base_url, sleep_time, verbose=False):
+  test_result_output = ''
+  test_all_succeeded = True
+  while running_test_keys:
+    for running_test_key in running_test_keys[:]:
+      try:
+        key_url = '%s/get_result?r=%s' % (base_url,
+                                          running_test_key['test_key'])
+        output = urllib2.urlopen(key_url).read()
+        if output:
+          if verbose:
+            test_result_output = (
+                '%s\n=======================\nConfig: %s\n%s' %
+                (test_result_output, running_test_key['config_name'], output))
+          if test_all_succeeded and '0 FAILED TESTS' not in output:
+            test_all_succeeded = False
+          running_test_keys.remove(running_test_key)
+          if verbose:
+            print 'Test done for %s' % running_test_key['config_name']
+        else:
+          if verbose:
+            print running_test_key['config_name'] + ' isn\'t done yet'
+      except urllib2.HTTPError, e:
+        print 'Calling %s threw %s' % (key_url, e)
+    time.sleep(sleep_time)
+  if verbose:
+    print test_result_output
+    print '======================='
+  if test_all_succeeded:
+    print 'All test succeeded'
+    return 0
+  else:
+    print 'At least one test failed'
+    return 42
+
+
 def main():
   parser = optparse.OptionParser(usage='%prog [options] [filename]',
                                  description=DESCRIPTION)
@@ -31,15 +67,15 @@ def main():
                     help='Wait for all test to complete and print their output')
   parser.add_option('-t', '--sleep_time', dest='sleep_time', type='int',
                     default=60, help='The time, in seconds, to wait between '
-                    'each poll. Defaults to 60 seconds.')
+                    'each poll. Defaults to %default seconds.')
   parser.add_option('-v', '--verbose', dest='verbose', action='store_true',
                     help='Print verbose logging')
   parser.add_option('-n', '--hostname', dest='hostname', default='localhost',
                     help='Specify the hostname of the Swarm server. Optional. '
-                    'Defaults to Localhost')
+                    'Defaults to %default')
   parser.add_option('-p', '--port', dest='port', type='int', default=8080,
                     help='Specify the port of the Swarm server. Optional. '
-                    'Defaults to 8080')
+                    'Defaults to %default')
 
   (options, args) = parser.parse_args()
   if not args:
@@ -69,7 +105,7 @@ def main():
   # Check that we can read the output as a JSON string
   try:
     test_keys = json.loads(output)
-  except (ValueError, TypeError), e:
+  except (ValueError, TypeError):
     print 'Request failed:'
     print output
     return 1
@@ -86,39 +122,10 @@ def main():
           test_key['num_instances'], test_key['test_key'])
 
   if options.wait_for_results:
-    test_result_output = ''
-    test_all_succeeded = True
-    while running_test_keys:
-      for running_test_key in running_test_keys[:]:
-        try:
-          key_url = '%s/get_result?r=%s' % (base_url,
-                                            running_test_key['test_key'])
-          output = urllib2.urlopen(key_url).read()
-          if output:
-            if options.verbose:
-              test_result_output = (
-                  '%s\n=======================\nConfig: %s\n%s' %
-                  (test_result_output, running_test_key['config_name'], output))
-            if test_all_succeeded and '0 FAILED TESTS' not in output:
-              test_all_succeeded = False
-            running_test_keys.remove(running_test_key)
-            if options.verbose:
-              print 'Test done for %s' % running_test_key['config_name']
-          else:
-            if options.verbose:
-              print running_test_key['config_name'] + ' isn\'t done yet'
-        except urllib2.HTTPError, e:
-          print 'Calling %s threw %s' % (key_url, e)
-      time.sleep(options.sleep_time)
-    if options.verbose:
-      print test_result_output
-      print '======================='
-    if test_all_succeeded:
-      print 'All test succeeded'
-      return 0
-    else:
-      print 'At least one test failed'
-      return 42
+    return WaitForResults(running_test_keys, base_url,
+                          options.sleep_time, options.verbose)
+
+  return 0
 
 if __name__ == '__main__':
   sys.exit(main())
