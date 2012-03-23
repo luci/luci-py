@@ -117,6 +117,12 @@ class TestRequest(db.Model):
 
     return None
 
+  def RunnerDeleted(self):
+    # Delete this request if we have deleted all the runners that were created
+    # because of it.
+    if self.runners.count() == 0:
+      self.delete()
+
 
 class TestRunner(db.Model):
   """Represents one instance of a test runner.
@@ -541,6 +547,12 @@ class TestRequestManager(object):
       else:
         logging.exception('Unknown url given as result url, %s',
                           test_case.result_url)
+
+    if (test_case.store_result == 'none' or
+        (test_case.store_result == 'fail' and runner.ran_successful)):
+      test_request = runner.test_request
+      runner.delete()
+      test_request.RunnerDeleted()
 
   def _EmailTestResults(self, runner, send_to):
     """Emails the test result.

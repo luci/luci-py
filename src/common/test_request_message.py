@@ -691,6 +691,7 @@ class TestCase(TestRequestMessageBase):
         virgin machines or not.
     tests: An optional tests list for this test case.
     result_url: An optional URL where to post the results of this test case.
+    store_result: The key to access the test run's storage string.
     output_destination: An optional dictionary with a URL where to post the
         output of this test case as well as the size of the chunks to use.
         The key for the URL is 'url' and the value must be a valid URL string.
@@ -700,10 +701,11 @@ class TestCase(TestRequestMessageBase):
     verbose: An optional boolean value that specifies if logging should be
         verbose or not.
   """
+  VALID_STORE_RESULT_VALUES = [None, '', 'all', 'fail', 'none']
 
   def __init__(self, test_case_name=None, env_vars=None, configurations=None,
                data=None, binaries=None, working_dir=None, admin=False,
-               virgin=False, tests=None, result_url=None,
+               virgin=False, tests=None, result_url=None, store_result=None,
                output_destination=None, failure_email=None, verbose=False):
     super(TestCase, self).__init__()
     self.test_case_name = test_case_name
@@ -731,6 +733,7 @@ class TestCase(TestRequestMessageBase):
     else:
       self.tests = []
     self.result_url = result_url
+    self.store_result = store_result
     self.output_destination = output_destination
     self.failure_email = failure_email
     self.verbose = verbose
@@ -759,7 +762,8 @@ class TestCase(TestRequestMessageBase):
                                             errors=errors) or
         not self.AreValidValues(['working_dir', 'failure_email', 'result_url'],
                                 str, errors=errors) or
-        (self.result_url and not self.AreValidUrls(['result_url'], errors))):
+        (self.result_url and not self.AreValidUrls(['result_url'], errors)) or
+        self.store_result not in TestCase.VALID_STORE_RESULT_VALUES):
       self.LogError('Invalid TestCase: %s' % self.__dict__, errors)
       return False
 

@@ -530,6 +530,8 @@ class TestCaseTest(TestHelper):
         virgin=TestHelper.VALID_BOOLEAN_VALUES[-1],
         tests=[TestObjectTest.GetFullObject()],
         result_url=TestHelper.VALID_URL_VALUES[-1],
+        store_result=
+        test_request_message.TestCase.VALID_STORE_RESULT_VALUES[-1],
         output_destination=
         TestHelper.VALID_OPTIONAL_OUTPUT_DESTINATION_VALUES[-1],
         failure_email=TestHelper.VALID_OPTIONAL_STRING_VALUES[-1],
@@ -571,6 +573,9 @@ class TestCaseTest(TestHelper):
                                               [test_config1]])
 
     self.AssertValidValues('result_url', TestHelper.VALID_OPTIONAL_URL_VALUES)
+    valid_store_result = test_request_message.TestCase.VALID_STORE_RESULT_VALUES
+    self.AssertValidValues('store_result', valid_store_result)
+
     self.AssertValidValues('output_destination',
                            TestHelper.VALID_OPTIONAL_OUTPUT_DESTINATION_VALUES)
     self.AssertValidValues('failure_email',
@@ -612,6 +617,15 @@ class TestCaseTest(TestHelper):
 
     self.AssertInvalidValues('result_url', TestHelper.INVALID_URL_VALUES)
     self.test_request.result_url = TestHelper.VALID_URL_VALUES[0]
+
+    invalid_store_result = (TestHelper.INVALID_STRING_VALUES +
+                            ['all_results', 'some', 'mine'])
+    #pylint: disable-msg=C6402
+    map(lambda i: self.assertFalse(i in valid_store_result),
+        invalid_store_result)
+    #pylint: enable-msg=C6402
+    self.AssertInvalidValues('store_result', invalid_store_result)
+    self.test_request.store_result = None
 
     self.AssertInvalidValues('output_destination',
                              TestHelper.INVALID_OUTPUT_DESTINATION_VALUES)
