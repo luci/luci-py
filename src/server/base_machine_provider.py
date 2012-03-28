@@ -31,7 +31,8 @@ class MachineStatus(object):
   WAITING = 0
   # The requested machine is ready and can be used.
   READY = 1
-  # The machine has been stopped and is about to be DONE.
+  # The machine has been stopped for some reason and will remain stopped until
+  # the machince provider says it can be used again.
   STOPPED = 2
   # The machine is done and can't be used anymore.
   DONE = 3

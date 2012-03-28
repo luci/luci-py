@@ -41,6 +41,11 @@ class Machine(db.Expando):
 
   _RESERVERED_NAMES = ['id', 'status', 'host']
 
+  def SetMachineInfo(self, machine_info):
+    if machine_info:
+      self.host = machine_info.Host()
+      self.status = machine_info.Status()
+
   def SetDimensions(self, config_dimensions):
     """Sets the dimensions from a given config dimensions dictionary.
 
@@ -282,9 +287,10 @@ class MachineManager(object):
     """Acquire a new machine.
 
     Acquires a new machine from the specified pool, and returns the provider's
-    machine id for this request.  Machine acquisition is async, so the machine
-    will not be ready immediately.  The status of the machine can be inquired
-    using the GetMachineStatus() function or by registering a callback function
+    machine id for this request.  Machine acquisition may be sync or async
+    (as decided by the machince provider), so the machine will not be ready
+    immediately.  The status of the machine can be inquired using the
+    GetMachineStatus() function or by registering a callback function
     for machine status changes.
 
     Args:
@@ -299,17 +305,21 @@ class MachineManager(object):
     Returns:
       An id that represents this machine, or -1 if an error occurred.
     """
-    machine = Machine(status=base_machine_provider.MachineStatus.WAITING)
-    if not machine.SetDimensions(config_dimensions):
-      logging.error('Invalid configuration: %s', str(config_dimensions))
-      return -1
-
     try:
       machine_id = self._machine_provider.RequestMachine(
           pool, config_dimensions, self._MACHINE_REQUEST_EXPIRATION_DELTA)
     except base_machine_provider.MachineProviderException, e:
       logging.warning('Can\'t open request, exception: %s (%d)',
                       e.message, e.error_code)
+      return -1
+
+    # Attempting to add a constructor to Machine that takes in MachineInfo
+    # results in an odd crash when calling put on Machine afterwards, not
+    # excatly sure why.
+    machine = Machine()
+    machine.SetMachineInfo(self._machine_provider.GetMachineInfo(machine_id))
+    if not machine.SetDimensions(config_dimensions):
+      logging.error('Invalid configuration: %s', str(config_dimensions))
       return -1
 
     machine.id = machine_id

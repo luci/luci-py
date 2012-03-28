@@ -747,6 +747,20 @@ class TestRequestManager(object):
       runner.machine_id = machine_id
       runner.put()
 
+  def _ExecuteTestRunnerIfPossible(self, runner, server_url):
+    """Execute a given runner on its specified machine if possible.
+
+    Args:
+      runner: A TestRunner object to execute.
+      server_url: The URL to the Swarm server so that we can set the result_url
+          in the Swarm file we upload to the machines.
+    """
+    info = self._machine_manager.GetMachineInfo(runner.machine_id)
+    if info and info.status == base_machine_provider.MachineStatus.READY:
+      self._ExecuteTestRunner(runner, server_url)
+    elif not info:
+      logging.warning('Machine %s, returned no info', runner.machine_id)
+
   def _ExecuteTestRunnerOnIdleMachine(self, runner, idle_machine, server_url):
     """Execute a given runner on the specified idle machine.
 
@@ -918,11 +932,7 @@ class TestRequestManager(object):
         if runner.machine_id != -1:
           # We already have a machine for this test run, so check if it's
           # ready to execute.
-          info = self._machine_manager.GetMachineInfo(runner.machine_id)
-          if info and info.status == base_machine_provider.MachineStatus.READY:
-            self._ExecuteTestRunner(runner, server_url)
-          else:
-            logging.warning('Machine %s, returned no info', runner.machine_id)
+          self._ExecuteTestRunnerIfPossible(runner, server_url)
       else:
         machine = self._FindMatchingIdleMachine(runner)
         if machine:
@@ -933,6 +943,9 @@ class TestRequestManager(object):
           # If we didn't already have a machine for this test and we couldn't
           # get an idle one, make sure we will eventually have one available.
           self._EnsureMachineAvailable(runner)
+          # The machine may have been returned ready so we check to see if it
+          # can already run the test.
+          self._ExecuteTestRunnerIfPossible(runner, server_url)
 
   def _GetCurrentTime(self):
     """Gets the current time.
