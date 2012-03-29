@@ -599,7 +599,7 @@ class TestRequestManager(object):
       logging.exception(
           'An exception was thrown when attemping to send mail\n%s', e)
 
-  def ExecuteTestRequest(self, request_message):
+  def ExecuteTestRequest(self, request_message, server_url):
     """Attempts to execute a test request.
 
     If machines are available for running any of the test's configurations,
@@ -608,6 +608,8 @@ class TestRequestManager(object):
 
     Args:
       request_message: A string representing a test request.
+      server_url: The URL to the Swarm server so that we can set the
+          result_url in the Swarm file we upload to the machines.
 
     Raises:
       test_request_message.Error: If the request's message isn't valid.
@@ -632,12 +634,36 @@ class TestRequestManager(object):
       for instance_index in range(config.min_instances):
         config.instance_index = instance_index
         config.num_instances = config.min_instances
-        test_key = self._QueueTestRequestConfig(request, config)
+        runner = self._QueueTestRequestConfig(request, config)
+
+        self._TryAndRun(runner, server_url)
+
         test_keys['test_keys'].append({'config_name': config.config_name,
                                        'instance_index': instance_index,
                                        'num_instances': config.num_instances,
-                                       'test_key': str(test_key)})
+                                       'test_key': str(runner.key())})
     return test_keys
+
+  def _TryAndRun(self, runner, server_url):
+    """Attempt to find a machine to run the given runner.
+
+    Args:
+      runner: The test runner that we wish to run.
+      server_url: The URL to the Swarm server so that we can set the
+          result_url in the Swarm file we upload to the machines.
+    """
+    machine = self._FindMatchingIdleMachine(runner)
+    if machine:
+      logging.debug('Found machine id=%d to runner=%s',
+                    int(machine.id), runner.GetName())
+      self._ExecuteTestRunnerOnIdleMachine(runner, machine, server_url)
+    else:
+      # If we didn't already have a machine for this test and we couldn't
+      # get an idle one, make sure we will eventually have one available.
+      self._EnsureMachineAvailable(runner)
+      # The machine may have been returned ready so we check to see if it
+      # can already run the test.
+      self._ExecuteTestRunnerIfPossible(runner, server_url)
 
   def _QueueTestRequestConfig(self, request, config):
     """Queue a given request's configuration for execution.
@@ -648,7 +674,8 @@ class TestRequestManager(object):
           run the test.
 
     Returns:
-      The id key of the test runner that was created and saved.
+      A tuple containing the id key of the test runner that was created
+      and saved, as well as the test runner.
     """
     logging.debug('TRM._QueueTestRequestConfig request=%s config=%s',
                   request.GetName(), config.config_name)
@@ -660,7 +687,9 @@ class TestRequestManager(object):
                         config_instance_index=config.instance_index,
                         num_config_instances=config.num_instances,
                         machine_id=0)
-    return runner.put()
+    runner.put()
+
+    return runner
 
   def _FindMatchingMachineInList(self, obj_list, config):
     """Find first object in obj_list whose machine matches the given config.
@@ -934,18 +963,7 @@ class TestRequestManager(object):
           # ready to execute.
           self._ExecuteTestRunnerIfPossible(runner, server_url)
       else:
-        machine = self._FindMatchingIdleMachine(runner)
-        if machine:
-          logging.debug('Found machine id=%d to runner=%s',
-                        int(machine.id), runner.GetName())
-          self._ExecuteTestRunnerOnIdleMachine(runner, machine, server_url)
-        else:
-          # If we didn't already have a machine for this test and we couldn't
-          # get an idle one, make sure we will eventually have one available.
-          self._EnsureMachineAvailable(runner)
-          # The machine may have been returned ready so we check to see if it
-          # can already run the test.
-          self._ExecuteTestRunnerIfPossible(runner, server_url)
+        self._TryAndRun(runner, server_url)
 
   def _GetCurrentTime(self):
     """Gets the current time.

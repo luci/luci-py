@@ -190,7 +190,8 @@ class TestRequestHandler(webapp.RequestHandler):
       return
 
     try:
-      response = str(_test_manager.ExecuteTestRequest(self.request.body))
+      response = str(_test_manager.ExecuteTestRequest(self.request.body,
+                                                      self.request.host_url))
       # This enables our callers to use the response string as a JSON string.
       response = response.replace("'", '"')
     except test_request_message.Error, ex:
