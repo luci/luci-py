@@ -549,7 +549,7 @@ class TestRequestManager(object):
                           test_case.result_url)
 
     if (test_case.store_result == 'none' or
-        (test_case.store_result == 'fail' and runner.ran_successful)):
+        (test_case.store_result == 'fail' and runner.ran_successfully)):
       test_request = runner.test_request
       runner.delete()
       test_request.RunnerDeleted()
