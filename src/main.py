@@ -1,6 +1,6 @@
 #!/usr/bin/python2.4
 #
-# Copyright 2011 Google Inc. All Rights Reserved.
+# Copyright 2012 Google Inc. All Rights Reserved.
 #
 # while testing on a linux box. Do the following:
 #
@@ -10,7 +10,7 @@ import datetime
 import logging
 import os.path
 
-
+from google.appengine.api import auto_import_fixer
 from google.appengine.api import users
 from google.appengine.ext import webapp
 from google.appengine.ext.webapp import template
@@ -254,6 +254,26 @@ class ShowMessageHandler(webapp.RequestHandler):
       self.response.out.write('Cannot find message for: %s' % key)
 
 
+class GetMatchingTestCasesHandler(webapp.RequestHandler):
+  """Get all the keys for any test runner that match a given test case name."""
+
+  def get(self):  # pylint: disable-msg=C6409
+    """Handles HTTP GET requests for this handler's URL."""
+    self.response.headers['Content-Type'] = 'text/plain'
+
+    test_case_name = self.request.get('name', '')
+
+    matches = _test_manager.GetAllMatchingTestRequests(test_case_name)
+    keys = []
+    for match in matches:
+      keys.extend(map(str, match.GetAllKeys()))
+
+    if keys:
+      self.response.out.write('\n'.join(keys))
+    else:
+      self.response.out.write('No matching Test Cases')
+
+
 class GetResultHandler(webapp.RequestHandler):
   """Show the full result string from a test runner."""
 
@@ -318,25 +338,32 @@ class RetryHandler(webapp.RequestHandler):
       self.response.out.write('Cannot find message for: %s' % key)
 
 
-def main():
+def CreateApplication():
+  """Create the managers required by app engine."""
   # pylint: disable-msg=W0603
-  global _test_manager, _machine_manager
+  global _machine_manager, _test_manager
 
+  # pylint: disable-msg=C6409
   _machine_manager = machine_manager.MachineManager(
       machine_provider.MachineProvider())
   _test_manager = test_manager.TestRequestManager(_machine_manager)
 
-  application = webapp.WSGIApplication([('/', MainHandler),
-                                        ('/show_message', ShowMessageHandler),
-                                        ('/get_result', GetResultHandler),
-                                        ('/cancel', CancelHandler),
-                                        ('/retry', RetryHandler),
-                                        ('/test', TestRequestHandler),
-                                        ('/result', ResultHandler),
-                                        ('/tasks/poll', PollHandler),
-                                        ('/tasks/quitquitquit', QuitHandler)],
-                                       debug=True)
-  util.run_wsgi_app(application)
+  return webapp.WSGIApplication([('/', MainHandler),
+                                 ('/show_message', ShowMessageHandler),
+                                 ('/get_matching_test_cases',
+                                  GetMatchingTestCasesHandler),
+                                 ('/get_result', GetResultHandler),
+                                 ('/cancel', CancelHandler),
+                                 ('/retry', RetryHandler),
+                                 ('/test', TestRequestHandler),
+                                 ('/result', ResultHandler),
+                                 ('/tasks/poll', PollHandler),
+                                 ('/tasks/quitquitquit', QuitHandler)],
+                                debug=True)
+
+
+def main():
+  util.run_wsgi_app(CreateApplication())
 
 
 if __name__ == '__main__':

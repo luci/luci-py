@@ -1,6 +1,6 @@
 #!/usr/bin/python2.4
 #
-# Copyright 2011 Google Inc. All Rights Reserved.
+# Copyright 2012 Google Inc. All Rights Reserved.
 
 """Test Request Manager.
 
@@ -116,6 +116,19 @@ class TestRequest(db.Model):
         return configuration
 
     return None
+
+  def GetAllKeys(self):
+    """Get all the keys representing the TestRunners owned by this instance.
+
+    Returns:
+      A list of all the keys.
+    """
+    # We can only access the runner if this class has been saved into the
+    # database.
+    if self.is_saved():
+      return [runner.key() for runner in self.runners]
+    else:
+      return []
 
   def RunnerDeleted(self):
     # Delete this request if we have deleted all the runners that were created
@@ -598,6 +611,22 @@ class TestRequestManager(object):
       # inputs (such as unauthorized sender).
       logging.exception(
           'An exception was thrown when attemping to send mail\n%s', e)
+
+  def GetAllMatchingTestRequests(self, test_case_name):
+    """Returns a list of all Test Request that match the given test_case_name.
+
+    Args:
+      test_case_name: The test case name to search for.
+
+    Returns:
+      A list of all Test Requests that have |test_case_name| as their name.
+    """
+    matches = []
+    for test_request in TestRequest.all():
+      if test_request.GetName() == test_case_name:
+        matches.append(test_request)
+
+    return matches
 
   def ExecuteTestRequest(self, request_message, server_url):
     """Attempts to execute a test request.
