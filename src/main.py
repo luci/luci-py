@@ -292,6 +292,24 @@ class GetResultHandler(webapp.RequestHandler):
       self.response.out.write('Cannot find message for: %s' % key)
 
 
+class CleanupResultsHandler(webapp.RequestHandler):
+  """Delete the Test Runner with the given key."""
+
+  def post(self):  # pylint: disable-msg=C6409
+    """Handles HTTP POST requests for this handler's URL."""
+    self.response.headers['Content-Type'] = 'test/plain'
+
+    key = self.request.get('r', '')
+    key_deleted = False
+    if key:
+      key_deleted = _test_manager.DeleteRunner(key)
+
+    if key_deleted:
+      self.response.out.write('Key deleted.')
+    else:
+      self.response.out.write('Deletion failed. Key not found.')
+
+
 class CancelHandler(webapp.RequestHandler):
   """Cancel a test runner that is not already running."""
 
@@ -353,6 +371,8 @@ def CreateApplication():
                                  ('/get_matching_test_cases',
                                   GetMatchingTestCasesHandler),
                                  ('/get_result', GetResultHandler),
+                                 ('/cleanup_results',
+                                  CleanupResultsHandler),
                                  ('/cancel', CancelHandler),
                                  ('/retry', RetryHandler),
                                  ('/test', TestRequestHandler),

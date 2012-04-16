@@ -1039,3 +1039,29 @@ class TestRequestManager(object):
     if machine_id > 0:
       self._machine_manager.ReleaseMachine(machine_id)
 
+  def DeleteRunner(self, key):
+    """Delete the runner that the given key refers to.
+
+    Args:
+      key: The key corresponding to the runner to be deleted.
+
+    Returns:
+      True if a matching TestRunner was found and deleted.
+    """
+    test_runner = None
+    try:
+      test_runner = TestRunner.get(key)
+    except db.BadKeyError:
+      # We don't need to take any special action with bad keys.
+      pass
+
+    if not test_runner:
+      logging.debug('No matching Test Runner found for key, %s', key)
+      return False
+
+    test_request = test_runner.test_request
+
+    test_runner.delete()
+    test_request.RunnerDeleted()
+
+    return True
