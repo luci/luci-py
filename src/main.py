@@ -6,12 +6,17 @@
 #
 
 
+try:  # pylint: disable-msg=C6205
+  import simplejson as json  # pylint: disable-msg=C6204
+except ImportError:
+  import json  # pylint: disable-msg=C6204
 import datetime
 import logging
 import os.path
 
 from google.appengine.api import auto_import_fixer
 from google.appengine.api import users
+from google.appengine.ext import db
 from google.appengine.ext import webapp
 from google.appengine.ext.webapp import template
 from google.appengine.ext.webapp import util
@@ -283,13 +288,18 @@ class GetResultHandler(webapp.RequestHandler):
 
     runner = None
     key = self.request.get('r', '')
+    runner = None
     if key:
-      runner = test_manager.TestRunner.get(key)
+      try:
+        runner = test_manager.TestRunner.get(key)
+      except db.BadKeyError:
+        pass
 
     if runner:
-      self.response.out.write(runner.result_string)
+      results = _test_manager.GetResults(runner)
+      self.response.out.write(json.dumps(results))
     else:
-      self.response.out.write('Cannot find message for: %s' % key)
+      self.response.set_status(204)
 
 
 class CleanupResultsHandler(webapp.RequestHandler):
@@ -338,8 +348,12 @@ class RetryHandler(webapp.RequestHandler):
     self.response.headers['Content-Type'] = 'text/plain'
 
     key = self.request.get('r', '')
+    runner = None
     if key:
-      runner = test_manager.TestRunner.get(key)
+      try:
+        runner = test_manager.TestRunner.get(key)
+      except db.BadKeyError:
+        pass
 
     if runner:
       runner.machine_id = 0
@@ -353,7 +367,7 @@ class RetryHandler(webapp.RequestHandler):
 
       self.response.out.write('Runner set for retry.')
     else:
-      self.response.out.write('Cannot find message for: %s' % key)
+      self.response.set_status(204)
 
 
 def CreateApplication():

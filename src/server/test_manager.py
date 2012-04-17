@@ -197,6 +197,11 @@ class TestRunner(db.Model):
   # ended (i.e. machine_id is < 0).  Until then, the value is unspecified.
   result_string = db.TextProperty()
 
+  # The hostname of the swarm bot that ran this test. This attribute is valid
+  # only when the runner had ended (i.e. machine_id < 0). Until then, the value
+  # is unspecified.
+  hostname = db.TextProperty()
+
   def GetName(self):
     """Gets a name for this runner.
 
@@ -459,9 +464,8 @@ class TestRequestManager(object):
       runner = TestRunner.get(db.Key(key))
 
     if runner:
-      # Find the high level success/failure from the URL.
-      # TODO(user): if we can't find it here, should we scrape the result
-      # string?
+      # Find the high level success/failure from the URL. We assume failure if
+      # we can't find the success parameter in the request.
       success = web_request.get('s', 'False') == 'True'
       result_string = urllib.unquote_plus(web_request.get('r'))
       exit_codes = urllib.unquote_plus(web_request.get('x'))
@@ -720,6 +724,23 @@ class TestRequestManager(object):
 
     return runner
 
+  def _AssignMachineToRunner(self, runner, machine_id):
+    """Assign the given machine to the given runner.
+
+    Args:
+      runner: The runner acquring the machine.
+      machine_id: The id of the machine being assigned.
+    """
+    machine_info = self._machine_manager.GetMachineInfo(machine_id)
+    if machine_info:
+      runner.machine_id = machine_id
+      runner.hostname = machine_info.host
+      runner.put()
+    else:
+      # We should never assign a machine that we can't get the MachineInfo for.
+      logging.error('Assigned a machine with id %d but failed to get '
+                    'MachineInfo. Aborting assignment.', machine_id)
+
   def _FindMatchingMachineInList(self, obj_list, config):
     """Find first object in obj_list whose machine matches the given config.
 
@@ -802,8 +823,7 @@ class TestRequestManager(object):
     machine_id = self._machine_manager.AcquireMachine(None, config.dimensions)
     if machine_id is not -1:
       logging.info('New machine acquired with id=%d', int(machine_id))
-      runner.machine_id = machine_id
-      runner.put()
+      self._AssignMachineToRunner(runner, machine_id)
 
   def _ExecuteTestRunnerIfPossible(self, runner, server_url):
     """Execute a given runner on its specified machine if possible.
@@ -840,11 +860,11 @@ class TestRequestManager(object):
     assert (runner.num_config_instances >= config.min_instances and
             runner.num_config_instances <= config.max_instances)
 
-    runner.machine_id = idle_machine.id
     # TODO(user): make the next two lines atomic?  If we crash in the
     # middle, the data store will be inconsistent, although this will be
     # checked for and corrected then next time the test manager starts up.
-    runner.put()
+    # There is a runner.put in _AssignMachineToRunner.
+    self._AssignMachineToRunner(runner, idle_machine.id)
     idle_machine.delete()
     self._ExecuteTestRunner(runner, server_url)
 
@@ -1003,6 +1023,20 @@ class TestRequestManager(object):
       The current time as a datetime.datetime object.
     """
     return datetime.datetime.now()
+
+  def GetResults(self, runner):
+    """Gets the results from the given test run.
+
+    Args:
+      runner: The instance of TestRunner to get the results from.
+
+    Returns:
+      A dictionary of the results.
+    """
+
+    return {'exit_codes': runner.exit_codes,
+            'hostname': runner.hostname,
+            'output': runner.result_string}
 
   def AbortStaleRunners(self):
     """Abort any runners that have been running longer than expected."""
