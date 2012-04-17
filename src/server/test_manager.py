@@ -198,7 +198,7 @@ class TestRunner(db.Model):
   result_string = db.TextProperty()
 
   # The hostname of the swarm bot that ran this test. This attribute is valid
-  # only when the runner had ended (i.e. machine_id < 0). Until then, the value
+  # only when the runner has been assigned a machine. Until then, the value
   # is unspecified.
   hostname = db.TextProperty()
 

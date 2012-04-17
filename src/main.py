@@ -14,7 +14,6 @@ import datetime
 import logging
 import os.path
 
-from google.appengine.api import auto_import_fixer
 from google.appengine.api import users
 from google.appengine.ext import db
 from google.appengine.ext import webapp
