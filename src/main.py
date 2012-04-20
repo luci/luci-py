@@ -194,8 +194,8 @@ class TestRequestHandler(webapp.RequestHandler):
       return
 
     try:
-      response = str(_test_manager.ExecuteTestRequest(self.request.body,
-                                                      self.request.host_url))
+      _test_manager.UpdateCacheServerURL(self.request.host_url)
+      response = str(_test_manager.ExecuteTestRequest(self.request.body))
       # This enables our callers to use the response string as a JSON string.
       response = response.replace("'", '"')
     except test_request_message.Error, ex:
@@ -221,7 +221,8 @@ class PollHandler(webapp.RequestHandler):
     """Handles HTTP GET requests for this handler's URL."""
     logging.debug('Polling')
     _machine_manager.ValidateMachines()
-    _test_manager.AssignPendingRequests(self.request.host_url)
+    _test_manager.UpdateCacheServerURL(self.request.host_url)
+    _test_manager.AssignPendingRequests()
     _test_manager.AbortStaleRunners()
     self.response.out.write("""
     <html>

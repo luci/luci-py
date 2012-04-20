@@ -312,6 +312,15 @@ class TestRequestManager(object):
 
     logging.debug('TRM created')
 
+  def UpdateCacheServerURL(self, server_url):
+    """Update the value of this server's url.
+
+    Args:
+      server_url: The URL to the Swarm server so that we can set the
+          result_url in the Swarm file we upload to the machines.
+    """
+    self.server_url = server_url
+
   def _CheckAllAcquiredMachines(self):
     """Ensure acquired machines are either idle or assigned to a runner."""
     logging.debug('TRM._CheckAllAcquiredMachines')
@@ -632,7 +641,7 @@ class TestRequestManager(object):
 
     return matches
 
-  def ExecuteTestRequest(self, request_message, server_url):
+  def ExecuteTestRequest(self, request_message):
     """Attempts to execute a test request.
 
     If machines are available for running any of the test's configurations,
@@ -641,8 +650,6 @@ class TestRequestManager(object):
 
     Args:
       request_message: A string representing a test request.
-      server_url: The URL to the Swarm server so that we can set the
-          result_url in the Swarm file we upload to the machines.
 
     Raises:
       test_request_message.Error: If the request's message isn't valid.
@@ -669,7 +676,7 @@ class TestRequestManager(object):
         config.num_instances = config.min_instances
         runner = self._QueueTestRequestConfig(request, config)
 
-        self._TryAndRun(runner, server_url)
+        self._TryAndRun(runner)
 
         test_keys['test_keys'].append({'config_name': config.config_name,
                                        'instance_index': instance_index,
@@ -677,26 +684,24 @@ class TestRequestManager(object):
                                        'test_key': str(runner.key())})
     return test_keys
 
-  def _TryAndRun(self, runner, server_url):
+  def _TryAndRun(self, runner):
     """Attempt to find a machine to run the given runner.
 
     Args:
       runner: The test runner that we wish to run.
-      server_url: The URL to the Swarm server so that we can set the
-          result_url in the Swarm file we upload to the machines.
     """
     machine = self._FindMatchingIdleMachine(runner)
     if machine:
       logging.debug('Found machine id=%d to runner=%s',
                     int(machine.id), runner.GetName())
-      self._ExecuteTestRunnerOnIdleMachine(runner, machine, server_url)
+      self._ExecuteTestRunnerOnIdleMachine(runner, machine)
     else:
       # If we didn't already have a machine for this test and we couldn't
       # get an idle one, make sure we will eventually have one available.
       self._EnsureMachineAvailable(runner)
       # The machine may have been returned ready so we check to see if it
       # can already run the test.
-      self._ExecuteTestRunnerIfPossible(runner, server_url)
+      self._ExecuteTestRunnerIfPossible(runner)
 
   def _QueueTestRequestConfig(self, request, config):
     """Queue a given request's configuration for execution.
@@ -825,29 +830,25 @@ class TestRequestManager(object):
       logging.info('New machine acquired with id=%d', int(machine_id))
       self._AssignMachineToRunner(runner, machine_id)
 
-  def _ExecuteTestRunnerIfPossible(self, runner, server_url):
+  def _ExecuteTestRunnerIfPossible(self, runner):
     """Execute a given runner on its specified machine if possible.
 
     Args:
       runner: A TestRunner object to execute.
-      server_url: The URL to the Swarm server so that we can set the result_url
-          in the Swarm file we upload to the machines.
     """
     info = self._machine_manager.GetMachineInfo(runner.machine_id)
     if info and info.status == base_machine_provider.MachineStatus.READY:
-      self._ExecuteTestRunner(runner, server_url)
+      self._ExecuteTestRunner(runner)
     elif not info:
       logging.warning('Machine %s, returned no info', runner.machine_id)
 
-  def _ExecuteTestRunnerOnIdleMachine(self, runner, idle_machine, server_url):
+  def _ExecuteTestRunnerOnIdleMachine(self, runner, idle_machine):
     """Execute a given runner on the specified idle machine.
 
     Args:
       runner: A TestRunner object to execute.
       idle_machine: An instance of IdleMachine representing the machine to run
           the test on.
-      server_url: The URL to the Swarm server so that we can set the
-          result_url in the Swarm file we upload to the machines.
     """
     logging.debug('TRM._ExecuteTestRunnerOnIdleMachine '
                   'runner=%s config=%s instance=%d num_instances=%d machine=%d',
@@ -866,15 +867,13 @@ class TestRequestManager(object):
     # There is a runner.put in _AssignMachineToRunner.
     self._AssignMachineToRunner(runner, idle_machine.id)
     idle_machine.delete()
-    self._ExecuteTestRunner(runner, server_url)
+    self._ExecuteTestRunner(runner)
 
-  def _ExecuteTestRunner(self, runner, server_url):
+  def _ExecuteTestRunner(self, runner):
     """Execute a given runner on it's assigned machine.
 
     Args:
       runner: A TestRunner object to execute.
-      server_url: The URL to the Swarm server so that we can set the
-          result_url in the Swarm file we upload to the machines.
     """
 
     # TODO(user): At the moment, we only run a single instance of the server
@@ -914,7 +913,7 @@ class TestRequestManager(object):
     file_pairs_to_upload.extend((os.path.join(root, file), file)
                                 for file in files)
 
-    test_run = self._BuildTestRun(runner, server_url)
+    test_run = self._BuildTestRun(runner)
     command_to_execute = [remote_python26_path,
                           r'%s/%s' % (test_run.working_dir,
                                       _TEST_RUNNER_SCRIPT),
@@ -951,13 +950,11 @@ class TestRequestManager(object):
                              result_string=('Tests aborted. Upload to the '
                                             'remote server failed.'))
 
-  def _BuildTestRun(self, runner, server_url):
+  def _BuildTestRun(self, runner):
     """Build a Test Run message for the remote test script.
 
     Args:
       runner: A TestRunner object for this test run.
-      server_url: The URL to the Swarm server so that we can set the
-          result_url in the Swarm file we upload to the machines.
 
     Raises:
       test_request_message.Error: If the request's message isn't valid.
@@ -973,7 +970,7 @@ class TestRequestManager(object):
         instance_index=runner.config_instance_index,
         num_instances=runner.num_config_instances,
         configuration=config,
-        result_url=('%s/result?k=%s' % (server_url, str(runner.key()))),
+        result_url=('%s/result?k=%s' % (self.server_url, str(runner.key()))),
         output_destination=test_request.output_destination,
         data=(test_request.data + test_request.binaries +
               config.data + config.binaries),
@@ -987,12 +984,8 @@ class TestRequestManager(object):
     assert test_run.IsValid(errors), errors
     return test_run
 
-  def AssignPendingRequests(self, server_url):
+  def AssignPendingRequests(self):
     """Assign test requests to available machines.
-
-    Args:
-      server_url: The URL to the Swarm server so that we can set the
-          result_url in the Swarm file we upload to the machines.
 
     Raises:
       test_request_message.Error: If the request's message isn't valid.
@@ -1010,9 +1003,9 @@ class TestRequestManager(object):
         if runner.machine_id != -1:
           # We already have a machine for this test run, so check if it's
           # ready to execute.
-          self._ExecuteTestRunnerIfPossible(runner, server_url)
+          self._ExecuteTestRunnerIfPossible(runner)
       else:
-        self._TryAndRun(runner, server_url)
+        self._TryAndRun(runner)
 
   def _GetCurrentTime(self):
     """Gets the current time.
