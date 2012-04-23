@@ -622,6 +622,7 @@ def main():
   if args:
     logging.warning('Ignoring unknown args: %s', args)
 
+  runner = None
   try:
     runner = LocalTestRunner(options.request_file_name, verbose=options.verbose,
                              data_folder_name=options.data_folder_name)
