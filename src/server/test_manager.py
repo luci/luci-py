@@ -344,9 +344,7 @@ class TestRequestManager(object):
         logging.debug('Machine id=%d is idle and unassigned', int(info.id))
 
         if info.status == base_machine_provider.MachineStatus.READY:
-          logging.debug('Machine id=%d put back on idle list', int(info.id))
-          idle_machine = IdleMachine(id=info.id)
-          idle_machine.put()
+          self._HandleIdleMachine(info=info)
         else:
           if info.status == base_machine_provider.MachineStatus.WAITING:
             # WAITING machines should ALWAYS be assigned a runner.
@@ -513,8 +511,7 @@ class TestRequestManager(object):
     # refer to a valid assigned machine, then this id should not be put onto
     # the idle list.
     if reuse_machine and runner.machine_id != 0:
-      machine = IdleMachine(id=runner.machine_id)
-      machine.put()
+      self._HandleIdleMachine(machine_id=runner.machine_id)
 
     runner.ran_successfully = success
     runner.exit_codes = exit_codes
@@ -822,6 +819,10 @@ class TestRequestManager(object):
     Args:
       runner: A TestRunner object to execute.
     """
+    if runner.machine_id <= 0:
+      # No machine has been assigned yet.
+      return
+
     info = self._machine_manager.GetMachineInfo(runner.machine_id)
     if info and info.status == base_machine_provider.MachineStatus.READY:
       self._ExecuteTestRunner(runner)
@@ -992,6 +993,35 @@ class TestRequestManager(object):
           self._ExecuteTestRunnerIfPossible(runner)
       else:
         self._TryAndRun(runner)
+
+  def _HandleIdleMachine(self, machine_id=None, info=None):
+    """Given a newly idle machine, attempts to use it before marking it as idle.
+
+    Args:
+      machine_id: The id of the idle machine. This must be valid if info
+          is None.
+      info: The info of the idle machine. This must be valid if id is None.
+    """
+    if not id and not info:
+      logging.error('Attempted to handle an idle machine with no id or info')
+      return
+
+    if not info:
+      info = self._machine_manager.GetMachineInfo(machine_id)
+
+    # Assign test runners from earliest to latest.
+    # We use a format argument for None, because putting None in the string
+    # doesn't work.
+    query = TestRunner.gql('WHERE started = :1 ORDER BY created', None)
+    for runner in query:
+      if info.MatchDimensions(runner.GetConfiguration().dimensions):
+        self._AssignMachineToRunner(runner, info.id)
+        self._ExecuteTestRunner(runner)
+        return
+
+    logging.debug('Machine id=%d put back on idle list', info.id)
+    idle_machine = IdleMachine(id=info.id)
+    idle_machine.put()
 
   def _GetCurrentTime(self):
     """Gets the current time.

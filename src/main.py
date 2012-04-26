@@ -211,6 +211,7 @@ class ResultHandler(webapp.RequestHandler):
   def post(self):  # pylint: disable-msg=C6409
     """Handles HTTP POST requests for this handler's URL."""
     logging.debug('Received Result: %s', self.request.url)
+    _test_manager.UpdateCacheServerURL(self.request.host_url)
     _test_manager.HandleTestResults(self.request)
 
 
@@ -333,6 +334,7 @@ class CancelHandler(webapp.RequestHandler):
 
     # Make sure found runner is not yet running.
     if runner and runner.machine_id == 0:
+      _test_manager.UpdateCacheServerURL(self.request.host_url)
       _test_manager.AbortRunner(runner, reason='Runner is not already running.')
       self.response.out.write('Runner canceled.')
     else:
