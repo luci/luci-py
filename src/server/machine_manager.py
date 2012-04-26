@@ -283,14 +283,14 @@ class MachineManager(object):
     # TODO(user): do we have to worry about enum during this operation?
     self._listeners.remove(listener)
 
-  def AcquireMachine(self, pool, config_dimensions):
-    """Acquire a new machine.
+  def RequestMachine(self, pool, config_dimensions):
+    """Requests a new machine.
 
-    Acquires a new machine from the specified pool, and returns the provider's
-    machine id for this request.  Machine acquisition may be sync or async
-    (as decided by the machince provider), so the machine will not be ready
-    immediately.  The status of the machine can be inquired using the
-    GetMachineStatus() function or by registering a callback function
+    Requests a new machine from the specified pool, and returns the provider's
+    machine id for this request if a machine is available.  Machine acquisition
+    may be sync or async (as decided by the machince provider), so the machine
+    might not be ready immediately.  The status of the machine can be inquired
+    using the GetMachineStatus() function or by registering a callback function
     for machine status changes.
 
     Args:
@@ -303,7 +303,7 @@ class MachineManager(object):
           The value of the map should be taken from the web page above.
 
     Returns:
-      An id that represents this machine, or -1 if an error occurred.
+      An id that represents this machine, or -1 if a machine was not available.
     """
     try:
       machine_id = self._machine_provider.RequestMachine(

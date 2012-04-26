@@ -678,6 +678,10 @@ class TestRequestManager(object):
 
         self._TryAndRun(runner)
 
+        # TODO(user): if the runner was unable to acquire a machine, check
+        # that acquisition will be possible at somepoint, if not we have
+        # an error
+
         test_keys['test_keys'].append({'config_name': config.config_name,
                                        'instance_index': instance_index,
                                        'num_instances': config.num_instances,
@@ -697,8 +701,8 @@ class TestRequestManager(object):
       self._ExecuteTestRunnerOnIdleMachine(runner, machine)
     else:
       # If we didn't already have a machine for this test and we couldn't
-      # get an idle one, make sure we will eventually have one available.
-      self._EnsureMachineAvailable(runner)
+      # get an idle one, see if we can acquire a new one.
+      self._RequestMachine(runner)
       # The machine may have been returned ready so we check to see if it
       # can already run the test.
       self._ExecuteTestRunnerIfPossible(runner)
@@ -752,7 +756,7 @@ class TestRequestManager(object):
     Args:
       obj_list: a list of objects with a numeric attribute 'id' that
           corresponds to the id of a machine as returned by
-          machine_manager.AcquireMachine().
+          machine_manager.RequestMachine().
       config: a TestConfiguration object as specified for TRS requests.
           See go/gforce/test-request-format for details.
 
@@ -796,36 +800,18 @@ class TestRequestManager(object):
     machines = self._machine_manager.ListAcquiredMachines()
     return self._FindMatchingMachineInList(machines, config)
 
-  def _EnsureMachineAvailable(self, runner):
-    """Ensures that a machine instance for the given runner is available.
-
-    Makes sure that a machine with the needed configuration and freshness is
-    available for running tests.  If a machine that matches the runner
-    configuration is already acquired but busy running an existing test,
-    then no new machine is acquired, unless the runner requires a virgin
-    machine or it is sharded across many machines.
-
-    If we need to force a new machine or there is none with the given
-    configuration that is already acquired and we decide that a new machine
-    can be requested (actual heuristic TBD) then one will be acquired using
-    the machine manager.
+  def _RequestMachine(self, runner):
+    """Request a machine to run the given runner.
 
     Args:
       runner: The runner we want to ensure a machine is available for.
     """
-    # TODO(user): implement some kind of upper limit for machines.
-
-    # If we have already acquired a machine with required dimensions, then
-    # simply wait for it to become available unless we need a fresh new one.
     config = runner.GetConfiguration()
-    if (not runner.RequiresVirginMachine() and
-        runner.num_config_instances == 1 and
-        self._FindMatchingAcquiredMachine(config)):
-      return
 
     # If we can't acquire the machine right now, the caller will try again
     # later when assigning runners.  See AssignPendingRequests.
-    machine_id = self._machine_manager.AcquireMachine(None, config.dimensions)
+    machine_id = self._machine_manager.RequestMachine(
+        None, config.dimensions)
     if machine_id is not -1:
       logging.info('New machine acquired with id=%d', int(machine_id))
       self._AssignMachineToRunner(runner, machine_id)
