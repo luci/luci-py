@@ -73,28 +73,6 @@ class Machine(db.Expando):
         setattr(self, dimension_name, config_dimension_value)
     return True
 
-  def MatchDimensions(self, config_dimensions):
-    """Check if our dimensions match a given config dimensions dictionary.
-
-    Args:
-      config_dimensions: A config dimensions dictionary to match.
-
-    Returns:
-      True if we have a match, False otherwise.
-    """
-    for (dimension_name, config_dimension_value) in config_dimensions.items():
-      if (not isinstance(dimension_name, str) or
-          not hasattr(self, dimension_name)):
-        return False
-      self_dimension_value = getattr(self, dimension_name)
-      if isinstance(config_dimension_value, (list, tuple)):
-        for config_dimension_value_item in config_dimension_value:
-          if config_dimension_value_item not in self_dimension_value:
-            return False
-      elif config_dimension_value not in self_dimension_value:
-        return False
-    return True
-
   def GetDimensions(self):
     """Returns a dictionary version of our data.
 

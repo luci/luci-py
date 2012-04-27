@@ -30,6 +30,7 @@ import urlparse
 from google.appengine.api import mail
 from google.appengine.api import urlfetch
 from google.appengine.ext import db
+from common import dimensions
 from common import test_request_message
 from server import base_machine_provider
 from test_runner import remote_test_runner
@@ -762,7 +763,10 @@ class TestRequestManager(object):
     """
     for obj in obj_list:
       info = self._machine_manager.GetMachineInfo(obj.id)
-      if info.MatchDimensions(config.dimensions):
+      (match, match_output) = dimensions.MatchDimensions(config.dimensions,
+                                                         info.GetDimensions())
+      logging.info(match_output)
+      if match:
         return obj
 
     return None
@@ -1014,7 +1018,10 @@ class TestRequestManager(object):
     # doesn't work.
     query = TestRunner.gql('WHERE started = :1 ORDER BY created', None)
     for runner in query:
-      if info.MatchDimensions(runner.GetConfiguration().dimensions):
+      (match, matching_output) = dimensions.MatchDimensions(
+          runner.GetConfiguration().dimensions, info.GetDimensions())
+      logging.info(matching_output)
+      if match:
         self._AssignMachineToRunner(runner, info.id)
         self._ExecuteTestRunner(runner)
         return
