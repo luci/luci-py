@@ -432,7 +432,7 @@ class LocalTestRunner(object):
       try:
         zip_file = zipfile.ZipFile(local_file)
         zip_file.extractall(self.data_dir)
-      except (zipfile.error, IOError, RuntimeError), e:
+      except (zipfile.error, zipfile.BadZipfile, IOError, RuntimeError), e:
         logging.exception('Failed to unzip %s\nException: %s', local_file, e)
         return False
       if zip_file:
