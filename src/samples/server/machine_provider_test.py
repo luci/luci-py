@@ -78,42 +78,42 @@ class _MachineProviderTestRunner(unittest.TestCase):
   def _GetDefaultTestData(self):
     return [{'id': 'win-xp-ready',
              'ip': 'win-xp-ready',
-             'state': 'READY',
+             'state': 'ACQUIRED',
              'dimensions': {'os': ['win-xp'],
                             'cpu': ['intel'],
                             'browser': ['ie-7'],
                             'lang': ['en-US']}},
             {'id': 'win-xp-done',
              'ip': 'win-xp-done',
-             'state': 'DONE',
+             'state': 'AVAILABLE',
              'dimensions': {'os': ['win-xp'],
                             'cpu': ['intel'],
                             'browser': ['ie-7'],
                             'lang': ['en-US']}},
             {'id': 'vista-ready',
              'ip': 'vista-ready',
-             'state': 'READY',
+             'state': 'ACQUIRED',
              'dimensions': {'os': ['vista'],
                             'cpu': ['intel'],
                             'browser': ['ie-7'],
                             'lang': ['en-US']}},
             {'id': 'vista-done',
              'ip': 'vista-done',
-             'state': 'DONE',
+             'state': 'AVAILABLE',
              'dimensions': {'os': ['vista'],
                             'cpu': ['intel'],
                             'browser': ['ie-7'],
                             'lang': ['en-US']}},
             {'id': 'vista-fr-done',
              'ip': 'vista-fr-done',
-             'state': 'DONE',
+             'state': 'AVAILABLE',
              'dimensions': {'os': ['vista'],
                             'cpu': ['intel'],
                             'browser': ['ie-7'],
                             'lang': ['fr']}},
             {'id': 'vista-ie7-ff-done',
              'ip': 'vista-ie7-ff-done',
-             'state': 'DONE',
+             'state': 'AVAILABLE',
              'dimensions': {'os': ['vista'],
                             'cpu': ['intel'],
                             'browser': ['ie-7', 'ff'],
@@ -155,22 +155,22 @@ class _MachineProviderTestRunner(unittest.TestCase):
 
     machine_info = self._machine_provider.GetMachineInfo('win-xp-done')
     self.assertEqual(machine_info.Status(),
-                     base_machine_provider.MachineStatus.DONE)
+                     base_machine_provider.MachineStatus.AVAILABLE)
     self.assertEqual(machine_info.Host(), 'win-xp-done')
 
     machine_info = self._machine_provider.GetMachineInfo('win-xp-ready')
     self.assertEqual(machine_info.Status(),
-                     base_machine_provider.MachineStatus.READY)
+                     base_machine_provider.MachineStatus.ACQUIRED)
     self.assertEqual(machine_info.Host(), 'win-xp-ready')
 
     machine_info = self._machine_provider.GetMachineInfo('vista-done')
     self.assertEqual(machine_info.Status(),
-                     base_machine_provider.MachineStatus.DONE)
+                     base_machine_provider.MachineStatus.AVAILABLE)
     self.assertEqual(machine_info.Host(), 'vista-done')
 
     machine_info = self._machine_provider.GetMachineInfo('vista-ie7-ff-done')
     self.assertEqual(machine_info.Status(),
-                     base_machine_provider.MachineStatus.DONE)
+                     base_machine_provider.MachineStatus.AVAILABLE)
     self.assertEqual(machine_info.Host(), 'vista-ie7-ff-done')
 
 

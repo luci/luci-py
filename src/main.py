@@ -129,12 +129,12 @@ class MainHandler(webapp.RequestHandler):
       machine.status_name = 'Unknown'
       if machine.status == base_machine_provider.MachineStatus.WAITING:
         machine.status_name = 'Waiting'
-      elif machine.status == base_machine_provider.MachineStatus.READY:
-        machine.status_name = 'Ready'
+      elif machine.status == base_machine_provider.MachineStatus.ACQUIRED:
+        machine.status_name = 'Acquired'
       elif machine.status == base_machine_provider.MachineStatus.STOPPED:
         machine.status_name = 'Stopped'
-      elif machine.status == base_machine_provider.MachineStatus.DONE:
-        machine.status_name = 'Done'
+      elif machine.status == base_machine_provider.MachineStatus.AVAILABLE:
+        machine.status_name = 'Available'
 
       # See if the machine is idle or not.
       idle = test_manager.IdleMachine.gql('WHERE id = :1', machine.id).get()

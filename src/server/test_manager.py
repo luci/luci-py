@@ -289,8 +289,9 @@ class TestRequestManager(object):
     for machine in IdleMachine.all():
       info = self._machine_manager.GetMachineInfo(machine.id)
       # "info" can be None if the machine ID is stale and doesn't reference a
-      # valid machine anymore. Idle Machines MUST be READY!
-      if not info or info.status != base_machine_provider.MachineStatus.READY:
+      # valid machine anymore. Idle Machines MUST be ACQUIRED!
+      if (not info or
+          info.status != base_machine_provider.MachineStatus.ACQUIRED):
         machines_to_del.append(machine)
         continue
 
@@ -299,7 +300,7 @@ class TestRequestManager(object):
       info = self._machine_manager.GetMachineInfo(runner.machine_id)
       if not info or info.status not in (
           base_machine_provider.MachineStatus.WAITING,
-          base_machine_provider.MachineStatus.READY):
+          base_machine_provider.MachineStatus.ACQUIRED):
         # The machine running the test has failed (either stopped or done).
         # Tell the user about it.
         r_str = 'Tests aborted. The machine running the test has failed. '
@@ -341,10 +342,10 @@ class TestRequestManager(object):
         idle_machine.delete()
       elif not runner and not idle_machine:
         # If a machine is neither idle nor assigned to a test runner, then put
-        # it in the idle pool if its READY. Otherwise, release it.
+        # it in the idle pool if its ACQUIRED. Otherwise, release it.
         logging.debug('Machine id=%d is idle and unassigned', int(info.id))
 
-        if info.status == base_machine_provider.MachineStatus.READY:
+        if info.status == base_machine_provider.MachineStatus.ACQUIRED:
           self._HandleIdleMachine(info=info)
         else:
           if info.status == base_machine_provider.MachineStatus.WAITING:
@@ -379,7 +380,7 @@ class TestRequestManager(object):
     though, this signals an error on the machine, and this is handled as
     needed in the _RunnerMachineStateChanged() function.
 
-    Otherwise, a WAITING machine has changed to READY and we can now start
+    Otherwise, a WAITING machine has changed to ACQUIRED and we can now start
     the associated test runner on it.
 
     Args:
@@ -413,16 +414,16 @@ class TestRequestManager(object):
                   info.status)
 
     # An idle machine should already be ready so can't transition to it.
-    assert info.status != base_machine_provider.MachineStatus.READY
+    assert info.status != base_machine_provider.MachineStatus.ACQUIRED
 
     # If the machine is stopped or done, it can't be reused for another test
     # run, so forget about it.
     if info.status == base_machine_provider.MachineStatus.STOPPED:
       # No need to delete the idle_machine in this case.  The listener will
-      # eventually be notified that that the machine has gone into the DONE
+      # eventually be notified that that the machine has gone into the AVAILABLE
       # state, and this will trigger the case below.
       self._machine_manager.ReleaseMachine(idle_machine.id)
-    elif info.status == base_machine_provider.MachineStatus.DONE:
+    elif info.status == base_machine_provider.MachineStatus.AVAILABLE:
       idle_machine.delete()
     else:
       logging.error('Invalid status change for idle machine_id=%d status=%d',
@@ -439,9 +440,9 @@ class TestRequestManager(object):
     logging.debug('TRM._RunnerMachineStateChanged id=%d status=%d runner=%s',
                   int(info.id), int(info.status), runner.GetName())
 
-    # If the machine is switching to the READY state, we will start the test
+    # If the machine is switching to the ACQUIRED state, we will start the test
     # associated to it in the next call to AssignPendingRequests.
-    if info.status != base_machine_provider.MachineStatus.READY:
+    if info.status != base_machine_provider.MachineStatus.ACQUIRED:
       # The machine running the test has failed.  Tell the user about it.
       r_str = ('Tests aborted. The machine (%d) running the test (%s) '
                'experienced a state change. Machine status: %d' %
@@ -450,7 +451,7 @@ class TestRequestManager(object):
 
       if info.status == base_machine_provider.MachineStatus.STOPPED:
         self._machine_manager.ReleaseMachine(info.id)
-      elif info.status != base_machine_provider.MachineStatus.DONE:
+      elif info.status != base_machine_provider.MachineStatus.AVAILABLE:
         logging.error('Invalid status change for machine_id=%d status=%d',
                       int(info.id), int(info.status))
 
@@ -828,7 +829,7 @@ class TestRequestManager(object):
       return
 
     info = self._machine_manager.GetMachineInfo(runner.machine_id)
-    if info and info.status == base_machine_provider.MachineStatus.READY:
+    if info and info.status == base_machine_provider.MachineStatus.ACQUIRED:
       self._ExecuteTestRunner(runner)
     elif not info:
       logging.warning('Machine %s, returned no info', runner.machine_id)

@@ -68,7 +68,7 @@ class MachineProvider(base_machine_provider.BaseMachineProvider):
                  machine_id, MachineProvider._last_machine_id)
     assert machine_id <= MachineProvider._last_machine_id
     return base_machine_provider.MachineInfo(
-        status=base_machine_provider.MachineStatus.READY,
+        status=base_machine_provider.MachineStatus.ACQUIRED,
         host='localhost')
 
   def ReleaseMachine(self, machine_id):

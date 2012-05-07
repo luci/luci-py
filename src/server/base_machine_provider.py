@@ -29,13 +29,14 @@ class MachineStatus(object):
   """An enumeration class to identify a machine status."""
   # The requested machine is not ready yet, it's being prepared.
   WAITING = 0
-  # The requested machine is ready and can be used.
-  READY = 1
+  # The requested machine has now been fully acquired and may be used
+  # at any time.
+  ACQUIRED = 1
+  # This machine is available to get acquired from the machine provider.
+  AVAILABLE = 2
   # The machine has been stopped for some reason and will remain stopped until
   # the machince provider says it can be used again.
-  STOPPED = 2
-  # The machine is done and can't be used anymore.
-  DONE = 3
+  STOPPED = 3
 
 
 class MachineInfo(object):

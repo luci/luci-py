@@ -96,14 +96,13 @@ class MachineProviderServer(BaseHTTPServer.BaseHTTPRequestHandler):
       self.log_error('Invalid machine list.\n%s' % str(e))
       return -1
     for machine in machine_list:
-      # We use DONE to identify a machine that isn't used.
-      if machine['state'] == 'DONE':
+      if machine['state'] == 'AVAILABLE':
         (match, log) = dimensions.MatchDimensions(config_dimensions,
                                                   machine['dimensions'])
         self.log_message(log)
         if match:
-          # Mark the machine as READY now.
-          machine['state'] = 'READY'
+          # Mark the machine as ACQUIRED now.
+          machine['state'] = 'ACQUIRED'
           try:
             self._SaveData(machine_list)
           except (IOError, ValueError), e:
@@ -161,7 +160,7 @@ class MachineProviderServer(BaseHTTPServer.BaseHTTPRequestHandler):
     for machine in machine_list:
       if machine['id'] == machine_id:
         # TODO(user): Check current state first?
-        machine['state'] = 'DONE'
+        machine['state'] = 'AVAILABLE'
         try:
           self._SaveData(machine_list)
         except (IOError, ValueError), e:

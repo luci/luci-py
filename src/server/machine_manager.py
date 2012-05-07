@@ -151,9 +151,9 @@ class MachineManager(object):
     # registered users.
 
     try:
-      # If the machine status is DONE, then this means we tried to release
+      # If the machine status is AVAILABLE, then this means we tried to release
       # this machine already, but failed.  So try again now.
-      if machine.status == base_machine_provider.MachineStatus.DONE:
+      if machine.status == base_machine_provider.MachineStatus.AVAILABLE:
         self._machine_provider.ReleaseMachine(machine.id)
         machine.delete()
       else:
@@ -166,21 +166,21 @@ class MachineManager(object):
       # errors we want to forget about this machine.
       if not self._IsTransientError(e):
         logging.exception('MachineProviderException: %s', e)
-        if machine.status == base_machine_provider.MachineStatus.DONE:
+        if machine.status == base_machine_provider.MachineStatus.AVAILABLE:
           machine.delete()
           return False
 
-        new_status = base_machine_provider.MachineStatus.DONE
+        new_status = base_machine_provider.MachineStatus.AVAILABLE
       else:
         logging.exception('MM: Provider error while validating id=%d: %s (%d)',
                           machine.id, e.message, e.error_code)
         return False
 
-    # If the status is READY, transfer the configuration properties to
+    # If the status is ACQUIRED, transfer the configuration properties to
     # the machine object.  Note that once the machine becomes ready these
     # properties don't change, so we only need to transfer configuration for
-    # status READY..
-    if new_status == base_machine_provider.MachineStatus.READY:
+    # status ACQUIRED..
+    if new_status == base_machine_provider.MachineStatus.ACQUIRED:
       self._InitMachine(machine, machine_info)
 
     if new_status != machine.status:
@@ -324,7 +324,7 @@ class MachineManager(object):
     # -1 is not a valid ID.
     assert machine_id is not -1
     machine = Machine.gql('WHERE id = :1 AND status != :2', machine_id,
-                          base_machine_provider.MachineStatus.DONE).get()
+                          base_machine_provider.MachineStatus.AVAILABLE).get()
     if machine:
       logging.debug('MM: GetMachineInfo status=%d dim=%s', machine.status,
                     machine.GetDimensions())
@@ -350,14 +350,14 @@ class MachineManager(object):
 
     success = False
     machine = Machine.gql('WHERE id = :1 AND status != :2', machine_id,
-                          base_machine_provider.MachineStatus.DONE).get()
+                          base_machine_provider.MachineStatus.AVAILABLE).get()
     if machine:
       logging.info('MM releasing machine id=%d', machine_id)
 
       # Mark the machine as being released.  We will persist the machine
       # in this state just in case the CloseRequest() below fails.  If it
       # does, the next time we validate will will try again.
-      machine.status = base_machine_provider.MachineStatus.DONE
+      machine.status = base_machine_provider.MachineStatus.AVAILABLE
       machine.put()
       self._SendNotification(machine)
 
@@ -397,7 +397,7 @@ class MachineManager(object):
       Returns a google.appengine.ext.db.Query of Machine objects.
     """
     return Machine.gql('WHERE status != :1',
-                       base_machine_provider.MachineStatus.DONE)
+                       base_machine_provider.MachineStatus.AVAILABLE)
 
   def GetMachineCount(self):
     """Returns the number of machines acquired for testing.
@@ -409,4 +409,4 @@ class MachineManager(object):
       The number of machines acquired for testing.
     """
     return Machine.gql('WHERE status != :1',
-                       base_machine_provider.MachineStatus.DONE).count()
+                       base_machine_provider.MachineStatus.AVAILABLE).count()

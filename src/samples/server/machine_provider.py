@@ -77,14 +77,14 @@ class MachineProvider(base_machine_provider.BaseMachineProvider):
     if response['status'] == 'ERROR':
       raise base_machine_provider.MachineProviderException(
           message='Machine is in an error state', error_code=-1)
-    elif response['status'] == 'READY':
-      status = base_machine_provider.MachineStatus.READY
+    elif response['status'] == 'ACQUIRED':
+      status = base_machine_provider.MachineStatus.ACQUIRED
     elif response['status'] == 'WAITING':
       status = base_machine_provider.MachineStatus.WAITING
     elif response['status'] == 'STOPPED':
       status = base_machine_provider.MachineStatus.STOPPED
-    elif response['status'] == 'DONE':
-      status = base_machine_provider.MachineStatus.DONE
+    elif response['status'] == 'AVAILABLE':
+      status = base_machine_provider.MachineStatus.AVAILABLE
     else:
       raise base_machine_provider.MachineProviderException(
           message='Machine is in an unknown state', error_code=-1)
