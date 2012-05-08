@@ -305,6 +305,32 @@ class TestRequestMessageBase(object):
         return False
     return True
 
+  def AreValidUrlLists(self, list_keys, required=False, errors=None):
+    """Checks if all the values in the given lists are valid urls.
+
+    Args:
+      list_keys: The key names of the value lists to validate.
+      required: An optional flag identifying if the list is required to be
+          non-empty. Defaults to False.
+      errors: An array where we can append error messages.
+
+    Returns:
+      True if all the values are valid urls, False otherwise.
+    """
+    if not self.AreValidLists(list_keys, str, required, errors):
+      return False
+
+    for list_key in list_keys:
+      if self.__dict__[list_key]:
+        for value in self.__dict__[list_key]:
+          if not self.IsValidUrl(value, errors):
+            return False
+      elif required:
+        self.LogError('Missing list %s' % list_key, errors)
+        return False
+
+    return True
+
   def IsValidInteger(self, value, errors=None):
     """Checks if the given value is castable to a valid integer.
 
@@ -588,7 +614,8 @@ class TestConfiguration(TestRequestMessageBase):
   Attributes:
     config_name: The name of this configuration.
     env_vars: An optional dictionary for environment variables.
-    data: An optional data list for this configuration.
+    data: An optional data list for this configuration. The strings must be
+        valid urls.
     binaries: An optional binaries list for this configuration.
     tests: An optional tests list for this configuration.
     min_instances: An optional integer specifying the minimum number of
@@ -639,7 +666,8 @@ class TestConfiguration(TestRequestMessageBase):
     if (not self.AreValidValues(['config_name'], str,
                                 required=True, errors=errors) or
         not self.AreValidDicts(['env_vars'], str, str, errors=errors) or
-        not self.AreValidLists(['data', 'binaries'], str, errors=errors) or
+        not self.AreValidUrlLists(['data'], errors=errors) or
+        not self.AreValidLists(['binaries'], str, errors=errors) or
         not self.AreValidObjectLists(['tests'], TestObject,
                                      unique_value_keys=['test_name'],
                                      errors=errors) or
@@ -692,7 +720,8 @@ class TestCase(TestRequestMessageBase):
     test_case_name: The name of this test case.
     env_vars: An optional dictionary for environment variables.
     configurations: A list of configurations for this test case.
-    data: An optional data list for this test case.
+    data: An optional data list for this test case. The strings must be
+        valid urls.
     binaries: An optional binaries list for this test case.
     working_dir: An optional path string for where to download/run tests.
         This must be an absolute path though we don't validate it since this
@@ -768,7 +797,8 @@ class TestCase(TestRequestMessageBase):
                                      required=True,
                                      unique_value_keys=['config_name'],
                                      errors=errors) or
-        not self.AreValidLists(['data', 'binaries'], str, errors=errors) or
+        not self.AreValidUrlLists(['data'], errors=errors) or
+        not self.AreValidLists(['binaries'], str, errors=errors) or
         not self.AreValidObjectLists(['tests'], TestObject,
                                      unique_value_keys=['test_name'],
                                      errors=errors) or
@@ -818,7 +848,8 @@ class TestRun(TestRequestMessageBase):
     test_run_name: The key to access the name of the test run.
     env_vars: An optional dictionary for environment variables.
     configuration: An optional configuration object for this test run.
-    data: An optional data list for this test run.
+    data: An optional data list for this test run. The strings must be valid
+        urls.
     working_dir: An optional path string for where to download/run tests.
         This must be an absolute path though we don't validate it since this
         script may run on a different platform than the one that will use the
@@ -882,7 +913,7 @@ class TestRun(TestRequestMessageBase):
         not self.configuration or
         not isinstance(self.configuration, TestConfiguration) or
         not self.configuration.IsValid(errors) or
-        not self.AreValidLists(['data'], str, errors=errors) or
+        not self.AreValidUrlLists(['data'], errors=errors) or
         not self.AreValidObjectLists(['tests'], TestObject,
                                      unique_value_keys=['test_name'],
                                      errors=errors) or
