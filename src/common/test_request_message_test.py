@@ -11,6 +11,7 @@
 import logging
 import os.path
 import unittest
+import urllib
 
 from common import test_request_message
 
@@ -146,6 +147,9 @@ class TestRequestMessageBaseTest(unittest.TestCase):
     self.trm.c.c = 42
     self.trm.d = None
     self.trm.e = {'%(var4)s': '%(var1)s', '%(var2)d': '%(var3)d'}
+    url = urllib.quote('http://www.google.com/hi world')
+    self.trm.f = url
+    self.trm.g = url + '%(var1)s'
 
     self.trm.ExpandVariables({'var1': 'one', 'var2': 22, 'var3': 333,
                               'var4': 'four'})
@@ -157,6 +161,8 @@ class TestRequestMessageBaseTest(unittest.TestCase):
     self.assertEqual(None, self.trm.d)
     # We intentionnaly don't expand key names, just values!
     self.assertEqual({'%(var4)s': 'one', '%(var2)d': '333'}, self.trm.e)
+    self.assertEqual(url, self.trm.f)
+    self.assertEqual(url + 'one', self.trm.g)
 
   class ParseResults(test_request_message.TestRequestMessageBase):
     def __init__(self):

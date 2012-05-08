@@ -31,6 +31,7 @@ Classes:
 
 
 import logging
+import urllib
 import urlparse
 
 
@@ -453,7 +454,20 @@ class TestRequestMessageBase(object):
         The resulting expanded value.
       """
       if isinstance(value, str):
+        # Because it is possible for some url paths to contain '%' without
+        # referring to variables that should be expanded, we unescape them
+        # before expanding the variables and then escape them again
+        # before returning.
+        unquoted = urllib.unquote(value)
+        was_quoted = (value != unquoted)
+        if was_quoted:
+          value = unquoted
         value %= variables
+
+        # Since the contents of the expanded variables aren't guaranteed
+        # to get escaped, they should not require escaping.
+        if was_quoted:
+          value = urllib.quote(value)
       elif isinstance(value, list):
         value = map(ExpandVariable, value)
       elif isinstance(value, tuple):
