@@ -493,7 +493,9 @@ class TestRequestMessageBase(object):
         # Since the contents of the expanded variables aren't guaranteed
         # to get escaped, they should not require escaping.
         if was_quoted:
-          value = urllib.quote(value)
+          # Don't escape ':' or '/' as doing so will break the format of
+          # url strings.
+          value = urllib.quote(value, ':/')
       elif isinstance(value, list):
         value = map(ExpandVariable, value)
       elif isinstance(value, tuple):

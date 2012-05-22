@@ -11,7 +11,6 @@
 import logging
 import os.path
 import unittest
-import urllib
 
 from common import test_request_message
 
@@ -173,7 +172,7 @@ class TestRequestMessageBaseTest(unittest.TestCase):
     self.trm.c.c = 42
     self.trm.d = None
     self.trm.e = {'%(var4)s': '%(var1)s', '%(var2)d': '%(var3)d'}
-    url = urllib.quote('http://www.google.com/hi world')
+    url = 'http://www.google.com/hi%20world'
     self.trm.f = url
     self.trm.g = url + '%(var1)s'
 
