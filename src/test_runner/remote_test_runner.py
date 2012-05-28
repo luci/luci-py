@@ -158,44 +158,6 @@ class RemoteTestRunner(object):
       return False
     return True
 
-  def _EnsureValidServer(self):
-    """Validates the self._xml_rpc_server.
-
-    Returns:
-      True is self._xml_rpc_server is valid.
-    """
-    if getattr(self, 'validated_server', False):
-      return True
-
-    if self._xml_rpc_server is None:
-      logging.error('You must specify an XmlRpc Server URL.')
-      return False
-
-    # The server might not be quite ready even though the machine is ready, so
-    # we try a few times.
-    num_startup_retries_left = self.xmlrpc_startup_retries
-    exceptions = []
-    while num_startup_retries_left > 0:
-      num_startup_retries_left -= 1
-      try:
-        logging.info('Validating XMLRPC server by asking for its SID()')
-        self._xml_rpc_server.sid()
-        # Remember that we validated the server.
-        # It would have raised an error if it wasn't valid.
-        self.validated_server = True
-        return True
-      # We need to catch all since AppEngine may throw specific things that
-      # we won't be able to specify outside of the appengine context.
-      except Exception, e:  # pylint: disable-msg=W0703
-        exceptions.append(e)
-        # Give some time for the initial startup to properly complete.
-        time.sleep(self.xmlrpc_startup_sleeps)
-    # If we get out of the loop it means we couldn't access the server at all.
-    assert self._xml_rpc_server_url is not None
-    logging.exception('%s is not a valid XmlRpc Server URL.\nExceptions:\n%s',
-                      self._xml_rpc_server_url, exceptions)
-    return False
-
   def _AutoUpdateServer(self):
     """Autoupdate the self._xml_rpc_server.
 
@@ -205,7 +167,7 @@ class RemoteTestRunner(object):
     if getattr(self, 'autoupdated_server', False):
       return True
 
-    if not self._EnsureValidServer():
+    if not self.EnsureValidServer():
       return False
 
     try:
@@ -261,6 +223,44 @@ class RemoteTestRunner(object):
       if file_handle:
         file_handle.close()
     return file_content
+
+  def EnsureValidServer(self):
+    """Validates the self._xml_rpc_server.
+
+    Returns:
+      True is self._xml_rpc_server is valid.
+    """
+    if getattr(self, 'validated_server', False):
+      return True
+
+    if self._xml_rpc_server is None:
+      logging.error('You must specify an XmlRpc Server URL.')
+      return False
+
+    # The server might not be quite ready even though the machine is ready, so
+    # we try a few times.
+    num_startup_retries_left = self.xmlrpc_startup_retries
+    exceptions = []
+    while num_startup_retries_left > 0:
+      num_startup_retries_left -= 1
+      try:
+        logging.info('Validating XMLRPC server by asking for its SID()')
+        self._xml_rpc_server.sid()
+        # Remember that we validated the server.
+        # It would have raised an error if it wasn't valid.
+        self.validated_server = True
+        return True
+      # We need to catch all since AppEngine may throw specific things that
+      # we won't be able to specify outside of the appengine context.
+      except Exception, e:  # pylint: disable-msg=W0703
+        exceptions.append(e)
+        # Give some time for the initial startup to properly complete.
+        time.sleep(self.xmlrpc_startup_sleeps)
+    # If we get out of the loop it means we couldn't access the server at all.
+    assert self._xml_rpc_server_url is not None
+    logging.exception('%s is not a valid XmlRpc Server URL.\nExceptions:\n%s',
+                      self._xml_rpc_server_url, exceptions)
+    return False
 
   def SetServerProxyUrl(self, server_url):
     """Sets the URL to the xmlrpclib.ServerProxy() and open it.
@@ -388,7 +388,7 @@ class RemoteTestRunner(object):
     Returns:
       A string containing the path to the python 2.6 executable.
     """
-    if not self._EnsureValidServer():
+    if not self.EnsureValidServer():
       return False
 
     if self._xml_rpc_server.exists(r'/python26'):
@@ -443,7 +443,7 @@ class RemoteTestRunner(object):
     Returns:
       False if something failed, True otherwise
     """
-    if not self._EnsureValidServer():
+    if not self.EnsureValidServer():
       return False
 
     if not self._EnsureRemoteFolderCreated(self._remote_root):
@@ -487,7 +487,7 @@ class RemoteTestRunner(object):
           representing the process id of the command.  If the command could
           not be started, the item is -1.
     """
-    if not self._EnsureValidServer():
+    if not self.EnsureValidServer():
       return None
 
     # If we want to capture the output, we must make sure that we are using the

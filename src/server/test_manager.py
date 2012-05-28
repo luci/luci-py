@@ -887,6 +887,21 @@ class TestRequestManager(object):
     remote_runner = remote_test_runner.RemoteTestRunner(
         server_url='http://%s:%d' % (info.host, port))
 
+    if not remote_runner.EnsureValidServer():
+      logging.warning('Unable to connect to RemoteTestRunner on %s. '
+                      'Marking machine as STOPPED. Test will acquire '
+                      'another machine and try again.', info.host)
+      # Mark the machine as STOPPED, since we can't communicate with it.
+      info.status = base_machine_provider.MachineStatus.STOPPED
+      info.put()
+
+      # Reset the test runner so that it can run on another machine.
+      runner.machine_id = 0
+      runner.started = None
+      runner.put()
+      self._TryAndRun(runner)
+      return
+
     remote_python26_path = remote_runner.RemotePython26Path()
 
     # We need to run the local_test_runner script from the remote root because
