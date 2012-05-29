@@ -76,11 +76,13 @@ import exceptions
 import logging
 import os
 from os import path
+import Queue
 import re
 import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import urllib
 import urllib2
@@ -97,6 +99,20 @@ except ImportError:
   from common import test_request_message
   from test_runner import downloader
 # pylint: enable-msg=C6204
+
+
+def EnqueueOutput(out, queue):
+  """Read all the output from the given handle and insert it into the queue."""
+  while True:
+    # This readline might block while waiting for new input, but that is
+    # acceptable because it is run on a different thread than the main
+    # code, so a deadlock here will have no impact on the program's
+    # ability to have the main thread run as intended.
+    data = out.readline()
+    if not data:
+      break
+    queue.put(data, block=True)
+  out.close()
 
 
 class Error(Exception):
@@ -320,17 +336,6 @@ class LocalTestRunner(object):
     assert isinstance(time_out, (int, float))
     parsed_command = [self._ExpandEnv(arg, env) for arg in command]
 
-    # Use a temporary file descriptor for the stdout pipe out of Popen so that
-    # we can read that file with another file object and not interfere. Also
-    # avoiding the known deadlock bugs with subprocess default PIPE.
-    (stdout_file_descriptor, stdout_file_name) = tempfile.mkstemp(text=True)
-    stdout_file = open(stdout_file_name)
-
-    def CleanupTempFiles():
-      os.close(stdout_file_descriptor)
-      stdout_file.close()
-      os.remove(stdout_file_name)
-
     # Temporarily change to the specified data directory in order to run
     # the command, then change back afterward.  We cannot use the "cwd"
     # parameter of Popen() for this because this changes the working directory
@@ -341,16 +346,21 @@ class LocalTestRunner(object):
     orig_dir = os.getcwd()
     os.chdir(self.data_dir)
     try:
-      proc = subprocess.Popen(parsed_command, stdout=stdout_file_descriptor,
+      proc = subprocess.Popen(parsed_command, stdout=subprocess.PIPE,
                               env=env, bufsize=1, stderr=subprocess.STDOUT,
-                              stdin=subprocess.PIPE)
+                              stdin=subprocess.PIPE, universal_newlines=True)
     except OSError, e:
       logging.exception('Execution of %s raised exception: %s.',
                         parsed_command, e)
-      CleanupTempFiles()
       return (1, e)
     finally:
       os.chdir(orig_dir)
+
+    stdout_queue = Queue.Queue()
+    stdout_thread = threading.Thread(target=EnqueueOutput,
+                                     args=(proc.stdout, stdout_queue))
+    stdout_thread.daemon = True  # Ensure this exits if the parent dies
+    stdout_thread.start()
 
     start_time = time.time()
     stdout_string = ''
@@ -368,10 +378,24 @@ class LocalTestRunner(object):
       except OSError, e:
         logging.exception('Polling execution of %s raised exception: %s.',
                           parsed_command, e)
-        CleanupTempFiles()
         return (1, e)
 
-      current_content = stdout_file.read()
+      current_content = ''
+      while True:
+        try:
+          current_content += stdout_queue.get_nowait()
+        except Queue.Empty:
+          break
+
+      # If the process has ended, then read all the output that it generated.
+      if exit_code:
+        while stdout_thread.isAlive() or not stdout_queue.empty():
+          try:
+            current_content += stdout_queue.get(block=True, timeout=1)
+          except Queue.Empty:
+            # Queue could still potentially contain more input later.
+            pass
+
       # Give some local feedback of progress and potentially upload to
       # output_destination if any.
       if current_content:
@@ -379,7 +403,7 @@ class LocalTestRunner(object):
 
       if upload_url and upload_chunk_size > 0:
         current_chunk_to_upload += current_content
-        if ((exit_code is not None) or
+        if ((exit_code is not None and len(current_chunk_to_upload)) or
             len(current_chunk_to_upload) >= upload_chunk_size):
           self._PostOutput(upload_url, current_chunk_to_upload,
                            self._SUCCESS_CGI_STRING[2])
@@ -388,8 +412,6 @@ class LocalTestRunner(object):
         stdout_string += current_content
 
       if exit_code is not None:
-        CleanupTempFiles()
-
         if not stdout_string:
           stdout_string = 'No output!'
         if upload_url and upload_chunk_size <= 0:

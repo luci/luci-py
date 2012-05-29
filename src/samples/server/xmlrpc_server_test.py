@@ -123,6 +123,19 @@ class _XmlRpcServerTestRunner(unittest.TestCase):
     self.assertTrue('line number 0' in results[1])
     self.assertTrue('line number 999' in results[1])
 
+    # Try capturing output with long pauses inbetween to ensure we don't have
+    # any issues with deadlocks due to lack of input.
+    results = self._server.start('python', [print_lines_script, '-n 100',
+                                            '-t 0.1'], True, True)
+    self.assertTrue(isinstance(results, list),
+                    'When we capture, we get both the exit code and stdout.')
+    logging.debug(results)
+    self.assertEqual(len(results), 2)
+    self.assertEqual(0, results[0], 'Should return exit code 0, got %s' %
+                     results[0])
+    self.assertTrue('line number 0' in results[1])
+    self.assertTrue('line number 99' in results[1])
+
   def testAutoupdateAndSid(self):
     # test autoupdate
     logging.debug('Testing the autoupdate method')
