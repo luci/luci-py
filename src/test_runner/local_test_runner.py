@@ -104,10 +104,12 @@ except ImportError:
 def EnqueueOutput(out, queue):
   """Read all the output from the given handle and insert it into the queue."""
   while True:
-    # This readline might block while waiting for new input, but that is
-    # acceptable because it is run on a different thread than the main
-    # code, so a deadlock here will have no impact on the program's
-    # ability to have the main thread run as intended.
+    # This readline will block until there is either new input or the handle
+    # is closed. Readline will only return None once the handle is close, so
+    # even if the output is being produced slowly, this function won't exit
+    # early.
+    # The potential dealock here is acceptable because this isn't run on the
+    # main thread.
     data = out.readline()
     if not data:
       break
