@@ -248,6 +248,23 @@ class TestRunner(db.Model):
     """
     return self.test_request.GetTestCase().virgin
 
+  def GetMessage(self):
+    """Get the message string representing this test runner.
+
+    Returns:
+      A string represent this test runner request.
+    """
+    message = ['Test Request Message:']
+    message.append(self.test_request.message)
+
+    message.append('')
+    message.append('Test Runner Message:')
+    message.append('Configuration Name: ' + self.config_name)
+    message.append('Configuration Instance Index: %d / %d' %
+                   (self.config_instance_index, self.num_config_instances))
+
+    return '\n'.join(message)
+
 
 class IdleMachine(db.Model):
   """An idle machine.

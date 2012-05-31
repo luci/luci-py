@@ -255,7 +255,7 @@ class ShowMessageHandler(webapp.RequestHandler):
       runner = test_manager.TestRunner.get(key)
 
     if runner:
-      self.response.out.write(runner.test_request.message)
+      self.response.out.write(runner.GetMessage())
     else:
       self.response.out.write('Cannot find message for: %s' % key)
 
