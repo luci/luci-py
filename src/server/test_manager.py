@@ -27,8 +27,10 @@ import urllib
 import urllib2
 import urlparse
 
+from google.appengine.api import files
 from google.appengine.api import mail
 from google.appengine.api import urlfetch
+from google.appengine.ext import blobstore
 from google.appengine.ext import db
 from common import dimensions
 from common import test_request_message
@@ -194,14 +196,24 @@ class TestRunner(db.Model):
   # The stringized array of exit_codes for each actions of the test.
   exit_codes = db.StringProperty()
 
-  # Full output of the test.  This attribute is valid only when the runner has
-  # ended (i.e. machine_id is < 0).  Until then, the value is unspecified.
-  result_string = db.TextProperty()
+  # The blobstore reference to the full output of the test.  This key valid only
+  # when the runner has ended (i.e. machine_id is < 0).  Until then, it
+  # is None.
+  result_string_reference = blobstore.BlobReferenceProperty()
 
   # The hostname of the swarm bot that ran this test. This attribute is valid
   # only when the runner has been assigned a machine. Until then, the value
   # is unspecified.
   hostname = db.TextProperty()
+
+  def delete(self):  # pylint: disable-msg=C6409
+    # We delete the blob referenced by this model because no one
+    # else will every care about it or try to reference it, so we
+    # are just cleaning up the blobstore.
+    if self.result_string_reference:
+      self.result_string_reference.delete()
+
+    db.Model.delete(self)
 
   def GetName(self):
     """Gets a name for this runner.
@@ -247,6 +259,26 @@ class TestRunner(db.Model):
       True iff this runner's test case requested a virgin machine.
     """
     return self.test_request.GetTestCase().virgin
+
+  def GetResultString(self):
+    """Get the result string for the runner.
+
+    Returns:
+      The string representing the output for this runner or an empty string
+        if the result hasn't been written yet.
+    """
+    if not self.result_string_reference:
+      return ''
+
+    blob_reader = self.result_string_reference.open()
+    result = ''
+    while True:
+      fetch = blob_reader.read(blobstore.MAX_BLOB_FETCH_SIZE)
+      if not fetch:
+        break
+      result += fetch
+
+    return result
 
   def GetMessage(self):
     """Get the message string representing this test runner.
@@ -534,8 +566,14 @@ class TestRequestManager(object):
 
     runner.ran_successfully = success
     runner.exit_codes = exit_codes
-    runner.result_string = result_string
     runner.machine_id = -1
+
+    filename = files.blobstore.create('text/plain')
+    with files.open(filename, 'a') as f:
+      f.write(result_string)
+    files.finalize(filename)
+
+    runner.result_string_reference = files.blobstore.get_blob_key(filename)
     runner.put()
 
     # If the test didn't run successfully, we send an email if one was
@@ -560,7 +598,7 @@ class TestRequestManager(object):
           # ASCII. Without this, the call to "urllib.urlencode" below can
           # throw a UnicodeEncodeError if the result string contains non-ASCII
           # characters.
-          encoded_result_string = runner.result_string.encode('utf-8')
+          encoded_result_string = runner.GetResultString().encode('utf-8')
           urllib2.urlopen(test_case.result_url,
                           urllib.urlencode((
                               ('n', runner.test_request.GetName()),
@@ -625,7 +663,7 @@ class TestRequestManager(object):
         'Number of Configurations: ' + str(runner.num_config_instances),
         'Exit Code: ' + str(runner.exit_codes),
         'Success: ' + str(runner.ran_successfully),
-        'Result Output: ' + runner.result_string]
+        'Result Output: ' + runner.GetResultString()]
     message_body = '\n'.join(message_body_parts)
 
     try:
@@ -933,9 +971,9 @@ class TestRequestManager(object):
     test_runner_init = os.path.join(_TEST_RUNNER_DIR, '__init__.py')
     common_init = os.path.join(_COMMON_DIR, '__init__.py')
 
-    files = [downloader_file, trm_file, test_runner_init, common_init]
+    files_to_upload = [downloader_file, trm_file, test_runner_init, common_init]
     file_pairs_to_upload.extend((os.path.join(root, file), file)
-                                for file in files)
+                                for file in files_to_upload)
 
     test_run = self._BuildTestRun(runner)
     command_to_execute = [remote_python26_path,
@@ -1085,7 +1123,7 @@ class TestRequestManager(object):
 
     return {'exit_codes': runner.exit_codes,
             'hostname': runner.hostname,
-            'output': runner.result_string}
+            'output': runner.GetResultString()}
 
   def AbortStaleRunners(self):
     """Abort any runners that have been running longer than expected."""
