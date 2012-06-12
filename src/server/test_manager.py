@@ -278,7 +278,7 @@ class TestRunner(db.Model):
         break
       result += fetch
 
-    return result
+    return result.decode('utf-8')
 
   def GetMessage(self):
     """Get the message string representing this test runner.
@@ -570,7 +570,7 @@ class TestRequestManager(object):
 
     filename = files.blobstore.create('text/plain')
     with files.open(filename, 'a') as f:
-      f.write(result_string)
+      f.write(result_string.encode('utf-8'))
     files.finalize(filename)
 
     runner.result_string_reference = files.blobstore.get_blob_key(filename)
