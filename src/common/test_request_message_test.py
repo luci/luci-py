@@ -382,6 +382,15 @@ class TestObjectTest(TestHelper):
         decorate_output=TestHelper.VALID_BOOLEAN_VALUES[-1],
         time_out=42)
 
+  def testNoReferences(self):
+    # Ensure that Test Object makes copies of its input, not references.
+    env_vars = {'a': 1}
+
+    test_object = test_request_message.TestObject(env_vars=env_vars)
+
+    env_vars['a'] = 2
+    self.assertNotEqual(env_vars, test_object.env_vars)
+
   def testIsValid(self):
     # Start with default success.
     self.assertTrue(self.test_request.IsValid())
@@ -442,6 +451,33 @@ class TestConfigurationTest(TestHelper):
         tests=[TestObjectTest.GetFullObject()],
         max_instances=2,
         min_instances=1)
+
+  def testNoReferences(self):
+    # Ensure that Test Configuration makes copies of its input, not references.
+    env_vars = {'a': 1}
+    data = ['data']
+    binaries = ['binaries']
+    tests = ['test']
+    dimensions = ['a', 'b']
+
+    test_configurations = test_request_message.TestConfiguration(
+        env_vars=env_vars, data=data, binaries=binaries, tests=tests,
+        dimensions=dimensions)
+
+    env_vars['a'] = 2
+    self.assertNotEqual(env_vars, test_configurations.env_vars)
+
+    data.append('data2')
+    self.assertNotEqual(data, test_configurations.data)
+
+    binaries.append('binaries2')
+    self.assertNotEqual(binaries, test_configurations.binaries)
+
+    tests.append('tests2')
+    self.assertNotEqual(tests, test_configurations.tests)
+
+    dimensions.append('c')
+    self.assertNotEqual(dimensions, test_configurations.dimensions)
 
   def testIsValid(self):
     # Start with default success.
@@ -577,6 +613,37 @@ class TestCaseTest(TestHelper):
         failure_email=TestHelper.VALID_OPTIONAL_STRING_VALUES[-1],
         verbose=TestHelper.VALID_BOOLEAN_VALUES[-1],
         configurations=[TestConfigurationTest.GetFullObject()])
+
+  def testNoReferences(self):
+    # Ensure that Test Case makes copies of its input, not references.
+    env_vars = {'a': 1}
+    configurations = [TestConfigurationTest.GetFullObject()]
+    data = ['data']
+    binaries = ['binaries']
+    tests = ['test']
+    output_destination = {'url': 'http://www.google.com', 'size': 1}
+
+    test_case = test_request_message.TestCase(
+        env_vars=env_vars, configurations=configurations, data=data,
+        binaries=binaries, tests=tests, output_destination=output_destination)
+
+    env_vars['a'] = 2
+    self.assertNotEqual(env_vars, test_case.env_vars)
+
+    configurations.append(TestConfigurationTest.GetFullObject())
+    self.assertNotEqual(configurations, test_case.configurations)
+
+    data.append('data2')
+    self.assertNotEqual(data, test_case.data)
+
+    binaries.append('binaries2')
+    self.assertNotEqual(binaries, test_case.binaries)
+
+    tests.append('tests2')
+    self.assertNotEqual(tests, test_case.tests)
+
+    output_destination['size'] = 2
+    self.assertNotEqual(output_destination, test_case.output_destination)
 
   def testIsValid(self):
     # Start with default success.
@@ -721,6 +788,29 @@ class TestRunTest(TestHelper):
         output_destination=
         TestHelper.VALID_OPTIONAL_OUTPUT_DESTINATION_VALUES[-1],
         cleanup=test_request_message.TestRun.VALID_CLEANUP_VALUES[-1])
+
+  def testNoReferences(self):
+    # Ensure that Test Run makes copies of its input, not references.
+    env_vars = {'a': 1}
+    data = ['data']
+    tests = ['test']
+    output_destination = {'url': 'http://www.google.com', 'size': 1}
+
+    test_run = test_request_message.TestRun(
+        env_vars=env_vars, data=data, tests=tests,
+        output_destination=output_destination)
+
+    env_vars['a'] = 2
+    self.assertNotEqual(env_vars, test_run.env_vars)
+
+    data.append('data2')
+    self.assertNotEqual(data, test_run.data)
+
+    tests.append('tests2')
+    self.assertNotEqual(tests, test_run.tests)
+
+    output_destination['size'] = 2
+    self.assertNotEqual(output_destination, test_run.output_destination)
 
   def testIsValid(self):
     # Start with default success.

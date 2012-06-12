@@ -576,7 +576,10 @@ class TestObject(TestRequestMessageBase):
                decorate_output=True, time_out=1200.0):
     super(TestObject, self).__init__()
     self.test_name = test_name
-    self.env_vars = env_vars
+    if env_vars:
+      self.env_vars = env_vars.copy()
+    else:
+      self.env_vars = None
     if action:
       self.action = action
     else:
@@ -633,17 +636,20 @@ class TestConfiguration(TestRequestMessageBase):
                tests=None, max_instances=None, min_instances=1, **dimensions):
     super(TestConfiguration, self).__init__()
     self.config_name = config_name
-    self.env_vars = env_vars
+    if env_vars:
+      self.env_vars = env_vars.copy()
+    else:
+      self.env_vars = None
     if data:
-      self.data = data
+      self.data = data[:]
     else:
       self.data = []
     if binaries:
-      self.binaries = binaries
+      self.binaries = binaries[:]
     else:
       self.binaries = []
     if tests:
-      self.tests = tests
+      self.tests = tests[:]
     else:
       self.tests = []
     self.min_instances = min_instances
@@ -754,17 +760,20 @@ class TestCase(TestRequestMessageBase):
                output_destination=None, failure_email=None, verbose=False):
     super(TestCase, self).__init__()
     self.test_case_name = test_case_name
-    self.env_vars = env_vars
+    if env_vars:
+      self.env_vars = env_vars.copy()
+    else:
+      self.env_vars = None
     if configurations:
-      self.configurations = configurations
+      self.configurations = configurations[:]
     else:
       self.configurations = []
     if data:
-      self.data = data
+      self.data = data[:]
     else:
       self.data = []
     if binaries:
-      self.binaries = binaries
+      self.binaries = binaries[:]
     else:
       self.binaries = []
     if working_dir:
@@ -774,12 +783,15 @@ class TestCase(TestRequestMessageBase):
     self.admin = admin
     self.virgin = virgin
     if tests:
-      self.tests = tests
+      self.tests = tests[:]
     else:
       self.tests = []
     self.result_url = result_url
     self.store_result = store_result
-    self.output_destination = output_destination
+    if output_destination:
+      self.output_destination = output_destination.copy()
+    else:
+      self.output_destination = None
     self.failure_email = failure_email
     self.verbose = verbose
 
@@ -880,10 +892,13 @@ class TestRun(TestRequestMessageBase):
                result_url=None, output_destination=None, cleanup=None):
     super(TestRun, self).__init__()
     self.test_run_name = test_run_name
-    self.env_vars = env_vars
+    if env_vars:
+      self.env_vars = env_vars.copy()
+    else:
+      self.env_vars = env_vars
     self.configuration = configuration
     if data:
-      self.data = data
+      self.data = data[:]
     else:
       self.data = []
     if working_dir:
@@ -891,13 +906,16 @@ class TestRun(TestRequestMessageBase):
     else:
       self.working_dir = self.DEFAULT_WORKING_DIR
     if tests:
-      self.tests = tests
+      self.tests = tests[:]
     else:
       self.tests = []
     self.instance_index = instance_index
     self.num_instances = num_instances
     self.result_url = result_url
-    self.output_destination = output_destination
+    if output_destination:
+      self.output_destination = output_destination.copy()
+    else:
+      self.output_destination = None
     self.cleanup = cleanup
 
   def IsValid(self, errors=None):
