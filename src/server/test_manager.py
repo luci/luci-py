@@ -26,6 +26,7 @@ import os.path
 import urllib
 import urllib2
 import urlparse
+import uuid
 
 from google.appengine.api import files
 from google.appengine.api import mail
@@ -1196,5 +1197,164 @@ class TestRequestManager(object):
 
     test_runner.delete()
     test_request.RunnerDeleted()
+
+    return True
+
+  def ExecuteRegisterRequest(self, attributes):
+    """Attempts to match the requesting machine with an existing TestRunner.
+
+    If the machine is matched with a request, the machine is told what to do.
+    Else, the machine is told to register at a later time.
+
+    Args:
+      attributes: A dictionary representing the attributes of the machine
+      registering itself.
+
+    Raises:
+      test_request_message.Error: If the request format/attributes aren't valid.
+
+    Returns:
+      A dictionary containing the commands the machine needs to execute.
+    """
+    # Validate and fix machine attributes. Will throw exception on errors.
+    attribs = self.ValidateAndFixAttributes(attributes)
+
+    assigned_runner = False
+
+    # Try assigning machine to a runner 10 times before we give up.
+    # TODO(user): Tune this parameter somehow.
+    for _ in range(10):
+      # Try to find a matching test runner for the machine.
+      runner = self._FindMatchingRunner(attribs)
+      if runner:
+        # Will atomically try to assign the machine to the runner. This could
+        # fail due to a race condition on the runner. If so, we loop back to
+        # finding a runner.
+        if self._AssignRunnerToMachine(attribs, runner):
+          # TODO(user): since this change list only has additions not
+          # modifications, we comment out the following line which actually runs
+          # the test. This will be fixed in upcoming changelists.
+          #response = self._ExecuteTestRunner(runner)
+          assigned_runner = True
+          break
+      # We found no runner, no use in re-trying so just break out of the loop.
+      else:
+        break
+
+    response = {'id': attribs['id']}
+    if not assigned_runner:
+      # Tell machine when to come back.
+      # TODO(user): Tune when machine should come back at some later time.
+      response['come_back'] = 1000
+
+    return response
+
+  def ValidateAndFixAttributes(self, attributes):
+    """Validates format and fixes the attributes of the requesting machine.
+
+    Args:
+      attributes: A dictionary representing the machine attributes.
+
+    Raises:
+      test_request_message.Error: If the request format/attributes aren't valid.
+
+    Returns:
+      A dictionary containing the fixed attributes of the machine.
+    """
+    # Parse given attributes.
+    for attrib, value in attributes.items():
+      if attrib == 'dimensions':
+        # Make sure the attribute value has proper type.
+        if not isinstance(value, dict):
+          raise test_request_message.Error('Invalid attrib value for '
+                                           'dimensions')
+      elif  attrib == 'id':
+        # Make sure the attribute value has proper type.
+        try:
+          value = uuid.UUID(value)
+        except (ValueError, AttributeError):
+          raise test_request_message.Error('Invalid attrib type for id')
+      elif attrib == 'tag' or attrib == 'username' or attrib == 'password':
+        # Make sure the attribute value has proper type.
+        if not isinstance(value, (str, unicode)):
+          raise test_request_message.Error('Invalid attrib value type for '
+                                           + attrib)
+      else:
+        raise test_request_message.Error('Invalid attribute to machine: '
+                                         + attrib)
+
+    # Make sure we have 'dimensions', the only required attrib.
+    if 'dimensions' not in attributes:
+      raise test_request_message.Error('Missing mandatory attribute: '
+                                       'dimensions')
+
+    if 'id' not in attributes:
+      # Try to create a unique ID for the machine if it doesn't have one. The
+      # machine will send us back this ID in subsequent tries.
+      # Even if the ID isn't unique, it will not create a significant problem.
+      # We use machine IDs to provide users some status report on machines.
+      # We loop so that in the extreme rare case that we actually generate a
+      # reserved ID, we retry.
+      # Note: the sun is more likely to burn out before we need an extra
+      # iteration!
+      i = 0
+      attributes['id'] = NO_MACHINE_ID
+      while (i < 10 and attributes['id'] in [NO_MACHINE_ID, DONE_MACHINE_ID]):
+        attributes['id'] = str(uuid.uuid4())
+        i += 1
+
+      assert (i < 10 and attributes['id'] not in
+              [NO_MACHINE_ID, DONE_MACHINE_ID])
+
+    return attributes
+
+  def _FindMatchingRunner(self, attribs):
+    """Find oldest TestRunner who hasn't already been assigned a machine.
+
+    Args:
+      attribs: the attributes defining the machine.
+
+    Returns:
+      A TestRunner object, or None if a matching runner is not found.
+    """
+
+    # TODO(user): limit the number of test runners checked to avoid querying
+    # all the tasks all the time.
+
+    # Assign test runners from earliest to latest.
+    # We use a format argument for None, because putting None in the string
+    # doesn't work.
+    query = TestRunner.gql('WHERE started = :1 AND machine_id = :2 '
+                           'ORDER BY created', None, NO_MACHINE_ID)
+    for runner in query:
+      runner_dimensions = runner.GetConfiguration().dimensions
+      (match, output) = dimensions.MatchDimensions(runner_dimensions,
+                                                   attribs['dimensions'])
+      logging.info(output)
+      if match:
+        logging.info('matched runner %s: '%runner.GetName()
+                     + str(runner_dimensions) + ' to machine: '
+                     + str(attribs['dimensions']))
+        return runner
+
+    return None
+
+  def _AssignRunnerToMachine(self, attribs, runner):
+    """Will try to atomically assign runner to machine defined by attributes.
+
+    This function is thread safe and can be called simultaneously on the same
+    runner. It will ensure all but one concurrent requests will fail.
+
+    Args:
+      attribs: the attributes defining the machine.
+      runner: test runner object to assign the machine to.
+
+    Returns:
+      True is succeeded, False otherwise.
+    """
+
+    #TODO(user): use a transaction to make atomic!!!
+    runner.machine_id = str(attribs['id'])
+    runner.put()
 
     return True
