@@ -18,6 +18,12 @@ import logging
 from google.appengine.ext import db
 from server import base_machine_provider
 
+# Reserved UUID to indicate 'no machine assigned but waiting for one'.
+NO_MACHINE_ID = '00000000-00000000-00000000-00000000'
+
+# Reserved UUID to indicate 'no machine assigned and done'.
+DONE_MACHINE_ID = 'FFFFFFFF-FFFFFFFF-FFFFFFFF-FFFFFFFF'
+
 
 class Machine(db.Expando):
   """Represents the acquisition of one machine.
@@ -29,7 +35,7 @@ class Machine(db.Expando):
   which may change in the future.
   """
   # The machine provider id of this machine.
-  id = db.IntegerProperty()
+  id = db.ByteStringProperty()
 
   # The machine provider status of this machine.  Can be one of the the
   # base_machine_provider.MachineStatus enum values.
@@ -281,7 +287,8 @@ class MachineManager(object):
           The value of the map should be taken from the web page above.
 
     Returns:
-      An id that represents this machine, or -1 if a machine was not available.
+      An id that represents this machine, or DONE_MACHINE_ID if a machine was
+      not available.
     """
     try:
       machine_id = self._machine_provider.RequestMachine(
@@ -289,7 +296,9 @@ class MachineManager(object):
     except base_machine_provider.MachineProviderException, e:
       logging.warning('Can\'t open request, exception: %s (%d)',
                       e.message, e.error_code)
-      return -1
+      return DONE_MACHINE_ID
+
+    assert machine_id != DONE_MACHINE_ID and machine_id != NO_MACHINE_ID
 
     # Attempting to add a constructor to Machine that takes in MachineInfo
     # results in an odd crash when calling put on Machine afterwards, not
@@ -298,7 +307,7 @@ class MachineManager(object):
     machine.SetMachineInfo(self._machine_provider.GetMachineInfo(machine_id))
     if not machine.SetDimensions(config_dimensions):
       logging.error('Invalid configuration: %s', str(config_dimensions))
-      return -1
+      return DONE_MACHINE_ID
 
     machine.id = machine_id
     machine.put()
@@ -321,8 +330,8 @@ class MachineManager(object):
       A Machine object.  Callers should not modify the returned object.  If no
       machine with the given id is found, None is returned.
     """
-    # -1 is not a valid ID.
-    assert machine_id is not -1
+    # DONE_MACHINE_ID is not a valid ID.
+    assert machine_id is not DONE_MACHINE_ID
     machine = Machine.gql('WHERE id = :1 AND status != :2', machine_id,
                           base_machine_provider.MachineStatus.AVAILABLE).get()
     if machine:
@@ -345,8 +354,8 @@ class MachineManager(object):
       True if we successfully released the machine.
       False otherwise.
     """
-    # -1 is not a valid ID.
-    assert machine_id is not -1
+    # DONE_MACHINE_ID is not a valid ID.
+    assert machine_id is not DONE_MACHINE_ID
 
     success = False
     machine = Machine.gql('WHERE id = :1 AND status != :2', machine_id,

@@ -16,7 +16,7 @@ from server import base_machine_provider
 class MachineProvider(base_machine_provider.BaseMachineProvider):
   """A Machine Provider for testing."""
 
-  _last_machine_id = 0
+  _last_machine_id = 1
 
   def __init__(self):
     """Constructor for MachineProvider.
@@ -46,10 +46,14 @@ class MachineProvider(base_machine_provider.BaseMachineProvider):
       base_machine_provider.MachineProviderException when no machine can be
       acquired.
     """
+
+    machine_id = ('00000000-00000000-00000000-%08d' %
+                  MachineProvider._last_machine_id)
     MachineProvider._last_machine_id += 1
-    logging.info('Acquiring new machine: %s',
-                 MachineProvider._last_machine_id)
-    return MachineProvider._last_machine_id
+
+    logging.info('Acquiring new machine: [%d] %s',
+                 MachineProvider._last_machine_id, machine_id)
+    return machine_id
 
   def GetMachineInfo(self, machine_id):
     """Returns information about a specific machine.
@@ -64,9 +68,12 @@ class MachineProvider(base_machine_provider.BaseMachineProvider):
       base_machine_provider.MachineProviderException when machine info can not
       be returned.
     """
-    logging.info('requesting info for %d with last = %s',
+    logging.info('requesting info for %s with last = %s',
                  machine_id, MachineProvider._last_machine_id)
-    assert machine_id <= MachineProvider._last_machine_id
+
+    machine_id_tail = int(machine_id[27:])
+    assert machine_id_tail < MachineProvider._last_machine_id
+
     return base_machine_provider.MachineInfo(
         status=base_machine_provider.MachineStatus.ACQUIRED,
         host='localhost')
@@ -80,6 +87,8 @@ class MachineProvider(base_machine_provider.BaseMachineProvider):
     Raises:
       MachineProviderException when machine can not be released.
     """
-    logging.info('Releasing machine %d with last = %s',
+    logging.info('Releasing machine %s with last = %s',
                  machine_id, MachineProvider._last_machine_id)
-    assert machine_id <= MachineProvider._last_machine_id
+
+    machine_id_tail = int(machine_id[27:])
+    assert machine_id_tail < MachineProvider._last_machine_id

@@ -53,6 +53,12 @@ _TEST_RUNNER_SCRIPT = 'local_test_runner.py'
 _TEST_RUNNER_DIR = 'test_runner'
 _COMMON_DIR = 'common'
 
+# Reserved UUID to indicate 'no machine assigned but waiting for one'.
+NO_MACHINE_ID = '00000000-00000000-00000000-00000000'
+
+# Reserved UUID to indicate 'no machine assigned and done'.
+DONE_MACHINE_ID = 'FFFFFFFF-FFFFFFFF-FFFFFFFF-FFFFFFFF'
+
 
 class TestRequest(db.Model):
   """A test request.
@@ -162,16 +168,17 @@ class TestRunner(db.Model):
   # The machine running the test.  The meaning of this field also tells us
   # about the state of the runner, to make it easier to run queries below.
   #
-  # If the machine_id is 0, then this runner has never been executed on a
-  # remote test runner.
+  # If the machine_id is NO_MACHINE_ID, then this runner is looking to be
+  # executed on a remote test runner (either for the first time or retry).
   #
-  # If the machine_id is > 0, this means that the runner has been assigned to
-  # a machine is currently running.  The 'started' attribute records the time at
-  # which test started.
+  # If the machine_id is DONE_MACHINE_ID, the runner has finished, either
+  # successfully or not.  The 'ended' attribute records the time at which
+  # the runner ended.
   #
-  # If the machine_id is < 0, the runner has finished, either successfully or
-  # not.  The 'ended' attribute records the time at which the runner ended.
-  machine_id = db.IntegerProperty()
+  # If the machine_id is neither, this means that the runner has been
+  # assigned to a machine and is currently running. The 'started' attribute
+  # records the time at which test started.
+  machine_id = db.ByteStringProperty()
 
   # The time at which this runner was created.  The runner may not have
   # started executing yet.
@@ -179,26 +186,26 @@ class TestRunner(db.Model):
 
   # The time at which this runner was executed on a remote machine.  This
   # attribute is valid only when the runner is executing or ended (i.e.
-  # machine_id is != 0).  Otherwise the value is None and we use the
-  # fact that it is None to identify if a test was started or not.
+  # machine_id is != NO_MACHINE_ID).  Otherwise the value is None and we
+  # use the fact that it is None to identify if a test was started or not.
   started = db.DateTimeProperty()
 
   # The time at which this runner ended.  This attribute is valid only when
-  # the runner has ended (i.e. machine_id is < 0).  Until then, the value is
-  # unspecified.
+  # the runner has ended (i.e. machine_id is == DONE_MACHINE_ID). Until then,
+  # the value is unspecified.
   ended = db.DateTimeProperty(auto_now=True)
 
   # True if the test run finished and succeeded.  This attribute is valid only
-  # when the runner has ended (i.e. machine_id is < 0).  Until then, the value
-  # is unspecified.
+  # when the runner has ended (i.e. machine_id is == DONE_MACHINE_ID).
+  # Until then, the value is unspecified.
   ran_successfully = db.BooleanProperty()
 
   # The stringized array of exit_codes for each actions of the test.
   exit_codes = db.StringProperty()
 
   # The blobstore reference to the full output of the test.  This key valid only
-  # when the runner has ended (i.e. machine_id is < 0).  Until then, it
-  # is None.
+  # when the runner has ended (i.e. machine_id is == DONE_MACHINE_ID).
+  # Until then, it is None.
   result_string_reference = blobstore.BlobReferenceProperty()
 
   # The hostname of the swarm bot that ran this test. This attribute is valid
@@ -307,7 +314,7 @@ class IdleMachine(db.Model):
   requests for virgin machines or sharded tests need new machines).
   """
   # The Id of the machine.
-  id = db.IntegerProperty()
+  id = db.ByteStringProperty()
 
 
 class TestRequestManager(object):
@@ -345,7 +352,8 @@ class TestRequestManager(object):
         continue
 
     # Load test runners and validate.
-    for runner in TestRunner.gql('WHERE machine_id > 0'):
+    for runner in TestRunner.gql('WHERE machine_id != :1 AND machine_id != :2',
+                                 NO_MACHINE_ID, DONE_MACHINE_ID):
       info = self._machine_manager.GetMachineInfo(runner.machine_id)
       if not info or info.status not in (
           base_machine_provider.MachineStatus.WAITING,
@@ -382,17 +390,17 @@ class TestRequestManager(object):
       idle_machine = IdleMachine.gql('WHERE id = :1', info.id).get()
       runner = TestRunner.gql('WHERE machine_id = :1', info.id).get()
 
-      logging.debug('Checking machine id=%d', int(info.id))
+      logging.debug('Checking machine id=%s', info.id)
 
       # If a machine is assigned to a runner, then it should not be idle.
       # Remove it from the idle pool if it is there.
       if idle_machine and runner:
-        logging.error('Machine id=%d idle and running', int(info.id))
+        logging.error('Machine id=%s idle and running', info.id)
         idle_machine.delete()
       elif not runner and not idle_machine:
         # If a machine is neither idle nor assigned to a test runner, then put
         # it in the idle pool if its ACQUIRED. Otherwise, release it.
-        logging.debug('Machine id=%d is idle and unassigned', int(info.id))
+        logging.debug('Machine id=%s is idle and unassigned', info.id)
 
         if info.status == base_machine_provider.MachineStatus.ACQUIRED:
           self._HandleIdleMachine(info=info)
@@ -403,7 +411,7 @@ class TestRequestManager(object):
             logging.error('Machine %s, should not be in WAITING state without'
                           'a runner!', info.id)
           else:
-            logging.debug('Machine id=%d will be released', int(info.id))
+            logging.debug('Machine id=%s will be released', info.id)
           machines_to_release.append(info.id)
       else:
         # If there is a machine that is ready and assigned a runner that is
@@ -413,7 +421,7 @@ class TestRequestManager(object):
 
     for machine_id in machines_to_release:
       self._machine_manager.ReleaseMachine(machine_id)
-      logging.debug('Machine id=%d released', int(machine_id))
+      logging.debug('Machine id=%s released', machine_id)
 
   def MachineStatusChanged(self, info):
     """Handles a status change of an acquired machine.
@@ -459,7 +467,7 @@ class TestRequestManager(object):
       idle_machine: An instance of machine_manager.Machine representing the
           machine whose state has changed.
     """
-    logging.debug('TRM._IdleMachineStateChanged id=%d status=%d', int(info.id),
+    logging.debug('TRM._IdleMachineStateChanged id=%s status=%d', info.id,
                   info.status)
 
     # An idle machine should already be ready so can't transition to it.
@@ -475,8 +483,8 @@ class TestRequestManager(object):
     elif info.status == base_machine_provider.MachineStatus.AVAILABLE:
       idle_machine.delete()
     else:
-      logging.error('Invalid status change for idle machine_id=%d status=%d',
-                    int(info.id), info.status)
+      logging.error('Invalid status change for idle machine_id=%s status=%d',
+                    info.id, info.status)
 
   def _RunnerMachineStateChanged(self, info, runner):
     """Handles a status change for a machine running a test.
@@ -486,23 +494,23 @@ class TestRequestManager(object):
       runner: An instance of TestRunner representing a running test whose
           machine state has changed.
     """
-    logging.debug('TRM._RunnerMachineStateChanged id=%d status=%d runner=%s',
-                  int(info.id), int(info.status), runner.GetName())
+    logging.debug('TRM._RunnerMachineStateChanged id=%s status=%d runner=%s',
+                  info.id, int(info.status), runner.GetName())
 
     # If the machine is switching to the ACQUIRED state, we will start the test
     # associated to it in the next call to AssignPendingRequests.
     if info.status != base_machine_provider.MachineStatus.ACQUIRED:
       # The machine running the test has failed.  Tell the user about it.
-      r_str = ('Tests aborted. The machine (%d) running the test (%s) '
+      r_str = ('Tests aborted. The machine (%s) running the test (%s) '
                'experienced a state change. Machine status: %d' %
-               (int(info.id), str(runner.key()), int(info.status)))
+               (info.id, str(runner.key()), int(info.status)))
       self._UpdateTestResult(runner, result_string=r_str)
 
       if info.status == base_machine_provider.MachineStatus.STOPPED:
         self._machine_manager.ReleaseMachine(info.id)
       elif info.status != base_machine_provider.MachineStatus.AVAILABLE:
-        logging.error('Invalid status change for machine_id=%d status=%d',
-                      int(info.id), int(info.status))
+        logging.error('Invalid status change for machine_id=%s status=%d',
+                      info.id, int(info.status))
 
   def HandleTestResults(self, web_request):
     """Handle a response from the remote script.
@@ -548,10 +556,10 @@ class TestRequestManager(object):
       logging.error('runner argument must be given')
       return
 
-    # If the machine id of this runner is -1, this means the machine finished
-    # running this test.  Don't try to process another response for this
-    # runner object.
-    if runner.machine_id == -1:
+    # If the machine id of this runner is DONE_MACHINE_ID, this means the
+    # machine finished running this test. Don't try to process another
+    # response for this runner object.
+    if runner.machine_id == DONE_MACHINE_ID:
       logging.error('Got a second response for runner=%s, not good',
                     runner.GetName())
       return
@@ -561,12 +569,12 @@ class TestRequestManager(object):
     # the machine id of this runner can be 0.  Since id 0 does not
     # refer to a valid assigned machine, then this id should not be put onto
     # the idle list.
-    if reuse_machine and runner.machine_id != 0:
+    if reuse_machine and runner.machine_id != NO_MACHINE_ID:
       self._HandleIdleMachine(machine_id=runner.machine_id)
 
     runner.ran_successfully = success
     runner.exit_codes = exit_codes
-    runner.machine_id = -1
+    runner.machine_id = DONE_MACHINE_ID
 
     filename = files.blobstore.create('text/plain')
     with files.open(filename, 'a') as f:
@@ -750,8 +758,8 @@ class TestRequestManager(object):
     """
     machine = self._FindMatchingIdleMachine(runner)
     if machine:
-      logging.debug('Found machine id=%d to runner=%s',
-                    int(machine.id), runner.GetName())
+      logging.debug('Found machine id=%s to runner=%s',
+                    machine.id, runner.GetName())
       self._ExecuteTestRunnerOnIdleMachine(runner, machine)
     else:
       # If we didn't already have a machine for this test and we couldn't
@@ -777,12 +785,13 @@ class TestRequestManager(object):
                   request.GetName(), config.config_name)
 
     # Create a runner entity to record this request/config pair that needs
-    # to be run.  Use a machine id of zero to indicate it has not yet been
-    # executed.  The runner will eventually be scheduled at a later time.
+    # to be run. Use a machine id of NO_MACHINE_ID to indicate it has not
+    # yet been executed. The runner will eventually be scheduled at a
+    # later time.
     runner = TestRunner(test_request=request, config_name=config.config_name,
                         config_instance_index=config.instance_index,
                         num_config_instances=config.num_instances,
-                        machine_id=0)
+                        machine_id=NO_MACHINE_ID)
     runner.put()
 
     return runner
@@ -869,8 +878,8 @@ class TestRequestManager(object):
     # later when assigning runners.  See AssignPendingRequests.
     machine_id = self._machine_manager.RequestMachine(
         None, config.dimensions)
-    if machine_id is not -1:
-      logging.info('New machine acquired with id=%d', int(machine_id))
+    if machine_id is not DONE_MACHINE_ID:
+      logging.info('New machine acquired with id=%s', machine_id)
       self._AssignMachineToRunner(runner, machine_id)
 
   def _ExecuteTestRunnerIfPossible(self, runner):
@@ -879,15 +888,17 @@ class TestRequestManager(object):
     Args:
       runner: A TestRunner object to execute.
     """
-    if runner.machine_id <= 0:
+    if runner.machine_id == NO_MACHINE_ID:
       # No machine has been assigned yet.
       return
+
+    assert runner.machine_id != DONE_MACHINE_ID
 
     info = self._machine_manager.GetMachineInfo(runner.machine_id)
     if info and info.status == base_machine_provider.MachineStatus.ACQUIRED:
       self._ExecuteTestRunner(runner)
     elif not info:
-      logging.warning('Machine %s, returned no info', runner.machine_id)
+      logging.warning('Machine %s, returned no info', str(runner.machine_id))
 
   def _ExecuteTestRunnerOnIdleMachine(self, runner, idle_machine):
     """Execute a given runner on the specified idle machine.
@@ -898,11 +909,11 @@ class TestRequestManager(object):
           the test on.
     """
     logging.debug('TRM._ExecuteTestRunnerOnIdleMachine '
-                  'runner=%s config=%s instance=%d num_instances=%d machine=%d',
+                  'runner=%s config=%s instance=%d num_instances=%d machine=%s',
                   runner.GetName(), runner.config_name,
                   int(runner.config_instance_index),
                   int(runner.num_config_instances),
-                  int(idle_machine.id))
+                  str(idle_machine.id))
     config = runner.GetConfiguration()
     assert runner.config_instance_index < runner.num_config_instances
     assert (runner.num_config_instances >= config.min_instances and
@@ -951,7 +962,7 @@ class TestRequestManager(object):
       info.put()
 
       # Reset the test runner so that it can run on another machine.
-      runner.machine_id = 0
+      runner.machine_id = NO_MACHINE_ID
       runner.started = None
       runner.put()
       self._TryAndRun(runner)
@@ -1059,10 +1070,10 @@ class TestRequestManager(object):
     # doesn't work.
     query = TestRunner.gql('WHERE started = :1 ORDER BY created', None)
     for runner in query:
-      if runner.machine_id:
+      if runner.machine_id != NO_MACHINE_ID:
         # TODO(user): I would like to filter this in the query above, but it
         # asks me to use the != property, i.e., machine_id to be used for ORDER.
-        if runner.machine_id != -1:
+        if runner.machine_id != DONE_MACHINE_ID:
           # We already have a machine for this test run, so check if it's
           # ready to execute.
           self._ExecuteTestRunnerIfPossible(runner)
@@ -1130,7 +1141,8 @@ class TestRequestManager(object):
     logging.debug('TRM.AbortStaleRunners starting')
     now = self._GetCurrentTime()
 
-    query = TestRunner.gql('WHERE machine_id > 0')
+    query = TestRunner.gql('WHERE machine_id != :1 AND machine_id != :2',
+                           NO_MACHINE_ID, DONE_MACHINE_ID)
     for runner in query:
       # Determine how long the runner should have taken.
       runner_timeout = runner.GetTimeout() + _TIMEOUT_FUDGE_FACTOR
@@ -1157,7 +1169,7 @@ class TestRequestManager(object):
     self._UpdateTestResult(runner, result_string=r_str)
 
     # Consider the runner's machine dead.  Release it.
-    if machine_id > 0:
+    if machine_id not in [NO_MACHINE_ID, DONE_MACHINE_ID]:
       self._machine_manager.ReleaseMachine(machine_id)
 
   def DeleteRunner(self, key):

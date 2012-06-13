@@ -24,6 +24,7 @@ from server import base_machine_provider
 from server import machine_manager
 from server import machine_provider
 from server import test_manager
+# pylint: enable-msg=C6205
 
 
 # An instance of the test runner manager.  This is used to assign test requests
@@ -91,11 +92,11 @@ class MainHandler(webapp.RequestHandler):
       runner.command_string = '&nbsp;'
       runner.failed_test_class_string = ''
 
-      if runner.machine_id == 0:
+      if runner.machine_id == test_manager.NO_MACHINE_ID:
         runner.status_string = 'Pending'
         runner.command_string = ('<a href="cancel?r=%s">Cancel</a>' %
                                  runner.key_string)
-      elif runner.machine_id >= 0:
+      elif runner.machine_id != test_manager.DONE_MACHINE_ID:
         runner.status_string = ('<a title="On machine %d, click for details" '
                                 'href="#machine_%d">Running</a>' %
                                 (runner.machine_id, runner.machine_id))
@@ -333,7 +334,7 @@ class CancelHandler(webapp.RequestHandler):
       runner = test_manager.TestRunner.get(key)
 
     # Make sure found runner is not yet running.
-    if runner and runner.machine_id == 0:
+    if runner and runner.machine_id == test_manager.NO_MACHINE_ID:
       _test_manager.UpdateCacheServerURL(self.request.host_url)
       _test_manager.AbortRunner(runner, reason='Runner is not already running.')
       self.response.out.write('Runner canceled.')
@@ -358,7 +359,7 @@ class RetryHandler(webapp.RequestHandler):
         pass
 
     if runner:
-      runner.machine_id = 0
+      runner.machine_id = test_manager.NO_MACHINE_ID
       runner.started = None
       # Update the created time to make sure that retrying the runner does not
       # make it jump the queue and get executed before other runners for
