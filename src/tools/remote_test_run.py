@@ -43,7 +43,7 @@ def ParseRequestFile(request_file_name):
     try:
       request_file = open(request_file_name, 'r')
       request_data = request_file.read()
-    except IOError, e:
+    except IOError as e:
       logging.exception('Failed to open file %s.\nException: %s',
                         request_file_name, e)
       return False
@@ -56,7 +56,7 @@ def ParseRequestFile(request_file_name):
     if not test_run.ParseTestRequestMessageText(request_data, errors):
       logging.error('Errors while parsing text file: %s', errors)
       return False
-  except test_request_message.Error, e:
+  except test_request_message.Error as e:
     logging.exception('Failed to evaluate %s\'s file content.\nException: %s',
                       request_file_name, e)
     return False

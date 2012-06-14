@@ -111,7 +111,7 @@ class _RemoteExecutor(object):
       proc = subprocess.Popen([command] + args, stdout=stdout_file_descriptor,
                               bufsize=1, stderr=subprocess.STDOUT,
                               stdin=subprocess.PIPE)
-    except OSError, e:
+    except OSError as e:
       logging.exception('Execution of %s raised exception: %s.',
                         str([command] + args), e)
       if capture:

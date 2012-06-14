@@ -274,7 +274,7 @@ http://goto/swarm.
     if not os.path.exists(self.options.unc_base_path):
       try:
         os.makedirs(self.options.unc_base_path)
-      except os.error, e:
+      except os.error as e:
         logging.exception('Can\'t create inexistent unc_base_path: %s', e)
         raise IOError(e)
 
@@ -467,6 +467,6 @@ http://goto/swarm.
 
     try:
       return self.SaveTestRequest(self.CreateTestRequest(tests_array))
-    except IOError, e:
+    except IOError as e:
       logging.exception('Failed to create and save test request: %s', e)
       return -1

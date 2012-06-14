@@ -52,7 +52,7 @@ def DownloadFile(local_file, url):
     try:
       url_stream = urllib2.urlopen(urllib2.Request(url))
       url_data = url_stream.read()
-    except (urllib2.URLError, IOError), e:
+    except (urllib2.URLError, IOError) as e:
       logging.exception('Failed to read from %s\n%s', url, e)
       raise
   finally:
@@ -64,7 +64,7 @@ def DownloadFile(local_file, url):
     try:
       file_stream = open(local_file, 'wb')
       file_stream.write(url_data)
-    except IOError, e:
+    except IOError as e:
       logging.exception('Failed to write to %s\n%s', local_file, e)
       raise
   finally:

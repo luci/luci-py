@@ -681,7 +681,7 @@ class TestRequestManager(object):
                      subject=subject,
                      body=message_body,
                      html='<pre>%s</pre>' % message_body)
-    except Exception, e:  # pylint: disable-msg=W0703
+    except Exception as e:  # pylint: disable-msg=W0703
       # We catch all errors thrown because mail.send_mail can throw errors
       # that it doesn't list in its description, but that are caused by our
       # inputs (such as unauthorized sender).

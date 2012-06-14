@@ -165,7 +165,7 @@ class MachineManager(object):
       else:
         machine_info = self._machine_provider.GetMachineInfo(machine.id)
         new_status = machine_info.Status()
-    except base_machine_provider.MachineProviderException, e:
+    except base_machine_provider.MachineProviderException as e:
       # We differentiate between transient and non-transient errors.  Because
       # we periodically poll the machine provider, we can simply ignore
       # transient errors here and we will check again later.  For non-transient
@@ -293,7 +293,7 @@ class MachineManager(object):
     try:
       machine_id = self._machine_provider.RequestMachine(
           pool, config_dimensions, self._MACHINE_REQUEST_EXPIRATION_DELTA)
-    except base_machine_provider.MachineProviderException, e:
+    except base_machine_provider.MachineProviderException as e:
       logging.warning('Can\'t open request, exception: %s (%d)',
                       e.message, e.error_code)
       return DONE_MACHINE_ID
@@ -379,7 +379,7 @@ class MachineManager(object):
         # the machine entity.
         machine.delete()
         success = True
-      except base_machine_provider.MachineProviderException, e:
+      except base_machine_provider.MachineProviderException as e:
         logging.warning('Failed to release machine id=%d: %s (%d)',
                         machine_id, e.message, e.error_code)
 

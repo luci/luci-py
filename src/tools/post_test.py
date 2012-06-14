@@ -45,7 +45,7 @@ def WaitForResults(running_test_keys, base_url, sleep_time, verbose=False):
         else:
           if verbose:
             print running_test_key['config_name'] + ' isn\'t done yet'
-      except urllib2.HTTPError, e:
+      except urllib2.HTTPError as e:
         print 'Calling %s threw %s' % (key_url, e)
     time.sleep(sleep_time)
   if verbose:
@@ -98,7 +98,7 @@ def main():
     print 'Sending %s to %s' % (os.path.basename(filename), test_url)
   try:
     output = urllib2.urlopen(test_url, data=f.read()).read()
-  except urllib2.URLError, ex:
+  except urllib2.URLError as ex:
     print 'Error: %s' % str(ex)
     return 1
 

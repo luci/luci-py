@@ -39,7 +39,7 @@ def main():
   try:
     urllib2.urlopen(url, urllib.urlencode((('s', False),
                                            ('r', options.result))))
-  except urllib2.URLError, ex:
+  except urllib2.URLError as ex:
     print 'Error: %s' % str(ex)
     return 1
 

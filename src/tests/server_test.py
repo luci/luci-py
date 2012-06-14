@@ -131,13 +131,13 @@ class _SwarmTestCase(unittest.TestCase):
       try:
         output = urllib2.urlopen(swarm_server_test_url,
                                  data=test_request.read()).read()
-      except urllib2.URLError, ex:
+      except urllib2.URLError as ex:
         self.fail('Error: %s' % str(ex))
 
       # Check that we can read the output as a JSON string
       try:
         test_keys = json.loads(output)
-      except (ValueError, TypeError), e:
+      except (ValueError, TypeError) as e:
         self.fail('Swarm Request failed: %s' % output)
 
       logging.info(test_keys)
@@ -152,7 +152,7 @@ class _SwarmTestCase(unittest.TestCase):
         # one to start the test. TODO(user): This should be fixed in the server.
         # No need for admin URL the second time...
         opener.open(urlparse.urljoin(self._swarm_server_url, 'tasks/poll'))
-      except urllib2.URLError, ex:
+      except urllib2.URLError as ex:
         self.fail('Error: %s' % str(ex))
 
       # Make sure the machines got the Swarm file correctly, since there once
@@ -202,7 +202,7 @@ class _SwarmTestCase(unittest.TestCase):
           test_all_succeeded = False
         if _SwarmTestProgram.options.verbose:
           logging.info('Test done for %s', running_test_key['config_name'])
-      except urllib2.HTTPError, e:
+      except urllib2.HTTPError as e:
         self.fail('Calling %s threw %s' % (result_url, e))
     if _SwarmTestProgram.options.verbose:
       logging.info(test_result_output)
