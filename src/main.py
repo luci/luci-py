@@ -6,13 +6,15 @@
 #
 
 
-try:  # pylint: disable-msg=C6205
-  import simplejson as json  # pylint: disable-msg=C6204
-except ImportError:
-  import json  # pylint: disable-msg=C6204
+# pylint: disable-msg=C6204
 import datetime
 import logging
 import os.path
+try:
+  import simplejson as json
+except ImportError:
+  import json
+# pylint: enable-msg=C6204
 
 from google.appengine.api import users
 from google.appengine.ext import db
@@ -24,7 +26,7 @@ from server import base_machine_provider
 from server import machine_manager
 from server import machine_provider
 from server import test_manager
-# pylint: enable-msg=C6205
+# pylint: enable-msg=C6204
 
 
 # An instance of the test runner manager.  This is used to assign test requests
@@ -373,6 +375,42 @@ class RetryHandler(webapp.RequestHandler):
       self.response.set_status(204)
 
 
+class RegisterHandler(webapp.RequestHandler):
+  """Handler for the register_machine of the Swarm server.
+
+     Attempt to find a matching job for the querying machine.
+  """
+
+  def post(self):  # pylint: disable-msg=C6409
+    """Handles HTTP POST requests for this handler's URL."""
+
+    # Validate the request.
+    if not self.request.body:
+      self.response.set_status(402)
+      self.response.out.write('Request must have a body')
+      return
+
+    _test_manager.UpdateCacheServerURL(self.request.host_url)
+    attributes_str = self.request.get('attributes')
+    try:
+      attributes = json.loads(attributes_str)
+    except (json.decoder.JSONDecodeError, TypeError, ValueError):
+      message = 'Invalid attributes: ' + attributes_str
+      logging.exception(message)
+      response = 'Error: %s' % message
+      self.response.out.write(response)
+      return
+
+    try:
+      response = json.dumps(_test_manager.ExecuteRegisterRequest(attributes))
+    except test_request_message.Error as ex:
+      message = str(ex)
+      logging.exception(message)
+      response = 'Error: %s' % message
+
+    self.response.out.write(response)
+
+
 def CreateApplication():
   """Create the managers required by app engine."""
   # pylint: disable-msg=W0603
@@ -395,6 +433,7 @@ def CreateApplication():
                                  ('/test', TestRequestHandler),
                                  ('/result', ResultHandler),
                                  ('/tasks/poll', PollHandler),
+                                 ('/poll_for_test', RegisterHandler),
                                  ('/tasks/quitquitquit', QuitHandler)],
                                 debug=True)
 
