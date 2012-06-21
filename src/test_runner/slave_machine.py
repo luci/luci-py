@@ -250,6 +250,58 @@ class SlaveMachine(object):
                         self._result_url, str(e))
 
 
+def BuildRPC(func_name, args):
+  """Builds a dictionary of an operation that needs to be executed.
+
+  Args:
+    func_name: a string of the function name to execute on the remote host.
+    args: a list of arguments to be passed to the function.
+
+  Returns:
+    A dictionary containing them function name and args.
+  """
+
+  return {'function': func_name, 'args': args}
+
+
+def ParseRPC(rpc):
+  """Parses RPC created by BuildRPC into a tuple.
+
+  Args:
+    rpc: dictionary containing function name and args.
+
+  Returns:
+    A tuple of (str, list) of function name and args.
+
+  Raises:
+    SlaveError: with human readable string.
+  """
+
+  if not isinstance(rpc, dict):
+    raise SlaveError('Invalid RPC container')
+
+  fields = ['function', 'args']
+  for key in rpc:
+    try:
+      fields.remove(key)
+    except ValueError:
+      raise SlaveError('Invalid extra arg to RPC: ' + key)
+
+  if fields:
+    raise SlaveError('Missing mandatory field to RPC: ' + str(fields))
+
+  function = rpc['function']
+  args = rpc['args']
+
+  if not isinstance(function, str):
+    raise SlaveError('Invalid RPC call function name type')
+
+  logging.debug('rpc function name: ' + function)
+  logging.debug('rpc function arg type: ' + str(type(args)))
+
+  return (function, args)
+
+
 class SlaveError(Exception):
   """Simple error exception properly scoped here."""
   pass
