@@ -1242,10 +1242,13 @@ class TestRequestManager(object):
         break
 
     response = {'id': attribs['id']}
-    if not assigned_runner:
+    if assigned_runner:
+      response['try_count'] = 0
+    else:
+      response['try_count'] = attribs['try_count'] + 1
       # Tell machine when to come back.
       # TODO(user): Tune when machine should come back at some later time.
-      response['come_back'] = 1000
+      response['come_back'] = 1
 
     return response
 
@@ -1279,6 +1282,14 @@ class TestRequestManager(object):
         if not isinstance(value, (str, unicode)):
           raise test_request_message.Error('Invalid attrib value type for '
                                            + attrib)
+      elif attrib == 'try_count':
+        # Make sure try_count is a non-negative integer.
+        if not isinstance(value, int):
+          raise test_request_message.Error('Invalid attrib value type for '
+                                           'try_count')
+        if value < 0:
+          raise test_request_message.Error('Invalid negative value for '
+                                           'try_count')
       else:
         raise test_request_message.Error('Invalid attribute to machine: '
                                          + attrib)
@@ -1305,6 +1316,10 @@ class TestRequestManager(object):
 
       assert (i < 10 and attributes['id'] not in
               [NO_MACHINE_ID, DONE_MACHINE_ID])
+
+    # Make sure attributes now has a try_count field.
+    if not 'try_count' in attributes:
+      attributes['try_count'] = 0
 
     return attributes
 

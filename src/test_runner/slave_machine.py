@@ -49,6 +49,7 @@ class SlaveMachine(object):
     self._attributes = attributes.copy() if attributes else {}
     self._result_url = None
     self._attributes['id'] = None
+    self._attributes['try_count'] = 0
 
   def Start(self, iterations=-1):
     """Starts the slave, which polls the Swarm server for jobs until it dies.
@@ -143,6 +144,10 @@ class SlaveMachine(object):
     self._attributes['id'] = str(response['id'])
     logging.debug('received id: ' + str(self._attributes['id']))
 
+    # Store try_count assigned by Swarm server to send it back in next request.
+    self._attributes['try_count'] = int(response['try_count'])
+    logging.debug('received try_count: ' + str(self._attributes['try_count']))
+
     commands = None
     if not 'commands' in response:
       self._come_back = float(response['come_back'])
@@ -166,22 +171,22 @@ class SlaveMachine(object):
         isinstance(response['result_url'], (str, unicode))):
       self._result_url = str(response['result_url'])
 
-    # Validate fields in the response. A response should have 'id', and only
-    # either one of ('come_back') or ('commands', 'result_url').
-    valid_fields = ['id']
+    # Validate fields in the response. A response should have 'id', 'try_count',
+    # and only either one of ('come_back') or ('commands', 'result_url').
+    required_fields = ['id', 'try_count']
     if 'commands' in response:
-      valid_fields += ['commands', 'result_url']
+      required_fields += ['commands', 'result_url']
     else:
-      valid_fields += ['come_back']
+      required_fields += ['come_back']
 
     # We allow extra fields in the response, but ignore them.
     for field in response:
-      if field in valid_fields:
-        valid_fields.remove(field)
+      if field in required_fields:
+        required_fields.remove(field)
 
     # Make sure we're not missing anything and don't have extras.
-    if valid_fields:
-      message = ('Missing fields in response: ' + str(valid_fields))
+    if required_fields:
+      message = ('Missing fields in response: ' + str(required_fields))
       self._PostFailedExecuteResults(message)
       return False
 
@@ -189,6 +194,18 @@ class SlaveMachine(object):
     if not isinstance(response['id'], (str, unicode)):
       self._PostFailedExecuteResults('Invalid ID type: ' +
                                      str(type(response['id'])))
+      return False
+
+    # Validate try_count type.
+    if not isinstance(response['try_count'], int):
+      self._PostFailedExecuteResults('Invalid try_count type: ' +
+                                     str(type(response['try_count'])))
+      return False
+
+    # try_count can not be negative.
+    if int(response['try_count']) < 0:
+      self._PostFailedExecuteResults('Invalid negative try_count value: %d' %
+                                     int(response['try_count']))
       return False
 
     if 'commands' in response:
