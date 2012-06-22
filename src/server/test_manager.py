@@ -60,6 +60,14 @@ NO_MACHINE_ID = '00000000-00000000-00000000-00000000'
 # Reserved UUID to indicate 'no machine assigned and done'.
 DONE_MACHINE_ID = 'FFFFFFFF-FFFFFFFF-FFFFFFFF-FFFFFFFF'
 
+# Maximum value for the come_back field in a response to an idle slave machine.
+# TODO(user): make this adjustable by the user.
+MAX_COMEBACK_SECS = 60.0
+
+# Maximum cap for try_count. A try_count value greater than this is clamped to
+# this constant which will result in ~400M secs (>3 years).
+MAX_TRY_COUNT = 30
+
 
 class TestRequest(db.Model):
   """A test request.
@@ -1246,9 +1254,8 @@ class TestRequestManager(object):
       response['try_count'] = 0
     else:
       response['try_count'] = attribs['try_count'] + 1
-      # Tell machine when to come back.
-      # TODO(user): Tune when machine should come back at some later time.
-      response['come_back'] = 1
+      # Tell machine when to come back, in seconds.
+      response['come_back'] = self._ComputeComebackValue(response['try_count'])
 
     return response
 
@@ -1322,6 +1329,25 @@ class TestRequestManager(object):
       attributes['try_count'] = 0
 
     return attributes
+
+  def _ComputeComebackValue(self, try_count):
+    """Computes when the slave machine should return based on given try_count..
+
+    Currently computes come_back exponentially.
+
+    Args:
+      try_count: The try_count number of the machine which is non-negative.
+
+    Returns:
+      A float, representing the seconds the slave should wait before asking
+      for a new job.
+    """
+    # Check for negativity just to be safe.
+    assert try_count >= 0
+
+    # Limit our exponential computation to a sane amount to avoid overflow.
+    try_count = min(try_count, MAX_TRY_COUNT)
+    return min(MAX_COMEBACK_SECS, float(2**try_count)/100 + 1)
 
   def _FindMatchingRunner(self, attribs):
     """Find oldest TestRunner who hasn't already been assigned a machine.
