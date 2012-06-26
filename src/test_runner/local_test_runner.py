@@ -326,9 +326,9 @@ class LocalTestRunner(object):
       command: A list containing the command to execute and its arguments.
           These will be expanded looking for environment variables.
 
-      time_out: The number of seconds to wait for the command to complete.
-          If the command doesn't complete under this time, then we kill
-          the process and return an error.
+      time_out: The number of seconds to wait for output from this command.
+          If the command doesn't produce any output for |time_out| seconds,
+          then we kill the process and return an error.
 
       env: A dictionary containing environment variables to be used when running
           the command. Defaults to None.
@@ -364,7 +364,7 @@ class LocalTestRunner(object):
     stdout_thread.daemon = True  # Ensure this exits if the parent dies
     stdout_thread.start()
 
-    start_time = time.time()
+    timeout_start_time = time.time()
     stdout_string = ''
     current_chunk_to_upload = ''
     upload_chunk_size = 0
@@ -374,7 +374,7 @@ class LocalTestRunner(object):
       upload_url = self.test_run.output_destination['url']
       if 'size' in self.test_run.output_destination:
         upload_chunk_size = self.test_run.output_destination['size']
-    while time_out == 0 or start_time + time_out > time.time():
+    while time_out == 0 or timeout_start_time + time_out > time.time():
       try:
         exit_code = proc.poll()
       except OSError, e:
@@ -385,6 +385,9 @@ class LocalTestRunner(object):
       current_content = ''
       while True:
         try:
+          # Some output was produced so reset the timeout counter.
+          if not stdout_queue.empty():
+            timeout_start_time = time.time()
           current_content += stdout_queue.get_nowait()
         except Queue.Empty:
           break
