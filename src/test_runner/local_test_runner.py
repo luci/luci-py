@@ -434,7 +434,12 @@ class LocalTestRunner(object):
     error_string = ('Execution of %s with pid: %d timed out after %fs!' %
                     (parsed_command, proc.pid, time_out))
     logging.error(error_string)
-    return (1, error_string)
+
+    if not stdout_string:
+      stdout_string = 'No ouput!'
+
+    stdout_string += '\n' + error_string
+    return (1, stdout_string)
 
   def DownloadAndExplodeData(self):
     """Download and explode the zip files enumerated in the test run data.
