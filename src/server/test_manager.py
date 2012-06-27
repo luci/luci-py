@@ -68,6 +68,11 @@ MAX_COMEBACK_SECS = 60.0
 # this constant which will result in ~400M secs (>3 years).
 MAX_TRY_COUNT = 30
 
+# Number of times to try a transaction before giving up. Since most likely the
+# recoverable exceptions will only happen when datastore is overloaded, it
+# doesn't make much sense to extensively retry many times.
+MAX_TRANSACTION_RETRY_COUNT = 3
+
 
 class TestRequest(db.Model):
   """A test request.
@@ -1238,7 +1243,7 @@ class TestRequestManager(object):
         # Will atomically try to assign the machine to the runner. This could
         # fail due to a race condition on the runner. If so, we loop back to
         # finding a runner.
-        if self._AssignRunnerToMachine(attribs, runner):
+        if self._AssignRunnerToMachine(attribs['id'], runner, AtomicAssignID):
           # TODO(user): since this change list only has additions not
           # modifications, we comment out the following line which actually runs
           # the test. This will be fixed in upcoming changelists.
@@ -1331,7 +1336,7 @@ class TestRequestManager(object):
     return attributes
 
   def _ComputeComebackValue(self, try_count):
-    """Computes when the slave machine should return based on given try_count..
+    """Computes when the slave machine should return based on given try_count.
 
     Currently computes come_back exponentially.
 
@@ -1380,22 +1385,81 @@ class TestRequestManager(object):
 
     return None
 
-  def _AssignRunnerToMachine(self, attribs, runner):
-    """Will try to atomically assign runner to machine defined by attributes.
+  def _AssignRunnerToMachine(self, machine_id, runner, atomic_assign):
+    """Will try to atomically assign runner.machine_id to machine_id.
 
     This function is thread safe and can be called simultaneously on the same
     runner. It will ensure all but one concurrent requests will fail.
 
+    It uses a transaction to run atomic_assign to assign the given machine_id
+    inside attribs to the given runner. If the transaction succeeds, it will
+    return True which means runner.machine_id = machine_id. However, based on
+    datastore documentation, it is possible for datastore to throw exceptions
+    on the transaction, and we have no way to conclude if the machine_id of
+    the runner was set or not.
+
+    After investigating a few alternative approaches, we decided to return
+    False in such situations. This means the runner.machine_id (1) 'might' or
+    (2) 'might not' have been changed, but we return False anyways. In case
+    (2) no harm, no foul. In case (1), the runner is assumed running but is
+    actually not. We expect the timeout event to fire at some future time and
+    restart the runner.
+
+    An alternate solution would be to delete that runner and recreate it, set
+    the correct created timestamp, etc. which seems a bit more messy. We might
+    switch to that if this starts to break at large scales.
+
     Args:
-      attribs: the attributes defining the machine.
+      machine_id: the machine_id of the machine.
       runner: test runner object to assign the machine to.
+      atomic_assign: function pointer to be done atomically.
 
     Returns:
       True is succeeded, False otherwise.
     """
+    for _ in range(0, MAX_TRANSACTION_RETRY_COUNT):
+      try:
+        db.run_in_transaction(atomic_assign, runner.key(), machine_id)
+        return True
+      except TxRunnerAlreadyAssignedError:
+        # The runner is already assigned to a machine. Abort.
+        break
+      except db.TransactionFailedError:
+        # This exception only happens if there is a problem with datastore,
+        # e.g.high contention, capacity cap, etc. It ensures the operation isn't
+        # done so we can safely retry.
+        # Since we are on the main server thread, we avoid sleeping between
+        # calls.
+        continue
+      except (db.Timeout, db.InternalError):
+        # These exceptions do NOT ensure the operation is done. Based on the
+        # Discussion above, we assume it hasn't been assigned.
+        logging.exception('Un-determined fate for runner=%s', runner.GetName())
+        break
 
-    #TODO(user): use a transaction to make atomic!!!
-    runner.machine_id = str(attribs['id'])
+    return False
+
+
+def AtomicAssignID(key, machine_id):
+  """Function to be run by db.run_in_transaction().
+
+  Args:
+    key: key of the test runner object to assign the machine_id to.
+    machine_id: machine_id of the machine we're trying to assign.
+
+  Raises:
+    TxRunnerAlreadyAssignedError: If runner has already been assigned a machine.
+  """
+  runner = db.get(key)
+  if runner and runner.machine_id == NO_MACHINE_ID:
+    runner.machine_id = str(machine_id)
     runner.put()
+  else:
+    # Tell caller to abort this operation.
+    raise TxRunnerAlreadyAssignedError
 
-    return True
+
+class TxRunnerAlreadyAssignedError(Exception):
+  """Simple exception class signaling a transaction fail."""
+  pass
+
