@@ -70,6 +70,15 @@ table {
 </table>
 
 <h1>Test Requests</h1>
+{{sorted_by_message}}
+<p>Sort By: 
+<select id="sort" onchange="document.location.href='?sort_by=' + this.value">
+<option value="">-</option>
+<option value="start">Start Time</option>
+<option value="reverse_start">Reverse Start Time</option>
+<option value="host_name">Host Name</option>
+</select>
+</p>
 <table id="request-table" summary="This table lists all test requests">
 <tr>
 <th>Name</th>
@@ -77,6 +86,7 @@ table {
 <th>Requested (UTC)</th>
 <th>Started (UTC)</th>
 <th>Ended (UTC)</th>
+<th>Host Used</th>
 <th>&nbsp;</th>
 </tr>
 {% for runner in runners %}
@@ -88,6 +98,7 @@ table {
 <td>{{runner.requested_on_string}}</td>
 <td>{{runner.started_string}}</td>
 <td>{{runner.ended_string}}</td>
+<td>{{runner.host_used}}</td>
 <td>{{runner.command_string}}</td>
 </tr>
 {% endfor %}

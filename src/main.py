@@ -78,12 +78,24 @@ class MainHandler(webapp.RequestHandler):
     # specific to a user to show him his terminated jobs, so allow him to
     # retry from there.
     show_success = self.request.get('s', 'False') != 'False'
+    sort_by = self.request.get('sort_by', 'reverse_chronological')
 
-    # After some initial usage, it was determined that it was more convenient
-    # to show the list of tests in reverse chronological order.
     runners = []
     query = test_manager.TestRunner.all()
-    query.order('-created')
+
+    sorted_by_message = '<p>Currently sorted by: '
+    if sort_by == 'start':
+      sorted_by_message += 'Start Time'
+      query.order('created')
+    elif sort_by == 'host_name':
+      sorted_by_message += 'Hostname'
+      query.order('hostname')
+    else:
+      # The default sort.
+      sorted_by_message += 'Reverse Start Time'
+      query.order('-created')
+    sorted_by_message += '</p>'
+
     for runner in query:
       runner.name_string = runner.GetName()
       runner.key_string = str(runner.key())
@@ -91,6 +103,7 @@ class MainHandler(webapp.RequestHandler):
       runner.requested_on_string = self.GetTimeString(runner.created)
       runner.started_string = '--'
       runner.ended_string = '--'
+      runner.host_used = '&nbsp'
       runner.command_string = '&nbsp;'
       runner.failed_test_class_string = ''
 
@@ -103,6 +116,7 @@ class MainHandler(webapp.RequestHandler):
                                 'href="#machine_%d">Running</a>' %
                                 (runner.machine_id, runner.machine_id))
         runner.started_string = self.GetTimeString(runner.started)
+        runner.host_used = runner.hostname
       else:
         # If this runner successfully completed, and we are not showing them,
         # just ignore it.
@@ -111,6 +125,8 @@ class MainHandler(webapp.RequestHandler):
 
         runner.started_string = self.GetTimeString(runner.started)
         runner.ended_string = self.GetTimeString(runner.ended)
+
+        runner.host_used = runner.hostname
 
         if runner.ran_successfully:
           runner.status_string = ('<a title="Click to see results" '
@@ -179,6 +195,7 @@ class MainHandler(webapp.RequestHandler):
         'runners': runners,
         'machines': machines,
         'enable_success_message': enable_success_message,
+        'sorted_by_message': sorted_by_message
     }
 
     path = os.path.join(os.path.dirname(__file__), 'index.html')
