@@ -51,6 +51,16 @@ class SlaveMachine(object):
     self._attributes['id'] = None
     self._attributes['try_count'] = 0
 
+    # Each RPC has (1) optional function to validate args (2) function to
+    # execute. The validate function, if given, only checks the format of the
+    # args and returns an error message if there is a problem with args, or
+    # None. The execute function should throw a SlaveRPCError if anything goes
+    # wrong while executing the RPC command.
+    # TODO(user): This is where we will add RPC functions.
+    self._rpc_map = {
+        'LogRPC': (self._LogRPCValidateArgs, self._LogRPCExecute)
+        }
+
   def Start(self, iterations=-1):
     """Starts the slave, which polls the Swarm server for jobs until it dies.
 
@@ -127,8 +137,40 @@ class SlaveMachine(object):
       assert self._come_back >= 0
       time.sleep(self._come_back)
     else:
-      # TODO(user): Run the commands.
-      pass
+      # Run the commands.
+      for rpc in commands:
+        function_name, args = ParseRPC(rpc)
+        try:
+          self._ExecuteRPC(function_name, args)
+        except SlaveRPCError as e:
+          self._PostFailedExecuteResults(str(e))
+
+  def _ExecuteRPC(self, name, args):
+    """Execute the function with given args.
+
+    Args:
+      name: Function name to call.
+      args: Arguments to pass to function.
+
+    Returns:
+      The result of the execute function.
+    """
+    return self._rpc_map[name][1](args)
+
+  def _ValidateRPCArgs(self, name, args):
+    """Validate the given args to an RPC function.
+
+    Args:
+      name: Function name to validate.
+      args: Arguments to pass to function to validate.
+
+    Returns:
+      The result of the validation function.
+    """
+    if self._rpc_map[name][0]:
+      return self._rpc_map[name][0](args)
+
+    return None
 
   def _ParseResponse(self, response):
     """Stores relevant fields from response to slave machine.
@@ -221,6 +263,27 @@ class SlaveMachine(object):
                                        str(type(response['commands'])))
         return False
 
+      # Validate rpc commands.
+      for rpc in response['commands']:
+        # Validate format.
+        try:
+          function_name, args = ParseRPC(rpc)
+        except SlaveError as e:
+          self._PostFailedExecuteResults('Error when parsing RPC: ' + str(e))
+          return False
+
+        # Validate function name.
+        if function_name not in self._rpc_map:
+          self._PostFailedExecuteResults('Unsupported RPC function name: '
+                                         + function_name)
+          return False
+
+        # Call the validate function of the RPC.
+        error_message = self._ValidateRPCArgs(function_name, args)
+        if error_message:
+          self._PostFailedExecuteResults(error_message)
+          return False
+
     else:
       # If the slave recieves no command, then it will just try again
       # at a later time and when the Swarm server told it to.
@@ -266,13 +329,32 @@ class SlaveMachine(object):
       logging.exception('Can\'t post result to url %s.\nError: %s',
                         self._result_url, str(e))
 
+  def _LogRPCValidateArgs(self, args):
+    """Checks type of args to be correct.
+
+    Args:
+      args: Provided by Swarm server.
+
+    Returns:
+      If args are invalid, will return an error message. None otherwise.
+    """
+    if not isinstance(args, (str, unicode)):
+      return ('Invalid arg types to LogRPC: %s (expected str or unicode)'%
+              str(type(args)))
+
+    return None
+
+  def _LogRPCExecute(self, args):
+    """Logs given args to logging.debug."""
+    logging.info(args)
+
 
 def BuildRPC(func_name, args):
   """Builds a dictionary of an operation that needs to be executed.
 
   Args:
     func_name: a string of the function name to execute on the remote host.
-    args: a list of arguments to be passed to the function.
+    args: arguments to be passed to the function.
 
   Returns:
     A dictionary containing them function name and args.
@@ -288,7 +370,7 @@ def ParseRPC(rpc):
     rpc: dictionary containing function name and args.
 
   Returns:
-    A tuple of (str, list) of function name and args.
+    A tuple of (str, args) of function name and args.
 
   Raises:
     SlaveError: with human readable string.
@@ -310,7 +392,7 @@ def ParseRPC(rpc):
   function = rpc['function']
   args = rpc['args']
 
-  if not isinstance(function, str):
+  if not isinstance(function, (str, unicode)):
     raise SlaveError('Invalid RPC call function name type')
 
   logging.debug('rpc function name: ' + function)
@@ -320,6 +402,11 @@ def ParseRPC(rpc):
 
 
 class SlaveError(Exception):
+  """Simple error exception properly scoped here."""
+  pass
+
+
+class SlaveRPCError(Exception):
   """Simple error exception properly scoped here."""
   pass
 
