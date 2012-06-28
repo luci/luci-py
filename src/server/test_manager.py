@@ -892,7 +892,7 @@ class TestRequestManager(object):
     # later when assigning runners.  See AssignPendingRequests.
     machine_id = self._machine_manager.RequestMachine(
         None, config.dimensions)
-    if machine_id is not DONE_MACHINE_ID:
+    if machine_id != DONE_MACHINE_ID:
       logging.info('New machine acquired with id=%s', machine_id)
       self._AssignMachineToRunner(runner, machine_id)
 
