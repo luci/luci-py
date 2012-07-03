@@ -91,6 +91,9 @@ class SlaveMachine(object):
           'attributes': self._attributes,
           }
 
+      # Reset the result_url to avoid posting to the wrong place.
+      self._result_url = None
+
       logging.debug('Connecting to Swarm server: ' + self._url)
       logging.debug('Request: ' + str(request))
 
