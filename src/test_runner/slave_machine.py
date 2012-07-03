@@ -18,6 +18,7 @@ http://code.google.com/p/swarming/wiki/MachineProvider for complete details.
 import logging
 import optparse
 import os
+import subprocess
 import sys
 import time
 import urllib
@@ -61,7 +62,9 @@ class SlaveMachine(object):
     self._rpc_map = {
         'LogRPC': (self._LogRPCValidateArgs, self._LogRPCExecute),
         'FilePairsToUploadRPC': (self._FilePairsToUploadRPCValidate,
-                                 self._FilePairsToUploadRPCExecute)
+                                 self._FilePairsToUploadRPCExecute),
+        'RunCommandsRPC': (self._RunCommandsRPCValidateArgs,
+                           self._RunCommandsRPCExecute)
         }
 
   def Start(self, iterations=-1):
@@ -303,6 +306,8 @@ class SlaveMachine(object):
 
     return True
 
+  # TODO(user): Implement mechanism for slave to give up after a
+  # certain number of consecutive failures.
   def _PostFailedExecuteResults(self, result_string, result_code=-1):
     """Will post given results to result URL *ONLY* in the case of a failure.
 
@@ -434,6 +439,49 @@ class SlaveMachine(object):
     file_p.close()
 
     logging.debug('File stored: ' + full_name)
+
+  def _RunCommandsRPCValidateArgs(self, args):
+    """Checks type of args to be correct.
+
+    Args:
+      args: Should be a list of strings to pass to python.
+
+    Returns:
+      If args are invalid, will return an error message. None otherwise.
+    """
+    if not isinstance(args, list):
+      return ('Invalid RunCommandsRPC arg type: %s (expected list of str or'
+              ' unicode)'%str(type(args)))
+
+    for command in args:
+      if not isinstance(command, (str, unicode)):
+        return ('Invalid element type in RunCommandsRPC args: %s (expected'
+                ' str or unicode)'% str(type(command)))
+
+    return None
+
+  def _RunCommandsRPCExecute(self, args):
+    """Executes the given command in args.
+
+    Args:
+      args: A list of strings to run.
+    Raises:
+      SlaveRPCError: If executing the commands fails.
+    """
+    commands = [sys.executable] + args
+
+    try:
+      subprocess.check_call(commands)
+    except subprocess.CalledProcessError as e:
+      logging.exception('Execution of %s raised exception: %s.',
+                        str(commands), str(e))
+
+      self._PostFailedExecuteResults('subprocess exception: ' + str(e))
+    else:
+      logging.debug('done!')
+      # At this point the script called by subprocess is responsible for
+      # notifying the Swarm server if anything goes wrong, so now the job
+      # is done.
 
 
 def BuildRPC(func_name, args):
