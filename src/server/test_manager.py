@@ -37,6 +37,7 @@ from common import dimensions
 from common import test_request_message
 from server import base_machine_provider
 from test_runner import remote_test_runner
+from test_runner import slave_machine
 
 # Fudge factor added to a runner's timeout before we consider it to have run
 # for too long.  Runners that run for too long will be aborted automatically.
@@ -49,6 +50,15 @@ _TEST_RUN_SWARM_FILE_NAME = 'test_run.swarm'
 
 # Name of python script to execute on the remote machine to run a test.
 _TEST_RUNNER_SCRIPT = 'local_test_runner.py'
+
+# Name of python script to download test files.
+_DOWNLOADER_SCRIPT = 'downloader.py'
+
+# Name of python script to validate swarm file format.
+_TEST_REQUEST_MESSAGE_SCRIPT = 'test_request_message.py'
+
+# Name of python script to mark folder as package.
+_PYTHON_INIT_SCRIPT = '__init__.py'
 
 # Name of directories in source tree and/or on remote machine.
 _TEST_RUNNER_DIR = 'test_runner'
@@ -72,6 +82,9 @@ MAX_TRY_COUNT = 30
 # recoverable exceptions will only happen when datastore is overloaded, it
 # doesn't make much sense to extensively retry many times.
 MAX_TRANSACTION_RETRY_COUNT = 3
+
+# Root directory of Swarm scripts.
+SWARM_ROOT_DIR = os.path.join(os.path.dirname(__file__), '..')
 
 
 class TestRequest(db.Model):
@@ -1233,6 +1246,7 @@ class TestRequestManager(object):
     attribs = self.ValidateAndFixAttributes(attributes)
 
     assigned_runner = False
+    response = {}
 
     # Try assigning machine to a runner 10 times before we give up.
     # TODO(user): Tune this parameter somehow.
@@ -1244,17 +1258,24 @@ class TestRequestManager(object):
         # fail due to a race condition on the runner. If so, we loop back to
         # finding a runner.
         if self._AssignRunnerToMachine(attribs['id'], runner, AtomicAssignID):
-          # TODO(user): since this change list only has additions not
-          # modifications, we comment out the following line which actually runs
-          # the test. This will be fixed in upcoming changelists.
-          #response = self._ExecuteTestRunner(runner)
-          assigned_runner = True
-          break
+          # Get the commands the machine needs to execute.
+          try:
+            commands, result_url = self._GetTestRunnerCommands(runner)
+          except PrepareRemoteCommandsError:
+            # Failed to load the scripts so mark the runner as 'not running'.
+            runner.machine_id = NO_MACHINE_ID
+            runner.started = None
+            runner.put()
+          else:
+            response['commands'] = commands
+            response['result_url'] = result_url
+            assigned_runner = True
+            break
       # We found no runner, no use in re-trying so just break out of the loop.
       else:
         break
 
-    response = {'id': attribs['id']}
+    response['id'] = attribs['id']
     if assigned_runner:
       response['try_count'] = 0
     else:
@@ -1439,6 +1460,135 @@ class TestRequestManager(object):
 
     return False
 
+  def _GetTestRunnerCommands(self, runner):
+    """Get the commands that need to be sent to a slave to execute the runner.
+
+    Args:
+      runner: test runner object to run.
+
+    Returns:
+      A tuple (commands, result_url) where commands is a list of RPC calls that
+      need to be run by the remote slave machine and result_url is where it
+      should post the results.
+
+    Raises:
+      PrepareRemoteCommandsError: Any error occured when preparing the commands.
+    """
+    output_commands = []
+
+    # Load the scripts.
+    try:
+      files_to_upload = self._GetFilesToUpload()
+    except IOError as e:
+      logging.exception(str(e))
+      raise PrepareRemoteCommandsError
+
+    # TODO(user): Use separate module for RPC related stuff rather
+    # than slave_machine.
+    output_commands.append(slave_machine.BuildRPC('FilePairsToUpload',
+                                                  files_to_upload))
+
+    # Create test manifest.
+    test_run = self._BuildTestRun(runner)
+    output_commands.append(slave_machine.BuildRPC('SetRemoteRoot',
+                                                  test_run.working_dir))
+    output_commands.append(slave_machine.BuildRPC('FilePairsToUpload',
+                                                  ['.',
+                                                   _TEST_RUN_SWARM_FILE_NAME,
+                                                   str(test_run)]))
+    # Define how to run the scripts.
+    command_to_execute = [r'%s' % _TEST_RUNNER_SCRIPT,
+                          '-f', r'%s' % _TEST_RUN_SWARM_FILE_NAME]
+
+    test_case = runner.test_request.GetTestCase()
+    if test_case.verbose:
+      command_to_execute.append('-v')
+
+    output_commands.append(slave_machine.BuildRPC('RunCommands',
+                                                  command_to_execute))
+
+    return (output_commands, test_run.result_url)
+
+  def _GetFilesToUpload(self):
+    """Loads required scripts into a single list of strings to be shipped.
+
+    Returns:
+      A list of tuples containing script names and contents. Each tuple has
+      the format: (path to file on remote machine, file name, file contents).
+
+    Raises:
+      IOError: A file cannot be loaded.
+    """
+    # A list of tuples containing script paths on local and remote machine. Each
+    # tuple has the format:
+    # (path on local machine, path on remote machine, file name).
+    file_paths = []
+
+    # The local script runner.
+    # We place the local running script in the current working directory (cwd)
+    # of the slave, and place the rest of the scripts in relation to cwd. E.g.,
+    # if the local script runner imports common.downloader, we create the folder
+    # common and put downloader.py in it.
+    file_paths.append(
+        (os.path.join(SWARM_ROOT_DIR, _TEST_RUNNER_DIR, _TEST_RUNNER_SCRIPT),
+         '.', _TEST_RUNNER_SCRIPT))
+
+    # The downloader_file.
+    file_paths.append(
+        (os.path.join(SWARM_ROOT_DIR, _TEST_RUNNER_DIR, _DOWNLOADER_SCRIPT),
+         _TEST_RUNNER_DIR, _DOWNLOADER_SCRIPT))
+
+    # The trm script.
+    file_paths.append(
+        (os.path.join(SWARM_ROOT_DIR, _COMMON_DIR,
+                      _TEST_REQUEST_MESSAGE_SCRIPT),
+         _COMMON_DIR, _TEST_REQUEST_MESSAGE_SCRIPT))
+
+    # The test_runner __init__.
+    file_paths.append(
+        (os.path.join(SWARM_ROOT_DIR, _TEST_RUNNER_DIR, _PYTHON_INIT_SCRIPT),
+         _TEST_RUNNER_DIR, _PYTHON_INIT_SCRIPT))
+
+    # The common __init__.
+    file_paths.append(
+        (os.path.join(SWARM_ROOT_DIR, _COMMON_DIR, _PYTHON_INIT_SCRIPT),
+         _COMMON_DIR, _PYTHON_INIT_SCRIPT))
+
+    files_to_upload = []
+
+    # TODO(user): On app engine we don't have access to files on disk.
+    # Need to find an alternative to loading files from disk.
+    for local_path, remote_path, file_name in file_paths:
+      try:
+        file_contents = self._LoadFile(local_path)
+      except IOError:
+        raise
+
+      files_to_upload.append((remote_path, file_name, file_contents))
+
+    return files_to_upload
+
+  def _LoadFile(self, file_name):
+    """Loads the given file and return its contents as a string.
+
+    Having this as a separate function makes is simpler to mock for tests.
+
+    Args:
+      file_name: A string of the file name to load.
+
+    Returns:
+      A string containing the file contents.
+
+    Raises:
+      IOError: The file cannot be loaded.
+    """
+    # The caller should catch the IOError exception.
+    file_p = open(file_name, 'r')
+    file_data = file_p.read()
+    file_p.close()
+
+    return file_data
+
 
 def AtomicAssignID(key, machine_id):
   """Function to be run by db.run_in_transaction().
@@ -1453,6 +1603,7 @@ def AtomicAssignID(key, machine_id):
   runner = db.get(key)
   if runner and runner.machine_id == NO_MACHINE_ID:
     runner.machine_id = str(machine_id)
+    runner.started = datetime.datetime.now()
     runner.put()
   else:
     # Tell caller to abort this operation.
@@ -1463,3 +1614,7 @@ class TxRunnerAlreadyAssignedError(Exception):
   """Simple exception class signaling a transaction fail."""
   pass
 
+
+class PrepareRemoteCommandsError(Exception):
+  """Simple exception class signaling failure to prepare remote commands."""
+  pass
