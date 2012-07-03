@@ -17,6 +17,7 @@ http://code.google.com/p/swarming/wiki/MachineProvider for complete details.
 
 import logging
 import optparse
+import os
 import sys
 import time
 import urllib
@@ -58,7 +59,9 @@ class SlaveMachine(object):
     # wrong while executing the RPC command.
     # TODO(user): This is where we will add RPC functions.
     self._rpc_map = {
-        'LogRPC': (self._LogRPCValidateArgs, self._LogRPCExecute)
+        'LogRPC': (self._LogRPCValidateArgs, self._LogRPCExecute),
+        'FilePairsToUploadRPC': (self._FilePairsToUploadRPCValidate,
+                                 self._FilePairsToUploadRPCExecute)
         }
 
   def Start(self, iterations=-1):
@@ -67,7 +70,8 @@ class SlaveMachine(object):
     Args:
       iterations: Number of times to poll the Swarm server. -1 indicates
       infinitely. Failing to connect to the server DOES NOT count as an
-      iteration.
+      iteration. This is useful for testing the slave and having an exit
+      condition.
 
     Raises:
       SlaveError: If the slave in unable to connect to the provided URL after
@@ -347,6 +351,89 @@ class SlaveMachine(object):
   def _LogRPCExecute(self, args):
     """Logs given args to logging.debug."""
     logging.info(args)
+
+  def _FilePairsToUploadRPCValidate(self, args):
+    """Checks type of args to be correct.
+
+    Args:
+      args: Provided by Swarm server. Should be a list of string
+      tuples formatted (file path, file name, file contents).
+
+    Returns:
+      If args are invalid, will return an error message. None otherwise.
+    """
+    if not isinstance(args, list):
+      return ('Invalid FilePairsToUploadRPC arg type: %s (expected list of'
+              ' str or unicode tuples)'%str(type(args)))
+
+    for file_tuple in args:
+      if not isinstance(file_tuple, list):
+        return ('Invalid element type in FilePairsToUploadRPC args: %s'
+                ' (expected str or unicode tuple)'% str(type(file_tuple)))
+      if len(file_tuple) != 3:
+        return ('Invalid element len (%d != 3) in FilePairsToUploadRPC args:'
+                ' %s'%(len(file_tuple), str(file_tuple)))
+
+      for string in file_tuple:
+        if not isinstance(string, (str, unicode)):
+          return ('Invalid tuple element type: %s (expected str or unicode)'%
+                  str(type(string)))
+
+    return None
+
+  def _FilePairsToUploadRPCExecute(self, args):
+    """Stores the given file contents to specified directory.
+
+    Args:
+      args: A list of string tuples: (file path, file name, file contents).
+    Raises:
+      SlaveRPCError: If any of the files can't be stored in given folder, or
+      the directory can't be created.
+    """
+    for file_path, file_name, file_contents in args:
+      logging.debug('Received file name: ' + file_name)
+
+      try:
+        self._MakeDirectory(file_path)
+      except os.error as e:
+        raise SlaveRPCError('MakeDirectory exception: ' + str(e))
+
+      try:
+        self._StoreFile(file_path, file_name, file_contents)
+      except IOError as e:
+        raise SlaveRPCError('StoreFile exception: ' + str(e))
+
+  def _MakeDirectory(self, path):
+    """Creates requested folder if it doesn't exist.
+
+    Args:
+      path: The folder path to create recursively.
+
+    Raises:
+      os.error: If the directory can't be created.
+    """
+    if path and not os.path.exists(path):
+      os.makedirs(path)
+      logging.debug('Created file path: ' + path)
+
+  def _StoreFile(self, file_path, file_name, file_contents):
+    """Stores file_contents in given path and name.
+
+    Args:
+      file_path: The folder the file should go in.
+      file_name: The file name.
+      file_contents: Contents of the file to store.
+
+    Raises:
+      IOError: the file can't be opened.
+    """
+    full_name = os.path.join(file_path, file_name)
+
+    file_p = open(full_name, 'wb')
+    file_p.write(file_contents)
+    file_p.close()
+
+    logging.debug('File stored: ' + full_name)
 
 
 def BuildRPC(func_name, args):
