@@ -1304,12 +1304,15 @@ class TestRequestManager(object):
         if not isinstance(value, dict):
           raise test_request_message.Error('Invalid attrib value for '
                                            'dimensions')
-      elif  attrib == 'id':
-        # Make sure the attribute value has proper type.
-        try:
-          value = uuid.UUID(value)
-        except (ValueError, AttributeError):
-          raise test_request_message.Error('Invalid attrib type for id')
+      elif attrib == 'id':
+        # Make sure the attribute value has proper type. None is a valid
+        # type and is treated as if it doesn't exist.
+        if value:
+          try:
+            value = uuid.UUID(value)
+          except (ValueError, AttributeError):
+            raise test_request_message.Error(
+                'Invalid attrib type for id: ' + str(type(value)))
       elif attrib == 'tag' or attrib == 'username' or attrib == 'password':
         # Make sure the attribute value has proper type.
         if not isinstance(value, (str, unicode)):
@@ -1332,7 +1335,7 @@ class TestRequestManager(object):
       raise test_request_message.Error('Missing mandatory attribute: '
                                        'dimensions')
 
-    if 'id' not in attributes:
+    if 'id' not in attributes or not attributes['id']:
       # Try to create a unique ID for the machine if it doesn't have one. The
       # machine will send us back this ID in subsequent tries.
       # Even if the ID isn't unique, it will not create a significant problem.
