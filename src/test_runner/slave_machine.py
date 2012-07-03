@@ -151,6 +151,7 @@ class SlaveMachine(object):
           self._ExecuteRPC(function_name, args)
         except SlaveRPCError as e:
           self._PostFailedExecuteResults(str(e))
+          break
 
   def _ExecuteRPC(self, name, args):
     """Execute the function with given args.
@@ -473,10 +474,9 @@ class SlaveMachine(object):
     try:
       subprocess.check_call(commands)
     except subprocess.CalledProcessError as e:
-      logging.exception('Execution of %s raised exception: %s.',
-                        str(commands), str(e))
-
-      self._PostFailedExecuteResults('subprocess exception: ' + str(e))
+      # The exception message will contain the commands that were
+      # run and error code returned.
+      self._PostFailedExecuteResults(str(e))
     else:
       logging.debug('done!')
       # At this point the script called by subprocess is responsible for
