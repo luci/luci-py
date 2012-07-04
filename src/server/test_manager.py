@@ -378,20 +378,6 @@ class TestRequestManager(object):
         machines_to_del.append(machine)
         continue
 
-    # Load test runners and validate.
-    for runner in TestRunner.gql('WHERE machine_id != :1 AND machine_id != :2',
-                                 NO_MACHINE_ID, DONE_MACHINE_ID):
-      info = self._machine_manager.GetMachineInfo(runner.machine_id)
-      if not info or info.status not in (
-          base_machine_provider.MachineStatus.WAITING,
-          base_machine_provider.MachineStatus.ACQUIRED):
-        # The machine running the test has failed (either stopped or done).
-        # Tell the user about it.
-        r_str = 'Tests aborted. The machine running the test has failed. '
-        r_str += ('Machine status: %s' % str(info.status) if info else
-                  'Status undefined.')
-        self._UpdateTestResult(runner, result_string=r_str)
-
     # Delete all objects that were stale.
     for machine in machines_to_del:
       machine.delete()
@@ -562,7 +548,7 @@ class TestRequestManager(object):
       success = web_request.get('s', 'False') == 'True'
       result_string = urllib.unquote_plus(web_request.get('r'))
       exit_codes = urllib.unquote_plus(web_request.get('x'))
-      self._UpdateTestResult(runner, success, exit_codes, result_string, True)
+      self._UpdateTestResult(runner, success, exit_codes, result_string)
     else:
       logging.error('No runner associated to web request, ignoring test result')
 
