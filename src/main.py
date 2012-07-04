@@ -112,8 +112,8 @@ class MainHandler(webapp.RequestHandler):
         runner.command_string = ('<a href="cancel?r=%s">Cancel</a>' %
                                  runner.key_string)
       elif runner.machine_id != test_manager.DONE_MACHINE_ID:
-        runner.status_string = ('<a title="On machine %d, click for details" '
-                                'href="#machine_%d">Running</a>' %
+        runner.status_string = ('<a title="On machine %s, click for details" '
+                                'href="#machine_%s">Running</a>' %
                                 (runner.machine_id, runner.machine_id))
         runner.started_string = self.GetTimeString(runner.started)
         runner.host_used = runner.hostname

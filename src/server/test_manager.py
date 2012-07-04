@@ -1479,29 +1479,26 @@ class TestRequestManager(object):
     """
     output_commands = []
 
+    # Get test manifest and scripts.
+    test_run = self._BuildTestRun(runner)
+
     # Load the scripts.
     try:
-      files_to_upload = self._GetFilesToUpload()
+      files_to_upload = self._GetFilesToUpload(test_run)
     except IOError as e:
       logging.exception(str(e))
       raise PrepareRemoteCommandsError
 
     # TODO(user): Use separate module for RPC related stuff rather
     # than slave_machine.
-    output_commands.append(slave_machine.BuildRPC('FilePairsToUpload',
+    output_commands.append(slave_machine.BuildRPC('StoreFiles',
                                                   files_to_upload))
 
-    # Create test manifest.
-    test_run = self._BuildTestRun(runner)
-    output_commands.append(slave_machine.BuildRPC('SetRemoteRoot',
-                                                  test_run.working_dir))
-    output_commands.append(slave_machine.BuildRPC('FilePairsToUpload',
-                                                  ['.',
-                                                   _TEST_RUN_SWARM_FILE_NAME,
-                                                   str(test_run)]))
     # Define how to run the scripts.
-    command_to_execute = [r'%s' % _TEST_RUNNER_SCRIPT,
-                          '-f', r'%s' % _TEST_RUN_SWARM_FILE_NAME]
+    command_to_execute = [
+        r'%s' % os.path.join(test_run.working_dir, _TEST_RUNNER_SCRIPT),
+        '-f', r'%s' % os.path.join(test_run.working_dir,
+                                   _TEST_RUN_SWARM_FILE_NAME)]
 
     test_case = runner.test_request.GetTestCase()
     if test_case.verbose:
@@ -1512,11 +1509,14 @@ class TestRequestManager(object):
 
     return (output_commands, test_run.result_url)
 
-  def _GetFilesToUpload(self):
+  def _GetFilesToUpload(self, test_run):
     """Loads required scripts into a single list of strings to be shipped.
 
+    Args:
+      test_run: A TestCase object representing the test to run.
+
     Returns:
-      A list of tuples containing script names and contents. Each tuple has
+      A list of tuples containing file names and contents. Each tuple has
       the format: (path to file on remote machine, file name, file contents).
 
     Raises:
@@ -1525,6 +1525,8 @@ class TestRequestManager(object):
     # A list of tuples containing script paths on local and remote machine. Each
     # tuple has the format:
     # (path on local machine, path on remote machine, file name).
+    # All remote paths are relative to the working directory specified by the
+    # test manifest.
     file_paths = []
 
     # The local script runner.
@@ -1534,28 +1536,32 @@ class TestRequestManager(object):
     # common and put downloader.py in it.
     file_paths.append(
         (os.path.join(SWARM_ROOT_DIR, _TEST_RUNNER_DIR, _TEST_RUNNER_SCRIPT),
-         '.', _TEST_RUNNER_SCRIPT))
+         test_run.working_dir, _TEST_RUNNER_SCRIPT))
 
     # The downloader_file.
     file_paths.append(
         (os.path.join(SWARM_ROOT_DIR, _TEST_RUNNER_DIR, _DOWNLOADER_SCRIPT),
-         _TEST_RUNNER_DIR, _DOWNLOADER_SCRIPT))
+         os.path.join(test_run.working_dir, _TEST_RUNNER_DIR),
+         _DOWNLOADER_SCRIPT))
 
     # The trm script.
     file_paths.append(
         (os.path.join(SWARM_ROOT_DIR, _COMMON_DIR,
                       _TEST_REQUEST_MESSAGE_SCRIPT),
-         _COMMON_DIR, _TEST_REQUEST_MESSAGE_SCRIPT))
+         os.path.join(test_run.working_dir, _COMMON_DIR),
+         _TEST_REQUEST_MESSAGE_SCRIPT))
 
     # The test_runner __init__.
     file_paths.append(
         (os.path.join(SWARM_ROOT_DIR, _TEST_RUNNER_DIR, _PYTHON_INIT_SCRIPT),
-         _TEST_RUNNER_DIR, _PYTHON_INIT_SCRIPT))
+         os.path.join(test_run.working_dir, _TEST_RUNNER_DIR),
+         _PYTHON_INIT_SCRIPT))
 
     # The common __init__.
     file_paths.append(
         (os.path.join(SWARM_ROOT_DIR, _COMMON_DIR, _PYTHON_INIT_SCRIPT),
-         _COMMON_DIR, _PYTHON_INIT_SCRIPT))
+         os.path.join(test_run.working_dir, _COMMON_DIR),
+         _PYTHON_INIT_SCRIPT))
 
     files_to_upload = []
 
@@ -1568,6 +1574,10 @@ class TestRequestManager(object):
         raise
 
       files_to_upload.append((remote_path, file_name, file_contents))
+
+    # Append the test manifest to files that need to be stored.
+    files_to_upload.append(
+        (test_run.working_dir, _TEST_RUN_SWARM_FILE_NAME, str(test_run)))
 
     return files_to_upload
 

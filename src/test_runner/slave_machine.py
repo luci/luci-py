@@ -58,13 +58,12 @@ class SlaveMachine(object):
     # args and returns an error message if there is a problem with args, or
     # None. The execute function should throw a SlaveRPCError if anything goes
     # wrong while executing the RPC command.
-    # TODO(user): This is where we will add RPC functions.
     self._rpc_map = {
         'LogRPC': (self._LogRPCValidateArgs, self._LogRPCExecute),
-        'FilePairsToUploadRPC': (self._FilePairsToUploadRPCValidate,
-                                 self._FilePairsToUploadRPCExecute),
-        'RunCommandsRPC': (self._RunCommandsRPCValidateArgs,
-                           self._RunCommandsRPCExecute)
+        'StoreFiles': (self._StoreFilesRPCValidate,
+                       self._StoreFilesRPCExecute),
+        'RunCommands': (self._RunCommandsRPCValidateArgs,
+                        self._RunCommandsRPCExecute),
         }
 
   def Start(self, iterations=-1):
@@ -78,17 +77,23 @@ class SlaveMachine(object):
 
     Raises:
       SlaveError: If the slave in unable to connect to the provided URL after
-      a few retries.
+      a few retries, or an invalid number of iterations were requested.
     """
 
     url = self._url + '/poll_for_test'
     done_iterations = 0
+    try:
+      iterations = int(iterations)
+    except ValueError:
+      raise SlaveError(
+          'Invalid iterations provided: ' + str(iterations))
+
     connection_retries = CONNECTION_RETRIES
 
     # Loop for requested number of iterations.
     while True:
       request = {
-          'attributes': self._attributes,
+          'attributes': json.dumps(self._attributes)
           }
 
       # Reset the result_url to avoid posting to the wrong place.
@@ -127,7 +132,7 @@ class SlaveMachine(object):
       # Continuously loop until we hit the requested number of iterations.
       if iterations != -1:
         done_iterations += 1
-        if done_iterations == iterations:
+        if done_iterations >= iterations:
           break
 
   def _ProcessResponse(self, response):
@@ -361,7 +366,7 @@ class SlaveMachine(object):
     """Logs given args to logging.debug."""
     logging.info(args)
 
-  def _FilePairsToUploadRPCValidate(self, args):
+  def _StoreFilesRPCValidate(self, args):
     """Checks type of args to be correct.
 
     Args:
@@ -372,15 +377,15 @@ class SlaveMachine(object):
       If args are invalid, will return an error message. None otherwise.
     """
     if not isinstance(args, list):
-      return ('Invalid FilePairsToUploadRPC arg type: %s (expected list of'
+      return ('Invalid StoreFiles arg type: %s (expected list of'
               ' str or unicode tuples)'%str(type(args)))
 
     for file_tuple in args:
       if not isinstance(file_tuple, list):
-        return ('Invalid element type in FilePairsToUploadRPC args: %s'
+        return ('Invalid element type in StoreFiles args: %s'
                 ' (expected str or unicode tuple)'% str(type(file_tuple)))
       if len(file_tuple) != 3:
-        return ('Invalid element len (%d != 3) in FilePairsToUploadRPC args:'
+        return ('Invalid element len (%d != 3) in StoreFiles args:'
                 ' %s'%(len(file_tuple), str(file_tuple)))
 
       for string in file_tuple:
@@ -390,7 +395,7 @@ class SlaveMachine(object):
 
     return None
 
-  def _FilePairsToUploadRPCExecute(self, args):
+  def _StoreFilesRPCExecute(self, args):
     """Stores the given file contents to specified directory.
 
     Args:
@@ -454,12 +459,12 @@ class SlaveMachine(object):
       If args are invalid, will return an error message. None otherwise.
     """
     if not isinstance(args, list):
-      return ('Invalid RunCommandsRPC arg type: %s (expected list of str or'
+      return ('Invalid RunCommands arg type: %s (expected list of str or'
               ' unicode)'%str(type(args)))
 
     for command in args:
       if not isinstance(command, (str, unicode)):
-        return ('Invalid element type in RunCommandsRPC args: %s (expected'
+        return ('Invalid element type in RunCommands args: %s (expected'
                 ' str or unicode)'% str(type(command)))
 
     return None
