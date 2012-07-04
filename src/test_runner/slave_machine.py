@@ -53,19 +53,6 @@ class SlaveMachine(object):
     self._attributes['id'] = None
     self._attributes['try_count'] = 0
 
-    # Each RPC has (1) optional function to validate args (2) function to
-    # execute. The validate function, if given, only checks the format of the
-    # args and returns an error message if there is a problem with args, or
-    # None. The execute function should throw a SlaveRPCError if anything goes
-    # wrong while executing the RPC command.
-    self._rpc_map = {
-        'LogRPC': (self._LogRPCValidateArgs, self._LogRPCExecute),
-        'StoreFiles': (self._StoreFilesRPCValidate,
-                       self._StoreFilesRPCExecute),
-        'RunCommands': (self._RunCommandsRPCValidateArgs,
-                        self._RunCommandsRPCExecute),
-        }
-
   def Start(self, iterations=-1):
     """Starts the slave, which polls the Swarm server for jobs until it dies.
 
@@ -79,7 +66,6 @@ class SlaveMachine(object):
       SlaveError: If the slave in unable to connect to the provided URL after
       a few retries, or an invalid number of iterations were requested.
     """
-
     url = self._url + '/poll_for_test'
     done_iterations = 0
     try:
@@ -87,6 +73,10 @@ class SlaveMachine(object):
     except ValueError:
       raise SlaveError(
           'Invalid iterations provided: ' + str(iterations))
+
+    if iterations < -1:
+      raise SlaveError(
+          'Invalid negative iterations provided: ' + str(iterations))
 
     connection_retries = CONNECTION_RETRIES
 
@@ -132,7 +122,7 @@ class SlaveMachine(object):
       # Continuously loop until we hit the requested number of iterations.
       if iterations != -1:
         done_iterations += 1
-        if done_iterations >= iterations:
+        if done_iterations == iterations:
           break
 
   def _ProcessResponse(self, response):
@@ -160,6 +150,10 @@ class SlaveMachine(object):
         except SlaveRPCError as e:
           self._PostFailedExecuteResults(str(e))
           break
+        except AttributeError:
+          self._PostFailedExecuteResults(
+              'Unsupported RPC function name: ' + function_name)
+          break
 
   def _ExecuteRPC(self, name, args):
     """Execute the function with given args.
@@ -171,22 +165,7 @@ class SlaveMachine(object):
     Returns:
       The result of the execute function.
     """
-    return self._rpc_map[name][1](args)
-
-  def _ValidateRPCArgs(self, name, args):
-    """Validate the given args to an RPC function.
-
-    Args:
-      name: Function name to validate.
-      args: Arguments to pass to function to validate.
-
-    Returns:
-      The result of the validation function.
-    """
-    if self._rpc_map[name][0]:
-      return self._rpc_map[name][0](args)
-
-    return None
+    return getattr(self, name)(args)
 
   def _ParseResponse(self, response):
     """Stores relevant fields from response to slave machine.
@@ -283,21 +262,9 @@ class SlaveMachine(object):
       for rpc in response['commands']:
         # Validate format.
         try:
-          function_name, args = ParseRPC(rpc)
+          ParseRPC(rpc)
         except SlaveError as e:
           self._PostFailedExecuteResults('Error when parsing RPC: ' + str(e))
-          return False
-
-        # Validate function name.
-        if function_name not in self._rpc_map:
-          self._PostFailedExecuteResults('Unsupported RPC function name: '
-                                         + function_name)
-          return False
-
-        # Call the validate function of the RPC.
-        error_message = self._ValidateRPCArgs(function_name, args)
-        if error_message:
-          self._PostFailedExecuteResults(error_message)
           return False
 
     else:
@@ -347,63 +314,58 @@ class SlaveMachine(object):
       logging.exception('Can\'t post result to url %s.\nError: %s',
                         self._result_url, str(e))
 
-  def _LogRPCValidateArgs(self, args):
-    """Checks type of args to be correct.
+  def LogRPC(self, args):
+    """Logs given args to logging.debug.
 
     Args:
-      args: Provided by Swarm server.
+      args: A string or unicode to be logged.
 
-    Returns:
-      If args are invalid, will return an error message. None otherwise.
+    Raises:
+      SlaveRPCError: If args are invalid will include an error message.
     """
+    # Validate args.
     if not isinstance(args, (str, unicode)):
-      return ('Invalid arg types to LogRPC: %s (expected str or unicode)'%
-              str(type(args)))
+      raise SlaveRPCError(
+          'Invalid arg types to LogRPC: %s (expected str or unicode)'%
+          str(type(args)))
 
-    return None
-
-  def _LogRPCExecute(self, args):
-    """Logs given args to logging.debug."""
+    # Execute functionality.
     logging.info(args)
 
-  def _StoreFilesRPCValidate(self, args):
-    """Checks type of args to be correct.
-
-    Args:
-      args: Provided by Swarm server. Should be a list of string
-      tuples formatted (file path, file name, file contents).
-
-    Returns:
-      If args are invalid, will return an error message. None otherwise.
-    """
-    if not isinstance(args, list):
-      return ('Invalid StoreFiles arg type: %s (expected list of'
-              ' str or unicode tuples)'%str(type(args)))
-
-    for file_tuple in args:
-      if not isinstance(file_tuple, list):
-        return ('Invalid element type in StoreFiles args: %s'
-                ' (expected str or unicode tuple)'% str(type(file_tuple)))
-      if len(file_tuple) != 3:
-        return ('Invalid element len (%d != 3) in StoreFiles args:'
-                ' %s'%(len(file_tuple), str(file_tuple)))
-
-      for string in file_tuple:
-        if not isinstance(string, (str, unicode)):
-          return ('Invalid tuple element type: %s (expected str or unicode)'%
-                  str(type(string)))
-
-    return None
-
-  def _StoreFilesRPCExecute(self, args):
+  def StoreFiles(self, args):
     """Stores the given file contents to specified directory.
 
     Args:
       args: A list of string tuples: (file path, file name, file contents).
+
     Raises:
-      SlaveRPCError: If any of the files can't be stored in given folder, or
-      the directory can't be created.
+      SlaveRPCError: If args are invalid will include an error message, or
+      if any of the files can't be stored in given folder, or the directory
+      can't be created.
     """
+    # Validate args.
+    if not isinstance(args, list):
+      raise SlaveRPCError(
+          'Invalid StoreFiles arg type: %s (expected list of str or unicode'
+          ' tuples)'%str(type(args)))
+
+    for file_tuple in args:
+      if not isinstance(file_tuple, list):
+        raise SlaveRPCError(
+            'Invalid element type in StoreFiles args: %s (expected str or'
+            ' unicode tuple)'% str(type(file_tuple)))
+      if len(file_tuple) != 3:
+        raise SlaveRPCError(
+            'Invalid element len (%d != 3) in StoreFiles args: %s'%
+            (len(file_tuple), str(file_tuple)))
+
+      for string in file_tuple:
+        if not isinstance(string, (str, unicode)):
+          raise SlaveRPCError(
+              'Invalid tuple element type: %s (expected str or unicode)'%
+              str(type(string)))
+
+    # Execute functionality.
     for file_path, file_name, file_contents in args:
       logging.debug('Received file name: ' + file_name)
 
@@ -449,34 +411,29 @@ class SlaveMachine(object):
 
     logging.debug('File stored: ' + full_name)
 
-  def _RunCommandsRPCValidateArgs(self, args):
+  def RunCommands(self, args):
     """Checks type of args to be correct.
 
     Args:
-      args: Should be a list of strings to pass to python.
+      args: A list of strings to pass to the python executable to run.
 
-    Returns:
-      If args are invalid, will return an error message. None otherwise.
+    Raises:
+      SlaveRPCError: If args are invalid will include an error message, or
+      if executing the commands fails.
     """
+    # Validate args.
     if not isinstance(args, list):
-      return ('Invalid RunCommands arg type: %s (expected list of str or'
-              ' unicode)'%str(type(args)))
+      raise SlaveRPCError(
+          'Invalid RunCommands arg type: %s (expected list of str or'
+          ' unicode)'%str(type(args)))
 
     for command in args:
       if not isinstance(command, (str, unicode)):
-        return ('Invalid element type in RunCommands args: %s (expected'
-                ' str or unicode)'% str(type(command)))
+        raise SlaveRPCError(
+            'Invalid element type in RunCommands args: %s (expected'
+            ' str or unicode)'% str(type(command)))
 
-    return None
-
-  def _RunCommandsRPCExecute(self, args):
-    """Executes the given command in args.
-
-    Args:
-      args: A list of strings to run.
-    Raises:
-      SlaveRPCError: If executing the commands fails.
-    """
+    # Execute functionality.
     commands = [sys.executable] + args
 
     try:
@@ -484,7 +441,7 @@ class SlaveMachine(object):
     except subprocess.CalledProcessError as e:
       # The exception message will contain the commands that were
       # run and error code returned.
-      self._PostFailedExecuteResults(str(e))
+      raise SlaveRPCError(str(e))
     else:
       logging.debug('done!')
       # At this point the script called by subprocess is responsible for
