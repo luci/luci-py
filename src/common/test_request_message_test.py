@@ -341,7 +341,9 @@ class TestHelper(unittest.TestCase):
   NON_ZERO_VALID_INT_VALUES = [1, 2L, 4, 8, 13, 42, 1234567890L]
   VALID_INT_VALUES = NON_ZERO_VALID_INT_VALUES + [0L, 0]
   INVALID_INT_VALUES = [None, '', 3.14159, [], (1,)]
+  INVALID_POSITIVE_INT_VALUES = INVALID_INT_VALUES + [-1, -10L]
   NON_ZERO_INVALID_INT_VALUES = INVALID_INT_VALUES + [0, 0L]
+  NON_ZERO_INVALID_POSITIVE_INT_VALUES = INVALID_INT_VALUES + [-1, -10L]
 
   VALID_ENV_VARS = [{'a': 'b'}, {'a': 'b', '1': 'b'}, {}, None]
   INVALID_ENV_VARS = [{1: 2}, {'a': 'b', 1: 'b'}, {'a': 1},
@@ -449,8 +451,8 @@ class TestConfigurationTest(TestHelper):
         data=TestHelper.VALID_URL_LIST_VALUES[-1],
         binaries=TestHelper.VALID_REQUIRED_STRING_LIST_VALUES[-1],
         tests=[TestObjectTest.GetFullObject()],
-        max_instances=2,
-        min_instances=1)
+        min_instances=1,
+        additional_instances=1)
 
   def testNoReferences(self):
     # Ensure that Test Configuration makes copies of its input, not references.
@@ -502,13 +504,10 @@ class TestConfigurationTest(TestHelper):
     self.AssertValidValues('tests', [[test_object1, test_object2],
                                      [test_object1]])
 
-    # We must make sure max will always be greater than or equal to min.
-    self.test_request.max_instances = max(TestHelper.NON_ZERO_VALID_INT_VALUES)
     self.AssertValidValues('min_instances',
                            TestHelper.NON_ZERO_VALID_INT_VALUES)
-    self.test_request.min_instances = 1
-    self.AssertValidValues('max_instances',
-                           TestHelper.NON_ZERO_VALID_INT_VALUES)
+    self.AssertValidValues('additional_instances',
+                           TestHelper.VALID_INT_VALUES)
 
     self.AssertValidValues('env_vars', TestHelper.VALID_ENV_VARS)
 
@@ -547,17 +546,12 @@ class TestConfigurationTest(TestHelper):
                                        [test_object1]])
     self.test_request.tests = []
 
-    self.test_request.max_instances = max(TestHelper.NON_ZERO_VALID_INT_VALUES)
     self.AssertInvalidValues('min_instances',
-                             TestHelper.NON_ZERO_INVALID_INT_VALUES)
+                             TestHelper.NON_ZERO_INVALID_POSITIVE_INT_VALUES)
     self.test_request.min_instances = 1
-    self.AssertInvalidValues('max_instances',
-                             TestHelper.NON_ZERO_INVALID_INT_VALUES)
-
-    self.test_request.min_instances = 2
-    self.test_request.max_instances = 1
-    self.assertFalse(self.test_request.IsValid(), 'Validating max < min')
-    self.test_request.min_instances = 1
+    self.AssertInvalidValues('additional_instances',
+                             TestHelper.INVALID_POSITIVE_INT_VALUES)
+    self.test_request.additional_instance = 0
 
     self.AssertInvalidValues('env_vars', TestHelper.INVALID_ENV_VARS)
     self.test_request.env_vars = None
@@ -885,7 +879,7 @@ class TestRunTest(TestHelper):
     self.assertFalse(self.test_request.IsValid(), 'Validating num == index')
 
     self.test_request.min_instances = None
-    self.test_request.max_instances = None
+    self.test_request.additional_instances = None
 
     test_config.dimensions = [42]
     self.assertFalse(test_config.IsValid())

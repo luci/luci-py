@@ -144,7 +144,9 @@ class TestRequestMessageBase(object):
         return False
 
       value = self.__dict__[value_key]
-      if required and not value:
+      # Since 0 is an acceptable required value, but (not 0 == True), we
+      # explicity check against 0.
+      if required and (not value and value != 0):
         self.LogError('%s must have a non-empty value' % value_key, errors)
         return False
       # If the value is not required, it could be None, which would
@@ -626,14 +628,15 @@ class TestConfiguration(TestRequestMessageBase):
     min_instances: An optional integer specifying the minimum number of
         instances of this configuration we want. Defaults to 1.
         Must be greater than 0.
-    max_instances: An optional integer specifying the maximum number of
-        instances of this configuration we want. Defaults to min_instances.
-        Must be greater or equal to min_instances.
+    additional_instances: An optional integer specifying the maximum number of
+        additional instances of this configuration we want. Defaults to 0.
+        Must be greater than 0.
     dimensions: A dictionary of strings or list of strings for dimensions.
   """
 
   def __init__(self, config_name=None, env_vars=None, data=None, binaries=None,
-               tests=None, max_instances=None, min_instances=1, **dimensions):
+               tests=None, min_instances=1, additional_instances=0,
+               **dimensions):
     super(TestConfiguration, self).__init__()
     self.config_name = config_name
     if env_vars:
@@ -653,10 +656,7 @@ class TestConfiguration(TestRequestMessageBase):
     else:
       self.tests = []
     self.min_instances = min_instances
-    if max_instances:
-      self.max_instances = max_instances
-    else:
-      self.max_instances = min_instances
+    self.additional_instances = additional_instances
 
     # Dimensions are kept dynamic so that we don't have to update this code
     # when the list of configuration dimensions changes.
@@ -680,9 +680,9 @@ class TestConfiguration(TestRequestMessageBase):
                                      unique_value_keys=['test_name'],
                                      errors=errors) or
         # required=True to make sure the caller doesn't set it to None.
-        not self.AreValidValues(['min_instances', 'max_instances'], (int, long),
-                                required=True, errors=errors) or
-        self.min_instances < 1 or self.min_instances > self.max_instances):
+        not self.AreValidValues(['min_instances', 'additional_instances'],
+                                (int, long), required=True, errors=errors) or
+        self.min_instances < 1 or self.additional_instances < 0):
       self.LogError('Invalid TestConfiguration: %s' % self.__dict__, errors)
       return False
 

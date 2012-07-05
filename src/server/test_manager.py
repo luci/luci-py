@@ -744,7 +744,7 @@ class TestRequestManager(object):
                  'test_keys': []}
 
     for config in test_case.configurations:
-      # TODO(user): deal with max_instances later!!!
+      # TODO(user): deal with addition_instances later!!!
       assert config.min_instances > 0
       for instance_index in range(config.min_instances):
         config.instance_index = instance_index
@@ -930,7 +930,8 @@ class TestRequestManager(object):
     config = runner.GetConfiguration()
     assert runner.config_instance_index < runner.num_config_instances
     assert (runner.num_config_instances >= config.min_instances and
-            runner.num_config_instances <= config.max_instances)
+            runner.num_config_instances <=
+            config.min_instances + config.additional_instances)
 
     # TODO(user): make the next two lines atomic?  If we crash in the
     # middle, the data store will be inconsistent, although this will be
