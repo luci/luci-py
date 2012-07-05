@@ -449,6 +449,7 @@ class SlaveMachine(object):
       # is done.
 
 
+# TODO(user): Move function to another file.
 def BuildRPC(func_name, args):
   """Builds a dictionary of an operation that needs to be executed.
 
@@ -463,6 +464,7 @@ def BuildRPC(func_name, args):
   return {'function': func_name, 'args': args}
 
 
+# TODO(user): Move function to another file.
 def ParseRPC(rpc):
   """Parses RPC created by BuildRPC into a tuple.
 
@@ -512,24 +514,28 @@ class SlaveRPCError(Exception):
 
 
 def main():
-  parser = optparse.OptionParser()
+  parser = optparse.OptionParser(
+      usage='%prog [options] [filename]',
+      description='Initialize the machine as a swarm slave. The dimensions of '
+      'the machine are either given through a file (if provided) or read from '
+      'stdin. See http://code.google.com/p/swarming/wiki/MachineProvider for '
+      'complete details.')
   parser.add_option('-a', '--address', dest='address',
                     help='Address of the Swarm server to connect to. '
-                    'Defaults to localhost. ', default='localhost')
+                    'Defaults to %default. ', default='localhost')
   parser.add_option('-p', '--port', dest='port',
                     help='Port of the Swarm server. '
-                    'Defaults to 8080. ', default='8080')
+                    'Defaults to %default. ', default='8080')
   parser.add_option('-v', '--verbose', action='store_true',
                     help='Set logging level to DEBUG. Optional. Defaults to '
                     'ERROR level.')
   parser.add_option('-i', '--iterations', default=-1, dest='iterations',
                     help='Number of iterations to request jobs from '
-                    'Swarm server. Defaults to -1 (infinite).')
+                    'Swarm server. Defaults to %default (infinite).')
   (options, args) = parser.parse_args()
 
-  if not args:
-    args.append('-')
-  elif len(args) > 1:
+  if len(args) > 1:
+    # Parser handles exiting this script after logging the error.
     parser.error('Must specify only one filename')
 
   if options.verbose:
@@ -537,15 +543,15 @@ def main():
   else:
     logging.getLogger().setLevel(logging.ERROR)
 
-  filename = args[0]
   # Open the specified file, or stdin.
-  if filename == '-':
+  if not args:
     source = sys.stdin
   else:
+    filename = args[0]
     try:
       source = open(filename)
     except IOError:
-      print 'Cannot open file: ' + filename
+      logging.error('Cannot open file: %s', filename)
       return
 
   # Read machine informations.
