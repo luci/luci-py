@@ -2,8 +2,6 @@
 #
 # Copyright 2012 Google Inc. All Rights Reserved.
 #
-# while testing on a linux box. Do the following:
-#
 
 
 # pylint: disable-msg=C6204

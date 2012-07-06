@@ -89,16 +89,8 @@ import urllib2
 import urlparse
 import zipfile
 
-
-# We need this so that we can run this script when we upload it to a VM.
-# pylint: disable-msg=C6204
-try:
-  from test_runner import downloader
-  from common import test_request_message
-except ImportError:
-  from common import test_request_message
-  from test_runner import downloader
-# pylint: enable-msg=C6204
+from test_runner import downloader
+from common import test_request_message
 
 
 def EnqueueOutput(out, queue):
