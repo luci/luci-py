@@ -44,7 +44,7 @@ table {
 </head>
 <body>
 
-<div style="text-align: right;"><p>{{topbar}}</p></div>
+<div style="text-align: right;"><p>{{topbar|safe}}</p></div>
 
 <h1>Acquired Machines</h1>
 <table id="machine-table"
@@ -61,7 +61,7 @@ table {
 <tr class="request {% cycle even,odd %}">
 <td><a name="machine_{{machine.id}}">{{machine.id}}</a></td>
 <td>{{machine.status_name}}</td>
-<td>{{machine.action_name}}</td>
+<td>{{machine.action_name|safe}}</td>
 <td>{{machine.host}}</td>
 <td>{{machine.vnc_password}}</td>
 <td>{{machine.dimensions}}</td>
@@ -70,7 +70,7 @@ table {
 </table>
 
 <h1>Test Requests</h1>
-{{sorted_by_message}}
+{{sorted_by_message|safe}}
 <p>Sort By: 
 <select id="sort" onchange="document.location.href='?sort_by=' + this.value">
 <option value="">-</option>
@@ -94,16 +94,16 @@ table {
 <td><a name="runner_{{runner.key_string}}"><a title="Click to see full message"
     href="show_message?r={{runner.key_string}}">{{runner.name_string}}</a></a>
 </td>
-<td>{{runner.status_string}}</td>
+<td>{{runner.status_string|safe}}</td>
 <td>{{runner.requested_on_string}}</td>
 <td>{{runner.started_string}}</td>
 <td>{{runner.ended_string}}</td>
-<td>{{runner.host_used}}</td>
-<td>{{runner.command_string}}</td>
+<td>{{runner.host_used|safe}}</td>
+<td>{{runner.command_string|safe}}</td>
 </tr>
 {% endfor %}
 </table>
-<p>{{ enable_success_message }}</p>
+<p>{{ enable_success_message|safe }}</p>
 
 <div style="float: left;"><p> 
   <a target="_blank" href="http://code.google.com/appengine/"><img border="0"
