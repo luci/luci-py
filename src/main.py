@@ -1,4 +1,4 @@
-#!/usr/bin/python2.4
+#!/usr/bin/python2.7
 #
 # Copyright 2012 Google Inc. All Rights Reserved.
 #
@@ -18,7 +18,7 @@ except ImportError:
 
 from google.appengine.api import users
 from google.appengine.ext import db
-from google.appengine.ext import webapp
+import webapp2
 from google.appengine.ext.webapp import template
 from google.appengine.ext.webapp import util
 from common import test_request_message
@@ -29,15 +29,7 @@ from server import test_manager
 # pylint: enable-msg=C6204
 
 
-# An instance of the test runner manager.  This is used to assign test requests
-# to different runners, and keep track of them.
-_test_manager = None
-
-# An instance of machine manager.  This is used to manage a set of machines.
-_machine_manager = None
-
-
-class MainHandler(webapp.RequestHandler):
+class MainHandler(webapp2.RequestHandler):
   """Handler for the main page of the web server.
 
   This handler lists all pending requests and allows callers to manage them.
@@ -202,11 +194,13 @@ class MainHandler(webapp.RequestHandler):
     self.response.out.write(template.render(path, params))
 
 
-class TestRequestHandler(webapp.RequestHandler):
+class TestRequestHandler(webapp2.RequestHandler):
   """Handles test requests from clients."""
 
   def post(self):  # pylint: disable-msg=C6409
     """Handles HTTP POST requests for this handler's URL."""
+    test_request_manager = CreateTestManager()
+
     # Validate the request.
     if not self.request.body:
       self.response.set_status(402)
@@ -214,8 +208,8 @@ class TestRequestHandler(webapp.RequestHandler):
       return
 
     try:
-      _test_manager.UpdateCacheServerURL(self.request.host_url)
-      response = str(_test_manager.ExecuteTestRequest(self.request.body))
+      test_request_manager.UpdateCacheServerURL(self.request.host_url)
+      response = str(test_request_manager.ExecuteTestRequest(self.request.body))
       # This enables our callers to use the response string as a JSON string.
       response = response.replace("'", '"')
     except test_request_message.Error as ex:
@@ -225,26 +219,30 @@ class TestRequestHandler(webapp.RequestHandler):
     self.response.out.write(response)
 
 
-class ResultHandler(webapp.RequestHandler):
+class ResultHandler(webapp2.RequestHandler):
   """Handles test results from remote test runners."""
 
   def post(self):  # pylint: disable-msg=C6409
     """Handles HTTP POST requests for this handler's URL."""
+    test_request_manager = CreateTestManager()
+
     logging.debug('Received Result: %s', self.request.url)
-    _test_manager.UpdateCacheServerURL(self.request.host_url)
-    _test_manager.HandleTestResults(self.request)
+    test_request_manager.UpdateCacheServerURL(self.request.host_url)
+    test_request_manager.HandleTestResults(self.request)
 
 
-class PollHandler(webapp.RequestHandler):
+class PollHandler(webapp2.RequestHandler):
   """Handles cron job to poll Machine Provider to execute pending requests."""
 
   def get(self):  # pylint: disable-msg=C6409
     """Handles HTTP GET requests for this handler's URL."""
+    test_request_manager, the_machine_manager = CreateTestAndMachineManagers()
+
     logging.debug('Polling')
-    _machine_manager.ValidateMachines()
-    _test_manager.UpdateCacheServerURL(self.request.host_url)
-    _test_manager.AssignPendingRequests()
-    _test_manager.AbortStaleRunners()
+    the_machine_manager.ValidateMachines()
+    test_request_manager.UpdateCacheServerURL(self.request.host_url)
+    test_request_manager.AssignPendingRequests()
+    test_request_manager.AbortStaleRunners()
     self.response.out.write("""
     <html>
     <head>
@@ -255,7 +253,7 @@ class PollHandler(webapp.RequestHandler):
     """)
 
 
-class QuitHandler(webapp.RequestHandler):
+class QuitHandler(webapp2.RequestHandler):
   """Handles the quitquitquit request to shutdown the server."""
 
   def get(self):  # pylint: disable-msg=C6409
@@ -263,7 +261,7 @@ class QuitHandler(webapp.RequestHandler):
     raise KeyboardInterrupt('Quit Request')  # pylint: disable-msg=W1010
 
 
-class ShowMessageHandler(webapp.RequestHandler):
+class ShowMessageHandler(webapp2.RequestHandler):
   """Show the full text of a test request."""
 
   def get(self):  # pylint: disable-msg=C6409
@@ -280,16 +278,18 @@ class ShowMessageHandler(webapp.RequestHandler):
       self.response.out.write('Cannot find message for: %s' % key)
 
 
-class GetMatchingTestCasesHandler(webapp.RequestHandler):
+class GetMatchingTestCasesHandler(webapp2.RequestHandler):
   """Get all the keys for any test runner that match a given test case name."""
 
   def get(self):  # pylint: disable-msg=C6409
     """Handles HTTP GET requests for this handler's URL."""
+    test_request_manager = CreateTestManager()
+
     self.response.headers['Content-Type'] = 'text/plain'
 
     test_case_name = self.request.get('name', '')
 
-    matches = _test_manager.GetAllMatchingTestRequests(test_case_name)
+    matches = test_request_manager.GetAllMatchingTestRequests(test_case_name)
     keys = []
     for match in matches:
       keys.extend(map(str, match.GetAllKeys()))
@@ -300,11 +300,13 @@ class GetMatchingTestCasesHandler(webapp.RequestHandler):
       self.response.out.write('No matching Test Cases')
 
 
-class GetResultHandler(webapp.RequestHandler):
+class GetResultHandler(webapp2.RequestHandler):
   """Show the full result string from a test runner."""
 
   def get(self):  # pylint: disable-msg=C6409
     """Handles HTTP GET requests for this handler's URL."""
+    test_request_manager = CreateTestManager()
+
     self.response.headers['Content-Type'] = 'text/plain'
 
     runner = None
@@ -317,23 +319,25 @@ class GetResultHandler(webapp.RequestHandler):
         pass
 
     if runner:
-      results = _test_manager.GetResults(runner)
+      results = test_request_manager.GetResults(runner)
       self.response.out.write(json.dumps(results))
     else:
       self.response.set_status(204)
 
 
-class CleanupResultsHandler(webapp.RequestHandler):
+class CleanupResultsHandler(webapp2.RequestHandler):
   """Delete the Test Runner with the given key."""
 
   def post(self):  # pylint: disable-msg=C6409
     """Handles HTTP POST requests for this handler's URL."""
+    test_request_manager = CreateTestManager()
+
     self.response.headers['Content-Type'] = 'test/plain'
 
     key = self.request.get('r', '')
     key_deleted = False
     if key:
-      key_deleted = _test_manager.DeleteRunner(key)
+      key_deleted = test_request_manager.DeleteRunner(key)
 
     if key_deleted:
       self.response.out.write('Key deleted.')
@@ -341,11 +345,13 @@ class CleanupResultsHandler(webapp.RequestHandler):
       self.response.out.write('Deletion failed. Key not found.')
 
 
-class CancelHandler(webapp.RequestHandler):
+class CancelHandler(webapp2.RequestHandler):
   """Cancel a test runner that is not already running."""
 
   def get(self):  # pylint: disable-msg=C6409
     """Handles HTTP GET requests for this handler's URL."""
+    test_request_manager = CreateTestManager()
+
     self.response.headers['Content-Type'] = 'text/plain'
 
     key = self.request.get('r', '')
@@ -354,15 +360,16 @@ class CancelHandler(webapp.RequestHandler):
 
     # Make sure found runner is not yet running.
     if runner and runner.machine_id == test_manager.NO_MACHINE_ID:
-      _test_manager.UpdateCacheServerURL(self.request.host_url)
-      _test_manager.AbortRunner(runner, reason='Runner is not already running.')
+      test_request_manager.UpdateCacheServerURL(self.request.host_url)
+      test_request_manager.AbortRunner(
+          runner, reason='Runner is not already running.')
       self.response.out.write('Runner canceled.')
     else:
       self.response.out.write('Cannot find runner or too late to cancel: %s' %
                               key)
 
 
-class RetryHandler(webapp.RequestHandler):
+class RetryHandler(webapp2.RequestHandler):
   """Retry a test runner again."""
 
   def get(self):  # pylint: disable-msg=C6409
@@ -392,7 +399,7 @@ class RetryHandler(webapp.RequestHandler):
       self.response.set_status(204)
 
 
-class RegisterHandler(webapp.RequestHandler):
+class RegisterHandler(webapp2.RequestHandler):
   """Handler for the register_machine of the Swarm server.
 
      Attempt to find a matching job for the querying machine.
@@ -400,6 +407,7 @@ class RegisterHandler(webapp.RequestHandler):
 
   def post(self):  # pylint: disable-msg=C6409
     """Handles HTTP POST requests for this handler's URL."""
+    test_request_manager = CreateTestManager()
 
     # Validate the request.
     if not self.request.body:
@@ -407,7 +415,7 @@ class RegisterHandler(webapp.RequestHandler):
       self.response.out.write('Request must have a body')
       return
 
-    _test_manager.UpdateCacheServerURL(self.request.host_url)
+    test_request_manager.UpdateCacheServerURL(self.request.host_url)
     attributes_str = self.request.get('attributes')
     try:
       attributes = json.loads(attributes_str)
@@ -419,7 +427,8 @@ class RegisterHandler(webapp.RequestHandler):
       return
 
     try:
-      response = json.dumps(_test_manager.ExecuteRegisterRequest(attributes))
+      response = json.dumps(
+          test_request_manager.ExecuteRegisterRequest(attributes))
     except test_request_message.Error as ex:
       message = str(ex)
       logging.exception(message)
@@ -428,36 +437,49 @@ class RegisterHandler(webapp.RequestHandler):
     self.response.out.write(response)
 
 
-def CreateApplication():
-  """Create the managers required by app engine."""
-  # pylint: disable-msg=W0603
-  global _machine_manager, _test_manager
+def CreateTestManager():
+  """Creates and returns a test manager instance.
 
-  # pylint: disable-msg=C6409
-  _machine_manager = machine_manager.MachineManager(
+  Returns:
+    A TestManager instance.
+  """
+  the_machine_manager = machine_manager.MachineManager(
       machine_provider.MachineProvider())
-  _test_manager = test_manager.TestRequestManager(_machine_manager)
+  test_request_manager = test_manager.TestRequestManager(the_machine_manager)
 
-  return webapp.WSGIApplication([('/', MainHandler),
-                                 ('/show_message', ShowMessageHandler),
-                                 ('/get_matching_test_cases',
-                                  GetMatchingTestCasesHandler),
-                                 ('/get_result', GetResultHandler),
-                                 ('/cleanup_results',
-                                  CleanupResultsHandler),
-                                 ('/cancel', CancelHandler),
-                                 ('/retry', RetryHandler),
-                                 ('/test', TestRequestHandler),
-                                 ('/result', ResultHandler),
-                                 ('/tasks/poll', PollHandler),
-                                 ('/poll_for_test', RegisterHandler),
-                                 ('/tasks/quitquitquit', QuitHandler)],
-                                debug=True)
+  return test_request_manager
 
 
-def main():
-  util.run_wsgi_app(CreateApplication())
+# Temporary function to keep backward compatibility until we totally
+# eliminate machine_manager.
+def CreateTestAndMachineManagers():
+  """Creates and returns a test manager and machine manager instance.
+
+  Returns:
+    A tuple of (TestManager, MachineManager).
+  """
+  the_machine_manager = machine_manager.MachineManager(
+      machine_provider.MachineProvider())
+  test_request_manager = test_manager.TestRequestManager(the_machine_manager)
+
+  return test_request_manager, the_machine_manager
 
 
-if __name__ == '__main__':
-  main()
+def CreateApplication():
+  return webapp2.WSGIApplication([('/', MainHandler),
+                                  ('/show_message', ShowMessageHandler),
+                                  ('/get_matching_test_cases',
+                                   GetMatchingTestCasesHandler),
+                                  ('/get_result', GetResultHandler),
+                                  ('/cleanup_results',
+                                   CleanupResultsHandler),
+                                  ('/cancel', CancelHandler),
+                                  ('/retry', RetryHandler),
+                                  ('/test', TestRequestHandler),
+                                  ('/result', ResultHandler),
+                                  ('/tasks/poll', PollHandler),
+                                  ('/poll_for_test', RegisterHandler),
+                                  ('/tasks/quitquitquit', QuitHandler)],
+                                 debug=True)
+
+app = CreateApplication()

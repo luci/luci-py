@@ -101,8 +101,10 @@ class _SwarmTestCase(unittest.TestCase):
       opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cj))
       opener.open(self.GetAdminURl(urlparse.urljoin(self._swarm_server_url,
                                                     'tasks/quitquitquit')))
+      # TODO(user): This line shouldn't be here, should be after the
+      # try block.
       self._swarm_server_process.wrapped_process.wait()
-    except httplib.BadStatusLine:
+    except (httplib.BadStatusLine, urllib2.HTTPError):
       # We expect this to throw since the quitquitquit request caused the
       # server to terminate and thus it won't be able to complete the request.
       pass

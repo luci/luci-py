@@ -1,12 +1,19 @@
-application: config-tests
+application: chromium-swarm
 version: 1
-runtime: python
+runtime: python27
 api_version: 1
+# We have no strong indication yet that Swarm isn't
+# thread safe. But we surpass that for now to be safe.
+threadsafe: false
 
 handlers:
 - url: /tasks/poll
-  script: main.py
+  script: main.app
   login: admin
 
 - url: .*
-  script: main.py
+  script: main.app
+
+libraries:
+- name: django
+  version: 1.2
