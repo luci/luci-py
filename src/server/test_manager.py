@@ -31,6 +31,7 @@ import uuid
 from google.appengine.api import files
 from google.appengine.api import mail
 from google.appengine.api import urlfetch
+from google.appengine.api import users
 from google.appengine.ext import blobstore
 from google.appengine.ext import db
 from common import dimensions
@@ -85,6 +86,31 @@ MAX_TRANSACTION_RETRY_COUNT = 3
 
 # Root directory of Swarm scripts.
 SWARM_ROOT_DIR = os.path.join(os.path.dirname(__file__), '..')
+
+
+class UserProfile(db.Model):
+  """A user profile.
+
+  All TestRequest and TestRunner objects are associated with a specific user.
+  A user has a whitelist of machine IPs that are allowed to interact with its
+  data.
+  """
+  # The actual account of the user.
+  user = db.UserProperty()
+
+  # A password (NOT equal to the actual user account password) used to
+  # ensure requests coming from a whitelist machine are indeed valid.
+  password = db.StringProperty()
+
+
+class MachineWhitelist(db.Model):
+  """A machine IP as part of a UserProfile whitelist."""
+  # A reference to the user's profile.
+  user_profile = db.ReferenceProperty(
+      UserProfile, required=True, collection_name='whitelist')
+
+  # The IP of the machine to whitelist.
+  ip = db.ByteStringProperty()
 
 
 class TestRequest(db.Model):
@@ -1588,6 +1614,58 @@ class TestRequestManager(object):
     file_p.close()
 
     return file_data
+
+  def ModifyUserProfileWhitelist(self, ip, add=True):
+    """Adds/removes the given ip from the whitelist of the current user.
+
+    If a user profile doesn't already exist, one will be created first.
+    This function is thread safe.
+
+    Args:
+      ip: The ip to be added/removed.
+      add: If True, will add the ip to the whitelist. Else, it will remove
+      the ip. Ignores duplicate or non-existing ips.
+
+    Returns:
+      True upon success.
+    """
+    user = users.get_current_user()
+    if not user:
+      logging.error('User not signed in? Security breach.')
+      return False
+
+    # Atomically create the user profile or use an existing one.
+    # Handle normal transaction exceptions.
+    try:
+      user_profile = UserProfile.get_or_insert(
+          user.user_id(), user=user, password=user.email())
+    except (db.TransactionFailedError, db.Timeout, db.InternalError) as e:
+      # This is a low-priority request. Abort on failures.
+      logging.exception('User profile creation exception: ' + str(e))
+      return False
+
+    assert user_profile
+
+    # Find existing entries, if any.
+    query = user_profile.whitelist.filter('ip =', ip)
+
+    # Sanity check.
+    assert query.count() == 1 or query.count() == 0
+
+    if add:
+      # Ignore duplicate requests.
+      if query.count() == 0:
+        # Create a new entry.
+        white_list = MachineWhitelist(ip=ip, user_profile=user_profile)
+        white_list.put()
+    else:
+      # Ignore non-existing requests.
+      if query.count() == 1:
+        # Delete existing entry.
+        white_list = query.get()
+        white_list.delete()
+
+    return True
 
 
 def AtomicAssignID(key, machine_id):
