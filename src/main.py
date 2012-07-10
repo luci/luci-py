@@ -468,7 +468,7 @@ class UserProfileHandler(webapp2.RequestHandler):
         whitelist = {}
         whitelist['ip'] = stored_whitelist.ip
         whitelist['username'] = user_profile.user.email()
-        whitelist['password'] = user_profile.password
+        whitelist['password'] = stored_whitelist.password
         whitelist['delete_command'] = (
             '<a href="/secure/change_whitelist?i=%s&a=False">remove</a>' %
             stored_whitelist.ip)

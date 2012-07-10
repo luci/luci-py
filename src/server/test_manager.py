@@ -93,14 +93,11 @@ class UserProfile(db.Model):
 
   All TestRequest and TestRunner objects are associated with a specific user.
   A user has a whitelist of machine IPs that are allowed to interact with its
-  data.
+  data. A UserProfile can be retrieved using the user's email address as
+  the key.
   """
   # The actual account of the user.
   user = db.UserProperty()
-
-  # A password (NOT equal to the actual user account password) used to
-  # ensure requests coming from a whitelist machine are indeed valid.
-  password = db.StringProperty()
 
 
 class MachineWhitelist(db.Model):
@@ -112,6 +109,11 @@ class MachineWhitelist(db.Model):
   # The IP of the machine to whitelist.
   ip = db.ByteStringProperty()
 
+  # A password (NOT necessarily equal to the actual user account password)
+  # used to ensure requests coming from a remote machine are indeed valid.
+  # Defaults to user email.
+  password = db.StringProperty()
+
 
 class TestRequest(db.Model):
   """A test request.
@@ -120,7 +122,6 @@ class TestRequest(db.Model):
   can be a build machine requesting a test after a build or it could be a
   developer requesting a test from their own build.
   """
-
   # The message received from the caller, formatted as a Test Case as
   # specified in
   # http://code.google.com/p/swarming/wiki/SwarmFileFormat.
@@ -1647,8 +1648,7 @@ class TestRequestManager(object):
     # Atomically create the user profile or use an existing one.
     # Handle normal transaction exceptions for get_or_insert.
     try:
-      user_profile = UserProfile.get_or_insert(
-          user.user_id(), user=user, password=user.email())
+      user_profile = UserProfile.get_or_insert(user.email(), user=user)
     except (db.TransactionFailedError, db.Timeout, db.InternalError) as e:
       # This is a low-priority request. Abort on any failures.
       logging.exception('User profile creation exception: %s', str(e))
@@ -1666,7 +1666,8 @@ class TestRequestManager(object):
       # Ignore duplicate requests.
       if query.count() == 0:
         # Create a new entry.
-        white_list = MachineWhitelist(ip=ip, user_profile=user_profile)
+        white_list = MachineWhitelist(
+            user_profile=user_profile, ip=ip, password=user.email())
         white_list.put()
         logging.debug('Stored ip: %s', ip)
     else:
@@ -1678,6 +1679,34 @@ class TestRequestManager(object):
         logging.debug('Removed ip: %s', ip)
 
     return True
+
+  def AuthenticateRequest(self, ip, username, password):
+    """Authenticates request to be from a valid source.
+
+    This function will try to match the given data with the user's whitelist.
+
+    Args:
+      ip: IP of the client making the request.
+      username: The username of the client making the request.
+      password: The password provided by the client making the request.
+
+    Returns:
+      True if the request is successfully authenticated.
+    """
+    if not ip or not username or not password:
+      return False
+
+    user_profile = UserProfile().get_by_key_name(username)
+    if not user_profile:
+      return False
+
+    whitelist = user_profile.whitelist.filter('ip =', ip)
+    whitelist.filter('password =', password)
+
+    # Sanity check.
+    assert whitelist.count() == 0 or whitelist.count() == 1
+
+    return whitelist.count() == 1
 
 
 def AtomicAssignID(key, machine_id):
