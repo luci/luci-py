@@ -42,7 +42,7 @@ class _ProcessWrapper(object):
 class _SwarmTestCase(unittest.TestCase):
   """Test case class for Swarm integration tests."""
 
-  def GetAdminURl(self, url):
+  def GetAdminUrl(self, url):
     """"Converts the given url to an admin privilege one.
 
     Args:
@@ -99,7 +99,7 @@ class _SwarmTestCase(unittest.TestCase):
       logging.info('Quitting Swarm server')
       cj = cookielib.CookieJar()
       opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cj))
-      opener.open(self.GetAdminURl(urlparse.urljoin(self._swarm_server_url,
+      opener.open(self.GetAdminUrl(urlparse.urljoin(self._swarm_server_url,
                                                     'tasks/quitquitquit')))
       # TODO(user): This line shouldn't be here, should be after the
       # try block.
@@ -148,7 +148,7 @@ class _SwarmTestCase(unittest.TestCase):
         logging.info('Polling Swarm server')
         cj = cookielib.CookieJar()
         opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cj))
-        opener.open(self.GetAdminURl(urlparse.urljoin(self._swarm_server_url,
+        opener.open(self.GetAdminUrl(urlparse.urljoin(self._swarm_server_url,
                                                       'tasks/poll')))
         # We need to poll twice, once for assigning the machine and a second
         # one to start the test. TODO(user): This should be fixed in the server.
@@ -182,6 +182,11 @@ class _SwarmTestCase(unittest.TestCase):
     test_result_output = ''
     # TODO(user): Maybe collect all failures so that we can enumerate them at
     # the end as the local test runner and gtest does.
+
+    cj = cookielib.CookieJar()
+    opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cj))
+    urllib2.install_opener(opener)
+
     test_all_succeeded = True
     for running_test_key in running_test_keys:
       try:
@@ -190,9 +195,11 @@ class _SwarmTestCase(unittest.TestCase):
         logging.info('Opening URL %s', result_url)
         urllib2.urlopen(result_url, urllib.urlencode((('s', True),
                                                       ('r', '0 FAILED TESTS'))))
-        key_url = urlparse.urljoin(
-            self._swarm_server_url,
-            'get_result?r=' + running_test_key['test_key'])
+        key_url = self.GetAdminUrl(
+            urlparse.urljoin(
+                self._swarm_server_url,
+                'secure/get_result?r=' + running_test_key['test_key']))
+
         logging.info('Opening URL %s', key_url)
         output = urllib2.urlopen(key_url).read()
         assert output

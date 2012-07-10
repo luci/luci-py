@@ -11,6 +11,11 @@ handlers:
   script: main.app
   login: admin
 
+# Protected handlers that require login.
+- url: /secure/.*
+  script: main.app
+  login: required
+
 - url: .*
   script: main.app
 

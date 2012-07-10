@@ -99,8 +99,8 @@ class MainHandler(webapp2.RequestHandler):
 
       if runner.machine_id == test_manager.NO_MACHINE_ID:
         runner.status_string = 'Pending'
-        runner.command_string = ('<a href="cancel?r=%s">Cancel</a>' %
-                                 runner.key_string)
+        runner.command_string = (
+            '<a href="/secure/cancel?r=%s">Cancel</a>' % runner.key_string)
       elif runner.machine_id != test_manager.DONE_MACHINE_ID:
         runner.status_string = ('<a title="On machine %s, click for details" '
                                 'href="#machine_%s">Running</a>' %
@@ -119,16 +119,16 @@ class MainHandler(webapp2.RequestHandler):
         runner.host_used = runner.hostname
 
         if runner.ran_successfully:
-          runner.status_string = ('<a title="Click to see results" '
-                                  'href="get_result?r=%s">Succeeded</a>' %
-                                  runner.key_string)
+          runner.status_string = (
+              '<a title="Click to see results" href="/secure/get_result?r=%s">'
+              'Succeeded</a>' % runner.key_string)
         else:
           runner.failed_test_class_string = 'failed_test'
-          runner.command_string = ('<a href="retry?r=%s">Retry</a>' %
-                                   runner.key_string)
-          runner.status_string = ('<a title="Click to see results" '
-                                  'href="get_result?r=%s">Failed</a>' %
-                                  runner.key_string)
+          runner.command_string = (
+              '<a href="/secure/retry?r=%s">Retry</a>' % runner.key_string)
+          runner.status_string = (
+              '<a title="Click to see results" href="/secure/get_result?r=%s">'
+              'Failed</a>' % runner.key_string)
 
       runners.append(runner)
 
@@ -190,6 +190,14 @@ class MainHandler(webapp2.RequestHandler):
 
     path = os.path.join(os.path.dirname(__file__), 'index.html')
     self.response.out.write(template.render(path, params))
+
+
+class RedirectToMainHandler(webapp2.RequestHandler):
+  """Handler to redirect requests to base page secured main page."""
+
+  def get(self):  # pylint: disable-msg=C6409
+    """Handles HTTP GET requests for this handler's URL."""
+    self.redirect('secure/main')
 
 
 class TestRequestHandler(webapp2.RequestHandler):
@@ -464,15 +472,18 @@ def CreateTestAndMachineManagers():
 
 
 def CreateApplication():
-  return webapp2.WSGIApplication([('/', MainHandler),
-                                  ('/show_message', ShowMessageHandler),
+  return webapp2.WSGIApplication([('/', RedirectToMainHandler),
+                                  ('/secure/main', MainHandler),
+                                  ('/secure/show_message',
+                                   ShowMessageHandler),
                                   ('/get_matching_test_cases',
                                    GetMatchingTestCasesHandler),
-                                  ('/get_result', GetResultHandler),
+                                  ('/secure/get_result',
+                                   GetResultHandler),
                                   ('/cleanup_results',
                                    CleanupResultsHandler),
-                                  ('/cancel', CancelHandler),
-                                  ('/retry', RetryHandler),
+                                  ('/secure/cancel', CancelHandler),
+                                  ('/secure/retry', RetryHandler),
                                   ('/test', TestRequestHandler),
                                   ('/result', ResultHandler),
                                   ('/tasks/poll', PollHandler),
