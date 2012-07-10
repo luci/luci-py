@@ -1634,14 +1634,24 @@ class TestRequestManager(object):
       logging.error('User not signed in? Security breach.')
       return False
 
+    # Validate arg types to be string and bool, respectively.
+    if not isinstance(ip, (str, unicode)):
+      logging.error('Invalid ip type: %s', str(type(ip)))
+      return False
+    ip = str(ip)
+
+    if not isinstance(add, bool):
+      logging.error('Invalid add type: %s', str(type(add)))
+      return False
+
     # Atomically create the user profile or use an existing one.
-    # Handle normal transaction exceptions.
+    # Handle normal transaction exceptions for get_or_insert.
     try:
       user_profile = UserProfile.get_or_insert(
           user.user_id(), user=user, password=user.email())
     except (db.TransactionFailedError, db.Timeout, db.InternalError) as e:
-      # This is a low-priority request. Abort on failures.
-      logging.exception('User profile creation exception: ' + str(e))
+      # This is a low-priority request. Abort on any failures.
+      logging.exception('User profile creation exception: %s', str(e))
       return False
 
     assert user_profile
@@ -1658,12 +1668,14 @@ class TestRequestManager(object):
         # Create a new entry.
         white_list = MachineWhitelist(ip=ip, user_profile=user_profile)
         white_list.put()
+        logging.debug('Stored ip: %s', ip)
     else:
       # Ignore non-existing requests.
       if query.count() == 1:
         # Delete existing entry.
         white_list = query.get()
         white_list.delete()
+        logging.debug('Removed ip: %s', ip)
 
     return True
 

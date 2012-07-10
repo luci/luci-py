@@ -1,0 +1,84 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html>
+<head>
+<title>Test Request Server</title>
+<style type="text/css">
+th {
+  color: #fff;
+  background-color: #000;
+  padding-left: 1em;
+  padding-right: 1em;
+}
+
+td {
+  padding-left: 1em;
+  padding-right: 1em;
+}
+
+.request {
+  border-top-style: solid;
+  border-top-color: black;
+  border-top-width: 1px;
+  border-bottom-style: solid;
+  border-bottom-color: black;
+  border-bottom-width: 1px;
+}
+
+.even {
+}
+
+.odd {
+  background-color: #eeeeee;
+}
+
+.failed_test {
+  background-color: #ffdddd;
+}
+
+table {
+  border: 1;
+  border-color: black;
+  border-collapse: collapse;
+}
+</style>
+</head>
+<body>
+
+<div style="text-align: right;"><p>{{topbar|safe}}</p></div>
+
+<h1>IP Whitelist</h1>
+<table id="request-table" summary="This table lists all test requests">
+<tr>
+<th>IP</th>
+<th>Username</th>
+<th>Password</th>
+<th>Action</th>
+<th>&nbsp;</th>
+</tr>
+{% for whitelist in whitelists %}
+<tr class="request {% cycle even,odd %} {{ runner.failed_test_class_string }}">
+<td>{{whitelist.ip}}</td>
+<td>{{whitelist.username}}</td>
+<td>{{whitelist.password}}</td>
+<td>{{whitelist.delete_command|safe}}</td>
+</tr>
+{% endfor %}
+</table>
+
+<div>
+<h1>Add New:</h1>
+<form name="input" action="/secure/change_whitelist" method="get">
+IP (x.x.x.x): <input type="text" name="i" />
+<input type="hidden" name="a" value="True">
+<input type="submit" value="Submit" />
+</form>
+</div>
+
+<div style="float: left;">
+  <a target="_blank" href="http://code.google.com/appengine/"><img border="0"
+   src="http://code.google.com/appengine/images/appengine-noborder-120x30.gif"
+   alt="Powered by Google App Engine" /></a>
+</div>
+
+</body>
+</html>

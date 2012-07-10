@@ -165,8 +165,9 @@ class MainHandler(webapp2.RequestHandler):
       machines.append(machine)
 
     if users.get_current_user():
-      topbar = ('%s | <a href="%s">Sign out</a>' %
-                (users.get_current_user().nickname(),
+      profile_url = '<a href=/secure/user_profile>Profile</a>'
+      topbar = ('%s | %s | <a href="%s">Sign out</a>' %
+                (users.get_current_user().nickname(), profile_url,
                  users.create_logout_url('/')))
     else:
       topbar = '<a href="%s">Sign in</a>' % users.create_login_url('/')
@@ -443,6 +444,60 @@ class RegisterHandler(webapp2.RequestHandler):
     self.response.out.write(response)
 
 
+class UserProfileHandler(webapp2.RequestHandler):
+  """Handler for the user profile page of the web server.
+
+  This handler lists user info, such as their IP whitelist and settings.
+  """
+
+  def get(self):  # pylint: disable-msg=C6409
+    """Handles HTTP GET requests for this handler's URL."""
+    user = users.get_current_user()
+    if user:
+      main_url = '<a href=/secure/main>Home</a>'
+      topbar = ('%s | %s | <a href="%s">Sign out</a>' %
+                (user.nickname(), main_url, users.create_logout_url('/')))
+    else:
+      topbar = ('<a href="%s">Sign in</a>' % users.create_login_url('/'))
+
+    display_whitelists = []
+
+    user_profile = test_manager.UserProfile.all().filter('user =', user).get()
+    if user_profile:
+      for stored_whitelist in user_profile.whitelist:
+        whitelist = {}
+        whitelist['ip'] = stored_whitelist.ip
+        whitelist['username'] = user_profile.user.email()
+        whitelist['password'] = user_profile.password
+        whitelist['delete_command'] = (
+            '<a href="/secure/change_whitelist?i=%s&a=False">remove</a>' %
+            stored_whitelist.ip)
+        display_whitelists.append(whitelist)
+
+    params = {
+        'topbar': topbar,
+        'whitelists': display_whitelists,
+    }
+
+    path = os.path.join(os.path.dirname(__file__), 'user_profile.html')
+    self.response.out.write(template.render(path, params))
+
+
+class ChangeWhitelistHandler(webapp2.RequestHandler):
+  """Handler for making changes to a user whitelist."""
+
+  def get(self):  # pylint: disable-msg=C6409
+    """Handles HTTP GET requests for this handler's URL."""
+    test_request_manager = CreateTestManager()
+
+    add = self.request.get('a')
+    ip = self.request.get('i')
+    if (add == 'True' or add == 'False') and ip:
+      test_request_manager.ModifyUserProfileWhitelist(ip, add == 'True')
+
+    self.redirect('/secure/user_profile', permanent=True)
+
+
 def CreateTestManager():
   """Creates and returns a test manager instance.
 
@@ -473,22 +528,25 @@ def CreateTestAndMachineManagers():
 
 def CreateApplication():
   return webapp2.WSGIApplication([('/', RedirectToMainHandler),
-                                  ('/secure/main', MainHandler),
-                                  ('/secure/show_message',
-                                   ShowMessageHandler),
-                                  ('/get_matching_test_cases',
-                                   GetMatchingTestCasesHandler),
-                                  ('/secure/get_result',
-                                   GetResultHandler),
                                   ('/cleanup_results',
                                    CleanupResultsHandler),
-                                  ('/secure/cancel', CancelHandler),
-                                  ('/secure/retry', RetryHandler),
-                                  ('/test', TestRequestHandler),
-                                  ('/result', ResultHandler),
-                                  ('/tasks/poll', PollHandler),
+                                  ('/get_matching_test_cases',
+                                   GetMatchingTestCasesHandler),
                                   ('/poll_for_test', RegisterHandler),
-                                  ('/tasks/quitquitquit', QuitHandler)],
+                                  ('/result', ResultHandler),
+                                  ('/secure/cancel', CancelHandler),
+                                  ('/secure/change_whitelist',
+                                   ChangeWhitelistHandler),
+                                  ('/secure/get_result',
+                                   GetResultHandler),
+                                  ('/secure/main', MainHandler),
+                                  ('/secure/retry', RetryHandler),
+                                  ('/secure/show_message',
+                                   ShowMessageHandler),
+                                  ('/secure/user_profile', UserProfileHandler),
+                                  ('/tasks/poll', PollHandler),
+                                  ('/tasks/quitquitquit', QuitHandler),
+                                  ('/test', TestRequestHandler)],
                                  debug=True)
 
 app = CreateApplication()
