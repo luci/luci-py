@@ -260,14 +260,6 @@ class PollHandler(webapp2.RequestHandler):
     """)
 
 
-class QuitHandler(webapp2.RequestHandler):
-  """Handles the quitquitquit request to shutdown the server."""
-
-  def get(self):  # pylint: disable-msg=C6409
-    # This is the only way to get the dev_appserver to stop serving.
-    raise KeyboardInterrupt('Quit Request')  # pylint: disable-msg=W1010
-
-
 class ShowMessageHandler(webapp2.RequestHandler):
   """Show the full text of a test request."""
 
@@ -545,7 +537,6 @@ def CreateApplication():
                                    ShowMessageHandler),
                                   ('/secure/user_profile', UserProfileHandler),
                                   ('/tasks/poll', PollHandler),
-                                  ('/tasks/quitquitquit', QuitHandler),
                                   ('/test', TestRequestHandler)],
                                  debug=True)
 
