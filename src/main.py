@@ -461,9 +461,8 @@ class UserProfileHandler(webapp2.RequestHandler):
         whitelist['ip'] = stored_whitelist.ip
         whitelist['username'] = user_profile.user.email()
         whitelist['password'] = stored_whitelist.password
-        whitelist['delete_command'] = (
-            '<a href="/secure/change_whitelist?i=%s&a=False">remove</a>' %
-            stored_whitelist.ip)
+        whitelist['key'] = stored_whitelist.key()
+        whitelist['url'] = '/secure/change_whitelist'
         display_whitelists.append(whitelist)
 
     params = {
@@ -478,13 +477,14 @@ class UserProfileHandler(webapp2.RequestHandler):
 class ChangeWhitelistHandler(webapp2.RequestHandler):
   """Handler for making changes to a user whitelist."""
 
-  def get(self):  # pylint: disable-msg=C6409
-    """Handles HTTP GET requests for this handler's URL."""
+  def post(self):  # pylint: disable-msg=C6409
+    """Handles HTTP POST requests for this handler's URL."""
     test_request_manager = CreateTestManager()
 
     add = self.request.get('a')
     ip = self.request.get('i')
     password = self.request.get('p', None)
+
     if (add == 'True' or add == 'False') and ip:
       test_request_manager.ModifyUserProfileWhitelist(
           ip, add == 'True', password)

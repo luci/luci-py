@@ -60,14 +60,21 @@ table {
 <td>{{whitelist.ip}}</td>
 <td>{{whitelist.username}}</td>
 <td>{{whitelist.password}}</td>
-<td>{{whitelist.delete_command|safe}}</td>
+<td>
+<form id="remove_{{whitelist.key}}" method="post" action={{whitelist.url}}>
+<input type="hidden" name="a" value="False"/>
+<input type="hidden" name="i" value="{{whitelist.ip}}" />
+<button onclick="document.getElementById('remove_{{whitelist.key}}').submit()">
+  remove</button>
+</form>
+</td>
 </tr>
 {% endfor %}
 </table>
 
 <div>
 <h1>Add New:</h1>
-<form name="input" action="/secure/change_whitelist" method="get">
+<form name="input" action="/secure/change_whitelist" method="post">
 IP (x.x.x.x): <input type="text" name="i" />
 <input type="hidden" name="a" value="True">
 <input type="submit" value="Submit" />
