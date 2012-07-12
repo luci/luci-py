@@ -109,9 +109,9 @@ class MachineWhitelist(db.Model):
   # The IP of the machine to whitelist.
   ip = db.ByteStringProperty()
 
-  # A password (NOT necessarily equal to the actual user account password)
-  # used to ensure requests coming from a remote machine are indeed valid.
-  # Defaults to user email.
+  # An optional password (NOT necessarily equal to the actual user
+  # account password) used to ensure requests coming from a remote machine
+  # are indeed valid. Defaults to None.
   password = db.StringProperty()
 
 
@@ -1616,7 +1616,7 @@ class TestRequestManager(object):
 
     return file_data
 
-  def ModifyUserProfileWhitelist(self, ip, add=True):
+  def ModifyUserProfileWhitelist(self, ip, add=True, password=None):
     """Adds/removes the given ip from the whitelist of the current user.
 
     If a user profile doesn't already exist, one will be created first.
@@ -1625,10 +1625,12 @@ class TestRequestManager(object):
     Args:
       ip: The ip to be added/removed.
       add: If True, will add the ip to the whitelist. Else, it will remove
-      the ip. Ignores duplicate or non-existing ips.
+      the ip. Ignores duplicate or non-existing ips regardless of the password.
+      password: Optional password to associate with the machine.
 
     Returns:
-      True upon success.
+      True if request was valid. Doesn't necessarily mean the ip was found for
+      remove or didn't exist for add, but that datastore is in a sane state.
     """
     user = users.get_current_user()
     if not user:
@@ -1667,7 +1669,7 @@ class TestRequestManager(object):
       if query.count() == 0:
         # Create a new entry.
         white_list = MachineWhitelist(
-            user_profile=user_profile, ip=ip, password=user.email())
+            user_profile=user_profile, ip=ip, password=password)
         white_list.put()
         logging.debug('Stored ip: %s', ip)
     else:
@@ -1680,33 +1682,26 @@ class TestRequestManager(object):
 
     return True
 
-  def AuthenticateRequest(self, ip, username, password):
-    """Authenticates request to be from a valid source.
-
-    This function will try to match the given data with the user's whitelist.
+  def FindUserWithWhitelistedIP(self, ip, password):
+    """Finds and returns the user that has whitelisted the given IP.
 
     Args:
       ip: IP of the client making the request.
-      username: The username of the client making the request.
       password: The password provided by the client making the request.
 
     Returns:
-      True if the request is successfully authenticated.
+      UserProfile of the user that has whitelisted the IP, None otherwise.
     """
-    if not ip or not username or not password:
-      return False
+    whitelist = MachineWhitelist.gql(
+        'WHERE ip = :1 AND password = :2', ip, password)
 
-    user_profile = UserProfile().get_by_key_name(username)
-    if not user_profile:
-      return False
-
-    whitelist = user_profile.whitelist.filter('ip =', ip)
-    whitelist.filter('password =', password)
+    if whitelist.count() == 0:
+      return None
 
     # Sanity check.
-    assert whitelist.count() == 0 or whitelist.count() == 1
+    assert whitelist.count() == 1
 
-    return whitelist.count() == 1
+    return whitelist.get().user_profile
 
 
 def AtomicAssignID(key, machine_id):

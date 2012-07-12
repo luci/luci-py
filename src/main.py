@@ -484,8 +484,10 @@ class ChangeWhitelistHandler(webapp2.RequestHandler):
 
     add = self.request.get('a')
     ip = self.request.get('i')
+    password = self.request.get('p', None)
     if (add == 'True' or add == 'False') and ip:
-      test_request_manager.ModifyUserProfileWhitelist(ip, add == 'True')
+      test_request_manager.ModifyUserProfileWhitelist(
+          ip, add == 'True', password)
 
     self.redirect('/secure/user_profile', permanent=True)
 
