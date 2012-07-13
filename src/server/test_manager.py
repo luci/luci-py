@@ -1686,26 +1686,27 @@ class TestRequestManager(object):
 
     return True
 
-  def FindUserWithWhitelistedIP(self, ip, password):
-    """Finds and returns the user that has whitelisted the given IP.
 
-    Args:
-      ip: IP of the client making the request.
-      password: The password provided by the client making the request.
+def FindUserWithWhitelistedIP(ip, password):
+  """Finds and returns the user that has whitelisted the given IP.
 
-    Returns:
-      UserProfile of the user that has whitelisted the IP, None otherwise.
-    """
-    whitelist = MachineWhitelist.gql(
-        'WHERE ip = :1 AND password = :2', ip, password)
+  Args:
+    ip: IP of the client making the request.
+    password: The password provided by the client making the request.
 
-    if whitelist.count() == 0:
-      return None
+  Returns:
+    UserProfile of the user that has whitelisted the IP, None otherwise.
+  """
+  whitelist = MachineWhitelist.gql(
+      'WHERE ip = :1 AND password = :2', ip, password)
 
-    # Sanity check.
-    assert whitelist.count() == 1
+  if whitelist.count() == 0:
+    return None
 
-    return whitelist.get().user_profile
+  # Sanity check.
+  assert whitelist.count() == 1
+
+  return whitelist.get().user_profile
 
 
 def AtomicAssignID(key, machine_id):

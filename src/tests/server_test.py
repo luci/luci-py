@@ -1,4 +1,4 @@
-#!/usr/bin/python2.4
+#!/usr/bin/python2.7
 #
 # Copyright 2011 Google Inc. All Rights Reserved.
 
@@ -122,6 +122,13 @@ class _SwarmTestCase(unittest.TestCase):
           swarm_files.append(os.path.join(dirpath, filename))
 
     logging.info('Will send these files to Swarm server: %s', swarm_files)
+
+    # Whitelist the machine to be allowed to run tests.
+    cj = cookielib.CookieJar()
+    opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cj))
+    test = self.GetAdminUrl(urlparse.urljoin(self._swarm_server_url,
+                                             'secure/change_whitelist?a=True'))
+    opener.open(test)
 
     swarm_server_test_url = urlparse.urljoin(self._swarm_server_url, 'test')
     running_test_keys = []

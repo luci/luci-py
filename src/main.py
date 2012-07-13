@@ -208,6 +208,18 @@ class TestRequestHandler(webapp2.RequestHandler):
     """Handles HTTP POST requests for this handler's URL."""
     test_request_manager = CreateTestManager()
 
+    # TODO(user): This handler uses the un-encoded request body to
+    # get the Swarm test request. A any call to self.request.get will
+    # change the body and encode it. Thus, for now we simply make a copy
+    # of the original body and use it later. The correct way would be to
+    # have this handler work with properly encoded data in the first place.
+    body = self.request.body
+    user_profile = AuthenticateRemoteMachine(self.request)
+    if not user_profile:
+      SendAuthenticationsFailure(self.response)
+      return
+    # TODO(user): Use user_profile when executing operation.
+
     # Validate the request.
     if not self.request.body:
       self.response.set_status(402)
@@ -216,7 +228,7 @@ class TestRequestHandler(webapp2.RequestHandler):
 
     try:
       test_request_manager.UpdateCacheServerURL(self.request.host_url)
-      response = str(test_request_manager.ExecuteTestRequest(self.request.body))
+      response = str(test_request_manager.ExecuteTestRequest(body))
       # This enables our callers to use the response string as a JSON string.
       response = response.replace("'", '"')
     except test_request_message.Error as ex:
@@ -232,6 +244,12 @@ class ResultHandler(webapp2.RequestHandler):
   def post(self):  # pylint: disable-msg=C6409
     """Handles HTTP POST requests for this handler's URL."""
     test_request_manager = CreateTestManager()
+
+    user_profile = AuthenticateRemoteMachine(self.request)
+    if not user_profile:
+      SendAuthenticationsFailure(self.response)
+      return
+    # TODO(user): Use user_profile when executing operation.
 
     logging.debug('Received Result: %s', self.request.url)
     test_request_manager.UpdateCacheServerURL(self.request.host_url)
@@ -284,6 +302,12 @@ class GetMatchingTestCasesHandler(webapp2.RequestHandler):
     """Handles HTTP GET requests for this handler's URL."""
     test_request_manager = CreateTestManager()
 
+    user_profile = AuthenticateRemoteMachine(self.request)
+    if not user_profile:
+      SendAuthenticationsFailure(self.response)
+      return
+    # TODO(user): Use user_profile when executing operation.
+
     self.response.headers['Content-Type'] = 'text/plain'
 
     test_case_name = self.request.get('name', '')
@@ -330,6 +354,12 @@ class CleanupResultsHandler(webapp2.RequestHandler):
   def post(self):  # pylint: disable-msg=C6409
     """Handles HTTP POST requests for this handler's URL."""
     test_request_manager = CreateTestManager()
+
+    user_profile = AuthenticateRemoteMachine(self.request)
+    if not user_profile:
+      SendAuthenticationsFailure(self.response)
+      return
+    # TODO(user): Use user_profile when executing operation.
 
     self.response.headers['Content-Type'] = 'test/plain'
 
@@ -408,6 +438,12 @@ class RegisterHandler(webapp2.RequestHandler):
     """Handles HTTP POST requests for this handler's URL."""
     test_request_manager = CreateTestManager()
 
+    user_profile = AuthenticateRemoteMachine(self.request)
+    if not user_profile:
+      SendAuthenticationsFailure(self.response)
+      return
+    # TODO(user): Use user_profile when executing operation.
+
     # Validate the request.
     if not self.request.body:
       self.response.set_status(402)
@@ -482,14 +518,44 @@ class ChangeWhitelistHandler(webapp2.RequestHandler):
     test_request_manager = CreateTestManager()
 
     add = self.request.get('a')
-    ip = self.request.get('i')
+    ip = self.request.get('i', self.request.remote_addr)
     password = self.request.get('p', None)
 
-    if (add == 'True' or add == 'False') and ip:
+    if add == 'True' or add == 'False':
       test_request_manager.ModifyUserProfileWhitelist(
           ip, add == 'True', password)
 
     self.redirect('/secure/user_profile', permanent=True)
+
+  def get(self):  # pylint: disable-msg=C6409
+    self.post()
+
+
+def AuthenticateRemoteMachine(request):
+  """Tries to find a user profile that has whitelisted the remote machine.
+
+  Will use the remote machine's IP and provided password (if any).
+
+  Args:
+    request: WebAPP request sent by remote machine.
+
+  Returns:
+    A test_manager.UserProfile that has whitelisted the machine, or None.
+  """
+  user_profile = test_manager.FindUserWithWhitelistedIP(
+      request.remote_addr, request.get('password', None))
+
+  return user_profile
+
+
+def SendAuthenticationsFailure(response):
+  """Writes an authentication failure error message to response with status.
+
+  Args:
+    response: Response to be sent to remote machine.
+  """
+  response.set_status(403)
+  response.out.write('Remote machine not whitelisted for operation')
 
 
 def CreateTestManager():
