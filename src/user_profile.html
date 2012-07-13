@@ -50,15 +50,12 @@ table {
 <table id="request-table" summary="This table lists all test requests">
 <tr>
 <th>IP</th>
-<th>Username</th>
 <th>Password</th>
 <th>Action</th>
-<th>&nbsp;</th>
 </tr>
 {% for whitelist in whitelists %}
 <tr class="request {% cycle even,odd %} {{ runner.failed_test_class_string }}">
 <td>{{whitelist.ip}}</td>
-<td>{{whitelist.username}}</td>
 <td>{{whitelist.password}}</td>
 <td>
 <form id="remove_{{whitelist.key}}" method="post" action={{whitelist.url}}>
@@ -76,6 +73,7 @@ table {
 <h1>Add New:</h1>
 <form name="input" action="/secure/change_whitelist" method="post">
 IP (x.x.x.x): <input type="text" name="i" />
+Password: <input type="text" name="p" />
 <input type="hidden" name="a" value="True">
 <input type="submit" value="Submit" />
 </form>

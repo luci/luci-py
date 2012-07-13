@@ -495,7 +495,6 @@ class UserProfileHandler(webapp2.RequestHandler):
       for stored_whitelist in user_profile.whitelist:
         whitelist = {}
         whitelist['ip'] = stored_whitelist.ip
-        whitelist['username'] = user_profile.user.email()
         whitelist['password'] = stored_whitelist.password
         whitelist['key'] = stored_whitelist.key()
         whitelist['url'] = '/secure/change_whitelist'
@@ -517,10 +516,14 @@ class ChangeWhitelistHandler(webapp2.RequestHandler):
     """Handles HTTP POST requests for this handler's URL."""
     test_request_manager = CreateTestManager()
 
-    add = self.request.get('a')
     ip = self.request.get('i', self.request.remote_addr)
-    password = self.request.get('p', None)
 
+    password = self.request.get('p', None)
+    # Make sure a password '' sent by the form is stored as None.
+    if not password:
+      password = None
+
+    add = self.request.get('a')
     if add == 'True' or add == 'False':
       test_request_manager.ModifyUserProfileWhitelist(
           ip, add == 'True', password)
