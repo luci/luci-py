@@ -1638,10 +1638,14 @@ class TestRequestManager(object):
       return False
 
     # Validate arg types to be string and bool, respectively.
-    if not isinstance(ip, (str, unicode)):
-      logging.error('Invalid ip type: %s', str(type(ip)))
-      return False
-    ip = str(ip)
+    # We accept None ips which happen in local testing. So if ip != None,
+    # it should be a string.
+    if ip is not None:
+      if not isinstance(ip, (str, unicode)):
+        logging.error('Invalid ip type: %s', str(type(ip)))
+        return False
+      else:
+        ip = str(ip)
 
     if not isinstance(add, bool):
       logging.error('Invalid add type: %s', str(type(add)))
