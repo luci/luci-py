@@ -218,7 +218,6 @@ class TestRequestHandler(webapp2.RequestHandler):
     if not user_profile:
       SendAuthenticationsFailure(self.response)
       return
-    # TODO(user): Use user_profile when executing operation.
 
     # Validate the request.
     if not self.request.body:
@@ -228,7 +227,8 @@ class TestRequestHandler(webapp2.RequestHandler):
 
     try:
       test_request_manager.UpdateCacheServerURL(self.request.host_url)
-      response = str(test_request_manager.ExecuteTestRequest(body))
+      response = str(test_request_manager.ExecuteTestRequest(
+          body, user_profile))
       # This enables our callers to use the response string as a JSON string.
       response = response.replace("'", '"')
     except test_request_message.Error as ex:

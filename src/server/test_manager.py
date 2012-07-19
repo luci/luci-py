@@ -95,9 +95,22 @@ class UserProfile(db.Model):
   A user has a whitelist of machine IPs that are allowed to interact with its
   data. A UserProfile can be retrieved using the user's email address as
   the key.
+
+  A UserProfile has a 'whitelist' list of MachineWhitelist of authorized remote
+  machines.
+  A UserProfile has a 'test_requests' list of TestRequest of tests belonging
+  to this user.
   """
   # The actual account of the user.
   user = db.UserProperty()
+
+  def DeleteProfile(self):
+    # Deletes the profile, its whitelists and test cases.
+    for test_case in self.test_requests:
+      test_case.delete()
+    for whitelist in self.whitelist:
+      whitelist.delete()
+    self.delete()
 
 
 class MachineWhitelist(db.Model):
@@ -122,6 +135,10 @@ class TestRequest(db.Model):
   can be a build machine requesting a test after a build or it could be a
   developer requesting a test from their own build.
   """
+  # A reference to the user's profile.
+  user_profile = db.ReferenceProperty(
+      UserProfile, required=True, collection_name='test_requests')
+
   # The message received from the caller, formatted as a Test Case as
   # specified in
   # http://code.google.com/p/swarming/wiki/SwarmFileFormat.
@@ -743,7 +760,7 @@ class TestRequestManager(object):
 
     return matches
 
-  def ExecuteTestRequest(self, request_message):
+  def ExecuteTestRequest(self, request_message, user_profile):
     """Attempts to execute a test request.
 
     If machines are available for running any of the test's configurations,
@@ -752,6 +769,8 @@ class TestRequestManager(object):
 
     Args:
       request_message: A string representing a test request.
+      user_profile: The user_profile the test belongs to. Should be a valid
+      profile.
 
     Raises:
       test_request_message.Error: If the request's message isn't valid.
@@ -762,8 +781,11 @@ class TestRequestManager(object):
     """
     logging.debug('TRM.ExecuteTestRequest msg=%s', request_message)
 
+    # The test sould belong to some user.
+    assert user_profile
+
     # Will raise an exception on error.
-    request = TestRequest(message=request_message)
+    request = TestRequest(message=request_message, user_profile=user_profile)
     test_case = request.GetTestCase()  # Will raise on invalid request.
     request.put()
 
