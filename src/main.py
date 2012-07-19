@@ -249,11 +249,10 @@ class ResultHandler(webapp2.RequestHandler):
     if not user_profile:
       SendAuthenticationsFailure(self.response)
       return
-    # TODO(user): Use user_profile when executing operation.
 
     logging.debug('Received Result: %s', self.request.url)
     test_request_manager.UpdateCacheServerURL(self.request.host_url)
-    test_request_manager.HandleTestResults(self.request)
+    test_request_manager.HandleTestResults(self.request, user_profile)
 
 
 class PollHandler(webapp2.RequestHandler):

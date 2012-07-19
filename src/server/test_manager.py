@@ -569,32 +569,41 @@ class TestRequestManager(object):
         logging.error('Invalid status change for machine_id=%s status=%d',
                       info.id, int(info.status))
 
-  def HandleTestResults(self, web_request):
+  def HandleTestResults(self, web_request, user_profile):
     """Handle a response from the remote script.
 
     Args:
       web_request: a google.appengine.ext.webapp.Request object containing the
           results of a test run.  The URL will contain a k= CGI parameter
           holding the persistent key for the runner.
+      user_profile: The profile of the user that allowed the remote machine
+          to execute the test.
     """
     if not web_request:
       return
 
     runner = None
-
     key = web_request.get('k')
     if key:
       runner = TestRunner.get(db.Key(key))
 
-    if runner:
-      # Find the high level success/failure from the URL. We assume failure if
-      # we can't find the success parameter in the request.
-      success = web_request.get('s', 'False') == 'True'
-      result_string = urllib.unquote_plus(web_request.get('r'))
-      exit_codes = urllib.unquote_plus(web_request.get('x'))
-      self._UpdateTestResult(runner, success, exit_codes, result_string)
-    else:
+    if not runner:
       logging.error('No runner associated to web request, ignoring test result')
+      return
+
+    # Make sure the remote machine is actually who they say they are by
+    # comparing the user that created the test with the one allowing the
+    # results.
+    if runner.test_request.user_profile.user != user_profile.user:
+      logging.error('Remote machine not authorized to post results')
+      return
+
+    # Find the high level success/failure from the URL. We assume failure if
+    # we can't find the success parameter in the request.
+    success = web_request.get('s', 'False') == 'True'
+    result_string = urllib.unquote_plus(web_request.get('r'))
+    exit_codes = urllib.unquote_plus(web_request.get('x'))
+    self._UpdateTestResult(runner, success, exit_codes, result_string)
 
   def _UpdateTestResult(self, runner, success=False, exit_codes='',
                         result_string='Tests aborted', reuse_machine=False):
