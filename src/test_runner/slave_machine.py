@@ -21,31 +21,31 @@ import os
 import subprocess
 import sys
 import time
-import urllib
-import urllib2
 
 try:
   import simplejson as json  # pylint: disable-msg=C6204
 except ImportError:
   import json  # pylint: disable-msg=C6204
 
-# Number of times in a row to try connect to the Swarm server before giving up.
-CONNECTION_RETRIES = 10
-
-# Number of seconds to wait between two consecutive tries.
-DELAY_BETWEEN_RETRIES = 2
+# pylint: disable-msg=C6204
+from common import url_helper
+# pylint: enable-msg=C6204
 
 
 class SlaveMachine(object):
   """Creates a slave that continuously polls the Swarm server for jobs."""
 
-  def __init__(self, url='http://localhost:8080', attributes=None):
+  def __init__(self, url='http://localhost:8080', attributes=None,
+               max_url_tries=1):
     """Sets the parameters of the slave.
 
     Args:
       url: URL of the Swarm server.
       attributes: A dict of the attributes of the machine. Should include
-      machine dimensions as well.
+          machine dimensions as well.
+      max_url_tries: The maximum number of consecutive url errors to accept
+          before throwing an exception.
+
     """
     self._url = url
     self._attributes = attributes.copy() if attributes else {}
@@ -53,18 +53,21 @@ class SlaveMachine(object):
     self._attributes['id'] = None
     self._attributes['try_count'] = 0
 
+    self._max_url_tries = max_url_tries
+
   def Start(self, iterations=-1):
     """Starts the slave, which polls the Swarm server for jobs until it dies.
 
     Args:
       iterations: Number of times to poll the Swarm server. -1 indicates
-      infinitely. Failing to connect to the server DOES NOT count as an
-      iteration. This is useful for testing the slave and having an exit
-      condition.
+          infinitely. Failing to connect to the server DOES NOT count as an
+          iteration. This is useful for testing the slave and having an exit
+          condition.
 
     Raises:
       SlaveError: If the slave in unable to connect to the provided URL after
-      a few retries, or an invalid number of iterations were requested.
+      the given number of tries, or an invalid number of iterations were
+      requested.
     """
     url = self._url + '/poll_for_test'
     done_iterations = 0
@@ -78,8 +81,6 @@ class SlaveMachine(object):
       raise SlaveError(
           'Invalid negative iterations provided: ' + str(iterations))
 
-    connection_retries = CONNECTION_RETRIES
-
     # Loop for requested number of iterations.
     while True:
       request = {
@@ -92,24 +93,13 @@ class SlaveMachine(object):
       logging.debug('Connecting to Swarm server: ' + self._url)
       logging.debug('Request: ' + str(request))
 
-      try:
-        server_response = urllib2.urlopen(url, data=urllib.urlencode(request))
-        response_str = server_response.read()
-      except urllib2.URLError as e:
-        connection_retries -= 1
-        if connection_retries == 0:
-          raise SlaveError('Error when connecting to Swarm server: ' + str(e))
-        else:
-          logging.info('Unable to connect to Swarm server'
-                       ' - retrying %d more times (error: %s)',
-                       connection_retries, str(e))
+      response_str = url_helper.UrlOpen(url, data=request,
+                                        max_tries=self._max_url_tries)
 
-          # Wait a specified amount of time before retrying (secs).
-          time.sleep(DELAY_BETWEEN_RETRIES)
-          continue
-
-      # If a successful connection is made, reset the counter.
-      connection_retries = CONNECTION_RETRIES
+      if response_str is None:
+        raise SlaveError('Error when connecting to Swarm server, %s, failed to '
+                         'connect after %d attempts.'
+                         % (url, self._max_url_tries))
 
       response = None
       try:
@@ -303,16 +293,11 @@ class SlaveMachine(object):
       logging.error('No URL to send results to!')
       return
 
-    try:
-      # Simply specifying data to urlopen makes it a POST.
-      urllib2.urlopen(
-          self._result_url, urllib.urlencode(
-              (('x', str(result_code)),
-               ('s', False),
-               ('r', result_string))))
-    except urllib2.URLError as e:
-      logging.exception('Can\'t post result to url %s.\nError: %s',
-                        self._result_url, str(e))
+    url_helper.UrlOpen(self._result_url,
+                       (('x', str(result_code)),
+                        ('s', False),
+                        ('r', result_string)),
+                       max_tries=self._max_url_tries)
 
   def LogRPC(self, args):
     """Logs given args to logging.debug.
@@ -526,6 +511,10 @@ def main():
   parser.add_option('-p', '--port', dest='port',
                     help='Port of the Swarm server. '
                     'Defaults to %default. ', default='8080')
+  parser.add_option('-r', '--max_url_tries', default=10,
+                    help='The maximum number of times url messages will '
+                    'attempt to be sent before accepting failure. Defaults '
+                    'to %default')
   parser.add_option('-v', '--verbose', action='store_true',
                     help='Set logging level to DEBUG. Optional. Defaults to '
                     'ERROR level.')
@@ -561,7 +550,8 @@ def main():
 
   url = 'http://'+options.address+':'+options.port
   slave = SlaveMachine(url=url,
-                       attributes=attributes)
+                       attributes=attributes,
+                       max_url_tries=options.max_url_tries)
 
   # Start requesting jobs.
   slave.Start(iterations=options.iterations)

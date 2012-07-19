@@ -84,7 +84,6 @@ import sys
 import tempfile
 import threading
 import time
-import urllib
 import urllib2
 import urlparse
 import zipfile
@@ -135,7 +134,8 @@ class LocalTestRunner(object):
   # An array to properly index the pending/success/failure CGI strings.
   _SUCCESS_CGI_STRING = ['success', 'failure', 'pending']
 
-  def __init__(self, request_file_name, verbose=False, data_folder_name=None):
+  def __init__(self, request_file_name, verbose=False, data_folder_name=None,
+               max_url_retries=1):
     """Inits LocalTestRunner with a request file.
 
     Args:
@@ -144,6 +144,8 @@ class LocalTestRunner(object):
       data_folder_name: The name of an optional subfolder where to explode the
           downloaded zip data so that they can be cleaned by the 'data' option
           of the cleanup field of a test run object in a Swarm file.
+      max_url_retries: The maximum number of times any urlopen call will get
+          retried if it encounters an error.
 
     Raises:
       Error: When request_file_name or data_folder_name is invalid.
@@ -187,6 +189,8 @@ class LocalTestRunner(object):
                   'file rather than a folder.')
     if not path.exists(self.data_dir):
       os.mkdir(self.data_dir)
+
+    self.max_url_retries = max_url_retries
 
   def __del__(self):
     # TODO(user): We may want to keep these around, even after the run, for
@@ -294,22 +298,17 @@ class LocalTestRunner(object):
       result: the value of the CGI param 'r' which should be from the
           self._SUCCESS_CGI_STRING array.
     """
-    try:
-      data = {'n': self.test_run.test_run_name,
-              'c': self.test_run.configuration.config_name,
-              'r': output, 's': result}
-      if (hasattr(self.test_run, 'instance_index') and
-          self.test_run.instance_index is not None):
-        assert hasattr(self.test_run, 'num_instances')
-        assert self.test_run.num_instances is not None
-        data['i'] = self.test_run.instance_index
-        data['m'] = self.test_run.num_instances
+    data = {'n': self.test_run.test_run_name,
+            'c': self.test_run.configuration.config_name,
+            'r': output, 's': result}
+    if (hasattr(self.test_run, 'instance_index') and
+        self.test_run.instance_index is not None):
+      assert hasattr(self.test_run, 'num_instances')
+      assert self.test_run.num_instances is not None
+      data['i'] = self.test_run.instance_index
+      data['m'] = self.test_run.num_instances
 
-      # Simply specifying data to urlopen makes it a POST.
-      urllib2.urlopen(upload_url, urllib.urlencode(data))
-    except (urllib2.URLError, Error), e:  # Error for testing purposes.
-      logging.exception('Can\'t post result to url %s.\nException: %s',
-                        upload_url, e)
+    url_helper.UrlOpen(upload_url, data, self.max_url_retries)
 
   def _RunCommand(self, command, time_out, env=None):
     """Runs the given command.
@@ -578,18 +577,14 @@ class LocalTestRunner(object):
       return True
     result_url_parts = urlparse.urlsplit(self.test_run.result_url)
     if result_url_parts[0] == 'http':
-      try:
-        # Simply specifying data to urlopen makes it a POST.
-        urllib2.urlopen(
-            self.test_run.result_url, urllib.urlencode(
-                (('n', self.test_run.test_run_name),
-                 ('c', self.test_run.configuration.config_name),
-                 ('x', ', '.join([str(i) for i in result_codes])),
-                 ('s', success),
-                 ('r', result_string))))
-      except (urllib2.URLError, Error), e:  # Error for testing purposes.
-        logging.exception('Can\'t post result to url %s.\nException: %s',
-                          self.test_run.result_url, e)
+      data = (('n', self.test_run.test_run_name),
+              ('c', self.test_run.configuration.config_name),
+              ('x', ', '.join([str(i) for i in result_codes])),
+              ('s', success),
+              ('r', result_string))
+
+      if not url_helper.UrlOpen(self.test_run.result_url, data,
+                                self.max_url_retries):
         return False
     elif result_url_parts[0] == 'file':
       file_path = '%s%s' % (result_url_parts[1], result_url_parts[2])
@@ -608,7 +603,7 @@ class LocalTestRunner(object):
       # TODO(user): Implement this!
       pass
     else:
-      assert False  # We sould have validated that in TestRun
+      assert False  # We should have validated that in TestRun
       return False
     return True
 
@@ -622,6 +617,14 @@ class LocalTestRunner(object):
     self.PublishResults(False, [], log_file.read())
     log_file.close()
 
+  def TestLogException(self, message):
+    """Logs the given message as an exception. This is useful for tests.
+
+    Args:
+      message: The message to log as an exception.
+    """
+    logging.exception(message)
+
 
 def main():
   """For when the script is used directly on the command line."""
@@ -630,12 +633,16 @@ def main():
   import optparse
   # pylint: enable-msg=C6204
   parser = optparse.OptionParser()
-  parser.add_option('-f', '--request_file_name', dest='request_file_name',
+  parser.add_option('-f', '--request_file_name',
                     help='The name of the request file.')
-  parser.add_option('-d', '--data_folder_name', dest='data_folder_name',
+  parser.add_option('-d', '--data_folder_name',
                     help='The name of a subfolder to create in the directory '
                     'containing the test runner to use for setting up and '
                     'running the tests. Defaults to None.')
+  parser.add_option('-r', '--max_url_retries', default=15,
+                    help='The maximum number of times url messages will '
+                    'attemp to be sent before accepting failure. Defaults to '
+                    '%default')
   parser.add_option('-v', '--verbose', action='store_true',
                     help='Set logging level to INFO. Optional. Defaults to '
                     'ERROR level.', default=False)
@@ -649,7 +656,8 @@ def main():
   runner = None
   try:
     runner = LocalTestRunner(options.request_file_name, verbose=options.verbose,
-                             data_folder_name=options.data_folder_name)
+                             data_folder_name=options.data_folder_name,
+                             max_url_retries=options.max_url_retries)
   except Error, e:
     logging.exception('Can\'t create TestRunner with file: %s.\nException: %s',
                       options.request_file_name, e)
