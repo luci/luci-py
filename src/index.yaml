@@ -23,5 +23,12 @@ indexes:
 
 - kind: TestRunner
   properties:
+  - name: machine_id
+  - name: started
+  - name: user
+  - name: created
+
+- kind: TestRunner
+  properties:
   - name: started
   - name: created
