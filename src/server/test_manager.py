@@ -756,17 +756,22 @@ class TestRequestManager(object):
       logging.exception(
           'An exception was thrown when attemping to send mail\n%s', e)
 
-  def GetAllMatchingTestRequests(self, test_case_name):
+  def GetAllMatchingTestRequests(self, test_case_name, user_profile):
     """Returns a list of all Test Request that match the given test_case_name.
 
     Args:
-      test_case_name: The test case name to search for.
+        test_case_name: The test case name to search for.
+        user_profile: The user_profile the tests belong to. Should be a valid
+            profile.
 
     Returns:
       A list of all Test Requests that have |test_case_name| as their name.
     """
+    # The tests sould belong to some user.
+    assert user_profile
+
     matches = []
-    for test_request in TestRequest.all():
+    for test_request in user_profile.test_requests:
       if test_request.GetName() == test_case_name:
         matches.append(test_request)
 
@@ -782,7 +787,7 @@ class TestRequestManager(object):
     Args:
       request_message: A string representing a test request.
       user_profile: The user_profile the test belongs to. Should be a valid
-      profile.
+          profile.
 
     Raises:
       test_request_message.Error: If the request's message isn't valid.

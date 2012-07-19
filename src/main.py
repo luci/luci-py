@@ -305,13 +305,13 @@ class GetMatchingTestCasesHandler(webapp2.RequestHandler):
     if not user_profile:
       SendAuthenticationsFailure(self.response)
       return
-    # TODO(user): Use user_profile when executing operation.
 
     self.response.headers['Content-Type'] = 'text/plain'
 
     test_case_name = self.request.get('name', '')
 
-    matches = test_request_manager.GetAllMatchingTestRequests(test_case_name)
+    matches = test_request_manager.GetAllMatchingTestRequests(
+        test_case_name, user_profile)
     keys = []
     for match in matches:
       keys.extend(map(str, match.GetAllKeys()))
