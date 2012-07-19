@@ -1256,7 +1256,7 @@ class TestRequestManager(object):
     test_runner = None
     try:
       test_runner = TestRunner.get(key)
-    except db.BadKeyError:
+    except (db.BadKeyError, db.KindError):
       # We don't need to take any special action with bad keys.
       pass
 

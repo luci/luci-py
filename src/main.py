@@ -358,14 +358,26 @@ class CleanupResultsHandler(webapp2.RequestHandler):
     if not user_profile:
       SendAuthenticationsFailure(self.response)
       return
-    # TODO(user): Use user_profile when executing operation.
 
     self.response.headers['Content-Type'] = 'test/plain'
 
     key = self.request.get('r', '')
     key_deleted = False
-    if key:
-      key_deleted = test_request_manager.DeleteRunner(key)
+    try:
+      runner = test_manager.TestRunner.get(key)
+    except (db.BadKeyError, db.KindError):
+      logging.info(
+          'Invalid key for cleanup [key: %s]', str(key))
+    else:
+      if runner:
+        if runner.test_request.user_profile.user == user_profile.user:
+          key_deleted = test_request_manager.DeleteRunner(key)
+        else:
+          logging.info('User not authorized to cleanup [user: %s][key: %s]',
+                       user_profile.user.email(), str(key))
+      else:
+        logging.info(
+            'runner not found for cleanup [key: %s]', str(key))
 
     if key_deleted:
       self.response.out.write('Key deleted.')
