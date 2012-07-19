@@ -32,3 +32,14 @@ indexes:
   properties:
   - name: started
   - name: created
+
+- kind: TestRunner
+  properties:
+  - name: user
+  - name: created
+
+- kind: TestRunner
+  properties:
+  - name: user
+  - name: created
+    direction: desc

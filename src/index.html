@@ -69,9 +69,9 @@ table {
 {% endfor %}
 </table>
 
-<h1>Test Requests</h1>
+<h1>User Test Requests</h1>
 {{sorted_by_message|safe}}
-<p>Sort By: 
+<p>Sort By:
 <select id="sort" onchange="document.location.href='?sort_by=' + this.value">
 <option value="">-</option>
 <option value="start">Start Time</option>
@@ -103,7 +103,30 @@ table {
 </tr>
 {% endfor %}
 </table>
+
 <p>{{ enable_success_message|safe }}</p>
+
+<h1>Global Test Requests</h1>
+<table id="global-request-table" summary="This table lists all test requests">
+<tr>
+<th>User</th>
+<th>Name</th>
+<th>Status</th>
+<th>Requested (UTC)</th>
+<th>Started (UTC)</th>
+<th>Ended (UTC)</th>
+</tr>
+{% for runner in global_runners %}
+<tr class="request {% cycle even,odd %} {{ runner.failed_test_class_string }}">
+<td>{{runner.user_email}}</td>
+<td>{{runner.name_string}}</td>
+<td>{{runner.status_string}}</td>
+<td>{{runner.requested_on_string}}</td>
+<td>{{runner.started_string}}</td>
+<td>{{runner.ended_string}}</td>
+</tr>
+{% endfor %}
+</table>
 
 <div style="float: left;"><p> 
   <a target="_blank" href="http://code.google.com/appengine/"><img border="0"

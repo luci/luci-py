@@ -26,6 +26,8 @@ from server import machine_provider
 from server import test_manager
 # pylint: enable-msg=C6204
 
+_NUM_GLOBAL_TESTS_TO_DISPLAY = 10
+
 
 class MainHandler(webapp2.RequestHandler):
   """Handler for the main page of the web server.
@@ -63,105 +65,47 @@ class MainHandler(webapp2.RequestHandler):
     # TODO(user): eventually we will want to show only runner that are
     # either pending or running.  The number of ended runners will grow
     # unbounded with time.
-    #
-    # Once we have labels for usernames, we can also show a second table
-    # specific to a user to show him his terminated jobs, so allow him to
-    # retry from there.
     show_success = self.request.get('s', 'False') != 'False'
     sort_by = self.request.get('sort_by', 'reverse_chronological')
-
-    runners = []
-    query = test_manager.TestRunner.all()
 
     sorted_by_message = '<p>Currently sorted by: '
     if sort_by == 'start':
       sorted_by_message += 'Start Time'
-      query.order('created')
+      sorted_by_query = 'created'
     elif sort_by == 'host_name':
       sorted_by_message += 'Hostname'
-      query.order('hostname')
+      sorted_by_query = 'hostname'
     else:
       # The default sort.
       sorted_by_message += 'Reverse Start Time'
-      query.order('-created')
+      sorted_by_query = 'created DESC'
     sorted_by_message += '</p>'
 
+    query = test_manager.TestRunner.gql(
+        'WHERE user = :1 ORDER BY %s' % sorted_by_query,
+        users.get_current_user())
+
+    runners = []
     for runner in query:
-      runner.name_string = runner.GetName()
-      runner.key_string = str(runner.key())
-      runner.status_string = '&nbsp;'
-      runner.requested_on_string = self.GetTimeString(runner.created)
-      runner.started_string = '--'
-      runner.ended_string = '--'
-      runner.host_used = '&nbsp'
-      runner.command_string = '&nbsp;'
-      runner.failed_test_class_string = ''
+      # If this runner successfully completed, and we are not showing them,
+      # just ignore it.
+      if (runner.machine_id == test_manager.DONE_MACHINE_ID and
+          runner.ran_successfully and not show_success):
+        continue
 
-      if runner.machine_id == test_manager.NO_MACHINE_ID:
-        runner.status_string = 'Pending'
-        runner.command_string = (
-            '<a href="/secure/cancel?r=%s">Cancel</a>' % runner.key_string)
-      elif runner.machine_id != test_manager.DONE_MACHINE_ID:
-        runner.status_string = ('<a title="On machine %s, click for details" '
-                                'href="#machine_%s">Running</a>' %
-                                (runner.machine_id, runner.machine_id))
-        runner.started_string = self.GetTimeString(runner.started)
-        runner.host_used = runner.hostname
-      else:
-        # If this runner successfully completed, and we are not showing them,
-        # just ignore it.
-        if runner.ran_successfully and not show_success:
-          continue
-
-        runner.started_string = self.GetTimeString(runner.started)
-        runner.ended_string = self.GetTimeString(runner.ended)
-
-        runner.host_used = runner.hostname
-
-        if runner.ran_successfully:
-          runner.status_string = (
-              '<a title="Click to see results" href="/secure/get_result?r=%s">'
-              'Succeeded</a>' % runner.key_string)
-        else:
-          runner.failed_test_class_string = 'failed_test'
-          runner.command_string = (
-              '<a href="/secure/retry?r=%s">Retry</a>' % runner.key_string)
-          runner.status_string = (
-              '<a title="Click to see results" href="/secure/get_result?r=%s">'
-              'Failed</a>' % runner.key_string)
-
+      self._GetDisplayableRunnerTemplate(runner, detailed_output=True)
       runners.append(runner)
+
+    global_runners = []
+    query = test_manager.TestRunner.all().order('-created')
+    for runner in query.run(limit=_NUM_GLOBAL_TESTS_TO_DISPLAY):
+      self._GetDisplayableRunnerTemplate(runner)
+      global_runners.append(runner)
 
     # Build info for acquired machines table.
     machines = []
     for machine in machine_manager.Machine.all():
-      machine.status_name = 'Unknown'
-      if machine.status == base_machine_provider.MachineStatus.WAITING:
-        machine.status_name = 'Waiting'
-      elif machine.status == base_machine_provider.MachineStatus.ACQUIRED:
-        machine.status_name = 'Acquired'
-      elif machine.status == base_machine_provider.MachineStatus.STOPPED:
-        machine.status_name = 'Stopped'
-      elif machine.status == base_machine_provider.MachineStatus.AVAILABLE:
-        machine.status_name = 'Available'
-
-      # See if the machine is idle or not.
-      idle = test_manager.IdleMachine.gql('WHERE id = :1', machine.id).get()
-      if idle:
-        machine.action_name = 'Idle'
-      else:
-        runner = (test_manager.TestRunner.gql('WHERE machine_id = :1',
-                                              machine.id).get())
-        if runner:
-          if runner.started:
-            machine.action_name = ('Running <a href="#runner_%s">%s</a>' %
-                                   (str(runner.key()), runner.GetName()))
-          else:
-            machine.action_name = ('Assigned <a href="#runner_%s">%s</a>' %
-                                   (str(runner.key()), runner.GetName()))
-        else:
-          machine.action_name = 'No runner?'
-
+      self._GetDisplayableMachineTemplate(machine)
       machines.append(machine)
 
     if users.get_current_user():
@@ -184,6 +128,7 @@ class MainHandler(webapp2.RequestHandler):
     params = {
         'topbar': topbar,
         'runners': runners,
+        'global_runners': global_runners,
         'machines': machines,
         'enable_success_message': enable_success_message,
         'sorted_by_message': sorted_by_message
@@ -191,6 +136,95 @@ class MainHandler(webapp2.RequestHandler):
 
     path = os.path.join(os.path.dirname(__file__), 'index.html')
     self.response.out.write(template.render(path, params))
+
+  def _GetDisplayableRunnerTemplate(self, runner, detailed_output=False):
+    """Puts different aspects of the runner in a displayable format.
+
+    Args:
+      runner: TestRunner object which will be displayed in Swarm server webpage.
+      detailed_output: Flag specifying how detailed the output should be.
+    """
+    runner.name_string = runner.GetName()
+    runner.key_string = str(runner.key())
+    runner.status_string = '&nbsp;'
+    runner.requested_on_string = self.GetTimeString(runner.created)
+    runner.started_string = '--'
+    runner.ended_string = '--'
+    runner.host_used = '&nbsp'
+    runner.command_string = '&nbsp;'
+    runner.failed_test_class_string = ''
+    runner.user_email = runner.user.email()
+
+    if runner.machine_id == test_manager.NO_MACHINE_ID:
+      runner.status_string = 'Pending'
+      runner.command_string = (
+          '<a href="/secure/cancel?r=%s">Cancel</a>' % runner.key_string)
+    elif runner.machine_id != test_manager.DONE_MACHINE_ID:
+      if detailed_output:
+        runner.status_string = ('<a title="On machine %s, click for details" '
+                                'href="#machine_%s">Running</a>' %
+                                (runner.machine_id, runner.machine_id))
+      else:
+        runner.status_string = 'Running'
+
+      runner.started_string = self.GetTimeString(runner.started)
+      runner.host_used = runner.hostname
+    else:
+      runner.started_string = self.GetTimeString(runner.started)
+      runner.ended_string = self.GetTimeString(runner.ended)
+
+      runner.host_used = runner.hostname
+
+      if runner.ran_successfully:
+        if detailed_output:
+          runner.status_string = (
+              '<a title="Click to see results" href="/secure/get_result?r=%s">'
+              'Succeeded</a>' % runner.key_string)
+        else:
+          runner.status_string = 'Succeeded'
+      else:
+        runner.failed_test_class_string = 'failed_test'
+        runner.command_string = (
+            '<a href="/secure/retry?r=%s">Retry</a>' % runner.key_string)
+        if detailed_output:
+          runner.status_string = (
+              '<a title="Click to see results" href="/secure/get_result?r=%s">'
+              'Failed</a>' % runner.key_string)
+        else:
+          runner.status_string = 'Failed'
+
+  def _GetDisplayableMachineTemplate(self, machine):
+    """Puts different aspects of the machine in a displayable format.
+
+    Args:
+      machine: Machine object which will be displayed in Swarm server webpage.
+    """
+    machine.status_name = 'Unknown'
+    if machine.status == base_machine_provider.MachineStatus.WAITING:
+      machine.status_name = 'Waiting'
+    elif machine.status == base_machine_provider.MachineStatus.ACQUIRED:
+      machine.status_name = 'Acquired'
+    elif machine.status == base_machine_provider.MachineStatus.STOPPED:
+      machine.status_name = 'Stopped'
+    elif machine.status == base_machine_provider.MachineStatus.AVAILABLE:
+      machine.status_name = 'Available'
+
+    # See if the machine is idle or not.
+    idle = test_manager.IdleMachine.gql('WHERE id = :1', machine.id).get()
+    if idle:
+      machine.action_name = 'Idle'
+    else:
+      runner = (test_manager.TestRunner.gql('WHERE machine_id = :1',
+                                            machine.id).get())
+      if runner:
+        if runner.started:
+          machine.action_name = ('Running <a href="#runner_%s">%s</a>' %
+                                 (str(runner.key()), runner.GetName()))
+        else:
+          machine.action_name = ('Assigned <a href="#runner_%s">%s</a>' %
+                                 (str(runner.key()), runner.GetName()))
+      else:
+        machine.action_name = 'No runner?'
 
 
 class RedirectToMainHandler(webapp2.RequestHandler):
