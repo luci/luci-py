@@ -453,7 +453,6 @@ class RegisterHandler(webapp2.RequestHandler):
     if not user_profile:
       SendAuthenticationsFailure(self.response)
       return
-    # TODO(user): Use user_profile when executing operation.
 
     # Validate the request.
     if not self.request.body:
@@ -474,7 +473,7 @@ class RegisterHandler(webapp2.RequestHandler):
 
     try:
       response = json.dumps(
-          test_request_manager.ExecuteRegisterRequest(attributes))
+          test_request_manager.ExecuteRegisterRequest(attributes, user_profile))
     except test_request_message.Error as ex:
       message = str(ex)
       logging.exception(message)

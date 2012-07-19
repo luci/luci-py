@@ -284,6 +284,9 @@ class TestRunner(db.Model):
   # is unspecified.
   hostname = db.TextProperty()
 
+  # The actual account of the user the runner belongs to.
+  user = db.UserProperty()
+
   def delete(self):  # pylint: disable-msg=C6409
     # We delete the blob referenced by this model because no one
     # else will every care about it or try to reference it, so we
@@ -807,7 +810,7 @@ class TestRequestManager(object):
       for instance_index in range(config.min_instances):
         config.instance_index = instance_index
         config.num_instances = config.min_instances
-        runner = self._QueueTestRequestConfig(request, config)
+        runner = self._QueueTestRequestConfig(request, config, user_profile)
 
         self._TryAndRun(runner)
 
@@ -840,13 +843,14 @@ class TestRequestManager(object):
       # can already run the test.
       self._ExecuteTestRunnerIfPossible(runner)
 
-  def _QueueTestRequestConfig(self, request, config):
+  def _QueueTestRequestConfig(self, request, config, user_profile):
     """Queue a given request's configuration for execution.
 
     Args:
       request: A TestRequest object to execute.
       config: A TestConfiguration object representing the machine on which to
           run the test.
+      user_profile: The user profile the runner belongs to.
 
     Returns:
       A tuple containing the id key of the test runner that was created
@@ -862,7 +866,7 @@ class TestRequestManager(object):
     runner = TestRunner(test_request=request, config_name=config.config_name,
                         config_instance_index=config.instance_index,
                         num_config_instances=config.num_instances,
-                        machine_id=NO_MACHINE_ID)
+                        machine_id=NO_MACHINE_ID, user=user_profile.user)
     runner.put()
 
     return runner
@@ -1271,7 +1275,7 @@ class TestRequestManager(object):
 
     return True
 
-  def ExecuteRegisterRequest(self, attributes):
+  def ExecuteRegisterRequest(self, attributes, user_profile):
     """Attempts to match the requesting machine with an existing TestRunner.
 
     If the machine is matched with a request, the machine is told what to do.
@@ -1280,6 +1284,8 @@ class TestRequestManager(object):
     Args:
       attributes: A dictionary representing the attributes of the machine
       registering itself.
+      user_profile: The user_profile that whitelisted the machine. Should be
+      a valid profile.
 
     Raises:
       test_request_message.Error: If the request format/attributes aren't valid.
@@ -1287,6 +1293,9 @@ class TestRequestManager(object):
     Returns:
       A dictionary containing the commands the machine needs to execute.
     """
+    # The machine should be whitelisted by some user.
+    assert user_profile
+
     # Validate and fix machine attributes. Will throw exception on errors.
     attribs = self.ValidateAndFixAttributes(attributes)
 
@@ -1297,7 +1306,7 @@ class TestRequestManager(object):
     # TODO(user): Tune this parameter somehow.
     for _ in range(10):
       # Try to find a matching test runner for the machine.
-      runner = self._FindMatchingRunner(attribs)
+      runner = self._FindMatchingRunner(attribs, user_profile)
       if runner:
         # Will atomically try to assign the machine to the runner. This could
         # fail due to a race condition on the runner. If so, we loop back to
@@ -1423,16 +1432,16 @@ class TestRequestManager(object):
     try_count = min(try_count, MAX_TRY_COUNT)
     return min(MAX_COMEBACK_SECS, float(2**try_count)/100 + 1)
 
-  def _FindMatchingRunner(self, attribs):
+  def _FindMatchingRunner(self, attribs, user_profile):
     """Find oldest TestRunner who hasn't already been assigned a machine.
 
     Args:
-      attribs: the attributes defining the machine.
+      attribs: The attributes defining the machine.
+      user_profile: The user_profile to search for runners.
 
     Returns:
       A TestRunner object, or None if a matching runner is not found.
     """
-
     # TODO(user): limit the number of test runners checked to avoid querying
     # all the tasks all the time.
 
@@ -1440,14 +1449,15 @@ class TestRequestManager(object):
     # We use a format argument for None, because putting None in the string
     # doesn't work.
     query = TestRunner.gql('WHERE started = :1 AND machine_id = :2 '
-                           'ORDER BY created', None, NO_MACHINE_ID)
+                           'AND user = :3 ORDER BY created',
+                           None, NO_MACHINE_ID, user_profile.user)
     for runner in query:
       runner_dimensions = runner.GetConfiguration().dimensions
       (match, output) = dimensions.MatchDimensions(runner_dimensions,
                                                    attribs['dimensions'])
       logging.info(output)
       if match:
-        logging.info('matched runner %s: '%runner.GetName()
+        logging.info('matched runner %s: ' % runner.GetName()
                      + str(runner_dimensions) + ' to machine: '
                      + str(attribs['dimensions']))
         return runner
