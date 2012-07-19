@@ -32,6 +32,100 @@ from common import url_helper
 # pylint: enable-msg=C6204
 
 
+# pylint: disable-msg=W0102
+def ValidateBasestring(x, error_prefix='', errors=[]):
+  """Validate the given variable as a valid basestring.
+
+  Args:
+    x: The object to evaluate.
+    error_prefix: A string to append to the start of every error message.
+    errors: An array where we can append error messages.
+
+  Returns:
+    True if the variable is a valid basestring.
+  """
+  if not isinstance(x, basestring):
+    errors.append('%sInvalid type: %s instead of %s' %
+                  (error_prefix, type(x), basestring))
+    return False
+  return True
+
+
+# pylint: disable-msg=W0102
+def ValidateNonNegativeFloat(x, error_prefix='', errors=[]):
+  """Validate the given variable as a non-negative float.
+
+  Args:
+    x: The object to evaluate.
+    error_prefix: A string to append to the start of every error message.
+    errors: An array where we can append error messages.
+
+  Returns:
+    True if the variable is a non-negative float.
+  """
+  if not isinstance(x, float):
+    errors.append('%sInvalid type: %s instead of %s' %
+                  (error_prefix, type(x), float))
+    return False
+
+  if x < 0:
+    errors.append('%s: Invalid negative float' % error_prefix)
+    return False
+  return True
+
+
+# pylint: disable-msg=W0102
+def ValidateNonNegativeInteger(x, error_prefix='', errors=[]):
+  """Validate the given variable as a non-negative integer.
+
+  Args:
+    x: The object to evaluate.
+    error_prefix: A string to append to the start of every error message.
+    errors: An array where we can append error messages.
+
+  Returns:
+    True if the variable is a non-negative integer.
+  """
+  if not isinstance(x, int):
+    errors.append('%sInvalid type: %s instead of %s'
+                  % (error_prefix, type(x), int))
+    return False
+
+  if x < 0:
+    errors.append('%sInvalid negative integer' % error_prefix)
+    return False
+  return True
+
+
+# pylint: disable-msg=W0102
+def ValidateCommand(commands, error_prefix='', errors=[]):
+  """Validate the given commands are the valid.
+
+  Args:
+    commands: The object to evaluate.
+    error_prefix: A string to append to the start of every error message.
+    errors: An array where we can append error messages.
+
+  Returns:
+    True if commands are a list and each element in the list is a
+    valid RPC command.
+  """
+  if not isinstance(commands, list):
+    errors.append('%sInvalid type: %s instead of %s' %
+                  (error_prefix, type(commands), list))
+    return False
+
+  valid = True
+  for command in commands:
+    try:
+      ParseRPC(command)
+    except SlaveError as e:
+      errors.append('%sError when parsing RPC: %s' % (error_prefix, e))
+      valid = False
+
+  return valid
+
+
 class SlaveMachine(object):
   """Creates a slave that continuously polls the Swarm server for jobs."""
 
@@ -52,6 +146,7 @@ class SlaveMachine(object):
     self._result_url = None
     self._attributes['id'] = None
     self._attributes['try_count'] = 0
+    self._come_back = 0
 
     self._max_url_tries = max_url_tries
 
@@ -71,15 +166,6 @@ class SlaveMachine(object):
     """
     url = self._url + '/poll_for_test'
     done_iterations = 0
-    try:
-      iterations = int(iterations)
-    except ValueError:
-      raise SlaveError(
-          'Invalid iterations provided: ' + str(iterations))
-
-    if iterations < -1:
-      raise SlaveError(
-          'Invalid negative iterations provided: ' + str(iterations))
 
     # Loop for requested number of iterations.
     while True:
@@ -90,8 +176,8 @@ class SlaveMachine(object):
       # Reset the result_url to avoid posting to the wrong place.
       self._result_url = None
 
-      logging.debug('Connecting to Swarm server: ' + self._url)
-      logging.debug('Request: ' + str(request))
+      logging.debug('Connecting to Swarm server: %s', self._url)
+      logging.debug('Request: %s', str(request))
 
       response_str = url_helper.UrlOpen(url, data=request,
                                         max_tries=self._max_url_tries)
@@ -168,12 +254,12 @@ class SlaveMachine(object):
     """
 
     # Store id assigned by Swarm server so in the future they know this slave.
-    self._attributes['id'] = str(response['id'])
-    logging.debug('received id: ' + str(self._attributes['id']))
+    self._attributes['id'] = response['id']
+    logging.debug('received id: %s', self._attributes['id'])
 
     # Store try_count assigned by Swarm server to send it back in next request.
     self._attributes['try_count'] = int(response['try_count'])
-    logging.debug('received try_count: ' + str(self._attributes['try_count']))
+    logging.debug('received try_count: %d', self._attributes['try_count'])
 
     commands = None
     if not 'commands' in response:
@@ -195,80 +281,40 @@ class SlaveMachine(object):
     # As part of error handling, we need a result URL. So try to get it
     # from the response, but don't fail if we are unable to.
     if ('result_url' in response and
-        isinstance(response['result_url'], (str, unicode))):
-      self._result_url = str(response['result_url'])
+        isinstance(response['result_url'], basestring)):
+      self._result_url = response['result_url']
 
     # Validate fields in the response. A response should have 'id', 'try_count',
     # and only either one of ('come_back') or ('commands', 'result_url').
-    required_fields = ['id', 'try_count']
+    required_fields = {
+        'id': ValidateBasestring,
+        'try_count': ValidateNonNegativeInteger
+        }
+
     if 'commands' in response:
-      required_fields += ['commands', 'result_url']
+      required_fields['commands'] = ValidateCommand
+      required_fields['result_url'] = ValidateBasestring
     else:
-      required_fields += ['come_back']
+      required_fields['come_back'] = ValidateNonNegativeFloat
 
     # We allow extra fields in the response, but ignore them.
-    for field in response:
-      if field in required_fields:
-        required_fields.remove(field)
-
-    # Make sure we're not missing anything and don't have extras.
-    if required_fields:
-      message = ('Missing fields in response: ' + str(required_fields))
+    missing_fields = set(required_fields).difference(set(response))
+    if missing_fields:
+      message = 'Missing fields in response: %s' % missing_fields
       self._PostFailedExecuteResults(message)
       return False
 
-    # Validate ID type.
-    if not isinstance(response['id'], (str, unicode)):
-      self._PostFailedExecuteResults('Invalid ID type: ' +
-                                     str(type(response['id'])))
+    # Validate fields.
+    errors = []
+    for key, validate_function in required_fields.iteritems():
+      validate_function(response[key],
+                        'Failed to validate %s with value "%s": ' %
+                        (key, response[key]),
+                        errors=errors)
+
+    if errors:
+      self._PostFailedExecuteResults(str(errors))
       return False
-
-    # Validate try_count type.
-    if not isinstance(response['try_count'], int):
-      self._PostFailedExecuteResults('Invalid try_count type: ' +
-                                     str(type(response['try_count'])))
-      return False
-
-    # try_count can not be negative.
-    if int(response['try_count']) < 0:
-      self._PostFailedExecuteResults('Invalid negative try_count value: %d' %
-                                     int(response['try_count']))
-      return False
-
-    if 'commands' in response:
-      # Validate result URL type.
-      if not isinstance(response['result_url'], (str, unicode)):
-        self._PostFailedExecuteResults('Invalid result URL type: ' +
-                                       str(type(response['result_url'])))
-        return False
-
-      # Validate commands type.
-      if not isinstance(response['commands'], list):
-        self._PostFailedExecuteResults('Invalid commands type: ' +
-                                       str(type(response['commands'])))
-        return False
-
-      # Validate rpc commands.
-      for rpc in response['commands']:
-        # Validate format.
-        try:
-          ParseRPC(rpc)
-        except SlaveError as e:
-          self._PostFailedExecuteResults('Error when parsing RPC: ' + str(e))
-          return False
-
-    else:
-      # If the slave recieves no command, then it will just try again
-      # at a later time and when the Swarm server told it to.
-      if not isinstance(response['come_back'], float):
-        self._PostFailedExecuteResults('Invalid come_back type: ' +
-                                       str(type(response['come_back'])))
-        return False
-
-      if float(response['come_back']) < 0:
-        self._PostFailedExecuteResults('Invalid negative come_back value: %f'%
-                                       float(response['come_back']))
-        return False
 
     return True
 
@@ -309,7 +355,7 @@ class SlaveMachine(object):
       SlaveRPCError: If args are invalid will include an error message.
     """
     # Validate args.
-    if not isinstance(args, (str, unicode)):
+    if not isinstance(args, basestring):
       raise SlaveRPCError(
           'Invalid arg types to LogRPC: %s (expected str or unicode)'%
           str(type(args)))
@@ -345,7 +391,7 @@ class SlaveMachine(object):
             (len(file_tuple), str(file_tuple)))
 
       for string in file_tuple:
-        if not isinstance(string, (str, unicode)):
+        if not isinstance(string, basestring):
           raise SlaveRPCError(
               'Invalid tuple element type: %s (expected str or unicode)'%
               str(type(string)))
@@ -413,7 +459,7 @@ class SlaveMachine(object):
           ' unicode)'%str(type(args)))
 
     for command in args:
-      if not isinstance(command, (str, unicode)):
+      if not isinstance(command, basestring):
         raise SlaveRPCError(
             'Invalid element type in RunCommands args: %s (expected'
             ' str or unicode)'% str(type(command)))
@@ -479,7 +525,7 @@ def ParseRPC(rpc):
   function = rpc['function']
   args = rpc['args']
 
-  if not isinstance(function, (str, unicode)):
+  if not isinstance(function, basestring):
     raise SlaveError('Invalid RPC call function name type')
 
   logging.debug('rpc function name: ' + function)
@@ -519,13 +565,17 @@ def main():
                     help='Set logging level to DEBUG. Optional. Defaults to '
                     'ERROR level.')
   parser.add_option('-i', '--iterations', default=-1, dest='iterations',
+                    type='int',
                     help='Number of iterations to request jobs from '
                     'Swarm server. Defaults to %default (infinite).')
   (options, args) = parser.parse_args()
 
+  # Parser handles exiting this script after logging the error.
   if len(args) > 1:
-    # Parser handles exiting this script after logging the error.
     parser.error('Must specify only one filename')
+
+  if options.iterations < -1 or options.iterations == 0:
+    parser.error('Number of iterations must be -1 or a positive number')
 
   if options.verbose:
     logging.getLogger().setLevel(logging.DEBUG)
@@ -544,13 +594,11 @@ def main():
       return
 
   # Read machine informations.
-  attributes_str = source.read()
+  attributes = json.loads(source)
   source.close()
-  attributes = json.loads(attributes_str)
 
-  url = 'http://'+options.address+':'+options.port
-  slave = SlaveMachine(url=url,
-                       attributes=attributes,
+  url = '%s:%d' % (options.address, options.port)
+  slave = SlaveMachine(url=url, attributes=attributes,
                        max_url_tries=options.max_url_tries)
 
   # Start requesting jobs.
