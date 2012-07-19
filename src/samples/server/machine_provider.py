@@ -46,8 +46,12 @@ class MachineProvider(base_machine_provider.BaseMachineProvider):
     """
     # TODO(user): Catch urllib2 and json errors.
     # TODO(user): Implement life span.
-    u = urllib2.urlopen(self._url, data=urllib.urlencode(
-        {'command': 'request', 'dimensions': json.dumps(config_dimensions)}))
+    try:
+      u = urllib2.urlopen(self._url, data=urllib.urlencode(
+          {'command': 'request', 'dimensions': json.dumps(config_dimensions)}))
+    except urllib2.URLError:
+      raise base_machine_provider.MachineProviderException(
+          message='Unable to connect to machine provider', error_code=-1)
     result = json.loads(u.read())
     if result['available'] == 0:
       raise base_machine_provider.MachineProviderException(
