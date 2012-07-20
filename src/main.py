@@ -587,6 +587,25 @@ class ChangeWhitelistHandler(webapp2.RequestHandler):
     self.post()
 
 
+class RemoteErrorHandler(webapp2.RequestHandler):
+  """Handler to log an error reported by remote machine."""
+
+  def post(self):  # pylint: disable-msg=C6409
+    """Handles HTTP POST requests for this handler's URL."""
+    user_profile = AuthenticateRemoteMachine(self.request)
+    if not user_profile:
+      SendAuthenticationFailure(self.request, self.response)
+      return
+
+    error_message = self.request.get('m', '')
+    error = test_manager.SwarmError(
+        name='Remote Error Report', message=error_message,
+        info='Remote machine address: %s' % self.request.remote_addr)
+    error.put()
+
+    self.response.out.write('Error logged')
+
+
 def AuthenticateRemoteMachine(request):
   """Tries to find a user profile that has whitelisted the remote machine.
 
@@ -656,6 +675,7 @@ def CreateApplication():
                                   ('/get_matching_test_cases',
                                    GetMatchingTestCasesHandler),
                                   ('/poll_for_test', RegisterHandler),
+                                  ('/remote_error', RemoteErrorHandler),
                                   ('/result', ResultHandler),
                                   ('/secure/cancel', CancelHandler),
                                   ('/secure/change_whitelist',
