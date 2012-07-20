@@ -58,6 +58,9 @@ _DOWNLOADER_SCRIPT = 'downloader.py'
 # Name of python script to validate swarm file format.
 _TEST_REQUEST_MESSAGE_SCRIPT = 'test_request_message.py'
 
+# Name of python script to handle url connections.
+_URL_HELPER_SCRIPT = 'url_helper.py'
+
 # Name of python script to mark folder as package.
 _PYTHON_INIT_SCRIPT = '__init__.py'
 
@@ -1618,6 +1621,13 @@ class TestRequestManager(object):
                       _TEST_REQUEST_MESSAGE_SCRIPT),
          os.path.join(test_run.working_dir, _COMMON_DIR),
          _TEST_REQUEST_MESSAGE_SCRIPT))
+
+    # The url helper script.
+    file_paths.append(
+        (os.path.join(SWARM_ROOT_DIR, _COMMON_DIR,
+                      _URL_HELPER_SCRIPT),
+         os.path.join(test_run.working_dir, _COMMON_DIR),
+         _URL_HELPER_SCRIPT))
 
     # The test_runner __init__.
     file_paths.append(
