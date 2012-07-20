@@ -87,6 +87,9 @@ MAX_TRANSACTION_RETRY_COUNT = 3
 # Root directory of Swarm scripts.
 SWARM_ROOT_DIR = os.path.join(os.path.dirname(__file__), '..')
 
+# Number of days to keep error logs around.
+SWARM_ERROR_TIME_TO_LIVE_DAYS = 7
+
 
 class UserProfile(db.Model):
   """A user profile.
@@ -389,6 +392,21 @@ class IdleMachine(db.Model):
   """
   # The Id of the machine.
   id = db.ByteStringProperty()
+
+
+class SwarmError(db.Model):
+  """A datastore entry representing an error in Swarm."""
+  # The name of the error.
+  name = db.StringProperty()
+
+  # A description of the error.
+  message = db.StringProperty()
+
+  # Optional details about the specific error instance.
+  info = db.StringProperty()
+
+  # The time at which this error was logged.  Used to clean up old errors.
+  created = db.DateTimeProperty(auto_now_add=True)
 
 
 class TestRequestManager(object):
@@ -1193,16 +1211,6 @@ class TestRequestManager(object):
     idle_machine = IdleMachine(id=info.id)
     idle_machine.put()
 
-  def _GetCurrentTime(self):
-    """Gets the current time.
-
-    This function is defined so that it can be mocked out in tests.
-
-    Returns:
-      The current time as a datetime.datetime object.
-    """
-    return datetime.datetime.now()
-
   def GetResults(self, runner):
     """Gets the results from the given test run.
 
@@ -1220,7 +1228,7 @@ class TestRequestManager(object):
   def AbortStaleRunners(self):
     """Abort any runners that have been running longer than expected."""
     logging.debug('TRM.AbortStaleRunners starting')
-    now = self._GetCurrentTime()
+    now = _GetCurrentTime()
 
     query = TestRunner.gql('WHERE machine_id != :1 AND machine_id != :2',
                            NO_MACHINE_ID, DONE_MACHINE_ID)
@@ -1753,6 +1761,30 @@ def FindUserWithWhitelistedIP(ip, password):
   assert whitelist.count() == 1
 
   return whitelist.get().user_profile
+
+
+def _GetCurrentTime():
+  """Gets the current time.
+
+  This function is defined so that it can be mocked out in tests.
+
+  Returns:
+    The current time as a datetime.datetime object.
+  """
+  return datetime.datetime.now()
+
+
+def DeleteOldErrors():
+  """Cleans up errors older than a certain age."""
+  logging.debug('DeleteOldErrors starting')
+  now = _GetCurrentTime()
+
+  for error in SwarmError.all():
+    delta = datetime.timedelta(days=SWARM_ERROR_TIME_TO_LIVE_DAYS)
+    if now > error.created + delta:
+      error.delete()
+
+  logging.debug('DeleteOldErrors done')
 
 
 def AtomicAssignID(key, machine_id):

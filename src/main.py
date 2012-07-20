@@ -27,6 +27,7 @@ from server import test_manager
 # pylint: enable-msg=C6204
 
 _NUM_GLOBAL_TESTS_TO_DISPLAY = 10
+_NUM_RECENT_ERRORS_TO_DISPLAY = 10
 
 
 class MainHandler(webapp2.RequestHandler):
@@ -102,6 +103,12 @@ class MainHandler(webapp2.RequestHandler):
       self._GetDisplayableRunnerTemplate(runner)
       global_runners.append(runner)
 
+    errors = []
+    query = test_manager.SwarmError.all().order('-created')
+    for error in query.run(limit=_NUM_RECENT_ERRORS_TO_DISPLAY):
+      error.log_time = self.GetTimeString(error.created)
+      errors.append(error)
+
     # Build info for acquired machines table.
     machines = []
     for machine in machine_manager.Machine.all():
@@ -129,6 +136,7 @@ class MainHandler(webapp2.RequestHandler):
         'topbar': topbar,
         'runners': runners,
         'global_runners': global_runners,
+        'errors': errors,
         'machines': machines,
         'enable_success_message': enable_success_message,
         'sorted_by_message': sorted_by_message
@@ -250,7 +258,7 @@ class TestRequestHandler(webapp2.RequestHandler):
     body = self.request.body
     user_profile = AuthenticateRemoteMachine(self.request)
     if not user_profile:
-      SendAuthenticationsFailure(self.response)
+      SendAuthenticationFailure(self.request, self.response)
       return
 
     # Validate the request.
@@ -281,7 +289,7 @@ class ResultHandler(webapp2.RequestHandler):
 
     user_profile = AuthenticateRemoteMachine(self.request)
     if not user_profile:
-      SendAuthenticationsFailure(self.response)
+      SendAuthenticationFailure(self.request, self.response)
       return
 
     logging.debug('Received Result: %s', self.request.url)
@@ -301,6 +309,7 @@ class PollHandler(webapp2.RequestHandler):
     test_request_manager.UpdateCacheServerURL(self.request.host_url)
     test_request_manager.AssignPendingRequests()
     test_request_manager.AbortStaleRunners()
+    test_manager.DeleteOldErrors()
     self.response.out.write("""
     <html>
     <head>
@@ -337,7 +346,7 @@ class GetMatchingTestCasesHandler(webapp2.RequestHandler):
 
     user_profile = AuthenticateRemoteMachine(self.request)
     if not user_profile:
-      SendAuthenticationsFailure(self.response)
+      SendAuthenticationFailure(self.request, self.response)
       return
 
     self.response.headers['Content-Type'] = 'text/plain'
@@ -390,7 +399,7 @@ class CleanupResultsHandler(webapp2.RequestHandler):
 
     user_profile = AuthenticateRemoteMachine(self.request)
     if not user_profile:
-      SendAuthenticationsFailure(self.response)
+      SendAuthenticationFailure(self.request, self.response)
       return
 
     self.response.headers['Content-Type'] = 'test/plain'
@@ -485,7 +494,7 @@ class RegisterHandler(webapp2.RequestHandler):
 
     user_profile = AuthenticateRemoteMachine(self.request)
     if not user_profile:
-      SendAuthenticationsFailure(self.response)
+      SendAuthenticationFailure(self.request, self.response)
       return
 
     # Validate the request.
@@ -595,12 +604,19 @@ def AuthenticateRemoteMachine(request):
   return user_profile
 
 
-def SendAuthenticationsFailure(response):
+def SendAuthenticationFailure(request, response):
   """Writes an authentication failure error message to response with status.
 
   Args:
+    request: The original request that failed to authenticate.
     response: Response to be sent to remote machine.
   """
+  # Log the error.
+  error = test_manager.SwarmError(
+      name='Authentication Failure', message='Handler: %s' % request.url,
+      info='Remote machine address: %s' % request.remote_addr)
+  error.put()
+
   response.set_status(403)
   response.out.write('Remote machine not whitelisted for operation')
 

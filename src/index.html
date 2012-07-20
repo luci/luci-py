@@ -128,6 +128,24 @@ table {
 {% endfor %}
 </table>
 
+<h1>Recent Errors</h1>
+<table id="error-table" summary="This table lists most recent errors">
+<tr>
+<th>Error</th>
+<th>Message</th>
+<th>Info</th>
+<th>Time (UTC)</th>
+</tr>
+{% for error in errors %}
+<tr class="request {% cycle even,odd %} {{ runner.failed_test_class_string }}">
+<td>{{error.name}}</td>
+<td>{{error.message}}</td>
+<td>{{error.info}}</td>
+<td>{{error.log_time}}</td>
+</tr>
+{% endfor %}
+</table>
+
 <div style="float: left;"><p> 
   <a target="_blank" href="http://code.google.com/appengine/"><img border="0"
    src="http://code.google.com/appengine/images/appengine-noborder-120x30.gif"
