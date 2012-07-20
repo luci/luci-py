@@ -88,8 +88,9 @@ import urllib2
 import urlparse
 import zipfile
 
-from test_runner import downloader
 from common import test_request_message
+from common import url_helper
+from test_runner import downloader
 
 
 def EnqueueOutput(out, queue):
