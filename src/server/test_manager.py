@@ -1214,6 +1214,38 @@ class TestRequestManager(object):
     idle_machine = IdleMachine(id=info.id)
     idle_machine.put()
 
+  def GetRunnerResults(self, key, user_profile):
+    """Returns the results of the runner specified by key.
+
+    Args:
+      key: TestRunner key representing the runner.
+      user_profile: The user requesting the results which should be the
+          same as the runner's owner.
+
+    Returns:
+      A dictionary of the runner's results, or None if the runner not found.
+
+    Raises:
+      AuthenticationError: If the user was not authorized to access the runner.
+    """
+    assert user_profile
+
+    try:
+      runner = TestRunner.get(key)
+    except (db.BadKeyError, db.KindError, db.BadArgumentError):
+      return None
+
+    if runner:
+      if runner.user == user_profile.user:
+        return self.GetResults(runner)
+      else:
+        logging.exception(
+            'Invalid access: user %s trying to get results of user %s',
+            user_profile.user.email(), runner.user.email())
+        raise AuthenticationError
+
+    return None
+
   def GetResults(self, runner):
     """Gets the results from the given test run.
 
@@ -1824,4 +1856,9 @@ class TxRunnerAlreadyAssignedError(Exception):
 
 class PrepareRemoteCommandsError(Exception):
   """Simple exception class signaling failure to prepare remote commands."""
+  pass
+
+
+class AuthenticationError(Exception):
+  """Exception signaling failure to authenticate a user performing a task."""
   pass

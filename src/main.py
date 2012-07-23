@@ -365,29 +365,37 @@ class GetMatchingTestCasesHandler(webapp2.RequestHandler):
       self.response.out.write('No matching Test Cases')
 
 
+class SecureGetResultHandler(webapp2.RequestHandler):
+  """Show the full result string from a test runner."""
+
+  def get(self):  # pylint: disable-msg=C6409
+    """Handles HTTP GET requests for this handler's URL."""
+    user = users.get_current_user()
+    key = self.request.get('r', '')
+    user_profile = test_manager.UserProfile.gql('WHERE user = :1', user).get()
+
+    if user_profile:
+      SendRunnerResults(self.response, key, user_profile)
+    else:
+      # It is possible that the current user logged in has never whitelisted
+      # a machine, so they have no profile. In that case, they are not allowed
+      # to view any results.
+      self.response.set_status(204)
+      logging.info('Could not find profile for user: %s', user.email())
+
+
 class GetResultHandler(webapp2.RequestHandler):
   """Show the full result string from a test runner."""
 
   def get(self):  # pylint: disable-msg=C6409
     """Handles HTTP GET requests for this handler's URL."""
-    test_request_manager = CreateTestManager()
+    user_profile = AuthenticateRemoteMachine(self.request)
+    if not user_profile:
+      SendAuthenticationFailure(self.request, self.response)
+      return
 
-    self.response.headers['Content-Type'] = 'text/plain'
-
-    runner = None
     key = self.request.get('r', '')
-    runner = None
-    if key:
-      try:
-        runner = test_manager.TestRunner.get(key)
-      except db.BadKeyError:
-        pass
-
-    if runner:
-      results = test_request_manager.GetResults(runner)
-      self.response.out.write(json.dumps(results))
-    else:
-      self.response.set_status(204)
+    SendRunnerResults(self.response, key, user_profile)
 
 
 class CleanupResultsHandler(webapp2.RequestHandler):
@@ -640,6 +648,31 @@ def SendAuthenticationFailure(request, response):
   response.out.write('Remote machine not whitelisted for operation')
 
 
+def SendRunnerResults(response, key, user_profile):
+  """Sends the results of the runner specified by key.
+
+  Args:
+    response: Response to be sent to remote machine.
+    key: Key identifying the runner.
+    user_profile: The user requesting the results.
+  """
+  test_request_manager = CreateTestManager()
+
+  response.headers['Content-Type'] = 'text/plain'
+  results = None
+  try:
+    results = test_request_manager.GetRunnerResults(key, user_profile)
+  except test_manager.AuthenticationError:
+    pass
+
+  if results:
+    response.out.write(json.dumps(results))
+  else:
+    response.set_status(204)
+    logging.info('Unable to provide runner results [user: %s][key: %s]',
+                 user_profile.user.email(), str(key))
+
+
 def CreateTestManager():
   """Creates and returns a test manager instance.
 
@@ -674,6 +707,7 @@ def CreateApplication():
                                    CleanupResultsHandler),
                                   ('/get_matching_test_cases',
                                    GetMatchingTestCasesHandler),
+                                  ('/get_result', GetResultHandler),
                                   ('/poll_for_test', RegisterHandler),
                                   ('/remote_error', RemoteErrorHandler),
                                   ('/result', ResultHandler),
@@ -681,7 +715,7 @@ def CreateApplication():
                                   ('/secure/change_whitelist',
                                    ChangeWhitelistHandler),
                                   ('/secure/get_result',
-                                   GetResultHandler),
+                                   SecureGetResultHandler),
                                   ('/secure/main', MainHandler),
                                   ('/secure/retry', RetryHandler),
                                   ('/secure/show_message',
