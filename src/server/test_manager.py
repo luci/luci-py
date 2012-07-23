@@ -90,6 +90,9 @@ MAX_TRANSACTION_RETRY_COUNT = 3
 # Root directory of Swarm scripts.
 SWARM_ROOT_DIR = os.path.join(os.path.dirname(__file__), '..')
 
+# Number of days to keep old runners around for.
+SWARM_FINISHED_RUNNER_TIME_TO_LIVE_DAYS = 14
+
 # Number of days to keep error logs around.
 SWARM_ERROR_TIME_TO_LIVE_DAYS = 7
 
@@ -1816,15 +1819,31 @@ def _GetCurrentTime():
   return datetime.datetime.now()
 
 
+def DeleteOldRunners():
+  """Clean up all runners that are older than a certain age and done."""
+  logging.debug('DeleteOldRunners starting')
+
+  old_cutoff = (
+      _GetCurrentTime() -
+      datetime.timedelta(days=SWARM_FINISHED_RUNNER_TIME_TO_LIVE_DAYS))
+
+  query = TestRunner.gql('WHERE ended < :1', old_cutoff)
+  for runner in query:
+    runner.delete()
+
+  logging.debug('DeleteOldRunners done')
+
+
 def DeleteOldErrors():
   """Cleans up errors older than a certain age."""
   logging.debug('DeleteOldErrors starting')
-  now = _GetCurrentTime()
+  old_cutoff = (
+      _GetCurrentTime() -
+      datetime.timedelta(days=SWARM_ERROR_TIME_TO_LIVE_DAYS))
 
-  for error in SwarmError.all():
-    delta = datetime.timedelta(days=SWARM_ERROR_TIME_TO_LIVE_DAYS)
-    if now > error.created + delta:
-      error.delete()
+  query = SwarmError.gql('WHERE created < :1', old_cutoff)
+  for error in query:
+    error.delete()
 
   logging.debug('DeleteOldErrors done')
 
