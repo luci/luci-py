@@ -388,6 +388,21 @@ class TestRunner(db.Model):
     return '\n'.join(message)
 
 
+class MachineAssignment(db.Model):
+  """A machine's last runner assignment."""
+  # The machine id of the polling machine.
+  machine_id = db.ByteStringProperty()
+
+  # The tag of the machine polling.
+  tag = db.StringProperty()
+
+  # The actual account of the user that whitelisted this machine.
+  user = db.UserProperty()
+
+  # The time of the assignment.
+  poll_time = db.DateTimeProperty(auto_now=True)
+
+
 class IdleMachine(db.Model):
   """An idle machine.
 
@@ -1351,6 +1366,7 @@ class TestRequestManager(object):
     attribs = self.ValidateAndFixAttributes(attributes)
 
     assigned_runner = False
+    runner = None
     response = {}
 
     # Try assigning machine to a runner 10 times before we give up.
@@ -1375,6 +1391,10 @@ class TestRequestManager(object):
             response['commands'] = commands
             response['result_url'] = result_url
             assigned_runner = True
+
+            self._RecordMachineRunnerAssignment(attribs['id'],
+                                                attributes.get('tag', None),
+                                                user_profile)
             break
       # We found no runner, no use in re-trying so just break out of the loop.
       else:
@@ -1463,6 +1483,26 @@ class TestRequestManager(object):
       attributes['try_count'] = 0
 
     return attributes
+
+  def _RecordMachineRunnerAssignment(self, machine_id, machine_tag,
+                                     user_profile):
+    """Record when a machine has a runner assigned to it.
+
+    Args:
+      machine_id: The machine id of the machine.
+      machine_tag: The tag identifier of the machine.
+      user_profile: The user profile that whitelisted this machine.
+    """
+    machine_assignment = MachineAssignment.gql('WHERE machine_id = :1',
+                                               machine_id).get()
+
+    # Check to see if we need to create the model.
+    if machine_assignment is None:
+      machine_assignment = MachineAssignment(machine_id=machine_id,
+                                             user=user_profile.user)
+
+    machine_assignment.tag = machine_tag
+    machine_assignment.put()
 
   def _ComputeComebackValue(self, try_count):
     """Computes when the slave machine should return based on given try_count.
