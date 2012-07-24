@@ -137,6 +137,26 @@ class MachineWhitelist(db.Model):
   password = db.StringProperty()
 
 
+def GetTestCase(request_message):
+  """Returns a TestCase object representing this Test Request message.
+
+  Args:
+    request_message: The request message to convert.
+
+  Returns:
+    A TestCase object representing this Test Request.
+
+  Raises:
+    test_request_message.Error: If the request's message isn't valid.
+  """
+  request_object = test_request_message.TestCase()
+  errors = []
+  if not request_object.ParseTestRequestMessageText(request_message, errors):
+    raise test_request_message.Error('\n'.join(errors))
+
+  return request_object
+
+
 class TestRequest(db.Model):
   """A test request.
 
@@ -156,6 +176,9 @@ class TestRequest(db.Model):
   # The time at which this request was received.
   requested_time = db.DateTimeProperty(auto_now_add=True)
 
+  # The name for this test request.
+  name = db.StringProperty(required=True)
+
   def GetTestCase(self):
     """Returns a TestCase object representing this Test Request.
 
@@ -170,25 +193,10 @@ class TestRequest(db.Model):
     # the test request message to keep from evaluating it all the time
     request_object = getattr(self, '_request_object', None)
     if not request_object:
-      request_object = test_request_message.TestCase()
-      errors = []
-      if not request_object.ParseTestRequestMessageText(self.message, errors):
-        raise test_request_message.Error('\n'.join(errors))
-
+      request_object = GetTestCase(self.message)
       self._request_object = request_object
 
     return request_object
-
-  def GetName(self):
-    """Gets a name for this test.
-
-    Returns:
-      The  name for this test.
-
-    Raises:
-      test_request_message.Error: If the request's message isn't valid.
-    """
-    return self.GetTestCase().test_case_name
 
   def GetConfiguration(self, config_name):
     """Gets the named configuration.
@@ -314,7 +322,7 @@ class TestRunner(db.Model):
     Raises:
       test_request_message.Error: If the request's message isn't valid.
     """
-    return '%s:%s' % (self.test_request.GetName(), self.config_name)
+    return '%s:%s' % (self.test_request.name, self.config_name)
 
   def GetConfiguration(self):
     """Gets the configuration associated with this runner.
@@ -717,7 +725,7 @@ class TestRequestManager(object):
           encoded_result_string = runner.GetResultString().encode('utf-8')
           urllib2.urlopen(test_case.result_url,
                           urllib.urlencode((
-                              ('n', runner.test_request.GetName()),
+                              ('n', runner.test_request.name),
                               ('c', runner.config_name),
                               ('i', runner.config_instance_index),
                               ('m', runner.num_config_instances),
@@ -773,7 +781,7 @@ class TestRequestManager(object):
       subject = '%s failed.' % runner.GetName()
 
     message_body_parts = [
-        'Test Request Name: ' + runner.test_request.GetName(),
+        'Test Request Name: ' + runner.test_request.name,
         'Configuration Name: ' + runner.config_name,
         'Configuration Instance Index: ' + str(runner.config_instance_index),
         'Number of Configurations: ' + str(runner.num_config_instances),
@@ -810,9 +818,10 @@ class TestRequestManager(object):
     assert user_profile
 
     matches = []
-    for test_request in user_profile.test_requests:
-      if test_request.GetName() == test_case_name:
-        matches.append(test_request)
+    query = TestRequest.gql('WHERE user_profile = :1 and name = :2',
+                            user_profile, test_case_name)
+    for test_request in query:
+      matches.append(test_request)
 
     return matches
 
@@ -841,7 +850,9 @@ class TestRequestManager(object):
     assert user_profile
 
     # Will raise an exception on error.
-    request = TestRequest(message=request_message, user_profile=user_profile)
+    test_name = GetTestCase(request_message).test_case_name
+    request = TestRequest(message=request_message, name=test_name,
+                          user_profile=user_profile)
     test_case = request.GetTestCase()  # Will raise on invalid request.
     request.put()
 
@@ -901,7 +912,7 @@ class TestRequestManager(object):
       and saved, as well as the test runner.
     """
     logging.debug('TRM._QueueTestRequestConfig request=%s config=%s',
-                  request.GetName(), config.config_name)
+                  request.name, config.config_name)
 
     # Create a runner entity to record this request/config pair that needs
     # to be run. Use a machine id of NO_MACHINE_ID to indicate it has not
