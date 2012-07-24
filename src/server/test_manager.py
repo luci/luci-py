@@ -266,7 +266,7 @@ class TestRunner(db.Model):
   # If the machine_id is neither, this means that the runner has been
   # assigned to a machine and is currently running. The 'started' attribute
   # records the time at which test started.
-  machine_id = db.ByteStringProperty()
+  machine_id = db.StringProperty()
 
   # The time at which this runner was created.  The runner may not have
   # started executing yet.
@@ -399,7 +399,7 @@ class TestRunner(db.Model):
 class MachineAssignment(db.Model):
   """A machine's last runner assignment."""
   # The machine id of the polling machine.
-  machine_id = db.ByteStringProperty()
+  machine_id = db.StringProperty()
 
   # The tag of the machine polling.
   tag = db.StringProperty()
@@ -420,7 +420,7 @@ class IdleMachine(db.Model):
   requests for virgin machines or sharded tests need new machines).
   """
   # The Id of the machine.
-  id = db.ByteStringProperty()
+  id = db.StringProperty()
 
 
 class SwarmError(db.Model):
