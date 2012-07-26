@@ -68,12 +68,6 @@ _PYTHON_INIT_SCRIPT = '__init__.py'
 _TEST_RUNNER_DIR = 'test_runner'
 _COMMON_DIR = 'common'
 
-# Reserved UUID to indicate 'no machine assigned but waiting for one'.
-NO_MACHINE_ID = '00000000-00000000-00000000-00000000'
-
-# Reserved UUID to indicate 'no machine assigned and done'.
-DONE_MACHINE_ID = 'FFFFFFFF-FFFFFFFF-FFFFFFFF-FFFFFFFF'
-
 # Maximum value for the come_back field in a response to an idle slave machine.
 # TODO(user): make this adjustable by the user.
 MAX_COMEBACK_SECS = 60.0
@@ -253,53 +247,37 @@ class TestRunner(db.Model):
   # The number of instances running on the same configuration as ours.
   num_config_instances = db.IntegerProperty()
 
-  # The machine running the test.  The meaning of this field also tells us
-  # about the state of the runner, to make it easier to run queries below.
-  #
-  # If the machine_id is NO_MACHINE_ID, then this runner is looking to be
-  # executed on a remote test runner (either for the first time or retry).
-  #
-  # If the machine_id is DONE_MACHINE_ID, the runner has finished, either
-  # successfully or not.  The 'ended' attribute records the time at which
-  # the runner ended.
-  #
-  # If the machine_id is neither, this means that the runner has been
-  # assigned to a machine and is currently running. The 'started' attribute
-  # records the time at which test started.
+  # The machine that is running or run the test. This attribute is only valid
+  # once a machine has been assigned to this runner.
   machine_id = db.StringProperty()
+
+  # Used to indicate if the runner has finished, either successfully or not.
+  done = db.BooleanProperty(default=False)
 
   # The time at which this runner was created.  The runner may not have
   # started executing yet.
   created = db.DateTimeProperty(auto_now_add=True)
 
-  # The time at which this runner was executed on a remote machine.  This
-  # attribute is valid only when the runner is executing or ended (i.e.
-  # machine_id is != NO_MACHINE_ID).  Otherwise the value is None and we
-  # use the fact that it is None to identify if a test was started or not.
+  # The time at which this runner was executed on a remote machine.  If the
+  # runner isn't executing or ended, then the value is None and we use the
+  # fact that it is None to identify if a test was started or not.
   started = db.DateTimeProperty()
 
   # The time at which this runner ended.  This attribute is valid only when
-  # the runner has ended (i.e. machine_id is == DONE_MACHINE_ID). Until then,
-  # the value is unspecified.
+  # the runner has ended (i.e. done == True). Until then, the value is
+  # unspecified.
   ended = db.DateTimeProperty(auto_now=True)
 
   # True if the test run finished and succeeded.  This attribute is valid only
-  # when the runner has ended (i.e. machine_id is == DONE_MACHINE_ID).
-  # Until then, the value is unspecified.
+  # when the runner has ended. Until then, the value is unspecified.
   ran_successfully = db.BooleanProperty()
 
   # The stringized array of exit_codes for each actions of the test.
   exit_codes = db.StringProperty()
 
   # The blobstore reference to the full output of the test.  This key valid only
-  # when the runner has ended (i.e. machine_id is == DONE_MACHINE_ID).
-  # Until then, it is None.
+  # when the runner has ended (i.e. done == True). Until then, it is None.
   result_string_reference = blobstore.BlobReferenceProperty()
-
-  # The hostname of the swarm bot that ran this test. This attribute is valid
-  # only when the runner has been assigned a machine. Until then, the value
-  # is unspecified.
-  hostname = db.TextProperty()
 
   # The actual account of the user the runner belongs to.
   user = db.UserProperty()
@@ -516,17 +494,16 @@ class TestRequestManager(object):
       logging.error('runner argument must be given')
       return
 
-    # If the machine id of this runner is DONE_MACHINE_ID, this means the
-    # machine finished running this test. Don't try to process another
-    # response for this runner object.
-    if runner.machine_id == DONE_MACHINE_ID:
+    # If the runnner is marked as done, don't try to process another
+    # response for it.
+    if runner.done:
       logging.error('Got a second response for runner=%s, not good',
                     runner.GetName())
       return
 
     runner.ran_successfully = success
     runner.exit_codes = exit_codes
-    runner.machine_id = DONE_MACHINE_ID
+    runner.done = True
 
     filename = files.blobstore.create('text/plain')
     with files.open(filename, 'a') as f:
@@ -744,13 +721,11 @@ class TestRequestManager(object):
                   request.name, config.config_name)
 
     # Create a runner entity to record this request/config pair that needs
-    # to be run. Use a machine id of NO_MACHINE_ID to indicate it has not
-    # yet been executed. The runner will eventually be scheduled at a
-    # later time.
+    # to be run. The runner will eventually be scheduled at a later time.
     runner = TestRunner(test_request=request, config_name=config.config_name,
                         config_instance_index=config.instance_index,
                         num_config_instances=config.num_instances,
-                        machine_id=NO_MACHINE_ID, user=user_profile.user)
+                        user=user_profile.user)
     runner.put()
 
     return runner
@@ -762,15 +737,8 @@ class TestRequestManager(object):
       runner: The runner acquring the machine.
       machine_id: The id of the machine being assigned.
     """
-    machine_info = self._machine_manager.GetMachineInfo(machine_id)
-    if machine_info:
-      runner.machine_id = machine_id
-      runner.hostname = machine_info.host
-      runner.put()
-    else:
-      # We should never assign a machine that we can't get the MachineInfo for.
-      logging.error('Assigned a machine with id %d but failed to get '
-                    'MachineInfo. Aborting assignment.', machine_id)
+    runner.machine_id = machine_id
+    runner.put()
 
   def _FindMatchingMachineInList(self, obj_list, config):
     """Find first object in obj_list whose machine matches the given config.
@@ -850,7 +818,7 @@ class TestRequestManager(object):
     # concurrent requests. But eventually we may want to have multiple schedule
     # tasks or tasks queues doing the assignments, in which case this would
     # become an issue.
-    assert runner.started is None
+    assert not runner.started
     runner.started = datetime.datetime.now()
     runner.put()
     info = self._machine_manager.GetMachineInfo(runner.machine_id)
@@ -873,7 +841,6 @@ class TestRequestManager(object):
       info.put()
 
       # Reset the test runner so that it can run on another machine.
-      runner.machine_id = NO_MACHINE_ID
       runner.started = None
       runner.put()
       self._TryAndRun(runner)
@@ -1011,7 +978,7 @@ class TestRequestManager(object):
     """
 
     return {'exit_codes': runner.exit_codes,
-            'hostname': runner.hostname,
+            'machine_id': runner.machine_id,
             'output': runner.GetResultString()}
 
   def AbortStaleRunners(self):
@@ -1019,15 +986,14 @@ class TestRequestManager(object):
     logging.debug('TRM.AbortStaleRunners starting')
     now = _GetCurrentTime()
 
-    query = TestRunner.gql('WHERE machine_id != :1 AND machine_id != :2',
-                           NO_MACHINE_ID, DONE_MACHINE_ID)
+    query = TestRunner.gql('WHERE started != :1 AND done = :2', None, False)
     for runner in query:
       # Determine how long the runner should have taken.
       runner_timeout = runner.GetTimeout() + _TIMEOUT_FUDGE_FACTOR
 
       # Determine if too much time has expired since the runner began.
       delta = datetime.timedelta(seconds=runner_timeout)
-      if runner.started and now > runner.started + delta:
+      if now > runner.started + delta:
         # Runner has been going for too long, abort it.
         logging.info('TRM.AbortStaleRunners aborting runner=%s',
                      runner.GetName())
@@ -1115,7 +1081,6 @@ class TestRequestManager(object):
             commands, result_url = self._GetTestRunnerCommands(runner)
           except PrepareRemoteCommandsError:
             # Failed to load the scripts so mark the runner as 'not running'.
-            runner.machine_id = NO_MACHINE_ID
             runner.started = None
             runner.put()
           else:
@@ -1192,22 +1157,7 @@ class TestRequestManager(object):
                                        'dimensions')
 
     if 'id' not in attributes or not attributes['id']:
-      # Try to create a unique ID for the machine if it doesn't have one. The
-      # machine will send us back this ID in subsequent tries.
-      # Even if the ID isn't unique, it will not create a significant problem.
-      # We use machine IDs to provide users some status report on machines.
-      # We loop so that in the extreme rare case that we actually generate a
-      # reserved ID, we retry.
-      # Note: the sun is more likely to burn out before we need an extra
-      # iteration!
-      i = 0
-      attributes['id'] = NO_MACHINE_ID
-      while (i < 10 and attributes['id'] in [NO_MACHINE_ID, DONE_MACHINE_ID]):
-        attributes['id'] = str(uuid.uuid4())
-        i += 1
-
-      assert (i < 10 and attributes['id'] not in
-              [NO_MACHINE_ID, DONE_MACHINE_ID])
+      attributes['id'] = str(uuid.uuid4())
 
     # Make sure attributes now has a try_count field.
     if not 'try_count' in attributes:
@@ -1270,9 +1220,8 @@ class TestRequestManager(object):
     # Assign test runners from earliest to latest.
     # We use a format argument for None, because putting None in the string
     # doesn't work.
-    query = TestRunner.gql('WHERE started = :1 AND machine_id = :2 '
-                           'AND user = :3 ORDER BY created',
-                           None, NO_MACHINE_ID, user_profile.user)
+    query = TestRunner.gql('WHERE started = :1 AND user = :2 ORDER BY created',
+                           None, user_profile.user)
     for runner in query:
       runner_dimensions = runner.GetConfiguration().dimensions
       (match, output) = dimensions.MatchDimensions(runner_dimensions,
@@ -1630,7 +1579,7 @@ def AtomicAssignID(key, machine_id):
     TxRunnerAlreadyAssignedError: If runner has already been assigned a machine.
   """
   runner = db.get(key)
-  if runner and runner.machine_id == NO_MACHINE_ID:
+  if runner and not runner.started:
     runner.machine_id = str(machine_id)
     runner.started = datetime.datetime.now()
     runner.put()

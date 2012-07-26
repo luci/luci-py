@@ -90,8 +90,8 @@ class MainHandler(webapp2.RequestHandler):
     for runner in query:
       # If this runner successfully completed, and we are not showing them,
       # just ignore it.
-      if (runner.machine_id == test_manager.DONE_MACHINE_ID and
-          runner.ran_successfully and not show_success):
+      # TODO(user): Modify the query above to handle this check.
+      if runner.done and runner.ran_successfully and not show_success:
         continue
 
       self._GetDisplayableRunnerTemplate(runner, detailed_output=True)
@@ -163,11 +163,11 @@ class MainHandler(webapp2.RequestHandler):
     runner.failed_test_class_string = ''
     runner.user_email = runner.user.email()
 
-    if runner.machine_id == test_manager.NO_MACHINE_ID:
+    if not runner.started:
       runner.status_string = 'Pending'
       runner.command_string = (
           '<a href="/secure/cancel?r=%s">Cancel</a>' % runner.key_string)
-    elif runner.machine_id != test_manager.DONE_MACHINE_ID:
+    elif not runner.done:
       if detailed_output:
         runner.status_string = ('<a title="On machine %s, click for details" '
                                 'href="#machine_%s">Running</a>' %
@@ -450,7 +450,7 @@ class CancelHandler(webapp2.RequestHandler):
       runner = test_manager.TestRunner.get(key)
 
     # Make sure found runner is not yet running.
-    if runner and runner.machine_id == test_manager.NO_MACHINE_ID:
+    if runner and not runner.started:
       test_request_manager.UpdateCacheServerURL(self.request.host_url)
       test_request_manager.AbortRunner(
           runner, reason='Runner is not already running.')
@@ -476,7 +476,6 @@ class RetryHandler(webapp2.RequestHandler):
         pass
 
     if runner:
-      runner.machine_id = test_manager.NO_MACHINE_ID
       runner.started = None
       # Update the created time to make sure that retrying the runner does not
       # make it jump the queue and get executed before other runners for

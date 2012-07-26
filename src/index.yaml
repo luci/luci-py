@@ -17,6 +17,11 @@ indexes:
 
 - kind: TestRunner
   properties:
+  - name: done
+  - name: started
+
+- kind: TestRunner
+  properties:
   - name: machine_id
   - name: started
   - name: created
@@ -31,6 +36,12 @@ indexes:
 - kind: TestRunner
   properties:
   - name: started
+  - name: created
+
+- kind: TestRunner
+  properties:
+  - name: started
+  - name: user
   - name: created
 
 - kind: TestRunner
