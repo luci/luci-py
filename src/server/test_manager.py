@@ -465,59 +465,6 @@ class TestRequestManager(object):
     """
     self.server_url = server_url
 
-  def _IdleMachineStateChanged(self, info, idle_machine):
-    """Handles a status change for a machine on the idle list.
-
-    Args:
-      info: A machine information object from the Machine Manager.
-      idle_machine: An instance of machine_manager.Machine representing the
-          machine whose state has changed.
-    """
-    logging.debug('TRM._IdleMachineStateChanged id=%s status=%d', info.id,
-                  info.status)
-
-    # An idle machine should already be ready so can't transition to it.
-    assert info.status != base_machine_provider.MachineStatus.ACQUIRED
-
-    # If the machine is stopped or done, it can't be reused for another test
-    # run, so forget about it.
-    if info.status == base_machine_provider.MachineStatus.STOPPED:
-      # No need to delete the idle_machine in this case.  The listener will
-      # eventually be notified that that the machine has gone into the AVAILABLE
-      # state, and this will trigger the case below.
-      self._machine_manager.ReleaseMachine(idle_machine.id)
-    elif info.status == base_machine_provider.MachineStatus.AVAILABLE:
-      idle_machine.delete()
-    else:
-      logging.error('Invalid status change for idle machine_id=%s status=%d',
-                    info.id, info.status)
-
-  def _RunnerMachineStateChanged(self, info, runner):
-    """Handles a status change for a machine running a test.
-
-    Args:
-      info: A machine information object from the Machine Manager.
-      runner: An instance of TestRunner representing a running test whose
-          machine state has changed.
-    """
-    logging.debug('TRM._RunnerMachineStateChanged id=%s status=%d runner=%s',
-                  info.id, int(info.status), runner.GetName())
-
-    # If the machine is switching to the ACQUIRED state, we will start the test
-    # associated to it in the next call to AssignPendingRequests.
-    if info.status != base_machine_provider.MachineStatus.ACQUIRED:
-      # The machine running the test has failed.  Tell the user about it.
-      r_str = ('Tests aborted. The machine (%s) running the test (%s) '
-               'experienced a state change. Machine status: %d' %
-               (info.id, str(runner.key()), int(info.status)))
-      self._UpdateTestResult(runner, result_string=r_str)
-
-      if info.status == base_machine_provider.MachineStatus.STOPPED:
-        self._machine_manager.ReleaseMachine(info.id)
-      elif info.status != base_machine_provider.MachineStatus.AVAILABLE:
-        logging.error('Invalid status change for machine_id=%s status=%d',
-                      info.id, int(info.status))
-
   def HandleTestResults(self, web_request, user_profile):
     """Handle a response from the remote script.
 
