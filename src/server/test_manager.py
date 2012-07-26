@@ -457,10 +457,6 @@ class TestRequestManager(object):
     self._machine_manager = machine_manager
     self._machine_manager.RegisterStatusChangeListener(self)
 
-    # Make sure that all acquired machines are either idle or assigned to a
-    # test runner.
-    self._CheckAllAcquiredMachines()
-
     # Load idle machines and validate.
     machines_to_del = []
     for machine in IdleMachine.all():
@@ -486,49 +482,6 @@ class TestRequestManager(object):
           result_url in the Swarm file we upload to the machines.
     """
     self.server_url = server_url
-
-  def _CheckAllAcquiredMachines(self):
-    """Ensure acquired machines are either idle or assigned to a runner."""
-    logging.debug('TRM._CheckAllAcquiredMachines')
-
-    machines_to_release = []
-
-    for info in self._machine_manager.ListAcquiredMachines():
-      idle_machine = IdleMachine.gql('WHERE id = :1', info.id).get()
-      runner = TestRunner.gql('WHERE machine_id = :1', info.id).get()
-
-      logging.debug('Checking machine id=%s', info.id)
-
-      # If a machine is assigned to a runner, then it should not be idle.
-      # Remove it from the idle pool if it is there.
-      if idle_machine and runner:
-        logging.error('Machine id=%s idle and running', info.id)
-        idle_machine.delete()
-      elif not runner and not idle_machine:
-        # If a machine is neither idle nor assigned to a test runner, then put
-        # it in the idle pool if its ACQUIRED. Otherwise, release it.
-        logging.debug('Machine id=%s is idle and unassigned', info.id)
-
-        if info.status == base_machine_provider.MachineStatus.ACQUIRED:
-          self._HandleIdleMachine(info=info)
-        else:
-          if info.status == base_machine_provider.MachineStatus.WAITING:
-            # WAITING machines should ALWAYS be assigned a runner.
-            # Since we don't know what to do with it, might as well release it.
-            logging.error('Machine %s, should not be in WAITING state without'
-                          'a runner!', info.id)
-          else:
-            logging.debug('Machine id=%s will be released', info.id)
-          machines_to_release.append(info.id)
-      else:
-        # If there is a machine that is ready and assigned a runner that is
-        # not started, we can't start it here because of thread safety, we
-        # must wait for the next call to AssignPendingRequests().
-        pass
-
-    for machine_id in machines_to_release:
-      self._machine_manager.ReleaseMachine(machine_id)
-      logging.debug('Machine id=%s released', machine_id)
 
   def MachineStatusChanged(self, info):
     """Handles a status change of an acquired machine.
