@@ -455,7 +455,6 @@ class TestRequestManager(object):
     logging.debug('TRM starting')
 
     self._machine_manager = machine_manager
-    self._machine_manager.RegisterStatusChangeListener(self)
 
     # Load idle machines and validate.
     machines_to_del = []
@@ -482,42 +481,6 @@ class TestRequestManager(object):
           result_url in the Swarm file we upload to the machines.
     """
     self.server_url = server_url
-
-  def MachineStatusChanged(self, info):
-    """Handles a status change of an acquired machine.
-
-    When machines are initially acquired in _EnsureMachineAvailable()
-    below, they are in the waiting state.
-
-    If the machine whose state has changed is idle, then we only expect to
-    see state changes to stopped, or done.
-
-    If the machine whose state has changed is currently running a test, then
-    we only expect to see state changes to stopped or done.  In both cases
-    though, this signals an error on the machine, and this is handled as
-    needed in the _RunnerMachineStateChanged() function.
-
-    Otherwise, a WAITING machine has changed to ACQUIRED and we can now start
-    the associated test runner on it.
-
-    Args:
-      info: A machine information object from the Machine Manager.
-    """
-    logging.debug('TRM.MachineStatusChanged')
-
-    idle_machine = IdleMachine.gql('WHERE id = :1', info.id).get()
-    if idle_machine:
-      # We can't have idle machines assigned to a test runner.
-      assert TestRunner.gql('WHERE machine_id = :1', info.id).get() is None
-      self._IdleMachineStateChanged(info, idle_machine)
-    else:
-      # If the machine is currently assigned to a running a test, run/abort it.
-      runner = TestRunner.gql('WHERE machine_id = :1', info.id).get()
-      if runner:
-        self._RunnerMachineStateChanged(info, runner)
-      else:
-        logging.error('Machine %s is not running nor Idle. Wazzup?', info.id)
-        # Next call to _CheckAllAcquiredMachines should fix that!
 
   def _IdleMachineStateChanged(self, info, idle_machine):
     """Handles a status change for a machine on the idle list.
