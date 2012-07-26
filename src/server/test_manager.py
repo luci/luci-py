@@ -1042,13 +1042,8 @@ class TestRequestManager(object):
       runner: An instance of TestRunner to be aborted.
       reason: A string message indicating why the TestRunner is being aborted.
     """
-    machine_id = runner.machine_id
     r_str = 'Tests aborted. AbortRunner() called. Reason: %s' % reason
     self._UpdateTestResult(runner, result_string=r_str)
-
-    # Consider the runner's machine dead.  Release it.
-    if machine_id not in [NO_MACHINE_ID, DONE_MACHINE_ID]:
-      self._machine_manager.ReleaseMachine(machine_id)
 
   def DeleteRunner(self, key):
     """Delete the runner that the given key refers to.
