@@ -307,7 +307,6 @@ class PollHandler(webapp2.RequestHandler):
     logging.debug('Polling')
     the_machine_manager.ValidateMachines()
     test_request_manager.UpdateCacheServerURL(self.request.host_url)
-    test_request_manager.AssignPendingRequests()
     test_request_manager.AbortStaleRunners()
     test_manager.DeleteOldRunners()
     test_manager.DeleteOldErrors()

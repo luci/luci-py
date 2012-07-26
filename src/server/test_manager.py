@@ -1034,29 +1034,6 @@ class TestRequestManager(object):
     assert test_run.IsValid(errors), errors
     return test_run
 
-  def AssignPendingRequests(self):
-    """Assign test requests to available machines.
-
-    Raises:
-      test_request_message.Error: If the request's message isn't valid.
-    """
-    logging.debug('TRM.AssignPendingRequests')
-
-    # Assign test runners from earliest to latest.
-    # We use a format argument for None, because putting None in the string
-    # doesn't work.
-    query = TestRunner.gql('WHERE started = :1 ORDER BY created', None)
-    for runner in query:
-      if runner.machine_id != NO_MACHINE_ID:
-        # TODO(user): I would like to filter this in the query above, but it
-        # asks me to use the != property, i.e., machine_id to be used for ORDER.
-        if runner.machine_id != DONE_MACHINE_ID:
-          # We already have a machine for this test run, so check if it's
-          # ready to execute.
-          self._ExecuteTestRunnerIfPossible(runner)
-      else:
-        self._TryAndRun(runner)
-
   def _HandleIdleMachine(self, machine_id=None, info=None):
     """Given a newly idle machine, attempts to use it before marking it as idle.
 
