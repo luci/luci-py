@@ -444,9 +444,7 @@ class TestRequestManager(object):
   def __init__(self, machine_manager):
     """Initializes the TRM.
 
-    Initializes the TRM to use the given machine manager to acquire and release
-    test machines, as well as validating the persisted state of test requests,
-    test runners, and idle machines.
+    Initializes the TRM to use the given machine manager.
 
     Args:
       machine_manager: An instance of machine_manager.MachineManager that is
@@ -455,21 +453,6 @@ class TestRequestManager(object):
     logging.debug('TRM starting')
 
     self._machine_manager = machine_manager
-
-    # Load idle machines and validate.
-    machines_to_del = []
-    for machine in IdleMachine.all():
-      info = self._machine_manager.GetMachineInfo(machine.id)
-      # "info" can be None if the machine ID is stale and doesn't reference a
-      # valid machine anymore. Idle Machines MUST be ACQUIRED!
-      if (not info or
-          info.status != base_machine_provider.MachineStatus.ACQUIRED):
-        machines_to_del.append(machine)
-        continue
-
-    # Delete all objects that were stale.
-    for machine in machines_to_del:
-      machine.delete()
 
     logging.debug('TRM created')
 
