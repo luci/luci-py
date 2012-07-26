@@ -8,15 +8,11 @@
 
 
 
-import logging
-
 from server import base_machine_provider
 
 
 class MachineProvider(base_machine_provider.BaseMachineProvider):
   """A Machine Provider for testing."""
-
-  _last_machine_id = 1
 
   def __init__(self):
     """Constructor for MachineProvider.
@@ -46,16 +42,10 @@ class MachineProvider(base_machine_provider.BaseMachineProvider):
       base_machine_provider.MachineProviderException when no machine can be
       acquired.
     """
+    raise base_machine_provider.MachineProviderException(
+        'deprecated functionality')
 
-    machine_id = ('00000000-00000000-00000000-%08d' %
-                  MachineProvider._last_machine_id)
-    MachineProvider._last_machine_id += 1
-
-    logging.info('Acquiring new machine: [%d] %s',
-                 MachineProvider._last_machine_id, machine_id)
-    return machine_id
-
-  def GetMachineInfo(self, machine_id):
+  def GetMachineInfo(self, machine_id):  # pylint: disable-msg=W0613
     """Returns information about a specific machine.
 
     Args:
@@ -68,17 +58,10 @@ class MachineProvider(base_machine_provider.BaseMachineProvider):
       base_machine_provider.MachineProviderException when machine info can not
       be returned.
     """
-    logging.info('requesting info for %s with last = %s',
-                 machine_id, MachineProvider._last_machine_id)
+    raise base_machine_provider.MachineProviderException(
+        'deprecated functionality')
 
-    machine_id_tail = int(machine_id[27:])
-    assert machine_id_tail < MachineProvider._last_machine_id
-
-    return base_machine_provider.MachineInfo(
-        status=base_machine_provider.MachineStatus.ACQUIRED,
-        host='localhost')
-
-  def ReleaseMachine(self, machine_id):
+  def ReleaseMachine(self, machine_id):  # pylint: disable-msg=W0613
     """Releases the specified machine and make it available again.
 
     Args:
@@ -87,8 +70,5 @@ class MachineProvider(base_machine_provider.BaseMachineProvider):
     Raises:
       MachineProviderException when machine can not be released.
     """
-    logging.info('Releasing machine %s with last = %s',
-                 machine_id, MachineProvider._last_machine_id)
-
-    machine_id_tail = int(machine_id[27:])
-    assert machine_id_tail < MachineProvider._last_machine_id
+    raise base_machine_provider.MachineProviderException(
+        'deprecated functionality')

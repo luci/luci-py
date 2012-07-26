@@ -16,10 +16,11 @@ import os
 import subprocess
 import time
 import unittest
-import urllib
 import urllib2
 import urlparse
-import xmlrpclib
+
+# Number of seconds to sleep between tries of polling for results.
+SLEEP_BETWEEN_RESULT_POLLS = 2
 
 
 # TODO(user): Find a way to avoid spawning other processes so that we can
@@ -55,25 +56,17 @@ class _SwarmTestCase(unittest.TestCase):
                             'continue=' + urllib2.quote(url))
 
   def setUp(self):
-    self._xmlrpc_server_process = None
     self._swarm_server_process = None
+    self._slave_machine_process = None
 
     # TODO(user): find a better way to choose the port.
-    self._swarm_server_url = 'http://localhost:8181'
+    swarm_server_addr = 'http://localhost'
+    swarm_server_port = '8181'
+    self._swarm_server_url = '%s:%s' % (swarm_server_addr, swarm_server_port)
 
     _SwarmTestProgram.options.appengine_cmds.extend(
-        ['-c', '-p 8181', '--skip_sdk_update_check',
+        ['-c', '-p %s' % swarm_server_port, '--skip_sdk_update_check',
          _SwarmTestProgram.options.swarm_path])
-
-    xmlrpc_process_cmds = ['python', os.path.join(os.path.dirname(__file__),
-                                                  'xmlrpc_server.py')]
-    if _SwarmTestProgram.options.verbose:
-      xmlrpc_process_cmds.append('-v')
-    self._xmlrpc_server_process = _ProcessWrapper(xmlrpc_process_cmds)
-    logging.info('Started XmlRpc Process with pid: %s',
-                 self._xmlrpc_server_process.wrapped_process.pid)
-    # TODO(user): find a better way to choose the port.
-    self._xmlrpc_server = xmlrpclib.ServerProxy('http://localhost:7399')
 
     self._swarm_server_process = _ProcessWrapper(
         _SwarmTestProgram.options.appengine_cmds)
@@ -92,9 +85,34 @@ class _SwarmTestCase(unittest.TestCase):
         time.sleep(1)
     self.assertTrue(ready, 'The swarm server could not be started')
 
+    # Whitelist the machine to be allowed to run tests.
+    cj = cookielib.CookieJar()
+    opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cj))
+    test = self.GetAdminUrl(urlparse.urljoin(self._swarm_server_url,
+                                             'secure/change_whitelist?a=True'))
+    opener.open(test)
+
+    # Start the slave machine script to start polling for tests.
+    logging.info('Current dir: %s', os.getcwd())
+    logging.info('Trying to run slave script: %s',
+                 _SwarmTestProgram.options.slave_script)
+
+    slave_machine_cmds = [
+        'python',
+        _SwarmTestProgram.options.slave_script,
+        '-a', swarm_server_addr,
+        '-p', swarm_server_port,
+        '-d', '/tmp',
+        _SwarmTestProgram.options.slave_config_file
+        ]
+
+    if _SwarmTestProgram.options.verbose:
+      slave_machine_cmds.append('-v')
+    self._slave_machine_process = _ProcessWrapper(slave_machine_cmds)
+    logging.info('Started slave machine process with pid: %s',
+                 self._slave_machine_process.wrapped_process.pid)
+
   def tearDown(self):
-    if self._xmlrpc_server.Shutdown():
-      self._xmlrpc_server_process.wrapped_process.wait()
     try:
       logging.info('Quitting Swarm server')
       cj = cookielib.CookieJar()
@@ -122,13 +140,6 @@ class _SwarmTestCase(unittest.TestCase):
           swarm_files.append(os.path.join(dirpath, filename))
 
     logging.info('Will send these files to Swarm server: %s', swarm_files)
-
-    # Whitelist the machine to be allowed to run tests.
-    cj = cookielib.CookieJar()
-    opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cj))
-    test = self.GetAdminUrl(urlparse.urljoin(self._swarm_server_url,
-                                             'secure/change_whitelist?a=True'))
-    opener.open(test)
 
     swarm_server_test_url = urlparse.urljoin(self._swarm_server_url, 'test')
     running_test_keys = []
@@ -164,16 +175,6 @@ class _SwarmTestCase(unittest.TestCase):
       except urllib2.URLError as ex:
         self.fail('Error: %s' % str(ex))
 
-      # Make sure the machines got the Swarm file correctly, since there once
-      # was a bug that broke the string conversion of the test request by
-      # creating and invalid test run because AppEngine's db.IntegerProper() is
-      # actually a long and not an int, and the test request message was
-      # validating for int's and thus the test run wasn't created and the
-      # uploaded file was empty...
-      test_run_content = self._xmlrpc_server.UploadedContent(
-          'c:\swarm_tests/test_run.swarm')  # TODO(user): Fix path thingy...
-      self.assertNotEqual(test_run_content, '')
-
       for test_key in test_keys['test_keys']:
         running_test_keys.append(test_key)
         if _SwarmTestProgram.options.verbose:
@@ -194,21 +195,24 @@ class _SwarmTestCase(unittest.TestCase):
     opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cj))
     urllib2.install_opener(opener)
 
-    test_all_succeeded = True
-    for running_test_key in running_test_keys:
-      try:
-        result_url = urlparse.urljoin(
-            self._swarm_server_url, 'result?k=' + running_test_key['test_key'])
-        logging.info('Opening URL %s', result_url)
-        urllib2.urlopen(result_url, urllib.urlencode((('s', True),
-                                                      ('r', '0 FAILED TESTS'))))
+    # The slave machine is running along with this test. Thus it may take
+    # some time before all the tests complete. We will keep polling the results
+    # with delays between them. If after 10 times all the tests are still not
+    # completed, we report a failure..
+    for _ in range(10):
+      test_all_succeeded = True
+      for running_test_key in running_test_keys:
         key_url = self.GetAdminUrl(
             urlparse.urljoin(
                 self._swarm_server_url,
                 'secure/get_result?r=' + running_test_key['test_key']))
 
         logging.info('Opening URL %s', key_url)
-        output = urllib2.urlopen(key_url).read()
+        try:
+          output = urllib2.urlopen(key_url).read()
+        except urllib2.HTTPError as e:
+          self.fail('Calling %s threw %s' % (key_url, e))
+
         assert output
         if _SwarmTestProgram.options.verbose:
           test_result_output = (
@@ -218,14 +222,18 @@ class _SwarmTestCase(unittest.TestCase):
           test_all_succeeded = False
         if _SwarmTestProgram.options.verbose:
           logging.info('Test done for %s', running_test_key['config_name'])
-      except urllib2.HTTPError as e:
-        self.fail('Calling %s threw %s' % (result_url, e))
-    if _SwarmTestProgram.options.verbose:
-      logging.info(test_result_output)
-      logging.info('=======================')
-    if test_all_succeeded:
-      logging.info('All test succeeded')
-    else:
+      if _SwarmTestProgram.options.verbose:
+        logging.info(test_result_output)
+        logging.info('=======================')
+      if test_all_succeeded:
+        logging.info('All tests succeeded')
+        break
+      else:
+        logging.info('At least one test not yet succeeded')
+
+      time.sleep(SLEEP_BETWEEN_RESULT_POLLS)
+
+    if not test_all_succeeded:
       self.fail('At least one test failed')
 
 
@@ -249,11 +257,17 @@ class _SwarmTestProgram(unittest.TestProgram):
                       '--skip_sdk_update_check arguments will '
                       'be added to the command(s) you specify.')
     parser.add_option('-s', '--swarm', dest='swarm_path',
-                      help='The root path of the Swarm server code.'
+                      help='The root path of the Swarm server code. '
                       'Defaults to the parent folder of where this script is.')
     parser.add_option('-t', '--tests', dest='tests_path',
-                      help='The path where the test files can be found.'
+                      help='The path where the test files can be found. '
                       'Defaults to the ./test_files folder.')
+    parser.add_option('-c', '--slave-config', dest='slave_config_file',
+                      help='The path to the slave dimensions config file. '
+                      'Defaults to %default.', default='machine_config.txt')
+    parser.add_option('-l', '--slave-script', dest='slave_script',
+                      help='The path to the slave_machine.py script. '
+                      'Defaults to %default.', default='slave_machine.py')
     parser.add_option('-o', '--swarm_server_start_timeout',
                       dest='swarm_server_start_timeout', type=int,
                       help='How long should we wait (in seconds) for the '
@@ -281,6 +295,10 @@ class _SwarmTestProgram(unittest.TestProgram):
           test_srcdir, _SwarmTestProgram.options.appengine_cmds[0])
       _SwarmTestProgram.options.swarm_path = os.path.join(
           test_srcdir, _SwarmTestProgram.options.swarm_path)
+      _SwarmTestProgram.options.slave_script = os.path.join(
+          test_srcdir, _SwarmTestProgram.options.slave_script)
+      _SwarmTestProgram.options.slave_config_file = os.path.join(
+          test_srcdir, _SwarmTestProgram.options.slave_config_file)
     super(_SwarmTestProgram, self).parseArgs(other_args)
 
 

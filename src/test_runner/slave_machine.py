@@ -556,7 +556,7 @@ def main():
                     'Defaults to %default. ', default='localhost')
   parser.add_option('-p', '--port', dest='port',
                     help='Port of the Swarm server. '
-                    'Defaults to %default. ', default='8080')
+                    'Defaults to %default. ', default='8080', type='int')
   parser.add_option('-r', '--max_url_tries', default=10,
                     help='The maximum number of times url messages will '
                     'attempt to be sent before accepting failure. Defaults '
@@ -568,6 +568,9 @@ def main():
                     type='int',
                     help='Number of iterations to request jobs from '
                     'Swarm server. Defaults to %default (infinite).')
+  parser.add_option('-d', '--directory', dest='directory',
+                    help='Sets the working directory of the slave. '
+                    'Defaults to %default. ', default='.')
   (options, args) = parser.parse_args()
 
   # Parser handles exiting this script after logging the error.
@@ -594,12 +597,15 @@ def main():
       return
 
   # Read machine informations.
-  attributes = json.loads(source)
+  attributes = json.load(source)
   source.close()
 
   url = '%s:%d' % (options.address, options.port)
   slave = SlaveMachine(url=url, attributes=attributes,
                        max_url_tries=options.max_url_tries)
+
+  # Change the working directory to specified path.
+  os.chdir(options.directory)
 
   # Start requesting jobs.
   slave.Start(iterations=options.iterations)
