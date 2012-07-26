@@ -736,13 +736,6 @@ class TestRequestManager(object):
       logging.debug('Found machine id=%s to runner=%s',
                     machine.id, runner.GetName())
       self._ExecuteTestRunnerOnIdleMachine(runner, machine)
-    else:
-      # If we didn't already have a machine for this test and we couldn't
-      # get an idle one, see if we can acquire a new one.
-      self._RequestMachine(runner)
-      # The machine may have been returned ready so we check to see if it
-      # can already run the test.
-      self._ExecuteTestRunnerIfPossible(runner)
 
   def _QueueTestRequestConfig(self, request, config, user_profile):
     """Queue a given request's configuration for execution.
@@ -826,37 +819,6 @@ class TestRequestManager(object):
       return None
     machines = IdleMachine.all()
     return self._FindMatchingMachineInList(machines, runner.GetConfiguration())
-
-  def _FindMatchingAcquiredMachine(self, config):
-    """Find an acquired machine that is a match for the given config.
-
-    Args:
-      config: a TestConfiguration object as specified for TRS requests.
-          See go/gforce/test-request-format for details.
-
-    Returns:
-      An instance of machine_manager.Machine, or None if a matching machine
-      is not found.
-    """
-    # Get an idle machine.
-    machines = self._machine_manager.ListAcquiredMachines()
-    return self._FindMatchingMachineInList(machines, config)
-
-  def _RequestMachine(self, runner):
-    """Request a machine to run the given runner.
-
-    Args:
-      runner: The runner we want to ensure a machine is available for.
-    """
-    config = runner.GetConfiguration()
-
-    # If we can't acquire the machine right now, the caller will try again
-    # later when assigning runners.  See AssignPendingRequests.
-    machine_id = self._machine_manager.RequestMachine(
-        None, config.dimensions)
-    if machine_id != DONE_MACHINE_ID:
-      logging.info('New machine acquired with id=%s', machine_id)
-      self._AssignMachineToRunner(runner, machine_id)
 
   def _ExecuteTestRunnerIfPossible(self, runner):
     """Execute a given runner on its specified machine if possible.
