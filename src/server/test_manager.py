@@ -502,7 +502,7 @@ class TestRequestManager(object):
     self._UpdateTestResult(runner, success, exit_codes, result_string)
 
   def _UpdateTestResult(self, runner, success=False, exit_codes='',
-                        result_string='Tests aborted', reuse_machine=False):
+                        result_string='Tests aborted'):
     """Update the runner with results of a test run.
 
     Args:
@@ -511,8 +511,6 @@ class TestRequestManager(object):
       success: a boolean indicating whether the test run succeeded or not.
       exit_codes: a string containing the array of exit codes of the test run.
       result_string: a string containing the output of the test run.
-      reuse_machine: a boolean indicating whether the machine that ran this
-          test should be reused for another test.
     """
     if not runner:
       logging.error('runner argument must be given')
@@ -525,14 +523,6 @@ class TestRequestManager(object):
       logging.error('Got a second response for runner=%s, not good',
                     runner.GetName())
       return
-
-    # Put the machine back onto the idle list if needed. In some cases,
-    # such as when running a debugging test request server,
-    # the machine id of this runner can be 0.  Since id 0 does not
-    # refer to a valid assigned machine, then this id should not be put onto
-    # the idle list.
-    if reuse_machine and runner.machine_id != NO_MACHINE_ID:
-      self._HandleIdleMachine(machine_id=runner.machine_id)
 
     runner.ran_successfully = success
     runner.exit_codes = exit_codes
@@ -820,24 +810,6 @@ class TestRequestManager(object):
     machines = IdleMachine.all()
     return self._FindMatchingMachineInList(machines, runner.GetConfiguration())
 
-  def _ExecuteTestRunnerIfPossible(self, runner):
-    """Execute a given runner on its specified machine if possible.
-
-    Args:
-      runner: A TestRunner object to execute.
-    """
-    if runner.machine_id == NO_MACHINE_ID:
-      # No machine has been assigned yet.
-      return
-
-    assert runner.machine_id != DONE_MACHINE_ID
-
-    info = self._machine_manager.GetMachineInfo(runner.machine_id)
-    if info and info.status == base_machine_provider.MachineStatus.ACQUIRED:
-      self._ExecuteTestRunner(runner)
-    elif not info:
-      logging.warning('Machine %s, returned no info', str(runner.machine_id))
-
   def _ExecuteTestRunnerOnIdleMachine(self, runner, idle_machine):
     """Execute a given runner on the specified idle machine.
 
@@ -995,38 +967,6 @@ class TestRequestManager(object):
     errors = []
     assert test_run.IsValid(errors), errors
     return test_run
-
-  def _HandleIdleMachine(self, machine_id=None, info=None):
-    """Given a newly idle machine, attempts to use it before marking it as idle.
-
-    Args:
-      machine_id: The id of the idle machine. This must be valid if info
-          is None.
-      info: The info of the idle machine. This must be valid if id is None.
-    """
-    if not id and not info:
-      logging.error('Attempted to handle an idle machine with no id or info')
-      return
-
-    if not info:
-      info = self._machine_manager.GetMachineInfo(machine_id)
-
-    # Assign test runners from earliest to latest.
-    # We use a format argument for None, because putting None in the string
-    # doesn't work.
-    query = TestRunner.gql('WHERE started = :1 ORDER BY created', None)
-    for runner in query:
-      (match, matching_output) = dimensions.MatchDimensions(
-          runner.GetConfiguration().dimensions, info.GetDimensions())
-      logging.info(matching_output)
-      if match:
-        self._AssignMachineToRunner(runner, info.id)
-        self._ExecuteTestRunner(runner)
-        return
-
-    logging.debug('Machine id=%d put back on idle list', info.id)
-    idle_machine = IdleMachine(id=info.id)
-    idle_machine.put()
 
   def GetRunnerResults(self, key, user_profile):
     """Returns the results of the runner specified by key.
