@@ -29,6 +29,29 @@ from server import test_manager
 _NUM_GLOBAL_TESTS_TO_DISPLAY = 10
 _NUM_RECENT_ERRORS_TO_DISPLAY = 10
 
+_HOME_URL = '<a href=/secure/main>Home</a>'
+_PROFILE_URL = '<a href=/secure/user_profile>Profile</a>'
+_MACHINE_LIST_URL = '<a href=/secure/machine_list>Machine List</a>'
+
+
+def GenerateTopbar():
+  """Generate the topbar to display on all server pages.
+
+  Returns:
+    The topbar to display.
+  """
+  if users.get_current_user():
+    topbar = ('%s |  <a href="%s">Sign out</a><br/> %s | %s | % s' %
+              (users.get_current_user().nickname(),
+               users.create_logout_url('/'),
+               _HOME_URL,
+               _PROFILE_URL,
+               _MACHINE_LIST_URL))
+  else:
+    topbar = '<a href="%s">Sign in</a>' % users.create_login_url('/')
+
+  return topbar
+
 
 class MainHandler(webapp2.RequestHandler):
   """Handler for the main page of the web server.
@@ -73,9 +96,9 @@ class MainHandler(webapp2.RequestHandler):
     if sort_by == 'start':
       sorted_by_message += 'Start Time'
       sorted_by_query = 'created'
-    elif sort_by == 'host_name':
-      sorted_by_message += 'Hostname'
-      sorted_by_query = 'hostname'
+    elif sort_by == 'machine_id':
+      sorted_by_message += 'Machine ID'
+      sorted_by_query = 'machine_id'
     else:
       # The default sort.
       sorted_by_message += 'Reverse Start Time'
@@ -115,14 +138,6 @@ class MainHandler(webapp2.RequestHandler):
       self._GetDisplayableMachineTemplate(machine)
       machines.append(machine)
 
-    if users.get_current_user():
-      profile_url = '<a href=/secure/user_profile>Profile</a>'
-      topbar = ('%s | %s | <a href="%s">Sign out</a>' %
-                (users.get_current_user().nickname(), profile_url,
-                 users.create_logout_url('/')))
-    else:
-      topbar = '<a href="%s">Sign in</a>' % users.create_login_url('/')
-
     if show_success:
       enable_success_message = """
         <a href="?s=False">Hide successfully completed tests</a>
@@ -133,7 +148,7 @@ class MainHandler(webapp2.RequestHandler):
       """
 
     params = {
-        'topbar': topbar,
+        'topbar': GenerateTopbar(),
         'runners': runners,
         'global_runners': global_runners,
         'errors': errors,
@@ -158,7 +173,7 @@ class MainHandler(webapp2.RequestHandler):
     runner.requested_on_string = self.GetTimeString(runner.created)
     runner.started_string = '--'
     runner.ended_string = '--'
-    runner.host_used = '&nbsp'
+    runner.machine_id_used = '&nbsp'
     runner.command_string = '&nbsp;'
     runner.failed_test_class_string = ''
     runner.user_email = runner.user.email()
@@ -169,19 +184,17 @@ class MainHandler(webapp2.RequestHandler):
           '<a href="/secure/cancel?r=%s">Cancel</a>' % runner.key_string)
     elif not runner.done:
       if detailed_output:
-        runner.status_string = ('<a title="On machine %s, click for details" '
-                                'href="#machine_%s">Running</a>' %
-                                (runner.machine_id, runner.machine_id))
+        runner.status_string = 'Running on machine %s' % runner.machine_id
       else:
         runner.status_string = 'Running'
 
       runner.started_string = self.GetTimeString(runner.started)
-      runner.host_used = runner.hostname
+      runner.machine_id_used = runner.machine_id
     else:
       runner.started_string = self.GetTimeString(runner.started)
       runner.ended_string = self.GetTimeString(runner.ended)
 
-      runner.host_used = runner.hostname
+      runner.machine_id_used = runner.machine_id
 
       if runner.ran_successfully:
         if detailed_output:
@@ -241,6 +254,23 @@ class RedirectToMainHandler(webapp2.RequestHandler):
   def get(self):  # pylint: disable-msg=C6409
     """Handles HTTP GET requests for this handler's URL."""
     self.redirect('secure/main')
+
+
+class MachineListHandler(webapp2.RequestHandler):
+  """Handler for the machine list page of the web server.
+
+  This handler lists all the machines that have ever polled the server and
+  some basic information about them.
+  """
+
+  def get(self):  # pylint: disable-msg=C6409
+    params = {
+        'topbar': GenerateTopbar(),
+        'machines': test_manager.GetAllMachines()
+    }
+
+    path = os.path.join(os.path.dirname(__file__), 'machine_list.html')
+    self.response.out.write(template.render(path, params))
 
 
 class TestRequestHandler(webapp2.RequestHandler):
@@ -541,12 +571,7 @@ class UserProfileHandler(webapp2.RequestHandler):
   def get(self):  # pylint: disable-msg=C6409
     """Handles HTTP GET requests for this handler's URL."""
     user = users.get_current_user()
-    if user:
-      main_url = '<a href=/secure/main>Home</a>'
-      topbar = ('%s | %s | <a href="%s">Sign out</a>' %
-                (user.nickname(), main_url, users.create_logout_url('/')))
-    else:
-      topbar = ('<a href="%s">Sign in</a>' % users.create_login_url('/'))
+    topbar = GenerateTopbar()
 
     display_whitelists = []
 
@@ -715,6 +740,7 @@ def CreateApplication():
                                    ChangeWhitelistHandler),
                                   ('/secure/get_result',
                                    SecureGetResultHandler),
+                                  ('/secure/machine_list', MachineListHandler),
                                   ('/secure/main', MainHandler),
                                   ('/secure/retry', RetryHandler),
                                   ('/secure/show_message',

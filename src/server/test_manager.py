@@ -386,7 +386,7 @@ class MachineAssignment(db.Model):
   user = db.UserProperty()
 
   # The time of the assignment.
-  poll_time = db.DateTimeProperty(auto_now=True)
+  assignment_time = db.DateTimeProperty(auto_now=True)
 
 
 class IdleMachine(db.Model):
@@ -1183,6 +1183,7 @@ class TestRequestManager(object):
                                              user=user_profile.user)
 
     machine_assignment.tag = machine_tag
+    machine_assignment.assignment_time = datetime.datetime.now()
     machine_assignment.put()
 
   def _ComputeComebackValue(self, try_count):
@@ -1504,6 +1505,15 @@ class TestRequestManager(object):
         logging.debug('Removed ip: %s', ip)
 
     return True
+
+
+def GetAllMachines():
+  """Return an iterator of all the machines that have ever polled the server.
+
+  Returns:
+    An iterator of all machines.
+  """
+  return (machine for machine in MachineAssignment.all())
 
 
 def FindUserWithWhitelistedIP(ip, password):

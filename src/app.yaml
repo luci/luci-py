@@ -20,6 +20,9 @@ handlers:
   static_files: static/images/favicon.ico
   upload: static/images/favicon\.ico
 
+- url: /css
+  static_dir: static/css
+
 - url: .*
   script: main.app
 

@@ -1,0 +1,37 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html>
+<head>
+<title>Machine List</title>
+<link rel="stylesheet" type="text/css" href="/css/swarm_style.css"/>
+</head>
+<body>
+
+<div style="text-align: right;">
+<p>{{topbar|safe}}</p>
+</div>
+
+<h1>Polled Machines</h1>
+<table id="machine-table"
+    summary="This table lists all machines that have polled this server">
+<tr>
+<th>ID</th>
+<th>Tag</th>
+<th>Time of Last Assignment</th>
+</tr>
+{% for machine in machines %}
+<tr class="request {% cycle even,odd %}">
+<td>{{machine.machine_id}}</td>
+<td>{{machine.tag}}</td>
+<td>{{machine.assignment_time}}</td>
+</tr>
+{% endfor %}
+</table>
+
+<div style="float: left;"><p>
+  <a target="_blank" href="http://code.google.com/appengine/"><img border="0"
+   src="http://code.google.com/appengine/images/appengine-noborder-120x30.gif"
+   alt="Powered by Google App Engine" /></a></p>
+</p></div>
+
+</body>
+</html>
