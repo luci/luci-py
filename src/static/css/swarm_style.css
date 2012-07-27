@@ -1,0 +1,37 @@
+th {
+  color: #fff;
+  background-color: #000;
+  padding-left: 1em;
+  padding-right: 1em;
+}
+
+td {
+  padding-left: 1em;
+  padding-right: 1em;
+}
+
+.request {
+  border-top-style: solid;
+  border-top-color: black;
+  border-top-width: 1px;
+  border-bottom-style: solid;
+  border-bottom-color: black;
+  border-bottom-width: 1px;
+}
+
+.even {
+}
+
+.odd {
+  background-color: #eeeeee;
+}
+
+.failed_test {
+  background-color: #ffdddd;
+}
+
+table {
+  border: 1;
+  border-color: black;
+  border-collapse: collapse;
+}
