@@ -409,21 +409,6 @@ class SwarmError(db.Model):
 class TestRequestManager(object):
   """The Test Request Manager."""
 
-  def __init__(self, machine_manager):
-    """Initializes the TRM.
-
-    Initializes the TRM to use the given machine manager.
-
-    Args:
-      machine_manager: An instance of machine_manager.MachineManager that is
-          used to acquire machines for running tests.
-    """
-    logging.debug('TRM starting')
-
-    self._machine_manager = machine_manager
-
-    logging.debug('TRM created')
-
   def UpdateCacheServerURL(self, server_url):
     """Update the value of this server's url.
 
@@ -701,29 +686,6 @@ class TestRequestManager(object):
     runner.put()
 
     return runner
-
-  def _FindMatchingMachineInList(self, obj_list, config):
-    """Find first object in obj_list whose machine matches the given config.
-
-    Args:
-      obj_list: a list of objects with a numeric attribute 'id' that
-          corresponds to the id of a machine as returned by
-          machine_manager.RequestMachine().
-      config: a TestConfiguration object as specified for TRS requests.
-          See go/gforce/test-request-format for details.
-
-    Returns:
-      An object from the list, or None if a matching machine is not found.
-    """
-    for obj in obj_list:
-      info = self._machine_manager.GetMachineInfo(obj.id)
-      (match, match_output) = dimensions.MatchDimensions(config.dimensions,
-                                                         info.GetDimensions())
-      logging.info(match_output)
-      if match:
-        return obj
-
-    return None
 
   def _BuildTestRun(self, runner):
     """Build a Test Run message for the remote test script.

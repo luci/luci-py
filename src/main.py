@@ -20,9 +20,6 @@ import webapp2
 from google.appengine.ext.webapp import template
 from google.appengine.ext.webapp import util
 from common import test_request_message
-from server import base_machine_provider
-from server import machine_manager
-from server import machine_provider
 from server import test_manager
 # pylint: enable-msg=C6204
 
@@ -132,12 +129,6 @@ class MainHandler(webapp2.RequestHandler):
       error.log_time = self.GetTimeString(error.created)
       errors.append(error)
 
-    # Build info for acquired machines table.
-    machines = []
-    for machine in machine_manager.Machine.all():
-      self._GetDisplayableMachineTemplate(machine)
-      machines.append(machine)
-
     if show_success:
       enable_success_message = """
         <a href="?s=False">Hide successfully completed tests</a>
@@ -152,7 +143,6 @@ class MainHandler(webapp2.RequestHandler):
         'runners': runners,
         'global_runners': global_runners,
         'errors': errors,
-        'machines': machines,
         'enable_success_message': enable_success_message,
         'sorted_by_message': sorted_by_message
     }
@@ -213,39 +203,6 @@ class MainHandler(webapp2.RequestHandler):
               'Failed</a>' % runner.key_string)
         else:
           runner.status_string = 'Failed'
-
-  def _GetDisplayableMachineTemplate(self, machine):
-    """Puts different aspects of the machine in a displayable format.
-
-    Args:
-      machine: Machine object which will be displayed in Swarm server webpage.
-    """
-    machine.status_name = 'Unknown'
-    if machine.status == base_machine_provider.MachineStatus.WAITING:
-      machine.status_name = 'Waiting'
-    elif machine.status == base_machine_provider.MachineStatus.ACQUIRED:
-      machine.status_name = 'Acquired'
-    elif machine.status == base_machine_provider.MachineStatus.STOPPED:
-      machine.status_name = 'Stopped'
-    elif machine.status == base_machine_provider.MachineStatus.AVAILABLE:
-      machine.status_name = 'Available'
-
-    # See if the machine is idle or not.
-    idle = test_manager.IdleMachine.gql('WHERE id = :1', machine.id).get()
-    if idle:
-      machine.action_name = 'Idle'
-    else:
-      runner = (test_manager.TestRunner.gql('WHERE machine_id = :1',
-                                            machine.id).get())
-      if runner:
-        if runner.started:
-          machine.action_name = ('Running <a href="#runner_%s">%s</a>' %
-                                 (str(runner.key()), runner.GetName()))
-        else:
-          machine.action_name = ('Assigned <a href="#runner_%s">%s</a>' %
-                                 (str(runner.key()), runner.GetName()))
-      else:
-        machine.action_name = 'No runner?'
 
 
 class RedirectToMainHandler(webapp2.RequestHandler):
@@ -332,10 +289,9 @@ class PollHandler(webapp2.RequestHandler):
 
   def get(self):  # pylint: disable-msg=C6409
     """Handles HTTP GET requests for this handler's URL."""
-    test_request_manager, the_machine_manager = CreateTestAndMachineManagers()
+    test_request_manager = CreateTestManager()
 
     logging.debug('Polling')
-    the_machine_manager.ValidateMachines()
     test_request_manager.UpdateCacheServerURL(self.request.host_url)
     test_request_manager.AbortStaleRunners()
     test_manager.DeleteOldRunners()
@@ -703,26 +659,7 @@ def CreateTestManager():
   Returns:
     A TestManager instance.
   """
-  the_machine_manager = machine_manager.MachineManager(
-      machine_provider.MachineProvider())
-  test_request_manager = test_manager.TestRequestManager(the_machine_manager)
-
-  return test_request_manager
-
-
-# Temporary function to keep backward compatibility until we totally
-# eliminate machine_manager.
-def CreateTestAndMachineManagers():
-  """Creates and returns a test manager and machine manager instance.
-
-  Returns:
-    A tuple of (TestManager, MachineManager).
-  """
-  the_machine_manager = machine_manager.MachineManager(
-      machine_provider.MachineProvider())
-  test_request_manager = test_manager.TestRequestManager(the_machine_manager)
-
-  return test_request_manager, the_machine_manager
+  return test_manager.TestRequestManager()
 
 
 def CreateApplication():
