@@ -36,8 +36,6 @@ from google.appengine.ext import blobstore
 from google.appengine.ext import db
 from common import dimensions
 from common import test_request_message
-from server import base_machine_provider
-from test_runner import remote_test_runner
 from test_runner import slave_machine
 
 # Fudge factor added to a runner's timeout before we consider it to have run
@@ -247,7 +245,7 @@ class TestRunner(db.Model):
   # The number of instances running on the same configuration as ours.
   num_config_instances = db.IntegerProperty()
 
-  # The machine that is running or run the test. This attribute is only valid
+  # The machine that is running or ran the test. This attribute is only valid
   # once a machine has been assigned to this runner.
   machine_id = db.StringProperty()
 
@@ -327,14 +325,6 @@ class TestRunner(db.Model):
     config = self.GetConfiguration()
     return (sum([test.time_out for test in test_case.tests]) +
             sum([test.time_out for test in config.tests]))
-
-  def RequiresVirginMachine(self):
-    """Get the virgin machine flag for this runner.
-
-    Returns:
-      True iff this runner's test case requested a virgin machine.
-    """
-    return self.test_request.GetTestCase().virgin
 
   def GetResultString(self):
     """Get the result string for the runner.
@@ -680,29 +670,11 @@ class TestRequestManager(object):
         config.num_instances = config.min_instances
         runner = self._QueueTestRequestConfig(request, config, user_profile)
 
-        self._TryAndRun(runner)
-
-        # TODO(user): if the runner was unable to acquire a machine, check
-        # that acquisition will be possible at somepoint, if not we have
-        # an error
-
         test_keys['test_keys'].append({'config_name': config.config_name,
                                        'instance_index': instance_index,
                                        'num_instances': config.num_instances,
                                        'test_key': str(runner.key())})
     return test_keys
-
-  def _TryAndRun(self, runner):
-    """Attempt to find a machine to run the given runner.
-
-    Args:
-      runner: The test runner that we wish to run.
-    """
-    machine = self._FindMatchingIdleMachine(runner)
-    if machine:
-      logging.debug('Found machine id=%s to runner=%s',
-                    machine.id, runner.GetName())
-      self._ExecuteTestRunnerOnIdleMachine(runner, machine)
 
   def _QueueTestRequestConfig(self, request, config, user_profile):
     """Queue a given request's configuration for execution.
@@ -730,16 +702,6 @@ class TestRequestManager(object):
 
     return runner
 
-  def _AssignMachineToRunner(self, runner, machine_id):
-    """Assign the given machine to the given runner.
-
-    Args:
-      runner: The runner acquring the machine.
-      machine_id: The id of the machine being assigned.
-    """
-    runner.machine_id = machine_id
-    runner.put()
-
   def _FindMatchingMachineInList(self, obj_list, config):
     """Find first object in obj_list whose machine matches the given config.
 
@@ -762,144 +724,6 @@ class TestRequestManager(object):
         return obj
 
     return None
-
-  def _FindMatchingIdleMachine(self, runner):
-    """Find an idle machine that is a match for the given runner.
-
-    Args:
-      runner: a TestRunner object for which we want to find a machine.
-
-    Returns:
-      An instance of IdleMachine, or None if a matching machine is not found.
-    """
-    # We can't return an idle machine if we need a virgin one
-    if runner.RequiresVirginMachine():
-      return None
-    machines = IdleMachine.all()
-    return self._FindMatchingMachineInList(machines, runner.GetConfiguration())
-
-  def _ExecuteTestRunnerOnIdleMachine(self, runner, idle_machine):
-    """Execute a given runner on the specified idle machine.
-
-    Args:
-      runner: A TestRunner object to execute.
-      idle_machine: An instance of IdleMachine representing the machine to run
-          the test on.
-    """
-    logging.debug('TRM._ExecuteTestRunnerOnIdleMachine '
-                  'runner=%s config=%s instance=%d num_instances=%d machine=%s',
-                  runner.GetName(), runner.config_name,
-                  int(runner.config_instance_index),
-                  int(runner.num_config_instances),
-                  str(idle_machine.id))
-    config = runner.GetConfiguration()
-    assert runner.config_instance_index < runner.num_config_instances
-    assert (runner.num_config_instances >= config.min_instances and
-            runner.num_config_instances <=
-            config.min_instances + config.additional_instances)
-
-    # TODO(user): make the next two lines atomic?  If we crash in the
-    # middle, the data store will be inconsistent, although this will be
-    # checked for and corrected then next time the test manager starts up.
-    # There is a runner.put in _AssignMachineToRunner.
-    self._AssignMachineToRunner(runner, idle_machine.id)
-    idle_machine.delete()
-    self._ExecuteTestRunner(runner)
-
-  def _ExecuteTestRunner(self, runner):
-    """Execute a given runner on it's assigned machine.
-
-    Args:
-      runner: A TestRunner object to execute.
-    """
-
-    # TODO(user): At the moment, we only run a single instance of the server
-    # and thus everything is serialized. So for now, there is no contention with
-    # concurrent requests. But eventually we may want to have multiple schedule
-    # tasks or tasks queues doing the assignments, in which case this would
-    # become an issue.
-    assert not runner.started
-    runner.started = datetime.datetime.now()
-    runner.put()
-    info = self._machine_manager.GetMachineInfo(runner.machine_id)
-
-    test_case = runner.test_request.GetTestCase()
-    if test_case.admin:
-      port = 7400
-    else:
-      port = 7399
-
-    remote_runner = remote_test_runner.RemoteTestRunner(
-        server_url='http://%s:%d' % (info.host, port))
-
-    if not remote_runner.EnsureValidServer():
-      logging.warning('Unable to connect to RemoteTestRunner on %s. '
-                      'Marking machine as STOPPED. Test will acquire '
-                      'another machine and try again.', info.host)
-      # Mark the machine as STOPPED, since we can't communicate with it.
-      info.status = base_machine_provider.MachineStatus.STOPPED
-      info.put()
-
-      # Reset the test runner so that it can run on another machine.
-      runner.started = None
-      runner.put()
-      self._TryAndRun(runner)
-      return
-
-    remote_python26_path = remote_runner.RemotePython26Path()
-
-    # We need to run the local_test_runner script from the remote root because
-    # we can't easily set the python path of the remote machine, so we make sure
-    # the root is in the python path by running the script from there.
-    root = os.path.join(os.path.dirname(__file__), '..')
-    local_script = os.path.join(root, _TEST_RUNNER_DIR, _TEST_RUNNER_SCRIPT)
-    file_pairs_to_upload = [(local_script, _TEST_RUNNER_SCRIPT)]
-
-    downloader_file = os.path.join(_TEST_RUNNER_DIR, 'downloader.py')
-    trm_file = os.path.join(_COMMON_DIR, 'test_request_message.py')
-    test_runner_init = os.path.join(_TEST_RUNNER_DIR, '__init__.py')
-    common_init = os.path.join(_COMMON_DIR, '__init__.py')
-
-    files_to_upload = [downloader_file, trm_file, test_runner_init, common_init]
-    file_pairs_to_upload.extend((os.path.join(root, file), file)
-                                for file in files_to_upload)
-
-    test_run = self._BuildTestRun(runner)
-    command_to_execute = [remote_python26_path,
-                          r'%s/%s' % (test_run.working_dir,
-                                      _TEST_RUNNER_SCRIPT),
-                          '-f', r'%s/%s' % (test_run.working_dir,
-                                            _TEST_RUN_SWARM_FILE_NAME)]
-    if test_case.verbose:
-      command_to_execute.append('-v')
-    commands_to_execute = [command_to_execute]
-
-    # TODO(user): Find a way to make the working dir platform independent.
-    remote_runner.SetRemoteRoot(test_run.working_dir)
-    remote_runner.SetTextToUpload([(_TEST_RUN_SWARM_FILE_NAME, str(test_run))])
-    remote_runner.SetFilePairsToUpload(file_pairs_to_upload)
-    remote_runner.SetCommandsToExecute(commands_to_execute)
-
-    succeeded = remote_runner.UploadFiles()
-    if succeeded:
-      run_results = remote_runner.RunCommands()
-      logging.debug('RunCommands returned: %s', run_results)
-      if run_results:
-        assert len(run_results) == len(commands_to_execute)
-        for result in run_results:
-          if result == -1:
-            logging.error('Failed to run all commands.')
-            succeeded = False
-            break
-      else:
-        succeeded = False
-    else:
-      logging.error('Failed to upload files.')
-
-    if not succeeded:
-      self._UpdateTestResult(runner,
-                             result_string=('Tests aborted. Upload to the '
-                                            'remote server failed.'))
 
   def _BuildTestRun(self, runner):
     """Build a Test Run message for the remote test script.
