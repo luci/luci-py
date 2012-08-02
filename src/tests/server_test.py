@@ -103,6 +103,7 @@ class _SwarmTestCase(unittest.TestCase):
         '-a', swarm_server_addr,
         '-p', swarm_server_port,
         '-d', '/tmp',
+        '-l', '/tmp/slave.log',
         _SwarmTestProgram.options.slave_config_file
         ]
 

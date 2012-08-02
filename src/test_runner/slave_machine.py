@@ -16,6 +16,7 @@ http://code.google.com/p/swarming/wiki/MachineProvider for complete details.
 
 
 import logging
+import logging.handlers
 import optparse
 import os
 import subprocess
@@ -551,12 +552,12 @@ def main():
       'the machine are either given through a file (if provided) or read from '
       'stdin. See http://code.google.com/p/swarming/wiki/MachineProvider for '
       'complete details.')
-  parser.add_option('-a', '--address', dest='address',
+  parser.add_option('-a', '--address', default='localhost',
                     help='Address of the Swarm server to connect to. '
-                    'Defaults to %default. ', default='localhost')
-  parser.add_option('-p', '--port', dest='port',
+                    'Defaults to %default. ')
+  parser.add_option('-p', '--port', default='8080', type='int',
                     help='Port of the Swarm server. '
-                    'Defaults to %default. ', default='8080', type='int')
+                    'Defaults to %default. ')
   parser.add_option('-r', '--max_url_tries', default=10,
                     help='The maximum number of times url messages will '
                     'attempt to be sent before accepting failure. Defaults '
@@ -564,13 +565,16 @@ def main():
   parser.add_option('-v', '--verbose', action='store_true',
                     help='Set logging level to DEBUG. Optional. Defaults to '
                     'ERROR level.')
-  parser.add_option('-i', '--iterations', default=-1, dest='iterations',
+  parser.add_option('-i', '--iterations', default=-1,
                     type='int',
                     help='Number of iterations to request jobs from '
                     'Swarm server. Defaults to %default (infinite).')
-  parser.add_option('-d', '--directory', dest='directory',
+  parser.add_option('-d', '--directory', default='.',
                     help='Sets the working directory of the slave. '
-                    'Defaults to %default. ', default='.')
+                    'Defaults to %default. ')
+  parser.add_option('-l', '--log_file', default='slave_machine.log',
+                    help='Set the name of the file to log to. '
+                    'Defaults to %default.')
   (options, args) = parser.parse_args()
 
   # Parser handles exiting this script after logging the error.
@@ -579,6 +583,14 @@ def main():
 
   if options.iterations < -1 or options.iterations == 0:
     parser.error('Number of iterations must be -1 or a positive number')
+
+  logging.basicConfig()
+  log_file = logging.handlers.RotatingFileHandler(options.log_file,
+                                                  maxBytes=10 * 1024 *1024,
+                                                  backupCount=5)
+  log_file.setFormatter(
+      logging.Formatter('%(asctime)s %(name)-12s %(levelname)-8s %(message)s'))
+  logging.getLogger().addHandler(log_file)
 
   if options.verbose:
     logging.getLogger().setLevel(logging.DEBUG)
