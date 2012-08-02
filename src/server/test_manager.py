@@ -1281,13 +1281,17 @@ class TestRequestManager(object):
     return True
 
 
-def GetAllMachines():
-  """Return an iterator of all the machines that have ever polled the server.
+def GetAllUserMachines(user_profile):
+  """Get the list of the user's whitelisted machines.
+
+  Args:
+    user_profile: The profile of the user that whitelisted the machines.
 
   Returns:
-    An iterator of all machines.
+    An iterator of all machines whitelisted by the user.
   """
-  return (machine for machine in MachineAssignment.all())
+  return (machine for machine in MachineAssignment.gql('WHERE user = :1',
+                                                       user_profile.user))
 
 
 def FindUserWithWhitelistedIP(ip, password):
@@ -1350,6 +1354,18 @@ def DeleteOldErrors():
     error.delete()
 
   logging.debug('DeleteOldErrors done')
+
+
+def GetUserProfile(user):
+  """Return the user profile that the given user corresponds to.
+
+  Args:
+    user: The user to find the profile for.
+
+  Returns:
+    The user profile of the user.
+  """
+  return UserProfile.gql('WHERE user = :1', user).get()
 
 
 def AtomicAssignID(key, machine_id):

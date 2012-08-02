@@ -221,9 +221,11 @@ class MachineListHandler(webapp2.RequestHandler):
   """
 
   def get(self):  # pylint: disable-msg=C6409
+    user_profile = test_manager.GetUserProfile(users.get_current_user())
+
     params = {
         'topbar': GenerateTopbar(),
-        'machines': test_manager.GetAllMachines()
+        'machines': test_manager.GetAllUsersMachines(user_profile)
     }
 
     path = os.path.join(os.path.dirname(__file__), 'machine_list.html')
@@ -357,8 +359,8 @@ class SecureGetResultHandler(webapp2.RequestHandler):
   def get(self):  # pylint: disable-msg=C6409
     """Handles HTTP GET requests for this handler's URL."""
     user = users.get_current_user()
+    user_profile = test_manager.GetUserProfile(user)
     key = self.request.get('r', '')
-    user_profile = test_manager.UserProfile.gql('WHERE user = :1', user).get()
 
     if user_profile:
       SendRunnerResults(self.response, key, user_profile)
