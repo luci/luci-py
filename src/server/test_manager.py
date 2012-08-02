@@ -379,18 +379,6 @@ class MachineAssignment(db.Model):
   assignment_time = db.DateTimeProperty(auto_now=True)
 
 
-class IdleMachine(db.Model):
-  """An idle machine.
-
-  Idle machines are those that have been previously acquired and are finished
-  running tests. As new tests arrive, machines are taken from the idle pool
-  before acquiring new ones unless we need a fresh machine (e.g., explicit
-  requests for virgin machines or sharded tests need new machines).
-  """
-  # The Id of the machine.
-  id = db.StringProperty()
-
-
 class SwarmError(db.Model):
   """A datastore entry representing an error in Swarm."""
   # The name of the error.
