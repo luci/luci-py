@@ -840,6 +840,13 @@ class TestRequestManager(object):
     runner = None
     response = {}
 
+    unfinished_test = TestRunner.gql(
+        'WHERE machine_id = :1 AND done = :2', attribs['id'], False).get()
+    if unfinished_test:
+      logging.error('A machine is asking for a new test, but there is '
+                    'already an unfinished test running on a machine '
+                    'with the same id, %s', attribs['id'])
+
     # Try assigning machine to a runner 10 times before we give up.
     # TODO(user): Tune this parameter somehow.
     for _ in range(10):
