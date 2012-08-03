@@ -65,15 +65,15 @@ def main():
   parser.add_option('-w', '--wait', dest='wait_for_results',
                     action='store_true',
                     help='Wait for all test to complete and print their output')
-  parser.add_option('-t', '--sleep_time', dest='sleep_time', type='int',
+  parser.add_option('-t', '--sleep_time', type='int',
                     default=60, help='The time, in seconds, to wait between '
                     'each poll. Defaults to %default seconds.')
-  parser.add_option('-v', '--verbose', dest='verbose', action='store_true',
+  parser.add_option('-v', '--verbose', action='store_true',
                     help='Print verbose logging')
-  parser.add_option('-n', '--hostname', dest='hostname', default='localhost',
-                    help='Specify the hostname of the Swarm server. Optional. '
-                    'Defaults to %default')
-  parser.add_option('-p', '--port', dest='port', type='int', default=8080,
+  parser.add_option('-n', '--hostname', default='localhost',
+                    help='Specify the hostname of the Swarm server. It may be '
+                    'given as an IP or a URL. Optional. Defaults to %default')
+  parser.add_option('-p', '--port', type='int', default=8080,
                     help='Specify the port of the Swarm server. Optional. '
                     'Defaults to %default')
 
@@ -84,7 +84,7 @@ def main():
     parser.error('Must specify only one filename')
 
   # Build the URL for sending the request.
-  base_url = 'http://%s:%d' % (options.hostname, options.port)
+  base_url = '%s:%d' % (options.hostname, options.port)
   test_url = base_url + '/test'
   filename = args[0]
 
