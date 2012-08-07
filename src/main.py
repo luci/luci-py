@@ -23,6 +23,7 @@ from common import test_request_message
 from server import test_manager
 # pylint: enable-msg=C6204
 
+_NUM_USER_TEST_RUNNERS_PER_PAGE = 50
 _NUM_GLOBAL_TESTS_TO_DISPLAY = 10
 _NUM_RECENT_ERRORS_TO_DISPLAY = 10
 
@@ -88,6 +89,7 @@ class MainHandler(webapp2.RequestHandler):
     # unbounded with time.
     show_success = self.request.get('s', 'False') != 'False'
     sort_by = self.request.get('sort_by', 'reverse_chronological')
+    page = int(self.request.get('page', 1))
 
     sorted_by_message = '<p>Currently sorted by: '
     if sort_by == 'start':
@@ -107,10 +109,10 @@ class MainHandler(webapp2.RequestHandler):
         users.get_current_user())
 
     runners = []
-    for runner in query:
+    for runner in query.run(limit=_NUM_USER_TEST_RUNNERS_PER_PAGE,
+                            offset=_NUM_USER_TEST_RUNNERS_PER_PAGE * page):
       # If this runner successfully completed, and we are not showing them,
       # just ignore it.
-      # TODO(user): Modify the query above to handle this check.
       if runner.done and runner.ran_successfully and not show_success:
         continue
 
@@ -138,13 +140,19 @@ class MainHandler(webapp2.RequestHandler):
         <a href="?s=True">Show successfully completed tests too</a>
       """
 
+    total_pages = (
+        test_manager.TestRunner.all().count() / _NUM_USER_TEST_RUNNERS_PER_PAGE)
+
     params = {
         'topbar': GenerateTopbar(),
         'runners': runners,
         'global_runners': global_runners,
         'errors': errors,
         'enable_success_message': enable_success_message,
-        'sorted_by_message': sorted_by_message
+        'sorted_by_message': sorted_by_message,
+        'current_page': page,
+        # Add 1 so the pages are 1-indexed.
+        'total_pages': map(str, range(1, total_pages + 1, 1))
     }
 
     path = os.path.join(os.path.dirname(__file__), 'index.html')

@@ -46,6 +46,16 @@
 {% endfor %}
 </table>
 
+<p>Currently on page: {{current_page}} </p>
+<p>Go To Page:
+<select id="new_page" onchange="document.location.href='?page=' + this.value">
+<option value="">-</option>
+{% for page in total_pages %}
+<option value='{{page}}'>{{page}}</option>
+{% endfor %}
+</select>
+</p>
+
 <p>{{ enable_success_message|safe }}</p>
 
 <h1>Global Test Requests</h1>
