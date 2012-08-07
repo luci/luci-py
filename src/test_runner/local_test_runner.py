@@ -577,7 +577,7 @@ class LocalTestRunner(object):
     if not self.test_run.result_url:
       return True
     result_url_parts = urlparse.urlsplit(self.test_run.result_url)
-    if result_url_parts[0] == 'http':
+    if result_url_parts[0] == 'http' or result_url_parts[0] == 'https':
       data = (('n', self.test_run.test_run_name),
               ('c', self.test_run.configuration.config_name),
               ('x', ', '.join([str(i) for i in result_codes])),

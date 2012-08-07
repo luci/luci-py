@@ -491,7 +491,7 @@ class TestRequestManager(object):
     # storage quota will be exceeded.
     if test_case.result_url:
       result_url_parts = urlparse.urlsplit(test_case.result_url)
-      if result_url_parts[0] == 'http':
+      if result_url_parts[0] == 'http' or result_url_parts[0] == 'https':
         # Send the result to the requested destination.
         try:
           # Encode the result string so that it's backwards-compatible with
