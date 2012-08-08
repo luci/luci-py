@@ -108,8 +108,9 @@ class MainHandler(webapp2.RequestHandler):
         users.get_current_user())
 
     runners = []
-    for runner in query.run(limit=_NUM_USER_TEST_RUNNERS_PER_PAGE,
-                            offset=_NUM_USER_TEST_RUNNERS_PER_PAGE * page):
+    for runner in query.run(
+        limit=_NUM_USER_TEST_RUNNERS_PER_PAGE,
+        offset=_NUM_USER_TEST_RUNNERS_PER_PAGE * (page - 1)):
       # If this runner successfully completed, and we are not showing them,
       # just ignore it.
       if runner.done and runner.ran_successfully and not show_success:
@@ -225,7 +226,7 @@ class MachineListHandler(webapp2.RequestHandler):
 
     params = {
         'topbar': GenerateTopbar(),
-        'machines': test_manager.GetAllUsersMachines(user_profile)
+        'machines': test_manager.GetAllUserMachines(user_profile)
     }
 
     path = os.path.join(os.path.dirname(__file__), 'machine_list.html')
