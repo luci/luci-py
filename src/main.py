@@ -24,7 +24,6 @@ from server import test_manager
 # pylint: enable-msg=C6204
 
 _NUM_USER_TEST_RUNNERS_PER_PAGE = 50
-_NUM_GLOBAL_TESTS_TO_DISPLAY = 10
 _NUM_RECENT_ERRORS_TO_DISPLAY = 10
 
 _HOME_URL = '<a href=/secure/main>Home</a>'
@@ -119,12 +118,6 @@ class MainHandler(webapp2.RequestHandler):
       self._GetDisplayableRunnerTemplate(runner, detailed_output=True)
       runners.append(runner)
 
-    global_runners = []
-    query = test_manager.TestRunner.all().order('-created')
-    for runner in query.run(limit=_NUM_GLOBAL_TESTS_TO_DISPLAY):
-      self._GetDisplayableRunnerTemplate(runner)
-      global_runners.append(runner)
-
     errors = []
     query = test_manager.SwarmError.all().order('-created')
     for error in query.run(limit=_NUM_RECENT_ERRORS_TO_DISPLAY):
@@ -146,7 +139,6 @@ class MainHandler(webapp2.RequestHandler):
     params = {
         'topbar': GenerateTopbar(),
         'runners': runners,
-        'global_runners': global_runners,
         'errors': errors,
         'enable_success_message': enable_success_message,
         'sorted_by_message': sorted_by_message,
