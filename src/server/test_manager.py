@@ -31,12 +31,12 @@ import uuid
 from google.appengine.api import files
 from google.appengine.api import mail
 from google.appengine.api import urlfetch
-from google.appengine.api import users
 from google.appengine.ext import blobstore
 from google.appengine.ext import db
 from common import dimensions
 from common import test_request_message
 from common import url_helper
+from server import user_manager
 from test_runner import slave_machine
 
 # Fudge factor added to a runner's timeout before we consider it to have run
@@ -90,46 +90,6 @@ SWARM_FINISHED_RUNNER_TIME_TO_LIVE_DAYS = 14
 SWARM_ERROR_TIME_TO_LIVE_DAYS = 7
 
 
-class UserProfile(db.Model):
-  """A user profile.
-
-  All TestRequest and TestRunner objects are associated with a specific user.
-  A user has a whitelist of machine IPs that are allowed to interact with its
-  data. A UserProfile can be retrieved using the user's email address as
-  the key.
-
-  A UserProfile has a 'whitelist' list of MachineWhitelist of authorized remote
-  machines.
-  A UserProfile has a 'test_requests' list of TestRequest of tests belonging
-  to this user.
-  """
-  # The actual account of the user.
-  user = db.UserProperty()
-
-  def DeleteProfile(self):
-    # Deletes the profile, its whitelists and test cases.
-    for test_case in self.test_requests:
-      test_case.delete()
-    for whitelist in self.whitelist:
-      whitelist.delete()
-    self.delete()
-
-
-class MachineWhitelist(db.Model):
-  """A machine IP as part of a UserProfile whitelist."""
-  # A reference to the user's profile.
-  user_profile = db.ReferenceProperty(
-      UserProfile, required=True, collection_name='whitelist')
-
-  # The IP of the machine to whitelist.
-  ip = db.ByteStringProperty()
-
-  # An optional password (NOT necessarily equal to the actual user
-  # account password) used to ensure requests coming from a remote machine
-  # are indeed valid. Defaults to None.
-  password = db.StringProperty()
-
-
 def GetTestCase(request_message):
   """Returns a TestCase object representing this Test Request message.
 
@@ -159,7 +119,7 @@ class TestRequest(db.Model):
   """
   # A reference to the user's profile.
   user_profile = db.ReferenceProperty(
-      UserProfile, required=True, collection_name='test_requests')
+      user_manager.UserProfile, required=True, collection_name='test_requests')
 
   # The message received from the caller, formatted as a Test Case as
   # specified in
@@ -1223,76 +1183,6 @@ class TestRequestManager(object):
 
     return file_data
 
-  def ModifyUserProfileWhitelist(self, ip, add=True, password=None):
-    """Adds/removes the given ip from the whitelist of the current user.
-
-    If a user profile doesn't already exist, one will be created first.
-    This function is thread safe.
-
-    Args:
-      ip: The ip to be added/removed.
-      add: If True, will add the ip to the whitelist. Else, it will remove
-      the ip. Ignores duplicate or non-existing ips regardless of the password.
-      password: Optional password to associate with the machine.
-
-    Returns:
-      True if request was valid. Doesn't necessarily mean the ip was found for
-      remove or didn't exist for add, but that datastore is in a sane state.
-    """
-    user = users.get_current_user()
-    if not user:
-      logging.error('User not signed in? Security breach.')
-      return False
-
-    # Validate arg types to be string and bool, respectively.
-    # We accept None ips which happen in local testing. So if ip != None,
-    # it should be a string.
-    if ip is not None:
-      if not isinstance(ip, (str, unicode)):
-        logging.error('Invalid ip type: %s', str(type(ip)))
-        return False
-      else:
-        ip = str(ip)
-
-    if not isinstance(add, bool):
-      logging.error('Invalid add type: %s', str(type(add)))
-      return False
-
-    # Atomically create the user profile or use an existing one.
-    # Handle normal transaction exceptions for get_or_insert.
-    try:
-      user_profile = UserProfile.get_or_insert(user.email(), user=user)
-    except (db.TransactionFailedError, db.Timeout, db.InternalError) as e:
-      # This is a low-priority request. Abort on any failures.
-      logging.exception('User profile creation exception: %s', str(e))
-      return False
-
-    assert user_profile
-
-    # Find existing entries, if any.
-    query = user_profile.whitelist.filter('ip =', ip)
-
-    # Sanity check.
-    assert query.count() == 1 or query.count() == 0
-
-    if add:
-      # Ignore duplicate requests.
-      if query.count() == 0:
-        # Create a new entry.
-        white_list = MachineWhitelist(
-            user_profile=user_profile, ip=ip, password=password)
-        white_list.put()
-        logging.debug('Stored ip: %s', ip)
-    else:
-      # Ignore non-existing requests.
-      if query.count() == 1:
-        # Delete existing entry.
-        white_list = query.get()
-        white_list.delete()
-        logging.debug('Removed ip: %s', ip)
-
-    return True
-
 
 def GetAllUserMachines(user_profile):
   """Get the list of the user's whitelisted machines.
@@ -1305,28 +1195,6 @@ def GetAllUserMachines(user_profile):
   """
   return (machine for machine in MachineAssignment.gql('WHERE user = :1',
                                                        user_profile.user))
-
-
-def FindUserWithWhitelistedIP(ip, password):
-  """Finds and returns the user that has whitelisted the given IP.
-
-  Args:
-    ip: IP of the client making the request.
-    password: The password provided by the client making the request.
-
-  Returns:
-    UserProfile of the user that has whitelisted the IP, None otherwise.
-  """
-  whitelist = MachineWhitelist.gql(
-      'WHERE ip = :1 AND password = :2', ip, password)
-
-  if whitelist.count() == 0:
-    return None
-
-  # Sanity check.
-  assert whitelist.count() == 1
-
-  return whitelist.get().user_profile
 
 
 def _GetCurrentTime():
@@ -1367,18 +1235,6 @@ def DeleteOldErrors():
     error.delete()
 
   logging.debug('DeleteOldErrors done')
-
-
-def GetUserProfile(user):
-  """Return the user profile that the given user corresponds to.
-
-  Args:
-    user: The user to find the profile for.
-
-  Returns:
-    The user profile of the user.
-  """
-  return UserProfile.gql('WHERE user = :1', user).get()
 
 
 def AtomicAssignID(key, machine_id):

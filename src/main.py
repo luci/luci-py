@@ -21,6 +21,7 @@ from google.appengine.ext.webapp import template
 from google.appengine.ext.webapp import util
 from common import test_request_message
 from server import test_manager
+from server import user_manager
 # pylint: enable-msg=C6204
 
 _NUM_USER_TEST_RUNNERS_PER_PAGE = 50
@@ -222,7 +223,7 @@ class MachineListHandler(webapp2.RequestHandler):
   """
 
   def get(self):  # pylint: disable-msg=C6409
-    user_profile = test_manager.GetUserProfile(users.get_current_user())
+    user_profile = user_manager.GetUserProfile(users.get_current_user())
 
     params = {
         'topbar': GenerateTopbar(),
@@ -360,7 +361,7 @@ class SecureGetResultHandler(webapp2.RequestHandler):
   def get(self):  # pylint: disable-msg=C6409
     """Handles HTTP GET requests for this handler's URL."""
     user = users.get_current_user()
-    user_profile = test_manager.GetUserProfile(user)
+    user_profile = user_manager.GetUserProfile(user)
     key = self.request.get('r', '')
 
     if user_profile:
@@ -534,7 +535,7 @@ class UserProfileHandler(webapp2.RequestHandler):
 
     display_whitelists = []
 
-    user_profile = test_manager.UserProfile.all().filter('user =', user).get()
+    user_profile = user_manager.UserProfile.all().filter('user =', user).get()
     if user_profile:
       for stored_whitelist in user_profile.whitelist:
         whitelist = {}
@@ -558,8 +559,6 @@ class ChangeWhitelistHandler(webapp2.RequestHandler):
 
   def post(self):  # pylint: disable-msg=C6409
     """Handles HTTP POST requests for this handler's URL."""
-    test_request_manager = CreateTestManager()
-
     ip = self.request.get('i', self.request.remote_addr)
 
     password = self.request.get('p', None)
@@ -568,9 +567,11 @@ class ChangeWhitelistHandler(webapp2.RequestHandler):
       password = None
 
     add = self.request.get('a')
-    if add == 'True' or add == 'False':
-      test_request_manager.ModifyUserProfileWhitelist(
-          ip, add == 'True', password)
+    if add == 'True':
+      user_manager.ModifyUserProfileAddWhitelist(
+          users.get_current_user(), ip, password)
+    elif add == 'False':
+      user_manager.ModifyUserProfileDelWhitelist(users.get_current_user(), ip)
 
     self.redirect('/secure/user_profile', permanent=True)
 
@@ -606,9 +607,9 @@ def AuthenticateRemoteMachine(request):
     request: WebAPP request sent by remote machine.
 
   Returns:
-    A test_manager.UserProfile that has whitelisted the machine, or None.
+    A user_manager.UserProfile that has whitelisted the machine, or None.
   """
-  user_profile = test_manager.FindUserWithWhitelistedIP(
+  user_profile = user_manager.FindUserWithWhitelistedIP(
       request.remote_addr, request.get('password', None))
 
   return user_profile
