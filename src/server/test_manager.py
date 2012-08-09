@@ -36,6 +36,7 @@ from google.appengine.ext import blobstore
 from google.appengine.ext import db
 from common import dimensions
 from common import test_request_message
+from common import url_helper
 from test_runner import slave_machine
 
 # Fudge factor added to a runner's timeout before we consider it to have run
@@ -424,6 +425,11 @@ class TestRequestManager(object):
     if key:
       runner = TestRunner.get(db.Key(key))
 
+    connection_attempt = web_request.get(url_helper.COUNT_KEY)
+    if connection_attempt:
+      logging.info('This is the %d connection attempt from this machine to '
+                   'POST these results', int(connection_attempt))
+
     if not runner:
       logging.error('No runner associated to web request, ignoring test result')
       return
@@ -460,8 +466,8 @@ class TestRequestManager(object):
     # If the runnner is marked as done, don't try to process another
     # response for it.
     if runner.done:
-      logging.error('Got a second response for runner=%s, not good',
-                    runner.GetName())
+      logging.error('Got a additional response for runner=%s (key %s), '
+                    'not good', runner.GetName(), runner.key())
       return
 
     runner.ran_successfully = success

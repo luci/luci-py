@@ -11,6 +11,7 @@ import logging
 import StringIO
 import time
 import unittest
+import urllib
 import urllib2
 
 import mox  # pylint: disable-msg=C6204
@@ -96,6 +97,32 @@ class UrlHelperTest(unittest.TestCase):
     # we get an HTTPError.
     self.assertEqual(url_helper.UrlOpen('url', max_tries=5), None)
 
+    self._mox.VerifyAll()
+
+  def testEnsureCountKeyIncludedInOpen(self):
+    attempts = 5
+    for i in range(attempts):
+      encoded_data = urllib.urlencode({url_helper.COUNT_KEY: i})
+
+      url_helper.urllib2.urlopen(
+          mox.IgnoreArg(), encoded_data).AndRaise(urllib2.URLError('url'))
+      logging.info(mox.IgnoreArg(), mox.IgnoreArg(), mox.IgnoreArg(),
+                   mox.IgnoreArg())
+      time.sleep(mox.IgnoreArg())
+
+    logging.error(mox.IgnoreArg(), mox.IgnoreArg(), mox.IgnoreArg())
+    self._mox.ReplayAll()
+
+    self.assertEqual(url_helper.UrlOpen('url', max_tries=attempts), None)
+    self._mox.VerifyAll()
+
+  def testCountKeyInData(self):
+    data = {url_helper.COUNT_KEY: 1}
+
+    logging.error(mox.StrContains('existed in the data'), url_helper.COUNT_KEY)
+    self._mox.ReplayAll()
+
+    self.assertEqual(url_helper.UrlOpen('url', data=data), None)
     self._mox.VerifyAll()
 
 
