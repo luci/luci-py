@@ -90,10 +90,15 @@ def ModifyUserProfileAddWhitelist(user, ip, password=None):
 
   # Ignore duplicate requests.
   if query.count() == 0:
-    # Create a new entry.
-    white_list = MachineWhitelist(
-        user_profile=user_profile, ip=ip, password=password)
-    white_list.put()
+    # Create a new entry if it doesn't already exist but belong to another user.
+    white_list = MachineWhitelist.get_or_insert(
+        str(ip), user_profile=user_profile, ip=ip, password=password)
+
+    if white_list.user_profile.user != user:
+      logging.debug('User %s trying to whitelist ip %s whitelisted by user %s',
+                    user.email(), ip, white_list.user_profile.user.email())
+      return False
+
     logging.debug('Stored ip: %s', ip)
   else:
     logging.info('Ignored duplicate whitelist request for ip: %s', ip)
