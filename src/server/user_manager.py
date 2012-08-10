@@ -94,6 +94,9 @@ def ModifyUserProfileAddWhitelist(user, ip, password=None):
     white_list = MachineWhitelist.get_or_insert(
         str(ip), user_profile=user_profile, ip=ip, password=password)
 
+    # The call to get_or_insert() returns either an existing Machinewhitelist
+    # for the given IP concurrently created by another user, or the newly
+    # created one for this user. Check to see which one happened.
     if white_list.user_profile.user != user:
       logging.debug('User %s trying to whitelist ip %s whitelisted by user %s',
                     user.email(), ip, white_list.user_profile.user.email())
