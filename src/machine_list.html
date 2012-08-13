@@ -11,6 +11,13 @@
 </div>
 
 <h1>Polled Machines</h1>
+<p>Sort By:
+<select id="sort" onchange="document.location.href='?sort_by=' + this.value">
+<option value="">-</option>
+<option value="machine_id">Machine ID</option>
+<option value="tag">Tag</option>
+<option value="assignment_time">Last Assignment Time</option>
+</p>
 <table id="machine-table"
     summary="This table lists all machines that have polled this server">
 <tr>

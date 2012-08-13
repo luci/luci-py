@@ -223,11 +223,13 @@ class MachineListHandler(webapp2.RequestHandler):
   """
 
   def get(self):  # pylint: disable-msg=C6409
+    """Handles HTTP GET requests for this handler's URL."""
     user_profile = user_manager.GetUserProfile(users.get_current_user())
+    sort_by = self.request.get('sort_by', 'machine_id')
 
     params = {
         'topbar': GenerateTopbar(),
-        'machines': test_manager.GetAllUserMachines(user_profile)
+        'machines': test_manager.GetAllUserMachines(user_profile, sort_by)
     }
 
     path = os.path.join(os.path.dirname(__file__), 'machine_list.html')

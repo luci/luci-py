@@ -1184,17 +1184,23 @@ class TestRequestManager(object):
     return file_data
 
 
-def GetAllUserMachines(user_profile):
+def GetAllUserMachines(user_profile, sort_by='machine_id'):
   """Get the list of the user's whitelisted machines.
 
   Args:
     user_profile: The profile of the user that whitelisted the machines.
+    sort_by: The string of the attribute to sort the machines by.
 
   Returns:
     An iterator of all machines whitelisted by the user.
   """
-  return (machine for machine in MachineAssignment.gql('WHERE user = :1',
-                                                       user_profile.user))
+  # If we recieve an invalid sort_by parameter, just default to machine_id.
+  # Also change sort by user, since all the machines will have the same user.
+  if not sort_by in MachineAssignment.properties() or sort_by == 'user':
+    sort_by = 'machine_id'
+
+  return (machine for machine in MachineAssignment.gql(
+      'WHERE user = :1 ORDER BY %s' % sort_by, user_profile.user))
 
 
 def _GetCurrentTime():
