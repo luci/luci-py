@@ -2,9 +2,7 @@ application: your-swarm-application-name
 version: 1
 runtime: python27
 api_version: 1
-# We have no strong indication yet that Swarm isn't
-# thread safe. But we surpass that for now to be safe.
-threadsafe: false
+threadsafe: true
 
 handlers:
 - url: /tasks/poll
