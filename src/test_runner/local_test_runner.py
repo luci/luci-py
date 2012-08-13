@@ -559,13 +559,16 @@ class LocalTestRunner(object):
     return (num_failures == 0, result_codes,
             '%s\n\n %d FAILED TESTS\n' % (result_string, num_failures))
 
-  def PublishResults(self, success, result_codes, result_string):
+  def PublishResults(self, success, result_codes, result_string,
+                     overwrite=False):
     """Publish the given result string to the result_url if any.
 
     Args:
       success: True if we must specify [?|&]s=true. False otherwise.
       result_codes: The array of exit codes to be published, one per action.
       result_string: The result to be published.
+      overwrite: True if we should signal the server to overwrite any old
+          result data it may have.
 
     Returns:
       True if we succeeded or had nothing to do, False otherwise.
@@ -582,7 +585,8 @@ class LocalTestRunner(object):
               'c': self.test_run.configuration.config_name,
               'x': ', '.join([str(i) for i in result_codes]),
               's': success,
-              'r': result_string}
+              'r': result_string,
+              'o': overwrite}
 
       if not url_helper.UrlOpen(self.test_run.result_url, data,
                                 self.max_url_retries):
@@ -615,7 +619,7 @@ class LocalTestRunner(object):
     self.logging_file_handler.close()
     # We let exceptions go through since there isn't much we can do with them.
     log_file = open(self.log_file_name)
-    self.PublishResults(False, [], log_file.read())
+    self.PublishResults(False, [], log_file.read(), overwrite=True)
     log_file.close()
 
   def TestLogException(self, message):
@@ -662,9 +666,10 @@ def main():
   except Error, e:
     logging.exception('Can\'t create TestRunner with file: %s.\nException: %s',
                       options.request_file_name, e)
+    published = False
     if runner:
-      runner.PublishInternalErrors()
-    return 1
+      published = runner.PublishInternalErrors()
+    return int(not published)
 
   try:
     if runner.DownloadAndExplodeData():
@@ -674,7 +679,8 @@ def main():
   except Exception, e:  # pylint: disable-msg=W0703
     # We want to catch all so that we can report all errors, even internal ones.
     logging.exception(e)
-  runner.PublishInternalErrors()
+    return not runner.PublishInternalErrors()
+
   return 1
 
 

@@ -406,10 +406,12 @@ class TestRequestManager(object):
     success = web_request.get('s', 'False') == 'True'
     result_string = urllib.unquote_plus(web_request.get('r'))
     exit_codes = urllib.unquote_plus(web_request.get('x'))
-    self._UpdateTestResult(runner, success, exit_codes, result_string)
+    overwrite = urllib.unquote_plus(web_request.get('o'))
+    self._UpdateTestResult(runner, success, exit_codes, result_string,
+                           overwrite)
 
   def _UpdateTestResult(self, runner, success=False, exit_codes='',
-                        result_string='Tests aborted'):
+                        result_string='Tests aborted', overwrite=False):
     """Update the runner with results of a test run.
 
     Args:
@@ -418,14 +420,16 @@ class TestRequestManager(object):
       success: a boolean indicating whether the test run succeeded or not.
       exit_codes: a string containing the array of exit codes of the test run.
       result_string: a string containing the output of the test run.
+      overwrite: a boolean indicating if we should always record this result,
+          even if a result had been previously recorded.
     """
     if not runner:
       logging.error('runner argument must be given')
       return
 
     # If the runnner is marked as done, don't try to process another
-    # response for it.
-    if runner.done:
+    # response for it, unless overwrite is enable.
+    if runner.done and not overwrite:
       logging.error('Got a additional response for runner=%s (key %s), '
                     'not good', runner.GetName(), runner.key())
       return
