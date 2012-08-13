@@ -1057,11 +1057,7 @@ class TestRequestManager(object):
     test_run = self._BuildTestRun(runner)
 
     # Load the scripts.
-    try:
-      files_to_upload = self._GetFilesToUpload(test_run)
-    except IOError as e:
-      logging.exception(str(e))
-      raise PrepareRemoteCommandsError
+    files_to_upload = self._GetFilesToUpload(test_run)
 
     # TODO(user): Use separate module for RPC related stuff rather
     # than slave_machine.
@@ -1094,7 +1090,8 @@ class TestRequestManager(object):
       the format: (path to file on remote machine, file name, file contents).
 
     Raises:
-      IOError: A file cannot be loaded.
+      PrepareRemoteCommandsErrors: If there is an error is reading the local
+          files.
     """
     # A list of tuples containing script paths on local and remote machine. Each
     # tuple has the format:
@@ -1146,13 +1143,12 @@ class TestRequestManager(object):
 
     files_to_upload = []
 
-    # TODO(user): On app engine we don't have access to files on disk.
-    # Need to find an alternative to loading files from disk.
     for local_path, remote_path, file_name in file_paths:
       try:
         file_contents = self._LoadFile(local_path)
-      except IOError:
-        raise
+      except IOError as e:
+        logging.exception(str(e))
+        raise PrepareRemoteCommandsError
 
       files_to_upload.append((remote_path, file_name, file_contents))
 

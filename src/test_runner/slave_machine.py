@@ -531,6 +531,7 @@ def ParseRPC(rpc):
 
   logging.debug('rpc function name: ' + function)
   logging.debug('rpc function arg type: ' + str(type(args)))
+  logging.debug('rpc function args: %s', str(args))
 
   return (function, args)
 
