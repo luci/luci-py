@@ -27,9 +27,17 @@ from server import user_manager
 _NUM_USER_TEST_RUNNERS_PER_PAGE = 50
 _NUM_RECENT_ERRORS_TO_DISPLAY = 10
 
-_HOME_URL = '<a href=/secure/main>Home</a>'
-_PROFILE_URL = '<a href=/secure/user_profile>Profile</a>'
-_MACHINE_LIST_URL = '<a href=/secure/machine_list>Machine List</a>'
+_HOME_LINK = '<a href=/secure/main>Home</a>'
+_PROFILE_LINK = '<a href=/secure/user_profile>Profile</a>'
+_MACHINE_LIST_LINK = '<a href=/secure/machine_list>Machine List</a>'
+
+
+_SECURE_CANCEL_URL = '/secure/cancel'
+_SECURE_CHANGE_WHITELIST_URL = '/secure/change_whitelist'
+_SECURE_DELETE_MACHINE_ASSIGNMENT_URL = '/secure/delete_machine_assignment'
+_SECURE_GET_RESULTS_URL = '/secure/get_result'
+_SECURE_MAIN_URL = '/secure/main'
+_SECURE_USER_PROFILE_URL = '/secure/user_profile'
 
 
 def GenerateTopbar():
@@ -42,9 +50,9 @@ def GenerateTopbar():
     topbar = ('%s |  <a href="%s">Sign out</a><br/> %s | %s | % s' %
               (users.get_current_user().nickname(),
                users.create_logout_url('/'),
-               _HOME_URL,
-               _PROFILE_URL,
-               _MACHINE_LIST_URL))
+               _HOME_LINK,
+               _PROFILE_LINK,
+               _MACHINE_LIST_LINK))
   else:
     topbar = '<a href="%s">Sign in</a>' % users.create_login_url('/')
 
@@ -173,7 +181,8 @@ class MainHandler(webapp2.RequestHandler):
     if not runner.started:
       runner.status_string = 'Pending'
       runner.command_string = (
-          '<a href="/secure/cancel?r=%s">Cancel</a>' % runner.key_string)
+          '<a href="%s?r=%s">Cancel</a>' % (_SECURE_CANCEL_URL,
+                                            runner.key_string))
     elif not runner.done:
       if detailed_output:
         runner.status_string = 'Running on machine %s' % runner.machine_id
@@ -191,8 +200,8 @@ class MainHandler(webapp2.RequestHandler):
       if runner.ran_successfully:
         if detailed_output:
           runner.status_string = (
-              '<a title="Click to see results" href="/secure/get_result?r=%s">'
-              'Succeeded</a>' % runner.key_string)
+              '<a title="Click to see results" href="%s?r=%s">Succeeded</a>' %
+              (_SECURE_GET_RESULTS_URL, runner.key_string))
         else:
           runner.status_string = 'Succeeded'
       else:
@@ -201,8 +210,8 @@ class MainHandler(webapp2.RequestHandler):
             '<a href="/secure/retry?r=%s">Retry</a>' % runner.key_string)
         if detailed_output:
           runner.status_string = (
-              '<a title="Click to see results" href="/secure/get_result?r=%s">'
-              'Failed</a>' % runner.key_string)
+              '<a title="Click to see results" href=%s"?r=%s">Failed</a>' %
+              (_SECURE_GET_RESULTS_URL, runner.key_string))
         else:
           runner.status_string = 'Failed'
 
@@ -212,7 +221,7 @@ class RedirectToMainHandler(webapp2.RequestHandler):
 
   def get(self):  # pylint: disable-msg=C6409
     """Handles HTTP GET requests for this handler's URL."""
-    self.redirect('secure/main')
+    self.redirect(_SECURE_MAIN_URL)
 
 
 class MachineListHandler(webapp2.RequestHandler):
@@ -235,8 +244,8 @@ class MachineListHandler(webapp2.RequestHandler):
     machines_displayable = []
     for machine in machines:
       machine.command_string = (
-          '<a href="/secure/remove_machine_assignment?r=%s">Delete</a>' %
-          machine.key())
+          '<a href="%s?r=%s">Delete</a>' %
+          (_SECURE_DELETE_MACHINE_ASSIGNMENT_URL, machine.key()))
       machines_displayable.append(machine)
 
     params = {
@@ -554,19 +563,18 @@ class UserProfileHandler(webapp2.RequestHandler):
 
   def get(self):  # pylint: disable-msg=C6409
     """Handles HTTP GET requests for this handler's URL."""
-    user = users.get_current_user()
     topbar = GenerateTopbar()
 
     display_whitelists = []
 
-    user_profile = user_manager.UserProfile.all().filter('user =', user).get()
+    user_profile = user_manager.GetUserProfile(user=users.get_current_user())
     if user_profile:
       for stored_whitelist in user_profile.whitelist:
         whitelist = {}
         whitelist['ip'] = stored_whitelist.ip
         whitelist['password'] = stored_whitelist.password
         whitelist['key'] = stored_whitelist.key()
-        whitelist['url'] = '/secure/change_whitelist'
+        whitelist['url'] = _SECURE_CHANGE_WHITELIST_URL
         display_whitelists.append(whitelist)
 
     params = {
@@ -597,7 +605,7 @@ class ChangeWhitelistHandler(webapp2.RequestHandler):
     elif add == 'False':
       user_manager.ModifyUserProfileDelWhitelist(users.get_current_user(), ip)
 
-    self.redirect('/secure/user_profile', permanent=True)
+    self.redirect(_SECURE_USER_PROFILE_URL, permanent=True)
 
   def get(self):  # pylint: disable-msg=C6409
     self.post()
@@ -700,21 +708,22 @@ def CreateApplication():
                                   ('/poll_for_test', RegisterHandler),
                                   ('/remote_error', RemoteErrorHandler),
                                   ('/result', ResultHandler),
-                                  ('/secure/cancel', CancelHandler),
-                                  ('/secure/change_whitelist',
-                                   ChangeWhitelistHandler),
-                                  ('/secure/get_result',
-                                   SecureGetResultHandler),
                                   ('/secure/machine_list', MachineListHandler),
-                                  ('/secure/main', MainHandler),
                                   ('/secure/retry', RetryHandler),
-                                  ('/secure/delete_machine_assignment',
-                                   DeleteMachineAssignmentHandler),
                                   ('/secure/show_message',
                                    ShowMessageHandler),
-                                  ('/secure/user_profile', UserProfileHandler),
                                   ('/tasks/poll', PollHandler),
-                                  ('/test', TestRequestHandler)],
+                                  ('/test', TestRequestHandler),
+                                  (_SECURE_CANCEL_URL, CancelHandler),
+                                  (_SECURE_CHANGE_WHITELIST_URL,
+                                   ChangeWhitelistHandler),
+                                  (_SECURE_DELETE_MACHINE_ASSIGNMENT_URL,
+                                   DeleteMachineAssignmentHandler),
+                                  (_SECURE_GET_RESULTS_URL,
+                                   SecureGetResultHandler),
+                                  (_SECURE_MAIN_URL, MainHandler),
+                                  (_SECURE_USER_PROFILE_URL,
+                                   UserProfileHandler)],
                                  debug=True)
 
 app = CreateApplication()
