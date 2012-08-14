@@ -588,8 +588,11 @@ class LocalTestRunner(object):
               'r': result_string,
               'o': overwrite}
 
-      if not url_helper.UrlOpen(self.test_run.result_url, data,
-                                self.max_url_retries):
+      url_results = url_helper.UrlOpen(self.test_run.result_url, data,
+                                       self.max_url_retries)
+      if url_results is None:
+        logging.error('Failed to publish results to given url, %s',
+                      self.test_run.result_url)
         return False
     elif result_url_parts[0] == 'file':
       file_path = '%s%s' % (result_url_parts[1], result_url_parts[2])
