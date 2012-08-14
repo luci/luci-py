@@ -621,7 +621,10 @@ def main():
   os.chdir(options.directory)
 
   # Start requesting jobs.
-  slave.Start(iterations=options.iterations)
+  try:
+    slave.Start(iterations=options.iterations)
+  except SlaveError as e:
+    logging.exception('Slave start threw an exception:\n%s', e)
 
 
 if __name__ == '__main__':
