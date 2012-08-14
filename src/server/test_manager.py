@@ -1203,6 +1203,29 @@ def GetAllUserMachines(user_profile, sort_by='machine_id'):
       'WHERE user = :1 ORDER BY %s' % sort_by, user_profile.user))
 
 
+def DeleteMachineAssignment(key):
+  """Delete the machine assignment referenced to by the given key.
+
+  Args:
+    key: The key of the machine assignment to delete.
+
+  Returns:
+    True if the key was valid and machine assignment was successfully deleted.
+  """
+  try:
+    machine_assignment = MachineAssignment.get(key)
+  except (db.BadKeyError, db.BadArgumentError):
+    logging.error('Invalid MachineAssignment key given, %s', str(key))
+    return False
+
+  if not machine_assignment:
+    logging.error('No MachineAssignment has key %s', str(key))
+    return False
+
+  machine_assignment.delete()
+  return True
+
+
 def _GetCurrentTime():
   """Gets the current time.
 

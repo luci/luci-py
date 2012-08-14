@@ -15,6 +15,21 @@ indexes:
   - name: id
   - name: status
 
+- kind: MachineAssignment
+  properties:
+  - name: user
+  - name: assignment_time
+
+- kind: MachineAssignment
+  properties:
+  - name: user
+  - name: machine_id
+
+- kind: MachineAssignment
+  properties:
+  - name: user
+  - name: tag
+
 - kind: TestRunner
   properties:
   - name: done

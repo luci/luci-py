@@ -227,13 +227,38 @@ class MachineListHandler(webapp2.RequestHandler):
     user_profile = user_manager.GetUserProfile(users.get_current_user())
     sort_by = self.request.get('sort_by', 'machine_id')
 
+    machines = []
+    if user_profile:
+      machines = test_manager.GetAllUserMachines(user_profile, sort_by)
+
+    # Add a delete option for each machine assignment.
+    machines_displayable = []
+    for machine in machines:
+      machine.command_string = (
+          '<a href="/secure/remove_machine_assignment?r=%s">Delete</a>' %
+          machine.key())
+      machines_displayable.append(machine)
+
     params = {
         'topbar': GenerateTopbar(),
-        'machines': test_manager.GetAllUserMachines(user_profile, sort_by)
+        'machines': machines_displayable
     }
 
     path = os.path.join(os.path.dirname(__file__), 'machine_list.html')
     self.response.out.write(template.render(path, params))
+
+
+class DeleteMachineAssignmentHandler(webapp2.RequestHandler):
+  """Handler to delete a machine assignment."""
+
+  def post(self):  # pylint:disable-msg=C6409
+    """Handles HTTP POST requests for this handler's URL."""
+    key = self.request.get('r')
+
+    if key and test_manager.DeleteMachineAssignment(key):
+      self.response.out.write('Machine Assignment removed.')
+    else:
+      self.response.set_status(204)
 
 
 class TestRequestHandler(webapp2.RequestHandler):
@@ -241,8 +266,6 @@ class TestRequestHandler(webapp2.RequestHandler):
 
   def post(self):  # pylint: disable-msg=C6409
     """Handles HTTP POST requests for this handler's URL."""
-    test_request_manager = CreateTestManager()
-
     # TODO(user): This handler uses the un-encoded request body to
     # get the Swarm test request. A any call to self.request.get will
     # change the body and encode it. Thus, for now we simply make a copy
@@ -260,6 +283,7 @@ class TestRequestHandler(webapp2.RequestHandler):
       self.response.out.write('Request must have a body')
       return
 
+    test_request_manager = CreateTestManager()
     try:
       test_request_manager.UpdateCacheServerURL(self.request.host_url)
       response = str(test_request_manager.ExecuteTestRequest(
@@ -278,14 +302,13 @@ class ResultHandler(webapp2.RequestHandler):
 
   def post(self):  # pylint: disable-msg=C6409
     """Handles HTTP POST requests for this handler's URL."""
-    test_request_manager = CreateTestManager()
-
     user_profile = AuthenticateRemoteMachine(self.request)
     if not user_profile:
       SendAuthenticationFailure(self.request, self.response)
       return
 
     logging.debug('Received Result: %s', self.request.url)
+    test_request_manager = CreateTestManager()
     test_request_manager.UpdateCacheServerURL(self.request.host_url)
     test_request_manager.HandleTestResults(self.request, user_profile)
 
@@ -433,8 +456,6 @@ class CancelHandler(webapp2.RequestHandler):
 
   def get(self):  # pylint: disable-msg=C6409
     """Handles HTTP GET requests for this handler's URL."""
-    test_request_manager = CreateTestManager()
-
     self.response.headers['Content-Type'] = 'text/plain'
 
     key = self.request.get('r', '')
@@ -443,6 +464,7 @@ class CancelHandler(webapp2.RequestHandler):
 
     # Make sure found runner is not yet running.
     if runner and not runner.started:
+      test_request_manager = CreateTestManager()
       test_request_manager.UpdateCacheServerURL(self.request.host_url)
       test_request_manager.AbortRunner(
           runner, reason='Runner is not already running.')
@@ -686,6 +708,8 @@ def CreateApplication():
                                   ('/secure/machine_list', MachineListHandler),
                                   ('/secure/main', MainHandler),
                                   ('/secure/retry', RetryHandler),
+                                  ('/secure/delete_machine_assignment',
+                                   DeleteMachineAssignmentHandler),
                                   ('/secure/show_message',
                                    ShowMessageHandler),
                                   ('/secure/user_profile', UserProfileHandler),

@@ -17,6 +17,7 @@
 <option value="machine_id">Machine ID</option>
 <option value="tag">Tag</option>
 <option value="assignment_time">Last Assignment Time</option>
+</select>
 </p>
 <table id="machine-table"
     summary="This table lists all machines that have polled this server">
@@ -24,12 +25,14 @@
 <th>ID</th>
 <th>Tag</th>
 <th>Time of Last Assignment</th>
+<th>&nbsp;</th>
 </tr>
 {% for machine in machines %}
 <tr class="request {% cycle even,odd %}">
 <td>{{machine.machine_id}}</td>
 <td>{{machine.tag}}</td>
 <td>{{machine.assignment_time}}</td>
+<td>{{machine.command_string|safe}}</td>
 </tr>
 {% endfor %}
 </table>
