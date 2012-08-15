@@ -559,15 +559,14 @@ def main():
   parser.add_option('-p', '--port', default='8080', type='int',
                     help='Port of the Swarm server. '
                     'Defaults to %default. ')
-  parser.add_option('-r', '--max_url_tries', default=10,
+  parser.add_option('-r', '--max_url_tries', default=10, type='int',
                     help='The maximum number of times url messages will '
                     'attempt to be sent before accepting failure. Defaults '
                     'to %default')
   parser.add_option('-v', '--verbose', action='store_true',
                     help='Set logging level to DEBUG. Optional. Defaults to '
                     'ERROR level.')
-  parser.add_option('-i', '--iterations', default=-1,
-                    type='int',
+  parser.add_option('-i', '--iterations', default=-1, type='int',
                     help='Number of iterations to request jobs from '
                     'Swarm server. Defaults to %default (infinite).')
   parser.add_option('-d', '--directory', default='.',
