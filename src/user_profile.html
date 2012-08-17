@@ -33,7 +33,7 @@
 
 <div>
 <h1>Add New:</h1>
-<form name="input" action="/secure/change_whitelist" method="post">
+<form name="input" action="{{change_whitelist_url|safe}}" method="post">
 IP (x.x.x.x): <input type="text" name="i" />
 Password: <input type="text" name="p" />
 <input type="hidden" name="a" value="True">

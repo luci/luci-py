@@ -16,6 +16,7 @@ import os
 import subprocess
 import time
 import unittest
+import urllib
 import urllib2
 import urlparse
 
@@ -43,17 +44,22 @@ class _ProcessWrapper(object):
 class _SwarmTestCase(unittest.TestCase):
   """Test case class for Swarm integration tests."""
 
-  def GetAdminUrl(self, url):
-    """"Converts the given url to an admin privilege one.
+  def GetAdminUrl(self, url=None):
+    """"Returns an url to login an admin user and then go to a url (if given).
 
     Args:
-      url: The url to be converted.
+      url: The url to continue to.
+
     Returns:
-      The converted url.
+      The full url.
     """
-    return urlparse.urljoin(self._swarm_server_url, '_ah/login?'
-                            'email=john@doe.com&admin=True&action=Login&'
-                            'continue=' + urllib2.quote(url))
+    admin_url = urlparse.urljoin(self._swarm_server_url, '_ah/login?'
+                                 'email=john@doe.com&admin=True&action=Login')
+
+    if url:
+      admin_url += '&continue=' + urllib2.quote(url)
+
+    return admin_url
 
   def setUp(self):
     self._swarm_server_process = None
@@ -88,9 +94,11 @@ class _SwarmTestCase(unittest.TestCase):
     # Whitelist the machine to be allowed to run tests.
     cj = cookielib.CookieJar()
     opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cj))
-    test = self.GetAdminUrl(urlparse.urljoin(self._swarm_server_url,
-                                             'secure/change_whitelist?a=True'))
-    opener.open(test)
+    opener.open(self.GetAdminUrl())
+
+    opener.open(urlparse.urljoin(self._swarm_server_url,
+                                 'secure/change_whitelist'),
+                urllib.urlencode({'a': True}))
 
     # Start the slave machine script to start polling for tests.
     logging.info('Current dir: %s', os.getcwd())
@@ -167,12 +175,11 @@ class _SwarmTestCase(unittest.TestCase):
         logging.info('Polling Swarm server')
         cj = cookielib.CookieJar()
         opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cj))
-        opener.open(self.GetAdminUrl(urlparse.urljoin(self._swarm_server_url,
-                                                      'tasks/poll')))
-        # We need to poll twice, once for assigning the machine and a second
-        # one to start the test. TODO(user): This should be fixed in the server.
-        # No need for admin URL the second time...
-        opener.open(urlparse.urljoin(self._swarm_server_url, 'tasks/poll'))
+        opener.open(self.GetAdminUrl())
+
+        # We include fake data to ensure the request is a POST.
+        opener.open(urlparse.urljoin(self._swarm_server_url, 'tasks/poll'),
+                    urllib.urlencode({'fake': 'data'}))
       except urllib2.URLError as ex:
         self.fail('Error: %s' % str(ex))
 

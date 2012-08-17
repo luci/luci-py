@@ -59,6 +59,26 @@ def GenerateTopbar():
   return topbar
 
 
+def GenerateButtonWithHiddenForm(button_text, url, form_id):
+  """Generate a button that when used will post to the given url.
+
+  Args:
+    button_text: The text to display on the button.
+    url: The url to post to.
+    form_id: The id to give the form.
+
+  Returns:
+    The html text to display the button.
+  """
+  button_html = '<form id="%s" method="post" action=%s>' % (form_id, url)
+  button_html += (
+      '<button onclick="document.getElementById(%s).submit()">%s</button>' %
+      (form_id, button_text))
+  button_html += '</form>'
+
+  return button_html
+
+
 class MainHandler(webapp2.RequestHandler):
   """Handler for the main page of the web server.
 
@@ -180,9 +200,10 @@ class MainHandler(webapp2.RequestHandler):
 
     if not runner.started:
       runner.status_string = 'Pending'
-      runner.command_string = (
-          '<a href="%s?r=%s">Cancel</a>' % (_SECURE_CANCEL_URL,
-                                            runner.key_string))
+      runner.command_string = GenerateButtonWithHiddenForm(
+          'Cancel', '%s?r=%s' % (_SECURE_CANCEL_URL, runner.key_string),
+          runner.key_string)
+
     elif not runner.done:
       if detailed_output:
         runner.status_string = 'Running on machine %s' % runner.machine_id
@@ -206,8 +227,9 @@ class MainHandler(webapp2.RequestHandler):
           runner.status_string = 'Succeeded'
       else:
         runner.failed_test_class_string = 'failed_test'
-        runner.command_string = (
-            '<a href="/secure/retry?r=%s">Retry</a>' % runner.key_string)
+        runner.command_string = GenerateButtonWithHiddenForm(
+            'Retry', '/secure/retry?r=%s' % runner.key_string,
+            runner.key_string)
         if detailed_output:
           runner.status_string = (
               '<a title="Click to see results" href=%s"?r=%s">Failed</a>' %
@@ -243,9 +265,10 @@ class MachineListHandler(webapp2.RequestHandler):
     # Add a delete option for each machine assignment.
     machines_displayable = []
     for machine in machines:
-      machine.command_string = (
-          '<a href="%s?r=%s">Delete</a>' %
-          (_SECURE_DELETE_MACHINE_ASSIGNMENT_URL, machine.key()))
+      machine.command_string = GenerateButtonWithHiddenForm(
+          'Delete',
+          '%s?r=%s' % (_SECURE_DELETE_MACHINE_ASSIGNMENT_URL, machine.key()),
+          machine.key())
       machines_displayable.append(machine)
 
     params = {
@@ -325,7 +348,7 @@ class ResultHandler(webapp2.RequestHandler):
 class PollHandler(webapp2.RequestHandler):
   """Handles cron job to poll Machine Provider to execute pending requests."""
 
-  def get(self):  # pylint: disable-msg=C6409
+  def post(self):  # pylint: disable-msg=C6409
     """Handles HTTP GET requests for this handler's URL."""
     test_request_manager = CreateTestManager()
 
@@ -463,7 +486,7 @@ class CleanupResultsHandler(webapp2.RequestHandler):
 class CancelHandler(webapp2.RequestHandler):
   """Cancel a test runner that is not already running."""
 
-  def get(self):  # pylint: disable-msg=C6409
+  def post(self):  # pylint: disable-msg=C6409
     """Handles HTTP GET requests for this handler's URL."""
     self.response.headers['Content-Type'] = 'text/plain'
 
@@ -486,7 +509,7 @@ class CancelHandler(webapp2.RequestHandler):
 class RetryHandler(webapp2.RequestHandler):
   """Retry a test runner again."""
 
-  def get(self):  # pylint: disable-msg=C6409
+  def post(self):  # pylint: disable-msg=C6409
     """Handles HTTP GET requests for this handler's URL."""
     self.response.headers['Content-Type'] = 'text/plain'
 
@@ -580,6 +603,7 @@ class UserProfileHandler(webapp2.RequestHandler):
     params = {
         'topbar': topbar,
         'whitelists': display_whitelists,
+        'change_whitelist_url': _SECURE_CHANGE_WHITELIST_URL
     }
 
     path = os.path.join(os.path.dirname(__file__), 'user_profile.html')
@@ -606,9 +630,6 @@ class ChangeWhitelistHandler(webapp2.RequestHandler):
       user_manager.ModifyUserProfileDelWhitelist(users.get_current_user(), ip)
 
     self.redirect(_SECURE_USER_PROFILE_URL, permanent=True)
-
-  def get(self):  # pylint: disable-msg=C6409
-    self.post()
 
 
 class RemoteErrorHandler(webapp2.RequestHandler):
