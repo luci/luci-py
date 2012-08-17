@@ -389,8 +389,6 @@ class GetMatchingTestCasesHandler(webapp2.RequestHandler):
 
   def get(self):  # pylint: disable-msg=C6409
     """Handles HTTP GET requests for this handler's URL."""
-    test_request_manager = CreateTestManager()
-
     user_profile = AuthenticateRemoteMachine(self.request)
     if not user_profile:
       SendAuthenticationFailure(self.request, self.response)
@@ -400,7 +398,7 @@ class GetMatchingTestCasesHandler(webapp2.RequestHandler):
 
     test_case_name = self.request.get('name', '')
 
-    matches = test_request_manager.GetAllMatchingTestRequests(
+    matches = test_manager.GetAllMatchingTestRequests(
         test_case_name, user_profile)
     keys = []
     for match in matches:
@@ -543,8 +541,6 @@ class RegisterHandler(webapp2.RequestHandler):
 
   def post(self):  # pylint: disable-msg=C6409
     """Handles HTTP POST requests for this handler's URL."""
-    test_request_manager = CreateTestManager()
-
     user_profile = AuthenticateRemoteMachine(self.request)
     if not user_profile:
       SendAuthenticationFailure(self.request, self.response)
@@ -556,6 +552,7 @@ class RegisterHandler(webapp2.RequestHandler):
       self.response.out.write('Request must have a body')
       return
 
+    test_request_manager = CreateTestManager()
     test_request_manager.UpdateCacheServerURL(self.request.host_url)
     attributes_str = self.request.get('attributes')
     try:
@@ -576,6 +573,29 @@ class RegisterHandler(webapp2.RequestHandler):
       response = 'Error: %s' % message
 
     self.response.out.write(response)
+
+
+class RunnerPingHandler(webapp2.RequestHandler):
+  """Handler for runner pings to the server.
+
+     The runner pings are used to let the server know a runner is still working,
+     so it won't consider it stale.
+  """
+
+  def post(self):  # pylint: disable-msg=C6409
+    """Handles HTTP POST requests for this handler's URL."""
+    user_profile = AuthenticateRemoteMachine(self.request)
+    if not user_profile:
+      SendAuthenticationFailure(self.request, self.response)
+      return
+
+    key = self.request.get('r', '')
+
+    if test_manager.PingRunner(key, user_profile):
+      self.response.out.write('Runner successfully pinged.')
+    else:
+      self.response.set_status(402)
+      self.response.out.write('Runner failed to ping.')
 
 
 class UserProfileHandler(webapp2.RequestHandler):
@@ -693,11 +713,10 @@ def SendRunnerResults(response, key, user_profile):
     key: Key identifying the runner.
     user_profile: The user requesting the results.
   """
-  test_request_manager = CreateTestManager()
-
   response.headers['Content-Type'] = 'text/plain'
   results = None
   try:
+    test_request_manager = CreateTestManager()
     results = test_request_manager.GetRunnerResults(key, user_profile)
   except test_manager.AuthenticationError:
     pass
@@ -729,6 +748,7 @@ def CreateApplication():
                                   ('/poll_for_test', RegisterHandler),
                                   ('/remote_error', RemoteErrorHandler),
                                   ('/result', ResultHandler),
+                                  ('/runner_ping', RunnerPingHandler),
                                   ('/secure/machine_list', MachineListHandler),
                                   ('/secure/retry', RetryHandler),
                                   ('/secure/show_message',

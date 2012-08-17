@@ -39,10 +39,11 @@ from common import url_helper
 from server import user_manager
 from test_runner import slave_machine
 
-# Fudge factor added to a runner's timeout before we consider it to have run
-# for too long.  Runners that run for too long will be aborted automatically.
+# The amount of time to wait after recieving a runners last message before
+# considering the runner to have run for too long. Runners that run for too
+# long will be aborted automatically.
 # Specified in number of seconds.
-_TIMEOUT_FUDGE_FACTOR = 600
+_TIMEOUT_FACTOR = 600
 
 # Default Test Run Swarm filename.  This file provides parameters
 # for the instance running tests.
@@ -222,6 +223,11 @@ class TestRunner(db.Model):
   # fact that it is None to identify if a test was started or not.
   started = db.DateTimeProperty()
 
+  # The last time a ping was recieved from the remote machine currently
+  # running the test. This is used to determine if a machine has become
+  # unresponse, which causes the runner to become aborted.
+  ping = db.DateTimeProperty()
+
   # The time at which this runner ended.  This attribute is valid only when
   # the runner has ended (i.e. done == True). Until then, the value is
   # unspecified.
@@ -270,22 +276,6 @@ class TestRunner(db.Model):
     config = self.test_request.GetConfiguration(self.config_name)
     assert config is not None
     return config
-
-  def GetTimeout(self):
-    """Get the timeout for this runner in seconds.
-
-    The timeout applicable to this runner is the sum of the timeouts of each
-    test that it will run.  The set of tests run is the union of the tests
-    specified in the TestCase object of the request plus the tests specified
-    in the Configuration object associated with this runner.
-
-    Returns:
-      The timeout value for this runner in seconds.
-    """
-    test_case = self.test_request.GetTestCase()
-    config = self.GetConfiguration()
-    return (sum([test.time_out for test in test_case.tests]) +
-            sum([test.time_out for test in config.tests]))
 
   def GetResultString(self):
     """Get the result string for the runner.
@@ -549,28 +539,6 @@ class TestRequestManager(object):
       logging.exception(
           'An exception was thrown when attemping to send mail\n%s', e)
 
-  def GetAllMatchingTestRequests(self, test_case_name, user_profile):
-    """Returns a list of all Test Request that match the given test_case_name.
-
-    Args:
-        test_case_name: The test case name to search for.
-        user_profile: The user_profile the tests belong to. Should be a valid
-            profile.
-
-    Returns:
-      A list of all Test Requests that have |test_case_name| as their name.
-    """
-    # The tests sould belong to some user.
-    assert user_profile
-
-    matches = []
-    query = TestRequest.gql('WHERE user_profile = :1 and name = :2',
-                            user_profile, test_case_name)
-    for test_request in query:
-      matches.append(test_request)
-
-    return matches
-
   def ExecuteTestRequest(self, request_message, user_profile):
     """Attempts to execute a test request.
 
@@ -729,19 +697,17 @@ class TestRequestManager(object):
     """Abort any runners that have been running longer than expected."""
     logging.debug('TRM.AbortStaleRunners starting')
     now = _GetCurrentTime()
+    # If any active runner hasn't recieved a ping in the last _TIMEOUT_FACTOR
+    # seconds then we consider it stale and abort it.
+    timeout_cutoff = now - datetime.timedelta(seconds=_TIMEOUT_FACTOR)
 
-    query = TestRunner.gql('WHERE started != :1 AND done = :2', None, False)
+    query = TestRunner.gql(
+        'WHERE done = :1 AND ping != :2 AND ping < :3',
+        False, None, timeout_cutoff)
     for runner in query:
-      # Determine how long the runner should have taken.
-      runner_timeout = runner.GetTimeout() + _TIMEOUT_FUDGE_FACTOR
-
-      # Determine if too much time has expired since the runner began.
-      delta = datetime.timedelta(seconds=runner_timeout)
-      if now > runner.started + delta:
-        # Runner has been going for too long, abort it.
-        logging.info('TRM.AbortStaleRunners aborting runner=%s',
-                     runner.GetName())
-        self.AbortRunner(runner, reason='Runner has become stale.')
+      logging.info('TRM.AbortStaleRunners aborting runner=%s',
+                   runner.GetName())
+      self.AbortRunner(runner, reason='Runner has become stale.')
 
     logging.debug('TRM.AbortStaleRunners done')
 
@@ -790,9 +756,9 @@ class TestRequestManager(object):
 
     Args:
       attributes: A dictionary representing the attributes of the machine
-      registering itself.
+          registering itself.
       user_profile: The user_profile that whitelisted the machine. Should be
-      a valid profile.
+          a valid profile.
 
     Raises:
       test_request_message.Error: If the request format/attributes aren't valid.
@@ -1184,6 +1150,30 @@ class TestRequestManager(object):
     return file_data
 
 
+def GetAllMatchingTestRequests(test_case_name, user_profile):
+  """Returns a list of all Test Request that match the given test_case_name.
+
+  Args:
+      test_case_name: The test case name to search for.
+      user_profile: The user_profile the tests belong to. Should be a valid
+          profile.
+
+  Returns:
+    A list of all Test Requests that have |test_case_name| as their name.
+  """
+  # The tests sould belong to some user.
+  assert user_profile
+
+  matches = []
+  query = TestRequest.gql('WHERE user_profile = :1 and name = :2',
+                          user_profile, test_case_name)
+
+  for test_request in query:
+    matches.append(test_request)
+
+  return matches
+
+
 def GetAllUserMachines(user_profile, sort_by='machine_id'):
   """Get the list of the user's whitelisted machines.
 
@@ -1266,6 +1256,47 @@ def DeleteOldErrors():
   logging.debug('DeleteOldErrors done')
 
 
+def PingRunner(key, user_profile):
+  """Pings the runner, if the key is valid and the user has access to it.
+
+  Args:
+    key: The key of the runner to ping.
+    user_profile: The user_profile that whitelisted the machine. Should be
+        a valid profile.
+
+  Returns:
+    True if the runner is successfully pinged.
+  """
+  assert user_profile
+
+  try:
+    runner = TestRunner.get(key)
+  except (db.BadKeyError, db.KindError, db.BadArgumentError) as e:
+    logging.error('Failed to find runner, %s', str(e))
+    return False
+
+  if not runner:
+    logging.error('Failed to find runner')
+    return False
+
+  # TODO(user): It might be useful to have the local_test_runner include
+  # its machine id and just use that to make sure the correct machine is
+  # pinging the runner.
+  if runner.user != user_profile.user:
+    logging.error('Invalid access: A machine whitelisted by user %s is trying '
+                  'to ping a runner associated with user %s.',
+                  user_profile.user.email(), runner.user.email())
+    return False
+
+  if runner.started is None or runner.done:
+    logging.error('Trying to ping a runner that is not currently running')
+    return False
+
+  runner.ping = datetime.datetime.now()
+  runner.put()
+  return True
+
+
 def AtomicAssignID(key, machine_id):
   """Function to be run by db.run_in_transaction().
 
@@ -1280,6 +1311,7 @@ def AtomicAssignID(key, machine_id):
   if runner and not runner.started:
     runner.machine_id = str(machine_id)
     runner.started = datetime.datetime.now()
+    runner.ping = datetime.datetime.now()
     runner.put()
   else:
     # Tell caller to abort this operation.

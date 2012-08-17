@@ -33,6 +33,11 @@ indexes:
 - kind: TestRunner
   properties:
   - name: done
+  - name: ping
+
+- kind: TestRunner
+  properties:
+  - name: done
   - name: started
 
 - kind: TestRunner
