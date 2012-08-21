@@ -779,8 +779,9 @@ class TestRequestManager(object):
         'WHERE machine_id = :1 AND done = :2', attribs['id'], False).get()
     if unfinished_test:
       logging.error('A machine is asking for a new test, but there is '
-                    'already an unfinished test running on a machine '
-                    'with the same id, %s', attribs['id'])
+                    'already an unfinished test with key, %s, running on a '
+                    'machine with the same id, %s', unfinished_test.key(),
+                    attribs['id'])
 
     # Try assigning machine to a runner 10 times before we give up.
     # TODO(user): Tune this parameter somehow.

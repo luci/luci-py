@@ -864,7 +864,7 @@ class TestRun(TestRequestMessageBase):
   """The object to hold on and validate attributes for a test run.
 
   Attributes:
-    test_run_name: The key to access the name of the test run.
+    test_run_name: The name of the test run.
     env_vars: An optional dictionary for environment variables.
     configuration: An optional configuration object for this test run.
     data: An optional data list for this test run. The strings must be valid

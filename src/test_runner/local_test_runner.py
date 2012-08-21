@@ -74,6 +74,7 @@ Top level Functions:
 
 import exceptions
 import logging
+import logging.handlers
 import os
 from os import path
 import Queue
@@ -91,6 +92,10 @@ import zipfile
 from common import test_request_message
 from common import url_helper
 from test_runner import downloader
+
+
+# The file name of the local rotating log file to store all test results to.
+LOCAL_TEST_RUNNER_CONSTANT_LOG_FILE = 'local_test_runner.log'
 
 
 def EnqueueOutput(out, queue):
@@ -200,18 +205,12 @@ class LocalTestRunner(object):
     # create them in the call to mkstemp above.
     if self.log_file_name:
       self.logging_file_handler.close()  # In case it hasn't been closed yet.
-      try:
-        self._DeleteFileOrDirectory(self.log_file_name)
-      except exceptions.WindowsError, e:
-        logging.exception('Could not delete file "%s": %s', self.log_file_name,
-                          e)
+      if not self._DeleteFileOrDirectory(self.log_file_name):
+        logging.error('Could not delete file "%s"', self.log_file_name)
 
     if self.test_run.cleanup == 'data':  # Implies cleanup zip.
-      try:
-        self._DeleteFileOrDirectory(self.data_dir)
-      except OSError, e:
-        logging.exception('Could not delete data directory "%s": %s',
-                          self.data_dir, e)
+      if not self._DeleteFileOrDirectory(self.data_dir):
+        logging.error('Could not delete data directory "%s"', self.data_dir)
 
   def _DeleteFileOrDirectory(self, name):
     """Deletes a file/directory, trying several times in case we need to wait.
@@ -219,7 +218,7 @@ class LocalTestRunner(object):
     Args:
       name: The name of the file or directory to delete.
     """
-    for unused_i in range(5):
+    for _ in range(5):
       try:
         if os.path.exists(name):
           if os.path.isdir(name):
@@ -227,7 +226,8 @@ class LocalTestRunner(object):
           else:
             os.remove(name)
         break
-      except (OSError, exceptions.WindowsError):
+      except (OSError, exceptions.WindowsError) as e:
+        logging.exception('Exception deleting "%s": %s', name, e)
         time.sleep(1)
     if os.path.exists(name):
       logging.error('File not deleted: ' + name)
@@ -654,6 +654,16 @@ def main():
   parser.add_option('-v', '--verbose', action='store_true',
                     help='Set logging level to INFO. Optional. Defaults to '
                     'ERROR level.', default=False)
+
+  # Setup up logging to a constant file so we can debug issues where
+  # the results aren't properly sent to the result URL.
+  logging_rotating_file = logging.handlers.RotatingFileHandler(
+      LOCAL_TEST_RUNNER_CONSTANT_LOG_FILE,
+      maxBytes=10 * 1024 * 1024, backupCount=5)
+  logging_rotating_file.setLevel(logging.DEBUG)
+  logging_rotating_file.setFormatter(logging.Formatter(
+      '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'))
+  logging.getLogger('').addHandler(logging_rotating_file)
 
   (options, args) = parser.parse_args()
   if not options.request_file_name:
