@@ -259,10 +259,10 @@ class TestRequestMessageBaseTest(unittest.TestCase):
   def testRequestText(self):
     # Success stories.
     parse_results = TestRequestMessageBaseTest.ParseResults()
-    expected_text = ("""{'int_value': 1,'int_array_value': [1, 2],"""
-                     """'str_value': 'a','dict_value': {1: 'a', """
-                     """'b': 2},'str_array_value': ['a', 'b', """
-                     """'a\\b', '\\a\\t'],}""")
+    expected_text = ("""{'dict_value': {1: 'a', 'b': 2},"""
+                     """'int_array_value': [1, 2],'int_value': 1,"""
+                     """'str_array_value': ['a', 'b', 'a\\b', '\\a\\t'],"""
+                     """'str_value': 'a',}""")
     self.assertEqual(str(parse_results), expected_text)
     parse_results.int_value = 'invalid'
     self.assertEqual(str(parse_results), '')
@@ -283,8 +283,8 @@ class TestRequestMessageBaseTest(unittest.TestCase):
             isinstance(self.dict_value, dict))
     outer_parse_result = OuterParseResults()
     outer_expected_text = ("""{'dict_value': {1: 'a', 'b': 2},"""
-                           """'str_value': 'a','parsed_result': %s,"""
-                           """'results': [%s, %s],}""" %
+                           """'parsed_result': %s,"""
+                           """'results': [%s, %s],'str_value': 'a',}""" %
                            (str(outer_parse_result.parsed_result),
                             str(outer_parse_result.parsed_result),
                             str(outer_parse_result.parsed_result)))

@@ -91,6 +91,10 @@ class TestRequestMessageBase(object):
       """
       if isinstance(value, list):
         value = '[%s]' % ', '.join([Stringize(i) for i in value])
+      elif isinstance(value, dict):
+        value = '{%s}' % ', '.join([('%s: %s' % (Stringize(i),
+                                                 Stringize(value[i])))
+                                    for i in sorted(value)])
       elif isinstance(value, TestRequestMessageBase):
         value = str(value)
       elif isinstance(value, str):
@@ -100,7 +104,8 @@ class TestRequestMessageBase(object):
       return value
 
     request_text_entries = ['{']
-    for item in self.__dict__:
+    # We sort the dictionary to ensure the string is always printed the same.
+    for item in sorted(self.__dict__):
       request_text_entries.extend([Stringize(item), ': ',
                                    Stringize(self.__dict__[item]), ','])
     request_text_entries.append('}')
