@@ -359,6 +359,10 @@ class TestHelper(unittest.TestCase):
       self.assertEqual(len(errors), 0, message)
 
   def AssertInvalidValues(self, value_key, values):
+    # First check that the test request is valid, otherwise we are failing
+    # due to errors other than we intended.
+    self.assertTrue(self.test_request.IsValid())
+
     for value in values:
       message = 'Validating %s with %s' % (value_key, value)
       setattr(self.test_request, value_key, value)
@@ -460,7 +464,7 @@ class TestConfigurationTest(TestHelper):
     data = ['data']
     binaries = ['binaries']
     tests = ['test']
-    dimensions = ['a', 'b']
+    dimensions = {'a': 'b'}
 
     test_configurations = test_request_message.TestConfiguration(
         env_vars=env_vars, data=data, binaries=binaries, tests=tests,
@@ -478,7 +482,7 @@ class TestConfigurationTest(TestHelper):
     tests.append('tests2')
     self.assertNotEqual(tests, test_configurations.tests)
 
-    dimensions.append('c')
+    dimensions['c'] = 'd'
     self.assertNotEqual(dimensions, test_configurations.dimensions)
 
   def testIsValid(self):
@@ -503,6 +507,7 @@ class TestConfigurationTest(TestHelper):
     self.assertTrue(test_object2.IsValid())
     self.AssertValidValues('tests', [[test_object1, test_object2],
                                      [test_object1]])
+    self.test_request.tests = []
 
     self.AssertValidValues('min_instances',
                            TestHelper.NON_ZERO_VALID_INT_VALUES)
@@ -526,14 +531,15 @@ class TestConfigurationTest(TestHelper):
     self.test_request.config_name = TestHelper.VALID_STRING_VALUES[0]
     self.AssertInvalidValues('data',
                              TestHelper.INVALID_URL_LIST_VALUES)
-    self.test_request.data = []
+    self.test_request.data = TestHelper.VALID_URL_LIST_VALUES[-1]
     self.AssertInvalidValues('binaries',
                              TestHelper.INVALID_STRING_LIST_VALUES)
-    self.test_request.binaries = []
+    self.test_request.binaries = None
 
     # Test names must be unique.
     test_object2.test_name = test_object1.test_name
     self.AssertInvalidValues('tests', [[test_object1, test_object2]])
+    self.test_request.tests = [TestObjectTest.GetFullObject()]
 
     # Make the names different again so we can test other failures
     test_object2.test_name = '%s2' % test_object1.test_name
@@ -551,7 +557,7 @@ class TestConfigurationTest(TestHelper):
     self.test_request.min_instances = 1
     self.AssertInvalidValues('additional_instances',
                              TestHelper.INVALID_POSITIVE_INT_VALUES)
-    self.test_request.additional_instance = 0
+    self.test_request.additional_instances = 0
 
     self.AssertInvalidValues('env_vars', TestHelper.INVALID_ENV_VARS)
     self.test_request.env_vars = None
@@ -663,6 +669,7 @@ class TestCaseTest(TestHelper):
     self.assertTrue(test_object2.IsValid())
     self.AssertValidValues('tests', [[test_object1, test_object2],
                                      [test_object1]])
+    self.test_request.tests = [TestObjectTest.GetFullObject()]
 
     test_config1 = test_request_message.TestConfiguration(
         config_name='a', os='a', browser='a', cpu='a')
@@ -673,6 +680,7 @@ class TestCaseTest(TestHelper):
     self.assertTrue(test_config2.IsValid())
     self.AssertValidValues('configurations', [[test_config1, test_config2],
                                               [test_config1]])
+    self.test_request.configurations = [TestConfigurationTest.GetFullObject()]
 
     self.AssertValidValues('result_url', TestHelper.VALID_OPTIONAL_URL_VALUES)
     valid_store_result = test_request_message.TestCase.VALID_STORE_RESULT_VALUES
@@ -693,10 +701,11 @@ class TestCaseTest(TestHelper):
     # Put the value back to a valid value, to test invalidity of other values.
     self.test_request.test_case_name = TestHelper.VALID_STRING_VALUES[0]
     self.AssertInvalidValues('data', TestHelper.INVALID_URL_LIST_VALUES)
-    self.test_request.data = []
+    self.test_request.data = TestHelper.VALID_URL_LIST_VALUES[-1]
     self.AssertInvalidValues('binaries',
                              TestHelper.INVALID_STRING_LIST_VALUES)
-    self.test_request.binaries = []
+    self.test_request.binaries = None
+    self.assertTrue(self.test_request.IsValid())
 
     test_object1.time_out = 'never'
     test_object2.action = 'None'
@@ -731,7 +740,7 @@ class TestCaseTest(TestHelper):
 
     self.AssertInvalidValues('output_destination',
                              TestHelper.INVALID_OUTPUT_DESTINATION_VALUES)
-    self.output_destination = None
+    self.test_request.output_destination = None
 
     self.AssertInvalidValues('failure_email', TestHelper.INVALID_STRING_VALUES)
     self.test_request.failure_email = None
@@ -772,13 +781,13 @@ class TestRunTest(TestHelper):
     return test_request_message.TestRun(
         test_run_name='a',
         configuration=TestConfigurationTest.GetFullObject(),
-        result_url=TestHelper.VALID_URL_VALUES[-1],
         env_vars=TestHelper.VALID_ENV_VARS[-1],
         data=TestHelper.VALID_URL_LIST_VALUES[-1],
         working_dir=TestHelper.VALID_STRING_VALUES[-1],
         tests=[TestObjectTest.GetFullObject()],
         instance_index=1,
         num_instances=2,
+        result_url=TestHelper.VALID_URL_VALUES[-1],
         output_destination=
         TestHelper.VALID_OPTIONAL_OUTPUT_DESTINATION_VALUES[-1],
         cleanup=test_request_message.TestRun.VALID_CLEANUP_VALUES[-1])
@@ -826,6 +835,7 @@ class TestRunTest(TestHelper):
     self.assertTrue(test_object2.IsValid())
     self.AssertValidValues('tests', [[test_object1, test_object2],
                                      [test_object1]])
+    self.test_request.tests = [TestObjectTest.GetFullObject()]
 
     self.test_request.num_instances = max(TestHelper.VALID_INT_VALUES) + 1
     self.AssertValidValues('instance_index', TestHelper.VALID_INT_VALUES)
@@ -837,6 +847,8 @@ class TestRunTest(TestHelper):
         config_name='a', os='a', browser='a', cpu='a')
     self.assertTrue(test_config.IsValid())
     self.AssertValidValues('configuration', [test_config])
+    self.test_request.configuration = (
+        TestConfigurationTest.GetFullObject())
 
     self.AssertValidValues('result_url', TestHelper.VALID_OPTIONAL_URL_VALUES)
     self.AssertValidValues('output_destination',
@@ -854,7 +866,7 @@ class TestRunTest(TestHelper):
     # Put the value back to a valid value, to test invalidity of other values.
     self.test_request.test_run_name = TestHelper.VALID_STRING_VALUES[0]
     self.AssertInvalidValues('data', TestHelper.INVALID_URL_LIST_VALUES)
-    self.test_request.data = []
+    self.test_request.data = TestHelper.VALID_URL_LIST_VALUES[-1]
 
     test_object1.time_out = 'never'
     test_object2.action = 'None'
@@ -864,7 +876,6 @@ class TestRunTest(TestHelper):
                                        [test_object1]])
     self.test_request.tests = []
 
-    self.test_request.num_instances = max(TestHelper.VALID_INT_VALUES) + 1
     self.AssertInvalidValues('instance_index', TestHelper.INVALID_INT_VALUES)
     self.test_request.instance_index = 0
     self.AssertInvalidValues('num_instances',
@@ -878,18 +889,22 @@ class TestRunTest(TestHelper):
     self.test_request.num_instances = 2
     self.assertFalse(self.test_request.IsValid(), 'Validating num == index')
 
-    self.test_request.min_instances = None
-    self.test_request.additional_instances = None
+    self.test_request.instance_index = 1
+    self.test_request.num_instances = 2
 
     test_config.dimensions = [42]
     self.assertFalse(test_config.IsValid())
-    self.AssertInvalidValues('configurations', [test_config])
-    self.test_request.configurations = []
+    test_config.dimensions = {'a': 42}
+    self.AssertInvalidValues('configuration', [test_config])
+    self.test_request.configuration = TestConfigurationTest.GetFullObject()
 
     self.AssertInvalidValues('result_url', TestHelper.INVALID_URL_VALUES)
+    self.test_request.result_url = TestHelper.VALID_URL_VALUES[0]
+
     self.AssertInvalidValues('output_destination',
                              TestHelper.INVALID_OUTPUT_DESTINATION_VALUES)
-    self.test_request.result_url = TestHelper.VALID_URL_VALUES[0]
+    self.test_request.output_destination = (
+        TestHelper.VALID_OPTIONAL_OUTPUT_DESTINATION_VALUES[-1])
 
     self.AssertInvalidValues('working_dir', TestHelper.INVALID_STRING_VALUES)
     self.test_request.working_dir = None

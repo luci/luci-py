@@ -941,7 +941,7 @@ class TestRun(TestRequestMessageBase):
                                             errors=errors) or
         not self.AreValidValues(['working_dir', 'result_url'], str,
                                 errors=errors) or
-        (self.result_url and not self.AreValidUrls(['result_url'], errors)) or
+        (self.result_url and not self.IsValidUrl(self.result_url, errors)) or
         self.cleanup not in TestRun.VALID_CLEANUP_VALUES or
         not self.AreValidValues(['instance_index', 'num_instances'],
                                 (int, long), errors=errors) or

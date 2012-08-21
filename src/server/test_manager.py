@@ -542,9 +542,8 @@ class TestRequestManager(object):
   def ExecuteTestRequest(self, request_message, user_profile):
     """Attempts to execute a test request.
 
-    If machines are available for running any of the test's configurations,
-    they will be started immediately.  The other test configurations will be
-    queued up for testing at a later time potentially requesting new machines.
+    Test configurations will be queued up for testing at a later time
+    when a matching machine queries the server for work.
 
     Args:
       request_message: A string representing a test request.
