@@ -76,7 +76,6 @@ class UrlHelperTest(unittest.TestCase):
   def testUrlOpenFailure(self):
     url_helper.urllib2.urlopen(
         mox.IgnoreArg(), mox.IgnoreArg()).AndRaise(urllib2.URLError('url'))
-    time.sleep(mox.IgnoreArg())
     logging.error(mox.IgnoreArg(), mox.IgnoreArg(), mox.IgnoreArg())
 
     self._mox.ReplayAll()
@@ -108,7 +107,8 @@ class UrlHelperTest(unittest.TestCase):
           mox.IgnoreArg(), encoded_data).AndRaise(urllib2.URLError('url'))
       logging.info(mox.IgnoreArg(), mox.IgnoreArg(), mox.IgnoreArg(),
                    mox.IgnoreArg())
-      time.sleep(mox.IgnoreArg())
+      if i != attempts - 1:
+        time.sleep(mox.IgnoreArg())
 
     logging.error(mox.IgnoreArg(), mox.IgnoreArg(), mox.IgnoreArg())
     self._mox.ReplayAll()

@@ -80,7 +80,9 @@ def UrlOpen(url, data=None, max_tries=1, wait_duration=None):
       else:
         duration = wait_duration
 
-      time.sleep(duration)
+      # Only sleep if we are going to try again.
+      if attempt != max_tries - 1:
+        time.sleep(duration)
 
     if url_response is not None:
       return url_response
