@@ -199,10 +199,6 @@ class LocalTestRunner(object):
     self.max_url_retries = max_url_retries
 
   def __del__(self):
-    # TODO(user): We may want to keep these around, even after the run, for
-    # postmortem investigations, but would they accumulate too much disk space?
-    # If we decide to keep them, we should provide a recognizable name when we
-    # create them in the call to mkstemp above.
     if self.log_file_name:
       self.logging_file_handler.close()  # In case it hasn't been closed yet.
       if not self._DeleteFileOrDirectory(self.log_file_name):
@@ -217,6 +213,9 @@ class LocalTestRunner(object):
 
     Args:
       name: The name of the file or directory to delete.
+
+    Returns:
+      True if the file or directory is successfully deleted.
     """
     for _ in range(5):
       try:
@@ -231,6 +230,8 @@ class LocalTestRunner(object):
         time.sleep(1)
     if os.path.exists(name):
       logging.error('File not deleted: ' + name)
+      return False
+    return True
 
   def _ExpandEnv(self, argument, env):
     """Expands any environment variables that may exist in argument.
