@@ -883,6 +883,8 @@ class TestRun(TestRequestMessageBase):
         Must be greater than instance_index.
         Must be specified if instance_index is specified.
     result_url: An optional URL where to post the results of this test run.
+    ping_url: A required URL that tells the test run where to ping to let the
+        server know that it is still active.
     output_destination: An optional dictionary with a URL where to post the
         output of this test case as well as the size of the chunks to use.
         The key for the URL is 'url' and the value must be a valid URL string.
@@ -894,7 +896,8 @@ class TestRun(TestRequestMessageBase):
   def __init__(self, test_run_name=None, env_vars=None,
                configuration=TestConfiguration(), data=None, working_dir=None,
                tests=None, instance_index=None, num_instances=None,
-               result_url=None, output_destination=None, cleanup=None):
+               result_url=None, ping_url=None, output_destination=None,
+               cleanup=None):
     super(TestRun, self).__init__()
     self.test_run_name = test_run_name
     if env_vars:
@@ -917,6 +920,7 @@ class TestRun(TestRequestMessageBase):
     self.instance_index = instance_index
     self.num_instances = num_instances
     self.result_url = result_url
+    self.ping_url = ping_url
     if output_destination:
       self.output_destination = output_destination.copy()
     else:
@@ -944,9 +948,10 @@ class TestRun(TestRequestMessageBase):
                                      errors=errors) or
         not self.AreValidOutputDestinations(['output_destination'],
                                             errors=errors) or
-        not self.AreValidValues(['working_dir', 'result_url'], str,
+        not self.AreValidValues(['working_dir', 'result_url', 'ping_url'], str,
                                 errors=errors) or
         (self.result_url and not self.IsValidUrl(self.result_url, errors)) or
+        not self.IsValidUrl(self.ping_url, errors) or
         self.cleanup not in TestRun.VALID_CLEANUP_VALUES or
         not self.AreValidValues(['instance_index', 'num_instances'],
                                 (int, long), errors=errors) or

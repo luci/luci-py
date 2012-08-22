@@ -94,6 +94,18 @@ from common import url_helper
 from test_runner import downloader
 
 
+# The amount of characters to read in each pass inside _RunCommand,
+# this helps to ensure that the _RunCommand function doesn't ignore
+# its other functions because it is too busy reading input.
+CHARACTERS_TO_READ_PER_PASS = 2000
+
+# The amount of time to wait between pings. This helps to prevent us from
+# swamping the server with pings, since it doesn't require a high degree of
+# accuracy.
+# TODO(user): This value should be set by the server and sent in the swarm
+# file. See https://code.google.com/p/swarming/issues/detail?id=40
+DELAY_BETWEEN_PINGS = 4 * 60
+
 # The file name of the local rotating log file to store all test results to.
 LOCAL_TEST_RUNNER_CONSTANT_LOG_FILE = 'local_test_runner.log'
 
@@ -367,6 +379,10 @@ class LocalTestRunner(object):
       upload_url = self.test_run.output_destination['url']
       if 'size' in self.test_run.output_destination:
         upload_chunk_size = self.test_run.output_destination['size']
+
+    last_ping_time = time.time()
+    got_output_since_last_ping = False
+
     while time_out == 0 or timeout_start_time + time_out > time.time():
       try:
         exit_code = proc.poll()
@@ -376,14 +392,24 @@ class LocalTestRunner(object):
         return (1, e)
 
       current_content = ''
-      while True:
+      got_output = False
+      for _ in range(CHARACTERS_TO_READ_PER_PASS):
         try:
-          # Some output was produced so reset the timeout counter.
-          if not stdout_queue.empty():
-            timeout_start_time = time.time()
           current_content += stdout_queue.get_nowait()
+          got_output = True
         except Queue.Empty:
           break
+
+      # Some output was produced so reset the timeout counter.
+      if got_output:
+        timeout_start_time = time.time()
+        got_output_since_last_ping = True
+
+      if (got_output_since_last_ping and
+          last_ping_time + DELAY_BETWEEN_PINGS < time.time()):
+        if url_helper.UrlOpen(self.test_run.ping_url) is not None:
+          last_ping_time = time.time()
+          got_output_since_last_ping = False
 
       # If the process has ended, then read all the output that it generated.
       if exit_code:

@@ -633,6 +633,7 @@ class TestRequestManager(object):
         num_instances=runner.num_config_instances,
         configuration=config,
         result_url=('%s/result?k=%s' % (self.server_url, str(runner.key()))),
+        ping_url=('%s/runner_ping?r=%s' % (self.server_url, str(runner.key()))),
         output_destination=test_request.output_destination,
         data=(test_request.data + test_request.binaries +
               config.data + config.binaries),
