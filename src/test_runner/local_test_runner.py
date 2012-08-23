@@ -652,6 +652,20 @@ class LocalTestRunner(object):
     self.PublishResults(False, [], log_file.read(), overwrite=True)
     log_file.close()
 
+  def RetrieveDataAndRunTests(self):
+    """Get the data required to run the tests, then run and publish the results.
+
+    Returns:
+      True if we we got the data, ran the tests and successfully published
+      the results.
+    """
+    if not self.DownloadAndExplodeData():
+      return False
+
+    (success, result_codes, result_string) = self.RunTests()
+
+    return self.PublishResults(success, result_codes, result_string)
+
   def TestLogException(self, message):
     """Logs the given message as an exception. This is useful for tests.
 
@@ -712,15 +726,13 @@ def main():
     return int(not published)
 
   try:
-    if runner.DownloadAndExplodeData():
-      (success, result_codes, result_string) = runner.RunTests()
-      if runner.PublishResults(success, result_codes, result_string):
-        return 0
+    if runner.RetrieveDataAndRunTests():
+      return 0
   except Exception, e:  # pylint: disable-msg=W0703
     # We want to catch all so that we can report all errors, even internal ones.
     logging.exception(e)
-    return not runner.PublishInternalErrors()
 
+  runner.PublishInternalErrors()
   return 1
 
 
