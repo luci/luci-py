@@ -232,7 +232,7 @@ class MainHandler(webapp2.RequestHandler):
             runner.key_string)
         if detailed_output:
           runner.status_string = (
-              '<a title="Click to see results" href=%s"?r=%s">Failed</a>' %
+              '<a title="Click to see results" href="%s?r=%s">Failed</a>' %
               (_SECURE_GET_RESULTS_URL, runner.key_string))
         else:
           runner.status_string = 'Failed'
