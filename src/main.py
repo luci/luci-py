@@ -349,7 +349,7 @@ class PollHandler(webapp2.RequestHandler):
   """Handles cron job to poll Machine Provider to execute pending requests."""
 
   def post(self):  # pylint: disable-msg=C6409
-    """Handles HTTP GET requests for this handler's URL."""
+    """Handles HTTP POST requests for this handler's URL."""
     test_request_manager = CreateTestManager()
 
     logging.debug('Polling')
@@ -365,6 +365,17 @@ class PollHandler(webapp2.RequestHandler):
     <body>Poll Done</body>
     </html>
     """)
+
+  def get(self):  # pylint: disable-msg=C6409
+    """Handles HTTP GET requests for this handler's URL."""
+    # Only an app engine cron job is allowed to poll via get (it currently
+    # has no way to make its request a post).
+    if self.request.headers.get('X-AppEngine-Cron') != 'true':
+      self.response.out.write('Only internal cron jobs can do this')
+      self.response.set_status(405)
+      return
+
+    self.post()
 
 
 class ShowMessageHandler(webapp2.RequestHandler):
