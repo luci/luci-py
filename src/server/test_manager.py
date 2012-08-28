@@ -23,6 +23,7 @@ also provides a UI for canceling Test Requests.
 import datetime
 import logging
 import os.path
+import time
 import urllib
 import urllib2
 import urlparse
@@ -80,6 +81,10 @@ MAX_TRY_COUNT = 30
 # recoverable exceptions will only happen when datastore is overloaded, it
 # doesn't make much sense to extensively retry many times.
 MAX_TRANSACTION_RETRY_COUNT = 3
+
+# The maximum number of times to try to write something to the blobstore before
+# giving up.
+MAX_BLOBSTORE_WRITE_TRIES = 5
 
 # Root directory of Swarm scripts.
 SWARM_ROOT_DIR = os.path.join(os.path.dirname(__file__), '..')
@@ -240,6 +245,11 @@ class TestRunner(db.Model):
   # The stringized array of exit_codes for each actions of the test.
   exit_codes = db.StringProperty()
 
+  # Contains any swarm specific errors that occured that caused the result
+  # string to not get correct setup with the runner output (i.e. the runner
+  # timed out so there was no data).
+  errors = db.StringProperty()
+
   # The blobstore reference to the full output of the test.  This key valid only
   # when the runner has ended (i.e. done == True). Until then, it is None.
   result_string_reference = blobstore.BlobReferenceProperty()
@@ -284,6 +294,10 @@ class TestRunner(db.Model):
       The string representing the output for this runner or an empty string
         if the result hasn't been written yet.
     """
+    if self.errors:
+      assert self.result_string_reference is None
+      return self.errors
+
     if not self.result_string_reference:
       return ''
 
@@ -398,10 +412,11 @@ class TestRequestManager(object):
     exit_codes = urllib.unquote_plus(web_request.get('x'))
     overwrite = urllib.unquote_plus(web_request.get('o'))
     self._UpdateTestResult(runner, success, exit_codes, result_string,
-                           overwrite)
+                           overwrite=overwrite)
 
   def _UpdateTestResult(self, runner, success=False, exit_codes='',
-                        result_string='Tests aborted', overwrite=False):
+                        result_string=None, errors=None,
+                        overwrite=False):
     """Update the runner with results of a test run.
 
     Args:
@@ -410,6 +425,7 @@ class TestRequestManager(object):
       success: a boolean indicating whether the test run succeeded or not.
       exit_codes: a string containing the array of exit codes of the test run.
       result_string: a string containing the output of the test run.
+      errors: a string explaining why we failed to get the actual result string.
       overwrite: a boolean indicating if we should always record this result,
           even if a result had been previously recorded.
     """
@@ -428,12 +444,28 @@ class TestRequestManager(object):
     runner.exit_codes = exit_codes
     runner.done = True
 
-    filename = files.blobstore.create('text/plain')
-    with files.open(filename, 'a') as f:
-      f.write(result_string.encode('utf-8'))
-    files.finalize(filename)
-
-    runner.result_string_reference = files.blobstore.get_blob_key(filename)
+    if result_string is not None:
+      for attempt in range(MAX_BLOBSTORE_WRITE_TRIES):
+        try:
+          filename = files.blobstore.create('text/plain')
+          with files.open(filename, 'a') as f:
+            f.write(result_string.encode('utf-8'))
+          files.finalize(filename)
+          runner.result_string_reference = files.blobstore.get_blob_key(
+              filename)
+        except files.ApiTemporaryUnavailableError:
+          logging.error('An exception while trying to store results in the '
+                        'blobstore. Attempt %d', attempt)
+          time.sleep(3)
+      if runner.result_string_reference:
+        logging.info('Successfully wrote out results to blobstore')
+      else:
+        logging.error(
+            'Failed to write out to blob store after multiple attempts')
+        runner.errors = ('Failed to create a blobstore to store the results '
+                         'from the runner. Results lost.')
+    else:
+      runner.errors = errors
     runner.put()
 
     # If the test didn't run successfully, we send an email if one was
@@ -719,7 +751,7 @@ class TestRequestManager(object):
       reason: A string message indicating why the TestRunner is being aborted.
     """
     r_str = 'Tests aborted. AbortRunner() called. Reason: %s' % reason
-    self._UpdateTestResult(runner, result_string=r_str)
+    self._UpdateTestResult(runner, errors=r_str)
 
   def DeleteRunner(self, key):
     """Delete the runner that the given key refers to.
