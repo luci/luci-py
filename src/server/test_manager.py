@@ -22,7 +22,9 @@ also provides a UI for canceling Test Requests.
 
 import datetime
 import logging
+import math
 import os.path
+import random
 import time
 import urllib
 import urllib2
@@ -76,6 +78,13 @@ MAX_COMEBACK_SECS = 60.0
 # Maximum cap for try_count. A try_count value greater than this is clamped to
 # this constant which will result in ~400M secs (>3 years).
 MAX_TRY_COUNT = 30
+
+# The odds of giving the machine a quick callback value, instead of the normal
+# exponential value.
+CHANCE_OF_QUICK_COMEBACK = 1.0 / 20.0
+
+# The time to use when we want the machine to have a quick callback time.
+QUICK_COMEBACK_SECS = 1
 
 # Number of times to try a transaction before giving up. Since most likely the
 # recoverable exceptions will only happen when datastore is overloaded, it
@@ -953,7 +962,12 @@ class TestRequestManager(object):
 
     # Limit our exponential computation to a sane amount to avoid overflow.
     try_count = min(try_count, MAX_TRY_COUNT)
-    return min(MAX_COMEBACK_SECS, float(2**try_count)/100 + 1)
+    comeback_duration = min(MAX_COMEBACK_SECS, math.pow(1.5, (try_count + 1)))
+
+    if random.random() < CHANCE_OF_QUICK_COMEBACK:
+      comeback_duration = QUICK_COMEBACK_SECS
+
+    return comeback_duration
 
   def _FindMatchingRunner(self, attribs, user_profile):
     """Find oldest TestRunner who hasn't already been assigned a machine.
