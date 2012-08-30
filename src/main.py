@@ -17,6 +17,7 @@ except ImportError:
 from google.appengine.api import users
 from google.appengine.ext import db
 import webapp2
+from google.appengine.ext.webapp import blobstore_handlers
 from google.appengine.ext.webapp import template
 from google.appengine.ext.webapp import util
 from common import test_request_message
@@ -682,6 +683,22 @@ class RemoteErrorHandler(webapp2.RequestHandler):
     self.response.out.write('Error logged')
 
 
+class UploadHandler(blobstore_handlers.BlobstoreUploadHandler):
+  def post(self):  # pylint: disable-msg=C6409
+    """Handles HTTP POST requests for this handler's URL."""
+    if self.request.host_url != self.request.remote_addr:
+      logging.error('A machine from %s attempted to upload a blobstore '
+                    'directly')
+
+      self.response.out.write('Only the server should attempt to upload '
+                              'blobstore data directly.')
+      self.response.set_status(403)
+
+    upload_result = self.get_uploads('result')
+    blob_info = upload_result[0]
+    self.response.out.write(blob_info.key())
+
+
 def AuthenticateRemoteMachine(request):
   """Tries to find a user profile that has whitelisted the remote machine.
 
@@ -766,6 +783,7 @@ def CreateApplication():
                                    ShowMessageHandler),
                                   ('/tasks/poll', PollHandler),
                                   ('/test', TestRequestHandler),
+                                  ('/upload', UploadHandler),
                                   (_SECURE_CANCEL_URL, CancelHandler),
                                   (_SECURE_CHANGE_WHITELIST_URL,
                                    ChangeWhitelistHandler),

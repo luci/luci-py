@@ -125,6 +125,15 @@ def GetTestCase(request_message):
   return request_object
 
 
+def OnDevAppEngine():
+  """Return True if this code is running on dev app engine.
+
+  Returns:
+    True if this code is running on dev app engine.
+  """
+  return os.environ['SERVER_SOFTWARE'].startswith('Development')
+
+
 class TestRequest(db.Model):
   """A test request.
 
@@ -371,6 +380,19 @@ class SwarmError(db.Model):
 class TestRequestManager(object):
   """The Test Request Manager."""
 
+  def __init__(self, use_blobstore_file_api=None):
+    if use_blobstore_file_api is None:
+      use_blobstore_file_api = OnDevAppEngine()
+    self.use_blobstore_file_api = use_blobstore_file_api
+
+  def SetUseBlobstoreFileApi(self, use_blobstore_file_api):
+    """Enable and disable the use of the experimental blobstore api.
+
+    Args:
+      use_blobstore_file_api: True to enable the api.
+    """
+    self.use_blobstore_file_api = use_blobstore_file_api
+
   def UpdateCacheServerURL(self, server_url):
     """Update the value of this server's url.
 
@@ -454,25 +476,36 @@ class TestRequestManager(object):
     runner.done = True
 
     if result_string is not None:
-      for attempt in range(MAX_BLOBSTORE_WRITE_TRIES):
-        try:
-          filename = files.blobstore.create('text/plain')
-          with files.open(filename, 'a') as f:
-            f.write(result_string.encode('utf-8'))
-          files.finalize(filename)
-          runner.result_string_reference = files.blobstore.get_blob_key(
-              filename)
-        except files.ApiTemporaryUnavailableError:
-          logging.error('An exception while trying to store results in the '
-                        'blobstore. Attempt %d', attempt)
-          time.sleep(3)
+      # If there in an old blobstore, delete it since nothing references it
+      # now.
       if runner.result_string_reference:
-        logging.info('Successfully wrote out results to blobstore')
+        runner.result_string_reference.delete()
+
+      result_blob_key = None
+      if self.use_blobstore_file_api:
+        for attempt in range(MAX_BLOBSTORE_WRITE_TRIES):
+          try:
+            filename = files.blobstore.create('text/plain')
+            with files.open(filename, 'a') as f:
+              f.write(result_string.encode('utf-8'))
+            files.finalize(filename)
+            result_blob_key = files.blobstore.get_blob_key(filename)
+          except files.ApiTemporaryUnavailableError:
+            logging.error('An exception while trying to store results in the '
+                          'blobstore. Attempt %d', attempt)
+            time.sleep(3)
       else:
-        logging.error(
-            'Failed to write out to blob store after multiple attempts')
-        runner.errors = ('Failed to create a blobstore to store the results '
-                         'from the runner. Results lost.')
+        # Create the blobstore.
+        upload_url = blobstore.create_upload_url('upload')
+        result_blob_key = url_helper.UrlOpen(
+            upload_url, {'result': result_string},
+            max_tries=MAX_BLOBSTORE_WRITE_TRIES, wait_duration=0)
+
+      if result_blob_key:
+        runner.result_string_reference = result_blob_key
+      else:
+        runner.errors = ('There was a problem when creating the blob store. '
+                         'The results where lost.')
     else:
       runner.errors = errors
     runner.put()
