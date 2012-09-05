@@ -381,8 +381,15 @@ class TestRequestManager(object):
   """The Test Request Manager."""
 
   def __init__(self, use_blobstore_file_api=None):
+    # TODO(user): Fix up the normal blobstore code, it currently fails
+    # to properly upload. See
+    # http://devblog.miumeet.com/2011/02/programmatically-upload-images-to.html
+    # for tips on how to get it working.
     if use_blobstore_file_api is None:
-      use_blobstore_file_api = OnDevAppEngine()
+      # Default to uses the file api until the normal code is fixed.
+      #use_blobstore_file_api = OnDevAppEngine()
+      use_blobstore_file_api = True
+
     self.use_blobstore_file_api = use_blobstore_file_api
 
   def SetUseBlobstoreFileApi(self, use_blobstore_file_api):

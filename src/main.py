@@ -687,8 +687,9 @@ class UploadHandler(blobstore_handlers.BlobstoreUploadHandler):
   def post(self):  # pylint: disable-msg=C6409
     """Handles HTTP POST requests for this handler's URL."""
     if self.request.host_url != self.request.remote_addr:
-      logging.error('A machine from %s attempted to upload a blobstore '
-                    'directly')
+      logging.error('A machine attempted to upload a blobstore directly')
+      logging.error('Server URL: %s', self.request_host_url)
+      logging.error('Machine URL: %s', self.request.remote_addr)
 
       self.response.out.write('Only the server should attempt to upload '
                               'blobstore data directly.')
@@ -697,6 +698,7 @@ class UploadHandler(blobstore_handlers.BlobstoreUploadHandler):
     upload_result = self.get_uploads('result')
     blob_info = upload_result[0]
     self.response.out.write(blob_info.key())
+    self.redirect('/')
 
 
 def AuthenticateRemoteMachine(request):
