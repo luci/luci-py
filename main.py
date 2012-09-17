@@ -86,7 +86,7 @@ def StoreValueInBlobstore(value):
 
 class ContainsHashHandler(webapp2.RequestHandler):
   """A simple handler for saying if a hash is already stored or not."""
-  def post(self):
+  def get(self):
     hash_keys = self.request.get('hash_key').split()
     namespace = self.request.get('namespace', 'default')
     logging.debug('Checking namespace %s for the following keys:\n%s',
@@ -120,16 +120,8 @@ class StoreContentByHashHandler(webapp2.RequestHandler):
       self.response.set_status(402)
       return
 
-    hash_content = self.request.get('hash_content')
-    if not hash_content:
-      msg = 'No hash content given'
-      logging.info(msg)
-
-      self.response.out.write(msg)
-      self.response.set_status(402)
-      return
-
     namespace = self.request.get('namespace', 'default')
+    hash_content = self.request.body
 
     # TODO(csharp): High priority requests, 0, should be loaded from memcache.
     priority = self.request.get('priority', '1')
@@ -181,7 +173,7 @@ class RemoveContentByHashHandler(webapp2.RequestHandler):
 
 class RetriveContentByHashHandler(blobstore_handlers.BlobstoreDownloadHandler):
   """The handlers for retrieving hash contents."""
-  def post(self):
+  def get(self):
     hash_key = self.request.get('hash_key')
     namespace = self.request.get('namespace', 'default')
     hash_entry = GetContentByHash(hash_key, namespace)
