@@ -8,6 +8,7 @@
 
 import hashlib
 import mimetools
+import time
 import unittest
 import urllib
 import urllib2
@@ -17,6 +18,9 @@ ISOLATE_SERVER_URL = 'http://test.isolateserver.appspot.com/'
 
 # Some basic binary data stored as a byte string.
 BINARY_DATA = (chr(0) + chr(57) + chr(128) + chr(255)) * 2
+
+# The maximum number of times to retry url errors.
+MAX_URL_ATTEMPTS = 5
 
 
 def fetch(suburl, params, payload=None, method='GET',
@@ -32,10 +36,21 @@ def fetch(suburl, params, payload=None, method='GET',
   full_url = base_url + "?" + urllib.urlencode(params)
   request = urllib2.Request(full_url, data=payload)
 
-  request.add_header('Content-Type', content_type)
+  request.add_header('content-type', content_type)
+  request.add_header('content-length', len(payload or ''))
 
-  return urllib2.urlopen(request)
+  for attempt in range(MAX_URL_ATTEMPTS):
+    try:
+      return urllib2.urlopen(request)
+    except urllib2.HTTPError:
+      # Always re-raise if we reached the server.
+      raise
+    except urllib2.URLError as e:
+      # Sleep with an exponential backoff.
+      time.sleep(1.5 ** attempt)
 
+  # If we end up here, we failed to reached the server so raise an error.
+  raise urllib2.URLError()
 
 class AppTest(unittest.TestCase):
   def RemoveAndVerify(self, hash_key):
@@ -71,6 +86,11 @@ class AppTest(unittest.TestCase):
     hash_key = hashlib.sha1(hash_contents).hexdigest()
 
     self.UploadHashAndRetriveHelper(hash_key, hash_contents)
+
+  def testStoreAndRetriveEmptyHash(self):
+    hash_key = hashlib.sha1().hexdigest()
+
+    self.UploadHashAndRetriveHelper(hash_key, '')
 
 
 if __name__ == '__main__':

@@ -121,7 +121,12 @@ class StoreContentByHashHandler(webapp2.RequestHandler):
       return
 
     namespace = self.request.get('namespace', 'default')
-    hash_content = self.request.body
+
+    # webapp2 doesn't like reading the body if it's empty.
+    if self.request.headers.get('content-length'):
+      hash_content = self.request.body
+    else:
+      hash_content = ''
 
     # TODO(csharp): High priority requests, 0, should be loaded from memcache.
     priority = self.request.get('priority', '1')
@@ -190,12 +195,12 @@ class RetriveContentByHashHandler(blobstore_handlers.BlobstoreDownloadHandler):
       hash_entry.last_access = datatime.date.today()
       hash_entry.put()
 
-    if hash_entry.hash_content:
-      logging.info('Returning hash content from model')
-      self.response.out.write(hash_entry.hash_content)
-    else:
+    if hash_entry.hash_content is None:
       logging.info('Returning hash content from blobstore')
       self.send_blob(hash_entry.hash_content_reference)
+    else:
+      logging.info('Returning hash content from model')
+      self.response.out.write(hash_entry.hash_content)
 
 
 def CreateApplication():
