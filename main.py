@@ -24,6 +24,12 @@ MIN_SIZE_FOR_BLOBSTORE = 20 * 8
 VALID_SHA1_RE = re.compile(r'[a-f0-9]{40}')
 
 
+class ContentNamespace(db.Model):
+  """Used as an ancestor of HashEntry to create mutiple content-addressed
+  "tables"."""
+  is_testing = db.BooleanProperty()
+
+
 class HashEntry(db.Model):
   """Represents the hash content."""
   # The reference pointing to the hash content, which is stored inside the
@@ -101,9 +107,10 @@ class ContainsHashHandler(webapp2.RequestHandler):
       self.response.out.set_status(402)
       return
 
-    contains = []
-    for hash_key in hash_keys:
-      contains.append(str(bool(GetContentByHash(hash_key, namespace))))
+    contains = (
+        str(bool(GetContentByHash(hash_key, namespace)))
+        for hash_key in hash_keys
+    )
 
     self.response.out.write('\n'.join(contains))
 
@@ -138,7 +145,10 @@ class StoreContentByHashHandler(webapp2.RequestHandler):
       self.response.out.write(msg)
       return
 
-    key = db.Key.from_path('ContentNamespace', namespace, 'HashEntry', hash_key)
+    namespace_model = ContentNamespace.get_or_insert(
+        namespace, is_testing=(namespace == 'test'))
+
+    key = db.Key.from_path('HashEntry', hash_key, parent=namespace_model.key())
     hash_entry = HashEntry(key=key)
     if len(hash_content) < MIN_SIZE_FOR_BLOBSTORE:
       logging.info('Storing hash content in model')
@@ -193,7 +203,7 @@ class RetriveContentByHashHandler(blobstore_handlers.BlobstoreDownloadHandler):
 
     if hash_entry.last_access != datetime.date.today():
       hash_entry.last_access = datatime.date.today()
-      hash_entry.put()
+      hash_entry.put_async()
 
     if hash_entry.hash_content is None:
       logging.info('Returning hash content from blobstore')
