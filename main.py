@@ -65,7 +65,9 @@ def GetContentByHash(hash_key, namespace):
     return None
 
   try:
-    key = db.Key.from_path('ContentNamespace', namespace, 'HashEntry', hash_key)
+    namespace_model = ContentNamespace.get_or_insert(
+        namespace, is_testing=namespace.startswith('temporary'))
+    key = db.Key.from_path('HashEntry', hash_key, parent=namespace_model.key())
     return HashEntry.get(key)
   except (db.BadKeyError, db.KindError):
     pass
@@ -88,6 +90,35 @@ def StoreValueInBlobstore(value):
     logging.warning('An exception while trying to store results in the '
                     'blobstore.')
   return None
+
+
+def CreateHashEntry(request, response):
+  """Generates a new hash entry from the request if one doesn't exist. Returns
+  None if there is a problem generating the entry or if an entry already exists
+  with the given key."""
+  hash_key = request.get('hash_key')
+  if not hash_key:
+    msg = 'No hash key given'
+    logging.info(msg)
+
+    response.out.write(msg)
+    response.set_status(402)
+    return None
+
+  namespace = request.get('namespace', 'default')
+
+  namespace_model = ContentNamespace.get_or_insert(
+      namespace, is_testing=namespace.startswith('temporary'))
+  key = db.Key.from_path('HashEntry', hash_key, parent=namespace_model.key())
+
+  if HashEntry.all(keys_only=True).filter('__key__ =', key).get():
+    msg = 'Hash entry already stored, no need to store again.'
+    logging.info(msg)
+
+    response.out.write(msg)
+    return None
+
+  return HashEntry(key=key)
 
 
 class ContainsHashHandler(webapp2.RequestHandler):
@@ -115,19 +146,51 @@ class ContainsHashHandler(webapp2.RequestHandler):
     self.response.out.write('\n'.join(contains))
 
 
+class GenerateBlobstoreHandler(webapp2.RequestHandler):
+  """Generate an upload url to directly load files into the blobstore."""
+  def get(self):
+    self.response.out.write(
+        blobstore.create_upload_url('/content/store_blobstore'))
+
+
+class StoreBlobstoreContentByHashHandler(
+    blobstore_handlers.BlobstoreUploadHandler):
+  """Assigns the newly stored blobstore entry to the correct hash key."""
+  def post(self):
+    upload_hash_contents = self.get_uploads('hash_contents')
+    if len(upload_hash_contents) != 1:
+      msg = ('Found %d hash_contents, there should only be 1.' %
+             len(upload_hash_contents))
+      logging.error(msg)
+
+      self.response.write.out(msg)
+      self.response.set_status(402)
+
+      # Delete all upload files since they aren't linked to anything.
+      db.delete_async(upload_hash_contents)
+      return
+
+    hash_entry = CreateHashEntry(self.request, self.response)
+
+    if not hash_entry:
+      # Delete all upload files since they aren't linked to anything.
+      db.delete_async(upload_hash_contents)
+      return
+
+    hash_entry.hash_content_reference = upload_hash_contents[0]
+    hash_entry.put()
+
+    logging.info('Uploaded data stored directly into blobstore')
+    self.response.out.write('hash content saved.')
+
+
 class StoreContentByHashHandler(webapp2.RequestHandler):
   """The handler for adding hash contents."""
   def post(self):
-    hash_key = self.request.get('hash_key')
-    if not hash_key:
-      msg = 'No hash key given'
-      logging.info(msg)
+    hash_entry = CreateHashEntry(self.request, self.response)
 
-      self.response.out.write(msg)
-      self.response.set_status(402)
+    if not hash_entry:
       return
-
-    namespace = self.request.get('namespace', 'default')
 
     # webapp2 doesn't like reading the body if it's empty.
     if self.request.headers.get('content-length'):
@@ -135,21 +198,6 @@ class StoreContentByHashHandler(webapp2.RequestHandler):
     else:
       hash_content = ''
 
-    # TODO(csharp): High priority requests, 0, should be loaded from memcache.
-    priority = self.request.get('priority', '1')
-
-    if GetContentByHash(hash_key, namespace):
-      msg = 'Hash entry already stored, no need to store again.'
-      logging.info(msg)
-
-      self.response.out.write(msg)
-      return
-
-    namespace_model = ContentNamespace.get_or_insert(
-        namespace, is_testing=(namespace == 'test'))
-
-    key = db.Key.from_path('HashEntry', hash_key, parent=namespace_model.key())
-    hash_entry = HashEntry(key=key)
     if len(hash_content) < MIN_SIZE_FOR_BLOBSTORE:
       logging.info('Storing hash content in model')
       hash_entry.hash_content = hash_content
@@ -192,6 +240,8 @@ class RetriveContentByHashHandler(blobstore_handlers.BlobstoreDownloadHandler):
     hash_key = self.request.get('hash_key')
     namespace = self.request.get('namespace', 'default')
     hash_entry = GetContentByHash(hash_key, namespace)
+    # TODO(csharp): High priority requests, 0, should be loaded from memcache.
+    priority = self.request.get('priority', '1')
 
     if not hash_entry:
       msg = 'Unable to find a hash with key \'%s\'.' % hash_key
@@ -216,7 +266,9 @@ class RetriveContentByHashHandler(blobstore_handlers.BlobstoreDownloadHandler):
 def CreateApplication():
   return webapp2.WSGIApplication([
       ('/content/contains', ContainsHashHandler),
+      ('/content/generate_blobstore_url', GenerateBlobstoreHandler),
       ('/content/store', StoreContentByHashHandler),
+      ('/content/store_blobstore', StoreBlobstoreContentByHashHandler),
       ('/content/remove', RemoveContentByHashHandler),
       ('/content/retrieve', RetriveContentByHashHandler)])
 
