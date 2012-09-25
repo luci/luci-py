@@ -3,6 +3,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import binascii
 import datetime
 import logging
 import re
@@ -15,13 +16,15 @@ from google.appengine.ext.webapp import blobstore_handlers
 
 # The maximum number of hash entries that can be queried in a single
 # has request.
-MAX_HASHKEYS_PER_HAS = 1000
+MAX_HASH_DIGESTS_PER_HAS = 1000
 
 # The minimum size, in bytes, a hash entry must be before it gets stored in the
 # blobstore, otherwise it is stored as a blob property.
 MIN_SIZE_FOR_BLOBSTORE = 20 * 8
 
-VALID_SHA1_RE = re.compile(r'[a-f0-9]{40}')
+HASH_DIGEST_LENGTH = 20
+HASH_HEXDIGEST_LENGTH = 40
+VALID_SHA1_RE = re.compile(r'[a-f0-9]{' + str(HASH_HEXDIGEST_LENGTH) + r'}')
 
 
 class ContentNamespace(db.Model):
@@ -123,27 +126,55 @@ def CreateHashEntry(request, response):
 
 class ContainsHashHandler(webapp2.RequestHandler):
   """A simple handler for saying if a hash is already stored or not."""
-  def get(self):
-    hash_keys = self.request.get('hash_key').split()
+  def post(self):
+    """This is a POST even though it doesn't modify any data, but it makes
+    it easier for python scripts."""
+    hash_digests = self.request.body
     namespace = self.request.get('namespace', 'default')
-    logging.debug('Checking namespace %s for the following keys:\n%s',
-                  namespace, str(hash_keys))
 
-    if len(hash_keys) > MAX_HASHKEYS_PER_HAS:
-      msg = (
-          'Requested more than %d hashkeys in a single has request, aborting' %
-          len(hash_keys))
+    if len(hash_digests) % HASH_DIGEST_LENGTH:
+      msg = ('Hash digests must all be of length %d, last digest was of '
+             'length %d' %
+             (HASH_DIGEST_LENGTH, len(hash_key) % HASH_DIGEST_LENGTH))
       logging.error(msg)
       self.response.out.write(msg)
-      self.response.out.set_status(402)
+      self.response.set_status(402)
+
+    hash_digest_count = len(hash_digests) / HASH_DIGEST_LENGTH
+    logging.info('Checking namespace %s for %d hash digests', namespace,
+                 hash_digest_count)
+
+    if hash_digest_count > MAX_HASH_DIGESTS_PER_HAS:
+      msg = (
+          'Requested more than %d hash digests in a single has request, '
+          'aborting' % hash_key_count)
+      logging.error(msg)
+      self.response.out.write(msg)
+      self.response.set_status(402)
       return
 
-    contains = (
-        str(bool(GetContentByHash(hash_key, namespace)))
-        for hash_key in hash_keys
+    namespace_model_key = ContentNamespace.get_or_insert(
+        namespace, is_testing=namespace.startswith('temporary')).key()
+
+    # Extract all the hashes.
+    hashes = (
+        binascii.hexlify(
+            hash_digests[i * HASH_DIGEST_LENGTH: (i + 1) * HASH_DIGEST_LENGTH])
+        for i in range(hash_digest_count)
     )
 
-    self.response.out.write('\n'.join(contains))
+    # Convert to entity keys.
+    keys = (
+        db.Key.from_path('HashEntry', hash_digest, parent=namespace_model_key)
+        for hash_digest in hashes
+    )
+
+    # Convert to byte, chr(0) if not present, chr(1) if it is.
+    contains = (
+        bool(HashEntry.all(keys_only=True).filter('__key__ =', key).get())
+        for key in keys)
+
+    self.response.out.write(bytearray(contains))
 
 
 class GenerateBlobstoreHandler(webapp2.RequestHandler):

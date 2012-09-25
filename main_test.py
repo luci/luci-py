@@ -6,6 +6,7 @@
 # This test connects to the test isolation server and ensures that is can
 # upload and then retrieve a hash value.
 
+import binascii
 import hashlib
 import mimetools
 import time
@@ -72,18 +73,17 @@ class AppTest(unittest.TestCase):
   def setUp(self):
     self.namespace = 'temporary' + str(time.time())
 
-  def fetch(self, suburl, params, base_url=ISOLATE_SERVER_URL, payload=None,
-            method='GET', content_type='application/octet-stream'):
+  def fetch(self, url, params=None, payload=None, method='GET',
+            content_type='application/octet-stream'):
     if method == 'POST' and payload == None:
       payload = ''
 
-    full_url = base_url + suburl
     if params:
       # Ensure we are in the test namepace.
       params['namespace'] = self.namespace
-      full_url += "?" + urllib.urlencode(params)
+      url += "?" + urllib.urlencode(params)
 
-    request = urllib2.Request(full_url, data=payload)
+    request = urllib2.Request(url, data=payload)
 
     request.add_header('content-type', content_type)
     request.add_header('content-length', len(payload or ''))
@@ -104,11 +104,15 @@ class AppTest(unittest.TestCase):
   def RemoveAndVerify(self, hash_key):
     """Removes the hash key from the server and verify it is deleted."""
     # Remove the given hash content, if it already exists.
-    self.fetch('content/remove', {'hash_key': hash_key}, method='POST')
+    self.fetch(ISOLATE_SERVER_URL + 'content/remove',
+               {'hash_key': hash_key}, method='POST')
 
     # Make sure we can't get the content, since it was deleted.
-    response = self.fetch('content/contains', {'hash_key': hash_key})
-    self.assertEqual('False', response.read())
+    response = self.fetch(ISOLATE_SERVER_URL + 'content/contains',
+                          params={'namespace': self.namespace},
+                          payload=binascii.unhexlify(hash_key))
+    contain_response = response.read().decode()
+    self.assertEqual(chr(0), contain_response)
 
   def UploadHashAndRetriveHelper(self, hash_key, hash_contents):
     self.RemoveAndVerify(hash_key)
@@ -124,14 +128,22 @@ class AppTest(unittest.TestCase):
       content_type, body = encode_multipart_formdata(
           [('hash_key', hash_key), ('namespace', self.namespace)],
           [('hash_contents', 'hash_contents', hash_contents)])
-      response = self.fetch('', params=None, base_url=upload_url, payload=body,
+      response = self.fetch(upload_url, params=None, payload=body,
                             content_type=content_type)
     else:
-      response = self.fetch('content/store', {'hash_key': hash_key},
+      response = self.fetch(ISOLATE_SERVER_URL + 'content/store',
+                            {'hash_key': hash_key},
                             payload=hash_contents)
     self.assertEqual('hash content saved.', response.read())
 
-    response = self.fetch('content/retrieve', {'hash_key': hash_key})
+    response = self.fetch(ISOLATE_SERVER_URL + 'content/contains',
+                          params={'namespace': self.namespace},
+                          payload=binascii.unhexlify(hash_key))
+    contains_response = response.read().decode()
+    self.assertEqual(chr(1), contains_response)
+
+    response = self.fetch(ISOLATE_SERVER_URL + 'content/retrieve',
+                          {'hash_key': hash_key})
     self.assertEqual(hash_contents, response.read())
 
     self.RemoveAndVerify(hash_key)
