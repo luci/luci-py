@@ -24,7 +24,6 @@ and log urllib2.URLError & IOError, we let the others through.
 
 import logging
 from os import path
-import urllib
 import urllib2
 
 
@@ -41,11 +40,6 @@ def DownloadFile(local_file, url):
 
   if not path.isabs(local_file):
     local_file = path.abspath(local_file)
-
-  # Don't quote ':' or '/' as that will break the url format.
-  # Don't quote '%' because it can be handled as is and could
-  # represent an element that has already been quoted.
-  url = urllib.quote(url, ':/%')
 
   try:
     url_stream = None
