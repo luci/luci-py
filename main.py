@@ -194,18 +194,18 @@ class StoreBlobstoreContentByHashHandler(
              len(upload_hash_contents))
       logging.error(msg)
 
-      self.response.write.out(msg)
+      self.response.out.write(msg)
       self.response.set_status(402)
 
       # Delete all upload files since they aren't linked to anything.
-      db.delete_async(upload_hash_contents)
+      blobstore.delete_async(upload_hash_contents)
       return
 
     hash_entry = CreateHashEntry(self.request, self.response)
 
     if not hash_entry:
       # Delete all upload files since they aren't linked to anything.
-      db.delete_async(upload_hash_contents)
+      blobstore.delete_async(upload_hash_contents)
       return
 
     hash_entry.hash_content_reference = upload_hash_contents[0]
