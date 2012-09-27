@@ -316,6 +316,16 @@ class TestHelper(unittest.TestCase):
                              ['shttps://safe.a.com', 'nfile://here'],
                              [55]]
 
+  VALID_URL_LOCAL_PATH_TUPLES_LISTS = [[('http://a.com', 'a')],
+                                       [('https://safe.a.com', 'b'),
+                                        ('file://my_file', 'local/state')]]
+  INVALID_URL_LOCAL_PATH_TUPLES_LISTS = ['', 1, ('hello'), [('asd', 'a')],
+                                         [('hps://safe.a.com', 'b'),
+                                          ('nfile://my_file', 'local/state')],
+                                         [('http://www.google.com', 5)],
+                                         [('http://a.com', 'b', 'c')],
+                                         [['http://a.com', 'a']]]
+
   VALID_OPTIONAL_OUTPUT_DESTINATION_VALUES = [{}, None, {'size': 10.0},
                                               {'size': 5}, {'size': '12'},
                                               {'size': -5}, {'size': '0'},
@@ -495,8 +505,8 @@ class TestConfigurationTest(TestHelper):
     # And then a few more valid values
     self.AssertValidValues('config_name',
                            TestHelper.VALID_STRING_VALUES)
-    self.AssertValidValues('data',
-                           TestHelper.VALID_OPTIONAL_URL_LIST_VALUES)
+    self.AssertValidValues('data', TestHelper.VALID_OPTIONAL_URL_LIST_VALUES +
+                           TestHelper.VALID_URL_LOCAL_PATH_TUPLES_LISTS)
     self.AssertValidValues('binaries',
                            TestHelper.VALID_REQUIRED_STRING_LIST_VALUES)
 
@@ -529,8 +539,8 @@ class TestConfigurationTest(TestHelper):
                              TestHelper.INVALID_REQUIRED_STRING_VALUES)
     # Put the value back to a valid value, to test invalidity of other values.
     self.test_request.config_name = TestHelper.VALID_STRING_VALUES[0]
-    self.AssertInvalidValues('data',
-                             TestHelper.INVALID_URL_LIST_VALUES)
+    self.AssertInvalidValues('data', TestHelper.INVALID_URL_LIST_VALUES +
+                             TestHelper.INVALID_URL_LOCAL_PATH_TUPLES_LISTS)
     self.test_request.data = TestHelper.VALID_URL_LIST_VALUES[-1]
     self.AssertInvalidValues('binaries',
                              TestHelper.INVALID_STRING_LIST_VALUES)
@@ -655,8 +665,8 @@ class TestCaseTest(TestHelper):
     # And then a few more valid values
     self.AssertValidValues('test_case_name',
                            TestHelper.VALID_STRING_VALUES)
-    self.AssertValidValues('data',
-                           TestHelper.VALID_OPTIONAL_URL_LIST_VALUES)
+    self.AssertValidValues('data', TestHelper.VALID_OPTIONAL_URL_LIST_VALUES +
+                           TestHelper.VALID_URL_LOCAL_PATH_TUPLES_LISTS)
     self.AssertValidValues('binaries',
                            TestHelper.VALID_REQUIRED_STRING_LIST_VALUES)
     self.AssertValidValues('admin', TestHelper.VALID_BOOLEAN_VALUES)
@@ -700,7 +710,8 @@ class TestCaseTest(TestHelper):
                              TestHelper.INVALID_REQUIRED_STRING_VALUES)
     # Put the value back to a valid value, to test invalidity of other values.
     self.test_request.test_case_name = TestHelper.VALID_STRING_VALUES[0]
-    self.AssertInvalidValues('data', TestHelper.INVALID_URL_LIST_VALUES)
+    self.AssertInvalidValues('data', TestHelper.INVALID_URL_LIST_VALUES +
+                             TestHelper.INVALID_URL_LOCAL_PATH_TUPLES_LISTS)
     self.test_request.data = TestHelper.VALID_URL_LIST_VALUES[-1]
     self.AssertInvalidValues('binaries',
                              TestHelper.INVALID_STRING_LIST_VALUES)
@@ -827,8 +838,8 @@ class TestRunTest(TestHelper):
     # And then a few more valid values
     self.AssertValidValues('test_run_name',
                            TestHelper.VALID_STRING_VALUES)
-    self.AssertValidValues('data',
-                           TestHelper.VALID_OPTIONAL_URL_LIST_VALUES)
+    self.AssertValidValues('data', TestHelper.VALID_OPTIONAL_URL_LIST_VALUES +
+                           TestHelper.VALID_URL_LOCAL_PATH_TUPLES_LISTS)
 
     test_object1 = test_request_message.TestObject(test_name='a', action=['a'])
     test_object2 = test_request_message.TestObject(
@@ -868,7 +879,8 @@ class TestRunTest(TestHelper):
                              TestHelper.INVALID_REQUIRED_STRING_VALUES)
     # Put the value back to a valid value, to test invalidity of other values.
     self.test_request.test_run_name = TestHelper.VALID_STRING_VALUES[0]
-    self.AssertInvalidValues('data', TestHelper.INVALID_URL_LIST_VALUES)
+    self.AssertInvalidValues('data', TestHelper.INVALID_URL_LIST_VALUES +
+                             TestHelper.INVALID_URL_LOCAL_PATH_TUPLES_LISTS)
     self.test_request.data = TestHelper.VALID_URL_LIST_VALUES[-1]
 
     test_object1.time_out = 'never'

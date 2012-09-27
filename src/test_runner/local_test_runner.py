@@ -468,9 +468,13 @@ class LocalTestRunner(object):
     """
     logging.info('Test case: %s starting to download data',
                  self.test_run.test_run_name)
-    for data_url in self.test_run.data:
-      local_file = path.join(self.data_dir,
-                             data_url[data_url.rfind('/') + 1:])
+    for data in self.test_run.data:
+      if isinstance(data, tuple):
+        (data_url, file_name) = data
+      else:
+        data_url = data
+        file_name = data_url[data_url.rfind('/') + 1:]
+      local_file = path.join(self.data_dir, file_name)
       logging.info('Downloading: %s from %s', local_file, data_url)
       try:
         downloader.DownloadFile(local_file, data_url)

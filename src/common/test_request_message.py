@@ -338,6 +338,52 @@ class TestRequestMessageBase(object):
 
     return True
 
+  def AreValidDataLists(self, list_keys, required=False, errors=None):
+    """Checks if all the values in the given lists are valid data.
+
+    Valid data is either a tuple of (valid url, local file name)
+    or just a valid url.
+
+    Args:
+      list_keys: The key names of the value lists to validate.
+      required: An optional flag identifying if the list is required to be
+          non-empty. Defaults to False.
+      errors: An array where we can append error messages.
+
+    Returns:
+      True if all the values are valid data elements.
+    """
+    if not self.AreValidValues(list_keys, list, required, errors):
+      return False
+
+    for list_key in list_keys:
+      if self.__dict__[list_key]:
+        for value in self.__dict__[list_key]:
+          if not isinstance(value, tuple) and not isinstance(value, basestring):
+            self.LogError('Data list wrong type, must be tuple or basestring, '
+                          'got %s' % type(value), errors)
+            return False
+
+          if isinstance(value, basestring):
+            if not self.IsValidUrl(value, errors):
+              return False
+          else:
+            if len(value) != 2:
+              self.LogError('Incorrect length of tuple, should be 2 but was '
+                            '%d' % len(value), errors)
+              return False
+            if not self.IsValidUrl(value[0], errors):
+              return False
+            if not isinstance(value[1], basestring):
+              self.LogError('Local path should be of type basestring, got %s' %
+                            type(value[1]), errors)
+              return False
+      elif required:
+        self.LogError('Missing list %s' % list_key, errors)
+        return False
+
+    return True
+
   def IsValidInteger(self, value, errors=None):
     """Checks if the given value is castable to a valid integer.
 
@@ -679,7 +725,7 @@ class TestConfiguration(TestRequestMessageBase):
     if (not self.AreValidValues(['config_name'], str,
                                 required=True, errors=errors) or
         not self.AreValidDicts(['env_vars'], str, str, errors=errors) or
-        not self.AreValidUrlLists(['data'], errors=errors) or
+        not self.AreValidDataLists(['data'], errors=errors) or
         not self.AreValidLists(['binaries'], str, errors=errors) or
         not self.AreValidObjectLists(['tests'], TestObject,
                                      unique_value_keys=['test_name'],
@@ -816,7 +862,7 @@ class TestCase(TestRequestMessageBase):
                                      required=True,
                                      unique_value_keys=['config_name'],
                                      errors=errors) or
-        not self.AreValidUrlLists(['data'], errors=errors) or
+        not self.AreValidDataLists(['data'], errors=errors) or
         not self.AreValidLists(['binaries'], str, errors=errors) or
         not self.AreValidObjectLists(['tests'], TestObject,
                                      unique_value_keys=['test_name'],
@@ -867,8 +913,7 @@ class TestRun(TestRequestMessageBase):
     test_run_name: The name of the test run.
     env_vars: An optional dictionary for environment variables.
     configuration: An optional configuration object for this test run.
-    data: An optional data list for this test run. The strings must be valid
-        urls.
+    data: An optional data list for this test run.
     working_dir: An optional path string for where to download/run tests.
         This must be an absolute path though we don't validate it since this
         script may run on a different platform than the one that will use the
@@ -942,7 +987,7 @@ class TestRun(TestRequestMessageBase):
         not self.configuration or
         not isinstance(self.configuration, TestConfiguration) or
         not self.configuration.IsValid(errors) or
-        not self.AreValidUrlLists(['data'], errors=errors) or
+        not self.AreValidDataLists(['data'], errors=errors) or
         not self.AreValidObjectLists(['tests'], TestObject,
                                      unique_value_keys=['test_name'],
                                      errors=errors) or
