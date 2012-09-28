@@ -9,10 +9,14 @@ import logging
 import re
 import webapp2
 
+# The app engine headers are located locally, so don't worry about not finding
+# them.
+# pylint: disable=E0611,F0401
 from google.appengine.api import files
 from google.appengine.ext import blobstore
 from google.appengine.ext import db
 from google.appengine.ext.webapp import blobstore_handlers
+# pylint: enable=E0611,F0401
 
 # The maximum number of hash entries that can be queried in a single
 # has request.
@@ -135,7 +139,7 @@ class ContainsHashHandler(webapp2.RequestHandler):
     if len(hash_digests) % HASH_DIGEST_LENGTH:
       msg = ('Hash digests must all be of length %d, last digest was of '
              'length %d' %
-             (HASH_DIGEST_LENGTH, len(hash_key) % HASH_DIGEST_LENGTH))
+             (HASH_DIGEST_LENGTH, len(hash_digests) % HASH_DIGEST_LENGTH))
       logging.error(msg)
       self.response.out.write(msg)
       self.response.set_status(402)
@@ -147,7 +151,7 @@ class ContainsHashHandler(webapp2.RequestHandler):
     if hash_digest_count > MAX_HASH_DIGESTS_PER_HAS:
       msg = (
           'Requested more than %d hash digests in a single has request, '
-          'aborting' % hash_key_count)
+          'aborting' % hash_digest_count)
       logging.error(msg)
       self.response.out.write(msg)
       self.response.set_status(402)
@@ -272,7 +276,7 @@ class RetriveContentByHashHandler(blobstore_handlers.BlobstoreDownloadHandler):
     namespace = self.request.get('namespace', 'default')
     hash_entry = GetContentByHash(hash_key, namespace)
     # TODO(csharp): High priority requests, 0, should be loaded from memcache.
-    priority = self.request.get('priority', '1')
+    _priority = self.request.get('priority', '1')
 
     if not hash_entry:
       msg = 'Unable to find a hash with key \'%s\'.' % hash_key
@@ -283,7 +287,7 @@ class RetriveContentByHashHandler(blobstore_handlers.BlobstoreDownloadHandler):
       return
 
     if hash_entry.last_access != datetime.date.today():
-      hash_entry.last_access = datatime.date.today()
+      hash_entry.last_access = datetime.date.today()
       hash_entry.put_async()
 
     if hash_entry.hash_content is None:

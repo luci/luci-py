@@ -8,7 +8,6 @@
 
 import binascii
 import hashlib
-import mimetools
 import time
 import unittest
 import urllib
@@ -95,6 +94,7 @@ class AppTest(unittest.TestCase):
         # Always re-raise if we reached the server.
         raise
       except urllib2.URLError as e:
+        print 'Error connecting to server: %s' % str(e)
         # Sleep with an exponential backoff.
         time.sleep(1.5 ** attempt)
 
