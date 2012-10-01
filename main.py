@@ -288,7 +288,7 @@ class RetriveContentByHashHandler(blobstore_handlers.BlobstoreDownloadHandler):
 
     if hash_entry.last_access != datetime.date.today():
       hash_entry.last_access = datetime.date.today()
-      hash_entry.put_async()
+      db.put_async(hash_entry)
 
     if hash_entry.hash_content is None:
       logging.info('Returning hash content from blobstore')
