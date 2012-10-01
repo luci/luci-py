@@ -317,14 +317,13 @@ class TestHelper(unittest.TestCase):
                              [55]]
 
   VALID_URL_LOCAL_PATH_TUPLES_LISTS = [[('http://a.com', 'a')],
-                                       [('https://safe.a.com', 'b'),
+                                       [['https://safe.a.com', 'b'],
                                         ('file://my_file', 'local/state')]]
   INVALID_URL_LOCAL_PATH_TUPLES_LISTS = ['', 1, ('hello'), [('asd', 'a')],
-                                         [('hps://safe.a.com', 'b'),
+                                         [['hps://safe.a.com', 'b'],
                                           ('nfile://my_file', 'local/state')],
                                          [('http://www.google.com', 5)],
-                                         [('http://a.com', 'b', 'c')],
-                                         [['http://a.com', 'a']]]
+                                         [('http://a.com', 'b', 'c')]]
 
   VALID_OPTIONAL_OUTPUT_DESTINATION_VALUES = [{}, None, {'size': 10.0},
                                               {'size': 5}, {'size': '12'},

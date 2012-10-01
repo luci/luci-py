@@ -341,7 +341,7 @@ class TestRequestMessageBase(object):
   def AreValidDataLists(self, list_keys, required=False, errors=None):
     """Checks if all the values in the given lists are valid data.
 
-    Valid data is either a tuple of (valid url, local file name)
+    Valid data is either a tuple/list of (valid url, local file name)
     or just a valid url.
 
     Args:
@@ -359,7 +359,7 @@ class TestRequestMessageBase(object):
     for list_key in list_keys:
       if self.__dict__[list_key]:
         for value in self.__dict__[list_key]:
-          if not isinstance(value, tuple) and not isinstance(value, basestring):
+          if not isinstance(value, (basestring, list, tuple)):
             self.LogError('Data list wrong type, must be tuple or basestring, '
                           'got %s' % type(value), errors)
             return False
@@ -369,7 +369,7 @@ class TestRequestMessageBase(object):
               return False
           else:
             if len(value) != 2:
-              self.LogError('Incorrect length of tuple, should be 2 but was '
+              self.LogError('Incorrect length, should be 2 but was '
                             '%d' % len(value), errors)
               return False
             if not self.IsValidUrl(value[0], errors):

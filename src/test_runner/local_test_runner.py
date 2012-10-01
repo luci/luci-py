@@ -469,7 +469,7 @@ class LocalTestRunner(object):
     logging.info('Test case: %s starting to download data',
                  self.test_run.test_run_name)
     for data in self.test_run.data:
-      if isinstance(data, tuple):
+      if isinstance(data, (list, tuple)):
         (data_url, file_name) = data
       else:
         data_url = data
