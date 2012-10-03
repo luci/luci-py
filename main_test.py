@@ -12,7 +12,7 @@ import time
 import unittest
 import urllib
 import urllib2
-from hashlib import md5
+from hashlib import md5  # pylint: disable=E0611
 
 
 # The url of the test isolate server.

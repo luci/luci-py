@@ -1,0 +1,4 @@
+cron:
+- description: old data cleanup
+  url: /content/cleanup
+  schedule: every day 00:00
