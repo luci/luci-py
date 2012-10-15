@@ -14,6 +14,7 @@ import re
 import webapp2
 from google.appengine.api import datastore_errors
 from google.appengine.api import files
+from google.appengine.api import users
 from google.appengine.api import taskqueue
 from google.appengine.ext import blobstore
 from google.appengine.ext import db
@@ -33,6 +34,12 @@ DATASTORE_TIME_TO_LIVE_IN_DAYS = 7
 
 # The maximum number of blobs to delete at a time.
 MAX_BLOBS_TO_DELETE_ASYNC = 100
+
+# The domains that are allowed to access this application.
+VALID_DOMAINS = (
+    'chromium.org',
+    'google.com',
+)
 
 HASH_DIGEST_LENGTH = 20
 HASH_HEXDIGEST_LENGTH = 40
@@ -125,6 +132,24 @@ def CreateHashEntry(request, response):
   return HashEntry(key=key)
 
 
+class ACLRequestHandler(webapp2.RequestHandler):
+  """Adds ACL to the request handler to ensure only valid users can use
+  the handlers."""
+  def dispatch(self):
+    """Ensures that only users from valid domains can continue, and that users
+    from invalid domains receive an error message."""
+    email = users.get_current_user().email()
+    domain = email.partition('@')[2]
+    if domain not in VALID_DOMAINS:
+      msg = 'Invalid domain, %s' % domain
+      logging.error(msg)
+      self.response.out.write(msg)
+      self.response.set_status(402)
+      return
+
+    return webapp2.RequestHandler.dispatch(self)
+
+
 class CleanupWorkerHandler(webapp2.RequestHandler):
   """Removes the old data from the blobstore and datastore. Only
   a task queue task can use this handler."""
@@ -191,7 +216,7 @@ class CleanupHandler(webapp2.RequestHandler):
     taskqueue.add(url='/cleanup_worker')
 
 
-class ContainsHashHandler(webapp2.RequestHandler):
+class ContainsHashHandler(ACLRequestHandler):
   """A simple handler for saying if a hash is already stored or not."""
   def post(self):
     """This is a POST even though it doesn't modify any data, but it makes
@@ -244,7 +269,7 @@ class ContainsHashHandler(webapp2.RequestHandler):
     self.response.out.write(bytearray(contains))
 
 
-class GenerateBlobstoreHandler(webapp2.RequestHandler):
+class GenerateBlobstoreHandler(ACLRequestHandler):
   """Generate an upload url to directly load files into the blobstore."""
   def get(self):
     self.response.out.write(
@@ -252,7 +277,8 @@ class GenerateBlobstoreHandler(webapp2.RequestHandler):
 
 
 class StoreBlobstoreContentByHashHandler(
-    blobstore_handlers.BlobstoreUploadHandler):
+  ACLRequestHandler,
+  blobstore_handlers.BlobstoreUploadHandler):
   """Assigns the newly stored blobstore entry to the correct hash key."""
   def post(self):
     upload_hash_contents = self.get_uploads('hash_contents')
@@ -282,7 +308,7 @@ class StoreBlobstoreContentByHashHandler(
     self.response.out.write('hash content saved.')
 
 
-class StoreContentByHashHandler(webapp2.RequestHandler):
+class StoreContentByHashHandler(ACLRequestHandler):
   """The handler for adding hash contents."""
   def post(self):
     hash_entry = CreateHashEntry(self.request, self.response)
@@ -314,7 +340,7 @@ class StoreContentByHashHandler(webapp2.RequestHandler):
     self.response.out.write('hash content saved.')
 
 
-class RemoveContentByHashHandler(webapp2.RequestHandler):
+class RemoveContentByHashHandler(ACLRequestHandler):
   """The handler for removing hash contents from the server."""
   def post(self):
     hash_key = self.request.get('hash_key')
@@ -332,7 +358,8 @@ class RemoveContentByHashHandler(webapp2.RequestHandler):
     logging.info('Deleted hash entry')
 
 
-class RetriveContentByHashHandler(blobstore_handlers.BlobstoreDownloadHandler):
+class RetrieveContentByHashHandler(ACLRequestHandler,
+                                  blobstore_handlers.BlobstoreDownloadHandler):
   """The handlers for retrieving hash contents."""
   def get(self):
     hash_key = self.request.get('hash_key')
@@ -370,6 +397,6 @@ def CreateApplication():
       ('/content/store', StoreContentByHashHandler),
       ('/content/store_blobstore', StoreBlobstoreContentByHashHandler),
       ('/content/remove', RemoveContentByHashHandler),
-      ('/content/retrieve', RetriveContentByHashHandler)])
+      ('/content/retrieve', RetrieveContentByHashHandler)])
 
 app = CreateApplication()

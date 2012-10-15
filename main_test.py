@@ -14,9 +14,12 @@ import urllib
 import urllib2
 from hashlib import md5  # pylint: disable=E0611
 
+import find_depot_tools  # pylint: disable=W0611
+
+from third_party import upload
 
 # The url of the test isolate server.
-ISOLATE_SERVER_URL = 'http://test.isolateserver.appspot.com/'
+ISOLATE_SERVER_URL = 'https://test.isolateserver.appspot.com/'
 
 # Some basic binary data stored as a byte string.
 BINARY_DATA = (chr(0) + chr(57) + chr(128) + chr(255)) * 2
@@ -71,9 +74,11 @@ def encode_multipart_formdata(fields, files,
 class AppTest(unittest.TestCase):
   def setUp(self):
     self.namespace = 'temporary' + str(time.time())
+    self.email = upload.GetEmail("Email (login for uploading to %s)" %
+                                 ISOLATE_SERVER_URL)
 
   def fetch(self, url, params=None, payload=None, method='GET',
-            content_type='application/octet-stream'):
+            content_type='application/octet-stream', use_authentication=True):
     if method == 'POST' and payload == None:
       payload = ''
 
@@ -82,14 +87,26 @@ class AppTest(unittest.TestCase):
       params['namespace'] = self.namespace
       url += "?" + urllib.urlencode(params)
 
-    request = urllib2.Request(url, data=payload)
-
-    request.add_header('content-type', content_type)
-    request.add_header('content-length', len(payload or ''))
+    if use_authentication:
+      rpc_server = upload.HttpRpcServer(
+        ISOLATE_SERVER_URL,
+        upload.KeyringCreds(ISOLATE_SERVER_URL, ISOLATE_SERVER_URL,
+                            self.email).GetUserCredentials
+      )
+    else:
+      request = urllib2.Request(url, data=payload)
+      request.add_header('content-type', content_type)
+      request.add_header('content-length', len(payload or ''))
 
     for attempt in range(MAX_URL_ATTEMPTS):
       try:
-        return urllib2.urlopen(request)
+        if use_authentication:
+          return rpc_server.Send(
+              url[len(ISOLATE_SERVER_URL):],
+              payload, content_type=content_type,
+              extra_headers={'content-length': len(payload or '')})
+        else:
+          return urllib2.urlopen(request).read()
       except urllib2.HTTPError:
         # Always re-raise if we reached the server.
         raise
@@ -111,7 +128,7 @@ class AppTest(unittest.TestCase):
     response = self.fetch(ISOLATE_SERVER_URL + 'content/contains',
                           params={'namespace': self.namespace},
                           payload=binascii.unhexlify(hash_key))
-    contain_response = response.read().decode()
+    contain_response = response.decode()
     self.assertEqual(chr(0), contain_response)
 
   def UploadHashAndRetriveHelper(self, hash_key, hash_contents):
@@ -120,9 +137,9 @@ class AppTest(unittest.TestCase):
     # Add the hash content and then retrieve it.
     if len(hash_contents) > MIN_SIZE_FOR_BLOBSTORE:
       # Query the server for a direct upload url.
-      response = urllib2.urlopen(ISOLATE_SERVER_URL +
-                                 '/content/generate_blobstore_url')
-      upload_url = response.read()
+      response = self.fetch(ISOLATE_SERVER_URL +
+                            '/content/generate_blobstore_url')
+      upload_url = response
       self.assertTrue(upload_url)
 
       content_type, body = encode_multipart_formdata(
@@ -134,17 +151,17 @@ class AppTest(unittest.TestCase):
       response = self.fetch(ISOLATE_SERVER_URL + 'content/store',
                             {'hash_key': hash_key},
                             payload=hash_contents)
-    self.assertEqual('hash content saved.', response.read())
+    self.assertEqual('hash content saved.', response)
 
     response = self.fetch(ISOLATE_SERVER_URL + 'content/contains',
                           params={'namespace': self.namespace},
                           payload=binascii.unhexlify(hash_key))
-    contains_response = response.read().decode()
+    contains_response = response.decode()
     self.assertEqual(chr(1), contains_response)
 
     response = self.fetch(ISOLATE_SERVER_URL + 'content/retrieve',
                           {'hash_key': hash_key})
-    self.assertEqual(hash_contents, response.read())
+    self.assertEqual(hash_contents, response)
 
     self.RemoveAndVerify(hash_key)
 
@@ -164,6 +181,15 @@ class AppTest(unittest.TestCase):
     hash_key = hashlib.sha1().hexdigest()
 
     self.UploadHashAndRetriveHelper(hash_key, '')
+
+  def testFailWithoutAuthentication(self):
+    hash_key = hashlib.sha1().hexdigest()
+
+    response = self.fetch(ISOLATE_SERVER_URL + 'content/contains',
+                          params={'namespace': self.namespace},
+                          payload=binascii.unhexlify(hash_key),
+                          use_authentication=False)
+    self.assertNotEqual('', response)
 
 
 if __name__ == '__main__':
