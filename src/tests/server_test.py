@@ -20,6 +20,7 @@ import urllib
 import urllib2
 import urlparse
 
+
 # Number of seconds to sleep between tries of polling for results.
 SLEEP_BETWEEN_RESULT_POLLS = 2
 
@@ -67,7 +68,7 @@ class _SwarmTestCase(unittest.TestCase):
 
     # TODO(user): find a better way to choose the port.
     swarm_server_addr = 'http://localhost'
-    swarm_server_port = '8181'
+swarm_server_port = '8181'
     self._swarm_server_url = '%s:%s' % (swarm_server_addr, swarm_server_port)
 
     _SwarmTestProgram.options.appengine_cmds.extend(
