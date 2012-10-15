@@ -14,6 +14,7 @@ import logging
 import optparse
 import os
 import subprocess
+import sys
 import time
 import unittest
 import urllib
@@ -107,7 +108,7 @@ swarm_server_port = '8181'
                  _SwarmTestProgram.options.slave_script)
 
     slave_machine_cmds = [
-        'python',
+        sys.executable,
         _SwarmTestProgram.options.slave_script,
         '-a', swarm_server_addr,
         '-p', swarm_server_port,
