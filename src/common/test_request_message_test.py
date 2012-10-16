@@ -462,7 +462,6 @@ class TestConfigurationTest(TestHelper):
         config_name='a', os='a', browser='a', cpu='a',
         env_vars=TestHelper.VALID_ENV_VARS[-1],
         data=TestHelper.VALID_URL_LIST_VALUES[-1],
-        binaries=TestHelper.VALID_REQUIRED_STRING_LIST_VALUES[-1],
         tests=[TestObjectTest.GetFullObject()],
         min_instances=1,
         additional_instances=1)
@@ -471,22 +470,17 @@ class TestConfigurationTest(TestHelper):
     # Ensure that Test Configuration makes copies of its input, not references.
     env_vars = {'a': 1}
     data = ['data']
-    binaries = ['binaries']
     tests = ['test']
     dimensions = {'a': ['b']}
 
     test_configurations = test_request_message.TestConfiguration(
-        env_vars=env_vars, data=data, binaries=binaries, tests=tests,
-        dimensions=dimensions)
+        env_vars=env_vars, data=data, tests=tests, dimensions=dimensions)
 
     env_vars['a'] = 2
     self.assertNotEqual(env_vars, test_configurations.env_vars)
 
     data.append('data2')
     self.assertNotEqual(data, test_configurations.data)
-
-    binaries.append('binaries2')
-    self.assertNotEqual(binaries, test_configurations.binaries)
 
     tests.append('tests2')
     self.assertNotEqual(tests, test_configurations.tests)
@@ -506,8 +500,6 @@ class TestConfigurationTest(TestHelper):
                            TestHelper.VALID_STRING_VALUES)
     self.AssertValidValues('data', TestHelper.VALID_OPTIONAL_URL_LIST_VALUES +
                            TestHelper.VALID_URL_LOCAL_PATH_TUPLES_LISTS)
-    self.AssertValidValues('binaries',
-                           TestHelper.VALID_REQUIRED_STRING_LIST_VALUES)
 
     test_object1 = test_request_message.TestObject(test_name='a', action=['a'])
     test_object2 = test_request_message.TestObject(
@@ -541,9 +533,6 @@ class TestConfigurationTest(TestHelper):
     self.AssertInvalidValues('data', TestHelper.INVALID_URL_LIST_VALUES +
                              TestHelper.INVALID_URL_LOCAL_PATH_TUPLES_LISTS)
     self.test_request.data = TestHelper.VALID_URL_LIST_VALUES[-1]
-    self.AssertInvalidValues('binaries',
-                             TestHelper.INVALID_STRING_LIST_VALUES)
-    self.test_request.binaries = None
 
     # Test names must be unique.
     test_object2.test_name = test_object1.test_name
@@ -609,10 +598,8 @@ class TestCaseTest(TestHelper):
         test_case_name='a',
         env_vars=TestHelper.VALID_ENV_VARS[-1],
         data=TestHelper.VALID_URL_LIST_VALUES[-1],
-        binaries=TestHelper.VALID_REQUIRED_STRING_LIST_VALUES[-1],
         working_dir=TestHelper.VALID_STRING_VALUES[-1],
         admin=TestHelper.VALID_BOOLEAN_VALUES[-1],
-        virgin=TestHelper.VALID_BOOLEAN_VALUES[-1],
         tests=[TestObjectTest.GetFullObject()],
         result_url=TestHelper.VALID_URL_VALUES[-1],
         store_result=
@@ -628,13 +615,12 @@ class TestCaseTest(TestHelper):
     env_vars = {'a': 1}
     configurations = [TestConfigurationTest.GetFullObject()]
     data = ['data']
-    binaries = ['binaries']
     tests = ['test']
     output_destination = {'url': 'http://www.google.com', 'size': 1}
 
     test_case = test_request_message.TestCase(
         env_vars=env_vars, configurations=configurations, data=data,
-        binaries=binaries, tests=tests, output_destination=output_destination)
+        tests=tests, output_destination=output_destination)
 
     env_vars['a'] = 2
     self.assertNotEqual(env_vars, test_case.env_vars)
@@ -644,9 +630,6 @@ class TestCaseTest(TestHelper):
 
     data.append('data2')
     self.assertNotEqual(data, test_case.data)
-
-    binaries.append('binaries2')
-    self.assertNotEqual(binaries, test_case.binaries)
 
     tests.append('tests2')
     self.assertNotEqual(tests, test_case.tests)
@@ -666,10 +649,7 @@ class TestCaseTest(TestHelper):
                            TestHelper.VALID_STRING_VALUES)
     self.AssertValidValues('data', TestHelper.VALID_OPTIONAL_URL_LIST_VALUES +
                            TestHelper.VALID_URL_LOCAL_PATH_TUPLES_LISTS)
-    self.AssertValidValues('binaries',
-                           TestHelper.VALID_REQUIRED_STRING_LIST_VALUES)
     self.AssertValidValues('admin', TestHelper.VALID_BOOLEAN_VALUES)
-    self.AssertValidValues('virgin', TestHelper.VALID_BOOLEAN_VALUES)
 
     test_object1 = test_request_message.TestObject(test_name='a', action=['a'])
     test_object2 = test_request_message.TestObject(
@@ -712,9 +692,6 @@ class TestCaseTest(TestHelper):
     self.AssertInvalidValues('data', TestHelper.INVALID_URL_LIST_VALUES +
                              TestHelper.INVALID_URL_LOCAL_PATH_TUPLES_LISTS)
     self.test_request.data = TestHelper.VALID_URL_LIST_VALUES[-1]
-    self.AssertInvalidValues('binaries',
-                             TestHelper.INVALID_STRING_LIST_VALUES)
-    self.test_request.binaries = None
     self.assertTrue(self.test_request.IsValid())
 
     test_object1.time_out = 'never'
@@ -741,10 +718,10 @@ class TestCaseTest(TestHelper):
 
     invalid_store_result = (TestHelper.INVALID_STRING_VALUES +
                             ['all_results', 'some', 'mine'])
-    #pylint: disable-msg=C6402
+    # pylint: disable-msg=C6402
     map(lambda i: self.assertFalse(i in valid_store_result),
         invalid_store_result)
-    #pylint: enable-msg=C6402
+    # pylint: enable-msg=C6402
     self.AssertInvalidValues('store_result', invalid_store_result)
     self.test_request.store_result = None
 

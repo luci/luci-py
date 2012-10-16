@@ -674,7 +674,6 @@ class TestConfiguration(TestRequestMessageBase):
     env_vars: An optional dictionary for environment variables.
     data: An optional data list for this configuration. The strings must be
         valid urls.
-    binaries: An optional binaries list for this configuration.
     tests: An optional tests list for this configuration.
     min_instances: An optional integer specifying the minimum number of
         instances of this configuration we want. Defaults to 1.
@@ -685,9 +684,8 @@ class TestConfiguration(TestRequestMessageBase):
     dimensions: A dictionary of strings or list of strings for dimensions.
   """
 
-  def __init__(self, config_name=None, env_vars=None, data=None, binaries=None,
-               tests=None, min_instances=1, additional_instances=0,
-               **dimensions):
+  def __init__(self, config_name=None, env_vars=None, data=None, tests=None,
+               min_instances=1, additional_instances=0, **dimensions):
     super(TestConfiguration, self).__init__()
     self.config_name = config_name
     if env_vars:
@@ -698,10 +696,6 @@ class TestConfiguration(TestRequestMessageBase):
       self.data = data[:]
     else:
       self.data = []
-    if binaries:
-      self.binaries = binaries[:]
-    else:
-      self.binaries = []
     if tests:
       self.tests = tests[:]
     else:
@@ -726,7 +720,6 @@ class TestConfiguration(TestRequestMessageBase):
                                 required=True, errors=errors) or
         not self.AreValidDicts(['env_vars'], str, str, errors=errors) or
         not self.AreValidDataLists(['data'], errors=errors) or
-        not self.AreValidLists(['binaries'], str, errors=errors) or
         not self.AreValidObjectLists(['tests'], TestObject,
                                      unique_value_keys=['test_name'],
                                      errors=errors) or
@@ -781,16 +774,13 @@ class TestCase(TestRequestMessageBase):
     configurations: A list of configurations for this test case.
     data: An optional data list for this test case. The strings must be
         valid urls.
-    binaries: An optional binaries list for this test case.
     working_dir: An optional path string for where to download/run tests.
         This must be an absolute path though we don't validate it since this
         script may run on a different platform than the one that will use the
-        path. Defaults to c:\swarm_tests.
+        path. Defaults to c:\\swarm_tests.
         TODO(user): Also support other platforms.
     admin: An optional boolean value that specifies if the tests should be run
         with admin privilege or not.
-    virgin: An optional boolean value that specifies if the tests must be run on
-        virgin machines or not.
     tests: An optional tests list for this test case.
     result_url: An optional URL where to post the results of this test case.
     store_result: The key to access the test run's storage string.
@@ -806,9 +796,9 @@ class TestCase(TestRequestMessageBase):
   VALID_STORE_RESULT_VALUES = [None, '', 'all', 'fail', 'none']
 
   def __init__(self, test_case_name=None, env_vars=None, configurations=None,
-               data=None, binaries=None, working_dir=None, admin=False,
-               virgin=False, tests=None, result_url=None, store_result=None,
-               output_destination=None, failure_email=None, verbose=False):
+               data=None, working_dir=None, admin=False, tests=None,
+               result_url=None, store_result=None, output_destination=None,
+               failure_email=None, verbose=False):
     super(TestCase, self).__init__()
     self.test_case_name = test_case_name
     if env_vars:
@@ -823,16 +813,11 @@ class TestCase(TestRequestMessageBase):
       self.data = data[:]
     else:
       self.data = []
-    if binaries:
-      self.binaries = binaries[:]
-    else:
-      self.binaries = []
     if working_dir:
       self.working_dir = working_dir
     else:
       self.working_dir = self.DEFAULT_WORKING_DIR
     self.admin = admin
-    self.virgin = virgin
     if tests:
       self.tests = tests[:]
     else:
@@ -863,7 +848,6 @@ class TestCase(TestRequestMessageBase):
                                      unique_value_keys=['config_name'],
                                      errors=errors) or
         not self.AreValidDataLists(['data'], errors=errors) or
-        not self.AreValidLists(['binaries'], str, errors=errors) or
         not self.AreValidObjectLists(['tests'], TestObject,
                                      unique_value_keys=['test_name'],
                                      errors=errors) or
@@ -876,9 +860,8 @@ class TestCase(TestRequestMessageBase):
       self.LogError('Invalid TestCase: %s' % self.__dict__, errors)
       return False
 
-    # self.verbose, self.admin and self.virgin don't need to be validated since
-    # we only need to evaluate them to True/False which can be done with any
-    # type.
+    # self.verbose and self.admin don't need to be validated since we only need
+    # to evaluate them to True/False which can be done with any type.
 
     logging.debug('Successfully validated request: %s', self.__dict__)
     return True
@@ -917,7 +900,7 @@ class TestRun(TestRequestMessageBase):
     working_dir: An optional path string for where to download/run tests.
         This must be an absolute path though we don't validate it since this
         script may run on a different platform than the one that will use the
-        path. Defaults to c:\swarm_tests.
+        path. Defaults to c:\\swarm_tests.
         TODO(user): Also support other platforms.
     tests: An optional tests list for this test run.
     instance_index: An optional integer specifying the zero based index of this

@@ -4,7 +4,7 @@
 
 """Test Request Manager.
 
-A Test Request is a request to install and run some arbitrary binaries and data
+A Test Request is a request to install and run some arbitrary data
 files on a set of remote computers for testing purposes.  The Test Request
 Manager accepts these requests, acquires remote machines to run them, and posts
 back the results of those tests to a given URL.
@@ -716,8 +716,7 @@ class TestRequestManager(object):
         result_url=('%s/result?k=%s' % (self.server_url, str(runner.key()))),
         ping_url=('%s/runner_ping?r=%s' % (self.server_url, str(runner.key()))),
         output_destination=test_request.output_destination,
-        data=(test_request.data + test_request.binaries +
-              config.data + config.binaries),
+        data=(test_request.data + config.data),
         tests=test_request.tests + config.tests,
         working_dir=test_request.working_dir)
     test_run.ExpandVariables({

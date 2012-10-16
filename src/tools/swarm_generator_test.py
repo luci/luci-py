@@ -46,7 +46,6 @@ class SwarmGeneratorTest(unittest.TestCase):
       self.options.failure_email = None
       self.options.result_url = self.GetDefaultResultUrl()
       self.options.destination_path = '.'
-      self.options.virgin = False
       self.options.verbose_test = False
 
     def GetDefaultTestName(self):
@@ -229,7 +228,6 @@ class SwarmGeneratorTest(unittest.TestCase):
          'configuration': {
              'config_name': config_names[0],
              'dimensions': dimensions.DIMENSIONS[config_names[0]]},
-         'virgin': False,
          'verbose': False},
         self.derived_swarm_generator.CreateTestRequest([0]))
 
@@ -246,7 +244,6 @@ class SwarmGeneratorTest(unittest.TestCase):
          'configuration': {
              'config_name': config_names[3],
              'dimensions': dimensions.DIMENSIONS[config_names[3]]},
-         'virgin': False,
          'verbose': False},
         self.derived_swarm_generator.CreateTestRequest([7]))
 
@@ -271,7 +268,6 @@ class SwarmGeneratorTest(unittest.TestCase):
               'dimensions': dimensions.DIMENSIONS[config_names[1]]},
              {'config_name': config_names[2],
               'dimensions': dimensions.DIMENSIONS[config_names[2]]}],
-         'virgin': False,
          'verbose': False},
         self.derived_swarm_generator.CreateTestRequest(self.valid_test_array))
 
@@ -286,7 +282,6 @@ class SwarmGeneratorTest(unittest.TestCase):
          'configurations': [{
              'config_name': config_names[0],
              'dimensions': dimensions.DIMENSIONS[config_names[0]]}],
-         'virgin': False,
          'verbose': False},
         self.derived_swarm_generator.CreateTestRequest(
             self.valid_test_array[1:]))

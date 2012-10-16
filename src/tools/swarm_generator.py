@@ -190,10 +190,6 @@ http://goto/swarm.
                            help='Where to save the swarm file. Optional. '
                            'Defaults to current folder and test name.',
                            default='.')
-    self.parser.add_option('-f', '--virgin', action='store_true',
-                           help='Request a fresh/virgin machine for this '
-                           'test case. Optional. Defaults to False.',
-                           default=False)
     self.parser.add_option('-b', '--verbose_test', action='store_true',
                            help='Indicates that the Swarm test case should '
                            'display verbose logging. Optional. Defaults to '
@@ -246,8 +242,6 @@ http://goto/swarm.
                            (config, self.all_config_names))
           self.LogError(error_message)
           return False
-
-    # No need to validate virgin option since it's just a flag.
 
     return True
 
@@ -377,7 +371,6 @@ http://goto/swarm.
     test_request = {
         test_name_key: '%s%s'% (self.options.test_name, test_name_suffix),
         'data': self.GetAllDataFileUrls(),
-        'virgin': self.options.virgin,
         'tests': tests_array,
         'result_url': self.options.result_url,
         'failure_email': self.options.failure_email,  # OK to be None.
