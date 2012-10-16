@@ -131,7 +131,7 @@ class AppTest(unittest.TestCase):
     contain_response = response.decode()
     self.assertEqual(chr(0), contain_response)
 
-  def UploadHashAndRetriveHelper(self, hash_key, hash_contents):
+  def UploadHashAndRetriveHelper(self, hash_key, hash_contents, priority=1):
     self.RemoveAndVerify(hash_key)
 
     # Add the hash content and then retrieve it.
@@ -149,7 +149,8 @@ class AppTest(unittest.TestCase):
                             content_type=content_type)
     else:
       response = self.fetch(ISOLATE_SERVER_URL + 'content/store',
-                            {'hash_key': hash_key},
+                            {'hash_key': hash_key,
+                             'priority': priority},
                             payload=hash_contents)
     self.assertEqual('hash content saved.', response)
 
@@ -181,6 +182,19 @@ class AppTest(unittest.TestCase):
     hash_key = hashlib.sha1().hexdigest()
 
     self.UploadHashAndRetriveHelper(hash_key, '')
+
+  def testStoreAndRetriveFromMemcache(self):
+    hash_key = hashlib.sha1(BINARY_DATA).hexdigest()
+
+    self.UploadHashAndRetriveHelper(hash_key, BINARY_DATA, priority=0)
+
+    # Check that we can't retrieve the cached element after it has been deleted.
+    try:
+      self.fetch(ISOLATE_SERVER_URL + 'content/retrieve',
+                 {'hash_key': hash_key})
+      self.fail('Memcache element was still present')
+    except urllib2.HTTPError as e:
+      self.assertTrue('HTTP Error 402' in str(e))
 
   def testFailWithoutAuthentication(self):
     hash_key = hashlib.sha1().hexdigest()

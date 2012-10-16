@@ -14,6 +14,7 @@ import re
 import webapp2
 from google.appengine.api import datastore_errors
 from google.appengine.api import files
+from google.appengine.api import memcache
 from google.appengine.api import users
 from google.appengine.api import taskqueue
 from google.appengine.ext import blobstore
@@ -322,6 +323,22 @@ class StoreContentByHashHandler(ACLRequestHandler):
     else:
       hash_content = ''
 
+    try:
+      priority = int(self.request.get('priority'))
+    except ValueError:
+      priority = 1
+
+    if priority == 0:
+      try:
+        if memcache.set(self.request.get('hash_key'), hash_content,
+                        namespace=self.request.get('namespace', 'default')):
+          logging.info('Storing hash content in memcache')
+        else:
+          logging.error('Attempted to save hash contents in memcache '
+                        'but failed')
+      except ValueError as e:
+        logging.error(e)
+
     if len(hash_content) < MIN_SIZE_FOR_BLOBSTORE:
       logging.info('Storing hash content in model')
       hash_entry.hash_content = hash_content
@@ -346,6 +363,7 @@ class RemoveContentByHashHandler(ACLRequestHandler):
     hash_key = self.request.get('hash_key')
     namespace = self.request.get('namespace', 'default')
     hash_entry = GetContentByHash(hash_key, namespace)
+    memcache.delete(hash_key, namespace=namespace)
 
     if not hash_entry:
       msg = 'Unable to find a hash with key \'%s\'.' % hash_key
@@ -364,10 +382,14 @@ class RetrieveContentByHashHandler(ACLRequestHandler,
   def get(self):
     hash_key = self.request.get('hash_key')
     namespace = self.request.get('namespace', 'default')
-    hash_entry = GetContentByHash(hash_key, namespace)
-    # TODO(csharp): High priority requests, 0, should be loaded from memcache.
-    _priority = self.request.get('priority', '1')
+    memcache_entry = memcache.get(hash_key, namespace=namespace)
 
+    if memcache_entry:
+      logging.info('Returning hash contents from memcache')
+      self.response.out.write(memcache_entry)
+      return
+
+    hash_entry = GetContentByHash(hash_key, namespace)
     if not hash_entry:
       msg = 'Unable to find a hash with key \'%s\'.' % hash_key
       logging.info(msg)
