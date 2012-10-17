@@ -11,10 +11,11 @@ handlers:
   login: admin
 
 # Protected handlers that require login.
+# TODO(user): Allow admins to whitelist users that can access secure pages.
 - url: /secure/.*
   script: main.app
   secure: always
-  login: required
+  login: admin
 
 - url: /favicon\.ico
   static_files: static/images/favicon.ico

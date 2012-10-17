@@ -39,7 +39,6 @@ from google.appengine.ext import db
 from common import dimensions
 from common import test_request_message
 from common import url_helper
-from server import user_manager
 from test_runner import slave_machine
 
 # The amount of time to wait after recieving a runners last message before
@@ -141,10 +140,6 @@ class TestRequest(db.Model):
   can be a build machine requesting a test after a build or it could be a
   developer requesting a test from their own build.
   """
-  # A reference to the user's profile.
-  user_profile = db.ReferenceProperty(
-      user_manager.UserProfile, required=True, collection_name='test_requests')
-
   # The message received from the caller, formatted as a Test Case as
   # specified in
   # http://code.google.com/p/swarming/wiki/SwarmFileFormat.
@@ -272,9 +267,6 @@ class TestRunner(db.Model):
   # when the runner has ended (i.e. done == True). Until then, it is None.
   result_string_reference = blobstore.BlobReferenceProperty()
 
-  # The actual account of the user the runner belongs to.
-  user = db.UserProperty()
-
   def delete(self):  # pylint: disable-msg=C6409
     # We delete the blob referenced by this model because no one
     # else will every care about it or try to reference it, so we
@@ -355,9 +347,6 @@ class MachineAssignment(db.Model):
   # The tag of the machine polling.
   tag = db.StringProperty()
 
-  # The actual account of the user that whitelisted this machine.
-  user = db.UserProperty()
-
   # The time of the assignment.
   assignment_time = db.DateTimeProperty(auto_now=True)
 
@@ -387,7 +376,7 @@ class TestRequestManager(object):
     # for tips on how to get it working.
     if use_blobstore_file_api is None:
       # Default to uses the file api until the normal code is fixed.
-      #use_blobstore_file_api = OnDevAppEngine()
+      # use_blobstore_file_api = OnDevAppEngine()
       use_blobstore_file_api = True
 
     self.use_blobstore_file_api = use_blobstore_file_api
@@ -409,15 +398,13 @@ class TestRequestManager(object):
     """
     self.server_url = server_url
 
-  def HandleTestResults(self, web_request, user_profile):
+  def HandleTestResults(self, web_request):
     """Handle a response from the remote script.
 
     Args:
       web_request: a google.appengine.ext.webapp.Request object containing the
           results of a test run.  The URL will contain a k= CGI parameter
           holding the persistent key for the runner.
-      user_profile: The profile of the user that allowed the remote machine
-          to execute the test.
     """
     if not web_request:
       return
@@ -434,13 +421,6 @@ class TestRequestManager(object):
 
     if not runner:
       logging.error('No runner associated to web request, ignoring test result')
-      return
-
-    # Make sure the remote machine is actually who they say they are by
-    # comparing the user that created the test with the one allowing the
-    # results.
-    if runner.test_request.user_profile.user != user_profile.user:
-      logging.error('Remote machine not authorized to post results')
       return
 
     # Find the high level success/failure from the URL. We assume failure if
@@ -620,7 +600,7 @@ class TestRequestManager(object):
       logging.exception(
           'An exception was thrown when attemping to send mail\n%s', e)
 
-  def ExecuteTestRequest(self, request_message, user_profile):
+  def ExecuteTestRequest(self, request_message):
     """Attempts to execute a test request.
 
     Test configurations will be queued up for testing at a later time
@@ -628,8 +608,6 @@ class TestRequestManager(object):
 
     Args:
       request_message: A string representing a test request.
-      user_profile: The user_profile the test belongs to. Should be a valid
-          profile.
 
     Raises:
       test_request_message.Error: If the request's message isn't valid.
@@ -640,13 +618,9 @@ class TestRequestManager(object):
     """
     logging.debug('TRM.ExecuteTestRequest msg=%s', request_message)
 
-    # The test sould belong to some user.
-    assert user_profile
-
     # Will raise an exception on error.
     test_name = GetTestCase(request_message).test_case_name
-    request = TestRequest(message=request_message, name=test_name,
-                          user_profile=user_profile)
+    request = TestRequest(message=request_message, name=test_name)
     test_case = request.GetTestCase()  # Will raise on invalid request.
     request.put()
 
@@ -659,7 +633,7 @@ class TestRequestManager(object):
       for instance_index in range(config.min_instances):
         config.instance_index = instance_index
         config.num_instances = config.min_instances
-        runner = self._QueueTestRequestConfig(request, config, user_profile)
+        runner = self._QueueTestRequestConfig(request, config)
 
         test_keys['test_keys'].append({'config_name': config.config_name,
                                        'instance_index': instance_index,
@@ -667,15 +641,13 @@ class TestRequestManager(object):
                                        'test_key': str(runner.key())})
     return test_keys
 
-  def _QueueTestRequestConfig(self, request, config, user_profile):
+  def _QueueTestRequestConfig(self, request, config):
     """Queue a given request's configuration for execution.
 
     Args:
       request: A TestRequest object to execute.
       config: A TestConfiguration object representing the machine on which to
           run the test.
-      user_profile: The user profile the runner belongs to.
-
     Returns:
       A tuple containing the id key of the test runner that was created
       and saved, as well as the test runner.
@@ -687,8 +659,7 @@ class TestRequestManager(object):
     # to be run. The runner will eventually be scheduled at a later time.
     runner = TestRunner(test_request=request, config_name=config.config_name,
                         config_instance_index=config.instance_index,
-                        num_config_instances=config.num_instances,
-                        user=user_profile.user)
+                        num_config_instances=config.num_instances)
     runner.put()
 
     return runner
@@ -727,21 +698,15 @@ class TestRequestManager(object):
     assert test_run.IsValid(errors), errors
     return test_run
 
-  def GetRunnerResults(self, key, user_profile):
+  def GetRunnerResults(self, key):
     """Returns the results of the runner specified by key.
 
     Args:
       key: TestRunner key representing the runner.
-      user_profile: The user requesting the results which should be the
-          same as the runner's owner.
 
     Returns:
       A dictionary of the runner's results, or None if the runner not found.
-
-    Raises:
-      AuthenticationError: If the user was not authorized to access the runner.
     """
-    assert user_profile
 
     try:
       runner = TestRunner.get(key)
@@ -749,13 +714,7 @@ class TestRequestManager(object):
       return None
 
     if runner:
-      if runner.user == user_profile.user:
-        return self.GetResults(runner)
-      else:
-        logging.exception(
-            'Invalid access: user %s trying to get results of user %s',
-            user_profile.user.email(), runner.user.email())
-        raise AuthenticationError
+      return self.GetResults(runner)
 
     return None
 
@@ -828,7 +787,7 @@ class TestRequestManager(object):
 
     return True
 
-  def ExecuteRegisterRequest(self, attributes, user_profile):
+  def ExecuteRegisterRequest(self, attributes):
     """Attempts to match the requesting machine with an existing TestRunner.
 
     If the machine is matched with a request, the machine is told what to do.
@@ -837,8 +796,6 @@ class TestRequestManager(object):
     Args:
       attributes: A dictionary representing the attributes of the machine
           registering itself.
-      user_profile: The user_profile that whitelisted the machine. Should be
-          a valid profile.
 
     Raises:
       test_request_message.Error: If the request format/attributes aren't valid.
@@ -846,9 +803,6 @@ class TestRequestManager(object):
     Returns:
       A dictionary containing the commands the machine needs to execute.
     """
-    # The machine should be whitelisted by some user.
-    assert user_profile
-
     # Validate and fix machine attributes. Will throw exception on errors.
     attribs = self.ValidateAndFixAttributes(attributes)
 
@@ -868,7 +822,7 @@ class TestRequestManager(object):
     # TODO(user): Tune this parameter somehow.
     for _ in range(10):
       # Try to find a matching test runner for the machine.
-      runner = self._FindMatchingRunner(attribs, user_profile)
+      runner = self._FindMatchingRunner(attribs)
       if runner:
         # Will atomically try to assign the machine to the runner. This could
         # fail due to a race condition on the runner. If so, we loop back to
@@ -887,8 +841,7 @@ class TestRequestManager(object):
             assigned_runner = True
 
             self._RecordMachineRunnerAssignment(attribs['id'],
-                                                attributes.get('tag', None),
-                                                user_profile)
+                                                attributes.get('tag', None))
             break
       # We found no runner, no use in re-trying so just break out of the loop.
       else:
@@ -963,22 +916,19 @@ class TestRequestManager(object):
 
     return attributes
 
-  def _RecordMachineRunnerAssignment(self, machine_id, machine_tag,
-                                     user_profile):
+  def _RecordMachineRunnerAssignment(self, machine_id, machine_tag):
     """Record when a machine has a runner assigned to it.
 
     Args:
       machine_id: The machine id of the machine.
       machine_tag: The tag identifier of the machine.
-      user_profile: The user profile that whitelisted this machine.
     """
     machine_assignment = MachineAssignment.gql('WHERE machine_id = :1',
                                                machine_id).get()
 
     # Check to see if we need to create the model.
     if machine_assignment is None:
-      machine_assignment = MachineAssignment(machine_id=machine_id,
-                                             user=user_profile.user)
+      machine_assignment = MachineAssignment(machine_id=machine_id)
 
     machine_assignment.tag = machine_tag
     machine_assignment.assignment_time = datetime.datetime.now()
@@ -1008,12 +958,11 @@ class TestRequestManager(object):
 
     return comeback_duration
 
-  def _FindMatchingRunner(self, attribs, user_profile):
+  def _FindMatchingRunner(self, attribs):
     """Find oldest TestRunner who hasn't already been assigned a machine.
 
     Args:
       attribs: The attributes defining the machine.
-      user_profile: The user_profile to search for runners.
 
     Returns:
       A TestRunner object, or None if a matching runner is not found.
@@ -1024,8 +973,7 @@ class TestRequestManager(object):
     # Assign test runners from earliest to latest.
     # We use a format argument for None, because putting None in the string
     # doesn't work.
-    query = TestRunner.gql('WHERE started = :1 AND user = :2 ORDER BY created',
-                           None, user_profile.user)
+    query = TestRunner.gql('WHERE started = :1 ORDER BY created', None)
     for runner in query:
       runner_dimensions = runner.GetConfiguration().dimensions
       (match, output) = dimensions.MatchDimensions(runner_dimensions,
@@ -1236,23 +1184,17 @@ class TestRequestManager(object):
     return file_data
 
 
-def GetAllMatchingTestRequests(test_case_name, user_profile):
+def GetAllMatchingTestRequests(test_case_name):
   """Returns a list of all Test Request that match the given test_case_name.
 
   Args:
       test_case_name: The test case name to search for.
-      user_profile: The user_profile the tests belong to. Should be a valid
-          profile.
 
   Returns:
     A list of all Test Requests that have |test_case_name| as their name.
   """
-  # The tests sould belong to some user.
-  assert user_profile
-
   matches = []
-  query = TestRequest.gql('WHERE user_profile = :1 and name = :2',
-                          user_profile, test_case_name)
+  query = TestRequest.gql('WHERE name = :1', test_case_name)
 
   for test_request in query:
     matches.append(test_request)
@@ -1260,23 +1202,20 @@ def GetAllMatchingTestRequests(test_case_name, user_profile):
   return matches
 
 
-def GetAllUserMachines(user_profile, sort_by='machine_id'):
+def GetAllUserMachines(sort_by='machine_id'):
   """Get the list of the user's whitelisted machines.
 
   Args:
-    user_profile: The profile of the user that whitelisted the machines.
     sort_by: The string of the attribute to sort the machines by.
 
   Returns:
     An iterator of all machines whitelisted by the user.
   """
   # If we recieve an invalid sort_by parameter, just default to machine_id.
-  # Also change sort by user, since all the machines will have the same user.
-  if not sort_by in MachineAssignment.properties() or sort_by == 'user':
+  if not sort_by in MachineAssignment.properties():
     sort_by = 'machine_id'
 
-  return (machine for machine in MachineAssignment.gql(
-      'WHERE user = :1 ORDER BY %s' % sort_by, user_profile.user))
+  return (machine for machine in MachineAssignment.gql('ORDER BY %s' % sort_by))
 
 
 def DeleteMachineAssignment(key):
@@ -1342,19 +1281,15 @@ def DeleteOldErrors():
   logging.debug('DeleteOldErrors done')
 
 
-def PingRunner(key, user_profile):
-  """Pings the runner, if the key is valid and the user has access to it.
+def PingRunner(key):
+  """Pings the runner, if the key is valid.
 
   Args:
     key: The key of the runner to ping.
-    user_profile: The user_profile that whitelisted the machine. Should be
-        a valid profile.
 
   Returns:
     True if the runner is successfully pinged.
   """
-  assert user_profile
-
   try:
     runner = TestRunner.get(key)
   except (db.BadKeyError, db.KindError, db.BadArgumentError) as e:
@@ -1368,12 +1303,6 @@ def PingRunner(key, user_profile):
   # TODO(user): It might be useful to have the local_test_runner include
   # its machine id and just use that to make sure the correct machine is
   # pinging the runner.
-  if runner.user != user_profile.user:
-    logging.error('Invalid access: A machine whitelisted by user %s is trying '
-                  'to ping a runner associated with user %s.',
-                  user_profile.user.email(), runner.user.email())
-    return False
-
   if runner.started is None or runner.done:
     logging.error('Trying to ping a runner that is not currently running')
     return False
@@ -1411,9 +1340,4 @@ class TxRunnerAlreadyAssignedError(Exception):
 
 class PrepareRemoteCommandsError(Exception):
   """Simple exception class signaling failure to prepare remote commands."""
-  pass
-
-
-class AuthenticationError(Exception):
-  """Exception signaling failure to authenticate a user performing a task."""
   pass

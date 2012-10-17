@@ -256,12 +256,8 @@ class MachineListHandler(webapp2.RequestHandler):
 
   def get(self):  # pylint: disable-msg=C6409
     """Handles HTTP GET requests for this handler's URL."""
-    user_profile = user_manager.GetUserProfile(users.get_current_user())
     sort_by = self.request.get('sort_by', 'machine_id')
-
-    machines = []
-    if user_profile:
-      machines = test_manager.GetAllUserMachines(user_profile, sort_by)
+    machines = test_manager.GetAllUserMachines(sort_by)
 
     # Add a delete option for each machine assignment.
     machines_displayable = []
@@ -305,8 +301,7 @@ class TestRequestHandler(webapp2.RequestHandler):
     # of the original body and use it later. The correct way would be to
     # have this handler work with properly encoded data in the first place.
     body = self.request.body
-    user_profile = AuthenticateRemoteMachine(self.request)
-    if not user_profile:
+    if not AuthenticateRemoteMachine(self.request):
       SendAuthenticationFailure(self.request, self.response)
       return
 
@@ -319,8 +314,7 @@ class TestRequestHandler(webapp2.RequestHandler):
     test_request_manager = CreateTestManager()
     try:
       test_request_manager.UpdateCacheServerURL(self.request.host_url)
-      response = str(test_request_manager.ExecuteTestRequest(
-          body, user_profile))
+      response = str(test_request_manager.ExecuteTestRequest(body))
       # This enables our callers to use the response string as a JSON string.
       response = response.replace("'", '"')
     except test_request_message.Error as ex:
@@ -335,15 +329,14 @@ class ResultHandler(webapp2.RequestHandler):
 
   def post(self):  # pylint: disable-msg=C6409
     """Handles HTTP POST requests for this handler's URL."""
-    user_profile = AuthenticateRemoteMachine(self.request)
-    if not user_profile:
+    if not AuthenticateRemoteMachine(self.request):
       SendAuthenticationFailure(self.request, self.response)
       return
 
     logging.debug('Received Result: %s', self.request.url)
     test_request_manager = CreateTestManager()
     test_request_manager.UpdateCacheServerURL(self.request.host_url)
-    test_request_manager.HandleTestResults(self.request, user_profile)
+    test_request_manager.HandleTestResults(self.request)
 
 
 class PollHandler(webapp2.RequestHandler):
@@ -401,8 +394,7 @@ class GetMatchingTestCasesHandler(webapp2.RequestHandler):
 
   def get(self):  # pylint: disable-msg=C6409
     """Handles HTTP GET requests for this handler's URL."""
-    user_profile = AuthenticateRemoteMachine(self.request)
-    if not user_profile:
+    if not AuthenticateRemoteMachine(self.request):
       SendAuthenticationFailure(self.request, self.response)
       return
 
@@ -410,8 +402,7 @@ class GetMatchingTestCasesHandler(webapp2.RequestHandler):
 
     test_case_name = self.request.get('name', '')
 
-    matches = test_manager.GetAllMatchingTestRequests(
-        test_case_name, user_profile)
+    matches = test_manager.GetAllMatchingTestRequests(test_case_name)
     keys = []
     for match in matches:
       keys.extend(map(str, match.GetAllKeys()))
@@ -427,18 +418,7 @@ class SecureGetResultHandler(webapp2.RequestHandler):
 
   def get(self):  # pylint: disable-msg=C6409
     """Handles HTTP GET requests for this handler's URL."""
-    user = users.get_current_user()
-    user_profile = user_manager.GetUserProfile(user)
-    key = self.request.get('r', '')
-
-    if user_profile:
-      SendRunnerResults(self.response, key, user_profile)
-    else:
-      # It is possible that the current user logged in has never whitelisted
-      # a machine, so they have no profile. In that case, they are not allowed
-      # to view any results.
-      self.response.set_status(204)
-      logging.info('Could not find profile for user: %s', user.email())
+    SendRunnerResults(self.response, self.request.get('r', ''))
 
 
 class GetResultHandler(webapp2.RequestHandler):
@@ -446,13 +426,12 @@ class GetResultHandler(webapp2.RequestHandler):
 
   def get(self):  # pylint: disable-msg=C6409
     """Handles HTTP GET requests for this handler's URL."""
-    user_profile = AuthenticateRemoteMachine(self.request)
-    if not user_profile:
+    if not AuthenticateRemoteMachine(self.request):
       SendAuthenticationFailure(self.request, self.response)
       return
 
     key = self.request.get('r', '')
-    SendRunnerResults(self.response, key, user_profile)
+    SendRunnerResults(self.response, key)
 
 
 class CleanupResultsHandler(webapp2.RequestHandler):
@@ -462,35 +441,18 @@ class CleanupResultsHandler(webapp2.RequestHandler):
     """Handles HTTP POST requests for this handler's URL."""
     test_request_manager = CreateTestManager()
 
-    user_profile = AuthenticateRemoteMachine(self.request)
-    if not user_profile:
+    if not AuthenticateRemoteMachine(self.request):
       SendAuthenticationFailure(self.request, self.response)
       return
 
     self.response.headers['Content-Type'] = 'test/plain'
 
     key = self.request.get('r', '')
-    key_deleted = False
-    try:
-      runner = test_manager.TestRunner.get(key)
-    except (db.BadKeyError, db.KindError):
-      logging.info(
-          'Invalid key for cleanup [key: %s]', str(key))
-    else:
-      if runner:
-        if runner.test_request.user_profile.user == user_profile.user:
-          key_deleted = test_request_manager.DeleteRunner(key)
-        else:
-          logging.info('User not authorized to cleanup [user: %s][key: %s]',
-                       user_profile.user.email(), str(key))
-      else:
-        logging.info(
-            'runner not found for cleanup [key: %s]', str(key))
-
-    if key_deleted:
+    if test_request_manager.DeleteRunner(key):
       self.response.out.write('Key deleted.')
     else:
-      self.response.out.write('Deletion failed. Key not found.')
+      self.response.out.write('Key deletion failed.')
+      logging.warning('Unable to delete runner [key: %s]', str(key))
 
 
 class CancelHandler(webapp2.RequestHandler):
@@ -553,8 +515,7 @@ class RegisterHandler(webapp2.RequestHandler):
 
   def post(self):  # pylint: disable-msg=C6409
     """Handles HTTP POST requests for this handler's URL."""
-    user_profile = AuthenticateRemoteMachine(self.request)
-    if not user_profile:
+    if not AuthenticateRemoteMachine(self.request):
       SendAuthenticationFailure(self.request, self.response)
       return
 
@@ -578,7 +539,7 @@ class RegisterHandler(webapp2.RequestHandler):
 
     try:
       response = json.dumps(
-          test_request_manager.ExecuteRegisterRequest(attributes, user_profile))
+          test_request_manager.ExecuteRegisterRequest(attributes))
     except test_request_message.Error as ex:
       message = str(ex)
       logging.exception(message)
@@ -596,14 +557,13 @@ class RunnerPingHandler(webapp2.RequestHandler):
 
   def post(self):  # pylint: disable-msg=C6409
     """Handles HTTP POST requests for this handler's URL."""
-    user_profile = AuthenticateRemoteMachine(self.request)
-    if not user_profile:
+    if not AuthenticateRemoteMachine(self.request):
       SendAuthenticationFailure(self.request, self.response)
       return
 
     key = self.request.get('r', '')
 
-    if test_manager.PingRunner(key, user_profile):
+    if test_manager.PingRunner(key):
       self.response.out.write('Runner successfully pinged.')
     else:
       self.response.set_status(402)
@@ -622,15 +582,13 @@ class UserProfileHandler(webapp2.RequestHandler):
 
     display_whitelists = []
 
-    user_profile = user_manager.GetUserProfile(user=users.get_current_user())
-    if user_profile:
-      for stored_whitelist in user_profile.whitelist:
-        whitelist = {}
-        whitelist['ip'] = stored_whitelist.ip
-        whitelist['password'] = stored_whitelist.password
-        whitelist['key'] = stored_whitelist.key()
-        whitelist['url'] = _SECURE_CHANGE_WHITELIST_URL
-        display_whitelists.append(whitelist)
+    for stored_whitelist in user_manager.MachineWhitelist().all():
+      whitelist = {}
+      whitelist['ip'] = stored_whitelist.ip
+      whitelist['password'] = stored_whitelist.password
+      whitelist['key'] = stored_whitelist.key()
+      whitelist['url'] = _SECURE_CHANGE_WHITELIST_URL
+      display_whitelists.append(whitelist)
 
     params = {
         'topbar': topbar,
@@ -656,10 +614,9 @@ class ChangeWhitelistHandler(webapp2.RequestHandler):
 
     add = self.request.get('a')
     if add == 'True':
-      user_manager.ModifyUserProfileAddWhitelist(
-          users.get_current_user(), ip, password)
+      user_manager.AddWhitelist(ip, password)
     elif add == 'False':
-      user_manager.ModifyUserProfileDelWhitelist(users.get_current_user(), ip)
+      user_manager.DeleteWhitelist(ip)
 
     self.redirect(_SECURE_USER_PROFILE_URL, permanent=True)
 
@@ -669,8 +626,7 @@ class RemoteErrorHandler(webapp2.RequestHandler):
 
   def post(self):  # pylint: disable-msg=C6409
     """Handles HTTP POST requests for this handler's URL."""
-    user_profile = AuthenticateRemoteMachine(self.request)
-    if not user_profile:
+    if not AuthenticateRemoteMachine(self.request):
       SendAuthenticationFailure(self.request, self.response)
       return
 
@@ -702,7 +658,7 @@ class UploadHandler(blobstore_handlers.BlobstoreUploadHandler):
 
 
 def AuthenticateRemoteMachine(request):
-  """Tries to find a user profile that has whitelisted the remote machine.
+  """Check to see if the request is from a whitelisted machine.
 
   Will use the remote machine's IP and provided password (if any).
 
@@ -710,12 +666,10 @@ def AuthenticateRemoteMachine(request):
     request: WebAPP request sent by remote machine.
 
   Returns:
-    A user_manager.UserProfile that has whitelisted the machine, or None.
+    True if the request is from a whitelisted machine.
   """
-  user_profile = user_manager.FindUserWithWhitelistedIP(
+  return user_manager.IsWhitelistedMachine(
       request.remote_addr, request.get('password', None))
-
-  return user_profile
 
 
 def SendAuthenticationFailure(request, response):
@@ -735,28 +689,22 @@ def SendAuthenticationFailure(request, response):
   response.out.write('Remote machine not whitelisted for operation')
 
 
-def SendRunnerResults(response, key, user_profile):
+def SendRunnerResults(response, key):
   """Sends the results of the runner specified by key.
 
   Args:
     response: Response to be sent to remote machine.
     key: Key identifying the runner.
-    user_profile: The user requesting the results.
   """
   response.headers['Content-Type'] = 'text/plain'
-  results = None
-  try:
-    test_request_manager = CreateTestManager()
-    results = test_request_manager.GetRunnerResults(key, user_profile)
-  except test_manager.AuthenticationError:
-    pass
+  test_request_manager = CreateTestManager()
+  results = test_request_manager.GetRunnerResults(key)
 
   if results:
     response.out.write(json.dumps(results))
   else:
     response.set_status(204)
-    logging.info('Unable to provide runner results [user: %s][key: %s]',
-                 user_profile.user.email(), str(key))
+    logging.info('Unable to provide runner results [key: %s]', str(key))
 
 
 def CreateTestManager():
