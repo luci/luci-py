@@ -7,22 +7,27 @@ threadsafe: true
 handlers:
 - url: /tasks/poll
   script: main.app
+  secure: always
   login: admin
 
 # Protected handlers that require login.
 - url: /secure/.*
   script: main.app
+  secure: always
   login: required
 
 - url: /favicon\.ico
   static_files: static/images/favicon.ico
   upload: static/images/favicon\.ico
+  secure: always
 
 - url: /css
   static_dir: static/css
+  secure: always
 
 - url: .*
   script: main.app
+  secure: always
 
 libraries:
 - name: django
