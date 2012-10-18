@@ -138,12 +138,9 @@ class MainHandler(webapp2.RequestHandler):
       sorted_by_query = 'created DESC'
     sorted_by_message += '</p>'
 
-    query = test_manager.TestRunner.gql(
-        'WHERE user = :1 ORDER BY %s' % sorted_by_query,
-        users.get_current_user())
-
     runners = []
-    for runner in query.run(
+    for runner in test_manager.GetTestRunners(
+        sorted_by_query,
         limit=_NUM_USER_TEST_RUNNERS_PER_PAGE,
         offset=_NUM_USER_TEST_RUNNERS_PER_PAGE * (page - 1)):
       # If this runner successfully completed, and we are not showing them,
@@ -262,7 +259,7 @@ class MachineListHandler(webapp2.RequestHandler):
   def get(self):  # pylint: disable-msg=C6409
     """Handles HTTP GET requests for this handler's URL."""
     sort_by = self.request.get('sort_by', 'machine_id')
-    machines = test_manager.GetAllUserMachines(sort_by)
+    machines = test_manager.GetAllMachines(sort_by)
 
     # Add a delete option for each machine assignment.
     machines_displayable = []
