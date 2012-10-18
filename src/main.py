@@ -3,6 +3,11 @@
 # Copyright 2012 Google Inc. All Rights Reserved.
 #
 
+"""Main entry point for TRS service.
+
+This file contains the URL handlers for all the TRS service URLs, implemented
+using the appengine webapp framework.
+"""
 
 # pylint: disable-msg=C6204
 import datetime

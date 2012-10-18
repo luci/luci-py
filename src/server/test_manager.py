@@ -227,6 +227,9 @@ class TestRunner(db.Model):
 
   # The machine that is running or ran the test. This attribute is only valid
   # once a machine has been assigned to this runner.
+  # TODO(user): Investigate making this a reference to the MachineAssignment.
+  # It would require ensuring the MachineAssignment is created when this value
+  # is set.
   machine_id = db.StringProperty()
 
   # Used to indicate if the runner has finished, either successfully or not.
@@ -728,8 +731,12 @@ class TestRequestManager(object):
       A dictionary of the results.
     """
 
+    machine = MachineAssignment.gql('WHERE machine_id = :1',
+                                    runner.machine_id).get()
+
     return {'exit_codes': runner.exit_codes,
             'machine_id': runner.machine_id,
+            'machine_tag': machine.tag if machine else 'Unknown',
             'output': runner.GetResultString()}
 
   def AbortStaleRunners(self):
