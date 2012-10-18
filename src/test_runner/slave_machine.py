@@ -1,4 +1,4 @@
-#!/usr/bin/python2.7
+!/usr/bin/python2.7
 #
 # Copyright 2012 Google Inc. All Rights Reserved.
 
@@ -130,7 +130,7 @@ def ValidateCommand(commands, error_prefix='', errors=[]):
 class SlaveMachine(object):
   """Creates a slave that continuously polls the Swarm server for jobs."""
 
-  def __init__(self, url='http://localhost:8080', attributes=None,
+  def __init__(self, url='https://localhost:443', attributes=None,
                max_url_tries=1):
     """Sets the parameters of the slave.
 
@@ -553,12 +553,12 @@ def main():
       'the machine are either given through a file (if provided) or read from '
       'stdin. See http://code.google.com/p/swarming/wiki/MachineProvider for '
       'complete details.')
-  parser.add_option('-a', '--address', default='localhost',
+  parser.add_option('-a', '--address', default='https://localhost',
                     help='Address of the Swarm server to connect to. '
                     'Defaults to %default. ')
-  parser.add_option('-p', '--port', default='8080', type='int',
+  parser.add_option('-p', '--port', default='443', type='int',
                     help='Port of the Swarm server. '
-                    'Defaults to %default. ')
+                    'Defaults to %default, which is te default https port.')
   parser.add_option('-r', '--max_url_tries', default=10, type='int',
                     help='The maximum number of times url messages will '
                     'attempt to be sent before accepting failure. Defaults '
