@@ -123,6 +123,7 @@ class MainHandler(webapp2.RequestHandler):
     page = int(self.request.get('page', 1))
 
     sorted_by_message = '<p>Currently sorted by: '
+    ascending = True
     if sort_by == 'start':
       sorted_by_message += 'Start Time'
       sorted_by_query = 'created'
@@ -132,12 +133,14 @@ class MainHandler(webapp2.RequestHandler):
     else:
       # The default sort.
       sorted_by_message += 'Reverse Start Time'
-      sorted_by_query = 'created DESC'
+      sorted_by_query = 'created'
+      ascending = False
     sorted_by_message += '</p>'
 
     runners = []
     for runner in test_manager.GetTestRunners(
         sorted_by_query,
+        ascending=ascending,
         limit=_NUM_USER_TEST_RUNNERS_PER_PAGE,
         offset=_NUM_USER_TEST_RUNNERS_PER_PAGE * (page - 1)):
       # If this runner successfully completed, and we are not showing them,

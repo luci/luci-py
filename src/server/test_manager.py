@@ -1229,11 +1229,12 @@ def GetAllMachines(sort_by='machine_id'):
   return (machine for machine in MachineAssignment.gql('ORDER BY %s' % sort_by))
 
 
-def GetTestRunners(sort_by, limit, offset):
+def GetTestRunners(sort_by, ascending, limit, offset):
   """Get the list of the test runners.
 
   Args:
     sort_by: The string of the attribute to sort the test runners by.
+    ascending: True if the runner should be sorted in ascending order.
     limit: The machine number of test runners to return.
     offset: The offset from the complete set of sorted elements and the returned
         list.
@@ -1244,6 +1245,9 @@ def GetTestRunners(sort_by, limit, offset):
   # If we recieve an invalid sort_by parameter, just default to machine_id.
   if not sort_by in TestRunner.properties():
     sort_by = 'machine_id'
+
+  if not ascending:
+    sort_by += ' DESC'
 
   return TestRunner.gql('ORDER BY %s' % sort_by).run(limit=limit, offset=offset)
 
