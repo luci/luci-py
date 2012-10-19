@@ -118,9 +118,6 @@ class MainHandler(webapp2.RequestHandler):
   def get(self):  # pylint: disable-msg=C6409
     """Handles HTTP GET requests for this handler's URL."""
     # Build info for test requests table.
-    # TODO(user): eventually we will want to show only runner that are
-    # either pending or running.  The number of ended runners will grow
-    # unbounded with time.
     show_success = self.request.get('s', 'False') != 'False'
     sort_by = self.request.get('sort_by', 'reverse_chronological')
     page = int(self.request.get('page', 1))
@@ -199,7 +196,6 @@ class MainHandler(webapp2.RequestHandler):
     runner.machine_id_used = '&nbsp'
     runner.command_string = '&nbsp;'
     runner.failed_test_class_string = ''
-    runner.user_email = runner.user.email()
 
     if not runner.started:
       runner.status_string = 'Pending'
