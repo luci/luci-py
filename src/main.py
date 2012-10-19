@@ -315,7 +315,6 @@ class TestRequestHandler(webapp2.RequestHandler):
 
     test_request_manager = CreateTestManager()
     try:
-      test_request_manager.UpdateCacheServerURL(self.request.host_url)
       response = str(test_request_manager.ExecuteTestRequest(body))
       # This enables our callers to use the response string as a JSON string.
       response = response.replace("'", '"')
@@ -337,7 +336,6 @@ class ResultHandler(webapp2.RequestHandler):
 
     logging.debug('Received Result: %s', self.request.url)
     test_request_manager = CreateTestManager()
-    test_request_manager.UpdateCacheServerURL(self.request.host_url)
     test_request_manager.HandleTestResults(self.request)
 
 
@@ -349,7 +347,6 @@ class PollHandler(webapp2.RequestHandler):
     test_request_manager = CreateTestManager()
 
     logging.debug('Polling')
-    test_request_manager.UpdateCacheServerURL(self.request.host_url)
     test_request_manager.AbortStaleRunners()
     test_manager.DeleteOldRunners()
     test_manager.DeleteOldErrors()
@@ -471,7 +468,6 @@ class CancelHandler(webapp2.RequestHandler):
     # Make sure found runner is not yet running.
     if runner and not runner.started:
       test_request_manager = CreateTestManager()
-      test_request_manager.UpdateCacheServerURL(self.request.host_url)
       test_request_manager.AbortRunner(
           runner, reason='Runner is not already running.')
       self.response.out.write('Runner canceled.')
@@ -528,7 +524,6 @@ class RegisterHandler(webapp2.RequestHandler):
       return
 
     test_request_manager = CreateTestManager()
-    test_request_manager.UpdateCacheServerURL(self.request.host_url)
     attributes_str = self.request.get('attributes')
     try:
       attributes = json.loads(attributes_str)
@@ -541,7 +536,8 @@ class RegisterHandler(webapp2.RequestHandler):
 
     try:
       response = json.dumps(
-          test_request_manager.ExecuteRegisterRequest(attributes))
+          test_request_manager.ExecuteRegisterRequest(attributes,
+                                                      self.request.host_url))
     except test_request_message.Error as ex:
       message = str(ex)
       logging.exception(message)

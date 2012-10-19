@@ -373,6 +373,12 @@ class TestRequestManager(object):
   """The Test Request Manager."""
 
   def __init__(self, use_blobstore_file_api=None):
+    """Constructor for the TestRequestManager.
+
+    Args:
+      use_blobstore_file_api: A flag to determine if the experimental file
+          api should be used.
+    """
     # TODO(user): Fix up the normal blobstore code, it currently fails
     # to properly upload. See
     # http://devblog.miumeet.com/2011/02/programmatically-upload-images-to.html
@@ -391,15 +397,6 @@ class TestRequestManager(object):
       use_blobstore_file_api: True to enable the api.
     """
     self.use_blobstore_file_api = use_blobstore_file_api
-
-  def UpdateCacheServerURL(self, server_url):
-    """Update the value of this server's url.
-
-    Args:
-      server_url: The URL to the Swarm server so that we can set the
-          result_url in the Swarm file we upload to the machines.
-    """
-    self.server_url = server_url
 
   def HandleTestResults(self, web_request):
     """Handle a response from the remote script.
@@ -667,11 +664,13 @@ class TestRequestManager(object):
 
     return runner
 
-  def _BuildTestRun(self, runner):
+  def _BuildTestRun(self, runner, server_url):
     """Build a Test Run message for the remote test script.
 
     Args:
       runner: A TestRunner object for this test run.
+      server_url: The URL to the Swarm server so that we can set the
+          result_url in the Swarm file we upload to the machines.
 
     Raises:
       test_request_message.Error: If the request's message isn't valid.
@@ -687,8 +686,8 @@ class TestRequestManager(object):
         instance_index=runner.config_instance_index,
         num_instances=runner.num_config_instances,
         configuration=config,
-        result_url=('%s/result?k=%s' % (self.server_url, str(runner.key()))),
-        ping_url=('%s/runner_ping?r=%s' % (self.server_url, str(runner.key()))),
+        result_url=('%s/result?k=%s' % (server_url, str(runner.key()))),
+        ping_url=('%s/runner_ping?r=%s' % (server_url, str(runner.key()))),
         output_destination=test_request.output_destination,
         data=(test_request.data + config.data),
         tests=test_request.tests + config.tests,
@@ -794,7 +793,7 @@ class TestRequestManager(object):
 
     return True
 
-  def ExecuteRegisterRequest(self, attributes):
+  def ExecuteRegisterRequest(self, attributes, server_url):
     """Attempts to match the requesting machine with an existing TestRunner.
 
     If the machine is matched with a request, the machine is told what to do.
@@ -803,6 +802,8 @@ class TestRequestManager(object):
     Args:
       attributes: A dictionary representing the attributes of the machine
           registering itself.
+      server_url: The URL to the Swarm server so that we can set the
+          result_url in the Swarm file we upload to the machines.
 
     Raises:
       test_request_message.Error: If the request format/attributes aren't valid.
@@ -837,7 +838,8 @@ class TestRequestManager(object):
         if self._AssignRunnerToMachine(attribs['id'], runner, AtomicAssignID):
           # Get the commands the machine needs to execute.
           try:
-            commands, result_url = self._GetTestRunnerCommands(runner)
+            commands, result_url = self._GetTestRunnerCommands(runner,
+                                                               server_url)
           except PrepareRemoteCommandsError:
             # Failed to load the scripts so mark the runner as 'not running'.
             runner.started = None
@@ -1048,11 +1050,13 @@ class TestRequestManager(object):
 
     return False
 
-  def _GetTestRunnerCommands(self, runner):
+  def _GetTestRunnerCommands(self, runner, server_url):
     """Get the commands that need to be sent to a slave to execute the runner.
 
     Args:
       runner: test runner object to run.
+      server_url: The URL to the Swarm server so that we can set the
+          result_url in the Swarm file we upload to the machines.
 
     Returns:
       A tuple (commands, result_url) where commands is a list of RPC calls that
@@ -1065,7 +1069,7 @@ class TestRequestManager(object):
     output_commands = []
 
     # Get test manifest and scripts.
-    test_run = self._BuildTestRun(runner)
+    test_run = self._BuildTestRun(runner, server_url)
 
     # Load the scripts.
     files_to_upload = self._GetFilesToUpload(test_run)
