@@ -1,0 +1,11 @@
+Metadata-Version: 1.0
+Name: mox
+Version: 0.5.3
+Summary: Mock object framework
+Home-page: http://code.google.com/p/pymox/
+Author: pymox maintainers
+Author-email: mox-discuss@googlegroups.com
+License: Apache License, Version 2.0
+Description: Mox is a mock object framework for Python based on the
+        Java mock object framework EasyMock.
+Platform: UNKNOWN
