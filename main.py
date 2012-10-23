@@ -92,7 +92,7 @@ def GetContentNamespaceKey(namespace):
   memcache.
   """
   return ContentNamespace.get_or_insert(
-      namespace, is_testing=namespace.startswith('temporary'))
+      namespace, is_testing=namespace.startswith('temporary')).key()
 
 
 def GetContentByHash(hash_key, namespace):
@@ -163,8 +163,8 @@ class ACLRequestHandler(webapp2.RequestHandler):
   def dispatch(self):
     """Ensures that only users from valid domains can continue, and that users
     from invalid domains receive an error message."""
-    email = users.get_current_user().email()
-    if not email:
+    user = users.get_current_user()
+    if not user:
       # Verify if its IP is whitelisted.
       query = WhitelistedIP.gql('WHERE ip = :1', self.request.remote_addr)
       if not query.count():
@@ -172,7 +172,7 @@ class ACLRequestHandler(webapp2.RequestHandler):
           self.abort(401, detail='Please login first.')
         return self.redirect(users.create_login_url(self.request.url))
     else:
-      domain = email.partition('@')[2]
+      domain = user.email().partition('@')[2]
       if domain not in VALID_DOMAINS:
         self.abort(403, detail='Invalid domain, %s' % domain)
 
@@ -243,9 +243,10 @@ class RestrictedWhitelistHandler(webapp2.RequestHandler):
   def post(self):
     ip = self.request.remote_addr
     if WhitelistedIP.gql('WHERE ip = :1', ip).get():
-      return 'Already present: %s' % ip
+      self.response.out.write('Already present: %s' % ip)
+      return
     WhitelistedIP(ip=ip).put()
-    return 'Success: %s' % ip
+    self.response.out.write('Success: %s' % ip)
 
 
 class ContainsHashHandler(ACLRequestHandler):

@@ -8,18 +8,19 @@
 
 import binascii
 import hashlib
+import sys
 import time
 import unittest
 import urllib
 import urllib2
-from hashlib import md5  # pylint: disable=E0611
 
 import find_depot_tools  # pylint: disable=W0611
 
 from third_party import upload
 
 # The url of the test isolate server.
-ISOLATE_SERVER_URL = 'https://test.isolateserver.appspot.com/'
+ISOLATE_SERVER_URL_TEMPLATE = 'https://%s-dot-isolateserver.appspot.com/'
+ISOLATE_SERVER_URL = ISOLATE_SERVER_URL_TEMPLATE % 'test'
 
 # Some basic binary data stored as a byte string.
 BINARY_DATA = (chr(0) + chr(57) + chr(128) + chr(255)) * 2
@@ -46,7 +47,7 @@ def encode_multipart_formdata(fields, files,
     content_type: for httplib.HTTP instance
     body: for httplib.HTTP instance
   """
-  boundary = md5(str(time.time())).hexdigest()
+  boundary = hashlib.md5(str(time.time())).hexdigest()
   body_list = []
   for (key, value) in fields:
     body_list.append('--' + boundary)
@@ -72,10 +73,14 @@ def encode_multipart_formdata(fields, files,
 
 
 class AppTest(unittest.TestCase):
+  EMAIL = None
+
   def setUp(self):
     self.namespace = 'temporary' + str(time.time())
-    self.email = upload.GetEmail("Email (login for uploading to %s)" %
-                                 ISOLATE_SERVER_URL)
+    if AppTest.EMAIL is None:
+      AppTest.EMAIL = upload.GetEmail(
+          "Email (login for uploading to %s)" %
+          ISOLATE_SERVER_URL)
 
   def fetch(self, url, params=None, payload=None, method='GET',
             content_type='application/octet-stream', use_authentication=True):
@@ -91,7 +96,7 @@ class AppTest(unittest.TestCase):
       rpc_server = upload.HttpRpcServer(
         ISOLATE_SERVER_URL,
         upload.KeyringCreds(ISOLATE_SERVER_URL, ISOLATE_SERVER_URL,
-                            self.email).GetUserCredentials
+                            self.EMAIL).GetUserCredentials
       )
     else:
       request = urllib2.Request(url, data=payload)
@@ -194,7 +199,7 @@ class AppTest(unittest.TestCase):
                  {'hash_key': hash_key})
       self.fail('Memcache element was still present')
     except urllib2.HTTPError as e:
-      self.assertTrue('HTTP Error 402' in str(e))
+      self.assertTrue('HTTP Error 404' in str(e), str(e))
 
   def testFailWithoutAuthentication(self):
     hash_key = hashlib.sha1().hexdigest()
@@ -207,4 +212,6 @@ class AppTest(unittest.TestCase):
 
 
 if __name__ == '__main__':
+  if len(sys.argv) > 1:
+    ISOLATE_SERVER_URL = ISOLATE_SERVER_URL_TEMPLATE % sys.argv.pop(1)
   unittest.main()

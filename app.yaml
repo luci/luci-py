@@ -10,7 +10,6 @@ handlers:
   secure: always
   login: admin
 
-handlers:
 - url: .*
   script: main.app
   secure: always
