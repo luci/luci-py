@@ -79,6 +79,11 @@ class HashEntry(db.Model):
   last_access = db.DateProperty(auto_now_add=True)
 
 
+class WhitelistedIP(db.Model):
+  """Items where the IP address is allowed."""
+  # The IP of the machine to whitelist. Can be either IPv4 or IPv6.
+  ip = db.StringProperty()
+
 
 def GetContentNamespaceKey(namespace):
   """Returns the ContentNamespace key for the namespace value.
@@ -159,13 +164,17 @@ class ACLRequestHandler(webapp2.RequestHandler):
     """Ensures that only users from valid domains can continue, and that users
     from invalid domains receive an error message."""
     email = users.get_current_user().email()
-    domain = email.partition('@')[2]
-    if domain not in VALID_DOMAINS:
-      msg = 'Invalid domain, %s' % domain
-      logging.error(msg)
-      self.response.out.write(msg)
-      self.response.set_status(402)
-      return
+    if not email:
+      # Verify if its IP is whitelisted.
+      query = WhitelistedIP.gql('WHERE ip = :1', self.request.remote_addr)
+      if not query.count():
+        if self.request.method != 'GET':
+          self.abort(401, detail='Please login first.')
+        return self.redirect(users.create_login_url(self.request.url))
+    else:
+      domain = email.partition('@')[2]
+      if domain not in VALID_DOMAINS:
+        self.abort(403, detail='Invalid domain, %s' % domain)
 
     return webapp2.RequestHandler.dispatch(self)
 
@@ -217,7 +226,6 @@ class RestrictedCleanupWorkerHandler(webapp2.RequestHandler):
       blobstore.delete_async(orphaned_blobs)
 
 
-
 class RestrictedCleanupHandler(webapp2.RequestHandler):
   """Removes old unused data from the blob store and datastore.
   Only cronjob from the server can access this handler."""
@@ -228,6 +236,16 @@ class RestrictedCleanupHandler(webapp2.RequestHandler):
       self.abort(405, detail='Only internal cron jobs can do this')
 
     taskqueue.add(url='/restricted/cleanup_worker')
+
+
+class RestrictedWhitelistHandler(webapp2.RequestHandler):
+  """Whitelists the current IP."""
+  def post(self):
+    ip = self.request.remote_addr
+    if WhitelistedIP.gql('WHERE ip = :1', ip).get():
+      return 'Already present: %s' % ip
+    WhitelistedIP(ip=ip).put()
+    return 'Success: %s' % ip
 
 
 class ContainsHashHandler(ACLRequestHandler):
@@ -410,6 +428,7 @@ def CreateApplication():
   return webapp2.WSGIApplication([
       (r'/restricted/cleanup_worker', RestrictedCleanupWorkerHandler),
       (r'/restricted/cleanup', RestrictedCleanupHandler),
+      (r'/restricted/whitelist', RestrictedWhitelistHandler),
 
       ('/content/contains', ContainsHashHandler),
       ('/content/generate_blobstore_url', GenerateBlobstoreHandler),
