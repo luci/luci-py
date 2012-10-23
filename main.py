@@ -151,7 +151,7 @@ class ACLRequestHandler(webapp2.RequestHandler):
     return webapp2.RequestHandler.dispatch(self)
 
 
-class CleanupWorkerHandler(webapp2.RequestHandler):
+class RestrictedCleanupWorkerHandler(webapp2.RequestHandler):
   """Removes the old data from the blobstore and datastore. Only
   a task queue task can use this handler."""
   def post(self):
@@ -203,7 +203,7 @@ class CleanupWorkerHandler(webapp2.RequestHandler):
 
 
 
-class CleanupHandler(webapp2.RequestHandler):
+class RestrictedCleanupHandler(webapp2.RequestHandler):
   """Removes old unused data from the blob store and datastore.
   Only cronjob from the server can access this handler."""
   def get(self):
@@ -214,7 +214,7 @@ class CleanupHandler(webapp2.RequestHandler):
       self.response.set_status(405)
       return
 
-    taskqueue.add(url='/cleanup_worker')
+    taskqueue.add(url='/restricted/cleanup_worker')
 
 
 class ContainsHashHandler(ACLRequestHandler):
@@ -412,8 +412,9 @@ class RetrieveContentByHashHandler(ACLRequestHandler,
 
 def CreateApplication():
   return webapp2.WSGIApplication([
-      ('/cleanup_worker', CleanupWorkerHandler),
-      ('/content/cleanup', CleanupHandler),
+      (r'/restricted/cleanup_worker', RestrictedCleanupWorkerHandler),
+      (r'/restricted/cleanup', RestrictedCleanupHandler),
+
       ('/content/contains', ContainsHashHandler),
       ('/content/generate_blobstore_url', GenerateBlobstoreHandler),
       ('/content/store', StoreContentByHashHandler),
