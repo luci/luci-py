@@ -175,11 +175,7 @@ class RestrictedCleanupWorkerHandler(webapp2.RequestHandler):
   a task queue task can use this handler."""
   def post(self):
     if not self.request.headers.get('X-AppEngine-QueueName'):
-      msg = 'Only internal task queue tasks can do this'
-      logging.error(msg)
-      self.response.out.write(msg)
-      self.response.set_status(405)
-      return
+      self.abort(405, detail='Only internal task queue tasks can do this')
     # Remove old datastore entries.
     logging.info('Deleting old datastore entries')
     old_cutoff = datetime.datetime.today() - datetime.timedelta(
@@ -229,9 +225,7 @@ class RestrictedCleanupHandler(webapp2.RequestHandler):
     # App engine cron jobs are always GET requests, so we cleanup as a get
     # even though it modifies the server's state.
     if self.request.headers.get('X-AppEngine-Cron') != 'true':
-      self.response.out.write('Only internal cron jobs can do this')
-      self.response.set_status(405)
-      return
+      self.abort(405, detail='Only internal cron jobs can do this')
 
     taskqueue.add(url='/restricted/cleanup_worker')
 
@@ -248,9 +242,7 @@ class ContainsHashHandler(ACLRequestHandler):
       msg = ('Hash digests must all be of length %d, last digest was of '
              'length %d' %
              (HASH_DIGEST_LENGTH, len(hash_digests) % HASH_DIGEST_LENGTH))
-      logging.error(msg)
-      self.response.out.write(msg)
-      self.response.set_status(402)
+      self.abort(400, detail=msg)
 
     hash_digest_count = len(hash_digests) / HASH_DIGEST_LENGTH
     logging.info('Checking namespace %s for %d hash digests', namespace,
@@ -260,10 +252,7 @@ class ContainsHashHandler(ACLRequestHandler):
       msg = (
           'Requested more than %d hash digests in a single has request, '
           'aborting' % hash_digest_count)
-      logging.error(msg)
-      self.response.out.write(msg)
-      self.response.set_status(402)
-      return
+      self.abort(400, detail=msg)
 
     namespace_model_key = GetContentNamespaceKey(namespace)
 
@@ -302,16 +291,11 @@ class StoreBlobstoreContentByHashHandler(
   def post(self):
     upload_hash_contents = self.get_uploads('hash_contents')
     if len(upload_hash_contents) != 1:
-      msg = ('Found %d hash_contents, there should only be 1.' %
-             len(upload_hash_contents))
-      logging.error(msg)
-
-      self.response.out.write(msg)
-      self.response.set_status(402)
-
       # Delete all upload files since they aren't linked to anything.
       blobstore.delete_async(upload_hash_contents)
-      return
+      msg = ('Found %d hash_contents, there should only be 1.' %
+             len(upload_hash_contents))
+      self.abort(400, detail=msg)
 
     hash_entry = CreateHashEntry(self.request, self.response)
 
@@ -365,12 +349,7 @@ class StoreContentByHashHandler(ACLRequestHandler):
       logging.info('Storing hash content in blobstore')
       hash_entry.hash_content_reference = StoreValueInBlobstore(hash_content)
       if not hash_entry.hash_content_reference:
-        msg = 'Unable to save the hash to the blobstore.'
-        logging.error(msg)
-
-        self.response.out.write(msg)
-        self.response.set_status(402)
-        return
+        self.abort(507, detail='Unable to save the hash to the blobstore.')
 
     hash_entry.put()
     self.response.out.write('hash content saved.')
@@ -413,11 +392,7 @@ class RetrieveContentByHashHandler(ACLRequestHandler,
     hash_entry = GetContentByHash(hash_key, namespace)
     if not hash_entry:
       msg = 'Unable to find a hash with key \'%s\'.' % hash_key
-      logging.info(msg)
-
-      self.response.out.write(msg)
-      self.response.set_status(402)
-      return
+      self.abort(404, detail=msg)
 
     if hash_entry.last_access != datetime.date.today():
       hash_entry.last_access = datetime.date.today()
