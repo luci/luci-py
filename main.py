@@ -49,7 +49,17 @@ VALID_SHA1_RE = re.compile(r'[a-f0-9]{' + str(HASH_HEXDIGEST_LENGTH) + r'}')
 
 class ContentNamespace(db.Model):
   """Used as an ancestor of HashEntry to create mutiple content-addressed
-  "tables"."""
+  "tables".
+
+  There's primarily three tables. The table name is its key name:
+  - default:    The default CAD.
+  - gzip:       This namespace contains the content in gzip'ed format.
+  - temporary*: This family of namespace is a discardable namespace for testing
+                purpose only.
+
+  All the tables in the temporary* family should have is_testing==True and the
+  others is_testing==False.
+  """
   is_testing = db.BooleanProperty()
 
 
@@ -69,6 +79,17 @@ class HashEntry(db.Model):
   last_access = db.DateProperty(auto_now_add=True)
 
 
+
+def GetContentNamespaceKey(namespace):
+  """Returns the ContentNamespace key for the namespace value.
+
+  Makes sure the entity exists in the datastore.
+  memcache.
+  """
+  return ContentNamespace.get_or_insert(
+      namespace, is_testing=namespace.startswith('temporary'))
+
+
 def GetContentByHash(hash_key, namespace):
   """Returns the HashEntry with the given key, or None if it no HashEntry
   matches."""
@@ -77,9 +98,8 @@ def GetContentByHash(hash_key, namespace):
     return None
 
   try:
-    namespace_model = ContentNamespace.get_or_insert(
-        namespace, is_testing=namespace.startswith('temporary'))
-    key = db.Key.from_path('HashEntry', hash_key, parent=namespace_model.key())
+    namespace_model_key = GetContentNamespaceKey(namespace)
+    key = db.Key.from_path('HashEntry', hash_key, parent=namespace_model_key)
     return HashEntry.get(key)
   except (db.BadKeyError, db.KindError):
     pass
@@ -119,9 +139,8 @@ def CreateHashEntry(request, response):
 
   namespace = request.get('namespace', 'default')
 
-  namespace_model = ContentNamespace.get_or_insert(
-      namespace, is_testing=namespace.startswith('temporary'))
-  key = db.Key.from_path('HashEntry', hash_key, parent=namespace_model.key())
+  namespace_model_key = GetContentNamespaceKey(namespace)
+  key = db.Key.from_path('HashEntry', hash_key, parent=namespace_model_key)
 
   if HashEntry.all(keys_only=True).filter('__key__ =', key).get():
     msg = 'Hash entry already stored, no need to store again.'
@@ -246,8 +265,7 @@ class ContainsHashHandler(ACLRequestHandler):
       self.response.set_status(402)
       return
 
-    namespace_model_key = ContentNamespace.get_or_insert(
-        namespace, is_testing=namespace.startswith('temporary')).key()
+    namespace_model_key = GetContentNamespaceKey(namespace)
 
     # Extract all the hashes.
     hashes = (
@@ -330,6 +348,7 @@ class StoreContentByHashHandler(ACLRequestHandler):
 
     if priority == 0:
       try:
+        # TODO(maruel): Use namespace='table_%s' % namespace.
         if memcache.set(self.request.get('hash_key'), hash_content,
                         namespace=self.request.get('namespace', 'default')):
           logging.info('Storing hash content in memcache')
@@ -363,6 +382,7 @@ class RemoveContentByHashHandler(ACLRequestHandler):
     hash_key = self.request.get('hash_key')
     namespace = self.request.get('namespace', 'default')
     hash_entry = GetContentByHash(hash_key, namespace)
+    # TODO(maruel): Use namespace='table_%s' % namespace.
     memcache.delete(hash_key, namespace=namespace)
 
     if not hash_entry:
@@ -382,6 +402,7 @@ class RetrieveContentByHashHandler(ACLRequestHandler,
   def get(self):
     hash_key = self.request.get('hash_key')
     namespace = self.request.get('namespace', 'default')
+    # TODO(maruel): Use namespace='table_%s' % namespace.
     memcache_entry = memcache.get(hash_key, namespace=namespace)
 
     if memcache_entry:
