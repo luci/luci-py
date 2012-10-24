@@ -288,11 +288,27 @@ class ContainsHashHandler(ACLRequestHandler):
         for hash_digest in hashes
     )
 
-    # Convert to byte, chr(0) if not present, chr(1) if it is.
-    contains = (
-        bool(HashEntry.all(keys_only=True).filter('__key__ =', key).get())
-        for key in keys)
+    # Start the queries in parallel. It must be a list so the calls are executed
+    # right away.
+    queries = [
+        HashEntry.all().filter('__key__ =', key).run(
+            read_policy=db.EVENTUAL_CONSISTENCY,
+            limit=1,
+            batch_size=1,
+            keys_only=True)
+        for key in keys
+    ]
 
+    # Convert to True/False. It's a bit annoying because run() returns a
+    # ResultsIterator.
+    def IteratorToBool(itr):
+      for _ in itr:
+        return True
+      return False
+
+    contains = (IteratorToBool(q) for q in queries)
+
+    # Convert to byte, chr(0) if not present, chr(1) if it is.
     self.response.out.write(bytearray(contains))
 
 
