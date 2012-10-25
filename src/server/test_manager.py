@@ -85,6 +85,10 @@ CHANCE_OF_QUICK_COMEBACK = 1.0 / 20.0
 # The time to use when we want the machine to have a quick callback time.
 QUICK_COMEBACK_SECS = 1
 
+# The amount of time we want a machine to wait before calling back after seeing
+# a server error.
+COMEBACK_AFTER_SERVER_ERROR_SECS = 10
+
 # Number of times to try a transaction before giving up. Since most likely the
 # recoverable exceptions will only happen when datastore is overloaded, it
 # doesn't make much sense to extensively retry many times.
@@ -814,10 +818,6 @@ class TestRequestManager(object):
     # Validate and fix machine attributes. Will throw exception on errors.
     attribs = self.ValidateAndFixAttributes(attributes)
 
-    assigned_runner = False
-    runner = None
-    response = {}
-
     unfinished_test = TestRunner.gql(
         'WHERE machine_id = :1 AND done = :2', attribs['id'], False).get()
     if unfinished_test:
@@ -828,37 +828,39 @@ class TestRequestManager(object):
 
     # Try assigning machine to a runner 10 times before we give up.
     # TODO(user): Tune this parameter somehow.
+    assigned_runner = False
     for _ in range(10):
       # Try to find a matching test runner for the machine.
       runner = self._FindMatchingRunner(attribs)
-      if runner:
-        # Will atomically try to assign the machine to the runner. This could
-        # fail due to a race condition on the runner. If so, we loop back to
-        # finding a runner.
-        if self._AssignRunnerToMachine(attribs['id'], runner, AtomicAssignID):
-          # Get the commands the machine needs to execute.
-          try:
-            commands, result_url = self._GetTestRunnerCommands(runner,
-                                                               server_url)
-          except PrepareRemoteCommandsError:
-            # Failed to load the scripts so mark the runner as 'not running'.
-            runner.started = None
-            runner.put()
-          else:
-            response['commands'] = commands
-            response['result_url'] = result_url
-            assigned_runner = True
-
-            self._RecordMachineRunnerAssignment(attribs['id'],
-                                                attributes.get('tag', None))
-            break
-      # We found no runner, no use in re-trying so just break out of the loop.
-      else:
+      # If no runner matches, no need to keep searching.
+      if not runner:
         break
 
-    response['id'] = attribs['id']
+      # Will atomically try to assign the machine to the runner. This could
+      # fail due to a race condition on the runner. If so, we loop back to
+      # finding a runner.
+      if self._AssignRunnerToMachine(attribs['id'], runner, AtomicAssignID):
+        assigned_runner = True
+        break
+
+    response = {'id': attribs['id']}
     if assigned_runner:
-      response['try_count'] = 0
+      # Get the commands the machine needs to execute.
+      try:
+        commands, result_url = self._GetTestRunnerCommands(runner, server_url)
+      except PrepareRemoteCommandsError:
+        # Failed to load the scripts so mark the runner as 'not running'.
+        runner.started = None
+        runner.put()
+        response['try_count'] = 0
+        response['come_back'] = COMEBACK_AFTER_SERVER_ERROR_SECS
+
+      else:
+        response['commands'] = commands
+        response['result_url'] = result_url
+        response['try_count'] = 0
+        self._RecordMachineRunnerAssignment(attribs['id'],
+                                            attributes.get('tag', None))
     else:
       response['try_count'] = attribs['try_count'] + 1
       # Tell machine when to come back, in seconds.
@@ -1157,7 +1159,6 @@ class TestRequestManager(object):
          _PYTHON_INIT_SCRIPT))
 
     files_to_upload = []
-
     for local_path, remote_path, file_name in file_paths:
       try:
         file_contents = self._LoadFile(local_path)
