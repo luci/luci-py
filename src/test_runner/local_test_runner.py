@@ -1,4 +1,4 @@
-#!/usr/bin/python2.6
+#!/usr/bin/python2.7
 #
 # Copyright 2011 Google Inc. All Rights Reserved.
 
@@ -248,8 +248,8 @@ class LocalTestRunner(object):
   def _ExpandEnv(self, argument, env):
     """Expands any environment variables that may exist in argument.
 
-    For example self._ExpandEnv('%%programfiles%%\Google\Chrome')
-    would return 'c:\program files\internet explorer\iexplore.exe'
+    For example self._ExpandEnv('%%programfiles%%\\Google\\Chrome')
+    would return 'c:\\program files\\internet explorer\\iexplore.exe'
     As mentioned in the documentation, we must use double % (e.g., %%ENV_VAR%%)
     so that the env-var doesn't get confisued with a Swarm Format Variable.
     see http://goto/swarm/design-doc/test-request-format for more details.

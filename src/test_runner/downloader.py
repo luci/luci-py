@@ -1,4 +1,4 @@
-#!/usr/bin/python2.4
+#!/usr/bin/python2.7
 #
 # Copyright 2010 Google Inc. All Rights Reserved.
 """A simple command line script/helper function to download files from a URL.

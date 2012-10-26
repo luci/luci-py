@@ -349,6 +349,7 @@ class PollHandler(webapp2.RequestHandler):
     test_request_manager.AbortStaleRunners()
     test_manager.DeleteOldRunners()
     test_manager.DeleteOldErrors()
+    test_manager.DeleteOldRunnerStats()
     self.response.out.write("""
     <html>
     <head>

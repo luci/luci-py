@@ -1,4 +1,4 @@
-#!/usr/bin/python2.4
+#!/usr/bin/python2.7
 #
 # Copyright 2010 Google Inc. All Rights Reserved.
 
@@ -40,6 +40,34 @@ class Error(Exception):
   pass
 
 
+def Stringize(value):
+  """Properly convert value to a string.
+
+  This is useful for objects deriving from TestRequestMessageBase so that
+  we can explicitly convert them to strings instead of getting the
+  usual <__main__.XXX object at 0x...>.
+
+  Args:
+    value: The value to Stringize.
+
+  Returns:
+    The stringized value.
+  """
+  if isinstance(value, list):
+    value = '[%s]' % ', '.join([Stringize(i) for i in value])
+  elif isinstance(value, dict):
+    value = '{%s}' % ', '.join([('%s: %s' % (Stringize(i),
+                                             Stringize(value[i])))
+                                for i in sorted(value)])
+  elif isinstance(value, TestRequestMessageBase):
+    value = str(value)
+  elif isinstance(value, str):
+    value = '\'%s\'' % value
+  else:
+    value = str(value)
+  return value
+
+
 class TestRequestMessageBase(object):
   """A Test Request Message base class to provide generic methods.
 
@@ -75,33 +103,6 @@ class TestRequestMessageBase(object):
     """
     if not self.IsValid(errors=None):
       return ''
-
-    def Stringize(value):
-      """Properly convert value to a string.
-
-      This is useful for objects deriving from TestRequestMessageBase so that
-      we can explicitly convert them to strings instead of getting the
-      usual <__main__.XXX object at 0x...>.
-
-      Args:
-        value: The value to Stringize.
-
-      Returns:
-        The stringized value.
-      """
-      if isinstance(value, list):
-        value = '[%s]' % ', '.join([Stringize(i) for i in value])
-      elif isinstance(value, dict):
-        value = '{%s}' % ', '.join([('%s: %s' % (Stringize(i),
-                                                 Stringize(value[i])))
-                                    for i in sorted(value)])
-      elif isinstance(value, TestRequestMessageBase):
-        value = str(value)
-      elif isinstance(value, str):
-        value = '\'%s\'' % value
-      else:
-        value = str(value)
-      return value
 
     request_text_entries = ['{']
     # We sort the dictionary to ensure the string is always printed the same.

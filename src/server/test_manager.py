@@ -107,6 +107,9 @@ SWARM_FINISHED_RUNNER_TIME_TO_LIVE_DAYS = 14
 # Number of days to keep error logs around.
 SWARM_ERROR_TIME_TO_LIVE_DAYS = 7
 
+# Number of days to evaluate when considering runner stats.
+RUNNER_STATS_EVALUATION_CUTOFF_DAYS = 7
+
 
 def GetTestCase(request_message):
   """Returns a TestCase object representing this Test Request message.
@@ -135,6 +138,17 @@ def OnDevAppEngine():
     True if this code is running on dev app engine.
   """
   return os.environ['SERVER_SOFTWARE'].startswith('Development')
+
+
+# MOE: start_strip
+# This is removed from the public version because the public version should
+# be run on python2.7 (or later), which has the builtin total_seconds() function
+# for timedelta.
+def TotalSeconds(time_delta):
+  return ((time_delta.microseconds +
+           (time_delta.seconds + time_delta.days * 24 * 3600) * 10**6) /
+          10**6)
+# MOE: end_strip
 
 
 class TestRequest(db.Model):
@@ -328,6 +342,30 @@ class TestRunner(db.Model):
 
     return result.decode('utf-8')
 
+  def GetDimensionsString(self):
+    """Get a string representing the dimensions this runner requires.
+
+    Returns:
+      The string representing the dimensions for this runner.
+    """
+    return test_request_message.Stringize(self.GetConfiguration().dimensions)
+
+  def GetWaitTime(self):
+    """Get the number of seconds between creation and execution start.
+
+    Returns:
+      The number of seconds the runner waited, if the runner hasn't started yet
+        return 0.
+    """
+    if not self.started:
+      return 0
+
+    time_delta = self.started - self.created
+    # MOE: start_strip
+    # TODO(user): Replace with total_seconds() once python2.7 is used
+    return TotalSeconds(time_delta)
+    # MOE: end_strip_and_replace return time_delta.total_seconds())
+
   def GetMessage(self):
     """Get the message string representing this test runner.
 
@@ -356,6 +394,19 @@ class MachineAssignment(db.Model):
 
   # The time of the assignment.
   assignment_time = db.DateTimeProperty(auto_now=True)
+
+
+class RunnerAssignment(db.Model):
+  """Stores how long a runner's assignment took and dimensions."""
+  # The dimensions of the runner.
+  dimensions = db.TextProperty()
+
+  # The time in seconds that passed between swarm creating this runner and
+  # it beginning execution.
+  wait_time = db.IntegerProperty()
+
+  # The start date of the runner, used to identify older data to be cleared.
+  started = db.DateProperty()
 
 
 class SwarmError(db.Model):
@@ -859,8 +910,9 @@ class TestRequestManager(object):
         response['commands'] = commands
         response['result_url'] = result_url
         response['try_count'] = 0
-        self._RecordMachineRunnerAssignment(attribs['id'],
-                                            attributes.get('tag', None))
+        self._RecordMachineAssignment(attribs['id'],
+                                      attributes.get('tag', None))
+        self._RecordRunnerAssignment(db.get(runner.key()))
     else:
       response['try_count'] = attribs['try_count'] + 1
       # Tell machine when to come back, in seconds.
@@ -927,8 +979,8 @@ class TestRequestManager(object):
 
     return attributes
 
-  def _RecordMachineRunnerAssignment(self, machine_id, machine_tag):
-    """Record when a machine has a runner assigned to it.
+  def _RecordMachineAssignment(self, machine_id, machine_tag):
+    """Records when a machine has a runner assigned.
 
     Args:
       machine_id: The machine id of the machine.
@@ -944,6 +996,46 @@ class TestRequestManager(object):
     machine_assignment.tag = machine_tag
     machine_assignment.assignment_time = datetime.datetime.now()
     machine_assignment.put()
+
+  def _RecordRunnerAssignment(self, runner):
+    """Records when a runner is assigned.
+
+    Args:
+      runner: The runner that is assigned.
+    """
+    runner_assignment = RunnerAssignment(
+        dimensions=runner.GetDimensionsString(),
+        wait_time=runner.GetWaitTime(),
+        started=runner.started.date())
+    runner_assignment.put()
+
+  def GetRunnerWaitStats(self):
+    """Returns the stats for how long runners are waiting.
+
+    Returns:
+      A dictionary where the key is the dimension, and the value is
+      (mean wait, median wait, longest wait) for getting an assigned
+      machine. Only values from the last RUNNER_STATS_EVALUATION_CUTOFF_DAYS
+      are consider.
+    """
+    # TODO(user): This should probably get just generated once every x hours
+    # as a cron job and this function just returns the cached value.
+
+    time_mappings = {}
+    for runner_assignment in RunnerAssignment.all():
+      time_mappings.setdefault(runner_assignment.dimensions, []).append(
+          runner_assignment.wait_time)
+
+    results = {}
+    for (dimension, times) in time_mappings.iteritems():
+      sorted_times = sorted(times)
+
+      mean = sum(sorted_times) / len(sorted_times)
+      median = sorted_times[len(sorted_times) / 2]
+
+      results[dimension] = (mean, median, sorted_times[-1])
+
+    return results
 
   def _ComputeComebackValue(self, try_count):
     """Computes when the slave machine should return based on given try_count.
@@ -1295,11 +1387,22 @@ def DeleteOldRunners():
       _GetCurrentTime() -
       datetime.timedelta(days=SWARM_FINISHED_RUNNER_TIME_TO_LIVE_DAYS))
 
-  query = TestRunner.gql('WHERE ended < :1', old_cutoff)
-  for runner in query:
-    runner.delete()
+  db.delete(TestRunner.gql('WHERE ended < :1', old_cutoff))
 
   logging.debug('DeleteOldRunners done')
+
+
+def DeleteOldRunnerStats():
+  """Clean up all runners that are older than a certain age and done."""
+  logging.debug('DeleteOldRunnersStats starting')
+
+  old_cutoff = (
+      _GetCurrentTime() -
+      datetime.timedelta(days=RUNNER_STATS_EVALUATION_CUTOFF_DAYS))
+
+  db.delete(RunnerAssignment.gql('WHERE started < :1', old_cutoff))
+
+  logging.debug('DeleteOldRunnersStats done')
 
 
 def DeleteOldErrors():
