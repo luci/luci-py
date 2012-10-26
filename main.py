@@ -192,10 +192,27 @@ class RestrictedCleanupWorkerHandler(webapp2.RequestHandler):
     # Each gql query returns a maximum of 1000 entries, so loop until there
     # are no elements left to delete.
     while True:
-      db_query = HashEntry.gql('WHERE last_access < :1', old_cutoff)
+      db_query = HashEntry.all(keys_only=True).filter(
+          'last_access <', old_cutoff)
       if not db_query.count():
         break
       db.delete_async(db_query)
+
+    # Keep stuff under testing for only one full day.
+    old_cutoff_testing = datetime.datetime.today() - datetime.timedelta(days=1)
+    while True:
+      query = ContentNamespace.all(keys_only=True).filter('is_testing =', True)
+      for namespace in query:
+        while True:
+          children = HashEntry.all(keys_only=True).ancestor(namespace).filter(
+              'last_access <', old_cutoff_testing)
+          if not children.count():
+            # Since delete_async() is used, the stale ContentNamespace will
+            # likely stay for another full day, no big deal.
+            if not HashEntry.all(keys_only=True).ancestor(namespace).count():
+              db.delete_async(namespace)
+            break
+          db.delete_async(children)
 
     # Remove orphaned blobs.
     logging.info('Deleting orphaned blobs')
