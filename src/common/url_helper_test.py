@@ -14,9 +14,9 @@ import unittest
 import urllib
 import urllib2
 
-import mox  # pylint: disable-msg=C6204
 
 from common import url_helper
+from third_party.mox import mox
 
 
 class UrlHelperTest(unittest.TestCase):
