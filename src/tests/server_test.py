@@ -25,6 +25,8 @@ import urlparse
 # Number of seconds to sleep between tries of polling for results.
 SLEEP_BETWEEN_RESULT_POLLS = 2
 
+ROOT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
+
 
 # TODO(user): Find a way to avoid spawning other processes so that we can
 # get code coverage, which doesn't work for code in other processes in Python.
@@ -267,27 +269,29 @@ class _SwarmTestProgram(unittest.TestProgram):
                       '--skip_sdk_update_check arguments will '
                       'be added to the command(s) you specify.')
     parser.add_option('-s', '--swarm', dest='swarm_path',
-                      help='The root path of the Swarm server code. '
-                      'Defaults to the parent folder of where this script is.')
+                      default=ROOT_DIR,
+                      help='The root path of the Swarm server code.')
     parser.add_option('-t', '--tests', dest='tests_path',
-                      help='The path where the test files can be found. '
-                      'Defaults to the ./test_files folder.')
+                      default=os.path.join(ROOT_DIR, 'test'),
+                      help='The path where the test files can be found.')
     parser.add_option('-c', '--slave-config', dest='slave_config_file',
+                      default=os.path.join(ROOT_DIR, 'tests',
+                                           'machine_config.txt'),
                       help='The path to the slave dimensions config file. '
-                      'Defaults to %default.', default='machine_config.txt')
+                      'Defaults to %default.')
     parser.add_option('-l', '--slave-script', dest='slave_script',
+                      default=os.path.join(ROOT_DIR, 'test_runner',
+                                           'slave_machine.py'),
                       help='The path to the slave_machine.py script. '
-                      'Defaults to %default.', default='slave_machine.py')
+                      'Defaults to %default.')
     parser.add_option('-o', '--swarm_server_start_timeout',
                       dest='swarm_server_start_timeout', type=int,
+                      default=90,
                       help='How long should we wait (in seconds) for the '
-                      'Swarm server to start? Defaults to 90 seconds.')
+                      'Swarm server to start? Defaults to %default seconds.')
     parser.add_option('-v', '--verbose', action='store_true',
                       help='Set logging level to INFO. Optional. Defaults to '
                       'ERROR level.')
-    parser.set_default('swarm_path', '..')
-    parser.set_default('swarm_server_start_timeout', 90)
-    parser.set_default('tests_path', 'test_files')
 
     (_SwarmTestProgram.options, other_args) = parser.parse_args(args=argv[1:])
     if not _SwarmTestProgram.options.appengine_cmds:

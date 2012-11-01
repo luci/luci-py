@@ -10,7 +10,6 @@ from common import dimensions
 
 
 class TestDimensions(unittest.TestCase):
-
   def testMatchDimensions(self):
     machine_dimensions = {'os': 'win32', 'lang': 'en', 'browser': ['ie', 'ff']}
 
@@ -65,3 +64,7 @@ class TestDimensions(unittest.TestCase):
                                                 machine_dimensions)[0])
     self.assertFalse(dimensions.MatchDimensions({'os': 'mac'},
                                                 machine_dimensions)[0])
+
+
+if __name__ == '__main__':
+  unittest.main()
