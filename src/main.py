@@ -9,15 +9,10 @@ This file contains the URL handlers for all the TRS service URLs, implemented
 using the appengine webapp framework.
 """
 
-# pylint: disable-msg=C6204
 import datetime
+import json
 import logging
 import os.path
-try:
-  import simplejson as json
-except ImportError:
-  import json
-# pylint: enable-msg=C6204
 
 from google.appengine.api import users
 from google.appengine.ext import db
@@ -527,7 +522,7 @@ class RegisterHandler(webapp2.RequestHandler):
     attributes_str = self.request.get('attributes')
     try:
       attributes = json.loads(attributes_str)
-    except (json.decoder.JSONDecodeError, TypeError, ValueError):
+    except (TypeError, ValueError):
       message = 'Invalid attributes: ' + attributes_str
       logging.exception(message)
       response = 'Error: %s' % message

@@ -11,14 +11,10 @@ it will write out the dimensions to that file.
 
 
 
+import json
 import logging
 import optparse
 import sys
-
-try:
-  import simplejson as json  # pylint: disable-msg=C6204
-except ImportError:
-  import json  # pylint: disable-msg=C6204
 
 
 # A mapping between sys.platform values and the corresponding swarm name

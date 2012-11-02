@@ -7,16 +7,13 @@
 
 
 
+import json
 import logging
 import os
 import sys
 import tempfile
 import unittest
 
-try:
-  import simplejson as json  # pylint: disable-msg=C6204
-except ImportError:
-  import json  # pylint: disable-msg=C6204
 
 import mox  # pylint: disable-msg=C6204
 

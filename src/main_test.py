@@ -7,12 +7,8 @@
 
 
 import datetime
+import json
 import unittest
-
-try:  # pylint: disable-msg=C6205
-  import simplejson as json  # pylint: disable-msg=C6204
-except ImportError:
-  import json  # pylint: disable-msg=C6204
 
 
 from google.appengine.ext import testbed

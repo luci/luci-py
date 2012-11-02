@@ -15,6 +15,7 @@ http://code.google.com/p/swarming/wiki/MachineProvider for complete details.
 """
 
 
+import json
 import logging
 import logging.handlers
 import optparse
@@ -22,11 +23,6 @@ import os
 import subprocess
 import sys
 import time
-
-try:
-  import simplejson as json  # pylint: disable-msg=C6204
-except ImportError:
-  import json  # pylint: disable-msg=C6204
 
 # pylint: disable-msg=C6204
 from common import url_helper

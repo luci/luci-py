@@ -6,6 +6,7 @@
 
 
 
+import json
 import logging
 import os
 import subprocess
@@ -14,16 +15,9 @@ import time
 import unittest
 
 
-# pylint: disable-msg=C6204
-try:
-  import simplejson as json
-except ImportError:
-  import json
-
 from common import url_helper
 from third_party.mox import mox
 from test_runner import slave_machine
-# pylint: enable-msg=C6204
 
 MACHINE_ID_1 = '12345678-12345678-12345678-12345678'
 MACHINE_ID_2 = '87654321-87654321-87654321-87654321'
