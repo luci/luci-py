@@ -221,8 +221,10 @@ class TestRequestManagerTest(unittest.TestCase):
       self._manager._LoadFile(
           mox.IgnoreArg()).MultipleTimes().AndReturn(contents)
 
-  def _ExecuteRegister(self, machine_id, register_should_match=True):
-    register_request = self._GetMachineRegisterRequest(machine_id=machine_id)
+  def _ExecuteRegister(self, machine_id, try_count=0,
+                       register_should_match=True):
+    register_request = self._GetMachineRegisterRequest(machine_id=machine_id,
+                                                       try_count=try_count)
     response = self._manager.ExecuteRegisterRequest(register_request,
                                                     self._SERVER_URL)
 
@@ -843,8 +845,9 @@ class TestRequestManagerTest(unittest.TestCase):
     # Assign different ids to the machines if requested, or have the same
     # machine do all the tests.
     for i in range(num_machines):
-      self._ExecuteRegister(MACHINE_IDS[i if different_ids else 0],
-                            not io_error and i < num_running)
+      self._ExecuteRegister(
+          MACHINE_IDS[i if different_ids else 0],
+          register_should_match=(not io_error and i < num_running))
 
     if io_error:
       # No tests should be assigned in the case of IO errors.
@@ -886,9 +889,8 @@ class TestRequestManagerTest(unittest.TestCase):
 
   def testNoPendingTestsOnRegisterNoTryCount(self):
     # A machine registers itself without an id and there are no tests pending.
-    machine = self._GetMachineRegisterRequest()
-
-    response = self._manager.ExecuteRegisterRequest(machine, self._SERVER_URL)
+    response = self._ExecuteRegister(machine_id=None,
+                                     register_should_match=False)
 
     expected_keys = ['try_count', 'come_back', 'id']
 
@@ -901,9 +903,8 @@ class TestRequestManagerTest(unittest.TestCase):
   def testNoPendingTestsOnRegisterWithTryCount(self):
     # A machine registers itself without an id and there are no tests pending
     try_count = 1234
-    machine = self._GetMachineRegisterRequest(try_count=try_count)
-
-    response = self._manager.ExecuteRegisterRequest(machine, self._SERVER_URL)
+    response = self._ExecuteRegister(machine_id=None, try_count=try_count,
+                                     register_should_match=False)
 
     expected_keys = ['try_count', 'come_back', 'id']
 
@@ -1314,9 +1315,7 @@ class TestRequestManagerTest(unittest.TestCase):
     self.assertEqual(0, test_manager.RunnerAssignment.all().count())
 
     # Assign the runner and ensure the assignment is marked
-    register_request = self._GetMachineRegisterRequest(
-        machine_id=MACHINE_IDS[0])
-    self._manager.ExecuteRegisterRequest(register_request, self._SERVER_URL)
+    self._ExecuteRegister(MACHINE_IDS[0])
     self.assertEqual(1, test_manager.RunnerAssignment.all().count())
 
     self._mox.VerifyAll()
@@ -1332,9 +1331,7 @@ class TestRequestManagerTest(unittest.TestCase):
     self.assertEqual({}, self._manager.GetRunnerWaitStats())
 
     # Start the runner and ensure the mean, median and max times are now set.
-    register_request = self._GetMachineRegisterRequest(
-        machine_id=MACHINE_IDS[0])
-    self._manager.ExecuteRegisterRequest(register_request, self._SERVER_URL)
+    self._ExecuteRegister(MACHINE_IDS[0])
 
     runner = test_manager.TestRunner.all().get()
     wait = runner.GetWaitTime()
