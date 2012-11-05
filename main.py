@@ -6,6 +6,7 @@
 import binascii
 import datetime
 import logging
+import os
 import re
 
 # The app engine headers are located locally, so don't worry about not finding
@@ -95,7 +96,7 @@ def GetContentNamespaceKey(namespace):
       namespace, is_testing=namespace.startswith('temporary')).key()
 
 
-def GetContentByHash(hash_key, namespace):
+def GetContentByHash(namespace, hash_key):
   """Returns the HashEntry with the given key, or None if it no HashEntry
   matches."""
   if not VALID_SHA1_RE.match(hash_key):
@@ -168,12 +169,11 @@ class ACLRequestHandler(webapp2.RequestHandler):
       # Verify if its IP is whitelisted.
       query = WhitelistedIP.gql('WHERE ip = :1', self.request.remote_addr)
       if not query.count():
-        if self.request.method != 'GET':
-          self.abort(401, detail='Please login first.')
-        return self.redirect(users.create_login_url(self.request.url))
+        self.abort(401, detail='Please login first.')
     else:
       domain = user.email().partition('@')[2]
       if domain not in VALID_DOMAINS:
+        logging.warn('Disallowing %s, invalid domain' % user.email())
         self.abort(403, detail='Invalid domain, %s' % domain)
 
     return webapp2.RequestHandler.dispatch(self)
@@ -267,7 +267,9 @@ class RestrictedWhitelistHandler(webapp2.RequestHandler):
 
 
 class ContainsHashHandler(ACLRequestHandler):
-  """A simple handler for saying if a hash is already stored or not."""
+  """Returns a 'string' of chr(1) or chr(0) for each hash in the request body,
+  signaling if the hash content is present in the namespace or not.
+  """
   def post(self):
     """This is a POST even though it doesn't modify any data, but it makes
     it easier for python scripts."""
@@ -337,8 +339,8 @@ class GenerateBlobstoreHandler(ACLRequestHandler):
 
 
 class StoreBlobstoreContentByHashHandler(
-  ACLRequestHandler,
-  blobstore_handlers.BlobstoreUploadHandler):
+    ACLRequestHandler,
+    blobstore_handlers.BlobstoreUploadHandler):
   """Assigns the newly stored blobstore entry to the correct hash key."""
   def post(self):
     upload_hash_contents = self.get_uploads('hash_contents')
@@ -412,7 +414,7 @@ class RemoveContentByHashHandler(ACLRequestHandler):
   def post(self):
     hash_key = self.request.get('hash_key')
     namespace = self.request.get('namespace', 'default')
-    hash_entry = GetContentByHash(hash_key, namespace)
+    hash_entry = GetContentByHash(namespace, hash_key)
     # TODO(maruel): Use namespace='table_%s' % namespace.
     memcache.delete(hash_key, namespace=namespace)
 
@@ -428,7 +430,7 @@ class RemoveContentByHashHandler(ACLRequestHandler):
 
 
 class RetrieveContentByHashHandler(ACLRequestHandler,
-                                  blobstore_handlers.BlobstoreDownloadHandler):
+                                   blobstore_handlers.BlobstoreDownloadHandler):
   """The handlers for retrieving hash contents."""
   def get(self):
     hash_key = self.request.get('hash_key')
@@ -441,7 +443,7 @@ class RetrieveContentByHashHandler(ACLRequestHandler,
       self.response.out.write(memcache_entry)
       return
 
-    hash_entry = GetContentByHash(hash_key, namespace)
+    hash_entry = GetContentByHash(namespace, hash_key)
     if not hash_entry:
       msg = 'Unable to find a hash with key \'%s\'.' % hash_key
       self.abort(404, detail=msg)
@@ -458,17 +460,37 @@ class RetrieveContentByHashHandler(ACLRequestHandler,
       self.response.out.write(hash_entry.hash_content)
 
 
-def CreateApplication():
-  return webapp2.WSGIApplication([
-      (r'/restricted/cleanup_worker', RestrictedCleanupWorkerHandler),
-      (r'/restricted/cleanup', RestrictedCleanupHandler),
-      (r'/restricted/whitelist', RestrictedWhitelistHandler),
+class RootHandler(webapp2.RequestHandler):
+  """Tells the user to RTM."""
+  def get(self):
+    url = 'http://dev.chromium.org/developers/testing/isolated-testing'
+    self.response.write(
+        '<html><body>Hi! Please read <a href="%s">%s</a>.</body></html>' %
+        (url, url))
 
-      ('/content/contains', ContainsHashHandler),
-      ('/content/generate_blobstore_url', GenerateBlobstoreHandler),
-      ('/content/store', StoreContentByHashHandler),
-      ('/content/store_blobstore', StoreBlobstoreContentByHashHandler),
-      ('/content/remove', RemoveContentByHashHandler),
-      ('/content/retrieve', RetrieveContentByHashHandler)])
+
+def CreateApplication():
+  if os.environ['SERVER_SOFTWARE'].startswith('Development') :
+    # Add example.com as a valid domain when testing.
+    global VALID_DOMAINS
+    VALID_DOMAINS = ('example.com',) + VALID_DOMAINS
+
+  return webapp2.WSGIApplication([
+      webapp2.Route(
+          r'/restricted/cleanup_worker', RestrictedCleanupWorkerHandler),
+      webapp2.Route(r'/restricted/cleanup', RestrictedCleanupHandler),
+      webapp2.Route(r'/restricted/whitelist', RestrictedWhitelistHandler),
+
+      webapp2.Route(r'/content/contains', ContainsHashHandler),
+      webapp2.Route(
+          r'/content/generate_blobstore_url', GenerateBlobstoreHandler),
+      webapp2.Route(r'/content/store', StoreContentByHashHandler),
+      webapp2.Route(
+          r'/content/store_blobstore', StoreBlobstoreContentByHashHandler),
+      webapp2.Route(r'/content/remove', RemoveContentByHashHandler),
+      webapp2.Route(r'/content/retrieve', RetrieveContentByHashHandler),
+      webapp2.Route(r'/', RootHandler),
+  ])
+
 
 app = CreateApplication()
