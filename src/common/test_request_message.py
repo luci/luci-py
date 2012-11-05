@@ -791,6 +791,7 @@ class TestCase(TestRequestMessageBase):
         The key for the chunk size is 'size'. It must be a whole number.
     failure_email: An optional email where to broadcast failures for this test
         case.
+    label: An optional string that can be used to label this test case.
     verbose: An optional boolean value that specifies if logging should be
         verbose or not.
   """
@@ -799,7 +800,7 @@ class TestCase(TestRequestMessageBase):
   def __init__(self, test_case_name=None, env_vars=None, configurations=None,
                data=None, working_dir=None, admin=False, tests=None,
                result_url=None, store_result=None, output_destination=None,
-               failure_email=None, verbose=False):
+               failure_email=None, label=None, verbose=False):
     super(TestCase, self).__init__()
     self.test_case_name = test_case_name
     if env_vars:
@@ -830,6 +831,7 @@ class TestCase(TestRequestMessageBase):
     else:
       self.output_destination = None
     self.failure_email = failure_email
+    self.label = label
     self.verbose = verbose
 
   def IsValid(self, errors=None):
@@ -854,7 +856,8 @@ class TestCase(TestRequestMessageBase):
                                      errors=errors) or
         not self.AreValidOutputDestinations(['output_destination'],
                                             errors=errors) or
-        not self.AreValidValues(['working_dir', 'failure_email', 'result_url'],
+        not self.AreValidValues(['working_dir', 'failure_email', 'result_url',
+                                 'label'],
                                 str, errors=errors) or
         (self.result_url and not self.AreValidUrls(['result_url'], errors)) or
         self.store_result not in TestCase.VALID_STORE_RESULT_VALUES):

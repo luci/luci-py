@@ -607,6 +607,7 @@ class TestCaseTest(TestHelper):
         output_destination=
         TestHelper.VALID_OPTIONAL_OUTPUT_DESTINATION_VALUES[-1],
         failure_email=TestHelper.VALID_OPTIONAL_STRING_VALUES[-1],
+        label=TestHelper.VALID_OPTIONAL_STRING_VALUES[-1],
         verbose=TestHelper.VALID_BOOLEAN_VALUES[-1],
         configurations=[TestConfigurationTest.GetFullObject()])
 
@@ -679,6 +680,8 @@ class TestCaseTest(TestHelper):
                            TestHelper.VALID_OPTIONAL_OUTPUT_DESTINATION_VALUES)
     self.AssertValidValues('failure_email',
                            TestHelper.VALID_OPTIONAL_STRING_VALUES)
+    self.AssertValidValues('label',
+                           TestHelper.VALID_OPTIONAL_STRING_VALUES)
     self.AssertValidValues('working_dir',
                            TestHelper.VALID_OPTIONAL_STRING_VALUES)
     self.AssertValidValues('verbose', TestHelper.VALID_BOOLEAN_VALUES)
@@ -731,6 +734,9 @@ class TestCaseTest(TestHelper):
 
     self.AssertInvalidValues('failure_email', TestHelper.INVALID_STRING_VALUES)
     self.test_request.failure_email = None
+
+    self.AssertInvalidValues('label', TestHelper.INVALID_STRING_VALUES)
+    self.test_request.label = None
 
     self.AssertInvalidValues('working_dir', TestHelper.INVALID_STRING_VALUES)
     self.test_request.working_dir = None
