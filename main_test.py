@@ -72,8 +72,20 @@ def encode_multipart_formdata(fields, files,
   return content_type, body
 
 
+class CachedCredentials(upload.KeyringCreds):
+  EMAIL = None
+  PASSWORD = None
+
+  def GetUserCredentials(self):
+    if self.PASSWORD is None:
+      self.EMAIL, self.PASSWORD = super(
+          CachedCredentials, self).GetUserCredentials()
+    return self.EMAIL, self.PASSWORD
+
+
 class AppTest(unittest.TestCase):
   EMAIL = None
+  CREDENTIALS = None
 
   def setUp(self):
     self.namespace = 'temporary' + str(time.time())
@@ -81,6 +93,9 @@ class AppTest(unittest.TestCase):
       AppTest.EMAIL = upload.GetEmail(
           "Email (login for uploading to %s)" %
           ISOLATE_SERVER_URL)
+    if AppTest.CREDENTIALS is None:
+      AppTest.CREDENTIALS = CachedCredentials(
+          ISOLATE_SERVER_URL, ISOLATE_SERVER_URL, self.EMAIL)
 
   def fetch(self, url, params=None, payload=None, method='GET',
             content_type='application/octet-stream', use_authentication=True):
@@ -94,10 +109,7 @@ class AppTest(unittest.TestCase):
 
     if use_authentication:
       rpc_server = upload.HttpRpcServer(
-        ISOLATE_SERVER_URL,
-        upload.KeyringCreds(ISOLATE_SERVER_URL, ISOLATE_SERVER_URL,
-                            self.EMAIL).GetUserCredentials
-      )
+          ISOLATE_SERVER_URL, AppTest.CREDENTIALS.GetUserCredentials)
     else:
       request = urllib2.Request(url, data=payload)
       request.add_header('content-type', content_type)
@@ -136,7 +148,7 @@ class AppTest(unittest.TestCase):
     contain_response = response.decode()
     self.assertEqual(chr(0), contain_response)
 
-  def UploadHashAndRetriveHelper(self, hash_key, hash_contents, priority=1):
+  def UploadHashAndRetrieveHelper(self, hash_key, hash_contents, priority=1):
     self.RemoveAndVerify(hash_key)
 
     # Add the hash content and then retrieve it.
@@ -174,24 +186,24 @@ class AppTest(unittest.TestCase):
   def testStoreAndRetrieveHashNotInBlobstore(self):
     hash_key = hashlib.sha1(BINARY_DATA).hexdigest()
 
-    self.UploadHashAndRetriveHelper(hash_key, BINARY_DATA)
+    self.UploadHashAndRetrieveHelper(hash_key, BINARY_DATA)
 
   def testStoreAndRetrieveHashfromBlobstore(self):
     # Try and upload a 40mb blobstore.
     hash_contents = (BINARY_DATA * 128) * 1024 * 40
     hash_key = hashlib.sha1(hash_contents).hexdigest()
 
-    self.UploadHashAndRetriveHelper(hash_key, hash_contents)
+    self.UploadHashAndRetrieveHelper(hash_key, hash_contents)
 
-  def testStoreAndRetriveEmptyHash(self):
+  def testStoreAndRetrieveEmptyHash(self):
     hash_key = hashlib.sha1().hexdigest()
 
-    self.UploadHashAndRetriveHelper(hash_key, '')
+    self.UploadHashAndRetrieveHelper(hash_key, '')
 
-  def testStoreAndRetriveFromMemcache(self):
+  def testStoreAndRetrieveFromMemcache(self):
     hash_key = hashlib.sha1(BINARY_DATA).hexdigest()
 
-    self.UploadHashAndRetriveHelper(hash_key, BINARY_DATA, priority=0)
+    self.UploadHashAndRetrieveHelper(hash_key, BINARY_DATA, priority=0)
 
     # Check that we can't retrieve the cached element after it has been deleted.
     try:
