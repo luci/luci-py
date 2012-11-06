@@ -167,7 +167,7 @@ class TestRequest(db.Model):
   requested_time = db.DateTimeProperty(auto_now_add=True)
 
   # The name for this test request.
-  name = db.StringProperty(required=True)
+  name = db.StringProperty()
 
   def GetTestCase(self):
     """Returns a TestCase object representing this Test Request.
@@ -673,10 +673,10 @@ class TestRequestManager(object):
     """
     logging.debug('TRM.ExecuteTestRequest msg=%s', request_message)
 
-    # Will raise an exception on error.
-    test_name = GetTestCase(request_message).test_case_name
-    request = TestRequest(message=request_message, name=test_name)
+    request = TestRequest(message=request_message)
     test_case = request.GetTestCase()  # Will raise on invalid request.
+    request.name = test_case.test_case_name
+
     request.put()
 
     test_keys = {'test_case_name': test_case.test_case_name,
