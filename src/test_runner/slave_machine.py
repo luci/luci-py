@@ -29,6 +29,10 @@ from common import url_helper
 # pylint: enable-msg=C6204
 
 
+# The default name of the text file containing the machine id of this machine.
+DEFAULT_MACHINE_ID_FILE = 'swarm_bot.id'
+
+
 # pylint: disable-msg=W0102
 def ValidateBasestring(x, error_prefix='', errors=[]):
   """Validate the given variable as a valid basestring.
@@ -127,7 +131,7 @@ class SlaveMachine(object):
   """Creates a slave that continuously polls the Swarm server for jobs."""
 
   def __init__(self, url='https://localhost:443', attributes=None,
-               max_url_tries=1):
+               max_url_tries=1, id_filename=None):
     """Sets the parameters of the slave.
 
     Args:
@@ -136,6 +140,8 @@ class SlaveMachine(object):
           machine dimensions as well.
       max_url_tries: The maximum number of consecutive url errors to accept
           before throwing an exception.
+      id_filename: The name of the file where the initial machine id should be
+          load from, and where any changes should be saved to.
 
     """
     self._url = url
@@ -144,6 +150,13 @@ class SlaveMachine(object):
     self._attributes['id'] = None
     self._attributes['try_count'] = 0
     self._come_back = 0
+    self._id_filename = id_filename
+
+    if self._id_filename:
+      with open(self._id_filename, 'r') as f:
+        # If this id is invalid the server will ignore it and generate a new
+        # id for this slave.
+        self._attributes['id'] = f.read()
 
     self._max_url_tries = max_url_tries
 
@@ -251,7 +264,12 @@ class SlaveMachine(object):
     """
 
     # Store id assigned by Swarm server so in the future they know this slave.
-    self._attributes['id'] = response['id']
+    if self._attributes['id'] != response['id']:
+      self._attributes['id'] = response['id']
+      if self._id_filename:
+        with open(self._id_filename, 'w') as f:
+          f.write(response['id'])
+
     logging.debug('received id: %s', self._attributes['id'])
 
     # Store try_count assigned by Swarm server to send it back in next request.
@@ -571,6 +589,10 @@ def main():
   parser.add_option('-l', '--log_file', default='slave_machine.log',
                     help='Set the name of the file to log to. '
                     'Defaults to %default.')
+  parser.add_option('--id_filename', default=DEFAULT_MACHINE_ID_FILE,
+                    help='The file to load the machine id from. If the file '
+                    'doesn\'t exist a new file will be create with a new ID '
+                    'retrieved from the swarm server. Defaults to %default')
   (options, args) = parser.parse_args()
 
   # Parser handles exiting this script after logging the error.
@@ -610,7 +632,8 @@ def main():
 
   url = '%s:%d' % (options.address, options.port)
   slave = SlaveMachine(url=url, attributes=attributes,
-                       max_url_tries=options.max_url_tries)
+                       max_url_tries=options.max_url_tries,
+                       id_filename=options.id_filename)
 
   # Change the working directory to specified path.
   os.chdir(options.directory)

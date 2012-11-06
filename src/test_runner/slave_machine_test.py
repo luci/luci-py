@@ -11,6 +11,7 @@ import logging
 import os
 import subprocess
 import sys
+import tempfile
 import time
 import unittest
 
@@ -137,6 +138,35 @@ class TestSlaveMachine(unittest.TestCase):
           commands).AndRaise(subprocess.CalledProcessError(-1, commands))
     else:
       subprocess.check_call(commands)
+
+  def testLoadAndSavingMachineId(self):
+    invalid_id = '12345'
+    come_back = 5.0
+    response = self._CreateResponse(MACHINE_ID_1, come_back=come_back)
+
+    url_helper.UrlOpen(
+        mox.IgnoreArg(),
+        data=self._CreateValidAttribs(machine_id=invalid_id),
+        max_tries=mox.IgnoreArg()).AndReturn(response)
+    time.sleep(come_back)
+
+    self._mox.ReplayAll()
+
+    id_file = tempfile.NamedTemporaryFile(delete=False)
+    try:
+      id_file.write(invalid_id)
+      id_file.close()
+
+      slave = slave_machine.SlaveMachine(attributes=VALID_ATTRIBUTES,
+                                         id_filename=id_file.name)
+      slave.Start(iterations=1)
+
+      with open(id_file.name) as f:
+        self.assertEqual(MACHINE_ID_1, f.read())
+    finally:
+      os.remove(id_file.name)
+
+    self._mox.VerifyAll()
 
   # Test with an invalid URL and try until it raises an exception.
   def testInvalidURLWithException(self):

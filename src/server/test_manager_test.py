@@ -983,12 +983,11 @@ class TestRequestManagerTest(unittest.TestCase):
                             self._manager.ValidateAndFixAttributes,
                             attributes)
 
-    # Test with invalid id type: int.
-    attributes = {'dimensions': {'os': 'win-xp'}, 'id': 10}
-    self.assertRaisesRegexp(test_request_message.Error,
-                            r"Invalid attrib type for id: <type 'int'>",
-                            self._manager.ValidateAndFixAttributes,
-                            attributes)
+    # Test with invalid id type (int), which should be replaced.
+    invalid_id_type = 10
+    attributes = {'dimensions': {'os': 'win-xp'}, 'id': invalid_id_type}
+    results = self._manager.ValidateAndFixAttributes(attributes)
+    self.assertNotEqual(invalid_id_type, results['id'])
 
     # Test with special id type: None.
     attributes = {'dimensions': {'os': 'win-xp'}, 'id': None}
@@ -997,11 +996,10 @@ class TestRequestManagerTest(unittest.TestCase):
     self.assertNotEqual(result['id'], None)
 
     # Test with invalid id value.
-    attributes = {'dimensions': {'os': 'win-xp'}, 'id': '12345'}
-    self.assertRaisesRegexp(test_request_message.Error,
-                            r"Invalid attrib type for id: <type 'str'>",
-                            self._manager.ValidateAndFixAttributes,
-                            attributes)
+    invalid_id_value = '12345'
+    attributes = {'dimensions': {'os': 'win-xp'}, 'id': invalid_id_value}
+    response = self._manager.ValidateAndFixAttributes(attributes)
+    self.assertNotEqual(invalid_id_value, response['id'])
 
     # Test with invalid attribute name.
     attributes = {'dimensions': {'os': 'win-xp'}, 'wrong': 'invalid'}

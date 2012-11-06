@@ -945,9 +945,10 @@ class TestRequestManager(object):
         if value:
           try:
             value = uuid.UUID(value)
-          except (ValueError, AttributeError):
-            raise test_request_message.Error(
-                'Invalid attrib type for id: ' + str(type(value)))
+          except (ValueError, AttributeError) as e:
+            logging.warning(
+                'Problem with given id, generating new id.\n%s', e)
+            attributes[attrib] = None
       elif attrib == 'tag' or attrib == 'username' or attrib == 'password':
         # Make sure the attribute value has proper type.
         if not isinstance(value, (str, unicode)):
