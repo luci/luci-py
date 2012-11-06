@@ -625,6 +625,41 @@ class TestLocalTestRunner(unittest.TestCase):
 
     self._mox.VerifyAll()
 
+  def testShutdownOrReturn(self):
+    self.CreateValidFile()
+
+    self._mox.StubOutWithMock(local_test_runner, 'Restart')
+
+    restart_message = 'Restarting machine'
+    local_test_runner.Restart().AndRaise(local_test_runner.Error(
+        restart_message))
+
+    self._mox.ReplayAll()
+
+    runner = local_test_runner.LocalTestRunner(self.data_file_name,
+                                               restart_on_failure=False)
+    return_value = 0
+
+    # No test failures and restart on failure disabled.
+    runner.success = True
+    self.assertEqual(return_value, runner.ShutdownOrReturn(return_value))
+
+    # Test failures with restart on failure disabled.
+    self.assertEqual(return_value, runner.ShutdownOrReturn(return_value))
+
+    # No test failures with restart on failure enabled.
+    runner.restart_on_failure = True
+    self.assertEqual(return_value, runner.ShutdownOrReturn(return_value))
+
+    # Test failures with restart of feature enabled.
+    runner.success = False
+    self.assertRaisesRegexp(local_test_runner.Error,
+                            restart_message,
+                            runner.ShutdownOrReturn,
+                            return_value)
+
+    self._mox.VerifyAll()
+
 
 if __name__ == '__main__':
   # We don't want the application logs to interfere with our own messages.

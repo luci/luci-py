@@ -126,6 +126,23 @@ def EnqueueOutput(out, queue):
   out.close()
 
 
+def Restart():
+  """Restarts this machine.
+
+  Raises:
+    Error: When it doesn't know how to restart the machine (unknown platform).
+  """
+  if sys.platform == 'win32' or sys.platform == 'cygwin':
+    subprocess.check_call(['shutdown', '-r', '-f', '-t', '1'])
+    # Sleep for 5 seconds to ensure we don't try to do anymore work while
+    # the OS is preparing to shutdown.
+    time.sleep(5)
+  elif sys.platform == 'linux2' or sys.platform == 'darwin':
+    subprocess.check_call(['sudo', 'shutdown', '-r', 'now'])
+  else:
+    raise Error('Unable to restart machine')
+
+
 class Error(Exception):
   """Simple error exception properly scoped here."""
   pass
@@ -153,7 +170,7 @@ class LocalTestRunner(object):
   _SUCCESS_CGI_STRING = ['success', 'failure', 'pending']
 
   def __init__(self, request_file_name, verbose=False, data_folder_name=None,
-               max_url_retries=1):
+               max_url_retries=1, restart_on_failure=False):
     """Inits LocalTestRunner with a request file.
 
     Args:
@@ -164,6 +181,9 @@ class LocalTestRunner(object):
           of the cleanup field of a test run object in a Swarm file.
       max_url_retries: The maximum number of times any urlopen call will get
           retried if it encounters an error.
+      restart_on_failure: True to have this machine restart if any of the tests
+         fail (although it waits for all the tests to run and the results to
+         have been uploaded first).
 
     Raises:
       Error: When request_file_name or data_folder_name is invalid.
@@ -209,6 +229,8 @@ class LocalTestRunner(object):
       os.mkdir(self.data_dir)
 
     self.max_url_retries = max_url_retries
+    self.restart_on_failure = restart_on_failure
+    self.success = False
 
   def __del__(self):
     if self.log_file_name:
@@ -505,8 +527,8 @@ class LocalTestRunner(object):
     """Run the tests specified in the test run tests list and output results.
 
     Returns:
-      A (success, result_string) tuple to identify a True/False sucess and also
-      provide a detailed result_string
+      A (success, result_codes, result_string) tuple to identify success,
+      the result codes and also provide a detailed result_string
     """
     logging.info('Running tests from %s test case',
                  self.test_run.test_run_name)
@@ -586,8 +608,11 @@ class LocalTestRunner(object):
                          (result_string, self.test_run.test_run_name,
                           tests_to_run[index].test_name))
 
+    # Record the success or failure.
+    self.success = (num_failures == 0)
+
     # And append their total number before returning the result string.
-    return (num_failures == 0, result_codes,
+    return (self.success, result_codes,
             '%s\n\n %d FAILED TESTS\n' % (result_string, num_failures))
 
   def PublishResults(self, success, result_codes, result_string,
@@ -678,6 +703,23 @@ class LocalTestRunner(object):
     """
     logging.exception(message)
 
+  def ShutdownOrReturn(self, return_value):
+    """Restart the machine if required or return return_value.
+
+    The machine is restarted if restart on failure was enable and at least
+    one test failed.
+
+    Args:
+      return_value: The value this function returns if it doesn't restart the
+          machine.
+
+    Returns:
+      return_value if the machine is still on.
+    """
+    if self.restart_on_failure and not self.success:
+      Restart()
+    return return_value
+
 
 def main():
   """For when the script is used directly on the command line."""
@@ -696,6 +738,9 @@ def main():
                     help='The maximum number of times url messages will '
                     'attemp to be sent before accepting failure. Defaults to '
                     '%default')
+  parser.add_option('--restart_on_failure', action='store__true',
+                    help='Have this script restart the machine if any of the '
+                    'tests fail.')
   parser.add_option('-v', '--verbose', action='store_true',
                     help='Set logging level to INFO. Optional. Defaults to '
                     'ERROR level.', default=False)
@@ -720,7 +765,8 @@ def main():
   try:
     runner = LocalTestRunner(options.request_file_name, verbose=options.verbose,
                              data_folder_name=options.data_folder_name,
-                             max_url_retries=options.max_url_retries)
+                             max_url_retries=options.max_url_retries,
+                             restart_on_failure=options.restart_on_failure)
   except Error, e:
     logging.exception('Can\'t create TestRunner with file: %s.\nException: %s',
                       options.request_file_name, e)
@@ -731,13 +777,13 @@ def main():
 
   try:
     if runner.RetrieveDataAndRunTests():
-      return 0
+      return runner.ShutdownIfRequired(0)
   except Exception, e:  # pylint: disable-msg=W0703
     # We want to catch all so that we can report all errors, even internal ones.
     logging.exception(e)
 
   runner.PublishInternalErrors()
-  return 1
+  return runner.ShutdownIfRequired(1)
 
 
 if __name__ == '__main__':

@@ -465,6 +465,7 @@ class SlaveMachine(object):
     commands = [sys.executable] + args
 
     try:
+      logging.debug('Running command: %s', commands)
       subprocess.check_call(commands)
     except subprocess.CalledProcessError as e:
       # The exception message will contain the commands that were
@@ -472,9 +473,8 @@ class SlaveMachine(object):
       raise SlaveRPCError(str(e))
     else:
       logging.debug('done!')
-      # At this point the script called by subprocess is responsible for
-      # notifying the Swarm server if anything goes wrong, so now the job
-      # is done.
+      # At this point the script called by subprocess has handled any further
+      # communication with the swarm server.
 
 
 # TODO(user): Move function to another file.

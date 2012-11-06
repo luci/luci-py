@@ -610,6 +610,7 @@ class TestCaseTest(TestHelper):
         result_url=TestHelper.VALID_URL_VALUES[-1],
         store_result=
         test_request_message.TestCase.VALID_STORE_RESULT_VALUES[-1],
+        restart_on_failure=TestHelper.VALID_BOOLEAN_VALUES[-1],
         output_destination=
         TestHelper.VALID_OPTIONAL_OUTPUT_DESTINATION_VALUES[-1],
         failure_email=TestHelper.VALID_OPTIONAL_STRING_VALUES[-1],
@@ -682,6 +683,8 @@ class TestCaseTest(TestHelper):
     valid_store_result = test_request_message.TestCase.VALID_STORE_RESULT_VALUES
     self.AssertValidValues('store_result', valid_store_result)
 
+    self.AssertValidValues('restart_on_failure',
+                           TestHelper.VALID_BOOLEAN_VALUES)
     self.AssertValidValues('output_destination',
                            TestHelper.VALID_OPTIONAL_OUTPUT_DESTINATION_VALUES)
     self.AssertValidValues('failure_email',
@@ -793,7 +796,8 @@ class TestRunTest(TestHelper):
         ping_url=TestHelper.VALID_URL_VALUES[-1],
         output_destination=
         TestHelper.VALID_OPTIONAL_OUTPUT_DESTINATION_VALUES[-1],
-        cleanup=test_request_message.TestRun.VALID_CLEANUP_VALUES[-1])
+        cleanup=test_request_message.TestRun.VALID_CLEANUP_VALUES[-1],
+        restart_on_failure=TestHelper.VALID_BOOLEAN_VALUES[-1])
 
   def testNoReferences(self):
     # Ensure that Test Run makes copies of its input, not references.
@@ -863,6 +867,8 @@ class TestRunTest(TestHelper):
     valid_cleanup = test_request_message.TestRun.VALID_CLEANUP_VALUES
     self.AssertValidValues('cleanup', valid_cleanup)
     self.AssertValidValues('env_vars', TestHelper.VALID_ENV_VARS)
+    self.AssertValidValues('restart_on_failure',
+                           TestHelper.VALID_BOOLEAN_VALUES)
 
     # Now try invalid values.
     self.AssertInvalidValues('test_run_name',

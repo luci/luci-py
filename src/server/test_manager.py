@@ -1183,6 +1183,9 @@ class TestRequestManager(object):
     if test_case.verbose:
       command_to_execute.append('-v')
 
+    if test_case.restart_on_failure:
+      command_to_execute.append('--restart_on_failure')
+
     output_commands.append(slave_machine.BuildRPC('RunCommands',
                                                   command_to_execute))
 

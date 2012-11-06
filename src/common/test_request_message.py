@@ -804,6 +804,8 @@ class TestCase(TestRequestMessageBase):
     tests: An optional tests list for this test case.
     result_url: An optional URL where to post the results of this test case.
     store_result: The key to access the test run's storage string.
+    restart_on_failure: An optional value indicating if the machine running the
+        tests should restart if any of the tests fail.
     output_destination: An optional dictionary with a URL where to post the
         output of this test case as well as the size of the chunks to use.
         The key for the URL is 'url' and the value must be a valid URL string.
@@ -818,8 +820,9 @@ class TestCase(TestRequestMessageBase):
 
   def __init__(self, test_case_name=None, env_vars=None, configurations=None,
                data=None, working_dir=None, admin=False, tests=None,
-               result_url=None, store_result=None, output_destination=None,
-               failure_email=None, label=None, verbose=False):
+               result_url=None, store_result=None, restart_on_failure=None,
+               output_destination=None, failure_email=None, label=None,
+               verbose=False):
     super(TestCase, self).__init__()
     self.test_case_name = test_case_name
     if env_vars:
@@ -845,6 +848,7 @@ class TestCase(TestRequestMessageBase):
       self.tests = []
     self.result_url = result_url
     self.store_result = store_result
+    self.restart_on_failure = restart_on_failure
     if output_destination:
       self.output_destination = output_destination.copy()
     else:
@@ -942,6 +946,8 @@ class TestRun(TestRequestMessageBase):
         The key for the URL is 'url' and the value must be a valid URL string.
         The key for the chunk size is 'size'. It must be a whole number.
     cleanup: The key to access the test run's cleanup string.
+    restart_on_failure: An optional value indicating if the machine running the
+        tests should restart if any of the tests fail.
   """
   VALID_CLEANUP_VALUES = [None, '', 'zip', 'data', 'root']
 
@@ -949,7 +955,7 @@ class TestRun(TestRequestMessageBase):
                configuration=TestConfiguration(), data=None, working_dir=None,
                tests=None, instance_index=None, num_instances=None,
                result_url=None, ping_url=None, output_destination=None,
-               cleanup=None):
+               cleanup=None, restart_on_failure=None):
     super(TestRun, self).__init__()
     self.test_run_name = test_run_name
     if env_vars:
@@ -978,6 +984,7 @@ class TestRun(TestRequestMessageBase):
     else:
       self.output_destination = None
     self.cleanup = cleanup
+    self.restart_on_failure = restart_on_failure
 
   def IsValid(self, errors=None):
     """Identifies if the current content is valid.

@@ -128,7 +128,8 @@ class TestRequestManagerTest(unittest.TestCase):
 
   def _GetRequestMessage(self, min_instances=1, additional_instances=0,
                          env_vars=None, result_url=DEFAULT_RESULT_URL,
-                         store_result='all', os='win-xp'):
+                         store_result='all', restart_on_failure=False,
+                         os='win-xp'):
     """Return a properly formatted request message text.
 
     Args:
@@ -140,6 +141,8 @@ class TestRequestManagerTest(unittest.TestCase):
       store_result: Identifies which Runner and Request data should stay in
           storage after the tests are done running (fail means only the failures
           are kept).
+      restart_on_failure: Identifies if the slave should be restarted if any
+          of its tests fail.
       os: The os to require in the test's configuration.
 
     Returns:
@@ -164,6 +167,7 @@ class TestRequestManagerTest(unittest.TestCase):
       test_request.result_url = result_url
       test_request.failure_email = 'john@doe.com'
       test_request.store_result = store_result
+      test_request.restart_on_failure = restart_on_failure
       self._test_request_text = test_request_message.Stringize(
           test_request, json_readable=True)
     return self._test_request_text
@@ -187,7 +191,7 @@ class TestRequestManagerTest(unittest.TestCase):
       os: The value of the os to use in the dimensions.
 
     Returns:
-      A dictionary which can be fed into test_manager.ExecutRegisterRequest().
+      A dictionary which can be fed into test_manager.ExecuteRegisterRequest().
     """
 
     dimensions = {'os': os, 'cpu': 'Unknown', 'browser': 'Unknown'}
@@ -303,10 +307,9 @@ class TestRequestManagerTest(unittest.TestCase):
 
   def testMultiRunnerWithEnvironmentVariables(self):
     num_indexes = 2
-    mock_contents = 'mock contents'
 
     # _Loadfile should be mocked when we have running tests.
-    self._SetupLoadFileExpectations(contents=mock_contents)
+    self._SetupLoadFileExpectations(contents='mock_contents')
 
     self._mox.ReplayAll()
 
@@ -332,6 +335,33 @@ class TestRequestManagerTest(unittest.TestCase):
           self.assertTrue("{'index': '%d'" % i in content)
 
     self._mox.VerifyAll()
+
+  def _TestForRestartOnFailurePresence(self, restart_on_failure):
+    # _Loadfile should be mocked when we have running tests.
+    self._SetupLoadFileExpectations(contents='mock_contents')
+
+    self._mox.ReplayAll()
+
+    self._manager.ExecuteTestRequest(self._GetRequestMessage(
+        restart_on_failure=restart_on_failure))
+
+    response = self._ExecuteRegister(MACHINE_IDS[0])
+
+    found_command = False
+    for command in response['commands']:
+      function_name, args = slave_machine.ParseRPC(command)
+      if function_name == 'RunCommands':
+        found_command = True
+        self.assertEqual('--restart_on_failure' in args, restart_on_failure)
+    self.assertTrue(found_command)
+
+    self._mox.VerifyAll()
+
+  def testNoRestartOnFailureByDefault(self):
+    self._TestForRestartOnFailurePresence(False)
+
+  def testRestartOnFailurePropagated(self):
+    self._TestForRestartOnFailurePresence(True)
 
   def _AddTestRunWithResultsExpectation(self, result_url, result_string):
     if not self._manager.use_blobstore_file_api:
