@@ -164,7 +164,8 @@ class TestRequestManagerTest(unittest.TestCase):
       test_request.result_url = result_url
       test_request.failure_email = 'john@doe.com'
       test_request.store_result = store_result
-      self._test_request_text = str(test_request)
+      self._test_request_text = test_request_message.Stringize(
+          test_request, json_readable=True)
     return self._test_request_text
 
   def _GetInvalidRequestMessage(self):
@@ -922,7 +923,7 @@ class TestRequestManagerTest(unittest.TestCase):
 
     request_message = self._GetInvalidRequestMessage()
     self.assertRaisesRegexp(test_request_message.Error,
-                            r'invalid syntax \(<string>, line 1\)',
+                            r'No JSON object could be decoded',
                             self._manager.ExecuteTestRequest,
                             request_message)
 

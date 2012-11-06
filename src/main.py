@@ -309,9 +309,7 @@ class TestRequestHandler(webapp2.RequestHandler):
 
     test_request_manager = CreateTestManager()
     try:
-      response = str(test_request_manager.ExecuteTestRequest(body))
-      # This enables our callers to use the response string as a JSON string.
-      response = response.replace("'", '"')
+      response = json.dumps(test_request_manager.ExecuteTestRequest(body))
     except test_request_message.Error as ex:
       message = str(ex)
       logging.exception(message)
@@ -402,7 +400,7 @@ class GetMatchingTestCasesHandler(webapp2.RequestHandler):
       keys.extend(map(str, match.GetAllKeys()))
 
     if keys:
-      self.response.out.write('\n'.join(keys))
+      self.response.out.write(json.dumps(keys))
     else:
       self.response.out.write('No matching Test Cases')
 

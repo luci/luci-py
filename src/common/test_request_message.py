@@ -30,6 +30,7 @@ Classes:
 
 
 
+import json
 import logging
 import urllib
 import urlparse
@@ -40,7 +41,7 @@ class Error(Exception):
   pass
 
 
-def Stringize(value):
+def Stringize(value, json_readable=False):
   """Properly convert value to a string.
 
   This is useful for objects deriving from TestRequestMessageBase so that
@@ -49,20 +50,29 @@ def Stringize(value):
 
   Args:
     value: The value to Stringize.
+    json_readable: If true, the string output will be valid to load with
+        json.loads().
 
   Returns:
     The stringized value.
   """
-  if isinstance(value, list):
-    value = '[%s]' % ', '.join([Stringize(i) for i in value])
+  if isinstance(value, (list, tuple)):
+    value = '[%s]' % ', '.join([Stringize(i, json_readable) for i in value])
   elif isinstance(value, dict):
-    value = '{%s}' % ', '.join([('%s: %s' % (Stringize(i),
-                                             Stringize(value[i])))
+    value = '{%s}' % ', '.join([('%s: %s' % (Stringize(i, json_readable),
+                                             Stringize(value[i],
+                                                       json_readable)))
                                 for i in sorted(value)])
   elif isinstance(value, TestRequestMessageBase):
-    value = str(value)
-  elif isinstance(value, str):
-    value = '\'%s\'' % value
+    value = value.__str__(json_readable)
+  elif isinstance(value, basestring):
+    if json_readable:
+      value = value.replace('\\', '\\\\')
+    value = '\"%s\"' % value if json_readable else '\'%s\'' % value
+  elif json_readable and value is None:
+    value = 'null'
+  elif json_readable and isinstance(value, bool):
+    value = 'true' if value else 'false'
   else:
     value = str(value)
   return value
@@ -93,10 +103,14 @@ class TestRequestMessageBase(object):
       logging.error(error_text)
       error_list.append(error_text)
 
-  def __str__(self):
+  def __str__(self, json_readable=False):
     """Returns the request text after validating it.
 
     If the request isn't valid, an empty string is returned.
+
+    Args:
+      json_readable: If true, the string output will be valid to load with
+        json.loads().
 
     Returns:
       The text string representing the request, or an empty string on errors.
@@ -107,8 +121,14 @@ class TestRequestMessageBase(object):
     request_text_entries = ['{']
     # We sort the dictionary to ensure the string is always printed the same.
     for item in sorted(self.__dict__):
-      request_text_entries.extend([Stringize(item), ': ',
-                                   Stringize(self.__dict__[item]), ','])
+      request_text_entries.extend([
+          Stringize(item, json_readable), ': ',
+          Stringize(self.__dict__[item], json_readable), ','])
+
+    # The json format doesn't allow trailing commas.
+    if json_readable and request_text_entries[-1] == ',':
+      request_text_entries.pop()
+
     request_text_entries.append('}')
     return ''.join(request_text_entries)
 
@@ -286,7 +306,7 @@ class TestRequestMessageBase(object):
     Returns:
       True if the URL is valid, false otherwise.
     """
-    if not isinstance(value, str):
+    if not isinstance(value, basestring):
       self.LogError('Unsupported url scheme, %s, must be a string' % value,
                     errors)
       return False
@@ -325,7 +345,7 @@ class TestRequestMessageBase(object):
     Returns:
       True if all the values are valid urls, False otherwise.
     """
-    if not self.AreValidLists(list_keys, str, required, errors):
+    if not self.AreValidLists(list_keys, basestring, required, errors):
       return False
 
     for list_key in list_keys:
@@ -437,7 +457,7 @@ class TestRequestMessageBase(object):
             self.LogError('Invalid size in output destination, %s' % value,
                           errors)
             return False
-          if isinstance(value, str):
+          if isinstance(value, basestring):
             # If we reach here then value is a valid integer, just in string
             # form, so we convert it to an int to prevent problems with later
             # code not using it correctly.
@@ -533,7 +553,7 @@ class TestRequestMessageBase(object):
       Returns:
         The resulting expanded value.
       """
-      if isinstance(value, str):
+      if isinstance(value, basestring):
         # Because it is possible for some url paths to contain '%' without
         # referring to variables that should be expanded, we unescape them
         # before expanding the variables and then escape them again
@@ -598,16 +618,12 @@ class TestRequestMessageBase(object):
           exception will be set with the syntax/type error text message.
     """
     try:
-      # Unfortunately, the escaping of the \ escape character gets lost in the
-      # evaluation, so we must double escape it.
-      test_request = eval(message_text.replace('\\', '\\\\'),
-                          {'__builtins__': None,
-                           # True/False needed for booleans like verbose.
-                           'False': False, 'True': True})
-    except (SyntaxError, TypeError, NameError), e:
-      logging.exception('Failed to evaluate text:\n-----\n%s.\n-----\n'
-                        'Exception: %s', message_text, e)
-      raise Error(e)
+      test_request = json.loads(message_text)
+    except (TypeError, ValueError), e:
+      message = ('Failed to evaluate text:\n-----\n%s\n-----\n'
+                 'Exception: %s' % (message_text, e))
+      logging.exception(message)
+      raise Error(message)
     if (not self.ParseDictionary(test_request, errors) or
         not self.IsValid(errors)):
       self.LogError('Invalid request not a dict: %s' % test_request, errors)
@@ -651,10 +667,12 @@ class TestObject(TestRequestMessageBase):
     Returns:
       True if the current content is valid, False otherwise.
     """
-    if (not self.AreValidValues(['test_name'], str,
+    if (not self.AreValidValues(['test_name'], basestring,
                                 required=True, errors=errors) or
-        not self.AreValidDicts(['env_vars'], str, str, errors=errors) or
-        not self.AreValidLists(['action'], str, required=True, errors=errors) or
+        not self.AreValidDicts(['env_vars'], basestring, basestring,
+                               errors=errors) or
+        not self.AreValidLists(['action'], basestring, required=True,
+                               errors=errors) or
         not self.AreValidValues(['time_out'], (int, long, float),
                                 errors=errors)):
       self.LogError('Invalid TestObject: %s' % self.__dict__, errors)
@@ -717,9 +735,10 @@ class TestConfiguration(TestRequestMessageBase):
     Returns:
       True if the current content is valid, False otherwise.
     """
-    if (not self.AreValidValues(['config_name'], str,
+    if (not self.AreValidValues(['config_name'], basestring,
                                 required=True, errors=errors) or
-        not self.AreValidDicts(['env_vars'], str, str, errors=errors) or
+        not self.AreValidDicts(['env_vars'], basestring, basestring,
+                               errors=errors) or
         not self.AreValidDataLists(['data'], errors=errors) or
         not self.AreValidObjectLists(['tests'], TestObject,
                                      unique_value_keys=['test_name'],
@@ -739,7 +758,7 @@ class TestConfiguration(TestRequestMessageBase):
       if not isinstance(values, (list, tuple)):
         values = [values]
       for value in values:
-        if not value or not isinstance(value, str):
+        if not value or not isinstance(value, basestring):
           self.LogError('Invalid TestConfiguration dimension value: %s' % value,
                         errors)
           return False
@@ -843,9 +862,10 @@ class TestCase(TestRequestMessageBase):
     Returns:
       True if the current content is valid, False otherwise.
     """
-    if (not self.AreValidValues(['test_case_name'], str,
+    if (not self.AreValidValues(['test_case_name'], basestring,
                                 required=True, errors=errors) or
-        not self.AreValidDicts(['env_vars'], str, str, errors=errors) or
+        not self.AreValidDicts(['env_vars'], basestring, basestring,
+                               errors=errors) or
         not self.AreValidObjectLists(['configurations'], TestConfiguration,
                                      required=True,
                                      unique_value_keys=['config_name'],
@@ -858,7 +878,7 @@ class TestCase(TestRequestMessageBase):
                                             errors=errors) or
         not self.AreValidValues(['working_dir', 'failure_email', 'result_url',
                                  'label'],
-                                str, errors=errors) or
+                                basestring, errors=errors) or
         (self.result_url and not self.AreValidUrls(['result_url'], errors)) or
         self.store_result not in TestCase.VALID_STORE_RESULT_VALUES):
       self.LogError('Invalid TestCase: %s' % self.__dict__, errors)
@@ -968,9 +988,10 @@ class TestRun(TestRequestMessageBase):
     Returns:
       True if the current content is valid, False otherwise.
     """
-    if (not self.AreValidValues(['test_run_name'], str,
+    if (not self.AreValidValues(['test_run_name'], basestring,
                                 required=True, errors=errors) or
-        not self.AreValidDicts(['env_vars'], str, str, errors=errors) or
+        not self.AreValidDicts(['env_vars'], basestring, basestring,
+                               errors=errors) or
         not self.configuration or
         not isinstance(self.configuration, TestConfiguration) or
         not self.configuration.IsValid(errors) or
@@ -980,8 +1001,8 @@ class TestRun(TestRequestMessageBase):
                                      errors=errors) or
         not self.AreValidOutputDestinations(['output_destination'],
                                             errors=errors) or
-        not self.AreValidValues(['working_dir', 'result_url', 'ping_url'], str,
-                                errors=errors) or
+        not self.AreValidValues(['working_dir', 'result_url', 'ping_url'],
+                                basestring, errors=errors) or
         (self.result_url and not self.IsValidUrl(self.result_url, errors)) or
         not self.IsValidUrl(self.ping_url, errors) or
         self.cleanup not in TestRun.VALID_CLEANUP_VALUES or

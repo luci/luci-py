@@ -8,6 +8,7 @@
 
 
 
+import json
 import logging
 import os.path
 import unittest
@@ -195,17 +196,18 @@ class TestRequestMessageBaseTest(unittest.TestCase):
       self.int_value = 1
       self.int_array_value = [1, 2]
       self.str_array_value = ['a', 'b', r'a\b', r'\a\t']
-      self.dict_value = {1: 'a', 'b': 2}
+      self.dict_value = {'a': 1, 'b': 2}
 
     def IsValid(self, errors=None):
       errors = errors
       return (
-          isinstance(self.str_value, str) and
+          isinstance(self.str_value, basestring) and
           isinstance(self.int_value, int) and
           isinstance(self.int_array_value, list) and
           not sum([not isinstance(i, int) for i in self.int_array_value]) and
           isinstance(self.str_array_value, list) and
-          not sum([not isinstance(i, str) for i in self.str_array_value]) and
+          not sum([not isinstance(i, basestring)
+                   for i in self.str_array_value]) and
           isinstance(self.dict_value, dict))
 
   def testParseTestRequestMessageText(self):
@@ -227,39 +229,39 @@ class TestRequestMessageBaseTest(unittest.TestCase):
     self.assertTrue(parse_results.ParseTestRequestMessageText(text_request))
     # Make sure no members were added or lost.
     self.assertEqual(len(parse_results.__dict__), len(naked_results.__dict__))
-    text_request = '{"ignored_member": 1}'
+    text_request = json.dumps({'ignored_member': 1})
     self.assertTrue(parse_results.ParseTestRequestMessageText(text_request))
     self.assertEqual(len(parse_results.__dict__), len(naked_results.__dict__))
-    text_request = '{"str_value": "new value"}'
+    text_request = json.dumps({'str_value': 'new value'})
     self.assertTrue(parse_results.ParseTestRequestMessageText(text_request))
     self.assertEqual(len(parse_results.__dict__), len(naked_results.__dict__))
     self.assertEqual(parse_results.str_value, 'new value')
-    text_request = """{
+    text_request = json.dumps({
         'str_value': 'newer value',
         'int_value': 2,
         'int_array_value': [3, 4],
-        'str_array_value': ['cc', 'dd', 'mm\\nn'],
-        'dict_value': {3: 'cc', 'dd': 4}}"""
+        'str_array_value': ['cc', 'dd', 'mm\nn'],
+        'dict_value': {'cc': 3, 'dd': 4}})
     self.assertTrue(parse_results.ParseTestRequestMessageText(text_request))
     self.assertEqual(len(parse_results.__dict__), len(naked_results.__dict__))
     self.assertEqual(parse_results.str_value, 'newer value')
     self.assertEqual(parse_results.int_value, 2)
     self.assertEqual(parse_results.int_array_value, [3, 4])
-    self.assertEqual(parse_results.str_array_value, ['cc', 'dd', r'mm\nn'])
-    self.assertEqual(parse_results.dict_value, {3: 'cc', 'dd': 4})
+    self.assertEqual(parse_results.str_array_value, [u'cc', u'dd', u'mm\nn'])
+    self.assertEqual(parse_results.dict_value, {u'cc': 3, u'dd': 4})
 
     # Now try a few invalid types.
-    text_request = '{"int_value": "new value"}'
+    text_request = json.dumps({'int_value': 'new value'})
     self.assertFalse(parse_results.ParseTestRequestMessageText(text_request))
     self.assertEqual(len(parse_results.__dict__), len(naked_results.__dict__))
-    text_request = '{"str_value": 42}'
+    text_request = json.dumps({'str_value': 42})
     self.assertFalse(parse_results.ParseTestRequestMessageText(text_request))
     self.assertEqual(len(parse_results.__dict__), len(naked_results.__dict__))
 
   def testRequestText(self):
     # Success stories.
     parse_results = TestRequestMessageBaseTest.ParseResults()
-    expected_text = ("""{'dict_value': {1: 'a', 'b': 2},"""
+    expected_text = ("""{'dict_value': {'a': 1, 'b': 2},"""
                      """'int_array_value': [1, 2],'int_value': 1,"""
                      """'str_array_value': ['a', 'b', 'a\\b', '\\a\\t'],"""
                      """'str_value': 'a',}""")
@@ -278,7 +280,7 @@ class TestRequestMessageBaseTest(unittest.TestCase):
 
       def IsValid(self, errors):
         return (
-            isinstance(self.str_value, str) and
+            isinstance(self.str_value, basestring) and
             self.parsed_result.IsValid(errors) and
             isinstance(self.dict_value, dict))
     outer_parse_result = OuterParseResults()
@@ -438,7 +440,8 @@ class TestObjectTest(TestHelper):
     # Vanilla object.
     new_object = test_request_message.TestObject()
     self.assertTrue(new_object.ParseTestRequestMessageText(
-        str(self.test_request)), 'Bad string: %s' % str(self.test_request))
+        test_request_message.Stringize(self.test_request, json_readable=True)),
+                    'Bad string: %s' % str(self.test_request))
     self.assertEqual(new_object, self.test_request)
 
     # Full object
@@ -446,7 +449,8 @@ class TestObjectTest(TestHelper):
     self.assertTrue(full_object.IsValid())
     new_object = test_request_message.TestObject()
     self.assertTrue(new_object.ParseTestRequestMessageText(
-        str(full_object)), 'Bad string: %s' % str(full_object))
+        test_request_message.Stringize(full_object, json_readable=True)),
+                    'Bad string: %s' % str(full_object))
     self.assertEqual(new_object, full_object)
 
 
@@ -572,7 +576,8 @@ class TestConfigurationTest(TestHelper):
     # Vanilla object.
     new_object = test_request_message.TestConfiguration()
     self.assertTrue(new_object.ParseTestRequestMessageText(
-        str(self.test_request)), 'Bad string: %s' % str(self.test_request))
+        test_request_message.Stringize(self.test_request, json_readable=True)),
+                    'Bad string: %s' % str(self.test_request))
     self.assertEqual(new_object, self.test_request)
 
     # Full object
@@ -580,7 +585,8 @@ class TestConfigurationTest(TestHelper):
     self.assertTrue(full_object.IsValid())
     new_object = test_request_message.TestConfiguration()
     self.assertTrue(new_object.ParseTestRequestMessageText(
-        str(full_object)), 'Bad string: %s' % str(full_object))
+        test_request_message.Stringize(full_object, json_readable=True)),
+                    'Bad string: %s' % str(full_object))
     self.assertEqual(new_object, full_object)
 
 
@@ -748,7 +754,8 @@ class TestCaseTest(TestHelper):
     # Vanilla object.
     new_object = test_request_message.TestCase()
     self.assertTrue(new_object.ParseTestRequestMessageText(
-        str(self.test_request)), 'Bad string: %s' % str(self.test_request))
+        test_request_message.Stringize(self.test_request, json_readable=True)),
+                    'Bad string: %s' % str(self.test_request))
     self.assertEqual(new_object, self.test_request)
 
     # Full object
@@ -756,7 +763,8 @@ class TestCaseTest(TestHelper):
     self.assertTrue(full_object.IsValid())
     new_object = test_request_message.TestCase()
     self.assertTrue(new_object.ParseTestRequestMessageText(
-        str(full_object)), 'Bad string: %s' % str(full_object))
+        test_request_message.Stringize(full_object, json_readable=True)),
+                    'Bad string: %s' % str(full_object))
     self.assertEqual(new_object, full_object)
 
 
@@ -921,7 +929,8 @@ class TestRunTest(TestHelper):
     # Vanilla object.
     new_object = test_request_message.TestRun()
     self.assertTrue(new_object.ParseTestRequestMessageText(
-        str(self.test_request)), 'Bad string: %s' % str(self.test_request))
+        test_request_message.Stringize(self.test_request, json_readable=True)),
+                    'Bad string: %s' % str(self.test_request))
     self.assertEqual(new_object, self.test_request)
 
     # Full object
@@ -930,7 +939,8 @@ class TestRunTest(TestHelper):
 
     new_object = test_request_message.TestRun()
     self.assertTrue(new_object.ParseTestRequestMessageText(
-        str(full_object)), 'Bad string: %s' % str(full_object))
+        test_request_message.Stringize(full_object, json_readable=True)),
+                    'Bad string: %s' % str(full_object))
     self.assertEqual(new_object, full_object)
 
 

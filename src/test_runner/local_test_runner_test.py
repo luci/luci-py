@@ -84,7 +84,8 @@ class TestLocalTestRunner(unittest.TestCase):
         result_url=self.result_url, ping_url=self.ping_url,
         output_destination=self.output_destination, tests=test_objects,
         cleanup=test_run_cleanup)
-    data_file.write(str(test_run))
+    data_file.write(test_request_message.Stringize(test_run,
+                                                   json_readable=True))
     data_file.close()
 
   def testInvalidTestRunFiles(self):
