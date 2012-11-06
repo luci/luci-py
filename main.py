@@ -266,9 +266,13 @@ class ContainsHashHandler(ACLRequestHandler):
     hash_digests = self.request.body
 
     if len(hash_digests) % HASH_DIGEST_LENGTH:
-      msg = ('Hash digests must all be of length %d, last digest was of '
-             'length %d' %
-             (HASH_DIGEST_LENGTH, len(hash_digests) % HASH_DIGEST_LENGTH))
+      msg = (
+          'Hash digests must all be of length %d, had %d bytes total, last '
+          'digest was of length %d' % (
+               HASH_DIGEST_LENGTH,
+               len(hash_digests),
+               len(hash_digests) % HASH_DIGEST_LENGTH))
+      logging.error(msg)
       self.abort(400, detail=msg)
 
     hash_digest_count = len(hash_digests) / HASH_DIGEST_LENGTH
@@ -279,6 +283,7 @@ class ContainsHashHandler(ACLRequestHandler):
       msg = (
           'Requested more than %d hash digests in a single has request, '
           'aborting' % hash_digest_count)
+      logging.warning(msg)
       self.abort(400, detail=msg)
 
     namespace_model_key = GetContentNamespaceKey(namespace)
