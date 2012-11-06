@@ -45,7 +45,11 @@ VALID_DOMAINS = (
 
 HASH_DIGEST_LENGTH = 20
 HASH_HEXDIGEST_LENGTH = 40
-VALID_SHA1_RE = re.compile(r'[a-f0-9]{' + str(HASH_HEXDIGEST_LENGTH) + r'}')
+# The SHA-1 must be lower case. This simplifies the code, e.g. the keys are
+# unambiguous, no need to constantly call .lower().
+VALID_SHA1_RE = r'[a-f0-9]{' + str(HASH_HEXDIGEST_LENGTH) + r'}'
+VALID_SHA1_RE_COMPILED = re.compile(VALID_SHA1_RE)
+VALID_NAMESPACE_RE = r'[a-z0-9A-Z]+'
 
 
 class ContentNamespace(db.Model):
@@ -99,7 +103,7 @@ def GetContentNamespaceKey(namespace):
 def GetContentByHash(namespace, hash_key):
   """Returns the HashEntry with the given key, or None if it no HashEntry
   matches."""
-  if not VALID_SHA1_RE.match(hash_key):
+  if not VALID_SHA1_RE_COMPILED.match(hash_key):
     logging.error('Given an invalid sha-1 value, %s', hash_key)
     return None
 
@@ -130,31 +134,17 @@ def StoreValueInBlobstore(value):
   return None
 
 
-def CreateHashEntry(request, response):
-  """Generates a new hash entry from the request if one doesn't exist. Returns
-  None if there is a problem generating the entry or if an entry already exists
-  with the given key."""
-  hash_key = request.get('hash_key')
-  if not hash_key:
-    msg = 'No hash key given'
-    logging.info(msg)
+def CreateHashEntry(namespace, hash_key):
+  """Generates a new hash entry from the request if one doesn't exist.
 
-    response.out.write(msg)
-    response.set_status(402)
-    return None
-
-  namespace = request.get('namespace', 'default')
-
+  Returns None if there is a problem generating the entry or if an entry already
+  exists with the given key.
+  """
   namespace_model_key = GetContentNamespaceKey(namespace)
   key = db.Key.from_path('HashEntry', hash_key, parent=namespace_model_key)
 
   if HashEntry.all(keys_only=True).filter('__key__ =', key).get():
-    msg = 'Hash entry already stored, no need to store again.'
-    logging.info(msg)
-
-    response.out.write(msg)
     return None
-
   return HashEntry(key=key)
 
 
@@ -173,7 +163,7 @@ class ACLRequestHandler(webapp2.RequestHandler):
     else:
       domain = user.email().partition('@')[2]
       if domain not in VALID_DOMAINS:
-        logging.warn('Disallowing %s, invalid domain' % user.email())
+        logging.warning('Disallowing %s, invalid domain' % user.email())
         self.abort(403, detail='Invalid domain, %s' % domain)
 
     return webapp2.RequestHandler.dispatch(self)
@@ -270,11 +260,10 @@ class ContainsHashHandler(ACLRequestHandler):
   """Returns a 'string' of chr(1) or chr(0) for each hash in the request body,
   signaling if the hash content is present in the namespace or not.
   """
-  def post(self):
+  def post(self, namespace):
     """This is a POST even though it doesn't modify any data, but it makes
     it easier for python scripts."""
     hash_digests = self.request.body
-    namespace = self.request.get('namespace', 'default')
 
     if len(hash_digests) % HASH_DIGEST_LENGTH:
       msg = ('Hash digests must all be of length %d, last digest was of '
@@ -325,13 +314,27 @@ class ContainsHashHandler(ACLRequestHandler):
         return True
       return False
 
-    contains = (IteratorToBool(q) for q in queries)
-
     # Convert to byte, chr(0) if not present, chr(1) if it is.
-    self.response.out.write(bytearray(contains))
+    contains = bytearray(IteratorToBool(q) for q in queries)
+    self.response.out.write(contains)
+
+
+class OldContainsHashHandler(ContainsHashHandler):
+  # pylint: disable=W0221
+  def post(self):
+    namespace = self.request.get('namespace', 'default')
+    return ContainsHashHandler.post(self, namespace)
 
 
 class GenerateBlobstoreHandler(ACLRequestHandler):
+  """Generate an upload url to directly load files into the blobstore."""
+  def get(self, namespace, hash_key):
+    self.response.out.write(
+        blobstore.create_upload_url(
+            '/content/store_blobstore/%s/%s' % (namespace, hash_key)))
+
+
+class OldGenerateBlobstoreHandler(ACLRequestHandler):
   """Generate an upload url to directly load files into the blobstore."""
   def get(self):
     self.response.out.write(
@@ -342,7 +345,7 @@ class StoreBlobstoreContentByHashHandler(
     ACLRequestHandler,
     blobstore_handlers.BlobstoreUploadHandler):
   """Assigns the newly stored blobstore entry to the correct hash key."""
-  def post(self):
+  def post(self, namespace, hash_key):
     upload_hash_contents = self.get_uploads('hash_contents')
     if len(upload_hash_contents) != 1:
       # Delete all upload files since they aren't linked to anything.
@@ -351,9 +354,11 @@ class StoreBlobstoreContentByHashHandler(
              len(upload_hash_contents))
       self.abort(400, detail=msg)
 
-    hash_entry = CreateHashEntry(self.request, self.response)
-
+    hash_entry = CreateHashEntry(namespace, hash_key)
     if not hash_entry:
+      msg = 'Hash entry already stored, no need to store again.'
+      logging.warning(msg)
+      self.response.out.write(msg)
       # Delete all upload files since they aren't linked to anything.
       blobstore.delete_async(upload_hash_contents)
       return
@@ -365,12 +370,22 @@ class StoreBlobstoreContentByHashHandler(
     self.response.out.write('hash content saved.')
 
 
+class OldStoreBlobstoreContentByHashHandler(StoreBlobstoreContentByHashHandler):
+  # pylint: disable=W0221
+  def post(self):
+    hash_key = self.request.get('hash_key')
+    namespace = self.request.get('namespace', 'default')
+    return StoreBlobstoreContentByHashHandler.post(self, namespace, hash_key)
+
+
 class StoreContentByHashHandler(ACLRequestHandler):
   """The handler for adding hash contents."""
-  def post(self):
-    hash_entry = CreateHashEntry(self.request, self.response)
-
+  def post(self, namespace, hash_key):
+    hash_entry = CreateHashEntry(namespace, hash_key)
     if not hash_entry:
+      msg = 'Hash entry already stored, no need to store again.'
+      logging.info(msg)
+      self.response.out.write(msg)
       return
 
     # webapp2 doesn't like reading the body if it's empty.
@@ -387,8 +402,7 @@ class StoreContentByHashHandler(ACLRequestHandler):
     if priority == 0:
       try:
         # TODO(maruel): Use namespace='table_%s' % namespace.
-        if memcache.set(self.request.get('hash_key'), hash_content,
-                        namespace=self.request.get('namespace', 'default')):
+        if memcache.set(hash_key, hash_content, namespace=namespace):
           logging.info('Storing hash content in memcache')
         else:
           logging.error('Attempted to save hash contents in memcache '
@@ -409,11 +423,17 @@ class StoreContentByHashHandler(ACLRequestHandler):
     self.response.out.write('hash content saved.')
 
 
-class RemoveContentByHashHandler(ACLRequestHandler):
-  """The handler for removing hash contents from the server."""
+class OldStoreContentByHashHandler(StoreContentByHashHandler):
+  # pylint: disable=W0221
   def post(self):
     hash_key = self.request.get('hash_key')
     namespace = self.request.get('namespace', 'default')
+    return StoreContentByHashHandler.post(self, namespace, hash_key)
+
+
+class RemoveContentByHashHandler(ACLRequestHandler):
+  """Removes hash contents from the server."""
+  def post(self, namespace, hash_key):
     hash_entry = GetContentByHash(namespace, hash_key)
     # TODO(maruel): Use namespace='table_%s' % namespace.
     memcache.delete(hash_key, namespace=namespace)
@@ -429,12 +449,18 @@ class RemoveContentByHashHandler(ACLRequestHandler):
     logging.info('Deleted hash entry')
 
 
+class OldRemoveContentByHashHandler(RemoveContentByHashHandler):
+  # pylint: disable=W0221
+  def post(self):
+    hash_key = self.request.get('hash_key')
+    namespace = self.request.get('namespace', 'default')
+    return RemoveContentByHashHandler.post(self, namespace, hash_key)
+
+
 class RetrieveContentByHashHandler(ACLRequestHandler,
                                    blobstore_handlers.BlobstoreDownloadHandler):
   """The handlers for retrieving hash contents."""
-  def get(self):
-    hash_key = self.request.get('hash_key')
-    namespace = self.request.get('namespace', 'default')
+  def get(self, namespace, hash_key):
     # TODO(maruel): Use namespace='table_%s' % namespace.
     memcache_entry = memcache.get(hash_key, namespace=namespace)
 
@@ -460,6 +486,14 @@ class RetrieveContentByHashHandler(ACLRequestHandler,
       self.response.out.write(hash_entry.hash_content)
 
 
+class OldRetrieveContentByHashHandler(RetrieveContentByHashHandler):
+  # pylint: disable=W0221
+  def get(self):
+    hash_key = self.request.get('hash_key')
+    namespace = self.request.get('namespace', 'default')
+    return RetrieveContentByHashHandler.get(self, namespace, hash_key)
+
+
 class RootHandler(webapp2.RequestHandler):
   """Tells the user to RTM."""
   def get(self):
@@ -475,20 +509,37 @@ def CreateApplication():
     global VALID_DOMAINS
     VALID_DOMAINS = ('example.com',) + VALID_DOMAINS
 
+  # Namespace can be letters and numbers.
+  namespace = r'/<namespace:' + VALID_NAMESPACE_RE + '>'
+  hashkey = r'/<hash_key:' + VALID_SHA1_RE + '>'
+  namespace_key = namespace + hashkey
   return webapp2.WSGIApplication([
       webapp2.Route(
           r'/restricted/cleanup_worker', RestrictedCleanupWorkerHandler),
       webapp2.Route(r'/restricted/cleanup', RestrictedCleanupHandler),
       webapp2.Route(r'/restricted/whitelist', RestrictedWhitelistHandler),
 
-      webapp2.Route(r'/content/contains', ContainsHashHandler),
+      webapp2.Route(r'/content/contains', OldContainsHashHandler),
+      webapp2.Route(r'/content/contains' + namespace, ContainsHashHandler),
       webapp2.Route(
-          r'/content/generate_blobstore_url', GenerateBlobstoreHandler),
-      webapp2.Route(r'/content/store', StoreContentByHashHandler),
+          r'/content/generate_blobstore_url', OldGenerateBlobstoreHandler),
       webapp2.Route(
-          r'/content/store_blobstore', StoreBlobstoreContentByHashHandler),
-      webapp2.Route(r'/content/remove', RemoveContentByHashHandler),
-      webapp2.Route(r'/content/retrieve', RetrieveContentByHashHandler),
+          r'/content/generate_blobstore_url' + namespace_key,
+          GenerateBlobstoreHandler),
+      webapp2.Route(r'/content/store', OldStoreContentByHashHandler),
+      webapp2.Route(
+          r'/content/store' + namespace_key, StoreContentByHashHandler),
+      webapp2.Route(
+          r'/content/store_blobstore', OldStoreBlobstoreContentByHashHandler),
+      webapp2.Route(
+          r'/content/store_blobstore' + namespace_key,
+          StoreBlobstoreContentByHashHandler),
+      webapp2.Route(r'/content/remove', OldRemoveContentByHashHandler),
+      webapp2.Route(
+          r'/content/remove' + namespace_key, RemoveContentByHashHandler),
+      webapp2.Route(r'/content/retrieve', OldRetrieveContentByHashHandler),
+      webapp2.Route(
+          r'/content/retrieve' + namespace_key, RetrieveContentByHashHandler),
       webapp2.Route(r'/', RootHandler),
   ])
 
