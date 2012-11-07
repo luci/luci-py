@@ -485,9 +485,11 @@ class RetrieveContentByHashHandler(ACLRequestHandler,
 
     if hash_entry.hash_content is None:
       logging.info('Returning hash content from blobstore')
-      self.send_blob(hash_entry.hash_content_reference)
+      self.send_blob(hash_entry.hash_content_reference, save_as=hash_key)
     else:
       logging.info('Returning hash content from model')
+      self.response.headers['Content-Disposition'] = (
+          'attachment; filename="%s"' % hash_key)
       self.response.out.write(hash_entry.hash_content)
 
 
