@@ -188,15 +188,14 @@ class TestLocalTestRunner(unittest.TestCase):
     os.chdir(mox.IsA(str)).AndReturn(None)
     os.chdir(mox.IsA(str)).AndReturn(None)
 
-    # Ensure that the first call to the server fails, so that it retries
-    # again even though there was no new output.
+    # Ensure that the first the server is pinged after both poll because
+    # the require ping delay will have elapsed.
     self._mox.StubOutWithMock(url_helper, 'UrlOpen')
     self.mock_proc.stdin_handle.write(self.result_string)
     self.mock_proc.poll().AndReturn(None)
+    url_helper.UrlOpen(self.ping_url).AndReturn('')
     self.mock_proc.poll().WithSideEffects(
-        self.mock_proc.stdin_handle.close()).AndReturn(None)
-    url_helper.UrlOpen(self.ping_url).AndReturn(None)
-    self.mock_proc.poll().AndReturn(exit_code)
+        self.mock_proc.stdin_handle.close()).AndReturn(exit_code)
     url_helper.UrlOpen(self.ping_url).AndReturn('')
     self._mox.ReplayAll()
 

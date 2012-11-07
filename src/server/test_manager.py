@@ -805,8 +805,8 @@ class TestRequestManager(object):
         'WHERE done = :1 AND ping != :2 AND ping < :3',
         False, None, timeout_cutoff)
     for runner in query:
-      logging.info('TRM.AbortStaleRunners aborting runner=%s',
-                   runner.GetName())
+      logging.error('TRM.AbortStaleRunners aborting runner %s with key %s',
+                    runner.GetName(), runner.key())
       self.AbortRunner(runner, reason='Runner has become stale.')
 
     logging.debug('TRM.AbortStaleRunners done')

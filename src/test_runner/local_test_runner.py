@@ -231,6 +231,7 @@ class LocalTestRunner(object):
     self.max_url_retries = max_url_retries
     self.restart_on_failure = restart_on_failure
     self.success = False
+    self.last_ping_time = time.time()
 
   def __del__(self):
     if self.log_file_name:
@@ -402,9 +403,6 @@ class LocalTestRunner(object):
       if 'size' in self.test_run.output_destination:
         upload_chunk_size = self.test_run.output_destination['size']
 
-    last_ping_time = time.time()
-    got_output_since_last_ping = False
-
     while time_out == 0 or timeout_start_time + time_out > time.time():
       try:
         exit_code = proc.poll()
@@ -425,13 +423,12 @@ class LocalTestRunner(object):
       # Some output was produced so reset the timeout counter.
       if got_output:
         timeout_start_time = time.time()
-        got_output_since_last_ping = True
 
-      if (got_output_since_last_ping and
-          last_ping_time + DELAY_BETWEEN_PINGS < time.time()):
+      # If enough time has passed, let the server know that we are still
+      # alive.
+      if self.last_ping_time + DELAY_BETWEEN_PINGS < time.time():
         if url_helper.UrlOpen(self.test_run.ping_url) is not None:
-          last_ping_time = time.time()
-          got_output_since_last_ping = False
+          self.last_ping_time = time.time()
 
       # If the process has ended, then read all the output that it generated.
       if exit_code:
