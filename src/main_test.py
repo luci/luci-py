@@ -226,7 +226,8 @@ class AppTest(unittest.TestCase):
     response = self.app.post('/poll_for_test', {'attributes': attributes})
     self.assertEquals('200 OK', response.status)
     response = json.loads(response.body)
-    self.assertEquals(['try_count', 'id', 'come_back'], response.keys())
+    self.assertEquals(sorted(['try_count', 'id', 'come_back']),
+                      sorted(response.keys()))
     self.assertEquals('12345678-12345678-12345678-12345678', response['id'])
 
   def testChangeWhitelistHandlerParams(self):
