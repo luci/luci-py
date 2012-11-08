@@ -735,7 +735,7 @@ def main():
                     help='The maximum number of times url messages will '
                     'attemp to be sent before accepting failure. Defaults to '
                     '%default')
-  parser.add_option('--restart_on_failure', action='store__true',
+  parser.add_option('--restart_on_failure', action='store_true',
                     help='Have this script restart the machine if any of the '
                     'tests fail.')
   parser.add_option('-v', '--verbose', action='store_true',
@@ -774,13 +774,13 @@ def main():
 
   try:
     if runner.RetrieveDataAndRunTests():
-      return runner.ShutdownIfRequired(0)
+      return runner.ShutdownOrReturn(0)
   except Exception, e:  # pylint: disable-msg=W0703
     # We want to catch all so that we can report all errors, even internal ones.
     logging.exception(e)
 
   runner.PublishInternalErrors()
-  return runner.ShutdownIfRequired(1)
+  return runner.ShutdownOrReturn(1)
 
 
 if __name__ == '__main__':

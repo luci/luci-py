@@ -69,7 +69,6 @@ class _SwarmTestCase(unittest.TestCase):
     self._swarm_server_process = None
     self._slave_machine_process = None
 
-    # TODO(user): find a better way to choose the port.
     swarm_server_addr = 'http://localhost'
     swarm_server_port = '8181'
     self._swarm_server_url = '%s:%s' % (swarm_server_addr, swarm_server_port)
@@ -152,6 +151,10 @@ class _SwarmTestCase(unittest.TestCase):
         if os.path.splitext(filename)[1].lower() == '.swarm':
           swarm_files.append(os.path.join(dirpath, filename))
 
+    self.assertTrue(swarm_files, 'No swarm files found to test, considering '
+                    'this a failure since the end-to-end process won\'t be '
+                    'tested')
+
     logging.info('Will send these files to Swarm server: %s', swarm_files)
 
     swarm_server_test_url = urlparse.urljoin(self._swarm_server_url, 'test')
@@ -174,18 +177,6 @@ class _SwarmTestCase(unittest.TestCase):
         self.fail('Swarm Request failed: %s' % output)
 
       logging.info(test_keys)
-
-      try:
-        logging.info('Polling Swarm server')
-        cj = cookielib.CookieJar()
-        opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cj))
-        opener.open(self.GetAdminUrl())
-
-        # We include fake data to ensure the request is a POST.
-        opener.open(urlparse.urljoin(self._swarm_server_url, 'tasks/poll'),
-                    urllib.urlencode({'fake': 'data'}))
-      except urllib2.URLError as ex:
-        self.fail('Error: %s' % str(ex))
 
       for test_key in test_keys['test_keys']:
         running_test_keys.append(test_key)
@@ -272,7 +263,7 @@ class _SwarmTestProgram(unittest.TestProgram):
                       default=ROOT_DIR,
                       help='The root path of the Swarm server code.')
     parser.add_option('-t', '--tests', dest='tests_path',
-                      default=os.path.join(ROOT_DIR, 'test'),
+                      default=os.path.join(ROOT_DIR, 'tests/test_files'),
                       help='The path where the test files can be found.')
     parser.add_option('-c', '--slave-config', dest='slave_config_file',
                       default=os.path.join(ROOT_DIR, 'tests',

@@ -1267,7 +1267,8 @@ class TestRequestManager(object):
 
     # Append the test manifest to files that need to be stored.
     files_to_upload.append(
-        (test_run.working_dir, _TEST_RUN_SWARM_FILE_NAME, str(test_run)))
+        (test_run.working_dir, _TEST_RUN_SWARM_FILE_NAME,
+         test_request_message.Stringize(test_run, json_readable=True)))
 
     return files_to_upload
 

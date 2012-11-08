@@ -9,6 +9,7 @@
 
 import cgi
 import datetime
+import json
 import logging
 import StringIO
 import time
@@ -332,7 +333,8 @@ class TestRequestManagerTest(unittest.TestCase):
       self.assertEqual(found_manifest, True)
       for unused_path, name, content in args:
         if name == test_manager._TEST_RUN_SWARM_FILE_NAME:
-          self.assertTrue("{'index': '%d'" % i in content)
+          swarm_json = json.loads(content)
+          self.assertEqual(str(i), swarm_json['env_vars']['index'])
 
     self._mox.VerifyAll()
 

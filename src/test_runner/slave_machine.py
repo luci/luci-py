@@ -152,7 +152,7 @@ class SlaveMachine(object):
     self._come_back = 0
     self._id_filename = id_filename
 
-    if self._id_filename:
+    if self._id_filename and os.path.exists(self._id_filename):
       with open(self._id_filename, 'r') as f:
         # If this id is invalid the server will ignore it and generate a new
         # id for this slave.
