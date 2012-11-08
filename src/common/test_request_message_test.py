@@ -360,6 +360,9 @@ class TestHelper(unittest.TestCase):
   INVALID_ENV_VARS = [{1: 2}, {'a': 'b', 1: 'b'}, {'a': 1},
                       {'a': None}]
 
+  INVALID_CLEANUP_VALUES = (INVALID_STRING_VALUES +
+                            ['mad', '7zip', 'binaries', 'tests'])
+
   def AssertValidValues(self, value_key, values):
     for value in values:
       message = 'Validating %s with %s' % (value_key, value)
@@ -613,6 +616,7 @@ class TestCaseTest(TestHelper):
         restart_on_failure=TestHelper.VALID_BOOLEAN_VALUES[-1],
         output_destination=
         TestHelper.VALID_OPTIONAL_OUTPUT_DESTINATION_VALUES[-1],
+        cleanup=test_request_message.TestRun.VALID_CLEANUP_VALUES[-1],
         failure_email=TestHelper.VALID_OPTIONAL_STRING_VALUES[-1],
         label=TestHelper.VALID_OPTIONAL_STRING_VALUES[-1],
         verbose=TestHelper.VALID_BOOLEAN_VALUES[-1],
@@ -687,6 +691,9 @@ class TestCaseTest(TestHelper):
                            TestHelper.VALID_BOOLEAN_VALUES)
     self.AssertValidValues('output_destination',
                            TestHelper.VALID_OPTIONAL_OUTPUT_DESTINATION_VALUES)
+
+    self.AssertValidValues('cleanup',
+                           test_request_message.TestRun.VALID_CLEANUP_VALUES)
     self.AssertValidValues('failure_email',
                            TestHelper.VALID_OPTIONAL_STRING_VALUES)
     self.AssertValidValues('label',
@@ -749,6 +756,9 @@ class TestCaseTest(TestHelper):
 
     self.AssertInvalidValues('working_dir', TestHelper.INVALID_STRING_VALUES)
     self.test_request.working_dir = None
+
+    self.AssertInvalidValues('cleanup', TestHelper.INVALID_CLEANUP_VALUES)
+    self.test_request.cleanup = None
 
     self.AssertInvalidValues('env_vars', TestHelper.INVALID_ENV_VARS)
     self.test_request.env_vars = None
@@ -864,8 +874,8 @@ class TestRunTest(TestHelper):
     self.AssertValidValues('working_dir',
                            TestHelper.VALID_OPTIONAL_STRING_VALUES)
 
-    valid_cleanup = test_request_message.TestRun.VALID_CLEANUP_VALUES
-    self.AssertValidValues('cleanup', valid_cleanup)
+    self.AssertValidValues('cleanup',
+                           test_request_message.TestRun.VALID_CLEANUP_VALUES)
     self.AssertValidValues('env_vars', TestHelper.VALID_ENV_VARS)
     self.AssertValidValues('restart_on_failure',
                            TestHelper.VALID_BOOLEAN_VALUES)
@@ -923,11 +933,9 @@ class TestRunTest(TestHelper):
     self.AssertInvalidValues('working_dir', TestHelper.INVALID_STRING_VALUES)
     self.test_request.working_dir = None
 
-    invalid_cleanup = (TestHelper.INVALID_STRING_VALUES +
-                       ['mad', '7zip', 'binaries', 'tests'])
-    map(lambda i: self.assertFalse(i in valid_cleanup), invalid_cleanup)
-    self.AssertInvalidValues('cleanup', invalid_cleanup)
+    self.AssertInvalidValues('cleanup', TestHelper.INVALID_CLEANUP_VALUES)
     self.test_request.cleanup = None
+
     self.AssertInvalidValues('env_vars', TestHelper.INVALID_ENV_VARS)
     self.test_request.env_vars = None
 

@@ -744,6 +744,7 @@ class TestRequestManager(object):
         result_url=('%s/result?k=%s' % (server_url, str(runner.key()))),
         ping_url=('%s/runner_ping?r=%s' % (server_url, str(runner.key()))),
         output_destination=test_request.output_destination,
+        cleanup=test_request.cleanup,
         data=(test_request.data + config.data),
         tests=test_request.tests + config.tests,
         working_dir=test_request.working_dir)

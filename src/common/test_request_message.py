@@ -810,6 +810,7 @@ class TestCase(TestRequestMessageBase):
         output of this test case as well as the size of the chunks to use.
         The key for the URL is 'url' and the value must be a valid URL string.
         The key for the chunk size is 'size'. It must be a whole number.
+    cleanup: The key to access the test run's cleanup string.
     failure_email: An optional email where to broadcast failures for this test
         case.
     label: An optional string that can be used to label this test case.
@@ -821,8 +822,8 @@ class TestCase(TestRequestMessageBase):
   def __init__(self, test_case_name=None, env_vars=None, configurations=None,
                data=None, working_dir=None, admin=False, tests=None,
                result_url=None, store_result=None, restart_on_failure=None,
-               output_destination=None, failure_email=None, label=None,
-               verbose=False):
+               output_destination=None, cleanup=None, failure_email=None,
+               label=None, verbose=False):
     super(TestCase, self).__init__()
     self.test_case_name = test_case_name
     if env_vars:
@@ -853,6 +854,7 @@ class TestCase(TestRequestMessageBase):
       self.output_destination = output_destination.copy()
     else:
       self.output_destination = None
+    self.cleanup = cleanup
     self.failure_email = failure_email
     self.label = label
     self.verbose = verbose
@@ -880,6 +882,7 @@ class TestCase(TestRequestMessageBase):
                                      errors=errors) or
         not self.AreValidOutputDestinations(['output_destination'],
                                             errors=errors) or
+        self.cleanup not in TestRun.VALID_CLEANUP_VALUES or
         not self.AreValidValues(['working_dir', 'failure_email', 'result_url',
                                  'label'],
                                 basestring, errors=errors) or
