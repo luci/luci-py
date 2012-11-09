@@ -83,7 +83,7 @@ MAX_TRY_COUNT = 30
 CHANCE_OF_QUICK_COMEBACK = 1.0 / 20.0
 
 # The time to use when we want the machine to have a quick callback time.
-QUICK_COMEBACK_SECS = 1
+QUICK_COMEBACK_SECS = 1.0
 
 # The amount of time we want a machine to wait before calling back after seeing
 # a server error.

@@ -572,7 +572,7 @@ def main():
                     'Defaults to %default. ')
   parser.add_option('-p', '--port', default='443', type='int',
                     help='Port of the Swarm server. '
-                    'Defaults to %default, which is te default https port.')
+                    'Defaults to %default, which is the default https port.')
   parser.add_option('-r', '--max_url_tries', default=10, type='int',
                     help='The maximum number of times url messages will '
                     'attempt to be sent before accepting failure. Defaults '
