@@ -340,11 +340,13 @@ class TestLocalTestRunner(unittest.TestCase):
 
     self._mox.VerifyAll()
 
-  def testRunTestsWithEnvVars(self):
+  def _RunTestsWithEnvVars(self, platform):
     config_env = {'var1': 'value1', 'var2': 'value2'}
     test_run_env = {'var3': 'value3', 'var4': 'value4'}
     test0_env = {'var5': 'value5', 'var6': 'value6'}
     test1_env = {'var7': 'value7', 'var8': 'value8'}
+    self._mox.StubOutWithMock(local_test_runner.sys, 'platform')
+    local_test_runner.sys.platform = platform
     self.PrepareRunTestsCall(config_env=config_env, test_run_env=test_run_env,
                              test_env=[test0_env, test1_env])
 
@@ -364,6 +366,15 @@ class TestLocalTestRunner(unittest.TestCase):
     self.assertIn('0 FAILED TESTS', result_string)
 
     self._mox.VerifyAll()
+
+  def testRunTestsWithEnvVarsOnWindows(self):
+    self._RunTestsWithEnvVars('win32')
+
+  def testRunTestsWithEnvVarsOnLinux(self):
+    self._RunTestsWithEnvVars('linux2')
+
+  def testRunTestsWithEnvVarsOnMac(self):
+    self._RunTestsWithEnvVars('darwin')
 
   def testRunFailedTests(self):
     ok_str = 'OK'
