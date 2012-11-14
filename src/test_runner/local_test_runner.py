@@ -375,6 +375,8 @@ class LocalTestRunner(object):
     # the data directory.
     orig_dir = os.getcwd()
     os.chdir(self.data_dir)
+    logging.info('Executing commands %s, with cwd %s and environment variables '
+                 '%s', parsed_command, self.data_dir, env)
     try:
       proc = subprocess.Popen(parsed_command, stdout=subprocess.PIPE,
                               env=env, bufsize=1, stderr=subprocess.STDOUT,
@@ -718,8 +720,11 @@ class LocalTestRunner(object):
     Returns:
       return_value if the machine is still on.
     """
+    logging.info('Checking if restart required.')
     if self.restart_on_failure and not self.success:
+      logging.info('Attempting to restart machine.')
       Restart()
+    logging.info('No restart required.')
     return return_value
 
 
