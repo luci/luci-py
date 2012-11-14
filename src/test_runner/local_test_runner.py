@@ -332,12 +332,12 @@ class LocalTestRunner(object):
     Args:
       upload_url: Where to post the output.
       output: the output to be posted.
-      result: the value of the CGI param 'r' which should be from the
+      result: the value of the CGI param 's' which should be from the
           self._SUCCESS_CGI_STRING array.
     """
     data = {'n': self.test_run.test_run_name,
             'c': self.test_run.configuration.config_name,
-            'r': output, 's': result}
+            'result_output': output, 's': result}
     if (hasattr(self.test_run, 'instance_index') and
         self.test_run.instance_index is not None):
       assert hasattr(self.test_run, 'num_instances')
@@ -643,7 +643,7 @@ class LocalTestRunner(object):
               'c': self.test_run.configuration.config_name,
               'x': ', '.join([str(i) for i in result_codes]),
               's': success,
-              'r': result_string,
+              'result_output': result_string,
               'o': overwrite}
 
       url_results = url_helper.UrlOpen(self.test_run.result_url, data,

@@ -7,7 +7,6 @@
 
 
 
-import cgi
 import datetime
 import json
 import logging
@@ -15,7 +14,6 @@ import StringIO
 import time
 import unittest
 import urllib2
-import urlparse
 
 
 from google.appengine.api import files
@@ -35,37 +33,6 @@ MACHINE_IDS = ['12345678-12345678-12345678-12345678',
                '87654321-87654321-87654321-87654321']
 
 DEFAULT_RESULT_URL = 'http://all.your.resul.ts/are/belong/to/us'
-
-
-class MockRequest(object):
-
-  def __init__(self, test_case, url, body):
-    self._test_case = test_case
-    self._url = url
-    (_, _, _, _, qs, _) = urlparse.urlparse(url)
-    self._query_params = cgi.parse_qs(qs)
-    self.body = body
-
-  def get(self, header, default_value=''):  # pylint: disable-msg=C6409
-    if header in self._query_params:
-      return self._query_params[header][0]
-    return default_value
-
-
-def GenerateResultUrl(base_url, runner_key, success=False, overwrite=False,
-                      result_string=None):
-  url = base_url + '?k=' + runner_key
-
-  if success:
-    url += '&s=%s' % True
-
-  if overwrite:
-    url += '&o=%s' % True
-
-  if result_string:
-    url += '&r=' + result_string
-
-  return url
 
 
 def CreateBlobstore(blobstore_data):
@@ -400,7 +367,8 @@ class TestRequestManagerTest(unittest.TestCase):
       self._AddTestRunWithResultsExpectation(result_url, result_string)
 
   def ExecuteHandleTestResults(self, success, result_url=DEFAULT_RESULT_URL,
-                               store_result='all', test_instances=1):
+                               store_result='all', test_instances=1,
+                               store_results_successfully=True):
     self._manager.ExecuteTestRequest(
         self._GetRequestMessage(min_instances=test_instances,
                                 result_url=result_url,
@@ -418,22 +386,10 @@ class TestRequestManagerTest(unittest.TestCase):
       runner_key = runner.key()
       runner = test_manager.TestRunner.get(runner_key)
 
-      # Create a response URL as a runner would should the tests succeed.  The
-      # runner would then HTTP POST to this URL, and the body would contain the
-      # test output results.  For this test, we don't care about the contents
-      # of the body.
-
-      # To create this URL, we need to have the key of the runner that was
-      # created above.
-      self.assertNotEqual(None, runner)
-      self.assertEqual(MACHINE_IDS[0], runner.machine_id)
-
-      response_url = 'http://foo.appspot.com/result?k=%s' % str(runner_key)
-      if success:
-        response_url += '&s=%s' % (1 != 2)
-
-      web_request = MockRequest(self, response_url, '')
-      self._manager.HandleTestResults(web_request)
+      self.assertEqual(store_results_successfully,
+                       self._manager.UpdateTestResult(runner, runner.machine_id,
+                                                      result_string='results',
+                                                      success=success))
 
       # If results aren't being stored we can't check the runner data because
       # it will have been deleted.
@@ -445,13 +401,10 @@ class TestRequestManagerTest(unittest.TestCase):
       self.assertEqual(success, runner.ran_successfully)
       self.assertTrue(runner.done)
 
-      # Pretend that the runner (or anyone) sends a second response for this
-      # runner.  Make sure it does not change.
-      response_url = GenerateResultUrl('http://foo.appspot.com/result',
-                                       str(runner_key), success=success)
-
-      web_request = MockRequest(self, response_url, '')
-      self._manager.HandleTestResults(web_request)
+      # Pretend that the runner sends a second response for this runner.
+      # Make sure it does not change.
+      self.assertFalse(self._manager.UpdateTestResult(runner, runner.machine_id,
+                                                      success=success))
 
       runner2 = test_manager.TestRunner.get(runner_key)
       self.assertNotEqual(None, runner2)
@@ -506,30 +459,39 @@ class TestRequestManagerTest(unittest.TestCase):
     runner = test_manager.TestRunner.all().get()
 
     # First results, always accepted.
-    response_url = GenerateResultUrl('http://foo.appspot.com/result',
-                                     str(runner.key()),
-                                     result_string=messages[0])
-    web_request = MockRequest(self, response_url, '')
-    self._manager.HandleTestResults(web_request)
+    self.assertTrue(self._manager.UpdateTestResult(runner, runner.machine_id,
+                                                   result_string=messages[0]))
 
     # Non-first request without overwrite, rejected.
-    response_url = GenerateResultUrl('http://foo.appspot.com/result',
-                                     str(runner.key()), overwrite=False,
-                                     result_string=messages[1])
-    web_request = MockRequest(self, response_url, '')
-    self._manager.HandleTestResults(web_request)
+    self.assertFalse(self._manager.UpdateTestResult(runner, runner.machine_id,
+                                                    result_string=messages[1],
+                                                    overwrite=False))
 
     # Non-first request with overwrite, accepted.
-    response_url = GenerateResultUrl('http://foo.appspot.com/result',
-                                     str(runner.key()), overwrite=True,
-                                     result_string=messages[2])
-    web_request = MockRequest(self, response_url, '')
-    self._manager.HandleTestResults(web_request)
+    self.assertTrue(self._manager.UpdateTestResult(runner, runner.machine_id,
+                                                   result_string=messages[2],
+                                                   overwrite=True))
 
     # Make sure that only one blobstore is stored, since only one
     # is referenced.
     self.assertEqual(1, blobstore.BlobInfo.all().count())
 
+    self._mox.VerifyAll()
+
+  def testRunnerCallerMachineIdMismatch(self):
+    self._mox.StubOutWithMock(test_manager.logging, 'warning')
+    test_manager.logging.warning('The machine id of the runner, %s, doesn\'t '
+                                 'match the machine id given, %s',
+                                 MACHINE_IDS[0], MACHINE_IDS[1])
+
+    self._mox.ReplayAll()
+
+    self._manager.ExecuteTestRequest(self._GetRequestMessage())
+    runner = test_manager.TestRunner.all().get()
+    runner.machine_id = MACHINE_IDS[0]
+    runner.put()
+
+    self.assertFalse(self._manager.UpdateTestResult(runner, MACHINE_IDS[1]))
     self._mox.VerifyAll()
 
   def testFileErrorInResultsOnce(self):
@@ -573,7 +535,8 @@ class TestRequestManagerTest(unittest.TestCase):
           files.ApiTemporaryUnavailableError())
     self._mox.ReplayAll()
 
-    self.ExecuteHandleTestResults(success=True)
+    self.ExecuteHandleTestResults(success=True,
+                                  store_results_successfully=False)
 
     self._mox.VerifyAll()
 

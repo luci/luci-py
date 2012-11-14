@@ -12,6 +12,7 @@ import unittest
 
 
 from google.appengine.ext import testbed
+from common import test_request_message
 from server import main as main_app
 from server import test_manager
 from server import user_manager
@@ -45,11 +46,27 @@ class AppTest(unittest.TestCase):
     self._mox.UnsetStubs()
     self._mox.ResetAll()
 
+  def _GetRequestMessage(self):
+    if not hasattr(self, '_test_request_message'):
+      test_case = test_request_message.TestCase()
+      test_case.test_case_name = self._default_test_request_name
+      test_case.tests = [test_request_message.TestObject(
+          test_name='t1', action=['ignore-me.exe'])]
+      test_case.configurations = [
+          test_request_message.TestConfiguration(
+              config_name='c1', os='win-xp',
+              tests=[test_request_message.TestObject(
+                  test_name='t2', action=['ignore-me-too.exe'])])]
+      self._test_request_message = test_request_message.Stringize(
+          test_case, json_readable=True)
+
+    return self._test_request_message
+
   def _GetRequest(self):
     return test_manager.TestRequest.all().get()
 
   def _CreateTestRunner(self, exit_code=None, started=None):
-    request = test_manager.TestRequest(name=self._default_test_request_name)
+    request = test_manager.TestRequest(message=self._GetRequestMessage())
     request.put()
 
     test_runner = test_manager.TestRunner(test_request=request,
@@ -229,6 +246,30 @@ class AppTest(unittest.TestCase):
     self.assertEquals(sorted(['try_count', 'id', 'come_back']),
                       sorted(response.keys()))
     self.assertEquals('12345678-12345678-12345678-12345678', response['id'])
+
+  def testResultHandler(self):
+    result = 'result string'
+    machine_id = '12345678-12345678-12345678-12345678'
+
+    runner = self._CreateTestRunner()
+    runner.machine_id = machine_id
+    runner.put()
+
+    url_parameters = {
+        'r': runner.key(),
+        'id': machine_id,
+        's': True,
+        'result_output': result,
+        }
+
+    response = self.app.post('/result', url_parameters)
+    self.assertEquals('200 OK', response.status)
+
+    # Get the lastest version of the runner and ensure it has the correct
+    # values.
+    runner = test_manager.TestRunner.all().get()
+    self.assertTrue(runner.ran_successfully)
+    self.assertEqual(result, runner.GetResultString())
 
   def testChangeWhitelistHandlerParams(self):
     # Make sure the link redirects to the right place.

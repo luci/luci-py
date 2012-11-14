@@ -13,6 +13,7 @@ import datetime
 import json
 import logging
 import os.path
+import urllib
 
 from google.appengine.api import users
 from google.appengine.ext import db
@@ -21,6 +22,7 @@ from google.appengine.ext.webapp import blobstore_handlers
 from google.appengine.ext.webapp import template
 from google.appengine.ext.webapp import util
 from common import test_request_message
+from common import url_helper
 from server import test_manager
 from server import user_manager
 # pylint: enable-msg=C6204
@@ -326,9 +328,38 @@ class ResultHandler(webapp2.RequestHandler):
       SendAuthenticationFailure(self.request, self.response)
       return
 
+    # TODO(user): Share this code between all the request handlers so we
+    # can always see how often a request is being sent.
+    connection_attempt = self.request.get(url_helper.COUNT_KEY)
+    if connection_attempt:
+      logging.info('This is the %s connection attempt from this machine to '
+                   'POST these results', connection_attempt)
+
     logging.debug('Received Result: %s', self.request.url)
+
+    runner = None
+    runner_key = self.request.get('r')
+    if runner_key:
+      runner = test_manager.TestRunner.get(runner_key)
+
+    # Find the high level success/failure from the URL. We assume failure if
+    # we can't find the success parameter in the request.
+    success = self.request.get('s', 'False') == 'True'
+    exit_codes = urllib.unquote_plus(self.request.get('x'))
+    overwrite = urllib.unquote_plus(self.request.get('o'))
+    machine_id = urllib.unquote_plus(self.request.get('id'))
+
+    # TODO(user): The result string should probably be in the body of the
+    # request.
+    result_string = urllib.unquote_plus(self.request.get('result_output'))
+
     test_request_manager = CreateTestManager()
-    test_request_manager.HandleTestResults(self.request)
+    if not test_request_manager.UpdateTestResult(runner, machine_id,
+                                                 success=success,
+                                                 exit_codes=exit_codes,
+                                                 result_string=result_string,
+                                                 overwrite=overwrite):
+      self.response.set_status(400)
 
 
 class PollHandler(webapp2.RequestHandler):

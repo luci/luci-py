@@ -478,7 +478,7 @@ class TestLocalTestRunner(unittest.TestCase):
       self.assertEqual(self.config_name, data['c'])
       self.assertEqual('pending', data['s'])
 
-      self.streamed_output += data['r']
+      self.streamed_output += data['result_output']
       return True
 
     self._mox.StubOutWithMock(url_helper, 'UrlOpen')
@@ -502,7 +502,7 @@ class TestLocalTestRunner(unittest.TestCase):
     self.CreateValidFile()
     self._mox.StubOutWithMock(url_helper, 'UrlOpen')
     data = {'n': self.test_run_name, 'c': self.config_name, 's': 'success',
-            'r': ''}
+            'result_output': ''}
     max_url_retries = 1
     url_helper.UrlOpen(self.output_destination['url'],
                        data.copy(),
@@ -533,13 +533,13 @@ class TestLocalTestRunner(unittest.TestCase):
         self.result_url,
         {'n': self.test_run_name, 'c': self.config_name,
          'x': ', '.join([str(i) for i in self.result_codes]),
-         's': True, 'r': self.result_string, 'o': False},
+         's': True, 'result_output': self.result_string, 'o': False},
         max_url_retries).AndReturn('')
     url_helper.UrlOpen(
         '%s?1=2' % self.result_url,
         {'n': self.test_run_name, 'c': self.config_name,
          'x': ', '.join([str(i) for i in self.result_codes]),
-         's': False, 'r': self.result_string, 'o': False},
+         's': False, 'result_output': self.result_string, 'o': False},
         max_url_retries).AndReturn('')
     self._mox.ReplayAll()
 
@@ -565,7 +565,7 @@ class TestLocalTestRunner(unittest.TestCase):
         self.result_url,
         {'n': self.test_run_name, 'c': self.config_name,
          'x': ', '.join([str(i) for i in self.result_codes]),
-         's': True, 'r': self.result_string, 'o': False},
+         's': True, 'result_output': self.result_string, 'o': False},
         max_url_retries).AndReturn(None)
     self._mox.ReplayAll()
 
@@ -586,7 +586,7 @@ class TestLocalTestRunner(unittest.TestCase):
         self.result_url,
         {'n': self.test_run_name, 'c': self.config_name,
          'x': ', '.join([str(i) for i in self.result_codes]),
-         's': True, 'r': self.result_string, 'o': False},
+         's': True, 'result_output': self.result_string, 'o': False},
         max_url_retries).AndReturn('')
     self._mox.ReplayAll()
 

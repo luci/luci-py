@@ -453,65 +453,39 @@ class TestRequestManager(object):
     """
     self.use_blobstore_file_api = use_blobstore_file_api
 
-  def HandleTestResults(self, web_request):
-    """Handle a response from the remote script.
-
-    Args:
-      web_request: a google.appengine.ext.webapp.Request object containing the
-          results of a test run.  The URL will contain a k= CGI parameter
-          holding the persistent key for the runner.
-    """
-    if not web_request:
-      return
-
-    runner = None
-    key = web_request.get('k')
-    if key:
-      runner = TestRunner.get(db.Key(key))
-
-    connection_attempt = web_request.get(url_helper.COUNT_KEY)
-    if connection_attempt:
-      logging.info('This is the %d connection attempt from this machine to '
-                   'POST these results', int(connection_attempt))
-
-    if not runner:
-      logging.error('No runner associated to web request, ignoring test result')
-      return
-
-    # Find the high level success/failure from the URL. We assume failure if
-    # we can't find the success parameter in the request.
-    success = web_request.get('s', 'False') == 'True'
-    result_string = urllib.unquote_plus(web_request.get('r'))
-    exit_codes = urllib.unquote_plus(web_request.get('x'))
-    overwrite = urllib.unquote_plus(web_request.get('o'))
-    self._UpdateTestResult(runner, success, exit_codes, result_string,
-                           overwrite=overwrite)
-
-  def _UpdateTestResult(self, runner, success=False, exit_codes='',
-                        result_string=None, errors=None,
-                        overwrite=False):
+  def UpdateTestResult(self, runner, machine_id, success=False, exit_codes='',
+                       result_string=None, errors=None, overwrite=False):
     """Update the runner with results of a test run.
 
     Args:
       runner: a TestRunner object pointing to the test request to which to
           send the results.  This argument must not be None.
+      machine_id: The machine id of the machine providing these results.
       success: a boolean indicating whether the test run succeeded or not.
       exit_codes: a string containing the array of exit codes of the test run.
       result_string: a string containing the output of the test run.
       errors: a string explaining why we failed to get the actual result string.
       overwrite: a boolean indicating if we should always record this result,
           even if a result had been previously recorded.
+
+    Returns:
+      True if the results are accepted and successfully stored.
     """
     if not runner:
       logging.error('runner argument must be given')
-      return
+      return False
+
+    if runner.machine_id != machine_id:
+      logging.warning('The machine id of the runner, %s, doesn\'t match the '
+                      'machine id given, %s', runner.machine_id, machine_id)
+      return False
 
     # If the runnner is marked as done, don't try to process another
     # response for it, unless overwrite is enable.
     if runner.done and not overwrite:
       logging.error('Got a additional response for runner=%s (key %s), '
                     'not good', runner.GetName(), runner.key())
-      return
+      return False
 
     runner.ran_successfully = success
     runner.exit_codes = exit_codes
@@ -609,6 +583,8 @@ class TestRequestManager(object):
       test_request = runner.test_request
       runner.delete()
       test_request.RunnerDeleted()
+
+    return not bool(runner.errors)
 
   def _EmailTestResults(self, runner, send_to):
     """Emails the test result.
@@ -741,7 +717,8 @@ class TestRequestManager(object):
         instance_index=runner.config_instance_index,
         num_instances=runner.num_config_instances,
         configuration=config,
-        result_url=('%s/result?k=%s' % (server_url, str(runner.key()))),
+        result_url=('%s/result?r=%s&id=%s' % (server_url, str(runner.key()),
+                                              runner.machine_id)),
         ping_url=('%s/runner_ping?r=%s' % (server_url, str(runner.key()))),
         output_destination=test_request.output_destination,
         cleanup=test_request.cleanup,
@@ -820,7 +797,7 @@ class TestRequestManager(object):
       reason: A string message indicating why the TestRunner is being aborted.
     """
     r_str = 'Tests aborted. AbortRunner() called. Reason: %s' % reason
-    self._UpdateTestResult(runner, errors=r_str)
+    self.UpdateTestResult(runner, runner.machine_id, errors=r_str)
 
   def DeleteRunner(self, key):
     """Delete the runner that the given key refers to.
@@ -893,6 +870,8 @@ class TestRequestManager(object):
       # finding a runner.
       if self._AssignRunnerToMachine(attribs['id'], runner, AtomicAssignID):
         assigned_runner = True
+        # Grab the new version of the runner.
+        runner = db.get(runner.key())
         break
 
     response = {'id': attribs['id']}
@@ -903,6 +882,8 @@ class TestRequestManager(object):
       except PrepareRemoteCommandsError:
         # Failed to load the scripts so mark the runner as 'not running'.
         runner.started = None
+        runner.machine_id = None
+        runner.ping = None
         runner.put()
         response['try_count'] = 0
         response['come_back'] = COMEBACK_AFTER_SERVER_ERROR_SECS
