@@ -607,46 +607,71 @@ class TestRequestManagerTest(unittest.TestCase):
     self.assertIsNotNone(machine)
     self.assertEqual(machine.tag, results['machine_tag'])
 
-  def testAbortStaleRunners(self):
-    self._AssignPendingRequestsTest(instances=2)
-
-    # Get the runner that was assigned in the function above.
-    query = test_manager.TestRunner.gql('WHERE machine_id = :1',
-                                        MACHINE_IDS[0])
-    self.assertNotEqual(None, query)
-    self.assertEqual(1, query.count())
-
-    runner = query.get()
-    self.assertNotEqual(None, runner)
-
-    # Set the current time to way in the future.
+  def _GenerateFutureTimeExpectation(self):
+    """Set the current time to way in the future and return it."""
     future_time = (datetime.datetime.now() +
                    datetime.timedelta(
                        seconds=(test_manager._TIMEOUT_FACTOR + 1000)))
-    self._mox.StubOutWithMock(test_manager, '_GetCurrentTime')
     test_manager._GetCurrentTime().AndReturn(future_time)
 
-    # Mark the first runner as having pinged so it won't be considered stale.
-    runner.ping = future_time
-    runner.put()
+    return future_time
 
-    # Setup the functions when the second runner is aborted because it is stale.
+  def testOnlyAbortStaleRunner(self):
+    self._AssignPendingRequestsTest()
+    runner = test_manager.TestRunner.all().get()
+
+    # Mark the runner as having pinged so it won't be considered stale and it
+    # won't be aborted.
+    self._mox.StubOutWithMock(test_manager, '_GetCurrentTime')
+    runner.ping = self._GenerateFutureTimeExpectation()
+    runner.put()
+    self._mox.ReplayAll()
+
+    self._manager.AbortStaleRunners()
+
+    runner = test_manager.TestRunner.all().get()
+    self.assertFalse(runner.done)
+    self.assertEqual(0, runner.automatic_retry_count)
+
+    self._mox.VerifyAll()
+
+  def testRetryAndThenAbortStaleRunners(self):
+    self._mox.StubOutWithMock(test_manager, '_GetCurrentTime')
+    attempts_to_reach_abort = test_manager.MAX_AUTOMATIC_RETRIES + 1
+
+    self._SetupLoadFileExpectations(contents='contents')
+    for _ in range(attempts_to_reach_abort):
+      self._GenerateFutureTimeExpectation()
+
+    # Setup the functions when the runner is aborted because it is stale.
     self._mox.StubOutWithMock(urllib2, 'urlopen')
     urllib2.urlopen(DEFAULT_RESULT_URL, mox.IgnoreArg())
     self._mox.StubOutWithMock(mail, 'send_mail')
     self._SetupSendMailExpectations()
     self._mox.ReplayAll()
 
-    self._manager.AbortStaleRunners()
+    self._manager.ExecuteTestRequest(self._GetRequestMessage())
 
-    self.assertEqual(1,
-                     test_manager.TestRunner.gql(
-                         'WHERE done = :1', False).count())
+    for i in range(attempts_to_reach_abort):
+      # Assign a machine to the runner.
+      self._ExecuteRegister(MACHINE_IDS[0])
 
-    aborted_runner_query = test_manager.TestRunner.gql('WHERE done = :1', True)
-    self.assertEqual(1, aborted_runner_query.count())
-    aborted_result_string = aborted_runner_query.get().GetResultString()
-    self.assertIn('Runner has become stale', aborted_result_string)
+      runner = test_manager.TestRunner.all().get()
+      self.assertFalse(runner.done)
+      self.assertEqual(i, runner.automatic_retry_count)
+      self.assertNotEqual(None, runner.started)
+
+      self._manager.AbortStaleRunners()
+
+      runner = test_manager.TestRunner.all().get()
+      if i == test_manager.MAX_AUTOMATIC_RETRIES:
+        self.assertTrue(runner.done)
+        self.assertNotEqual(None, runner.started)
+        self.assertIn('Runner has become stale', runner.GetResultString())
+      else:
+        self.assertFalse(runner.done)
+        self.assertEqual(i + 1, runner.automatic_retry_count)
+        self.assertEqual(None, runner.started)
 
     self._mox.VerifyAll()
 

@@ -98,6 +98,10 @@ MAX_TRANSACTION_RETRY_COUNT = 3
 # giving up.
 MAX_BLOBSTORE_WRITE_TRIES = 5
 
+# The maximum number of times to retry a runner that has failed for a swarm
+# related reasons (like the machine timing out).
+MAX_AUTOMATIC_RETRIES = 3
+
 # Root directory of Swarm scripts.
 SWARM_ROOT_DIR = os.path.join(os.path.dirname(__file__), '..')
 
@@ -261,6 +265,10 @@ class TestRunner(db.Model):
   # runner isn't executing or ended, then the value is None and we use the
   # fact that it is None to identify if a test was started or not.
   started = db.DateTimeProperty()
+
+  # The number of times that this runner has been retried for swarm failures
+  # (such as the machine that is running it timing out).
+  automatic_retry_count = db.IntegerProperty(default=0)
 
   # The last time a ping was recieved from the remote machine currently
   # running the test. This is used to determine if a machine has become
@@ -772,7 +780,11 @@ class TestRequestManager(object):
             'output': runner.GetResultString()}
 
   def AbortStaleRunners(self):
-    """Abort any runners that have been running longer than expected."""
+    """Abort any runners that have been running longer than expected.
+
+    The runner will automatically retry if it hasn't been aborted more than
+    MAX_AUTOMATIC_RETRY times.
+    """
     logging.debug('TRM.AbortStaleRunners starting')
     now = _GetCurrentTime()
     # If any active runner hasn't recieved a ping in the last _TIMEOUT_FACTOR
@@ -783,9 +795,21 @@ class TestRequestManager(object):
         'WHERE done = :1 AND ping != :2 AND ping < :3',
         False, None, timeout_cutoff)
     for runner in query:
-      logging.error('TRM.AbortStaleRunners aborting runner %s with key %s',
-                    runner.GetName(), runner.key())
-      self.AbortRunner(runner, reason='Runner has become stale.')
+      if runner.automatic_retry_count < MAX_AUTOMATIC_RETRIES:
+        # Don't restart the created time since it is not the users fault
+        # we are retrying it (so it should have high prority to go again).
+        runner.machine_id = None
+        runner.started = None
+        runner.ping = None
+        runner.automatic_retry_count += 1
+        runner.put()
+        logging.warning('TRM.AbortStaleRunners retrying runner %s with key %s. '
+                        'Attempt %d', runner.GetName(), runner.key(),
+                        runner.automatic_retry_count)
+      else:
+        logging.error('TRM.AbortStaleRunners aborting runner %s with key %s',
+                      runner.GetName(), runner.key())
+        self.AbortRunner(runner, reason='Runner has become stale.')
 
     logging.debug('TRM.AbortStaleRunners done')
 

@@ -520,8 +520,11 @@ class RetryHandler(webapp2.RequestHandler):
       # Update the created time to make sure that retrying the runner does not
       # make it jump the queue and get executed before other runners for
       # requests added before the user pressed the retry button.
+      runner.machine_id = None
+      runner.done = False
       runner.created = datetime.datetime.now()
       runner.ran_successfully = False
+      runner.automatic_retry_count = 0
       runner.put()
 
       self.response.out.write('Runner set for retry.')
