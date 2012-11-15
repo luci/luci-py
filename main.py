@@ -324,26 +324,12 @@ class ContainsHashHandler(ACLRequestHandler):
     self.response.out.write(contains)
 
 
-class OldContainsHashHandler(ContainsHashHandler):
-  # pylint: disable=W0221
-  def post(self):
-    namespace = self.request.get('namespace', 'default')
-    return ContainsHashHandler.post(self, namespace)
-
-
 class GenerateBlobstoreHandler(ACLRequestHandler):
   """Generate an upload url to directly load files into the blobstore."""
   def get(self, namespace, hash_key):
     self.response.out.write(
         blobstore.create_upload_url(
             '/content/store_blobstore/%s/%s' % (namespace, hash_key)))
-
-
-class OldGenerateBlobstoreHandler(ACLRequestHandler):
-  """Generate an upload url to directly load files into the blobstore."""
-  def get(self):
-    self.response.out.write(
-        blobstore.create_upload_url('/content/store_blobstore'))
 
 
 class StoreBlobstoreContentByHashHandler(
@@ -373,14 +359,6 @@ class StoreBlobstoreContentByHashHandler(
 
     logging.info('Uploaded data stored directly into blobstore')
     self.response.out.write('hash content saved.')
-
-
-class OldStoreBlobstoreContentByHashHandler(StoreBlobstoreContentByHashHandler):
-  # pylint: disable=W0221
-  def post(self):
-    hash_key = self.request.get('hash_key')
-    namespace = self.request.get('namespace', 'default')
-    return StoreBlobstoreContentByHashHandler.post(self, namespace, hash_key)
 
 
 class StoreContentByHashHandler(ACLRequestHandler):
@@ -428,14 +406,6 @@ class StoreContentByHashHandler(ACLRequestHandler):
     self.response.out.write('hash content saved.')
 
 
-class OldStoreContentByHashHandler(StoreContentByHashHandler):
-  # pylint: disable=W0221
-  def post(self):
-    hash_key = self.request.get('hash_key')
-    namespace = self.request.get('namespace', 'default')
-    return StoreContentByHashHandler.post(self, namespace, hash_key)
-
-
 class RemoveContentByHashHandler(ACLRequestHandler):
   """Removes hash contents from the server."""
   def post(self, namespace, hash_key):
@@ -452,14 +422,6 @@ class RemoveContentByHashHandler(ACLRequestHandler):
 
     hash_entry.delete()
     logging.info('Deleted hash entry')
-
-
-class OldRemoveContentByHashHandler(RemoveContentByHashHandler):
-  # pylint: disable=W0221
-  def post(self):
-    hash_key = self.request.get('hash_key')
-    namespace = self.request.get('namespace', 'default')
-    return RemoveContentByHashHandler.post(self, namespace, hash_key)
 
 
 class RetrieveContentByHashHandler(ACLRequestHandler,
@@ -493,14 +455,6 @@ class RetrieveContentByHashHandler(ACLRequestHandler,
       self.response.out.write(hash_entry.hash_content)
 
 
-class OldRetrieveContentByHashHandler(RetrieveContentByHashHandler):
-  # pylint: disable=W0221
-  def get(self):
-    hash_key = self.request.get('hash_key')
-    namespace = self.request.get('namespace', 'default')
-    return RetrieveContentByHashHandler.get(self, namespace, hash_key)
-
-
 class RootHandler(webapp2.RequestHandler):
   """Tells the user to RTM."""
   def get(self):
@@ -526,25 +480,17 @@ def CreateApplication():
       webapp2.Route(r'/restricted/cleanup', RestrictedCleanupHandler),
       webapp2.Route(r'/restricted/whitelist', RestrictedWhitelistHandler),
 
-      webapp2.Route(r'/content/contains', OldContainsHashHandler),
       webapp2.Route(r'/content/contains' + namespace, ContainsHashHandler),
-      webapp2.Route(
-          r'/content/generate_blobstore_url', OldGenerateBlobstoreHandler),
       webapp2.Route(
           r'/content/generate_blobstore_url' + namespace_key,
           GenerateBlobstoreHandler),
-      webapp2.Route(r'/content/store', OldStoreContentByHashHandler),
       webapp2.Route(
           r'/content/store' + namespace_key, StoreContentByHashHandler),
       webapp2.Route(
-          r'/content/store_blobstore', OldStoreBlobstoreContentByHashHandler),
-      webapp2.Route(
           r'/content/store_blobstore' + namespace_key,
           StoreBlobstoreContentByHashHandler),
-      webapp2.Route(r'/content/remove', OldRemoveContentByHashHandler),
       webapp2.Route(
           r'/content/remove' + namespace_key, RemoveContentByHashHandler),
-      webapp2.Route(r'/content/retrieve', OldRetrieveContentByHashHandler),
       webapp2.Route(
           r'/content/retrieve' + namespace_key, RetrieveContentByHashHandler),
       webapp2.Route(r'/', RootHandler),
