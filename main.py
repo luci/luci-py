@@ -66,6 +66,7 @@ class ContentNamespace(db.Model):
   others is_testing==False.
   """
   is_testing = db.BooleanProperty()
+  creation = db.DateTimeProperty(auto_now=True)
 
 
 class HashEntry(db.Model):
@@ -83,11 +84,16 @@ class HashEntry(db.Model):
   # data is old and should be cleared.
   last_access = db.DateProperty(auto_now_add=True)
 
+  creation = db.DateTimeProperty(auto_now=True)
+
 
 class WhitelistedIP(db.Model):
   """Items where the IP address is allowed."""
   # The IP of the machine to whitelist. Can be either IPv4 or IPv6.
   ip = db.StringProperty()
+
+  # Is only for maintenance purpose, not used.
+  comment = db.StringProperty()
 
 
 def GetContentNamespaceKey(namespace):
