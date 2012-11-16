@@ -34,8 +34,8 @@ MIN_SIZE_FOR_BLOBSTORE = 20 * 8
 # The number of days a datamodel must go unaccessed for before it is deleted.
 DATASTORE_TIME_TO_LIVE_IN_DAYS = 7
 
-# The maximum number of blobs to delete at a time.
-MAX_BLOBS_TO_DELETE_ASYNC = 100
+# The maximum number of items to delete at a time.
+ITEMS_TO_DELETE_ASYNC = 100
 
 # The domains that are allowed to access this application.
 VALID_DOMAINS = (
@@ -175,80 +175,120 @@ class ACLRequestHandler(webapp2.RequestHandler):
     return webapp2.RequestHandler.dispatch(self)
 
 
-class RestrictedCleanupWorkerHandler(webapp2.RequestHandler):
-  """Removes the old data from the blobstore and datastore. Only
-  a task queue task can use this handler."""
+### Restricted handlers
+
+
+def incremental_delete(query, check=None, delete=db.delete_async):
+  """Applies |delete| to objects in a query asynchrously.
+
+  Returns True if at least one object was found.
+  """
+  to_delete = []
+  found = False
+  count = 0
+  for item in query:
+    count += 1
+    if not (count % 1000):
+      logging.debug('Found %d items', count)
+    if check and not check(item):
+      continue
+    to_delete.append(item)
+    found = True
+    if len(to_delete) == ITEMS_TO_DELETE_ASYNC:
+      logging.info('Deleting %s entries', len(to_delete))
+      delete(to_delete)
+      to_delete = []
+  if to_delete:
+    logging.info('Deleting %s entries', len(to_delete))
+    delete(to_delete)
+  return found
+
+
+class RestrictedCleanupOldEntriesWorkerHandler(webapp2.RequestHandler):
+  """Removes the old data from the datastore.
+
+  Only a task queue task can use this handler.
+  """
   def post(self):
     if not self.request.headers.get('X-AppEngine-QueueName'):
       self.abort(405, detail='Only internal task queue tasks can do this')
-    # Remove old datastore entries.
     logging.info('Deleting old datastore entries')
     old_cutoff = datetime.datetime.today() - datetime.timedelta(
         days=DATASTORE_TIME_TO_LIVE_IN_DAYS)
-    # Each gql query returns a maximum of 1000 entries, so loop until there
-    # are no elements left to delete.
-    while True:
-      db_query = HashEntry.all(keys_only=True).filter(
-          'last_access <', old_cutoff)
-      if not db_query.count():
-        break
-      db.delete_async(db_query)
+    incremental_delete(
+        HashEntry.all(keys_only=True).filter('last_access <', old_cutoff))
+    logging.info('Done deleting old entries')
 
-    # Keep stuff under testing for only one full day.
+
+class RestrictedCleanupTestingEntriesWorkerHandler(webapp2.RequestHandler):
+  """Removes the testing data from the datastore.
+
+  Keep stuff under testing for only one full day.
+
+  Only a task queue task can use this handler.
+  """
+  def post(self):
+    if not self.request.headers.get('X-AppEngine-QueueName'):
+      self.abort(405, detail='Only internal task queue tasks can do this')
+    logging.info('Deleting testing entries')
     old_cutoff_testing = datetime.datetime.today() - datetime.timedelta(days=1)
-    while True:
-      query = ContentNamespace.all(keys_only=True).filter('is_testing =', True)
-      for namespace in query:
-        while True:
-          children = HashEntry.all(keys_only=True).ancestor(namespace).filter(
-              'last_access <', old_cutoff_testing)
-          if not children.count():
-            # Since delete_async() is used, the stale ContentNamespace will
-            # likely stay for another full day, no big deal.
-            if not HashEntry.all(keys_only=True).ancestor(namespace).count():
-              db.delete_async(namespace)
-            break
-          db.delete_async(children)
+    # For each testing namespace.
+    namespace_query = ContentNamespace.all(keys_only=True).filter(
+        'is_testing =', True)
+    orphaned_namespaces = []
+    for namespace in namespace_query:
+      logging.debug('Namespace %s', namespace.key().name())
+      found = incremental_delete(
+          HashEntry.all(keys_only=True).ancestor(
+              namespace).filter(
+              'last_access <', old_cutoff_testing))
+      if not found:
+        orphaned_namespaces.append(namespace)
+    if orphaned_namespaces:
+      # Since delete_async() is used, the stale ContentNamespace will
+      # likely stay for another full day, so keep it an extra day.
+      logging.info('Deleting %s testing namespaces', len(orphaned_namespaces))
+      db.delete_async(orphaned_namespaces)
+    logging.info('Done deleting testing namespaces')
 
-    # Remove orphaned blobs.
+
+class RestrictedCleanupOrphanedBlobsWorkerHandler(webapp2.RequestHandler):
+  """Removes the orphaned blobs from the blobstore.
+
+  Only a task queue task can use this handler.
+  """
+  def post(self):
+    if not self.request.headers.get('X-AppEngine-QueueName'):
+      self.abort(405, detail='Only internal task queue tasks can do this')
     logging.info('Deleting orphaned blobs')
-    count = 0
-    orphaned_blobs = []
     blobstore_query = blobstore.BlobInfo.all()
+
+    def check(blob_info):
+      """Looks if the corresponding entry exists."""
+      return not HashEntry.gql(
+          'WHERE hash_content_reference = :1', blob_info.key()).count(limit=1)
+
     while True:
       try:
-        for blob_key in blobstore_query.run(batch_size=1000):
-          count += 1
-          if count % 1000 == 0:
-            logging.info('Scanned %d elements', count)
-          if not HashEntry.gql('WHERE hash_content_reference = :1',
-                               blob_key.key()).count(limit=1):
-            orphaned_blobs.append(blob_key.key())
-            if len(orphaned_blobs) == MAX_BLOBS_TO_DELETE_ASYNC:
-              logging.info('Deleting %d orphan blobs', len(orphaned_blobs))
-              blobstore.delete_async(orphaned_blobs)
-              orphaned_blobs = []
-        # All the blobs have been examined so we can stop.
+        incremental_delete(
+            blobstore_query, check=check, delete=blobstore.delete_async)
+        # Didn't throw, can now move on.
         break
       except datastore_errors.BadRequestError:
         blobstore_query.with_cursor(blobstore_query.cursor())
         logging.info('Request timed out, retrying')
-
-    if orphaned_blobs:
-      logging.info('Deleting %d orphan blobs', len(orphaned_blobs))
-      blobstore.delete_async(orphaned_blobs)
+    logging.info('Done deleting orphaned blobs')
 
 
-class RestrictedCleanupHandler(webapp2.RequestHandler):
-  """Removes old unused data from the blob store and datastore.
-  Only cronjob from the server can access this handler."""
-  def get(self):
-    # App engine cron jobs are always GET requests, so we cleanup as a get
-    # even though it modifies the server's state.
-    if self.request.headers.get('X-AppEngine-Cron') != 'true':
-      self.abort(405, detail='Only internal cron jobs can do this')
-
-    taskqueue.add(url='/restricted/cleanup_worker')
+class RestrictedCleanupTriggerHandler(webapp2.RequestHandler):
+  """Triggers a taskqueue to clean up."""
+  def get(self, name):
+    if name in ('old', 'testing', 'orphaned'):
+      url = '/restricted/cleanup/worker/' + name
+      taskqueue.add(url=url)
+      self.response.out.write('Triggered %s' % url)
+    else:
+      self.abort(404, 'Unknown job')
 
 
 class RestrictedWhitelistHandler(webapp2.RequestHandler):
@@ -261,6 +301,7 @@ class RestrictedWhitelistHandler(webapp2.RequestHandler):
     WhitelistedIP(ip=ip).put()
     self.response.out.write('Success: %s' % ip)
 
+### Non-restricted handlers
 
 class ContainsHashHandler(ACLRequestHandler):
   """Returns a 'string' of chr(1) or chr(0) for each hash in the request body,
@@ -482,8 +523,17 @@ def CreateApplication():
   namespace_key = namespace + hashkey
   return webapp2.WSGIApplication([
       webapp2.Route(
-          r'/restricted/cleanup_worker', RestrictedCleanupWorkerHandler),
-      webapp2.Route(r'/restricted/cleanup', RestrictedCleanupHandler),
+          r'/restricted/cleanup/trigger/<name:[a-z]+>',
+          RestrictedCleanupTriggerHandler),
+      webapp2.Route(
+          r'/restricted/cleanup/worker/old',
+          RestrictedCleanupOldEntriesWorkerHandler),
+      webapp2.Route(
+          r'/restricted/cleanup/worker/testing',
+          RestrictedCleanupTestingEntriesWorkerHandler),
+      webapp2.Route(
+          r'/restricted/cleanup/worker/orphaned',
+          RestrictedCleanupOrphanedBlobsWorkerHandler),
       webapp2.Route(r'/restricted/whitelist', RestrictedWhitelistHandler),
 
       webapp2.Route(r'/content/contains' + namespace, ContainsHashHandler),

@@ -1,4 +1,12 @@
 cron:
 - description: old data cleanup
-  url: /restricted/cleanup
-  schedule: every day 00:00
+  url: /restricted/cleanup/trigger/old
+  schedule: every day 01:50
+
+- description: testing data cleanup
+  url: /restricted/cleanup/trigger/testing
+  schedule: every day 09:50
+
+- description: orphaned blobstores cleanup
+  url: /restricted/cleanup/trigger/orphaned
+  schedule: every day 17:50
