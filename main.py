@@ -86,6 +86,16 @@ class HashEntry(db.Model):
 
   creation = db.DateTimeProperty(auto_now=True)
 
+  # It is an .isolated file.
+  is_isolated = db.BooleanProperty(default=False)
+
+  @property
+  def is_compressed(self):
+    """Is it the raw data or was it modified in any form, e.g. compressed, so
+    that the SHA-1 doesn't match.
+    """
+    self.parent_key().name().endswith(('bzip2', 'gzip'))
+
 
 class WhitelistedIP(db.Model):
   """Items where the IP address is allowed."""
@@ -401,7 +411,14 @@ class StoreBlobstoreContentByHashHandler(
       blobstore.delete_async(upload_hash_contents)
       return
 
+    try:
+      priority = int(self.request.get('priority'))
+    except ValueError:
+      priority = 1
+
     hash_entry.hash_content_reference = upload_hash_contents[0]
+    # TODO(maruel): Add a new parameter.
+    hash_entry.is_isolated = (priority == 0)
     hash_entry.put()
 
     logging.info('Uploaded data stored directly into blobstore')
@@ -443,6 +460,8 @@ class StoreContentByHashHandler(ACLRequestHandler):
     if len(hash_content) < MIN_SIZE_FOR_BLOBSTORE:
       logging.info('Storing hash content in model')
       hash_entry.hash_content = hash_content
+      # TODO(maruel): Add a new parameter.
+      hash_entry.is_isolated = (priority == 0)
     else:
       logging.info('Storing hash content in blobstore')
       hash_entry.hash_content_reference = StoreValueInBlobstore(hash_content)
