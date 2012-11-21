@@ -133,14 +133,16 @@ def Restart():
     Error: When it doesn't know how to restart the machine (unknown platform).
   """
   if sys.platform == 'win32' or sys.platform == 'cygwin':
-    subprocess.check_call(['shutdown', '-r', '-f', '-t', '1'])
-    # Sleep for 5 seconds to ensure we don't try to do anymore work while
-    # the OS is preparing to shutdown.
-    time.sleep(5)
+    subprocess.call(['shutdown', '-r', '-f', '-t', '1'])
   elif sys.platform == 'linux2' or sys.platform == 'darwin':
-    subprocess.check_call(['sudo', 'shutdown', '-r', 'now'])
-  else:
-    raise Error('Unable to restart machine')
+    subprocess.call(['sudo', 'shutdown', '-r', 'now'])
+
+  # Sleep for 5 seconds to ensure we don't try to do anymore work while
+  # the OS is preparing to shutdown.
+  time.sleep(5)
+
+  # The machine should be shutdown by now.
+  raise Error('Unable to restart machine')
 
 
 class Error(Exception):
