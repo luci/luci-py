@@ -1,0 +1,11 @@
+queue:
+- name: cleanup
+  rate: 1/m
+  retry_parameters:
+    task_age_limit: 1d
+
+- name: tag
+  bucket_size: 100
+  rate: 50/s
+  retry_parameters:
+    task_age_limit: 1d

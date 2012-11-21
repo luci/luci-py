@@ -24,8 +24,8 @@ from google.appengine.ext.webapp import blobstore_handlers
 # pylint: enable=E0611,F0401
 
 # The maximum number of hash entries that can be queried in a single
-# has request.
-MAX_HASH_DIGESTS_PER_HAS = 1000
+# request.
+MAX_HASH_DIGESTS_PER_CALL = 1000
 
 # The minimum size, in bytes, a hash entry must be before it gets stored in the
 # blobstore, otherwise it is stored as a blob property.
@@ -185,6 +185,29 @@ class ACLRequestHandler(webapp2.RequestHandler):
     return webapp2.RequestHandler.dispatch(self)
 
 
+def payload_to_hashes(request):
+  """Loads the hash provided on the payload concatenated in binary form."""
+  hash_digests = request.request.body
+  if len(hash_digests) % HASH_DIGEST_LENGTH:
+    msg = (
+        'Hash digests must all be of length %d, had %d bytes total, last '
+        'digest was of length %d' % (
+              HASH_DIGEST_LENGTH,
+              len(hash_digests),
+              len(hash_digests) % HASH_DIGEST_LENGTH))
+    logging.error(msg)
+    request.abort(400, detail=msg)
+
+  hash_digest_count = len(hash_digests) / HASH_DIGEST_LENGTH
+  if hash_digest_count > MAX_HASH_DIGESTS_PER_CALL:
+    msg = (
+        'Requested more than %d hash digests in a single request, '
+        'aborting' % hash_digest_count)
+    logging.warning(msg)
+    request.abort(400, detail=msg)
+  return hash_digests, hash_digest_count
+
+
 ### Restricted handlers
 
 
@@ -294,11 +317,39 @@ class RestrictedCleanupTriggerHandler(webapp2.RequestHandler):
   """Triggers a taskqueue to clean up."""
   def get(self, name):
     if name in ('old', 'testing', 'orphaned'):
-      url = '/restricted/cleanup/worker/' + name
-      taskqueue.add(url=url)
+      url = '/restricted/taskqueue/cleanup/' + name
+      taskqueue.add(url=url, queue_name='cleanup', name=name)
       self.response.out.write('Triggered %s' % url)
     else:
       self.abort(404, 'Unknown job')
+
+
+class RestrictedTagWorkerHandler(webapp2.RequestHandler):
+  """Tags HashEntries that were tested for with /content/contains."""
+  def post(self, namespace, year, month, day):
+    if not self.request.headers.get('X-AppEngine-QueueName'):
+      self.abort(405, detail='Only internal task queue tasks can do this')
+    hash_digests, hash_digest_count = payload_to_hashes(self)
+    logging.info(
+        'Stamping %d entries in namespace %s', hash_digest_count, namespace)
+
+    # Extract all the hashes.
+    hashes = (
+        binascii.hexlify(
+            hash_digests[i * HASH_DIGEST_LENGTH: (i + 1) * HASH_DIGEST_LENGTH])
+        for i in range(hash_digest_count)
+    )
+    today = datetime.date(int(year), int(month), int(day))
+    parent_key = GetContentNamespaceKey(namespace)
+    to_save = []
+    for hash_digest in hashes:
+      key = db.Key.from_path('HashEntry', hash_digest, parent=parent_key)
+      item = HashEntry.get(key)
+      if item and item.last_access != today:
+        item.last_access = today
+        to_save.append(item)
+    db.put(to_save)
+    logging.info('Done timestamping entries')
 
 
 class RestrictedWhitelistHandler(webapp2.RequestHandler):
@@ -311,7 +362,9 @@ class RestrictedWhitelistHandler(webapp2.RequestHandler):
     WhitelistedIP(ip=ip).put()
     self.response.out.write('Success: %s' % ip)
 
+
 ### Non-restricted handlers
+
 
 class ContainsHashHandler(ACLRequestHandler):
   """Returns a 'string' of chr(1) or chr(0) for each hash in the request body,
@@ -319,30 +372,11 @@ class ContainsHashHandler(ACLRequestHandler):
   """
   def post(self, namespace):
     """This is a POST even though it doesn't modify any data, but it makes
-    it easier for python scripts."""
-    hash_digests = self.request.body
-
-    if len(hash_digests) % HASH_DIGEST_LENGTH:
-      msg = (
-          'Hash digests must all be of length %d, had %d bytes total, last '
-          'digest was of length %d' % (
-               HASH_DIGEST_LENGTH,
-               len(hash_digests),
-               len(hash_digests) % HASH_DIGEST_LENGTH))
-      logging.error(msg)
-      self.abort(400, detail=msg)
-
-    hash_digest_count = len(hash_digests) / HASH_DIGEST_LENGTH
+    it easier for python scripts.
+    """
+    hash_digests, hash_digest_count = payload_to_hashes(self)
     logging.info('Checking namespace %s for %d hash digests', namespace,
                  hash_digest_count)
-
-    if hash_digest_count > MAX_HASH_DIGESTS_PER_HAS:
-      msg = (
-          'Requested more than %d hash digests in a single has request, '
-          'aborting' % hash_digest_count)
-      logging.warning(msg)
-      self.abort(400, detail=msg)
-
     namespace_model_key = GetContentNamespaceKey(namespace)
 
     # Extract all the hashes.
@@ -377,8 +411,16 @@ class ContainsHashHandler(ACLRequestHandler):
       return False
 
     # Convert to byte, chr(0) if not present, chr(1) if it is.
-    contains = bytearray(IteratorToBool(q) for q in queries)
-    self.response.out.write(contains)
+
+    contains = [IteratorToBool(q) for q in queries]
+    self.response.out.write(bytearray(contains))
+
+    # For all the ones that exist, update their last_access in a task queue.
+    hashes_to_tag = ''.join(
+        hash_digests[i * HASH_DIGEST_LENGTH: (i + 1) * HASH_DIGEST_LENGTH]
+        for i in xrange(hash_digest_count) if contains[i])
+    url = '/restricted/taskqueue/tag/%s/%s' % (namespace, datetime.date.today())
+    taskqueue.add(url=url, payload=hashes_to_tag, queue_name='tag')
 
 
 class GenerateBlobstoreHandler(ACLRequestHandler):
@@ -545,14 +587,18 @@ def CreateApplication():
           r'/restricted/cleanup/trigger/<name:[a-z]+>',
           RestrictedCleanupTriggerHandler),
       webapp2.Route(
-          r'/restricted/cleanup/worker/old',
+          r'/restricted/taskqueue/cleanup/old',
           RestrictedCleanupOldEntriesWorkerHandler),
       webapp2.Route(
-          r'/restricted/cleanup/worker/testing',
+          r'/restricted/taskqueue/cleanup/testing',
           RestrictedCleanupTestingEntriesWorkerHandler),
       webapp2.Route(
-          r'/restricted/cleanup/worker/orphaned',
+          r'/restricted/taskqueue/cleanup/orphaned',
           RestrictedCleanupOrphanedBlobsWorkerHandler),
+      webapp2.Route(
+          r'/restricted/taskqueue/tag' + namespace +
+            r'/<year:\d\d\d\d>-<month:\d\d>-<day:\d\d>',
+          RestrictedTagWorkerHandler),
       webapp2.Route(r'/restricted/whitelist', RestrictedWhitelistHandler),
 
       webapp2.Route(r'/content/contains' + namespace, ContainsHashHandler),
