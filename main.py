@@ -307,7 +307,7 @@ class RestrictedCleanupOrphanedBlobsWorkerHandler(webapp2.RequestHandler):
     if not self.request.headers.get('X-AppEngine-QueueName'):
       self.abort(405, detail='Only internal task queue tasks can do this')
     logging.info('Deleting orphaned blobs')
-    blobstore_query = blobstore.BlobInfo.all()
+    blobstore_query = blobstore.BlobInfo.all().order('creation')
 
     def check(blob_info):
       """Looks if the corresponding entry exists."""
@@ -324,6 +324,29 @@ class RestrictedCleanupOrphanedBlobsWorkerHandler(webapp2.RequestHandler):
         blobstore_query.with_cursor(blobstore_query.cursor())
         logging.info('Request timed out, retrying')
     logging.info('Done deleting orphaned blobs')
+
+
+class RestrictedObliterateWorkerHandler(webapp2.RequestHandler):
+  """Deletes all the stuff."""
+  def post(self):
+    if not self.request.headers.get('X-AppEngine-QueueName'):
+      self.abort(405, detail='Only internal task queue tasks can do this')
+    logging.info('Deleting blobs')
+    incremental_delete(
+        blobstore.BlobInfo.all().order('creation'),
+        blobstore.delete_async)
+
+    logging.info('Deleting HashEntry')
+    incremental_delete(
+        HashEntry.all(keys_only=True).order('creation'),
+        db.delete_async)
+
+    logging.info('Deleting Namespaces')
+    incremental_delete(
+        ContentNamespace.all(keys_only=True).order('creation'),
+        db.delete_async)
+    logging.info('Finally done!')
+
 
 
 class RestrictedCleanupTriggerHandler(webapp2.RequestHandler):
@@ -608,6 +631,9 @@ def CreateApplication():
       webapp2.Route(
           r'/restricted/taskqueue/cleanup/orphaned',
           RestrictedCleanupOrphanedBlobsWorkerHandler),
+      webapp2.Route(
+          r'/restricted/taskqueue/cleanup/obliterate',
+          RestrictedObliterateWorkerHandler),
       webapp2.Route(
           r'/restricted/taskqueue/tag' + namespace +
             r'/<year:\d\d\d\d>-<month:\d\d>-<day:\d\d>',
