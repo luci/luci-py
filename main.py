@@ -352,7 +352,7 @@ class RestrictedObliterateWorkerHandler(webapp2.RequestHandler):
 class RestrictedCleanupTriggerHandler(webapp2.RequestHandler):
   """Triggers a taskqueue to clean up."""
   def get(self, name):
-    if name in ('old', 'testing', 'orphaned'):
+    if name in ('obliterate', 'old', 'orphaned', 'testing'):
       url = '/restricted/taskqueue/cleanup/' + name
       taskqueue.add(url=url, queue_name='cleanup', name=name)
       self.response.out.write('Triggered %s' % url)
