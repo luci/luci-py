@@ -175,6 +175,7 @@ class ACLRequestHandler(webapp2.RequestHandler):
       # Verify if its IP is whitelisted.
       query = WhitelistedIP.gql('WHERE ip = :1', self.request.remote_addr)
       if not query.count():
+        logging.warning('Blocking IP %s', self.request.remote_addr)
         self.abort(401, detail='Please login first.')
     else:
       domain = user.email().partition('@')[2]
