@@ -29,7 +29,7 @@ MAX_HASH_DIGESTS_PER_CALL = 1000
 
 # The minimum size, in bytes, a hash entry must be before it gets stored in the
 # blobstore, otherwise it is stored as a blob property.
-MIN_SIZE_FOR_BLOBSTORE = 20 * 8
+MIN_SIZE_FOR_BLOBSTORE = 20 * 1024
 
 # The number of days a datamodel must go unaccessed for before it is deleted.
 DATASTORE_TIME_TO_LIVE_IN_DAYS = 7
@@ -495,7 +495,8 @@ class StoreBlobstoreContentByHashHandler(
 
     hash_entry = CreateHashEntry(namespace, hash_key)
     if not hash_entry:
-      msg = 'Hash entry already stored, no need to store again.'
+      msg = 'Hash entry already stored, no need to store %d bytes again.' % (
+          upload_hash_contents[0].size)
       logging.warning(msg)
       self.response.out.write(msg)
       # Delete all upload files since they aren't linked to anything.
@@ -512,25 +513,28 @@ class StoreBlobstoreContentByHashHandler(
     hash_entry.is_isolated = (priority == 0)
     hash_entry.put()
 
-    logging.info('Uploaded data stored directly into blobstore')
+    logging.info(
+        '%d bytes uploaded directly into blobstore',
+        hash_entry.hash_content_reference.size)
     self.response.out.write('hash content saved.')
 
 
 class StoreContentByHashHandler(ACLRequestHandler):
   """The handler for adding hash contents."""
   def post(self, namespace, hash_key):
-    hash_entry = CreateHashEntry(namespace, hash_key)
-    if not hash_entry:
-      msg = 'Hash entry already stored, no need to store again.'
-      logging.info(msg)
-      self.response.out.write(msg)
-      return
-
     # webapp2 doesn't like reading the body if it's empty.
     if self.request.headers.get('content-length'):
       hash_content = self.request.body
     else:
       hash_content = ''
+
+    hash_entry = CreateHashEntry(namespace, hash_key)
+    if not hash_entry:
+      msg = 'Hash entry already stored, no need to store %d bytes again.' % (
+          len(hash_content))
+      logging.info(msg)
+      self.response.out.write(msg)
+      return
 
     try:
       priority = int(self.request.get('priority'))
@@ -541,20 +545,23 @@ class StoreContentByHashHandler(ACLRequestHandler):
       try:
         # TODO(maruel): Use namespace='table_%s' % namespace.
         if memcache.set(hash_key, hash_content, namespace=namespace):
-          logging.info('Storing hash content in memcache')
+          logging.info(
+              'Storing %d bytes of content in memcache', len(hash_content))
         else:
-          logging.error('Attempted to save hash contents in memcache '
-                        'but failed')
+          logging.error(
+              'Attempted to save %d bytes of content in memcache but failed',
+              len(hash_content))
       except ValueError as e:
         logging.error(e)
 
     if len(hash_content) < MIN_SIZE_FOR_BLOBSTORE:
-      logging.info('Storing hash content in model')
+      logging.info('Storing %d bytes of content in model', len(hash_content))
       hash_entry.hash_content = hash_content
       # TODO(maruel): Add a new parameter.
       hash_entry.is_isolated = (priority == 0)
     else:
-      logging.info('Storing hash content in blobstore')
+      logging.info(
+          'Storing %d bytes of content in blobstore', len(hash_content))
       hash_entry.hash_content_reference = StoreValueInBlobstore(hash_content)
       if not hash_entry.hash_content_reference:
         self.abort(507, detail='Unable to save the hash to the blobstore.')
@@ -589,7 +596,7 @@ class RetrieveContentByHashHandler(ACLRequestHandler,
     memcache_entry = memcache.get(hash_key, namespace=namespace)
 
     if memcache_entry:
-      logging.info('Returning hash contents from memcache')
+      logging.info('Returning %d bytes from memcache', len(memcache_entry))
       self.response.out.write(memcache_entry)
       return
 
@@ -603,10 +610,13 @@ class RetrieveContentByHashHandler(ACLRequestHandler,
       db.put_async(hash_entry)
 
     if hash_entry.hash_content is None:
-      logging.info('Returning hash content from blobstore')
+      logging.info(
+          'Returning %d bytes from blobstore',
+          hash_entry.hash_content_reference.size)
       self.send_blob(hash_entry.hash_content_reference, save_as=hash_key)
     else:
-      logging.info('Returning hash content from model')
+      logging.info(
+          'Returning %d bytes from model', len(hash_entry.hash_content))
       self.response.headers['Content-Disposition'] = (
           'attachment; filename="%s"' % hash_key)
       self.response.out.write(hash_entry.hash_content)
