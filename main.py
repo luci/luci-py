@@ -211,6 +211,15 @@ def payload_to_hashes(request):
 ### Restricted handlers
 
 
+def delete_blobinfo_async(blobinfos):
+  """Deletes BlobInfo properly.
+
+  blobstore.delete*() do not accept a list of BlobInfo, they only accept a list
+  BlobKey.
+  """
+  blobstore.delete_async((b.key() for b in blobinfos))
+
+
 def incremental_delete(query, delete, check=None):
   """Applies |delete| to objects in a query asynchrously.
 
@@ -255,7 +264,7 @@ class RestrictedCleanupOldEntriesWorkerHandler(webapp2.RequestHandler):
       blobs_to_delete = [
         i.hash_content_reference for i in to_delete if i.hash_content_reference
       ]
-      blobstore.delete_async(blobs_to_delete)
+      delete_blobinfo_async(blobs_to_delete)
       # Then delete the entities.
       db.delete_async(to_delete)
 
@@ -317,7 +326,7 @@ class RestrictedCleanupOrphanedBlobsWorkerHandler(webapp2.RequestHandler):
     while True:
       try:
         incremental_delete(
-            blobstore_query, check=check, delete=blobstore.delete_async)
+            blobstore_query, check=check, delete=delete_blobinfo_async)
         # Didn't throw, can now move on.
         break
       except datastore_errors.BadRequestError:
@@ -334,7 +343,7 @@ class RestrictedObliterateWorkerHandler(webapp2.RequestHandler):
     logging.info('Deleting blobs')
     incremental_delete(
         blobstore.BlobInfo.all().order('creation'),
-        blobstore.delete_async)
+        delete_blobinfo_async)
 
     logging.info('Deleting HashEntry')
     incremental_delete(
@@ -354,7 +363,11 @@ class RestrictedCleanupTriggerHandler(webapp2.RequestHandler):
   def get(self, name):
     if name in ('obliterate', 'old', 'orphaned', 'testing'):
       url = '/restricted/taskqueue/cleanup/' + name
-      taskqueue.add(url=url, queue_name='cleanup', name=name)
+      # The push task queue name must be unique over a ~7 days period so use
+      # the date at second precision, there's no point in triggering each of
+      # time more than once a second anyway.
+      now = datetime.datetime.utcnow().strftime('%Y-%m-%d_%I-%M-%S')
+      taskqueue.add(url=url, queue_name='cleanup', name=name + '_' + now)
       self.response.out.write('Triggered %s' % url)
     else:
       self.abort(404, 'Unknown job')
@@ -475,7 +488,7 @@ class StoreBlobstoreContentByHashHandler(
     upload_hash_contents = self.get_uploads('hash_contents')
     if len(upload_hash_contents) != 1:
       # Delete all upload files since they aren't linked to anything.
-      blobstore.delete_async(upload_hash_contents)
+      delete_blobinfo_async(upload_hash_contents)
       msg = ('Found %d hash_contents, there should only be 1.' %
              len(upload_hash_contents))
       self.abort(400, detail=msg)
@@ -486,7 +499,7 @@ class StoreBlobstoreContentByHashHandler(
       logging.warning(msg)
       self.response.out.write(msg)
       # Delete all upload files since they aren't linked to anything.
-      blobstore.delete_async(upload_hash_contents)
+      delete_blobinfo_async(upload_hash_contents)
       return
 
     try:
