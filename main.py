@@ -398,7 +398,7 @@ class RestrictedTagWorkerHandler(webapp2.RequestHandler):
         item.last_access = today
         to_save.append(item)
     db.put(to_save)
-    logging.info('Done timestamping entries')
+    logging.info('Done timestamping %d entries', len(to_save))
 
 
 class RestrictedWhitelistHandler(webapp2.RequestHandler):
@@ -463,13 +463,16 @@ class ContainsHashHandler(ACLRequestHandler):
 
     contains = [IteratorToBool(q) for q in queries]
     self.response.out.write(bytearray(contains))
-
-    # For all the ones that exist, update their last_access in a task queue.
-    hashes_to_tag = ''.join(
-        hash_digests[i * HASH_DIGEST_LENGTH: (i + 1) * HASH_DIGEST_LENGTH]
-        for i in xrange(hash_digest_count) if contains[i])
-    url = '/restricted/taskqueue/tag/%s/%s' % (namespace, datetime.date.today())
-    taskqueue.add(url=url, payload=hashes_to_tag, queue_name='tag')
+    found = sum(contains, 0)
+    logging.info('%d hit, %d miss', found, hash_digest_count - found)
+    if found:
+      # For all the ones that exist, update their last_access in a task queue.
+      hashes_to_tag = ''.join(
+          hash_digests[i * HASH_DIGEST_LENGTH: (i + 1) * HASH_DIGEST_LENGTH]
+          for i in xrange(hash_digest_count) if contains[i])
+      url = '/restricted/taskqueue/tag/%s/%s' % (
+          namespace, datetime.date.today())
+      taskqueue.add(url=url, payload=hashes_to_tag, queue_name='tag')
 
 
 class GenerateBlobstoreHandler(ACLRequestHandler):
