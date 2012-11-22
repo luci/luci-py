@@ -49,7 +49,7 @@ HASH_HEXDIGEST_LENGTH = 40
 # unambiguous, no need to constantly call .lower().
 VALID_SHA1_RE = r'[a-f0-9]{' + str(HASH_HEXDIGEST_LENGTH) + r'}'
 VALID_SHA1_RE_COMPILED = re.compile(VALID_SHA1_RE)
-VALID_NAMESPACE_RE = r'[a-z0-9A-Z]+'
+VALID_NAMESPACE_RE = r'[a-z0-9A-Z\-]+'
 
 
 class ContentNamespace(db.Model):
