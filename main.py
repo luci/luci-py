@@ -211,7 +211,7 @@ def payload_to_hashes(request):
 ### Restricted handlers
 
 
-def incremental_delete(query, check=None, delete=db.delete_async):
+def incremental_delete(query, delete, check=None):
   """Applies |delete| to objects in a query asynchrously.
 
   Returns True if at least one object was found.
@@ -248,8 +248,20 @@ class RestrictedCleanupOldEntriesWorkerHandler(webapp2.RequestHandler):
     logging.info('Deleting old datastore entries')
     old_cutoff = datetime.datetime.today() - datetime.timedelta(
         days=DATASTORE_TIME_TO_LIVE_IN_DAYS)
+
+    def delete_hash_and_blobs(to_delete):
+      """Deletes HashEntry and their blobs."""
+      # Note all the blobs to delete first.
+      blobs_to_delete = [
+        i.hash_content_reference for i in to_delete if i.hash_content_reference
+      ]
+      blobstore.delete_async(blobs_to_delete)
+      # Then delete the entities.
+      db.delete_async(to_delete)
+
     incremental_delete(
-        HashEntry.all(keys_only=True).filter('last_access <', old_cutoff))
+        HashEntry.all(keys_only=True).filter('last_access <', old_cutoff),
+        delete=delete_hash_and_blobs)
     logging.info('Done deleting old entries')
 
 
@@ -274,7 +286,8 @@ class RestrictedCleanupTestingEntriesWorkerHandler(webapp2.RequestHandler):
       found = incremental_delete(
           HashEntry.all(keys_only=True).ancestor(
               namespace).filter(
-              'last_access <', old_cutoff_testing))
+              'last_access <', old_cutoff_testing),
+          delete=db.delete_async)
       if not found:
         orphaned_namespaces.append(namespace)
     if orphaned_namespaces:
