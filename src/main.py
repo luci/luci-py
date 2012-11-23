@@ -354,12 +354,15 @@ class ResultHandler(webapp2.RequestHandler):
     result_string = urllib.unquote_plus(self.request.get('result_output'))
 
     test_request_manager = CreateTestManager()
-    if not test_request_manager.UpdateTestResult(runner, machine_id,
-                                                 success=success,
-                                                 exit_codes=exit_codes,
-                                                 result_string=result_string,
-                                                 overwrite=overwrite):
+    if test_request_manager.UpdateTestResult(runner, machine_id,
+                                             success=success,
+                                             exit_codes=exit_codes,
+                                             result_string=result_string,
+                                             overwrite=overwrite):
+      self.response.out.write('Successfully update the runner results.')
+    else:
       self.response.set_status(400)
+      self.response.out.write('Failed to update the runner results.')
 
 
 class PollHandler(webapp2.RequestHandler):

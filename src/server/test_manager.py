@@ -592,6 +592,10 @@ class TestRequestManager(object):
       runner.delete()
       test_request.RunnerDeleted()
 
+    if not runner.errors:
+      logging.info('Successfully updated the results of runner %s.',
+                   runner.key())
+
     return not bool(runner.errors)
 
   def _EmailTestResults(self, runner, send_to):
