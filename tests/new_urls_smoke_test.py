@@ -19,6 +19,7 @@ import sys
 import time
 import unittest
 import urllib2
+import zlib
 
 import find_depot_tools  # pylint: disable=W0611
 
@@ -222,7 +223,38 @@ class AppTestSignedIn(unittest.TestCase):
           payload=None)
       self.fail('Memcache element was still present')
     except urllib2.HTTPError as e:
-      self.assertTrue('HTTP Error 404' in str(e), str(e))
+      self.assertEqual(404, e.code)
+
+  def test_gzip(self):
+    self.namespace += '-gzip'
+    hash_key = hashlib.sha1(BINARY_DATA).hexdigest()
+    compressed = zlib.compress(BINARY_DATA)
+    self.UploadHashAndRetrieveHelper(hash_key, compressed)
+
+  def testCorrupted(self):
+    hash_key = hashlib.sha1(BINARY_DATA + 'x').hexdigest()
+    try:
+      self.UploadHashAndRetrieveHelper(hash_key, BINARY_DATA)
+      self.fail()
+    except urllib2.HTTPError as e:
+      self.assertEqual(400, e.code)
+
+  def testCorrupted_gzip(self):
+    self.namespace += '-gzip'
+    hash_key = hashlib.sha1(BINARY_DATA + 'x').hexdigest()
+    compressed = zlib.compress(BINARY_DATA)
+    try:
+      self.UploadHashAndRetrieveHelper(hash_key, compressed)
+      self.fail()
+    except urllib2.HTTPError as e:
+      self.assertEqual(400, e.code)
+
+  def testCorrupted_Large(self):
+    # Try and upload a corrupted 40mb blobstore.
+    hash_contents = (BINARY_DATA * 128) * 1024 * 40
+    hash_key = hashlib.sha1(hash_contents + 'x').hexdigest()
+    # TODO(maruel): This code tests that the code is not checking properly.
+    self.UploadHashAndRetrieveHelper(hash_key, hash_contents)
 
 
 class AppTestSignedOut(unittest.TestCase):

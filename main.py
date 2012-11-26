@@ -5,9 +5,11 @@
 
 import binascii
 import datetime
+import hashlib
 import logging
 import os
 import re
+import zlib
 
 # The app engine headers are located locally, so don't worry about not finding
 # them.
@@ -544,6 +546,21 @@ class StoreContentByHashHandler(ACLRequestHandler):
       priority = int(self.request.get('priority'))
     except ValueError:
       priority = 1
+
+    # Verify the data while at it since it's already in memory but before
+    # storing it in memcache and datastore.
+    raw_data = hash_content
+    if namespace.endswith('-gzip'):
+      try:
+        raw_data = zlib.decompress(hash_content)
+      except zlib.error as e:
+        logging.error(e)
+        self.abort(400, str(e))
+
+    if hashlib.sha1(raw_data).hexdigest() != hash_key:
+      msg = 'SHA-1 and data do not match'
+      logging.error(msg)
+      self.abort(400, msg)
 
     if priority == 0:
       try:
