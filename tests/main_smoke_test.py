@@ -8,7 +8,7 @@ upload and then retrieve a hash value.
 
 To run against a local dev server with verbosity for a single test case, use the
 following format:
-  ./tests/new_urls_smoke_test.py http://localhost:8080/ -v \
+  ./tests/main_smoke_test.py http://localhost:8080/ -v \
       AppTestSignedIn.testStoreAndRetrieveEmptyHash
 """
 
