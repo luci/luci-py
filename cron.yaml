@@ -7,6 +7,9 @@ cron:
   url: /restricted/cleanup/trigger/testing
   schedule: every day 09:50
 
-- description: orphaned blobstores cleanup
-  url: /restricted/cleanup/trigger/orphaned
-  schedule: every day 17:50
+# TODO(maruel): It's currently broken, it times out while enumerating the
+# BlobStore entries at around 4000 entities within 60s. So a cursor query should
+# be done.
+#- description: orphaned blobstores cleanup
+#  url: /restricted/cleanup/trigger/orphaned
+#  schedule: every day 17:50
