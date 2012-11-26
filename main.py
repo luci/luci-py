@@ -294,7 +294,7 @@ class RestrictedCleanupTestingEntriesWorkerHandler(webapp2.RequestHandler):
         'is_testing =', True)
     orphaned_namespaces = []
     for namespace in namespace_query:
-      logging.debug('Namespace %s', namespace.key().name())
+      logging.debug('Namespace %s', namespace.name())
       found = incremental_delete(
           HashEntry.all(keys_only=True).ancestor(
               namespace).filter(
