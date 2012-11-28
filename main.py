@@ -15,6 +15,7 @@ import zlib
 # them.
 # pylint: disable=E0611,F0401
 import webapp2
+from google.appengine import runtime
 from google.appengine.api import datastore_errors
 from google.appengine.api import files
 from google.appengine.api import memcache
@@ -90,6 +91,9 @@ class HashEntry(db.Model):
 
   # It is an .isolated file.
   is_isolated = db.BooleanProperty(default=False)
+
+  # It's content was verified to not be corrupted.
+  is_verified = db.BooleanProperty(default=False)
 
   @property
   def is_compressed(self):
@@ -209,6 +213,22 @@ def payload_to_hashes(request):
     logging.warning(msg)
     request.abort(400, detail=msg)
   return hash_digests, hash_digest_count
+
+
+def read_blob(blob, callback):
+  """Reads a BlobInfo/BlobKey and pass the data through callback.
+
+  Returns the amount of data read.
+  """
+  position = 0
+  chunk_size = blobstore.MAX_BLOB_FETCH_SIZE
+  while True:
+    data = blobstore.fetch_data(blob, position, position + chunk_size - 1)
+    callback(data)
+    position += len(data)
+    if len(data) < chunk_size:
+      break
+  return position
 
 
 ### Restricted handlers
@@ -360,7 +380,6 @@ class RestrictedObliterateWorkerHandler(webapp2.RequestHandler):
     logging.info('Finally done!')
 
 
-
 class RestrictedCleanupTriggerHandler(webapp2.RequestHandler):
   """Triggers a taskqueue to clean up."""
   def get(self, name):
@@ -377,7 +396,10 @@ class RestrictedCleanupTriggerHandler(webapp2.RequestHandler):
 
 
 class RestrictedTagWorkerHandler(webapp2.RequestHandler):
-  """Tags HashEntries that were tested for with /content/contains."""
+  """Tags .last_access for HashEntries tested for with /content/contains.
+
+  This makes sure they are not evicted from the LRU cache too fast.
+  """
   def post(self, namespace, year, month, day):
     if not self.request.headers.get('X-AppEngine-QueueName'):
       self.abort(405, detail='Only internal task queue tasks can do this')
@@ -402,6 +424,61 @@ class RestrictedTagWorkerHandler(webapp2.RequestHandler):
         to_save.append(item)
     db.put(to_save)
     logging.info('Done timestamping %d entries', len(to_save))
+
+
+class RestrictedVerifyWorkerHandler(webapp2.RequestHandler):
+  """Verify the SHA-1 matches for an object stored in BlobStore."""
+  def post(self, namespace, hash_key):
+    if not self.request.headers.get('X-AppEngine-QueueName'):
+      self.abort(405, detail='Only internal task queue tasks can do this')
+
+    hash_entry = GetContentByHash(namespace, hash_key)
+    if not hash_entry:
+      logging.error('Failed to find entity')
+      return
+    if hash_entry.is_verified:
+      logging.info('Was already verified')
+      return
+    if not hash_entry.hash_content_reference or hash_entry.hash_content:
+      logging.error('Should not be called with inline content')
+      return
+
+    digest = hashlib.sha1()
+    if namespace.endswith('-gzip'):
+      # Decompress before hashing.
+      zlib_state = zlib.decompressobj()
+      callback = lambda data: digest.update(zlib_state.decompress(data))
+    else:
+      callback = digest.update
+
+    is_verified = False
+    count = 0
+    try:
+      # Start a loop where it reads the data in block.
+      count = read_blob(hash_entry.hash_content_reference, callback)
+
+      # Need a fixup for zipped content to complete the decompression.
+      if namespace.endswith('-gzip'):
+        digest.update(zlib_state.flush())
+      is_verified = digest.hexdigest() == hash_key
+    except runtime.DeadlineExceededError:
+      # Failed to read it through. If it's compressed, at least no zlib error
+      # was thrown so the object is fine.
+      logging.warning('Got DeadlineExceededError, giving up')
+      return
+    except zlib.error as e:
+      # It's broken. At that point, is_verified is False.
+      logging.error(e)
+
+    if not is_verified:
+      # Delete the entity since it's corrupted.
+      logging.error('SHA-1 and data do not match, %d bytes', count)
+      blobstore.delete(hash_entry.hash_content_reference.key())
+      db.delete(hash_entry)
+    else:
+      logging.info('%d bytes verified', count)
+      hash_entry.is_verified = True
+      hash_entry.put()
 
 
 class RestrictedWhitelistHandler(webapp2.RequestHandler):
@@ -458,6 +535,8 @@ class ContainsHashHandler(ACLRequestHandler):
     # Convert to True/False. It's a bit annoying because run() returns a
     # ResultsIterator.
     def IteratorToBool(itr):
+      # TODO(maruel): Return if the entity is verified or not. Or add a filter
+      # to the query above?
       for _ in itr:
         return True
       return False
@@ -518,6 +597,11 @@ class StoreBlobstoreContentByHashHandler(
     # TODO(maruel): Add a new parameter.
     hash_entry.is_isolated = (priority == 0)
     hash_entry.put()
+
+    # Trigger a verification. It can't be done inline since it could be too
+    # long to complete.
+    url = '/restricted/taskqueue/verify/%s/%s' % (namespace, hash_key)
+    taskqueue.add(url=url, queue_name='verify')
 
     logging.info(
         '%d bytes uploaded directly into blobstore',
@@ -587,6 +671,7 @@ class StoreContentByHashHandler(ACLRequestHandler):
       if not hash_entry.hash_content_reference:
         self.abort(507, detail='Unable to save the hash to the blobstore.')
 
+    hash_entry.is_verified = True
     hash_entry.put()
     self.response.out.write('hash content saved.')
 
@@ -682,6 +767,9 @@ def CreateApplication():
           r'/restricted/taskqueue/tag' + namespace +
             r'/<year:\d\d\d\d>-<month:\d\d>-<day:\d\d>',
           RestrictedTagWorkerHandler),
+      webapp2.Route(
+          r'/restricted/taskqueue/verify' + namespace_key,
+          RestrictedVerifyWorkerHandler),
       webapp2.Route(r'/restricted/whitelist', RestrictedWhitelistHandler),
 
       webapp2.Route(r'/content/contains' + namespace, ContainsHashHandler),
