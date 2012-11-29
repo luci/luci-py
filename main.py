@@ -292,7 +292,7 @@ class RestrictedCleanupOldEntriesWorkerHandler(webapp2.RequestHandler):
       db.delete_async(to_delete)
 
     incremental_delete(
-        HashEntry.all(keys_only=True).filter('last_access <', old_cutoff),
+        HashEntry.all().filter('last_access <', old_cutoff),
         delete=delete_hash_and_blobs)
     logging.info('Done deleting old entries')
 
