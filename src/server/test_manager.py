@@ -736,7 +736,8 @@ class TestRequestManager(object):
         cleanup=test_request.cleanup,
         data=(test_request.data + config.data),
         tests=test_request.tests + config.tests,
-        working_dir=test_request.working_dir)
+        working_dir=test_request.working_dir,
+        encoding=test_request.encoding)
     test_run.ExpandVariables({
         'instance_index': runner.config_instance_index,
         'num_instances': runner.num_config_instances,

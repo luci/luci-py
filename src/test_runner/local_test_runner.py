@@ -569,6 +569,15 @@ class LocalTestRunner(object):
       (exit_code, stdout_string) = self._RunCommand(test.action, test.time_out,
                                                     env=dict(test_env_vars))
 
+      try:
+        stdout_string = stdout_string.decode(self.test_run.encoding)
+      except UnicodeDecodeError:
+        stdout_string = (
+            '! Output contains characters not valid in %s encoding !\n%s'
+            % (self.test_run.encoding, stdout_string.decode(
+                self.test_run.encoding,
+                'replace')))
+
       # We always accumulate the test output and exit code.
       result_string = '%s\n%s' % (result_string, stdout_string)
       result_codes.append(exit_code)

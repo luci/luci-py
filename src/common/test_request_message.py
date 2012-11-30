@@ -36,6 +36,17 @@ import urllib
 import urlparse
 
 
+# All the accepted url schemes.
+VALID_URL_SCHEMES = ['http', 'https', 'file', 'mailto']
+
+# The default encoding to assume for the test output.
+DEFAULT_ENCODING = 'ascii'
+
+# The default working directory.
+# TODO(user): Change this value if the system isn't windows.
+DEFAULT_WORKING_DIR = r'c:\swarm_tests'
+
+
 class Error(Exception):
   """Simple error exception properly scoped here."""
   pass
@@ -68,13 +79,13 @@ def Stringize(value, json_readable=False):
   elif isinstance(value, basestring):
     if json_readable:
       value = value.replace('\\', '\\\\')
-    value = '\"%s\"' % value if json_readable else '\'%s\'' % value
+    value = u'\"%s\"' % value if json_readable else u'\'%s\'' % value
   elif json_readable and value is None:
-    value = 'null'
+    value = u'null'
   elif json_readable and isinstance(value, bool):
-    value = 'true' if value else 'false'
+    value = u'true' if value else u'false'
   else:
-    value = str(value)
+    value = unicode(value)
   return value
 
 
@@ -86,8 +97,6 @@ class TestRequestMessageBase(object):
   it should have no other instance data members then the ones that are part of
   the Test Request Format.
   """
-  VALID_URL_SCHEMES = ['http', 'https', 'file', 'mailto']
-  DEFAULT_WORKING_DIR = r'c:\swarm_tests'
 
   @staticmethod
   def LogError(error_text, error_list):
@@ -312,7 +321,7 @@ class TestRequestMessageBase(object):
       return False
 
     url_parts = urlparse.urlsplit(value)
-    if url_parts[0] not in TestRequestMessageBase.VALID_URL_SCHEMES:
+    if url_parts[0] not in VALID_URL_SCHEMES:
       self.LogError('Unsupported url scheme, %s' % url_parts[0], errors)
       return False
 
@@ -471,6 +480,23 @@ class TestRequestMessageBase(object):
           self.LogError('Invalid key, %s, in output destination' % key, errors)
           return False
     return True
+
+  def IsValidEncoding(self, encoding, errors):
+    """Identifies if the given encoding is valid.
+
+    Args:
+      encoding: The encoding to check.
+      errors: An array where we can append error messages.
+
+    Returns:
+      True if the encoding is valid.
+    """
+    try:
+      unicode('0', encoding)
+      return True
+    except LookupError:
+      self.LogError('Invalid encoding %s' % encoding, errors)
+      return False
 
   def IsValid(self, errors=None):
     """Identifies if the current content is valid.
@@ -810,6 +836,7 @@ class TestCase(TestRequestMessageBase):
         output of this test case as well as the size of the chunks to use.
         The key for the URL is 'url' and the value must be a valid URL string.
         The key for the chunk size is 'size'. It must be a whole number.
+    encoding: The encoding of the tests output.
     cleanup: The key to access the test run's cleanup string.
     failure_email: An optional email where to broadcast failures for this test
         case.
@@ -820,9 +847,10 @@ class TestCase(TestRequestMessageBase):
   VALID_STORE_RESULT_VALUES = [None, '', 'all', 'fail', 'none']
 
   def __init__(self, test_case_name=None, env_vars=None, configurations=None,
-               data=None, working_dir=None, admin=False, tests=None,
-               result_url=None, store_result=None, restart_on_failure=None,
-               output_destination=None, cleanup=None, failure_email=None,
+               data=None, working_dir=DEFAULT_WORKING_DIR, admin=False,
+               tests=None, result_url=None, store_result=None,
+               restart_on_failure=None, output_destination=None,
+               encoding=DEFAULT_ENCODING, cleanup=None, failure_email=None,
                label=None, verbose=False):
     super(TestCase, self).__init__()
     self.test_case_name = test_case_name
@@ -838,10 +866,7 @@ class TestCase(TestRequestMessageBase):
       self.data = data[:]
     else:
       self.data = []
-    if working_dir:
-      self.working_dir = working_dir
-    else:
-      self.working_dir = self.DEFAULT_WORKING_DIR
+    self.working_dir = working_dir
     self.admin = admin
     if tests:
       self.tests = tests[:]
@@ -854,6 +879,7 @@ class TestCase(TestRequestMessageBase):
       self.output_destination = output_destination.copy()
     else:
       self.output_destination = None
+    self.encoding = encoding
     self.cleanup = cleanup
     self.failure_email = failure_email
     self.label = label
@@ -886,6 +912,8 @@ class TestCase(TestRequestMessageBase):
         not self.AreValidValues(['working_dir', 'failure_email', 'result_url',
                                  'label'],
                                 basestring, errors=errors) or
+        (self.encoding and
+         not self.IsValidEncoding(self.encoding, errors=errors)) or
         (self.result_url and not self.AreValidUrls(['result_url'], errors)) or
         self.store_result not in TestCase.VALID_STORE_RESULT_VALUES):
       self.LogError('Invalid TestCase: %s' % self.__dict__, errors)
@@ -951,14 +979,16 @@ class TestRun(TestRequestMessageBase):
     cleanup: The key to access the test run's cleanup string.
     restart_on_failure: An optional value indicating if the machine running the
         tests should restart if any of the tests fail.
+    encoding: The character encoding to use.
   """
   VALID_CLEANUP_VALUES = [None, '', 'zip', 'data', 'root']
 
   def __init__(self, test_run_name=None, env_vars=None,
-               configuration=TestConfiguration(), data=None, working_dir=None,
-               tests=None, instance_index=None, num_instances=None,
-               result_url=None, ping_url=None, output_destination=None,
-               cleanup=None, restart_on_failure=None):
+               configuration=TestConfiguration(), data=None,
+               working_dir=DEFAULT_WORKING_DIR, tests=None,
+               instance_index=None, num_instances=None, result_url=None,
+               ping_url=None, output_destination=None, cleanup=None,
+               restart_on_failure=None, encoding=DEFAULT_ENCODING):
     super(TestRun, self).__init__()
     self.test_run_name = test_run_name
     if env_vars:
@@ -970,10 +1000,7 @@ class TestRun(TestRequestMessageBase):
       self.data = data[:]
     else:
       self.data = []
-    if working_dir:
-      self.working_dir = working_dir
-    else:
-      self.working_dir = self.DEFAULT_WORKING_DIR
+    self.working_dir = working_dir
     if tests:
       self.tests = tests[:]
     else:
@@ -988,6 +1015,7 @@ class TestRun(TestRequestMessageBase):
       self.output_destination = None
     self.cleanup = cleanup
     self.restart_on_failure = restart_on_failure
+    self.encoding = encoding
 
   def IsValid(self, errors=None):
     """Identifies if the current content is valid.
@@ -1018,6 +1046,7 @@ class TestRun(TestRequestMessageBase):
         self.cleanup not in TestRun.VALID_CLEANUP_VALUES or
         not self.AreValidValues(['instance_index', 'num_instances'],
                                 (int, long), errors=errors) or
+        not self.IsValidEncoding(self.encoding, errors=errors) or
         (self.instance_index is not None and self.num_instances is None) or
         (self.num_instances is not None and self.instance_index is None) or
         (self.num_instances is not None and

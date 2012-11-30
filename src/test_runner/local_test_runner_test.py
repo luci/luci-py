@@ -1,4 +1,5 @@
 #!/usr/bin/python2.7
+# coding=utf-8
 #
 # Copyright 2011 Google Inc. All Rights Reserved.
 
@@ -43,6 +44,9 @@ class TestLocalTestRunner(unittest.TestCase):
     self.result_string = 'This is a result string'
     self.result_codes = [1, 42, 3, 0]
 
+    self.test_name1 = 'test1'
+    self.test_name2 = 'test2'
+
   def tearDown(self):
     self._mox.UnsetStubs()
     self._mox.ResetAll()
@@ -51,7 +55,7 @@ class TestLocalTestRunner(unittest.TestCase):
 
   def CreateValidFile(self, test_objects_data=None, test_run_data=None,
                       test_run_cleanup=None, config_env=None,
-                      test_run_env=None):
+                      test_run_env=None, test_encoding=None):
     """Creates a text file that the local_test_runner can load.
 
     Args:
@@ -62,13 +66,16 @@ class TestLocalTestRunner(unittest.TestCase):
       test_run_cleanup: The cleanup string to be passed to the TestRun object.
       config_env: The dictionary to be used for the configuration's env_vars.
       test_run_env: The dictionary to be used for the test run's env_vars.
+      test_encoding: The enocding to use for the test's output.
     """
     if not test_objects_data:
       test_objects_data = [('a', ['a'], None, None, 0)]
     if not test_run_data:
       test_run_data = []
 
-    data_file = open(self.data_file_name, mode='w+b')
+    if not test_encoding:
+      test_encoding = 'ascii'
+
     test_config = test_request_message.TestConfiguration(
         env_vars=config_env, config_name=self.config_name, os='a', browser='a',
         cpu='a')
@@ -83,10 +90,16 @@ class TestLocalTestRunner(unittest.TestCase):
         data=test_run_data, configuration=test_config,
         result_url=self.result_url, ping_url=self.ping_url,
         output_destination=self.output_destination, tests=test_objects,
-        cleanup=test_run_cleanup)
-    data_file.write(test_request_message.Stringize(test_run,
-                                                   json_readable=True))
-    data_file.close()
+        cleanup=test_run_cleanup, encoding=test_encoding)
+
+    # Check that the message is valid, otherwise the test will fail when trying
+    # to load it.
+    errors = []
+    self.assertTrue(test_run.IsValid(errors), errors)
+
+    with open(self.data_file_name, mode='w+b') as data_file:
+      data = test_request_message.Stringize(test_run, json_readable=True)
+      data_file.write(data.encode('utf-8'))
 
   def testInvalidTestRunFiles(self):
     def TestInvalidContent(file_content):
@@ -281,15 +294,16 @@ class TestLocalTestRunner(unittest.TestCase):
     self._mox.VerifyAll()
 
   def PrepareRunTestsCall(self, decorate_output=None, results=None,
-                          test_run_env=None, config_env=None, test_env=None):
+                          encoding=None, test_names=None, test_run_env=None,
+                          config_env=None, test_env=None):
     if not decorate_output:
       decorate_output = [False, False]
     if not results:
       results = [(0, 'success'), (0, 'success')]
     self.action1 = ['foo']
     self.action2 = ['bar', 'foo', 'bar']
-    self.test_name1 = 'test1'
-    self.test_name2 = 'test2'
+    if not test_names:
+      test_names = [self.test_name1, self.test_name2]
     self.assertEqual(len(results), 2)
     test0_env = test1_env = None
     if test_env:
@@ -297,12 +311,13 @@ class TestLocalTestRunner(unittest.TestCase):
       test0_env = test_env[0]
       test1_env = test_env[1]
     test_objects_data = [
-        (self.test_name1, self.action1, decorate_output[0], test0_env, 0),
-        (self.test_name2, self.action2, decorate_output[1], test1_env, 9)
+        (test_names[0], self.action1, decorate_output[0], test0_env, 0),
+        (test_names[1], self.action2, decorate_output[1], test1_env, 9)
     ]
     self.assertEqual(len(decorate_output), len(results))
     self.CreateValidFile(test_objects_data=test_objects_data,
-                         test_run_env=test_run_env, config_env=config_env)
+                         test_run_env=test_run_env, config_env=config_env,
+                         test_encoding=encoding)
     self.runner = local_test_runner.LocalTestRunner(self.data_file_name)
 
     self._mox.StubOutWithMock(self.runner, '_RunCommand')
@@ -437,6 +452,41 @@ class TestLocalTestRunner(unittest.TestCase):
     self.assertIn('[  FAILED  ] %s.%s' % (self.test_run_name, self.test_name1),
                   result_string)
     self.assertIn('1 FAILED TESTS', result_string)
+    self._mox.VerifyAll()
+
+  def testRunTestsWithNonAsciiOutput(self):
+    # This result string must be a byte string, not unicode, because that is
+    # how the subprocess returns its output. If this string is changed to
+    # unicode then the test will pass, but real world tests can still crash.
+    unicode_string_valid_utf8 = b'Output with \xe2\x98\x83 â'
+    unicode_string_invalid_utf8 = b'Output with invalid \xa0\xa1'
+
+    test_names = [u'Testâ-\xe2\x98\x83',
+                  u'Test1â-\xe2\x98\x83']
+    self.test_run_name = u'Unicode Test Runâ-\xe2\x98\x83'
+    encoding = 'utf-8'
+
+    self.PrepareRunTestsCall(decorate_output=[True, False],
+                             results=[(0, unicode_string_valid_utf8),
+                                      (0, unicode_string_invalid_utf8)],
+                             test_names=test_names,
+                             encoding=encoding)
+    self._mox.ReplayAll()
+
+    (success, result_codes, result_string) = self.runner.RunTests()
+    self.assertTrue(success)
+    self.assertEqual([0, 0], result_codes)
+    self.assertEqual(unicode, type(result_string))
+
+    # The valid utf-8 output should still be present and unchanged, but the
+    # invalid string should have the invalid characters replaced.
+    self.assertIn(unicode_string_valid_utf8.decode(encoding), result_string)
+
+    string_invalid_output = (
+        '! Output contains characters not valid in %s encoding !\n%s' %
+        (encoding, unicode_string_invalid_utf8.decode(encoding, 'replace')))
+    self.assertIn(string_invalid_output, result_string)
+
     self._mox.VerifyAll()
 
   def testPostIncrementalOutput(self):

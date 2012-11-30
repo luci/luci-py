@@ -1,5 +1,5 @@
 #!/usr/bin/python2.7
-#
+# coding=utf-8
 # Copyright 2011 Google Inc. All Rights Reserved.
 
 """Unit tests for classes implemented in test_request_message.py."""
@@ -300,7 +300,7 @@ class TestHelper(unittest.TestCase):
   INVALID_REQUIRED_STRING_VALUES = (INVALID_STRING_VALUES +
                                     EXTRA_OPTIONAL_STRING_VALUES)
   VALID_STRING_VALUES = ['a', '42', '[]', os.path.join('a', 'b', 'c'),
-                         r'a\b\c']
+                         r'a\b\c', u'\xe2\x99\x88', u'âââ']
   VALID_OPTIONAL_STRING_VALUES = (VALID_STRING_VALUES +
                                   EXTRA_OPTIONAL_STRING_VALUES)
 
@@ -363,6 +363,9 @@ class TestHelper(unittest.TestCase):
   INVALID_CLEANUP_VALUES = (INVALID_STRING_VALUES +
                             ['mad', '7zip', 'binaries', 'tests'])
 
+  VALID_ENCODING_VALUES = ['ascii', 'utf_8', 'latin_1']
+  INVALID_ENCODING_VALUES = ['mad', 'my_encoding', 'None', 'unicode']
+
   def AssertValidValues(self, value_key, values):
     for value in values:
       message = 'Validating %s with %s' % (value_key, value)
@@ -413,10 +416,10 @@ class TestObjectTest(TestHelper):
 
   def testIsValid(self):
     # Start with default success.
-    self.assertTrue(self.test_request.IsValid())
     errors = []
-    self.assertTrue(self.test_request.IsValid(errors))
-    self.assertFalse(errors)
+    self.assertTrue(self.test_request.IsValid(errors), errors)
+    self.assertFalse(errors, errors)
+    self.assertTrue(self.test_request.IsValid())
 
     # And then a few more valid values
     self.AssertValidValues('test_name', TestHelper.VALID_STRING_VALUES)
@@ -444,16 +447,17 @@ class TestObjectTest(TestHelper):
     new_object = test_request_message.TestObject()
     self.assertTrue(new_object.ParseTestRequestMessageText(
         test_request_message.Stringize(self.test_request, json_readable=True)),
-                    'Bad string: %s' % str(self.test_request))
+                    'Bad string: %s' % unicode(self.test_request))
     self.assertEqual(new_object, self.test_request)
 
     # Full object
     full_object = TestObjectTest.GetFullObject()
-    self.assertTrue(full_object.IsValid())
+    errors = []
+    self.assertTrue(full_object.IsValid(errors), errors)
     new_object = test_request_message.TestObject()
     self.assertTrue(new_object.ParseTestRequestMessageText(
         test_request_message.Stringize(full_object, json_readable=True)),
-                    'Bad string: %s' % str(full_object))
+                    'Bad string: %s' % unicode(full_object))
     self.assertEqual(new_object, full_object)
 
 
@@ -497,10 +501,10 @@ class TestConfigurationTest(TestHelper):
 
   def testIsValid(self):
     # Start with default success.
-    self.assertTrue(self.test_request.IsValid())
     errors = []
-    self.assertTrue(self.test_request.IsValid(errors))
-    self.assertFalse(errors)
+    self.assertTrue(self.test_request.IsValid(errors), errors)
+    self.assertFalse(errors, errors)
+    self.assertTrue(self.test_request.IsValid())
 
     # And then a few more valid values
     self.AssertValidValues('config_name',
@@ -580,16 +584,17 @@ class TestConfigurationTest(TestHelper):
     new_object = test_request_message.TestConfiguration()
     self.assertTrue(new_object.ParseTestRequestMessageText(
         test_request_message.Stringize(self.test_request, json_readable=True)),
-                    'Bad string: %s' % str(self.test_request))
+                    'Bad string: %s' % unicode(self.test_request))
     self.assertEqual(new_object, self.test_request)
 
     # Full object
     full_object = TestConfigurationTest.GetFullObject()
-    self.assertTrue(full_object.IsValid())
+    errors = []
+    self.assertTrue(full_object.IsValid(errors), errors)
     new_object = test_request_message.TestConfiguration()
     self.assertTrue(new_object.ParseTestRequestMessageText(
         test_request_message.Stringize(full_object, json_readable=True)),
-                    'Bad string: %s' % str(full_object))
+                    'Bad string: %s' % unicode(full_object))
     self.assertEqual(new_object, full_object)
 
 
@@ -616,6 +621,7 @@ class TestCaseTest(TestHelper):
         restart_on_failure=TestHelper.VALID_BOOLEAN_VALUES[-1],
         output_destination=
         TestHelper.VALID_OPTIONAL_OUTPUT_DESTINATION_VALUES[-1],
+        encoding=TestHelper.VALID_ENCODING_VALUES[-1],
         cleanup=test_request_message.TestRun.VALID_CLEANUP_VALUES[-1],
         failure_email=TestHelper.VALID_OPTIONAL_STRING_VALUES[-1],
         label=TestHelper.VALID_OPTIONAL_STRING_VALUES[-1],
@@ -651,11 +657,10 @@ class TestCaseTest(TestHelper):
 
   def testIsValid(self):
     # Start with default success.
-    self.assertTrue(self.test_request.IsValid())
     errors = []
-    self.assertTrue(self.test_request.IsValid(errors))
-    self.assertFalse(errors)
-
+    self.assertTrue(self.test_request.IsValid(errors), errors)
+    self.assertFalse(errors, errors)
+    self.assertTrue(self.test_request.IsValid())
     # And then a few more valid values
     self.AssertValidValues('test_case_name',
                            TestHelper.VALID_STRING_VALUES)
@@ -691,6 +696,8 @@ class TestCaseTest(TestHelper):
                            TestHelper.VALID_BOOLEAN_VALUES)
     self.AssertValidValues('output_destination',
                            TestHelper.VALID_OPTIONAL_OUTPUT_DESTINATION_VALUES)
+    self.AssertValidValues('encoding',
+                           TestHelper.VALID_ENCODING_VALUES)
 
     self.AssertValidValues('cleanup',
                            test_request_message.TestRun.VALID_CLEANUP_VALUES)
@@ -748,6 +755,9 @@ class TestCaseTest(TestHelper):
                              TestHelper.INVALID_OUTPUT_DESTINATION_VALUES)
     self.test_request.output_destination = None
 
+    self.AssertInvalidValues('encoding', TestHelper.INVALID_ENCODING_VALUES)
+    self.test_request.encoding = TestHelper.VALID_ENCODING_VALUES[-1]
+
     self.AssertInvalidValues('failure_email', TestHelper.INVALID_STRING_VALUES)
     self.test_request.failure_email = None
 
@@ -768,16 +778,17 @@ class TestCaseTest(TestHelper):
     new_object = test_request_message.TestCase()
     self.assertTrue(new_object.ParseTestRequestMessageText(
         test_request_message.Stringize(self.test_request, json_readable=True)),
-                    'Bad string: %s' % str(self.test_request))
+                    'Bad string: %s' % unicode(self.test_request))
     self.assertEqual(new_object, self.test_request)
 
     # Full object
     full_object = TestCaseTest.GetFullObject()
-    self.assertTrue(full_object.IsValid())
+    errors = []
+    self.assertTrue(full_object.IsValid(errors), errors)
     new_object = test_request_message.TestCase()
     self.assertTrue(new_object.ParseTestRequestMessageText(
         test_request_message.Stringize(full_object, json_readable=True)),
-                    'Bad string: %s' % str(full_object))
+                    'Bad string: %s' % unicode(full_object))
     self.assertEqual(new_object, full_object)
 
 
@@ -789,12 +800,13 @@ class TestRunTest(TestHelper):
         configuration=test_request_message.TestConfiguration(
             config_name='a', os='a', browser='a', cpu='a'),
         result_url=TestHelper.VALID_URL_VALUES[0],
-        ping_url=TestHelper.VALID_URL_VALUES[0])
+        ping_url=TestHelper.VALID_URL_VALUES[0],
+        encoding=TestHelper.VALID_ENCODING_VALUES[0])
 
   @staticmethod
   def GetFullObject():
     return test_request_message.TestRun(
-        test_run_name='a',
+        test_run_name=TestHelper.VALID_STRING_VALUES[-1],
         configuration=TestConfigurationTest.GetFullObject(),
         env_vars=TestHelper.VALID_ENV_VARS[-1],
         data=TestHelper.VALID_URL_LIST_VALUES[-1],
@@ -807,7 +819,8 @@ class TestRunTest(TestHelper):
         output_destination=
         TestHelper.VALID_OPTIONAL_OUTPUT_DESTINATION_VALUES[-1],
         cleanup=test_request_message.TestRun.VALID_CLEANUP_VALUES[-1],
-        restart_on_failure=TestHelper.VALID_BOOLEAN_VALUES[-1])
+        restart_on_failure=TestHelper.VALID_BOOLEAN_VALUES[-1],
+        encoding=TestHelper.VALID_ENCODING_VALUES[-1])
 
   def testNoReferences(self):
     # Ensure that Test Run makes copies of its input, not references.
@@ -834,10 +847,10 @@ class TestRunTest(TestHelper):
 
   def testIsValid(self):
     # Start with default success.
-    self.assertTrue(self.test_request.IsValid())
     errors = []
-    self.assertTrue(self.test_request.IsValid(errors))
-    self.assertFalse(errors)
+    self.assertTrue(self.test_request.IsValid(errors), errors)
+    self.assertFalse(errors, errors)
+    self.assertTrue(self.test_request.IsValid())
 
     # And then a few more valid values
     self.AssertValidValues('test_run_name',
@@ -879,6 +892,7 @@ class TestRunTest(TestHelper):
     self.AssertValidValues('env_vars', TestHelper.VALID_ENV_VARS)
     self.AssertValidValues('restart_on_failure',
                            TestHelper.VALID_BOOLEAN_VALUES)
+    self.AssertValidValues('encoding', TestHelper.VALID_ENCODING_VALUES)
 
     # Now try invalid values.
     self.AssertInvalidValues('test_run_name',
@@ -939,22 +953,26 @@ class TestRunTest(TestHelper):
     self.AssertInvalidValues('env_vars', TestHelper.INVALID_ENV_VARS)
     self.test_request.env_vars = None
 
+    self.AssertInvalidValues('encoding', TestHelper.INVALID_ENCODING_VALUES)
+    self.test_request.encoding = TestHelper.VALID_ENCODING_VALUES[-1]
+
   def testStringize(self):
     # Vanilla object.
     new_object = test_request_message.TestRun()
     self.assertTrue(new_object.ParseTestRequestMessageText(
         test_request_message.Stringize(self.test_request, json_readable=True)),
-                    'Bad string: %s' % str(self.test_request))
+                    'Bad string: %s' % unicode(self.test_request))
     self.assertEqual(new_object, self.test_request)
 
     # Full object
     full_object = TestRunTest.GetFullObject()
-    self.assertTrue(full_object.IsValid())
+    errors = []
+    self.assertTrue(full_object.IsValid(errors), errors)
 
     new_object = test_request_message.TestRun()
     self.assertTrue(new_object.ParseTestRequestMessageText(
         test_request_message.Stringize(full_object, json_readable=True)),
-                    'Bad string: %s' % str(full_object))
+                    'Bad string: %s' % unicode(full_object))
     self.assertEqual(new_object, full_object)
 
 
