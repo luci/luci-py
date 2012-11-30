@@ -10,6 +10,7 @@
 
 import logging
 import math
+import os
 import random
 import time
 import urllib
@@ -19,7 +20,7 @@ import urllib2
 COUNT_KEY = 'UrlOpenAttempt'
 
 
-def UrlOpen(url, data=None, max_tries=1, wait_duration=None):
+def UrlOpen(url, data=None, max_tries=5, wait_duration=None):
   """Attempts to open the given url multiple times.
 
   UrlOpen will attempt to open the the given url several times, stopping
@@ -92,3 +93,31 @@ def UrlOpen(url, data=None, max_tries=1, wait_duration=None):
   logging.error('Unable to open given url, %s, after %d attempts.',
                 url, max_tries)
   return None
+
+
+def DownloadFile(local_file, url):
+  """Downloads the data from the given url and saves it in the local_file.
+
+  Args:
+    local_file: Where to save the data downloaded from the url.
+    url: Where to fetch the data from.
+
+  Returns:
+    True if the file is successfully downloaded.
+  """
+  if not os.path.isabs(local_file):
+    local_file = os.path.abspath(local_file)
+
+  url_data = UrlOpen(url)
+
+  if url_data is None:
+    return False
+
+  try:
+    with open(local_file, 'wb') as f:
+      f.write(url_data)
+  except IOError as e:
+    logging.error('Failed to write to %s\n%s', local_file, e)
+    return False
+
+  return True

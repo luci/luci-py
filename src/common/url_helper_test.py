@@ -8,7 +8,10 @@
 
 
 import logging
+import os
+import stat
 import StringIO
+import tempfile
 import time
 import unittest
 import urllib
@@ -80,7 +83,7 @@ class UrlHelperTest(unittest.TestCase):
 
     self._mox.ReplayAll()
 
-    self.assertFalse(url_helper.UrlOpen('url'))
+    self.assertFalse(url_helper.UrlOpen('url', max_tries=1))
 
     self._mox.VerifyAll()
 
@@ -92,9 +95,9 @@ class UrlHelperTest(unittest.TestCase):
 
     self._mox.ReplayAll()
 
-    # Even though we set max_tries to 5, we should only try once since
+    # Even though we set max_tries to 10, we should only try once since
     # we get an HTTPError.
-    self.assertEqual(url_helper.UrlOpen('url', max_tries=5), None)
+    self.assertEqual(url_helper.UrlOpen('url', max_tries=10), None)
 
     self._mox.VerifyAll()
 
@@ -124,6 +127,64 @@ class UrlHelperTest(unittest.TestCase):
 
     self.assertEqual(url_helper.UrlOpen('url', data=data), None)
     self._mox.VerifyAll()
+
+  def testDownloadFile(self):
+    local_file = None
+    try:
+      local_file = tempfile.NamedTemporaryFile(delete=False)
+      local_file.close()
+
+      self._mox.StubOutWithMock(url_helper, 'UrlOpen')
+      file_data = 'data'
+      url_helper.UrlOpen(mox.IgnoreArg()).AndReturn(file_data)
+      self._mox.ReplayAll()
+
+      self.assertTrue(url_helper.DownloadFile(local_file.name,
+                                              'http://www.fakeurl.com'))
+      with open(local_file.name) as f:
+        self.assertEqual(file_data, f.read())
+
+      self._mox.VerifyAll()
+    finally:
+      if local_file:
+        os.remove(local_file.name)
+
+  def testDownloadFileDownloadError(self):
+    try:
+      fake_file = 'fake_local_file.fake'
+
+      self._mox.StubOutWithMock(url_helper, 'UrlOpen')
+      url_helper.UrlOpen(mox.IgnoreArg()).AndReturn(None)
+      self._mox.ReplayAll()
+
+      self.assertFalse(url_helper.DownloadFile(fake_file,
+                                               'http://www.fakeurl.com'))
+      self._mox.VerifyAll()
+    finally:
+      if os.path.exists(fake_file):
+        os.remove(fake_file)
+
+  def testDownloadFileSavingErrors(self):
+    file_readonly = None
+    try:
+      file_readonly = tempfile.NamedTemporaryFile(delete=False)
+      file_readonly.close()
+      os.chmod(file_readonly.name, stat.S_IREAD)
+
+      self._mox.StubOutWithMock(url_helper, 'UrlOpen')
+
+      url_helper.UrlOpen(mox.IgnoreArg()).AndReturn('data')
+      url_helper.logging.error(mox.StrContains('Failed'), mox.IgnoreArg(),
+                               mox.IgnoreArg())
+      self._mox.ReplayAll()
+
+      self.assertFalse(url_helper.DownloadFile('fake_file.fake',
+                                               'http://www.fakeurl.com'))
+
+      self._mox.VerifyAll()
+    finally:
+      if file_readonly:
+        os.remove(file_readonly.name)
 
 
 if __name__ == '__main__':

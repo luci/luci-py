@@ -235,14 +235,14 @@ class TestLocalTestRunner(unittest.TestCase):
     self.runner = local_test_runner.LocalTestRunner(
         self.data_file_name, data_folder_name=data_folder_name)
 
-    self._mox.StubOutWithMock(local_test_runner, 'downloader')
+    self._mox.StubOutWithMock(local_test_runner, 'url_helper')
     data_dir = os.path.basename(self.runner.data_dir)
-    local_test_runner.downloader.DownloadFile(
+    local_test_runner.url_helper.DownloadFile(
         mox.Regex(DATA_FILE_REGEX % (data_dir, self.local_file1)),
-        data_url).AndReturn(None)
-    local_test_runner.downloader.DownloadFile(
+        data_url).AndReturn(True)
+    local_test_runner.url_helper.DownloadFile(
         mox.Regex(DATA_FILE_REGEX % (data_dir, self.local_file2)),
-        data_url_with_local_name[0]).AndReturn(None)
+        data_url_with_local_name[0]).AndReturn(True)
 
     self._mox.StubOutWithMock(local_test_runner, 'zipfile')
     self.mock_zipfile = self._mox.CreateMock(zipfile.ZipFile)

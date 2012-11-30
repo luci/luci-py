@@ -85,13 +85,11 @@ import sys
 import tempfile
 import threading
 import time
-import urllib2
 import urlparse
 import zipfile
 
 from common import test_request_message
 from common import url_helper
-from test_runner import downloader
 
 
 # The amount of characters to read in each pass inside _RunCommand,
@@ -499,11 +497,7 @@ class LocalTestRunner(object):
         file_name = data_url[data_url.rfind('/') + 1:]
       local_file = path.join(self.data_dir, file_name)
       logging.info('Downloading: %s from %s', local_file, data_url)
-      try:
-        downloader.DownloadFile(local_file, data_url)
-      except (urllib2.URLError, IOError), e:
-        logging.exception('Failed to download data file from: %s.\n'
-                          'Exception: %s', data_url, e)
+      if not url_helper.DownloadFile(local_file, data_url):
         return False
 
       zip_file = None

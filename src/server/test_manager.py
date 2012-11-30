@@ -54,9 +54,6 @@ _TEST_RUN_SWARM_FILE_NAME = 'test_run.swarm'
 # Name of python script to execute on the remote machine to run a test.
 _TEST_RUNNER_SCRIPT = 'local_test_runner.py'
 
-# Name of python script to download test files.
-_DOWNLOADER_SCRIPT = 'downloader.py'
-
 # Name of python script to validate swarm file format.
 _TEST_REQUEST_MESSAGE_SCRIPT = 'test_request_message.py'
 
@@ -1227,17 +1224,11 @@ class TestRequestManager(object):
     # The local script runner.
     # We place the local running script in the current working directory (cwd)
     # of the slave, and place the rest of the scripts in relation to cwd. E.g.,
-    # if the local script runner imports common.downloader, we create the folder
-    # common and put downloader.py in it.
+    # if the local script runner imports common.url_helper, we create the folder
+    # common and put url_helper.py in it.
     file_paths.append(
         (os.path.join(SWARM_ROOT_DIR, _TEST_RUNNER_DIR, _TEST_RUNNER_SCRIPT),
          test_run.working_dir, _TEST_RUNNER_SCRIPT))
-
-    # The downloader_file.
-    file_paths.append(
-        (os.path.join(SWARM_ROOT_DIR, _TEST_RUNNER_DIR, _DOWNLOADER_SCRIPT),
-         os.path.join(test_run.working_dir, _TEST_RUNNER_DIR),
-         _DOWNLOADER_SCRIPT))
 
     # The trm script.
     file_paths.append(
