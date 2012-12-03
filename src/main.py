@@ -346,7 +346,7 @@ class ResultHandler(webapp2.RequestHandler):
     # we can't find the success parameter in the request.
     success = self.request.get('s', 'False') == 'True'
     exit_codes = urllib.unquote_plus(self.request.get('x'))
-    overwrite = urllib.unquote_plus(self.request.get('o'))
+    overwrite = self.request.get('o', 'False') == 'True'
     machine_id = urllib.unquote_plus(self.request.get('id'))
 
     # TODO(user): The result string should probably be in the body of the
