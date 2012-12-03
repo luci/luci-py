@@ -203,6 +203,7 @@ class SlaveMachine(object):
       except ValueError:
         self._PostFailedExecuteResults('Invalid response: ' + response_str)
       else:
+        logging.debug('Valid server response:\n %s', response_str)
         self._ProcessResponse(response)
 
       # Continuously loop until we hit the requested number of iterations.
@@ -228,6 +229,7 @@ class SlaveMachine(object):
       assert self._come_back >= 0
       time.sleep(self._come_back)
     else:
+      logging.debug('Commads received, executing now')
       # Run the commands.
       for rpc in commands:
         function_name, args = ParseRPC(rpc)

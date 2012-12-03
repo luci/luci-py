@@ -490,6 +490,7 @@ class TestRequestManager(object):
     if runner.done and not overwrite:
       logging.error('Got a additional response for runner=%s (key %s), '
                     'not good', runner.GetName(), runner.key())
+      logging.debug('Dropped result string was:\n%s', result_string)
       return False
 
     runner.ran_successfully = success
