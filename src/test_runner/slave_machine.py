@@ -357,7 +357,7 @@ class SlaveMachine(object):
     url_helper.UrlOpen(self._result_url,
                        {'x': str(result_code),
                         's': False,
-                        'r': result_string},
+                        url_helper.RESULT_STRING_KEY: result_string},
                        max_tries=self._max_url_tries)
 
   def LogRPC(self, args):

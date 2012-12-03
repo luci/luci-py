@@ -351,7 +351,8 @@ class ResultHandler(webapp2.RequestHandler):
 
     # TODO(user): The result string should probably be in the body of the
     # request.
-    result_string = urllib.unquote_plus(self.request.get('result_output'))
+    result_string = urllib.unquote_plus(self.request.get(
+        url_helper.RESULT_STRING_KEY))
 
     test_request_manager = CreateTestManager()
     if test_request_manager.UpdateTestResult(runner, machine_id,

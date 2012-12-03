@@ -18,6 +18,7 @@ import urllib2
 
 
 COUNT_KEY = 'UrlOpenAttempt'
+RESULT_STRING_KEY = 'result_output'
 
 
 def UrlOpen(url, data=None, max_tries=5, wait_duration=None):

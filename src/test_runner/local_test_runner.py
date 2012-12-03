@@ -337,7 +337,8 @@ class LocalTestRunner(object):
     """
     data = {'n': self.test_run.test_run_name,
             'c': self.test_run.configuration.config_name,
-            'result_output': output, 's': result}
+            url_helper.RESULT_STRING_KEY: output,
+            's': result}
     if (hasattr(self.test_run, 'instance_index') and
         self.test_run.instance_index is not None):
       assert hasattr(self.test_run, 'num_instances')
