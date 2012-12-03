@@ -52,8 +52,7 @@ def UrlOpen(url, data=None, max_tries=5, wait_duration=None):
     logging.error('Invalid wait duration, %d, passed in.', wait_duration)
     return None
 
-  if data is None:
-    data = {}
+  data = data or {}
 
   if COUNT_KEY in data:
     logging.error('%s already existed in the data passed into UlrOpen. It '
@@ -106,8 +105,7 @@ def DownloadFile(local_file, url):
   Returns:
     True if the file is successfully downloaded.
   """
-  if not os.path.isabs(local_file):
-    local_file = os.path.abspath(local_file)
+  local_file = os.path.abspath(local_file)
 
   url_data = UrlOpen(url)
 
