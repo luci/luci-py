@@ -51,6 +51,9 @@ _TIMEOUT_FACTOR = 600
 # for the instance running tests.
 _TEST_RUN_SWARM_FILE_NAME = 'test_run.swarm'
 
+# Name of python script containing constants.
+_SWARM_CONSTANTS_SCRIPT = 'swarm_constants.py'
+
 # Name of python script to execute on the remote machine to run a test.
 _TEST_RUNNER_SCRIPT = 'local_test_runner.py'
 
@@ -1230,6 +1233,13 @@ class TestRequestManager(object):
     file_paths.append(
         (os.path.join(SWARM_ROOT_DIR, _TEST_RUNNER_DIR, _TEST_RUNNER_SCRIPT),
          test_run.working_dir, _TEST_RUNNER_SCRIPT))
+
+    # The swarm constants script.
+    file_paths.append(
+        (os.path.join(SWARM_ROOT_DIR, _COMMON_DIR,
+                      _SWARM_CONSTANTS_SCRIPT),
+         os.path.join(test_run.working_dir, _COMMON_DIR),
+         _SWARM_CONSTANTS_SCRIPT))
 
     # The trm script.
     file_paths.append(

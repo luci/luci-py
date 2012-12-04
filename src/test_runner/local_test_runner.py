@@ -89,6 +89,7 @@ import urlparse
 import zipfile
 
 from common import test_request_message
+from common import swarm_constants
 from common import url_helper
 
 
@@ -122,25 +123,6 @@ def EnqueueOutput(out, queue):
       break
     queue.put(data, block=True)
   out.close()
-
-
-def Restart():
-  """Restarts this machine.
-
-  Raises:
-    Error: When it doesn't know how to restart the machine (unknown platform).
-  """
-  if sys.platform == 'win32' or sys.platform == 'cygwin':
-    subprocess.call(['shutdown', '-r', '-f', '-t', '1'])
-  elif sys.platform == 'linux2' or sys.platform == 'darwin':
-    subprocess.call(['sudo', 'shutdown', '-r', 'now'])
-
-  # Sleep for 5 seconds to ensure we don't try to do anymore work while
-  # the OS is preparing to shutdown.
-  time.sleep(5)
-
-  # The machine should be shutdown by now.
-  raise Error('Unable to restart machine')
 
 
 class Error(Exception):
@@ -713,24 +695,30 @@ class LocalTestRunner(object):
     """
     logging.exception(message)
 
-  def ShutdownOrReturn(self, return_value):
-    """Restart the machine if required or return return_value.
+  def ReturnExitCode(self, return_value):
+    """Return the restart exit code if the machine should restart.
 
+    If the machine shouldn't restart then just return the value passed in.
     The machine is restarted if restart on failure was enable and at least
     one test failed.
 
     Args:
-      return_value: The value this function returns if it doesn't restart the
-          machine.
+      return_value: The value this function returns if the machine shouldn't
+          restart.
 
     Returns:
-      return_value if the machine is still on.
+      return_value: Either the restart exit code or |return_value|.
     """
+    if return_value == swarm_constants.RESTART_EXIT_CODE:
+      logging.error('return_value and restart exit code are the same, unable '
+                    'to signal no restart')
+
     logging.info('Checking if restart required.')
     if self.restart_on_failure and not self.success:
-      logging.info('Attempting to restart machine.')
-      Restart()
-    logging.info('No restart required.')
+      logging.info('Restart required.')
+      return_value = swarm_constants.RESTART_EXIT_CODE
+    else:
+      logging.info('No restart required.')
     return return_value
 
 
@@ -747,7 +735,7 @@ def main():
                     help='The name of a subfolder to create in the directory '
                     'containing the test runner to use for setting up and '
                     'running the tests. Defaults to None.')
-  parser.add_option('-r', '--max_url_retries', default=15,
+  parser.add_option('-r', '--max_url_retries', default=15, type='int',
                     help='The maximum number of times url messages will '
                     'attemp to be sent before accepting failure. Defaults to '
                     '%default')
@@ -790,13 +778,13 @@ def main():
 
   try:
     if runner.RetrieveDataAndRunTests():
-      return runner.ShutdownOrReturn(0)
+      return runner.ReturnExitCode(0)
   except Exception, e:  # pylint: disable-msg=W0703
     # We want to catch all so that we can report all errors, even internal ones.
     logging.exception(e)
 
   runner.PublishInternalErrors()
-  return runner.ShutdownOrReturn(1)
+  return runner.ReturnExitCode(1)
 
 
 if __name__ == '__main__':

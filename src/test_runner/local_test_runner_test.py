@@ -17,6 +17,7 @@ import unittest
 import zipfile
 
 
+from common import swarm_constants
 from common import test_request_message
 from common import url_helper
 from third_party.mox import mox
@@ -687,38 +688,25 @@ class TestLocalTestRunner(unittest.TestCase):
 
   def testShutdownOrReturn(self):
     self.CreateValidFile()
-
-    self._mox.StubOutWithMock(local_test_runner, 'Restart')
-
-    restart_message = 'Restarting machine'
-    local_test_runner.Restart().AndRaise(local_test_runner.Error(
-        restart_message))
-
-    self._mox.ReplayAll()
-
     runner = local_test_runner.LocalTestRunner(self.data_file_name,
                                                restart_on_failure=False)
     return_value = 0
 
     # No test failures and restart on failure disabled.
     runner.success = True
-    self.assertEqual(return_value, runner.ShutdownOrReturn(return_value))
+    self.assertEqual(return_value, runner.ReturnExitCode(return_value))
 
     # Test failures with restart on failure disabled.
-    self.assertEqual(return_value, runner.ShutdownOrReturn(return_value))
+    self.assertEqual(return_value, runner.ReturnExitCode(return_value))
 
     # No test failures with restart on failure enabled.
     runner.restart_on_failure = True
-    self.assertEqual(return_value, runner.ShutdownOrReturn(return_value))
+    self.assertEqual(return_value, runner.ReturnExitCode(return_value))
 
     # Test failures with restart of feature enabled.
     runner.success = False
-    self.assertRaisesRegexp(local_test_runner.Error,
-                            restart_message,
-                            runner.ShutdownOrReturn,
-                            return_value)
-
-    self._mox.VerifyAll()
+    self.assertEqual(swarm_constants.RESTART_EXIT_CODE,
+                     runner.ReturnExitCode(return_value))
 
 
 if __name__ == '__main__':

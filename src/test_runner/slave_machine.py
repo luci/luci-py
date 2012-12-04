@@ -25,12 +25,32 @@ import sys
 import time
 
 # pylint: disable-msg=C6204
+from common import swarm_constants
 from common import url_helper
 # pylint: enable-msg=C6204
 
 
 # The default name of the text file containing the machine id of this machine.
 DEFAULT_MACHINE_ID_FILE = 'swarm_bot.id'
+
+
+def Restart():
+  """Restarts this machine.
+
+  Raises:
+    Exception: When it is unable to restart the machine.
+  """
+  if sys.platform == 'win32' or sys.platform == 'cygwin':
+    subprocess.call(['shutdown', '-r', '-f', '-t', '1'])
+  elif sys.platform == 'linux2' or sys.platform == 'darwin':
+    subprocess.call(['sudo', 'shutdown', '-r', 'now'])
+
+  # Sleep for 5 seconds to ensure we don't try to do anymore work while
+  # the OS is preparing to shutdown.
+  time.sleep(5)
+
+  # The machine should be shutdown by now.
+  raise Exception('Unable to restart machine')
 
 
 # pylint: disable-msg=W0102
@@ -229,7 +249,7 @@ class SlaveMachine(object):
       assert self._come_back >= 0
       time.sleep(self._come_back)
     else:
-      logging.debug('Commads received, executing now')
+      logging.debug('Commands received, executing now:\n%s', commands)
       # Run the commands.
       for rpc in commands:
         function_name, args = ParseRPC(rpc)
@@ -488,6 +508,8 @@ class SlaveMachine(object):
       logging.debug('Running command: %s', commands)
       subprocess.check_call(commands)
     except subprocess.CalledProcessError as e:
+      if e.returncode == swarm_constants.RESTART_EXIT_CODE:
+        Restart()
       # The exception message will contain the commands that were
       # run and error code returned.
       raise SlaveRPCError(str(e))
