@@ -10,7 +10,7 @@ indexes:
 # automatically uploaded to the admin console when you next deploy
 # your application using appcfg.py.
 
-- kind: HashEntry
+- kind: ContentEntry
   ancestor: yes
   properties:
   - name: last_access

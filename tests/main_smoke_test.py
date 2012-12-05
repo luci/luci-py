@@ -141,7 +141,7 @@ class AppTestSignedIn(unittest.TestCase):
         payload='')
     if response != '':
       self.assertEqual(
-          "Unable to find a hash with key '%s'." % hash_key,
+          "Unable to find a ContentEntry with key '%s'." % hash_key,
           response)
     else:
       self.assertEqual('', response)
@@ -175,7 +175,7 @@ class AppTestSignedIn(unittest.TestCase):
           ISOLATE_SERVER_URL + 'content/store/%s/%s?priority=%d' % (
               self.namespace, hash_key, priority),
           payload=hash_contents)
-    self.assertEqual('hash content saved.', response)
+    self.assertEqual('Content saved.', response)
 
     # Verify the object is present.
     response = self.fetch(
@@ -189,7 +189,13 @@ class AppTestSignedIn(unittest.TestCase):
         ISOLATE_SERVER_URL + 'content/retrieve/%s/%s' % (
             self.namespace, hash_key),
         payload=None)
-    self.assertEqual(hash_contents, response)
+    if hash_contents != response:
+      # Process it manually in case it's several megabytes, unittest happily
+      # print it out.
+      self.fail(
+          'Expected %s (%d bytes), got %s (%d bytes)' %
+          (hash_contents[:512], len(hash_contents),
+            response[:512], len(response)))
 
     self.RemoveAndVerify(hash_key)
 
@@ -249,12 +255,15 @@ class AppTestSignedIn(unittest.TestCase):
     except urllib2.HTTPError as e:
       self.assertEqual(400, e.code)
 
-  def testCorrupted_Large(self):
-    # Try and upload a corrupted 40mb blobstore.
-    hash_contents = (BINARY_DATA * 128) * 1024 * 40
-    hash_key = hashlib.sha1(hash_contents + 'x').hexdigest()
-    # TODO(maruel): This code tests that the code is not checking properly.
-    self.UploadHashAndRetrieveHelper(hash_key, hash_contents)
+# TODO(maruel): Add a /content/verify/namespace/hash_key to ensure a large
+# object is verified? Otherwise, it's run in a taskqueue at an indeterminate
+# time in the future.
+#  def testCorrupted_Large(self):
+#    # Try and upload a corrupted 40mb blobstore.
+#    hash_contents = (BINARY_DATA * 128) * 1024 * 40
+#    hash_key = hashlib.sha1(hash_contents + 'x').hexdigest()
+#    # TODO(maruel): This code tests that the code is not checking properly.
+#    self.UploadHashAndRetrieveHelper(hash_key, hash_contents)
 
 
 class AppTestSignedOut(unittest.TestCase):
