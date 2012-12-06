@@ -134,7 +134,7 @@ def GetContentByHash(namespace, hash_key):
   Returns None if it no ContentEntry matches.
   """
   if not VALID_SHA1_RE_COMPILED.match(hash_key):
-    logging.error('Given an invalid sha-1 value, %s', hash_key)
+    logging.error('Given an invalid key, %s', hash_key)
     return None
 
   try:
@@ -200,7 +200,7 @@ class ACLRequestHandler(webapp2.RequestHandler):
     return webapp2.RequestHandler.dispatch(self)
 
 
-def split_payload(request, chunk_size, max_chunks):
+def SplitPayload(request, chunk_size, max_chunks):
   """Splits a binary payload into elements of |chunk_size| length.
 
   Returns each chunks.
@@ -227,12 +227,12 @@ def split_payload(request, chunk_size, max_chunks):
   return [content[i * chunk_size: (i + 1) * chunk_size] for i in xrange(count)]
 
 
-def payload_to_sha1_hashes(request):
+def PayloadToSha1Hashes(request):
   """Converts a raw payload into SHA-1 hashes as bytes."""
-  return split_payload(request, SHA1_DIGEST_LENGTH, MAX_KEYS_PER_CALL)
+  return SplitPayload(request, SHA1_DIGEST_LENGTH, MAX_KEYS_PER_CALL)
 
 
-def read_blob(blob, callback):
+def ReadBlob(blob, callback):
   """Reads a BlobInfo/BlobKey and pass the data through callback.
 
   Returns the amount of data read.
@@ -248,10 +248,7 @@ def read_blob(blob, callback):
   return position
 
 
-### Restricted handlers
-
-
-def delete_blobinfo_async(blobinfos):
+def DeleteBlobinfoAsync(blobinfos):
   """Deletes BlobInfo properly.
 
   blobstore.delete*() do not accept a list of BlobInfo, they only accept a list
@@ -260,7 +257,7 @@ def delete_blobinfo_async(blobinfos):
   blobstore.delete_async((b.key() for b in blobinfos))
 
 
-def incremental_delete(query, delete, check=None):
+def IncrementalDelete(query, delete, check=None):
   """Applies |delete| to objects in a query asynchrously.
 
   Returns True if at least one object was found.
@@ -286,6 +283,9 @@ def incremental_delete(query, delete, check=None):
   return found
 
 
+### Restricted handlers
+
+
 class RestrictedCleanupOldEntriesWorkerHandler(webapp2.RequestHandler):
   """Removes the old data from the datastore.
 
@@ -304,11 +304,11 @@ class RestrictedCleanupOldEntriesWorkerHandler(webapp2.RequestHandler):
       blobs_to_delete = [
         i.content_reference for i in to_delete if i.content_reference
       ]
-      delete_blobinfo_async(blobs_to_delete)
+      DeleteBlobinfoAsync(blobs_to_delete)
       # Then delete the entities.
       db.delete_async(to_delete)
 
-    incremental_delete(
+    IncrementalDelete(
         ContentEntry.all().filter('last_access <', old_cutoff),
         delete=delete_entry_and_blobs)
     logging.info('Done deleting old entries')
@@ -332,7 +332,7 @@ class RestrictedCleanupTestingEntriesWorkerHandler(webapp2.RequestHandler):
     orphaned_namespaces = []
     for namespace in namespace_query:
       logging.debug('Namespace %s', namespace.name())
-      found = incremental_delete(
+      found = IncrementalDelete(
           ContentEntry.all(keys_only=True).ancestor(
               namespace).filter(
               'last_access <', old_cutoff_testing),
@@ -365,8 +365,8 @@ class RestrictedCleanupOrphanedBlobsWorkerHandler(webapp2.RequestHandler):
 
     while True:
       try:
-        incremental_delete(
-            blobstore_query, check=check, delete=delete_blobinfo_async)
+        IncrementalDelete(
+            blobstore_query, check=check, delete=DeleteBlobinfoAsync)
         # Didn't throw, can now move on.
         break
       except datastore_errors.BadRequestError:
@@ -381,17 +381,17 @@ class RestrictedObliterateWorkerHandler(webapp2.RequestHandler):
     if not self.request.headers.get('X-AppEngine-QueueName'):
       self.abort(405, detail='Only internal task queue tasks can do this')
     logging.info('Deleting blobs')
-    incremental_delete(
+    IncrementalDelete(
         blobstore.BlobInfo.all().order('creation'),
-        delete_blobinfo_async)
+        DeleteBlobinfoAsync)
 
     logging.info('Deleting ContentEntry')
-    incremental_delete(
+    IncrementalDelete(
         ContentEntry.all(keys_only=True).order('creation'),
         db.delete_async)
 
     logging.info('Deleting Namespaces')
-    incremental_delete(
+    IncrementalDelete(
         ContentNamespace.all(keys_only=True).order('creation'),
         db.delete_async)
     logging.info('Finally done!')
@@ -420,7 +420,7 @@ class RestrictedTagWorkerHandler(webapp2.RequestHandler):
   def post(self, namespace, year, month, day):
     if not self.request.headers.get('X-AppEngine-QueueName'):
       self.abort(405, detail='Only internal task queue tasks can do this')
-    raw_hash_digests = payload_to_sha1_hashes(self)
+    raw_hash_digests = PayloadToSha1Hashes(self)
     logging.info(
         'Stamping %d entries in namespace %s', len(raw_hash_digests), namespace)
 
@@ -467,7 +467,7 @@ class RestrictedVerifyWorkerHandler(webapp2.RequestHandler):
     count = 0
     try:
       # Start a loop where it reads the data in block.
-      count = read_blob(entry.content_reference, callback)
+      count = ReadBlob(entry.content_reference, callback)
 
       # Need a fixup for zipped content to complete the decompression.
       if namespace.endswith('-gzip'):
@@ -517,7 +517,7 @@ class ContainsHashHandler(ACLRequestHandler):
     """This is a POST even though it doesn't modify any data, but it makes
     it easier for python scripts.
     """
-    raw_hash_digests = payload_to_sha1_hashes(self)
+    raw_hash_digests = PayloadToSha1Hashes(self)
     logging.info(
         'Checking namespace %s for %d hash digests',
         namespace, len(raw_hash_digests))
@@ -587,7 +587,7 @@ class StoreBlobstoreContentByHashHandler(
       contents = self.get_uploads('hash_contents')
     if len(contents) != 1:
       # Delete all upload files since they aren't linked to anything.
-      delete_blobinfo_async(contents)
+      DeleteBlobinfoAsync(contents)
       msg = 'Found %d files, there should only be 1.' % len(contents)
       self.abort(400, detail=msg)
 
@@ -598,7 +598,7 @@ class StoreBlobstoreContentByHashHandler(
       logging.warning(msg)
       self.response.out.write(msg)
       # Delete all upload files since they aren't linked to anything.
-      delete_blobinfo_async(contents)
+      DeleteBlobinfoAsync(contents)
       return
 
     try:
