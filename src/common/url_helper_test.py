@@ -51,14 +51,30 @@ class UrlHelperTest(unittest.TestCase):
 
     self._mox.VerifyAll()
 
-  def testUrlOpenSuccess(self):
+  def testUrlOpenGETSuccess(self):
+    url = 'http://my.url.com'
+
     response = 'True'
-    url_helper.urllib2.urlopen(mox.IgnoreArg(), mox.IgnoreArg()).AndReturn(
+    url_helper.urllib2.urlopen(mox.StrContains(url)).AndReturn(
         StringIO.StringIO(response))
 
     self._mox.ReplayAll()
 
-    self.assertEqual(url_helper.UrlOpen('url'), response)
+    self.assertEqual(url_helper.UrlOpen(url, method='GET'), response)
+
+    self._mox.VerifyAll()
+
+  def testUrlOpenPOSTSuccess(self):
+    url = 'http://my.url.com'
+
+    response = 'True'
+    url_helper.urllib2.urlopen(url, mox.IgnoreArg()).AndReturn(
+        StringIO.StringIO(response))
+
+    self._mox.ReplayAll()
+
+    self.assertEqual(url_helper.UrlOpen(url, method='POST'),
+                     response)
 
     self._mox.VerifyAll()
 
@@ -136,7 +152,7 @@ class UrlHelperTest(unittest.TestCase):
 
       self._mox.StubOutWithMock(url_helper, 'UrlOpen')
       file_data = 'data'
-      url_helper.UrlOpen(mox.IgnoreArg()).AndReturn(file_data)
+      url_helper.UrlOpen(mox.IgnoreArg(), method='GET').AndReturn(file_data)
       self._mox.ReplayAll()
 
       self.assertTrue(url_helper.DownloadFile(local_file.name,
@@ -154,7 +170,7 @@ class UrlHelperTest(unittest.TestCase):
       fake_file = 'fake_local_file.fake'
 
       self._mox.StubOutWithMock(url_helper, 'UrlOpen')
-      url_helper.UrlOpen(mox.IgnoreArg()).AndReturn(None)
+      url_helper.UrlOpen(mox.IgnoreArg(), method='GET').AndReturn(None)
       self._mox.ReplayAll()
 
       self.assertFalse(url_helper.DownloadFile(fake_file,
@@ -173,7 +189,7 @@ class UrlHelperTest(unittest.TestCase):
 
       self._mox.StubOutWithMock(url_helper, 'UrlOpen')
 
-      url_helper.UrlOpen(mox.IgnoreArg()).AndReturn('data')
+      url_helper.UrlOpen(mox.IgnoreArg(), method='GET').AndReturn('data')
       url_helper.logging.error(mox.StrContains('Failed'), mox.IgnoreArg(),
                                mox.IgnoreArg())
       self._mox.ReplayAll()

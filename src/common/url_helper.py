@@ -15,13 +15,17 @@ import random
 import time
 import urllib
 import urllib2
+import urlparse
 
 
 COUNT_KEY = 'UrlOpenAttempt'
 RESULT_STRING_KEY = 'result_output'
 
+# The index of the query elements from urlparse.
+QUERY_INDEX = 4
 
-def UrlOpen(url, data=None, max_tries=5, wait_duration=None):
+
+def UrlOpen(url, data=None, max_tries=5, wait_duration=None, method='POST'):
   """Attempts to open the given url multiple times.
 
   UrlOpen will attempt to open the the given url several times, stopping
@@ -38,6 +42,7 @@ def UrlOpen(url, data=None, max_tries=5, wait_duration=None):
         This must be greater than or equal to 0. If no value is given then a
         random value between 0.1 and 10 will be chosen each time (with
         exponential back off to give later retries a longer wait).
+    method: Indicates if the request should be a GET or POST request.
 
   Returns:
     The reponse from the url contacted. If it failed to connect or is given
@@ -63,8 +68,15 @@ def UrlOpen(url, data=None, max_tries=5, wait_duration=None):
   for attempt in range(max_tries):
     data[COUNT_KEY] = attempt
     try:
-      # Simply specifying data to urlopen makes it a POST.
-      url_response = urllib2.urlopen(url, urllib.urlencode(data)).read()
+      encoded_data = urllib.urlencode(data)
+      if method == 'POST':
+        # Simply specifying data to urlopen makes it a POST.
+        url_response = urllib2.urlopen(url, encoded_data).read()
+      else:
+        url_parts = list(urlparse.urlparse(url))
+        url_parts[QUERY_INDEX] = encoded_data
+        url = urlparse.urlunparse(url_parts)
+        url_response = urllib2.urlopen(url).read()
     except urllib2.HTTPError as e:
       # An HTTPError means we reached the server, so don't retry.
       logging.error('Able to connect to %s but an exception was thrown.\n%s',
@@ -107,7 +119,7 @@ def DownloadFile(local_file, url):
   """
   local_file = os.path.abspath(local_file)
 
-  url_data = UrlOpen(url)
+  url_data = UrlOpen(url, method='GET')
 
   if url_data is None:
     return False
