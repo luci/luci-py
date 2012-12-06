@@ -125,7 +125,7 @@ def GetContentByHash(namespace, hash_key):
 
   Returns None if it no ContentEntry matches.
   """
-  length = GetHashAlgo(namespace).digest * 2
+  length = GetHashAlgo(namespace).digest_size * 2
   if not re.match(r'[a-f0-9]{' + str(length) + r'}', hash_key):
     logging.error('Given an invalid key, %s', hash_key)
     return None
@@ -163,7 +163,7 @@ def CreateEntry(namespace, hash_key):
   Returns None if there is a problem generating the entry or if an entry already
   exists with the given hex encoded SHA-1 hash |hash_key|.
   """
-  length = GetHashAlgo(namespace).digest * 2
+  length = GetHashAlgo(namespace).digest_size * 2
   if not re.match(r'[a-f0-9]{' + str(length) + r'}', hash_key):
     logging.error('Given an invalid key, %s', hash_key)
     return None
@@ -234,7 +234,7 @@ def SplitPayload(request, chunk_size, max_chunks):
 def PayloadToHashes(request, namespace):
   """Converts a raw payload into SHA-1 hashes as bytes."""
   return SplitPayload(
-      request, GetHashAlgo(namespace).digest, MAX_KEYS_PER_CALL)
+      request, GetHashAlgo(namespace).digest_size, MAX_KEYS_PER_CALL)
 
 
 def ReadBlob(blob, callback):
