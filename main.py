@@ -45,14 +45,6 @@ VALID_DOMAINS = (
     'google.com',
 )
 
-SHA1_DIGEST_LENGTH = hashlib.sha1().digest_size
-SHA1_HEXDIGEST_LENGTH = SHA1_DIGEST_LENGTH * 2
-# The SHA-1 must be lower case. This simplifies the code, e.g. the keys are
-# unambiguous, no need to constantly call .lower().
-VALID_SHA1_RE = r'[a-f0-9]{' + str(SHA1_HEXDIGEST_LENGTH) + r'}'
-VALID_SHA1_RE_COMPILED = re.compile(VALID_SHA1_RE)
-VALID_NAMESPACE_RE = r'[a-z0-9A-Z\-]+'
-
 
 class ContentNamespace(db.Model):
   """Used as an ancestor of ContentEntry to create mutiple content-addressed
@@ -133,7 +125,8 @@ def GetContentByHash(namespace, hash_key):
 
   Returns None if it no ContentEntry matches.
   """
-  if not VALID_SHA1_RE_COMPILED.match(hash_key):
+  length = GetHashAlgo(namespace).digest * 2
+  if not re.match(r'[a-f0-9]{' + str(length) + r'}', hash_key):
     logging.error('Given an invalid key, %s', hash_key)
     return None
 
@@ -170,12 +163,23 @@ def CreateEntry(namespace, hash_key):
   Returns None if there is a problem generating the entry or if an entry already
   exists with the given hex encoded SHA-1 hash |hash_key|.
   """
+  length = GetHashAlgo(namespace).digest * 2
+  if not re.match(r'[a-f0-9]{' + str(length) + r'}', hash_key):
+    logging.error('Given an invalid key, %s', hash_key)
+    return None
+
   namespace_model_key = GetContentNamespaceKey(namespace)
   key = db.Key.from_path('ContentEntry', hash_key, parent=namespace_model_key)
 
   if ContentEntry.all(keys_only=True).filter('__key__ =', key).get():
     return None
   return ContentEntry(key=key)
+
+
+def GetHashAlgo(_namespace):
+  """Returns an instance of the hashing algorithm for the namespace."""
+  # TODO(maruel): Support other algorithms.
+  return hashlib.sha1()
 
 
 class ACLRequestHandler(webapp2.RequestHandler):
@@ -227,9 +231,10 @@ def SplitPayload(request, chunk_size, max_chunks):
   return [content[i * chunk_size: (i + 1) * chunk_size] for i in xrange(count)]
 
 
-def PayloadToSha1Hashes(request):
+def PayloadToHashes(request, namespace):
   """Converts a raw payload into SHA-1 hashes as bytes."""
-  return SplitPayload(request, SHA1_DIGEST_LENGTH, MAX_KEYS_PER_CALL)
+  return SplitPayload(
+      request, GetHashAlgo(namespace).digest, MAX_KEYS_PER_CALL)
 
 
 def ReadBlob(blob, callback):
@@ -420,7 +425,7 @@ class RestrictedTagWorkerHandler(webapp2.RequestHandler):
   def post(self, namespace, year, month, day):
     if not self.request.headers.get('X-AppEngine-QueueName'):
       self.abort(405, detail='Only internal task queue tasks can do this')
-    raw_hash_digests = PayloadToSha1Hashes(self)
+    raw_hash_digests = PayloadToHashes(self, namespace)
     logging.info(
         'Stamping %d entries in namespace %s', len(raw_hash_digests), namespace)
 
@@ -455,7 +460,7 @@ class RestrictedVerifyWorkerHandler(webapp2.RequestHandler):
       logging.error('Should not be called with inline content')
       return
 
-    digest = hashlib.sha1()
+    digest = GetHashAlgo(namespace)
     if namespace.endswith('-gzip'):
       # Decompress before hashing.
       zlib_state = zlib.decompressobj()
@@ -517,7 +522,7 @@ class ContainsHashHandler(ACLRequestHandler):
     """This is a POST even though it doesn't modify any data, but it makes
     it easier for python scripts.
     """
-    raw_hash_digests = PayloadToSha1Hashes(self)
+    raw_hash_digests = PayloadToHashes(self, namespace)
     logging.info(
         'Checking namespace %s for %d hash digests',
         namespace, len(raw_hash_digests))
@@ -654,7 +659,9 @@ class StoreContentByHashHandler(ACLRequestHandler):
         logging.error(e)
         self.abort(400, str(e))
 
-    if hashlib.sha1(raw_data).hexdigest() != hash_key:
+    digest = GetHashAlgo(namespace)
+    digest.update(raw_data)
+    if digest.hexdigest() != hash_key:
       msg = 'SHA-1 and data do not match'
       logging.error(msg)
       self.abort(400, msg)
@@ -755,8 +762,9 @@ def CreateApplication():
     VALID_DOMAINS = ('example.com',) + VALID_DOMAINS
 
   # Namespace can be letters and numbers.
-  namespace = r'/<namespace:' + VALID_NAMESPACE_RE + '>'
-  hashkey = r'/<hash_key:' + VALID_SHA1_RE + '>'
+  namespace = r'/<namespace:[a-z0-9A-Z\-]+>'
+  # Do not enforce a length limit.
+  hashkey = r'/<hash_key:[a-f0-9]{4,}>'
   namespace_key = namespace + hashkey
   return webapp2.WSGIApplication([
       webapp2.Route(
