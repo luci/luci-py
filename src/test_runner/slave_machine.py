@@ -40,17 +40,25 @@ def Restart():
   Raises:
     Exception: When it is unable to restart the machine.
   """
+  restart_cmd = None
   if sys.platform == 'win32' or sys.platform == 'cygwin':
-    subprocess.call(['shutdown', '-r', '-f', '-t', '1'])
+    restart_cmd = ['shutdown', '-r', '-f', '-t', '1']
   elif sys.platform == 'linux2' or sys.platform == 'darwin':
-    subprocess.call(['sudo', 'shutdown', '-r', 'now'])
+    restart_cmd = ['sudo', 'shutdown', '-r', 'now']
+
+  if restart_cmd:
+    logging.info('Restarting machine with command %s', restart_cmd)
+    try:
+      subprocess.call(restart_cmd)
+    except OSError as e:
+      logging.exception(e)
 
   # Sleep for 5 seconds to ensure we don't try to do anymore work while
   # the OS is preparing to shutdown.
   time.sleep(5)
 
   # The machine should be shutdown by now.
-  raise Exception('Unable to restart machine')
+  raise SlaveError('Unable to restart machine')
 
 
 # pylint: disable-msg=W0102

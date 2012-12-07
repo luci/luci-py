@@ -16,6 +16,7 @@ import time
 import unittest
 
 
+from common import swarm_constants
 from common import url_helper
 from third_party.mox import mox
 from test_runner import slave_machine
@@ -33,6 +34,7 @@ class TestSlaveMachine(unittest.TestCase):
     self._mox.StubOutWithMock(url_helper, 'UrlOpen')
     self._mox.StubOutWithMock(time, 'sleep')
     self._mox.StubOutWithMock(logging, 'error')
+    self._mox.StubOutWithMock(logging, 'exception')
 
   def tearDown(self):
     self._mox.UnsetStubs()
@@ -130,12 +132,12 @@ class TestSlaveMachine(unittest.TestCase):
       slave._StoreFile(path, name, contents)
 
   # Mocks subprocess.check_call and raises exception if specified.
-  def _MockSubprocessCheckCall(self, commands, exception=False):
+  def _MockSubprocessCheckCall(self, commands, exit_code=0):
     self._mox.StubOutWithMock(subprocess, 'check_call')
 
-    if exception:
+    if exit_code:
       subprocess.check_call(
-          commands).AndRaise(subprocess.CalledProcessError(-1, commands))
+          commands).AndRaise(subprocess.CalledProcessError(exit_code, commands))
     else:
       subprocess.check_call(commands)
 
@@ -794,12 +796,13 @@ class TestSlaveMachine(unittest.TestCase):
 
     # Mock subprocess to raise exception.
     full_commands = [sys.executable] + args
-    self._MockSubprocessCheckCall(commands=full_commands, exception=True)
+    exit_code = -1
+    self._MockSubprocessCheckCall(commands=full_commands, exit_code=exit_code)
 
     # Mock the call to post failed results.
     self._MockPostFailedExecuteResults(
-        slave, "Command '%s' returned non-zero exit status -1"
-        % str(full_commands))
+        slave, "Command '%s' returned non-zero exit status %d"
+        % (str(full_commands), exit_code))
 
     self._mox.ReplayAll()
 
@@ -826,6 +829,37 @@ class TestSlaveMachine(unittest.TestCase):
     self._mox.ReplayAll()
 
     slave.Start(iterations=1)
+
+    self._mox.VerifyAll()
+
+  def testRunCommandsRPCRestartFails(self):
+    function_name = 'RunCommands'
+    args = [u'is an', u'awesome', u'language']
+
+    slave = slave_machine.SlaveMachine()
+    commands = [slave_machine.BuildRPC(function_name, args)]
+    response = self._CreateResponse(commands=commands, result_url='here.com')
+
+    # Mock initial job request.
+    url_helper.UrlOpen(
+        mox.IgnoreArg(), data=mox.IgnoreArg(), max_tries=mox.IgnoreArg()
+        ).AndReturn(response)
+
+    # Mock subprocess to raise exception and signal a restart.
+    self._MockSubprocessCheckCall(commands=[sys.executable]+args,
+                                  exit_code=swarm_constants.RESTART_EXIT_CODE)
+
+    # Mock out the the restart attempt to raise a subprocess exception.
+    self._mox.StubOutWithMock(subprocess, 'call')
+    subprocess.call(mox.IgnoreArg()).AndRaise(OSError('Invalid command'))
+
+    # Handle the fallout from the failed restart.
+    logging.exception(mox.IgnoreArg())
+    time.sleep(mox.IgnoreArg())
+
+    self._mox.ReplayAll()
+
+    self.assertRaises(slave_machine.SlaveError, slave.Start, iterations=1)
 
     self._mox.VerifyAll()
 
