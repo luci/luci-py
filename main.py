@@ -246,10 +246,16 @@ def ReadBlob(blob, callback):
   chunk_size = blobstore.MAX_BLOB_FETCH_SIZE
   while True:
     data = blobstore.fetch_data(blob, position, position + chunk_size - 1)
+    logging.debug('Read %d bytes', len(data))
     callback(data)
     position += len(data)
     if len(data) < chunk_size:
       break
+    # Make sure it's unallocated. Otherwise the python subsystem could keep the
+    # data in the heap for a while waiting for the next GC but the AppEngine
+    # subsystem could decide that this instance is using too much memory.
+    # Deleting this 1mb chunk explicitly helps work around this issue.
+    del data
   return position
 
 
@@ -464,7 +470,12 @@ class RestrictedVerifyWorkerHandler(webapp2.RequestHandler):
     if namespace.endswith('-gzip'):
       # Decompress before hashing.
       zlib_state = zlib.decompressobj()
-      callback = lambda data: digest.update(zlib_state.decompress(data))
+      def gzip_decompress(data):
+        decompressed_data = zlib_state.decompress(data)
+        digest.update(decompressed_data)
+        # Make sure the memory is unallocated.
+        del decompressed_data
+      callback = gzip_decompress
     else:
       callback = digest.update
 
