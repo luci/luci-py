@@ -755,6 +755,11 @@ class RootHandler(webapp2.RequestHandler):
         (url, url))
 
 
+class WarmupHandler(webapp2.RequestHandler):
+  def get(self):
+    self.response.write('ok')
+
+
 def CreateApplication():
   if os.environ['SERVER_SOFTWARE'].startswith('Development') :
     # Add example.com as a valid domain when testing.
@@ -805,6 +810,8 @@ def CreateApplication():
       webapp2.Route(
           r'/content/retrieve' + namespace_key, RetrieveContentByHashHandler),
       webapp2.Route(r'/', RootHandler),
+
+      webapp2.Route(r'/_ah/warmup', WarmupHandler),
   ])
 
 
