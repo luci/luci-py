@@ -627,6 +627,11 @@ class StoreBlobstoreContentByHashHandler(
     entry.is_isolated = (priority == 0)
     entry.put()
 
+    if entry.content_reference.size < MIN_SIZE_FOR_BLOBSTORE:
+      logging.error(
+          'User stored a file too small %d in blobstore, fix client code.',
+          entry.content_reference.size)
+
     # Trigger a verification. It can't be done inline since it could be too
     # long to complete.
     url = '/restricted/taskqueue/verify/%s/%s' % (namespace, hash_key)
