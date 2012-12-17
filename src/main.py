@@ -31,9 +31,9 @@ _NUM_USER_TEST_RUNNERS_PER_PAGE = 50
 _NUM_RECENT_ERRORS_TO_DISPLAY = 10
 
 _HOME_LINK = '<a href=/secure/main>Home</a>'
-_PROFILE_LINK = '<a href=/secure/user_profile>Profile</a>'
 _MACHINE_LIST_LINK = '<a href=/secure/machine_list>Machine List</a>'
-
+_PROFILE_LINK = '<a href=/secure/user_profile>Profile</a>'
+_STATS_LINK = '<a href=/secure/stats>Stats</a>'
 
 _SECURE_CANCEL_URL = '/secure/cancel'
 _SECURE_CHANGE_WHITELIST_URL = '/secure/change_whitelist'
@@ -50,12 +50,16 @@ def GenerateTopbar():
     The topbar to display.
   """
   if users.get_current_user():
-    topbar = ('%s |  <a href="%s">Sign out</a><br/> %s | %s | % s' %
+    # TODO(user): These links should only be visible if the user is able to
+    # access them (i.e. the user is an admin or has been given permission to
+    # access these pages).
+    topbar = ('%s |  <a href="%s">Sign out</a><br/> %s | %s | %s | %s' %
               (users.get_current_user().nickname(),
                users.create_logout_url('/'),
                _HOME_LINK,
                _PROFILE_LINK,
-               _MACHINE_LIST_LINK))
+               _MACHINE_LIST_LINK,
+               _STATS_LINK))
   else:
     topbar = '<a href="%s">Sign in</a>' % users.create_login_url('/')
 
@@ -416,6 +420,19 @@ class ShowMessageHandler(webapp2.RequestHandler):
       self.response.out.write('Cannot find message for: %s' % key)
 
 
+class StatsHandler(webapp2.RequestHandler):
+  """Show all the collected swarm stats."""
+
+  def get(self):  # pylint: disable-msg=C6409
+    params = {
+        'topbar': GenerateTopbar(),
+        'runner_wait_stats': test_manager.GetRunnerWaitStats(),
+    }
+
+    path = os.path.join(os.path.dirname(__file__), 'stats.html')
+    self.response.out.write(template.render(path, params))
+
+
 class GetMatchingTestCasesHandler(webapp2.RequestHandler):
   """Get all the keys for any test runner that match a given test case name."""
 
@@ -760,6 +777,7 @@ def CreateApplication():
                                   ('/secure/retry', RetryHandler),
                                   ('/secure/show_message',
                                    ShowMessageHandler),
+                                  ('/secure/stats', StatsHandler),
                                   ('/tasks/poll', PollHandler),
                                   ('/test', TestRequestHandler),
                                   ('/upload', UploadHandler),

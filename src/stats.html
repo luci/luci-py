@@ -1,0 +1,39 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html>
+<head>
+<title>Stats</title>
+<link rel="stylesheet" type="text/css" href="/css/swarm_style.css"/>
+</head>
+<body>
+
+<div style="text-align: right;">
+<p>{{topbar|safe}}</p>
+</div>
+
+<h1>Runner Wait Times</h1>
+<table id="runner-wait-table"
+    summary="This table lists the wait times of all the runner, grouped by dimensions.">
+<tr>
+<th>Runner Dimensions</th>
+<th>Mean Wait</th>
+<th>Median Wait</th>
+<th>Longest Wait</th>
+</tr>
+{% for runner_dimensions, runner_summary in runner_wait_stats.items %}
+<tr class="request {% cycle even,odd %}">
+<td>{{runner_dimensions}}</td>
+<td>{{runner_summary[0]}}</td>
+<td>{{runner_summary[1]}}</td>
+<td>{{runner_summary[2]}}</td>
+</tr>
+{% endfor %}
+</table>
+
+<div style="float: left;"><p>
+  <a target="_blank" href="http://code.google.com/appengine/"><img border="0"
+   src="http://code.google.com/appengine/images/appengine-noborder-120x30.gif"
+   alt="Powered by Google App Engine" /></a></p>
+</p></div>
+
+</body>
+</html>

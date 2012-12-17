@@ -1022,34 +1022,6 @@ class TestRequestManager(object):
         started=runner.started.date())
     runner_assignment.put()
 
-  def GetRunnerWaitStats(self):
-    """Returns the stats for how long runners are waiting.
-
-    Returns:
-      A dictionary where the key is the dimension, and the value is
-      (mean wait, median wait, longest wait) for getting an assigned
-      machine. Only values from the last RUNNER_STATS_EVALUATION_CUTOFF_DAYS
-      are consider.
-    """
-    # TODO(user): This should probably get just generated once every x hours
-    # as a cron job and this function just returns the cached value.
-
-    time_mappings = {}
-    for runner_assignment in RunnerAssignment.all():
-      time_mappings.setdefault(runner_assignment.dimensions, []).append(
-          runner_assignment.wait_time)
-
-    results = {}
-    for (dimension, times) in time_mappings.iteritems():
-      sorted_times = sorted(times)
-
-      mean = sum(sorted_times) / len(sorted_times)
-      median = sorted_times[len(sorted_times) / 2]
-
-      results[dimension] = (mean, median, sorted_times[-1])
-
-    return results
-
   def _ComputeComebackValue(self, try_count):
     """Computes when the slave machine should return based on given try_count.
 
@@ -1338,6 +1310,35 @@ def GetAllMachines(sort_by='machine_id'):
     sort_by = 'machine_id'
 
   return (machine for machine in MachineAssignment.gql('ORDER BY %s' % sort_by))
+
+
+def GetRunnerWaitStats():
+  """Returns the stats for how long runners are waiting.
+
+  Returns:
+    A dictionary where the key is the dimension, and the value is
+    (mean wait, median wait, longest wait) for getting an assigned
+    machine. Only values from the last RUNNER_STATS_EVALUATION_CUTOFF_DAYS
+    are consider.
+  """
+  # TODO(user): This should probably get just generated once every x hours
+  # as a cron job and this function just returns the cached value.
+
+  time_mappings = {}
+  for runner_assignment in RunnerAssignment.all():
+    time_mappings.setdefault(runner_assignment.dimensions, []).append(
+        runner_assignment.wait_time)
+
+  results = {}
+  for (dimension, times) in time_mappings.iteritems():
+    sorted_times = sorted(times)
+
+    mean = sum(sorted_times) / len(sorted_times)
+    median = sorted_times[len(sorted_times) / 2]
+
+    results[dimension] = (mean, median, sorted_times[-1])
+
+  return results
 
 
 def GetTestRunners(sort_by, ascending, limit, offset):

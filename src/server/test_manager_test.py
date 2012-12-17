@@ -1343,11 +1343,11 @@ class TestRequestManagerTest(unittest.TestCase):
     self._SetupLoadFileExpectations(contents='script contents')
     self._mox.ReplayAll()
 
-    self.assertEqual({}, self._manager.GetRunnerWaitStats())
+    self.assertEqual({}, test_manager.GetRunnerWaitStats())
 
     # Create a pending Request that should have no affect on the stats.
     self._manager.ExecuteTestRequest(self._GetRequestMessage())
-    self.assertEqual({}, self._manager.GetRunnerWaitStats())
+    self.assertEqual({}, test_manager.GetRunnerWaitStats())
 
     # Start the runner and ensure the mean, median and max times are now set.
     self._ExecuteRegister(MACHINE_IDS[0])
@@ -1355,7 +1355,7 @@ class TestRequestManagerTest(unittest.TestCase):
     runner = test_manager.TestRunner.all().get()
     wait = runner.GetWaitTime()
     expected_waits = {runner.GetDimensionsString(): (wait, wait, wait)}
-    self.assertEqual(expected_waits, self._manager.GetRunnerWaitStats())
+    self.assertEqual(expected_waits, test_manager.GetRunnerWaitStats())
 
     self._mox.VerifyAll()
 
@@ -1380,7 +1380,7 @@ class TestRequestManagerTest(unittest.TestCase):
                  (max_count + median_count))
 
     expected_waits = {dimensions: (mean_wait, median_time, max_time)}
-    self.assertEqual(expected_waits, self._manager.GetRunnerWaitStats())
+    self.assertEqual(expected_waits, test_manager.GetRunnerWaitStats())
 
   def testGetTestRunners(self):
     self.assertEqual(0,

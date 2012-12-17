@@ -383,6 +383,21 @@ class AppTest(unittest.TestCase):
     response = self.app.post('/tasks/poll')
     self.assertEqual('200 OK', response.status)
 
+  def testStatsHandler(self):
+    self._mox.StubOutWithMock(main_app.template, 'render')
+    main_app.template.render(mox.IgnoreArg(), mox.IgnoreArg()).AndReturn('')
+    self._mox.ReplayAll()
+
+    # Add a RunnerAssignment
+    runner_assignment = test_manager.RunnerAssignment(
+        dimension='', wait_time=0, started=datetime.date.today())
+    runner_assignment.put()
+
+    response = self.app.get('/secure/stats')
+    self.assertTrue('200' in response.status)
+
+    self._mox.VerifyAll()
+
 
 if __name__ == '__main__':
   unittest.main()
