@@ -11,12 +11,16 @@ import json
 import unittest
 
 
+from google.appengine import runtime
 from google.appengine.ext import testbed
 from common import test_request_message
 from server import main as main_app
 from server import test_manager
 from server import user_manager
 from third_party.mox import mox
+
+# A simple machine id constant to use in tests.
+MACHINE_ID = '12345678-12345678-12345678-12345678'
 
 
 class AppTest(unittest.TestCase):
@@ -65,11 +69,12 @@ class AppTest(unittest.TestCase):
   def _GetRequest(self):
     return test_manager.TestRequest.all().get()
 
-  def _CreateTestRunner(self, exit_code=None, started=None):
+  def _CreateTestRunner(self, machine_id=None, exit_code=None, started=None):
     request = test_manager.TestRequest(message=self._GetRequestMessage())
     request.put()
 
     test_runner = test_manager.TestRunner(test_request=request,
+                                          machine_id=machine_id,
                                           exit_code=exit_code,
                                           started=started)
     test_runner.put()
@@ -239,30 +244,29 @@ class AppTest(unittest.TestCase):
 
     # Valid attributes.
     attributes = ('{"dimensions": {"os": ["win-xp"]},'
-                  '"id": "12345678-12345678-12345678-12345678"}')
+                  '"id": "%s"}' % MACHINE_ID)
     response = self.app.post('/poll_for_test', {'attributes': attributes})
     self.assertEquals('200 OK', response.status)
     response = json.loads(response.body)
     self.assertEquals(sorted(['try_count', 'id', 'come_back']),
                       sorted(response.keys()))
-    self.assertEquals('12345678-12345678-12345678-12345678', response['id'])
+    self.assertEquals(MACHINE_ID, response['id'])
 
-  def testResultHandler(self):
-    result = 'result string'
-    machine_id = '12345678-12345678-12345678-12345678'
-
-    runner = self._CreateTestRunner()
-    runner.machine_id = machine_id
-    runner.put()
-
+  def _PostResults(self, runner, result):
     url_parameters = {
         'r': runner.key(),
-        'id': machine_id,
+        'id': runner.machine_id,
         's': True,
         'result_output': result,
         }
+    return self.app.post('/result', url_parameters)
 
-    response = self.app.post('/result', url_parameters)
+  def testResultHandler(self):
+    runner = self._CreateTestRunner(machine_id=MACHINE_ID,
+                                    started=datetime.datetime.now())
+
+    result = 'result string'
+    response = self._PostResults(runner, result)
     self.assertEquals('200 OK', response.status)
 
     # Get the lastest version of the runner and ensure it has the correct
@@ -270,6 +274,49 @@ class AppTest(unittest.TestCase):
     runner = test_manager.TestRunner.all().get()
     self.assertTrue(runner.ran_successfully)
     self.assertEqual(result, runner.GetResultString())
+
+  # Ensure that if we lose a test's results due to the file api acting up,
+  # we retry the test to get the results instead of giving the user no output.
+  def testResultHandlerTimedOut(self):
+    runner = self._CreateTestRunner(machine_id=MACHINE_ID,
+                                    started=datetime.datetime.now())
+
+    self._mox.StubOutWithMock(test_manager.files.blobstore, 'create')
+    self._mox.StubOutWithMock(test_manager.logging, 'warning')
+
+    test_manager.files.blobstore.create(mox.IgnoreArg()).AndRaise(
+        runtime.DeadlineExceededError)
+    test_manager.logging.warning(mox.StrContains('Deadline exceeded'))
+
+    test_manager.files.blobstore.create(mox.IgnoreArg()).AndRaise(
+        runtime.DeadlineExceededError)
+    self._mox.ReplayAll()
+
+    # The runner should be automatically retried.
+    missing_results = 'missing results'
+    self._PostResults(runner, missing_results)
+
+    # Get the lastest version of the runner and ensure it has the correct
+    # values.
+    runner = test_manager.TestRunner.all().get()
+    self.assertFalse(runner.done)
+    self.assertIsNone(runner.started)
+    self.assertEqual(1, runner.automatic_retry_count)
+    self.assertEqual('', runner.GetResultString())
+
+    # This runner has been automatically retried too many times, so give up.
+    runner.automatic_retry_count = test_manager.MAX_AUTOMATIC_RETRIES
+    runner.machine_id = MACHINE_ID
+    runner.put()
+    self._PostResults(runner, missing_results)
+
+    # Get the lastest version of the runner and ensure it has the correct
+    # values.
+    runner = test_manager.TestRunner.all().get()
+    self.assertTrue(runner.done)
+    self.assertIn('Deadline exceeded', runner.GetResultString())
+
+    self._mox.VerifyAll()
 
   def testChangeWhitelistHandlerParams(self):
     # Make sure the link redirects to the right place.

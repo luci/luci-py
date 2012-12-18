@@ -534,7 +534,7 @@ class TestRequestManager(object):
       if result_blob_key:
         runner.result_string_reference = result_blob_key
       else:
-        runner.errors = ('There was a problem when creating the blob store. '
+        runner.errors = ('There was a problem when creating the blobstore. '
                          'The results where lost.')
     else:
       runner.errors = errors
@@ -790,6 +790,31 @@ class TestRequestManager(object):
             'machine_tag': machine.tag if machine else 'Unknown',
             'output': runner.GetResultString()}
 
+  def AutomaticallyRetryRunner(self, runner):
+    """Attempt to automaticlly retry runner.
+
+    This runner will only be retried if it has't already been automatically
+    retried too many times.
+
+    Args:
+      runner: The runner to retry.
+
+    Returns:
+      True if the runner was successfully setup to get run again.
+    """
+    if runner.automatic_retry_count < MAX_AUTOMATIC_RETRIES:
+      # Don't change the created time since it is not the user's fault
+      # we are retrying it (so it should have high prority to run again).
+      runner.machine_id = None
+      runner.done = False
+      runner.started = None
+      runner.ping = None
+      runner.automatic_retry_count += 1
+      runner.put()
+      return True
+
+    return False
+
   def AbortStaleRunners(self):
     """Abort any runners are taking too long to run or too long to find a match.
 
@@ -811,14 +836,7 @@ class TestRequestManager(object):
         'WHERE done = :1 AND ping != :2 AND ping < :3',
         False, None, timeout_cutoff)
     for runner in query:
-      if runner.automatic_retry_count < MAX_AUTOMATIC_RETRIES:
-        # Don't restart the created time since it is not the users fault
-        # we are retrying it (so it should have high prority to go again).
-        runner.machine_id = None
-        runner.started = None
-        runner.ping = None
-        runner.automatic_retry_count += 1
-        runner.put()
+      if self.AutomaticallyRetryRunner(runner):
         logging.warning('TRM.AbortStaleRunners retrying runner %s with key %s. '
                         'Attempt %d', runner.GetName(), runner.key(),
                         runner.automatic_retry_count)

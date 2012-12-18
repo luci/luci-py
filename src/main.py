@@ -15,7 +15,9 @@ import logging
 import os.path
 import urllib
 
+from google.appengine import runtime
 from google.appengine.api import users
+from google.appengine.ext import blobstore
 from google.appengine.ext import db
 import webapp2
 from google.appengine.ext.webapp import blobstore_handlers
@@ -359,15 +361,28 @@ class ResultHandler(webapp2.RequestHandler):
         url_helper.RESULT_STRING_KEY))
 
     test_request_manager = CreateTestManager()
-    if test_request_manager.UpdateTestResult(runner, machine_id,
-                                             success=success,
-                                             exit_codes=exit_codes,
-                                             result_string=result_string,
-                                             overwrite=overwrite):
-      self.response.out.write('Successfully update the runner results.')
-    else:
-      self.response.set_status(400)
-      self.response.out.write('Failed to update the runner results.')
+    try:
+      if test_request_manager.UpdateTestResult(runner, machine_id,
+                                               success=success,
+                                               exit_codes=exit_codes,
+                                               result_string=result_string,
+                                               overwrite=overwrite):
+        self.response.out.write('Successfully update the runner results.')
+      else:
+        self.response.set_status(400)
+        self.response.out.write('Failed to update the runner results.')
+    except runtime.DeadlineExceededError:
+      if test_request_manager.AutomaticallyRetryRunner(runner):
+        logging.warning('Deadline exceeded while trying to store runner '
+                        'results, runner will automatically get retried.')
+      else:
+        msg = ('Deadline exceeded while trying to store runner results and '
+               'unable to automatically retry the runner (the runner was '
+               'already retried %d times)' % runner.automatic_retry_count)
+        logging.exception(msg)
+        runner.errors = msg
+        runner.done = True
+        runner.put()
 
 
 class PollHandler(webapp2.RequestHandler):
@@ -696,8 +711,10 @@ class UploadHandler(blobstore_handlers.BlobstoreUploadHandler):
       self.response.out.write('Only the server should attempt to upload '
                               'blobstore data directly.')
       self.response.set_status(403)
+      return
 
     upload_result = self.get_uploads('result')
+    # TODO(user): check that there is only one result uploaded.
     blob_info = upload_result[0]
     self.response.out.write(blob_info.key())
     self.redirect('/')
