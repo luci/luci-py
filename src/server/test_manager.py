@@ -94,6 +94,11 @@ COMEBACK_AFTER_SERVER_ERROR_SECS = 10
 # doesn't make much sense to extensively retry many times.
 MAX_TRANSACTION_RETRY_COUNT = 3
 
+# The time (in seconds) to wait after recieving a runner before aborting it.
+# This is intended to delete runners that will never run because they will
+# never find a matching machine.
+SWARM_RUNNER_MAX_WAIT_SECS = 24 * 60 * 60
+
 # The maximum number of times to try to write something to the blobstore before
 # giving up.
 MAX_BLOBSTORE_WRITE_TRIES = 5
@@ -786,10 +791,13 @@ class TestRequestManager(object):
             'output': runner.GetResultString()}
 
   def AbortStaleRunners(self):
-    """Abort any runners that have been running longer than expected.
+    """Abort any runners are taking too long to run or too long to find a match.
 
-    The runner will automatically retry if it hasn't been aborted more than
+    If the runner is aborted because the machine timed out, it will
+    automatically be retried if it hasn't been aborted more than
     MAX_AUTOMATIC_RETRY times.
+    If a runner is aborted because it hasn't hasn't found any machine to run it
+    in over SWARM_RUNNER_MAX_WAIT_SECS seconds, there is no automatic retry.
     """
     logging.debug('TRM.AbortStaleRunners starting')
     now = _GetCurrentTime()
@@ -797,6 +805,8 @@ class TestRequestManager(object):
     # seconds then we consider it stale and abort it.
     timeout_cutoff = now - datetime.timedelta(seconds=_TIMEOUT_FACTOR)
 
+    # Abort all currently running runners that haven't recently pinged the
+    # server.
     query = TestRunner.gql(
         'WHERE done = :1 AND ping != :2 AND ping < :3',
         False, None, timeout_cutoff)
@@ -816,6 +826,16 @@ class TestRequestManager(object):
         logging.error('TRM.AbortStaleRunners aborting runner %s with key %s',
                       runner.GetName(), runner.key())
         self.AbortRunner(runner, reason='Runner has become stale.')
+
+    # Abort all runners that haven't been able to find a machine to run them
+    # in SWARM_RUNNER_MAX_WAIT_SECS seconds.
+    timecut_off = now - datetime.timedelta(seconds=SWARM_RUNNER_MAX_WAIT_SECS)
+    query = TestRunner.gql('WHERE created < :1 and started = :2 and '
+                           'automatic_retry_count = 0', timecut_off, None)
+    for runner in query:
+      self.AbortRunner(runner, reason=('Runner was unable to find a machine to '
+                                       'run it within %d seconds' %
+                                       SWARM_RUNNER_MAX_WAIT_SECS))
 
     logging.debug('TRM.AbortStaleRunners done')
 

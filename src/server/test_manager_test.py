@@ -616,7 +616,7 @@ class TestRequestManagerTest(unittest.TestCase):
 
     return future_time
 
-  def testOnlyAbortStaleRunner(self):
+  def testOnlyAbortStaleRunningRunner(self):
     self._AssignPendingRequestsTest()
     runner = test_manager.TestRunner.all().get()
 
@@ -634,6 +634,50 @@ class TestRequestManagerTest(unittest.TestCase):
     self.assertEqual(0, runner.automatic_retry_count)
 
     self._mox.VerifyAll()
+
+  def testAbortStaleRunnerWaitingForMachine(self):
+    self._AssignPendingRequestsTest()
+    runner = test_manager.TestRunner.all().get()
+
+    # Mark the runner as having been created in the past so it will be
+    # considered stale (i.e., it took too long to find a match).
+    runner.created -= datetime.timedelta(
+        seconds=(2 * test_manager.SWARM_RUNNER_MAX_WAIT_SECS))
+    runner.put()
+
+    # Don't abort the runner if it is running and it has been pinging the server
+    # (no matter how old).
+    runner.started = datetime.datetime.now()
+    runner.ping = datetime.datetime.now() + datetime.timedelta(days=1)
+    runner.put()
+    self.assertFalse(runner.done)
+    self._manager.AbortStaleRunners()
+
+    runner = test_manager.TestRunner.all().get()
+    self.assertFalse(runner.done)
+    runner.started = None
+    runner.put()
+
+    # Don't abort the runner if it has been automatically retried, since
+    # that means it has been matched with a machine before.
+    runner.automatic_retry_count = 1
+    runner.put()
+    self.assertFalse(runner.done)
+    self._manager.AbortStaleRunners()
+
+    runner = test_manager.TestRunner.all().get()
+    self.assertFalse(runner.done)
+    runner.automatic_retry_count = 0
+    runner.put()
+
+    # Now the runner should be aborted, since it hasn't been matched within
+    # SWARM_RUNNER_MAX_WAIT_SECS seconds.
+    self._manager.AbortStaleRunners()
+
+    runner = test_manager.TestRunner.all().get()
+    self.assertTrue(runner.done)
+    self.assertIn('Runner was unable to find a machine to run it within',
+                  runner.GetResultString())
 
   def testRetryAndThenAbortStaleRunners(self):
     self._mox.StubOutWithMock(test_manager, '_GetCurrentTime')
