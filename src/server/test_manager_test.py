@@ -21,6 +21,7 @@ from google.appengine.api import mail
 from google.appengine.ext import blobstore
 from google.appengine.ext import db
 from google.appengine.ext import testbed
+from common import dimensions_utils
 from common import test_request_message
 from server import test_manager
 from third_party.mox import mox
@@ -162,8 +163,8 @@ class TestRequestManagerTest(unittest.TestCase):
       A dictionary which can be fed into test_manager.ExecuteRegisterRequest().
     """
 
-    dimensions = {'os': os, 'cpu': 'Unknown', 'browser': 'Unknown'}
-    attributes = {'dimensions': dimensions}
+    config_dimensions = {'os': os, 'cpu': 'Unknown', 'browser': 'Unknown'}
+    attributes = {'dimensions': config_dimensions}
     if machine_id:
       attributes['id'] = str(machine_id)
     if username:
@@ -194,21 +195,22 @@ class TestRequestManagerTest(unittest.TestCase):
       self._manager._LoadFile(
           mox.IgnoreArg()).MultipleTimes().AndReturn(contents)
 
-  def _ExecuteRegister(self, machine_id, try_count=0,
+  def _ExecuteRegister(self, machine_id, try_count=0, os='win-xp',
                        register_should_match=True):
     register_request = self._GetMachineRegisterRequest(machine_id=machine_id,
-                                                       try_count=try_count)
+                                                       try_count=try_count,
+                                                       os=os)
     response = self._manager.ExecuteRegisterRequest(register_request,
                                                     self._SERVER_URL)
 
     if register_should_match:
-      self.assertTrue('commands' in response)
-      self.assertTrue('result_url' in response)
-      self.assertTrue('come_back' not in response)
+      self.assertTrue('commands' in response, response)
+      self.assertTrue('result_url' in response, response)
+      self.assertTrue('come_back' not in response, response)
     else:
-      self.assertTrue('commands' not in response)
-      self.assertTrue('result_url' not in response)
-      self.assertTrue('come_back' in response)
+      self.assertTrue('commands' not in response, response)
+      self.assertTrue('result_url' not in response, response)
+      self.assertTrue('come_back' in response, response)
 
     return response
 
@@ -225,6 +227,30 @@ class TestRequestManagerTest(unittest.TestCase):
     self._manager.ExecuteTestRequest(self._GetRequestMessage())
 
     self._ExecuteRegister(MACHINE_IDS[0])
+    runner = test_manager.TestRunner.gql('WHERE machine_id = :1',
+                                         MACHINE_IDS[0]).get()
+    self.assertNotEqual(None, runner)
+    self.assertEqual(MACHINE_IDS[0], runner.machine_id)
+    self.assertNotEqual(None, runner.started)
+
+    self._mox.VerifyAll()
+
+  # By testing with a large number of configurations for a machine we are
+  # unable to use the hashing method to find a match, so ensure we fall back
+  # on the old direct comparision method.
+  def testRequestGoodMachineWithLargeConfig(self):
+    # Setup expectations.
+    # _Loadfile should be mocked when we have running tests.
+    self._SetupLoadFileExpectations(contents='script contents')
+    self._mox.ReplayAll()
+
+    large_os_config = map(str, range(  # pylint: disable-msg=C6402
+        dimensions_utils.MAX_DIMENSIONS_PER_MACHINE * 2))
+
+    self._manager.ExecuteTestRequest(self._GetRequestMessage(
+        os=large_os_config))
+
+    self._ExecuteRegister(MACHINE_IDS[0], os=large_os_config)
     runner = test_manager.TestRunner.gql('WHERE machine_id = :1',
                                          MACHINE_IDS[0]).get()
     self.assertNotEqual(None, runner)
@@ -1098,6 +1124,7 @@ class TestRequestManagerTest(unittest.TestCase):
     config_name = config_name or self._request_message_config_name
     runner = test_manager.TestRunner(
         test_request=request, config_name=config_name,
+        config_hash=request.GetConfigurationDimensionHash(config_name),
         config_instance_index=config_index,
         num_config_instances=num_config_instances)
     if machine_id:
@@ -1404,26 +1431,26 @@ class TestRequestManagerTest(unittest.TestCase):
     self._mox.VerifyAll()
 
   def testGetStatsForMultipleRunners(self):
-    dimensions = '{"os": "windows"}'
+    config_dimensions = '{"os": "windows"}'
 
     median_time = 500
     median_count = 10
     for _ in range(median_count):
-      runner_assignment = test_manager.RunnerAssignment(dimensions=dimensions,
-                                                        wait_time=median_time)
+      runner_assignment = test_manager.RunnerAssignment(
+          dimensions=config_dimensions, wait_time=median_time)
       runner_assignment.put()
 
     max_time = 1000
     max_count = 5
     for _ in range(max_count):
-      runner_assignment = test_manager.RunnerAssignment(dimensions=dimensions,
-                                                        wait_time=max_time)
+      runner_assignment = test_manager.RunnerAssignment(
+          dimensions=config_dimensions, wait_time=max_time)
       runner_assignment.put()
 
     mean_wait = ((max_time * max_count + median_time * median_count) /
                  (max_count + median_count))
 
-    expected_waits = {dimensions: (mean_wait, median_time, max_time)}
+    expected_waits = {config_dimensions: (mean_wait, median_time, max_time)}
     self.assertEqual(expected_waits, test_manager.GetRunnerWaitStats())
 
   def testGetTestRunners(self):
@@ -1433,25 +1460,25 @@ class TestRequestManagerTest(unittest.TestCase):
 
     # Create some test requests.
     test_runner_count = 3
-    config_names = ['c', 'b', 'a']
     for i in range(test_runner_count):
-      self._CreatePendingRequest(config_name=config_names[i],
-                                 config_index=i,
+      self._CreatePendingRequest(config_index=i,
                                  num_config_instances=test_runner_count)
 
     # Make sure the results are sorted.
-    test_runners = test_manager.GetTestRunners('config_name', ascending=True,
+    test_runners = test_manager.GetTestRunners('config_instance_index',
+                                               ascending=True,
+                                               limit=3, offset=0)
+    for i in range(test_runner_count):
+      self.assertEqual(i, test_runners.next().config_instance_index)
+    self.assertEqual(0, len(list(test_runners)))
+
+    # Make sure the results are sorted in descending order.
+    test_runners = test_manager.GetTestRunners('config_instance_index',
+                                               ascending=False,
                                                limit=3, offset=0)
     for i in range(test_runner_count):
       self.assertEqual(test_runner_count - 1 - i,
                        test_runners.next().config_instance_index)
-    self.assertEqual(0, len(list(test_runners)))
-
-    # Make sure the results are sorted in descending order.
-    test_runners = test_manager.GetTestRunners('config_name', ascending=False,
-                                               limit=3, offset=0)
-    for i in range(test_runner_count):
-      self.assertEqual(i, test_runners.next().config_instance_index)
     self.assertEqual(0, len(list(test_runners)))
 
 

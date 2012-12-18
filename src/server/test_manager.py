@@ -36,7 +36,7 @@ from google.appengine.api import mail
 from google.appengine.api import urlfetch
 from google.appengine.ext import blobstore
 from google.appengine.ext import db
-from common import dimensions
+from common import dimensions_utils
 from common import test_request_message
 from common import url_helper
 from test_runner import slave_machine
@@ -213,6 +213,18 @@ class TestRequest(db.Model):
 
     return None
 
+  def GetConfigurationDimensionHash(self, config_name):
+    """Gets the hash of the named configuration.
+
+    Args:
+      config_name: The name of the configuration to get the hash for.
+
+    Returns:
+      The hash of the configuration.
+    """
+    return dimensions_utils.GenerateDimensionHash(
+        self.GetConfiguration(config_name).dimensions)
+
   def GetAllKeys(self):
     """Get all the keys representing the TestRunners owned by this instance.
 
@@ -245,6 +257,9 @@ class TestRunner(db.Model):
 
   # The name of the request's configuration being tested.
   config_name = db.StringProperty()
+
+  # The hash of the configuration. Required in order to match machines.
+  config_hash = db.StringProperty(required=True)
 
   # The 0 based instance index of the request's configuration being tested.
   config_instance_index = db.IntegerProperty()
@@ -706,9 +721,11 @@ class TestRequestManager(object):
 
     # Create a runner entity to record this request/config pair that needs
     # to be run. The runner will eventually be scheduled at a later time.
-    runner = TestRunner(test_request=request, config_name=config.config_name,
-                        config_instance_index=config.instance_index,
-                        num_config_instances=config.num_instances)
+    runner = TestRunner(
+        test_request=request, config_name=config.config_name,
+        config_hash=request.GetConfigurationDimensionHash(config.config_name),
+        config_instance_index=config.instance_index,
+        num_config_instances=config.num_instances)
     runner.put()
 
     return runner
@@ -914,6 +931,8 @@ class TestRequestManager(object):
     """
     # Validate and fix machine attributes. Will throw exception on errors.
     attribs = self.ValidateAndFixAttributes(attributes)
+    dimension_hashes = dimensions_utils.GenerateAllDimensionHashes(
+        attribs['dimensions'])
 
     unfinished_test = TestRunner.gql(
         'WHERE machine_id = :1 AND done = :2', attribs['id'], False).get()
@@ -928,7 +947,10 @@ class TestRequestManager(object):
     assigned_runner = False
     for _ in range(10):
       # Try to find a matching test runner for the machine.
-      runner = self._FindMatchingRunner(attribs)
+      if dimension_hashes:
+        runner = self._FindMatchingRunnerUsingHashes(dimension_hashes)
+      else:
+        runner = self._FindMatchingRunnerUsingAttribs(attribs)
       # If no runner matches, no need to keep searching.
       if not runner:
         break
@@ -1084,7 +1106,36 @@ class TestRequestManager(object):
 
     return comeback_duration
 
-  def _FindMatchingRunner(self, attribs):
+  def _FindMatchingRunnerUsingHashes(self, attrib_hashes):
+    """Find oldest TestRunner who hasn't already been assigned a machine.
+
+    Args:
+      attrib_hashes: The list of all the configs hash that the machine
+          could handle.
+
+    Returns:
+      A TestRunner object, or None if a matching runner is not found.
+    """
+    # We can only have 30 elements in a IN query at a time (app engine limit).
+    number_of_queries = int(math.ceil(len(attrib_hashes) / 30.0))
+
+    runner = None
+    for i in range(number_of_queries):
+      # We use a format argument for None, because putting None in the string
+      # doesn't work.
+      query_runner = TestRunner.gql('WHERE started = :1 and config_hash IN :2 '
+                                    'ORDER BY created LIMIT 1', None,
+                                    attrib_hashes[i * 30:(i + 1) * 30]).get()
+
+      # Use this runner if it is older than our currently held runner.
+      if not runner:
+        runner = query_runner
+      elif query_runner and query_runner.created < runner.created:
+        runner = query_runner
+
+    return runner
+
+  def _FindMatchingRunnerUsingAttribs(self, attribs):
     """Find oldest TestRunner who hasn't already been assigned a machine.
 
     Args:
@@ -1102,8 +1153,8 @@ class TestRequestManager(object):
     query = TestRunner.gql('WHERE started = :1 ORDER BY created', None)
     for runner in query:
       runner_dimensions = runner.GetConfiguration().dimensions
-      (match, output) = dimensions.MatchDimensions(runner_dimensions,
-                                                   attribs['dimensions'])
+      (match, output) = dimensions_utils.MatchDimensions(runner_dimensions,
+                                                         attribs['dimensions'])
       logging.info(output)
       if match:
         logging.info('matched runner %s: ' % runner.GetName()

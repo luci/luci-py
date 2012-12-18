@@ -13,6 +13,7 @@ import unittest
 
 from google.appengine import runtime
 from google.appengine.ext import testbed
+from common import dimensions_utils
 from common import test_request_message
 from server import admin_user
 from server import main as main_app
@@ -39,6 +40,9 @@ class AppTest(unittest.TestCase):
 
     # The default name to use for test requests.
     self._default_test_request_name = 'test name'
+
+    # A basic config hash to use when creating runners.
+    self.config_hash = dimensions_utils.GenerateDimensionHash({})
 
     # Authenticate with none as IP.
     user_manager.AddWhitelist(None)
@@ -76,8 +80,8 @@ class AppTest(unittest.TestCase):
 
     test_runner = test_manager.TestRunner(test_request=request,
                                           machine_id=machine_id,
-                                          exit_code=exit_code,
-                                          started=started)
+                                          config_hash=self.config_hash,
+                                          exit_code=exit_code, started=started)
     test_runner.put()
 
     return test_runner
@@ -92,7 +96,8 @@ class AppTest(unittest.TestCase):
     # Test with a single matching runner.
     request = test_manager.TestRequest(name=self._default_test_request_name)
     request.put()
-    test_runner = test_manager.TestRunner(test_request=request)
+    test_runner = test_manager.TestRunner(test_request=request,
+                                          config_hash=self.config_hash)
     test_runner.put()
 
     response = self.app.get('/get_matching_test_cases',
@@ -101,7 +106,8 @@ class AppTest(unittest.TestCase):
     self.assertTrue(str(test_runner.key()) in response.body)
 
     # Test with a multiple matching runners.
-    additional_test_runner = test_manager.TestRunner(test_request=request)
+    additional_test_runner = test_manager.TestRunner(
+        test_request=request, config_hash=self.config_hash)
     additional_test_runner.put()
 
     # pylint: disable-msg=C6402
