@@ -14,6 +14,7 @@ import unittest
 from google.appengine import runtime
 from google.appengine.ext import testbed
 from common import test_request_message
+from server import admin_user
 from server import main as main_app
 from server import test_manager
 from server import user_manager
@@ -430,6 +431,27 @@ class AppTest(unittest.TestCase):
     response = self.app.post('/tasks/poll')
     self.assertEqual('200 OK', response.status)
 
+  def testSendEReporter(self):
+    # Ensure this function works without an admin user model.
+    response = self.app.get('/tasks/sendereporter')
+    self.assertEqual('200 OK', response.status)
+
+    # Ensure this function works an admin user with a garbage email.
+    admin = admin_user.AdminUser.all().get()
+    admin.email = None
+    admin.put()
+    response = self.app.get('/tasks/sendereporter')
+    self.assertEqual('200 OK', response.status)
+
+    # Ensure this function works with a valid admin email.
+    admin.email = 'admin@app.com'
+    admin.put()
+
+    response = self.app.get('/tasks/sendereporter')
+    # The 302 moved response is correct because that means we have successfully
+    # redirected to the full ereporter handler.
+    self.assertTrue('302 Moved' in response.status)
+
   def testStatsHandler(self):
     self._mox.StubOutWithMock(main_app.template, 'render')
     main_app.template.render(mox.IgnoreArg(), mox.IgnoreArg()).AndReturn('')
@@ -442,8 +464,6 @@ class AppTest(unittest.TestCase):
 
     response = self.app.get('/secure/stats')
     self.assertTrue('200' in response.status)
-
-    self._mox.VerifyAll()
 
 
 if __name__ == '__main__':

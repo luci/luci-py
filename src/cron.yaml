@@ -2,3 +2,7 @@ cron:
 - description: Poll hive for request status and see if any tests are waiting for execution
   url: /tasks/poll
   schedule: every 1 minutes
+
+- description: Daily exception report
+  url: /tasks/sendereporter
+  schedule: every day 00:00

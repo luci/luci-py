@@ -16,15 +16,18 @@ import os.path
 import urllib
 
 from google.appengine import runtime
+from google.appengine.api import mail
 from google.appengine.api import users
 from google.appengine.ext import blobstore
 from google.appengine.ext import db
+from google.appengine.ext import ereporter
 import webapp2
 from google.appengine.ext.webapp import blobstore_handlers
 from google.appengine.ext.webapp import template
 from google.appengine.ext.webapp import util
 from common import test_request_message
 from common import url_helper
+from server import admin_user
 from server import test_manager
 from server import user_manager
 # pylint: enable-msg=C6204
@@ -418,6 +421,21 @@ class PollHandler(webapp2.RequestHandler):
     self.post()
 
 
+class SendEReporterHandler(webapp2.RequestHandler):
+  """Handles calling EReporter with the correct parameters."""
+
+  def get(self):  # pylint: disable-msg=C6409
+    # grab the mailing admin
+    admin = admin_user.AdminUser.all().get()
+    if not admin:
+      # Create a dummy value so it can be edited from the datastore admin.
+      admin = admin_user.AdminUser(email='')
+      admin.put()
+
+    if mail.is_email_valid(admin.email):
+      self.redirect('/_ereporter?sender=%s' % admin.email)
+
+
 class ShowMessageHandler(webapp2.RequestHandler):
   """Show the full text of a test request."""
 
@@ -796,6 +814,8 @@ def CreateApplication():
                                    ShowMessageHandler),
                                   ('/secure/stats', StatsHandler),
                                   ('/tasks/poll', PollHandler),
+                                  ('/tasks/sendereporter',
+                                   SendEReporterHandler),
                                   ('/test', TestRequestHandler),
                                   ('/upload', UploadHandler),
                                   (_SECURE_CANCEL_URL, CancelHandler),
@@ -810,4 +830,5 @@ def CreateApplication():
                                    UserProfileHandler)],
                                  debug=True)
 
+ereporter.register_logger()
 app = CreateApplication()

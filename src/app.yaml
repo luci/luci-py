@@ -10,6 +10,11 @@ handlers:
   secure: always
   login: admin
 
+- url: /tasks/sendereporter
+  script: main.app
+  secure: always
+  login: admin
+
 # Protected handlers that require login.
 # TODO(user): Allow admins to whitelist users that can access secure pages.
 - url: /secure/.*
@@ -25,6 +30,10 @@ handlers:
 - url: /css
   static_dir: static/css
   secure: always
+
+- url: /_ereporter.*
+  script: google.appengine.ext.ereporter.report_generator.application
+  login: admin
 
 - url: .*
   script: main.app
