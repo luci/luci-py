@@ -39,6 +39,18 @@ indexes:
 
 - kind: TestRunner
   properties:
+  - name: automatic_retry_count
+  - name: started
+  - name: created
+
+- kind: TestRunner
+  properties:
+  - name: config_hash
+  - name: started
+  - name: created
+
+- kind: TestRunner
+  properties:
   - name: done
   - name: ping
 
