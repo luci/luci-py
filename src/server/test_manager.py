@@ -761,7 +761,8 @@ class TestRequestManager(object):
         configuration=config,
         result_url=('%s/result?r=%s&id=%s' % (server_url, str(runner.key()),
                                               runner.machine_id)),
-        ping_url=('%s/runner_ping?r=%s' % (server_url, str(runner.key()))),
+        ping_url=('%s/runner_ping?r=%s&id=%s' % (server_url, str(runner.key()),
+                                                 runner.machine_id)),
         output_destination=test_request.output_destination,
         cleanup=test_request.cleanup,
         data=(test_request.data + config.data),
@@ -1534,11 +1535,12 @@ def DeleteOldErrors():
   logging.debug('DeleteOldErrors done')
 
 
-def PingRunner(key):
+def PingRunner(key, machine_id):
   """Pings the runner, if the key is valid.
 
   Args:
     key: The key of the runner to ping.
+    machine_id: The machine id of the machine pinging.
 
   Returns:
     True if the runner is successfully pinged.
@@ -1553,9 +1555,11 @@ def PingRunner(key):
     logging.error('Failed to find runner')
     return False
 
-  # TODO(user): It might be useful to have the local_test_runner include
-  # its machine id and just use that to make sure the correct machine is
-  # pinging the runner.
+  if machine_id != runner.machine_id:
+    logging.error('Machine ids don\'t match, expected %s but got %s',
+                  runner.machine_id, machine_id)
+    return False
+
   if runner.started is None or runner.done:
     logging.error('Trying to ping a runner that is not currently running')
     return False

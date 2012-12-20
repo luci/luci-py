@@ -428,8 +428,10 @@ class AppTest(unittest.TestCase):
     self.assertEqual('Runner failed to ping.', response.body)
 
     # Start a test and successfully ping it
-    test_runner = self._CreateTestRunner(started=datetime.datetime.now())
-    response = self.app.post('/runner_ping', {'r': test_runner.key()})
+    test_runner = self._CreateTestRunner(machine_id=MACHINE_ID,
+                                         started=datetime.datetime.now())
+    response = self.app.post('/runner_ping', {'r': test_runner.key(),
+                                              'id': test_runner.machine_id})
     self.assertEqual('200 OK', response.status)
     self.assertEqual('Runner successfully pinged.', response.body)
 

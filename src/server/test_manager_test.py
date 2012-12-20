@@ -1365,28 +1365,36 @@ class TestRequestManagerTest(unittest.TestCase):
 
   def testPingRunner(self):
     # Try with a few invalid keys.
-    self.assertFalse(test_manager.PingRunner(1))
-    self.assertFalse(test_manager.PingRunner('2'))
+    self.assertFalse(test_manager.PingRunner(1, None))
+    self.assertFalse(test_manager.PingRunner('2', None))
 
     # Tests with a valid key
     test_runner = self._CreatePendingRequest()
 
     # Runner hasn't started.
-    self.assertFalse(test_manager.PingRunner(test_runner.key()))
+    self.assertFalse(test_manager.PingRunner(test_runner.key(), None))
 
     # Runner starts and can get pinged.
     test_runner.started = datetime.datetime.now()
+    test_runner.machine_id = MACHINE_IDS[0]
     test_runner.put()
-    self.assertTrue(test_manager.PingRunner(test_runner.key()))
+    self.assertTrue(test_manager.PingRunner(test_runner.key(),
+                                            MACHINE_IDS[0]))
+
+    # The machine ids don't match so fail.
+    self.assertFalse(test_manager.PingRunner(test_runner.key(),
+                                             MACHINE_IDS[1]))
 
     # Runner is done.
     test_runner.done = True
     test_runner.put()
-    self.assertFalse(test_manager.PingRunner(test_runner.key()))
+    self.assertFalse(test_manager.PingRunner(test_runner.key(),
+                                             MACHINE_IDS[0]))
 
     # Delete the runner and try to ping.
     test_runner.delete()
-    self.assertFalse(test_manager.PingRunner(test_runner.key()))
+    self.assertFalse(test_manager.PingRunner(test_runner.key(),
+                                             MACHINE_IDS[0]))
 
   def testGetAllMachines(self):
     self.assertEqual(0, len(list(test_manager.GetAllMachines())))

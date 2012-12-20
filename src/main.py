@@ -641,8 +641,9 @@ class RunnerPingHandler(webapp2.RequestHandler):
       return
 
     key = self.request.get('r', '')
+    machine_id = self.request.get('id', '')
 
-    if test_manager.PingRunner(key):
+    if test_manager.PingRunner(key, machine_id):
       self.response.out.write('Runner successfully pinged.')
     else:
       self.response.set_status(402)
