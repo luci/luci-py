@@ -106,7 +106,7 @@ class WhitelistedIP(db.Model):
   # The IP of the machine to whitelist. Can be either IPv4 or IPv6.
   ip = db.StringProperty()
 
-  # Is only for maintenance purpose, not used.
+  # Is only for maintenance purpose.
   comment = db.StringProperty()
 
 
@@ -509,15 +509,29 @@ class RestrictedVerifyWorkerHandler(webapp2.RequestHandler):
       entry.put()
 
 
+def htmlwrap(text):
+  """Wraps text in minimal HTML tags."""
+  return '<html><body>%s</body></html>' % text
+
 class RestrictedWhitelistHandler(webapp2.RequestHandler):
   """Whitelists the current IP."""
+  def get(self):
+    self.response.out.write(htmlwrap(
+      '<form name="whitelist" method="post">'
+      'Comment: <input type="text" name="comment" /><br />'
+      '<input type="submit" value="SUBMIT" />'))
+
   def post(self):
     ip = self.request.remote_addr
-    if WhitelistedIP.gql('WHERE ip = :1', ip).get():
-      self.response.out.write('Already present: %s' % ip)
+    comment = self.request.get('comment')
+    item = WhitelistedIP.gql('WHERE ip = :1', ip).get()
+    if item:
+      item.comment = comment or item.comment
+      item.put()
+      self.response.out.write(htmlwrap('Already present: %s' % ip))
       return
-    WhitelistedIP(ip=ip).put()
-    self.response.out.write('Success: %s' % ip)
+    WhitelistedIP(ip=ip, comment=comment).put()
+    self.response.out.write(htmlwrap('Success: %s' % ip))
 
 
 ### Non-restricted handlers
