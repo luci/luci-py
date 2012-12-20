@@ -488,6 +488,10 @@ class TestRequestManagerTest(unittest.TestCase):
     self.assertTrue(self._manager.UpdateTestResult(runner, runner.machine_id,
                                                    result_string=messages[0]))
 
+    # The first result resend, accepted since the strings are equal.
+    self.assertTrue(self._manager.UpdateTestResult(runner, runner.machine_id,
+                                                   result_string=messages[0]))
+
     # Non-first request without overwrite, rejected.
     self.assertFalse(self._manager.UpdateTestResult(runner, runner.machine_id,
                                                     result_string=messages[1],

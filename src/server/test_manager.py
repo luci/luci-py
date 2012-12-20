@@ -511,10 +511,17 @@ class TestRequestManager(object):
     # If the runnner is marked as done, don't try to process another
     # response for it, unless overwrite is enable.
     if runner.done and not overwrite:
-      logging.error('Got a additional response for runner=%s (key %s), '
-                    'not good', runner.GetName(), runner.key())
-      logging.debug('Dropped result string was:\n%s', result_string)
-      return False
+      if result_string == runner.GetResultString():
+        # This can happen if the server stores the results and then runs out
+        # of memory, so the return code is 500, which causes the
+        # local_test_runner to resend the results.
+        logging.warning('The runner already contained the given result string.')
+        return True
+      else:
+        logging.error('Got a additional response for runner=%s (key %s), '
+                      'not good', runner.GetName(), runner.key())
+        logging.debug('Dropped result string was:\n%s', result_string)
+        return False
 
     runner.ran_successfully = success
     runner.exit_codes = exit_codes

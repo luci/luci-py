@@ -99,21 +99,40 @@ class UrlHelperTest(unittest.TestCase):
 
     self._mox.ReplayAll()
 
-    self.assertFalse(url_helper.UrlOpen('url', max_tries=1))
+    self.assertIsNone(url_helper.UrlOpen('url', max_tries=1))
 
     self._mox.VerifyAll()
 
-  def testUrlOpenHTTPError(self):
+  def testUrlOpenHTTPErrorNoRetry(self):
     url_helper.urllib2.urlopen(
         mox.IgnoreArg(), mox.IgnoreArg()).AndRaise(
-            urllib2.HTTPError('url', 0, 'error message', None, None))
+            urllib2.HTTPError('url', 400, 'error message', None, None))
     logging.error(mox.IgnoreArg(), mox.IgnoreArg(), mox.IgnoreArg())
 
     self._mox.ReplayAll()
 
     # Even though we set max_tries to 10, we should only try once since
     # we get an HTTPError.
-    self.assertEqual(url_helper.UrlOpen('url', max_tries=10), None)
+    self.assertIsNone(url_helper.UrlOpen('url', max_tries=10))
+
+    self._mox.VerifyAll()
+
+  def testUrlOpenHTTPErrorWithRetry(self):
+    response = 'response'
+
+    url_helper.urllib2.urlopen(
+        mox.IgnoreArg(), mox.IgnoreArg()).AndRaise(
+            urllib2.HTTPError('url', 500, 'error message', None, None))
+    logging.warning(mox.IgnoreArg(), mox.IgnoreArg(), mox.IgnoreArg(),
+                    mox.IgnoreArg())
+    url_helper.urllib2.urlopen(
+        mox.IgnoreArg(), mox.IgnoreArg()).AndReturn(StringIO.StringIO(response))
+
+    self._mox.ReplayAll()
+
+    # Since the HTTPError was a server error, we should retry and get the
+    # desired response after the error.
+    self.assertEqual(response, url_helper.UrlOpen('url', max_tries=10))
 
     self._mox.VerifyAll()
 

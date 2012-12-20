@@ -78,14 +78,19 @@ def UrlOpen(url, data=None, max_tries=5, wait_duration=None, method='POST'):
         url = urlparse.urlunparse(url_parts)
         url_response = urllib2.urlopen(url).read()
     except urllib2.HTTPError as e:
-      # An HTTPError means we reached the server, so don't retry.
-      logging.error('Able to connect to %s but an exception was thrown.\n%s',
-                    url, e)
-      return None
+      if e.code >= 500:
+        # The HTTPError was due to a server error, so retry the attempt.
+        logging.warning('Able to connect to %s on attempt %d.\nException: %s ',
+                        url, attempt, e)
+      else:
+        # This HTTPError means we reached the server and there was a problem
+        # with the request, so don't retry.
+        logging.error('Able to connect to %s but an exception was thrown.\n%s',
+                      url, e)
+        return None
     except urllib2.URLError as e:
-      logging.info(
-          'Unable to open url %s on attempt %d.\nException: %s',
-          url, attempt, e)
+      logging.warning('Unable to open url %s on attempt %d.\nException: %s',
+                      url, attempt, e)
 
       if wait_duration is None:
         duration = random.random() * 3 + math.pow(1.5, (attempt + 1))
