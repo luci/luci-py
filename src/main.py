@@ -460,6 +460,7 @@ class StatsHandler(webapp2.RequestHandler):
     params = {
         'topbar': GenerateTopbar(),
         'runner_wait_stats': test_manager.GetRunnerWaitStats(),
+        'runner_cutoff': test_manager.RUNNER_STATS_EVALUATION_CUTOFF_DAYS
     }
 
     path = os.path.join(os.path.dirname(__file__), 'stats.html')
