@@ -478,6 +478,7 @@ class TestRequestManagerTest(unittest.TestCase):
     logging.error(mox.StrContains('additional response'), mox.IgnoreArg(),
                   mox.IgnoreArg())
     self._AddTestRunWithResultsExpectation(DEFAULT_RESULT_URL, messages[2])
+    urllib2.urlopen(DEFAULT_RESULT_URL, mox.StrContains('r=' + messages[0]))
     self._mox.ReplayAll()
 
     self._manager.ExecuteTestRequest(self._GetRequestMessage())
@@ -488,7 +489,7 @@ class TestRequestManagerTest(unittest.TestCase):
     self.assertTrue(self._manager.UpdateTestResult(runner, runner.machine_id,
                                                    result_string=messages[0]))
 
-    # The first result resend, accepted since the strings are equal.
+    # The first result resent, accepted since the strings are equal.
     self.assertTrue(self._manager.UpdateTestResult(runner, runner.machine_id,
                                                    result_string=messages[0]))
 
@@ -505,6 +506,20 @@ class TestRequestManagerTest(unittest.TestCase):
     # Make sure that only one blobstore is stored, since only one
     # is referenced.
     self.assertEqual(1, blobstore.BlobInfo.all().count())
+
+    # Accept the first message as an error with overwrite.
+    self.assertTrue(self._manager.UpdateTestResult(runner, runner.machine_id,
+                                                   errors=messages[0],
+                                                   overwrite=True))
+
+    # Accept the first message as an error again, since it is equal to what is
+    # already stored.
+    self.assertTrue(self._manager.UpdateTestResult(runner, runner.machine_id,
+                                                   errors=messages[0]))
+
+    # Make sure there are no blobs store now, since errors are just stored as
+    # strings.
+    self.assertEqual(0, blobstore.BlobInfo.all().count())
 
     self._mox.VerifyAll()
 

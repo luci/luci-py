@@ -497,7 +497,8 @@ class TestRequestManager(object):
           even if a result had been previously recorded.
 
     Returns:
-      True if the results are accepted and successfully stored.
+      True if the results are successfully stored and the result_url is
+          properly updated (if there is one).
     """
     if not runner:
       logging.error('runner argument must be given')
@@ -511,7 +512,8 @@ class TestRequestManager(object):
     # If the runnner is marked as done, don't try to process another
     # response for it, unless overwrite is enable.
     if runner.done and not overwrite:
-      if result_string == runner.GetResultString():
+      stored_results = runner.GetResultString()
+      if result_string == stored_results or errors == stored_results:
         # This can happen if the server stores the results and then runs out
         # of memory, so the return code is 500, which causes the
         # local_test_runner to resend the results.
@@ -520,19 +522,24 @@ class TestRequestManager(object):
       else:
         logging.error('Got a additional response for runner=%s (key %s), '
                       'not good', runner.GetName(), runner.key())
-        logging.debug('Dropped result string was:\n%s', result_string)
+        logging.debug('Dropped result string was:\n%s',
+                      result_string or errors)
         return False
+
+    # Clear any old result strings that are stored if we are overwriting.
+    if overwrite:
+      if runner.result_string_reference:
+        runner.result_string_reference.delete()
+        runner.result_string_reference = None
+      runner.errors = None
+      runner.put()
 
     runner.ran_successfully = success
     runner.exit_codes = exit_codes
     runner.done = True
 
+    update_successful = True
     if result_string is not None:
-      # If there in an old blobstore, delete it since nothing references it
-      # now.
-      if runner.result_string_reference:
-        runner.result_string_reference.delete()
-
       result_blob_key = None
       if self.use_blobstore_file_api:
         for attempt in range(MAX_BLOBSTORE_WRITE_TRIES):
@@ -554,10 +561,14 @@ class TestRequestManager(object):
             max_tries=MAX_BLOBSTORE_WRITE_TRIES, wait_duration=0)
 
       if result_blob_key:
+        assert runner.result_string_reference is None, (
+            'There is a reference stored, overwriting it would leak the old '
+            'element.')
         runner.result_string_reference = result_blob_key
       else:
         runner.errors = ('There was a problem when creating the blobstore. '
                          'The results where lost.')
+        update_successful = False
     else:
       runner.errors = errors
     runner.put()
@@ -597,6 +608,7 @@ class TestRequestManager(object):
         except urllib2.URLError:
           logging.exception('Could not send results back to sender at %s',
                             test_case.result_url)
+          update_successful = False
         except urlfetch.Error:
           # The docs for urllib2.urlopen() say it only raises urllib2.URLError.
           # However, in the appengine environment urlfetch.Error may also be
@@ -605,6 +617,7 @@ class TestRequestManager(object):
           # for more details.
           logging.exception('Could not send results back to sender at %s',
                             test_case.result_url)
+          update_successful = False
       elif result_url_parts[0] == 'mailto':
         # Only send an email if we didn't send a failure email earlier to
         # prevent repeats.
@@ -613,6 +626,7 @@ class TestRequestManager(object):
       else:
         logging.exception('Unknown url given as result url, %s',
                           test_case.result_url)
+        update_successful = False
 
     if (test_case.store_result == 'none' or
         (test_case.store_result == 'fail' and runner.ran_successfully)):
@@ -620,11 +634,11 @@ class TestRequestManager(object):
       runner.delete()
       test_request.RunnerDeleted()
 
-    if not runner.errors:
+    if update_successful:
       logging.info('Successfully updated the results of runner %s.',
                    runner.key())
 
-    return not bool(runner.errors)
+    return update_successful
 
   def _EmailTestResults(self, runner, send_to):
     """Emails the test result.
