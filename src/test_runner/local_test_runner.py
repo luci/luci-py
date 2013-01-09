@@ -753,7 +753,7 @@ def main():
       maxBytes=10 * 1024 * 1024, backupCount=5)
   logging_rotating_file.setLevel(logging.DEBUG)
   logging_rotating_file.setFormatter(logging.Formatter(
-      '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'))
+      '%(asctime)s %(levelname)-8s %(module)15s(%(lineno)4d): %(message)s'))
   logging.getLogger('').addHandler(logging_rotating_file)
 
   (options, args) = parser.parse_args()
