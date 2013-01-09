@@ -78,6 +78,20 @@ class UrlHelperTest(unittest.TestCase):
 
     self._mox.VerifyAll()
 
+  def testUrlOpenPOSTFORMSuccess(self):
+    url = 'http://my.url.com'
+
+    response = 'True'
+    url_helper.urllib2.urlopen(mox.IsA(urllib2.Request)).AndReturn(
+        StringIO.StringIO(response))
+
+    self._mox.ReplayAll()
+
+    self.assertEqual(url_helper.UrlOpen(url, method='POSTFORM'),
+                     response)
+
+    self._mox.VerifyAll()
+
   def testUrlOpenSuccessAfterFailure(self):
     url_helper.urllib2.urlopen(
         mox.IgnoreArg(), mox.IgnoreArg()).AndRaise(urllib2.URLError('url'))
@@ -220,6 +234,32 @@ class UrlHelperTest(unittest.TestCase):
     finally:
       if file_readonly:
         os.remove(file_readonly.name)
+
+  def testEncodeMultipartFormData(self):
+    fields = [('x', 'y'), (1, 2)]
+    files = [('key', 'filename', 'file data')]
+
+    # Ensure that EncodeMultipartFormData works with any combination of fields
+    # and files.
+    content_type, body = url_helper.EncodeMultipartFormData()
+    self.assertTrue(content_type.startswith('multipart/form-data; boundary='))
+    self.assertEqual('', body)
+
+    content_type, body = url_helper.EncodeMultipartFormData(fields=fields)
+    self.assertTrue(content_type.startswith('multipart/form-data; boundary='))
+    self.assertTrue('name="x"\r\n\r\ny' in body, body)
+    self.assertTrue('name="1"\r\n\r\n2' in body, body)
+
+    content_type, body = url_helper.EncodeMultipartFormData(files=files)
+    self.assertTrue(content_type.startswith('multipart/form-data; boundary='))
+    self.assertTrue('name="key"; filename="filename"' in body, body)
+    self.assertTrue('file data' in body, body)
+
+    content_type, body = url_helper.EncodeMultipartFormData(fields=fields,
+                                                            files=files)
+    self.assertTrue(content_type.startswith('multipart/form-data; boundary='))
+    self.assertTrue('name="x"\r\n\r\ny' in body, body)
+    self.assertTrue('name="1"\r\n\r\n2' in body, body)
 
 
 if __name__ == '__main__':
