@@ -462,14 +462,8 @@ class TestRequestManager(object):
       use_blobstore_file_api: A flag to determine if the experimental file
           api should be used.
     """
-    # TODO(user): Fix up the normal blobstore code, it currently fails
-    # to properly upload. See
-    # http://devblog.miumeet.com/2011/02/programmatically-upload-images-to.html
-    # for tips on how to get it working.
     if use_blobstore_file_api is None:
-      # Default to uses the file api until the normal code is fixed.
-      # use_blobstore_file_api = OnDevAppEngine()
-      use_blobstore_file_api = True
+      use_blobstore_file_api = OnDevAppEngine()
 
     self.use_blobstore_file_api = use_blobstore_file_api
 
@@ -555,10 +549,11 @@ class TestRequestManager(object):
             time.sleep(3)
       else:
         # Create the blobstore.
-        upload_url = blobstore.create_upload_url('upload')
+        upload_url = blobstore.create_upload_url('/upload')
         result_blob_key = url_helper.UrlOpen(
-            upload_url, {'result': result_string},
-            max_tries=MAX_BLOBSTORE_WRITE_TRIES, wait_duration=0)
+            upload_url, files=[('result', 'result', result_string)],
+            max_tries=MAX_BLOBSTORE_WRITE_TRIES, wait_duration=0,
+            method='POSTFORM')
 
       if result_blob_key:
         assert runner.result_string_reference is None, (

@@ -362,9 +362,8 @@ class TestRequestManagerTest(unittest.TestCase):
     if not self._manager.use_blobstore_file_api:
       # Writing the result to the blobstore.
       blob_key = CreateBlobstore(result_string)
-      urllib2.urlopen(
-          mox.StrContains('/upload/'), mox.StrContains('result=')).AndReturn(
-              StringIO.StringIO(blob_key))
+      urllib2.urlopen(mox.IsA(urllib2.Request)).AndReturn(
+          StringIO.StringIO(blob_key))
 
     # Setup expectations for HandleTestResults().
     if result_url.startswith('mailto'):
