@@ -9,6 +9,7 @@ import optparse
 import os.path
 import sys
 import time
+import urllib
 import urllib2
 
 
@@ -97,7 +98,8 @@ def main():
   if options.verbose:
     print 'Sending %s to %s' % (os.path.basename(filename), test_url)
   try:
-    output = urllib2.urlopen(test_url, data=f.read()).read()
+    data = urllib.urlencode({'request': f.read()})
+    output = urllib2.urlopen(test_url, data=data).read()
   except urllib2.URLError as ex:
     print 'Error: %s' % str(ex)
     return 1

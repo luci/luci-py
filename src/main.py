@@ -302,25 +302,20 @@ class TestRequestHandler(webapp2.RequestHandler):
 
   def post(self):  # pylint: disable-msg=C6409
     """Handles HTTP POST requests for this handler's URL."""
-    # TODO(user): This handler uses the un-encoded request body to
-    # get the Swarm test request. A any call to self.request.get will
-    # change the body and encode it. Thus, for now we simply make a copy
-    # of the original body and use it later. The correct way would be to
-    # have this handler work with properly encoded data in the first place.
-    body = self.request.body
     if not AuthenticateRemoteMachine(self.request):
       SendAuthenticationFailure(self.request, self.response)
       return
 
     # Validate the request.
-    if not self.request.body:
+    if not self.request.get('request'):
       self.response.set_status(402)
-      self.response.out.write('Request must have a body')
+      self.response.out.write('No request parameter found')
       return
 
     test_request_manager = CreateTestManager()
     try:
-      response = json.dumps(test_request_manager.ExecuteTestRequest(body))
+      response = json.dumps(test_request_manager.ExecuteTestRequest(
+          self.request.get('request')))
     except test_request_message.Error as ex:
       message = str(ex)
       logging.exception(message)

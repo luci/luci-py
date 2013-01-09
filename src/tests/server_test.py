@@ -165,8 +165,8 @@ class _SwarmTestCase(unittest.TestCase):
       test_request = open(swarm_file)
       output = None
       try:
-        output = urllib2.urlopen(swarm_server_test_url,
-                                 data=test_request.read()).read()
+        data = urllib.urlencode({'request': test_request.read()})
+        output = urllib2.urlopen(swarm_server_test_url, data=data).read()
       except urllib2.URLError as ex:
         self.fail('Error: %s' % str(ex))
 
