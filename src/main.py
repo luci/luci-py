@@ -47,6 +47,9 @@ _SECURE_GET_RESULTS_URL = '/secure/get_result'
 _SECURE_MAIN_URL = '/secure/main'
 _SECURE_USER_PROFILE_URL = '/secure/user_profile'
 
+# Allow GET requests to be passed through as POST requests.
+ALLOW_POST_AS_GET = False
+
 
 def GenerateTopbar():
   """Generate the topbar to display on all server pages.
@@ -299,6 +302,12 @@ class DeleteMachineAssignmentHandler(webapp2.RequestHandler):
 
 class TestRequestHandler(webapp2.RequestHandler):
   """Handles test requests from clients."""
+
+  def get(self):  # pylint: disable-msg=C6409
+    if ALLOW_POST_AS_GET:
+      return self.post()
+    else:
+      self.response.set_status(405)
 
   def post(self):  # pylint: disable-msg=C6409
     """Handles HTTP POST requests for this handler's URL."""
@@ -587,6 +596,12 @@ class RegisterHandler(webapp2.RequestHandler):
 
      Attempt to find a matching job for the querying machine.
   """
+
+  def get(self):  # pylint: disable-msg=C6409
+    if ALLOW_POST_AS_GET:
+      return self.post()
+    else:
+      self.response.set_status(405)
 
   def post(self):  # pylint: disable-msg=C6409
     """Handles HTTP POST requests for this handler's URL."""
