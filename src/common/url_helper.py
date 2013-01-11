@@ -9,6 +9,7 @@
 
 
 import hashlib
+import httplib
 import logging
 import math
 import os
@@ -103,7 +104,7 @@ def UrlOpen(url, data=None, files=None, max_tries=5, wait_duration=None,
         logging.error('Able to connect to %s but an exception was thrown.\n%s',
                       url, e)
         return None
-    except urllib2.URLError as e:
+    except (urllib2.URLError, httplib.HTTPException) as e:
       logging.warning('Unable to open url %s on attempt %d.\nException: %s',
                       url, attempt, e)
 
