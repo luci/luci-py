@@ -245,7 +245,11 @@ def ReadBlob(blob, callback):
   position = 0
   chunk_size = blobstore.MAX_BLOB_FETCH_SIZE
   while True:
-    data = blobstore.fetch_data(blob, position, position + chunk_size - 1)
+    try:
+      data = blobstore.fetch_data(blob, position, position + chunk_size - 1)
+    except taskqueue.InternalError as e:
+      logging.warning('Exception while reading blobstore data, retrying\n%s', e)
+      continue
     logging.debug('Read %d bytes', len(data))
     callback(data)
     position += len(data)
