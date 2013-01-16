@@ -25,17 +25,16 @@ import logging
 import math
 import os.path
 import random
-import time
 import urllib
 import urllib2
 import urlparse
 import uuid
 
-from google.appengine.api import files
 from google.appengine.api import mail
 from google.appengine.api import urlfetch
 from google.appengine.ext import blobstore
 from google.appengine.ext import db
+from common import blobstore_helper
 from common import dimensions_utils
 from common import test_request_message
 from common import url_helper
@@ -98,10 +97,6 @@ MAX_TRANSACTION_RETRY_COUNT = 3
 # This is intended to delete runners that will never run because they will
 # never find a matching machine.
 SWARM_RUNNER_MAX_WAIT_SECS = 24 * 60 * 60
-
-# The maximum number of times to try to write something to the blobstore before
-# giving up.
-MAX_BLOBSTORE_WRITE_TRIES = 5
 
 # The maximum number of times to retry a runner that has failed for a swarm
 # related reasons (like the machine timing out).
@@ -360,15 +355,7 @@ class TestRunner(db.Model):
     if not self.result_string_reference:
       return ''
 
-    blob_reader = self.result_string_reference.open()
-    result = ''
-    while True:
-      fetch = blob_reader.read(blobstore.MAX_BLOB_FETCH_SIZE)
-      if not fetch:
-        break
-      result += fetch
-
-    return result.decode('utf-8')
+    return blobstore_helper.GetBlobstore(self.result_string_reference.key())
 
   def GetDimensionsString(self):
     """Get a string representing the dimensions this runner requires.
@@ -536,24 +523,14 @@ class TestRequestManager(object):
     if result_string is not None:
       result_blob_key = None
       if self.use_blobstore_file_api:
-        for attempt in range(MAX_BLOBSTORE_WRITE_TRIES):
-          try:
-            filename = files.blobstore.create('text/plain')
-            with files.open(filename, 'a') as f:
-              f.write(result_string.encode('utf-8'))
-            files.finalize(filename)
-            result_blob_key = files.blobstore.get_blob_key(filename)
-          except files.ApiTemporaryUnavailableError:
-            logging.error('An exception while trying to store results in the '
-                          'blobstore. Attempt %d', attempt)
-            time.sleep(3)
+        result_blob_key = blobstore_helper.CreateBlobstore(result_string)
       else:
         # Create the blobstore.
         upload_url = blobstore.create_upload_url('/upload')
         result_blob_key = url_helper.UrlOpen(
             upload_url, files=[('result', 'result', result_string)],
-            max_tries=MAX_BLOBSTORE_WRITE_TRIES, wait_duration=0,
-            method='POSTFORM')
+            max_tries=blobstore_helper.MAX_BLOBSTORE_WRITE_TRIES,
+            wait_duration=0, method='POSTFORM')
 
       if result_blob_key:
         assert runner.result_string_reference is None, (
@@ -561,9 +538,18 @@ class TestRequestManager(object):
             'element.')
         runner.result_string_reference = result_blob_key
       else:
-        runner.errors = ('There was a problem when creating the blobstore. '
-                         'The results where lost.')
-        update_successful = False
+        if self.AutomaticallyRetryRunner(runner):
+          logging.warning('Runner results were lost due to server problems, '
+                          'automatically retrying the runner.')
+          # Drop out of this function since we don't want to let the user know
+          # the test is done since we are retrying it.
+          return False
+        else:
+          logging.error('Runner result were lost, but this runner was unable '
+                        'to get automatically restarted.')
+          runner.errors = ('There was a problem when creating the blobstore. '
+                           'The results where lost.')
+          update_successful = False
     else:
       runner.errors = errors
     runner.put()

@@ -11,16 +11,15 @@ import datetime
 import json
 import logging
 import StringIO
-import time
 import unittest
 import urllib2
 
 
-from google.appengine.api import files
 from google.appengine.api import mail
 from google.appengine.ext import blobstore
 from google.appengine.ext import db
 from google.appengine.ext import testbed
+from common import blobstore_helper
 from common import dimensions_utils
 from common import test_request_message
 from server import test_manager
@@ -34,28 +33,6 @@ MACHINE_IDS = ['12345678-12345678-12345678-12345678',
                '87654321-87654321-87654321-87654321']
 
 DEFAULT_RESULT_URL = 'http://all.your.resul.ts/are/belong/to/us'
-
-
-def CreateBlobstore(blobstore_data):
-  """Create a blostore with the desired value and return the key to it.
-
-     This uses the experimental blobstore file api, which can possible have
-     issues.
-
-  Args:
-    blobstore_data: The data to add to the blobstore.
-
-  Returns:
-    The blob key to access the stored blobstore.
-  """
-  file_name = files.blobstore.create(mime_type='application/octet-stream')
-
-  with files.open(file_name, 'a') as f:
-    f.write(blobstore_data)
-
-  files.finalize(file_name)
-
-  return files.blobstore.get_blob_key(file_name)
 
 
 class TestRequestManagerTest(unittest.TestCase):
@@ -361,7 +338,7 @@ class TestRequestManagerTest(unittest.TestCase):
   def _AddTestRunWithResultsExpectation(self, result_url, result_string):
     if not self._manager.use_blobstore_file_api:
       # Writing the result to the blobstore.
-      blob_key = CreateBlobstore(result_string)
+      blob_key = blobstore_helper.CreateBlobstore(result_string)
       urllib2.urlopen(mox.IsA(urllib2.Request)).AndReturn(
           StringIO.StringIO(blob_key))
 
@@ -522,6 +499,50 @@ class TestRequestManagerTest(unittest.TestCase):
 
     self._mox.VerifyAll()
 
+  # Ensure that if we lose a test's results due to the file api acting up,
+  # we retry the test to get the results instead of giving the user no output.
+  def testHandleBlobstoreFailures(self):
+    self._mox.StubOutWithMock(test_manager.url_helper, 'UrlOpen')
+
+    for _ in range(2):
+      test_manager.url_helper.UrlOpen(mox.StrContains('/upload'),
+                                      files=mox.IgnoreArg(),
+                                      max_tries=mox.IgnoreArg(),
+                                      wait_duration=0,
+                                      method='POSTFORM').AndReturn(None)
+    self._mox.ReplayAll()
+
+    self._manager.ExecuteTestRequest(self._GetRequestMessage())
+    runner = test_manager.TestRunner.all().get()
+
+    # The runner should be automatically retried.
+    missing_results = 'missing results'
+    self._manager.UpdateTestResult(runner, runner.machine_id,
+                                   result_string=missing_results)
+
+    # Get the lastest version of the runner and ensure it has the correct
+    # values.
+    runner = test_manager.TestRunner.all().get()
+    self.assertFalse(runner.done)
+    self.assertIsNone(runner.started)
+    self.assertEqual(1, runner.automatic_retry_count)
+    self.assertEqual('', runner.GetResultString())
+
+    # This runner has been automatically retried too many times, so give up.
+    runner.automatic_retry_count = test_manager.MAX_AUTOMATIC_RETRIES
+    runner.put()
+    self._manager.UpdateTestResult(runner, runner.machine_id,
+                                   result_string=missing_results)
+
+    # Get the lastest version of the runner and ensure it has the correct
+    # values.
+    runner = test_manager.TestRunner.all().get()
+    self.assertTrue(runner.done)
+    self.assertEqual('There was a problem when creating the blobstore. '
+                     'The results where lost.', runner.GetResultString())
+
+    self._mox.VerifyAll()
+
   def testRunnerCallerMachineIdMismatch(self):
     self._mox.StubOutWithMock(test_manager.logging, 'warning')
     test_manager.logging.warning('The machine id of the runner, %s, doesn\'t '
@@ -536,52 +557,6 @@ class TestRequestManagerTest(unittest.TestCase):
     runner.put()
 
     self.assertFalse(self._manager.UpdateTestResult(runner, MACHINE_IDS[1]))
-    self._mox.VerifyAll()
-
-  def testFileErrorInResultsOnce(self):
-    # Force the uses of the blobstore file api since we are testing it.
-    self._manager.SetUseBlobstoreFileApi(True)
-
-    # This must be a class variable because otherwise python gets confused
-    # instead of MockCreate and thinks attempt is just a local variable.
-    self.attempt = 0
-    old_create = files.blobstore.create
-
-    def MockCreate(mime_type):
-      if self.attempt < 1:
-        self.attempt += 1
-        raise files.ApiTemporaryUnavailableError()
-
-      return old_create(mime_type)
-
-    self._SetupHandleTestResults()
-    self._mox.StubOutWithMock(files.blobstore, 'create')
-    self._mox.StubOutWithMock(time, 'sleep')
-    files.blobstore.create = MockCreate
-    time.sleep(mox.IgnoreArg())
-    self._mox.ReplayAll()
-
-    self.ExecuteHandleTestResults(success=True)
-    self.assertEqual(1, self.attempt)
-
-    self._mox.VerifyAll()
-
-  def testFileErrorInResultsForever(self):
-    # Force the uses of the blobstore file api since we are testing it.
-    self._manager.SetUseBlobstoreFileApi(True)
-
-    # Make sure that the code gives up trying to create a blobstore if it fails
-    # too often.
-    self._SetupHandleTestResults()
-    self._mox.StubOutWithMock(files.blobstore, 'create')
-    for _ in range(test_manager.MAX_BLOBSTORE_WRITE_TRIES):
-      files.blobstore.create(mox.IgnoreArg()).AndRaise(
-          files.ApiTemporaryUnavailableError())
-    self._mox.ReplayAll()
-
-    self.ExecuteHandleTestResults(success=True,
-                                  store_results_successfully=False)
-
     self._mox.VerifyAll()
 
   def _SetupAndExecuteTestResults(self, result_url):

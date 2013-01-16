@@ -11,7 +11,6 @@ import json
 import unittest
 
 
-from google.appengine import runtime
 from google.appengine.ext import testbed
 from common import dimensions_utils
 from common import test_request_message
@@ -281,49 +280,6 @@ class AppTest(unittest.TestCase):
     runner = test_manager.TestRunner.all().get()
     self.assertTrue(runner.ran_successfully)
     self.assertEqual(result, runner.GetResultString())
-
-  # Ensure that if we lose a test's results due to the file api acting up,
-  # we retry the test to get the results instead of giving the user no output.
-  def testResultHandlerTimedOut(self):
-    runner = self._CreateTestRunner(machine_id=MACHINE_ID,
-                                    started=datetime.datetime.now())
-
-    self._mox.StubOutWithMock(test_manager.files.blobstore, 'create')
-    self._mox.StubOutWithMock(test_manager.logging, 'warning')
-
-    test_manager.files.blobstore.create(mox.IgnoreArg()).AndRaise(
-        runtime.DeadlineExceededError)
-    test_manager.logging.warning(mox.StrContains('Deadline exceeded'))
-
-    test_manager.files.blobstore.create(mox.IgnoreArg()).AndRaise(
-        runtime.DeadlineExceededError)
-    self._mox.ReplayAll()
-
-    # The runner should be automatically retried.
-    missing_results = 'missing results'
-    self._PostResults(runner, missing_results)
-
-    # Get the lastest version of the runner and ensure it has the correct
-    # values.
-    runner = test_manager.TestRunner.all().get()
-    self.assertFalse(runner.done)
-    self.assertIsNone(runner.started)
-    self.assertEqual(1, runner.automatic_retry_count)
-    self.assertEqual('', runner.GetResultString())
-
-    # This runner has been automatically retried too many times, so give up.
-    runner.automatic_retry_count = test_manager.MAX_AUTOMATIC_RETRIES
-    runner.machine_id = MACHINE_ID
-    runner.put()
-    self._PostResults(runner, missing_results)
-
-    # Get the lastest version of the runner and ensure it has the correct
-    # values.
-    runner = test_manager.TestRunner.all().get()
-    self.assertTrue(runner.done)
-    self.assertIn('Deadline exceeded', runner.GetResultString())
-
-    self._mox.VerifyAll()
 
   def testChangeWhitelistHandlerParams(self):
     # Make sure the link redirects to the right place.
