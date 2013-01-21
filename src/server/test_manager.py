@@ -329,7 +329,13 @@ class TestRunner(db.Model):
     Raises:
       test_request_message.Error: If the request's message isn't valid.
     """
-    return '%s:%s' % (self.test_request.name, self.config_name)
+    try:
+      return '%s:%s' % (self.test_request.name, self.config_name)
+    except db.ReferencePropertyResolveError as e:
+      # Sometimes the test runner is unable to resolve the TestRequest
+      # member.
+      logging.warning(e)
+      return None
 
   def GetConfiguration(self):
     """Gets the configuration associated with this runner.
