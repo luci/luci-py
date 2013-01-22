@@ -24,6 +24,7 @@ import webapp2
 from google.appengine.ext.webapp import blobstore_handlers
 from google.appengine.ext.webapp import template
 from google.appengine.ext.webapp import util
+from common import blobstore_helper
 from common import test_request_message
 from common import url_helper
 from server import admin_user
@@ -91,6 +92,15 @@ def GenerateButtonWithHiddenForm(button_text, url, form_id):
   button_html += '</form>'
 
   return button_html
+
+
+def OnDevAppEngine():
+  """Return True if this code is running on dev app engine.
+
+  Returns:
+    True if this code is running on dev app engine.
+  """
+  return os.environ['SERVER_SOFTWARE'].startswith('Development')
 
 
 class MainHandler(webapp2.RequestHandler):
@@ -366,12 +376,27 @@ class ResultHandler(webapp2.RequestHandler):
     result_string = urllib.unquote_plus(self.request.get(
         url_helper.RESULT_STRING_KEY))
 
+    # If we are on dev app engine we can't use the create_upload_url method
+    # because it requires 2 threads, and dev app engine isn't multithreaded
+    # (It needs this thread, and another thread to handle the url POSTFORM).
+    result_blob_key = None
+    if OnDevAppEngine():
+      result_blob_key = blobstore_helper.CreateBlobstore(result_string)
+    else:
+      # Create the blobstore.
+      upload_url = blobstore.create_upload_url('/upload')
+      result_blob_key = url_helper.UrlOpen(
+          upload_url, files=[('result', 'result', result_string)],
+          max_tries=blobstore_helper.MAX_BLOBSTORE_WRITE_TRIES,
+          wait_duration=0, method='POSTFORM')
+
     test_request_manager = CreateTestManager()
-    if test_request_manager.UpdateTestResult(runner, machine_id,
-                                             success=success,
-                                             exit_codes=exit_codes,
-                                             result_string=result_string,
-                                             overwrite=overwrite):
+    if (result_blob_key and
+        test_request_manager.UpdateTestResult(runner, machine_id,
+                                              success=success,
+                                              exit_codes=exit_codes,
+                                              result_blob_key=result_blob_key,
+                                              overwrite=overwrite)):
       self.response.out.write('Successfully update the runner results.')
     else:
       self.response.set_status(400)

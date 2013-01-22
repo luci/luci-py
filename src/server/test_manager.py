@@ -37,7 +37,6 @@ from google.appengine.ext import db
 from common import blobstore_helper
 from common import dimensions_utils
 from common import test_request_message
-from common import url_helper
 from test_runner import slave_machine
 
 # The amount of time to wait after recieving a runners last message before
@@ -448,28 +447,8 @@ class SwarmError(db.Model):
 class TestRequestManager(object):
   """The Test Request Manager."""
 
-  def __init__(self, use_blobstore_file_api=None):
-    """Constructor for the TestRequestManager.
-
-    Args:
-      use_blobstore_file_api: A flag to determine if the experimental file
-          api should be used.
-    """
-    if use_blobstore_file_api is None:
-      use_blobstore_file_api = OnDevAppEngine()
-
-    self.use_blobstore_file_api = use_blobstore_file_api
-
-  def SetUseBlobstoreFileApi(self, use_blobstore_file_api):
-    """Enable and disable the use of the experimental blobstore api.
-
-    Args:
-      use_blobstore_file_api: True to enable the api.
-    """
-    self.use_blobstore_file_api = use_blobstore_file_api
-
   def UpdateTestResult(self, runner, machine_id, success=False, exit_codes='',
-                       result_string=None, errors=None, overwrite=False):
+                       result_blob_key=None, errors=None, overwrite=False):
     """Update the runner with results of a test run.
 
     Args:
@@ -478,7 +457,7 @@ class TestRequestManager(object):
       machine_id: The machine id of the machine providing these results.
       success: a boolean indicating whether the test run succeeded or not.
       exit_codes: a string containing the array of exit codes of the test run.
-      result_string: a string containing the output of the test run.
+      result_blob_key: a key to the blob containing the results.
       errors: a string explaining why we failed to get the actual result string.
       overwrite: a boolean indicating if we should always record this result,
           even if a result had been previously recorded.
@@ -500,7 +479,13 @@ class TestRequestManager(object):
     # response for it, unless overwrite is enable.
     if runner.done and not overwrite:
       stored_results = runner.GetResultString()
-      if result_string == stored_results or errors == stored_results:
+      new_results = blobstore_helper.GetBlobstore(result_blob_key)
+
+      # The new results won't get stored so delete them.
+      if result_blob_key:
+        blobstore.delete_async(result_blob_key)
+
+      if new_results == stored_results or errors == stored_results:
         # This can happen if the server stores the results and then runs out
         # of memory, so the return code is 500, which causes the
         # local_test_runner to resend the results.
@@ -510,7 +495,7 @@ class TestRequestManager(object):
         logging.error('Got a additional response for runner=%s (key %s), '
                       'not good', runner.GetName(), runner.key())
         logging.debug('Dropped result string was:\n%s',
-                      result_string or errors)
+                      new_results or errors)
         return False
 
     # Clear any old result strings that are stored if we are overwriting.
@@ -525,40 +510,17 @@ class TestRequestManager(object):
     runner.exit_codes = exit_codes
     runner.done = True
 
-    update_successful = True
-    if result_string is not None:
-      result_blob_key = None
-      if self.use_blobstore_file_api:
-        result_blob_key = blobstore_helper.CreateBlobstore(result_string)
-      else:
-        # Create the blobstore.
-        upload_url = blobstore.create_upload_url('/upload')
-        result_blob_key = url_helper.UrlOpen(
-            upload_url, files=[('result', 'result', result_string)],
-            max_tries=blobstore_helper.MAX_BLOBSTORE_WRITE_TRIES,
-            wait_duration=0, method='POSTFORM')
-
-      if result_blob_key:
-        assert runner.result_string_reference is None, (
-            'There is a reference stored, overwriting it would leak the old '
-            'element.')
-        runner.result_string_reference = result_blob_key
-      else:
-        if self.AutomaticallyRetryRunner(runner):
-          logging.warning('Runner results were lost due to server problems, '
-                          'automatically retrying the runner.')
-          # Drop out of this function since we don't want to let the user know
-          # the test is done since we are retrying it.
-          return False
-        else:
-          logging.error('Runner result were lost, but this runner was unable '
-                        'to get automatically restarted.')
-          runner.errors = ('There was a problem when creating the blobstore. '
-                           'The results where lost.')
-          update_successful = False
+    if result_blob_key:
+      assert runner.result_string_reference is None, (
+          'There is a reference stored, overwriting it would leak the old '
+          'element.')
+      runner.result_string_reference = result_blob_key
     else:
       runner.errors = errors
+
     runner.put()
+    logging.info('Successfully updated the results of runner %s.',
+                 runner.key())
 
     # If the test didn't run successfully, we send an email if one was
     # requested via the test request.
@@ -573,6 +535,7 @@ class TestRequestManager(object):
     # go back to the TRS web UI and see the results of any test that has run.
     # Eventually we will want to see how to delete old requests as the apps
     # storage quota will be exceeded.
+    update_successful = True
     if test_case.result_url:
       result_url_parts = urlparse.urlsplit(test_case.result_url)
       if result_url_parts[0] == 'http' or result_url_parts[0] == 'https':
@@ -620,10 +583,6 @@ class TestRequestManager(object):
       test_request = runner.test_request
       runner.delete()
       test_request.RunnerDeleted()
-
-    if update_successful:
-      logging.info('Successfully updated the results of runner %s.',
-                   runner.key())
 
     return update_successful
 

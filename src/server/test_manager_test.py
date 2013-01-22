@@ -10,7 +10,6 @@
 import datetime
 import json
 import logging
-import StringIO
 import unittest
 import urllib2
 
@@ -51,8 +50,7 @@ class TestRequestManagerTest(unittest.TestCase):
     self._mox = mox.Mox()
 
     # Create a test manager instance for the tests.
-    self._manager = test_manager.TestRequestManager(
-        use_blobstore_file_api=False)
+    self._manager = test_manager.TestRequestManager()
 
     # Mock out LoadFile.
     self._mox.StubOutWithMock(self._manager, '_LoadFile')
@@ -336,12 +334,6 @@ class TestRequestManagerTest(unittest.TestCase):
     self._TestForRestartOnFailurePresence(True)
 
   def _AddTestRunWithResultsExpectation(self, result_url, result_string):
-    if not self._manager.use_blobstore_file_api:
-      # Writing the result to the blobstore.
-      blob_key = blobstore_helper.CreateBlobstore(result_string)
-      urllib2.urlopen(mox.IsA(urllib2.Request)).AndReturn(
-          StringIO.StringIO(blob_key))
-
     # Setup expectations for HandleTestResults().
     if result_url.startswith('mailto'):
       mail.send_mail(sender='Test Request Server <no_reply@google.com>',
@@ -388,10 +380,12 @@ class TestRequestManagerTest(unittest.TestCase):
       runner_key = runner.key()
       runner = test_manager.TestRunner.get(runner_key)
 
+      result_blob_key = blobstore_helper.CreateBlobstore('results')
       self.assertEqual(store_results_successfully,
-                       self._manager.UpdateTestResult(runner, runner.machine_id,
-                                                      result_string='results',
-                                                      success=success))
+                       self._manager.UpdateTestResult(
+                           runner, runner.machine_id,
+                           result_blob_key=result_blob_key,
+                           success=success))
 
       # If results aren't being stored we can't check the runner data because
       # it will have been deleted.
@@ -461,27 +455,41 @@ class TestRequestManagerTest(unittest.TestCase):
 
     runner = test_manager.TestRunner.all().get()
 
-    # First results, always accepted.
-    self.assertTrue(self._manager.UpdateTestResult(runner, runner.machine_id,
-                                                   result_string=messages[0]))
+    try:
+      # Replace the async with a non-async version to ensure the blobs
+      # are deleted before we check if they were deleted by the following
+      # asserts.
+      old_delete_async = test_manager.blobstore.delete_async
+      test_manager.blobstore.delete_async = blobstore.delete
 
-    # The first result resent, accepted since the strings are equal.
-    self.assertTrue(self._manager.UpdateTestResult(runner, runner.machine_id,
-                                                   result_string=messages[0]))
+      # First results, always accepted.
+      self.assertTrue(self._manager.UpdateTestResult(
+          runner, runner.machine_id,
+          result_blob_key=blobstore_helper.CreateBlobstore(messages[0])))
+      # Always ensure that there is only one element in the blobstore.
+      self.assertEqual(1, blobstore.BlobInfo.all().count())
 
-    # Non-first request without overwrite, rejected.
-    self.assertFalse(self._manager.UpdateTestResult(runner, runner.machine_id,
-                                                    result_string=messages[1],
-                                                    overwrite=False))
+      # The first result resent, accepted since the strings are equal.
+      self.assertTrue(self._manager.UpdateTestResult(
+          runner, runner.machine_id,
+          result_blob_key=blobstore_helper.CreateBlobstore(messages[0])))
+      self.assertEqual(1, blobstore.BlobInfo.all().count())
 
-    # Non-first request with overwrite, accepted.
-    self.assertTrue(self._manager.UpdateTestResult(runner, runner.machine_id,
-                                                   result_string=messages[2],
-                                                   overwrite=True))
+      # Non-first request without overwrite, rejected.
+      self.assertFalse(self._manager.UpdateTestResult(
+          runner, runner.machine_id,
+          result_blob_key=blobstore_helper.CreateBlobstore(messages[1]),
+          overwrite=False))
+      self.assertEqual(1, blobstore.BlobInfo.all().count())
 
-    # Make sure that only one blobstore is stored, since only one
-    # is referenced.
-    self.assertEqual(1, blobstore.BlobInfo.all().count())
+      # Non-first request with overwrite, accepted.
+      self.assertTrue(self._manager.UpdateTestResult(
+          runner, runner.machine_id,
+          result_blob_key=blobstore_helper.CreateBlobstore(messages[2]),
+          overwrite=True))
+      self.assertEqual(1, blobstore.BlobInfo.all().count())
+    finally:
+      test_manager.blobstore.delete_async = old_delete_async
 
     # Accept the first message as an error with overwrite.
     self.assertTrue(self._manager.UpdateTestResult(runner, runner.machine_id,
@@ -496,50 +504,6 @@ class TestRequestManagerTest(unittest.TestCase):
     # Make sure there are no blobs store now, since errors are just stored as
     # strings.
     self.assertEqual(0, blobstore.BlobInfo.all().count())
-
-    self._mox.VerifyAll()
-
-  # Ensure that if we lose a test's results due to the file api acting up,
-  # we retry the test to get the results instead of giving the user no output.
-  def testHandleBlobstoreFailures(self):
-    self._mox.StubOutWithMock(test_manager.url_helper, 'UrlOpen')
-
-    for _ in range(2):
-      test_manager.url_helper.UrlOpen(mox.StrContains('/upload'),
-                                      files=mox.IgnoreArg(),
-                                      max_tries=mox.IgnoreArg(),
-                                      wait_duration=0,
-                                      method='POSTFORM').AndReturn(None)
-    self._mox.ReplayAll()
-
-    self._manager.ExecuteTestRequest(self._GetRequestMessage())
-    runner = test_manager.TestRunner.all().get()
-
-    # The runner should be automatically retried.
-    missing_results = 'missing results'
-    self._manager.UpdateTestResult(runner, runner.machine_id,
-                                   result_string=missing_results)
-
-    # Get the lastest version of the runner and ensure it has the correct
-    # values.
-    runner = test_manager.TestRunner.all().get()
-    self.assertFalse(runner.done)
-    self.assertIsNone(runner.started)
-    self.assertEqual(1, runner.automatic_retry_count)
-    self.assertEqual('', runner.GetResultString())
-
-    # This runner has been automatically retried too many times, so give up.
-    runner.automatic_retry_count = test_manager.MAX_AUTOMATIC_RETRIES
-    runner.put()
-    self._manager.UpdateTestResult(runner, runner.machine_id,
-                                   result_string=missing_results)
-
-    # Get the lastest version of the runner and ensure it has the correct
-    # values.
-    runner = test_manager.TestRunner.all().get()
-    self.assertTrue(runner.done)
-    self.assertEqual('There was a problem when creating the blobstore. '
-                     'The results where lost.', runner.GetResultString())
 
     self._mox.VerifyAll()
 

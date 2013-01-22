@@ -12,6 +12,7 @@ import unittest
 
 
 from google.appengine.ext import testbed
+from common import blobstore_helper
 from common import dimensions_utils
 from common import test_request_message
 from server import admin_user
@@ -258,14 +259,14 @@ class AppTest(unittest.TestCase):
                       sorted(response.keys()))
     self.assertEquals(MACHINE_ID, response['id'])
 
-  def _PostResults(self, runner, result):
+  def _PostResults(self, runner, result, expect_errors=False):
     url_parameters = {
         'r': runner.key(),
         'id': runner.machine_id,
         's': True,
         'result_output': result,
         }
-    return self.app.post('/result', url_parameters)
+    return self.app.post('/result', url_parameters, expect_errors=expect_errors)
 
   def testResultHandler(self):
     runner = self._CreateTestRunner(machine_id=MACHINE_ID,
@@ -280,6 +281,26 @@ class AppTest(unittest.TestCase):
     runner = test_manager.TestRunner.all().get()
     self.assertTrue(runner.ran_successfully)
     self.assertEqual(result, runner.GetResultString())
+
+  def testResultHandlerBlobstoreFailure(self):
+    self._mox.StubOutWithMock(blobstore_helper, 'CreateBlobstore')
+    blobstore_helper.CreateBlobstore(mox.IgnoreArg()).AndReturn(None)
+    self._mox.ReplayAll()
+
+    runner = self._CreateTestRunner(machine_id=MACHINE_ID,
+                                    started=datetime.datetime.now())
+
+    result = 'result string'
+    response = self._PostResults(runner, result, expect_errors=True)
+    self.assertEquals('400 Bad Request', response.status)
+    self.assertEquals('Failed to update the runner results.', response.body)
+
+    # Get the lastest version of the runner and ensure it hasn't been marked as
+    # done.
+    runner = test_manager.TestRunner.all().get()
+    self.assertFalse(runner.done)
+
+    self._mox.VerifyAll()
 
   def testChangeWhitelistHandlerParams(self):
     # Make sure the link redirects to the right place.
