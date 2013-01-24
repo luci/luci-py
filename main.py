@@ -765,10 +765,6 @@ class RetrieveContentByHashHandler(ACLRequestHandler,
       msg = 'Unable to find an ContentEntry with key \'%s\'.' % hash_key
       self.abort(404, detail=msg)
 
-    if entry.last_access != datetime.date.today():
-      entry.last_access = datetime.date.today()
-      db.put_async(entry)
-
     if entry.content is None:
       logging.info(
           'Returning %d bytes from blobstore', entry.content_reference.size)
