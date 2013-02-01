@@ -27,6 +27,7 @@ class UrlHelperTest(unittest.TestCase):
     self._mox = mox.Mox()
 
     self._mox.StubOutWithMock(logging, 'error')
+    self._mox.StubOutWithMock(logging, 'exception')
     self._mox.StubOutWithMock(time, 'sleep')
     self._mox.StubOutWithMock(urllib2, 'urlopen')
 
@@ -121,7 +122,7 @@ class UrlHelperTest(unittest.TestCase):
     url_helper.urllib2.urlopen(
         mox.IgnoreArg(), mox.IgnoreArg()).AndRaise(
             urllib2.HTTPError('url', 400, 'error message', None, None))
-    logging.error(mox.IgnoreArg(), mox.IgnoreArg(), mox.IgnoreArg())
+    logging.exception(mox.IgnoreArg(), mox.IgnoreArg(), mox.IgnoreArg())
 
     self._mox.ReplayAll()
 

@@ -101,8 +101,8 @@ def UrlOpen(url, data=None, files=None, max_tries=5, wait_duration=None,
       else:
         # This HTTPError means we reached the server and there was a problem
         # with the request, so don't retry.
-        logging.error('Able to connect to %s but an exception was thrown.\n%s',
-                      url, e)
+        logging.exception('Able to connect to %s but an exception was '
+                          'thrown.\n%s', url, e)
         return None
     except (urllib2.URLError, httplib.HTTPException) as e:
       logging.warning('Unable to open url %s on attempt %d.\nException: %s',
