@@ -390,13 +390,18 @@ class ResultHandler(webapp2.RequestHandler):
           max_tries=blobstore_helper.MAX_BLOBSTORE_WRITE_TRIES,
           wait_duration=0, method='POSTFORM')
 
+    if result_blob_key is None:
+      self.response.out.write('The server was unable to save the results to '
+                              'the blobstore')
+      self.response.set_status(500)
+      return
+
     test_request_manager = CreateTestManager()
-    if (result_blob_key and
-        test_request_manager.UpdateTestResult(runner, machine_id,
-                                              success=success,
-                                              exit_codes=exit_codes,
-                                              result_blob_key=result_blob_key,
-                                              overwrite=overwrite)):
+    if test_request_manager.UpdateTestResult(runner, machine_id,
+                                             success=success,
+                                             exit_codes=exit_codes,
+                                             result_blob_key=result_blob_key,
+                                             overwrite=overwrite):
       self.response.out.write('Successfully update the runner results.')
     else:
       self.response.set_status(400)

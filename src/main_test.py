@@ -292,8 +292,10 @@ class AppTest(unittest.TestCase):
 
     result = 'result string'
     response = self._PostResults(runner, result, expect_errors=True)
-    self.assertEquals('400 Bad Request', response.status)
-    self.assertEquals('Failed to update the runner results.', response.body)
+    self.assertEquals('500 Internal Server Error', response.status)
+    self.assertEquals(
+        'The server was unable to save the results to the blobstore',
+        response.body)
 
     # Get the lastest version of the runner and ensure it hasn't been marked as
     # done.
