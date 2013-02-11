@@ -247,7 +247,7 @@ def ReadBlob(blob, callback):
   while True:
     try:
       data = blobstore.fetch_data(blob, position, position + chunk_size - 1)
-    except taskqueue.InternalError as e:
+    except (blobstore.InternalError, taskqueue.InternalError) as e:
       logging.warning('Exception while reading blobstore data, retrying\n%s', e)
       continue
     logging.debug('Read %d bytes', len(data))
@@ -614,7 +614,7 @@ class StoreBlobstoreContentByHashHandler(
     ACLRequestHandler,
     blobstore_handlers.BlobstoreUploadHandler):
   """Assigns the newly stored blobstore entry to the correct hash key."""
-  def post(self, namespace, hash_key):
+  def post(self, namespace, hash_key):  #pylint: disable=W0221
     contents = self.get_uploads('content')
     if not contents:
       # TODO(maruel): Remove, only kept for short term compatibility.
@@ -751,7 +751,7 @@ class RemoveContentByHashHandler(ACLRequestHandler):
 class RetrieveContentByHashHandler(ACLRequestHandler,
                                    blobstore_handlers.BlobstoreDownloadHandler):
   """The handlers for retrieving contents by its SHA-1 hash |hash_key|."""
-  def get(self, namespace, hash_key):
+  def get(self, namespace, hash_key):  #pylint: disable=W0221
     # TODO(maruel): Use namespace='table_%s' % namespace.
     memcache_entry = memcache.get(hash_key, namespace=namespace)
 
