@@ -26,7 +26,7 @@ import find_depot_tools  # pylint: disable=W0611
 from third_party import upload
 
 # The url of the test isolate server.
-ISOLATE_SERVER_URL_TEMPLATE = 'https://%s-dot-isolateserver.appspot.com/'
+ISOLATE_SERVER_URL_TEMPLATE = 'https://%s-dot-isolateserver-dev.appspot.com/'
 ISOLATE_SERVER_URL = ISOLATE_SERVER_URL_TEMPLATE % 'test'
 
 # Some basic binary data stored as a byte string.
@@ -264,6 +264,16 @@ class AppTestSignedIn(unittest.TestCase):
 #    hash_key = hashlib.sha1(hash_contents + 'x').hexdigest()
 #    # TODO(maruel): This code tests that the code is not checking properly.
 #    self.UploadHashAndRetrieveHelper(hash_key, hash_contents)
+
+  def testGetToken(self):
+    response1 = self.fetch(
+        ISOLATE_SERVER_URL + 'content/get_token', payload=None)
+    self.assertEqual(16, len(response1))
+    response2 = self.fetch(
+        ISOLATE_SERVER_URL + 'content/get_token', payload=None)
+    self.assertEqual(16, len(response2))
+    # There's a small chance the responses differ so do not assert they are
+    # equal even if they should in practice.
 
 
 class AppTestSignedOut(unittest.TestCase):

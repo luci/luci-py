@@ -9,6 +9,7 @@ import hashlib
 import logging
 import os
 import re
+import time
 import zlib
 
 # The app engine headers are located locally, so don't worry about not finding
@@ -44,6 +45,12 @@ VALID_DOMAINS = (
     'chromium.org',
     'google.com',
 )
+
+
+class User(db.Model):
+  secret = db.ByteStringProperty(indexed=False)
+  # For information purpose only.
+  email = db.StringProperty(indexed=False)
 
 
 class ContentNamespace(db.Model):
@@ -107,7 +114,8 @@ class WhitelistedIP(db.Model):
   ip = db.StringProperty()
 
   # Is only for maintenance purpose.
-  comment = db.StringProperty()
+  comment = db.StringProperty(indexed=False)
+  secret = db.ByteStringProperty(indexed=False)
 
 
 def GetContentNamespaceKey(namespace):
@@ -185,23 +193,72 @@ def GetHashAlgo(_namespace):
 class ACLRequestHandler(webapp2.RequestHandler):
   """Adds ACL to the request handler to ensure only valid users can use
   the handlers."""
+  def __init__(self, *args, **kwargs):
+    webapp2.RequestHandler.__init__(self, *args, **kwargs)
+    self.secret = None
+    self.access_id = None
+
   def dispatch(self):
     """Ensures that only users from valid domains can continue, and that users
     from invalid domains receive an error message."""
-    user = users.get_current_user()
-    if not user:
-      # Verify if its IP is whitelisted.
-      query = WhitelistedIP.gql('WHERE ip = :1', self.request.remote_addr)
-      if not query.count():
+    current_user = users.get_current_user()
+    if current_user:
+      self.CheckUser(current_user)
+    else:
+      self.CheckIP(self.request.remote_addr)
+    return webapp2.RequestHandler.dispatch(self)
+
+  def CheckIP(self, ip):
+    """Verifies if the IP is whitelisted."""
+    self.access_id = ip
+    self.secret = memcache.get(self.access_id, namespace='ip_token')
+    if not self.secret:
+      whitelisted = WhitelistedIP.all().filter('ip', self.access_id).get()
+      if not whitelisted:
         logging.warning('Blocking IP %s', self.request.remote_addr)
         self.abort(401, detail='Please login first.')
-    else:
-      domain = user.email().partition('@')[2]
-      if domain not in VALID_DOMAINS:
-        logging.warning('Disallowing %s, invalid domain' % user.email())
-        self.abort(403, detail='Invalid domain, %s' % domain)
+      self.secret = whitelisted.secret
+      if not self.secret:
+        self.secret = os.urandom(8)
+        whitelisted.secret = self.secret
+        whitelisted.put()
+      memcache.set(self.access_id, self.secret, namespace='ip_token')
 
-    return webapp2.RequestHandler.dispatch(self)
+  def CheckUser(self, user):
+    """Verifies if the user is whitelisted."""
+    domain = user.email().partition('@')[2]
+    if domain not in VALID_DOMAINS:
+      logging.warning('Disallowing %s, invalid domain' % user.email())
+      self.abort(403, detail='Invalid domain, %s' % domain)
+
+    # user_id() is only set with Google accounts, fallback to the email address
+    # otherwise.
+    self.access_id = user.user_id() or user.email()
+    self.secret = memcache.get(self.access_id, namespace='user_token')
+    if not self.secret:
+      user_obj = User.get_by_key_name(self.access_id)
+      if not user_obj:
+        user_obj = User.get_or_insert(
+            self.access_id, secret=os.urandom(8), email=user.email())
+      if not user_obj.secret:
+        # Should not happen but cope with it.
+        user_obj.secret = os.urandom(8)
+        user_obj.put()
+      self.secret = user_obj.secret
+      memcache.set(self.access_id, self.secret, namespace='user_token')
+
+  def GetToken(self, offset):
+    """Returns a valid token for the current user.
+
+    |offset| is the offset versus current time of day, in hours. It should be 0
+    or -1.
+    """
+    m = hashlib.sha1(self.secret)
+    m.update(self.access_id)
+    # Rotate every hour.
+    m.update(str(int(time.time()) / 3600 + offset))
+    # Keep 8 bytes of entropy.
+    return m.hexdigest()[:16]
 
 
 def SplitPayload(request, chunk_size, max_chunks):
@@ -517,6 +574,7 @@ def htmlwrap(text):
   """Wraps text in minimal HTML tags."""
   return '<html><body>%s</body></html>' % text
 
+
 class RestrictedWhitelistHandler(webapp2.RequestHandler):
   """Whitelists the current IP."""
   def get(self):
@@ -776,6 +834,13 @@ class RetrieveContentByHashHandler(ACLRequestHandler,
       self.response.out.write(entry.content)
 
 
+class GetTokenHandler(ACLRequestHandler):
+  """Returns the token."""
+  def get(self):
+    self.response.headers['Content-Type'] = 'text/plain'
+    self.response.out.write(self.GetToken(0))
+
+
 class RootHandler(webapp2.RequestHandler):
   """Tells the user to RTM."""
   def get(self):
@@ -830,6 +895,7 @@ def CreateApplication():
       webapp2.Route(
           r'/content/generate_blobstore_url' + namespace_key,
           GenerateBlobstoreHandler),
+      webapp2.Route(r'/content/get_token', GetTokenHandler),
       webapp2.Route(
           r'/content/store' + namespace_key, StoreContentByHashHandler),
       webapp2.Route(
