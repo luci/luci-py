@@ -523,6 +523,26 @@ class TestRequestManagerTest(unittest.TestCase):
     self.assertFalse(self._manager.UpdateTestResult(runner, MACHINE_IDS[1]))
     self._mox.VerifyAll()
 
+  def testRunnerCallerOldMachine(self):
+    self._mox.StubOutWithMock(urllib2, 'urlopen')
+    urllib2.urlopen(mox.IgnoreArg(), mox.StrContains('r='))
+    self._mox.ReplayAll()
+
+    self._manager.ExecuteTestRequest(self._GetRequestMessage())
+    runner = test_manager.TestRunner.all().get()
+    runner.machine_id = MACHINE_IDS[0]
+    runner.old_machine_ids = [MACHINE_IDS[1]]
+    runner.put()
+
+    self.assertTrue(self._manager.UpdateTestResult(runner, MACHINE_IDS[1]))
+
+    runner = test_manager.TestRunner.all().get()
+    self.assertEqual(MACHINE_IDS[1], runner.machine_id)
+    self.assertEqual([MACHINE_IDS[0]], runner.old_machine_ids)
+    self.assertTrue(runner.done)
+
+    self._mox.VerifyAll()
+
   def _SetupAndExecuteTestResults(self, result_url):
     self._SetupHandleTestResults(result_url=result_url)
     self._mox.ReplayAll()
@@ -697,8 +717,47 @@ class TestRequestManagerTest(unittest.TestCase):
         self.assertIn('Runner has become stale', runner.GetResultString())
       else:
         self.assertFalse(runner.done)
+        self.assertEqual([MACHINE_IDS[0]] * (i + 1), runner.old_machine_ids)
         self.assertEqual(i + 1, runner.automatic_retry_count)
         self.assertEqual(None, runner.started)
+
+    self._mox.VerifyAll()
+
+  def testAbortRunnerThenReattach(self):
+    self._mox.StubOutWithMock(test_manager, '_GetCurrentTime')
+
+    self._SetupLoadFileExpectations(contents='contents')
+    self._GenerateFutureTimeExpectation()
+
+    self._mox.ReplayAll()
+
+    self._manager.ExecuteTestRequest(self._GetRequestMessage())
+
+    # Assign a machine to the runner.
+    self._ExecuteRegister(MACHINE_IDS[0])
+
+    runner = test_manager.TestRunner.all().get()
+    self.assertFalse(runner.done)
+    self.assertEqual(0, runner.automatic_retry_count)
+    self.assertNotEqual(None, runner.started)
+    self.assertEqual(MACHINE_IDS[0], runner.machine_id)
+
+    # Abort the runner because its taken too long to ping.
+    self._manager.AbortStaleRunners()
+
+    runner = test_manager.TestRunner.all().get()
+    self.assertEqual(1, runner.automatic_retry_count)
+    self.assertEqual(None, runner.started)
+    self.assertEqual(None, runner.machine_id)
+
+    # Have the the machine ping the server and get reconnected to the runner.
+    self.assertTrue(test_manager.PingRunner(runner.key(), MACHINE_IDS[0]))
+
+    runner = test_manager.TestRunner.all().get()
+    self.assertEqual(0, runner.automatic_retry_count)
+    self.assertNotEqual(None, runner.started)
+    self.assertEqual(MACHINE_IDS[0], runner.machine_id)
+    self.assertEqual([], runner.old_machine_ids)
 
     self._mox.VerifyAll()
 
@@ -1098,7 +1157,7 @@ class TestRequestManagerTest(unittest.TestCase):
 
     runner = self._CreatePendingRequest(machine_id=MACHINE_IDS[1])
 
-    self.assertFalse(self._manager._AssignRunnerToMachine(
+    self.assertFalse(test_manager.AssignRunnerToMachine(
         MACHINE_IDS[0], runner, _RaiseError))
 
   # Test with another exception.
@@ -1108,7 +1167,7 @@ class TestRequestManagerTest(unittest.TestCase):
 
     runner = self._CreatePendingRequest(machine_id=MACHINE_IDS[1])
 
-    self.assertFalse(self._manager._AssignRunnerToMachine(
+    self.assertFalse(test_manager.AssignRunnerToMachine(
         MACHINE_IDS[0], runner, _RaiseError))
 
   # Test with yet another exception.
@@ -1118,7 +1177,7 @@ class TestRequestManagerTest(unittest.TestCase):
 
     runner = self._CreatePendingRequest(machine_id=MACHINE_IDS[1])
 
-    self.assertFalse(self._manager._AssignRunnerToMachine(
+    self.assertFalse(test_manager.AssignRunnerToMachine(
         MACHINE_IDS[0], runner, _RaiseError))
 
   # Same as above, but the transaction stops throwing exception
@@ -1140,7 +1199,7 @@ class TestRequestManagerTest(unittest.TestCase):
 
     runner = self._CreatePendingRequest(machine_id=MACHINE_IDS[1])
 
-    self.assertTrue(self._manager._AssignRunnerToMachine(
+    self.assertTrue(test_manager.AssignRunnerToMachine(
         MACHINE_IDS[0], runner, _RaiseTempError))
 
   # Test with one more exception.
@@ -1150,7 +1209,7 @@ class TestRequestManagerTest(unittest.TestCase):
 
     runner = self._CreatePendingRequest(machine_id=MACHINE_IDS[1])
 
-    self.assertFalse(self._manager._AssignRunnerToMachine(
+    self.assertFalse(test_manager.AssignRunnerToMachine(
         MACHINE_IDS[0], runner, _RaiseError))
 
   # Test proper behavior of AtomicAssignID.
@@ -1181,17 +1240,17 @@ class TestRequestManagerTest(unittest.TestCase):
     runner = self._CreatePendingRequest()
 
     # First assignment should work correctly.
-    self.assertTrue(self._manager._AssignRunnerToMachine(
+    self.assertTrue(test_manager.AssignRunnerToMachine(
         MACHINE_IDS[0], runner, test_manager.AtomicAssignID))
 
     # Next assignment should fail.
-    self.assertFalse(self._manager._AssignRunnerToMachine(
+    self.assertFalse(test_manager.AssignRunnerToMachine(
         MACHINE_IDS[0], runner, test_manager.AtomicAssignID))
 
     runner.started = None
     runner.put()
     # This assignment should now work correctly.
-    self.assertTrue(self._manager._AssignRunnerToMachine(
+    self.assertTrue(test_manager.AssignRunnerToMachine(
         MACHINE_IDS[0], runner, test_manager.AtomicAssignID))
 
   # Test the case where the runner is deleted before the tx is done.
@@ -1200,7 +1259,7 @@ class TestRequestManagerTest(unittest.TestCase):
     runner.delete()
 
     # Assignment should fail without an exception.
-    self.assertFalse(self._manager._AssignRunnerToMachine(
+    self.assertFalse(test_manager.AssignRunnerToMachine(
         MACHINE_IDS[0], runner, test_manager.AtomicAssignID))
 
   # Make sure file I/O exceptions are propagated.

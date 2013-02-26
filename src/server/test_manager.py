@@ -268,6 +268,10 @@ class TestRunner(db.Model):
   # is set.
   machine_id = db.StringProperty()
 
+  # A list of the old machines ids that this runner previous ran on. This is
+  # useful for knowing when a ping is from an older machine.
+  old_machine_ids = db.ListProperty(str)
+
   # Used to indicate if the runner has finished, either successfully or not.
   done = db.BooleanProperty(default=False)
 
@@ -468,12 +472,25 @@ class TestRequestManager(object):
     """
     if not runner:
       logging.error('runner argument must be given')
+      # The new results won't get stored so delete them.
+      if result_blob_key:
+        blobstore.delete_async(result_blob_key)
       return False
 
     if runner.machine_id != machine_id:
-      logging.warning('The machine id of the runner, %s, doesn\'t match the '
-                      'machine id given, %s', runner.machine_id, machine_id)
-      return False
+      if machine_id not in runner.old_machine_ids:
+        logging.warning('The machine id of the runner, %s, doesn\'t match the '
+                        'machine id given, %s', runner.machine_id, machine_id)
+        # The new results won't get stored so delete them.
+        if result_blob_key:
+          blobstore.delete_async(result_blob_key)
+        return False
+      # Update the old and active machines ids.
+      logging.info('Recieved result from old machine, making it current '
+                   'machine and storing results')
+      runner.old_machine_ids.append(runner.machine_id)
+      runner.machine_id = machine_id
+      runner.old_machine_ids.remove(machine_id)
 
     # If the runnner is marked as done, don't try to process another
     # response for it, unless overwrite is enable.
@@ -790,6 +807,7 @@ class TestRequestManager(object):
     if runner.automatic_retry_count < MAX_AUTOMATIC_RETRIES:
       # Don't change the created time since it is not the user's fault
       # we are retrying it (so it should have high prority to run again).
+      runner.old_machine_ids.append(runner.machine_id)
       runner.machine_id = None
       runner.done = False
       runner.started = None
@@ -926,7 +944,7 @@ class TestRequestManager(object):
       # Will atomically try to assign the machine to the runner. This could
       # fail due to a race condition on the runner. If so, we loop back to
       # finding a runner.
-      if self._AssignRunnerToMachine(attribs['id'], runner, AtomicAssignID):
+      if AssignRunnerToMachine(attribs['id'], runner, AtomicAssignID):
         assigned_runner = True
         # Grab the new version of the runner.
         runner = db.get(runner.key())
@@ -1131,60 +1149,6 @@ class TestRequestManager(object):
         return runner
 
     return None
-
-  def _AssignRunnerToMachine(self, machine_id, runner, atomic_assign):
-    """Will try to atomically assign runner.machine_id to machine_id.
-
-    This function is thread safe and can be called simultaneously on the same
-    runner. It will ensure all but one concurrent requests will fail.
-
-    It uses a transaction to run atomic_assign to assign the given machine_id
-    inside attribs to the given runner. If the transaction succeeds, it will
-    return True which means runner.machine_id = machine_id. However, based on
-    datastore documentation, it is possible for datastore to throw exceptions
-    on the transaction, and we have no way to conclude if the machine_id of
-    the runner was set or not.
-
-    After investigating a few alternative approaches, we decided to return
-    False in such situations. This means the runner.machine_id (1) 'might' or
-    (2) 'might not' have been changed, but we return False anyways. In case
-    (2) no harm, no foul. In case (1), the runner is assumed running but is
-    actually not. We expect the timeout event to fire at some future time and
-    restart the runner.
-
-    An alternate solution would be to delete that runner and recreate it, set
-    the correct created timestamp, etc. which seems a bit more messy. We might
-    switch to that if this starts to break at large scales.
-
-    Args:
-      machine_id: the machine_id of the machine.
-      runner: test runner object to assign the machine to.
-      atomic_assign: function pointer to be done atomically.
-
-    Returns:
-      True is succeeded, False otherwise.
-    """
-    for _ in range(0, MAX_TRANSACTION_RETRY_COUNT):
-      try:
-        db.run_in_transaction(atomic_assign, runner.key(), machine_id)
-        return True
-      except TxRunnerAlreadyAssignedError:
-        # The runner is already assigned to a machine. Abort.
-        break
-      except db.TransactionFailedError:
-        # This exception only happens if there is a problem with datastore,
-        # e.g.high contention, capacity cap, etc. It ensures the operation isn't
-        # done so we can safely retry.
-        # Since we are on the main server thread, we avoid sleeping between
-        # calls.
-        continue
-      except (db.Timeout, db.InternalError):
-        # These exceptions do NOT ensure the operation is done. Based on the
-        # Discussion above, we assume it hasn't been assigned.
-        logging.exception('Un-determined fate for runner=%s', runner.GetName())
-        break
-
-    return False
 
   def _GetTestRunnerCommands(self, runner, server_url):
     """Get the commands that need to be sent to a slave to execute the runner.
@@ -1516,9 +1480,28 @@ def PingRunner(key, machine_id):
     return False
 
   if machine_id != runner.machine_id:
-    logging.error('Machine ids don\'t match, expected %s but got %s',
-                  runner.machine_id, machine_id)
-    return False
+    if machine_id in runner.old_machine_ids:
+      # This can happen if the network on the slave went down and the server
+      # thought it was dead and retried the test.
+      if (runner.machine_id is None and
+          AssignRunnerToMachine(machine_id, runner, AtomicAssignID)):
+        logging.info('Ping from older machine has resulted in runner '
+                     'reconnecting to the machine')
+
+        # The runner stored in the db was updated by AssignRunnerToMachine,
+        # so the local runner needed to get updated to contain the same values.
+        runner = TestRunner.get(key)
+        runner.automatic_retry_count -= 1
+        runner.old_machine_ids.remove(machine_id)
+        runner.put()
+      else:
+        logging.info('Recieved a ping from an older machine, pretending to '
+                     'accept ping.')
+      return True
+    else:
+      logging.error('Machine ids don\'t match, expected %s but got %s',
+                    runner.machine_id, machine_id)
+      return False
 
   if runner.started is None or runner.done:
     logging.error('Trying to ping a runner that is not currently running')
@@ -1548,6 +1531,61 @@ def AtomicAssignID(key, machine_id):
   else:
     # Tell caller to abort this operation.
     raise TxRunnerAlreadyAssignedError
+
+
+def AssignRunnerToMachine(machine_id, runner, atomic_assign):
+  """Will try to atomically assign runner.machine_id to machine_id.
+
+  This function is thread safe and can be called simultaneously on the same
+  runner. It will ensure all but one concurrent requests will fail.
+
+  It uses a transaction to run atomic_assign to assign the given machine_id
+  inside attribs to the given runner. If the transaction succeeds, it will
+  return True which means runner.machine_id = machine_id. However, based on
+  datastore documentation, it is possible for datastore to throw exceptions
+  on the transaction, and we have no way to conclude if the machine_id of
+  the runner was set or not.
+
+  After investigating a few alternative approaches, we decided to return
+  False in such situations. This means the runner.machine_id (1) 'might' or
+  (2) 'might not' have been changed, but we return False anyways. In case
+  (2) no harm, no foul. In case (1), the runner is assumed running but is
+  actually not. We expect the timeout event to fire at some future time and
+  restart the runner.
+
+  An alternate solution would be to delete that runner and recreate it, set
+  the correct created timestamp, etc. which seems a bit more messy. We might
+  switch to that if this starts to break at large scales.
+
+  Args:
+    machine_id: the machine_id of the machine.
+    runner: test runner object to assign the machine to.
+    atomic_assign: function pointer to be done atomically.
+
+  Returns:
+    True is succeeded, False otherwise.
+  """
+  for _ in range(0, MAX_TRANSACTION_RETRY_COUNT):
+    try:
+      db.run_in_transaction(atomic_assign, runner.key(), machine_id)
+      return True
+    except TxRunnerAlreadyAssignedError:
+      # The runner is already assigned to a machine. Abort.
+      break
+    except db.TransactionFailedError:
+      # This exception only happens if there is a problem with datastore,
+      # e.g.high contention, capacity cap, etc. It ensures the operation isn't
+      # done so we can safely retry.
+      # Since we are on the main server thread, we avoid sleeping between
+      # calls.
+      continue
+    except (db.Timeout, db.InternalError):
+      # These exceptions do NOT ensure the operation is done. Based on the
+      # Discussion above, we assume it hasn't been assigned.
+      logging.exception('Un-determined fate for runner=%s', runner.GetName())
+      break
+
+  return False
 
 
 class TxRunnerAlreadyAssignedError(Exception):
