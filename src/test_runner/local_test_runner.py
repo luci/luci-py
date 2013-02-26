@@ -621,6 +621,7 @@ class LocalTestRunner(object):
     Returns:
       True if we succeeded or had nothing to do, False otherwise.
     """
+    logging.debug('Publishing Results')
     if (self.test_run.output_destination and
         'url' in self.test_run.output_destination):
       self._PostOutput(self.test_run.output_destination['url'], '',
@@ -664,14 +665,21 @@ class LocalTestRunner(object):
     return True
 
   def PublishInternalErrors(self):
-    # Make sure all logging is done and flushed. Logging in the PublishResults
-    # call below will simply be ignored...
+    """Get the current log data and publish it."""
+    logging.debug('Publishing internal errors')
+    # All future log data will only get stored in the rotating logs, it
+    # won't get published.
     self.logging_file_handler.flush()
     self.logging_file_handler.close()
-    # We let exceptions go through since there isn't much we can do with them.
-    log_file = open(self.log_file_name)
-    self.PublishResults(False, [], log_file.read(), overwrite=True)
-    log_file.close()
+
+    try:
+      with open(self.log_file_name) as f:
+        log_data = f.read()
+    except IOError:
+      log_data = 'local_test_runner was unable to read its logs.'
+      logging.exception(log_data)
+
+    self.PublishResults(False, [], log_data, overwrite=True)
 
   def RetrieveDataAndRunTests(self):
     """Get the data required to run the tests, then run and publish the results.
@@ -693,7 +701,12 @@ class LocalTestRunner(object):
     Args:
       message: The message to log as an exception.
     """
-    logging.exception(message)
+    # This looks a bit strange, but logging.exception should only be called
+    # from within an exception handler.
+    try:
+      raise Error(message)
+    except Error as e:
+      logging.exception(e)
 
   def ReturnExitCode(self, return_value):
     """Return the restart exit code if the machine should restart.
@@ -768,7 +781,7 @@ def main():
                              data_folder_name=options.data_folder_name,
                              max_url_retries=options.max_url_retries,
                              restart_on_failure=options.restart_on_failure)
-  except Error, e:
+  except Error as e:
     logging.exception('Can\'t create TestRunner with file: %s.\nException: %s',
                       options.request_file_name, e)
     published = False
@@ -779,7 +792,7 @@ def main():
   try:
     if runner.RetrieveDataAndRunTests():
       return runner.ReturnExitCode(0)
-  except Exception, e:  # pylint: disable-msg=W0703
+  except Exception as e:  # pylint: disable-msg=W0703
     # We want to catch all so that we can report all errors, even internal ones.
     logging.exception(e)
 
