@@ -193,10 +193,8 @@ def GetHashAlgo(_namespace):
 class ACLRequestHandler(webapp2.RequestHandler):
   """Adds ACL to the request handler to ensure only valid users can use
   the handlers."""
-  def __init__(self, *args, **kwargs):
-    webapp2.RequestHandler.__init__(self, *args, **kwargs)
-    self.secret = None
-    self.access_id = None
+  secret = None
+  access_id = None
 
   def dispatch(self):
     """Ensures that only users from valid domains can continue, and that users
