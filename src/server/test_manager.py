@@ -710,7 +710,10 @@ class TestRequestManager(object):
         config_hash=request.GetConfigurationDimensionHash(config.config_name),
         config_instance_index=config.instance_index,
         num_config_instances=config.num_instances)
-    runner.put()
+
+    # Put the runner in with a transaction, to ensure that it is visible right
+    # away.
+    db.run_in_transaction(runner.put)
 
     return runner
 
@@ -1565,7 +1568,7 @@ def AssignRunnerToMachine(machine_id, runner, atomic_assign):
   Returns:
     True is succeeded, False otherwise.
   """
-  for _ in range(0, MAX_TRANSACTION_RETRY_COUNT):
+  for _ in range(MAX_TRANSACTION_RETRY_COUNT):
     try:
       db.run_in_transaction(atomic_assign, runner.key(), machine_id)
       return True
