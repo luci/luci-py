@@ -661,9 +661,19 @@ class ContainsHashHandler(ACLRequestHandler):
 class GenerateBlobstoreHandler(ACLRequestHandler):
   """Generate an upload url to directly load files into the blobstore."""
   def get(self, namespace, hash_key):
+    # Deprecated. Left while the clients are updated and rolled out.
+    self.response.headers['Content-Type'] = 'text/plain'
     self.response.out.write(
         blobstore.create_upload_url(
             '/content/store_blobstore/%s/%s' % (namespace, hash_key)))
+
+  def post(self, namespace, hash_key):
+    token = self.request.get('token')
+    self.response.headers['Content-Type'] = 'text/plain'
+    self.response.out.write(
+        blobstore.create_upload_url(
+            '/content/store_blobstore/%s/%s?token=%s' %
+            (namespace, hash_key, token)))
 
 
 class StoreBlobstoreContentByHashHandler(
