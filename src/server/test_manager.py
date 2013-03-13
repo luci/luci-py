@@ -711,9 +711,7 @@ class TestRequestManager(object):
         config_instance_index=config.instance_index,
         num_config_instances=config.num_instances)
 
-    # Put the runner in with a transaction, to ensure that it is visible right
-    # away.
-    db.run_in_transaction(runner.put)
+    runner.put()
 
     return runner
 
@@ -1312,7 +1310,12 @@ def GetAllMatchingTestRequests(test_case_name):
     A list of all Test Requests that have |test_case_name| as their name.
   """
   matches = []
-  query = TestRequest.gql('WHERE name = :1', test_case_name)
+
+  # Perform the query in a transaction to ensure that it gets the most recent
+  # data, otherwise it is possible for one machine to add tests, and then be
+  # unable to find them through this function after.
+  query = db.run_in_transaction(TestRequest.gql, 'WHERE name = :1',
+                                test_case_name)
 
   for test_request in query:
     matches.append(test_request)
