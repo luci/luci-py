@@ -414,8 +414,12 @@ class AppTest(unittest.TestCase):
     self.assertEqual('200 OK', response.status)
     self.assertEqual('Runner successfully pinged.', response.body)
 
+  def testCleanupData(self):
+    response = self.app.post('/tasks/cleanup_data')
+    self.assertEqual('200 OK', response.status)
+
   def testCronJobPoll(self):
-    response = self.app.post('/tasks/poll')
+    response = self.app.post('/tasks/abort_stale_runners')
     self.assertEqual('200 OK', response.status)
 
   def testSendEReporter(self):

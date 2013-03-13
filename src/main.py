@@ -408,8 +408,20 @@ class ResultHandler(webapp2.RequestHandler):
       self.response.out.write('Failed to update the runner results.')
 
 
-class PollHandler(webapp2.RequestHandler):
-  """Handles cron job to poll Machine Provider to execute pending requests."""
+class CleanupDataHandler(webapp2.RequestHandler):
+  """Handles cron job to delete orphaned blobs."""
+
+  def post(self):  # pylint: disable-msg=C6409
+    test_manager.DeleteOldRunners()
+    test_manager.DeleteOldErrors()
+    test_manager.DeleteOldRunnerStats()
+    test_manager.DeleteOrphanedBlobs()
+
+    self.response.out.write('Successfully cleaned up old data.')
+
+
+class AbortStaleRunnersHandler(webapp2.RequestHandler):
+  """Handles cron job to abort stale runners."""
 
   def post(self):  # pylint: disable-msg=C6409
     """Handles HTTP POST requests for this handler's URL."""
@@ -417,9 +429,6 @@ class PollHandler(webapp2.RequestHandler):
 
     logging.debug('Polling')
     test_request_manager.AbortStaleRunners()
-    test_manager.DeleteOldRunners()
-    test_manager.DeleteOldErrors()
-    test_manager.DeleteOldRunnerStats()
     self.response.out.write("""
     <html>
     <head>
@@ -838,7 +847,9 @@ def CreateApplication():
                                   ('/secure/show_message',
                                    ShowMessageHandler),
                                   ('/secure/stats', StatsHandler),
-                                  ('/tasks/poll', PollHandler),
+                                  ('/tasks/abort_stale_runners',
+                                   AbortStaleRunnersHandler),
+                                  ('/tasks/cleanup_data', CleanupDataHandler),
                                   ('/tasks/sendereporter',
                                    SendEReporterHandler),
                                   ('/test', TestRequestHandler),

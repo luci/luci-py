@@ -1,8 +1,12 @@
 cron:
-- description: Poll hive for request status and see if any tests are waiting for execution
-  url: /tasks/poll
+- description: Abort stale runners
+  url: /tasks/abort_stale_runners
   schedule: every 1 minutes
 
 - description: Daily exception report
   url: /tasks/sendereporter
   schedule: every day 00:00
+
+- description: Cleanup old data and orphaned blobs
+  url: /tasks/cleanup_data
+  schedule: every 6 hours

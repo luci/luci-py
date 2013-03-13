@@ -1425,6 +1425,24 @@ def _GetCurrentTime():
   return datetime.datetime.now()
 
 
+def DeleteOrphanedBlobs():
+  """Remove all the orphaned blobs."""
+  logging.debug('DeleteOrphanedBlobs starting')
+
+  blobstore_query = blobstore.BlobInfo.all().order('creation')
+  blobs_deleted = 0
+
+  for blob in blobstore_query:
+    if not TestRunner.gql('WHERE result_string_reference = :1',
+                          blob.key()).count(limit=1):
+      blobstore.delete_async(blob.key())
+      blobs_deleted += 1
+
+  logging.debug('DeleteOrphanedBlobs done')
+
+  return blobs_deleted
+
+
 def DeleteOldRunners():
   """Clean up all runners that are older than a certain age and done."""
   logging.debug('DeleteOldRunners starting')

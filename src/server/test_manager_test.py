@@ -761,6 +761,20 @@ class TestRequestManagerTest(unittest.TestCase):
 
     self._mox.VerifyAll()
 
+  def testDeleteOrphanedBlobs(self):
+    self.assertEqual(0, test_manager.DeleteOrphanedBlobs())
+
+    # Add a runner with a blob and don't delete the blob.
+    test_runner = self._CreatePendingRequest()
+    test_runner.result_string_reference = blobstore_helper.CreateBlobstore(
+        'owned blob')
+    test_runner.put()
+    self.assertEqual(0, test_manager.DeleteOrphanedBlobs())
+
+    # Add an orphaned blob and delete it.
+    blobstore_helper.CreateBlobstore('orphaned blob')
+    self.assertEqual(1, test_manager.DeleteOrphanedBlobs())
+
   def testSwarmDeleteOldRunners(self):
     self._SetupHandleTestResults()
 
