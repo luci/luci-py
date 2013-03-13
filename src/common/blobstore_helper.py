@@ -72,6 +72,7 @@ def GetBlobstore(blob_key):
     blob_reader = blobstore.BlobReader(blob_key)
     return blob_reader.read(blobstore.MAX_BLOB_FETCH_SIZE).decode('utf-8')
 
-  except (ValueError, TypeError, blobstore.BlobNotFoundError) as e:
+  except (ValueError, TypeError, blobstore.BlobNotFoundError,
+          blobstore.InternalError) as e:
     logging.warning('Problem getting blobstore entry.\n%s', e)
     return None

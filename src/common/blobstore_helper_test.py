@@ -13,6 +13,7 @@ import unittest
 
 from google.appengine import runtime
 from google.appengine.api import files
+from google.appengine.ext import blobstore
 from google.appengine.ext import testbed
 from common import blobstore_helper
 from third_party.mox import mox
@@ -89,6 +90,21 @@ class BlobstoreHelperTest(unittest.TestCase):
     blobstore_data = 'data'
     blob_key = blobstore_helper.CreateBlobstore(blobstore_data)
     self.assertEqual(blobstore_data, blobstore_helper.GetBlobstore(blob_key))
+
+  def testGetBlobStoreExceptions(self):
+    class BrokenBlobReader(object):
+      def read(self, size):  # pylint: disable-msg=C6409,W0613
+        raise blobstore.InternalError()
+
+    self._mox.StubOutWithMock(blobstore_helper.blobstore, 'BlobReader')
+    blobstore_helper.blobstore.BlobReader(mox.IgnoreArg()).AndReturn(
+        BrokenBlobReader())
+    self._mox.ReplayAll()
+
+    blob_key = blobstore_helper.CreateBlobstore('valid data')
+    self.assertIsNone(blobstore_helper.GetBlobstore(blob_key))
+
+    self._mox.VerifyAll()
 
 
 if __name__ == '__main__':
