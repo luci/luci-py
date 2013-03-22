@@ -70,7 +70,7 @@ def GetBlobstore(blob_key):
   """
   try:
     blob_reader = blobstore.BlobReader(blob_key)
-    return blob_reader.read(blobstore.MAX_BLOB_FETCH_SIZE).decode('utf-8')
+    return blob_reader.read().decode('utf-8')
 
   except (ValueError, TypeError, blobstore.BlobNotFoundError,
           blobstore.InternalError) as e:

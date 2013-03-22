@@ -91,6 +91,15 @@ class BlobstoreHelperTest(unittest.TestCase):
     blob_key = blobstore_helper.CreateBlobstore(blobstore_data)
     self.assertEqual(blobstore_data, blobstore_helper.GetBlobstore(blob_key))
 
+  def testGetHugeBlob(self):
+    huge_blob = 'a' * (blobstore.MAX_BLOB_FETCH_SIZE * 5) + 'end_of_blob'
+
+    blob_key = blobstore_helper.CreateBlobstore(huge_blob)
+
+    read_blob = blobstore_helper.GetBlobstore(blob_key)
+    self.assertEqual(len(read_blob), len(huge_blob))
+    self.assertEqual(read_blob, huge_blob)
+
   def testGetBlobStoreExceptions(self):
     class BrokenBlobReader(object):
       def read(self, size):  # pylint: disable-msg=C6409,W0613
