@@ -682,6 +682,14 @@ class TestRequestManagerTest(unittest.TestCase):
     self.assertIn('Runner was unable to find a machine to run it within',
                   runner.GetResultString())
 
+    # Check that the runner isn't aborted a second time.
+    old_abort = self._manager.AbortRunner
+    try:
+      self._manager.AbortRunner = lambda runner, reason: self.fail()
+      self._manager.AbortStaleRunners()
+    finally:
+      self._manager.AbortRunner = old_abort
+
   def testRetryAndThenAbortStaleRunners(self):
     self._mox.StubOutWithMock(test_manager, '_GetCurrentTime')
     attempts_to_reach_abort = test_manager.MAX_AUTOMATIC_RETRIES + 1

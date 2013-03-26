@@ -486,7 +486,7 @@ class TestRequestManager(object):
           blobstore.delete_async(result_blob_key)
         return False
       # Update the old and active machines ids.
-      logging.info('Recieved result from old machine, making it current '
+      logging.info('Received result from old machine, making it current '
                    'machine and storing results')
       runner.old_machine_ids.append(runner.machine_id)
       runner.machine_id = machine_id
@@ -496,10 +496,11 @@ class TestRequestManager(object):
     # response for it, unless overwrite is enable.
     if runner.done and not overwrite:
       stored_results = runner.GetResultString()
-      new_results = blobstore_helper.GetBlobstore(result_blob_key)
 
       # The new results won't get stored so delete them.
+      new_results = None
       if result_blob_key:
+        new_results = blobstore_helper.GetBlobstore(result_blob_key)
         blobstore.delete_async(result_blob_key)
 
       if new_results == stored_results or errors == stored_results:
@@ -852,8 +853,9 @@ class TestRequestManager(object):
     # Abort all runners that haven't been able to find a machine to run them
     # in SWARM_RUNNER_MAX_WAIT_SECS seconds.
     timecut_off = now - datetime.timedelta(seconds=SWARM_RUNNER_MAX_WAIT_SECS)
-    query = TestRunner.gql('WHERE created < :1 and started = :2 and '
-                           'automatic_retry_count = 0', timecut_off, None)
+    query = TestRunner.gql('WHERE created < :1 and started = :2 and done = :3 '
+                           'and automatic_retry_count = 0', timecut_off, None,
+                           False)
     for runner in query:
       self.AbortRunner(runner, reason=('Runner was unable to find a machine to '
                                        'run it within %d seconds' %
