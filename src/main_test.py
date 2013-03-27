@@ -17,6 +17,7 @@ from common import dimensions_utils
 from common import test_request_message
 from server import admin_user
 from server import main as main_app
+from server import stats_manager
 from server import test_manager
 from server import user_manager
 from third_party.mox import mox
@@ -449,7 +450,7 @@ class AppTest(unittest.TestCase):
     self._mox.ReplayAll()
 
     # Add a RunnerAssignment
-    runner_assignment = test_manager.RunnerAssignment(
+    runner_assignment = stats_manager.RunnerAssignment(
         dimension='', wait_time=0, started=datetime.date.today())
     runner_assignment.put()
 

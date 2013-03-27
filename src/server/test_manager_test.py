@@ -21,6 +21,7 @@ from google.appengine.ext import testbed
 from common import blobstore_helper
 from common import dimensions_utils
 from common import test_request_message
+from server import stats_manager
 from server import test_manager
 from third_party.mox import mox
 from test_runner import slave_machine
@@ -812,35 +813,6 @@ class TestRequestManagerTest(unittest.TestCase):
 
     self._mox.VerifyAll()
 
-  def testSwarmDeleteOldRunnerStats(self):
-    self._SetupHandleTestResults()
-
-    self._mox.StubOutWithMock(test_manager, '_GetCurrentTime')
-
-    # Set the current time to the future, but not too much.
-    mock_now = (datetime.datetime.now() + datetime.timedelta(
-        days=test_manager.RUNNER_STATS_EVALUATION_CUTOFF_DAYS - 1))
-    test_manager._GetCurrentTime().AndReturn(mock_now)
-
-    # Set the current time to way in the future.
-    mock_now = (datetime.datetime.now() + datetime.timedelta(
-        days=test_manager.RUNNER_STATS_EVALUATION_CUTOFF_DAYS + 1))
-    test_manager._GetCurrentTime().AndReturn(mock_now)
-    self._mox.ReplayAll()
-
-    self.ExecuteHandleTestResults(success=True)
-    self.assertEqual(1, test_manager.RunnerAssignment.all().count())
-
-    # Make sure that new runner stats aren't deleted.
-    test_manager.DeleteOldRunnerStats()
-    self.assertEqual(1, test_manager.RunnerAssignment.all().count())
-
-    # Make sure that old runner stats are deleted.
-    test_manager.DeleteOldRunnerStats()
-    self.assertEqual(0, test_manager.RunnerAssignment.all().count())
-
-    self._mox.VerifyAll()
-
   def testSwarmErrorDeleteOldErrors(self):
     # Create error.
     error = test_manager.SwarmError(
@@ -1448,56 +1420,13 @@ class TestRequestManagerTest(unittest.TestCase):
 
     # Create a pending runner.
     self._manager.ExecuteTestRequest(self._GetRequestMessage())
-    self.assertEqual(0, test_manager.RunnerAssignment.all().count())
+    self.assertEqual(0, stats_manager.RunnerAssignment.all().count())
 
     # Assign the runner and ensure the assignment is marked
     self._ExecuteRegister(MACHINE_IDS[0])
-    self.assertEqual(1, test_manager.RunnerAssignment.all().count())
+    self.assertEqual(1, stats_manager.RunnerAssignment.all().count())
 
     self._mox.VerifyAll()
-
-  def testGetStatsForOneRunnerAssignment(self):
-    self._SetupLoadFileExpectations(contents='script contents')
-    self._mox.ReplayAll()
-
-    self.assertEqual({}, test_manager.GetRunnerWaitStats())
-
-    # Create a pending Request that should have no affect on the stats.
-    self._manager.ExecuteTestRequest(self._GetRequestMessage())
-    self.assertEqual({}, test_manager.GetRunnerWaitStats())
-
-    # Start the runner and ensure the mean, median and max times are now set.
-    self._ExecuteRegister(MACHINE_IDS[0])
-
-    runner = test_manager.TestRunner.all().get()
-    wait = runner.GetWaitTime()
-    expected_waits = {runner.GetDimensionsString(): (wait, wait, wait)}
-    self.assertEqual(expected_waits, test_manager.GetRunnerWaitStats())
-
-    self._mox.VerifyAll()
-
-  def testGetStatsForMultipleRunners(self):
-    config_dimensions = '{"os": "windows"}'
-
-    median_time = 500
-    median_count = 10
-    for _ in range(median_count):
-      runner_assignment = test_manager.RunnerAssignment(
-          dimensions=config_dimensions, wait_time=median_time)
-      runner_assignment.put()
-
-    max_time = 1000
-    max_count = 5
-    for _ in range(max_count):
-      runner_assignment = test_manager.RunnerAssignment(
-          dimensions=config_dimensions, wait_time=max_time)
-      runner_assignment.put()
-
-    mean_wait = ((max_time * max_count + median_time * median_count) /
-                 (max_count + median_count))
-
-    expected_waits = {config_dimensions: (mean_wait, median_time, max_time)}
-    self.assertEqual(expected_waits, test_manager.GetRunnerWaitStats())
 
   def testGetTestRunners(self):
     self.assertEqual(0,

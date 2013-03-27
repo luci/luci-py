@@ -37,6 +37,7 @@ from google.appengine.ext import db
 from common import blobstore_helper
 from common import dimensions_utils
 from common import test_request_message
+from server import stats_manager
 from test_runner import slave_machine
 
 # The amount of time to wait after recieving a runners last message before
@@ -109,9 +110,6 @@ SWARM_FINISHED_RUNNER_TIME_TO_LIVE_DAYS = 14
 
 # Number of days to keep error logs around.
 SWARM_ERROR_TIME_TO_LIVE_DAYS = 7
-
-# Number of days to evaluate when considering runner stats.
-RUNNER_STATS_EVALUATION_CUTOFF_DAYS = 7
 
 
 def GetTestCase(request_message):
@@ -418,19 +416,6 @@ class MachineAssignment(db.Model):
 
   # The time of the assignment.
   assignment_time = db.DateTimeProperty(auto_now=True)
-
-
-class RunnerAssignment(db.Model):
-  """Stores how long a runner's assignment took and dimensions."""
-  # The dimensions of the runner.
-  dimensions = db.TextProperty()
-
-  # The time in seconds that passed between swarm creating this runner and
-  # it beginning execution.
-  wait_time = db.IntegerProperty()
-
-  # The start date of the runner, used to identify older data to be cleared.
-  started = db.DateProperty()
 
 
 class SwarmError(db.Model):
@@ -973,7 +958,7 @@ class TestRequestManager(object):
         response['try_count'] = 0
         self._RecordMachineAssignment(attribs['id'],
                                       attributes.get('tag', None))
-        self._RecordRunnerAssignment(db.get(runner.key()))
+        stats_manager.RecordRunnerAssignment(db.get(runner.key()))
     else:
       response['try_count'] = attribs['try_count'] + 1
       # Tell machine when to come back, in seconds.
@@ -1058,18 +1043,6 @@ class TestRequestManager(object):
     machine_assignment.tag = machine_tag
     machine_assignment.assignment_time = datetime.datetime.now()
     machine_assignment.put()
-
-  def _RecordRunnerAssignment(self, runner):
-    """Records when a runner is assigned.
-
-    Args:
-      runner: The runner that is assigned.
-    """
-    runner_assignment = RunnerAssignment(
-        dimensions=runner.GetDimensionsString(),
-        wait_time=runner.GetWaitTime(),
-        started=runner.started.date())
-    runner_assignment.put()
 
   def _ComputeComebackValue(self, try_count):
     """Computes when the slave machine should return based on given try_count.
@@ -1341,35 +1314,6 @@ def GetAllMachines(sort_by='machine_id'):
   return (machine for machine in MachineAssignment.gql('ORDER BY %s' % sort_by))
 
 
-def GetRunnerWaitStats():
-  """Returns the stats for how long runners are waiting.
-
-  Returns:
-    A dictionary where the key is the dimension, and the value is
-    (mean wait, median wait, longest wait) for getting an assigned
-    machine. Only values from the last RUNNER_STATS_EVALUATION_CUTOFF_DAYS
-    are consider.
-  """
-  # TODO(user): This should probably get just generated once every x hours
-  # as a cron job and this function just returns the cached value.
-
-  time_mappings = {}
-  for runner_assignment in RunnerAssignment.all():
-    time_mappings.setdefault(runner_assignment.dimensions, []).append(
-        runner_assignment.wait_time)
-
-  results = {}
-  for (dimension, times) in time_mappings.iteritems():
-    sorted_times = sorted(times)
-
-    mean = sum(sorted_times) / len(sorted_times)
-    median = sorted_times[len(sorted_times) / 2]
-
-    results[dimension] = (mean, median, sorted_times[-1])
-
-  return results
-
-
 def GetTestRunners(sort_by, ascending, limit, offset):
   """Get the list of the test runners.
 
@@ -1456,19 +1400,6 @@ def DeleteOldRunners():
   db.delete(TestRunner.gql('WHERE ended < :1', old_cutoff))
 
   logging.debug('DeleteOldRunners done')
-
-
-def DeleteOldRunnerStats():
-  """Clean up all runners that are older than a certain age and done."""
-  logging.debug('DeleteOldRunnersStats starting')
-
-  old_cutoff = (
-      _GetCurrentTime() -
-      datetime.timedelta(days=RUNNER_STATS_EVALUATION_CUTOFF_DAYS))
-
-  db.delete(RunnerAssignment.gql('WHERE started < :1', old_cutoff))
-
-  logging.debug('DeleteOldRunnersStats done')
 
 
 def DeleteOldErrors():
