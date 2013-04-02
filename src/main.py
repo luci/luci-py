@@ -21,6 +21,7 @@ from google.appengine.ext import blobstore
 from google.appengine.ext import db
 from google.appengine.ext import ereporter
 import webapp2
+from google.appengine.ext.ereporter.report_generator import ReportGenerator
 from google.appengine.ext.webapp import blobstore_handlers
 from google.appengine.ext.webapp import template
 from google.appengine.ext.webapp import util
@@ -421,6 +422,17 @@ class CleanupDataHandler(webapp2.RequestHandler):
 
     self.response.out.write('Successfully cleaned up old data.')
 
+  def get(self):  # pylint: disable-msg=C6409
+    """Handles HTTP GET requests for this handler's URL."""
+    # Only an app engine cron job is allowed to poll via get (it currently
+    # has no way to make its request a post).
+    if self.request.headers.get('X-AppEngine-Cron') != 'true':
+      self.response.out.write('Only internal cron jobs can do this')
+      self.response.set_status(405)
+      return
+
+    self.post()
+
 
 class AbortStaleRunnersHandler(webapp2.RequestHandler):
   """Handles cron job to abort stale runners."""
@@ -452,7 +464,7 @@ class AbortStaleRunnersHandler(webapp2.RequestHandler):
     self.post()
 
 
-class SendEReporterHandler(webapp2.RequestHandler):
+class SendEReporterHandler(ReportGenerator):
   """Handles calling EReporter with the correct parameters."""
 
   def get(self):  # pylint: disable-msg=C6409
@@ -464,7 +476,12 @@ class SendEReporterHandler(webapp2.RequestHandler):
       admin.put()
 
     if mail.is_email_valid(admin.email):
-      self.redirect('/_ereporter?sender=%s' % admin.email)
+      self.request.GET['sender'] = admin.email
+      super(SendEReporterHandler, self).get()
+    else:
+      self.response.out.write('Invalid admin email, \'%s\'. Must be a valid '
+                              'email.' % admin.email)
+      self.response.set_status(400)
 
 
 class ShowMessageHandler(webapp2.RequestHandler):

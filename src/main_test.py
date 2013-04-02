@@ -8,6 +8,7 @@
 
 import datetime
 import json
+import os
 import unittest
 
 
@@ -416,33 +417,42 @@ class AppTest(unittest.TestCase):
     self.assertEqual('Runner successfully pinged.', response.body)
 
   def testCleanupData(self):
-    response = self.app.post('/tasks/cleanup_data')
+    # All cron job requests must be gets.
+    response = self.app.get('/tasks/cleanup_data',
+                            headers={'X-AppEngine-Cron': 'true'})
     self.assertEqual('200 OK', response.status)
 
-  def testCronJobPoll(self):
-    response = self.app.post('/tasks/abort_stale_runners')
+  def testAbortStaleRunners(self):
+    # All cron job requests must be gets.
+    response = self.app.get('/tasks/abort_stale_runners',
+                            headers={'X-AppEngine-Cron': 'true'})
     self.assertEqual('200 OK', response.status)
 
   def testSendEReporter(self):
-    # Ensure this function works without an admin user model.
-    response = self.app.get('/tasks/sendereporter')
-    self.assertEqual('200 OK', response.status)
+    # The version must be set for the ereporter.
+    os.environ['CURRENT_VERSION_ID'] = '1.1'
 
-    # Ensure this function works an admin user with a garbage email.
+    # Ensure this function correctly complains if the admin email isn't set.
+    response = self.app.get('/tasks/sendereporter', expect_errors=True)
+    self.assertEqual('400 Bad Request', response.status)
+    self.assertEqual('Invalid admin email, \'\'. Must be a valid email.',
+                     response.body)
+
+    # Ensure this function complains when a garbage email is set.
     admin = admin_user.AdminUser.all().get()
     admin.email = None
     admin.put()
-    response = self.app.get('/tasks/sendereporter')
-    self.assertEqual('200 OK', response.status)
+    response = self.app.get('/tasks/sendereporter', expect_errors=True)
+    self.assertEqual('400 Bad Request', response.status)
+    self.assertEqual('Invalid admin email, \'None\'. Must be a valid email.',
+                     response.body)
 
     # Ensure this function works with a valid admin email.
     admin.email = 'admin@app.com'
     admin.put()
 
     response = self.app.get('/tasks/sendereporter')
-    # The 302 moved response is correct because that means we have successfully
-    # redirected to the full ereporter handler.
-    self.assertTrue('302 Moved' in response.status)
+    self.assertTrue('200 OK' in response.status)
 
   def testStatsHandler(self):
     self._mox.StubOutWithMock(main_app.template, 'render')
