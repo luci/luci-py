@@ -40,6 +40,13 @@ indexes:
 - kind: TestRunner
   properties:
   - name: automatic_retry_count
+  - name: done
+  - name: started
+  - name: created
+
+- kind: TestRunner
+  properties:
+  - name: automatic_retry_count
   - name: started
   - name: created
 
