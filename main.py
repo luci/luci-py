@@ -184,6 +184,17 @@ def CreateEntry(namespace, hash_key):
   return ContentEntry(key=key)
 
 
+def delete_entry_and_blobs(to_delete):
+  """Deletes ContentEntry and their blobs."""
+  # Note all the blobs to delete first.
+  blobs_to_delete = [
+      i.content_reference for i in to_delete if i.content_reference
+  ]
+  DeleteBlobinfoAsync(blobs_to_delete)
+  # Then delete the entities.
+  db.delete_async(to_delete)
+
+
 def GetHashAlgo(_namespace):
   """Returns an instance of the hashing algorithm for the namespace."""
   # TODO(maruel): Support other algorithms.
@@ -367,16 +378,6 @@ class RestrictedCleanupOldEntriesWorkerHandler(webapp2.RequestHandler):
     logging.info('Deleting old datastore entries')
     old_cutoff = datetime.datetime.today() - datetime.timedelta(
         days=DATASTORE_TIME_TO_LIVE_IN_DAYS)
-
-    def delete_entry_and_blobs(to_delete):
-      """Deletes ContentEntry and their blobs."""
-      # Note all the blobs to delete first.
-      blobs_to_delete = [
-        i.content_reference for i in to_delete if i.content_reference
-      ]
-      DeleteBlobinfoAsync(blobs_to_delete)
-      # Then delete the entities.
-      db.delete_async(to_delete)
 
     IncrementalDelete(
         ContentEntry.all().filter('last_access <', old_cutoff),
@@ -655,7 +656,11 @@ class ContainsHashHandler(ACLRequestHandler):
           if contains[i])
       url = '/restricted/taskqueue/tag/%s/%s' % (
           namespace, datetime.date.today())
-      taskqueue.add(url=url, payload=hashes_to_tag, queue_name='tag')
+      try:
+        taskqueue.add(url=url, payload=hashes_to_tag, queue_name='tag')
+      except (taskqueue.Error, runtime.DeadlineExceededError) as e:
+        logging.warning('Problem adding task to update last_access. These '
+                        'objects may get deleted sooner than intended.\n%s', e)
 
 
 class GenerateBlobstoreHandler(ACLRequestHandler):
@@ -719,7 +724,16 @@ class StoreBlobstoreContentByHashHandler(
     # Trigger a verification. It can't be done inline since it could be too
     # long to complete.
     url = '/restricted/taskqueue/verify/%s/%s' % (namespace, hash_key)
-    taskqueue.add(url=url, queue_name='verify')
+    try:
+      taskqueue.add(url=url, queue_name='verify')
+    except runtime.DeadlineExceededError as e:
+      msg = 'Unable to add task to verify blob.\n%s' % e
+      logging.warning(msg)
+      self.response.out.write(msg)
+      self.response.set_status(500)
+
+      delete_entry_and_blobs([entry])
+      return
 
     logging.info(
         '%d bytes uploaded directly into blobstore',
