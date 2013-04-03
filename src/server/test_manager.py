@@ -1378,11 +1378,15 @@ def DeleteOrphanedBlobs():
   blobstore_query = blobstore.BlobInfo.all().order('creation')
   blobs_deleted = 0
 
-  for blob in blobstore_query:
-    if not TestRunner.gql('WHERE result_string_reference = :1',
-                          blob.key()).count(limit=1):
-      blobstore.delete_async(blob.key())
-      blobs_deleted += 1
+  try:
+    for blob in blobstore_query:
+      if not TestRunner.gql('WHERE result_string_reference = :1',
+                            blob.key()).count(limit=1):
+        blobstore.delete_async(blob.key())
+        blobs_deleted += 1
+  except db.Timeout:
+    logging.warning('Hit a timeout error while deleting orphaned blobs, some '
+                    'orphans may still exist')
 
   logging.debug('DeleteOrphanedBlobs done')
 
