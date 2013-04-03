@@ -378,6 +378,10 @@ class ResultHandler(webapp2.RequestHandler):
     result_string = urllib.unquote_plus(self.request.get(
         url_helper.RESULT_STRING_KEY))
 
+    # Mark the runner as pinging now to prevent it from timing out while
+    # the results are getting stored in the blobstore.
+    test_manager.PingRunner(runner.key(), machine_id)
+
     # If we are on dev app engine we can't use the create_upload_url method
     # because it requires 2 threads, and dev app engine isn't multithreaded
     # (It needs this thread, and another thread to handle the url POSTFORM).

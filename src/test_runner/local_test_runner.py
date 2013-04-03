@@ -796,7 +796,10 @@ def main():
     # We want to catch all so that we can report all errors, even internal ones.
     logging.exception(e)
 
-  runner.PublishInternalErrors()
+  try:
+    runner.PublishInternalErrors()
+  except Exception as e:  # pylint: disable-msg=W0703
+    logging.exception('Unable to publish internal errors')
   return runner.ReturnExitCode(1)
 
 
