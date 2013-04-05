@@ -21,10 +21,10 @@ from google.appengine.ext import testbed
 from common import blobstore_helper
 from common import dimensions_utils
 from common import test_request_message
-from server import stats_manager
 from server import test_manager
-from third_party.mox import mox
+from stats import runner_stats
 from test_runner import slave_machine
+from third_party.mox import mox
 
 
 MACHINE_IDS = ['12345678-12345678-12345678-12345678',
@@ -1420,11 +1420,11 @@ class TestRequestManagerTest(unittest.TestCase):
 
     # Create a pending runner.
     self._manager.ExecuteTestRequest(self._GetRequestMessage())
-    self.assertEqual(0, stats_manager.RunnerAssignment.all().count())
+    self.assertEqual(0, runner_stats.RunnerStats.all().count())
 
     # Assign the runner and ensure the assignment is marked
     self._ExecuteRegister(MACHINE_IDS[0])
-    self.assertEqual(1, stats_manager.RunnerAssignment.all().count())
+    self.assertEqual(1, runner_stats.RunnerStats.all().count())
 
     self._mox.VerifyAll()
 

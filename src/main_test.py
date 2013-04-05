@@ -18,9 +18,9 @@ from common import dimensions_utils
 from common import test_request_message
 from server import admin_user
 from server import main as main_app
-from server import stats_manager
 from server import test_manager
 from server import user_manager
+from stats import runner_stats
 from third_party.mox import mox
 
 # A simple machine id constant to use in tests.
@@ -459,10 +459,10 @@ class AppTest(unittest.TestCase):
     main_app.template.render(mox.IgnoreArg(), mox.IgnoreArg()).AndReturn('')
     self._mox.ReplayAll()
 
-    # Add a RunnerAssignment
-    runner_assignment = stats_manager.RunnerAssignment(
+    # Add a RunnerStats
+    r_stats = runner_stats.RunnerStats(
         dimension='', wait_time=0, started=datetime.date.today())
-    runner_assignment.put()
+    r_stats.put()
 
     response = self.app.get('/secure/stats')
     self.assertTrue('200' in response.status)

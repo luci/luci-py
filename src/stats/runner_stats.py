@@ -2,11 +2,9 @@
 #
 # Copyright 2013 Google Inc. All Rights Reserved.
 
-"""Stats Manager.
+"""Runner Stats.
 
-The stats manager contains all the logic to generate any stats that a user
-might want to know about the swarm system, such as failure rates or currently
-dead bots.
+Contains the RunnerStats class and helper functions.
 """
 
 
@@ -21,8 +19,12 @@ from google.appengine.ext import db
 RUNNER_STATS_EVALUATION_CUTOFF_DAYS = 7
 
 
-class RunnerAssignment(db.Model):
-  """Stores how long a runner's assignment took and its dimensions."""
+class RunnerStats(db.Model):
+  """Stores basic stats about a runner.
+
+  If a runner is restarted for any reason, such as an automatic retry, a new
+  RunnerStats is created.
+  """
   # The dimensions of the runner.
   dimensions = db.TextProperty()
 
@@ -40,11 +42,11 @@ def RecordRunnerAssignment(runner):
   Args:
     runner: The runner that is assigned.
   """
-  runner_assignment = RunnerAssignment(
+  runner_stats = RunnerStats(
       dimensions=runner.GetDimensionsString(),
       wait_time=runner.GetWaitTime(),
       started=runner.started.date())
-  runner_assignment.put()
+  runner_stats.put()
 
 
 def GetRunnerWaitStats():
@@ -60,9 +62,9 @@ def GetRunnerWaitStats():
   # as a cron job and this function just returns the cached value.
 
   time_mappings = {}
-  for runner_assignment in RunnerAssignment.all():
-    time_mappings.setdefault(runner_assignment.dimensions, []).append(
-        runner_assignment.wait_time)
+  for runner_stats in RunnerStats.all():
+    time_mappings.setdefault(runner_stats.dimensions, []).append(
+        runner_stats.wait_time)
 
   results = {}
   for (dimension, times) in time_mappings.iteritems():
@@ -94,6 +96,6 @@ def DeleteOldRunnerStats():
       _GetCurrentTime() -
       datetime.timedelta(days=RUNNER_STATS_EVALUATION_CUTOFF_DAYS))
 
-  db.delete(RunnerAssignment.gql('WHERE started < :1', old_cutoff))
+  db.delete(RunnerStats.gql('WHERE started < :1', old_cutoff))
 
   logging.debug('DeleteOldRunnersStats done')

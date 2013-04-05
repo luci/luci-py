@@ -29,9 +29,9 @@ from common import blobstore_helper
 from common import test_request_message
 from common import url_helper
 from server import admin_user
-from server import stats_manager
 from server import test_manager
 from server import user_manager
+from stats import runner_stats
 # pylint: enable-msg=C6204
 
 _NUM_USER_TEST_RUNNERS_PER_PAGE = 50
@@ -422,7 +422,7 @@ class CleanupDataHandler(webapp2.RequestHandler):
     test_manager.DeleteOldErrors()
     test_manager.DeleteOrphanedBlobs()
 
-    stats_manager.DeleteOldRunnerStats()
+    runner_stats.DeleteOldRunnerStats()
 
     self.response.out.write('Successfully cleaned up old data.')
 
@@ -511,8 +511,8 @@ class StatsHandler(webapp2.RequestHandler):
   def get(self):  # pylint: disable-msg=C6409
     params = {
         'topbar': GenerateTopbar(),
-        'runner_wait_stats': stats_manager.GetRunnerWaitStats(),
-        'runner_cutoff': stats_manager.RUNNER_STATS_EVALUATION_CUTOFF_DAYS
+        'runner_wait_stats': runner_stats.GetRunnerWaitStats(),
+        'runner_cutoff': runner_stats.RUNNER_STATS_EVALUATION_CUTOFF_DAYS
     }
 
     path = os.path.join(os.path.dirname(__file__), 'stats.html')

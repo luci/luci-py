@@ -37,7 +37,7 @@ from google.appengine.ext import db
 from common import blobstore_helper
 from common import dimensions_utils
 from common import test_request_message
-from server import stats_manager
+from stats import runner_stats
 from test_runner import slave_machine
 
 # The amount of time to wait after recieving a runners last message before
@@ -958,7 +958,7 @@ class TestRequestManager(object):
         response['try_count'] = 0
         self._RecordMachineAssignment(attribs['id'],
                                       attributes.get('tag', None))
-        stats_manager.RecordRunnerAssignment(db.get(runner.key()))
+        runner_stats.RecordRunnerAssignment(db.get(runner.key()))
     else:
       response['try_count'] = attribs['try_count'] + 1
       # Tell machine when to come back, in seconds.
