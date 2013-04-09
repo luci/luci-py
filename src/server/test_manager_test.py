@@ -93,29 +93,26 @@ class TestRequestManagerTest(unittest.TestCase):
     Returns:
       A properly formatted request message text.
     """
-    if not hasattr(self, '_test_request_text'):
-      test_request = test_request_message.TestCase()
-      test_request.test_case_name = self._request_message_test_case_name
-      test_request.tests = [test_request_message.TestObject(
-          test_name='t1', action=['ignore-me.exe'])]
-      test_request.configurations = [
-          test_request_message.TestConfiguration(
-              config_name=self._request_message_config_name, os=os,
-              cpu='Unknown', data=['http://b.ina.ry/files2.zip'],
-              browser='Unknown',
-              min_instances=min_instances,
-              additional_instances=additional_instances,
-              tests=[test_request_message.TestObject(
-                  test_name='t2', action=['ignore-me-too.exe'])])]
-      if env_vars:
-        test_request.env_vars = env_vars.copy()
-      test_request.result_url = result_url
-      test_request.failure_email = 'john@doe.com'
-      test_request.store_result = store_result
-      test_request.restart_on_failure = restart_on_failure
-      self._test_request_text = test_request_message.Stringize(
-          test_request, json_readable=True)
-    return self._test_request_text
+    test_request = test_request_message.TestCase()
+    test_request.test_case_name = self._request_message_test_case_name
+    test_request.tests = [test_request_message.TestObject(
+        test_name='t1', action=['ignore-me.exe'])]
+    test_request.configurations = [
+        test_request_message.TestConfiguration(
+            config_name=self._request_message_config_name, os=os,
+            cpu='Unknown', data=['http://b.ina.ry/files2.zip'],
+            browser='Unknown',
+            min_instances=min_instances,
+            additional_instances=additional_instances,
+            tests=[test_request_message.TestObject(
+                test_name='t2', action=['ignore-me-too.exe'])])]
+    if env_vars:
+      test_request.env_vars = env_vars.copy()
+    test_request.result_url = result_url
+    test_request.failure_email = 'john@doe.com'
+    test_request.store_result = store_result
+    test_request.restart_on_failure = restart_on_failure
+    return test_request_message.Stringize(test_request, json_readable=True)
 
   def _GetInvalidRequestMessage(self):
     """Return an improperly formatted request message text."""
