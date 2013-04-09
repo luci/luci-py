@@ -206,6 +206,7 @@ class ACLRequestHandler(webapp2.RequestHandler):
   the handlers."""
   secret = None
   access_id = None
+  is_user = None
 
   def dispatch(self):
     """Ensures that only users from valid domains can continue, and that users
@@ -232,6 +233,7 @@ class ACLRequestHandler(webapp2.RequestHandler):
         whitelisted.secret = self.secret
         whitelisted.put()
       memcache.set(self.access_id, self.secret, namespace='ip_token')
+    self.is_user = False
 
   def CheckUser(self, user):
     """Verifies if the user is whitelisted."""
@@ -239,24 +241,30 @@ class ACLRequestHandler(webapp2.RequestHandler):
     if domain not in VALID_DOMAINS:
       logging.warning('Disallowing %s, invalid domain' % user.email())
       self.abort(403, detail='Invalid domain, %s' % domain)
+    return self.CheckUserId(user.user_id() or user.email(), user.email())
 
+  def CheckUserId(self, user_id, email):
     # user_id() is only set with Google accounts, fallback to the email address
     # otherwise.
-    self.access_id = user.user_id() or user.email()
+    self.access_id = user_id
     self.secret = memcache.get(self.access_id, namespace='user_token')
     if not self.secret:
       user_obj = User.get_by_key_name(self.access_id)
       if not user_obj:
+        if not email:
+          logging.warning('Blocking user %s', user_id)
+          self.abort(403, detail='Please login first.')
         user_obj = User.get_or_insert(
-            self.access_id, secret=os.urandom(8), email=user.email())
+            self.access_id, secret=os.urandom(8), email=email)
       if not user_obj.secret:
         # Should not happen but cope with it.
         user_obj.secret = os.urandom(8)
         user_obj.put()
       self.secret = user_obj.secret
       memcache.set(self.access_id, self.secret, namespace='user_token')
+    self.is_user = True
 
-  def GetToken(self, offset):
+  def GetToken(self, offset, now):
     """Returns a valid token for the current user.
 
     |offset| is the offset versus current time of day, in hours. It should be 0
@@ -265,9 +273,30 @@ class ACLRequestHandler(webapp2.RequestHandler):
     m = hashlib.sha1(self.secret)
     m.update(self.access_id)
     # Rotate every hour.
-    m.update(str(int(time.time()) / 3600 + offset))
+    this_hour = int(now / 3600.)
+    m.update(str(this_hour + offset))
     # Keep 8 bytes of entropy.
     return m.hexdigest()[:16]
+
+  def CheckToken(self):
+    """Ensures the token is valid."""
+    token = self.request.get('token')
+    if not token:
+      logging.info('Token was not provided')
+      self.abort(403)
+
+    now = time.time()
+    token_0 = self.GetToken(0, now)
+    if token != token_0:
+      token_1 = self.GetToken(-1, now)
+      if token != token_1:
+        logging.info(
+            'Token was invalid:\nGot %s\nExpected %s or %s\nAccessId: %s\n'
+              'Secret: %s',
+            token, token_0, token_1, self.access_id,
+            binascii.hexlify(self.secret))
+      self.abort(403)
+    return token
 
 
 def SplitPayload(request, chunk_size, max_chunks):
@@ -580,9 +609,11 @@ class RestrictedWhitelistHandler(webapp2.RequestHandler):
     self.response.out.write(htmlwrap(
       '<form name="whitelist" method="post">'
       'Comment: <input type="text" name="comment" /><br />'
-      '<input type="submit" value="SUBMIT" />'))
+      '<input type="hidden" name="token" value="%s" />'
+      '<input type="submit" value="SUBMIT" />' % self.GetToken(0, time.time())))
 
   def post(self):
+    self.CheckToken()
     ip = self.request.remote_addr
     comment = self.request.get('comment')
     item = WhitelistedIP.gql('WHERE ip = :1', ip).get()
@@ -605,9 +636,12 @@ class ContainsHashHandler(ACLRequestHandler):
   chr(1) or chr(0) is in the 'string' returned.
   """
   def post(self, namespace):
-    """This is a POST even though it doesn't modify any data, but it makes
+    """This is a POST even though it doesn't modify any data[1], but it makes
     it easier for python scripts.
+
+    [1] It does modify the timestamp of the objects.
     """
+    self.CheckToken()
     raw_hash_digests = PayloadToHashes(self, namespace)
     logging.info(
         'Checking namespace %s for %d hash digests',
@@ -665,27 +699,34 @@ class ContainsHashHandler(ACLRequestHandler):
 
 class GenerateBlobstoreHandler(ACLRequestHandler):
   """Generate an upload url to directly load files into the blobstore."""
-  def get(self, namespace, hash_key):
-    # Deprecated. Left while the clients are updated and rolled out.
-    self.response.headers['Content-Type'] = 'text/plain'
-    self.response.out.write(
-        blobstore.create_upload_url(
-            '/content/store_blobstore/%s/%s' % (namespace, hash_key)))
-
   def post(self, namespace, hash_key):
-    token = self.request.get('token')
+    token = self.CheckToken()
     self.response.headers['Content-Type'] = 'text/plain'
-    self.response.out.write(
-        blobstore.create_upload_url(
-            '/content/store_blobstore/%s/%s?token=%s' %
-            (namespace, hash_key, token)))
+    url = '/content/store_blobstore/%s/%s/%d/%s?token=%s' % (
+        namespace, hash_key, int(self.is_user), self.access_id, token)
+    logging.info('Url: %s', url)
+    self.response.out.write(blobstore.create_upload_url(url))
 
 
 class StoreBlobstoreContentByHashHandler(
     ACLRequestHandler,
     blobstore_handlers.BlobstoreUploadHandler):
   """Assigns the newly stored blobstore entry to the correct hash key."""
-  def post(self, namespace, hash_key):  #pylint: disable=W0221
+  def dispatch(self):
+    """Disable ACLRequestHandler.dispatch() checks here because the originating
+    IP is always an AppEngine IP, which confuses the authentication code.
+    """
+    return webapp2.RequestHandler.dispatch(self)
+
+  # pylint: disable=W0221
+  def post(self, namespace, hash_key, is_user, original_access_id):
+    # In particular, do not use self.request.remote_addr because the request
+    # has as original an AppEngine local IP.
+    if is_user == '1':
+      self.CheckUserId(original_access_id, None)
+    else:
+      self.CheckIP(original_access_id)
+    self.CheckToken()
     contents = self.get_uploads('content')
     if not contents:
       # TODO(maruel): Remove, only kept for short term compatibility.
@@ -744,6 +785,7 @@ class StoreBlobstoreContentByHashHandler(
 class StoreContentByHashHandler(ACLRequestHandler):
   """The handler for adding content."""
   def post(self, namespace, hash_key):
+    self.CheckToken()
     # webapp2 doesn't like reading the body if it's empty.
     if self.request.headers.get('content-length'):
       content = self.request.body
@@ -813,6 +855,7 @@ class StoreContentByHashHandler(ACLRequestHandler):
 class RemoveContentByHashHandler(ACLRequestHandler):
   """Removes content by its SHA-1 hash key from the server."""
   def post(self, namespace, hash_key):
+    self.CheckToken()
     entry = GetContentByHash(namespace, hash_key)
     # TODO(maruel): Use namespace='table_%s' % namespace.
     memcache.delete(hash_key, namespace=namespace)
@@ -860,7 +903,11 @@ class GetTokenHandler(ACLRequestHandler):
   """Returns the token."""
   def get(self):
     self.response.headers['Content-Type'] = 'text/plain'
-    self.response.out.write(self.GetToken(0))
+    token = self.GetToken(0, time.time())
+    self.response.out.write(token)
+    logging.info(
+        'Generated %s\nAccessId: %s\nSecret: %s',
+        token, self.access_id, binascii.hexlify(self.secret))
 
 
 class RootHandler(webapp2.RequestHandler):
@@ -913,7 +960,9 @@ def CreateApplication():
           RestrictedVerifyWorkerHandler),
       webapp2.Route(r'/restricted/whitelist', RestrictedWhitelistHandler),
 
-      webapp2.Route(r'/content/contains' + namespace, ContainsHashHandler),
+      webapp2.Route(
+          r'/content/contains' + namespace,
+          ContainsHashHandler),
       webapp2.Route(
           r'/content/generate_blobstore_url' + namespace_key,
           GenerateBlobstoreHandler),
@@ -921,7 +970,8 @@ def CreateApplication():
       webapp2.Route(
           r'/content/store' + namespace_key, StoreContentByHashHandler),
       webapp2.Route(
-          r'/content/store_blobstore' + namespace_key,
+          r'/content/store_blobstore' + namespace_key +
+            r'/<is_user:[01]>/<original_access_id:[^\/]+>',
           StoreBlobstoreContentByHashHandler),
       webapp2.Route(
           r'/content/remove' + namespace_key, RemoveContentByHashHandler),
