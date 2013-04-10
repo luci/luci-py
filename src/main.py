@@ -16,6 +16,7 @@ import os.path
 import urllib
 
 from google.appengine.api import mail
+from google.appengine.api import mail_errors
 from google.appengine.api import users
 from google.appengine.ext import blobstore
 from google.appengine.ext import db
@@ -481,7 +482,25 @@ class SendEReporterHandler(ReportGenerator):
 
     if mail.is_email_valid(admin.email):
       self.request.GET['sender'] = admin.email
-      super(SendEReporterHandler, self).get()
+      exception_count = ereporter.ExceptionRecord.all(keys_only=True).count()
+
+      while exception_count:
+        try:
+          self.request.GET['max_results'] = exception_count
+          super(SendEReporterHandler, self).get()
+          exception_count = min(
+              exception_count,
+              ereporter.ExceptionRecord.all(keys_only=True).count())
+        except mail_errors.BadRequestError:
+          if exception_count == 1:
+            # This is bad, it means we can't send any exceptions, so just
+            # clear all exceptions.
+            db.delete_async(ereporter.ExceptionRecord.all(keys_only=True))
+            break
+
+          # ereporter doesn't handle the email being too big, so manually
+          # decrease the size and try again.
+          exception_count = max(exception_count / 2, 1)
     else:
       self.response.out.write('Invalid admin email, \'%s\'. Must be a valid '
                               'email.' % admin.email)

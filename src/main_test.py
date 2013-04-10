@@ -31,8 +31,10 @@ class AppTest(unittest.TestCase):
   def setUp(self):
     self.testbed = testbed.Testbed()
     self.testbed.activate()
-    self.testbed.init_datastore_v3_stub()
     self.testbed.init_all_stubs()
+
+    # Some tests require this to be set.
+    os.environ['CURRENT_VERSION_ID'] = '1.1'
 
     self.app = webtest.TestApp(main_app.CreateApplication())
 
@@ -429,9 +431,6 @@ class AppTest(unittest.TestCase):
     self.assertEqual('200 OK', response.status)
 
   def testSendEReporter(self):
-    # The version must be set for the ereporter.
-    os.environ['CURRENT_VERSION_ID'] = '1.1'
-
     # Ensure this function correctly complains if the admin email isn't set.
     response = self.app.get('/tasks/sendereporter', expect_errors=True)
     self.assertEqual('400 Bad Request', response.status)
