@@ -1437,7 +1437,7 @@ class TestRequestManagerTest(unittest.TestCase):
                                  num_config_instances=test_runner_count)
 
     # Make sure the results are sorted.
-    test_runners = test_manager.GetTestRunners('config_instance_index',
+    test_runners = test_manager.GetTestRunners('created',
                                                ascending=True,
                                                limit=3, offset=0)
     for i in range(test_runner_count):
@@ -1445,7 +1445,7 @@ class TestRequestManagerTest(unittest.TestCase):
     self.assertEqual(0, len(list(test_runners)))
 
     # Make sure the results are sorted in descending order.
-    test_runners = test_manager.GetTestRunners('config_instance_index',
+    test_runners = test_manager.GetTestRunners('created',
                                                ascending=False,
                                                limit=3, offset=0)
     for i in range(test_runner_count):

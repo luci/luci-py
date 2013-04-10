@@ -17,36 +17,10 @@ indexes:
   - name: minor_version
     direction: desc
 
-- kind: Machine
-  properties:
-  - name: id
-  - name: status
-
-- kind: MachineAssignment
-  properties:
-  - name: user
-  - name: assignment_time
-
-- kind: MachineAssignment
-  properties:
-  - name: user
-  - name: machine_id
-
-- kind: MachineAssignment
-  properties:
-  - name: user
-  - name: tag
-
 - kind: TestRunner
   properties:
   - name: automatic_retry_count
   - name: done
-  - name: started
-  - name: created
-
-- kind: TestRunner
-  properties:
-  - name: automatic_retry_count
   - name: started
   - name: created
 
@@ -64,39 +38,16 @@ indexes:
 - kind: TestRunner
   properties:
   - name: done
-  - name: started
-
-- kind: TestRunner
-  properties:
   - name: machine_id
-  - name: started
-  - name: created
-
-- kind: TestRunner
-  properties:
-  - name: machine_id
-  - name: started
-  - name: user
-  - name: created
 
 - kind: TestRunner
   properties:
   - name: started
   - name: created
 
-- kind: TestRunner
+- kind: UserManager
   properties:
-  - name: started
-  - name: user
-  - name: created
+  - name: ip
+  - name: whitelist
 
-- kind: TestRunner
-  properties:
-  - name: user
-  - name: created
 
-- kind: TestRunner
-  properties:
-  - name: user
-  - name: created
-    direction: desc

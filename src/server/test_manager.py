@@ -164,9 +164,6 @@ class TestRequest(db.Model):
   # http://code.google.com/p/swarming/wiki/SwarmFileFormat.
   message = db.TextProperty()
 
-  # The time at which this request was received.
-  requested_time = db.DateTimeProperty(auto_now_add=True)
-
   # The name for this test request.
   name = db.StringProperty()
 
@@ -248,16 +245,16 @@ class TestRunner(db.Model):
                                       collection_name='runners')
 
   # The name of the request's configuration being tested.
-  config_name = db.StringProperty()
+  config_name = db.StringProperty(indexed=False)
 
   # The hash of the configuration. Required in order to match machines.
   config_hash = db.StringProperty(required=True)
 
   # The 0 based instance index of the request's configuration being tested.
-  config_instance_index = db.IntegerProperty()
+  config_instance_index = db.IntegerProperty(indexed=False)
 
   # The number of instances running on the same configuration as ours.
-  num_config_instances = db.IntegerProperty()
+  num_config_instances = db.IntegerProperty(indexed=False)
 
   # The machine that is running or ran the test. This attribute is only valid
   # once a machine has been assigned to this runner.
@@ -268,7 +265,7 @@ class TestRunner(db.Model):
 
   # A list of the old machines ids that this runner previous ran on. This is
   # useful for knowing when a ping is from an older machine.
-  old_machine_ids = db.ListProperty(str)
+  old_machine_ids = db.ListProperty(str, indexed=False)
 
   # Used to indicate if the runner has finished, either successfully or not.
   done = db.BooleanProperty(default=False)
@@ -298,15 +295,15 @@ class TestRunner(db.Model):
 
   # True if the test run finished and succeeded.  This attribute is valid only
   # when the runner has ended. Until then, the value is unspecified.
-  ran_successfully = db.BooleanProperty()
+  ran_successfully = db.BooleanProperty(indexed=False)
 
   # The stringized array of exit_codes for each actions of the test.
-  exit_codes = db.StringProperty()
+  exit_codes = db.StringProperty(indexed=False)
 
   # Contains any swarm specific errors that occured that caused the result
   # string to not get correct setup with the runner output (i.e. the runner
   # timed out so there was no data).
-  errors = db.StringProperty()
+  errors = db.StringProperty(indexed=False)
 
   # The blobstore reference to the full output of the test.  This key valid only
   # when the runner has ended (i.e. done == True). Until then, it is None.
@@ -421,13 +418,13 @@ class MachineAssignment(db.Model):
 class SwarmError(db.Model):
   """A datastore entry representing an error in Swarm."""
   # The name of the error.
-  name = db.StringProperty()
+  name = db.StringProperty(indexed=False)
 
   # A description of the error.
-  message = db.StringProperty()
+  message = db.StringProperty(indexed=False)
 
   # Optional details about the specific error instance.
-  info = db.StringProperty()
+  info = db.StringProperty(indexed=False)
 
   # The time at which this error was logged.  Used to clean up old errors.
   created = db.DateTimeProperty(auto_now_add=True)

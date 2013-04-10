@@ -30,7 +30,7 @@ class RunnerStats(db.Model):
 
   # The time in seconds that passed between swarm creating this runner and
   # it beginning execution.
-  wait_time = db.IntegerProperty()
+  wait_time = db.IntegerProperty(indexed=False)
 
   # The start date of the runner, used to identify older data to be cleared.
   started = db.DateProperty()
