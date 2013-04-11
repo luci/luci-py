@@ -295,7 +295,7 @@ class ACLRequestHandler(webapp2.RequestHandler):
               'Secret: %s',
             token, token_0, token_1, self.access_id,
             binascii.hexlify(self.secret))
-      self.abort(403)
+        self.abort(403)
     return token
 
 
