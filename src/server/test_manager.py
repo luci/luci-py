@@ -49,6 +49,11 @@ from test_runner import slave_machine
 # Specified in number of seconds.
 _TIMEOUT_FACTOR = 600
 
+# The number of pings that need to be missed before a runner is considered to
+# have timed out. |_TIMEOUT_FACTOR| / |this| will determine the desired delay
+# between pings/
+_MISSED_PINGS_BEFORE_TIMEOUT = 10
+
 # Default Test Run Swarm filename.  This file provides parameters
 # for the instance running tests.
 _TEST_RUN_SWARM_FILE_NAME = 'test_run.swarm'
@@ -419,6 +424,7 @@ class TestRequestManager(object):
                                               runner.machine_id)),
         ping_url=('%s/runner_ping?r=%s&id=%s' % (server_url, str(runner.key()),
                                                  runner.machine_id)),
+        ping_delay=(_TIMEOUT_FACTOR / _MISSED_PINGS_BEFORE_TIMEOUT),
         output_destination=request.output_destination,
         cleanup=request.cleanup,
         data=(request.data + config.data),

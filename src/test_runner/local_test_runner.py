@@ -98,13 +98,6 @@ from common import url_helper
 # its other functions because it is too busy reading input.
 CHARACTERS_TO_READ_PER_PASS = 2000
 
-# The amount of time to wait between pings. This helps to prevent us from
-# swamping the server with pings, since it doesn't require a high degree of
-# accuracy.
-# TODO(user): This value should be set by the server and sent in the swarm
-# file. See https://code.google.com/p/swarming/issues/detail?id=40
-DELAY_BETWEEN_PINGS = 4 * 60
-
 # The file name of the local rotating log file to store all test results to.
 LOCAL_TEST_RUNNER_CONSTANT_LOG_FILE = 'local_test_runner.log'
 
@@ -411,7 +404,7 @@ class LocalTestRunner(object):
 
       # If enough time has passed, let the server know that we are still
       # alive.
-      if self.last_ping_time + DELAY_BETWEEN_PINGS < time.time():
+      if self.last_ping_time + self.test_run.ping_delay < time.time():
         if url_helper.UrlOpen(self.test_run.ping_url) is not None:
           self.last_ping_time = time.time()
 

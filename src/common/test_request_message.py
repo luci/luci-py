@@ -972,6 +972,7 @@ class TestRun(TestRequestMessageBase):
     result_url: An optional URL where to post the results of this test run.
     ping_url: A required URL that tells the test run where to ping to let the
         server know that it is still active.
+    ping_delay: The amount of time to wait between pings (in seconds).
     output_destination: An optional dictionary with a URL where to post the
         output of this test case as well as the size of the chunks to use.
         The key for the URL is 'url' and the value must be a valid URL string.
@@ -987,8 +988,9 @@ class TestRun(TestRequestMessageBase):
                configuration=TestConfiguration(), data=None,
                working_dir=DEFAULT_WORKING_DIR, tests=None,
                instance_index=None, num_instances=None, result_url=None,
-               ping_url=None, output_destination=None, cleanup=None,
-               restart_on_failure=None, encoding=DEFAULT_ENCODING):
+               ping_url=None, ping_delay=None, output_destination=None,
+               cleanup=None, restart_on_failure=None,
+               encoding=DEFAULT_ENCODING):
     super(TestRun, self).__init__()
     self.test_run_name = test_run_name
     if env_vars:
@@ -1009,6 +1011,7 @@ class TestRun(TestRequestMessageBase):
     self.num_instances = num_instances
     self.result_url = result_url
     self.ping_url = ping_url
+    self.ping_delay = ping_delay
     if output_destination:
       self.output_destination = output_destination.copy()
     else:
@@ -1043,6 +1046,9 @@ class TestRun(TestRequestMessageBase):
                                 basestring, errors=errors) or
         (self.result_url and not self.IsValidUrl(self.result_url, errors)) or
         not self.IsValidUrl(self.ping_url, errors) or
+        not self.AreValidValues(['ping_delay'], (int, long), required=True,
+                                errors=errors) or
+        self.ping_delay < 0 or
         self.cleanup not in TestRun.VALID_CLEANUP_VALUES or
         not self.AreValidValues(['instance_index', 'num_instances'],
                                 (int, long), errors=errors) or

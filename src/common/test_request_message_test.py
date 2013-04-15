@@ -801,6 +801,7 @@ class TestRunTest(TestHelper):
             config_name='a', os='a', browser='a', cpu='a'),
         result_url=TestHelper.VALID_URL_VALUES[0],
         ping_url=TestHelper.VALID_URL_VALUES[0],
+        ping_delay=TestHelper.VALID_INT_VALUES[0],
         encoding=TestHelper.VALID_ENCODING_VALUES[0])
 
   @staticmethod
@@ -816,6 +817,7 @@ class TestRunTest(TestHelper):
         num_instances=2,
         result_url=TestHelper.VALID_URL_VALUES[-1],
         ping_url=TestHelper.VALID_URL_VALUES[-1],
+        ping_delay=TestHelper.VALID_INT_VALUES[-1],
         output_destination=
         TestHelper.VALID_OPTIONAL_OUTPUT_DESTINATION_VALUES[-1],
         cleanup=test_request_message.TestRun.VALID_CLEANUP_VALUES[-1],
@@ -882,6 +884,7 @@ class TestRunTest(TestHelper):
 
     self.AssertValidValues('result_url', TestHelper.VALID_OPTIONAL_URL_VALUES)
     self.AssertValidValues('ping_url', TestHelper.VALID_URL_VALUES)
+    self.AssertValidValues('ping_delay', TestHelper.VALID_INT_VALUES)
     self.AssertValidValues('output_destination',
                            TestHelper.VALID_OPTIONAL_OUTPUT_DESTINATION_VALUES)
     self.AssertValidValues('working_dir',
@@ -938,6 +941,10 @@ class TestRunTest(TestHelper):
 
     self.AssertInvalidValues('ping_url', TestHelper.INVALID_URL_VALUES)
     self.test_request.ping_url = TestHelper.VALID_URL_VALUES[0]
+
+    self.AssertInvalidValues('ping_delay',
+                             TestHelper.INVALID_POSITIVE_INT_VALUES)
+    self.test_request.ping_delay = TestHelper.VALID_INT_VALUES[0]
 
     self.AssertInvalidValues('output_destination',
                              TestHelper.INVALID_OUTPUT_DESTINATION_VALUES)

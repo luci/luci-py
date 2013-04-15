@@ -33,6 +33,7 @@ class TestLocalTestRunner(unittest.TestCase):
   def setUp(self):
     self.result_url = 'http://a.com/result'
     self.ping_url = 'http://a.com/ping'
+    self.ping_delay = 10
     self.output_destination = {}
     self.test_run_name = 'TestRunName'
     self.config_name = 'ConfigName'
@@ -90,8 +91,8 @@ class TestLocalTestRunner(unittest.TestCase):
         test_run_name=self.test_run_name, env_vars=test_run_env,
         data=test_run_data, configuration=test_config,
         result_url=self.result_url, ping_url=self.ping_url,
-        output_destination=self.output_destination, tests=test_objects,
-        cleanup=test_run_cleanup, encoding=test_encoding)
+        ping_delay=self.ping_delay, output_destination=self.output_destination,
+        tests=test_objects, cleanup=test_run_cleanup, encoding=test_encoding)
 
     # Check that the message is valid, otherwise the test will fail when trying
     # to load it.
@@ -213,9 +214,8 @@ class TestLocalTestRunner(unittest.TestCase):
     url_helper.UrlOpen(self.ping_url).AndReturn('')
     self._mox.ReplayAll()
 
-    # Make the delay between pings negative to ensure we get a ping
-    # for this runner.
-    local_test_runner.DELAY_BETWEEN_PINGS = -100
+    # Set the ping delay to 0 to ensure we get a ping for this runner.
+    self.ping_delay = 0
 
     self.CreateValidFile()
     runner = local_test_runner.LocalTestRunner(self.data_file_name)
