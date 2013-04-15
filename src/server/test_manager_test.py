@@ -22,6 +22,7 @@ from common import blobstore_helper
 from common import dimensions_utils
 from common import test_request_message
 from server import test_manager
+from stats import machine_stats
 from stats import runner_stats
 from test_runner import slave_machine
 from third_party.mox import mox
@@ -603,8 +604,8 @@ class TestRequestManagerTest(unittest.TestCase):
     self.assertEqual(test_runner.machine_id, results['machine_id'])
     self.assertEqual(test_runner.GetResultString(), results['output'])
 
-    machine = test_manager.MachineAssignment.gql('WHERE machine_id = :1',
-                                                 test_runner.machine_id).get()
+    machine = machine_stats.MachineStats.gql('WHERE machine_id = :1',
+                                             test_runner.machine_id).get()
     self.assertIsNotNone(machine)
     self.assertEqual(machine.tag, results['machine_tag'])
 
@@ -1267,22 +1268,6 @@ class TestRequestManagerTest(unittest.TestCase):
 
     self._mox.VerifyAll()
 
-  def testDeleteMachineAssignments(self):
-    # Try to delete with bad keys.
-    self.assertFalse(test_manager.DeleteMachineAssignment('bad key'))
-    self.assertFalse(test_manager.DeleteMachineAssignment(1))
-
-    # Add and then delete a machine assignment.
-    machine_assignment = test_manager.MachineAssignment()
-    machine_assignment.put()
-    self.assertEqual(1, test_manager.MachineAssignment.all().count())
-    self.assertTrue(
-        test_manager.DeleteMachineAssignment(machine_assignment.key()))
-
-    # Try and delete the machine assignment again.
-    self.assertFalse(
-        test_manager.DeleteMachineAssignment(machine_assignment.key()))
-
   # Ensure that if we have a machine request a test that has the same id
   # as a machine that is supposed to be running a test, we log an error, since
   # it probably means we failed to get the results from the last test.
@@ -1312,37 +1297,25 @@ class TestRequestManagerTest(unittest.TestCase):
     self._manager.ExecuteRegisterRequest(register_request, self._SERVER_URL)
     self._mox.VerifyAll()
 
-  def testRecordMachineRunnerAssignment(self):
-    machine_tag = 'tag'
-    self.assertEqual(0, test_manager.MachineAssignment.all().count())
-
-    # Assign a runner.
-    self._manager._RecordMachineAssignment(MACHINE_IDS[0], machine_tag)
-    self.assertEqual(1, test_manager.MachineAssignment.all().count())
-
-    # Assign another runner.
-    self._manager._RecordMachineAssignment(MACHINE_IDS[1], machine_tag)
-    self.assertEqual(2, test_manager.MachineAssignment.all().count())
-
   def testRecordMachineRunnerAssignedCorrectlyCalled(self):
     matching_config = 'win-xp'
     request_message = self._GetRequestMessage(os=matching_config)
     self._manager.ExecuteTestRequest(request_message)
 
-    self.assertEqual(0, test_manager.MachineAssignment.all().count())
+    self.assertEqual(0, machine_stats.MachineStats.all().count())
 
     # Ensure nothing is added since no runner was matched.
     nonmatching_config = 'win-vista'
     self._manager.ExecuteRegisterRequest(
         self._GetMachineRegisterRequest(os=nonmatching_config),
         self._SERVER_URL)
-    self.assertEqual(0, test_manager.MachineAssignment.all().count())
+    self.assertEqual(0, machine_stats.MachineStats.all().count())
 
     # Ensure the runner match is recorded.
     self._manager.ExecuteRegisterRequest(
         self._GetMachineRegisterRequest(os=matching_config),
         self._SERVER_URL)
-    self.assertEqual(1, test_manager.MachineAssignment.all().count())
+    self.assertEqual(1, machine_stats.MachineStats.all().count())
 
   def testGetRunnerResults(self):
     # Create a test.
@@ -1398,18 +1371,6 @@ class TestRequestManagerTest(unittest.TestCase):
     test_runner.delete()
     self.assertFalse(test_manager.PingRunner(test_runner.key(),
                                              MACHINE_IDS[0]))
-
-  def testGetAllMachines(self):
-    self.assertEqual(0, len(list(test_manager.GetAllMachines())))
-
-    self._manager._RecordMachineAssignment(MACHINE_IDS[0], 'b')
-    self._manager._RecordMachineAssignment(MACHINE_IDS[1], 'a')
-
-    # Ensure that the returned values are sorted by tags.
-    machines = test_manager.GetAllMachines('tag')
-    self.assertEqual(MACHINE_IDS[1], machines.next().machine_id)
-    self.assertEqual(MACHINE_IDS[0], machines.next().machine_id)
-    self.assertEqual(0, len(list(machines)))
 
   def testRecordRunnerAssignment(self):
     self._SetupLoadFileExpectations(contents='script contents')

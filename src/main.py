@@ -32,6 +32,7 @@ from common import url_helper
 from server import admin_user
 from server import test_manager
 from server import user_manager
+from stats import machine_stats
 from stats import runner_stats
 # pylint: enable-msg=C6204
 
@@ -45,7 +46,7 @@ _STATS_LINK = '<a href=/secure/stats>Stats</a>'
 
 _SECURE_CANCEL_URL = '/secure/cancel'
 _SECURE_CHANGE_WHITELIST_URL = '/secure/change_whitelist'
-_SECURE_DELETE_MACHINE_ASSIGNMENT_URL = '/secure/delete_machine_assignment'
+_SECURE_DELETE_MACHINE_STATS_URL = '/secure/delete_machine_stats'
 _SECURE_GET_RESULTS_URL = '/secure/get_result'
 _SECURE_MAIN_URL = '/secure/main'
 _SECURE_USER_PROFILE_URL = '/secure/user_profile'
@@ -279,14 +280,14 @@ class MachineListHandler(webapp2.RequestHandler):
   def get(self):  # pylint: disable-msg=C6409
     """Handles HTTP GET requests for this handler's URL."""
     sort_by = self.request.get('sort_by', 'machine_id')
-    machines = test_manager.GetAllMachines(sort_by)
+    machines = machine_stats.GetAllMachines(sort_by)
 
     # Add a delete option for each machine assignment.
     machines_displayable = []
     for machine in machines:
       machine.command_string = GenerateButtonWithHiddenForm(
           'Delete',
-          '%s?r=%s' % (_SECURE_DELETE_MACHINE_ASSIGNMENT_URL, machine.key()),
+          '%s?r=%s' % (_SECURE_DELETE_MACHINE_STATS_URL, machine.key()),
           machine.key())
       machines_displayable.append(machine)
 
@@ -299,14 +300,14 @@ class MachineListHandler(webapp2.RequestHandler):
     self.response.out.write(template.render(path, params))
 
 
-class DeleteMachineAssignmentHandler(webapp2.RequestHandler):
+class DeleteMachineStatsHandler(webapp2.RequestHandler):
   """Handler to delete a machine assignment."""
 
   def post(self):  # pylint:disable-msg=C6409
     """Handles HTTP POST requests for this handler's URL."""
     key = self.request.get('r')
 
-    if key and test_manager.DeleteMachineAssignment(key):
+    if key and machine_stats.DeleteMachineStats(key):
       self.response.out.write('Machine Assignment removed.')
     else:
       self.response.set_status(204)
@@ -899,8 +900,8 @@ def CreateApplication():
                                   (_SECURE_CANCEL_URL, CancelHandler),
                                   (_SECURE_CHANGE_WHITELIST_URL,
                                    ChangeWhitelistHandler),
-                                  (_SECURE_DELETE_MACHINE_ASSIGNMENT_URL,
-                                   DeleteMachineAssignmentHandler),
+                                  (_SECURE_DELETE_MACHINE_STATS_URL,
+                                   DeleteMachineStatsHandler),
                                   (_SECURE_GET_RESULTS_URL,
                                    SecureGetResultHandler),
                                   (_SECURE_MAIN_URL, MainHandler),

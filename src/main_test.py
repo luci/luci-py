@@ -20,6 +20,7 @@ from server import admin_user
 from server import main as main_app
 from server import test_manager
 from server import user_manager
+from stats import machine_stats
 from stats import runner_stats
 from third_party.mox import mox
 
@@ -165,26 +166,26 @@ class AppTest(unittest.TestCase):
     self._mox.ReplayAll()
 
     # Add a machine to display.
-    test_manager.MachineAssignment(machine_id='id', tag='tag')
+    machine_stats.MachineStats(machine_id='id', tag='tag')
 
     response = self.app.get('/secure/machine_list')
     self.assertTrue('200' in response.status)
 
     self._mox.VerifyAll()
 
-  def testDeleteMachineAssignment(self):
+  def testDeleteMachineStats(self):
     # Add a machine assignment to delete.
-    machine_assignment = test_manager.MachineAssignment()
-    machine_assignment.put()
+    m_stats = machine_stats.MachineStats()
+    m_stats.put()
 
     # Delete the machine assignment.
-    response = self.app.post('/secure/delete_machine_assignment?r=%s' %
-                             machine_assignment.key())
+    response = self.app.post('/secure/delete_machine_stats?r=%s' %
+                             m_stats.key())
     self.assertTrue('200' in response.status)
 
     # Attempt to delete the assignment again and fail.
-    response = self.app.post('/secure/delete_machine_assignment?r=%s' %
-                             machine_assignment.key())
+    response = self.app.post('/secure/delete_machine_stats?r=%s' %
+                             m_stats.key())
     self.assertTrue('204' in response.status)
 
   def testMainHandler(self):

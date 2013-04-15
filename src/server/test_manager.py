@@ -37,6 +37,7 @@ from google.appengine.ext import db
 from common import blobstore_helper
 from common import dimensions_utils
 from common import test_request_message
+from stats import machine_stats
 from stats import runner_stats
 from test_runner import slave_machine
 
@@ -258,8 +259,8 @@ class TestRunner(db.Model):
 
   # The machine that is running or ran the test. This attribute is only valid
   # once a machine has been assigned to this runner.
-  # TODO(user): Investigate making this a reference to the MachineAssignment.
-  # It would require ensuring the MachineAssignment is created when this value
+  # TODO(user): Investigate making this a reference to the MachineStats.
+  # It would require ensuring the MachineStats is created when this value
   # is set.
   machine_id = db.StringProperty()
 
@@ -401,18 +402,6 @@ class TestRunner(db.Model):
                    (self.config_instance_index, self.num_config_instances))
 
     return '\n'.join(message)
-
-
-class MachineAssignment(db.Model):
-  """A machine's last runner assignment."""
-  # The machine id of the polling machine.
-  machine_id = db.StringProperty()
-
-  # The tag of the machine polling.
-  tag = db.StringProperty()
-
-  # The time of the assignment.
-  assignment_time = db.DateTimeProperty(auto_now=True)
 
 
 class SwarmError(db.Model):
@@ -767,13 +756,9 @@ class TestRequestManager(object):
     Returns:
       A dictionary of the results.
     """
-
-    machine = MachineAssignment.gql('WHERE machine_id = :1',
-                                    runner.machine_id).get()
-
     return {'exit_codes': runner.exit_codes,
             'machine_id': runner.machine_id,
-            'machine_tag': machine.tag if machine else 'Unknown',
+            'machine_tag': machine_stats.GetMachineTag(runner.machine_id),
             'output': runner.GetResultString()}
 
   def AutomaticallyRetryRunner(self, runner):
@@ -953,8 +938,8 @@ class TestRequestManager(object):
         response['commands'] = commands
         response['result_url'] = result_url
         response['try_count'] = 0
-        self._RecordMachineAssignment(attribs['id'],
-                                      attributes.get('tag', None))
+        machine_stats.RecordMachineAssignment(attribs['id'],
+                                              attributes.get('tag', None))
         runner_stats.RecordRunnerAssignment(db.get(runner.key()))
     else:
       response['try_count'] = attribs['try_count'] + 1
@@ -1022,24 +1007,6 @@ class TestRequestManager(object):
       attributes['try_count'] = 0
 
     return attributes
-
-  def _RecordMachineAssignment(self, machine_id, machine_tag):
-    """Records when a machine has a runner assigned.
-
-    Args:
-      machine_id: The machine id of the machine.
-      machine_tag: The tag identifier of the machine.
-    """
-    machine_assignment = MachineAssignment.gql('WHERE machine_id = :1',
-                                               machine_id).get()
-
-    # Check to see if we need to create the model.
-    if machine_assignment is None:
-      machine_assignment = MachineAssignment(machine_id=machine_id)
-
-    machine_assignment.tag = machine_tag
-    machine_assignment.assignment_time = datetime.datetime.now()
-    machine_assignment.put()
 
   def _ComputeComebackValue(self, try_count):
     """Computes when the slave machine should return based on given try_count.
@@ -1295,22 +1262,6 @@ def GetAllMatchingTestRequests(test_case_name):
   return matches
 
 
-def GetAllMachines(sort_by='machine_id'):
-  """Get the list of whitelisted machines.
-
-  Args:
-    sort_by: The string of the attribute to sort the machines by.
-
-  Returns:
-    An iterator of all machines whitelisted.
-  """
-  # If we recieve an invalid sort_by parameter, just default to machine_id.
-  if not sort_by in MachineAssignment.properties():
-    sort_by = 'machine_id'
-
-  return (machine for machine in MachineAssignment.gql('ORDER BY %s' % sort_by))
-
-
 def GetTestRunners(sort_by, ascending, limit, offset):
   """Get the list of the test runners.
 
@@ -1332,29 +1283,6 @@ def GetTestRunners(sort_by, ascending, limit, offset):
     sort_by += ' DESC'
 
   return TestRunner.gql('ORDER BY %s' % sort_by).run(limit=limit, offset=offset)
-
-
-def DeleteMachineAssignment(key):
-  """Delete the machine assignment referenced to by the given key.
-
-  Args:
-    key: The key of the machine assignment to delete.
-
-  Returns:
-    True if the key was valid and machine assignment was successfully deleted.
-  """
-  try:
-    machine_assignment = MachineAssignment.get(key)
-  except (db.BadKeyError, db.BadArgumentError):
-    logging.error('Invalid MachineAssignment key given, %s', str(key))
-    return False
-
-  if not machine_assignment:
-    logging.error('No MachineAssignment has key %s', str(key))
-    return False
-
-  machine_assignment.delete()
-  return True
 
 
 def _GetCurrentTime():
