@@ -31,6 +31,8 @@ from common import test_request_message
 from common import url_helper
 from server import admin_user
 from server import test_manager
+from server import test_request
+from server import test_runner
 from server import user_manager
 from stats import machine_stats
 from stats import runner_stats
@@ -160,7 +162,7 @@ class MainHandler(webapp2.RequestHandler):
     sorted_by_message += '</p>'
 
     runners = []
-    for runner in test_manager.GetTestRunners(
+    for runner in test_runner.GetTestRunners(
         sorted_by_query,
         ascending=ascending,
         limit=_NUM_USER_TEST_RUNNERS_PER_PAGE,
@@ -189,7 +191,7 @@ class MainHandler(webapp2.RequestHandler):
       """
 
     total_pages = (
-        test_manager.TestRunner.all().count() / _NUM_USER_TEST_RUNNERS_PER_PAGE)
+        test_runner.TestRunner.all().count() / _NUM_USER_TEST_RUNNERS_PER_PAGE)
 
     params = {
         'topbar': GenerateTopbar(),
@@ -366,7 +368,7 @@ class ResultHandler(webapp2.RequestHandler):
     runner = None
     runner_key = self.request.get('r')
     if runner_key:
-      runner = test_manager.TestRunner.get(runner_key)
+      runner = test_runner.TestRunner.get(runner_key)
 
     # Find the high level success/failure from the URL. We assume failure if
     # we can't find the success parameter in the request.
@@ -382,7 +384,7 @@ class ResultHandler(webapp2.RequestHandler):
 
     # Mark the runner as pinging now to prevent it from timing out while
     # the results are getting stored in the blobstore.
-    test_manager.PingRunner(runner.key(), machine_id)
+    test_runner.PingRunner(runner.key(), machine_id)
 
     # If we are on dev app engine we can't use the create_upload_url method
     # because it requires 2 threads, and dev app engine isn't multithreaded
@@ -420,9 +422,9 @@ class CleanupDataHandler(webapp2.RequestHandler):
   """Handles cron job to delete orphaned blobs."""
 
   def post(self):  # pylint: disable-msg=C6409
-    test_manager.DeleteOldRunners()
     test_manager.DeleteOldErrors()
-    test_manager.DeleteOrphanedBlobs()
+    test_runner.DeleteOldRunners()
+    test_runner.DeleteOrphanedBlobs()
 
     runner_stats.DeleteOldRunnerStats()
 
@@ -552,7 +554,7 @@ class GetMatchingTestCasesHandler(webapp2.RequestHandler):
 
     test_case_name = self.request.get('name', '')
 
-    matches = test_manager.GetAllMatchingTestRequests(test_case_name)
+    matches = test_request.GetAllMatchingTestRequests(test_case_name)
     keys = []
     for match in matches:
       keys.extend(map(str, match.GetAllKeys()))
@@ -589,8 +591,6 @@ class CleanupResultsHandler(webapp2.RequestHandler):
 
   def post(self):  # pylint: disable-msg=C6409
     """Handles HTTP POST requests for this handler's URL."""
-    test_request_manager = CreateTestManager()
-
     if not AuthenticateRemoteMachine(self.request):
       SendAuthenticationFailure(self.request, self.response)
       return
@@ -598,7 +598,7 @@ class CleanupResultsHandler(webapp2.RequestHandler):
     self.response.headers['Content-Type'] = 'test/plain'
 
     key = self.request.get('r', '')
-    if test_request_manager.DeleteRunner(key):
+    if test_runner.DeleteRunnerFromKey(key):
       self.response.out.write('Key deleted.')
     else:
       self.response.out.write('Key deletion failed.')
@@ -638,7 +638,7 @@ class RetryHandler(webapp2.RequestHandler):
     runner = None
     if key:
       try:
-        runner = test_manager.TestRunner.get(key)
+        runner = test_runner.TestRunner.get(key)
       except db.BadKeyError:
         pass
 
@@ -722,7 +722,7 @@ class RunnerPingHandler(webapp2.RequestHandler):
     key = self.request.get('r', '')
     machine_id = self.request.get('id', '')
 
-    if test_manager.PingRunner(key, machine_id):
+    if test_runner.PingRunner(key, machine_id):
       self.response.out.write('Runner successfully pinged.')
     else:
       self.response.set_status(402)

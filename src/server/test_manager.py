@@ -37,6 +37,8 @@ from google.appengine.ext import db
 from common import blobstore_helper
 from common import dimensions_utils
 from common import test_request_message
+from server import test_request
+from server import test_runner
 from stats import machine_stats
 from stats import runner_stats
 from test_runner import slave_machine
@@ -89,48 +91,16 @@ QUICK_COMEBACK_SECS = 1.0
 # a server error.
 COMEBACK_AFTER_SERVER_ERROR_SECS = 10
 
-# Number of times to try a transaction before giving up. Since most likely the
-# recoverable exceptions will only happen when datastore is overloaded, it
-# doesn't make much sense to extensively retry many times.
-MAX_TRANSACTION_RETRY_COUNT = 3
-
 # The time (in seconds) to wait after recieving a runner before aborting it.
 # This is intended to delete runners that will never run because they will
 # never find a matching machine.
 SWARM_RUNNER_MAX_WAIT_SECS = 24 * 60 * 60
 
-# The maximum number of times to retry a runner that has failed for a swarm
-# related reasons (like the machine timing out).
-MAX_AUTOMATIC_RETRIES = 3
-
 # Root directory of Swarm scripts.
 SWARM_ROOT_DIR = os.path.join(os.path.dirname(__file__), '..')
 
-# Number of days to keep old runners around for.
-SWARM_FINISHED_RUNNER_TIME_TO_LIVE_DAYS = 14
-
 # Number of days to keep error logs around.
 SWARM_ERROR_TIME_TO_LIVE_DAYS = 7
-
-
-def GetTestCase(request_message):
-  """Returns a TestCase object representing this Test Request message.
-
-  Args:
-    request_message: The request message to convert.
-
-  Returns:
-    A TestCase object representing this Test Request.
-
-  Raises:
-    test_request_message.Error: If the request's message isn't valid.
-  """
-  request_object = test_request_message.TestCase()
-  errors = []
-  if not request_object.ParseTestRequestMessageText(request_message, errors):
-    raise test_request_message.Error('\n'.join(errors))
-
-  return request_object
 
 
 def OnDevAppEngine():
@@ -140,268 +110,6 @@ def OnDevAppEngine():
     True if this code is running on dev app engine.
   """
   return os.environ['SERVER_SOFTWARE'].startswith('Development')
-
-
-# MOE: start_strip
-# This is removed from the public version because the public version should
-# be run on python2.7 (or later), which has the builtin total_seconds() function
-# for timedelta.
-def TotalSeconds(time_delta):
-  return ((time_delta.microseconds +
-           (time_delta.seconds + time_delta.days * 24 * 3600) * 10**6) /
-          10**6)
-# MOE: end_strip
-
-
-class TestRequest(db.Model):
-  """A test request.
-
-  Test Request objects represent one test request from one client.  The client
-  can be a build machine requesting a test after a build or it could be a
-  developer requesting a test from their own build.
-  """
-  # The message received from the caller, formatted as a Test Case as
-  # specified in
-  # http://code.google.com/p/swarming/wiki/SwarmFileFormat.
-  message = db.TextProperty()
-
-  # The name for this test request.
-  name = db.StringProperty()
-
-  def GetTestCase(self):
-    """Returns a TestCase object representing this Test Request.
-
-    Returns:
-      A TestCase object representing this Test Request.
-
-    Raises:
-      test_request_message.Error: If the request's message isn't valid.
-    """
-    # NOTE: because _request_object is not declared with db.Property, it will
-    # not be persisted to the data store.  This is used as a transient cache of
-    # the test request message to keep from evaluating it all the time
-    request_object = getattr(self, '_request_object', None)
-    if not request_object:
-      request_object = GetTestCase(self.message)
-      self._request_object = request_object
-
-    return request_object
-
-  def GetConfiguration(self, config_name):
-    """Gets the named configuration.
-
-    Args:
-      config_name: The name of the configuration to get.
-
-    Returns:
-      A configuration dictionary for the named configuration, or None if the
-      name is not found.
-    """
-    for configuration in self.GetTestCase().configurations:
-      if configuration.config_name == config_name:
-        return configuration
-
-    return None
-
-  def GetConfigurationDimensionHash(self, config_name):
-    """Gets the hash of the named configuration.
-
-    Args:
-      config_name: The name of the configuration to get the hash for.
-
-    Returns:
-      The hash of the configuration.
-    """
-    return dimensions_utils.GenerateDimensionHash(
-        self.GetConfiguration(config_name).dimensions)
-
-  def GetAllKeys(self):
-    """Get all the keys representing the TestRunners owned by this instance.
-
-    Returns:
-      A list of all the keys.
-    """
-    # We can only access the runner if this class has been saved into the
-    # database.
-    if self.is_saved():
-      return [runner.key() for runner in self.runners]
-    else:
-      return []
-
-  def RunnerDeleted(self):
-    # Delete this request if we have deleted all the runners that were created
-    # because of it.
-    if self.runners.count() == 0:
-      self.delete()
-
-
-class TestRunner(db.Model):
-  """Represents one instance of a test runner.
-
-  A test runner represents a given configuration of a given test request running
-  on a given machine.
-  """
-  # The test being run.
-  test_request = db.ReferenceProperty(TestRequest, required=True,
-                                      collection_name='runners')
-
-  # The name of the request's configuration being tested.
-  config_name = db.StringProperty(indexed=False)
-
-  # The hash of the configuration. Required in order to match machines.
-  config_hash = db.StringProperty(required=True)
-
-  # The 0 based instance index of the request's configuration being tested.
-  config_instance_index = db.IntegerProperty(indexed=False)
-
-  # The number of instances running on the same configuration as ours.
-  num_config_instances = db.IntegerProperty(indexed=False)
-
-  # The machine that is running or ran the test. This attribute is only valid
-  # once a machine has been assigned to this runner.
-  # TODO(user): Investigate making this a reference to the MachineStats.
-  # It would require ensuring the MachineStats is created when this value
-  # is set.
-  machine_id = db.StringProperty()
-
-  # A list of the old machines ids that this runner previous ran on. This is
-  # useful for knowing when a ping is from an older machine.
-  old_machine_ids = db.ListProperty(str, indexed=False)
-
-  # Used to indicate if the runner has finished, either successfully or not.
-  done = db.BooleanProperty(default=False)
-
-  # The time at which this runner was created.  The runner may not have
-  # started executing yet.
-  created = db.DateTimeProperty(auto_now_add=True)
-
-  # The time at which this runner was executed on a remote machine.  If the
-  # runner isn't executing or ended, then the value is None and we use the
-  # fact that it is None to identify if a test was started or not.
-  started = db.DateTimeProperty()
-
-  # The number of times that this runner has been retried for swarm failures
-  # (such as the machine that is running it timing out).
-  automatic_retry_count = db.IntegerProperty(default=0)
-
-  # The last time a ping was recieved from the remote machine currently
-  # running the test. This is used to determine if a machine has become
-  # unresponse, which causes the runner to become aborted.
-  ping = db.DateTimeProperty()
-
-  # The time at which this runner ended.  This attribute is valid only when
-  # the runner has ended (i.e. done == True). Until then, the value is
-  # unspecified.
-  ended = db.DateTimeProperty(auto_now=True)
-
-  # True if the test run finished and succeeded.  This attribute is valid only
-  # when the runner has ended. Until then, the value is unspecified.
-  ran_successfully = db.BooleanProperty(indexed=False)
-
-  # The stringized array of exit_codes for each actions of the test.
-  exit_codes = db.StringProperty(indexed=False)
-
-  # Contains any swarm specific errors that occured that caused the result
-  # string to not get correct setup with the runner output (i.e. the runner
-  # timed out so there was no data).
-  errors = db.StringProperty(indexed=False)
-
-  # The blobstore reference to the full output of the test.  This key valid only
-  # when the runner has ended (i.e. done == True). Until then, it is None.
-  result_string_reference = blobstore.BlobReferenceProperty()
-
-  def delete(self):  # pylint: disable-msg=C6409
-    # We delete the blob referenced by this model because no one
-    # else will every care about it or try to reference it, so we
-    # are just cleaning up the blobstore.
-    if self.result_string_reference:
-      self.result_string_reference.delete()
-
-    db.Model.delete(self)
-
-  def GetName(self):
-    """Gets a name for this runner.
-
-    Returns:
-      The  name for this runner.
-
-    Raises:
-      test_request_message.Error: If the request's message isn't valid.
-    """
-    try:
-      return '%s:%s' % (self.test_request.name, self.config_name)
-    except db.ReferencePropertyResolveError as e:
-      # Sometimes the test runner is unable to resolve the TestRequest
-      # member.
-      logging.warning(e)
-      return None
-
-  def GetConfiguration(self):
-    """Gets the configuration associated with this runner.
-
-    Returns:
-      A configuration dictionary for this runner.
-    """
-    config = self.test_request.GetConfiguration(self.config_name)
-    assert config is not None
-    return config
-
-  def GetResultString(self):
-    """Get the result string for the runner.
-
-    Returns:
-      The string representing the output for this runner or an empty string
-        if the result hasn't been written yet.
-    """
-    if self.errors:
-      assert self.result_string_reference is None
-      return self.errors
-
-    if not self.result_string_reference:
-      return ''
-
-    return blobstore_helper.GetBlobstore(self.result_string_reference.key())
-
-  def GetDimensionsString(self):
-    """Get a string representing the dimensions this runner requires.
-
-    Returns:
-      The string representing the dimensions for this runner.
-    """
-    return test_request_message.Stringize(self.GetConfiguration().dimensions)
-
-  def GetWaitTime(self):
-    """Get the number of seconds between creation and execution start.
-
-    Returns:
-      The number of seconds the runner waited, if the runner hasn't started yet
-        return 0.
-    """
-    if not self.started:
-      return 0
-
-    time_delta = self.started - self.created
-    # MOE: start_strip
-    # TODO(user): Replace with total_seconds() once python2.7 is used
-    return TotalSeconds(time_delta)
-    # MOE: end_strip_and_replace return time_delta.total_seconds())
-
-  def GetMessage(self):
-    """Get the message string representing this test runner.
-
-    Returns:
-      A string represent this test runner request.
-    """
-    message = ['Test Request Message:']
-    message.append(self.test_request.message)
-
-    message.append('')
-    message.append('Test Runner Message:')
-    message.append('Configuration Name: ' + self.config_name)
-    message.append('Configuration Instance Index: %d / %d' %
-                   (self.config_instance_index, self.num_config_instances))
-
-    return '\n'.join(message)
 
 
 class SwarmError(db.Model):
@@ -513,7 +221,7 @@ class TestRequestManager(object):
 
     # If the test didn't run successfully, we send an email if one was
     # requested via the test request.
-    test_case = runner.test_request.GetTestCase()
+    test_case = runner.request.GetTestCase()
     if not runner.ran_successfully and test_case.failure_email:
       # TODO(user): provide better info for failure. E.g., if we don't have a
       # web_request.body, we should have info like: Failed to upload files.
@@ -537,7 +245,7 @@ class TestRequestManager(object):
           encoded_result_string = runner.GetResultString().encode('utf-8')
           urllib2.urlopen(test_case.result_url,
                           urllib.urlencode((
-                              ('n', runner.test_request.name),
+                              ('n', runner.request.name),
                               ('c', runner.config_name),
                               ('i', runner.config_instance_index),
                               ('m', runner.num_config_instances),
@@ -569,9 +277,7 @@ class TestRequestManager(object):
 
     if (test_case.store_result == 'none' or
         (test_case.store_result == 'fail' and runner.ran_successfully)):
-      test_request = runner.test_request
-      runner.delete()
-      test_request.RunnerDeleted()
+      test_runner.DeleteRunner(runner)
 
     return update_successful
 
@@ -598,7 +304,7 @@ class TestRequestManager(object):
       subject = '%s failed.' % runner.GetName()
 
     message_body_parts = [
-        'Test Request Name: ' + runner.test_request.name,
+        'Test Request Name: ' + runner.request.name,
         'Configuration Name: ' + runner.config_name,
         'Configuration Instance Index: ' + str(runner.config_instance_index),
         'Number of Configurations: ' + str(runner.num_config_instances),
@@ -638,7 +344,7 @@ class TestRequestManager(object):
     """
     logging.debug('TRM.ExecuteTestRequest msg=%s', request_message)
 
-    request = TestRequest(message=request_message)
+    request = test_request.TestRequest(message=request_message)
     test_case = request.GetTestCase()  # Will raise on invalid request.
     request.name = test_case.test_case_name
 
@@ -677,8 +383,8 @@ class TestRequestManager(object):
 
     # Create a runner entity to record this request/config pair that needs
     # to be run. The runner will eventually be scheduled at a later time.
-    runner = TestRunner(
-        test_request=request, config_name=config.config_name,
+    runner = test_runner.TestRunner(
+        request=request, config_name=config.config_name,
         config_hash=request.GetConfigurationDimensionHash(config.config_name),
         config_instance_index=config.instance_index,
         num_config_instances=config.num_instances)
@@ -701,11 +407,11 @@ class TestRequestManager(object):
     Returns:
       A Test Run message for the remote test script.
     """
-    test_request = runner.test_request.GetTestCase()
+    request = runner.request.GetTestCase()
     config = runner.GetConfiguration()
     test_run = test_request_message.TestRun(
-        test_run_name=test_request.test_case_name,
-        env_vars=test_request.env_vars,
+        test_run_name=request.test_case_name,
+        env_vars=request.env_vars,
         instance_index=runner.config_instance_index,
         num_instances=runner.num_config_instances,
         configuration=config,
@@ -713,12 +419,12 @@ class TestRequestManager(object):
                                               runner.machine_id)),
         ping_url=('%s/runner_ping?r=%s&id=%s' % (server_url, str(runner.key()),
                                                  runner.machine_id)),
-        output_destination=test_request.output_destination,
-        cleanup=test_request.cleanup,
-        data=(test_request.data + config.data),
-        tests=test_request.tests + config.tests,
-        working_dir=test_request.working_dir,
-        encoding=test_request.encoding)
+        output_destination=request.output_destination,
+        cleanup=request.cleanup,
+        data=(request.data + config.data),
+        tests=request.tests + config.tests,
+        working_dir=request.working_dir,
+        encoding=request.encoding)
     test_run.ExpandVariables({
         'instance_index': runner.config_instance_index,
         'num_instances': runner.num_config_instances,
@@ -738,7 +444,7 @@ class TestRequestManager(object):
     """
 
     try:
-      runner = TestRunner.get(key)
+      runner = test_runner.TestRunner.get(key)
     except (db.BadKeyError, db.KindError, db.BadArgumentError):
       return None
 
@@ -761,32 +467,6 @@ class TestRequestManager(object):
             'machine_tag': machine_stats.GetMachineTag(runner.machine_id),
             'output': runner.GetResultString()}
 
-  def AutomaticallyRetryRunner(self, runner):
-    """Attempt to automaticlly retry runner.
-
-    This runner will only be retried if it has't already been automatically
-    retried too many times.
-
-    Args:
-      runner: The runner to retry.
-
-    Returns:
-      True if the runner was successfully setup to get run again.
-    """
-    if runner.automatic_retry_count < MAX_AUTOMATIC_RETRIES:
-      # Don't change the created time since it is not the user's fault
-      # we are retrying it (so it should have high prority to run again).
-      runner.old_machine_ids.append(runner.machine_id)
-      runner.machine_id = None
-      runner.done = False
-      runner.started = None
-      runner.ping = None
-      runner.automatic_retry_count += 1
-      runner.put()
-      return True
-
-    return False
-
   def AbortStaleRunners(self):
     """Abort any runners are taking too long to run or too long to find a match.
 
@@ -804,11 +484,11 @@ class TestRequestManager(object):
 
     # Abort all currently running runners that haven't recently pinged the
     # server.
-    query = TestRunner.gql(
+    query = test_runner.TestRunner.gql(
         'WHERE done = :1 AND ping != :2 AND ping < :3',
         False, None, timeout_cutoff)
     for runner in query:
-      if self.AutomaticallyRetryRunner(runner):
+      if test_runner.AutomaticallyRetryRunner(runner):
         logging.warning('TRM.AbortStaleRunners retrying runner %s with key %s. '
                         'Attempt %d', runner.GetName(), runner.key(),
                         runner.automatic_retry_count)
@@ -820,9 +500,10 @@ class TestRequestManager(object):
     # Abort all runners that haven't been able to find a machine to run them
     # in SWARM_RUNNER_MAX_WAIT_SECS seconds.
     timecut_off = now - datetime.timedelta(seconds=SWARM_RUNNER_MAX_WAIT_SECS)
-    query = TestRunner.gql('WHERE created < :1 and started = :2 and done = :3 '
-                           'and automatic_retry_count = 0', timecut_off, None,
-                           False)
+    query = test_runner.TestRunner.gql('WHERE created < :1 and started = :2 '
+                                       'and done = :3 and '
+                                       'automatic_retry_count = 0', timecut_off,
+                                       None, False)
     for runner in query:
       self.AbortRunner(runner, reason=('Runner was unable to find a machine to '
                                        'run it within %d seconds' %
@@ -839,33 +520,6 @@ class TestRequestManager(object):
     """
     r_str = 'Tests aborted. AbortRunner() called. Reason: %s' % reason
     self.UpdateTestResult(runner, runner.machine_id, errors=r_str)
-
-  def DeleteRunner(self, key):
-    """Delete the runner that the given key refers to.
-
-    Args:
-      key: The key corresponding to the runner to be deleted.
-
-    Returns:
-      True if a matching TestRunner was found and deleted.
-    """
-    test_runner = None
-    try:
-      test_runner = TestRunner.get(key)
-    except (db.BadKeyError, db.KindError):
-      # We don't need to take any special action with bad keys.
-      pass
-
-    if not test_runner:
-      logging.debug('No matching Test Runner found for key, %s', key)
-      return False
-
-    test_request = test_runner.test_request
-
-    test_runner.delete()
-    test_request.RunnerDeleted()
-
-    return True
 
   def ExecuteRegisterRequest(self, attributes, server_url):
     """Attempts to match the requesting machine with an existing TestRunner.
@@ -890,7 +544,7 @@ class TestRequestManager(object):
     dimension_hashes = dimensions_utils.GenerateAllDimensionHashes(
         attribs['dimensions'])
 
-    unfinished_test = TestRunner.gql(
+    unfinished_test = test_runner.TestRunner.gql(
         'WHERE machine_id = :1 AND done = :2', attribs['id'], False).get()
     if unfinished_test:
       logging.error('A machine is asking for a new test, but there is '
@@ -914,7 +568,8 @@ class TestRequestManager(object):
       # Will atomically try to assign the machine to the runner. This could
       # fail due to a race condition on the runner. If so, we loop back to
       # finding a runner.
-      if AssignRunnerToMachine(attribs['id'], runner, AtomicAssignID):
+      if test_runner.AssignRunnerToMachine(attribs['id'], runner,
+                                           test_runner.AtomicAssignID):
         assigned_runner = True
         # Grab the new version of the runner.
         runner = db.get(runner.key())
@@ -1049,9 +704,9 @@ class TestRequestManager(object):
     for i in range(number_of_queries):
       # We use a format argument for None, because putting None in the string
       # doesn't work.
-      query_runner = TestRunner.gql('WHERE started = :1 and config_hash IN :2 '
-                                    'ORDER BY created LIMIT 1', None,
-                                    attrib_hashes[i * 30:(i + 1) * 30]).get()
+      query_runner = test_runner.TestRunner.gql(
+          'WHERE started = :1 and config_hash IN :2 ORDER BY created LIMIT 1',
+          None, attrib_hashes[i * 30:(i + 1) * 30]).get()
 
       # Use this runner if it is older than our currently held runner.
       if not runner:
@@ -1076,7 +731,8 @@ class TestRequestManager(object):
     # Assign test runners from earliest to latest.
     # We use a format argument for None, because putting None in the string
     # doesn't work.
-    query = TestRunner.gql('WHERE started = :1 ORDER BY created', None)
+    query = test_runner.TestRunner.gql('WHERE started = :1 ORDER BY created',
+                                       None)
     for runner in query:
       runner_dimensions = runner.GetConfiguration().dimensions
       (match, output) = dimensions_utils.MatchDimensions(runner_dimensions,
@@ -1125,7 +781,7 @@ class TestRequestManager(object):
         '-f', r'%s' % os.path.join(test_run.working_dir,
                                    _TEST_RUN_SWARM_FILE_NAME)]
 
-    test_case = runner.test_request.GetTestCase()
+    test_case = runner.request.GetTestCase()
     if test_case.verbose:
       command_to_execute.append('-v')
 
@@ -1239,52 +895,6 @@ class TestRequestManager(object):
     return file_data
 
 
-def GetAllMatchingTestRequests(test_case_name):
-  """Returns a list of all Test Request that match the given test_case_name.
-
-  Args:
-      test_case_name: The test case name to search for.
-
-  Returns:
-    A list of all Test Requests that have |test_case_name| as their name.
-  """
-  matches = []
-
-  # Perform the query in a transaction to ensure that it gets the most recent
-  # data, otherwise it is possible for one machine to add tests, and then be
-  # unable to find them through this function after.
-  query = db.run_in_transaction(TestRequest.gql, 'WHERE name = :1',
-                                test_case_name)
-
-  for test_request in query:
-    matches.append(test_request)
-
-  return matches
-
-
-def GetTestRunners(sort_by, ascending, limit, offset):
-  """Get the list of the test runners.
-
-  Args:
-    sort_by: The string of the attribute to sort the test runners by.
-    ascending: True if the runner should be sorted in ascending order.
-    limit: The machine number of test runners to return.
-    offset: The offset from the complete set of sorted elements and the returned
-        list.
-
-  Returns:
-    An iterator of test runners in the given range.
-  """
-  # If we recieve an invalid sort_by parameter, just default to machine_id.
-  if not sort_by in TestRunner.properties():
-    sort_by = 'machine_id'
-
-  if not ascending:
-    sort_by += ' DESC'
-
-  return TestRunner.gql('ORDER BY %s' % sort_by).run(limit=limit, offset=offset)
-
-
 def _GetCurrentTime():
   """Gets the current time.
 
@@ -1294,41 +904,6 @@ def _GetCurrentTime():
     The current time as a datetime.datetime object.
   """
   return datetime.datetime.now()
-
-
-def DeleteOrphanedBlobs():
-  """Remove all the orphaned blobs."""
-  logging.debug('DeleteOrphanedBlobs starting')
-
-  blobstore_query = blobstore.BlobInfo.all().order('creation')
-  blobs_deleted = 0
-
-  try:
-    for blob in blobstore_query:
-      if not TestRunner.gql('WHERE result_string_reference = :1',
-                            blob.key()).count(limit=1):
-        blobstore.delete_async(blob.key())
-        blobs_deleted += 1
-  except db.Timeout:
-    logging.warning('Hit a timeout error while deleting orphaned blobs, some '
-                    'orphans may still exist')
-
-  logging.debug('DeleteOrphanedBlobs done')
-
-  return blobs_deleted
-
-
-def DeleteOldRunners():
-  """Clean up all runners that are older than a certain age and done."""
-  logging.debug('DeleteOldRunners starting')
-
-  old_cutoff = (
-      _GetCurrentTime() -
-      datetime.timedelta(days=SWARM_FINISHED_RUNNER_TIME_TO_LIVE_DAYS))
-
-  db.delete(TestRunner.gql('WHERE ended < :1', old_cutoff))
-
-  logging.debug('DeleteOldRunners done')
 
 
 def DeleteOldErrors():
@@ -1343,140 +918,6 @@ def DeleteOldErrors():
     error.delete()
 
   logging.debug('DeleteOldErrors done')
-
-
-def PingRunner(key, machine_id):
-  """Pings the runner, if the key is valid.
-
-  Args:
-    key: The key of the runner to ping.
-    machine_id: The machine id of the machine pinging.
-
-  Returns:
-    True if the runner is successfully pinged.
-  """
-  try:
-    runner = TestRunner.get(key)
-  except (db.BadKeyError, db.KindError, db.BadArgumentError) as e:
-    logging.error('Failed to find runner, %s', str(e))
-    return False
-
-  if not runner:
-    logging.error('Failed to find runner')
-    return False
-
-  if machine_id != runner.machine_id:
-    if machine_id in runner.old_machine_ids:
-      # This can happen if the network on the slave went down and the server
-      # thought it was dead and retried the test.
-      if (runner.machine_id is None and
-          AssignRunnerToMachine(machine_id, runner, AtomicAssignID)):
-        logging.info('Ping from older machine has resulted in runner '
-                     'reconnecting to the machine')
-
-        # The runner stored in the db was updated by AssignRunnerToMachine,
-        # so the local runner needed to get updated to contain the same values.
-        runner = TestRunner.get(key)
-        runner.automatic_retry_count -= 1
-        runner.old_machine_ids.remove(machine_id)
-        runner.put()
-      else:
-        logging.info('Recieved a ping from an older machine, pretending to '
-                     'accept ping.')
-      return True
-    else:
-      logging.error('Machine ids don\'t match, expected %s but got %s',
-                    runner.machine_id, machine_id)
-      return False
-
-  if runner.started is None or runner.done:
-    logging.error('Trying to ping a runner that is not currently running')
-    return False
-
-  runner.ping = datetime.datetime.now()
-  runner.put()
-  return True
-
-
-def AtomicAssignID(key, machine_id):
-  """Function to be run by db.run_in_transaction().
-
-  Args:
-    key: key of the test runner object to assign the machine_id to.
-    machine_id: machine_id of the machine we're trying to assign.
-
-  Raises:
-    TxRunnerAlreadyAssignedError: If runner has already been assigned a machine.
-  """
-  runner = db.get(key)
-  if runner and not runner.started:
-    runner.machine_id = str(machine_id)
-    runner.started = datetime.datetime.now()
-    runner.ping = datetime.datetime.now()
-    runner.put()
-  else:
-    # Tell caller to abort this operation.
-    raise TxRunnerAlreadyAssignedError
-
-
-def AssignRunnerToMachine(machine_id, runner, atomic_assign):
-  """Will try to atomically assign runner.machine_id to machine_id.
-
-  This function is thread safe and can be called simultaneously on the same
-  runner. It will ensure all but one concurrent requests will fail.
-
-  It uses a transaction to run atomic_assign to assign the given machine_id
-  inside attribs to the given runner. If the transaction succeeds, it will
-  return True which means runner.machine_id = machine_id. However, based on
-  datastore documentation, it is possible for datastore to throw exceptions
-  on the transaction, and we have no way to conclude if the machine_id of
-  the runner was set or not.
-
-  After investigating a few alternative approaches, we decided to return
-  False in such situations. This means the runner.machine_id (1) 'might' or
-  (2) 'might not' have been changed, but we return False anyways. In case
-  (2) no harm, no foul. In case (1), the runner is assumed running but is
-  actually not. We expect the timeout event to fire at some future time and
-  restart the runner.
-
-  An alternate solution would be to delete that runner and recreate it, set
-  the correct created timestamp, etc. which seems a bit more messy. We might
-  switch to that if this starts to break at large scales.
-
-  Args:
-    machine_id: the machine_id of the machine.
-    runner: test runner object to assign the machine to.
-    atomic_assign: function pointer to be done atomically.
-
-  Returns:
-    True is succeeded, False otherwise.
-  """
-  for _ in range(MAX_TRANSACTION_RETRY_COUNT):
-    try:
-      db.run_in_transaction(atomic_assign, runner.key(), machine_id)
-      return True
-    except TxRunnerAlreadyAssignedError:
-      # The runner is already assigned to a machine. Abort.
-      break
-    except db.TransactionFailedError:
-      # This exception only happens if there is a problem with datastore,
-      # e.g.high contention, capacity cap, etc. It ensures the operation isn't
-      # done so we can safely retry.
-      # Since we are on the main server thread, we avoid sleeping between
-      # calls.
-      continue
-    except (db.Timeout, db.InternalError):
-      # These exceptions do NOT ensure the operation is done. Based on the
-      # Discussion above, we assume it hasn't been assigned.
-      logging.exception('Un-determined fate for runner=%s', runner.GetName())
-      break
-
-  return False
-
-
-class TxRunnerAlreadyAssignedError(Exception):
-  """Simple exception class signaling a transaction fail."""
-  pass
 
 
 class PrepareRemoteCommandsError(Exception):

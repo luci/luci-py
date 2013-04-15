@@ -19,6 +19,8 @@ from common import test_request_message
 from server import admin_user
 from server import main as main_app
 from server import test_manager
+from server import test_request
+from server import test_runner
 from server import user_manager
 from stats import machine_stats
 from stats import runner_stats
@@ -77,19 +79,20 @@ class AppTest(unittest.TestCase):
     return self._test_request_message
 
   def _GetRequest(self):
-    return test_manager.TestRequest.all().get()
+    return test_request.TestRequest.all().get()
 
   def _CreateTestRunner(self, machine_id=None, exit_code=None, started=None):
-    request = test_manager.TestRequest(message=self._GetRequestMessage())
+    request = test_request.TestRequest(message=self._GetRequestMessage(),
+                                       name=self._default_test_request_name)
     request.put()
 
-    test_runner = test_manager.TestRunner(test_request=request,
-                                          machine_id=machine_id,
-                                          config_hash=self.config_hash,
-                                          exit_code=exit_code, started=started)
-    test_runner.put()
+    runner = test_runner.TestRunner(request=request,
+                                    machine_id=machine_id,
+                                    config_hash=self.config_hash,
+                                    exit_code=exit_code, started=started)
+    runner.put()
 
-    return test_runner
+    return runner
 
   def testMatchingTestCasesHandler(self):
     # Test when no matching tests.
@@ -99,27 +102,20 @@ class AppTest(unittest.TestCase):
     self.assertTrue('No matching Test Cases' in response.body)
 
     # Test with a single matching runner.
-    request = test_manager.TestRequest(name=self._default_test_request_name)
-    request.put()
-    test_runner = test_manager.TestRunner(test_request=request,
-                                          config_hash=self.config_hash)
-    test_runner.put()
-
+    runner = self._CreateTestRunner()
     response = self.app.get('/get_matching_test_cases',
                             {'name': self._default_test_request_name})
     self.assertEqual('200 OK', response.status)
-    self.assertTrue(str(test_runner.key()) in response.body)
+    self.assertTrue(str(runner.key()) in response.body)
 
     # Test with a multiple matching runners.
-    additional_test_runner = test_manager.TestRunner(
-        test_request=request, config_hash=self.config_hash)
-    additional_test_runner.put()
+    additional_test_runner = self._CreateTestRunner()
 
     # pylint: disable-msg=C6402
     response = self.app.get('/get_matching_test_cases',
                             {'name': self._default_test_request_name})
     self.assertEqual('200 OK', response.status)
-    self.assertTrue(str(test_runner.key()) in response.body)
+    self.assertTrue(str(runner.key()) in response.body)
     self.assertTrue(str(additional_test_runner.key()) in response.body)
 
   def testGetResultHandler(self):
@@ -131,7 +127,7 @@ class AppTest(unittest.TestCase):
       self.assertTrue('204' in response.status)
 
     # Create test and runner.
-    test_runner = self._CreateTestRunner(exit_code=0)
+    runner = self._CreateTestRunner(exit_code=0)
 
     self._mox.StubOutWithMock(self.test_request_manager, 'GetResults')
     self.test_request_manager.GetResults(mox.IgnoreArg()).MultipleTimes(
@@ -147,7 +143,7 @@ class AppTest(unittest.TestCase):
 
     # Valid key.
     for handler in handlers:
-      response = self.app.get(handler, {'r': test_runner.key()})
+      response = self.app.get(handler, {'r': runner.key()})
       self.assertEquals('200 OK', response.status)
 
       try:
@@ -207,7 +203,7 @@ class AppTest(unittest.TestCase):
     self.assertEqual('200 OK', response.status)
     self.assertTrue('Key deletion failed.' in response.body)
 
-    test_runner = self._CreateTestRunner()
+    runner = self._CreateTestRunner()
 
     # Try to clean up with valid key but belonging to other class.
     response = self.app.post('/cleanup_results',
@@ -216,7 +212,7 @@ class AppTest(unittest.TestCase):
     self.assertTrue('Key deletion failed.' in response.body)
 
     # Try to clean up with a valid key.
-    response = self.app.post('/cleanup_results', {'r': test_runner.key()})
+    response = self.app.post('/cleanup_results', {'r': runner.key()})
     self.assertEqual('200 OK', response.status)
     self.assertTrue('Key deleted.' in response.body)
 
@@ -226,9 +222,9 @@ class AppTest(unittest.TestCase):
     self.assertTrue('204' in response.status)
 
     # Test with matching key.
-    test_runner = self._CreateTestRunner(exit_code=0)
+    runner = self._CreateTestRunner(exit_code=0)
 
-    response = self.app.post('/secure/retry', {'r': test_runner.key()})
+    response = self.app.post('/secure/retry', {'r': runner.key()})
     self.assertEquals('200 OK', response.status)
     self.assertTrue('Runner set for retry' in response.body)
 
@@ -283,7 +279,7 @@ class AppTest(unittest.TestCase):
 
     # Get the lastest version of the runner and ensure it has the correct
     # values.
-    runner = test_manager.TestRunner.all().get()
+    runner = test_runner.TestRunner.all().get()
     self.assertTrue(runner.ran_successfully)
     self.assertEqual(result, runner.GetResultString())
 
@@ -304,7 +300,7 @@ class AppTest(unittest.TestCase):
 
     # Get the lastest version of the runner and ensure it hasn't been marked as
     # done.
-    runner = test_manager.TestRunner.all().get()
+    runner = test_runner.TestRunner.all().get()
     self.assertFalse(runner.done)
 
     self._mox.VerifyAll()
@@ -412,10 +408,10 @@ class AppTest(unittest.TestCase):
     self.assertEqual('Runner failed to ping.', response.body)
 
     # Start a test and successfully ping it
-    test_runner = self._CreateTestRunner(machine_id=MACHINE_ID,
-                                         started=datetime.datetime.now())
-    response = self.app.post('/runner_ping', {'r': test_runner.key(),
-                                              'id': test_runner.machine_id})
+    runner = self._CreateTestRunner(machine_id=MACHINE_ID,
+                                    started=datetime.datetime.now())
+    response = self.app.post('/runner_ping', {'r': runner.key(),
+                                              'id': runner.machine_id})
     self.assertEqual('200 OK', response.status)
     self.assertEqual('Runner successfully pinged.', response.body)
 

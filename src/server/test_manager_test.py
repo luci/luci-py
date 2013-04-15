@@ -16,12 +16,13 @@ import urllib2
 
 from google.appengine.api import mail
 from google.appengine.ext import blobstore
-from google.appengine.ext import db
 from google.appengine.ext import testbed
 from common import blobstore_helper
 from common import dimensions_utils
 from common import test_request_message
 from server import test_manager
+from server import test_request
+from server import test_runner
 from stats import machine_stats
 from stats import runner_stats
 from test_runner import slave_machine
@@ -94,11 +95,11 @@ class TestRequestManagerTest(unittest.TestCase):
     Returns:
       A properly formatted request message text.
     """
-    test_request = test_request_message.TestCase()
-    test_request.test_case_name = self._request_message_test_case_name
-    test_request.tests = [test_request_message.TestObject(
+    request = test_request_message.TestCase()
+    request.test_case_name = self._request_message_test_case_name
+    request.tests = [test_request_message.TestObject(
         test_name='t1', action=['ignore-me.exe'])]
-    test_request.configurations = [
+    request.configurations = [
         test_request_message.TestConfiguration(
             config_name=self._request_message_config_name, os=os,
             cpu='Unknown', data=['http://b.ina.ry/files2.zip'],
@@ -108,12 +109,13 @@ class TestRequestManagerTest(unittest.TestCase):
             tests=[test_request_message.TestObject(
                 test_name='t2', action=['ignore-me-too.exe'])])]
     if env_vars:
-      test_request.env_vars = env_vars.copy()
-    test_request.result_url = result_url
-    test_request.failure_email = 'john@doe.com'
-    test_request.store_result = store_result
-    test_request.restart_on_failure = restart_on_failure
-    return test_request_message.Stringize(test_request, json_readable=True)
+      request.env_vars = env_vars.copy()
+    request.result_url = result_url
+    request.failure_email = 'john@doe.com'
+    request.store_result = store_result
+    request.restart_on_failure = restart_on_failure
+
+    return test_request_message.Stringize(request, json_readable=True)
 
   def _GetInvalidRequestMessage(self):
     """Return an improperly formatted request message text."""
@@ -201,8 +203,8 @@ class TestRequestManagerTest(unittest.TestCase):
     self._manager.ExecuteTestRequest(self._GetRequestMessage())
 
     self._ExecuteRegister(MACHINE_IDS[0])
-    runner = test_manager.TestRunner.gql('WHERE machine_id = :1',
-                                         MACHINE_IDS[0]).get()
+    runner = test_runner.TestRunner.gql('WHERE machine_id = :1',
+                                        MACHINE_IDS[0]).get()
     self.assertNotEqual(None, runner)
     self.assertEqual(MACHINE_IDS[0], runner.machine_id)
     self.assertNotEqual(None, runner.started)
@@ -225,34 +227,13 @@ class TestRequestManagerTest(unittest.TestCase):
         os=large_os_config))
 
     self._ExecuteRegister(MACHINE_IDS[0], os=large_os_config)
-    runner = test_manager.TestRunner.gql('WHERE machine_id = :1',
-                                         MACHINE_IDS[0]).get()
+    runner = test_runner.TestRunner.gql('WHERE machine_id = :1',
+                                        MACHINE_IDS[0]).get()
     self.assertNotEqual(None, runner)
     self.assertEqual(MACHINE_IDS[0], runner.machine_id)
     self.assertNotEqual(None, runner.started)
 
     self._mox.VerifyAll()
-
-  def testGetTestRequestKeys(self):
-    self._manager.ExecuteTestRequest(
-        self._GetRequestMessage(min_instances=1))
-
-    test_request = test_manager.TestRequest.all().get()
-    self.assertNotEqual(None, test_request)
-    self.assertEqual(1, len(test_request.GetAllKeys()))
-
-    # Ensure it works with no keys.
-    empty_test_request = test_manager.TestRequest(
-        name=self._request_message_test_case_name)
-    self.assertEqual(0, len(empty_test_request.GetAllKeys()))
-
-  def testGetTestRequestKeysMultipleKeys(self, instances=2):
-    self._manager.ExecuteTestRequest(
-        self._GetRequestMessage(min_instances=instances))
-
-    test_request = test_manager.TestRequest.all().get()
-    self.assertNotEqual(None, test_request)
-    self.assertEqual(instances, len(test_request.GetAllKeys()))
 
   def _AssignPendingRequestsTest(self, instances=1):
     self._manager.ExecuteTestRequest(
@@ -267,8 +248,8 @@ class TestRequestManagerTest(unittest.TestCase):
     self.assertLessEqual(instances, len(MACHINE_IDS))
     for i in range(instances):
       self._ExecuteRegister(MACHINE_IDS[i])
-      runner = test_manager.TestRunner.gql('WHERE machine_id = :1',
-                                           MACHINE_IDS[i]).get()
+      runner = test_runner.TestRunner.gql('WHERE machine_id = :1',
+                                          MACHINE_IDS[i]).get()
       self.assertNotEqual(None, runner)
 
     self._mox.VerifyAll()
@@ -372,12 +353,12 @@ class TestRequestManagerTest(unittest.TestCase):
       self._ExecuteRegister(MACHINE_IDS[0])
 
     # For each runner return the test results and ensure it is handled properly.
-    for runner in test_manager.TestRunner.all():
+    for runner in test_runner.TestRunner.all():
       # Get the updated verison of the runner, the current one was
       # cached by the loop and only the key is guaranteed to be the same, so we
       # use it to get a fresh version.
       runner_key = runner.key()
-      runner = test_manager.TestRunner.get(runner_key)
+      runner = test_runner.TestRunner.get(runner_key)
 
       result_blob_key = blobstore_helper.CreateBlobstore('results')
       self.assertEqual(store_results_successfully,
@@ -391,7 +372,7 @@ class TestRequestManagerTest(unittest.TestCase):
       if store_result == 'none' or (store_result == 'fail' and success):
         continue
 
-      runner = test_manager.TestRunner.get(runner_key)
+      runner = test_runner.TestRunner.get(runner_key)
       self.assertNotEqual(None, runner)
       self.assertEqual(success, runner.ran_successfully)
       self.assertTrue(runner.done)
@@ -401,7 +382,7 @@ class TestRequestManagerTest(unittest.TestCase):
       self.assertFalse(self._manager.UpdateTestResult(runner, runner.machine_id,
                                                       success=success))
 
-      runner2 = test_manager.TestRunner.get(runner_key)
+      runner2 = test_runner.TestRunner.get(runner_key)
       self.assertNotEqual(None, runner2)
       self.assertEqual(success, runner2.ran_successfully)
       self.assertTrue(runner2.done)
@@ -423,7 +404,7 @@ class TestRequestManagerTest(unittest.TestCase):
                                   test_instances=1)
     # Check that the test instance has been handled by the single machine
     # and had its results cleared.
-    self.assertEqual(0, test_manager.TestRunner.all().count())
+    self.assertEqual(0, test_runner.TestRunner.all().count())
 
     self._mox.VerifyAll()
 
@@ -452,7 +433,7 @@ class TestRequestManagerTest(unittest.TestCase):
 
     self._manager.ExecuteTestRequest(self._GetRequestMessage())
 
-    runner = test_manager.TestRunner.all().get()
+    runner = test_runner.TestRunner.all().get()
 
     try:
       # Replace the async with a non-async version to ensure the blobs
@@ -515,7 +496,7 @@ class TestRequestManagerTest(unittest.TestCase):
     self._mox.ReplayAll()
 
     self._manager.ExecuteTestRequest(self._GetRequestMessage())
-    runner = test_manager.TestRunner.all().get()
+    runner = test_runner.TestRunner.all().get()
     runner.machine_id = MACHINE_IDS[0]
     runner.put()
 
@@ -528,14 +509,14 @@ class TestRequestManagerTest(unittest.TestCase):
     self._mox.ReplayAll()
 
     self._manager.ExecuteTestRequest(self._GetRequestMessage())
-    runner = test_manager.TestRunner.all().get()
+    runner = test_runner.TestRunner.all().get()
     runner.machine_id = MACHINE_IDS[0]
     runner.old_machine_ids = [MACHINE_IDS[1]]
     runner.put()
 
     self.assertTrue(self._manager.UpdateTestResult(runner, MACHINE_IDS[1]))
 
-    runner = test_manager.TestRunner.all().get()
+    runner = test_runner.TestRunner.all().get()
     self.assertEqual(MACHINE_IDS[1], runner.machine_id)
     self.assertEqual([MACHINE_IDS[0]], runner.old_machine_ids)
     self.assertTrue(runner.done)
@@ -564,8 +545,8 @@ class TestRequestManagerTest(unittest.TestCase):
     self.ExecuteHandleTestResults(success=True, store_result='none')
     self._mox.VerifyAll()
 
-    self.assertEqual(None, test_manager.TestRunner.all().get())
-    self.assertEqual(None, test_manager.TestRequest.all().get())
+    self.assertEqual(None, test_runner.TestRunner.all().get())
+    self.assertEqual(None, test_request.TestRequest.all().get())
 
   def testClearingFailedRunnerAndRequestSucceeded(self):
     self._SetupHandleTestResults()
@@ -574,8 +555,8 @@ class TestRequestManagerTest(unittest.TestCase):
     self.ExecuteHandleTestResults(success=True, store_result='fail')
     self._mox.VerifyAll()
 
-    self.assertEqual(None, test_manager.TestRunner.all().get())
-    self.assertEqual(None, test_manager.TestRequest.all().get())
+    self.assertEqual(None, test_runner.TestRunner.all().get())
+    self.assertEqual(None, test_request.TestRequest.all().get())
 
   def testClearingFailedRunnerAndRequestFailed(self):
     self._SetupHandleTestResults()
@@ -585,8 +566,8 @@ class TestRequestManagerTest(unittest.TestCase):
     self.ExecuteHandleTestResults(success=False, store_result='fail')
     self._mox.VerifyAll()
 
-    self.assertNotEqual(None, test_manager.TestRunner.all().get())
-    self.assertNotEqual(None, test_manager.TestRequest.all().get())
+    self.assertNotEqual(None, test_runner.TestRunner.all().get())
+    self.assertNotEqual(None, test_request.TestRequest.all().get())
 
   def testGetResults(self):
     self._SetupHandleTestResults()
@@ -595,17 +576,17 @@ class TestRequestManagerTest(unittest.TestCase):
     self.ExecuteHandleTestResults(success=True)
     self._mox.VerifyAll()
 
-    test_runner = test_manager.TestRunner.all().get()
-    self.assertNotEqual(None, test_runner)
+    runner = test_runner.TestRunner.all().get()
+    self.assertNotEqual(None, runner)
 
-    results = self._manager.GetResults(test_runner)
+    results = self._manager.GetResults(runner)
 
-    self.assertEqual(test_runner.exit_codes, results['exit_codes'])
-    self.assertEqual(test_runner.machine_id, results['machine_id'])
-    self.assertEqual(test_runner.GetResultString(), results['output'])
+    self.assertEqual(runner.exit_codes, results['exit_codes'])
+    self.assertEqual(runner.machine_id, results['machine_id'])
+    self.assertEqual(runner.GetResultString(), results['output'])
 
     machine = machine_stats.MachineStats.gql('WHERE machine_id = :1',
-                                             test_runner.machine_id).get()
+                                             runner.machine_id).get()
     self.assertIsNotNone(machine)
     self.assertEqual(machine.tag, results['machine_tag'])
 
@@ -620,7 +601,7 @@ class TestRequestManagerTest(unittest.TestCase):
 
   def testOnlyAbortStaleRunningRunner(self):
     self._AssignPendingRequestsTest()
-    runner = test_manager.TestRunner.all().get()
+    runner = test_runner.TestRunner.all().get()
 
     # Mark the runner as having pinged so it won't be considered stale and it
     # won't be aborted.
@@ -631,7 +612,7 @@ class TestRequestManagerTest(unittest.TestCase):
 
     self._manager.AbortStaleRunners()
 
-    runner = test_manager.TestRunner.all().get()
+    runner = test_runner.TestRunner.all().get()
     self.assertFalse(runner.done)
     self.assertEqual(0, runner.automatic_retry_count)
 
@@ -639,7 +620,7 @@ class TestRequestManagerTest(unittest.TestCase):
 
   def testAbortStaleRunnerWaitingForMachine(self):
     self._AssignPendingRequestsTest()
-    runner = test_manager.TestRunner.all().get()
+    runner = test_runner.TestRunner.all().get()
 
     # Mark the runner as having been created in the past so it will be
     # considered stale (i.e., it took too long to find a match).
@@ -655,7 +636,7 @@ class TestRequestManagerTest(unittest.TestCase):
     self.assertFalse(runner.done)
     self._manager.AbortStaleRunners()
 
-    runner = test_manager.TestRunner.all().get()
+    runner = test_runner.TestRunner.all().get()
     self.assertFalse(runner.done)
     runner.started = None
     runner.put()
@@ -667,7 +648,7 @@ class TestRequestManagerTest(unittest.TestCase):
     self.assertFalse(runner.done)
     self._manager.AbortStaleRunners()
 
-    runner = test_manager.TestRunner.all().get()
+    runner = test_runner.TestRunner.all().get()
     self.assertFalse(runner.done)
     runner.automatic_retry_count = 0
     runner.put()
@@ -676,7 +657,7 @@ class TestRequestManagerTest(unittest.TestCase):
     # SWARM_RUNNER_MAX_WAIT_SECS seconds.
     self._manager.AbortStaleRunners()
 
-    runner = test_manager.TestRunner.all().get()
+    runner = test_runner.TestRunner.all().get()
     self.assertTrue(runner.done)
     self.assertIn('Runner was unable to find a machine to run it within',
                   runner.GetResultString())
@@ -691,7 +672,7 @@ class TestRequestManagerTest(unittest.TestCase):
 
   def testRetryAndThenAbortStaleRunners(self):
     self._mox.StubOutWithMock(test_manager, '_GetCurrentTime')
-    attempts_to_reach_abort = test_manager.MAX_AUTOMATIC_RETRIES + 1
+    attempts_to_reach_abort = test_runner.MAX_AUTOMATIC_RETRIES + 1
 
     self._SetupLoadFileExpectations(contents='contents')
     for _ in range(attempts_to_reach_abort):
@@ -710,15 +691,15 @@ class TestRequestManagerTest(unittest.TestCase):
       # Assign a machine to the runner.
       self._ExecuteRegister(MACHINE_IDS[0])
 
-      runner = test_manager.TestRunner.all().get()
+      runner = test_runner.TestRunner.all().get()
       self.assertFalse(runner.done)
       self.assertEqual(i, runner.automatic_retry_count)
       self.assertNotEqual(None, runner.started)
 
       self._manager.AbortStaleRunners()
 
-      runner = test_manager.TestRunner.all().get()
-      if i == test_manager.MAX_AUTOMATIC_RETRIES:
+      runner = test_runner.TestRunner.all().get()
+      if i == test_runner.MAX_AUTOMATIC_RETRIES:
         self.assertTrue(runner.done)
         self.assertNotEqual(None, runner.started)
         self.assertIn('Runner has become stale', runner.GetResultString())
@@ -727,87 +708,6 @@ class TestRequestManagerTest(unittest.TestCase):
         self.assertEqual([MACHINE_IDS[0]] * (i + 1), runner.old_machine_ids)
         self.assertEqual(i + 1, runner.automatic_retry_count)
         self.assertEqual(None, runner.started)
-
-    self._mox.VerifyAll()
-
-  def testAbortRunnerThenReattach(self):
-    self._mox.StubOutWithMock(test_manager, '_GetCurrentTime')
-
-    self._SetupLoadFileExpectations(contents='contents')
-    self._GenerateFutureTimeExpectation()
-
-    self._mox.ReplayAll()
-
-    self._manager.ExecuteTestRequest(self._GetRequestMessage())
-
-    # Assign a machine to the runner.
-    self._ExecuteRegister(MACHINE_IDS[0])
-
-    runner = test_manager.TestRunner.all().get()
-    self.assertFalse(runner.done)
-    self.assertEqual(0, runner.automatic_retry_count)
-    self.assertNotEqual(None, runner.started)
-    self.assertEqual(MACHINE_IDS[0], runner.machine_id)
-
-    # Abort the runner because its taken too long to ping.
-    self._manager.AbortStaleRunners()
-
-    runner = test_manager.TestRunner.all().get()
-    self.assertEqual(1, runner.automatic_retry_count)
-    self.assertEqual(None, runner.started)
-    self.assertEqual(None, runner.machine_id)
-
-    # Have the the machine ping the server and get reconnected to the runner.
-    self.assertTrue(test_manager.PingRunner(runner.key(), MACHINE_IDS[0]))
-
-    runner = test_manager.TestRunner.all().get()
-    self.assertEqual(0, runner.automatic_retry_count)
-    self.assertNotEqual(None, runner.started)
-    self.assertEqual(MACHINE_IDS[0], runner.machine_id)
-    self.assertEqual([], runner.old_machine_ids)
-
-    self._mox.VerifyAll()
-
-  def testDeleteOrphanedBlobs(self):
-    self.assertEqual(0, test_manager.DeleteOrphanedBlobs())
-
-    # Add a runner with a blob and don't delete the blob.
-    test_runner = self._CreatePendingRequest()
-    test_runner.result_string_reference = blobstore_helper.CreateBlobstore(
-        'owned blob')
-    test_runner.put()
-    self.assertEqual(0, test_manager.DeleteOrphanedBlobs())
-
-    # Add an orphaned blob and delete it.
-    blobstore_helper.CreateBlobstore('orphaned blob')
-    self.assertEqual(1, test_manager.DeleteOrphanedBlobs())
-
-  def testSwarmDeleteOldRunners(self):
-    self._SetupHandleTestResults()
-
-    self._mox.StubOutWithMock(test_manager, '_GetCurrentTime')
-
-    # Set the current time to the future, but not too much.
-    mock_now = (datetime.datetime.now() + datetime.timedelta(
-        days=test_manager.SWARM_FINISHED_RUNNER_TIME_TO_LIVE_DAYS - 1))
-    test_manager._GetCurrentTime().AndReturn(mock_now)
-
-    # Set the current time to way in the future.
-    mock_now = (datetime.datetime.now() + datetime.timedelta(
-        days=test_manager.SWARM_FINISHED_RUNNER_TIME_TO_LIVE_DAYS + 1))
-    test_manager._GetCurrentTime().AndReturn(mock_now)
-    self._mox.ReplayAll()
-
-    self.ExecuteHandleTestResults(success=True)
-    self.assertEqual(1, test_manager.TestRunner.all().count())
-
-    # Make sure that new runners aren't deleted.
-    test_manager.DeleteOldRunners()
-    self.assertEqual(1, test_manager.TestRunner.all().count())
-
-    # Make sure that old runners are deleted.
-    test_manager.DeleteOldRunners()
-    self.assertEqual(0, test_manager.TestRunner.all().count())
 
     self._mox.VerifyAll()
 
@@ -842,64 +742,11 @@ class TestRequestManagerTest(unittest.TestCase):
 
     self._mox.VerifyAll()
 
-  def testGetMatchingTestRequests(self):
-    self._manager.ExecuteTestRequest(self._GetRequestMessage(min_instances=1))
-
-    matches = test_manager.GetAllMatchingTestRequests(
-        self._request_message_test_case_name)
-    self.assertEqual(1, len(matches))
-
-    # Ensure it works with no matches.
-    self.assertNotEqual('unknown', self._request_message_test_case_name)
-    matches = test_manager.GetAllMatchingTestRequests('unknown')
-    self.assertEqual(0, len(matches))
-
-  def testGetMatchingTestRequestsMultiple(self):
-    self._manager.ExecuteTestRequest(self._GetRequestMessage(min_instances=1))
-    self._manager.ExecuteTestRequest(self._GetRequestMessage(min_instances=1))
-
-    matches = test_manager.GetAllMatchingTestRequests(
-        self._request_message_test_case_name)
-    self.assertEqual(2, len(matches))
-
-  def testDeleteRunnerFromKey(self):
-    self._manager.ExecuteTestRequest(self._GetRequestMessage(min_instances=1))
-
-    # Make sure the request and the runner are stored.
-    self.assertEqual(1, test_manager.TestRunner.all().count())
-    self.assertEqual(1, test_manager.TestRequest.all().count())
-
-    # Try deleting with an invalid key and make sure nothing happens.
-    self._manager.DeleteRunner(db.Key())
-    self.assertEqual(1, test_manager.TestRunner.all().count())
-    self.assertEqual(1, test_manager.TestRequest.all().count())
-
-    # Delete the runner by its key.
-    key = test_manager.TestRunner.all().get().key()
-    self._manager.DeleteRunner(key)
-
-    # Ensure the runner is deleted and that the request is deleted (since it
-    # has no remaining runners).
-    self.assertEqual(0, test_manager.TestRunner.all().count())
-    self.assertEqual(0, test_manager.TestRequest.all().count())
-
-    # Now try deleting the Test Runner again, this should be a noop.
-    self._manager.DeleteRunner(key)
-    self.assertEqual(0, test_manager.TestRunner.all().count())
-    self.assertEqual(0, test_manager.TestRequest.all().count())
-
-  def testGetResultStringFromEmptyRunner(self):
-    test_runner = self._CreatePendingRequest()
-
-    # Since the request hasn't been run yet there should be just be an
-    # empty string for the result string.
-    self.assertEqual('', test_runner.GetResultString())
-
   def testResultWithUnicode(self):
     # Make sure we can handle results with unicode in them.
-    test_runner = self._CreatePendingRequest()
+    runner = self._CreatePendingRequest()
 
-    self._manager.AbortRunner(test_runner, u'\u04bb')
+    self._manager.AbortRunner(runner, u'\u04bb')
 
   def testAssignSinglePendingRequest(self):
     # Test when there is 1 test request then 1 machine registers itself.
@@ -970,20 +817,20 @@ class TestRequestManagerTest(unittest.TestCase):
       self._AssertPendingTestCount(max(0, num_tests - num_machines))
 
     # No test should be done.
-    done_tests = test_manager.TestRunner.gql('WHERE done = :1', True)
+    done_tests = test_runner.TestRunner.gql('WHERE done = :1', True)
     self.assertEqual(0, done_tests.count())
 
     self._mox.VerifyAll()
 
   # Asserts exactly 'expected_count' number of tests exist that have machine_id.
   def _AssertTestCount(self, machine_id, expected_count):
-    tests = test_manager.TestRunner.gql('WHERE machine_id = :1', machine_id)
+    tests = test_runner.TestRunner.gql('WHERE machine_id = :1', machine_id)
     self.assertEqual(expected_count, tests.count())
 
   # Asserts exactly 'expected_count' number of tests exist and are waiting
   # for a machine.
   def _AssertPendingTestCount(self, expected_count):
-    tests = test_manager.TestRunner.gql('WHERE started = :1', None)
+    tests = test_runner.TestRunner.gql('WHERE started = :1', None)
     self.assertEqual(expected_count, tests.count())
 
   def testNoPendingTestsOnRegisterNoTryCount(self):
@@ -997,7 +844,7 @@ class TestRequestManagerTest(unittest.TestCase):
     self.assertEqual(response['try_count'], 1)
 
     # Make sure the register request doesn't create a TestRunner.
-    self.assertEqual(0, test_manager.TestRunner.all().count())
+    self.assertEqual(0, test_runner.TestRunner.all().count())
 
   def testNoPendingTestsOnRegisterWithTryCount(self):
     # A machine registers itself without an id and there are no tests pending
@@ -1011,7 +858,7 @@ class TestRequestManagerTest(unittest.TestCase):
     self.assertEqual(response['try_count'], try_count+1)
 
     # Make sure the register request doesn't create a TestRunner.
-    self.assertEqual(0, test_manager.TestRunner.all().count())
+    self.assertEqual(0, test_runner.TestRunner.all().count())
 
     self._mox.VerifyAll()
 
@@ -1124,14 +971,14 @@ class TestRequestManagerTest(unittest.TestCase):
 
   def _CreatePendingRequest(self, config_name=None, config_index=0,
                             num_config_instances=1, machine_id=None):
-    request = test_manager.TestRequest(
+    request = test_request.TestRequest(
         message=self._GetRequestMessage(),
         name=self._request_message_test_case_name)
     request.put()
 
     config_name = config_name or self._request_message_config_name
-    runner = test_manager.TestRunner(
-        test_request=request, config_name=config_name,
+    runner = test_runner.TestRunner(
+        request=request, config_name=config_name,
         config_hash=request.GetConfigurationDimensionHash(config_name),
         config_instance_index=config_index,
         num_config_instances=num_config_instances)
@@ -1141,118 +988,6 @@ class TestRequestManagerTest(unittest.TestCase):
     runner.put()
 
     return runner
-
-  # Test with an exception.
-  def testAssignRunnerToMachineTxError(self):
-    def _RaiseError(key, machine_id):  # pylint: disable-msg=W0613
-      raise test_manager.TxRunnerAlreadyAssignedError
-
-    runner = self._CreatePendingRequest(machine_id=MACHINE_IDS[1])
-
-    self.assertFalse(test_manager.AssignRunnerToMachine(
-        MACHINE_IDS[0], runner, _RaiseError))
-
-  # Test with another exception.
-  def testAssignRunnerToMachineTimeout(self):
-    def _RaiseError(key, machine_id):  # pylint: disable-msg=W0613
-      raise db.Timeout
-
-    runner = self._CreatePendingRequest(machine_id=MACHINE_IDS[1])
-
-    self.assertFalse(test_manager.AssignRunnerToMachine(
-        MACHINE_IDS[0], runner, _RaiseError))
-
-  # Test with yet another exception.
-  def testAssignRunnerToMachineTransactionFailedError(self):
-    def _RaiseError(key, machine_id):  # pylint: disable-msg=W0613
-      raise db.TransactionFailedError
-
-    runner = self._CreatePendingRequest(machine_id=MACHINE_IDS[1])
-
-    self.assertFalse(test_manager.AssignRunnerToMachine(
-        MACHINE_IDS[0], runner, _RaiseError))
-
-  # Same as above, but the transaction stops throwing exception
-  # before the server gives up. So everything should be fine.
-  def testAssignRunnerToMachineTransactionTempFailedError(self):
-    def _StaticVar(varname, value):
-      def _Decorate(func):
-        setattr(func, varname, value)
-        return func
-      return _Decorate
-
-    @_StaticVar('error_count', test_manager.MAX_TRANSACTION_RETRY_COUNT)
-    def _RaiseTempError(key, machine_id):  # pylint: disable-msg=W0613
-      _RaiseTempError.error_count -= 1
-      if _RaiseTempError.error_count:
-        raise db.TransactionFailedError
-      else:
-        return True
-
-    runner = self._CreatePendingRequest(machine_id=MACHINE_IDS[1])
-
-    self.assertTrue(test_manager.AssignRunnerToMachine(
-        MACHINE_IDS[0], runner, _RaiseTempError))
-
-  # Test with one more exception.
-  def testAssignRunnerToMachineInternalError(self):
-    def _RaiseError(key, machine_id):  # pylint: disable-msg=W0613
-      raise db.InternalError
-
-    runner = self._CreatePendingRequest(machine_id=MACHINE_IDS[1])
-
-    self.assertFalse(test_manager.AssignRunnerToMachine(
-        MACHINE_IDS[0], runner, _RaiseError))
-
-  # Test proper behavior of AtomicAssignID.
-  def testAtomicAssignID(self):
-    runners = []
-
-    # Create some pending runners.
-    for _ in range(0, 2):
-      runners.append(self._CreatePendingRequest())
-
-    # Make sure it assigns machine_id correctly.
-    test_manager.AtomicAssignID(runners[0].key(), MACHINE_IDS[0])
-    runner = test_manager.TestRunner.gql(
-        'WHERE machine_id = :1', MACHINE_IDS[0]).get()
-    self.assertEqual(runner.machine_id, MACHINE_IDS[0])
-
-    # Make sure it didn't touch the other machine.
-    self.assertEqual(
-        1, test_manager.TestRunner.gql('WHERE started = :1', None).count())
-
-    # Try to reassign runner and raise exception.
-    self.assertRaises(test_manager.TxRunnerAlreadyAssignedError,
-                      test_manager.AtomicAssignID,
-                      runners[0].key(), MACHINE_IDS[1])
-
-  # Test with an exception.
-  def testAssignRunnerToMachineFull(self):
-    runner = self._CreatePendingRequest()
-
-    # First assignment should work correctly.
-    self.assertTrue(test_manager.AssignRunnerToMachine(
-        MACHINE_IDS[0], runner, test_manager.AtomicAssignID))
-
-    # Next assignment should fail.
-    self.assertFalse(test_manager.AssignRunnerToMachine(
-        MACHINE_IDS[0], runner, test_manager.AtomicAssignID))
-
-    runner.started = None
-    runner.put()
-    # This assignment should now work correctly.
-    self.assertTrue(test_manager.AssignRunnerToMachine(
-        MACHINE_IDS[0], runner, test_manager.AtomicAssignID))
-
-  # Test the case where the runner is deleted before the tx is done.
-  def testAssignDeletedRunnerToMachine(self):
-    runner = self._CreatePendingRequest()
-    runner.delete()
-
-    # Assignment should fail without an exception.
-    self.assertFalse(test_manager.AssignRunnerToMachine(
-        MACHINE_IDS[0], runner, test_manager.AtomicAssignID))
 
   # Make sure file I/O exceptions are propagated.
   def testGetCommandsFileException(self):
@@ -1288,9 +1023,9 @@ class TestRequestManagerTest(unittest.TestCase):
     self._mox.VerifyAll()
 
     # Now mark the test as done, and ensure we don't get the warning.
-    test_runner = test_manager.TestRunner.all().get()
-    test_runner.done = True
-    test_runner.put()
+    runner = test_runner.TestRunner.all().get()
+    runner.done = True
+    runner.put()
 
     self._mox.ReplayAll()
 
@@ -1332,45 +1067,12 @@ class TestRequestManagerTest(unittest.TestCase):
     self.assertEqual(None, self._manager.GetRunnerResults(None))
     self.assertEqual(None, self._manager.GetRunnerResults('d3d'))
     self.assertEqual(None, self._manager.GetRunnerResults(
-        test_manager.TestRequest.all().get().key()))
+        test_request.TestRequest.all().get().key()))
 
     # Valid key.
     self.assertNotEqual(None, self._manager.GetRunnerResults(runner.key()))
 
     self._mox.VerifyAll()
-
-  def testPingRunner(self):
-    # Try with a few invalid keys.
-    self.assertFalse(test_manager.PingRunner(1, None))
-    self.assertFalse(test_manager.PingRunner('2', None))
-
-    # Tests with a valid key
-    test_runner = self._CreatePendingRequest()
-
-    # Runner hasn't started.
-    self.assertFalse(test_manager.PingRunner(test_runner.key(), None))
-
-    # Runner starts and can get pinged.
-    test_runner.started = datetime.datetime.now()
-    test_runner.machine_id = MACHINE_IDS[0]
-    test_runner.put()
-    self.assertTrue(test_manager.PingRunner(test_runner.key(),
-                                            MACHINE_IDS[0]))
-
-    # The machine ids don't match so fail.
-    self.assertFalse(test_manager.PingRunner(test_runner.key(),
-                                             MACHINE_IDS[1]))
-
-    # Runner is done.
-    test_runner.done = True
-    test_runner.put()
-    self.assertFalse(test_manager.PingRunner(test_runner.key(),
-                                             MACHINE_IDS[0]))
-
-    # Delete the runner and try to ping.
-    test_runner.delete()
-    self.assertFalse(test_manager.PingRunner(test_runner.key(),
-                                             MACHINE_IDS[0]))
 
   def testRecordRunnerAssignment(self):
     self._SetupLoadFileExpectations(contents='script contents')
@@ -1385,34 +1087,6 @@ class TestRequestManagerTest(unittest.TestCase):
     self.assertEqual(1, runner_stats.RunnerStats.all().count())
 
     self._mox.VerifyAll()
-
-  def testGetTestRunners(self):
-    self.assertEqual(0,
-                     len(list(test_manager.GetTestRunners(
-                         'machine_id', ascending=True, limit=0, offset=0))))
-
-    # Create some test requests.
-    test_runner_count = 3
-    for i in range(test_runner_count):
-      self._CreatePendingRequest(config_index=i,
-                                 num_config_instances=test_runner_count)
-
-    # Make sure the results are sorted.
-    test_runners = test_manager.GetTestRunners('created',
-                                               ascending=True,
-                                               limit=3, offset=0)
-    for i in range(test_runner_count):
-      self.assertEqual(i, test_runners.next().config_instance_index)
-    self.assertEqual(0, len(list(test_runners)))
-
-    # Make sure the results are sorted in descending order.
-    test_runners = test_manager.GetTestRunners('created',
-                                               ascending=False,
-                                               limit=3, offset=0)
-    for i in range(test_runner_count):
-      self.assertEqual(test_runner_count - 1 - i,
-                       test_runners.next().config_instance_index)
-    self.assertEqual(0, len(list(test_runners)))
 
 
 if __name__ == '__main__':
