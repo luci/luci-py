@@ -211,6 +211,7 @@ class TestRequestManager(object):
     runner.ran_successfully = success
     runner.exit_codes = exit_codes
     runner.done = True
+    runner.ended = datetime.datetime.now()
 
     if result_blob_key:
       assert runner.result_string_reference is None, (
@@ -279,6 +280,8 @@ class TestRequestManager(object):
         logging.exception('Unknown url given as result url, %s',
                           test_case.result_url)
         update_successful = False
+
+    runner_stats.RecordRunnerStats(runner)
 
     if (test_case.store_result == 'none' or
         (test_case.store_result == 'fail' and runner.ran_successfully)):
@@ -601,7 +604,6 @@ class TestRequestManager(object):
         response['try_count'] = 0
         machine_stats.RecordMachineAssignment(attribs['id'],
                                               attributes.get('tag', None))
-        runner_stats.RecordRunnerAssignment(db.get(runner.key()))
     else:
       response['try_count'] = attribs['try_count'] + 1
       # Tell machine when to come back, in seconds.

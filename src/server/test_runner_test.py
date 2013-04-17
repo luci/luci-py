@@ -15,37 +15,16 @@ import unittest
 from google.appengine.ext import db
 from google.appengine.ext import testbed
 from common import blobstore_helper
+from common import test_request_message
 from server import test_request
 from server import test_runner
+from stats import runner_stats
 from third_party.mox import mox
 
 MACHINE_IDS = ['12345678-12345678-12345678-12345678',
                '23456789-23456789-23456789-23456789',
                '34567890-34567890-34567890-34567890',
                '87654321-87654321-87654321-87654321']
-
-
-def CreateRunner(config_instance_index=0, num_instances=1):
-  """Creates a new runner.
-
-  Args:
-    config_instance_index: The config_instance_index of the runner.
-    num_instances: The num_config_instances for the runner.
-
-  Returns:
-    The newly created runner.
-  """
-  request = test_request.TestRequest()
-  request.put()
-
-  runner = test_runner.TestRunner(
-      request=request,
-      config_hash=hashlib.sha1().hexdigest(),
-      config_instance_index=config_instance_index,
-      num_config_instances=num_instances)
-  runner.put()
-
-  return runner
 
 
 class TestRunnerTest(unittest.TestCase):
@@ -59,13 +38,49 @@ class TestRunnerTest(unittest.TestCase):
     # Setup a mock object.
     self._mox = mox.Mox()
 
+    self.config_name = 'c1'
+
   def tearDown(self):
     self.testbed.deactivate()
 
     self._mox.UnsetStubs()
 
+  # TODO(user): This _GetRequestMessage and _CreateRunner is used by most
+  # tests, create a helper function that all the tests can use instead of
+  # rolling their own.
+  def _GetRequestMessage(self):
+    test_case = test_request_message.TestCase()
+    test_case.test_case_name = 'test_case'
+    test_case.configurations = [
+        test_request_message.TestConfiguration(
+            config_name=self.config_name, os='win-xp',)]
+    return test_request_message.Stringize(test_case, json_readable=True)
+
+  def _CreateRunner(self, config_instance_index=0, num_instances=1):
+    """Creates a new runner.
+
+    Args:
+      config_instance_index: The config_instance_index of the runner.
+      num_instances: The num_config_instances for the runner.
+
+    Returns:
+      The newly created runner.
+    """
+    request = test_request.TestRequest(message=self._GetRequestMessage())
+    request.put()
+
+    runner = test_runner.TestRunner(
+        request=request,
+        config_hash=hashlib.sha1().hexdigest(),
+        config_name=self.config_name,
+        config_instance_index=config_instance_index,
+        num_config_instances=num_instances)
+    runner.put()
+
+    return runner
+
   def testGetResultStringFromEmptyRunner(self):
-    runner = CreateRunner()
+    runner = self._CreateRunner()
 
     # Since the request hasn't been run yet there should be just be an
     # empty string for the result string.
@@ -76,7 +91,7 @@ class TestRunnerTest(unittest.TestCase):
     def _RaiseError(key, machine_id):  # pylint: disable-msg=W0613
       raise test_runner.TxRunnerAlreadyAssignedError
 
-    runner = CreateRunner()
+    runner = self._CreateRunner()
 
     self.assertFalse(test_runner.AssignRunnerToMachine(
         MACHINE_IDS[0], runner, _RaiseError))
@@ -86,7 +101,7 @@ class TestRunnerTest(unittest.TestCase):
     def _RaiseError(key, machine_id):  # pylint: disable-msg=W0613
       raise db.Timeout
 
-    runner = CreateRunner()
+    runner = self._CreateRunner()
 
     self.assertFalse(test_runner.AssignRunnerToMachine(
         MACHINE_IDS[0], runner, _RaiseError))
@@ -96,7 +111,7 @@ class TestRunnerTest(unittest.TestCase):
     def _RaiseError(key, machine_id):  # pylint: disable-msg=W0613
       raise db.TransactionFailedError
 
-    runner = CreateRunner()
+    runner = self._CreateRunner()
 
     self.assertFalse(test_runner.AssignRunnerToMachine(
         MACHINE_IDS[0], runner, _RaiseError))
@@ -118,7 +133,7 @@ class TestRunnerTest(unittest.TestCase):
       else:
         return True
 
-    runner = CreateRunner()
+    runner = self._CreateRunner()
 
     self.assertTrue(test_runner.AssignRunnerToMachine(
         MACHINE_IDS[0], runner, _RaiseTempError))
@@ -128,7 +143,7 @@ class TestRunnerTest(unittest.TestCase):
     def _RaiseError(key, machine_id):  # pylint: disable-msg=W0613
       raise db.InternalError
 
-    runner = CreateRunner()
+    runner = self._CreateRunner()
 
     self.assertFalse(test_runner.AssignRunnerToMachine(
         MACHINE_IDS[0], runner, _RaiseError))
@@ -139,7 +154,7 @@ class TestRunnerTest(unittest.TestCase):
 
     # Create some pending runners.
     for _ in range(0, 2):
-      runners.append(CreateRunner())
+      runners.append(self._CreateRunner())
 
     # Make sure it assigns machine_id correctly.
     test_runner.AtomicAssignID(runners[0].key(), MACHINE_IDS[0])
@@ -158,7 +173,7 @@ class TestRunnerTest(unittest.TestCase):
 
   # Test with an exception.
   def testAssignRunnerToMachineFull(self):
-    runner = CreateRunner()
+    runner = self._CreateRunner()
 
     # First assignment should work correctly.
     self.assertTrue(test_runner.AssignRunnerToMachine(
@@ -176,12 +191,24 @@ class TestRunnerTest(unittest.TestCase):
 
   # Test the case where the runner is deleted before the tx is done.
   def testAssignDeletedRunnerToMachine(self):
-    runner = CreateRunner()
+    runner = self._CreateRunner()
     runner.delete()
 
     # Assignment should fail without an exception.
     self.assertFalse(test_runner.AssignRunnerToMachine(
         MACHINE_IDS[0], runner, test_runner.AtomicAssignID))
+
+  def testRecordRunnerStatsAfterAutoRetry(self):
+    runner = self._CreateRunner()
+    runner.machine_id = MACHINE_IDS[0]
+    runner.put()
+
+    test_runner.AutomaticallyRetryRunner(runner)
+
+    self.assertEqual(1, runner_stats.RunnerStats.all().count())
+    r_stats = runner_stats.RunnerStats.all().get()
+    self.assertFalse(r_stats.success)
+    self.assertEqual(0, r_stats.automatic_retry_count)
 
   def testPingRunner(self):
     # Try with a few invalid keys.
@@ -189,7 +216,7 @@ class TestRunnerTest(unittest.TestCase):
     self.assertFalse(test_runner.PingRunner('2', None))
 
     # Tests with a valid key
-    runner = CreateRunner()
+    runner = self._CreateRunner()
 
     # Runner hasn't started.
     self.assertFalse(test_runner.PingRunner(runner.key(), None))
@@ -217,7 +244,7 @@ class TestRunnerTest(unittest.TestCase):
                                             MACHINE_IDS[0]))
 
   def testAbortRunnerThenReattach(self):
-    runner = CreateRunner()
+    runner = self._CreateRunner()
     runner.machine_id = MACHINE_IDS[0]
     runner.started = datetime.datetime.now()
     runner.ping = datetime.datetime.now()
@@ -248,7 +275,8 @@ class TestRunnerTest(unittest.TestCase):
     # Create some test requests.
     test_runner_count = 3
     for i in range(test_runner_count):
-      CreateRunner(config_instance_index=i, num_instances=test_runner_count)
+      self._CreateRunner(config_instance_index=i,
+                         num_instances=test_runner_count)
 
     # Make sure the results are sorted.
     test_runners = test_runner.GetTestRunners('config_instance_index',
@@ -268,7 +296,7 @@ class TestRunnerTest(unittest.TestCase):
     self.assertEqual(0, len(list(test_runners)))
 
   def testDeleteRunner(self):
-    CreateRunner()
+    self._CreateRunner()
 
     # Make sure the request and the runner are stored.
     self.assertEqual(1, test_runner.TestRunner.all().count())
@@ -282,7 +310,7 @@ class TestRunnerTest(unittest.TestCase):
     self.assertEqual(0, test_request.TestRequest.all().count())
 
   def testDeleteRunnerFromKey(self):
-    CreateRunner()
+    self._CreateRunner()
 
     # Make sure the request and the runner are stored.
     self.assertEqual(1, test_runner.TestRunner.all().count())
@@ -321,7 +349,9 @@ class TestRunnerTest(unittest.TestCase):
     test_runner._GetCurrentTime().AndReturn(mock_now)
     self._mox.ReplayAll()
 
-    CreateRunner()
+    runner = self._CreateRunner()
+    runner.ended = datetime.datetime.now()
+    runner.put()
 
     # Make sure that new runners aren't deleted.
     test_runner.DeleteOldRunners()
@@ -337,7 +367,7 @@ class TestRunnerTest(unittest.TestCase):
     self.assertEqual(0, test_runner.DeleteOrphanedBlobs())
 
     # Add a runner with a blob and don't delete the blob.
-    runner = CreateRunner()
+    runner = self._CreateRunner()
     runner.result_string_reference = blobstore_helper.CreateBlobstore(
         'owned blob')
     runner.put()

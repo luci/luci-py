@@ -16,6 +16,7 @@ from google.appengine.ext import db
 from common import blobstore_helper
 from common import test_request_message
 from server import test_request
+from stats import runner_stats
 
 # The maximum number of times to retry a runner that has failed for a swarm
 # related reasons (like the machine timing out).
@@ -104,7 +105,7 @@ class TestRunner(db.Model):
   # The time at which this runner ended.  This attribute is valid only when
   # the runner has ended (i.e. done == True). Until then, the value is
   # unspecified.
-  ended = db.DateTimeProperty(auto_now=True)
+  ended = db.DateTimeProperty()
 
   # True if the test run finished and succeeded.  This attribute is valid only
   # when the runner has ended. Until then, the value is unspecified.
@@ -302,6 +303,7 @@ def AutomaticallyRetryRunner(runner):
     True if the runner was successfully setup to get run again.
   """
   if runner.automatic_retry_count < MAX_AUTOMATIC_RETRIES:
+    runner_stats.RecordRunnerStats(runner)
     # Don't change the created time since it is not the user's fault
     # we are retrying it (so it should have high prority to run again).
     runner.old_machine_ids.append(runner.machine_id)
@@ -436,7 +438,8 @@ def DeleteOldRunners():
       _GetCurrentTime() -
       datetime.timedelta(days=SWARM_FINISHED_RUNNER_TIME_TO_LIVE_DAYS))
 
-  db.delete(TestRunner.gql('WHERE ended < :1', old_cutoff))
+  db.delete(TestRunner.gql('WHERE ended != :1 and ended < :2', None,
+                           old_cutoff))
 
   logging.debug('DeleteOldRunners done')
 

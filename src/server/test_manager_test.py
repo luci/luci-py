@@ -508,8 +508,7 @@ class TestRequestManagerTest(unittest.TestCase):
     urllib2.urlopen(mox.IgnoreArg(), mox.StrContains('r='))
     self._mox.ReplayAll()
 
-    self._manager.ExecuteTestRequest(self._GetRequestMessage())
-    runner = test_runner.TestRunner.all().get()
+    runner = self._CreatePendingRequest(machine_id=MACHINE_IDS[0])
     runner.machine_id = MACHINE_IDS[0]
     runner.old_machine_ids = [MACHINE_IDS[1]]
     runner.put()
@@ -744,7 +743,7 @@ class TestRequestManagerTest(unittest.TestCase):
 
   def testResultWithUnicode(self):
     # Make sure we can handle results with unicode in them.
-    runner = self._CreatePendingRequest()
+    runner = self._CreatePendingRequest(machine_id=MACHINE_IDS[0])
 
     self._manager.AbortRunner(runner, u'\u04bb')
 
@@ -1074,17 +1073,25 @@ class TestRequestManagerTest(unittest.TestCase):
 
     self._mox.VerifyAll()
 
-  def testRecordRunnerAssignment(self):
+  def testRecordRunnerStats(self):
     self._SetupLoadFileExpectations(contents='script contents')
     self._mox.ReplayAll()
 
-    # Create a pending runner.
+    # Create a pending runner and execute it.
     self._manager.ExecuteTestRequest(self._GetRequestMessage())
+    self._ExecuteRegister(MACHINE_IDS[0])
     self.assertEqual(0, runner_stats.RunnerStats.all().count())
 
-    # Assign the runner and ensure the assignment is marked
-    self._ExecuteRegister(MACHINE_IDS[0])
+    # Return the results for the test and ensure the stats are updated.
+    runner = test_runner.TestRunner.all().get()
+    self._manager.UpdateTestResult(runner, runner.machine_id, success=True)
+
     self.assertEqual(1, runner_stats.RunnerStats.all().count())
+    r_stats = runner_stats.RunnerStats.all().get()
+    self.assertNotEqual(None, r_stats.created_time)
+    self.assertNotEqual(None, r_stats.assigned_time)
+    self.assertNotEqual(None, r_stats.end_time)
+    self.assertTrue(r_stats.success)
 
     self._mox.VerifyAll()
 

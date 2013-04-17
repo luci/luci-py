@@ -620,7 +620,7 @@ class CancelHandler(webapp2.RequestHandler):
     if runner and not runner.started:
       test_request_manager = CreateTestManager()
       test_request_manager.AbortRunner(
-          runner, reason='Runner is not already running.')
+          runner, reason='Runner cancelled by user.')
       self.response.out.write('Runner canceled.')
     else:
       self.response.out.write('Cannot find runner or too late to cancel: %s' %

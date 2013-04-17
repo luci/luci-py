@@ -89,6 +89,9 @@ class AppTest(unittest.TestCase):
     runner = test_runner.TestRunner(request=request,
                                     machine_id=machine_id,
                                     config_hash=self.config_hash,
+                                    config_name='c1',
+                                    config_instance_index=0,
+                                    num_config_instances=1,
                                     exit_code=exit_code, started=started)
     runner.put()
 
@@ -455,10 +458,9 @@ class AppTest(unittest.TestCase):
     main_app.template.render(mox.IgnoreArg(), mox.IgnoreArg()).AndReturn('')
     self._mox.ReplayAll()
 
-    # Add a RunnerStats
-    r_stats = runner_stats.RunnerStats(
-        dimension='', wait_time=0, started=datetime.date.today())
-    r_stats.put()
+    # Ensure there are some runner stats.
+    runner = self._CreateTestRunner()
+    runner_stats.RecordRunnerStats(runner)
 
     response = self.app.get('/secure/stats')
     self.assertTrue('200' in response.status)
