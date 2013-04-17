@@ -534,7 +534,7 @@ class LocalTestRunner(object):
 
       # Windows can't accept environment variables that are unicode.
       if sys.platform in ('win32', 'cygwin'):
-        test_env_vars = map(lambda x: (str(x[0]), str(x[1])), test_env_vars)
+        test_env_vars = [(str(x[0]), str(x[1])) for x in test_env_vars]
 
       (exit_code, stdout_string) = self._RunCommand(test.action, test.time_out,
                                                     env=dict(test_env_vars))

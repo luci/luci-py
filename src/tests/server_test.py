@@ -271,7 +271,7 @@ class _SwarmTestProgram(unittest.TestProgram):
                       help='The path to the slave dimensions config file. '
                       'Defaults to %default.')
     parser.add_option('-l', '--slave-script', dest='slave_script',
-                      default=os.path.join(ROOT_DIR, 'test_runner',
+                      default=os.path.join(ROOT_DIR, 'swarm_bot',
                                            'slave_machine.py'),
                       help='The path to the slave_machine.py script. '
                       'Defaults to %default.')

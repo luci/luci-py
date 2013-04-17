@@ -25,7 +25,7 @@ from server import test_request
 from server import test_runner
 from stats import machine_stats
 from stats import runner_stats
-from test_runner import slave_machine
+from swarm_bot import slave_machine
 from third_party.mox import mox
 
 

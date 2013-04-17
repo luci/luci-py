@@ -20,8 +20,8 @@ import zipfile
 from common import swarm_constants
 from common import test_request_message
 from common import url_helper
+from swarm_bot import local_test_runner
 from third_party.mox import mox
-from test_runner import local_test_runner
 
 DATA_FILE_REGEX = r'\S*/%s/%s'
 DATA_FOLDER_REGEX = r'\S*/%s'

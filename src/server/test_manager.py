@@ -41,7 +41,7 @@ from server import test_request
 from server import test_runner
 from stats import machine_stats
 from stats import runner_stats
-from test_runner import slave_machine
+from swarm_bot import slave_machine
 
 # The amount of time to wait after recieving a runners last message before
 # considering the runner to have run for too long. Runners that run for too
@@ -74,7 +74,7 @@ _URL_HELPER_SCRIPT = 'url_helper.py'
 _PYTHON_INIT_SCRIPT = '__init__.py'
 
 # Name of directories in source tree and/or on remote machine.
-_TEST_RUNNER_DIR = 'test_runner'
+_TEST_RUNNER_DIR = 'swarm_bot'
 _COMMON_DIR = 'common'
 
 # Maximum value for the come_back field in a response to an idle slave machine.

@@ -18,8 +18,8 @@ import unittest
 
 from common import swarm_constants
 from common import url_helper
+from swarm_bot import slave_machine
 from third_party.mox import mox
-from test_runner import slave_machine
 
 MACHINE_ID_1 = '12345678-12345678-12345678-12345678'
 MACHINE_ID_2 = '87654321-87654321-87654321-87654321'
