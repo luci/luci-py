@@ -15,6 +15,7 @@ import logging
 import os.path
 import urllib
 
+from google.appengine import runtime
 from google.appengine.api import mail
 from google.appengine.api import mail_errors
 from google.appengine.api import users
@@ -698,8 +699,17 @@ class RegisterHandler(webapp2.RequestHandler):
       response = json.dumps(
           test_request_manager.ExecuteRegisterRequest(attributes,
                                                       self.request.host_url))
-    except test_request_message.Error as ex:
-      message = str(ex)
+    except runtime.DeadlineExceededError as e:
+      # If the timeout happened before a runner was assigned there are no
+      # problems. If the timeout occurred after a runner was assigned, that
+      # runner will timeout (since the machine didn't get the details required
+      # to run it) and it will automatically get retried when the machine
+      # "timeout".
+      message = str(e)
+      logging.warning(message)
+      response = 'Error: %s' % message
+    except test_request_message.Error as e:
+      message = str(e)
       logging.exception(message)
       response = 'Error: %s' % message
 
