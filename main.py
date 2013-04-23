@@ -497,7 +497,6 @@ class ContainsHashHandler(acl.ACLRequestHandler):
 
     [1] It does modify the timestamp of the objects.
     """
-    self.CheckToken()
     raw_hash_digests = PayloadToHashes(self, namespace)
     logging.info(
         'Checking namespace %s for %d hash digests',
@@ -556,10 +555,9 @@ class ContainsHashHandler(acl.ACLRequestHandler):
 class GenerateBlobstoreHandler(acl.ACLRequestHandler):
   """Generate an upload url to directly load files into the blobstore."""
   def post(self, namespace, hash_key):
-    token = self.CheckToken()
     self.response.headers['Content-Type'] = 'text/plain'
     url = '/content/store_blobstore/%s/%s/%d/%s?token=%s' % (
-        namespace, hash_key, int(self.is_user), self.access_id, token)
+        namespace, hash_key, int(self.is_user), self.access_id, self.token)
     logging.info('Url: %s', url)
     self.response.out.write(blobstore.create_upload_url(url))
 
@@ -568,6 +566,10 @@ class StoreBlobstoreContentByHashHandler(
     acl.ACLRequestHandler,
     blobstore_handlers.BlobstoreUploadHandler):
   """Assigns the newly stored blobstore entry to the correct hash key."""
+
+  # Requires special processing.
+  enforce_token_on_post = False
+
   def dispatch(self):
     """Disable ACLRequestHandler.dispatch() checks here because the originating
     IP is always an AppEngine IP, which confuses the authentication code.
@@ -579,10 +581,10 @@ class StoreBlobstoreContentByHashHandler(
     # In particular, do not use self.request.remote_addr because the request
     # has as original an AppEngine local IP.
     if is_user == '1':
-      self.CheckUserId(original_access_id, None)
+      self.check_user_id(original_access_id, None)
     else:
-      self.CheckIP(original_access_id)
-    self.CheckToken()
+      self.check_ip(original_access_id)
+    self.enforce_valid_token()
     contents = self.get_uploads('content')
     if not contents:
       # TODO(maruel): Remove, only kept for short term compatibility.
@@ -641,7 +643,6 @@ class StoreBlobstoreContentByHashHandler(
 class StoreContentByHashHandler(acl.ACLRequestHandler):
   """The handler for adding content."""
   def post(self, namespace, hash_key):
-    self.CheckToken()
     # webapp2 doesn't like reading the body if it's empty.
     if self.request.headers.get('content-length'):
       content = self.request.body
@@ -711,7 +712,6 @@ class StoreContentByHashHandler(acl.ACLRequestHandler):
 class RemoveContentByHashHandler(acl.ACLRequestHandler):
   """Removes content by its SHA-1 hash key from the server."""
   def post(self, namespace, hash_key):
-    self.CheckToken()
     entry = GetContentByHash(namespace, hash_key)
     # TODO(maruel): Use namespace='table_%s' % namespace.
     memcache.delete(hash_key, namespace=namespace)

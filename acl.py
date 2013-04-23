@@ -85,18 +85,25 @@ class ACLRequestHandler(webapp2.RequestHandler):
   secret = None
   access_id = None
   is_user = None
+  # Set to False if custom processing is required. In that case, a call to
+  # self.enforce_valid_token() is required inside the post() handler.
+  enforce_token_on_post = True
+  # The value is cached on the request once calculated.
+  token = None
 
   def dispatch(self):
     """Ensures that only users from valid domains can continue, and that users
     from invalid domains receive an error message."""
     current_user = users.get_current_user()
     if current_user:
-      self.CheckUser(current_user)
+      self.check_user(current_user)
     else:
-      self.CheckIP(self.request.remote_addr)
+      self.check_ip(self.request.remote_addr)
+    if self.request.method == 'POST' and self.enforce_token_on_post:
+      self.enforce_valid_token()
     return webapp2.RequestHandler.dispatch(self)
 
-  def CheckIP(self, ip):
+  def check_ip(self, ip):
     """Verifies if the IP is whitelisted."""
     self.access_id = ip
     self.secret = memcache.get(self.access_id, namespace='ip_token')
@@ -113,15 +120,15 @@ class ACLRequestHandler(webapp2.RequestHandler):
       memcache.set(self.access_id, self.secret, namespace='ip_token')
     self.is_user = False
 
-  def CheckUser(self, user):
+  def check_user(self, user):
     """Verifies if the user is whitelisted."""
     domain = user.email().partition('@')[2]
     if not is_valid_domain(domain) and not users.is_current_user_admin():
       logging.warning('Disallowing %s, invalid domain' % user.email())
       self.abort(403, detail='Invalid domain, %s' % domain)
-    return self.CheckUserId(user.user_id() or user.email(), user.email())
+    return self.check_user_id(user.user_id() or user.email(), user.email())
 
-  def CheckUserId(self, user_id, email):
+  def check_user_id(self, user_id, email):
     # user_id() is only set with Google accounts, fallback to the email address
     # otherwise.
     self.access_id = user_id
@@ -142,7 +149,7 @@ class ACLRequestHandler(webapp2.RequestHandler):
       memcache.set(self.access_id, self.secret, namespace='user_token')
     self.is_user = True
 
-  def GetToken(self, offset, now):
+  def get_token(self, offset, now):
     """Returns a valid token for the current user.
 
     |offset| is the offset versus current time of day, in hours. It should be 0
@@ -156,7 +163,7 @@ class ACLRequestHandler(webapp2.RequestHandler):
     # Keep 8 bytes of entropy.
     return m.hexdigest()[:16]
 
-  def CheckToken(self):
+  def enforce_valid_token(self):
     """Ensures the token is valid."""
     token = self.request.get('token')
     if not token:
@@ -164,9 +171,9 @@ class ACLRequestHandler(webapp2.RequestHandler):
       self.abort(403)
 
     now = time.time()
-    token_0 = self.GetToken(0, now)
+    token_0 = self.get_token(0, now)
     if token != token_0:
-      token_1 = self.GetToken(-1, now)
+      token_1 = self.get_token(-1, now)
       if token != token_1:
         logging.info(
             'Token was invalid:\nGot %s\nExpected %s or %s\nAccessId: %s\n'
@@ -174,6 +181,7 @@ class ACLRequestHandler(webapp2.RequestHandler):
             token, token_0, token_1, self.access_id,
             binascii.hexlify(self.secret))
         self.abort(403, detail='Invalid token.')
+    self.token = token
     return token
 
 
@@ -189,11 +197,11 @@ class RestrictedWhitelistIPHandler(ACLRequestHandler):
       '<form name="whitelist" method="post">'
       'Comment: <input type="text" name="comment" /><br />'
       '<input type="hidden" name="token" value="%s" />'
-      '<input type="submit" value="SUBMIT" />' % self.GetToken(0, time.time())))
+      '<input type="submit" value="SUBMIT" />' %
+        self.get_token(0, time.time())))
     self.response.headers['Content-Type'] = 'text/html'
 
   def post(self):
-    self.CheckToken()
     ip = self.request.remote_addr
     comment = self.request.get('comment')
     item = WhitelistedIP.gql('WHERE ip = :1', ip).get()
@@ -219,11 +227,11 @@ class RestrictedWhitelistDomainHandler(ACLRequestHandler):
       '<form name="whitelist" method="post">'
       'Domain: <input type="text" name="domain" /><br />'
       '<input type="hidden" name="token" value="%s" />'
-      '<input type="submit" value="SUBMIT" />' % self.GetToken(0, time.time())))
+      '<input type="submit" value="SUBMIT" />' %
+        self.get_token(0, time.time())))
     self.response.headers['Content-Type'] = 'text/html'
 
   def post(self):
-    self.CheckToken()
     domain = self.request.get('domain')
     if not is_valid_domain(domain):
       WhitelistedDomain(key_name=domain).put()
@@ -237,7 +245,7 @@ class GetTokenHandler(ACLRequestHandler):
   """Returns the token."""
   def get(self):
     self.response.headers['Content-Type'] = 'text/plain'
-    token = self.GetToken(0, time.time())
+    token = self.get_token(0, time.time())
     self.response.out.write(token)
     logging.info(
         'Generated %s\nAccessId: %s\nSecret: %s',
