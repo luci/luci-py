@@ -99,11 +99,13 @@ class AppTestSignedIn(unittest.TestCase):
     super(AppTestSignedIn, self).setUp()
     self.namespace = 'temporary' + str(long(time.time()))
     if AppTestSignedIn.RPC is None:
-      if not ISOLATE_SERVER_URL.endswith('.com'):
+      if not ISOLATE_SERVER_URL.rstrip('/').endswith('.com'):
         # Cheap check for local server.
+        print('Using test server: %s' % ISOLATE_SERVER_URL)
         AppTestSignedIn.RPC = upload.GetRpcServer(
             ISOLATE_SERVER_URL, 'test@example.com')
       else:
+        print('Using real server')
         AppTestSignedIn.EMAIL = upload.GetEmail(
             "Email (login for uploading to %s)" %
             ISOLATE_SERVER_URL)
@@ -111,6 +113,8 @@ class AppTestSignedIn(unittest.TestCase):
             ISOLATE_SERVER_URL, ISOLATE_SERVER_URL, self.EMAIL)
         AppTestSignedIn.RPC = upload.HttpRpcServer(
             ISOLATE_SERVER_URL, AppTestSignedIn.CREDENTIALS.GetUserCredentials)
+    self.token = self.fetch(
+        ISOLATE_SERVER_URL + 'content/get_token', payload=None)
 
   def fetch(self, url, payload, content_type='application/octet-stream'):
     last_error = Exception()
@@ -136,8 +140,8 @@ class AppTestSignedIn(unittest.TestCase):
     """Removes the hash key from the server and verify it is deleted."""
     # Remove the given hash content, if it already exists.
     response = self.fetch(
-        ISOLATE_SERVER_URL + 'content/remove/%s/%s' % (
-            self.namespace, hash_key),
+        ISOLATE_SERVER_URL + 'content/remove/%s/%s?token=%s' % (
+            self.namespace, hash_key, self.token),
         payload='')
     if response != '':
       self.assertEqual(
@@ -146,11 +150,18 @@ class AppTestSignedIn(unittest.TestCase):
     else:
       self.assertEqual('', response)
 
-    # Make sure we can't get the content, since it was deleted.
-    response = self.fetch(
-        ISOLATE_SERVER_URL + 'content/contains/%s' % self.namespace,
-        payload=binascii.unhexlify(hash_key))
-    contain_response = response.decode()
+    # Make sure we can't get the content, since it was deleted. Explicitly deal
+    # with internal inconsistency.
+    for i in range(MAX_URL_ATTEMPTS):
+      response = self.fetch(
+          ISOLATE_SERVER_URL + 'content/contains/%s?token=%s' %
+            (self.namespace, self.token),
+          payload=binascii.unhexlify(hash_key))
+      contain_response = response.decode()
+      if chr(0) == contain_response:
+        break
+      if i != (MAX_URL_ATTEMPTS - 1):
+        time.sleep(0.5)
     self.assertEqual(chr(0), contain_response)
 
   def UploadHashAndRetrieveHelper(self, hash_key, hash_contents, priority=1):
@@ -161,27 +172,37 @@ class AppTestSignedIn(unittest.TestCase):
       # Query the server for a direct upload url.
       response = self.fetch(
           ISOLATE_SERVER_URL +
-          'content/generate_blobstore_url/%s/%s' % (self.namespace, hash_key),
-          payload=None)
+          'content/generate_blobstore_url/%s/%s?token=%s' %
+            (self.namespace, hash_key, self.token),
+          payload='')
       upload_url = response
       self.assertTrue(upload_url)
 
       content_type, body = encode_multipart_formdata(
-          [],
+          [('token', self.token)],
           [('hash_contents', 'hash_contents', hash_contents)])
       response = self.fetch(upload_url, payload=body, content_type=content_type)
     else:
       response = self.fetch(
-          ISOLATE_SERVER_URL + 'content/store/%s/%s?priority=%d' % (
-              self.namespace, hash_key, priority),
+          ISOLATE_SERVER_URL + 'content/store/%s/%s?priority=%d&token=%s' % (
+              self.namespace, hash_key, priority, self.token),
           payload=hash_contents)
     self.assertEqual('Content saved.', response)
 
     # Verify the object is present.
-    response = self.fetch(
-        ISOLATE_SERVER_URL + 'content/contains/%s' % self.namespace,
-        payload=binascii.unhexlify(hash_key))
-    contains_response = response.decode()
+    for i in range(MAX_URL_ATTEMPTS):
+      response = self.fetch(
+          ISOLATE_SERVER_URL + 'content/contains/%s?token=%s' %
+            (self.namespace, self.token),
+          payload=binascii.unhexlify(hash_key))
+      contains_response = response.decode()
+      if contains_response == chr(1):
+        break
+      # GAE is exposing its internal data inconsistency.
+      if i != (MAX_URL_ATTEMPTS - 1):
+        print('Visible datastore inconsistency, retrying.')
+        time.sleep(0.5)
+
     self.assertEqual(chr(1), contains_response)
 
     # Retrieve the object.
@@ -280,9 +301,21 @@ class AppTestSignedOut(unittest.TestCase):
   def setUp(self):
     super(AppTestSignedOut, self).setUp()
     self.namespace = 'temporary' + str(long(time.time()))
+    self.token = None
+    try:
+      self.token = urllib2.urlopen(
+          ISOLATE_SERVER_URL + 'content/get_token').read()
+    except urllib2.HTTPError:
+      pass
+    if self.token:
+      print('Testing with whitelisted IP')
+    else:
+      print('Testing unauthencated')
 
   @staticmethod
   def fetch(url, payload):
+    # Do not use upload's implementation since the goal here is to try out
+    # without google account authentication.
     request = urllib2.Request(url, data=payload)
     request.add_header('content-type', 'application/octet-stream')
     request.add_header('content-length', len(payload or ''))
@@ -296,26 +329,50 @@ class AppTestSignedOut(unittest.TestCase):
 
   def testContains(self):
     hash_key = hashlib.sha1().hexdigest()
-    response = self.fetch(
-        ISOLATE_SERVER_URL + 'content/contains/%s' % self.namespace,
-        payload=binascii.unhexlify(hash_key))
-    self.assertEqual(401, response)
+    if self.token:
+      url = ISOLATE_SERVER_URL + 'content/contains/%s?token=%s' % (
+          self.namespace, self.token)
+    else:
+      url = ISOLATE_SERVER_URL + 'content/contains/%s' % self.namespace
+
+    response = self.fetch(url, payload=binascii.unhexlify(hash_key))
+    if self.token:
+      self.assertEqual('\x00', response)
+    else:
+      self.assertEqual(401, response)
 
   def testGetBlobStoreUrl(self):
     hash_key = hashlib.sha1().hexdigest()
-    response = self.fetch(
-        ISOLATE_SERVER_URL +
-        'content/generate_blobstore_url/%s/%s' % (self.namespace, hash_key),
-        payload=None)
-    self.assertEqual(401, response)
+    if self.token:
+      url = ISOLATE_SERVER_URL + (
+          'content/generate_blobstore_url/%s/%s?token=%s' % (
+            self.namespace, hash_key, self.token))
+    else:
+      url = ISOLATE_SERVER_URL + 'content/generate_blobstore_url/%s/%s' % (
+          self.namespace, hash_key)
+
+    response = self.fetch(url, payload='')
+    if self.token:
+      # It returns an url.
+      self.assertTrue(
+          response.startswith(ISOLATE_SERVER_URL + '_ah/upload/'), response)
+    else:
+      self.assertEqual(401, response)
 
   def testStore(self):
     hash_key = hashlib.sha1().hexdigest()
-    response = self.fetch(
-          ISOLATE_SERVER_URL + 'content/store/%s/%s' % (
-              self.namespace, hash_key),
-          payload='')
-    self.assertEqual(401, response)
+    if self.token:
+      url = ISOLATE_SERVER_URL + 'content/store/%s/%s?token=%s' % (
+              self.namespace, hash_key, self.token)
+    else:
+      url = ISOLATE_SERVER_URL + 'content/store/%s/%s' % (
+              self.namespace, hash_key)
+
+    response = self.fetch(url, payload='')
+    if self.token:
+      self.assertEqual('Content saved.', response)
+    else:
+      self.assertEqual(401, response)
 
 
 if __name__ == '__main__':

@@ -806,7 +806,10 @@ def CreateApplication():
       webapp2.Route(
           r'/restricted/taskqueue/verify' + namespace_key,
           RestrictedVerifyWorkerHandler),
-      webapp2.Route(r'/restricted/whitelist', acl.RestrictedWhitelistHandler),
+      webapp2.Route(
+          r'/restricted/whitelistip', acl.RestrictedWhitelistIPHandler),
+      webapp2.Route(
+          r'/restricted/whitelistdomain', acl.RestrictedWhitelistDomainHandler),
 
       webapp2.Route(
           r'/content/contains' + namespace,

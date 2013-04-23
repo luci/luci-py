@@ -18,19 +18,12 @@ from google.appengine.ext import db
 # pylint: enable=E0611,F0401
 
 
-# The domains that are allowed to access this application.
-VALID_DOMAINS = (
-    'chromium.org',
-    'google.com',
-)
-
-
-def htmlwrap(text):
-  """Wraps text in minimal HTML tags."""
-  return '<html><body>%s</body></html>' % text
+### Models
 
 
 class User(db.Model):
+  timestamp = db.DateTimeProperty(auto_now=True)
+
   secret = db.ByteStringProperty(indexed=False)
   # For information purpose only.
   email = db.StringProperty(indexed=False)
@@ -38,12 +31,52 @@ class User(db.Model):
 
 class WhitelistedIP(db.Model):
   """Items where the IP address is allowed."""
+  # Logs who made the change.
+  timestamp = db.DateTimeProperty(auto_now=True)
+  who = db.UserProperty(auto_current_user=True)
+
   # The IP of the machine to whitelist. Can be either IPv4 or IPv6.
   ip = db.StringProperty()
 
   # Is only for maintenance purpose.
   comment = db.StringProperty(indexed=False)
   secret = db.ByteStringProperty(indexed=False)
+
+
+class WhitelistedDomain(db.Model):
+  """Domain from which users can use the isolate server.
+
+  The key is the domain name, like 'example.com'.
+  """
+  # Logs who made the change.
+  timestamp = db.DateTimeProperty(auto_now=True)
+  who = db.UserProperty(auto_current_user=True)
+
+
+### Utility
+
+
+def htmlwrap(text):
+  """Wraps text in minimal HTML tags."""
+  return '<html><body>%s</body></html>' % text
+
+
+def is_valid_domain(domain):
+  """Returns True if the domain is valid.
+
+  Deleting a domain by deleting the corresponding WhitelistedDomain requires
+  clearing memcache.
+  """
+  if memcache.get(domain, namespace='whitelisted_domain'):
+    return True
+  if WhitelistedDomain.get_by_key_name(domain):
+    memcache.set(domain, True, namespace='whitelisted_domain')
+    return True
+  # Do not save negative result.
+  return False
+
+
+### Handlers
 
 
 class ACLRequestHandler(webapp2.RequestHandler):
@@ -83,7 +116,7 @@ class ACLRequestHandler(webapp2.RequestHandler):
   def CheckUser(self, user):
     """Verifies if the user is whitelisted."""
     domain = user.email().partition('@')[2]
-    if domain not in VALID_DOMAINS:
+    if not is_valid_domain(domain) and not users.is_current_user_admin():
       logging.warning('Disallowing %s, invalid domain' % user.email())
       self.abort(403, detail='Invalid domain, %s' % domain)
     return self.CheckUserId(user.user_id() or user.email(), user.email())
@@ -140,20 +173,24 @@ class ACLRequestHandler(webapp2.RequestHandler):
               'Secret: %s',
             token, token_0, token_1, self.access_id,
             binascii.hexlify(self.secret))
-        self.abort(403)
+        self.abort(403, detail='Invalid token.')
     return token
 
 
-class RestrictedWhitelistHandler(ACLRequestHandler):
-  """Whitelists the current IP."""
+class RestrictedWhitelistIPHandler(ACLRequestHandler):
+  """Whitelists the current IP.
+
+  This handler must have login:admin in app.yaml.
+  """
   def get(self):
     # The user must authenticate with a user credential before being able to
-    # whitelist the IP.
+    # whitelist the IP. This is done with login:admin.
     self.response.out.write(htmlwrap(
       '<form name="whitelist" method="post">'
       'Comment: <input type="text" name="comment" /><br />'
       '<input type="hidden" name="token" value="%s" />'
       '<input type="submit" value="SUBMIT" />' % self.GetToken(0, time.time())))
+    self.response.headers['Content-Type'] = 'text/html'
 
   def post(self):
     self.CheckToken()
@@ -167,10 +204,36 @@ class RestrictedWhitelistHandler(ACLRequestHandler):
       return
     WhitelistedIP(ip=ip, comment=comment).put()
     self.response.out.write(htmlwrap('Success: %s' % ip))
+    self.response.headers['Content-Type'] = 'text/html'
+
+
+class RestrictedWhitelistDomainHandler(ACLRequestHandler):
+  """Whitelists a domain.
+
+  This handler must have login:admin in app.yaml.
+  """
+  def get(self):
+    # The user must authenticate with a user credential before being able to
+    # whitelist the IP. This is done with login:admin.
+    self.response.out.write(htmlwrap(
+      '<form name="whitelist" method="post">'
+      'Domain: <input type="text" name="domain" /><br />'
+      '<input type="hidden" name="token" value="%s" />'
+      '<input type="submit" value="SUBMIT" />' % self.GetToken(0, time.time())))
+    self.response.headers['Content-Type'] = 'text/html'
+
+  def post(self):
+    self.CheckToken()
+    domain = self.request.get('domain')
+    if not is_valid_domain(domain):
+      WhitelistedDomain(key_name=domain).put()
+      self.response.out.write(htmlwrap('Success: %s' % domain))
+    else:
+      self.response.out.write(htmlwrap('Already present: %s' % domain))
+    self.response.headers['Content-Type'] = 'text/html'
 
 
 def bootstrap():
+  """Adds example.com as a valid domain when testing."""
   if os.environ['SERVER_SOFTWARE'].startswith('Development'):
-    # Add example.com as a valid domain when testing.
-    global VALID_DOMAINS
-    VALID_DOMAINS = ('example.com',) + VALID_DOMAINS
+    WhitelistedDomain.get_or_insert(key_name='example.com')
