@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # Copyright (c) 2012 The Chromium Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
@@ -7,7 +6,6 @@ import binascii
 import datetime
 import hashlib
 import logging
-import os
 import re
 import time
 import zlib
@@ -20,12 +18,13 @@ from google.appengine import runtime
 from google.appengine.api import datastore_errors
 from google.appengine.api import files
 from google.appengine.api import memcache
-from google.appengine.api import users
 from google.appengine.api import taskqueue
 from google.appengine.ext import blobstore
 from google.appengine.ext import db
 from google.appengine.ext.webapp import blobstore_handlers
 # pylint: enable=E0611,F0401
+
+import acl
 
 # The maximum number of entries that can be queried in a single request.
 MAX_KEYS_PER_CALL = 1000
@@ -39,18 +38,6 @@ DATASTORE_TIME_TO_LIVE_IN_DAYS = 7
 
 # The maximum number of items to delete at a time.
 ITEMS_TO_DELETE_ASYNC = 100
-
-# The domains that are allowed to access this application.
-VALID_DOMAINS = (
-    'chromium.org',
-    'google.com',
-)
-
-
-class User(db.Model):
-  secret = db.ByteStringProperty(indexed=False)
-  # For information purpose only.
-  email = db.StringProperty(indexed=False)
 
 
 class ContentNamespace(db.Model):
@@ -106,16 +93,6 @@ class ContentEntry(db.Model):
     that the SHA-1 doesn't match.
     """
     self.parent_key().name().endswith(('bzip2', 'gzip'))
-
-
-class WhitelistedIP(db.Model):
-  """Items where the IP address is allowed."""
-  # The IP of the machine to whitelist. Can be either IPv4 or IPv6.
-  ip = db.StringProperty()
-
-  # Is only for maintenance purpose.
-  comment = db.StringProperty(indexed=False)
-  secret = db.ByteStringProperty(indexed=False)
 
 
 def GetContentNamespaceKey(namespace):
@@ -199,104 +176,6 @@ def GetHashAlgo(_namespace):
   """Returns an instance of the hashing algorithm for the namespace."""
   # TODO(maruel): Support other algorithms.
   return hashlib.sha1()
-
-
-class ACLRequestHandler(webapp2.RequestHandler):
-  """Adds ACL to the request handler to ensure only valid users can use
-  the handlers."""
-  secret = None
-  access_id = None
-  is_user = None
-
-  def dispatch(self):
-    """Ensures that only users from valid domains can continue, and that users
-    from invalid domains receive an error message."""
-    current_user = users.get_current_user()
-    if current_user:
-      self.CheckUser(current_user)
-    else:
-      self.CheckIP(self.request.remote_addr)
-    return webapp2.RequestHandler.dispatch(self)
-
-  def CheckIP(self, ip):
-    """Verifies if the IP is whitelisted."""
-    self.access_id = ip
-    self.secret = memcache.get(self.access_id, namespace='ip_token')
-    if not self.secret:
-      whitelisted = WhitelistedIP.all().filter('ip', self.access_id).get()
-      if not whitelisted:
-        logging.warning('Blocking IP %s', self.request.remote_addr)
-        self.abort(401, detail='Please login first.')
-      self.secret = whitelisted.secret
-      if not self.secret:
-        self.secret = os.urandom(8)
-        whitelisted.secret = self.secret
-        whitelisted.put()
-      memcache.set(self.access_id, self.secret, namespace='ip_token')
-    self.is_user = False
-
-  def CheckUser(self, user):
-    """Verifies if the user is whitelisted."""
-    domain = user.email().partition('@')[2]
-    if domain not in VALID_DOMAINS:
-      logging.warning('Disallowing %s, invalid domain' % user.email())
-      self.abort(403, detail='Invalid domain, %s' % domain)
-    return self.CheckUserId(user.user_id() or user.email(), user.email())
-
-  def CheckUserId(self, user_id, email):
-    # user_id() is only set with Google accounts, fallback to the email address
-    # otherwise.
-    self.access_id = user_id
-    self.secret = memcache.get(self.access_id, namespace='user_token')
-    if not self.secret:
-      user_obj = User.get_by_key_name(self.access_id)
-      if not user_obj:
-        if not email:
-          logging.warning('Blocking user %s', user_id)
-          self.abort(403, detail='Please login first.')
-        user_obj = User.get_or_insert(
-            self.access_id, secret=os.urandom(8), email=email)
-      if not user_obj.secret:
-        # Should not happen but cope with it.
-        user_obj.secret = os.urandom(8)
-        user_obj.put()
-      self.secret = user_obj.secret
-      memcache.set(self.access_id, self.secret, namespace='user_token')
-    self.is_user = True
-
-  def GetToken(self, offset, now):
-    """Returns a valid token for the current user.
-
-    |offset| is the offset versus current time of day, in hours. It should be 0
-    or -1.
-    """
-    m = hashlib.sha1(self.secret)
-    m.update(self.access_id)
-    # Rotate every hour.
-    this_hour = int(now / 3600.)
-    m.update(str(this_hour + offset))
-    # Keep 8 bytes of entropy.
-    return m.hexdigest()[:16]
-
-  def CheckToken(self):
-    """Ensures the token is valid."""
-    token = self.request.get('token')
-    if not token:
-      logging.info('Token was not provided')
-      self.abort(403)
-
-    now = time.time()
-    token_0 = self.GetToken(0, now)
-    if token != token_0:
-      token_1 = self.GetToken(-1, now)
-      if token != token_1:
-        logging.info(
-            'Token was invalid:\nGot %s\nExpected %s or %s\nAccessId: %s\n'
-              'Secret: %s',
-            token, token_0, token_1, self.access_id,
-            binascii.hexlify(self.secret))
-        self.abort(403)
-    return token
 
 
 def SplitPayload(request, chunk_size, max_chunks):
@@ -598,38 +477,10 @@ class RestrictedVerifyWorkerHandler(webapp2.RequestHandler):
       entry.put()
 
 
-def htmlwrap(text):
-  """Wraps text in minimal HTML tags."""
-  return '<html><body>%s</body></html>' % text
-
-
-class RestrictedWhitelistHandler(webapp2.RequestHandler):
-  """Whitelists the current IP."""
-  def get(self):
-    self.response.out.write(htmlwrap(
-      '<form name="whitelist" method="post">'
-      'Comment: <input type="text" name="comment" /><br />'
-      '<input type="hidden" name="token" value="%s" />'
-      '<input type="submit" value="SUBMIT" />' % self.GetToken(0, time.time())))
-
-  def post(self):
-    self.CheckToken()
-    ip = self.request.remote_addr
-    comment = self.request.get('comment')
-    item = WhitelistedIP.gql('WHERE ip = :1', ip).get()
-    if item:
-      item.comment = comment or item.comment
-      item.put()
-      self.response.out.write(htmlwrap('Already present: %s' % ip))
-      return
-    WhitelistedIP(ip=ip, comment=comment).put()
-    self.response.out.write(htmlwrap('Success: %s' % ip))
-
-
 ### Non-restricted handlers
 
 
-class ContainsHashHandler(ACLRequestHandler):
+class ContainsHashHandler(acl.ACLRequestHandler):
   """Returns the presence of each hash key in the payload as a binary string.
 
   For each SHA-1 hash key in the request body in binary form, a corresponding
@@ -697,7 +548,7 @@ class ContainsHashHandler(ACLRequestHandler):
                         'objects may get deleted sooner than intended.\n%s', e)
 
 
-class GenerateBlobstoreHandler(ACLRequestHandler):
+class GenerateBlobstoreHandler(acl.ACLRequestHandler):
   """Generate an upload url to directly load files into the blobstore."""
   def post(self, namespace, hash_key):
     token = self.CheckToken()
@@ -709,7 +560,7 @@ class GenerateBlobstoreHandler(ACLRequestHandler):
 
 
 class StoreBlobstoreContentByHashHandler(
-    ACLRequestHandler,
+    acl.ACLRequestHandler,
     blobstore_handlers.BlobstoreUploadHandler):
   """Assigns the newly stored blobstore entry to the correct hash key."""
   def dispatch(self):
@@ -782,7 +633,7 @@ class StoreBlobstoreContentByHashHandler(
     self.response.out.write('Content saved.')
 
 
-class StoreContentByHashHandler(ACLRequestHandler):
+class StoreContentByHashHandler(acl.ACLRequestHandler):
   """The handler for adding content."""
   def post(self, namespace, hash_key):
     self.CheckToken()
@@ -852,7 +703,7 @@ class StoreContentByHashHandler(ACLRequestHandler):
     self.response.out.write('Content saved.')
 
 
-class RemoveContentByHashHandler(ACLRequestHandler):
+class RemoveContentByHashHandler(acl.ACLRequestHandler):
   """Removes content by its SHA-1 hash key from the server."""
   def post(self, namespace, hash_key):
     self.CheckToken()
@@ -871,7 +722,7 @@ class RemoveContentByHashHandler(ACLRequestHandler):
     logging.info('Deleted ContentEntry')
 
 
-class RetrieveContentByHashHandler(ACLRequestHandler,
+class RetrieveContentByHashHandler(acl.ACLRequestHandler,
                                    blobstore_handlers.BlobstoreDownloadHandler):
   """The handlers for retrieving contents by its SHA-1 hash |hash_key|."""
   def get(self, namespace, hash_key):  #pylint: disable=W0221
@@ -899,7 +750,7 @@ class RetrieveContentByHashHandler(ACLRequestHandler,
       self.response.out.write(entry.content)
 
 
-class GetTokenHandler(ACLRequestHandler):
+class GetTokenHandler(acl.ACLRequestHandler):
   """Returns the token."""
   def get(self):
     self.response.headers['Content-Type'] = 'text/plain'
@@ -925,10 +776,7 @@ class WarmupHandler(webapp2.RequestHandler):
 
 
 def CreateApplication():
-  if os.environ['SERVER_SOFTWARE'].startswith('Development') :
-    # Add example.com as a valid domain when testing.
-    global VALID_DOMAINS
-    VALID_DOMAINS = ('example.com',) + VALID_DOMAINS
+  acl.bootstrap()
 
   # Namespace can be letters and numbers.
   namespace = r'/<namespace:[a-z0-9A-Z\-]+>'
@@ -958,7 +806,7 @@ def CreateApplication():
       webapp2.Route(
           r'/restricted/taskqueue/verify' + namespace_key,
           RestrictedVerifyWorkerHandler),
-      webapp2.Route(r'/restricted/whitelist', RestrictedWhitelistHandler),
+      webapp2.Route(r'/restricted/whitelist', acl.RestrictedWhitelistHandler),
 
       webapp2.Route(
           r'/content/contains' + namespace,
