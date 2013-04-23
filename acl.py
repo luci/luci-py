@@ -233,6 +233,17 @@ class RestrictedWhitelistDomainHandler(ACLRequestHandler):
     self.response.headers['Content-Type'] = 'text/html'
 
 
+class GetTokenHandler(ACLRequestHandler):
+  """Returns the token."""
+  def get(self):
+    self.response.headers['Content-Type'] = 'text/plain'
+    token = self.GetToken(0, time.time())
+    self.response.out.write(token)
+    logging.info(
+        'Generated %s\nAccessId: %s\nSecret: %s',
+        token, self.access_id, binascii.hexlify(self.secret))
+
+
 def bootstrap():
   """Adds example.com as a valid domain when testing."""
   if os.environ['SERVER_SOFTWARE'].startswith('Development'):

@@ -7,7 +7,6 @@ import datetime
 import hashlib
 import logging
 import re
-import time
 import zlib
 
 # The app engine headers are located locally, so don't worry about not finding
@@ -38,6 +37,9 @@ DATASTORE_TIME_TO_LIVE_IN_DAYS = 7
 
 # The maximum number of items to delete at a time.
 ITEMS_TO_DELETE_ASYNC = 100
+
+
+#### Models
 
 
 class ContentNamespace(db.Model):
@@ -123,6 +125,9 @@ def GetContentByHash(namespace, hash_key):
     pass
 
   return None
+
+
+### Utility
 
 
 def StoreValueInBlobstore(value):
@@ -750,17 +755,6 @@ class RetrieveContentByHashHandler(acl.ACLRequestHandler,
       self.response.out.write(entry.content)
 
 
-class GetTokenHandler(acl.ACLRequestHandler):
-  """Returns the token."""
-  def get(self):
-    self.response.headers['Content-Type'] = 'text/plain'
-    token = self.GetToken(0, time.time())
-    self.response.out.write(token)
-    logging.info(
-        'Generated %s\nAccessId: %s\nSecret: %s',
-        token, self.access_id, binascii.hexlify(self.secret))
-
-
 class RootHandler(webapp2.RequestHandler):
   """Tells the user to RTM."""
   def get(self):
@@ -817,7 +811,7 @@ def CreateApplication():
       webapp2.Route(
           r'/content/generate_blobstore_url' + namespace_key,
           GenerateBlobstoreHandler),
-      webapp2.Route(r'/content/get_token', GetTokenHandler),
+      webapp2.Route(r'/content/get_token', acl.GetTokenHandler),
       webapp2.Route(
           r'/content/store' + namespace_key, StoreContentByHashHandler),
       webapp2.Route(
