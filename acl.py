@@ -6,6 +6,7 @@ import base64
 import hashlib
 import logging
 import os
+import re
 import time
 
 # The app engine headers are located locally, so don't worry about not finding
@@ -27,12 +28,17 @@ class GlobalSecret(db.Model):
 
 
 class WhitelistedIP(db.Model):
-  """Items where the IP address is allowed."""
+  """Items where the IP address is allowed.
+
+  The key is the ip as returned by ip_to_str(*parse_ip(ip)).
+  """
   # Logs who made the change.
   timestamp = db.DateTimeProperty(auto_now=True)
   who = db.UserProperty(auto_current_user=True)
 
-  # The IP of the machine to whitelist. Can be either IPv4 or IPv6.
+  # The textual representation of the IP of the machine to whitelist. Not used
+  # in practice, just there since the canonical representation is hard to make
+  # sense of.
   ip = db.StringProperty()
 
   # Is only for maintenance purpose.
@@ -55,6 +61,44 @@ class WhitelistedDomain(db.Model):
 def htmlwrap(text):
   """Wraps text in minimal HTML tags."""
   return '<html><body>%s</body></html>' % text
+
+
+def parse_ip(ipstr):
+  """Returns a long number representing the IP and its type, 'v4' or 'v6'.
+
+  This works around potentially different representations of the same value,
+  like 1.1.1.1 vs 1.01.1.1 or hex case difference in IPv6.
+  """
+  if '.' in ipstr:
+    # IPv4.
+    try:
+      values = [int(i) for i in ipstr.split('.')]
+    except ValueError:
+      return None, None
+    if len(values) != 4 or not all(0 <= i <= 255 for i in values):
+      return None, None
+    factor = 256
+    iptype = 'v4'
+  else:
+    # IPv6.
+    try:
+      values = [int(i, 16) for i in ipstr.split(':')]
+    except ValueError:
+      return None, None
+    if len(values) != 8 or not all(0 <= i <= 65535 for i in values):
+      return None, None
+    factor = 65536
+    iptype = 'v6'
+  value = 0L
+  for i in values:
+    value = value * factor + i
+  return iptype, value
+
+
+def ip_to_str(iptype, ipvalue):
+  if not iptype:
+    return None
+  return '%s-%d' % (iptype, ipvalue)
 
 
 def is_valid_domain(domain):
@@ -146,9 +190,14 @@ class ACLRequestHandler(webapp2.RequestHandler):
     self.access_id = ip
     valid = memcache.get(self.access_id, namespace='ip_token')
     if not valid:
-      whitelisted = WhitelistedIP.all().filter('ip', self.access_id).get()
+      iptype, ipvalue = parse_ip(ip)
+      whitelisted = WhitelistedIP.get_by_key_name(ip_to_str(iptype, ipvalue))
       if not whitelisted:
-        logging.warning('Blocking IP %s', self.request.remote_addr)
+        # Fallback during convertion.
+        # TODO(maruel): TBD.
+        whitelisted = WhitelistedIP.all().filter('ip', ip).get()
+      if not whitelisted:
+        logging.warning('Blocking IP %s', ip)
         self.abort(401, detail='Please login first.')
       # Performance enhancement.
       memcache.set(self.access_id, True, namespace='ip_token')
@@ -194,24 +243,27 @@ class RestrictedWhitelistIPHandler(ACLRequestHandler):
     # The user must authenticate with a user credential before being able to
     # whitelist the IP. This is done with login:admin.
     self.response.out.write(htmlwrap(
-      '<form name="whitelist" method="post">'
-      'Comment: <input type="text" name="comment" /><br />'
-      '<input type="hidden" name="token" value="%s" />'
-      '<input type="submit" value="SUBMIT" />' %
-        self.get_token(0, time.time())))
+      ('<form name="whitelist" method="post">'
+       'IP: <input type="text" name="ip" value="%s" /><br />'
+       'Comment: <input type="text" name="comment" /><br />'
+       '<input type="hidden" name="token" value="%s" />'
+       '<input type="submit" value="SUBMIT" />') %
+          (self.request.remote_addr, self.get_token(0, time.time()))))
     self.response.headers['Content-Type'] = 'text/html'
 
   def post(self):
-    ip = self.request.remote_addr
+    ip = self.request.get('ip')
     comment = self.request.get('comment')
-    item = WhitelistedIP.gql('WHERE ip = :1', ip).get()
+    key = ip_to_str(*parse_ip(ip))
+    item = WhitelistedIP.get_by_key_name(key)
     if item:
       item.comment = comment or item.comment
+      item.ip = ip
       item.put()
       self.response.out.write(htmlwrap('Already present: %s' % ip))
-      return
-    WhitelistedIP(ip=ip, comment=comment).put()
-    self.response.out.write(htmlwrap('Success: %s' % ip))
+    else:
+      WhitelistedIP(key_name=key, ip=ip, comment=comment).put()
+      self.response.out.write(htmlwrap('Success: %s' % ip))
     self.response.headers['Content-Type'] = 'text/html'
 
 
@@ -233,6 +285,8 @@ class RestrictedWhitelistDomainHandler(ACLRequestHandler):
 
   def post(self):
     domain = self.request.get('domain')
+    if not re.match(r'^[a-z\.\-]+$', domain):
+      self.abort(403, 'Invalid domain format')
     if not is_valid_domain(domain):
       WhitelistedDomain(key_name=domain).put()
       self.response.out.write(htmlwrap('Success: %s' % domain))
