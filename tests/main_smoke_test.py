@@ -18,6 +18,7 @@ import logging
 import sys
 import time
 import unittest
+import urllib
 import urllib2
 import zlib
 
@@ -113,8 +114,8 @@ class AppTestSignedIn(unittest.TestCase):
             ISOLATE_SERVER_URL, ISOLATE_SERVER_URL, self.EMAIL)
         AppTestSignedIn.RPC = upload.HttpRpcServer(
             ISOLATE_SERVER_URL, AppTestSignedIn.CREDENTIALS.GetUserCredentials)
-    self.token = self.fetch(
-        ISOLATE_SERVER_URL + 'content/get_token', payload=None)
+    self.token = urllib.quote(
+        self.fetch(ISOLATE_SERVER_URL + 'content/get_token', payload=None))
 
   def fetch(self, url, payload, content_type='application/octet-stream'):
     last_error = Exception()
@@ -289,10 +290,13 @@ class AppTestSignedIn(unittest.TestCase):
   def testGetToken(self):
     response1 = self.fetch(
         ISOLATE_SERVER_URL + 'content/get_token', payload=None)
-    self.assertEqual(16, len(response1))
+    # The length can vary, but it is a truncated base64 of a sha1 to 16 chars +
+    # '-' + epoch in hours, so it's 23 chars until January 2084. If this code is
+    # still used by 2084, maruel is impressed.
+    self.assertEqual(23, len(response1), response1)
     response2 = self.fetch(
         ISOLATE_SERVER_URL + 'content/get_token', payload=None)
-    self.assertEqual(16, len(response2))
+    self.assertEqual(23, len(response2), response2)
     # There's a small chance the responses differ so do not assert they are
     # equal even if they should in practice.
 
@@ -303,8 +307,8 @@ class AppTestSignedOut(unittest.TestCase):
     self.namespace = 'temporary' + str(long(time.time()))
     self.token = None
     try:
-      self.token = urllib2.urlopen(
-          ISOLATE_SERVER_URL + 'content/get_token').read()
+      self.token = urllib.quote(
+          urllib2.urlopen(ISOLATE_SERVER_URL + 'content/get_token').read())
     except urllib2.HTTPError:
       pass
     if self.token:

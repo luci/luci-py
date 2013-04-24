@@ -557,7 +557,11 @@ class GenerateBlobstoreHandler(acl.ACLRequestHandler):
   def post(self, namespace, hash_key):
     self.response.headers['Content-Type'] = 'text/plain'
     url = '/content/store_blobstore/%s/%s/%d/%s?token=%s' % (
-        namespace, hash_key, int(self.is_user), self.access_id, self.token)
+        namespace,
+        hash_key,
+        int(self.is_user),
+        self.access_id,
+        self.request.get('token'))
     logging.info('Url: %s', url)
     self.response.out.write(blobstore.create_upload_url(url))
 
@@ -581,7 +585,7 @@ class StoreBlobstoreContentByHashHandler(
     # In particular, do not use self.request.remote_addr because the request
     # has as original an AppEngine local IP.
     if is_user == '1':
-      self.check_user_id(original_access_id, None)
+      self.check_user_id(original_access_id)
     else:
       self.check_ip(original_access_id)
     self.enforce_valid_token()
