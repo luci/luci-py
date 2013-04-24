@@ -553,12 +553,13 @@ class TestRequestManager(object):
     dimension_hashes = dimensions_utils.GenerateAllDimensionHashes(
         attribs['dimensions'])
 
-    unfinished_test = test_runner.TestRunner.gql(
-        'WHERE machine_id = :1 AND done = :2', attribs['id'], False).get()
-    if unfinished_test:
+    unfinished_test_key = db.GqlQuery(
+        'SELECT __key__ FROM TestRunner WHERE machine_id = :1 AND done = :2',
+        attribs['id'], False).get()
+    if unfinished_test_key:
       logging.error('A machine is asking for a new test, but there is '
                     'already an unfinished test with key, %s, running on a '
-                    'machine with the same id, %s', unfinished_test.key(),
+                    'machine with the same id, %s', unfinished_test_key,
                     attribs['id'])
 
     # Try assigning machine to a runner 10 times before we give up.
