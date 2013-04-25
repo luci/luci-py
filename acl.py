@@ -44,7 +44,7 @@ class WhitelistedIP(db.Model):
   # The textual representation of the IP of the machine to whitelist. Not used
   # in practice, just there since the canonical representation is hard to make
   # sense of.
-  ip = db.StringProperty()
+  ip = db.StringProperty(indexed=False)
 
   # Is only for maintenance purpose.
   comment = db.StringProperty(indexed=False)
@@ -196,10 +196,6 @@ class ACLRequestHandler(webapp2.RequestHandler):
       iptype, ipvalue = parse_ip(ip)
       whitelisted = WhitelistedIP.get_by_key_name(ip_to_str(iptype, ipvalue))
       if not whitelisted:
-        # Fallback during convertion.
-        # TODO(maruel): TBD.
-        whitelisted = WhitelistedIP.all().filter('ip', ip).get()
-      if not whitelisted:
         logging.warning('Blocking IP %s', ip)
         self.abort(401, detail='Please login first.')
       if whitelisted.group:
@@ -209,9 +205,7 @@ class ACLRequestHandler(webapp2.RequestHandler):
       # Performance enhancement.
       memcache.set(ip, self.access_id, namespace='ip_token')
     else:
-      # TODO(maruel): Remove the condition once the old code is not run anymore.
-      if valid != True:
-        self.access_id = valid
+      self.access_id = valid
 
   def check_user(self, user):
     """Verifies if the user is whitelisted."""
