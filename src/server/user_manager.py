@@ -33,10 +33,7 @@ def AddWhitelist(ip, password=None):
     password: Optional password to associate with the machine.
   """
   # Find existing entries, if any.
-  query = MachineWhitelist.gql('WHERE ip = :1', ip)
-
-  # Sanity check.
-  assert query.count() < 2
+  query = MachineWhitelist.gql('WHERE ip = :1 LIMIT 1', ip)
 
   # Ignore duplicate requests.
   if query.count() == 0:
@@ -54,16 +51,12 @@ def DeleteWhitelist(ip):
     ip: The ip to be removed. Ignores non-existing ips.
   """
   # Find existing entries, if any.
-  query = MachineWhitelist.gql('WHERE ip = :1', ip)
-
-  # Sanity check.
-  assert query.count() < 2
+  query = db.GqlQuery('SELECT __key__ FROM MachineWhitelist WHERE ip = :1 '
+                      'LIMIT 1', ip)
 
   # Ignore non-existing requests.
   if query.count() == 1:
-    # Delete existing entry.
-    white_list = query.get()
-    white_list.delete()
+    db.delete(query.get())
     logging.debug('Removed ip: %s', ip)
   else:
     logging.info('Ignored missing remove whitelist request for ip: %s', ip)
@@ -79,7 +72,7 @@ def IsWhitelistedMachine(ip, password):
   Returns:
     True if the machine referenced is whitelisted.
   """
-  whitelist = MachineWhitelist.gql(
-      'WHERE ip = :1 AND password = :2', ip, password)
+  query = db.GqlQuery('SELECT __key__ FROM MachineWhitelist WHERE ip = :1 AND '
+                      'password = :2 LIMIT 1', ip, password)
 
-  return whitelist.count() == 1
+  return query.count() == 1
