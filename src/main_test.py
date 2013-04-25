@@ -263,10 +263,10 @@ class AppTest(unittest.TestCase):
                       sorted(response.keys()))
     self.assertEquals(MACHINE_ID, response['id'])
 
-  def _PostResults(self, runner, result, expect_errors=False):
+  def _PostResults(self, runner_key, machine_id, result, expect_errors=False):
     url_parameters = {
-        'r': runner.key(),
-        'id': runner.machine_id,
+        'r': runner_key,
+        'id': machine_id,
         's': True,
         'result_output': result,
         }
@@ -277,7 +277,7 @@ class AppTest(unittest.TestCase):
                                     started=datetime.datetime.now())
 
     result = 'result string'
-    response = self._PostResults(runner, result)
+    response = self._PostResults(runner.key(), runner.machine_id, result)
     self.assertEquals('200 OK', response.status)
 
     # Get the lastest version of the runner and ensure it has the correct
@@ -285,6 +285,13 @@ class AppTest(unittest.TestCase):
     runner = test_runner.TestRunner.all().get()
     self.assertTrue(runner.ran_successfully)
     self.assertEqual(result, runner.GetResultString())
+
+    # Delete the runner and try posting the results again. This can happen
+    # if two machines are running the same test (due to flaky connections),
+    # and the results were then deleted before the second machine returned.
+    runner.delete()
+    response = self._PostResults(runner.key(), runner.machine_id, result)
+    self.assertEqual('200 OK', response.status)
 
   def testResultHandlerBlobstoreFailure(self):
     self._mox.StubOutWithMock(blobstore_helper, 'CreateBlobstore')
@@ -295,7 +302,8 @@ class AppTest(unittest.TestCase):
                                     started=datetime.datetime.now())
 
     result = 'result string'
-    response = self._PostResults(runner, result, expect_errors=True)
+    response = self._PostResults(runner.key(), runner.machine_id, result,
+                                 expect_errors=True)
     self.assertEquals('500 Internal Server Error', response.status)
     self.assertEquals(
         'The server was unable to save the results to the blobstore',

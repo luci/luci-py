@@ -371,6 +371,16 @@ class ResultHandler(webapp2.RequestHandler):
     if runner_key:
       runner = test_runner.TestRunner.get(runner_key)
 
+    if not runner:
+      # If the runner is gone, it probably already received results from
+      # a different machine and was naturally deleted. We can't do anything
+      # with the results now, so just ignore them.
+      msg = ('The runner, with key %s, has already been deleted, results lost.'
+             % runner_key)
+      logging.info(msg)
+      self.response.out.write(msg)
+      return
+
     # Find the high level success/failure from the URL. We assume failure if
     # we can't find the success parameter in the request.
     success = self.request.get('s', 'False') == 'True'
