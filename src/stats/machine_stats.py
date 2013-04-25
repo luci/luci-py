@@ -94,6 +94,7 @@ def GetMachineTag(machine_id):
   Returns:
     The machine's tag, or None if the machine id isn't used.
   """
-  machine = MachineStats.gql('WHERE machine_id = :1', machine_id).get()
+  machine = db.GqlQuery('SELECT tag FROM MachineStats WHERE machine_id = :1 '
+                        'LIMIT 1', machine_id).get()
 
   return machine.tag if machine else 'Unknown'
