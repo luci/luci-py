@@ -36,6 +36,11 @@ class WhitelistedIP(db.Model):
   timestamp = db.DateTimeProperty(auto_now=True)
   who = db.UserProperty(auto_current_user=True)
 
+  # This is used for sharing token. Use case: a slave are multiple HTTP proxies
+  # which different public IP used in a round-robin fashion, so the slave looks
+  # like a different IP at each request, but reuses the original token.
+  group = db.StringProperty(indexed=False)
+
   # The textual representation of the IP of the machine to whitelist. Not used
   # in practice, just there since the canonical representation is hard to make
   # sense of.
@@ -186,7 +191,7 @@ class ACLRequestHandler(webapp2.RequestHandler):
   def check_ip(self, ip):
     """Verifies if the IP is whitelisted."""
     self.access_id = ip
-    valid = memcache.get(self.access_id, namespace='ip_token')
+    valid = memcache.get(ip, namespace='ip_token')
     if not valid:
       iptype, ipvalue = parse_ip(ip)
       whitelisted = WhitelistedIP.get_by_key_name(ip_to_str(iptype, ipvalue))
@@ -197,8 +202,16 @@ class ACLRequestHandler(webapp2.RequestHandler):
       if not whitelisted:
         logging.warning('Blocking IP %s', ip)
         self.abort(401, detail='Please login first.')
+      if whitelisted.group:
+        # Any member of of the group can impersonate others. This is to enable
+        # support for slaves behind proxies with multiple IPs.
+        self.access_id = whitelisted.group
       # Performance enhancement.
-      memcache.set(self.access_id, True, namespace='ip_token')
+      memcache.set(ip, self.access_id, namespace='ip_token')
+    else:
+      # TODO(maruel): Remove the condition once the old code is not run anymore.
+      if valid != True:
+        self.access_id = valid
 
   def check_user(self, user):
     """Verifies if the user is whitelisted."""
@@ -234,6 +247,7 @@ class RestrictedWhitelistIPHandler(ACLRequestHandler):
     self.response.out.write(htmlwrap(
       ('<form name="whitelist" method="post">'
        'IP: <input type="text" name="ip" value="%s" /><br />'
+       'Group: <input type="text" name="group" /><br />'
        'Comment: <input type="text" name="comment" /><br />'
        '<input type="hidden" name="token" value="%s" />'
        '<input type="submit" value="SUBMIT" />') %
@@ -241,17 +255,23 @@ class RestrictedWhitelistIPHandler(ACLRequestHandler):
     self.response.headers['Content-Type'] = 'text/html'
 
   def post(self):
-    ip = self.request.get('ip')
     comment = self.request.get('comment')
+    group = self.request.get('group')
+    ip = self.request.get('ip')
     key = ip_to_str(*parse_ip(ip))
+    if not comment:
+      self.abort(403, 'Comment is required.')
+    if not key:
+      self.abort(403, 'IP is invalid')
     item = WhitelistedIP.get_by_key_name(key)
     if item:
       item.comment = comment or item.comment
+      item.group = group
       item.ip = ip
       item.put()
       self.response.out.write(htmlwrap('Already present: %s' % ip))
     else:
-      WhitelistedIP(key_name=key, ip=ip, comment=comment).put()
+      WhitelistedIP(key_name=key, comment=comment, group=group, ip=ip).put()
       self.response.out.write(htmlwrap('Success: %s' % ip))
     self.response.headers['Content-Type'] = 'text/html'
 
