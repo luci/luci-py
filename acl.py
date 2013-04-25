@@ -24,7 +24,7 @@ from google.appengine.ext import db
 
 class GlobalSecret(db.Model):
   """Secret."""
-  secret = db.BlobProperty()
+  secret = db.ByteStringProperty()
 
 
 class WhitelistedIP(db.Model):
@@ -141,7 +141,7 @@ def gen_token(access_id, offset, now):
   this_hour = int(now / 3600.)
   timestamp = str(this_hour + offset)
   version = os.environ['CURRENT_VERSION_ID']
-  secrets = (get_global_secret(), access_id, version, timestamp)
+  secrets = (get_global_secret(), str(access_id), str(version), timestamp)
   hashed = hashlib.sha1('\0'.join(secrets)).digest()
   return base64.urlsafe_b64encode(hashed)[:16] + '-' + timestamp
 
@@ -167,8 +167,6 @@ class ACLRequestHandler(webapp2.RequestHandler):
   the handlers."""
   # Set to the uniquely identifiable token, either the userid or the IP address.
   access_id = None
-  # True if the user is authenticated. False if the IP is whitelisted.
-  is_user = None
   # Set to False if custom processing is required. In that case, a call to
   # self.enforce_valid_token() is required inside the post() handler.
   enforce_token_on_post = True
@@ -201,7 +199,6 @@ class ACLRequestHandler(webapp2.RequestHandler):
         self.abort(401, detail='Please login first.')
       # Performance enhancement.
       memcache.set(self.access_id, True, namespace='ip_token')
-    self.is_user = False
 
   def check_user(self, user):
     """Verifies if the user is whitelisted."""
@@ -211,15 +208,7 @@ class ACLRequestHandler(webapp2.RequestHandler):
       self.abort(403, detail='Invalid domain, %s' % domain)
     # user_id() is only set with Google accounts, fallback to the email address
     # otherwise.
-    return self.check_user_id(user.user_id() or user.email())
-
-  def check_user_id(self, user_id):
-    """Note the current user id being used for token verifications.
-
-    There isn't much verification to do at that point.
-    """
-    self.access_id = user_id
-    self.is_user = True
+    self.access_id = user.user_id() or user.email()
 
   def get_token(self, offset, now):
     return gen_token(self.access_id, offset, now)

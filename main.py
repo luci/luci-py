@@ -556,10 +556,9 @@ class GenerateBlobstoreHandler(acl.ACLRequestHandler):
   """Generate an upload url to directly load files into the blobstore."""
   def post(self, namespace, hash_key):
     self.response.headers['Content-Type'] = 'text/plain'
-    url = '/content/store_blobstore/%s/%s/%d/%s?token=%s' % (
+    url = '/content/store_blobstore/%s/%s/%s?token=%s' % (
         namespace,
         hash_key,
-        int(self.is_user),
         self.access_id,
         self.request.get('token'))
     logging.info('Url: %s', url)
@@ -581,13 +580,10 @@ class StoreBlobstoreContentByHashHandler(
     return webapp2.RequestHandler.dispatch(self)
 
   # pylint: disable=W0221
-  def post(self, namespace, hash_key, is_user, original_access_id):
+  def post(self, namespace, hash_key, original_access_id):
     # In particular, do not use self.request.remote_addr because the request
     # has as original an AppEngine local IP.
-    if is_user == '1':
-      self.check_user_id(original_access_id)
-    else:
-      self.check_ip(original_access_id)
+    self.access_id = original_access_id
     self.enforce_valid_token()
     contents = self.get_uploads('content')
     if not contents:
@@ -820,7 +816,7 @@ def CreateApplication():
           r'/content/store' + namespace_key, StoreContentByHashHandler),
       webapp2.Route(
           r'/content/store_blobstore' + namespace_key +
-            r'/<is_user:[01]>/<original_access_id:[^\/]+>',
+            r'/<original_access_id:[^\/]+>',
           StoreBlobstoreContentByHashHandler),
       webapp2.Route(
           r'/content/remove' + namespace_key, RemoveContentByHashHandler),
