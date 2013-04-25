@@ -597,6 +597,15 @@ class GetResultHandler(webapp2.RequestHandler):
     SendRunnerResults(self.response, key)
 
 
+class GetTokenHandler(webapp2.RequestHandler):
+  """Returns an authentication token."""
+
+  def get(self):  # pylint: disable-msg=C6409
+    """Handles HTTP GET requests for this handler's URL."""
+    self.response.headers['Content-Type'] = 'text/plain'
+    self.response.out.write('dummy_token')
+
+
 class CleanupResultsHandler(webapp2.RequestHandler):
   """Delete the Test Runner with the given key."""
 
@@ -901,6 +910,7 @@ def CreateApplication():
                                   ('/get_matching_test_cases',
                                    GetMatchingTestCasesHandler),
                                   ('/get_result', GetResultHandler),
+                                  ('/get_token', GetTokenHandler),
                                   ('/poll_for_test', RegisterHandler),
                                   ('/remote_error', RemoteErrorHandler),
                                   ('/result', ResultHandler),
