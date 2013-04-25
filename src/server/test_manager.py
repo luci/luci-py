@@ -553,6 +553,9 @@ class TestRequestManager(object):
     dimension_hashes = dimensions_utils.GenerateAllDimensionHashes(
         attribs['dimensions'])
 
+    machine_stats.RecordMachineQueriedForWork(attribs['id'],
+                                              attributes.get('tag', None))
+
     unfinished_test_key = db.GqlQuery(
         'SELECT __key__ FROM TestRunner WHERE machine_id = :1 AND done = :2',
         attribs['id'], False).get()
@@ -603,8 +606,6 @@ class TestRequestManager(object):
         response['commands'] = commands
         response['result_url'] = result_url
         response['try_count'] = 0
-        machine_stats.RecordMachineAssignment(attribs['id'],
-                                              attributes.get('tag', None))
     else:
       response['try_count'] = attribs['try_count'] + 1
       # Tell machine when to come back, in seconds.

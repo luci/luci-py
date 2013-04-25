@@ -17,17 +17,17 @@ from google.appengine.ext import db
 class MachineStats(db.Model):
   """A machine's stats."""
   # The machine id of the polling machine.
-  machine_id = db.StringProperty()
+  machine_id = db.StringProperty(required=True)
 
   # The tag of the machine polling.
   tag = db.StringProperty(default='')
 
-  # The time of the assignment.
-  assignment_time = db.DateTimeProperty(auto_now=True)
+  # The last day the machine queried for work.
+  last_seen = db.DateProperty(required=True)
 
 
-def RecordMachineAssignment(machine_id, machine_tag):
-  """Records when a machine has a runner assigned.
+def RecordMachineQueriedForWork(machine_id, machine_tag):
+  """Records when a machine has queried for work.
 
   Args:
     machine_id: The machine id of the machine.
@@ -38,11 +38,15 @@ def RecordMachineAssignment(machine_id, machine_tag):
 
   # Check to see if we need to create the model.
   if machine_stats is None:
-    machine_stats = MachineStats(machine_id=machine_id)
+    machine_stats = MachineStats(machine_id=machine_id,
+                                 last_seen=datetime.date.today())
 
   if machine_tag is not None:
     machine_stats.tag = machine_tag
-  machine_stats.assignment_time = datetime.datetime.now()
+
+  if machine_stats.last_seen < datetime.date.today():
+    machine_stats.last_seen = datetime.date.today()
+
   machine_stats.put()
 
 

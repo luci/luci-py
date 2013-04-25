@@ -1038,18 +1038,18 @@ class TestRequestManagerTest(unittest.TestCase):
 
     self.assertEqual(0, machine_stats.MachineStats.all().count())
 
-    # Ensure nothing is added since no runner was matched.
+    # Ensure query is recorded, even though there was no match.
     nonmatching_config = 'win-vista'
     self._manager.ExecuteRegisterRequest(
         self._GetMachineRegisterRequest(os=nonmatching_config),
         self._SERVER_URL)
-    self.assertEqual(0, machine_stats.MachineStats.all().count())
+    self.assertEqual(1, machine_stats.MachineStats.all().count())
 
-    # Ensure the runner match is recorded.
+    # Ensure the query is recorded.
     self._manager.ExecuteRegisterRequest(
         self._GetMachineRegisterRequest(os=matching_config),
         self._SERVER_URL)
-    self.assertEqual(1, machine_stats.MachineStats.all().count())
+    self.assertEqual(2, machine_stats.MachineStats.all().count())
 
   def testGetRunnerResults(self):
     # Create a test.

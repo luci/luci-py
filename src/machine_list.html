@@ -16,7 +16,7 @@
 <option value="">-</option>
 <option value="machine_id">Machine ID</option>
 <option value="tag">Tag</option>
-<option value="assignment_time">Last Assignment Time</option>
+<option value="assignment_time">Last Day Seen</option>
 </select>
 </p>
 <table id="machine-table"
@@ -31,7 +31,7 @@
 <tr class="request {% cycle even,odd %}">
 <td>{{machine.machine_id}}</td>
 <td>{{machine.tag}}</td>
-<td>{{machine.assignment_time}}</td>
+<td>{{machine.last_seen}}</td>
 <td>{{machine.command_string|safe}}</td>
 </tr>
 {% endfor %}

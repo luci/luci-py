@@ -6,6 +6,7 @@
 
 
 
+import datetime
 import logging
 import unittest
 
@@ -28,17 +29,23 @@ class MachineStatsTest(unittest.TestCase):
   def tearDown(self):
     self.testbed.deactivate()
 
-  def testRecordMachineRunnerAssignment(self):
+  def testRecordMachineQueries(self):
     machine_tag = 'tag'
     self.assertEqual(0, machine_stats.MachineStats.all().count())
 
-    # Assign a runner.
-    machine_stats.RecordMachineAssignment(MACHINE_IDS[0], machine_tag)
+    machine_stats.RecordMachineQueriedForWork(MACHINE_IDS[0], machine_tag)
     self.assertEqual(1, machine_stats.MachineStats.all().count())
 
-    # Assign another runner.
-    machine_stats.RecordMachineAssignment(MACHINE_IDS[1], machine_tag)
-    self.assertEqual(2, machine_stats.MachineStats.all().count())
+    # Ensure that last_seen is updated if it is old.
+    m_stats = machine_stats.MachineStats.all().get()
+    m_stats.last_seen -= datetime.timedelta(days=5)
+    m_stats.put()
+
+    old_date = m_stats.last_seen
+    machine_stats.RecordMachineQueriedForWork(MACHINE_IDS[0], machine_tag)
+
+    m_stats = machine_stats.MachineStats.all().get()
+    self.assertNotEqual(old_date, m_stats.last_seen)
 
   def testDeleteMachineStats(self):
     # Try to delete with bad keys.
@@ -46,7 +53,8 @@ class MachineStatsTest(unittest.TestCase):
     self.assertFalse(machine_stats.DeleteMachineStats(1))
 
     # Add and then delete a machine assignment.
-    m_stats = machine_stats.MachineStats()
+    m_stats = machine_stats.MachineStats(machine_id='id',
+                                         last_seen=datetime.date.today())
     m_stats.put()
     self.assertEqual(1, machine_stats.MachineStats.all().count())
     self.assertTrue(
@@ -59,8 +67,8 @@ class MachineStatsTest(unittest.TestCase):
   def testGetAllMachines(self):
     self.assertEqual(0, len(list(machine_stats.GetAllMachines())))
 
-    machine_stats.RecordMachineAssignment(MACHINE_IDS[0], 'b')
-    machine_stats.RecordMachineAssignment(MACHINE_IDS[1], 'a')
+    machine_stats.RecordMachineQueriedForWork(MACHINE_IDS[0], 'b')
+    machine_stats.RecordMachineQueriedForWork(MACHINE_IDS[1], 'a')
 
     # Ensure that the returned values are sorted by tags.
     machines = machine_stats.GetAllMachines('tag')
@@ -73,7 +81,7 @@ class MachineStatsTest(unittest.TestCase):
     self.assertEqual('Unknown', machine_stats.GetMachineTag(MACHINE_IDS[0]))
 
     tag = 'machine_tag'
-    machine_stats.RecordMachineAssignment(MACHINE_IDS[0], tag)
+    machine_stats.RecordMachineQueriedForWork(MACHINE_IDS[0], tag)
     self.assertEqual(tag, machine_stats.GetMachineTag(MACHINE_IDS[0]))
 
 
