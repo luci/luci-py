@@ -17,6 +17,11 @@ indexes:
   - name: minor_version
     direction: desc
 
+- kind: MachineStats
+  properties:
+  - name: machine_id
+  - name: tag
+
 - kind: TestRunner
   properties:
   - name: automatic_retry_count
