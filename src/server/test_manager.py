@@ -206,7 +206,6 @@ class TestRequestManager(object):
         runner.result_string_reference.delete()
         runner.result_string_reference = None
       runner.errors = None
-      runner.put()
 
     runner.ran_successfully = success
     runner.exit_codes = exit_codes
