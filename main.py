@@ -536,6 +536,7 @@ class ContainsHashHandler(acl.ACLRequestHandler):
 
     contains = [IteratorToBool(q) for q in queries]
     self.response.out.write(bytearray(contains))
+    self.response.headers['Content-Type'] = 'application/octet-stream'
     found = sum(contains, 0)
     logging.info('%d hit, %d miss', found, len(raw_hash_digests) - found)
     if found:
@@ -563,6 +564,7 @@ class GenerateBlobstoreHandler(acl.ACLRequestHandler):
         self.request.get('token'))
     logging.info('Url: %s', url)
     self.response.out.write(blobstore.create_upload_url(url))
+    self.response.headers['Content-Type'] = 'text/plain'
 
 
 class StoreBlobstoreContentByHashHandler(
@@ -638,6 +640,7 @@ class StoreBlobstoreContentByHashHandler(
         '%d bytes uploaded directly into blobstore',
         entry.content_reference.size)
     self.response.out.write('Content saved.')
+    self.response.headers['Content-Type'] = 'text/plain'
 
 
 class StoreContentByHashHandler(acl.ACLRequestHandler):
@@ -707,6 +710,7 @@ class StoreContentByHashHandler(acl.ACLRequestHandler):
     entry.is_verified = True
     entry.put()
     self.response.out.write('Content saved.')
+    self.response.headers['Content-Type'] = 'text/plain'
 
 
 class RemoveContentByHashHandler(acl.ACLRequestHandler):
@@ -721,10 +725,13 @@ class RemoveContentByHashHandler(acl.ACLRequestHandler):
       logging.info(msg)
 
       self.response.out.write(msg)
+      self.response.headers['Content-Type'] = 'text/plain'
       return
 
     entry.delete()
-    logging.info('Deleted ContentEntry')
+    logging.info('Deleted entry.')
+    self.response.write('Deleted entry.')
+    self.response.headers['Content-Type'] = 'text/plain'
 
 
 class RetrieveContentByHashHandler(acl.ACLRequestHandler,
@@ -747,11 +754,15 @@ class RetrieveContentByHashHandler(acl.ACLRequestHandler,
     if entry.content is None:
       logging.info(
           'Returning %d bytes from blobstore', entry.content_reference.size)
-      self.send_blob(entry.content_reference, save_as=hash_key)
+      self.send_blob(
+          entry.content_reference,
+          save_as=hash_key,
+          content_type='application/octet-stream')
     else:
       logging.info('Returning %d bytes from model', len(entry.content))
       self.response.headers['Content-Disposition'] = (
           'attachment; filename="%s"' % hash_key)
+      self.response.headers['Content-Type'] = 'application/octet-stream'
       self.response.out.write(entry.content)
 
 
@@ -762,11 +773,13 @@ class RootHandler(webapp2.RequestHandler):
     self.response.write(
         '<html><body>Hi! Please read <a href="%s">%s</a>.</body></html>' %
         (url, url))
+    self.response.headers['Content-Type'] = 'text/html'
 
 
 class WarmupHandler(webapp2.RequestHandler):
   def get(self):
     self.response.write('ok')
+    self.response.headers['Content-Type'] = 'text/plain'
 
 
 def CreateApplication():
