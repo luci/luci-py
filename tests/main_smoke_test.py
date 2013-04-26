@@ -91,14 +91,20 @@ class CachedCredentials(upload.KeyringCreds):
     return self.EMAIL, self.PASSWORD
 
 
-class AppTestSignedIn(unittest.TestCase):
+class TestCase(unittest.TestCase):
+  def setUp(self):
+    super(TestCase, self).setUp()
+    case = self.id().split('.', 1)[1].replace('.', '').replace('_', '')
+    self.namespace = 'temporary' + str(long(time.time())) + case
+
+
+class AppTestSignedIn(TestCase):
   EMAIL = None
   CREDENTIALS = None
   RPC = None
 
   def setUp(self):
     super(AppTestSignedIn, self).setUp()
-    self.namespace = 'temporary' + str(long(time.time()))
     if AppTestSignedIn.RPC is None:
       if not ISOLATE_SERVER_URL.rstrip('/').endswith('.com'):
         # Cheap check for local server.
@@ -117,57 +123,32 @@ class AppTestSignedIn(unittest.TestCase):
     self.token = urllib.quote(
         self.fetch(ISOLATE_SERVER_URL + 'content/get_token', payload=None))
 
+  def fetch_no_retry(
+      self, url, payload, content_type='application/octet-stream'):
+    return self.RPC.Send(
+        url[len(ISOLATE_SERVER_URL):],
+        payload, content_type=content_type,
+        extra_headers={'content-length': len(payload or '')})
+
   def fetch(self, url, payload, content_type='application/octet-stream'):
     last_error = Exception()
     for attempt in range(MAX_URL_ATTEMPTS):
       try:
-        return self.RPC.Send(
-            url[len(ISOLATE_SERVER_URL):],
-            payload, content_type=content_type,
-            extra_headers={'content-length': len(payload or '')})
+        return self.fetch_no_retry(url, payload, content_type)
       except urllib2.HTTPError:
         # Always re-raise if we reached the server.
         raise
       except urllib2.URLError as e:
         last_error = e
         print 'Error connecting to server: %s' % str(e)
-        # Sleep with an exponential backoff.
-        time.sleep(1.5 ** attempt)
+        if attempt != (MAX_URL_ATTEMPTS - 1):
+          time.sleep(0.1)
 
     # If we end up here, we failed to reached the server so raise an error.
     raise last_error
 
-  def RemoveAndVerify(self, hash_key):
-    """Removes the hash key from the server and verify it is deleted."""
-    # Remove the given hash content, if it already exists.
-    response = self.fetch(
-        ISOLATE_SERVER_URL + 'content/remove/%s/%s?token=%s' % (
-            self.namespace, hash_key, self.token),
-        payload='')
-    if response != '':
-      self.assertEqual(
-          "Unable to find a ContentEntry with key '%s'." % hash_key,
-          response)
-    else:
-      self.assertEqual('', response)
-
-    # Make sure we can't get the content, since it was deleted. Explicitly deal
-    # with internal inconsistency.
-    for i in range(MAX_URL_ATTEMPTS):
-      response = self.fetch(
-          ISOLATE_SERVER_URL + 'content/contains/%s?token=%s' %
-            (self.namespace, self.token),
-          payload=binascii.unhexlify(hash_key))
-      contain_response = response.decode()
-      if chr(0) == contain_response:
-        break
-      if i != (MAX_URL_ATTEMPTS - 1):
-        time.sleep(0.5)
-    self.assertEqual(chr(0), contain_response)
-
-  def UploadHashAndRetrieveHelper(self, hash_key, content, priority=1):
-    self.RemoveAndVerify(hash_key)
-
+  def upload(self, hash_key, content, priority=1):
+    """Stores an object."""
     # Add the hash content and then retrieve it.
     if len(content) > MIN_SIZE_FOR_BLOBSTORE:
       # Query the server for a direct upload url.
@@ -190,9 +171,10 @@ class AppTestSignedIn(unittest.TestCase):
           payload=content)
     self.assertEqual('Content saved.', response)
 
-    # Verify the object is present.
+  def verify_is_present(self, hash_key):
+    """Verifies the object is present."""
     for i in range(MAX_URL_ATTEMPTS):
-      response = self.fetch(
+      response = self.fetch_no_retry(
           ISOLATE_SERVER_URL + 'content/contains/%s?token=%s' %
             (self.namespace, self.token),
           payload=binascii.unhexlify(hash_key))
@@ -202,11 +184,12 @@ class AppTestSignedIn(unittest.TestCase):
       # GAE is exposing its internal data inconsistency.
       if i != (MAX_URL_ATTEMPTS - 1):
         print('Visible datastore inconsistency, retrying.')
-        time.sleep(0.5)
+        time.sleep(0.1)
 
     self.assertEqual(chr(1), contains_response)
 
-    # Retrieve the object.
+  def retrieve(self, hash_key, content):
+    """Retrieves an object."""
     response = self.fetch(
         ISOLATE_SERVER_URL + 'content/retrieve/%s/%s' % (
             self.namespace, hash_key),
@@ -219,50 +202,40 @@ class AppTestSignedIn(unittest.TestCase):
           (content[:512], len(content),
             response[:512], len(response)))
 
-    self.RemoveAndVerify(hash_key)
+  def upload_and_retrieve(self, hash_key, content, priority=1):
+    """Stores and retrieve an object."""
+    self.upload(hash_key, content, priority)
+    self.verify_is_present(hash_key)
+    self.retrieve(hash_key, content)
 
   def testStoreAndRetrieveHashNotInBlobstore(self):
     hash_key = hashlib.sha1(BINARY_DATA).hexdigest()
 
-    self.UploadHashAndRetrieveHelper(hash_key, BINARY_DATA)
+    self.upload_and_retrieve(hash_key, BINARY_DATA)
 
-  def testStoreAndRetrieveHashfromBlobstore(self):
+  def testStoreAndRetrieveHashfromBlobstore_40mb(self):
     # Try and upload a 40mb blobstore.
     content = (BINARY_DATA * 128) * 1024 * 40
     hash_key = hashlib.sha1(content).hexdigest()
 
-    self.UploadHashAndRetrieveHelper(hash_key, content)
+    self.upload_and_retrieve(hash_key, content)
 
   def testStoreAndRetrieveEmptyHash(self):
     hash_key = hashlib.sha1().hexdigest()
 
-    self.UploadHashAndRetrieveHelper(hash_key, '')
-
-  def testStoreAndRetrieveFromMemcache(self):
-    hash_key = hashlib.sha1(BINARY_DATA).hexdigest()
-
-    self.UploadHashAndRetrieveHelper(hash_key, BINARY_DATA, priority=0)
-
-    # Check that we can't retrieve the cached element after it has been deleted.
-    try:
-      self.fetch(
-          ISOLATE_SERVER_URL + 'content/retrieve/%s/%s' % (
-              self.namespace, hash_key),
-          payload=None)
-      self.fail('Memcache element was still present')
-    except urllib2.HTTPError as e:
-      self.assertEqual(404, e.code)
+    self.upload_and_retrieve(hash_key, '')
 
   def test_gzip(self):
     self.namespace += '-gzip'
     hash_key = hashlib.sha1(BINARY_DATA).hexdigest()
     compressed = zlib.compress(BINARY_DATA)
-    self.UploadHashAndRetrieveHelper(hash_key, compressed)
+    self.upload_and_retrieve(hash_key, compressed)
 
   def testCorrupted(self):
     hash_key = hashlib.sha1(BINARY_DATA + 'x').hexdigest()
     try:
-      self.UploadHashAndRetrieveHelper(hash_key, BINARY_DATA)
+      # The upload is refused right away.
+      self.upload(hash_key, BINARY_DATA)
       self.fail()
     except urllib2.HTTPError as e:
       self.assertEqual(400, e.code)
@@ -272,7 +245,8 @@ class AppTestSignedIn(unittest.TestCase):
     hash_key = hashlib.sha1(BINARY_DATA + 'x').hexdigest()
     compressed = zlib.compress(BINARY_DATA)
     try:
-      self.UploadHashAndRetrieveHelper(hash_key, compressed)
+      # The upload is refused right away.
+      self.upload(hash_key, compressed)
       self.fail()
     except urllib2.HTTPError as e:
       self.assertEqual(400, e.code)
@@ -285,7 +259,7 @@ class AppTestSignedIn(unittest.TestCase):
 #    content = (BINARY_DATA * 128) * 1024 * 40
 #    hash_key = hashlib.sha1(content + 'x').hexdigest()
 #    # TODO(maruel): This code tests that the code is not checking properly.
-#    self.UploadHashAndRetrieveHelper(hash_key, content)
+#    self.upload_and_retrieve(hash_key, content)
 
   def testGetToken(self):
     response1 = self.fetch(
@@ -301,10 +275,9 @@ class AppTestSignedIn(unittest.TestCase):
     # equal even if they should in practice.
 
 
-class AppTestSignedOut(unittest.TestCase):
+class AppTestSignedOut(TestCase):
   def setUp(self):
     super(AppTestSignedOut, self).setUp()
-    self.namespace = 'temporary' + str(long(time.time()))
     self.token = None
     try:
       self.token = urllib.quote(

@@ -710,27 +710,6 @@ class StoreContentByHashHandler(acl.ACLRequestHandler):
     self.response.headers['Content-Type'] = 'text/plain'
 
 
-class RemoveContentByHashHandler(acl.ACLRequestHandler):
-  """Removes content by its SHA-1 hash key from the server."""
-  def post(self, namespace, hash_key):
-    entry = get_content_by_hash(namespace, hash_key)
-    # TODO(maruel): Use namespace='table_%s' % namespace.
-    memcache.delete(hash_key, namespace=namespace)
-
-    if not entry:
-      msg = 'Unable to find a ContentEntry with key \'%s\'.' % hash_key
-      logging.info(msg)
-
-      self.response.out.write(msg)
-      self.response.headers['Content-Type'] = 'text/plain'
-      return
-
-    entry.delete()
-    logging.info('Deleted entry.')
-    self.response.write('Deleted entry.')
-    self.response.headers['Content-Type'] = 'text/plain'
-
-
 class RetrieveContentByHashHandler(acl.ACLRequestHandler,
                                    blobstore_handlers.BlobstoreDownloadHandler):
   """The handlers for retrieving contents by its SHA-1 hash |hash_key|."""
@@ -815,6 +794,7 @@ def CreateApplication():
       webapp2.Route(
           r'/restricted/whitelistdomain', acl.RestrictedWhitelistDomainHandler),
 
+      # The public API:
       webapp2.Route(
           r'/content/contains' + namespace,
           ContainsHashHandler),
@@ -825,16 +805,19 @@ def CreateApplication():
       webapp2.Route(
           r'/content/store' + namespace_key, StoreContentByHashHandler),
       webapp2.Route(
+          r'/content/retrieve' + namespace_key, RetrieveContentByHashHandler),
+
+      # TODO(maruel): Move this url handler to restricted:
+      webapp2.Route(
           r'/content/store_blobstore' + namespace_key +
             r'/<original_access_id:[^\/]+>',
           StoreBlobstoreContentByHashHandler),
-      webapp2.Route(
-          r'/content/remove' + namespace_key, RemoveContentByHashHandler),
-      webapp2.Route(
-          r'/content/retrieve' + namespace_key, RetrieveContentByHashHandler),
-      webapp2.Route(r'/', RootHandler),
 
+      # AppEngine-specific url:
       webapp2.Route(r'/_ah/warmup', WarmupHandler),
+
+      # Must be last.
+      webapp2.Route(r'/', RootHandler),
   ])
 
 
