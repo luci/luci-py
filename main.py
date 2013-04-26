@@ -97,7 +97,7 @@ class ContentEntry(db.Model):
     self.parent_key().name().endswith(('bzip2', 'gzip'))
 
 
-def GetContentNamespaceKey(namespace):
+def get_content_namespace_key(namespace):
   """Returns the ContentNamespace key for the namespace value.
 
   Makes sure the entity exists in the datastore.
@@ -107,18 +107,18 @@ def GetContentNamespaceKey(namespace):
       namespace, is_testing=namespace.startswith('temporary')).key()
 
 
-def GetContentByHash(namespace, hash_key):
+def get_content_by_hash(namespace, hash_key):
   """Returns the ContentEntry with the given hex encoded SHA-1 hash |hash_key|.
 
   Returns None if it no ContentEntry matches.
   """
-  length = GetHashAlgo(namespace).digest_size * 2
+  length = get_hash_algo(namespace).digest_size * 2
   if not re.match(r'[a-f0-9]{' + str(length) + r'}', hash_key):
     logging.error('Given an invalid key, %s', hash_key)
     return None
 
   try:
-    namespace_model_key = GetContentNamespaceKey(namespace)
+    namespace_model_key = get_content_namespace_key(namespace)
     key = db.Key.from_path('ContentEntry', hash_key, parent=namespace_model_key)
     return ContentEntry.get(key)
   except (db.BadKeyError, db.KindError):
@@ -130,7 +130,7 @@ def GetContentByHash(namespace, hash_key):
 ### Utility
 
 
-def StoreValueInBlobstore(value):
+def store_value_in_blobstore(value):
   """Store the given content in the blobstore, returning the key if it is
   successfully stored, otherwise return None."""
   # TODO(csharp): don't use the experimental API, instead create a blobstore
@@ -147,18 +147,18 @@ def StoreValueInBlobstore(value):
   return None
 
 
-def CreateEntry(namespace, hash_key):
+def create_entry(namespace, hash_key):
   """Generates a new ContentEntry from the request if one doesn't exist.
 
   Returns None if there is a problem generating the entry or if an entry already
   exists with the given hex encoded SHA-1 hash |hash_key|.
   """
-  length = GetHashAlgo(namespace).digest_size * 2
+  length = get_hash_algo(namespace).digest_size * 2
   if not re.match(r'[a-f0-9]{' + str(length) + r'}', hash_key):
     logging.error('Given an invalid key, %s', hash_key)
     return None
 
-  namespace_model_key = GetContentNamespaceKey(namespace)
+  namespace_model_key = get_content_namespace_key(namespace)
   key = db.Key.from_path('ContentEntry', hash_key, parent=namespace_model_key)
 
   if ContentEntry.all(keys_only=True).filter('__key__ =', key).get():
@@ -172,18 +172,18 @@ def delete_entry_and_blobs(to_delete):
   blobs_to_delete = [
       i.content_reference for i in to_delete if i.content_reference
   ]
-  DeleteBlobinfoAsync(blobs_to_delete)
+  delete_blobinfo_async(blobs_to_delete)
   # Then delete the entities.
   db.delete_async(to_delete)
 
 
-def GetHashAlgo(_namespace):
+def get_hash_algo(_namespace):
   """Returns an instance of the hashing algorithm for the namespace."""
   # TODO(maruel): Support other algorithms.
   return hashlib.sha1()
 
 
-def SplitPayload(request, chunk_size, max_chunks):
+def split_payload(request, chunk_size, max_chunks):
   """Splits a binary payload into elements of |chunk_size| length.
 
   Returns each chunks.
@@ -210,13 +210,13 @@ def SplitPayload(request, chunk_size, max_chunks):
   return [content[i * chunk_size: (i + 1) * chunk_size] for i in xrange(count)]
 
 
-def PayloadToHashes(request, namespace):
+def payload_to_hashes(request, namespace):
   """Converts a raw payload into SHA-1 hashes as bytes."""
-  return SplitPayload(
-      request, GetHashAlgo(namespace).digest_size, MAX_KEYS_PER_CALL)
+  return split_payload(
+      request, get_hash_algo(namespace).digest_size, MAX_KEYS_PER_CALL)
 
 
-def ReadBlob(blob, callback):
+def read_blob(blob, callback):
   """Reads a BlobInfo/BlobKey and pass the data through callback.
 
   Returns the amount of data read.
@@ -242,7 +242,7 @@ def ReadBlob(blob, callback):
   return position
 
 
-def DeleteBlobinfoAsync(blobinfos):
+def delete_blobinfo_async(blobinfos):
   """Deletes BlobInfo properly.
 
   blobstore.delete*() do not accept a list of BlobInfo, they only accept a list
@@ -251,7 +251,7 @@ def DeleteBlobinfoAsync(blobinfos):
   blobstore.delete_async((b.key() for b in blobinfos))
 
 
-def IncrementalDelete(query, delete, check=None):
+def incremental_delete(query, delete, check=None):
   """Applies |delete| to objects in a query asynchrously.
 
   Returns True if at least one object was found.
@@ -292,7 +292,7 @@ class RestrictedCleanupOldEntriesWorkerHandler(webapp2.RequestHandler):
     old_cutoff = datetime.datetime.today() - datetime.timedelta(
         days=DATASTORE_TIME_TO_LIVE_IN_DAYS)
 
-    IncrementalDelete(
+    incremental_delete(
         ContentEntry.all().filter('last_access <', old_cutoff),
         delete=delete_entry_and_blobs)
     logging.info('Done deleting old entries')
@@ -316,7 +316,7 @@ class RestrictedCleanupTestingEntriesWorkerHandler(webapp2.RequestHandler):
     orphaned_namespaces = []
     for namespace in namespace_query:
       logging.debug('Namespace %s', namespace.name())
-      found = IncrementalDelete(
+      found = incremental_delete(
           ContentEntry.all(keys_only=True).ancestor(
               namespace).filter(
               'last_access <', old_cutoff_testing),
@@ -349,8 +349,8 @@ class RestrictedCleanupOrphanedBlobsWorkerHandler(webapp2.RequestHandler):
 
     while True:
       try:
-        IncrementalDelete(
-            blobstore_query, check=check, delete=DeleteBlobinfoAsync)
+        incremental_delete(
+            blobstore_query, check=check, delete=delete_blobinfo_async)
         # Didn't throw, can now move on.
         break
       except datastore_errors.BadRequestError:
@@ -365,17 +365,17 @@ class RestrictedObliterateWorkerHandler(webapp2.RequestHandler):
     if not self.request.headers.get('X-AppEngine-QueueName'):
       self.abort(405, detail='Only internal task queue tasks can do this')
     logging.info('Deleting blobs')
-    IncrementalDelete(
+    incremental_delete(
         blobstore.BlobInfo.all().order('creation'),
-        DeleteBlobinfoAsync)
+        delete_blobinfo_async)
 
     logging.info('Deleting ContentEntry')
-    IncrementalDelete(
+    incremental_delete(
         ContentEntry.all(keys_only=True).order('creation'),
         db.delete_async)
 
     logging.info('Deleting Namespaces')
-    IncrementalDelete(
+    incremental_delete(
         ContentNamespace.all(keys_only=True).order('creation'),
         db.delete_async)
     logging.info('Finally done!')
@@ -404,12 +404,12 @@ class RestrictedTagWorkerHandler(webapp2.RequestHandler):
   def post(self, namespace, year, month, day):
     if not self.request.headers.get('X-AppEngine-QueueName'):
       self.abort(405, detail='Only internal task queue tasks can do this')
-    raw_hash_digests = PayloadToHashes(self, namespace)
+    raw_hash_digests = payload_to_hashes(self, namespace)
     logging.info(
         'Stamping %d entries in namespace %s', len(raw_hash_digests), namespace)
 
     today = datetime.date(int(year), int(month), int(day))
-    parent_key = GetContentNamespaceKey(namespace)
+    parent_key = get_content_namespace_key(namespace)
     to_save = []
     for raw_hash_digest in raw_hash_digests:
       hash_digest = binascii.hexlify(raw_hash_digest)
@@ -428,7 +428,7 @@ class RestrictedVerifyWorkerHandler(webapp2.RequestHandler):
     if not self.request.headers.get('X-AppEngine-QueueName'):
       self.abort(405, detail='Only internal task queue tasks can do this')
 
-    entry = GetContentByHash(namespace, hash_key)
+    entry = get_content_by_hash(namespace, hash_key)
     if not entry:
       logging.error('Failed to find entity')
       return
@@ -439,7 +439,7 @@ class RestrictedVerifyWorkerHandler(webapp2.RequestHandler):
       logging.error('Should not be called with inline content')
       return
 
-    digest = GetHashAlgo(namespace)
+    digest = get_hash_algo(namespace)
     if namespace.endswith('-gzip'):
       # Decompress before hashing.
       zlib_state = zlib.decompressobj()
@@ -456,7 +456,7 @@ class RestrictedVerifyWorkerHandler(webapp2.RequestHandler):
     count = 0
     try:
       # Start a loop where it reads the data in block.
-      count = ReadBlob(entry.content_reference, callback)
+      count = read_blob(entry.content_reference, callback)
 
       # Need a fixup for zipped content to complete the decompression.
       if namespace.endswith('-gzip'):
@@ -497,11 +497,11 @@ class ContainsHashHandler(acl.ACLRequestHandler):
 
     [1] It does modify the timestamp of the objects.
     """
-    raw_hash_digests = PayloadToHashes(self, namespace)
+    raw_hash_digests = payload_to_hashes(self, namespace)
     logging.info(
         'Checking namespace %s for %d hash digests',
         namespace, len(raw_hash_digests))
-    namespace_model_key = GetContentNamespaceKey(namespace)
+    namespace_model_key = get_content_namespace_key(namespace)
 
     # Convert to entity keys.
     keys = (
@@ -590,18 +590,18 @@ class StoreBlobstoreContentByHashHandler(
     contents = self.get_uploads('content')
     if len(contents) != 1:
       # Delete all upload files since they aren't linked to anything.
-      DeleteBlobinfoAsync(contents)
+      delete_blobinfo_async(contents)
       msg = 'Found %d files, there should only be 1.' % len(contents)
       self.abort(400, detail=msg)
 
-    entry = CreateEntry(namespace, hash_key)
+    entry = create_entry(namespace, hash_key)
     if not entry:
       msg = 'Hash entry already stored, no need to store %d bytes again.' % (
           contents[0].size)
       logging.warning(msg)
       self.response.out.write(msg)
       # Delete all upload files since they aren't linked to anything.
-      DeleteBlobinfoAsync(contents)
+      delete_blobinfo_async(contents)
       return
 
     try:
@@ -649,7 +649,7 @@ class StoreContentByHashHandler(acl.ACLRequestHandler):
     else:
       content = ''
 
-    entry = CreateEntry(namespace, hash_key)
+    entry = create_entry(namespace, hash_key)
     if not entry:
       msg = 'Hash entry already stored, no need to store %d bytes again.' % (
           len(content))
@@ -672,7 +672,7 @@ class StoreContentByHashHandler(acl.ACLRequestHandler):
         logging.error(e)
         self.abort(400, str(e))
 
-    digest = GetHashAlgo(namespace)
+    digest = get_hash_algo(namespace)
     digest.update(raw_data)
     if digest.hexdigest() != hash_key:
       msg = 'SHA-1 and data do not match'
@@ -700,7 +700,7 @@ class StoreContentByHashHandler(acl.ACLRequestHandler):
     else:
       logging.info(
           'Storing %d bytes of content in blobstore', len(content))
-      entry.content_reference = StoreValueInBlobstore(content)
+      entry.content_reference = store_value_in_blobstore(content)
       if not entry.content_reference:
         self.abort(507, detail='Unable to save the content to the blobstore.')
 
@@ -713,7 +713,7 @@ class StoreContentByHashHandler(acl.ACLRequestHandler):
 class RemoveContentByHashHandler(acl.ACLRequestHandler):
   """Removes content by its SHA-1 hash key from the server."""
   def post(self, namespace, hash_key):
-    entry = GetContentByHash(namespace, hash_key)
+    entry = get_content_by_hash(namespace, hash_key)
     # TODO(maruel): Use namespace='table_%s' % namespace.
     memcache.delete(hash_key, namespace=namespace)
 
@@ -743,7 +743,7 @@ class RetrieveContentByHashHandler(acl.ACLRequestHandler,
       self.response.out.write(memcache_entry)
       return
 
-    entry = GetContentByHash(namespace, hash_key)
+    entry = get_content_by_hash(namespace, hash_key)
     if not entry:
       msg = 'Unable to find an ContentEntry with key \'%s\'.' % hash_key
       self.abort(404, detail=msg)
