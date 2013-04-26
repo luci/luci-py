@@ -588,9 +588,6 @@ class StoreBlobstoreContentByHashHandler(
     self.access_id = original_access_id
     self.enforce_valid_token()
     contents = self.get_uploads('content')
-    if not contents:
-      # TODO(maruel): Remove, only kept for short term compatibility.
-      contents = self.get_uploads('hash_contents')
     if len(contents) != 1:
       # Delete all upload files since they aren't linked to anything.
       DeleteBlobinfoAsync(contents)
