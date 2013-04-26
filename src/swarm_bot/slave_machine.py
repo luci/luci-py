@@ -609,6 +609,9 @@ def main():
                     help='The maximum number of times url messages will '
                     'attempt to be sent before accepting failure. Defaults '
                     'to %default')
+  parser.add_option('--keep_alive', action='store_true',
+                    help='Have the slave swallow all exceptions and run'
+                    'forever.')
   parser.add_option('-v', '--verbose', action='store_true',
                     help='Set logging level to DEBUG. Optional. Defaults to '
                     'ERROR level.')
@@ -670,11 +673,16 @@ def main():
   # Change the working directory to specified path.
   os.chdir(options.directory)
 
-  # Start requesting jobs.
-  try:
-    slave.Start(iterations=options.iterations)
-  except SlaveError as e:
-    logging.exception('Slave start threw an exception:\n%s', e)
+  while True:
+    # Start requesting jobs.
+    try:
+      slave.Start(iterations=options.iterations)
+    except SlaveError as e:
+      logging.exception('Slave start threw an exception:\n%s', e)
+
+    if not options.keep_alive:
+      break
+    logging.info('Slave is set to stay alive, starting again.')
 
 
 if __name__ == '__main__':
