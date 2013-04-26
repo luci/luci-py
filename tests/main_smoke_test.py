@@ -165,11 +165,11 @@ class AppTestSignedIn(unittest.TestCase):
         time.sleep(0.5)
     self.assertEqual(chr(0), contain_response)
 
-  def UploadHashAndRetrieveHelper(self, hash_key, hash_contents, priority=1):
+  def UploadHashAndRetrieveHelper(self, hash_key, content, priority=1):
     self.RemoveAndVerify(hash_key)
 
     # Add the hash content and then retrieve it.
-    if len(hash_contents) > MIN_SIZE_FOR_BLOBSTORE:
+    if len(content) > MIN_SIZE_FOR_BLOBSTORE:
       # Query the server for a direct upload url.
       response = self.fetch(
           ISOLATE_SERVER_URL +
@@ -181,13 +181,13 @@ class AppTestSignedIn(unittest.TestCase):
 
       content_type, body = encode_multipart_formdata(
           [('token', self.token)],
-          [('hash_contents', 'hash_contents', hash_contents)])
+          [('content', hash_key, content)])
       response = self.fetch(upload_url, payload=body, content_type=content_type)
     else:
       response = self.fetch(
           ISOLATE_SERVER_URL + 'content/store/%s/%s?priority=%d&token=%s' % (
               self.namespace, hash_key, priority, self.token),
-          payload=hash_contents)
+          payload=content)
     self.assertEqual('Content saved.', response)
 
     # Verify the object is present.
@@ -211,12 +211,12 @@ class AppTestSignedIn(unittest.TestCase):
         ISOLATE_SERVER_URL + 'content/retrieve/%s/%s' % (
             self.namespace, hash_key),
         payload=None)
-    if hash_contents != response:
+    if content != response:
       # Process it manually in case it's several megabytes, unittest happily
       # print it out.
       self.fail(
           'Expected %s (%d bytes), got %s (%d bytes)' %
-          (hash_contents[:512], len(hash_contents),
+          (content[:512], len(content),
             response[:512], len(response)))
 
     self.RemoveAndVerify(hash_key)
@@ -228,10 +228,10 @@ class AppTestSignedIn(unittest.TestCase):
 
   def testStoreAndRetrieveHashfromBlobstore(self):
     # Try and upload a 40mb blobstore.
-    hash_contents = (BINARY_DATA * 128) * 1024 * 40
-    hash_key = hashlib.sha1(hash_contents).hexdigest()
+    content = (BINARY_DATA * 128) * 1024 * 40
+    hash_key = hashlib.sha1(content).hexdigest()
 
-    self.UploadHashAndRetrieveHelper(hash_key, hash_contents)
+    self.UploadHashAndRetrieveHelper(hash_key, content)
 
   def testStoreAndRetrieveEmptyHash(self):
     hash_key = hashlib.sha1().hexdigest()
@@ -282,10 +282,10 @@ class AppTestSignedIn(unittest.TestCase):
 # time in the future.
 #  def testCorrupted_Large(self):
 #    # Try and upload a corrupted 40mb blobstore.
-#    hash_contents = (BINARY_DATA * 128) * 1024 * 40
-#    hash_key = hashlib.sha1(hash_contents + 'x').hexdigest()
+#    content = (BINARY_DATA * 128) * 1024 * 40
+#    hash_key = hashlib.sha1(content + 'x').hexdigest()
 #    # TODO(maruel): This code tests that the code is not checking properly.
-#    self.UploadHashAndRetrieveHelper(hash_key, hash_contents)
+#    self.UploadHashAndRetrieveHelper(hash_key, content)
 
   def testGetToken(self):
     response1 = self.fetch(
