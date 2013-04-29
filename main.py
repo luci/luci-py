@@ -216,11 +216,8 @@ def payload_to_hashes(request, namespace):
       request, get_hash_algo(namespace).digest_size, MAX_KEYS_PER_CALL)
 
 
-def read_blob(blob, callback):
-  """Reads a BlobInfo/BlobKey and pass the data through callback.
-
-  Returns the amount of data read.
-  """
+def open_blob_for_reading(blob):
+  """Reads a BlobInfo/BlobKey and yield the data in chunks."""
   position = 0
   chunk_size = blobstore.MAX_BLOB_FETCH_SIZE
   while True:
@@ -230,7 +227,8 @@ def read_blob(blob, callback):
       logging.warning('Exception while reading blobstore data, retrying\n%s', e)
       continue
     logging.debug('Read %d bytes', len(data))
-    callback(data)
+    yield data
+
     position += len(data)
     if len(data) < chunk_size:
       break
@@ -239,7 +237,26 @@ def read_blob(blob, callback):
     # subsystem could decide that this instance is using too much memory.
     # Deleting this 1mb chunk explicitly helps work around this issue.
     del data
-  return position
+
+
+def expand_content(namespace, source):
+  """Yields expanded data from source."""
+  if namespace.endswith('-gzip'):
+    zlib_state = zlib.decompressobj()
+    for i in source:
+      yield zlib_state.decompress(i, blobstore.MAX_BLOB_FETCH_SIZE)
+      del i
+      while zlib_state.unconsumed_tail:
+        yield zlib_state.decompress(
+            zlib_state.unconsumed_tail, blobstore.MAX_BLOB_FETCH_SIZE)
+    yield zlib_state.flush()
+    # Forcibly delete the state.
+    del zlib_state
+  else:
+    # Returns the source as-is.
+    for i in source:
+      yield i
+      del i
 
 
 def delete_blobinfo_async(blobinfos):
@@ -439,28 +456,17 @@ class RestrictedVerifyWorkerHandler(webapp2.RequestHandler):
       logging.error('Should not be called with inline content')
       return
 
-    digest = get_hash_algo(namespace)
-    if namespace.endswith('-gzip'):
-      # Decompress before hashing.
-      zlib_state = zlib.decompressobj()
-      def gzip_decompress(data):
-        decompressed_data = zlib_state.decompress(data)
-        digest.update(decompressed_data)
-        # Make sure the memory is unallocated.
-        del decompressed_data
-      callback = gzip_decompress
-    else:
-      callback = digest.update
-
-    is_verified = False
     count = 0
+    is_verified = False
+    digest = get_hash_algo(namespace)
     try:
       # Start a loop where it reads the data in block.
-      count = read_blob(entry.content_reference, callback)
-
-      # Need a fixup for zipped content to complete the decompression.
-      if namespace.endswith('-gzip'):
-        digest.update(zlib_state.flush())
+      blob = open_blob_for_reading(entry.content_reference)
+      for data in expand_content(namespace, blob):
+        count += len(data)
+        digest.update(data)
+        # Make sure the data is GC'ed.
+        del data
       is_verified = digest.hexdigest() == hash_key
     except runtime.DeadlineExceededError:
       # Failed to read it through. If it's compressed, at least no zlib error
@@ -664,20 +670,30 @@ class StoreContentByHashHandler(acl.ACLRequestHandler):
 
     # Verify the data while at it since it's already in memory but before
     # storing it in memcache and datastore.
-    raw_data = content
-    if namespace.endswith('-gzip'):
-      try:
-        raw_data = zlib.decompress(content)
-      except zlib.error as e:
-        logging.error(e)
-        self.abort(400, str(e))
-
+    count = 0
+    is_verified = False
     digest = get_hash_algo(namespace)
-    digest.update(raw_data)
-    if digest.hexdigest() != hash_key:
-      msg = 'SHA-1 and data do not match'
+    try:
+      for data in expand_content(namespace, [content]):
+        count += len(data)
+        digest.update(data)
+        # Make sure the data is GC'ed.
+        del data
+      is_verified = digest.hexdigest() == hash_key
+    except zlib.error as e:
+      msg = 'Data is corrupted: %s' % e
       logging.error(msg)
       self.abort(400, msg)
+
+    if not is_verified:
+      # Delete the entity since it's corrupted.
+      msg = 'SHA-1 and data do not match, %d bytes' % count
+      logging.error(msg)
+      self.abort(400, msg)
+
+    logging.info('%d bytes verified', count)
+    entry.is_verified = True
+    entry.put()
 
     if priority == 0:
       try:

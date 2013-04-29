@@ -231,6 +231,15 @@ class AppTestSignedIn(TestCase):
     compressed = zlib.compress(BINARY_DATA)
     self.upload_and_retrieve(hash_key, compressed)
 
+  def test_gzip_512mb(self):
+    # The goal here is to explode the 128mb memory limit of the F1 AppEngine
+    # instance.
+    self.namespace += '-gzip'
+    content = (BINARY_DATA * 128) * 1024 * 512
+    hash_key = hashlib.sha1(content).hexdigest()
+    compressed = zlib.compress(content)
+    self.upload_and_retrieve(hash_key, compressed)
+
   def testCorrupted(self):
     hash_key = hashlib.sha1(BINARY_DATA + 'x').hexdigest()
     try:
@@ -251,15 +260,18 @@ class AppTestSignedIn(TestCase):
     except urllib2.HTTPError as e:
       self.assertEqual(400, e.code)
 
-# TODO(maruel): Add a /content/verify/namespace/hash_key to ensure a large
-# object is verified? Otherwise, it's run in a taskqueue at an indeterminate
-# time in the future.
-#  def testCorrupted_Large(self):
-#    # Try and upload a corrupted 40mb blobstore.
-#    content = (BINARY_DATA * 128) * 1024 * 40
-#    hash_key = hashlib.sha1(content + 'x').hexdigest()
-#    # TODO(maruel): This code tests that the code is not checking properly.
-#    self.upload_and_retrieve(hash_key, content)
+  def testCorrupted_gzip_512mb(self):
+    # Try and upload a corrupted 512mb blob. The goal here is to explode the
+    # 128mb memory limit of the F1 AppEngine instance.
+    content = (BINARY_DATA * 128) * 1024 * 512
+    hash_key = hashlib.sha1(content + 'x').hexdigest()
+    compressed = zlib.compress(BINARY_DATA)
+    try:
+      # The upload is refused right away.
+      self.upload(hash_key, compressed)
+      self.fail()
+    except urllib2.HTTPError as e:
+      self.assertEqual(400, e.code)
 
   def testGetToken(self):
     response1 = self.fetch(
