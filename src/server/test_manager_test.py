@@ -10,8 +10,15 @@
 import datetime
 import json
 import logging
+import os
+import shutil
+import StringIO
+import subprocess
+import sys
+import tempfile
 import unittest
 import urllib2
+import zipfile
 
 
 from google.appengine.api import mail
@@ -76,7 +83,7 @@ class TestRequestManagerTest(unittest.TestCase):
   def _GetRequestMessage(self, min_instances=1, additional_instances=0,
                          env_vars=None, result_url=DEFAULT_RESULT_URL,
                          store_result='all', restart_on_failure=False,
-                         os='win-xp'):
+                         platform='win-xp'):
     """Return a properly formatted request message text.
 
     Args:
@@ -90,7 +97,7 @@ class TestRequestManagerTest(unittest.TestCase):
           are kept).
       restart_on_failure: Identifies if the slave should be restarted if any
           of its tests fail.
-      os: The os to require in the test's configuration.
+      platform: The os to require in the test's configuration.
 
     Returns:
       A properly formatted request message text.
@@ -101,7 +108,7 @@ class TestRequestManagerTest(unittest.TestCase):
         test_name='t1', action=['ignore-me.exe'])]
     request.configurations = [
         test_request_message.TestConfiguration(
-            config_name=self._request_message_config_name, os=os,
+            config_name=self._request_message_config_name, os=platform,
             cpu='Unknown', data=['http://b.ina.ry/files2.zip'],
             browser='Unknown',
             min_instances=min_instances,
@@ -124,7 +131,7 @@ class TestRequestManagerTest(unittest.TestCase):
 
   def _GetMachineRegisterRequest(self, machine_id=None, username=None,
                                  password=None, tag=None, try_count=None,
-                                 os='win-xp'):
+                                 platform='win-xp'):
     """Return a properly formatted register machine request.
 
     Args:
@@ -133,13 +140,13 @@ class TestRequestManagerTest(unittest.TestCase):
       password: If provided, the password of the machine will be set to this.
       tag: If provided, the tag of the machine will be set to this.
       try_count: If provided, the try_count of the machine will be set to this.
-      os: The value of the os to use in the dimensions.
+      platform: The value of the os to use in the dimensions.
 
     Returns:
       A dictionary which can be fed into test_manager.ExecuteRegisterRequest().
     """
 
-    config_dimensions = {'os': os, 'cpu': 'Unknown', 'browser': 'Unknown'}
+    config_dimensions = {'os': platform, 'cpu': 'Unknown', 'browser': 'Unknown'}
     attributes = {'dimensions': config_dimensions}
     if machine_id:
       attributes['id'] = str(machine_id)
@@ -171,11 +178,11 @@ class TestRequestManagerTest(unittest.TestCase):
       self._manager._LoadFile(
           mox.IgnoreArg()).MultipleTimes().AndReturn(contents)
 
-  def _ExecuteRegister(self, machine_id, try_count=0, os='win-xp',
+  def _ExecuteRegister(self, machine_id, try_count=0, platform='win-xp',
                        register_should_match=True):
     register_request = self._GetMachineRegisterRequest(machine_id=machine_id,
                                                        try_count=try_count,
-                                                       os=os)
+                                                       platform=platform)
     response = self._manager.ExecuteRegisterRequest(register_request,
                                                     self._SERVER_URL)
 
@@ -224,9 +231,9 @@ class TestRequestManagerTest(unittest.TestCase):
         dimensions_utils.MAX_DIMENSIONS_PER_MACHINE * 2))
 
     self._manager.ExecuteTestRequest(self._GetRequestMessage(
-        os=large_os_config))
+        platform=large_os_config))
 
-    self._ExecuteRegister(MACHINE_IDS[0], os=large_os_config)
+    self._ExecuteRegister(MACHINE_IDS[0], platform=large_os_config)
     runner = test_runner.TestRunner.gql('WHERE machine_id = :1',
                                         MACHINE_IDS[0]).get()
     self.assertNotEqual(None, runner)
@@ -1033,7 +1040,7 @@ class TestRequestManagerTest(unittest.TestCase):
 
   def testRecordMachineRunnerAssignedCorrectlyCalled(self):
     matching_config = 'win-xp'
-    request_message = self._GetRequestMessage(os=matching_config)
+    request_message = self._GetRequestMessage(platform=matching_config)
     self._manager.ExecuteTestRequest(request_message)
 
     self.assertEqual(0, machine_stats.MachineStats.all().count())
@@ -1041,13 +1048,13 @@ class TestRequestManagerTest(unittest.TestCase):
     # Ensure query is recorded, even though there was no match.
     nonmatching_config = 'win-vista'
     self._manager.ExecuteRegisterRequest(
-        self._GetMachineRegisterRequest(os=nonmatching_config),
+        self._GetMachineRegisterRequest(platform=nonmatching_config),
         self._SERVER_URL)
     self.assertEqual(1, machine_stats.MachineStats.all().count())
 
     # Ensure the query is recorded.
     self._manager.ExecuteRegisterRequest(
-        self._GetMachineRegisterRequest(os=matching_config),
+        self._GetMachineRegisterRequest(platform=matching_config),
         self._SERVER_URL)
     self.assertEqual(2, machine_stats.MachineStats.all().count())
 
@@ -1094,6 +1101,32 @@ class TestRequestManagerTest(unittest.TestCase):
     self.assertTrue(r_stats.success)
 
     self._mox.VerifyAll()
+
+  def testSlaveCodeZipped(self):
+    zipped_code = test_manager.SlaveCodeZipped()
+
+    temp_dir = tempfile.mkdtemp()
+    try:
+      with zipfile.ZipFile(StringIO.StringIO(zipped_code), 'r') as zip_file:
+        zip_file.extractall(temp_dir)
+
+      expected_slave_script = os.path.join(temp_dir,
+                                           test_manager._SLAVE_MACHINE_SCRIPT)
+      self.assertTrue(os.path.exists(expected_slave_script))
+
+      common_dir = os.path.join(temp_dir, test_manager._COMMON_DIR)
+      self.assertTrue(os.path.exists(
+          os.path.join(common_dir, test_manager._PYTHON_INIT_SCRIPT)))
+      self.assertTrue(os.path.exists(
+          os.path.join(common_dir, test_manager._SWARM_CONSTANTS_SCRIPT)))
+      self.assertTrue(os.path.exists(
+          os.path.join(common_dir, test_manager._URL_HELPER_SCRIPT)))
+
+      # Try running the slave and ensure it can import the required files.
+      # (It would crash if it failed to import them).
+      subprocess.check_call([sys.executable, expected_slave_script, '-h'])
+    finally:
+      shutil.rmtree(temp_dir)
 
 
 if __name__ == '__main__':

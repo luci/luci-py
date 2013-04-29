@@ -597,6 +597,19 @@ class GetResultHandler(webapp2.RequestHandler):
     SendRunnerResults(self.response, key)
 
 
+class GetSlaveCodeHandler(webapp2.RequestHandler):
+  """Returns a zip file with all the files required by a slave."""
+
+  def get(self):  # pylint: disable-msg=C6409
+    """Handles HTTP GET requests for this handler's URL."""
+    if not AuthenticateRemoteMachine(self.request):
+      SendAuthenticationFailure(self.request, self.response)
+      return
+
+    self.response.headers['Content-Type'] = 'application/octet-stream'
+    self.response.out.write(test_manager.SlaveCodeZipped())
+
+
 class GetTokenHandler(webapp2.RequestHandler):
   """Returns an authentication token."""
 
@@ -910,6 +923,7 @@ def CreateApplication():
                                   ('/get_matching_test_cases',
                                    GetMatchingTestCasesHandler),
                                   ('/get_result', GetResultHandler),
+                                  ('/get_slave_code', GetSlaveCodeHandler),
                                   ('/get_token', GetTokenHandler),
                                   ('/poll_for_test', RegisterHandler),
                                   ('/remote_error', RemoteErrorHandler),

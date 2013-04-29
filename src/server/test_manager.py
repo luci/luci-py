@@ -25,10 +25,12 @@ import logging
 import math
 import os.path
 import random
+import StringIO
 import urllib
 import urllib2
 import urlparse
 import uuid
+import zipfile
 
 from google.appengine.api import mail
 from google.appengine.api import urlfetch
@@ -60,6 +62,9 @@ _TEST_RUN_SWARM_FILE_NAME = 'test_run.swarm'
 
 # Name of python script containing constants.
 _SWARM_CONSTANTS_SCRIPT = 'swarm_constants.py'
+
+# Name of python script for swarm slaves.
+_SLAVE_MACHINE_SCRIPT = 'slave_machine.py'
 
 # Name of python script to execute on the remote machine to run a test.
 _TEST_RUNNER_SCRIPT = 'local_test_runner.py'
@@ -927,6 +932,30 @@ def DeleteOldErrors():
     error.delete()
 
   logging.debug('DeleteOldErrors done')
+
+
+def SlaveCodeZipped():
+  """Returns a zipped file of all the files a slave needs to run.
+
+  Returns:
+    A string representing the zipped file's contents.
+  """
+  zip_memory_file = StringIO.StringIO()
+  with zipfile.ZipFile(zip_memory_file, 'w') as zip_file:
+    slave_script = os.path.join(SWARM_ROOT_DIR, _TEST_RUNNER_DIR,
+                                _SLAVE_MACHINE_SCRIPT)
+    zip_file.write(slave_script, _SLAVE_MACHINE_SCRIPT)
+
+    # Copy all the required helper files.
+    common_dir = os.path.join(SWARM_ROOT_DIR, _COMMON_DIR)
+    zip_file.write(os.path.join(common_dir, _PYTHON_INIT_SCRIPT),
+                   os.path.join(_COMMON_DIR, _PYTHON_INIT_SCRIPT))
+    zip_file.write(os.path.join(common_dir, _SWARM_CONSTANTS_SCRIPT),
+                   os.path.join(_COMMON_DIR, _SWARM_CONSTANTS_SCRIPT))
+    zip_file.write(os.path.join(common_dir, _URL_HELPER_SCRIPT),
+                   os.path.join(_COMMON_DIR, _URL_HELPER_SCRIPT))
+
+  return zip_memory_file.getvalue()
 
 
 class PrepareRemoteCommandsError(Exception):

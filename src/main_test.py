@@ -164,6 +164,10 @@ class AppTest(unittest.TestCase):
     self.assertEqual('200 OK', response.status)
     self.assertEqual('dummy_token', response.body)
 
+  def testGetSlaveCode(self):
+    response = self.app.get('/get_slave_code')
+    self.assertEqual('200 OK', response.status)
+
   def testMachineList(self):
     self._mox.StubOutWithMock(main_app.template, 'render')
     main_app.template.render(mox.IgnoreArg(), mox.IgnoreArg()).AndReturn('')
