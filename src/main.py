@@ -59,6 +59,9 @@ _SECURE_USER_PROFILE_URL = '/secure/user_profile'
 # Allow GET requests to be passed through as POST requests.
 ALLOW_POST_AS_GET = False
 
+# The domains that are allowed to access this application.
+ALLOW_ACCESS_FROM_DOMAINS = ()
+
 
 def GenerateTopbar():
   """Generate the topbar to display on all server pages.
@@ -110,6 +113,84 @@ def OnDevAppEngine():
     True if this code is running on dev app engine.
   """
   return os.environ['SERVER_SOFTWARE'].startswith('Development')
+
+
+def AuthenticateMachine(method):
+  """Decorator for 'get' or 'post' methods that require machine authentication.
+
+  Decorated method verifies that a remote machine is IP whitelisted. Methods
+  marked by this decorator are indented to be called only by swarm slaves.
+
+  Args:
+    method: 'get' or 'post' method of RequestHandler subclass.
+
+  Returns:
+    Decorated method that verifies that machine is IP whitelisted.
+  """
+  def Wrapper(handler, *args, **kwargs):
+    if not IsAuthenticatedMachine(handler.request):
+      SendAuthenticationFailure(handler.request, handler.response)
+    else:
+      return method(handler, *args, **kwargs)
+  return Wrapper
+
+
+def AuthenticateMachineOrUser(method):
+  """Decorator for 'get' or 'post' methods that require authentication.
+
+  Decorated method verifies that a remote machine is IP whitelisted or
+  the request is issued by a known user account. Methods marked by this
+  decorator are indented to be called by swarm slaves or by users submitting
+  tests to the swarm.
+
+  Args:
+    method: 'get' or 'post' method of RequestHandler subclass.
+
+  Returns:
+    Decorated method.
+  """
+  def Wrapper(handler, *args, **kwargs):
+    # Check user account first, it's fast.
+    user = users.get_current_user()
+    if user and (users.is_current_user_admin() or IsAuthenticatedUser(user)):
+      return method(handler, *args, **kwargs)
+
+    # Check IP whitelist, it's slower.
+    if IsAuthenticatedMachine(handler.request):
+      return method(handler, *args, **kwargs)
+
+    # Both checks failed, respond with error,
+    SendAuthenticationFailure(handler.request, handler.response)
+  return Wrapper
+
+
+def IsAuthenticatedUser(user):
+  """Check to see if the user is allowed to execute a request.
+
+  Args:
+    user: api.users.User with info about user that issued the request.
+
+  Returns:
+    True if the user is allowed to execute a request.
+  """
+  assert user
+  domain = user.email().partition('@')[2]
+  return domain in ALLOW_ACCESS_FROM_DOMAINS
+
+
+def IsAuthenticatedMachine(request):
+  """Check to see if the request is from a whitelisted machine.
+
+  Will use the remote machine's IP and provided password (if any).
+
+  Args:
+    request: WebAPP request sent by remote machine.
+
+  Returns:
+    True if the request is from a whitelisted machine.
+  """
+  return user_manager.IsWhitelistedMachine(
+      request.remote_addr, request.get('password', None))
 
 
 class MainHandler(webapp2.RequestHandler):
@@ -327,12 +408,9 @@ class TestRequestHandler(webapp2.RequestHandler):
     else:
       self.response.set_status(405)
 
+  @AuthenticateMachineOrUser
   def post(self):  # pylint: disable-msg=C6409
     """Handles HTTP POST requests for this handler's URL."""
-    if not AuthenticateRemoteMachine(self.request):
-      SendAuthenticationFailure(self.request, self.response)
-      return
-
     # Validate the request.
     if not self.request.get('request'):
       self.response.set_status(402)
@@ -353,12 +431,9 @@ class TestRequestHandler(webapp2.RequestHandler):
 class ResultHandler(webapp2.RequestHandler):
   """Handles test results from remote test runners."""
 
+  @AuthenticateMachine
   def post(self):  # pylint: disable-msg=C6409
     """Handles HTTP POST requests for this handler's URL."""
-    if not AuthenticateRemoteMachine(self.request):
-      SendAuthenticationFailure(self.request, self.response)
-      return
-
     # TODO(user): Share this code between all the request handlers so we
     # can always see how often a request is being sent.
     connection_attempt = self.request.get(url_helper.COUNT_KEY)
@@ -557,12 +632,9 @@ class StatsHandler(webapp2.RequestHandler):
 class GetMatchingTestCasesHandler(webapp2.RequestHandler):
   """Get all the keys for any test runner that match a given test case name."""
 
+  @AuthenticateMachineOrUser
   def get(self):  # pylint: disable-msg=C6409
     """Handles HTTP GET requests for this handler's URL."""
-    if not AuthenticateRemoteMachine(self.request):
-      SendAuthenticationFailure(self.request, self.response)
-      return
-
     self.response.headers['Content-Type'] = 'text/plain'
 
     test_case_name = self.request.get('name', '')
@@ -589,25 +661,18 @@ class SecureGetResultHandler(webapp2.RequestHandler):
 class GetResultHandler(webapp2.RequestHandler):
   """Show the full result string from a test runner."""
 
+  @AuthenticateMachineOrUser
   def get(self):  # pylint: disable-msg=C6409
     """Handles HTTP GET requests for this handler's URL."""
-    if not AuthenticateRemoteMachine(self.request):
-      SendAuthenticationFailure(self.request, self.response)
-      return
-
-    key = self.request.get('r', '')
-    SendRunnerResults(self.response, key)
+    SendRunnerResults(self.response, self.request.get('r', ''))
 
 
 class GetSlaveCodeHandler(webapp2.RequestHandler):
   """Returns a zip file with all the files required by a slave."""
 
+  @AuthenticateMachine
   def get(self):  # pylint: disable-msg=C6409
     """Handles HTTP GET requests for this handler's URL."""
-    if not AuthenticateRemoteMachine(self.request):
-      SendAuthenticationFailure(self.request, self.response)
-      return
-
     self.response.headers['Content-Type'] = 'application/octet-stream'
     self.response.out.write(test_manager.SlaveCodeZipped())
 
@@ -624,12 +689,9 @@ class GetTokenHandler(webapp2.RequestHandler):
 class CleanupResultsHandler(webapp2.RequestHandler):
   """Delete the Test Runner with the given key."""
 
+  @AuthenticateMachine
   def post(self):  # pylint: disable-msg=C6409
     """Handles HTTP POST requests for this handler's URL."""
-    if not AuthenticateRemoteMachine(self.request):
-      SendAuthenticationFailure(self.request, self.response)
-      return
-
     self.response.headers['Content-Type'] = 'test/plain'
 
     key = self.request.get('r', '')
@@ -706,12 +768,9 @@ class RegisterHandler(webapp2.RequestHandler):
     else:
       self.response.set_status(405)
 
+  @AuthenticateMachine
   def post(self):  # pylint: disable-msg=C6409
     """Handles HTTP POST requests for this handler's URL."""
-    if not AuthenticateRemoteMachine(self.request):
-      SendAuthenticationFailure(self.request, self.response)
-      return
-
     # Validate the request.
     if not self.request.body:
       self.response.set_status(402)
@@ -757,12 +816,9 @@ class RunnerPingHandler(webapp2.RequestHandler):
      so it won't consider it stale.
   """
 
+  @AuthenticateMachine
   def post(self):  # pylint: disable-msg=C6409
     """Handles HTTP POST requests for this handler's URL."""
-    if not AuthenticateRemoteMachine(self.request):
-      SendAuthenticationFailure(self.request, self.response)
-      return
-
     key = self.request.get('r', '')
     machine_id = self.request.get('id', '')
 
@@ -827,12 +883,9 @@ class ChangeWhitelistHandler(webapp2.RequestHandler):
 class RemoteErrorHandler(webapp2.RequestHandler):
   """Handler to log an error reported by remote machine."""
 
+  @AuthenticateMachine
   def post(self):  # pylint: disable-msg=C6409
     """Handles HTTP POST requests for this handler's URL."""
-    if not AuthenticateRemoteMachine(self.request):
-      SendAuthenticationFailure(self.request, self.response)
-      return
-
     error_message = self.request.get('m', '')
     error = test_manager.SwarmError(
         name='Remote Error Report', message=error_message,
@@ -857,21 +910,6 @@ class UploadHandler(blobstore_handlers.BlobstoreUploadHandler):
 
     blob_info = upload_result[0]
     self.response.out.write(blob_info.key())
-
-
-def AuthenticateRemoteMachine(request):
-  """Check to see if the request is from a whitelisted machine.
-
-  Will use the remote machine's IP and provided password (if any).
-
-  Args:
-    request: WebAPP request sent by remote machine.
-
-  Returns:
-    True if the request is from a whitelisted machine.
-  """
-  return user_manager.IsWhitelistedMachine(
-      request.remote_addr, request.get('password', None))
 
 
 def SendAuthenticationFailure(request, response):

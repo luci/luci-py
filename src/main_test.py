@@ -97,6 +97,12 @@ class AppTest(unittest.TestCase):
 
     return runner
 
+  def _ReplaceCurrentUser(self, email):
+    if email:
+      self.testbed.setup_env(USER_EMAIL=email, overwrite=True)
+    else:
+      self.testbed.setup_env(overwrite=True)
+
   def testMatchingTestCasesHandler(self):
     # Test when no matching tests.
     response = self.app.get('/get_matching_test_cases',
@@ -373,15 +379,16 @@ class AppTest(unittest.TestCase):
         '/secure/change_whitelist', {'i': ip[1], 'a': 'False', 'p': 'Invalid'})
     self.assertEqual(0, user_manager.MachineWhitelist.all().count())
 
-  # Test non-secure hanlders to make sure they check the remote machine to be
+  # Test non-secure handlers to make sure they check the remote machine to be
   # whitelisted before allowing them to perform the task.
-  def testUnsecureHandlerAuthentication(self):
+  def testUnsecureHandlerMachineAuthentication(self):
     password = '4321'
 
     # List of non-secure handlers and their method.
     handlers = [('/cleanup_results', self.app.post),
                 ('/get_matching_test_cases', self.app.get),
                 ('/get_result', self.app.get),
+                ('/get_slave_code', self.app.get),
                 ('/poll_for_test', self.app.post),
                 ('/remote_error', self.app.post),
                 ('/result', self.app.post),
@@ -407,6 +414,50 @@ class AppTest(unittest.TestCase):
     for handler, method in handlers:
       response = method(
           handler, {'password': 'something else'}, expect_errors=True)
+      self.assertEqual(
+          '403 Forbidden', response.status, msg='Handler: ' + handler)
+
+  # Test that some specific non-secure handlers allow access to authenticated
+  # user. Also verify that authenticated user still can't use other handlers.
+  def testUnsecureHandlerUserAuthentication(self):
+    # List of non-secure handlers and their method that can be called by user.
+    allowed = [('/get_matching_test_cases', self.app.get),
+               ('/get_result', self.app.get),
+               ('/test', self.app.post)]
+
+    # List of non-secure handlers that should not be accessible to the user.
+    forbidden = [('/cleanup_results', self.app.post),
+                 ('/get_slave_code', self.app.get),
+                 ('/poll_for_test', self.app.post),
+                 ('/remote_error', self.app.post),
+                 ('/result', self.app.post)]
+
+    # Reset state to non-whitelisted, anonymous machine.
+    user_manager.DeleteWhitelist(None)
+    self._ReplaceCurrentUser(None)
+
+    # Make sure all anonymous requests are rejected.
+    for handler, method in (allowed + forbidden):
+      response = method(handler, expect_errors=True)
+      self.assertEqual(
+          '403 Forbidden', response.status, msg='Handler: ' + handler)
+
+    # Make sure all requests from unknown account are rejected.
+    self._ReplaceCurrentUser('someone@example.com')
+    for handler, method in (allowed + forbidden):
+      response = method(handler, expect_errors=True)
+      self.assertEqual(
+          '403 Forbidden', response.status, msg='Handler: ' + handler)
+
+    # Make sure for a known account 'allowed' methods are accessible
+    # and 'forbidden' are not.
+    self._ReplaceCurrentUser('someone@google.com')
+    for handler, method in allowed:
+      response = method(handler, expect_errors=True)
+      self.assertNotEqual(
+          '403 Forbidden', response.status, msg='Handler: ' + handler)
+    for handler, method in forbidden:
+      response = method(handler, expect_errors=True)
       self.assertEqual(
           '403 Forbidden', response.status, msg='Handler: ' + handler)
 
