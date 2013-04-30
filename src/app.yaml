@@ -5,12 +5,7 @@ api_version: 1
 threadsafe: true
 
 handlers:
-- url: /tasks/poll
-  script: main.app
-  secure: always
-  login: admin
-
-- url: /tasks/sendereporter
+- url: /tasks/*
   script: main.app
   secure: always
   login: admin

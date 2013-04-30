@@ -7,6 +7,10 @@ cron:
   url: /tasks/sendereporter
   schedule: every day 00:00
 
+- description: Detect dead machines
+  url: /tasks/detect_dead_machines
+  schedule: every day 01:00
+
 - description: Cleanup old data and orphaned blobs
   url: /tasks/cleanup_data
   schedule: every 6 hours

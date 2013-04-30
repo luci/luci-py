@@ -11,6 +11,7 @@ import logging
 import unittest
 
 from google.appengine.ext import testbed
+from server import admin_user
 from stats import machine_stats
 
 
@@ -28,6 +29,38 @@ class MachineStatsTest(unittest.TestCase):
 
   def tearDown(self):
     self.testbed.deactivate()
+
+  def testDetectDeadMachines(self):
+    self.assertEqual([], machine_stats.FindDeadMachines())
+
+    m_stats = machine_stats.MachineStats(
+        machine_id='id1', tag='young_machine', last_seen=datetime.date.today())
+    m_stats.put()
+    self.assertEqual([], machine_stats.FindDeadMachines())
+
+    old_date = datetime.date.today() - datetime.timedelta(
+        days=machine_stats.MACHINE_TIMEOUT_IN_DAYS * 2)
+    m_stats = machine_stats.MachineStats(
+        machine_id='id2', tag='old_machine', last_seen=old_date)
+    m_stats.put()
+
+    dead_machines = machine_stats.FindDeadMachines()
+    self.assertEqual(1, len(dead_machines))
+    self.assertEqual('id2', dead_machines[0].machine_id)
+    self.assertEqual('old_machine', dead_machines[0].tag)
+
+  def testNotifyAdminsOfDeadMachines(self):
+    dead_machine = machine_stats.MachineStats(machine_id='id', tag='tag',
+                                              last_seen=datetime.date.today())
+    dead_machine.put()
+
+    # No admins are set, so no email should be sent.
+    self.assertFalse(machine_stats.NotifyAdminsOfDeadMachines([dead_machine]))
+
+    # Set an admin and ensure emails can get sent to them.
+    user = admin_user.AdminUser(email='fake@email.com')
+    user.put()
+    self.assertTrue(machine_stats.NotifyAdminsOfDeadMachines([dead_machine]))
 
   def testRecordMachineQueries(self):
     machine_tag = 'tag'

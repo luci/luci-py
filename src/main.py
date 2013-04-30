@@ -506,17 +506,8 @@ class ResultHandler(webapp2.RequestHandler):
       self.response.out.write('Failed to update the runner results.')
 
 
-class CleanupDataHandler(webapp2.RequestHandler):
-  """Handles cron job to delete orphaned blobs."""
-
-  def post(self):  # pylint: disable-msg=C6409
-    test_manager.DeleteOldErrors()
-    test_runner.DeleteOldRunners()
-    test_runner.DeleteOrphanedBlobs()
-
-    runner_stats.DeleteOldRunnerStats()
-
-    self.response.out.write('Successfully cleaned up old data.')
+class CronJobHandler(webapp2.RequestHandler):
+  """A helper class to handle redirecting GET cron jobs to POSTs."""
 
   def get(self):  # pylint: disable-msg=C6409
     """Handles HTTP GET requests for this handler's URL."""
@@ -530,7 +521,39 @@ class CleanupDataHandler(webapp2.RequestHandler):
     self.post()
 
 
-class AbortStaleRunnersHandler(webapp2.RequestHandler):
+class CleanupDataHandler(CronJobHandler):
+  """Handles cron jobs to delete orphaned blobs."""
+
+  def post(self):  # pylint: disable-msg=C6409
+    test_manager.DeleteOldErrors()
+    test_runner.DeleteOldRunners()
+    test_runner.DeleteOrphanedBlobs()
+
+    runner_stats.DeleteOldRunnerStats()
+
+    self.response.out.write('Successfully cleaned up old data.')
+
+
+class DetectDeadMachinesHandler(CronJobHandler):
+  """Handles cron jobs to detect dead machines."""
+
+  def post(self):  # pylint: disable-msg=C6409
+    dead_machines = machine_stats.FindDeadMachines()
+    if not dead_machines:
+      msg = 'No dead machines found'
+      logging.info(msg)
+      self.response.out.write(msg)
+      return
+
+    logging.warning('Dead machines were detected, emailing admins')
+    machine_stats.NotifyAdminsOfDeadMachines(dead_machines)
+
+    msg = 'Successfully detected dead machines and emailed admins.'
+    logging.info(msg)
+    self.response.out.write(msg)
+
+
+class AbortStaleRunnersHandler(CronJobHandler):
   """Handles cron job to abort stale runners."""
 
   def post(self):  # pylint: disable-msg=C6409
@@ -547,17 +570,6 @@ class AbortStaleRunnersHandler(webapp2.RequestHandler):
     <body>Poll Done</body>
     </html>
     """)
-
-  def get(self):  # pylint: disable-msg=C6409
-    """Handles HTTP GET requests for this handler's URL."""
-    # Only an app engine cron job is allowed to poll via get (it currently
-    # has no way to make its request a post).
-    if self.request.headers.get('X-AppEngine-Cron') != 'true':
-      self.response.out.write('Only internal cron jobs can do this')
-      self.response.set_status(405)
-      return
-
-    self.post()
 
 
 class SendEReporterHandler(ReportGenerator):
@@ -977,6 +989,8 @@ def CreateApplication():
                                   ('/tasks/abort_stale_runners',
                                    AbortStaleRunnersHandler),
                                   ('/tasks/cleanup_data', CleanupDataHandler),
+                                  ('/tasks/find_dead_machines',
+                                   DetectDeadMachinesHandler),
                                   ('/tasks/sendereporter',
                                    SendEReporterHandler),
                                   ('/test', TestRequestHandler),

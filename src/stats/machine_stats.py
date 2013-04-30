@@ -11,7 +11,31 @@ The model of the Machine Stats, and various helper functions.
 import datetime
 import logging
 
+from google.appengine.api import app_identity
+from google.appengine.api import mail
 from google.appengine.ext import db
+from server import admin_user
+
+
+# The number of days that have to pass before a machine is considered dead.
+MACHINE_TIMEOUT_IN_DAYS = 3
+
+# The message to use for each dead machine.
+_INDIVIDUAL_DEAD_MACHINE_MESSAGE = (
+    'Machine %(machine_id)s(%(machine_tag)s) was last seen %(last_seen)s and '
+    'is assumed to be dead.')
+
+# The message body of the dead machine message to send admins.
+_DEAD_MACHINE_MESSAGE_BODY = """Hello,
+
+The following registered machines haven't been active in %(machine_timeout)s
+days.
+
+%(death_summary)s
+
+Please revive the machines or remove them from the server's list of active
+machines.
+"""
 
 
 class MachineStats(db.Model):
@@ -24,6 +48,54 @@ class MachineStats(db.Model):
 
   # The last day the machine queried for work.
   last_seen = db.DateProperty(required=True)
+
+
+def FindDeadMachines():
+  """Find all dead machines.
+
+  Returns:
+    A list of the dead machines.
+  """
+  dead_machine_cutoff = (datetime.date.today() -
+                         datetime.timedelta(days=MACHINE_TIMEOUT_IN_DAYS))
+
+  return list(MachineStats.gql('WHERE last_seen < :1', dead_machine_cutoff))
+
+
+def NotifyAdminsOfDeadMachines(dead_machines):
+  """Notify the admins of the dead_machines detected.
+
+  Args:
+    dead_machines: The list of the currently dead machines.
+
+  Returns:
+    True if the email was successfully sent.
+  """
+  if admin_user.AdminUser.all().count() == 0:
+    logging.error('No admins found, no one to notify of dead machines')
+    return False
+
+  death_summary = []
+  for machine in dead_machines:
+    death_summary.append(
+        _INDIVIDUAL_DEAD_MACHINE_MESSAGE % {'machine_id': machine.machine_id,
+                                            'machine_tag': machine.tag,
+                                            'last_seen': machine.last_seen})
+
+  app_id = app_identity.get_application_id()
+
+  message = mail.EmailMessage()
+  message.sender = 'dead_machine_detecter@%s.appspotmail.com' % app_id
+  message.to = ','.join(admin.email for admin in admin_user.AdminUser.all())
+  message.subject = 'Dead Machines Found on %s' % app_id
+
+  message.body = _DEAD_MACHINE_MESSAGE_BODY % {
+      'machine_timeout': MACHINE_TIMEOUT_IN_DAYS,
+      'death_summary': death_summary}
+
+  message.send()
+
+  return True
 
 
 def RecordMachineQueriedForWork(machine_id, machine_tag):

@@ -494,11 +494,32 @@ class AppTest(unittest.TestCase):
                             headers={'X-AppEngine-Cron': 'true'})
     self.assertEqual('200 OK', response.status)
 
+    # Only cron job requests can be gets for this handler.
+    response = self.app.get('/tasks/cleanup_data',
+                            expect_errors=True)
+    self.assertEquals('405 Method Not Allowed', response.status)
+
   def testAbortStaleRunners(self):
     # All cron job requests must be gets.
     response = self.app.get('/tasks/abort_stale_runners',
                             headers={'X-AppEngine-Cron': 'true'})
     self.assertEqual('200 OK', response.status)
+
+    # Only cron job requests can be gets for this handler.
+    response = self.app.get('/tasks/abort_stale_runners',
+                            expect_errors=True)
+    self.assertEquals('405 Method Not Allowed', response.status)
+
+  def testFindDeadMachines(self):
+    # All cron job requests must be gets.
+    response = self.app.get('/tasks/find_dead_machines',
+                            headers={'X-AppEngine-Cron': 'true'})
+    self.assertEquals('200 OK', response.status)
+
+    # Only cron job requests can be gets for this handler.
+    response = self.app.get('/tasks/find_dead_machines',
+                            expect_errors=True)
+    self.assertEquals('405 Method Not Allowed', response.status)
 
   def testSendEReporter(self):
     # Ensure this function correctly complains if the admin email isn't set.
