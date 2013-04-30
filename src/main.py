@@ -22,7 +22,6 @@ from google.appengine.api import users
 from google.appengine.ext import blobstore
 from google.appengine.ext import db
 from google.appengine.ext import ereporter
-import webapp2
 from google.appengine.ext.ereporter.report_generator import ReportGenerator
 from google.appengine.ext.webapp import blobstore_handlers
 from google.appengine.ext.webapp import template
@@ -38,6 +37,9 @@ from server import user_manager
 from stats import machine_stats
 from stats import runner_stats
 # pylint: enable-msg=C6204
+
+import webapp2  # pylint: disable-msg=C6203
+
 
 _NUM_USER_TEST_RUNNERS_PER_PAGE = 50
 _NUM_RECENT_ERRORS_TO_DISPLAY = 10
