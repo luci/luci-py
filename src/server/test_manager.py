@@ -478,6 +478,8 @@ class TestRequestManager(object):
     return {'exit_codes': runner.exit_codes,
             'machine_id': runner.machine_id,
             'machine_tag': machine_stats.GetMachineTag(runner.machine_id),
+            'config_instance_index': runner.config_instance_index,
+            'num_config_instances': runner.num_config_instances,
             'output': runner.GetResultString()}
 
   def AbortStaleRunners(self):

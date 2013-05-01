@@ -589,6 +589,10 @@ class TestRequestManagerTest(unittest.TestCase):
 
     self.assertEqual(runner.exit_codes, results['exit_codes'])
     self.assertEqual(runner.machine_id, results['machine_id'])
+    self.assertEqual(runner.config_instance_index,
+                     results['config_instance_index'])
+    self.assertEqual(runner.num_config_instances,
+                     results['num_config_instances'])
     self.assertEqual(runner.GetResultString(), results['output'])
 
     machine = machine_stats.MachineStats.gql('WHERE machine_id = :1',
