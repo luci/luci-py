@@ -581,31 +581,35 @@ class SendEReporterHandler(ReportGenerator):
       admin = admin_user.AdminUser(email='')
       admin.put()
 
-    if mail.is_email_valid(admin.email):
-      self.request.GET['sender'] = admin.email
-      exception_count = ereporter.ExceptionRecord.all(keys_only=True).count()
+    try:
+      if mail.is_email_valid(admin.email):
+        self.request.GET['sender'] = admin.email
+        exception_count = ereporter.ExceptionRecord.all(keys_only=True).count()
 
-      while exception_count:
-        try:
-          self.request.GET['max_results'] = exception_count
-          super(SendEReporterHandler, self).get()
-          exception_count = min(
-              exception_count,
-              ereporter.ExceptionRecord.all(keys_only=True).count())
-        except mail_errors.BadRequestError:
-          if exception_count == 1:
-            # This is bad, it means we can't send any exceptions, so just
-            # clear all exceptions.
-            db.delete_async(ereporter.ExceptionRecord.all(keys_only=True))
-            break
+        while exception_count:
+          try:
+            self.request.GET['max_results'] = exception_count
+            super(SendEReporterHandler, self).get()
+            exception_count = min(
+                exception_count,
+                ereporter.ExceptionRecord.all(keys_only=True).count())
+          except mail_errors.BadRequestError:
+            if exception_count == 1:
+              # This is bad, it means we can't send any exceptions, so just
+              # clear all exceptions.
+              db.delete_async(ereporter.ExceptionRecord.all(keys_only=True))
+              break
 
-          # ereporter doesn't handle the email being too big, so manually
-          # decrease the size and try again.
-          exception_count = max(exception_count / 2, 1)
-    else:
-      self.response.out.write('Invalid admin email, \'%s\'. Must be a valid '
-                              'email.' % admin.email)
-      self.response.set_status(400)
+            # ereporter doesn't handle the email being too big, so manually
+            # decrease the size and try again.
+            exception_count = max(exception_count / 2, 1)
+      else:
+        self.response.out.write('Invalid admin email, \'%s\'. Must be a valid '
+                                'email.' % admin.email)
+        self.response.set_status(400)
+    except runtime.DeadlineExceededError as e:
+      # Hitting the deadline here isn't a big deal if it is rare.
+      logging.warning(e)
 
 
 class ShowMessageHandler(webapp2.RequestHandler):
