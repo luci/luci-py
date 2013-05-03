@@ -443,10 +443,8 @@ class ResultHandler(webapp2.RequestHandler):
 
     logging.debug('Received Result: %s', self.request.url)
 
-    runner = None
-    runner_key = self.request.get('r')
-    if runner_key:
-      runner = test_runner.TestRunner.get(runner_key)
+    runner_key = self.request.get('r', '')
+    runner = test_runner.GetRunnerFromKey(runner_key)
 
     if not runner:
       # If the runner is gone, it probably already received results from
@@ -617,14 +615,13 @@ class ShowMessageHandler(webapp2.RequestHandler):
     """Handles HTTP GET requests for this handler's URL."""
     self.response.headers['Content-Type'] = 'text/plain'
 
-    key = self.request.get('r', '')
-    if key:
-      runner = test_manager.TestRunner.get(key)
+    runner_key = self.request.get('r', '')
+    runner = test_runner.GetRunnerFromKey(runner_key)
 
     if runner:
       self.response.out.write(runner.GetMessage())
     else:
-      self.response.out.write('Cannot find message for: %s' % key)
+      self.response.out.write('Cannot find message for: %s' % runner_key)
 
 
 class StatsHandler(webapp2.RequestHandler):
@@ -721,9 +718,8 @@ class CancelHandler(webapp2.RequestHandler):
     """Handles HTTP GET requests for this handler's URL."""
     self.response.headers['Content-Type'] = 'text/plain'
 
-    key = self.request.get('r', '')
-    if key:
-      runner = test_manager.TestRunner.get(key)
+    runner_key = self.request.get('r', '')
+    runner = test_runner.GetRunnerFromKey(runner_key)
 
     # Make sure found runner is not yet running.
     if runner and not runner.started:
@@ -733,7 +729,7 @@ class CancelHandler(webapp2.RequestHandler):
       self.response.out.write('Runner canceled.')
     else:
       self.response.out.write('Cannot find runner or too late to cancel: %s' %
-                              key)
+                              runner_key)
 
 
 class RetryHandler(webapp2.RequestHandler):
@@ -743,13 +739,8 @@ class RetryHandler(webapp2.RequestHandler):
     """Handles HTTP GET requests for this handler's URL."""
     self.response.headers['Content-Type'] = 'text/plain'
 
-    key = self.request.get('r', '')
-    runner = None
-    if key:
-      try:
-        runner = test_runner.TestRunner.get(key)
-      except db.BadKeyError:
-        pass
+    runner_key = self.request.get('r', '')
+    runner = test_runner.GetRunnerFromKey(runner_key)
 
     if runner:
       runner.started = None

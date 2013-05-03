@@ -394,6 +394,22 @@ def GetTestRunners(sort_by, ascending, limit, offset):
   return TestRunner.gql('ORDER BY %s' % sort_by).run(limit=limit, offset=offset)
 
 
+def GetRunnerFromKey(key):
+  """Returns the runner specified by the given key.
+
+  Args:
+    key: The key of the runner to return.
+
+  Returns:
+    The runner with the given key, otherwise None if the key doesn't refer
+    to a valid runner.
+  """
+  try:
+    return TestRunner.get(key)
+  except (db.BadKeyError, db.KindError):
+    return None
+
+
 def DeleteRunnerFromKey(key):
   """Delete the runner that the given key refers to.
 
@@ -403,12 +419,7 @@ def DeleteRunnerFromKey(key):
   Returns:
     True if a matching TestRunner was found and deleted.
   """
-  runner = None
-  try:
-    runner = TestRunner.get(key)
-  except (db.BadKeyError, db.KindError):
-    # We don't need to take any special action with bad keys.
-    pass
+  runner = GetRunnerFromKey(key)
 
   if not runner:
     logging.debug('No matching Test Runner found for key, %s', key)

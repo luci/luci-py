@@ -295,6 +295,21 @@ class TestRunnerTest(unittest.TestCase):
                        test_runners.next().config_instance_index)
     self.assertEqual(0, len(list(test_runners)))
 
+  def testGetRunnerFromKey(self):
+    self.assertEqual(None, test_runner.GetRunnerFromKey('fake_key'))
+
+    runner = self._CreateRunner()
+    print test_runner.TestRunner.all().count()
+    self.assertEqual(runner.key(),
+                     test_runner.GetRunnerFromKey(runner.key()).key())
+
+    # Check keys that are valid, but point to deleted models or models of the
+    # wrong type.
+    self.assertEqual(None, test_runner.GetRunnerFromKey(runner.request.key()))
+
+    test_runner.DeleteRunner(runner)
+    self.assertEqual(None, test_runner.GetRunnerFromKey(runner.key()))
+
   def testDeleteRunner(self):
     self._CreateRunner()
 

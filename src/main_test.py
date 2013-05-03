@@ -223,15 +223,8 @@ class AppTest(unittest.TestCase):
     self.assertEqual('200 OK', response.status)
     self.assertTrue('Key deletion failed.' in response.body)
 
-    runner = self._CreateTestRunner()
-
-    # Try to clean up with valid key but belonging to other class.
-    response = self.app.post('/cleanup_results',
-                             {'r': self._GetRequest().key()})
-    self.assertEqual('200 OK', response.status)
-    self.assertTrue('Key deletion failed.' in response.body)
-
     # Try to clean up with a valid key.
+    runner = self._CreateTestRunner()
     response = self.app.post('/cleanup_results', {'r': runner.key()})
     self.assertEqual('200 OK', response.status)
     self.assertTrue('Key deleted.' in response.body)
@@ -247,6 +240,15 @@ class AppTest(unittest.TestCase):
     response = self.app.post('/secure/retry', {'r': runner.key()})
     self.assertEquals('200 OK', response.status)
     self.assertTrue('Runner set for retry' in response.body)
+
+  def testShowMessageHandler(self):
+    response = self.app.get('/secure/show_message', {'r': 'fake_key'})
+    self.assertEquals('200 OK', response.status)
+    self.assertTrue('Cannot find message' in response.body, response.body)
+
+    runner = self._CreateTestRunner()
+    response = self.app.get('/secure/show_message', {'r': runner.key()})
+    self.assertEquals('200 OK', response.status)
 
   def testRegisterHandler(self):
     # Missing attributes field.
@@ -555,6 +557,16 @@ class AppTest(unittest.TestCase):
 
     response = self.app.get('/secure/stats')
     self.assertTrue('200' in response.status)
+
+  def testCancelHandler(self):
+    response = self.app.post(main_app._SECURE_CANCEL_URL, {'r': 'invalid_key'})
+    self.assertEquals('200 OK', response.status)
+    self.assertTrue('Cannot find runner' in response.body, response.body)
+
+    runner = self._CreateTestRunner()
+    response = self.app.post(main_app._SECURE_CANCEL_URL, {'r': runner.key()})
+    self.assertEquals('200 OK', response.status)
+    self.assertEquals('Runner canceled.', response.body)
 
 
 if __name__ == '__main__':
