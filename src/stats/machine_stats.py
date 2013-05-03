@@ -28,13 +28,11 @@ _INDIVIDUAL_DEAD_MACHINE_MESSAGE = (
 # The message body of the dead machine message to send admins.
 _DEAD_MACHINE_MESSAGE_BODY = """Hello,
 
-The following registered machines haven't been active in %(machine_timeout)s
-days.
+The following registered machines haven't been active in %(timeout)s days.
 
 %(death_summary)s
 
-Please revive the machines or remove them from the server's list of active
-machines.
+Please revive the machines or remove them from the list of active machines.
 """
 
 
@@ -90,8 +88,8 @@ def NotifyAdminsOfDeadMachines(dead_machines):
   message.subject = 'Dead Machines Found on %s' % app_id
 
   message.body = _DEAD_MACHINE_MESSAGE_BODY % {
-      'machine_timeout': MACHINE_TIMEOUT_IN_DAYS,
-      'death_summary': death_summary}
+      'timeout': MACHINE_TIMEOUT_IN_DAYS,
+      'death_summary': '\n'.join(death_summary)}
 
   message.send()
 

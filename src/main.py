@@ -984,7 +984,7 @@ def CreateApplication():
                                   ('/tasks/abort_stale_runners',
                                    AbortStaleRunnersHandler),
                                   ('/tasks/cleanup_data', CleanupDataHandler),
-                                  ('/tasks/find_dead_machines',
+                                  ('/tasks/detect_dead_machines',
                                    DetectDeadMachinesHandler),
                                   ('/tasks/sendereporter',
                                    SendEReporterHandler),

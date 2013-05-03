@@ -512,14 +512,14 @@ class AppTest(unittest.TestCase):
                             expect_errors=True)
     self.assertEquals('405 Method Not Allowed', response.status)
 
-  def testFindDeadMachines(self):
+  def testDetectDeadMachines(self):
     # All cron job requests must be gets.
-    response = self.app.get('/tasks/find_dead_machines',
+    response = self.app.get('/tasks/detect_dead_machines',
                             headers={'X-AppEngine-Cron': 'true'})
     self.assertEquals('200 OK', response.status)
 
     # Only cron job requests can be gets for this handler.
-    response = self.app.get('/tasks/find_dead_machines',
+    response = self.app.get('/tasks/detect_dead_machines',
                             expect_errors=True)
     self.assertEquals('405 Method Not Allowed', response.status)
 
