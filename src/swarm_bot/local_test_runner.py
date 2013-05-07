@@ -521,8 +521,10 @@ class LocalTestRunner(object):
 
     # We want to time to whole test run.
     test_run_start_time = time.time()
+    decorate_output = None
     for test in tests_to_run:
       logging.info('Test %s', test.test_name)
+      decorate_output = decorate_output or test.decorate_output
       if test.decorate_output:
         test_case_start_time = time.time()
         result_string = ('%s\n[ RUN      ] %s.%s' %
@@ -572,33 +574,36 @@ class LocalTestRunner(object):
     assert sum([1 for result_code in result_codes
                 if not isinstance(result_code, int)]) is 0
 
-    # We always decorate the whole test run.
-    result_string = ('%s\n\n[----------] %s summary' %
-                     (result_string, self.test_run.test_run_name))
-    result_string = ('%s\n[==========] %d tests ran. (%d ms total)' %
-                     (result_string, num_results, test_run_timing * 1000))
-
     # We sum the number of exit codes that were non-zero for success.
     num_failures = num_results - sum([not int(x) for x in result_codes])
-    result_string = '%s\n[  PASSED  ] %d tests.' % (result_string,
-                                                    num_results - num_failures)
-    result_string = '%s\n[  FAILED  ] %d tests' % (result_string, num_failures)
-    if num_failures > 0:
-      result_string = '%s, listed below:' % result_string
 
-    # We finish by enumerating all failed individual tests.
-    for index in range(min(len(result_codes), len(tests_to_run))):
-      if result_codes[index] is not 0:
-        result_string = ('%s\n[  FAILED  ] %s.%s' %
-                         (result_string, self.test_run.test_run_name,
-                          tests_to_run[index].test_name))
+    if decorate_output:
+      result_string = '%s\n\n[----------] %s summary' % (
+          result_string, self.test_run.test_run_name)
+      result_string = '%s\n[==========] %d tests ran. (%d ms total)' % (
+          result_string, num_results, test_run_timing * 1000)
 
+      result_string = '%s\n[  PASSED  ] %d tests.' % (
+          result_string, num_results - num_failures)
+      result_string = '%s\n[  FAILED  ] %d tests' % (
+          result_string, num_failures)
+      if num_failures > 0:
+        result_string = '%s, listed below:' % result_string
+
+      # We finish by enumerating all failed individual tests.
+      for index in range(min(len(result_codes), len(tests_to_run))):
+        if result_codes[index] is not 0:
+          result_string = '%s\n[  FAILED  ] %s.%s' % (
+              result_string,
+              self.test_run.test_run_name,
+              tests_to_run[index].test_name)
+
+      result_string += '\n\n %d FAILED TESTS\n' % num_failures
     # Record the success or failure.
     self.success = (num_failures == 0)
 
     # And append their total number before returning the result string.
-    return (self.success, result_codes,
-            '%s\n\n %d FAILED TESTS\n' % (result_string, num_failures))
+    return (self.success, result_codes, result_string)
 
   def PublishResults(self, success, result_codes, result_string,
                      overwrite=False):

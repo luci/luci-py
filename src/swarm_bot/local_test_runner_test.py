@@ -338,7 +338,7 @@ class TestLocalTestRunner(unittest.TestCase):
     self.runner._RunCommand(self.action2, 9, env=env).AndReturn((results[1]))
 
   def testRunTests(self):
-    self.PrepareRunTestsCall()
+    self.PrepareRunTestsCall(decorate_output=[True, True])
     self._mox.ReplayAll()
     (success, result_codes, result_string) = self.runner.RunTests()
     self.assertTrue(success)
@@ -363,7 +363,8 @@ class TestLocalTestRunner(unittest.TestCase):
     test1_env = {'var7': 'value7', 'var8': 'value8'}
     self._mox.StubOutWithMock(local_test_runner.sys, 'platform')
     local_test_runner.sys.platform = platform
-    self.PrepareRunTestsCall(config_env=config_env, test_run_env=test_run_env,
+    self.PrepareRunTestsCall(decorate_output=[True, True],
+                             config_env=config_env, test_run_env=test_run_env,
                              test_env=[test0_env, test1_env])
 
     self._mox.ReplayAll()
@@ -410,15 +411,15 @@ class TestLocalTestRunner(unittest.TestCase):
                                              self.test_name1), result_string)
     self.assertNotIn('[ RUN      ] %s.%s' % (self.test_run_name,
                                              self.test_name2), result_string)
-    self.assertIn('[----------] %s summary' % self.test_run_name, result_string)
-    self.assertIn('[==========] 2 tests ran.', result_string)
-    self.assertIn('[==========] 2 tests ran.', result_string)
-    self.assertIn('[==========] 2 tests ran.', result_string)
-    self.assertIn('[  PASSED  ] 1 tests.', result_string)
-    self.assertIn('[  FAILED  ] 1 tests, listed below:', result_string)
-    self.assertIn('[  FAILED  ] %s.%s' % (self.test_run_name, self.test_name1),
-                  result_string)
-    self.assertIn('1 FAILED TESTS', result_string)
+    self.assertNotIn('[----------] %s summary' % self.test_run_name,
+                     result_string)
+    self.assertNotIn('[==========] 2 tests ran.', result_string)
+    self.assertNotIn('[  PASSED  ] 1 tests.', result_string)
+    self.assertNotIn('[  FAILED  ] 1 tests, listed below:', result_string)
+    self.assertNotIn('[  FAILED  ] %s.%s' % (self.test_run_name,
+                                             self.test_name1),
+                     result_string)
+    self.assertNotIn('1 FAILED TESTS', result_string)
 
     self._mox.VerifyAll()
 
