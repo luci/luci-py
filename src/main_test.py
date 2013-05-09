@@ -463,6 +463,58 @@ class AppTest(unittest.TestCase):
       self.assertEqual(
           '403 Forbidden', response.status, msg='Handler: ' + handler)
 
+  # Test that all handlers are accessible only to authenticated user or machine.
+  # Assumes all routes are defined with plain paths
+  # (i.e. '/some/handler/path' and not regexps).
+  def testAllHandlersAreSecured(self):
+    # URL prefixes that correspond to 'login: admin' areas in app.yaml.
+    # Handlers that correspond to this prefixes are protected by GAE itself.
+    secured_paths = ['/tasks/', '/secure/', '/_ereporter']
+
+    # Handlers that are explicitly allowed to be called by anyone.
+    # TODO(user): Figure out how to protected access to '/upload'.
+    allowed_urls = set(['/', '/upload'])
+
+    # Grab the set of all routes.
+    app = self.app.app
+    routes = set(app.router.match_routes)
+    routes.update(app.router.build_routes.itervalues())
+
+    # Get all routes that are not protected by GAE auth mechanism.
+    unprotected = []
+    for route in routes:
+      if route.template in allowed_urls:
+        continue
+      for path in secured_paths:
+        if route.template.startswith(path):
+          break
+      else:
+        unprotected.append(route)
+
+    # Helper function that executes GET or POST handler for corresponding route
+    # and asserts it returns 403 or 405.
+    def CheckProtected(route, method):
+      assert method in ('GET', 'POST')
+      # Get back original path from regexp.
+      path = route.template
+      if path[0] == '^':
+        path = path[1:]
+      if path[-1] == '$':
+        path = path[:-1]
+
+      response = getattr(self.app, method.lower())(path, expect_errors=True)
+      message = ('%s handler is not protected: %s, '
+                 'returned %s' % (method, path, response))
+      self.assertIn(response.status_int, (403, 405), msg=message)
+
+    # Reset state to non-whitelisted, anonymous machine.
+    user_manager.DeleteWhitelist(None)
+    self._ReplaceCurrentUser(None)
+    # Try to execute 'get' and 'post' and verify they fail with 403 or 405.
+    for route in unprotected:
+      CheckProtected(route, 'GET')
+      CheckProtected(route, 'POST')
+
   def testRemoteErrorHandler(self):
     self.assertEqual(0, test_manager.SwarmError.all().count())
 

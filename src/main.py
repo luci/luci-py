@@ -693,6 +693,7 @@ class GetSlaveCodeHandler(webapp2.RequestHandler):
 class GetTokenHandler(webapp2.RequestHandler):
   """Returns an authentication token."""
 
+  @AuthenticateMachineOrUser
   def get(self):  # pylint: disable-msg=C6409
     """Handles HTTP GET requests for this handler's URL."""
     self.response.headers['Content-Type'] = 'text/plain'
