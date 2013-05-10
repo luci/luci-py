@@ -177,7 +177,8 @@ class TestRequestManager(object):
       # Update the old and active machines ids.
       logging.info('Received result from old machine, making it current '
                    'machine and storing results')
-      runner.old_machine_ids.append(runner.machine_id)
+      if runner.machine_id:
+        runner.old_machine_ids.append(runner.machine_id)
       runner.machine_id = machine_id
       runner.old_machine_ids.remove(machine_id)
 
@@ -674,7 +675,7 @@ class TestRequestManager(object):
       attributes['id'] = str(uuid.uuid4())
 
     # Make sure attributes now has a try_count field.
-    if not 'try_count' in attributes:
+    if 'try_count' not in attributes:
       attributes['try_count'] = 0
 
     return attributes

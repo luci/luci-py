@@ -529,6 +529,25 @@ class TestRequestManagerTest(unittest.TestCase):
 
     self._mox.VerifyAll()
 
+  def testRunnerCallerOldMachineWithNoCurrent(self):
+    self._mox.StubOutWithMock(urllib2, 'urlopen')
+    urllib2.urlopen(mox.IgnoreArg(), mox.StrContains('r='))
+    self._mox.ReplayAll()
+
+    runner = self._CreatePendingRequest(machine_id=MACHINE_IDS[0])
+    runner.machine_id = None
+    runner.old_machine_ids = [MACHINE_IDS[1]]
+    runner.put()
+
+    self.assertTrue(self._manager.UpdateTestResult(runner, MACHINE_IDS[1]))
+
+    runner = test_runner.TestRunner.all().get()
+    self.assertEqual(MACHINE_IDS[1], runner.machine_id)
+    self.assertEqual([], runner.old_machine_ids)
+    self.assertTrue(runner.done)
+
+    self._mox.VerifyAll()
+
   def _SetupAndExecuteTestResults(self, result_url):
     self._SetupHandleTestResults(result_url=result_url)
     self._mox.ReplayAll()
