@@ -27,6 +27,7 @@ import time
 # pylint: disable-msg=C6204
 from common import swarm_constants
 from common import url_helper
+from common import version
 # pylint: enable-msg=C6204
 
 
@@ -177,6 +178,7 @@ class SlaveMachine(object):
     self._result_url = None
     self._attributes['id'] = None
     self._attributes['try_count'] = 0
+    self._attributes['version'] = version.GenerateSwarmSlaveVersion(__file__)
     self._come_back = 0
     self._id_filename = id_filename
 

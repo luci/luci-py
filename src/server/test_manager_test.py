@@ -8,6 +8,7 @@
 
 
 import datetime
+import hashlib
 import json
 import logging
 import os
@@ -26,6 +27,7 @@ from google.appengine.ext import blobstore
 from google.appengine.ext import testbed
 from common import blobstore_helper
 from common import dimensions_utils
+from common import swarm_constants
 from common import test_request_message
 from server import test_manager
 from server import test_request
@@ -964,6 +966,11 @@ class TestRequestManagerTest(unittest.TestCase):
     result = self._manager.ValidateAndFixAttributes(attributes)
     self.assertEqual(result['try_count'], 0)
 
+    # Make sure version is accepted.
+    attributes = {'dimensions': {'os': 'win-xp'},
+                  'version': hashlib.sha1().hexdigest()}
+    result = self._manager.ValidateAndFixAttributes(attributes)
+
   def testValidateAndFixAttributesTryCount(self):
     # Test with bad try_count type.
     attributes = {'dimensions': {'os': 'win-xp'},
@@ -1134,16 +1141,13 @@ class TestRequestManagerTest(unittest.TestCase):
         zip_file.extractall(temp_dir)
 
       expected_slave_script = os.path.join(temp_dir,
-                                           test_manager._SLAVE_MACHINE_SCRIPT)
+                                           swarm_constants.SLAVE_MACHINE_SCRIPT)
       self.assertTrue(os.path.exists(expected_slave_script))
 
-      common_dir = os.path.join(temp_dir, test_manager._COMMON_DIR)
-      self.assertTrue(os.path.exists(
-          os.path.join(common_dir, test_manager._PYTHON_INIT_SCRIPT)))
-      self.assertTrue(os.path.exists(
-          os.path.join(common_dir, test_manager._SWARM_CONSTANTS_SCRIPT)))
-      self.assertTrue(os.path.exists(
-          os.path.join(common_dir, test_manager._URL_HELPER_SCRIPT)))
+      common_dir = os.path.join(temp_dir, swarm_constants.COMMON_DIR)
+      for common_file in swarm_constants.SWARM_BOT_COMMON_FILES:
+        self.assertTrue(os.path.exists(
+            os.path.join(common_dir, common_file)))
 
       # Try running the slave and ensure it can import the required files.
       # (It would crash if it failed to import them).

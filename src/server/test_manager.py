@@ -38,6 +38,7 @@ from google.appengine.ext import blobstore
 from google.appengine.ext import db
 from common import blobstore_helper
 from common import dimensions_utils
+from common import swarm_constants
 from common import test_request_message
 from server import test_request
 from server import test_runner
@@ -60,28 +61,6 @@ _MISSED_PINGS_BEFORE_TIMEOUT = 10
 # for the instance running tests.
 _TEST_RUN_SWARM_FILE_NAME = 'test_run.swarm'
 
-# Name of python script containing constants.
-_SWARM_CONSTANTS_SCRIPT = 'swarm_constants.py'
-
-# Name of python script for swarm slaves.
-_SLAVE_MACHINE_SCRIPT = 'slave_machine.py'
-
-# Name of python script to execute on the remote machine to run a test.
-_TEST_RUNNER_SCRIPT = 'local_test_runner.py'
-
-# Name of python script to validate swarm file format.
-_TEST_REQUEST_MESSAGE_SCRIPT = 'test_request_message.py'
-
-# Name of python script to handle url connections.
-_URL_HELPER_SCRIPT = 'url_helper.py'
-
-# Name of python script to mark folder as package.
-_PYTHON_INIT_SCRIPT = '__init__.py'
-
-# Name of directories in source tree and/or on remote machine.
-_TEST_RUNNER_DIR = 'swarm_bot'
-_COMMON_DIR = 'common'
-
 # Maximum value for the come_back field in a response to an idle slave machine.
 # TODO(user): make this adjustable by the user.
 MAX_COMEBACK_SECS = 60.0
@@ -99,15 +78,12 @@ QUICK_COMEBACK_SECS = 1.0
 
 # The amount of time we want a machine to wait before calling back after seeing
 # a server error.
-COMEBACK_AFTER_SERVER_ERROR_SECS = 10
+COMEBACK_AFTER_SERVER_ERROR_SECS = 10.0
 
 # The time (in seconds) to wait after recieving a runner before aborting it.
 # This is intended to delete runners that will never run because they will
 # never find a matching machine.
 SWARM_RUNNER_MAX_WAIT_SECS = 24 * 60 * 60
-
-# Root directory of Swarm scripts.
-SWARM_ROOT_DIR = os.path.join(os.path.dirname(__file__), '..')
 
 # Number of days to keep error logs around.
 SWARM_ERROR_TIME_TO_LIVE_DAYS = 7
@@ -649,7 +625,8 @@ class TestRequestManager(object):
             logging.warning(
                 'Problem with given id, generating new id.\n%s', e)
             attributes[attrib] = None
-      elif attrib == 'tag' or attrib == 'username' or attrib == 'password':
+      elif (attrib == 'tag' or attrib == 'username' or attrib == 'password' or
+            attrib == 'version'):
         # Make sure the attribute value has proper type.
         if not isinstance(value, (str, unicode)):
           raise test_request_message.Error('Invalid attrib value type for '
@@ -794,7 +771,8 @@ class TestRequestManager(object):
 
     # Define how to run the scripts.
     command_to_execute = [
-        r'%s' % os.path.join(test_run.working_dir, _TEST_RUNNER_SCRIPT),
+        r'%s' % os.path.join(test_run.working_dir,
+                             swarm_constants.TEST_RUNNER_SCRIPT),
         '-f', r'%s' % os.path.join(test_run.working_dir,
                                    _TEST_RUN_SWARM_FILE_NAME)]
 
@@ -837,41 +815,27 @@ class TestRequestManager(object):
     # if the local script runner imports common.url_helper, we create the folder
     # common and put url_helper.py in it.
     file_paths.append(
-        (os.path.join(SWARM_ROOT_DIR, _TEST_RUNNER_DIR, _TEST_RUNNER_SCRIPT),
-         test_run.working_dir, _TEST_RUNNER_SCRIPT))
-
-    # The swarm constants script.
-    file_paths.append(
-        (os.path.join(SWARM_ROOT_DIR, _COMMON_DIR,
-                      _SWARM_CONSTANTS_SCRIPT),
-         os.path.join(test_run.working_dir, _COMMON_DIR),
-         _SWARM_CONSTANTS_SCRIPT))
-
-    # The trm script.
-    file_paths.append(
-        (os.path.join(SWARM_ROOT_DIR, _COMMON_DIR,
-                      _TEST_REQUEST_MESSAGE_SCRIPT),
-         os.path.join(test_run.working_dir, _COMMON_DIR),
-         _TEST_REQUEST_MESSAGE_SCRIPT))
-
-    # The url helper script.
-    file_paths.append(
-        (os.path.join(SWARM_ROOT_DIR, _COMMON_DIR,
-                      _URL_HELPER_SCRIPT),
-         os.path.join(test_run.working_dir, _COMMON_DIR),
-         _URL_HELPER_SCRIPT))
+        (os.path.join(swarm_constants.SWARM_ROOT_DIR,
+                      swarm_constants.TEST_RUNNER_DIR,
+                      swarm_constants.TEST_RUNNER_SCRIPT),
+         test_run.working_dir, swarm_constants.TEST_RUNNER_SCRIPT))
 
     # The test_runner __init__.
     file_paths.append(
-        (os.path.join(SWARM_ROOT_DIR, _TEST_RUNNER_DIR, _PYTHON_INIT_SCRIPT),
-         os.path.join(test_run.working_dir, _TEST_RUNNER_DIR),
-         _PYTHON_INIT_SCRIPT))
+        (os.path.join(swarm_constants.SWARM_ROOT_DIR,
+                      swarm_constants.TEST_RUNNER_DIR,
+                      swarm_constants.PYTHON_INIT_SCRIPT),
+         os.path.join(test_run.working_dir, swarm_constants.TEST_RUNNER_DIR),
+         swarm_constants.PYTHON_INIT_SCRIPT))
 
-    # The common __init__.
-    file_paths.append(
-        (os.path.join(SWARM_ROOT_DIR, _COMMON_DIR, _PYTHON_INIT_SCRIPT),
-         os.path.join(test_run.working_dir, _COMMON_DIR),
-         _PYTHON_INIT_SCRIPT))
+    # Add all the common files.
+    for common_file in swarm_constants.SWARM_BOT_COMMON_FILES:
+      file_paths.append(
+          (os.path.join(swarm_constants.SWARM_ROOT_DIR,
+                        swarm_constants.COMMON_DIR,
+                        common_file),
+           os.path.join(test_run.working_dir, swarm_constants.COMMON_DIR),
+           common_file))
 
     files_to_upload = []
     for local_path, remote_path, file_name in file_paths:
@@ -945,18 +909,18 @@ def SlaveCodeZipped():
   """
   zip_memory_file = StringIO.StringIO()
   with zipfile.ZipFile(zip_memory_file, 'w') as zip_file:
-    slave_script = os.path.join(SWARM_ROOT_DIR, _TEST_RUNNER_DIR,
-                                _SLAVE_MACHINE_SCRIPT)
-    zip_file.write(slave_script, _SLAVE_MACHINE_SCRIPT)
+    slave_script = os.path.join(swarm_constants.SWARM_ROOT_DIR,
+                                swarm_constants.TEST_RUNNER_DIR,
+                                swarm_constants.SLAVE_MACHINE_SCRIPT)
+    zip_file.write(slave_script, swarm_constants.SLAVE_MACHINE_SCRIPT)
 
     # Copy all the required helper files.
-    common_dir = os.path.join(SWARM_ROOT_DIR, _COMMON_DIR)
-    zip_file.write(os.path.join(common_dir, _PYTHON_INIT_SCRIPT),
-                   os.path.join(_COMMON_DIR, _PYTHON_INIT_SCRIPT))
-    zip_file.write(os.path.join(common_dir, _SWARM_CONSTANTS_SCRIPT),
-                   os.path.join(_COMMON_DIR, _SWARM_CONSTANTS_SCRIPT))
-    zip_file.write(os.path.join(common_dir, _URL_HELPER_SCRIPT),
-                   os.path.join(_COMMON_DIR, _URL_HELPER_SCRIPT))
+    common_dir = os.path.join(swarm_constants.SWARM_ROOT_DIR,
+                              swarm_constants.COMMON_DIR)
+
+    for common_file in swarm_constants.SWARM_BOT_COMMON_FILES:
+      zip_file.write(os.path.join(common_dir, common_file),
+                     os.path.join(swarm_constants.COMMON_DIR, common_file))
 
   return zip_memory_file.getvalue()
 

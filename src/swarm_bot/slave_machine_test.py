@@ -18,12 +18,19 @@ import unittest
 
 from common import swarm_constants
 from common import url_helper
+from common import version
 from swarm_bot import slave_machine
 from third_party.mox import mox
 
+# The slave script being tested.
+SLAVE_SCRIPT_FILE = os.path.join(os.path.dirname(__file__), 'slave_machine.py')
+
 MACHINE_ID_1 = '12345678-12345678-12345678-12345678'
 MACHINE_ID_2 = '87654321-87654321-87654321-87654321'
-VALID_ATTRIBUTES = {'dimensions': {'os': ['Linux']}}
+VALID_ATTRIBUTES = {
+    'dimensions': {'os': ['Linux']},
+    'version': version.GenerateSwarmSlaveVersion(SLAVE_SCRIPT_FILE),
+}
 
 
 class TestSlaveMachine(unittest.TestCase):
