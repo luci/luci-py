@@ -660,7 +660,7 @@ class GetMatchingTestCasesHandler(webapp2.RequestHandler):
     if keys:
       self.response.out.write(json.dumps(keys))
     else:
-      self.response.out.write('No matching Test Cases')
+      self.response.set_status(404)
 
 
 class SecureGetResultHandler(webapp2.RequestHandler):

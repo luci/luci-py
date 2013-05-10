@@ -106,9 +106,9 @@ class AppTest(unittest.TestCase):
   def testMatchingTestCasesHandler(self):
     # Test when no matching tests.
     response = self.app.get('/get_matching_test_cases',
-                            {'name': self._default_test_request_name})
-    self.assertEqual('200 OK', response.status)
-    self.assertTrue('No matching Test Cases' in response.body)
+                            {'name': self._default_test_request_name},
+                            expect_errors=True)
+    self.assertEqual('404 Not Found', response.status)
 
     # Test with a single matching runner.
     runner = self._CreateTestRunner()
