@@ -31,8 +31,14 @@ def GenerateSwarmSlaveVersion(slave_machine_script):
   """
   version_hash = hashlib.sha1()
 
-  with open(slave_machine_script, 'rb') as main_file:
-    version_hash.update(main_file.read())
+  with open(slave_machine_script, 'rb') as f:
+    version_hash.update(f.read())
+
+  local_test_runner = os.path.join(swarm_constants.SWARM_ROOT_DIR,
+                                   swarm_constants.TEST_RUNNER_DIR,
+                                   swarm_constants.TEST_RUNNER_SCRIPT)
+  with open(local_test_runner, 'r') as f:
+    version_hash.update(f.read())
 
   common_dir = os.path.join(swarm_constants.SWARM_ROOT_DIR,
                             swarm_constants.COMMON_DIR)

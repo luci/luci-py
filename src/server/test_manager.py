@@ -813,7 +813,7 @@ class TestRequestManager(object):
     # We place the local running script in the current working directory (cwd)
     # of the slave, and place the rest of the scripts in relation to cwd. E.g.,
     # if the local script runner imports common.url_helper, we create the folder
-    # common and put url_helper.py in it.
+    # 'common' and put the common files there.
     file_paths.append(
         (os.path.join(swarm_constants.SWARM_ROOT_DIR,
                       swarm_constants.TEST_RUNNER_DIR,
