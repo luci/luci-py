@@ -519,6 +519,24 @@ class CronJobHandler(webapp2.RequestHandler):
     self.post()
 
 
+class AbortStaleRunnersHandler(CronJobHandler):
+  """Handles cron jobs to abort stale runners."""
+
+  def post(self):  # pylint: disable-msg=C6409
+    """Handles HTTP POST requests for this handler's URL."""
+    test_request_manager = CreateTestManager()
+
+    logging.debug('Polling')
+    test_request_manager.AbortStaleRunners()
+    self.response.out.write("""
+    <html>
+    <head>
+    <title>Poll Done</title>
+    </head>
+    <body>Poll Done</body>
+    </html>""")
+
+
 class CleanupDataHandler(CronJobHandler):
   """Handles cron jobs to delete orphaned blobs."""
 
@@ -551,23 +569,11 @@ class DetectDeadMachinesHandler(CronJobHandler):
     self.response.out.write(msg)
 
 
-class AbortStaleRunnersHandler(CronJobHandler):
-  """Handles cron job to abort stale runners."""
+class GenerateStatsHandler(CronJobHandler):
+  """Handles cron jobs to generate new stats."""
 
   def post(self):  # pylint: disable-msg=C6409
-    """Handles HTTP POST requests for this handler's URL."""
-    test_request_manager = CreateTestManager()
-
-    logging.debug('Polling')
-    test_request_manager.AbortStaleRunners()
-    self.response.out.write("""
-    <html>
-    <head>
-    <title>Poll Done</title>
-    </head>
-    <body>Poll Done</body>
-    </html>
-    """)
+    pass
 
 
 class SendEReporterHandler(ReportGenerator):
@@ -987,6 +993,8 @@ def CreateApplication():
                                   ('/tasks/cleanup_data', CleanupDataHandler),
                                   ('/tasks/detect_dead_machines',
                                    DetectDeadMachinesHandler),
+                                  ('/tasks/generate_stats',
+                                   GenerateStatsHandler),
                                   ('/tasks/sendereporter',
                                    SendEReporterHandler),
                                   ('/test', TestRequestHandler),

@@ -14,3 +14,7 @@ cron:
 - description: Cleanup old data and orphaned blobs
   url: /tasks/cleanup_data
   schedule: every 6 hours
+
+- description: Generate stats
+  url: /tasks/generate_stats
+  schedule: every 5 minutes

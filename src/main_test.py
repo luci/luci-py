@@ -542,38 +542,21 @@ class AppTest(unittest.TestCase):
     self.assertEqual('200 OK', response.status)
     self.assertEqual('Runner successfully pinged.', response.body)
 
-  def testCleanupData(self):
-    # All cron job requests must be gets.
-    response = self.app.get('/tasks/cleanup_data',
-                            headers={'X-AppEngine-Cron': 'true'})
-    self.assertEqual('200 OK', response.status)
+  def testCronJobTasks(self):
+    cron_job_urls = ['/tasks/abort_stale_runners',
+                     '/tasks/cleanup_data',
+                     '/tasks/detect_dead_machines',
+                     '/tasks/generate_stats',
+                    ]
 
-    # Only cron job requests can be gets for this handler.
-    response = self.app.get('/tasks/cleanup_data',
-                            expect_errors=True)
-    self.assertEquals('405 Method Not Allowed', response.status)
+    for cron_job_url in cron_job_urls:
+      response = self.app.get(cron_job_url,
+                              headers={'X-AppEngine-Cron': 'true'})
+      self.assertEqual('200 OK', response.status)
 
-  def testAbortStaleRunners(self):
-    # All cron job requests must be gets.
-    response = self.app.get('/tasks/abort_stale_runners',
-                            headers={'X-AppEngine-Cron': 'true'})
-    self.assertEqual('200 OK', response.status)
-
-    # Only cron job requests can be gets for this handler.
-    response = self.app.get('/tasks/abort_stale_runners',
-                            expect_errors=True)
-    self.assertEquals('405 Method Not Allowed', response.status)
-
-  def testDetectDeadMachines(self):
-    # All cron job requests must be gets.
-    response = self.app.get('/tasks/detect_dead_machines',
-                            headers={'X-AppEngine-Cron': 'true'})
-    self.assertEquals('200 OK', response.status)
-
-    # Only cron job requests can be gets for this handler.
-    response = self.app.get('/tasks/detect_dead_machines',
-                            expect_errors=True)
-    self.assertEquals('405 Method Not Allowed', response.status)
+      # Only cron job requests can be gets for this handler.
+      response = self.app.get(cron_job_url, expect_errors=True)
+      self.assertEquals('405 Method Not Allowed', response.status)
 
   def testSendEReporter(self):
     # Ensure this function correctly complains if the admin email isn't set.
