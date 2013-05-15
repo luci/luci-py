@@ -133,7 +133,7 @@ class TestRequestManagerTest(unittest.TestCase):
 
   def _GetMachineRegisterRequest(self, machine_id=None, username=None,
                                  password=None, tag=None, try_count=None,
-                                 platform='win-xp'):
+                                 version=None, platform='win-xp'):
     """Return a properly formatted register machine request.
 
     Args:
@@ -142,6 +142,7 @@ class TestRequestManagerTest(unittest.TestCase):
       password: If provided, the password of the machine will be set to this.
       tag: If provided, the tag of the machine will be set to this.
       try_count: If provided, the try_count of the machine will be set to this.
+      version: If provided, the version of the machine will be set to this.
       platform: The value of the os to use in the dimensions.
 
     Returns:
@@ -160,6 +161,8 @@ class TestRequestManagerTest(unittest.TestCase):
       attributes['tag'] = tag
     if try_count:
       attributes['try_count'] = try_count
+    if version:
+      attributes['version'] = version
 
     return attributes
 
@@ -1132,6 +1135,25 @@ class TestRequestManagerTest(unittest.TestCase):
 
     self._mox.VerifyAll()
 
+  def testGetUpdateWhenPollingForWork(self):
+    # Drop the last character of the version string to ensure a version
+    # mismatch.
+    version = test_manager.SlaveVersion()[:-1]
+
+    response = self._manager.ExecuteRegisterRequest(
+        self._GetMachineRegisterRequest(version=version),
+        self._SERVER_URL)
+
+    self.assertTrue('id' in response)
+    self.assertTrue('try_count' in response)
+    self.assertTrue('commands' in response)
+    self.assertTrue('result_url' in response)
+
+    self.assertEqual([{'args': self._SERVER_URL + 'get_slave_code',
+                       'function': 'UpdateSlave'}],
+                     response['commands'])
+    self.assertEqual(self._SERVER_URL + 'remote_error', response['result_url'])
+
   def testSlaveCodeZipped(self):
     zipped_code = test_manager.SlaveCodeZipped()
 
@@ -1143,6 +1165,11 @@ class TestRequestManagerTest(unittest.TestCase):
       expected_slave_script = os.path.join(temp_dir,
                                            swarm_constants.SLAVE_MACHINE_SCRIPT)
       self.assertTrue(os.path.exists(expected_slave_script))
+
+      expected_test_runner = os.path.join(temp_dir,
+                                          swarm_constants.TEST_RUNNER_DIR,
+                                          swarm_constants.TEST_RUNNER_SCRIPT)
+      self.assertTrue(os.path.exists(expected_test_runner))
 
       common_dir = os.path.join(temp_dir, swarm_constants.COMMON_DIR)
       for common_file in swarm_constants.SWARM_BOT_COMMON_FILES:

@@ -31,19 +31,25 @@ def GenerateSwarmSlaveVersion(slave_machine_script):
   """
   version_hash = hashlib.sha1()
 
-  with open(slave_machine_script, 'rb') as f:
-    version_hash.update(f.read())
+  try:
+    with open(slave_machine_script, 'rb') as main_file:
+      version_hash.update(main_file.read())
 
-  local_test_runner = os.path.join(swarm_constants.SWARM_ROOT_DIR,
-                                   swarm_constants.TEST_RUNNER_DIR,
-                                   swarm_constants.TEST_RUNNER_SCRIPT)
-  with open(local_test_runner, 'r') as f:
-    version_hash.update(f.read())
+    local_test_runner = os.path.join(swarm_constants.SWARM_ROOT_DIR,
+                                     swarm_constants.TEST_RUNNER_DIR,
+                                     swarm_constants.TEST_RUNNER_SCRIPT)
 
-  common_dir = os.path.join(swarm_constants.SWARM_ROOT_DIR,
-                            swarm_constants.COMMON_DIR)
-  for common_file in swarm_constants.SWARM_BOT_COMMON_FILES:
-    with open(os.path.join(common_dir, common_file), 'rb') as support_file:
-      version_hash.update(support_file.read())
+    with open(local_test_runner, 'rb') as f:
+      version_hash.update(f.read())
+
+    common_dir = os.path.join(swarm_constants.SWARM_ROOT_DIR,
+                              swarm_constants.COMMON_DIR)
+    for common_file in swarm_constants.SWARM_BOT_COMMON_FILES:
+      with open(os.path.join(common_dir, common_file), 'rb') as support_file:
+        version_hash.update(support_file.read())
+  except IOError:
+    # If any files are missing don't worry about it, the version hash will be
+    # different so we will get them in the next update.
+    pass
 
   return version_hash.hexdigest()

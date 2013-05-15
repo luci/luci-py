@@ -13,19 +13,57 @@ import json
 import logging
 import optparse
 import os
+import shutil
 import subprocess
 import sys
+import tempfile
 import time
 import unittest
 import urllib
 import urllib2
 import urlparse
 
+from common import swarm_constants
 
 # Number of seconds to sleep between tries of polling for results.
 SLEEP_BETWEEN_RESULT_POLLS = 2
 
 ROOT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
+
+# The script to start the slave with. The python script is passed in because
+# during tests, sys.executable was sometimes failing to find python.
+START_SLAVE = """import os
+import subprocess
+import sys
+
+subprocess.call(['%(python)s', '%(slave_script)s',
+                 '-a', '%(server_address)s', '-p', '%(server_port)s',
+                 '-d', '%(slave_directory)s',
+                 '-l', os.path.join('%(slave_directory)s', 'slave.log'),
+                 '%(config_file)s'])
+"""
+
+
+def CopyDirectory(source_path, destination_path):
+  """Copy a directory like shutil.copy_tree, but without keeping stats.
+
+  This will allow making a copy of a protected build folder that can then
+  be modified.
+
+  Args:
+    source_path: The directory to copy over.
+    destination_path: The destination directory to copy the files to.
+  """
+  for item in os.listdir(source_path):
+    if os.path.isdir(os.path.join(source_path, item)):
+      destination_subdirectory = os.path.join(destination_path, item)
+      os.mkdir(destination_subdirectory)
+
+      CopyDirectory(os.path.join(source_path, item),
+                    destination_subdirectory)
+    else:
+      shutil.copyfile(os.path.join(source_path, item),
+                      os.path.join(destination_path, item))
 
 
 # TODO(user): Find a way to avoid spawning other processes so that we can
@@ -37,8 +75,8 @@ class _ProcessWrapper(object):
     command_line: An array with the command to execute followed by its args.
   """
 
-  def __init__(self, command_line):
-    self.wrapped_process = subprocess.Popen(command_line)
+  def __init__(self, command_line, cwd=None):
+    self.wrapped_process = subprocess.Popen(command_line, cwd=cwd)
 
   def __del__(self):
     if hasattr(self, 'wrapped_process') and self.wrapped_process.poll() is None:
@@ -82,6 +120,39 @@ class _SwarmTestCase(unittest.TestCase):
     logging.info('Started Swarm server Process with pid: %s',
                  self._swarm_server_process.wrapped_process.pid)
 
+    # Setup the slave code in a temporary directory so it can be modified.
+    self._temp_directory = tempfile.mkdtemp()
+    slave_root_dir = os.path.join(
+        os.path.dirname(_SwarmTestProgram.options.slave_script), '..')
+    CopyDirectory(slave_root_dir, self._temp_directory)
+
+    # Move the slave_machine.py script to its correct home.
+    os.rename(os.path.join(self._temp_directory,
+                           swarm_constants.TEST_RUNNER_DIR,
+                           swarm_constants.SLAVE_MACHINE_SCRIPT),
+              os.path.join(self._temp_directory,
+                           swarm_constants.SLAVE_MACHINE_SCRIPT))
+
+    # Remove the local test runner script to ensure the slave is out of date
+    # and is updated.
+    local_test_runner_script = os.path.join(self._temp_directory,
+                                            swarm_constants.TEST_RUNNER_DIR,
+                                            swarm_constants.TEST_RUNNER_SCRIPT)
+    os.remove(local_test_runner_script)
+
+    # Create the start_slave.py script.
+    start_slave_script = os.path.join(self._temp_directory,
+                                      'start_slave.py')
+    with open(start_slave_script, 'w') as f:
+      f.write(START_SLAVE % {
+          'python': sys.executable,
+          'slave_script': os.path.join(self._temp_directory,
+                                       swarm_constants.SLAVE_MACHINE_SCRIPT),
+          'server_address': swarm_server_addr,
+          'server_port': swarm_server_port,
+          'slave_directory': self._temp_directory,
+          'config_file': _SwarmTestProgram.options.slave_config_file})
+
     # Wait for the Swarm server to be ready
     ready = False
     time_out = _SwarmTestProgram.options.swarm_server_start_timeout
@@ -105,26 +176,25 @@ class _SwarmTestCase(unittest.TestCase):
 
     # Start the slave machine script to start polling for tests.
     logging.info('Current dir: %s', os.getcwd())
+    slave_script = os.path.join(self._temp_directory,
+                                swarm_constants.TEST_RUNNER_DIR,
+                                'slave_machine.py')
     logging.info('Trying to run slave script: %s',
-                 _SwarmTestProgram.options.slave_script)
+                 slave_script)
 
     slave_machine_cmds = [
         sys.executable,
-        _SwarmTestProgram.options.slave_script,
-        '-a', swarm_server_addr,
-        '-p', swarm_server_port,
-        '-d', '/tmp',
-        '-l', '/tmp/slave.log',
-        _SwarmTestProgram.options.slave_config_file
-        ]
-
+        start_slave_script]
     if _SwarmTestProgram.options.verbose:
       slave_machine_cmds.append('-v')
-    self._slave_machine_process = _ProcessWrapper(slave_machine_cmds)
+    self._slave_machine_process = _ProcessWrapper(slave_machine_cmds,
+                                                  self._temp_directory)
+
     logging.info('Started slave machine process with pid: %s',
                  self._slave_machine_process.wrapped_process.pid)
 
   def tearDown(self):
+    shutil.rmtree(self._temp_directory)
     try:
       logging.info('Quitting Swarm server')
       cj = cookielib.CookieJar()

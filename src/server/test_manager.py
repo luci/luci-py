@@ -33,6 +33,7 @@ import uuid
 import zipfile
 
 from google.appengine.api import mail
+from google.appengine.api import memcache
 from google.appengine.api import urlfetch
 from google.appengine.ext import blobstore
 from google.appengine.ext import db
@@ -40,6 +41,7 @@ from common import blobstore_helper
 from common import dimensions_utils
 from common import swarm_constants
 from common import test_request_message
+from common import version
 from server import test_request
 from server import test_runner
 from stats import machine_stats
@@ -533,6 +535,25 @@ class TestRequestManager(object):
     """
     # Validate and fix machine attributes. Will throw exception on errors.
     attribs = self.ValidateAndFixAttributes(attributes)
+    response = {'id': attribs['id']}
+
+    # Check the slave version, forcing it to update if required.
+    if 'version' in attributes:
+      if attributes['version'] != SlaveVersion():
+        response['commands'] = [slave_machine.BuildRPC(
+            'UpdateSlave',
+            server_url.rstrip('/') + '/get_slave_code')]
+        response['try_count'] = 0
+        # The only time a slave would have results to send here would be if
+        # the machine failed to update.
+        response['result_url'] = server_url.rstrip('/') + '/remote_error'
+
+        return response
+    else:
+      logging.warning('%s(%s) is querying for work but it is too old to '
+                      'automatically update. Please manually update the slave.',
+                      attribs['id'], attributes.get('tag', None))
+
     dimension_hashes = dimensions_utils.GenerateAllDimensionHashes(
         attribs['dimensions'])
 
@@ -571,7 +592,6 @@ class TestRequestManager(object):
         runner = db.get(runner.key())
         break
 
-    response = {'id': attribs['id']}
     if assigned_runner:
       # Get the commands the machine needs to execute.
       try:
@@ -901,6 +921,30 @@ def DeleteOldErrors():
   logging.debug('DeleteOldErrors done')
 
 
+def SlaveVersion():
+  """Retrieves the slave version loaded on this server.
+
+  The memcache is first checked for the version, otherwise the value
+  is generated and then stored in the memcache.
+
+  Returns:
+    The hash of the current slave version.
+  """
+
+  slave_version = memcache.get('slave_version')
+  if slave_version:
+    return slave_version
+
+  slave_machine_script = os.path.join(swarm_constants.SWARM_ROOT_DIR,
+                                      swarm_constants.TEST_RUNNER_DIR,
+                                      swarm_constants.SLAVE_MACHINE_SCRIPT)
+
+  slave_version = version.GenerateSwarmSlaveVersion(slave_machine_script)
+  memcache.set('slave_version', slave_version)
+
+  return slave_version
+
+
 def SlaveCodeZipped():
   """Returns a zipped file of all the files a slave needs to run.
 
@@ -913,6 +957,13 @@ def SlaveCodeZipped():
                                 swarm_constants.TEST_RUNNER_DIR,
                                 swarm_constants.SLAVE_MACHINE_SCRIPT)
     zip_file.write(slave_script, swarm_constants.SLAVE_MACHINE_SCRIPT)
+
+    local_test_runner = os.path.join(swarm_constants.SWARM_ROOT_DIR,
+                                     swarm_constants.TEST_RUNNER_DIR,
+                                     swarm_constants.TEST_RUNNER_SCRIPT)
+    zip_file.write(local_test_runner,
+                   os.path.join(swarm_constants.TEST_RUNNER_DIR,
+                                swarm_constants.TEST_RUNNER_SCRIPT))
 
     # Copy all the required helper files.
     common_dir = os.path.join(swarm_constants.SWARM_ROOT_DIR,

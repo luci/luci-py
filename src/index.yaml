@@ -38,12 +38,12 @@ indexes:
 - kind: TestRunner
   properties:
   - name: done
-  - name: ping
+  - name: machine_id
 
 - kind: TestRunner
   properties:
   - name: done
-  - name: machine_id
+  - name: ping
 
 - kind: TestRunner
   properties:
@@ -54,4 +54,3 @@ indexes:
   properties:
   - name: ip
   - name: whitelist
-

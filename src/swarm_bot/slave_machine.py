@@ -34,6 +34,25 @@ from common import version
 # The default name of the text file containing the machine id of this machine.
 DEFAULT_MACHINE_ID_FILE = 'swarm_bot.id'
 
+# The zip file to contain the zipped slave code.
+ZIPPED_SLAVE_FILES = 'slave_files.zip'
+
+# The code to unzip the slave code and start the slave back up. This needs to be
+# a separate script so that the update process can overwrite it and then run
+# it without the rest of the slave running, otherwise the slave files will be
+# protected and it won't be possible to replace them with the new zipped file
+# version.
+SLAVE_SETUP_SCRIPT = """
+import os
+import sys
+import zipfile
+
+with zipfile.ZipFile('%(zipped_slave_files)s') as f:
+  f.extractall()
+
+os.execl(sys.executable, sys.executable, 'start_slave.py')
+""" % {'zipped_slave_files': ZIPPED_SLAVE_FILES}
+
 
 def Restart():
   """Restarts this machine.
@@ -309,7 +328,7 @@ class SlaveMachine(object):
     logging.debug('received try_count: %d', self._attributes['try_count'])
 
     commands = None
-    if not 'commands' in response:
+    if 'commands' not in response:
       self._come_back = float(response['come_back'])
     else:
       commands = response['commands']
@@ -404,7 +423,7 @@ class SlaveMachine(object):
     # Validate args.
     if not isinstance(args, basestring):
       raise SlaveRPCError(
-          'Invalid arg types to LogRPC: %s (expected str or unicode)'%
+          'Invalid arg types to LogRPC: %s (expected str or unicode)' %
           str(type(args)))
 
     # Execute functionality.
@@ -425,22 +444,22 @@ class SlaveMachine(object):
     if not isinstance(args, list):
       raise SlaveRPCError(
           'Invalid StoreFiles arg type: %s (expected list of str or unicode'
-          ' tuples)'%str(type(args)))
+          ' tuples)' % str(type(args)))
 
     for file_tuple in args:
       if not isinstance(file_tuple, list):
         raise SlaveRPCError(
             'Invalid element type in StoreFiles args: %s (expected str or'
-            ' unicode tuple)'% str(type(file_tuple)))
+            ' unicode tuple)' % str(type(file_tuple)))
       if len(file_tuple) != 3:
         raise SlaveRPCError(
-            'Invalid element len (%d != 3) in StoreFiles args: %s'%
+            'Invalid element len (%d != 3) in StoreFiles args: %s' %
             (len(file_tuple), str(file_tuple)))
 
       for string in file_tuple:
         if not isinstance(string, basestring):
           raise SlaveRPCError(
-              'Invalid tuple element type: %s (expected str or unicode)'%
+              'Invalid tuple element type: %s (expected str or unicode)' %
               str(type(string)))
 
     # Execute functionality.
@@ -527,6 +546,38 @@ class SlaveMachine(object):
       logging.debug('done!')
       # At this point the script called by subprocess has handled any further
       # communication with the swarm server.
+
+  def UpdateSlave(self, args):
+    """Download the current version of the slave code and then run it.
+
+    Args:
+      args: The url for the slave code.
+
+    Raises:
+      SlaveRPCError: If args are invalid.
+    """
+    if not isinstance(args, basestring):
+      raise SlaveRPCError(
+          'Invalid arg types to UpdateSlave: %s (expected str or unicode)' %
+          str(type(args)))
+
+    zipped_slave = url_helper.UrlOpen(args, method='GET')
+
+    if not zipped_slave:
+      logging.error('Unable to download required slave files.')
+      return
+
+    with open(ZIPPED_SLAVE_FILES, 'w') as f:
+      f.write(zipped_slave)
+
+    with open('slave_setup.py', 'w') as f:
+      f.write(SLAVE_SETUP_SCRIPT)
+
+    sys.stdout.flush()
+    sys.stderr.flush()
+    # Repeat sys.executable since the first one is what we call, and the
+    # second one is arg[0].
+    os.execl(sys.executable, sys.executable, 'slave_setup.py')
 
 
 # TODO(user): Move function to another file.
