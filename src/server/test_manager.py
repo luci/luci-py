@@ -37,16 +37,16 @@ from google.appengine.api import memcache
 from google.appengine.api import urlfetch
 from google.appengine.ext import blobstore
 from google.appengine.ext import db
-from .common import blobstore_helper
-from .common import dimensions_utils
-from .common import swarm_constants
-from .common import test_request_message
-from .common import version
-from .server import test_request
-from .server import test_runner
-from .stats import machine_stats
-from .stats import runner_stats
-from .swarm_bot import slave_machine
+from common import blobstore_helper
+from common import dimensions_utils
+from common import swarm_constants
+from common import test_request_message
+from common import version
+from server import test_request
+from server import test_runner
+from stats import machine_stats
+from stats import runner_stats
+from swarm_bot import slave_machine
 
 # The amount of time to wait after recieving a runners last message before
 # considering the runner to have run for too long. Runners that run for too

@@ -14,16 +14,16 @@ import unittest
 
 from google.appengine.ext import testbed
 from  import main as main_app
-from .common import blobstore_helper
-from .common import dimensions_utils
-from .common import test_request_message
-from .server import admin_user
-from .server import test_manager
-from .server import test_request
-from .server import test_runner
-from .server import user_manager
-from .stats import machine_stats
-from .stats import runner_stats
+from common import blobstore_helper
+from common import dimensions_utils
+from common import test_request_message
+from server import admin_user
+from server import test_manager
+from server import test_request
+from server import test_runner
+from server import user_manager
+from stats import machine_stats
+from stats import runner_stats
 from third_party.mox import mox
 
 # A simple machine id constant to use in tests.

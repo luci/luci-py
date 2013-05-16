@@ -11,8 +11,8 @@ import logging
 import unittest
 
 from google.appengine.ext import testbed
-from .server import admin_user
-from .stats import machine_stats
+from server import admin_user
+from stats import machine_stats
 
 
 MACHINE_IDS = ['12345678-12345678-12345678-12345678',

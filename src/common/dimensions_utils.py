@@ -9,7 +9,7 @@ import itertools
 import logging
 
 from google.appengine.api import memcache
-from .common import test_request_message
+from common import test_request_message
 
 
 # The maximum number of hashes that can be in a list such that the total size

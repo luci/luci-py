@@ -14,11 +14,11 @@ import unittest
 
 from google.appengine.ext import db
 from google.appengine.ext import testbed
-from .common import blobstore_helper
-from .common import test_request_message
-from .server import test_request
-from .server import test_runner
-from .stats import runner_stats
+from common import blobstore_helper
+from common import test_request_message
+from server import test_request
+from server import test_runner
+from stats import runner_stats
 from third_party.mox import mox
 
 MACHINE_IDS = ['12345678-12345678-12345678-12345678',

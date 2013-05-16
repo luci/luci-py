@@ -12,7 +12,7 @@ import unittest
 
 
 from google.appengine.ext import testbed
-from .server import user_manager
+from server import user_manager
 from third_party.mox import mox
 
 IP = ['192.168.0.1', '192.168.0.2']

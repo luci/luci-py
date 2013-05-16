@@ -16,10 +16,10 @@ import time
 import unittest
 
 
-from .common import swarm_constants
-from .common import url_helper
-from .common import version
-from .swarm_bot import slave_machine
+from common import swarm_constants
+from common import url_helper
+from common import version
+from swarm_bot import slave_machine
 from third_party.mox import mox
 
 # The slave script being tested.

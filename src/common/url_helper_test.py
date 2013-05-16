@@ -18,7 +18,7 @@ import urllib
 import urllib2
 
 
-from .common import url_helper
+from common import url_helper
 from third_party.mox import mox
 
 

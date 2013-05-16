@@ -13,10 +13,10 @@ import logging
 
 from google.appengine.ext import blobstore
 from google.appengine.ext import db
-from .common import blobstore_helper
-from .common import test_request_message
-from .server import test_request
-from .stats import runner_stats
+from common import blobstore_helper
+from common import test_request_message
+from server import test_request
+from stats import runner_stats
 
 # The maximum number of times to retry a runner that has failed for a swarm
 # related reasons (like the machine timing out).

@@ -26,16 +26,16 @@ from google.appengine.ext.ereporter.report_generator import ReportGenerator
 from google.appengine.ext.webapp import blobstore_handlers
 from google.appengine.ext.webapp import template
 from google.appengine.ext.webapp import util
-from .common import blobstore_helper
-from .common import test_request_message
-from .common import url_helper
-from .server import admin_user
-from .server import test_manager
-from .server import test_request
-from .server import test_runner
-from .server import user_manager
-from .stats import machine_stats
-from .stats import runner_stats
+from common import blobstore_helper
+from common import test_request_message
+from common import url_helper
+from server import admin_user
+from server import test_manager
+from server import test_request
+from server import test_runner
+from server import user_manager
+from stats import machine_stats
+from stats import runner_stats
 # pylint: enable-msg=C6204
 
 import webapp2  # pylint: disable-msg=C6203

@@ -14,7 +14,7 @@ import logging
 from google.appengine.api import app_identity
 from google.appengine.api import mail
 from google.appengine.ext import db
-from .server import admin_user
+from server import admin_user
 
 
 # The number of days that have to pass before a machine is considered dead.

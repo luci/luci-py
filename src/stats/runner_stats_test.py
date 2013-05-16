@@ -13,10 +13,10 @@ import unittest
 
 
 from google.appengine.ext import testbed
-from .common import test_request_message
-from .server import test_request
-from .server import test_runner
-from .stats import runner_stats
+from common import test_request_message
+from server import test_request
+from server import test_runner
+from stats import runner_stats
 from third_party.mox import mox
 
 

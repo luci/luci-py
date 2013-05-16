@@ -17,10 +17,10 @@ import unittest
 import zipfile
 
 
-from .common import swarm_constants
-from .common import test_request_message
-from .common import url_helper
-from .swarm_bot import local_test_runner
+from common import swarm_constants
+from common import test_request_message
+from common import url_helper
+from swarm_bot import local_test_runner
 from third_party.mox import mox
 
 DATA_FILE_REGEX = r'\S*/%s/%s'

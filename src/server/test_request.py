@@ -10,8 +10,8 @@ developer requesting a test from their own build.
 
 
 from google.appengine.ext import db
-from .common import dimensions_utils
-from .common import test_request_message
+from common import dimensions_utils
+from common import test_request_message
 
 
 def GetTestCase(request_message):
