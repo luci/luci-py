@@ -15,7 +15,7 @@ from google.appengine import runtime
 from google.appengine.api import files
 from google.appengine.ext import blobstore
 from google.appengine.ext import testbed
-from common import blobstore_helper
+from .common import blobstore_helper
 from third_party.mox import mox
 
 

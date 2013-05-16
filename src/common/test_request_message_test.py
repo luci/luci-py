@@ -13,7 +13,7 @@ import logging
 import os.path
 import unittest
 
-from common import test_request_message
+from .common import test_request_message
 
 
 class TestRequestMessageBaseTest(unittest.TestCase):

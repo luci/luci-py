@@ -23,7 +23,7 @@ import urllib
 import urllib2
 import urlparse
 
-from common import swarm_constants
+from .common import swarm_constants
 
 # Number of seconds to sleep between tries of polling for results.
 SLEEP_BETWEEN_RESULT_POLLS = 2

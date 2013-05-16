@@ -11,8 +11,8 @@ import logging
 import unittest
 
 from google.appengine.ext import testbed
-from server import test_request
-from server import test_runner
+from .server import test_request
+from .server import test_runner
 
 
 def CreateRequest(num_instances):

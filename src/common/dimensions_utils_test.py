@@ -7,7 +7,7 @@
 import unittest
 
 from google.appengine.ext import testbed
-from common import dimensions_utils
+from .common import dimensions_utils
 
 
 def AreDimensionsInMachineDimensions(dimensions, machine_dimensions):

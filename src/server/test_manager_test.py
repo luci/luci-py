@@ -25,16 +25,16 @@ import zipfile
 from google.appengine.api import mail
 from google.appengine.ext import blobstore
 from google.appengine.ext import testbed
-from common import blobstore_helper
-from common import dimensions_utils
-from common import swarm_constants
-from common import test_request_message
-from server import test_manager
-from server import test_request
-from server import test_runner
-from stats import machine_stats
-from stats import runner_stats
-from swarm_bot import slave_machine
+from .common import blobstore_helper
+from .common import dimensions_utils
+from .common import swarm_constants
+from .common import test_request_message
+from .server import test_manager
+from .server import test_request
+from .server import test_runner
+from .stats import machine_stats
+from .stats import runner_stats
+from .swarm_bot import slave_machine
 from third_party.mox import mox
 
 

@@ -25,9 +25,9 @@ import sys
 import time
 
 # pylint: disable-msg=C6204
-from common import swarm_constants
-from common import url_helper
-from common import version
+from .common import swarm_constants
+from .common import url_helper
+from .common import version
 # pylint: enable-msg=C6204
 
 

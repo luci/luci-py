@@ -60,7 +60,7 @@ import zipfile
 try:
   import dimensions
 except ImportError:
-  from tools import dimensions
+  from .tools import dimensions
 # pylint: enable-msg=C6204
 
 

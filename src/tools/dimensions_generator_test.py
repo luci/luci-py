@@ -17,7 +17,7 @@ import unittest
 
 import mox  # pylint: disable-msg=C6204
 
-from tools import dimensions_generator
+from .tools import dimensions_generator
 
 
 class DimensionsGeneratorTest(unittest.TestCase):

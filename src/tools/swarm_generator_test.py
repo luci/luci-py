@@ -12,8 +12,8 @@ import tempfile
 import unittest
 import zipfile
 
-from tools import dimensions
-from tools import swarm_generator
+from .tools import dimensions
+from .tools import swarm_generator
 
 
 class SwarmGeneratorTest(unittest.TestCase):
