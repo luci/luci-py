@@ -931,7 +931,8 @@ def SlaveVersion():
     The hash of the current slave version.
   """
 
-  slave_version = memcache.get('slave_version')
+  slave_version = memcache.get('slave_version',
+                               namespace=os.environ['CURRENT_VERSION_ID'])
   if slave_version:
     return slave_version
 
@@ -940,7 +941,8 @@ def SlaveVersion():
                                       swarm_constants.SLAVE_MACHINE_SCRIPT)
 
   slave_version = version.GenerateSwarmSlaveVersion(slave_machine_script)
-  memcache.set('slave_version', slave_version)
+  memcache.set('slave_version', slave_version,
+               namespace=os.environ['CURRENT_VERSION_ID'])
 
   return slave_version
 
