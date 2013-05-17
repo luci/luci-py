@@ -561,14 +561,9 @@ class SlaveMachine(object):
           'Invalid arg types to UpdateSlave: %s (expected str or unicode)' %
           str(type(args)))
 
-    zipped_slave = url_helper.UrlOpen(args, method='GET')
-
-    if not zipped_slave:
+    if not url_helper.DownloadFile(ZIPPED_SLAVE_FILES, args):
       logging.error('Unable to download required slave files.')
       return
-
-    with open(ZIPPED_SLAVE_FILES, 'w') as f:
-      f.write(zipped_slave)
 
     with open('slave_setup.py', 'w') as f:
       f.write(SLAVE_SETUP_SCRIPT)
