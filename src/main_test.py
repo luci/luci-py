@@ -8,7 +8,9 @@
 
 import datetime
 import json
+import logging
 import os
+import sys
 import unittest
 
 
@@ -254,17 +256,23 @@ class AppTest(unittest.TestCase):
     # Missing attributes field.
     response = self.app.post('/poll_for_test', {'something': 'nothing'})
     self.assertEquals('200 OK', response.status)
-    self.assertEquals('Error: Invalid attributes: ', response.body)
+    self.assertEquals(
+        'Error: Invalid attributes: : No JSON object could be decoded',
+        response.body)
 
     # Invalid attributes field.
     response = self.app.post('/poll_for_test', {'attributes': 'nothing'})
     self.assertEquals('200 OK', response.status)
-    self.assertEquals('Error: Invalid attributes: nothing', response.body)
+    self.assertEquals(
+        'Error: Invalid attributes: nothing: No JSON object could be decoded',
+        response.body)
 
     # Invalid empty attributes field.
     response = self.app.post('/poll_for_test', {'attributes': None})
     self.assertEquals('200 OK', response.status)
-    self.assertEquals('Error: Invalid attributes: None', response.body)
+    self.assertEquals(
+        'Error: Invalid attributes: None: No JSON object could be decoded',
+        response.body)
 
     # Valid attributes but missing dimensions.
     response = self.app.post('/poll_for_test', {'attributes': '{}'})
@@ -605,4 +613,6 @@ class AppTest(unittest.TestCase):
 
 
 if __name__ == '__main__':
+  logging.basicConfig(
+      level=logging.DEBUG if '-v' in sys.argv else logging.CRITICAL)
   unittest.main()

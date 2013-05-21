@@ -378,6 +378,8 @@ class _SwarmTestProgram(unittest.TestProgram):
 
 
 if __name__ == '__main__':
+  logging.basicConfig(
+      level=logging.DEBUG if '-v' in sys.argv else logging.CRITICAL)
   if 'TEST_SRCDIR' not in os.environ:
     os.environ['TEST_SRCDIR'] = ''
   _SwarmTestProgram()

@@ -423,7 +423,7 @@ class TestRequestHandler(webapp2.RequestHandler):
           self.request.get('request')))
     except test_request_message.Error as ex:
       message = str(ex)
-      logging.exception(message)
+      logging.error(message)
       response = 'Error: %s' % message
     self.response.out.write(response)
 
@@ -795,9 +795,9 @@ class RegisterHandler(webapp2.RequestHandler):
     attributes_str = self.request.get('attributes')
     try:
       attributes = json.loads(attributes_str)
-    except (TypeError, ValueError):
-      message = 'Invalid attributes: ' + attributes_str
-      logging.exception(message)
+    except (TypeError, ValueError) as e:
+      message = 'Invalid attributes: %s: %s' % (attributes_str, e)
+      logging.error(message)
       response = 'Error: %s' % message
       self.response.out.write(response)
       return
@@ -817,7 +817,7 @@ class RegisterHandler(webapp2.RequestHandler):
       response = 'Error: %s' % message
     except test_request_message.Error as e:
       message = str(e)
-      logging.exception(message)
+      logging.error(message)
       response = 'Error: %s' % message
 
     self.response.out.write(response)
