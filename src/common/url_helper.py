@@ -14,6 +14,7 @@ import logging
 import math
 import os
 import random
+import socket
 import time
 import urllib
 import urllib2
@@ -104,7 +105,7 @@ def UrlOpen(url, data=None, files=None, max_tries=5, wait_duration=None,
         logging.exception('Able to connect to %s but an exception was '
                           'thrown.\n%s', url, e)
         return None
-    except (urllib2.URLError, httplib.HTTPException) as e:
+    except (httplib.HTTPException, socket.error, urllib2.URLError) as e:
       logging.warning('Unable to open url %s on attempt %d.\nException: %s',
                       url, attempt, e)
 
