@@ -482,10 +482,14 @@ class TestRequestManager(object):
         'WHERE done = :1 AND ping != :2 AND ping < :3',
         False, None, timeout_cutoff)
     for runner in query:
-      if test_runner.AutomaticallyRetryRunner(runner):
-        logging.warning('TRM.AbortStaleRunners retrying runner %s with key %s. '
-                        'Attempt %d', runner.GetName(), runner.key(),
-                        runner.automatic_retry_count)
+      if test_runner.ShouldAutomaticallyRetryRunner(runner):
+        if test_runner.AutomaticallyRetryRunner(runner):
+          logging.warning('TRM.AbortStaleRunners retrying runner %s with key '
+                          ' %s. Attempt %d', runner.GetName(), runner.key(),
+                          runner.automatic_retry_count)
+        else:
+          logging.info('TRM.AbortStaleRunner unable to retry runner with key '
+                       '%s even though it can. Skipping for now.', runner.key())
       else:
         logging.error('TRM.AbortStaleRunners aborting runner %s with key %s',
                       runner.GetName(), runner.key())

@@ -198,6 +198,14 @@ class TestRunnerTest(unittest.TestCase):
     self.assertFalse(test_runner.AssignRunnerToMachine(
         MACHINE_IDS[0], runner, test_runner.AtomicAssignID))
 
+  def testShouldAutomaticallyRetryRunner(self):
+    runner = self._CreateRunner()
+    runner.automatic_retry_count = 0
+    self.assertTrue(test_runner.ShouldAutomaticallyRetryRunner(runner))
+
+    runner.automatic_retry_count = test_runner.MAX_AUTOMATIC_RETRIES
+    self.assertFalse(test_runner.ShouldAutomaticallyRetryRunner(runner))
+
   def testRecordRunnerStatsAfterAutoRetry(self):
     runner = self._CreateRunner()
     runner.machine_id = MACHINE_IDS[0]

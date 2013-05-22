@@ -290,6 +290,18 @@ def AssignRunnerToMachine(machine_id, runner, atomic_assign):
   return False
 
 
+def ShouldAutomaticallyRetryRunner(runner):
+  """Decide if the given runner should be automatically retried.
+
+  Args:
+    runner: The runner to examine.
+
+  Returns:
+    True if the runner should be automatically retried.
+  """
+  return runner.automatic_retry_count < MAX_AUTOMATIC_RETRIES
+
+
 def AutomaticallyRetryRunner(runner):
   """Attempt to automaticlly retry runner.
 
@@ -302,18 +314,37 @@ def AutomaticallyRetryRunner(runner):
   Returns:
     True if the runner was successfully setup to get run again.
   """
-  if runner.automatic_retry_count < MAX_AUTOMATIC_RETRIES:
-    runner_stats.RecordRunnerStats(runner)
+  def RestartRunnerTransaction():
+    # Ensure that we have the most up to date runner.
+    transaction_runner = db.get(runner.key())
+
+    if not transaction_runner or transaction_runner.done:
+      return False
+
     # Don't change the created time since it is not the user's fault
     # we are retrying it (so it should have high prority to run again).
-    runner.old_machine_ids.append(runner.machine_id)
-    runner.machine_id = None
-    runner.done = False
-    runner.started = None
-    runner.ping = None
-    runner.automatic_retry_count += 1
-    runner.put()
+    transaction_runner.old_machine_ids.append(transaction_runner.machine_id)
+    transaction_runner.machine_id = None
+    transaction_runner.done = False
+    transaction_runner.started = None
+    transaction_runner.ping = None
+    transaction_runner.automatic_retry_count += 1
+    transaction_runner.put()
+
     return True
+
+  try:
+    # We wrap the restart in a transaction to ensure that the runner really has
+    # timed out, because with app engine's date model it is possible for the
+    # runner to actually be done (and this machine was just working with old
+    # data).
+    # We can't tests this because the unit tests can't reproduce the issue of
+    # machines being slighly out of sync with each other.
+    if db.run_in_transaction(RestartRunnerTransaction):
+      runner_stats.RecordRunnerStats(runner)
+      return True
+  except db.TransactionFailedError:
+    pass
 
   return False
 
