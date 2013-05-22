@@ -120,8 +120,8 @@ def UrlOpen(url, data=None, files=None, max_tries=5, wait_duration=None,
         time.sleep(duration)
 
     if url_response is not None:
-      logging.info('Opened given url, %s, and got response:\n%s', url,
-                   url_response)
+      logging.info('Opened given url, %s, and got a response of length %d.',
+                   url, len(url_response))
       return url_response
 
   logging.error('Unable to open given url, %s, after %d attempts.',
