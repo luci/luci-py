@@ -767,11 +767,11 @@ class TestRequestManagerTest(unittest.TestCase):
     self._mox.ReplayAll()
 
     # First call shouldn't delete the error since its not stale yet.
-    test_manager.DeleteOldErrors()
+    test_manager.DeleteOldErrors().get_result()
     self.assertEqual(1, test_manager.SwarmError.all().count())
 
     # Second call should remove the now stale error.
-    test_manager.DeleteOldErrors()
+    test_manager.DeleteOldErrors().get_result()
     self.assertEqual(0, test_manager.SwarmError.all().count())
 
     self._mox.VerifyAll()

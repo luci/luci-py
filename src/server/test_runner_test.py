@@ -369,11 +369,11 @@ class TestRunnerTest(unittest.TestCase):
     runner.put()
 
     # Make sure that new runners aren't deleted.
-    test_runner.DeleteOldRunners()
+    test_runner.DeleteOldRunners().get_result()
     self.assertEqual(1, test_runner.TestRunner.all().count())
 
     # Make sure that old runners are deleted.
-    test_runner.DeleteOldRunners()
+    test_runner.DeleteOldRunners().get_result()
     self.assertEqual(0, test_runner.TestRunner.all().count())
 
     self._mox.VerifyAll()

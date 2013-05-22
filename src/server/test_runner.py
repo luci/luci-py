@@ -385,7 +385,7 @@ def GetTestRunners(sort_by, ascending, limit, offset):
     An iterator of test runners in the given range.
   """
   # If we recieve an invalid sort_by parameter, just default to machine_id.
-  if not sort_by in TestRunner.properties():
+  if sort_by not in TestRunner.properties():
     sort_by = 'machine_id'
 
   if not ascending:
@@ -442,17 +442,23 @@ def DeleteRunner(runner):
 
 
 def DeleteOldRunners():
-  """Clean up all runners that are older than a certain age and done."""
+  """Clean up all runners that are older than a certain age and done.
+
+  Returns:
+    The rpc for the async delete call (mainly meant for tests).
+  """
   logging.debug('DeleteOldRunners starting')
 
   old_cutoff = (
       _GetCurrentTime() -
       datetime.timedelta(days=SWARM_FINISHED_RUNNER_TIME_TO_LIVE_DAYS))
 
-  db.delete(TestRunner.gql('WHERE ended != :1 and ended < :2', None,
-                           old_cutoff))
+  rpc = db.delete_async(TestRunner.gql('WHERE ended != :1 and ended < :2', None,
+                                       old_cutoff))
 
   logging.debug('DeleteOldRunners done')
+
+  return rpc
 
 
 def DeleteOrphanedBlobs():

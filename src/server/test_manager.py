@@ -908,17 +908,21 @@ def _GetCurrentTime():
 
 
 def DeleteOldErrors():
-  """Cleans up errors older than a certain age."""
+  """Cleans up errors older than a certain age.
+
+  Returns:
+    The rpc for the async delete call (mainly meant for tests).
+  """
   logging.debug('DeleteOldErrors starting')
   old_cutoff = (
       _GetCurrentTime() -
       datetime.timedelta(days=SWARM_ERROR_TIME_TO_LIVE_DAYS))
 
-  query = SwarmError.gql('WHERE created < :1', old_cutoff)
-  for error in query:
-    error.delete()
+  rpc = db.delete_async(SwarmError.gql('WHERE created < :1', old_cutoff))
 
   logging.debug('DeleteOldErrors done')
+
+  return rpc
 
 
 def SlaveVersion():
