@@ -322,13 +322,13 @@ class AppTest(unittest.TestCase):
 
   def testResultHandlerBlobstoreFailure(self):
     self._mox.StubOutWithMock(blobstore_helper, 'CreateBlobstore')
-    blobstore_helper.CreateBlobstore(mox.IgnoreArg()).AndReturn(None)
+    result = 'result string'
+    blobstore_helper.CreateBlobstore(result).AndReturn(None)
     self._mox.ReplayAll()
 
     runner = self._CreateTestRunner(machine_id=MACHINE_ID,
                                     started=datetime.datetime.now())
 
-    result = 'result string'
     response = self._PostResults(runner.key(), runner.machine_id, result,
                                  expect_errors=True)
     self.assertEquals('500 Internal Server Error', response.status)

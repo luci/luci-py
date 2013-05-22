@@ -16,6 +16,7 @@ import os.path
 import urllib
 
 from google.appengine import runtime
+from google.appengine.api import files
 from google.appengine.api import mail
 from google.appengine.api import mail_errors
 from google.appengine.api import users
@@ -104,15 +105,6 @@ def GenerateButtonWithHiddenForm(button_text, url, form_id):
   button_html += '</form>'
 
   return button_html
-
-
-def OnDevAppEngine():
-  """Return True if this code is running on dev app engine.
-
-  Returns:
-    True if this code is running on dev app engine.
-  """
-  return os.environ['SERVER_SOFTWARE'].startswith('Development')
 
 
 def AuthenticateMachine(method):
@@ -472,21 +464,8 @@ class ResultHandler(webapp2.RequestHandler):
     # the results are getting stored in the blobstore.
     test_runner.PingRunner(runner.key(), machine_id)
 
-    # If we are on dev app engine we can't use the create_upload_url method
-    # because it requires 2 threads, and dev app engine isn't multithreaded
-    # (It needs this thread, and another thread to handle the url POSTFORM).
-    result_blob_key = None
-    if OnDevAppEngine():
-      result_blob_key = blobstore_helper.CreateBlobstore(result_string)
-    else:
-      # Create the blobstore.
-      upload_url = blobstore.create_upload_url('/upload')
-      result_blob_key = url_helper.UrlOpen(
-          upload_url, files=[('result', 'result', result_string)],
-          max_tries=blobstore_helper.MAX_BLOBSTORE_WRITE_TRIES,
-          wait_duration=0, method='POSTFORM')
-
-    if result_blob_key is None:
+    result_blob_key = blobstore_helper.CreateBlobstore(result_string)
+    if not result_blob_key:
       self.response.out.write('The server was unable to save the results to '
                               'the blobstore')
       self.response.set_status(500)
