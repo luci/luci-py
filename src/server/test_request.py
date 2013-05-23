@@ -14,6 +14,11 @@ from common import dimensions_utils
 from common import test_request_message
 
 
+# The key for the model that is the parent of every TestRequest. This parent
+# allows transaction queries on TestRequest.
+TEST_REQUEST_PARENT_KEY = 'test_request_parent_key'
+
+
 def GetTestCase(request_message):
   """Returns a TestCase object representing this Test Request message.
 
@@ -45,6 +50,15 @@ class TestRequest(db.Model):
 
   # The name for this test request.
   name = db.StringProperty()
+
+  def __init__(self, *args, **kwargs):
+    # 'parent' can be the first arg or a keyword, only add a parent if there
+    # isn't one.
+    if not args and 'parent' not in kwargs:
+      parent_model = db.Model.get_or_insert(TEST_REQUEST_PARENT_KEY)
+      kwargs['parent'] = parent_model
+
+    super(TestRequest, self).__init__(*args, **kwargs)
 
   def GetTestCase(self):
     """Returns a TestCase object representing this Test Request.
@@ -122,10 +136,13 @@ def GetAllMatchingTestRequests(test_case_name):
   Returns:
     A list of all Test Requests that have |test_case_name| as their name.
   """
+  parent_model = db.Model.get_or_insert(TEST_REQUEST_PARENT_KEY)
+
   # Perform the query in a transaction to ensure that it gets the most recent
   # data, otherwise it is possible for one machine to add tests, and then be
   # unable to find them through this function after.
-  query = db.run_in_transaction(TestRequest.gql, 'WHERE name = :1',
-                                test_case_name)
+  query = db.run_in_transaction(TestRequest.gql, 'WHERE name = :1 AND '
+                                'ANCESTOR IS :2', test_case_name,
+                                parent_model.key())
 
   return [request for request in query]
