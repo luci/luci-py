@@ -47,8 +47,11 @@ import os
 import sys
 import zipfile
 
-with zipfile.ZipFile('%(zipped_slave_files)s') as f:
+f = zipfile.ZipFile('%(zipped_slave_files)s')
+try:
   f.extractall()
+finally:
+  f.close()
 
 os.execl(sys.executable, sys.executable, 'start_slave.py')
 """ % {'zipped_slave_files': ZIPPED_SLAVE_FILES}
