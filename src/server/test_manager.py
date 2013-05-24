@@ -568,10 +568,11 @@ class TestRequestManager(object):
         'SELECT __key__ FROM TestRunner WHERE machine_id = :1 AND done = :2',
         attribs['id'], False).get()
     if unfinished_test_key:
-      logging.error('A machine is asking for a new test, but there is '
-                    'already an unfinished test with key, %s, running on a '
-                    'machine with the same id, %s', unfinished_test_key,
-                    attribs['id'])
+      logging.warning('A machine is asking for a new test, but there still '
+                      'seems to be an unfinished test with key, %s, running on '
+                      'a machine with the same id, %s. This might just be due '
+                      'to app engine being only eventually consisten',
+                      unfinished_test_key, attribs['id'])
 
     # Try assigning machine to a runner 10 times before we give up.
     # TODO(user): Tune this parameter somehow.

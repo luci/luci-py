@@ -280,7 +280,7 @@ class TestRequestManagerTest(unittest.TestCase):
     self._manager.ExecuteTestRequest(request_message)
 
     for i in range(num_indexes):
-      response = self._ExecuteRegister(MACHINE_IDS[0])
+      response = self._ExecuteRegister(MACHINE_IDS[i])
 
       # Validate shard indices are set correctly by parsing the commands.
       found_manifest = False
@@ -795,10 +795,6 @@ class TestRequestManagerTest(unittest.TestCase):
     # This will result in 3 pending test.
     self._AssignPendingRequests(num_tests=5, num_machines=2)
 
-  def testAssignMultiplePendingRequestLessDifferentMachines(self):
-    # Test when there are 5 test requests then 3 machines register themselves.
-    self._AssignPendingRequests(num_tests=5, num_machines=3, different_ids=True)
-
   def testAssignMultiplePendingRequestLessTests(self):
     # Test when there are 3 test requests then 4 machines register themselves.
     self._AssignPendingRequests(num_tests=3, num_machines=4)
@@ -808,8 +804,7 @@ class TestRequestManagerTest(unittest.TestCase):
     # but there are IO errors on the server disk.
     self._AssignPendingRequests(num_tests=4, num_machines=2, io_error=True)
 
-  def _AssignPendingRequests(self, num_tests=1, num_machines=1,
-                             different_ids=False, io_error=False):
+  def _AssignPendingRequests(self, num_tests=1, num_machines=1, io_error=False):
 
     num_running = min(num_tests, num_machines)
 
@@ -826,26 +821,20 @@ class TestRequestManagerTest(unittest.TestCase):
     # machine do all the tests.
     for i in range(num_machines):
       self._ExecuteRegister(
-          MACHINE_IDS[i if different_ids else 0],
+          MACHINE_IDS[i],
           register_should_match=(not io_error and i < num_running))
 
     if io_error:
       # No tests should be assigned in the case of IO errors.
-      if different_ids:
-        for i in range(num_running):
-          self._AssertTestCount(MACHINE_IDS[i], 0)
-      else:
-        self._AssertTestCount(MACHINE_IDS[0], 0)
+      for i in range(num_running):
+        self._AssertTestCount(MACHINE_IDS[i], 0)
 
       # All tests should still be pending upon errors.
       self._AssertPendingTestCount(num_tests)
     else:
       # No IO errors, so there should be some tests assigned.
-      if different_ids:
-        for i in range(num_running):
-          self._AssertTestCount(MACHINE_IDS[i], 1)
-      else:
-        self._AssertTestCount(MACHINE_IDS[0], num_running)
+      for i in range(num_running):
+        self._AssertTestCount(MACHINE_IDS[i], 1)
 
       # If there were more tests than machines there should some pending tests.
       self._AssertPendingTestCount(max(0, num_tests - num_machines))
@@ -1046,16 +1035,17 @@ class TestRequestManagerTest(unittest.TestCase):
   # as a machine that is supposed to be running a test, we log an error, since
   # it probably means we failed to get the results from the last test.
   def testRequestBeforeResult(self):
-    self._mox.StubOutWithMock(logging, 'error')
+    self._mox.StubOutWithMock(logging, 'warning')
 
     self._SetupLoadFileExpectations()
-    logging.error(mox.StrContains('unfinished test'), mox.IgnoreArg(),
-                  mox.IgnoreArg())
+    logging.warning(mox.StrContains('unfinished test'), mox.IgnoreArg(),
+                    mox.IgnoreArg())
     self._mox.ReplayAll()
 
     self._manager.ExecuteTestRequest(self._GetRequestMessage())
 
-    register_request = self._GetMachineRegisterRequest()
+    version = test_manager.SlaveVersion()
+    register_request = self._GetMachineRegisterRequest(version=version)
     self._manager.ExecuteRegisterRequest(register_request, self._SERVER_URL)
     self._manager.ExecuteRegisterRequest(register_request, self._SERVER_URL)
 
