@@ -75,8 +75,8 @@ Top level Functions:
 import exceptions
 import logging
 import logging.handlers
+import optparse
 import os
-from os import path
 import Queue
 import re
 import shutil
@@ -197,10 +197,10 @@ class LocalTestRunner(object):
     self.data_dir = os.path.abspath(os.path.dirname(__file__))
     if data_folder_name:
       self.data_dir = os.path.join(self.data_dir, data_folder_name)
-    if path.exists(self.data_dir) and not path.isdir(self.data_dir):
+    if os.path.exists(self.data_dir) and not os.path.isdir(self.data_dir):
       raise Error('The specified data folder already exists, but is a regular '
                   'file rather than a folder.')
-    if not path.exists(self.data_dir):
+    if not os.path.exists(self.data_dir):
       os.mkdir(self.data_dir)
 
     self.max_url_retries = max_url_retries
@@ -471,7 +471,7 @@ class LocalTestRunner(object):
       else:
         data_url = data
         file_name = data_url[data_url.rfind('/') + 1:]
-      local_file = path.join(self.data_dir, file_name)
+      local_file = os.path.join(self.data_dir, file_name)
       logging.info('Downloading: %s from %s', local_file, data_url)
       if not url_helper.DownloadFile(local_file, data_url):
         return False
@@ -735,10 +735,6 @@ class LocalTestRunner(object):
 
 def main():
   """For when the script is used directly on the command line."""
-  # Here so that it isn't imported for nothing if we are imported as a module.
-  # pylint: disable-msg=C6204
-  import optparse
-  # pylint: enable-msg=C6204
   parser = optparse.OptionParser()
   parser.add_option('-f', '--request_file_name',
                     help='The name of the request file.')
