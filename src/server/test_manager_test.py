@@ -64,9 +64,6 @@ class TestRequestManagerTest(unittest.TestCase):
     # Create a test manager instance for the tests.
     self._manager = test_manager.TestRequestManager()
 
-    # Mock out LoadFile.
-    self._mox.StubOutWithMock(self._manager, '_LoadFile')
-
     # Create default configurations.
     self._config_win = test_request_message.TestConfiguration(
         config_name='Windows', os='win-xp', browser='Unknown', cpu='Unknown')
@@ -175,14 +172,6 @@ class TestRequestManagerTest(unittest.TestCase):
                    body=mox.IgnoreArg(),
                    html=mox.IgnoreArg())
 
-  def _SetupLoadFileExpectations(self, contents=None, raise_error=False):
-    if raise_error:
-      self._manager._LoadFile(
-          mox.IgnoreArg()).MultipleTimes().AndRaise(IOError('File not found'))
-    else:
-      self._manager._LoadFile(
-          mox.IgnoreArg()).MultipleTimes().AndReturn(contents)
-
   def _ExecuteRegister(self, machine_id, try_count=0, platform='win-xp',
                        register_should_match=True):
     register_request = self._GetMachineRegisterRequest(machine_id=machine_id,
@@ -206,12 +195,6 @@ class TestRequestManagerTest(unittest.TestCase):
     # A test request is received then one machine polls for a job.  This
     # machine matches the requirements of the test, so the TestRequestManager
     # should send it to that machine.
-
-    # Setup expectations.
-    # _Loadfile should be mocked when we have running tests.
-    self._SetupLoadFileExpectations(contents='script contents')
-    self._mox.ReplayAll()
-
     self._manager.ExecuteTestRequest(self._GetRequestMessage())
 
     self._ExecuteRegister(MACHINE_IDS[0])
@@ -221,17 +204,10 @@ class TestRequestManagerTest(unittest.TestCase):
     self.assertEqual(MACHINE_IDS[0], runner.machine_id)
     self.assertNotEqual(None, runner.started)
 
-    self._mox.VerifyAll()
-
   # By testing with a large number of configurations for a machine we are
   # unable to use the hashing method to find a match, so ensure we fall back
   # on the old direct comparision method.
   def testRequestGoodMachineWithLargeConfig(self):
-    # Setup expectations.
-    # _Loadfile should be mocked when we have running tests.
-    self._SetupLoadFileExpectations(contents='script contents')
-    self._mox.ReplayAll()
-
     large_os_config = map(str, range(  # pylint: disable-msg=C6402
         dimensions_utils.MAX_DIMENSIONS_PER_MACHINE * 2))
 
@@ -245,16 +221,9 @@ class TestRequestManagerTest(unittest.TestCase):
     self.assertEqual(MACHINE_IDS[0], runner.machine_id)
     self.assertNotEqual(None, runner.started)
 
-    self._mox.VerifyAll()
-
   def _AssignPendingRequestsTest(self, instances=1):
     self._manager.ExecuteTestRequest(
         self._GetRequestMessage(min_instances=instances))
-
-    # Setup expectations.
-    # _Loadfile should be mocked when we have running tests.
-    self._SetupLoadFileExpectations(contents='script contents')
-    self._mox.ReplayAll()
 
     # Execute the runners.
     self.assertLessEqual(instances, len(MACHINE_IDS))
@@ -264,15 +233,8 @@ class TestRequestManagerTest(unittest.TestCase):
                                           MACHINE_IDS[i]).get()
       self.assertNotEqual(None, runner)
 
-    self._mox.VerifyAll()
-
   def testMultiRunnerWithEnvironmentVariables(self):
     num_indexes = 2
-
-    # _Loadfile should be mocked when we have running tests.
-    self._SetupLoadFileExpectations(contents='mock_contents')
-
-    self._mox.ReplayAll()
 
     request_message = self._GetRequestMessage(
         min_instances=num_indexes, env_vars={'index': '%(instance_index)s'})
@@ -296,14 +258,7 @@ class TestRequestManagerTest(unittest.TestCase):
           swarm_json = json.loads(content)
           self.assertEqual(str(i), swarm_json['env_vars']['index'])
 
-    self._mox.VerifyAll()
-
   def _TestForRestartOnFailurePresence(self, restart_on_failure):
-    # _Loadfile should be mocked when we have running tests.
-    self._SetupLoadFileExpectations(contents='mock_contents')
-
-    self._mox.ReplayAll()
-
     self._manager.ExecuteTestRequest(self._GetRequestMessage(
         restart_on_failure=restart_on_failure))
 
@@ -316,8 +271,6 @@ class TestRequestManagerTest(unittest.TestCase):
         found_command = True
         self.assertEqual('--restart_on_failure' in args, restart_on_failure)
     self.assertTrue(found_command)
-
-    self._mox.VerifyAll()
 
   def testNoRestartOnFailureByDefault(self):
     self._TestForRestartOnFailurePresence(False)
@@ -341,9 +294,6 @@ class TestRequestManagerTest(unittest.TestCase):
   def _SetupHandleTestResults(self, result_url=DEFAULT_RESULT_URL,
                               result_string='', test_instances=1):
     # Setup a valid request waiting for completion from the runner.
-
-    # _Loadfile should be mocked when we have running tests.
-    self._SetupLoadFileExpectations(contents='script contents')
 
     # Setup expectations for ExecuteTestRequest() and AssignPendingRequests().
     self._mox.StubOutWithMock(urllib2, 'urlopen')
@@ -708,7 +658,6 @@ class TestRequestManagerTest(unittest.TestCase):
     self._mox.StubOutWithMock(test_manager, '_GetCurrentTime')
     attempts_to_reach_abort = test_runner.MAX_AUTOMATIC_RETRIES + 1
 
-    self._SetupLoadFileExpectations(contents='contents')
     for _ in range(attempts_to_reach_abort):
       self._GenerateFutureTimeExpectation()
 
@@ -799,21 +748,8 @@ class TestRequestManagerTest(unittest.TestCase):
     # Test when there are 3 test requests then 4 machines register themselves.
     self._AssignPendingRequests(num_tests=3, num_machines=4)
 
-  def testAssignMultiplePendingRequestIOError(self):
-    # Test when there are 4 test requests then 2 machines register themselves,
-    # but there are IO errors on the server disk.
-    self._AssignPendingRequests(num_tests=4, num_machines=2, io_error=True)
-
-  def _AssignPendingRequests(self, num_tests=1, num_machines=1, io_error=False):
-
+  def _AssignPendingRequests(self, num_tests=1, num_machines=1):
     num_running = min(num_tests, num_machines)
-
-    # If there are running tests, then _Loadfile should be mocked.
-    if num_running:
-      self._SetupLoadFileExpectations(contents='script contents',
-                                      raise_error=io_error)
-    self._mox.ReplayAll()
-
     for _ in range(num_tests):
       self._CreatePendingRequest()
 
@@ -822,28 +758,17 @@ class TestRequestManagerTest(unittest.TestCase):
     for i in range(num_machines):
       self._ExecuteRegister(
           MACHINE_IDS[i],
-          register_should_match=(not io_error and i < num_running))
+          register_should_match=(i < num_running))
 
-    if io_error:
-      # No tests should be assigned in the case of IO errors.
-      for i in range(num_running):
-        self._AssertTestCount(MACHINE_IDS[i], 0)
+    for i in range(num_running):
+      self._AssertTestCount(MACHINE_IDS[i], 1)
 
-      # All tests should still be pending upon errors.
-      self._AssertPendingTestCount(num_tests)
-    else:
-      # No IO errors, so there should be some tests assigned.
-      for i in range(num_running):
-        self._AssertTestCount(MACHINE_IDS[i], 1)
-
-      # If there were more tests than machines there should some pending tests.
-      self._AssertPendingTestCount(max(0, num_tests - num_machines))
+    # If there were more tests than machines there should some pending tests.
+    self._AssertPendingTestCount(max(0, num_tests - num_machines))
 
     # No test should be done.
     done_tests = test_runner.TestRunner.gql('WHERE done = :1', True)
     self.assertEqual(0, done_tests.count())
-
-    self._mox.VerifyAll()
 
   # Asserts exactly 'expected_count' number of tests exist that have machine_id.
   def _AssertTestCount(self, machine_id, expected_count):
@@ -1017,27 +942,12 @@ class TestRequestManagerTest(unittest.TestCase):
 
     return runner
 
-  # Make sure file I/O exceptions are propagated.
-  def testGetCommandsFileException(self):
-    self._SetupLoadFileExpectations(raise_error=True)
-
-    self._mox.ReplayAll()
-
-    runner = self._CreatePendingRequest()
-
-    self.assertRaises(test_manager.PrepareRemoteCommandsError,
-                      self._manager._GetTestRunnerCommands,
-                      runner, self._SERVER_URL)
-
-    self._mox.VerifyAll()
-
   # Ensure that if we have a machine request a test that has the same id
   # as a machine that is supposed to be running a test, we log an error, since
   # it probably means we failed to get the results from the last test.
   def testRequestBeforeResult(self):
     self._mox.StubOutWithMock(logging, 'warning')
 
-    self._SetupLoadFileExpectations()
     logging.warning(mox.StrContains('unfinished test'), mox.IgnoreArg(),
                     mox.IgnoreArg())
     self._mox.ReplayAll()
@@ -1104,9 +1014,6 @@ class TestRequestManagerTest(unittest.TestCase):
     self._mox.VerifyAll()
 
   def testRecordRunnerStats(self):
-    self._SetupLoadFileExpectations(contents='script contents')
-    self._mox.ReplayAll()
-
     # Create a pending runner and execute it.
     self._manager.ExecuteTestRequest(self._GetRequestMessage())
     self._ExecuteRegister(MACHINE_IDS[0])
@@ -1122,8 +1029,6 @@ class TestRequestManagerTest(unittest.TestCase):
     self.assertNotEqual(None, r_stats.assigned_time)
     self.assertNotEqual(None, r_stats.end_time)
     self.assertTrue(r_stats.success)
-
-    self._mox.VerifyAll()
 
   def testGetUpdateWhenPollingForWork(self):
     # Drop the last character of the version string to ensure a version

@@ -599,21 +599,10 @@ class TestRequestManager(object):
 
     if assigned_runner:
       # Get the commands the machine needs to execute.
-      try:
-        commands, result_url = self._GetTestRunnerCommands(runner, server_url)
-      except PrepareRemoteCommandsError:
-        # Failed to load the scripts so mark the runner as 'not running'.
-        runner.started = None
-        runner.machine_id = None
-        runner.ping = None
-        runner.put()
-        response['try_count'] = 0
-        response['come_back'] = COMEBACK_AFTER_SERVER_ERROR_SECS
-
-      else:
-        response['commands'] = commands
-        response['result_url'] = result_url
-        response['try_count'] = 0
+      commands, result_url = self._GetTestRunnerCommands(runner, server_url)
+      response['commands'] = commands
+      response['result_url'] = result_url
+      response['try_count'] = 0
     else:
       response['try_count'] = attribs['try_count'] + 1
       # Tell machine when to come back, in seconds.
@@ -777,17 +766,18 @@ class TestRequestManager(object):
       A tuple (commands, result_url) where commands is a list of RPC calls that
       need to be run by the remote slave machine and result_url is where it
       should post the results.
-
-    Raises:
-      PrepareRemoteCommandsError: Any error occured when preparing the commands.
     """
     output_commands = []
 
     # Get test manifest and scripts.
     test_run = self._BuildTestRun(runner, server_url)
 
-    # Load the scripts.
-    files_to_upload = self._GetFilesToUpload(test_run)
+    # Prepare the manifest file for downloading. The format is (directory,
+    # filename, file contents).
+    files_to_upload = [
+        (test_run.working_dir, _TEST_RUN_SWARM_FILE_NAME,
+         test_request_message.Stringize(test_run, json_readable=True))
+    ]
 
     # TODO(user): Use separate module for RPC related stuff rather
     # than slave_machine.
@@ -796,7 +786,7 @@ class TestRequestManager(object):
 
     # Define how to run the scripts.
     command_to_execute = [
-        r'%s' % os.path.join(test_run.working_dir,
+        r'%s' % os.path.join(swarm_constants.TEST_RUNNER_DIR,
                              swarm_constants.TEST_RUNNER_SCRIPT),
         '-f', r'%s' % os.path.join(test_run.working_dir,
                                    _TEST_RUN_SWARM_FILE_NAME)]
@@ -812,93 +802,6 @@ class TestRequestManager(object):
                                                   command_to_execute))
 
     return (output_commands, test_run.result_url)
-
-  def _GetFilesToUpload(self, test_run):
-    """Loads required scripts into a single list of strings to be shipped.
-
-    Args:
-      test_run: A TestCase object representing the test to run.
-
-    Returns:
-      A list of tuples containing file names and contents. Each tuple has
-      the format: (path to file on remote machine, file name, file contents).
-
-    Raises:
-      PrepareRemoteCommandsErrors: If there is an error is reading the local
-          files.
-    """
-    # A list of tuples containing script paths on local and remote machine. Each
-    # tuple has the format:
-    # (path on local machine, path on remote machine, file name).
-    # All remote paths are relative to the working directory specified by the
-    # test manifest.
-    file_paths = []
-
-    # The local script runner.
-    # We place the local running script in the current working directory (cwd)
-    # of the slave, and place the rest of the scripts in relation to cwd. E.g.,
-    # if the local script runner imports common.url_helper, we create the folder
-    # 'common' and put the common files there.
-    file_paths.append(
-        (os.path.join(swarm_constants.SWARM_ROOT_DIR,
-                      swarm_constants.TEST_RUNNER_DIR,
-                      swarm_constants.TEST_RUNNER_SCRIPT),
-         test_run.working_dir, swarm_constants.TEST_RUNNER_SCRIPT))
-
-    # The test_runner __init__.
-    file_paths.append(
-        (os.path.join(swarm_constants.SWARM_ROOT_DIR,
-                      swarm_constants.TEST_RUNNER_DIR,
-                      swarm_constants.PYTHON_INIT_SCRIPT),
-         os.path.join(test_run.working_dir, swarm_constants.TEST_RUNNER_DIR),
-         swarm_constants.PYTHON_INIT_SCRIPT))
-
-    # Add all the common files.
-    for common_file in swarm_constants.SWARM_BOT_COMMON_FILES:
-      file_paths.append(
-          (os.path.join(swarm_constants.SWARM_ROOT_DIR,
-                        swarm_constants.COMMON_DIR,
-                        common_file),
-           os.path.join(test_run.working_dir, swarm_constants.COMMON_DIR),
-           common_file))
-
-    files_to_upload = []
-    for local_path, remote_path, file_name in file_paths:
-      try:
-        file_contents = self._LoadFile(local_path)
-      except IOError as e:
-        logging.exception(str(e))
-        raise PrepareRemoteCommandsError
-
-      files_to_upload.append((remote_path, file_name, file_contents))
-
-    # Append the test manifest to files that need to be stored.
-    files_to_upload.append(
-        (test_run.working_dir, _TEST_RUN_SWARM_FILE_NAME,
-         test_request_message.Stringize(test_run, json_readable=True)))
-
-    return files_to_upload
-
-  def _LoadFile(self, file_name):
-    """Loads the given file and return its contents as a string.
-
-    Having this as a separate function makes is simpler to mock for tests.
-
-    Args:
-      file_name: A string of the file name to load.
-
-    Returns:
-      A string containing the file contents.
-
-    Raises:
-      IOError: The file cannot be loaded.
-    """
-    # The caller should catch the IOError exception.
-    file_p = open(file_name, 'r')
-    file_data = file_p.read()
-    file_p.close()
-
-    return file_data
 
 
 def _GetCurrentTime():
@@ -985,8 +888,3 @@ def SlaveCodeZipped():
                      os.path.join(swarm_constants.COMMON_DIR, common_file))
 
   return zip_memory_file.getvalue()
-
-
-class PrepareRemoteCommandsError(Exception):
-  """Simple exception class signaling failure to prepare remote commands."""
-  pass
