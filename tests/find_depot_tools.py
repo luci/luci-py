@@ -19,7 +19,7 @@ def add_depot_tools_to_path():
   # Then look if depot_tools is in PATH, common case.
   for i in os.environ['PATH'].split(os.pathsep):
     if i.rstrip(os.sep).endswith('depot_tools'):
-      sys.path.append(i.rstrip(os.sep))
+      sys.path.insert(0, i.rstrip(os.sep))
       return i
   # Rare case, it's not even in PATH, look upward up to root.
   root_dir = os.path.dirname(os.path.abspath(__file__))
@@ -27,7 +27,7 @@ def add_depot_tools_to_path():
   while root_dir and root_dir != previous_dir:
     if os.path.isfile(os.path.join(root_dir, 'depot_tools', 'breakpad.py')):
       i = os.path.join(root_dir, 'depot_tools')
-      sys.path.append(i)
+      sys.path.insert(0, i)
       return i
     previous_dir = root_dir
     root_dir = os.path.dirname(root_dir)
