@@ -520,11 +520,13 @@ class CleanupDataHandler(CronJobHandler):
   """Handles cron jobs to delete orphaned blobs."""
 
   def post(self):  # pylint: disable-msg=C6409
+    # TODO(user): These calls should all be moved onto the task queue.
     test_manager.DeleteOldErrors()
     test_runner.DeleteOldRunners()
     test_runner.DeleteOrphanedBlobs()
 
     runner_stats.DeleteOldRunnerStats()
+    runner_stats.DeleteOldWaitSummaries()
 
     self.response.out.write('Successfully cleaned up old data.')
 
@@ -552,7 +554,7 @@ class GenerateStatsHandler(CronJobHandler):
   """Handles cron jobs to generate new stats."""
 
   def post(self):  # pylint: disable-msg=C6409
-    pass
+    runner_stats.GenerateStats()
 
 
 class SendEReporterHandler(ReportGenerator):
