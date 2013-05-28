@@ -14,6 +14,7 @@ import zlib
 # pylint: disable=E0611,F0401
 import webapp2
 from google.appengine import runtime
+from google.appengine.api import app_identity
 from google.appengine.api import datastore_errors
 from google.appengine.api import files
 from google.appengine.api import memcache
@@ -37,6 +38,11 @@ DATASTORE_TIME_TO_LIVE_IN_DAYS = 7
 
 # The maximum number of items to delete at a time.
 ITEMS_TO_DELETE_ASYNC = 100
+
+# Limit the namespace to 29 characters because app engine seems unable to
+# find the blobs in cloud storage if the namespace is longer.
+# TODO(csharp): Find a way to support namespaces greater than 29 characters.
+MAX_NAMESPACE_LEN = 29
 
 
 #### Models
@@ -562,14 +568,25 @@ class ContainsHashHandler(acl.ACLRequestHandler):
 class GenerateBlobstoreHandler(acl.ACLRequestHandler):
   """Generate an upload url to directly load files into the blobstore."""
   def post(self, namespace, hash_key):
+    gs_bucket = app_identity.get_application_id()
+
+    if len(namespace) > MAX_NAMESPACE_LEN:
+      self.response.out.write('Unable to handle namespaces with more than %d '
+                              'characters', MAX_NAMESPACE_LEN)
+      self.response.set_status(400)
+
     self.response.headers['Content-Type'] = 'text/plain'
     url = '/content/store_blobstore/%s/%s/%s?token=%s' % (
         namespace,
         hash_key,
         self.access_id,
         self.request.get('token'))
-    logging.info('Url: %s', url)
-    self.response.out.write(blobstore.create_upload_url(url))
+
+    full_gs_path = '%s/%s' % (gs_bucket, namespace) if gs_bucket else None
+
+    self.response.out.write(blobstore.create_upload_url(
+        url,
+        gs_bucket_name=full_gs_path))
     self.response.headers['Content-Type'] = 'text/plain'
 
 

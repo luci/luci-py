@@ -37,7 +37,11 @@ BINARY_DATA = (chr(0) + chr(57) + chr(128) + chr(255)) * 2
 MAX_URL_ATTEMPTS = 5
 
 # The size of data that must be sent to the blobstore directly (30mb).
-MIN_SIZE_FOR_BLOBSTORE = 1024 * 1024 *30
+MIN_SIZE_FOR_BLOBSTORE = 1024 * 1024 * 30
+
+# Limit the length of namespace strings, otherwise app engine seems to have
+# trouble interacting with the cloud storage.
+MAX_NAMESPACE_LEN = 29
 
 
 def encode_multipart_formdata(fields, files,
@@ -95,7 +99,8 @@ class TestCase(unittest.TestCase):
   def setUp(self):
     super(TestCase, self).setUp()
     case = self.id().split('.', 1)[1].replace('.', '').replace('_', '')
-    self.namespace = 'temporary' + str(long(time.time())) + case
+    self.namespace = 'temp' + str(long(time.time())) + case
+    self.namespace = self.namespace[:MAX_NAMESPACE_LEN]
 
 
 class AppTestSignedIn(TestCase):
