@@ -473,7 +473,7 @@ class RestrictedVerifyWorkerHandler(webapp2.RequestHandler):
       # was thrown so the object is fine.
       logging.warning('Got DeadlineExceededError, giving up')
       return
-    except zlib.error as e:
+    except (blobstore.BlobNotFoundError, zlib.error) as e:
       # It's broken. At that point, is_verified is False.
       logging.error(e)
 
