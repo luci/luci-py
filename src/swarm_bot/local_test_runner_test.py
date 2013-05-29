@@ -19,7 +19,6 @@ import zipfile
 
 from common import swarm_constants
 from common import test_request_message
-from common import url_helper
 from swarm_bot import local_test_runner
 from third_party.mox import mox
 
@@ -205,13 +204,13 @@ class TestLocalTestRunner(unittest.TestCase):
 
     # Ensure that the first the server is pinged after both poll because
     # the require ping delay will have elapsed.
-    self._mox.StubOutWithMock(url_helper, 'UrlOpen')
+    self._mox.StubOutWithMock(local_test_runner.url_helper, 'UrlOpen')
     self.mock_proc.stdin_handle.write(self.result_string)
     self.mock_proc.poll().AndReturn(None)
-    url_helper.UrlOpen(self.ping_url).AndReturn('')
+    local_test_runner.url_helper.UrlOpen(self.ping_url).AndReturn('')
     self.mock_proc.poll().WithSideEffects(
         self.mock_proc.stdin_handle.close()).AndReturn(exit_code)
-    url_helper.UrlOpen(self.ping_url).AndReturn('')
+    local_test_runner.url_helper.UrlOpen(self.ping_url).AndReturn('')
     self._mox.ReplayAll()
 
     # Set the ping delay to 0 to ensure we get a ping for this runner.
@@ -533,10 +532,10 @@ class TestLocalTestRunner(unittest.TestCase):
       self.streamed_output += data['result_output']
       return True
 
-    self._mox.StubOutWithMock(url_helper, 'UrlOpen')
-    url_helper.UrlOpen(self.output_destination['url'],
-                       mox.Func(ValidateUrlData),
-                       1).AndReturn('Accepted')
+    self._mox.StubOutWithMock(local_test_runner.url_helper, 'UrlOpen')
+    local_test_runner.url_helper.UrlOpen(self.output_destination['url'],
+                                         mox.Func(ValidateUrlData),
+                                         1).AndReturn('Accepted')
 
     self._mox.ReplayAll()
 
@@ -552,17 +551,18 @@ class TestLocalTestRunner(unittest.TestCase):
     self.output_destination['url'] = 'http://blabla.com'
     self.result_url = None
     self.CreateValidFile()
-    self._mox.StubOutWithMock(url_helper, 'UrlOpen')
+    self._mox.StubOutWithMock(local_test_runner.url_helper, 'UrlOpen')
     data = {'n': self.test_run_name, 'c': self.config_name, 's': 'success',
             'result_output': ''}
     max_url_retries = 1
-    url_helper.UrlOpen(self.output_destination['url'],
-                       data.copy(),
-                       max_url_retries).AndReturn('')
+    local_test_runner.url_helper.UrlOpen(self.output_destination['url'],
+                                         data.copy(),
+                                         max_url_retries).AndReturn('')
     data['s'] = 'failure'
-    url_helper.UrlOpen('%s?1=2' % self.output_destination['url'],
-                       data.copy(),
-                       max_url_retries).AndReturn('')
+    local_test_runner.url_helper.UrlOpen(('%s?1=2' %
+                                          self.output_destination['url']),
+                                         data.copy(),
+                                         max_url_retries).AndReturn('')
     self._mox.ReplayAll()
 
     self.runner = local_test_runner.LocalTestRunner(
@@ -579,15 +579,15 @@ class TestLocalTestRunner(unittest.TestCase):
 
   def testPublishResults(self):
     self.CreateValidFile()
-    self._mox.StubOutWithMock(url_helper, 'UrlOpen')
+    self._mox.StubOutWithMock(local_test_runner.url_helper, 'UrlOpen')
     max_url_retries = 1
-    url_helper.UrlOpen(
+    local_test_runner.url_helper.UrlOpen(
         self.result_url,
         {'n': self.test_run_name, 'c': self.config_name,
          'x': ', '.join([str(i) for i in self.result_codes]),
          's': True, 'result_output': self.result_string, 'o': False},
         max_url_retries).AndReturn('')
-    url_helper.UrlOpen(
+    local_test_runner.url_helper.UrlOpen(
         '%s?1=2' % self.result_url,
         {'n': self.test_run_name, 'c': self.config_name,
          'x': ', '.join([str(i) for i in self.result_codes]),
@@ -611,9 +611,9 @@ class TestLocalTestRunner(unittest.TestCase):
 
   def testPublishResultsUnableToReachResultUrl(self):
     self.CreateValidFile()
-    self._mox.StubOutWithMock(url_helper, 'UrlOpen')
+    self._mox.StubOutWithMock(local_test_runner.url_helper, 'UrlOpen')
     max_url_retries = 1
-    url_helper.UrlOpen(
+    local_test_runner.url_helper.UrlOpen(
         self.result_url,
         {'n': self.test_run_name, 'c': self.config_name,
          'x': ', '.join([str(i) for i in self.result_codes]),
@@ -630,11 +630,11 @@ class TestLocalTestRunner(unittest.TestCase):
 
   def testPublishResultsHTTPS(self):
     self.CreateValidFile()
-    self._mox.StubOutWithMock(url_helper, 'UrlOpen')
+    self._mox.StubOutWithMock(local_test_runner.url_helper, 'UrlOpen')
     self.result_url = 'https://secure.com/result'
 
     max_url_retries = 1
-    url_helper.UrlOpen(
+    local_test_runner.url_helper.UrlOpen(
         self.result_url,
         {'n': self.test_run_name, 'c': self.config_name,
          'x': ', '.join([str(i) for i in self.result_codes]),
@@ -664,7 +664,7 @@ class TestLocalTestRunner(unittest.TestCase):
 
   def testPublishInternalErrors(self):
     self.CreateValidFile()
-    self._mox.StubOutWithMock(url_helper, 'UrlOpen')
+    self._mox.StubOutWithMock(local_test_runner.url_helper, 'UrlOpen')
     exception_text = 'Bad MAD, no cookie!'
     max_url_retries = 1
 
@@ -676,8 +676,9 @@ class TestLocalTestRunner(unittest.TestCase):
 
       return exception_text in str(url_data)
 
-    url_helper.UrlOpen(self.result_url, mox.Func(ValidateInternalErrorsResult),
-                       max_url_retries).AndReturn('')
+    local_test_runner.url_helper.UrlOpen(self.result_url,
+                                         mox.Func(ValidateInternalErrorsResult),
+                                         max_url_retries).AndReturn('')
     self._mox.ReplayAll()
 
     self.runner = local_test_runner.LocalTestRunner(

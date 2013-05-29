@@ -88,8 +88,13 @@ import time
 import urlparse
 import zipfile
 
-from common import test_request_message
+# This script should always live in the swarm_bot directory of the swarm slave,
+# so we need to adjust its sys.path so it can find the common swarm directory.
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+
+# pylint: disable-msg=C6204
 from common import swarm_constants
+from common import test_request_message
 from common import url_helper
 
 
