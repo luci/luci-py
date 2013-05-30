@@ -68,6 +68,27 @@ class DailyStatsTest(unittest.TestCase):
     self.assertEqual(2, daily_stat.shards_failed)
     self.assertEqual(1, daily_stat.shards_timed_out)
 
+  def testGetDailyStats(self):
+    current_day = datetime.date.today()
+    days_to_add = 7
+    for i in range(days_to_add):
+      day = current_day - datetime.timedelta(days=i)
+      daily_stat = daily_stats.DailyStats(date=day)
+      daily_stat.put()
+
+    # Check just getting one day.
+    stats = daily_stats.GetDailyStats(current_day)
+    self.assertEqual(1, len(stats))
+    self.assertEqual(current_day, stats[0].date)
+
+    # Check getting all days.
+    stats = daily_stats.GetDailyStats(
+        current_day - datetime.timedelta(days=days_to_add))
+    self.assertEqual(days_to_add, len(stats))
+    self.assertEqual(current_day, stats[0].date)
+    self.assertEqual(current_day - datetime.timedelta(days=days_to_add - 1),
+                     stats[days_to_add - 1].date)
+
 
 if __name__ == '__main__':
   unittest.main()

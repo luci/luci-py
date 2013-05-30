@@ -630,6 +630,8 @@ class StatsHandler(webapp2.RequestHandler):
   def get(self):  # pylint: disable-msg=C6409
     params = {
         'topbar': GenerateTopbar(),
+        'daily_stats': daily_stats.GetDailyStats(
+            datetime.date.today() - datetime.timedelta(days=7)),
         'runner_wait_stats': runner_stats.GetRunnerWaitStats(),
         'runner_cutoff': runner_stats.RUNNER_STATS_EVALUATION_CUTOFF_DAYS
     }

@@ -71,3 +71,16 @@ def GenerateDailyStats(day):
   daily_stats.put()
 
   return True
+
+
+def GetDailyStats(oldest_day):
+  """Return all daily stats that are younger or equal to oldest_day.
+
+  Args:
+    oldest_day: The day to use as a cutoff to determine what stat to show.
+
+  Returns:
+    A sorted list (descending order) of the daily stats.
+  """
+  return [stat for stat in
+          DailyStats.gql('WHERE date >= :1 ORDER BY date DESC', oldest_day)]
