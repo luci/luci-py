@@ -571,6 +571,10 @@ class SlaveMachine(object):
     with open('slave_setup.py', 'w') as f:
       f.write(SLAVE_SETUP_SCRIPT)
 
+    logging.info('New slave code downloaded, replacing this process to allow '
+                 'updating these files. After the files are replaced this '
+                 'slave will be restarted through start_slave.py')
+
     sys.stdout.flush()
     sys.stderr.flush()
     # Repeat sys.executable since the first one is what we call, and the
