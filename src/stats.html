@@ -38,8 +38,8 @@ These stats are based on the last {{runner_cutoff}} days
 <tr>
 <th>Runner Dimensions</th>
 <th>Mean Wait</th>
-<th>Median Wait</th>
-<th>Longest Wait</th>
+<th>Median Wait (Rounded to Nearest Minute)</th>
+<th>Longest Wait (Rounded to Nearest Minute)</th>
 </tr>
 {% for runner_dimensions, runner_summary in runner_wait_stats.items %}
 <tr class="request {% cycle even,odd %}">
