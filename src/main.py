@@ -35,6 +35,7 @@ from server import test_manager
 from server import test_request
 from server import test_runner
 from server import user_manager
+from stats import daily_stats
 from stats import machine_stats
 from stats import runner_stats
 # pylint: enable-msg=C6204
@@ -550,8 +551,16 @@ class DetectDeadMachinesHandler(CronJobHandler):
     self.response.out.write(msg)
 
 
-class GenerateStatsHandler(CronJobHandler):
-  """Handles cron jobs to generate new stats."""
+class GenerateDailyStatsHandler(CronJobHandler):
+  """Handles cron jobs to generate new daily stats."""
+
+  def post(self):  # pylint: disable-msg=C6409
+    yesterday = datetime.date.today() - datetime.timedelta(days=1)
+    daily_stats.GenerateDailyStats(yesterday)
+
+
+class GenerateRecentStatsHandler(CronJobHandler):
+  """Handles cron jobs to generate new recent stats."""
 
   def post(self):  # pylint: disable-msg=C6409
     runner_stats.GenerateStats()
@@ -974,8 +983,10 @@ def CreateApplication():
                                   ('/tasks/cleanup_data', CleanupDataHandler),
                                   ('/tasks/detect_dead_machines',
                                    DetectDeadMachinesHandler),
-                                  ('/tasks/generate_stats',
-                                   GenerateStatsHandler),
+                                  ('/tasks/generate_daily_stats',
+                                   GenerateDailyStatsHandler),
+                                  ('/tasks/generate_recent_stats',
+                                   GenerateRecentStatsHandler),
                                   ('/tasks/sendereporter',
                                    SendEReporterHandler),
                                   ('/test', TestRequestHandler),

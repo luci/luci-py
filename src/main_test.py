@@ -554,7 +554,8 @@ class AppTest(unittest.TestCase):
     cron_job_urls = ['/tasks/abort_stale_runners',
                      '/tasks/cleanup_data',
                      '/tasks/detect_dead_machines',
-                     '/tasks/generate_stats',
+                     '/tasks/generate_daily_stats',
+                     '/tasks/generate_recent_stats',
                     ]
 
     for cron_job_url in cron_job_urls:

@@ -3,6 +3,10 @@ cron:
   url: /tasks/abort_stale_runners
   schedule: every 1 minutes
 
+- description: Cleanup old data and orphaned blobs
+  url: /tasks/cleanup_data
+  schedule: every 6 hours
+
 - description: Daily exception report
   url: /tasks/sendereporter
   schedule: every day 00:00
@@ -11,10 +15,10 @@ cron:
   url: /tasks/detect_dead_machines
   schedule: every day 01:00
 
-- description: Cleanup old data and orphaned blobs
-  url: /tasks/cleanup_data
-  schedule: every 6 hours
+- description: Generate daily stats
+  url: /tasks/generate_daily_stats
+  schedule: every day 00:30
 
-- description: Generate stats
-  url: /tasks/generate_stats
+- description: Generate recent stats
+  url: /tasks/generate_recent_stats
   schedule: every 5 minutes
