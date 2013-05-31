@@ -835,6 +835,55 @@ class RunnerPingHandler(webapp2.RequestHandler):
       self.response.out.write('Runner failed to ping.')
 
 
+class DailyStatsGraphHandler(webapp2.RequestHandler):
+  """Handler for generating the html page to display the daily stats."""
+
+  def _GetGraphableDailyStats(self, stats):
+    """Convert the daily_stats into a list of graphs objects for visualization.
+
+    Args:
+      stats: A list of daily stats to split into components.
+
+    Returns:
+      A list of dictionaries with the graph title and an array that can be
+      passed to the data visualization tool.
+    """
+    # A mapping of the element's variable name, and the name that should be
+    # displayed to the user.
+    elements_to_graph = {
+        'shards_finished': 'Shards Finished',
+        'shards_failed': 'Shards Failed',
+        'shards_timed_out': 'Shards Timed Out',
+        }
+
+    graphs_to_show = []
+    for element_name, title_name in elements_to_graph.iteritems():
+      graphs_to_show.append(
+          {'element_id': element_name,
+           'title': title_name,
+           'data_array': [['Date', title_name]]})
+
+    for stat in stats:
+      date_str = stat.date.isoformat()
+      for i, element_name in enumerate(elements_to_graph):
+        graphs_to_show[i]['data_array'].append(
+            # App engine adds the leading _ to the variable names when
+            # referencing them through the dict.
+            [date_str, stat.__dict__['_' + element_name]])
+
+    return graphs_to_show
+
+  def get(self):  # pylint: disable-msg=C6409
+    """Handles HTTP GET requests for this handler's URL."""
+    params = {
+        'graphs': daily_stats.GetDailyStats(datetime.date.today()),
+        'topbar': GenerateTopbar()
+    }
+
+    path = os.path.join(os.path.dirname(__file__), 'graph.html')
+    self.response.out.write(template.render(path, params))
+
+
 class UserProfileHandler(webapp2.RequestHandler):
   """Handler for the user profile page of the web server.
 
@@ -975,6 +1024,8 @@ def CreateApplication():
                                   ('/remote_error', RemoteErrorHandler),
                                   ('/result', ResultHandler),
                                   ('/runner_ping', RunnerPingHandler),
+                                  ('/secure/graphs/daily_stats',
+                                   DailyStatsGraphHandler),
                                   ('/secure/machine_list', MachineListHandler),
                                   ('/secure/retry', RetryHandler),
                                   ('/secure/show_message',

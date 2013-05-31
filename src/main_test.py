@@ -550,6 +550,18 @@ class AppTest(unittest.TestCase):
     self.assertEqual('200 OK', response.status)
     self.assertEqual('Runner successfully pinged.', response.body)
 
+  def testGraphPages(self):
+    graph_urls = ['/secure/graphs/daily_stats',
+                 ]
+
+    self._mox.StubOutWithMock(main_app.template, 'render')
+    main_app.template.render(mox.IgnoreArg(), mox.IgnoreArg()).AndReturn('')
+    self._mox.ReplayAll()
+
+    for graph_url in graph_urls:
+      response = self.app.get(graph_url)
+      self.assertEqual('200 OK', response.status)
+
   def testCronJobTasks(self):
     cron_job_urls = ['/tasks/abort_stale_runners',
                      '/tasks/cleanup_data',

@@ -85,9 +85,9 @@ class DailyStatsTest(unittest.TestCase):
     stats = daily_stats.GetDailyStats(
         current_day - datetime.timedelta(days=days_to_add))
     self.assertEqual(days_to_add, len(stats))
-    self.assertEqual(current_day, stats[0].date)
     self.assertEqual(current_day - datetime.timedelta(days=days_to_add - 1),
-                     stats[days_to_add - 1].date)
+                     stats[0].date)
+    self.assertEqual(current_day, stats[-1].date)
 
 
 if __name__ == '__main__':

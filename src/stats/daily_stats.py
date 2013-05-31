@@ -80,7 +80,7 @@ def GetDailyStats(oldest_day):
     oldest_day: The day to use as a cutoff to determine what stat to show.
 
   Returns:
-    A sorted list (descending order) of the daily stats.
+    A sorted list (ascending order) of the daily stats.
   """
   return [stat for stat in
-          DailyStats.gql('WHERE date >= :1 ORDER BY date DESC', oldest_day)]
+          DailyStats.gql('WHERE date >= :1 ORDER BY date ASC', oldest_day)]
