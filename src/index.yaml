@@ -22,6 +22,12 @@ indexes:
   - name: machine_id
   - name: tag
 
+- kind: RunnerStats
+  properties:
+  - name: end_time
+  - name: success
+  - name: timed_out
+
 - kind: TestRunner
   properties:
   - name: automatic_retry_count
