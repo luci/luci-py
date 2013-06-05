@@ -5,6 +5,11 @@ api_version: 1
 threadsafe: true
 
 handlers:
+- url: /task_queues/*
+  script: main.app
+  secure: always
+  login: admin
+
 - url: /tasks/*
   script: main.app
   secure: always

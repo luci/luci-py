@@ -3,8 +3,8 @@ cron:
   url: /tasks/abort_stale_runners
   schedule: every 1 minutes
 
-- description: Cleanup old data and orphaned blobs
-  url: /tasks/cleanup_data
+- description: Trigger the cleanup of old data and orphaned blobs
+  url: /tasks/trigger_cleanup_data
   schedule: every 6 hours
 
 - description: Daily exception report

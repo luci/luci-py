@@ -477,7 +477,7 @@ class AppTest(unittest.TestCase):
   def testAllHandlersAreSecured(self):
     # URL prefixes that correspond to 'login: admin' areas in app.yaml.
     # Handlers that correspond to this prefixes are protected by GAE itself.
-    secured_paths = ['/tasks/', '/secure/', '/_ereporter']
+    secured_paths = ['/task_queues/', '/tasks/', '/secure/', '/_ereporter']
 
     # Handlers that are explicitly allowed to be called by anyone.
     # TODO(user): Figure out how to protected access to '/upload'.
@@ -562,12 +562,19 @@ class AppTest(unittest.TestCase):
       response = self.app.get(graph_url)
       self.assertEqual('200 OK', response.status)
 
+  def testTaskQueueUrls(self):
+    task_queue_urls = ['/task_queues/cleanup_data']
+
+    for task_queue_url in task_queue_urls:
+      response = self.app.post(task_queue_url)
+      self.assertEqual('200 OK', response.status)
+
   def testCronJobTasks(self):
     cron_job_urls = ['/tasks/abort_stale_runners',
-                     '/tasks/cleanup_data',
                      '/tasks/detect_dead_machines',
                      '/tasks/generate_daily_stats',
                      '/tasks/generate_recent_stats',
+                     '/tasks/trigger_cleanup_data',
                     ]
 
     for cron_job_url in cron_job_urls:
@@ -577,7 +584,7 @@ class AppTest(unittest.TestCase):
 
       # Only cron job requests can be gets for this handler.
       response = self.app.get(cron_job_url, expect_errors=True)
-      self.assertEquals('405 Method Not Allowed', response.status)
+      self.assertEquals('405 Method Not Allowed', response.status, cron_job_url)
 
   def testSendEReporter(self):
     # Ensure this function correctly complains if the admin email isn't set.

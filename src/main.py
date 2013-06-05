@@ -19,6 +19,7 @@ from google.appengine import runtime
 from google.appengine.api import files
 from google.appengine.api import mail
 from google.appengine.api import mail_errors
+from google.appengine.api import taskqueue
 from google.appengine.api import users
 from google.appengine.ext import blobstore
 from google.appengine.ext import db
@@ -484,6 +485,20 @@ class ResultHandler(webapp2.RequestHandler):
       self.response.out.write('Failed to update the runner results.')
 
 
+class CleanupDataHandler(webapp2.RequestHandler):
+  """Handles tasks to delete orphaned blobs."""
+
+  def post(self):  # pylint: disable-msg=C6409
+    test_manager.DeleteOldErrors()
+    test_runner.DeleteOldRunners()
+    test_runner.DeleteOrphanedBlobs()
+
+    runner_stats.DeleteOldRunnerStats()
+    runner_stats.DeleteOldWaitSummaries()
+
+    self.response.out.write('Successfully cleaned up old data.')
+
+
 class CronJobHandler(webapp2.RequestHandler):
   """A helper class to handle redirecting GET cron jobs to POSTs."""
 
@@ -517,19 +532,12 @@ class AbortStaleRunnersHandler(CronJobHandler):
     </html>""")
 
 
-class CleanupDataHandler(CronJobHandler):
+class TriggerCleanupDataHandler(CronJobHandler):
   """Handles cron jobs to delete orphaned blobs."""
 
   def post(self):  # pylint: disable-msg=C6409
-    # TODO(user): These calls should all be moved onto the task queue.
-    test_manager.DeleteOldErrors()
-    test_runner.DeleteOldRunners()
-    test_runner.DeleteOrphanedBlobs()
-
-    runner_stats.DeleteOldRunnerStats()
-    runner_stats.DeleteOldWaitSummaries()
-
-    self.response.out.write('Successfully cleaned up old data.')
+    taskqueue.add(method='POST', url='/task_queues/cleanup_data')
+    self.response.out.write('Successfully triggered task to clean up old data.')
 
 
 class DetectDeadMachinesHandler(CronJobHandler):
@@ -1031,9 +1039,10 @@ def CreateApplication():
                                   ('/secure/show_message',
                                    ShowMessageHandler),
                                   ('/secure/stats', StatsHandler),
+                                  ('/task_queues/cleanup_data',
+                                   CleanupDataHandler),
                                   ('/tasks/abort_stale_runners',
                                    AbortStaleRunnersHandler),
-                                  ('/tasks/cleanup_data', CleanupDataHandler),
                                   ('/tasks/detect_dead_machines',
                                    DetectDeadMachinesHandler),
                                   ('/tasks/generate_daily_stats',
@@ -1042,6 +1051,8 @@ def CreateApplication():
                                    GenerateRecentStatsHandler),
                                   ('/tasks/sendereporter',
                                    SendEReporterHandler),
+                                  ('/tasks/trigger_cleanup_data',
+                                   TriggerCleanupDataHandler),
                                   ('/test', TestRequestHandler),
                                   ('/upload', UploadHandler),
                                   (_SECURE_CANCEL_URL, CancelHandler),
