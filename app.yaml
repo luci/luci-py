@@ -19,5 +19,8 @@ handlers:
   script: main.app
   secure: always
 
+builtins:
+- remote_api: on
+
 inbound_services:
 - warmup
