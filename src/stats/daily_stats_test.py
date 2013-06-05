@@ -14,12 +14,22 @@ from google.appengine.ext import testbed
 from stats import daily_stats
 from stats import runner_stats
 
+# The amount of time (in minutes) that every runner took to get assigned.
+WAIT_TIME = 2
+
+# The amount of time (in minutes) that every runner took to run.
+RUNNING_TIME = 3
+
 
 def _AddRunner(end_time, success, timeout):
+  assigned_time = end_time - datetime.timedelta(minutes=RUNNING_TIME)
+  created_time = assigned_time - datetime.timedelta(minutes=WAIT_TIME)
+
   runner = runner_stats.RunnerStats(
       test_case_name='name', dimensions='xp', num_instances=0,
-      instance_index=0, created_time=datetime.datetime.now(), end_time=end_time,
-      success=success, timed_out=timeout, automatic_retry_count=0)
+      instance_index=0, created_time=created_time, assigned_time=assigned_time,
+      end_time=end_time, success=success, timed_out=timeout,
+      automatic_retry_count=0)
   runner.put()
 
 
@@ -67,6 +77,8 @@ class DailyStatsTest(unittest.TestCase):
     self.assertEqual(4, daily_stat.shards_finished)
     self.assertEqual(2, daily_stat.shards_failed)
     self.assertEqual(1, daily_stat.shards_timed_out)
+    self.assertEqual(WAIT_TIME * 4, daily_stat.total_wait_time)
+    self.assertEqual(RUNNING_TIME * 4, daily_stat.total_running_time)
 
   def testGetDailyStats(self):
     current_day = datetime.date.today()

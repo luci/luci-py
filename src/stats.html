@@ -18,6 +18,8 @@
 <th>Total Number of Shards Requested</th>
 <th>Total Number of Shard Failures</th>
 <th>Total Number of Internal Timeout</th>
+<th>Total Time Runnning Shards</th>
+<th>Total Time Shards Spent Waiting to Run</th>
 </tr>
 {% for stats in daily_stats %}
 <tr class="request {% cycle even,odd %}">
@@ -25,6 +27,8 @@
 <td>{{stats.shards_finished}}</td>
 <td>{{stats.shards_failed}}</td>
 <td>{{stats.shards_timed_out}}</td>
+<td>{{stats.total_running_time}}</td>
+<td>{{stats.total_wait_time}}</td>
 </tr>
 {% endfor %}
 </table>

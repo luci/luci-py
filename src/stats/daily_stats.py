@@ -21,14 +21,32 @@ class DailyStats(db.Model):
   date = db.DateProperty(required=True)
 
   # The number of shards that finished (or timed out) during this day.
-  shards_finished = db.IntegerProperty(indexed=False)
+  shards_finished = db.IntegerProperty(default=0, indexed=False)
 
-  # The number of shards that failed to terminated successfully (excluding
+  # The number of shards that failed to terminate successfully (excluding
   # failures due to internal timeouts).
-  shards_failed = db.IntegerProperty(indexed=False)
+  shards_failed = db.IntegerProperty(default=0, indexed=False)
 
   # The number of shards that failed due to internal timeouts.
-  shards_timed_out = db.IntegerProperty(indexed=False)
+  shards_timed_out = db.IntegerProperty(default=0, indexed=False)
+
+  # The total amount of time (in minutes) that all the runners waited to run.
+  total_wait_time = db.IntegerProperty(default=0, indexed=False)
+
+  # The total amount of time (in minutes) that runners were running on machines.
+  total_running_time = db.IntegerProperty(default=0, indexed=False)
+
+
+def _TimeDeltaToMinutes(delta):
+  """Return the number of minutes (rounded) in a timedelta.
+
+  Args:
+    delta: The timedelta to convert.
+
+  Returns:
+    The number of minutes in the given timedelta.
+  """
+  return int(round(delta.total_seconds() / 60.0))
 
 
 def GenerateDailyStats(day):
@@ -53,21 +71,26 @@ def GenerateDailyStats(day):
 
   # Find the number of shards that ran, as well as how many failed, during the
   # day.
-  shard_count = 0
-  failures = 0
-  timeouts = 0
-  query = db.GqlQuery('SELECT success, timed_out FROM RunnerStats WHERE '
-                      'end_time >= :1 AND end_time < :2', day_midnight,
+  query = db.GqlQuery('SELECT success, timed_out, created_time, assigned_time, '
+                      'end_time FROM RunnerStats WHERE end_time >= :1 AND '
+                      'end_time < :2', day_midnight,
                       next_day_midnight)
-  for runner in query:
-    shard_count += 1
-    if runner.timed_out:
-      timeouts += 1
-    elif not runner.success:
-      failures += 1
 
-  daily_stats = DailyStats(date=day, shards_finished=shard_count,
-                           shards_failed=failures, shards_timed_out=timeouts)
+  daily_stats = DailyStats(date=day)
+  for runner in query:
+    # Update the time spent waiting and running.
+    daily_stats.total_wait_time += _TimeDeltaToMinutes(
+        runner.assigned_time - runner.created_time)
+    daily_stats.total_running_time += _TimeDeltaToMinutes(
+        runner.end_time - runner.assigned_time)
+
+    # Update the raw counts.
+    daily_stats.shards_finished += 1
+    if runner.timed_out:
+      daily_stats.shards_timed_out += 1
+    elif not runner.success:
+      daily_stats.shards_failed += 1
+
   daily_stats.put()
 
   return True
