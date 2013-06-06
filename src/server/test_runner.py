@@ -68,7 +68,7 @@ class TestRunner(db.Model):
   config_instance_index = db.IntegerProperty()
 
   # The number of instances running on the same configuration as ours.
-  num_config_instances = db.IntegerProperty()
+  num_config_instances = db.IntegerProperty(indexed=False)
 
   # The machine that is running or ran the test. This attribute is only valid
   # once a machine has been assigned to this runner.
@@ -79,7 +79,7 @@ class TestRunner(db.Model):
 
   # A list of the old machines ids that this runner previous ran on. This is
   # useful for knowing when a ping is from an older machine.
-  old_machine_ids = db.ListProperty(str)
+  old_machine_ids = db.ListProperty(str, indexed=False)
 
   # Used to indicate if the runner has finished, either successfully or not.
   done = db.BooleanProperty(default=False)
@@ -109,15 +109,15 @@ class TestRunner(db.Model):
 
   # True if the test run finished and succeeded.  This attribute is valid only
   # when the runner has ended. Until then, the value is unspecified.
-  ran_successfully = db.BooleanProperty()
+  ran_successfully = db.BooleanProperty(indexed=False)
 
   # The stringized array of exit_codes for each actions of the test.
-  exit_codes = db.StringProperty()
+  exit_codes = db.StringProperty(indexed=False)
 
   # Contains any swarm specific errors that occured that caused the result
   # string to not get correct setup with the runner output (i.e. the runner
   # timed out so there was no data).
-  errors = db.StringProperty()
+  errors = db.StringProperty(indexed=False)
 
   # The blobstore reference to the full output of the test.  This key valid only
   # when the runner has ended (i.e. done == True). Until then, it is None.
