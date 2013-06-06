@@ -15,7 +15,7 @@ import tempfile
 import unittest
 
 
-import mox  # pylint: disable-msg=C6204
+import mox  # pylint: disable=g-import-not-at-top
 
 from tools import dimensions_generator
 

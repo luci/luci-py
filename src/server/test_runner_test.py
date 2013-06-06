@@ -88,7 +88,7 @@ class TestRunnerTest(unittest.TestCase):
 
   # Test with an exception.
   def testAssignRunnerToMachineTxError(self):
-    def _RaiseError(key, machine_id):  # pylint: disable-msg=W0613
+    def _RaiseError(key, machine_id):  # pylint: disable=unused-argument
       raise test_runner.TxRunnerAlreadyAssignedError
 
     runner = self._CreateRunner()
@@ -98,7 +98,7 @@ class TestRunnerTest(unittest.TestCase):
 
   # Test with another exception.
   def testAssignRunnerToMachineTimeout(self):
-    def _RaiseError(key, machine_id):  # pylint: disable-msg=W0613
+    def _RaiseError(key, machine_id):  # pylint: disable=unused-argument
       raise db.Timeout
 
     runner = self._CreateRunner()
@@ -108,7 +108,7 @@ class TestRunnerTest(unittest.TestCase):
 
   # Test with yet another exception.
   def testAssignRunnerToMachineTransactionFailedError(self):
-    def _RaiseError(key, machine_id):  # pylint: disable-msg=W0613
+    def _RaiseError(key, machine_id):  # pylint: disable=unused-argument
       raise db.TransactionFailedError
 
     runner = self._CreateRunner()
@@ -126,7 +126,7 @@ class TestRunnerTest(unittest.TestCase):
       return _Decorate
 
     @_StaticVar('error_count', test_runner.MAX_TRANSACTION_RETRY_COUNT)
-    def _RaiseTempError(key, machine_id):  # pylint: disable-msg=W0613
+    def _RaiseTempError(key, machine_id):  # pylint: disable=unused-argument
       _RaiseTempError.error_count -= 1
       if _RaiseTempError.error_count:
         raise db.TransactionFailedError
@@ -140,7 +140,7 @@ class TestRunnerTest(unittest.TestCase):
 
   # Test with one more exception.
   def testAssignRunnerToMachineInternalError(self):
-    def _RaiseError(key, machine_id):  # pylint: disable-msg=W0613
+    def _RaiseError(key, machine_id):  # pylint: disable=unused-argument
       raise db.InternalError
 
     runner = self._CreateRunner()

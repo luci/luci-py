@@ -744,10 +744,10 @@ class TestCaseTest(TestHelper):
 
     invalid_store_result = (TestHelper.INVALID_STRING_VALUES +
                             ['all_results', 'some', 'mine'])
-    # pylint: disable-msg=C6402
+    # pylint: disable=g-long-lambda
     map(lambda i: self.assertFalse(i in valid_store_result),
         invalid_store_result)
-    # pylint: enable-msg=C6402
+    # pylint: enable=g-long-lambda
     self.AssertInvalidValues('store_result', invalid_store_result)
     self.test_request.store_result = None
 

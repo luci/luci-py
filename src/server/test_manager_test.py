@@ -208,7 +208,7 @@ class TestRequestManagerTest(unittest.TestCase):
   # unable to use the hashing method to find a match, so ensure we fall back
   # on the old direct comparision method.
   def testRequestGoodMachineWithLargeConfig(self):
-    large_os_config = map(str, range(  # pylint: disable-msg=C6402
+    large_os_config = map(str, range(  # pylint: disable=g-long-lambda
         dimensions_utils.MAX_DIMENSIONS_PER_MACHINE * 2))
 
     self._manager.ExecuteTestRequest(self._GetRequestMessage(

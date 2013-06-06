@@ -24,11 +24,11 @@ import subprocess
 import sys
 import time
 
-# pylint: disable-msg=C6204
+# pylint: disable=g-import-not-at-top
 from common import swarm_constants
 from common import url_helper
 from common import version
-# pylint: enable-msg=C6204
+# pylint: enable=g-import-not-at-top
 
 
 # The default name of the text file containing the machine id of this machine.
@@ -84,7 +84,7 @@ def Restart():
   raise SlaveError('Unable to restart machine')
 
 
-# pylint: disable-msg=W0102
+# pylint: disable=dangerous-default-value
 def ValidateBasestring(x, error_prefix='', errors=[]):
   """Validate the given variable as a valid basestring.
 
@@ -103,7 +103,7 @@ def ValidateBasestring(x, error_prefix='', errors=[]):
   return True
 
 
-# pylint: disable-msg=W0102
+# pylint: disable=dangerous-default-value
 def ValidateNonNegativeFloat(x, error_prefix='', errors=[]):
   """Validate the given variable as a non-negative float.
 
@@ -126,7 +126,7 @@ def ValidateNonNegativeFloat(x, error_prefix='', errors=[]):
   return True
 
 
-# pylint: disable-msg=W0102
+# pylint: disable=dangerous-default-value
 def ValidateNonNegativeInteger(x, error_prefix='', errors=[]):
   """Validate the given variable as a non-negative integer.
 
@@ -149,7 +149,7 @@ def ValidateNonNegativeInteger(x, error_prefix='', errors=[]):
   return True
 
 
-# pylint: disable-msg=W0102
+# pylint: disable=dangerous-default-value
 def ValidateCommand(commands, error_prefix='', errors=[]):
   """Validate the given commands are the valid.
 

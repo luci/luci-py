@@ -123,7 +123,7 @@ class TestRunner(db.Model):
   # when the runner has ended (i.e. done == True). Until then, it is None.
   result_string_reference = blobstore.BlobReferenceProperty()
 
-  def delete(self):  # pylint: disable-msg=C6409
+  def delete(self):  # pylint: disable=g-bad-name
     # We delete the blob referenced by this model because no one
     # else will ever care about it or try to reference it, so we
     # are just cleaning up the blobstore.

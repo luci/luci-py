@@ -102,7 +102,7 @@ class BlobstoreHelperTest(unittest.TestCase):
 
   def testGetBlobStoreExceptions(self):
     class BrokenBlobReader(object):
-      def read(self, size):  # pylint: disable-msg=C6409,W0613
+      def read(self, size):  # pylint: disable=g-bad-name,unused-argument
         raise blobstore.InternalError()
 
     self._mox.StubOutWithMock(blobstore_helper.blobstore, 'BlobReader')

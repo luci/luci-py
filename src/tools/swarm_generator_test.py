@@ -75,10 +75,10 @@ class SwarmGeneratorTest(unittest.TestCase):
           self.options = options
           self.args = args
 
-        def parse_args(self):  # pylint: disable-msg=C6409
+        def parse_args(self):  # pylint: disable=g-bad-name
           return (self.options, self.args)
 
-        def format_help(self):  # pylint: disable-msg=C6409
+        def format_help(self):  # pylint: disable=g-bad-name
           return ''
       self.parser = TestParser(self.options, None)
 

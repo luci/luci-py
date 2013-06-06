@@ -56,12 +56,12 @@ import urllib
 import zipfile
 
 # TODO(user): fix this
-# pylint: disable-msg=C6204
+# pylint: disable=g-import-not-at-top
 try:
   import dimensions
 except ImportError:
   from tools import dimensions
-# pylint: enable-msg=C6204
+# pylint: enable=g-import-not-at-top
 
 
 class SwarmGenerator(object):
