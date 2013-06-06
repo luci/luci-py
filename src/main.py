@@ -636,10 +636,14 @@ class StatsHandler(webapp2.RequestHandler):
   """Show all the collected swarm stats."""
 
   def get(self):  # pylint: disable-msg=C6409
+    # Reverse the daily stats so that the newest data is listed first, which
+    # makes more sense when listing these values in a table.
+    daily_stats_reversed = daily_stats.GetDailyStats(
+        datetime.date.today() - datetime.timedelta(days=7)).reverse()
+
     params = {
         'topbar': GenerateTopbar(),
-        'daily_stats': daily_stats.GetDailyStats(
-            datetime.date.today() - datetime.timedelta(days=7)),
+        'daily_stats': daily_stats_reversed,
         'runner_wait_stats': runner_stats.GetRunnerWaitStats(),
         'runner_cutoff': runner_stats.RUNNER_STATS_EVALUATION_CUTOFF_DAYS
     }
