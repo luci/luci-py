@@ -148,8 +148,11 @@ class AppTestSignedIn(TestCase):
         print 'Error connecting to server: %s' % str(e)
         if attempt != (MAX_URL_ATTEMPTS - 1):
           time.sleep(0.1)
+      except SystemExit:
+        break
 
     # If we end up here, we failed to reached the server so raise an error.
+    print('Failed to access %s' % url)
     raise last_error
 
   def upload(self, hash_key, content, priority=1):
