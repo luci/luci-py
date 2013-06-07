@@ -24,6 +24,7 @@ from server import test_manager
 from server import test_request
 from server import test_runner
 from server import user_manager
+from stats import daily_stats
 from stats import machine_stats
 from stats import runner_stats
 from third_party.mox import mox
@@ -557,6 +558,9 @@ class AppTest(unittest.TestCase):
     self._mox.StubOutWithMock(main_app.template, 'render')
     main_app.template.render(mox.IgnoreArg(), mox.IgnoreArg()).AndReturn('')
     self._mox.ReplayAll()
+
+    # Add a daily stats to ensure it the basic data processing.
+    daily_stats.DailyStats(date=datetime.date.today()).put()
 
     for graph_url in graph_urls:
       response = self.app.get(graph_url)

@@ -862,14 +862,16 @@ class DailyStatsGraphHandler(webapp2.RequestHandler):
     """
     # A mapping of the element's variable name, and the name that should be
     # displayed to the user.
-    elements_to_graph = {
-        'shards_finished': 'Shards Finished',
-        'shards_failed': 'Shards Failed',
-        'shards_timed_out': 'Shards Timed Out',
-        }
+    elements_to_graph = [
+        ('shards_finished', 'Shards Finished'),
+        ('shards_failed', 'Shards Failed'),
+        ('shards_timed_out', 'Shards Timed Out'),
+        ('total_running_time', 'Total Running Time'),
+        ('total_wait_time', 'Total Wait Time'),
+        ]
 
     graphs_to_show = []
-    for element_name, title_name in elements_to_graph.iteritems():
+    for element_name, title_name in elements_to_graph:
       graphs_to_show.append(
           {'element_id': element_name,
            'title': title_name,
@@ -877,18 +879,20 @@ class DailyStatsGraphHandler(webapp2.RequestHandler):
 
     for stat in stats:
       date_str = stat.date.isoformat()
-      for i, element_name in enumerate(elements_to_graph):
+      for i, element in enumerate(elements_to_graph):
         graphs_to_show[i]['data_array'].append(
             # App engine adds the leading _ to the variable names when
             # referencing them through the dict.
-            [date_str, stat.__dict__['_' + element_name]])
+            [date_str, stat.__dict__['_' + element[0]]])
 
     return graphs_to_show
 
   def get(self):  # pylint: disable-msg=C6409
     """Handles HTTP GET requests for this handler's URL."""
     params = {
-        'graphs': daily_stats.GetDailyStats(datetime.date.today()),
+        # TODO(user): Let the user choose the number of days to display.
+        'graphs': self._GetGraphableDailyStats(daily_stats.GetDailyStats(
+            datetime.date.today() - datetime.timedelta(days=7))),
         'topbar': GenerateTopbar()
     }
 
