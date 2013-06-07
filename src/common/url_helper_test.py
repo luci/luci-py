@@ -135,11 +135,15 @@ class UrlHelperTest(unittest.TestCase):
   def testUrlOpenHTTPErrorWithRetry(self):
     response = 'response'
 
+    # Urlopen failure attempt.
     url_helper.urllib2.urlopen(
         mox.IgnoreArg(), mox.IgnoreArg()).AndRaise(
             urllib2.HTTPError('url', 500, 'error message', None, None))
     logging.warning(mox.IgnoreArg(), mox.IgnoreArg(), mox.IgnoreArg(),
                     mox.IgnoreArg())
+    time.sleep(mox.IgnoreArg())
+
+    # Urlopen success attempt.
     url_helper.urllib2.urlopen(
         mox.IgnoreArg(), mox.IgnoreArg()).AndReturn(StringIO.StringIO(response))
 

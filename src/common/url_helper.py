@@ -109,20 +109,19 @@ def UrlOpen(url, data=None, files=None, max_tries=5, wait_duration=None,
       logging.warning('Unable to open url %s on attempt %d.\nException: %s',
                       url, attempt, e)
 
+    if url_response is not None:
+      logging.info('Opened given url, %s, and got a response of length %d.',
+                   url, len(url_response))
+      return url_response
+    elif attempt != max_tries - 1:
+      # Only sleep if we are going to try and connect again.
       if wait_duration is None:
         duration = random.random() * 3 + math.pow(1.5, (attempt + 1))
         duration = min(10, max(0.1, duration))
       else:
         duration = wait_duration
 
-      # Only sleep if we are going to try again.
-      if attempt != max_tries - 1:
-        time.sleep(duration)
-
-    if url_response is not None:
-      logging.info('Opened given url, %s, and got a response of length %d.',
-                   url, len(url_response))
-      return url_response
+      time.sleep(duration)
 
   logging.error('Unable to open given url, %s, after %d attempts.',
                 url, max_tries)
