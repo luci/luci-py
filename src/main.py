@@ -39,9 +39,9 @@ from server import user_manager
 from stats import daily_stats
 from stats import machine_stats
 from stats import runner_stats
-# pylint: enable-msg=C6204
+# pylint: enable=g-import-not-at-top
 
-import webapp2  # pylint: disable-msg=C6203
+import webapp2  # pylint: disable=g-bad-import-order
 
 
 _NUM_USER_TEST_RUNNERS_PER_PAGE = 50
@@ -217,7 +217,7 @@ class MainHandler(webapp2.RequestHandler):
 
     return s
 
-  def get(self):  # pylint: disable-msg=C6409
+  def get(self):  # pylint: disable=g-bad-name
     """Handles HTTP GET requests for this handler's URL."""
     # Build info for test requests table.
     show_success = self.request.get('s', 'False') != 'False'
@@ -345,7 +345,7 @@ class MainHandler(webapp2.RequestHandler):
 class RedirectToMainHandler(webapp2.RequestHandler):
   """Handler to redirect requests to base page secured main page."""
 
-  def get(self):  # pylint: disable-msg=C6409
+  def get(self):  # pylint: disable=g-bad-name
     """Handles HTTP GET requests for this handler's URL."""
     self.redirect(_SECURE_MAIN_URL)
 
@@ -357,7 +357,7 @@ class MachineListHandler(webapp2.RequestHandler):
   some basic information about them.
   """
 
-  def get(self):  # pylint: disable-msg=C6409
+  def get(self):  # pylint: disable=g-bad-name
     """Handles HTTP GET requests for this handler's URL."""
     sort_by = self.request.get('sort_by', 'machine_id')
     machines = machine_stats.GetAllMachines(sort_by)
@@ -383,7 +383,7 @@ class MachineListHandler(webapp2.RequestHandler):
 class DeleteMachineStatsHandler(webapp2.RequestHandler):
   """Handler to delete a machine assignment."""
 
-  def post(self):  # pylint:disable-msg=C6409
+  def post(self):  # pylint: disable=g-bad-name
     """Handles HTTP POST requests for this handler's URL."""
     key = self.request.get('r')
 
@@ -396,14 +396,14 @@ class DeleteMachineStatsHandler(webapp2.RequestHandler):
 class TestRequestHandler(webapp2.RequestHandler):
   """Handles test requests from clients."""
 
-  def get(self):  # pylint: disable-msg=C6409
+  def get(self):  # pylint: disable=g-bad-name
     if ALLOW_POST_AS_GET:
       return self.post()
     else:
       self.response.set_status(405)
 
   @AuthenticateMachineOrUser
-  def post(self):  # pylint: disable-msg=C6409
+  def post(self):  # pylint: disable=g-bad-name
     """Handles HTTP POST requests for this handler's URL."""
     # Validate the request.
     if not self.request.get('request'):
@@ -426,7 +426,7 @@ class ResultHandler(webapp2.RequestHandler):
   """Handles test results from remote test runners."""
 
   @AuthenticateMachine
-  def post(self):  # pylint: disable-msg=C6409
+  def post(self):  # pylint: disable=g-bad-name
     """Handles HTTP POST requests for this handler's URL."""
     # TODO(user): Share this code between all the request handlers so we
     # can always see how often a request is being sent.
@@ -488,7 +488,7 @@ class ResultHandler(webapp2.RequestHandler):
 class CleanupDataHandler(webapp2.RequestHandler):
   """Handles tasks to delete orphaned blobs."""
 
-  def post(self):  # pylint: disable-msg=C6409
+  def post(self):  # pylint: disable=g-bad-name
     test_manager.DeleteOldErrors()
     test_runner.DeleteOldRunners()
     test_runner.DeleteOrphanedBlobs()
@@ -502,7 +502,7 @@ class CleanupDataHandler(webapp2.RequestHandler):
 class CronJobHandler(webapp2.RequestHandler):
   """A helper class to handle redirecting GET cron jobs to POSTs."""
 
-  def get(self):  # pylint: disable-msg=C6409
+  def get(self):  # pylint: disable=g-bad-name
     """Handles HTTP GET requests for this handler's URL."""
     # Only an app engine cron job is allowed to poll via get (it currently
     # has no way to make its request a post).
@@ -517,7 +517,7 @@ class CronJobHandler(webapp2.RequestHandler):
 class AbortStaleRunnersHandler(CronJobHandler):
   """Handles cron jobs to abort stale runners."""
 
-  def post(self):  # pylint: disable-msg=C6409
+  def post(self):  # pylint: disable=g-bad-name
     """Handles HTTP POST requests for this handler's URL."""
     test_request_manager = CreateTestManager()
 
@@ -535,7 +535,7 @@ class AbortStaleRunnersHandler(CronJobHandler):
 class TriggerCleanupDataHandler(CronJobHandler):
   """Handles cron jobs to delete orphaned blobs."""
 
-  def post(self):  # pylint: disable-msg=C6409
+  def post(self):  # pylint: disable=g-bad-name
     taskqueue.add(method='POST', url='/task_queues/cleanup_data')
     self.response.out.write('Successfully triggered task to clean up old data.')
 
@@ -543,7 +543,7 @@ class TriggerCleanupDataHandler(CronJobHandler):
 class DetectDeadMachinesHandler(CronJobHandler):
   """Handles cron jobs to detect dead machines."""
 
-  def post(self):  # pylint: disable-msg=C6409
+  def post(self):  # pylint: disable=g-bad-name
     dead_machines = machine_stats.FindDeadMachines()
     if not dead_machines:
       msg = 'No dead machines found'
@@ -562,7 +562,7 @@ class DetectDeadMachinesHandler(CronJobHandler):
 class GenerateDailyStatsHandler(CronJobHandler):
   """Handles cron jobs to generate new daily stats."""
 
-  def post(self):  # pylint: disable-msg=C6409
+  def post(self):  # pylint: disable=g-bad-name
     yesterday = datetime.date.today() - datetime.timedelta(days=1)
     daily_stats.GenerateDailyStats(yesterday)
 
@@ -570,14 +570,14 @@ class GenerateDailyStatsHandler(CronJobHandler):
 class GenerateRecentStatsHandler(CronJobHandler):
   """Handles cron jobs to generate new recent stats."""
 
-  def post(self):  # pylint: disable-msg=C6409
+  def post(self):  # pylint: disable=g-bad-name
     runner_stats.GenerateStats()
 
 
 class SendEReporterHandler(ReportGenerator):
   """Handles calling EReporter with the correct parameters."""
 
-  def get(self):  # pylint: disable-msg=C6409
+  def get(self):  # pylint: disable=g-bad-name
     # grab the mailing admin
     admin = admin_user.AdminUser.all().get()
     if not admin:
@@ -619,7 +619,7 @@ class SendEReporterHandler(ReportGenerator):
 class ShowMessageHandler(webapp2.RequestHandler):
   """Show the full text of a test request."""
 
-  def get(self):  # pylint: disable-msg=C6409
+  def get(self):  # pylint: disable=g-bad-name
     """Handles HTTP GET requests for this handler's URL."""
     self.response.headers['Content-Type'] = 'text/plain'
 
@@ -635,7 +635,7 @@ class ShowMessageHandler(webapp2.RequestHandler):
 class StatsHandler(webapp2.RequestHandler):
   """Show all the collected swarm stats."""
 
-  def get(self):  # pylint: disable-msg=C6409
+  def get(self):  # pylint: disable=g-bad-name
     weeks_daily_stats = daily_stats.GetDailyStats(
         datetime.date.today() - datetime.timedelta(days=7))
     # Reverse the daily stats so that the newest data is listed first, which
@@ -657,7 +657,7 @@ class GetMatchingTestCasesHandler(webapp2.RequestHandler):
   """Get all the keys for any test runner that match a given test case name."""
 
   @AuthenticateMachineOrUser
-  def get(self):  # pylint: disable-msg=C6409
+  def get(self):  # pylint: disable=g-bad-name
     """Handles HTTP GET requests for this handler's URL."""
     self.response.headers['Content-Type'] = 'text/plain'
 
@@ -677,7 +677,7 @@ class GetMatchingTestCasesHandler(webapp2.RequestHandler):
 class SecureGetResultHandler(webapp2.RequestHandler):
   """Show the full result string from a test runner."""
 
-  def get(self):  # pylint: disable-msg=C6409
+  def get(self):  # pylint: disable=g-bad-name
     """Handles HTTP GET requests for this handler's URL."""
     SendRunnerResults(self.response, self.request.get('r', ''))
 
@@ -686,7 +686,7 @@ class GetResultHandler(webapp2.RequestHandler):
   """Show the full result string from a test runner."""
 
   @AuthenticateMachineOrUser
-  def get(self):  # pylint: disable-msg=C6409
+  def get(self):  # pylint: disable=g-bad-name
     """Handles HTTP GET requests for this handler's URL."""
     SendRunnerResults(self.response, self.request.get('r', ''))
 
@@ -695,7 +695,7 @@ class GetSlaveCodeHandler(webapp2.RequestHandler):
   """Returns a zip file with all the files required by a slave."""
 
   @AuthenticateMachine
-  def get(self):  # pylint: disable-msg=C6409
+  def get(self):  # pylint: disable=g-bad-name
     """Handles HTTP GET requests for this handler's URL."""
     self.response.headers['Content-Type'] = 'application/octet-stream'
     self.response.out.write(test_manager.SlaveCodeZipped())
@@ -705,7 +705,7 @@ class GetTokenHandler(webapp2.RequestHandler):
   """Returns an authentication token."""
 
   @AuthenticateMachineOrUser
-  def get(self):  # pylint: disable-msg=C6409
+  def get(self):  # pylint: disable=g-bad-name
     """Handles HTTP GET requests for this handler's URL."""
     self.response.headers['Content-Type'] = 'text/plain'
     self.response.out.write('dummy_token')
@@ -715,7 +715,7 @@ class CleanupResultsHandler(webapp2.RequestHandler):
   """Delete the Test Runner with the given key."""
 
   @AuthenticateMachine
-  def post(self):  # pylint: disable-msg=C6409
+  def post(self):  # pylint: disable=g-bad-name
     """Handles HTTP POST requests for this handler's URL."""
     self.response.headers['Content-Type'] = 'test/plain'
 
@@ -730,7 +730,7 @@ class CleanupResultsHandler(webapp2.RequestHandler):
 class CancelHandler(webapp2.RequestHandler):
   """Cancel a test runner that is not already running."""
 
-  def post(self):  # pylint: disable-msg=C6409
+  def post(self):  # pylint: disable=g-bad-name
     """Handles HTTP GET requests for this handler's URL."""
     self.response.headers['Content-Type'] = 'text/plain'
 
@@ -751,7 +751,7 @@ class CancelHandler(webapp2.RequestHandler):
 class RetryHandler(webapp2.RequestHandler):
   """Retry a test runner again."""
 
-  def post(self):  # pylint: disable-msg=C6409
+  def post(self):  # pylint: disable=g-bad-name
     """Handles HTTP GET requests for this handler's URL."""
     self.response.headers['Content-Type'] = 'text/plain'
 
@@ -781,14 +781,14 @@ class RegisterHandler(webapp2.RequestHandler):
      Attempt to find a matching job for the querying machine.
   """
 
-  def get(self):  # pylint: disable-msg=C6409
+  def get(self):  # pylint: disable=g-bad-name
     if ALLOW_POST_AS_GET:
       return self.post()
     else:
       self.response.set_status(405)
 
   @AuthenticateMachine
-  def post(self):  # pylint: disable-msg=C6409
+  def post(self):  # pylint: disable=g-bad-name
     """Handles HTTP POST requests for this handler's URL."""
     # Validate the request.
     if not self.request.body:
@@ -836,7 +836,7 @@ class RunnerPingHandler(webapp2.RequestHandler):
   """
 
   @AuthenticateMachine
-  def post(self):  # pylint: disable-msg=C6409
+  def post(self):  # pylint: disable=g-bad-name
     """Handles HTTP POST requests for this handler's URL."""
     key = self.request.get('r', '')
     machine_id = self.request.get('id', '')
@@ -888,7 +888,7 @@ class DailyStatsGraphHandler(webapp2.RequestHandler):
 
     return graphs_to_show
 
-  def get(self):  # pylint: disable-msg=C6409
+  def get(self):  # pylint: disable=g-bad-name
     """Handles HTTP GET requests for this handler's URL."""
     params = {
         # TODO(user): Let the user choose the number of days to display.
@@ -907,7 +907,7 @@ class UserProfileHandler(webapp2.RequestHandler):
   This handler lists user info, such as their IP whitelist and settings.
   """
 
-  def get(self):  # pylint: disable-msg=C6409
+  def get(self):  # pylint: disable=g-bad-name
     """Handles HTTP GET requests for this handler's URL."""
     topbar = GenerateTopbar()
 
@@ -934,7 +934,7 @@ class UserProfileHandler(webapp2.RequestHandler):
 class ChangeWhitelistHandler(webapp2.RequestHandler):
   """Handler for making changes to a user whitelist."""
 
-  def post(self):  # pylint: disable-msg=C6409
+  def post(self):  # pylint: disable=g-bad-name
     """Handles HTTP POST requests for this handler's URL."""
     ip = self.request.get('i', self.request.remote_addr)
 
@@ -956,7 +956,7 @@ class RemoteErrorHandler(webapp2.RequestHandler):
   """Handler to log an error reported by remote machine."""
 
   @AuthenticateMachine
-  def post(self):  # pylint: disable-msg=C6409
+  def post(self):  # pylint: disable=g-bad-name
     """Handles HTTP POST requests for this handler's URL."""
     error_message = self.request.get('m', '')
     error = test_manager.SwarmError(
@@ -968,7 +968,7 @@ class RemoteErrorHandler(webapp2.RequestHandler):
 
 
 class UploadHandler(blobstore_handlers.BlobstoreUploadHandler):
-  def post(self):  # pylint: disable-msg=C6409
+  def post(self):  # pylint: disable=g-bad-name
     """Handles HTTP POST requests for this handler's URL."""
     upload_result = self.get_uploads('result')
 
