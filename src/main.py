@@ -638,12 +638,13 @@ class StatsHandler(webapp2.RequestHandler):
   def get(self):  # pylint: disable-msg=C6409
     weeks_daily_stats = daily_stats.GetDailyStats(
         datetime.date.today() - datetime.timedelta(days=7))
+    # Reverse the daily stats so that the newest data is listed first, which
+    # makes more sense when listing these values in a table.
+    weeks_daily_stats.reverse()
 
     params = {
         'topbar': GenerateTopbar(),
-        # Reverse the daily stats so that the newest data is listed first, which
-        # makes more sense when listing these values in a table.
-        'daily_stats': weeks_daily_stats.reverse(),
+        'daily_stats': weeks_daily_stats,
         'runner_wait_stats': runner_stats.GetRunnerWaitStats(),
         'runner_cutoff': runner_stats.RUNNER_STATS_EVALUATION_CUTOFF_DAYS
     }
