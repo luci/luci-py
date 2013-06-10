@@ -25,6 +25,14 @@ indexes:
 - kind: RunnerStats
   properties:
   - name: end_time
+  - name: assigned_time
+  - name: created_time
+  - name: success
+  - name: timed_out
+
+- kind: RunnerStats
+  properties:
+  - name: end_time
   - name: success
   - name: timed_out
 
