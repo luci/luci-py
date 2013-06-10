@@ -323,7 +323,8 @@ def AutomaticallyRetryRunner(runner):
 
     # Don't change the created time since it is not the user's fault
     # we are retrying it (so it should have high prority to run again).
-    transaction_runner.old_machine_ids.append(transaction_runner.machine_id)
+    if transaction_runner.machine_id:
+      transaction_runner.old_machine_ids.append(transaction_runner.machine_id)
     transaction_runner.machine_id = None
     transaction_runner.done = False
     transaction_runner.started = None

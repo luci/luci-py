@@ -201,10 +201,21 @@ class TestRunnerTest(unittest.TestCase):
   def testShouldAutomaticallyRetryRunner(self):
     runner = self._CreateRunner()
     runner.automatic_retry_count = 0
+    runner.put()
     self.assertTrue(test_runner.ShouldAutomaticallyRetryRunner(runner))
 
     runner.automatic_retry_count = test_runner.MAX_AUTOMATIC_RETRIES
     self.assertFalse(test_runner.ShouldAutomaticallyRetryRunner(runner))
+
+  # There were observed cases where machine_id was somehow set to None before
+  # calling AutomaticallyRetryRunner. It is unclear how this is possible, so
+  # handle this case gracefully.
+  def testAutomaticallyRetryMachineIdNone(self):
+    runner = self._CreateRunner()
+    runner.automatic_retry_count = 0
+    runner.machine_id = None
+    runner.put()
+    self.assertTrue(test_runner.AutomaticallyRetryRunner(runner))
 
   def testRecordRunnerStatsAfterAutoRetry(self):
     runner = self._CreateRunner()
