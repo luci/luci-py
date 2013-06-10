@@ -42,6 +42,7 @@ from common import dimensions_utils
 from common import swarm_constants
 from common import test_request_message
 from common import version
+from server import dimension_mapping
 from server import test_request
 from server import test_runner
 from stats import machine_stats
@@ -345,12 +346,21 @@ class TestRequestManager(object):
                  'test_keys': []}
 
     for config in test_case.configurations:
+      logging.debug('Creating runners for request=%s config=%s',
+                    request.name, config.config_name)
+      config_hash = request.GetConfigurationDimensionHash(config.config_name)
+      # Ensure that we have a record of something with this config getting
+      # created.
+      dimension_mapping.DimensionMapping.get_or_insert(
+          config_hash,
+          dimensions=test_request_message.Stringize(config.dimensions))
+
       # TODO(user): deal with addition_instances later!!!
       assert config.min_instances > 0
       for instance_index in range(config.min_instances):
         config.instance_index = instance_index
         config.num_instances = config.min_instances
-        runner = self._QueueTestRequestConfig(request, config)
+        runner = self._QueueTestRequestConfig(request, config, config_hash)
 
         test_keys['test_keys'].append({'config_name': config.config_name,
                                        'instance_index': instance_index,
@@ -358,26 +368,24 @@ class TestRequestManager(object):
                                        'test_key': str(runner.key())})
     return test_keys
 
-  def _QueueTestRequestConfig(self, request, config):
+  def _QueueTestRequestConfig(self, request, config, config_hash):
     """Queue a given request's configuration for execution.
 
     Args:
       request: A TestRequest object to execute.
       config: A TestConfiguration object representing the machine on which to
           run the test.
+      config_hash: The config_hash for this request config.
+
     Returns:
       A tuple containing the id key of the test runner that was created
       and saved, as well as the test runner.
     """
-    logging.debug('TRM._QueueTestRequestConfig request=%s config=%s',
-                  request.name, config.config_name)
-
     # Create a runner entity to record this request/config pair that needs
     # to be run. The runner will eventually be scheduled at a later time.
     runner = test_runner.TestRunner(
         request=request, config_name=config.config_name,
-        config_hash=request.GetConfigurationDimensionHash(config.config_name),
-        config_instance_index=config.instance_index,
+        config_hash=config_hash, config_instance_index=config.instance_index,
         num_config_instances=config.num_instances)
 
     runner.put()

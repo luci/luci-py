@@ -4,6 +4,7 @@
 
 """Implements helpers for dealing with dimensions of machines and tests."""
 
+
 import hashlib
 import itertools
 import logging
