@@ -884,7 +884,7 @@ class DailyStatsGraphHandler(webapp2.RequestHandler):
         graphs_to_show[i]['data_array'].append(
             # App engine adds the leading _ to the variable names when
             # referencing them through the dict.
-            [date_str, stat.__dict__['_' + element[0]]])
+            [date_str, int(stat.__dict__['_' + element[0]])])
 
     return graphs_to_show
 
