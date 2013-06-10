@@ -742,6 +742,13 @@ class RetrieveContentByHashHandler(acl.ACLRequestHandler,
       self.response.headers['Content-Type'] = 'application/octet-stream'
       self.response.out.write(entry.content)
     else:
+      if not entry.filepath:
+        # Corrupted entry. Delete.
+        msg = 'Corrupted entry with key \'%s\'.' % hash_key
+        logging.error(msg)
+        entry.delete()
+        self.abort(404, detail=msg)
+
       # send_blob() will call create_gs_key() itself but this only works if
       # the string is encoded as utf-8.
       blobkey = gsfiles.to_filepath(GS_BUCKET, entry.gs_filepath).encode(
