@@ -742,7 +742,7 @@ class RetrieveContentByHashHandler(acl.ACLRequestHandler,
       self.response.headers['Content-Type'] = 'application/octet-stream'
       self.response.out.write(entry.content)
     else:
-      if not entry.filepath:
+      if not entry.filename:
         # Corrupted entry. Delete.
         msg = 'Corrupted entry with key \'%s\'.' % hash_key
         logging.error(msg)
