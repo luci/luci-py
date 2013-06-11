@@ -176,7 +176,10 @@ def create_entry(namespace, hash_key):
 
 
 def delete_entry_and_gs_entry(to_delete):
-  """Deletes ContentEntry and their GS files."""
+  """Deletes ContentEntry and their GS files.
+
+  Returns a list of Future that must be waited on.
+  """
   # Note all the files to delete.
   gs_files_to_delete = filter(None, (i.gs_filepath for i in to_delete))
 
@@ -186,8 +189,7 @@ def delete_entry_and_gs_entry(to_delete):
   # TODO(maruel): This could leak a broken BlobInfo object in the blobstore
   # table. There is no easy way to find it back.
   gsfiles.delete(gs_files_to_delete)
-
-  entities_future.wait()
+  return entities_future
 
 
 def get_hash_algo(_namespace):
@@ -254,6 +256,8 @@ def delete_blobinfo_async(blobinfos):
 
   blobstore.delete*() do not accept a list of BlobInfo, they only accept a list
   BlobKey.
+
+  Returns a list of Rpc objects.
   """
   # TODO(maruel): Deprecated, to delete.
   return blobstore.delete_async((b.key() for b in blobinfos))
@@ -262,11 +266,22 @@ def delete_blobinfo_async(blobinfos):
 def incremental_delete(query, delete, check=None):
   """Applies |delete| to objects in a query asynchrously.
 
+  This function is itself synchronous.
+
+  Arguments:
+  - query: iterator of items to process.
+  - delete: callback that accepts a list of objects to delete and returns a list
+            of objects that have a method .wait() to make sure all calls
+            completed.
+  - check: optional callback that can filter out items from |query| from
+          deletion.
+
   Returns True if at least one object was found.
   """
   to_delete = []
   found = False
   count = 0
+  futures = []
   for item in query:
     count += 1
     if not (count % 1000):
@@ -277,11 +292,22 @@ def incremental_delete(query, delete, check=None):
     found = True
     if len(to_delete) == ITEMS_TO_DELETE_ASYNC:
       logging.info('Deleting %s entries', len(to_delete))
-      delete(to_delete)
+      futures.extend(delete(to_delete))
       to_delete = []
+
+    # That's a lot of on-going operations which could take a significant amount
+    # of memory. Wait a little on the oldest operations.
+    # TODO(maruel): Profile memory usage to see if a few thousands of on-going
+    # RPC objects is a problem in practice.
+    while len(futures) > 10 * ITEMS_TO_DELETE_ASYNC:
+      futures.pop(0).wait()
+
   if to_delete:
     logging.info('Deleting %s entries', len(to_delete))
-    delete(to_delete)
+    futures.extend(delete(to_delete))
+
+  for future in futures:
+    future.wait()
   return found
 
 
@@ -360,6 +386,11 @@ class RestrictedObliterateWorkerHandler(webapp2.RequestHandler):
     incremental_delete(
         gsfiles.list_files(GS_BUCKET, None),
         lambda x: gsfiles.delete_files(GS_BUCKET, x))
+
+    logging.info('Flushing memcache')
+    # High priority (.isolated files) are cached explicitly. Make sure ghosts
+    # are zapped too.
+    memcache.flush_all()
     logging.info('Finally done!')
 
 
@@ -445,7 +476,8 @@ class RestrictedVerifyWorkerHandler(webapp2.RequestHandler):
     if not is_verified:
       # Delete the entity since it's corrupted.
       logging.error('SHA-1 and data do not match, %d bytes', count)
-      delete_entry_and_gs_entry([entry])
+      for future in delete_entry_and_gs_entry([entry]):
+        future.wait()
       # Do not return failure since we don't want the task scheduler to retry.
     else:
       logging.info('%d bytes verified', count)
@@ -618,7 +650,8 @@ class StoreBlobstoreContentByHashHandler(
       self.response.out.write(msg)
       self.response.set_status(500)
 
-      delete_entry_and_gs_entry([entry])
+      for future in delete_entry_and_gs_entry([entry]):
+        future.wait()
       return
 
     logging.info('%d bytes uploaded directly into GS', size)

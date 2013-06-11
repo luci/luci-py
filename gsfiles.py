@@ -105,3 +105,7 @@ def delete_files(bucket, filenames):
   """
   filepaths = [to_filepath(bucket, i) for i in filenames]
   files.delete(*filepaths)
+
+  # Returns an empty list so this function can be used with functions that
+  # expect the RPC to return a Future.
+  return []
