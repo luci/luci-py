@@ -551,19 +551,25 @@ class AppTest(unittest.TestCase):
     self.assertEqual('200 OK', response.status)
     self.assertEqual('Runner successfully pinged.', response.body)
 
-  def testGraphPages(self):
-    graph_urls = ['/secure/graphs/daily_stats',
-                 ]
+  def testStatPages(self):
+    stat_urls = ['/secure/graphs/daily_stats',
+                 '/secure/runner_summary',
+                 '/secure/stats',
+                ]
 
     self._mox.StubOutWithMock(main_app.template, 'render')
-    main_app.template.render(mox.IgnoreArg(), mox.IgnoreArg()).AndReturn('')
+    for _ in range(len(stat_urls)):
+      main_app.template.render(mox.IgnoreArg(),
+                               mox.IgnoreArg()).AndReturn('')
     self._mox.ReplayAll()
 
-    # Add a daily stats to ensure it the basic data processing.
+    # Add some basic stats items to ensure the loop bodies are executed.
+    runner = self._CreateTestRunner()
+    runner_stats.RecordRunnerStats(runner)
     daily_stats.DailyStats(date=datetime.date.today()).put()
 
-    for graph_url in graph_urls:
-      response = self.app.get(graph_url)
+    for stat_url in stat_urls:
+      response = self.app.get(stat_url)
       self.assertEqual('200 OK', response.status)
 
   def testTaskQueueUrls(self):
@@ -612,18 +618,6 @@ class AppTest(unittest.TestCase):
 
     response = self.app.get('/tasks/sendereporter')
     self.assertTrue('200 OK' in response.status)
-
-  def testStatsHandler(self):
-    self._mox.StubOutWithMock(main_app.template, 'render')
-    main_app.template.render(mox.IgnoreArg(), mox.IgnoreArg()).AndReturn('')
-    self._mox.ReplayAll()
-
-    # Ensure there are some runner stats.
-    runner = self._CreateTestRunner()
-    runner_stats.RecordRunnerStats(runner)
-
-    response = self.app.get('/secure/stats')
-    self.assertTrue('200' in response.status)
 
   def testCancelHandler(self):
     response = self.app.post(main_app._SECURE_CANCEL_URL, {'r': 'invalid_key'})

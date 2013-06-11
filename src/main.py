@@ -89,6 +89,19 @@ def GenerateTopbar():
   return topbar
 
 
+def GenerateStatLinks():
+  """Generate the stat links to display on all stats pages.
+
+  Returns:
+    The stat links to display.
+  """
+  stat_links = (
+      '<a href="/secure/graphs/daily_stats">Graph of Daily Stats</a><br/>'
+      '<a href="/secure/runner_summary"">Pending and Waiting Summary</a>')
+
+  return stat_links
+
+
 def GenerateButtonWithHiddenForm(button_text, url, form_id):
   """Generate a button that when used will post to the given url.
 
@@ -644,6 +657,7 @@ class StatsHandler(webapp2.RequestHandler):
 
     params = {
         'topbar': GenerateTopbar(),
+        'stat_links': GenerateStatLinks(),
         'daily_stats': weeks_daily_stats,
         'runner_wait_stats': runner_stats.GetRunnerWaitStats(),
         'runner_cutoff': runner_stats.RUNNER_STATS_EVALUATION_CUTOFF_DAYS
@@ -848,6 +862,23 @@ class RunnerPingHandler(webapp2.RequestHandler):
       self.response.out.write('Runner failed to ping.')
 
 
+class RunnerSummaryHandler(webapp2.RequestHandler):
+  """Handler for displaying a summary of the current runners."""
+
+  def get(self):  # pylint: disable=g-bad-name
+    params = {
+        'topbar': GenerateTopbar(),
+        'stats_links': GenerateStatLinks(),
+        # TODO(user): Generate the actual stats.
+        'total_running_runners': 0,
+        'total_pending_runners': 0,
+        'dimension_summary': [],
+    }
+
+    path = os.path.join(os.path.dirname(__file__), 'runner_summary.html')
+    self.response.out.write(template.render(path, params))
+
+
 class DailyStatsGraphHandler(webapp2.RequestHandler):
   """Handler for generating the html page to display the daily stats."""
 
@@ -894,6 +925,7 @@ class DailyStatsGraphHandler(webapp2.RequestHandler):
         # TODO(user): Let the user choose the number of days to display.
         'graphs': self._GetGraphableDailyStats(daily_stats.GetDailyStats(
             datetime.date.today() - datetime.timedelta(days=7))),
+        'stat_links': GenerateStatLinks(),
         'topbar': GenerateTopbar()
     }
 
@@ -1045,6 +1077,8 @@ def CreateApplication():
                                    DailyStatsGraphHandler),
                                   ('/secure/machine_list', MachineListHandler),
                                   ('/secure/retry', RetryHandler),
+                                  ('/secure/runner_summary',
+                                   RunnerSummaryHandler),
                                   ('/secure/show_message',
                                    ShowMessageHandler),
                                   ('/secure/stats', StatsHandler),
