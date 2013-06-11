@@ -311,4 +311,8 @@ def bootstrap():
   """Adds example.com as a valid domain when testing."""
   if os.environ['SERVER_SOFTWARE'].startswith('Development'):
     WhitelistedDomain.get_or_insert(key_name='example.com')
+    WhitelistedIP.get_or_insert(
+        key_name=ip_to_str('v4', 2130706433),
+        ip='127.0.0.1',
+        comment='automatic because of running on dev server')
   get_global_secret()
