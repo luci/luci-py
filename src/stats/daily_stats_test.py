@@ -32,6 +32,8 @@ def _AddRunner(end_time, success, timeout):
       automatic_retry_count=0)
   runner.put()
 
+  return runner
+
 
 class DailyStatsTest(unittest.TestCase):
   def setUp(self):
@@ -79,6 +81,22 @@ class DailyStatsTest(unittest.TestCase):
     self.assertEqual(1, daily_stat.shards_timed_out)
     self.assertEqual(WAIT_TIME * 4, daily_stat.total_wait_time)
     self.assertEqual(RUNNING_TIME * 4, daily_stat.total_running_time)
+
+  def testGenerateDailyStatsWithAbortedRunner(self):
+    current_day = datetime.date.today()
+
+    runner = _AddRunner(datetime.datetime.combine(current_day, datetime.time()),
+                        success=False, timeout=False)
+
+    # If a runner is never run and is aborted because we never see a machine
+    # that can run it, it will lack an assigned time.
+    runner.assigned_time = None
+    runner.put()
+
+    self.assertTrue(daily_stats.GenerateDailyStats(current_day))
+
+    daily_stat = daily_stats.DailyStats.all().get()
+    self.assertEqual(0, daily_stat.shards_finished)
 
   def testGetDailyStats(self):
     current_day = datetime.date.today()

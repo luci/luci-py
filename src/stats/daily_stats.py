@@ -73,11 +73,14 @@ def GenerateDailyStats(day):
   # day.
   query = db.GqlQuery('SELECT success, timed_out, created_time, assigned_time, '
                       'end_time FROM RunnerStats WHERE end_time >= :1 AND '
-                      'end_time < :2', day_midnight,
-                      next_day_midnight)
+                      'end_time < :2', day_midnight, next_day_midnight)
 
   daily_stats = DailyStats(date=day)
   for runner in query:
+    # If there is no assigned time, the runner never ran, so ignore it.
+    if not runner.assigned_time:
+      continue
+
     # Update the time spent waiting and running.
     daily_stats.total_wait_time += _TimeDeltaToMinutes(
         runner.assigned_time - runner.created_time)
