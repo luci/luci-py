@@ -38,14 +38,32 @@ Please revive the machines or remove them from the list of active machines.
 
 class MachineStats(db.Model):
   """A machine's stats."""
-  # The machine id of the polling machine.
-  machine_id = db.StringProperty(required=True)
-
   # The tag of the machine polling.
   tag = db.StringProperty(default='')
 
   # The last day the machine queried for work.
-  last_seen = db.DateProperty(required=True)
+  last_seen = db.DateProperty(auto_now=True, required=True)
+
+  def MachineID(self):
+    """Get the machine id of this stat.
+
+    The machine id is stored as the model's key.
+
+    Returns:
+      The machine id.
+    """
+    return self.key().name()
+
+
+def _GetCurrentDay():
+  """Returns the current day.
+
+  This function is defined so it can be mocked out in tests.
+
+  Returns:
+    The current day.
+  """
+  return datetime.date.today()
 
 
 def FindDeadMachines():
@@ -54,7 +72,7 @@ def FindDeadMachines():
   Returns:
     A list of the dead machines.
   """
-  dead_machine_cutoff = (datetime.date.today() -
+  dead_machine_cutoff = (_GetCurrentDay() -
                          datetime.timedelta(days=MACHINE_TIMEOUT_IN_DAYS))
 
   return list(MachineStats.gql('WHERE last_seen < :1', dead_machine_cutoff))
@@ -76,7 +94,7 @@ def NotifyAdminsOfDeadMachines(dead_machines):
   death_summary = []
   for machine in dead_machines:
     death_summary.append(
-        _INDIVIDUAL_DEAD_MACHINE_MESSAGE % {'machine_id': machine.machine_id,
+        _INDIVIDUAL_DEAD_MACHINE_MESSAGE % {'machine_id': machine.MachineID(),
                                             'machine_tag': machine.tag,
                                             'last_seen': machine.last_seen})
 
@@ -103,21 +121,13 @@ def RecordMachineQueriedForWork(machine_id, machine_tag):
     machine_id: The machine id of the machine.
     machine_tag: The tag identifier of the machine.
   """
-  machine_stats = MachineStats.gql('WHERE machine_id = :1',
-                                   machine_id).get()
+  machine_stats = MachineStats.get_or_insert(machine_id)
 
-  # Check to see if we need to create the model.
-  if machine_stats is None:
-    machine_stats = MachineStats(machine_id=machine_id,
-                                 last_seen=datetime.date.today())
-
-  if machine_tag is not None:
+  if (machine_stats.tag != machine_tag or
+      machine_stats.last_seen < datetime.date.today()):
     machine_stats.tag = machine_tag
-
-  if machine_stats.last_seen < datetime.date.today():
-    machine_stats.last_seen = datetime.date.today()
-
-  machine_stats.put()
+    # Calling put() automatically updates the last_seen value.
+    machine_stats.put()
 
 
 def DeleteMachineStats(key):
@@ -153,7 +163,7 @@ def GetAllMachines(sort_by='machine_id'):
     An iterator of all machines whitelisted.
   """
   # If we recieve an invalid sort_by parameter, just default to machine_id.
-  if not sort_by in MachineStats.properties():
+  if sort_by not in MachineStats.properties():
     sort_by = 'machine_id'
 
   return (machine for machine in MachineStats.gql('ORDER BY %s' % sort_by))
@@ -168,7 +178,6 @@ def GetMachineTag(machine_id):
   Returns:
     The machine's tag, or None if the machine id isn't used.
   """
-  machine = db.GqlQuery('SELECT tag FROM MachineStats WHERE machine_id = :1 '
-                        'LIMIT 1', machine_id).get()
+  machine = MachineStats.get_by_key_name(machine_id) if machine_id else None
 
   return machine.tag if machine else 'Unknown'

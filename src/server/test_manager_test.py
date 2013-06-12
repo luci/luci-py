@@ -567,8 +567,7 @@ class TestRequestManagerTest(unittest.TestCase):
                      results['num_config_instances'])
     self.assertEqual(runner.GetResultString(), results['output'])
 
-    machine = machine_stats.MachineStats.gql('WHERE machine_id = :1',
-                                             runner.machine_id).get()
+    machine = machine_stats.MachineStats.get_by_key_name(runner.machine_id)
     self.assertIsNotNone(machine)
     self.assertEqual(machine.tag, results['machine_tag'])
 

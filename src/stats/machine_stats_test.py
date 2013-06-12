@@ -10,9 +10,11 @@ import datetime
 import logging
 import unittest
 
+
 from google.appengine.ext import testbed
 from server import admin_user
 from stats import machine_stats
+from third_party.mox import mox
 
 
 MACHINE_IDS = ['12345678-12345678-12345678-12345678',
@@ -26,31 +28,40 @@ class MachineStatsTest(unittest.TestCase):
     self.testbed.activate()
     self.testbed.init_all_stubs()
 
+    # Setup a mock object.
+    self._mox = mox.Mox()
+
   def tearDown(self):
     self.testbed.deactivate()
 
+    self._mox.UnsetStubs()
+
   def testDetectDeadMachines(self):
+    # Have two calls to today, then 1 in the future when stats are old.
+    self._mox.StubOutWithMock(machine_stats, '_GetCurrentDay')
+    machine_stats._GetCurrentDay().AndReturn(datetime.date.today())
+    machine_stats._GetCurrentDay().AndReturn(datetime.date.today())
+    machine_stats._GetCurrentDay().AndReturn(
+        datetime.date.today() +
+        datetime.timedelta(days=machine_stats.MACHINE_TIMEOUT_IN_DAYS * 2))
+    self._mox.ReplayAll()
+
     self.assertEqual([], machine_stats.FindDeadMachines())
 
-    m_stats = machine_stats.MachineStats(
-        machine_id='id1', tag='young_machine', last_seen=datetime.date.today())
+    m_stats = machine_stats.MachineStats.get_or_insert('id1', tag='machine')
     m_stats.put()
     self.assertEqual([], machine_stats.FindDeadMachines())
-
-    old_date = datetime.date.today() - datetime.timedelta(
-        days=machine_stats.MACHINE_TIMEOUT_IN_DAYS * 2)
-    m_stats = machine_stats.MachineStats(
-        machine_id='id2', tag='old_machine', last_seen=old_date)
-    m_stats.put()
 
     dead_machines = machine_stats.FindDeadMachines()
     self.assertEqual(1, len(dead_machines))
-    self.assertEqual('id2', dead_machines[0].machine_id)
-    self.assertEqual('old_machine', dead_machines[0].tag)
+    self.assertEqual('id1', dead_machines[0].MachineID())
+    self.assertEqual('machine', dead_machines[0].tag)
+
+    self._mox.VerifyAll()
 
   def testNotifyAdminsOfDeadMachines(self):
-    dead_machine = machine_stats.MachineStats(machine_id='id', tag='tag',
-                                              last_seen=datetime.date.today())
+    dead_machine = machine_stats.MachineStats.get_or_insert(
+        'id', tag='tag', last_seen=datetime.date.today())
     dead_machine.put()
 
     # No admins are set, so no email should be sent.
@@ -85,8 +96,8 @@ class MachineStatsTest(unittest.TestCase):
     self.assertFalse(machine_stats.DeleteMachineStats(1))
 
     # Add and then delete a machine assignment.
-    m_stats = machine_stats.MachineStats(machine_id='id',
-                                         last_seen=datetime.date.today())
+    m_stats = machine_stats.MachineStats.get_or_insert(
+        'id', last_seen=datetime.date.today())
     m_stats.put()
     self.assertEqual(1, machine_stats.MachineStats.all().count())
     self.assertTrue(
@@ -104,11 +115,15 @@ class MachineStatsTest(unittest.TestCase):
 
     # Ensure that the returned values are sorted by tags.
     machines = machine_stats.GetAllMachines('tag')
-    self.assertEqual(MACHINE_IDS[1], machines.next().machine_id)
-    self.assertEqual(MACHINE_IDS[0], machines.next().machine_id)
+    self.assertEqual(MACHINE_IDS[1], machines.next().MachineID())
+    self.assertEqual(MACHINE_IDS[0], machines.next().MachineID())
     self.assertEqual(0, len(list(machines)))
 
   def testGetMachineTag(self):
+    # We get calls with None when trying to get the results for runners that
+    # haven't started yet.
+    self.assertEqual('Unknown', machine_stats.GetMachineTag(None))
+
     # Test with an invalid machine id still returns a value.
     self.assertEqual('Unknown', machine_stats.GetMachineTag(MACHINE_IDS[0]))
 
