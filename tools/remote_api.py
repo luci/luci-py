@@ -11,6 +11,7 @@ import logging
 import optparse
 import os
 import sys
+import urllib2
 
 APP_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -88,9 +89,13 @@ def load_context(sdk_path, app_dir, host, app_id, version):
     from google.appengine.api.users import User
     from google.appengine.ext import db
 
-    remote_api_stub.ConfigureRemoteDatastore(
-        None, '/_ah/remote_api', default_auth_func, host,
-        save_cookies=True, secure=True)
+    try:
+      remote_api_stub.ConfigureRemoteDatastore(
+          None, '/_ah/remote_api', default_auth_func, host,
+          save_cookies=True, secure=True)
+    except urllib2.URLError:
+      print >> sys.stderr, 'Failed to access %s' % host
+      return None
     remote_api_stub.MaybeInvokeAuthentication()
 
     os.environ['SERVER_SOFTWARE'] = 'Development (remote_api_shell)/1.0'
@@ -109,7 +114,7 @@ def load_context(sdk_path, app_dir, host, app_id, version):
     if version:
       host = '%s-dot-%s.appspot.com' % (version, app_id)
     else:
-      host = '%s..appspot.com' % (app_id)
+      host = '%s.appspot.com' % (app_id)
   return setup_env(host), app_id
 
 
@@ -137,6 +142,8 @@ def Main():
 
   predefined_vars, app_id = load_context(options.sdk_path, APP_DIR,
       options.host, options.app_id, options.version)
+  if not predefined_vars:
+    return 1
   prompt = (
       'App Engine interactive console for "%s".\n'
       'Available symbols:\n'
