@@ -7,5 +7,5 @@
 
 
 
-# pylint: disable-msg=W0611
+# pylint: disable=unused-import
 import multiprocessing

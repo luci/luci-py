@@ -92,7 +92,7 @@ import zipfile
 # so we need to adjust its sys.path so it can find the common swarm directory.
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-# pylint: disable-msg=C6204
+# pylint: disable=g-import-not-at-top
 from common import swarm_constants
 from common import test_request_message
 from common import url_helper
@@ -791,13 +791,13 @@ def main():
   try:
     if runner.RetrieveDataAndRunTests():
       return runner.ReturnExitCode(0)
-  except Exception as e:  # pylint: disable-msg=W0703
+  except Exception as e:  # pylint: disable=broad-except
     # We want to catch all so that we can report all errors, even internal ones.
     logging.exception(e)
 
   try:
     runner.PublishInternalErrors()
-  except Exception as e:  # pylint: disable-msg=W0703
+  except Exception as e:  # pylint: disable=broad-except
     logging.exception('Unable to publish internal errors')
   return runner.ReturnExitCode(1)
 

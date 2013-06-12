@@ -123,7 +123,7 @@ class AppTest(unittest.TestCase):
     # Test with a multiple matching runners.
     additional_test_runner = self._CreateTestRunner()
 
-    # pylint: disable-msg=C6402
+    # pylint: disable=g-long-lambda
     response = self.app.get('/get_matching_test_cases',
                             {'name': self._default_test_request_name})
     self.assertEqual('200 OK', response.status)

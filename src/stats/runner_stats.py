@@ -76,7 +76,7 @@ class WaitSummary(db.Model):
   # time of any runner in this summary.
   end_time = db.DateTimeProperty(required=True)
 
-  def delete(self):  # pylint: disable-msg=C6409
+  def delete(self):  # pylint: disable=g-bad-name
     """Delete any children of this wait summary."""
     # Even if there are no children, self.children is still defined.
     for child in self.children:
