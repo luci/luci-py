@@ -351,9 +351,12 @@ class TestRequestManager(object):
       config_hash = request.GetConfigurationDimensionHash(config.config_name)
       # Ensure that we have a record of something with this config getting
       # created.
-      dimension_mapping.DimensionMapping.get_or_insert(
+      dimension = dimension_mapping.DimensionMapping.get_or_insert(
           config_hash,
           dimensions=test_request_message.Stringize(config.dimensions))
+      if dimension.last_seen != datetime.date.today():
+        # DimensionMapping automatically updates last_seen when put() is called.
+        dimension.put()
 
       # TODO(user): deal with addition_instances later!!!
       assert config.min_instances > 0

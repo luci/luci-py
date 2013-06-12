@@ -10,7 +10,15 @@ it.
 """
 
 
+import datetime
+import logging
+
 from google.appengine.ext import ndb
+
+
+# The number of days to keep a dimension around before deleting it (assuming
+# if isn't seen again).
+DIMENSION_MAPPING_DAYS_TO_LIVE = 30
 
 
 class DimensionMapping(ndb.Model):
@@ -20,3 +28,24 @@ class DimensionMapping(ndb.Model):
   """
   # The raw config string.
   dimensions = ndb.StringProperty()
+
+  # The last day that a runner was seen with these dimensions.
+  last_seen = ndb.DateProperty(auto_now=True)
+
+
+def DeleteOldDimensionMapping():
+  """Deletes mapping that haven't been seen in DIMENSION_MAPPING_DAYS_TO_LIVE.
+
+  Returns:
+    The rpc for the async delete call (mainly meant for tests).
+  """
+  logging.debug('DeleteOldDimensions starting')
+  old_cutoff = (datetime.date.today() -
+                datetime.timedelta(days=DIMENSION_MAPPING_DAYS_TO_LIVE))
+
+  rpc = ndb.delete_multi_async(
+      DimensionMapping.query(DimensionMapping.last_seen < old_cutoff,
+                             default_options=ndb.QueryOptions(keys_only=True)))
+
+  logging.debug('DeleteOldDimension done')
+  return rpc

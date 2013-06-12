@@ -32,6 +32,7 @@ from common import blobstore_helper
 from common import test_request_message
 from common import url_helper
 from server import admin_user
+from server import dimension_mapping
 from server import test_manager
 from server import test_request
 from server import test_runner
@@ -503,6 +504,9 @@ class CleanupDataHandler(webapp2.RequestHandler):
 
   def post(self):  # pylint: disable=g-bad-name
     test_manager.DeleteOldErrors()
+
+    dimension_mapping.DeleteOldDimensionMapping()
+
     test_runner.DeleteOldRunners()
     test_runner.DeleteOrphanedBlobs()
 
