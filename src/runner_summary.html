@@ -1,0 +1,40 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html>
+<head>
+<title>Stats</title>
+<link rel="stylesheet" type="text/css" href="/css/swarm_style.css"/>
+</head>
+<body>
+
+<div style="text-align: right;">
+<p>{{topbar|safe}}</br>
+{{stat_links|safe}}
+</div>
+
+<h1>Currently Running and Pending Jobs</h1>
+Total Active Runners: {{total_running_runners}}<br/>
+Total Pending Runner: {{total_pending_runners}}<br/>
+<p/>
+
+<table id="pending-and-active-runners-table" summary="The current number of running and pending runner, broken down by dimensions">
+<tr>
+<th>Dimensions</th>
+<th>Number of Currently Running Runners</th>
+<th>Number of Currently Pending Runners</th>
+{% for dimension in dimension_summary %}
+<tr class="request {% cycle even,odd %}">
+<td>{{dimension.dimensions}}</td>
+<td>{{dimension.running_runners}}</td>
+<td>{{dimension.pending_runners}}</td>
+</tr>
+{% endfor %}
+</table>
+
+<div style="float: left;"><p>
+  <a target="_blank" href="http://code.google.com/appengine/"><img border="0"
+   src="http://code.google.com/appengine/images/appengine-noborder-120x30.gif"
+   alt="Powered by Google App Engine" /></a></p>
+</p></div>
+
+</body>
+</html>
