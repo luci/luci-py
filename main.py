@@ -121,36 +121,6 @@ class ContentEntry(ndb.Model):
     return u'%s/%s' % (self.key.parent().id(), self.filename)
 
 
-def get_content_namespace_key(namespace):
-  """Returns the ContentNamespace key for the namespace value.
-
-  Makes sure the entity exists in the datastore.
-  memcache.
-  """
-  # TODO(maruel): Use get_or_insert_async().
-  return ContentNamespace.get_or_insert(
-      namespace, is_testing=namespace.startswith('temporary')).key
-
-
-def get_content_by_hash(namespace, hash_key):
-  """Returns the ContentEntry with the given hex encoded SHA-1 hash |hash_key|.
-
-  Returns None if it no ContentEntry matches.
-  """
-  length = get_hash_algo(namespace).digest_size * 2
-  if not re.match(r'[a-f0-9]{' + str(length) + r'}', hash_key):
-    logging.error('Given an invalid key, %s', hash_key)
-    return None
-
-  try:
-    namespace_model_key = get_content_namespace_key(namespace)
-    return ContentEntry.get_by_id(hash_key, namespace_model_key)
-  except (ndb.BadKeyError, ndb.KindError):
-    pass
-
-  return None
-
-
 ### Utility
 
 
@@ -167,8 +137,33 @@ class Accumulator(object):
       del i
 
 
+def get_content_by_hash(namespace, hash_key):
+  """Returns the ContentEntry with the given hex encoded SHA-1 hash |hash_key|.
+
+  This function is synchronous.
+
+  Returns None if it no ContentEntry matches.
+  """
+  length = get_hash_algo(namespace).digest_size * 2
+  if not re.match(r'[a-f0-9]{' + str(length) + r'}', hash_key):
+    logging.error('Given an invalid key, %s', hash_key)
+    return None
+
+  try:
+    return ContentEntry.get_by_id(
+        hash_key, parent=ndb.Key(ContentNamespace, namespace))
+  except (ndb.BadKeyError, ndb.KindError):
+    pass
+
+  return None
+
+
 def create_entry(namespace, hash_key):
   """Generates a new ContentEntry from the request if one doesn't exist.
+
+  This function is synchronous.
+
+  Creates the ContentNamespace entity on the fly if needed.
 
   Returns None if there is a problem generating the entry or if an entry already
   exists with the given hex encoded SHA-1 hash |hash_key|.
@@ -178,14 +173,18 @@ def create_entry(namespace, hash_key):
     logging.error('Given an invalid key, %s', hash_key)
     return None
 
-  get_content_namespace_key(namespace)
+  future_namespace = ContentNamespace.get_or_insert_async(
+      namespace, is_testing=namespace.startswith('temporary'))
   key = ndb.Key(ContentNamespace, namespace, ContentEntry, hash_key)
-
-  # It's already present.
   # TODO(maruel): Profile to see if it is faster to fetch the whole entity so
   # the cache is used.
-  if ContentEntry.query(ContentEntry.key == key).get(keys_only=True):
+  future_entry = ContentEntry.query(ContentEntry.key == key).get_async(
+      keys_only=True)
+  future_namespace.wait()
+
+  if future_entry.get_result():
     return None
+  # The entity was not present. Create a new one.
   return ContentEntry(key=key)
 
 
@@ -446,13 +445,21 @@ class RestrictedTagWorkerHandler(webapp2.RequestHandler):
         'Stamping %d entries in namespace %s', len(raw_hash_digests), namespace)
 
     today = datetime.date(int(year), int(month), int(day))
-    parent_key = get_content_namespace_key(namespace)
+    # It is safe to assume ContentNamespace entity exists. If it doesn't the
+    # query will simply return nothing.
+    parent_key = ndb.Key(ContentNamespace, namespace)
+    # Fire up all the RPCs.
+    rpcs = [
+      ContentEntry.get_by_id_async(
+          binascii.hexlify(raw_hash_digest), parent=parent_key)
+      for raw_hash_digest in raw_hash_digests
+    ]
+
     to_save = []
-    for raw_hash_digest in raw_hash_digests:
-      hash_digest = binascii.hexlify(raw_hash_digest)
-      # TODO(maruel): Use get_by_id_async()
-      item = ContentEntry.get_by_id(hash_digest, parent=parent_key)
+    for future in rpcs:
+      item = future.get_result()
       if item and item.last_access != today:
+        # Update the timestamp.
         item.last_access = today
         to_save.append(item)
     ndb.put_multi(to_save)
@@ -543,7 +550,10 @@ class ContainsHashHandler(acl.ACLRequestHandler):
     logging.info(
         'Checking namespace %s for %d hash digests',
         namespace, len(raw_hash_digests))
-    namespace_model_key = get_content_namespace_key(namespace)
+
+    # No need to verify the entity is present, no object exists nor will be
+    # found if the ancestor doesn't exist.
+    namespace_model_key = ndb.Key(ContentNamespace, namespace)
 
     # Convert to entity keys.
     keys = (
