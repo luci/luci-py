@@ -54,8 +54,6 @@ class TestRequestManagerTest(unittest.TestCase):
     # Setup the app engine test bed.
     self.testbed = testbed.Testbed()
     self.testbed.activate()
-    self.testbed.init_blobstore_stub()
-    self.testbed.init_datastore_v3_stub()
     self.testbed.init_all_stubs()
 
     # Setup a mock object.
