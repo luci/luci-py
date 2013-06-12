@@ -26,6 +26,7 @@ from google.appengine.ext.webapp import blobstore_handlers
 import acl
 import config
 import gsfiles
+import template
 
 
 # The maximum number of entries that can be queried in a single request.
@@ -832,10 +833,7 @@ class RetrieveContentByHashHandler(acl.ACLRequestHandler,
 class RootHandler(webapp2.RequestHandler):
   """Tells the user to RTM."""
   def get(self):
-    url = 'http://dev.chromium.org/developers/testing/isolated-testing'
-    self.response.write(
-        '<html><body>Hi! Please read <a href="%s">%s</a>.</body></html>' %
-        (url, url))
+    self.response.write(template.get('root.html').render({}))
     self.response.headers['Content-Type'] = 'text/html'
 
 
@@ -846,17 +844,34 @@ class WarmupHandler(webapp2.RequestHandler):
 
 
 def CreateApplication():
+  """Creates the url router.
+
+  The basic layouts is as follow:
+  - /restricted/.* requires being an instance administrator.
+  - /restricted/taskqueue/.* are task queues.
+  - /content/.* has the public HTTP API.
+
+  Set in app.yaml:
+  - /css/(.*) links to static/css/(\1)
+  - /images/(.*) links to static/images/(\1)
+  """
   acl.bootstrap()
 
-  # Namespace can be letters and numbers.
+  # Namespace can be letters, numbers and '-'.
   namespace = r'/<namespace:[a-z0-9A-Z\-]+>'
-  # Do not enforce a length limit.
+  # Do not enforce a length limit to support different hashing algorithm. This
+  # should represent a valid hex value.
   hashkey = r'/<hash_key:[a-f0-9]{4,}>'
+  # This means a complete key is required.
   namespace_key = namespace + hashkey
+
   return webapp2.WSGIApplication([
+      # Triggers a taskqueue.
       webapp2.Route(
           r'/restricted/cleanup/trigger/<name:[a-z]+>',
           RestrictedCleanupTriggerHandler),
+
+      # Cleanup tasks.
       webapp2.Route(
           r'/restricted/taskqueue/cleanup/old',
           RestrictedCleanupOldEntriesWorkerHandler),
@@ -866,6 +881,8 @@ def CreateApplication():
       webapp2.Route(
           r'/restricted/taskqueue/cleanup/obliterate',
           RestrictedObliterateWorkerHandler),
+
+      # Tasks triggered by other request handlers.
       webapp2.Route(
           r'/restricted/taskqueue/tag' + namespace +
             r'/<year:\d\d\d\d>-<month:\d\d>-<day:\d\d>',
@@ -873,10 +890,14 @@ def CreateApplication():
       webapp2.Route(
           r'/restricted/taskqueue/verify' + namespace_key,
           RestrictedVerifyWorkerHandler),
+
+      # Administrative urls.
       webapp2.Route(
           r'/restricted/whitelistip', acl.RestrictedWhitelistIPHandler),
       webapp2.Route(
           r'/restricted/whitelistdomain', acl.RestrictedWhitelistDomainHandler),
+
+      # Internal AppEngine handling for blobstore uploads.
       webapp2.Route(
           r'/restricted/content/store_blobstore' + namespace_key +
             r'/<original_access_id:[^\/]+>',
