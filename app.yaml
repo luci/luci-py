@@ -10,12 +10,12 @@ handlers:
   secure: always
   login: admin
 
-- url: /
-  script: main.app
+- url: /favicon\.ico
+  static_files: static/images/favicon.ico
+  upload: static/images/favicon\.ico
   secure: always
-  login: required
 
-- url: .*
+- url: /.*
   script: main.app
   secure: always
 
@@ -25,3 +25,15 @@ builtins:
 
 inbound_services:
 - warmup
+
+# https://developers.google.com/appengine/docs/python/tools/libraries27
+# As the doc says, serious applications should specify the third party versions.
+libraries:
+- name: jinja2
+  version: "2.6"
+- name: webapp2
+  version: "2.5.2"
+- name: webob
+  version: "1.2.3"
+- name: yaml
+  version: "3.10"
