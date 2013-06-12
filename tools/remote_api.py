@@ -102,6 +102,8 @@ def load_context(sdk_path, app_dir, host, app_id, version):
 
     # Create shortcuts.
     import acl
+    import config
+    import gsfiles
     import main
     from main import ContentNamespace, ContentEntry
 

@@ -15,7 +15,6 @@ import zlib
 # pylint: disable=E0611,F0401
 import webapp2
 from google.appengine import runtime
-from google.appengine.api import app_identity
 from google.appengine.ext import blobstore
 from google.appengine.api import files
 from google.appengine.api import memcache
@@ -25,12 +24,9 @@ from google.appengine.ext.webapp import blobstore_handlers
 # pylint: enable=E0611,F0401
 
 import acl
+import config
 import gsfiles
 
-
-# The bucket where to save the data. By default it's the name of the
-# application instance.
-GS_BUCKET = app_identity.get_application_id()
 
 # The maximum number of entries that can be queried in a single request.
 MAX_KEYS_PER_CALL = 1000
@@ -38,9 +34,6 @@ MAX_KEYS_PER_CALL = 1000
 # The minimum size, in bytes, an entry must be before it gets stored in Google
 # Cloud Storage, otherwise it is stored as a blob property.
 MIN_SIZE_FOR_GS = 501
-
-# The number of days a datamodel must go unaccessed for before it is deleted.
-DATASTORE_TIME_TO_LIVE_IN_DAYS = 7
 
 # The maximum number of items to delete at a time.
 ITEMS_TO_DELETE_ASYNC = 100
@@ -324,7 +317,7 @@ class RestrictedCleanupOldEntriesWorkerHandler(webapp2.RequestHandler):
       self.abort(405, detail='Only internal task queue tasks can do this')
     logging.info('Deleting old datastore entries')
     old_cutoff = datetime.datetime.today() - datetime.timedelta(
-        days=DATASTORE_TIME_TO_LIVE_IN_DAYS)
+        days=config.settings().retension_days)
 
     incremental_delete(
         ContentEntry.query(ContentEntry.last_access < old_cutoff),
@@ -382,10 +375,11 @@ class RestrictedObliterateWorkerHandler(webapp2.RequestHandler):
     logging.info('Deleting blobs')
     incremental_delete(blobstore.BlobInfo.all(), delete_blobinfo_async)
 
-    logging.info('Deleting GS bucket %s', GS_BUCKET)
+    gs_bucket = config.settings().gs_bucket
+    logging.info('Deleting GS bucket %s', gs_bucket)
     incremental_delete(
-        gsfiles.list_files(GS_BUCKET, None),
-        lambda x: gsfiles.delete_files(GS_BUCKET, x))
+        gsfiles.list_files(gs_bucket, None),
+        lambda x: gsfiles.delete_files(gs_bucket, x))
 
     logging.info('Flushing memcache')
     # High priority (.isolated files) are cached explicitly. Make sure ghosts
@@ -457,7 +451,8 @@ class RestrictedVerifyWorkerHandler(webapp2.RequestHandler):
     digest = get_hash_algo(namespace)
     try:
       # Start a loop where it reads the data in block.
-      blob = gsfiles.open_file_for_reading(GS_BUCKET, entry.gs_filepath)
+      blob = gsfiles.open_file_for_reading(
+          config.settings().gs_bucket, entry.gs_filepath)
       for data in expand_content(namespace, blob):
         count += len(data)
         digest.update(data)
@@ -563,7 +558,7 @@ class GenerateBlobstoreHandler(acl.ACLRequestHandler):
         self.access_id,
         self.request.get('token'))
 
-    full_gs_path = '%s/%s' % (GS_BUCKET, namespace)
+    full_gs_path = '%s/%s' % (config.settings().gs_bucket, namespace)
 
     # Sadly, it is impossible to control the filename, only the path.
     # An option is to create a single file per directory but we could get into
@@ -604,7 +599,7 @@ class StoreBlobstoreContentByHashHandler(
       self.abort(400, detail=msg)
 
     if not contents[0].gs_object_name.startswith(
-        gsfiles.to_filepath(GS_BUCKET, namespace)):
+        gsfiles.to_filepath(config.settings().gs_bucket, namespace)):
       files.delete(*[c.gs_object_name for c in contents])
       msg = 'Unexpected namespace or GS bucket.'
       logging.error(msg)
@@ -730,7 +725,8 @@ class StoreContentByHashHandler(acl.ACLRequestHandler):
       logging.info(
           'Storing %d bytes of content in GS', len(content))
       filepath = '%s/%s' % (namespace, hash_key)
-      if not gsfiles.store_content(GS_BUCKET, filepath, content):
+      if not gsfiles.store_content(
+          config.settings().gs_bucket, filepath, content):
         self.abort(507, detail='Unable to save the content to GS.')
       entry.filename = hash_key
       entry.size = len(content)
@@ -775,8 +771,8 @@ class RetrieveContentByHashHandler(acl.ACLRequestHandler,
 
       # send_blob() will call create_gs_key() itself but this only works if
       # the string is encoded as utf-8.
-      blobkey = gsfiles.to_filepath(GS_BUCKET, entry.gs_filepath).encode(
-          'utf-8')
+      blobkey = gsfiles.to_filepath(
+          config.settings().gs_bucket, entry.gs_filepath).encode('utf-8')
       logging.info('Returning from GS; %s -> %s', entry.gs_filepath, blobkey)
       self.send_blob(
           blobkey,
