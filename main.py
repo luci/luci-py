@@ -531,100 +531,7 @@ class RestrictedVerifyWorkerHandler(webapp2.RequestHandler):
     future.wait()
 
 
-### Non-restricted handlers
-
-
-class ContainsHashHandler(acl.ACLRequestHandler):
-  """Returns the presence of each hash key in the payload as a binary string.
-
-  For each SHA-1 hash key in the request body in binary form, a corresponding
-  chr(1) or chr(0) is in the 'string' returned.
-  """
-  def post(self, namespace):
-    """This is a POST even though it doesn't modify any data[1], but it makes
-    it easier for python scripts.
-
-    [1] It does modify the timestamp of the objects.
-    """
-    raw_hash_digests = payload_to_hashes(self, namespace)
-    logging.info(
-        'Checking namespace %s for %d hash digests',
-        namespace, len(raw_hash_digests))
-
-    # No need to verify the entity is present, no object exists nor will be
-    # found if the ancestor doesn't exist.
-    namespace_model_key = ndb.Key(ContentNamespace, namespace)
-
-    # Convert to entity keys.
-    keys = (
-        ndb.Key(
-            ContentEntry,
-            binascii.hexlify(raw_hash_digest),
-            parent=namespace_model_key)
-        for raw_hash_digest in raw_hash_digests
-    )
-
-    # Start the queries in parallel. It must be a list so the calls are executed
-    # right away.
-    # TODO(maruel): Queries are not cached so in practice it could be faster to
-    # use get_by_id_async() or count_async instead even if this means pulling
-    # all the data in. This needs to be profiled. Another option is to do the
-    # caching ourself (?).
-    queries = [
-        ContentEntry.query(ContentEntry.key == key).get_async(keys_only=True)
-        for key in keys
-    ]
-
-    # Convert the Future to True/False, then to byte, chr(0) if not present,
-    # chr(1) if it is.
-    contains = [bool(q.get_result()) for q in queries]
-    self.response.out.write(bytearray(contains))
-    self.response.headers['Content-Type'] = 'application/octet-stream'
-    found = sum(contains, 0)
-    logging.info('%d hit, %d miss', found, len(raw_hash_digests) - found)
-    if found:
-      # For all the ones that exist, update their last_access in a task queue.
-      hashes_to_tag = ''.join(
-          raw_hash_digest for i, raw_hash_digest in enumerate(raw_hash_digests)
-          if contains[i])
-      url = '/restricted/taskqueue/tag/%s/%s' % (
-          namespace, datetime.date.today())
-      try:
-        taskqueue.add(url=url, payload=hashes_to_tag, queue_name='tag')
-      except (taskqueue.Error, runtime.DeadlineExceededError) as e:
-        logging.warning('Problem adding task to update last_access. These '
-                        'objects may get deleted sooner than intended.\n%s', e)
-
-
-class GenerateBlobstoreHandler(acl.ACLRequestHandler):
-  """Generate an upload url to directly load files into the GS bucket."""
-  def post(self, namespace, hash_key):
-
-    if len(namespace) > MAX_NAMESPACE_LEN:
-      self.response.out.write('Unable to handle namespaces with more than %d '
-                              'characters', MAX_NAMESPACE_LEN)
-      self.response.set_status(400)
-
-    self.response.headers['Content-Type'] = 'text/plain'
-    url = '/content/store_blobstore/%s/%s/%s?token=%s' % (
-        namespace,
-        hash_key,
-        self.access_id,
-        self.request.get('token'))
-
-    full_gs_path = '%s/%s' % (config.settings().gs_bucket, namespace)
-
-    # Sadly, it is impossible to control the filename, only the path.
-    # An option is to create a single file per directory but we could get into
-    # an edge case with large number of directories.
-    # TODO(maruel): Look at the alternatives.
-    self.response.out.write(blobstore.create_upload_url(
-        url,
-        gs_bucket_name=full_gs_path))
-    self.response.headers['Content-Type'] = 'text/plain'
-
-
-class StoreBlobstoreContentByHashHandler(
+class RestrictedStoreBlobstoreContentByHashHandler(
     acl.ACLRequestHandler,
     blobstore_handlers.BlobstoreUploadHandler):
   """Assigns the newly stored GS entry to the correct hash key."""
@@ -704,6 +611,99 @@ class StoreBlobstoreContentByHashHandler(
 
     logging.info('%d bytes uploaded directly into GS', entry.size)
     self.response.out.write('Content saved.')
+    self.response.headers['Content-Type'] = 'text/plain'
+
+
+### Non-restricted handlers
+
+
+class ContainsHashHandler(acl.ACLRequestHandler):
+  """Returns the presence of each hash key in the payload as a binary string.
+
+  For each SHA-1 hash key in the request body in binary form, a corresponding
+  chr(1) or chr(0) is in the 'string' returned.
+  """
+  def post(self, namespace):
+    """This is a POST even though it doesn't modify any data[1], but it makes
+    it easier for python scripts.
+
+    [1] It does modify the timestamp of the objects.
+    """
+    raw_hash_digests = payload_to_hashes(self, namespace)
+    logging.info(
+        'Checking namespace %s for %d hash digests',
+        namespace, len(raw_hash_digests))
+
+    # No need to verify the entity is present, no object exists nor will be
+    # found if the ancestor doesn't exist.
+    namespace_model_key = ndb.Key(ContentNamespace, namespace)
+
+    # Convert to entity keys.
+    keys = (
+        ndb.Key(
+            ContentEntry,
+            binascii.hexlify(raw_hash_digest),
+            parent=namespace_model_key)
+        for raw_hash_digest in raw_hash_digests
+    )
+
+    # Start the queries in parallel. It must be a list so the calls are executed
+    # right away.
+    # TODO(maruel): Queries are not cached so in practice it could be faster to
+    # use get_by_id_async() or count_async instead even if this means pulling
+    # all the data in. This needs to be profiled. Another option is to do the
+    # caching ourself (?).
+    queries = [
+        ContentEntry.query(ContentEntry.key == key).get_async(keys_only=True)
+        for key in keys
+    ]
+
+    # Convert the Future to True/False, then to byte, chr(0) if not present,
+    # chr(1) if it is.
+    contains = [bool(q.get_result()) for q in queries]
+    self.response.out.write(bytearray(contains))
+    self.response.headers['Content-Type'] = 'application/octet-stream'
+    found = sum(contains, 0)
+    logging.info('%d hit, %d miss', found, len(raw_hash_digests) - found)
+    if found:
+      # For all the ones that exist, update their last_access in a task queue.
+      hashes_to_tag = ''.join(
+          raw_hash_digest for i, raw_hash_digest in enumerate(raw_hash_digests)
+          if contains[i])
+      url = '/restricted/taskqueue/tag/%s/%s' % (
+          namespace, datetime.date.today())
+      try:
+        taskqueue.add(url=url, payload=hashes_to_tag, queue_name='tag')
+      except (taskqueue.Error, runtime.DeadlineExceededError) as e:
+        logging.warning('Problem adding task to update last_access. These '
+                        'objects may get deleted sooner than intended.\n%s', e)
+
+
+class GenerateBlobstoreHandler(acl.ACLRequestHandler):
+  """Generate an upload url to directly load files into the GS bucket."""
+  def post(self, namespace, hash_key):
+
+    if len(namespace) > MAX_NAMESPACE_LEN:
+      self.response.out.write('Unable to handle namespaces with more than %d '
+                              'characters', MAX_NAMESPACE_LEN)
+      self.response.set_status(400)
+
+    self.response.headers['Content-Type'] = 'text/plain'
+    url = '/restricted/content/store_blobstore/%s/%s/%s?token=%s' % (
+        namespace,
+        hash_key,
+        self.access_id,
+        self.request.get('token'))
+
+    full_gs_path = '%s/%s' % (config.settings().gs_bucket, namespace)
+
+    # Sadly, it is impossible to control the filename, only the path.
+    # An option is to create a single file per directory but we could get into
+    # an edge case with large number of directories.
+    # TODO(maruel): Look at the alternatives.
+    self.response.out.write(blobstore.create_upload_url(
+        url,
+        gs_bucket_name=full_gs_path))
     self.response.headers['Content-Type'] = 'text/plain'
 
 
@@ -877,6 +877,10 @@ def CreateApplication():
           r'/restricted/whitelistip', acl.RestrictedWhitelistIPHandler),
       webapp2.Route(
           r'/restricted/whitelistdomain', acl.RestrictedWhitelistDomainHandler),
+      webapp2.Route(
+          r'/restricted/content/store_blobstore' + namespace_key +
+            r'/<original_access_id:[^\/]+>',
+          RestrictedStoreBlobstoreContentByHashHandler),
 
       # The public API:
       webapp2.Route(
@@ -890,12 +894,6 @@ def CreateApplication():
           r'/content/store' + namespace_key, StoreContentByHashHandler),
       webapp2.Route(
           r'/content/retrieve' + namespace_key, RetrieveContentByHashHandler),
-
-      # TODO(maruel): Move this url handler to restricted:
-      webapp2.Route(
-          r'/content/store_blobstore' + namespace_key +
-            r'/<original_access_id:[^\/]+>',
-          StoreBlobstoreContentByHashHandler),
 
       # AppEngine-specific url:
       webapp2.Route(r'/_ah/warmup', WarmupHandler),
