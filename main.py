@@ -43,6 +43,10 @@ ITEMS_TO_DELETE_ASYNC = 100
 # TODO(csharp): Find a way to support namespaces greater than 29 characters.
 MAX_NAMESPACE_LEN = 29
 
+# Maximum size of file stored in GS to be saved in memcache. The value must be
+# small enough so that the whole content can safely fit in memory.
+MAX_MEMCACHE_ISOLATED = 500*1024
+
 
 #### Models
 
@@ -81,6 +85,13 @@ class ContentEntry(ndb.Model):
   # Cache the file size for statistics purposes.
   size = ndb.IntegerProperty()
 
+  # Serves two purposes. It is only set once the Entry had its hash been
+  # verified. -1 means it wasn't verified yet.
+  #
+  # The value is the Cache the expanded file size for statistics purposes. Its
+  # value is different from size only in compressed namespaces.
+  expanded_size = ndb.IntegerProperty(default=-1)
+
   # The content stored inline. This is only valid if the content was smaller
   # than MIN_SIZE_FOR_GS.
   content = ndb.BlobProperty()
@@ -93,9 +104,6 @@ class ContentEntry(ndb.Model):
 
   # It is an .isolated file.
   is_isolated = ndb.BooleanProperty(default=False)
-
-  # It's content was verified to not be corrupted.
-  is_verified = ndb.BooleanProperty(indexed=False, default=False)
 
   @property
   def is_compressed(self):
@@ -144,6 +152,19 @@ def get_content_by_hash(namespace, hash_key):
 
 
 ### Utility
+
+
+class Accumulator(object):
+  """Accumulates output from a generator."""
+  def __init__(self, source):
+    self.accumulated = []
+    self._source = source
+
+  def __iter__(self):
+    for i in self._source:
+      self.accumulated.append(i)
+      yield i
+      del i
 
 
 def create_entry(namespace, hash_key):
@@ -252,8 +273,7 @@ def delete_blobinfo_async(blobinfos):
 
   Returns a list of Rpc objects.
   """
-  # TODO(maruel): Deprecated, to delete.
-  return blobstore.delete_async((b.key() for b in blobinfos))
+  return [blobstore.delete_async((b.key() for b in blobinfos))]
 
 
 def incremental_delete(query, delete, check=None):
@@ -302,6 +322,16 @@ def incremental_delete(query, delete, check=None):
   for future in futures:
     future.wait()
   return found
+
+
+def save_in_memcache(namespace, hash_key, content):
+  try:
+    if not memcache.set(hash_key, content, namespace='table_%s' % namespace):
+      logging.error(
+          'Attempted to save %d bytes of content in memcache but failed',
+          len(content))
+  except ValueError as e:
+    logging.error(e)
 
 
 ### Restricted handlers
@@ -439,22 +469,29 @@ class RestrictedVerifyWorkerHandler(webapp2.RequestHandler):
     if not entry:
       logging.error('Failed to find entity')
       return
-    if entry.is_verified:
-      logging.info('Was already verified')
+    if entry.expanded_size != -1:
+      logging.warning('Was already verified')
       return
     if entry.content:
       logging.error('Should not be called with inline content')
       return
 
-    count = 0
+    save_to_memcache = entry.size <= MAX_MEMCACHE_ISOLATED and entry.is_isolated
+
+    expanded_size = 0
     is_verified = False
     digest = get_hash_algo(namespace)
     try:
       # Start a loop where it reads the data in block.
+      # TODO(maruel): Calculate the number of bytes read and assert it's the
+      # same as entry.size.
       blob = gsfiles.open_file_for_reading(
           config.settings().gs_bucket, entry.gs_filepath)
+      if save_to_memcache:
+        # Wraps blob with a generator that accumulate the data.
+        blob = Accumulator(blob)
       for data in expand_content(namespace, blob):
-        count += len(data)
+        expanded_size += len(data)
         digest.update(data)
         # Make sure the data is GC'ed.
         del data
@@ -470,14 +507,21 @@ class RestrictedVerifyWorkerHandler(webapp2.RequestHandler):
 
     if not is_verified:
       # Delete the entity since it's corrupted.
-      logging.error('SHA-1 and data do not match, %d bytes', count)
+      logging.error(
+          'SHA-1 and data do not match, %d bytes (%d bytes expanded)',
+          entry.size, expanded_size)
       for future in delete_entry_and_gs_entry([entry]):
         future.wait()
       # Do not return failure since we don't want the task scheduler to retry.
-    else:
-      logging.info('%d bytes verified', count)
-      entry.is_verified = True
-      entry.put()
+      return
+
+    entry.expanded_size = expanded_size
+    future = entry.put_async()
+    logging.info(
+        '%d bytes (%d bytes expanded) verified', entry.size, expanded_size)
+    if save_to_memcache:
+      save_in_memcache(namespace, hash_key, ''.join(blob.accumulated))
+    future.wait()
 
 
 ### Non-restricted handlers
@@ -628,11 +672,10 @@ class StoreBlobstoreContentByHashHandler(
     # TODO(maruel): Add a new parameter.
     entry.is_isolated = (priority == 0)
     entry.put()
-    size = contents[0].size
 
-    if size < MIN_SIZE_FOR_GS:
+    if entry.size < MIN_SIZE_FOR_GS:
       logging.error(
-          'User stored a file too small %d in GS, fix client code.', size)
+          'User stored a file too small %d in GS, fix client code.', entry.size)
 
     # Trigger a verification. It can't be done inline since it could be too
     # long to complete.
@@ -649,7 +692,7 @@ class StoreBlobstoreContentByHashHandler(
         future.wait()
       return
 
-    logging.info('%d bytes uploaded directly into GS', size)
+    logging.info('%d bytes uploaded directly into GS', entry.size)
     self.response.out.write('Content saved.')
     self.response.headers['Content-Type'] = 'text/plain'
 
@@ -678,12 +721,12 @@ class StoreContentByHashHandler(acl.ACLRequestHandler):
 
     # Verify the data while at it since it's already in memory but before
     # storing it in memcache and datastore.
-    count = 0
+    expanded_size = 0
     is_verified = False
     digest = get_hash_algo(namespace)
     try:
       for data in expand_content(namespace, [content]):
-        count += len(data)
+        expanded_size += len(data)
         digest.update(data)
         # Make sure the data is GC'ed.
         del data
@@ -695,54 +738,50 @@ class StoreContentByHashHandler(acl.ACLRequestHandler):
 
     if not is_verified:
       # Delete the entity since it's corrupted.
-      msg = 'SHA-1 and data do not match, %d bytes' % count
+      msg = 'SHA-1 and data do not match, %d bytes (%d bytes expanded)' % (
+          len(content), expanded_size)
       logging.error(msg)
       self.abort(400, msg)
 
-    logging.info('%d bytes verified', count)
-    entry.is_verified = True
-    entry.put()
-
-    if priority == 0:
-      try:
-        # TODO(maruel): Use namespace='table_%s' % namespace.
-        if memcache.set(hash_key, content, namespace=namespace):
-          logging.info(
-              'Storing %d bytes of content in memcache', len(content))
-        else:
-          logging.error(
-              'Attempted to save %d bytes of content in memcache but failed',
-              len(content))
-      except ValueError as e:
-        logging.error(e)
-
     if len(content) < MIN_SIZE_FOR_GS:
-      logging.info('Storing %d bytes of content in model', len(content))
+      logging.info(
+          'Storing %d bytes (%d bytes expanded) of content in model',
+          len(content), expanded_size)
       entry.content = content
-      # TODO(maruel): Add a new parameter.
-      entry.is_isolated = (priority == 0)
     else:
       logging.info(
-          'Storing %d bytes of content in GS', len(content))
+          'Storing %d bytes (%d bytes expanded) of content in GS',
+          len(content), expanded_size)
       filepath = '%s/%s' % (namespace, hash_key)
       if not gsfiles.store_content(
           config.settings().gs_bucket, filepath, content):
         self.abort(507, detail='Unable to save the content to GS.')
       entry.filename = hash_key
-      entry.size = len(content)
 
-    entry.is_verified = True
-    entry.put()
+    # TODO(maruel): Add a new parameter to explicitly signal it is an
+    # .isolated file.
+    entry.is_isolated = (priority == 0)
+    entry.size = len(content)
+    entry.expanded_size = expanded_size
+    future = entry.put_async()
     self.response.out.write('Content saved.')
     self.response.headers['Content-Type'] = 'text/plain'
+
+    if (entry.filename and
+        entry.is_isolated and
+        entry.size <= MAX_MEMCACHE_ISOLATED):
+      # There's no point in saving inline blobs in memcache because ndb already
+      # memcaches them.
+      save_in_memcache(namespace, hash_key, content)
+
+    future.wait()
 
 
 class RetrieveContentByHashHandler(acl.ACLRequestHandler,
                                    blobstore_handlers.BlobstoreDownloadHandler):
   """The handlers for retrieving contents by its SHA-1 hash |hash_key|."""
   def get(self, namespace, hash_key):  #pylint: disable=W0221
-    # TODO(maruel): Use namespace='table_%s' % namespace.
-    memcache_entry = memcache.get(hash_key, namespace=namespace)
+    memcache_entry = memcache.get(hash_key, namespace='table_%s' % namespace)
 
     if memcache_entry:
       logging.info('Returning %d bytes from memcache', len(memcache_entry))
