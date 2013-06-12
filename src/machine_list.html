@@ -25,6 +25,7 @@
 <th>ID</th>
 <th>Tag</th>
 <th>Day Last Seen</th>
+<th>Dimensions</th>
 <th>&nbsp;</th>
 </tr>
 {% for machine in machines %}
@@ -32,6 +33,7 @@
 <td>{{machine.machine_id}}</td>
 <td>{{machine.tag}}</td>
 <td>{{machine.last_seen}}</td>
+<td>{{machine.dimensions}}</td>
 <td>{{machine.command_string|safe}}</td>
 </tr>
 {% endfor %}

@@ -73,10 +73,12 @@ class MachineStatsTest(unittest.TestCase):
     self.assertTrue(machine_stats.NotifyAdminsOfDeadMachines([dead_machine]))
 
   def testRecordMachineQueries(self):
+    dimensions = 'dimensions'
     machine_tag = 'tag'
     self.assertEqual(0, machine_stats.MachineStats.all().count())
 
-    machine_stats.RecordMachineQueriedForWork(MACHINE_IDS[0], machine_tag)
+    machine_stats.RecordMachineQueriedForWork(MACHINE_IDS[0], dimensions,
+                                              machine_tag)
     self.assertEqual(1, machine_stats.MachineStats.all().count())
 
     # Ensure that last_seen is updated if it is old.
@@ -85,7 +87,8 @@ class MachineStatsTest(unittest.TestCase):
     m_stats.put()
 
     old_date = m_stats.last_seen
-    machine_stats.RecordMachineQueriedForWork(MACHINE_IDS[0], machine_tag)
+    machine_stats.RecordMachineQueriedForWork(MACHINE_IDS[0], dimensions,
+                                              machine_tag)
 
     m_stats = machine_stats.MachineStats.all().get()
     self.assertNotEqual(old_date, m_stats.last_seen)
@@ -110,8 +113,9 @@ class MachineStatsTest(unittest.TestCase):
   def testGetAllMachines(self):
     self.assertEqual(0, len(list(machine_stats.GetAllMachines())))
 
-    machine_stats.RecordMachineQueriedForWork(MACHINE_IDS[0], 'b')
-    machine_stats.RecordMachineQueriedForWork(MACHINE_IDS[1], 'a')
+    dimensions = 'dimensions'
+    machine_stats.RecordMachineQueriedForWork(MACHINE_IDS[0], dimensions, 'b')
+    machine_stats.RecordMachineQueriedForWork(MACHINE_IDS[1], dimensions, 'a')
 
     # Ensure that the returned values are sorted by tags.
     machines = machine_stats.GetAllMachines('tag')
@@ -127,8 +131,9 @@ class MachineStatsTest(unittest.TestCase):
     # Test with an invalid machine id still returns a value.
     self.assertEqual('Unknown', machine_stats.GetMachineTag(MACHINE_IDS[0]))
 
+    dimensions = 'dimensions'
     tag = 'machine_tag'
-    machine_stats.RecordMachineQueriedForWork(MACHINE_IDS[0], tag)
+    machine_stats.RecordMachineQueriedForWork(MACHINE_IDS[0], dimensions, tag)
     self.assertEqual(tag, machine_stats.GetMachineTag(MACHINE_IDS[0]))
 
 

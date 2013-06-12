@@ -572,8 +572,9 @@ class TestRequestManager(object):
     dimension_hashes = dimensions_utils.GenerateAllDimensionHashes(
         attribs['dimensions'])
 
-    machine_stats.RecordMachineQueriedForWork(attribs['id'],
-                                              attributes.get('tag', None))
+    machine_stats.RecordMachineQueriedForWork(
+        attribs['id'], test_request_message.Stringize(attribs['dimensions']),
+        attributes.get('tag', None))
 
     unfinished_test_key = db.GqlQuery(
         'SELECT __key__ FROM TestRunner WHERE machine_id = :1 AND done = :2',

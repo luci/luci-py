@@ -41,6 +41,9 @@ class MachineStats(db.Model):
   # The tag of the machine polling.
   tag = db.StringProperty(default='')
 
+  # The dimensions of the machine polling.
+  dimensions = db.StringProperty(default='')
+
   # The last day the machine queried for work.
   last_seen = db.DateProperty(auto_now=True, required=True)
 
@@ -114,17 +117,20 @@ def NotifyAdminsOfDeadMachines(dead_machines):
   return True
 
 
-def RecordMachineQueriedForWork(machine_id, machine_tag):
+def RecordMachineQueriedForWork(machine_id, dimensions_str, machine_tag):
   """Records when a machine has queried for work.
 
   Args:
     machine_id: The machine id of the machine.
+    dimensions_str: The string representation of the machines dimensions.
     machine_tag: The tag identifier of the machine.
   """
   machine_stats = MachineStats.get_or_insert(machine_id)
 
-  if (machine_stats.tag != machine_tag or
-      machine_stats.last_seen < datetime.date.today()):
+  if (machine_stats.dimensions != dimensions_str or
+      machine_stats.last_seen < datetime.date.today() or
+      machine_stats.tag != machine_tag):
+    machine_stats.dimensions = dimensions_str
     machine_stats.tag = machine_tag
     # Calling put() automatically updates the last_seen value.
     machine_stats.put()
