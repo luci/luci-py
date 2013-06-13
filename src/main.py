@@ -1045,8 +1045,7 @@ def SendRunnerResults(response, key):
     key: Key identifying the runner.
   """
   response.headers['Content-Type'] = 'text/plain'
-  test_request_manager = CreateTestManager()
-  results = test_request_manager.GetRunnerResults(key)
+  results = test_runner.GetRunnerResults(key)
 
   if results:
     response.out.write(json.dumps(results))

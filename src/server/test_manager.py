@@ -436,42 +436,6 @@ class TestRequestManager(object):
     assert test_run.IsValid(errors), errors
     return test_run
 
-  def GetRunnerResults(self, key):
-    """Returns the results of the runner specified by key.
-
-    Args:
-      key: TestRunner key representing the runner.
-
-    Returns:
-      A dictionary of the runner's results, or None if the runner not found.
-    """
-
-    try:
-      runner = test_runner.TestRunner.get(key)
-    except (db.BadKeyError, db.KindError, db.BadArgumentError):
-      return None
-
-    if runner:
-      return self.GetResults(runner)
-
-    return None
-
-  def GetResults(self, runner):
-    """Gets the results from the given test run.
-
-    Args:
-      runner: The instance of TestRunner to get the results from.
-
-    Returns:
-      A dictionary of the results.
-    """
-    return {'exit_codes': runner.exit_codes,
-            'machine_id': runner.machine_id,
-            'machine_tag': machine_stats.GetMachineTag(runner.machine_id),
-            'config_instance_index': runner.config_instance_index,
-            'num_config_instances': runner.num_config_instances,
-            'output': runner.GetResultString()}
-
   def AbortStaleRunners(self):
     """Abort any runners are taking too long to run or too long to find a match.
 

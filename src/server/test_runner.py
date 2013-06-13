@@ -16,6 +16,7 @@ from google.appengine.ext import db
 from common import blobstore_helper
 from common import test_request_message
 from server import test_request
+from stats import machine_stats
 from stats import runner_stats
 
 # The maximum number of times to retry a runner that has failed for a swarm
@@ -438,8 +439,29 @@ def GetRunnerFromKey(key):
   """
   try:
     return TestRunner.get(key)
-  except (db.BadKeyError, db.KindError):
+  except (db.BadArgumentError, db.BadKeyError, db.KindError):
     return None
+
+
+def GetRunnerResults(key):
+  """Returns the results of the runner specified by key.
+
+  Args:
+    key: TestRunner key representing the runner.
+
+  Returns:
+    A dictionary of the runner's results, or None if the runner not found.
+  """
+  runner = GetRunnerFromKey(key)
+  if not runner:
+    return None
+
+  return {'exit_codes': runner.exit_codes,
+          'machine_id': runner.machine_id,
+          'machine_tag': machine_stats.GetMachineTag(runner.machine_id),
+          'config_instance_index': runner.config_instance_index,
+          'num_config_instances': runner.num_config_instances,
+          'output': runner.GetResultString()}
 
 
 def DeleteRunnerFromKey(key):

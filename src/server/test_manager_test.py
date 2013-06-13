@@ -547,30 +547,6 @@ class TestRequestManagerTest(unittest.TestCase):
     self.assertNotEqual(None, test_runner.TestRunner.all().get())
     self.assertNotEqual(None, test_request.TestRequest.all().get())
 
-  def testGetResults(self):
-    self._SetupHandleTestResults()
-    self._mox.ReplayAll()
-
-    self.ExecuteHandleTestResults(success=True)
-    self._mox.VerifyAll()
-
-    runner = test_runner.TestRunner.all().get()
-    self.assertNotEqual(None, runner)
-
-    results = self._manager.GetResults(runner)
-
-    self.assertEqual(runner.exit_codes, results['exit_codes'])
-    self.assertEqual(runner.machine_id, results['machine_id'])
-    self.assertEqual(runner.config_instance_index,
-                     results['config_instance_index'])
-    self.assertEqual(runner.num_config_instances,
-                     results['num_config_instances'])
-    self.assertEqual(runner.GetResultString(), results['output'])
-
-    machine = machine_stats.MachineStats.get_by_key_name(runner.machine_id)
-    self.assertIsNotNone(machine)
-    self.assertEqual(machine.tag, results['machine_tag'])
-
   def _GenerateFutureTimeExpectation(self):
     """Set the current time to way in the future and return it."""
     future_time = (datetime.datetime.now() +
@@ -987,28 +963,6 @@ class TestRequestManagerTest(unittest.TestCase):
         self._GetMachineRegisterRequest(platform=matching_config),
         self._SERVER_URL)
     self.assertEqual(2, machine_stats.MachineStats.all().count())
-
-  def testGetRunnerResults(self):
-    # Create a test.
-    runner = self._CreatePendingRequest()
-
-    result = {'exit_codes': [0, 1], 'hostname': '0.0.0.0',
-              'output': 'test output'}
-    self._mox.StubOutWithMock(self._manager, 'GetResults')
-    self._manager.GetResults(mox.IgnoreArg()).AndReturn(result)
-
-    self._mox.ReplayAll()
-
-    # Invalid keys.
-    self.assertEqual(None, self._manager.GetRunnerResults(None))
-    self.assertEqual(None, self._manager.GetRunnerResults('d3d'))
-    self.assertEqual(None, self._manager.GetRunnerResults(
-        test_request.TestRequest.all().get().key()))
-
-    # Valid key.
-    self.assertNotEqual(None, self._manager.GetRunnerResults(runner.key()))
-
-    self._mox.VerifyAll()
 
   def testRecordRunnerStats(self):
     # Create a pending runner and execute it.

@@ -139,13 +139,7 @@ class AppTest(unittest.TestCase):
       self.assertTrue('204' in response.status)
 
     # Create test and runner.
-    runner = self._CreateTestRunner(exit_code=0)
-
-    self._mox.StubOutWithMock(self.test_request_manager, 'GetResults')
-    self.test_request_manager.GetResults(mox.IgnoreArg()).MultipleTimes(
-        ).AndReturn({'exit_codes': [0, 1], 'hostname': '0.0.0.0',
-                     'output': 'test output'})
-    self._mox.ReplayAll()
+    runner = self._CreateTestRunner(machine_id=MACHINE_ID, exit_code=0)
 
     # Invalid key.
     for handler in handlers:
@@ -162,11 +156,9 @@ class AppTest(unittest.TestCase):
         results = json.loads(response.body)
       except (ValueError, TypeError), e:
         self.fail(e)
-      self.assertEqual([0, 1], results['exit_codes'])
-      self.assertEqual('0.0.0.0', results['hostname'])
-      self.assertEqual('test output', results['output'])
-
-    self._mox.VerifyAll()
+      self.assertEqual(runner.exit_codes, results['exit_codes'])
+      self.assertEqual(runner.machine_id, results['machine_id'])
+      self.assertEqual(runner.GetResultString(), results['output'])
 
   def testGetToken(self):
     response = self.app.get('/get_token')

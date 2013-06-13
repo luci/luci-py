@@ -314,10 +314,12 @@ class TestRunnerTest(unittest.TestCase):
     self.assertEqual(0, len(list(test_runners)))
 
   def testGetRunnerFromKey(self):
-    self.assertEqual(None, test_runner.GetRunnerFromKey('fake_key'))
-
     runner = self._CreateRunner()
-    print test_runner.TestRunner.all().count()
+
+    self.assertEqual(None, test_runner.GetRunnerFromKey('fake_key'))
+    test_request_key = test_request.TestRequest.all().get().key()
+    self.assertEqual(None, test_runner.GetRunnerFromKey(test_request_key))
+
     self.assertEqual(runner.key(),
                      test_runner.GetRunnerFromKey(runner.key()).key())
 
@@ -327,6 +329,23 @@ class TestRunnerTest(unittest.TestCase):
 
     test_runner.DeleteRunner(runner)
     self.assertEqual(None, test_runner.GetRunnerFromKey(runner.key()))
+
+  def testGetRunnerResult(self):
+    self.assertEqual(None, test_runner.GetRunnerResults('invalid key'))
+
+    runner = self._CreateRunner()
+    runner.machine_id = MACHINE_IDS[0]
+    runner.put()
+
+    results = test_runner.GetRunnerResults(runner.key())
+    self.assertNotEqual(None, results)
+    self.assertEqual(runner.exit_codes, results['exit_codes'])
+    self.assertEqual(runner.machine_id, results['machine_id'])
+    self.assertEqual(runner.config_instance_index,
+                     results['config_instance_index'])
+    self.assertEqual(runner.num_config_instances,
+                     results['num_config_instances'])
+    self.assertEqual(runner.GetResultString(), results['output'])
 
   def testDeleteRunner(self):
     self._CreateRunner()
