@@ -31,6 +31,11 @@ MAX_TRANSACTION_RETRY_COUNT = 3
 # Number of days to keep old runners around for.
 SWARM_FINISHED_RUNNER_TIME_TO_LIVE_DAYS = 14
 
+# The amount of time, in minutes, that a runner must wait before it is
+# considered to be hanging (this is usually a sign that the machines that can
+# run this test are broken and not communicating with swarm).
+TIME_BEFORE_RUNNER_HANGING_IN_MINS = 60
+
 
 # MOE: start_strip
 # This is removed from the public version because the public version should
@@ -425,6 +430,21 @@ def GetTestRunners(sort_by, ascending, limit, offset):
     sort_by += ' DESC'
 
   return TestRunner.gql('ORDER BY %s' % sort_by).run(limit=limit, offset=offset)
+
+
+def GetHangingRunners():
+  """Gets all the currently hanging runners.
+
+  Returns:
+    A list of all the hanging runners.
+  """
+  cutoff_time = datetime.datetime.now() - datetime.timedelta(
+      minutes=TIME_BEFORE_RUNNER_HANGING_IN_MINS)
+
+  hanging_runners = TestRunner.gql('WHERE started = :1 AND '
+                                   'automatic_retry_count = :2 AND '
+                                   'created < :3', None, 0, cutoff_time)
+  return [hanging_runner for hanging_runner in hanging_runners]
 
 
 def GetRunnerFromKey(key):

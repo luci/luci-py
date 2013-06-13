@@ -16,6 +16,7 @@ import os.path
 import urllib
 
 from google.appengine import runtime
+from google.appengine.api import app_identity
 from google.appengine.api import files
 from google.appengine.api import mail
 from google.appengine.api import mail_errors
@@ -576,6 +577,27 @@ class DetectDeadMachinesHandler(CronJobHandler):
     self.response.out.write(msg)
 
 
+class DetectHangingRunnersHandler(CronJobHandler):
+  """Handles cron jobs to detect runners that have been waiting too long."""
+
+  def get(self):   # pylint: disable=g-bad-name
+    hanging_runners = test_runner.GetHangingRunners()
+    if hanging_runners:
+      subject = 'Hanging Runners on %s' % app_identity.get_application_id()
+
+      hanging_dimensions = set(runner.GetDimensionsString()
+                               for runner in hanging_runners)
+      body = ('The following dimensions have hanging runners (runners that '
+              'have been waiting more than %d minutes to run).\n' % (
+                  test_runner.TIME_BEFORE_RUNNER_HANGING_IN_MINS) +
+              '\n'.join(hanging_dimensions) +
+              '\n\nHere are the hanging runner names:\n' +
+              '\n'.join(runner.GetName() for runner in hanging_runners)
+             )
+
+      admin_user.EmailAdmins(subject, body)
+
+
 class GenerateDailyStatsHandler(CronJobHandler):
   """Handles cron jobs to generate new daily stats."""
 
@@ -1091,6 +1113,8 @@ def CreateApplication():
                                    AbortStaleRunnersHandler),
                                   ('/tasks/detect_dead_machines',
                                    DetectDeadMachinesHandler),
+                                  ('/tasks/detect_hanging_runners',
+                                   DetectHangingRunnersHandler),
                                   ('/tasks/generate_daily_stats',
                                    GenerateDailyStatsHandler),
                                   ('/tasks/generate_recent_stats',

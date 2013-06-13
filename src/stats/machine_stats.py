@@ -12,7 +12,6 @@ import datetime
 import logging
 
 from google.appengine.api import app_identity
-from google.appengine.api import mail
 from google.appengine.ext import db
 from server import admin_user
 
@@ -90,10 +89,6 @@ def NotifyAdminsOfDeadMachines(dead_machines):
   Returns:
     True if the email was successfully sent.
   """
-  if admin_user.AdminUser.all().count() == 0:
-    logging.error('No admins found, no one to notify of dead machines')
-    return False
-
   death_summary = []
   for machine in dead_machines:
     death_summary.append(
@@ -101,20 +96,12 @@ def NotifyAdminsOfDeadMachines(dead_machines):
                                             'machine_tag': machine.tag,
                                             'last_seen': machine.last_seen})
 
-  app_id = app_identity.get_application_id()
-
-  message = mail.EmailMessage()
-  message.sender = 'dead_machine_detecter@%s.appspotmail.com' % app_id
-  message.to = ','.join(admin.email for admin in admin_user.AdminUser.all())
-  message.subject = 'Dead Machines Found on %s' % app_id
-
-  message.body = _DEAD_MACHINE_MESSAGE_BODY % {
+  subject = 'Dead Machines Found on %s' % app_identity.get_application_id()
+  body = _DEAD_MACHINE_MESSAGE_BODY % {
       'timeout': MACHINE_TIMEOUT_IN_DAYS,
       'death_summary': '\n'.join(death_summary)}
 
-  message.send()
-
-  return True
+  return admin_user.EmailAdmins(subject, body)
 
 
 def RecordMachineQueriedForWork(machine_id, dimensions_str, machine_tag):

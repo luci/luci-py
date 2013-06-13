@@ -588,6 +588,19 @@ class AppTest(unittest.TestCase):
       response = self.app.get(cron_job_url, expect_errors=True)
       self.assertEquals('405 Method Not Allowed', response.status, cron_job_url)
 
+  def testDetectHangingRunners(self):
+    response = self.app.get('/tasks/detect_hanging_runners')
+    self.assertEqual('200 OK', response.status)
+
+    # Test when there is a hanging runner.
+    runner = self._CreateTestRunner()
+    runner.created = datetime.datetime.now() - datetime.timedelta(
+        minutes=2 * test_runner.TIME_BEFORE_RUNNER_HANGING_IN_MINS)
+    runner.put()
+
+    response = self.app.get('/tasks/detect_hanging_runners')
+    self.assertEqual('200 OK', response.status)
+
   def testSendEReporter(self):
     # Ensure this function correctly complains if the admin email isn't set.
     response = self.app.get('/tasks/sendereporter', expect_errors=True)

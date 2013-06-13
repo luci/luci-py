@@ -313,6 +313,39 @@ class TestRunnerTest(unittest.TestCase):
                        test_runners.next().config_instance_index)
     self.assertEqual(0, len(list(test_runners)))
 
+  def testGetHangingRunners(self):
+    self.assertEqual([], test_runner.GetHangingRunners())
+
+    self._CreateRunner()
+    self.assertEqual([], test_runner.GetHangingRunners())
+
+    old_time = datetime.datetime.now() - datetime.timedelta(
+        minutes=2 * test_runner.TIME_BEFORE_RUNNER_HANGING_IN_MINS)
+
+    # Create an older runner that is running and isn't hanging.
+    old_runner = self._CreateRunner()
+    old_runner.created = old_time
+    old_runner.started = datetime.datetime.now()
+    old_runner.put()
+    self.assertEqual([], test_runner.GetHangingRunners())
+
+    # Create a runner that was automatically restart, and can never be viewed
+    # as hanging.
+    retried_runner = self._CreateRunner()
+    retried_runner.created = old_time
+    retried_runner.automatic_retry_count = 1
+    retried_runner.put()
+    self.assertEqual([], test_runner.GetHangingRunners())
+
+    # Create an older runner that will be marked as hanging.
+    hanging_runner = self._CreateRunner()
+    hanging_runner.created = old_time
+    hanging_runner.put()
+
+    found_hanging_runners = test_runner.GetHangingRunners()
+    self.assertEqual(1, len(found_hanging_runners))
+    self.assertEqual(hanging_runner.key(), found_hanging_runners[0].key())
+
   def testGetRunnerFromKey(self):
     runner = self._CreateRunner()
 

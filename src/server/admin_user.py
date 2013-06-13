@@ -6,6 +6,9 @@
 
 
 
+import logging
+
+from google.appengine.api import mail
 from google.appengine.ext import db
 
 
@@ -16,3 +19,23 @@ class AdminUser(db.Model):
   """
   # The email to send the exception emails from.
   email = db.StringProperty()
+
+
+def EmailAdmins(subject, body):
+  """Emails the admins the given message and subject.
+
+  Args:
+    subject: The subject of the email.
+    body: The body of the email.
+
+  Returns:
+    True if the email was sucessfully sent.
+  """
+  if AdminUser.all().count() == 0:
+    logging.error('No admins found, no one to email')
+    return False
+
+  send_to = ','.join(admin.email for admin in AdminUser.all())
+  mail.send_mail(sender='Swarm Server <no_reply@google.com>', to=send_to,
+                 subject=subject, body=body)
+  return True

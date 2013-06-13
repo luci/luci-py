@@ -15,6 +15,10 @@ cron:
   url: /tasks/detect_dead_machines
   schedule: every day 01:00
 
+- description: Detect hanging runners
+  url: /tasks/detect_hanging_runners
+  schedule: every 10 minutes
+
 - description: Generate daily stats
   url: /tasks/generate_daily_stats
   schedule: every day 00:30

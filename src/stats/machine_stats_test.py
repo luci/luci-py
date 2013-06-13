@@ -64,9 +64,6 @@ class MachineStatsTest(unittest.TestCase):
         'id', tag='tag', last_seen=datetime.date.today())
     dead_machine.put()
 
-    # No admins are set, so no email should be sent.
-    self.assertFalse(machine_stats.NotifyAdminsOfDeadMachines([dead_machine]))
-
     # Set an admin and ensure emails can get sent to them.
     user = admin_user.AdminUser(email='fake@email.com')
     user.put()
