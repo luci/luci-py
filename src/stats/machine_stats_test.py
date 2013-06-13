@@ -114,6 +114,9 @@ class MachineStatsTest(unittest.TestCase):
     machine_stats.RecordMachineQueriedForWork(MACHINE_IDS[0], dimensions, 'b')
     machine_stats.RecordMachineQueriedForWork(MACHINE_IDS[1], dimensions, 'a')
 
+    # Ensure that the default works.
+    self.assertEqual(2, len(list(machine_stats.GetAllMachines())))
+
     # Ensure that the returned values are sorted by tags.
     machines = machine_stats.GetAllMachines('tag')
     self.assertEqual(MACHINE_IDS[1], machines.next().MachineID())

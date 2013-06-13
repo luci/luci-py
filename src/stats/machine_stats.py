@@ -146,7 +146,7 @@ def DeleteMachineStats(key):
   return True
 
 
-def GetAllMachines(sort_by='machine_id'):
+def GetAllMachines(sort_by='__key__'):
   """Get the list of whitelisted machines.
 
   Args:
@@ -155,9 +155,10 @@ def GetAllMachines(sort_by='machine_id'):
   Returns:
     An iterator of all machines whitelisted.
   """
-  # If we recieve an invalid sort_by parameter, just default to machine_id.
+  # If we receive an invalid sort_by parameter, just default to __key__ (which
+  # is the machine id).
   if sort_by not in MachineStats.properties():
-    sort_by = 'machine_id'
+    sort_by = '__key__'
 
   return (machine for machine in MachineStats.gql('ORDER BY %s' % sort_by))
 

@@ -380,6 +380,7 @@ class MachineListHandler(webapp2.RequestHandler):
     # Add a delete option for each machine assignment.
     machines_displayable = []
     for machine in machines:
+      machine.machine_id = machine.MachineID()
       machine.command_string = GenerateButtonWithHiddenForm(
           'Delete',
           '%s?r=%s' % (_SECURE_DELETE_MACHINE_STATS_URL, machine.key()),

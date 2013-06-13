@@ -175,8 +175,8 @@ class AppTest(unittest.TestCase):
     self._mox.ReplayAll()
 
     # Add a machine to display.
-    machine_stats.MachineStats(machine_id='id', tag='tag',
-                               last_seen=datetime.date.today())
+    m_stats = machine_stats.MachineStats(tag='tag')
+    m_stats.put()
 
     response = self.app.get('/secure/machine_list')
     self.assertTrue('200' in response.status)
@@ -185,8 +185,7 @@ class AppTest(unittest.TestCase):
 
   def testDeleteMachineStats(self):
     # Add a machine assignment to delete.
-    m_stats = machine_stats.MachineStats(machine_id='id',
-                                         last_seen=datetime.date.today())
+    m_stats = machine_stats.MachineStats()
     m_stats.put()
 
     # Delete the machine assignment.
