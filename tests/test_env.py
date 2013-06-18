@@ -30,6 +30,3 @@ def setup_test_env():
 
   # TODO(maruel): Load it from app.yaml.
   os.environ['APPLICATION_ID'] = 'isolateserver-dev'
-
-
-setup_test_env()

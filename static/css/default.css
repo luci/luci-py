@@ -31,10 +31,7 @@ table {
   border-bottom-width: 1px;
 }
 
-.even {
-}
-
-.odd {
+.request tr:nth-child(odd) {
   background-color: #eeeeee;
 }
 
