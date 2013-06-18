@@ -26,6 +26,7 @@ from google.appengine.ext.webapp import blobstore_handlers
 import acl
 import config
 import gsfiles
+import stats
 import template
 
 
@@ -578,10 +579,8 @@ class RestrictedStoreBlobstoreContentByHashHandler(
 
     entry = create_entry(namespace, hash_key)
     if not entry:
-      msg = 'Hash entry already stored, no need to store %d bytes again.' % (
-          contents[0].size)
-      logging.warning(msg)
-      self.response.out.write(msg)
+      stats.log(stats.DUPE, contents[0].size, '')
+      self.response.out.write('Entry already existed')
       self._delete(contents)
       # Still report success.
       return
@@ -618,7 +617,7 @@ class RestrictedStoreBlobstoreContentByHashHandler(
         future.wait()
       return
 
-    logging.info('%d bytes uploaded directly into GS', entry.size)
+    stats.log(stats.STORE, entry.size, 'GS; %s' % entry.filename)
     self.response.out.write('Content saved.')
     self.response.headers['Content-Type'] = 'text/plain'
 
@@ -673,7 +672,7 @@ class ContainsHashHandler(acl.ACLRequestHandler):
     self.response.out.write(bytearray(contains))
     self.response.headers['Content-Type'] = 'application/octet-stream'
     found = sum(contains, 0)
-    logging.info('%d hit, %d miss', found, len(raw_hash_digests) - found)
+    stats.log(stats.LOOKUP, len(raw_hash_digests), found)
     if found:
       # For all the ones that exist, update their last_access in a task queue.
       hashes_to_tag = ''.join(
@@ -727,10 +726,8 @@ class StoreContentByHashHandler(acl.ACLRequestHandler):
 
     entry = create_entry(namespace, hash_key)
     if not entry:
-      msg = 'Hash entry already stored, no need to store %d bytes again.' % (
-          len(content))
-      logging.info(msg)
-      self.response.out.write(msg)
+      stats.log(stats.DUPE, len(content), 'inline')
+      self.response.out.write('Entry already existed')
       return
 
     try:
@@ -763,14 +760,8 @@ class StoreContentByHashHandler(acl.ACLRequestHandler):
       self.abort(400, msg)
 
     if len(content) < MIN_SIZE_FOR_GS:
-      logging.info(
-          'Storing %d bytes (%d bytes expanded) of content in model',
-          len(content), expanded_size)
       entry.content = content
     else:
-      logging.info(
-          'Storing %d bytes (%d bytes expanded) of content in GS',
-          len(content), expanded_size)
       filepath = '%s/%s' % (namespace, hash_key)
       if not gsfiles.store_content(
           config.settings().gs_bucket, filepath, content):
@@ -793,6 +784,8 @@ class StoreContentByHashHandler(acl.ACLRequestHandler):
       # memcaches them.
       save_in_memcache(namespace, hash_key, content)
 
+    where = 'GS; ' + entry.filename if entry.filename else 'inline'
+    stats.log(stats.STORE, len(content), where)
     future.wait()
 
 
@@ -803,7 +796,7 @@ class RetrieveContentByHashHandler(acl.ACLRequestHandler,
     memcache_entry = memcache.get(hash_key, namespace='table_%s' % namespace)
 
     if memcache_entry:
-      logging.info('Returning %d bytes from memcache', len(memcache_entry))
+      stats.log(stats.RETURN, len(memcache_entry), 'memcache')
       self.response.out.write(memcache_entry)
       return
 
@@ -814,7 +807,7 @@ class RetrieveContentByHashHandler(acl.ACLRequestHandler,
 
     if entry.content is not None:
       # Serve directly.
-      logging.info('Returning %d bytes from model', len(entry.content))
+      stats.log(stats.RETURN, len(entry.content), 'inline')
       self.response.headers['Content-Disposition'] = (
           'attachment; filename="%s"' % hash_key)
       self.response.headers['Content-Type'] = 'application/octet-stream'
@@ -831,7 +824,7 @@ class RetrieveContentByHashHandler(acl.ACLRequestHandler,
       # the string is encoded as utf-8.
       blobkey = gsfiles.to_filepath(
           config.settings().gs_bucket, entry.gs_filepath).encode('utf-8')
-      logging.info('Returning from GS; %s -> %s', entry.gs_filepath, blobkey)
+      stats.log(stats.RETURN, entry.size, 'GS; %s' % entry.filename)
       self.send_blob(
           blobkey,
           save_as=hash_key,
