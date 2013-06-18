@@ -546,6 +546,15 @@ class RestrictedStoreBlobstoreContentByHashHandler(
     """
     return webapp2.RequestHandler.dispatch(self)
 
+  @staticmethod
+  def _delete(contents):
+    """Deletes unnecessary files stored in Cloud Storage."""
+    items = [c.gs_object_name for c in contents]
+    try:
+      files.delete(*items)
+    except runtime.DeadlineExceededError:
+      logging.warning('Leaking files: %s', ', '.join(items))
+
   # pylint: disable=W0221
   def post(self, namespace, hash_key, original_access_id):
     # In particular, do not use self.request.remote_addr because the request
@@ -555,14 +564,14 @@ class RestrictedStoreBlobstoreContentByHashHandler(
     contents = self.get_file_infos('content')
     if len(contents) != 1:
       # Delete all upload files since they aren't linked to anything.
-      files.delete(*[c.gs_object_name for c in contents])
+      self._delete(contents)
       msg = 'Found %d files, there should only be 1.' % len(contents)
       logging.error(msg)
       self.abort(400, detail=msg)
 
     if not contents[0].gs_object_name.startswith(
         gsfiles.to_filepath(config.settings().gs_bucket, namespace)):
-      files.delete(*[c.gs_object_name for c in contents])
+      self._delete(contents)
       msg = 'Unexpected namespace or GS bucket.'
       logging.error(msg)
       self.abort(400, detail=msg)
@@ -573,8 +582,7 @@ class RestrictedStoreBlobstoreContentByHashHandler(
           contents[0].size)
       logging.warning(msg)
       self.response.out.write(msg)
-      # Delete all upload files since they aren't linked to anything.
-      files.delete(*[c.gs_object_name for c in contents])
+      self._delete(contents)
       # Still report success.
       return
 

@@ -75,11 +75,6 @@ def open_file_for_reading(bucket, filename):
         break
       logging.debug('Read %d bytes', len(data))
       yield data
-      # Make sure it's unallocated. Otherwise the python subsystem could keep
-      # the data in the heap for a while waiting for the next GC but the
-      # AppEngine subsystem could decide that this instance is using too much
-      # memory. Deleting this chunk explicitly helps work around this issue.
-      del data
 
 
 def list_files(bucket, subdir):
