@@ -64,17 +64,21 @@ def store_content(bucket, filename, content):
 
 def open_file_for_reading(bucket, filename):
   """Reads a GS file and yield the data in chunks."""
-  # TODO(maruel): Handle exceptions?
-  filepath = to_filepath(bucket, filename)
-  with files.open(filepath, 'r') as f:
-    while True:
-      # TODO(maruel): Start the read on the next request while the processing is
-      # being done to reduce the effect of latency on the throughput.
-      data = f.read(CHUNK_SIZE)
-      if not data:
-        break
-      logging.debug('Read %d bytes', len(data))
-      yield data
+  count = 0
+  try:
+    filepath = to_filepath(bucket, filename)
+    with files.open(filepath, 'r') as f:
+      while True:
+        # TODO(maruel): Start the read on the next request while the processing
+        # is being done to reduce the effect of latency on the throughput.
+        data = f.read(CHUNK_SIZE)
+        if not data:
+          break
+        count += len(data)
+        yield data
+  except Exception:
+    logging.debug('Read %d bytes', count)
+    raise
 
 
 def list_files(bucket, subdir):

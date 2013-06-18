@@ -136,7 +136,6 @@ class Accumulator(object):
     for i in self._source:
       self.accumulated.append(i)
       yield i
-      del i
 
 
 def get_content_by_hash(namespace, hash_key):
@@ -252,7 +251,6 @@ def expand_content(namespace, source):
     zlib_state = zlib.decompressobj()
     for i in source:
       yield zlib_state.decompress(i, gsfiles.CHUNK_SIZE)
-      del i
       while zlib_state.unconsumed_tail:
         yield zlib_state.decompress(
             zlib_state.unconsumed_tail, gsfiles.CHUNK_SIZE)
@@ -263,7 +261,6 @@ def expand_content(namespace, source):
     # Returns the source as-is.
     for i in source:
       yield i
-      del i
 
 
 def delete_blobinfo_async(blobinfos):
@@ -374,7 +371,7 @@ class RestrictedCleanupTestingEntriesWorkerHandler(webapp2.RequestHandler):
     orphaned_namespaces = []
     # TODO(maruel): These could be run in parallel with @ndb.synctasklet.
     for namespace in namespace_query.iter(keys_only=True):
-      logging.debug('Namespace %s', namespace.name())
+      logging.debug('Namespace %s', namespace.id())
       found = incremental_delete(
           ContentEntry.query(
               ContentEntry.last_access < old_cutoff_testing,
@@ -502,8 +499,6 @@ class RestrictedVerifyWorkerHandler(webapp2.RequestHandler):
       for data in expand_content(namespace, blob):
         expanded_size += len(data)
         digest.update(data)
-        # Make sure the data is GC'ed.
-        del data
       is_verified = digest.hexdigest() == hash_key
     except runtime.DeadlineExceededError:
       # Failed to read it through. If it's compressed, at least no zlib error
@@ -744,8 +739,6 @@ class StoreContentByHashHandler(acl.ACLRequestHandler):
       for data in expand_content(namespace, [content]):
         expanded_size += len(data)
         digest.update(data)
-        # Make sure the data is GC'ed.
-        del data
       is_verified = digest.hexdigest() == hash_key
     except zlib.error as e:
       msg = 'Data is corrupted: %s' % e
@@ -765,7 +758,8 @@ class StoreContentByHashHandler(acl.ACLRequestHandler):
       filepath = '%s/%s' % (namespace, hash_key)
       if not gsfiles.store_content(
           config.settings().gs_bucket, filepath, content):
-        self.abort(507, detail='Unable to save the content to GS.')
+        # Returns 503 so the client automatically retries.
+        self.abort(503, detail='Unable to save the content to GS.')
       entry.filename = hash_key
 
     # TODO(maruel): Add a new parameter to explicitly signal it is an
