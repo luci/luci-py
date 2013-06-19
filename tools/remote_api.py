@@ -87,7 +87,7 @@ def load_context(sdk_path, app_dir, host, app_id, version):
     # pylint: disable=W0612
     from google.appengine.api import memcache
     from google.appengine.api.users import User
-    from google.appengine.ext import db
+    from google.appengine.ext import ndb
 
     try:
       remote_api_stub.ConfigureRemoteDatastore(
@@ -105,6 +105,7 @@ def load_context(sdk_path, app_dir, host, app_id, version):
     import config
     import gsfiles
     import main
+    import stats
     from main import ContentNamespace, ContentEntry
 
     # Symbols presented to the user.
