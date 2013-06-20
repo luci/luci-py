@@ -450,30 +450,46 @@ class RestrictedTagWorkerHandler(webapp2.RequestHandler):
   def post(self, namespace, year, month, day):
     if not self.request.headers.get('X-AppEngine-QueueName'):
       self.abort(405, detail='Only internal task queue tasks can do this')
-    raw_hash_digests = payload_to_hashes(self, namespace)
-    logging.info(
-        'Stamping %d entries in namespace %s', len(raw_hash_digests), namespace)
 
-    today = datetime.date(int(year), int(month), int(day))
-    # It is safe to assume ContentNamespace entity exists. If it doesn't the
-    # query will simply return nothing.
-    parent_key = ndb.Key(ContentNamespace, namespace)
-    # Fire up all the RPCs.
-    rpcs = [
-      ContentEntry.get_by_id_async(
-          binascii.hexlify(raw_hash_digest), parent=parent_key)
-      for raw_hash_digest in raw_hash_digests
-    ]
-
-    to_save = []
-    for future in rpcs:
-      item = future.get_result()
-      if item and item.last_access != today:
-        # Update the timestamp.
-        item.last_access = today
-        to_save.append(item)
-    ndb.put_multi(to_save)
-    logging.info('Done timestamping %d entries', len(to_save))
+    try:
+      raw_hash_digests = payload_to_hashes(self, namespace)
+      today = datetime.date(int(year), int(month), int(day))
+      # Requests all the entities at once.
+      futures = ndb.get_multi_async(
+        ndb.Key(
+            ContentNamespace, namespace,
+            ContentEntry, binascii.hexlify(raw_hash_digest))
+        for raw_hash_digest in raw_hash_digests)
+      to_save = []
+      while futures:
+        # Return opportunistically the first entity that can be retrieved.
+        future = ndb.Future.wait_any(futures)
+        futures.remove(future)
+        item = future.get_result()
+        # Skip updating if last_access > today. It can happen when multiples
+        # /contains requests are done around midnight and the task queues are
+        # run out of order. There is still a small chance of 2 task queues
+        # stepping on each other feet but explicitly do not handle this case:
+        # 1. .last_access is older than 2 days.
+        # 2. Item is requested via /contains exactly twice, one exactly before
+        #    midnight, another exactly after midnight.
+        # 3. The task queues are run in reverse order, causing .last_access to
+        #    be on the date before midnight.
+        #
+        # This is solely documented for thoroughness purpose but it's not
+        # something worth handling.
+        if item and item.last_access < today:
+          # Update the timestamp.
+          item.last_access = today
+          to_save.append(item)
+      if to_save:
+        ndb.put_multi(to_save)
+      logging.info(
+          'Timestamped %d entries out of %s',
+          len(to_save), len(raw_hash_digests))
+    except Exception as e:
+      logging.error('Failed to stamp %d entries: %s', len(raw_hash_digests), e)
+      raise
 
 
 class RestrictedVerifyWorkerHandler(webapp2.RequestHandler):
@@ -653,54 +669,64 @@ class ContainsHashHandler(acl.ACLRequestHandler):
 
     [1] It does modify the timestamp of the objects.
     """
-    raw_hash_digests = payload_to_hashes(self, namespace)
-    logging.info(
-        'Checking namespace %s for %d hash digests',
-        namespace, len(raw_hash_digests))
+    try:
+      raw_hash_digests = payload_to_hashes(self, namespace)
+      # No need to verify the entity is present, no object exists nor will be
+      # found if the ancestor doesn't exist.
+      namespace_model_key = ndb.Key(ContentNamespace, namespace)
 
-    # No need to verify the entity is present, no object exists nor will be
-    # found if the ancestor doesn't exist.
-    namespace_model_key = ndb.Key(ContentNamespace, namespace)
+      # Convert to entity keys.
+      keys = (
+          ndb.Key(
+              ContentEntry,
+              binascii.hexlify(raw_hash_digest),
+              parent=namespace_model_key)
+          for raw_hash_digest in raw_hash_digests
+      )
 
-    # Convert to entity keys.
-    keys = (
-        ndb.Key(
-            ContentEntry,
-            binascii.hexlify(raw_hash_digest),
-            parent=namespace_model_key)
-        for raw_hash_digest in raw_hash_digests
-    )
+      # Start the queries in parallel. It must be a list so the calls are
+      # executed right away.
+      # TODO(maruel): Queries are not cached so in practice it could be faster
+      # to use get_by_id_async() or count_async instead even if this means
+      # pulling all the data in. This needs to be profiled. Another option is to
+      # do the caching ourself (?).
+      # In practice, using projection disable caching, so this is out of the
+      # equation.
+      # In the end, we may as well just take the memory hit, the worst case is
+      # 500*20kb = 10mb. This means if a single instance processes over 10
+      # simultaneous /contains requests at 500 items per requests, it's
+      # dangerously near the 128mb soft limit.
+      queries = [
+          ContentEntry.query(ContentEntry.key == key).get_async(keys_only=True)
+          for key in keys
+      ]
 
-    # Start the queries in parallel. It must be a list so the calls are executed
-    # right away.
-    # TODO(maruel): Queries are not cached so in practice it could be faster to
-    # use get_by_id_async() or count_async instead even if this means pulling
-    # all the data in. This needs to be profiled. Another option is to do the
-    # caching ourself (?).
-    queries = [
-        ContentEntry.query(ContentEntry.key == key).get_async(keys_only=True)
-        for key in keys
-    ]
-
-    # Convert the Future to True/False, then to byte, chr(0) if not present,
-    # chr(1) if it is.
-    contains = [bool(q.get_result()) for q in queries]
-    self.response.out.write(bytearray(contains))
-    self.response.headers['Content-Type'] = 'application/octet-stream'
-    found = sum(contains, 0)
-    stats.log(stats.LOOKUP, len(raw_hash_digests), found)
-    if found:
-      # For all the ones that exist, update their last_access in a task queue.
-      hashes_to_tag = ''.join(
-          raw_hash_digest for i, raw_hash_digest in enumerate(raw_hash_digests)
-          if contains[i])
-      url = '/restricted/taskqueue/tag/%s/%s' % (
-          namespace, datetime.date.today())
-      try:
-        taskqueue.add(url=url, payload=hashes_to_tag, queue_name='tag')
-      except (taskqueue.Error, runtime.DeadlineExceededError) as e:
-        logging.warning('Problem adding task to update last_access. These '
-                        'objects may get deleted sooner than intended.\n%s', e)
+      # Convert the Future to True/False, then to byte, chr(0) if not present,
+      # chr(1) if it is.
+      contains = [bool(q.get_result()) for q in queries]
+      self.response.out.write(bytearray(contains))
+      self.response.headers['Content-Type'] = 'application/octet-stream'
+      found = sum(contains, 0)
+      stats.log(stats.LOOKUP, len(raw_hash_digests), found)
+      if found:
+        # For all the ones that exist, update their last_access in a task queue.
+        hashes_to_tag = ''.join(
+            raw_hash_digest
+            for i, raw_hash_digest in enumerate(raw_hash_digests)
+            if contains[i])
+        url = '/restricted/taskqueue/tag/%s/%s' % (
+            namespace, datetime.date.today())
+        try:
+          taskqueue.add(url=url, payload=hashes_to_tag, queue_name='tag')
+        except (taskqueue.Error, runtime.DeadlineExceededError) as e:
+          logging.warning(
+              'Problem adding task to update last_access. These '
+              'objects may get deleted sooner than intended.\n%s', e)
+    except Exception as e:
+      logging.error(
+          'Tried checking for %d hash digests but all we got was: %s',
+          len(raw_hash_digests), e)
+      raise
 
 
 class GenerateBlobstoreHandler(acl.ACLRequestHandler):
