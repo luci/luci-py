@@ -199,12 +199,12 @@ def delete_entry_and_gs_entry(to_delete):
   # Note all the files to delete.
   gs_files_to_delete = filter(None, (i.gs_filepath for i in to_delete))
 
-  entities_future = ndb.delete_multi_async(to_delete)
+  entities_future = ndb.delete_multi_async([i.key for i in to_delete])
 
   # Do this one last because it is synchronous.
   # TODO(maruel): This could leak a broken BlobInfo object in the blobstore
   # table. There is no easy way to find it back.
-  gsfiles.delete(gs_files_to_delete)
+  gsfiles.delete_files(config.settings().gs_bucket, gs_files_to_delete)
   return entities_future
 
 
@@ -511,8 +511,9 @@ class RestrictedVerifyWorkerHandler(webapp2.RequestHandler):
       # Failed to read it through. If it's compressed, at least no zlib error
       # was thrown so the object is fine.
       logging.warning('Got DeadlineExceededError, giving up')
-      return
-    except (blobstore.BlobNotFoundError, zlib.error) as e:
+      # Abort so the job is retried automatically.
+      self.abort(500)
+    except (blobstore.BlobNotFoundError, zlib.error, gsfiles.files.Error) as e:
       # It's broken. At that point, is_verified is False.
       logging.error(e)
 
