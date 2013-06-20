@@ -519,6 +519,13 @@ class RestrictedVerifyWorkerHandler(webapp2.RequestHandler):
       logging.warning('Got DeadlineExceededError, giving up')
       # Abort so the job is retried automatically.
       self.abort(500)
+    except (
+        gsfiles.files.FileNotOpenedError,
+        gsfiles.files.ApiTemporaryUnavailableError) as e:
+      # Don't delete the file yet since it's an API issue.
+      logging.warning('CloudStorage is acting up: %s', e)
+      # Abort so the job is retried automatically.
+      self.abort(500)
     except (blobstore.BlobNotFoundError, zlib.error, gsfiles.files.Error) as e:
       # It's broken. At that point, is_verified is False.
       logging.error(e)
