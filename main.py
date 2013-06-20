@@ -66,9 +66,10 @@ class ContentNamespace(ndb.Model):
                 purpose only.
 
   The table name can have suffix:
-  - -gzip:      The namespace contains the content in gzip'ed format. The
-                content key is the hash of the uncompressed data, not the
-                compressed one. That is why it is in a separate namespace.
+  - -gzip or -deflate: The namespace contains the content in deflated format.
+                       The content key is the hash of the uncompressed data, not
+                       the compressed one. That is why it is in a separate
+                       namespace.
 
   All the tables in the temporary* family must have is_testing==True and the
   others is_testing==False.
@@ -112,7 +113,7 @@ class ContentEntry(ndb.Model):
     """Is it the raw data or was it modified in any form, e.g. compressed, so
     that the SHA-1 doesn't match.
     """
-    self.key.parent().id().endswith(('bzip2', 'gzip'))
+    self.key.parent().id().endswith(('-gzip', '-deflate'))
 
   @property
   def gs_filepath(self):
@@ -247,7 +248,8 @@ def payload_to_hashes(request, namespace):
 
 def expand_content(namespace, source):
   """Yields expanded data from source."""
-  if namespace.endswith('-gzip'):
+  # TODO(maruel): Remove '-gzip' since it's a misnomer.
+  if namespace.endswith(('-deflate', '-gzip')):
     zlib_state = zlib.decompressobj()
     for i in source:
       yield zlib_state.decompress(i, gsfiles.CHUNK_SIZE)
@@ -798,6 +800,13 @@ class RetrieveContentByHashHandler(acl.ACLRequestHandler,
     if not entry:
       msg = 'Unable to find an ContentEntry with key \'%s\'.' % hash_key
       self.abort(404, detail=msg)
+
+    # Result can be safely cached for 12 hours if it is present.
+    self.response.headers['Cache-Control'] = 'public, max-age=43200'
+
+    # If AppEngine wasn't silly and would stop stripping off the header, we'd
+    # want that to have the HTTP level code decompress the response on the fly:
+    #self.response.headers['Content-Encoding'] = 'deflate'
 
     if entry.content is not None:
       # Serve directly.
