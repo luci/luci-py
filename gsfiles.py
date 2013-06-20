@@ -76,6 +76,7 @@ def open_file_for_reading(bucket, filename):
           break
         count += len(data)
         yield data
+        del data
   except Exception:
     logging.debug('Read %d bytes', count)
     raise

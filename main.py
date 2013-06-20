@@ -137,6 +137,7 @@ class Accumulator(object):
     for i in self._source:
       self.accumulated.append(i)
       yield i
+      del i
 
 
 def get_content_by_hash(namespace, hash_key):
@@ -253,6 +254,7 @@ def expand_content(namespace, source):
     zlib_state = zlib.decompressobj()
     for i in source:
       yield zlib_state.decompress(i, gsfiles.CHUNK_SIZE)
+      del i
       while zlib_state.unconsumed_tail:
         yield zlib_state.decompress(
             zlib_state.unconsumed_tail, gsfiles.CHUNK_SIZE)
@@ -263,6 +265,7 @@ def expand_content(namespace, source):
     # Returns the source as-is.
     for i in source:
       yield i
+      del i
 
 
 def delete_blobinfo_async(blobinfos):
@@ -501,6 +504,8 @@ class RestrictedVerifyWorkerHandler(webapp2.RequestHandler):
       for data in expand_content(namespace, blob):
         expanded_size += len(data)
         digest.update(data)
+        # Make sure the data is GC'ed.
+        del data
       is_verified = digest.hexdigest() == hash_key
     except runtime.DeadlineExceededError:
       # Failed to read it through. If it's compressed, at least no zlib error
@@ -741,6 +746,8 @@ class StoreContentByHashHandler(acl.ACLRequestHandler):
       for data in expand_content(namespace, [content]):
         expanded_size += len(data)
         digest.update(data)
+        # Make sure the data is GC'ed.
+        del data
       is_verified = digest.hexdigest() == hash_key
     except zlib.error as e:
       msg = 'Data is corrupted: %s' % e
