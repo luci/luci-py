@@ -253,12 +253,18 @@ def expand_content(namespace, source):
   if namespace.endswith(('-deflate', '-gzip')):
     zlib_state = zlib.decompressobj()
     for i in source:
-      yield zlib_state.decompress(i, gsfiles.CHUNK_SIZE)
-      del i
+      data = zlib_state.decompress(i, gsfiles.CHUNK_SIZE)
+      yield data
+      del data
       while zlib_state.unconsumed_tail:
-        yield zlib_state.decompress(
+        data = zlib_state.decompress(
             zlib_state.unconsumed_tail, gsfiles.CHUNK_SIZE)
-    yield zlib_state.flush()
+        yield data
+        del data
+      del i
+    data = zlib_state.flush()
+    yield data
+    del data
     # Forcibly delete the state.
     del zlib_state
   else:
