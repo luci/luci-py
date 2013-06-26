@@ -20,9 +20,9 @@ cron:
   schedule: every 10 minutes
 
 - description: Generate daily stats
-  url: /tasks/generate_daily_stats
+  url: /tasks/trigger_generate_daily_stats
   schedule: every day 00:30
 
 - description: Generate recent stats
-  url: /tasks/generate_recent_stats
+  url: /tasks/trigger_generate_recent_stats
   schedule: every 5 minutes

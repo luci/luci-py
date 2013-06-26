@@ -564,19 +564,34 @@ class AppTest(unittest.TestCase):
       self.assertEqual('200 OK', response.status)
 
   def testTaskQueueUrls(self):
-    task_queue_urls = ['/task_queues/cleanup_data']
+    self.taskqueue_stub = self.testbed.get_stub(testbed.TASKQUEUE_SERVICE_NAME)
 
-    for task_queue_url in task_queue_urls:
-      response = self.app.post(task_queue_url)
+    task_queue_url_triggers = [
+        '/tasks/trigger_cleanup_data',
+        '/tasks/trigger_generate_daily_stats',
+        '/tasks/trigger_generate_recent_stats',
+        ]
+
+    for i, task_queue_url_trigger in enumerate(task_queue_url_triggers):
+      response = self.app.post(task_queue_url_trigger)
       self.assertEqual('200 OK', response.status)
 
+      # Find the task and run it.
+      tasks = self.taskqueue_stub.get_filtered_tasks()
+      self.assertEqual(i + 1, len(tasks))
+
+      task = tasks[-1]
+      params = task.extract_params()
+      if task.method == 'POST':
+        response = self.app.post(task.url, params)
+      else:
+        response = self.app.get(task.url, params)
+
   def testCronJobTasks(self):
-    cron_job_urls = ['/tasks/abort_stale_runners',
-                     '/tasks/detect_dead_machines',
-                     '/tasks/generate_daily_stats',
-                     '/tasks/generate_recent_stats',
-                     '/tasks/trigger_cleanup_data',
-                    ]
+    cron_job_urls = [
+        '/tasks/abort_stale_runners',
+        '/tasks/detect_dead_machines',
+        ]
 
     for cron_job_url in cron_job_urls:
       response = self.app.get(cron_job_url,

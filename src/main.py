@@ -559,6 +559,24 @@ class TriggerCleanupDataHandler(CronJobHandler):
     self.response.out.write('Successfully triggered task to clean up old data.')
 
 
+class TriggerGenerateDailyStats(CronJobHandler):
+  """Handles cron jobs to generate daily stats."""
+
+  def post(self):  # pylint: disable-msg=g-bad-name
+    taskqueue.add(method='POST', url='/task_queues/generate_daily_stats')
+    self.response.out.write('Successfully triggered task to generate daily '
+                            'stats.')
+
+
+class TriggerGenerateRecentStats(CronJobHandler):
+  """Handles cron jobs to generate recent stats."""
+
+  def post(self):   # pylint: disable-msg=g-bad-name
+    taskqueue.add(method='POST', url='/task_queues/generate_recent_stats')
+    self.response.out.write('Successfully triggered task to generate recent '
+                            'stats.')
+
+
 class DetectDeadMachinesHandler(CronJobHandler):
   """Handles cron jobs to detect dead machines."""
 
@@ -1110,20 +1128,24 @@ def CreateApplication():
                                   ('/secure/stats', StatsHandler),
                                   ('/task_queues/cleanup_data',
                                    CleanupDataHandler),
+                                  ('/task_queues/generate_daily_stats',
+                                   GenerateDailyStatsHandler),
+                                  ('/task_queues/generate_recent_stats',
+                                   GenerateRecentStatsHandler),
                                   ('/tasks/abort_stale_runners',
                                    AbortStaleRunnersHandler),
                                   ('/tasks/detect_dead_machines',
                                    DetectDeadMachinesHandler),
                                   ('/tasks/detect_hanging_runners',
                                    DetectHangingRunnersHandler),
-                                  ('/tasks/generate_daily_stats',
-                                   GenerateDailyStatsHandler),
-                                  ('/tasks/generate_recent_stats',
-                                   GenerateRecentStatsHandler),
                                   ('/tasks/sendereporter',
                                    SendEReporterHandler),
                                   ('/tasks/trigger_cleanup_data',
                                    TriggerCleanupDataHandler),
+                                  ('/tasks/trigger_generate_daily_stats',
+                                   TriggerGenerateDailyStats),
+                                  ('/tasks/trigger_generate_recent_stats',
+                                   TriggerGenerateRecentStats),
                                   ('/test', TestRequestHandler),
                                   ('/upload', UploadHandler),
                                   (_SECURE_CANCEL_URL, CancelHandler),
