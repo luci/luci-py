@@ -8,6 +8,7 @@
 
 import logging
 
+from google.appengine.api import app_identity
 from google.appengine.api import mail
 from google.appengine.ext import db
 
@@ -36,6 +37,8 @@ def EmailAdmins(subject, body):
     return False
 
   send_to = ','.join(admin.email for admin in AdminUser.all())
-  mail.send_mail(sender='Swarm Server <no_reply@google.com>', to=send_to,
-                 subject=subject, body=body)
+  server_email = 'Swarm Server <no_reply@%s.appspotmail.com>' % (
+      app_identity.get_application_id())
+
+  mail.send_mail(sender=server_email, to=send_to, subject=subject, body=body)
   return True
