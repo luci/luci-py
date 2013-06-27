@@ -67,7 +67,7 @@ def Restart():
   if sys.platform == 'win32' or sys.platform == 'cygwin':
     restart_cmd = ['shutdown', '-r', '-f', '-t', '1']
   elif sys.platform == 'linux2' or sys.platform == 'darwin':
-    restart_cmd = ['sudo', 'shutdown', '-r', 'now']
+    restart_cmd = ['sudo', '/sbin/shutdown', '-r', 'now']
 
   if restart_cmd:
     logging.info('Restarting machine with command %s', restart_cmd)
