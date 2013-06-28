@@ -457,7 +457,7 @@ class LocalTestRunner(object):
     logging.error(error_string)
 
     if not stdout_string:
-      stdout_string = 'No ouput!'
+      stdout_string = 'No output!'
 
     stdout_string += '\n' + error_string
     return (1, stdout_string)
