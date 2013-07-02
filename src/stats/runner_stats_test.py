@@ -87,7 +87,7 @@ class StatManagerTest(unittest.TestCase):
     request.GetTestCase()
 
     runner = test_runner.TestRunner(
-        request=request,
+        request=request.key,
         config_hash=hashlib.sha1().hexdigest(),
         config_name=self.config_name,
         config_instance_index=0,

@@ -180,7 +180,7 @@ class TestRequestManager(object):
         return True
       else:
         logging.error('Got a additional response for runner=%s (key %s), '
-                      'not good', runner.GetName(), runner.key())
+                      'not good', runner.GetName(), runner.key.urlsafe())
         logging.debug('Dropped result string was:\n%s',
                       new_results or errors)
         return False
@@ -188,7 +188,7 @@ class TestRequestManager(object):
     # Clear any old result strings that are stored if we are overwriting.
     if overwrite:
       if runner.result_string_reference:
-        runner.result_string_reference.delete()
+        blobstore.delete(runner.result_string_reference)
         runner.result_string_reference = None
       runner.errors = None
 
@@ -207,11 +207,11 @@ class TestRequestManager(object):
 
     runner.put()
     logging.info('Successfully updated the results of runner %s.',
-                 runner.key())
+                 runner.key.urlsafe())
 
     # If the test didn't run successfully, we send an email if one was
     # requested via the test request.
-    test_case = runner.request.GetTestCase()
+    test_case = runner.request.get().GetTestCase()
     if not runner.ran_successfully and test_case.failure_email:
       # TODO(user): provide better info for failure. E.g., if we don't have a
       # web_request.body, we should have info like: Failed to upload files.
@@ -235,7 +235,7 @@ class TestRequestManager(object):
           encoded_result_string = runner.GetResultString().encode('utf-8')
           urllib2.urlopen(test_case.result_url,
                           urllib.urlencode((
-                              ('n', runner.request.name),
+                              ('n', runner.request.get().name),
                               ('c', runner.config_name),
                               ('i', runner.config_instance_index),
                               ('m', runner.num_config_instances),
@@ -296,7 +296,7 @@ class TestRequestManager(object):
       subject = '%s failed.' % runner.GetName()
 
     message_body_parts = [
-        'Test Request Name: ' + runner.request.name,
+        'Test Request Name: ' + runner.request.get().name,
         'Configuration Name: ' + runner.config_name,
         'Configuration Instance Index: ' + str(runner.config_instance_index),
         'Number of Configurations: ' + str(runner.num_config_instances),
@@ -368,7 +368,7 @@ class TestRequestManager(object):
         test_keys['test_keys'].append({'config_name': config.config_name,
                                        'instance_index': instance_index,
                                        'num_instances': config.num_instances,
-                                       'test_key': str(runner.key())})
+                                       'test_key': runner.key.urlsafe()})
     return test_keys
 
   def _QueueTestRequestConfig(self, request, config, config_hash):
@@ -387,7 +387,7 @@ class TestRequestManager(object):
     # Create a runner entity to record this request/config pair that needs
     # to be run. The runner will eventually be scheduled at a later time.
     runner = test_runner.TestRunner(
-        request=request, config_name=config.config_name,
+        request=request.key, config_name=config.config_name,
         config_hash=config_hash, config_instance_index=config.instance_index,
         num_config_instances=config.num_instances)
 
@@ -409,7 +409,7 @@ class TestRequestManager(object):
     Returns:
       A Test Run message for the remote test script.
     """
-    request = runner.request.GetTestCase()
+    request = runner.request.get().GetTestCase()
     config = runner.GetConfiguration()
     test_run = test_request_message.TestRun(
         test_run_name=request.test_case_name,
@@ -417,9 +417,11 @@ class TestRequestManager(object):
         instance_index=runner.config_instance_index,
         num_instances=runner.num_config_instances,
         configuration=config,
-        result_url=('%s/result?r=%s&id=%s' % (server_url, str(runner.key()),
+        result_url=('%s/result?r=%s&id=%s' % (server_url,
+                                              runner.key.urlsafe(),
                                               runner.machine_id)),
-        ping_url=('%s/runner_ping?r=%s&id=%s' % (server_url, str(runner.key()),
+        ping_url=('%s/runner_ping?r=%s&id=%s' % (server_url,
+                                                 runner.key.urlsafe(),
                                                  runner.machine_id)),
         ping_delay=(_TIMEOUT_FACTOR / _MISSED_PINGS_BEFORE_TIMEOUT),
         output_destination=request.output_destination,
@@ -460,14 +462,15 @@ class TestRequestManager(object):
       if test_runner.ShouldAutomaticallyRetryRunner(runner):
         if test_runner.AutomaticallyRetryRunner(runner):
           logging.warning('TRM.AbortStaleRunners retrying runner %s with key '
-                          ' %s. Attempt %d', runner.GetName(), runner.key(),
-                          runner.automatic_retry_count)
+                          ' %s. Attempt %d', runner.GetName(),
+                          runner.key.urlsafe(), runner.automatic_retry_count)
         else:
           logging.info('TRM.AbortStaleRunner unable to retry runner with key '
-                       '%s even though it can. Skipping for now.', runner.key())
+                       '%s even though it can. Skipping for now.',
+                       runner.urlsafe())
       else:
         logging.error('TRM.AbortStaleRunners aborting runner %s with key %s',
-                      runner.GetName(), runner.key())
+                      runner.GetName(), runner.key.urlsafe())
         self.AbortRunner(runner, reason='Runner has become stale.')
 
     # Abort all runners that haven't been able to find a machine to run them
@@ -540,15 +543,17 @@ class TestRequestManager(object):
         attribs['id'], test_request_message.Stringize(attribs['dimensions']),
         attributes.get('tag', None))
 
-    unfinished_test_key = db.GqlQuery(
-        'SELECT __key__ FROM TestRunner WHERE machine_id = :1 AND done = :2',
-        attribs['id'], False).get()
+    # pylint: disable=g-explicit-bool-comparison
+    unfinished_test_key = test_runner.TestRunner.query().filter(
+        test_runner.TestRunner.machine_id == attribs['id'],
+        test_runner.TestRunner.done == False).get(keys_only=True)
+    # pylint: enable=g-explicit-bool-comparison
     if unfinished_test_key:
       logging.warning('A machine is asking for a new test, but there still '
                       'seems to be an unfinished test with key, %s, running on '
                       'a machine with the same id, %s. This might just be due '
-                      'to app engine being only eventually consisten',
-                      unfinished_test_key, attribs['id'])
+                      'to app engine being only eventually consistent',
+                      unfinished_test_key.urlsafe(), attribs['id'])
 
     # Try assigning machine to a runner 10 times before we give up.
     # TODO(user): Tune this parameter somehow.
@@ -570,7 +575,7 @@ class TestRequestManager(object):
                                            test_runner.AtomicAssignID):
         assigned_runner = True
         # Grab the new version of the runner.
-        runner = db.get(runner.key())
+        runner = runner.key.get()
         break
 
     if assigned_runner:
@@ -767,7 +772,7 @@ class TestRequestManager(object):
         '-f', r'%s' % os.path.join(test_run.working_dir,
                                    _TEST_RUN_SWARM_FILE_NAME)]
 
-    test_case = runner.request.GetTestCase()
+    test_case = runner.request.get().GetTestCase()
     if test_case.verbose:
       command_to_execute.append('-v')
 

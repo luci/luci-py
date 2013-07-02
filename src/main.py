@@ -283,8 +283,8 @@ class MainHandler(webapp2.RequestHandler):
         <a href="?s=True">Show successfully completed tests too</a>
       """
 
-    total_pages = (
-        test_runner.TestRunner.all().count() / _NUM_USER_TEST_RUNNERS_PER_PAGE)
+    total_pages = (test_runner.TestRunner.query().count() /
+                   _NUM_USER_TEST_RUNNERS_PER_PAGE)
 
     params = {
         'topbar': GenerateTopbar(),
@@ -308,7 +308,7 @@ class MainHandler(webapp2.RequestHandler):
       detailed_output: Flag specifying how detailed the output should be.
     """
     runner.name_string = runner.GetName()
-    runner.key_string = str(runner.key())
+    runner.key_string = str(runner.key.urlsafe())
     runner.status_string = '&nbsp;'
     runner.requested_on_string = self.GetTimeString(runner.created)
     runner.started_string = '--'
@@ -454,7 +454,7 @@ class ResultHandler(webapp2.RequestHandler):
     logging.debug('Received Result: %s', self.request.url)
 
     runner_key = self.request.get('r', '')
-    runner = test_runner.GetRunnerFromKey(runner_key)
+    runner = test_runner.GetRunnerFromUrlSafeKey(runner_key)
 
     if not runner:
       # If the runner is gone, it probably already received results from
@@ -480,7 +480,7 @@ class ResultHandler(webapp2.RequestHandler):
 
     # Mark the runner as pinging now to prevent it from timing out while
     # the results are getting stored in the blobstore.
-    test_runner.PingRunner(runner.key(), machine_id)
+    test_runner.PingRunner(runner.key.urlsafe(), machine_id)
 
     result_blob_key = blobstore_helper.CreateBlobstore(result_string)
     if not result_blob_key:
@@ -682,7 +682,7 @@ class ShowMessageHandler(webapp2.RequestHandler):
     self.response.headers['Content-Type'] = 'text/plain'
 
     runner_key = self.request.get('r', '')
-    runner = test_runner.GetRunnerFromKey(runner_key)
+    runner = test_runner.GetRunnerFromUrlSafeKey(runner_key)
 
     if runner:
       self.response.out.write(runner.GetMessage())
@@ -725,7 +725,7 @@ class GetMatchingTestCasesHandler(webapp2.RequestHandler):
     matches = test_request.GetAllMatchingTestRequests(test_case_name)
     keys = []
     for match in matches:
-      keys.extend(map(str, match.GetAllKeys()))
+      keys.extend([key.urlsafe() for key in match.GetAllKeys()])
 
     if keys:
       self.response.out.write(json.dumps(keys))
@@ -794,7 +794,7 @@ class CancelHandler(webapp2.RequestHandler):
     self.response.headers['Content-Type'] = 'text/plain'
 
     runner_key = self.request.get('r', '')
-    runner = test_runner.GetRunnerFromKey(runner_key)
+    runner = test_runner.GetRunnerFromUrlSafeKey(runner_key)
 
     # Make sure found runner is not yet running.
     if runner and not runner.started:
@@ -815,7 +815,7 @@ class RetryHandler(webapp2.RequestHandler):
     self.response.headers['Content-Type'] = 'text/plain'
 
     runner_key = self.request.get('r', '')
-    runner = test_runner.GetRunnerFromKey(runner_key)
+    runner = test_runner.GetRunnerFromUrlSafeKey(runner_key)
 
     if runner:
       runner.started = None

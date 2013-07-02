@@ -29,7 +29,7 @@ def CreateRequest(num_instances):
 
   for i in range(num_instances):
     runner = test_runner.TestRunner(
-        request=request,
+        request=request.key,
         config_hash=hashlib.sha1().hexdigest(),
         config_instance_index=i,
         num_config_instances=num_instances)
@@ -50,7 +50,7 @@ class TestRequestTest(unittest.TestCase):
 
   def testGetTestRequestKeys(self):
     # Ensure it works with no keys.
-    empty_test_request = test_request.TestRequest()
+    empty_test_request = CreateRequest(num_instances=0)
     self.assertEqual(0, len(empty_test_request.GetAllKeys()))
 
     # Try with one runner.
@@ -88,17 +88,17 @@ class TestRequestTest(unittest.TestCase):
     # Create a request with no runners and ensure it gets deleted.
     request = test_request.TestRequest()
     request.put()
-    self.assertEqual(1, test_request.TestRequest.all().count())
+    self.assertEqual(1, test_request.TestRequest.query().count())
 
     request.DeleteIfNoMoreRunners()
-    self.assertEqual(0, test_request.TestRequest.all().count())
+    self.assertEqual(0, test_request.TestRequest.query().count())
 
     # Create a request with runner and ensure it isn't deleted.
     request = CreateRequest(1)
-    self.assertEqual(1, test_request.TestRequest.all().count())
+    self.assertEqual(1, test_request.TestRequest.query().count())
 
     request.DeleteIfNoMoreRunners()
-    self.assertEqual(1, test_request.TestRequest.all().count())
+    self.assertEqual(1, test_request.TestRequest.query().count())
 
 
 if __name__ == '__main__':

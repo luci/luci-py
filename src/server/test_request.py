@@ -9,10 +9,11 @@ developer requesting a test from their own build.
 
 
 
-from google.appengine.ext import db
+from google.appengine.ext import ndb
+
 from common import dimensions_utils
 from common import test_request_message
-
+from server import test_runner
 
 # The key for the model that is the parent of every TestRequest. This parent
 # allows transaction queries on TestRequest.
@@ -39,24 +40,36 @@ def GetTestCase(request_message):
   return request_object
 
 
-class TestRequest(db.Model):
+class TestRequest(ndb.Model):
   # The message received from the caller, formatted as a Test Case as
   # specified in
   # http://code.google.com/p/swarming/wiki/SwarmFileFormat.
-  message = db.TextProperty()
+  message = ndb.TextProperty()
 
   # The time at which this request was received.
-  requested_time = db.DateTimeProperty(auto_now_add=True)
+  requested_time = ndb.DateTimeProperty(auto_now_add=True)
 
   # The name for this test request.
-  name = db.StringProperty()
+  name = ndb.StringProperty()
+
+  @property
+  def runners(self):
+    return test_runner.TestRunner.query(
+        test_runner.TestRunner.request == self.key)
 
   def __init__(self, *args, **kwargs):
     # 'parent' can be the first arg or a keyword, only add a parent if there
     # isn't one.
     if not args and 'parent' not in kwargs:
-      parent_model = db.Model.get_or_insert(TEST_REQUEST_PARENT_KEY)
-      kwargs['parent'] = parent_model
+      try:
+        parent_model = ndb.Model.get_or_insert(TEST_REQUEST_PARENT_KEY)
+      except ndb.KindError:
+        # This exception is thrown when first trying to find the model
+        # on a dev app engine server.
+        parent_model = ndb.Model(id=TEST_REQUEST_PARENT_KEY)
+        parent_model.put()
+
+      kwargs['parent'] = parent_model.key
 
     super(TestRequest, self).__init__(*args, **kwargs)
 
@@ -113,18 +126,13 @@ class TestRequest(db.Model):
     Returns:
       A list of all the keys.
     """
-    # We can only access the runner if this class has been saved into the
-    # database.
-    if self.is_saved():
-      return [runner.key() for runner in self.runners]
-    else:
-      return []
+    return [runner.key for runner in self.runners]
 
   def DeleteIfNoMoreRunners(self):
     # Delete this request if we have deleted all the runners that were created
     # because of it.
     if self.runners.count() == 0:
-      self.delete()
+      self.key.delete()
 
 
 def GetAllMatchingTestRequests(test_case_name):
@@ -136,13 +144,14 @@ def GetAllMatchingTestRequests(test_case_name):
   Returns:
     A list of all Test Requests that have |test_case_name| as their name.
   """
-  parent_model = db.Model.get_or_insert(TEST_REQUEST_PARENT_KEY)
+  parent_model = ndb.Model.get_or_insert(TEST_REQUEST_PARENT_KEY)
 
   # Perform the query in a transaction to ensure that it gets the most recent
   # data, otherwise it is possible for one machine to add tests, and then be
   # unable to find them through this function after.
-  query = db.run_in_transaction(TestRequest.gql, 'WHERE name = :1 AND '
-                                'ANCESTOR IS :2', test_case_name,
-                                parent_model.key())
+  def GetMatches():
+    return TestRequest.gql('WHERE name = :1 AND ANCESTOR IS :2',
+                           test_case_name, parent_model.key)
+  query = ndb.transaction(GetMatches)
 
   return [request for request in query]

@@ -11,22 +11,18 @@ on a given machine.
 import datetime
 import logging
 
+from google.appengine.api import datastore_errors
 from google.appengine.ext import blobstore
-from google.appengine.ext import db
+from google.appengine.ext import ndb
+
 from common import blobstore_helper
 from common import test_request_message
-from server import test_request
 from stats import machine_stats
 from stats import runner_stats
 
 # The maximum number of times to retry a runner that has failed for a swarm
 # related reasons (like the machine timing out).
 MAX_AUTOMATIC_RETRIES = 3
-
-# Number of times to try a transaction before giving up. Since most likely the
-# recoverable exceptions will only happen when datastore is overloaded, it
-# doesn't make much sense to extensively retry many times.
-MAX_TRANSACTION_RETRY_COUNT = 3
 
 # Number of days to keep old runners around for.
 SWARM_FINISHED_RUNNER_TIME_TO_LIVE_DAYS = 14
@@ -59,84 +55,83 @@ def _GetCurrentTime():
   return datetime.datetime.now()
 
 
-class TestRunner(db.Model):
+class TestRunner(ndb.Model):
   # The test being run.
-  request = db.ReferenceProperty(test_request.TestRequest, required=True,
-                                 collection_name='runners')
+  request = ndb.KeyProperty(kind='TestRequest', required=True)
 
   # The name of the request's configuration being tested.
-  config_name = db.StringProperty()
+  config_name = ndb.StringProperty()
 
   # The hash of the configuration. Required in order to match machines.
-  config_hash = db.StringProperty(required=True)
+  config_hash = ndb.StringProperty(required=True)
 
   # The 0 based instance index of the request's configuration being tested.
-  config_instance_index = db.IntegerProperty()
+  config_instance_index = ndb.IntegerProperty(indexed=False)
 
   # The number of instances running on the same configuration as ours.
-  num_config_instances = db.IntegerProperty(indexed=False)
+  num_config_instances = ndb.IntegerProperty(indexed=False)
 
   # The machine that is running or ran the test. This attribute is only valid
   # once a machine has been assigned to this runner.
   # TODO(user): Investigate making this a reference to the MachineAssignment.
   # It would require ensuring the MachineAssignment is created when this value
   # is set.
-  machine_id = db.StringProperty()
+  machine_id = ndb.StringProperty()
 
   # A list of the old machines ids that this runner previous ran on. This is
   # useful for knowing when a ping is from an older machine.
-  old_machine_ids = db.ListProperty(str, indexed=False)
+  old_machine_ids = ndb.StringProperty(repeated=True, indexed=False)
 
   # Used to indicate if the runner has finished, either successfully or not.
-  done = db.BooleanProperty(default=False)
+  done = ndb.BooleanProperty(default=False)
 
   # The time at which this runner was created.  The runner may not have
   # started executing yet.
-  created = db.DateTimeProperty(auto_now_add=True)
+  created = ndb.DateTimeProperty(auto_now_add=True)
 
   # The time at which this runner was executed on a remote machine.  If the
   # runner isn't executing or ended, then the value is None and we use the
   # fact that it is None to identify if a test was started or not.
-  started = db.DateTimeProperty()
+  started = ndb.DateTimeProperty()
 
   # The number of times that this runner has been retried for swarm failures
   # (such as the machine that is running it timing out).
-  automatic_retry_count = db.IntegerProperty(default=0)
+  automatic_retry_count = ndb.IntegerProperty(default=0)
 
   # The last time a ping was recieved from the remote machine currently
   # running the test. This is used to determine if a machine has become
   # unresponse, which causes the runner to become aborted.
-  ping = db.DateTimeProperty()
+  ping = ndb.DateTimeProperty()
 
   # The time at which this runner ended.  This attribute is valid only when
   # the runner has ended (i.e. done == True). Until then, the value is
   # unspecified.
-  ended = db.DateTimeProperty()
+  ended = ndb.DateTimeProperty()
 
   # True if the test run finished and succeeded.  This attribute is valid only
   # when the runner has ended. Until then, the value is unspecified.
-  ran_successfully = db.BooleanProperty(indexed=False)
+  ran_successfully = ndb.BooleanProperty(indexed=False)
 
   # The stringized array of exit_codes for each actions of the test.
-  exit_codes = db.StringProperty(indexed=False)
+  exit_codes = ndb.StringProperty(indexed=False)
 
   # Contains any swarm specific errors that occured that caused the result
   # string to not get correct setup with the runner output (i.e. the runner
   # timed out so there was no data).
-  errors = db.StringProperty(indexed=False)
+  errors = ndb.StringProperty(indexed=False)
 
   # The blobstore reference to the full output of the test.  This key valid only
   # when the runner has ended (i.e. done == True). Until then, it is None.
-  result_string_reference = blobstore.BlobReferenceProperty()
+  result_string_reference = ndb.BlobKeyProperty()
 
   def delete(self):  # pylint: disable=g-bad-name
     # We delete the blob referenced by this model because no one
     # else will ever care about it or try to reference it, so we
     # are just cleaning up the blobstore.
     if self.result_string_reference:
-      self.result_string_reference.delete()
+      blobstore.delete(self.result_string_reference)
 
-    db.Model.delete(self)
+    self.key.delete()
 
   def GetName(self):
     """Gets a name for this runner.
@@ -144,13 +139,7 @@ class TestRunner(db.Model):
     Returns:
       The  name for this runner, or None if unable to get the name.
     """
-    try:
-      return '%s:%s' % (self.request.name, self.config_name)
-    except db.ReferencePropertyResolveError as e:
-      # Sometimes the test runner is unable to resolve the TestRequest
-      # member.
-      logging.warning(e)
-      return None
+    return '%s:%s' % (self.request.get().name, self.config_name)
 
   def GetConfiguration(self):
     """Gets the configuration associated with this runner.
@@ -158,7 +147,7 @@ class TestRunner(db.Model):
     Returns:
       A configuration dictionary for this runner.
     """
-    config = self.request.GetConfiguration(self.config_name)
+    config = self.request.get().GetConfiguration(self.config_name)
     assert config is not None
     return config
 
@@ -176,7 +165,7 @@ class TestRunner(db.Model):
     if not self.result_string_reference:
       return ''
 
-    return blobstore_helper.GetBlobstore(self.result_string_reference.key())
+    return blobstore_helper.GetBlobstore(self.result_string_reference)
 
   def GetDimensionsString(self):
     """Get a string representing the dimensions this runner requires.
@@ -209,7 +198,7 @@ class TestRunner(db.Model):
       A string represent this test runner request.
     """
     message = ['Test Request Message:']
-    message.append(self.request.message)
+    message.append(self.request.get().message)
 
     message.append('')
     message.append('Test Runner Message:')
@@ -220,6 +209,7 @@ class TestRunner(db.Model):
     return '\n'.join(message)
 
 
+@ndb.transactional
 def AtomicAssignID(key, machine_id):
   """Function to be run by db.run_in_transaction().
 
@@ -230,7 +220,7 @@ def AtomicAssignID(key, machine_id):
   Raises:
     TxRunnerAlreadyAssignedError: If runner has already been assigned a machine.
   """
-  runner = db.get(key)
+  runner = key.get()
   if runner and not runner.started:
     runner.machine_id = str(machine_id)
     runner.started = datetime.datetime.now()
@@ -273,25 +263,17 @@ def AssignRunnerToMachine(machine_id, runner, atomic_assign):
   Returns:
     True is succeeded, False otherwise.
   """
-  for _ in range(MAX_TRANSACTION_RETRY_COUNT):
-    try:
-      db.run_in_transaction(atomic_assign, runner.key(), machine_id)
-      return True
-    except TxRunnerAlreadyAssignedError:
-      # The runner is already assigned to a machine. Abort.
-      break
-    except db.TransactionFailedError:
-      # This exception only happens if there is a problem with datastore,
-      # e.g.high contention, capacity cap, etc. It ensures the operation isn't
-      # done so we can safely retry.
-      # Since we are on the main server thread, we avoid sleeping between
-      # calls.
-      continue
-    except (db.Timeout, db.InternalError):
-      # These exceptions do NOT ensure the operation is done. Based on the
-      # Discussion above, we assume it hasn't been assigned.
-      logging.exception('Un-determined fate for runner=%s', runner.GetName())
-      break
+  try:
+    atomic_assign(runner.key, machine_id)
+    return True
+  except (TxRunnerAlreadyAssignedError,
+          datastore_errors.TransactionFailedError):
+    # Failed to assign the runner because it is probably already assigned.
+    pass
+  except (datastore_errors.Timeout, datastore_errors.InternalError):
+    # These exceptions do NOT ensure the operation is done. Based on the
+    # Discussion above, we assume it hasn't been assigned.
+    logging.exception('Un-determined fate for runner=%s', runner.GetName())
 
   return False
 
@@ -322,7 +304,7 @@ def AutomaticallyRetryRunner(runner):
   """
   def RestartRunnerTransaction():
     # Ensure that we have the most up to date runner.
-    transaction_runner = db.get(runner.key())
+    transaction_runner = runner.key.get()
 
     if not transaction_runner or transaction_runner.done:
       return False
@@ -347,10 +329,10 @@ def AutomaticallyRetryRunner(runner):
     # data).
     # We can't tests this because the unit tests can't reproduce the issue of
     # machines being slighly out of sync with each other.
-    if db.run_in_transaction(RestartRunnerTransaction):
+    if ndb.transaction(RestartRunnerTransaction):
       runner_stats.RecordRunnerStats(runner)
       return True
-  except db.TransactionFailedError:
+  except datastore_errors.TransactionFailedError:
     pass
 
   return False
@@ -366,12 +348,7 @@ def PingRunner(key, machine_id):
   Returns:
     True if the runner is successfully pinged.
   """
-  try:
-    runner = TestRunner.get(key)
-  except (db.BadKeyError, db.KindError, db.BadArgumentError) as e:
-    logging.error('Failed to find runner, %s', str(e))
-    return False
-
+  runner = GetRunnerFromUrlSafeKey(key)
   if not runner:
     logging.error('Failed to find runner')
     return False
@@ -387,7 +364,7 @@ def PingRunner(key, machine_id):
 
         # The runner stored in the db was updated by AssignRunnerToMachine,
         # so the local runner needed to get updated to contain the same values.
-        runner = TestRunner.get(key)
+        runner = GetRunnerFromUrlSafeKey(key)
         runner.automatic_retry_count -= 1
         runner.old_machine_ids.remove(machine_id)
         runner.put()
@@ -423,13 +400,20 @@ def GetTestRunners(sort_by, ascending, limit, offset):
     An iterator of test runners in the given range.
   """
   # If we recieve an invalid sort_by parameter, just default to machine_id.
-  if sort_by not in TestRunner.properties():
+  acceptable_sort_values = (
+      'created',
+      'ended',
+      'machine_id',
+      'started',
+      )
+  if sort_by not in acceptable_sort_values:
     sort_by = 'machine_id'
 
   if not ascending:
     sort_by += ' DESC'
 
-  return TestRunner.gql('ORDER BY %s' % sort_by).run(limit=limit, offset=offset)
+  return TestRunner.gql('ORDER BY %s' % sort_by).iter(limit=limit,
+                                                      offset=offset)
 
 
 def GetHangingRunners():
@@ -447,19 +431,25 @@ def GetHangingRunners():
   return [hanging_runner for hanging_runner in hanging_runners]
 
 
-def GetRunnerFromKey(key):
-  """Returns the runner specified by the given key.
+def GetRunnerFromUrlSafeKey(url_safe_key):
+  """Returns the runner specified by the given key string.
 
   Args:
-    key: The key of the runner to return.
+    url_safe_key: The key string of the runner to return.
 
   Returns:
     The runner with the given key, otherwise None if the key doesn't refer
     to a valid runner.
   """
   try:
-    return TestRunner.get(key)
-  except (db.BadArgumentError, db.BadKeyError, db.KindError):
+    key = ndb.Key(urlsafe=url_safe_key)
+    if key.kind() == 'TestRunner':
+      return key.get()
+    return None
+  except Exception:  # pylint: disable=broad-except
+    # All exceptions must be caught because some exceptions can only be caught
+    # this way. See this bug report for more details:
+    # https://code.google.com/p/appengine-ndb-experiment/issues/detail?id=143
     return None
 
 
@@ -472,7 +462,7 @@ def GetRunnerResults(key):
   Returns:
     A dictionary of the runner's results, or None if the runner not found.
   """
-  runner = GetRunnerFromKey(key)
+  runner = GetRunnerFromUrlSafeKey(key)
   if not runner:
     return None
 
@@ -493,7 +483,7 @@ def DeleteRunnerFromKey(key):
   Returns:
     True if a matching TestRunner was found and deleted.
   """
-  runner = GetRunnerFromKey(key)
+  runner = GetRunnerFromUrlSafeKey(key)
 
   if not runner:
     logging.debug('No matching Test Runner found for key, %s', key)
@@ -512,7 +502,7 @@ def DeleteRunner(runner):
   """
   request = runner.request
   runner.delete()
-  request.DeleteIfNoMoreRunners()
+  request.get().DeleteIfNoMoreRunners()
 
 
 def DeleteOldRunners():
@@ -527,8 +517,15 @@ def DeleteOldRunners():
       _GetCurrentTime() -
       datetime.timedelta(days=SWARM_FINISHED_RUNNER_TIME_TO_LIVE_DAYS))
 
-  rpc = db.delete_async(TestRunner.gql('WHERE ended != :1 and ended < :2', None,
-                                       old_cutoff))
+  old_runner_query = TestRunner.query(
+      default_options=ndb.QueryOptions(keys_only=True))
+
+  # '!= None' must be used instead of 'is not None' because these arguments
+  # become part of a GQL query, where 'is not None' is invalid syntax.
+  old_runner_query = old_runner_query.filter(
+      TestRunner.ended != None,  # pylint: disable-msg=g-equals-none
+      TestRunner.ended < old_cutoff)
+  rpc = ndb.delete_multi_async(old_runner_query)
 
   logging.debug('DeleteOldRunners done')
 
@@ -548,7 +545,7 @@ def DeleteOrphanedBlobs():
                             blob.key()).count(limit=1):
         blobstore.delete_async(blob.key())
         blobs_deleted += 1
-  except db.Timeout:
+  except datastore_errors.Timeout:
     logging.warning('Hit a timeout error while deleting orphaned blobs, some '
                     'orphans may still exist')
 

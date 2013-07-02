@@ -82,20 +82,21 @@ class AppTest(unittest.TestCase):
     return self._test_request_message
 
   def _GetRequest(self):
-    return test_request.TestRequest.all().get()
+    return test_request.TestRequest.query().get()
 
-  def _CreateTestRunner(self, machine_id=None, exit_code=None, started=None):
+  def _CreateTestRunner(self, machine_id=None, exit_codes=None, started=None):
     request = test_request.TestRequest(message=self._GetRequestMessage(),
                                        name=self._default_test_request_name)
     request.put()
 
-    runner = test_runner.TestRunner(request=request,
+    runner = test_runner.TestRunner(request=request.key,
                                     machine_id=machine_id,
                                     config_hash=self.config_hash,
                                     config_name='c1',
                                     config_instance_index=0,
                                     num_config_instances=1,
-                                    exit_code=exit_code, started=started)
+                                    exit_codes=exit_codes,
+                                    started=started)
     runner.put()
 
     return runner
@@ -118,7 +119,7 @@ class AppTest(unittest.TestCase):
     response = self.app.get('/get_matching_test_cases',
                             {'name': self._default_test_request_name})
     self.assertEqual('200 OK', response.status)
-    self.assertTrue(str(runner.key()) in response.body)
+    self.assertTrue(str(runner.key.urlsafe()) in response.body, response.body)
 
     # Test with a multiple matching runners.
     additional_test_runner = self._CreateTestRunner()
@@ -127,8 +128,9 @@ class AppTest(unittest.TestCase):
     response = self.app.get('/get_matching_test_cases',
                             {'name': self._default_test_request_name})
     self.assertEqual('200 OK', response.status)
-    self.assertTrue(str(runner.key()) in response.body)
-    self.assertTrue(str(additional_test_runner.key()) in response.body)
+    self.assertTrue(str(runner.key.urlsafe()) in response.body, response.body)
+    self.assertTrue(str(additional_test_runner.key.urlsafe()) in response.body,
+                    response.body)
 
   def testGetResultHandler(self):
     handlers = ['/get_result', '/secure/get_result']
@@ -139,17 +141,17 @@ class AppTest(unittest.TestCase):
       self.assertTrue('204' in response.status)
 
     # Create test and runner.
-    runner = self._CreateTestRunner(machine_id=MACHINE_ID, exit_code=0)
+    runner = self._CreateTestRunner(machine_id=MACHINE_ID, exit_codes='[0]')
 
     # Invalid key.
     for handler in handlers:
       response = self.app.get(handler,
-                              {'r': self._GetRequest().key()})
+                              {'r': self._GetRequest().key.urlsafe()})
       self.assertTrue('204' in response.status)
 
     # Valid key.
     for handler in handlers:
-      response = self.app.get(handler, {'r': runner.key()})
+      response = self.app.get(handler, {'r': runner.key.urlsafe()})
       self.assertEquals('200 OK', response.status)
 
       try:
@@ -219,7 +221,7 @@ class AppTest(unittest.TestCase):
 
     # Try to clean up with a valid key.
     runner = self._CreateTestRunner()
-    response = self.app.post('/cleanup_results', {'r': runner.key()})
+    response = self.app.post('/cleanup_results', {'r': runner.key.urlsafe()})
     self.assertEqual('200 OK', response.status)
     self.assertTrue('Key deleted.' in response.body)
 
@@ -229,9 +231,9 @@ class AppTest(unittest.TestCase):
     self.assertTrue('204' in response.status)
 
     # Test with matching key.
-    runner = self._CreateTestRunner(exit_code=0)
+    runner = self._CreateTestRunner(exit_codes='[0]')
 
-    response = self.app.post('/secure/retry', {'r': runner.key()})
+    response = self.app.post('/secure/retry', {'r': runner.key.urlsafe()})
     self.assertEquals('200 OK', response.status)
     self.assertTrue('Runner set for retry' in response.body)
 
@@ -241,7 +243,8 @@ class AppTest(unittest.TestCase):
     self.assertTrue('Cannot find message' in response.body, response.body)
 
     runner = self._CreateTestRunner()
-    response = self.app.get('/secure/show_message', {'r': runner.key()})
+    response = self.app.get('/secure/show_message',
+                            {'r': runner.key.urlsafe()})
     self.assertEquals('200 OK', response.status)
 
   def testRegisterHandler(self):
@@ -296,12 +299,13 @@ class AppTest(unittest.TestCase):
                                     started=datetime.datetime.now())
 
     result = 'result string'
-    response = self._PostResults(runner.key(), runner.machine_id, result)
+    response = self._PostResults(runner.key.urlsafe(), runner.machine_id,
+                                 result)
     self.assertEquals('200 OK', response.status)
 
     # Get the lastest version of the runner and ensure it has the correct
     # values.
-    runner = test_runner.TestRunner.all().get()
+    runner = test_runner.TestRunner.query().get()
     self.assertTrue(runner.ran_successfully)
     self.assertEqual(result, runner.GetResultString())
 
@@ -309,7 +313,8 @@ class AppTest(unittest.TestCase):
     # if two machines are running the same test (due to flaky connections),
     # and the results were then deleted before the second machine returned.
     runner.delete()
-    response = self._PostResults(runner.key(), runner.machine_id, result)
+    response = self._PostResults(runner.key.urlsafe(), runner.machine_id,
+                                 result)
     self.assertEqual('200 OK', response.status)
 
   def testResultHandlerBlobstoreFailure(self):
@@ -321,7 +326,8 @@ class AppTest(unittest.TestCase):
     runner = self._CreateTestRunner(machine_id=MACHINE_ID,
                                     started=datetime.datetime.now())
 
-    response = self._PostResults(runner.key(), runner.machine_id, result,
+    response = self._PostResults(runner.key.urlsafe(), runner.machine_id,
+                                 result,
                                  expect_errors=True)
     self.assertEquals('500 Internal Server Error', response.status)
     self.assertEquals(
@@ -330,7 +336,7 @@ class AppTest(unittest.TestCase):
 
     # Get the lastest version of the runner and ensure it hasn't been marked as
     # done.
-    runner = test_runner.TestRunner.all().get()
+    runner = test_runner.TestRunner.query().get()
     self.assertFalse(runner.done)
 
     self._mox.VerifyAll()
@@ -537,7 +543,7 @@ class AppTest(unittest.TestCase):
     # Start a test and successfully ping it
     runner = self._CreateTestRunner(machine_id=MACHINE_ID,
                                     started=datetime.datetime.now())
-    response = self.app.post('/runner_ping', {'r': runner.key(),
+    response = self.app.post('/runner_ping', {'r': runner.key.urlsafe(),
                                               'id': runner.machine_id})
     self.assertEqual('200 OK', response.status)
     self.assertEqual('Runner successfully pinged.', response.body)
@@ -644,7 +650,8 @@ class AppTest(unittest.TestCase):
     self.assertTrue('Cannot find runner' in response.body, response.body)
 
     runner = self._CreateTestRunner()
-    response = self.app.post(main_app._SECURE_CANCEL_URL, {'r': runner.key()})
+    response = self.app.post(main_app._SECURE_CANCEL_URL,
+                             {'r': runner.key.urlsafe()})
     self.assertEquals('200 OK', response.status)
     self.assertEquals('Runner canceled.', response.body)
 
