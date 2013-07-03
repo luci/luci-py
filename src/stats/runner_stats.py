@@ -15,56 +15,57 @@ import logging
 
 
 from google.appengine.ext import db
+from google.appengine.ext import ndb
 
 
 # Number of days to evaluate when considering runner stats.
 RUNNER_STATS_EVALUATION_CUTOFF_DAYS = 7
 
 
-class RunnerStats(db.Model):
+class RunnerStats(ndb.Model):
   """Stores basic stats about a runner.
 
   If a runner is restarted for any reason, such as an automatic retry, a new
   RunnerStats is created.
   """
   # The name of the test case run by the runner.
-  test_case_name = db.StringProperty(required=True)
+  test_case_name = ndb.StringProperty(required=True)
 
   # The dimensions of the runner.
-  dimensions = db.TextProperty(required=True)
+  dimensions = ndb.TextProperty(required=True)
 
   # The number of runner instances for this test case and config combo.
-  num_instances = db.IntegerProperty(required=True)
+  num_instances = ndb.IntegerProperty(required=True)
 
   # The 0 based instance index of the runner.
-  instance_index = db.IntegerProperty(required=True)
+  instance_index = ndb.IntegerProperty(required=True)
 
   # The time that the runner is created and begins to look for a machine.
-  created_time = db.DateTimeProperty(required=True)
+  created_time = ndb.DateTimeProperty(required=True)
 
   # The time that the runner is assigned a machine to run on. If the runner
   # never ran, this value can be empty.
-  assigned_time = db.DateTimeProperty()
+  assigned_time = ndb.DateTimeProperty()
 
   # The time that the runner ended (either by the machine returning or through
   # timing out). If the runner never ran, this value can be empty.
-  end_time = db.DateTimeProperty()
+  end_time = ndb.DateTimeProperty()
 
   # The machine id of the machine that ran this runner. Only valid after the
   # runner has been assigned. If the runner never ran, this value can be empty.
-  machine_id = db.StringProperty()
+  machine_id = ndb.StringProperty()
 
   # Indicates if the runner tasks were successful . This is valid only once the
   # runner has finished or timed out.
-  success = db.BooleanProperty(required=True)
+  success = ndb.BooleanProperty(required=True)
 
   # Indicates if the runner timed out. This is valid only once the runner has
   # finished or timed out.
-  timed_out = db.BooleanProperty(required=True)
+  timed_out = ndb.BooleanProperty(required=True)
 
   # The number of times the runner for this stats has been automatically retried
   # (each retry has its own RunnerStats).
-  automatic_retry_count = db.IntegerProperty(required=True)
+  automatic_retry_count = ndb.IntegerProperty(required=True)
 
 
 class WaitSummary(db.Model):
@@ -299,8 +300,16 @@ def DeleteOldRunnerStats():
       _GetCurrentTime() -
       datetime.timedelta(days=RUNNER_STATS_EVALUATION_CUTOFF_DAYS))
 
-  rpc = db.delete_async(RunnerStats.gql('WHERE end_time != :1 and end_time < '
-                                        ':2', None, old_cutoff))
+  old_runner_stats_query = RunnerStats.query(
+      default_options=ndb.QueryOptions(keys_only=True))
+
+  # '!= None' must be used instead of 'is not None' because these arguments
+  # become part of a GQL query, where 'is not None' is invalid syntax.
+  old_runner_stats_query = old_runner_stats_query.filter(
+      RunnerStats.end_time != None,  # pylint: disable-msg=g-equals-none
+      RunnerStats.end_time < old_cutoff)
+
+  rpc = ndb.delete_multi_async(old_runner_stats_query)
 
   logging.debug('DeleteOldRunnersStats done')
 

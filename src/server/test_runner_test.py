@@ -179,8 +179,8 @@ class TestRunnerTest(unittest.TestCase):
 
     test_runner.AutomaticallyRetryRunner(runner)
 
-    self.assertEqual(1, runner_stats.RunnerStats.all().count())
-    r_stats = runner_stats.RunnerStats.all().get()
+    self.assertEqual(1, runner_stats.RunnerStats.query().count())
+    r_stats = runner_stats.RunnerStats.query().get()
     self.assertFalse(r_stats.success)
     self.assertEqual(0, r_stats.automatic_retry_count)
 

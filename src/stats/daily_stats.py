@@ -12,6 +12,9 @@ import datetime
 import logging
 
 from google.appengine.ext import db
+from google.appengine.ext import ndb
+
+from stats import runner_stats
 
 
 class DailyStats(db.Model):
@@ -69,17 +72,13 @@ def GenerateDailyStats(day):
       day + datetime.timedelta(days=1),
       datetime.time())
 
-  # Find the number of shards that ran, as well as how many failed, during the
-  # day.
-  query = db.GqlQuery('SELECT success, timed_out, created_time, assigned_time, '
-                      'end_time FROM RunnerStats WHERE end_time >= :1 AND '
-                      'end_time < :2', day_midnight, next_day_midnight)
-
   daily_stats = DailyStats(date=day)
-  for runner in query:
+
+  def ComputeRunnerStats(runner):
+    """Add the stats from the given runner into the daily stats."""
     # If there is no assigned time, the runner never ran, so ignore it.
     if not runner.assigned_time:
-      continue
+      return
 
     # Update the time spent waiting and running.
     daily_stats.total_wait_time += _TimeDeltaToMinutes(
@@ -94,6 +93,16 @@ def GenerateDailyStats(day):
     elif not runner.success:
       daily_stats.shards_failed += 1
 
+  # Find the number of shards that ran, as well as how many failed, during the
+  # day.
+  query = runner_stats.RunnerStats.query(
+      default_options=ndb.QueryOptions(
+          projection=('assigned_time', 'created_time', 'end_time', 'success',
+                      'timed_out')))
+  query = query.filter(runner_stats.RunnerStats.end_time >= day_midnight,
+                       runner_stats.RunnerStats.end_time < next_day_midnight)
+
+  query.map_async(ComputeRunnerStats).get_result()
   daily_stats.put()
 
   return True

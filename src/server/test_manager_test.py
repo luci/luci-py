@@ -968,14 +968,14 @@ class TestRequestManagerTest(unittest.TestCase):
     # Create a pending runner and execute it.
     self._manager.ExecuteTestRequest(self._GetRequestMessage())
     self._ExecuteRegister(MACHINE_IDS[0])
-    self.assertEqual(0, runner_stats.RunnerStats.all().count())
+    self.assertEqual(0, runner_stats.RunnerStats.query().count())
 
     # Return the results for the test and ensure the stats are updated.
     runner = test_runner.TestRunner.query().get()
     self._manager.UpdateTestResult(runner, runner.machine_id, success=True)
 
-    self.assertEqual(1, runner_stats.RunnerStats.all().count())
-    r_stats = runner_stats.RunnerStats.all().get()
+    self.assertEqual(1, runner_stats.RunnerStats.query().count())
+    r_stats = runner_stats.RunnerStats.query().get()
     self.assertNotEqual(None, r_stats.created_time)
     self.assertNotEqual(None, r_stats.assigned_time)
     self.assertNotEqual(None, r_stats.end_time)

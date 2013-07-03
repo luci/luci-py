@@ -14,6 +14,8 @@ import unittest
 
 
 from google.appengine.ext import testbed
+from google.appengine.ext import ndb
+
 from common import test_request_message
 from server import test_request
 from server import test_runner
@@ -102,7 +104,7 @@ class StatManagerTest(unittest.TestCase):
     return runner
 
   def testRecordRunnerStats(self):
-    r_stats = runner_stats.RunnerStats.all().get()
+    r_stats = runner_stats.RunnerStats.query().get()
     self.assertEqual(None, r_stats)
 
     # Create stats from a runner that didn't timeout.
@@ -326,22 +328,22 @@ class StatManagerTest(unittest.TestCase):
     r_stats = _CreateRunnerStats(dimensions='dimensions')
     r_stats.assigned_time = r_stats.created_time
     r_stats.put()
-    self.assertEqual(1, runner_stats.RunnerStats.all().count())
+    self.assertEqual(1, runner_stats.RunnerStats.query().count())
 
     # Make sure that runners aren't deleted if they don't have an ended_time.
-    runner_stats.DeleteOldRunnerStats().get_result()
-    self.assertEqual(1, runner_stats.RunnerStats.all().count())
+    ndb.Future.wait_all(runner_stats.DeleteOldRunnerStats())
+    self.assertEqual(1, runner_stats.RunnerStats.query().count())
 
     # Make sure that new runner stats aren't deleted (even if they started
     # long ago).
     r_stats.end_time = r_stats.assigned_time + datetime.timedelta(days=3)
     r_stats.put()
-    runner_stats.DeleteOldRunnerStats().get_result()
-    self.assertEqual(1, runner_stats.RunnerStats.all().count())
+    ndb.Future.wait_all(runner_stats.DeleteOldRunnerStats())
+    self.assertEqual(1, runner_stats.RunnerStats.query().count())
 
     # Make sure that old runner stats are deleted.
-    runner_stats.DeleteOldRunnerStats().get_result()
-    self.assertEqual(0, runner_stats.RunnerStats.all().count())
+    ndb.Future.wait_all(runner_stats.DeleteOldRunnerStats())
+    self.assertEqual(0, runner_stats.RunnerStats.query().count())
 
     self._mox.VerifyAll()
 
