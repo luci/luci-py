@@ -129,7 +129,7 @@ class TestRunner(ndb.Model):
     # else will ever care about it or try to reference it, so we
     # are just cleaning up the blobstore.
     if self.result_string_reference:
-      blobstore.delete(self.result_string_reference)
+      blobstore.delete_async(self.result_string_reference)
 
     self.key.delete()
 
