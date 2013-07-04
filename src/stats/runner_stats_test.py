@@ -136,9 +136,9 @@ class StatManagerTest(unittest.TestCase):
     r_stats.put()
 
     runner_stats.GenerateStats()
-    self.assertEqual(1, runner_stats.WaitSummary.all().count())
+    self.assertEqual(1, runner_stats.WaitSummary.query().count())
 
-    runner_waits = runner_stats.WaitSummary.all().get()
+    runner_waits = runner_stats.WaitSummary.query().get()
     self.assertEqual(1, runner_waits.children.count())
     self.assertEqual(datetime.datetime.min, runner_waits.start_time)
     self.assertEqual(r_stats.assigned_time, runner_waits.end_time)
@@ -172,9 +172,9 @@ class StatManagerTest(unittest.TestCase):
         sum(count for _, count in time_counts)))
 
     runner_stats.GenerateStats()
-    self.assertEqual(1, runner_stats.WaitSummary.all().count())
+    self.assertEqual(1, runner_stats.WaitSummary.query().count())
 
-    runner_waits = runner_stats.WaitSummary.all().get()
+    runner_waits = runner_stats.WaitSummary.query().get()
     self.assertEqual(1, runner_waits.children.count())
     self.assertEqual(datetime.datetime.min, runner_waits.start_time)
     self.assertEqual(r_stats.assigned_time, runner_waits.end_time)
@@ -194,7 +194,7 @@ class StatManagerTest(unittest.TestCase):
     r_stats.put()
 
     runner_stats.GenerateStats()
-    self.assertEqual(1, runner_stats.WaitSummary.all().count())
+    self.assertEqual(1, runner_stats.WaitSummary.query().count())
 
     # Now create a second set of stats, which should get stored in its own
     # model.
@@ -204,9 +204,9 @@ class StatManagerTest(unittest.TestCase):
     r_stats.put()
 
     runner_stats.GenerateStats()
-    self.assertEqual(2, runner_stats.WaitSummary.all().count())
+    self.assertEqual(2, runner_stats.WaitSummary.query().count())
 
-    runner_waits = list(runner_stats.WaitSummary.all())
+    runner_waits = list(runner_stats.WaitSummary.query())
     self.assertNotEqual(runner_waits[0].start_time, runner_waits[1].start_time)
     if runner_waits[0].start_time < runner_waits[1].start_time:
       oldest = 0
@@ -244,10 +244,10 @@ class StatManagerTest(unittest.TestCase):
 
       runner_stats.GenerateStats()
 
-    start_times = [wait.start_time for wait in runner_stats.WaitSummary.all()]
+    start_times = [wait.start_time for wait in runner_stats.WaitSummary.query()]
     self.assertEqual(len(start_times), len(set(start_times)), start_times)
 
-    end_times = [wait.end_time for wait in runner_stats.WaitSummary.all()]
+    end_times = [wait.end_time for wait in runner_stats.WaitSummary.query()]
     self.assertEqual(len(end_times), len(set(end_times)), end_times)
 
   def testGetStatsForOneRunnerWaits(self):
@@ -262,8 +262,7 @@ class StatManagerTest(unittest.TestCase):
         num_runners=1,
         mean_wait=wait,
         median_buckets=json.dumps({'0': 1}),
-        longest_wait=wait,
-        summary_parent=wait_summary)
+        summary_parent=wait_summary.key)
     dimension_wait.put()
 
     expected_waits = {
@@ -282,8 +281,7 @@ class StatManagerTest(unittest.TestCase):
           num_runners=1,
           mean_wait=i,
           median_buckets=json.dumps({str(int(round(i / 60.0))): 1}),
-          longest_wait=i,
-          summary_parent=wait_summary)
+          summary_parent=wait_summary.key)
       dimension_wait.put()
 
     mean_wait = float(sum(times)) / len(times)
@@ -364,20 +362,20 @@ class StatManagerTest(unittest.TestCase):
 
     wait_summary = _CreateWaitSummary(end_time=datetime.datetime.now())
     dimension_wait = runner_stats.DimensionWaitSummary(
-        summary_parent=wait_summary)
+        summary_parent=wait_summary.key)
     dimension_wait.put()
-    self.assertEqual(1, runner_stats.WaitSummary.all().count())
-    self.assertEqual(1, runner_stats.DimensionWaitSummary.all().count())
+    self.assertEqual(1, runner_stats.WaitSummary.query().count())
+    self.assertEqual(1, runner_stats.DimensionWaitSummary.query().count())
 
     # Make sure that stats aren't deleted if they aren't old.
-    runner_stats.DeleteOldWaitSummaries()
-    self.assertEqual(1, runner_stats.WaitSummary.all().count())
-    self.assertEqual(1, runner_stats.DimensionWaitSummary.all().count())
+    ndb.Future.wait_all(runner_stats.DeleteOldWaitSummaries())
+    self.assertEqual(1, runner_stats.WaitSummary.query().count())
+    self.assertEqual(1, runner_stats.DimensionWaitSummary.query().count())
 
     # Make sure that old runner stats are deleted.
-    runner_stats.DeleteOldWaitSummaries()
-    self.assertEqual(0, runner_stats.WaitSummary.all().count())
-    self.assertEqual(0, runner_stats.DimensionWaitSummary.all().count())
+    ndb.Future.wait_all(runner_stats.DeleteOldWaitSummaries())
+    self.assertEqual(0, runner_stats.WaitSummary.query().count())
+    self.assertEqual(0, runner_stats.DimensionWaitSummary.query().count())
 
     self._mox.VerifyAll()
 

@@ -312,7 +312,7 @@ class AppTest(unittest.TestCase):
     # Delete the runner and try posting the results again. This can happen
     # if two machines are running the same test (due to flaky connections),
     # and the results were then deleted before the second machine returned.
-    runner.delete()
+    runner.key.delete()
     response = self._PostResults(runner.key.urlsafe(), runner.machine_id,
                                  result)
     self.assertEqual('200 OK', response.status)

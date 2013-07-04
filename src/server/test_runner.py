@@ -124,14 +124,14 @@ class TestRunner(ndb.Model):
   # when the runner has ended (i.e. done == True). Until then, it is None.
   result_string_reference = ndb.BlobKeyProperty()
 
-  def delete(self):  # pylint: disable=g-bad-name
+  @classmethod
+  def _pre_delete_hook(cls, key):  # pylint: disable=g-bad-name
+    runner = key.get()
     # We delete the blob referenced by this model because no one
     # else will ever care about it or try to reference it, so we
     # are just cleaning up the blobstore.
-    if self.result_string_reference:
-      blobstore.delete_async(self.result_string_reference)
-
-    self.key.delete()
+    if runner.result_string_reference:
+      blobstore.delete_async(runner.result_string_reference)
 
   def GetName(self):
     """Gets a name for this runner.
@@ -501,7 +501,7 @@ def DeleteRunner(runner):
     runner: The runner to delete.
   """
   request = runner.request
-  runner.delete()
+  runner.key.delete()
   request.get().DeleteIfNoMoreRunners()
 
 

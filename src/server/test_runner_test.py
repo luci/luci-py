@@ -147,7 +147,7 @@ class TestRunnerTest(unittest.TestCase):
   # Test the case where the runner is deleted before the tx is done.
   def testAssignDeletedRunnerToMachine(self):
     runner = self._CreateRunner()
-    runner.delete()
+    runner.key.delete()
 
     # Assignment should fail without an exception.
     self.assertFalse(test_runner.AssignRunnerToMachine(
@@ -213,7 +213,7 @@ class TestRunnerTest(unittest.TestCase):
                                             MACHINE_IDS[0]))
 
     # Delete the runner and try to ping.
-    runner.delete()
+    runner.key.delete()
     self.assertFalse(test_runner.PingRunner(runner.key.urlsafe(),
                                             MACHINE_IDS[0]))
 

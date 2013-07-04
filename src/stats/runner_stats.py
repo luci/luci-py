@@ -14,7 +14,6 @@ import json
 import logging
 
 
-from google.appengine.ext import db
 from google.appengine.ext import ndb
 
 
@@ -71,47 +70,49 @@ class RunnerStats(ndb.Model):
   automatic_retry_count = ndb.IntegerProperty(required=True)
 
 
-class WaitSummary(db.Model):
-  """Stores a summary of wait times from the set of runners."""
-  # The start time of the range of this summary.
-  start_time = db.DateTimeProperty(required=True, indexed=False)
-
-  # The end time of the range of this summary, this will be the latest assigned
-  # time of any runner in this summary.
-  end_time = db.DateTimeProperty(required=True)
-
-  def delete(self):  # pylint: disable=g-bad-name
-    """Delete any children of this wait summary."""
-    # Even if there are no children, self.children is still defined.
-    for child in self.children:
-      child.delete()
-
-    db.Model.delete(self)
-
-
-class DimensionWaitSummary(db.Model):
+class DimensionWaitSummary(ndb.Model):
   """Store the wait summaries for a single dimension."""
 
   # The dimension for this summary.
-  dimensions = db.TextProperty(indexed=False)
+  dimensions = ndb.TextProperty(indexed=False)
 
   # The number of runners in this summary.
-  num_runners = db.IntegerProperty(indexed=False)
+  num_runners = ndb.IntegerProperty(indexed=False)
 
   # The average wait for these runners to start (in seconds).
-  mean_wait = db.IntegerProperty(indexed=False)
+  mean_wait = ndb.IntegerProperty(indexed=False)
 
   # The start times are recorded with minute precision and then recorded in a
   # dictionary where the key is the time in minutes and the value is the number
   # of runners that waited that long.
   # Store the json.dump of the dictionary, since app engine doesn't have a
   # dictionary property.
-  median_buckets = db.TextProperty(indexed=False)
+  median_buckets = ndb.TextProperty(indexed=False)
 
   # The parent summary, which contains the starting and ending times that this
   # summary spans.
-  summary_parent = db.ReferenceProperty(WaitSummary,
-                                        collection_name='children')
+  summary_parent = ndb.KeyProperty(kind='WaitSummary')
+
+
+class WaitSummary(ndb.Model):
+  """Stores a summary of wait times from the set of runners."""
+  # The start time of the range of this summary.
+  start_time = ndb.DateTimeProperty(required=True, indexed=False)
+
+  # The end time of the range of this summary, this will be the latest assigned
+  # time of any runner in this summary.
+  end_time = ndb.DateTimeProperty(required=True)
+
+  @property
+  def children(self):
+    return DimensionWaitSummary.query(
+        DimensionWaitSummary.summary_parent == self.key)
+
+  @classmethod
+  def _pre_delete_hook(cls, key):  # pylint: disable=g-bad-name
+    """Delete any children of this wait summary."""
+    for child in key.get().children:
+      child.key.delete()
 
 
 class DimensionWaitSums(object):
@@ -214,7 +215,7 @@ def GenerateStats():
   app engine is only eventually data consistent). The potentially loss of a
   runner's stats shouldn't cause any major problems.
   """
-  newest_runner_waits = db.GqlQuery(
+  newest_runner_waits = ndb.gql(
       'SELECT end_time FROM WaitSummary ORDER BY end_time DESC').get()
   start_time = (newest_runner_waits.end_time if newest_runner_waits else
                 datetime.datetime.min)
@@ -253,7 +254,7 @@ def GenerateStats():
         num_runners=len(times),
         mean_wait=_TotalSeconds(mean),
         median_buckets=json.dumps(_CreateMedianBuckets(times)),
-        summary_parent=wait_summary)
+        summary_parent=wait_summary.key)
     dimension_summary.put()
 
 
@@ -268,7 +269,7 @@ def GetRunnerWaitStats():
   """
   # Merge the various wait summaries.
   dimension_summaries = {}
-  for dimension_wait in DimensionWaitSummary.all():
+  for dimension_wait in DimensionWaitSummary.query():
     dimension_summaries.setdefault(
         dimension_wait.dimensions,
         DimensionWaitSums(dimension_wait.dimensions)
@@ -325,14 +326,23 @@ def DeleteOldRunnerStats():
 
 
 def DeleteOldWaitSummaries():
-  """Clean up all the wait summaries that are older than a certain age."""
+  """Clean up all the wait summaries that are older than a certain age.
+
+  Returns:
+    The rpc for the async delete call (mainly meant for tests).
+  """
   logging.debug('DeleteOldWaitSummaries starting')
 
   old_cutoff = (
       _GetCurrentTime() -
       datetime.timedelta(days=WAIT_SUMMARY_LIFE_IN_DAYS))
 
-  for wait in WaitSummary.gql('WHERE end_time < :1', old_cutoff):
-    wait.delete()
+  old_wait_summary_query = WaitSummary.query(
+      WaitSummary.end_time < old_cutoff,
+      default_options=ndb.QueryOptions(keys_only=True))
+
+  rpc = ndb.delete_multi_async(old_wait_summary_query)
 
   logging.debug('DeleteOldWaitSummaries done')
+
+  return rpc
