@@ -40,6 +40,23 @@ def GetTestCase(request_message):
   return request_object
 
 
+def GetTestRequestParent():
+  """Gets the parent model for all TestRequests.
+
+  Returns:
+    The parent model for all TestRequests.
+  """
+  try:
+    return ndb.Model.get_or_insert(TEST_REQUEST_PARENT_KEY)
+  except ndb.KindError:
+    # This exception is thrown when first trying to find the model on a app
+    # engine server (dev or non-dev). This error doesn't occur in the test
+    # framework though.
+    parent_model = ndb.Model(id=TEST_REQUEST_PARENT_KEY)
+    parent_model.put()
+    return parent_model
+
+
 class TestRequest(ndb.Model):
   # The message received from the caller, formatted as a Test Case as
   # specified in
@@ -61,14 +78,7 @@ class TestRequest(ndb.Model):
     # 'parent' can be the first arg or a keyword, only add a parent if there
     # isn't one.
     if not args and 'parent' not in kwargs:
-      try:
-        parent_model = ndb.Model.get_or_insert(TEST_REQUEST_PARENT_KEY)
-      except ndb.KindError:
-        # This exception is thrown when first trying to find the model
-        # on a dev app engine server.
-        parent_model = ndb.Model(id=TEST_REQUEST_PARENT_KEY)
-        parent_model.put()
-
+      parent_model = GetTestRequestParent()
       kwargs['parent'] = parent_model.key
 
     super(TestRequest, self).__init__(*args, **kwargs)
@@ -144,7 +154,7 @@ def GetAllMatchingTestRequests(test_case_name):
   Returns:
     A list of all Test Requests that have |test_case_name| as their name.
   """
-  parent_model = ndb.Model.get_or_insert(TEST_REQUEST_PARENT_KEY)
+  parent_model = GetTestRequestParent()
 
   # Perform the query in a transaction to ensure that it gets the most recent
   # data, otherwise it is possible for one machine to add tests, and then be
