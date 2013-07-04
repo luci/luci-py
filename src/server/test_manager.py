@@ -544,7 +544,7 @@ class TestRequestManager(object):
         attributes.get('tag', None))
 
     # pylint: disable=g-explicit-bool-comparison
-    unfinished_test_key = test_runner.TestRunner.query().filter(
+    unfinished_test_key = test_runner.TestRunner.query(
         test_runner.TestRunner.machine_id == attribs['id'],
         test_runner.TestRunner.done == False).get(keys_only=True)
     # pylint: enable=g-explicit-bool-comparison

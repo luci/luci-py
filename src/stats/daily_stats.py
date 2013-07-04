@@ -98,11 +98,11 @@ def GenerateDailyStats(day):
   # Find the number of shards that ran, as well as how many failed, during the
   # day.
   query = runner_stats.RunnerStats.query(
+      runner_stats.RunnerStats.end_time >= day_midnight,
+      runner_stats.RunnerStats.end_time < next_day_midnight,
       default_options=ndb.QueryOptions(
           projection=('assigned_time', 'created_time', 'end_time', 'success',
                       'timed_out')))
-  query = query.filter(runner_stats.RunnerStats.end_time >= day_midnight,
-                       runner_stats.RunnerStats.end_time < next_day_midnight)
 
   query.map_async(ComputeRunnerStats).get_result()
   daily_stats.put()
@@ -135,10 +135,8 @@ def DeleteOldDailyStats():
       days=DAILY_STATS_LIFE_IN_DAYS))
 
   old_daily_stats_query = DailyStats.query(
+      DailyStats.date < old_cutoff,
       default_options=ndb.QueryOptions(keys_only=True))
-
-  old_daily_stats_query = old_daily_stats_query.filter(
-      DailyStats.date < old_cutoff)
 
   rpc = ndb.delete_multi_async(old_daily_stats_query)
 

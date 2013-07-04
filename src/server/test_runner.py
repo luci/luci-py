@@ -517,14 +517,13 @@ def DeleteOldRunners():
       _GetCurrentTime() -
       datetime.timedelta(days=SWARM_FINISHED_RUNNER_TIME_TO_LIVE_DAYS))
 
-  old_runner_query = TestRunner.query(
-      default_options=ndb.QueryOptions(keys_only=True))
-
   # '!= None' must be used instead of 'is not None' because these arguments
   # become part of a GQL query, where 'is not None' is invalid syntax.
-  old_runner_query = old_runner_query.filter(
+  old_runner_query = TestRunner.query(
       TestRunner.ended != None,  # pylint: disable-msg=g-equals-none
-      TestRunner.ended < old_cutoff)
+      TestRunner.ended < old_cutoff,
+      default_options=ndb.QueryOptions(keys_only=True))
+
   rpc = ndb.delete_multi_async(old_runner_query)
 
   logging.debug('DeleteOldRunners done')

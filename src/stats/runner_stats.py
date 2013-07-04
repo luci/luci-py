@@ -310,14 +310,12 @@ def DeleteOldRunnerStats():
       _GetCurrentTime() -
       datetime.timedelta(days=RUNNER_STATS_EVALUATION_CUTOFF_DAYS))
 
-  old_runner_stats_query = RunnerStats.query(
-      default_options=ndb.QueryOptions(keys_only=True))
-
   # '!= None' must be used instead of 'is not None' because these arguments
   # become part of a GQL query, where 'is not None' is invalid syntax.
-  old_runner_stats_query = old_runner_stats_query.filter(
+  old_runner_stats_query = RunnerStats.query(
       RunnerStats.end_time != None,  # pylint: disable-msg=g-equals-none
-      RunnerStats.end_time < old_cutoff)
+      RunnerStats.end_time < old_cutoff,
+      default_options=ndb.QueryOptions(keys_only=True))
 
   rpc = ndb.delete_multi_async(old_runner_stats_query)
 
