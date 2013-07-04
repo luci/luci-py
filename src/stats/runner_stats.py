@@ -215,19 +215,26 @@ def GenerateStats():
       'SELECT end_time FROM WaitSummary ORDER BY end_time DESC').get()
   start_time = (newest_runner_waits.end_time if newest_runner_waits else
                 datetime.datetime.min)
-  end_time = start_time
+  end_time = datetime.datetime.now()
 
   time_mappings = {}
-  for runner_stats in RunnerStats.gql('WHERE assigned_time != :1 and '
-                                      'assigned_time > :2 ', None, start_time):
+  query = RunnerStats.gql('WHERE assigned_time != :1 and assigned_time > :2 ',
+                          None, start_time)
+
+  def RecordRunnerDuration(runner_stats):
     # The query doesn't seem to examine milliseconds, so it can return models
     # that have already had their stats generated.
     if runner_stats.assigned_time <= start_time:
-      continue
+      return
 
-    end_time = max(end_time, runner_stats.assigned_time)
     time_mappings.setdefault(runner_stats.dimensions, []).append(
         runner_stats.assigned_time - runner_stats.created_time)
+    return runner_stats.assigned_time
+
+  runner_end_times = query.map_async(RecordRunnerDuration).get_result()
+
+  if runner_end_times:
+    end_time = max(runner_end_times)
 
   wait_summary = WaitSummary(start_time=start_time,
                              end_time=end_time)
