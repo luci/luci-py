@@ -21,6 +21,9 @@ from google.appengine.ext import ndb
 # Number of days to evaluate when considering runner stats.
 RUNNER_STATS_EVALUATION_CUTOFF_DAYS = 7
 
+# The number of days to keep WaitSummaries before deleting them.
+WAIT_SUMMARY_LIFE_IN_DAYS = 28
+
 
 class RunnerStats(ndb.Model):
   """Stores basic stats about a runner.
@@ -329,7 +332,7 @@ def DeleteOldWaitSummaries():
 
   old_cutoff = (
       _GetCurrentTime() -
-      datetime.timedelta(days=RUNNER_STATS_EVALUATION_CUTOFF_DAYS))
+      datetime.timedelta(days=WAIT_SUMMARY_LIFE_IN_DAYS))
 
   for wait in WaitSummary.gql('WHERE end_time < :1', old_cutoff):
     wait.delete()

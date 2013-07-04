@@ -353,12 +353,12 @@ class StatManagerTest(unittest.TestCase):
     # Set the current time to the future, but not too much, so the model
     # isn't deleted.
     mock_now = (datetime.datetime.now() + datetime.timedelta(
-        days=runner_stats.RUNNER_STATS_EVALUATION_CUTOFF_DAYS - 1))
+        days=runner_stats.WAIT_SUMMARY_LIFE_IN_DAYS - 1))
     runner_stats._GetCurrentTime().AndReturn(mock_now)
 
     # Set the current time to way in the future so the model is deleted.
     mock_now = (datetime.datetime.now() + datetime.timedelta(
-        days=runner_stats.RUNNER_STATS_EVALUATION_CUTOFF_DAYS + 5))
+        days=runner_stats.WAIT_SUMMARY_LIFE_IN_DAYS + 5))
     runner_stats._GetCurrentTime().AndReturn(mock_now)
     self._mox.ReplayAll()
 
