@@ -11,33 +11,35 @@ Contains the DailyStats class and helper functions.
 import datetime
 import logging
 
-from google.appengine.ext import db
 from google.appengine.ext import ndb
 
 from stats import runner_stats
 
+# The number of days to keep daily stats around before deleteing them.
+DAILY_STATS_LIFE_IN_DAYS = 28
 
-class DailyStats(db.Model):
+
+class DailyStats(ndb.Model):
   """Stores a summary of information generated each day."""
 
   # The date this summary is covering
-  date = db.DateProperty(required=True)
+  date = ndb.DateProperty(required=True)
 
   # The number of shards that finished (or timed out) during this day.
-  shards_finished = db.IntegerProperty(default=0, indexed=False)
+  shards_finished = ndb.IntegerProperty(default=0, indexed=False)
 
   # The number of shards that failed to terminate successfully (excluding
   # failures due to internal timeouts).
-  shards_failed = db.IntegerProperty(default=0, indexed=False)
+  shards_failed = ndb.IntegerProperty(default=0, indexed=False)
 
   # The number of shards that failed due to internal timeouts.
-  shards_timed_out = db.IntegerProperty(default=0, indexed=False)
+  shards_timed_out = ndb.IntegerProperty(default=0, indexed=False)
 
   # The total amount of time (in minutes) that all the runners waited to run.
-  total_wait_time = db.IntegerProperty(default=0, indexed=False)
+  total_wait_time = ndb.IntegerProperty(default=0, indexed=False)
 
   # The total amount of time (in minutes) that runners were running on machines.
-  total_running_time = db.IntegerProperty(default=0, indexed=False)
+  total_running_time = ndb.IntegerProperty(default=0, indexed=False)
 
 
 def _TimeDeltaToMinutes(delta):
@@ -61,8 +63,8 @@ def GenerateDailyStats(day):
   Returns:
     True if the daily stats were successfully generated.
   """
-  if db.GqlQuery('SELECT __key__ FROM DailyStats WHERE date = :1 LIMIT 1',
-                 day).get():
+  if ndb.gql('SELECT __key__ FROM DailyStats WHERE date = :1 LIMIT 1',
+             day).get():
     logging.warning('Daily stats for %s already exist, skipping '
                     'GenerateDailyStats', day)
     return False
@@ -119,3 +121,27 @@ def GetDailyStats(oldest_day):
   """
   return [stat for stat in
           DailyStats.gql('WHERE date >= :1 ORDER BY date ASC', oldest_day)]
+
+
+def DeleteOldDailyStats():
+  """Clean up all daily stats that are more than DAILY_STATS_LIFE_IN_DAYS old.
+
+  Returns:
+    The rpc for the async delete call (mainly meant for tests).
+  """
+  logging.debug('DeleteOldDailyStats starting')
+
+  old_cutoff = (datetime.date.today() - datetime.timedelta(
+      days=DAILY_STATS_LIFE_IN_DAYS))
+
+  old_daily_stats_query = DailyStats.query(
+      default_options=ndb.QueryOptions(keys_only=True))
+
+  old_daily_stats_query = old_daily_stats_query.filter(
+      DailyStats.date < old_cutoff)
+
+  rpc = ndb.delete_multi_async(old_daily_stats_query)
+
+  logging.debug('DeleteOldDailyStats done')
+
+  return rpc

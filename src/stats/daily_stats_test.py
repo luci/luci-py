@@ -11,6 +11,8 @@ import unittest
 
 
 from google.appengine.ext import testbed
+from google.appengine.ext import ndb
+
 from stats import daily_stats
 from stats import runner_stats
 
@@ -73,9 +75,9 @@ class DailyStatsTest(unittest.TestCase):
                success=True, timeout=False)
 
     self.assertTrue(daily_stats.GenerateDailyStats(current_day))
-    self.assertEqual(1, daily_stats.DailyStats.all().count())
+    self.assertEqual(1, daily_stats.DailyStats.query().count())
 
-    daily_stat = daily_stats.DailyStats.all().get()
+    daily_stat = daily_stats.DailyStats.query().get()
     self.assertEqual(4, daily_stat.shards_finished)
     self.assertEqual(2, daily_stat.shards_failed)
     self.assertEqual(1, daily_stat.shards_timed_out)
@@ -95,7 +97,7 @@ class DailyStatsTest(unittest.TestCase):
 
     self.assertTrue(daily_stats.GenerateDailyStats(current_day))
 
-    daily_stat = daily_stats.DailyStats.all().get()
+    daily_stat = daily_stats.DailyStats.query().get()
     self.assertEqual(0, daily_stat.shards_finished)
 
   def testGetDailyStats(self):
@@ -118,6 +120,31 @@ class DailyStatsTest(unittest.TestCase):
     self.assertEqual(current_day - datetime.timedelta(days=days_to_add - 1),
                      stats[0].date)
     self.assertEqual(current_day, stats[-1].date)
+
+  def testDeleteOldDailyStats(self):
+    current_day = datetime.date.today()
+
+    # Add a daily stats model that shouldn't get deleted.
+    daily_stat = daily_stats.DailyStats(date=current_day)
+    daily_stat.put()
+
+    ndb.Future.wait_all(daily_stats.DeleteOldDailyStats())
+    self.assertEqual(1, daily_stats.DailyStats.query().count())
+
+    # Add a daily stats model that should get deleted.
+    daily_stat = daily_stats.DailyStats(
+        date=(current_day -
+              datetime.timedelta(days=daily_stats.DAILY_STATS_LIFE_IN_DAYS +
+                                 1)))
+    daily_stat.put()
+    self.assertEqual(2, daily_stats.DailyStats.query().count())
+
+    # Ensure the correct model is deleted.
+    ndb.Future.wait_all(daily_stats.DeleteOldDailyStats())
+    self.assertEqual(1, daily_stats.DailyStats.query().count())
+
+    remaining_model = daily_stats.DailyStats.query().get()
+    self.assertEqual(current_day, remaining_model.date)
 
 
 if __name__ == '__main__':

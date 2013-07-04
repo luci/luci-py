@@ -512,6 +512,8 @@ class CleanupDataHandler(webapp2.RequestHandler):
     test_runner.DeleteOldRunners()
     test_runner.DeleteOrphanedBlobs()
 
+    daily_stats.DeleteOldDailyStats()
+
     runner_stats.DeleteOldRunnerStats()
     runner_stats.DeleteOldWaitSummaries()
 
@@ -958,9 +960,7 @@ class DailyStatsGraphHandler(webapp2.RequestHandler):
       date_str = stat.date.isoformat()
       for i, element in enumerate(elements_to_graph):
         graphs_to_show[i]['data_array'].append(
-            # App engine adds the leading _ to the variable names when
-            # referencing them through the dict.
-            [date_str, int(stat.__dict__['_' + element[0]])])
+            [date_str, int(getattr(stat, element[0]))])
 
     return graphs_to_show
 
