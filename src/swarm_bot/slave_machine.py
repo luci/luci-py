@@ -64,8 +64,10 @@ def Restart():
     Exception: When it is unable to restart the machine.
   """
   restart_cmd = None
-  if sys.platform == 'win32' or sys.platform == 'cygwin':
+  if sys.platform == 'win32':
     restart_cmd = ['shutdown', '-r', '-f', '-t', '1']
+  elif sys.platform == 'cygwin':
+    restart_cmd = ['shutdown', '-r', '-f', '1']
   elif sys.platform == 'linux2' or sys.platform == 'darwin':
     restart_cmd = ['sudo', '/sbin/shutdown', '-r', 'now']
 
