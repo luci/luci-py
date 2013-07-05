@@ -36,7 +36,8 @@ from google.appengine.api import mail
 from google.appengine.api import memcache
 from google.appengine.api import urlfetch
 from google.appengine.ext import blobstore
-from google.appengine.ext import db
+from google.appengine.ext import ndb
+
 from common import blobstore_helper
 from common import dimensions_utils
 from common import swarm_constants
@@ -101,19 +102,19 @@ def OnDevAppEngine():
   return os.environ['SERVER_SOFTWARE'].startswith('Development')
 
 
-class SwarmError(db.Model):
+class SwarmError(ndb.Model):
   """A datastore entry representing an error in Swarm."""
   # The name of the error.
-  name = db.StringProperty(indexed=False)
+  name = ndb.StringProperty(indexed=False)
 
   # A description of the error.
-  message = db.StringProperty(indexed=False)
+  message = ndb.StringProperty(indexed=False)
 
   # Optional details about the specific error instance.
-  info = db.StringProperty(indexed=False)
+  info = ndb.StringProperty(indexed=False)
 
   # The time at which this error was logged.  Used to clean up old errors.
-  created = db.DateTimeProperty(auto_now_add=True)
+  created = ndb.DateTimeProperty(auto_now_add=True)
 
 
 class TestRequestManager(object):
@@ -807,7 +808,10 @@ def DeleteOldErrors():
       _GetCurrentTime() -
       datetime.timedelta(days=SWARM_ERROR_TIME_TO_LIVE_DAYS))
 
-  rpc = db.delete_async(SwarmError.gql('WHERE created < :1', old_cutoff))
+  old_error_query = SwarmError.query(
+      SwarmError.created < old_cutoff,
+      default_options=ndb.QueryOptions(keys_only=True))
+  rpc = ndb.delete_multi_async(old_error_query)
 
   logging.debug('DeleteOldErrors done')
 

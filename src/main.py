@@ -29,6 +29,8 @@ from google.appengine.ext.ereporter.report_generator import ReportGenerator
 from google.appengine.ext.webapp import blobstore_handlers
 from google.appengine.ext.webapp import template
 from google.appengine.ext.webapp import util
+from google.appengine.ext import ndb
+
 from common import blobstore_helper
 from common import test_request_message
 from common import url_helper
@@ -269,8 +271,11 @@ class MainHandler(webapp2.RequestHandler):
       runners.append(runner)
 
     errors = []
-    query = test_manager.SwarmError.all().order('-created')
-    for error in query.run(limit=_NUM_RECENT_ERRORS_TO_DISPLAY):
+    query = test_manager.SwarmError.query(
+        default_options=ndb.QueryOptions(
+            limit=_NUM_RECENT_ERRORS_TO_DISPLAY)).order(
+                -test_manager.SwarmError.created)
+    for error in query:
       error.log_time = self.GetTimeString(error.created)
       errors.append(error)
 

@@ -25,6 +25,8 @@ import zipfile
 from google.appengine.api import mail
 from google.appengine.ext import blobstore
 from google.appengine.ext import testbed
+from google.appengine.ext import ndb
+
 from common import blobstore_helper
 from common import dimensions_utils
 from common import swarm_constants
@@ -672,7 +674,7 @@ class TestRequestManagerTest(unittest.TestCase):
     error = test_manager.SwarmError(
         name='name', message='msg', info='info')
     error.put()
-    self.assertEqual(1, test_manager.SwarmError.all().count())
+    self.assertEqual(1, test_manager.SwarmError.query().count())
 
     self._mox.StubOutWithMock(test_manager, '_GetCurrentTime')
 
@@ -689,12 +691,12 @@ class TestRequestManagerTest(unittest.TestCase):
     self._mox.ReplayAll()
 
     # First call shouldn't delete the error since its not stale yet.
-    test_manager.DeleteOldErrors().get_result()
-    self.assertEqual(1, test_manager.SwarmError.all().count())
+    ndb.Future.wait_all(test_manager.DeleteOldErrors())
+    self.assertEqual(1, test_manager.SwarmError.query().count())
 
     # Second call should remove the now stale error.
-    test_manager.DeleteOldErrors().get_result()
-    self.assertEqual(0, test_manager.SwarmError.all().count())
+    ndb.Future.wait_all(test_manager.DeleteOldErrors())
+    self.assertEqual(0, test_manager.SwarmError.query().count())
 
     self._mox.VerifyAll()
 

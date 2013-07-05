@@ -522,7 +522,7 @@ class AppTest(unittest.TestCase):
       CheckProtected(route, 'POST')
 
   def testRemoteErrorHandler(self):
-    self.assertEqual(0, test_manager.SwarmError.all().count())
+    self.assertEqual(0, test_manager.SwarmError.query().count())
 
     error_message = 'error message'
 
@@ -530,8 +530,8 @@ class AppTest(unittest.TestCase):
     self.assertEqual('200 OK', response.status)
     self.assertTrue('Error logged' in response.body)
 
-    self.assertEqual(1, test_manager.SwarmError.all().count())
-    error = test_manager.SwarmError.all().get()
+    self.assertEqual(1, test_manager.SwarmError.query().count())
+    error = test_manager.SwarmError.query().get()
     self.assertEqual(error.message, error_message)
 
   def testRunnerPing(self):
