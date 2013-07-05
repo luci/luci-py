@@ -569,7 +569,7 @@ class TestRequestManagerTest(unittest.TestCase):
     runner.put()
     self._mox.ReplayAll()
 
-    self._manager.AbortStaleRunners()
+    ndb.Future.wait_all(self._manager.AbortStaleRunners())
 
     runner = test_runner.TestRunner.query().get()
     self.assertFalse(runner.done)
@@ -593,7 +593,7 @@ class TestRequestManagerTest(unittest.TestCase):
     runner.ping = datetime.datetime.now() + datetime.timedelta(days=1)
     runner.put()
     self.assertFalse(runner.done)
-    self._manager.AbortStaleRunners()
+    ndb.Future.wait_all(self._manager.AbortStaleRunners())
 
     runner = test_runner.TestRunner.query().get()
     self.assertFalse(runner.done)
@@ -605,7 +605,7 @@ class TestRequestManagerTest(unittest.TestCase):
     runner.automatic_retry_count = 1
     runner.put()
     self.assertFalse(runner.done)
-    self._manager.AbortStaleRunners()
+    ndb.Future.wait_all(self._manager.AbortStaleRunners())
 
     runner = test_runner.TestRunner.query().get()
     self.assertFalse(runner.done)
@@ -614,7 +614,7 @@ class TestRequestManagerTest(unittest.TestCase):
 
     # Now the runner should be aborted, since it hasn't been matched within
     # SWARM_RUNNER_MAX_WAIT_SECS seconds.
-    self._manager.AbortStaleRunners()
+    ndb.Future.wait_all(self._manager.AbortStaleRunners())
 
     runner = test_runner.TestRunner.query().get()
     self.assertTrue(runner.done)
@@ -625,7 +625,7 @@ class TestRequestManagerTest(unittest.TestCase):
     old_abort = self._manager.AbortRunner
     try:
       self._manager.AbortRunner = lambda runner, reason: self.fail()
-      self._manager.AbortStaleRunners()
+      ndb.Future.wait_all(self._manager.AbortStaleRunners())
     finally:
       self._manager.AbortRunner = old_abort
 
@@ -654,7 +654,7 @@ class TestRequestManagerTest(unittest.TestCase):
       self.assertEqual(i, runner.automatic_retry_count)
       self.assertNotEqual(None, runner.started)
 
-      self._manager.AbortStaleRunners()
+      ndb.Future.wait_all(self._manager.AbortStaleRunners())
 
       runner = test_runner.TestRunner.query().get()
       if i == test_runner.MAX_AUTOMATIC_RETRIES:

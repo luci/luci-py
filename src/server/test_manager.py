@@ -447,6 +447,9 @@ class TestRequestManager(object):
     MAX_AUTOMATIC_RETRY times.
     If a runner is aborted because it hasn't hasn't found any machine to run it
     in over SWARM_RUNNER_MAX_WAIT_SECS seconds, there is no automatic retry.
+
+    Returns:
+      The rpcs for all the delete queries (mainly used by tests).
     """
     logging.debug('TRM.AbortStaleRunners starting')
     now = _GetCurrentTime()
@@ -456,10 +459,7 @@ class TestRequestManager(object):
 
     # Abort all currently running runners that haven't recently pinged the
     # server.
-    query = test_runner.TestRunner.gql(
-        'WHERE done = :1 AND ping != :2 AND ping < :3',
-        False, None, timeout_cutoff)
-    for runner in query:
+    def HandleStaleRunner(runner):
       if test_runner.ShouldAutomaticallyRetryRunner(runner):
         if test_runner.AutomaticallyRetryRunner(runner):
           logging.warning('TRM.AbortStaleRunners retrying runner %s with key '
@@ -474,19 +474,28 @@ class TestRequestManager(object):
                       runner.GetName(), runner.key.urlsafe())
         self.AbortRunner(runner, reason='Runner has become stale.')
 
+    query = test_runner.TestRunner.gql(
+        'WHERE done = :1 AND ping != :2 AND ping < :3',
+        False, None, timeout_cutoff)
+    stale_runner_rpc = query.map_async(HandleStaleRunner)
+
     # Abort all runners that haven't been able to find a machine to run them
     # in SWARM_RUNNER_MAX_WAIT_SECS seconds.
+    def AbortUnfullfilledRunner(runner):
+      self.AbortRunner(runner, reason=('Runner was unable to find a machine to '
+                                       'run it within %d seconds' %
+                                       SWARM_RUNNER_MAX_WAIT_SECS))
+
     timecut_off = now - datetime.timedelta(seconds=SWARM_RUNNER_MAX_WAIT_SECS)
     query = test_runner.TestRunner.gql('WHERE created < :1 and started = :2 '
                                        'and done = :3 and '
                                        'automatic_retry_count = 0', timecut_off,
                                        None, False)
-    for runner in query:
-      self.AbortRunner(runner, reason=('Runner was unable to find a machine to '
-                                       'run it within %d seconds' %
-                                       SWARM_RUNNER_MAX_WAIT_SECS))
+    unfullfilled_rpc = query.map_async(AbortUnfullfilledRunner)
 
     logging.debug('TRM.AbortStaleRunners done')
+
+    return [stale_runner_rpc, unfullfilled_rpc]
 
   def AbortRunner(self, runner, reason='Not specified.'):
     """Abort the given test runner.
