@@ -974,6 +974,7 @@ def CreateApplication():
           r'/content/retrieve' + namespace_key, RetrieveContentByHashHandler),
 
       # Public stats.
+      webapp2.Route(r'/stats/json', stats.StatsJsonHandler),
       webapp2.Route(r'/stats', stats.StatsHandler),
 
       # AppEngine-specific url:

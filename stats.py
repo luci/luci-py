@@ -10,6 +10,7 @@ log entry at info level per request.
 """
 
 import datetime
+import json
 import logging
 import os
 
@@ -177,6 +178,90 @@ def _get_request_as_int(request, key, default, min_value, max_value):
   return min(max_value, max(min_value, value))
 
 
+def _generate_stats_data(request):
+  """Returns a dict for data requested in the query."""
+  DEFAULT_DAYS = 5
+  DEFAULT_HOURS = 48
+  DEFAULT_MINUTES = 120
+  MIN_VALUE = 0
+  MAX_DAYS = 367
+  MAX_HOURS = 480
+  MAX_MINUTES = 480
+
+  limit_days = _get_request_as_int(
+      request, 'days', DEFAULT_DAYS, MIN_VALUE, MAX_DAYS)
+  limit_hours = _get_request_as_int(
+      request, 'hours', DEFAULT_HOURS, MIN_VALUE, MAX_HOURS)
+  limit_minutes = _get_request_as_int(
+      request, 'minutes', DEFAULT_MINUTES, MIN_VALUE, MAX_MINUTES)
+
+  now_text = request.params.get('now')
+  now = None
+  if now_text:
+    FORMATS = ('%Y-%m-%d', '%Y-%m-%d %H:%M')
+    for f in FORMATS:
+      try:
+        now = datetime.datetime.strptime(now_text, f)
+        break
+      except ValueError:
+        continue
+  if not now:
+    now = datetime.datetime.utcnow()
+  today = now.date()
+
+  # Fire up all the datastore requests.
+  future_days = []
+  if limit_days:
+    future_days = ndb.get_multi_async(
+        _STATS_HANDLER.day_key(today - datetime.timedelta(days=i))
+        for i in range(limit_days + 1))
+
+  future_hours = []
+  if limit_hours:
+    future_hours = ndb.get_multi_async(
+        _STATS_HANDLER.hour_key(now - datetime.timedelta(hours=i))
+        for i in range(limit_hours + 1))
+
+  future_minutes = []
+  if limit_minutes:
+    future_minutes = ndb.get_multi_async(
+        _STATS_HANDLER.minute_key(now - datetime.timedelta(minutes=i))
+        for i in range(limit_minutes + 1))
+
+  def filterout(futures):
+    """Filters out inexistent entities."""
+    intermediary = (i.get_result() for i in futures)
+    return [i for i in intermediary if i]
+
+  return {
+    'days': filterout(future_days),
+    'hours': filterout(future_hours),
+    'minutes': filterout(future_minutes),
+    'now': now.strftime(stats_framework.TIME_FORMAT),
+  }
+
+
+def _to_json(data):
+  """Converts data into json-compatible data."""
+  if isinstance(data, unicode):
+    return data
+  elif isinstance(data, str):
+    return data.decode('utf-8')
+  if isinstance(data, dict):
+    return dict((_to_json(k), _to_json(v)) for k, v in data.iteritems())
+  elif isinstance(data, ndb.Model):
+    return _to_json(data.to_dict())
+  elif isinstance(data, (list, tuple)):
+    return [_to_json(i) for i in data]
+  elif isinstance(data, datetime.datetime):
+    return unicode(str(data))
+  elif isinstance(data, (int, float, long)):
+    # Note: overflowing is an issue with int and long.
+    return data
+  else:
+    assert False, 'Don\'t know how to handle %r' % data
+
+
 ### Handlers
 
 
@@ -194,54 +279,18 @@ class StatsHandler(webapp2.RequestHandler):
   """Returns the statistics page."""
   def get(self):
     """Presents nice recent statistics."""
-    # TODO(maruel): Query MinuteStats to do a nice graph precise to the minute.
-    limit_days = _get_request_as_int(self.request, 'days', 5, 0, 367)
-    limit_hours = _get_request_as_int(self.request, 'hours', 48, 0, 480)
-    limit_minutes = _get_request_as_int(self.request, 'minutes', 120, 0, 480)
-    now_text = self.request.params.get('now')
-    now = None
-    if now_text:
-      FORMATS = ('%Y-%m-%d', '%Y-%m-%d %H:%M')
-      for f in FORMATS:
-        try:
-          now = datetime.datetime.strptime(now_text, f)
-          break
-        except ValueError:
-          continue
-    if not now:
-      now = datetime.datetime.utcnow()
-    today = now.date()
-
-    # Fire up all the datastore requests.
-    future_days = []
-    if limit_days:
-      future_days = ndb.get_multi_async(
-          _STATS_HANDLER.day_key(today - datetime.timedelta(days=i))
-          for i in range(limit_days + 1))
-
-    future_hours = []
-    if limit_hours:
-      future_hours = ndb.get_multi_async(
-          _STATS_HANDLER.hour_key(now - datetime.timedelta(hours=i))
-          for i in range(limit_hours + 1))
-
-    future_minutes = []
-    if limit_minutes:
-      future_minutes = ndb.get_multi_async(
-          _STATS_HANDLER.minute_key(now - datetime.timedelta(minutes=i))
-          for i in range(limit_minutes + 1))
-
+    data = _generate_stats_data(self.request)
     to_render = template.get('stats.html')
-
-    def filterout(futures):
-      intermediary = (i.get_result() for i in futures)
-      return [i for i in intermediary if i]
-
-    data = {
-      'days': filterout(future_days),
-      'hours': filterout(future_hours),
-      'minutes': filterout(future_minutes),
-      'now': now.strftime(stats_framework.TIME_FORMAT),
-    }
     self.response.write(to_render.render(data))
     self.response.headers['Content-Type'] = 'text/html'
+
+
+class StatsJsonHandler(webapp2.RequestHandler):
+  """Returns the statistic data."""
+  def get(self):
+    data = _to_json(_generate_stats_data(self.request))
+
+    # Make it json-compatible.
+    self.response.write(json.dumps(data, separators=(',',':')))
+    self.response.headers['Content-Type'] = 'application/json'
+    self.response.headers['Access-Control-Allow-Origin'] = '*'
