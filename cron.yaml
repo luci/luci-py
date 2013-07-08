@@ -9,4 +9,4 @@ cron:
 
 - description: Cron job that gathers statistics
   url: /restricted/stats/update
-  schedule: every 1 minute
+  schedule: every 1 minutes
