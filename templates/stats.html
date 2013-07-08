@@ -1,0 +1,87 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html>
+<head>
+  <title>Isolate Server Stats</title>
+  <link rel="stylesheet" type="text/css" href="/css/default.css"/>
+</head>
+<body>
+  <div style="float: right;">
+    {{now}}
+  </div>
+
+  {% if days %}
+    <h1>Activity in the Last {{days|length}} Days</h1>
+    <table id="daily-stats-table"
+      summary="This table lists the server statistics on each day.">
+      <thead>
+        <th>Date</th>
+        <th>Requests</th>
+        <th>Downloads</th>
+        <th>Uploads</th>
+        <th>Lookups</th>
+      </thead>
+      {% for stats in days %}
+      <tr class="request">
+        <td>{{stats.key.id()}}</td>
+        <td>{{stats.values.requests_as_text()}}</td>
+        <td>{{stats.values.downloads_as_text()}}</td>
+        <td>{{stats.values.uploads_as_text()}}</td>
+        <td>{{stats.values.lookups_as_text()}}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  {% endif %}
+
+  {% if hours %}
+    <h1>Hourly stats</h1>
+    <table id="hourly-stats-table"
+        summary="This table lists the server statistics at each hour.">
+      <thead>
+        <th>Hour</th>
+        <th>Requests</th>
+        <th>Downloads</th>
+        <th>Uploads</th>
+        <th>Lookups</th>
+      </thead>
+      {% for stats in hours %}
+      <tr class="request">
+        <td>{{stats.key.parent().id()}} {{stats.key.id()}}:00</td>
+        <td>{{stats.values.requests_as_text()}}</td>
+        <td>{{stats.values.downloads_as_text()}}</td>
+        <td>{{stats.values.uploads_as_text()}}</td>
+        <td>{{stats.values.lookups_as_text()}}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  {% endif %}
+
+  {% if minutes %}
+    <h1>Minute stats</h1>
+    <table id="minute-stats-table"
+        summary="This table lists the server statistics at each minute.">
+      <thead>
+        <th>Minute</th>
+        <th>Requests</th>
+        <th>Downloads</th>
+        <th>Uploads</th>
+        <th>Lookups</th>
+      </thead>
+      {% for stats in minutes %}
+      <tr class="request">
+        <td>{{stats.key.parent().parent().id()}} {{stats.key.parent().id()}}:{{stats.key.id()}}</td>
+        <td>{{stats.values.requests_as_text()}}</td>
+        <td>{{stats.values.downloads_as_text()}}</td>
+        <td>{{stats.values.uploads_as_text()}}</td>
+        <td>{{stats.values.lookups_as_text()}}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  {% endif %}
+
+  <div style="float: left;"><p>
+    <a target="_blank" href="https://code.google.com/appengine/"><img border="0"
+    src="https://code.google.com/appengine/images/appengine-noborder-120x30.gif"
+    alt="Powered by Google App Engine" /></a></p>
+  </div>
+</body>
+</html>

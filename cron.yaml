@@ -6,3 +6,7 @@ cron:
 - description: testing data cleanup
   url: /restricted/cleanup/trigger/testing
   schedule: every day 09:50
+
+- description: Cron job that gathers statistics
+  url: /restricted/stats/update
+  schedule: every 1 minute

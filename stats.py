@@ -9,7 +9,20 @@ for general performance concerns. Each http handler should strive to do only one
 log entry at info level per request.
 """
 
+import datetime
 import logging
+import os
+
+# The app engine headers are located locally, so don't worry about not finding
+# them.
+# pylint: disable=E0611,F0401
+import webapp2
+from google.appengine.api import logservice
+from google.appengine.ext import ndb
+# pylint: enable=E0611,F0401
+
+import stats_framework
+import template
 
 
 ### Public API
@@ -28,6 +41,59 @@ def log(action, number, where):
   logging.info('%s%s; %d; %s', _PREFIX, _ACTION_NAMES[action], number, where)
 
 
+def to_units(number):
+  """Convert a string to numbers."""
+  UNITS = ('', 'k', 'm', 'g', 't', 'p', 'e', 'z', 'y')
+  unit = 0
+  while number >= 1024.:
+    unit += 1
+    number = number / 1024.
+    if unit == len(UNITS) - 1:
+      break
+  if unit:
+    return '%.2f%s' % (number, UNITS[unit])
+  return '%d' % number
+
+
+### Models
+
+
+class Snapshot(ndb.Model):
+  """A snapshot of statistics, to be embedded in another entity."""
+  # Number of individual uploads and total amount of bytes. Same for downloads.
+  uploads = ndb.IntegerProperty(default=0, indexed=False)
+  uploads_bytes = ndb.IntegerProperty(default=0, indexed=False)
+  downloads = ndb.IntegerProperty(default=0, indexed=False)
+  downloads_bytes = ndb.IntegerProperty(default=0, indexed=False)
+
+  # Number of /contains requests and total number of items looked up.
+  contains_requests = ndb.IntegerProperty(default=0, indexed=False)
+  contains_lookups = ndb.IntegerProperty(default=0, indexed=False)
+
+  # Total number of requests to calculate QPS
+  requests = ndb.IntegerProperty(default=0, indexed=False)
+  # Number of non-200 requests.
+  failures = ndb.IntegerProperty(default=0, indexed=False)
+
+  def accumulate(self, rhs):
+    return stats_framework.accumulate(self, rhs)
+
+  def requests_as_text(self):
+    return '%s (%s failed)' % (
+      to_units(self.requests), to_units(self.failures))
+
+  def downloads_as_text(self):
+    return '%s (%sb)' % (
+        to_units(self.downloads), to_units(self.downloads_bytes))
+
+  def uploads_as_text(self):
+    return '%s (%sb)' % (to_units(self.uploads), to_units(self.uploads_bytes))
+
+  def lookups_as_text(self):
+    return '%s (%s items)' % (
+        to_units(self.contains_requests), to_units(self.contains_lookups))
+
+
 ### Utility
 
 
@@ -37,3 +103,145 @@ _ACTION_NAMES = ['store', 'return', 'lookup', 'dupe']
 
 # Logs prefix.
 _PREFIX = 'Stats: '
+
+
+# Number of minutes to ignore because they are too fresh. This is done so that
+# eventual log consistency doesn't have to be managed explicitly. On the dev
+# server, there's no eventual inconsistency so process up to the last minute.
+_TOO_RECENT = 5 if not os.environ['SERVER_SOFTWARE'].startswith('Dev') else 1
+
+
+def _parse_line(line, values):
+  """Updates a Snapshot instance with a processed statistics line if relevant.
+  """
+  if not line.startswith(_PREFIX):
+    return
+  line = line[len(_PREFIX):]
+  if line.count(';') < 2:
+    return
+  action_id, measurement, _rest = line.split('; ', 2)
+  action = _ACTION_NAMES.index(action_id)
+  measurement = int(measurement)
+
+  if action == STORE:
+    values.uploads += 1
+    values.uploads_bytes += measurement
+  elif action == RETURN:
+    values.downloads += 1
+    values.downloads_bytes += measurement
+  elif action == LOOKUP:
+    values.contains_requests += 1
+    values.contains_lookups += measurement
+  elif action == DUPE:
+    pass
+  else:
+    assert False
+
+
+def _extract_snapshot_from_logs(start_time, end_time):
+  """Processes the logs to harvest data and return a Snapshot instance."""
+  values = Snapshot()
+  for entry in logservice.fetch(
+      start_time=start_time,
+      end_time=end_time,
+      minimum_log_level=logservice.LOG_LEVEL_INFO,
+      include_incomplete=True,
+      include_app_logs=True):
+    # Ignore other urls.
+    if not entry.resource.startswith(('/content/', '/restricted/content/')):
+      continue
+
+    values.requests += 1
+    if entry.status >= 400:
+      values.failures += 1
+
+    for log_line in entry.app_logs:
+      if log_line.level != logservice.LOG_LEVEL_INFO:
+        continue
+      _parse_line(log_line.message, values)
+  return values
+
+
+# The global stats bookkeeper. This needs to be after the function.
+_STATS_HANDLER = stats_framework.StatisticsFramework(
+    'global_stats', Snapshot, _extract_snapshot_from_logs)
+
+
+def _get_request_as_int(request, key, default, min_value, max_value):
+  """Returns a request value as int."""
+  value = request.params.get(key, '')
+  try:
+    value = int(value)
+  except ValueError:
+    return default
+  return min(max_value, max(min_value, value))
+
+
+### Handlers
+
+
+class RestrictedStatsUpdateHandler(webapp2.RequestHandler):
+  """Called every few minutes to update statistics."""
+  def get(self):
+    i = _STATS_HANDLER.process_next_chunk(_TOO_RECENT)
+    msg = 'Processed %d minutes' % i
+    logging.info(msg)
+    self.response.write(msg)
+    self.response.headers['Content-Type'] = 'text/plain'
+
+
+class StatsHandler(webapp2.RequestHandler):
+  """Returns the statistics page."""
+  def get(self):
+    """Presents nice recent statistics."""
+    # TODO(maruel): Query MinuteStats to do a nice graph precise to the minute.
+    limit_days = _get_request_as_int(self.request, 'days', 5, 0, 367)
+    limit_hours = _get_request_as_int(self.request, 'hours', 48, 0, 480)
+    limit_minutes = _get_request_as_int(self.request, 'minutes', 120, 0, 480)
+    now_text = self.request.params.get('now')
+    now = None
+    if now_text:
+      FORMATS = ('%Y-%m-%d', '%Y-%m-%d %H:%M')
+      for f in FORMATS:
+        try:
+          now = datetime.datetime.strptime(now_text, f)
+          break
+        except ValueError:
+          continue
+    if not now:
+      now = datetime.datetime.utcnow()
+    today = now.date()
+
+    # Fire up all the datastore requests.
+    future_days = []
+    if limit_days:
+      future_days = ndb.get_multi_async(
+          _STATS_HANDLER.day_key(today - datetime.timedelta(days=i))
+          for i in range(limit_days + 1))
+
+    future_hours = []
+    if limit_hours:
+      future_hours = ndb.get_multi_async(
+          _STATS_HANDLER.hour_key(now - datetime.timedelta(hours=i))
+          for i in range(limit_hours + 1))
+
+    future_minutes = []
+    if limit_minutes:
+      future_minutes = ndb.get_multi_async(
+          _STATS_HANDLER.minute_key(now - datetime.timedelta(minutes=i))
+          for i in range(limit_minutes + 1))
+
+    to_render = template.get('stats.html')
+
+    def filterout(futures):
+      intermediary = (i.get_result() for i in futures)
+      return [i for i in intermediary if i]
+
+    data = {
+      'days': filterout(future_days),
+      'hours': filterout(future_hours),
+      'minutes': filterout(future_minutes),
+      'now': now.strftime(stats_framework.TIME_FORMAT),
+    }
+    self.response.write(to_render.render(data))
+    self.response.headers['Content-Type'] = 'text/html'

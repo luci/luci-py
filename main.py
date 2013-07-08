@@ -901,6 +901,7 @@ def CreateApplication():
   - /restricted/.* requires being an instance administrator.
   - /restricted/taskqueue/.* are task queues.
   - /content/.* has the public HTTP API.
+  - /stats/.* has statistics.
 
   Set in app.yaml:
   - /css/(.*) links to static/css/(\1)
@@ -942,6 +943,11 @@ def CreateApplication():
           r'/restricted/taskqueue/verify' + namespace_key,
           RestrictedVerifyWorkerHandler),
 
+      # Stats
+      webapp2.Route(
+          r'/restricted/stats/update',
+          stats.RestrictedStatsUpdateHandler),
+
       # Administrative urls.
       webapp2.Route(
           r'/restricted/whitelistip', acl.RestrictedWhitelistIPHandler),
@@ -966,6 +972,9 @@ def CreateApplication():
           r'/content/store' + namespace_key, StoreContentByHashHandler),
       webapp2.Route(
           r'/content/retrieve' + namespace_key, RetrieveContentByHashHandler),
+
+      # Public stats.
+      webapp2.Route(r'/stats', stats.StatsHandler),
 
       # AppEngine-specific url:
       webapp2.Route(r'/_ah/warmup', WarmupHandler),
