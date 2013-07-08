@@ -38,15 +38,6 @@ class GlobalConfig(ndb.Model):
   gs_bucket = ndb.StringProperty(
       indexed=False, default=app_identity.get_application_id())
 
-  # Enable appstats and optionally cost calculation.
-  #
-  # Note: to take effect, the datastore cache must first be cleared by flushing
-  # memcache, and only then, the instances need to be restarted. This can be
-  # achieved by switching the default app version or reuploading the same code
-  # to the same version, which forces all the instances to restart.
-  enable_appstats = ndb.BooleanProperty(indexed=False, default=False)
-  enable_appstats_cost = ndb.BooleanProperty(indexed=False, default=False)
-
 
 def settings():
   return settings_async().get_result()

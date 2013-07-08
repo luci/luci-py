@@ -2,18 +2,15 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-"""Configures appstats if enabled in the config.
-
-See config.py for more information.
+"""Configures appstats.
 
 https://developers.google.com/appengine/docs/python/tools/appengineconfig
 """
 
-_SETTINGS = __import__('config').settings()
-
-
-appstats_CALC_RPC_COSTS = (
-    _SETTINGS.enable_appstats and _SETTINGS.enable_appstats_cost)
+# Enable appstats and optionally cost calculation.
+# Change these values and upload again if you want to enable appstats.
+enable_appstats = False
+appstats_CALC_RPC_COSTS = False
 
 
 def webapp_add_wsgi_middleware(app):
@@ -21,7 +18,7 @@ def webapp_add_wsgi_middleware(app):
 
   https://developers.google.com/appengine/docs/python/tools/appstats
   """
-  if _SETTINGS.enable_appstats:
+  if enable_appstats:
     # pylint: disable=E0611,F0401
     from google.appengine.ext.appstats import recording
     return recording.appstats_wsgi_middleware(app)
