@@ -701,18 +701,23 @@ class StatsHandler(webapp2.RequestHandler):
   """Show all the collected swarm stats."""
 
   def get(self):  # pylint: disable=g-bad-name
+    days_to_show = self.request.get('days', 7)
+
     weeks_daily_stats = daily_stats.GetDailyStats(
-        datetime.date.today() - datetime.timedelta(days=7))
+        datetime.date.today() - datetime.timedelta(days=days_to_show))
     # Reverse the daily stats so that the newest data is listed first, which
     # makes more sense when listing these values in a table.
     weeks_daily_stats.reverse()
 
+    max_days_to_show = min(daily_stats.DAILY_STATS_LIFE_IN_DAYS,
+                           runner_stats.WAIT_SUMMARY_LIFE_IN_DAYS)
     params = {
         'topbar': GenerateTopbar(),
         'stat_links': GenerateStatLinks(),
         'daily_stats': weeks_daily_stats,
-        'runner_wait_stats': runner_stats.GetRunnerWaitStats(),
-        'runner_cutoff': runner_stats.RUNNER_STATS_EVALUATION_CUTOFF_DAYS
+        'days_to_show': days_to_show,
+        'max_days_to_show': range(1, max_days_to_show),
+        'runner_wait_stats': runner_stats.GetRunnerWaitStats(days_to_show),
     }
 
     path = os.path.join(os.path.dirname(__file__), 'stats.html')
@@ -971,10 +976,12 @@ class DailyStatsGraphHandler(webapp2.RequestHandler):
 
   def get(self):  # pylint: disable=g-bad-name
     """Handles HTTP GET requests for this handler's URL."""
+    days_to_show = self.request.get('days', 7)
+
     params = {
-        # TODO(user): Let the user choose the number of days to display.
         'graphs': self._GetGraphableDailyStats(daily_stats.GetDailyStats(
-            datetime.date.today() - datetime.timedelta(days=7))),
+            datetime.date.today() - datetime.timedelta(days=days_to_show))),
+        'max_days_to_show': range(1, daily_stats.DAILY_STATS_LIFE_IN_DAYS),
         'stat_links': GenerateStatLinks(),
         'topbar': GenerateTopbar()
     }

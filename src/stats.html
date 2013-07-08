@@ -11,7 +11,17 @@
 {{stat_links|safe}}
 </div>
 
-<h1>Activity in the Last 7 Days</h1>
+<div style="text-align: right;">
+Days to Show:
+<select id="days_to_show" onchange="document.location.href='?days=' + this.value">
+<option value="">-</option>
+{% for day in max_days_to_show %}
+<option value='{{day}}'>{{day}}</option>
+{% endfor %}
+</select>
+</div>
+
+<h1>Activity in the Last {{days_to_show}} Days</h1>
 <table id="daily-activity-table" summary="This table summarizes the basic server activities over the last week.">
 <tr>
 <th>Date</th>
@@ -38,7 +48,7 @@
 <table id="runner-wait-table"
     summary="This table lists the wait times of all the runner, grouped by dimensions.">
 <p>
-These stats are based on the last {{runner_cutoff}} days
+These stats are based on the last {{days_to_show}} days
 </p>
 <tr>
 <th>Runner Dimensions</th>

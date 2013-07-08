@@ -29,6 +29,16 @@
 {{stat_links|safe}}<br/>
 </div>
 
+<div style="text-align: right;">
+Days to Show:
+<select id="days_to_show" onchange="document.location.href='?days=' + this.value">
+<option value="">-</option>
+{% for day in max_days_to_show %}
+<option value='{{day}}'>{{day}}</option>
+{% endfor %}
+</select>
+</div>
+
 {% for graph in graphs %}
 <div id="{{graph.element_id}}" style="width: 100%; height: 400px;"></div>
 <br/>

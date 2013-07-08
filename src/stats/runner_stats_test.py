@@ -251,11 +251,25 @@ class StatManagerTest(unittest.TestCase):
     self.assertEqual(len(end_times), len(set(end_times)), end_times)
 
   def testGetStatsForOneRunnerWaits(self):
-    self.assertEqual({}, runner_stats.GetRunnerWaitStats())
+    self.assertEqual({}, runner_stats.GetRunnerWaitStats(1))
 
+    # Add some old wait stats that should be ignored.
     wait = 10
     dimensions = 'machine_dimensions'
 
+    wait_summary = _CreateWaitSummary(end_time=(datetime.datetime.now() -
+                                                datetime.timedelta(days=2)))
+    dimension_wait = runner_stats.DimensionWaitSummary(
+        dimensions=dimensions,
+        num_runners=1,
+        mean_wait=wait,
+        median_buckets=json.dumps({'0': 1}),
+        summary_parent=wait_summary.key)
+    dimension_wait.put()
+
+    self.assertEqual({}, runner_stats.GetRunnerWaitStats(1))
+
+    # Add some current stats that should be retrieved.
     wait_summary = _CreateWaitSummary()
     dimension_wait = runner_stats.DimensionWaitSummary(
         dimensions=dimensions,
@@ -269,7 +283,7 @@ class StatManagerTest(unittest.TestCase):
         dimensions: [datetime.timedelta(seconds=wait),
                      datetime.timedelta(minutes=round(wait / 60.0)),
                      datetime.timedelta(minutes=round(wait / 60.0))]}
-    self.assertEqual(expected_waits, runner_stats.GetRunnerWaitStats())
+    self.assertEqual(expected_waits, runner_stats.GetRunnerWaitStats(1))
 
   def testGetStatsForMultipleRunners(self):
     dimensions = '{"os": "windows"}'
@@ -292,7 +306,7 @@ class StatManagerTest(unittest.TestCase):
         datetime.timedelta(seconds=mean_wait),
         datetime.timedelta(minutes=round(median_wait / 60.0)),
         datetime.timedelta(minutes=round(max_time / 60.0))]}
-    self.assertEqual(expected_waits, runner_stats.GetRunnerWaitStats())
+    self.assertEqual(expected_waits, runner_stats.GetRunnerWaitStats(1))
 
   def testGetStatsAbortedRunners(self):
     r_stats = _CreateRunnerStats()
@@ -301,7 +315,7 @@ class StatManagerTest(unittest.TestCase):
     r_stats.end_time = None
     r_stats.put()
 
-    self.assertEqual({}, runner_stats.GetRunnerWaitStats())
+    self.assertEqual({}, runner_stats.GetRunnerWaitStats(1))
 
   def testSwarmDeleteOldRunnerStats(self):
     self._mox.StubOutWithMock(runner_stats, '_GetCurrentTime')

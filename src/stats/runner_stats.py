@@ -258,22 +258,31 @@ def GenerateStats():
     dimension_summary.put()
 
 
-def GetRunnerWaitStats():
+def GetRunnerWaitStats(days_to_show):
   """Returns the stats for how long runners are waiting.
+
+  Args:
+    days_to_show: The number of days to return the runner stats for.
 
   Returns:
     A dictionary where the key is the dimension, and the value is
     (mean wait, median wait, longest wait) for getting an assigned
-    machine. Only values from the last RUNNER_STATS_EVALUATION_CUTOFF_DAYS
-    are consider.
+    machine.
   """
   # Merge the various wait summaries.
   dimension_summaries = {}
-  for dimension_wait in DimensionWaitSummary.query():
-    dimension_summaries.setdefault(
-        dimension_wait.dimensions,
-        DimensionWaitSums(dimension_wait.dimensions)
-        ).Add(dimension_wait)
+  cutoff_date = datetime.datetime.today() - datetime.timedelta(
+      days=days_to_show)
+
+  def MapWaitSummary(wait_summary):
+    for dimension_wait in wait_summary.children:
+      dimension_summaries.setdefault(
+          dimension_wait.dimensions,
+          DimensionWaitSums(dimension_wait.dimensions)
+          ).Add(dimension_wait)
+
+  wait_summary_query = WaitSummary.query(WaitSummary.end_time > cutoff_date)
+  wait_summary_query.map(MapWaitSummary)
 
   # Convert the dimension results to the desire formats.
   results = {}
