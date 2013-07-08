@@ -322,21 +322,7 @@ class MainHandler(webapp2.RequestHandler):
     runner.command_string = '&nbsp;'
     runner.failed_test_class_string = ''
 
-    if not runner.started:
-      runner.status_string = 'Pending'
-      runner.command_string = GenerateButtonWithHiddenForm(
-          'Cancel', '%s?r=%s' % (_SECURE_CANCEL_URL, runner.key_string),
-          runner.key_string)
-
-    elif not runner.done:
-      if detailed_output:
-        runner.status_string = 'Running on machine %s' % runner.machine_id
-      else:
-        runner.status_string = 'Running'
-
-      runner.started_string = self.GetTimeString(runner.started)
-      runner.machine_id_used = runner.machine_id
-    else:
+    if runner.done:
       runner.started_string = self.GetTimeString(runner.started)
       runner.ended_string = self.GetTimeString(runner.ended)
 
@@ -360,6 +346,19 @@ class MainHandler(webapp2.RequestHandler):
               (_SECURE_GET_RESULTS_URL, runner.key_string))
         else:
           runner.status_string = 'Failed'
+    elif runner.started:
+      if detailed_output:
+        runner.status_string = 'Running on machine %s' % runner.machine_id
+      else:
+        runner.status_string = 'Running'
+
+      runner.started_string = self.GetTimeString(runner.started)
+      runner.machine_id_used = runner.machine_id
+    else:
+      runner.status_string = 'Pending'
+      runner.command_string = GenerateButtonWithHiddenForm(
+          'Cancel', '%s?r=%s' % (_SECURE_CANCEL_URL, runner.key_string),
+          runner.key_string)
 
 
 class RedirectToMainHandler(webapp2.RequestHandler):

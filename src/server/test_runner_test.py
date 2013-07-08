@@ -17,6 +17,7 @@ from google.appengine.ext import ndb
 
 from common import blobstore_helper
 from server import test_helper
+from server import test_manager
 from server import test_request
 from server import test_runner
 from stats import runner_stats
@@ -248,6 +249,13 @@ class TestRunnerTest(unittest.TestCase):
     retried_runner.created = old_time
     retried_runner.automatic_retry_count = 1
     retried_runner.put()
+    self.assertEqual([], test_runner.GetHangingRunners())
+
+    # Create a runner that was aborted before running.
+    aborted_runner = test_helper.CreatePendingRunner()
+    aborted_runner.created = old_time
+    manager = test_manager.TestRequestManager()
+    manager.AbortRunner(aborted_runner)
     self.assertEqual([], test_runner.GetHangingRunners())
 
     # Create an older runner that will be marked as hanging.

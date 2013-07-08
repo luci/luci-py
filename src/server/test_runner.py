@@ -427,7 +427,8 @@ def GetHangingRunners():
 
   hanging_runners = TestRunner.gql('WHERE started = :1 AND '
                                    'automatic_retry_count = :2 AND '
-                                   'created < :3', None, 0, cutoff_time)
+                                   'created < :3 AND done = :4', None, 0,
+                                   cutoff_time, False)
   return [hanging_runner for hanging_runner in hanging_runners]
 
 
