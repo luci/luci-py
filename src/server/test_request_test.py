@@ -6,36 +6,12 @@
 
 
 
-import hashlib
 import logging
 import unittest
 
 from google.appengine.ext import testbed
+from server import test_helper
 from server import test_request
-from server import test_runner
-
-
-def CreateRequest(num_instances):
-  """Creates a basic request with the specified number of runners.
-
-  Args:
-    num_instances: The number of runner instances to give this request.
-
-  Returns:
-    The newly created request.
-  """
-  request = test_request.TestRequest()
-  request.put()
-
-  for i in range(num_instances):
-    runner = test_runner.TestRunner(
-        request=request.key,
-        config_hash=hashlib.sha1().hexdigest(),
-        config_instance_index=i,
-        num_config_instances=num_instances)
-    runner.put()
-
-  return request
 
 
 class TestRequestTest(unittest.TestCase):
@@ -50,16 +26,16 @@ class TestRequestTest(unittest.TestCase):
 
   def testGetTestRequestKeys(self):
     # Ensure it works with no keys.
-    empty_test_request = CreateRequest(num_instances=0)
+    empty_test_request = test_helper.CreateRequest(num_instances=0)
     self.assertEqual(0, len(empty_test_request.GetAllKeys()))
 
     # Try with one runner.
-    request = CreateRequest(num_instances=1)
+    request = test_helper.CreateRequest(num_instances=1)
     self.assertEqual(1, len(request.GetAllKeys()))
 
     # Test with more than 1 runner.
     instances = 5
-    request = CreateRequest(num_instances=instances)
+    request = test_helper.CreateRequest(num_instances=instances)
     self.assertEqual(instances, len(request.GetAllKeys()))
 
   def testGetMatchingTestRequests(self):
@@ -94,7 +70,7 @@ class TestRequestTest(unittest.TestCase):
     self.assertEqual(0, test_request.TestRequest.query().count())
 
     # Create a request with runner and ensure it isn't deleted.
-    request = CreateRequest(1)
+    request = test_helper.CreateRequest(1)
     self.assertEqual(1, test_request.TestRequest.query().count())
 
     request.DeleteIfNoMoreRunners()

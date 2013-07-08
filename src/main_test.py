@@ -18,8 +18,8 @@ from google.appengine.ext import testbed
 from  import main as main_app
 from common import blobstore_helper
 from common import dimensions_utils
-from common import test_request_message
 from server import admin_user
+from server import test_helper
 from server import test_manager
 from server import test_request
 from server import test_runner
@@ -48,9 +48,6 @@ class AppTest(unittest.TestCase):
     self.test_request_manager = main_app.CreateTestManager()
     main_app.CreateTestManager = (lambda: self.test_request_manager)
 
-    # The default name to use for test requests.
-    self._default_test_request_name = 'test name'
-
     # A basic config hash to use when creating runners.
     self.config_hash = dimensions_utils.GenerateDimensionHash({})
 
@@ -65,41 +62,8 @@ class AppTest(unittest.TestCase):
     self._mox.UnsetStubs()
     self._mox.ResetAll()
 
-  def _GetRequestMessage(self):
-    if not hasattr(self, '_test_request_message'):
-      test_case = test_request_message.TestCase()
-      test_case.test_case_name = self._default_test_request_name
-      test_case.tests = [test_request_message.TestObject(
-          test_name='t1', action=['ignore-me.exe'])]
-      test_case.configurations = [
-          test_request_message.TestConfiguration(
-              config_name='c1', os='win-xp',
-              tests=[test_request_message.TestObject(
-                  test_name='t2', action=['ignore-me-too.exe'])])]
-      self._test_request_message = test_request_message.Stringize(
-          test_case, json_readable=True)
-
-    return self._test_request_message
-
   def _GetRequest(self):
     return test_request.TestRequest.query().get()
-
-  def _CreateTestRunner(self, machine_id=None, exit_codes=None, started=None):
-    request = test_request.TestRequest(message=self._GetRequestMessage(),
-                                       name=self._default_test_request_name)
-    request.put()
-
-    runner = test_runner.TestRunner(request=request.key,
-                                    machine_id=machine_id,
-                                    config_hash=self.config_hash,
-                                    config_name='c1',
-                                    config_instance_index=0,
-                                    num_config_instances=1,
-                                    exit_codes=exit_codes,
-                                    started=started)
-    runner.put()
-
-    return runner
 
   def _ReplaceCurrentUser(self, email):
     if email:
@@ -109,24 +73,27 @@ class AppTest(unittest.TestCase):
 
   def testMatchingTestCasesHandler(self):
     # Test when no matching tests.
-    response = self.app.get('/get_matching_test_cases',
-                            {'name': self._default_test_request_name},
-                            expect_errors=True)
+    response = self.app.get(
+        '/get_matching_test_cases',
+        {'name': test_helper.REQUEST_MESSAGE_TEST_CASE_NAME},
+        expect_errors=True)
     self.assertEqual('404 Not Found', response.status)
 
     # Test with a single matching runner.
-    runner = self._CreateTestRunner()
-    response = self.app.get('/get_matching_test_cases',
-                            {'name': self._default_test_request_name})
+    runner = test_helper.CreatePendingRunner()
+    response = self.app.get(
+        '/get_matching_test_cases',
+        {'name': test_helper.REQUEST_MESSAGE_TEST_CASE_NAME})
     self.assertEqual('200 OK', response.status)
     self.assertTrue(str(runner.key.urlsafe()) in response.body, response.body)
 
     # Test with a multiple matching runners.
-    additional_test_runner = self._CreateTestRunner()
+    additional_test_runner = test_helper.CreatePendingRunner()
 
     # pylint: disable=g-long-lambda
-    response = self.app.get('/get_matching_test_cases',
-                            {'name': self._default_test_request_name})
+    response = self.app.get(
+        '/get_matching_test_cases',
+        {'name': test_helper.REQUEST_MESSAGE_TEST_CASE_NAME})
     self.assertEqual('200 OK', response.status)
     self.assertTrue(str(runner.key.urlsafe()) in response.body, response.body)
     self.assertTrue(str(additional_test_runner.key.urlsafe()) in response.body,
@@ -141,7 +108,8 @@ class AppTest(unittest.TestCase):
       self.assertTrue('204' in response.status)
 
     # Create test and runner.
-    runner = self._CreateTestRunner(machine_id=MACHINE_ID, exit_codes='[0]')
+    runner = test_helper.CreatePendingRunner(machine_id=MACHINE_ID,
+                                             exit_codes='[0]')
 
     # Invalid key.
     for handler in handlers:
@@ -206,7 +174,7 @@ class AppTest(unittest.TestCase):
     self._mox.ReplayAll()
 
     # Add a test runner to show on the page.
-    self._CreateTestRunner()
+    test_helper.CreatePendingRunner()
 
     response = self.app.get('/secure/main')
     self.assertTrue('200' in response.status)
@@ -220,7 +188,7 @@ class AppTest(unittest.TestCase):
     self.assertTrue('Key deletion failed.' in response.body)
 
     # Try to clean up with a valid key.
-    runner = self._CreateTestRunner()
+    runner = test_helper.CreatePendingRunner()
     response = self.app.post('/cleanup_results', {'r': runner.key.urlsafe()})
     self.assertEqual('200 OK', response.status)
     self.assertTrue('Key deleted.' in response.body)
@@ -231,7 +199,7 @@ class AppTest(unittest.TestCase):
     self.assertTrue('204' in response.status)
 
     # Test with matching key.
-    runner = self._CreateTestRunner(exit_codes='[0]')
+    runner = test_helper.CreatePendingRunner(exit_codes='[0]')
 
     response = self.app.post('/secure/retry', {'r': runner.key.urlsafe()})
     self.assertEquals('200 OK', response.status)
@@ -242,7 +210,7 @@ class AppTest(unittest.TestCase):
     self.assertEquals('200 OK', response.status)
     self.assertTrue('Cannot find message' in response.body, response.body)
 
-    runner = self._CreateTestRunner()
+    runner = test_helper.CreatePendingRunner()
     response = self.app.get('/secure/show_message',
                             {'r': runner.key.urlsafe()})
     self.assertEquals('200 OK', response.status)
@@ -295,8 +263,12 @@ class AppTest(unittest.TestCase):
     return self.app.post('/result', url_parameters, expect_errors=expect_errors)
 
   def testResultHandler(self):
-    runner = self._CreateTestRunner(machine_id=MACHINE_ID,
-                                    started=datetime.datetime.now())
+    self._mox.StubOutWithMock(test_manager.urllib2, 'urlopen')
+    test_manager.urllib2.urlopen(test_helper.DEFAULT_RESULT_URL,
+                                 mox.IgnoreArg())
+    self._mox.ReplayAll()
+
+    runner = test_helper.CreatePendingRunner(machine_id=MACHINE_ID)
 
     result = 'result string'
     response = self._PostResults(runner.key.urlsafe(), runner.machine_id,
@@ -317,14 +289,15 @@ class AppTest(unittest.TestCase):
                                  result)
     self.assertEqual('200 OK', response.status)
 
+    self._mox.VerifyAll()
+
   def testResultHandlerBlobstoreFailure(self):
     self._mox.StubOutWithMock(blobstore_helper, 'CreateBlobstore')
     result = 'result string'
     blobstore_helper.CreateBlobstore(result).AndReturn(None)
     self._mox.ReplayAll()
 
-    runner = self._CreateTestRunner(machine_id=MACHINE_ID,
-                                    started=datetime.datetime.now())
+    runner = test_helper.CreatePendingRunner(machine_id=MACHINE_ID)
 
     response = self._PostResults(runner.key.urlsafe(), runner.machine_id,
                                  result,
@@ -541,8 +514,7 @@ class AppTest(unittest.TestCase):
     self.assertEqual('Runner failed to ping.', response.body)
 
     # Start a test and successfully ping it
-    runner = self._CreateTestRunner(machine_id=MACHINE_ID,
-                                    started=datetime.datetime.now())
+    runner = test_helper.CreatePendingRunner(machine_id=MACHINE_ID)
     response = self.app.post('/runner_ping', {'r': runner.key.urlsafe(),
                                               'id': runner.machine_id})
     self.assertEqual('200 OK', response.status)
@@ -561,7 +533,7 @@ class AppTest(unittest.TestCase):
     self._mox.ReplayAll()
 
     # Add some basic stats items to ensure the loop bodies are executed.
-    runner = self._CreateTestRunner()
+    runner = test_helper.CreatePendingRunner()
     runner_stats.RecordRunnerStats(runner)
     daily_stats.DailyStats(date=datetime.date.today()).put()
 
@@ -613,7 +585,7 @@ class AppTest(unittest.TestCase):
     self.assertEqual('200 OK', response.status)
 
     # Test when there is a hanging runner.
-    runner = self._CreateTestRunner()
+    runner = test_helper.CreatePendingRunner()
     runner.created = datetime.datetime.now() - datetime.timedelta(
         minutes=2 * test_runner.TIME_BEFORE_RUNNER_HANGING_IN_MINS)
     runner.put()
@@ -649,7 +621,7 @@ class AppTest(unittest.TestCase):
     self.assertEquals('200 OK', response.status)
     self.assertTrue('Cannot find runner' in response.body, response.body)
 
-    runner = self._CreateTestRunner()
+    runner = test_helper.CreatePendingRunner()
     response = self.app.post(main_app._SECURE_CANCEL_URL,
                              {'r': runner.key.urlsafe()})
     self.assertEquals('200 OK', response.status)

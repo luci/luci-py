@@ -7,7 +7,6 @@
 
 
 import datetime
-import hashlib
 import logging
 import unittest
 
@@ -17,7 +16,7 @@ from google.appengine.ext import testbed
 from google.appengine.ext import ndb
 
 from common import blobstore_helper
-from common import test_request_message
+from server import test_helper
 from server import test_request
 from server import test_runner
 from stats import runner_stats
@@ -39,49 +38,13 @@ class TestRunnerTest(unittest.TestCase):
     # Setup a mock object.
     self._mox = mox.Mox()
 
-    self.config_name = 'c1'
-
   def tearDown(self):
     self.testbed.deactivate()
 
     self._mox.UnsetStubs()
 
-  # TODO(user): This _GetRequestMessage and _CreateRunner is used by most
-  # tests, create a helper function that all the tests can use instead of
-  # rolling their own.
-  def _GetRequestMessage(self):
-    test_case = test_request_message.TestCase()
-    test_case.test_case_name = 'test_case'
-    test_case.configurations = [
-        test_request_message.TestConfiguration(
-            config_name=self.config_name, os='win-xp',)]
-    return test_request_message.Stringize(test_case, json_readable=True)
-
-  def _CreateRunner(self, config_instance_index=0, num_instances=1):
-    """Creates a new runner.
-
-    Args:
-      config_instance_index: The config_instance_index of the runner.
-      num_instances: The num_config_instances for the runner.
-
-    Returns:
-      The newly created runner.
-    """
-    request = test_request.TestRequest(message=self._GetRequestMessage())
-    request.put()
-
-    runner = test_runner.TestRunner(
-        request=request.key,
-        config_hash=hashlib.sha1().hexdigest(),
-        config_name=self.config_name,
-        config_instance_index=config_instance_index,
-        num_config_instances=num_instances)
-    runner.put()
-
-    return runner
-
   def testGetResultStringFromEmptyRunner(self):
-    runner = self._CreateRunner()
+    runner = test_helper.CreatePendingRunner()
 
     # Since the request hasn't been run yet there should be just be an
     # empty string for the result string.
@@ -96,7 +59,7 @@ class TestRunnerTest(unittest.TestCase):
         test_runner.TxRunnerAlreadyAssignedError
         ]
 
-    runner = self._CreateRunner()
+    runner = test_helper.CreatePendingRunner()
     for e in exceptions:
       def _Raise(key, machine_id):  # pylint: disable=unused-argument
         raise e
@@ -109,7 +72,7 @@ class TestRunnerTest(unittest.TestCase):
 
     # Create some pending runners.
     for _ in range(0, 2):
-      runners.append(self._CreateRunner())
+      runners.append(test_helper.CreatePendingRunner())
 
     # Make sure it assigns machine_id correctly.
     test_runner.AtomicAssignID(runners[0].key, MACHINE_IDS[0])
@@ -128,7 +91,7 @@ class TestRunnerTest(unittest.TestCase):
 
   # Test with an exception.
   def testAssignRunnerToMachineFull(self):
-    runner = self._CreateRunner()
+    runner = test_helper.CreatePendingRunner()
 
     # First assignment should work correctly.
     self.assertTrue(test_runner.AssignRunnerToMachine(
@@ -146,7 +109,7 @@ class TestRunnerTest(unittest.TestCase):
 
   # Test the case where the runner is deleted before the tx is done.
   def testAssignDeletedRunnerToMachine(self):
-    runner = self._CreateRunner()
+    runner = test_helper.CreatePendingRunner()
     runner.key.delete()
 
     # Assignment should fail without an exception.
@@ -154,9 +117,7 @@ class TestRunnerTest(unittest.TestCase):
         MACHINE_IDS[0], runner, test_runner.AtomicAssignID))
 
   def testShouldAutomaticallyRetryRunner(self):
-    runner = self._CreateRunner()
-    runner.automatic_retry_count = 0
-    runner.put()
+    runner = test_helper.CreatePendingRunner()
     self.assertTrue(test_runner.ShouldAutomaticallyRetryRunner(runner))
 
     runner.automatic_retry_count = test_runner.MAX_AUTOMATIC_RETRIES
@@ -166,16 +127,11 @@ class TestRunnerTest(unittest.TestCase):
   # calling AutomaticallyRetryRunner. It is unclear how this is possible, so
   # handle this case gracefully.
   def testAutomaticallyRetryMachineIdNone(self):
-    runner = self._CreateRunner()
-    runner.automatic_retry_count = 0
-    runner.machine_id = None
-    runner.put()
+    runner = test_helper.CreatePendingRunner(machine_id=None)
     self.assertTrue(test_runner.AutomaticallyRetryRunner(runner))
 
   def testRecordRunnerStatsAfterAutoRetry(self):
-    runner = self._CreateRunner()
-    runner.machine_id = MACHINE_IDS[0]
-    runner.put()
+    runner = test_helper.CreatePendingRunner(machine_id=MACHINE_IDS[0])
 
     test_runner.AutomaticallyRetryRunner(runner)
 
@@ -190,7 +146,7 @@ class TestRunnerTest(unittest.TestCase):
     self.assertFalse(test_runner.PingRunner('2', None))
 
     # Tests with a valid key
-    runner = self._CreateRunner()
+    runner = test_helper.CreatePendingRunner()
 
     # Runner hasn't started.
     self.assertFalse(test_runner.PingRunner(runner.key.urlsafe(), None))
@@ -218,11 +174,7 @@ class TestRunnerTest(unittest.TestCase):
                                             MACHINE_IDS[0]))
 
   def testAbortRunnerThenReattach(self):
-    runner = self._CreateRunner()
-    runner.machine_id = MACHINE_IDS[0]
-    runner.started = datetime.datetime.now()
-    runner.ping = datetime.datetime.now()
-    runner.put()
+    runner = test_helper.CreatePendingRunner(machine_id=MACHINE_IDS[0])
 
     # Retry the runner since its taken too long to ping.
     self.assertTrue(test_runner.AutomaticallyRetryRunner(runner))
@@ -250,8 +202,8 @@ class TestRunnerTest(unittest.TestCase):
     # Create some test requests.
     test_runner_count = 3
     for i in range(test_runner_count):
-      runner = self._CreateRunner(config_instance_index=i,
-                                  num_instances=test_runner_count)
+      runner = test_helper.CreatePendingRunner()
+      runner.config_instance_index = i
       # Ensure the created times are far enough apart that we can reliably
       # sort the runners by it.
       runner.started = datetime.datetime.now() + datetime.timedelta(days=i)
@@ -277,14 +229,14 @@ class TestRunnerTest(unittest.TestCase):
   def testGetHangingRunners(self):
     self.assertEqual([], test_runner.GetHangingRunners())
 
-    self._CreateRunner()
+    test_helper.CreatePendingRunner()
     self.assertEqual([], test_runner.GetHangingRunners())
 
     old_time = datetime.datetime.now() - datetime.timedelta(
         minutes=2 * test_runner.TIME_BEFORE_RUNNER_HANGING_IN_MINS)
 
     # Create an older runner that is running and isn't hanging.
-    old_runner = self._CreateRunner()
+    old_runner = test_helper.CreatePendingRunner()
     old_runner.created = old_time
     old_runner.started = datetime.datetime.now()
     old_runner.put()
@@ -292,14 +244,14 @@ class TestRunnerTest(unittest.TestCase):
 
     # Create a runner that was automatically restart, and can never be viewed
     # as hanging.
-    retried_runner = self._CreateRunner()
+    retried_runner = test_helper.CreatePendingRunner()
     retried_runner.created = old_time
     retried_runner.automatic_retry_count = 1
     retried_runner.put()
     self.assertEqual([], test_runner.GetHangingRunners())
 
     # Create an older runner that will be marked as hanging.
-    hanging_runner = self._CreateRunner()
+    hanging_runner = test_helper.CreatePendingRunner()
     hanging_runner.created = old_time
     hanging_runner.put()
 
@@ -308,7 +260,7 @@ class TestRunnerTest(unittest.TestCase):
     self.assertEqual(hanging_runner.key, found_hanging_runners[0].key)
 
   def testGetRunnerFromUrlSafeKey(self):
-    runner = self._CreateRunner()
+    runner = test_helper.CreatePendingRunner()
 
     self.assertEqual(None, test_runner.GetRunnerFromUrlSafeKey(''))
     self.assertEqual(None, test_runner.GetRunnerFromUrlSafeKey('fake_key'))
@@ -327,9 +279,7 @@ class TestRunnerTest(unittest.TestCase):
   def testGetRunnerResult(self):
     self.assertEqual(None, test_runner.GetRunnerResults('invalid key'))
 
-    runner = self._CreateRunner()
-    runner.machine_id = MACHINE_IDS[0]
-    runner.put()
+    runner = test_helper.CreatePendingRunner(machine_id=MACHINE_IDS[0])
 
     results = test_runner.GetRunnerResults(runner.key.urlsafe())
     self.assertNotEqual(None, results)
@@ -342,11 +292,11 @@ class TestRunnerTest(unittest.TestCase):
     self.assertEqual(runner.GetResultString(), results['output'])
 
   def testGetMessage(self):
-    runner = self._CreateRunner()
+    runner = test_helper.CreatePendingRunner()
     runner.GetMessage()
 
   def testDeleteRunner(self):
-    self._CreateRunner()
+    test_helper.CreatePendingRunner()
 
     # Make sure the request and the runner are stored.
     self.assertEqual(1, test_runner.TestRunner.query().count())
@@ -360,7 +310,7 @@ class TestRunnerTest(unittest.TestCase):
     self.assertEqual(0, test_request.TestRequest.query().count())
 
   def testDeleteRunnerFromKey(self):
-    self._CreateRunner()
+    test_helper.CreatePendingRunner()
 
     # Make sure the request and the runner are stored.
     self.assertEqual(1, test_runner.TestRunner.query().count())
@@ -399,7 +349,7 @@ class TestRunnerTest(unittest.TestCase):
     test_runner._GetCurrentTime().AndReturn(mock_now)
     self._mox.ReplayAll()
 
-    runner = self._CreateRunner()
+    runner = test_helper.CreatePendingRunner()
     runner.ended = datetime.datetime.now()
     runner.put()
 
@@ -417,7 +367,7 @@ class TestRunnerTest(unittest.TestCase):
     self.assertEqual(0, test_runner.DeleteOrphanedBlobs())
 
     # Add a runner with a blob and don't delete the blob.
-    runner = self._CreateRunner()
+    runner = test_helper.CreatePendingRunner()
     runner.result_string_reference = blobstore_helper.CreateBlobstore(
         'owned blob')
     runner.put()

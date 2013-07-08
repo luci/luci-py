@@ -31,6 +31,7 @@ from common import blobstore_helper
 from common import dimensions_utils
 from common import swarm_constants
 from common import test_request_message
+from server import test_helper
 from server import test_manager
 from server import test_request
 from server import test_runner
@@ -44,8 +45,6 @@ MACHINE_IDS = ['12345678-12345678-12345678-12345678',
                '23456789-23456789-23456789-23456789',
                '34567890-34567890-34567890-34567890',
                '87654321-87654321-87654321-87654321']
-
-DEFAULT_RESULT_URL = 'http://all.your.resul.ts/are/belong/to/us'
 
 
 class TestRequestManagerTest(unittest.TestCase):
@@ -78,50 +77,6 @@ class TestRequestManagerTest(unittest.TestCase):
     self.testbed.deactivate()
 
     self._mox.UnsetStubs()
-
-  def _GetRequestMessage(self, min_instances=1, additional_instances=0,
-                         env_vars=None, result_url=DEFAULT_RESULT_URL,
-                         store_result='all', restart_on_failure=False,
-                         platform='win-xp'):
-    """Return a properly formatted request message text.
-
-    Args:
-      min_instances: The minimum number of instance of the given config.
-      additional_instances: The number of additional instances for of the given
-          config.
-      env_vars: A dictionary of environment variables for the request.
-      result_url: The result url to use.
-      store_result: Identifies which Runner and Request data should stay in
-          storage after the tests are done running (fail means only the failures
-          are kept).
-      restart_on_failure: Identifies if the slave should be restarted if any
-          of its tests fail.
-      platform: The os to require in the test's configuration.
-
-    Returns:
-      A properly formatted request message text.
-    """
-    request = test_request_message.TestCase()
-    request.test_case_name = self._request_message_test_case_name
-    request.tests = [test_request_message.TestObject(
-        test_name='t1', action=['ignore-me.exe'])]
-    request.configurations = [
-        test_request_message.TestConfiguration(
-            config_name=self._request_message_config_name, os=platform,
-            cpu='Unknown', data=['http://b.ina.ry/files2.zip'],
-            browser='Unknown',
-            min_instances=min_instances,
-            additional_instances=additional_instances,
-            tests=[test_request_message.TestObject(
-                test_name='t2', action=['ignore-me-too.exe'])])]
-    if env_vars:
-      request.env_vars = env_vars.copy()
-    request.result_url = result_url
-    request.failure_email = 'john@doe.com'
-    request.store_result = store_result
-    request.restart_on_failure = restart_on_failure
-
-    return test_request_message.Stringize(request, json_readable=True)
 
   def _GetInvalidRequestMessage(self):
     """Return an improperly formatted request message text."""
@@ -195,7 +150,7 @@ class TestRequestManagerTest(unittest.TestCase):
     # A test request is received then one machine polls for a job.  This
     # machine matches the requirements of the test, so the TestRequestManager
     # should send it to that machine.
-    self._manager.ExecuteTestRequest(self._GetRequestMessage())
+    self._manager.ExecuteTestRequest(test_helper.GetRequestMessage())
 
     self._ExecuteRegister(MACHINE_IDS[0])
     runner = test_runner.TestRunner.gql('WHERE machine_id = :1',
@@ -211,7 +166,7 @@ class TestRequestManagerTest(unittest.TestCase):
     large_os_config = map(str, range(  # pylint: disable=g-long-lambda
         dimensions_utils.MAX_DIMENSIONS_PER_MACHINE * 2))
 
-    self._manager.ExecuteTestRequest(self._GetRequestMessage(
+    self._manager.ExecuteTestRequest(test_helper.GetRequestMessage(
         platform=large_os_config))
 
     self._ExecuteRegister(MACHINE_IDS[0], platform=large_os_config)
@@ -223,7 +178,7 @@ class TestRequestManagerTest(unittest.TestCase):
 
   def _AssignPendingRequestsTest(self, instances=1):
     self._manager.ExecuteTestRequest(
-        self._GetRequestMessage(min_instances=instances))
+        test_helper.GetRequestMessage(min_instances=instances))
 
     # Execute the runners.
     self.assertLessEqual(instances, len(MACHINE_IDS))
@@ -236,7 +191,7 @@ class TestRequestManagerTest(unittest.TestCase):
   def testMultiRunnerWithEnvironmentVariables(self):
     num_indexes = 2
 
-    request_message = self._GetRequestMessage(
+    request_message = test_helper.GetRequestMessage(
         min_instances=num_indexes, env_vars={'index': '%(instance_index)s'})
 
     self._manager.ExecuteTestRequest(request_message)
@@ -259,7 +214,7 @@ class TestRequestManagerTest(unittest.TestCase):
           self.assertEqual(str(i), swarm_json['env_vars']['index'])
 
   def _TestForRestartOnFailurePresence(self, restart_on_failure):
-    self._manager.ExecuteTestRequest(self._GetRequestMessage(
+    self._manager.ExecuteTestRequest(test_helper.GetRequestMessage(
         restart_on_failure=restart_on_failure))
 
     response = self._ExecuteRegister(MACHINE_IDS[0])
@@ -291,7 +246,7 @@ class TestRequestManagerTest(unittest.TestCase):
     else:
       urllib2.urlopen(result_url, mox.StrContains('r=' + result_string))
 
-  def _SetupHandleTestResults(self, result_url=DEFAULT_RESULT_URL,
+  def _SetupHandleTestResults(self, result_url=test_helper.DEFAULT_RESULT_URL,
                               result_string='', test_instances=1):
     # Setup a valid request waiting for completion from the runner.
 
@@ -302,13 +257,14 @@ class TestRequestManagerTest(unittest.TestCase):
     for _ in range(test_instances):
       self._AddTestRunWithResultsExpectation(result_url, result_string)
 
-  def ExecuteHandleTestResults(self, success, result_url=DEFAULT_RESULT_URL,
+  def ExecuteHandleTestResults(self, success,
+                               result_url=test_helper.DEFAULT_RESULT_URL,
                                store_result='all', test_instances=1,
                                store_results_successfully=True):
     self._manager.ExecuteTestRequest(
-        self._GetRequestMessage(min_instances=test_instances,
-                                result_url=result_url,
-                                store_result=store_result))
+        test_helper.GetRequestMessage(min_instances=test_instances,
+                                      result_url=result_url,
+                                      store_result=store_result))
 
     # Execute the tests by having a machine poll for them.
     for _ in range(test_instances):
@@ -386,14 +342,17 @@ class TestRequestManagerTest(unittest.TestCase):
 
     self._mox.StubOutWithMock(urllib2, 'urlopen')
     self._mox.StubOutWithMock(logging, 'error')
-    self._AddTestRunWithResultsExpectation(DEFAULT_RESULT_URL, messages[0])
+    self._AddTestRunWithResultsExpectation(test_helper.DEFAULT_RESULT_URL,
+                                           messages[0])
     logging.error(mox.StrContains('additional response'), mox.IgnoreArg(),
                   mox.IgnoreArg())
-    self._AddTestRunWithResultsExpectation(DEFAULT_RESULT_URL, messages[2])
-    urllib2.urlopen(DEFAULT_RESULT_URL, mox.StrContains('r=' + messages[0]))
+    self._AddTestRunWithResultsExpectation(test_helper.DEFAULT_RESULT_URL,
+                                           messages[2])
+    urllib2.urlopen(test_helper.DEFAULT_RESULT_URL,
+                    mox.StrContains('r=' + messages[0]))
     self._mox.ReplayAll()
 
-    self._manager.ExecuteTestRequest(self._GetRequestMessage())
+    self._manager.ExecuteTestRequest(test_helper.GetRequestMessage())
 
     runner = test_runner.TestRunner.query().get()
 
@@ -457,7 +416,7 @@ class TestRequestManagerTest(unittest.TestCase):
 
     self._mox.ReplayAll()
 
-    self._manager.ExecuteTestRequest(self._GetRequestMessage())
+    self._manager.ExecuteTestRequest(test_helper.GetRequestMessage())
     runner = test_runner.TestRunner.query().get()
     runner.machine_id = MACHINE_IDS[0]
     runner.put()
@@ -470,7 +429,7 @@ class TestRequestManagerTest(unittest.TestCase):
     urllib2.urlopen(mox.IgnoreArg(), mox.StrContains('r='))
     self._mox.ReplayAll()
 
-    runner = self._CreatePendingRequest(machine_id=MACHINE_IDS[0])
+    runner = test_helper.CreatePendingRunner(machine_id=MACHINE_IDS[0])
     runner.machine_id = MACHINE_IDS[0]
     runner.old_machine_ids = [MACHINE_IDS[1]]
     runner.put()
@@ -489,7 +448,7 @@ class TestRequestManagerTest(unittest.TestCase):
     urllib2.urlopen(mox.IgnoreArg(), mox.StrContains('r='))
     self._mox.ReplayAll()
 
-    runner = self._CreatePendingRequest(machine_id=MACHINE_IDS[0])
+    runner = test_helper.CreatePendingRunner(machine_id=MACHINE_IDS[0])
     runner.machine_id = None
     runner.old_machine_ids = [MACHINE_IDS[1]]
     runner.put()
@@ -638,12 +597,12 @@ class TestRequestManagerTest(unittest.TestCase):
 
     # Setup the functions when the runner is aborted because it is stale.
     self._mox.StubOutWithMock(urllib2, 'urlopen')
-    urllib2.urlopen(DEFAULT_RESULT_URL, mox.IgnoreArg())
+    urllib2.urlopen(test_helper.DEFAULT_RESULT_URL, mox.IgnoreArg())
     self._mox.StubOutWithMock(mail, 'send_mail')
     self._SetupSendMailExpectations()
     self._mox.ReplayAll()
 
-    self._manager.ExecuteTestRequest(self._GetRequestMessage())
+    self._manager.ExecuteTestRequest(test_helper.GetRequestMessage())
 
     for i in range(attempts_to_reach_abort):
       # Assign a machine to the runner.
@@ -702,7 +661,7 @@ class TestRequestManagerTest(unittest.TestCase):
 
   def testResultWithUnicode(self):
     # Make sure we can handle results with unicode in them.
-    runner = self._CreatePendingRequest(machine_id=MACHINE_IDS[0])
+    runner = test_helper.CreatePendingRunner(machine_id=MACHINE_IDS[0])
 
     self._manager.AbortRunner(runner, u'\u04bb')
 
@@ -726,7 +685,7 @@ class TestRequestManagerTest(unittest.TestCase):
   def _AssignPendingRequests(self, num_tests=1, num_machines=1):
     num_running = min(num_tests, num_machines)
     for _ in range(num_tests):
-      self._CreatePendingRequest()
+      test_helper.CreatePendingRunner()
 
     # Assign different ids to the machines if requested, or have the same
     # machine do all the tests.
@@ -897,26 +856,6 @@ class TestRequestManagerTest(unittest.TestCase):
       self.assertGreaterEqual(delay, 0)
       self.assertLessEqual(delay, test_manager.MAX_COMEBACK_SECS)
 
-  def _CreatePendingRequest(self, config_name=None, config_index=0,
-                            num_config_instances=1, machine_id=None):
-    request = test_request.TestRequest(
-        message=self._GetRequestMessage(),
-        name=self._request_message_test_case_name)
-    request.put()
-
-    config_name = config_name or self._request_message_config_name
-    runner = test_runner.TestRunner(
-        request=request.key, config_name=config_name,
-        config_hash=request.GetConfigurationDimensionHash(config_name),
-        config_instance_index=config_index,
-        num_config_instances=num_config_instances)
-    if machine_id:
-      runner.machine_id = machine_id
-      runner.started = datetime.datetime.now()
-    runner.put()
-
-    return runner
-
   # Ensure that if we have a machine request a test that has the same id
   # as a machine that is supposed to be running a test, we log an error, since
   # it probably means we failed to get the results from the last test.
@@ -927,7 +866,7 @@ class TestRequestManagerTest(unittest.TestCase):
                     mox.IgnoreArg())
     self._mox.ReplayAll()
 
-    self._manager.ExecuteTestRequest(self._GetRequestMessage())
+    self._manager.ExecuteTestRequest(test_helper.GetRequestMessage())
 
     version = test_manager.SlaveVersion()
     register_request = self._GetMachineRegisterRequest(version=version)
@@ -948,7 +887,7 @@ class TestRequestManagerTest(unittest.TestCase):
 
   def testRecordMachineRunnerAssignedCorrectlyCalled(self):
     matching_config = 'win-xp'
-    request_message = self._GetRequestMessage(platform=matching_config)
+    request_message = test_helper.GetRequestMessage(platform=matching_config)
     self._manager.ExecuteTestRequest(request_message)
 
     self.assertEqual(0, machine_stats.MachineStats.all().count())
@@ -968,7 +907,7 @@ class TestRequestManagerTest(unittest.TestCase):
 
   def testRecordRunnerStats(self):
     # Create a pending runner and execute it.
-    self._manager.ExecuteTestRequest(self._GetRequestMessage())
+    self._manager.ExecuteTestRequest(test_helper.GetRequestMessage())
     self._ExecuteRegister(MACHINE_IDS[0])
     self.assertEqual(0, runner_stats.RunnerStats.query().count())
 
