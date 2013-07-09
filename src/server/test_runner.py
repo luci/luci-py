@@ -17,6 +17,7 @@ from google.appengine.ext import ndb
 
 from common import blobstore_helper
 from common import test_request_message
+from server import dimension_mapping
 from stats import machine_stats
 from stats import runner_stats
 
@@ -124,14 +125,28 @@ class TestRunner(ndb.Model):
   # when the runner has ended (i.e. done == True). Until then, it is None.
   result_string_reference = ndb.BlobKeyProperty()
 
+  # The dimension string for this runner.
+  dimensions = ndb.StringProperty(required=True)
+
   @classmethod
   def _pre_delete_hook(cls, key):  # pylint: disable=g-bad-name
+    """Delete the associated blob before deleting the runner.
+
+    Args:
+      key: The key of the TestRunner to be deleted.
+    """
     runner = key.get()
     # We delete the blob referenced by this model because no one
     # else will ever care about it or try to reference it, so we
     # are just cleaning up the blobstore.
     if runner.result_string_reference:
       blobstore.delete_async(runner.result_string_reference)
+
+  def _pre_put_hook(self):  # pylint: disable=g-bad-name
+    """Ensure that all runners have their dimensions properly set."""
+    if not self.dimensions:
+      self.dimensions = test_request_message.Stringize(
+          self.GetConfiguration().dimensions)
 
   def GetName(self):
     """Gets a name for this runner.
@@ -166,14 +181,6 @@ class TestRunner(ndb.Model):
       return ''
 
     return blobstore_helper.GetBlobstore(self.result_string_reference)
-
-  def GetDimensionsString(self):
-    """Get a string representing the dimensions this runner requires.
-
-    Returns:
-      The string representing the dimensions for this runner.
-    """
-    return test_request_message.Stringize(self.GetConfiguration().dimensions)
 
   def GetWaitTime(self):
     """Get the number of seconds between creation and execution start.
@@ -473,6 +480,36 @@ def GetRunnerResults(key):
           'config_instance_index': runner.config_instance_index,
           'num_config_instances': runner.num_config_instances,
           'output': runner.GetResultString()}
+
+
+def GetRunnerSummaryByDimension():
+  """Returns a high level summary of the current runners per dimension.
+
+  Returns:
+    A dictionary where the key is the dimension and the value is a tuple of
+    (pending runners, running runners) for the dimension.
+  """
+  def GetRunnerSummary(mapping):
+    # Since the following commands are part of a GQL query, we can't use
+    # the pythonic "is None", "is not None" or the explicit boolean comparison.
+    # pylint: disable=g-equals-none,g-explicit-bool-comparison
+    pending_runners_future = TestRunner.query(
+        TestRunner.dimensions == mapping.dimensions,
+        TestRunner.started == None,
+        TestRunner.done == False).count_async()
+
+    running_runners_future = TestRunner.query(
+        TestRunner.dimensions == mapping.dimensions,
+        TestRunner.started != None,
+        TestRunner.done == False).count_async()
+    # pylint: enable=g-equals-none,g-explicit-bool-comparison
+
+    return (mapping.dimensions,
+            (pending_runners_future.get_result(),
+             running_runners_future.get_result()))
+
+  dimension_query = dimension_mapping.DimensionMapping.query()
+  return dict(dimension_query.map(GetRunnerSummary))
 
 
 def DeleteRunnerFromKey(key):

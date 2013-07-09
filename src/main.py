@@ -630,8 +630,7 @@ class DetectHangingRunnersHandler(CronJobHandler):
     if hanging_runners:
       subject = 'Hanging Runners on %s' % app_identity.get_application_id()
 
-      hanging_dimensions = set(runner.GetDimensionsString()
-                               for runner in hanging_runners)
+      hanging_dimensions = set(runner.dimensions for runner in hanging_runners)
       body = ('The following dimensions have hanging runners (runners that '
               'have been waiting more than %d minutes to run).\n' % (
                   test_runner.TIME_BEFORE_RUNNER_HANGING_IN_MINS) +
@@ -938,17 +937,36 @@ class RunnerPingHandler(webapp2.RequestHandler):
       self.response.out.write('Runner failed to ping.')
 
 
+class RunnerSummary(object):
+  """A basic helper class for holding the runner summary for a dimension."""
+
+  def __init__(self, dimensions, num_pending, num_running):
+    self.dimension = dimensions
+    self.pending_runners = num_pending
+    self.running_runners = num_running
+
+
 class RunnerSummaryHandler(webapp2.RequestHandler):
   """Handler for displaying a summary of the current runners."""
 
   def get(self):  # pylint: disable=g-bad-name
+    total_pending = 0
+    total_running = 0
+
+    dimension_summary = []
+    for dimensions, runner_summary in test_runner.GetRunnerSummaryByDimension():
+      total_pending += runner_summary[0]
+      total_running += runner_summary[1]
+      dimension_summary.append(RunnerSummary(dimensions,
+                                             runner_summary[0],
+                                             runner_summary[1]))
+
     params = {
         'topbar': GenerateTopbar(),
         'stats_links': GenerateStatLinks(),
-        # TODO(user): Generate the actual stats.
-        'total_running_runners': 0,
-        'total_pending_runners': 0,
-        'dimension_summary': [],
+        'total_pending_runners': total_pending,
+        'total_running_runners': total_running,
+        'dimension_summary': dimension_summary,
     }
 
     path = os.path.join(os.path.dirname(__file__), 'runner_summary.html')

@@ -159,7 +159,7 @@ def RecordRunnerStats(runner):
 
   runner_stats = RunnerStats(
       test_case_name=runner.GetName(),
-      dimensions=runner.GetDimensionsString(),
+      dimensions=runner.dimensions,
       num_instances=runner.num_config_instances,
       instance_index=runner.config_instance_index,
       created_time=runner.created,
