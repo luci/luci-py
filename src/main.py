@@ -204,6 +204,26 @@ def IsAuthenticatedMachine(request):
       request.remote_addr, request.get('password', None))
 
 
+def DaysToShow(request):
+  """Find the number of days to show, according to the request.
+
+  Args:
+    request: A dictionary that might contain the days value, otherwise return
+        the default days_to_show value.
+
+  Returns:
+    The number of days to show.
+  """
+  days_to_show = 7
+  try:
+    days_to_show = int(request.get('days', days_to_show))
+  except ValueError:
+    # Stick with the default value.
+    pass
+
+  return days_to_show
+
+
 class MainHandler(webapp2.RequestHandler):
   """Handler for the main page of the web server.
 
@@ -700,7 +720,7 @@ class StatsHandler(webapp2.RequestHandler):
   """Show all the collected swarm stats."""
 
   def get(self):  # pylint: disable=g-bad-name
-    days_to_show = self.request.get('days', 7)
+    days_to_show = DaysToShow(self.request)
 
     weeks_daily_stats = daily_stats.GetDailyStats(
         datetime.date.today() - datetime.timedelta(days=days_to_show))
@@ -975,7 +995,7 @@ class DailyStatsGraphHandler(webapp2.RequestHandler):
 
   def get(self):  # pylint: disable=g-bad-name
     """Handles HTTP GET requests for this handler's URL."""
-    days_to_show = self.request.get('days', 7)
+    days_to_show = DaysToShow(self.request)
 
     params = {
         'graphs': self._GetGraphableDailyStats(daily_stats.GetDailyStats(
