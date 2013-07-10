@@ -37,6 +37,10 @@ DEFAULT_MACHINE_ID_FILE = 'swarm_bot.id'
 # The zip file to contain the zipped slave code.
 ZIPPED_SLAVE_FILES = 'slave_files.zip'
 
+# The name of a user added file that can be used to specify conditions under
+# which a slave should stop querying for work.
+CHECK_REQUIREMENTS_FILE = 'check_requirements.py'
+
 # The code to unzip the slave code and start the slave back up. This needs to be
 # a separate script so that the update process can overwrite it and then run
 # it without the rest of the slave running, otherwise the slave files will be
@@ -84,6 +88,27 @@ def Restart():
 
   # The machine should be shutdown by now.
   raise SlaveError('Unable to restart machine')
+
+
+def ShouldRun(remaining_iterations):
+  """Do some basic checks to determine if the slave should run.
+
+  Args:
+    remaining_iterations: The remaining number of iterations to do (or -1 to
+        never stop).
+
+  Returns:
+     True if this machine should continue running.
+  """
+  if remaining_iterations == 0:
+    return False
+
+  # If a CHECK_REQUIREMENT_FILE is present, call it to give slaves a way of
+  # determining if they should still communicate with the server or not.
+  if os.path.exists(CHECK_REQUIREMENTS_FILE):
+    return not bool(subprocess.call([sys.executable, CHECK_REQUIREMENTS_FILE]))
+
+  return True
 
 
 # pylint: disable=dangerous-default-value
@@ -229,9 +254,8 @@ class SlaveMachine(object):
       requested.
     """
     url = self._url + '/poll_for_test'
-    done_iterations = 0
+    remaining_iterations = iterations
 
-    # Loop for requested number of iterations.
     while True:
       request = {
           'attributes': json.dumps(self._attributes)
@@ -260,11 +284,11 @@ class SlaveMachine(object):
         logging.debug('Valid server response:\n %s', response_str)
         self._ProcessResponse(response)
 
-      # Continuously loop until we hit the requested number of iterations.
-      if iterations != -1:
-        done_iterations += 1
-        if done_iterations == iterations:
-          break
+      if remaining_iterations > 0:
+        remaining_iterations -= 1
+
+      if not ShouldRun(remaining_iterations):
+        break
 
   def _ProcessResponse(self, response):
     """Deals with processing the response sent to slave machine.
