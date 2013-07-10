@@ -25,6 +25,14 @@ class GlobalSecret(ndb.Model):
   """Secret."""
   secret = ndb.BlobProperty()
 
+  def _pre_put_hook(self):
+    """Generates random data only when necessary.
+
+    If default=os.urandom(16) was set on secret, it would fetch 16 bytes of
+    random data on every process startup, which is unnecessary.
+    """
+    self.secret = self.secret or os.urandom(16)
+
 
 class WhitelistedIP(ndb.Model):
   """Items where the IP address is allowed.
@@ -60,6 +68,9 @@ class WhitelistedDomain(ndb.Model):
 
 
 ### Utility
+
+
+_GLOBAL_KEY = 'global'
 
 
 def htmlwrap(text):
@@ -105,20 +116,6 @@ def ip_to_str(iptype, ipvalue):
   return '%s-%d' % (iptype, ipvalue)
 
 
-def is_valid_domain(domain):
-  """Returns True if the domain is valid."""
-  return bool(WhitelistedDomain.get_by_id(domain))
-
-
-def get_global_secret():
-  """Returns the global secret to be used for the token."""
-  secret_obj = GlobalSecret.get_by_id('global')
-  if not secret_obj:
-    # First time.
-    secret_obj = GlobalSecret.get_or_insert('global', secret=os.urandom(16))
-  return secret_obj.secret
-
-
 def gen_token(access_id, offset, now):
   """Returns a valid token for the access_id.
 
@@ -130,7 +127,11 @@ def gen_token(access_id, offset, now):
   this_hour = int(now / 3600.)
   timestamp = str(this_hour + offset)
   version = os.environ['CURRENT_VERSION_ID']
-  secrets = (get_global_secret(), str(access_id), str(version), timestamp)
+  secrets = (
+      GlobalSecret.get_or_insert(_GLOBAL_KEY).secret,
+      str(access_id),
+      str(version),
+      timestamp)
   hashed = hashlib.sha1('\0'.join(secrets)).digest()
   return base64.urlsafe_b64encode(hashed)[:16] + '-' + timestamp
 
@@ -188,7 +189,8 @@ class ACLRequestHandler(webapp2.RequestHandler):
   def check_user(self, user):
     """Verifies if the user is whitelisted."""
     domain = user.email().partition('@')[2]
-    if not is_valid_domain(domain) and not users.is_current_user_admin():
+    if (not WhitelistedDomain.get_by_id(domain) and
+        not users.is_current_user_admin()):
       logging.warning('Disallowing %s, invalid domain' % user.email())
       self.abort(403, detail='Invalid domain, %s' % domain)
     # user_id() is only set with Google accounts, fallback to the email address
@@ -268,8 +270,10 @@ class RestrictedWhitelistDomainHandler(ACLRequestHandler):
     domain = self.request.get('domain')
     if not re.match(r'^[a-z\.\-]+$', domain):
       self.abort(403, 'Invalid domain format')
-    if not is_valid_domain(domain):
-      WhitelistedDomain(domain).put()
+    # Do not use get_or_insert() right away so we know if the entity existed
+    # before.
+    if not WhitelistedDomain.get_by_id(domain):
+      WhitelistedDomain.get_or_insert(domain)
       self.response.out.write(htmlwrap('Success: %s' % domain))
     else:
       self.response.out.write(htmlwrap('Already present: %s' % domain))
@@ -293,4 +297,3 @@ def bootstrap():
         ip_to_str('v4', 2130706433),
         ip='127.0.0.1',
         comment='automatic because of running on dev server')
-  get_global_secret()
