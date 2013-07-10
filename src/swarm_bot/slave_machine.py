@@ -82,9 +82,9 @@ def Restart():
     except OSError as e:
       logging.exception(e)
 
-  # Sleep for 5 seconds to ensure we don't try to do anymore work while
+  # Sleep for 300 seconds to ensure we don't try to do anymore work while
   # the OS is preparing to shutdown.
-  time.sleep(5)
+  time.sleep(300)
 
   # The machine should be shutdown by now.
   raise SlaveError('Unable to restart machine')
