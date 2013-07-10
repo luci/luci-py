@@ -42,7 +42,7 @@ def _CreateRunner(request, config_name):
 def GetRequestMessage(min_instances=1, additional_instances=0,
                       env_vars=None, result_url=DEFAULT_RESULT_URL,
                       store_result='all', restart_on_failure=False,
-                      platform='win-xp'):
+                      platform='win-xp', priority=10):
   """Return a properly formatted request message text.
 
   Args:
@@ -57,6 +57,7 @@ def GetRequestMessage(min_instances=1, additional_instances=0,
     restart_on_failure: Identifies if the slave should be restarted if any
         of its tests fail.
     platform: The os to require in the test's configuration.
+    priority: The priority given to this request.
 
   Returns:
     A properly formatted request message text.
@@ -72,6 +73,7 @@ def GetRequestMessage(min_instances=1, additional_instances=0,
           browser='Unknown',
           min_instances=min_instances,
           additional_instances=additional_instances,
+          priority=priority,
           tests=[test_request_message.TestObject(
               test_name='t2', action=['ignore-me-too.exe'])])]
   if env_vars:

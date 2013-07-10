@@ -359,11 +359,11 @@ class TestRequestManager(object):
         # DimensionMapping automatically updates last_seen when put() is called.
         dimension.put()
 
-      # TODO(user): deal with addition_instances later!!!
+      # TODO(user): deal with addition_instances later.
       assert config.min_instances > 0
+      config.num_instances = config.min_instances
       for instance_index in range(config.min_instances):
         config.instance_index = instance_index
-        config.num_instances = config.min_instances
         runner = self._QueueTestRequestConfig(request, config, config_hash)
 
         test_keys['test_keys'].append({'config_name': config.config_name,
@@ -390,7 +390,7 @@ class TestRequestManager(object):
     runner = test_runner.TestRunner(
         request=request.key, config_name=config.config_name,
         config_hash=config_hash, config_instance_index=config.instance_index,
-        num_config_instances=config.num_instances)
+        num_config_instances=config.num_instances, priority=config.priority)
 
     runner.put()
 
@@ -698,13 +698,13 @@ class TestRequestManager(object):
     """
     # We can only have 30 elements in a IN query at a time (app engine limit).
     number_of_queries = int(math.ceil(len(attrib_hashes) / 30.0))
-
     runner = None
     for i in range(number_of_queries):
       # We use a format argument for None, because putting None in the string
       # doesn't work.
       query_runner = test_runner.TestRunner.gql(
-          'WHERE started = :1 and config_hash IN :2 ORDER BY created LIMIT 1',
+          'WHERE started = :1 and config_hash IN :2 ORDER BY '
+          'priority_and_created LIMIT 1',
           None, attrib_hashes[i * 30:(i + 1) * 30]).get()
 
       # Use this runner if it is older than our currently held runner.
@@ -730,8 +730,8 @@ class TestRequestManager(object):
     # Assign test runners from earliest to latest.
     # We use a format argument for None, because putting None in the string
     # doesn't work.
-    query = test_runner.TestRunner.gql('WHERE started = :1 ORDER BY created',
-                                       None)
+    query = test_runner.TestRunner.gql('WHERE started = :1 ORDER BY '
+                                       'priority_and_created', None)
     for runner in query:
       runner_dimensions = runner.GetConfiguration().dimensions
       (match, output) = dimensions_utils.MatchDimensions(runner_dimensions,

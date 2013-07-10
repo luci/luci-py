@@ -90,6 +90,26 @@ class TestRunner(ndb.Model):
   # started executing yet.
   created = ndb.DateTimeProperty(auto_now_add=True)
 
+  # The priority of the runner. A lower number is higher priority.
+  priority = ndb.IntegerProperty(default=10)
+
+  # The priority and date added together to allow queries to order the results
+  # by this field to allow sorting by priority first, and then date.
+  @ndb.ComputedProperty
+  def priority_and_created(self):  # pylint: disable=g-bad-name
+    # The first time a runner is stored, it computes this property before the
+    # created value has been created, so we need to get a time to use.
+    # datetime.datetime.now() will give the runner a slightly earlier time, but
+    # all runners have the same change, so the order of runners should be
+    # preserved.
+    created_str = str(self.created if self.created else datetime.datetime.now())
+
+    priority_str = (
+        ('%%0%dd' % len(str(test_request_message.MAX_PRIORITY_VALUE))) %
+        self.priority)
+
+    return priority_str + created_str
+
   # The time at which this runner was executed on a remote machine.  If the
   # runner isn't executing or ended, then the value is None and we use the
   # fact that it is None to identify if a test was started or not.
@@ -143,7 +163,7 @@ class TestRunner(ndb.Model):
       blobstore.delete_async(runner.result_string_reference)
 
   def _pre_put_hook(self):  # pylint: disable=g-bad-name
-    """Ensure that all runners have their dimensions properly set."""
+    """Ensure that all runner values are properly set."""
     if not self.dimensions:
       self.dimensions = test_request_message.Stringize(
           self.GetConfiguration().dimensions)

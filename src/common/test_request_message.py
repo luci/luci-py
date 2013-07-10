@@ -46,6 +46,9 @@ DEFAULT_ENCODING = 'ascii'
 # TODO(user): Change this value if the system isn't windows.
 DEFAULT_WORKING_DIR = r'c:\swarm_tests'
 
+# The maximum priority value that a runner can have.
+MAX_PRIORITY_VALUE = 1000
+
 
 class Error(Exception):
   """Simple error exception properly scoped here."""
@@ -726,11 +729,16 @@ class TestConfiguration(TestRequestMessageBase):
     additional_instances: An optional integer specifying the maximum number of
         additional instances of this configuration we want. Defaults to 0.
         Must be greater than 0.
+    priority: The priority of this configuartion, used to determine execute
+        order (a lower number is higher priority). Defaults to 10, the
+        acceptable values are [0, MAX_PRIORITY_VALUE].
+
     dimensions: A dictionary of strings or list of strings for dimensions.
   """
 
   def __init__(self, config_name=None, env_vars=None, data=None, tests=None,
-               min_instances=1, additional_instances=0, **dimensions):
+               min_instances=1, additional_instances=0, priority=10,
+               **dimensions):
     super(TestConfiguration, self).__init__()
     self.config_name = config_name
     if env_vars:
@@ -747,6 +755,7 @@ class TestConfiguration(TestRequestMessageBase):
       self.tests = []
     self.min_instances = min_instances
     self.additional_instances = additional_instances
+    self.priority = priority
 
     # Dimensions are kept dynamic so that we don't have to update this code
     # when the list of configuration dimensions changes.
@@ -770,9 +779,11 @@ class TestConfiguration(TestRequestMessageBase):
                                      unique_value_keys=['test_name'],
                                      errors=errors) or
         # required=True to make sure the caller doesn't set it to None.
-        not self.AreValidValues(['min_instances', 'additional_instances'],
+        not self.AreValidValues(['min_instances', 'additional_instances',
+                                 'priority'],
                                 (int, long), required=True, errors=errors) or
-        self.min_instances < 1 or self.additional_instances < 0):
+        self.min_instances < 1 or self.additional_instances < 0 or
+        self.priority < 0 or self.priority > MAX_PRIORITY_VALUE):
       self.LogError('Invalid TestConfiguration: %s' % self.__dict__, errors)
       return False
 

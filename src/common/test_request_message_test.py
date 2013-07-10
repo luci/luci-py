@@ -475,7 +475,8 @@ class TestConfigurationTest(TestHelper):
         data=TestHelper.VALID_URL_LIST_VALUES[-1],
         tests=[TestObjectTest.GetFullObject()],
         min_instances=1,
-        additional_instances=1)
+        additional_instances=1,
+        priority=1)
 
   def testNoReferences(self):
     # Ensure that Test Configuration makes copies of its input, not references.
@@ -526,6 +527,9 @@ class TestConfigurationTest(TestHelper):
     self.AssertValidValues('additional_instances',
                            TestHelper.VALID_INT_VALUES)
 
+    self.AssertValidValues('priority',
+                           [0, 10, 33, test_request_message.MAX_PRIORITY_VALUE])
+
     self.AssertValidValues('env_vars', TestHelper.VALID_ENV_VARS)
 
     for value in TestHelper.VALID_STRING_VALUES:
@@ -567,6 +571,11 @@ class TestConfigurationTest(TestHelper):
     self.AssertInvalidValues('additional_instances',
                              TestHelper.INVALID_POSITIVE_INT_VALUES)
     self.test_request.additional_instances = 0
+
+    self.AssertInvalidValues('priority',
+                             TestHelper.INVALID_POSITIVE_INT_VALUES +
+                             [test_request_message.MAX_PRIORITY_VALUE + 1])
+    self.test_request.priority = 10
 
     self.AssertInvalidValues('env_vars', TestHelper.INVALID_ENV_VARS)
     self.test_request.env_vars = None

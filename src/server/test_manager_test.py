@@ -176,6 +176,30 @@ class TestRequestManagerTest(unittest.TestCase):
     self.assertEqual(MACHINE_IDS[0], runner.machine_id)
     self.assertNotEqual(None, runner.started)
 
+  def testRunnersWithDifferentPriorities(self):
+    self._manager.ExecuteTestRequest(test_helper.GetRequestMessage(
+        priority=100))
+    self._manager.ExecuteTestRequest(test_helper.GetRequestMessage(priority=1))
+
+    self._ExecuteRegister(MACHINE_IDS[0])
+
+    old_low_priority_runner = test_runner.TestRunner.query(
+        test_runner.TestRunner.priority == 100).get()
+    self.assertNotEqual(None, old_low_priority_runner)
+
+    new_high_priority_runner = test_runner.TestRunner.query(
+        test_runner.TestRunner.priority == 1).get()
+    self.assertNotEqual(None, new_high_priority_runner)
+
+    # Ensure that the low priority runner is older.
+    self.assertTrue(
+        old_low_priority_runner.created < new_high_priority_runner.created)
+
+    # Ensure that the new runner executes, since it has higher priority, even
+    # though it is newer.
+    self.assertEqual(None, old_low_priority_runner.started)
+    self.assertNotEqual(None, new_high_priority_runner.started)
+
   def _AssignPendingRequestsTest(self, instances=1):
     self._manager.ExecuteTestRequest(
         test_helper.GetRequestMessage(min_instances=instances))
