@@ -13,51 +13,50 @@ import time
 # them.
 # pylint: disable=E0611,F0401
 import webapp2
-from google.appengine.api import memcache
 from google.appengine.api import users
-from google.appengine.ext import db
+from google.appengine.ext import ndb
 # pylint: enable=E0611,F0401
 
 
 ### Models
 
 
-class GlobalSecret(db.Model):
+class GlobalSecret(ndb.Model):
   """Secret."""
-  secret = db.ByteStringProperty()
+  secret = ndb.BlobProperty()
 
 
-class WhitelistedIP(db.Model):
+class WhitelistedIP(ndb.Model):
   """Items where the IP address is allowed.
 
   The key is the ip as returned by ip_to_str(*parse_ip(ip)).
   """
   # Logs who made the change.
-  timestamp = db.DateTimeProperty(auto_now=True)
-  who = db.UserProperty(auto_current_user=True)
+  timestamp = ndb.DateTimeProperty(auto_now=True)
+  who = ndb.UserProperty(auto_current_user=True)
 
   # This is used for sharing token. Use case: a slave are multiple HTTP proxies
   # which different public IP used in a round-robin fashion, so the slave looks
   # like a different IP at each request, but reuses the original token.
-  group = db.StringProperty(indexed=False)
+  group = ndb.StringProperty(indexed=False)
 
   # The textual representation of the IP of the machine to whitelist. Not used
   # in practice, just there since the canonical representation is hard to make
   # sense of.
-  ip = db.StringProperty(indexed=False)
+  ip = ndb.StringProperty(indexed=False)
 
   # Is only for maintenance purpose.
-  comment = db.StringProperty(indexed=False)
+  comment = ndb.StringProperty(indexed=False)
 
 
-class WhitelistedDomain(db.Model):
+class WhitelistedDomain(ndb.Model):
   """Domain from which users can use the isolate server.
 
   The key is the domain name, like 'example.com'.
   """
   # Logs who made the change.
-  timestamp = db.DateTimeProperty(auto_now=True)
-  who = db.UserProperty(auto_current_user=True)
+  timestamp = ndb.DateTimeProperty(auto_now=True)
+  who = ndb.UserProperty(auto_current_user=True)
 
 
 ### Utility
@@ -107,32 +106,17 @@ def ip_to_str(iptype, ipvalue):
 
 
 def is_valid_domain(domain):
-  """Returns True if the domain is valid.
-
-  Deleting a domain by deleting the corresponding WhitelistedDomain requires
-  clearing memcache.
-  """
-  if memcache.get(domain, namespace='whitelisted_domain'):
-    return True
-  if WhitelistedDomain.get_by_key_name(domain):
-    memcache.set(domain, True, namespace='whitelisted_domain')
-    return True
-  # Do not save negative result.
-  return False
+  """Returns True if the domain is valid."""
+  return bool(WhitelistedDomain.get_by_id(domain))
 
 
 def get_global_secret():
   """Returns the global secret to be used for the token."""
-  secret = memcache.get('value', namespace='global_secret')
-  if not secret:
-    secret_obj = GlobalSecret.get_by_key_name('global')
-    if not secret_obj:
-      # First time.
-      secret_obj = GlobalSecret(key_name='global', secret=os.urandom(16))
-      secret_obj.put()
-    secret = secret_obj.secret
-    memcache.set('value', secret, namespace='global_secret')
-  return secret
+  secret_obj = GlobalSecret.get_by_id('global')
+  if not secret_obj:
+    # First time.
+    secret_obj = GlobalSecret.get_or_insert('global', secret=os.urandom(16))
+  return secret_obj.secret
 
 
 def gen_token(access_id, offset, now):
@@ -191,21 +175,15 @@ class ACLRequestHandler(webapp2.RequestHandler):
   def check_ip(self, ip):
     """Verifies if the IP is whitelisted."""
     self.access_id = ip
-    valid = memcache.get(ip, namespace='ip_token')
-    if not valid:
-      iptype, ipvalue = parse_ip(ip)
-      whitelisted = WhitelistedIP.get_by_key_name(ip_to_str(iptype, ipvalue))
-      if not whitelisted:
-        logging.warning('Blocking IP %s', ip)
-        self.abort(401, detail='Please login first.')
-      if whitelisted.group:
-        # Any member of of the group can impersonate others. This is to enable
-        # support for slaves behind proxies with multiple IPs.
-        self.access_id = whitelisted.group
-      # Performance enhancement.
-      memcache.set(ip, self.access_id, namespace='ip_token')
-    else:
-      self.access_id = valid
+    iptype, ipvalue = parse_ip(ip)
+    whitelisted = WhitelistedIP.get_by_id(ip_to_str(iptype, ipvalue))
+    if not whitelisted:
+      logging.warning('Blocking IP %s', ip)
+      self.abort(401, detail='Please login first.')
+    if whitelisted.group:
+      # Any member of of the group can impersonate others. This is to enable
+      # support for slaves behind proxies with multiple IPs.
+      self.access_id = whitelisted.group
 
   def check_user(self, user):
     """Verifies if the user is whitelisted."""
@@ -257,7 +235,7 @@ class RestrictedWhitelistIPHandler(ACLRequestHandler):
       self.abort(403, 'Comment is required.')
     if not key:
       self.abort(403, 'IP is invalid')
-    item = WhitelistedIP.get_by_key_name(key)
+    item = WhitelistedIP.get_by_id(key)
     if item:
       item.comment = comment or item.comment
       item.group = group
@@ -265,7 +243,7 @@ class RestrictedWhitelistIPHandler(ACLRequestHandler):
       item.put()
       self.response.out.write(htmlwrap('Already present: %s' % ip))
     else:
-      WhitelistedIP(key_name=key, comment=comment, group=group, ip=ip).put()
+      WhitelistedIP(key, comment=comment, group=group, ip=ip).put()
       self.response.out.write(htmlwrap('Success: %s' % ip))
     self.response.headers['Content-Type'] = 'text/html'
 
@@ -291,7 +269,7 @@ class RestrictedWhitelistDomainHandler(ACLRequestHandler):
     if not re.match(r'^[a-z\.\-]+$', domain):
       self.abort(403, 'Invalid domain format')
     if not is_valid_domain(domain):
-      WhitelistedDomain(key_name=domain).put()
+      WhitelistedDomain(domain).put()
       self.response.out.write(htmlwrap('Success: %s' % domain))
     else:
       self.response.out.write(htmlwrap('Already present: %s' % domain))
@@ -310,9 +288,9 @@ class GetTokenHandler(ACLRequestHandler):
 def bootstrap():
   """Adds example.com as a valid domain when testing."""
   if os.environ['SERVER_SOFTWARE'].startswith('Development'):
-    WhitelistedDomain.get_or_insert(key_name='example.com')
+    WhitelistedDomain.get_or_insert('example.com')
     WhitelistedIP.get_or_insert(
-        key_name=ip_to_str('v4', 2130706433),
+        ip_to_str('v4', 2130706433),
         ip='127.0.0.1',
         comment='automatic because of running on dev server')
   get_global_secret()
