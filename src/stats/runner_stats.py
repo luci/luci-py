@@ -93,6 +93,11 @@ class DimensionWaitSummary(ndb.Model):
   # summary spans.
   summary_parent = ndb.KeyProperty(kind='WaitSummary')
 
+  # Get the end time of the parent. This is very useful for getting ranges of
+  # summaries.
+  end_time = ndb.ComputedProperty(
+      lambda self: self.summary_parent.get().end_time)
+
 
 class WaitSummary(ndb.Model):
   """Stores a summary of wait times from the set of runners."""
@@ -274,15 +279,13 @@ def GetRunnerWaitStats(days_to_show):
   cutoff_date = datetime.datetime.today() - datetime.timedelta(
       days=days_to_show)
 
-  def MapWaitSummary(wait_summary):
-    for dimension_wait in wait_summary.children:
-      dimension_summaries.setdefault(
-          dimension_wait.dimensions,
-          DimensionWaitSums(dimension_wait.dimensions)
-          ).Add(dimension_wait)
-
-  wait_summary_query = WaitSummary.query(WaitSummary.end_time > cutoff_date)
-  wait_summary_query.map(MapWaitSummary)
+  dimension_wait_summary_query = DimensionWaitSummary.query(
+      DimensionWaitSummary.end_time > cutoff_date)
+  for dimension_wait in dimension_wait_summary_query:
+    dimension_summaries.setdefault(
+        dimension_wait.dimensions,
+        DimensionWaitSums(dimension_wait.dimensions)
+        ).Add(dimension_wait)
 
   # Convert the dimension results to the desire formats.
   results = {}
