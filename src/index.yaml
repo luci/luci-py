@@ -49,7 +49,7 @@ indexes:
   - name: started
   - name: priority_and_created
 
-kind: TestRunner
+- kind: TestRunner
   properties:
   - name: dimensions
   - name: done
