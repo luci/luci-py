@@ -5,6 +5,11 @@
 Test Request objects represent one test request from one client.  The client
 can be a build machine requesting a test after a build or it could be a
 developer requesting a test from their own build.
+
+Test Requests are described using strings formatted as a subset of the python
+syntax to a dictionary object.  See
+http://code.google.com/p/swarming/wiki/SwarmFileFormat for
+complete details.
 """
 
 

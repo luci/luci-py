@@ -10,8 +10,13 @@ on a given machine.
 
 import datetime
 import logging
+import urllib
+import urllib2
+import urlparse
 
 from google.appengine.api import datastore_errors
+from google.appengine.api import mail
+from google.appengine.api import urlfetch
 from google.appengine.ext import blobstore
 from google.appengine.ext import ndb
 
@@ -32,17 +37,6 @@ SWARM_FINISHED_RUNNER_TIME_TO_LIVE_DAYS = 14
 # considered to be hanging (this is usually a sign that the machines that can
 # run this test are broken and not communicating with swarm).
 TIME_BEFORE_RUNNER_HANGING_IN_MINS = 60
-
-
-# MOE: start_strip
-# This is removed from the public version because the public version should
-# be run on python2.7 (or later), which has the builtin total_seconds() function
-# for timedelta.
-def TotalSeconds(time_delta):
-  return ((time_delta.microseconds +
-           (time_delta.seconds + time_delta.days * 24 * 3600) * 10**6) /
-          10**6)
-# MOE: end_strip
 
 
 def _GetCurrentTime():
@@ -212,11 +206,7 @@ class TestRunner(ndb.Model):
     if not self.started:
       return 0
 
-    time_delta = self.started - self.created
-    # MOE: start_strip
-    # TODO(user): Replace with total_seconds() once python2.7 is used
-    return TotalSeconds(time_delta)
-    # MOE: end_strip_and_replace return time_delta.total_seconds())
+    return (self.started - self.created).total_seconds()
 
   def GetMessage(self):
     """Get the message string representing this test runner.
@@ -234,6 +224,189 @@ class TestRunner(ndb.Model):
                    (self.config_instance_index, self.num_config_instances))
 
     return '\n'.join(message)
+
+  def UpdateTestResult(self, machine_id, success=False, exit_codes='',
+                       result_blob_key=None, errors=None, overwrite=False):
+    """Update the runner with results of a test run.
+
+    Args:
+      machine_id: The machine id of the machine providing these results.
+      success: a boolean indicating whether the test run succeeded or not.
+      exit_codes: a string containing the array of exit codes of the test run.
+      result_blob_key: a key to the blob containing the results.
+      errors: a string explaining why we failed to get the actual result string.
+      overwrite: a boolean indicating if we should always record this result,
+          even if a result had been previously recorded.
+
+    Returns:
+      True if the results are successfully stored and the result_url is
+          properly updated (if there is one).
+    """
+    if self.machine_id != machine_id:
+      if machine_id not in self.old_machine_ids:
+        logging.warning('The machine id of the runner, %s, doesn\'t match the '
+                        'machine id given, %s', self.machine_id, machine_id)
+        # The new results won't get stored so delete them.
+        if result_blob_key:
+          blobstore.delete_async(result_blob_key)
+        return False
+      # Update the old and active machines ids.
+      logging.info('Received result from old machine, making it current '
+                   'machine and storing results')
+      if self.machine_id:
+        self.old_machine_ids.append(self.machine_id)
+      self.machine_id = machine_id
+      self.old_machine_ids.remove(machine_id)
+
+    # If the runnner is marked as done, don't try to process another
+    # response for it, unless overwrite is enable.
+    if self.done and not overwrite:
+      stored_results = self.GetResultString()
+      # The new results won't get stored so delete them.
+      new_results = None
+      if result_blob_key:
+        new_results = blobstore_helper.GetBlobstore(result_blob_key)
+        blobstore.delete_async(result_blob_key)
+
+      if new_results == stored_results or errors == stored_results:
+        # This can happen if the server stores the results and then runs out
+        # of memory, so the return code is 500, which causes the
+        # local_test_runner to resend the results.
+        logging.warning('The runner already contained the given result string.')
+        return True
+      else:
+        logging.error('Got a additional response for runner=%s (key %s), '
+                      'not good', self.GetName(), self.key.urlsafe())
+        logging.debug('Dropped result string was:\n%s',
+                      new_results or errors)
+        return False
+
+    # Clear any old result strings that are stored if we are overwriting.
+    if overwrite:
+      if self.result_string_reference:
+        blobstore.delete(self.result_string_reference)
+        self.result_string_reference = None
+      self.errors = None
+
+    self.ran_successfully = success
+    self.exit_codes = exit_codes
+    self.done = True
+    self.ended = datetime.datetime.now()
+
+    if result_blob_key:
+      assert self.result_string_reference is None, (
+          'There is a reference stored, overwriting it would leak the old '
+          'element.')
+      self.result_string_reference = result_blob_key
+    else:
+      self.errors = errors
+
+    self.put()
+    logging.info('Successfully updated the results of runner %s.',
+                 self.key.urlsafe())
+
+    # If the test didn't run successfully, we send an email if one was
+    # requested via the test request.
+    test_case = self.request.get().GetTestCase()
+    if not self.ran_successfully and test_case.failure_email:
+      # TODO(user): provide better info for failure. E.g., if we don't have a
+      # web_request.body, we should have info like: Failed to upload files.
+      self._EmailTestResults(test_case.failure_email)
+
+    # TODO(user): test result objects, and hence their test request objects,
+    # are currently not deleted from the data store.  This allows someone to
+    # go back to the TRS web UI and see the results of any test that has run.
+    # Eventually we will want to see how to delete old requests as the apps
+    # storage quota will be exceeded.
+    update_successful = True
+    if test_case.result_url:
+      result_url_parts = urlparse.urlsplit(test_case.result_url)
+      if result_url_parts[0] == 'http' or result_url_parts[0] == 'https':
+        # Send the result to the requested destination.
+        try:
+          # Encode the result string so that it's backwards-compatible with
+          # ASCII. Without this, the call to "urllib.urlencode" below can
+          # throw a UnicodeEncodeError if the result string contains non-ASCII
+          # characters.
+          encoded_result_string = self.GetResultString().encode('utf-8')
+          urllib2.urlopen(test_case.result_url,
+                          urllib.urlencode((
+                              ('n', self.request.get().name),
+                              ('c', self.config_name),
+                              ('i', self.config_instance_index),
+                              ('m', self.num_config_instances),
+                              ('x', self.exit_codes),
+                              ('s', self.ran_successfully),
+                              ('r', encoded_result_string))))
+        except urllib2.URLError:
+          logging.exception('Could not send results back to sender at %s',
+                            test_case.result_url)
+          update_successful = False
+        except urlfetch.Error:
+          # The docs for urllib2.urlopen() say it only raises urllib2.URLError.
+          # However, in the appengine environment urlfetch.Error may also be
+          # raised. This is normal, see the "Fetching URLs in Python" section of
+          # http://code.google.com/appengine/docs/python/urlfetch/overview.html
+          # for more details.
+          logging.exception('Could not send results back to sender at %s',
+                            test_case.result_url)
+          update_successful = False
+      elif result_url_parts[0] == 'mailto':
+        # Only send an email if we didn't send a failure email earlier to
+        # prevent repeats.
+        if self.ran_successfully or not test_case.failure_email:
+          self._EmailTestResults(result_url_parts[1])
+      else:
+        logging.exception('Unknown url given as result url, %s',
+                          test_case.result_url)
+        update_successful = False
+
+    runner_stats.RecordRunnerStats(self)
+
+    if (test_case.store_result == 'none' or
+        (test_case.store_result == 'fail' and self.ran_successfully)):
+      DeleteRunner(self)
+
+    return update_successful
+
+  def _EmailTestResults(self, send_to):
+    """Emails the test result.
+
+    Args:
+      send_to: the email address to send the result to. This must be a valid
+          email address.
+    """
+    if not mail.is_email_valid(send_to):
+      logging.error('Invalid email passed to result_url, %s', send_to)
+      return
+
+    if self.ran_successfully:
+      subject = '%s succeeded.' % self.GetName()
+    else:
+      subject = '%s failed.' % self.GetName()
+
+    message_body_parts = [
+        'Test Request Name: ' + self.request.get().name,
+        'Configuration Name: ' + self.config_name,
+        'Configuration Instance Index: ' + str(self.config_instance_index),
+        'Number of Configurations: ' + str(self.num_config_instances),
+        'Exit Code: ' + str(self.exit_codes),
+        'Success: ' + str(self.ran_successfully),
+        'Result Output: ' + self.GetResultString()]
+    message_body = '\n'.join(message_body_parts)
+
+    try:
+      mail.send_mail(sender='Test Request Server <no_reply@google.com>',
+                     to=send_to,
+                     subject=subject,
+                     body=message_body,
+                     html='<pre>%s</pre>' % message_body)
+    except Exception as e:  # pylint: disable=broad-except
+      # We catch all errors thrown because mail.send_mail can throw errors
+      # that it doesn't list in its description, but that are caused by our
+      # inputs (such as unauthorized sender).
+      logging.exception(
+          'An exception was thrown when attemping to send mail\n%s', e)
 
 
 @ndb.transactional

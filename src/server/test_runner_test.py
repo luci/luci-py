@@ -9,16 +9,18 @@
 import datetime
 import logging
 import unittest
+import urllib2
 
 
 from google.appengine.api import datastore_errors
+from google.appengine.ext import blobstore
 from google.appengine.ext import testbed
 from google.appengine.ext import ndb
 
 from common import blobstore_helper
 from server import dimension_mapping
 from server import test_helper
-from server import test_manager
+from server import test_management
 from server import test_request
 from server import test_runner
 from stats import runner_stats
@@ -255,8 +257,7 @@ class TestRunnerTest(unittest.TestCase):
     # Create a runner that was aborted before running.
     aborted_runner = test_helper.CreatePendingRunner()
     aborted_runner.created = old_time
-    manager = test_manager.TestRequestManager()
-    manager.AbortRunner(aborted_runner)
+    test_management.AbortRunner(aborted_runner)
     self.assertEqual([], test_runner.GetHangingRunners())
 
     # Create an older runner that will be marked as hanging.
@@ -303,6 +304,145 @@ class TestRunnerTest(unittest.TestCase):
   def testGetMessage(self):
     runner = test_helper.CreatePendingRunner()
     runner.GetMessage()
+
+  def testRunnerCallerMachineIdMismatch(self):
+    self._mox.StubOutWithMock(test_management.logging, 'warning')
+    test_runner.logging.warning('The machine id of the runner, %s, doesn\'t '
+                                'match the machine id given, %s',
+                                MACHINE_IDS[0], MACHINE_IDS[1])
+
+    self._mox.ReplayAll()
+
+    test_management.ExecuteTestRequest(test_helper.GetRequestMessage())
+    runner = test_helper.CreatePendingRunner(machine_id=MACHINE_IDS[0])
+
+    self.assertFalse(runner.UpdateTestResult(MACHINE_IDS[1]))
+    self._mox.VerifyAll()
+
+  def testRunnerCallerOldMachine(self):
+    self._mox.StubOutWithMock(urllib2, 'urlopen')
+    urllib2.urlopen(mox.IgnoreArg(), mox.StrContains('r='))
+    self._mox.ReplayAll()
+
+    runner = test_helper.CreatePendingRunner(machine_id=MACHINE_IDS[0])
+    runner.machine_id = MACHINE_IDS[0]
+    runner.old_machine_ids = [MACHINE_IDS[1]]
+    runner.put()
+
+    self.assertTrue(runner.UpdateTestResult(MACHINE_IDS[1]))
+
+    runner = test_runner.TestRunner.query().get()
+    self.assertEqual(MACHINE_IDS[1], runner.machine_id)
+    self.assertEqual([MACHINE_IDS[0]], runner.old_machine_ids)
+    self.assertTrue(runner.done)
+
+    self._mox.VerifyAll()
+
+  def testRunnerCallerOldMachineWithNoCurrent(self):
+    self._mox.StubOutWithMock(urllib2, 'urlopen')
+    urllib2.urlopen(mox.IgnoreArg(), mox.StrContains('r='))
+    self._mox.ReplayAll()
+
+    runner = test_helper.CreatePendingRunner(machine_id=MACHINE_IDS[0])
+    runner.machine_id = None
+    runner.old_machine_ids = [MACHINE_IDS[1]]
+    runner.put()
+
+    self.assertTrue(runner.UpdateTestResult(MACHINE_IDS[1]))
+
+    runner = test_runner.TestRunner.query().get()
+    self.assertEqual(MACHINE_IDS[1], runner.machine_id)
+    self.assertEqual([], runner.old_machine_ids)
+    self.assertTrue(runner.done)
+
+    self._mox.VerifyAll()
+
+  def testHandleOverwriteTestResults(self):
+    messages = ['first-message',
+                'second-message',
+                'third-message']
+
+    self._mox.StubOutWithMock(logging, 'error')
+    self._mox.StubOutWithMock(urllib2, 'urlopen')
+
+    urllib2.urlopen(test_helper.DEFAULT_RESULT_URL,
+                    mox.StrContains('r=' + messages[0]))
+    logging.error(mox.StrContains('additional response'), mox.IgnoreArg(),
+                  mox.IgnoreArg())
+    urllib2.urlopen(test_helper.DEFAULT_RESULT_URL,
+                    mox.StrContains('r=' + messages[2]))
+    urllib2.urlopen(test_helper.DEFAULT_RESULT_URL,
+                    mox.StrContains('r=' + messages[0]))
+    self._mox.ReplayAll()
+
+    runner = test_helper.CreatePendingRunner(machine_id=MACHINE_IDS[0])
+
+    try:
+      # Replace the async with a non-async version to ensure the blobs
+      # are deleted before we check if they were deleted before the following
+      # asserts.
+      old_delete_async = test_runner.blobstore.delete_async
+      test_runner.blobstore.delete_async = blobstore.delete
+
+      # First results, always accepted.
+      self.assertTrue(runner.UpdateTestResult(
+          runner.machine_id,
+          result_blob_key=blobstore_helper.CreateBlobstore(messages[0])))
+      # Always ensure that there is only one element in the blobstore.
+      self.assertEqual(1, blobstore.BlobInfo.all().count())
+
+      # The first result resent, accepted since the strings are equal.
+      self.assertTrue(runner.UpdateTestResult(
+          runner.machine_id,
+          result_blob_key=blobstore_helper.CreateBlobstore(messages[0])))
+      self.assertEqual(1, blobstore.BlobInfo.all().count())
+
+      # Non-first request without overwrite, rejected.
+      self.assertFalse(runner.UpdateTestResult(
+          runner.machine_id,
+          result_blob_key=blobstore_helper.CreateBlobstore(messages[1]),
+          overwrite=False))
+      self.assertEqual(1, blobstore.BlobInfo.all().count())
+
+      # Non-first request with overwrite, accepted.
+      self.assertTrue(runner.UpdateTestResult(
+          runner.machine_id,
+          result_blob_key=blobstore_helper.CreateBlobstore(messages[2]),
+          overwrite=True))
+      self.assertEqual(1, blobstore.BlobInfo.all().count())
+    finally:
+      test_runner.blobstore.delete_async = old_delete_async
+
+    # Accept the first message as an error with overwrite.
+    self.assertTrue(runner.UpdateTestResult(runner.machine_id,
+                                            errors=messages[0],
+                                            overwrite=True))
+
+    # Accept the first message as an error again, since it is equal to what is
+    # already stored.
+    self.assertTrue(runner.UpdateTestResult(runner.machine_id,
+                                            errors=messages[0]))
+
+    # Make sure there are no blobs store now, since errors are just stored as
+    # strings.
+    self.assertEqual(0, blobstore.BlobInfo.all().count())
+
+    self._mox.VerifyAll()
+
+  def testRecordRunnerStats(self):
+    # Create a pending runner and execute it.
+    runner = test_helper.CreatePendingRunner(machine_id=MACHINE_IDS[0])
+    self.assertEqual(0, runner_stats.RunnerStats.query().count())
+
+    # Return the results for the test and ensure the stats are updated.
+    runner.UpdateTestResult(runner.machine_id, success=True)
+
+    self.assertEqual(1, runner_stats.RunnerStats.query().count())
+    r_stats = runner_stats.RunnerStats.query().get()
+    self.assertNotEqual(None, r_stats.created_time)
+    self.assertNotEqual(None, r_stats.assigned_time)
+    self.assertNotEqual(None, r_stats.end_time)
+    self.assertTrue(r_stats.success)
 
   def testGetRunnerSummaryByDimension(self):
     self.assertEqual({}, test_runner.GetRunnerSummaryByDimension())

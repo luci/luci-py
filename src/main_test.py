@@ -20,7 +20,7 @@ from common import blobstore_helper
 from common import dimensions_utils
 from server import admin_user
 from server import test_helper
-from server import test_manager
+from server import test_management
 from server import test_request
 from server import test_runner
 from server import user_manager
@@ -43,10 +43,6 @@ class AppTest(unittest.TestCase):
     os.environ['CURRENT_VERSION_ID'] = '1.1'
 
     self.app = webtest.TestApp(main_app.CreateApplication())
-
-    # Create local instance of test manager and make sure main_app uses it.
-    self.test_request_manager = main_app.CreateTestManager()
-    main_app.CreateTestManager = (lambda: self.test_request_manager)
 
     # A basic config hash to use when creating runners.
     self.config_hash = dimensions_utils.GenerateDimensionHash({})
@@ -263,9 +259,8 @@ class AppTest(unittest.TestCase):
     return self.app.post('/result', url_parameters, expect_errors=expect_errors)
 
   def testResultHandler(self):
-    self._mox.StubOutWithMock(test_manager.urllib2, 'urlopen')
-    test_manager.urllib2.urlopen(test_helper.DEFAULT_RESULT_URL,
-                                 mox.IgnoreArg())
+    self._mox.StubOutWithMock(test_runner.urllib2, 'urlopen')
+    test_runner.urllib2.urlopen(test_helper.DEFAULT_RESULT_URL, mox.IgnoreArg())
     self._mox.ReplayAll()
 
     runner = test_helper.CreatePendingRunner(machine_id=MACHINE_ID)
@@ -495,7 +490,7 @@ class AppTest(unittest.TestCase):
       CheckProtected(route, 'POST')
 
   def testRemoteErrorHandler(self):
-    self.assertEqual(0, test_manager.SwarmError.query().count())
+    self.assertEqual(0, test_management.SwarmError.query().count())
 
     error_message = 'error message'
 
@@ -503,8 +498,8 @@ class AppTest(unittest.TestCase):
     self.assertEqual('200 OK', response.status)
     self.assertTrue('Error logged' in response.body)
 
-    self.assertEqual(1, test_manager.SwarmError.query().count())
-    error = test_manager.SwarmError.query().get()
+    self.assertEqual(1, test_management.SwarmError.query().count())
+    error = test_management.SwarmError.query().get()
     self.assertEqual(error.message, error_message)
 
   def testRunnerPing(self):

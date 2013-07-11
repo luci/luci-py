@@ -19,6 +19,8 @@ REQUEST_MESSAGE_TEST_CASE_NAME = 'tc'
 
 DEFAULT_RESULT_URL = 'http://all.your.resul.ts/are/belong/to/us'
 
+DEFAULT_FAILURE_EMAIL = 'john@doe.com'
+
 
 def _CreateRunner(request, config_name):
   """Create a basic runner.
@@ -79,7 +81,7 @@ def GetRequestMessage(min_instances=1, additional_instances=0,
   if env_vars:
     request.env_vars = env_vars.copy()
   request.result_url = result_url
-  request.failure_email = 'john@doe.com'
+  request.failure_email = DEFAULT_FAILURE_EMAIL
   request.store_result = store_result
   request.restart_on_failure = restart_on_failure
 

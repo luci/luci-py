@@ -36,7 +36,7 @@ from common import test_request_message
 from common import url_helper
 from server import admin_user
 from server import dimension_mapping
-from server import test_manager
+from server import test_management
 from server import test_request
 from server import test_runner
 from server import user_manager
@@ -291,10 +291,10 @@ class MainHandler(webapp2.RequestHandler):
       runners.append(runner)
 
     errors = []
-    query = test_manager.SwarmError.query(
+    query = test_management.SwarmError.query(
         default_options=ndb.QueryOptions(
             limit=_NUM_RECENT_ERRORS_TO_DISPLAY)).order(
-                -test_manager.SwarmError.created)
+                -test_management.SwarmError.created)
     for error in query:
       error.log_time = self.GetTimeString(error.created)
       errors.append(error)
@@ -451,9 +451,8 @@ class TestRequestHandler(webapp2.RequestHandler):
       self.response.out.write('No request parameter found')
       return
 
-    test_request_manager = CreateTestManager()
     try:
-      response = json.dumps(test_request_manager.ExecuteTestRequest(
+      response = json.dumps(test_management.ExecuteTestRequest(
           self.request.get('request')))
     except test_request_message.Error as ex:
       message = str(ex)
@@ -513,12 +512,11 @@ class ResultHandler(webapp2.RequestHandler):
       self.response.set_status(500)
       return
 
-    test_request_manager = CreateTestManager()
-    if test_request_manager.UpdateTestResult(runner, machine_id,
-                                             success=success,
-                                             exit_codes=exit_codes,
-                                             result_blob_key=result_blob_key,
-                                             overwrite=overwrite):
+    if runner.UpdateTestResult(machine_id,
+                               success=success,
+                               exit_codes=exit_codes,
+                               result_blob_key=result_blob_key,
+                               overwrite=overwrite):
       self.response.out.write('Successfully update the runner results.')
     else:
       self.response.set_status(400)
@@ -529,7 +527,7 @@ class CleanupDataHandler(webapp2.RequestHandler):
   """Handles tasks to delete orphaned blobs."""
 
   def post(self):  # pylint: disable=g-bad-name
-    test_manager.DeleteOldErrors()
+    test_management.DeleteOldErrors()
 
     dimension_mapping.DeleteOldDimensionMapping()
 
@@ -564,10 +562,9 @@ class AbortStaleRunnersHandler(CronJobHandler):
 
   def post(self):  # pylint: disable=g-bad-name
     """Handles HTTP POST requests for this handler's URL."""
-    test_request_manager = CreateTestManager()
 
     logging.debug('Polling')
-    test_request_manager.AbortStaleRunners()
+    test_management.AbortStaleRunners()
     self.response.out.write("""
     <html>
     <head>
@@ -787,7 +784,7 @@ class GetSlaveCodeHandler(webapp2.RequestHandler):
   def get(self):  # pylint: disable=g-bad-name
     """Handles HTTP GET requests for this handler's URL."""
     self.response.headers['Content-Type'] = 'application/octet-stream'
-    self.response.out.write(test_manager.SlaveCodeZipped())
+    self.response.out.write(test_management.SlaveCodeZipped())
 
 
 class GetTokenHandler(webapp2.RequestHandler):
@@ -828,9 +825,7 @@ class CancelHandler(webapp2.RequestHandler):
 
     # Make sure found runner is not yet running.
     if runner and not runner.started:
-      test_request_manager = CreateTestManager()
-      test_request_manager.AbortRunner(
-          runner, reason='Runner cancelled by user.')
+      test_management.AbortRunner(runner, reason='Runner cancelled by user.')
       self.response.out.write('Runner canceled.')
     else:
       self.response.out.write('Cannot find runner or too late to cancel: %s' %
@@ -885,7 +880,6 @@ class RegisterHandler(webapp2.RequestHandler):
       self.response.out.write('Request must have a body')
       return
 
-    test_request_manager = CreateTestManager()
     attributes_str = self.request.get('attributes')
     try:
       attributes = json.loads(attributes_str)
@@ -898,8 +892,8 @@ class RegisterHandler(webapp2.RequestHandler):
 
     try:
       response = json.dumps(
-          test_request_manager.ExecuteRegisterRequest(attributes,
-                                                      self.request.host_url))
+          test_management.ExecuteRegisterRequest(attributes,
+                                                 self.request.host_url))
     except runtime.DeadlineExceededError as e:
       # If the timeout happened before a runner was assigned there are no
       # problems. If the timeout occurred after a runner was assigned, that
@@ -1085,7 +1079,7 @@ class RemoteErrorHandler(webapp2.RequestHandler):
   def post(self):  # pylint: disable=g-bad-name
     """Handles HTTP POST requests for this handler's URL."""
     error_message = self.request.get('m', '')
-    error = test_manager.SwarmError(
+    error = test_management.SwarmError(
         name='Remote Error Report', message=error_message,
         info='Remote machine address: %s' % self.request.remote_addr)
     error.put()
@@ -1118,7 +1112,7 @@ def SendAuthenticationFailure(request, response):
     response: Response to be sent to remote machine.
   """
   # Log the error.
-  error = test_manager.SwarmError(
+  error = test_management.SwarmError(
       name='Authentication Failure', message='Handler: %s' % request.url,
       info='Remote machine address: %s' % request.remote_addr)
   error.put()
@@ -1142,15 +1136,6 @@ def SendRunnerResults(response, key):
   else:
     response.set_status(204)
     logging.info('Unable to provide runner results [key: %s]', str(key))
-
-
-def CreateTestManager():
-  """Creates and returns a test manager instance.
-
-  Returns:
-    A TestManager instance.
-  """
-  return test_manager.TestRequestManager()
 
 
 def CreateApplication():
