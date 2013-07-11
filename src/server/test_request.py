@@ -25,6 +25,11 @@ from server import test_runner
 TEST_REQUEST_PARENT_KEY = 'test_request_parent_key'
 
 
+class TestRequestParent(ndb.Model):
+  """A dummy model class that is the parent of every TestRequest."""
+  pass
+
+
 def GetTestCase(request_message):
   """Returns a TestCase object representing this Test Request message.
 
@@ -51,15 +56,7 @@ def GetTestRequestParent():
   Returns:
     The parent model for all TestRequests.
   """
-  try:
-    return ndb.Model.get_or_insert(TEST_REQUEST_PARENT_KEY)
-  except ndb.KindError:
-    # This exception is thrown when first trying to find the model on a app
-    # engine server (dev or non-dev). This error doesn't occur in the test
-    # framework though.
-    parent_model = ndb.Model(id=TEST_REQUEST_PARENT_KEY)
-    parent_model.put()
-    return parent_model
+  return TestRequestParent.get_or_insert(TEST_REQUEST_PARENT_KEY)
 
 
 class TestRequest(ndb.Model):
