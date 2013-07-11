@@ -47,7 +47,7 @@ indexes:
   properties:
   - name: config_hash
   - name: started
-  - name: created
+  - name: priority_and_created
 
 - kind: TestRunner
   properties:
