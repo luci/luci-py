@@ -49,6 +49,12 @@ indexes:
   - name: started
   - name: priority_and_created
 
+kind: TestRunner
+  properties:
+  - name: dimensions
+  - name: done
+  - name: started
+
 - kind: TestRunner
   properties:
   - name: done
