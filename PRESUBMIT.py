@@ -1,5 +1,5 @@
-# Copyright (c) 2012 The Chromium Authors. All rights reserved.
-# Use of this source code is governed by a BSD-style license that can be
+# Copyright 2012 The Swarming Authors. All rights reserved.
+# Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
 """Top-level presubmit script for isolateserver.
@@ -41,6 +41,18 @@ def CheckChangeOnUpload(input_api, output_api):
 
 def CheckChangeOnCommit(input_api, output_api):
   output = CommonChecks(input_api, output_api)
+  current_year = int(input_api.time.strftime('%Y'))
+  allowed_years = (str(s) for s in reversed(xrange(2011, current_year + 1)))
+  years_re = '(' + '|'.join(allowed_years) + ')'
+  license_header = (
+    r'.*? Copyright %(year)s The Swarming Authors\. '
+      r'All rights reserved\.\n'
+    r'.*? Use of this source code is governed by the Apache v2\.0 license '
+      r'that can be\n'
+    r'.*? found in the LICENSE file\.(?: \*/)?\n'
+  ) % {
+    'year': years_re,
+  }
   output.extend(input_api.canned_checks.PanProjectChecks(
-      input_api, output_api, owners_check=False))
+      input_api, output_api, owners_check=False, license_header=license_header))
   return output
