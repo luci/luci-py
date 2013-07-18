@@ -59,8 +59,11 @@ def _GetCurrentTime():
 
 
 class TestRunner(ndb.Model):
+
   # The test being run.
-  request = ndb.KeyProperty(kind='TestRequest', required=True)
+  @property
+  def request(self):
+    return self.key.parent()
 
   # The name of the request's configuration being tested.
   config_name = ndb.StringProperty()

@@ -7,7 +7,6 @@
 
 
 import datetime
-import hashlib
 import json
 import logging
 import unittest
@@ -16,9 +15,7 @@ import unittest
 from google.appengine.ext import testbed
 from google.appengine.ext import ndb
 
-from common import test_request_message
-from server import test_request
-from server import test_runner
+from server import test_helper
 from stats import runner_stats
 from third_party.mox import mox
 
@@ -69,46 +66,12 @@ class StatManagerTest(unittest.TestCase):
 
     self._mox.UnsetStubs()
 
-  def _GetRequestMessage(self):
-    test_case = test_request_message.TestCase()
-    test_case.test_case_name = 'test_case'
-    test_case.configurations = [
-        test_request_message.TestConfiguration(
-            config_name=self.config_name, os='win-xp',)]
-    return test_request_message.Stringize(test_case, json_readable=True)
-
-  def _CreateRunner(self):
-    """Creates a new runner.
-
-    Returns:
-      The newly created runner.
-    """
-    request = test_request.TestRequest(message=self._GetRequestMessage(),
-                                       name='name')
-    request.put()
-    request.GetTestCase()
-
-    runner = test_runner.TestRunner(
-        request=request.key,
-        config_hash=hashlib.sha1().hexdigest(),
-        config_name=self.config_name,
-        config_instance_index=0,
-        num_config_instances=1,
-        machine_id='id',
-        started=datetime.datetime.now(),
-        ended=datetime.datetime.now(),
-        ran_successfully=True,
-        )
-    runner.put()
-
-    return runner
-
   def testRecordRunnerStats(self):
     r_stats = runner_stats.RunnerStats.query().get()
     self.assertEqual(None, r_stats)
 
     # Create stats from a runner that didn't timeout.
-    runner = self._CreateRunner()
+    runner = test_helper.CreatePendingRunner()
     r_stats = runner_stats.RecordRunnerStats(runner)
     self.assertFalse(r_stats.timed_out)
 
@@ -119,7 +82,7 @@ class StatManagerTest(unittest.TestCase):
 
   def testRecordInvalidRunnerStats(self):
     # Create stats from a runner timed out, but was also successful.
-    runner = self._CreateRunner()
+    runner = test_helper.CreatePendingRunner()
     runner.errors = 'Runner has become stale'
     runner.ran_successfully = True
     runner.put()

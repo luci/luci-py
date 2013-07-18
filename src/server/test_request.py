@@ -72,9 +72,9 @@ class TestRequest(ndb.Model):
   name = ndb.StringProperty()
 
   @property
+  @ndb.transactional
   def runners(self):
-    return test_runner.TestRunner.query(
-        test_runner.TestRunner.request == self.key)
+    return test_runner.TestRunner.query(ancestor=self.key)
 
   def __init__(self, *args, **kwargs):
     # 'parent' can be the first arg or a keyword, only add a parent if there
