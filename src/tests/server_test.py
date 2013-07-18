@@ -271,10 +271,13 @@ class _SwarmTestCase(unittest.TestCase):
     # The slave machine is running along with this test. Thus it may take
     # some time before all the tests complete. We will keep polling the results
     # with delays between them. If after 10 times all the tests are still not
-    # completed, we report a failure..
+    # completed, we report a failure.
+    triggered_retry = False
     for _ in range(10):
-      test_all_succeeded = True
-      for running_test_key in running_test_keys:
+      logging.info('Still waiting for the following tests:\n%s',
+                   '\n'.join(test['test_key'] for test in running_test_keys))
+
+      for running_test_key in running_test_keys[:]:
         key_url = self.GetAdminUrl(
             urlparse.urljoin(
                 self._swarm_server_url,
@@ -286,28 +289,43 @@ class _SwarmTestCase(unittest.TestCase):
         except urllib2.HTTPError as e:
           self.fail('Calling %s threw %s' % (key_url, e))
 
-        assert output
-        if _SwarmTestProgram.options.verbose:
-          test_result_output = (
-              '%s\n=======================\nConfig: %s\n%s' %
-              (test_result_output, running_test_key['config_name'], output))
-        if test_all_succeeded and '0 FAILED TESTS' not in output:
-          test_all_succeeded = False
-        if _SwarmTestProgram.options.verbose:
-          logging.info('Test done for %s', running_test_key['config_name'])
-      if _SwarmTestProgram.options.verbose:
+        results = json.loads(output)
+
+        if not results['exit_codes']:
+          # The test hasn't finished yet
+          continue
+
+        logging.info('Test done for %s', running_test_key['config_name'])
+
+        if '0 FAILED TESTS' not in output:
+          self.fail('Test failed.\n%s' % output)
+
+        # If we haven't retried a runner yet, do that with this runner.
+        if not triggered_retry:
+          logging.info('Retrying test %s', running_test_key['test_key'])
+          swarm_server_retry_url = urlparse.urljoin(self._swarm_server_url,
+                                                    'secure/retry')
+          data = urllib.urlencode({'r': running_test_key['test_key']})
+          urllib2.urlopen(swarm_server_retry_url, data=data)
+          triggered_retry = True
+        else:
+          running_test_keys.remove(running_test_key)
+
+        test_result_output = (
+            '%s\n=======================\nConfig: %s\n%s' %
+            (test_result_output, running_test_key['config_name'], output))
         logging.info(test_result_output)
         logging.info('=======================')
-      if test_all_succeeded:
+
+      if running_test_keys:
+        logging.info('At least one test not yet succeeded')
+        time.sleep(SLEEP_BETWEEN_RESULT_POLLS)
+      else:
         logging.info('All tests succeeded')
         break
-      else:
-        logging.info('At least one test not yet succeeded')
 
-      time.sleep(SLEEP_BETWEEN_RESULT_POLLS)
-
-    if not test_all_succeeded:
-      self.fail('At least one test failed')
+    if running_test_keys:
+      self.fail('%d tests failed to complete.' % len(running_test_keys))
 
 
 class _SwarmTestProgram(unittest.TestProgram):
@@ -378,8 +396,6 @@ class _SwarmTestProgram(unittest.TestProgram):
 
 
 if __name__ == '__main__':
-  logging.basicConfig(
-      level=logging.DEBUG if '-v' in sys.argv else logging.CRITICAL)
   if 'TEST_SRCDIR' not in os.environ:
     os.environ['TEST_SRCDIR'] = ''
   _SwarmTestProgram()

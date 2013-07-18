@@ -9,7 +9,6 @@
 import datetime
 import logging
 import unittest
-import urllib2
 
 
 from google.appengine.api import datastore_errors
@@ -18,6 +17,7 @@ from google.appengine.ext import testbed
 from google.appengine.ext import ndb
 
 from common import blobstore_helper
+from common import url_helper
 from server import dimension_mapping
 from server import test_helper
 from server import test_management
@@ -41,6 +41,8 @@ class TestRunnerTest(unittest.TestCase):
 
     # Setup a mock object.
     self._mox = mox.Mox()
+
+    self._mox.StubOutWithMock(url_helper, 'UrlOpen')
 
   def tearDown(self):
     self.testbed.deactivate()
@@ -199,9 +201,8 @@ class TestRunnerTest(unittest.TestCase):
     self.assertEqual([], runner.old_machine_ids)
 
   def testGetTestRunners(self):
-    self.assertEqual(0,
-                     len(list(test_runner.GetTestRunners(
-                         'machine_id', ascending=True, limit=0, offset=0))))
+    self.assertEqual(0, len(list(test_runner.GetTestRunners(
+        'machine_id', ascending=True, limit=5, offset=0))))
 
     # Create some test requests.
     test_runner_count = 3
@@ -213,22 +214,84 @@ class TestRunnerTest(unittest.TestCase):
       runner.started = datetime.datetime.now() + datetime.timedelta(days=i)
       runner.put()
 
+    # Make sure limits are respected.
+    self.assertEqual(1, len(list(test_runner.GetTestRunners(
+        'machine_id', ascending=True, limit=1, offset=0))))
+    self.assertEqual(3, len(list(test_runner.GetTestRunners(
+        'machine_id', ascending=True, limit=5, offset=0))))
+
     # Make sure the results are sorted.
-    test_runners = test_runner.GetTestRunners('started',
-                                              ascending=True,
-                                              limit=3, offset=0)
-    for i in range(test_runner_count):
-      self.assertEqual(i, test_runners.next().config_instance_index)
-    self.assertEqual(0, len(list(test_runners)))
+    test_runners = list(test_runner.GetTestRunners('started',
+                                                   ascending=True,
+                                                   limit=5, offset=0))
+    self.assertEqual(test_runner_count, len(test_runners))
+    for i, runner in enumerate(test_runners):
+      self.assertEqual(i, runner.config_instance_index)
 
     # Make sure the results are sorted in descending order.
-    test_runners = test_runner.GetTestRunners('started',
-                                              ascending=False,
-                                              limit=3, offset=0)
-    for i in range(test_runner_count):
+    test_runners = list(test_runner.GetTestRunners('started',
+                                                   ascending=False,
+                                                   limit=5, offset=0))
+    self.assertEqual(test_runner_count, len(test_runners))
+    for i, runner in enumerate(test_runners):
       self.assertEqual(test_runner_count - 1 - i,
-                       test_runners.next().config_instance_index)
-    self.assertEqual(0, len(list(test_runners)))
+                       runner.config_instance_index)
+
+  def testFilterTestRunners(self):
+    # Add a runner in each state (pending, running, failed, successful).
+    pending_runner = test_helper.CreatePendingRunner()
+    running_runner = test_helper.CreatePendingRunner(machine_id=MACHINE_IDS[0])
+
+    failed_runner = test_helper.CreatePendingRunner(machine_id=MACHINE_IDS[1])
+    failed_runner.done = True
+    failed_runner.ran_successfully = False
+    failed_runner.put()
+
+    successful_runner = test_helper.CreatePendingRunner(
+        machine_id=MACHINE_IDS[2])
+    successful_runner.done = True
+    successful_runner.ran_successfully = True
+    successful_runner.put()
+
+    def CheckQuery(expected_list, actual_query):
+      expected_set = set(element.key for element in expected_list)
+      actual_set = set(element.key for element in actual_query)
+
+      self.assertEqual(expected_set, actual_set)
+
+    unfiltered_query = test_runner.TestRunner.query()
+    CheckQuery(unfiltered_query,
+               test_runner.ApplyFilters(unfiltered_query))
+
+    # Check all the status values.
+    CheckQuery(unfiltered_query,
+               test_runner.ApplyFilters(unfiltered_query, status='all'))
+
+    CheckQuery([pending_runner],
+               test_runner.ApplyFilters(unfiltered_query, status='pending'))
+
+    CheckQuery([running_runner],
+               test_runner.ApplyFilters(unfiltered_query, status='running'))
+
+    CheckQuery([failed_runner, successful_runner],
+               test_runner.ApplyFilters(unfiltered_query, status='done'))
+
+    CheckQuery(
+        [pending_runner, running_runner, failed_runner],
+        test_runner.ApplyFilters(unfiltered_query,
+                                 show_successfully_completed=False))
+
+    # Give the pending runner a unique name and ensure we can filter by names.
+    pending_runner.name = 'unique name'
+    pending_runner.put()
+    CheckQuery(
+        [pending_runner],
+        test_runner.ApplyFilters(unfiltered_query,
+                                 test_name=pending_runner.name))
+
+    CheckQuery([running_runner],
+               test_runner.ApplyFilters(unfiltered_query,
+                                        machine_id=MACHINE_IDS[0]))
 
   def testGetHangingRunners(self):
     self.assertEqual([], test_runner.GetHangingRunners())
@@ -320,8 +383,8 @@ class TestRunnerTest(unittest.TestCase):
     self._mox.VerifyAll()
 
   def testRunnerCallerOldMachine(self):
-    self._mox.StubOutWithMock(urllib2, 'urlopen')
-    urllib2.urlopen(mox.IgnoreArg(), mox.StrContains('r='))
+    url_helper.UrlOpen(mox.IgnoreArg(), data=mox.IgnoreArg()).AndReturn(
+        'response')
     self._mox.ReplayAll()
 
     runner = test_helper.CreatePendingRunner(machine_id=MACHINE_IDS[0])
@@ -339,8 +402,8 @@ class TestRunnerTest(unittest.TestCase):
     self._mox.VerifyAll()
 
   def testRunnerCallerOldMachineWithNoCurrent(self):
-    self._mox.StubOutWithMock(urllib2, 'urlopen')
-    urllib2.urlopen(mox.IgnoreArg(), mox.StrContains('r='))
+    url_helper.UrlOpen(mox.IgnoreArg(), data=mox.IgnoreArg()).AndReturn(
+        'response')
     self._mox.ReplayAll()
 
     runner = test_helper.CreatePendingRunner(machine_id=MACHINE_IDS[0])
@@ -363,16 +426,18 @@ class TestRunnerTest(unittest.TestCase):
                 'third-message']
 
     self._mox.StubOutWithMock(logging, 'error')
-    self._mox.StubOutWithMock(urllib2, 'urlopen')
 
-    urllib2.urlopen(test_helper.DEFAULT_RESULT_URL,
-                    mox.StrContains('r=' + messages[0]))
+    url_helper.UrlOpen(test_helper.DEFAULT_RESULT_URL,
+                       data=mox.ContainsKeyValue('r', messages[0])).AndReturn(
+                           'response')
     logging.error(mox.StrContains('additional response'), mox.IgnoreArg(),
                   mox.IgnoreArg())
-    urllib2.urlopen(test_helper.DEFAULT_RESULT_URL,
-                    mox.StrContains('r=' + messages[2]))
-    urllib2.urlopen(test_helper.DEFAULT_RESULT_URL,
-                    mox.StrContains('r=' + messages[0]))
+    url_helper.UrlOpen(test_helper.DEFAULT_RESULT_URL,
+                       data=mox.ContainsKeyValue('r', messages[2])).AndReturn(
+                           'response')
+    url_helper.UrlOpen(test_helper.DEFAULT_RESULT_URL,
+                       data=mox.ContainsKeyValue('r', messages[0])).AndReturn(
+                           'response')
     self._mox.ReplayAll()
 
     runner = test_helper.CreatePendingRunner(machine_id=MACHINE_IDS[0])

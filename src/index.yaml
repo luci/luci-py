@@ -58,7 +58,179 @@ indexes:
 - kind: TestRunner
   properties:
   - name: done
+  - name: created
+    direction: desc
+
+- kind: TestRunner
+  properties:
+  - name: done
   - name: machine_id
+
+- kind: TestRunner
+  properties:
+  - name: done
+  - name: machine_id
+  - name: created
+    direction: desc
+
+- kind: TestRunner
+  properties:
+  - name: done
+  - name: machine_id
+  - name: name
+  - name: created
+    direction: desc
+
+- kind: TestRunner
+  properties:
+  - name: done
+  - name: machine_id
+  - name: name
+  - name: ran_successfully
+  - name: created
+    direction: desc
+
+- kind: TestRunner
+  properties:
+  - name: done
+  - name: machine_id
+  - name: name
+  - name: ran_successfully
+  - name: started
+
+- kind: TestRunner
+  properties:
+  - name: done
+  - name: machine_id
+  - name: name
+  - name: ran_successfully
+  - name: started
+  - name: created
+    direction: desc
+
+- kind: TestRunner
+  properties:
+  - name: done
+  - name: machine_id
+  - name: name
+  - name: started
+
+- kind: TestRunner
+  properties:
+  - name: done
+  - name: machine_id
+  - name: name
+  - name: started
+  - name: created
+    direction: desc
+
+- kind: TestRunner
+  properties:
+  - name: done
+  - name: machine_id
+  - name: ran_successfully
+  - name: created
+    direction: desc
+
+- kind: TestRunner
+  properties:
+  - name: done
+  - name: machine_id
+  - name: ran_successfully
+  - name: started
+
+- kind: TestRunner
+  properties:
+  - name: done
+  - name: machine_id
+  - name: ran_successfully
+  - name: started
+  - name: created
+    direction: desc
+
+- kind: TestRunner
+  properties:
+  - name: done
+  - name: machine_id
+  - name: started
+
+- kind: TestRunner
+  properties:
+  - name: done
+  - name: machine_id
+  - name: started
+  - name: created
+    direction: desc
+
+- kind: TestRunner
+  properties:
+  - name: done
+  - name: machine_id
+    direction: desc
+
+- kind: TestRunner
+  properties:
+  - name: done
+  - name: name
+  - name: created
+    direction: desc
+
+- kind: TestRunner
+  properties:
+  - name: done
+  - name: name
+  - name: machine_id
+    direction: desc
+
+- kind: TestRunner
+  properties:
+  - name: done
+  - name: name
+  - name: ran_successfully
+  - name: created
+    direction: desc
+
+- kind: TestRunner
+  properties:
+  - name: done
+  - name: name
+  - name: ran_successfully
+  - name: machine_id
+    direction: desc
+
+- kind: TestRunner
+  properties:
+  - name: done
+  - name: name
+  - name: ran_successfully
+  - name: started
+  - name: created
+    direction: desc
+
+- kind: TestRunner
+  properties:
+  - name: done
+  - name: name
+  - name: ran_successfully
+  - name: started
+  - name: machine_id
+    direction: desc
+
+- kind: TestRunner
+  properties:
+  - name: done
+  - name: name
+  - name: started
+  - name: created
+    direction: desc
+
+- kind: TestRunner
+  properties:
+  - name: done
+  - name: name
+  - name: started
+  - name: machine_id
+    direction: desc
 
 - kind: TestRunner
   properties:
@@ -67,8 +239,206 @@ indexes:
 
 - kind: TestRunner
   properties:
+  - name: done
+  - name: ran_successfully
+  - name: created
+    direction: desc
+
+- kind: TestRunner
+  properties:
+  - name: done
+  - name: ran_successfully
+  - name: machine_id
+    direction: desc
+
+- kind: TestRunner
+  properties:
+  - name: done
+  - name: ran_successfully
   - name: started
   - name: created
+    direction: desc
+
+- kind: TestRunner
+  properties:
+  - name: done
+  - name: ran_successfully
+  - name: started
+  - name: machine_id
+    direction: desc
+
+- kind: TestRunner
+  properties:
+  - name: done
+  - name: started
+  - name: created
+    direction: desc
+
+- kind: TestRunner
+  properties:
+  - name: done
+  - name: started
+  - name: machine_id
+    direction: desc
+
+- kind: TestRunner
+  properties:
+  - name: machine_id
+  - name: created
+    direction: desc
+
+- kind: TestRunner
+  properties:
+  - name: machine_id
+  - name: name
+  - name: created
+    direction: desc
+
+- kind: TestRunner
+  properties:
+  - name: machine_id
+  - name: name
+  - name: ran_successfully
+  - name: created
+    direction: desc
+
+- kind: TestRunner
+  properties:
+  - name: machine_id
+  - name: name
+  - name: ran_successfully
+  - name: started
+  - name: created
+    direction: desc
+
+- kind: TestRunner
+  properties:
+  - name: machine_id
+  - name: name
+  - name: started
+  - name: created
+    direction: desc
+
+- kind: TestRunner
+  properties:
+  - name: machine_id
+  - name: ran_successfully
+  - name: created
+    direction: desc
+
+- kind: TestRunner
+  properties:
+  - name: machine_id
+  - name: ran_successfully
+  - name: started
+  - name: created
+    direction: desc
+
+- kind: TestRunner
+  properties:
+  - name: machine_id
+  - name: started
+  - name: created
+    direction: desc
+
+- kind: TestRunner
+  properties:
+  - name: name
+  - name: created
+    direction: desc
+
+- kind: TestRunner
+  properties:
+  - name: name
+  - name: machine_id
+    direction: desc
+
+- kind: TestRunner
+  properties:
+  - name: name
+  - name: ran_successfully
+  - name: created
+    direction: desc
+
+- kind: TestRunner
+  properties:
+  - name: name
+  - name: ran_successfully
+  - name: machine_id
+    direction: desc
+
+- kind: TestRunner
+  properties:
+  - name: name
+  - name: ran_successfully
+  - name: started
+  - name: created
+    direction: desc
+
+- kind: TestRunner
+  properties:
+  - name: name
+  - name: ran_successfully
+  - name: started
+  - name: machine_id
+    direction: desc
+
+- kind: TestRunner
+  properties:
+  - name: name
+  - name: started
+  - name: created
+    direction: desc
+
+- kind: TestRunner
+  properties:
+  - name: name
+  - name: started
+  - name: machine_id
+    direction: desc
+
+- kind: TestRunner
+  properties:
+  - name: ran_successfully
+  - name: created
+    direction: desc
+
+- kind: TestRunner
+  properties:
+  - name: ran_successfully
+  - name: machine_id
+    direction: desc
+
+- kind: TestRunner
+  properties:
+  - name: ran_successfully
+  - name: started
+  - name: created
+    direction: desc
+
+- kind: TestRunner
+  properties:
+  - name: ran_successfully
+  - name: started
+  - name: machine_id
+    direction: desc
+
+- kind: TestRunner
+  properties:
+  - name: started
+  - name: created
+
+- kind: TestRunner
+  properties:
+  - name: started
+  - name: created
+    direction: desc
+
+- kind: TestRunner
+  properties:
+  - name: started
+  - name: machine_id
+    direction: desc
 
 - kind: UserManager
   properties:

@@ -18,7 +18,6 @@ import subprocess
 import sys
 import tempfile
 import unittest
-import urllib2
 import zipfile
 
 
@@ -30,6 +29,7 @@ from common import blobstore_helper
 from common import dimensions_utils
 from common import swarm_constants
 from common import test_request_message
+from common import url_helper
 from server import test_helper
 from server import test_management
 from server import test_request
@@ -265,14 +265,16 @@ class TestManagementTest(unittest.TestCase):
                      body=mox.StrContains(result_string),
                      html=mox.IgnoreArg())
     else:
-      urllib2.urlopen(result_url, mox.StrContains('r=' + result_string))
+      url_helper.UrlOpen(
+          result_url,
+          data=mox.ContainsKeyValue('r', result_string)).AndReturn('response')
 
   def _SetupHandleTestResults(self, result_url=test_helper.DEFAULT_RESULT_URL,
-                              result_string='', test_instances=1):
+                              result_string='results', test_instances=1):
     # Setup a valid request waiting for completion from the runner.
 
     # Setup expectations for ExecuteTestRequest() and AssignPendingRequests().
-    self._mox.StubOutWithMock(urllib2, 'urlopen')
+    self._mox.StubOutWithMock(url_helper, 'UrlOpen')
     self._mox.StubOutWithMock(mail, 'send_mail')
 
     for _ in range(test_instances):
@@ -280,6 +282,7 @@ class TestManagementTest(unittest.TestCase):
 
   def ExecuteHandleTestResults(self, success,
                                result_url=test_helper.DEFAULT_RESULT_URL,
+                               result_string='results',
                                store_result='all', test_instances=1,
                                store_results_successfully=True):
     test_management.ExecuteTestRequest(
@@ -299,7 +302,7 @@ class TestManagementTest(unittest.TestCase):
       runner_key = runner.key
       runner = runner_key.get()
 
-      result_blob_key = blobstore_helper.CreateBlobstore('results')
+      result_blob_key = blobstore_helper.CreateBlobstore(result_string)
       self.assertEqual(store_results_successfully,
                        runner.UpdateTestResult(runner.machine_id,
                                                result_blob_key=result_blob_key,
@@ -486,8 +489,9 @@ class TestManagementTest(unittest.TestCase):
       self._GenerateFutureTimeExpectation()
 
     # Setup the functions when the runner is aborted because it is stale.
-    self._mox.StubOutWithMock(urllib2, 'urlopen')
-    urllib2.urlopen(test_helper.DEFAULT_RESULT_URL, mox.IgnoreArg())
+    self._mox.StubOutWithMock(url_helper, 'UrlOpen')
+    url_helper.UrlOpen(test_helper.DEFAULT_RESULT_URL,
+                       data=mox.IgnoreArg()).AndReturn('response')
     self._mox.StubOutWithMock(mail, 'send_mail')
     self._SetupSendMailExpectations()
     self._mox.ReplayAll()
@@ -550,10 +554,17 @@ class TestManagementTest(unittest.TestCase):
     self._mox.VerifyAll()
 
   def testResultWithUnicode(self):
+    self._mox.StubOutWithMock(url_helper, 'UrlOpen')
+    self._AddTestRunWithResultsExpectation(test_helper.DEFAULT_RESULT_URL,
+                                           mox.IgnoreArg())
+    self._mox.ReplayAll()
+
     # Make sure we can handle results with unicode in them.
     runner = test_helper.CreatePendingRunner(machine_id=MACHINE_IDS[0])
 
     test_management.AbortRunner(runner, u'\u04bb')
+
+    self._mox.VerifyAll()
 
   def testAssignSinglePendingRequest(self):
     # Test when there is 1 test request then 1 machine registers itself.

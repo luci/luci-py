@@ -182,6 +182,20 @@ class UrlHelperTest(unittest.TestCase):
     self.assertEqual(url_helper.UrlOpen('url', data=data), None)
     self._mox.VerifyAll()
 
+  def testNonAcsiiData(self):
+    data = {'r': u'not ascii \xa3 \u04bb'}
+    url = 'http://my.url.com'
+
+    response = 'True'
+    url_helper.urllib2.urlopen(mox.StrContains(url), mox.IgnoreArg()).AndReturn(
+        StringIO.StringIO(response))
+
+    self._mox.ReplayAll()
+
+    self.assertEqual(url_helper.UrlOpen(url, data=data), response)
+
+    self._mox.VerifyAll()
+
   def testDownloadFile(self):
     local_file = None
     try:

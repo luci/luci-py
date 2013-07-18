@@ -163,7 +163,7 @@ def RecordRunnerStats(runner):
   timed_out = bool(runner.errors and 'Runner has become stale' in runner.errors)
 
   runner_stats = RunnerStats(
-      test_case_name=runner.GetName(),
+      test_case_name=runner.name,
       dimensions=runner.dimensions,
       num_instances=runner.num_config_instances,
       instance_index=runner.config_instance_index,
@@ -177,7 +177,7 @@ def RecordRunnerStats(runner):
 
   if runner_stats.timed_out and runner_stats.success:
     logging.error('Runner, %s, was sucessful and timed out, trying as failure',
-                  runner.GetName())
+                  runner.name)
     runner_stats.success = False
   runner_stats.put()
 

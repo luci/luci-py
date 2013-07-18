@@ -10,18 +10,17 @@ on a given machine.
 
 import datetime
 import logging
-import urllib
-import urllib2
 import urlparse
 
 from google.appengine.api import datastore_errors
 from google.appengine.api import mail
-from google.appengine.api import urlfetch
+from google.appengine.datastore import datastore_query
 from google.appengine.ext import blobstore
 from google.appengine.ext import ndb
 
 from common import blobstore_helper
 from common import test_request_message
+from common import url_helper
 from server import dimension_mapping
 from stats import machine_stats
 from stats import runner_stats
@@ -37,6 +36,15 @@ SWARM_FINISHED_RUNNER_TIME_TO_LIVE_DAYS = 14
 # considered to be hanging (this is usually a sign that the machines that can
 # run this test are broken and not communicating with swarm).
 TIME_BEFORE_RUNNER_HANGING_IN_MINS = 60
+
+# A dictionary of all the acceptable parameters to sort TestRunners by, with
+# the value being the readable value for that key that users should see.
+ACCEPTABLE_SORTS = {
+    'created': 'Created',
+    'ended': 'Ended',
+    'name': 'Name',
+    'started': 'Started',
+    }
 
 
 def _GetCurrentTime():
@@ -59,6 +67,9 @@ class TestRunner(ndb.Model):
 
   # The hash of the configuration. Required in order to match machines.
   config_hash = ndb.StringProperty(required=True)
+
+  # The full name of this test runner.
+  name = ndb.StringProperty(required=True)
 
   # The 0 based instance index of the request's configuration being tested.
   config_instance_index = ndb.IntegerProperty(indexed=False)
@@ -125,7 +136,7 @@ class TestRunner(ndb.Model):
 
   # True if the test run finished and succeeded.  This attribute is valid only
   # when the runner has ended. Until then, the value is unspecified.
-  ran_successfully = ndb.BooleanProperty(indexed=False)
+  ran_successfully = ndb.BooleanProperty()
 
   # The stringized array of exit_codes for each actions of the test.
   exit_codes = ndb.StringProperty(indexed=False)
@@ -162,13 +173,8 @@ class TestRunner(ndb.Model):
       self.dimensions = test_request_message.Stringize(
           self.GetConfiguration().dimensions)
 
-  def GetName(self):
-    """Gets a name for this runner.
-
-    Returns:
-      The  name for this runner, or None if unable to get the name.
-    """
-    return '%s:%s' % (self.request.get().name, self.config_name)
+    if not self.name:
+      self.name = '%s:%s' % (self.request.get().name, self.config_name)
 
   def GetConfiguration(self):
     """Gets the configuration associated with this runner.
@@ -225,6 +231,25 @@ class TestRunner(ndb.Model):
 
     return '\n'.join(message)
 
+  def ClearRunnerRun(self):
+    """Clear the status of any previous run from this runner."""
+    self.started = None
+    self.machine_id = None
+    self.old_machine_ids = []
+    self.done = False
+    self.started = None
+    self.automatic_retry_count = 0
+    self.ping = None
+    self.ended = None
+    self.ran_successfully = False
+    self.exit_codes = None
+    self.errors = None
+    if self.result_string_reference:
+      blobstore.delete_async(self.result_string_reference)
+      self.result_string_reference = None
+
+    self.put()
+
   def UpdateTestResult(self, machine_id, success=False, exit_codes='',
                        result_blob_key=None, errors=None, overwrite=False):
     """Update the runner with results of a test run.
@@ -276,7 +301,7 @@ class TestRunner(ndb.Model):
         return True
       else:
         logging.error('Got a additional response for runner=%s (key %s), '
-                      'not good', self.GetName(), self.key.urlsafe())
+                      'not good', self.name, self.key.urlsafe())
         logging.debug('Dropped result string was:\n%s',
                       new_results or errors)
         return False
@@ -323,31 +348,14 @@ class TestRunner(ndb.Model):
       result_url_parts = urlparse.urlsplit(test_case.result_url)
       if result_url_parts[0] == 'http' or result_url_parts[0] == 'https':
         # Send the result to the requested destination.
-        try:
-          # Encode the result string so that it's backwards-compatible with
-          # ASCII. Without this, the call to "urllib.urlencode" below can
-          # throw a UnicodeEncodeError if the result string contains non-ASCII
-          # characters.
-          encoded_result_string = self.GetResultString().encode('utf-8')
-          urllib2.urlopen(test_case.result_url,
-                          urllib.urlencode((
-                              ('n', self.request.get().name),
-                              ('c', self.config_name),
-                              ('i', self.config_instance_index),
-                              ('m', self.num_config_instances),
-                              ('x', self.exit_codes),
-                              ('s', self.ran_successfully),
-                              ('r', encoded_result_string))))
-        except urllib2.URLError:
-          logging.exception('Could not send results back to sender at %s',
-                            test_case.result_url)
-          update_successful = False
-        except urlfetch.Error:
-          # The docs for urllib2.urlopen() say it only raises urllib2.URLError.
-          # However, in the appengine environment urlfetch.Error may also be
-          # raised. This is normal, see the "Fetching URLs in Python" section of
-          # http://code.google.com/appengine/docs/python/urlfetch/overview.html
-          # for more details.
+        data = {'n': self.request.get().name,
+                'c': self.config_name,
+                'i': self.config_instance_index,
+                'm': self.num_config_instances,
+                'x': self.exit_codes,
+                's': self.ran_successfully,
+                'r': self.GetResultString()}
+        if not url_helper.UrlOpen(test_case.result_url, data=data):
           logging.exception('Could not send results back to sender at %s',
                             test_case.result_url)
           update_successful = False
@@ -381,9 +389,9 @@ class TestRunner(ndb.Model):
       return
 
     if self.ran_successfully:
-      subject = '%s succeeded.' % self.GetName()
+      subject = '%s succeeded.' % self.name
     else:
-      subject = '%s failed.' % self.GetName()
+      subject = '%s failed.' % self.name
 
     message_body_parts = [
         'Test Request Name: ' + self.request.get().name,
@@ -473,7 +481,7 @@ def AssignRunnerToMachine(machine_id, runner, atomic_assign):
   except (datastore_errors.Timeout, datastore_errors.InternalError):
     # These exceptions do NOT ensure the operation is done. Based on the
     # Discussion above, we assume it hasn't been assigned.
-    logging.exception('Un-determined fate for runner=%s', runner.GetName())
+    logging.exception('Un-determined fate for runner=%s', runner.name)
 
   return False
 
@@ -509,15 +517,17 @@ def AutomaticallyRetryRunner(runner):
     if not transaction_runner or transaction_runner.done:
       return False
 
-    # Don't change the created time since it is not the user's fault
-    # we are retrying it (so it should have high prority to run again).
+    # Remember and keep the old machines and the automatic_retry_count since
+    # this isn't a full runner restart.
     if transaction_runner.machine_id:
       transaction_runner.old_machine_ids.append(transaction_runner.machine_id)
-    transaction_runner.machine_id = None
-    transaction_runner.done = False
-    transaction_runner.started = None
-    transaction_runner.ping = None
-    transaction_runner.automatic_retry_count += 1
+    old_machine_ids = transaction_runner.old_machine_ids
+    automatic_retry_count = transaction_runner.automatic_retry_count + 1
+
+    transaction_runner.ClearRunnerRun()
+
+    transaction_runner.automatic_retry_count = automatic_retry_count
+    transaction_runner.old_machine_ids = old_machine_ids
     transaction_runner.put()
 
     return True
@@ -586,7 +596,8 @@ def PingRunner(key, machine_id):
   return True
 
 
-def GetTestRunners(sort_by, ascending, limit, offset):
+def GetTestRunners(sort_by='machine_id', ascending=True, limit=None,
+                   offset=None, sort_by_first=None):
   """Get the list of the test runners.
 
   Args:
@@ -595,25 +606,71 @@ def GetTestRunners(sort_by, ascending, limit, offset):
     limit: The machine number of test runners to return.
     offset: The offset from the complete set of sorted elements and the returned
         list.
+    sort_by_first: An optional string to specify a field that we should sort by
+        first, this is required if the a query will contain an inequality
+        filter.
 
   Returns:
-    An iterator of test runners in the given range.
+    An query of test runners in the given range.
   """
-  # If we recieve an invalid sort_by parameter, just default to machine_id.
-  acceptable_sort_values = (
-      'created',
-      'ended',
-      'machine_id',
-      'started',
-      )
-  if sort_by not in acceptable_sort_values:
+  query = TestRunner.query(default_options=ndb.QueryOptions(limit=limit,
+                                                            offset=offset))
+
+  # If we receive an invalid sort_by parameter, just default to machine_id.
+  if sort_by not in ACCEPTABLE_SORTS:
     sort_by = 'machine_id'
 
-  if not ascending:
-    sort_by += ' DESC'
+  if sort_by_first and sort_by_first != sort_by:
+    query = query.order(datastore_query.PropertyOrder(
+        'started',
+        datastore_query.PropertyOrder.ASCENDING))
 
-  return TestRunner.gql('ORDER BY %s' % sort_by).iter(limit=limit,
-                                                      offset=offset)
+  direction = (datastore_query.PropertyOrder.ASCENDING if ascending else
+               datastore_query.PropertyOrder.DESCENDING)
+  query = query.order(datastore_query.PropertyOrder(sort_by, direction))
+
+  return query
+
+
+def ApplyFilters(query, status='', show_successfully_completed=True,
+                 test_name='', machine_id=''):
+  """Applies the required filters to the given query.
+
+  Args:
+    query: The query to filter.
+    status: A string representing which runner states should be included.
+        Options are (all, pending, running, done). Unknown values are treated as
+        all.
+    show_successfully_completed: True if runners that successfully completed
+        should be shown.
+    test_name: The test name to filter for.
+    machine_id: The machine id to filter for.
+
+  Returns:
+    A query equivalent to the one given, with all the required filters applied.
+  """
+  # If the status isn't one of these options, then apply no filter.
+  # pylint: disable=g-explicit-bool-comparison, g-equals-none
+  if status == 'pending':
+    query = query.filter(TestRunner.started == None)
+  elif status == 'running':
+    query = query.filter(TestRunner.started != None,
+                         TestRunner.done == False)
+  elif status == 'done':
+    query = query.filter(TestRunner.done == True)
+
+  if not show_successfully_completed:
+    query = query.filter(ndb.OR(TestRunner.done == False,
+                                TestRunner.ran_successfully == False))
+  # pylint: enable=g-explicit-bool-comparison, g-equals-none
+
+  if test_name:
+    query = query.filter(test_name == TestRunner.name)
+
+  if machine_id:
+    query = query.filter(machine_id == TestRunner.machine_id)
+
+  return query
 
 
 def GetHangingRunners():

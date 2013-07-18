@@ -13,14 +13,29 @@
 
 <h1>User Test Requests</h1>
 {{sorted_by_message|safe}}
-<p>Sort By:
-<select id="sort" onchange="document.location.href='?sort_by=' + this.value">
-<option value="">-</option>
-<option value="start">Start Time</option>
-<option value="reverse_start">Reverse Start Time</option>
-<option value="machine_id">Machine ID</option>
+Sort By (changing drops all current filters):
+<!--We don't allow sorting and filters to fully interact to prevent the server from requiring a huge number of indices, which would make runners.put() very expensive.-->
+<select id="sort" onchange="document.location.href='{{url_no_sort_by_or_filters}}&sort_by=' + this.value">
+{% for sort_option in sort_options %}
+{% if sort_option.key == selected_sort %}
+<option value="{{sort_option.key}}" selected="">{{sort_option.name}}</option>
+{% else %}
+<option value="{{sort_option.key}}">{{sort_option.name}}</option>
+{% endif %}
+{% endfor %}
 </select>
-</p>
+
+<h2>Filters:</h2>
+Always sorted by reverse created.
+<form id="filter" action="{{url_no_filters}}" method="get">
+{{filter_selects|safe}}
+Test Name (Full Matches Only):<input type="text" name="test_name_filter" value="{{test_name_filter}}">
+Machine ID (Full Matches Only):<input type="text" name="machine_id_filter" value="{{machine_id_filter}}">
+<!--Add the page and sort_by values so they don't get lost-->
+<input type="hidden" name="page" value="{{current_page}}">
+<input type="hidden" name="sort_by" value="reverse_created">
+<input type="submit" name="Filter">
+</form>
 <table id="request-table" summary="This table lists all test requests">
 <tr>
 <th>Name</th>
@@ -48,15 +63,13 @@
 
 <p>Currently on page: {{current_page}} </p>
 <p>Go To Page:
-<select id="new_page" onchange="document.location.href='?page=' + this.value">
+<select id="new_page" onchange="document.location.href='{{url_no_page}}&page=' + this.value">
 <option value="">-</option>
 {% for page in total_pages %}
 <option value='{{page}}'>{{page}}</option>
 {% endfor %}
 </select>
 </p>
-
-<p>{{ enable_success_message|safe }}</p>
 
 <h1>Recent Errors</h1>
 <table id="error-table" summary="This table lists most recent errors">

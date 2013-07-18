@@ -54,7 +54,6 @@ def UrlOpen(url, data=None, files=None, max_tries=5, wait_duration=None,
     The reponse from the url contacted. If it failed to connect or is given
     invalid arguments, then it returns None.
   """
-
   if max_tries <= 0:
     logging.error('Invalid number of tries, %d, passed in.', max_tries)
     return None
@@ -74,6 +73,11 @@ def UrlOpen(url, data=None, files=None, max_tries=5, wait_duration=None,
   for attempt in range(max_tries):
     data[COUNT_KEY] = attempt
     try:
+      # urlencode requires that all strings be in ASCII form.
+      for key, value in data.iteritems():
+        if isinstance(value, basestring):
+          data[key] = value.encode('utf-8', 'xmlcharrefreplace')
+
       encoded_data = urllib.urlencode(data)
 
       if method == 'POSTFORM':

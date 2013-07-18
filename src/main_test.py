@@ -18,6 +18,7 @@ from google.appengine.ext import testbed
 from  import main as main_app
 from common import blobstore_helper
 from common import dimensions_utils
+from common import url_helper
 from server import admin_user
 from server import test_helper
 from server import test_management
@@ -259,8 +260,10 @@ class AppTest(unittest.TestCase):
     return self.app.post('/result', url_parameters, expect_errors=expect_errors)
 
   def testResultHandler(self):
-    self._mox.StubOutWithMock(test_runner.urllib2, 'urlopen')
-    test_runner.urllib2.urlopen(test_helper.DEFAULT_RESULT_URL, mox.IgnoreArg())
+    self._mox.StubOutWithMock(url_helper, 'UrlOpen')
+    url_helper.UrlOpen(
+        test_helper.DEFAULT_RESULT_URL, data=mox.IgnoreArg()).AndReturn(
+            'response')
     self._mox.ReplayAll()
 
     runner = test_helper.CreatePendingRunner(machine_id=MACHINE_ID)
@@ -612,6 +615,11 @@ class AppTest(unittest.TestCase):
     self.assertTrue('200 OK' in response.status)
 
   def testCancelHandler(self):
+    self._mox.StubOutWithMock(url_helper, 'UrlOpen')
+    url_helper.UrlOpen(mox.IgnoreArg(), data=mox.IgnoreArg()).AndReturn(
+        'response')
+    self._mox.ReplayAll()
+
     response = self.app.post(main_app._SECURE_CANCEL_URL, {'r': 'invalid_key'})
     self.assertEquals('200 OK', response.status)
     self.assertTrue('Cannot find runner' in response.body, response.body)
@@ -621,6 +629,8 @@ class AppTest(unittest.TestCase):
                              {'r': runner.key.urlsafe()})
     self.assertEquals('200 OK', response.status)
     self.assertEquals('Runner canceled.', response.body)
+
+    self._mox.VerifyAll()
 
 
 if __name__ == '__main__':

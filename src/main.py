@@ -224,6 +224,14 @@ def DaysToShow(request):
   return days_to_show
 
 
+class SortOptions(object):
+  """A basic helper class for displaying the sort options."""
+
+  def __init__(self, key, name):
+    self.key = key
+    self.name = name
+
+
 class MainHandler(webapp2.RequestHandler):
   """Handler for the main page of the web server.
 
@@ -254,40 +262,166 @@ class MainHandler(webapp2.RequestHandler):
 
     return s
 
+  def GeneratePageUrl(self, current_page=None, sort_by=None,
+                      include_filters=False):
+    """Generate a URL that points to the current page (it has the same options).
+
+    If an option is listed as None, don't include it to allow the html page to
+    ensure it can add its desired option.
+
+    Args:
+      current_page: The current page to display.
+      sort_by: The value to sort the runners by.
+      include_filters: True if the filters should be included in the url.
+
+    Returns:
+      The user for the described page.
+    """
+    url = '?'
+
+    if current_page:
+      url += 'page=' + str(current_page) + '&'
+
+    if sort_by:
+      url += 'sort_by=' + sort_by + '&'
+
+    if include_filters:
+      if self.status is not None:
+        url += 'status=' + self.status + '&'
+
+      if self.show_successfully_completed is not None:
+        url += ('show_successfully_completed=' +
+                str(self.show_successfully_completed) +'&')
+
+      if self.test_name_filter is not None:
+        url += 'test_name_filter=' + self.test_name_filter + '&'
+
+      if self.machine_id_filter is not None:
+        url += 'machine_id_filter=' + self.machine_id_filter + '&'
+
+    # Remove the trailing &.
+    url = url[:-1]
+
+    return url
+
+  def ParseFilters(self):
+    """Parse the filters from the request."""
+    self.status = self.request.get('status', '')
+
+    # Compare to 'False' so that the default value for invalid user input
+    # is True.
+    self.show_successfully_completed = (
+        self.request.get('show_successfully_completed', '') != 'False')
+
+    self.test_name_filter = self.request.get('test_name_filter', '')
+    self.machine_id_filter = self.request.get('machine_id_filter', '')
+
+  def GetTestRunners(self, sort_by=None, ascending=None, limit=None,
+                     offset=None):
+    """Get a query with the given parameters, also applying the filters.
+
+    Args:
+      sort_by: The value to sort the runners by.
+      ascending: True if the runners should be sorted in ascending order.
+      limit: The maximum number of runners the query should return.
+      offset: Number of queries to skip.
+
+    Returns:
+      The TestRunner query that is properly adjusted and filtered.
+    """
+    # If we are filtering for running runners, then we will test for inequality
+    # on the started field. App engine requires any fields used in an
+    # inequality be the first sorts that are applied to the query.
+    sort_by_first = 'started' if self.status == 'running' else None
+
+    query = test_runner.GetTestRunners(sort_by, ascending, limit, offset,
+                                       sort_by_first)
+
+    return test_runner.ApplyFilters(query, self.status,
+                                    self.show_successfully_completed,
+                                    self.test_name_filter,
+                                    self.machine_id_filter)
+
+  def FilterSelectsHTML(self):
+    """Generates the HTML filter select values, with the proper defaults set.
+
+    Returns:
+      The HTML representing the filter select options.
+    """
+    html = ('Ran Successfully:'
+            '<select name="show_successfully_completed" form="filter">')
+
+    if self.show_successfully_completed:
+      html += ('<option value="True" selected="True">Yes</option>'
+               '<option value="False">No</option>')
+    else:
+      html += ('<option value="True">Yes</option>'
+               '<option value="False" selected="True">No</option>')
+
+    html += ('</select>'
+             'Status:'
+             '<select name="status" form="filter">')
+
+    if self.status == 'pending':
+      html += ('<option value="all">All</option>'
+               '<option value="pending" selected="True">Pending Only</option>'
+               '<option value="running">Running Only</option>'
+               '<option value="done">Done Only</option>')
+    elif self.status == 'running':
+      html += ('<option value="all">All</option>'
+               '<option value="pending">Pending Only</option>'
+               '<option value="running" selected="True">Running Only</option>'
+               '<option value="done">Done Only</option>')
+    elif self.status == 'done':
+      html += ('<option value="all">All</option>'
+               '<option value="pending">Pending Only</option>'
+               '<option value="running">Running Only</option>'
+               '<option value="done" selected="True">Done Only</option>')
+    else:
+      html += ('<option value="all">All</option>'
+               '<option value="pending">Pending Only</option>'
+               '<option value="running">Running Only</option>'
+               '<option value="done">Done Only</option>')
+
+    html += '</select>'
+
+    return html
+
   def get(self):  # pylint: disable=g-bad-name
     """Handles HTTP GET requests for this handler's URL."""
     # Build info for test requests table.
-    show_success = self.request.get('s', 'False') != 'False'
-    sort_by = self.request.get('sort_by', 'reverse_chronological')
-    page = int(self.request.get('page', 1))
+    sort_by = self.request.get('sort_by')
+    sort_split = sort_by.split('_', 1)
+    ascending = not sort_split[0]
+    sort_key = sort_split[1] if len(sort_split) > 1 else ''
+
+    # Make sure that the sort key is a valid option.
+    if sort_key not in test_runner.ACCEPTABLE_SORTS:
+      sort_key = 'created'
+      ascending = False
 
     sorted_by_message = '<p>Currently sorted by: '
-    ascending = True
-    if sort_by == 'start':
-      sorted_by_message += 'Start Time'
-      sorted_by_query = 'created'
-    elif sort_by == 'machine_id':
-      sorted_by_message += 'Machine ID'
-      sorted_by_query = 'machine_id'
-    else:
-      # The default sort.
-      sorted_by_message += 'Reverse Start Time'
-      sorted_by_query = 'created'
-      ascending = False
-    sorted_by_message += '</p>'
+    if not ascending:
+      sorted_by_message += 'Reverse '
+    sorted_by_message += test_runner.ACCEPTABLE_SORTS[sort_key] + '</p>'
+
+    # Prase and load the filters
+    self.ParseFilters()
+
+    runner_count_async = self.GetTestRunners().count_async()
+
+    try:
+      page = int(self.request.get('page', 1))
+    except ValueError:
+      page = 1
 
     runners = []
-    for runner in test_runner.GetTestRunners(
-        sorted_by_query,
+    for runner in self.GetTestRunners(
+        sort_key,
         ascending=ascending,
         limit=_NUM_USER_TEST_RUNNERS_PER_PAGE,
         offset=_NUM_USER_TEST_RUNNERS_PER_PAGE * (page - 1)):
-      # If this runner successfully completed, and we are not showing them,
-      # just ignore it.
-      if runner.done and runner.ran_successfully and not show_success:
-        continue
-
-      self._GetDisplayableRunnerTemplate(runner, detailed_output=True)
+      self._GetDisplayableRunnerTemplate(runner)
       runners.append(runner)
 
     errors = []
@@ -299,40 +433,52 @@ class MainHandler(webapp2.RequestHandler):
       error.log_time = self.GetTimeString(error.created)
       errors.append(error)
 
-    if show_success:
-      enable_success_message = """
-        <a href="?s=False">Hide successfully completed tests</a>
-      """
-    else:
-      enable_success_message = """
-        <a href="?s=True">Show successfully completed tests too</a>
-      """
+    sort_options = []
+    for key, value in test_runner.ACCEPTABLE_SORTS.iteritems():
+      # Add the leading _ to the non-reversed key to show it is not to be
+      # reversed.
+      sort_options.append(SortOptions('_' + key, value))
+      sort_options.append(SortOptions('reverse_' + key, 'Reverse ' + value))
 
-    total_pages = (test_runner.TestRunner.query().count() /
+    selected_sort = '_' if ascending else 'reverse_'
+    selected_sort += sort_key
+
+    total_pages = (runner_count_async.get_result() /
                    _NUM_USER_TEST_RUNNERS_PER_PAGE)
+
+    # Ensure the shown page is capped to a page with content.
+    page = min(page, total_pages + 1)
 
     params = {
         'topbar': GenerateTopbar(),
         'runners': runners,
         'errors': errors,
-        'enable_success_message': enable_success_message,
         'sorted_by_message': sorted_by_message,
+        'sort_options': sort_options,
+        'selected_sort': selected_sort,
         'current_page': page,
         # Add 1 so the pages are 1-indexed.
-        'total_pages': map(str, range(1, total_pages + 1, 1))
+        'total_pages': map(str, range(1, total_pages + 1, 1)),
+        'url_no_page': self.GeneratePageUrl(sort_by=sort_by,
+                                            include_filters=True),
+        'url_no_sort_by_or_filters': self.GeneratePageUrl(
+            page, include_filters=False),
+        'url_no_filters': self.GeneratePageUrl(page, sort_by),
+        'filter_selects': self.FilterSelectsHTML(),
+        'machine_id_filter': self.machine_id_filter,
+        'test_name_filter': self.test_name_filter,
     }
 
     path = os.path.join(os.path.dirname(__file__), 'index.html')
     self.response.out.write(template.render(path, params))
 
-  def _GetDisplayableRunnerTemplate(self, runner, detailed_output=False):
+  def _GetDisplayableRunnerTemplate(self, runner):
     """Puts different aspects of the runner in a displayable format.
 
     Args:
       runner: TestRunner object which will be displayed in Swarm server webpage.
-      detailed_output: Flag specifying how detailed the output should be.
     """
-    runner.name_string = runner.GetName()
+    runner.name_string = runner.name
     runner.key_string = str(runner.key.urlsafe())
     runner.status_string = '&nbsp;'
     runner.requested_on_string = self.GetTimeString(runner.created)
@@ -349,29 +495,19 @@ class MainHandler(webapp2.RequestHandler):
       runner.machine_id_used = runner.machine_id
 
       if runner.ran_successfully:
-        if detailed_output:
-          runner.status_string = (
-              '<a title="Click to see results" href="%s?r=%s">Succeeded</a>' %
-              (_SECURE_GET_RESULTS_URL, runner.key_string))
-        else:
-          runner.status_string = 'Succeeded'
+        runner.status_string = (
+            '<a title="Click to see results" href="%s?r=%s">Succeeded</a>' %
+            (_SECURE_GET_RESULTS_URL, runner.key_string))
       else:
         runner.failed_test_class_string = 'failed_test'
         runner.command_string = GenerateButtonWithHiddenForm(
             'Retry', '/secure/retry?r=%s' % runner.key_string,
             runner.key_string)
-        if detailed_output:
-          runner.status_string = (
-              '<a title="Click to see results" href="%s?r=%s">Failed</a>' %
-              (_SECURE_GET_RESULTS_URL, runner.key_string))
-        else:
-          runner.status_string = 'Failed'
+        runner.status_string = (
+            '<a title="Click to see results" href="%s?r=%s">Failed</a>' %
+            (_SECURE_GET_RESULTS_URL, runner.key_string))
     elif runner.started:
-      if detailed_output:
-        runner.status_string = 'Running on machine %s' % runner.machine_id
-      else:
-        runner.status_string = 'Running'
-
+      runner.status_string = 'Running on machine %s' % runner.machine_id
       runner.started_string = self.GetTimeString(runner.started)
       runner.machine_id_used = runner.machine_id
     else:
@@ -633,7 +769,7 @@ class DetectHangingRunnersHandler(CronJobHandler):
                   test_runner.TIME_BEFORE_RUNNER_HANGING_IN_MINS) +
               '\n'.join(hanging_dimensions) +
               '\n\nHere are the hanging runner names:\n' +
-              '\n'.join(runner.GetName() for runner in hanging_runners)
+              '\n'.join(runner.name for runner in hanging_runners)
              )
 
       admin_user.EmailAdmins(subject, body)
@@ -754,6 +890,7 @@ class GetMatchingTestCasesHandler(webapp2.RequestHandler):
     for match in matches:
       keys.extend([key.urlsafe() for key in match.GetAllKeys()])
 
+    logging.info('Found %d keys in %d TestRequests', len(keys), len(matches))
     if keys:
       self.response.out.write(json.dumps(keys))
     else:
@@ -843,15 +980,13 @@ class RetryHandler(webapp2.RequestHandler):
     runner = test_runner.GetRunnerFromUrlSafeKey(runner_key)
 
     if runner:
-      runner.started = None
+      runner.ClearRunnerRun()
+
       # Update the created time to make sure that retrying the runner does not
       # make it jump the queue and get executed before other runners for
       # requests added before the user pressed the retry button.
-      runner.machine_id = None
-      runner.done = False
       runner.created = datetime.datetime.now()
-      runner.ran_successfully = False
-      runner.automatic_retry_count = 0
+
       runner.put()
 
       self.response.out.write('Runner set for retry.')

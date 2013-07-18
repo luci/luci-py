@@ -236,7 +236,7 @@ def AbortStaleRunners():
     if test_runner.ShouldAutomaticallyRetryRunner(runner):
       if test_runner.AutomaticallyRetryRunner(runner):
         logging.warning('TRM.AbortStaleRunners retrying runner %s with key '
-                        ' %s. Attempt %d', runner.GetName(),
+                        ' %s. Attempt %d', runner.name,
                         runner.key.urlsafe(), runner.automatic_retry_count)
       else:
         logging.info('TRM.AbortStaleRunner unable to retry runner with key '
@@ -244,7 +244,7 @@ def AbortStaleRunners():
                      runner.urlsafe())
     else:
       logging.error('TRM.AbortStaleRunners aborting runner %s with key %s',
-                    runner.GetName(), runner.key.urlsafe())
+                    runner.name, runner.key.urlsafe())
       AbortRunner(runner, reason='Runner has become stale.')
 
   query = test_runner.TestRunner.gql(
@@ -278,7 +278,8 @@ def AbortRunner(runner, reason='Not specified.'):
     runner: An instance of TestRunner to be aborted.
     reason: A string message indicating why the TestRunner is being aborted.
   """
-  r_str = 'Tests aborted. AbortRunner() called. Reason: %s' % reason
+  r_str = ('Tests aborted. AbortRunner() called. Reason: %s' %
+           reason.encode('ascii', 'xmlcharrefreplace'))
   runner.UpdateTestResult(runner.machine_id, errors=r_str)
 
 
@@ -519,7 +520,7 @@ def _FindMatchingRunnerUsingAttribs(attribs):
                                                        attribs['dimensions'])
     logging.info(output)
     if match:
-      logging.info('matched runner %s: ' % runner.GetName()
+      logging.info('matched runner %s: ' % runner.name
                    + str(runner_dimensions) + ' to machine: '
                    + str(attribs['dimensions']))
       return runner
