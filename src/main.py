@@ -534,22 +534,36 @@ class MachineListHandler(webapp2.RequestHandler):
 
   def get(self):  # pylint: disable=g-bad-name
     """Handles HTTP GET requests for this handler's URL."""
-    sort_by = self.request.get('sort_by', 'machine_id')
+    sort_by = self.request.get('sort_by', '')
+    if sort_by != 'status' and sort_by not in machine_stats.ACCEPTABLE_SORTS:
+      sort_by = 'machine_id'
+
     machines = machine_stats.GetAllMachines(sort_by)
 
     # Add a delete option for each machine assignment.
     machines_displayable = []
     for machine in machines:
-      machine.machine_id = machine.MachineID()
+      # TODO(user): Actually set the machine status.
+      machine.status = '-'
+
       machine.command_string = GenerateButtonWithHiddenForm(
           'Delete',
-          '%s?r=%s' % (_SECURE_DELETE_MACHINE_STATS_URL, machine.key()),
-          machine.key())
+          '%s?r=%s' % (_SECURE_DELETE_MACHINE_STATS_URL,
+                       machine.key.string_id()),
+          machine.key.string_id())
       machines_displayable.append(machine)
+
+    sort_options = [SortOptions(key, value) for key, value in
+                    machine_stats.ACCEPTABLE_SORTS.iteritems()]
+    # Add the special status sort option.
+    sort_options.append(SortOptions('status', 'Status'))
 
     params = {
         'topbar': GenerateTopbar(),
-        'machines': machines_displayable
+        'machines': machines_displayable,
+        'machine_update_time': machine_stats.MACHINE_UPDATE_TIME,
+        'selected_sort': sort_by,
+        'sort_options': sort_options,
     }
 
     path = os.path.join(os.path.dirname(__file__), 'machine_list.html')

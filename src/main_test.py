@@ -142,8 +142,7 @@ class AppTest(unittest.TestCase):
     self._mox.ReplayAll()
 
     # Add a machine to display.
-    m_stats = machine_stats.MachineStats(tag='tag')
-    m_stats.put()
+    machine_stats.MachineStats.get_or_insert(MACHINE_ID, tag='tag')
 
     response = self.app.get('/secure/machine_list')
     self.assertTrue('200' in response.status)
@@ -152,17 +151,16 @@ class AppTest(unittest.TestCase):
 
   def testDeleteMachineStats(self):
     # Add a machine assignment to delete.
-    m_stats = machine_stats.MachineStats()
-    m_stats.put()
+    m_stats = machine_stats.MachineStats.get_or_insert(MACHINE_ID)
 
     # Delete the machine assignment.
     response = self.app.post('/secure/delete_machine_stats?r=%s' %
-                             m_stats.key())
+                             m_stats.key.string_id())
     self.assertTrue('200' in response.status)
 
     # Attempt to delete the assignment again and fail.
     response = self.app.post('/secure/delete_machine_stats?r=%s' %
-                             m_stats.key())
+                             m_stats.key.string_id())
     self.assertTrue('204' in response.status)
 
   def testMainHandler(self):

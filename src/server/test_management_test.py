@@ -791,20 +791,20 @@ class TestManagementTest(unittest.TestCase):
     request_message = test_helper.GetRequestMessage(platform=matching_config)
     test_management.ExecuteTestRequest(request_message)
 
-    self.assertEqual(0, machine_stats.MachineStats.all().count())
+    self.assertEqual(0, machine_stats.MachineStats.query().count())
 
     # Ensure query is recorded, even though there was no match.
     nonmatching_config = 'win-vista'
     test_management.ExecuteRegisterRequest(
         self._GetMachineRegisterRequest(platform=nonmatching_config),
         self._SERVER_URL)
-    self.assertEqual(1, machine_stats.MachineStats.all().count())
+    self.assertEqual(1, machine_stats.MachineStats.query().count())
 
     # Ensure the query is recorded.
     test_management.ExecuteRegisterRequest(
         self._GetMachineRegisterRequest(platform=matching_config),
         self._SERVER_URL)
-    self.assertEqual(2, machine_stats.MachineStats.all().count())
+    self.assertEqual(2, machine_stats.MachineStats.query().count())
 
   def testGetUpdateWhenPollingForWork(self):
     # Drop the last character of the version string to ensure a version

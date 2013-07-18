@@ -13,19 +13,26 @@
 <h1>Polled Machines</h1>
 <p>Sort By:
 <select id="sort" onchange="document.location.href='?sort_by=' + this.value">
-<option value="">-</option>
-<option value="machine_id">Machine ID</option>
-<option value="tag">Tag</option>
-<option value="assignment_time">Last Day Seen</option>
+{% for sort_option in sort_options %}
+{% if sort_option.key == selected_sort %}
+<option value="{{sort_option.key}}" selected="">{{sort_option.name}}</option>
+{% else %}
+<option value="{{sort_option.key}}">{{sort_option.name}}</option>
+{% endif %}
+{% endfor %}
 </select>
+</p>
+<p>
+Note: The last seen value is updated at most once per {{machine_update_time}}, so it is likely that we've seen the machine since the listed time.
 </p>
 <table id="machine-table"
     summary="This table lists all machines that have polled this server">
 <tr>
 <th>ID</th>
 <th>Tag</th>
-<th>Day Last Seen</th>
+<th>Last Seen</th>
 <th>Dimensions</th>
+<th>Status</th>
 <th>&nbsp;</th>
 </tr>
 {% for machine in machines %}
@@ -34,6 +41,7 @@
 <td>{{machine.tag}}</td>
 <td>{{machine.last_seen}}</td>
 <td>{{machine.dimensions}}</td>
+<td>{{machine.status}}</td>
 <td>{{machine.command_string|safe}}</td>
 </tr>
 {% endfor %}

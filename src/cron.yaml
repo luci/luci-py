@@ -13,7 +13,7 @@ cron:
 
 - description: Detect dead machines
   url: /tasks/detect_dead_machines
-  schedule: every day 01:00
+  schedule: every 1 hours
 
 - description: Detect hanging runners
   url: /tasks/detect_hanging_runners

@@ -10,11 +10,9 @@ import datetime
 import logging
 import unittest
 
-
 from google.appengine.ext import testbed
 from server import admin_user
 from stats import machine_stats
-from third_party.mox import mox
 
 
 MACHINE_IDS = ['12345678-12345678-12345678-12345678',
@@ -28,40 +26,28 @@ class MachineStatsTest(unittest.TestCase):
     self.testbed.activate()
     self.testbed.init_all_stubs()
 
-    # Setup a mock object.
-    self._mox = mox.Mox()
-
   def tearDown(self):
     self.testbed.deactivate()
 
-    self._mox.UnsetStubs()
-
   def testDetectDeadMachines(self):
-    # Have two calls to today, then 1 in the future when stats are old.
-    self._mox.StubOutWithMock(machine_stats, '_GetCurrentDay')
-    machine_stats._GetCurrentDay().AndReturn(datetime.date.today())
-    machine_stats._GetCurrentDay().AndReturn(datetime.date.today())
-    machine_stats._GetCurrentDay().AndReturn(
-        datetime.date.today() +
-        datetime.timedelta(days=machine_stats.MACHINE_TIMEOUT_IN_DAYS * 2))
-    self._mox.ReplayAll()
-
     self.assertEqual([], machine_stats.FindDeadMachines())
 
     m_stats = machine_stats.MachineStats.get_or_insert('id1', tag='machine')
     m_stats.put()
     self.assertEqual([], machine_stats.FindDeadMachines())
 
+    # Make the machine old and ensure it is marked as dead.
+    m_stats.last_seen = (datetime.datetime.now() -
+                         2 * machine_stats.MACHINE_DEATH_TIMEOUT)
+    m_stats.put()
+
     dead_machines = machine_stats.FindDeadMachines()
     self.assertEqual(1, len(dead_machines))
-    self.assertEqual('id1', dead_machines[0].MachineID())
+    self.assertEqual('id1', dead_machines[0].machine_id)
     self.assertEqual('machine', dead_machines[0].tag)
 
-    self._mox.VerifyAll()
-
   def testNotifyAdminsOfDeadMachines(self):
-    dead_machine = machine_stats.MachineStats.get_or_insert(
-        'id', tag='tag', last_seen=datetime.date.today())
+    dead_machine = machine_stats.MachineStats.get_or_insert('id', tag='tag')
     dead_machine.put()
 
     # Set an admin and ensure emails can get sent to them.
@@ -72,23 +58,31 @@ class MachineStatsTest(unittest.TestCase):
   def testRecordMachineQueries(self):
     dimensions = 'dimensions'
     machine_tag = 'tag'
-    self.assertEqual(0, machine_stats.MachineStats.all().count())
+    self.assertEqual(0, machine_stats.MachineStats.query().count())
 
     machine_stats.RecordMachineQueriedForWork(MACHINE_IDS[0], dimensions,
                                               machine_tag)
-    self.assertEqual(1, machine_stats.MachineStats.all().count())
+    self.assertEqual(1, machine_stats.MachineStats.query().count())
+
+    # Ensure that last since isn't update, since not enough time will have
+    # elapsed.
+    m_stats = machine_stats.MachineStats.query().get()
+    old_time = m_stats.last_seen
+    machine_stats.RecordMachineQueriedForWork(MACHINE_IDS[0], dimensions,
+                                              machine_tag)
+    self.assertEqual(old_time, m_stats.last_seen)
 
     # Ensure that last_seen is updated if it is old.
-    m_stats = machine_stats.MachineStats.all().get()
-    m_stats.last_seen -= datetime.timedelta(days=5)
+    m_stats = machine_stats.MachineStats.query().get()
+    m_stats.last_seen -= 2 * machine_stats.MACHINE_UPDATE_TIME
     m_stats.put()
 
-    old_date = m_stats.last_seen
+    old_time = m_stats.last_seen
     machine_stats.RecordMachineQueriedForWork(MACHINE_IDS[0], dimensions,
                                               machine_tag)
 
-    m_stats = machine_stats.MachineStats.all().get()
-    self.assertNotEqual(old_date, m_stats.last_seen)
+    m_stats = machine_stats.MachineStats.query().get()
+    self.assertNotEqual(old_time, m_stats.last_seen)
 
   def testDeleteMachineStats(self):
     # Try to delete with bad keys.
@@ -96,16 +90,15 @@ class MachineStatsTest(unittest.TestCase):
     self.assertFalse(machine_stats.DeleteMachineStats(1))
 
     # Add and then delete a machine assignment.
-    m_stats = machine_stats.MachineStats.get_or_insert(
-        'id', last_seen=datetime.date.today())
+    m_stats = machine_stats.MachineStats.get_or_insert('id')
     m_stats.put()
-    self.assertEqual(1, machine_stats.MachineStats.all().count())
+    self.assertEqual(1, machine_stats.MachineStats.query().count())
     self.assertTrue(
-        machine_stats.DeleteMachineStats(m_stats.key()))
+        machine_stats.DeleteMachineStats(m_stats.machine_id))
 
     # Try and delete the machine assignment again.
     self.assertFalse(
-        machine_stats.DeleteMachineStats(m_stats.key()))
+        machine_stats.DeleteMachineStats(m_stats.machine_id))
 
   def testGetAllMachines(self):
     self.assertEqual(0, len(list(machine_stats.GetAllMachines())))
@@ -119,8 +112,8 @@ class MachineStatsTest(unittest.TestCase):
 
     # Ensure that the returned values are sorted by tags.
     machines = machine_stats.GetAllMachines('tag')
-    self.assertEqual(MACHINE_IDS[1], machines.next().MachineID())
-    self.assertEqual(MACHINE_IDS[0], machines.next().MachineID())
+    self.assertEqual(MACHINE_IDS[1], machines.next().machine_id)
+    self.assertEqual(MACHINE_IDS[0], machines.next().machine_id)
     self.assertEqual(0, len(list(machines)))
 
   def testGetMachineTag(self):
