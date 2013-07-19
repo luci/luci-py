@@ -1344,4 +1344,6 @@ def CreateApplication():
                                  debug=True)
 
 ereporter.register_logger()
-app = CreateApplication()
+# Use ndb.toplevel to ensure that any async operations started in any handler
+# are finished before the handler returns.
+app = ndb.toplevel(CreateApplication())
