@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import base64
+import datetime
 import hashlib
 import logging
 import os
@@ -16,6 +17,8 @@ import webapp2
 from google.appengine.api import users
 from google.appengine.ext import ndb
 # pylint: enable=E0611,F0401
+
+import template
 
 
 ### Models
@@ -114,6 +117,32 @@ def ip_to_str(iptype, ipvalue):
   if not iptype:
     return None
   return '%s-%d' % (iptype, ipvalue)
+
+
+def ipv4_to_int(ip):
+  values = [int(i) for i in ip.split('.')]
+  factor = 256
+  value = 0L
+  for i in values:
+    value = value * factor + i
+  return value
+
+
+def int_to_ipv4(integer):
+  values = []
+  factor = 256
+  for _ in range(4):
+    values.append(integer % factor)
+    integer = integer / factor
+  return '.'.join(str(i) for i in reversed(values))
+
+
+def expand_subnet(ip, mask):
+  """Returns all the IP addressed comprised in a range."""
+  if mask == 32:
+    return [ip]
+  bit = 1 << (32 - mask)
+  return [int_to_ipv4(ipv4_to_int(ip) + r) for r in range(bit)]
 
 
 def gen_token(access_id, offset, now):
@@ -218,35 +247,59 @@ class RestrictedWhitelistIPHandler(ACLRequestHandler):
   def get(self):
     # The user must authenticate with a user credential before being able to
     # whitelist the IP. This is done with login:admin.
-    self.response.out.write(htmlwrap(
-      ('<form name="whitelist" method="post">'
-       'IP: <input type="text" name="ip" value="%s" /><br />'
-       'Group: <input type="text" name="group" /><br />'
-       'Comment: <input type="text" name="comment" /><br />'
-       '<input type="hidden" name="token" value="%s" />'
-       '<input type="submit" value="SUBMIT" />') %
-          (self.request.remote_addr, self.get_token(0, time.time()))))
+    data = {
+      'default_comment': '',
+      'default_group': '',
+      'default_ip': self.request.remote_addr,
+      'note': '',
+      'now': datetime.datetime.utcnow(),
+      'token': self.get_token(0, time.time()),
+      'whitelistips': WhitelistedIP.query(),
+    }
+    self.response.out.write(template.get('whitelistip.html').render(data))
     self.response.headers['Content-Type'] = 'text/html'
 
   def post(self):
     comment = self.request.get('comment')
     group = self.request.get('group')
     ip = self.request.get('ip')
-    key = ip_to_str(*parse_ip(ip))
     if not comment:
       self.abort(403, 'Comment is required.')
-    if not key:
+    mask = 32
+    if '/' in ip:
+      ip, mask = ip.split('/', 1)
+      mask = int(mask)
+
+    if not all(ip_to_str(*parse_ip(i)) for i in expand_subnet(ip, mask)):
       self.abort(403, 'IP is invalid')
-    item = WhitelistedIP.get_by_id(key)
-    if item:
-      item.comment = comment or item.comment
-      item.group = group
-      item.ip = ip
-      item.put()
-      self.response.out.write(htmlwrap('Already present: %s' % ip))
-    else:
-      WhitelistedIP(key, comment=comment, group=group, ip=ip).put()
-      self.response.out.write(htmlwrap('Success: %s' % ip))
+
+    note = []
+    for i in expand_subnet(ip, mask):
+      key = ip_to_str(*parse_ip(i))
+      item = WhitelistedIP.get_by_id(key)
+      item_comment = comment
+      if mask != 32:
+        item_comment += ' ' + self.request.get('ip')
+      if item:
+        item.comment = item_comment
+        item.group = group
+        item.ip = i
+        item.put()
+        note.append('Already present: %s' % i)
+      else:
+        WhitelistedIP(id=key, comment=item_comment, group=group, ip=i).put()
+        note.append('Success: %s' % i)
+
+    data = {
+      'default_comment': self.request.get('comment'),
+      'default_group': self.request.get('group'),
+      'default_ip': self.request.get('ip'),
+      'note': '<br>'.join(note),
+      'now': datetime.datetime.utcnow(),
+      'token': self.get_token(0, time.time()),
+      'whitelistips': WhitelistedIP.query(),
+    }
+    self.response.out.write(template.get('whitelistip.html').render(data))
     self.response.headers['Content-Type'] = 'text/html'
 
 
