@@ -589,25 +589,38 @@ class AppTest(unittest.TestCase):
     response = self.app.get('/tasks/detect_hanging_runners')
     self.assertEqual('200 OK', response.status)
 
-  def testSendEReporter(self):
+  def testSendEReporter_NoAdmin(self):
     # Ensure this function correctly complains if the admin email isn't set.
     response = self.app.get('/tasks/sendereporter', expect_errors=True)
     self.assertEqual('400 Bad Request', response.status)
     self.assertEqual('Invalid admin email, \'\'. Must be a valid email.',
                      response.body)
 
+  def testSendEReporter_GarbageAdmin(self):
     # Ensure this function complains when a garbage email is set.
-    admin = admin_user.AdminUser.all().get()
-    admin.email = None
-    admin.put()
+    admin_user.AdminUser().put()
     response = self.app.get('/tasks/sendereporter', expect_errors=True)
     self.assertEqual('400 Bad Request', response.status)
     self.assertEqual('Invalid admin email, \'None\'. Must be a valid email.',
                      response.body)
 
+  def testSendEReporter_Ok(self):
     # Ensure this function works with a valid admin email.
-    admin.email = 'admin@app.com'
-    admin.put()
+    version = os.environ['CURRENT_VERSION_ID']
+    major, minor = version.split('.')
+    yesterday = datetime.date.today() - datetime.timedelta(days=1)
+    main_app.ereporter.ExceptionRecord(
+        key_name=main_app.ereporter.ExceptionRecord.get_key_name(
+            'X', version, yesterday),
+        signature='X',
+        major_version=major,
+        minor_version=int(minor),
+        date=yesterday,
+        stacktrace='I blew up',
+        http_method='GET',
+        url='/nowhere',
+        handler='No one').put()
+    admin_user.AdminUser(email='admin@example.com').put()
 
     response = self.app.get('/tasks/sendereporter')
     self.assertTrue('200 OK' in response.status)
