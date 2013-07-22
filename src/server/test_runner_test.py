@@ -242,6 +242,13 @@ class TestRunnerTest(unittest.TestCase):
     pending_runner = test_helper.CreatePendingRunner()
     running_runner = test_helper.CreatePendingRunner(machine_id=MACHINE_IDS[0])
 
+    # Hung runner, aborted without ever running.
+    hung_runner = test_helper.CreatePendingRunner()
+    test_management.AbortRunner(hung_runner)
+
+    aborted_runner = test_helper.CreatePendingRunner(machine_id=MACHINE_IDS[1])
+    test_management.AbortRunner(aborted_runner)
+
     failed_runner = test_helper.CreatePendingRunner(machine_id=MACHINE_IDS[1])
     failed_runner.done = True
     failed_runner.ran_successfully = False
@@ -273,11 +280,12 @@ class TestRunnerTest(unittest.TestCase):
     CheckQuery([running_runner],
                test_runner.ApplyFilters(unfiltered_query, status='running'))
 
-    CheckQuery([failed_runner, successful_runner],
+    CheckQuery([hung_runner, aborted_runner, failed_runner, successful_runner],
                test_runner.ApplyFilters(unfiltered_query, status='done'))
 
     CheckQuery(
-        [pending_runner, running_runner, failed_runner],
+        [pending_runner, running_runner, hung_runner, aborted_runner,
+         failed_runner],
         test_runner.ApplyFilters(unfiltered_query,
                                  show_successfully_completed=False))
 

@@ -655,7 +655,8 @@ def ApplyFilters(query, status='', show_successfully_completed=True,
   # If the status isn't one of these options, then apply no filter.
   # pylint: disable=g-explicit-bool-comparison, g-equals-none
   if status == 'pending':
-    query = query.filter(TestRunner.started == None)
+    query = query.filter(TestRunner.started == None,
+                         TestRunner.done == False)
   elif status == 'running':
     query = query.filter(TestRunner.started != None,
                          TestRunner.done == False)
