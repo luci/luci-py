@@ -326,7 +326,7 @@ class LocalTestRunner(object):
       data['i'] = self.test_run.instance_index
       data['m'] = self.test_run.num_instances
 
-    url_helper.UrlOpen(upload_url, data, self.max_url_retries)
+    url_helper.UrlOpen(upload_url, data=data, max_tries=self.max_url_retries)
 
   def _RunCommand(self, command, time_out, env=None):
     """Runs the given command.
@@ -640,8 +640,8 @@ class LocalTestRunner(object):
               'result_output': result_string,
               'o': overwrite}
 
-      url_results = url_helper.UrlOpen(self.test_run.result_url, data,
-                                       self.max_url_retries)
+      url_results = url_helper.UrlOpen(self.test_run.result_url, data=data,
+                                       max_tries=self.max_url_retries)
       if url_results is None:
         logging.error('Failed to publish results to given url, %s',
                       self.test_run.result_url)
