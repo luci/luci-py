@@ -15,6 +15,7 @@ import unittest
 from google.appengine.ext import testbed
 from google.appengine.ext import ndb
 
+from common import test_request_message
 from server import dimension_mapping
 from server import test_helper
 from stats import runner_stats
@@ -66,7 +67,27 @@ class RunnerSummaryTest(unittest.TestCase):
 
     self._mox.UnsetStubs()
 
-  def testGenerateStatsForOneRunnerStats(self):
+  def testGenerateSnapshotSummary(self):
+    runner_summary.GenerateSnapshotSummary()
+
+    self.assertEqual(0, runner_summary.RunnerSummary.query().count())
+
+    # Add a single pending runner.
+    pending_runner = test_helper.CreatePendingRunner()
+    dimensions = pending_runner.dimensions
+    dimension_mapping.DimensionMapping(dimensions=dimensions).put()
+
+    runner_summary.GenerateSnapshotSummary()
+
+    self.assertEqual(1, runner_summary.RunnerSummary.query().count())
+
+    summary = runner_summary.RunnerSummary.query().get()
+    self.assertEqual(test_request_message.Stringize(pending_runner.dimensions),
+                     summary.dimensions)
+    self.assertEqual(1, summary.pending)
+    self.assertEqual(0, summary.running)
+
+  def testGenerateWaitSummaryForOneRunnerStats(self):
     dimensions = 'machine_dimensions'
     wait = 10
     r_stats = _CreateRunnerStats(dimensions=dimensions)
@@ -87,7 +108,7 @@ class RunnerSummaryTest(unittest.TestCase):
     self.assertEqual(wait, dimension_wait.mean_wait)
     self.assertEqual({'0': 1}, json.loads(dimension_wait.median_buckets))
 
-  def testGenerateStatsForMultipleRunners(self):
+  def testGenerateWaitSummaryForMultipleRunners(self):
     config_dimensions = '{"os": "windows"}'
     median_time = 500
     max_time = 1000
@@ -124,7 +145,7 @@ class RunnerSummaryTest(unittest.TestCase):
     self.assertEqual(expected_median_buckets,
                      json.loads(dimension_wait.median_buckets))
 
-  def testGenerateStatsMultipleTimes(self):
+  def testGenerateWaitSummaryMultipleTimes(self):
     dimensions = 'machine_dimensions'
     wait = 10
     r_stats = _CreateRunnerStats(dimensions=dimensions)

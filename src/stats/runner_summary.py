@@ -17,12 +17,41 @@ import logging
 
 from google.appengine.ext import ndb
 
+from common import test_request_message
 from server import dimension_mapping
 from server import test_runner
 from stats import runner_stats
 
 # The number of days to keep WaitSummaries before deleting them.
 WAIT_SUMMARY_LIFE_IN_DAYS = 28
+
+
+class RunnerSummary(ndb.Model):
+  """Stores a basic summary of runners at a given point in time."""
+
+  # The time of this snapshot.
+  time = ndb.DateTimeProperty()
+
+  # The dimensions for this snapshot.
+  dimensions = ndb.StringProperty()
+
+  # The number of pending runners.
+  pending = ndb.IntegerProperty(indexed=False)
+
+  # The number of running runners.
+  running = ndb.IntegerProperty(indexed=False)
+
+
+def GenerateSnapshotSummary():
+  """Store a snapshot of the current runner summary."""
+  # Store the time now so all the models will have the same time.
+  current_time = datetime.datetime.now()
+
+  for dimensions, summary in GetRunnerSummaryByDimension().iteritems():
+    RunnerSummary(time=current_time,
+                  dimensions=test_request_message.Stringize(dimensions),
+                  pending=summary[0],
+                  running=summary[1]).put()
 
 
 class DimensionWaitSummary(ndb.Model):

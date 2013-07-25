@@ -803,6 +803,7 @@ class GenerateRecentStatsHandler(CronJobHandler):
   """Handles cron jobs to generate new recent stats."""
 
   def post(self):  # pylint: disable=g-bad-name
+    runner_summary.GenerateSnapshotSummary()
     runner_summary.GenerateWaitSummary()
 
 
