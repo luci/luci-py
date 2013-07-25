@@ -43,6 +43,7 @@ from server import user_manager
 from stats import daily_stats
 from stats import machine_stats
 from stats import runner_stats
+from stats import runner_summary
 # pylint: enable=g-import-not-at-top
 
 import webapp2  # pylint: disable=g-bad-import-order
@@ -687,7 +688,8 @@ class CleanupDataHandler(webapp2.RequestHandler):
     daily_stats.DeleteOldDailyStats()
 
     runner_stats.DeleteOldRunnerStats()
-    runner_stats.DeleteOldWaitSummaries()
+
+    runner_summary.DeleteOldWaitSummaries()
 
     self.response.out.write('Successfully cleaned up old data.')
 
@@ -801,7 +803,7 @@ class GenerateRecentStatsHandler(CronJobHandler):
   """Handles cron jobs to generate new recent stats."""
 
   def post(self):  # pylint: disable=g-bad-name
-    runner_stats.GenerateStats()
+    runner_summary.GenerateWaitSummary()
 
 
 class SendEReporterHandler(ReportGenerator):
@@ -875,14 +877,14 @@ class StatsHandler(webapp2.RequestHandler):
     weeks_daily_stats.reverse()
 
     max_days_to_show = min(daily_stats.DAILY_STATS_LIFE_IN_DAYS,
-                           runner_stats.WAIT_SUMMARY_LIFE_IN_DAYS)
+                           runner_summary.WAIT_SUMMARY_LIFE_IN_DAYS)
     params = {
         'topbar': GenerateTopbar(),
         'stat_links': GenerateStatLinks(),
         'daily_stats': weeks_daily_stats,
         'days_to_show': days_to_show,
         'max_days_to_show': range(1, max_days_to_show),
-        'runner_wait_stats': runner_stats.GetRunnerWaitStats(days_to_show),
+        'runner_wait_stats': runner_summary.GetRunnerWaitStats(days_to_show),
     }
 
     path = os.path.join(os.path.dirname(__file__), 'stats.html')
@@ -1097,12 +1099,12 @@ class RunnerSummaryHandler(webapp2.RequestHandler):
     total_running = 0
 
     dimension_summary = []
-    for dimensions, runner_summary in test_runner.GetRunnerSummaryByDimension():
-      total_pending += runner_summary[0]
-      total_running += runner_summary[1]
-      dimension_summary.append(RunnerSummary(dimensions,
-                                             runner_summary[0],
-                                             runner_summary[1]))
+    runner_summaries = runner_summary.GetRunnerSummaryByDimension().iteritems()
+    for dimensions, summary in runner_summaries:
+      total_pending += summary[0]
+      total_running += summary[1]
+      dimension_summary.append(
+          RunnerSummary(dimensions, summary[0], summary[1]))
 
     params = {
         'topbar': GenerateTopbar(),

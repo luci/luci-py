@@ -18,7 +18,6 @@ from google.appengine.ext import ndb
 
 from common import blobstore_helper
 from common import url_helper
-from server import dimension_mapping
 from server import test_helper
 from server import test_management
 from server import test_request
@@ -516,47 +515,6 @@ class TestRunnerTest(unittest.TestCase):
     self.assertNotEqual(None, r_stats.assigned_time)
     self.assertNotEqual(None, r_stats.end_time)
     self.assertTrue(r_stats.success)
-
-  def testGetRunnerSummaryByDimension(self):
-    self.assertEqual({}, test_runner.GetRunnerSummaryByDimension())
-
-    # Add a pending runner and its dimensions.
-    pending_runner = test_helper.CreatePendingRunner()
-    dimensions = pending_runner.dimensions
-    dimension_mapping.DimensionMapping(dimensions=dimensions).put()
-
-    self.assertEqual({dimensions: (1, 0)},
-                     test_runner.GetRunnerSummaryByDimension())
-
-    # Add a running runner.
-    running_runner = test_helper.CreatePendingRunner()
-    running_runner.started = datetime.datetime.now()
-    running_runner.put()
-
-    self.assertEqual({dimensions: (1, 1)},
-                     test_runner.GetRunnerSummaryByDimension())
-
-    # Add a runner with a new dimension
-    new_dimensions = running_runner.dimensions + 'extra dimensions'
-    dimension_mapping.DimensionMapping(dimensions=new_dimensions).put()
-
-    new_dimension_runner = test_helper.CreatePendingRunner()
-    new_dimension_runner.dimensions = new_dimensions
-    new_dimension_runner.put()
-
-    self.assertEqual({dimensions: (1, 1),
-                      new_dimensions: (1, 0)},
-                     test_runner.GetRunnerSummaryByDimension())
-
-    # Make both the runners on the original dimensions as done.
-    pending_runner.done = True
-    pending_runner.put()
-    running_runner.done = True
-    running_runner.put()
-
-    self.assertEqual({dimensions: (0, 0),
-                      new_dimensions: (1, 0)},
-                     test_runner.GetRunnerSummaryByDimension())
 
   def testDeleteRunner(self):
     test_helper.CreatePendingRunner()

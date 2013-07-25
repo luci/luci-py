@@ -21,7 +21,6 @@ from google.appengine.ext import ndb
 from common import blobstore_helper
 from common import test_request_message
 from common import url_helper
-from server import dimension_mapping
 from stats import machine_stats
 from stats import runner_stats
 
@@ -734,36 +733,6 @@ def GetRunnerResults(key):
           'config_instance_index': runner.config_instance_index,
           'num_config_instances': runner.num_config_instances,
           'output': runner.GetResultString()}
-
-
-def GetRunnerSummaryByDimension():
-  """Returns a high level summary of the current runners per dimension.
-
-  Returns:
-    A dictionary where the key is the dimension and the value is a tuple of
-    (pending runners, running runners) for the dimension.
-  """
-  def GetRunnerSummary(mapping):
-    # Since the following commands are part of a GQL query, we can't use
-    # the pythonic "is None", "is not None" or the explicit boolean comparison.
-    # pylint: disable=g-equals-none,g-explicit-bool-comparison
-    pending_runners_future = TestRunner.query(
-        TestRunner.dimensions == mapping.dimensions,
-        TestRunner.started == None,
-        TestRunner.done == False).count_async()
-
-    running_runners_future = TestRunner.query(
-        TestRunner.dimensions == mapping.dimensions,
-        TestRunner.started != None,
-        TestRunner.done == False).count_async()
-    # pylint: enable=g-equals-none,g-explicit-bool-comparison
-
-    return (mapping.dimensions,
-            (pending_runners_future.get_result(),
-             running_runners_future.get_result()))
-
-  dimension_query = dimension_mapping.DimensionMapping.query()
-  return dict(dimension_query.map(GetRunnerSummary))
 
 
 def DeleteRunnerFromKey(key):
