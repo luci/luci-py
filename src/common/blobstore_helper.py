@@ -51,6 +51,12 @@ def CreateBlobstore(blobstore_data):
       logging.error('An exception while trying to store results in the '
                     'blobstore. Attempt %d', attempt)
       time.sleep(3)
+    except files.ExistenceError:
+      # Log the exception as well since there are different types of exitence
+      # errors.
+      logging.warning('The file seems to not exist, attempt %d.', exc_info=True)
+    except files.UnknownError:
+      logging.warning('Encountered an unknown error. Attempt %d', attempt)
     except runtime.DeadlineExceededError:
       logging.exception('The blobstore file api took too long to write the '
                         'file, aborting')
