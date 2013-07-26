@@ -1087,7 +1087,7 @@ class RunnerSummary(object):
   """A basic helper class for holding the runner summary for a dimension."""
 
   def __init__(self, dimensions, num_pending, num_running):
-    self.dimension = dimensions
+    self.dimensions = dimensions
     self.pending_runners = num_pending
     self.running_runners = num_running
 
@@ -1095,24 +1095,80 @@ class RunnerSummary(object):
 class RunnerSummaryHandler(webapp2.RequestHandler):
   """Handler for displaying a summary of the current runners."""
 
+  def GenerateHistoryHoursSelect(self):
+    """Returns the HTML to generate a select box for the hours to show.
+
+    Returns:
+      The required HTML.
+    """
+    html = ('<select id="hours_to_show" onchange="document.location.href=\''
+            '?hours=\' + this.value">')
+    html += '<option>-</option>'
+
+    # Allow up to a day, by the hour.
+    for i in range(1, 25):
+      html += '<option value=\'%d\'>%d hours</option>' % (i, i)
+
+    # Allow multiple days, up to 4 weeks
+    for i in range(2, 29):
+      html += '<option value=\'%d\'>%d days</option>' % (i * 24, i)
+
+    html += '</select>'
+
+    return html
+
   def get(self):  # pylint: disable=g-bad-name
+    try:
+      hours = int(self.request.get('hours', '24'))
+    except ValueError:
+      hours = 24
+
+    if hours <= 24:
+      time_frame = '%d hours' % hours
+    else:
+      time_frame = '%d days' % (hours/24)
+
+    # Start querying all the summaries for the graph.
+    summary_cutoff_time = (datetime.datetime.now() -
+                           datetime.timedelta(hours=hours))
+    summaries_async = runner_summary.RunnerSummary.query(
+        runner_summary.RunnerSummary.time > summary_cutoff_time).fetch_async()
+
+    # Get a snapshot of the current state of pending and running runners.
     total_pending = 0
     total_running = 0
-
-    dimension_summary = []
     runner_summaries = runner_summary.GetRunnerSummaryByDimension().iteritems()
+    snapshot_summary = []
     for dimensions, summary in runner_summaries:
       total_pending += summary[0]
       total_running += summary[1]
-      dimension_summary.append(
-          RunnerSummary(dimensions, summary[0], summary[1]))
+      snapshot_summary.append(
+          RunnerSummary(test_request_message.Stringize(dimensions),
+                        summary[0],
+                        summary[1]))
+
+    # Start the graph dict for each dimension.
+    runner_summary_graphs = {}
+    for i, summary in enumerate(snapshot_summary):
+      runner_summary_graphs[summary.dimensions] = {
+          'id': i,
+          'title': summary.dimensions,
+          'data': []}
+
+    # Convert the runner summaries to the graph array.
+    for summary in summaries_async.get_result():
+      runner_summary_graphs[summary.dimensions]['data'].append(
+          [summary.time.isoformat(), summary.pending, summary.running])
 
     params = {
         'topbar': GenerateTopbar(),
         'stats_links': GenerateStatLinks(),
         'total_pending_runners': total_pending,
         'total_running_runners': total_running,
-        'dimension_summary': dimension_summary,
+        'snapshot_summary': snapshot_summary,
+        'hours_select': self.GenerateHistoryHoursSelect(),
+        'time_frame': time_frame,
+        'runner_summary_graphs': runner_summary_graphs.values(),
     }
 
     path = os.path.join(os.path.dirname(__file__), 'runner_summary.html')

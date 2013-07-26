@@ -20,6 +20,7 @@ from common import blobstore_helper
 from common import dimensions_utils
 from common import url_helper
 from server import admin_user
+from server import dimension_mapping
 from server import test_helper
 from server import test_management
 from server import test_request
@@ -28,6 +29,7 @@ from server import user_manager
 from stats import daily_stats
 from stats import machine_stats
 from stats import runner_stats
+from stats import runner_summary
 from third_party.mox import mox
 
 # A simple machine id constant to use in tests.
@@ -521,6 +523,16 @@ class AppTest(unittest.TestCase):
                  '/secure/runner_summary',
                  '/secure/stats',
                 ]
+
+    # Create a pending runner and an active runner.
+    runner = test_helper.CreatePendingRunner()
+    test_helper.CreatePendingRunner(machine_id=MACHINE_ID)
+
+    # Ensure the dimension mapping is created.
+    dimension_mapping.DimensionMapping(dimensions=runner.dimensions).put()
+
+    # Ensure a RunnerSummary is created.
+    runner_summary.GenerateSnapshotSummary()
 
     self._mox.StubOutWithMock(main_app.template, 'render')
     for _ in range(len(stat_urls)):

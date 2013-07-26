@@ -3,6 +3,36 @@
 <head>
 <title>Stats</title>
 <link rel="stylesheet" type="text/css" href="/css/swarm_style.css"/>
+<script type="text/javascript" src="https://www.google.com/jsapi"></script>
+<script type="text/javascript">
+  google.load("visualization", "1", {packages:["corechart"]});
+
+  google.setOnLoadCallback(drawCharts);
+  function drawCharts() {
+    {% for runner_summary in runner_summary_graphs %}
+      var data_with_date = {{runner_summary.data|safe}}
+
+      var data = new google.visualization.DataTable();
+      data.addColumn('datetime', 'snapshot time');
+      data.addColumn('number', 'Pending Runners');
+      data.addColumn('number', 'Running Runners');
+
+      for (var i=0; i < data_with_date.length; ++i) {
+        data_with_date[i][0] = new Date(data_with_date[i][0]);
+        data.addRow(data_with_date[i]);
+      }
+
+      var options = {
+        title: "{{runner_summary.title|safe}}",
+        hAxis: {title: "Time"},
+        vAxis: {title: "Number of Runners"},
+      };
+
+      var chart_{{runner_summary.id}} = new google.visualization.LineChart(document.getElementById({{runner_summary.id}}));
+      chart_{{runner_summary.id}}.draw(data, options);
+    {% endfor %}
+  }
+</script>
 </head>
 <body>
 
@@ -21,14 +51,22 @@ Total Pending Runner: {{total_pending_runners}}<br/>
 <th>Dimensions</th>
 <th>Number of Currently Running Runners</th>
 <th>Number of Currently Pending Runners</th>
-{% for dimension in dimension_summary %}
+{% for snapshot in snapshot_summary %}
 <tr class="request {% cycle even,odd %}">
-<td>{{dimension.dimensions}}</td>
-<td>{{dimension.running_runners}}</td>
-<td>{{dimension.pending_runners}}</td>
+<td>{{snapshot.dimensions}}</td>
+<td>{{snapshot.running_runners}}</td>
+<td>{{snapshot.pending_runners}}</td>
 </tr>
 {% endfor %}
 </table>
+
+<h1>Number of Pending Jobs (For the last {{time_frame}})</h1>
+Hours to Show:
+{{hours_select|safe}}
+{% for runner_summary in runner_summary_graphs %}
+<div id="{{runner_summary.id}}" style="width: 100%; height: 400px;"></div>
+<br/>
+{% endfor %}
 
 <div style="float: left;"><p>
   <a target="_blank" href="https://code.google.com/appengine/"><img border="0"
