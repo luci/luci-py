@@ -17,31 +17,13 @@ APP_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 sys.path.insert(0, APP_DIR)
 
+import find_gae_sdk
+
+
 # pylint doesn't know where the AppEngine SDK is, so silence these errors.
 # F0401: Unable to import 'XXX'
 # E0611: No name 'XXX' in module 'YYY'
 # pylint: disable=E0611,F0401
-
-
-def find_gae_sdk(search_dir):
-  """Returns the path to GAE SDK if found, else None."""
-  # First search up the directories up to root.
-  while True:
-    attempt = os.path.join(search_dir, 'google_appengine')
-    if os.path.isfile(os.path.join(attempt, 'dev_appserver.py')):
-      return attempt
-    prev_dir = search_dir
-    search_dir = os.path.dirname(search_dir)
-    if search_dir == prev_dir:
-      break
-
-  # Next search PATH.
-  for item in os.environ['PATH'].split(os.pathsep):
-    if not item:
-      continue
-    item = os.path.normpath(os.path.abspath(item))
-    if os.path.isfile(os.path.join(item, 'dev_appserver.py')):
-      return item
 
 
 def setup_gae_sdk(sdk_path):
@@ -139,7 +121,7 @@ def Main():
 
   if args:
     parser.error('Unknown arguments, %s' % args)
-  options.sdk_path = options.sdk_path or find_gae_sdk(APP_DIR)
+  options.sdk_path = options.sdk_path or find_gae_sdk.find_gae_sdk(APP_DIR)
   if not options.sdk_path:
     parser.error('Failed to find the AppEngine SDK. Pass --sdk-path argument.')
 
