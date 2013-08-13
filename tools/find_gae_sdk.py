@@ -5,6 +5,12 @@
 """Finds AppEngine SDK."""
 
 import os
+import sys
+
+# pylint doesn't know where the AppEngine SDK is, so silence these errors.
+# F0401: Unable to import 'XXX'
+# E0611: No name 'XXX' in module 'YYY'
+# pylint: disable=E0611,F0401
 
 
 def find_gae_sdk(search_dir):
@@ -26,3 +32,22 @@ def find_gae_sdk(search_dir):
     item = os.path.normpath(os.path.abspath(item))
     if os.path.isfile(os.path.join(item, 'dev_appserver.py')):
       return item
+
+
+def setup_gae_sdk(sdk_path):
+  """Sets up App Engine environment.
+
+  Then any AppEngine included module can be imported. The change is global and
+  permanent.
+  """
+  sys.path.insert(0, sdk_path)
+
+  import dev_appserver
+  dev_appserver.fix_sys_path()
+
+
+def default_app_id(app_dir):
+  """Returns the application name."""
+  import yaml
+
+  return yaml.load(open(os.path.join(app_dir, 'app.yaml')))['application']

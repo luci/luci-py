@@ -33,13 +33,15 @@ def calculate_version(tag):
 
   remote = 'origin/master'
   mergebase = git(['merge-base', 'HEAD', remote]).rstrip()
-  if not commit.startswith(mergebase):
+  logging.info('commit: %s, mergebase: %s', commit, mergebase)
+  if not mergebase.startswith(commit):
     pristine = False
     # Using a local commit hash is not useful, use the real base commit instead.
     # Trim it to 7 characters like 'git describe' does.
     commit = mergebase[:7]
   else:
     pristine = not git(['diff', mergebase])
+    logging.info('was diff clear? %s', pristine)
 
   version = '%s-%s' % (pseudo_revision, commit)
   if not pristine:
@@ -67,6 +69,9 @@ def main():
   if not options.sdk_path:
     parser.error('Failed to find the AppEngine SDK. Pass --sdk-path argument.')
 
+  find_gae_sdk.setup_gae_sdk(options.sdk_path)
+  options.app_id = options.app_id or find_gae_sdk.default_app_id(APP_DIR)
+
   version = calculate_version(options.tag)
   cmd = [
       sys.executable,
@@ -84,8 +89,11 @@ def main():
   if options.verbose:
     cmd.append('--verbose')
 
-  print('Uploading version %s' % version)
-  return subprocess.call(cmd, cwd=APP_DIR)
+  ret = subprocess.call(cmd, cwd=APP_DIR)
+  if not ret:
+    print(' https://%s-dot-%s.appspot.com' % (version, options.app_id))
+    print(' https://appengine.google.com/deployment?app_id=s~' + options.app_id)
+  return ret
 
 
 if __name__ == '__main__':

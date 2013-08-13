@@ -7,11 +7,26 @@
 
 import code
 import getpass
+import socket
+import hashlib
 import logging
 import optparse
 import os
 import sys
 import urllib2
+
+try:
+  # https://pypi.python.org/pypi/keyring
+  import keyring
+except ImportError:
+  keyring = None
+
+try:
+  # Keyring doesn't has native "unlock keyring" support.
+  import gnomekeyring
+except ImportError:
+  gnomekeyring = None
+
 
 APP_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -20,48 +35,108 @@ sys.path.insert(0, APP_DIR)
 import find_gae_sdk
 
 
-# pylint doesn't know where the AppEngine SDK is, so silence these errors.
-# F0401: Unable to import 'XXX'
-# E0611: No name 'XXX' in module 'YYY'
-# pylint: disable=E0611,F0401
+def unlock_keyring():
+  """Tries to unlock the gnome keyring. Returns True on success."""
+  if not os.environ.get('DISPLAY') or not gnomekeyring:
+    return False
+  try:
+    gnomekeyring.unlock_sync(None, getpass.getpass('Keyring password: '))
+    return True
+  except Exception as e:
+    print >> sys.stderr, 'Failed to unlock keyring: %s' % e
+    return False
 
 
-def setup_gae_sdk(sdk_path):
-  """Sets up App Engine environment.
+class DefaultAuth(object):
+  """Simple authentication support based on getpass.getpass()."""
+  def __init__(self):
+    self._last_key = os.environ.get('EMAIL_ADDRESS')
 
-  Then any AppEngine included module can be imported. The change is global and
-  permanent.
-  """
-  sys.path.insert(0, sdk_path)
+  def _retrieve_password(self):  # pylint: disable=R0201
+    return getpass.getpass('Please enter the password:' )
 
-  import dev_appserver
-  dev_appserver.fix_sys_path()
+  def auth_func(self):
+    if self._last_key:
+      result = raw_input('Username (default: %s): ' % self._last_key)
+      if result:
+        self._last_key = result
+    else:
+      self._last_key = raw_input('Username: ')
+
+    return self._last_key, self._retrieve_password()
 
 
-def default_auth_func():
-  user = os.environ.get('EMAIL_ADDRESS')
-  if user:
-    result = raw_input('Username (default: %s): ' % user)
-    if result:
-      user = result
-  else:
-    user = raw_input('Username: ')
-  return user, getpass.getpass('Password: ')
+class KeyringAuth(DefaultAuth):
+  """Enhanced password support based on keyring."""
+  def __init__(self, bucket):
+    super(KeyringAuth, self).__init__()
+    self._bucket = bucket
+    self._unlocked = False
+    self._keys = set()
+
+  def _retrieve_password(self):
+    """Returns the password for the corresponding key.
+
+    'key' is retrieved from self._last_key.
+
+    The key is salted and hashed so the direct mapping between an email address
+    and its password is not stored directly in the keyring.
+    """
+    # Create a salt out of the bucket name.
+    salt = hashlib.sha512('1234' + self._bucket + '1234').digest()
+    # Create a salted hash from the key.
+    key = self._last_key
+    actual_key = hashlib.sha512(salt + key).hexdigest()
+
+    if key in self._keys:
+      # It was already tried. Clear up keyring if any value was set.
+      try:
+        logging.info('Clearing password for key %s (%s)', key, actual_key)
+        keyring.set_password(self._bucket, actual_key, '')
+      except Exception as e:
+        print >> sys.stderr, 'Failed to erase in keyring: %s' % e
+    else:
+      self._keys.add(key)
+      try:
+        logging.info('Getting password for key %s (%s)', key, actual_key)
+        value = keyring.get_password(self._bucket, actual_key)
+        if value:
+          return value
+      except Exception as e:
+        print >> sys.stderr, 'Failed to get password from keyring: %s' % e
+        if unlock_keyring():
+          # Unlocking worked, try getting the password again.
+          try:
+            value = keyring.get_password(self._bucket, actual_key)
+            if value:
+              return value
+          except Exception as e:
+            print >> sys.stderr, 'Failed to get password from keyring: %s' % e
+
+    # At this point, it failed to get the password from keyring. Ask the user.
+    value = super(KeyringAuth, self)._retrieve_password()
+
+    answer = raw_input('Store password in system keyring (y/N)?').strip()
+    if answer == 'y':
+      try:
+        logging.info('Saving password for key %s (%s)', key, actual_key)
+        keyring.set_password(self._bucket, actual_key, value)
+      except Exception as e:
+        print >> sys.stderr, 'Failed to save in keyring: %s' % e
+
+    return value
 
 
 def load_context(sdk_path, app_dir, host, app_id, version):
   """Returns a closure where the GAE SDK is initialized."""
-  setup_gae_sdk(sdk_path)
+  find_gae_sdk.setup_gae_sdk(sdk_path)
+  # pylint doesn't know where the AppEngine SDK is, so silence these errors.
+  # E0611: No name 'XXX' in module 'YYY'
+  # F0401: Unable to import 'XXX'
+  # pylint: disable=E0611,F0401
 
   # Import GAE's SDK modules as needed.
   from google.appengine.ext.remote_api import remote_api_stub
-  import yaml
-
-
-  def default_app_id():
-    """Returns the application name."""
-    return yaml.load(open(os.path.join(app_dir, 'app.yaml')))['application']
-
 
   def setup_env(host):
     """Setup remote access to a GAE instance."""
@@ -71,9 +146,13 @@ def load_context(sdk_path, app_dir, host, app_id, version):
     from google.appengine.api.users import User
     from google.appengine.ext import ndb
 
+    if keyring:
+      auth = KeyringAuth('remote_api_isolate_%s' % socket.getfqdn())
+    else:
+      auth = DefaultAuth()
     try:
       remote_api_stub.ConfigureRemoteDatastore(
-          None, '/_ah/remote_api', default_auth_func, host,
+          None, '/_ah/remote_api', auth.auth_func, host,
           save_cookies=True, secure=True)
     except urllib2.URLError:
       print >> sys.stderr, 'Failed to access %s' % host
@@ -94,7 +173,7 @@ def load_context(sdk_path, app_dir, host, app_id, version):
     predefined_vars = locals().copy()
     return predefined_vars
 
-  app_id = app_id or default_app_id()
+  app_id = app_id or find_gae_sdk.default_app_id(app_dir)
   if not host:
     if version:
       host = '%s-dot-%s.appspot.com' % (version, app_id)
