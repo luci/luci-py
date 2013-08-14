@@ -902,10 +902,6 @@ def CreateApplication():
   - /restricted/taskqueue/.* are task queues.
   - /content/.* has the public HTTP API.
   - /stats/.* has statistics.
-
-  Set in app.yaml:
-  - /css/(.*) links to static/css/(\1)
-  - /images/(.*) links to static/images/(\1)
   """
   acl.bootstrap()
 
