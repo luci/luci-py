@@ -14,6 +14,7 @@ import time
 # them.
 # pylint: disable=E0611,F0401
 import webapp2
+from google.appengine.api import app_identity
 from google.appengine.api import users
 from google.appengine.ext import ndb
 # pylint: enable=E0611,F0401
@@ -155,11 +156,11 @@ def gen_token(access_id, offset, now):
   # Rotate every hour.
   this_hour = int(now / 3600.)
   timestamp = str(this_hour + offset)
-  version = os.environ['CURRENT_VERSION_ID']
+  app_id = app_identity.get_application_id()
   secrets = (
       GlobalSecret.get_or_insert(_GLOBAL_KEY).secret,
       str(access_id),
-      str(version),
+      str(app_id),
       timestamp)
   hashed = hashlib.sha1('\0'.join(secrets)).digest()
   return base64.urlsafe_b64encode(hashed)[:16] + '-' + timestamp
