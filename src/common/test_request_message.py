@@ -737,7 +737,7 @@ class TestConfiguration(TestRequestMessageBase):
   """
 
   def __init__(self, config_name=None, env_vars=None, data=None, tests=None,
-               min_instances=1, additional_instances=0, priority=10,
+               min_instances=1, additional_instances=0, priority=100,
                **dimensions):
     super(TestConfiguration, self).__init__()
     self.config_name = config_name
