@@ -55,7 +55,7 @@ _NUM_RECENT_ERRORS_TO_DISPLAY = 10
 _HOME_LINK = '<a href=/secure/main>Home</a>'
 _MACHINE_LIST_LINK = '<a href=/secure/machine_list>Machine List</a>'
 _PROFILE_LINK = '<a href=/secure/user_profile>Profile</a>'
-_STATS_LINK = '<a href=/secure/stats>Stats</a>'
+_STATS_LINK = '<a href=/stats>Stats</a>'
 
 _SECURE_CANCEL_URL = '/secure/cancel'
 _SECURE_CHANGE_WHITELIST_URL = '/secure/change_whitelist'
@@ -78,16 +78,16 @@ def GenerateTopbar():
     The topbar to display.
   """
   if users.get_current_user():
-    # TODO(user): These links should only be visible if the user is able to
-    # access them (i.e. the user is an admin or has been given permission to
-    # access these pages).
-    topbar = ('%s |  <a href="%s">Sign out</a><br/> %s | %s | %s | %s' %
+    topbar = ('%s |  <a href="%s">Sign out</a><br/>' %
               (users.get_current_user().nickname(),
-               users.create_logout_url('/'),
-               _HOME_LINK,
-               _PROFILE_LINK,
-               _MACHINE_LIST_LINK,
-               _STATS_LINK))
+               users.create_logout_url('/')))
+
+    if users.is_current_user_admin():
+      topbar += (' %s | %s | %s | %s' %
+                 (_HOME_LINK,
+                  _PROFILE_LINK,
+                  _MACHINE_LIST_LINK,
+                  _STATS_LINK))
   else:
     topbar = '<a href="%s">Sign in</a>' % users.create_login_url('/')
 
@@ -101,8 +101,8 @@ def GenerateStatLinks():
     The stat links to display.
   """
   stat_links = (
-      '<a href="/secure/graphs/daily_stats">Graph of Daily Stats</a><br/>'
-      '<a href="/secure/runner_summary"">Pending and Waiting Summary</a>')
+      '<a href="/graphs/daily_stats">Graph of Daily Stats</a><br/>'
+      '<a href="/runner_summary"">Pending and Waiting Summary</a>')
 
   return stat_links
 
@@ -1355,19 +1355,18 @@ def CreateApplication():
                                   ('/get_result', GetResultHandler),
                                   ('/get_slave_code', GetSlaveCodeHandler),
                                   ('/get_token', GetTokenHandler),
+                                  ('/graphs/daily_stats',
+                                   DailyStatsGraphHandler),
                                   ('/poll_for_test', RegisterHandler),
                                   ('/remote_error', RemoteErrorHandler),
                                   ('/result', ResultHandler),
                                   ('/runner_ping', RunnerPingHandler),
-                                  ('/secure/graphs/daily_stats',
-                                   DailyStatsGraphHandler),
+                                  ('/runner_summary', RunnerSummaryHandler),
                                   ('/secure/machine_list', MachineListHandler),
                                   ('/secure/retry', RetryHandler),
-                                  ('/secure/runner_summary',
-                                   RunnerSummaryHandler),
                                   ('/secure/show_message',
                                    ShowMessageHandler),
-                                  ('/secure/stats', StatsHandler),
+                                  ('/stats', StatsHandler),
                                   ('/task_queues/cleanup_data',
                                    CleanupDataHandler),
                                   ('/task_queues/generate_daily_stats',

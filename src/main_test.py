@@ -450,7 +450,8 @@ class AppTest(unittest.TestCase):
 
     # Handlers that are explicitly allowed to be called by anyone.
     # TODO(user): Figure out how to protected access to '/upload'.
-    allowed_urls = set(['/', '/upload'])
+    allowed_urls = set(['/', '/graphs/daily_stats', '/runner_summary', '/stats',
+                        '/upload'])
 
     # Grab the set of all routes.
     app = self.app.app
@@ -519,9 +520,9 @@ class AppTest(unittest.TestCase):
     self.assertEqual('Runner successfully pinged.', response.body)
 
   def testStatPages(self):
-    stat_urls = ['/secure/graphs/daily_stats',
-                 '/secure/runner_summary',
-                 '/secure/stats',
+    stat_urls = ['/graphs/daily_stats',
+                 '/runner_summary',
+                 '/stats',
                 ]
 
     # Create a pending runner and an active runner.
