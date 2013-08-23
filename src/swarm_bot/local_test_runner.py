@@ -123,6 +123,22 @@ def EnqueueOutput(out, queue):
   out.close()
 
 
+def _TimedOut(time_out, time_out_start):
+  """Returns true if we reached the timeout.
+
+  This function makes it easy to mock out timeouts in tests.
+
+  Args:
+    time_out: The amount of time required to time out.
+    time_out_start: The start of the time out clock.
+
+  Returns:
+    True if the given values have timed out.
+  """
+  assert time_out_start <= time.time()
+  return time_out != 0 and time_out_start + time_out < time.time()
+
+
 class Error(Exception):
   """Simple error exception properly scoped here."""
   pass
@@ -328,14 +344,18 @@ class LocalTestRunner(object):
 
     url_helper.UrlOpen(upload_url, data=data, max_tries=self.max_url_retries)
 
-  def _RunCommand(self, command, time_out, env=None):
+  def _RunCommand(self, command, hard_time_out, io_time_out, env=None):
     """Runs the given command.
 
     Args:
       command: A list containing the command to execute and its arguments.
           These will be expanded looking for environment variables.
 
-      time_out: The number of seconds to wait for output from this command.
+      hard_time_out: The maximum number of seconds to run this command for. If
+          the command takes longer than this to finish, we kill the process
+          and return an error.
+
+      io_time_out: The number of seconds to wait for output from this command.
           If the command doesn't produce any output for |time_out| seconds,
           then we kill the process and return an error.
 
@@ -344,7 +364,8 @@ class LocalTestRunner(object):
     Returns:
       A tuple containing the exit code and the stdout/stderr of the execution.
     """
-    assert isinstance(time_out, (int, float))
+    assert isinstance(hard_time_out, (int, float))
+    assert isinstance(io_time_out, (int, float))
     parsed_command = [self._ExpandEnv(arg, env) for arg in command]
 
     # Temporarily change to the specified data directory in order to run
@@ -375,7 +396,10 @@ class LocalTestRunner(object):
     stdout_thread.daemon = True  # Ensure this exits if the parent dies
     stdout_thread.start()
 
-    timeout_start_time = time.time()
+    hard_time_out_start_time = time.time()
+    hit_hard_time_out = False
+    io_time_out_start_time = time.time()
+    hit_io_time_out = False
     stdout_string = ''
     current_chunk_to_upload = ''
     upload_chunk_size = 0
@@ -386,7 +410,7 @@ class LocalTestRunner(object):
       if 'size' in self.test_run.output_destination:
         upload_chunk_size = self.test_run.output_destination['size']
 
-    while time_out == 0 or timeout_start_time + time_out > time.time():
+    while not hit_hard_time_out and not hit_io_time_out:
       try:
         exit_code = proc.poll()
       except OSError, e:
@@ -405,7 +429,7 @@ class LocalTestRunner(object):
 
       # Some output was produced so reset the timeout counter.
       if got_output:
-        timeout_start_time = time.time()
+        io_time_out_start_time = time.time()
 
       # If enough time has passed, let the server know that we are still
       # alive.
@@ -451,9 +475,21 @@ class LocalTestRunner(object):
       # before we poll it again.
       time.sleep(0.1)
 
+      if _TimedOut(hard_time_out, hard_time_out_start_time):
+        hit_hard_time_out = True
+
+      if _TimedOut(io_time_out, io_time_out_start_time):
+        hit_io_time_out = True
+
     # If we get here, it's because we timed out.
-    error_string = ('Execution of %s with pid: %d timed out after %fs!' %
-                    (parsed_command, proc.pid, time_out))
+    if hit_hard_time_out:
+      error_string = ('Execution of %s with pid: %d encountered a hard time '
+                      'out after %fs' % (parsed_command, proc.pid,
+                                         hard_time_out))
+    else:
+      error_string = ('Execution of %s with pid: %d timed out after %fs of no '
+                      'output!' % (parsed_command, proc.pid, io_time_out))
+
     logging.error(error_string)
 
     if not stdout_string:
@@ -543,7 +579,9 @@ class LocalTestRunner(object):
       if sys.platform in ('win32', 'cygwin'):
         test_env_vars = [(str(x[0]), str(x[1])) for x in test_env_vars]
 
-      (exit_code, stdout_string) = self._RunCommand(test.action, test.time_out,
+      (exit_code, stdout_string) = self._RunCommand(test.action,
+                                                    test.hard_time_out,
+                                                    test.io_time_out,
                                                     env=dict(test_env_vars))
 
       try:

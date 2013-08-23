@@ -403,7 +403,8 @@ class TestObjectTest(TestHelper):
         action=TestHelper.VALID_REQUIRED_STRING_LIST_VALUES[-1],
         env_vars=TestHelper.VALID_ENV_VARS[-1],
         decorate_output=TestHelper.VALID_BOOLEAN_VALUES[-1],
-        time_out=42)
+        hard_time_out=42,
+        io_time_out=42)
 
   def testNoReferences(self):
     # Ensure that Test Object makes copies of its input, not references.
@@ -425,7 +426,8 @@ class TestObjectTest(TestHelper):
     self.AssertValidValues('test_name', TestHelper.VALID_STRING_VALUES)
     self.AssertValidValues('action',
                            TestHelper.VALID_REQUIRED_STRING_LIST_VALUES)
-    self.AssertValidValues('time_out', [1.1, 3, 0, .00003])
+    self.AssertValidValues('hard_time_out', [1.1, 3, 0, .00003])
+    self.AssertValidValues('io_time_out', [1.1, 3, 0, .00003])
     self.AssertValidValues('decorate_output', TestHelper.VALID_BOOLEAN_VALUES)
     self.AssertValidValues('env_vars', TestHelper.VALID_ENV_VARS)
 
@@ -437,8 +439,10 @@ class TestObjectTest(TestHelper):
     self.AssertInvalidValues('action',
                              TestHelper.INVALID_REQUIRED_STRING_LIST_VALUES)
     self.test_request.action = TestHelper.VALID_REQUIRED_STRING_LIST_VALUES[0]
-    self.AssertInvalidValues('time_out', ['never', '', {}, [], (1, 2)])
-    self.test_request.time_out = None
+    self.AssertInvalidValues('hard_time_out', ['never', '', {}, [], (1, 2)])
+    self.test_request.hard_time_out = None
+    self.AssertInvalidValues('io_time_out', ['never', '', {}, [], (1, 2)])
+    self.test_request.io_time_out = None
     self.AssertInvalidValues('env_vars', TestHelper.INVALID_ENV_VARS)
     self.test_request.env_vars = None
 
@@ -557,7 +561,7 @@ class TestConfigurationTest(TestHelper):
     # Make the names different again so we can test other failures
     test_object2.test_name = '%s2' % test_object1.test_name
 
-    test_object1.time_out = 'never'
+    test_object1.io_time_out = 'never'
     test_object2.action = 'None'
     self.assertFalse(test_object1.IsValid())
     self.assertFalse(test_object2.IsValid())
@@ -729,7 +733,7 @@ class TestCaseTest(TestHelper):
     self.test_request.data = TestHelper.VALID_URL_LIST_VALUES[-1]
     self.assertTrue(self.test_request.IsValid())
 
-    test_object1.time_out = 'never'
+    test_object1.io_time_out = 'never'
     test_object2.action = 'None'
     self.assertFalse(test_object1.IsValid())
     self.assertFalse(test_object2.IsValid())
@@ -753,10 +757,7 @@ class TestCaseTest(TestHelper):
 
     invalid_store_result = (TestHelper.INVALID_STRING_VALUES +
                             ['all_results', 'some', 'mine'])
-    # pylint: disable=g-long-lambda
-    map(lambda i: self.assertFalse(i in valid_store_result),
-        invalid_store_result)
-    # pylint: enable=g-long-lambda
+    self.assertFalse(any(i in valid_store_result for i in invalid_store_result))
     self.AssertInvalidValues('store_result', invalid_store_result)
     self.test_request.store_result = None
 
@@ -915,7 +916,7 @@ class TestRunTest(TestHelper):
                              TestHelper.INVALID_URL_LOCAL_PATH_TUPLES_LISTS)
     self.test_request.data = TestHelper.VALID_URL_LIST_VALUES[-1]
 
-    test_object1.time_out = 'never'
+    test_object1.io_time_out = 'never'
     test_object2.action = 'None'
     self.assertFalse(test_object1.IsValid())
     self.assertFalse(test_object2.IsValid())

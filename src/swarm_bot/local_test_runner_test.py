@@ -60,9 +60,9 @@ class TestLocalTestRunner(unittest.TestCase):
     """Creates a text file that the local_test_runner can load.
 
     Args:
-      test_objects_data: An array of 5-tuples with (test_name, action,
-          decorate_output, time_out) values them. A TestObject will be created
-          for each of them.
+      test_objects_data: An array of 6-tuples with (test_name, action,
+          decorate_output, env_vars, hard_time_out, io_time_out) values them.
+          A TestObject will be created for each of them.
       test_run_data: The data list to be passed to the TestRun object.
       test_run_cleanup: The cleanup string to be passed to the TestRun object.
       config_env: The dictionary to be used for the configuration's env_vars.
@@ -70,7 +70,7 @@ class TestLocalTestRunner(unittest.TestCase):
       test_encoding: The enocding to use for the test's output.
     """
     if not test_objects_data:
-      test_objects_data = [('a', ['a'], None, None, 0)]
+      test_objects_data = [('a', ['a'], None, None, 0, 0)]
     if not test_run_data:
       test_run_data = []
 
@@ -85,7 +85,7 @@ class TestLocalTestRunner(unittest.TestCase):
       test_objects.append(test_request_message.TestObject(
           test_name=test_object_data[0], action=test_object_data[1],
           decorate_output=test_object_data[2], env_vars=test_object_data[3],
-          time_out=test_object_data[4]))
+          hard_time_out=test_object_data[4], io_time_out=test_object_data[5]))
     test_run = test_request_message.TestRun(
         test_run_name=self.test_run_name, env_vars=test_run_env,
         data=test_run_data, configuration=test_config,
@@ -168,25 +168,64 @@ class TestLocalTestRunner(unittest.TestCase):
 
     self.CreateValidFile()
     runner = local_test_runner.LocalTestRunner(self.data_file_name)
-    (exit_code_ret, result_string_ret) = runner._RunCommand(cmd, time_out=0)
+    (exit_code_ret, result_string_ret) = runner._RunCommand(cmd, 0, 0)
     self.assertEqual(exit_code_ret, exit_code)
     self.assertEqual(result_string_ret, self.result_string)
 
     self._mox.VerifyAll()
 
-  def testRunCommandTimeout(self):
+  def testRunCommandHardTimeout(self):
     cmd = ['a']
     self.PrepareRunCommandCall(cmd)
-    self.mock_proc.poll().MultipleTimes().AndReturn(None)
+
     self.mock_proc.pid = 42
+    self.mock_proc.poll().AndReturn(None)
     self._mox.StubOutWithMock(os, 'chdir')
     os.chdir(mox.IsA(str)).AndReturn(None)
     os.chdir(mox.IsA(str)).AndReturn(None)
+
+    self._mox.StubOutWithMock(local_test_runner, '_TimedOut')
+    # Ensure the hard limit is hit.
+    local_test_runner._TimedOut(1, mox.IgnoreArg()).AndReturn(
+        True)
+    # Ensure the IO time limit isn't hit.
+    local_test_runner._TimedOut(0, mox.IgnoreArg()).AndReturn(
+        True)
+
     self._mox.ReplayAll()
 
     self.CreateValidFile()
     runner = local_test_runner.LocalTestRunner(self.data_file_name)
-    (exit_code, result_string) = runner._RunCommand(cmd, time_out=0.2)
+    (exit_code, result_string) = runner._RunCommand(cmd, 1, 0)
+    self.assertNotEqual(exit_code, 0)
+    self.assertTrue(result_string)
+    self.assertIn(str(self.mock_proc.pid), result_string)
+
+    self._mox.VerifyAll()
+
+  def testRunCommandIOTimeout(self):
+    cmd = ['a']
+    self.PrepareRunCommandCall(cmd)
+
+    self.mock_proc.pid = 42
+    self.mock_proc.poll().AndReturn(None)
+    self._mox.StubOutWithMock(os, 'chdir')
+    os.chdir(mox.IsA(str)).AndReturn(None)
+    os.chdir(mox.IsA(str)).AndReturn(None)
+
+    self._mox.StubOutWithMock(local_test_runner, '_TimedOut')
+    # The hard limit isn't hit
+    local_test_runner._TimedOut(1, mox.IgnoreArg()).AndReturn(
+        False)
+    # Ensure the IO time limit is hit.
+    local_test_runner._TimedOut(0, mox.IgnoreArg()).AndReturn(
+        True)
+
+    self._mox.ReplayAll()
+
+    self.CreateValidFile()
+    runner = local_test_runner.LocalTestRunner(self.data_file_name)
+    (exit_code, result_string) = runner._RunCommand(cmd, 1, 0)
     self.assertNotEqual(exit_code, 0)
     self.assertTrue(result_string)
     self.assertIn(str(self.mock_proc.pid), result_string)
@@ -218,7 +257,7 @@ class TestLocalTestRunner(unittest.TestCase):
 
     self.CreateValidFile()
     runner = local_test_runner.LocalTestRunner(self.data_file_name)
-    (exit_code_ret, result_string_ret) = runner._RunCommand(cmd, time_out=0)
+    (exit_code_ret, result_string_ret) = runner._RunCommand(cmd, 0, 0)
     self.assertEqual(exit_code_ret, exit_code)
     self.assertEqual(result_string_ret, self.result_string)
 
@@ -311,8 +350,8 @@ class TestLocalTestRunner(unittest.TestCase):
       test0_env = test_env[0]
       test1_env = test_env[1]
     test_objects_data = [
-        (test_names[0], self.action1, decorate_output[0], test0_env, 0),
-        (test_names[1], self.action2, decorate_output[1], test1_env, 9)
+        (test_names[0], self.action1, decorate_output[0], test0_env, 60, 0),
+        (test_names[1], self.action2, decorate_output[1], test1_env, 60, 9)
     ]
     self.assertEqual(len(decorate_output), len(results))
     self.CreateValidFile(test_objects_data=test_objects_data,
@@ -330,11 +369,11 @@ class TestLocalTestRunner(unittest.TestCase):
 
     if test0_env:
       env = dict(env_items + test0_env.items())
-    self.runner._RunCommand(self.action1, 0, env=env).AndReturn((results[0]))
+    self.runner._RunCommand(self.action1, 60, 0, env=env).AndReturn(results[0])
 
     if test1_env:
       env = dict(env_items + test1_env.items())
-    self.runner._RunCommand(self.action2, 9, env=env).AndReturn((results[1]))
+    self.runner._RunCommand(self.action2, 60, 9, env=env).AndReturn(results[1])
 
   def testRunTests(self):
     self.PrepareRunTestsCall(decorate_output=[True, True])
@@ -540,7 +579,7 @@ class TestLocalTestRunner(unittest.TestCase):
     self._mox.ReplayAll()
 
     runner = local_test_runner.LocalTestRunner(self.data_file_name)
-    (exit_code_ret, result_string_ret) = runner._RunCommand(cmd, time_out=0)
+    (exit_code_ret, result_string_ret) = runner._RunCommand(cmd, 0, 0)
     self.assertEqual(exit_code_ret, exit_code)
     self.assertEqual(result_string_ret, 'No output!')
     self.assertEqual(self.streamed_output, ''.join(stdout_contents))

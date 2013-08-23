@@ -668,11 +668,13 @@ class TestObject(TestRequestMessageBase):
     env_vars: An optional dictionary for environment variables.
     action: The action list of this test object.
     decorate_output: The output decoration flag of this test object.
-    time_out: The time out value of this test object.
+    hard_time_out: The maximum time this test can take.
+    io_time_out: The maximum time this test can take (resetting anytime the
+        test writes to stdout).
   """
 
   def __init__(self, test_name=None, env_vars=None, action=None,
-               decorate_output=True, time_out=1200.0):
+               decorate_output=True, hard_time_out=3600.0, io_time_out=1200.0):
     super(TestObject, self).__init__()
     self.test_name = test_name
     if env_vars:
@@ -684,7 +686,8 @@ class TestObject(TestRequestMessageBase):
     else:
       self.action = []
     self.decorate_output = decorate_output
-    self.time_out = time_out
+    self.hard_time_out = hard_time_out
+    self.io_time_out = io_time_out
 
   def IsValid(self, errors=None):
     """Identifies if the current content is valid.
@@ -702,8 +705,8 @@ class TestObject(TestRequestMessageBase):
                                errors=errors) or
         not self.AreValidLists(['action'], basestring, required=True,
                                errors=errors) or
-        not self.AreValidValues(['time_out'], (int, long, float),
-                                errors=errors)):
+        not self.AreValidValues(['hard_time_out', 'io_time_out'],
+                                (int, long, float), errors=errors)):
       self.LogError('Invalid TestObject: %s' % self.__dict__, errors)
       return False
 
