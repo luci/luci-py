@@ -451,7 +451,7 @@ class AppTest(unittest.TestCase):
     # Handlers that are explicitly allowed to be called by anyone.
     # TODO(user): Figure out how to protected access to '/upload'.
     allowed_urls = set(['/', '/graphs/daily_stats', '/runner_summary', '/stats',
-                        '/upload'])
+                        '/upload', '/waits_by_minute'])
 
     # Grab the set of all routes.
     app = self.app.app
@@ -523,17 +523,23 @@ class AppTest(unittest.TestCase):
     stat_urls = ['/graphs/daily_stats',
                  '/runner_summary',
                  '/stats',
+                 '/waits_by_minute',
                 ]
 
-    # Create a pending runner and an active runner.
-    runner = test_helper.CreatePendingRunner()
+    # Create a pending, active and done runner.
+    test_helper.CreatePendingRunner()
     test_helper.CreatePendingRunner(machine_id=MACHINE_ID)
+    runner = test_helper.CreatePendingRunner(machine_id=MACHINE_ID)
+    runner.UpdateTestResult(machine_id=MACHINE_ID)
 
     # Ensure the dimension mapping is created.
     dimension_mapping.DimensionMapping(dimensions=runner.dimensions).put()
 
     # Ensure a RunnerSummary is created.
     runner_summary.GenerateSnapshotSummary()
+
+    # Ensure wait stats are generated.
+    runner_summary.GenerateWaitSummary()
 
     self._mox.StubOutWithMock(main_app.template, 'render')
     for _ in range(len(stat_urls)):

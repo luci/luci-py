@@ -281,6 +281,44 @@ def GetRunnerWaitStats(days_to_show):
   return results
 
 
+def GetRunnerWaitStatsBreakdown(days_to_show):
+  """Returns the runner wait times, broken down by minute.
+
+  Args:
+    days_to_show: The number of days to return the wait times for.
+
+  Returns:
+    A dictionary where the key is the dimenion, and the value is a list of
+    how many runners waited that many minutes (index 0 waited 0 minute, index 1
+    waited 1 minute, etc).
+  """
+  dimension_median_buckets = {}
+  cutoff_date = datetime.datetime.today() - datetime.timedelta(
+      days=days_to_show)
+
+  # Sum up all the collections.
+  dimension_wait_summary_query = DimensionWaitSummary.query(
+      DimensionWaitSummary.end_time > cutoff_date)
+  for dimension_wait in dimension_wait_summary_query:
+    dimension_median_buckets.setdefault(
+        dimension_wait.dimensions, collections.Counter()).update(
+            json.loads(dimension_wait.median_buckets))
+
+  # Convert the collections to the correct output format.
+  results = {}
+  for dimensions, median_bucket in dimension_median_buckets.iteritems():
+    for minute, count in median_bucket.iteritems():
+      median_list = results.setdefault(dimensions, [])
+      minute = int(minute)
+
+      if len(median_list) <= minute:
+        median_list.extend([0] * (minute - len(median_list) + 1))
+
+      median_list[minute] += count
+
+  return results
+
+
 def _GetCurrentTime():
   """Gets the current time.
 

@@ -1162,7 +1162,7 @@ class RunnerSummaryHandler(webapp2.RequestHandler):
 
     params = {
         'topbar': GenerateTopbar(),
-        'stats_links': GenerateStatLinks(),
+        'stat_links': GenerateStatLinks(),
         'total_pending_runners': total_pending,
         'total_running_runners': total_running,
         'snapshot_summary': snapshot_summary,
@@ -1312,6 +1312,25 @@ class UploadHandler(blobstore_handlers.BlobstoreUploadHandler):
     self.response.out.write(blob_info.key())
 
 
+class WaitsByMinuteHandler(webapp2.RequestHandler):
+  """Handler for displaying the wait times, broken by minute, per dimensions."""
+
+  def get(self):  # pylint: disable=g-bad-name
+    days_to_show = DaysToShow(self.request)
+
+    params = {
+        'topbar': GenerateTopbar(),
+        'stat_links': GenerateStatLinks(),
+        'days_to_show': days_to_show,
+        'max_days_to_show': range(1, runner_summary.WAIT_SUMMARY_LIFE_IN_DAYS),
+        'wait_breakdown': runner_summary.GetRunnerWaitStatsBreakdown(
+            days_to_show)
+    }
+
+    path = os.path.join(os.path.dirname(__file__), 'waits_by_minute.html')
+    self.response.out.write(template.render(path, params))
+
+
 def SendAuthenticationFailure(request, response):
   """Writes an authentication failure error message to response with status.
 
@@ -1389,6 +1408,7 @@ def CreateApplication():
                                    TriggerGenerateRecentStats),
                                   ('/test', TestRequestHandler),
                                   ('/upload', UploadHandler),
+                                  ('/waits_by_minute', WaitsByMinuteHandler),
                                   (_SECURE_CANCEL_URL, CancelHandler),
                                   (_SECURE_CHANGE_WHITELIST_URL,
                                    ChangeWhitelistHandler),

@@ -318,6 +318,51 @@ class RunnerSummaryTest(unittest.TestCase):
 
     self.assertEqual({}, runner_summary.GetRunnerWaitStats(1))
 
+  def testGetRunnerWaitStatsBreakdown(self):
+    self.assertEqual({}, runner_summary.GetRunnerWaitStatsBreakdown(1))
+
+    # Add data that is too old and ensure it is ignored.
+    wait_summary = _CreateWaitSummary(end_time=(datetime.datetime.now() -
+                                                datetime.timedelta(days=2)))
+    dimensions = 'machine_dimensions'
+    dimension_wait = runner_summary.DimensionWaitSummary(
+        dimensions=dimensions,
+        num_runners=1,
+        mean_wait=1,
+        median_buckets=json.dumps({'0': 1}),
+        summary_parent=wait_summary.key)
+    dimension_wait.put()
+
+    self.assertEqual({}, runner_summary.GetRunnerWaitStatsBreakdown(1))
+
+    # Add data that should be returned.
+    wait_summary = _CreateWaitSummary()
+    dimension_wait = runner_summary.DimensionWaitSummary(
+        dimensions=dimensions,
+        num_runners=1,
+        mean_wait=1,
+        median_buckets=json.dumps({'0': 1, '5': 3}),
+        summary_parent=wait_summary.key)
+    dimension_wait.put()
+
+    expected_output = {dimensions: [1, 0, 0, 0, 0, 3]}
+    self.assertEqual(expected_output,
+                     runner_summary.GetRunnerWaitStatsBreakdown(1))
+
+    # Add a second set of data to ensure it is properly added to the first one.
+    wait_summary = _CreateWaitSummary()
+    dimension_wait = runner_summary.DimensionWaitSummary(
+        dimensions=dimensions,
+        num_runners=1,
+        mean_wait=1,
+        median_buckets=json.dumps({'0': 1, '3': 2}),
+        summary_parent=wait_summary.key)
+    dimension_wait.put()
+
+    expected_output = {dimensions: [2, 0, 0, 2, 0, 3]}
+    self.assertEqual(expected_output,
+                     runner_summary.GetRunnerWaitStatsBreakdown(1))
+
   def testDeleteOldWaitStats(self):
     self._mox.StubOutWithMock(runner_summary, '_GetCurrentTime')
 
