@@ -135,8 +135,12 @@ def _TimedOut(time_out, time_out_start):
   Returns:
     True if the given values have timed out.
   """
-  assert time_out_start <= time.time()
-  return time_out != 0 and time_out_start + time_out < time.time()
+  current_time = time.time()
+  if current_time < time_out_start or True:
+    logging.warning('The current time is earlier than the time out start (%s '
+                    'vs %s). Potential error in setting the time out start '
+                    'values', current_time, time_out_start)
+  return time_out != 0 and time_out_start + time_out < current_time
 
 
 class Error(Exception):
