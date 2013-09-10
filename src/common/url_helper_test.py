@@ -56,8 +56,9 @@ class UrlHelperTest(unittest.TestCase):
     url = 'http://my.url.com'
 
     response = 'True'
-    url_helper.urllib2.urlopen(mox.StrContains(url)).AndReturn(
-        StringIO.StringIO(response))
+    url_helper.urllib2.urlopen(mox.StrContains(url),
+                               timeout=mox.IgnoreArg()).AndReturn(
+                                   StringIO.StringIO(response))
 
     self._mox.ReplayAll()
 
@@ -69,8 +70,9 @@ class UrlHelperTest(unittest.TestCase):
     url = 'http://my.url.com'
 
     response = 'True'
-    url_helper.urllib2.urlopen(url, mox.IgnoreArg()).AndReturn(
-        StringIO.StringIO(response))
+    url_helper.urllib2.urlopen(url, mox.IgnoreArg(),
+                               timeout=mox.IgnoreArg()).AndReturn(
+                                   StringIO.StringIO(response))
 
     self._mox.ReplayAll()
 
@@ -83,8 +85,9 @@ class UrlHelperTest(unittest.TestCase):
     url = 'http://my.url.com'
 
     response = 'True'
-    url_helper.urllib2.urlopen(mox.IsA(urllib2.Request)).AndReturn(
-        StringIO.StringIO(response))
+    url_helper.urllib2.urlopen(
+        mox.IsA(urllib2.Request), timeout=mox.IgnoreArg()).AndReturn(
+            StringIO.StringIO(response))
 
     self._mox.ReplayAll()
 
@@ -95,11 +98,13 @@ class UrlHelperTest(unittest.TestCase):
 
   def testUrlOpenSuccessAfterFailure(self):
     url_helper.urllib2.urlopen(
-        mox.IgnoreArg(), mox.IgnoreArg()).AndRaise(urllib2.URLError('url'))
+        mox.IgnoreArg(), mox.IgnoreArg(), timeout=mox.IgnoreArg()).AndRaise(
+            urllib2.URLError('url'))
     time.sleep(mox.IgnoreArg())
     response = 'True'
-    url_helper.urllib2.urlopen(mox.IgnoreArg(), mox.IgnoreArg()).AndReturn(
-        StringIO.StringIO(response))
+    url_helper.urllib2.urlopen(mox.IgnoreArg(), mox.IgnoreArg(),
+                               timeout=mox.IgnoreArg()).AndReturn(
+                                   StringIO.StringIO(response))
 
     self._mox.ReplayAll()
 
@@ -109,7 +114,8 @@ class UrlHelperTest(unittest.TestCase):
 
   def testUrlOpenFailure(self):
     url_helper.urllib2.urlopen(
-        mox.IgnoreArg(), mox.IgnoreArg()).AndRaise(urllib2.URLError('url'))
+        mox.IgnoreArg(), mox.IgnoreArg(), timeout=mox.IgnoreArg()).AndRaise(
+            urllib2.URLError('url'))
     logging.error(mox.IgnoreArg(), mox.IgnoreArg(), mox.IgnoreArg())
 
     self._mox.ReplayAll()
@@ -120,7 +126,7 @@ class UrlHelperTest(unittest.TestCase):
 
   def testUrlOpenHTTPErrorNoRetry(self):
     url_helper.urllib2.urlopen(
-        mox.IgnoreArg(), mox.IgnoreArg()).AndRaise(
+        mox.IgnoreArg(), mox.IgnoreArg(), timeout=mox.IgnoreArg()).AndRaise(
             urllib2.HTTPError('url', 400, 'error message', None, None))
     logging.exception(mox.IgnoreArg(), mox.IgnoreArg(), mox.IgnoreArg())
 
@@ -137,7 +143,7 @@ class UrlHelperTest(unittest.TestCase):
 
     # Urlopen failure attempt.
     url_helper.urllib2.urlopen(
-        mox.IgnoreArg(), mox.IgnoreArg()).AndRaise(
+        mox.IgnoreArg(), mox.IgnoreArg(), timeout=mox.IgnoreArg()).AndRaise(
             urllib2.HTTPError('url', 500, 'error message', None, None))
     logging.warning(mox.IgnoreArg(), mox.IgnoreArg(), mox.IgnoreArg(),
                     mox.IgnoreArg())
@@ -145,7 +151,8 @@ class UrlHelperTest(unittest.TestCase):
 
     # Urlopen success attempt.
     url_helper.urllib2.urlopen(
-        mox.IgnoreArg(), mox.IgnoreArg()).AndReturn(StringIO.StringIO(response))
+        mox.IgnoreArg(), mox.IgnoreArg(), timeout=mox.IgnoreArg()).AndReturn(
+            StringIO.StringIO(response))
 
     self._mox.ReplayAll()
 
@@ -161,7 +168,8 @@ class UrlHelperTest(unittest.TestCase):
       encoded_data = urllib.urlencode({url_helper.COUNT_KEY: i})
 
       url_helper.urllib2.urlopen(
-          mox.IgnoreArg(), encoded_data).AndRaise(urllib2.URLError('url'))
+          mox.IgnoreArg(), encoded_data, timeout=mox.IgnoreArg()).AndRaise(
+              urllib2.URLError('url'))
       logging.info(mox.IgnoreArg(), mox.IgnoreArg(), mox.IgnoreArg(),
                    mox.IgnoreArg())
       if i != attempts - 1:
@@ -187,8 +195,9 @@ class UrlHelperTest(unittest.TestCase):
     url = 'http://my.url.com'
 
     response = 'True'
-    url_helper.urllib2.urlopen(mox.StrContains(url), mox.IgnoreArg()).AndReturn(
-        StringIO.StringIO(response))
+    url_helper.urllib2.urlopen(mox.StrContains(url), mox.IgnoreArg(),
+                               timeout=mox.IgnoreArg()).AndReturn(
+                                   StringIO.StringIO(response))
 
     self._mox.ReplayAll()
 

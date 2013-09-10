@@ -288,6 +288,7 @@ class SlaveMachine(object):
         remaining_iterations -= 1
 
       if not ShouldRun(remaining_iterations):
+        logging.debug('No more iterations to run, stopping slave.')
         break
 
   def _ProcessResponse(self, response):

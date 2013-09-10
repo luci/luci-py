@@ -27,6 +27,9 @@ RESULT_STRING_KEY = 'result_output'
 # The index of the query elements from urlparse.
 QUERY_INDEX = 4
 
+# The timeout to apply whenever opening a url.
+URL_OPEN_TIMEOUT = 5 * 60
+
 
 def UrlOpen(url, data=None, files=None, max_tries=5, wait_duration=None,
             method='POST'):
@@ -89,15 +92,16 @@ def UrlOpen(url, data=None, files=None, max_tries=5, wait_duration=None,
         request.add_header('Content-Type', content_type)
         request.add_header('Content-Length', len(body))
 
-        url_response = urllib2.urlopen(request).read()
+        url_response = urllib2.urlopen(request, timeout=URL_OPEN_TIMEOUT).read()
       elif method == 'POST':
         # Simply specifying data to urlopen makes it a POST.
-        url_response = urllib2.urlopen(url, encoded_data).read()
+        url_response = urllib2.urlopen(url, encoded_data,
+                                       timeout=URL_OPEN_TIMEOUT).read()
       else:
         url_parts = list(urlparse.urlparse(url))
         url_parts[QUERY_INDEX] = encoded_data
         url = urlparse.urlunparse(url_parts)
-        url_response = urllib2.urlopen(url).read()
+        url_response = urllib2.urlopen(url, timeout=URL_OPEN_TIMEOUT).read()
     except urllib2.HTTPError as e:
       if e.code >= 500:
         # The HTTPError was due to a server error, so retry the attempt.
