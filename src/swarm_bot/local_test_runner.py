@@ -136,7 +136,7 @@ def _TimedOut(time_out, time_out_start):
     True if the given values have timed out.
   """
   current_time = time.time()
-  if current_time < time_out_start or True:
+  if current_time < time_out_start:
     logging.warning('The current time is earlier than the time out start (%s '
                     'vs %s). Potential error in setting the time out start '
                     'values', current_time, time_out_start)
