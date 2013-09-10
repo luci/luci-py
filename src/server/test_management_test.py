@@ -78,7 +78,7 @@ class TestManagementTest(unittest.TestCase):
 
     return 'this is a bad request.'
 
-  def _GetMachineRegisterRequest(self, machine_id=None, username=None,
+  def _GetMachineRegisterRequest(self, machine_id=MACHINE_IDS[0], username=None,
                                  password=None, tag=None, try_count=None,
                                  version=None, platform='win-xp'):
     """Return a properly formatted register machine request.
@@ -617,11 +617,11 @@ class TestManagementTest(unittest.TestCase):
     self.assertEqual(expected_count, tests.count())
 
   def testNoPendingTestsOnRegisterNoTryCount(self):
-    # A machine registers itself without an id and there are no tests pending.
-    response = self._ExecuteRegister(machine_id=None,
+    # A machine registers itself and there are no tests pending.
+    response = self._ExecuteRegister(MACHINE_IDS[0],
                                      register_should_match=False)
 
-    expected_keys = ['try_count', 'come_back', 'id']
+    expected_keys = ['try_count', 'come_back']
 
     self.assertEqual(response.keys().sort(), expected_keys.sort())
     self.assertEqual(response['try_count'], 1)
@@ -630,12 +630,13 @@ class TestManagementTest(unittest.TestCase):
     self.assertEqual(0, test_runner.TestRunner.query().count())
 
   def testNoPendingTestsOnRegisterWithTryCount(self):
-    # A machine registers itself without an id and there are no tests pending
+    # A machine registers itself and there are no tests pending
     try_count = 1234
-    response = self._ExecuteRegister(machine_id=None, try_count=try_count,
+    response = self._ExecuteRegister(MACHINE_IDS[0],
+                                     try_count=try_count,
                                      register_should_match=False)
 
-    expected_keys = ['try_count', 'come_back', 'id']
+    expected_keys = ['try_count', 'come_back']
 
     self.assertEqual(response.keys().sort(), expected_keys.sort())
     self.assertEqual(response['try_count'], try_count+1)
@@ -657,60 +658,50 @@ class TestManagementTest(unittest.TestCase):
 
   def testValidateAndFixAttributes(self):
     # Test test_management.ValidateAndFixAttributes
-    attributes = {}
+    attributes = {'id': MACHINE_IDS[0]}
     self.assertRaisesRegexp(test_request_message.Error,
                             r'Missing mandatory attribute: dimensions',
                             test_management.ValidateAndFixAttributes,
                             attributes)
 
     # Test with empty dimensions.
-    attributes = {'dimensions': ''}
+    attributes = {'dimensions': '',
+                  'id': MACHINE_IDS[0]}
     self.assertRaisesRegexp(test_request_message.Error,
                             r'Invalid attrib value for dimensions',
                             test_management.ValidateAndFixAttributes,
                             attributes)
 
-    attributes = {'dimensions': {'os': 'win-xp'}}
+    attributes = {'dimensions': {'os': 'win-xp'},
+                  'id': MACHINE_IDS[0]}
     result = test_management.ValidateAndFixAttributes(attributes)
-    self.assertIn('id', result)
 
     # Test with invalid attribute types.
-    attributes = {'dimensions': {'os': 'win-xp'}, 'tag': 10}
+    attributes = {'dimensions': {'os': 'win-xp'},
+                  'id': MACHINE_IDS[0],
+                  'tag': 10}
     self.assertRaisesRegexp(test_request_message.Error,
                             r'Invalid attrib value type for tag',
                             test_management.ValidateAndFixAttributes,
                             attributes)
 
-    # Test with invalid id type (int), which should be replaced.
+    # Test with invalid id type.
     invalid_id_type = 10
-    attributes = {'dimensions': {'os': 'win-xp'}, 'id': invalid_id_type}
-    results = test_management.ValidateAndFixAttributes(attributes)
-    self.assertNotEqual(invalid_id_type, results['id'])
-
-    # Test with special id type: None.
-    attributes = {'dimensions': {'os': 'win-xp'}, 'id': None}
-    result = test_management.ValidateAndFixAttributes(attributes)
-    self.assertTrue('id' in result)
-    self.assertNotEqual(result['id'], None)
-
-    # Test with invalid id value.
-    invalid_id_value = '12345'
-    attributes = {'dimensions': {'os': 'win-xp'}, 'id': invalid_id_value}
-    response = test_management.ValidateAndFixAttributes(attributes)
-    self.assertNotEqual(invalid_id_value, response['id'])
+    attributes = {'dimensions': {'os': 'win-xp'},
+                  'id': invalid_id_type}
+    self.assertRaisesRegexp(test_request_message.Error,
+                            r'Invalid attrib value for id',
+                            test_management.ValidateAndFixAttributes,
+                            attributes)
 
     # Test with invalid attribute name.
-    attributes = {'dimensions': {'os': 'win-xp'}, 'wrong': 'invalid'}
+    attributes = {'dimensions': {'os': 'win-xp'},
+                  'id': MACHINE_IDS[0],
+                  'wrong': 'invalid'}
     self.assertRaisesRegexp(test_request_message.Error,
                             r'Invalid attribute to machine: wrong',
                             test_management.ValidateAndFixAttributes,
                             attributes)
-
-    # Make sure machine id is not regenerated every time.
-    attributes = {'dimensions': {'os': 'win-xp'},
-                  'id': MACHINE_IDS[0]}
-    result = test_management.ValidateAndFixAttributes(attributes)
-    self.assertEqual(MACHINE_IDS[0], result['id'])
 
     # Test with missing try_count and make sure its set to 0.
     attributes = {'dimensions': {'os': 'win-xp'},
@@ -720,6 +711,7 @@ class TestManagementTest(unittest.TestCase):
 
     # Make sure version is accepted.
     attributes = {'dimensions': {'os': 'win-xp'},
+                  'id': MACHINE_IDS[0],
                   'version': hashlib.sha1().hexdigest()}
     result = test_management.ValidateAndFixAttributes(attributes)
 
@@ -796,13 +788,15 @@ class TestManagementTest(unittest.TestCase):
     # Ensure query is recorded, even though there was no match.
     nonmatching_config = 'win-vista'
     test_management.ExecuteRegisterRequest(
-        self._GetMachineRegisterRequest(platform=nonmatching_config),
+        self._GetMachineRegisterRequest(machine_id=MACHINE_IDS[0],
+                                        platform=nonmatching_config),
         self._SERVER_URL)
     self.assertEqual(1, machine_stats.MachineStats.query().count())
 
     # Ensure the query is recorded.
     test_management.ExecuteRegisterRequest(
-        self._GetMachineRegisterRequest(platform=matching_config),
+        self._GetMachineRegisterRequest(machine_id=MACHINE_IDS[1],
+                                        platform=matching_config),
         self._SERVER_URL)
     self.assertEqual(2, machine_stats.MachineStats.query().count())
 
@@ -815,7 +809,6 @@ class TestManagementTest(unittest.TestCase):
         self._GetMachineRegisterRequest(version=version),
         self._SERVER_URL)
 
-    self.assertTrue('id' in response)
     self.assertTrue('try_count' in response)
     self.assertTrue('commands' in response)
     self.assertTrue('result_url' in response)

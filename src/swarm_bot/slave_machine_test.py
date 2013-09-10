@@ -9,9 +9,9 @@
 import json
 import logging
 import os
+import socket
 import subprocess
 import sys
-import tempfile
 import time
 import unittest
 
@@ -47,19 +47,16 @@ class TestSlaveMachine(unittest.TestCase):
     self._mox.UnsetStubs()
     self._mox.ResetAll()
 
-  def _CreateValidAttribs(self, machine_id=None, try_count=0):
+  def _CreateValidAttribs(self, try_count=0):
     attributes = VALID_ATTRIBUTES.copy()
-    attributes['id'] = machine_id
+    attributes['id'] = socket.getfqdn()
     attributes['try_count'] = try_count
     return {'attributes': json.dumps(attributes)}
 
-  def _CreateResponse(self, machine_id=MACHINE_ID_1, come_back=None,
-                      try_count=1, commands=None, result_url=None,
-                      extra_arg=None):
+  def _CreateResponse(self, come_back=None, try_count=1, commands=None,
+                      result_url=None, extra_arg=None):
     response = {}
 
-    if machine_id is not None:
-      response['id'] = machine_id
     if come_back is not None:
       response['come_back'] = come_back
     if try_count is not None:
@@ -148,35 +145,6 @@ class TestSlaveMachine(unittest.TestCase):
     else:
       subprocess.check_call(commands)
 
-  def testLoadAndSavingMachineId(self):
-    invalid_id = '12345'
-    come_back = 5.0
-    response = self._CreateResponse(MACHINE_ID_1, come_back=come_back)
-
-    url_helper.UrlOpen(
-        mox.IgnoreArg(),
-        data=self._CreateValidAttribs(machine_id=invalid_id),
-        max_tries=mox.IgnoreArg()).AndReturn(response)
-    time.sleep(come_back)
-
-    self._mox.ReplayAll()
-
-    id_file = tempfile.NamedTemporaryFile(delete=False)
-    try:
-      id_file.write(invalid_id)
-      id_file.close()
-
-      slave = slave_machine.SlaveMachine(attributes=VALID_ATTRIBUTES,
-                                         id_filename=id_file.name)
-      slave.Start(iterations=1)
-
-      with open(id_file.name) as f:
-        self.assertEqual(MACHINE_ID_1, f.read())
-    finally:
-      os.remove(id_file.name)
-
-    self._mox.VerifyAll()
-
   # Test with an invalid URL and try until it raises an exception.
   def testInvalidURLWithException(self):
     max_url_tries = 5
@@ -242,23 +210,6 @@ class TestSlaveMachine(unittest.TestCase):
                                            "set(['come_back'])",
                                            url=mox.IgnoreArg(),
                                            data=mox.IgnoreArg())
-    self._mox.ReplayAll()
-
-    slave = slave_machine.SlaveMachine()
-    slave.Start(iterations=1)
-
-    self._mox.VerifyAll()
-
-  # Test with missing mandatory fields in response: id.
-  def testMissingID(self):
-    response = self._CreateResponse(machine_id=None, come_back=2)
-
-    self._SetPollJobAndLogFailExpectations(response,
-                                           'Missing fields in response: '
-                                           "set(['id'])",
-                                           url=mox.IgnoreArg(),
-                                           data=mox.IgnoreArg())
-
     self._mox.ReplayAll()
 
     slave = slave_machine.SlaveMachine()
@@ -548,42 +499,6 @@ class TestSlaveMachine(unittest.TestCase):
     self._mox.ReplayAll()
 
     slave = slave_machine.SlaveMachine()
-    slave.Start(iterations=len(response))
-
-    self._mox.VerifyAll()
-
-  # Make sure the slave keeps echoing the id given to them
-  # every time, not just the first time.
-  def testEchoValues(self):
-    come_back = 2.0
-    try_count = 1
-    message = 'blah blah blah'
-    response = [self._CreateResponse(come_back=come_back, try_count=try_count),
-                self._CreateResponse(come_back=come_back, try_count=try_count),
-                self._CreateResponse(come_back=come_back, try_count=try_count),
-                message]
-
-    # The calls we expect. The last three ensure the slave echos
-    # back the id assigned by the server.
-    call = [self._CreateValidAttribs(),
-            self._CreateValidAttribs(MACHINE_ID_1, try_count=try_count),
-            self._CreateValidAttribs(MACHINE_ID_1, try_count=try_count),
-            self._CreateValidAttribs(MACHINE_ID_1, try_count=try_count)]
-
-    for i in range(len(response)):
-      if i < len(response) - 1:
-        url_helper.UrlOpen(
-            mox.IgnoreArg(), data=call[i], max_tries=mox.IgnoreArg()
-            ).AndReturn(response[i])
-        time.sleep(come_back)
-      else:
-        self._SetPollJobAndLogFailExpectations(
-            response[i], 'Invalid response: ' + message,
-            mox.IgnoreArg(), mox.IgnoreArg())
-
-    self._mox.ReplayAll()
-
-    slave = slave_machine.SlaveMachine(attributes=VALID_ATTRIBUTES)
     slave.Start(iterations=len(response))
 
     self._mox.VerifyAll()

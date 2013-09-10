@@ -20,6 +20,7 @@ import logging
 import logging.handlers
 import optparse
 import os
+import socket
 import subprocess
 import sys
 import time
@@ -30,9 +31,6 @@ from common import url_helper
 from common import version
 # pylint: enable=g-import-not-at-top
 
-
-# The default name of the text file containing the machine id of this machine.
-DEFAULT_MACHINE_ID_FILE = 'swarm_bot.id'
 
 # The zip file to contain the zipped slave code.
 ZIPPED_SLAVE_FILES = 'slave_files.zip'
@@ -209,7 +207,7 @@ class SlaveMachine(object):
   """Creates a slave that continuously polls the Swarm server for jobs."""
 
   def __init__(self, url='https://localhost:443', attributes=None,
-               max_url_tries=1, id_filename=None):
+               max_url_tries=1):
     """Sets the parameters of the slave.
 
     Args:
@@ -218,25 +216,16 @@ class SlaveMachine(object):
           machine dimensions as well.
       max_url_tries: The maximum number of consecutive url errors to accept
           before throwing an exception.
-      id_filename: The name of the file where the initial machine id should be
-          load from, and where any changes should be saved to.
-
     """
     self._url = url
     self._attributes = attributes.copy() if attributes else {}
     self._result_url = None
-    self._attributes['id'] = None
+    # The fully qualified domain name will uniquely identify this machine
+    # to the server, so we can use it to give a deterministic id for this slave.
+    self._attributes['id'] = socket.getfqdn()
     self._attributes['try_count'] = 0
     self._attributes['version'] = version.GenerateSwarmSlaveVersion(__file__)
     self._come_back = 0
-    self._id_filename = id_filename
-
-    if self._id_filename and os.path.exists(self._id_filename):
-      with open(self._id_filename, 'r') as f:
-        # If this id is invalid the server will ignore it and generate a new
-        # id for this slave.
-        self._attributes['id'] = f.read()
-
     self._max_url_tries = max_url_tries
 
   def Start(self, iterations=-1):
@@ -343,16 +332,6 @@ class SlaveMachine(object):
     Returns:
       List of commands to execute, None if none specified by the server.
     """
-
-    # Store id assigned by Swarm server so in the future they know this slave.
-    if self._attributes['id'] != response['id']:
-      self._attributes['id'] = response['id']
-      if self._id_filename:
-        with open(self._id_filename, 'w') as f:
-          f.write(response['id'])
-
-    logging.debug('received id: %s', self._attributes['id'])
-
     # Store try_count assigned by Swarm server to send it back in next request.
     self._attributes['try_count'] = int(response['try_count'])
     logging.debug('received try_count: %d', self._attributes['try_count'])
@@ -380,10 +359,9 @@ class SlaveMachine(object):
         isinstance(response['result_url'], basestring)):
       self._result_url = response['result_url']
 
-    # Validate fields in the response. A response should have 'id', 'try_count',
+    # Validate fields in the response. A response should have 'try_count'
     # and only either one of ('come_back') or ('commands', 'result_url').
     required_fields = {
-        'id': ValidateBasestring,
         'try_count': ValidateNonNegativeInteger
         }
 
@@ -706,10 +684,6 @@ def main():
   parser.add_option('-l', '--log_file', default='slave_machine.log',
                     help='Set the name of the file to log to. '
                     'Defaults to %default.')
-  parser.add_option('--id_filename', default=DEFAULT_MACHINE_ID_FILE,
-                    help='The file to load the machine id from. If the file '
-                    'doesn\'t exist a new file will be create with a new ID '
-                    'retrieved from the swarm server. Defaults to %default')
   (options, args) = parser.parse_args()
 
   # Parser handles exiting this script after logging the error.
@@ -749,8 +723,7 @@ def main():
 
   url = '%s:%d' % (options.address, options.port)
   slave = SlaveMachine(url=url, attributes=attributes,
-                       max_url_tries=options.max_url_tries,
-                       id_filename=options.id_filename)
+                       max_url_tries=options.max_url_tries)
 
   # Change the working directory to specified path.
   os.chdir(options.directory)

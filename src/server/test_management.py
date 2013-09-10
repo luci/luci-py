@@ -15,7 +15,6 @@ import math
 import os.path
 import random
 import StringIO
-import uuid
 import zipfile
 
 from google.appengine.api import memcache
@@ -305,7 +304,7 @@ def ExecuteRegisterRequest(attributes, server_url):
   """
   # Validate and fix machine attributes. Will throw exception on errors.
   attribs = ValidateAndFixAttributes(attributes)
-  response = {'id': attribs['id']}
+  response = {}
 
   # Check the slave version, forcing it to update if required.
   if 'version' in attributes:
@@ -400,15 +399,9 @@ def ValidateAndFixAttributes(attributes):
         raise test_request_message.Error('Invalid attrib value for '
                                          'dimensions')
     elif attrib == 'id':
-      # Make sure the attribute value has proper type. None is a valid
-      # type and is treated as if it doesn't exist.
-      if value:
-        try:
-          value = uuid.UUID(value)
-        except (ValueError, AttributeError) as e:
-          logging.warning(
-              'Problem with given id, generating new id.\n%s', e)
-          attributes[attrib] = None
+      # Make sure the attribute value has proper type.
+      if not isinstance(value, basestring):
+        raise test_request_message.Error('Invalid attrib value for id')
     elif (attrib == 'tag' or attrib == 'username' or attrib == 'password' or
           attrib == 'version'):
       # Make sure the attribute value has proper type.
@@ -427,13 +420,13 @@ def ValidateAndFixAttributes(attributes):
       raise test_request_message.Error('Invalid attribute to machine: '
                                        + attrib)
 
-  # Make sure we have 'dimensions', the only required attrib.
+  # Make sure we have 'dimensions' and 'id', the two required attribs.
   if 'dimensions' not in attributes:
     raise test_request_message.Error('Missing mandatory attribute: '
                                      'dimensions')
 
-  if 'id' not in attributes or not attributes['id']:
-    attributes['id'] = str(uuid.uuid4())
+  if 'id' not in attributes:
+    raise test_request_message.Error('Missing mandatory attribute: id')
 
   # Make sure attributes now has a try_count field.
   if 'try_count' not in attributes:

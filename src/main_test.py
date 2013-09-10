@@ -235,7 +235,8 @@ class AppTest(unittest.TestCase):
         response.body)
 
     # Valid attributes but missing dimensions.
-    response = self.app.post('/poll_for_test', {'attributes': '{}'})
+    attributes = '{"id": "%s"}' % MACHINE_ID
+    response = self.app.post('/poll_for_test', {'attributes': attributes})
     self.assertEquals('200 OK', response.status)
     self.assertEquals('Error: Missing mandatory attribute: dimensions',
                       response.body)
@@ -246,9 +247,8 @@ class AppTest(unittest.TestCase):
     response = self.app.post('/poll_for_test', {'attributes': attributes})
     self.assertEquals('200 OK', response.status)
     response = json.loads(response.body)
-    self.assertEquals(sorted(['try_count', 'id', 'come_back']),
+    self.assertEquals(sorted(['try_count', 'come_back']),
                       sorted(response.keys()))
-    self.assertEquals(MACHINE_ID, response['id'])
 
   def _PostResults(self, runner_key, machine_id, result, expect_errors=False):
     url_parameters = {
