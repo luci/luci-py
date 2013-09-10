@@ -49,7 +49,7 @@ class TestSlaveMachine(unittest.TestCase):
 
   def _CreateValidAttribs(self, try_count=0):
     attributes = VALID_ATTRIBUTES.copy()
-    attributes['id'] = socket.getfqdn()
+    attributes['id'] = socket.getfqdn().lower()
     attributes['try_count'] = try_count
     return {'attributes': json.dumps(attributes)}
 

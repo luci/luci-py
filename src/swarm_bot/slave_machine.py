@@ -222,7 +222,8 @@ class SlaveMachine(object):
     self._result_url = None
     # The fully qualified domain name will uniquely identify this machine
     # to the server, so we can use it to give a deterministic id for this slave.
-    self._attributes['id'] = socket.getfqdn()
+    # Also store as lower case, since it is already case-insensitive.
+    self._attributes['id'] = socket.getfqdn().lower()
     self._attributes['try_count'] = 0
     self._attributes['version'] = version.GenerateSwarmSlaveVersion(__file__)
     self._come_back = 0
