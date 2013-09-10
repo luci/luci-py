@@ -35,7 +35,7 @@ from swarm_bot import slave_machine
 # considering the runner to have run for too long. Runners that run for too
 # long will be aborted automatically.
 # Specified in number of seconds.
-_TIMEOUT_FACTOR = 600
+_TIMEOUT_FACTOR = 300
 
 # The number of pings that need to be missed before a runner is considered to
 # have timed out. |_TIMEOUT_FACTOR| / |this| will determine the desired delay
@@ -235,16 +235,18 @@ def AbortStaleRunners():
   def HandleStaleRunner(runner):
     if test_runner.ShouldAutomaticallyRetryRunner(runner):
       if test_runner.AutomaticallyRetryRunner(runner):
-        logging.warning('TRM.AbortStaleRunners retrying runner %s with key '
-                        ' %s. Attempt %d', runner.name,
-                        runner.key.urlsafe(), runner.automatic_retry_count)
+        logging.warning('TRM.AbortStaleRunners retrying runner %s on machine '
+                        '%s with key %s. Attempt %d', runner.name,
+                        runner.machine_id, runner.key.urlsafe(),
+                        runner.automatic_retry_count)
       else:
         logging.info('TRM.AbortStaleRunner unable to retry runner with key '
-                     '%s even though it can. Skipping for now.',
-                     runner.urlsafe())
+                     '%s on machine %s even though it can. Skipping for now.',
+                     runner.urlsafe(), runner.machine_id)
     else:
-      logging.error('TRM.AbortStaleRunners aborting runner %s with key %s',
-                    runner.name, runner.key.urlsafe())
+      logging.error('TRM.AbortStaleRunners aborting runner %s on machine %s '
+                    'with key %s', runner.name, runner.machine_id,
+                    runner.key.urlsafe())
       AbortRunner(runner, reason='Runner has become stale.')
 
   query = test_runner.TestRunner.gql(
