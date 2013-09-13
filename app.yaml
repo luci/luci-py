@@ -37,3 +37,5 @@ libraries:
   version: "1.2.3"
 - name: yaml
   version: "3.10"
+- name: pycrypto
+  version: "2.6"

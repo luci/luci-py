@@ -8,6 +8,7 @@ import hashlib
 import logging
 import os
 import re
+import time
 import zlib
 
 # The app engine headers are located locally, so don't worry about not finding
@@ -15,10 +16,10 @@ import zlib
 # pylint: disable=E0611,F0401
 import webapp2
 from google.appengine import runtime
-from google.appengine.ext import blobstore
 from google.appengine.api import files
 from google.appengine.api import memcache
 from google.appengine.api import taskqueue
+from google.appengine.ext import blobstore
 from google.appengine.ext import ndb
 from google.appengine.ext.webapp import blobstore_handlers
 # pylint: enable=E0611,F0401
@@ -26,6 +27,7 @@ from google.appengine.ext.webapp import blobstore_handlers
 import acl
 import config
 import gsfiles
+import signed_urls
 import stats
 import template
 
@@ -654,6 +656,42 @@ class RestrictedStoreBlobstoreContentByHashHandler(
     self.response.headers['Content-Type'] = 'text/plain'
 
 
+class RestrictedAdminUIHandler(acl.ACLRequestHandler):
+  """Root admin UI page."""
+  def get(self):
+    self.response.write(template.get('restricted.html').render())
+    self.response.headers['Content-Type'] = 'text/html'
+
+
+class RestrictedGoogleStorageConfig(acl.ACLRequestHandler):
+  """View and modify Google Storage config entries."""
+  def get(self):
+    settings = config.settings()
+    self.response.write(template.get('gs_config.html').render({
+        'gs_bucket': settings.gs_bucket,
+        'gs_client_id_email': settings.gs_client_id_email,
+        'gs_private_key': settings.gs_private_key,
+        'token': self.get_token(0, time.time()),
+    }))
+    self.response.headers['Content-Type'] = 'text/html'
+
+  def post(self):
+    settings = config.settings()
+    settings.gs_bucket = self.request.get('gs_bucket')
+    settings.gs_client_id_email = self.request.get('gs_client_id_email')
+    settings.gs_private_key = self.request.get('gs_private_key')
+    try:
+      # Ensure key is correct, it's easy to make a mistake when creating it.
+      signed_urls.CloudStorageURLSigner.load_private_key(
+          settings.gs_private_key)
+    except Exception as exc:
+      self.response.write('Bad private key: %s' % exc)
+      return
+    # Store the settings.
+    settings.put()
+    self.response.write('Done!')
+
+
 ### Non-restricted handlers
 
 
@@ -881,10 +919,53 @@ class RetrieveContentByHashHandler(acl.ACLRequestHandler,
           content_type='application/octet-stream')
 
 
+class RetrieveContentByHashHandlerGS(acl.ACLRequestHandler):
+  """The handlers for retrieving contents by its SHA-1 hash |hash_key|."""
+
+  def get(self, namespace, hash_key):  #pylint: disable=W0221
+    memcache_entry = memcache.get(hash_key, namespace='table_%s' % namespace)
+    if memcache_entry:
+      return self.send_data(hash_key, memcache_entry, 'memcache')
+
+    entry = get_content_by_hash(namespace, hash_key)
+    if not entry:
+      msg = 'Unable to find an ContentEntry with key \'%s\'.' % hash_key
+      return self.abort(404, detail=msg)
+
+    if entry.content is not None:
+      return self.send_data(hash_key, entry.content, 'inline')
+
+    if not entry.filename:
+      # Corrupted entry. Delete.
+      msg = 'Corrupted entry with key \'%s\'.' % hash_key
+      logging.error(msg)
+      entry.delete()
+      return self.abort(404, detail=msg)
+
+    # Generate signed download URL.
+    settings = config.settings()
+    signer = signed_urls.CloudStorageURLSigner(settings.gs_bucket,
+        settings.gs_client_id_email, settings.gs_private_key)
+    signed_url = signer.get_download_url(entry.gs_filepath)
+
+    # Redirect client to this URL.
+    stats.log(stats.RETURN, entry.size, 'GS; %s' % entry.filename)
+    self.redirect(signed_url)
+
+  def send_data(self, hash_key, data, origin):
+    """Serves data directly from memory."""
+    stats.log(stats.RETURN, len(data), origin)
+    self.response.headers['Content-Disposition'] = (
+        'attachment; filename="%s"' % hash_key)
+    self.response.headers['Content-Type'] = 'application/octet-stream'
+    self.response.headers['Cache-Control'] = 'public, max-age=43200'
+    self.response.out.write(data)
+
+
 class RootHandler(webapp2.RequestHandler):
   """Tells the user to RTM."""
   def get(self):
-    self.response.write(template.get('root.html').render({}))
+    self.response.write(template.get('root.html').render())
     self.response.headers['Content-Type'] = 'text/html'
 
 
@@ -946,9 +1027,13 @@ def CreateApplication():
 
       # Administrative urls.
       webapp2.Route(
+          r'/restricted', RestrictedAdminUIHandler),
+      webapp2.Route(
           r'/restricted/whitelistip', acl.RestrictedWhitelistIPHandler),
       webapp2.Route(
           r'/restricted/whitelistdomain', acl.RestrictedWhitelistDomainHandler),
+      webapp2.Route(
+          r'/restricted/gs_config', RestrictedGoogleStorageConfig),
 
       # Internal AppEngine handling for blobstore uploads.
       webapp2.Route(
@@ -968,6 +1053,11 @@ def CreateApplication():
           r'/content/store' + namespace_key, StoreContentByHashHandler),
       webapp2.Route(
           r'/content/retrieve' + namespace_key, RetrieveContentByHashHandler),
+
+      # Experimental API for direct Google Storage download URLs.
+      webapp2.Route(
+          r'/content/retrieve_gs' + namespace_key,
+          RetrieveContentByHashHandlerGS),
 
       # Public stats.
       webapp2.Route(r'/stats/json', stats.StatsJsonHandler),

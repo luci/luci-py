@@ -38,6 +38,12 @@ class GlobalConfig(ndb.Model):
   gs_bucket = ndb.StringProperty(
       indexed=False, default=app_identity.get_application_id())
 
+  # Email address of Service account used to access Google Storage.
+  gs_client_id_email = ndb.StringProperty(indexed=False, default='')
+
+  # Secret key used to sign Google Storage URLs: base64 encoded *.der file.
+  gs_private_key = ndb.StringProperty(indexed=False, default='')
+
 
 def settings():
   return settings_async().get_result()
