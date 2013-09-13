@@ -5,7 +5,7 @@ api_version: 1
 threadsafe: true
 
 handlers:
-- url: /restricted/.*
+- url: /restricted.*
   script: main.app
   secure: always
   login: admin
