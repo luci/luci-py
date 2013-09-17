@@ -16,7 +16,10 @@ Workflow to edit a value:
   - Update the value with AppEngine's Datastore Viewer.
   - Wait a few seconds for datastore coherency.
   - Flush Memcache.
+  - Wait 1 min for a local in-memory cache to expire.
 """
+
+import os
 
 # The app engine headers are located locally, so don't worry about not finding
 # them.
@@ -25,13 +28,18 @@ from google.appengine.api import app_identity
 from google.appengine.ext import ndb
 # pylint: enable=E0611,F0401
 
+import utils
+
 
 class GlobalConfig(ndb.Model):
   """Application wide settings."""
   # The number of days a cache entry must be kept for before it is evicted.
   # Note: this doesn't applies to namespaces where is_temporary is True. For
-  # these, the retension is always 1 day.
-  retension_days = ndb.IntegerProperty(indexed=False, default=7)
+  # these, the retention is always 1 day.
+  retention_days = ndb.IntegerProperty(indexed=False, default=7)
+
+  # Secret key used to generate XSRF tokens and signatures.
+  global_secret = ndb.BlobProperty()
 
   # The Google Cloud Storage bucket where to save the data. By default it's the
   # name of the application instance.
@@ -44,20 +52,24 @@ class GlobalConfig(ndb.Model):
   # Secret key used to sign Google Storage URLs: base64 encoded *.der file.
   gs_private_key = ndb.StringProperty(indexed=False, default='')
 
+  def _pre_put_hook(self):
+    """Generates global_secret only when necessary.
 
+    If default=os.urandom(16) was set on secret, it would fetch 16 bytes of
+    random data on every process startup, which is unnecessary.
+    """
+    self.global_secret = self.global_secret or os.urandom(16)
+
+
+@utils.cache_with_expiration(expiration_sec=60)
 def settings():
-  return settings_async().get_result()
-
-
-@ndb.tasklet
-def settings_async():
-  """Loads GlobalConfig or create one if not present, asynchronously.
+  """Loads GlobalConfig or create one if not present.
 
   Saves any default value that could be missing from the stored entity.
   """
   # Access to a protected member XXX of a client class.
   # pylint: disable=W0212
-  config = yield GlobalConfig.get_or_insert_async('global_config')
+  config = GlobalConfig.get_or_insert('global_config', use_cache=False)
 
   # Look in AppEngine internal guts to see if all the values were stored. If
   # not, store the missing properties in the entity in the datastore.
@@ -71,6 +83,6 @@ def settings_async():
     # transaction but in practice it's fine.
     for key, default in missing.iteritems():
       setattr(config, key, default)
-    yield config.put_async()
+    config.put()
 
-  raise ndb.Return(config)
+  return config

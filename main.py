@@ -358,7 +358,7 @@ class RestrictedCleanupOldEntriesWorkerHandler(webapp2.RequestHandler):
       self.abort(405, detail='Only internal task queue tasks can do this')
     logging.info('Deleting old datastore entries')
     old_cutoff = datetime.datetime.today() - datetime.timedelta(
-        days=config.settings().retension_days)
+        days=config.settings().retention_days)
 
     incremental_delete(
         ContentEntry.query(ContentEntry.last_access < old_cutoff),
@@ -971,6 +971,8 @@ class RootHandler(webapp2.RequestHandler):
 
 class WarmupHandler(webapp2.RequestHandler):
   def get(self):
+    # Generate/precache settings.
+    config.settings()
     self.response.write('ok')
     self.response.headers['Content-Type'] = 'text/plain'
 

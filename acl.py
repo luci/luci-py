@@ -19,23 +19,11 @@ from google.appengine.api import users
 from google.appengine.ext import ndb
 # pylint: enable=E0611,F0401
 
+import config
 import template
 
 
 ### Models
-
-
-class GlobalSecret(ndb.Model):
-  """Secret."""
-  secret = ndb.BlobProperty()
-
-  def _pre_put_hook(self):
-    """Generates random data only when necessary.
-
-    If default=os.urandom(16) was set on secret, it would fetch 16 bytes of
-    random data on every process startup, which is unnecessary.
-    """
-    self.secret = self.secret or os.urandom(16)
 
 
 class WhitelistedIP(ndb.Model):
@@ -72,9 +60,6 @@ class WhitelistedDomain(ndb.Model):
 
 
 ### Utility
-
-
-_GLOBAL_KEY = 'global'
 
 
 def htmlwrap(text):
@@ -158,7 +143,7 @@ def gen_token(access_id, offset, now):
   timestamp = str(this_hour + offset)
   app_id = app_identity.get_application_id()
   secrets = (
-      GlobalSecret.get_or_insert(_GLOBAL_KEY).secret,
+      config.settings().global_secret,
       str(access_id),
       str(app_id),
       timestamp)
