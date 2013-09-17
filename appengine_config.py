@@ -7,9 +7,15 @@
 https://developers.google.com/appengine/docs/python/tools/appengineconfig
 """
 
-# Enable appstats and optionally cost calculation.
-# Change these values and upload again if you want to enable appstats.
-enable_appstats = False
+# The app engine headers are located locally, so don't worry about not finding
+# them.
+# pylint: disable=E0611,F0401
+from google.appengine.api import app_identity
+# pylint: enable=E0611,F0401
+
+
+# Enable appstats and optionally cost calculation on a dev instance.
+enable_appstats = app_identity.get_application_id().endswith('-dev')
 appstats_CALC_RPC_COSTS = False
 
 
