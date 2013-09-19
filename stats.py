@@ -20,6 +20,7 @@ import os
 import webapp2
 from google.appengine.api import logservice
 from google.appengine.ext import ndb
+from google.appengine.runtime import DeadlineExceededError
 # pylint: enable=E0611,F0401
 
 import stats_framework
@@ -268,11 +269,16 @@ def _to_json(data):
 class RestrictedStatsUpdateHandler(webapp2.RequestHandler):
   """Called every few minutes to update statistics."""
   def get(self):
-    i = _STATS_HANDLER.process_next_chunk(_TOO_RECENT)
+    self.response.headers['Content-Type'] = 'text/plain'
+    try:
+      i = _STATS_HANDLER.process_next_chunk(_TOO_RECENT)
+    except DeadlineExceededError:
+      logging.error('Timed out')
+      self.response.status_code = 500
+      return
     msg = 'Processed %d minutes' % i
     logging.info(msg)
     self.response.write(msg)
-    self.response.headers['Content-Type'] = 'text/plain'
 
 
 class StatsHandler(webapp2.RequestHandler):

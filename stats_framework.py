@@ -20,6 +20,7 @@ import logging
 # pylint: disable=E0611,F0401
 from google.appengine.api import memcache
 from google.appengine.ext import ndb
+from google.appengine.runtime import DeadlineExceededError
 # pylint: enable=E0611,F0401
 
 
@@ -28,8 +29,10 @@ TIME_FORMAT = '%Y-%m-%d %H:%M'
 
 
 class StatisticsFramework(object):
-  # Default lock timeout is one hour when calling generate_snapshot.
-  LOCK_TIMEOUT = 3600
+  # Default lock timeout is one hour when calling generate_snapshot. Must be
+  # longer than the maximum duration of a cron job, currently limited at 10
+  # minutes.
+  LOCK_TIMEOUT = 700
 
   # Maximum number of days to look back to generate stats when starting fresh.
   # It will always start looking at 00:00 on the given day in UTC time.
@@ -89,13 +92,16 @@ class StatisticsFramework(object):
     """
     if not memcache.add(
         'lock', 1, time=self.LOCK_TIMEOUT, namespace=self.memcache_namespace):
+      logging.warning('Lock was held, skipping.')
       return 0
 
     get_now = get_now or datetime.datetime.utcnow
     # At this point, the 'lock' is owned.
     try:
-      now = get_now()
-      next_minute = self._get_next_minute_to_process(now)
+      original_now = get_now()
+      now = original_now
+      original_minute = self._get_next_minute_to_process(now)
+      next_minute = original_minute
       count = 0
       while now - next_minute >= datetime.timedelta(minutes=up_to):
         # Keep the lock alive.
@@ -109,6 +115,13 @@ class StatisticsFramework(object):
         next_minute = next_minute + datetime.timedelta(minutes=1)
         now = get_now()
       return count
+    except DeadlineExceededError:
+      logging.error(
+          'Started at %s processing %s\n'
+          'Tried to get up to %s\n'
+          'Processed %d minutes\n',
+          original_now, original_minute, up_to, count)
+      raise
     finally:
       # Make sure to release the lock. At worst, the lock will be held for
       # self.LOCK_TIMEOUT.
