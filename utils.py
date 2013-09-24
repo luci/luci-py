@@ -37,3 +37,13 @@ def cache_with_expiration(expiration_sec):
     # pylint: disable=W0108
     return functools.wraps(func)(lambda: cache.get_value())
   return decorator
+
+
+def constant_time_equals(a, b):
+  """Compares two strings in constant time regardless of theirs content."""
+  if len(a) != len(b):
+    return False
+  result = 0
+  for x, y in zip(a, b):
+    result |= ord(x) ^ ord(y)
+  return result == 0

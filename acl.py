@@ -173,8 +173,8 @@ class ACLRequestHandler(webapp2.RequestHandler):
   # Set to the uniquely identifiable token, either the userid or the IP address.
   access_id = None
   # Set to False if custom processing is required. In that case, a call to
-  # self.enforce_valid_token() is required inside the post() handler.
-  enforce_token_on_post = True
+  # self.enforce_valid_token() is required inside the post()/put() handler.
+  enforce_token = True
 
   def dispatch(self):
     """Ensures that only users from valid domains can continue, and that users
@@ -184,7 +184,7 @@ class ACLRequestHandler(webapp2.RequestHandler):
       self.check_user(current_user)
     else:
       self.check_ip(self.request.remote_addr)
-    if self.request.method == 'POST' and self.enforce_token_on_post:
+    if self.request.method in ('POST', 'PUT') and self.enforce_token:
       self.enforce_valid_token()
     return webapp2.RequestHandler.dispatch(self)
 

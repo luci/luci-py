@@ -86,3 +86,8 @@ def settings():
     config.put()
 
   return config
+
+
+def is_local_dev_server():
+  """Returns True if running on local development server."""
+  return os.environ.get('SERVER_SOFTWARE', '').startswith('Development')
