@@ -91,3 +91,9 @@ def settings():
 def is_local_dev_server():
   """Returns True if running on local development server."""
   return os.environ.get('SERVER_SOFTWARE', '').startswith('Development')
+
+
+def get_app_version():
+  """Returns currently running version (as seen in app engine console)."""
+  # os.environ['CURRENT_VERSION_ID'] has a form <version>.370477462622784206.
+  return os.environ['CURRENT_VERSION_ID'].split('.')[0]

@@ -953,6 +953,74 @@ class RetrieveContentByHashHandler(acl.ACLRequestHandler,
 
 ### New experimental handlers for direct GS access.
 
+# Version of isolate protocol returned to clients in /handshake request.
+ISOLATE_PROTOCOL_VERSION = '1.0'
+
+
+class HandshakeHandlerGS(acl.ACLRequestHandler):
+  """Returns access token, version and capabilities of the server."""
+
+  # This handler is called to get the token, there's nothing to enforce yet.
+  enforce_token = False
+
+  def post(self):
+    """Reads client versions and responds with access token and server version.
+
+    Request body is a JSON dict:
+      {
+        "protocol_version": "1.0",
+        "client_app_version": "0.2",
+        "pusher": true,
+        "fetcher": true,
+        ...
+      }
+
+    Response body is a JSON dict:
+      {
+        "protocol_version": "1.0",
+        "server_app_version": "138-193f1f3",
+        "access_token": "......",
+        ...
+      }
+      or
+      {
+        "protocol_version": "1.0",
+        "server_app_version": "138-193f1f3",
+        "error": "Some user friendly error text",
+      }
+    """
+    try:
+      request = json.loads(self.request.body)
+      client_protocol = request['protocol_version']
+      client_app_version = request['client_app_version']
+      pusher = request.get('pusher', True)
+      fetcher = request.get('fetcher', True)
+    except (ValueError, KeyError) as exc:
+      logging.error('Invalid body of /handshake call: %s', exc)
+      return self.abort(400)
+
+    response = {
+        'protocol_version': ISOLATE_PROTOCOL_VERSION,
+        'server_app_version': config.get_app_version(),
+        'access_token': self.get_token(0, time.time()),
+    }
+
+    # Log details of the handshake to the server log.
+    logging_info = {
+      'Client protocol version': client_protocol,
+      'Client app version': client_app_version,
+      'Client is pusher': pusher,
+      'Client is fetcher': fetcher,
+      'Access Id': self.access_id,
+      'Token': response['access_token'],
+    }
+    logging.info(
+      '\n'.join('%s: %s' % (k, logging_info[k]) for k in sorted(logging_info)))
+
+    # Send back the response.
+    self.response.headers['Content-Type'] = 'application/json'
+    json.dump(response, self.response.out, separators=(',', ':'))
+
 
 class PreUploadContentHandlerGS(acl.ACLRequestHandler):
   """Checks for entries existence, generates upload URLs."""
@@ -1460,6 +1528,9 @@ def CreateApplication():
           r'/content/retrieve' + namespace_key, RetrieveContentByHashHandler),
 
       # Experimental API for direct Google Storage download and upload URLs.
+      webapp2.Route(
+          r'/content-gs/handshake',
+          HandshakeHandlerGS),
       webapp2.Route(
           r'/content-gs/pre-upload' + namespace,
           PreUploadContentHandlerGS),
