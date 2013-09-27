@@ -19,6 +19,7 @@ from google.appengine.ext import blobstore
 from google.appengine.ext import ndb
 
 from common import blobstore_helper
+from common import result_helper
 from common import test_request_message
 from common import url_helper
 from stats import machine_stats
@@ -148,9 +149,16 @@ class TestRunner(ndb.Model):
   # timed out so there was no data).
   errors = ndb.StringProperty(indexed=False)
 
+  # TODO(user): Remove this in future CL when the servers no longer have
+  # models that still use this value.
   # The blobstore reference to the full output of the test.  This key valid only
   # when the runner has ended (i.e. done == True). Until then, it is None.
   result_string_reference = ndb.BlobKeyProperty()
+
+  # A reference to the class that contains the outputted results. This key is
+  # valid only when the runner has ended (i.e. done == True). Until then, it is
+  # None.
+  results_reference = ndb.KeyProperty(kind=result_helper.Results)
 
   # The dimension string for this runner.
   dimensions = ndb.StringProperty(required=True)
@@ -197,12 +205,17 @@ class TestRunner(ndb.Model):
     """
     if self.errors:
       assert self.result_string_reference is None
+      assert self.results_reference is None
       return self.errors
 
-    if not self.result_string_reference:
-      return ''
+    if self.results_reference:
+      return self.results_reference.get().GetResults()
 
-    return blobstore_helper.GetBlobstore(self.result_string_reference)
+    # TODO(user): Remove once the servers no longer serve this data.
+    if self.result_string_reference:
+      return blobstore_helper.GetBlobstore(self.result_string_reference)
+
+    return ''
 
   def GetWaitTime(self):
     """Get the number of seconds between creation and execution start.
@@ -246,6 +259,9 @@ class TestRunner(ndb.Model):
     self.ran_successfully = False
     self.exit_codes = None
     self.errors = None
+    if self.results_reference:
+      self.results_reference.delete()
+      self.results_reference = None
     if self.result_string_reference:
       blobstore.delete_async(self.result_string_reference)
       self.result_string_reference = None
@@ -253,14 +269,14 @@ class TestRunner(ndb.Model):
     self.put()
 
   def UpdateTestResult(self, machine_id, success=False, exit_codes='',
-                       result_blob_key=None, errors=None, overwrite=False):
+                       results=None, errors=None, overwrite=False):
     """Update the runner with results of a test run.
 
     Args:
       machine_id: The machine id of the machine providing these results.
       success: a boolean indicating whether the test run succeeded or not.
       exit_codes: a string containing the array of exit codes of the test run.
-      result_blob_key: a key to the blob containing the results.
+      results: a Results class containing the results.
       errors: a string explaining why we failed to get the actual result string.
       overwrite: a boolean indicating if we should always record this result,
           even if a result had been previously recorded.
@@ -274,8 +290,8 @@ class TestRunner(ndb.Model):
         logging.warning('The machine id of the runner, %s, doesn\'t match the '
                         'machine id given, %s', self.machine_id, machine_id)
         # The new results won't get stored so delete them.
-        if result_blob_key:
-          blobstore.delete_async(result_blob_key)
+        if results:
+          results.key.delete_async()
         return False
       # Update the old and active machines ids.
       logging.info('Received result from old machine, making it current '
@@ -291,9 +307,9 @@ class TestRunner(ndb.Model):
       stored_results = self.GetResultString()
       # The new results won't get stored so delete them.
       new_results = None
-      if result_blob_key:
-        new_results = blobstore_helper.GetBlobstore(result_blob_key)
-        blobstore.delete_async(result_blob_key)
+      if results:
+        new_results = results.GetResults()
+        results.key.delete_async()
 
       if new_results == stored_results or errors == stored_results:
         # This can happen if the server stores the results and then runs out
@@ -313,6 +329,9 @@ class TestRunner(ndb.Model):
       if self.result_string_reference:
         blobstore.delete(self.result_string_reference)
         self.result_string_reference = None
+      if self.results_reference:
+        self.results_reference.delete_async()
+        self.results_reference = None
       self.errors = None
 
     self.ran_successfully = success
@@ -320,11 +339,11 @@ class TestRunner(ndb.Model):
     self.done = True
     self.ended = datetime.datetime.now()
 
-    if result_blob_key:
-      assert self.result_string_reference is None, (
+    if results:
+      assert self.results_reference is None, (
           'There is a reference stored, overwriting it would leak the old '
           'element.')
-      self.result_string_reference = result_blob_key
+      self.results_reference = results.key
     else:
       self.errors = errors
 
@@ -766,6 +785,9 @@ def DeleteOldRunners():
   return rpc
 
 
+# TODO(user): Delete this in a follow up cl.
+# Keeping this will allow servers to delete the old blobs over time, instead
+# of having to clear them all at once.
 def DeleteOrphanedBlobs():
   """Remove all the orphaned blobs."""
   logging.debug('DeleteOrphanedBlobs starting')

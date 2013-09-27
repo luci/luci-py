@@ -16,7 +16,6 @@ import unittest
 
 from google.appengine.ext import testbed
 from  import main as main_app
-from common import blobstore_helper
 from common import dimensions_utils
 from common import url_helper
 from server import admin_user
@@ -289,29 +288,6 @@ class AppTest(unittest.TestCase):
 
     self._mox.VerifyAll()
 
-  def testResultHandlerBlobstoreFailure(self):
-    self._mox.StubOutWithMock(blobstore_helper, 'CreateBlobstore')
-    result = 'result string'
-    blobstore_helper.CreateBlobstore(result).AndReturn(None)
-    self._mox.ReplayAll()
-
-    runner = test_helper.CreatePendingRunner(machine_id=MACHINE_ID)
-
-    response = self._PostResults(runner.key.urlsafe(), runner.machine_id,
-                                 result,
-                                 expect_errors=True)
-    self.assertEquals('500 Internal Server Error', response.status)
-    self.assertEquals(
-        'The server was unable to save the results to the blobstore',
-        response.body)
-
-    # Get the lastest version of the runner and ensure it hasn't been marked as
-    # done.
-    runner = test_runner.TestRunner.query().get()
-    self.assertFalse(runner.done)
-
-    self._mox.VerifyAll()
-
   def testChangeWhitelistHandlerParams(self):
     # Make sure the link redirects to the right place.
     response = self.app.post('/secure/change_whitelist', {})
@@ -416,14 +392,14 @@ class AppTest(unittest.TestCase):
     self._ReplaceCurrentUser(None)
 
     # Make sure all anonymous requests are rejected.
-    for handler, method in (allowed + forbidden):
+    for handler, method in allowed + forbidden:
       response = method(handler, expect_errors=True)
       self.assertEqual(
           '403 Forbidden', response.status, msg='Handler: ' + handler)
 
     # Make sure all requests from unknown account are rejected.
     self._ReplaceCurrentUser('someone@example.com')
-    for handler, method in (allowed + forbidden):
+    for handler, method in allowed + forbidden:
       response = method(handler, expect_errors=True)
       self.assertEqual(
           '403 Forbidden', response.status, msg='Handler: ' + handler)

@@ -12,11 +12,11 @@ import unittest
 
 
 from google.appengine.api import datastore_errors
-from google.appengine.ext import blobstore
 from google.appengine.ext import testbed
 from google.appengine.ext import ndb
 
 from common import blobstore_helper
+from common import result_helper
 from common import url_helper
 from server import test_helper
 from server import test_management
@@ -449,55 +449,49 @@ class TestRunnerTest(unittest.TestCase):
 
     runner = test_helper.CreatePendingRunner(machine_id=MACHINE_IDS[0])
 
-    try:
-      # Replace the async with a non-async version to ensure the blobs
-      # are deleted before we check if they were deleted before the following
-      # asserts.
-      old_delete_async = test_runner.blobstore.delete_async
-      test_runner.blobstore.delete_async = blobstore.delete
+    # Wrap the function call in ndb.toplevel to ensure all asysnc calls
+    # terminate before we return
+    @ndb.toplevel
+    def CallUpdateTestResult(results=None, errors=None, overwrite=False):
+      return runner.UpdateTestResult(runner.machine_id,
+                                     results=results,
+                                     errors=errors,
+                                     overwrite=overwrite)
 
-      # First results, always accepted.
-      self.assertTrue(runner.UpdateTestResult(
-          runner.machine_id,
-          result_blob_key=blobstore_helper.CreateBlobstore(messages[0])))
-      # Always ensure that there is only one element in the blobstore.
-      self.assertEqual(1, blobstore.BlobInfo.all().count())
+    # First results, always accepted.
+    self.assertTrue(CallUpdateTestResult(
+        results=result_helper.StoreResults(messages[0])))
+    # Always ensure that there is only one stored result.
+    self.assertEqual(1, result_helper.Results.query().count())
 
-      # The first result resent, accepted since the strings are equal.
-      self.assertTrue(runner.UpdateTestResult(
-          runner.machine_id,
-          result_blob_key=blobstore_helper.CreateBlobstore(messages[0])))
-      self.assertEqual(1, blobstore.BlobInfo.all().count())
+    # The first result resent, accepted since the strings are equal.
+    self.assertTrue(CallUpdateTestResult(
+        results=result_helper.StoreResults(messages[0])))
+    self.assertEqual(1, result_helper.Results.query().count())
 
-      # Non-first request without overwrite, rejected.
-      self.assertFalse(runner.UpdateTestResult(
-          runner.machine_id,
-          result_blob_key=blobstore_helper.CreateBlobstore(messages[1]),
-          overwrite=False))
-      self.assertEqual(1, blobstore.BlobInfo.all().count())
+    # Non-first request without overwrite, rejected.
+    self.assertFalse(CallUpdateTestResult(
+        results=result_helper.StoreResults(messages[1]),
+        overwrite=False))
+    self.assertEqual(1, result_helper.Results.query().count())
 
-      # Non-first request with overwrite, accepted.
-      self.assertTrue(runner.UpdateTestResult(
-          runner.machine_id,
-          result_blob_key=blobstore_helper.CreateBlobstore(messages[2]),
-          overwrite=True))
-      self.assertEqual(1, blobstore.BlobInfo.all().count())
-    finally:
-      test_runner.blobstore.delete_async = old_delete_async
+    # Non-first request with overwrite, accepted.
+    self.assertTrue(CallUpdateTestResult(
+        results=result_helper.StoreResults(messages[2]),
+        overwrite=True))
+    self.assertEqual(1, result_helper.Results.query().count())
 
     # Accept the first message as an error with overwrite.
-    self.assertTrue(runner.UpdateTestResult(runner.machine_id,
-                                            errors=messages[0],
-                                            overwrite=True))
+    self.assertTrue(CallUpdateTestResult(errors=messages[0],
+                                         overwrite=True))
 
     # Accept the first message as an error again, since it is equal to what is
     # already stored.
-    self.assertTrue(runner.UpdateTestResult(runner.machine_id,
-                                            errors=messages[0]))
+    self.assertTrue(CallUpdateTestResult(errors=messages[0]))
 
-    # Make sure there are no blobs store now, since errors are just stored as
+    # Make sure there are no results now, since errors are just stored as
     # strings.
-    self.assertEqual(0, blobstore.BlobInfo.all().count())
+    self.assertEqual(0, result_helper.Results.query().count())
 
     self._mox.VerifyAll()
 

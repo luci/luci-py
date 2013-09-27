@@ -25,8 +25,8 @@ from google.appengine.api import mail
 from google.appengine.ext import testbed
 from google.appengine.ext import ndb
 
-from common import blobstore_helper
 from common import dimensions_utils
+from common import result_helper
 from common import swarm_constants
 from common import test_request_message
 from common import url_helper
@@ -305,10 +305,10 @@ class TestManagementTest(unittest.TestCase):
       runner_key = runner.key
       runner = runner_key.get()
 
-      result_blob_key = blobstore_helper.CreateBlobstore(result_string)
+      results = result_helper.StoreResults(result_string)
       self.assertEqual(store_results_successfully,
                        runner.UpdateTestResult(runner.machine_id,
-                                               result_blob_key=result_blob_key,
+                                               results=results,
                                                success=success))
 
       # If results aren't being stored we can't check the runner data because

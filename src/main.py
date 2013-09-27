@@ -32,7 +32,7 @@ from google.appengine.ext.webapp import template
 from google.appengine.ext.webapp import util
 from google.appengine.ext import ndb
 
-from common import blobstore_helper
+from common import result_helper
 from common import test_request_message
 from common import url_helper
 from server import admin_user
@@ -657,17 +657,11 @@ class ResultHandler(webapp2.RequestHandler):
     # the results are getting stored in the blobstore.
     test_runner.PingRunner(runner.key.urlsafe(), machine_id)
 
-    result_blob_key = blobstore_helper.CreateBlobstore(result_string)
-    if not result_blob_key:
-      self.response.out.write('The server was unable to save the results to '
-                              'the blobstore')
-      self.response.set_status(500)
-      return
-
+    results = result_helper.StoreResults(result_string)
     if runner.UpdateTestResult(machine_id,
                                success=success,
                                exit_codes=exit_codes,
-                               result_blob_key=result_blob_key,
+                               results=results,
                                overwrite=overwrite):
       self.response.out.write('Successfully update the runner results.')
     else:
