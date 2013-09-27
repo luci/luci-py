@@ -100,8 +100,11 @@ class WaitSummary(ndb.Model):
   @classmethod
   def _pre_delete_hook(cls, key):  # pylint: disable=g-bad-name
     """Delete any children of this wait summary."""
-    for child in key.get().children:
-      child.key.delete()
+    wait_summary = key.get()
+
+    if wait_summary:
+      for child in wait_summary.children:
+        child.key.delete()
 
 
 class DimensionWaitSums(object):

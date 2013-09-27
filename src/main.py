@@ -17,6 +17,7 @@ import urllib
 
 from google.appengine import runtime
 from google.appengine.api import app_identity
+from google.appengine.api import datastore_errors
 from google.appengine.api import files
 from google.appengine.api import mail
 from google.appengine.api import mail_errors
@@ -678,20 +679,25 @@ class CleanupDataHandler(webapp2.RequestHandler):
   """Handles tasks to delete orphaned blobs."""
 
   def post(self):  # pylint: disable=g-bad-name
-    test_management.DeleteOldErrors()
+    try:
+      test_management.DeleteOldErrors()
 
-    dimension_mapping.DeleteOldDimensionMapping()
+      dimension_mapping.DeleteOldDimensionMapping()
 
-    test_runner.DeleteOldRunners()
-    test_runner.DeleteOrphanedBlobs()
+      test_runner.DeleteOldRunners()
+      test_runner.DeleteOrphanedBlobs()
 
-    daily_stats.DeleteOldDailyStats()
+      daily_stats.DeleteOldDailyStats()
 
-    runner_stats.DeleteOldRunnerStats()
+      runner_stats.DeleteOldRunnerStats()
 
-    runner_summary.DeleteOldWaitSummaries()
+      runner_summary.DeleteOldWaitSummaries()
 
-    self.response.out.write('Successfully cleaned up old data.')
+      self.response.out.write('Successfully cleaned up old data.')
+    except datastore_errors.Timeout:
+      logging.info('Ran out of time while cleaning up data. Triggering '
+                   'another cleanup.')
+      taskqueue.add(method='POST', url='/task_queues/cleanup_data')
 
 
 class CronJobHandler(webapp2.RequestHandler):
