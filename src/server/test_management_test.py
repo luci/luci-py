@@ -98,7 +98,10 @@ class TestManagementTest(unittest.TestCase):
     """
 
     config_dimensions = {'os': platform, 'cpu': 'Unknown', 'browser': 'Unknown'}
-    attributes = {'dimensions': config_dimensions}
+    attributes = {
+        'dimensions': config_dimensions,
+        'version': test_management.SlaveVersion()
+    }
     if machine_id:
       attributes['id'] = str(machine_id)
     if username:
@@ -761,8 +764,7 @@ class TestManagementTest(unittest.TestCase):
 
     test_management.ExecuteTestRequest(test_helper.GetRequestMessage())
 
-    version = test_management.SlaveVersion()
-    register_request = self._GetMachineRegisterRequest(version=version)
+    register_request = self._GetMachineRegisterRequest()
     test_management.ExecuteRegisterRequest(register_request, self._SERVER_URL)
     test_management.ExecuteRegisterRequest(register_request, self._SERVER_URL)
 

@@ -503,51 +503,25 @@ def ShouldAutomaticallyRetryRunner(runner):
 def AutomaticallyRetryRunner(runner):
   """Attempt to automaticlly retry runner.
 
-  This runner will only be retried if it has't already been automatically
-  retried too many times.
-
   Args:
     runner: The runner to retry.
-
-  Returns:
-    True if the runner was successfully setup to get run again.
   """
-  def RestartRunnerTransaction():
-    # Ensure that we have the most up to date runner.
-    transaction_runner = runner.key.get()
+  # Record the stats from the attempted run before we clear them.
+  runner_stats.RecordRunnerStats(runner)
 
-    if not transaction_runner or transaction_runner.done:
-      return False
+  # Remember and keep the old machines and the automatic_retry_count since
+  # this isn't a full runner restart.
+  if runner.machine_id:
+    runner.old_machine_ids.append(runner.machine_id)
+  old_machine_ids = runner.old_machine_ids
+  automatic_retry_count = runner.automatic_retry_count + 1
 
-    # Remember and keep the old machines and the automatic_retry_count since
-    # this isn't a full runner restart.
-    if transaction_runner.machine_id:
-      transaction_runner.old_machine_ids.append(transaction_runner.machine_id)
-    old_machine_ids = transaction_runner.old_machine_ids
-    automatic_retry_count = transaction_runner.automatic_retry_count + 1
+  runner.ClearRunnerRun()
 
-    transaction_runner.ClearRunnerRun()
+  runner.automatic_retry_count = automatic_retry_count
+  runner.old_machine_ids = old_machine_ids
 
-    transaction_runner.automatic_retry_count = automatic_retry_count
-    transaction_runner.old_machine_ids = old_machine_ids
-    transaction_runner.put()
-
-    return True
-
-  try:
-    # We wrap the restart in a transaction to ensure that the runner really has
-    # timed out, because with app engine's date model it is possible for the
-    # runner to actually be done (and this machine was just working with old
-    # data).
-    # We can't tests this because the unit tests can't reproduce the issue of
-    # machines being slighly out of sync with each other.
-    if ndb.transaction(RestartRunnerTransaction):
-      runner_stats.RecordRunnerStats(runner)
-      return True
-  except datastore_errors.TransactionFailedError:
-    pass
-
-  return False
+  runner.put()
 
 
 def PingRunner(key, machine_id):

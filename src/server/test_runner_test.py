@@ -133,7 +133,7 @@ class TestRunnerTest(unittest.TestCase):
   # handle this case gracefully.
   def testAutomaticallyRetryMachineIdNone(self):
     runner = test_helper.CreatePendingRunner(machine_id=None)
-    self.assertTrue(test_runner.AutomaticallyRetryRunner(runner))
+    test_runner.AutomaticallyRetryRunner(runner)
 
   def testRecordRunnerStatsAfterAutoRetry(self):
     runner = test_helper.CreatePendingRunner(machine_id=MACHINE_IDS[0])
@@ -182,7 +182,7 @@ class TestRunnerTest(unittest.TestCase):
     runner = test_helper.CreatePendingRunner(machine_id=MACHINE_IDS[0])
 
     # Retry the runner since its taken too long to ping.
-    self.assertTrue(test_runner.AutomaticallyRetryRunner(runner))
+    test_runner.AutomaticallyRetryRunner(runner)
 
     runner = test_runner.TestRunner.query().get()
     self.assertEqual(1, runner.automatic_retry_count)

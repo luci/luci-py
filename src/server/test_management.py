@@ -17,6 +17,7 @@ import random
 import StringIO
 import zipfile
 
+from google.appengine.api import datastore_errors
 from google.appengine.api import memcache
 from google.appengine.ext import ndb
 
@@ -232,6 +233,18 @@ def AbortStaleRunners():
   # Abort all currently running runners that haven't recently pinged the
   # server.
   def HandleStaleRunner(runner):
+    # Get the most updated version of the runner.
+    try:
+      runner = ndb.transaction(runner.key.get)
+    except datastore_errors.TransactionFailedError:
+      # If we can't get the newest version of the runner, don't worry about
+      # aborting it (since this probably means someone else is updating it).
+      return
+
+    # Ensure that the runner really has timed out and not finished.
+    if not runner or runner.done or timeout_cutoff < runner.ping:
+      return
+
     if test_runner.ShouldAutomaticallyRetryRunner(runner):
       if test_runner.AutomaticallyRetryRunner(runner):
         logging.warning('TRM.AbortStaleRunners retrying runner %s on machine '
