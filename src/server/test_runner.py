@@ -175,7 +175,10 @@ class TestRunner(ndb.Model):
     # else will ever care about it or try to reference it, so we
     # are just cleaning up the blobstore.
     if runner.result_string_reference:
-      blobstore.delete_async(runner.result_string_reference)
+      blobstore.delete(runner.result_string_reference)
+
+    if runner.results_reference:
+      runner.results_reference.delete()
 
   def _pre_put_hook(self):  # pylint: disable=g-bad-name
     """Ensure that all runner values are properly set."""
@@ -263,7 +266,7 @@ class TestRunner(ndb.Model):
       self.results_reference.delete()
       self.results_reference = None
     if self.result_string_reference:
-      blobstore.delete_async(self.result_string_reference)
+      blobstore.delete(self.result_string_reference)
       self.result_string_reference = None
 
     self.put()
@@ -291,7 +294,7 @@ class TestRunner(ndb.Model):
                         'machine id given, %s', self.machine_id, machine_id)
         # The new results won't get stored so delete them.
         if results:
-          results.key.delete_async()
+          results.key.delete()
         return False
       # Update the old and active machines ids.
       logging.info('Received result from old machine, making it current '
@@ -309,7 +312,7 @@ class TestRunner(ndb.Model):
       new_results = None
       if results:
         new_results = results.GetResults()
-        results.key.delete_async()
+        results.key.delete()
 
       if new_results == stored_results or errors == stored_results:
         # This can happen if the server stores the results and then runs out
@@ -330,7 +333,7 @@ class TestRunner(ndb.Model):
         blobstore.delete(self.result_string_reference)
         self.result_string_reference = None
       if self.results_reference:
-        self.results_reference.delete_async()
+        self.results_reference.delete()
         self.results_reference = None
       self.errors = None
 
@@ -763,7 +766,7 @@ def DeleteOldRunners():
   """Clean up all runners that are older than a certain age and done.
 
   Returns:
-    The rpc for the async delete call (mainly meant for tests).
+    The rpc for the async delete call.
   """
   logging.debug('DeleteOldRunners starting')
 
@@ -793,17 +796,16 @@ def DeleteOrphanedBlobs():
   logging.debug('DeleteOrphanedBlobs starting')
 
   blobstore_query = blobstore.BlobInfo.all().order('creation')
-  blobs_deleted = 0
 
+  rpcs = []
   for blob in blobstore_query:
     if not TestRunner.gql('WHERE result_string_reference = :1',
                           blob.key()).count(limit=1):
-      blobstore.delete_async(blob.key())
-      blobs_deleted += 1
+      rpcs.append(blobstore.delete_async(blob.key()))
 
   logging.debug('DeleteOrphanedBlobs done')
 
-  return blobs_deleted
+  return rpcs
 
 
 class TxRunnerAlreadyAssignedError(Exception):

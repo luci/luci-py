@@ -220,9 +220,6 @@ def AbortStaleRunners():
   MAX_AUTOMATIC_RETRY times.
   If a runner is aborted because it hasn't hasn't found any machine to run it
   in over SWARM_RUNNER_MAX_WAIT_SECS seconds, there is no automatic retry.
-
-  Returns:
-    The rpcs for all the delete queries (mainly used by tests).
   """
   logging.debug('TRM.AbortStaleRunners starting')
   now = _GetCurrentTime()
@@ -282,7 +279,7 @@ def AbortStaleRunners():
 
   logging.debug('TRM.AbortStaleRunners done')
 
-  return [stale_runner_rpc, unfullfilled_rpc]
+  ndb.Future.wait_all([stale_runner_rpc, unfullfilled_rpc])
 
 
 def AbortRunner(runner, reason='Not specified.'):
@@ -601,7 +598,7 @@ def DeleteOldErrors():
   """Cleans up errors older than a certain age.
 
   Returns:
-    The rpc for the async delete call (mainly meant for tests).
+    The rpc for the async delete call.
   """
   logging.debug('DeleteOldErrors starting')
   old_cutoff = (

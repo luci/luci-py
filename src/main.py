@@ -674,18 +674,22 @@ class CleanupDataHandler(webapp2.RequestHandler):
 
   def post(self):  # pylint: disable=g-bad-name
     try:
-      test_management.DeleteOldErrors()
+      futures = []
+      futures.extend(test_management.DeleteOldErrors())
 
-      dimension_mapping.DeleteOldDimensionMapping()
+      futures.extend(dimension_mapping.DeleteOldDimensionMapping())
 
-      test_runner.DeleteOldRunners()
-      test_runner.DeleteOrphanedBlobs()
+      futures.extend(test_runner.DeleteOldRunners())
 
-      daily_stats.DeleteOldDailyStats()
+      futures.extend(test_runner.DeleteOrphanedBlobs())
 
-      runner_stats.DeleteOldRunnerStats()
+      futures.extend(daily_stats.DeleteOldDailyStats())
 
-      runner_summary.DeleteOldWaitSummaries()
+      futures.extend(runner_stats.DeleteOldRunnerStats())
+
+      futures.extend(runner_summary.DeleteOldWaitSummaries())
+
+      ndb.Future.wait_all(futures)
 
       self.response.out.write('Successfully cleaned up old data.')
     except datastore_errors.Timeout:
@@ -834,7 +838,7 @@ class SendEReporterHandler(ReportGenerator):
             if exception_count == 1:
               # This is bad, it means we can't send any exceptions, so just
               # clear all exceptions.
-              db.delete_async(ereporter.ExceptionRecord.all(keys_only=True))
+              db.delete(ereporter.ExceptionRecord.all(keys_only=True))
               break
 
             # ereporter doesn't handle the email being too big, so manually
@@ -1295,6 +1299,8 @@ class RemoteErrorHandler(webapp2.RequestHandler):
     self.response.out.write('Error logged')
 
 
+# TODO(user): Is this function still needed? It can probably be removed
+# after blobstore_helper is removed.
 class UploadHandler(blobstore_handlers.BlobstoreUploadHandler):
   def post(self):  # pylint: disable=g-bad-name
     """Handles HTTP POST requests for this handler's URL."""
@@ -1305,7 +1311,7 @@ class UploadHandler(blobstore_handlers.BlobstoreUploadHandler):
       self.response.out.write('Expected 1 upload but received %d',
                               len(upload_result))
 
-      blobstore.delete_async((b.key() for b in upload_result))
+      blobstore.delete((b.key() for b in upload_result))
       return
 
     blob_info = upload_result[0]
@@ -1424,4 +1430,4 @@ def CreateApplication():
 ereporter.register_logger()
 # Use ndb.toplevel to ensure that any async operations started in any handler
 # are finished before the handler returns.
-app = ndb.toplevel(CreateApplication())
+app = CreateApplication()

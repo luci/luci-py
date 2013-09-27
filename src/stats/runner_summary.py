@@ -337,7 +337,7 @@ def DeleteOldWaitSummaries():
   """Clean up all the wait summaries that are older than a certain age.
 
   Returns:
-    The rpc for the async delete call (mainly meant for tests).
+    The rpc for the async delete call.
   """
   logging.debug('DeleteOldWaitSummaries starting')
 

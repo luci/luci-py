@@ -37,7 +37,7 @@ def DeleteOldDimensionMapping():
   """Deletes mapping that haven't been seen in DIMENSION_MAPPING_DAYS_TO_LIVE.
 
   Returns:
-    The rpc for the async delete call (mainly meant for tests).
+    The rpc for the async delete call.
   """
   logging.debug('DeleteOldDimensions starting')
   old_cutoff = (datetime.date.today() -

@@ -579,18 +579,18 @@ class TestRunnerTest(unittest.TestCase):
     self._mox.VerifyAll()
 
   def testDeleteOrphanedBlobs(self):
-    self.assertEqual(0, test_runner.DeleteOrphanedBlobs())
+    self.assertEqual(0, len(test_runner.DeleteOrphanedBlobs()))
 
     # Add a runner with a blob and don't delete the blob.
     runner = test_helper.CreatePendingRunner()
     runner.result_string_reference = blobstore_helper.CreateBlobstore(
         'owned blob')
     runner.put()
-    self.assertEqual(0, test_runner.DeleteOrphanedBlobs())
+    self.assertEqual(0, len(test_runner.DeleteOrphanedBlobs()))
 
     # Add an orphaned blob and delete it.
     blobstore_helper.CreateBlobstore('orphaned blob')
-    self.assertEqual(1, test_runner.DeleteOrphanedBlobs())
+    self.assertEqual(1, len(test_runner.DeleteOrphanedBlobs()))
 
 if __name__ == '__main__':
   # We don't want the application logs to interfere with our own messages.

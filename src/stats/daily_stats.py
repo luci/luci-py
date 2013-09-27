@@ -127,7 +127,7 @@ def DeleteOldDailyStats():
   """Clean up all daily stats that are more than DAILY_STATS_LIFE_IN_DAYS old.
 
   Returns:
-    The rpc for the async delete call (mainly meant for tests).
+    The rpc for the async delete call.
   """
   logging.debug('DeleteOldDailyStats starting')
 

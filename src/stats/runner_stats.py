@@ -114,7 +114,7 @@ def DeleteOldRunnerStats():
   """Clean up all runners that are older than a certain age and done.
 
   Returns:
-    The rpc for the async delete call (mainly meant for tests).
+    The rpc for the async delete call.
   """
   logging.debug('DeleteOldRunnersStats starting')
 
