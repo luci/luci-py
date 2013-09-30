@@ -39,6 +39,8 @@ class Results(ndb.Model):
       key: The key of the Results to be deleted.
     """
     results = key.get()
+    if not results:
+      return
 
     for key in results.chunk_keys:
       key.delete_async()
