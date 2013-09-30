@@ -165,12 +165,15 @@ class TestRunner(ndb.Model):
 
   @classmethod
   def _pre_delete_hook(cls, key):  # pylint: disable=g-bad-name
-    """Delete the associated blob before deleting the runner.
+    """Delete the associated blob and result model before deleting the runner.
 
     Args:
       key: The key of the TestRunner to be deleted.
     """
     runner = key.get()
+    if not runner:
+      return
+
     # We delete the blob referenced by this model because no one
     # else will ever care about it or try to reference it, so we
     # are just cleaning up the blobstore.
