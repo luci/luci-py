@@ -114,7 +114,7 @@ def DeleteOldRunnerStats():
   """Clean up all runners that are older than a certain age and done.
 
   Returns:
-    The rpc for the async delete call.
+    The list of Futures for all the async delete calls.
   """
   logging.debug('DeleteOldRunnersStats starting')
 
@@ -129,8 +129,8 @@ def DeleteOldRunnerStats():
       RunnerStats.end_time < old_cutoff,
       default_options=ndb.QueryOptions(keys_only=True))
 
-  rpc = ndb.delete_multi_async(old_runner_stats_query)
+  futures = ndb.delete_multi_async(old_runner_stats_query)
 
   logging.debug('DeleteOldRunnersStats done')
 
-  return rpc
+  return futures

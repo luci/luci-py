@@ -674,6 +674,9 @@ class CleanupDataHandler(webapp2.RequestHandler):
 
   def post(self):  # pylint: disable=g-bad-name
     try:
+      # The blob deletion use a different rpc callback than the ndb models.
+      rpcs = test_runner.DeleteOldBlobs()
+
       futures = []
       futures.extend(test_management.DeleteOldErrors())
 
@@ -681,13 +684,19 @@ class CleanupDataHandler(webapp2.RequestHandler):
 
       futures.extend(test_runner.DeleteOldRunners())
 
-      futures.extend(test_runner.DeleteOrphanedBlobs())
-
       futures.extend(daily_stats.DeleteOldDailyStats())
 
       futures.extend(runner_stats.DeleteOldRunnerStats())
 
       futures.extend(runner_summary.DeleteOldWaitSummaries())
+
+      futures.extend(result_helper.DeleteOldResults())
+
+      futures.extend(result_helper.DeleteOldResultChunks())
+
+      # pylint: disable-msg=expression-not-assigned
+      [rpc.wait() for rpc in rpcs]
+      # pylint: enable-msg=expression-not-assigned
 
       ndb.Future.wait_all(futures)
 

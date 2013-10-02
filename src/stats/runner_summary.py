@@ -339,7 +339,7 @@ def DeleteOldWaitSummaries():
   """Clean up all the wait summaries that are older than a certain age.
 
   Returns:
-    The rpc for the async delete call.
+    The list of Futures for all the async delete calls.
   """
   logging.debug('DeleteOldWaitSummaries starting')
 
@@ -351,8 +351,8 @@ def DeleteOldWaitSummaries():
       WaitSummary.end_time < old_cutoff,
       default_options=ndb.QueryOptions(keys_only=True))
 
-  rpc = ndb.delete_multi_async(old_wait_summary_query)
+  futures = ndb.delete_multi_async(old_wait_summary_query)
 
   logging.debug('DeleteOldWaitSummaries done')
 
-  return rpc
+  return futures

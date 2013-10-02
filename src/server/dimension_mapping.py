@@ -37,15 +37,15 @@ def DeleteOldDimensionMapping():
   """Deletes mapping that haven't been seen in DIMENSION_MAPPING_DAYS_TO_LIVE.
 
   Returns:
-    The rpc for the async delete call.
+    The list of Futures for all the async delete calls.
   """
   logging.debug('DeleteOldDimensions starting')
   old_cutoff = (datetime.date.today() -
                 datetime.timedelta(days=DIMENSION_MAPPING_DAYS_TO_LIVE))
 
-  rpc = ndb.delete_multi_async(
+  futures = ndb.delete_multi_async(
       DimensionMapping.query(DimensionMapping.last_seen < old_cutoff,
                              default_options=ndb.QueryOptions(keys_only=True)))
 
   logging.debug('DeleteOldDimension done')
-  return rpc
+  return futures

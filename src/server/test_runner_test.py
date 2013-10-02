@@ -12,11 +12,13 @@ import unittest
 
 
 from google.appengine.api import datastore_errors
+from google.appengine.ext import blobstore
 from google.appengine.ext import testbed
 from google.appengine.ext import ndb
 
 from common import blobstore_helper
 from common import result_helper
+from common import swarm_constants
 from common import url_helper
 from server import test_helper
 from server import test_management
@@ -555,12 +557,12 @@ class TestRunnerTest(unittest.TestCase):
 
     # Set the current time to the future, but not too much.
     mock_now = (datetime.datetime.now() + datetime.timedelta(
-        days=test_runner.SWARM_FINISHED_RUNNER_TIME_TO_LIVE_DAYS - 1))
+        days=swarm_constants.SWARM_FINISHED_RUNNER_TIME_TO_LIVE_DAYS - 1))
     test_runner._GetCurrentTime().AndReturn(mock_now)
 
     # Set the current time to way in the future.
     mock_now = (datetime.datetime.now() + datetime.timedelta(
-        days=test_runner.SWARM_FINISHED_RUNNER_TIME_TO_LIVE_DAYS + 1))
+        days=swarm_constants.SWARM_FINISHED_RUNNER_TIME_TO_LIVE_DAYS + 1))
     test_runner._GetCurrentTime().AndReturn(mock_now)
     self._mox.ReplayAll()
 
@@ -578,19 +580,35 @@ class TestRunnerTest(unittest.TestCase):
 
     self._mox.VerifyAll()
 
-  def testDeleteOrphanedBlobs(self):
-    self.assertEqual(0, len(test_runner.DeleteOrphanedBlobs()))
+  def testDeleteOldBlobs(self):
+    # The first check should reveal a close time, when the second time shows
+    # the blob as old.
+    self._mox.StubOutWithMock(test_runner, '_GetCurrentTime')
+    test_runner._GetCurrentTime().AndReturn(
+        datetime.datetime.now() +
+        datetime.timedelta(
+            days=swarm_constants.SWARM_OLD_RESULTS_TIME_TO_LIVE_DAYS - 1))
+    test_runner._GetCurrentTime().AndReturn(
+        datetime.datetime.now() +
+        datetime.timedelta(
+            days=swarm_constants.SWARM_OLD_RESULTS_TIME_TO_LIVE_DAYS + 1))
 
-    # Add a runner with a blob and don't delete the blob.
-    runner = test_helper.CreatePendingRunner()
-    runner.result_string_reference = blobstore_helper.CreateBlobstore(
-        'owned blob')
-    runner.put()
-    self.assertEqual(0, len(test_runner.DeleteOrphanedBlobs()))
+    self._mox.ReplayAll()
 
-    # Add an orphaned blob and delete it.
+    # Add a blob and don't delete it when it is young.
     blobstore_helper.CreateBlobstore('orphaned blob')
-    self.assertEqual(1, len(test_runner.DeleteOrphanedBlobs()))
+    # pylint: disable-msg=expression-not-assigned
+    [rpc.wait() for rpc in test_runner.DeleteOldBlobs()]
+    # pylint: enable-msg=expression-not-assigned
+    self.assertEqual(1, blobstore.BlobInfo.all().count())
+
+    # Now the blob is old so delete it.
+    # pylint: disable-msg=expression-not-assigned
+    [rpc.wait() for rpc in test_runner.DeleteOldBlobs()]
+    # pylint: enable-msg=expression-not-assigned
+    self.assertEqual(0, blobstore.BlobInfo.all().count())
+
+    self._mox.VerifyAll()
 
 if __name__ == '__main__':
   # We don't want the application logs to interfere with our own messages.

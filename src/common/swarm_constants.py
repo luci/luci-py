@@ -2,9 +2,9 @@
 #
 # Copyright 2012 Google Inc. All Rights Reserved.
 
-"""Various swarm constants required by the server and the swarm slaves.
+"""Various swarm constants required by multiple files.
 
-This allows the swarm slaves to have this files and the needed variables without
+This allows the swarm slaves to have this file and the needed variables without
 having to download the whole swarm directory.
 """
 
@@ -52,3 +52,14 @@ SWARM_BOT_COMMON_FILES = [
     TEST_REQUEST_MESSAGE_SCRIPT,
     URL_HELPER_SCRIPT,
 ]
+
+# Number of days to keep old runners around for.
+SWARM_FINISHED_RUNNER_TIME_TO_LIVE_DAYS = 14
+
+# Number of days to keep results around before assuming they are orphans and
+# can be safely deleted. This value should always be more than
+# SWARM_FINISHED_RUNNER_TIME_TO_LIVE_DAYS to ensure they are orphans.
+# TODO(user): Move this to result_helper.py once blobstore_helper.py is
+# removed.
+SWARM_OLD_RESULTS_TIME_TO_LIVE_DAYS = (
+    SWARM_FINISHED_RUNNER_TIME_TO_LIVE_DAYS + 5)

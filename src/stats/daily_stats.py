@@ -127,7 +127,7 @@ def DeleteOldDailyStats():
   """Clean up all daily stats that are more than DAILY_STATS_LIFE_IN_DAYS old.
 
   Returns:
-    The rpc for the async delete call.
+    The list of Futures for all the async delete calls.
   """
   logging.debug('DeleteOldDailyStats starting')
 
@@ -138,8 +138,8 @@ def DeleteOldDailyStats():
       DailyStats.date < old_cutoff,
       default_options=ndb.QueryOptions(keys_only=True))
 
-  rpc = ndb.delete_multi_async(old_daily_stats_query)
+  futures = ndb.delete_multi_async(old_daily_stats_query)
 
   logging.debug('DeleteOldDailyStats done')
 
-  return rpc
+  return futures

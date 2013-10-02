@@ -20,6 +20,7 @@ from google.appengine.ext import ndb
 
 from common import blobstore_helper
 from common import result_helper
+from common import swarm_constants
 from common import test_request_message
 from common import url_helper
 from stats import machine_stats
@@ -28,9 +29,6 @@ from stats import runner_stats
 # The maximum number of times to retry a runner that has failed for a swarm
 # related reasons (like the machine timing out).
 MAX_AUTOMATIC_RETRIES = 3
-
-# Number of days to keep old runners around for.
-SWARM_FINISHED_RUNNER_TIME_TO_LIVE_DAYS = 14
 
 # The amount of time, in minutes, that a runner must wait before it is
 # considered to be hanging (this is usually a sign that the machines that can
@@ -769,13 +767,14 @@ def DeleteOldRunners():
   """Clean up all runners that are older than a certain age and done.
 
   Returns:
-    The rpc for the async delete call.
+    The list of all the Futures for the async delete calls.
   """
   logging.debug('DeleteOldRunners starting')
 
   old_cutoff = (
       _GetCurrentTime() -
-      datetime.timedelta(days=SWARM_FINISHED_RUNNER_TIME_TO_LIVE_DAYS))
+      datetime.timedelta(
+          days=swarm_constants.SWARM_FINISHED_RUNNER_TIME_TO_LIVE_DAYS))
 
   # '!= None' must be used instead of 'is not None' because these arguments
   # become part of a GQL query, where 'is not None' is invalid syntax.
@@ -784,27 +783,36 @@ def DeleteOldRunners():
       TestRunner.ended < old_cutoff,
       default_options=ndb.QueryOptions(keys_only=True))
 
-  rpc = ndb.delete_multi_async(old_runner_query)
+  futures = ndb.delete_multi_async(old_runner_query)
 
   logging.debug('DeleteOldRunners done')
 
-  return rpc
+  return futures
 
 
 # TODO(user): Delete this in a follow up cl.
 # Keeping this will allow servers to delete the old blobs over time, instead
 # of having to clear them all at once.
-def DeleteOrphanedBlobs():
-  """Remove all the orphaned blobs."""
+def DeleteOldBlobs():
+  """Remove all the orphaned blobs.
+
+  Returns:
+    The list of rpcs for the async delete calls.
+  """
   logging.debug('DeleteOrphanedBlobs starting')
 
-  blobstore_query = blobstore.BlobInfo.all().order('creation')
+  old_cutoff = (
+      _GetCurrentTime() -
+      datetime.timedelta(
+          days=swarm_constants.SWARM_OLD_RESULTS_TIME_TO_LIVE_DAYS))
 
-  rpcs = []
-  for blob in blobstore_query:
-    if not TestRunner.gql('WHERE result_string_reference = :1',
-                          blob.key()).count(limit=1):
-      rpcs.append(blobstore.delete_async(blob.key()))
+  old_blobinfo_query = blobstore.BlobInfo.gql(
+      'WHERE creation < :1',
+      old_cutoff,
+      default_options=ndb.QueryOptions(keys_only=True))
+
+  rpcs = [blobstore.delete_async(old_blobinfo.key())
+          for old_blobinfo in old_blobinfo_query]
 
   logging.debug('DeleteOrphanedBlobs done')
 

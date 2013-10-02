@@ -598,7 +598,7 @@ def DeleteOldErrors():
   """Cleans up errors older than a certain age.
 
   Returns:
-    The rpc for the async delete call.
+    The list of all the Futures for the async delete calls.
   """
   logging.debug('DeleteOldErrors starting')
   old_cutoff = (
@@ -608,11 +608,11 @@ def DeleteOldErrors():
   old_error_query = SwarmError.query(
       SwarmError.created < old_cutoff,
       default_options=ndb.QueryOptions(keys_only=True))
-  rpc = ndb.delete_multi_async(old_error_query)
+  futures = ndb.delete_multi_async(old_error_query)
 
   logging.debug('DeleteOldErrors done')
 
-  return rpc
+  return futures
 
 
 def SlaveVersion():
