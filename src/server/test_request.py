@@ -15,12 +15,12 @@ complete details.
 
 
 import hashlib
+import logging
 
 from google.appengine.ext import ndb
 
 from common import dimensions_utils
 from common import test_request_message
-from server import test_runner
 
 
 # The number of digits from the hash digest to use when determining the
@@ -93,10 +93,8 @@ class TestRequest(ndb.Model):
   # The name for this test request.
   name = ndb.StringProperty()
 
-  @property
-  @ndb.transactional
-  def runners(self):
-    return test_runner.TestRunner.query(ancestor=self.key)
+  # The runners associated with this runner.
+  runner_keys = ndb.KeyProperty(kind='TestRunner', repeated=True)
 
   def __init__(self, *args, **kwargs):
     # 'parent' can be the first arg or a keyword, only add a parent if there
@@ -154,18 +152,17 @@ class TestRequest(ndb.Model):
     return dimensions_utils.GenerateDimensionHash(
         self.GetConfiguration(config_name).dimensions)
 
-  def GetAllKeys(self):
-    """Get all the keys representing the TestRunners owned by this instance.
+  def RemoveRunner(self, runner_key):
+    if runner_key in self.runner_keys:
+      self.runner_keys.remove(runner_key)
+      self.put()
+    else:
+      logging.error('Attempted to remove a runner key from a TestRequest that '
+                    'doesn\'t contain that runner.')
 
-    Returns:
-      A list of all the keys.
-    """
-    return [runner.key for runner in self.runners]
-
-  def DeleteIfNoMoreRunners(self):
     # Delete this request if we have deleted all the runners that were created
     # because of it.
-    if self.runners.count() == 0:
+    if not self.runner_keys:
       self.key.delete()
 
 

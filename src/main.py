@@ -922,7 +922,7 @@ class GetMatchingTestCasesHandler(webapp2.RequestHandler):
     matches = test_request.GetAllMatchingTestRequests(test_case_name)
     keys = []
     for match in matches:
-      keys.extend([key.urlsafe() for key in match.GetAllKeys()])
+      keys.extend([key.urlsafe() for key in match.runner_keys])
 
     logging.info('Found %d keys in %d TestRequests', len(keys), len(matches))
     if keys:

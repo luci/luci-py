@@ -11,6 +11,7 @@ import unittest
 
 from google.appengine.datastore import datastore_stub_util
 from google.appengine.ext import testbed
+
 from server import test_helper
 from server import test_request
 
@@ -26,18 +27,24 @@ class TestRequestTest(unittest.TestCase):
     self.testbed.deactivate()
 
   def testGetTestRequestKeys(self):
+   # Ensure that matching works even when the datastore is not being
+    # consistent.
+    self.policy = datastore_stub_util.PseudoRandomHRConsistencyPolicy(
+        probability=0)
+    self.testbed.init_datastore_v3_stub(consistency_policy=self.policy)
+
     # Ensure it works with no keys.
     empty_test_request = test_helper.CreateRequest(num_instances=0)
-    self.assertEqual(0, len(empty_test_request.GetAllKeys()))
+    self.assertEqual(0, len(empty_test_request.runner_keys))
 
     # Try with one runner.
     request = test_helper.CreateRequest(num_instances=1)
-    self.assertEqual(1, len(request.GetAllKeys()))
+    self.assertEqual(1, len(request.runner_keys))
 
     # Test with more than 1 runner.
     instances = 5
     request = test_helper.CreateRequest(num_instances=instances)
-    self.assertEqual(instances, len(request.GetAllKeys()))
+    self.assertEqual(instances, len(request.runner_keys))
 
   def testGetMatchingTestRequests(self):
     # Ensure that matching works even when the datastore is not being
@@ -73,14 +80,14 @@ class TestRequestTest(unittest.TestCase):
     request.put()
     self.assertEqual(1, test_request.TestRequest.query().count())
 
-    request.DeleteIfNoMoreRunners()
+    request.RemoveRunner(None)
     self.assertEqual(0, test_request.TestRequest.query().count())
 
     # Create a request with runner and ensure it isn't deleted.
     request = test_helper.CreateRequest(1)
     self.assertEqual(1, test_request.TestRequest.query().count())
 
-    request.DeleteIfNoMoreRunners()
+    request.RemoveRunner(None)
     self.assertEqual(1, test_request.TestRequest.query().count())
 
 

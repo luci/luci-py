@@ -140,6 +140,12 @@ def ExecuteTestRequest(request_message):
                                      'instance_index': instance_index,
                                      'num_instances': config.num_instances,
                                      'test_key': runner.key.urlsafe()})
+      # Ensure that the request has the keys of all its runners.
+      request.runner_keys.append(runner.key)
+
+  # Save the request to save the runner keys.
+  request.put()
+
   return test_keys
 
 
@@ -159,7 +165,7 @@ def _QueueTestRequestConfig(request, config, config_hash):
   # Create a runner entity to record this request/config pair that needs
   # to be run. The runner will eventually be scheduled at a later time.
   runner = test_runner.TestRunner(
-      parent=request.key, config_name=config.config_name,
+      request=request.key, config_name=config.config_name,
       config_hash=config_hash, config_instance_index=config.instance_index,
       num_config_instances=config.num_instances, priority=config.priority)
 

@@ -59,9 +59,7 @@ def _GetCurrentTime():
 class TestRunner(ndb.Model):
 
   # The test being run.
-  @property
-  def request(self):
-    return self.key.parent()
+  request = ndb.KeyProperty(kind='TestRequest')
 
   # The name of the request's configuration being tested.
   config_name = ndb.StringProperty()
@@ -760,7 +758,7 @@ def DeleteRunner(runner):
   """
   request = runner.request
   runner.key.delete()
-  request.get().DeleteIfNoMoreRunners()
+  request.get().RemoveRunner(runner.key)
 
 
 def DeleteOldRunners():

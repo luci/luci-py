@@ -33,10 +33,13 @@ def _CreateRunner(request, config_name):
     The newly created runner.
   """
   runner = test_runner.TestRunner(
-      parent=request.key,
+      request=request.key,
       config_name=config_name,
       config_hash=request.GetConfigurationDimensionHash(config_name))
   runner.put()
+
+  request.runner_keys.append(runner.key)
+  request.put()
 
   return runner
 

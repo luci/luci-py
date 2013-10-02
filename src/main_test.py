@@ -15,6 +15,7 @@ import unittest
 
 
 from google.appengine.api import apiproxy_stub_map
+from google.appengine.datastore import datastore_stub_util
 from google.appengine.ext import testbed
 from  import main as main_app
 from common import dimensions_utils
@@ -76,6 +77,20 @@ class AppTest(unittest.TestCase):
       self.testbed.setup_env(overwrite=True)
 
   def testMatchingTestCasesHandler(self):
+    # Ensure that matching works even when the datastore is not being
+    # consistent.
+    self.policy = datastore_stub_util.PseudoRandomHRConsistencyPolicy(
+        probability=0)
+    self.testbed.init_datastore_v3_stub(consistency_policy=self.policy)
+
+    # Mock out all the authenication, since it doesn't work with the server
+    # being only eventually consisten (but it is ok for the machines to take
+    # a while to appear).
+    self._mox.StubOutWithMock(main_app, 'IsAuthenticatedMachine')
+    for _ in range(3):
+      main_app.IsAuthenticatedMachine(mox.IgnoreArg()).AndReturn(True)
+    self._mox.ReplayAll()
+
     # Test when no matching tests.
     response = self.app.get(
         '/get_matching_test_cases',
@@ -102,6 +117,8 @@ class AppTest(unittest.TestCase):
     self.assertTrue(str(runner.key.urlsafe()) in response.body, response.body)
     self.assertTrue(str(additional_test_runner.key.urlsafe()) in response.body,
                     response.body)
+
+    self._mox.VerifyAll()
 
   def testGetResultHandler(self):
     handlers = ['/get_result', '/secure/get_result']
