@@ -14,6 +14,7 @@ import sys
 import unittest
 
 
+from google.appengine.api import apiproxy_stub_map
 from google.appengine.ext import testbed
 from  import main as main_app
 from common import dimensions_utils
@@ -40,6 +41,11 @@ class AppTest(unittest.TestCase):
     self.testbed = testbed.Testbed()
     self.testbed.activate()
     self.testbed.init_all_stubs()
+
+    # Ensure the test can find queue.yaml.
+    queue_yaml_directory = os.path.dirname(__file__)
+    taskqueue_stub = apiproxy_stub_map.apiproxy.GetStub('taskqueue')
+    taskqueue_stub._root_path = queue_yaml_directory
 
     # Some tests require this to be set.
     os.environ['CURRENT_VERSION_ID'] = '1.1'

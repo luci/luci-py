@@ -695,7 +695,8 @@ class CleanupDataHandler(webapp2.RequestHandler):
     except datastore_errors.Timeout:
       logging.info('Ran out of time while cleaning up data. Triggering '
                    'another cleanup.')
-      taskqueue.add(method='POST', url='/task_queues/cleanup_data')
+      taskqueue.add(method='POST', url='/task_queues/cleanup_data',
+                    queue_name='cleanup')
 
 
 class CronJobHandler(webapp2.RequestHandler):
@@ -734,7 +735,8 @@ class TriggerCleanupDataHandler(CronJobHandler):
   """Handles cron jobs to delete orphaned blobs."""
 
   def post(self):  # pylint: disable=g-bad-name
-    taskqueue.add(method='POST', url='/task_queues/cleanup_data')
+    taskqueue.add(method='POST', url='/task_queues/cleanup_data',
+                  queue_name='cleanup')
     self.response.out.write('Successfully triggered task to clean up old data.')
 
 
@@ -742,7 +744,8 @@ class TriggerGenerateDailyStats(CronJobHandler):
   """Handles cron jobs to generate daily stats."""
 
   def post(self):  # pylint: disable-msg=g-bad-name
-    taskqueue.add(method='POST', url='/task_queues/generate_daily_stats')
+    taskqueue.add(method='POST', url='/task_queues/generate_daily_stats',
+                  queue_name='stats')
     self.response.out.write('Successfully triggered task to generate daily '
                             'stats.')
 
@@ -751,7 +754,8 @@ class TriggerGenerateRecentStats(CronJobHandler):
   """Handles cron jobs to generate recent stats."""
 
   def post(self):   # pylint: disable-msg=g-bad-name
-    taskqueue.add(method='POST', url='/task_queues/generate_recent_stats')
+    taskqueue.add(method='POST', url='/task_queues/generate_recent_stats',
+                  queue_name='stats')
     self.response.out.write('Successfully triggered task to generate recent '
                             'stats.')
 
