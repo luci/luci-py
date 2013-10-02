@@ -451,45 +451,42 @@ class TestRunnerTest(unittest.TestCase):
 
     runner = test_helper.CreatePendingRunner(machine_id=MACHINE_IDS[0])
 
-    # Wrap the function call in ndb.toplevel to ensure all asysnc calls
-    # terminate before we return
-    @ndb.toplevel
-    def CallUpdateTestResult(results=None, errors=None, overwrite=False):
-      return runner.UpdateTestResult(runner.machine_id,
-                                     results=results,
-                                     errors=errors,
-                                     overwrite=overwrite)
-
     # First results, always accepted.
-    self.assertTrue(CallUpdateTestResult(
+    self.assertTrue(runner.UpdateTestResult(
+        runner.machine_id,
         results=result_helper.StoreResults(messages[0])))
     # Always ensure that there is only one stored result.
     self.assertEqual(1, result_helper.Results.query().count())
 
     # The first result resent, accepted since the strings are equal.
-    self.assertTrue(CallUpdateTestResult(
+    self.assertTrue(runner.UpdateTestResult(
+        runner.machine_id,
         results=result_helper.StoreResults(messages[0])))
     self.assertEqual(1, result_helper.Results.query().count())
 
     # Non-first request without overwrite, rejected.
-    self.assertFalse(CallUpdateTestResult(
+    self.assertFalse(runner.UpdateTestResult(
+        runner.machine_id,
         results=result_helper.StoreResults(messages[1]),
         overwrite=False))
     self.assertEqual(1, result_helper.Results.query().count())
 
     # Non-first request with overwrite, accepted.
-    self.assertTrue(CallUpdateTestResult(
+    self.assertTrue(runner.UpdateTestResult(
+        runner.machine_id,
         results=result_helper.StoreResults(messages[2]),
         overwrite=True))
     self.assertEqual(1, result_helper.Results.query().count())
 
     # Accept the first message as an error with overwrite.
-    self.assertTrue(CallUpdateTestResult(errors=messages[0],
-                                         overwrite=True))
+    self.assertTrue(runner.UpdateTestResult(runner.machine_id,
+                                            errors=messages[0],
+                                            overwrite=True))
 
     # Accept the first message as an error again, since it is equal to what is
     # already stored.
-    self.assertTrue(CallUpdateTestResult(errors=messages[0]))
+    self.assertTrue(runner.UpdateTestResult(runner.machine_id,
+                                            errors=messages[0]))
 
     # Make sure there are no results now, since errors are just stored as
     # strings.

@@ -9,6 +9,7 @@
 import logging
 import unittest
 
+from google.appengine.datastore import datastore_stub_util
 from google.appengine.ext import testbed
 from server import test_helper
 from server import test_request
@@ -39,6 +40,12 @@ class TestRequestTest(unittest.TestCase):
     self.assertEqual(instances, len(request.GetAllKeys()))
 
   def testGetMatchingTestRequests(self):
+    # Ensure that matching works even when the datastore is not being
+    # consistent.
+    self.policy = datastore_stub_util.PseudoRandomHRConsistencyPolicy(
+        probability=0)
+    self.testbed.init_datastore_v3_stub(consistency_policy=self.policy)
+
     request_name = 'request'
 
     # Ensure it works with no matches.

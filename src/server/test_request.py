@@ -14,19 +14,36 @@ complete details.
 
 
 
+import hashlib
+
 from google.appengine.ext import ndb
 
 from common import dimensions_utils
 from common import test_request_message
 from server import test_runner
 
-# The key for the model that is the parent of every TestRequest. This parent
-# allows transaction queries on TestRequest.
-TEST_REQUEST_PARENT_KEY = 'test_request_parent_key'
+
+# The number of digits from the hash digest to use when determining the
+# TestRequestParent to use. If there are too many TestRequests per parent and
+# collisions are becoming a problem (since app engine only supports ~1 write per
+# second to an entity group), this number may be increased to reduce the size
+# of entity groups.
+# See https://developers.google.com/appengine/docs/python/
+# datastore/structuring_for_strong_consistency for more details.
+# With the current value of 2, the app should be able to handle roughly 256
+# TestRequest creations per second (since that is the only time we write to
+# them).
+HEXDIGEST_DIGITS_TO_USE = 2
 
 
 class TestRequestParent(ndb.Model):
-  """A dummy model class that is the parent of every TestRequest."""
+  """A dummy model class that is the parent of a group of TestRequest.
+
+  For a given TestRequestParent, all the children will have the same sha256
+  hexdigest of their name. We need this parent to allow our query in
+  GetAllMatchingTestRequests to be able to actually find all the test requests
+  (by providing data consistency).
+  """
   pass
 
 
@@ -50,13 +67,18 @@ def GetTestCase(request_message):
   return request_object
 
 
-def GetTestRequestParent():
-  """Gets the parent model for all TestRequests.
+def GetTestRequestParent(test_case_name):
+  """Gets the parent model for TestRequests with this test_case_name.
+
+  Args:
+    test_case_name: The test case name of the TestRequest that is looking for
+        a parent.
 
   Returns:
-    The parent model for all TestRequests.
+    The parent model for all TestRequests with this test_case_name.
   """
-  return TestRequestParent.get_or_insert(TEST_REQUEST_PARENT_KEY)
+  hexdigest = hashlib.sha256(test_case_name).hexdigest()
+  return TestRequestParent.get_or_insert(hexdigest[:HEXDIGEST_DIGITS_TO_USE])
 
 
 class TestRequest(ndb.Model):
@@ -80,7 +102,7 @@ class TestRequest(ndb.Model):
     # 'parent' can be the first arg or a keyword, only add a parent if there
     # isn't one.
     if not args and 'parent' not in kwargs:
-      parent_model = GetTestRequestParent()
+      parent_model = GetTestRequestParent(kwargs.get('name', ''))
       kwargs['parent'] = parent_model.key
 
     super(TestRequest, self).__init__(*args, **kwargs)
@@ -156,7 +178,7 @@ def GetAllMatchingTestRequests(test_case_name):
   Returns:
     A list of all Test Requests that have |test_case_name| as their name.
   """
-  parent_model = GetTestRequestParent()
+  parent_model = GetTestRequestParent(test_case_name)
 
   # Perform the query in a transaction to ensure that it gets the most recent
   # data, otherwise it is possible for one machine to add tests, and then be

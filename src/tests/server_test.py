@@ -111,6 +111,9 @@ class _SwarmTestCase(unittest.TestCase):
     swarm_server_port = '8181'
     self._swarm_server_url = '%s:%s' % (swarm_server_addr, swarm_server_port)
 
+    # TODO(user): Eventually add --datastore_consistency_policy=random
+    # to ensure we are properly handling datastore inconsistency. This should be
+    # possible once this project lives fully in the open source world.
     _SwarmTestProgram.options.appengine_cmds.extend(
         ['-c', '-p %s' % swarm_server_port, '--skip_sdk_update_check',
          _SwarmTestProgram.options.swarm_path])
