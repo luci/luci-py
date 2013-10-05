@@ -377,6 +377,22 @@ def save_in_memcache(namespace, hash_key, content, async=False):
     logging.error(e)
 
 
+def enqueue_task(url, queue_name, payload=None, name=None):
+  """Adds a task to a task queue.
+
+  It will be executed by a separate backend module that runs same version as
+  currently executing instance.
+  """
+  # Note that just using 'target=module' here would redirect task request to
+  # a default version of a module, not the currently executing one.
+  return taskqueue.add(
+      url=url,
+      queue_name=queue_name,
+      payload=payload,
+      name=name,
+      headers={'Host': config.get_task_queue_host()})
+
+
 ### Restricted handlers
 
 
@@ -470,7 +486,7 @@ class RestrictedCleanupTriggerHandler(webapp2.RequestHandler):
       # the date at second precision, there's no point in triggering each of
       # time more than once a second anyway.
       now = datetime.datetime.utcnow().strftime('%Y-%m-%d_%I-%M-%S')
-      taskqueue.add(url=url, queue_name='cleanup', name=name + '_' + now)
+      enqueue_task(url, 'cleanup', name=name + '_' + now)
       self.response.out.write('Triggered %s' % url)
     else:
       self.abort(404, 'Unknown job')
@@ -672,7 +688,7 @@ class RestrictedStoreBlobstoreContentByHashHandler(
     # long to complete.
     url = '/restricted/taskqueue/verify/%s/%s' % (namespace, hash_key)
     try:
-      taskqueue.add(url=url, queue_name='verify')
+      enqueue_task(url, 'verify')
     except runtime.DeadlineExceededError as e:
       msg = 'Unable to add task to verify blob.\n%s' % e
       logging.warning(msg)
@@ -787,7 +803,7 @@ class ContainsHashHandler(acl.ACLRequestHandler):
         url = '/restricted/taskqueue/tag/%s/%s' % (
             namespace, datetime.date.today())
         try:
-          taskqueue.add(url=url, payload=hashes_to_tag, queue_name='tag')
+          enqueue_task(url, 'tag', payload=hashes_to_tag)
         except (taskqueue.Error, runtime.DeadlineExceededError) as e:
           logging.warning(
               'Problem adding task to update last_access. These '
@@ -1085,10 +1101,10 @@ class PreUploadContentHandlerGS(acl.ACLRequestHandler):
     """Enqueues a task to update last_access time for given entries."""
     url = '/restricted/taskqueue/tag/%s/%s' % (namespace, datetime.date.today())
     try:
-      taskqueue.add(
+      enqueue_task(
           url=url,
-          payload=''.join(binascii.unhexlify(e.digest) for e in entries),
-          queue_name='tag')
+          queue_name='tag',
+          payload=''.join(binascii.unhexlify(e.digest) for e in entries))
     except (taskqueue.Error, runtime.DeadlineExceededError) as e:
       logging.warning(
           'Problem adding task to update last_access. These '
@@ -1417,7 +1433,7 @@ class StoreContentHandlerGS(acl.ACLRequestHandler):
     if needs_verification and not config.is_local_dev_server():
       url = '/restricted/taskqueue/verify/%s/%s' % (namespace, hash_key)
       try:
-        taskqueue.add(url=url, queue_name='verify')
+        enqueue_task(url, 'verify')
       except (taskqueue.Error, runtime.DeadlineExceededError) as e:
         # TODO(vadimsh): Don't fail whole request here, because several RPCs are
         # required to roll it back and there isn't much time left

@@ -11,9 +11,8 @@ import signal
 import subprocess
 import sys
 
+import app_config
 import find_gae_sdk
-
-APP_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 def main():
@@ -26,7 +25,7 @@ def main():
       help='Path to AppEngine SDK. Will try to find by itself.')
   options, args = parser.parse_args()
 
-  options.sdk_path = options.sdk_path or find_gae_sdk.find_gae_sdk(APP_DIR)
+  options.sdk_path = options.sdk_path or find_gae_sdk.find_gae_sdk()
   if not options.sdk_path:
     parser.error('Failed to find the AppEngine SDK. Pass --sdk-path argument.')
 
@@ -34,12 +33,11 @@ def main():
       sys.executable,
       os.path.join(options.sdk_path, 'dev_appserver.py'),
       '--skip_sdk_update_check=yes',
-      APP_DIR,
-  ] + args
+  ] + app_config.MODULES + args
 
   # Let dev_appserver.py handle interrupts.
   signal.signal(signal.SIGINT, signal.SIG_IGN)
-  return subprocess.call(cmd, cwd=APP_DIR)
+  return subprocess.call(cmd, cwd=app_config.APP_DIR)
 
 
 if __name__ == '__main__':

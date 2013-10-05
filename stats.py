@@ -12,17 +12,18 @@ log entry at info level per request.
 import datetime
 import json
 import logging
-import os
 
 # The app engine headers are located locally, so don't worry about not finding
 # them.
 # pylint: disable=E0611,F0401
 import webapp2
 from google.appengine.api import logservice
+from google.appengine.api import modules
 from google.appengine.ext import ndb
 from google.appengine.runtime import DeadlineExceededError
 # pylint: enable=E0611,F0401
 
+import config
 import stats_framework
 import template
 
@@ -110,7 +111,15 @@ _PREFIX = 'Stats: '
 # Number of minutes to ignore because they are too fresh. This is done so that
 # eventual log consistency doesn't have to be managed explicitly. On the dev
 # server, there's no eventual inconsistency so process up to the last minute.
-_TOO_RECENT = 5 if not os.environ['SERVER_SOFTWARE'].startswith('Dev') else 1
+_TOO_RECENT = 5 if not config.is_local_dev_server() else 1
+
+
+def _get_module_version_list(module_list):
+  """Returns a list of pairs (module name, version name) to fetch logs for."""
+  result = []
+  for module in module_list:
+    result.extend((module, ver) for ver in modules.get_versions(module))
+  return result
 
 
 def _parse_line(line, values):
@@ -142,15 +151,18 @@ def _parse_line(line, values):
 
 def _extract_snapshot_from_logs(start_time, end_time):
   """Processes the logs to harvest data and return a Snapshot instance."""
+  # TODO(vadimsh): Cache result of _get_module_version_list for a duration of
+  # /stats/update request?
   values = Snapshot()
   for entry in logservice.fetch(
       start_time=start_time,
       end_time=end_time,
       minimum_log_level=logservice.LOG_LEVEL_INFO,
       include_incomplete=True,
-      include_app_logs=True):
+      include_app_logs=True,
+      module_versions=_get_module_version_list(config.STATS_MODULES)):
     # Ignore other urls.
-    if not entry.resource.startswith(('/content/', '/restricted/content/')):
+    if not entry.resource.startswith(config.STATS_REQUEST_PATHS):
       continue
 
     values.requests += 1

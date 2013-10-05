@@ -25,10 +25,22 @@ import os
 # them.
 # pylint: disable=E0611,F0401
 from google.appengine.api import app_identity
+from google.appengine.api import modules
 from google.appengine.ext import ndb
 # pylint: enable=E0611,F0401
 
 import utils
+
+
+# App engine module to run task queue tasks on.
+TASK_QUEUE_MODULE = 'backend'
+
+# Requests that can possibly produce stats log entries.
+STATS_REQUEST_PATHS = ('/content/', '/content-gs/', '/restricted/content/')
+
+# Modules that can possibly produce stats log entries.
+STATS_MODULES = ('default',)
+
 
 
 class GlobalConfig(ndb.Model):
@@ -94,6 +106,19 @@ def is_local_dev_server():
 
 
 def get_app_version():
-  """Returns currently running version (as seen in app engine console)."""
-  # os.environ['CURRENT_VERSION_ID'] has a form <version>.370477462622784206.
-  return os.environ['CURRENT_VERSION_ID'].split('.')[0]
+  """Returns currently running version (not necessary a default one)."""
+  return modules.get_current_version_name()
+
+
+def get_task_queue_host():
+  """Returns domain name of app engine instance to run a task queue task on.
+
+  This domain name points to a matching version of appropriate app engine
+  module - <version>.<module>.isolateserver.appspot.com where:
+    version: version of the module that is calling this function.
+    module: app engine module to execute task on.
+
+  That way a task enqueued from version 'A' of default module would be executed
+  on same version 'A' of backend module.
+  """
+  return modules.get_hostname(module=TASK_QUEUE_MODULE)

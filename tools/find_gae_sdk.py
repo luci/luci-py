@@ -5,6 +5,7 @@
 """Finds AppEngine SDK."""
 
 import os
+import subprocess
 import sys
 
 # pylint doesn't know where the AppEngine SDK is, so silence these errors.
@@ -13,7 +14,11 @@ import sys
 # pylint: disable=E0611,F0401
 
 
-def find_gae_sdk(search_dir):
+# Directory with this file.
+TOOLS_DIR = os.path.dirname(os.path.abspath(__file__))
+
+
+def find_gae_sdk(search_dir=TOOLS_DIR):
   """Returns the path to GAE SDK if found, else None."""
   # First search up the directories up to root.
   while True:
@@ -50,4 +55,34 @@ def default_app_id(app_dir):
   """Returns the application name."""
   import yaml
 
-  return yaml.load(open(os.path.join(app_dir, 'app.yaml')))['application']
+  with open(os.path.join(app_dir, 'app.yaml')) as f:
+    return yaml.load(f)['application']
+
+
+def get_app_modules(app_dir, module_files):
+  """Returns a list of app module names (fetched from |module_files| yamls)."""
+  import yaml
+
+  modules = []
+  for name in module_files:
+    with open(os.path.join(app_dir, name)) as f:
+      modules.append(yaml.load(f)['module'])
+  return modules
+
+
+def appcfg(app_dir, args, sdk_path, app_id=None, version=None, verbose=False):
+  """Runs appcfg.py subcommand in |app_dir| and returns its exit code."""
+  cmd = [
+      sys.executable,
+      os.path.join(sdk_path, 'appcfg.py'),
+      '--oauth2',
+      '--noauth_local_webserver',
+  ]
+  if version:
+    cmd.extend(('--version', version))
+  if app_id:
+    cmd.extend(('--application', app_id))
+  if verbose:
+    cmd.append('--verbose')
+  cmd.extend(args)
+  return subprocess.call(cmd, cwd=app_dir)

@@ -9,20 +9,18 @@ checkout state.
 
 import logging
 import optparse
-import os
 import subprocess
 import sys
 
+import app_config
 import find_gae_sdk
 
-APP_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+def git(cmd, cwd):
+  return subprocess.check_output(['git'] + cmd, cwd=cwd)
 
 
-def git(cmd):
-  return subprocess.check_output(['git'] + cmd, cwd=APP_DIR)
-
-
-def get_pseudo_revision(remote, baserev_tag_name):
+def get_pseudo_revision(app_dir, remote, baserev_tag_name):
   """Returns the pseudo revision number and commit hash describing
   the base upstream commit this branch is based on.
 
@@ -52,8 +50,8 @@ def get_pseudo_revision(remote, baserev_tag_name):
     - pseudo revision number as a int
     - upstream commit hash this branch is based of.
   """
-  mergebase = git(['merge-base', 'HEAD', remote]).rstrip()
-  describe = git(['describe', mergebase]).rstrip()
+  mergebase = git(['merge-base', 'HEAD', remote], cwd=app_dir).rstrip()
+  describe = git(['describe', mergebase], cwd=app_dir).rstrip()
   if not describe.startswith(baserev_tag_name + '-'):
     print >> sys.stderr, 'Make sure to run git fetch --tags'
     sys.exit(1)
@@ -66,15 +64,16 @@ def get_pseudo_revision(remote, baserev_tag_name):
   return pseudo_revision, mergebase
 
 
-def calculate_version(tag):
+def calculate_version(app_dir, tag):
   """Returns a tag for a git checkout.
 
   Uses the pseudo revision number from the upstream commit this branch is based
   on, the abbreviated commit hash. Adds -tainted if the code is not
   pristine and optionally adds a tag to further describe it.
   """
-  pseudo_revision, mergebase = get_pseudo_revision('origin/master', 'baserev')
-  head = git(['rev-parse', 'HEAD']).rstrip()
+  pseudo_revision, mergebase = get_pseudo_revision(
+      app_dir, 'origin/master', 'baserev')
+  head = git(['rev-parse', 'HEAD'], cwd=app_dir).rstrip()
 
   logging.info('head: %s, mergebase: %s', head, mergebase)
   if head != mergebase:
@@ -82,7 +81,8 @@ def calculate_version(tag):
   else:
     # Look for local uncommitted diff.
     pristine = not (
-        git(['diff', mergebase]) or git(['diff', '--cached', mergebase]))
+        git(['diff', mergebase], cwd=app_dir) or
+        git(['diff', '--cached', mergebase], cwd=app_dir))
     logging.info('was diff clear? %s', pristine)
 
   # Trim it to 7 characters like 'git describe' does. 40 characters is
@@ -100,6 +100,8 @@ def main():
   parser.add_option('-v', '--verbose', action='store_true')
   parser.add_option('-A', '--app-id', help='Defaults to name in app.yaml')
   parser.add_option(
+      '-m', '--module', action='append', help='Module yaml to update')
+  parser.add_option(
       '-t', '--tag', help='Tag to attach to a tainted version')
   parser.add_option(
       '-s', '--sdk-path',
@@ -109,35 +111,38 @@ def main():
 
   if args:
     parser.error('Unknown arguments, %s' % args)
-  options.sdk_path = options.sdk_path or find_gae_sdk.find_gae_sdk(APP_DIR)
+  options.sdk_path = options.sdk_path or find_gae_sdk.find_gae_sdk()
   if not options.sdk_path:
     parser.error('Failed to find the AppEngine SDK. Pass --sdk-path argument.')
 
   find_gae_sdk.setup_gae_sdk(options.sdk_path)
-  options.app_id = options.app_id or find_gae_sdk.default_app_id(APP_DIR)
+  options.app_id = (
+      options.app_id or find_gae_sdk.default_app_id(app_config.APP_DIR))
 
-  version = calculate_version(options.tag)
-  cmd = [
-      sys.executable,
-      os.path.join(options.sdk_path, 'appcfg.py'),
-      'update',
-      '--oauth2',
-      '--noauth_local_webserver',
-      '--version', version,
-      APP_DIR,
-  ]
+  version = calculate_version(app_config.APP_DIR, options.tag)
+  modules = options.module or app_config.MODULES
 
-  if options.app_id:
-    cmd.extend(('--application', options.app_id))
+  # 'appcfg.py update <list of modules>' does not update the rest of app engine
+  # app like 'appcfg.py update <app dir>' does. It updates only modules. So do
+  # index, queues, etc. updates manually afterwards.
+  commands = (
+      ['update'] + modules,
+      ['update_indexes', '.'],
+      ['update_queues', '.'],
+      ['update_cron', '.'],
+  )
 
-  if options.verbose:
-    cmd.append('--verbose')
+  for cmd in commands:
+    ret = find_gae_sdk.appcfg(app_config.APP_DIR, cmd, options.sdk_path,
+      options.app_id, version, options.verbose)
+    if ret:
+      print('Command \'%s\' failed with code %d' % (' '.join(cmd), ret))
+      return ret
 
-  ret = subprocess.call(cmd, cwd=APP_DIR)
-  if not ret:
-    print(' https://%s-dot-%s.appspot.com' % (version, options.app_id))
-    print(' https://appengine.google.com/deployment?app_id=s~' + options.app_id)
-  return ret
+  print(' https://%s-dot-%s.appspot.com' % (version, options.app_id))
+  print(' https://appengine.google.com/deployment?app_id=s~' + options.app_id)
+
+  return 0
 
 
 if __name__ == '__main__':
