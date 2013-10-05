@@ -382,15 +382,29 @@ def enqueue_task(url, queue_name, payload=None, name=None):
 
   It will be executed by a separate backend module that runs same version as
   currently executing instance.
+
+  Returns True if a task was successfully added, logs error and returns False
+  if task queue is acting up.
   """
-  # Note that just using 'target=module' here would redirect task request to
-  # a default version of a module, not the currently executing one.
-  return taskqueue.add(
-      url=url,
-      queue_name=queue_name,
-      payload=payload,
-      name=name,
-      headers={'Host': config.get_task_queue_host()})
+  try:
+    # Note that just using 'target=module' here would redirect task request to
+    # a default version of a module, not the currently executing one.
+    taskqueue.add(
+        url=url,
+        queue_name=queue_name,
+        payload=payload,
+        name=name,
+        headers={'Host': config.get_task_queue_host()})
+    return True
+  except (
+      taskqueue.Error,
+      runtime.DeadlineExceededError,
+      runtime.api_proxy.DeadlineExceededError,
+      runtime.api_proxy.OverQuotaError) as e:
+    logging.warning(
+        'Problem adding task \'%s\' to task queue \'%s\' (%s): %s',
+        url, queue_name, e.__class__.__name__, e)
+    return False
 
 
 ### Restricted handlers
@@ -486,8 +500,10 @@ class RestrictedCleanupTriggerHandler(webapp2.RequestHandler):
       # the date at second precision, there's no point in triggering each of
       # time more than once a second anyway.
       now = datetime.datetime.utcnow().strftime('%Y-%m-%d_%I-%M-%S')
-      enqueue_task(url, 'cleanup', name=name + '_' + now)
-      self.response.out.write('Triggered %s' % url)
+      if enqueue_task(url, 'cleanup', name=name + '_' + now):
+        self.response.out.write('Triggered %s' % url)
+      else:
+        self.abort(500, 'Failed to enqueue a cleanup task, see logs')
     else:
       self.abort(404, 'Unknown job')
 
@@ -687,12 +703,8 @@ class RestrictedStoreBlobstoreContentByHashHandler(
     # Trigger a verification. It can't be done inline since it could be too
     # long to complete.
     url = '/restricted/taskqueue/verify/%s/%s' % (namespace, hash_key)
-    try:
-      enqueue_task(url, 'verify')
-    except runtime.DeadlineExceededError as e:
-      msg = 'Unable to add task to verify blob.\n%s' % e
-      logging.warning(msg)
-      self.response.out.write(msg)
+    if not enqueue_task(url, 'verify'):
+      self.response.out.write('Unable to add task to verify blob.')
       self.response.set_status(500)
 
       for future in delete_entry_and_gs_entry([entry]):
@@ -802,12 +814,7 @@ class ContainsHashHandler(acl.ACLRequestHandler):
             if contains[i])
         url = '/restricted/taskqueue/tag/%s/%s' % (
             namespace, datetime.date.today())
-        try:
-          enqueue_task(url, 'tag', payload=hashes_to_tag)
-        except (taskqueue.Error, runtime.DeadlineExceededError) as e:
-          logging.warning(
-              'Problem adding task to update last_access. These '
-              'objects may get deleted sooner than intended.\n%s', e)
+        enqueue_task(url, 'tag', payload=hashes_to_tag)
     except Exception as e:
       logging.error(
           'Tried checking for %d hash digests but all we got was: %s',
@@ -1100,15 +1107,8 @@ class PreUploadContentHandlerGS(acl.ACLRequestHandler):
   def tag_entries(entries, namespace):
     """Enqueues a task to update last_access time for given entries."""
     url = '/restricted/taskqueue/tag/%s/%s' % (namespace, datetime.date.today())
-    try:
-      enqueue_task(
-          url=url,
-          queue_name='tag',
-          payload=''.join(binascii.unhexlify(e.digest) for e in entries))
-    except (taskqueue.Error, runtime.DeadlineExceededError) as e:
-      logging.warning(
-          'Problem adding task to update last_access. These '
-          'objects may get deleted sooner than intended.\n%s', e)
+    payload = ''.join(binascii.unhexlify(e.digest) for e in entries)
+    return enqueue_task(url, 'tag', payload=payload)
 
   @staticmethod
   def should_push_to_gs(entry):
@@ -1231,6 +1231,11 @@ class PreUploadContentHandlerGS(acl.ACLRequestHandler):
     # Log stats, enqueue tagging task that updates last access time.
     stats.log(stats.LOOKUP, len(entries), len(existing))
     if existing:
+      # Ignore errors in a call below. They happen when task queue service has
+      # a bad time and doesn't accept tagging tasks. We don't want isolate
+      # server's reliability to depend on task queue service health. An ignored
+      # error here means there's a chance some entry might be deleted sooner
+      # than it should.
       self.tag_entries(existing, namespace)
 
 
@@ -1432,9 +1437,7 @@ class StoreContentHandlerGS(acl.ACLRequestHandler):
     # TODO(vadimsh): Verification doesn't work locally yet.
     if needs_verification and not config.is_local_dev_server():
       url = '/restricted/taskqueue/verify/%s/%s' % (namespace, hash_key)
-      try:
-        enqueue_task(url, 'verify')
-      except (taskqueue.Error, runtime.DeadlineExceededError) as e:
+      if not enqueue_task(url, 'verify'):
         # TODO(vadimsh): Don't fail whole request here, because several RPCs are
         # required to roll it back and there isn't much time left
         # (after DeadlineExceededError is already caught) to perform them.
@@ -1443,8 +1446,7 @@ class StoreContentHandlerGS(acl.ACLRequestHandler):
         # unverified entities and launch verification tasks, for instance
         # a datastore index on 'is_verified' boolean field and a cron task that
         # verifies all unverified entities.
-        msg = 'Unable to add task to verify blob.\n%s' % e
-        logging.warning(msg)
+        self.response.out.write('Warning: Unable to add task to verify blob.')
 
 
 ###
