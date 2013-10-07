@@ -1091,13 +1091,19 @@ class PreUploadContentHandlerGS(acl.ACLRequestHandler):
     # found if the ancestor doesn't exist.
     namespace_key = ndb.Key(ContentNamespace, namespace)
 
+    # Context options for NDB calls.
+    ctx_options = {
+      # Don't bother with in-process cache, it's not going to be used.
+      'use_cache': False,
+      # Make sure queries for ~100 items always use single RPC.
+      'max_memcache_items': 200,
+    }
+
     # Kick off all queries in parallel. Build mapping Future -> digest.
     futures = {}
     for entry in entries:
       key = ndb.Key(ContentEntry, entry.digest, parent=namespace_key)
-      future = ContentEntry.query(
-          ContentEntry.key == key).get_async(keys_only=True)
-      futures[future] = entry
+      futures[key.get_async(**ctx_options)] = entry
 
     # Pick first one that finishes and yield it, rinse, repeat.
     while futures:
