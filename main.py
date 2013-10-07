@@ -399,8 +399,9 @@ def enqueue_task(url, queue_name, payload=None, name=None):
   except (
       taskqueue.Error,
       runtime.DeadlineExceededError,
-      runtime.api_proxy.DeadlineExceededError,
-      runtime.api_proxy.OverQuotaError) as e:
+      runtime.apiproxy_errors.CancelledError,
+      runtime.apiproxy_errors.DeadlineExceededError,
+      runtime.apiproxy_errors.OverQuotaError) as e:
     logging.warning(
         'Problem adding task \'%s\' to task queue \'%s\' (%s): %s',
         url, queue_name, e.__class__.__name__, e)
