@@ -81,7 +81,8 @@ def settings():
   """
   # Access to a protected member XXX of a client class.
   # pylint: disable=W0212
-  config = GlobalConfig.get_or_insert('global_config', use_cache=False)
+  context = ndb.ContextOptions(use_cache=False)
+  config = GlobalConfig.get_or_insert('global_config', context_options=context)
 
   # Look in AppEngine internal guts to see if all the values were stored. If
   # not, store the missing properties in the entity in the datastore.
