@@ -53,31 +53,28 @@ class TestRequestTest(unittest.TestCase):
         probability=0)
     self.testbed.init_datastore_v3_stub(consistency_policy=self.policy)
 
-    request_name = 'request'
-
     # Ensure it works with no matches.
-    self.assertNotEqual('unknown', request_name)
+    self.assertNotEqual('unknown', test_helper.REQUEST_MESSAGE_TEST_CASE_NAME)
     matches = test_request.GetAllMatchingTestRequests('unknown')
     self.assertEqual(0, len(matches))
 
     # Check with one matching request.
-    request = test_request.TestRequest(name=request_name)
-    request.put()
+    test_helper.CreateRequest(1)
 
-    matches = test_request.GetAllMatchingTestRequests(request_name)
+    matches = test_request.GetAllMatchingTestRequests(
+        test_helper.REQUEST_MESSAGE_TEST_CASE_NAME)
     self.assertEqual(1, len(matches))
 
     # Add another request to ensure it works with multiple requests.
-    request = test_request.TestRequest(name=request_name)
-    request.put()
+    test_helper.CreateRequest(1)
 
-    matches = test_request.GetAllMatchingTestRequests(request_name)
+    matches = test_request.GetAllMatchingTestRequests(
+        test_helper.REQUEST_MESSAGE_TEST_CASE_NAME)
     self.assertEqual(2, len(matches))
 
   def testDeleteIfNoMoreRunner(self):
     # Create a request with no runners and ensure it gets deleted.
-    request = test_request.TestRequest()
-    request.put()
+    request = test_helper.CreateRequest(num_instances=0)
     self.assertEqual(1, test_request.TestRequest.query().count())
 
     request.RemoveRunner(None)

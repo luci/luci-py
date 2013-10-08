@@ -107,10 +107,10 @@ def ExecuteTestRequest(request_message):
   """
   logging.debug('TRM.ExecuteTestRequest msg=%s', request_message)
 
-  request = test_request.TestRequest(message=request_message)
-  test_case = request.GetTestCase()  # Will raise on invalid request.
-  request.name = test_case.test_case_name
-
+  # This will raise on an invalid request.
+  test_case = test_request.GetTestCase(request_message)
+  request = test_request.TestRequest(name=test_case.test_case_name,
+                                     message=request_message)
   request.put()
 
   test_keys = {'test_case_name': test_case.test_case_name,

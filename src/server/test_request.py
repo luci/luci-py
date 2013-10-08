@@ -90,8 +90,9 @@ class TestRequest(ndb.Model):
   # The time at which this request was received.
   requested_time = ndb.DateTimeProperty(auto_now_add=True)
 
-  # The name for this test request.
-  name = ndb.StringProperty()
+  # The name for this test request. This is required because it determines the
+  # parent model for this model, so it must be set at creation.
+  name = ndb.StringProperty(required=True)
 
   # The runners associated with this runner.
   runner_keys = ndb.KeyProperty(kind='TestRunner', repeated=True)
@@ -100,8 +101,12 @@ class TestRequest(ndb.Model):
     # 'parent' can be the first arg or a keyword, only add a parent if there
     # isn't one.
     if not args and 'parent' not in kwargs:
-      parent_model = GetTestRequestParent(kwargs.get('name', ''))
-      kwargs['parent'] = parent_model.key
+      # If name isn't in kwargs we can't find the correct parent, so don't try.
+      # Although name is a required attribute, sometimes app engine creates
+      # models without it.
+      if 'name' in kwargs:
+        parent_model = GetTestRequestParent(kwargs['name'])
+        kwargs['parent'] = parent_model.key
 
     super(TestRequest, self).__init__(*args, **kwargs)
 

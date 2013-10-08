@@ -231,7 +231,9 @@ class _SwarmTestCase(unittest.TestCase):
     logging.info('Will send these files to Swarm server: %s', swarm_files)
 
     swarm_server_test_url = urlparse.urljoin(self._swarm_server_url, 'test')
-    running_test_keys = []
+    swarm_server_get_matching_test_cases = urlparse.urljoin(
+        self._swarm_server_url, 'get_matching_test_cases')
+    running_tests = []
     for swarm_file in swarm_files:
       logging.info('Sending content of %s to Swarm server.', swarm_file)
       # Build the URL for sending the request.
@@ -246,19 +248,34 @@ class _SwarmTestCase(unittest.TestCase):
       # Check that we can read the output as a JSON string
       try:
         test_keys = json.loads(output)
+        logging.info('Test successfully uploaded')
       except (ValueError, TypeError) as e:
         self.fail('Swarm Request failed: %s' % output)
 
       logging.info(test_keys)
 
+      current_test_keys = []
       for test_key in test_keys['test_keys']:
-        running_test_keys.append(test_key)
+        current_test_keys.append(test_key['test_key'])
+        running_tests.append(test_key)
         if _SwarmTestProgram.options.verbose:
           logging.info('Config: %s, index: %s/%s, test key: %s',
                        test_key['config_name'],
                        int(test_key['instance_index']) + 1,
                        test_key['num_instances'],
                        test_key['test_key'])
+
+      # Make sure that we can actually find the keys from just the test names.
+      logging.info('Checking if we can find the keys for the recently added '
+                   'tests')
+
+      data = urllib.urlencode({'name': test_keys['test_case_name']})
+      # Append the data to the url so the request is a GET request as
+      # required.
+      matching_keys_json = urllib2.urlopen(
+          swarm_server_get_matching_test_cases + '?' + data)
+      matching_keys = json.load(matching_keys_json)
+      self.assertEquals(set(matching_keys), set(current_test_keys))
 
     # TODO(user): This code below and a big chunk of the parts above were stolen
     # from the post_test.py script under the tools folder. We should find a
@@ -278,9 +295,9 @@ class _SwarmTestCase(unittest.TestCase):
     triggered_retry = False
     for _ in range(10):
       logging.info('Still waiting for the following tests:\n%s',
-                   '\n'.join(test['test_key'] for test in running_test_keys))
+                   '\n'.join(test['test_key'] for test in running_tests))
 
-      for running_test_key in running_test_keys[:]:
+      for running_test_key in running_tests[:]:
         key_url = self.GetAdminUrl(
             urlparse.urljoin(
                 self._swarm_server_url,
@@ -312,7 +329,7 @@ class _SwarmTestCase(unittest.TestCase):
           urllib2.urlopen(swarm_server_retry_url, data=data)
           triggered_retry = True
         else:
-          running_test_keys.remove(running_test_key)
+          running_tests.remove(running_test_key)
 
         test_result_output = (
             '%s\n=======================\nConfig: %s\n%s' %
@@ -320,15 +337,15 @@ class _SwarmTestCase(unittest.TestCase):
         logging.info(test_result_output)
         logging.info('=======================')
 
-      if running_test_keys:
+      if running_tests:
         logging.info('At least one test not yet succeeded')
         time.sleep(SLEEP_BETWEEN_RESULT_POLLS)
       else:
         logging.info('All tests succeeded')
         break
 
-    if running_test_keys:
-      self.fail('%d tests failed to complete.' % len(running_test_keys))
+    if running_tests:
+      self.fail('%d tests failed to complete.' % len(running_tests))
 
 
 class _SwarmTestProgram(unittest.TestProgram):
