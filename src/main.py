@@ -58,9 +58,10 @@ _MACHINE_LIST_LINK = '<a href=/secure/machine_list>Machine List</a>'
 _PROFILE_LINK = '<a href=/secure/user_profile>Profile</a>'
 _STATS_LINK = '<a href=/stats>Stats</a>'
 
+_DELETE_MACHINE_STATS_URL = '/delete_machine_stats'
+
 _SECURE_CANCEL_URL = '/secure/cancel'
 _SECURE_CHANGE_WHITELIST_URL = '/secure/change_whitelist'
-_SECURE_DELETE_MACHINE_STATS_URL = '/secure/delete_machine_stats'
 _SECURE_GET_RESULTS_URL = '/secure/get_result'
 _SECURE_MAIN_URL = '/secure/main'
 _SECURE_USER_PROFILE_URL = '/secure/user_profile'
@@ -550,7 +551,7 @@ class MachineListHandler(webapp2.RequestHandler):
 
       machine.command_string = GenerateButtonWithHiddenForm(
           'Delete',
-          '%s?r=%s' % (_SECURE_DELETE_MACHINE_STATS_URL,
+          '%s?r=%s' % (_DELETE_MACHINE_STATS_URL,
                        machine.key.string_id()),
           machine.key.string_id())
       machines_displayable.append(machine)
@@ -575,6 +576,7 @@ class MachineListHandler(webapp2.RequestHandler):
 class DeleteMachineStatsHandler(webapp2.RequestHandler):
   """Handler to delete a machine assignment."""
 
+  @AuthenticateMachineOrUser
   def post(self):  # pylint: disable=g-bad-name
     """Handles HTTP POST requests for this handler's URL."""
     key = self.request.get('r')
@@ -1428,11 +1430,11 @@ def CreateApplication():
                                   ('/test', TestRequestHandler),
                                   ('/upload', UploadHandler),
                                   ('/waits_by_minute', WaitsByMinuteHandler),
+                                  (_DELETE_MACHINE_STATS_URL,
+                                   DeleteMachineStatsHandler),
                                   (_SECURE_CANCEL_URL, CancelHandler),
                                   (_SECURE_CHANGE_WHITELIST_URL,
                                    ChangeWhitelistHandler),
-                                  (_SECURE_DELETE_MACHINE_STATS_URL,
-                                   DeleteMachineStatsHandler),
                                   (_SECURE_GET_RESULTS_URL,
                                    SecureGetResultHandler),
                                   (_SECURE_MAIN_URL, MainHandler),

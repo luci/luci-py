@@ -178,12 +178,12 @@ class AppTest(unittest.TestCase):
     m_stats = machine_stats.MachineStats.get_or_insert(MACHINE_ID)
 
     # Delete the machine assignment.
-    response = self.app.post('/secure/delete_machine_stats?r=%s' %
+    response = self.app.post('/delete_machine_stats?r=%s' %
                              m_stats.key.string_id())
     self.assertTrue('200' in response.status)
 
     # Attempt to delete the assignment again and fail.
-    response = self.app.post('/secure/delete_machine_stats?r=%s' %
+    response = self.app.post('/delete_machine_stats?r=%s' %
                              m_stats.key.string_id())
     self.assertTrue('204' in response.status)
 
