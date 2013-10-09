@@ -30,8 +30,7 @@ from google.appengine.ext.webapp import blobstore_handlers
 
 import acl
 import config
-import gsfiles
-import signed_urls
+import gcs
 import stats
 import template
 import utils
@@ -213,9 +212,7 @@ def delete_entry_and_gs_entry(to_delete):
   entities_future = ndb.delete_multi_async([i.key for i in to_delete])
 
   # Do this one last because it is synchronous.
-  # TODO(maruel): This could leak a broken BlobInfo object in the blobstore
-  # table. There is no easy way to find it back.
-  gsfiles.delete_files(config.settings().gs_bucket, gs_files_to_delete)
+  gcs.delete_files(config.settings().gs_bucket, gs_files_to_delete)
   return entities_future
 
 
@@ -264,12 +261,12 @@ def expand_content(namespace, source):
   if namespace.endswith(('-deflate', '-gzip')):
     zlib_state = zlib.decompressobj()
     for i in source:
-      data = zlib_state.decompress(i, gsfiles.CHUNK_SIZE)
+      data = zlib_state.decompress(i, gcs.CHUNK_SIZE)
       yield data
       del data
       while zlib_state.unconsumed_tail:
         data = zlib_state.decompress(
-            zlib_state.unconsumed_tail, gsfiles.CHUNK_SIZE)
+            zlib_state.unconsumed_tail, gcs.CHUNK_SIZE)
         yield data
         del data
       del i
@@ -303,6 +300,11 @@ def hash_content(content, namespace):
     return digest.hexdigest(), expanded_size
   except zlib.error as e:
     raise ValueError('Data is corrupted: %s' % e)
+
+
+def to_blobkey(bucket, filename):
+  """Given GS bucket and filename returns Blobstore blob key."""
+  return u'/gs/%s/%s' % (bucket, filename)
 
 
 def delete_blobinfo_async(blobinfos):
@@ -482,8 +484,8 @@ class RestrictedObliterateWorkerHandler(webapp2.RequestHandler):
     gs_bucket = config.settings().gs_bucket
     logging.info('Deleting GS bucket %s', gs_bucket)
     incremental_delete(
-        gsfiles.list_files(gs_bucket, None),
-        lambda x: gsfiles.delete_files(gs_bucket, x))
+        gcs.list_files(gs_bucket),
+        lambda filenames: gcs.delete_files(gs_bucket, filenames))
 
     logging.info('Flushing memcache')
     # High priority (.isolated files) are cached explicitly. Make sure ghosts
@@ -560,7 +562,15 @@ class RestrictedTagWorkerHandler(webapp2.RequestHandler):
 
 
 class RestrictedVerifyWorkerHandler(webapp2.RequestHandler):
-  """Verify the SHA-1 matches for an object stored in BlobStore."""
+  """Verify the SHA-1 matches for an object stored in Cloud Storage."""
+
+  @staticmethod
+  def purge_entry(entry, message, *args):
+    """Logs error message, deletes |entry| from datastore and GS."""
+    logging.error(
+        'Verification failed for %s: %s', entry.gs_filepath, message % args)
+    ndb.Future.wait_all(delete_entry_and_gs_entry([entry]))
+
   def post(self, namespace, hash_key):
     if not self.request.headers.get('X-AppEngine-QueueName'):
       self.abort(405, detail='Only internal task queue tasks can do this')
@@ -572,63 +582,97 @@ class RestrictedVerifyWorkerHandler(webapp2.RequestHandler):
     if entry.expanded_size != -1:
       logging.warning('Was already verified')
       return
-    if entry.content:
+    if entry.content is not None:
       logging.error('Should not be called with inline content')
       return
 
-    save_to_memcache = entry.size <= MAX_MEMCACHE_ISOLATED and entry.is_isolated
+    # Get GS file size.
+    gs_bucket = config.settings().gs_bucket
+    gs_filepath = entry.gs_filepath
+    gs_file_info = gcs.get_file_info(gs_bucket, gs_filepath)
 
+    # It's None if file is missing.
+    if not gs_file_info:
+      # According to the docs, GS is read-after-write consistent, so a file is
+      # missing only if it wasn't stored at all or it was deleted, in any case
+      # it's not a valid ContentEntry.
+      self.purge_entry(entry, 'No such GS file')
+      return
+
+    # Expected stored length and actual length should match.
+    if gs_file_info.size != entry.size:
+      self.purge_entry(entry,
+          'Bad GS file: expected size is %d, actual size is %d',
+          entry.size, gs_file_info.size)
+      return
+
+    save_to_memcache = entry.size <= MAX_MEMCACHE_ISOLATED and entry.is_isolated
     expanded_size = 0
-    is_verified = False
     digest = get_hash_algo(namespace)
+    data = None
+
     try:
       # Start a loop where it reads the data in block.
-      # TODO(maruel): Calculate the number of bytes read and assert it's the
-      # same as entry.size.
-      blob = gsfiles.open_file_for_reading(
-          config.settings().gs_bucket, entry.gs_filepath)
+      stream = gcs.read_file(gs_bucket, gs_filepath)
       if save_to_memcache:
-        # Wraps blob with a generator that accumulate the data.
-        blob = Accumulator(blob)
-      for data in expand_content(namespace, blob):
+        # Wraps stream with a generator that accumulates the data.
+        stream = Accumulator(stream)
+
+      for data in expand_content(namespace, stream):
         expanded_size += len(data)
         digest.update(data)
         # Make sure the data is GC'ed.
         del data
-      is_verified = digest.hexdigest() == hash_key
+
+      # Hashes should match.
+      if digest.hexdigest() != hash_key:
+        self.purge_entry(entry,
+            'SHA-1 do not match data (%d bytes, %d bytes expanded)',
+            entry.size, expanded_size)
+        return
+
     except runtime.DeadlineExceededError:
       # Failed to read it through. If it's compressed, at least no zlib error
       # was thrown so the object is fine.
       logging.warning('Got DeadlineExceededError, giving up')
       # Abort so the job is retried automatically.
-      self.abort(500)
-    except (
-        gsfiles.files.FileNotOpenedError,
-        gsfiles.files.ApiTemporaryUnavailableError) as e:
-      # Don't delete the file yet since it's an API issue.
-      logging.warning('CloudStorage is acting up: %s', e)
-      # Abort so the job is retried automatically.
-      self.abort(500)
-    except (blobstore.BlobNotFoundError, zlib.error, gsfiles.files.Error) as e:
-      # It's broken. At that point, is_verified is False.
-      logging.error(e)
+      return self.abort(500)
 
-    if not is_verified:
-      # Delete the entity since it's corrupted.
-      logging.error(
-          'SHA-1 and data do not match, %d bytes (%d bytes expanded)',
-          entry.size, expanded_size)
-      for future in delete_entry_and_gs_entry([entry]):
-        future.wait()
-      # Do not return failure since we don't want the task scheduler to retry.
+    except gcs.NotFoundError as e:
+      # Somebody deleted a file between get_file_info and read_file calls.
+      self.purge_entry(entry, 'File was unexpectedly deleted')
       return
 
+    except gcs.TransientError as e:
+      # Don't delete the file yet since it's an API issue.
+      logging.warning(
+          'CloudStorage is acting up (%s): %s', e.__class__.__name__, e)
+      # Abort so the job is retried automatically.
+      return self.abort(500)
+
+    except (gcs.ForbiddenError, gcs.AuthorizationError) as e:
+      # Misconfiguration in Google Storage ACLs. Don't delete an entry, it may
+      # be fine. Maybe ACL problems would be fixed before the next retry.
+      logging.warning(
+          'CloudStorage auth issues (%s): %s', e.__class__.__name__, e)
+      # Abort so the job is retried automatically.
+      return self.abort(500)
+
+    # ForbiddenError and AuthorizationError inherit FatalError, so this except
+    # block should be last.
+    except (gcs.FatalError, zlib.error, IOError) as e:
+      # It's broken or unreadable.
+      self.purge_entry(entry,
+          'Failed to read the file (%s): %s', e.__class__.__name__, e)
+      return
+
+    # Verified. Data matches the hash.
     entry.expanded_size = expanded_size
     future = entry.put_async()
     logging.info(
         '%d bytes (%d bytes expanded) verified', entry.size, expanded_size)
     if save_to_memcache:
-      save_in_memcache(namespace, hash_key, ''.join(blob.accumulated))
+      save_in_memcache(namespace, hash_key, ''.join(stream.accumulated))
     future.wait()
 
 
@@ -670,7 +714,7 @@ class RestrictedStoreBlobstoreContentByHashHandler(
       self.abort(400, detail=msg)
 
     if not contents[0].gs_object_name.startswith(
-        gsfiles.to_filepath(config.settings().gs_bucket, namespace)):
+        to_blobkey(config.settings().gs_bucket, namespace)):
       self._delete(contents)
       msg = 'Unexpected namespace or GS bucket.'
       logging.error(msg)
@@ -743,8 +787,7 @@ class RestrictedGoogleStorageConfig(acl.ACLRequestHandler):
     settings.gs_private_key = self.request.get('gs_private_key')
     try:
       # Ensure key is correct, it's easy to make a mistake when creating it.
-      signed_urls.CloudStorageURLSigner.load_private_key(
-          settings.gs_private_key)
+      gcs.URLSigner.load_private_key(settings.gs_private_key)
     except Exception as exc:
       self.response.write('Bad private key: %s' % exc)
       return
@@ -899,8 +942,7 @@ class StoreContentByHashHandler(acl.ACLRequestHandler):
       entry.content = content
     else:
       filepath = '%s/%s' % (namespace, hash_key)
-      if not gsfiles.store_content(
-          config.settings().gs_bucket, filepath, content):
+      if not gcs.write_file(config.settings().gs_bucket, filepath, [content]):
         # Returns 503 so the client automatically retries.
         self.abort(503, detail='Unable to save the content to GS.')
       entry.filename = hash_key
@@ -966,7 +1008,7 @@ class RetrieveContentByHashHandler(acl.ACLRequestHandler,
 
       # send_blob() will call create_gs_key() itself but this only works if
       # the string is encoded as utf-8.
-      blobkey = gsfiles.to_filepath(
+      blobkey = to_blobkey(
           config.settings().gs_bucket, entry.gs_filepath).encode('utf-8')
       stats.log(stats.RETURN, entry.size, 'GS; %s' % entry.filename)
       self.send_blob(
@@ -1131,7 +1173,7 @@ class PreUploadContentHandlerGS(acl.ACLRequestHandler):
     """On demand instance of CloudStorageURLSigner object."""
     if not self._gs_url_signer:
       settings = config.settings()
-      self._gs_url_signer = signed_urls.CloudStorageURLSigner(
+      self._gs_url_signer = gcs.URLSigner(
           settings.gs_bucket,
           settings.gs_client_id_email,
           settings.gs_private_key)
@@ -1251,7 +1293,7 @@ class RetrieveContentHandlerGS(acl.ACLRequestHandler):
 
   def get(self, namespace, hash_key):  #pylint: disable=W0221
     memcache_entry = memcache.get(hash_key, namespace='table_%s' % namespace)
-    if memcache_entry:
+    if memcache_entry is not None:
       return self.send_data(hash_key, memcache_entry, 'memcache')
 
     entry = get_content_by_hash(namespace, hash_key)
@@ -1271,7 +1313,7 @@ class RetrieveContentHandlerGS(acl.ACLRequestHandler):
 
     # Generate signed download URL.
     settings = config.settings()
-    signer = signed_urls.CloudStorageURLSigner(settings.gs_bucket,
+    signer = gcs.URLSigner(settings.gs_bucket,
         settings.gs_client_id_email, settings.gs_private_key)
     signed_url = signer.get_download_url(entry.gs_filepath)
 
@@ -1367,6 +1409,10 @@ class StoreContentHandlerGS(acl.ACLRequestHandler):
       else:
         content = ''
 
+    # Info about corresponding GS entry (if it exists).
+    gs_bucket = config.settings().gs_bucket
+    gs_filepath = '%s/%s' % (namespace, hash_key)
+
     # To be populated below.
     compressed_size = None
     needs_verification = True
@@ -1393,15 +1439,17 @@ class StoreContentHandlerGS(acl.ACLRequestHandler):
       # Successfully verified!
       needs_verification = False
     else:
-      # TODO(vadimsh): Fetch file size via Google Store 'stat' RPC call.
-      # For now use 'item_size' which is _uncompressed_ file size.
-      compressed_size = item_size
+      # Fetch size of the stored file.
+      file_info = gcs.get_file_info(gs_bucket, gs_filepath)
+      if not file_info:
+        msg = 'File \'%s\' is not in Google Storage' % gs_filepath
+        logging.error(msg)
+        return self.abort(503, detail=msg)
+      compressed_size = file_info.size
 
     # Data is here and it's too large for DS, so put it in GS.
     if content is not None and len(content) >= MIN_SIZE_FOR_GS:
-      filepath = '%s/%s' % (namespace, hash_key)
-      if not gsfiles.store_content(
-          config.settings().gs_bucket, filepath, content):
+      if not gcs.write_file(gs_bucket, gs_filepath, [content]):
         # Returns 503 so the client automatically retries.
         return self.abort(503, detail='Unable to save the content to GS.')
       # It's now in GS.
@@ -1410,7 +1458,7 @@ class StoreContentHandlerGS(acl.ACLRequestHandler):
     # Can create entity now, everything appears to be legit.
     entry = create_entry(namespace, hash_key)
     if not entry:
-      stats.log(stats.DUPE, len(content or ''), 'inline')
+      stats.log(stats.DUPE, compressed_size, 'inline')
       self.response.out.write('Entry already exists')
       return
 
@@ -1435,7 +1483,7 @@ class StoreContentHandlerGS(acl.ACLRequestHandler):
 
     # Log stats.
     where = 'GS; ' + entry.filename if entry.filename else 'inline'
-    stats.log(stats.STORE, len(content or ''), where)
+    stats.log(stats.STORE, entry.size, where)
 
     # Verification task will be accessing the entity, so ensure it exists.
     ndb.Future.wait_all(futures)

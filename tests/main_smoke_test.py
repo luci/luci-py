@@ -24,6 +24,7 @@ import zlib
 
 import find_depot_tools  # pylint: disable=W0611
 
+# pylint: disable=E0611,E1002
 from third_party import upload
 
 # The url of the test isolate server.
