@@ -23,6 +23,9 @@ def main():
   parser.add_option(
       '-s', '--sdk-path',
       help='Path to AppEngine SDK. Will try to find by itself.')
+  parser.add_option(
+      '-o', '--open', action='store_true',
+      help='Listen to all interfaces (less secure)')
   options, args = parser.parse_args()
 
   options.sdk_path = options.sdk_path or find_gae_sdk.find_gae_sdk()
@@ -34,7 +37,8 @@ def main():
       os.path.join(options.sdk_path, 'dev_appserver.py'),
       '--skip_sdk_update_check=yes',
   ] + app_config.MODULES + args
-
+  if options.open:
+    cmd.extend(('--host', '0.0.0.0', '--admin_host', '0.0.0.0'))
   # Let dev_appserver.py handle interrupts.
   signal.signal(signal.SIGINT, signal.SIG_IGN)
   return subprocess.call(cmd, cwd=app_config.APP_DIR)

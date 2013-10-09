@@ -127,7 +127,7 @@ class KeyringAuth(DefaultAuth):
     return value
 
 
-def load_context(sdk_path, app_dir, host, app_id, version):
+def load_context(sdk_path, app_dir, host, app_id, version, module_id):
   """Returns a closure where the GAE SDK is initialized."""
   find_gae_sdk.setup_gae_sdk(sdk_path)
   # pylint doesn't know where the AppEngine SDK is, so silence these errors.
@@ -160,6 +160,11 @@ def load_context(sdk_path, app_dir, host, app_id, version):
     remote_api_stub.MaybeInvokeAuthentication()
 
     os.environ['SERVER_SOFTWARE'] = 'Development (remote_api_shell)/1.0'
+    # TODO(maruel): Connect and request what the default version is currently,
+    # and set the variable accordingly.
+    if version:
+      os.environ['CURRENT_VERSION_ID'] = version
+    os.environ['CURRENT_MODULE_ID'] = module_id
 
     # Create shortcuts.
     import acl
@@ -175,10 +180,9 @@ def load_context(sdk_path, app_dir, host, app_id, version):
 
   app_id = app_id or find_gae_sdk.default_app_id(app_dir)
   if not host:
-    if version:
-      host = '%s-dot-%s.appspot.com' % (version, app_id)
-    else:
-      host = '%s.appspot.com' % (app_id)
+    # https://developers.google.com/appengine/docs/python/modules/
+    prefixes = filter(None, (version, module_id, app_id))
+    host = '%s.appspot.com' % '-dot-'.join(prefixes)
   return setup_env(host), app_id
 
 
@@ -193,6 +197,9 @@ def Main():
       help='Defaults to the default active instance. Override to connect to a '
            'non-default instance.')
   parser.add_option(
+      '-M', '--module', default='default',
+      help='Module to connect to. default: %default')
+  parser.add_option(
       '-s', '--sdk-path',
       help='Path to AppEngine SDK. Will try to find by itself.')
   options, args = parser.parse_args()
@@ -205,7 +212,7 @@ def Main():
     parser.error('Failed to find the AppEngine SDK. Pass --sdk-path argument.')
 
   predefined_vars, app_id = load_context(options.sdk_path, APP_DIR,
-      options.host, options.app_id, options.version)
+      options.host, options.app_id, options.version, options.module)
   if not predefined_vars:
     return 1
   prompt = (
