@@ -31,6 +31,8 @@ from third_party.cloudstorage.errors import (
     NotFoundError,
     TransientError)
 
+import config
+
 
 # The limit is 32 megs but it's a tad on the large side. Use 512kb chunks
 # instead to not clog memory when there's multiple concurrent requests being
@@ -189,6 +191,51 @@ class URLSigner(object):
   # Default expiration time for signed links.
   DEFAULT_EXPIRATION = datetime.timedelta(hours=4)
 
+  # Google Storage URL template for a singed link.
+  GS_URL = 'https://%(bucket)s.storage.googleapis.com/%(filename)s?%(query)s'
+
+  # True if switched to a local dev mode.
+  DEV_MODE_ENABLED = False
+
+  @staticmethod
+  def switch_to_dev_mode():
+    """Enables GS mock for a local dev server.
+
+    Returns:
+      List of webapp2.Routes objects to add to the application.
+    """
+    # pylint: disable=F0401
+    import webapp2
+
+    assert config.is_local_dev_server(), 'Must not be run in production'
+    assert not URLSigner.DEV_MODE_ENABLED, 'Already in a dev mode'
+
+    # Replace GS_URL with a mocked one.
+    URLSigner.DEV_MODE_ENABLED = True
+    URLSigner.GS_URL = (
+        'http://%s/_gcs_mock/' % config.get_local_dev_server_host())
+    URLSigner.GS_URL += '%(bucket)s/%(filename)s?%(query)s'
+
+    class LocalStorageHandler(webapp2.RequestHandler):
+      """Handles requests to a mock GS implementation."""
+
+      def get(self, bucket, filepath):
+        """Read a file from a mocked GS, return 404 if not found."""
+        try:
+          with cloudstorage.open('/%s/%s' % (bucket, filepath), 'r') as f:
+            self.response.out.write(f.read())
+          self.response.headers['Content-Type'] = 'application/octet-stream'
+        except cloudstorage.errors.NotFoundError:
+          self.abort(404)
+
+      def put(self, bucket, filepath):
+        """Stores a file in a mocked GS."""
+        with cloudstorage.open('/%s/%s' % (bucket, filepath), 'w') as f:
+          f.write(self.request.body)
+
+    endpoint = r'/_gcs_mock/<bucket:[a-z0-9\.\-_]+>/<filepath:.*>'
+    return [webapp2.Route(endpoint, LocalStorageHandler)]
+
   def __init__(self, bucket, client_id, private_key):
     self.bucket = str(bucket)
     self.client_id = str(client_id)
@@ -197,8 +244,21 @@ class URLSigner(object):
   @staticmethod
   def load_private_key(private_key):
     """Converts base64 *.der private key into RSA key instance."""
+    # Empty private key is ok in a dev mode.
+    if URLSigner.DEV_MODE_ENABLED and not private_key:
+      return None
     binary = base64.b64decode(private_key)
     return RSA.importKey(binary)
+
+  def generate_signature(self, data_to_sign):
+    """Signs |data_to_sign| with a private key and returns a signature."""
+    # Signatures are not used in a dev mode.
+    if self.DEV_MODE_ENABLED:
+      return 'fakesig'
+    # Sign it with RSA-SHA256.
+    signer = PKCS1_v1_5.new(self.private_key)
+    signature = base64.b64encode(signer.sign(SHA256.new(data_to_sign)))
+    return signature
 
   def get_signed_url(self, filename, http_verb, expiration=DEFAULT_EXPIRATION,
                      content_type='', content_md5=''):
@@ -213,19 +273,16 @@ class URLSigner(object):
         expires,
         '/%s/%s' % (self.bucket, filename),
     ])
-
-    # Sign it with RSA-SHA256.
-    signer = PKCS1_v1_5.new(self.private_key)
-    signature = base64.b64encode(signer.sign(SHA256.new(data_to_sign)))
-
     # Construct final URL.
     query_params = urllib.urlencode([
         ('GoogleAccessId', self.client_id),
         ('Expires', expires),
-        ('Signature', signature),
+        ('Signature', self.generate_signature(data_to_sign)),
     ])
-    return 'https://%s.storage.googleapis.com/%s?%s' % (
-        self.bucket, filename, query_params)
+    return self.GS_URL % {
+        'bucket': self.bucket,
+        'filename': filename,
+        'query': query_params}
 
   def get_download_url(self, filename, expiration=DEFAULT_EXPIRATION):
     """Returns signed URL that can be used to download a file."""

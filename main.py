@@ -1489,8 +1489,7 @@ class StoreContentHandlerGS(acl.ACLRequestHandler):
     ndb.Future.wait_all(futures)
 
     # Trigger a verification task for files in the GS.
-    # TODO(vadimsh): Verification doesn't work locally yet.
-    if needs_verification and not config.is_local_dev_server():
+    if needs_verification:
       url = '/restricted/taskqueue/verify/%s/%s' % (namespace, hash_key)
       if not enqueue_task(url, 'verify'):
         # TODO(vadimsh): Don't fail whole request here, because several RPCs are
@@ -1532,6 +1531,11 @@ def CreateApplication():
   """
   acl.bootstrap()
 
+  # Routes added to WSGIApplication only a dev mode.
+  dev_routes = []
+  if config.is_local_dev_server():
+    dev_routes.extend(gcs.URLSigner.switch_to_dev_mode())
+
   # Namespace can be letters, numbers and '-'.
   namespace = r'/<namespace:[a-z0-9A-Z\-]+>'
   # Do not enforce a length limit to support different hashing algorithm. This
@@ -1540,7 +1544,7 @@ def CreateApplication():
   # This means a complete key is required.
   namespace_key = namespace + hashkey
 
-  return webapp2.WSGIApplication([
+  return webapp2.WSGIApplication(dev_routes + [
       # Triggers a taskqueue.
       webapp2.Route(
           r'/restricted/cleanup/trigger/<name:[a-z]+>',

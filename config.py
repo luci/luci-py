@@ -106,6 +106,12 @@ def is_local_dev_server():
   return os.environ.get('SERVER_SOFTWARE', '').startswith('Development')
 
 
+def get_local_dev_server_host():
+  """Returns 'hostname:port' for a default module on a local dev server."""
+  assert is_local_dev_server()
+  return modules.get_hostname(module='default')
+
+
 def get_app_version():
   """Returns currently running version (not necessary a default one)."""
   return modules.get_current_version_name()
