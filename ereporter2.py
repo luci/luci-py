@@ -87,8 +87,13 @@ IGNORED_LINES = (
       'loading request.',
 )
 
+
+# Ignore these exceptions.
 IGNORED_EXCEPTIONS = (
+  'CancelledError',
   'DeadlineExceededError',
+  # TODO(maruel): Reenable this trace once we got over the storm of exceptions.
+  'OverQuotaError',
 )
 
 
@@ -175,7 +180,9 @@ class ErrorRecord(object):
       # Look for special messages to reduce.
       SOFT_MEMORY = 'Exceeded soft private memory limit'
       if lines[0].startswith(SOFT_MEMORY):
-        lines[0] = SOFT_MEMORY
+        # To reenable, uncomment the following line and remove the return.
+        # lines[0] = SOFT_MEMORY
+        return None
 
       return lines[0].strip() + '@' + self.version
 

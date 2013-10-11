@@ -368,14 +368,18 @@ def incremental_delete(query, delete, check=None):
 
 
 def save_in_memcache(namespace, hash_key, content, async=False):
+  namespace_key = 'table_%s' % namespace
   if async:
-    return ndb.get_context().memcache_set(hash_key, content,
-        namespace='table_%s' % namespace)
+    return ndb.get_context().memcache_set(
+        hash_key, content, namespace=namespace_key)
   try:
-    if not memcache.set(hash_key, content, namespace='table_%s' % namespace):
-      logging.error(
-          'Attempted to save %d bytes of content in memcache but failed',
-          len(content))
+    if not memcache.set(hash_key, content, namespace=namespace_key):
+      msg = 'Failed to save content to memcache.\n%s\\%s %d bytes' % (
+          namespace_key, hash_key, len(content))
+      if len(content) < 100*1024:
+        logging.error(msg)
+      else:
+        logging.warning(msg)
   except ValueError as e:
     logging.error(e)
 
