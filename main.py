@@ -31,6 +31,7 @@ from google.appengine.ext.webapp import blobstore_handlers
 import acl
 import config
 import gcs
+import ereporter2
 import stats
 import template
 import utils
@@ -796,6 +797,41 @@ class RestrictedGoogleStorageConfig(acl.ACLRequestHandler):
     self.response.write('Done!')
 
 
+class RestrictedEreporter2Mail(webapp2.RequestHandler):
+  """Handler class to generate and email an exception report."""
+  def get(self):
+    """Sends email(s) containing the exceptions logged."""
+    self.response.headers['Content-Type'] = 'text/plain'
+    recipients = config.settings().monitoring_recipients.strip()
+    request_id_url = self.request.host_url + '/restricted/ereporter2/request/'
+    msg = ereporter2.generate_and_email_report(
+        recipients,
+        config.get_module_version_list(None, False),
+        request_id_url)
+    logging.info(msg)
+    self.response.write(msg)
+
+
+class RestrictedEreporter2Report(webapp2.RequestHandler):
+  """Returns all the recent errors as a web page."""
+  def get(self):
+    request_id_url = self.request.host_url + '/restricted/ereporter2/request/'
+    report = ereporter2.generate_html_report(
+        config.get_module_version_list(None, False),
+        request_id_url)
+    self.response.headers['Content-Type'] = 'text/html'
+    self.response.write(report)
+
+
+class RestrictedEreporter2Request(webapp2.RequestHandler):
+  def get(self, request_id):
+    data = ereporter2.log_request_id_to_dict(request_id)
+    if not data:
+      self.abort(404, detail='Request id was not found.')
+    self.response.headers['Content-Type'] = 'application/json'
+    json.dump(data, self.response, indent=2, sort_keys=True)
+
+
 ### Non-restricted handlers
 
 
@@ -1505,6 +1541,7 @@ class StoreContentHandlerGS(acl.ACLRequestHandler):
 
 ###
 
+
 class RootHandler(webapp2.RequestHandler):
   """Tells the user to RTM."""
   def get(self):
@@ -1529,6 +1566,7 @@ def CreateApplication():
   - /content/.* has the public HTTP API.
   - /stats/.* has statistics.
   """
+  ereporter2.register_formatter()
   acl.bootstrap()
 
   # Routes added to WSGIApplication only a dev mode.
@@ -1569,6 +1607,16 @@ def CreateApplication():
       webapp2.Route(
           r'/restricted/taskqueue/verify' + namespace_key,
           RestrictedVerifyWorkerHandler),
+
+     webapp2.Route(
+          r'/restricted/cron/ereporter2/mail', RestrictedEreporter2Mail),
+     webapp2.Route(
+          r'/restricted/ereporter2/report',
+          RestrictedEreporter2Report),
+     webapp2.Route(
+          r'/restricted/ereporter2/request/<request_id:[0-9a-fA-F]+>',
+          RestrictedEreporter2Request),
+
 
       # Stats
       webapp2.Route(

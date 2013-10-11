@@ -18,7 +18,6 @@ import logging
 # pylint: disable=E0611,F0401
 import webapp2
 from google.appengine.api import logservice
-from google.appengine.api import modules
 from google.appengine.ext import ndb
 from google.appengine.runtime import DeadlineExceededError
 # pylint: enable=E0611,F0401
@@ -114,14 +113,6 @@ _PREFIX = 'Stats: '
 _TOO_RECENT = 5 if not config.is_local_dev_server() else 1
 
 
-def _get_module_version_list(module_list):
-  """Returns a list of pairs (module name, version name) to fetch logs for."""
-  result = []
-  for module in module_list:
-    result.extend((module, ver) for ver in modules.get_versions(module))
-  return result
-
-
 def _parse_line(line, values):
   """Updates a Snapshot instance with a processed statistics line if relevant.
   """
@@ -151,16 +142,15 @@ def _parse_line(line, values):
 
 def _extract_snapshot_from_logs(start_time, end_time):
   """Processes the logs to harvest data and return a Snapshot instance."""
-  # TODO(vadimsh): Cache result of _get_module_version_list for a duration of
-  # /stats/update request?
   values = Snapshot()
+  module_versions = config.get_module_version_list(config.STATS_MODULES, True)
   for entry in logservice.fetch(
       start_time=start_time,
       end_time=end_time,
       minimum_log_level=logservice.LOG_LEVEL_INFO,
       include_incomplete=True,
       include_app_logs=True,
-      module_versions=_get_module_version_list(config.STATS_MODULES)):
+      module_versions=module_versions):
     # Ignore other urls.
     if not entry.resource.startswith(config.STATS_REQUEST_PATHS):
       continue

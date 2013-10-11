@@ -98,8 +98,7 @@ class StatisticsFramework(object):
     get_now = get_now or datetime.datetime.utcnow
     # At this point, the 'lock' is owned.
     try:
-      original_now = get_now()
-      now = original_now
+      now = get_now()
       original_minute = self._get_next_minute_to_process(now)
       next_minute = original_minute
       count = 0
@@ -116,11 +115,15 @@ class StatisticsFramework(object):
         now = get_now()
       return count
     except DeadlineExceededError:
-      logging.error(
-          'Started at %s processing %s\n'
-          'Tried to get up to %s\n'
-          'Processed %d minutes\n',
-          original_now, original_minute, up_to, count)
+      msg = (
+          'Got DeadlineExceededError while processing stats.\n'
+          'Processing started at %s; tried to get up to %smins from now; '
+          'Processed %dmins') % (
+          original_minute, up_to, count)
+      if not count:
+        logging.error(msg)
+      else:
+        logging.warning(msg)
       raise
     finally:
       # Make sure to release the lock. At worst, the lock will be held for

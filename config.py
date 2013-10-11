@@ -25,6 +25,7 @@ import os
 # them.
 # pylint: disable=E0611,F0401
 from google.appengine.api import app_identity
+from google.appengine.api import memcache
 from google.appengine.api import modules
 from google.appengine.ext import ndb
 # pylint: enable=E0611,F0401
@@ -64,6 +65,10 @@ class GlobalConfig(ndb.Model):
   # Secret key used to sign Google Storage URLs: base64 encoded *.der file.
   gs_private_key = ndb.StringProperty(indexed=False, default='')
 
+  # Comma separated list of email addresses that will receive exception reports.
+  # If not set, all admins will receive the message.
+  monitoring_recipients = ndb.StringProperty(indexed=False, default='')
+
   def _pre_put_hook(self):
     """Generates global_secret only when necessary.
 
@@ -99,6 +104,36 @@ def settings():
     config.put()
 
   return config
+
+
+def get_module_version_list(module_list, tainted):
+  """Returns a list of pairs (module name, version name) to fetch logs for.
+
+  Arguments:
+    module_list: list of modules to list, defaults to all modules.
+    tainted: if False, excludes versions with '-tainted' in their name.
+  """
+  result = []
+  if not module_list:
+    # If the function it called too often, it'll raise a OverQuotaError. So
+    # cache it for 10 minutes.
+    module_list = memcache.get('modules_list')
+    if not module_list:
+      module_list = modules.get_modules()
+      memcache.set('modules_list', module_list, time=10*60)
+
+  for module in module_list:
+    # If the function it called too often, it'll raise a OverQuotaError.
+    # Versions is a bit more tricky since we'll loose data, since versions are
+    # changed much more often than modules. So cache it for 3 minutes.
+    key = 'modules_list-' + module
+    version_list = memcache.get(key)
+    if not version_list:
+      version_list = modules.get_versions(module)
+      memcache.set(key, version_list, time=3*60)
+    result.extend(
+        (module, v) for v in version_list if tainted or '-tainted' not in v)
+  return result
 
 
 def is_local_dev_server():
