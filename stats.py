@@ -275,7 +275,6 @@ class RestrictedStatsUpdateHandler(webapp2.RequestHandler):
     try:
       i = _STATS_HANDLER.process_next_chunk(_TOO_RECENT)
     except DeadlineExceededError:
-      logging.error('Timed out')
       self.response.status_code = 500
       return
     msg = 'Processed %d minutes' % i
