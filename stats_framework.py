@@ -56,14 +56,14 @@ class StatisticsFramework(object):
 
     # Generate the model classes. The factories are members so they can be
     # overriden if necessary.
-    self.root_stats_cls = self._generate_root_stats_cls()
-    self.root_key = ndb.Key(self.root_stats_cls, self.root_key_id)
-    self.daily_stats_cls = self._generate_daily_stats_cls(self.snapshot_cls)
-    self.hourly_stats_cls = self._generate_hourly_stats_cls(self.snapshot_cls)
-    self.minute_stats_cls = self._generate_minute_stats_cls(self.snapshot_cls)
+    self.stats_root_cls = self._generate_stats_root_cls()
+    self.root_key = ndb.Key(self.stats_root_cls, self.root_key_id)
+    self.stats_day_cls = self._generate_stats_day_cls(self.snapshot_cls)
+    self.stats_hour_cls = self._generate_stats_hour_cls(self.snapshot_cls)
+    self.stats_minute_cls = self._generate_stats_minute_cls(self.snapshot_cls)
 
     # The root entity is used for transactions so make sure it exists.
-    self.root_stats_cls.get_or_insert(self.root_key_id)
+    self.stats_root_cls.get_or_insert(self.root_key_id)
 
   def process_next_chunk(self, up_to, get_now=None):
     """Processes as much minutes starting at a specific time.
@@ -78,7 +78,7 @@ class StatisticsFramework(object):
     - get_now: optional argument that returns a 'now' value. Mostly to be used
                in test to hard code the value of 'now'.
 
-    Returns the number of self.minute_stats_cls generated, e.g. the number of
+    Returns the number of self.stats_minute_cls generated, e.g. the number of
     minutes processed successfully by self_generate_snapshot.
     """
     get_now = get_now or datetime.datetime.utcnow
@@ -109,15 +109,15 @@ class StatisticsFramework(object):
   def day_key(self, day):
     """Returns the complete entity key for a specific day stats.
 
-    The key is to a self.daily_stats_cls instance.
+    The key is to a self.stats_day_cls instance.
 
     Argument:
       - day is a datetime.date instance.
     """
     assert isinstance(day, datetime.date)
     return ndb.Key(
-        self.root_stats_cls, self.root_key_id,
-        self.daily_stats_cls, str(day))
+        self.stats_root_cls, self.root_key_id,
+        self.stats_day_cls, str(day))
 
   def hour_key(self, hour):
     """Returns the complete entity key for a specific hour stats.
@@ -127,9 +127,9 @@ class StatisticsFramework(object):
     """
     assert isinstance(hour, datetime.datetime)
     return ndb.Key(
-        self.root_stats_cls, self.root_key_id,
-        self.daily_stats_cls, str(hour.date()),
-        self.hourly_stats_cls, '%02d' % hour.hour)
+        self.stats_root_cls, self.root_key_id,
+        self.stats_day_cls, str(hour.date()),
+        self.stats_hour_cls, '%02d' % hour.hour)
 
   def minute_key(self, minute):
     """Returns the complete entity key for a specific minute stats.
@@ -139,16 +139,16 @@ class StatisticsFramework(object):
     """
     assert isinstance(minute, datetime.datetime)
     return ndb.Key(
-        self.root_stats_cls, self.root_key_id,
-        self.daily_stats_cls, str(minute.date()),
-        self.hourly_stats_cls, '%02d' % minute.hour,
-        self.minute_stats_cls, '%02d' % minute.minute)
+        self.stats_root_cls, self.root_key_id,
+        self.stats_day_cls, str(minute.date()),
+        self.stats_hour_cls, '%02d' % minute.hour,
+        self.stats_minute_cls, '%02d' % minute.minute)
 
   ### Protected code.
 
   @staticmethod
-  def _generate_root_stats_cls():
-    class RootStats(ndb.Model):
+  def _generate_stats_root_cls():
+    class StatsRoot(ndb.Model):
       """Used as a base class for transaction coherency.
 
       It will be updated once every X minutes when the cron job runs to gather
@@ -157,17 +157,17 @@ class StatisticsFramework(object):
       created = ndb.DateTimeProperty(indexed=False, auto_now=True)
       timestamp = ndb.DateTimeProperty(indexed=False)
 
-    return RootStats
+    return StatsRoot
 
   @staticmethod
-  def _generate_daily_stats_cls(snapshot_cls):
-    class DailyStats(ndb.Model):
+  def _generate_stats_day_cls(snapshot_cls):
+    class StatsDay(ndb.Model):
       """Statistics for the whole day.
 
       The Key format is YYYY-MM-DD with 0 prefixes so the key sort naturally.
-      Ancestor is self.root_stats_cls with key id self.root_key_id.
+      Ancestor is self.stats_root_cls with key id self.root_key_id.
 
-      This entity is updated every time a new self.hourly_stats_cls is sealed,
+      This entity is updated every time a new self.stats_hour_cls is sealed,
       so ~1 update per hour.
       """
       created = ndb.DateTimeProperty(indexed=False, auto_now=True)
@@ -188,17 +188,17 @@ class StatisticsFramework(object):
         year, month, day = self.key.id().split('-', 2)
         return datetime.date(int(year), int(month), int(day))
 
-    return DailyStats
+    return StatsDay
 
   @staticmethod
-  def _generate_hourly_stats_cls(snapshot_cls):
-    class HourlyStats(ndb.Model):
+  def _generate_stats_hour_cls(snapshot_cls):
+    class StatsHour(ndb.Model):
       """Statistics for a single hour.
 
       The Key format is HH with 0 prefix so the key sort naturally. Ancestor is
-      self.daily_stats_cls.
+      self.stats_day_cls.
 
-      This entity is updated every time a new self.minute_stats_cls is
+      This entity is updated every time a new self.stats_minute_cls is
       generated under a transaction, so ~1 transaction per minute.
       """
       created = ndb.DateTimeProperty(indexed=False, auto_now=True)
@@ -211,15 +211,15 @@ class StatisticsFramework(object):
       # Used for queries.
       SEALED_BITMAP = 0xFFFFFFFFFFFFFFF
 
-    return HourlyStats
+    return StatsHour
 
   @staticmethod
-  def _generate_minute_stats_cls(snapshot_cls):
-    class MinuteStats(ndb.Model):
+  def _generate_stats_minute_cls(snapshot_cls):
+    class StatsMinute(ndb.Model):
       """Statistics for a single minute.
 
       The Key format is MM with 0 prefix so the key sort naturally. Ancestor is
-      self.hourly_stats_cls.
+      self.stats_hour_cls.
 
       This entity is written once and never modified so it is sealed by
       definition.
@@ -227,14 +227,14 @@ class StatisticsFramework(object):
       created = ndb.DateTimeProperty(indexed=False, auto_now=True)
       values = ndb.LocalStructuredProperty(snapshot_cls, default=snapshot_cls())
 
-    return MinuteStats
+    return StatsMinute
 
   def _set_last_processed_time(self, moment):
     """Saves the last minute processed."""
     root = self.root_key.get()
     if not root:
       # This is bad, someone deleted the root entity.
-      root = self.root_stats_cls(id=self.root_key_id)
+      root = self.stats_root_cls(id=self.root_key_id)
     root.timestamp = moment
     root.put()
 
@@ -242,26 +242,26 @@ class StatisticsFramework(object):
     """Returns a datetime.datetime representing the last minute that was last
     sealed.
 
-    It ensures the entities self.daily_stats_cls and self.hourly_stats_cls
+    It ensures the entities self.stats_day_cls and self.stats_hour_cls
     exist for the minute that is going to be processed.
 
-    It doesn't look at self.minute_stats_cls so the entity for the minute could
+    It doesn't look at self.stats_minute_cls so the entity for the minute could
     exist.
     """
     # This is bad, someone deleted the root entity. The root entity is used
     # for transactions so make sure it exists.
-    root = self.root_stats_cls.get_or_insert(self.root_key_id)
+    root = self.stats_root_cls.get_or_insert(self.root_key_id)
     if root.timestamp:
       # Returns the minute right after.
       minute_after = root.timestamp + datetime.timedelta(minutes=1)
       if minute_after.date() != root.timestamp.date():
         # That was 23:59. Make sure day for 00:00 exists.
-        self.daily_stats_cls.get_or_insert(
+        self.stats_day_cls.get_or_insert(
             str(minute_after.date()), parent=self.root_key)
 
       if minute_after.hour != root.timestamp.hour:
         # That was NN:59.
-        self.hourly_stats_cls.get_or_insert(
+        self.stats_hour_cls.get_or_insert(
             '%02d' % minute_after.hour,
             parent=self.day_key(minute_after.date()))
       return minute_after
@@ -270,38 +270,38 @@ class StatisticsFramework(object):
   def _guess_earlier_minute_to_process(self, now):
     """Searches backward in time for the last sealed day."""
     logging.info('Guessing for earliest day')
-    q = self.daily_stats_cls.query(ancestor=self.root_key)
+    q = self.stats_day_cls.query(ancestor=self.root_key)
     # TODO(maruel): It should search for recent unsealed day, that is still
     # reachable from the logs, e.g. the logs for that day hasn't been expurged
     # yet.
     q.filter(
-        self.daily_stats_cls.hours_bitmap == self.daily_stats_cls.SEALED_BITMAP)
-    q.order(-self.daily_stats_cls.key)
+        self.stats_day_cls.hours_bitmap == self.stats_day_cls.SEALED_BITMAP)
+    q.order(-self.stats_day_cls.key)
     last_sealed_day = q.get()
     if not last_sealed_day:
       # Maybe there's an non-sealed day. Get the latest one.
-      q = self.daily_stats_cls.query(ancestor=self.root_key)
-      q.order(-self.daily_stats_cls.key)
+      q = self.stats_day_cls.query(ancestor=self.root_key)
+      q.order(-self.stats_day_cls.key)
       day = q.get()
       if not day:
         # We are bootstrapping as there is no entity at all. Use ~5 days ago at
         # midnight to regenerate stats. It will be resource intensive.
         today = now.date()
         key_id = str(today - datetime.timedelta(days=self.MAX_BACKTRACK))
-        day = self.daily_stats_cls.get_or_insert(key_id, parent=self.root_key)
+        day = self.stats_day_cls.get_or_insert(key_id, parent=self.root_key)
     else:
       # Take the next unsealed day. Note that if there's a non-sealed, sealed,
-      # sealed sequence of self.daily_stats_cls, the non-sealed entity will be
+      # sealed sequence of self.stats_day_cls, the non-sealed entity will be
       # skipped.
       # TODO(maruel): Fix this.
       key_id = str(last_sealed_day.to_date() + datetime.timedelta(days=1))
-      day = self.daily_stats_cls.get_or_insert(key_id)
+      day = self.stats_day_cls.get_or_insert(key_id)
 
     # TODO(maruel): Should we trust it all the time or do an explicit query? For
     # now, trust the bitmap.
     hour_bit = _lowest_missing_bit(day.hours_bitmap)
     assert hour_bit < 24, hour_bit
-    hour = self.hourly_stats_cls.get_or_insert(
+    hour = self.stats_hour_cls.get_or_insert(
         '%02d' % hour_bit, parent=day.key)
     minute_bit = _lowest_missing_bit(hour.minutes_bitmap)
     assert minute_bit < 60, minute_bit
@@ -310,32 +310,32 @@ class StatisticsFramework(object):
         date.year, date.month, date.day, hour_bit, minute_bit)
 
   def _process_one_minute(self, moment):
-    """Generates exactly one self.minute_stats_cls.
+    """Generates exactly one self.stats_minute_cls.
 
     Always process logs in exactly 1 minute chunks. It is small so it won't take
     too long even under relatively high QPS.
 
     In theory a transaction should be used when saving the aggregated statistics
-    in self.hourly_stats_cls and self.daily_stats_cls. In practice it is not
+    in self.stats_hour_cls and self.stats_day_cls. In practice it is not
     necessary because:
     - The caller uses a lock to guard against concurrent calls.
     - Even if it were to become inconsistent or have 2 cron jobs run
       simultaneously, hours_bit|minutes_bit will stay internally consistent with
       the associated values snapshot in it in the respective
-      self.daily_stats_cls and self.hourly_stats_cls entities.
+      self.stats_day_cls and self.stats_hour_cls entities.
     """
     minute_key_id = '%02d' % moment.minute
 
     # Fetch the entities.
-    future_daily = self.daily_stats_cls.get_or_insert_async(
+    future_day = self.stats_day_cls.get_or_insert_async(
         str(moment.date()), parent=self.root_key)
-    future_hourly = self.hourly_stats_cls.get_or_insert_async(
+    future_hour = self.stats_hour_cls.get_or_insert_async(
         '%02d' % moment.hour, parent=self.day_key(moment.date()))
-    future_minute = self.minute_stats_cls.get_by_id_async(
+    future_minute = self.stats_minute_cls.get_by_id_async(
         minute_key_id, parent=self.hour_key(moment))
 
-    daily = future_daily.get_result()
-    hourly = future_hourly.get_result()
+    day = future_day.get_result()
+    hour = future_hour.get_result()
     # Normally 'minute' should be None.
     minute = future_minute.get_result()
     futures = []
@@ -346,34 +346,34 @@ class StatisticsFramework(object):
       minute_values = self._generate_snapshot(
           calendar.timegm(moment.timetuple()), calendar.timegm(end.timetuple()))
 
-      minute = self.minute_stats_cls(
-          id=minute_key_id, parent=hourly.key, values=minute_values)
+      minute = self.stats_minute_cls(
+          id=minute_key_id, parent=hour.key, values=minute_values)
       futures.append(minute.put_async())
     else:
       minute_values = minute.values
 
     minute_bit = (1 << moment.minute)
-    minute_bit_is_set = bool(hourly.minutes_bitmap & minute_bit)
+    minute_bit_is_set = bool(hour.minutes_bitmap & minute_bit)
     if not minute_bit_is_set:
-      hourly.values.accumulate(minute_values)
-      hourly.minutes_bitmap |= minute_bit
-      futures.append(hourly.put_async())
-      if hourly.minutes_bitmap == self.hourly_stats_cls.SEALED_BITMAP:
+      hour.values.accumulate(minute_values)
+      hour.minutes_bitmap |= minute_bit
+      futures.append(hour.put_async())
+      if hour.minutes_bitmap == self.stats_hour_cls.SEALED_BITMAP:
         logging.info(
             '%s Hour is sealed: %s-%s',
-            self.root_key_id, daily.key.id(), hourly.key.id())
+            self.root_key_id, day.key.id(), hour.key.id())
 
-    # Adds data for the past hour back into daily.
-    if hourly.minutes_bitmap == self.hourly_stats_cls.SEALED_BITMAP:
+    # Adds data for the past hour back into day.
+    if hour.minutes_bitmap == self.stats_hour_cls.SEALED_BITMAP:
       hour_bit = (1 << moment.hour)
-      hour_bit_is_set = bool(daily.hours_bitmap & hour_bit)
+      hour_bit_is_set = bool(day.hours_bitmap & hour_bit)
       if not hour_bit_is_set:
-        daily.values.accumulate(hourly.values)
-        daily.hours_bitmap |= hour_bit
-        futures.append(daily.put_async())
-        if daily.hours_bitmap == self.daily_stats_cls.SEALED_BITMAP:
+        day.values.accumulate(hour.values)
+        day.hours_bitmap |= hour_bit
+        futures.append(day.put_async())
+        if day.hours_bitmap == self.stats_day_cls.SEALED_BITMAP:
           logging.info(
-              '%s Day is sealed: %s', self.root_key_id, daily.key.id())
+              '%s Day is sealed: %s', self.root_key_id, day.key.id())
 
     if futures:
       ndb.Future.wait_all(futures)

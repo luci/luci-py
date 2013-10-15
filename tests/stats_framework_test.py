@@ -79,11 +79,11 @@ class StatsFrameworkTest(unittest.TestCase):
     expected = {'a': hours_minutes, 'b': float(hours_minutes)}
     self.assertEqual(expected, day_obj.values.to_dict())
 
-    # Ensure DailyStats.hours_bitmap is valid.
+    # Ensure StatsDay.hours_bitmap is valid.
     expected_hours_bitmap = (1 << last_hour.hour) - 1
     self.assertEqual(expected_hours_bitmap, day_obj.hours_bitmap)
 
-    # Ensure HourlyStats.hours_bitmap is valid.
+    # Ensure StatsHour.minutes_bitmap is valid.
     last_hour_obj = handler.hour_key(now).get()
     expected_minutes_bitmap = (1 << now.minute) - 1
     self.assertEqual(expected_minutes_bitmap, last_hour_obj.minutes_bitmap)
