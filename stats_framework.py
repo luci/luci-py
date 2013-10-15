@@ -18,7 +18,6 @@ import logging
 # The app engine headers are located locally, so don't worry about not finding
 # them.
 # pylint: disable=E0611,F0401
-from google.appengine.api import memcache
 from google.appengine.ext import ndb
 from google.appengine.runtime import DeadlineExceededError
 # pylint: enable=E0611,F0401
@@ -29,11 +28,6 @@ TIME_FORMAT = '%Y-%m-%d %H:%M'
 
 
 class StatisticsFramework(object):
-  # Default lock timeout is one hour when calling generate_snapshot. Must be
-  # longer than the maximum duration of a cron job, currently limited at 10
-  # minutes.
-  LOCK_TIMEOUT = 700
-
   # Maximum number of days to look back to generate stats when starting fresh.
   # It will always start looking at 00:00 on the given day in UTC time.
   MAX_BACKTRACK = 5
@@ -60,26 +54,23 @@ class StatisticsFramework(object):
     self.snapshot_cls = snapshot_cls
     self._generate_snapshot = generate_snapshot
 
-    # Generate the model classes.
+    # Generate the model classes. The factories are members so they can be
+    # overriden if necessary.
     self.root_stats_cls = self._generate_root_stats_cls()
-    self.daily_stats_cls = self._generate_daily_stats_cls()
-    self.hourly_stats_cls = self._generate_hourly_stats_cls()
-    self.minute_stats_cls = self._generate_minute_stats_cls()
-
     self.root_key = ndb.Key(self.root_stats_cls, self.root_key_id)
+    self.daily_stats_cls = self._generate_daily_stats_cls(self.snapshot_cls)
+    self.hourly_stats_cls = self._generate_hourly_stats_cls(self.snapshot_cls)
+    self.minute_stats_cls = self._generate_minute_stats_cls(self.snapshot_cls)
 
     # The root entity is used for transactions so make sure it exists.
     self.root_stats_cls.get_or_insert(self.root_key_id)
 
-    self.memcache_namespace = 'stats_%s' % self.root_key_id
-
   def process_next_chunk(self, up_to, get_now=None):
     """Processes as much minutes starting at a specific time.
 
-    This class should be called from a non-synchronized cron job, so it's more
-    or less guaranteed to only have one instance running at a time. In any case,
-    it keeps its own internal locking to protect itself against misuse.
-    Explicitly handles datastore inconsistency.
+    This class should be called from a non-synchronized cron job, so it will
+    rarely have more than one instance running at a time. Every entity is self
+    contained so it explicitly handles datastore inconsistency.
 
     Arguments:
     - up_to: number of minutes to buffer between 'now' and the last minute to
@@ -90,24 +81,13 @@ class StatisticsFramework(object):
     Returns the number of self.minute_stats_cls generated, e.g. the number of
     minutes processed successfully by self_generate_snapshot.
     """
-    if not memcache.add(
-        'lock', 1, time=self.LOCK_TIMEOUT, namespace=self.memcache_namespace):
-      logging.warning('Lock was held, skipping.')
-      return 0
-
     get_now = get_now or datetime.datetime.utcnow
-    # At this point, the 'lock' is owned.
     try:
       now = get_now()
       original_minute = self._get_next_minute_to_process(now)
       next_minute = original_minute
       count = 0
       while now - next_minute >= datetime.timedelta(minutes=up_to):
-        # Keep the lock alive.
-        memcache.set(
-            'lock', 1,
-            time=self.LOCK_TIMEOUT,
-            namespace=self.memcache_namespace)
         self._process_one_minute(next_minute)
         self._set_last_processed_time(next_minute)
         count += 1
@@ -125,10 +105,6 @@ class StatisticsFramework(object):
       else:
         logging.warning(msg)
       raise
-    finally:
-      # Make sure to release the lock. At worst, the lock will be held for
-      # self.LOCK_TIMEOUT.
-      memcache.delete('lock', namespace=self.memcache_namespace)
 
   def day_key(self, day):
     """Returns the complete entity key for a specific day stats.
@@ -173,12 +149,18 @@ class StatisticsFramework(object):
   @staticmethod
   def _generate_root_stats_cls():
     class RootStats(ndb.Model):
-      """Used as a base class for transaction coherency."""
+      """Used as a base class for transaction coherency.
+
+      It will be updated once every X minutes when the cron job runs to gather
+      new data.
+      """
       created = ndb.DateTimeProperty(indexed=False, auto_now=True)
+      timestamp = ndb.DateTimeProperty(indexed=False)
 
     return RootStats
 
-  def _generate_daily_stats_cls(self):
+  @staticmethod
+  def _generate_daily_stats_cls(snapshot_cls):
     class DailyStats(ndb.Model):
       """Statistics for the whole day.
 
@@ -192,8 +174,7 @@ class StatisticsFramework(object):
       modified = ndb.DateTimeProperty(indexed=False, auto_now_add=True)
 
       # Statistics for the day.
-      values = ndb.LocalStructuredProperty(
-          self.snapshot_cls, default=self.snapshot_cls())
+      values = ndb.LocalStructuredProperty(snapshot_cls, default=snapshot_cls())
 
       # Hours that have been summed. A complete day will be set to (1<<24)-1,
       # e.g.  0xFFFFFF, e.g. 24 bits or 6x4 bits.
@@ -209,7 +190,8 @@ class StatisticsFramework(object):
 
     return DailyStats
 
-  def _generate_hourly_stats_cls(self):
+  @staticmethod
+  def _generate_hourly_stats_cls(snapshot_cls):
     class HourlyStats(ndb.Model):
       """Statistics for a single hour.
 
@@ -220,8 +202,7 @@ class StatisticsFramework(object):
       generated under a transaction, so ~1 transaction per minute.
       """
       created = ndb.DateTimeProperty(indexed=False, auto_now=True)
-      values = ndb.LocalStructuredProperty(
-          self.snapshot_cls, default=self.snapshot_cls())
+      values = ndb.LocalStructuredProperty(snapshot_cls, default=snapshot_cls())
 
       # Minutes that have been summed. A complete hour will be set to (1<<60)-1,
       # e.g. 0xFFFFFFFFFFFFFFF, e.g. 60 bits or 15x4 bits.
@@ -232,7 +213,8 @@ class StatisticsFramework(object):
 
     return HourlyStats
 
-  def _generate_minute_stats_cls(self):
+  @staticmethod
+  def _generate_minute_stats_cls(snapshot_cls):
     class MinuteStats(ndb.Model):
       """Statistics for a single minute.
 
@@ -243,15 +225,18 @@ class StatisticsFramework(object):
       definition.
       """
       created = ndb.DateTimeProperty(indexed=False, auto_now=True)
-      values = ndb.LocalStructuredProperty(
-          self.snapshot_cls, default=self.snapshot_cls())
+      values = ndb.LocalStructuredProperty(snapshot_cls, default=snapshot_cls())
 
     return MinuteStats
 
   def _set_last_processed_time(self, moment):
-    """Saves to memcache the last minute processed."""
-    t = (moment.year, moment.month, moment.day, moment.hour, moment.minute)
-    memcache.set('last_processed', t, namespace=self.memcache_namespace)
+    """Saves the last minute processed."""
+    root = self.root_key.get()
+    if not root:
+      # This is bad, someone deleted the root entity.
+      root = self.root_stats_cls(id=self.root_key_id)
+    root.timestamp = moment
+    root.put()
 
   def _get_next_minute_to_process(self, now):
     """Returns a datetime.datetime representing the last minute that was last
@@ -263,31 +248,34 @@ class StatisticsFramework(object):
     It doesn't look at self.minute_stats_cls so the entity for the minute could
     exist.
     """
-    value = memcache.get('last_processed', namespace=self.memcache_namespace)
-    if value:
-      assert isinstance(value, tuple) and len(value) == 5, value
+    # This is bad, someone deleted the root entity. The root entity is used
+    # for transactions so make sure it exists.
+    root = self.root_stats_cls.get_or_insert(self.root_key_id)
+    if root.timestamp:
       # Returns the minute right after.
-      last_processed = datetime.datetime(*value)
-      minute_after = last_processed + datetime.timedelta(minutes=1)
-
-      if minute_after.date() != last_processed.date():
+      minute_after = root.timestamp + datetime.timedelta(minutes=1)
+      if minute_after.date() != root.timestamp.date():
         # That was 23:59. Make sure day for 00:00 exists.
         self.daily_stats_cls.get_or_insert(
             str(minute_after.date()), parent=self.root_key)
 
-      if minute_after.hour != last_processed.hour:
+      if minute_after.hour != root.timestamp.hour:
         # That was NN:59.
         self.hourly_stats_cls.get_or_insert(
             '%02d' % minute_after.hour,
             parent=self.day_key(minute_after.date()))
       return minute_after
+    return self._guess_earlier_minute_to_process(now)
 
-    # Search backward in time for the last sealed day. It can return nothing if
-    # stats are just getting started.
+  def _guess_earlier_minute_to_process(self, now):
+    """Searches backward in time for the last sealed day."""
+    logging.info('Guessing for earliest day')
     q = self.daily_stats_cls.query(ancestor=self.root_key)
+    # TODO(maruel): It should search for recent unsealed day, that is still
+    # reachable from the logs, e.g. the logs for that day hasn't been expurged
+    # yet.
     q.filter(
-        self.daily_stats_cls.hours_bitmap ==
-        self.daily_stats_cls.SEALED_BITMAP)
+        self.daily_stats_cls.hours_bitmap == self.daily_stats_cls.SEALED_BITMAP)
     q.order(-self.daily_stats_cls.key)
     last_sealed_day = q.get()
     if not last_sealed_day:
@@ -296,17 +284,18 @@ class StatisticsFramework(object):
       q.order(-self.daily_stats_cls.key)
       day = q.get()
       if not day:
-        # Too bad. Use ~5 days ago at midnight to regenerate stats. It will be
-        # resource intensive.
+        # We are bootstrapping as there is no entity at all. Use ~5 days ago at
+        # midnight to regenerate stats. It will be resource intensive.
         today = now.date()
         key_id = str(today - datetime.timedelta(days=self.MAX_BACKTRACK))
         day = self.daily_stats_cls.get_or_insert(key_id, parent=self.root_key)
     else:
-      # Take the next unsealed day. Note that if there's a sealed, non-sealed,
+      # Take the next unsealed day. Note that if there's a non-sealed, sealed,
       # sealed sequence of self.daily_stats_cls, the non-sealed entity will be
       # skipped.
-      day_after = last_sealed_day.to_date() + datetime.timedelta(days=1)
-      day = self.daily_stats_cls.get_or_insert(str(day_after))
+      # TODO(maruel): Fix this.
+      key_id = str(last_sealed_day.to_date() + datetime.timedelta(days=1))
+      day = self.daily_stats_cls.get_or_insert(key_id)
 
     # TODO(maruel): Should we trust it all the time or do an explicit query? For
     # now, trust the bitmap.
