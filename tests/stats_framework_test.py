@@ -26,6 +26,15 @@ sys.path.insert(0, ROOT_DIR)
 import stats_framework
 
 
+class Snapshot(ndb.Model):
+  """Fake statistics."""
+  a = ndb.IntegerProperty(default=0)
+  b = ndb.FloatProperty(default=0)
+
+  def accumulate(self, rhs):
+    return stats_framework.accumulate(self, rhs)
+
+
 class StatsFrameworkTest(unittest.TestCase):
   def setUp(self):
     super(StatsFrameworkTest, self).setUp()
@@ -39,66 +48,81 @@ class StatsFrameworkTest(unittest.TestCase):
     super(StatsFrameworkTest, self).tearDown()
 
   def test_framework(self):
-    class Data(ndb.Model):
-      a = ndb.IntegerProperty(default=0)
-      b = ndb.FloatProperty(default=0)
-
-      def accumulate(self, rhs):
-        return stats_framework.accumulate(self, rhs)
-
+    # Ensures the processing will run for 120 minutes starting
+    # StatisticsFramework.MAX_BACKTRACK days ago.
     called = []
+
     def gen_data(start, end):
+      """Returns fake statistics."""
       self.assertEqual(start + 60, end)
       called.append(start)
-      return Data(a=1, b=1)
+      return Snapshot(a=1, b=1)
 
     handler = stats_framework.StatisticsFramework(
-        'test_framework', Data, gen_data)
-    # Start at midnight of the current day, otherwise the test case is just too
-    # slow, as in 20+ seconds.
-    # TODO(maruel): Have the code only backtrack for X hours.
-    handler.MAX_BACKTRACK = 0
+        'test_framework', Snapshot, gen_data)
 
-    # Calculate the number of minutes since midnight.
-    now = datetime.datetime(2008, 9, 3, 3, 12)
-    midnight = datetime.datetime(now.year, now.month, now.day)
-    minutes = int((now - midnight).total_seconds() / 60)
-    i = handler.process_next_chunk(1, lambda: now)
-    self.assertEqual(minutes, i)
+    now = datetime.datetime.utcnow()
+    start_date = now - datetime.timedelta(
+        days=stats_framework.StatisticsFramework.MAX_BACKTRACK)
+    limit = handler.MAX_MINUTES_PER_PROCESS
+
+    i = handler.process_next_chunk(5, lambda: now)
+    self.assertEqual(limit, i)
+
+    # Fresh new stats gathering always starts at midnight.
+    midnight = datetime.datetime(*start_date.date().timetuple()[:3])
     expected_calls = [
       calendar.timegm((midnight + datetime.timedelta(minutes=i)).timetuple())
-      for i in range(minutes)
+      for i in range(limit)
     ]
     self.assertEqual(expected_calls, called)
 
-    # Now ensure the aggregate values for the day is the exact sum of every
-    # minutes up to the last completed hour.
-    last_hour = datetime.datetime(now.year, now.month, now.day, now.hour)
-    hours_minutes = int((last_hour - midnight).total_seconds() / 60)
-    day_obj = handler.day_key(now.date()).get()
-    expected = {'a': hours_minutes, 'b': float(hours_minutes)}
-    self.assertEqual(expected, day_obj.values.to_dict())
+    expected = [{'hours_bitmap': 3, 'values': {'a': limit, 'b': float(limit)}}]
+    actual = [d.to_dict() for d in handler.stats_day_cls.query().fetch()]
+    for i in actual:
+      i.pop('created')
+      i.pop('modified')
+    self.assertEqual(expected, actual)
 
-    # Ensure StatsDay.hours_bitmap is valid.
-    expected_hours_bitmap = (1 << last_hour.hour) - 1
-    self.assertEqual(expected_hours_bitmap, day_obj.hours_bitmap)
+    expected = [
+      {'minutes_bitmap': (1<<60)-1, 'values': {'a': 60, 'b': 60.}}
+      for _ in range(limit / 60)
+    ]
+    actual = [d.to_dict() for d in handler.stats_hour_cls.query().fetch()]
+    for i in actual:
+      i.pop('created')
+    self.assertEqual(expected, actual)
 
-    # Ensure StatsHour.minutes_bitmap is valid.
-    last_hour_obj = handler.hour_key(now).get()
-    expected_minutes_bitmap = (1 << now.minute) - 1
-    self.assertEqual(expected_minutes_bitmap, last_hour_obj.minutes_bitmap)
-    expected = {'a': now.minute, 'b': float(now.minute)}
-    self.assertEqual(expected, last_hour_obj.values.to_dict())
+    expected = [{'values': {'a': 1, 'b': 1.}} for i in range(limit)]
+    actual = [d.to_dict() for d in handler.stats_minute_cls.query().fetch()]
+    for i in actual:
+      i.pop('created')
+    self.assertEqual(expected, actual)
 
-    # Check the last minute.
-    last_minute = now - datetime.timedelta(minutes=1)
-    last_minute_obj = handler.minute_key(last_minute).get()
-    expected = {'a': 1, 'b': 1.}
-    self.assertEqual(expected, last_minute_obj.values.to_dict())
+  def test_keys(self):
+    handler = stats_framework.StatisticsFramework(
+        'test_framework', Snapshot, None)
+    date = datetime.datetime(2010, 1, 2)
+    self.assertEqual(
+        ndb.Key('StatsRoot', 'test_framework', 'StatsDay', '2010-01-02'),
+        handler.day_key(date.date()))
 
-    # Ensure the minute after the last minute is not present.
-    self.assertEqual(None, handler.minute_key(now).get())
+    self.assertEqual(
+        ndb.Key(
+          'StatsRoot', 'test_framework',
+          'StatsDay', '2010-01-02',
+          'StatsHour', '00'),
+        handler.hour_key(date))
+    self.assertEqual(
+        ndb.Key(
+          'StatsRoot', 'test_framework',
+          'StatsDay', '2010-01-02',
+          'StatsHour', '00',
+          'StatsMinute', '00'),
+        handler.minute_key(date))
 
 
 if __name__ == '__main__':
+  if '-v' in sys.argv:
+    unittest.TestCase.maxDiff = None
   unittest.main()

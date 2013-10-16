@@ -31,6 +31,8 @@ class StatisticsFramework(object):
   # Maximum number of days to look back to generate stats when starting fresh.
   # It will always start looking at 00:00 on the given day in UTC time.
   MAX_BACKTRACK = 5
+  # Process at maximum 2 hours at a time.
+  MAX_MINUTES_PER_PROCESS = 120
 
   def __init__(self, root_key_id, snapshot_cls, generate_snapshot):
     """Creates an instance to do bookkeeping of statistics.
@@ -91,6 +93,8 @@ class StatisticsFramework(object):
         self._process_one_minute(next_minute)
         self._set_last_processed_time(next_minute)
         count += 1
+        if self.MAX_MINUTES_PER_PROCESS == count:
+          break
         next_minute = next_minute + datetime.timedelta(minutes=1)
         now = get_now()
       return count
@@ -114,7 +118,7 @@ class StatisticsFramework(object):
     Argument:
       - day is a datetime.date instance.
     """
-    assert isinstance(day, datetime.date)
+    assert day.__class__ is datetime.date
     return ndb.Key(
         self.stats_root_cls, self.root_key_id,
         self.stats_day_cls, str(day))
