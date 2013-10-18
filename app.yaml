@@ -45,3 +45,16 @@ libraries:
   version: "3.10"
 - name: pycrypto
   version: "2.6"
+
+skip_files:
+- ^(.*/)?#.*#
+- ^(.*/)?.*~
+- ^(.*/)?.*\.py[co]
+- ^(.*/)?\..*
+- ^tests.*
+- ^tools.*
+- ^(.*/)?.*\.orig
+- ^(.*/)?.*\.rej
+- ^[A-Z]+
+- ^[A-Z]+\.[a-z]+
+- codereview\.settings
