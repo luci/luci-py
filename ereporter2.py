@@ -75,26 +75,8 @@ RE_STACK_TRACE_FILE = (
     r'^(?P<prefix>  File \")(?P<file>[^\"]+)(?P<suffix>\"\, line )'
     r'(?P<line_no>\d+)(?P<rest>|\, in .+)$')
 
-
-# Ignore these failures, there's nothing to do.
-IGNORED_LINES = (
-  # And..?
-  '/base/data/home/runtimes/python27/python27_lib/versions/1/google/appengine/'
-      '_internal/django/template/__init__.py:729: UserWarning: api_milliseconds'
-      ' does not return a meaningful value',
-  # Thanks AppEngine.
-  'Process terminated because the request deadline was exceeded during a '
-      'loading request.',
-)
-
-
-# Ignore these exceptions.
-IGNORED_EXCEPTIONS = (
-  'CancelledError',
-  'DeadlineExceededError',
-  # TODO(maruel): Reenable this trace once we got over the storm of exceptions.
-  'OverQuotaError',
-)
+# Handle this error message specifically.
+SOFT_MEMORY = 'Exceeded soft private memory limit'
 
 
 class ErrorReportingInfo(ndb.Model):
@@ -102,7 +84,6 @@ class ErrorReportingInfo(ndb.Model):
   KEY_ID = 'root'
 
   timestamp = ndb.FloatProperty()
-
 
 
 class ErrorCategory(object):
@@ -168,70 +149,100 @@ class ErrorRecord(object):
     self.status = status
     self.message = message
 
-  def get_signature(self):
-    """Returns a unique signature string for an exception."""
-    lines = self.message.splitlines()
-    if any(l in IGNORED_LINES for l in lines):
-      return None
+    # Creates an unique signature string based on the message.
+    self.short_signature, self.exception_type = signature_from_message(message)
+    self.signature = self.short_signature + '@' + version
 
-    if STACK_TRACE_MARKER not in lines:
-      # Not an exception. Use the first line as the 'signature'.
 
-      # Look for special messages to reduce.
-      SOFT_MEMORY = 'Exceeded soft private memory limit'
-      if lines[0].startswith(SOFT_MEMORY):
-        # To reenable, uncomment the following line and remove the return.
-        # lines[0] = SOFT_MEMORY
-        return None
+def signature_from_message(message):
+  """Calculates a signature and extract the exception if any.
 
-      return lines[0].strip() + '@' + self.version
+  Arguments:
+    message: a complete log entry potentially containing a stack trace.
 
-    stacktrace = []
-    index = lines.index(STACK_TRACE_MARKER) + 1
-    while index < len(lines):
-      if not re.match(RE_STACK_TRACE_FILE, lines[index]):
-        break
-      if (len(lines) > index + 1 and
-          re.match(RE_STACK_TRACE_FILE, lines[index+1])):
-        # It happens occasionally with jinja2 templates.
-        stacktrace.append(lines[index])
-        index += 1
-      else:
-        stacktrace.extend(lines[index:index+2])
-        index += 2
+  Returns:
+    tuple of a signature and the exception type, if any.
+  """
+  lines = message.splitlines()
+  if STACK_TRACE_MARKER not in lines:
+    # Not an exception. Use the first line as the 'signature'.
 
-    if index >= len(lines):
-      # Failed at grabbing the exception.
-      return lines[0].strip() + '@' + self.version
+    # Look for special messages to reduce.
+    if lines[0].startswith(SOFT_MEMORY):
+      # Consider SOFT_MEMORY an 'exception'.
+      return SOFT_MEMORY, SOFT_MEMORY
+    return lines[0].strip(), None
 
-    # SyntaxError produces this.
-    if lines[index].strip() == '^':
+  # It is a stack trace.
+  stacktrace = []
+  index = lines.index(STACK_TRACE_MARKER) + 1
+  while index < len(lines):
+    if not re.match(RE_STACK_TRACE_FILE, lines[index]):
+      break
+    if (len(lines) > index + 1 and
+        re.match(RE_STACK_TRACE_FILE, lines[index+1])):
+      # It happens occasionally with jinja2 templates.
+      stacktrace.append(lines[index])
       index += 1
+    else:
+      stacktrace.extend(lines[index:index+2])
+      index += 2
 
-    while True:
-      ex_type = lines[index].split(':', 1)[0].strip()
-      if ex_type:
-        break
-      if not index:
-        logging.error('Failed to process message:\n%s', self.message)
-        return None
-      index -= 1
-    if ex_type in IGNORED_EXCEPTIONS:
-      # Ignore this exception.
-      return None
+  if index >= len(lines):
+    # Failed at grabbing the exception.
+    return lines[0].strip(), None
 
-    path = None
-    line_no = -1
-    for l in reversed(stacktrace):
-      m = re.match(RE_STACK_TRACE_FILE, l)
-      if m:
-        path = os.path.basename(m.group('file'))
-        line_no = int(m.group('line_no'))
-        break
-    signature = '%s@%s:%d' % (ex_type, path, line_no)
-    if len(signature) > 256:
-      signature = 'hash:%s' % hashlib.sha1(signature).hexdigest()
-    return signature + '@' + self.version
+  # SyntaxError produces this.
+  if lines[index].strip() == '^':
+    index += 1
+
+  assert index > 0
+  while True:
+    ex_type = lines[index].split(':', 1)[0].strip()
+    if ex_type:
+      break
+    if not index:
+      logging.error('Failed to process message.\n%s', message)
+      # Fall back to returning the first line.
+      return lines[0].strip(), None
+    index -= 1
+
+  path = None
+  line_no = -1
+  for l in reversed(stacktrace):
+    m = re.match(RE_STACK_TRACE_FILE, l)
+    if m:
+      path = os.path.basename(m.group('file'))
+      line_no = int(m.group('line_no'))
+      break
+  signature = '%s@%s:%d' % (ex_type, path, line_no)
+  if len(signature) > 256:
+    signature = 'hash:%s' % hashlib.sha1(signature).hexdigest()
+  return signature, ex_type
+
+
+def should_ignore_error_record(error_record):
+  """Returns True if an ErrorRecord should be ignored."""
+  # Ignore these failures, there's nothing to do.
+  IGNORED_LINES = (
+    # And..?
+    '/base/data/home/runtimes/python27/python27_lib/versions/1/google/'
+        'appengine/_internal/django/template/__init__.py:729: UserWarning: '
+        'api_milliseconds does not return a meaningful value',
+    # Thanks AppEngine.
+    'Process terminated because the request deadline was exceeded during a '
+        'loading request.',
+  )
+  # Ignore these exceptions.
+  IGNORED_EXCEPTIONS = (
+    'CancelledError',
+    'DeadlineExceededError',
+    SOFT_MEMORY,
+  )
+
+  if any(l in IGNORED_LINES for l in error_record.message.splitlines()):
+    return True
+  return error_record.exception_type in IGNORED_EXCEPTIONS
 
 
 def records_to_html(error_categories, ignored_count, request_id_url):
@@ -327,18 +338,22 @@ def generate_html_report(module_versions, request_id_url):
   """Returns an HTML report since the last email report and return it."""
   info = ErrorReportingInfo.get_by_id(ErrorReportingInfo.KEY_ID)
   start_time = info.timestamp if info else None
-  ignored = 0
+  ignored = {}
   categories = {}
   for i in _extract_exceptions_from_logs(start_time, None, module_versions):
-    signature = i.get_signature()
-    if not signature:
-      ignored += 1
-      continue
-    category = categories.setdefault(
-        signature,
-        ErrorCategory(signature, i.version, i.module, i.message, i.resource))
+    if should_ignore_error_record(i):
+      category = ignored.setdefault(
+          i.signature,
+          ErrorCategory(
+              i.signature, i.version, i.module, i.message, i.resource))
+    else:
+      category = categories.setdefault(
+          i.signature,
+          ErrorCategory(
+              i.signature, i.version, i.module, i.message, i.resource))
     category.events.append(i)
-  return records_to_html(categories.values(), ignored, request_id_url)
+  ignored_count = sum(len(c.events) for c in ignored.itervalues())
+  return records_to_html(categories.values(), ignored_count, request_id_url)
 
 
 def generate_and_email_report(recipients, module_versions, request_id_url):
@@ -369,16 +384,16 @@ def generate_and_email_report(recipients, module_versions, request_id_url):
     batch_max_size = 100
     for i in _extract_exceptions_from_logs(
         start_time, end_time, module_versions):
-      signature = i.get_signature()
-      if not signature:
+      if should_ignore_error_record(i):
         ignored += 1
         continue
       category = categories.setdefault(
-          signature,
-          ErrorCategory(signature, i.version, i.module, i.message, i.resource))
+          i.signature,
+          ErrorCategory(
+              i.signature, i.version, i.module, i.message, i.resource))
       category.events.append(i)
       total += 1
-      signatures_seen.add(signature)
+      signatures_seen.add(i.signature)
 
       if total == batch_max_size or len(categories) > 50:
         _email_batch(recipients, categories.values(), ignored, request_id_url)

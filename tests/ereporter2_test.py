@@ -24,6 +24,13 @@ import ereporter2
 from third_party import auto_stub
 
 
+class ErrorRecordStub(object):
+  """Intentionally thin stub to test should_ignore_error_record()."""
+  def __init__(self, message, exception_type):
+    self.message = message
+    self.exception_type = exception_type
+
+
 class Ereporter2Test(auto_stub.TestCase):
   def setUp(self):
     super(Ereporter2Test, self).setUp()
@@ -97,52 +104,66 @@ class Ereporter2Test(auto_stub.TestCase):
     ]
     self.assertEqual(expected, emailed)
 
-  def test_ignored(self):
+  def test_signatures(self):
     messages = [
       (
-        '\nTraceback (most recent call last):\n'
+        ('\nTraceback (most recent call last):\n'
         '  File \"appengine/runtime/wsgi.py\", line 239, in Handle\n'
         '    handler = _config_handle.add_wsgi_middleware(self._LoadHandler())'
             '\n'
         '  File \"appengine/ext/ndb/utils.py\", line 28, in wrapping\n'
         '    def wrapping_wrapper(wrapper):\n'
         'DeadlineExceededError'),
+        'DeadlineExceededError@utils.py:28',
+        'DeadlineExceededError',
+        True
+      ),
       (
-        '/base/data/home/runtimes/python27/python27_lib/versions/1/google/'
+        ('/base/data/home/runtimes/python27/python27_lib/versions/1/google/'
         'appengine/_internal/django/template/__init__.py:729: UserWarning: '
         'api_milliseconds does not return a meaningful value\n'
         '  current = current()'),
+        '/base/data/home/runtimes/python27/python27_lib/versions/1/google/'
+            'appengine/_internal/django/template/__init__.py:729: UserWarning: '
+            'api_milliseconds does not return a meaningful value',
+        None,
+        True,
+      ),
+      (
+        ('\'error\' is undefined\n'
+        'Traceback (most recent call last):\n'
+        '  File \"tp/webapp2-2.5/webapp2.py\", line 1535, in __call__\n'
+        '    rv = self.handle_exception(request, response, e)\n'
+        '  File \"tp/jinja2-2.6/jinja2/environment.py\", line 894, in render\n'
+        '    return self.environment.handle_exception(exc_info, True)\n'
+        '  File \"<template>\", line 6, in top-level template code\n'
+        '  File \"tp/jinja2-2.6/jinja2/environment.py\", line 372, in getattr\n'
+        '    return getattr(obj, attribute)\n'
+        'UndefinedError: \'error\' is undefined'),
+        'UndefinedError@environment.py:372',
+        'UndefinedError',
+        False,
+      ),
+      (
+        ('\nTraceback (most recent call last):\n'
+        '  File \"ereporter2.py\", line 74\n'
+        '    class ErrorReportingInfo(ndb.Model):\n'
+        '        ^\n'
+        'SyntaxError: invalid syntax'),
+        'SyntaxError@ereporter2.py:74',
+        'SyntaxError',
+        False,
+      ),
     ]
-    for message in messages:
-      report = self._ErrorRecord(message=message)
-      self.assertEqual(None, report.get_signature())
 
-  def test_exception_frame_skipped(self):
-    message = (
-      '\'error\' is undefined\n'
-      'Traceback (most recent call last):\n'
-      '  File \"third_party/webapp2-2.5/webapp2.py\", line 1535, in __call__\n'
-      '    rv = self.handle_exception(request, response, e)\n'
-      '  File \"tp/jinja2-2.6/jinja2/environment.py\", line 894, in render\n'
-      '    return self.environment.handle_exception(exc_info, True)\n'
-      '  File \"<template>\", line 6, in top-level template code\n'
-      '  File \"tp/jinja2-2.6/jinja2/environment.py\", line 372, in getattr\n'
-      '    return getattr(obj, attribute)\n'
-      'UndefinedError: \'error\' is undefined')
-    report = self._ErrorRecord(message=message)
-    self.assertEqual(
-        'UndefinedError@environment.py:372@v1',
-        report.get_signature())
-
-  def test_exception_syntaxerror(self):
-    message = (
-      '\nTraceback (most recent call last):\n'
-      '  File \"ereporter2.py\", line 74\n'
-      '    class ErrorReportingInfo(ndb.Model):\n'
-      '        ^\n'
-      'SyntaxError: invalid syntax')
-    report = self._ErrorRecord(message=message)
-    self.assertEqual('SyntaxError@ereporter2.py:74@v1', report.get_signature())
+    for (message, expected_signature, excepted_exception,
+         expected_ignored) in messages:
+      signature, exception_type = ereporter2.signature_from_message(message)
+      self.assertEqual(expected_signature, signature)
+      self.assertEqual(excepted_exception, exception_type)
+      result = ereporter2.should_ignore_error_record(
+          ErrorRecordStub(message, exception_type))
+      self.assertEqual(expected_ignored, result, message)
 
 
 if __name__ == '__main__':
