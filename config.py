@@ -152,6 +152,7 @@ def get_app_version():
   return modules.get_current_version_name()
 
 
+@utils.cache_with_expiration(expiration_sec=3600)
 def get_task_queue_host():
   """Returns domain name of app engine instance to run a task queue task on.
 
@@ -163,4 +164,11 @@ def get_task_queue_host():
   That way a task enqueued from version 'A' of default module would be executed
   on same version 'A' of backend module.
   """
-  return modules.get_hostname(module=TASK_QUEUE_MODULE)
+  # modules.get_hostname sometimes fails with unknown internal error.
+  # Cache its result in a memcache to avoid calling it too often.
+  cache_key = 'task_queue_host:%s' % get_app_version()
+  value = memcache.get(cache_key)
+  if not value:
+    value = modules.get_hostname(module=TASK_QUEUE_MODULE)
+    memcache.set(cache_key, value)
+  return value
