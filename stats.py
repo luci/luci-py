@@ -99,6 +99,10 @@ class Snapshot(ndb.Model):
 ### Utility
 
 
+# The global stats bookkeeper. This is initialized in bootstrap().
+_STATS_HANDLER = None
+
+
 # Text to store for the corresponding actions.
 _ACTION_NAMES = ['store', 'return', 'lookup', 'dupe']
 
@@ -164,11 +168,6 @@ def _extract_snapshot_from_logs(start_time, end_time):
         continue
       _parse_line(log_line.message, values)
   return values
-
-
-# The global stats bookkeeper. This needs to be after the function.
-_STATS_HANDLER = stats_framework.StatisticsFramework(
-    'global_stats', Snapshot, _extract_snapshot_from_logs)
 
 
 def _get_request_as_int(request, key, default, min_value, max_value):
@@ -301,3 +300,10 @@ class StatsJsonHandler(webapp2.RequestHandler):
     self.response.write(json.dumps(data, separators=(',',':')))
     self.response.headers['Content-Type'] = 'application/json'
     self.response.headers['Access-Control-Allow-Origin'] = '*'
+
+
+def bootstrap():
+  """Initializes the stats handler."""
+  global _STATS_HANDLER
+  _STATS_HANDLER = stats_framework.StatisticsFramework(
+    'global_stats', Snapshot, _extract_snapshot_from_logs)

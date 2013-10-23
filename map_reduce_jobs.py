@@ -30,7 +30,7 @@ MAP_REDUCE_JOBS = {
     'handler_spec': 'map_reduce_jobs.detect_missing_gs_file_mapper',
     'reader_spec': 'mapreduce.input_readers.DatastoreInputReader',
     'mapper_parameters': {
-      'entity_kind': 'main.ContentEntry',
+      'entity_kind': 'handlers.ContentEntry',
       'batch_size': 50,
     },
     'shard_count': 32,

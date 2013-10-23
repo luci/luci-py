@@ -170,9 +170,9 @@ def load_context(sdk_path, app_dir, host, app_id, version, module_id):
     import acl
     import config
     import gcs
-    import main
+    import handlers
     import stats
-    from main import ContentNamespace, ContentEntry
+    from handlers import ContentNamespace, ContentEntry
 
     # Symbols presented to the user.
     predefined_vars = locals().copy()
