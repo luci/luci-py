@@ -11,10 +11,19 @@ automatic_scaling:
   max_pending_latency: 250ms
 
 handlers:
+- url: /restricted/mapreduce(/.*)?
+  script: map_reduce_jobs.app
+  secure: always
+  login: admin
+
 - url: /restricted.*
   script: main.app
   secure: always
   login: admin
+
+- url: /mapreduce/pipeline/images
+  static_dir: third_party/mapreduce/lib/pipeline/ui/images
+  secure: always
 
 - url: /(.+)\.(css|gif|ico|js)
   static_files: static/\1.\2

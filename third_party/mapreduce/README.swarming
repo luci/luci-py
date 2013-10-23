@@ -1,0 +1,12 @@
+Name: Google App Engine API for running MapReduce jobs
+Short Name: appengine-mapreduce
+URL: https://code.google.com/p/appengine-mapreduce/
+Revision: 554
+License: Apache License, Version 2.0
+
+Description:
+AppEngine-MapReduce is an open-source library for doing MapReduce-style
+computations on the Google App Engine platform.
+
+Local Modifications:
+Kept only trunk/python/src/mapreduce.

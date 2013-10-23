@@ -30,8 +30,9 @@ from google.appengine.ext.webapp import blobstore_handlers
 
 import acl
 import config
-import gcs
 import ereporter2
+import gcs
+import map_reduce_jobs
 import stats
 import template
 import utils
@@ -384,16 +385,22 @@ def save_in_memcache(namespace, hash_key, content, async=False):
     logging.error(e)
 
 
-def enqueue_task(url, queue_name, payload=None, name=None):
+def enqueue_task(url, queue_name, payload=None, name=None,
+                 use_dedicated_module=True):
   """Adds a task to a task queue.
 
-  It will be executed by a separate backend module that runs same version as
-  currently executing instance.
+  If |use_dedicated_module| is True (default) a task will be executed by
+  a separate backend module instance that runs same version as currently
+  executing instance. Otherwise it will run on a current version of default
+  module.
 
   Returns True if a task was successfully added, logs error and returns False
   if task queue is acting up.
   """
   try:
+    headers = None
+    if use_dedicated_module:
+      headers = {'Host': config.get_task_queue_host()}
     # Note that just using 'target=module' here would redirect task request to
     # a default version of a module, not the currently executing one.
     taskqueue.add(
@@ -401,7 +408,7 @@ def enqueue_task(url, queue_name, payload=None, name=None):
         queue_name=queue_name,
         payload=payload,
         name=name,
-        headers={'Host': config.get_task_queue_host()})
+        headers=headers)
     return True
   except (
       taskqueue.Error,
@@ -769,7 +776,13 @@ class RestrictedStoreBlobstoreContentByHashHandler(
 class RestrictedAdminUIHandler(acl.ACLRequestHandler):
   """Root admin UI page."""
   def get(self):
-    self.response.write(template.get('restricted.html').render())
+    self.response.write(template.get('restricted.html').render({
+        'token': self.get_token(0, time.time()),
+        'map_reduce_jobs': [
+            {'id': job_id, 'name': job_def['name']}
+            for job_id, job_def in map_reduce_jobs.MAP_REDUCE_JOBS.iteritems()
+        ],
+    }))
     self.response.headers['Content-Type'] = 'text/html'
 
 
@@ -834,6 +847,42 @@ class RestrictedEreporter2Request(webapp2.RequestHandler):
       self.abort(404, detail='Request id was not found.')
     self.response.headers['Content-Type'] = 'application/json'
     json.dump(data, self.response, indent=2, sort_keys=True)
+
+
+### Mapreduce related handlers
+
+
+class RestrictedLaunchMapReduceJob(acl.ACLRequestHandler):
+  """Enqueues a task to start a map reduce job on the backend module.
+
+  A tree of map reduce jobs inherits module and version of a handler that
+  launched it. All UI handlers are executes by 'default' module. So to run a
+  map reduce on a backend module one needs to pass a request to a task running
+  on backend module.
+  """
+  def post(self):
+    job_id = self.request.get('job_id')
+    assert job_id in map_reduce_jobs.MAP_REDUCE_JOBS
+    # Do not use 'backend' module when running from dev appserver. Mapreduce
+    # generates URLs that are incompatible with dev appserver URL routing when
+    # using custom modules.
+    success = enqueue_task(
+        url='/restricted/taskqueue/mapreduce/launch/%s' % job_id,
+        queue_name=map_reduce_jobs.MAP_REDUCE_TASK_QUEUE,
+        use_dedicated_module=not config.is_local_dev_server())
+    # New tasks should show up on the status page.
+    if success:
+      self.redirect('/restricted/mapreduce/status')
+    else:
+      self.abort(500, 'Failed to launch the job')
+
+
+class RestrictedLaunchMapReduceJobWorkerHandler(webapp2.RequestHandler):
+  """Called via task queue or cron to start a map reduce job."""
+  def post(self, job_id):
+    if not self.request.headers.get('X-AppEngine-QueueName'):
+      self.abort(405, detail='Only internal task queue tasks can do this')
+    map_reduce_jobs.launch_job(job_id)
 
 
 ### Non-restricted handlers
@@ -1636,6 +1685,14 @@ def CreateApplication():
           r'/restricted/whitelistdomain', acl.RestrictedWhitelistDomainHandler),
       webapp2.Route(
           r'/restricted/gs_config', RestrictedGoogleStorageConfig),
+
+      # Mapreduce related urls.
+      webapp2.Route(
+          r'/restricted/launch_map_reduce',
+          RestrictedLaunchMapReduceJob),
+      webapp2.Route(
+          r'/restricted/taskqueue/mapreduce/launch/<job_id:[^\/]+>',
+          RestrictedLaunchMapReduceJobWorkerHandler),
 
       # Internal AppEngine handling for blobstore uploads.
       webapp2.Route(

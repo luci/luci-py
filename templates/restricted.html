@@ -3,13 +3,31 @@
 
 {% block body %}
 
-<h1>Admin pages</h1>
+<h3>Configuration</h3>
 <ul>
   <li><a href="/restricted/whitelistdomain">Whitelist Domain</a></li>
   <li><a href="/restricted/whitelistip">Whitelist IP</a></li>
   <li><a href="/restricted/gs_config">Google Storage Config</a></li>
+</ul>
+
+<h3>Error reports</h3>
+<ul>
   <li><a href="/restricted/ereporter2/report">Recent ereporter2 errors</a></li>
   <li><a href="/restricted/cron/ereporter2/mail">Force sending error report</a></li>
+</ul>
+
+<h3>Map reduce jobs</h3>
+<ul>
+  <li><a href="/restricted/mapreduce/status">Map reduce jobs status</a></li>
+  {% for job in map_reduce_jobs %}
+    <li>
+      <form action="/restricted/launch_map_reduce" method="post">
+        <input type="hidden" name="token" value="{{token}}" />
+        <input type="hidden" name="job_id" value="{{job.id}}" />
+        <button type="submit">Launch '{{job.name}}'</button>
+      </form>
+    </li>
+  {% endfor %}
 </ul>
 
 {% endblock %}
