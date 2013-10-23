@@ -4,15 +4,10 @@
 # found in the LICENSE file.
 
 import logging
-import os
 import sys
 import unittest
 
 import test_env
-
-ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, ROOT_DIR)
-
 test_env.setup_test_env()
 
 import acl

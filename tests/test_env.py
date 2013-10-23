@@ -5,7 +5,8 @@
 import os
 import sys
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+TESTS_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.path.dirname(TESTS_DIR)
 
 
 def find_gae_sdk():
@@ -30,3 +31,7 @@ def setup_test_env():
 
   # TODO(maruel): Load it from app.yaml.
   os.environ['APPLICATION_ID'] = 'isolateserver-dev'
+
+  sys.path.insert(0, BASE_DIR)
+  sys.path.insert(0, os.path.join(TESTS_DIR, 'third_party'))
+  sys.path.insert(0, os.path.join(BASE_DIR, 'third_party'))

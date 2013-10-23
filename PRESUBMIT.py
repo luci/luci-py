@@ -10,13 +10,17 @@ details on the presubmit API built into gcl.
 
 def CommonChecks(input_api, output_api):
   output = []
-  test_directory = input_api.os_path.join(
-      input_api.PresubmitLocalPath(), 'tests')
+  def join(*args):
+    return input_api.os_path.join(input_api.PresubmitLocalPath(), *args)
 
   import sys
   old_sys_path = sys.path
   try:
-    sys.path = [test_directory] + sys.path
+    sys.path = [
+      join('tests'),
+      join('third_party'),
+      join('tests', 'third_party'),
+    ] + sys.path
     disabled_warnings = [
         'E1101',  # Instance X has no member Y
         'W0232', # Class has no __init__ method
@@ -29,7 +33,7 @@ def CommonChecks(input_api, output_api):
   output.extend(
       input_api.canned_checks.RunUnitTestsInDirectory(
           input_api, output_api,
-          test_directory,
+          join('tests'),
           whitelist=[r'.+_test\.py$'],
           blacklist=[r'.+_smoke_test\.py$']))
   return output

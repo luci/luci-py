@@ -1,0 +1,11 @@
+Name: depot_tools
+Short Name: depot_tools
+URL: https://chromium.googlesource.com/chromium/tools/depot_tools.git
+Revision: 91507f76f8261d93b01188440dc0bc69920e7687
+License: BSD
+
+Description:
+Tools for Chromium developpers.
+
+Local Modifications:
+Kept testing_support/auto_stub.py.

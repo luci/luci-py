@@ -5,12 +5,10 @@
 
 import calendar
 import datetime
-import os
 import sys
 import unittest
 
 import test_env
-
 test_env.setup_test_env()
 
 # The app engine headers are located locally, so don't worry about not finding
@@ -19,9 +17,6 @@ test_env.setup_test_env()
 from google.appengine.ext import ndb
 from google.appengine.ext import testbed
 # pylint: enable=E0611,F0401
-
-ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, ROOT_DIR)
 
 import stats_framework
 

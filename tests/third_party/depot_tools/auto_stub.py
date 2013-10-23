@@ -2,13 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-"""Manages stubs in an simple and efficient way.
-
-Original source:
-https://chromium.googlesource.com/chromium/tools/depot_tools.git/ \
-    +/master/testing_support/auto_stub.py
-"""
-
 import inspect
 import unittest
 

@@ -15,6 +15,7 @@ following format:
 import binascii
 import hashlib
 import logging
+import os
 import sys
 import time
 import unittest
@@ -22,10 +23,11 @@ import urllib
 import urllib2
 import zlib
 
-import find_depot_tools  # pylint: disable=W0611
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(BASE_DIR, 'third_party'))
 
-# pylint: disable=E0611,E1002
-from third_party import upload
+from rietveld import upload
+
 
 # The url of the test isolate server.
 ISOLATE_SERVER_URL_TEMPLATE = 'https://%s-dot-isolateserver-dev.appspot.com/'

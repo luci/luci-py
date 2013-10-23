@@ -2,6 +2,8 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
+"""This module is the entry point for all isolateserver url handlers."""
+
 import binascii
 import collections
 import datetime
@@ -11,6 +13,7 @@ import json
 import logging
 import os
 import re
+import sys
 import time
 import urllib
 import zlib
@@ -27,6 +30,9 @@ from google.appengine.ext import blobstore
 from google.appengine.ext import ndb
 from google.appengine.ext.webapp import blobstore_handlers
 # pylint: enable=E0611,F0401
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(BASE_DIR, 'third_party'))
 
 import acl
 import config

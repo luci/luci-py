@@ -20,11 +20,11 @@ import Crypto.Hash.SHA256 as SHA256
 import Crypto.PublicKey.RSA as RSA
 import Crypto.Signature.PKCS1_v1_5 as PKCS1_v1_5
 
-from third_party import cloudstorage
+import cloudstorage
 
 # Export some exceptions for users of this module.
 # pylint: disable=W0611
-from third_party.cloudstorage.errors import (
+from cloudstorage.errors import (
     AuthorizationError,
     FatalError,
     ForbiddenError,
