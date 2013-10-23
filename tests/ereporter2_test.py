@@ -60,6 +60,13 @@ def ErrorRecord(**kwargs):
   return ereporter2.ErrorRecord(**default_values)
 
 
+def ignorer(error_record):
+  return ereporter2.should_ignore_error_record(
+      ['Process terminated because the request deadline was exceeded during a '
+        'loading request.',],
+      ['DeadlineExceededError'],
+      error_record)
+
 class TestCase(auto_stub.TestCase):
   """Support class to enable google.appengine.api.mail.send_mail_to_admins()."""
   def setUp(self):
@@ -116,6 +123,7 @@ class Ereporter2Test(TestCase):
         start_time=10,
         end_time=20,
         module_versions=[],
+        ignorer=ignorer,
         recipients=None,
         request_id_url='http://foo/request/',
         report_url='http://foo/report',
@@ -140,6 +148,7 @@ class Ereporter2Test(TestCase):
         start_time=10,
         end_time=20,
         module_versions=[],
+        ignorer=ignorer,
         recipients='joe@example.com',
         request_id_url='http://foo/request/',
         report_url='http://foo/report',
@@ -207,12 +216,22 @@ class Ereporter2Test(TestCase):
       ),
     ]
 
+    IGNORED_LINES = [
+      '/base/data/home/runtimes/python27/python27_lib/versions/1/google/'
+          'appengine/_internal/django/template/__init__.py:729: UserWarning: '
+          'api_milliseconds does not return a meaningful value',
+    ]
+    IGNORED_EXCEPTIONS = [
+      'DeadlineExceededError',
+    ]
     for (message, expected_signature, excepted_exception,
          expected_ignored) in messages:
       signature, exception_type = ereporter2.signature_from_message(message)
       self.assertEqual(expected_signature, signature)
       self.assertEqual(excepted_exception, exception_type)
       result = ereporter2.should_ignore_error_record(
+          IGNORED_LINES,
+          IGNORED_EXCEPTIONS,
           ErrorRecordStub(message, exception_type))
       self.assertEqual(expected_ignored, result, message)
 
@@ -232,7 +251,7 @@ class Ereporter2Test(TestCase):
       ErrorRecord(),
     ]
     self.mock(ereporter2, '_extract_exceptions_from_logs', lambda *_: data)
-    report, ignored = ereporter2.generate_report(10, 20, None)
+    report, ignored = ereporter2.generate_report(10, 20, None, ignorer)
     expected_report = ereporter2.ErrorCategory(
         'Failed@v1', 'v1', 'default', 'Failed', '/foo')
     expected_report.events = [
@@ -256,7 +275,8 @@ class Ereporter2Test(TestCase):
     ]
     self.mock(ereporter2, '_extract_exceptions_from_logs', lambda *_: data)
     module_versions = [('foo', 'bar')]
-    report, ignored = ereporter2.generate_report(10, 20, module_versions)
+    report, ignored = ereporter2.generate_report(
+        10, 20, module_versions, ignorer)
     env = ereporter2.get_template_env(10, 20, module_versions)
     out = ereporter2.report_to_html(
         report, ignored,

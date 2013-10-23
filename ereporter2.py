@@ -240,28 +240,11 @@ def signature_from_message(message):
   return signature, ex_type
 
 
-def should_ignore_error_record(error_record):
+def should_ignore_error_record(ignored_lines, ignored_exceptions, error_record):
   """Returns True if an ErrorRecord should be ignored."""
-  # Ignore these failures, there's nothing to do.
-  IGNORED_LINES = (
-    # And..?
-    '/base/data/home/runtimes/python27/python27_lib/versions/1/google/'
-        'appengine/_internal/django/template/__init__.py:729: UserWarning: '
-        'api_milliseconds does not return a meaningful value',
-    # Thanks AppEngine.
-    'Process terminated because the request deadline was exceeded during a '
-        'loading request.',
-  )
-  # Ignore these exceptions.
-  IGNORED_EXCEPTIONS = (
-    'CancelledError',
-    'DeadlineExceededError',
-    SOFT_MEMORY,
-  )
-
-  if any(l in IGNORED_LINES for l in error_record.message.splitlines()):
+  if any(l in ignored_lines for l in error_record.message.splitlines()):
     return True
-  return error_record.exception_type in IGNORED_EXCEPTIONS
+  return error_record.exception_type in ignored_exceptions
 
 
 def time2str(t):
@@ -399,13 +382,14 @@ def _handle_time_range(start_time, end_time, default_end_time):
   return start_time, end_time
 
 
-def generate_report(start_time, end_time, module_versions):
+def generate_report(start_time, end_time, module_versions, ignorer):
   """Returns a list of ErrorCategory to generate a report.
 
   Arguments:
     start_time: time to look for report, defaults to last email sent.
     end_time: time to end the search for error, defaults to now.
     module_versions: list of tuple of module-version to gather info about.
+    ignorer: function that returns True if an ErrorRecord should be ignored.
 
   Returns:
     tuple of two list of ErrorCategory, the ones that should be reported and the
@@ -415,7 +399,7 @@ def generate_report(start_time, end_time, module_versions):
   ignored = {}
   categories = {}
   for i in _extract_exceptions_from_logs(start_time, end_time, module_versions):
-    bucket = ignored if should_ignore_error_record(i) else categories
+    bucket = ignored if ignorer and ignorer(i) else categories
     category = bucket.setdefault(
         i.signature,
         ErrorCategory(i.signature, i.version, i.module, i.message, i.resource))
@@ -424,7 +408,7 @@ def generate_report(start_time, end_time, module_versions):
 
 
 def generate_and_email_report(
-    start_time, end_time, module_versions, recipients, request_id_url,
+    start_time, end_time, module_versions, ignorer, recipients, request_id_url,
     report_url, title_template, content_template, extras):
   """Generates and emails an exception report.
 
@@ -434,6 +418,7 @@ def generate_and_email_report(
     start_time: time to look for report, defaults to last email sent.
     end_time: time to end the search for error, defaults to now - 5 minutes.
     module_versions: list of tuple of module-version to gather info about.
+    ignorer: function that returns True if an ErrorRecord should be ignored.
     recipients: str containing comma separated email addresses.
     request_id_url: base url to use to link to a specific request_id.
     report_url: base url to use to recreate this report.
@@ -456,7 +441,8 @@ def generate_and_email_report(
       start_time, end_time, module_versions, recipients)
   result = False
   try:
-    categories, ignored = generate_report(start_time, end_time, module_versions)
+    categories, ignored = generate_report(
+        start_time, end_time, module_versions, ignorer)
     more_extras = get_template_env(start_time, end_time, module_versions)
     more_extras.update(extras or {})
     body = records_to_html(

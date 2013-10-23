@@ -7,6 +7,7 @@
 import binascii
 import collections
 import datetime
+import functools
 import hashlib
 import hmac
 import json
@@ -66,6 +67,26 @@ MAX_NAMESPACE_LEN = 29
 # Maximum size of file stored in GS to be saved in memcache. The value must be
 # small enough so that the whole content can safely fit in memory.
 MAX_MEMCACHE_ISOLATED = 500*1024
+
+
+# Ignore these failures, there's nothing to do.
+# TODO(maruel): Store them in the db and make this runtime configurable.
+IGNORED_LINES = (
+  # And..?
+  '/base/data/home/runtimes/python27/python27_lib/versions/1/google/'
+      'appengine/_internal/django/template/__init__.py:729: UserWarning: '
+      'api_milliseconds does not return a meaningful value',
+  # Thanks AppEngine.
+  'Process terminated because the request deadline was exceeded during a '
+      'loading request.',
+)
+
+# Ignore these exceptions.
+IGNORED_EXCEPTIONS = (
+  'CancelledError',
+  'DeadlineExceededError',
+  ereporter2.SOFT_MEMORY,
+)
 
 
 #### Models
@@ -426,6 +447,10 @@ def enqueue_task(url, queue_name, payload=None, name=None,
         'Problem adding task \'%s\' to task queue \'%s\' (%s): %s',
         url, queue_name, e.__class__.__name__, e)
     return False
+
+
+should_ignore_error_record = functools.partial(
+    ereporter2.should_ignore_error_record, IGNORED_LINES, IGNORED_EXCEPTIONS)
 
 
 ### Restricted handlers
@@ -834,6 +859,7 @@ class RestrictedEreporter2Mail(webapp2.RequestHandler):
         'recipients', config.settings().monitoring_recipients)
     result = ereporter2.generate_and_email_report(
         None, None, None,
+        should_ignore_error_record,
         recipients,
         request_id_url,
         report_url,
@@ -868,7 +894,8 @@ class RestrictedEreporter2Report(webapp2.RequestHandler):
       modules = modules.split(',')
     tainted = bool(int(self.request.get('tainted', '0')))
     module_versions = config.get_module_version_list(modules, tainted)
-    report, ignored = ereporter2.generate_report(start, end, module_versions)
+    report, ignored = ereporter2.generate_report(
+        start, end, module_versions, should_ignore_error_record)
     env = ereporter2.get_template_env(start, end, module_versions)
     out = ereporter2.report_to_html(
         report, ignored,
