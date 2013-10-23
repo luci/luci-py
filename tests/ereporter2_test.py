@@ -16,7 +16,7 @@ test_env.setup_test_env()
 from google.appengine.ext import testbed
 # pylint: enable=E0611,F0401
 
-import ereporter2
+from components import ereporter2
 from depot_tools import auto_stub
 
 

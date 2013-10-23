@@ -36,8 +36,8 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(BASE_DIR, 'third_party'))
 
 import acl
+from components import ereporter2
 import config
-import ereporter2
 import gcs
 import map_reduce_jobs
 import stats

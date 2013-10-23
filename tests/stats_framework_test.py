@@ -18,7 +18,7 @@ from google.appengine.ext import ndb
 from google.appengine.ext import testbed
 # pylint: enable=E0611,F0401
 
-import stats_framework
+from components import stats_framework
 
 
 class Snapshot(ndb.Model):

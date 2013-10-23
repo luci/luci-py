@@ -22,8 +22,8 @@ from google.appengine.ext import ndb
 from google.appengine.runtime import DeadlineExceededError
 # pylint: enable=E0611,F0401
 
+from components import stats_framework
 import config
-import stats_framework
 import template
 
 
