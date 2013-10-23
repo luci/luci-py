@@ -3,6 +3,7 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
+import json
 import sys
 import unittest
 
@@ -19,6 +20,10 @@ import ereporter2
 from depot_tools import auto_stub
 
 
+# W0212: Access to a protected member XXX of a client class
+# pylint: disable=W0212
+
+
 class ErrorRecordStub(object):
   """Intentionally thin stub to test should_ignore_error_record()."""
   def __init__(self, message, exception_type):
@@ -26,78 +31,129 @@ class ErrorRecordStub(object):
     self.exception_type = exception_type
 
 
-class Ereporter2Test(auto_stub.TestCase):
+def ErrorRecord(**kwargs):
+  """Returns an ErrorRecord filled with default dummy values."""
+  default_values = {
+      'request_id': 'a',
+      'start_time': None,
+      'exception_time': None,
+      'latency': 0,
+      'mcycles': 0,
+      'ip': '0.0.1.0',
+      'nickname': None,
+      'referrer': None,
+      'user_agent': 'Comodore64',
+      'host': 'localhost',
+      'resource': '/foo',
+      'method': 'GET',
+      'task_queue_name': None,
+      'was_loading_request': False,
+      'version': 'v1',
+      'module': 'default',
+      'handler_module': 'main.app',
+      'gae_version': '1.9.0',
+      'instance': '123',
+      'status': 200,
+      'message': 'Failed',
+  }
+  default_values.update(kwargs)
+  return ereporter2.ErrorRecord(**default_values)
+
+
+class TestCase(auto_stub.TestCase):
+  """Support class to enable google.appengine.api.mail.send_mail_to_admins()."""
   def setUp(self):
-    super(Ereporter2Test, self).setUp()
+    super(TestCase, self).setUp()
     self.testbed = testbed.Testbed()
     self.testbed.activate()
+    # Using init_all_stubs() costs ~10ms more to run all the tests.
     self.testbed.init_datastore_v3_stub()
     self.testbed.init_memcache_stub()
+    self.testbed.init_mail_stub()
+    self.mail_stub = self.testbed.get_stub(testbed.MAIL_SERVICE_NAME)
+    self.old_send_to_admins = self.mock(
+        self.mail_stub, '_Dynamic_SendToAdmins', self._SendToAdmins)
 
   def tearDown(self):
     self.testbed.deactivate()
-    super(Ereporter2Test, self).tearDown()
+    super(TestCase, self).tearDown()
 
-  @staticmethod
-  def _ErrorRecord(**kwargs):
-    default_values = {
-        'request_id': 'a',
-        'start_time': None,
-        'exception_time': None,
-        'latency': 0,
-        'mcycles': 0,
-        'ip': '0.0.1.0',
-        'nickname': None,
-        'referrer': None,
-        'user_agent': 'Comodore64',
-        'host': 'localhost',
-        'resource': '/foo',
-        'method': 'GET',
-        'task_queue_name': None,
-        'was_loading_request': False,
-        'version': 'v1',
-        'module': 'default',
-        'handler_module': 'main.app',
-        'gae_version': '1.9.0',
-        'instance': '123',
-        'status': 200,
-        'message': 'Failed',
-    }
-    default_values.update(kwargs)
-    return ereporter2.ErrorRecord(**default_values)
+  def _SendToAdmins(self, request, *args, **kwargs):
+    """Make sure the request is logged.
 
-  def test_render(self):
-    data = [
-      self._ErrorRecord(),
-    ]
-    emailed = []
-    def send_email(*args):
-      emailed.append(args)
-      return True
-    self.mock(ereporter2, '_extract_exceptions_from_logs', lambda *_: data)
-    self.mock(ereporter2, 'email_html', send_email)
-    result = ereporter2.generate_and_email_report(
-        'joe@example.com', None, 'http://foo/bar/')
+    See google_appengine/google/appengine/api/mail_stub.py around line 299,
+    MailServiceStub._SendToAdmins().
+    """
+    self.mail_stub._CacheMessage(request)
+    return self.old_send_to_admins(request, *args, **kwargs)
+
+
+class Ereporter2Test(TestCase):
+  def assertContent(self, message):
     self.assertEqual(
-        'Processed 1 items, ignored 0, sent to joe@example.com:\nFailed@v1',
-        result)
-    expected = [
-      (
-        'joe@example.com',
-        'Exceptions on "isolateserver-dev"',
-        '<html><head><title>Exceptions on "isolateserver-dev".</title></head>\n'
-        '<body><h3>1 occurrences of 1 errors across 1 versions.</h3>\n'
-        '\n'
-        '<span style="font-size:130%">Failed@v1</span><br>\n'
-        'main.app<br>\n'
-        'GET localhost/foo (HTTP 200)<br>\n'
-        '<pre>Failed</pre>\n'
-        '1 occurrences: <a href="http://foo/bar/a">Entry</a> <p>\n'
-        '<br>\n'
-        u'</body>'
-      ),
+        u'no_reply@isolateserver-dev.appspotmail.com', message.sender)
+    self.assertEqual(u'Exceptions on "isolateserver-dev"', message.subject)
+    expected_html = (
+        u'<html><body><h3><a href="http://foo/report?start=10&end=20">1 '
+        'occurrences of 1 errors across 1 versions.</a></h3>\n\n'
+        '<span style="font-size:130%">Failed@v1</span><br>\nmain.app<br>\n'
+        'GET localhost/foo (HTTP 200)<br>\n<pre>Failed</pre>\n'
+        '1 occurrences: <a href="http://foo/request/a">Entry</a> <p>\n<br>\n'
+        '</body></html>')
+    self.assertEqual(expected_html, message.html.payload)
+    expected_text = (
+        '1 occurrences of 1 errors across 1 versions.\n\n'
+        'Failed@v1\nmain.app\nGET localhost/foo (HTTP 200)\nFailed\n'
+        '1 occurrences: Entry \n\n')
+    self.assertEqual(expected_text, message.body.payload)
+
+  def test_email_no_recipients(self):
+    data = [
+      ErrorRecord(),
     ]
-    self.assertEqual(expected, emailed)
+    self.mock(ereporter2, '_extract_exceptions_from_logs', lambda *_: data)
+    result = ereporter2.generate_and_email_report(
+        start_time=10,
+        end_time=20,
+        module_versions=[],
+        recipients=None,
+        request_id_url='http://foo/request/',
+        report_url='http://foo/report',
+        title_template=ereporter2.REPORT_TITLE_TEMPLATE,
+        content_template=ereporter2.REPORT_CONTENT_TEMPLATE,
+        extras={})
+    self.assertEqual(True, result)
+
+    # Verify the email that was sent.
+    messages = self.mail_stub.get_sent_messages()
+    self.assertEqual(1, len(messages))
+    message = messages[0]
+    self.assertFalse(hasattr(message, 'to'))
+    self.assertContent(message)
+
+  def test_email_recipients(self):
+    data = [
+      ErrorRecord(),
+    ]
+    self.mock(ereporter2, '_extract_exceptions_from_logs', lambda *_: data)
+    result = ereporter2.generate_and_email_report(
+        start_time=10,
+        end_time=20,
+        module_versions=[],
+        recipients='joe@example.com',
+        request_id_url='http://foo/request/',
+        report_url='http://foo/report',
+        title_template=ereporter2.REPORT_TITLE_TEMPLATE,
+        content_template=ereporter2.REPORT_CONTENT_TEMPLATE,
+        extras={})
+    self.assertEqual(True, result)
+
+    # Verify the email that was sent.
+    messages = self.mail_stub.get_sent_messages()
+    self.assertEqual(1, len(messages))
+    message = messages[0]
+    self.assertEqual(u'joe@example.com', message.to)
+    self.assertContent(message)
 
   def test_signatures(self):
     messages = [
@@ -159,6 +215,71 @@ class Ereporter2Test(auto_stub.TestCase):
       result = ereporter2.should_ignore_error_record(
           ErrorRecordStub(message, exception_type))
       self.assertEqual(expected_ignored, result, message)
+
+  def assertEqualObj(self, a, b):
+    """Makes complex objects easier to diff."""
+    a_str = json.dumps(
+        ereporter2.serialize(a), indent=2, sort_keys=True).splitlines()
+    b_str = json.dumps(
+        ereporter2.serialize(b), indent=2, sort_keys=True).splitlines()
+    self.assertEqual(a_str, b_str)
+
+  def test_generate_report(self):
+    msg = ereporter2.STACK_TRACE_MARKER + '\nDeadlineExceededError'
+    data = [
+      ErrorRecord(),
+      ErrorRecord(message=msg),
+      ErrorRecord(),
+    ]
+    self.mock(ereporter2, '_extract_exceptions_from_logs', lambda *_: data)
+    report, ignored = ereporter2.generate_report(10, 20, None)
+    expected_report = ereporter2.ErrorCategory(
+        'Failed@v1', 'v1', 'default', 'Failed', '/foo')
+    expected_report.events = [
+      ErrorRecord(),
+      ErrorRecord(),
+    ]
+    self.assertEqualObj([expected_report], report)
+    expected_ignored = ereporter2.ErrorCategory(
+        'DeadlineExceededError@None:-1@v1', 'v1', 'default', msg, '/foo')
+    expected_ignored.events = [
+      ErrorRecord(message=msg),
+    ]
+    self.assertEqualObj([expected_ignored], ignored)
+
+  def test_report_to_html(self):
+    msg = ereporter2.STACK_TRACE_MARKER + '\nDeadlineExceededError'
+    data = [
+      ErrorRecord(),
+      ErrorRecord(message=msg),
+      ErrorRecord(),
+    ]
+    self.mock(ereporter2, '_extract_exceptions_from_logs', lambda *_: data)
+    module_versions = [('foo', 'bar')]
+    report, ignored = ereporter2.generate_report(10, 20, module_versions)
+    env = ereporter2.get_template_env(10, 20, module_versions)
+    out = ereporter2.report_to_html(
+        report, ignored,
+        ereporter2.REPORT_TITLE_TEMPLATE,
+        ereporter2.REPORT_HEADER_TEMPLATE,
+        ereporter2.REPORT_CONTENT_TEMPLATE,
+        'http://foo/request_id', env)
+    expected = (
+      '<html>\n<head><title>Exceptions on "isolateserver-dev"</title></head>\n'
+      '<body><h2>Report for 1970-01-01 00:00:10 (10) to 1970-01-01 00:00:20 '
+      '(20)</h2>\nModules-Versions:\n<ul><li>foo - bar</li>\n'
+      '</ul><h3>2 occurrences of 1 errors across 1 versions.</h3>\n\n'
+      '<span style="font-size:130%">Failed@v1</span><br>\nmain.app<br>\n'
+      'GET localhost/foo (HTTP 200)<br>\n<pre>Failed</pre>\n'
+      '2 occurrences: <a href="http://foo/request_ida">Entry</a> '
+      '<a href="http://foo/request_ida">Entry</a> <p>\n<br>\n<hr>\n'
+      '<h2>Ignored reports</h2>\n<h3>1 occurrences of 1 errors across 1 '
+      'versions.</h3>\n\n<span style="font-size:130%">DeadlineExceededError@'
+      'None:-1@v1</span><br>\nmain.app<br>\nGET localhost/foo (HTTP 200)<br>\n'
+      '<pre>Traceback (most recent call last):\nDeadlineExceededError</pre>\n'
+      '1 occurrences: <a href="http://foo/request_ida">Entry</a> <p>\n<br>\n'
+      '</body></html>')
+    self.assertEqual(expected, out)
 
 
 if __name__ == '__main__':

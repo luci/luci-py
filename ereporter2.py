@@ -10,6 +10,7 @@ using the DB.
 Also adds logging formatException() filtering to reduce the file paths length.
 """
 
+import datetime
 import hashlib
 import logging
 import os
@@ -21,6 +22,7 @@ from xml.sax import saxutils
 # them.
 # pylint: disable=E0611,F0401
 import jinja2
+import webob
 import webapp2
 from google.appengine import runtime
 from google.appengine.api import app_identity
@@ -33,6 +35,7 @@ from google.appengine.ext import ndb
 
 # Paths that can be stripped from the stack traces by relative_path().
 PATHS_TO_STRIP = (
+  # On AppEngine, cwd is always the application's root directory.
   os.getcwd() + '/',
   os.path.dirname(os.path.dirname(os.path.dirname(runtime.__file__))) + '/',
   os.path.dirname(os.path.dirname(os.path.dirname(webapp2.__file__))) + '/',
@@ -41,15 +44,24 @@ PATHS_TO_STRIP = (
 )
 
 
+# These are the default templates but any template can be used.
+REPORT_HEADER = (
+  '<h2>Report for {{start_str}} ({{start}}) to {{end_str}} ({{end}})</h2>\n'
+  'Modules-Versions:\n'
+  '<ul>{% for i in module_versions %}<li>{{i.0}} - {{i.1}}</li>\n{% endfor %}'
+  '</ul>\n')
+REPORT_HEADER_TEMPLATE = jinja2.Template(REPORT_HEADER)
+
 # Content of the exception report.
 # Unusual layout is to ensure template is useful with tags stripped for the bare
 # text format.
-REPORT_HTML = (
-  '<html><head><title>Exceptions on "{{app_id}}".</title></head>\n'
-  '<body><h3>{{occurrence_count}} occurrences of {{error_count}} '
-      'errors across {{version_count}} versions.'
+REPORT_CONTENT = (
+  '<h3>{% if report_url %}<a href="{{report_url}}?start={{start}}&end={{end}}">'
+      '{% endif %}'
+      '{{occurrence_count}} occurrences of {{error_count}} errors across '
+      '{{version_count}} versions.'
       '{% if ignored_count %}<br>\nIgnored {{ignored_count}} errors.{% endif %}'
-      '</h3>\n'
+      '{% if report_url %}</a>{% endif %}</h3>\n'
   '{% for category in errors %}\n'
   '<span style="font-size:130%">{{category.signature}}</span><br>\n'
   '{{category.events.0.handler_module}}<br>\n'
@@ -61,12 +73,19 @@ REPORT_HTML = (
       'href="{{request_id_url}}{{event.request_id}}">Entry</a> {% endfor %}'
   '<p>\n'
   '<br>\n'
-  '{% endfor %}</body>\n'
+  '{% endfor %}'
 )
+REPORT_CONTENT_TEMPLATE = jinja2.Template(REPORT_CONTENT)
 
 
-# Cache the precompiled template.
-REPORT_HTML_TEMPLATE = jinja2.Template(REPORT_HTML)
+REPORT_TITLE = 'Exceptions on "{{app_id}}"'
+REPORT_TITLE_TEMPLATE = jinja2.Template(REPORT_TITLE)
+
+ERROR_TITLE = 'Failed to email exceptions on "{{app_id}}"'
+ERROR_CONTENT = (
+    '<strong>Failed to email the report due to {{exception}}</strong>.<br>\n'
+    'Visit it online at <a href="{{report_url}}?start={{start}}&end={{end}}">'
+      '{{report_url}}?start={{start}}&end={{end}}</a>.\n')
 
 
 # Markers to read back a stack trace.
@@ -245,30 +264,82 @@ def should_ignore_error_record(error_record):
   return error_record.exception_type in IGNORED_EXCEPTIONS
 
 
-def records_to_html(error_categories, ignored_count, request_id_url):
+def time2str(t):
+  """Converts a time since epoch into human readable datetime str."""
+  return str(datetime.datetime(*time.gmtime(t)[:7])).rsplit('.', 1)[0]
+
+
+def get_template_env(start_time, end_time, module_versions):
+  """Generates commonly used jinja2 template variables."""
+  return {
+    'app_id': app_identity.get_application_id(),
+    'end': end_time,
+    'end_str': time2str(end_time),
+    'module_versions': module_versions,
+    'start': start_time or 0,
+    'start_str': time2str(start_time or 0),
+  }
+
+
+def records_to_html(
+    error_categories, ignored_count, request_id_url, report_url, template,
+    extras):
   """Generates and returns an HTML error report.
 
   Arguments:
-    error_categories: List of ErrorCategory reports.
+    error_categories: list of ErrorCategory reports.
+    ignored_count: number of errors not reported because ignored.
+    request_id_url: base url to link to a specific request_id.
+    report_url: base url to use to recreate this report.
+    template: precompiled jinja2 template. REPORT_CONTENT_TEMPLATE is
+              recommended.
+    extras: extra dict to use to render the template.
   """
   error_categories.sort(key=lambda e: (e.version, -e.count))
   template_values = {
-    'app_id': app_identity.get_application_id(),
     'error_count': len(error_categories),
     'errors': error_categories,
     'ignored_count': ignored_count,
     'occurrence_count': sum(e.count for e in error_categories),
+    'report_url': report_url,
     'request_id_url': request_id_url,
     'version_count': len(set(e.version for e in error_categories)),
   }
-  return REPORT_HTML_TEMPLATE.render(template_values)
+  template_values.update(extras)
+  return template.render(template_values)
+
+
+def report_to_html(
+    report, ignored, title_template, header_template, content_template,
+    request_id_url, env):
+  """Helper function to generate a full HTML report."""
+  title = title_template.render(env)
+  header = header_template.render(env)
+  # Create two reports, the one for the actual error messages and another one
+  # for the ignored messages.
+  report_out = records_to_html(
+      report, 0, request_id_url, None, content_template, env)
+  ignored_out = records_to_html(
+      ignored, 0, request_id_url, None, content_template, env)
+  return ''.join((
+      '<html>\n<head><title>',
+      title,
+      '</title></head>\n<body>',
+      header,
+      report_out,
+      '<hr>\n<h2>Ignored reports</h2>\n',
+      ignored_out,
+      '</body></html>'))
 
 
 def email_html(to, subject, body):
-  """Sends an email including a textual representation of the HTML body."""
+  """Sends an email including a textual representation of the HTML body.
+
+  The body must not contain <html> or <body> tags.
+  """
   mail_args = {
     'body': saxutils.unescape(re.sub(r'<[^>]+>', r'', body)),
-    'html': body,
+    'html': '<html><body>%s</body></html>' % body,
     'sender': 'no_reply@%s.appspotmail.com' % app_identity.get_application_id(),
     'subject': subject,
   }
@@ -316,102 +387,102 @@ def _extract_exceptions_from_logs(start_time, end_time, module_versions):
         entry.status, '\n'.join(msgs))
 
 
-def _email_batch(recipients, batch, ignored_count, request_id_url):
-  """Emails a batch of ErrorCategories."""
-  batch_size = len(batch)
-  while batch:
-    body = records_to_html(batch[:batch_size], ignored_count, request_id_url)
-    subject = 'Exceptions on "%s"' % app_identity.get_application_id()
-    if email_html(recipients, subject, body):
-      # Success.
-      batch = batch[batch_size:]
-      continue
-    if batch_size == 1:
-      msg = 'Can\'t email exceptions to %s' % recipients
-      logging.error(msg)
-      break
-    # Try again with a smaller batch.
-    batch_size = max(batch_size / 2, 1)
+def _handle_time_range(start_time, end_time, default_end_time):
+  """Calculates default values for start_time and end_time."""
+  end_time = end_time or default_end_time
+  if not start_time:
+    info = ErrorReportingInfo.get_by_id(id=ErrorReportingInfo.KEY_ID)
+    start_time = info.timestamp if info else None
+    if start_time >= end_time:
+      raise webob.exc.HTTPBadRequest(
+          'Invalid range, start_time must be before end_time.')
+  return start_time, end_time
 
 
-def generate_html_report(module_versions, request_id_url):
-  """Returns an HTML report since the last email report and return it."""
-  info = ErrorReportingInfo.get_by_id(ErrorReportingInfo.KEY_ID)
-  start_time = info.timestamp if info else None
+def generate_report(start_time, end_time, module_versions):
+  """Returns a list of ErrorCategory to generate a report.
+
+  Arguments:
+    start_time: time to look for report, defaults to last email sent.
+    end_time: time to end the search for error, defaults to now.
+    module_versions: list of tuple of module-version to gather info about.
+
+  Returns:
+    tuple of two list of ErrorCategory, the ones that should be reported and the
+    ones that should be ignored.
+  """
+  start_time, end_time = _handle_time_range(start_time, end_time, time.time())
   ignored = {}
   categories = {}
-  for i in _extract_exceptions_from_logs(start_time, None, module_versions):
-    if should_ignore_error_record(i):
-      category = ignored.setdefault(
-          i.signature,
-          ErrorCategory(
-              i.signature, i.version, i.module, i.message, i.resource))
-    else:
-      category = categories.setdefault(
-          i.signature,
-          ErrorCategory(
-              i.signature, i.version, i.module, i.message, i.resource))
+  for i in _extract_exceptions_from_logs(start_time, end_time, module_versions):
+    bucket = ignored if should_ignore_error_record(i) else categories
+    category = bucket.setdefault(
+        i.signature,
+        ErrorCategory(i.signature, i.version, i.module, i.message, i.resource))
     category.events.append(i)
-  ignored_count = sum(len(c.events) for c in ignored.itervalues())
-  return records_to_html(categories.values(), ignored_count, request_id_url)
+  return categories.values(), ignored.values()
 
 
-def generate_and_email_report(recipients, module_versions, request_id_url):
+def generate_and_email_report(
+    start_time, end_time, module_versions, recipients, request_id_url,
+    report_url, title_template, content_template, extras):
   """Generates and emails an exception report.
 
   To be called from a cron_job.
 
   Arguments:
-    recipients: str containing comma separated email addresses
-    module_versions: list of tuple of module-version combinations to listen to
-    request_id_url: base url to use to link to a specific request_id
+    start_time: time to look for report, defaults to last email sent.
+    end_time: time to end the search for error, defaults to now - 5 minutes.
+    module_versions: list of tuple of module-version to gather info about.
+    recipients: str containing comma separated email addresses.
+    request_id_url: base url to use to link to a specific request_id.
+    report_url: base url to use to recreate this report.
+    title_template: precompiled jinja2 template to render the email subject.
+                      REPORT_TITLE_TEMPLATE is recommended.
+    content_template: precompiled jinja2 template to render the email content.
+                      REPORT_CONTENT_TEMPLATE is recommended.+
+    extras: extra dict to use to render the template.
+
+  Returns:
+    True if the email was sent successfully.
   """
-  # Never read anything more recent than 5 minutes to cope with mild level of
-  # logservice inconsistency. High levels of logservice inconsistencies will
-  # result in lost messages.
-  end_time = time.time() - 5*60
+  # Do not read by default anything more recent than 5 minutes to cope with mild
+  # level of logservice inconsistency. High levels of logservice inconsistencies
+  # will result in lost messages.
+  start_time, end_time = _handle_time_range(
+      start_time, end_time, time.time() - 5*60)
   logging.info(
-      'generate_and_email_report(%s, %s), %s',
-      recipients, module_versions, end_time)
-  ignored = 0
-  total = 0
-  signatures_seen = set()
+      'generate_and_email_report(%s, %s, %s, ..., %s)',
+      start_time, end_time, module_versions, recipients)
+  result = False
   try:
-    info = ErrorReportingInfo.get_by_id(id=ErrorReportingInfo.KEY_ID)
-    start_time = info.timestamp if info else None
-
-    categories = {}
-    batch_max_size = 100
-    for i in _extract_exceptions_from_logs(
-        start_time, end_time, module_versions):
-      if should_ignore_error_record(i):
-        ignored += 1
-        continue
-      category = categories.setdefault(
-          i.signature,
-          ErrorCategory(
-              i.signature, i.version, i.module, i.message, i.resource))
-      category.events.append(i)
-      total += 1
-      signatures_seen.add(i.signature)
-
-      if total == batch_max_size or len(categories) > 50:
-        _email_batch(recipients, categories.values(), ignored, request_id_url)
-        logging.info('New timestamp %s', i.start_time)
-        ErrorReportingInfo(
-            id=ErrorReportingInfo.KEY_ID, timestamp=i.start_time).put()
-        categories = {}
-
-    # Iteration is completed.
+    categories, ignored = generate_report(start_time, end_time, module_versions)
+    more_extras = get_template_env(start_time, end_time, module_versions)
+    more_extras.update(extras or {})
+    body = records_to_html(
+        categories, sum(len(c.events) for c in ignored), request_id_url,
+        report_url, content_template, more_extras)
     if categories:
-      _email_batch(recipients, categories.values(), ignored, request_id_url)
+      subject_line = title_template.render(more_extras)
+      if not email_html(recipients, subject_line, body):
+        # Send an email to alert.
+        more_extras['report_url'] = report_url
+        subject_line = jinja2.Template(ERROR_TITLE).render(more_extras)
+        body = jinja2.Template(ERROR_CONTENT).render(more_extras)
+        email_html(recipients, subject_line, body)
     logging.info('New timestamp %s', end_time)
     ErrorReportingInfo(id=ErrorReportingInfo.KEY_ID, timestamp=end_time).put()
+    result = True
   except runtime.DeadlineExceededError:
     # Hitting the deadline here isn't a big deal if it is rare.
     logging.warning('Got a DeadlineExceededError')
-  return 'Processed %d items, ignored %d, sent to %s:\n%s' % (
-      total, ignored, recipients, '\n'.join(sorted(signatures_seen)))
+  logging.info(
+      'Processed %d items, ignored %d, reduced to %d categories, sent to %s.',
+      sum(len(c.events) for c in categories),
+      sum(len(c.events) for c in ignored),
+      len(categories),
+      recipients)
+  return result
 
 
 def serialize(obj):
@@ -501,4 +572,6 @@ def register_formatter():
   for handler in logging.getLogger().handlers:
     # pylint: disable=W0212
     formatter = handler.formatter or logging._defaultFormatter
-    handler.setFormatter(Formatter(formatter))
+    if not isinstance(formatter, Formatter):
+      # Prevent immediate recursion.
+      handler.setFormatter(Formatter(formatter))

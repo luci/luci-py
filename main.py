@@ -823,31 +823,66 @@ class RestrictedGoogleStorageConfig(acl.ACLRequestHandler):
 class RestrictedEreporter2Mail(webapp2.RequestHandler):
   """Handler class to generate and email an exception report."""
   def get(self):
-    """Sends email(s) containing the exceptions logged."""
-    self.response.headers['Content-Type'] = 'text/plain'
-    recipients = config.settings().monitoring_recipients.strip()
+    """Sends email(s) containing the errors logged."""
+    # Must be run from a cron job.
+    if 'true' != self.request.headers.get('X-AppEngine-Cron'):
+      self.abort(403, 'Must be a cron request.')
+
     request_id_url = self.request.host_url + '/restricted/ereporter2/request/'
-    msg = ereporter2.generate_and_email_report(
+    report_url = self.request.host_url + '/restricted/ereporter2/report'
+    recipients = self.request.get(
+        'recipients', config.settings().monitoring_recipients)
+    result = ereporter2.generate_and_email_report(
+        None, None, None,
         recipients,
-        config.get_module_version_list(None, False),
-        request_id_url)
-    logging.info(msg)
-    self.response.write(msg)
+        request_id_url,
+        report_url,
+        ereporter2.REPORT_TITLE_TEMPLATE,
+        ereporter2.REPORT_CONTENT_TEMPLATE,
+        {})
+    self.response.headers['Content-Type'] = 'text/plain'
+    if result:
+      self.response.write('Success.')
+    else:
+      # Do not HTTP 500 since we do not want it to be retried.
+      self.response.write('Failed.')
 
 
 class RestrictedEreporter2Report(webapp2.RequestHandler):
   """Returns all the recent errors as a web page."""
   def get(self):
-    request_id_url = self.request.host_url + '/restricted/ereporter2/request/'
-    report = ereporter2.generate_html_report(
-        config.get_module_version_list(None, False),
-        request_id_url)
+    """Reports the errors logged and ignored.
+
+    Arguments:
+      start: epoch time to start looking at. Defaults to the messages since the
+             last email.
+      end: epoch time to stop looking at. Defaults to now.
+      modules: comma separated modules to look at.
+      tainted: 0 or 1, specifying if desiring tainted versions. Defaults to 0.
+    """
+    request_id_url = '/restricted/ereporter2/request/'
+    end = int(float(self.request.get('end', 0)))
+    start = int(float(self.request.get('start', 0)))
+    modules = self.request.get('modules')
+    if modules:
+      modules = modules.split(',')
+    tainted = bool(int(self.request.get('tainted', '0')))
+    module_versions = config.get_module_version_list(modules, tainted)
+    report, ignored = ereporter2.generate_report(start, end, module_versions)
+    env = ereporter2.get_template_env(start, end, module_versions)
+    out = ereporter2.report_to_html(
+        report, ignored,
+        ereporter2.REPORT_TITLE_TEMPLATE,
+        ereporter2.REPORT_HEADER_TEMPLATE,
+        ereporter2.REPORT_CONTENT_TEMPLATE,
+        request_id_url, env)
     self.response.headers['Content-Type'] = 'text/html'
-    self.response.write(report)
+    self.response.write(out)
 
 
 class RestrictedEreporter2Request(webapp2.RequestHandler):
   def get(self, request_id):
+    # TODO(maruel): Add UI.
     data = ereporter2.log_request_id_to_dict(request_id)
     if not data:
       self.abort(404, detail='Request id was not found.')
