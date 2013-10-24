@@ -115,12 +115,12 @@ def CreatePendingRunner(config_name=REQUEST_MESSAGE_CONFIG_NAME,
 
   if machine_id:
     runner.machine_id = machine_id
-    runner.started = datetime.datetime.now()
+    runner.started = datetime.datetime.utcnow()
     runner.ping = runner.started
 
   if exit_codes:
     runner.done = True
-    runner.ended = datetime.datetime.now()
+    runner.ended = datetime.datetime.utcnow()
     runner.exit_codes = exit_codes
 
   runner.put()

@@ -107,7 +107,7 @@ def _GetCurrentTime():
   Returns:
     The current time as a datetime.datetime object.
   """
-  return datetime.datetime.now()
+  return datetime.datetime.utcnow()
 
 
 def DeleteOldRunnerStats():

@@ -86,11 +86,11 @@ class ResultHelperTest(unittest.TestCase):
     self._mox.StubOutWithMock(result_helper, '_GetCurrentTime')
 
     result_helper._GetCurrentTime().AndReturn(
-        datetime.datetime.now() +
+        datetime.datetime.utcnow() +
         datetime.timedelta(
             days=swarm_constants.SWARM_OLD_RESULTS_TIME_TO_LIVE_DAYS - 1))
     result_helper._GetCurrentTime().AndReturn(
-        datetime.datetime.now() +
+        datetime.datetime.utcnow() +
         datetime.timedelta(
             days=swarm_constants.SWARM_OLD_RESULTS_TIME_TO_LIVE_DAYS + 1))
     self._mox.ReplayAll()
@@ -114,11 +114,11 @@ class ResultHelperTest(unittest.TestCase):
     self._mox.StubOutWithMock(result_helper, '_GetCurrentTime')
 
     result_helper._GetCurrentTime().AndReturn(
-        datetime.datetime.now() +
+        datetime.datetime.utcnow() +
         datetime.timedelta(
             days=result_helper.SWARM_RESULT_CHUNK_OLD_TIME_TO_LIVE_DAYS - 1))
     result_helper._GetCurrentTime().AndReturn(
-        datetime.datetime.now() +
+        datetime.datetime.utcnow() +
         datetime.timedelta(
             days=result_helper.SWARM_RESULT_CHUNK_OLD_TIME_TO_LIVE_DAYS + 1))
     self._mox.ReplayAll()

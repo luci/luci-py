@@ -253,8 +253,9 @@ class MainHandler(webapp2.RequestHandler):
     s = '--'
 
     if dt:
-      midnight_today = datetime.datetime.now().replace(hour=0, minute=0,
-                                                       second=0, microsecond=0)
+      midnight_today = datetime.datetime.utcnow().replace(hour=0, minute=0,
+                                                          second=0,
+                                                          microsecond=0)
       midnight_yesterday = midnight_today - datetime.timedelta(days=1)
       if dt > midnight_today:
         s = dt.strftime('Today at %H:%M')
@@ -814,7 +815,7 @@ class GenerateDailyStatsHandler(CronJobHandler):
   """Handles cron jobs to generate new daily stats."""
 
   def post(self):  # pylint: disable=g-bad-name
-    yesterday = datetime.date.today() - datetime.timedelta(days=1)
+    yesterday = datetime.datetime.utcnow().date() - datetime.timedelta(days=1)
     daily_stats.GenerateDailyStats(yesterday)
 
 
@@ -891,7 +892,8 @@ class StatsHandler(webapp2.RequestHandler):
     days_to_show = DaysToShow(self.request)
 
     weeks_daily_stats = daily_stats.GetDailyStats(
-        datetime.date.today() - datetime.timedelta(days=days_to_show))
+        datetime.datetime.utcnow().date() -
+        datetime.timedelta(days=days_to_show))
     # Reverse the daily stats so that the newest data is listed first, which
     # makes more sense when listing these values in a table.
     weeks_daily_stats.reverse()
@@ -1021,7 +1023,7 @@ class RetryHandler(webapp2.RequestHandler):
       # Update the created time to make sure that retrying the runner does not
       # make it jump the queue and get executed before other runners for
       # requests added before the user pressed the retry button.
-      runner.created = datetime.datetime.now()
+      runner.created = datetime.datetime.utcnow()
 
       runner.put()
 
@@ -1148,7 +1150,7 @@ class RunnerSummaryHandler(webapp2.RequestHandler):
       time_frame = '%d days' % (hours/24)
 
     # Start querying all the summaries for the graph.
-    summary_cutoff_time = (datetime.datetime.now() -
+    summary_cutoff_time = (datetime.datetime.utcnow() -
                            datetime.timedelta(hours=hours))
     summaries_async = runner_summary.RunnerSummary.query(
         runner_summary.RunnerSummary.time > summary_cutoff_time).fetch_async()
@@ -1238,7 +1240,8 @@ class DailyStatsGraphHandler(webapp2.RequestHandler):
 
     params = {
         'graphs': self._GetGraphableDailyStats(daily_stats.GetDailyStats(
-            datetime.date.today() - datetime.timedelta(days=days_to_show))),
+            datetime.datetime.utcnow().date() -
+            datetime.timedelta(days=days_to_show))),
         'max_days_to_show': range(1, daily_stats.DAILY_STATS_LIFE_IN_DAYS),
         'stat_links': GenerateStatLinks(),
         'topbar': GenerateTopbar()

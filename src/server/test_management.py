@@ -86,7 +86,15 @@ class SwarmError(ndb.Model):
   info = ndb.StringProperty(indexed=False)
 
   # The time at which this error was logged.  Used to clean up old errors.
-  created = ndb.DateTimeProperty(auto_now_add=True)
+  # Don't use auto_now_add so we control exactly what the time is set to
+  # (since we later need to compare this value, so we need to know if it was
+  # made with .now() or .utcnow()).
+  created = ndb.DateTimeProperty()
+
+  def _pre_put_hook(self):  # pylint: disable=g-bad-name
+    """Stores the creation time for this model."""
+    if not self.created:
+      self.created = datetime.datetime.utcnow()
 
 
 def ExecuteTestRequest(request_message):
@@ -125,7 +133,7 @@ def ExecuteTestRequest(request_message):
     dimension = dimension_mapping.DimensionMapping.get_or_insert(
         config_hash,
         dimensions=test_request_message.Stringize(config.dimensions))
-    if dimension.last_seen != datetime.date.today():
+    if dimension.last_seen != datetime.datetime.utcnow().date():
       # DimensionMapping automatically updates last_seen when put() is called.
       dimension.put()
 
@@ -597,7 +605,7 @@ def _GetCurrentTime():
   Returns:
     The current time as a datetime.datetime object.
   """
-  return datetime.datetime.now()
+  return datetime.datetime.utcnow()
 
 
 def DeleteOldErrors():

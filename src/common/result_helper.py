@@ -36,14 +36,22 @@ def _GetCurrentTime():
   Returns:
     The current time as a datetime.datetime object.
   """
-  return datetime.datetime.now()
+  return datetime.datetime.utcnow()
 
 
 class ResultChunk(ndb.Model):
   """A chunk of the results."""
   chunk = ndb.BlobProperty(compressed=False)
 
-  created = ndb.DateProperty(auto_now_add=True)
+  # Don't use auto_now_add so we control exactly what the time is set to
+  # (since we later need to compare this value, so we need to know if it was
+  # made with .now() or .utcnow()).
+  created = ndb.DateProperty()
+
+  def _pre_put_hook(self):  # pylint: disable=g-bad-name
+    """Stores the creation time for this model."""
+    if not self.created:
+      self.created = datetime.datetime.utcnow().date()
 
 
 class Results(ndb.Model):
@@ -54,7 +62,10 @@ class Results(ndb.Model):
   """
   chunk_keys = ndb.KeyProperty(kind=ResultChunk, repeated=True)
 
-  created = ndb.DateProperty(auto_now_add=True)
+  # Don't use auto_now_add so we control exactly what the time is set to
+  # (since we later need to compare this value, so we need to know if it was
+  # made with .now() or .utcnow()).
+  created = ndb.DateProperty()
 
   @classmethod
   def _pre_delete_hook(cls, key):  # pylint: disable=g-bad-name
@@ -69,6 +80,11 @@ class Results(ndb.Model):
 
     for key in results.chunk_keys:
       key.delete_async()
+
+  def _pre_put_hook(self):  # pylint: disable=g-bad-name
+    """Stores the creation time for this model."""
+    if not self.created:
+      self.created = datetime.datetime.utcnow().date()
 
   def GetResults(self):
     """Return the results stored in this model.

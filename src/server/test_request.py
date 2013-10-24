@@ -14,6 +14,7 @@ complete details.
 
 
 
+import datetime
 import hashlib
 import logging
 
@@ -88,7 +89,10 @@ class TestRequest(ndb.Model):
   message = ndb.TextProperty()
 
   # The time at which this request was received.
-  requested_time = ndb.DateTimeProperty(auto_now_add=True)
+  # Don't use auto_now_add so we control exactly what the time is set to
+  # (since we later need to compare this value, so we need to know if it was
+  # made with .now() or .utcnow()).
+  requested_time = ndb.DateTimeProperty()
 
   # The name for this test request. This is required because it determines the
   # parent model for this model, so it must be set at creation.
@@ -109,6 +113,11 @@ class TestRequest(ndb.Model):
         kwargs['parent'] = parent_model.key
 
     super(TestRequest, self).__init__(*args, **kwargs)
+
+  def _pre_put_hook(self):  # pylint: disable=g-bad-name
+    """Stores the creation time for this model."""
+    if not self.requested_time:
+      self.requested_time = datetime.datetime.utcnow()
 
   def GetTestCase(self):
     """Returns a TestCase object representing this Test Request.

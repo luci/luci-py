@@ -53,7 +53,7 @@ def _GetCurrentTime():
   Returns:
     The current time as a datetime.datetime object.
   """
-  return datetime.datetime.now()
+  return datetime.datetime.utcnow()
 
 
 class TestRunner(ndb.Model):
@@ -92,7 +92,10 @@ class TestRunner(ndb.Model):
 
   # The time at which this runner was created.  The runner may not have
   # started executing yet.
-  created = ndb.DateTimeProperty(auto_now_add=True)
+  # Don't use auto_now_add so we control exactly what the time is set to
+  # (since we later need to compare this value, so we need to know if it was
+  # made with .now() or .utcnow()).
+  created = ndb.DateTimeProperty()
 
   # The priority of the runner. A lower number is higher priority.
   priority = ndb.IntegerProperty(default=10)
@@ -103,10 +106,11 @@ class TestRunner(ndb.Model):
   def priority_and_created(self):  # pylint: disable=g-bad-name
     # The first time a runner is stored, it computes this property before the
     # created value has been created, so we need to get a time to use.
-    # datetime.datetime.now() will give the runner a slightly earlier time, but
-    # all runners have the same change, so the order of runners should be
+    # datetime.datetime.utcnow() will give the runner a slightly earlier time,
+    # but all runners have the same change, so the order of runners should be
     # preserved.
-    created_str = str(self.created if self.created else datetime.datetime.now())
+    created_str = str(
+        self.created if self.created else datetime.datetime.utcnow())
 
     priority_str = (
         ('%%0%dd' % len(str(test_request_message.MAX_PRIORITY_VALUE))) %
@@ -187,6 +191,9 @@ class TestRunner(ndb.Model):
 
     if not self.name:
       self.name = '%s:%s' % (self.request.get().name, self.config_name)
+
+    if not self.created:
+      self.created = datetime.datetime.utcnow()
 
   def GetConfiguration(self):
     """Gets the configuration associated with this runner.
@@ -339,7 +346,7 @@ class TestRunner(ndb.Model):
     self.ran_successfully = success
     self.exit_codes = exit_codes
     self.done = True
-    self.ended = datetime.datetime.now()
+    self.ended = datetime.datetime.utcnow()
 
     if results:
       assert self.results_reference is None, (
@@ -454,8 +461,8 @@ def AtomicAssignID(key, machine_id):
   runner = key.get()
   if runner and not runner.started:
     runner.machine_id = str(machine_id)
-    runner.started = datetime.datetime.now()
-    runner.ping = datetime.datetime.now()
+    runner.started = datetime.datetime.utcnow()
+    runner.ping = datetime.datetime.utcnow()
     runner.put()
   else:
     # Tell caller to abort this operation.
@@ -588,7 +595,7 @@ def PingRunner(key, machine_id):
     logging.error('Trying to ping a runner that is not currently running')
     return False
 
-  runner.ping = datetime.datetime.now()
+  runner.ping = datetime.datetime.utcnow()
   runner.put()
   return True
 
@@ -677,7 +684,7 @@ def GetHangingRunners():
   Returns:
     A list of all the hanging runners.
   """
-  cutoff_time = datetime.datetime.now() - datetime.timedelta(
+  cutoff_time = datetime.datetime.utcnow() - datetime.timedelta(
       minutes=TIME_BEFORE_RUNNER_HANGING_IN_MINS)
 
   hanging_runners = TestRunner.gql('WHERE started = :1 AND '

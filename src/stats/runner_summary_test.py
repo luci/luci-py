@@ -32,9 +32,9 @@ def _CreateRunnerStats(dimensions='dimensions'):
                                   dimensions=dimensions,
                                   num_instances=1,
                                   instance_index=0,
-                                  created_time=datetime.datetime.now(),
-                                  assigned_time=datetime.datetime.now(),
-                                  end_time=datetime.datetime.now(),
+                                  created_time=datetime.datetime.utcnow(),
+                                  assigned_time=datetime.datetime.utcnow(),
+                                  end_time=datetime.datetime.utcnow(),
                                   machine_id='id',
                                   success=True,
                                   timed_out=False,
@@ -42,8 +42,8 @@ def _CreateRunnerStats(dimensions='dimensions'):
 
 
 def _CreateWaitSummary(start_time=None, end_time=None):
-  start_time = start_time or datetime.datetime.now()
-  end_time = end_time or datetime.datetime.now()
+  start_time = start_time or datetime.datetime.utcnow()
+  end_time = end_time or datetime.datetime.utcnow()
 
   wait_summary = runner_summary.WaitSummary(start_time=start_time,
                                             end_time=end_time)
@@ -195,7 +195,7 @@ class RunnerSummaryTest(unittest.TestCase):
     # Create a set of summaries and ensure they all have unique start and end
     # times.
     dimensions = 'machine_dimensions'
-    start_time = datetime.datetime.now()
+    start_time = datetime.datetime.utcnow()
     for i in range(5):
       r_stats = _CreateRunnerStats(dimensions=dimensions)
       r_stats.assigned_time = _AddSecondsToDateTime(start_time, i)
@@ -223,7 +223,7 @@ class RunnerSummaryTest(unittest.TestCase):
 
     # Add a running runner.
     running_runner = test_helper.CreatePendingRunner()
-    running_runner.started = datetime.datetime.now()
+    running_runner.started = datetime.datetime.utcnow()
     running_runner.put()
 
     self.assertEqual({dimensions: (1, 1)},
@@ -258,7 +258,7 @@ class RunnerSummaryTest(unittest.TestCase):
     wait = 10
     dimensions = 'machine_dimensions'
 
-    wait_summary = _CreateWaitSummary(end_time=(datetime.datetime.now() -
+    wait_summary = _CreateWaitSummary(end_time=(datetime.datetime.utcnow() -
                                                 datetime.timedelta(days=2)))
     dimension_wait = runner_summary.DimensionWaitSummary(
         dimensions=dimensions,
@@ -322,7 +322,7 @@ class RunnerSummaryTest(unittest.TestCase):
     self.assertEqual({}, runner_summary.GetRunnerWaitStatsBreakdown(1))
 
     # Add data that is too old and ensure it is ignored.
-    wait_summary = _CreateWaitSummary(end_time=(datetime.datetime.now() -
+    wait_summary = _CreateWaitSummary(end_time=(datetime.datetime.utcnow() -
                                                 datetime.timedelta(days=2)))
     dimensions = 'machine_dimensions'
     dimension_wait = runner_summary.DimensionWaitSummary(
@@ -368,17 +368,17 @@ class RunnerSummaryTest(unittest.TestCase):
 
     # Set the current time to the future, but not too much, so the model
     # isn't deleted.
-    mock_now = (datetime.datetime.now() + datetime.timedelta(
+    mock_now = (datetime.datetime.utcnow() + datetime.timedelta(
         days=runner_summary.WAIT_SUMMARY_LIFE_IN_DAYS - 1))
     runner_summary._GetCurrentTime().AndReturn(mock_now)
 
     # Set the current time to way in the future so the model is deleted.
-    mock_now = (datetime.datetime.now() + datetime.timedelta(
+    mock_now = (datetime.datetime.utcnow() + datetime.timedelta(
         days=runner_summary.WAIT_SUMMARY_LIFE_IN_DAYS + 5))
     runner_summary._GetCurrentTime().AndReturn(mock_now)
     self._mox.ReplayAll()
 
-    wait_summary = _CreateWaitSummary(end_time=datetime.datetime.now())
+    wait_summary = _CreateWaitSummary(end_time=datetime.datetime.utcnow())
     dimension_wait = runner_summary.DimensionWaitSummary(
         summary_parent=wait_summary.key)
     dimension_wait.put()

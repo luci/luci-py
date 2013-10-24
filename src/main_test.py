@@ -549,7 +549,7 @@ class AppTest(unittest.TestCase):
     # Add some basic stats items to ensure the loop bodies are executed.
     runner = test_helper.CreatePendingRunner()
     runner_stats.RecordRunnerStats(runner)
-    daily_stats.DailyStats(date=datetime.date.today()).put()
+    daily_stats.DailyStats(date=datetime.datetime.utcnow().date()).put()
 
     for stat_url in stat_urls:
       response = self.app.get(stat_url)
@@ -600,7 +600,7 @@ class AppTest(unittest.TestCase):
 
     # Test when there is a hanging runner.
     runner = test_helper.CreatePendingRunner()
-    runner.created = datetime.datetime.now() - datetime.timedelta(
+    runner.created = datetime.datetime.utcnow() - datetime.timedelta(
         minutes=2 * test_runner.TIME_BEFORE_RUNNER_HANGING_IN_MINS)
     runner.put()
 
@@ -626,7 +626,7 @@ class AppTest(unittest.TestCase):
     # Ensure this function works with a valid admin email.
     version = os.environ['CURRENT_VERSION_ID']
     major, minor = version.split('.')
-    yesterday = datetime.date.today() - datetime.timedelta(days=1)
+    yesterday = datetime.datetime.utcnow().date() - datetime.timedelta(days=1)
     main_app.ereporter.ExceptionRecord(
         key_name=main_app.ereporter.ExceptionRecord.get_key_name(
             'X', version, yesterday),

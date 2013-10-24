@@ -57,11 +57,19 @@ class MachineStats(ndb.Model):
   # The dimensions of the machine polling.
   dimensions = ndb.StringProperty(default='')
 
-  # The last day the machine queried for work.
-  last_seen = ndb.DateTimeProperty(auto_now_add=True, required=True)
+  # The last time the machine queried for work.
+  # Don't use auto_now_add so we control exactly what the time is set to
+  # (since we later need to compare this value, so we need to know if it was
+  # made with .now() or .utcnow()).
+  last_seen = ndb.DateTimeProperty(required=True)
 
   # The machine id, which is also the model's key.
   machine_id = ndb.ComputedProperty(lambda self: self.key.string_id())
+
+  def _pre_put_hook(self):  # pylint: disable=g-bad-name
+    """Stores the creation time for this model."""
+    if not self.last_seen:
+      self.last_seen = datetime.datetime.utcnow()
 
 
 def FindDeadMachines():
@@ -70,7 +78,7 @@ def FindDeadMachines():
   Returns:
     A list of the dead machines.
   """
-  dead_machine_cutoff = (datetime.datetime.now() - MACHINE_DEATH_TIMEOUT)
+  dead_machine_cutoff = (datetime.datetime.utcnow() - MACHINE_DEATH_TIMEOUT)
 
   return list(MachineStats.gql('WHERE last_seen < :1', dead_machine_cutoff))
 
@@ -110,10 +118,11 @@ def RecordMachineQueriedForWork(machine_id, dimensions_str, machine_tag):
   machine_stats = MachineStats.get_or_insert(machine_id)
 
   if (machine_stats.dimensions != dimensions_str or
-      machine_stats.last_seen + MACHINE_UPDATE_TIME < datetime.datetime.now() or
+      (machine_stats.last_seen + MACHINE_UPDATE_TIME <
+       datetime.datetime.utcnow()) or
       machine_stats.tag != machine_tag):
     machine_stats.dimensions = dimensions_str
-    machine_stats.last_seen = datetime.datetime.now()
+    machine_stats.last_seen = datetime.datetime.utcnow()
     machine_stats.tag = machine_tag
     machine_stats.put()
 

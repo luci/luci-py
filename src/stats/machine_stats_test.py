@@ -37,7 +37,7 @@ class MachineStatsTest(unittest.TestCase):
     self.assertEqual([], machine_stats.FindDeadMachines())
 
     # Make the machine old and ensure it is marked as dead.
-    m_stats.last_seen = (datetime.datetime.now() -
+    m_stats.last_seen = (datetime.datetime.utcnow() -
                          2 * machine_stats.MACHINE_DEATH_TIMEOUT)
     m_stats.put()
 

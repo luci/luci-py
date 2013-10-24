@@ -24,9 +24,9 @@ def _CreateRunnerStats():
                                   dimensions='dimensions',
                                   num_instances=1,
                                   instance_index=0,
-                                  created_time=datetime.datetime.now(),
-                                  assigned_time=datetime.datetime.now(),
-                                  end_time=datetime.datetime.now(),
+                                  created_time=datetime.datetime.utcnow(),
+                                  assigned_time=datetime.datetime.utcnow(),
+                                  end_time=datetime.datetime.utcnow(),
                                   machine_id='id',
                                   success=True,
                                   timed_out=False,
@@ -79,18 +79,18 @@ class StatManagerTest(unittest.TestCase):
     self._mox.StubOutWithMock(runner_stats, '_GetCurrentTime')
 
     # Set the current time to the future, but not too much.
-    mock_now = (datetime.datetime.now() + datetime.timedelta(
+    mock_now = (datetime.datetime.utcnow() + datetime.timedelta(
         days=runner_stats.RUNNER_STATS_EVALUATION_CUTOFF_DAYS - 1))
     runner_stats._GetCurrentTime().AndReturn(mock_now)
 
     # Set the current time to way in the future after the start time, but
     # still close enough to the end time.
-    mock_now = (datetime.datetime.now() + datetime.timedelta(
+    mock_now = (datetime.datetime.utcnow() + datetime.timedelta(
         days=runner_stats.RUNNER_STATS_EVALUATION_CUTOFF_DAYS + 1))
     runner_stats._GetCurrentTime().AndReturn(mock_now)
 
     # Set the current time to way in the future.
-    mock_now = (datetime.datetime.now() + datetime.timedelta(
+    mock_now = (datetime.datetime.utcnow() + datetime.timedelta(
         days=runner_stats.RUNNER_STATS_EVALUATION_CUTOFF_DAYS + 5))
     runner_stats._GetCurrentTime().AndReturn(mock_now)
     self._mox.ReplayAll()

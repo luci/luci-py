@@ -48,13 +48,13 @@ class DailyStatsTest(unittest.TestCase):
     self.testbed.deactivate()
 
   def testGenerateDailyStatsTwice(self):
-    current_day = datetime.date.today()
+    current_day = datetime.datetime.utcnow().date()
 
     self.assertTrue(daily_stats.GenerateDailyStats(current_day))
     self.assertFalse(daily_stats.GenerateDailyStats(current_day))
 
   def testGenerateDailyStatsWithBasicInfo(self):
-    current_day = datetime.date.today()
+    current_day = datetime.datetime.utcnow().date()
 
     # Add 1 sucess, 2 regular failures, and 1 failure due to a timeout.
     _AddRunner(datetime.datetime.combine(current_day, datetime.time()),
@@ -85,7 +85,7 @@ class DailyStatsTest(unittest.TestCase):
     self.assertEqual(RUNNING_TIME * 4, daily_stat.total_running_time)
 
   def testGenerateDailyStatsWithAbortedRunner(self):
-    current_day = datetime.date.today()
+    current_day = datetime.datetime.utcnow().date()
 
     runner = _AddRunner(datetime.datetime.combine(current_day, datetime.time()),
                         success=False, timeout=False)
@@ -101,7 +101,7 @@ class DailyStatsTest(unittest.TestCase):
     self.assertEqual(0, daily_stat.shards_finished)
 
   def testGetDailyStats(self):
-    current_day = datetime.date.today()
+    current_day = datetime.datetime.utcnow().date()
     days_to_add = 7
     for i in range(days_to_add):
       day = current_day - datetime.timedelta(days=i)
@@ -122,7 +122,7 @@ class DailyStatsTest(unittest.TestCase):
     self.assertEqual(current_day, stats[-1].date)
 
   def testDeleteOldDailyStats(self):
-    current_day = datetime.date.today()
+    current_day = datetime.datetime.utcnow().date()
 
     # Add a daily stats model that shouldn't get deleted.
     daily_stat = daily_stats.DailyStats(date=current_day)

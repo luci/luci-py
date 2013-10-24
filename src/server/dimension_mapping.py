@@ -29,8 +29,14 @@ class DimensionMapping(ndb.Model):
   # The raw config string.
   dimensions = ndb.StringProperty()
 
-  # The last day that a runner was seen with these dimensions.
-  last_seen = ndb.DateProperty(auto_now=True)
+  # Don't use auto_now_add so we control exactly what the time is set to
+  # (since we later need to compare this value, so we need to know if it was
+  # made with .now() or .utcnow()).
+  last_seen = ndb.DateProperty()
+
+  def _pre_put_hook(self):  # pylint: disable=g-bad-name
+    """Stores the time this dimension was last seen."""
+    self.last_seen = datetime.datetime.utcnow().date()
 
 
 def DeleteOldDimensionMapping():
@@ -40,7 +46,7 @@ def DeleteOldDimensionMapping():
     The list of Futures for all the async delete calls.
   """
   logging.debug('DeleteOldDimensions starting')
-  old_cutoff = (datetime.date.today() -
+  old_cutoff = (datetime.datetime.utcnow().date() -
                 datetime.timedelta(days=DIMENSION_MAPPING_DAYS_TO_LIVE))
 
   futures = ndb.delete_multi_async(

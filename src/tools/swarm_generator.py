@@ -353,7 +353,7 @@ http://goto/swarm.
     assert isinstance(tests_array, (list, tuple))
     assert tests_array  # Should not be empty.
 
-    name_suffix = datetime.datetime.now().strftime('-%Y-%m%d-%Hh%Mm%Ss')
+    name_suffix = datetime.datetime.utcnow().strftime('-%Y-%m%d-%Hh%Mm%Ss')
     test_name_suffix = ''
     # For multi config without a specific test name,
     # we add a test_name_suffix to avoid collisions.

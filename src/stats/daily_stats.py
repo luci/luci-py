@@ -131,7 +131,7 @@ def DeleteOldDailyStats():
   """
   logging.debug('DeleteOldDailyStats starting')
 
-  old_cutoff = (datetime.date.today() - datetime.timedelta(
+  old_cutoff = (datetime.datetime.utcnow().date() - datetime.timedelta(
       days=DAILY_STATS_LIFE_IN_DAYS))
 
   old_daily_stats_query = DailyStats.query(

@@ -35,7 +35,7 @@ class DimensionMappingTest(unittest.TestCase):
     self.assertTrue(1, dimension_mapping.DimensionMapping.query().count())
 
     # Add an old dimension and ensure it gets removed.
-    old_date = datetime.date.today() - datetime.timedelta(
+    old_date = datetime.datetime.utcnow().date() - datetime.timedelta(
         days=dimension_mapping.DIMENSION_MAPPING_DAYS_TO_LIVE + 5)
     dimension_mapping.DimensionMapping(last_seen=old_date).put()
 

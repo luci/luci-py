@@ -406,7 +406,7 @@ class TestManagementTest(unittest.TestCase):
 
   def _GenerateFutureTimeExpectation(self):
     """Set the current time to way in the future and return it."""
-    future_time = (datetime.datetime.now() +
+    future_time = (datetime.datetime.utcnow() +
                    datetime.timedelta(
                        seconds=(test_management._TIMEOUT_FACTOR + 1000)))
     test_management._GetCurrentTime().AndReturn(future_time)
@@ -444,8 +444,8 @@ class TestManagementTest(unittest.TestCase):
 
     # Don't abort the runner if it is running and it has been pinging the server
     # (no matter how old).
-    runner.started = datetime.datetime.now()
-    runner.ping = datetime.datetime.now() + datetime.timedelta(days=1)
+    runner.started = datetime.datetime.utcnow()
+    runner.ping = datetime.datetime.utcnow() + datetime.timedelta(days=1)
     runner.put()
     self.assertFalse(runner.done)
     test_management.AbortStaleRunners()
@@ -535,12 +535,12 @@ class TestManagementTest(unittest.TestCase):
     self._mox.StubOutWithMock(test_management, '_GetCurrentTime')
 
     # Set the current time to the future, but not too much.
-    mock_now = (datetime.datetime.now() + datetime.timedelta(
+    mock_now = (datetime.datetime.utcnow() + datetime.timedelta(
         days=test_management.SWARM_ERROR_TIME_TO_LIVE_DAYS - 1))
     test_management._GetCurrentTime().AndReturn(mock_now)
 
     # Set the current time to way in the future.
-    mock_now = (datetime.datetime.now() + datetime.timedelta(
+    mock_now = (datetime.datetime.utcnow() + datetime.timedelta(
         days=test_management.SWARM_ERROR_TIME_TO_LIVE_DAYS + 1))
     test_management._GetCurrentTime().AndReturn(mock_now)
 

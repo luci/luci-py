@@ -45,7 +45,7 @@ class RunnerSummary(ndb.Model):
 def GenerateSnapshotSummary():
   """Store a snapshot of the current runner summary."""
   # Store the time now so all the models will have the same time.
-  current_time = datetime.datetime.now()
+  current_time = datetime.datetime.utcnow()
 
   for dimensions, summary in GetRunnerSummaryByDimension().iteritems():
     RunnerSummary(time=current_time,
@@ -180,7 +180,7 @@ def GenerateWaitSummary():
       'SELECT end_time FROM WaitSummary ORDER BY end_time DESC').get()
   start_time = (newest_runner_waits.end_time if newest_runner_waits else
                 datetime.datetime.min)
-  end_time = datetime.datetime.now()
+  end_time = datetime.datetime.utcnow()
 
   time_mappings = {}
   query = runner_stats.RunnerStats.gql('WHERE assigned_time != :1 and '
@@ -262,11 +262,11 @@ def GetRunnerWaitStats(days_to_show):
   """
   # Merge the various wait summaries.
   dimension_summaries = {}
-  cutoff_date = datetime.datetime.today() - datetime.timedelta(
+  cutoff_time = datetime.datetime.utcnow() - datetime.timedelta(
       days=days_to_show)
 
   dimension_wait_summary_query = DimensionWaitSummary.query(
-      DimensionWaitSummary.end_time > cutoff_date)
+      DimensionWaitSummary.end_time > cutoff_time)
   for dimension_wait in dimension_wait_summary_query:
     dimension_summaries.setdefault(
         dimension_wait.dimensions,
@@ -293,17 +293,17 @@ def GetRunnerWaitStatsBreakdown(days_to_show):
     days_to_show: The number of days to return the wait times for.
 
   Returns:
-    A dictionary where the key is the dimenion, and the value is a list of
+    A dictionary where the key is the dimension, and the value is a list of
     how many runners waited that many minutes (index 0 waited 0 minute, index 1
     waited 1 minute, etc).
   """
   dimension_median_buckets = {}
-  cutoff_date = datetime.datetime.today() - datetime.timedelta(
+  cutoff_time = datetime.datetime.utcnow() - datetime.timedelta(
       days=days_to_show)
 
   # Sum up all the collections.
   dimension_wait_summary_query = DimensionWaitSummary.query(
-      DimensionWaitSummary.end_time > cutoff_date)
+      DimensionWaitSummary.end_time > cutoff_time)
   for dimension_wait in dimension_wait_summary_query:
     dimension_median_buckets.setdefault(
         dimension_wait.dimensions, collections.Counter()).update(
@@ -332,7 +332,7 @@ def _GetCurrentTime():
   Returns:
     The current time as a datetime.datetime object.
   """
-  return datetime.datetime.now()
+  return datetime.datetime.utcnow()
 
 
 def DeleteOldWaitSummaries():

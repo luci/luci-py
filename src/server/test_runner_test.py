@@ -159,7 +159,7 @@ class TestRunnerTest(unittest.TestCase):
     self.assertFalse(test_runner.PingRunner(runner.key.urlsafe(), None))
 
     # Runner starts and can get pinged.
-    runner.started = datetime.datetime.now()
+    runner.started = datetime.datetime.utcnow()
     runner.machine_id = MACHINE_IDS[0]
     runner.put()
     self.assertTrue(test_runner.PingRunner(runner.key.urlsafe(),
@@ -212,7 +212,7 @@ class TestRunnerTest(unittest.TestCase):
       runner.config_instance_index = i
       # Ensure the created times are far enough apart that we can reliably
       # sort the runners by it.
-      runner.started = datetime.datetime.now() + datetime.timedelta(days=i)
+      runner.started = datetime.datetime.utcnow() + datetime.timedelta(days=i)
       runner.put()
 
     # Make sure limits are respected.
@@ -308,13 +308,13 @@ class TestRunnerTest(unittest.TestCase):
     test_helper.CreatePendingRunner()
     self.assertEqual([], test_runner.GetHangingRunners())
 
-    old_time = datetime.datetime.now() - datetime.timedelta(
+    old_time = datetime.datetime.utcnow() - datetime.timedelta(
         minutes=2 * test_runner.TIME_BEFORE_RUNNER_HANGING_IN_MINS)
 
     # Create an older runner that is running and isn't hanging.
     old_runner = test_helper.CreatePendingRunner()
     old_runner.created = old_time
-    old_runner.started = datetime.datetime.now()
+    old_runner.started = datetime.datetime.utcnow()
     old_runner.put()
     self.assertEqual([], test_runner.GetHangingRunners())
 
@@ -553,18 +553,18 @@ class TestRunnerTest(unittest.TestCase):
     self._mox.StubOutWithMock(test_runner, '_GetCurrentTime')
 
     # Set the current time to the future, but not too much.
-    mock_now = (datetime.datetime.now() + datetime.timedelta(
+    mock_now = (datetime.datetime.utcnow() + datetime.timedelta(
         days=swarm_constants.SWARM_FINISHED_RUNNER_TIME_TO_LIVE_DAYS - 1))
     test_runner._GetCurrentTime().AndReturn(mock_now)
 
     # Set the current time to way in the future.
-    mock_now = (datetime.datetime.now() + datetime.timedelta(
+    mock_now = (datetime.datetime.utcnow() + datetime.timedelta(
         days=swarm_constants.SWARM_FINISHED_RUNNER_TIME_TO_LIVE_DAYS + 1))
     test_runner._GetCurrentTime().AndReturn(mock_now)
     self._mox.ReplayAll()
 
     runner = test_helper.CreatePendingRunner()
-    runner.ended = datetime.datetime.now()
+    runner.ended = datetime.datetime.utcnow()
     runner.put()
 
     # Make sure that new runners aren't deleted.
@@ -582,11 +582,11 @@ class TestRunnerTest(unittest.TestCase):
     # the blob as old.
     self._mox.StubOutWithMock(test_runner, '_GetCurrentTime')
     test_runner._GetCurrentTime().AndReturn(
-        datetime.datetime.now() +
+        datetime.datetime.utcnow() +
         datetime.timedelta(
             days=swarm_constants.SWARM_OLD_RESULTS_TIME_TO_LIVE_DAYS - 1))
     test_runner._GetCurrentTime().AndReturn(
-        datetime.datetime.now() +
+        datetime.datetime.utcnow() +
         datetime.timedelta(
             days=swarm_constants.SWARM_OLD_RESULTS_TIME_TO_LIVE_DAYS + 1))
 
