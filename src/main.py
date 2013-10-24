@@ -424,7 +424,7 @@ class MainHandler(webapp2.RequestHandler):
         sort_key,
         ascending=ascending,
         limit=_NUM_USER_TEST_RUNNERS_PER_PAGE,
-        offset=_NUM_USER_TEST_RUNNERS_PER_PAGE * (page - 1)):
+        offset=_NUM_USER_TEST_RUNNERS_PER_PAGE * (page - 1)).fetch():
       self._GetDisplayableRunnerTemplate(runner)
       runners.append(runner)
 
