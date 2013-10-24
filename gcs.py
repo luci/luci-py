@@ -20,6 +20,12 @@ import Crypto.Hash.SHA256 as SHA256
 import Crypto.PublicKey.RSA as RSA
 import Crypto.Signature.PKCS1_v1_5 as PKCS1_v1_5
 
+# The app engine headers are located locally, so don't worry about not finding
+# them.
+# pylint: disable=F0401
+import webapp2
+# pylint: enable=F0401
+
 import cloudstorage
 
 # Export some exceptions for users of this module.
@@ -204,17 +210,13 @@ class URLSigner(object):
     Returns:
       List of webapp2.Routes objects to add to the application.
     """
-    # pylint: disable=F0401
-    import webapp2
-
     assert config.is_local_dev_server(), 'Must not be run in production'
-    assert not URLSigner.DEV_MODE_ENABLED, 'Already in a dev mode'
-
-    # Replace GS_URL with a mocked one.
-    URLSigner.DEV_MODE_ENABLED = True
-    URLSigner.GS_URL = (
-        'http://%s/_gcs_mock/' % config.get_local_dev_server_host())
-    URLSigner.GS_URL += '%(bucket)s/%(filename)s?%(query)s'
+    if not URLSigner.DEV_MODE_ENABLED:
+      # Replace GS_URL with a mocked one.
+      URLSigner.GS_URL = (
+          'http://%s/_gcs_mock/' % config.get_local_dev_server_host())
+      URLSigner.GS_URL += '%(bucket)s/%(filename)s?%(query)s'
+      URLSigner.DEV_MODE_ENABLED = True
 
     class LocalStorageHandler(webapp2.RequestHandler):
       """Handles requests to a mock GS implementation."""
