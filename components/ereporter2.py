@@ -18,9 +18,6 @@ import re
 import time
 from xml.sax import saxutils
 
-# The app engine headers are located locally, so don't worry about not finding
-# them.
-# pylint: disable=E0611,F0401
 import jinja2
 import webob
 import webapp2
@@ -30,7 +27,6 @@ from google.appengine.api import logservice
 from google.appengine.api import mail
 from google.appengine.api import mail_errors
 from google.appengine.ext import ndb
-# pylint: enable=E0611,F0401
 
 
 # Paths that can be stripped from the stack traces by relative_path().

@@ -19,9 +19,6 @@ import time
 import urllib
 import zlib
 
-# The app engine headers are located locally, so don't worry about not finding
-# them.
-# pylint: disable=E0611,F0401
 import webapp2
 from google.appengine import runtime
 from google.appengine.api import files
@@ -30,7 +27,6 @@ from google.appengine.api import taskqueue
 from google.appengine.ext import blobstore
 from google.appengine.ext import ndb
 from google.appengine.ext.webapp import blobstore_handlers
-# pylint: enable=E0611,F0401
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(BASE_DIR, 'third_party'))

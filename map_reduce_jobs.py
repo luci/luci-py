@@ -10,7 +10,6 @@ import sys
 ROOT_DIR = os.path.abspath(os.path.dirname(__file__))
 sys.path.append(os.path.join(ROOT_DIR, 'third_party'))
 
-# pylint: disable=E0611,F0401
 from mapreduce import control
 from mapreduce import main
 

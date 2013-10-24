@@ -13,14 +13,10 @@ import datetime
 import json
 import logging
 
-# The app engine headers are located locally, so don't worry about not finding
-# them.
-# pylint: disable=E0611,F0401
 import webapp2
 from google.appengine.api import logservice
 from google.appengine.ext import ndb
 from google.appengine.runtime import DeadlineExceededError
-# pylint: enable=E0611,F0401
 
 from components import stats_framework
 import config

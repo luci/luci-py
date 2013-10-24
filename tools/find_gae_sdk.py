@@ -8,12 +8,6 @@ import os
 import subprocess
 import sys
 
-# pylint doesn't know where the AppEngine SDK is, so silence these errors.
-# F0401: Unable to import 'XXX'
-# E0611: No name 'XXX' in module 'YYY'
-# pylint: disable=E0611,F0401
-
-
 # Directory with this file.
 TOOLS_DIR = os.path.dirname(os.path.abspath(__file__))
 

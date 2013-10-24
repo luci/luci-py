@@ -21,14 +21,10 @@ Workflow to edit a value:
 
 import os
 
-# The app engine headers are located locally, so don't worry about not finding
-# them.
-# pylint: disable=E0611,F0401
 from google.appengine.api import app_identity
 from google.appengine.api import memcache
 from google.appengine.api import modules
 from google.appengine.ext import ndb
-# pylint: enable=E0611,F0401
 
 import utils
 

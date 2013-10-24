@@ -130,10 +130,6 @@ class KeyringAuth(DefaultAuth):
 def load_context(sdk_path, app_dir, host, app_id, version, module_id):
   """Returns a closure where the GAE SDK is initialized."""
   find_gae_sdk.setup_gae_sdk(sdk_path)
-  # pylint doesn't know where the AppEngine SDK is, so silence these errors.
-  # E0611: No name 'XXX' in module 'YYY'
-  # F0401: Unable to import 'XXX'
-  # pylint: disable=E0611,F0401
 
   # Import GAE's SDK modules as needed.
   from google.appengine.ext.remote_api import remote_api_stub
