@@ -13,13 +13,11 @@ sys.path.insert(0, os.path.join(BASE_DIR, 'third_party'))
 import acl
 from components import ereporter2
 import handlers
-import stats
 
 
 def CreateApplication():
   """Bootstraps the app and creates the url router."""
   ereporter2.register_formatter()
-  stats.bootstrap()
   acl.bootstrap()
   return handlers.CreateApplication()
 

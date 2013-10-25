@@ -21,6 +21,7 @@ from google.appengine.runtime import DeadlineExceededError
 from components import stats_framework
 import config
 import template
+import utils
 
 
 ### Public API
@@ -95,8 +96,11 @@ class Snapshot(ndb.Model):
 ### Utility
 
 
-# The global stats bookkeeper. This is initialized in bootstrap().
-_STATS_HANDLER = None
+@utils.cache
+def get_stats_handler():
+  """Returns a global stats bookkeeper, lazily initializing it."""
+  return stats_framework.StatisticsFramework(
+    'global_stats', Snapshot, _extract_snapshot_from_logs)
 
 
 # Text to store for the corresponding actions.
@@ -208,22 +212,24 @@ def _generate_stats_data(request):
   today = now.date()
 
   # Fire up all the datastore requests.
+  stats_handler = get_stats_handler()
+
   future_days = []
   if limit_days:
     future_days = ndb.get_multi_async(
-        _STATS_HANDLER.day_key(today - datetime.timedelta(days=i))
+        stats_handler.day_key(today - datetime.timedelta(days=i))
         for i in range(limit_days + 1))
 
   future_hours = []
   if limit_hours:
     future_hours = ndb.get_multi_async(
-        _STATS_HANDLER.hour_key(now - datetime.timedelta(hours=i))
+        stats_handler.hour_key(now - datetime.timedelta(hours=i))
         for i in range(limit_hours + 1))
 
   future_minutes = []
   if limit_minutes:
     future_minutes = ndb.get_multi_async(
-        _STATS_HANDLER.minute_key(now - datetime.timedelta(minutes=i))
+        stats_handler.minute_key(now - datetime.timedelta(minutes=i))
         for i in range(limit_minutes + 1))
 
   def filterout(futures):
@@ -268,7 +274,7 @@ class RestrictedStatsUpdateHandler(webapp2.RequestHandler):
   def get(self):
     self.response.headers['Content-Type'] = 'text/plain'
     try:
-      i = _STATS_HANDLER.process_next_chunk(_TOO_RECENT)
+      i = get_stats_handler().process_next_chunk(_TOO_RECENT)
     except DeadlineExceededError:
       self.response.status_code = 500
       return
@@ -296,10 +302,3 @@ class StatsJsonHandler(webapp2.RequestHandler):
     self.response.write(json.dumps(data, separators=(',',':')))
     self.response.headers['Content-Type'] = 'application/json'
     self.response.headers['Access-Control-Allow-Origin'] = '*'
-
-
-def bootstrap():
-  """Initializes the stats handler."""
-  global _STATS_HANDLER
-  _STATS_HANDLER = stats_framework.StatisticsFramework(
-    'global_stats', Snapshot, _extract_snapshot_from_logs)
