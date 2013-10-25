@@ -9,33 +9,47 @@ import threading
 import time
 
 
-class CacheWithExpiration(object):
-  """Holds state of a cache for cache_with_expiration decorator."""
+class _Cache(object):
+  """Holds state of a cache for cache_with_expiration and cache decorators."""
 
   def __init__(self, func, expiration_sec):
     self.func = func
     self.expiration_sec = expiration_sec
     self.lock = threading.Lock()
     self.value = None
+    self.value_is_set = False
     self.expires = None
 
   def get_value(self):
     """Returns a cached value refreshing it if it has expired."""
-    now = time.time()
     with self.lock:
-      if self.expires is None or now > self.expires:
+      if not self.value_is_set or (self.expires and time.time() > self.expires):
         self.value = self.func()
-        self.expires = now + self.expiration_sec
+        self.value_is_set = True
+        if self.expiration_sec:
+          self.expires = time.time() + self.expiration_sec
       return self.value
+
+  def get_wrapper(self):
+    """Returns a callable object that can be used in place of |func|.
+
+    It's basically self.get_value, updated by functools.wraps to look more like
+    original function.
+    """
+    # functools.wraps doesn't like 'instancemethod', use lambda as a proxy.
+    # pylint: disable=W0108
+    return functools.wraps(self.func)(lambda: self.get_value())
+
+
+def cache(func):
+  """Decorator that implements permanent cache of a zero-parameter function."""
+  return _Cache(func, None).get_wrapper()
 
 
 def cache_with_expiration(expiration_sec):
   """Decorator that implements in-memory cache for a zero-parameter function."""
   def decorator(func):
-    cache = CacheWithExpiration(func, expiration_sec)
-    # functools.wraps doesn't like 'instancemethod', use lambda as a proxy.
-    # pylint: disable=W0108
-    return functools.wraps(func)(lambda: cache.get_value())
+    return _Cache(func, expiration_sec).get_wrapper()
   return decorator
 
 

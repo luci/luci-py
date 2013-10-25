@@ -445,6 +445,27 @@ def enqueue_task(url, queue_name, payload=None, name=None,
     return False
 
 
+def render_template(template_path, env=None):
+  """Renders a template with some common variables in template env.
+
+  Should be used for templates that extend base.html.
+
+  Parameters:
+    template_path: path to a template relative to templates/.
+    env: a dict that will be added to default template environment.
+
+  Returns:
+    Rendered template as str.
+  """
+  default_env = {
+      'app_revision_url': config.get_app_revision_url(),
+      'app_version': config.get_app_version(),
+  }
+  if env:
+    default_env.update(env)
+  return template.get(template_path).render(default_env)
+
+
 should_ignore_error_record = functools.partial(
     ereporter2.should_ignore_error_record, IGNORED_LINES, IGNORED_EXCEPTIONS)
 
@@ -803,7 +824,7 @@ class RestrictedStoreBlobstoreContentByHashHandler(
 class RestrictedAdminUIHandler(acl.ACLRequestHandler):
   """Root admin UI page."""
   def get(self):
-    self.response.write(template.get('restricted.html').render({
+    self.response.write(render_template('restricted.html', {
         'token': self.get_token(0, time.time()),
         'map_reduce_jobs': [
             {'id': job_id, 'name': job_def['name']}
@@ -817,7 +838,7 @@ class RestrictedGoogleStorageConfig(acl.ACLRequestHandler):
   """View and modify Google Storage config entries."""
   def get(self):
     settings = config.settings()
-    self.response.write(template.get('gs_config.html').render({
+    self.response.write(render_template('gs_config.html', {
         'gs_bucket': settings.gs_bucket,
         'gs_client_id_email': settings.gs_client_id_email,
         'gs_private_key': settings.gs_private_key,
@@ -1662,7 +1683,7 @@ class StoreContentHandlerGS(acl.ACLRequestHandler):
 class RootHandler(webapp2.RequestHandler):
   """Tells the user to RTM."""
   def get(self):
-    self.response.write(template.get('root.html').render())
+    self.response.write(render_template('root.html'))
     self.response.headers['Content-Type'] = 'text/html'
 
 

@@ -20,6 +20,7 @@ Workflow to edit a value:
 """
 
 import os
+import re
 
 from google.appengine.api import app_identity
 from google.appengine.api import memcache
@@ -37,7 +38,6 @@ STATS_REQUEST_PATHS = ('/content/', '/content-gs/', '/restricted/content/')
 
 # Modules that can possibly produce stats log entries.
 STATS_MODULES = ('default',)
-
 
 
 class GlobalConfig(ndb.Model):
@@ -143,12 +143,28 @@ def get_local_dev_server_host():
   return modules.get_hostname(module='default')
 
 
+@utils.cache
 def get_app_version():
   """Returns currently running version (not necessary a default one)."""
   return modules.get_current_version_name()
 
 
-@utils.cache_with_expiration(expiration_sec=3600)
+@utils.cache
+def get_app_revision_url():
+  """Returns URL of a git revision page for currently running app version.
+
+  Works only for non-tainted versions uploaded with tools/update.py: app version
+  should look like '162-efaec47'.
+
+  Returns None if a version is tainted or has unexpected name.
+  """
+  rev = re.match(r'\d+-([a-f0-9]+)$', get_app_version())
+  template = ('https://code.google.com/p'
+    '/swarming/source/detail?repo=isolate-server&r=%s')
+  return template % rev.group(1) if rev else None
+
+
+@utils.cache
 def get_task_queue_host():
   """Returns domain name of app engine instance to run a task queue task on.
 
