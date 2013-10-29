@@ -289,10 +289,9 @@ def records_to_html(
 
 
 def report_to_html(
-    report, ignored, title_template, header_template, content_template,
+    report, ignored, header_template, content_template,
     request_id_url, env):
   """Helper function to generate a full HTML report."""
-  title = title_template.render(env)
   header = header_template.render(env)
   # Create two reports, the one for the actual error messages and another one
   # for the ignored messages.
@@ -301,14 +300,10 @@ def report_to_html(
   ignored_out = records_to_html(
       ignored, 0, request_id_url, None, content_template, env)
   return ''.join((
-      '<html>\n<head><title>',
-      title,
-      '</title></head>\n<body>',
       header,
       report_out,
       '<hr>\n<h2>Ignored reports</h2>\n',
-      ignored_out,
-      '</body></html>'))
+      ignored_out))
 
 
 def email_html(to, subject, body):

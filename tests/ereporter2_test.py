@@ -244,13 +244,11 @@ class Ereporter2Test(test_case.TestCase):
     env = ereporter2.get_template_env(10, 20, module_versions)
     out = ereporter2.report_to_html(
         report, ignored,
-        ereporter2.REPORT_TITLE_TEMPLATE,
         ereporter2.REPORT_HEADER_TEMPLATE,
         ereporter2.REPORT_CONTENT_TEMPLATE,
         'http://foo/request_id', env)
     expected = (
-      '<html>\n<head><title>Exceptions on "isolateserver-dev"</title></head>\n'
-      '<body><h2>Report for 1970-01-01 00:00:10 (10) to 1970-01-01 00:00:20 '
+      '<h2>Report for 1970-01-01 00:00:10 (10) to 1970-01-01 00:00:20 '
       '(20)</h2>\nModules-Versions:\n<ul><li>foo - bar</li>\n'
       '</ul><h3>2 occurrences of 1 errors across 1 versions.</h3>\n\n'
       '<span style="font-size:130%">Failed@v1</span><br>\nmain.app<br>\n'
@@ -261,8 +259,7 @@ class Ereporter2Test(test_case.TestCase):
       'versions.</h3>\n\n<span style="font-size:130%">DeadlineExceededError@'
       'None:-1@v1</span><br>\nmain.app<br>\nGET localhost/foo (HTTP 200)<br>\n'
       '<pre>Traceback (most recent call last):\nDeadlineExceededError</pre>\n'
-      '1 occurrences: <a href="http://foo/request_ida">Entry</a> <p>\n<br>\n'
-      '</body></html>')
+      '1 occurrences: <a href="http://foo/request_ida">Entry</a> <p>\n<br>\n')
     self.assertEqual(expected, out)
 
 

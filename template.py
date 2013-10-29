@@ -11,7 +11,8 @@ ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 JINJA = jinja2.Environment(
     loader=jinja2.FileSystemLoader(os.path.join(ROOT_DIR, 'templates')),
-    extensions=['jinja2.ext.autoescape'])
+    extensions=['jinja2.ext.autoescape'],
+    autoescape=True)
 
 
 def get(*args, **kwargs):

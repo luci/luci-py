@@ -916,12 +916,12 @@ class RestrictedEreporter2Report(webapp2.RequestHandler):
     report, ignored = ereporter2.generate_report(
         start, end, module_versions, should_ignore_error_record)
     env = ereporter2.get_template_env(start, end, module_versions)
-    out = ereporter2.report_to_html(
+    content = ereporter2.report_to_html(
         report, ignored,
-        ereporter2.REPORT_TITLE_TEMPLATE,
         ereporter2.REPORT_HEADER_TEMPLATE,
         ereporter2.REPORT_CONTENT_TEMPLATE,
         request_id_url, env)
+    out = render_template('ereporter2_report.html', {'content': content})
     self.response.headers['Content-Type'] = 'text/html'
     self.response.write(out)
 
