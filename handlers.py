@@ -72,9 +72,6 @@ IGNORED_LINES = (
   '/base/data/home/runtimes/python27/python27_lib/versions/1/google/'
       'appengine/_internal/django/template/__init__.py:729: UserWarning: '
       'api_milliseconds does not return a meaningful value',
-  # Thanks AppEngine.
-  'Process terminated because the request deadline was exceeded during a '
-      'loading request.',
 )
 
 # Ignore these exceptions.
