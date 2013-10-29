@@ -875,7 +875,7 @@ class RestrictedEreporter2Mail(webapp2.RequestHandler):
     recipients = self.request.get(
         'recipients', config.settings().monitoring_recipients)
     result = ereporter2.generate_and_email_report(
-        None, None, None,
+        None,
         should_ignore_error_record,
         recipients,
         request_id_url,
@@ -904,8 +904,10 @@ class RestrictedEreporter2Report(webapp2.RequestHandler):
       tainted: 0 or 1, specifying if desiring tainted versions. Defaults to 0.
     """
     request_id_url = '/restricted/ereporter2/request/'
-    end = int(float(self.request.get('end', 0)))
-    start = int(float(self.request.get('start', 0)))
+    end = int(float(self.request.get('end', 0)) or time.time())
+    start = int(
+        float(self.request.get('start', 0)) or
+        ereporter2.get_default_start_time())
     modules = self.request.get('modules')
     if modules:
       modules = modules.split(',')

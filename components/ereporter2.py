@@ -334,10 +334,21 @@ def email_html(to, subject, body):
 
 
 def _extract_exceptions_from_logs(start_time, end_time, module_versions):
-  """Yields ErrorRecord objects from the logs."""
+  """Yields ErrorRecord objects from the logs.
+
+  Arguments:
+    start_time: epoch time to start searching. If 0 or None, defaults to
+                1970-01-01.
+    end_time: epoch time to stop searching. If 0 or None, defaults to
+              time.time().
+    module_versions: list of tuple of module-version to gather info about.
+  """
+  if start_time and end_time and start_time >= end_time:
+    raise webob.exc.HTTPBadRequest(
+        'Invalid range, start_time must be before end_time.')
   for entry in logservice.fetch(
-      start_time=start_time,
-      end_time=end_time,
+      start_time=start_time or None,
+      end_time=end_time or None,
       minimum_log_level=logservice.LOG_LEVEL_ERROR,
       include_incomplete=True,
       include_app_logs=True,
@@ -366,16 +377,10 @@ def _extract_exceptions_from_logs(start_time, end_time, module_versions):
         entry.status, '\n'.join(msgs))
 
 
-def _handle_time_range(start_time, end_time, default_end_time):
-  """Calculates default values for start_time and end_time."""
-  end_time = end_time or default_end_time
-  if not start_time:
-    info = ErrorReportingInfo.get_by_id(id=ErrorReportingInfo.KEY_ID)
-    start_time = info.timestamp if info else None
-    if start_time >= end_time:
-      raise webob.exc.HTTPBadRequest(
-          'Invalid range, start_time must be before end_time.')
-  return start_time, end_time
+def get_default_start_time():
+  """Calculates default value for start_time."""
+  info = ErrorReportingInfo.get_by_id(id=ErrorReportingInfo.KEY_ID)
+  return info.timestamp if info else None
 
 
 def generate_report(start_time, end_time, module_versions, ignorer):
@@ -391,7 +396,6 @@ def generate_report(start_time, end_time, module_versions, ignorer):
     tuple of two list of ErrorCategory, the ones that should be reported and the
     ones that should be ignored.
   """
-  start_time, end_time = _handle_time_range(start_time, end_time, time.time())
   ignored = {}
   categories = {}
   for i in _extract_exceptions_from_logs(start_time, end_time, module_versions):
@@ -403,16 +407,24 @@ def generate_report(start_time, end_time, module_versions, ignorer):
   return categories.values(), ignored.values()
 
 
+def _get_end_time_for_email():
+  """Exists so it can be mocked when testing generate_and_email_report().
+
+  Do not read by default anything more recent than 5 minutes to cope with mild
+  level of logservice inconsistency. High levels of logservice inconsistencies
+  will result in lost messages.
+  """
+  return int(time.time() - 5*60)
+
+
 def generate_and_email_report(
-    start_time, end_time, module_versions, ignorer, recipients, request_id_url,
+    module_versions, ignorer, recipients, request_id_url,
     report_url, title_template, content_template, extras):
   """Generates and emails an exception report.
 
   To be called from a cron_job.
 
   Arguments:
-    start_time: time to look for report, defaults to last email sent.
-    end_time: time to end the search for error, defaults to now - 5 minutes.
     module_versions: list of tuple of module-version to gather info about.
     ignorer: function that returns True if an ErrorRecord should be ignored.
     recipients: str containing comma separated email addresses.
@@ -427,11 +439,8 @@ def generate_and_email_report(
   Returns:
     True if the email was sent successfully.
   """
-  # Do not read by default anything more recent than 5 minutes to cope with mild
-  # level of logservice inconsistency. High levels of logservice inconsistencies
-  # will result in lost messages.
-  start_time, end_time = _handle_time_range(
-      start_time, end_time, time.time() - 5*60)
+  start_time = get_default_start_time()
+  end_time = _get_end_time_for_email()
   logging.info(
       'generate_and_email_report(%s, %s, %s, ..., %s)',
       start_time, end_time, module_versions, recipients)

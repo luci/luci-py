@@ -59,18 +59,23 @@ def ignorer(error_record):
 
 
 class Ereporter2Test(test_case.TestCase):
+  def setUp(self):
+    super(Ereporter2Test, self).setUp()
+    self.mock(ereporter2, '_get_end_time_for_email', lambda: 1383000000)
+
   def assertContent(self, message):
     self.assertEqual(
         u'no_reply@isolateserver-dev.appspotmail.com', message.sender)
     self.assertEqual(u'Exceptions on "isolateserver-dev"', message.subject)
     expected_html = (
-        u'<html><body><h3><a href="http://foo/report?start=10&end=20">1 '
+        '<html><body><h3><a href="http://foo/report?start=0&end=1383000000">1 '
         'occurrences of 1 errors across 1 versions.</a></h3>\n\n'
         '<span style="font-size:130%">Failed@v1</span><br>\nmain.app<br>\n'
         'GET localhost/foo (HTTP 200)<br>\n<pre>Failed</pre>\n'
         '1 occurrences: <a href="http://foo/request/a">Entry</a> <p>\n<br>\n'
         '</body></html>')
-    self.assertEqual(expected_html, message.html.payload)
+    self.assertEqual(
+        expected_html.splitlines(), message.html.payload.splitlines())
     expected_text = (
         '1 occurrences of 1 errors across 1 versions.\n\n'
         'Failed@v1\nmain.app\nGET localhost/foo (HTTP 200)\nFailed\n'
@@ -83,8 +88,6 @@ class Ereporter2Test(test_case.TestCase):
     ]
     self.mock(ereporter2, '_extract_exceptions_from_logs', lambda *_: data)
     result = ereporter2.generate_and_email_report(
-        start_time=10,
-        end_time=20,
         module_versions=[],
         ignorer=ignorer,
         recipients=None,
@@ -108,8 +111,6 @@ class Ereporter2Test(test_case.TestCase):
     ]
     self.mock(ereporter2, '_extract_exceptions_from_logs', lambda *_: data)
     result = ereporter2.generate_and_email_report(
-        start_time=10,
-        end_time=20,
         module_versions=[],
         ignorer=ignorer,
         recipients='joe@example.com',
