@@ -81,6 +81,9 @@ IGNORED_LINES = (
 IGNORED_EXCEPTIONS = (
   'CancelledError',
   'DeadlineExceededError',
+  # These are DeadlineExceededError wrapped up by
+  # third_party/cloudstorage/storage_api.py.
+  'TimeoutError',
   ereporter2.SOFT_MEMORY,
 )
 
