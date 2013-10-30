@@ -177,15 +177,20 @@ def write_file(bucket, filename, content):
   Returns:
     True if successfully written a file, False on error.
   """
+  written = 0
+  last_chunk_size = 0
   try:
     with cloudstorage.open('/%s/%s' % (bucket, filename), 'w') as f:
       for chunk in content:
+        last_chunk_size = len(chunk)
         f.write(chunk)
+        written += last_chunk_size
     return True
   except cloudstorage.errors.Error as exc:
     logging.error(
-        'Failed to write to a GS file \'/%s/%s\': %s %s',
-        bucket, filename, exc.__class__.__name__, exc)
+        'Failed to write to a GS file.\n'
+        '\'/%s/%s\', wrote %d bytes, failed at writting %d bytes: %s %s',
+        bucket, filename, written, last_chunk_size, exc.__class__.__name__, exc)
     # Delete an incomplete file.
     delete_files(bucket, [filename])
     return False
