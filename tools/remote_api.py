@@ -156,13 +156,6 @@ def load_context(sdk_path, app_dir, host, app_id, version, module_id):
       return None
     remote_api_stub.MaybeInvokeAuthentication()
 
-    os.environ['SERVER_SOFTWARE'] = 'Development (remote_api_shell)/1.0'
-    # TODO(maruel): Connect and request what the default version is currently,
-    # and set the variable accordingly.
-    if version:
-      os.environ['CURRENT_VERSION_ID'] = version
-    os.environ['CURRENT_MODULE_ID'] = module_id
-
     # Create shortcuts.
     import acl
     import config
@@ -180,6 +173,7 @@ def load_context(sdk_path, app_dir, host, app_id, version, module_id):
     # https://developers.google.com/appengine/docs/python/modules/
     prefixes = filter(None, (version, module_id, app_id))
     host = '%s.appspot.com' % '-dot-'.join(prefixes)
+  find_gae_sdk.setup_env(app_dir, app_id, version, module_id)
   return setup_env(host), app_id
 
 

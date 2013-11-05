@@ -45,12 +45,42 @@ def setup_gae_sdk(sdk_path):
   dev_appserver.fix_sys_path()
 
 
+def setup_env(app_dir, app_id, version, module_id):
+  """Setups os.environ so GAE code works."""
+  os.environ['SERVER_SOFTWARE'] = 'Development yo dawg/1.0'
+  if app_dir:
+    app_id = app_id or default_app_id(app_dir)
+    version = version or default_version(app_dir, module_id)
+  if app_id:
+    os.environ['APPLICATION_ID'] = app_id
+  if version:
+    os.environ['CURRENT_VERSION_ID'] = str(version)
+  if module_id:
+    os.environ['CURRENT_MODULE_ID'] = module_id
+
+
+def load_module_yaml(app_dir, module_id):
+  import yaml
+  using_module_id = module_id and module_id != 'default'
+  if using_module_id:
+    p = os.path.join(app_dir, 'module-%s.yaml' % module_id)
+  else:
+    p = os.path.join(app_dir, 'app.yaml')
+  with open(p) as f:
+    data = yaml.load(f)
+    if using_module_id:
+      assert data['module'] == module_id
+    return data
+
+
 def default_app_id(app_dir):
   """Returns the application name."""
-  import yaml
+  return load_module_yaml(app_dir, None)['application']
 
-  with open(os.path.join(app_dir, 'app.yaml')) as f:
-    return yaml.load(f)['application']
+
+def default_version(app_dir, module_id=None):
+  """Returns the application default version."""
+  return load_module_yaml(app_dir, module_id)['version']
 
 
 def get_app_modules(app_dir, module_files):
