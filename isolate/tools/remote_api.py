@@ -28,12 +28,15 @@ except ImportError:
   gnomekeyring = None
 
 
-APP_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+import app_config
 
-sys.path.insert(0, APP_DIR)
-sys.path.insert(0, os.path.join(APP_DIR, 'third_party'))
+ROOT_DIR = os.path.dirname(app_config.APP_DIR)
+sys.path.insert(0, os.path.join(ROOT_DIR, 'tools'))
 
 import find_gae_sdk
+
+sys.path.insert(0, app_config.APP_DIR)
+sys.path.insert(0, os.path.join(app_config.APP_DIR, 'third_party'))
 
 
 def unlock_keyring():
@@ -198,11 +201,13 @@ def Main():
 
   if args:
     parser.error('Unknown arguments, %s' % args)
-  options.sdk_path = options.sdk_path or find_gae_sdk.find_gae_sdk(APP_DIR)
+  options.sdk_path = options.sdk_path or find_gae_sdk.find_gae_sdk(
+      app_config.APP_DIR)
   if not options.sdk_path:
     parser.error('Failed to find the AppEngine SDK. Pass --sdk-path argument.')
 
-  predefined_vars, app_id = load_context(options.sdk_path, APP_DIR,
+  predefined_vars, app_id = load_context(
+      options.sdk_path, app_config.APP_DIR,
       options.host, options.app_id, options.version, options.module)
   if not predefined_vars:
     return 1

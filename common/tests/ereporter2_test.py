@@ -10,7 +10,7 @@ import unittest
 import test_env
 test_env.setup_test_env()
 
-from components import ereporter2
+from common import ereporter2
 import test_case
 
 
@@ -65,8 +65,8 @@ class Ereporter2Test(test_case.TestCase):
 
   def assertContent(self, message):
     self.assertEqual(
-        u'no_reply@isolateserver-dev.appspotmail.com', message.sender)
-    self.assertEqual(u'Exceptions on "isolateserver-dev"', message.subject)
+        u'no_reply@sample-app.appspotmail.com', message.sender)
+    self.assertEqual(u'Exceptions on "sample-app"', message.subject)
     expected_html = (
         '<html><body><h3><a href="http://foo/report?start=0&end=1383000000">1 '
         'occurrences of 1 errors across 1 versions.</a></h3>\n\n'

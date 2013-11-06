@@ -12,6 +12,10 @@ import subprocess
 import sys
 
 import app_config
+
+ROOT_DIR = os.path.dirname(app_config.APP_DIR)
+sys.path.insert(0, os.path.join(ROOT_DIR, 'tools'))
+
 import find_gae_sdk
 
 

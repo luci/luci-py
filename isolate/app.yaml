@@ -66,4 +66,3 @@ skip_files:
 - ^(.*/)?.*\.rej
 - ^[A-Z]+
 - ^[A-Z]+\.[a-z]+
-- codereview\.settings

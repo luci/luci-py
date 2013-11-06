@@ -14,7 +14,7 @@ test_env.setup_test_env()
 from google.appengine.ext import ndb
 from google.appengine.ext import testbed
 
-from components import stats_framework
+from common import stats_framework
 
 
 class Snapshot(ndb.Model):

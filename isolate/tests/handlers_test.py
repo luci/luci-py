@@ -13,10 +13,38 @@ test_env.setup_test_env()
 import webtest
 
 # For TestCase.
-import ereporter2_test
 import test_case
 
 import handlers
+
+
+def _ErrorRecord(**kwargs):
+  """Returns an ErrorRecord filled with default dummy values."""
+  default_values = {
+      'request_id': 'a',
+      'start_time': None,
+      'exception_time': None,
+      'latency': 0,
+      'mcycles': 0,
+      'ip': '0.0.1.0',
+      'nickname': None,
+      'referrer': None,
+      'user_agent': 'Comodore64',
+      'host': 'localhost',
+      'resource': '/foo',
+      'method': 'GET',
+      'task_queue_name': None,
+      'was_loading_request': False,
+      'version': 'v1',
+      'module': 'default',
+      'handler_module': 'main.app',
+      'gae_version': '1.9.0',
+      'instance': '123',
+      'status': 200,
+      'message': 'Failed',
+  }
+  default_values.update(kwargs)
+  return handlers.ereporter2.ErrorRecord(**default_values)
 
 
 class MainTest(test_case.TestCase):
@@ -41,9 +69,7 @@ class MainTest(test_case.TestCase):
     self.assertEqual([], self.mail_stub.get_sent_messages())
 
   def test_restricted_cron_ereporter2_mail(self):
-    data = [
-      ereporter2_test.ErrorRecord(),
-    ]
+    data = [_ErrorRecord()]
     self.mock(
         handlers.ereporter2, '_extract_exceptions_from_logs', lambda *_: data)
     headers = {'X-AppEngine-Cron': 'true'}
