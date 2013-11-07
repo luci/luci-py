@@ -86,7 +86,7 @@ class TestSlaveMachine(unittest.TestCase):
 
     data = {'x': str(result_code),
             's': False,
-            url_helper.RESULT_STRING_KEY: result_string}
+            swarm_constants.RESULT_STRING_KEY: result_string}
 
     url_helper.UrlOpen(result_url, data, max_tries=mox.IgnoreArg()
                       ).AndReturn(None if bad_url else 'Success')

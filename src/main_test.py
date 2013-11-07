@@ -19,6 +19,7 @@ from google.appengine.datastore import datastore_stub_util
 from google.appengine.ext import testbed
 from  import main as main_app
 from common import dimensions_utils
+from common import swarm_constants
 from common import url_helper
 from server import admin_user
 from server import dimension_mapping
@@ -277,9 +278,12 @@ class AppTest(unittest.TestCase):
         'r': runner_key,
         'id': machine_id,
         's': True,
-        'result_output': result,
         }
-    return self.app.post('/result', url_parameters, expect_errors=expect_errors)
+    files = [(swarm_constants.RESULT_STRING_KEY,
+              swarm_constants.RESULT_STRING_KEY,
+              result)]
+    return self.app.post('/result', url_parameters, upload_files=files,
+                         expect_errors=expect_errors)
 
   def testResultHandler(self):
     self._mox.StubOutWithMock(url_helper, 'UrlOpen')

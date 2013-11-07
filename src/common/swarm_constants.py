@@ -16,6 +16,9 @@ import os
 # The exit code to return when the machine should restart.
 RESTART_EXIT_CODE = 99
 
+# The key and file name to use when uploading results from the slaves.
+RESULT_STRING_KEY = 'result_output'
+
 # Name of python script containing constants.
 SWARM_CONSTANTS_SCRIPT = 'swarm_constants.py'
 

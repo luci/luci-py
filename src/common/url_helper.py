@@ -22,7 +22,6 @@ import urlparse
 
 
 COUNT_KEY = 'UrlOpenAttempt'
-RESULT_STRING_KEY = 'result_output'
 
 # The index of the query elements from urlparse.
 QUERY_INDEX = 4

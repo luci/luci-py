@@ -337,7 +337,7 @@ class LocalTestRunner(object):
     """
     data = {'n': self.test_run.test_run_name,
             'c': self.test_run.configuration.config_name,
-            url_helper.RESULT_STRING_KEY: output,
+            swarm_constants.RESULT_STRING_KEY: output,
             's': result}
     if (hasattr(self.test_run, 'instance_index') and
         self.test_run.instance_index is not None):
@@ -679,11 +679,17 @@ class LocalTestRunner(object):
               'c': self.test_run.configuration.config_name,
               'x': ', '.join([str(i) for i in result_codes]),
               's': success,
-              'result_output': result_string,
               'o': overwrite}
+      # Pass the output as a file to ensure the server handler doesn't
+      # incorrectly convert the output to unicode.
+      files = [(swarm_constants.RESULT_STRING_KEY,
+                swarm_constants.RESULT_STRING_KEY,
+                result_string)]
 
       url_results = url_helper.UrlOpen(self.test_run.result_url, data=data,
-                                       max_tries=self.max_url_retries)
+                                       files=files,
+                                       max_tries=self.max_url_retries,
+                                       method='POSTFORM')
       if url_results is None:
         logging.error('Failed to publish results to given url, %s',
                       self.test_run.result_url)

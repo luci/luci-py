@@ -59,7 +59,9 @@ class ResultHelperTest(unittest.TestCase):
     self.assertEqual(0, result_helper.ResultChunk.query().count())
 
   def testStoreUnicode(self):
-    results_data = u'a unicode string'
+    # We should be storing all data as just raw bytes, so add \xb8 which isn't
+    # valid ascii to ensure we do.
+    results_data = b'a unicode string with a random unicode char \xb8'
     results = result_helper.StoreResults(results_data)
 
     self.assertEqual(results_data, results.GetResults())

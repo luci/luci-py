@@ -33,6 +33,7 @@ from google.appengine.ext.webapp import util
 from google.appengine.ext import ndb
 
 from common import result_helper
+from common import swarm_constants
 from common import test_request_message
 from common import url_helper
 from server import admin_user
@@ -654,7 +655,7 @@ class ResultHandler(webapp2.RequestHandler):
     # TODO(user): The result string should probably be in the body of the
     # request.
     result_string = urllib.unquote_plus(self.request.get(
-        url_helper.RESULT_STRING_KEY))
+        swarm_constants.RESULT_STRING_KEY))
 
     # Mark the runner as pinging now to prevent it from timing out while
     # the results are getting stored in the blobstore.

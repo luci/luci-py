@@ -568,7 +568,7 @@ class TestLocalTestRunner(unittest.TestCase):
       self.assertEqual(self.config_name, data['c'])
       self.assertEqual('pending', data['s'])
 
-      self.streamed_output += data['result_output']
+      self.streamed_output += data[swarm_constants.RESULT_STRING_KEY]
       return True
 
     self._mox.StubOutWithMock(local_test_runner.url_helper, 'UrlOpen')
@@ -592,7 +592,7 @@ class TestLocalTestRunner(unittest.TestCase):
     self.CreateValidFile()
     self._mox.StubOutWithMock(local_test_runner.url_helper, 'UrlOpen')
     data = {'n': self.test_run_name, 'c': self.config_name, 's': 'success',
-            'result_output': ''}
+            swarm_constants.RESULT_STRING_KEY: ''}
     max_url_retries = 1
     local_test_runner.url_helper.UrlOpen(
         self.output_destination['url'],
@@ -627,17 +627,23 @@ class TestLocalTestRunner(unittest.TestCase):
               'c': self.config_name,
               'x': ', '.join([str(i) for i in self.result_codes]),
               's': True,
-              'result_output': self.result_string,
               'o': False},
-        max_tries=max_url_retries).AndReturn('')
+        files=[(swarm_constants.RESULT_STRING_KEY,
+                swarm_constants.RESULT_STRING_KEY,
+                self.result_string)],
+        max_tries=max_url_retries,
+        method='POSTFORM').AndReturn('')
     local_test_runner.url_helper.UrlOpen(
         '%s?1=2' % self.result_url,
         data={'n': self.test_run_name,
               'c': self.config_name,
               'x': ', '.join([str(i) for i in self.result_codes]),
               's': False,
-              'result_output': self.result_string,
               'o': False},
+        files=[(swarm_constants.RESULT_STRING_KEY,
+                swarm_constants.RESULT_STRING_KEY,
+                self.result_string)],
+        method='POSTFORM',
         max_tries=max_url_retries).AndReturn('')
     self._mox.ReplayAll()
 
@@ -665,9 +671,12 @@ class TestLocalTestRunner(unittest.TestCase):
               'c': self.config_name,
               'x': ', '.join([str(i) for i in self.result_codes]),
               's': True,
-              'result_output': self.result_string,
               'o': False},
-        max_tries=max_url_retries).AndReturn(None)
+        files=[(swarm_constants.RESULT_STRING_KEY,
+                swarm_constants.RESULT_STRING_KEY,
+                self.result_string)],
+        max_tries=max_url_retries,
+        method='POSTFORM').AndReturn(None)
     self._mox.ReplayAll()
 
     self.runner = local_test_runner.LocalTestRunner(
@@ -689,9 +698,12 @@ class TestLocalTestRunner(unittest.TestCase):
               'c': self.config_name,
               'x': ', '.join([str(i) for i in self.result_codes]),
               's': True,
-              'result_output': self.result_string,
               'o': False},
-        max_tries=max_url_retries).AndReturn('')
+        files=[(swarm_constants.RESULT_STRING_KEY,
+                swarm_constants.RESULT_STRING_KEY,
+                self.result_string)],
+        max_tries=max_url_retries,
+        method='POSTFORM').AndReturn('')
     self._mox.ReplayAll()
 
     self.CreateValidFile()
@@ -722,16 +734,22 @@ class TestLocalTestRunner(unittest.TestCase):
 
     # We use this function to check if exception_text is properly published and
     # that the overwrite value is True.
-    def ValidateInternalErrorsResult(url_data):
-      if not url_data['o']:
+    def ValidateInternalErrorsResult(url_files):
+      if len(url_files) != 1:
         return False
 
-      return exception_text in str(url_data)
+      if (url_files[0][0] != swarm_constants.RESULT_STRING_KEY or
+          url_files[0][1] != swarm_constants.RESULT_STRING_KEY):
+        return False
+
+      return exception_text in url_files[0][2]
 
     local_test_runner.url_helper.UrlOpen(
         self.result_url,
-        data=mox.Func(ValidateInternalErrorsResult),
-        max_tries=max_url_retries).AndReturn('')
+        data=mox.ContainsKeyValue('o', True),
+        files=mox.Func(ValidateInternalErrorsResult),
+        max_tries=max_url_retries,
+        method='POSTFORM').AndReturn('')
     self._mox.ReplayAll()
 
     self.runner = local_test_runner.LocalTestRunner(

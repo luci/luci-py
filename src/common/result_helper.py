@@ -109,7 +109,7 @@ def StoreResults(results_data):
     # Store the results as just raw bytes because otherwise app engine won't
     # accept unicode string.
     chunk_futures = [
-        ResultChunk(chunk=bytes(results_data[x:x+MAX_CHUNK_SIZE])).put_async()
+        ResultChunk(chunk=results_data[x:x+MAX_CHUNK_SIZE]).put_async()
         for x in range(0, len(results_data), MAX_CHUNK_SIZE)
     ]
 
