@@ -37,8 +37,8 @@ def EmailAdmins(subject, body):
     return False
 
   send_to = ','.join(admin.email for admin in AdminUser.all())
-  server_email = 'Swarm Server <no_reply@%s.appspotmail.com>' % (
-      app_identity.get_application_id())
+  server_name = app_identity.get_application_id()
+  server_email = '%s <no_reply@%s.appspotmail.com>' % (server_name, server_name)
 
   mail.send_mail(sender=server_email, to=send_to, subject=subject, body=body)
   return True
