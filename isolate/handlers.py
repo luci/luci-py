@@ -1199,38 +1199,61 @@ class RetrieveContentByHashHandler(acl.ACLRequestHandler,
 ISOLATE_PROTOCOL_VERSION = '1.0'
 
 
-class HandshakeHandlerGS(acl.ACLRequestHandler):
-  """Returns access token, version and capabilities of the server."""
+class ProtocolHandlerMixin(object):
+  """Mixing class for request handlers that implement isolate protocol."""
+
+  def send_json(self, body, http_code=200):
+    """Serializes |body| into JSON and sends it as a response."""
+    self.response.set_status(http_code)
+    self.response.headers['Content-Type'] = 'application/json'
+    json.dump(body, self.response.out, separators=(',', ':'))
+
+  def send_error(self, message, http_code=400):
+    """Sends a error message and aborts the request, logs the error."""
+    logging.error(message)
+    self.abort(http_code, detail=message)
+
+  def send_data(self, data, filename=None):
+    """Sends binary data as a response."""
+    self.response.set_status(200)
+    if filename:
+      self.response.headers['Content-Disposition'] = (
+          'attachment; filename="%s"' % filename)
+    self.response.headers['Content-Type'] = 'application/octet-stream'
+    self.response.headers['Cache-Control'] = 'public, max-age=43200'
+    self.response.out.write(data)
+
+
+class HandshakeHandlerGS(acl.ACLRequestHandler, ProtocolHandlerMixin):
+  """Returns access token, version and capabilities of the server.
+
+  Request body is a JSON dict:
+    {
+      "client_app_version": "0.2",
+      "fetcher": true,
+      "protocol_version": "1.0",
+      "pusher": true,
+    }
+
+  Response body is a JSON dict:
+    {
+      "access_token": "......",
+      "protocol_version": "1.0",
+      "server_app_version": "138-193f1f3",
+    }
+    or
+    {
+      "error": "Some user friendly error text",
+      "protocol_version": "1.0",
+      "server_app_version": "138-193f1f3",
+    }
+  """
 
   # This handler is called to get the token, there's nothing to enforce yet.
   enforce_token = False
 
   def post(self):
-    """Reads client versions and responds with access token and server version.
-
-    Request body is a JSON dict:
-      {
-        "protocol_version": "1.0",
-        "client_app_version": "0.2",
-        "pusher": true,
-        "fetcher": true,
-        ...
-      }
-
-    Response body is a JSON dict:
-      {
-        "protocol_version": "1.0",
-        "server_app_version": "138-193f1f3",
-        "access_token": "......",
-        ...
-      }
-      or
-      {
-        "protocol_version": "1.0",
-        "server_app_version": "138-193f1f3",
-        "error": "Some user friendly error text",
-      }
-    """
+    """Responds with access token and server version."""
     try:
       request = json.loads(self.request.body)
       client_protocol = request['protocol_version']
@@ -1238,34 +1261,61 @@ class HandshakeHandlerGS(acl.ACLRequestHandler):
       pusher = request.get('pusher', True)
       fetcher = request.get('fetcher', True)
     except (ValueError, KeyError) as exc:
-      logging.error('Invalid body of /handshake call: %s', exc)
-      return self.abort(400)
+      return self.send_error(
+          'Invalid body of /handshake call.\nError: %s.' % exc)
 
-    response = {
-        'protocol_version': ISOLATE_PROTOCOL_VERSION,
-        'server_app_version': config.get_app_version(),
-        'access_token': self.get_token(0, time.time()),
-    }
+    # This access token will be used to validate each subsequent requests.
+    access_token = self.get_token(0, time.time())
 
     # Log details of the handshake to the server log.
     logging_info = {
-      'Client protocol version': client_protocol,
-      'Client app version': client_app_version,
-      'Client is pusher': pusher,
-      'Client is fetcher': fetcher,
-      'Access Id': self.access_id,
-      'Token': response['access_token'],
+        'Access Id': self.access_id,
+        'Client app version': client_app_version,
+        'Client is fetcher': fetcher,
+        'Client is pusher': pusher,
+        'Client protocol version': client_protocol,
+        'Token': access_token,
     }
     logging.info(
-      '\n'.join('%s: %s' % (k, logging_info[k]) for k in sorted(logging_info)))
+        '\n'.join('%s: %s' % (k, logging_info[k])
+        for k in sorted(logging_info)))
 
     # Send back the response.
-    self.response.headers['Content-Type'] = 'application/json'
-    json.dump(response, self.response.out, separators=(',', ':'))
+    self.send_json({
+        'access_token': access_token,
+        'protocol_version': ISOLATE_PROTOCOL_VERSION,
+        'server_app_version': config.get_app_version(),
+    })
 
 
-class PreUploadContentHandlerGS(acl.ACLRequestHandler):
-  """Checks for entries existence, generates upload URLs."""
+class PreUploadContentHandlerGS(acl.ACLRequestHandler, ProtocolHandlerMixin):
+  """Checks for entries existence, generates upload URLs.
+
+  Request body is a JSON list:
+  [
+      {
+          "h": <hex digest>,
+          "i": <1 for isolated file, 0 for rest of them>
+          "s": <int entry size>,
+      },
+      ...
+  ]
+
+  Response is a JSON list of the same length where each item is either:
+    * If an entry is missing: a list with two URLs - URL to upload a file to,
+      and URL to call when upload is done (can be null).
+    * If entry is already present: null.
+
+  For instance:
+  [
+      ["<upload url>", "<finalize url>"],
+      null,
+      null,
+      ["<upload url>", null],
+      null,
+      ...
+  ]
+  """
 
   # Default expiration time for signed links.
   DEFAULT_LINK_EXPIRATION = datetime.timedelta(hours=4)
@@ -1311,10 +1361,10 @@ class PreUploadContentHandlerGS(acl.ACLRequestHandler):
 
     # Context options for NDB calls.
     ctx_options = {
-      # Don't bother with in-process cache, it's not going to be used.
-      'use_cache': False,
-      # Make sure queries for ~100 items always use single RPC.
-      'max_memcache_items': 200,
+        # Don't bother with in-process cache, it's not going to be used.
+        'use_cache': False,
+        # Make sure queries for ~100 items always use single RPC.
+        'max_memcache_items': 200,
     }
 
     # Kick off all queries in parallel. Build mapping Future -> digest.
@@ -1375,12 +1425,12 @@ class PreUploadContentHandlerGS(acl.ACLRequestHandler):
 
     # Construct url with query parameters, reuse auth token.
     params = {
-      'x': expiration_ts,
-      's': item_size,
-      'i': is_isolated,
-      'g': uploaded_to_gs,
-      'sig': sig,
-      'token': self.request.get('token'),
+        'g': uploaded_to_gs,
+        'i': is_isolated,
+        's': item_size,
+        'sig': sig,
+        'token': self.request.get('token'),
+        'x': expiration_ts,
     }
     return '%s?%s' % (url_base, urllib.urlencode(params))
 
@@ -1415,29 +1465,13 @@ class PreUploadContentHandlerGS(acl.ACLRequestHandler):
     return upload_url, finalize_url
 
   def post(self, namespace):
-    """Reads JSON body with items to upload and replies with URLs to upload to.
-
-    Expected request body is a JSON list:
-    [
-        {
-            "h": <hex digest>,
-            "s": <int entry size>,
-            "i": <1 for isolated file, 0 for rest of them>
-        },
-        ...
-    ]
-
-    Response format is a JSON list of the same length where each item is a
-    list with two URLs: URL to upload a file to, and URL to call when upload
-    is done.
-    """
+    """Reads body with items to upload and replies with URLs to upload to."""
     # Parse a body into list of EntryInfo objects.
     try:
       entries = self.parse_request(self.request.body, namespace)
     except ValueError as err:
-      logging.error('Bad /pre-upload request (%s): %s',
-          err, self.request.body[:200])
-      return self.abort(400, detail=err.message)
+      return self.send_error(
+          'Bad /pre-upload request.\n(%s)\n%s' % (err, self.request.body[:200]))
 
     # Generate push_urls for missing entries.
     push_urls = {}
@@ -1449,9 +1483,7 @@ class PreUploadContentHandlerGS(acl.ACLRequestHandler):
         push_urls[entry.digest] = self.generate_push_urls(entry, namespace)
 
     # Send back the response.
-    self.response.headers['Content-Type'] = 'application/json'
-    json.dump([push_urls.get(entry.digest) for entry in entries],
-        self.response.out, separators=(',', ':'))
+    self.send_json([push_urls.get(entry.digest) for entry in entries])
 
     # Log stats, enqueue tagging task that updates last access time.
     stats.log(stats.LOOKUP, len(entries), len(existing))
@@ -1464,28 +1496,35 @@ class PreUploadContentHandlerGS(acl.ACLRequestHandler):
       self.tag_entries(existing, namespace)
 
 
-class RetrieveContentHandlerGS(acl.ACLRequestHandler):
-  """The handlers for retrieving contents by its SHA-1 hash |hash_key|."""
+class RetrieveContentHandlerGS(acl.ACLRequestHandler, ProtocolHandlerMixin):
+  """The handlers for retrieving contents by its SHA-1 hash |hash_key|.
+
+  Can produce 3 types of responses:
+    * HTTP 200: the content is in response body as octet-stream.
+    * HTTP 302: http redirect to a file with the content.
+    * HTTP 404: content is not available, response body is a error message.
+  """
 
   def get(self, namespace, hash_key):  #pylint: disable=W0221
     memcache_entry = memcache.get(hash_key, namespace='table_%s' % namespace)
     if memcache_entry is not None:
-      return self.send_data(hash_key, memcache_entry, 'memcache')
+      stats.log(stats.RETURN, len(memcache_entry), 'memcache')
+      return self.send_data(memcache_entry, filename=hash_key)
 
     entry = get_content_by_hash(namespace, hash_key)
     if not entry:
-      msg = 'Unable to find an ContentEntry with key \'%s\'.' % hash_key
-      return self.abort(404, detail=msg)
+      return self.send_error(
+          'Unable to find an entry.\nKey is \'%s\'.' % hash_key, http_code=404)
 
     if entry.content is not None:
-      return self.send_data(hash_key, entry.content, 'inline')
+      stats.log(stats.RETURN, len(entry.content), 'inline')
+      return self.send_data(entry.content, filename=hash_key)
 
     if not entry.filename:
       # Corrupted entry. Delete.
-      msg = 'Corrupted entry with key \'%s\'.' % hash_key
-      logging.error(msg)
       entry.delete()
-      return self.abort(404, detail=msg)
+      return self.send_error(
+          'Found corrupted entry.\nKey is \'%s\'.' % hash_key, http_code=404)
 
     # Generate signed download URL.
     settings = config.settings()
@@ -1497,18 +1536,39 @@ class RetrieveContentHandlerGS(acl.ACLRequestHandler):
     stats.log(stats.RETURN, entry.size, 'GS; %s' % entry.filename)
     self.redirect(signed_url)
 
-  def send_data(self, hash_key, data, origin):
-    """Serves data directly from memory."""
-    stats.log(stats.RETURN, len(data), origin)
-    self.response.headers['Content-Disposition'] = (
-        'attachment; filename="%s"' % hash_key)
-    self.response.headers['Content-Type'] = 'application/octet-stream'
-    self.response.headers['Cache-Control'] = 'public, max-age=43200'
-    self.response.out.write(data)
 
+class StoreContentHandlerGS(acl.ACLRequestHandler, ProtocolHandlerMixin):
+  """Creates ContentEntry Datastore entity for some uploaded file.
 
-class StoreContentHandlerGS(acl.ACLRequestHandler):
-  """Creates ContentEntry Datastore entity for some uploaded file."""
+  Clients usually do not call this handler explicitly. Signed URL to it
+  is returned in /pre-upload call.
+
+  This handler is called in two ways:
+    * As a POST request to finalize a file already uploaded to GS. Request
+      body is empty in that case.
+    * As a PUT request to upload an actual data and create ContentEntry in one
+      call. Request body contains octet-stream with entry's data.
+
+  In either case query parameters define details of new content entry:
+    g - 1 if it was previously uploaded to GS.
+    i - 1 if it its *.isolated file.
+    s - size of the uncompressed file.
+    x - URL signature expiration timestamp.
+    sig - signature of request parameters, to verify they are not tampered with.
+
+  Can produce 3 types of responses:
+    * HTTP 200: success, entry is created or existed before, response body is
+      a json dict with information about new entry.
+    * HTTP 400: fatal error, retrying request won't fix it, response body is
+      a error message.
+    * HTTP 503: transient error, request should be retried by client, response
+      body is a error message.
+
+  In case of HTTP 200, body is a JSON dict:
+  {
+      'entry': {<details about the entry>}
+  }
+  """
 
   @staticmethod
   def generate_signature(secret_key, http_verb, expiration_ts, namespace,
@@ -1557,7 +1617,7 @@ class StoreContentHandlerGS(acl.ACLRequestHandler):
 
     # Verify signature is correct.
     if not utils.constant_time_equals(signature, expected_sig):
-      return self.abort(400, detail='Incorrect signature')
+      return self.send_error('Incorrect signature.')
 
     # Convert parameters from strings back to something useful.
     # It can't fail since matching signature means it was us who generated
@@ -1569,13 +1629,13 @@ class StoreContentHandlerGS(acl.ACLRequestHandler):
 
     # Verify signature is not yet expired.
     if time.time() > expiration_ts:
-      return self.abort(400, detail='Expired signature')
+      return self.send_error('Expired signature.')
 
     if uploaded_to_gs:
       # GS upload finalization uses empty POST body.
       assert self.request.method == 'POST'
       if self.request.headers.get('content-length'):
-        return self.abort(400, detail='Expecting empty POST')
+        return self.send_error('Expecting empty POST.')
       content = None
     else:
       # Datastore upload uses PUT.
@@ -1610,24 +1670,23 @@ class StoreContentHandlerGS(acl.ACLRequestHandler):
               'Advertised data length (%d) and actual data length (%d) '
               'do not match' % (item_size, expanded_size))
       except ValueError as err:
-        logging.error(str(err))
-        return self.abort(400, str(err))
+        return self.send_error('Inline verification failed.\n%s' % err)
       # Successfully verified!
       needs_verification = False
     else:
       # Fetch size of the stored file.
       file_info = gcs.get_file_info(gs_bucket, gs_filepath)
       if not file_info:
-        msg = 'File \'%s\' is not in Google Storage' % gs_filepath
-        logging.error(msg)
-        return self.abort(503, detail=msg)
+        return self.send_error(
+            'File should be in Google Storage.\nFile is \'%s\'.' % gs_filepath)
       compressed_size = file_info.size
 
     # Data is here and it's too large for DS, so put it in GS.
     if content is not None and len(content) >= MIN_SIZE_FOR_GS:
       if not gcs.write_file(gs_bucket, gs_filepath, [content]):
         # Returns 503 so the client automatically retries.
-        return self.abort(503, detail='Unable to save the content to GS.')
+        return self.send_error(
+            'Unable to save the content to GS.', http_code=503)
       # It's now in GS.
       uploaded_to_gs = True
 
@@ -1635,7 +1694,7 @@ class StoreContentHandlerGS(acl.ACLRequestHandler):
     entry = create_entry(namespace, hash_key)
     if not entry:
       stats.log(stats.DUPE, compressed_size, 'inline')
-      self.response.out.write('Entry already exists')
+      self.send_json({'entry': {}})
       return
 
     # If it's not in GS then put it inline.
@@ -1676,7 +1735,10 @@ class StoreContentHandlerGS(acl.ACLRequestHandler):
         # unverified entities and launch verification tasks, for instance
         # a datastore index on 'is_verified' boolean field and a cron task that
         # verifies all unverified entities.
-        self.response.out.write('Warning: Unable to add task to verify blob.')
+        logging.error('Unable to add task to verify uploaded content.')
+
+    # TODO(vadimsh): Fill in details about the entry, such as expiration time.
+    self.send_json({'entry': {}})
 
 
 ###
