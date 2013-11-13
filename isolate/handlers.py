@@ -825,7 +825,7 @@ class RestrictedAdminUIHandler(acl.ACLRequestHandler):
   """Root admin UI page."""
   def get(self):
     self.response.write(render_template('restricted.html', {
-        'token': self.get_token(0, time.time()),
+        'token': self.generate_token(),
         'map_reduce_jobs': [
             {'id': job_id, 'name': job_def['name']}
             for job_id, job_def in map_reduce_jobs.MAP_REDUCE_JOBS.iteritems()
@@ -842,7 +842,7 @@ class RestrictedGoogleStorageConfig(acl.ACLRequestHandler):
         'gs_bucket': settings.gs_bucket,
         'gs_client_id_email': settings.gs_client_id_email,
         'gs_private_key': settings.gs_private_key,
-        'token': self.get_token(0, time.time()),
+        'token': self.generate_token(),
     }))
     self.response.headers['Content-Type'] = 'text/html'
 
@@ -1223,6 +1223,16 @@ class ProtocolHandlerMixin(object):
     self.response.headers['Cache-Control'] = 'public, max-age=43200'
     self.response.out.write(data)
 
+  @property
+  def client_protocol_version(self):
+    """Returns protocol version client provided during handshake, or None if not
+    known.
+
+    Valid only for POST or PUT requests for now.
+    """
+    # See HandshakeHandlerGS, its where token_data is generated.
+    return self.token_data.get('v')
+
 
 class HandshakeHandlerGS(acl.ACLRequestHandler, ProtocolHandlerMixin):
   """Returns access token, version and capabilities of the server.
@@ -1256,16 +1266,16 @@ class HandshakeHandlerGS(acl.ACLRequestHandler, ProtocolHandlerMixin):
     """Responds with access token and server version."""
     try:
       request = json.loads(self.request.body)
-      client_protocol = request['protocol_version']
-      client_app_version = request['client_app_version']
+      client_protocol = str(request['protocol_version'])
+      client_app_version = str(request['client_app_version'])
       pusher = request.get('pusher', True)
       fetcher = request.get('fetcher', True)
     except (ValueError, KeyError) as exc:
       return self.send_error(
           'Invalid body of /handshake call.\nError: %s.' % exc)
 
-    # This access token will be used to validate each subsequent requests.
-    access_token = self.get_token(0, time.time())
+    # This access token will be used to validate each subsequent request.
+    access_token = self.generate_token(token_data={'v': client_protocol})
 
     # Log details of the handshake to the server log.
     logging_info = {
