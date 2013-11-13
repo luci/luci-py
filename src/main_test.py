@@ -235,6 +235,15 @@ class AppTest(unittest.TestCase):
                             {'r': runner.key.urlsafe()})
     self.assertEquals('200 OK', response.status)
 
+  def testUploadStartSlaveHandler(self):
+    response = self.app.post('/secure/upload_start_slave', expect_errors=True)
+    self.assertEquals('400 Bad Request', response.status)
+
+    response = self.app.post(
+        '/secure/upload_start_slave',
+        upload_files=[('script', 'script', 'script_body')])
+    self.assertEquals('200 OK', response.status)
+
   def testRegisterHandler(self):
     # Missing attributes field.
     response = self.app.post('/poll_for_test', {'something': 'nothing'})

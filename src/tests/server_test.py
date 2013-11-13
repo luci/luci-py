@@ -24,6 +24,7 @@ import urllib2
 import urlparse
 
 from common import swarm_constants
+from common import url_helper
 
 # Number of seconds to sleep between tries of polling for results.
 SLEEP_BETWEEN_RESULT_POLLS = 2
@@ -146,15 +147,16 @@ class _SwarmTestCase(unittest.TestCase):
     # Create the start_slave.py script.
     start_slave_script = os.path.join(self._temp_directory,
                                       'start_slave.py')
+    full_start_slave_script = START_SLAVE % {
+        'python': sys.executable,
+        'slave_script': os.path.join(self._temp_directory,
+                                     swarm_constants.SLAVE_MACHINE_SCRIPT),
+        'server_address': swarm_server_addr,
+        'server_port': swarm_server_port,
+        'slave_directory': self._temp_directory,
+        'config_file': _SwarmTestProgram.options.slave_config_file}
     with open(start_slave_script, 'w') as f:
-      f.write(START_SLAVE % {
-          'python': sys.executable,
-          'slave_script': os.path.join(self._temp_directory,
-                                       swarm_constants.SLAVE_MACHINE_SCRIPT),
-          'server_address': swarm_server_addr,
-          'server_port': swarm_server_port,
-          'slave_directory': self._temp_directory,
-          'config_file': _SwarmTestProgram.options.slave_config_file})
+      f.write(full_start_slave_script)
 
     # Wait for the Swarm server to be ready
     ready = False
@@ -171,11 +173,21 @@ class _SwarmTestCase(unittest.TestCase):
     # Whitelist the machine to be allowed to run tests.
     cj = cookielib.CookieJar()
     opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cj))
+    # Make this opener the default so we can use url_helper.UrlOpen and still
+    # have the cookies present.
+    urllib2.install_opener(opener)
+
     opener.open(self.GetAdminUrl())
 
     opener.open(urlparse.urljoin(self._swarm_server_url,
                                  'secure/change_whitelist'),
                 urllib.urlencode({'a': True}))
+
+    # Upload the start slave script to the server.
+    url_helper.UrlOpen(urlparse.urljoin(self._swarm_server_url,
+                                        'secure/upload_start_slave'),
+                       files=[('script', 'script', full_start_slave_script)],
+                       method='POSTFORM')
 
     # Start the slave machine script to start polling for tests.
     logging.info('Current dir: %s', os.getcwd())

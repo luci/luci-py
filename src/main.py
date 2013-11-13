@@ -886,6 +886,19 @@ class ShowMessageHandler(webapp2.RequestHandler):
       self.response.out.write('Cannot find message for: %s' % runner_key)
 
 
+class UploadStartSlaveHandler(webapp2.RequestHandler):
+  """Accept a new start slave script."""
+
+  def post(self):  # pylint: disable=g-bad-name
+    """Handles HTTP POST requests for this handler's URL."""
+
+    script = self.request.get('script', '')
+    if not script:
+      self.abort(400, 'No script uploaded')
+
+    test_management.StoreStartSlaveScript(script)
+
+
 class StatsHandler(webapp2.RequestHandler):
   """Show all the collected swarm stats."""
 
@@ -1410,6 +1423,8 @@ def CreateApplication():
                                   ('/secure/retry', RetryHandler),
                                   ('/secure/show_message',
                                    ShowMessageHandler),
+                                  ('/secure/upload_start_slave',
+                                   UploadStartSlaveHandler),
                                   ('/stats', StatsHandler),
                                   ('/task_queues/cleanup_data',
                                    CleanupDataHandler),

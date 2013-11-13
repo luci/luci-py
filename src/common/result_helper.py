@@ -18,9 +18,6 @@ from google.appengine.ext import ndb
 
 from common import swarm_constants
 
-# The maximum size a chunk may be, according to app engine.
-MAX_CHUNK_SIZE = 768 * 1024
-
 # The number of days to keep result chunks around before assuming they are
 # orphaned and can be safely deleted. This value should always be more than
 # SWARM_OLD_RESULTS_TIME_TO_LIVE_DAYS to ensure they are orphans.
@@ -78,8 +75,7 @@ class Results(ndb.Model):
     if not results:
       return
 
-    for key in results.chunk_keys:
-      key.delete_async()
+    ndb.delete_multi(results.chunk_keys)
 
   def _pre_put_hook(self):  # pylint: disable=g-bad-name
     """Stores the creation time for this model."""
@@ -106,11 +102,10 @@ def StoreResults(results_data):
   """
   chunk_futures = []
   if results_data:
-    # Store the results as just raw bytes because otherwise app engine won't
-    # accept unicode string.
     chunk_futures = [
-        ResultChunk(chunk=results_data[x:x+MAX_CHUNK_SIZE]).put_async()
-        for x in range(0, len(results_data), MAX_CHUNK_SIZE)
+        ResultChunk(
+            chunk=results_data[x:x+swarm_constants.MAX_CHUNK_SIZE]).put_async()
+        for x in range(0, len(results_data), swarm_constants.MAX_CHUNK_SIZE)
     ]
 
   new_results = Results(

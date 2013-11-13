@@ -39,6 +39,9 @@ ZIPPED_SLAVE_FILES = 'slave_files.zip'
 # which a slave should stop querying for work.
 CHECK_REQUIREMENTS_FILE = 'check_requirements.py'
 
+START_SLAVE_SCRIPT_PATH = os.path.join(os.path.dirname(__file__),
+                                       'start_slave.py')
+
 # The code to unzip the slave code and start the slave back up. This needs to be
 # a separate script so that the update process can overwrite it and then run
 # it without the rest of the slave running, otherwise the slave files will be
@@ -55,8 +58,11 @@ try:
 finally:
   f.close()
 
-os.execl(sys.executable, sys.executable, 'start_slave.py')
-""" % {'zipped_slave_files': ZIPPED_SLAVE_FILES}
+os.execl(sys.executable, sys.executable, '%(start_slave)s')
+""" % {
+    'start_slave': START_SLAVE_SCRIPT_PATH,
+    'zipped_slave_files': ZIPPED_SLAVE_FILES
+}
 
 
 def Restart():
@@ -225,9 +231,15 @@ class SlaveMachine(object):
     # Also store as lower case, since it is already case-insensitive.
     self._attributes['id'] = socket.getfqdn().lower()
     self._attributes['try_count'] = 0
-    self._attributes['version'] = version.GenerateSwarmSlaveVersion(__file__)
     self._come_back = 0
     self._max_url_tries = max_url_tries
+
+    with open(START_SLAVE_SCRIPT_PATH, 'r') as script:
+      start_slave_contents = script.read()
+
+    self._attributes['version'] = version.GenerateSwarmSlaveVersion(
+        __file__,
+        start_slave_contents)
 
   def Start(self, iterations=-1):
     """Starts the slave, which polls the Swarm server for jobs until it dies.

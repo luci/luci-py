@@ -25,11 +25,13 @@ from third_party.mox import mox
 # The slave script being tested.
 SLAVE_SCRIPT_FILE = os.path.join(os.path.dirname(__file__), 'slave_machine.py')
 
+# The start slave script.
+START_SLAVE_FILE = os.path.join(os.path.dirname(__file__), 'start_slave.py')
+
 MACHINE_ID_1 = '12345678-12345678-12345678-12345678'
 MACHINE_ID_2 = '87654321-87654321-87654321-87654321'
 VALID_ATTRIBUTES = {
-    'dimensions': {'os': ['Linux']},
-    'version': version.GenerateSwarmSlaveVersion(SLAVE_SCRIPT_FILE),
+    'dimensions': {'os': ['Linux']}
 }
 
 
@@ -42,6 +44,13 @@ class TestSlaveMachine(unittest.TestCase):
     self._mox.StubOutWithMock(time, 'sleep')
     self._mox.StubOutWithMock(logging, 'error')
     self._mox.StubOutWithMock(logging, 'exception')
+
+    with open(START_SLAVE_FILE, 'r') as f:
+      start_slave_contents = f.read()
+
+    VALID_ATTRIBUTES['version'] = version.GenerateSwarmSlaveVersion(
+        SLAVE_SCRIPT_FILE,
+        start_slave_contents)
 
   def tearDown(self):
     self._mox.UnsetStubs()

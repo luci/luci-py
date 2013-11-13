@@ -802,6 +802,16 @@ class TestManagementTest(unittest.TestCase):
         self._SERVER_URL)
     self.assertEqual(2, machine_stats.MachineStats.query().count())
 
+  def testStoreStartSlaveScriptClearCache(self):
+    # When a new start slave script is uploaded, we should recalculate the
+    # version hash since it will have changed.
+    old_version = test_management.SlaveVersion()
+
+    test_management.StoreStartSlaveScript('dummy_script')
+
+    self.assertNotEqual(old_version,
+                        test_management.SlaveVersion())
+
   def testGetUpdateWhenPollingForWork(self):
     # Drop the last character of the version string to ensure a version
     # mismatch.

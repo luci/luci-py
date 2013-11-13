@@ -16,7 +16,7 @@ import os
 from common import swarm_constants
 
 
-def GenerateSwarmSlaveVersion(slave_machine_script):
+def GenerateSwarmSlaveVersion(slave_machine_script, start_slave_contents):
   """Returns the SHA1 hash of the swarm slave code, representing the version.
 
   When run on a slave, this is the currently running version. When run on
@@ -24,12 +24,16 @@ def GenerateSwarmSlaveVersion(slave_machine_script):
 
   Args:
     slave_machine_script: The location of slave_machine.py, since its
-        location may vary depending on if this is run on the server of a slave.
+        location may vary depending if this is run on the server or a slave.
+    start_slave_contents: The contents of the start_slave_script. On the server
+        it is stored in the database, but it is on disk on the slaves.
 
   Returns:
     The SHA1 hash of the slave code.
   """
   version_hash = hashlib.sha1()
+
+  version_hash.update(start_slave_contents)
 
   try:
     with open(slave_machine_script, 'rb') as main_file:

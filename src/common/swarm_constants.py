@@ -19,6 +19,14 @@ RESTART_EXIT_CODE = 99
 # The key and file name to use when uploading results from the slaves.
 RESULT_STRING_KEY = 'result_output'
 
+# The key to use to access the start slave script file model.
+START_SLAVE_SCRIPT_KEY = 'start_slave_script'
+
+# The maximum size a chunk should be when creating chunk models. Although App
+# Engine allows bigger, this gives some wiggle room in case something needs to
+# be added to a chunk model.
+MAX_CHUNK_SIZE = 768 * 1024
+
 # Name of python script containing constants.
 SWARM_CONSTANTS_SCRIPT = 'swarm_constants.py'
 

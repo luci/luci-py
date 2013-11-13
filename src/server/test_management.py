@@ -22,6 +22,7 @@ from google.appengine.api import memcache
 from google.appengine.ext import ndb
 
 from common import dimensions_utils
+from common import file_chunks
 from common import swarm_constants
 from common import test_request_message
 from common import version
@@ -629,6 +630,18 @@ def DeleteOldErrors():
   return futures
 
 
+def StoreStartSlaveScript(script):
+  """Stores the given script as the new start slave script for all slave.
+
+  Args:
+    script: The contents of the new start slave script.
+  """
+  file_chunks.StoreFile(swarm_constants.START_SLAVE_SCRIPT_KEY, script)
+
+  # Clear the cached version value since it has now changed.
+  memcache.delete('slave_version', namespace=os.environ['CURRENT_VERSION_ID'])
+
+
 def SlaveVersion():
   """Retrieves the slave version loaded on this server.
 
@@ -638,7 +651,6 @@ def SlaveVersion():
   Returns:
     The hash of the current slave version.
   """
-
   slave_version = memcache.get('slave_version',
                                namespace=os.environ['CURRENT_VERSION_ID'])
   if slave_version:
@@ -648,7 +660,13 @@ def SlaveVersion():
                                       swarm_constants.TEST_RUNNER_DIR,
                                       swarm_constants.SLAVE_MACHINE_SCRIPT)
 
-  slave_version = version.GenerateSwarmSlaveVersion(slave_machine_script)
+  # Retrieve the start slave script, treating it as an empty file if it
+  # wasn't found.
+  start_slave_contents = file_chunks.RetrieveFile(
+      swarm_constants.START_SLAVE_SCRIPT_KEY) or ''
+
+  slave_version = version.GenerateSwarmSlaveVersion(slave_machine_script,
+                                                    start_slave_contents)
   memcache.set('slave_version', slave_version,
                namespace=os.environ['CURRENT_VERSION_ID'])
 
@@ -667,6 +685,12 @@ def SlaveCodeZipped():
                                 swarm_constants.TEST_RUNNER_DIR,
                                 swarm_constants.SLAVE_MACHINE_SCRIPT)
     zip_file.write(slave_script, swarm_constants.SLAVE_MACHINE_SCRIPT)
+
+    # Get the start slave script from the database and zip it, if present.
+    # Pass an empty file if the files isn't present.
+    start_slave_script = file_chunks.RetrieveFile(
+        swarm_constants.START_SLAVE_SCRIPT_KEY) or ''
+    zip_file.writestr('start_slave.py', start_slave_script)
 
     local_test_runner = os.path.join(swarm_constants.SWARM_ROOT_DIR,
                                      swarm_constants.TEST_RUNNER_DIR,
