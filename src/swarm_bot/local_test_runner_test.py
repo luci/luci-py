@@ -567,14 +567,25 @@ class TestLocalTestRunner(unittest.TestCase):
       self.assertEqual(self.test_run_name, data['n'])
       self.assertEqual(self.config_name, data['c'])
       self.assertEqual('pending', data['s'])
+      return True
 
-      self.streamed_output += data[swarm_constants.RESULT_STRING_KEY]
+    def ValidateUrlFiles(files):
+      self.assertEqual(1, len(files))
+      self.assertEqual(3, len(files[0]))
+
+      self.assertEqual(swarm_constants.RESULT_STRING_KEY, files[0][0])
+      self.assertEqual(swarm_constants.RESULT_STRING_KEY, files[0][1])
+
+      self.streamed_output += files[0][2]
       return True
 
     self._mox.StubOutWithMock(local_test_runner.url_helper, 'UrlOpen')
     local_test_runner.url_helper.UrlOpen(self.output_destination['url'],
                                          data=mox.Func(ValidateUrlData),
-                                         max_tries=1).AndReturn('Accepted')
+                                         files=mox.Func(ValidateUrlFiles),
+                                         max_tries=1,
+                                         method='POSTFORM').AndReturn(
+                                             'Accepted')
 
     self._mox.ReplayAll()
 
@@ -591,18 +602,24 @@ class TestLocalTestRunner(unittest.TestCase):
     self.result_url = None
     self.CreateValidFile()
     self._mox.StubOutWithMock(local_test_runner.url_helper, 'UrlOpen')
-    data = {'n': self.test_run_name, 'c': self.config_name, 's': 'success',
-            swarm_constants.RESULT_STRING_KEY: ''}
+    data = {'n': self.test_run_name, 'c': self.config_name, 's': 'success'}
+    files = [(swarm_constants.RESULT_STRING_KEY,
+              swarm_constants.RESULT_STRING_KEY,
+              '')]
     max_url_retries = 1
     local_test_runner.url_helper.UrlOpen(
         self.output_destination['url'],
         data=data.copy(),
-        max_tries=max_url_retries).AndReturn('')
+        files=files[:],
+        max_tries=max_url_retries,
+        method='POSTFORM').AndReturn('')
     data['s'] = 'failure'
     local_test_runner.url_helper.UrlOpen(
         ('%s?1=2' % self.output_destination['url']),
         data=data.copy(),
-        max_tries=max_url_retries).AndReturn('')
+        files=files[:],
+        max_tries=max_url_retries,
+        method='POSTFORM').AndReturn('')
     self._mox.ReplayAll()
 
     self.runner = local_test_runner.LocalTestRunner(

@@ -94,11 +94,14 @@ class TestSlaveMachine(unittest.TestCase):
         'Error [code: %d]: %s', result_code, result_string)
 
     data = {'x': str(result_code),
-            's': False,
-            swarm_constants.RESULT_STRING_KEY: result_string}
+            's': False}
+    files = [(swarm_constants.RESULT_STRING_KEY,
+              swarm_constants.RESULT_STRING_KEY,
+              result_string)]
 
-    url_helper.UrlOpen(result_url, data, max_tries=mox.IgnoreArg()
-                      ).AndReturn(None if bad_url else 'Success')
+    url_helper.UrlOpen(result_url, data=data, files=files,
+                       max_tries=mox.IgnoreArg(), method='POSTFORM').AndReturn(
+                           None if bad_url else 'Success')
 
   # Setup mox expectations for slave behavior under errors: a
   # url_helper.UrlOpen to request a job, and 2 calls to logging.error with

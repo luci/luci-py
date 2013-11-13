@@ -426,11 +426,13 @@ class SlaveMachine(object):
       logging.error('No URL to send results to!')
       return
 
-    url_helper.UrlOpen(self._result_url,
-                       {'x': str(result_code),
-                        's': False,
-                        swarm_constants.RESULT_STRING_KEY: result_string},
-                       max_tries=self._max_url_tries)
+    data = {'x': str(result_code), 's': False}
+    files = [(swarm_constants.RESULT_STRING_KEY,
+              swarm_constants.RESULT_STRING_KEY,
+              result_string)]
+    url_helper.UrlOpen(self._result_url, data=data, files=files,
+                       max_tries=self._max_url_tries,
+                       method='POSTFORM')
 
   def LogRPC(self, args):
     """Logs given args to logging.debug.

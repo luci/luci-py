@@ -337,8 +337,10 @@ class LocalTestRunner(object):
     """
     data = {'n': self.test_run.test_run_name,
             'c': self.test_run.configuration.config_name,
-            swarm_constants.RESULT_STRING_KEY: output,
             's': result}
+    files = [(swarm_constants.RESULT_STRING_KEY,
+              swarm_constants.RESULT_STRING_KEY,
+              output)]
     if (hasattr(self.test_run, 'instance_index') and
         self.test_run.instance_index is not None):
       assert hasattr(self.test_run, 'num_instances')
@@ -346,7 +348,8 @@ class LocalTestRunner(object):
       data['i'] = self.test_run.instance_index
       data['m'] = self.test_run.num_instances
 
-    url_helper.UrlOpen(upload_url, data=data, max_tries=self.max_url_retries)
+    url_helper.UrlOpen(upload_url, data=data, files=files,
+                       max_tries=self.max_url_retries, method='POSTFORM')
 
   def _RunCommand(self, command, hard_time_out, io_time_out, env=None):
     """Runs the given command.
