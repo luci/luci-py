@@ -355,6 +355,8 @@ def ExecuteRegisterRequest(attributes, server_url):
       attribs['id'], test_request_message.Stringize(attribs['dimensions']),
       attributes.get('tag', None))
 
+  # Since the following commands are part of a GQL query, we can't use
+  # explicit boolean comparison.
   # pylint: disable=g-explicit-bool-comparison
   unfinished_test_key = test_runner.TestRunner.query(
       test_runner.TestRunner.machine_id == attribs['id'],

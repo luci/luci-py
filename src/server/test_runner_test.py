@@ -27,10 +27,12 @@ from server import test_runner
 from stats import runner_stats
 from third_party.mox import mox
 
-MACHINE_IDS = ['12345678-12345678-12345678-12345678',
-               '23456789-23456789-23456789-23456789',
-               '34567890-34567890-34567890-34567890',
-               '87654321-87654321-87654321-87654321']
+MACHINE_IDS = [
+    '12345678-12345678-12345678-12345678',
+    '23456789-23456789-23456789-23456789',
+    '34567890-34567890-34567890-34567890',
+    '87654321-87654321-87654321-87654321',
+]
 
 
 class TestRunnerTest(unittest.TestCase):
@@ -63,8 +65,8 @@ class TestRunnerTest(unittest.TestCase):
         datastore_errors.InternalError,
         datastore_errors.Timeout,
         datastore_errors.TransactionFailedError,
-        test_runner.TxRunnerAlreadyAssignedError
-        ]
+        test_runner.TxRunnerAlreadyAssignedError,
+    ]
 
     runner = test_helper.CreatePendingRunner()
     for e in exceptions:
@@ -92,9 +94,8 @@ class TestRunnerTest(unittest.TestCase):
         1, test_runner.TestRunner.gql('WHERE started = :1', None).count())
 
     # Try to reassign runner and raise exception.
-    self.assertRaises(test_runner.TxRunnerAlreadyAssignedError,
-                      test_runner.AtomicAssignID,
-                      runners[0].key, MACHINE_IDS[1])
+    with self.assertRaises(test_runner.TxRunnerAlreadyAssignedError):
+      test_runner.AtomicAssignID(runners[0].key, MACHINE_IDS[1])
 
   # Test with an exception.
   def testAssignRunnerToMachineFull(self):
@@ -104,17 +105,18 @@ class TestRunnerTest(unittest.TestCase):
     self.assertTrue(test_runner.AssignRunnerToMachine(
         MACHINE_IDS[0], runner, test_runner.AtomicAssignID))
 
-    # Next assignment should fail.
+    # Next assignment should fail since the runner is already assigned.
     self.assertFalse(test_runner.AssignRunnerToMachine(
         MACHINE_IDS[0], runner, test_runner.AtomicAssignID))
 
     runner.started = None
     runner.put()
-    # This assignment should now work correctly.
+    # This assignment should now work correctly since the runner doesn't think
+    # it has has a machine (since it hasn't started yet).
     self.assertTrue(test_runner.AssignRunnerToMachine(
         MACHINE_IDS[0], runner, test_runner.AtomicAssignID))
 
-  # Test the case where the runner is deleted before the tx is done.
+  # Test the case where the runner is deleted before the transaction is done.
   def testAssignDeletedRunnerToMachine(self):
     runner = test_helper.CreatePendingRunner()
     runner.key.delete()
@@ -169,7 +171,7 @@ class TestRunnerTest(unittest.TestCase):
     self.assertFalse(test_runner.PingRunner(runner.key.urlsafe(),
                                             MACHINE_IDS[1]))
 
-    # Runner is done.
+    # Runner is done so it can't be pinged.
     runner.done = True
     runner.put()
     self.assertFalse(test_runner.PingRunner(runner.key.urlsafe(),
@@ -430,9 +432,11 @@ class TestRunnerTest(unittest.TestCase):
     self._mox.VerifyAll()
 
   def testHandleOverwriteTestResults(self):
-    messages = ['first-message',
-                'second-message',
-                'third-message']
+    messages = [
+        'first-message',
+        'second-message',
+        'third-message',
+    ]
 
     self._mox.StubOutWithMock(logging, 'error')
 
@@ -455,7 +459,7 @@ class TestRunnerTest(unittest.TestCase):
     self.assertTrue(runner.UpdateTestResult(
         runner.machine_id,
         results=result_helper.StoreResults(messages[0])))
-    # Always ensure that there is only one stored result.
+    # Ensure that there is only one stored result.
     self.assertEqual(1, result_helper.Results.query().count())
 
     # The first result resent, accepted since the strings are equal.
@@ -464,14 +468,14 @@ class TestRunnerTest(unittest.TestCase):
         results=result_helper.StoreResults(messages[0])))
     self.assertEqual(1, result_helper.Results.query().count())
 
-    # Non-first request without overwrite, rejected.
+    # Reject a different request without the overwrite flag.
     self.assertFalse(runner.UpdateTestResult(
         runner.machine_id,
         results=result_helper.StoreResults(messages[1]),
         overwrite=False))
     self.assertEqual(1, result_helper.Results.query().count())
 
-    # Non-first request with overwrite, accepted.
+    # Accept a different request with the overwrite flag.
     self.assertTrue(runner.UpdateTestResult(
         runner.machine_id,
         results=result_helper.StoreResults(messages[2]),
@@ -578,8 +582,8 @@ class TestRunnerTest(unittest.TestCase):
     self._mox.VerifyAll()
 
   def testDeleteOldBlobs(self):
-    # The first check should reveal a close time, when the second time shows
-    # the blob as old.
+    # The first check should show the blob as still young, while the second
+    # time will show the blob as old.
     self._mox.StubOutWithMock(test_runner, '_GetCurrentTime')
     test_runner._GetCurrentTime().AndReturn(
         datetime.datetime.utcnow() +
@@ -594,9 +598,10 @@ class TestRunnerTest(unittest.TestCase):
 
     # Add a blob and don't delete it when it is young.
     blobstore_helper.CreateBlobstore('orphaned blob')
-    # pylint: disable-msg=expression-not-assigned
-    [rpc.wait() for rpc in test_runner.DeleteOldBlobs()]
-    # pylint: enable-msg=expression-not-assigned
+
+    for rpc in test_runner.DeleteOldBlobs():
+      rpc.wait()
+
     self.assertEqual(1, blobstore.BlobInfo.all().count())
 
     # Now the blob is old so delete it.

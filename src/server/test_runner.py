@@ -56,6 +56,10 @@ def _GetCurrentTime():
   return datetime.datetime.utcnow()
 
 
+class TxRunnerAlreadyAssignedError(Exception):
+  """Simple exception class signaling a transaction fail."""
+
+
 class TestRunner(ndb.Model):
 
   # The test being run.
@@ -283,11 +287,11 @@ class TestRunner(ndb.Model):
 
     Args:
       machine_id: The machine id of the machine providing these results.
-      success: a boolean indicating whether the test run succeeded or not.
-      exit_codes: a string containing the array of exit codes of the test run.
-      results: a Results class containing the results.
-      errors: a string explaining why we failed to get the actual result string.
-      overwrite: a boolean indicating if we should always record this result,
+      success: A boolean indicating whether the test run succeeded or not.
+      exit_codes: A string containing the array of exit codes of the test run.
+      results: A Results class containing the results.
+      errors: A string explaining why we failed to get the actual result string.
+      overwrite: A boolean indicating if we should always record this result,
           even if a result had been previously recorded.
 
     Returns:
@@ -364,19 +368,14 @@ class TestRunner(ndb.Model):
     # requested via the test request.
     test_case = self.request.get().GetTestCase()
     if not self.ran_successfully and test_case.failure_email:
-      # TODO(user): provide better info for failure. E.g., if we don't have a
+      # TODO(user): Provide better info for failure. E.g., if we don't have a
       # web_request.body, we should have info like: Failed to upload files.
       self._EmailTestResults(test_case.failure_email)
 
-    # TODO(user): test result objects, and hence their test request objects,
-    # are currently not deleted from the data store.  This allows someone to
-    # go back to the TRS web UI and see the results of any test that has run.
-    # Eventually we will want to see how to delete old requests as the apps
-    # storage quota will be exceeded.
     update_successful = True
     if test_case.result_url:
       result_url_parts = urlparse.urlsplit(test_case.result_url)
-      if result_url_parts[0] == 'http' or result_url_parts[0] == 'https':
+      if result_url_parts.scheme in('http', 'https'):
         # Send the result to the requested destination.
         data = {'n': self.request.get().name,
                 'c': self.config_name,
@@ -389,14 +388,14 @@ class TestRunner(ndb.Model):
           logging.exception('Could not send results back to sender at %s',
                             test_case.result_url)
           update_successful = False
-      elif result_url_parts[0] == 'mailto':
+      elif result_url_parts.scheme == 'mailto':
         # Only send an email if we didn't send a failure email earlier to
         # prevent repeats.
         if self.ran_successfully or not test_case.failure_email:
-          self._EmailTestResults(result_url_parts[1])
+          self._EmailTestResults(result_url_parts.netloc)
       else:
-        logging.exception('Unknown url given as result url, %s',
-                          test_case.result_url)
+        logging.exception('Unsupported scheme "%s" in url "%s"',
+                          result_url_parts.scheme, test_case.result_url)
         update_successful = False
 
     runner_stats.RecordRunnerStats(self)
@@ -411,7 +410,7 @@ class TestRunner(ndb.Model):
     """Emails the test result.
 
     Args:
-      send_to: the email address to send the result to. This must be a valid
+      send_to: The email address to send the result to. This must be a valid
           email address.
     """
     if not mail.is_email_valid(send_to):
@@ -449,11 +448,14 @@ class TestRunner(ndb.Model):
 
 @ndb.transactional
 def AtomicAssignID(key, machine_id):
-  """Function to be run by db.run_in_transaction().
+  """Attempts to assign the given machine to the runner represented by the key.
+
+  This function always needs to run within a transaction to prevent two machines
+  from both thinking they are assigned to the same runner.
 
   Args:
-    key: key of the test runner object to assign the machine_id to.
-    machine_id: machine_id of the machine we're trying to assign.
+    key: The key of the test runner object to assign the machine_id to.
+    machine_id: The machine_id of the machine we're trying to assign.
 
   Raises:
     TxRunnerAlreadyAssignedError: If runner has already been assigned a machine.
@@ -470,7 +472,7 @@ def AtomicAssignID(key, machine_id):
 
 
 def AssignRunnerToMachine(machine_id, runner, atomic_assign):
-  """Will try to atomically assign runner.machine_id to machine_id.
+  """Try to atomically assign runner.machine_id to machine_id.
 
   This function is thread safe and can be called simultaneously on the same
   runner. It will ensure all but one concurrent requests will fail.
@@ -494,12 +496,12 @@ def AssignRunnerToMachine(machine_id, runner, atomic_assign):
   switch to that if this starts to break at large scales.
 
   Args:
-    machine_id: the machine_id of the machine.
-    runner: test runner object to assign the machine to.
-    atomic_assign: function pointer to be done atomically.
+    machine_id: The machine_id of the machine.
+    runner: The test runner object to assign the machine to.
+    atomic_assign: The function to perform the atomic assignment.
 
   Returns:
-    True is succeeded, False otherwise.
+    True if the runner is successfully assigned.
   """
   try:
     atomic_assign(runner.key, machine_id)
@@ -507,13 +509,12 @@ def AssignRunnerToMachine(machine_id, runner, atomic_assign):
   except (TxRunnerAlreadyAssignedError,
           datastore_errors.TransactionFailedError):
     # Failed to assign the runner because it is probably already assigned.
-    pass
+    return False
   except (datastore_errors.Timeout, datastore_errors.InternalError):
     # These exceptions do NOT ensure the operation is done. Based on the
     # Discussion above, we assume it hasn't been assigned.
     logging.exception('Un-determined fate for runner=%s', runner.name)
-
-  return False
+    return False
 
 
 def ShouldAutomaticallyRetryRunner(runner):
@@ -602,12 +603,12 @@ def PingRunner(key, machine_id):
 
 def GetTestRunners(sort_by='machine_id', ascending=True, limit=None,
                    offset=None, sort_by_first=None):
-  """Get the list of the test runners.
+  """Return a query for the given range of test runners.
 
   Args:
     sort_by: The string of the attribute to sort the test runners by.
     ascending: True if the runner should be sorted in ascending order.
-    limit: The machine number of test runners to return.
+    limit: The maximum number of test runners to return.
     offset: The offset from the complete set of sorted elements and the returned
         list.
     sort_by_first: An optional string to specify a field that we should sort by
@@ -615,7 +616,7 @@ def GetTestRunners(sort_by='machine_id', ascending=True, limit=None,
         filter.
 
   Returns:
-    An query of test runners in the given range.
+    A query of test runners in the given range.
   """
   query = TestRunner.query(default_options=ndb.QueryOptions(limit=limit,
                                                             offset=offset))
@@ -651,9 +652,12 @@ def ApplyFilters(query, status='', show_successfully_completed=True,
     machine_id: The machine id to filter for.
 
   Returns:
-    A query equivalent to the one given, with all the required filters applied.
+    A query equivalent to the one requested, with all the required filters
+    applied.
   """
   # If the status isn't one of these options, then apply no filter.
+  # Since the following commands are part of a GQL query, we can't use
+  # the pythonic "is None", "is not None" or the explicit boolean comparison.
   # pylint: disable=g-explicit-bool-comparison, g-equals-none
   if status == 'pending':
     query = query.filter(TestRunner.started == None,
@@ -679,7 +683,7 @@ def ApplyFilters(query, status='', show_successfully_completed=True,
 
 
 def GetHangingRunners():
-  """Gets all the currently hanging runners.
+  """Return all the currently hanging runners.
 
   Returns:
     A list of all the hanging runners.
@@ -691,11 +695,11 @@ def GetHangingRunners():
                                    'automatic_retry_count = :2 AND '
                                    'created < :3 AND done = :4', None, 0,
                                    cutoff_time, False)
-  return [hanging_runner for hanging_runner in hanging_runners]
+  return list(hanging_runners)
 
 
 def GetRunnerFromUrlSafeKey(url_safe_key):
-  """Returns the runner specified by the given key string.
+  """Return the runner specified by the given key string.
 
   Args:
     url_safe_key: The key string of the runner to return.
@@ -822,8 +826,3 @@ def DeleteOldBlobs():
   logging.debug('DeleteOrphanedBlobs done')
 
   return rpcs
-
-
-class TxRunnerAlreadyAssignedError(Exception):
-  """Simple exception class signaling a transaction fail."""
-  pass
