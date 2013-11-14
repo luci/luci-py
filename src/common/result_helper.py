@@ -1,13 +1,12 @@
-#!/usr/bin/python2.7
-#
-# Copyright 2013 Google Inc. All Rights Reserved.
+# Copyright 2013 The Swarming Authors. All rights reserved.
+# Use of this source code is governed by the Apache v2.0 license that can be
+# found in the LICENSE file.
 
 """Result Helper.
 
 A basic class to assist with storing test results in the datastore. This helper
 acts similiar to the normal blobstore, but the values all stay in the datastore.
 """
-
 
 
 import datetime

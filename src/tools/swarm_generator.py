@@ -1,6 +1,7 @@
-#!/usr/bin/python2.7
-#
-# Copyright 2011 Google Inc. All Rights Reserved.
+#!/usr/bin/env python
+# Copyright 2013 The Swarming Authors. All rights reserved.
+# Use of this source code is governed by the Apache v2.0 license that can be
+# found in the LICENSE file.
 
 """A base class for creating Swarm files.
 
@@ -43,7 +44,6 @@ if __name__ == '__main__':
   my_swarm = MySwarm()
   sys.exit(my_swarm.Main())
 """
-
 
 
 import datetime

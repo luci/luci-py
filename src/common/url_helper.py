@@ -1,11 +1,8 @@
-#!/usr/bin/python2.7
-#
-# Copyright 2012 Google Inc. All Rights Reserved.
+# Copyright 2013 The Swarming Authors. All rights reserved.
+# Use of this source code is governed by the Apache v2.0 license that can be
+# found in the LICENSE file.
 
 """A helper script for wrapping url calls."""
-
-
-
 
 
 import hashlib

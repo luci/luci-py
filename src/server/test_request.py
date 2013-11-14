@@ -1,4 +1,6 @@
-# Copyright 2013 Google Inc. All Rights Reserved.
+# Copyright 2013 The Swarming Authors. All rights reserved.
+# Use of this source code is governed by the Apache v2.0 license that can be
+# found in the LICENSE file.
 
 """Test Request.
 
@@ -11,7 +13,6 @@ syntax to a dictionary object.  See
 http://code.google.com/p/swarming/wiki/SwarmFileFormat for
 complete details.
 """
-
 
 
 import datetime

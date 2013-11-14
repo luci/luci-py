@@ -1,11 +1,12 @@
-# Copyright 2013 Google Inc. All Rights Reserved.
+# Copyright 2013 The Swarming Authors. All rights reserved.
+# Use of this source code is governed by the Apache v2.0 license that can be
+# found in the LICENSE file.
 
 """Test Runner.
 
 A test runner represents a given configuration of a given test request running
 on a given machine.
 """
-
 
 
 import datetime

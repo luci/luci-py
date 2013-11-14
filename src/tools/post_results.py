@@ -1,6 +1,7 @@
-#!/usr/bin/python2.7
-#
-# Copyright 2010 Google Inc. All Rights Reserved.
+#!/usr/bin/env python
+# Copyright 2013 The Swarming Authors. All rights reserved.
+# Use of this source code is governed by the Apache v2.0 license that can be
+# found in the LICENSE file.
 
 """Sends test results to the TRS.
 
@@ -48,4 +49,3 @@ def main():
 
 if __name__ == '__main__':
   sys.exit(main())
-

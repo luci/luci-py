@@ -1,6 +1,6 @@
-#!/usr/bin/python2.7
-#
-# Copyright 2010 Google Inc. All Rights Reserved.
+# Copyright 2013 The Swarming Authors. All rights reserved.
+# Use of this source code is governed by the Apache v2.0 license that can be
+# found in the LICENSE file.
 
 """A function to manage a Test Request Message to/from text.
 
@@ -25,9 +25,6 @@ Classes:
   TestCase: For the Test Case messages.
   TestRun: For the Test Run messages.
 """
-
-
-
 
 
 import json

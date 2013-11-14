@@ -1,12 +1,10 @@
-#!/usr/bin/python2.7
+#!/usr/bin/env python
 # coding=utf-8
-#
-# Copyright 2011 Google Inc. All Rights Reserved.
+# Copyright 2013 The Swarming Authors. All rights reserved.
+# Use of this source code is governed by the Apache v2.0 license that can be
+# found in the LICENSE file.
 
 """Unittest to exercise the code in local_test_runner.py."""
-
-
-
 
 
 import logging
