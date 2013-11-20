@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # Copyright 2013 The Swarming Authors. All rights reserved.
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
@@ -9,11 +10,19 @@ import logging
 import os
 import stat
 import StringIO
+import sys
 import tempfile
 import time
 import unittest
 import urllib
 import urllib2
+
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, ROOT_DIR)
+
+import test_env
+
+test_env.setup_test_env()
 
 
 from common import url_helper
@@ -253,7 +262,7 @@ class UrlHelperTest(unittest.TestCase):
                                mox.IgnoreArg())
       self._mox.ReplayAll()
 
-      self.assertFalse(url_helper.DownloadFile('fake_file.fake',
+      self.assertFalse(url_helper.DownloadFile(file_readonly.name,
                                                'http://www.fakeurl.com'))
 
       self._mox.VerifyAll()
@@ -289,4 +298,7 @@ class UrlHelperTest(unittest.TestCase):
 
 
 if __name__ == '__main__':
+  # We don't want the application logs to interfere with our own messages.
+  # You can comment it out for more information when debugging.
+  logging.disable(logging.FATAL)
   unittest.main()

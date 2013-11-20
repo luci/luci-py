@@ -10,13 +10,21 @@
 import logging
 import os
 import subprocess
+import sys
 import tempfile
 import unittest
 import zipfile
 
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, ROOT_DIR)
+
+import test_env
+
+test_env.setup_test_env()
 
 from common import swarm_constants
 from common import test_request_message
+
 from swarm_bot import local_test_runner
 from third_party.mox import mox
 
@@ -320,9 +328,9 @@ class TestLocalTestRunner(unittest.TestCase):
 
   def testDownloadExplodeAndCleanupData(self):
     self.PrepareDownloadCall(cleanup='data', data_folder_name='data')
-    self._mox.StubOutWithMock(self.runner, '_DeleteFileOrDirectory')
-    self.runner._DeleteFileOrDirectory(mox.IsA(str)).AndReturn(None)
-    self.runner._DeleteFileOrDirectory(mox.IsA(str)).AndReturn(None)
+    self._mox.StubOutWithMock(local_test_runner, '_DeleteFileOrDirectory')
+    local_test_runner._DeleteFileOrDirectory(mox.IsA(str)).AndReturn(None)
+    local_test_runner._DeleteFileOrDirectory(mox.IsA(str)).AndReturn(None)
 
     self._mox.ReplayAll()
     self.assertTrue(self.runner.DownloadAndExplodeData())
@@ -332,7 +340,7 @@ class TestLocalTestRunner(unittest.TestCase):
 
   def PrepareRunTestsCall(self, decorate_output=None, results=None,
                           encoding=None, test_names=None, test_run_env=None,
-                          config_env=None, test_env=None):
+                          config_env=None, slave_test_env=None):
     if not decorate_output:
       decorate_output = [False, False]
     if not results:
@@ -343,10 +351,10 @@ class TestLocalTestRunner(unittest.TestCase):
       test_names = [self.test_name1, self.test_name2]
     self.assertEqual(len(results), 2)
     test0_env = test1_env = None
-    if test_env:
-      assert len(test_env) == 2
-      test0_env = test_env[0]
-      test1_env = test_env[1]
+    if slave_test_env:
+      assert len(slave_test_env) == 2
+      test0_env = slave_test_env[0]
+      test1_env = slave_test_env[1]
     test_objects_data = [
         (test_names[0], self.action1, decorate_output[0], test0_env, 60, 0),
         (test_names[1], self.action2, decorate_output[1], test1_env, 60, 9)
@@ -401,7 +409,7 @@ class TestLocalTestRunner(unittest.TestCase):
     local_test_runner.sys.platform = platform
     self.PrepareRunTestsCall(decorate_output=[True, True],
                              config_env=config_env, test_run_env=test_run_env,
-                             test_env=[test0_env, test1_env])
+                             slave_test_env=[test0_env, test1_env])
 
     self._mox.ReplayAll()
     (success, result_codes, result_string) = self.runner.RunTests()
@@ -742,37 +750,43 @@ class TestLocalTestRunner(unittest.TestCase):
     result_file.close()
 
   def testPublishInternalErrors(self):
-    self.CreateValidFile()
-    self._mox.StubOutWithMock(local_test_runner.url_helper, 'UrlOpen')
-    exception_text = 'Bad MAD, no cookie!'
-    max_url_retries = 1
+    try:
+      # This test requires logging to be enabled.
+      logging.disable(logging.NOTSET)
 
-    # We use this function to check if exception_text is properly published and
-    # that the overwrite value is True.
-    def ValidateInternalErrorsResult(url_files):
-      if len(url_files) != 1:
-        return False
+      self.CreateValidFile()
+      self._mox.StubOutWithMock(local_test_runner.url_helper, 'UrlOpen')
+      exception_text = 'Bad MAD, no cookie!'
+      max_url_retries = 1
 
-      if (url_files[0][0] != swarm_constants.RESULT_STRING_KEY or
-          url_files[0][1] != swarm_constants.RESULT_STRING_KEY):
-        return False
+      # We use this function to check if exception_text is properly published
+      # and that the overwrite value is True.
+      def ValidateInternalErrorsResult(url_files):
+        if len(url_files) != 1:
+          return False
 
-      return exception_text in url_files[0][2]
+        if (url_files[0][0] != swarm_constants.RESULT_STRING_KEY or
+            url_files[0][1] != swarm_constants.RESULT_STRING_KEY):
+          return False
 
-    local_test_runner.url_helper.UrlOpen(
-        self.result_url,
-        data=mox.ContainsKeyValue('o', True),
-        files=mox.Func(ValidateInternalErrorsResult),
-        max_tries=max_url_retries,
-        method='POSTFORM').AndReturn('')
-    self._mox.ReplayAll()
+        return exception_text in url_files[0][2]
 
-    self.runner = local_test_runner.LocalTestRunner(
-        self.data_file_name, max_url_retries=max_url_retries)
-    self.runner.TestLogException(exception_text)
-    self.runner.PublishInternalErrors()
+      local_test_runner.url_helper.UrlOpen(
+          self.result_url,
+          data=mox.ContainsKeyValue('o', True),
+          files=mox.Func(ValidateInternalErrorsResult),
+          max_tries=max_url_retries,
+          method='POSTFORM').AndReturn('')
+      self._mox.ReplayAll()
 
-    self._mox.VerifyAll()
+      self.runner = local_test_runner.LocalTestRunner(
+          self.data_file_name, max_url_retries=max_url_retries)
+      self.runner.TestLogException(exception_text)
+      self.runner.PublishInternalErrors()
+
+      self._mox.VerifyAll()
+    finally:
+      logging.disable(_logging_level)
 
   def testShutdownOrReturn(self):
     self.CreateValidFile()
@@ -797,8 +811,12 @@ class TestLocalTestRunner(unittest.TestCase):
                      runner.ReturnExitCode(return_value))
 
 
+# We don't want the application logs to interfere with our own messages.
+# You can comment it out or change for more information when debugging.
+# This is a global variable because some tests need to know what this
+# value is.
+_logging_level = logging.FATAL
+
 if __name__ == '__main__':
-  # We don't want the application logs to interfere with our own messages.
-  # You can comment it out or change for more information when debugging.
-  logging.getLogger().setLevel(logging.CRITICAL)
+  logging.disable(_logging_level)
   unittest.main()

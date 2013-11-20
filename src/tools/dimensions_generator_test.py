@@ -13,9 +13,14 @@ import sys
 import tempfile
 import unittest
 
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, ROOT_DIR)
 
-import mox  # pylint: disable=g-import-not-at-top
+import test_env
 
+test_env.setup_test_env()
+
+from third_party.mox import mox
 from tools import dimensions_generator
 
 
@@ -96,4 +101,7 @@ class DimensionsGeneratorTest(unittest.TestCase):
 
 
 if __name__ == '__main__':
+  # We don't want the application logs to interfere with our own messages.
+  # You can comment it out for more information when debugging.
+  logging.disable(logging.FATAL)
   unittest.main()

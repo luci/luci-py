@@ -115,7 +115,7 @@ class TestRequest(ndb.Model):
 
     super(TestRequest, self).__init__(*args, **kwargs)
 
-  def _pre_put_hook(self):  # pylint: disable=g-bad-name
+  def _pre_put_hook(self):
     """Stores the creation time for this model."""
     if not self.requested_time:
       self.requested_time = datetime.datetime.utcnow()

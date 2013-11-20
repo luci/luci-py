@@ -92,7 +92,7 @@ class SwarmError(ndb.Model):
   # made with .now() or .utcnow()).
   created = ndb.DateTimeProperty()
 
-  def _pre_put_hook(self):  # pylint: disable=g-bad-name
+  def _pre_put_hook(self):
     """Stores the creation time for this model."""
     if not self.created:
       self.created = datetime.datetime.utcnow()
@@ -357,11 +357,9 @@ def ExecuteRegisterRequest(attributes, server_url):
 
   # Since the following commands are part of a GQL query, we can't use
   # explicit boolean comparison.
-  # pylint: disable=g-explicit-bool-comparison
   unfinished_test_key = test_runner.TestRunner.query(
       test_runner.TestRunner.machine_id == attribs['id'],
       test_runner.TestRunner.done == False).get(keys_only=True)
-  # pylint: enable=g-explicit-bool-comparison
   if unfinished_test_key:
     logging.warning('A machine is asking for a new test, but there still '
                     'seems to be an unfinished test with key, %s, running on '

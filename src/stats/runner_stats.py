@@ -125,7 +125,7 @@ def DeleteOldRunnerStats():
   # '!= None' must be used instead of 'is not None' because these arguments
   # become part of a GQL query, where 'is not None' is invalid syntax.
   old_runner_stats_query = RunnerStats.query(
-      RunnerStats.end_time != None,  # pylint: disable-msg=g-equals-none
+      RunnerStats.end_time != None,
       RunnerStats.end_time < old_cutoff,
       default_options=ndb.QueryOptions(keys_only=True))
 

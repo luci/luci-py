@@ -22,13 +22,24 @@ import urllib
 import urllib2
 import urlparse
 
+# Add swarm folder to system path.
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, ROOT_DIR)
+
 from common import swarm_constants
 from common import url_helper
 
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, ROOT_DIR)
+
+import test_env
+
+test_env.setup_test_env()
+
+import find_gae_sdk
+
 # Number of seconds to sleep between tries of polling for results.
 SLEEP_BETWEEN_RESULT_POLLS = 2
-
-ROOT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
 
 # The script to start the slave with. The python script is passed in because
 # during tests, sys.executable was sometimes failing to find python.
@@ -115,7 +126,9 @@ class _SwarmTestCase(unittest.TestCase):
     # to ensure we are properly handling datastore inconsistency. This should be
     # possible once this project lives fully in the open source world.
     _SwarmTestProgram.options.appengine_cmds.extend(
-        ['-c', '-p %s' % swarm_server_port, '--skip_sdk_update_check',
+        ['--clear_datastore', 'True',
+         '--port', str(swarm_server_port),
+         '--skip_sdk_update_check', 'False',
          _SwarmTestProgram.options.swarm_path])
 
     self._swarm_server_process = _ProcessWrapper(
@@ -404,9 +417,11 @@ class _SwarmTestProgram(unittest.TestProgram):
                       'ERROR level.')
 
     (_SwarmTestProgram.options, other_args) = parser.parse_args(args=argv[1:])
+
+    # If no app engine was specified, try to find and use the dev server.
     if not _SwarmTestProgram.options.appengine_cmds:
-      parser.error('You must specify the AppEngine command(s) to start the '
-                   'AppEngine launcher.')
+      dev_server = find_gae_sdk.find_gae_dev_server()
+      _SwarmTestProgram.options.appengine_cmds = [dev_server]
 
     if _SwarmTestProgram.options.verbose:
       logging.getLogger().setLevel(logging.INFO)
@@ -427,6 +442,7 @@ class _SwarmTestProgram(unittest.TestProgram):
 
 
 if __name__ == '__main__':
+  logging.disable(logging.CRITICAL)
   if 'TEST_SRCDIR' not in os.environ:
     os.environ['TEST_SRCDIR'] = ''
   _SwarmTestProgram()

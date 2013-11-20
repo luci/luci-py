@@ -90,7 +90,6 @@ import zipfile
 # so we need to adjust its sys.path so it can find the common swarm directory.
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-# pylint: disable=g-import-not-at-top
 from common import swarm_constants
 from common import test_request_message
 from common import url_helper
@@ -139,6 +138,32 @@ def _TimedOut(time_out, time_out_start):
                     'vs %s). Potential error in setting the time out start '
                     'values', current_time, time_out_start)
   return time_out != 0 and time_out_start + time_out < current_time
+
+
+def _DeleteFileOrDirectory(name):
+  """Deletes a file/directory, trying several times in case we need to wait.
+
+  Args:
+    name: The name of the file or directory to delete.
+
+  Returns:
+    True if the file or directory is successfully deleted.
+  """
+  for _ in range(5):
+    try:
+      if os.path.exists(name):
+        if os.path.isdir(name):
+          shutil.rmtree(name)
+        else:
+          os.remove(name)
+      break
+    except (OSError, exceptions.WindowsError) as e:
+      logging.exception('Exception deleting "%s": %s', name, e)
+      time.sleep(1)
+  if os.path.exists(name):
+    logging.error('File not deleted: %s', name)
+    return False
+  return True
 
 
 class Error(Exception):
@@ -234,37 +259,14 @@ class LocalTestRunner(object):
   def __del__(self):
     if self.log_file_name:
       self.logging_file_handler.close()  # In case it hasn't been closed yet.
-      if not self._DeleteFileOrDirectory(self.log_file_name):
+      if not _DeleteFileOrDirectory(self.log_file_name):
         logging.error('Could not delete file "%s"', self.log_file_name)
 
     if self.test_run.cleanup == 'data':  # Implies cleanup zip.
-      if not self._DeleteFileOrDirectory(self.data_dir):
+      if not _DeleteFileOrDirectory(self.data_dir):
         logging.error('Could not delete data directory "%s"', self.data_dir)
 
-  def _DeleteFileOrDirectory(self, name):
-    """Deletes a file/directory, trying several times in case we need to wait.
 
-    Args:
-      name: The name of the file or directory to delete.
-
-    Returns:
-      True if the file or directory is successfully deleted.
-    """
-    for _ in range(5):
-      try:
-        if os.path.exists(name):
-          if os.path.isdir(name):
-            shutil.rmtree(name)
-          else:
-            os.remove(name)
-        break
-      except (OSError, exceptions.WindowsError) as e:
-        logging.exception('Exception deleting "%s": %s', name, e)
-        time.sleep(1)
-    if os.path.exists(name):
-      logging.error('File not deleted: ' + name)
-      return False
-    return True
 
   def _ExpandEnv(self, argument, env):
     """Expands any environment variables that may exist in argument.
@@ -840,13 +842,13 @@ def main():
   try:
     if runner.RetrieveDataAndRunTests():
       return runner.ReturnExitCode(0)
-  except Exception as e:  # pylint: disable=broad-except
+  except Exception as e:
     # We want to catch all so that we can report all errors, even internal ones.
     logging.exception(e)
 
   try:
     runner.PublishInternalErrors()
-  except Exception as e:  # pylint: disable=broad-except
+  except Exception as e:
     logging.exception('Unable to publish internal errors')
   return runner.ReturnExitCode(1)
 

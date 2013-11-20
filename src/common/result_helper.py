@@ -44,7 +44,7 @@ class ResultChunk(ndb.Model):
   # made with .now() or .utcnow()).
   created = ndb.DateProperty()
 
-  def _pre_put_hook(self):  # pylint: disable=g-bad-name
+  def _pre_put_hook(self):
     """Stores the creation time for this model."""
     if not self.created:
       self.created = datetime.datetime.utcnow().date()
@@ -64,7 +64,7 @@ class Results(ndb.Model):
   created = ndb.DateProperty()
 
   @classmethod
-  def _pre_delete_hook(cls, key):  # pylint: disable=g-bad-name
+  def _pre_delete_hook(cls, key):
     """Deletes the associated chunk before deleting the results.
 
     Args:
@@ -76,7 +76,7 @@ class Results(ndb.Model):
 
     ndb.delete_multi(results.chunk_keys)
 
-  def _pre_put_hook(self):  # pylint: disable=g-bad-name
+  def _pre_put_hook(self):
     """Stores the creation time for this model."""
     if not self.created:
       self.created = datetime.datetime.utcnow().date()

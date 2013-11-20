@@ -8,8 +8,16 @@
 
 import datetime
 import logging
+import os
+import sys
 import unittest
 
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, ROOT_DIR)
+
+import test_env
+
+test_env.setup_test_env()
 
 from google.appengine.api import datastore_errors
 from google.appengine.ext import blobstore
@@ -70,7 +78,7 @@ class TestRunnerTest(unittest.TestCase):
 
     runner = test_helper.CreatePendingRunner()
     for e in exceptions:
-      def _Raise(key, machine_id):  # pylint: disable=unused-argument
+      def _Raise(_key, _machine_id):
         raise e
       self.assertFalse(test_runner.AssignRunnerToMachine(
           MACHINE_IDS[0], runner, _Raise))
@@ -605,9 +613,8 @@ class TestRunnerTest(unittest.TestCase):
     self.assertEqual(1, blobstore.BlobInfo.all().count())
 
     # Now the blob is old so delete it.
-    # pylint: disable-msg=expression-not-assigned
-    [rpc.wait() for rpc in test_runner.DeleteOldBlobs()]
-    # pylint: enable-msg=expression-not-assigned
+    for rpc in test_runner.DeleteOldBlobs():
+      rpc.wait()
     self.assertEqual(0, blobstore.BlobInfo.all().count())
 
     self._mox.VerifyAll()

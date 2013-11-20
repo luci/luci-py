@@ -19,6 +19,12 @@ import tempfile
 import unittest
 import zipfile
 
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, ROOT_DIR)
+
+import test_env
+
+test_env.setup_test_env()
 
 from google.appengine.api import mail
 from google.appengine.ext import testbed
@@ -161,7 +167,7 @@ class TestManagementTest(unittest.TestCase):
   # unable to use the hashing method to find a match, so ensure we fall back
   # on the old direct comparision method.
   def testRequestGoodMachineWithLargeConfig(self):
-    large_os_config = map(str, range(  # pylint: disable=g-long-lambda
+    large_os_config = map(str, range(
         dimensions_utils.MAX_DIMENSIONS_PER_MACHINE * 2))
 
     test_management.ExecuteTestRequest(test_helper.GetRequestMessage(
@@ -231,7 +237,7 @@ class TestManagementTest(unittest.TestCase):
           break
 
       self.assertEqual(found_manifest, True)
-      for unused_path, name, content in args:
+      for _unused_path, name, content in args:
         if name == test_management._TEST_RUN_SWARM_FILE_NAME:
           swarm_json = json.loads(content)
           self.assertEqual(str(i), swarm_json['env_vars']['index'])

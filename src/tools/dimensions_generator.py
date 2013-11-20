@@ -29,7 +29,7 @@ PLATFORM_MAPPING = {
 class DimensionsGenerator(object):
   """A base class for creating dimension files."""
 
-  def GetDimensions(self):
+  def GetDimensions(self):  # pylint: disable=R0201
     """Returns a dictionary of attributes representing this machine.
 
     Returns:

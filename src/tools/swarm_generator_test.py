@@ -9,9 +9,17 @@
 import logging
 import os
 import shutil
+import sys
 import tempfile
 import unittest
 import zipfile
+
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, ROOT_DIR)
+
+import test_env
+
+test_env.setup_test_env()
 
 from tools import dimensions
 from tools import swarm_generator
@@ -22,11 +30,13 @@ class SwarmGeneratorTest(unittest.TestCase):
 
   class DerivedSwarmGeneratorBase(swarm_generator.SwarmGenerator):
     def __init__(self):
-      super(SwarmGeneratorTest.DerivedSwarmGeneratorBase, self).__init__()
+      # These are needed in the base class constructor.
       self.default_test_name = 'default_test_name'
       self.default_result_url = 'default_result_url'
       self.default_data_base_url = 'default_data_base_url'
       self.default_data_base_unc_path = '.'
+
+      super(SwarmGeneratorTest.DerivedSwarmGeneratorBase, self).__init__()
       self.data_files_to_zip = []
       self.other_local_data_files = []
       self.other_data_file_urls = []
@@ -76,10 +86,10 @@ class SwarmGeneratorTest(unittest.TestCase):
           self.options = options
           self.args = args
 
-        def parse_args(self):  # pylint: disable=g-bad-name
+        def parse_args(self):
           return (self.options, self.args)
 
-        def format_help(self):  # pylint: disable=g-bad-name
+        def format_help(self):  # pylint:disable=R0201
           return ''
       self.parser = TestParser(self.options, None)
 
@@ -96,7 +106,7 @@ class SwarmGeneratorTest(unittest.TestCase):
         SwarmGeneratorTest.DerivedSwarmGeneratorBase())
     self.derived_swarm_generator = SwarmGeneratorTest.DerivedSwarmGenerator()
     self.valid_local_root = '.'
-    self.invalid_path_value = 'I can\'t exist:/\\'
+    self.invalid_path_value = '/I can\'t exist:/\\'
     self.invalid_target = 'not valid'
     self.invalid_config = 'Not a valid config'
     self.valid_test_array = [{'test_name': 'test_name1',
@@ -105,7 +115,14 @@ class SwarmGeneratorTest(unittest.TestCase):
                               'action': ['b1', 'b2']}]
     (temp_file_descriptor, self.temp_file_name) = tempfile.mkstemp()
     os.close(temp_file_descriptor)
-    self.files_to_remove = [self.temp_file_name]
+
+    default_swarm_request_file = (
+        self.derived_swarm_generator.GetDefaultTestName() + '.swarm')
+
+    self.files_to_remove = [self.temp_file_name,
+                            default_swarm_request_file]
+
+    self.trees_to_remove = []
 
   def tearDown(self):
     if hasattr(self, 'trees_to_remove'):
@@ -113,7 +130,8 @@ class SwarmGeneratorTest(unittest.TestCase):
         shutil.rmtree(tree_to_remove)
     if hasattr(self, 'files_to_remove'):
       for file_to_remove in self.files_to_remove:
-        os.remove(file_to_remove)
+        if os.path.exists(file_to_remove):
+          os.remove(file_to_remove)
 
   def testValidateOptions(self):
     self.derived_swarm_generator.options.local_root = self.invalid_path_value

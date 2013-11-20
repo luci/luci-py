@@ -34,7 +34,7 @@ class DimensionMapping(ndb.Model):
   # made with .now() or .utcnow()).
   last_seen = ndb.DateProperty()
 
-  def _pre_put_hook(self):  # pylint: disable=g-bad-name
+  def _pre_put_hook(self):
     """Stores the time this dimension was last seen."""
     self.last_seen = datetime.datetime.utcnow().date()
 

@@ -66,7 +66,7 @@ class MachineStats(ndb.Model):
   # The machine id, which is also the model's key.
   machine_id = ndb.ComputedProperty(lambda self: self.key.string_id())
 
-  def _pre_put_hook(self):  # pylint: disable=g-bad-name
+  def _pre_put_hook(self):
     """Stores the creation time for this model."""
     if not self.last_seen:
       self.last_seen = datetime.datetime.utcnow()
@@ -141,7 +141,7 @@ def DeleteMachineStats(key):
     if not key.get():
       logging.error('No MachineStats has key: %s', str(key))
       return False
-  except Exception:  # pylint: disable=broad-except
+  except Exception:
     # All exceptions must be caught because some exceptions can only be caught
     # this way. See this bug report for more details:
     # https://code.google.com/p/appengine-ndb-experiment/issues/detail?id=143

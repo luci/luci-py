@@ -51,17 +51,16 @@ import logging
 import optparse
 import os.path
 import shutil
+import sys
 import tempfile
 import urllib
 import zipfile
 
-# TODO(user): fix this
-# pylint: disable=g-import-not-at-top
-try:
-  import dimensions
-except ImportError:
-  from tools import dimensions
-# pylint: enable=g-import-not-at-top
+# Add swarm folder to system path.
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, ROOT_DIR)
+
+from tools import dimensions
 
 
 class SwarmGenerator(object):
@@ -74,75 +73,7 @@ http://goto/swarm.
 """
     self.all_config_names = dimensions.DIMENSIONS.keys()
 
-  def GetDefaultTestName(self):
-    """Allows derived classes to specify the default test name.
-
-    The default test name is used if none was specified as a command
-    line argument. It is used as the test_case_name (or test_run_name) field of
-    the test request as well as the name of the generated zip file and the
-    name of the output Swarm file.
-
-    Returns:
-      A string reprensenting the test name. Base class returns 'Test'.
-    """
-    return 'Test'
-
-  def GetDefaultResultUrl(self):
-    """Allows derived classes to specify the default result URL.
-
-    The default result URL is used if none was specified as a command
-    line argument. It is used as the result_url field of the test request.
-
-    Returns:
-      A base result URL that will be used to set the result_url field.
-      Base class returns 'http://mad-tests.appspot.com/result'.
-    """
-    return 'http://mad-tests.appspot.com/result'
-
-  def GetDataFilesToZip(self):
-    """Allows derived classes to specify other data files to be zipped.
-
-    The resulting zip file will be copied to the base UNC path.
-
-    Returns:
-      An array of local data files to be zipped.
-      Base class returns an empty array.
-    """
-    return []
-
-  def GetOtherLocalDataFiles(self):
-    """Allows derived classes to specify other local data files.
-
-    Local data files are copied to the data UNC path so that they can be
-    accessed via the data URL.
-
-    Returns:
-      An array of local data files. Base class returns an empty array.
-    """
-    return []
-
-  def GetOtherDataFileUrls(self):
-    """Allows derived classes to specify other data file URLs.
-
-    Other data file URLs are simply appended to the test request's data field.
-
-    Returns:
-      An array of data file URLs. Base class returns an empty array.
-    """
-    return []
-
-  def LogError(self, error_message):
-    """Logs an error message and prints the command line argument details.
-
-    Args:
-      error_message: The error message to display.
-    """
-    if hasattr(self, 'parser'):
-      print self.parser.format_help()
-    logging.error(error_message)
-
-  def CreateParser(self):
-    """Create the base option parser so that derived classes can modify it."""
+    # Create the base option parser so that derived classes can modify it.
     self.parser = optparse.OptionParser(usage='%prog [options]',
                                         description=self.description)
     self.parser.add_option('-v', '--verbose', action='store_true',
@@ -196,8 +127,77 @@ http://goto/swarm.
                            'False.',
                            default=False)
 
+    self.options = None
+
+  def GetDefaultTestName(self):  # pylint: disable=R0201
+    """Allows derived classes to specify the default test name.
+
+    The default test name is used if none was specified as a command
+    line argument. It is used as the test_case_name (or test_run_name) field of
+    the test request as well as the name of the generated zip file and the
+    name of the output Swarm file.
+
+    Returns:
+      A string reprensenting the test name. Base class returns 'Test'.
+    """
+    return 'Test'
+
+  def GetDefaultResultUrl(self):  # pylint: disable=R0201
+    """Allows derived classes to specify the default result URL.
+
+    The default result URL is used if none was specified as a command
+    line argument. It is used as the result_url field of the test request.
+
+    Returns:
+      A base result URL that will be used to set the result_url field.
+      Base class returns 'http://mad-tests.appspot.com/result'.
+    """
+    return 'http://mad-tests.appspot.com/result'
+
+  def GetDataFilesToZip(self):  # pylint: disable=R0201
+    """Allows derived classes to specify other data files to be zipped.
+
+    The resulting zip file will be copied to the base UNC path.
+
+    Returns:
+      An array of local data files to be zipped.
+      Base class returns an empty array.
+    """
+    return []
+
+  def GetOtherLocalDataFiles(self):  # pylint: disable=R0201
+    """Allows derived classes to specify other local data files.
+
+    Local data files are copied to the data UNC path so that they can be
+    accessed via the data URL.
+
+    Returns:
+      An array of local data files. Base class returns an empty array.
+    """
+    return []
+
+  def GetOtherDataFileUrls(self):  # pylint: disable=R0201
+    """Allows derived classes to specify other data file URLs.
+
+    Other data file URLs are simply appended to the test request's data field.
+
+    Returns:
+      An array of data file URLs. Base class returns an empty array.
+    """
+    return []
+
+  def LogError(self, error_message):
+    """Logs an error message and prints the command line argument details.
+
+    Args:
+      error_message: The error message to display.
+    """
+    if hasattr(self, 'parser'):
+      print self.parser.format_help()
+    logging.error(error_message)
+
   def ValidateOptions(self):
-    """Validate the values of self.options which are set in CreateParser.
+    """Validate the values of self.options which are set in __init__.
 
     Returns:
       True if all values are valid. False otherwise.
@@ -407,12 +407,11 @@ http://goto/swarm.
     logging.info('Saving swarm file: %s.', self.options.destination_path)
     if os.path.exists(self.options.destination_path):
       logging.warning('Will attempt to overwrite existing file.')
-    output_file = None
-    try:
-      output_file = open(self.options.destination_path, 'w')
-      output_file.write(str(test_request))
-    finally:
-      output_file.close()
+
+    with open(self.options.destination_path, 'w') as f:
+      f.write(str(test_request))
+
+    return 0
 
   def Main(self):
     """Main entry point doing all the work :-).
@@ -420,7 +419,6 @@ http://goto/swarm.
     Returns:
       0 for success, and non-0 for failures.
     """
-    self.CreateParser()
     (self.options, args) = self.parser.parse_args()
 
     if self.options.verbose:

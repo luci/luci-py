@@ -108,7 +108,7 @@ class TestRunner(ndb.Model):
   # The priority and date added together to allow queries to order the results
   # by this field to allow sorting by priority first, and then date.
   @ndb.ComputedProperty
-  def priority_and_created(self):  # pylint: disable=g-bad-name
+  def priority_and_created(self):
     # The first time a runner is stored, it computes this property before the
     # created value has been created, so we need to get a time to use.
     # datetime.datetime.utcnow() will give the runner a slightly earlier time,
@@ -169,7 +169,7 @@ class TestRunner(ndb.Model):
   dimensions = ndb.StringProperty(required=True)
 
   @classmethod
-  def _pre_delete_hook(cls, key):  # pylint: disable=g-bad-name
+  def _pre_delete_hook(cls, key):
     """Delete the associated blob and result model before deleting the runner.
 
     Args:
@@ -188,7 +188,7 @@ class TestRunner(ndb.Model):
     if runner.results_reference:
       runner.results_reference.delete()
 
-  def _pre_put_hook(self):  # pylint: disable=g-bad-name
+  def _pre_put_hook(self):
     """Ensure that all runner values are properly set."""
     if not self.dimensions:
       self.dimensions = test_request_message.Stringize(
@@ -439,7 +439,7 @@ class TestRunner(ndb.Model):
                      subject=subject,
                      body=message_body,
                      html='<pre>%s</pre>' % message_body)
-    except Exception as e:  # pylint: disable=broad-except
+    except Exception as e:
       # We catch all errors thrown because mail.send_mail can throw errors
       # that it doesn't list in its description, but that are caused by our
       # inputs (such as unauthorized sender).
@@ -659,7 +659,6 @@ def ApplyFilters(query, status='', show_successfully_completed=True,
   # If the status isn't one of these options, then apply no filter.
   # Since the following commands are part of a GQL query, we can't use
   # the pythonic "is None", "is not None" or the explicit boolean comparison.
-  # pylint: disable=g-explicit-bool-comparison, g-equals-none
   if status == 'pending':
     query = query.filter(TestRunner.started == None,
                          TestRunner.done == False)
@@ -672,7 +671,6 @@ def ApplyFilters(query, status='', show_successfully_completed=True,
   if not show_successfully_completed:
     query = query.filter(ndb.OR(TestRunner.done == False,
                                 TestRunner.ran_successfully == False))
-  # pylint: enable=g-explicit-bool-comparison, g-equals-none
 
   if test_name:
     query = query.filter(test_name == TestRunner.name)
@@ -714,7 +712,7 @@ def GetRunnerFromUrlSafeKey(url_safe_key):
     if key.kind() == 'TestRunner':
       return key.get()
     return None
-  except Exception:  # pylint: disable=broad-except
+  except Exception:
     # All exceptions must be caught because some exceptions can only be caught
     # this way. See this bug report for more details:
     # https://code.google.com/p/appengine-ndb-experiment/issues/detail?id=143
@@ -789,7 +787,7 @@ def DeleteOldRunners():
   # '!= None' must be used instead of 'is not None' because these arguments
   # become part of a GQL query, where 'is not None' is invalid syntax.
   old_runner_query = TestRunner.query(
-      TestRunner.ended != None,  # pylint: disable-msg=g-equals-none
+      TestRunner.ended != None,
       TestRunner.ended < old_cutoff,
       default_options=ndb.QueryOptions(keys_only=True))
 

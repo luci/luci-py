@@ -98,7 +98,7 @@ class WaitSummary(ndb.Model):
         DimensionWaitSummary.summary_parent == self.key)
 
   @classmethod
-  def _pre_delete_hook(cls, key):  # pylint: disable=g-bad-name
+  def _pre_delete_hook(cls, key):
     """Delete any children of this wait summary."""
     wait_summary = key.get()
     if not wait_summary:
@@ -229,7 +229,6 @@ def GetRunnerSummaryByDimension():
   def GetRunnerSummary(mapping):
     # Since the following commands are part of a GQL query, we can't use
     # the pythonic "is None", "is not None" or the explicit boolean comparison.
-    # pylint: disable=g-equals-none,g-explicit-bool-comparison
     pending_runners_future = test_runner.TestRunner.query(
         test_runner.TestRunner.dimensions == mapping.dimensions,
         test_runner.TestRunner.started == None,
@@ -239,7 +238,6 @@ def GetRunnerSummaryByDimension():
         test_runner.TestRunner.dimensions == mapping.dimensions,
         test_runner.TestRunner.started != None,
         test_runner.TestRunner.done == False).count_async()
-    # pylint: enable=g-equals-none,g-explicit-bool-comparison
 
     return (mapping.dimensions,
             (pending_runners_future.get_result(),

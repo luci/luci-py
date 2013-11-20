@@ -15,6 +15,13 @@ import sys
 import time
 import unittest
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+ROOT_DIR = os.path.dirname(BASE_DIR)
+sys.path.insert(0, ROOT_DIR)
+
+import test_env
+
+test_env.setup_test_env()
 
 from common import swarm_constants
 from common import url_helper
@@ -23,16 +30,84 @@ from swarm_bot import slave_machine
 from third_party.mox import mox
 
 # The slave script being tested.
-SLAVE_SCRIPT_FILE = os.path.join(os.path.dirname(__file__), 'slave_machine.py')
-
-# The start slave script.
-START_SLAVE_FILE = os.path.join(os.path.dirname(__file__), 'start_slave.py')
+SLAVE_SCRIPT_FILE = os.path.join(BASE_DIR, 'slave_machine.py')
 
 MACHINE_ID_1 = '12345678-12345678-12345678-12345678'
 MACHINE_ID_2 = '87654321-87654321-87654321-87654321'
 VALID_ATTRIBUTES = {
     'dimensions': {'os': ['Linux']}
 }
+
+
+def _CreateValidAttribs(try_count=0):
+  attributes = VALID_ATTRIBUTES.copy()
+  attributes['id'] = socket.getfqdn().lower()
+  attributes['try_count'] = try_count
+  return {'attributes': json.dumps(attributes)}
+
+
+def _CreateResponse(come_back=None, try_count=1, commands=None, result_url=None,
+                    extra_arg=None):
+  response = {}
+
+  if come_back is not None:
+    response['come_back'] = come_back
+  if try_count is not None:
+    response['try_count'] = try_count
+  if commands is not None:
+    response['commands'] = commands
+  if extra_arg is not None:
+    response['extra_arg'] = extra_arg
+  if result_url is not None:
+    response['result_url'] = result_url
+
+  return json.dumps(response)
+
+
+
+def _SetPollJobAndPostFailExpectations(response, result_url, result_string,
+                                       result_code=-1, bad_url=False):
+  """Setup mox expectations for slave behavior under errors.
+
+  A url_helper.UrlOpen to request a job, and one to tell the server something
+  went wrong with the response it received.
+  """
+  # Original register machine request.
+  url_helper.UrlOpen(
+      mox.IgnoreArg(), data=mox.IgnoreArg(), max_tries=mox.IgnoreArg()
+      ).AndReturn(response)
+
+  slave_machine.logging.error(
+      'Error [code: %d]: %s', result_code, result_string)
+
+  data = {'x': str(result_code),
+          's': False}
+  files = [(swarm_constants.RESULT_STRING_KEY,
+            swarm_constants.RESULT_STRING_KEY,
+            result_string)]
+
+  url_helper.UrlOpen(result_url, data=data, files=files,
+                     max_tries=mox.IgnoreArg(), method='POSTFORM').AndReturn(
+                         None if bad_url else 'Success')
+
+
+
+def _SetPollJobAndLogFailExpectations(response, result_string, url, data):
+  """Setup mox expectations for slave behavior under errors.
+
+  A url_helper.UrlOpen to request a job, and 2 calls to logging.error with
+  proper error message. This function is called instead of
+  _SetPollJobAndPostFailExpectations when the slave has no where to send its
+  error message.
+  """
+  # Original register machine request.
+  url_helper.UrlOpen(
+      url, data=data, max_tries=mox.IgnoreArg()
+      ).AndReturn(response)
+
+  # Logging due to lack of result url.
+  slave_machine.logging.error('Error [code: %d]: %s', -1, result_string)
+  slave_machine.logging.error('No URL to send results to!')
 
 
 class TestSlaveMachine(unittest.TestCase):
@@ -45,7 +120,7 @@ class TestSlaveMachine(unittest.TestCase):
     self._mox.StubOutWithMock(logging, 'error')
     self._mox.StubOutWithMock(logging, 'exception')
 
-    with open(START_SLAVE_FILE, 'r') as f:
+    with open(slave_machine.START_SLAVE_SCRIPT_PATH, 'r') as f:
       start_slave_contents = f.read()
 
     VALID_ATTRIBUTES['version'] = version.GenerateSwarmSlaveVersion(
@@ -55,70 +130,6 @@ class TestSlaveMachine(unittest.TestCase):
   def tearDown(self):
     self._mox.UnsetStubs()
     self._mox.ResetAll()
-
-  def _CreateValidAttribs(self, try_count=0):
-    attributes = VALID_ATTRIBUTES.copy()
-    attributes['id'] = socket.getfqdn().lower()
-    attributes['try_count'] = try_count
-    return {'attributes': json.dumps(attributes)}
-
-  def _CreateResponse(self, come_back=None, try_count=1, commands=None,
-                      result_url=None, extra_arg=None):
-    response = {}
-
-    if come_back is not None:
-      response['come_back'] = come_back
-    if try_count is not None:
-      response['try_count'] = try_count
-    if commands is not None:
-      response['commands'] = commands
-    if extra_arg is not None:
-      response['extra_arg'] = extra_arg
-    if result_url is not None:
-      response['result_url'] = result_url
-
-    return json.dumps(response)
-
-  # Setup mox expectations for slave behavior under errors: a
-  # url_helper.UrlOpen to request a job, and one to tell the server something
-  # went wrong with the response it received.
-  def _SetPollJobAndPostFailExpectations(self, response,
-                                         result_url, result_string,
-                                         result_code=-1, bad_url=False):
-    # Original register machine request.
-    url_helper.UrlOpen(
-        mox.IgnoreArg(), data=mox.IgnoreArg(), max_tries=mox.IgnoreArg()
-        ).AndReturn(response)
-
-    slave_machine.logging.error(
-        'Error [code: %d]: %s', result_code, result_string)
-
-    data = {'x': str(result_code),
-            's': False}
-    files = [(swarm_constants.RESULT_STRING_KEY,
-              swarm_constants.RESULT_STRING_KEY,
-              result_string)]
-
-    url_helper.UrlOpen(result_url, data=data, files=files,
-                       max_tries=mox.IgnoreArg(), method='POSTFORM').AndReturn(
-                           None if bad_url else 'Success')
-
-  # Setup mox expectations for slave behavior under errors: a
-  # url_helper.UrlOpen to request a job, and 2 calls to logging.error with
-  # proper error message. This function is called instead of
-  # _SetPollJobAndPostFailExpectations when the slave has no where to
-  # send its error message.
-  def _SetPollJobAndLogFailExpectations(self, response,
-                                        result_string,
-                                        url, data):
-    # Original register machine request.
-    url_helper.UrlOpen(
-        url, data=data, max_tries=mox.IgnoreArg()
-        ).AndReturn(response)
-
-    # Logging due to lack of result url.
-    slave_machine.logging.error('Error [code: %d]: %s', -1, result_string)
-    slave_machine.logging.error('No URL to send results to!')
 
   # Mock slave_machine._PostFailedExecuteResults.
   def _MockPostFailedExecuteResults(self, slave, result_string):
@@ -179,14 +190,14 @@ class TestSlaveMachine(unittest.TestCase):
     self._mox.VerifyAll()
 
   def testAttributesFormatBadString(self):
-    data = self._CreateValidAttribs()
+    data = _CreateValidAttribs()
 
     response = 'blah blah blah'
-    self._SetPollJobAndLogFailExpectations(response,
-                                           'Invalid response: blah blah blah',
-                                           url='https://localhost:443/'
-                                           'poll_for_test',
-                                           data=data)
+    _SetPollJobAndLogFailExpectations(response,
+                                      'Invalid response: blah blah blah',
+                                      url='https://localhost:443/'
+                                      'poll_for_test',
+                                      data=data)
 
     self._mox.ReplayAll()
 
@@ -197,14 +208,14 @@ class TestSlaveMachine(unittest.TestCase):
 
   # Test how values specified in the constructor are reflected in the request.
   def testConstructor(self):
-    data = self._CreateValidAttribs()
+    data = _CreateValidAttribs()
 
     response = 'blah blah blah'
-    self._SetPollJobAndLogFailExpectations(response,
-                                           'Invalid response: blah blah blah',
-                                           url='http://www.google.ca/'
-                                           'poll_for_test',
-                                           data=data)
+    _SetPollJobAndLogFailExpectations(response,
+                                      'Invalid response: blah blah blah',
+                                      url='http://www.google.ca/'
+                                      'poll_for_test',
+                                      data=data)
     self._mox.ReplayAll()
 
     slave = slave_machine.SlaveMachine(url='http://www.google.ca',
@@ -215,13 +226,13 @@ class TestSlaveMachine(unittest.TestCase):
 
   # Test with missing mandatory fields in response: come_back.
   def testMissingAll(self):
-    response = self._CreateResponse()
+    response = _CreateResponse()
 
-    self._SetPollJobAndLogFailExpectations(response,
-                                           'Missing fields in response: '
-                                           "set(['come_back'])",
-                                           url=mox.IgnoreArg(),
-                                           data=mox.IgnoreArg())
+    _SetPollJobAndLogFailExpectations(response,
+                                      'Missing fields in response: '
+                                      "set(['come_back'])",
+                                      url=mox.IgnoreArg(),
+                                      data=mox.IgnoreArg())
     self._mox.ReplayAll()
 
     slave = slave_machine.SlaveMachine()
@@ -231,13 +242,13 @@ class TestSlaveMachine(unittest.TestCase):
 
   # Test with missing mandatory fields in response: try_count.
   def testMissingTryCount(self):
-    response = self._CreateResponse(come_back=2, try_count=None)
+    response = _CreateResponse(come_back=2, try_count=None)
 
-    self._SetPollJobAndLogFailExpectations(response,
-                                           'Missing fields in response: '
-                                           "set(['try_count'])",
-                                           url=mox.IgnoreArg(),
-                                           data=mox.IgnoreArg())
+    _SetPollJobAndLogFailExpectations(response,
+                                      'Missing fields in response: '
+                                      "set(['try_count'])",
+                                      url=mox.IgnoreArg(),
+                                      data=mox.IgnoreArg())
 
     self._mox.ReplayAll()
 
@@ -248,13 +259,13 @@ class TestSlaveMachine(unittest.TestCase):
 
   # Test with both commands and come_back missing.
   def testMissingComeback(self):
-    response = self._CreateResponse()
+    response = _CreateResponse()
 
-    self._SetPollJobAndLogFailExpectations(response,
-                                           'Missing fields in response: '
-                                           "set(['come_back'])",
-                                           url=mox.IgnoreArg(),
-                                           data=mox.IgnoreArg())
+    _SetPollJobAndLogFailExpectations(response,
+                                      'Missing fields in response: '
+                                      "set(['come_back'])",
+                                      url=mox.IgnoreArg(),
+                                      data=mox.IgnoreArg())
 
     self._mox.ReplayAll()
 
@@ -267,8 +278,8 @@ class TestSlaveMachine(unittest.TestCase):
   # without an error.
   def testExtraResponseArgs(self):
     come_back = 11.0
-    response = self._CreateResponse(come_back=come_back,
-                                    extra_arg='INVALID')
+    response = _CreateResponse(come_back=come_back,
+                               extra_arg='INVALID')
 
     url_helper.UrlOpen(mox.IgnoreArg(), data=mox.IgnoreArg(),
                        max_tries=mox.IgnoreArg()
@@ -283,14 +294,13 @@ class TestSlaveMachine(unittest.TestCase):
 
   # Test with missing mandatory fields in response: result_url.
   def testMissingResultURL(self):
-    response = self._CreateResponse(
-        commands=[slave_machine.BuildRPC('a', None)])
+    response = _CreateResponse(commands=[slave_machine.BuildRPC('a', None)])
 
-    self._SetPollJobAndLogFailExpectations(response,
-                                           'Missing fields in response: '
-                                           "set(['result_url'])",
-                                           url=mox.IgnoreArg(),
-                                           data=mox.IgnoreArg())
+    _SetPollJobAndLogFailExpectations(response,
+                                      'Missing fields in response: '
+                                      "set(['result_url'])",
+                                      url=mox.IgnoreArg(),
+                                      data=mox.IgnoreArg())
     self._mox.ReplayAll()
 
     slave = slave_machine.SlaveMachine()
@@ -300,15 +310,14 @@ class TestSlaveMachine(unittest.TestCase):
 
   # Test with bad type for result_url.
   def testBadResultURLType(self):
-    response = self._CreateResponse(
-        commands=[slave_machine.BuildRPC('a', None)],
-        result_url=['here.com'])
+    response = _CreateResponse(commands=[slave_machine.BuildRPC('a', None)],
+                               result_url=['here.com'])
 
-    self._SetPollJobAndLogFailExpectations(response,
-                                           mox.StrContains(
-                                               'Failed to validate result_url'),
-                                           url=mox.IgnoreArg(),
-                                           data=mox.IgnoreArg())
+    _SetPollJobAndLogFailExpectations(response,
+                                      mox.StrContains(
+                                          'Failed to validate result_url'),
+                                      url=mox.IgnoreArg(),
+                                      data=mox.IgnoreArg())
     self._mox.ReplayAll()
 
     slave = slave_machine.SlaveMachine()
@@ -318,9 +327,9 @@ class TestSlaveMachine(unittest.TestCase):
 
   # Test with bad type for commands.
   def testBadCommands(self):
-    response = self._CreateResponse(commands='do this', result_url='here.com')
+    response = _CreateResponse(commands='do this', result_url='here.com')
 
-    self._SetPollJobAndPostFailExpectations(
+    _SetPollJobAndPostFailExpectations(
         response, 'here.com',
         '[u\'Failed to validate commands with value "do this": '
         "Invalid type: <type \\'unicode\\'> instead of <type \\'list\\'>\']")
@@ -334,9 +343,9 @@ class TestSlaveMachine(unittest.TestCase):
 
   # Test with wrong RPC format for commands.
   def testBadCommandsParseRPCFormat(self):
-    response = self._CreateResponse(commands=['do this'], result_url='here.com')
+    response = _CreateResponse(commands=['do this'], result_url='here.com')
 
-    self._SetPollJobAndPostFailExpectations(
+    _SetPollJobAndPostFailExpectations(
         response, 'here.com',
         '[\'Failed to validate commands with value "[u\\\'do this\\\']": '
         'Error when parsing RPC: Invalid RPC container\']')
@@ -351,9 +360,9 @@ class TestSlaveMachine(unittest.TestCase):
   # Test with wrong RPC function name.
   def testBadCommandsParseRPCFunctionName(self):
     commands = [slave_machine.BuildRPC('WrongFunc', None)]
-    response = self._CreateResponse(commands=commands, result_url='here.com')
+    response = _CreateResponse(commands=commands, result_url='here.com')
 
-    self._SetPollJobAndPostFailExpectations(
+    _SetPollJobAndPostFailExpectations(
         response, 'here.com', 'Unsupported RPC function name: WrongFunc')
 
     self._mox.ReplayAll()
@@ -366,9 +375,9 @@ class TestSlaveMachine(unittest.TestCase):
   # Test with correct RPC function name but wrong arg type.
   def testBadCommandsParseRPCArgType(self):
     commands = [slave_machine.BuildRPC('LogRPC', None)]
-    response = self._CreateResponse(commands=commands, result_url='here.com')
+    response = _CreateResponse(commands=commands, result_url='here.com')
 
-    self._SetPollJobAndPostFailExpectations(
+    _SetPollJobAndPostFailExpectations(
         response, 'here.com', "Invalid arg types to LogRPC: <type 'NoneType'>"
         ' (expected str or unicode)')
 
@@ -387,7 +396,7 @@ class TestSlaveMachine(unittest.TestCase):
     self._mox.StubOutWithMock(logging, 'info')
 
     commands = [slave_machine.BuildRPC(function_name, args)]
-    response = self._CreateResponse(commands=commands, result_url='here.com')
+    response = _CreateResponse(commands=commands, result_url='here.com')
 
     url_helper.UrlOpen(
         mox.IgnoreArg(), data=mox.IgnoreArg(), max_tries=mox.IgnoreArg()
@@ -404,13 +413,13 @@ class TestSlaveMachine(unittest.TestCase):
 
   # Test with both fields in response: come_back and commands.
   def testInvalidBothCommandsAndComeback(self):
-    response = self._CreateResponse(come_back=3, commands='do this')
+    response = _CreateResponse(come_back=3, commands='do this')
 
-    self._SetPollJobAndLogFailExpectations(response,
-                                           'Missing fields in response: '
-                                           "set(['result_url'])",
-                                           url=mox.IgnoreArg(),
-                                           data=mox.IgnoreArg())
+    _SetPollJobAndLogFailExpectations(response,
+                                      'Missing fields in response: '
+                                      "set(['result_url'])",
+                                      url=mox.IgnoreArg(),
+                                      data=mox.IgnoreArg())
 
     self._mox.ReplayAll()
 
@@ -421,13 +430,13 @@ class TestSlaveMachine(unittest.TestCase):
 
   # Test invalid come_back type.
   def testInvalidComebackType(self):
-    response = self._CreateResponse(come_back='3')
+    response = _CreateResponse(come_back='3')
 
-    self._SetPollJobAndLogFailExpectations(response,
-                                           mox.StrContains(
-                                               'Failed to validate come_back'),
-                                           url=mox.IgnoreArg(),
-                                           data=mox.IgnoreArg())
+    _SetPollJobAndLogFailExpectations(response,
+                                      mox.StrContains(
+                                          'Failed to validate come_back'),
+                                      url=mox.IgnoreArg(),
+                                      data=mox.IgnoreArg())
 
     self._mox.ReplayAll()
 
@@ -438,13 +447,13 @@ class TestSlaveMachine(unittest.TestCase):
 
   # Test invalid come_back value.
   def testInvalidComebackValue(self):
-    response = self._CreateResponse(come_back=-3.0)
+    response = _CreateResponse(come_back=-3.0)
 
-    self._SetPollJobAndLogFailExpectations(response,
-                                           mox.StrContains(
-                                               'Failed to validate come_back'),
-                                           url=mox.IgnoreArg(),
-                                           data=mox.IgnoreArg())
+    _SetPollJobAndLogFailExpectations(response,
+                                      mox.StrContains(
+                                          'Failed to validate come_back'),
+                                      url=mox.IgnoreArg(),
+                                      data=mox.IgnoreArg())
 
     self._mox.ReplayAll()
 
@@ -455,13 +464,13 @@ class TestSlaveMachine(unittest.TestCase):
 
   # Test invalid try_count type.
   def testInvalidTryCountType(self):
-    response = self._CreateResponse(come_back=3.0, try_count='1')
+    response = _CreateResponse(come_back=3.0, try_count='1')
 
-    self._SetPollJobAndLogFailExpectations(response,
-                                           mox.StrContains(
-                                               'Failed to validate try_count'),
-                                           url=mox.IgnoreArg(),
-                                           data=mox.IgnoreArg())
+    _SetPollJobAndLogFailExpectations(response,
+                                      mox.StrContains(
+                                          'Failed to validate try_count'),
+                                      url=mox.IgnoreArg(),
+                                      data=mox.IgnoreArg())
 
     self._mox.ReplayAll()
 
@@ -472,13 +481,13 @@ class TestSlaveMachine(unittest.TestCase):
 
   # Test invalid try_count value.
   def testInvalidTryCountValue(self):
-    response = self._CreateResponse(come_back=3.0, try_count=-1)
+    response = _CreateResponse(come_back=3.0, try_count=-1)
 
-    self._SetPollJobAndLogFailExpectations(response,
-                                           mox.StrContains(
-                                               'Failed to validate try_count'),
-                                           url=mox.IgnoreArg(),
-                                           data=mox.IgnoreArg())
+    _SetPollJobAndLogFailExpectations(response,
+                                      mox.StrContains(
+                                          'Failed to validate try_count'),
+                                      url=mox.IgnoreArg(),
+                                      data=mox.IgnoreArg())
 
     self._mox.ReplayAll()
 
@@ -492,9 +501,9 @@ class TestSlaveMachine(unittest.TestCase):
     come_back = 1.0
     try_count = 0
     message = 'blah blah blah'
-    response = [self._CreateResponse(come_back=come_back, try_count=try_count),
-                self._CreateResponse(come_back=come_back, try_count=try_count),
-                self._CreateResponse(come_back=come_back, try_count=try_count),
+    response = [_CreateResponse(come_back=come_back, try_count=try_count),
+                _CreateResponse(come_back=come_back, try_count=try_count),
+                _CreateResponse(come_back=come_back, try_count=try_count),
                 message]
 
     for i in range(len(response)):
@@ -504,7 +513,7 @@ class TestSlaveMachine(unittest.TestCase):
             ).AndReturn(response[i])
         time.sleep(come_back)
       else:
-        self._SetPollJobAndLogFailExpectations(
+        _SetPollJobAndLogFailExpectations(
             response[i], 'Invalid response: ' + message,
             mox.IgnoreArg(), mox.IgnoreArg())
 
@@ -599,9 +608,9 @@ class TestSlaveMachine(unittest.TestCase):
 
     for i in range(0, len(invalid_args)):
       commands = [slave_machine.BuildRPC(function_name, invalid_args[i])]
-      response = self._CreateResponse(commands=commands, result_url='here.com')
+      response = _CreateResponse(commands=commands, result_url='here.com')
 
-      self._SetPollJobAndPostFailExpectations(
+      _SetPollJobAndPostFailExpectations(
           response, 'here.com', expected_error[i])
 
     self._mox.ReplayAll()
@@ -617,7 +626,7 @@ class TestSlaveMachine(unittest.TestCase):
     args = [(u'file path', u'file name', u'file contents')]
 
     commands = [slave_machine.BuildRPC(function_name, args)]
-    response = self._CreateResponse(commands=commands, result_url='here.com')
+    response = _CreateResponse(commands=commands, result_url='here.com')
 
     # Mock initial job request.
     url_helper.UrlOpen(
@@ -642,7 +651,7 @@ class TestSlaveMachine(unittest.TestCase):
     args = [(u'file path', u'file name', u'file contents')]
 
     commands = [slave_machine.BuildRPC(function_name, args)]
-    response = self._CreateResponse(commands=commands, result_url='here.com')
+    response = _CreateResponse(commands=commands, result_url='here.com')
 
     # Mock initial job request.
     url_helper.UrlOpen(
@@ -668,7 +677,7 @@ class TestSlaveMachine(unittest.TestCase):
     args = [(u'file path', u'file name', u'file contents')]
 
     commands = [slave_machine.BuildRPC(function_name, args)]
-    response = self._CreateResponse(commands=commands, result_url='here.com')
+    response = _CreateResponse(commands=commands, result_url='here.com')
 
     # Mock initial job request.
     url_helper.UrlOpen(
@@ -703,9 +712,9 @@ class TestSlaveMachine(unittest.TestCase):
 
     for i in range(0, len(invalid_args)):
       commands = [slave_machine.BuildRPC(function_name, invalid_args[i])]
-      response = self._CreateResponse(commands=commands, result_url='here.com')
+      response = _CreateResponse(commands=commands, result_url='here.com')
 
-      self._SetPollJobAndPostFailExpectations(
+      _SetPollJobAndPostFailExpectations(
           response, 'here.com', expected_error[i])
 
     self._mox.ReplayAll()
@@ -721,7 +730,7 @@ class TestSlaveMachine(unittest.TestCase):
 
     slave = slave_machine.SlaveMachine()
     commands = [slave_machine.BuildRPC(function_name, args)]
-    response = self._CreateResponse(commands=commands, result_url='here.com')
+    response = _CreateResponse(commands=commands, result_url='here.com')
 
     # Mock initial job request.
     url_helper.UrlOpen(
@@ -750,7 +759,7 @@ class TestSlaveMachine(unittest.TestCase):
 
     slave = slave_machine.SlaveMachine()
     commands = [slave_machine.BuildRPC(function_name, args)]
-    response = self._CreateResponse(commands=commands, result_url='here.com')
+    response = _CreateResponse(commands=commands, result_url='here.com')
 
     # Mock initial job request.
     url_helper.UrlOpen(
@@ -772,7 +781,7 @@ class TestSlaveMachine(unittest.TestCase):
 
     slave = slave_machine.SlaveMachine()
     commands = [slave_machine.BuildRPC(function_name, args)]
-    response = self._CreateResponse(commands=commands, result_url='here.com')
+    response = _CreateResponse(commands=commands, result_url='here.com')
 
     # Mock initial job request.
     url_helper.UrlOpen(
@@ -801,18 +810,18 @@ class TestSlaveMachine(unittest.TestCase):
   # job is requested.
   def testResultURLReset(self):
     commands = [slave_machine.BuildRPC('WrongFunc', None)]
-    response = [self._CreateResponse(commands=commands, result_url='here1.com'),
-                self._CreateResponse(commands=commands),
-                self._CreateResponse(commands=commands, result_url='here2.com')]
+    response = [_CreateResponse(commands=commands, result_url='here1.com'),
+                _CreateResponse(commands=commands),
+                _CreateResponse(commands=commands, result_url='here2.com')]
 
-    self._SetPollJobAndPostFailExpectations(
+    _SetPollJobAndPostFailExpectations(
         response[0], 'here1.com', 'Unsupported RPC function name: WrongFunc')
     # This response has no result_url. So it shouldn't use the result_url given
     # in the first response.
-    self._SetPollJobAndLogFailExpectations(
+    _SetPollJobAndLogFailExpectations(
         response[1], "Missing fields in response: set(['result_url'])",
         mox.IgnoreArg(), mox.IgnoreArg())
-    self._SetPollJobAndPostFailExpectations(
+    _SetPollJobAndPostFailExpectations(
         response[2], 'here2.com', 'Unsupported RPC function name: WrongFunc')
 
     self._mox.ReplayAll()
@@ -826,5 +835,5 @@ class TestSlaveMachine(unittest.TestCase):
 if __name__ == '__main__':
   # We don't want the application logs to interfere with our own messages.
   # You can comment it out for more information when debugging.
-  logging.disable(logging.FATAL)
+  #logging.disable(logging.FATAL)
   unittest.main()

@@ -6,14 +6,23 @@
 """Tests for Blobstore Helper class."""
 
 
+import os
+import sys
 import time
 import unittest
 
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, ROOT_DIR)
+
+import test_env
+
+test_env.setup_test_env()
 
 from google.appengine import runtime
 from google.appengine.api import files
 from google.appengine.ext import blobstore
 from google.appengine.ext import testbed
+
 from common import blobstore_helper
 from third_party.mox import mox
 
@@ -99,7 +108,7 @@ class BlobstoreHelperTest(unittest.TestCase):
 
   def testGetBlobStoreExceptions(self):
     class BrokenBlobReader(object):
-      def read(self, size):  # pylint: disable=g-bad-name,unused-argument
+      def read(self, _size):
         raise blobstore.InternalError()
 
     self._mox.StubOutWithMock(blobstore_helper.blobstore, 'BlobReader')

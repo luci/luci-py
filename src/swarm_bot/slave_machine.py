@@ -26,11 +26,9 @@ import subprocess
 import sys
 import time
 
-# pylint: disable=g-import-not-at-top
 from common import swarm_constants
 from common import url_helper
 from common import version
-# pylint: enable=g-import-not-at-top
 
 
 # The zip file to contain the zipped slave code.
@@ -39,6 +37,11 @@ ZIPPED_SLAVE_FILES = 'slave_files.zip'
 # The name of a user added file that can be used to specify conditions under
 # which a slave should stop querying for work.
 CHECK_REQUIREMENTS_FILE = 'check_requirements.py'
+
+# Make sure we get the path to this file, not the compiled python code, because
+# when calculating the version on the slave, we want to use (not the compiled
+# file).
+SLAVE_MACHINE_SCRIPT = os.path.abspath(__file__.rstrip('c'))
 
 START_SLAVE_SCRIPT_PATH = os.path.join(os.path.dirname(__file__),
                                        'start_slave.py')
@@ -116,8 +119,7 @@ def ShouldRun(remaining_iterations):
   return True
 
 
-# pylint: disable=dangerous-default-value
-def ValidateBasestring(x, error_prefix='', errors=[]):
+def ValidateBasestring(x, error_prefix='', errors=None):
   """Validate the given variable as a valid basestring.
 
   Args:
@@ -129,14 +131,14 @@ def ValidateBasestring(x, error_prefix='', errors=[]):
     True if the variable is a valid basestring.
   """
   if not isinstance(x, basestring):
-    errors.append('%sInvalid type: %s instead of %s' %
-                  (error_prefix, type(x), basestring))
+    if errors is not None:
+      errors.append('%sInvalid type: %s instead of %s' %
+                    (error_prefix, type(x), basestring))
     return False
   return True
 
 
-# pylint: disable=dangerous-default-value
-def ValidateNonNegativeFloat(x, error_prefix='', errors=[]):
+def ValidateNonNegativeFloat(x, error_prefix='', errors=None):
   """Validate the given variable as a non-negative float.
 
   Args:
@@ -148,18 +150,19 @@ def ValidateNonNegativeFloat(x, error_prefix='', errors=[]):
     True if the variable is a non-negative float.
   """
   if not isinstance(x, float):
-    errors.append('%sInvalid type: %s instead of %s' %
-                  (error_prefix, type(x), float))
+    if errors is not None:
+      errors.append('%sInvalid type: %s instead of %s' %
+                    (error_prefix, type(x), float))
     return False
 
   if x < 0:
-    errors.append('%s: Invalid negative float' % error_prefix)
+    if errors is not None:
+      errors.append('%s: Invalid negative float' % error_prefix)
     return False
   return True
 
 
-# pylint: disable=dangerous-default-value
-def ValidateNonNegativeInteger(x, error_prefix='', errors=[]):
+def ValidateNonNegativeInteger(x, error_prefix='', errors=None):
   """Validate the given variable as a non-negative integer.
 
   Args:
@@ -171,18 +174,19 @@ def ValidateNonNegativeInteger(x, error_prefix='', errors=[]):
     True if the variable is a non-negative integer.
   """
   if not isinstance(x, int):
-    errors.append('%sInvalid type: %s instead of %s'
-                  % (error_prefix, type(x), int))
+    if errors is not None:
+      errors.append('%sInvalid type: %s instead of %s'
+                    % (error_prefix, type(x), int))
     return False
 
   if x < 0:
-    errors.append('%sInvalid negative integer' % error_prefix)
+    if errors is not None:
+      errors.append('%sInvalid negative integer' % error_prefix)
     return False
   return True
 
 
-# pylint: disable=dangerous-default-value
-def ValidateCommand(commands, error_prefix='', errors=[]):
+def ValidateCommand(commands, error_prefix='', errors=None):
   """Validate the given commands are the valid.
 
   Args:
@@ -195,8 +199,9 @@ def ValidateCommand(commands, error_prefix='', errors=[]):
     valid RPC command.
   """
   if not isinstance(commands, list):
-    errors.append('%sInvalid type: %s instead of %s' %
-                  (error_prefix, type(commands), list))
+    if errors is not None:
+      errors.append('%sInvalid type: %s instead of %s' %
+                    (error_prefix, type(commands), list))
     return False
 
   valid = True
@@ -239,7 +244,7 @@ class SlaveMachine(object):
       start_slave_contents = script.read()
 
     self._attributes['version'] = version.GenerateSwarmSlaveVersion(
-        __file__,
+        SLAVE_MACHINE_SCRIPT,
         start_slave_contents)
 
   def Start(self, iterations=-1):

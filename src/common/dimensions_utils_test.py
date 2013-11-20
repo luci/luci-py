@@ -5,9 +5,19 @@
 
 """Test cases for the dimensions code."""
 
+import os
+import sys
 import unittest
 
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, ROOT_DIR)
+
+import test_env
+
+test_env.setup_test_env()
+
 from google.appengine.ext import testbed
+
 from common import dimensions_utils
 
 
@@ -187,7 +197,7 @@ class TestDimensionsUtils(unittest.TestCase):
         machine_dimensions_with_extra,
         machine_dimensions))
 
-  def testGenerateAllDimensionHashesLarge(self):
+  def testGenerateAllDimensionHashesLarge(self):  # pylint: disable=R0201
     # This dimension generates a list too large to store in the memcache,
     # so ensure it doesn't crash by trying to.
     dimension = {'browser': range(15)}

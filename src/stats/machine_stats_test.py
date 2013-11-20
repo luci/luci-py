@@ -8,9 +8,19 @@
 
 import datetime
 import logging
+import os
+import sys
 import unittest
 
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, ROOT_DIR)
+
+import test_env
+
+test_env.setup_test_env()
+
 from google.appengine.ext import testbed
+
 from server import admin_user
 from stats import machine_stats
 

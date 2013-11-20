@@ -6,19 +6,21 @@
 """Tests the app engine handlers in main.py."""
 
 
-
 import datetime
 import json
 import logging
 import os
-import sys
 import unittest
 
+import test_env
+
+test_env.setup_test_env()
 
 from google.appengine.api import apiproxy_stub_map
 from google.appengine.datastore import datastore_stub_util
 from google.appengine.ext import testbed
-from  import main as main_app
+
+import main as main_app
 from common import dimensions_utils
 from common import swarm_constants
 from common import url_helper
@@ -33,7 +35,9 @@ from stats import daily_stats
 from stats import machine_stats
 from stats import runner_stats
 from stats import runner_summary
+from third_party import webtest
 from third_party.mox import mox
+
 
 # A simple machine id constant to use in tests.
 MACHINE_ID = '12345678-12345678-12345678-12345678'
@@ -60,6 +64,9 @@ class AppTest(unittest.TestCase):
 
     # Authenticate with none as IP.
     user_manager.AddWhitelist(None)
+
+    # For testing, accept emails from the google domain.
+    main_app.ALLOW_ACCESS_FROM_DOMAINS = ('google.com')
 
     # Setup mox handler.
     self._mox = mox.Mox()
@@ -111,7 +118,6 @@ class AppTest(unittest.TestCase):
     # Test with a multiple matching runners.
     additional_test_runner = test_helper.CreatePendingRunner()
 
-    # pylint: disable=g-long-lambda
     response = self.app.get(
         '/get_matching_test_cases',
         {'name': test_helper.REQUEST_MESSAGE_TEST_CASE_NAME})
@@ -539,6 +545,17 @@ class AppTest(unittest.TestCase):
                  '/waits_by_minute',
                 ]
 
+    self._mox.StubOutWithMock(url_helper, 'UrlOpen')
+    url_helper.UrlOpen(
+        test_helper.DEFAULT_RESULT_URL, data=mox.IgnoreArg()).AndReturn(
+            'response')
+
+    self._mox.StubOutWithMock(main_app.template, 'render')
+    for _ in range(len(stat_urls)):
+      main_app.template.render(mox.IgnoreArg(),
+                               mox.IgnoreArg()).AndReturn('')
+    self._mox.ReplayAll()
+
     # Create a pending, active and done runner.
     test_helper.CreatePendingRunner()
     test_helper.CreatePendingRunner(machine_id=MACHINE_ID)
@@ -554,12 +571,6 @@ class AppTest(unittest.TestCase):
     # Ensure wait stats are generated.
     runner_summary.GenerateWaitSummary()
 
-    self._mox.StubOutWithMock(main_app.template, 'render')
-    for _ in range(len(stat_urls)):
-      main_app.template.render(mox.IgnoreArg(),
-                               mox.IgnoreArg()).AndReturn('')
-    self._mox.ReplayAll()
-
     # Add some basic stats items to ensure the loop bodies are executed.
     runner = test_helper.CreatePendingRunner()
     runner_stats.RecordRunnerStats(runner)
@@ -568,6 +579,8 @@ class AppTest(unittest.TestCase):
     for stat_url in stat_urls:
       response = self.app.get(stat_url)
       self.assertEqual('200 OK', response.status)
+
+    self._mox.VerifyAll()
 
   def testTaskQueueUrls(self):
     self.taskqueue_stub = self.testbed.get_stub(testbed.TASKQUEUE_SERVICE_NAME)
@@ -677,6 +690,5 @@ class AppTest(unittest.TestCase):
 
 
 if __name__ == '__main__':
-  logging.basicConfig(
-      level=logging.DEBUG if '-v' in sys.argv else logging.CRITICAL)
+  logging.disable(logging.ERROR)
   unittest.main()
