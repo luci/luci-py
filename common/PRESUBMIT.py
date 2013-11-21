@@ -46,10 +46,9 @@ def CommonChecks(input_api, output_api):
     sys.path = [
       # To support 'from common import ...'
       join('..'),
-      # For tests/test_env.py.
       join('tests'),
       # See tests/test_env.py for more information.
-      join('third_party'),
+      join('..', 'tools', 'third_party'),
       join('..', 'tools'),
     ] + sys.path
     disabled_warnings = [

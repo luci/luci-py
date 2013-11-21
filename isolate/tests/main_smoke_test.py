@@ -15,7 +15,6 @@ following format:
 import binascii
 import hashlib
 import logging
-import os
 import sys
 import time
 import unittest
@@ -23,8 +22,7 @@ import urllib
 import urllib2
 import zlib
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.join(BASE_DIR, 'third_party'))
+import test_env  # pylint: disable=W0611
 
 from rietveld import upload
 

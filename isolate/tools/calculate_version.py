@@ -13,12 +13,18 @@ import os
 import subprocess
 import sys
 
+ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(ROOT_DIR, '..', '..', 'tools', 'third_party'))
+
+from depot_tools import git_number
+from depot_tools import git_common
+
 
 def git(cmd, cwd):
   return subprocess.check_output(['git'] + cmd, cwd=cwd)
 
 
-def get_pseudo_revision(root, remote, baserev_tag_name):
+def get_pseudo_revision(root, remote):
   """Returns the pseudo revision number and commit hash describing
   the base upstream commit this branch is based on.
 
@@ -26,22 +32,12 @@ def get_pseudo_revision(root, remote, baserev_tag_name):
   page for more information.
 
   The pseudo revision is calculated by the number of commits separating the base
-  upstream commit from a predetermined tag created with 'git tag'. The proper
-  setup is to create a git tag of the earliest commit (the root commit) with:
-
-    git tag -a baserev <earliest commit>
-
-  where 'baserev' matches |baserev_tag_name|. Do not forget to push the tag
-  upstream! The earliest commit should be a root commit, e.g. a commit with no
-  parent. A git tree can have multiple root commits when git repositories are
-  merged together so the developer should select the one that makes the most
-  sense. The list of all root commits can be retrieved with:
+  upstream commit from the rootest commit.  The earliest commit should be a root
+  commit, e.g. a commit with no parent. A git tree can have multiple root
+  commits when git repositories are merged together. The oldest one will be
+  selected. The list of all root commits can be retrieved with:
 
     git rev-list --parents HEAD | egrep "^[a-f0-9]{40}$"
-
-  Then this function uses 'git describe' which will implicitly use the tag
-  created above to count the number of commits separating the tag from the merge
-  base commit. This is the pseudo revision number.
 
   Returns:
     tuple of:
@@ -49,17 +45,10 @@ def get_pseudo_revision(root, remote, baserev_tag_name):
     - upstream commit hash this branch is based of.
   """
   mergebase = git(['merge-base', 'HEAD', remote], cwd=root).rstrip()
-  describe = git(['describe', mergebase], cwd=root).rstrip()
-  if not describe.startswith(baserev_tag_name + '-'):
-    print >> sys.stderr, 'Make sure to run git fetch --tags'
-    sys.exit(1)
-
-  # describe has a format similar to 'baserev-124-g33c3dca'.
-  _, pseudo_revision, commit = describe.split('-', 2)
-  assert commit.startswith('g'), commit
-  pseudo_revision = int(pseudo_revision)
-  assert mergebase.startswith(commit[1:]), (mergebase, commit)
-  return pseudo_revision, mergebase
+  targets = git_common.parse_commitrefs(mergebase)
+  git_number.load_generation_numbers(targets)
+  git_number.finalize(targets)
+  return git_number.get_num(targets[0]), mergebase
 
 
 def calculate_version(root, tag):
@@ -69,8 +58,7 @@ def calculate_version(root, tag):
   on, the abbreviated commit hash. Adds -tainted if the code is not
   pristine and optionally adds a tag to further describe it.
   """
-  pseudo_revision, mergebase = get_pseudo_revision(
-      root, 'origin/master', 'baserev')
+  pseudo_revision, mergebase = get_pseudo_revision(root, 'origin/master')
   head = git(['rev-parse', 'HEAD'], cwd=root).rstrip()
 
   logging.info('head: %s, mergebase: %s', head, mergebase)

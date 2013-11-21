@@ -1,1 +1,4 @@
 Modules in this directory are not isolate-server specific.
+
+These modules must be necessary for the AppEngine instance to run. Anything that
+is not necessary to run an AppEngine instance must be in tools/.

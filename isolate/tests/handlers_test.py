@@ -9,7 +9,7 @@ import unittest
 import test_env
 test_env.setup_test_env()
 
-# From tests/third_party/
+# From tools/third_party/
 import webtest
 
 # For TestCase.
