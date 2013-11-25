@@ -1,0 +1,21 @@
+{% set title = 'Isolate Server' %}
+{% extends "base.html" %}
+
+{% block body %}
+
+<h1>Welcome to an Isolate Server instance</h1>
+Isolate Server is a Content-Addressed Cache that is used by the Swarming
+project to distribute test execution accross a swarm of slaves.
+<p>
+Please visit <a
+  href="http://dev.chromium.org/developers/testing/isolated-testing">http://dev.chromium.org/developers/testing/isolated-testing</a>
+for more information.
+<p>
+
+<p>Usage stats are <a href="/stats">here</a>.</p>
+
+<p>If you are an admin of this app engine instance you can use
+  <a href="/restricted">Admin pages</a>.
+</p>
+
+{% endblock %}

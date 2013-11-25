@@ -1,0 +1,79 @@
+{% set title = 'Isolate Server Stats' %}
+{% extends "base.html" %}
+
+{% block body %}
+
+<div style="float: right;">
+  {{now}}
+</div>
+
+{% if days %}
+  <h1>Activity in the Last {{days|length}} Days</h1>
+  <table id="daily-stats-table"
+    summary="This table lists the server statistics on each day.">
+    <thead>
+      <th>Date</th>
+      <th>Requests</th>
+      <th>Downloads</th>
+      <th>Uploads</th>
+      <th>Lookups</th>
+    </thead>
+    {% for stats in days %}
+    <tr class="request">
+      <td>{{stats.key.id()}}</td>
+      <td>{{stats.values.requests_as_text()}}</td>
+      <td>{{stats.values.downloads_as_text()}}</td>
+      <td>{{stats.values.uploads_as_text()}}</td>
+      <td>{{stats.values.lookups_as_text()}}</td>
+    </tr>
+    {% endfor %}
+  </table>
+{% endif %}
+
+{% if hours %}
+  <h1>Hourly stats</h1>
+  <table id="hourly-stats-table"
+      summary="This table lists the server statistics at each hour.">
+    <thead>
+      <th>Hour</th>
+      <th>Requests</th>
+      <th>Downloads</th>
+      <th>Uploads</th>
+      <th>Lookups</th>
+    </thead>
+    {% for stats in hours %}
+    <tr class="request">
+      <td>{{stats.key.parent().id()}} {{stats.key.id()}}:00</td>
+      <td>{{stats.values.requests_as_text()}}</td>
+      <td>{{stats.values.downloads_as_text()}}</td>
+      <td>{{stats.values.uploads_as_text()}}</td>
+      <td>{{stats.values.lookups_as_text()}}</td>
+    </tr>
+    {% endfor %}
+  </table>
+{% endif %}
+
+{% if minutes %}
+  <h1>Minute stats</h1>
+  <table id="minute-stats-table"
+      summary="This table lists the server statistics at each minute.">
+    <thead>
+      <th>Minute</th>
+      <th>Requests</th>
+      <th>Downloads</th>
+      <th>Uploads</th>
+      <th>Lookups</th>
+    </thead>
+    {% for stats in minutes %}
+    <tr class="request">
+      <td>{{stats.key.parent().parent().id()}} {{stats.key.parent().id()}}:{{stats.key.id()}}</td>
+      <td>{{stats.values.requests_as_text()}}</td>
+      <td>{{stats.values.downloads_as_text()}}</td>
+      <td>{{stats.values.uploads_as_text()}}</td>
+      <td>{{stats.values.lookups_as_text()}}</td>
+    </tr>
+    {% endfor %}
+  </table>
+{% endif %}
+
+{% endblock %}

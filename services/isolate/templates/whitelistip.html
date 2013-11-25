@@ -1,0 +1,46 @@
+{% set title = 'Isolate Server Whitelist IPs' %}
+{% extends "base.html" %}
+
+{% block body %}
+
+<div style="float: right;">
+  {{now}}
+</div>
+
+<h1>Whitelisted IPs</h1>
+<table>
+  <thead>
+    <th>Date</th>
+    <th>IP</th>
+    <th>Who</th>
+    <th>Group</th>
+    <th>Comment</th>
+  </thead>
+  <tbody>
+    {% for i in whitelistips %}
+    <tr>
+      <td>{{i.timestamp}}</td>
+      <td>{{i.ip}}</td>
+      <td>{{i.who.email() if i.who else ''}}</td>
+      <td>{{i.group}}</td>
+      <td>{{i.comment}}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+<p>
+
+<form name="whitelist" method="post">
+  IP: <input type="text" name="ip" value="{{ default_ip }}" /><br />
+  Group: <input type="text" name="group" value="{{ default_group }}" /><br />
+  Comment: <input type="text" name="comment" value="{{ default_comment }}" />
+    <br />
+  <input type="hidden" name="token" value="{{ token }}" />
+  <input type="submit" value="SUBMIT" />
+</form>
+
+<p>
+
+{{ note }}
+
+{% endblock %}

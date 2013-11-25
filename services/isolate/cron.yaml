@@ -1,0 +1,19 @@
+cron:
+- description: old data cleanup
+  target: backend
+  url: /restricted/cleanup/trigger/old
+  schedule: every day 01:50
+
+- description: testing data cleanup
+  target: backend
+  url: /restricted/cleanup/trigger/testing
+  schedule: every day 09:50
+
+- description: Cron job that gathers statistics
+  target: backend
+  url: /restricted/stats/update
+  schedule: every 1 minutes
+
+- description: Mail exception report via ereporter2
+  url: /restricted/cron/ereporter2/mail
+  schedule: every 1 hours synchronized
