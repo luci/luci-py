@@ -1,6 +1,3 @@
-[submodule "isolate-server"]
-	path = isolate-server
-	url = https://code.google.com/p/swarming.isolate-server
 [submodule "swarming-server"]
 	path = swarming-server
 	url = https://code.google.com/p/swarming.swarming-server
