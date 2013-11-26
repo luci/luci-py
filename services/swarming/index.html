@@ -1,0 +1,99 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html>
+<head>
+<title>Test Request Server</title>
+<link rel="stylesheet" type="text/css" href="/css/swarm_style.css"/>
+</head>
+<body>
+
+<div style="text-align: right;">
+<p>{{topbar|safe}}</p>
+</div>
+
+
+<h1>User Test Requests</h1>
+{{sorted_by_message|safe}}
+Sort By (changing drops all current filters):
+<!--We don't allow sorting and filters to fully interact to prevent the server from requiring a huge number of indices, which would make runners.put() very expensive.-->
+<select id="sort" onchange="document.location.href='{{url_no_sort_by_or_filters}}&sort_by=' + this.value">
+{% for sort_option in sort_options %}
+{% if sort_option.key == selected_sort %}
+<option value="{{sort_option.key}}" selected="">{{sort_option.name}}</option>
+{% else %}
+<option value="{{sort_option.key}}">{{sort_option.name}}</option>
+{% endif %}
+{% endfor %}
+</select>
+
+<h2>Filters:</h2>
+Always sorted by reverse created.
+<form id="filter" action="{{url_no_filters}}" method="get">
+{{filter_selects|safe}}
+Test Name (Full Matches Only):<input type="text" name="test_name_filter" value="{{test_name_filter}}">
+Machine ID (Full Matches Only):<input type="text" name="machine_id_filter" value="{{machine_id_filter}}">
+<!--Add the page and sort_by values so they don't get lost-->
+<input type="hidden" name="page" value="{{current_page}}">
+<input type="hidden" name="sort_by" value="reverse_created">
+<input type="submit" name="Filter">
+</form>
+<table id="request-table" summary="This table lists all test requests">
+<tr>
+<th>Name</th>
+<th>Status</th>
+<th>Requested (UTC)</th>
+<th>Started (UTC)</th>
+<th>Ended (UTC)</th>
+<th>Machine ID</th>
+<th>&nbsp;</th>
+</tr>
+{% for runner in runners %}
+<tr class="request {% cycle even,odd %} {{ runner.failed_test_class_string }}">
+<td><a name="runner_{{runner.key_string}}"><a title="Click to see full message"
+    href="show_message?r={{runner.key_string}}">{{runner.name_string}}</a></a>
+</td>
+<td>{{runner.status_string|safe}}</td>
+<td>{{runner.requested_on_string}}</td>
+<td>{{runner.started_string}}</td>
+<td>{{runner.ended_string}}</td>
+<td>{{runner.machine_id_used|safe}}</td>
+<td>{{runner.command_string|safe}}</td>
+</tr>
+{% endfor %}
+</table>
+
+<p>Currently on page: {{current_page}} </p>
+<p>Go To Page:
+<select id="new_page" onchange="document.location.href='{{url_no_page}}&page=' + this.value">
+<option value="">-</option>
+{% for page in total_pages %}
+<option value='{{page}}'>{{page}}</option>
+{% endfor %}
+</select>
+</p>
+
+<h1>Recent Errors</h1>
+<table id="error-table" summary="This table lists most recent errors">
+<tr>
+<th>Error</th>
+<th>Message</th>
+<th>Info</th>
+<th>Time (UTC)</th>
+</tr>
+{% for error in errors %}
+<tr class="request {% cycle even,odd %} {{ runner.failed_test_class_string }}">
+<td>{{error.name}}</td>
+<td>{{error.message}}</td>
+<td>{{error.info}}</td>
+<td>{{error.log_time}}</td>
+</tr>
+{% endfor %}
+</table>
+
+<div style="float: left;"><p> 
+  <a target="_blank" href="https://code.google.com/appengine/"><img border="0"
+   src="https://code.google.com/appengine/images/appengine-noborder-120x30.gif"
+   alt="Powered by Google App Engine" /></a></p>
+</p></div>
+
+</body>
+</html>

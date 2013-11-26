@@ -1,0 +1,54 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html>
+<head>
+<title>Stats</title>
+<link rel="stylesheet" type="text/css" href="/css/swarm_style.css"/>
+<script type="text/javascript" src="https://www.google.com/jsapi"></script>
+    <script type="text/javascript">
+      google.load("visualization", "1", {packages:["corechart"]});
+
+      google.setOnLoadCallback(drawCharts);
+      function drawCharts() {
+      {% for graph in graphs %}
+        var data = google.visualization.arrayToDataTable({{graph.data_array|safe}})
+
+        var options = {
+          title: '{{graph.title}}'
+        };
+
+        var chart{{graph.element_id}} = new google.visualization.LineChart(document.getElementById('{{graph.element_id}}'));
+        chart{{graph.element_id}}.draw(data, options);
+      {% endfor %}
+      }
+    </script>
+</head>
+<body>
+
+<div style="text-align: right;">
+<p>{{topbar|safe}}<br/>
+{{stat_links|safe}}<br/>
+</div>
+
+<div style="text-align: right;">
+Days to Show:
+<select id="days_to_show" onchange="document.location.href='?days=' + this.value">
+<option value="">-</option>
+{% for day in max_days_to_show %}
+<option value='{{day}}'>{{day}}</option>
+{% endfor %}
+</select>
+</div>
+
+{% for graph in graphs %}
+<div id="{{graph.element_id}}" style="width: 100%; height: 400px;"></div>
+<br/>
+{% endfor %}
+
+<div style="float: left;"><p>
+  <a target="_blank" href="https://code.google.com/appengine/"><img border="0"
+   src="https://code.google.com/appengine/images/appengine-noborder-120x30.gif"
+   alt="Powered by Google App Engine" /></a></p>
+</p></div>
+
+</body>
+</html>

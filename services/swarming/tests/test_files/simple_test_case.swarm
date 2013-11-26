@@ -1,0 +1,27 @@
+{
+  "test_case_name": "Simple Test Case",
+  "tests": [
+    {
+      "test_name": "Hello World",
+      "action": [
+        "dir"
+      ]
+    },
+    {
+      "test_name": "Goodbye World",
+      "action": [
+        "dir"
+      ]
+    }
+  ],
+  "verbose": true,
+  "configurations": [
+    {
+      "config_name": "WinXP32-enUS",
+      "dimensions": {
+        "lang": "en-US",
+        "os": "win-xp"
+      }
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+# Copyright 2013 The Swarming Authors. All rights reserved.
+# Use of this source code is governed by the Apache v2.0 license that can be
+# found in the LICENSE file.
+
+# Watchlist Rules
+# Refer: http://dev.chromium.org/developers/contributing-code/watchlists
+
+{
+
+  'WATCHLIST_DEFINITIONS': {
+    'all': {
+      'filepath': '.+',
+    },
+  },
+
+  'WATCHLISTS': {
+    'all': [
+      # Add yourself here to get explicitly spammed.
+    ],
+  },
+
+}

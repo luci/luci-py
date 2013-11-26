@@ -1,0 +1,47 @@
+application: your-swarm-application-name
+version: 1
+runtime: python27
+api_version: 1
+threadsafe: true
+
+handlers:
+- url: /task_queues/*
+  script: main.app
+  secure: always
+  login: admin
+
+- url: /tasks/*
+  script: main.app
+  secure: always
+  login: admin
+
+# Protected handlers that require login.
+# TODO(user): Allow admins to whitelist users that can access secure pages.
+- url: /secure/.*
+  script: main.app
+  secure: always
+  login: admin
+
+- url: /favicon\.ico
+  static_files: static/images/favicon.ico
+  upload: static/images/favicon\.ico
+  secure: always
+
+- url: /css
+  static_dir: static/css
+  secure: always
+
+- url: /_ereporter.*
+  script: google.appengine.ext.ereporter.report_generator.application
+  login: admin
+
+- url: .*
+  script: main.app
+  secure: always
+
+builtins:
+- remote_api: on
+
+libraries:
+- name: django
+  version: 1.2

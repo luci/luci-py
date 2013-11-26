@@ -1,4 +1,4 @@
-# Copyright 2012 The Swarming Authors. All rights reserved.
+# Copyright 2013 The Swarming Authors. All rights reserved.
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
@@ -26,12 +26,16 @@ def header(input_api):
   return license_header
 
 
-def CheckChangeOnUpload(input_api, output_api):
-  return []
-
-
-def CheckChangeOnCommit(input_api, output_api):
+def CommonChecks(input_api, output_api):
   return input_api.canned_checks.PanProjectChecks(
       input_api, output_api,
       owners_check=False,
       license_header=header(input_api))
+
+
+def CheckChangeOnUpload(input_api, output_api):
+  return CommonChecks(input_api, output_api)
+
+
+def CheckChangeOnCommit(input_api, output_api):
+  return CommonChecks(input_api, output_api)

@@ -33,6 +33,13 @@ def find_gae_sdk(search_dir=TOOLS_DIR):
       return item
 
 
+def find_gae_dev_server(search_dir=TOOLS_DIR):
+  """Returns the path to the GAE dev server if found, else None."""
+  gae_sdk = find_gae_sdk(search_dir)
+  if gae_sdk:
+    return os.path.join(gae_sdk, 'dev_appserver.py')
+
+
 def setup_gae_sdk(sdk_path):
   """Sets up App Engine environment.
 

@@ -1,0 +1,36 @@
+{
+  "test_case_name": "shards",
+  "env_vars": {
+    "GTEST_TOTAL_SHARDS": "%(num_instances)d",
+    "GTEST_SHARD_INDEX": "%(instance_index)d"
+  },
+  "tests": [
+    {
+      "test_name": "Hello World",
+      "action": [
+        "dir"
+      ]
+    }
+  ],
+  "verbose": true,
+  "configurations": [
+    {
+      "config_name": "WinXP32-enUS",
+      "min_instances": 3,
+      "max_instances": 3,
+      "dimensions": {
+        "lang": "en-US",
+        "os": "win-xp"
+      }
+    },
+    {
+      "config_name": "Vista32-enUS",
+      "min_instances": 2,
+      "max_instances": 2,
+      "dimensions": {
+        "lang": "en-US",
+        "os": "win-vista"
+      }
+    }
+  ]
+}
