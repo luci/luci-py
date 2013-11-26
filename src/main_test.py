@@ -469,8 +469,15 @@ class AppTest(unittest.TestCase):
 
     # Handlers that are explicitly allowed to be called by anyone.
     # TODO(user): Figure out how to protected access to '/upload'.
-    allowed_urls = set(['/', '/graphs/daily_stats', '/runner_summary', '/stats',
-                        '/upload', '/waits_by_minute'])
+    allowed_urls = set([
+        '/',
+        '/graphs/daily_stats',
+        '/runner_summary',
+        '/server_ping',
+        '/stats',
+        '/upload',
+        '/waits_by_minute',
+    ])
 
     # Grab the set of all routes.
     app = self.app.app

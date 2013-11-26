@@ -1260,6 +1260,19 @@ class DailyStatsGraphHandler(webapp2.RequestHandler):
     self.response.out.write(template.render(path, params))
 
 
+class ServerPingHandler(webapp2.RequestHandler):
+  """Handler to ping when checking if the server is up.
+
+  This handler should be extremely lightweight. It shouldn't do any
+  computations, it should just state that the server is up.
+  """
+
+  def get(self):
+    """Handles HTTP GET requests for this handler's URL."""
+    self.response.headers['Content-Type'] = 'text/plain'
+    self.response.out.write('Server up')
+
+
 class UserProfileHandler(webapp2.RequestHandler):
   """Handler for the user profile page of the web server.
 
@@ -1420,6 +1433,7 @@ def CreateApplication():
                                    ShowMessageHandler),
                                   ('/secure/upload_start_slave',
                                    UploadStartSlaveHandler),
+                                  ('/server_ping', ServerPingHandler),
                                   ('/stats', StatsHandler),
                                   ('/task_queues/cleanup_data',
                                    CleanupDataHandler),

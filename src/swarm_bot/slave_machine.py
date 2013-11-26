@@ -232,10 +232,6 @@ class SlaveMachine(object):
     self._url = url
     self._attributes = attributes.copy() if attributes else {}
     self._result_url = None
-    # The fully qualified domain name will uniquely identify this machine
-    # to the server, so we can use it to give a deterministic id for this slave.
-    # Also store as lower case, since it is already case-insensitive.
-    self._attributes['id'] = socket.getfqdn().lower()
     self._attributes['try_count'] = 0
     self._come_back = 0
     self._max_url_tries = max_url_tries
@@ -261,6 +257,20 @@ class SlaveMachine(object):
       the given number of tries, or an invalid number of iterations were
       requested.
     """
+    # Ping the swarm server before trying to find the fqdn below to ensure
+    # that we have acquired our fqdn (otherwise getfqdn() below maybe return
+    # an incorrect value).
+    ping_url = self._url + '/server_ping'
+    if url_helper.UrlOpen(ping_url, method='GET') is None:
+      logging.error('Unable to make initial connection to the swarm server. '
+                    'Aborting.')
+      return
+
+    # The fully qualified domain name will uniquely identify this machine
+    # to the server, so we can use it to give a deterministic id for this slave.
+    # Also store as lower case, since it is already case-insensitive.
+    self._attributes['id'] = socket.getfqdn().lower()
+
     url = self._url + '/poll_for_test'
     remaining_iterations = iterations
 
