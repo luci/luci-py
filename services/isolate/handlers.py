@@ -817,13 +817,14 @@ class RestrictedStoreBlobstoreContentByHashHandler(
       return
 
     stats.log(stats.STORE, entry.size, 'GS; %s' % entry.filename)
-    self.response.out.write('Content saved.')
     self.response.headers['Content-Type'] = 'text/plain'
+    self.response.out.write('Content saved.')
 
 
 class RestrictedAdminUIHandler(acl.ACLRequestHandler):
   """Root admin UI page."""
   def get(self):
+    self.response.headers['Content-Type'] = 'text/html'
     self.response.write(render_template('restricted.html', {
         'token': self.generate_token(),
         'map_reduce_jobs': [
@@ -831,26 +832,26 @@ class RestrictedAdminUIHandler(acl.ACLRequestHandler):
             for job_id, job_def in map_reduce_jobs.MAP_REDUCE_JOBS.iteritems()
         ],
     }))
-    self.response.headers['Content-Type'] = 'text/html'
 
 
 class RestrictedGoogleStorageConfig(acl.ACLRequestHandler):
   """View and modify Google Storage config entries."""
   def get(self):
     settings = config.settings()
+    self.response.headers['Content-Type'] = 'text/html'
     self.response.write(render_template('gs_config.html', {
         'gs_bucket': settings.gs_bucket,
         'gs_client_id_email': settings.gs_client_id_email,
         'gs_private_key': settings.gs_private_key,
         'token': self.generate_token(),
     }))
-    self.response.headers['Content-Type'] = 'text/html'
 
   def post(self):
     settings = config.settings()
     settings.gs_bucket = self.request.get('gs_bucket')
     settings.gs_client_id_email = self.request.get('gs_client_id_email')
     settings.gs_private_key = self.request.get('gs_private_key')
+    self.response.headers['Content-Type'] = 'text/plain'
     try:
       # Ensure key is correct, it's easy to make a mistake when creating it.
       gcs.URLSigner.load_private_key(settings.gs_private_key)
@@ -1022,8 +1023,8 @@ class ContainsHashHandler(acl.ACLRequestHandler):
       # Convert the Future to True/False, then to byte, chr(0) if not present,
       # chr(1) if it is.
       contains = [bool(q.get_result()) for q in queries]
-      self.response.out.write(bytearray(contains))
       self.response.headers['Content-Type'] = 'application/octet-stream'
+      self.response.out.write(bytearray(contains))
       found = sum(contains, 0)
       stats.log(stats.LOOKUP, len(raw_hash_digests), found)
       if found:
@@ -1045,13 +1046,12 @@ class ContainsHashHandler(acl.ACLRequestHandler):
 class GenerateBlobstoreHandler(acl.ACLRequestHandler):
   """Generate an upload url to directly load files into the GS bucket."""
   def post(self, namespace, hash_key):
-
     if len(namespace) > MAX_NAMESPACE_LEN:
-      self.response.out.write('Unable to handle namespaces with more than %d '
-                              'characters', MAX_NAMESPACE_LEN)
-      self.response.set_status(400)
+      self.abort(
+          400,
+          'Unable to handle namespaces with more than %d characters' %
+          MAX_NAMESPACE_LEN)
 
-    self.response.headers['Content-Type'] = 'text/plain'
     url = '/restricted/content/store_blobstore/%s/%s/%s?token=%s' % (
         namespace,
         hash_key,
@@ -1064,10 +1064,10 @@ class GenerateBlobstoreHandler(acl.ACLRequestHandler):
     # An option is to create a single file per directory but we could get into
     # an edge case with large number of directories.
     # TODO(maruel): Look at the alternatives.
+    self.response.headers['Content-Type'] = 'text/plain'
     self.response.out.write(blobstore.create_upload_url(
         url,
         gs_bucket_name=full_gs_path))
-    self.response.headers['Content-Type'] = 'text/plain'
 
 
 class StoreContentByHashHandler(acl.ACLRequestHandler):
@@ -1129,8 +1129,8 @@ class StoreContentByHashHandler(acl.ACLRequestHandler):
     entry.size = len(content)
     entry.expanded_size = expanded_size
     future = entry.put_async()
-    self.response.out.write('Content saved.')
     self.response.headers['Content-Type'] = 'text/plain'
+    self.response.out.write('Content saved.')
 
     if (entry.filename and
         entry.is_isolated and
@@ -1757,16 +1757,16 @@ class StoreContentHandlerGS(acl.ACLRequestHandler, ProtocolHandlerMixin):
 class RootHandler(webapp2.RequestHandler):
   """Tells the user to RTM."""
   def get(self):
-    self.response.write(render_template('root.html'))
     self.response.headers['Content-Type'] = 'text/html'
+    self.response.write(render_template('root.html'))
 
 
 class WarmupHandler(webapp2.RequestHandler):
   def get(self):
     # Generate/precache settings.
     config.settings()
-    self.response.write('ok')
     self.response.headers['Content-Type'] = 'text/plain'
+    self.response.write('ok')
 
 
 def CreateApplication():
