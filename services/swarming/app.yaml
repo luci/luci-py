@@ -40,4 +40,14 @@ builtins:
 
 libraries:
 - name: django
-  version: 1.2
+  version: "1.4"
+- name: jinja2
+  version: "2.6"
+- name: pycrypto
+  version: "2.6"
+- name: webapp2
+  version: "2.5.2"
+- name: webob
+  version: "1.2.3"
+- name: yaml
+  version: "3.10"

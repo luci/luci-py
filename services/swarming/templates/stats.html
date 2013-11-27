@@ -59,7 +59,7 @@
     <th>Longest Wait (Rounded to Nearest Minute)</th>
   </thead>
   <tbody>
-    {% for runner_dimensions, runner_summary in runner_wait_stats.items %}
+    {% for runner_dimensions, runner_summary in runner_wait_stats|dictsort %}
       <tr class="request">
         <td>{{runner_dimensions}}</td>
         {% for stat in runner_summary %}

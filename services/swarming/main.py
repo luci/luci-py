@@ -11,7 +11,6 @@ using the appengine webapp framework.
 import datetime
 import json
 import logging
-import os.path
 import urllib
 
 import webapp2
@@ -26,7 +25,6 @@ from google.appengine.api import users
 from google.appengine.ext import db
 from google.appengine.ext import ereporter
 from google.appengine.ext.ereporter.report_generator import ReportGenerator
-from google.appengine.ext.webapp import template
 from google.appengine.ext import ndb
 
 from common import result_helper
@@ -43,6 +41,8 @@ from stats import daily_stats
 from stats import machine_stats
 from stats import runner_stats
 from stats import runner_summary
+
+import template
 
 
 _NUM_USER_TEST_RUNNERS_PER_PAGE = 50
@@ -467,9 +467,7 @@ class MainHandler(webapp2.RequestHandler):
         'machine_id_filter': self.machine_id_filter,
         'test_name_filter': self.test_name_filter,
     }
-
-    path = os.path.join(os.path.dirname(__file__), 'index.html')
-    self.response.out.write(template.render(path, params))
+    self.response.out.write(template.get('index.html').render(params))
 
   def _GetDisplayableRunnerTemplate(self, runner):
     """Puts different aspects of the runner in a displayable format.
@@ -564,9 +562,7 @@ class MachineListHandler(webapp2.RequestHandler):
         'selected_sort': sort_by,
         'sort_options': sort_options,
     }
-
-    path = os.path.join(os.path.dirname(__file__), 'machine_list.html')
-    self.response.out.write(template.render(path, params))
+    self.response.out.write(template.get('machine_list.html').render(params))
 
 
 class DeleteMachineStatsHandler(webapp2.RequestHandler):
@@ -903,9 +899,7 @@ class StatsHandler(webapp2.RequestHandler):
         'max_days_to_show': range(1, max_days_to_show),
         'runner_wait_stats': runner_summary.GetRunnerWaitStats(days_to_show),
     }
-
-    path = os.path.join(os.path.dirname(__file__), 'stats.html')
-    self.response.out.write(template.render(path, params))
+    self.response.out.write(template.get('stats.html').render(params))
 
 
 class GetMatchingTestCasesHandler(webapp2.RequestHandler):
@@ -1186,9 +1180,7 @@ class RunnerSummaryHandler(webapp2.RequestHandler):
         'time_frame': time_frame,
         'runner_summary_graphs': runner_summary_graphs.values(),
     }
-
-    path = os.path.join(os.path.dirname(__file__), 'runner_summary.html')
-    self.response.out.write(template.render(path, params))
+    self.response.out.write(template.get('runner_summary.html').render(params))
 
 
 class DailyStatsGraphHandler(webapp2.RequestHandler):
@@ -1241,9 +1233,7 @@ class DailyStatsGraphHandler(webapp2.RequestHandler):
         'stat_links': GenerateStatLinks(),
         'topbar': GenerateTopbar()
     }
-
-    path = os.path.join(os.path.dirname(__file__), 'graph.html')
-    self.response.out.write(template.render(path, params))
+    self.response.out.write(template.get('graph.html').render(params))
 
 
 class ServerPingHandler(webapp2.RequestHandler):
@@ -1284,9 +1274,7 @@ class UserProfileHandler(webapp2.RequestHandler):
         'whitelists': display_whitelists,
         'change_whitelist_url': _SECURE_CHANGE_WHITELIST_URL
     }
-
-    path = os.path.join(os.path.dirname(__file__), 'user_profile.html')
-    self.response.out.write(template.render(path, params))
+    self.response.out.write(template.get('user_profile.html').render(params))
 
 
 class ChangeWhitelistHandler(webapp2.RequestHandler):
@@ -1339,9 +1327,7 @@ class WaitsByMinuteHandler(webapp2.RequestHandler):
         'wait_breakdown': runner_summary.GetRunnerWaitStatsBreakdown(
             days_to_show)
     }
-
-    path = os.path.join(os.path.dirname(__file__), 'waits_by_minute.html')
-    self.response.out.write(template.render(path, params))
+    self.response.out.write(template.get('waits_by_minute.html').render(params))
 
 
 def SendAuthenticationFailure(request, response):

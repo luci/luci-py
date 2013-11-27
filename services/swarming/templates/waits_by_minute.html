@@ -22,9 +22,9 @@
   </select>
 </div>
 
-{% for dimensions, waits in wait_breakdown.items %}
+{% for dimensions, waits in wait_breakdown|dictsort %}
   <h1>Wait Times for "{{dimensions}}"</h1>
-  <table id="wait-times-breakdown-{{forloop.counter}}"
+  <table id="wait-times-breakdown-{{loop.counter}}"
       class="alterning_background">
     <thead>
       <th>Minutes Waited</th>
@@ -33,7 +33,7 @@
     <tbody>
       {% for count in waits %}
         <tr class="request">
-          <td>{{forloop.counter0}}</td>
+          <td>{{loop.counter0}}</td>
           <td>{{count}}</td>
         </tr>
       {% endfor %}

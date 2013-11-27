@@ -169,8 +169,6 @@ class AppTest(unittest.TestCase):
     self.assertEqual('200 OK', response.status)
 
   def testMachineList(self):
-    self._mox.StubOutWithMock(main_app.template, 'render')
-    main_app.template.render(mox.IgnoreArg(), mox.IgnoreArg()).AndReturn('')
     self._mox.ReplayAll()
 
     # Add a machine to display.
@@ -196,8 +194,6 @@ class AppTest(unittest.TestCase):
     self.assertTrue('204' in response.status)
 
   def testMainHandler(self):
-    self._mox.StubOutWithMock(main_app.template, 'render')
-    main_app.template.render(mox.IgnoreArg(), mox.IgnoreArg()).AndReturn('')
     self._mox.ReplayAll()
 
     # Add a test runner to show on the page.
@@ -330,6 +326,11 @@ class AppTest(unittest.TestCase):
     self.assertEqual('200 OK', response.status)
 
     self._mox.VerifyAll()
+
+  def testUserProfile(self):
+    # Make sure the template renders.
+    response = self.app.get('/secure/user_profile', {})
+    self.assertEquals('200 OK', response.status)
 
   def testChangeWhitelistHandlerParams(self):
     # Make sure the link redirects to the right place.
@@ -556,11 +557,6 @@ class AppTest(unittest.TestCase):
     url_helper.UrlOpen(
         test_helper.DEFAULT_RESULT_URL, data=mox.IgnoreArg()).AndReturn(
             'response')
-
-    self._mox.StubOutWithMock(main_app.template, 'render')
-    for _ in range(len(stat_urls)):
-      main_app.template.render(mox.IgnoreArg(),
-                               mox.IgnoreArg()).AndReturn('')
     self._mox.ReplayAll()
 
     # Create a pending, active and done runner.
