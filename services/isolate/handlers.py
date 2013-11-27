@@ -782,9 +782,9 @@ class RestrictedStoreBlobstoreContentByHashHandler(
 
     entry = create_entry(namespace, hash_key)
     if not entry:
-      stats.log(stats.DUPE, contents[0].size, '')
       self.response.out.write('Entry already existed')
       self._delete(contents)
+      stats.log(stats.DUPE, contents[0].size, '')
       # Still report success.
       return
 
@@ -816,9 +816,9 @@ class RestrictedStoreBlobstoreContentByHashHandler(
         future.wait()
       return
 
-    stats.log(stats.STORE, entry.size, 'GS; %s' % entry.filename)
     self.response.headers['Content-Type'] = 'text/plain'
     self.response.out.write('Content saved.')
+    stats.log(stats.STORE, entry.size, 'GS; %s' % entry.filename)
 
 
 class RestrictedAdminUIHandler(acl.ACLRequestHandler):
@@ -1081,8 +1081,8 @@ class StoreContentByHashHandler(acl.ACLRequestHandler):
 
     entry = create_entry(namespace, hash_key)
     if not entry:
-      stats.log(stats.DUPE, len(content), 'inline')
       self.response.out.write('Entry already existed')
+      stats.log(stats.DUPE, len(content), 'inline')
       return
 
     try:
@@ -1140,8 +1140,8 @@ class StoreContentByHashHandler(acl.ACLRequestHandler):
       save_in_memcache(namespace, hash_key, content)
 
     where = 'GS; ' + entry.filename if entry.filename else 'inline'
-    stats.log(stats.STORE, len(content), where)
     future.wait()
+    stats.log(stats.STORE, len(content), where)
 
 
 class RetrieveContentByHashHandler(acl.ACLRequestHandler,
@@ -1151,8 +1151,8 @@ class RetrieveContentByHashHandler(acl.ACLRequestHandler,
     memcache_entry = memcache.get(hash_key, namespace='table_%s' % namespace)
 
     if memcache_entry:
-      stats.log(stats.RETURN, len(memcache_entry), 'memcache')
       self.response.out.write(memcache_entry)
+      stats.log(stats.RETURN, len(memcache_entry), 'memcache')
       return
 
     entry = get_content_by_hash(namespace, hash_key)
@@ -1169,11 +1169,11 @@ class RetrieveContentByHashHandler(acl.ACLRequestHandler,
 
     if entry.content is not None:
       # Serve directly.
-      stats.log(stats.RETURN, len(entry.content), 'inline')
       self.response.headers['Content-Disposition'] = (
           'attachment; filename="%s"' % hash_key)
       self.response.headers['Content-Type'] = 'application/octet-stream'
       self.response.out.write(entry.content)
+      stats.log(stats.RETURN, len(entry.content), 'inline')
     else:
       if not entry.filename:
         # Corrupted entry. Delete.
@@ -1186,11 +1186,11 @@ class RetrieveContentByHashHandler(acl.ACLRequestHandler,
       # the string is encoded as utf-8.
       blobkey = to_blobkey(
           config.settings().gs_bucket, entry.gs_filepath).encode('utf-8')
-      stats.log(stats.RETURN, entry.size, 'GS; %s' % entry.filename)
       self.send_blob(
           blobkey,
           save_as=hash_key,
           content_type='application/octet-stream')
+      stats.log(stats.RETURN, entry.size, 'GS; %s' % entry.filename)
 
 
 ### New experimental handlers for direct GS access.
@@ -1518,8 +1518,9 @@ class RetrieveContentHandlerGS(acl.ACLRequestHandler, ProtocolHandlerMixin):
   def get(self, namespace, hash_key):  #pylint: disable=W0221
     memcache_entry = memcache.get(hash_key, namespace='table_%s' % namespace)
     if memcache_entry is not None:
+      self.send_data(memcache_entry, filename=hash_key)
       stats.log(stats.RETURN, len(memcache_entry), 'memcache')
-      return self.send_data(memcache_entry, filename=hash_key)
+      return
 
     entry = get_content_by_hash(namespace, hash_key)
     if not entry:
@@ -1527,8 +1528,9 @@ class RetrieveContentHandlerGS(acl.ACLRequestHandler, ProtocolHandlerMixin):
           'Unable to find an entry.\nKey is \'%s\'.' % hash_key, http_code=404)
 
     if entry.content is not None:
+      self.send_data(entry.content, filename=hash_key)
       stats.log(stats.RETURN, len(entry.content), 'inline')
-      return self.send_data(entry.content, filename=hash_key)
+      return
 
     if not entry.filename:
       # Corrupted entry. Delete.
@@ -1538,13 +1540,14 @@ class RetrieveContentHandlerGS(acl.ACLRequestHandler, ProtocolHandlerMixin):
 
     # Generate signed download URL.
     settings = config.settings()
+    # TODO(maruel): The GS object may not exist anymore. Handle this.
     signer = gcs.URLSigner(settings.gs_bucket,
         settings.gs_client_id_email, settings.gs_private_key)
     signed_url = signer.get_download_url(entry.gs_filepath)
 
     # Redirect client to this URL.
-    stats.log(stats.RETURN, entry.size, 'GS; %s' % entry.filename)
     self.redirect(signed_url)
+    stats.log(stats.RETURN, entry.size, 'GS; %s' % entry.filename)
 
 
 class StoreContentHandlerGS(acl.ACLRequestHandler, ProtocolHandlerMixin):
@@ -1703,8 +1706,8 @@ class StoreContentHandlerGS(acl.ACLRequestHandler, ProtocolHandlerMixin):
     # Can create entity now, everything appears to be legit.
     entry = create_entry(namespace, hash_key)
     if not entry:
-      stats.log(stats.DUPE, compressed_size, 'inline')
       self.send_json({'entry': {}})
+      stats.log(stats.DUPE, compressed_size, 'inline')
       return
 
     # If it's not in GS then put it inline.
@@ -1728,7 +1731,6 @@ class StoreContentHandlerGS(acl.ACLRequestHandler, ProtocolHandlerMixin):
 
     # Log stats.
     where = 'GS; ' + entry.filename if entry.filename else 'inline'
-    stats.log(stats.STORE, entry.size, where)
 
     # Verification task will be accessing the entity, so ensure it exists.
     ndb.Future.wait_all(futures)
@@ -1749,6 +1751,7 @@ class StoreContentHandlerGS(acl.ACLRequestHandler, ProtocolHandlerMixin):
 
     # TODO(vadimsh): Fill in details about the entry, such as expiration time.
     self.send_json({'entry': {}})
+    stats.log(stats.STORE, entry.size, where)
 
 
 ###
