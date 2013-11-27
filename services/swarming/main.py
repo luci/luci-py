@@ -650,6 +650,9 @@ class ResultHandler(webapp2.RequestHandler):
     # request.
     result_string = urllib.unquote_plus(self.request.get(
         swarm_constants.RESULT_STRING_KEY))
+    if isinstance(result_string, unicode):
+      result_string = result_string.encode(
+          runner.request.get().GetTestCase().encoding)
 
     # Mark the runner as pinging now to prevent it from timing out while
     # the results are getting stored.

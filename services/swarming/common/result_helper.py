@@ -106,6 +106,7 @@ def StoreResults(results_data):
   Returns:
     A model containing the given data.
   """
+  assert isinstance(results_data, str)
   chunk_futures = []
   if results_data:
     chunk_futures = [
