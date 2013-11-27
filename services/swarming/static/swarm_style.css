@@ -2,19 +2,29 @@
  * Use of this source code is governed by the Apache v2.0 license that can be
  * found in the LICENSE file.
  */
-th {
+table.alterning_background {
+  border: 1;
+  border-color: black;
+  border-collapse: collapse;
+}
+
+table.alterning_background thead {
   color: #fff;
   background-color: #000;
   padding-left: 1em;
   padding-right: 1em;
 }
 
-td {
+table.alterning_background tbody tr:nth-child(even) {
+  background-color: #eeeeee;
+}
+
+table.alterning_background td {
   padding-left: 1em;
   padding-right: 1em;
 }
 
-.request {
+table.alterning_background tbody .request {
   border-top-style: solid;
   border-top-color: black;
   border-top-width: 1px;
@@ -23,19 +33,6 @@ td {
   border-bottom-width: 1px;
 }
 
-.even {
-}
-
-.odd {
-  background-color: #eeeeee;
-}
-
-.failed_test {
-  background-color: #ffdddd;
-}
-
-table {
-  border: 1;
-  border-color: black;
-  border-collapse: collapse;
+table.alterning_background tbody .failed_test {
+  background-color: #ffdddd !important;
 }

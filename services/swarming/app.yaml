@@ -5,6 +5,11 @@ api_version: 1
 threadsafe: true
 
 handlers:
+- url: /([^/]+)\.(css|ico|txt)
+  static_files: static/\1.\2
+  upload: static/(.+)\.(css|ico|txt)
+  secure: always
+
 - url: /task_queues/*
   script: main.app
   secure: always
@@ -21,15 +26,6 @@ handlers:
   script: main.app
   secure: always
   login: admin
-
-- url: /favicon\.ico
-  static_files: static/images/favicon.ico
-  upload: static/images/favicon\.ico
-  secure: always
-
-- url: /css
-  static_dir: static/css
-  secure: always
 
 - url: /_ereporter.*
   script: google.appengine.ext.ereporter.report_generator.application

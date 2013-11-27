@@ -1,74 +1,81 @@
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<!DOCTYPE html>
 <html>
 <head>
-<title>Stats</title>
-<link rel="stylesheet" type="text/css" href="/css/swarm_style.css"/>
+  <title>Stats</title>
+  <link rel="stylesheet" type="text/css" href="/swarm_style.css"/>
 </head>
 <body>
 
 <div style="text-align: right;">
-<p>{{topbar|safe}}</br>
-{{stat_links|safe}}
+  <p>{{topbar|safe}}</br>
+  {{stat_links|safe}}
 </div>
 
 <div style="text-align: right;">
-Days to Show:
-<select id="days_to_show" onchange="document.location.href='?days=' + this.value">
-<option value="">-</option>
-{% for day in max_days_to_show %}
-<option value='{{day}}'>{{day}}</option>
-{% endfor %}
-</select>
+  Days to Show:
+  <select id="days_to_show"
+      onchange="document.location.href='?days=' + this.value">
+    <option value="">-</option>
+    {% for day in max_days_to_show %}
+      <option value='{{day}}'>{{day}}</option>
+    {% endfor %}
+  </select>
 </div>
 
 <h1>Activity in the Last {{days_to_show}} Days</h1>
-<table id="daily-activity-table" summary="This table summarizes the basic server activities over the last week.">
-<tr>
-<th>Date</th>
-<th>Total Number of Shards Requested</th>
-<th>Total Number of Shard Failures</th>
-<th>Total Number of Internal Timeout</th>
-<th>Total Time Runnning Shards (in Minutes)</th>
-<th>Total Time Shards Spent Waiting to Run (in Minutes)</th>
-</tr>
-{% for stats in daily_stats %}
-<tr class="request {% cycle even,odd %}">
-<td>{{stats.date}}</td>
-<td>{{stats.shards_finished}}</td>
-<td>{{stats.shards_failed}}</td>
-<td>{{stats.shards_timed_out}}</td>
-<td>{{stats.total_running_time}}</td>
-<td>{{stats.total_wait_time}}</td>
-</tr>
-{% endfor %}
+<table id="daily-activity-table" class="alterning_background"
+    summary="This table summarizes the basic server activities over the last week.">
+  <thead>
+    <th>Date</th>
+    <th>Total Number of Shards Requested</th>
+    <th>Total Number of Shard Failures</th>
+    <th>Total Number of Internal Timeout</th>
+    <th>Total Time Runnning Shards (in Minutes)</th>
+    <th>Total Time Shards Spent Waiting to Run (in Minutes)</th>
+  </thead>
+  <tbody>
+    {% for stats in daily_stats %}
+      <tr class="request">
+        <td>{{stats.date}}</td>
+        <td>{{stats.shards_finished}}</td>
+        <td>{{stats.shards_failed}}</td>
+        <td>{{stats.shards_timed_out}}</td>
+        <td>{{stats.total_running_time}}</td>
+        <td>{{stats.total_wait_time}}</td>
+      </tr>
+    {% endfor %}
+  </tbody>
 </table>
 
 
 <h1>Runner Wait Times in the Last {{days_to_show}} Days</h1>
 <a href="/waits_by_minute">Minute by Minute Breakdown</a>
-<table id="runner-wait-table"
+<table id="runner-wait-table" class="alterning_background"
     summary="This table lists the wait times of all the runner, grouped by dimensions.">
-<tr>
-<th>Runner Dimensions</th>
-<th>Mean Wait</th>
-<th>Median Wait (Rounded to Nearest Minute)</th>
-<th>Longest Wait (Rounded to Nearest Minute)</th>
-</tr>
-{% for runner_dimensions, runner_summary in runner_wait_stats.items %}
-<tr class="request {% cycle even,odd %}">
-<td>{{runner_dimensions}}</td>
-{% for stat in runner_summary %}
-<td>{{stat}}</td>
-{% endfor %}
-</tr>
-{% endfor %}
+  <thead>
+    <th>Runner Dimensions</th>
+    <th>Mean Wait</th>
+    <th>Median Wait (Rounded to Nearest Minute)</th>
+    <th>Longest Wait (Rounded to Nearest Minute)</th>
+  </thead>
+  <tbody>
+    {% for runner_dimensions, runner_summary in runner_wait_stats.items %}
+      <tr class="request">
+        <td>{{runner_dimensions}}</td>
+        {% for stat in runner_summary %}
+          <td>{{stat}}</td>
+        {% endfor %}
+      </tr>
+    {% endfor %}
+  </tbody>
 </table>
 
 <div style="float: left;"><p>
   <a target="_blank" href="https://code.google.com/appengine/"><img border="0"
    src="https://code.google.com/appengine/images/appengine-noborder-120x30.gif"
-   alt="Powered by Google App Engine" /></a></p>
-</p></div>
+   alt="Powered by Google App Engine" /></a>
+ </p></p>
+</div>
 
 </body>
 </html>
