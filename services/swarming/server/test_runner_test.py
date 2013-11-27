@@ -20,11 +20,9 @@ import test_env
 test_env.setup_test_env()
 
 from google.appengine.api import datastore_errors
-from google.appengine.ext import blobstore
 from google.appengine.ext import testbed
 from google.appengine.ext import ndb
 
-from common import blobstore_helper
 from common import result_helper
 from common import swarm_constants
 from common import url_helper
@@ -589,35 +587,6 @@ class TestRunnerTest(unittest.TestCase):
 
     self._mox.VerifyAll()
 
-  def testDeleteOldBlobs(self):
-    # The first check should show the blob as still young, while the second
-    # time will show the blob as old.
-    self._mox.StubOutWithMock(test_runner, '_GetCurrentTime')
-    test_runner._GetCurrentTime().AndReturn(
-        datetime.datetime.utcnow() +
-        datetime.timedelta(
-            days=swarm_constants.SWARM_OLD_RESULTS_TIME_TO_LIVE_DAYS - 1))
-    test_runner._GetCurrentTime().AndReturn(
-        datetime.datetime.utcnow() +
-        datetime.timedelta(
-            days=swarm_constants.SWARM_OLD_RESULTS_TIME_TO_LIVE_DAYS + 1))
-
-    self._mox.ReplayAll()
-
-    # Add a blob and don't delete it when it is young.
-    blobstore_helper.CreateBlobstore('orphaned blob')
-
-    for rpc in test_runner.DeleteOldBlobs():
-      rpc.wait()
-
-    self.assertEqual(1, blobstore.BlobInfo.all().count())
-
-    # Now the blob is old so delete it.
-    for rpc in test_runner.DeleteOldBlobs():
-      rpc.wait()
-    self.assertEqual(0, blobstore.BlobInfo.all().count())
-
-    self._mox.VerifyAll()
 
 if __name__ == '__main__':
   # We don't want the application logs to interfere with our own messages.

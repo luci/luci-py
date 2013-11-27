@@ -17,11 +17,18 @@ from google.appengine.ext import ndb
 
 from common import swarm_constants
 
+
+# Number of days to keep results around before assuming they are orphans and
+# can be safely deleted. This value should always be more than
+# SWARM_FINISHED_RUNNER_TIME_TO_LIVE_DAYS to ensure they are orphans.
+SWARM_OLD_RESULTS_TIME_TO_LIVE_DAYS = (
+    swarm_constants.SWARM_FINISHED_RUNNER_TIME_TO_LIVE_DAYS + 5)
+
 # The number of days to keep result chunks around before assuming they are
 # orphaned and can be safely deleted. This value should always be more than
 # SWARM_OLD_RESULTS_TIME_TO_LIVE_DAYS to ensure they are orphans.
 SWARM_RESULT_CHUNK_OLD_TIME_TO_LIVE_DAYS = (
-    swarm_constants.SWARM_OLD_RESULTS_TIME_TO_LIVE_DAYS + 5)
+    SWARM_OLD_RESULTS_TIME_TO_LIVE_DAYS + 5)
 
 
 def _GetCurrentTime():
@@ -124,8 +131,7 @@ def DeleteOldResults():
 
   old_cutoff = (
       _GetCurrentTime() -
-      datetime.timedelta(
-          days=swarm_constants.SWARM_OLD_RESULTS_TIME_TO_LIVE_DAYS))
+      datetime.timedelta(days=SWARM_OLD_RESULTS_TIME_TO_LIVE_DAYS))
 
   old_results_query = Results.query(
       Results.created < old_cutoff,

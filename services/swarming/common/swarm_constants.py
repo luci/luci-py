@@ -65,11 +65,3 @@ SWARM_BOT_COMMON_FILES = [
 
 # Number of days to keep old runners around for.
 SWARM_FINISHED_RUNNER_TIME_TO_LIVE_DAYS = 14
-
-# Number of days to keep results around before assuming they are orphans and
-# can be safely deleted. This value should always be more than
-# SWARM_FINISHED_RUNNER_TIME_TO_LIVE_DAYS to ensure they are orphans.
-# TODO(user): Move this to result_helper.py once blobstore_helper.py is
-# removed.
-SWARM_OLD_RESULTS_TIME_TO_LIVE_DAYS = (
-    SWARM_FINISHED_RUNNER_TIME_TO_LIVE_DAYS + 5)

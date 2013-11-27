@@ -16,10 +16,8 @@ import urlparse
 from google.appengine.api import datastore_errors
 from google.appengine.api import mail
 from google.appengine.datastore import datastore_query
-from google.appengine.ext import blobstore
 from google.appengine.ext import ndb
 
-from common import blobstore_helper
 from common import result_helper
 from common import swarm_constants
 from common import test_request_message
@@ -154,12 +152,6 @@ class TestRunner(ndb.Model):
   # timed out so there was no data).
   errors = ndb.StringProperty(indexed=False)
 
-  # TODO(user): Remove this in future CL when the servers no longer have
-  # models that still use this value.
-  # The blobstore reference to the full output of the test.  This key valid only
-  # when the runner has ended (i.e. done == True). Until then, it is None.
-  result_string_reference = ndb.BlobKeyProperty()
-
   # A reference to the class that contains the outputted results. This key is
   # valid only when the runner has ended (i.e. done == True). Until then, it is
   # None.
@@ -178,12 +170,6 @@ class TestRunner(ndb.Model):
     runner = key.get()
     if not runner:
       return
-
-    # We delete the blob referenced by this model because no one
-    # else will ever care about it or try to reference it, so we
-    # are just cleaning up the blobstore.
-    if runner.result_string_reference:
-      blobstore.delete(runner.result_string_reference)
 
     if runner.results_reference:
       runner.results_reference.delete()
@@ -218,16 +204,11 @@ class TestRunner(ndb.Model):
       if the result hasn't been written yet.
     """
     if self.errors:
-      assert self.result_string_reference is None
       assert self.results_reference is None
       return self.errors
 
     if self.results_reference:
       return self.results_reference.get().GetResults()
-
-    # TODO(user): Remove once the servers no longer serve this data.
-    if self.result_string_reference:
-      return blobstore_helper.GetBlobstore(self.result_string_reference)
 
     return ''
 
@@ -276,9 +257,6 @@ class TestRunner(ndb.Model):
     if self.results_reference:
       self.results_reference.delete()
       self.results_reference = None
-    if self.result_string_reference:
-      blobstore.delete(self.result_string_reference)
-      self.result_string_reference = None
 
     self.put()
 
@@ -340,9 +318,6 @@ class TestRunner(ndb.Model):
 
     # Clear any old result strings that are stored if we are overwriting.
     if overwrite:
-      if self.result_string_reference:
-        blobstore.delete(self.result_string_reference)
-        self.result_string_reference = None
       if self.results_reference:
         self.results_reference.delete()
         self.results_reference = None
@@ -796,32 +771,3 @@ def DeleteOldRunners():
   logging.debug('DeleteOldRunners done')
 
   return futures
-
-
-# TODO(user): Delete this in a follow up cl.
-# Keeping this will allow servers to delete the old blobs over time, instead
-# of having to clear them all at once.
-def DeleteOldBlobs():
-  """Remove all the orphaned blobs.
-
-  Returns:
-    The list of rpcs for the async delete calls.
-  """
-  logging.debug('DeleteOrphanedBlobs starting')
-
-  old_cutoff = (
-      _GetCurrentTime() -
-      datetime.timedelta(
-          days=swarm_constants.SWARM_OLD_RESULTS_TIME_TO_LIVE_DAYS))
-
-  old_blobinfo_query = blobstore.BlobInfo.gql(
-      'WHERE creation < :1',
-      old_cutoff,
-      default_options=ndb.QueryOptions(keys_only=True))
-
-  rpcs = [blobstore.delete_async(old_blobinfo.key())
-          for old_blobinfo in old_blobinfo_query]
-
-  logging.debug('DeleteOrphanedBlobs done')
-
-  return rpcs

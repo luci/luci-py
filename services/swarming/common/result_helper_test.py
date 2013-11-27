@@ -22,7 +22,6 @@ from google.appengine.ext import testbed
 from google.appengine.ext import ndb
 
 from common import result_helper
-from common import swarm_constants
 from third_party.mox import mox
 
 
@@ -98,11 +97,11 @@ class ResultHelperTest(unittest.TestCase):
     result_helper._GetCurrentTime().AndReturn(
         datetime.datetime.utcnow() +
         datetime.timedelta(
-            days=swarm_constants.SWARM_OLD_RESULTS_TIME_TO_LIVE_DAYS - 1))
+            days=result_helper.SWARM_OLD_RESULTS_TIME_TO_LIVE_DAYS - 1))
     result_helper._GetCurrentTime().AndReturn(
         datetime.datetime.utcnow() +
         datetime.timedelta(
-            days=swarm_constants.SWARM_OLD_RESULTS_TIME_TO_LIVE_DAYS + 1))
+            days=result_helper.SWARM_OLD_RESULTS_TIME_TO_LIVE_DAYS + 1))
     self._mox.ReplayAll()
 
     self.assertEqual(0, result_helper.Results.query().count())

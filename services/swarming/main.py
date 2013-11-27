@@ -23,11 +23,9 @@ from google.appengine.api import mail
 from google.appengine.api import mail_errors
 from google.appengine.api import taskqueue
 from google.appengine.api import users
-from google.appengine.ext import blobstore
 from google.appengine.ext import db
 from google.appengine.ext import ereporter
 from google.appengine.ext.ereporter.report_generator import ReportGenerator
-from google.appengine.ext.webapp import blobstore_handlers
 from google.appengine.ext.webapp import template
 from google.appengine.ext import ndb
 
@@ -654,7 +652,7 @@ class ResultHandler(webapp2.RequestHandler):
         swarm_constants.RESULT_STRING_KEY))
 
     # Mark the runner as pinging now to prevent it from timing out while
-    # the results are getting stored in the blobstore.
+    # the results are getting stored.
     test_runner.PingRunner(runner.key.urlsafe(), machine_id)
 
     results = result_helper.StoreResults(result_string)
@@ -674,31 +672,16 @@ class CleanupDataHandler(webapp2.RequestHandler):
 
   def post(self):
     try:
-      # The blob deletion use a different rpc callback than the ndb models.
-      rpcs = test_runner.DeleteOldBlobs()
-
       futures = []
       futures.extend(test_management.DeleteOldErrors())
-
       futures.extend(dimension_mapping.DeleteOldDimensionMapping())
-
       futures.extend(test_runner.DeleteOldRunners())
-
       futures.extend(daily_stats.DeleteOldDailyStats())
-
       futures.extend(runner_stats.DeleteOldRunnerStats())
-
       futures.extend(runner_summary.DeleteOldWaitSummaries())
-
       futures.extend(result_helper.DeleteOldResults())
-
       futures.extend(result_helper.DeleteOldResultChunks())
-
-      for rpc in rpcs:
-        rpc.wait()
-
       ndb.Future.wait_all(futures)
-
       self.response.out.write('Successfully cleaned up old data.')
     except datastore_errors.Timeout:
       logging.info('Ran out of time while cleaning up data. Triggering '
@@ -1339,25 +1322,6 @@ class RemoteErrorHandler(webapp2.RequestHandler):
     self.response.out.write('Error logged')
 
 
-# TODO(user): Is this function still needed? It can probably be removed
-# after blobstore_helper is removed.
-class UploadHandler(blobstore_handlers.BlobstoreUploadHandler):
-  def post(self):
-    """Handles HTTP POST requests for this handler's URL."""
-    upload_result = self.get_uploads('result')
-
-    if len(upload_result) != 1:
-      self.response.set_status(403)
-      self.response.out.write('Expected 1 upload but received %d',
-                              len(upload_result))
-
-      blobstore.delete((b.key() for b in upload_result))
-      return
-
-    blob_info = upload_result[0]
-    self.response.out.write(blob_info.key())
-
-
 class WaitsByMinuteHandler(webapp2.RequestHandler):
   """Handler for displaying the wait times, broken by minute, per dimensions."""
 
@@ -1442,7 +1406,6 @@ def CreateApplication():
       ('/tasks/trigger_generate_daily_stats', TriggerGenerateDailyStats),
       ('/tasks/trigger_generate_recent_stats', TriggerGenerateRecentStats),
       ('/test', TestRequestHandler),
-      ('/upload', UploadHandler),
       ('/waits_by_minute', WaitsByMinuteHandler),
       (_DELETE_MACHINE_STATS_URL, DeleteMachineStatsHandler),
       (_SECURE_CANCEL_URL, CancelHandler),

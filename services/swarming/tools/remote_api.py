@@ -125,7 +125,6 @@ def LoadContext(sdk_path, app_dir, host, app_id, version):
     os.environ['SERVER_SOFTWARE'] = 'Development (remote_api_shell)/1.0'
 
     # Create shortcuts.
-    from common import blobstore_helper
     from common import dimensions_utils
     from common import swarm_constants
     from server import admin_user
