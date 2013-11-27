@@ -1,0 +1,5 @@
+This directory contains the services needed for a Swarming infrastructure.
+
+- components/ contains the code shared by both servers.
+- isolate/ contains the code for the Isolate Server.
+- swarming/ contains the code for the Swarming Server.

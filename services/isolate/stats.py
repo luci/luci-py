@@ -18,7 +18,7 @@ from google.appengine.api import logservice
 from google.appengine.ext import ndb
 from google.appengine.runtime import DeadlineExceededError
 
-from common import stats_framework
+from components import stats_framework
 import config
 import template
 import utils

@@ -10,7 +10,7 @@ import unittest
 import test_env
 test_env.setup_test_env()
 
-from common import ereporter2
+from components import ereporter2
 import test_case
 
 

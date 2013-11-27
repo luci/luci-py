@@ -2,7 +2,7 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
-"""Top-level presubmit script for common.
+"""Top-level presubmit script for services/components/.
 
 See http://dev.chromium.org/developers/how-tos/depottools/presubmit-scripts for
 details on the presubmit API built into gcl.
@@ -44,7 +44,7 @@ def CommonChecks(input_api, output_api):
     appcfg.fix_sys_path()
     # Add project specific paths to sys.path
     sys.path = [
-      # To support 'from common import ...'
+      # To support 'from components import ...'
       join('..'),
       join('tests'),
       # See tests/test_env.py for more information.
