@@ -13,8 +13,8 @@ import os
 import subprocess
 import sys
 
-ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.join(ROOT_DIR, '..', '..', 'tools', 'third_party'))
+TOOLS_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(TOOLS_DIR, 'third_party'))
 
 from depot_tools import git_number
 from depot_tools import git_common

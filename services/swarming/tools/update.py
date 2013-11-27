@@ -3,24 +3,22 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
-"""Updates Isolate server with the version derived from the current git checkout
-state.
+"""Updates Swarming server with the version derived from the current git
+checkout state.
 """
 
 import os
 import sys
 
-import app_config
-
-ROOT_DIR = os.path.dirname(app_config.APP_DIR)
-sys.path.insert(0, os.path.join(ROOT_DIR, 'tools'))
+APP_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(APP_DIR, '..', 'tools'))
 
 import update_instance
 
 
 def main():
   return update_instance.main(
-      sys.argv[1:], app_config.APP_DIR, app_config.MODULES)
+      sys.argv[1:], APP_DIR, [os.path.join(APP_DIR, 'app.yaml')])
 
 
 if __name__ == '__main__':
