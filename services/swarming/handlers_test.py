@@ -3,14 +3,13 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
-"""Tests the app engine handlers in main.py."""
-
-
 import datetime
 import json
 import logging
 import os
 import unittest
+
+APP_DIR = os.path.dirname(os.path.abspath(__file__))
 
 import test_env
 
@@ -20,7 +19,7 @@ from google.appengine.api import apiproxy_stub_map
 from google.appengine.datastore import datastore_stub_util
 from google.appengine.ext import testbed
 
-import main as main_app
+import handlers
 from common import dimensions_utils
 from common import swarm_constants
 from common import url_helper
@@ -45,28 +44,27 @@ MACHINE_ID = '12345678-12345678-12345678-12345678'
 
 class AppTest(unittest.TestCase):
   def setUp(self):
+    super(AppTest, self).setUp()
+    handlers.ALLOW_ACCESS_FROM_DOMAINS = ('example.com',)
+
+    # Some tests require this to be set.
+    os.environ['CURRENT_VERSION_ID'] = '1.1'
+
     self.testbed = testbed.Testbed()
     self.testbed.activate()
     self.testbed.init_all_stubs()
 
     # Ensure the test can find queue.yaml.
-    queue_yaml_directory = os.path.dirname(__file__)
     taskqueue_stub = apiproxy_stub_map.apiproxy.GetStub('taskqueue')
-    taskqueue_stub._root_path = queue_yaml_directory
+    taskqueue_stub._root_path = APP_DIR
 
-    # Some tests require this to be set.
-    os.environ['CURRENT_VERSION_ID'] = '1.1'
-
-    self.app = webtest.TestApp(main_app.CreateApplication())
+    self.app = webtest.TestApp(handlers.CreateApplication())
 
     # A basic config hash to use when creating runners.
     self.config_hash = dimensions_utils.GenerateDimensionHash({})
 
     # Authenticate with none as IP.
     user_manager.AddWhitelist(None)
-
-    # For testing, accept emails from the google domain.
-    main_app.ALLOW_ACCESS_FROM_DOMAINS = ('google.com')
 
     # Setup mox handler.
     self._mox = mox.Mox()
@@ -75,6 +73,7 @@ class AppTest(unittest.TestCase):
     self.testbed.deactivate()
     self._mox.UnsetStubs()
     self._mox.ResetAll()
+    super(AppTest, self).tearDown()
 
   def _GetRequest(self):
     return test_request.TestRequest.query().get()
@@ -95,9 +94,9 @@ class AppTest(unittest.TestCase):
     # Mock out all the authenication, since it doesn't work with the server
     # being only eventually consisten (but it is ok for the machines to take
     # a while to appear).
-    self._mox.StubOutWithMock(main_app, 'IsAuthenticatedMachine')
+    self._mox.StubOutWithMock(handlers, 'IsAuthenticatedMachine')
     for _ in range(3):
-      main_app.IsAuthenticatedMachine(mox.IgnoreArg()).AndReturn(True)
+      handlers.IsAuthenticatedMachine(mox.IgnoreArg()).AndReturn(True)
     self._mox.ReplayAll()
 
     # Test when no matching tests.
@@ -129,10 +128,10 @@ class AppTest(unittest.TestCase):
     self._mox.VerifyAll()
 
   def testGetResultHandler(self):
-    handlers = ['/get_result', '/secure/get_result']
+    handler_urls = ['/get_result', '/secure/get_result']
 
     # Test when no matching key
-    for handler in handlers:
+    for handler in handler_urls:
       response = self.app.get(handler, {'r': 'fake_key'}, status=204)
       self.assertTrue('204' in response.status)
 
@@ -141,13 +140,13 @@ class AppTest(unittest.TestCase):
                                              exit_codes='[0]')
 
     # Invalid key.
-    for handler in handlers:
+    for handler in handler_urls:
       response = self.app.get(handler,
                               {'r': self._GetRequest().key.urlsafe()})
       self.assertTrue('204' in response.status)
 
     # Valid key.
-    for handler in handlers:
+    for handler in handler_urls:
       response = self.app.get(handler, {'r': runner.key.urlsafe()})
       self.assertEquals('200 OK', response.status)
 
@@ -384,18 +383,20 @@ class AppTest(unittest.TestCase):
     password = '4321'
 
     # List of non-secure handlers and their method.
-    handlers = [('/cleanup_results', self.app.post),
-                ('/get_matching_test_cases', self.app.get),
-                ('/get_result', self.app.get),
-                ('/get_slave_code', self.app.get),
-                ('/poll_for_test', self.app.post),
-                ('/remote_error', self.app.post),
-                ('/result', self.app.post),
-                ('/test', self.app.post)]
+    handlers_to_check = [
+        ('/cleanup_results', self.app.post),
+        ('/get_matching_test_cases', self.app.get),
+        ('/get_result', self.app.get),
+        ('/get_slave_code', self.app.get),
+        ('/poll_for_test', self.app.post),
+        ('/remote_error', self.app.post),
+        ('/result', self.app.post),
+        ('/test', self.app.post),
+    ]
 
     # Make sure non-whitelisted requests are rejected.
     user_manager.DeleteWhitelist(None)
-    for handler, method in handlers:
+    for handler, method in handlers_to_check:
       response = method(handler, {}, expect_errors=True)
       self.assertEqual(
           '403 Forbidden', response.status, msg='Handler: ' + handler)
@@ -404,13 +405,13 @@ class AppTest(unittest.TestCase):
     user_manager.AddWhitelist(None, password=password)
 
     # Make sure whitelisted requests are accepted.
-    for handler, method in handlers:
+    for handler, method in handlers_to_check:
       response = method(handler, {'password': password}, expect_errors=True)
       self.assertNotEqual(
           '403 Forbidden', response.status, msg='Handler: ' + handler)
 
     # Make sure invalid passwords are rejected.
-    for handler, method in handlers:
+    for handler, method in handlers_to_check:
       response = method(
           handler, {'password': 'something else'}, expect_errors=True)
       self.assertEqual(
@@ -442,7 +443,7 @@ class AppTest(unittest.TestCase):
           '403 Forbidden', response.status, msg='Handler: ' + handler)
 
     # Make sure all requests from unknown account are rejected.
-    self._ReplaceCurrentUser('someone@example.com')
+    self._ReplaceCurrentUser('someone@denied.com')
     for handler, method in allowed + forbidden:
       response = method(handler, expect_errors=True)
       self.assertEqual(
@@ -450,7 +451,7 @@ class AppTest(unittest.TestCase):
 
     # Make sure for a known account 'allowed' methods are accessible
     # and 'forbidden' are not.
-    self._ReplaceCurrentUser('someone@google.com')
+    self._ReplaceCurrentUser('someone@example.com')
     for handler, method in allowed:
       response = method(handler, expect_errors=True)
       self.assertNotEqual(
@@ -657,8 +658,8 @@ class AppTest(unittest.TestCase):
     version = os.environ['CURRENT_VERSION_ID']
     major, minor = version.split('.')
     yesterday = datetime.datetime.utcnow().date() - datetime.timedelta(days=1)
-    main_app.ereporter.ExceptionRecord(
-        key_name=main_app.ereporter.ExceptionRecord.get_key_name(
+    handlers.ereporter.ExceptionRecord(
+        key_name=handlers.ereporter.ExceptionRecord.get_key_name(
             'X', version, yesterday),
         signature='X',
         major_version=major,
@@ -668,7 +669,7 @@ class AppTest(unittest.TestCase):
         http_method='GET',
         url='/nowhere',
         handler='No one').put()
-    admin_user.AdminUser(email='admin@example.com').put()
+    admin_user.AdminUser(email='admin@denied.com').put()
 
     response = self.app.get('/tasks/sendereporter')
     self.assertTrue('200 OK' in response.status)
@@ -679,12 +680,12 @@ class AppTest(unittest.TestCase):
         'response')
     self._mox.ReplayAll()
 
-    response = self.app.post(main_app._SECURE_CANCEL_URL, {'r': 'invalid_key'})
+    response = self.app.post(handlers._SECURE_CANCEL_URL, {'r': 'invalid_key'})
     self.assertEquals('200 OK', response.status)
     self.assertTrue('Cannot find runner' in response.body, response.body)
 
     runner = test_helper.CreatePendingRunner()
-    response = self.app.post(main_app._SECURE_CANCEL_URL,
+    response = self.app.post(handlers._SECURE_CANCEL_URL,
                              {'r': runner.key.urlsafe()})
     self.assertEquals('200 OK', response.status)
     self.assertEquals('Runner canceled.', response.body)

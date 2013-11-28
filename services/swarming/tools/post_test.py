@@ -3,7 +3,16 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
-"""Sends test requests to the TRS."""
+"""Sends test requests to the Swarming server.
+
+The request is taken from a file as specified on the command line and must be
+formatted as explained in http://code.google.com/p/swarming/wiki/SwarmFileFormat
+
+If no filename is specified, or if - is specified as the filename, standard
+input is used to read the request.
+
+The results of the test will be visible on the Swarming server web interface.
+"""
 
 import json
 import optparse
@@ -12,17 +21,6 @@ import sys
 import time
 import urllib
 import urllib2
-
-
-DESCRIPTION = """This script sends a test request to a TRS server.  The request
-is taken from a file as specified on the command line and must be formatted
-as explained in http://code.google.com/p/swarming/wiki/SwarmFileFormat.
-
-If no filename is specified, or if - is specified as the filename, standard
-input is used to read the request.
-
-The results of the test will be visible on the TRS web interface.
-"""
 
 
 def WaitForResults(running_test_keys, base_url, sleep_time, verbose=False):
@@ -63,7 +61,7 @@ def WaitForResults(running_test_keys, base_url, sleep_time, verbose=False):
 
 def main():
   parser = optparse.OptionParser(usage='%prog [options] [filename]',
-                                 description=DESCRIPTION)
+                                 description=sys.modules[__name__].__doc__)
   parser.add_option('-w', '--wait', dest='wait_for_results',
                     action='store_true',
                     help='Wait for all test to complete and print their output')

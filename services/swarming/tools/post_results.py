@@ -3,9 +3,9 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
-"""Sends test results to the TRS.
+"""Sends test results to the Swarming server.
 
-This is a useful debugging tool to fake sending results to the TRS.
+This is a useful debugging tool to fake sending results to the Swarming server.
 """
 
 import optparse
