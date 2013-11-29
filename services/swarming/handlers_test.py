@@ -467,17 +467,15 @@ class AppTest(unittest.TestCase):
   def testAllHandlersAreSecured(self):
     # URL prefixes that correspond to 'login: admin' areas in app.yaml.
     # Handlers that correspond to this prefixes are protected by GAE itself.
-    secured_paths = ['/task_queues/', '/tasks/', '/secure/', '/_ereporter']
+    secured_paths = ['/secure/', '/_ereporter']
 
     # Handlers that are explicitly allowed to be called by anyone.
-    # TODO(user): Figure out how to protected access to '/upload'.
     allowed_urls = set([
         '/',
         '/graphs/daily_stats',
         '/runner_summary',
         '/server_ping',
         '/stats',
-        '/upload',
         '/waits_by_minute',
     ])
 
@@ -590,9 +588,9 @@ class AppTest(unittest.TestCase):
     self.taskqueue_stub = self.testbed.get_stub(testbed.TASKQUEUE_SERVICE_NAME)
 
     task_queue_url_triggers = [
-        '/tasks/trigger_cleanup_data',
-        '/tasks/trigger_generate_daily_stats',
-        '/tasks/trigger_generate_recent_stats',
+        '/secure/cron/trigger_cleanup_data',
+        '/secure/cron/trigger_generate_daily_stats',
+        '/secure/cron/trigger_generate_recent_stats',
         ]
 
     for i, task_queue_url_trigger in enumerate(task_queue_url_triggers):
@@ -612,8 +610,8 @@ class AppTest(unittest.TestCase):
 
   def testCronJobTasks(self):
     cron_job_urls = [
-        '/tasks/abort_stale_runners',
-        '/tasks/detect_dead_machines',
+        '/secure/cron/abort_stale_runners',
+        '/secure/cron/detect_dead_machines',
         ]
 
     for cron_job_url in cron_job_urls:
@@ -626,7 +624,7 @@ class AppTest(unittest.TestCase):
       self.assertEquals('405 Method Not Allowed', response.status, cron_job_url)
 
   def testDetectHangingRunners(self):
-    response = self.app.get('/tasks/detect_hanging_runners')
+    response = self.app.get('/secure/cron/detect_hanging_runners')
     self.assertEqual('200 OK', response.status)
 
     # Test when there is a hanging runner.
@@ -635,12 +633,12 @@ class AppTest(unittest.TestCase):
         minutes=2 * test_runner.TIME_BEFORE_RUNNER_HANGING_IN_MINS)
     runner.put()
 
-    response = self.app.get('/tasks/detect_hanging_runners')
+    response = self.app.get('/secure/cron/detect_hanging_runners')
     self.assertEqual('200 OK', response.status)
 
   def testSendEReporter_NoAdmin(self):
     # Ensure this function correctly complains if the admin email isn't set.
-    response = self.app.get('/tasks/sendereporter', expect_errors=True)
+    response = self.app.get('/secure/cron/sendereporter', expect_errors=True)
     self.assertEqual('400 Bad Request', response.status)
     self.assertEqual('Invalid admin email, \'\'. Must be a valid email.',
                      response.body)
@@ -648,7 +646,7 @@ class AppTest(unittest.TestCase):
   def testSendEReporter_GarbageAdmin(self):
     # Ensure this function complains when a garbage email is set.
     admin_user.AdminUser().put()
-    response = self.app.get('/tasks/sendereporter', expect_errors=True)
+    response = self.app.get('/secure/cron/sendereporter', expect_errors=True)
     self.assertEqual('400 Bad Request', response.status)
     self.assertEqual('Invalid admin email, \'None\'. Must be a valid email.',
                      response.body)
@@ -671,7 +669,7 @@ class AppTest(unittest.TestCase):
         handler='No one').put()
     admin_user.AdminUser(email='admin@denied.com').put()
 
-    response = self.app.get('/tasks/sendereporter')
+    response = self.app.get('/secure/cron/sendereporter')
     self.assertTrue('200 OK' in response.status)
 
   def testCancelHandler(self):

@@ -10,18 +10,6 @@ handlers:
   upload: static/(.+)\.(css|ico|txt)
   secure: always
 
-- url: /task_queues/*
-  script: main.app
-  secure: always
-  login: admin
-
-- url: /tasks/*
-  script: main.app
-  secure: always
-  login: admin
-
-# Protected handlers that require login.
-# TODO(user): Allow admins to whitelist users that can access secure pages.
 - url: /secure/.*
   script: main.app
   secure: always

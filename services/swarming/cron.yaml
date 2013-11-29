@@ -1,28 +1,28 @@
 cron:
 - description: Abort stale runners
-  url: /tasks/abort_stale_runners
+  url: /secure/cron/abort_stale_runners
   schedule: every 1 minutes
 
 - description: Trigger the cleanup of old data and orphaned blobs
-  url: /tasks/trigger_cleanup_data
+  url: /secure/cron/trigger_cleanup_data
   schedule: every 6 hours
 
 - description: Daily exception report
-  url: /tasks/sendereporter
+  url: /secure/cron/sendereporter
   schedule: every day 00:00
 
 - description: Detect dead machines
-  url: /tasks/detect_dead_machines
+  url: /secure/cron/detect_dead_machines
   schedule: every 1 hours
 
 - description: Detect hanging runners
-  url: /tasks/detect_hanging_runners
+  url: /secure/cron/detect_hanging_runners
   schedule: every 10 minutes
 
 - description: Generate daily stats
-  url: /tasks/trigger_generate_daily_stats
+  url: /secure/cron/trigger_generate_daily_stats
   schedule: every day 00:30
 
 - description: Generate recent stats
-  url: /tasks/trigger_generate_recent_stats
+  url: /secure/cron/trigger_generate_recent_stats
   schedule: every 5 minutes

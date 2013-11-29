@@ -685,7 +685,7 @@ class CleanupDataHandler(webapp2.RequestHandler):
     except datastore_errors.Timeout:
       logging.info('Ran out of time while cleaning up data. Triggering '
                    'another cleanup.')
-      taskqueue.add(method='POST', url='/task_queues/cleanup_data',
+      taskqueue.add(method='POST', url='/secure/task_queues/cleanup_data',
                     queue_name='cleanup')
 
 
@@ -725,7 +725,7 @@ class TriggerCleanupDataHandler(CronJobHandler):
   """Handles cron jobs to delete orphaned blobs."""
 
   def post(self):
-    taskqueue.add(method='POST', url='/task_queues/cleanup_data',
+    taskqueue.add(method='POST', url='/secure/task_queues/cleanup_data',
                   queue_name='cleanup')
     self.response.out.write('Successfully triggered task to clean up old data.')
 
@@ -734,7 +734,7 @@ class TriggerGenerateDailyStats(CronJobHandler):
   """Handles cron jobs to generate daily stats."""
 
   def post(self):
-    taskqueue.add(method='POST', url='/task_queues/generate_daily_stats',
+    taskqueue.add(method='POST', url='/secure/task_queues/generate_daily_stats',
                   queue_name='stats')
     self.response.out.write('Successfully triggered task to generate daily '
                             'stats.')
@@ -744,7 +744,8 @@ class TriggerGenerateRecentStats(CronJobHandler):
   """Handles cron jobs to generate recent stats."""
 
   def post(self):
-    taskqueue.add(method='POST', url='/task_queues/generate_recent_stats',
+    taskqueue.add(method='POST',
+                  url='/secure/task_queues/generate_recent_stats',
                   queue_name='stats')
     self.response.out.write('Successfully triggered task to generate recent '
                             'stats.')
@@ -1378,22 +1379,23 @@ def CreateApplication():
       ('/result', ResultHandler),
       ('/runner_ping', RunnerPingHandler),
       ('/runner_summary', RunnerSummaryHandler),
+      ('/secure/cron/abort_stale_runners', AbortStaleRunnersHandler),
+      ('/secure/cron/detect_dead_machines', DetectDeadMachinesHandler),
+      ('/secure/cron/detect_hanging_runners', DetectHangingRunnersHandler),
+      ('/secure/cron/sendereporter', SendEReporterHandler),
+      ('/secure/cron/trigger_cleanup_data', TriggerCleanupDataHandler),
+      ('/secure/cron/trigger_generate_daily_stats', TriggerGenerateDailyStats),
+      ('/secure/cron/trigger_generate_recent_stats',
+          TriggerGenerateRecentStats),
       ('/secure/machine_list', MachineListHandler),
       ('/secure/retry', RetryHandler),
       ('/secure/show_message', ShowMessageHandler),
+      ('/secure/task_queues/cleanup_data', CleanupDataHandler),
+      ('/secure/task_queues/generate_daily_stats', GenerateDailyStatsHandler),
+      ('/secure/task_queues/generate_recent_stats', GenerateRecentStatsHandler),
       ('/secure/upload_start_slave', UploadStartSlaveHandler),
       ('/server_ping', ServerPingHandler),
       ('/stats', StatsHandler),
-      ('/task_queues/cleanup_data', CleanupDataHandler),
-      ('/task_queues/generate_daily_stats', GenerateDailyStatsHandler),
-      ('/task_queues/generate_recent_stats', GenerateRecentStatsHandler),
-      ('/tasks/abort_stale_runners', AbortStaleRunnersHandler),
-      ('/tasks/detect_dead_machines', DetectDeadMachinesHandler),
-      ('/tasks/detect_hanging_runners', DetectHangingRunnersHandler),
-      ('/tasks/sendereporter', SendEReporterHandler),
-      ('/tasks/trigger_cleanup_data', TriggerCleanupDataHandler),
-      ('/tasks/trigger_generate_daily_stats', TriggerGenerateDailyStats),
-      ('/tasks/trigger_generate_recent_stats', TriggerGenerateRecentStats),
       ('/test', TestRequestHandler),
       ('/waits_by_minute', WaitsByMinuteHandler),
       (_DELETE_MACHINE_STATS_URL, DeleteMachineStatsHandler),
