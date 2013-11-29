@@ -20,6 +20,7 @@ def setup_test_env():
     raise Exception('Unable to find gae sdk path, aborting test.')
 
   find_gae_sdk.setup_gae_sdk(gae_sdk)
+  find_gae_sdk.setup_env(ROOT_DIR, None, None, None)
 
   # Add the path for the third party code.
   sys.path.insert(0, os.path.join(ROOT_DIR, 'third_party'))

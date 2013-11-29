@@ -24,7 +24,7 @@
 
 {% for dimensions, waits in wait_breakdown|dictsort %}
   <h1>Wait Times for "{{dimensions}}"</h1>
-  <table id="wait-times-breakdown-{{loop.counter}}"
+  <table id="wait-times-breakdown-{{loop.index0}}"
       class="alterning_background">
     <thead>
       <th>Minutes Waited</th>
@@ -33,7 +33,7 @@
     <tbody>
       {% for count in waits %}
         <tr class="request">
-          <td>{{loop.counter0}}</td>
+          <td>{{loop.index0}}</td>
           <td>{{count}}</td>
         </tr>
       {% endfor %}

@@ -47,9 +47,6 @@ class AppTest(unittest.TestCase):
     super(AppTest, self).setUp()
     handlers.ALLOW_ACCESS_FROM_DOMAINS = ('example.com',)
 
-    # Some tests require this to be set.
-    os.environ['CURRENT_VERSION_ID'] = '1.1'
-
     self.testbed = testbed.Testbed()
     self.testbed.activate()
     self.testbed.init_all_stubs()

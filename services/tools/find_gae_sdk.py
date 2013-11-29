@@ -7,6 +7,7 @@
 import os
 import subprocess
 import sys
+import time
 
 # Directory with this file.
 TOOLS_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -61,7 +62,8 @@ def setup_env(app_dir, app_id, version, module_id):
   if app_id:
     os.environ['APPLICATION_ID'] = app_id
   if version:
-    os.environ['CURRENT_VERSION_ID'] = str(version)
+    os.environ['CURRENT_VERSION_ID'] = '%s.%d' % (
+        version, int(time.time()) << 28)
   if module_id:
     os.environ['CURRENT_MODULE_ID'] = module_id
 
