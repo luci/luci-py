@@ -230,6 +230,35 @@ class SortOptions(object):
     self.name = name
 
 
+def require_cronjob(f):
+  """Enforces cronjob."""
+  def hook(self, *args, **kwargs):
+    if self.request.headers.get('X-AppEngine-Cron') != 'true':
+      self.response.headers['Content-Type'] = 'text/plain'
+      self.response.set_status(405)
+      self.response.out.write('Only internal cron jobs can do this')
+      return
+    return f(self, *args, **kwargs)
+  return hook
+
+
+def require_taskqueue(task_name):
+  """Enforces the task is run with a specific task queue."""
+  def decorator(f):
+    def hook(self, *args, **kwargs):
+      if self.request.headers.get('X-AppEngine-QueueName') != task_name:
+        self.response.headers['Content-Type'] = 'text/plain'
+        self.response.set_status(405)
+        self.response.out.write('Only internal task %s can do this' % task_name)
+        return
+      return f(self, *args, **kwargs)
+    return hook
+  return decorator
+
+
+### Handlers
+
+
 class MainHandler(webapp2.RequestHandler):
   """Handler for the main page of the web server.
 
@@ -387,7 +416,6 @@ class MainHandler(webapp2.RequestHandler):
     return html
 
   def get(self):
-    """Handles HTTP GET requests for this handler's URL."""
     # Build info for test requests table.
     sort_by = self.request.get('sort_by')
     sort_split = sort_by.split('_', 1)
@@ -518,7 +546,6 @@ class RedirectToMainHandler(webapp2.RequestHandler):
   """Handler to redirect requests to base page secured main page."""
 
   def get(self):
-    """Handles HTTP GET requests for this handler's URL."""
     self.redirect(_SECURE_MAIN_URL)
 
 
@@ -530,7 +557,6 @@ class MachineListHandler(webapp2.RequestHandler):
   """
 
   def get(self):
-    """Handles HTTP GET requests for this handler's URL."""
     sort_by = self.request.get('sort_by', '')
     if sort_by != 'status' and sort_by not in machine_stats.ACCEPTABLE_SORTS:
       sort_by = 'machine_id'
@@ -570,9 +596,9 @@ class DeleteMachineStatsHandler(webapp2.RequestHandler):
 
   @AuthenticateMachineOrUser
   def post(self):
-    """Handles HTTP POST requests for this handler's URL."""
     key = self.request.get('r')
 
+    self.response.headers['Content-Type'] = 'text/plain'
     if key and machine_stats.DeleteMachineStats(key):
       self.response.out.write('Machine Assignment removed.')
     else:
@@ -590,10 +616,10 @@ class TestRequestHandler(webapp2.RequestHandler):
 
   @AuthenticateMachineOrUser
   def post(self):
-    """Handles HTTP POST requests for this handler's URL."""
     # Validate the request.
     if not self.request.get('request'):
       self.response.set_status(402)
+      self.response.headers['Content-Type'] = 'text/plain'
       self.response.out.write('No request parameter found')
       return
 
@@ -612,7 +638,6 @@ class ResultHandler(webapp2.RequestHandler):
 
   @AuthenticateMachine
   def post(self):
-    """Handles HTTP POST requests for this handler's URL."""
     # TODO(user): Share this code between all the request handlers so we
     # can always see how often a request is being sent.
     connection_attempt = self.request.get(url_helper.COUNT_KEY)
@@ -655,20 +680,21 @@ class ResultHandler(webapp2.RequestHandler):
     test_runner.PingRunner(runner.key.urlsafe(), machine_id)
 
     results = result_helper.StoreResults(result_string)
-    if runner.UpdateTestResult(machine_id,
-                               success=success,
-                               exit_codes=exit_codes,
-                               results=results,
-                               overwrite=overwrite):
-      self.response.out.write('Successfully update the runner results.')
-    else:
-      self.response.set_status(400)
-      self.response.out.write('Failed to update the runner results.')
+    if not runner.UpdateTestResult(
+        machine_id,
+        success=success,
+        exit_codes=exit_codes,
+        results=results,
+        overwrite=overwrite):
+      self.abort(400, 'Failed to update the runner results.')
+    self.response.headers['Content-Type'] = 'text/plain'
+    self.response.out.write('Successfully update the runner results.')
 
 
-class CleanupDataHandler(webapp2.RequestHandler):
-  """Handles tasks to delete orphaned blobs."""
+class TaskCleanupDataHandler(webapp2.RequestHandler):
+  """Deletes orphaned blobs."""
 
+  @require_taskqueue('cleanup')
   def post(self):
     try:
       futures = []
@@ -681,98 +707,78 @@ class CleanupDataHandler(webapp2.RequestHandler):
       futures.extend(result_helper.DeleteOldResults())
       futures.extend(result_helper.DeleteOldResultChunks())
       ndb.Future.wait_all(futures)
-      self.response.out.write('Successfully cleaned up old data.')
     except datastore_errors.Timeout:
       logging.info('Ran out of time while cleaning up data. Triggering '
                    'another cleanup.')
       taskqueue.add(method='POST', url='/secure/task_queues/cleanup_data',
                     queue_name='cleanup')
+    self.response.headers['Content-Type'] = 'text/plain'
+    self.response.out.write('Success.')
 
 
-class CronJobHandler(webapp2.RequestHandler):
-  """A helper class to handle redirecting GET cron jobs to POSTs."""
+class CronAbortStaleRunnersHandler(webapp2.RequestHandler):
+  """Aborts stale runners."""
 
+  @require_cronjob
   def get(self):
-    """Handles HTTP GET requests for this handler's URL."""
-    # Only an app engine cron job is allowed to poll via get (it currently
-    # has no way to make its request a post).
-    if self.request.headers.get('X-AppEngine-Cron') != 'true':
-      self.response.out.write('Only internal cron jobs can do this')
-      self.response.set_status(405)
-      return
-
-    self.post()
-
-
-class AbortStaleRunnersHandler(CronJobHandler):
-  """Handles cron jobs to abort stale runners."""
-
-  def post(self):
-    """Handles HTTP POST requests for this handler's URL."""
-
-    logging.debug('Polling')
     test_management.AbortStaleRunners()
-    self.response.out.write("""
-    <html>
-    <head>
-    <title>Poll Done</title>
-    </head>
-    <body>Poll Done</body>
-    </html>""")
+    self.response.headers['Content-Type'] = 'text/plain'
+    self.response.out.write('Success.')
 
 
-class TriggerCleanupDataHandler(CronJobHandler):
-  """Handles cron jobs to delete orphaned blobs."""
+class CronTriggerCleanupDataHandler(webapp2.RequestHandler):
+  """Triggers task to delete orphaned blobs."""
 
-  def post(self):
+  @require_cronjob
+  def get(self):
     taskqueue.add(method='POST', url='/secure/task_queues/cleanup_data',
                   queue_name='cleanup')
-    self.response.out.write('Successfully triggered task to clean up old data.')
+    self.response.headers['Content-Type'] = 'text/plain'
+    self.response.out.write('Success.')
 
 
-class TriggerGenerateDailyStats(CronJobHandler):
-  """Handles cron jobs to generate daily stats."""
+class CronTriggerGenerateDailyStats(webapp2.RequestHandler):
+  """Triggers task to generate daily stats."""
 
-  def post(self):
+  @require_cronjob
+  def get(self):
     taskqueue.add(method='POST', url='/secure/task_queues/generate_daily_stats',
                   queue_name='stats')
-    self.response.out.write('Successfully triggered task to generate daily '
-                            'stats.')
+    self.response.headers['Content-Type'] = 'text/plain'
+    self.response.out.write('Success.')
 
 
-class TriggerGenerateRecentStats(CronJobHandler):
-  """Handles cron jobs to generate recent stats."""
+class CronTriggerGenerateRecentStats(webapp2.RequestHandler):
+  """Triggers task to generate recent stats."""
 
-  def post(self):
+  @require_cronjob
+  def get(self):
     taskqueue.add(method='POST',
                   url='/secure/task_queues/generate_recent_stats',
                   queue_name='stats')
-    self.response.out.write('Successfully triggered task to generate recent '
-                            'stats.')
+    self.response.headers['Content-Type'] = 'text/plain'
+    self.response.out.write('Success.')
 
 
-class DetectDeadMachinesHandler(CronJobHandler):
-  """Handles cron jobs to detect dead machines."""
+class CronDetectDeadMachinesHandler(webapp2.RequestHandler):
+  """Emails reports of dead machines."""
 
-  def post(self):
+  @require_cronjob
+  def get(self):
+    self.response.headers['Content-Type'] = 'text/plain'
     dead_machines = machine_stats.FindDeadMachines()
-    if not dead_machines:
-      msg = 'No dead machines found'
-      logging.info(msg)
-      self.response.out.write(msg)
-      return
-
-    logging.warning('Dead machines were detected, emailing admins')
-    machine_stats.NotifyAdminsOfDeadMachines(dead_machines)
-
-    msg = 'Successfully detected dead machines and emailed admins.'
-    logging.info(msg)
-    self.response.out.write(msg)
+    if dead_machines:
+      logging.warning(
+          '%d dead machines were detected, emailing admins.',
+          len(dead_machines))
+      machine_stats.NotifyAdminsOfDeadMachines(dead_machines)
+    self.response.out.write('Success.')
 
 
-class DetectHangingRunnersHandler(CronJobHandler):
-  """Handles cron jobs to detect runners that have been waiting too long."""
+class CronDetectHangingRunnersHandler(webapp2.RequestHandler):
+  """Emails reports of runners that have been waiting too long."""
 
+  @require_cronjob
   def get(self):
     hanging_runners = test_runner.GetHangingRunners()
     if hanging_runners:
@@ -788,28 +794,38 @@ class DetectHangingRunnersHandler(CronJobHandler):
              )
 
       admin_user.EmailAdmins(subject, body)
+    self.response.headers['Content-Type'] = 'text/plain'
+    self.response.out.write('Success.')
 
 
-class GenerateDailyStatsHandler(CronJobHandler):
-  """Handles cron jobs to generate new daily stats."""
+class TaskGenerateDailyStatsHandler(webapp2.RequestHandler):
+  """Generates new daily stats."""
 
+  @require_taskqueue('stats')
   def post(self):
     yesterday = datetime.datetime.utcnow().date() - datetime.timedelta(days=1)
     daily_stats.GenerateDailyStats(yesterday)
+    self.response.headers['Content-Type'] = 'text/plain'
+    self.response.out.write('Success.')
 
 
-class GenerateRecentStatsHandler(CronJobHandler):
-  """Handles cron jobs to generate new recent stats."""
+class TaskGenerateRecentStatsHandler(webapp2.RequestHandler):
+  """Generates new recent stats."""
 
+  @require_taskqueue('stats')
   def post(self):
     runner_summary.GenerateSnapshotSummary()
     runner_summary.GenerateWaitSummary()
+    self.response.headers['Content-Type'] = 'text/plain'
+    self.response.out.write('Success.')
 
 
-class SendEReporterHandler(ReportGenerator):
-  """Handles calling EReporter with the correct parameters."""
+class CronSendEReporterHandler(ReportGenerator):
+  """Generates EReporter emails."""
 
+  @require_cronjob
   def get(self):
+    self.response.headers['Content-Type'] = 'text/plain'
     # grab the mailing admin
     admin = admin_user.AdminUser.all().get()
     if not admin:
@@ -825,10 +841,11 @@ class SendEReporterHandler(ReportGenerator):
         while exception_count:
           try:
             self.request.GET['max_results'] = str(exception_count)
-            super(SendEReporterHandler, self).get()
-            exception_count = min(
-                exception_count,
-                ereporter.ExceptionRecord.all(keys_only=True).count())
+            super(CronSendEReporterHandler, self).get()
+            new_count = ereporter.ExceptionRecord.all(keys_only=True).count()
+            if new_count == exception_count:
+              break
+            exception_count = min(exception_count, new_count)
           except mail_errors.BadRequestError:
             if exception_count == 1:
               # This is bad, it means we can't send any exceptions, so just
@@ -840,19 +857,20 @@ class SendEReporterHandler(ReportGenerator):
             # decrease the size and try again.
             exception_count = max(exception_count / 2, 1)
       else:
+        self.response.set_status(400)
         self.response.out.write('Invalid admin email, \'%s\'. Must be a valid '
                                 'email.' % admin.email)
-        self.response.set_status(400)
+        return
     except runtime.DeadlineExceededError as e:
       # Hitting the deadline here isn't a big deal if it is rare.
       logging.warning(e)
+    self.response.out.write('Success.')
 
 
 class ShowMessageHandler(webapp2.RequestHandler):
   """Show the full text of a test request."""
 
   def get(self):
-    """Handles HTTP GET requests for this handler's URL."""
     self.response.headers['Content-Type'] = 'text/plain'
 
     runner_key = self.request.get('r', '')
@@ -868,8 +886,6 @@ class UploadStartSlaveHandler(webapp2.RequestHandler):
   """Accept a new start slave script."""
 
   def post(self):
-    """Handles HTTP POST requests for this handler's URL."""
-
     script = self.request.get('script', '')
     if not script:
       self.abort(400, 'No script uploaded')
@@ -908,28 +924,26 @@ class GetMatchingTestCasesHandler(webapp2.RequestHandler):
 
   @AuthenticateMachineOrUser
   def get(self):
-    """Handles HTTP GET requests for this handler's URL."""
-    self.response.headers['Content-Type'] = 'text/plain'
-
     test_case_name = self.request.get('name', '')
 
     matches = test_request.GetAllMatchingTestRequests(test_case_name)
     keys = []
     for match in matches:
-      keys.extend([key.urlsafe() for key in match.runner_keys])
+      keys.extend(key.urlsafe() for key in match.runner_keys)
 
     logging.info('Found %d keys in %d TestRequests', len(keys), len(matches))
+    self.response.headers['Content-Type'] = 'application/json'
     if keys:
       self.response.out.write(json.dumps(keys))
     else:
       self.response.set_status(404)
+      self.response.out.write('[]')
 
 
 class SecureGetResultHandler(webapp2.RequestHandler):
   """Show the full result string from a test runner."""
 
   def get(self):
-    """Handles HTTP GET requests for this handler's URL."""
     SendRunnerResults(self.response, self.request.get('r', ''))
 
 
@@ -938,7 +952,6 @@ class GetResultHandler(webapp2.RequestHandler):
 
   @AuthenticateMachineOrUser
   def get(self):
-    """Handles HTTP GET requests for this handler's URL."""
     SendRunnerResults(self.response, self.request.get('r', ''))
 
 
@@ -947,7 +960,6 @@ class GetSlaveCodeHandler(webapp2.RequestHandler):
 
   @AuthenticateMachine
   def get(self):
-    """Handles HTTP GET requests for this handler's URL."""
     self.response.headers['Content-Type'] = 'application/octet-stream'
     self.response.out.write(test_management.SlaveCodeZipped())
 
@@ -957,7 +969,6 @@ class GetTokenHandler(webapp2.RequestHandler):
 
   @AuthenticateMachineOrUser
   def get(self):
-    """Handles HTTP GET requests for this handler's URL."""
     self.response.headers['Content-Type'] = 'text/plain'
     self.response.out.write('dummy_token')
 
@@ -967,7 +978,6 @@ class CleanupResultsHandler(webapp2.RequestHandler):
 
   @AuthenticateMachine
   def post(self):
-    """Handles HTTP POST requests for this handler's URL."""
     self.response.headers['Content-Type'] = 'test/plain'
 
     key = self.request.get('r', '')
@@ -982,7 +992,6 @@ class CancelHandler(webapp2.RequestHandler):
   """Cancel a test runner that is not already running."""
 
   def post(self):
-    """Handles HTTP GET requests for this handler's URL."""
     self.response.headers['Content-Type'] = 'text/plain'
 
     runner_key = self.request.get('r', '')
@@ -1001,7 +1010,6 @@ class RetryHandler(webapp2.RequestHandler):
   """Retry a test runner again."""
 
   def post(self):
-    """Handles HTTP GET requests for this handler's URL."""
     self.response.headers['Content-Type'] = 'text/plain'
 
     runner_key = self.request.get('r', '')
@@ -1036,9 +1044,9 @@ class RegisterHandler(webapp2.RequestHandler):
 
   @AuthenticateMachine
   def post(self):
-    """Handles HTTP POST requests for this handler's URL."""
     # Validate the request.
     if not self.request.body:
+      self.response.headers['Content-Type'] = 'text/plain'
       self.response.set_status(402)
       self.response.out.write('Request must have a body')
       return
@@ -1083,9 +1091,9 @@ class RunnerPingHandler(webapp2.RequestHandler):
 
   @AuthenticateMachine
   def post(self):
-    """Handles HTTP POST requests for this handler's URL."""
     key = self.request.get('r', '')
     machine_id = self.request.get('id', '')
+    self.response.headers['Content-Type'] = 'text/plain'
 
     if test_runner.PingRunner(key, machine_id):
       self.response.out.write('Runner successfully pinged.')
@@ -1223,7 +1231,6 @@ class DailyStatsGraphHandler(webapp2.RequestHandler):
     return graphs_to_show
 
   def get(self):
-    """Handles HTTP GET requests for this handler's URL."""
     days_to_show = DaysToShow(self.request)
 
     params = {
@@ -1245,7 +1252,6 @@ class ServerPingHandler(webapp2.RequestHandler):
   """
 
   def get(self):
-    """Handles HTTP GET requests for this handler's URL."""
     self.response.headers['Content-Type'] = 'text/plain'
     self.response.out.write('Server up')
 
@@ -1257,7 +1263,6 @@ class UserProfileHandler(webapp2.RequestHandler):
   """
 
   def get(self):
-    """Handles HTTP GET requests for this handler's URL."""
     topbar = GenerateTopbar()
 
     display_whitelists = []
@@ -1282,7 +1287,6 @@ class ChangeWhitelistHandler(webapp2.RequestHandler):
   """Handler for making changes to a user whitelist."""
 
   def post(self):
-    """Handles HTTP POST requests for this handler's URL."""
     ip = self.request.get('i', self.request.remote_addr)
 
     password = self.request.get('p', None)
@@ -1304,13 +1308,13 @@ class RemoteErrorHandler(webapp2.RequestHandler):
 
   @AuthenticateMachine
   def post(self):
-    """Handles HTTP POST requests for this handler's URL."""
     error_message = self.request.get('m', '')
     error = test_management.SwarmError(
         name='Remote Error Report', message=error_message,
         info='Remote machine address: %s' % self.request.remote_addr)
     error.put()
 
+    self.response.headers['Content-Type'] = 'text/plain'
     self.response.out.write('Error logged')
 
 
@@ -1344,6 +1348,7 @@ def SendAuthenticationFailure(request, response):
       info='Remote machine address: %s' % request.remote_addr)
   error.put()
 
+  response.headers['Content-Type'] = 'text/plain'
   response.set_status(403)
   response.out.write('Remote machine not whitelisted for operation')
 
@@ -1355,12 +1360,14 @@ def SendRunnerResults(response, key):
     response: Response to be sent to remote machine.
     key: Key identifying the runner.
   """
-  response.headers['Content-Type'] = 'text/plain'
   results = test_runner.GetRunnerResults(key)
 
   if results:
+    response.headers['Content-Type'] = 'application/json'
     response.out.write(json.dumps(results))
   else:
+    response.headers['Content-Type'] = 'text/plain'
+    # TODO(maruel): 204 cannot return content. It is not proxy-safe.
     response.set_status(204)
     logging.info('Unable to provide runner results [key: %s]', str(key))
 
@@ -1379,20 +1386,23 @@ def CreateApplication():
       ('/result', ResultHandler),
       ('/runner_ping', RunnerPingHandler),
       ('/runner_summary', RunnerSummaryHandler),
-      ('/secure/cron/abort_stale_runners', AbortStaleRunnersHandler),
-      ('/secure/cron/detect_dead_machines', DetectDeadMachinesHandler),
-      ('/secure/cron/detect_hanging_runners', DetectHangingRunnersHandler),
-      ('/secure/cron/sendereporter', SendEReporterHandler),
-      ('/secure/cron/trigger_cleanup_data', TriggerCleanupDataHandler),
-      ('/secure/cron/trigger_generate_daily_stats', TriggerGenerateDailyStats),
+      ('/secure/cron/abort_stale_runners', CronAbortStaleRunnersHandler),
+      ('/secure/cron/detect_dead_machines', CronDetectDeadMachinesHandler),
+      ('/secure/cron/detect_hanging_runners', CronDetectHangingRunnersHandler),
+      ('/secure/cron/sendereporter', CronSendEReporterHandler),
+      ('/secure/cron/trigger_cleanup_data', CronTriggerCleanupDataHandler),
+      ('/secure/cron/trigger_generate_daily_stats',
+          CronTriggerGenerateDailyStats),
       ('/secure/cron/trigger_generate_recent_stats',
-          TriggerGenerateRecentStats),
+          CronTriggerGenerateRecentStats),
       ('/secure/machine_list', MachineListHandler),
       ('/secure/retry', RetryHandler),
       ('/secure/show_message', ShowMessageHandler),
-      ('/secure/task_queues/cleanup_data', CleanupDataHandler),
-      ('/secure/task_queues/generate_daily_stats', GenerateDailyStatsHandler),
-      ('/secure/task_queues/generate_recent_stats', GenerateRecentStatsHandler),
+      ('/secure/task_queues/cleanup_data', TaskCleanupDataHandler),
+      ('/secure/task_queues/generate_daily_stats',
+          TaskGenerateDailyStatsHandler),
+      ('/secure/task_queues/generate_recent_stats',
+          TaskGenerateRecentStatsHandler),
       ('/secure/upload_start_slave', UploadStartSlaveHandler),
       ('/server_ping', ServerPingHandler),
       ('/stats', StatsHandler),
