@@ -4,13 +4,13 @@
 
 """Defines the application."""
 
-from google.appengine.ext import ereporter
+from components import ereporter2
 
 import handlers
 
 
 def CreateApplication():
-  ereporter.register_logger()
+  ereporter2.register_formatter()
   return handlers.CreateApplication()
 
 

@@ -80,11 +80,11 @@ class AppTest(unittest.TestCase):
   def _GetRequest(self):
     return test_request.TestRequest.query().get()
 
-  def _ReplaceCurrentUser(self, email):
+  def _ReplaceCurrentUser(self, email, **kwargs):
     if email:
-      self.testbed.setup_env(USER_EMAIL=email, overwrite=True)
+      self.testbed.setup_env(USER_EMAIL=email, overwrite=True, **kwargs)
     else:
-      self.testbed.setup_env(overwrite=True)
+      self.testbed.setup_env(overwrite=True, **kwargs)
 
   def assertResponse(self, response, status, body):
     self.assertEqual(status, response.status, response)
@@ -498,7 +498,7 @@ class AppTest(unittest.TestCase):
   def testAllHandlersAreSecured(self):
     # URL prefixes that correspond to 'login: admin' areas in app.yaml.
     # Handlers that correspond to this prefixes are protected by GAE itself.
-    secured_paths = ['/secure/', '/_ereporter']
+    secured_paths = ['/secure/']
 
     # Handlers that are explicitly allowed to be called by anyone.
     allowed_urls = set([
@@ -665,8 +665,9 @@ class AppTest(unittest.TestCase):
       # Only cron job requests can be gets for this handler.
       response = self.app.get(cron_job_url, expect_errors=True)
       self.assertResponse(
-          response, '405 Method Not Allowed',
-          'Only internal cron jobs can do this')
+          response, '403 Forbidden',
+          '403 Forbidden\n\nAccess was denied to this resource.\n\n '
+          'Only internal cron jobs can do this  ')
 
   def testDetectHangingRunners(self):
     response = self.app.get('/secure/cron/detect_hanging_runners',
@@ -683,42 +684,10 @@ class AppTest(unittest.TestCase):
                             headers={'X-AppEngine-Cron': 'true'})
     self.assertResponse(response, '200 OK', 'Success.')
 
-  def testSendEReporter_NoAdmin(self):
-    # Ensure this function correctly complains if the admin email isn't set.
-    response = self.app.get('/secure/cron/sendereporter', expect_errors=True,
-                            headers={'X-AppEngine-Cron': 'true'})
-    self.assertResponse(
-        response, '400 Bad Request',
-        'Invalid admin email, \'\'. Must be a valid email.')
-
-  def testSendEReporter_GarbageAdmin(self):
-    # Ensure this function complains when a garbage email is set.
-    admin_user.AdminUser().put()
-    response = self.app.get('/secure/cron/sendereporter', expect_errors=True,
-                            headers={'X-AppEngine-Cron': 'true'})
-    self.assertResponse(
-        response, '400 Bad Request',
-        'Invalid admin email, \'None\'. Must be a valid email.')
-
-  def testSendEReporter_Ok(self):
-    # Ensure this function works with a valid admin email.
-    version = os.environ['CURRENT_VERSION_ID']
-    major, minor = version.split('.')
-    yesterday = datetime.datetime.utcnow().date() - datetime.timedelta(days=1)
-    handlers.ereporter.ExceptionRecord(
-        key_name=handlers.ereporter.ExceptionRecord.get_key_name(
-            'X', version, yesterday),
-        signature='X',
-        major_version=major,
-        minor_version=int(minor),
-        date=yesterday,
-        stacktrace='I blew up',
-        http_method='GET',
-        url='/nowhere',
-        handler='No one').put()
-    admin_user.AdminUser(email='admin@denied.com').put()
-
-    response = self.app.get('/secure/cron/sendereporter',
+  def testSendEReporter(self):
+    self._ReplaceCurrentUser(
+        'someone@example.com', USER_ID='123', USER_IS_ADMIN='1')
+    response = self.app.get('/secure/cron/ereporter2/mail',
                             headers={'X-AppEngine-Cron': 'true'})
     self.assertResponse(response, '200 OK', 'Success.')
 

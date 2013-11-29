@@ -42,6 +42,10 @@ class AdminUserTest(unittest.TestCase):
     user.put()
     self.assertTrue(admin_user.EmailAdmins('', ''))
 
+  def testGetAdmins(self):
+    admin_user.AdminUser(email='fake@email.com').put()
+    self.assertEqual(['fake@email.com'], admin_user.GetAdmins())
+
 
 if __name__ == '__main__':
   # We don't want the application logs to interfere with our own messages.

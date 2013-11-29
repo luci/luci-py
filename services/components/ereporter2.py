@@ -179,6 +179,9 @@ def signature_from_message(message):
     tuple of a signature and the exception type, if any.
   """
   lines = message.splitlines()
+  if not lines:
+    return '', None
+
   if STACK_TRACE_MARKER not in lines:
     # Not an exception. Use the first line as the 'signature'.
 
@@ -254,7 +257,7 @@ def get_template_env(start_time, end_time, module_versions):
     'app_id': app_identity.get_application_id(),
     'end': end_time,
     'end_str': time2str(end_time),
-    'module_versions': module_versions,
+    'module_versions': module_versions or [],
     'start': start_time or 0,
     'start_str': time2str(start_time or 0),
   }
@@ -359,6 +362,12 @@ def _extract_exceptions_from_logs(start_time, end_time, module_versions):
       msg = log_line.message.strip('\n')
       if not msg.strip():
         continue
+      # The message here is assumed to be utf-8 encoded but that is not
+      # guaranteed. The dashboard does prints out utf-8 log entries properly.
+      try:
+        msg = msg.decode('utf-8')
+      except UnicodeDecodeError:
+        msg = msg.decode('ascii', 'replace')
       msgs.append(msg)
       log_time = log_time or log_line.time
 

@@ -9,8 +9,10 @@ implemented using the webapp2 framework.
 """
 
 import datetime
+import functools
 import json
 import logging
+import time
 import urllib
 
 import webapp2
@@ -18,19 +20,16 @@ import webapp2
 from google.appengine import runtime
 from google.appengine.api import app_identity
 from google.appengine.api import datastore_errors
-from google.appengine.api import mail
-from google.appengine.api import mail_errors
+from google.appengine.api import modules
 from google.appengine.api import taskqueue
 from google.appengine.api import users
-from google.appengine.ext import db
-from google.appengine.ext import ereporter
-from google.appengine.ext.ereporter.report_generator import ReportGenerator
 from google.appengine.ext import ndb
 
 from common import result_helper
 from common import swarm_constants
 from common import test_request_message
 from common import url_helper
+from components import ereporter2
 from server import admin_user
 from server import dimension_mapping
 from server import test_management
@@ -66,6 +65,11 @@ ALLOW_POST_AS_GET = False
 
 # The domains that are allowed to access this application.
 ALLOW_ACCESS_FROM_DOMAINS = ()
+
+
+# Function that is used to determine if an error entry should be ignored.
+should_ignore_error_record = functools.partial(
+    ereporter2.should_ignore_error_record, (), ())
 
 
 def GenerateTopbar():
@@ -222,6 +226,14 @@ def DaysToShow(request):
   return days_to_show
 
 
+def GetModulesVersions():
+  """Returns the current versions on the instance.
+
+  TODO(maruel): Move in components/.
+  """
+  return [('default', i) for i in modules.get_versions()]
+
+
 class SortOptions(object):
   """A basic helper class for displaying the sort options."""
 
@@ -232,11 +244,13 @@ class SortOptions(object):
 
 def require_cronjob(f):
   """Enforces cronjob."""
+  @functools.wraps(f)
   def hook(self, *args, **kwargs):
     if self.request.headers.get('X-AppEngine-Cron') != 'true':
       self.response.headers['Content-Type'] = 'text/plain'
-      self.response.set_status(405)
-      self.response.out.write('Only internal cron jobs can do this')
+      msg = 'Only internal cron jobs can do this'
+      logging.error(msg)
+      self.abort(403, msg)
       return
     return f(self, *args, **kwargs)
   return hook
@@ -245,11 +259,13 @@ def require_cronjob(f):
 def require_taskqueue(task_name):
   """Enforces the task is run with a specific task queue."""
   def decorator(f):
+    @functools.wraps(f)
     def hook(self, *args, **kwargs):
       if self.request.headers.get('X-AppEngine-QueueName') != task_name:
         self.response.headers['Content-Type'] = 'text/plain'
-        self.response.set_status(405)
-        self.response.out.write('Only internal task %s can do this' % task_name)
+        msg = 'Only internal task %s can do this' % task_name
+        logging.error(msg)
+        self.abort(403, msg)
         return
       return f(self, *args, **kwargs)
     return hook
@@ -598,8 +614,8 @@ class DeleteMachineStatsHandler(webapp2.RequestHandler):
   def post(self):
     key = self.request.get('r')
 
-    self.response.headers['Content-Type'] = 'text/plain'
     if key and machine_stats.DeleteMachineStats(key):
+      self.response.headers['Content-Type'] = 'text/plain'
       self.response.out.write('Machine Assignment removed.')
     else:
       self.response.set_status(204)
@@ -820,51 +836,68 @@ class TaskGenerateRecentStatsHandler(webapp2.RequestHandler):
     self.response.out.write('Success.')
 
 
-class CronSendEReporterHandler(ReportGenerator):
-  """Generates EReporter emails."""
+class CronSendEreporter2MailHandler(webapp2.RequestHandler):
+  """Sends email containing the errors found in logservice."""
 
   @require_cronjob
   def get(self):
+    request_id_url = self.request.host_url + '/secure/ereporter2/request/'
+    report_url = self.request.host_url + '/secure/ereporter2/report'
+    result = ereporter2.generate_and_email_report(
+        None,
+        should_ignore_error_record,
+        admin_user.GetAdmins(),
+        request_id_url,
+        report_url,
+        ereporter2.REPORT_TITLE_TEMPLATE,
+        ereporter2.REPORT_CONTENT_TEMPLATE,
+        {})
     self.response.headers['Content-Type'] = 'text/plain'
-    # grab the mailing admin
-    admin = admin_user.AdminUser.all().get()
-    if not admin:
-      # Create a dummy value so it can be edited from the datastore admin.
-      admin = admin_user.AdminUser(email='')
-      admin.put()
+    if result:
+      self.response.write('Success.')
+    else:
+      # Do not HTTP 500 since we do not want it to be retried.
+      self.response.write('Failed.')
 
-    try:
-      if mail.is_email_valid(admin.email):
-        self.request.GET['sender'] = admin.email
-        exception_count = ereporter.ExceptionRecord.all(keys_only=True).count()
 
-        while exception_count:
-          try:
-            self.request.GET['max_results'] = str(exception_count)
-            super(CronSendEReporterHandler, self).get()
-            new_count = ereporter.ExceptionRecord.all(keys_only=True).count()
-            if new_count == exception_count:
-              break
-            exception_count = min(exception_count, new_count)
-          except mail_errors.BadRequestError:
-            if exception_count == 1:
-              # This is bad, it means we can't send any exceptions, so just
-              # clear all exceptions.
-              db.delete(ereporter.ExceptionRecord.all(keys_only=True))
-              break
+class Ereporter2ReportHandler(webapp2.RequestHandler):
+  """Returns all the recent errors as a web page."""
 
-            # ereporter doesn't handle the email being too big, so manually
-            # decrease the size and try again.
-            exception_count = max(exception_count / 2, 1)
-      else:
-        self.response.set_status(400)
-        self.response.out.write('Invalid admin email, \'%s\'. Must be a valid '
-                                'email.' % admin.email)
-        return
-    except runtime.DeadlineExceededError as e:
-      # Hitting the deadline here isn't a big deal if it is rare.
-      logging.warning(e)
-    self.response.out.write('Success.')
+  def get(self):
+    """Reports the errors logged and ignored.
+
+    Arguments:
+      start: epoch time to start looking at. Defaults to the messages since the
+             last email.
+      end: epoch time to stop looking at. Defaults to now.
+    """
+    request_id_url = '/secure/ereporter2/request/'
+    end = int(float(self.request.get('end', 0)) or time.time())
+    start = int(
+        float(self.request.get('start', 0)) or
+        ereporter2.get_default_start_time() or 0)
+    module_versions = GetModulesVersions()
+    report, ignored = ereporter2.generate_report(
+        start, end, module_versions, should_ignore_error_record)
+    env = ereporter2.get_template_env(start, end, module_versions)
+    content = ereporter2.report_to_html(
+        report, ignored,
+        ereporter2.REPORT_HEADER_TEMPLATE,
+        ereporter2.REPORT_CONTENT_TEMPLATE,
+        request_id_url, env)
+    out = template.get('ereporter2_report.html').render({'content': content})
+    self.response.headers['Content-Type'] = 'text/html'
+    self.response.write(out)
+
+
+class Ereporter2RequestHandler(webapp2.RequestHandler):
+  def get(self, request_id):
+    # TODO(maruel): Add UI.
+    data = ereporter2.log_request_id_to_dict(request_id)
+    if not data:
+      self.abort(404, detail='Request id was not found.')
+    self.response.headers['Content-Type'] = 'application/json'
+    json.dump(data, self.response, indent=2, sort_keys=True)
 
 
 class ShowMessageHandler(webapp2.RequestHandler):
@@ -1010,8 +1043,6 @@ class RetryHandler(webapp2.RequestHandler):
   """Retry a test runner again."""
 
   def post(self):
-    self.response.headers['Content-Type'] = 'text/plain'
-
     runner_key = self.request.get('r', '')
     runner = test_runner.GetRunnerFromUrlSafeKey(runner_key)
 
@@ -1022,9 +1053,8 @@ class RetryHandler(webapp2.RequestHandler):
       # make it jump the queue and get executed before other runners for
       # requests added before the user pressed the retry button.
       runner.created = datetime.datetime.utcnow()
-
       runner.put()
-
+      self.response.headers['Content-Type'] = 'text/plain'
       self.response.out.write('Runner set for retry.')
     else:
       self.response.set_status(204)
@@ -1364,10 +1394,8 @@ def SendRunnerResults(response, key):
     response.headers['Content-Type'] = 'application/json'
     response.out.write(json.dumps(results))
   else:
-    response.headers['Content-Type'] = 'text/plain'
-    # TODO(maruel): 204 cannot return content. It is not proxy-safe.
     response.set_status(204)
-    logging.info('Unable to provide runner results [key: %s]', str(key))
+    logging.info('Unable to provide runner results [key: %s]', key)
 
 
 def CreateApplication():
@@ -1387,12 +1415,15 @@ def CreateApplication():
       ('/secure/cron/abort_stale_runners', CronAbortStaleRunnersHandler),
       ('/secure/cron/detect_dead_machines', CronDetectDeadMachinesHandler),
       ('/secure/cron/detect_hanging_runners', CronDetectHangingRunnersHandler),
-      ('/secure/cron/sendereporter', CronSendEReporterHandler),
       ('/secure/cron/trigger_cleanup_data', CronTriggerCleanupDataHandler),
       ('/secure/cron/trigger_generate_daily_stats',
           CronTriggerGenerateDailyStats),
       ('/secure/cron/trigger_generate_recent_stats',
           CronTriggerGenerateRecentStats),
+      ('/secure/cron/ereporter2/mail', CronSendEreporter2MailHandler),
+      ('/secure/ereporter2/report', Ereporter2ReportHandler),
+      ('/secure/ereporter2/request/<request_id:[0-9a-fA-F]+>',
+          Ereporter2RequestHandler),
       ('/secure/machine_list', MachineListHandler),
       ('/secure/retry', RetryHandler),
       ('/secure/show_message', ShowMessageHandler),
@@ -1413,4 +1444,6 @@ def CreateApplication():
       (_SECURE_MAIN_URL, MainHandler),
       (_SECURE_USER_PROFILE_URL, UserProfileHandler),
   ]
-  return webapp2.WSGIApplication(urls, debug=True)
+  # Upgrade to Route objects so regexp work.
+  routes = [webapp2.Route(*i) for i in urls]
+  return webapp2.WSGIApplication(routes, debug=True)

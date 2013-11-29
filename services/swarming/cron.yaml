@@ -7,9 +7,9 @@ cron:
   url: /secure/cron/trigger_cleanup_data
   schedule: every 6 hours
 
-- description: Daily exception report
-  url: /secure/cron/sendereporter
-  schedule: every day 00:00
+- description: Mail exception report via ereporter2
+  url: /secure/cron/ereporter2/mail
+  schedule: every 1 hours synchronized
 
 - description: Detect dead machines
   url: /secure/cron/detect_dead_machines

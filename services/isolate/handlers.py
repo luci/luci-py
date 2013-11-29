@@ -908,7 +908,7 @@ class RestrictedEreporter2Report(webapp2.RequestHandler):
     end = int(float(self.request.get('end', 0)) or time.time())
     start = int(
         float(self.request.get('start', 0)) or
-        ereporter2.get_default_start_time())
+        ereporter2.get_default_start_time() or 0)
     modules = self.request.get('modules')
     if modules:
       modules = modules.split(',')

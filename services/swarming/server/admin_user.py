@@ -9,16 +9,21 @@ import logging
 
 from google.appengine.api import app_identity
 from google.appengine.api import mail
-from google.appengine.ext import db
+from google.appengine.ext import ndb
 
 
-class AdminUser(db.Model):
+class AdminUser(ndb.Model):
   """A email address of the admin to send the exception emails.
 
   If there isn't a valid instance of these then no emails are sent.
   """
   # The email to send the exception emails from.
-  email = db.StringProperty()
+  email = ndb.StringProperty(indexed=False)
+
+
+def GetAdmins():
+  """Returns the list of email addresses that should get email reports."""
+  return [a.email for a in AdminUser.query()]
 
 
 def EmailAdmins(subject, body):
@@ -31,11 +36,12 @@ def EmailAdmins(subject, body):
   Returns:
     True if the email was sucessfully sent.
   """
-  if AdminUser.all().count() == 0:
+  admins = GetAdmins()
+  if not admins:
     logging.error('No admins found, no one to email')
     return False
 
-  send_to = ','.join(admin.email for admin in AdminUser.all())
+  send_to = ','.join(admins)
   server_name = app_identity.get_application_id()
   server_email = '%s <no_reply@%s.appspotmail.com>' % (server_name, server_name)
 
