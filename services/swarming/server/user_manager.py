@@ -10,19 +10,19 @@ The User Manager is responsible for handling user profiles and whitelisting.
 
 import logging
 
-from google.appengine.ext import db
+from google.appengine.ext import ndb
 
 
 # TODO(user): Machine should not be whitelisted, but just
 # authenticate themselves with valid accounts.
-class MachineWhitelist(db.Model):
+class MachineWhitelist(ndb.Model):
   # The IP of the machine to whitelist.
-  ip = db.StringProperty()
+  ip = ndb.StringProperty()
 
   # An optional password (NOT necessarily equal to the actual user
   # account password) used to ensure requests coming from a remote machine
   # are indeed valid. Defaults to None.
-  password = db.StringProperty()
+  password = ndb.StringProperty()
 
 
 def AddWhitelist(ip, password=None):
@@ -32,16 +32,13 @@ def AddWhitelist(ip, password=None):
     ip: The ip to be added. Ignores duplicate ips regardless of the password.
     password: Optional password to associate with the machine.
   """
-  # Find existing entries, if any.
-  query = MachineWhitelist.gql('WHERE ip = :1 LIMIT 1', ip)
-
-  # Ignore duplicate requests.
-  if query.count() == 0:
-    machine_whitelist = MachineWhitelist(ip=ip, password=password)
-    machine_whitelist.put()
-    logging.debug('Stored ip: %s', ip)
-  else:
+  if MachineWhitelist.query().filter(MachineWhitelist.ip == ip).count(1):
+    # Ignore duplicate requests. Note that the password is silently ignored.
     logging.info('Ignored duplicate whitelist request for ip: %s', ip)
+    return
+
+  MachineWhitelist(ip=ip, password=password).put()
+  logging.debug('Stored ip: %s', ip)
 
 
 def DeleteWhitelist(ip):
@@ -50,16 +47,15 @@ def DeleteWhitelist(ip):
   Args:
     ip: The ip to be removed. Ignores non-existing ips.
   """
-  # Find existing entries, if any.
-  query = db.GqlQuery('SELECT __key__ FROM MachineWhitelist WHERE ip = :1 '
-                      'LIMIT 1', ip)
-
-  # Ignore non-existing requests.
-  if query.count() == 1:
-    db.delete(query.get())
-    logging.debug('Removed ip: %s', ip)
-  else:
+  entries = MachineWhitelist.query(
+      default_options=ndb.QueryOptions(keys_only=True)).filter(
+        MachineWhitelist.ip == ip).fetch()
+  if not entries:
     logging.info('Ignored missing remove whitelist request for ip: %s', ip)
+    return
+
+  ndb.delete_multi(entries)
+  logging.debug('Removed ip: %s', ip)
 
 
 def IsWhitelistedMachine(ip, password):
@@ -72,7 +68,7 @@ def IsWhitelistedMachine(ip, password):
   Returns:
     True if the machine referenced is whitelisted.
   """
-  query = db.GqlQuery('SELECT __key__ FROM MachineWhitelist WHERE ip = :1 AND '
-                      'password = :2 LIMIT 1', ip, password)
-
-  return query.count() == 1
+  entries = MachineWhitelist.query().filter(
+      MachineWhitelist.ip == ip).filter(
+          MachineWhitelist.password == password).count(1)
+  return bool(entries)

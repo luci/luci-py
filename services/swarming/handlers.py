@@ -1264,17 +1264,15 @@ class UserProfileHandler(webapp2.RequestHandler):
 
   def get(self):
     topbar = GenerateTopbar()
-
-    display_whitelists = []
-
-    for stored_whitelist in user_manager.MachineWhitelist().all():
-      whitelist = {}
-      whitelist['ip'] = stored_whitelist.ip
-      whitelist['password'] = stored_whitelist.password
-      whitelist['key'] = stored_whitelist.key()
-      whitelist['url'] = _SECURE_CHANGE_WHITELIST_URL
-      display_whitelists.append(whitelist)
-
+    display_whitelists = (
+        {
+          'ip': w.ip,
+          'key': w.key.id,
+          'password': w.password,
+          'url': _SECURE_CHANGE_WHITELIST_URL,
+        } for w in user_manager.MachineWhitelist().query()
+    )
+    display_whitelists = sorted(display_whitelists, key=lambda x: x['ip'])
     params = {
         'topbar': topbar,
         'whitelists': display_whitelists,

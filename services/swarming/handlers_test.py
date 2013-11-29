@@ -375,32 +375,33 @@ class AppTest(unittest.TestCase):
     password = [None, 'pa$$w0rd']
 
     user_manager.DeleteWhitelist(None)
-    self.assertEqual(0, user_manager.MachineWhitelist.all().count())
+    self.assertEqual(0, user_manager.MachineWhitelist.query().count())
 
     # Whitelist an ip.
     self.app.post('/secure/change_whitelist', {'i': ip[0], 'a': 'True'})
 
-    self.assertEqual(1, user_manager.MachineWhitelist.all().count())
+    self.assertEqual(1, user_manager.MachineWhitelist.query().count())
 
     # Whitelist an ip with a password.
     self.app.post(
         '/secure/change_whitelist', {'i': ip[1], 'a': 'True', 'p': password[1]})
-    self.assertEqual(2, user_manager.MachineWhitelist.all().count())
+    self.assertEqual(2, user_manager.MachineWhitelist.query().count())
 
     # Make sure ips & passwords are sorted correctly.
     for i in range(2):
-      whitelist = user_manager.MachineWhitelist.gql(
-          'WHERE ip = :1 AND password = :2', ip[i], password[i])
+      whitelist = user_manager.MachineWhitelist.query().filter(
+          user_manager.MachineWhitelist.ip == ip[i]).filter(
+              user_manager.MachineWhitelist.password == password[i])
       self.assertEqual(1, whitelist.count(), msg='Iteration %d' % i)
 
     # Remove whitelisted ip.
     self.app.post('/secure/change_whitelist', {'i': ip[0], 'a': 'False'})
-    self.assertEqual(1, user_manager.MachineWhitelist.all().count())
+    self.assertEqual(1, user_manager.MachineWhitelist.query().count())
 
     # Make sure whitelists are removed based on IP and not password.
     self.app.post(
         '/secure/change_whitelist', {'i': ip[1], 'a': 'False', 'p': 'Invalid'})
-    self.assertEqual(0, user_manager.MachineWhitelist.all().count())
+    self.assertEqual(0, user_manager.MachineWhitelist.query().count())
 
   def testUnsecureHandlerMachineAuthentication(self):
     # Test non-secure handlers to make sure they check the remote machine to be

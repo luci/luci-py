@@ -48,37 +48,40 @@ class UserManagerTest(unittest.TestCase):
     # then another remove.
     for _ in range(3):
       user_manager.AddWhitelist(IP[0])
-    self.assertEqual(1, user_manager.MachineWhitelist.all().count())
+    self.assertEqual(1, user_manager.MachineWhitelist.query().count())
     self.assertTrue(user_manager.IsWhitelistedMachine(IP[0], None))
 
     user_manager.DeleteWhitelist(IP[0])
-    self.assertEqual(0, user_manager.MachineWhitelist.all().count())
+    self.assertEqual(0, user_manager.MachineWhitelist.query().count())
     self.assertFalse(user_manager.IsWhitelistedMachine(IP[0], None))
 
     user_manager.DeleteWhitelist(IP[0])
-    self.assertEqual(0, user_manager.MachineWhitelist.all().count())
+    self.assertEqual(0, user_manager.MachineWhitelist.query().count())
 
     # Make one request with password, one without one. Second one should
     # be ignored.
     user_manager.AddWhitelist(IP[0], password=password)
     user_manager.AddWhitelist(IP[0])
-    self.assertEqual(1, user_manager.MachineWhitelist.all().count())
+    self.assertEqual(1, user_manager.MachineWhitelist.query().count())
 
     # Should fail whitelist check because no password is given.
     self.assertFalse(user_manager.IsWhitelistedMachine(IP[0], None))
 
     # Make sure removes are done based on ip, ignoring password.
     user_manager.DeleteWhitelist(IP[0])
-    self.assertEqual(0, user_manager.MachineWhitelist.all().count())
+    self.assertEqual(0, user_manager.MachineWhitelist.query().count())
 
   def testModifyUserProfileWhitelistArguments(self):
     # We accept None for ip.
     user_manager.AddWhitelist(ip=None, password=IP[0])
-    self.assertEqual(1, user_manager.MachineWhitelist.all().count())
-    self.assertEqual(None, user_manager.MachineWhitelist.all().get().ip)
-    self.assertEqual(IP[0], user_manager.MachineWhitelist.all().get().password)
+    self.assertEqual(1, user_manager.MachineWhitelist.query().count())
+    self.assertEqual(None, user_manager.MachineWhitelist.query().get().ip)
     self.assertEqual(
-        1, user_manager.MachineWhitelist.gql('WHERE ip = :1', None).count())
+        IP[0], user_manager.MachineWhitelist.query().get().password)
+    self.assertEqual(
+        1,
+        user_manager.MachineWhitelist.query().filter(
+            user_manager.MachineWhitelist.ip == None).count())
 
 
 if __name__ == '__main__':
