@@ -94,7 +94,7 @@ Always sorted by reverse created.
   </thead>
   <tbody>
     {% for error in errors %}
-      <tr class="request {{ runner.failed_test_class_string }}">
+      <tr class="request">
         <td>{{error.name}}</td>
         <td>{{error.message}}</td>
         <td>{{error.info}}</td>
