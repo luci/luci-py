@@ -24,21 +24,6 @@ MACHINE_DEATH_TIMEOUT = datetime.timedelta(hours=3)
 # MachineStats will update for a given machine, to prevent too many puts.
 MACHINE_UPDATE_TIME = datetime.timedelta(hours=1)
 
-# The message to use for each dead machine.
-_INDIVIDUAL_DEAD_MACHINE_MESSAGE = (
-    'Machine %(machine_id)s(%(machine_tag)s) was last seen %(last_seen)s and '
-    'is assumed to be dead.')
-
-# The message body of the dead machine message to send admins.
-_DEAD_MACHINE_MESSAGE_BODY = """Hello,
-
-The following registered machines haven't been active in %(timeout)s.
-
-%(death_summary)s
-
-Please revive the machines or remove them from the list of active machines.
-"""
-
 # The dict of acceptable keys to sort MachineStats by, with the key as the key
 # and the value as the human readable name.
 ACCEPTABLE_SORTS = {
@@ -71,9 +56,14 @@ class MachineStats(ndb.Model):
     if not self.last_seen:
       self.last_seen = datetime.datetime.utcnow()
 
+  @property
+  def last_seen_str(self):
+    """Returns a shorter version of self.last_seen as a str."""
+    return self.last_seen.strftime('%Y-%m-%d %H:%M')
+
 
 def FindDeadMachines():
-  """Find all dead machines.
+  """Finds all dead machines.
 
   Returns:
     A list of the dead machines.
@@ -84,7 +74,7 @@ def FindDeadMachines():
 
 
 def NotifyAdminsOfDeadMachines(dead_machines):
-  """Notify the admins of the dead_machines detected.
+  """Notifies the admins of the dead_machines detected.
 
   Args:
     dead_machines: The list of the currently dead machines.
@@ -92,18 +82,16 @@ def NotifyAdminsOfDeadMachines(dead_machines):
   Returns:
     True if the email was successfully sent.
   """
-  death_summary = []
-  for machine in dead_machines:
-    death_summary.append(
-        _INDIVIDUAL_DEAD_MACHINE_MESSAGE % {'machine_id': machine.machine_id,
-                                            'machine_tag': machine.tag,
-                                            'last_seen': machine.last_seen})
+  death_list = (
+      '  %s (%s)   %s' % (m.machine_id, m.tag, m.last_seen_str)
+      for m in dead_machines)
 
-  subject = 'Dead Machines Found on %s' % app_identity.get_application_id()
-  body = _DEAD_MACHINE_MESSAGE_BODY % {
-      'timeout': MACHINE_DEATH_TIMEOUT,
-      'death_summary': '\n'.join(death_summary)}
+  body = (
+    'The following registered machines haven\'t been active in at least %s.\n'
+    'They are assumed to be dead:\n'
+    '%s\n') % (MACHINE_DEATH_TIMEOUT, '\n'.join(sorted(death_list)))
 
+  subject = 'Dead Machines on %s' % app_identity.get_application_id()
   return admin_user.EmailAdmins(subject, body)
 
 
