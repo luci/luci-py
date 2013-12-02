@@ -60,9 +60,6 @@ _SECURE_GET_RESULTS_URL = '/secure/get_result'
 _SECURE_MAIN_URL = '/secure/main'
 _SECURE_USER_PROFILE_URL = '/secure/user_profile'
 
-# Allow GET requests to be passed through as POST requests.
-ALLOW_POST_AS_GET = False
-
 # The domains that are allowed to access this application.
 ALLOW_ACCESS_FROM_DOMAINS = ()
 
@@ -624,12 +621,6 @@ class DeleteMachineStatsHandler(webapp2.RequestHandler):
 class TestRequestHandler(webapp2.RequestHandler):
   """Handles test requests from clients."""
 
-  def get(self):
-    if ALLOW_POST_AS_GET:
-      return self.post()
-    else:
-      self.response.set_status(405)
-
   @AuthenticateMachineOrUser
   def post(self):
     # Validate the request.
@@ -1065,12 +1056,6 @@ class RegisterHandler(webapp2.RequestHandler):
 
      Attempt to find a matching job for the querying machine.
   """
-
-  def get(self):
-    if ALLOW_POST_AS_GET:
-      return self.post()
-    else:
-      self.response.set_status(405)
 
   @AuthenticateMachine
   def post(self):
