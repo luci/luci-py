@@ -3,9 +3,6 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
-"""Tests for User Manager."""
-
-
 import logging
 import os
 import sys
@@ -18,28 +15,21 @@ import test_env
 
 test_env.setup_test_env()
 
-from google.appengine.ext import testbed
-
+import test_case
 from server import user_manager
 from third_party.mox import mox
 
 IP = ['192.168.0.1', '192.168.0.2']
 
 
-class UserManagerTest(unittest.TestCase):
+class UserManagerTest(test_case.TestCase):
   def setUp(self):
-    # Setup the app engine test bed.
-    self.testbed = testbed.Testbed()
-    self.testbed.activate()
-    self.testbed.init_all_stubs()
-
-    # Setup a mock object.
+    super(UserManagerTest, self).setUp()
     self._mox = mox.Mox()
 
   def tearDown(self):
-    self.testbed.deactivate()
-
     self._mox.UnsetStubs()
+    super(UserManagerTest, self).tearDown()
 
   def testModifyUserProfileWhitelist(self):
     password = 'wasspord'

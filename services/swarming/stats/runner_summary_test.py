@@ -3,9 +3,6 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
-"""Tests for RunnerSummary class."""
-
-
 import datetime
 import json
 import logging
@@ -20,9 +17,9 @@ import test_env
 
 test_env.setup_test_env()
 
-from google.appengine.ext import testbed
 from google.appengine.ext import ndb
 
+import test_case
 from common import test_request_message
 from server import dimension_mapping
 from server import test_helper
@@ -60,20 +57,14 @@ def _CreateWaitSummary(start_time=None, end_time=None):
   return wait_summary
 
 
-class RunnerSummaryTest(unittest.TestCase):
+class RunnerSummaryTest(test_case.TestCase):
   def setUp(self):
-    # Setup the app engine test bed.
-    self.testbed = testbed.Testbed()
-    self.testbed.activate()
-    self.testbed.init_all_stubs()
-
-    # Setup a mock object.
+    super(RunnerSummaryTest, self).setUp()
     self._mox = mox.Mox()
 
   def tearDown(self):
-    self.testbed.deactivate()
-
     self._mox.UnsetStubs()
+    super(RunnerSummaryTest, self).tearDown()
 
   def testGenerateSnapshotSummary(self):
     runner_summary.GenerateSnapshotSummary()

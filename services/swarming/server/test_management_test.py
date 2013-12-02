@@ -3,9 +3,6 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
-"""Tests for TestRequestManager file."""
-
-
 import datetime
 import hashlib
 import json
@@ -27,9 +24,9 @@ import test_env
 test_env.setup_test_env()
 
 from google.appengine.api import mail
-from google.appengine.ext import testbed
 from google.appengine.ext import ndb
 
+import test_case
 from common import dimensions_utils
 from common import result_helper
 from common import swarm_constants
@@ -50,17 +47,12 @@ MACHINE_IDS = ['12345678-12345678-12345678-12345678',
                '87654321-87654321-87654321-87654321']
 
 
-class TestManagementTest(unittest.TestCase):
+class TestManagementTest(test_case.TestCase):
 
   _SERVER_URL = 'http://my.server.com/'
 
   def setUp(self):
-    # Setup the app engine test bed.
-    self.testbed = testbed.Testbed()
-    self.testbed.activate()
-    self.testbed.init_all_stubs()
-
-    # Setup a mock object.
+    super(TestManagementTest, self).setUp()
     self._mox = mox.Mox()
 
     # Create default configurations.
@@ -74,9 +66,8 @@ class TestManagementTest(unittest.TestCase):
     self._request_message_test_case_name = 'tc'
 
   def tearDown(self):
-    self.testbed.deactivate()
-
     self._mox.UnsetStubs()
+    super(TestManagementTest, self).tearDown()
 
   def _GetInvalidRequestMessage(self):
     """Return an improperly formatted request message text."""
@@ -438,6 +429,9 @@ class TestManagementTest(unittest.TestCase):
     self._mox.VerifyAll()
 
   def testAbortStaleRunnerWaitingForMachine(self):
+    # No UrlOpen call shall succeed.
+    self.mock(url_helper, 'UrlOpen', lambda *_: None)
+
     self._AssignPendingRequestsTest()
     runner = test_runner.TestRunner.query().get()
 
@@ -482,12 +476,8 @@ class TestManagementTest(unittest.TestCase):
                   runner.GetResultString())
 
     # Check that the runner isn't aborted a second time.
-    old_abort = test_management.AbortRunner
-    try:
-      test_management.AbortRunner = lambda runner, reason: self.fail()
-      test_management.AbortStaleRunners()
-    finally:
-      test_management.AbortRunner = old_abort
+    self.mock(test_management, 'AbortRunner', lambda *_: self.fail())
+    test_management.AbortStaleRunners()
 
   def testRetryAndThenAbortStaleRunners(self):
     self._mox.StubOutWithMock(test_management, '_GetCurrentTime')
@@ -859,13 +849,17 @@ class TestManagementTest(unittest.TestCase):
 
       # Try running the slave and ensure it can import the required files.
       # (It would crash if it failed to import them).
-      subprocess.check_call([sys.executable, expected_slave_script, '-h'])
+      subprocess.check_output([sys.executable, expected_slave_script, '-h'])
     finally:
       shutil.rmtree(temp_dir)
 
 
 if __name__ == '__main__':
-  # We don't want the application logs to interfere with our own messages.
-  # You can comment it out for more information when debugging.
-  logging.disable(logging.ERROR)
+  if '-v' in sys.argv:
+    logging.basicConfig(level=logging.DEBUG)
+  else:
+    # We don't want the application logs to interfere with our own messages.
+    # You can comment it out for more information when debugging.
+    logging.disable(logging.ERROR)
+
   unittest.main()

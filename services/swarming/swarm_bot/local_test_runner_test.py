@@ -4,9 +4,6 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
-"""Unittest to exercise the code in local_test_runner.py."""
-
-
 import logging
 import os
 import subprocess
@@ -36,6 +33,7 @@ class TestLocalTestRunner(unittest.TestCase):
   """Test class for the LocalTestRunner class."""
 
   def setUp(self):
+    super(TestLocalTestRunner, self).setUp()
     self.result_url = 'http://a.com/result'
     self.ping_url = 'http://a.com/ping'
     self.ping_delay = 10
@@ -56,9 +54,9 @@ class TestLocalTestRunner(unittest.TestCase):
 
   def tearDown(self):
     self._mox.UnsetStubs()
-    self._mox.ResetAll()
     for file_to_remove in self.files_to_remove:
       os.remove(file_to_remove)
+    super(TestLocalTestRunner, self).tearDown()
 
   def CreateValidFile(self, test_objects_data=None, test_run_data=None,
                       test_run_cleanup=None, config_env=None,

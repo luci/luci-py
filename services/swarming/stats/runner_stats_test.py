@@ -3,9 +3,6 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
-"""Tests for RunnerStats class."""
-
-
 import datetime
 import logging
 import os
@@ -19,9 +16,9 @@ import test_env
 
 test_env.setup_test_env()
 
-from google.appengine.ext import testbed
 from google.appengine.ext import ndb
 
+import test_case
 from server import test_helper
 from stats import runner_stats
 from third_party.mox import mox
@@ -41,22 +38,16 @@ def _CreateRunnerStats():
                                   automatic_retry_count=0)
 
 
-class StatManagerTest(unittest.TestCase):
+class StatManagerTest(test_case.TestCase):
   def setUp(self):
-    # Setup the app engine test bed.
-    self.testbed = testbed.Testbed()
-    self.testbed.activate()
-    self.testbed.init_all_stubs()
-
-    # Setup a mock object.
+    super(StatManagerTest, self).setUp()
     self._mox = mox.Mox()
 
     self.config_name = 'c1'
 
   def tearDown(self):
-    self.testbed.deactivate()
-
     self._mox.UnsetStubs()
+    super(StatManagerTest, self).tearDown()
 
   def testRecordRunnerStats(self):
     r_stats = runner_stats.RunnerStats.query().get()

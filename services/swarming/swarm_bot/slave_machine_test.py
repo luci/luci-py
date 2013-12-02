@@ -3,9 +3,6 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
-"""Unittest to exercise the code in slave_machine.py."""
-
-
 import json
 import logging
 import os
@@ -114,6 +111,7 @@ class TestSlaveMachine(unittest.TestCase):
   """Test class for the SlaveMachine class."""
 
   def setUp(self):
+    super(TestSlaveMachine, self).setUp()
     self._mox = mox.Mox()
     self._mox.StubOutWithMock(url_helper, 'UrlOpen')
     self._mox.StubOutWithMock(time, 'sleep')
@@ -129,7 +127,7 @@ class TestSlaveMachine(unittest.TestCase):
 
   def tearDown(self):
     self._mox.UnsetStubs()
-    self._mox.ResetAll()
+    super(TestSlaveMachine, self).tearDown()
 
   # Mock slave_machine._PostFailedExecuteResults.
   def _MockPostFailedExecuteResults(self, slave, result_string):

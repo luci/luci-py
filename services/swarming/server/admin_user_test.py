@@ -3,9 +3,6 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
-"""Tests for MachineStats class."""
-
-
 import logging
 import os
 import sys
@@ -18,21 +15,11 @@ import test_env
 
 test_env.setup_test_env()
 
-from google.appengine.ext import testbed
-
+import test_case
 from server import admin_user
 
 
-class AdminUserTest(unittest.TestCase):
-  def setUp(self):
-    # Setup the app engine test bed.
-    self.testbed = testbed.Testbed()
-    self.testbed.activate()
-    self.testbed.init_all_stubs()
-
-  def tearDown(self):
-    self.testbed.deactivate()
-
+class AdminUserTest(test_case.TestCase):
   def testEmailAdmins(self):
     # No admins are set, so no email should be sent.
     self.assertFalse(admin_user.EmailAdmins('', ''))

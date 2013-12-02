@@ -3,8 +3,6 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
-"""Test cases for the dimensions code."""
-
 import os
 import sys
 import unittest
@@ -16,8 +14,7 @@ import test_env
 
 test_env.setup_test_env()
 
-from google.appengine.ext import testbed
-
+import test_case
 from common import dimensions_utils
 
 
@@ -26,15 +23,7 @@ def AreDimensionsInMachineDimensions(dimensions, machine_dimensions):
           dimensions_utils.GenerateAllDimensionHashes(machine_dimensions))
 
 
-class TestDimensionsUtils(unittest.TestCase):
-  def setUp(self):
-    self.testbed = testbed.Testbed()
-    self.testbed.activate()
-    self.testbed.init_memcache_stub()
-
-  def tearDown(self):
-    self.testbed.deactivate()
-
+class TestDimensionsUtils(test_case.TestCase):
   def testMatchDimensions(self):
     machine_dimensions = {'os': 'win32', 'lang': 'en', 'browser': ['ie', 'ff']}
 

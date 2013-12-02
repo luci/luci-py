@@ -3,9 +3,6 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
-"""Tests for Result Helper class."""
-
-
 import datetime
 import os
 import sys
@@ -18,26 +15,21 @@ import test_env
 
 test_env.setup_test_env()
 
-from google.appengine.ext import testbed
 from google.appengine.ext import ndb
 
+import test_case
 from common import result_helper
 from third_party.mox import mox
 
 
-class ResultHelperTest(unittest.TestCase):
+class ResultHelperTest(test_case.TestCase):
   def setUp(self):
-    # Setup the app engine test bed.
-    self.testbed = testbed.Testbed()
-    self.testbed.activate()
-    self.testbed.init_all_stubs()
-
+    super(ResultHelperTest, self).setUp()
     self._mox = mox.Mox()
 
   def tearDown(self):
-    self.testbed.deactivate()
-
     self._mox.UnsetStubs()
+    super(ResultHelperTest, self).tearDown()
 
   def testStoreEmpty(self):
     result_helper.StoreResults('')

@@ -3,9 +3,6 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
-"""Tests for DailyStats class."""
-
-
 import datetime
 import os
 import sys
@@ -19,8 +16,8 @@ import test_env
 test_env.setup_test_env()
 
 from google.appengine.ext import ndb
-from google.appengine.ext import testbed
 
+import test_case
 from stats import daily_stats
 from stats import runner_stats
 
@@ -45,16 +42,7 @@ def _AddRunner(end_time, success, timeout):
   return runner
 
 
-class DailyStatsTest(unittest.TestCase):
-  def setUp(self):
-    # Setup the app engine test bed.
-    self.testbed = testbed.Testbed()
-    self.testbed.activate()
-    self.testbed.init_all_stubs()
-
-  def tearDown(self):
-    self.testbed.deactivate()
-
+class DailyStatsTest(test_case.TestCase):
   def testGenerateDailyStatsTwice(self):
     current_day = datetime.datetime.utcnow().date()
 

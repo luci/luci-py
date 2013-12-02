@@ -3,9 +3,6 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
-"""Tests for File and FileChunks."""
-
-
 import os
 import sys
 import unittest
@@ -17,22 +14,12 @@ import test_env
 
 test_env.setup_test_env()
 
-from google.appengine.ext import testbed
-
+import test_case
 from common import file_chunks
 from common import swarm_constants
 
 
-class FileTest(unittest.TestCase):
-  def setUp(self):
-    # Setup the app engine test bed.
-    self.testbed = testbed.Testbed()
-    self.testbed.activate()
-    self.testbed.init_all_stubs()
-
-  def tearDown(self):
-    self.testbed.deactivate()
-
+class FileTest(test_case.TestCase):
   def testStoreFile(self):
     file_id = 'file_id'
     expected_file = 'file'

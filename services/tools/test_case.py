@@ -2,9 +2,6 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
-import test_env
-test_env.setup_test_env()
-
 from google.appengine.ext import testbed
 
 from depot_tools import auto_stub

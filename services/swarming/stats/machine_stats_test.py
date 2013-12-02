@@ -3,9 +3,6 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
-"""Tests for MachineStats class."""
-
-
 import datetime
 import logging
 import os
@@ -19,8 +16,7 @@ import test_env
 
 test_env.setup_test_env()
 
-from google.appengine.ext import testbed
-
+import test_case
 from server import admin_user
 from stats import machine_stats
 
@@ -29,16 +25,7 @@ MACHINE_IDS = ['12345678-12345678-12345678-12345678',
                '23456789-23456789-23456789-23456789']
 
 
-class MachineStatsTest(unittest.TestCase):
-  def setUp(self):
-    # Setup the app engine test bed.
-    self.testbed = testbed.Testbed()
-    self.testbed.activate()
-    self.testbed.init_all_stubs()
-
-  def tearDown(self):
-    self.testbed.deactivate()
-
+class MachineStatsTest(test_case.TestCase):
   def testDetectDeadMachines(self):
     self.assertEqual([], machine_stats.FindDeadMachines())
 

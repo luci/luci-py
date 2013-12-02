@@ -35,21 +35,31 @@ def CommonChecks(input_api, output_api):
       join('server'),
       join('stats'),
       join('swarm_bot'),
-      join('tests'),
       join('tools'),
   ]
 
-  # post_test.py isn't a test, it it meant to post a test to the server.
-  blacklist = ['post_test.py']
+  blacklist = [
+    # post_test.py isn't a test, it it meant to post a test to the server.
+    'post_test.py',
+  ]
+  if not input_api.is_committing:
+    # Skip smoke tests on upload.
+    blacklist.append('.+_smoke_test.py')
+  else:
+    # GetUnitTestsInDirectory() will error out if it doesn't find anything to
+    # run in a directory and 'tests' only contain smoke tests, so only add the
+    # directory if smoke tests are to be run.
+    test_directories.append(join('tests'))
 
+  tests = []
   for directory in test_directories:
-    output.extend(
-        input_api.canned_checks.RunUnitTestsInDirectory(
+    tests.extend(
+        input_api.canned_checks.GetUnitTestsInDirectory(
             input_api, output_api,
             directory,
             whitelist=[r'.+_test\.py$'],
             blacklist=blacklist))
-
+  output.extend(input_api.RunTests(tests, parallel=True))
   return output
 
 

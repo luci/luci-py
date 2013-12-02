@@ -19,6 +19,8 @@ from google.appengine.datastore import datastore_stub_util
 from google.appengine.ext import testbed
 
 import handlers
+import test_case
+import webtest
 from common import dimensions_utils
 from common import swarm_constants
 from common import url_helper
@@ -33,7 +35,6 @@ from stats import daily_stats
 from stats import machine_stats
 from stats import runner_stats
 from stats import runner_summary
-from third_party import webtest
 from third_party.mox import mox
 
 
@@ -41,14 +42,13 @@ from third_party.mox import mox
 MACHINE_ID = '12345678-12345678-12345678-12345678'
 
 
-class AppTest(unittest.TestCase):
+class AppTest(test_case.TestCase):
   def setUp(self):
     super(AppTest, self).setUp()
     handlers.ALLOW_ACCESS_FROM_DOMAINS = ('example.com',)
-
-    self.testbed = testbed.Testbed()
-    self.testbed.activate()
-    self.testbed.init_all_stubs()
+    self.testbed.init_logservice_stub()
+    self.testbed.init_taskqueue_stub()
+    self.testbed.init_user_stub()
 
     # Ensure the test can find queue.yaml.
     self.taskqueue_stub = self.testbed.get_stub(testbed.TASKQUEUE_SERVICE_NAME)
@@ -62,13 +62,10 @@ class AppTest(unittest.TestCase):
     # Authenticate with none as IP.
     user_manager.AddWhitelist(None)
 
-    # Setup mox handler.
     self._mox = mox.Mox()
 
   def tearDown(self):
-    self.testbed.deactivate()
     self._mox.UnsetStubs()
-    self._mox.ResetAll()
     super(AppTest, self).tearDown()
 
   def _GetRoutes(self):

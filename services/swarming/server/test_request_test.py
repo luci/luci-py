@@ -3,9 +3,6 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
-"""Tests for TestRequest class."""
-
-
 import logging
 import os
 import sys
@@ -19,22 +16,13 @@ import test_env
 test_env.setup_test_env()
 
 from google.appengine.datastore import datastore_stub_util
-from google.appengine.ext import testbed
 
+import test_case
 from server import test_helper
 from server import test_request
 
 
-class TestRequestTest(unittest.TestCase):
-  def setUp(self):
-    # Setup the app engine test bed.
-    self.testbed = testbed.Testbed()
-    self.testbed.activate()
-    self.testbed.init_all_stubs()
-
-  def tearDown(self):
-    self.testbed.deactivate()
-
+class TestRequestTest(test_case.TestCase):
   def testGetTestRequestKeys(self):
    # Ensure that matching works even when the datastore is not being
     # consistent.

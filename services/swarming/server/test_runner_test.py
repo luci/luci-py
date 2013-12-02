@@ -3,9 +3,6 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
-"""Tests for TestRunner class."""
-
-
 import datetime
 import logging
 import os
@@ -20,9 +17,9 @@ import test_env
 test_env.setup_test_env()
 
 from google.appengine.api import datastore_errors
-from google.appengine.ext import testbed
 from google.appengine.ext import ndb
 
+import test_case
 from common import result_helper
 from common import swarm_constants
 from common import url_helper
@@ -41,22 +38,16 @@ MACHINE_IDS = [
 ]
 
 
-class TestRunnerTest(unittest.TestCase):
+class TestRunnerTest(test_case.TestCase):
   def setUp(self):
-    # Setup the app engine test bed.
-    self.testbed = testbed.Testbed()
-    self.testbed.activate()
-    self.testbed.init_all_stubs()
-
-    # Setup a mock object.
+    super(TestRunnerTest, self).setUp()
     self._mox = mox.Mox()
 
     self._mox.StubOutWithMock(url_helper, 'UrlOpen')
 
   def tearDown(self):
-    self.testbed.deactivate()
-
     self._mox.UnsetStubs()
+    super(TestRunnerTest, self).tearDown()
 
   def testGetResultStringFromEmptyRunner(self):
     runner = test_helper.CreatePendingRunner()
