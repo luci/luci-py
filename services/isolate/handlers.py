@@ -816,7 +816,7 @@ class RestrictedStoreBlobstoreContentByHashHandler(
         future.wait()
       return
 
-    self.response.headers['Content-Type'] = 'text/plain'
+    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
     self.response.out.write('Content saved.')
     stats.log(stats.STORE, entry.size, 'GS; %s' % entry.filename)
 
@@ -824,7 +824,6 @@ class RestrictedStoreBlobstoreContentByHashHandler(
 class RestrictedAdminUIHandler(acl.ACLRequestHandler):
   """Root admin UI page."""
   def get(self):
-    self.response.headers['Content-Type'] = 'text/html'
     self.response.write(render_template('restricted.html', {
         'token': self.generate_token(),
         'map_reduce_jobs': [
@@ -838,7 +837,6 @@ class RestrictedGoogleStorageConfig(acl.ACLRequestHandler):
   """View and modify Google Storage config entries."""
   def get(self):
     settings = config.settings()
-    self.response.headers['Content-Type'] = 'text/html'
     self.response.write(render_template('gs_config.html', {
         'gs_bucket': settings.gs_bucket,
         'gs_client_id_email': settings.gs_client_id_email,
@@ -851,7 +849,7 @@ class RestrictedGoogleStorageConfig(acl.ACLRequestHandler):
     settings.gs_bucket = self.request.get('gs_bucket')
     settings.gs_client_id_email = self.request.get('gs_client_id_email')
     settings.gs_private_key = self.request.get('gs_private_key')
-    self.response.headers['Content-Type'] = 'text/plain'
+    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
     try:
       # Ensure key is correct, it's easy to make a mistake when creating it.
       gcs.URLSigner.load_private_key(settings.gs_private_key)
@@ -884,7 +882,7 @@ class RestrictedEreporter2Mail(webapp2.RequestHandler):
         ereporter2.REPORT_TITLE_TEMPLATE,
         ereporter2.REPORT_CONTENT_TEMPLATE,
         {})
-    self.response.headers['Content-Type'] = 'text/plain'
+    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
     if result:
       self.response.write('Success.')
     else:
@@ -923,7 +921,6 @@ class RestrictedEreporter2Report(webapp2.RequestHandler):
         ereporter2.REPORT_CONTENT_TEMPLATE,
         request_id_url, env)
     out = render_template('ereporter2_report.html', {'content': content})
-    self.response.headers['Content-Type'] = 'text/html'
     self.response.write(out)
 
 
@@ -933,7 +930,7 @@ class RestrictedEreporter2Request(webapp2.RequestHandler):
     data = ereporter2.log_request_id_to_dict(request_id)
     if not data:
       self.abort(404, detail='Request id was not found.')
-    self.response.headers['Content-Type'] = 'application/json'
+    self.response.headers['Content-Type'] = 'application/json; charset=utf-8'
     json.dump(data, self.response, indent=2, sort_keys=True)
 
 
@@ -1064,7 +1061,7 @@ class GenerateBlobstoreHandler(acl.ACLRequestHandler):
     # An option is to create a single file per directory but we could get into
     # an edge case with large number of directories.
     # TODO(maruel): Look at the alternatives.
-    self.response.headers['Content-Type'] = 'text/plain'
+    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
     self.response.out.write(blobstore.create_upload_url(
         url,
         gs_bucket_name=full_gs_path))
@@ -1129,7 +1126,7 @@ class StoreContentByHashHandler(acl.ACLRequestHandler):
     entry.size = len(content)
     entry.expanded_size = expanded_size
     future = entry.put_async()
-    self.response.headers['Content-Type'] = 'text/plain'
+    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
     self.response.out.write('Content saved.')
 
     if (entry.filename and
@@ -1205,7 +1202,7 @@ class ProtocolHandlerMixin(object):
   def send_json(self, body, http_code=200):
     """Serializes |body| into JSON and sends it as a response."""
     self.response.set_status(http_code)
-    self.response.headers['Content-Type'] = 'application/json'
+    self.response.headers['Content-Type'] = 'application/json; charset=utf-8'
     json.dump(body, self.response.out, separators=(',', ':'))
 
   def send_error(self, message, http_code=400):
@@ -1760,7 +1757,6 @@ class StoreContentHandlerGS(acl.ACLRequestHandler, ProtocolHandlerMixin):
 class RootHandler(webapp2.RequestHandler):
   """Tells the user to RTM."""
   def get(self):
-    self.response.headers['Content-Type'] = 'text/html'
     self.response.write(render_template('root.html'))
 
 
@@ -1768,7 +1764,7 @@ class WarmupHandler(webapp2.RequestHandler):
   def get(self):
     # Generate/precache settings.
     config.settings()
-    self.response.headers['Content-Type'] = 'text/plain'
+    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
     self.response.write('ok')
 
 

@@ -245,7 +245,7 @@ def require_cronjob(f):
   @functools.wraps(f)
   def hook(self, *args, **kwargs):
     if self.request.headers.get('X-AppEngine-Cron') != 'true':
-      self.response.headers['Content-Type'] = 'text/plain'
+      self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
       msg = 'Only internal cron jobs can do this'
       logging.error(msg)
       self.abort(403, msg)
@@ -260,7 +260,7 @@ def require_taskqueue(task_name):
     @functools.wraps(f)
     def hook(self, *args, **kwargs):
       if self.request.headers.get('X-AppEngine-QueueName') != task_name:
-        self.response.headers['Content-Type'] = 'text/plain'
+        self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
         msg = 'Only internal task %s can do this' % task_name
         logging.error(msg)
         self.abort(403, msg)
@@ -613,7 +613,7 @@ class DeleteMachineStatsHandler(webapp2.RequestHandler):
     key = self.request.get('r')
 
     if key and machine_stats.DeleteMachineStats(key):
-      self.response.headers['Content-Type'] = 'text/plain'
+      self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
       self.response.out.write('Machine Assignment removed.')
     else:
       self.response.set_status(204)
@@ -627,7 +627,7 @@ class TestRequestHandler(webapp2.RequestHandler):
     # Validate the request.
     if not self.request.get('request'):
       self.response.set_status(402)
-      self.response.headers['Content-Type'] = 'text/plain'
+      self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
       self.response.out.write('No request parameter found')
       return
 
@@ -665,6 +665,7 @@ class ResultHandler(webapp2.RequestHandler):
       msg = ('The runner, with key %s, has already been deleted, results lost.'
              % runner_key)
       logging.info(msg)
+      self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
       self.response.out.write(msg)
       return
 
@@ -695,7 +696,7 @@ class ResultHandler(webapp2.RequestHandler):
         results=results,
         overwrite=overwrite):
       self.abort(400, 'Failed to update the runner results.')
-    self.response.headers['Content-Type'] = 'text/plain'
+    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
     self.response.out.write('Successfully update the runner results.')
 
 
@@ -721,7 +722,7 @@ class TaskCleanupDataHandler(webapp2.RequestHandler):
                    'another cleanup.')
       taskqueue.add(method='POST', url='/secure/task_queues/cleanup_data',
                     queue_name='cleanup')
-    self.response.headers['Content-Type'] = 'text/plain'
+    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
     self.response.out.write('Success.')
 
 
@@ -731,7 +732,7 @@ class CronAbortStaleRunnersHandler(webapp2.RequestHandler):
   @require_cronjob
   def get(self):
     test_management.AbortStaleRunners()
-    self.response.headers['Content-Type'] = 'text/plain'
+    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
     self.response.out.write('Success.')
 
 
@@ -742,7 +743,7 @@ class CronTriggerCleanupDataHandler(webapp2.RequestHandler):
   def get(self):
     taskqueue.add(method='POST', url='/secure/task_queues/cleanup_data',
                   queue_name='cleanup')
-    self.response.headers['Content-Type'] = 'text/plain'
+    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
     self.response.out.write('Success.')
 
 
@@ -753,7 +754,7 @@ class CronTriggerGenerateDailyStats(webapp2.RequestHandler):
   def get(self):
     taskqueue.add(method='POST', url='/secure/task_queues/generate_daily_stats',
                   queue_name='stats')
-    self.response.headers['Content-Type'] = 'text/plain'
+    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
     self.response.out.write('Success.')
 
 
@@ -765,7 +766,7 @@ class CronTriggerGenerateRecentStats(webapp2.RequestHandler):
     taskqueue.add(method='POST',
                   url='/secure/task_queues/generate_recent_stats',
                   queue_name='stats')
-    self.response.headers['Content-Type'] = 'text/plain'
+    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
     self.response.out.write('Success.')
 
 
@@ -774,7 +775,7 @@ class CronDetectDeadMachinesHandler(webapp2.RequestHandler):
 
   @require_cronjob
   def get(self):
-    self.response.headers['Content-Type'] = 'text/plain'
+    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
     dead_machines = machine_stats.FindDeadMachines()
     if dead_machines:
       logging.warning(
@@ -803,7 +804,7 @@ class CronDetectHangingRunnersHandler(webapp2.RequestHandler):
              )
 
       admin_user.EmailAdmins(subject, body)
-    self.response.headers['Content-Type'] = 'text/plain'
+    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
     self.response.out.write('Success.')
 
 
@@ -814,7 +815,7 @@ class TaskGenerateDailyStatsHandler(webapp2.RequestHandler):
   def post(self):
     yesterday = datetime.datetime.utcnow().date() - datetime.timedelta(days=1)
     daily_stats.GenerateDailyStats(yesterday)
-    self.response.headers['Content-Type'] = 'text/plain'
+    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
     self.response.out.write('Success.')
 
 
@@ -825,7 +826,7 @@ class TaskGenerateRecentStatsHandler(webapp2.RequestHandler):
   def post(self):
     runner_summary.GenerateSnapshotSummary()
     runner_summary.GenerateWaitSummary()
-    self.response.headers['Content-Type'] = 'text/plain'
+    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
     self.response.out.write('Success.')
 
 
@@ -845,7 +846,7 @@ class CronSendEreporter2MailHandler(webapp2.RequestHandler):
         ereporter2.REPORT_TITLE_TEMPLATE,
         ereporter2.REPORT_CONTENT_TEMPLATE,
         {})
-    self.response.headers['Content-Type'] = 'text/plain'
+    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
     if result:
       self.response.write('Success.')
     else:
@@ -879,7 +880,6 @@ class Ereporter2ReportHandler(webapp2.RequestHandler):
         ereporter2.REPORT_CONTENT_TEMPLATE,
         request_id_url, env)
     out = template.get('ereporter2_report.html').render({'content': content})
-    self.response.headers['Content-Type'] = 'text/html'
     self.response.write(out)
 
 
@@ -889,7 +889,7 @@ class Ereporter2RequestHandler(webapp2.RequestHandler):
     data = ereporter2.log_request_id_to_dict(request_id)
     if not data:
       self.abort(404, detail='Request id was not found.')
-    self.response.headers['Content-Type'] = 'application/json'
+    self.response.headers['Content-Type'] = 'application/json; charset=utf-8'
     json.dump(data, self.response, indent=2, sort_keys=True)
 
 
@@ -897,7 +897,7 @@ class ShowMessageHandler(webapp2.RequestHandler):
   """Show the full text of a test request."""
 
   def get(self):
-    self.response.headers['Content-Type'] = 'text/plain'
+    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
 
     runner_key = self.request.get('r', '')
     runner = test_runner.GetRunnerFromUrlSafeKey(runner_key)
@@ -917,6 +917,8 @@ class UploadStartSlaveHandler(webapp2.RequestHandler):
       self.abort(400, 'No script uploaded')
 
     test_management.StoreStartSlaveScript(script)
+    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
+    self.response.out.write('Success.')
 
 
 class StatsHandler(webapp2.RequestHandler):
@@ -958,7 +960,7 @@ class GetMatchingTestCasesHandler(webapp2.RequestHandler):
       keys.extend(key.urlsafe() for key in match.runner_keys)
 
     logging.info('Found %d keys in %d TestRequests', len(keys), len(matches))
-    self.response.headers['Content-Type'] = 'application/json'
+    self.response.headers['Content-Type'] = 'application/json; charset=utf-8'
     if keys:
       self.response.out.write(json.dumps(keys))
     else:
@@ -995,7 +997,7 @@ class GetTokenHandler(webapp2.RequestHandler):
 
   @AuthenticateMachineOrUser
   def get(self):
-    self.response.headers['Content-Type'] = 'text/plain'
+    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
     self.response.out.write('dummy_token')
 
 
@@ -1018,7 +1020,7 @@ class CancelHandler(webapp2.RequestHandler):
   """Cancel a test runner that is not already running."""
 
   def post(self):
-    self.response.headers['Content-Type'] = 'text/plain'
+    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
 
     runner_key = self.request.get('r', '')
     runner = test_runner.GetRunnerFromUrlSafeKey(runner_key)
@@ -1047,7 +1049,7 @@ class RetryHandler(webapp2.RequestHandler):
       # requests added before the user pressed the retry button.
       runner.created = datetime.datetime.utcnow()
       runner.put()
-      self.response.headers['Content-Type'] = 'text/plain'
+      self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
       self.response.out.write('Runner set for retry.')
     else:
       self.response.set_status(204)
@@ -1061,9 +1063,10 @@ class RegisterHandler(webapp2.RequestHandler):
 
   @AuthenticateMachine
   def post(self):
+    # TODO(maruel): Stop replying either json or text.
     # Validate the request.
     if not self.request.body:
-      self.response.headers['Content-Type'] = 'text/plain'
+      self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
       self.response.set_status(402)
       self.response.out.write('Request must have a body')
       return
@@ -1082,6 +1085,7 @@ class RegisterHandler(webapp2.RequestHandler):
       response = json.dumps(
           test_management.ExecuteRegisterRequest(attributes,
                                                  self.request.host_url))
+      self.response.headers['Content-Type'] = 'application/json; charset=utf-8'
     except runtime.DeadlineExceededError as e:
       # If the timeout happened before a runner was assigned there are no
       # problems. If the timeout occurred after a runner was assigned, that
@@ -1091,10 +1095,12 @@ class RegisterHandler(webapp2.RequestHandler):
       message = str(e)
       logging.warning(message)
       response = 'Error: %s' % message
+      self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
     except test_request_message.Error as e:
       message = str(e)
       logging.error(message)
       response = 'Error: %s' % message
+      self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
 
     self.response.out.write(response)
 
@@ -1110,7 +1116,7 @@ class RunnerPingHandler(webapp2.RequestHandler):
   def post(self):
     key = self.request.get('r', '')
     machine_id = self.request.get('id', '')
-    self.response.headers['Content-Type'] = 'text/plain'
+    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
 
     if test_runner.PingRunner(key, machine_id):
       self.response.out.write('Runner successfully pinged.')
@@ -1276,7 +1282,7 @@ class ServerPingHandler(webapp2.RequestHandler):
   """
 
   def get(self):
-    self.response.headers['Content-Type'] = 'text/plain'
+    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
     self.response.out.write('Server up')
 
 
@@ -1336,7 +1342,7 @@ class RemoteErrorHandler(webapp2.RequestHandler):
         info='Remote machine address: %s' % self.request.remote_addr)
     error.put()
 
-    self.response.headers['Content-Type'] = 'text/plain'
+    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
     self.response.out.write('Error logged')
 
 
@@ -1370,7 +1376,7 @@ def SendAuthenticationFailure(request, response):
       info='Remote machine address: %s' % request.remote_addr)
   error.put()
 
-  response.headers['Content-Type'] = 'text/plain'
+  response.headers['Content-Type'] = 'text/plain; charset=utf-8'
   response.set_status(403)
   response.out.write('Remote machine not whitelisted for operation')
 
@@ -1385,7 +1391,7 @@ def SendRunnerResults(response, key):
   results = test_runner.GetRunnerResults(key)
 
   if results:
-    response.headers['Content-Type'] = 'application/json'
+    response.headers['Content-Type'] = 'application/json; charset=utf-8'
     response.out.write(json.dumps(results))
   else:
     response.set_status(204)

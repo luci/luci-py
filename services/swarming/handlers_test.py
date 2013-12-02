@@ -270,7 +270,7 @@ class AppTest(unittest.TestCase):
     response = self.app.post(
         '/secure/upload_start_slave',
         upload_files=[('script', 'script', 'script_body')])
-    self.assertResponse(response, '200 OK', '')
+    self.assertResponse(response, '200 OK', 'Success.')
 
   def testRegisterHandler(self):
     # Missing attributes field.
