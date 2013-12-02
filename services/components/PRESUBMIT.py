@@ -60,12 +60,15 @@ def CommonChecks(input_api, output_api):
   finally:
     sys.path = old_sys_path
 
-  output.extend(
-      input_api.canned_checks.RunUnitTestsInDirectory(
-          input_api, output_api,
-          join('tests'),
-          whitelist=[r'.+_test\.py$'],
-          blacklist=[r'.+_smoke_test\.py$']))
+  blacklist = []
+  if not input_api.is_committing:
+    blacklist.append(r'.+_smoke_test\.py$')
+  tests = input_api.canned_checks.GetUnitTestsInDirectory(
+      input_api, output_api,
+      join('tests'),
+      whitelist=[r'.+_test\.py$'],
+      blacklist=blacklist)
+  output.extend(input_api.RunTests(tests, parallel=True))
   return output
 
 

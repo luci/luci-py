@@ -44,7 +44,7 @@ def CommonChecks(input_api, output_api):
   ]
   if not input_api.is_committing:
     # Skip smoke tests on upload.
-    blacklist.append('.+_smoke_test.py')
+    blacklist.append(r'.+_smoke_test\.py$')
   else:
     # GetUnitTestsInDirectory() will error out if it doesn't find anything to
     # run in a directory and 'tests' only contain smoke tests, so only add the

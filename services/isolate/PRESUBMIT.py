@@ -59,12 +59,13 @@ def CommonChecks(input_api, output_api):
   finally:
     sys.path = old_sys_path
 
-  output.extend(
-      input_api.canned_checks.RunUnitTestsInDirectory(
-          input_api, output_api,
-          join('tests'),
-          whitelist=[r'.+_test\.py$'],
-          blacklist=[r'.+_smoke_test\.py$']))
+  # TODO(maruel): Create a smoke test that use local servers.
+  tests = input_api.canned_checks.GetUnitTestsInDirectory(
+      input_api, output_api,
+      join('tests'),
+      whitelist=[r'.+_test\.py$'],
+      blacklist=[r'.+_smoke_test\.py$'])
+  output.extend(input_api.RunTests(tests, parallel=True))
   return output
 
 
