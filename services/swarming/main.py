@@ -4,14 +4,23 @@
 
 """Defines the application."""
 
-from components import ereporter2
+import os
 
+from google.appengine.ext.appstats import recording
+
+from components import ereporter2
 import handlers
 
 
 def CreateApplication():
   ereporter2.register_formatter()
-  return handlers.CreateApplication()
+  a = handlers.CreateApplication()
+  # In theory we'd want to take the output of app_identity.get_application_id().
+  # Sadly, this function does an RPC call and may contribute to cause time out
+  # on the initial load.
+  if os.environ['APPLICATION_ID'].endswith('-dev'):
+    a = recording.appstats_wsgi_middleware(a)
+  return a
 
 
 app = CreateApplication()

@@ -20,6 +20,7 @@ handlers:
   secure: always
 
 builtins:
+- appstats: on
 - remote_api: on
 
 libraries:
