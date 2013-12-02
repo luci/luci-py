@@ -827,6 +827,8 @@ class TestCase(TestRequestMessageBase):
 
   Attributes:
     test_case_name: The name of this test case.
+    requestor: The id of the user requesting this test (generally an email
+        address).
     env_vars: An optional dictionary for environment variables.
     configurations: A list of configurations for this test case.
     data: An optional data list for this test case. The strings must be
@@ -857,14 +859,17 @@ class TestCase(TestRequestMessageBase):
   """
   VALID_STORE_RESULT_VALUES = [None, '', 'all', 'fail', 'none']
 
-  def __init__(self, test_case_name=None, env_vars=None, configurations=None,
-               data=None, working_dir=DEFAULT_WORKING_DIR, admin=False,
-               tests=None, result_url=None, store_result=None,
+  def __init__(self, test_case_name=None, requestor=None, env_vars=None,
+               configurations=None, data=None, working_dir=DEFAULT_WORKING_DIR,
+               admin=False, tests=None, result_url=None, store_result=None,
                restart_on_failure=None, output_destination=None,
                encoding=DEFAULT_ENCODING, cleanup=None, failure_email=None,
                label=None, verbose=False):
     super(TestCase, self).__init__()
     self.test_case_name = test_case_name
+    # TODO(csharp): Stop using a default so test requests that don't give a
+    # requestor are rejected.
+    self.requestor = requestor or 'unknown'
     if env_vars:
       self.env_vars = env_vars.copy()
     else:
@@ -907,6 +912,7 @@ class TestCase(TestRequestMessageBase):
     """
     if (not self.AreValidValues(['test_case_name'], basestring,
                                 required=True, errors=errors) or
+        not self.AreValidValues(['requestor'], basestring, errors=errors) or
         not self.AreValidDicts(['env_vars'], basestring, basestring,
                                errors=errors) or
         not self.AreValidObjectLists(['configurations'], TestConfiguration,

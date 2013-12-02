@@ -630,6 +630,7 @@ class TestCaseTest(TestHelper):
   def GetFullObject():
     return test_request_message.TestCase(
         test_case_name='a',
+        requestor='user@swarm.com',
         env_vars=TestHelper.VALID_ENV_VARS[-1],
         data=TestHelper.VALID_URL_LIST_VALUES[-1],
         working_dir=TestHelper.VALID_STRING_VALUES[-1],
@@ -684,6 +685,9 @@ class TestCaseTest(TestHelper):
     # And then a few more valid values
     self.AssertValidValues('test_case_name',
                            TestHelper.VALID_STRING_VALUES)
+    # TODO(csharp): requestor should change to be required, not optional.
+    self.AssertValidValues('requestor',
+                           TestHelper.VALID_OPTIONAL_STRING_VALUES)
     self.AssertValidValues('data', TestHelper.VALID_OPTIONAL_URL_LIST_VALUES +
                            TestHelper.VALID_URL_LOCAL_PATH_TUPLES_LISTS)
     self.AssertValidValues('admin', TestHelper.VALID_BOOLEAN_VALUES)
@@ -735,6 +739,9 @@ class TestCaseTest(TestHelper):
                              TestHelper.INVALID_REQUIRED_STRING_VALUES)
     # Put the value back to a valid value, to test invalidity of other values.
     self.test_request.test_case_name = TestHelper.VALID_STRING_VALUES[0]
+    self.AssertInvalidValues('requestor',
+                             TestHelper.INVALID_STRING_VALUES)
+    self.test_request.requestor = 'user@swarm.com'
     self.AssertInvalidValues('data', TestHelper.INVALID_URL_LIST_VALUES +
                              TestHelper.INVALID_URL_LOCAL_PATH_TUPLES_LISTS)
     self.test_request.data = TestHelper.VALID_URL_LIST_VALUES[-1]

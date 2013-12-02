@@ -15,7 +15,6 @@ import logging
 
 from google.appengine.ext import ndb
 
-
 # Number of days to evaluate when considering runner stats.
 RUNNER_STATS_EVALUATION_CUTOFF_DAYS = 7
 

@@ -38,6 +38,7 @@ from server import test_runner
 from server import user_manager
 from stats import daily_stats
 from stats import machine_stats
+from stats import requestor_daily_stats
 from stats import runner_stats
 from stats import runner_summary
 
@@ -709,6 +710,7 @@ class TaskCleanupDataHandler(webapp2.RequestHandler):
       futures.extend(dimension_mapping.DeleteOldDimensionMapping())
       futures.extend(test_runner.DeleteOldRunners())
       futures.extend(daily_stats.DeleteOldDailyStats())
+      futures.extend(requestor_daily_stats.DeleteOldRequestorDailyStats())
       futures.extend(runner_stats.DeleteOldRunnerStats())
       futures.extend(runner_summary.DeleteOldWaitSummaries())
       futures.extend(result_helper.DeleteOldResults())

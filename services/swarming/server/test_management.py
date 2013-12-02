@@ -174,8 +174,9 @@ def _QueueTestRequestConfig(request, config, config_hash):
   # Create a runner entity to record this request/config pair that needs
   # to be run. The runner will eventually be scheduled at a later time.
   runner = test_runner.TestRunner(
-      request=request.key, config_name=config.config_name,
-      config_hash=config_hash, config_instance_index=config.instance_index,
+      request=request.key, requestor=request.GetTestCase().requestor,
+      config_name=config.config_name, config_hash=config_hash,
+      config_instance_index=config.instance_index,
       num_config_instances=config.num_instances, priority=config.priority)
 
   runner.put()

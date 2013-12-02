@@ -23,6 +23,7 @@ from common import swarm_constants
 from common import test_request_message
 from common import url_helper
 from stats import machine_stats
+from stats import requestor_daily_stats
 from stats import runner_stats
 
 # The maximum number of times to retry a runner that has failed for a swarm
@@ -63,6 +64,9 @@ class TestRunner(ndb.Model):
 
   # The test being run.
   request = ndb.KeyProperty(kind='TestRequest')
+
+  # The id of the requestor of this test.
+  requestor = ndb.StringProperty()
 
   # The name of the request's configuration being tested.
   config_name = ndb.StringProperty()
@@ -374,7 +378,9 @@ class TestRunner(ndb.Model):
                           result_url_parts.scheme, test_case.result_url)
         update_successful = False
 
+    # Record the basic stats and usage from this runner.
     runner_stats.RecordRunnerStats(self)
+    requestor_daily_stats.UpdateDailyStats(self)
 
     if (test_case.store_result == 'none' or
         (test_case.store_result == 'fail' and self.ran_successfully)):
