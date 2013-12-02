@@ -64,10 +64,18 @@ _SECURE_USER_PROFILE_URL = '/secure/user_profile'
 # The domains that are allowed to access this application.
 ALLOW_ACCESS_FROM_DOMAINS = ()
 
+# Ignore these failures, there's nothing to do.
+# TODO(maruel): Store them in the db and make this runtime configurable.
+IGNORED_LINES = (
+  # Probably originating from appstats.
+  '/base/data/home/runtimes/python27/python27_lib/versions/1/google/'
+      'appengine/_internal/django/template/__init__.py:729: UserWarning: '
+      'api_milliseconds does not return a meaningful value',
+)
 
 # Function that is used to determine if an error entry should be ignored.
 should_ignore_error_record = functools.partial(
-    ereporter2.should_ignore_error_record, (), ())
+    ereporter2.should_ignore_error_record, IGNORED_LINES, ())
 
 
 def GenerateTopbar():
