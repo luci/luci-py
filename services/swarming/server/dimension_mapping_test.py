@@ -34,11 +34,13 @@ class DimensionMappingTest(test_case.TestCase):
     # Add an old dimension and ensure it gets removed.
     old_date = datetime.datetime.utcnow().date() - datetime.timedelta(
         days=dimension_mapping.DIMENSION_MAPPING_DAYS_TO_LIVE + 5)
-    dimension_mapping.DimensionMapping(last_seen=old_date).put()
+    old_mapping = dimension_mapping.DimensionMapping(last_seen=old_date)
+    # Remove the put hook so the model doesn't force last seen to today.
+    old_mapping._pre_put_hook = lambda: None
+    old_mapping.put()
 
     _WaitForResults(dimension_mapping.DeleteOldDimensionMapping())
-    # TODO(csharp): This should be 1, not 2.
-    self.assertEqual(2, dimension_mapping.DimensionMapping.query().count())
+    self.assertEqual(1, dimension_mapping.DimensionMapping.query().count())
 
 
 if __name__ == '__main__':
