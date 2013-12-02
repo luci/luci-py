@@ -1191,8 +1191,15 @@ class RunnerSummaryHandler(webapp2.RequestHandler):
 
     # Convert the runner summaries to the graph array.
     for summary in summaries_async.get_result():
-      runner_summary_graphs[summary.dimensions]['data'].append(
-          [summary.time.isoformat(), summary.pending, summary.running])
+      # It seems possible to get a summary that we don't have a snapshot for.
+      # Got crashes but unable to repo, so add logging to try and catch
+      # this case.
+      if summary.dimensions in runner_summary_graphs:
+        runner_summary_graphs[summary.dimensions]['data'].append(
+            [summary.time.isoformat(), summary.pending, summary.running])
+      else:
+        logging.error('\'%s\' wasn\'t in set of runner summaries [%s]',
+                      summary.dimension, runner_summary_graphs.keys())
 
     params = {
         'topbar': GenerateTopbar(),
