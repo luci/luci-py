@@ -83,8 +83,6 @@ def UpdateDailyStats(runner):
   # because it wasn't the users fault, so they shouldn't be blamed for the
   # additional usage.
   if runner.automatic_retry_count:
-    logging.error('Tried to add an automatically retried runner to the usage '
-                  'stats.')
     return
 
   requestor = runner.requestor
