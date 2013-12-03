@@ -8,6 +8,7 @@ This file contains the URL handlers for all the Swarming service URLs,
 implemented using the webapp2 framework.
 """
 
+import collections
 import datetime
 import functools
 import json
@@ -240,12 +241,8 @@ def GetModulesVersions():
   return [('default', i) for i in modules.get_versions()]
 
 
-class SortOptions(object):
-  """A basic helper class for displaying the sort options."""
-
-  def __init__(self, key, name):
-    self.key = key
-    self.name = name
+# Helper class for displaying the sort options in html templates.
+SortOptions = collections.namedtuple('SortOptions', ['key', 'name'])
 
 
 def require_cronjob(f):
@@ -580,35 +577,32 @@ class MachineListHandler(webapp2.RequestHandler):
 
   def get(self):
     sort_by = self.request.get('sort_by', '')
-    if sort_by != 'status' and sort_by not in machine_stats.ACCEPTABLE_SORTS:
+    if sort_by not in machine_stats.ACCEPTABLE_SORTS:
       sort_by = 'machine_id'
 
-    machines = machine_stats.GetAllMachines(sort_by)
-
-    # Add a delete option for each machine assignment.
-    machines_displayable = []
-    for machine in machines:
-      # TODO(user): Actually set the machine status.
-      machine.status = '-'
-
-      machine.command_string = GenerateButtonWithHiddenForm(
+    dead_machine_cutoff = (
+        datetime.datetime.utcnow() - machine_stats.MACHINE_DEATH_TIMEOUT)
+    machines = []
+    for machine in machine_stats.GetAllMachines(sort_by):
+      m = machine.to_dict()
+      m['html_class'] = (
+          'dead_machine' if machine.last_seen < dead_machine_cutoff else '')
+      # Add a delete option for each machine assignment.
+      m['command_string'] = GenerateButtonWithHiddenForm(
           'Delete',
-          '%s?r=%s' % (_DELETE_MACHINE_STATS_URL,
-                       machine.key.string_id()),
+          '%s?r=%s' % (_DELETE_MACHINE_STATS_URL, machine.key.string_id()),
           machine.key.string_id())
-      machines_displayable.append(machine)
+      machines.append(m)
 
-    sort_options = [SortOptions(key, value) for key, value in
-                    machine_stats.ACCEPTABLE_SORTS.iteritems()]
-    # Add the special status sort option.
-    sort_options.append(SortOptions('status', 'Status'))
-
+    sort_options = [
+        SortOptions(k, v) for k, v in machine_stats.ACCEPTABLE_SORTS.iteritems()
+    ]
     params = {
-        'topbar': GenerateTopbar(),
-        'machines': machines_displayable,
         'machine_update_time': machine_stats.MACHINE_UPDATE_TIME,
+        'machines': machines,
         'selected_sort': sort_by,
         'sort_options': sort_options,
+        'topbar': GenerateTopbar(),
     }
     self.response.out.write(template.get('machine_list.html').render(params))
 

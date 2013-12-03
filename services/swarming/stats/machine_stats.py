@@ -14,6 +14,7 @@ import logging
 from google.appengine.api import app_identity
 from google.appengine.ext import ndb
 
+import template
 from server import admin_user
 
 
@@ -56,11 +57,6 @@ class MachineStats(ndb.Model):
     if not self.last_seen:
       self.last_seen = datetime.datetime.utcnow()
 
-  @property
-  def last_seen_str(self):
-    """Returns a shorter version of self.last_seen as a str."""
-    return self.last_seen.strftime('%Y-%m-%d %H:%M')
-
 
 def FindDeadMachines():
   """Finds all dead machines.
@@ -83,7 +79,8 @@ def NotifyAdminsOfDeadMachines(dead_machines):
     True if the email was successfully sent.
   """
   death_list = (
-      '  %s (%s)   %s' % (m.machine_id, m.tag, m.last_seen_str)
+      '  %s (%s)   %s' % (
+        m.machine_id, m.tag, template.datetimeformat(m.last_seen))
       for m in dead_machines)
 
   body = (

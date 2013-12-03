@@ -2,6 +2,8 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
+"""Setups jinja2 environment."""
+
 import os
 
 import jinja2
@@ -15,5 +17,16 @@ JINJA = jinja2.Environment(
     autoescape=True)
 
 
+# Registers library custom filters.
+
+
+def datetimeformat(value, f='%Y-%m-%d %H:%M'):
+  return value.strftime(f)
+
+
+JINJA.filters['datetimeformat'] = datetimeformat
+
+
 def get(*args, **kwargs):
+  """Shorthand to load a template."""
   return JINJA.get_template(*args, **kwargs)

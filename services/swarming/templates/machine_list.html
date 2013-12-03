@@ -35,17 +35,15 @@ so it is likely that we've seen the machine since the listed time.
     <th>Tag</th>
     <th>Last Seen</th>
     <th>Dimensions</th>
-    <th>Status</th>
     <th>&nbsp;</th>
   </thead>
   <tbody>
     {% for machine in machines %}
-      <tr class="request">
+      <tr class="request {{machine.html_class}}">
         <td>{{machine.machine_id}}</td>
         <td>{{machine.tag}}</td>
-        <td>{{machine.last_seen_str}}</td>
+        <td>{{machine.last_seen|datetimeformat}}</td>
         <td>{{machine.dimensions}}</td>
-        <td>{{machine.status}}</td>
         <td>{{machine.command_string|safe}}</td>
       </tr>
     {% endfor %}
