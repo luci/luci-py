@@ -67,8 +67,8 @@ def calculate_version(root, tag):
   else:
     # Look for local uncommitted diff.
     pristine = not (
-        git(['diff', mergebase], cwd=root) or
-        git(['diff', '--cached', mergebase], cwd=root))
+        git(['diff', '--ignore-submodules', mergebase], cwd=root) or
+        git(['diff', '--ignore-submodules', '--cached', mergebase], cwd=root))
     logging.info('was diff clear? %s', pristine)
 
   # Trim it to 7 characters like 'git describe' does. 40 characters is
