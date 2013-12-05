@@ -180,6 +180,30 @@ class AppTest(test_case.TestCase):
 
     self._mox.VerifyAll()
 
+  def testMachineListJson(self):
+    machine_stats.MachineStats(
+        id=MACHINE_ID,
+        tag='tag',
+        last_seen=datetime.datetime(2000, 1, 2, 3, 4, 5, 6),
+        dimensions='{"foo": "bar"}').put()
+
+    response = self.app.get('/secure/machine_list/json')
+    self.assertEqual('200 OK', response.status)
+    actual = json.loads(response.body)
+    expected = {
+        u'machine_death_timeout': 10800,
+        u'machine_update_time': 3600,
+        u'machines': [
+          {
+            u'dimensions': u'{"foo": "bar"}',
+            u'last_seen': u'2000-01-02 03:04:05',
+            u'machine_id': u'12345678-12345678-12345678-12345678',
+            u'tag': u'tag',
+          },
+       ],
+    }
+    self.assertEqual(expected, actual)
+
   def testDeleteMachineStats(self):
     # Add a machine assignment to delete.
     m_stats = machine_stats.MachineStats.get_or_insert(MACHINE_ID)

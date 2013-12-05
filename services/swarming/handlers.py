@@ -31,6 +31,7 @@ from common import swarm_constants
 from common import test_request_message
 from common import url_helper
 from components import ereporter2
+from components import utils
 from server import admin_user
 from server import dimension_mapping
 from server import test_management
@@ -605,6 +606,19 @@ class MachineListHandler(webapp2.RequestHandler):
         'topbar': GenerateTopbar(),
     }
     self.response.out.write(template.get('machine_list.html').render(params))
+
+
+class MachineListJsonHandler(webapp2.RequestHandler):
+  """Returns the list of known swarming bot as json data."""
+
+  def get(self):
+    params = {
+        'machine_death_timeout': machine_stats.MACHINE_DEATH_TIMEOUT,
+        'machine_update_time': machine_stats.MACHINE_UPDATE_TIME,
+        'machines': [m.to_dict() for m in machine_stats.MachineStats.query()],
+    }
+    self.response.headers['Content-Type'] = 'application/json; charset=utf-8'
+    self.response.out.write(utils.SmartJsonEncoder().encode(params))
 
 
 class DeleteMachineStatsHandler(webapp2.RequestHandler):
@@ -1398,6 +1412,7 @@ def CreateApplication():
       ('/secure/ereporter2/request/<request_id:[0-9a-fA-F]+>',
           Ereporter2RequestHandler),
       ('/secure/machine_list', MachineListHandler),
+      ('/secure/machine_list/json', MachineListJsonHandler),
       ('/secure/retry', RetryHandler),
       ('/secure/show_message', ShowMessageHandler),
       ('/secure/task_queues/cleanup_data', TaskCleanupDataHandler),
