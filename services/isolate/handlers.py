@@ -1210,15 +1210,37 @@ class ProtocolHandlerMixin(object):
     logging.error(message)
     self.abort(http_code, detail=message)
 
-  def send_data(self, data, filename=None):
-    """Sends binary data as a response."""
-    self.response.set_status(200)
+  def send_data(self, data, filename=None, offset=0):
+    """Sends binary data as a response.
+
+    If |offset| is zero, returns an entire |data| and sets HTTP code to 200.
+    If |offset| is non-zero, returns a subrange of |data| with HTTP code
+    set to 206 and 'Content-Range' header.
+    If |offset| is outside of acceptable range, returns HTTP code 416.
+    """
+    # Bad offset? Return 416.
+    if offset < 0 or offset >= len(data):
+      return self.send_error(
+          'Unacceptable offset.\nRequested offset is %d while file '
+          'size is %d' % (offset, len(data)), http_code=416)
+
+    # Common headers that are set regardless of |offset| value.
     if filename:
       self.response.headers['Content-Disposition'] = (
           'attachment; filename="%s"' % filename)
     self.response.headers['Content-Type'] = 'application/octet-stream'
     self.response.headers['Cache-Control'] = 'public, max-age=43200'
-    self.response.out.write(data)
+
+    if not offset:
+      # Returning an entire file.
+      self.response.set_status(200)
+      self.response.out.write(data)
+    else:
+      # Returning a partial content, set Content-Range header.
+      self.response.set_status(206)
+      self.response.headers['Content-Range'] = (
+          'bytes %d-%d/%d' % (offset, len(data) - 1, len(data)))
+      self.response.out.write(data[offset:])
 
   @property
   def client_protocol_version(self):
@@ -1506,17 +1528,30 @@ class PreUploadContentHandlerGS(acl.ACLRequestHandler, ProtocolHandlerMixin):
 class RetrieveContentHandlerGS(acl.ACLRequestHandler, ProtocolHandlerMixin):
   """The handlers for retrieving contents by its SHA-1 hash |hash_key|.
 
-  Can produce 3 types of responses:
+  Can produce 5 types of responses:
     * HTTP 200: the content is in response body as octet-stream.
+    * HTTP 206: partial content is in response body.
     * HTTP 302: http redirect to a file with the content.
     * HTTP 404: content is not available, response body is a error message.
+    * HTTP 416: requested byte range can not be satisfied.
   """
 
   def get(self, namespace, hash_key):  #pylint: disable=W0221
+    # Parse 'Range' header if it's present to extract initial offset.
+    # Only support single continuous range from some |offset| to the end.
+    offset = 0
+    range_header = self.request.headers.get('range')
+    if range_header:
+      match = re.match(r'bytes=(\d+)-', range_header)
+      if not match:
+        return self.send_error(
+            'Unsupported byte range.\n\'%s\'.' % range_header, http_code=416)
+      offset = int(match.group(1))
+
     memcache_entry = memcache.get(hash_key, namespace='table_%s' % namespace)
     if memcache_entry is not None:
-      self.send_data(memcache_entry, filename=hash_key)
-      stats.log(stats.RETURN, len(memcache_entry), 'memcache')
+      self.send_data(memcache_entry, filename=hash_key, offset=offset)
+      stats.log(stats.RETURN, len(memcache_entry) - offset, 'memcache')
       return
 
     entry = get_content_by_hash(namespace, hash_key)
@@ -1525,8 +1560,8 @@ class RetrieveContentHandlerGS(acl.ACLRequestHandler, ProtocolHandlerMixin):
           'Unable to find an entry.\nKey is \'%s\'.' % hash_key, http_code=404)
 
     if entry.content is not None:
-      self.send_data(entry.content, filename=hash_key)
-      stats.log(stats.RETURN, len(entry.content), 'inline')
+      self.send_data(entry.content, filename=hash_key, offset=offset)
+      stats.log(stats.RETURN, len(entry.content) - offset, 'inline')
       return
 
     if not entry.filename:
@@ -1542,9 +1577,11 @@ class RetrieveContentHandlerGS(acl.ACLRequestHandler, ProtocolHandlerMixin):
         settings.gs_client_id_email, settings.gs_private_key)
     signed_url = signer.get_download_url(entry.gs_filepath)
 
-    # Redirect client to this URL.
+    # Redirect client to this URL. If 'Range' header is used, client will
+    # correctly pass it to Google Storage to fetch only subrange of file,
+    # so update stats accordingly.
     self.redirect(signed_url)
-    stats.log(stats.RETURN, entry.size, 'GS; %s' % entry.filename)
+    stats.log(stats.RETURN, entry.size - offset, 'GS; %s' % entry.filename)
 
 
 class StoreContentHandlerGS(acl.ACLRequestHandler, ProtocolHandlerMixin):
