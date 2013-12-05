@@ -576,9 +576,9 @@ class MachineListHandler(webapp2.RequestHandler):
   """
 
   def get(self):
-    sort_by = self.request.get('sort_by', '')
+    sort_by = self.request.get('sort_by', 'machine_id')
     if sort_by not in machine_stats.ACCEPTABLE_SORTS:
-      sort_by = 'machine_id'
+      self.abort(400, 'Invalid sort_by query parameter')
 
     dead_machine_cutoff = (
         datetime.datetime.utcnow() - machine_stats.MACHINE_DEATH_TIMEOUT)
@@ -628,19 +628,17 @@ class TestRequestHandler(webapp2.RequestHandler):
   def post(self):
     # Validate the request.
     if not self.request.get('request'):
-      self.response.set_status(402)
-      self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
-      self.response.out.write('No request parameter found')
-      return
+      self.abort(400, 'No request parameter found.')
 
     try:
-      response = json.dumps(test_management.ExecuteTestRequest(
-          self.request.get('request')))
-    except test_request_message.Error as ex:
-      message = str(ex)
+      result = test_management.ExecuteTestRequest(self.request.get('request'))
+    except test_request_message.Error as e:
+      message = str(e)
       logging.error(message)
-      response = 'Error: %s' % message
-    self.response.out.write(response)
+      self.abort(500, message)
+
+    self.response.headers['Content-Type'] = 'application/json; charset=utf-8'
+    self.response.out.write(json.dumps(result))
 
 
 class ResultHandler(webapp2.RequestHandler):
@@ -1060,18 +1058,14 @@ class RetryHandler(webapp2.RequestHandler):
 class RegisterHandler(webapp2.RequestHandler):
   """Handler for the register_machine of the Swarm server.
 
-     Attempt to find a matching job for the querying machine.
+  Attempt to find a matching job for the querying machine.
   """
 
   @AuthenticateMachine
   def post(self):
-    # TODO(maruel): Stop replying either json or text.
     # Validate the request.
     if not self.request.body:
-      self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
-      self.response.set_status(402)
-      self.response.out.write('Request must have a body')
-      return
+      self.abort(400, 'Request must have a body')
 
     attributes_str = self.request.get('attributes')
     try:
@@ -1079,15 +1073,12 @@ class RegisterHandler(webapp2.RequestHandler):
     except (TypeError, ValueError) as e:
       message = 'Invalid attributes: %s: %s' % (attributes_str, e)
       logging.error(message)
-      response = 'Error: %s' % message
-      self.response.out.write(response)
-      return
+      self.abort(400, message)
 
     try:
       response = json.dumps(
           test_management.ExecuteRegisterRequest(attributes,
                                                  self.request.host_url))
-      self.response.headers['Content-Type'] = 'application/json; charset=utf-8'
     except runtime.DeadlineExceededError as e:
       # If the timeout happened before a runner was assigned there are no
       # problems. If the timeout occurred after a runner was assigned, that
@@ -1096,76 +1087,64 @@ class RegisterHandler(webapp2.RequestHandler):
       # "timeout".
       message = str(e)
       logging.warning(message)
-      response = 'Error: %s' % message
-      self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
+      self.abort(500, message)
     except test_request_message.Error as e:
       message = str(e)
       logging.error(message)
-      response = 'Error: %s' % message
-      self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
+      self.abort(500, message)
 
+    self.response.headers['Content-Type'] = 'application/json; charset=utf-8'
     self.response.out.write(response)
 
 
 class RunnerPingHandler(webapp2.RequestHandler):
   """Handler for runner pings to the server.
 
-     The runner pings are used to let the server know a runner is still working,
-     so it won't consider it stale.
+  The runner pings are used to let the server know a runner is still working, so
+  it won't consider it stale.
   """
 
   @AuthenticateMachine
   def post(self):
     key = self.request.get('r', '')
     machine_id = self.request.get('id', '')
+    if not test_runner.PingRunner(key, machine_id):
+      self.abort(400, 'Runner failed to ping.')
+
     self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
-
-    if test_runner.PingRunner(key, machine_id):
-      self.response.out.write('Runner successfully pinged.')
-    else:
-      self.response.set_status(402)
-      self.response.out.write('Runner failed to ping.')
+    self.response.out.write('Success.')
 
 
-class RunnerSummary(object):
-  """A basic helper class for holding the runner summary for a dimension."""
+# A basic helper class for holding the runner summary for a dimension.
+RunnerSummary = collections.namedtuple(
+    'RunnerSummary', ['dimensions', 'pending_runners', 'running_runners'])
 
-  def __init__(self, dimensions, num_pending, num_running):
-    self.dimensions = dimensions
-    self.pending_runners = num_pending
-    self.running_runners = num_running
+
+def GenerateHistoryHoursSelect():
+  """Returns the HTML to generate a select box for the hours to show."""
+  # Allow up to a day, by the hour.
+  options_hours = ''.join(
+      '<option value=\'%d\'>%d hours</option>' % (i, i) for i in range(1, 25))
+
+  # Allow multiple days, up to 4 weeks.
+  options_days = ''.join(
+      '<option value=\'%d\'>%d days</option>' % (i * 24, i)
+      for i in range(2, 29))
+
+  return (
+      '<select id="hours_to_show" onchange="document.location.href=\'?hours=\' '
+      '+ this.value"><option>-</option>%s%s</select>' %
+      (options_hours, options_days))
 
 
 class RunnerSummaryHandler(webapp2.RequestHandler):
   """Handler for displaying a summary of the current runners."""
 
-  def GenerateHistoryHoursSelect(self):
-    """Returns the HTML to generate a select box for the hours to show.
-
-    Returns:
-      The required HTML.
-    """
-    html = ('<select id="hours_to_show" onchange="document.location.href=\''
-            '?hours=\' + this.value">')
-    html += '<option>-</option>'
-
-    # Allow up to a day, by the hour.
-    for i in range(1, 25):
-      html += '<option value=\'%d\'>%d hours</option>' % (i, i)
-
-    # Allow multiple days, up to 4 weeks
-    for i in range(2, 29):
-      html += '<option value=\'%d\'>%d days</option>' % (i * 24, i)
-
-    html += '</select>'
-
-    return html
-
   def get(self):
     try:
       hours = int(self.request.get('hours', '24'))
     except ValueError:
-      hours = 24
+      self.abort(400, 'Invalid hours')
 
     if hours <= 24:
       time_frame = '%d hours' % hours
@@ -1175,32 +1154,24 @@ class RunnerSummaryHandler(webapp2.RequestHandler):
     # Start querying all the summaries for the graph.
     summary_cutoff_time = (datetime.datetime.utcnow() -
                            datetime.timedelta(hours=hours))
-    summaries_async = runner_summary.RunnerSummary.query(
+    summaries_future = runner_summary.RunnerSummary.query(
         runner_summary.RunnerSummary.time > summary_cutoff_time).fetch_async()
 
     # Get a snapshot of the current state of pending and running runners.
-    total_pending = 0
-    total_running = 0
-    runner_summaries = runner_summary.GetRunnerSummaryByDimension().iteritems()
-    snapshot_summary = []
-    for dimensions, summary in runner_summaries:
-      total_pending += summary[0]
-      total_running += summary[1]
-      snapshot_summary.append(
-          RunnerSummary(test_request_message.Stringize(dimensions),
-                        summary[0],
-                        summary[1]))
+    snapshot_summary = [
+        RunnerSummary(test_request_message.Stringize(d), s[0], s[1])
+        for d, s in runner_summary.GetRunnerSummaryByDimension().iteritems()
+    ]
+    total_pending = sum(r.pending_runners for r in snapshot_summary)
+    total_running = sum(r.running_runners for r in snapshot_summary)
 
     # Start the graph dict for each dimension.
-    runner_summary_graphs = {}
-    for i, summary in enumerate(snapshot_summary):
-      runner_summary_graphs[summary.dimensions] = {
-          'id': i,
-          'title': summary.dimensions,
-          'data': []}
+    runner_summary_graphs = dict(
+        (s.dimensions, {'data': [], 'id': i, 'title': s.dimensions})
+        for i, s in enumerate(snapshot_summary))
 
     # Convert the runner summaries to the graph array.
-    for summary in summaries_async.get_result():
+    for summary in summaries_future.get_result():
       # It seems possible to get a summary that we don't have a snapshot for.
       # Got crashes but unable to repo, so add logging to try and catch
       # this case.
@@ -1212,20 +1183,30 @@ class RunnerSummaryHandler(webapp2.RequestHandler):
                       summary.dimension, runner_summary_graphs.keys())
 
     params = {
-        'topbar': GenerateTopbar(),
+        'hours_select': GenerateHistoryHoursSelect(),
+        'runner_summary_graphs': runner_summary_graphs.values(),
+        'snapshot_summary': snapshot_summary,
         'stat_links': GenerateStatLinks(),
+        'time_frame': time_frame,
+        'topbar': GenerateTopbar(),
         'total_pending_runners': total_pending,
         'total_running_runners': total_running,
-        'snapshot_summary': snapshot_summary,
-        'hours_select': self.GenerateHistoryHoursSelect(),
-        'time_frame': time_frame,
-        'runner_summary_graphs': runner_summary_graphs.values(),
     }
     self.response.out.write(template.get('runner_summary.html').render(params))
 
 
 class DailyStatsGraphHandler(webapp2.RequestHandler):
   """Handler for generating the html page to display the daily stats."""
+
+  # A mapping of the element's variable name, and the name that should be
+  # displayed to the user.
+  ELEMENTS_TO_GRAPH = [
+      ('shards_failed', 'Shards Failed'),
+      ('shards_finished', 'Shards Finished'),
+      ('shards_timed_out', 'Shards Timed Out'),
+      ('total_running_time', 'Total Running Time'),
+      ('total_wait_time', 'Total Wait Time'),
+  ]
 
   def _GetGraphableDailyStats(self, stats):
     """Convert the daily_stats into a list of graphs objects for visualization.
@@ -1237,26 +1218,16 @@ class DailyStatsGraphHandler(webapp2.RequestHandler):
       A list of dictionaries with the graph title and an array that can be
       passed to the data visualization tool.
     """
-    # A mapping of the element's variable name, and the name that should be
-    # displayed to the user.
-    elements_to_graph = [
-        ('shards_finished', 'Shards Finished'),
-        ('shards_failed', 'Shards Failed'),
-        ('shards_timed_out', 'Shards Timed Out'),
-        ('total_running_time', 'Total Running Time'),
-        ('total_wait_time', 'Total Wait Time'),
-        ]
-
-    graphs_to_show = []
-    for element_name, title_name in elements_to_graph:
-      graphs_to_show.append(
-          {'element_id': element_name,
-           'title': title_name,
-           'data_array': [['Date', title_name]]})
-
+    graphs_to_show = [
+        {
+          'data_array': [['Date', title_name]],
+          'element_id': element_name,
+          'title': title_name,
+        } for element_name, title_name in self.ELEMENTS_TO_GRAPH
+    ]
     for stat in stats:
       date_str = stat.date.isoformat()
-      for i, element in enumerate(elements_to_graph):
+      for i, element in enumerate(self.ELEMENTS_TO_GRAPH):
         graphs_to_show[i]['data_array'].append(
             [date_str, int(getattr(stat, element[0]))])
 
@@ -1271,7 +1242,7 @@ class DailyStatsGraphHandler(webapp2.RequestHandler):
             datetime.timedelta(days=days_to_show))),
         'max_days_to_show': range(1, daily_stats.DAILY_STATS_LIFE_IN_DAYS),
         'stat_links': GenerateStatLinks(),
-        'topbar': GenerateTopbar()
+        'topbar': GenerateTopbar(),
     }
     self.response.out.write(template.get('graph.html').render(params))
 
@@ -1295,20 +1266,20 @@ class UserProfileHandler(webapp2.RequestHandler):
   """
 
   def get(self):
-    topbar = GenerateTopbar()
-    display_whitelists = (
-        {
-          'ip': w.ip,
-          'key': w.key.id,
-          'password': w.password,
-          'url': _SECURE_CHANGE_WHITELIST_URL,
-        } for w in user_manager.MachineWhitelist().query()
-    )
-    display_whitelists = sorted(display_whitelists, key=lambda x: x['ip'])
+    display_whitelists = sorted(
+        (
+          {
+            'ip': w.ip,
+            'key': w.key.id,
+            'password': w.password,
+            'url': _SECURE_CHANGE_WHITELIST_URL,
+          } for w in user_manager.MachineWhitelist().query()),
+        key=lambda x: x['ip'])
+
     params = {
-        'topbar': topbar,
+        'change_whitelist_url': _SECURE_CHANGE_WHITELIST_URL,
+        'topbar': GenerateTopbar(),
         'whitelists': display_whitelists,
-        'change_whitelist_url': _SECURE_CHANGE_WHITELIST_URL
     }
     self.response.out.write(template.get('user_profile.html').render(params))
 
@@ -1319,16 +1290,16 @@ class ChangeWhitelistHandler(webapp2.RequestHandler):
   def post(self):
     ip = self.request.get('i', self.request.remote_addr)
 
-    password = self.request.get('p', None)
     # Make sure a password '' sent by the form is stored as None.
-    if not password:
-      password = None
+    password = self.request.get('p', None) or None
 
     add = self.request.get('a')
     if add == 'True':
       user_manager.AddWhitelist(ip, password)
     elif add == 'False':
       user_manager.DeleteWhitelist(ip)
+    else:
+      self.abort(400, 'Invalid \'a\' parameter.')
 
     self.redirect(_SECURE_USER_PROFILE_URL, permanent=True)
 
@@ -1345,7 +1316,7 @@ class RemoteErrorHandler(webapp2.RequestHandler):
     error.put()
 
     self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
-    self.response.out.write('Error logged')
+    self.response.out.write('Success.')
 
 
 class WaitsByMinuteHandler(webapp2.RequestHandler):
@@ -1355,12 +1326,12 @@ class WaitsByMinuteHandler(webapp2.RequestHandler):
     days_to_show = DaysToShow(self.request)
 
     params = {
-        'topbar': GenerateTopbar(),
-        'stat_links': GenerateStatLinks(),
         'days_to_show': days_to_show,
         'max_days_to_show': range(1, runner_summary.WAIT_SUMMARY_LIFE_IN_DAYS),
+        'stat_links': GenerateStatLinks(),
+        'topbar': GenerateTopbar(),
         'wait_breakdown': runner_summary.GetRunnerWaitStatsBreakdown(
-            days_to_show)
+            days_to_show),
     }
     self.response.out.write(template.get('waits_by_minute.html').render(params))
 

@@ -271,29 +271,49 @@ class AppTest(test_case.TestCase):
 
   def testRegisterHandler(self):
     # Missing attributes field.
-    response = self.app.post('/poll_for_test', {'something': 'nothing'})
+    response = self.app.post(
+        '/poll_for_test', {'something': 'nothing'}, expect_errors=True)
     self.assertResponse(
-        response, '200 OK',
-        'Error: Invalid attributes: : No JSON object could be decoded')
+        response,
+        '400 Bad Request',
+        '400 Bad Request\n\n'
+        'The server could not comply with the request since it is either '
+        'malformed or otherwise incorrect.\n\n'
+        ' Invalid attributes: : No JSON object could be decoded  ')
 
     # Invalid attributes field.
-    response = self.app.post('/poll_for_test', {'attributes': 'nothing'})
+    response = self.app.post(
+        '/poll_for_test', {'attributes': 'nothing'}, expect_errors=True)
     self.assertResponse(
-        response, '200 OK',
-        'Error: Invalid attributes: nothing: No JSON object could be decoded')
+        response,
+        '400 Bad Request',
+        '400 Bad Request\n\n'
+        'The server could not comply with the request since it is either '
+        'malformed or otherwise incorrect.\n\n'
+        ' Invalid attributes: nothing: No JSON object could be decoded  ')
 
     # Invalid empty attributes field.
-    response = self.app.post('/poll_for_test', {'attributes': None})
+    response = self.app.post(
+        '/poll_for_test', {'attributes': None}, expect_errors=True)
     self.assertResponse(
-        response, '200 OK',
-        'Error: Invalid attributes: None: No JSON object could be decoded')
+        response,
+        '400 Bad Request',
+        '400 Bad Request\n\n'
+        'The server could not comply with the request since it is either '
+        'malformed or otherwise incorrect.\n\n'
+        ' Invalid attributes: None: No JSON object could be decoded  ')
 
     # Valid attributes but missing dimensions.
     attributes = '{"id": "%s"}' % MACHINE_ID
-    response = self.app.post('/poll_for_test', {'attributes': attributes})
+    response = self.app.post(
+        '/poll_for_test', {'attributes': attributes}, expect_errors=True)
     self.assertResponse(
-        response, '200 OK',
-        'Error: Missing mandatory attribute: dimensions')
+        response,
+        '500 Internal Server Error',
+        '500 Internal Server Error\n\n'
+        'The server has either erred or is incapable of performing the '
+        'requested operation.\n\n'
+        ' Missing mandatory attribute: dimensions  ')
 
     # Valid attributes.
     attributes = ('{"dimensions": {"os": ["win-xp"]},'
@@ -356,17 +376,31 @@ class AppTest(test_case.TestCase):
 
   def testChangeWhitelistHandlerParams(self):
     # Make sure the link redirects to the right place.
-    response = self.app.post('/secure/change_whitelist', {})
+    # setUp adds one item.
+    self.assertEqual(
+        [{'ip': None, 'password': None}],
+        [t.to_dict() for t in user_manager.MachineWhitelist.query().fetch()])
+    response = self.app.post(
+        '/secure/change_whitelist', {'a': 'True'},
+        extra_environ={'REMOTE_ADDR': 'foo'})
+    self.assertEqual(
+        [{'ip': None, 'password': None}, {'ip': u'foo', 'password': None}],
+        [t.to_dict() for t in user_manager.MachineWhitelist.query().fetch()])
     self.assertEqual('301 Moved Permanently', response.status)
     self.assertEqual(
         'http://localhost/secure/user_profile', response.location)
 
-    # All of these requests are invalid so none of them should make a call
-    # to ModifyUserProfileWhitelist.
-    self.app.post('/secure/change_whitelist', {'i': ''})
-    self.app.post('/secure/change_whitelist', {'i': '123'})
-    self.app.post('/secure/change_whitelist', {'p': 'password'})
-    self.app.post('/secure/change_whitelist', {'i': '123', 'a': 'true'})
+    # All of these requests are invalid so none of them modify entites.
+    self.app.post('/secure/change_whitelist', {'i': ''}, expect_errors=True)
+    self.app.post('/secure/change_whitelist', {'i': '123'}, expect_errors=True)
+    self.app.post(
+        '/secure/change_whitelist', {'p': 'password'}, expect_errors=True)
+    self.app.post(
+        '/secure/change_whitelist', {'i': '123', 'a': 'true'},
+        expect_errors=True)
+    self.assertEqual(
+        [{'ip': None, 'password': None}, {'ip': u'foo', 'password': None}],
+        [t.to_dict() for t in user_manager.MachineWhitelist.query().fetch()])
 
   def testChangeWhitelistHandler(self):
     ip = ['123', '456']
@@ -554,7 +588,7 @@ class AppTest(test_case.TestCase):
     error_message = 'error message'
 
     response = self.app.post('/remote_error', {'m': error_message})
-    self.assertResponse(response, '200 OK', 'Error logged')
+    self.assertResponse(response, '200 OK', 'Success.')
 
     self.assertEqual(1, test_management.SwarmError.query().count())
     error = test_management.SwarmError.query().get()
@@ -564,13 +598,17 @@ class AppTest(test_case.TestCase):
     # Try with an invalid runner key
     response = self.app.post('/runner_ping', {'r': '1'}, expect_errors=True)
     self.assertResponse(
-        response, '402 Payment Required', 'Runner failed to ping.')
+        response, '400 Bad Request',
+        '400 Bad Request\n\n'
+        'The server could not comply with the request since it is either '
+        'malformed or otherwise incorrect.\n\n'
+        ' Runner failed to ping.  ')
 
     # Start a test and successfully ping it
     runner = test_helper.CreatePendingRunner(machine_id=MACHINE_ID)
     response = self.app.post('/runner_ping', {'r': runner.key.urlsafe(),
                                               'id': runner.machine_id})
-    self.assertResponse(response, '200 OK', 'Runner successfully pinged.')
+    self.assertResponse(response, '200 OK', 'Success.')
 
   def testStatPages(self):
     stat_urls = ['/graphs/daily_stats',
