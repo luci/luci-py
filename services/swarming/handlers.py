@@ -75,9 +75,16 @@ IGNORED_LINES = (
       'api_milliseconds does not return a meaningful value',
 )
 
+# Ignore these exceptions.
+IGNORED_EXCEPTIONS = (
+  'DeadlineExceededError',
+  # These occurs during a transaction.
+  'Timeout',
+)
+
 # Function that is used to determine if an error entry should be ignored.
 should_ignore_error_record = functools.partial(
-    ereporter2.should_ignore_error_record, IGNORED_LINES, ())
+    ereporter2.should_ignore_error_record, IGNORED_LINES, IGNORED_EXCEPTIONS)
 
 
 def GenerateTopbar():
