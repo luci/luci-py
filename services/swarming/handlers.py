@@ -1385,6 +1385,10 @@ def SendRunnerResults(response, key):
   results = test_runner.GetRunnerResults(key)
 
   if results:
+    # Convert the output to utf-8 to ensure that the JSON library can
+    # handle it without problems.
+    results['output'] = results['output'].decode('utf-8', 'replace')
+
     response.headers['Content-Type'] = 'application/json; charset=utf-8'
     response.out.write(json.dumps(results))
   else:

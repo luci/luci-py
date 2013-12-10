@@ -21,7 +21,9 @@ from google.appengine.ext import testbed
 import handlers
 import test_case
 import webtest
+
 from common import dimensions_utils
+from common import result_helper
 from common import swarm_constants
 from common import url_helper
 from server import admin_user
@@ -141,6 +143,9 @@ class AppTest(test_case.TestCase):
     # Create test and runner.
     runner = test_helper.CreatePendingRunner(machine_id=MACHINE_ID,
                                              exit_codes='[0]')
+    results = result_helper.StoreResults('\xe9 Invalid utf-8 string')
+    runner.results_reference = results.key
+    runner.put()
 
     # Invalid key.
     for handler in handler_urls:
@@ -159,7 +164,10 @@ class AppTest(test_case.TestCase):
         self.fail(e)
       self.assertEqual(runner.exit_codes, results['exit_codes'])
       self.assertEqual(runner.machine_id, results['machine_id'])
-      self.assertEqual(runner.GetResultString(), results['output'])
+
+      expected_result_string = runner.GetResultString().decode('utf-8',
+                                                               'replace')
+      self.assertEqual(expected_result_string, results['output'])
 
   def testGetToken(self):
     response = self.app.get('/get_token')
