@@ -932,6 +932,7 @@ class ShowMessageHandler(webapp2.RequestHandler):
 class UploadStartSlaveHandler(webapp2.RequestHandler):
   """Accept a new start slave script."""
 
+  @AuthenticateMachineOrUser
   def post(self):
     script = self.request.get('script', '')
     if not script:
@@ -1431,10 +1432,10 @@ def CreateApplication():
           TaskGenerateDailyStatsHandler),
       ('/secure/task_queues/generate_recent_stats',
           TaskGenerateRecentStatsHandler),
-      ('/secure/upload_start_slave', UploadStartSlaveHandler),
       ('/server_ping', ServerPingHandler),
       ('/stats', StatsHandler),
       ('/test', TestRequestHandler),
+      ('/upload_start_slave', UploadStartSlaveHandler),
       ('/waits_by_minute', WaitsByMinuteHandler),
       (_DELETE_MACHINE_STATS_URL, DeleteMachineStatsHandler),
       (_SECURE_CANCEL_URL, CancelHandler),

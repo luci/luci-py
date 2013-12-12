@@ -197,7 +197,7 @@ class _SwarmTestCase(unittest.TestCase):
 
     # Upload the start slave script to the server.
     url_helper.UrlOpen(urlparse.urljoin(self._swarm_server_url,
-                                        'secure/upload_start_slave'),
+                                        'upload_start_slave'),
                        files=[('script', 'script', full_start_slave_script)],
                        method='POSTFORM')
 

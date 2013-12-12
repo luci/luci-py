@@ -289,7 +289,7 @@ class AppTest(test_case.TestCase):
     self.assertResponse(response, '200 OK', expected)
 
   def testUploadStartSlaveHandler(self):
-    response = self.app.post('/secure/upload_start_slave', expect_errors=True)
+    response = self.app.post('/upload_start_slave', expect_errors=True)
     self.assertResponse(
         response, '400 Bad Request',
         '400 Bad Request\n\nThe server could not comply with the request since '
@@ -297,7 +297,7 @@ class AppTest(test_case.TestCase):
         '  ')
 
     response = self.app.post(
-        '/secure/upload_start_slave',
+        '/upload_start_slave',
         upload_files=[('script', 'script', 'script_body')])
     self.assertResponse(response, '200 OK', 'Success.')
 
