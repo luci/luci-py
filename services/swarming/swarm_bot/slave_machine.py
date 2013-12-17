@@ -62,11 +62,9 @@ try:
 finally:
   f.close()
 
-os.execl(sys.executable, sys.executable, '%(start_slave)s')
-""" % {
-    'start_slave': START_SLAVE_SCRIPT_PATH,
-    'zipped_slave_files': ZIPPED_SLAVE_FILES
-}
+os.execl(sys.executable, sys.executable, '%(start_slave)s',
+         '--swarm-server=%(swarm_server)s')
+"""
 
 
 def Restart():
@@ -604,8 +602,14 @@ class SlaveMachine(object):
       logging.error('Unable to download required slave files.')
       return
 
+    slave_setup_script_contents = SLAVE_SETUP_SCRIPT % {
+        'start_slave': START_SLAVE_SCRIPT_PATH,
+        'swarm_server': self._url,
+        'zipped_slave_files': ZIPPED_SLAVE_FILES
+    }
+
     with open('slave_setup.py', 'w') as f:
-      f.write(SLAVE_SETUP_SCRIPT)
+      f.write(slave_setup_script_contents)
 
     logging.info('New slave code downloaded, replacing this process to allow '
                  'updating these files. After the files are replaced this '
