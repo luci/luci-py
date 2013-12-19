@@ -25,6 +25,7 @@ import socket
 import subprocess
 import sys
 import time
+import urlparse
 
 from common import swarm_constants
 from common import url_helper
@@ -63,7 +64,8 @@ finally:
   f.close()
 
 os.execl(sys.executable, sys.executable, '%(start_slave)s',
-         '--swarm-server=%(swarm_server)s')
+         '--swarm-server=%(swarming_server)s',
+         '--swarm-server-port=%(server_port)s')
 """
 
 
@@ -602,9 +604,13 @@ class SlaveMachine(object):
       logging.error('Unable to download required slave files.')
       return
 
+    url_parts = urlparse.urlparse(self._url)
+    server = url_parts.scheme + url_parts.hostname
+
     slave_setup_script_contents = SLAVE_SETUP_SCRIPT % {
+        'server_port': url_parts.port,
         'start_slave': START_SLAVE_SCRIPT_PATH,
-        'swarm_server': self._url,
+        'swarming_server': server,
         'zipped_slave_files': ZIPPED_SLAVE_FILES
     }
 
