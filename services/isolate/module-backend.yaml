@@ -6,8 +6,13 @@ api_version: 1
 threadsafe: true
 
 handlers:
-- url: /restricted/mapreduce(/.*)?
+- url: /internal/mapreduce(/.*)?
   script: map_reduce_jobs.app
+  secure: always
+  login: admin
+
+- url: /internal.*
+  script: main.app
   secure: always
   login: admin
 

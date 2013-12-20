@@ -475,7 +475,7 @@ should_ignore_error_record = functools.partial(
 ### Restricted handlers
 
 
-class RestrictedCleanupOldEntriesWorkerHandler(webapp2.RequestHandler):
+class InternalCleanupOldEntriesWorkerHandler(webapp2.RequestHandler):
   """Removes the old data from the datastore.
 
   Only a task queue task can use this handler.
@@ -493,7 +493,7 @@ class RestrictedCleanupOldEntriesWorkerHandler(webapp2.RequestHandler):
     logging.info('Done deleting old entries')
 
 
-class RestrictedCleanupTestingEntriesWorkerHandler(webapp2.RequestHandler):
+class InternalCleanupTestingEntriesWorkerHandler(webapp2.RequestHandler):
   """Removes the testing data from the datastore.
 
   Keep stuff under testing for only one full day.
@@ -527,7 +527,7 @@ class RestrictedCleanupTestingEntriesWorkerHandler(webapp2.RequestHandler):
     logging.info('Done deleting testing namespaces')
 
 
-class RestrictedObliterateWorkerHandler(webapp2.RequestHandler):
+class InternalObliterateWorkerHandler(webapp2.RequestHandler):
   """Deletes all the stuff."""
   def post(self):
     if not self.request.headers.get('X-AppEngine-QueueName'):
@@ -557,11 +557,11 @@ class RestrictedObliterateWorkerHandler(webapp2.RequestHandler):
     logging.info('Finally done!')
 
 
-class RestrictedCleanupTriggerHandler(webapp2.RequestHandler):
+class InternalCleanupTriggerHandler(webapp2.RequestHandler):
   """Triggers a taskqueue to clean up."""
   def get(self, name):
     if name in ('obliterate', 'old', 'orphaned', 'testing'):
-      url = '/restricted/taskqueue/cleanup/' + name
+      url = '/internal/taskqueue/cleanup/' + name
       # The push task queue name must be unique over a ~7 days period so use
       # the date at second precision, there's no point in triggering each of
       # time more than once a second anyway.
@@ -574,7 +574,7 @@ class RestrictedCleanupTriggerHandler(webapp2.RequestHandler):
       self.abort(404, 'Unknown job')
 
 
-class RestrictedTagWorkerHandler(webapp2.RequestHandler):
+class InternalTagWorkerHandler(webapp2.RequestHandler):
   """Tags .last_access for HashEntries tested for with /content/contains.
 
   This makes sure they are not evicted from the LRU cache too fast.
@@ -624,7 +624,7 @@ class RestrictedTagWorkerHandler(webapp2.RequestHandler):
       raise
 
 
-class RestrictedVerifyWorkerHandler(webapp2.RequestHandler):
+class InternalVerifyWorkerHandler(webapp2.RequestHandler):
   """Verify the SHA-1 matches for an object stored in Cloud Storage."""
 
   @staticmethod
@@ -779,7 +779,7 @@ class RestrictedGoogleStorageConfig(acl.ACLRequestHandler):
     self.response.write('Done!')
 
 
-class RestrictedEreporter2Mail(webapp2.RequestHandler):
+class InternalEreporter2Mail(webapp2.RequestHandler):
   """Handler class to generate and email an exception report."""
   def get(self):
     """Sends email(s) containing the errors logged."""
@@ -870,17 +870,17 @@ class RestrictedLaunchMapReduceJob(acl.ACLRequestHandler):
     # generates URLs that are incompatible with dev appserver URL routing when
     # using custom modules.
     success = enqueue_task(
-        url='/restricted/taskqueue/mapreduce/launch/%s' % job_id,
+        url='/internal/taskqueue/mapreduce/launch/%s' % job_id,
         queue_name=map_reduce_jobs.MAP_REDUCE_TASK_QUEUE,
         use_dedicated_module=not config.is_local_dev_server())
     # New tasks should show up on the status page.
     if success:
-      self.redirect('/restricted/mapreduce/status')
+      self.redirect('/internal/mapreduce/status')
     else:
       self.abort(500, 'Failed to launch the job')
 
 
-class RestrictedLaunchMapReduceJobWorkerHandler(webapp2.RequestHandler):
+class InternalLaunchMapReduceJobWorkerHandler(webapp2.RequestHandler):
   """Called via task queue or cron to start a map reduce job."""
   def post(self, job_id):
     if not self.request.headers.get('X-AppEngine-QueueName'):
@@ -1105,7 +1105,7 @@ class PreUploadContentHandlerGS(acl.ACLRequestHandler, ProtocolHandlerMixin):
   @staticmethod
   def tag_entries(entries, namespace):
     """Enqueues a task to update last_access time for given entries."""
-    url = '/restricted/taskqueue/tag/%s/%s' % (namespace, datetime.date.today())
+    url = '/internal/taskqueue/tag/%s/%s' % (namespace, datetime.date.today())
     payload = ''.join(binascii.unhexlify(e.digest) for e in entries)
     return enqueue_task(url, 'tag', payload=payload)
 
@@ -1466,7 +1466,7 @@ class StoreContentHandlerGS(acl.ACLRequestHandler, ProtocolHandlerMixin):
 
     # Trigger a verification task for files in the GS.
     if needs_verification:
-      url = '/restricted/taskqueue/verify/%s/%s' % (namespace, hash_key)
+      url = '/internal/taskqueue/verify/%s/%s' % (namespace, hash_key)
       if not enqueue_task(url, 'verify'):
         # TODO(vadimsh): Don't fail whole request here, because several RPCs are
         # required to roll it back and there isn't much time left
@@ -1504,8 +1504,8 @@ def CreateApplication():
   """Creates the url router.
 
   The basic layouts is as follow:
+  - /internal/.* requires being an instance administrator.
   - /restricted/.* requires being an instance administrator.
-  - /restricted/taskqueue/.* are task queues.
   - /content/.* has the public HTTP API.
   - /stats/.* has statistics.
   """
@@ -1525,31 +1525,38 @@ def CreateApplication():
   return webapp2.WSGIApplication(dev_routes + [
       # Triggers a taskqueue.
       webapp2.Route(
+          r'/internal/cron/cleanup/trigger/<name:[a-z]+>',
+          InternalCleanupTriggerHandler),
+      # TODO(maruel): Remove me.
+      webapp2.Route(
           r'/restricted/cleanup/trigger/<name:[a-z]+>',
-          RestrictedCleanupTriggerHandler),
+          InternalCleanupTriggerHandler),
 
       # Cleanup tasks.
       webapp2.Route(
-          r'/restricted/taskqueue/cleanup/old',
-          RestrictedCleanupOldEntriesWorkerHandler),
+          r'/internal/taskqueue/cleanup/old',
+          InternalCleanupOldEntriesWorkerHandler),
       webapp2.Route(
-          r'/restricted/taskqueue/cleanup/testing',
-          RestrictedCleanupTestingEntriesWorkerHandler),
+          r'/internal/taskqueue/cleanup/testing',
+          InternalCleanupTestingEntriesWorkerHandler),
       webapp2.Route(
-          r'/restricted/taskqueue/cleanup/obliterate',
-          RestrictedObliterateWorkerHandler),
+          r'/internal/taskqueue/cleanup/obliterate',
+          InternalObliterateWorkerHandler),
 
       # Tasks triggered by other request handlers.
       webapp2.Route(
-          r'/restricted/taskqueue/tag' + namespace +
+          r'/internal/taskqueue/tag' + namespace +
             r'/<year:\d\d\d\d>-<month:\d\d>-<day:\d\d>',
-          RestrictedTagWorkerHandler),
+          InternalTagWorkerHandler),
       webapp2.Route(
-          r'/restricted/taskqueue/verify' + namespace_key,
-          RestrictedVerifyWorkerHandler),
+          r'/internal/taskqueue/verify' + namespace_key,
+          InternalVerifyWorkerHandler),
 
      webapp2.Route(
-          r'/restricted/cron/ereporter2/mail', RestrictedEreporter2Mail),
+          r'/internal/cron/ereporter2/mail', InternalEreporter2Mail),
+     # TODO(maruel): Remove me.
+     webapp2.Route(
+          r'/restricted/cron/ereporter2/mail', InternalEreporter2Mail),
      webapp2.Route(
           r'/restricted/ereporter2/report',
           RestrictedEreporter2Report),
@@ -1560,8 +1567,12 @@ def CreateApplication():
 
       # Stats
       webapp2.Route(
+          r'/internal/cron/stats/update',
+          stats.InternalStatsUpdateHandler),
+     # TODO(maruel): Remove me.
+      webapp2.Route(
           r'/restricted/stats/update',
-          stats.RestrictedStatsUpdateHandler),
+          stats.InternalStatsUpdateHandler),
 
       # Administrative urls.
       webapp2.Route(
@@ -1578,8 +1589,8 @@ def CreateApplication():
           r'/restricted/launch_map_reduce',
           RestrictedLaunchMapReduceJob),
       webapp2.Route(
-          r'/restricted/taskqueue/mapreduce/launch/<job_id:[^\/]+>',
-          RestrictedLaunchMapReduceJobWorkerHandler),
+          r'/internal/taskqueue/mapreduce/launch/<job_id:[^\/]+>',
+          InternalLaunchMapReduceJobWorkerHandler),
 
       # The public API:
       webapp2.Route(

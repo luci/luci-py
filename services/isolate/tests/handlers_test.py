@@ -56,9 +56,9 @@ class MainTest(test_case.TestCase):
     app = handlers.CreateApplication()
     self.testapp = webtest.TestApp(app)
 
-  def test_restricted_cron_ereporter2_mail_not_cron(self):
+  def test_internal_cron_ereporter2_mail_not_cron(self):
     response = self.testapp.get(
-        '/restricted/cron/ereporter2/mail', expect_errors=True)
+        '/internal/cron/ereporter2/mail', expect_errors=True)
     self.assertEqual(response.status_int, 403)
     self.assertEqual(
         response.normal_body,
@@ -68,13 +68,13 @@ class MainTest(test_case.TestCase):
     # Verify no email was sent.
     self.assertEqual([], self.mail_stub.get_sent_messages())
 
-  def test_restricted_cron_ereporter2_mail(self):
+  def test_internal_cron_ereporter2_mail(self):
     data = [_ErrorRecord()]
     self.mock(
         handlers.ereporter2, '_extract_exceptions_from_logs', lambda *_: data)
     headers = {'X-AppEngine-Cron': 'true'}
     response = self.testapp.get(
-        '/restricted/cron/ereporter2/mail', headers=headers)
+        '/internal/cron/ereporter2/mail', headers=headers)
     self.assertEqual(response.status_int, 200)
     self.assertEqual(response.normal_body, 'Success.')
     self.assertEqual(response.content_type, 'text/plain')

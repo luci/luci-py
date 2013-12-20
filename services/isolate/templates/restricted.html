@@ -17,10 +17,10 @@
 
 <h3>Map reduce jobs</h3>
 <ul>
-  <li><a href="/restricted/mapreduce/status">Map reduce jobs status</a></li>
+  <li><a href="/internal/mapreduce/status">Map reduce jobs status</a></li>
   {% for job in map_reduce_jobs %}
     <li>
-      <form action="/restricted/launch_map_reduce" method="post">
+      <form action="/internal/launch_map_reduce" method="post">
         <input type="hidden" name="token" value="{{token}}" />
         <input type="hidden" name="job_id" value="{{job.id}}" />
         <button type="submit">Launch '{{job.name}}'</button>

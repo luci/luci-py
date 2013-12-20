@@ -269,7 +269,7 @@ def _to_json(data):
 ### Handlers
 
 
-class RestrictedStatsUpdateHandler(webapp2.RequestHandler):
+class InternalStatsUpdateHandler(webapp2.RequestHandler):
   """Called every few minutes to update statistics."""
   def get(self):
     self.response.headers['Content-Type'] = 'text/plain'

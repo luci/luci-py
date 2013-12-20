@@ -42,7 +42,7 @@ def launch_job(job_id):
   """Launches a job given its key from MAP_REDUCE_JOBS dict."""
   assert job_id in MAP_REDUCE_JOBS, 'Unknown mapreduce job id %s' % job_id
   job_def = MAP_REDUCE_JOBS[job_id]
-  return control.start_map(base_path='/restricted/mapreduce', **job_def)
+  return control.start_map(base_path='/internal/mapreduce', **job_def)
 
 
 ### Actual mappers
