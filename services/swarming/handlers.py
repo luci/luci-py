@@ -1113,7 +1113,7 @@ class RegisterHandler(webapp2.RequestHandler):
     except test_request_message.Error as e:
       message = str(e)
       logging.error(message)
-      self.abort(500, message)
+      self.abort(400, message)
 
     self.response.headers['Content-Type'] = 'application/json; charset=utf-8'
     self.response.out.write(response)

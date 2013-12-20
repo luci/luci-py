@@ -44,8 +44,9 @@ CHECK_REQUIREMENTS_FILE = 'check_requirements.py'
 # file).
 SLAVE_MACHINE_SCRIPT = os.path.abspath(__file__.rstrip('c'))
 
-START_SLAVE_SCRIPT_PATH = os.path.join(os.path.dirname(__file__),
-                                       'start_slave.py')
+START_SLAVE_SCRIPT_PATH = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    'start_slave.py')
 
 # The code to unzip the slave code and start the slave back up. This needs to be
 # a separate script so that the update process can overwrite it and then run
@@ -65,7 +66,7 @@ finally:
 
 os.execl(sys.executable, sys.executable, '%(start_slave)s',
          '--swarm-server=%(swarming_server)s',
-         '--swarm-server-port=%(server_port)s')
+         '--port=%(server_port)s')
 """
 
 
@@ -236,8 +237,11 @@ class SlaveMachine(object):
     self._come_back = 0
     self._max_url_tries = max_url_tries
 
-    with open(START_SLAVE_SCRIPT_PATH, 'r') as script:
-      start_slave_contents = script.read()
+    try:
+      with open(START_SLAVE_SCRIPT_PATH, 'r') as script:
+        start_slave_contents = script.read()
+    except IOError:
+      start_slave_contents = ''
 
     self._attributes['version'] = version.GenerateSwarmSlaveVersion(
         SLAVE_MACHINE_SCRIPT,
@@ -605,7 +609,7 @@ class SlaveMachine(object):
       return
 
     url_parts = urlparse.urlparse(self._url)
-    server = url_parts.scheme + url_parts.hostname
+    server = url_parts.scheme + '://' + url_parts.hostname
 
     slave_setup_script_contents = SLAVE_SETUP_SCRIPT % {
         'server_port': url_parts.port,

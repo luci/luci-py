@@ -86,7 +86,7 @@ class AppTest(test_case.TestCase):
       self.testbed.setup_env(overwrite=True, **kwargs)
 
   def assertResponse(self, response, status, body):
-    self.assertEqual(status, response.status, response)
+    self.assertEqual(status, response.status, response.status)
     self.assertEqual(body, response.body, repr(response.body))
 
   def testMatchingTestCasesHandler(self):
@@ -341,10 +341,10 @@ class AppTest(test_case.TestCase):
         '/poll_for_test', {'attributes': attributes}, expect_errors=True)
     self.assertResponse(
         response,
-        '500 Internal Server Error',
-        '500 Internal Server Error\n\n'
-        'The server has either erred or is incapable of performing the '
-        'requested operation.\n\n'
+        '400 Bad Request',
+        '400 Bad Request\n\n'
+        'The server could not comply with the request since it is '
+        'either malformed or otherwise incorrect.\n\n'
         ' Missing mandatory attribute: dimensions  ')
 
     # Valid attributes.
