@@ -21,12 +21,10 @@ import zlib
 
 import webapp2
 from google.appengine import runtime
-from google.appengine.api import files
 from google.appengine.api import memcache
 from google.appengine.api import taskqueue
 from google.appengine.ext import blobstore
 from google.appengine.ext import ndb
-from google.appengine.ext.webapp import blobstore_handlers
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(BASE_DIR, 'third_party'))
@@ -543,6 +541,7 @@ class RestrictedObliterateWorkerHandler(webapp2.RequestHandler):
         ContentNamespace.query().iter(keys_only=True), ndb.delete_multi_async)
 
     logging.info('Deleting blobs')
+    # TODO(maruel): Delete this once we are done creating blobs.
     incremental_delete(blobstore.BlobInfo.all(), delete_blobinfo_async)
 
     gs_bucket = config.settings().gs_bucket
@@ -738,91 +737,6 @@ class RestrictedVerifyWorkerHandler(webapp2.RequestHandler):
     if save_to_memcache:
       save_in_memcache(namespace, hash_key, ''.join(stream.accumulated))
     future.wait()
-
-
-class RestrictedStoreBlobstoreContentByHashHandler(
-    acl.ACLRequestHandler,
-    blobstore_handlers.BlobstoreUploadHandler):
-  """Assigns the newly stored GS entry to the correct hash key."""
-
-  # Requires special processing.
-  enforce_token = False
-
-  def dispatch(self):
-    """Disable ACLRequestHandler.dispatch() checks here because the originating
-    IP is always an AppEngine IP, which confuses the authentication code.
-    """
-    return webapp2.RequestHandler.dispatch(self)
-
-  @staticmethod
-  def _delete(contents):
-    """Deletes unnecessary files stored in Cloud Storage."""
-    items = [c.gs_object_name for c in contents]
-    try:
-      files.delete(*items)
-    except runtime.DeadlineExceededError:
-      logging.warning('Leaking files: %s', ', '.join(items))
-
-  # pylint: disable=W0221
-  def post(self, namespace, hash_key, original_access_id):
-    # In particular, do not use self.request.remote_addr because the request
-    # has as original an AppEngine local IP.
-    self.access_id = original_access_id
-    self.enforce_valid_token()
-    contents = self.get_file_infos('content')
-    if len(contents) != 1:
-      # Delete all upload files since they aren't linked to anything.
-      self._delete(contents)
-      msg = 'Found %d files, there should only be 1.' % len(contents)
-      logging.error(msg)
-      self.abort(400, detail=msg)
-
-    if not contents[0].gs_object_name.startswith(
-        to_blobkey(config.settings().gs_bucket, namespace)):
-      self._delete(contents)
-      msg = 'Unexpected namespace or GS bucket.'
-      logging.error(msg)
-      self.abort(400, detail=msg)
-
-    entry = create_entry(namespace, hash_key)
-    if not entry:
-      self.response.out.write('Entry already existed')
-      self._delete(contents)
-      stats.log(stats.DUPE, contents[0].size, '')
-      # Still report success.
-      return
-
-    try:
-      priority = int(self.request.get('priority'))
-    except ValueError:
-      priority = 1
-
-    # No need to save the full path, only the base name.
-
-    entry.filename = os.path.basename(contents[0].gs_object_name)
-    entry.size = contents[0].size
-    # TODO(maruel): Add a new parameter.
-    entry.is_isolated = (priority == 0)
-    entry.put()
-
-    if entry.size < MIN_SIZE_FOR_GS:
-      logging.error(
-          'User stored a file too small %d in GS, fix client code.', entry.size)
-
-    # Trigger a verification. It can't be done inline since it could be too
-    # long to complete.
-    url = '/restricted/taskqueue/verify/%s/%s' % (namespace, hash_key)
-    if not enqueue_task(url, 'verify'):
-      self.response.out.write('Unable to add task to verify blob.')
-      self.response.set_status(500)
-
-      for future in delete_entry_and_gs_entry([entry]):
-        future.wait()
-      return
-
-    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
-    self.response.out.write('Content saved.')
-    stats.log(stats.STORE, entry.size, 'GS; %s' % entry.filename)
 
 
 class RestrictedAdminUIHandler(acl.ACLRequestHandler):
@@ -1666,12 +1580,6 @@ def CreateApplication():
       webapp2.Route(
           r'/restricted/taskqueue/mapreduce/launch/<job_id:[^\/]+>',
           RestrictedLaunchMapReduceJobWorkerHandler),
-
-      # Internal AppEngine handling for blobstore uploads.
-      webapp2.Route(
-          r'/restricted/content/store_blobstore' + namespace_key +
-            r'/<original_access_id:[^\/]+>',
-          RestrictedStoreBlobstoreContentByHashHandler),
 
       # The public API:
       webapp2.Route(
