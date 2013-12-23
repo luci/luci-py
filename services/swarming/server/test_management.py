@@ -267,7 +267,7 @@ def AbortStaleRunners():
       else:
         logging.info('TRM.AbortStaleRunner unable to retry runner with key '
                      '%s on machine %s even though it can. Skipping for now.',
-                     runner.urlsafe(), runner.machine_id)
+                     runner.key.urlsafe(), runner.machine_id)
     else:
       logging.error('TRM.AbortStaleRunners aborting runner %s on machine %s '
                     'with key %s', runner.name, runner.machine_id,
