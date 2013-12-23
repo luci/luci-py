@@ -611,9 +611,13 @@ class SlaveMachine(object):
     url_parts = urlparse.urlparse(self._url)
     server = url_parts.scheme + '://' + url_parts.hostname
 
+    # Since we are writing to a file, make sure all '\'s are properly escaped,
+    # so the file won't contain unexpected escapes.
+    escaped_start_slave_path = START_SLAVE_SCRIPT_PATH.replace('\\', '\\\\')
+
     slave_setup_script_contents = SLAVE_SETUP_SCRIPT % {
         'server_port': url_parts.port,
-        'start_slave': START_SLAVE_SCRIPT_PATH,
+        'start_slave': escaped_start_slave_path,
         'swarming_server': server,
         'zipped_slave_files': ZIPPED_SLAVE_FILES
     }
