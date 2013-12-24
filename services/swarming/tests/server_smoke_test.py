@@ -129,6 +129,10 @@ class _SwarmTestCase(unittest.TestCase):
         ['--clear_datastore', 'True',
          '--port', str(swarm_server_port),
          '--skip_sdk_update_check', 'False',
+         # Note: The random policy will provide the same consistency every time
+         # the test is run because the random generator is always given the
+         # same seed.
+         '--datastore_consistency_policy', 'random',
          _SwarmTestProgram.options.swarm_path])
 
     self._swarm_server_process = _ProcessWrapper(
@@ -335,10 +339,9 @@ class _SwarmTestCase(unittest.TestCase):
                    '\n'.join(test['test_key'] for test in running_tests))
 
       for running_test_key in running_tests[:]:
-        key_url = self.GetAdminUrl(
-            urlparse.urljoin(
-                self._swarm_server_url,
-                'secure/get_result?r=' + running_test_key['test_key']))
+        key_url = urlparse.urljoin(
+            self._swarm_server_url,
+            'secure/get_result?r=' + running_test_key['test_key'])
 
         logging.info('Opening URL %s', key_url)
         try:

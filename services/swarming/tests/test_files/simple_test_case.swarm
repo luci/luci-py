@@ -2,13 +2,13 @@
   "test_case_name": "Simple Test Case",
   "tests": [
     {
-      "test_name": "Hello World",
+      "test_name": "Hello World (simple)",
       "action": [
         "dir"
       ]
     },
     {
-      "test_name": "Goodbye World",
+      "test_name": "Goodbye World (simple)",
       "action": [
         "dir"
       ]

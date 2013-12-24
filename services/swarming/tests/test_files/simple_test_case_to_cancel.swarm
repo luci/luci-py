@@ -2,13 +2,7 @@
   "test_case_name": "Simple Test Case To Cancel",
   "tests": [
     {
-      "test_name": "Hello World",
-      "action": [
-        "dir"
-      ]
-    },
-    {
-      "test_name": "Goodbye World",
+      "test_name": "Goodbye Cancelled World",
       "action": [
         "dir"
       ]

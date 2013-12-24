@@ -6,7 +6,7 @@
   },
   "tests": [
     {
-      "test_name": "Hello World",
+      "test_name": "Hello World (sharded)",
       "action": [
         "dir"
       ]
