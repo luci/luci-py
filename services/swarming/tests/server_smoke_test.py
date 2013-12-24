@@ -224,10 +224,8 @@ class _SwarmTestCase(unittest.TestCase):
     shutil.rmtree(self._temp_directory)
     try:
       logging.info('Quitting Swarm server')
-      cj = cookielib.CookieJar()
-      opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cj))
-      opener.open(self.GetAdminUrl(urlparse.urljoin(self._swarm_server_url,
-                                                    'tasks/quitquitquit')))
+      urllib2.urlopen(urlparse.urljoin(self._swarm_server_url,
+                                       'tasks/quitquitquit'))
       # TODO(user): This line shouldn't be here, should be after the
       # try block.
       self._swarm_server_process.wrapped_process.wait()
@@ -258,6 +256,7 @@ class _SwarmTestCase(unittest.TestCase):
     swarm_server_get_matching_test_cases = urlparse.urljoin(
         self._swarm_server_url, 'get_matching_test_cases')
     running_tests = []
+    tests_to_cancel = []
     for swarm_file in swarm_files:
       logging.info('Sending content of %s to Swarm server.', swarm_file)
       # Build the URL for sending the request.
@@ -281,13 +280,15 @@ class _SwarmTestCase(unittest.TestCase):
       current_test_keys = []
       for test_key in test_keys['test_keys']:
         current_test_keys.append(test_key['test_key'])
-        running_tests.append(test_key)
-        if _SwarmTestProgram.options.verbose:
-          logging.info('Config: %s, index: %s/%s, test key: %s',
-                       test_key['config_name'],
-                       int(test_key['instance_index']) + 1,
-                       test_key['num_instances'],
-                       test_key['test_key'])
+        if 'To Cancel' in test_keys['test_case_name']:
+          tests_to_cancel.append(test_key)
+        else:
+          running_tests.append(test_key)
+        logging.info('Config: %s, index: %s/%s, test key: %s',
+                     test_key['config_name'],
+                     int(test_key['instance_index']) + 1,
+                     test_key['num_instances'],
+                     test_key['test_key'])
 
       # Make sure that we can actually find the keys from just the test names.
       logging.info('Checking if we can find the keys for the recently added '
@@ -308,9 +309,15 @@ class _SwarmTestCase(unittest.TestCase):
     # TODO(user): Maybe collect all failures so that we can enumerate them at
     # the end as the local test runner and gtest does.
 
-    cj = cookielib.CookieJar()
-    opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cj))
-    urllib2.install_opener(opener)
+    # Cancel all the tests that are suppose to be cancelled.
+    swarm_server_cancel_url = urlparse.urljoin(self._swarm_server_url,
+                                               'secure/cancel')
+    for test in tests_to_cancel:
+      try:
+        data = urllib.urlencode({'r': test['test_key']})
+        urllib2.urlopen(swarm_server_cancel_url, data)
+      except urllib2.URLError as e:
+        self.fail('Error: %s' % e)
 
     # The slave machine is running along with this test. Thus it may take
     # some time before all the tests complete. We will keep polling the results
@@ -369,7 +376,8 @@ class _SwarmTestCase(unittest.TestCase):
         break
 
     if running_tests:
-      self.fail('%d tests failed to complete.' % len(running_tests))
+      self.fail('%d tests failed to complete.\n%s' % (len(running_tests),
+                                                      running_tests))
 
 
 class _SwarmTestProgram(unittest.TestProgram):

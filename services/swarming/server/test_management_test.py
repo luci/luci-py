@@ -471,6 +471,8 @@ class TestManagementTest(test_case.TestCase):
     test_management.AbortStaleRunners()
 
     runner = test_runner.TestRunner.query().get()
+    self.assertIsNotNone(runner.started)
+    self.assertIsNotNone(runner.ended)
     self.assertTrue(runner.done)
     self.assertIn('Runner was unable to find a machine to run it within',
                   runner.GetResultString())
@@ -510,13 +512,14 @@ class TestManagementTest(test_case.TestCase):
       runner = test_runner.TestRunner.query().get()
       if i == test_runner.MAX_AUTOMATIC_RETRIES:
         self.assertTrue(runner.done)
-        self.assertNotEqual(None, runner.started)
+        self.assertIsNotNone(runner.started)
+        self.assertIsNotNone(runner.ended)
         self.assertIn('Runner has become stale', runner.GetResultString())
       else:
         self.assertFalse(runner.done)
         self.assertEqual([MACHINE_IDS[0]] * (i + 1), runner.old_machine_ids)
         self.assertEqual(i + 1, runner.automatic_retry_count)
-        self.assertEqual(None, runner.started)
+        self.assertIsNone(runner.started)
 
     self._mox.VerifyAll()
 

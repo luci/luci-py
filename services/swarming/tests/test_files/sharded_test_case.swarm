@@ -15,7 +15,7 @@
   "verbose": true,
   "configurations": [
     {
-      "config_name": "WinXP32-enUS",
+      "config_name": "WinXP32-enUS-sharded",
       "min_instances": 3,
       "max_instances": 3,
       "dimensions": {
@@ -24,7 +24,7 @@
       }
     },
     {
-      "config_name": "Vista32-enUS",
+      "config_name": "Vista32-enUS-sharded",
       "min_instances": 2,
       "max_instances": 2,
       "dimensions": {

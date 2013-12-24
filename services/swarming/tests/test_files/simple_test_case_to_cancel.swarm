@@ -1,5 +1,5 @@
 {
-  "test_case_name": "Simple Test Case",
+  "test_case_name": "Simple Test Case To Cancel",
   "tests": [
     {
       "test_name": "Hello World",
@@ -17,10 +17,9 @@
   "verbose": true,
   "configurations": [
     {
-      "config_name": "WinXP32-enUS-simple",
+      "config_name": "Linux-To-Cancel",
       "dimensions": {
-        "lang": "en-US",
-        "os": "win-xp"
+        "os": "linux"
       }
     }
   ]

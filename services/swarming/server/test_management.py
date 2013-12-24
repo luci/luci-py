@@ -307,6 +307,11 @@ def AbortRunner(runner, reason='Not specified.'):
   """
   r_str = ('Tests aborted. AbortRunner() called. Reason: %s' %
            reason.encode('ascii', 'xmlcharrefreplace'))
+
+  # The cancellation time should count as the time the runner started.
+  runner.started = datetime.datetime.utcnow()
+  runner.put()
+
   runner.UpdateTestResult(runner.machine_id, errors=r_str)
 
 
