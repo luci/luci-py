@@ -91,7 +91,7 @@ class _ProcessWrapper(object):
 
   def __del__(self):
     if hasattr(self, 'wrapped_process') and self.wrapped_process.poll() is None:
-      self.wrapped_process.terminate()
+      self.wrapped_process.kill()
 
 
 class _SwarmTestCase(unittest.TestCase):
@@ -223,6 +223,12 @@ class _SwarmTestCase(unittest.TestCase):
   def tearDown(self):
     shutil.rmtree(self._temp_directory)
     try:
+      # Kill the swarm slave before the server to prevent it from complaining
+      # when it can no longer connect to the server
+      logging.info('Kill the swarm slave')
+      self._slave_machine_process.wrapped_process.kill()
+      self._slave_machine_process.wrapped_process.wait()
+
       logging.info('Quitting Swarm server')
       urllib2.urlopen(urlparse.urljoin(self._swarm_server_url,
                                        'tasks/quitquitquit'))
