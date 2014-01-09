@@ -1,0 +1,13 @@
+Name: A powerful URL router and dispatcher for golang.
+Short name: mux
+URL: https://github.com/gorilla/mux
+Revision: 9ede152210fa25c1377d33e867cb828c19316445
+License: New BSD
+License File: LICENSE
+
+Description:
+gorilla/mux is a powerful URL router and dispatcher.
+Read the full documentation here: http://www.gorillatoolkit.org/pkg/mux
+
+Local modifications:
+Removed all tests.

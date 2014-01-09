@@ -1,0 +1,19 @@
+Contains all service agnostic utility packages that are third parties.
+
+To add a third party, execute the following steps taking a project
+"github.com/example/project" as an example:
+  0. Get the 'goven' tool with: go get -u github.com/maruel/goven
+  1. Fetch the project with: go get -u github.com/example/project
+  2. Copy it here and fix imports with the goven tool:
+       goven -extra third_party github.com/example/project
+  3. Add third_party/github.com/example/project/README.swarming to note the
+     git/hg revision used at the time of import.
+
+goven is a tool to help import third party packages locally. What it does is to
+copy the tree of files into the current directory, prefixed with the value
+passed to -extra. Then it updates the imports for all .go files found in any
+subdirectory of the current directory for imports to this project, and fix the
+import to be to the new copied location. Visit https://github.com/maruel/goven
+for more details.
+
+TODO: Add automatic README generation that includes the revision of the project.

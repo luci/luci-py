@@ -1,0 +1,13 @@
+Name: Google APIs Client Library for Go
+Short name: google-api-go-client
+URL: https://code.google.com/p/google-api-go-client/
+Revision: 2f3a11c87522
+License: New BSD
+License File: LICENSE
+
+Description:
+These are auto-generated Go libraries from the Google Discovery Service's JSON
+description files of the available "new style" Google APIs.
+
+Local modifications:
+Only kept googleapi/ and storage/.

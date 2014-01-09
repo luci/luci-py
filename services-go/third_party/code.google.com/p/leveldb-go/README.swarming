@@ -1,0 +1,13 @@
+Name: The LevelDB key/value database in Go
+Short Name: leveldb-go
+URL: https://code.google.com/p/leveldb-go/
+Revision: a2c0ed4d6198
+License: New BSD
+License File: LICENSE
+
+Description:
+This is is an implementation of the LevelDB key/value database in the Go
+programming language.
+
+Local modifications:
+Removed all tests.

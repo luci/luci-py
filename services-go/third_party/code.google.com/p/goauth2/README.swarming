@@ -1,0 +1,11 @@
+Name: goauth2
+URL: https://code.google.com/p/goauth2/
+Revision: 5877582f0cb0
+License: New BSD
+License File: LICENSE
+
+Description:
+OAuth 2.0 for Go clients.
+
+Local modifications:
+Removed all tests.
