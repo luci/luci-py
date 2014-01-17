@@ -192,7 +192,7 @@ def get_content_by_hash(namespace, hash_key):
   try:
     return ContentEntry.get_by_id(
         hash_key, parent=ndb.Key(ContentNamespace, namespace))
-  except (ndb.BadKeyError, ndb.KindError):
+  except ndb.KindError:
     pass
 
   return None
