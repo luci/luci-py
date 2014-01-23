@@ -8,6 +8,9 @@
 # pylint: disable=E1120
 
 import logging
+import os
+import threading
+import time
 
 from google.appengine.ext import ndb
 from google.appengine.ext.ndb import metadata
@@ -17,6 +20,26 @@ from . import model
 
 # This module doesn't export any public API yet.
 __all__ = []
+
+
+# How soon process-global AuthDB cache expires, sec.
+PROCESS_CACHE_EXPIRATION_SEC = 30
+
+
+# True if fetch_auth_db was called at least once and created all root entities.
+_lazy_bootstrap_ran = False
+
+# Protects _auth_db* globals below.
+_auth_db_lock = threading.Lock()
+# Currently cached instance of AuthDB.
+_auth_db = None
+# When current value of _auth_db should be refetched.
+_auth_db_expiration = None
+# Holds id of a thread that is currently fetching AuthDB (or None).
+_auth_db_fetching_thread = None
+
+# Thread local storage for RequestCache (see 'get_request_cache').
+_thread_local = threading.local()
 
 
 class AuthDB(object):
@@ -212,8 +235,50 @@ class AuthDB(object):
         self.global_config.oauth_client_secret)
 
 
-# True if fetch_auth_db was called at least once and created all root entities.
-_lazy_bootstrap_ran = False
+class RequestCache(object):
+  """Holds authentication related information for the current request.
+
+  Current request is a request being processed by currently running thread.
+  A thread can handle at most one request at a time (as assumed by WSGI model).
+  But same thread can be reused for another request later. In that case second
+  request gets a new copy of RequestCache. See also 'get_request_cache'.
+  """
+
+  def __init__(self):
+    self.current_identity = None
+    self.auth_db = None
+    self.is_admin = False
+
+  def set_current_identity(self, current_identity, is_admin):
+    """Called early during request processing to set identity for a request."""
+    self.current_identity = current_identity
+    self.is_admin = is_admin
+
+  def close(self):
+    """Helps GC to collect garbage faster."""
+    self.current_identity = None
+    self.auth_db = None
+
+
+def get_request_cache():
+  """Returns instance of RequestCache associated with the current request.
+
+  A new instance is created for each new HTTP request. We determine
+  that we're in a new request by inspecting os.environ, which is thread-local
+  and reset at the start of each request.
+  """
+  # Properly close an object from previous request served by the current thread.
+  request_cache = getattr(_thread_local, 'request_cache', None)
+  if not os.getenv('__AUTH_CACHE__') and request_cache is not None:
+    request_cache.close()
+    _thread_local.request_cache = None
+    request_cache = None
+  # Make a new cache, put it in thread local state, put flag in os.environ.
+  if request_cache is None:
+    request_cache = RequestCache()
+    _thread_local.request_cache = request_cache
+    os.environ['__AUTH_CACHE__'] = '1'
+  return request_cache
 
 
 def fetch_auth_db(known_version=None):
@@ -260,8 +325,12 @@ def fetch_auth_db(known_version=None):
     if known_version is not None and current_version == known_version:
       return None
 
+    # TODO(vadimsh): Add memcache keyed at |current_version| so only one
+    # frontend instance have to pay the cost of fetching AuthDB from Datastore
+    # via multiple RPCs. All other instances will fetch it via single
+    # memcache 'get'.
+
     # Fetch all stuff in parallel. Fetch ALL groups and ALL secrets.
-    logging.info('Fetching AuthDB')
     global_config = root_key.get_async()
     service_config = model.AuthServiceConfig.get_by_id_async(
         'local', parent=root_key)
@@ -280,3 +349,92 @@ def fetch_auth_db(known_version=None):
 
   bootstrap()
   return fetch()
+
+
+def get_process_auth_db():
+  """Returns instance of AuthDB from process-global cache.
+
+  Will refetch it if necessary. Two subsequent calls may return different
+  instances if cache expires between the calls.
+  """
+  global _auth_db
+  global _auth_db_expiration
+  global _auth_db_fetching_thread
+
+  known_auth_db = None
+  known_auth_db_version = None
+
+  with _auth_db_lock:
+    # Cached copy is still fresh?
+    if _auth_db and time.time() < _auth_db_expiration:
+      return _auth_db
+
+    # Fetching AuthDB for the first time ever? Do it under the lock because
+    # there's nothing to return yet. All threads would have to wait for this
+    # initial fetch to complete.
+    if _auth_db is None:
+      logging.info('Initial fetch of AuthDB')
+      _auth_db = fetch_auth_db()
+      _auth_db_expiration = time.time() + PROCESS_CACHE_EXPIRATION_SEC
+      return _auth_db
+
+    # We have a cached copy and it has expired. Maybe some thread is already
+    # fetching it? Don't block an entire process on this, return a little bit
+    # stale copy instead right away.
+    if _auth_db_fetching_thread is not None:
+      logging.info(
+          'Using stale copy of AuthDB while tid %s is fetching a fresh one. '
+          'Cached copy expired %.1f sec ago.',
+          _auth_db_fetching_thread,
+          time.time() - _auth_db_expiration)
+      return _auth_db
+
+    # No one is fetching AuthDB yet. Start the operation, release the lock so
+    # other threads can figure this out and use stale copies instead of blocking
+    # on the lock.
+    _auth_db_fetching_thread = threading.current_thread()
+    known_auth_db = _auth_db
+    known_auth_db_version = _auth_db.entity_group_version
+    logging.info('Refetching AuthDB, tid is %s', _auth_db_fetching_thread)
+
+  # Do the actual fetch outside the lock. Be careful to handle any unexpected
+  # exception by 'fixing' the global state before leaving this function.
+  try:
+    fresh_copy = fetch_auth_db(known_version=known_auth_db_version)
+    if fresh_copy is None:
+      # No changes, entity group versions match, reuse same object.
+      fresh_copy = known_auth_db
+  except Exception:
+    # Failed. Be sure to allow other threads to try the fetch. Meanwhile log the
+    # exception and return a stale copy of AuthDB. Better than nothing.
+    logging.exception('Failed to refetch AuthDB, returning stale cached copy')
+    with _auth_db_lock:
+      assert _auth_db_fetching_thread == threading.current_thread()
+      _auth_db_fetching_thread = None
+      return _auth_db
+
+  # Fetch has completed successfully. Update process cache now.
+  with _auth_db_lock:
+    assert _auth_db_fetching_thread == threading.current_thread()
+    _auth_db_fetching_thread = None
+    _auth_db = fresh_copy
+    _auth_db_expiration = time.time() + PROCESS_CACHE_EXPIRATION_SEC
+    return _auth_db
+
+
+def get_request_auth_db():
+  """Returns instance of AuthDB from request-local cache.
+
+  In a context of a single request this function always returns same
+  instance of AuthDB. So as long as request runs, ACL rules stay consistent and
+  don't change beneath your feet.
+
+  Effectively request handler uses a snapshot of AuthDB at the moment request
+  starts. If it somehow makes a call that initiates another request that uses
+  AuthDB (via task queue, or UrlFetch) that another request may see a different
+  copy of AuthDB.
+  """
+  cache = get_request_cache()
+  if cache.auth_db is None:
+    cache.auth_db = get_process_auth_db()
+  return cache.auth_db

@@ -3,7 +3,9 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
+import Queue
 import sys
+import threading
 import unittest
 
 import test_env
@@ -296,6 +298,205 @@ class AuthDBTest(test_case.TestCase):
     self.assertEqual(
         set(s.key.id() for s in global_secrets),
         set(auth_db.secrets['global']))
+
+
+class TestAuthDBCache(test_case.TestCase):
+  """Tests for process-global and request-local AuthDB cache."""
+
+  def setUp(self):
+    super(TestAuthDBCache, self).setUp()
+    # Reset the state of all caches.
+    api._auth_db = None
+    api._auth_db_expiration = None
+    api._auth_db_fetching_thread = None
+    api._thread_local = threading.local()
+
+  def set_time(self, ts):
+    """Mocks time.time() to return |ts|."""
+    self.mock(api.time, 'time', lambda: ts)
+
+  def set_fetched_auth_db(self, auth_db):
+    """Mocks fetch_auth_db to return |auth_db|."""
+    def mock_fetch_auth_db(known_version=None):
+      if (known_version is not None and
+          auth_db.entity_group_version == known_version):
+        return None
+      return auth_db
+    self.mock(api, 'fetch_auth_db', mock_fetch_auth_db)
+
+  def test_get_request_cache_different_threads(self):
+    """Ensure get_request_cache() respects multiple threads."""
+    # Runs in its own thread.
+    def thread_proc():
+      # get_request_cache() returns something meaningful.
+      request_cache = api.get_request_cache()
+      self.assertTrue(request_cache)
+      # Returns same object in a context of a same request thread.
+      self.assertTrue(api.get_request_cache() is request_cache)
+      return request_cache
+
+    # Launch two threads running 'thread_proc', wait for them to stop, collect
+    # whatever they return.
+    results_queue = Queue.Queue()
+    threads = [
+      threading.Thread(target=lambda: results_queue.put(thread_proc()))
+      for _ in xrange(2)
+    ]
+    for t in threads:
+      t.start()
+    results = [results_queue.get() for _ in xrange(len(threads))]
+
+    # Different threads use different RequestCache objects.
+    self.assertTrue(results[0] is not results[1])
+
+  def test_get_request_cache_different_requests(self):
+    """Ensure get_request_cache() returns new object for a new request."""
+    # Grab request cache for 'current' request.
+    request_cache = api.get_request_cache()
+
+    # Track calls to 'close'.
+    close_calls = []
+    self.mock(request_cache, 'close', lambda: close_calls.append(1))
+
+    # Restart testbed, effectively emulating a new request on a same thread.
+    self.testbed.deactivate()
+    self.testbed.activate()
+
+    # Should return a new instance of request cache now.
+    self.assertTrue(api.get_request_cache() is not request_cache)
+    # Old one should have been closed.
+    self.assertEqual(1, len(close_calls))
+
+  def test_get_process_auth_db_expiration(self):
+    """Ensure get_process_auth_db() respects expiration."""
+    # Prepare several instances of AuthDB to be used in mocks.
+    auth_db_v0 = api.AuthDB(entity_group_version=0)
+    auth_db_v1 = api.AuthDB(entity_group_version=1)
+
+    # Fetch initial copy of AuthDB.
+    self.set_time(0)
+    self.set_fetched_auth_db(auth_db_v0)
+    self.assertEqual(auth_db_v0, api.get_process_auth_db())
+
+    # It doesn't expire for some time.
+    self.set_time(api.PROCESS_CACHE_EXPIRATION_SEC - 1)
+    self.set_fetched_auth_db(auth_db_v1)
+    self.assertEqual(auth_db_v0, api.get_process_auth_db())
+
+    # But eventually it does.
+    self.set_time(api.PROCESS_CACHE_EXPIRATION_SEC + 1)
+    self.set_fetched_auth_db(auth_db_v1)
+    self.assertEqual(auth_db_v1, api.get_process_auth_db())
+
+  def test_get_process_auth_db_known_version(self):
+    """Ensure get_process_auth_db() respects entity group version."""
+    # Prepare several instances of AuthDB to be used in mocks.
+    auth_db_v0 = api.AuthDB(entity_group_version=0)
+    auth_db_v0_again = api.AuthDB(entity_group_version=0)
+
+    # Fetch initial copy of AuthDB.
+    self.set_time(0)
+    self.set_fetched_auth_db(auth_db_v0)
+    self.assertEqual(auth_db_v0, api.get_process_auth_db())
+
+    # Make cache expire, but setup fetch_auth_db to return a new instance of
+    # AuthDB, but with same entity group version. Old known instance of AuthDB
+    # should be reused.
+    self.set_time(api.PROCESS_CACHE_EXPIRATION_SEC + 1)
+    self.set_fetched_auth_db(auth_db_v0_again)
+    self.assertTrue(api.get_process_auth_db() is auth_db_v0)
+
+  def test_get_process_auth_db_multithreading(self):
+    """Ensure get_process_auth_db() plays nice with multiple threads."""
+
+    def run_in_thread(func):
+      """Runs |func| in a parallel thread, returns future (as Queue)."""
+      result = Queue.Queue()
+      thread = threading.Thread(target=lambda: result.put(func()))
+      thread.start()
+      return result
+
+    # Prepare several instances of AuthDB to be used in mocks.
+    auth_db_v0 = api.AuthDB(entity_group_version=0)
+    auth_db_v1 = api.AuthDB(entity_group_version=1)
+
+    # Run initial fetch, should cache |auth_db_v0| in process cache.
+    self.set_time(0)
+    self.set_fetched_auth_db(auth_db_v0)
+    self.assertEqual(auth_db_v0, api.get_process_auth_db())
+
+    # Make process cache expire.
+    self.set_time(api.PROCESS_CACHE_EXPIRATION_SEC + 1)
+
+    # Start fetching AuthDB from another thread, at some point it will call
+    # 'fetch_auth_db', and we pause the thread then and resume main thread.
+    fetching_now = threading.Event()
+    auth_db_queue = Queue.Queue()
+    def mock_fetch_auth_db(**_kwargs):
+      fetching_now.set()
+      return auth_db_queue.get()
+    self.mock(api, 'fetch_auth_db', mock_fetch_auth_db)
+    future = run_in_thread(api.get_process_auth_db)
+
+    # Wait for internal thread to call |fetch_auth_db|.
+    fetching_now.wait()
+
+    # Ok, now main thread is unblocked, while internal thread is blocking on a
+    # artificially slow 'fetch_auth_db' call. Main thread can now try to get
+    # AuthDB via get_process_auth_db(). It should get older stale copy right
+    # away.
+    self.assertEqual(auth_db_v0, api.get_process_auth_db())
+
+    # Finish background 'fetch_auth_db' call by returning 'auth_db_v1'.
+    # That's what internal thread should get as result of 'get_process_auth_db'.
+    auth_db_queue.put(auth_db_v1)
+    self.assertEqual(auth_db_v1, future.get())
+
+    # Now main thread should get it as well.
+    self.assertEqual(auth_db_v1, api.get_process_auth_db())
+
+  def test_get_process_auth_db_exceptions(self):
+    """Ensure get_process_auth_db() handles DB exceptions well."""
+    # Prepare several instances of AuthDB to be used in mocks.
+    auth_db_v0 = api.AuthDB(entity_group_version=0)
+    auth_db_v1 = api.AuthDB(entity_group_version=1)
+
+    # Fetch initial copy of AuthDB.
+    self.set_time(0)
+    self.set_fetched_auth_db(auth_db_v0)
+    self.assertEqual(auth_db_v0, api.get_process_auth_db())
+
+    # Make process cache expire.
+    self.set_time(api.PROCESS_CACHE_EXPIRATION_SEC + 1)
+
+    # Emulate an exception in fetch_auth_db.
+    def mock_fetch_auth_db(*_kwargs):
+      raise Exception('Boom!')
+    self.mock(api, 'fetch_auth_db', mock_fetch_auth_db)
+
+    # Capture calls to logging.exception.
+    logger_calls = []
+    self.mock(api.logging, 'exception', lambda *_args: logger_calls.append(1))
+
+    # Should return older copy of auth_db_v0 and log the exception.
+    self.assertEqual(auth_db_v0, api.get_process_auth_db())
+    self.assertEqual(1, len(logger_calls))
+
+    # Make fetch_auth_db to work again. Verify get_process_auth_db() works too.
+    self.set_fetched_auth_db(auth_db_v1)
+    self.assertEqual(auth_db_v1, api.get_process_auth_db())
+
+  def test_get_request_auth_db(self):
+    """Ensure get_request_auth_db() caches AuthDB in request cache."""
+    # 'get_request_auth_db()' returns whatever get_process_auth_db() returns
+    # when called for a first time.
+    self.mock(api, 'get_process_auth_db', lambda: 'fake')
+    self.assertEqual('fake', api.get_request_auth_db())
+
+    # But then it caches it locally and reuses local copy, instead of calling
+    # 'get_process_auth_db()' all the time.
+    self.mock(api, 'get_process_auth_db', lambda: 'another-fake')
+    self.assertEqual('fake', api.get_request_auth_db())
 
 
 if __name__ == '__main__':
