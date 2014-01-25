@@ -12,4 +12,5 @@ export a portion of public API by specifying exported symbols in its __all__.
 # pylint: disable=W0401,W0403
 
 from api import *
+from handler import *
 from model import *
