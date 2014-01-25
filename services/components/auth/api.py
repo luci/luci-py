@@ -7,8 +7,12 @@
 # Pylint doesn't like ndb.transactional(...).
 # pylint: disable=E1120
 
+import functools
+import inspect
 import logging
 import os
+import re
+import string
 import threading
 import time
 
@@ -17,9 +21,17 @@ from google.appengine.ext.ndb import metadata
 
 from . import model
 
-
-# This module doesn't export any public API yet.
-__all__ = []
+# Part of public API of 'auth' component, exposed by this module.
+__all__ = [
+  'AuthenticationError',
+  'AuthorizationError',
+  'Error',
+  'get_current_identity',
+  'has_permission',
+  'public',
+  'require',
+  'UninitializedError',
+]
 
 
 # How soon process-global AuthDB cache expires, sec.
@@ -40,6 +52,32 @@ _auth_db_fetching_thread = None
 
 # Thread local storage for RequestCache (see 'get_request_cache').
 _thread_local = threading.local()
+
+
+################################################################################
+## Exception classes.
+
+
+class Error(Exception):
+  """Base class for exceptions raised by auth component."""
+  def __init__(self, message=None):
+    super(Error, self).__init__(message or self.__doc__)
+
+
+class AuthenticationError(Error):
+  """Provided credentials are invalid."""
+
+
+class AuthorizationError(Error):
+  """Access is denied."""
+
+
+class UninitializedError(Error):
+  """Request auth context is not initialized."""
+
+
+################################################################################
+## AuthDB and RequestCache.
 
 
 class AuthDB(object):
@@ -70,9 +108,10 @@ class AuthDB(object):
     """
     self.global_config = global_config or model.AuthGlobalConfig()
     self.service_config = service_config or model.AuthServiceConfig()
-    self.groups = dict((g.key.string_id(), g) for g in (groups or []))
+    self.groups = {g.key.string_id(): g for g in (groups or [])}
     self.secrets = {'local': {}, 'global': {}}
     self.entity_group_version = entity_group_version
+    self._regexp_cache = {}
 
     # Split |secrets| into local and global ones based on parent key id.
     for secret in (secrets or []):
@@ -116,6 +155,13 @@ class AuthDB(object):
           for nested in group_obj.nested)
 
     return is_group_member_internal(identity, group, set())
+
+  def is_matching_resource(self, regexp, resource):
+    """True if |resource| name matches resource regexp from a rule."""
+    # There's a harmless race condition here.
+    if regexp not in self._regexp_cache:
+      self._regexp_cache[regexp] = re.compile(regexp)
+    return self._regexp_cache[regexp].match(resource)
 
   def get_groups(self, identity=None):
     """Returns a set of group names that contain |identity| as a member.
@@ -163,7 +209,7 @@ class AuthDB(object):
     for rule in self.service_config.rules:
       if action and action not in rule.actions:
         continue
-      if resource and not rule.resource.match(resource):
+      if resource and not self.is_matching_resource(rule.resource, resource):
         continue
       if identity and not self.is_group_member(identity, rule.group):
         continue
@@ -192,7 +238,7 @@ class AuthDB(object):
     assert action in model.ALLOWED_ACTIONS
     for rule in self.service_config.rules:
       if (action in rule.actions and
-          rule.resource.match(resource) and
+          self.is_matching_resource(rule.resource, resource) and
           self.is_group_member(identity, rule.group)):
         return rule.kind == model.ALLOW_RULE
     return False
@@ -247,12 +293,11 @@ class RequestCache(object):
   def __init__(self):
     self.current_identity = None
     self.auth_db = None
-    self.is_admin = False
 
-  def set_current_identity(self, current_identity, is_admin):
+  def set_current_identity(self, current_identity):
     """Called early during request processing to set identity for a request."""
+    assert current_identity is not None
     self.current_identity = current_identity
-    self.is_admin = is_admin
 
   def close(self):
     """Helps GC to collect garbage faster."""
@@ -308,10 +353,18 @@ def fetch_auth_db(known_version=None):
     # initial loading.
     global _lazy_bootstrap_ran
     if not _lazy_bootstrap_ran:
+      # Freshly created AuthServiceConfig contains single 'Allow all' rule that
+      # basically leaves service wide open for everyone. The idea is that
+      # service administrator then goes to ACL management UI and sets up correct
+      # restrictive ACL rules and Groups. Without 'Allow all' rule he/she won't
+      # be able to use management UI.
       logging.info('Ensuring AuthDB root entities exist')
       ndb.Future.wait_all([
         model.AuthGlobalConfig.get_or_insert_async(root_key.string_id()),
-        model.AuthServiceConfig.get_or_insert_async('local', parent=root_key),
+        model.AuthServiceConfig.get_or_insert_async(
+            'local',
+            rules=[model.AllowAllRule],
+            parent=root_key),
       ])
       # Update _lazy_bootstrap_ran only when DB calls successfully finish.
       _lazy_bootstrap_ran = True
@@ -438,3 +491,188 @@ def get_request_auth_db():
   if cache.auth_db is None:
     cache.auth_db = get_process_auth_db()
   return cache.auth_db
+
+
+################################################################################
+## Identity retrieval, @public and @require decorators.
+
+
+def get_current_identity():
+  """Returns Identity associated with the current request.
+
+  Always returns instance of Identity (that can possibly be Anonymous,
+  but never None).
+
+  Raises UninitializedError if current request handler is not aware of 'auth'
+  component, i.e. it's not inherited from AuthenticatingHandler. Usually it
+  shouldn't be the case (or rather handlers not aware of 'auth' should not use
+  get_current_identity()), so it's safe to let this exception to propagate to
+  top level and cause HTTP 500.
+  """
+  # |current_identity| may be None only if 'RequestCache.set_current_identity'
+  # was never called. It happens if request handler isn't inherited from
+  # AuthenticatingHandler.
+  ident = get_request_cache().current_identity
+  if ident is None:
+    raise UninitializedError()
+  return ident
+
+
+def has_permission(action, resource):
+  """True if Identity associated with the current request can perform an action.
+
+  See comment for AuthDB.has_permission for description of how rules are
+  evaluated.
+
+  Raises UninitializedError if current request handler is not aware of 'auth'
+  component. See doc string for 'get_current_identity' for more info about that.
+  """
+  return get_request_auth_db().has_permission(
+      get_current_identity(), action, resource)
+
+
+def public(func):
+  """Decorator that marks a function as available for anonymous access.
+
+  Useful only in a context of AuthenticatingHandler subclass to mark method as
+  explicitly open for anonymous access. Without it AuthenticatingHandler will
+  complain:
+
+  class MyHandler(auth.AuthenticatingHandler):
+    @auth.public
+    def get(self):
+      ....
+  """
+  # @require decorator sets __auth_require attribute.
+  if hasattr(func, '__auth_require'):
+    raise TypeError('Can\'t use @public and @require on a same function')
+  func.__auth_public = True
+  return func
+
+
+def require(action, resource):
+  """Decorator that checks current identity's permissions.
+
+  Args:
+    action: one of CREATE, READ, UPDATE, DELETE.
+    resource: concrete resource name (like 'isolate/namespaces/default') or a
+        template that can reference decorated function arguments by name, e.g.
+        'isolate/namespaces/{namespace}'. This template together with actual
+        arguments used in a decorated function invocation will be used to deduce
+        a resource name. Uses same syntax as builtin 'str.format' method.
+
+  If Identity associated with the current request can perform |action| against
+  resolved |resource|, calls decorated function. Otherwise raises
+  AuthorizationError exception.
+
+  Note that if ACL rules explicitly allow 'anonymous:anonymous' to access
+  |resource|, this decorator will happily allow it as well.
+
+  Multiple @require decorators can be safely nested on top of each other to
+  check multiple permissions. Also it's safe to mix them with NDB decorators
+  such as ndb.transactional.
+
+  Usage example:
+
+  class MyHandler(auth.AuthenticatingHandler):
+    @auth.require(auth.READ, 'isolate/namespaces/{namespace}')
+    def get(self, namespace):
+      ....
+  """
+  def decorator(func):
+    # @public decorator sets __auth_public attribute.
+    if hasattr(func, '__auth_public'):
+      raise TypeError('Can\'t use @public and @require on same function')
+
+    # When nesting multiple decorators the information (argspec, name) about
+    # original function gets lost. Explicitly preserve reference to original
+    # function in __wrapped__. It is also what NDB does. So 'require' decorator
+    # plays nicely with ndb decorators.
+    original = getattr(func, '__wrapped__', func)
+
+    # Build a function that can substitute variables in the resource template.
+    # Do it once when decorating. Always use original function as a source of
+    # information about arguments (since decorator wrappers use opaque *args
+    # and **kwargs not usable for introspection.
+    renderer = get_template_renderer(original, resource)
+
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+      if not has_permission(action, renderer(*args, **kwargs)):
+        raise AuthorizationError()
+      return func(*args, **kwargs)
+
+    # Propagate reference to original function, mark function as decorated.
+    wrapper.__wrapped__ = original
+    wrapper.__auth_require = True
+    return wrapper
+
+  return decorator
+
+
+def is_decorated(func):
+  """Return True if |func| is decorated by @public or @require decorators."""
+  return hasattr(func, '__auth_public') or hasattr(func, '__auth_require')
+
+
+def get_template_renderer(func, resource):
+  """Returns a function that renders a resource template into a resource name.
+
+  Resource template is a string that can reference |func| arguments by name in
+  a same way str.format can. It is used to produce some concrete resource name
+  protected by ACLs.
+
+  Returned function accepts positional and keyword arguments of invocation of
+  decorated function, and uses them to render |resource| template
+  via str.format. Note that |resource| can only use named fields (i.e.
+  positional fields like {0} are not allowed).
+
+  See also http://docs.python.org/2/library/string.html#format-examples
+
+  For example:
+    def func(arg, another='default'):
+      ...
+    renderer = get_template_renderer(func, 'test/{arg}/{another}')
+    assert renderer(1, 2) == 'test/1/2'
+    assert renderer(1) == 'test/1/default'
+    assert renderer(1, another='boom') == 'test/1/boom'
+  """
+  # Validate format string, extract names of all referenced arguments.
+  # See http://docs.python.org/2/library/string.html#string.Formatter
+  used_args = set()
+  for (_, field_name, _, _) in string.Formatter().parse(resource):
+    if not field_name:
+      continue
+    # |field_name| has the following format (we extract |arg_name| from it):
+    #   field_name ::= arg_name ("." attribute_name | "[" element_index "]")*
+    arg_name = ''
+    for c in field_name:
+      if c in ('.', '['):
+        break
+      arg_name += c
+    # Reject positional arguments. Only keyword ones are allowed.
+    assert arg_name
+    if arg_name[0] in string.digits:
+      raise ValueError(
+          'Positional argument \'%s\' is not allowed in resource '
+          'template \'%s\'' % (field_name, resource))
+    used_args.add(arg_name)
+
+  # Template is just a predefined static resource name?
+  # Don't bother trying to 'render' it.
+  if not used_args:
+    return lambda *_args, **_kwargs: resource
+
+  # All template args should be among explicit arguments of the function.
+  # Whatever additional arguments are passed via *args or **kwargs should not
+  # be used during template expansion.
+  defined_args = set(inspect.getargspec(func).args)
+  if not used_args.issubset(defined_args):
+    raise TypeError(
+        'Referencing unknown variable(s) \'%s\' in resource '
+        'template \'%s\'' % (used_args.difference(defined_args), resource))
+
+  # Get a dict 'arg name -> arg value' and use it to render the template.
+  # See http://docs.python.org/2/library/inspect.html#inspect.getcallargs.
+  return lambda *args, **kwargs: (
+      resource.format(**inspect.getcallargs(func, *args, **kwargs)))

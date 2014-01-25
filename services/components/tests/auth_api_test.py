@@ -3,6 +3,10 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
+# Disable 'Unused argument' and 'Unused variable'.
+# pylint: disable=W0612,W0613
+
+
 import Queue
 import sys
 import threading
@@ -254,6 +258,9 @@ class AuthDBTest(test_case.TestCase):
     self.assertTrue(model.ROOT_KEY.get())
     self.assertTrue(local_conf_key.get())
 
+    # 'Allow all' rule is set.
+    self.assertEqual([model.AllowAllRule], local_conf_key.get().rules)
+
   def test_fetch_auth_db(self):
     # Create AuthGlobalConfig.
     global_config = model.AuthGlobalConfig(key=model.ROOT_KEY)
@@ -497,6 +504,296 @@ class TestAuthDBCache(test_case.TestCase):
     # 'get_process_auth_db()' all the time.
     self.mock(api, 'get_process_auth_db', lambda: 'another-fake')
     self.assertEqual('fake', api.get_request_auth_db())
+
+
+class ApiTest(test_case.TestCase):
+  """Test for publicly exported API."""
+
+  def mock_has_permission(self, permissions):
+    """Setup a mock for api.has_permission that collects calls."""
+    calls = []
+    def mocked(action, resource):
+      calls.append((action, resource))
+      return permissions[(action, resource)]
+    self.mock(api, 'has_permission', mocked)
+    return calls
+
+  def test_get_current_identity_unitialized(self):
+    """If set_current_identity wasn't called raises an exception."""
+    with self.assertRaises(api.UninitializedError):
+      api.get_current_identity()
+
+  def test_get_current_identity(self):
+    """Ensure get_current_identity returns whatever was put in request cache."""
+    api.get_request_cache().set_current_identity(model.Anonymous)
+    self.assertEqual(model.Anonymous, api.get_current_identity())
+
+  def test_has_permission_uninitialized(self):
+    """If set_current_identity wasn't called raises an exception."""
+    with self.assertRaises(api.UninitializedError):
+      api.has_permission(model.READ, 'stuff')
+
+  def test_has_permission(self):
+    """Ensure has_permission uses AuthDB."""
+    calls = []
+    def mock_auth_db_has_permission(identity, action, resource):
+      calls.append((identity, action, resource))
+      return True
+    auth_db = api.AuthDB()
+    self.mock(auth_db, 'has_permission', mock_auth_db_has_permission)
+    self.mock(api, 'get_request_auth_db', lambda: auth_db)
+
+    # Ensure api.has_permission uses mocked AuthDB.has_permission.
+    api.get_request_cache().set_current_identity(model.Anonymous)
+    self.assertTrue(api.has_permission(model.READ, 'some'))
+    self.assertEqual([(model.Anonymous, model.READ, 'some')], calls)
+
+  def test_require_decorator_ok(self):
+    """@require calls 'has_permissions' and then decorated function."""
+    calls = self.mock_has_permission({(model.READ, 'some-resource'): True})
+
+    @api.require(model.READ, 'some-resource')
+    def allowed(*args, **kwargs):
+      return (args, kwargs)
+    self.assertEqual(((1, 2), {'a': 3}), allowed(1, 2, a=3))
+    self.assertEqual([(model.READ, 'some-resource')], calls)
+
+  def test_require_decorator_fail(self):
+    """@require raises exception and doesn't call decorated function."""
+    calls = self.mock_has_permission({(model.DELETE, 'some-resource'): False})
+    forbidden_calls = []
+
+    @api.require(model.DELETE, 'some-resource')
+    def forbidden():
+      forbidden_calls.append(1)
+    with self.assertRaises(api.AuthorizationError):
+      forbidden()
+    self.assertFalse(forbidden_calls)
+    self.assertEqual([(model.DELETE, 'some-resource')], calls)
+
+  def test_require_decorator_nesting_ok(self):
+    """Permission checks are called in order."""
+    calls = self.mock_has_permission({
+      (model.READ, 'A/value'): True,
+      (model.READ, 'B/value'): True,
+    })
+
+    @api.require(model.READ, 'A/{arg}')
+    @api.require(model.READ, 'B/{arg}')
+    def allowed(arg):
+      return arg
+    self.assertEqual('value', allowed('value'))
+    self.assertEqual([(model.READ, 'A/value'), (model.READ, 'B/value')], calls)
+
+  def test_require_decorator_nesting_first_deny(self):
+    """First deny raises AuthorizationError."""
+    calls = self.mock_has_permission({
+      (model.DELETE, 'A/value'): False,
+      (model.READ, 'B/value'): True,
+    })
+    forbidden_calls = []
+
+    @api.require(model.DELETE, 'A/{arg}')
+    @api.require(model.READ, 'B/{arg}')
+    def forbidden(arg):
+      forbidden_calls.append(1)
+    with self.assertRaises(api.AuthorizationError):
+      forbidden('value')
+    self.assertFalse(forbidden_calls)
+    self.assertEqual([(model.DELETE, 'A/value')], calls)
+
+  def test_require_decorator_nesting_non_first_deny(self):
+    """Non-first deny also raises AuthorizationError."""
+    calls = self.mock_has_permission({
+      (model.READ, 'A/value'): True,
+      (model.DELETE, 'B/value'): False,
+    })
+    forbidden_calls = []
+
+    @api.require(model.READ, 'A/{arg}')
+    @api.require(model.DELETE, 'B/{arg}')
+    def forbidden(arg):
+      forbidden_calls.append(1)
+    with self.assertRaises(api.AuthorizationError):
+      forbidden('value')
+    self.assertFalse(forbidden_calls)
+    self.assertEqual(
+        [(model.READ, 'A/value'), (model.DELETE, 'B/value')], calls)
+
+  def test_require_decorator_on_method(self):
+    calls = self.mock_has_permission({(model.READ, 'value'): True})
+
+    class Class(object):
+      @api.require(model.READ, '{arg}')
+      def method(self, arg):
+        return (self, arg)
+
+    obj = Class()
+    self.assertEqual((obj, 'value'), obj.method('value'))
+    self.assertEqual([(model.READ, 'value')], calls)
+
+  def test_require_decorator_on_static_method(self):
+    calls = self.mock_has_permission({(model.READ, 'value'): True})
+
+    class Class(object):
+      @staticmethod
+      @api.require(model.READ, '{arg}')
+      def static_method(arg):
+        return arg
+
+    obj = Class()
+    self.assertEqual('value', Class.static_method('value'))
+    self.assertEqual([(model.READ, 'value')], calls)
+
+  def test_require_decorator_on_class_method(self):
+    calls = self.mock_has_permission({(model.READ, 'value'): True})
+
+    class Class(object):
+      @classmethod
+      @api.require(model.READ, '{arg}')
+      def class_method(cls, arg):
+        return (cls, arg)
+
+    obj = Class()
+    self.assertEqual((Class, 'value'), Class.class_method('value'))
+    self.assertEqual([(model.READ, 'value')], calls)
+
+  def test_require_decorator_ndb_nesting_require_first(self):
+    calls = self.mock_has_permission({(model.READ, 'value'): True})
+
+    @api.require(model.READ, '{arg}')
+    @ndb.non_transactional
+    def func(arg):
+      return arg
+    self.assertEqual('value', func('value'))
+    self.assertEqual([(model.READ, 'value')], calls)
+
+  def test_require_decorator_ndb_nesting_require_last(self):
+    calls = self.mock_has_permission({(model.READ, 'value'): True})
+
+    @ndb.non_transactional
+    @api.require(model.READ, '{arg}')
+    def func(arg):
+      return arg
+    self.assertEqual('value', func('value'))
+    self.assertEqual([(model.READ, 'value')], calls)
+
+  def test_public_then_require_fails(self):
+    with self.assertRaises(TypeError):
+      @api.public
+      @api.require(model.READ, 'some')
+      def func():
+        pass
+
+  def test_require_then_public_fails(self):
+    with self.assertRaises(TypeError):
+      @api.require(model.READ, 'some')
+      @api.public
+      def func():
+        pass
+
+  def test_is_decorated(self):
+    self.assertTrue(api.is_decorated(api.public(lambda: None)))
+    self.assertTrue(
+        api.is_decorated(api.require(model.READ, 'some')(lambda: None)))
+
+
+class TestResourceTemplateRenderer(test_case.TestCase):
+  """Tests for get_template_renderer function."""
+
+  def test_rejects_positional_format(self):
+    with self.assertRaises(ValueError):
+      api.get_template_renderer(lambda arg: None, '{0}')
+
+  def test_unknown_vars(self):
+    api.get_template_renderer(lambda arg: None, '{arg}')
+    with self.assertRaises(TypeError):
+      api.get_template_renderer(lambda another_arg: None, '{arg}')
+    with self.assertRaises(TypeError):
+      api.get_template_renderer(lambda *arg: None, '{arg}')
+    with self.assertRaises(TypeError):
+      api.get_template_renderer(lambda **kwargs: None, '{kwargs}')
+
+  def test_no_args(self):
+    renderer = api.get_template_renderer(lambda: None, 'not-a-template')
+    self.assertEqual('not-a-template', renderer())
+
+  def test_positional_args(self):
+    renderer = api.get_template_renderer(lambda a, b, c: None, '{a}/{b}/{c}')
+    self.assertEqual('1/2/3', renderer(1, 2, 3))
+
+  def test_positional_and_default_args(self):
+    renderer = api.get_template_renderer(lambda a, b, c=3: None, '{a}/{b}/{c}')
+    self.assertEqual('1/2/3', renderer(1, 2))
+    self.assertEqual('1/2/4', renderer(1, 2, 4))
+
+  def test_keyword_args(self):
+    renderer = api.get_template_renderer(lambda a, b, c: None, '{a}/{b}/{c}')
+    self.assertEqual('1/2/3', renderer(a=1, b=2, c=3))
+
+  def test_keyword_and_default_args(self):
+    renderer = api.get_template_renderer(lambda a, b, c=3: None, '{a}/{b}/{c}')
+    self.assertEqual('1/2/3', renderer(a=1, b=2))
+    self.assertEqual('1/2/4', renderer(a=1, b=2, c=4))
+
+  def test_positional_and_keyword_args(self):
+    renderer = api.get_template_renderer(lambda a, b, c: None, '{a}/{b}/{c}')
+    self.assertEqual('1/2/3', renderer(1, 2, c=3))
+
+  def test_positional_and_keyword_and_default_args(self):
+    renderer = api.get_template_renderer(lambda a, b, c=3: None, '{a}/{b}/{c}')
+    self.assertEqual('1/2/3', renderer(1, b=2))
+    self.assertEqual('1/2/4', renderer(1, b=2, c=4))
+
+  def test_many_defaults(self):
+    renderer = api.get_template_renderer(
+        lambda a=1, b=2, c=3: None, '{a}/{b}/{c}')
+    self.assertEqual('1/2/3', renderer())
+    self.assertEqual('4/2/3', renderer(4))
+    self.assertEqual('4/2/3', renderer(a=4))
+    self.assertEqual('1/4/3', renderer(b=4))
+    self.assertEqual('1/2/4', renderer(c=4))
+
+  def test_extra_args(self):
+    renderer = api.get_template_renderer(lambda a, b, c=3: None, '{c}')
+    self.assertEqual('3', renderer(1, 2))
+    self.assertEqual('4', renderer(1, 2, 4))
+    self.assertEqual('4', renderer(1, 2, c=4))
+
+  def test_missing_args(self):
+    renderer = api.get_template_renderer(lambda a, b, c: None, '{a}/{b}/{c}')
+    with self.assertRaises(TypeError):
+      renderer(1, 2)
+
+  def test_args_placeholder(self):
+    renderer = api.get_template_renderer(lambda a, b, *args: None, '{a}/{b}')
+    self.assertEqual('1/2', renderer(1, 2))
+    self.assertEqual('1/2', renderer(1, 2, 3, 4, 5))
+    self.assertEqual('1/2', renderer(1, b=2))
+
+  def test_kwargs_placeholder(self):
+    renderer = api.get_template_renderer(lambda a, b, **kwargs: None, '{a}/{b}')
+    self.assertEqual('1/2', renderer(1, 2))
+    self.assertEqual('1/2', renderer(1, 2, c=3, d=4))
+    self.assertEqual('1/2', renderer(1, b=2))
+    self.assertEqual('1/2', renderer(1, b=2, c=3, d=4))
+
+  def test_positional_keyword_args_overlap(self):
+    # Attempting to specify 'c' twice: as positional and as keyword arg.
+    renderer = api.get_template_renderer(
+        lambda a, b, c=3, d=4: None, '{a}/{b}/{c}/{d}')
+    with self.assertRaises(TypeError):
+      renderer(1, 2, 'x', c=3)
+
+  def test_index_in_format_string(self):
+    renderer = api.get_template_renderer(lambda a: None, '{a[0]}')
+    self.assertEqual('1', renderer([1]))
+
+  def test_attribute_in_format_string(self):
+    renderer = api.get_template_renderer(lambda a: None, '{a.name}')
+    self.assertEqual(
+        'joe@example.com',
+        renderer(model.Identity(model.IDENTITY_USER, 'joe@example.com')))
 
 
 if __name__ == '__main__':

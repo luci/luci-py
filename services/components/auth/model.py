@@ -295,18 +295,19 @@ class AccessRule(
           'Resource pattern should start with \'^\' and end '
           'with \'$\': %s' % resource)
     try:
-      resource = re.compile(resource)
+      re.compile(resource)
     except re.error:
       raise ValueError('Invalid resource regexp pattern: %s' % resource)
 
-    return super(AccessRule, cls).__new__(cls, kind, group, actions, resource)
+    return super(AccessRule, cls).__new__(
+        cls, kind, str(group), actions, resource)
 
   def to_jsonish(self):
     return {
       'actions': self.actions,
       'group': self.group,
       'kind': self.kind,
-      'resource': self.resource.pattern,
+      'resource': self.resource,
     }
 
   @classmethod
@@ -319,6 +320,8 @@ class AccessRule(
 
 # Special rule 'deny all access' implicitly added to list of rules.
 DenyAllRule = AccessRule(DENY_RULE, GROUP_ALL, ALLOWED_ACTIONS, '^.*$')
+# Special rule 'allow all access' added to list of rules during bootstrap.
+AllowAllRule = AccessRule(ALLOW_RULE, GROUP_ALL, ALLOWED_ACTIONS, '^.*$')
 
 
 class AccessRuleProperty(utils.JsonSerializableProperty):
