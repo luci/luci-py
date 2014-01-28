@@ -306,6 +306,41 @@ class AuthDBTest(test_case.TestCase):
         set(s.key.id() for s in global_secrets),
         set(auth_db.secrets['global']))
 
+  def test_get_secret(self):
+    # Make AuthDB with two secrets.
+    local_secret = model.AuthSecret.bootstrap('local_secret', 'local')
+    global_secret = model.AuthSecret.bootstrap('global_secret', 'global')
+    auth_db = api.AuthDB(secrets=[local_secret, global_secret])
+
+    # Ensure they are accessible via get_secret.
+    self.assertEqual(
+        local_secret.values,
+        auth_db.get_secret(api.SecretKey('local_secret', 'local')))
+    self.assertEqual(
+        global_secret.values,
+        auth_db.get_secret(api.SecretKey('global_secret', 'global')))
+
+  def test_get_secret_bootstrap(self):
+    # Mock AuthSecret.bootstrap to capture calls to it.
+    original = api.model.AuthSecret.bootstrap
+    calls = []
+    @classmethod
+    def mocked_bootstrap(cls, name, scope):
+      calls.append((name, scope))
+      result = original(name, scope)
+      result.values = ['123']
+      return result
+    self.mock(api.model.AuthSecret, 'bootstrap', mocked_bootstrap)
+
+    auth_db = api.AuthDB()
+    got = auth_db.get_secret(api.SecretKey('local_secret', 'local'))
+    self.assertEqual(['123'], got)
+    self.assertEqual([('local_secret', 'local')], calls)
+
+  def test_get_secret_bad_scope(self):
+    with self.assertRaises(ValueError):
+      api.AuthDB().get_secret(api.SecretKey('some', 'bad-scope'))
+
 
 class TestAuthDBCache(test_case.TestCase):
   """Tests for process-global and request-local AuthDB cache."""

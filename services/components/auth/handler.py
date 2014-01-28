@@ -4,6 +4,9 @@
 
 """Integration with webapp2."""
 
+# Disable 'Method could be a function.'
+# pylint: disable=R0201
+
 import logging
 import webapp2
 
@@ -12,6 +15,7 @@ from google.appengine.api import users
 
 from . import api
 from . import model
+from . import tokens
 
 # Part of public API of 'auth' component, exposed by this module.
 __all__ = [
@@ -26,6 +30,13 @@ __all__ = [
 # Global list of authentication functions to use to authenticate all
 # requests. Used by AuthenticatingHandler. Initialized in 'configure'.
 _auth_methods = ()
+
+
+class XSRFToken(tokens.TokenKind):
+  """XSRF token parameters."""
+  expiration_sec = 2 * 3600
+  secret_key = api.SecretKey('xsrf_token', scope='local')
+  version = 1
 
 
 class AuthenticatingHandlerMetaclass(type):
@@ -54,6 +65,15 @@ class AuthenticatingHandler(webapp2.RequestHandler):
   # Checks that all 'get', 'post', etc. are marked with @require or @public.
   __metaclass__ = AuthenticatingHandlerMetaclass
 
+  # List of HTTP methods that trigger XSRF token validation.
+  xsrf_token_enforce_on = ('DELETE', 'POST', 'PUT')
+  # If not None, the header to search for XSRF token.
+  xsrf_token_header = 'X-XSRF-Token'
+  # If not None, the request parameter (GET or POST) to search for XSRF token.
+  xsrf_token_request_param = 'xsrf_token'
+  # Embedded data extracted from XSRF token of current request.
+  xsrf_token_data = None
+
   def dispatch(self):
     """Extracts and verifies Identity, sets up request auth context."""
     identity = model.Anonymous
@@ -73,7 +93,10 @@ class AuthenticatingHandler(webapp2.RequestHandler):
     api.get_request_cache().set_current_identity(identity)
 
     try:
-      # TODO(vadimsh): Add XSRF token verification.
+      # Verify XSRF token if required.
+      self.xsrf_token_data = {}
+      if self.request.method in self.xsrf_token_enforce_on:
+        self.xsrf_token_data = self.verify_xsrf_token()
 
       # All other ACL checks will be performed by corresponding handlers
       # manually or via '@required' decorator. Failed ACL check raises
@@ -82,6 +105,41 @@ class AuthenticatingHandler(webapp2.RequestHandler):
     except api.AuthorizationError as err:
       logging.error('Authorization error.\n%s\nIdentity: %s', err, identity)
       self.authorization_error(err)
+
+  def generate_xsrf_token(self, xsrf_token_data=None):
+    """Returns new XSRF token that embeds |xsrf_token_data|.
+
+    The token is bound to current identity and is valid only when used by same
+    identity.
+    """
+    return XSRFToken.generate(
+        [api.get_current_identity().to_bytes()], xsrf_token_data)
+
+  def verify_xsrf_token(self):
+    """Grabs a token from the request, validates it and extracts embedded data.
+
+    Current identity must be the same as one used to generate the token.
+
+    Returns:
+      Whatever was passed as |xsrf_token_data| in 'generate_xsrf_token'
+      method call used to generate the token.
+
+    Raises:
+      AuthorizationError if token is missing, invalid or expired.
+    """
+    # Get token from header or request parameter.
+    token = None
+    if self.xsrf_token_header:
+      token = self.request.headers.get(self.xsrf_token_header)
+    if not token and self.xsrf_token_request_param:
+      token = self.request.get(self.xsrf_token_request_param)
+    if not token:
+      raise api.AuthorizationError('XSRF token is missing')
+    # And check that it was generated for same identity.
+    try:
+      return XSRFToken.validate(token, [api.get_current_identity().to_bytes()])
+    except tokens.InvalidTokenError as err:
+      raise api.AuthorizationError(str(err))
 
   def authentication_error(self, error):
     """Called when authentication fails to report the error to requester.

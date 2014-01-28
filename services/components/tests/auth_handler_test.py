@@ -175,6 +175,115 @@ class AuthenticatingHandlerTest(test_case.TestCase):
     # Authorization error is logged.
     self.assertEqual(1, len(self.logged_errors))
 
+  def make_xsrf_handling_app(
+      self,
+      xsrf_token_enforce_on=None,
+      xsrf_token_header=None,
+      xsrf_token_request_param=None):
+    """Returns webtest app with single XSRF-aware handler.
+
+    If generates XSRF tokens on GET and validates them on POST, PUT, DELETE.
+    """
+    calls = []
+
+    def record(request_handler, method):
+      is_valid = request_handler.xsrf_token_data == {'some': 'data'}
+      calls.append((method, is_valid))
+
+    class Handler(handler.AuthenticatingHandler):
+      @api.public
+      def get(self):
+        self.response.write(self.generate_xsrf_token({'some': 'data'}))
+      @api.public
+      def post(self):
+        record(self, 'POST')
+      @api.public
+      def put(self):
+        record(self, 'PUT')
+      @api.public
+      def delete(self):
+        record(self, 'DELETE')
+
+    if xsrf_token_enforce_on is not None:
+      Handler.xsrf_token_enforce_on = xsrf_token_enforce_on
+    if xsrf_token_header is not None:
+      Handler.xsrf_token_header = xsrf_token_header
+    if xsrf_token_request_param is not None:
+      Handler.xsrf_token_request_param = xsrf_token_request_param
+
+    app = self.make_test_app('/request', Handler)
+    return app, calls
+
+  def mock_get_current_identity(self, ident):
+    """Mocks api.get_current_identity() to return |ident|."""
+    self.mock(handler.api, 'get_current_identity', lambda: ident)
+
+  def test_xsrf_token_get_param(self):
+    """XSRF token works if put in GET parameters."""
+    app, calls = self.make_xsrf_handling_app()
+    token = app.get('/request').body
+    app.post('/request?xsrf_token=%s' % token)
+    self.assertEqual([('POST', True)], calls)
+
+  def test_xsrf_token_post_param(self):
+    """XSRF token works if put in POST parameters."""
+    app, calls = self.make_xsrf_handling_app()
+    token = app.get('/request').body
+    app.post('/request', {'xsrf_token': token})
+    self.assertEqual([('POST', True)], calls)
+
+  def test_xsrf_token_header(self):
+    """XSRF token works if put in the headers."""
+    app, calls = self.make_xsrf_handling_app()
+    token = app.get('/request').body
+    app.post('/request', headers={'X-XSRF-Token': token})
+    self.assertEqual([('POST', True)], calls)
+
+  def test_xsrf_token_missing(self):
+    """XSRF token is not given but handler requires it."""
+    app, calls = self.make_xsrf_handling_app()
+    response = app.post('/request', expect_errors=True)
+    self.assertEqual(403, response.status_int)
+    self.assertFalse(calls)
+
+  def test_xsrf_token_uses_enforce_on(self):
+    """Only methods set in |xsrf_token_enforce_on| trigger token validation."""
+    # Validate tokens only on PUT (not on POST).
+    app, calls = self.make_xsrf_handling_app(
+        xsrf_token_enforce_on=('PUT',))
+    token = app.get('/request').body
+    # POST check is False, because it ignores the token. PUT is fine.
+    app.post('/request', {'xsrf_token': token})
+    app.put('/request', {'xsrf_token': token})
+    self.assertEqual([('POST', False), ('PUT', True)], calls)
+
+  def test_xsrf_token_uses_xsrf_token_header(self):
+    """Name of the header used for XSRF can be changed."""
+    app, calls = self.make_xsrf_handling_app(xsrf_token_header='X-Some')
+    token = app.get('/request').body
+    app.post('/request', headers={'X-Some': token})
+    self.assertEqual([('POST', True)], calls)
+
+  def test_xsrf_token_uses_xsrf_token_request_param(self):
+    """Name of the request param used for XSRF can be changed."""
+    app, calls = self.make_xsrf_handling_app(xsrf_token_request_param='tok')
+    token = app.get('/request').body
+    app.post('/request', {'tok': token})
+    self.assertEqual([('POST', True)], calls)
+
+  def test_xsrf_token_identity_matters(self):
+    app, calls = self.make_xsrf_handling_app()
+    # Generate token for identity A.
+    self.mock_get_current_identity(
+        model.Identity(model.IDENTITY_USER, 'a@example.com'))
+    token = app.get('/request').body
+    # Try to use it by identity B.
+    self.mock_get_current_identity(
+        model.Identity(model.IDENTITY_USER, 'b@example.com'))
+    response = app.post('/request', expect_errors=True)
+    self.assertEqual(403, response.status_int)
+    self.assertFalse(calls)
+
 
 class CookieAuthenticationTest(test_case.TestCase):
   """Tests for cookie_authentication function."""

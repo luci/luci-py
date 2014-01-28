@@ -7,6 +7,7 @@
 # Pylint doesn't like ndb.transactional(...).
 # pylint: disable=E1120
 
+import collections
 import functools
 import inspect
 import logging
@@ -27,9 +28,11 @@ __all__ = [
   'AuthorizationError',
   'Error',
   'get_current_identity',
+  'get_secret',
   'has_permission',
   'public',
   'require',
+  'SecretKey',
   'UninitializedError',
 ]
 
@@ -78,6 +81,11 @@ class UninitializedError(Error):
 
 ################################################################################
 ## AuthDB and RequestCache.
+
+
+# Name of a secret. Can be service-local (scope == 'local') or global across
+# all services (scope == 'global'). Used by 'get_secret' function.
+SecretKey = collections.namedtuple('SecretKey', ['name', 'scope'])
 
 
 class AuthDB(object):
@@ -243,22 +251,25 @@ class AuthDB(object):
         return rule.kind == model.ALLOW_RULE
     return False
 
-  def get_secret(self, name, scope):
+  def get_secret(self, secret_key):
     """Returns list of strings with last known values of a secret.
 
+    If secret doesn't exist yet, it will be created.
+
     Args:
-      name: name of a secret, if it doesn't exist it will be created.
-      scope: 'local' or 'global', see doc string for AuthSecretScope.
+      secret_key: instance of SecretKey with name of a secret and a scope
+          ('local' or 'global', see doc string for AuthSecretScope).
     """
-    if scope not in self.secrets:
-      raise ValueError('Invalid secret key scope')
+    if secret_key.scope not in self.secrets:
+      raise ValueError('Invalid secret key scope: %s' % secret_key.scope)
     # There's a race condition here: multiple requests, that share same AuthDB
     # object, fetch same missing secret key. It's rare (since key bootstrap
     # process is rare) and not harmful (since AuthSecret.bootstrap is
     # implemented with transaction inside). We ignore it.
-    if name not in self.secrets[scope]:
-      self.secrets[scope][name] = model.AuthSecret.bootstrap(name, scope)
-    entity = self.secrets[scope][name]
+    if secret_key.name not in self.secrets[secret_key.scope]:
+      self.secrets[secret_key.scope][secret_key.name] = (
+          model.AuthSecret.bootstrap(secret_key.name, secret_key.scope))
+    entity = self.secrets[secret_key.scope][secret_key.name]
     return list(entity.values)
 
   def is_allowed_oauth_client_id(self, client_id):
@@ -529,6 +540,18 @@ def has_permission(action, resource):
   """
   return get_request_auth_db().has_permission(
       get_current_identity(), action, resource)
+
+
+def get_secret(secret_key):
+  """Given an instance of SecretKey returns several last values of the secret.
+
+  First item in the list is the current value of a secret (that can be used to
+  validate and generate tokens), the rest are previous values (that can be used
+  to validate older tokens, but shouldn't be used to create new ones).
+
+  Creates a new secret if necessary.
+  """
+  return get_request_auth_db().get_secret(secret_key)
 
 
 def public(func):
