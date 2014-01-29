@@ -63,8 +63,8 @@ class AuthenticatingHandlerTest(test_case.TestCase):
     handler.configure([])
     # Capture error log messages.
     self.logged_errors = []
-    self.mock(
-        handler.logging, 'error', lambda *args: self.logged_errors.append(args))
+    self.mock(handler.logging, 'error',
+        lambda *args, **kwargs: self.logged_errors.append((args, kwargs)))
 
   def make_test_app(self, path, request_handler):
     """Returns webtest.TestApp with single route."""
@@ -73,6 +73,9 @@ class AuthenticatingHandlerTest(test_case.TestCase):
   def test_anonymous(self):
     """If all auth methods are not applicable, identity is set to Anonymous."""
     test = self
+
+    non_applicable = lambda _request: None
+    handler.configure([non_applicable, non_applicable])
 
     class Handler(handler.AuthenticatingHandler):
       @api.public

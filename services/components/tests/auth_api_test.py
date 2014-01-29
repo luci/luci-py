@@ -3,8 +3,8 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
-# Disable 'Unused argument' and 'Unused variable'.
-# pylint: disable=W0612,W0613
+# Disable 'Access to a protected member', Unused argument', 'Unused variable'.
+# pylint: disable=W0212,W0612,W0613
 
 
 import Queue
@@ -539,6 +539,12 @@ class TestAuthDBCache(test_case.TestCase):
     # 'get_process_auth_db()' all the time.
     self.mock(api, 'get_process_auth_db', lambda: 'another-fake')
     self.assertEqual('fake', api.get_request_auth_db())
+
+  def test_warmup(self):
+    """Ensure api.warmup() fetches AuthDB into process-global cache."""
+    self.assertFalse(api._auth_db)
+    api.warmup()
+    self.assertTrue(api._auth_db)
 
 
 class ApiTest(test_case.TestCase):

@@ -31,6 +31,8 @@ sys.path.insert(0, os.path.join(BASE_DIR, 'third_party'))
 
 import acl
 from components import ereporter2
+from components import auth
+from components import auth_ui
 import config
 import gcs
 import map_reduce_jobs
@@ -1496,6 +1498,7 @@ class WarmupHandler(webapp2.RequestHandler):
   def get(self):
     # Generate/precache settings.
     config.settings()
+    auth.warmup()
     self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
     self.response.write('ok')
 
@@ -1514,6 +1517,16 @@ def CreateApplication():
   if config.is_local_dev_server():
     dev_routes.extend(gcs.URLSigner.switch_to_dev_mode())
 
+  # Supported authentication mechanisms.
+  auth.configure([
+    auth.oauth_authentication,
+    auth.cookie_authentication,
+    auth.service_to_service_authentication,
+  ])
+
+  # Routes with Auth REST API.
+  auth_routes = auth_ui.get_rest_api_routes()
+
   # Namespace can be letters, numbers and '-'.
   namespace = r'/<namespace:[a-z0-9A-Z\-]+>'
   # Do not enforce a length limit to support different hashing algorithm. This
@@ -1522,7 +1535,7 @@ def CreateApplication():
   # This means a complete key is required.
   namespace_key = namespace + hashkey
 
-  return webapp2.WSGIApplication(dev_routes + [
+  return webapp2.WSGIApplication(dev_routes + auth_routes + [
       # Triggers a taskqueue.
       webapp2.Route(
           r'/internal/cron/cleanup/trigger/<name:[a-z]+>',

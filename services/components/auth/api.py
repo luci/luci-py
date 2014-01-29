@@ -34,6 +34,7 @@ __all__ = [
   'require',
   'SecretKey',
   'UninitializedError',
+  'warmup',
 ]
 
 
@@ -502,6 +503,11 @@ def get_request_auth_db():
   if cache.auth_db is None:
     cache.auth_db = get_process_auth_db()
   return cache.auth_db
+
+
+def warmup():
+  """Can be called from /_ah/warmup handler to precache authentication DB."""
+  get_process_auth_db()
 
 
 ################################################################################

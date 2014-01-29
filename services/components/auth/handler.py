@@ -76,7 +76,7 @@ class AuthenticatingHandler(webapp2.RequestHandler):
 
   def dispatch(self):
     """Extracts and verifies Identity, sets up request auth context."""
-    identity = model.Anonymous
+    identity = None
     for method_func in _auth_methods:
       try:
         identity = method_func(self.request)
@@ -86,6 +86,9 @@ class AuthenticatingHandler(webapp2.RequestHandler):
         logging.error('Authentication error.\n%s', err)
         self.authentication_error(err)
         return
+
+    # If no authentication method is applicable, default to anonymous identity.
+    identity = identity or model.Anonymous
 
     # Successfully extracted and validated an identity. Put it into request
     # cache. It's later used by 'get_current_identity()' and 'has_permission()'.
