@@ -30,6 +30,8 @@ from common import result_helper
 from common import swarm_constants
 from common import test_request_message
 from common import url_helper
+from components import auth
+from components import auth_ui
 from components import ereporter2
 from components import utils
 from server import admin_user
@@ -1444,6 +1446,18 @@ def CreateApplication():
       (_SECURE_MAIN_URL, MainHandler),
       (_SECURE_USER_PROFILE_URL, UserProfileHandler),
   ]
+
   # Upgrade to Route objects so regexp work.
   routes = [webapp2.Route(*i) for i in urls]
+
+  # Supported authentication mechanisms.
+  auth.configure([
+      auth.oauth_authentication,
+      auth.cookie_authentication,
+      auth.service_to_service_authentication,
+  ])
+
+  # Add routes with Auth REST API.
+  routes.extend(auth_ui.get_rest_api_routes())
+
   return webapp2.WSGIApplication(routes, debug=True)

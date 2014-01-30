@@ -559,10 +559,14 @@ class AppTest(test_case.TestCase):
   # Test that all handlers are accessible only to authenticated user or machine.
   # Assumes all routes are defined with plain paths
   # (i.e. '/some/handler/path' and not regexps).
-  def testAllHandlersAreSecured(self):
-    # URL prefixes that correspond to 'login: admin' areas in app.yaml.
-    # Handlers that correspond to this prefixes are protected by GAE itself.
-    secured_paths = ['/secure/']
+  def testAllSwarmingHandlersAreSecured(self):
+    # URL prefixes that correspond to routes that are not protected by
+    # swarming app code. It may be routes that do not require login or routes
+    # protected by GAE itself via 'login: admin' in app.yaml.
+    allowed_paths = (
+        '/auth/',
+        '/secure/',
+    )
 
     # Handlers that are explicitly allowed to be called by anyone.
     allowed_urls = set([
@@ -582,12 +586,8 @@ class AppTest(test_case.TestCase):
     # Get all routes that are not protected by GAE auth mechanism.
     unprotected = []
     for route in routes:
-      if route.template in allowed_urls:
-        continue
-      for path in secured_paths:
-        if route.template.startswith(path):
-          break
-      else:
+      if (route.template not in allowed_urls and
+          not route.template.startswith(allowed_paths)):
         unprotected.append(route)
 
     # Helper function that executes GET or POST handler for corresponding route
