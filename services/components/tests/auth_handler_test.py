@@ -61,10 +61,13 @@ class AuthenticatingHandlerTest(test_case.TestCase):
     super(AuthenticatingHandlerTest, self).setUp()
     # Reset global config of auth library before each test.
     handler.configure([])
-    # Capture error log messages.
+    # Capture error and warning log messages.
     self.logged_errors = []
     self.mock(handler.logging, 'error',
         lambda *args, **kwargs: self.logged_errors.append((args, kwargs)))
+    self.logged_warnings = []
+    self.mock(handler.logging, 'warning',
+        lambda *args, **kwargs: self.logged_warnings.append((args, kwargs)))
 
   def make_test_app(self, path, request_handler):
     """Returns webtest.TestApp with single route."""
@@ -175,9 +178,6 @@ class AuthenticatingHandlerTest(test_case.TestCase):
     self.assertEqual(['authorization_error'], calls)
     self.assertEqual(403, response.status_int)
 
-    # Authorization error is logged.
-    self.assertEqual(1, len(self.logged_errors))
-
   def make_xsrf_handling_app(
       self,
       xsrf_token_enforce_on=None,
@@ -286,6 +286,34 @@ class AuthenticatingHandlerTest(test_case.TestCase):
     response = app.post('/request', expect_errors=True)
     self.assertEqual(403, response.status_int)
     self.assertFalse(calls)
+
+  def test_get_methods_permissions(self):
+    class Handler(handler.AuthenticatingHandler):
+      @api.require(model.READ, '{some}')
+      def get(self, some):
+        pass
+      @api.public
+      def post(self):
+        pass
+
+    self.assertEqual(
+        {'GET': [(model.READ, '{some}')], 'POST': []},
+        Handler.get_methods_permissions())
+
+  def test_get_authenticated_routes(self):
+    class Authenticated(handler.AuthenticatingHandler):
+      pass
+
+    class NotAuthenticated(webapp2.RequestHandler):
+      pass
+
+    app = webapp2.WSGIApplication([
+      webapp2.Route('/authenticated', Authenticated),
+      webapp2.Route('/not-authenticated', NotAuthenticated),
+    ])
+    routes = handler.get_authenticated_routes(app)
+    self.assertEqual(1, len(routes))
+    self.assertEqual(Authenticated, routes[0].handler)
 
 
 class CookieAuthenticationTest(test_case.TestCase):

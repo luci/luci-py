@@ -4,8 +4,8 @@
 
 """Defines main bulk of public API of auth component."""
 
-# Pylint doesn't like ndb.transactional(...).
-# pylint: disable=E1120
+# Pylint doesn't like ndb.transactional(...) and access to __auth_require.
+# pylint: disable=E1120,W0212
 
 import collections
 import functools
@@ -633,7 +633,11 @@ def require(action, resource):
 
     # Propagate reference to original function, mark function as decorated.
     wrapper.__wrapped__ = original
-    wrapper.__auth_require = True
+    wrapper.__auth_require = getattr(func, '__auth_require', [])
+
+    # Store requirements in __auth_require, used by 'get_require_decorators'.
+    wrapper.__auth_require.insert(0, (action, resource))
+
     return wrapper
 
   return decorator
@@ -642,6 +646,17 @@ def require(action, resource):
 def is_decorated(func):
   """Return True if |func| is decorated by @public or @require decorators."""
   return hasattr(func, '__auth_public') or hasattr(func, '__auth_require')
+
+
+def get_require_decorators(func):
+  """Given a function decorated with @require returns list of requirements.
+
+  Each requirement is a pair (action, resource template) as passed to @require
+  decorator. Outermost decorator comes first in the list.
+
+  Returns empty list for public or non-decorated function.
+  """
+  return getattr(func, '__auth_require', [])
 
 
 def get_template_renderer(func, resource):

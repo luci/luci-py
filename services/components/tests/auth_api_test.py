@@ -596,6 +596,8 @@ class ApiTest(test_case.TestCase):
     @api.require(model.READ, 'some-resource')
     def allowed(*args, **kwargs):
       return (args, kwargs)
+    self.assertEqual(
+        [(model.READ, 'some-resource')], api.get_require_decorators(allowed))
     self.assertEqual(((1, 2), {'a': 3}), allowed(1, 2, a=3))
     self.assertEqual([(model.READ, 'some-resource')], calls)
 
@@ -623,6 +625,9 @@ class ApiTest(test_case.TestCase):
     @api.require(model.READ, 'B/{arg}')
     def allowed(arg):
       return arg
+    self.assertEqual(
+        [(model.READ, 'A/{arg}'), (model.READ, 'B/{arg}')],
+        api.get_require_decorators(allowed))
     self.assertEqual('value', allowed('value'))
     self.assertEqual([(model.READ, 'A/value'), (model.READ, 'B/value')], calls)
 
@@ -706,6 +711,7 @@ class ApiTest(test_case.TestCase):
     @ndb.non_transactional
     def func(arg):
       return arg
+    self.assertEqual([(model.READ, '{arg}')], api.get_require_decorators(func))
     self.assertEqual('value', func('value'))
     self.assertEqual([(model.READ, 'value')], calls)
 
@@ -716,6 +722,7 @@ class ApiTest(test_case.TestCase):
     @api.require(model.READ, '{arg}')
     def func(arg):
       return arg
+    self.assertEqual([(model.READ, '{arg}')], api.get_require_decorators(func))
     self.assertEqual('value', func('value'))
     self.assertEqual([(model.READ, 'value')], calls)
 
@@ -737,6 +744,12 @@ class ApiTest(test_case.TestCase):
     self.assertTrue(api.is_decorated(api.public(lambda: None)))
     self.assertTrue(
         api.is_decorated(api.require(model.READ, 'some')(lambda: None)))
+
+  def test_get_require_decorators_on_undecorated(self):
+    self.assertEqual([], api.get_require_decorators(lambda: None))
+
+  def test_get_require_decorators_on_public(self):
+    self.assertEqual([], api.get_require_decorators(api.public(lambda: None)))
 
 
 class TestResourceTemplateRenderer(test_case.TestCase):

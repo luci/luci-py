@@ -17,6 +17,8 @@ import test_case
 
 import handlers
 
+from components import auth
+
 
 def _ErrorRecord(**kwargs):
   """Returns an ErrorRecord filled with default dummy values."""
@@ -88,6 +90,23 @@ class MainTest(test_case.TestCase):
       'Failed@v1\nmain.app\nGET localhost/foo (HTTP 200)\nFailed\n'
       '1 occurrences: Entry \n\n')
     self.assertEqual(expected_text, message.body.payload)
+
+  def test_known_auth_resources(self):
+    # This test is supposed to catch typos and new types of auth resources.
+    # It walks over all AuthenticatedHandler routes and ensures @require
+    # decorator use resources from this set.
+    expected = {
+      'isolate/management',
+      'isolate/namespaces/',
+      'isolate/namespaces/{namespace}',
+    }
+    for route in auth.get_authenticated_routes(handlers.CreateApplication()):
+      per_method = route.handler.get_methods_permissions()
+      for method, permissions in per_method.iteritems():
+        self.assertTrue(
+            expected.issuperset(resource for _, resource in permissions),
+            msg='Unexpected auth resource in %s of %s: %s' %
+                (method, route, permissions))
 
 
 if __name__ == '__main__':

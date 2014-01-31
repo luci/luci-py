@@ -22,6 +22,7 @@ __all__ = [
   'AuthenticatingHandler',
   'configure',
   'cookie_authentication',
+  'get_authenticated_routes',
   'oauth_authentication',
   'service_to_service_authentication',
 ]
@@ -74,6 +75,23 @@ class AuthenticatingHandler(webapp2.RequestHandler):
   # Embedded data extracted from XSRF token of current request.
   xsrf_token_data = None
 
+  @classmethod
+  def get_methods_permissions(cls):
+    """Returns dictionary 'HTTP method name' -> list of permission requirements.
+
+    Each requirement is a pair (action, resource template) as passed to @require
+    decorator for corresponding handler. Outermost decorator comes first in
+    the list. For public methods the list is empty.
+
+    Intended to be used only for testing.
+    """
+    methods = {}
+    for method in webapp2.WSGIApplication.allowed_methods:
+      func = getattr(cls, method.lower(), None)
+      if func:
+        methods[method] = api.get_require_decorators(func)
+    return methods
+
   def dispatch(self):
     """Extracts and verifies Identity, sets up request auth context."""
     identity = None
@@ -106,7 +124,8 @@ class AuthenticatingHandler(webapp2.RequestHandler):
       # AuthorizationError.
       return super(AuthenticatingHandler, self).dispatch()
     except api.AuthorizationError as err:
-      logging.error('Authorization error.\n%s\nIdentity: %s', err, identity)
+      if not identity.is_anonymous:
+        logging.warning('Authorization error.\n%s\nIdentity: %s', err, identity)
       self.authorization_error(err)
 
   def generate_xsrf_token(self, xsrf_token_data=None):
@@ -206,6 +225,20 @@ def configure(auth_methods):
   global _auth_methods
   assert all(callable(func) for func in auth_methods)
   _auth_methods = tuple(auth_methods)
+
+
+def get_authenticated_routes(app):
+  """Given WSGIApplication returns list of routes that use authentication.
+
+  Intended to be used only for testing.
+  """
+  # This code is adapted from router's __repr__ method (that enumerate
+  # all routes for pretty-printing).
+  routes = list(app.router.match_routes)
+  routes.extend(
+      v for k, v in app.router.build_routes.iteritems()
+      if v not in app.router.match_routes)
+  return [r for r in routes if issubclass(r.handler, AuthenticatingHandler)]
 
 
 ################################################################################

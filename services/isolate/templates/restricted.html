@@ -5,7 +5,6 @@
 
 <h3>Configuration</h3>
 <ul>
-  <li><a href="/restricted/whitelistdomain">Whitelist Domain</a></li>
   <li><a href="/restricted/whitelistip">Whitelist IP</a></li>
   <li><a href="/restricted/gs_config">Google Storage Config</a></li>
 </ul>
@@ -20,8 +19,8 @@
   <li><a href="/internal/mapreduce/status">Map reduce jobs status</a></li>
   {% for job in map_reduce_jobs %}
     <li>
-      <form action="/internal/launch_map_reduce" method="post">
-        <input type="hidden" name="token" value="{{token}}" />
+      <form action="/restricted/launch_map_reduce" method="post">
+        <input type="hidden" name="xsrf_token" value="{{xsrf_token}}" />
         <input type="hidden" name="job_id" value="{{job.id}}" />
         <button type="submit">Launch '{{job.name}}'</button>
       </form>

@@ -304,7 +304,6 @@ class XSRFHandlerTest(RestAPITestCase):
         '/auth/api/v1/accounts/self/xsrf_token', expect_errors=True)
     self.assertEqual(403, status)
     self.assertEqual({'text': 'Missing required XSRF request header'}, body)
-    self.assertEqual(1, len(self.errors))
 
 
 if __name__ == '__main__':
