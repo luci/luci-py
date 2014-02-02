@@ -18,6 +18,8 @@ test_env.setup_test_env()
 from google.appengine.datastore import datastore_stub_util
 from google.appengine.ext import testbed
 
+from components import auth
+
 import handlers
 import test_case
 import webtest
@@ -43,11 +45,20 @@ from third_party.mox import mox
 # A simple machine id constant to use in tests.
 MACHINE_ID = '12345678-12345678-12345678-12345678'
 
+# Sample email of unknown user. It is effectively anonymous.
+UNKNOWN_EMAIL = 'unknown@example.com'
+# Sample email of some known user (but not admin).
+USER_EMAIL = 'user@example.com'
+# Sample email of admin user. It has all permissions.
+ADMIN_EMAIL = 'admin@example.com'
+
+# remote_addr of a fake bot that makes requests in tests.
+FAKE_IP = 'fake-ip'
+
 
 class AppTest(test_case.TestCase):
   def setUp(self):
     super(AppTest, self).setUp()
-    handlers.ALLOW_ACCESS_FROM_DOMAINS = ('example.com',)
     self.testbed.init_logservice_stub()
     self.testbed.init_taskqueue_stub()
     self.testbed.init_user_stub()
@@ -56,13 +67,28 @@ class AppTest(test_case.TestCase):
     self.taskqueue_stub = self.testbed.get_stub(testbed.TASKQUEUE_SERVICE_NAME)
     self.taskqueue_stub._root_path = APP_DIR
 
-    self.app = webtest.TestApp(handlers.CreateApplication())
+    # By default requests in tests are coming from bot with fake IP.
+    self.app = webtest.TestApp(
+        handlers.CreateApplication(),
+        extra_environ={'REMOTE_ADDR': FAKE_IP})
+
+    # Whitelist that fake bot.
+    user_manager.AddWhitelist(FAKE_IP)
 
     # A basic config hash to use when creating runners.
     self.config_hash = dimensions_utils.GenerateDimensionHash({})
 
-    # Authenticate with none as IP.
-    user_manager.AddWhitelist(None)
+    # Mock expected permission structure.
+    def mocked_has_permission(_action, resource):
+      ident = auth.get_current_identity()
+      # Admin has access to everything. Known users have access to client
+      # portion, unknown users are effectively anonymous (have no access).
+      if ident.is_user:
+        return (ident.name == ADMIN_EMAIL) or (ident.name == USER_EMAIL and
+            resource == 'swarming/clients')
+      # Bots have access to client and bot portions.
+      return ident.is_bot and resource in ('swarming/clients', 'swarming/bots')
+    self.mock(auth.api, 'has_permission', mocked_has_permission)
 
     self._mox = mox.Mox()
 
@@ -96,13 +122,10 @@ class AppTest(test_case.TestCase):
         probability=0)
     self.testbed.init_datastore_v3_stub(consistency_policy=self.policy)
 
-    # Mock out all the authenication, since it doesn't work with the server
-    # being only eventually consisten (but it is ok for the machines to take
+    # Mock out all the authentication, since it doesn't work with the server
+    # being only eventually consistent (but it is ok for the machines to take
     # a while to appear).
-    self._mox.StubOutWithMock(handlers, 'IsAuthenticatedMachine')
-    for _ in range(3):
-      handlers.IsAuthenticatedMachine(mox.IgnoreArg()).AndReturn(True)
-    self._mox.ReplayAll()
+    self.mock(handlers.user_manager, 'IsWhitelistedMachine', lambda *_arg: True)
 
     # Test when no matching tests.
     response = self.app.get(
@@ -134,6 +157,9 @@ class AppTest(test_case.TestCase):
 
   def testGetResultHandler(self):
     handler_urls = ['/get_result', '/secure/get_result']
+
+    # Act under admin identity.
+    self._ReplaceCurrentUser(ADMIN_EMAIL)
 
     # Test when no matching key
     for handler in handler_urls:
@@ -169,15 +195,14 @@ class AppTest(test_case.TestCase):
                                                                'replace')
       self.assertEqual(expected_result_string, results['output'])
 
-  def testGetToken(self):
-    response = self.app.get('/get_token')
-    self.assertResponse(response, '200 OK', 'dummy_token')
-
   def testGetSlaveCode(self):
     response = self.app.get('/get_slave_code')
     self.assertEqual('200 OK', response.status)
 
   def testMachineList(self):
+    # Act under admin identity.
+    self._ReplaceCurrentUser(ADMIN_EMAIL)
+
     self._mox.ReplayAll()
 
     # Add a machine to display.
@@ -189,6 +214,9 @@ class AppTest(test_case.TestCase):
     self._mox.VerifyAll()
 
   def testMachineListJson(self):
+    # Act under admin identity.
+    self._ReplaceCurrentUser(ADMIN_EMAIL)
+
     machine_stats.MachineStats(
         id=MACHINE_ID,
         tag='tag',
@@ -213,6 +241,9 @@ class AppTest(test_case.TestCase):
     self.assertEqual(expected, actual)
 
   def testDeleteMachineStats(self):
+    # Act under admin identity.
+    self._ReplaceCurrentUser(ADMIN_EMAIL)
+
     # Add a machine assignment to delete.
     m_stats = machine_stats.MachineStats.get_or_insert(MACHINE_ID)
 
@@ -227,6 +258,9 @@ class AppTest(test_case.TestCase):
     self.assertResponse(response, '204 No Content', '')
 
   def testMainHandler(self):
+    # Act under admin identity.
+    self._ReplaceCurrentUser(ADMIN_EMAIL)
+
     self._mox.ReplayAll()
 
     # Add a test runner to show on the page.
@@ -248,6 +282,9 @@ class AppTest(test_case.TestCase):
     self.assertResponse(response, '200 OK', 'Key deleted.')
 
   def testRetryHandler(self):
+    # Act under admin identity.
+    self._ReplaceCurrentUser(ADMIN_EMAIL)
+
     # Test when no matching key
     response = self.app.post('/secure/retry', {'r': 'fake_key'}, status=204)
     self.assertResponse(response, '204 No Content', '')
@@ -259,6 +296,9 @@ class AppTest(test_case.TestCase):
     self.assertResponse(response, '200 OK', 'Runner set for retry.')
 
   def testShowMessageHandler(self):
+    # Act under admin identity.
+    self._ReplaceCurrentUser(ADMIN_EMAIL)
+
     response = self.app.get('/secure/show_message', {'r': 'fake_key'})
     self.assertEqual('200 OK', response.status)
     self.assertTrue(
@@ -289,6 +329,9 @@ class AppTest(test_case.TestCase):
     self.assertResponse(response, '200 OK', expected)
 
   def testUploadStartSlaveHandler(self):
+    # Act under admin identity.
+    self._ReplaceCurrentUser(ADMIN_EMAIL)
+
     response = self.app.post('/upload_start_slave', expect_errors=True)
     self.assertResponse(
         response, '400 Bad Request',
@@ -402,21 +445,27 @@ class AppTest(test_case.TestCase):
     self._mox.VerifyAll()
 
   def testUserProfile(self):
+    # Act under admin identity.
+    self._ReplaceCurrentUser(ADMIN_EMAIL)
+
     # Make sure the template renders.
     response = self.app.get('/secure/user_profile', {})
     self.assertEqual('200 OK', response.status)
 
   def testChangeWhitelistHandlerParams(self):
+    # Act under admin identity.
+    self._ReplaceCurrentUser(ADMIN_EMAIL)
+
     # Make sure the link redirects to the right place.
     # setUp adds one item.
     self.assertEqual(
-        [{'ip': None, 'password': None}],
+        [{'ip': FAKE_IP, 'password': None}],
         [t.to_dict() for t in user_manager.MachineWhitelist.query().fetch()])
     response = self.app.post(
         '/secure/change_whitelist', {'a': 'True'},
         extra_environ={'REMOTE_ADDR': 'foo'})
     self.assertEqual(
-        [{'ip': None, 'password': None}, {'ip': u'foo', 'password': None}],
+        [{'ip': FAKE_IP, 'password': None}, {'ip': u'foo', 'password': None}],
         [t.to_dict() for t in user_manager.MachineWhitelist.query().fetch()])
     self.assertEqual('301 Moved Permanently', response.status)
     self.assertEqual(
@@ -431,14 +480,17 @@ class AppTest(test_case.TestCase):
         '/secure/change_whitelist', {'i': '123', 'a': 'true'},
         expect_errors=True)
     self.assertEqual(
-        [{'ip': None, 'password': None}, {'ip': u'foo', 'password': None}],
+        [{'ip': FAKE_IP, 'password': None}, {'ip': u'foo', 'password': None}],
         [t.to_dict() for t in user_manager.MachineWhitelist.query().fetch()])
 
   def testChangeWhitelistHandler(self):
     ip = ['123', '456']
     password = [None, 'pa$$w0rd']
 
-    user_manager.DeleteWhitelist(None)
+    # Act under admin identity.
+    self._ReplaceCurrentUser(ADMIN_EMAIL)
+
+    user_manager.DeleteWhitelist(FAKE_IP)
     self.assertEqual(0, user_manager.MachineWhitelist.query().count())
 
     # Whitelist an ip.
@@ -485,15 +537,14 @@ class AppTest(test_case.TestCase):
     ]
 
     # Make sure non-whitelisted requests are rejected.
-    user_manager.DeleteWhitelist(None)
+    user_manager.DeleteWhitelist(FAKE_IP)
     for handler, method in handlers_to_check:
       response = method(handler, {}, expect_errors=True)
-      self.assertResponse(
-          response, '403 Forbidden',
-          'Remote machine not whitelisted for operation')
+      self.assertEqual(
+          '403 Forbidden', response.status, msg='Handler: ' + handler)
 
     # Whitelist a machine.
-    user_manager.AddWhitelist(None, password=password)
+    user_manager.AddWhitelist(FAKE_IP, password=password)
 
     # Make sure whitelisted requests are accepted.
     for handler, method in handlers_to_check:
@@ -505,9 +556,8 @@ class AppTest(test_case.TestCase):
     for handler, method in handlers_to_check:
       response = method(
           handler, {'password': 'something else'}, expect_errors=True)
-      self.assertResponse(
-          response, '403 Forbidden',
-          'Remote machine not whitelisted for operation')
+      self.assertEqual(
+          '403 Forbidden', response.status, msg='Handler: ' + handler)
 
   # Test that some specific non-secure handlers allow access to authenticated
   # user. Also verify that authenticated user still can't use other handlers.
@@ -525,36 +575,33 @@ class AppTest(test_case.TestCase):
                  ('/result', self.app.post)]
 
     # Reset state to non-whitelisted, anonymous machine.
-    user_manager.DeleteWhitelist(None)
+    user_manager.DeleteWhitelist(FAKE_IP)
     self._ReplaceCurrentUser(None)
 
     # Make sure all anonymous requests are rejected.
     for handler, method in allowed + forbidden:
       response = method(handler, expect_errors=True)
-      self.assertResponse(
-          response, '403 Forbidden',
-          'Remote machine not whitelisted for operation')
+      self.assertEqual(
+          '403 Forbidden', response.status, msg='Handler: ' + handler)
 
     # Make sure all requests from unknown account are rejected.
-    self._ReplaceCurrentUser('someone@denied.com')
+    self._ReplaceCurrentUser(UNKNOWN_EMAIL)
     for handler, method in allowed + forbidden:
       response = method(handler, expect_errors=True)
-      self.assertResponse(
-          response, '403 Forbidden',
-          'Remote machine not whitelisted for operation')
+      self.assertEqual(
+          '403 Forbidden', response.status, msg='Handler: ' + handler)
 
     # Make sure for a known account 'allowed' methods are accessible
     # and 'forbidden' are not.
-    self._ReplaceCurrentUser('someone@example.com')
+    self._ReplaceCurrentUser(USER_EMAIL)
     for handler, method in allowed:
       response = method(handler, expect_errors=True)
       self.assertNotEqual(
           '403 Forbidden', response.status, msg='Handler: ' + handler)
     for handler, method in forbidden:
       response = method(handler, expect_errors=True)
-      self.assertResponse(
-          response, '403 Forbidden',
-          'Remote machine not whitelisted for operation')
+      self.assertEqual(
+          '403 Forbidden', response.status, msg='Handler: ' + handler)
 
   # Test that all handlers are accessible only to authenticated user or machine.
   # Assumes all routes are defined with plain paths
@@ -584,11 +631,11 @@ class AppTest(test_case.TestCase):
     routes.update(app.router.build_routes.itervalues())
 
     # Get all routes that are not protected by GAE auth mechanism.
-    unprotected = []
+    routes_to_check = []
     for route in routes:
       if (route.template not in allowed_urls and
           not route.template.startswith(allowed_paths)):
-        unprotected.append(route)
+        routes_to_check.append(route)
 
     # Helper function that executes GET or POST handler for corresponding route
     # and asserts it returns 403 or 405.
@@ -607,10 +654,10 @@ class AppTest(test_case.TestCase):
       self.assertIn(response.status_int, (403, 405), msg=message)
 
     # Reset state to non-whitelisted, anonymous machine.
-    user_manager.DeleteWhitelist(None)
+    user_manager.DeleteWhitelist(FAKE_IP)
     self._ReplaceCurrentUser(None)
     # Try to execute 'get' and 'post' and verify they fail with 403 or 405.
-    for route in unprotected:
+    for route in routes_to_check:
       CheckProtected(route, 'GET')
       CheckProtected(route, 'POST')
 
@@ -753,13 +800,15 @@ class AppTest(test_case.TestCase):
     self.assertResponse(response, '200 OK', 'Success.')
 
   def testSendEReporter(self):
-    self._ReplaceCurrentUser(
-        'someone@example.com', USER_ID='123', USER_IS_ADMIN='1')
+    self._ReplaceCurrentUser(ADMIN_EMAIL)
     response = self.app.get('/secure/cron/ereporter2/mail',
                             headers={'X-AppEngine-Cron': 'true'})
     self.assertResponse(response, '200 OK', 'Success.')
 
   def testCancelHandler(self):
+    # Act under admin identity.
+    self._ReplaceCurrentUser(ADMIN_EMAIL)
+
     self._mox.StubOutWithMock(url_helper, 'UrlOpen')
     url_helper.UrlOpen(mox.IgnoreArg(), data=mox.IgnoreArg()).AndReturn(
         'response')
@@ -775,6 +824,23 @@ class AppTest(test_case.TestCase):
     self.assertResponse(response, '200 OK', 'Runner canceled.')
 
     self._mox.VerifyAll()
+
+  def testKnownAuthResources(self):
+    # This test is supposed to catch typos and new types of auth resources.
+    # It walks over all AuthenticatedHandler routes and ensures @require
+    # decorator use resources from this set.
+    expected = {
+        'swarming/bots',
+        'swarming/clients',
+        'swarming/management',
+    }
+    for route in auth.get_authenticated_routes(handlers.CreateApplication()):
+      per_method = route.handler.get_methods_permissions()
+      for method, permissions in per_method.iteritems():
+        self.assertTrue(
+            expected.issuperset(resource for _, resource in permissions),
+            msg='Unexpected auth resource in %s of %s: %s' %
+                (method, route, permissions))
 
 
 if __name__ == '__main__':

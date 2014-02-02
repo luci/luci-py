@@ -65,8 +65,6 @@ _SECURE_GET_RESULTS_URL = '/secure/get_result'
 _SECURE_MAIN_URL = '/secure/main'
 _SECURE_USER_PROFILE_URL = '/secure/user_profile'
 
-# The domains that are allowed to access this application.
-ALLOW_ACCESS_FROM_DOMAINS = ()
 
 # Ignore these failures, there's nothing to do.
 # TODO(maruel): Store them in the db and make this runtime configurable.
@@ -145,84 +143,6 @@ def GenerateButtonWithHiddenForm(button_text, url, form_id):
   return button_html
 
 
-def AuthenticateMachine(method):
-  """Decorator for 'get' or 'post' methods that require machine authentication.
-
-  Decorated method verifies that a remote machine is IP whitelisted. Methods
-  marked by this decorator are indented to be called only by swarm slaves.
-
-  Args:
-    method: 'get' or 'post' method of RequestHandler subclass.
-
-  Returns:
-    Decorated method that verifies that machine is IP whitelisted.
-  """
-  def Wrapper(handler, *args, **kwargs):
-    if not IsAuthenticatedMachine(handler.request):
-      SendAuthenticationFailure(handler.request, handler.response)
-    else:
-      return method(handler, *args, **kwargs)
-  return Wrapper
-
-
-def AuthenticateMachineOrUser(method):
-  """Decorator for 'get' or 'post' methods that require authentication.
-
-  Decorated method verifies that a remote machine is IP whitelisted or
-  the request is issued by a known user account. Methods marked by this
-  decorator are indented to be called by swarm slaves or by users submitting
-  tests to the swarm.
-
-  Args:
-    method: 'get' or 'post' method of RequestHandler subclass.
-
-  Returns:
-    Decorated method.
-  """
-  def Wrapper(handler, *args, **kwargs):
-    # Check user account first, it's fast.
-    user = users.get_current_user()
-    if user and (users.is_current_user_admin() or IsAuthenticatedUser(user)):
-      return method(handler, *args, **kwargs)
-
-    # Check IP whitelist, it's slower.
-    if IsAuthenticatedMachine(handler.request):
-      return method(handler, *args, **kwargs)
-
-    # Both checks failed, respond with error,
-    SendAuthenticationFailure(handler.request, handler.response)
-  return Wrapper
-
-
-def IsAuthenticatedUser(user):
-  """Check to see if the user is allowed to execute a request.
-
-  Args:
-    user: api.users.User with info about user that issued the request.
-
-  Returns:
-    True if the user is allowed to execute a request.
-  """
-  assert user
-  domain = user.email().partition('@')[2]
-  return domain in ALLOW_ACCESS_FROM_DOMAINS
-
-
-def IsAuthenticatedMachine(request):
-  """Check to see if the request is from a whitelisted machine.
-
-  Will use the remote machine's IP and provided password (if any).
-
-  Args:
-    request: WebAPP request sent by remote machine.
-
-  Returns:
-    True if the request is from a whitelisted machine.
-  """
-  return user_manager.IsWhitelistedMachine(
-      request.remote_addr, request.get('password', None))
-
-
 def DaysToShow(request):
   """Find the number of days to show, according to the request.
 
@@ -288,7 +208,7 @@ def require_taskqueue(task_name):
 ### Handlers
 
 
-class MainHandler(webapp2.RequestHandler):
+class MainHandler(auth.AuthenticatingHandler):
   """Handler for the main page of the web server.
 
   This handler lists all pending requests and allows callers to manage them.
@@ -444,6 +364,7 @@ class MainHandler(webapp2.RequestHandler):
 
     return html
 
+  @auth.require(auth.READ, 'swarming/management')
   def get(self):
     # Build info for test requests table.
     sort_by = self.request.get('sort_by')
@@ -578,13 +499,14 @@ class RedirectToMainHandler(webapp2.RequestHandler):
     self.redirect(_SECURE_MAIN_URL)
 
 
-class MachineListHandler(webapp2.RequestHandler):
+class MachineListHandler(auth.AuthenticatingHandler):
   """Handler for the machine list page of the web server.
 
   This handler lists all the machines that have ever polled the server and
   some basic information about them.
   """
 
+  @auth.require(auth.READ, 'swarming/management')
   def get(self):
     sort_by = self.request.get('sort_by', 'machine_id')
     if sort_by not in machine_stats.ACCEPTABLE_SORTS:
@@ -617,9 +539,10 @@ class MachineListHandler(webapp2.RequestHandler):
     self.response.out.write(template.get('machine_list.html').render(params))
 
 
-class MachineListJsonHandler(webapp2.RequestHandler):
+class MachineListJsonHandler(auth.AuthenticatingHandler):
   """Returns the list of known swarming bot as json data."""
 
+  @auth.require(auth.READ, 'swarming/management')
   def get(self):
     params = {
         'machine_death_timeout': machine_stats.MACHINE_DEATH_TIMEOUT,
@@ -630,10 +553,13 @@ class MachineListJsonHandler(webapp2.RequestHandler):
     self.response.out.write(utils.SmartJsonEncoder().encode(params))
 
 
-class DeleteMachineStatsHandler(webapp2.RequestHandler):
+class DeleteMachineStatsHandler(auth.AuthenticatingHandler):
   """Handler to delete a machine assignment."""
 
-  @AuthenticateMachineOrUser
+  # TODO(vadimsh): Implement XSRF token support.
+  xsrf_token_enforce_on = ()
+
+  @auth.require(auth.UPDATE, 'swarming/management')
   def post(self):
     key = self.request.get('r')
 
@@ -644,15 +570,19 @@ class DeleteMachineStatsHandler(webapp2.RequestHandler):
       self.response.set_status(204)
 
 
-class TestRequestHandler(webapp2.RequestHandler):
+class TestRequestHandler(auth.AuthenticatingHandler):
   """Handles test requests from clients."""
 
-  @AuthenticateMachineOrUser
+  # TODO(vadimsh): Implement XSRF token support.
+  xsrf_token_enforce_on = ()
+
+  @auth.require(auth.UPDATE, 'swarming/clients')
   def post(self):
     # Validate the request.
     if not self.request.get('request'):
       self.abort(400, 'No request parameter found.')
 
+    # TODO(vadimsh): Store identity of a user that posted the request.
     try:
       result = test_management.ExecuteTestRequest(self.request.get('request'))
     except test_request_message.Error as e:
@@ -664,10 +594,13 @@ class TestRequestHandler(webapp2.RequestHandler):
     self.response.out.write(json.dumps(result))
 
 
-class ResultHandler(webapp2.RequestHandler):
+class ResultHandler(auth.AuthenticatingHandler):
   """Handles test results from remote test runners."""
 
-  @AuthenticateMachine
+  # TODO(vadimsh): Implement XSRF token support.
+  xsrf_token_enforce_on = ()
+
+  @auth.require(auth.UPDATE, 'swarming/bots')
   def post(self):
     # TODO(user): Share this code between all the request handlers so we
     # can always see how often a request is being sent.
@@ -678,6 +611,8 @@ class ResultHandler(webapp2.RequestHandler):
 
     logging.debug('Received Result: %s', self.request.url)
 
+    # TODO(vadimsh): Check that machine that posts the result is same as
+    # machine that claimed the runner.
     runner_key = self.request.get('r', '')
     runner = test_runner.GetRunnerFromUrlSafeKey(runner_key)
 
@@ -698,6 +633,9 @@ class ResultHandler(webapp2.RequestHandler):
     exit_codes = urllib.unquote_plus(self.request.get('x'))
     overwrite = self.request.get('o', 'False') == 'True'
     machine_id = urllib.unquote_plus(self.request.get('id'))
+
+    # TODO(vadimsh): Verify machine_id matches credentials that are used for
+    # current request (i.e. auth.get_current_identity()).
 
     # TODO(user): The result string should probably be in the body of the
     # request.
@@ -877,9 +815,10 @@ class CronSendEreporter2MailHandler(webapp2.RequestHandler):
       self.response.write('Failed.')
 
 
-class Ereporter2ReportHandler(webapp2.RequestHandler):
+class Ereporter2ReportHandler(auth.AuthenticatingHandler):
   """Returns all the recent errors as a web page."""
 
+  @auth.require(auth.READ, 'swarming/management')
   def get(self):
     """Reports the errors logged and ignored.
 
@@ -906,7 +845,10 @@ class Ereporter2ReportHandler(webapp2.RequestHandler):
     self.response.write(out)
 
 
-class Ereporter2RequestHandler(webapp2.RequestHandler):
+class Ereporter2RequestHandler(auth.AuthenticatingHandler):
+  """Dumps information about single logged request."""
+
+  @auth.require(auth.READ, 'swarming/management')
   def get(self, request_id):
     # TODO(maruel): Add UI.
     data = ereporter2.log_request_id_to_dict(request_id)
@@ -916,9 +858,10 @@ class Ereporter2RequestHandler(webapp2.RequestHandler):
     json.dump(data, self.response, indent=2, sort_keys=True)
 
 
-class ShowMessageHandler(webapp2.RequestHandler):
+class ShowMessageHandler(auth.AuthenticatingHandler):
   """Show the full text of a test request."""
 
+  @auth.require(auth.READ, 'swarming/management')
   def get(self):
     self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
 
@@ -931,10 +874,13 @@ class ShowMessageHandler(webapp2.RequestHandler):
       self.response.out.write('Cannot find message for: %s' % runner_key)
 
 
-class UploadStartSlaveHandler(webapp2.RequestHandler):
+class UploadStartSlaveHandler(auth.AuthenticatingHandler):
   """Accept a new start slave script."""
 
-  @AuthenticateMachineOrUser
+  # TODO(vadimsh): Implement XSRF token support.
+  xsrf_token_enforce_on = ()
+
+  @auth.require(auth.UPDATE, 'swarming/management')
   def post(self):
     script = self.request.get('script', '')
     if not script:
@@ -971,10 +917,10 @@ class StatsHandler(webapp2.RequestHandler):
     self.response.out.write(template.get('stats.html').render(params))
 
 
-class GetMatchingTestCasesHandler(webapp2.RequestHandler):
+class GetMatchingTestCasesHandler(auth.AuthenticatingHandler):
   """Get all the keys for any test runner that match a given test case name."""
 
-  @AuthenticateMachineOrUser
+  @auth.require(auth.READ, 'swarming/clients')
   def get(self):
     test_case_name = self.request.get('name', '')
 
@@ -992,43 +938,39 @@ class GetMatchingTestCasesHandler(webapp2.RequestHandler):
       self.response.out.write('[]')
 
 
-class SecureGetResultHandler(webapp2.RequestHandler):
+# TODO(vadimsh): Remove once final ACLs structure is in place.
+class SecureGetResultHandler(auth.AuthenticatingHandler):
   """Show the full result string from a test runner."""
 
+  @auth.require(auth.READ, 'swarming/management')
   def get(self):
     SendRunnerResults(self.response, self.request.get('r', ''))
 
 
-class GetResultHandler(webapp2.RequestHandler):
+class GetResultHandler(auth.AuthenticatingHandler):
   """Show the full result string from a test runner."""
 
-  @AuthenticateMachineOrUser
+  @auth.require(auth.READ, 'swarming/clients')
   def get(self):
     SendRunnerResults(self.response, self.request.get('r', ''))
 
 
-class GetSlaveCodeHandler(webapp2.RequestHandler):
+class GetSlaveCodeHandler(auth.AuthenticatingHandler):
   """Returns a zip file with all the files required by a slave."""
 
-  @AuthenticateMachine
+  @auth.require(auth.READ, 'swarming/bots')
   def get(self):
     self.response.headers['Content-Type'] = 'application/octet-stream'
     self.response.out.write(test_management.SlaveCodeZipped())
 
 
-class GetTokenHandler(webapp2.RequestHandler):
-  """Returns an authentication token."""
-
-  @AuthenticateMachineOrUser
-  def get(self):
-    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
-    self.response.out.write('dummy_token')
-
-
-class CleanupResultsHandler(webapp2.RequestHandler):
+class CleanupResultsHandler(auth.AuthenticatingHandler):
   """Delete the Test Runner with the given key."""
 
-  @AuthenticateMachine
+  # TODO(vadimsh): Implement XSRF token support.
+  xsrf_token_enforce_on = ()
+
+  @auth.require(auth.UPDATE, 'swarming/bots')
   def post(self):
     self.response.headers['Content-Type'] = 'test/plain'
 
@@ -1040,9 +982,13 @@ class CleanupResultsHandler(webapp2.RequestHandler):
       logging.warning('Unable to delete runner [key: %s]', str(key))
 
 
-class CancelHandler(webapp2.RequestHandler):
+class CancelHandler(auth.AuthenticatingHandler):
   """Cancel a test runner that is not already running."""
 
+  # TODO(vadimsh): Implement XSRF token support.
+  xsrf_token_enforce_on = ()
+
+  @auth.require(auth.UPDATE, 'swarming/management')
   def post(self):
     self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
 
@@ -1058,9 +1004,13 @@ class CancelHandler(webapp2.RequestHandler):
                               runner_key)
 
 
-class RetryHandler(webapp2.RequestHandler):
+class RetryHandler(auth.AuthenticatingHandler):
   """Retry a test runner again."""
 
+  # TODO(vadimsh): Implement XSRF token support.
+  xsrf_token_enforce_on = ()
+
+  @auth.require(auth.UPDATE, 'swarming/management')
   def post(self):
     runner_key = self.request.get('r', '')
     runner = test_runner.GetRunnerFromUrlSafeKey(runner_key)
@@ -1079,13 +1029,16 @@ class RetryHandler(webapp2.RequestHandler):
       self.response.set_status(204)
 
 
-class RegisterHandler(webapp2.RequestHandler):
+class RegisterHandler(auth.AuthenticatingHandler):
   """Handler for the register_machine of the Swarm server.
 
   Attempt to find a matching job for the querying machine.
   """
 
-  @AuthenticateMachine
+  # TODO(vadimsh): Implement XSRF token support.
+  xsrf_token_enforce_on = ()
+
+  @auth.require(auth.UPDATE, 'swarming/bots')
   def post(self):
     # Validate the request.
     if not self.request.body:
@@ -1099,6 +1052,8 @@ class RegisterHandler(webapp2.RequestHandler):
       logging.error(message)
       self.abort(400, message)
 
+    # TODO(vadimsh): Ensure attributes['id'] matches credentials used
+    # to authenticate the request (i.e. auth.get_current_identity()).
     try:
       response = json.dumps(
           test_management.ExecuteRegisterRequest(attributes,
@@ -1121,15 +1076,21 @@ class RegisterHandler(webapp2.RequestHandler):
     self.response.out.write(response)
 
 
-class RunnerPingHandler(webapp2.RequestHandler):
+class RunnerPingHandler(auth.AuthenticatingHandler):
   """Handler for runner pings to the server.
 
   The runner pings are used to let the server know a runner is still working, so
   it won't consider it stale.
   """
 
-  @AuthenticateMachine
+  # TODO(vadimsh): Implement XSRF token support.
+  xsrf_token_enforce_on = ()
+
+  @auth.require(auth.UPDATE, 'swarming/bots')
   def post(self):
+    # TODO(vadimsh): Any machine can send ping on behalf of any other machine.
+    # Ensure 'id' matches credentials used to authenticate the request (i.e.
+    # auth.get_current_identity()).
     key = self.request.get('r', '')
     machine_id = self.request.get('id', '')
     if not test_runner.PingRunner(key, machine_id):
@@ -1283,12 +1244,13 @@ class ServerPingHandler(webapp2.RequestHandler):
     self.response.out.write('Server up')
 
 
-class UserProfileHandler(webapp2.RequestHandler):
+class UserProfileHandler(auth.AuthenticatingHandler):
   """Handler for the user profile page of the web server.
 
   This handler lists user info, such as their IP whitelist and settings.
   """
 
+  @auth.require(auth.READ, 'swarming/management')
   def get(self):
     display_whitelists = sorted(
         (
@@ -1308,9 +1270,13 @@ class UserProfileHandler(webapp2.RequestHandler):
     self.response.out.write(template.get('user_profile.html').render(params))
 
 
-class ChangeWhitelistHandler(webapp2.RequestHandler):
+class ChangeWhitelistHandler(auth.AuthenticatingHandler):
   """Handler for making changes to a user whitelist."""
 
+  # TODO(vadimsh): Implement XSRF token support.
+  xsrf_token_enforce_on = ()
+
+  @auth.require(auth.UPDATE, 'swarming/management')
   def post(self):
     ip = self.request.get('i', self.request.remote_addr)
 
@@ -1328,11 +1294,15 @@ class ChangeWhitelistHandler(webapp2.RequestHandler):
     self.redirect(_SECURE_USER_PROFILE_URL, permanent=True)
 
 
-class RemoteErrorHandler(webapp2.RequestHandler):
+class RemoteErrorHandler(auth.AuthenticatingHandler):
   """Handler to log an error reported by remote machine."""
 
-  @AuthenticateMachine
+  # TODO(vadimsh): Implement XSRF token support.
+  xsrf_token_enforce_on = ()
+
+  @auth.require(auth.UPDATE, 'swarming/bots')
   def post(self):
+    # TODO(vadimsh): Log machine identity as well.
     error_message = self.request.get('m', '')
     error = test_management.SwarmError(
         name='Remote Error Report', message=error_message,
@@ -1360,22 +1330,33 @@ class WaitsByMinuteHandler(webapp2.RequestHandler):
     self.response.out.write(template.get('waits_by_minute.html').render(params))
 
 
-def SendAuthenticationFailure(request, response):
-  """Writes an authentication failure error message to response with status.
+def ip_whitelist_authentication(request):
+  """Check to see if the request is from a whitelisted machine.
+
+  Will use the remote machine's IP and provided password (if any).
 
   Args:
-    request: The original request that failed to authenticate.
-    response: Response to be sent to remote machine.
+    request: WebAPP request sent by remote machine.
+
+  Returns:
+    auth.Identity of a machine if IP is whitelisted, None otherwise.
   """
+  assert request.remote_addr
+  is_whitelisted = user_manager.IsWhitelistedMachine(
+      request.remote_addr, request.get('password', None))
+
+  # IP v6 addresses contain ':' that is not allowed in identity name.
+  if is_whitelisted:
+    return auth.Identity(
+        auth.IDENTITY_BOT, request.remote_addr.replace(':', '-'))
+
   # Log the error.
   error = test_management.SwarmError(
       name='Authentication Failure', message='Handler: %s' % request.url,
       info='Remote machine address: %s' % request.remote_addr)
   error.put()
 
-  response.headers['Content-Type'] = 'text/plain; charset=utf-8'
-  response.set_status(403)
-  response.out.write('Remote machine not whitelisted for operation')
+  return None
 
 
 def SendRunnerResults(response, key):
@@ -1406,7 +1387,6 @@ def CreateApplication():
       ('/get_matching_test_cases', GetMatchingTestCasesHandler),
       ('/get_result', GetResultHandler),
       ('/get_slave_code', GetSlaveCodeHandler),
-      ('/get_token', GetTokenHandler),
       ('/graphs/daily_stats', DailyStatsGraphHandler),
       ('/poll_for_test', RegisterHandler),
       ('/remote_error', RemoteErrorHandler),
@@ -1455,6 +1435,7 @@ def CreateApplication():
       auth.oauth_authentication,
       auth.cookie_authentication,
       auth.service_to_service_authentication,
+      ip_whitelist_authentication,
   ])
 
   # Add routes with Auth REST API.
