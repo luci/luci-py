@@ -8,8 +8,8 @@ import (
 	"os"
 	"sync"
 
-	"code.google.com/p/swarming/services/third_party/code.google.com/p/leveldb-go/leveldb/db"
-	"code.google.com/p/swarming/services/third_party/code.google.com/p/leveldb-go/leveldb/table"
+	"code.google.com/p/swarming/services-go/third_party/code.google.com/p/leveldb-go/leveldb/db"
+	"code.google.com/p/swarming/services-go/third_party/code.google.com/p/leveldb-go/leveldb/table"
 )
 
 type tableCache struct {
