@@ -777,6 +777,10 @@ def main():
   # Change the working directory to specified path.
   os.chdir(options.directory)
 
+  # Add SWARMING_HEADLESS into environ so subcommands know that they are running
+  # in a headless (non-interactive) mode.
+  os.environ['SWARMING_HEADLESS'] = '1'
+
   while True:
     # Start requesting jobs.
     try:
