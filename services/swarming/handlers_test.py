@@ -728,6 +728,36 @@ class AppTest(test_case.TestCase):
 
     self._mox.VerifyAll()
 
+  def testTestRequest(self):
+    # Ensure that a test request fails without a request.
+    response = self.app.post('/test', expect_errors=True)
+    self.assertResponse(response, '400 Bad Request',
+                        '400 Bad Request\n\nThe server could not comply with '
+                        'the request since it is either malformed or otherwise '
+                        'incorrect.\n\n No request parameter found.  ')
+
+    # Ensure invalid requests are rejected.
+    request = {
+        "configurations": [{
+            "config_name": "win",
+            "dimensions": {"os": "win"},
+        }],
+        "test_case_name": "",
+        "tests":[{
+            "action": ["python", "run_test.py"],
+            "test_name": "Run Test",
+        }],
+    }
+    response = self.app.post('/test', {'request': json.dumps(request)},
+                             expect_errors=True)
+    self.assertEquals('400 Bad Request', response.status)
+
+    # Ensure that valid requests are accepted.
+    request['test_case_name'] = 'test_case'
+    response = self.app.post('/test', {'request': json.dumps(request)},
+                             expect_errors=True)
+    self.assertEquals('200 OK', response.status)
+
   def testCronTriggerTask(self):
     triggers = [
         ('cleanup', '/secure/cron/trigger_cleanup_data'),
