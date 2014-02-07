@@ -83,6 +83,9 @@ class TestRunner(ndb.Model):
   # The number of instances running on the same configuration as ours.
   num_config_instances = ndb.IntegerProperty(indexed=False)
 
+  # If run_by is set and the runner hasn't started by run_by, it is aborted.
+  run_by = ndb.DateTimeProperty(default=None)
+
   # The machine that is running or ran the test. This attribute is only valid
   # once a machine has been assigned to this runner.
   # TODO(user): Investigate making this a reference to the MachineAssignment.
@@ -513,6 +516,10 @@ def ShouldAutomaticallyRetryRunner(runner):
 
 def AutomaticallyRetryRunner(runner):
   """Attempt to automaticlly retry runner.
+
+  Getting automatically retried doesn't increase the run_by time limit, because
+  it is assumed that the user wants their test finished shortly after that (and
+  they might not care about the results after that time).
 
   Args:
     runner: The runner to retry.

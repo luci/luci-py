@@ -430,15 +430,14 @@ class TestManagementTest(test_case.TestCase):
 
   def testAbortStaleRunnerWaitingForMachine(self):
     # No UrlOpen call shall succeed.
-    self.mock(url_helper, 'UrlOpen', lambda *_: None)
+    self.mock(url_helper, 'UrlOpen', lambda *args, **kwargs: None)
 
     self._AssignPendingRequestsTest()
     runner = test_runner.TestRunner.query().get()
 
-    # Mark the runner as having been created in the past so it will be
-    # considered stale (i.e., it took too long to find a match).
-    runner.created -= datetime.timedelta(
-        seconds=(2 * test_management.SWARM_RUNNER_MAX_WAIT_SECS))
+    # Make the runner's run_by time in the past, so it will be considered stale.
+    runner.run_by -= datetime.timedelta(
+        seconds=(2 * swarm_constants.SWARM_RUNNER_MAX_WAIT_SECS))
     runner.put()
 
     # Don't abort the runner if it is running and it has been pinging the server
@@ -454,20 +453,8 @@ class TestManagementTest(test_case.TestCase):
     runner.started = None
     runner.put()
 
-    # Don't abort the runner if it has been automatically retried, since
-    # that means it has been matched with a machine before.
-    runner.automatic_retry_count = 1
-    runner.put()
-    self.assertFalse(runner.done)
-    test_management.AbortStaleRunners()
-
-    runner = test_runner.TestRunner.query().get()
-    self.assertFalse(runner.done)
-    runner.automatic_retry_count = 0
-    runner.put()
-
-    # Now the runner should be aborted, since it hasn't been matched within
-    # SWARM_RUNNER_MAX_WAIT_SECS seconds.
+    # Now the runner should be aborted, since it hasn't been matched by its
+    # run_by deadline.
     test_management.AbortStaleRunners()
 
     runner = test_runner.TestRunner.query().get()
@@ -505,7 +492,8 @@ class TestManagementTest(test_case.TestCase):
       runner = test_runner.TestRunner.query().get()
       self.assertFalse(runner.done)
       self.assertEqual(i, runner.automatic_retry_count)
-      self.assertNotEqual(None, runner.started)
+      self.assertIsNotNone(runner.started)
+      self.assertIsNotNone(runner.ping)
 
       test_management.AbortStaleRunners()
 
@@ -517,9 +505,9 @@ class TestManagementTest(test_case.TestCase):
         self.assertIn('Runner has become stale', runner.GetResultString())
       else:
         self.assertFalse(runner.done)
-        self.assertEqual([MACHINE_IDS[0]] * (i + 1), runner.old_machine_ids)
-        self.assertEqual(i + 1, runner.automatic_retry_count)
         self.assertIsNone(runner.started)
+        self.assertEqual(i + 1, runner.automatic_retry_count)
+        self.assertEqual([MACHINE_IDS[0]] * (i + 1), runner.old_machine_ids)
 
     self._mox.VerifyAll()
 

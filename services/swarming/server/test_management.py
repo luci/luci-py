@@ -66,11 +66,6 @@ QUICK_COMEBACK_SECS = 1.0
 # a server error.
 COMEBACK_AFTER_SERVER_ERROR_SECS = 10.0
 
-# The time (in seconds) to wait after recieving a runner before aborting it.
-# This is intended to delete runners that will never run because they will
-# never find a matching machine.
-SWARM_RUNNER_MAX_WAIT_SECS = 24 * 60 * 60
-
 # Number of days to keep error logs around.
 SWARM_ERROR_TIME_TO_LIVE_DAYS = 7
 
@@ -177,7 +172,10 @@ def _QueueTestRequestConfig(request, config, config_hash):
       request=request.key, requestor=request.GetTestCase().requestor,
       config_name=config.config_name, config_hash=config_hash,
       config_instance_index=config.instance_index,
-      num_config_instances=config.num_instances, priority=config.priority)
+      num_config_instances=config.num_instances,
+      run_by = datetime.datetime.utcnow() + datetime.timedelta(
+          seconds=config.deadline_to_run),
+      priority=config.priority)
 
   runner.put()
 
@@ -226,6 +224,20 @@ def _BuildTestRun(runner, server_url):
   errors = []
   assert test_run.IsValid(errors), errors
   return test_run
+
+
+def _AbortUnfullfilledRunner(runner):
+  """Aborts an unfilled runner.
+
+  An unfilled runner is one that hasn't been able to find a machine to run on
+  within it's run_by deadline.
+
+  Args:
+    runner: The unfilled runner to abort.
+  """
+  AbortRunner(runner, reason=('Runner was unable to find a machine to '
+                              'run it within %d seconds' %
+                              (runner.run_by - runner.created).total_seconds()))
 
 
 def AbortStaleRunners():
@@ -279,19 +291,10 @@ def AbortStaleRunners():
       False, None, timeout_cutoff)
   stale_runner_rpc = query.map_async(HandleStaleRunner)
 
-  # Abort all runners that haven't been able to find a machine to run them
-  # in SWARM_RUNNER_MAX_WAIT_SECS seconds.
-  def AbortUnfullfilledRunner(runner):
-    AbortRunner(runner, reason=('Runner was unable to find a machine to '
-                                'run it within %d seconds' %
-                                SWARM_RUNNER_MAX_WAIT_SECS))
-
-  timecut_off = now - datetime.timedelta(seconds=SWARM_RUNNER_MAX_WAIT_SECS)
-  query = test_runner.TestRunner.gql('WHERE created < :1 and started = :2 '
-                                     'and done = :3 and '
-                                     'automatic_retry_count = 0', timecut_off,
-                                     None, False)
-  unfullfilled_rpc = query.map_async(AbortUnfullfilledRunner)
+  # Abort all runners that took longer than their own deadline to start running.
+  query = test_runner.TestRunner.gql('WHERE run_by < :1 and started = :2 '
+                                     'and done = :3', now, None, False)
+  unfullfilled_rpc = query.map_async(_AbortUnfullfilledRunner)
 
   logging.debug('TRM.AbortStaleRunners done')
 

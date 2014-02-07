@@ -65,3 +65,8 @@ SWARM_BOT_COMMON_FILES = [
 
 # Number of days to keep old runners around for.
 SWARM_FINISHED_RUNNER_TIME_TO_LIVE_DAYS = 14
+
+# The time (in seconds) to wait after receiving a runner before aborting it.
+# This is intended to delete runners that will never run because they will
+# never find a matching machine.
+SWARM_RUNNER_MAX_WAIT_SECS = 24 * 60 * 60

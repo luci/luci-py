@@ -32,6 +32,8 @@ import logging
 import urllib
 import urlparse
 
+from common import swarm_constants
+
 
 # All the accepted url schemes.
 VALID_URL_SCHEMES = ['http', 'https', 'file', 'mailto']
@@ -729,16 +731,19 @@ class TestConfiguration(TestRequestMessageBase):
     additional_instances: An optional integer specifying the maximum number of
         additional instances of this configuration we want. Defaults to 0.
         Must be greater than 0.
+    deadline_to_run: An optional value that specifies how long the test can
+        wait before it is aborted (in seconds). Defaults to
+        SWARM_RUNNER_MAX_WAIT_SECS if no value is given.
     priority: The priority of this configuartion, used to determine execute
         order (a lower number is higher priority). Defaults to 10, the
         acceptable values are [0, MAX_PRIORITY_VALUE].
-
     dimensions: A dictionary of strings or list of strings for dimensions.
   """
 
   def __init__(self, config_name=None, env_vars=None, data=None, tests=None,
-               min_instances=1, additional_instances=0, priority=100,
-               **dimensions):
+               min_instances=1, additional_instances=0,
+               deadline_to_run=swarm_constants.SWARM_RUNNER_MAX_WAIT_SECS,
+               priority=100, **dimensions):
     super(TestConfiguration, self).__init__()
     self.config_name = config_name
     if env_vars:
@@ -755,6 +760,7 @@ class TestConfiguration(TestRequestMessageBase):
       self.tests = []
     self.min_instances = min_instances
     self.additional_instances = additional_instances
+    self.deadline_to_run = deadline_to_run
     self.priority = priority
 
     # Dimensions are kept dynamic so that we don't have to update this code
@@ -780,10 +786,11 @@ class TestConfiguration(TestRequestMessageBase):
                                      errors=errors) or
         # required=True to make sure the caller doesn't set it to None.
         not self.AreValidValues(['min_instances', 'additional_instances',
-                                 'priority'],
+                                 'deadline_to_run', 'priority'],
                                 (int, long), required=True, errors=errors) or
         self.min_instances < 1 or self.additional_instances < 0 or
-        self.priority < 0 or self.priority > MAX_PRIORITY_VALUE):
+        self.deadline_to_run < 0 or self.priority < 0 or
+        self.priority > MAX_PRIORITY_VALUE):
       self.LogError('Invalid TestConfiguration: %s' % self.__dict__, errors)
       return False
 

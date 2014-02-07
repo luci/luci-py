@@ -487,6 +487,7 @@ class TestConfigurationTest(TestHelper):
         tests=[TestObjectTest.GetFullObject()],
         min_instances=1,
         additional_instances=1,
+        deadline_to_run=1,
         priority=1)
 
   def testNoReferences(self):
@@ -538,6 +539,9 @@ class TestConfigurationTest(TestHelper):
     self.AssertValidValues('additional_instances',
                            TestHelper.VALID_INT_VALUES)
 
+    self.AssertValidValues('deadline_to_run',
+                           TestHelper.VALID_INT_VALUES)
+
     self.AssertValidValues('priority',
                            [0, 10, 33, test_request_message.MAX_PRIORITY_VALUE])
 
@@ -582,6 +586,10 @@ class TestConfigurationTest(TestHelper):
     self.AssertInvalidValues('additional_instances',
                              TestHelper.INVALID_POSITIVE_INT_VALUES)
     self.test_request.additional_instances = 0
+
+    self.AssertInvalidValues('deadline_to_run',
+                             TestHelper.INVALID_POSITIVE_INT_VALUES)
+    self.test_request.deadline_to_run = 0
 
     self.AssertInvalidValues('priority',
                              TestHelper.INVALID_POSITIVE_INT_VALUES +
