@@ -218,16 +218,24 @@ class Ereporter2Test(test_case.TestCase):
     report, ignored = ereporter2.generate_report(10, 20, None, ignorer)
     expected_report = ereporter2.ErrorCategory(
         'Failed@v1', 'v1', 'default', 'Failed', '/foo')
-    expected_report.events = [
-      ErrorRecord(),
-      ErrorRecord(),
-    ]
+    expected_report.events = ereporter2.CappedList(
+        ereporter2.ERROR_LIST_HEAD_SIZE,
+        ereporter2.ERROR_LIST_TAIL_SIZE,
+        [
+          ErrorRecord(),
+          ErrorRecord(),
+        ],
+    )
     self.assertEqualObj([expected_report], report)
     expected_ignored = ereporter2.ErrorCategory(
         'DeadlineExceededError@None:-1@v1', 'v1', 'default', msg, '/foo')
-    expected_ignored.events = [
-      ErrorRecord(message=msg),
-    ]
+    expected_ignored.events = ereporter2.CappedList(
+        ereporter2.ERROR_LIST_HEAD_SIZE,
+        ereporter2.ERROR_LIST_TAIL_SIZE,
+        [
+          ErrorRecord(message=msg),
+        ],
+    )
     self.assertEqualObj([expected_ignored], ignored)
 
   def test_report_to_html(self):
@@ -261,6 +269,32 @@ class Ereporter2Test(test_case.TestCase):
       '<pre>Traceback (most recent call last):\nDeadlineExceededError</pre>\n'
       '1 occurrences: <a href="http://foo/request_ida">Entry</a> <p>\n<br>\n')
     self.assertEqual(expected, out)
+
+  def test_capped_list(self):
+    l = ereporter2.CappedList(5, 10)
+
+    # Grow a bit, should go to head.
+    for i in xrange(5):
+      l.append(i)
+    self.assertFalse(l.has_gap)
+    self.assertEqual(5, l.total_count)
+    self.assertEqual(range(5), l.head)
+    self.assertEqual(0, len(l.tail))
+
+    # Start growing a tail, still not long enough to start evicting items.
+    for i in xrange(5, 15):
+      l.append(i)
+    self.assertFalse(l.has_gap)
+    self.assertEqual(15, l.total_count)
+    self.assertEqual(range(5), l.head)
+    self.assertEqual(range(5, 15), list(l.tail))
+
+    # Adding one more item should evict oldest one ('5') from tail.
+    l.append(15)
+    self.assertTrue(l.has_gap)
+    self.assertEqual(16, l.total_count)
+    self.assertEqual(range(5), l.head)
+    self.assertEqual(range(6, 16), list(l.tail))
 
 
 if __name__ == '__main__':

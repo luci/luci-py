@@ -10,6 +10,7 @@ using the DB.
 Also adds logging formatException() filtering to reduce the file paths length.
 """
 
+import collections
 import datetime
 import hashlib
 import logging
@@ -60,12 +61,16 @@ REPORT_CONTENT = (
       '{% if report_url %}</a>{% endif %}</h3>\n'
   '{% for category in errors %}\n'
   '<span style="font-size:130%">{{category.signature}}</span><br>\n'
-  '{{category.events.0.handler_module}}<br>\n'
-  '{{category.events.0.method}} {{category.events.0.host}}'
-      '{{category.events.0.resource}} (HTTP {{category.events.0.status}})<br>\n'
-  '<pre>{{category.events.0.message}}</pre>\n'
-  '{{category.count}} occurrences: '
-      '{% for event in category.events %}<a '
+  '{{category.events.head.0.handler_module}}<br>\n'
+  '{{category.events.head.0.method}} {{category.events.head.0.host}}'
+      '{{category.events.head.0.resource}} '
+      '(HTTP {{category.events.head.0.status}})<br>\n'
+  '<pre>{{category.events.head.0.message}}</pre>\n'
+  '{{category.events.total_count}} occurrences: '
+      '{% for event in category.events.head %}<a '
+      'href="{{request_id_url}}{{event.request_id}}">Entry</a> {% endfor %}'
+      '{% if category.events.has_gap %}&hellip;{% endif %}'
+      '{% for event in category.events.tail %}<a '
       'href="{{request_id_url}}{{event.request_id}}">Entry</a> {% endfor %}'
   '<p>\n'
   '<br>\n'
@@ -93,6 +98,11 @@ RE_STACK_TRACE_FILE = (
 # Handle this error message specifically.
 SOFT_MEMORY = 'Exceeded soft private memory limit'
 
+# Number of first error records to show in the category error list.
+ERROR_LIST_HEAD_SIZE = 10
+# Number of last error records to show in the category error list.
+ERROR_LIST_TAIL_SIZE = 10
+
 
 class ErrorReportingInfo(ndb.Model):
   """Notes the last timestamp to be used to resume collecting errors."""
@@ -109,19 +119,20 @@ class ErrorCategory(object):
     self.module = module
     self.message = message
     self.resource = resource
-    self.events = []
-
-  @property
-  def count(self):
-    return len(self.events)
-
-  @property
-  def request_ids(self):
-    return [i.request_id for i in self.events]
+    self.events = CappedList(ERROR_LIST_HEAD_SIZE, ERROR_LIST_TAIL_SIZE)
 
 
 class ErrorRecord(object):
   """Describes the context in which an error was logged."""
+
+  # Use slots to reduce memory footprint of ErrorRecord object.
+  __slots__ = (
+      'request_id', 'start_time', 'exception_time', 'latency', 'mcycles', 'ip',
+      'nickname', 'referrer', 'user_agent', 'host', 'resource', 'method',
+      'task_queue_name', 'was_loading_request', 'version', 'module',
+      'handler_module', 'gae_version', 'instance', 'status', 'message',
+      'short_signature', 'exception_type', 'signature')
+
   def __init__(
       self, request_id, start_time, exception_time, latency, mcycles,
       ip, nickname, referrer, user_agent,
@@ -167,6 +178,50 @@ class ErrorRecord(object):
     # Creates an unique signature string based on the message.
     self.short_signature, self.exception_type = signature_from_message(message)
     self.signature = self.short_signature + '@' + version
+
+
+class CappedList(object):
+  """List of objects with only several first ones and several last ones
+  actually stored.
+
+  Basically a structure for:
+  0 1 2 3 ..... N-3 N-2 N-1 N
+  """
+
+  def __init__(self, head_size, tail_size, items=None):
+    assert head_size > 0, head_size
+    assert tail_size > 0, tail_size
+    self.head_size = head_size
+    self.tail_size = tail_size
+    self.head = []
+    self.tail = collections.deque()
+    self.total_count = 0
+    for item in (items or []):
+      self.append(item)
+
+  def append(self, item):
+    """Adds item to the list.
+
+    If list is small enough, will add it to the head, else to the tail
+    (evicting oldest stored tail item).
+    """
+    # Keep count of all elements ever added (even though they may not be
+    # actually stored).
+    self.total_count += 1
+    # List is still short, grow head.
+    if len(self.head) < self.head_size:
+      self.head.append(item)
+    else:
+      # List is long enough to start using tail. Grow tail, but keep only
+      # end of it.
+      if len(self.tail) == self.tail_size:
+        self.tail.popleft()
+      self.tail.append(item)
+
+  @property
+  def has_gap(self):
+    """True if this list contains skipped middle section."""
+    return len(self.head) + len(self.tail) < self.total_count
 
 
 def signature_from_message(message):
@@ -277,12 +332,12 @@ def records_to_html(
               recommended.
     extras: extra dict to use to render the template.
   """
-  error_categories.sort(key=lambda e: (e.version, -e.count))
+  error_categories.sort(key=lambda e: (e.version, -e.events.total_count))
   template_values = {
     'error_count': len(error_categories),
     'errors': error_categories,
     'ignored_count': ignored_count,
-    'occurrence_count': sum(e.count for e in error_categories),
+    'occurrence_count': sum(e.events.total_count for e in error_categories),
     'report_url': report_url,
     'request_id_url': request_id_url,
     'version_count': len(set(e.version for e in error_categories)),
@@ -404,10 +459,10 @@ def generate_report(start_time, end_time, module_versions, ignorer):
   categories = {}
   for i in _extract_exceptions_from_logs(start_time, end_time, module_versions):
     bucket = ignored if ignorer and ignorer(i) else categories
-    category = bucket.setdefault(
-        i.signature,
-        ErrorCategory(i.signature, i.version, i.module, i.message, i.resource))
-    category.events.append(i)
+    if i.signature not in bucket:
+      bucket[i.signature] = ErrorCategory(
+          i.signature, i.version, i.module, i.message, i.resource)
+    bucket[i.signature].events.append(i)
   return categories.values(), ignored.values()
 
 
@@ -455,7 +510,7 @@ def generate_and_email_report(
     more_extras = get_template_env(start_time, end_time, module_versions)
     more_extras.update(extras or {})
     body = records_to_html(
-        categories, sum(len(c.events) for c in ignored), request_id_url,
+        categories, sum(c.events.total_count for c in ignored), request_id_url,
         report_url, content_template, more_extras)
     if categories:
       subject_line = title_template.render(more_extras)
@@ -473,8 +528,8 @@ def generate_and_email_report(
     logging.warning('Got a DeadlineExceededError')
   logging.info(
       'Processed %d items, ignored %d, reduced to %d categories, sent to %s.',
-      sum(len(c.events) for c in categories),
-      sum(len(c.events) for c in ignored),
+      sum(c.events.total_count for c in categories),
+      sum(c.events.total_count for c in ignored),
       len(categories),
       recipients)
   return result

@@ -15,5 +15,6 @@ cron:
   schedule: every 1 minutes
 
 - description: Mail exception report via ereporter2
+  target: backend
   url: /restricted/cron/ereporter2/mail
   schedule: every 1 hours synchronized
