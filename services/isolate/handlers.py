@@ -799,7 +799,7 @@ class InternalEreporter2Mail(webapp2.RequestHandler):
     recipients = self.request.get(
         'recipients', config.settings().monitoring_recipients)
     result = ereporter2.generate_and_email_report(
-        None,
+        config.get_module_version_list(None, False),
         should_ignore_error_record,
         recipients,
         request_id_url,
