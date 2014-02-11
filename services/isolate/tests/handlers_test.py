@@ -5,6 +5,7 @@
 
 import sys
 import unittest
+import urllib
 
 import test_env
 test_env.setup_test_env()
@@ -56,7 +57,38 @@ class MainTest(test_case.TestCase):
     super(MainTest, self).setUp()
     self.testbed.init_modules_stub()
     app = handlers.CreateApplication()
-    self.testapp = webtest.TestApp(app)
+    self.source_ip = '127.0.0.1'
+    self.testapp = webtest.TestApp(
+        app, extra_environ={'REMOTE_ADDR': self.source_ip})
+
+  def whitelist_self(self):
+    handlers.acl.WhitelistedIP(
+        id=handlers.acl.ip_to_str(*handlers.acl.parse_ip(self.source_ip)),
+        ip='127.0.0.1').put()
+
+  def handshake(self):
+    self.whitelist_self()
+    data = {
+      'client_app_version': '0.2',
+      'fetcher': True,
+      'protocol_version': handlers.ISOLATE_PROTOCOL_VERSION,
+      'pusher': True,
+    }
+    req = self.testapp.post_json('/content-gs/handshake', data)
+    return req.json['access_token']
+
+  @staticmethod
+  def preupload_foo():
+    """Returns data to send to /pre-upload to upload 'foo'."""
+    h = handlers.get_hash_algo('default')
+    h.update('foo')
+    return [
+      {
+        'h': h.hexdigest(),
+        's': 3,
+        'i': 0,
+      },
+    ]
 
   def test_internal_cron_ereporter2_mail_not_cron(self):
     response = self.testapp.get(
@@ -107,6 +139,25 @@ class MainTest(test_case.TestCase):
             expected.issuperset(resource for _, resource in permissions),
             msg='Unexpected auth resource in %s of %s: %s' %
                 (method, route, permissions))
+
+  def test_pre_upload_ok(self):
+    req = self.testapp.post_json(
+        '/content-gs/pre-upload/a?token=%s' % urllib.quote(self.handshake()),
+        self.preupload_foo())
+    self.assertEqual(1, len(req.json))
+    self.assertEqual(2, len(req.json[0]))
+    # ['url', None]
+    self.assertTrue(req.json[0][0])
+    self.assertEqual(None, req.json[0][1])
+
+  def test_pre_upload_invalid_namespace(self):
+    req = self.testapp.post_json(
+        '/content-gs/pre-upload/[?token=%s' % urllib.quote(self.handshake()),
+        self.preupload_foo(),
+        expect_errors=True)
+    self.assertTrue(
+        'Invalid namespace; allowed keys must pass regexp "[a-z0-9A-Z\-._]+"' in
+        req.body)
 
 
 if __name__ == '__main__':

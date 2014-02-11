@@ -79,6 +79,7 @@ def parse_ip(ipstr):
     factor = 256
     iptype = 'v4'
   else:
+    assert ':' in ipstr, ipstr
     # IPv6.
     try:
       values = [int(i, 16) for i in ipstr.split(':')]

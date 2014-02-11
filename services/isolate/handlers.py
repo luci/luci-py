@@ -89,6 +89,10 @@ IGNORED_EXCEPTIONS = (
 )
 
 
+# Valid namespace key.
+NAMESPACE_RE = r'[a-z0-9A-Z\-._]+'
+
+
 #### Models
 
 
@@ -1209,6 +1213,11 @@ class PreUploadContentHandler(ProtocolHandler):
   @auth.require(auth.UPDATE, 'isolate/namespaces/{namespace}')
   def post(self, namespace):
     """Reads body with items to upload and replies with URLs to upload to."""
+    if not re.match(r'^%s$' % NAMESPACE_RE, namespace):
+      self.send_error(
+          'Invalid namespace; allowed keys must pass regexp "%s"' %
+          NAMESPACE_RE)
+
     # Parse a body into list of EntryInfo objects.
     try:
       entries = self.parse_request(self.request.body, namespace)
@@ -1548,8 +1557,8 @@ def CreateApplication():
   # Routes with Auth REST API.
   auth_routes = auth_ui.get_rest_api_routes()
 
-  # Namespace can be letters, numbers and '-'.
-  namespace = r'/<namespace:[a-z0-9A-Z\-]+>'
+  # Namespace can be letters, numbers, '-', '.' and '_'.
+  namespace = r'/<namespace:%s>' % NAMESPACE_RE
   # Do not enforce a length limit to support different hashing algorithm. This
   # should represent a valid hex value.
   hashkey = r'/<hash_key:[a-f0-9]{4,}>'
@@ -1579,11 +1588,11 @@ def CreateApplication():
 
       # Tasks triggered by other request handlers.
       webapp2.Route(
-          r'/internal/taskqueue/tag' + namespace +
-            r'/<year:\d\d\d\d>-<month:\d\d>-<day:\d\d>',
+          r'/internal/taskqueue/tag%s/<year:\d\d\d\d>-<month:\d\d>-<day:\d\d>' %
+              namespace,
           InternalTagWorkerHandler),
       webapp2.Route(
-          r'/internal/taskqueue/verify' + namespace_key,
+          r'/internal/taskqueue/verify%s' % namespace_key,
           InternalVerifyWorkerHandler),
 
      webapp2.Route(
@@ -1629,13 +1638,13 @@ def CreateApplication():
           r'/content-gs/handshake',
           HandshakeHandler),
       webapp2.Route(
-          r'/content-gs/pre-upload' + namespace,
+          r'/content-gs/pre-upload/<namespace:.*>',
           PreUploadContentHandler),
       webapp2.Route(
-          r'/content-gs/retrieve' + namespace_key,
+          r'/content-gs/retrieve%s' % namespace_key,
           RetrieveContentHandler),
       webapp2.Route(
-          r'/content-gs/store' + namespace_key,
+          r'/content-gs/store%s' % namespace_key,
           StoreContentHandler,
           name='store-gs'),
 

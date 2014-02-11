@@ -17,7 +17,6 @@ class IpUtilsTest(unittest.TestCase):
   def test_parse_ip(self):
     data = [
       # (input, expected)
-      ('allo', (None, None)),
       ('0.0.0.0', ('v4', 0L)),
       ('255.255.255.255', ('v4', 4294967295L)),
       ('255.256.255.255', (None, None)),
@@ -28,6 +27,10 @@ class IpUtilsTest(unittest.TestCase):
     ]
     actual = [(v, acl.parse_ip(v)) for v, _ in data]
     self.assertEqual(data, actual)
+
+  def test_parse_ip_bad(self):
+    with self.assertRaises(AssertionError):
+      acl.parse_ip('allo')
 
   def test_ip_to_str(self):
     data = [
