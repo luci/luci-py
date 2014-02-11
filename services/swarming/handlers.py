@@ -1000,6 +1000,7 @@ class CancelHandler(auth.AuthenticatingHandler):
       test_management.AbortRunner(runner, reason='Runner cancelled by user.')
       self.response.out.write('Runner canceled.')
     else:
+      # TODO(maruel): Return HTTP 400.
       self.response.out.write('Cannot find runner or too late to cancel: %s' %
                               runner_key)
 

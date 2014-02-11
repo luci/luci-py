@@ -384,8 +384,7 @@ class LocalTestRunner(object):
     # the data directory.
     orig_dir = os.getcwd()
     os.chdir(self.data_dir)
-    logging.info('Executing commands %s, with cwd %s and environment variables '
-                 '%s', parsed_command, self.data_dir, env)
+    logging.info('Executing: %s\ncwd: %s', parsed_command, self.data_dir)
     try:
       proc = subprocess.Popen(parsed_command, stdout=subprocess.PIPE,
                               env=env, bufsize=1, stderr=subprocess.STDOUT,
