@@ -16,19 +16,17 @@ import test_env
 
 test_env.setup_test_env()
 
+from google.appengine.ext import ndb
+
 import test_case
 from server import dimension_mapping
-
-
-def _WaitForResults(futures):
-  return [future.get_result() for future in futures]
 
 
 class DimensionMappingTest(test_case.TestCase):
   def testDeleteOldDimensions(self):
     dimension_mapping.DimensionMapping().put()
 
-    _WaitForResults(dimension_mapping.DeleteOldDimensionMapping())
+    ndb.delete_multi(dimension_mapping.QueryOldDimensionMapping())
     self.assertEqual(1, dimension_mapping.DimensionMapping.query().count())
 
     # Add an old dimension and ensure it gets removed.
@@ -39,7 +37,7 @@ class DimensionMappingTest(test_case.TestCase):
     old_mapping._pre_put_hook = lambda: None
     old_mapping.put()
 
-    _WaitForResults(dimension_mapping.DeleteOldDimensionMapping())
+    ndb.delete_multi(dimension_mapping.QueryOldDimensionMapping())
     self.assertEqual(1, dimension_mapping.DimensionMapping.query().count())
 
 

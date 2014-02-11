@@ -333,24 +333,11 @@ def _GetCurrentTime():
   return datetime.datetime.utcnow()
 
 
-def DeleteOldWaitSummaries():
-  """Clean up all the wait summaries that are older than a certain age.
-
-  Returns:
-    The list of Futures for all the async delete calls.
-  """
-  logging.debug('DeleteOldWaitSummaries starting')
-
+def QueryOldWaitSummaries():
+  """Returns keys for wait summaries older than WAIT_SUMMARY_LIFE_IN_DAYS."""
   old_cutoff = (
       _GetCurrentTime() -
       datetime.timedelta(days=WAIT_SUMMARY_LIFE_IN_DAYS))
-
-  old_wait_summary_query = WaitSummary.query(
+  return WaitSummary.query(
       WaitSummary.end_time < old_cutoff,
       default_options=ndb.QueryOptions(keys_only=True))
-
-  futures = ndb.delete_multi_async(old_wait_summary_query)
-
-  logging.debug('DeleteOldWaitSummaries done')
-
-  return futures

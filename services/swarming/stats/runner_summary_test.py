@@ -385,12 +385,12 @@ class RunnerSummaryTest(test_case.TestCase):
     self.assertEqual(1, runner_summary.DimensionWaitSummary.query().count())
 
     # Make sure that stats aren't deleted if they aren't old.
-    ndb.Future.wait_all(runner_summary.DeleteOldWaitSummaries())
+    ndb.delete_multi(runner_summary.QueryOldWaitSummaries())
     self.assertEqual(1, runner_summary.WaitSummary.query().count())
     self.assertEqual(1, runner_summary.DimensionWaitSummary.query().count())
 
     # Make sure that old runner stats are deleted.
-    ndb.Future.wait_all(runner_summary.DeleteOldWaitSummaries())
+    ndb.delete_multi(runner_summary.QueryOldWaitSummaries())
     self.assertEqual(0, runner_summary.WaitSummary.query().count())
     self.assertEqual(0, runner_summary.DimensionWaitSummary.query().count())
 

@@ -100,18 +100,18 @@ class StatManagerTest(test_case.TestCase):
     self.assertEqual(1, runner_stats.RunnerStats.query().count())
 
     # Make sure that runners aren't deleted if they don't have an ended_time.
-    ndb.Future.wait_all(runner_stats.DeleteOldRunnerStats())
+    ndb.delete_multi(runner_stats.QueryOldRunnerStats())
     self.assertEqual(1, runner_stats.RunnerStats.query().count())
 
     # Make sure that new runner stats aren't deleted (even if they started
     # long ago).
     r_stats.end_time = r_stats.assigned_time + datetime.timedelta(days=3)
     r_stats.put()
-    ndb.Future.wait_all(runner_stats.DeleteOldRunnerStats())
+    ndb.delete_multi(runner_stats.QueryOldRunnerStats())
     self.assertEqual(1, runner_stats.RunnerStats.query().count())
 
     # Make sure that old runner stats are deleted.
-    ndb.Future.wait_all(runner_stats.DeleteOldRunnerStats())
+    ndb.delete_multi(runner_stats.QueryOldRunnerStats())
     self.assertEqual(0, runner_stats.RunnerStats.query().count())
 
     self._mox.VerifyAll()

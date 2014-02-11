@@ -109,27 +109,13 @@ def _GetCurrentTime():
   return datetime.datetime.utcnow()
 
 
-def DeleteOldRunnerStats():
-  """Clean up all runners that are older than a certain age and done.
-
-  Returns:
-    The list of Futures for all the async delete calls.
+def QueryOldRunnerStats():
+  """Returns keys for runners that are done and older than
+  RUNNER_STATS_EVALUATION_CUTOFF_DAYS.
   """
-  logging.debug('DeleteOldRunnersStats starting')
-
   old_cutoff = (
       _GetCurrentTime() -
       datetime.timedelta(days=RUNNER_STATS_EVALUATION_CUTOFF_DAYS))
-
-  # '!= None' must be used instead of 'is not None' because these arguments
-  # become part of a GQL query, where 'is not None' is invalid syntax.
-  old_runner_stats_query = RunnerStats.query(
-      RunnerStats.end_time != None,
+  return RunnerStats.query(
       RunnerStats.end_time < old_cutoff,
       default_options=ndb.QueryOptions(keys_only=True))
-
-  futures = ndb.delete_multi_async(old_runner_stats_query)
-
-  logging.debug('DeleteOldRunnersStats done')
-
-  return futures

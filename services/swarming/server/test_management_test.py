@@ -533,11 +533,11 @@ class TestManagementTest(test_case.TestCase):
     self._mox.ReplayAll()
 
     # First call shouldn't delete the error since its not stale yet.
-    ndb.Future.wait_all(test_management.DeleteOldErrors())
+    ndb.delete_multi(test_management.QueryOldErrors())
     self.assertEqual(1, test_management.SwarmError.query().count())
 
     # Second call should remove the now stale error.
-    ndb.Future.wait_all(test_management.DeleteOldErrors())
+    ndb.delete_multi(test_management.QueryOldErrors())
     self.assertEqual(0, test_management.SwarmError.query().count())
 
     self._mox.VerifyAll()

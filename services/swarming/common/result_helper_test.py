@@ -101,11 +101,11 @@ class ResultHelperTest(test_case.TestCase):
 
     # Create the Results model and ensure it isn't deleted the first time.
     result_helper.StoreResults('dummy data')
-    ndb.Future.wait_all(result_helper.DeleteOldResults())
+    ndb.delete_multi(result_helper.QueryOldResults())
     self.assertTrue(0 < result_helper.Results.query().count())
     self.assertTrue(0 < result_helper.ResultChunk.query().count())
 
-    ndb.Future.wait_all(result_helper.DeleteOldResults())
+    ndb.delete_multi(result_helper.QueryOldResults())
     self.assertEqual(0, result_helper.Results.query().count())
     self.assertEqual(0, result_helper.ResultChunk.query().count())
 
@@ -128,10 +128,10 @@ class ResultHelperTest(test_case.TestCase):
 
     # Create the ResultChunk model and ensure it isn't deleted the first time.
     result_helper.ResultChunk(chunk='random chunk').put()
-    ndb.Future.wait_all(result_helper.DeleteOldResultChunks())
+    ndb.delete_multi(result_helper.QueryOldResultChunks())
     self.assertTrue(0 < result_helper.ResultChunk.query().count())
 
-    ndb.Future.wait_all(result_helper.DeleteOldResultChunks())
+    ndb.delete_multi(result_helper.QueryOldResultChunks())
     self.assertEqual(0, result_helper.ResultChunk.query().count())
 
     self._mox.VerifyAll()

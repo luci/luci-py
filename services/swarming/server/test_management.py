@@ -618,25 +618,14 @@ def _GetCurrentTime():
   return datetime.datetime.utcnow()
 
 
-def DeleteOldErrors():
-  """Cleans up errors older than a certain age.
-
-  Returns:
-    The list of all the Futures for the async delete calls.
-  """
-  logging.debug('DeleteOldErrors starting')
+def QueryOldErrors():
+  """Returns keys for errors older than SWARM_ERROR_TIME_TO_LIVE_DAYS."""
   old_cutoff = (
       _GetCurrentTime() -
       datetime.timedelta(days=SWARM_ERROR_TIME_TO_LIVE_DAYS))
-
-  old_error_query = SwarmError.query(
+  return SwarmError.query(
       SwarmError.created < old_cutoff,
       default_options=ndb.QueryOptions(keys_only=True))
-  futures = ndb.delete_multi_async(old_error_query)
-
-  logging.debug('DeleteOldErrors done')
-
-  return futures
 
 
 def StoreStartSlaveScript(script):

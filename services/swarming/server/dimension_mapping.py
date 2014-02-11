@@ -9,9 +9,7 @@ queries) as well as converted a dimension hash back to the string that generated
 it.
 """
 
-
 import datetime
-import logging
 
 from google.appengine.ext import ndb
 
@@ -39,19 +37,10 @@ class DimensionMapping(ndb.Model):
     self.last_seen = datetime.datetime.utcnow().date()
 
 
-def DeleteOldDimensionMapping():
-  """Deletes mapping that haven't been seen in DIMENSION_MAPPING_DAYS_TO_LIVE.
-
-  Returns:
-    The list of Futures for all the async delete calls.
-  """
-  logging.debug('DeleteOldDimensions starting')
+def QueryOldDimensionMapping():
+  """Returns keys for mappings older than DIMENSION_MAPPING_DAYS_TO_LIVE."""
   old_cutoff = (datetime.datetime.utcnow().date() -
                 datetime.timedelta(days=DIMENSION_MAPPING_DAYS_TO_LIVE))
-
-  futures = ndb.delete_multi_async(
-      DimensionMapping.query(DimensionMapping.last_seen < old_cutoff,
-                             default_options=ndb.QueryOptions(keys_only=True)))
-
-  logging.debug('DeleteOldDimension done')
-  return futures
+  return DimensionMapping.query(
+      DimensionMapping.last_seen < old_cutoff,
+      default_options=ndb.QueryOptions(keys_only=True))

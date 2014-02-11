@@ -8,9 +8,7 @@ A basic class to assist with storing test results in the datastore. This helper
 acts similiar to the normal blobstore, but the values all stay in the datastore.
 """
 
-
 import datetime
-import logging
 
 
 from google.appengine.ext import ndb
@@ -122,53 +120,29 @@ def StoreResults(results_data):
   return new_results
 
 
-def DeleteOldResults():
-  """Deletes old results from the database.
-
-  Returns:
-    The list of Futures for all the async deletes.
-  """
-  logging.debug('DeleteOldResults starting.')
-
+def QueryOldResults():
+  """Returns keys for results older than SWARM_OLD_RESULTS_TIME_TO_LIVE_DAYS."""
   old_cutoff = (
       _GetCurrentTime() -
       datetime.timedelta(days=SWARM_OLD_RESULTS_TIME_TO_LIVE_DAYS))
-
-  old_results_query = Results.query(
+  return Results.query(
       Results.created < old_cutoff,
       default_options=ndb.QueryOptions(keys_only=True))
 
-  futures = ndb.delete_multi_async(old_results_query)
 
-  logging.debug('DeleteOldResults done.')
-
-  return futures
-
-
-def DeleteOldResultChunks():
-  """Deletes old result chunks from the database.
+def QueryOldResultChunks():
+  """Returns keys for result chunks older than
+  SWARM_RESULT_CHUNK_OLD_TIME_TO_LIVE_DAYS.
 
   This function shouldn't find orphans very often, since they can only get
   created in StoreResults, if after a chunk is created we fail to create
   the remaining chunks or the Results object (which could happen due to
   datastore times or other AE specific errors).
-
-  Returns:
-    The list of Futures for all the async deletes.
   """
-  logging.debug('DeleteOldResultChunks starting.')
-
   old_cutoff = (
       _GetCurrentTime() -
       datetime.timedelta(
           days=SWARM_RESULT_CHUNK_OLD_TIME_TO_LIVE_DAYS))
-
-  old_result_chunks_query = ResultChunk.query(
+  return ResultChunk.query(
       ResultChunk.created < old_cutoff,
       default_options=ndb.QueryOptions(keys_only=True))
-
-  futures = ndb.delete_multi_async(old_result_chunks_query)
-
-  logging.debug('DeleteOldResultChunks done.')
-
-  return futures

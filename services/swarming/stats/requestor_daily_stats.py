@@ -109,23 +109,12 @@ def UpdateDailyStats(runner):
     logging.warning('Unable to update daily user usage.')
 
 
-def DeleteOldRequestorDailyStats():
-  """Clean up all RequestorDailyStats older than REQUESTOR_STATS_LIFE_IN_DAYS.
-
-  Returns:
-    The list of Futures for all the async delete calls.
+def QueryOldRequestorDailyStats():
+  """Returns keys for RequestorDailyStats older than
+  REQUESTOR_STATS_LIFE_IN_DAYS.
   """
-  logging.debug('DeleteOldRequestorDailyStats starting')
-
   old_cutoff = datetime.datetime.utcnow().date() - datetime.timedelta(
       days=REQUESTOR_DAILY_STATS_LIFE_IN_DAYS)
-
-  old_requestor_daily_stats_query = RequestorDailyStats.query(
+  return RequestorDailyStats.query(
       RequestorDailyStats.date < old_cutoff,
       default_options=ndb.QueryOptions(keys_only=True))
-
-  futures = ndb.delete_multi_async(old_requestor_daily_stats_query)
-
-  logging.debug('DeleteOldRequestorDailyStats done')
-
-  return futures

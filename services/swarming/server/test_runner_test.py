@@ -565,15 +565,16 @@ class TestRunnerTest(test_case.TestCase):
     self._mox.ReplayAll()
 
     runner = test_helper.CreatePendingRunner()
+    runner.done = True
     runner.ended = datetime.datetime.utcnow()
     runner.put()
 
     # Make sure that new runners aren't deleted.
-    ndb.Future.wait_all(test_runner.DeleteOldRunners())
+    ndb.delete_multi(test_runner.QueryOldRunners())
     self.assertEqual(1, test_runner.TestRunner.query().count())
 
     # Make sure that old runners are deleted.
-    ndb.Future.wait_all(test_runner.DeleteOldRunners())
+    ndb.delete_multi(test_runner.QueryOldRunners())
     self.assertEqual(0, test_runner.TestRunner.query().count())
 
     self._mox.VerifyAll()

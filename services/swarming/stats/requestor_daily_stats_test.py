@@ -178,7 +178,7 @@ class RequestorStatsTest(unittest.TestCase):
     daily_stat = requestor_daily_stats.RequestorDailyStats(date=current_day)
     daily_stat.put()
 
-    ndb.Future.wait_all(requestor_daily_stats.DeleteOldRequestorDailyStats())
+    ndb.delete_multi(requestor_daily_stats.QueryOldRequestorDailyStats())
     self.assertEqual(1,
                      requestor_daily_stats.RequestorDailyStats.query().count())
 
@@ -192,7 +192,7 @@ class RequestorStatsTest(unittest.TestCase):
                      requestor_daily_stats.RequestorDailyStats.query().count())
 
     # Ensure the correct model was deleted.
-    ndb.Future.wait_all(requestor_daily_stats.DeleteOldRequestorDailyStats())
+    ndb.delete_multi(requestor_daily_stats.QueryOldRequestorDailyStats())
     self.assertEqual(1,
                      requestor_daily_stats.RequestorDailyStats.query().count())
 

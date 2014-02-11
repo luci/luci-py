@@ -123,23 +123,10 @@ def GetDailyStats(oldest_day):
           DailyStats.gql('WHERE date >= :1 ORDER BY date ASC', oldest_day)]
 
 
-def DeleteOldDailyStats():
-  """Clean up all daily stats that are more than DAILY_STATS_LIFE_IN_DAYS old.
-
-  Returns:
-    The list of Futures for all the async delete calls.
-  """
-  logging.debug('DeleteOldDailyStats starting')
-
+def QueryOldDailyStats():
+  """Returns keys for daily stats older than DAILY_STATS_LIFE_IN_DAYS."""
   old_cutoff = (datetime.datetime.utcnow().date() - datetime.timedelta(
       days=DAILY_STATS_LIFE_IN_DAYS))
-
-  old_daily_stats_query = DailyStats.query(
+  return DailyStats.query(
       DailyStats.date < old_cutoff,
       default_options=ndb.QueryOptions(keys_only=True))
-
-  futures = ndb.delete_multi_async(old_daily_stats_query)
-
-  logging.debug('DeleteOldDailyStats done')
-
-  return futures

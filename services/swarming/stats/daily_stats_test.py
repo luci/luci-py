@@ -124,7 +124,7 @@ class DailyStatsTest(test_case.TestCase):
     daily_stat = daily_stats.DailyStats(date=current_day)
     daily_stat.put()
 
-    ndb.Future.wait_all(daily_stats.DeleteOldDailyStats())
+    ndb.delete_multi(daily_stats.QueryOldDailyStats())
     self.assertEqual(1, daily_stats.DailyStats.query().count())
 
     # Add a daily stats model that should get deleted.
@@ -136,7 +136,7 @@ class DailyStatsTest(test_case.TestCase):
     self.assertEqual(2, daily_stats.DailyStats.query().count())
 
     # Ensure the correct model is deleted.
-    ndb.Future.wait_all(daily_stats.DeleteOldDailyStats())
+    ndb.delete_multi(daily_stats.QueryOldDailyStats())
     self.assertEqual(1, daily_stats.DailyStats.query().count())
 
     remaining_model = daily_stats.DailyStats.query().get()

@@ -667,17 +667,19 @@ class TaskCleanupDataHandler(webapp2.RequestHandler):
   @require_taskqueue('cleanup')
   def post(self):
     try:
-      futures = []
-      futures.extend(test_management.DeleteOldErrors())
-      futures.extend(dimension_mapping.DeleteOldDimensionMapping())
-      futures.extend(test_runner.DeleteOldRunners())
-      futures.extend(daily_stats.DeleteOldDailyStats())
-      futures.extend(requestor_daily_stats.DeleteOldRequestorDailyStats())
-      futures.extend(runner_stats.DeleteOldRunnerStats())
-      futures.extend(runner_summary.DeleteOldWaitSummaries())
-      futures.extend(result_helper.DeleteOldResults())
-      futures.extend(result_helper.DeleteOldResultChunks())
-      ndb.Future.wait_all(futures)
+      # All the things that need to be deleted.
+      queries = [
+          test_management.QueryOldErrors(),
+          dimension_mapping.QueryOldDimensionMapping(),
+          test_runner.QueryOldRunners(),
+          daily_stats.QueryOldDailyStats(),
+          requestor_daily_stats.QueryOldRequestorDailyStats(),
+          runner_stats.QueryOldRunnerStats(),
+          runner_summary.QueryOldWaitSummaries(),
+          result_helper.QueryOldResults(),
+          result_helper.QueryOldResultChunks(),
+      ]
+      utils.incremental_map(queries, ndb.delete_multi_async, max_inflight=50)
     except datastore_errors.Timeout:
       logging.info('Ran out of time while cleaning up data. Triggering '
                    'another cleanup.')

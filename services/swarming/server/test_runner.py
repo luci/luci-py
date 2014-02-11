@@ -759,28 +759,15 @@ def DeleteRunner(runner):
   request.get().RemoveRunner(runner.key)
 
 
-def DeleteOldRunners():
-  """Clean up all runners that are older than a certain age and done.
-
-  Returns:
-    The list of all the Futures for the async delete calls.
+def QueryOldRunners():
+  """Returns keys for all runners that are done and older than
+  SWARM_FINISHED_RUNNER_TIME_TO_LIVE_DAYS.
   """
-  logging.debug('DeleteOldRunners starting')
-
   old_cutoff = (
       _GetCurrentTime() -
       datetime.timedelta(
           days=swarm_constants.SWARM_FINISHED_RUNNER_TIME_TO_LIVE_DAYS))
-
-  # '!= None' must be used instead of 'is not None' because these arguments
-  # become part of a GQL query, where 'is not None' is invalid syntax.
-  old_runner_query = TestRunner.query(
-      TestRunner.ended != None,
+  return TestRunner.query(
       TestRunner.ended < old_cutoff,
-      default_options=ndb.QueryOptions(keys_only=True))
-
-  futures = ndb.delete_multi_async(old_runner_query)
-
-  logging.debug('DeleteOldRunners done')
-
-  return futures
+      default_options=ndb.QueryOptions(keys_only=True)).filter(
+          TestRunner.done == True)
