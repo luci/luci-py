@@ -21,6 +21,7 @@ import zlib
 
 import webapp2
 from google.appengine import runtime
+from google.appengine.api import datastore_errors
 from google.appengine.api import memcache
 from google.appengine.api import taskqueue
 from google.appengine.ext import blobstore
@@ -625,6 +626,16 @@ class InternalTagWorkerHandler(webapp2.RequestHandler):
       logging.info(
           'Timestamped %d entries out of %s',
           len(to_save), len(raw_hash_digests))
+    except (
+        datastore_errors.InternalError,
+        datastore_errors.Timeout,
+        datastore_errors.TransactionFailedError):
+      # No need to print a stack trace. Return 500 so it is retried
+      # automatically. Disable this from an error reporting standpoint because
+      # we can't do anything about it.
+      logging.warning(
+          'Failed to stamp %d entries: %s', len(raw_hash_digests), e)
+      self.abort(500, detail='Timed out while tagging.')
     except Exception as e:
       logging.error('Failed to stamp %d entries: %s', len(raw_hash_digests), e)
       raise
