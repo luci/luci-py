@@ -55,7 +55,9 @@ MIN_SIZE_FOR_GS = 501
 
 # The minimum size, in bytes, for entry that get's uploaded directly to Google
 # Cloud Storage, bypassing App engine layer.
-MIN_SIZE_FOR_DIRECT_GS = 20 * 1024
+# This effectively disable inline upload. This is because urlfetch is too flaky
+# in practice so it is not worth the associated downtime.
+MIN_SIZE_FOR_DIRECT_GS = MIN_SIZE_FOR_GS
 
 # The maximum number of items to delete at a time.
 ITEMS_TO_DELETE_ASYNC = 100
@@ -1462,10 +1464,11 @@ class StoreContentHandler(ProtocolHandler):
       file_info = gcs.get_file_info(gs_bucket, gs_filepath)
       if not file_info:
         return self.send_error(
-            'File should be in Google Storage.\nFile is \'%s\'.' % gs_filepath)
+            'File should be in Google Storage.\nFile: \'%s\'.' % gs_filepath)
       compressed_size = file_info.size
 
-    # Data is here and it's too large for DS, so put it in GS.
+    # Data is here and it's too large for DS, so put it in GS. It is likely
+    # between MIN_SIZE_FOR_GS <= len(content) < MIN_SIZE_FOR_DIRECT_GS
     if content is not None and len(content) >= MIN_SIZE_FOR_GS:
       if not gcs.write_file(gs_bucket, gs_filepath, [content]):
         # Returns 503 so the client automatically retries.
