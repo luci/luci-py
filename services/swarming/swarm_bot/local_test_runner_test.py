@@ -19,10 +19,9 @@ import test_env
 
 test_env.setup_test_env()
 
+import local_test_runner
 from common import swarm_constants
 from common import test_request_message
-
-from swarm_bot import local_test_runner
 from third_party.mox import mox
 
 DATA_FILE_REGEX = r'\S*/%s/%s'
@@ -102,15 +101,14 @@ class TestLocalTestRunner(unittest.TestCase):
     errors = []
     self.assertTrue(test_run.IsValid(errors), errors)
 
-    with open(self.data_file_name, mode='w+b') as data_file:
-      data = test_request_message.Stringize(test_run, json_readable=True)
-      data_file.write(data.encode('utf-8'))
+    data = test_request_message.Stringize(test_run, json_readable=True)
+    with open(self.data_file_name, 'wb') as f:
+      f.write(data.encode('utf-8'))
 
   def testInvalidTestRunFiles(self):
     def TestInvalidContent(file_content):
-      data_file = open(self.data_file_name, mode='w+b')
-      data_file.write(file_content)
-      data_file.close()
+      with open(self.data_file_name, 'wb') as f:
+        f.write(file_content)
       self.assertRaises(local_test_runner.Error,
                         local_test_runner.LocalTestRunner,
                         self.data_file_name)
@@ -151,7 +149,7 @@ class TestLocalTestRunner(unittest.TestCase):
         universal_newlines=True).AndReturn(self.mock_proc)
 
     (output_pipe, input_pipe) = os.pipe()
-    self.mock_proc.stdin_handle = os.fdopen(input_pipe, 'w')
+    self.mock_proc.stdin_handle = os.fdopen(input_pipe, 'wb')
 
     stdout_handle = os.fdopen(output_pipe)
     self.mock_proc.stdout = stdout_handle
@@ -743,9 +741,8 @@ class TestLocalTestRunner(unittest.TestCase):
     self.CreateValidFile()  # Recreate the request file with new value.
     self.runner = local_test_runner.LocalTestRunner(self.data_file_name)
     self.assertTrue(self.runner.PublishResults(True, [], self.result_string))
-    result_file = open(result_file_path)
-    self.assertEqual(result_file.read(), self.result_string)
-    result_file.close()
+    with open(result_file_path, 'rb') as f:
+      self.assertEqual(f.read(), self.result_string)
 
   def testPublishInternalErrors(self):
     try:

@@ -8,7 +8,6 @@ A test runner represents a given configuration of a given test request running
 on a given machine.
 """
 
-
 import datetime
 import logging
 import urlparse
@@ -18,10 +17,9 @@ from google.appengine.api import mail
 from google.appengine.datastore import datastore_query
 from google.appengine.ext import ndb
 
-from common import result_helper
-from common import swarm_constants
 from common import test_request_message
 from common import url_helper
+from server import result_helper
 from stats import machine_stats
 from stats import requestor_daily_stats
 from stats import runner_stats
@@ -766,7 +764,7 @@ def QueryOldRunners():
   old_cutoff = (
       _GetCurrentTime() -
       datetime.timedelta(
-          days=swarm_constants.SWARM_FINISHED_RUNNER_TIME_TO_LIVE_DAYS))
+          days=result_helper.SWARM_FINISHED_RUNNER_TIME_TO_LIVE_DAYS))
   return TestRunner.query(
       TestRunner.ended < old_cutoff,
       default_options=ndb.QueryOptions(keys_only=True)).filter(

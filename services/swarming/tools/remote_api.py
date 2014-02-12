@@ -125,10 +125,10 @@ def LoadContext(sdk_path, app_dir, host, app_id, version):
     os.environ['SERVER_SOFTWARE'] = 'Development (remote_api_shell)/1.0'
 
     # Create shortcuts.
-    from common import dimensions_utils
     from common import swarm_constants
     from server import admin_user
     from server import dimension_mapping
+    from server import dimensions_utils
     from server import test_management
     from server import test_request
     from server import test_runner

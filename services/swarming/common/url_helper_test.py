@@ -24,17 +24,19 @@ import test_env
 
 test_env.setup_test_env()
 
-
+from depot_tools import auto_stub
 from common import url_helper
 from third_party.mox import mox
 
 
-class UrlHelperTest(unittest.TestCase):
+class UrlHelperTest(auto_stub.TestCase):
   def setUp(self):
     self._mox = mox.Mox()
 
-    self._mox.StubOutWithMock(logging, 'error')
-    self._mox.StubOutWithMock(logging, 'exception')
+    self.mock(logging, 'error', lambda *_: None)
+    self.mock(logging, 'exception', lambda *_: None)
+    self.mock(logging, 'info', lambda *_: None)
+    self.mock(logging, 'warning', lambda *_: None)
     self._mox.StubOutWithMock(time, 'sleep')
     self._mox.StubOutWithMock(urllib2, 'urlopen')
 
@@ -42,8 +44,6 @@ class UrlHelperTest(unittest.TestCase):
     self._mox.UnsetStubs()
 
   def testUrlOpenInvalidTryCount(self):
-    url_helper.logging.error(mox.IgnoreArg(), mox.IgnoreArg())
-
     self._mox.ReplayAll()
 
     self.assertEqual(url_helper.UrlOpen('url', max_tries=-1), None)
@@ -51,8 +51,6 @@ class UrlHelperTest(unittest.TestCase):
     self._mox.VerifyAll()
 
   def testUrlOpenInvalidWaitDuration(self):
-    url_helper.logging.error(mox.IgnoreArg(), mox.IgnoreArg())
-
     self._mox.ReplayAll()
 
     self.assertEqual(url_helper.UrlOpen('url', wait_duration=-1), None)
@@ -123,8 +121,6 @@ class UrlHelperTest(unittest.TestCase):
     url_helper.urllib2.urlopen(
         mox.IgnoreArg(), mox.IgnoreArg(), timeout=mox.IgnoreArg()).AndRaise(
             urllib2.URLError('url'))
-    logging.error(mox.IgnoreArg(), mox.IgnoreArg(), mox.IgnoreArg())
-
     self._mox.ReplayAll()
 
     self.assertIsNone(url_helper.UrlOpen('url', max_tries=1))
@@ -135,8 +131,6 @@ class UrlHelperTest(unittest.TestCase):
     url_helper.urllib2.urlopen(
         mox.IgnoreArg(), mox.IgnoreArg(), timeout=mox.IgnoreArg()).AndRaise(
             urllib2.HTTPError('url', 400, 'error message', None, None))
-    logging.exception(mox.IgnoreArg(), mox.IgnoreArg(), mox.IgnoreArg())
-
     self._mox.ReplayAll()
 
     # Even though we set max_tries to 10, we should only try once since
@@ -152,8 +146,6 @@ class UrlHelperTest(unittest.TestCase):
     url_helper.urllib2.urlopen(
         mox.IgnoreArg(), mox.IgnoreArg(), timeout=mox.IgnoreArg()).AndRaise(
             urllib2.HTTPError('url', 500, 'error message', None, None))
-    logging.warning(mox.IgnoreArg(), mox.IgnoreArg(), mox.IgnoreArg(),
-                    mox.IgnoreArg())
     time.sleep(mox.IgnoreArg())
 
     # Urlopen success attempt.
@@ -177,12 +169,8 @@ class UrlHelperTest(unittest.TestCase):
       url_helper.urllib2.urlopen(
           mox.IgnoreArg(), encoded_data, timeout=mox.IgnoreArg()).AndRaise(
               urllib2.URLError('url'))
-      logging.info(mox.IgnoreArg(), mox.IgnoreArg(), mox.IgnoreArg(),
-                   mox.IgnoreArg())
       if i != attempts - 1:
         time.sleep(mox.IgnoreArg())
-
-    logging.error(mox.IgnoreArg(), mox.IgnoreArg(), mox.IgnoreArg())
     self._mox.ReplayAll()
 
     self.assertEqual(url_helper.UrlOpen('url', max_tries=attempts), None)
@@ -190,8 +178,6 @@ class UrlHelperTest(unittest.TestCase):
 
   def testCountKeyInData(self):
     data = {url_helper.COUNT_KEY: 1}
-
-    logging.error(mox.StrContains('existed in the data'), url_helper.COUNT_KEY)
     self._mox.ReplayAll()
 
     self.assertEqual(url_helper.UrlOpen('url', data=data), None)
@@ -258,8 +244,6 @@ class UrlHelperTest(unittest.TestCase):
       self._mox.StubOutWithMock(url_helper, 'UrlOpen')
 
       url_helper.UrlOpen(mox.IgnoreArg(), method='GET').AndReturn('data')
-      url_helper.logging.error(mox.StrContains('Failed'), mox.IgnoreArg(),
-                               mox.IgnoreArg())
       self._mox.ReplayAll()
 
       self.assertFalse(url_helper.DownloadFile(file_readonly.name,

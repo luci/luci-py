@@ -21,8 +21,8 @@ import logging
 
 from google.appengine.ext import ndb
 
-from common import dimensions_utils
 from common import test_request_message
+from server import dimensions_utils
 
 
 # The number of digits from the hash digest to use when determining the

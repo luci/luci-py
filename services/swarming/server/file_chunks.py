@@ -8,10 +8,12 @@ Contains the models required to store a file on the server. This is mainly
 intended to contain scripts that will be run on the slaves/
 """
 
-
 from google.appengine.ext import ndb
 
-from common import swarm_constants
+# The maximum size a chunk should be when creating chunk models. Although App
+# Engine allows bigger, this gives some wiggle room in case something needs to
+# be added to a chunk model.
+MAX_CHUNK_SIZE = 768 * 1024
 
 
 class FileChunk(ndb.Model):
@@ -38,9 +40,8 @@ def StoreFile(file_id, contents):
       default_options=ndb.QueryOptions(keys_only=True)))
 
   chunk_futures = []
-  for chunk_start in range(0, len(contents), swarm_constants.MAX_CHUNK_SIZE):
-    chunk_contents = contents[
-        chunk_start:chunk_start+swarm_constants.MAX_CHUNK_SIZE]
+  for chunk_start in range(0, len(contents), MAX_CHUNK_SIZE):
+    chunk_contents = contents[chunk_start:chunk_start+MAX_CHUNK_SIZE]
 
     file_chunk = FileChunk(parent=file_model.key,
                            id=chunk_start,

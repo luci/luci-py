@@ -77,16 +77,13 @@ class DimensionsGeneratorTest(unittest.TestCase):
 
   def testDimensionsGeneratorWriteToFileSuccess(self):
     temp_file = tempfile.NamedTemporaryFile()
-
-    dimensions = dimensions_generator.DimensionsGenerator()
-    self.assertTrue(dimensions.WriteDimensionsToFile(temp_file.name))
-
-    dimensions_file = open(temp_file.name)
-    self.assertEqual(json.load(dimensions_file),
-                     dimensions.GetDimensions())
-
-    dimensions_file.close()
-    temp_file.close()
+    try:
+      dimensions = dimensions_generator.DimensionsGenerator()
+      self.assertTrue(dimensions.WriteDimensionsToFile(temp_file.name))
+      with open(temp_file.name, 'rb') as f:
+        self.assertEqual(json.load(f), dimensions.GetDimensions())
+    finally:
+      temp_file.close()
 
   def testDimensionsGeneratorWriteToFileFailure(self):
     # Python should be unable to open this file for writing since it is in

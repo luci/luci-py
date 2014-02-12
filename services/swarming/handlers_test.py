@@ -24,12 +24,12 @@ import handlers
 import test_case
 import webtest
 
-from common import dimensions_utils
-from common import result_helper
 from common import swarm_constants
 from common import url_helper
 from server import admin_user
 from server import dimension_mapping
+from server import dimensions_utils
+from server import result_helper
 from server import test_helper
 from server import test_management
 from server import test_request

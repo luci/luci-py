@@ -15,7 +15,6 @@ as a subset of the python syntax to a dictionary object. See
 http://code.google.com/p/swarming/wiki/MachineProvider for complete details.
 """
 
-
 import json
 import logging
 import logging.handlers
@@ -27,10 +26,13 @@ import sys
 import time
 import urlparse
 
+from common import bot_archive
+from common import rpc
 from common import swarm_constants
 from common import url_helper
-from common import version
 
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # The zip file to contain the zipped slave code.
 ZIPPED_SLAVE_FILES = 'slave_files.zip'
@@ -39,14 +41,7 @@ ZIPPED_SLAVE_FILES = 'slave_files.zip'
 # which a slave should stop querying for work.
 CHECK_REQUIREMENTS_FILE = 'check_requirements.py'
 
-# Make sure we get the path to this file, not the compiled python code, because
-# when calculating the version on the slave, we want to use (not the compiled
-# file).
-SLAVE_MACHINE_SCRIPT = os.path.abspath(__file__.rstrip('c'))
-
-START_SLAVE_SCRIPT_PATH = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)),
-    'start_slave.py')
+START_SLAVE_SCRIPT_PATH = os.path.join(BASE_DIR, 'start_slave.py')
 
 # The code to unzip the slave code and start the slave back up. This needs to be
 # a separate script so that the update process can overwrite it and then run
@@ -208,8 +203,8 @@ def ValidateCommand(commands, error_prefix='', errors=None):
   valid = True
   for command in commands:
     try:
-      ParseRPC(command)
-    except SlaveError as e:
+      rpc.ParseRPC(command)
+    except rpc.RPCError as e:
       errors.append('%sError when parsing RPC: %s' % (error_prefix, e))
       valid = False
 
@@ -238,14 +233,16 @@ class SlaveMachine(object):
     self._max_url_tries = max_url_tries
 
     try:
-      with open(START_SLAVE_SCRIPT_PATH, 'r') as script:
+      with open(START_SLAVE_SCRIPT_PATH, 'rb') as script:
         start_slave_contents = script.read()
     except IOError:
       start_slave_contents = ''
 
-    self._attributes['version'] = version.GenerateSwarmSlaveVersion(
-        SLAVE_MACHINE_SCRIPT,
-        start_slave_contents)
+    additionals = {
+      'start_slave.py': start_slave_contents,
+    }
+    self._attributes['version'] = bot_archive.GenerateSlaveVersion(
+        additionals, True)
 
   def Start(self, iterations=-1):
     """Starts the slave, which polls the Swarm server for jobs until it dies.
@@ -285,9 +282,6 @@ class SlaveMachine(object):
 
       # Reset the result_url to avoid posting to the wrong place.
       self._result_url = None
-
-      logging.debug('Connecting to Swarm server: %s', self._url)
-      logging.debug('Request: %s', str(request))
 
       response_str = url_helper.UrlOpen(url, data=request,
                                         max_tries=self._max_url_tries)
@@ -330,10 +324,9 @@ class SlaveMachine(object):
       assert self._come_back >= 0
       time.sleep(self._come_back)
     else:
-      logging.debug('Commands received, executing now:\n%s', commands)
       # Run the commands.
-      for rpc in commands:
-        function_name, args = ParseRPC(rpc)
+      for rpc_packet in commands:
+        function_name, args = rpc.ParseRPC(rpc_packet)
         try:
           self._ExecuteRPC(function_name, args)
         except SlaveRPCError as e:
@@ -544,12 +537,9 @@ class SlaveMachine(object):
       IOError: the file can't be opened.
     """
     full_name = os.path.join(file_path, file_name)
-
-    file_p = open(full_name, 'wb')
-    file_p.write(file_contents)
-    file_p.close()
-
-    logging.debug('File stored: ' + full_name)
+    with open(full_name, 'wb') as f:
+      f.write(file_contents)
+    logging.debug('File stored: %s', full_name)
 
   def RunCommands(self, args):
     """Checks type of args to be correct.
@@ -622,73 +612,18 @@ class SlaveMachine(object):
         'zipped_slave_files': ZIPPED_SLAVE_FILES
     }
 
-    with open('slave_setup.py', 'w') as f:
+    with open('slave_setup.py', 'wb') as f:
       f.write(slave_setup_script_contents)
 
-    logging.info('New slave code downloaded, replacing this process to allow '
-                 'updating these files. After the files are replaced this '
-                 'slave will be restarted through start_slave.py')
+    logging.info(
+        'Updateslave() slave_setup.py is %d bytes',
+        len(slave_setup_script_contents))
 
     sys.stdout.flush()
     sys.stderr.flush()
     # Repeat sys.executable since the first one is what we call, and the
     # second one is arg[0].
     os.execl(sys.executable, sys.executable, 'slave_setup.py')
-
-
-# TODO(user): Move function to another file.
-def BuildRPC(func_name, args):
-  """Builds a dictionary of an operation that needs to be executed.
-
-  Args:
-    func_name: a string of the function name to execute on the remote host.
-    args: arguments to be passed to the function.
-
-  Returns:
-    A dictionary containing them function name and args.
-  """
-
-  return {'function': func_name, 'args': args}
-
-
-# TODO(user): Move function to another file.
-def ParseRPC(rpc):
-  """Parses RPC created by BuildRPC into a tuple.
-
-  Args:
-    rpc: dictionary containing function name and args.
-
-  Returns:
-    A tuple of (str, args) of function name and args.
-
-  Raises:
-    SlaveError: with human readable string.
-  """
-
-  if not isinstance(rpc, dict):
-    raise SlaveError('Invalid RPC container')
-
-  fields = ['function', 'args']
-  for key in rpc:
-    try:
-      fields.remove(key)
-    except ValueError:
-      raise SlaveError('Invalid extra arg to RPC: ' + key)
-
-  if fields:
-    raise SlaveError('Missing mandatory field to RPC: ' + str(fields))
-
-  function = rpc['function']
-  args = rpc['args']
-
-  if not isinstance(function, basestring):
-    raise SlaveError('Invalid RPC call function name type')
-
-  logging.debug('rpc function name: ' + function)
-  logging.debug('rpc function arg type: ' + str(type(args)))
-  logging.debug('rpc function args: %s', str(args))
-
-  return (function, args)
 
 
 class SlaveError(Exception):
@@ -721,9 +656,8 @@ def main():
   parser.add_option('--keep_alive', action='store_true',
                     help='Have the slave swallow all exceptions and run'
                     'forever.')
-  parser.add_option('-v', '--verbose', action='store_true',
-                    help='Set logging level to DEBUG. Optional. Defaults to '
-                    'ERROR level.')
+  parser.add_option('-v', '--verbose', action='count', default=0,
+                    help='Set logging level to INFO, twice for DEBUG.')
   parser.add_option('-i', '--iterations', default=-1, type='int',
                     help='Number of iterations to request jobs from '
                     'Swarm server. Defaults to %default (infinite).')
@@ -750,10 +684,8 @@ def main():
       logging.Formatter('%(asctime)s %(name)-12s %(levelname)-8s %(message)s'))
   logging.getLogger().addHandler(log_file)
 
-  if options.verbose:
-    logging.getLogger().setLevel(logging.DEBUG)
-  else:
-    logging.getLogger().setLevel(logging.ERROR)
+  levels = [logging.WARNING, logging.INFO, logging.DEBUG]
+  logging.getLogger().setLevel(levels[min(options.verbose, len(levels)-1)])
 
   # Open the specified file, or stdin.
   if not args:
@@ -785,7 +717,7 @@ def main():
     # Start requesting jobs.
     try:
       slave.Start(iterations=options.iterations)
-    except SlaveError as e:
+    except (rpc.RPCError, SlaveError) as e:
       logging.exception('Slave start threw an exception:\n%s', e)
 
     if not options.keep_alive:

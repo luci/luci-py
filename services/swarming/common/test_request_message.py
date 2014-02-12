@@ -32,8 +32,6 @@ import logging
 import urllib
 import urlparse
 
-from common import swarm_constants
-
 
 # All the accepted url schemes.
 VALID_URL_SCHEMES = ['http', 'https', 'file', 'mailto']
@@ -47,6 +45,11 @@ DEFAULT_WORKING_DIR = r'c:\swarm_tests'
 
 # The maximum priority value that a runner can have.
 MAX_PRIORITY_VALUE = 1000
+
+# The time (in seconds) to wait after receiving a runner before aborting it.
+# This is intended to delete runners that will never run because they will
+# never find a matching machine.
+SWARM_RUNNER_MAX_WAIT_SECS = 24 * 60 * 60
 
 
 class Error(Exception):
@@ -742,7 +745,7 @@ class TestConfiguration(TestRequestMessageBase):
 
   def __init__(self, config_name=None, env_vars=None, data=None, tests=None,
                min_instances=1, additional_instances=0,
-               deadline_to_run=swarm_constants.SWARM_RUNNER_MAX_WAIT_SECS,
+               deadline_to_run=SWARM_RUNNER_MAX_WAIT_SECS,
                priority=100, **dimensions):
     super(TestConfiguration, self).__init__()
     self.config_name = config_name

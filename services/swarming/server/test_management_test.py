@@ -27,17 +27,17 @@ from google.appengine.api import mail
 from google.appengine.ext import ndb
 
 import test_case
-from common import dimensions_utils
-from common import result_helper
-from common import swarm_constants
+from common import bot_archive
+from common import rpc
 from common import test_request_message
 from common import url_helper
+from server import dimensions_utils
+from server import result_helper
 from server import test_helper
 from server import test_management
 from server import test_request
 from server import test_runner
 from stats import machine_stats
-from swarm_bot import slave_machine
 from third_party.mox import mox
 
 
@@ -222,7 +222,7 @@ class TestManagementTest(test_case.TestCase):
       # Validate shard indices are set correctly by parsing the commands.
       found_manifest = False
       for command in response['commands']:
-        function_name, args = slave_machine.ParseRPC(command)
+        function_name, args = rpc.ParseRPC(command)
         if function_name == 'StoreFiles':
           found_manifest = True
           break
@@ -241,7 +241,7 @@ class TestManagementTest(test_case.TestCase):
 
     found_command = False
     for command in response['commands']:
-      function_name, args = slave_machine.ParseRPC(command)
+      function_name, args = rpc.ParseRPC(command)
       if function_name == 'RunCommands':
         found_command = True
         self.assertEqual('--restart_on_failure' in args, restart_on_failure)
@@ -437,7 +437,7 @@ class TestManagementTest(test_case.TestCase):
 
     # Make the runner's run_by time in the past, so it will be considered stale.
     runner.run_by -= datetime.timedelta(
-        seconds=(2 * swarm_constants.SWARM_RUNNER_MAX_WAIT_SECS))
+        seconds=(2 * test_request_message.SWARM_RUNNER_MAX_WAIT_SECS))
     runner.put()
 
     # Don't abort the runner if it is running and it has been pinging the server
@@ -819,28 +819,20 @@ class TestManagementTest(test_case.TestCase):
   def testSlaveCodeZipped(self):
     zipped_code = test_management.SlaveCodeZipped()
 
-    temp_dir = tempfile.mkdtemp()
+    temp_dir = tempfile.mkdtemp(prefix='swarming')
     try:
       with zipfile.ZipFile(StringIO.StringIO(zipped_code), 'r') as zip_file:
         zip_file.extractall(temp_dir)
 
-      expected_slave_script = os.path.join(temp_dir,
-                                           swarm_constants.SLAVE_MACHINE_SCRIPT)
-      self.assertTrue(os.path.exists(expected_slave_script))
-
-      expected_test_runner = os.path.join(temp_dir,
-                                          swarm_constants.TEST_RUNNER_DIR,
-                                          swarm_constants.TEST_RUNNER_SCRIPT)
-      self.assertTrue(os.path.exists(expected_test_runner))
-
-      common_dir = os.path.join(temp_dir, swarm_constants.COMMON_DIR)
-      for common_file in swarm_constants.SWARM_BOT_COMMON_FILES:
-        self.assertTrue(os.path.exists(
-            os.path.join(common_dir, common_file)))
+      for i in bot_archive.FILES:
+        self.assertTrue(os.path.isfile(os.path.join(temp_dir, i)), i)
+      for i in bot_archive.MAPPED.itervalues():
+        self.assertTrue(os.path.isfile(os.path.join(temp_dir, i)), i)
 
       # Try running the slave and ensure it can import the required files.
       # (It would crash if it failed to import them).
-      subprocess.check_output([sys.executable, expected_slave_script, '-h'])
+      subprocess.check_output(
+          [sys.executable, os.path.join(temp_dir, 'slave_machine.py'), '-h'])
     finally:
       shutil.rmtree(temp_dir)
 

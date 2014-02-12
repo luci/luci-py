@@ -10,17 +10,19 @@ acts similiar to the normal blobstore, but the values all stay in the datastore.
 
 import datetime
 
-
 from google.appengine.ext import ndb
 
-from common import swarm_constants
+from server import file_chunks
 
+
+# Number of days to keep old runners around for.
+SWARM_FINISHED_RUNNER_TIME_TO_LIVE_DAYS = 14
 
 # Number of days to keep results around before assuming they are orphans and
 # can be safely deleted. This value should always be more than
 # SWARM_FINISHED_RUNNER_TIME_TO_LIVE_DAYS to ensure they are orphans.
 SWARM_OLD_RESULTS_TIME_TO_LIVE_DAYS = (
-    swarm_constants.SWARM_FINISHED_RUNNER_TIME_TO_LIVE_DAYS + 5)
+    SWARM_FINISHED_RUNNER_TIME_TO_LIVE_DAYS + 5)
 
 # The number of days to keep result chunks around before assuming they are
 # orphaned and can be safely deleted. This value should always be more than
@@ -109,8 +111,8 @@ def StoreResults(results_data):
   if results_data:
     chunk_futures = [
         ResultChunk(
-            chunk=results_data[x:x+swarm_constants.MAX_CHUNK_SIZE]).put_async()
-        for x in range(0, len(results_data), swarm_constants.MAX_CHUNK_SIZE)
+            chunk=results_data[x:x+file_chunks.MAX_CHUNK_SIZE]).put_async()
+        for x in range(0, len(results_data), file_chunks.MAX_CHUNK_SIZE)
     ]
 
   new_results = Results(

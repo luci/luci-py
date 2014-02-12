@@ -26,7 +26,6 @@ from google.appengine.api import taskqueue
 from google.appengine.api import users
 from google.appengine.ext import ndb
 
-from common import result_helper
 from common import swarm_constants
 from common import test_request_message
 from common import url_helper
@@ -36,6 +35,7 @@ from components import ereporter2
 from components import utils
 from server import admin_user
 from server import dimension_mapping
+from server import result_helper
 from server import test_management
 from server import test_request
 from server import test_runner

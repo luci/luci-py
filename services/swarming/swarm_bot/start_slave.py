@@ -13,7 +13,6 @@ by the server.
 """
 
 
-
 import logging
 
 logging.error('start_slave.py doesn\'t know what machine configurations to '

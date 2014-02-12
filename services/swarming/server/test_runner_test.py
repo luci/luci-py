@@ -20,9 +20,8 @@ from google.appengine.api import datastore_errors
 from google.appengine.ext import ndb
 
 import test_case
-from common import result_helper
-from common import swarm_constants
 from common import url_helper
+from server import result_helper
 from server import test_helper
 from server import test_management
 from server import test_request
@@ -555,12 +554,12 @@ class TestRunnerTest(test_case.TestCase):
 
     # Set the current time to the future, but not too much.
     mock_now = (datetime.datetime.utcnow() + datetime.timedelta(
-        days=swarm_constants.SWARM_FINISHED_RUNNER_TIME_TO_LIVE_DAYS - 1))
+        days=result_helper.SWARM_FINISHED_RUNNER_TIME_TO_LIVE_DAYS - 1))
     test_runner._GetCurrentTime().AndReturn(mock_now)
 
     # Set the current time to way in the future.
     mock_now = (datetime.datetime.utcnow() + datetime.timedelta(
-        days=swarm_constants.SWARM_FINISHED_RUNNER_TIME_TO_LIVE_DAYS + 1))
+        days=result_helper.SWARM_FINISHED_RUNNER_TIME_TO_LIVE_DAYS + 1))
     test_runner._GetCurrentTime().AndReturn(mock_now)
     self._mox.ReplayAll()
 

@@ -18,7 +18,7 @@ test_env.setup_test_env()
 from google.appengine.ext import ndb
 
 import test_case
-from common import result_helper
+from server import result_helper
 from third_party.mox import mox
 
 

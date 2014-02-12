@@ -54,18 +54,17 @@ def UrlOpen(url, data=None, files=None, max_tries=5, wait_duration=None,
     invalid arguments, then it returns None.
   """
   if max_tries <= 0:
-    logging.error('Invalid number of tries, %d, passed in.', max_tries)
+    logging.error('UrlOpen(%s): Invalid number of tries: %d', url, max_tries)
     return None
 
   if wait_duration and wait_duration < 0:
-    logging.error('Invalid wait duration, %d, passed in.', wait_duration)
+    logging.error('UrlOpen(%s): Invalid wait duration: %d', url, wait_duration)
     return None
 
   data = data or {}
 
   if COUNT_KEY in data:
-    logging.error('%s already existed in the data passed into UlrOpen. It '
-                  'would be overwritten. Aborting UrlOpen', COUNT_KEY)
+    logging.error('UrlOpen(%s): key \'%s\' is duplicate.', url, COUNT_KEY)
     return None
 
   url_response = None
@@ -101,21 +100,17 @@ def UrlOpen(url, data=None, files=None, max_tries=5, wait_duration=None,
     except urllib2.HTTPError as e:
       if e.code >= 500:
         # The HTTPError was due to a server error, so retry the attempt.
-        logging.warning('Able to connect to %s on attempt %d.\nException: %s ',
-                        url, attempt, e)
+        logging.warning('UrlOpen(%s): attempt %d: %s ', url, attempt, e)
       else:
         # This HTTPError means we reached the server and there was a problem
         # with the request, so don't retry.
-        logging.exception('Able to connect to %s but an exception was '
-                          'thrown.\n%s', url, e)
+        logging.exception('UrlOpen(%s): %s', url, e)
         return None
     except (httplib.HTTPException, socket.error, urllib2.URLError) as e:
-      logging.warning('Unable to open url %s on attempt %d.\nException: %s',
-                      url, attempt, e)
+      logging.warning('UrlOpen(%s): attempt %d: %s', url, attempt, e)
 
     if url_response is not None:
-      logging.info('Opened given url, %s, and got a response of length %d.',
-                   url, len(url_response))
+      logging.info('UrlOpen(%s) got %d bytes.', url, len(url_response))
       return url_response
     elif attempt != max_tries - 1:
       # Only sleep if we are going to try and connect again.
@@ -127,8 +122,7 @@ def UrlOpen(url, data=None, files=None, max_tries=5, wait_duration=None,
 
       time.sleep(duration)
 
-  logging.error('Unable to open given url, %s, after %d attempts.',
-                url, max_tries)
+  logging.error('UrlOpen(%s): Unable to open after %d attempts', url, max_tries)
   return None
 
 

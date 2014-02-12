@@ -69,7 +69,6 @@ Top level Functions:
         as RunTests.
 """
 
-
 import exceptions
 import logging
 import logging.handlers
@@ -303,17 +302,13 @@ class LocalTestRunner(object):
     Returns:
       True if the parsed request file was validated, False othewise.
     """
-    request_file = None
     try:
-      request_file = open(request_file_name, 'r')
-      request_data = request_file.read()
+      with open(request_file_name, 'rb') as f:
+        request_data = f.read()
     except IOError, e:
       logging.exception('Failed to open file %s.\nException: %s',
                         request_file_name, e)
       return False
-    finally:
-      if request_file:
-        request_file.close()
     try:
       self.test_run = test_request_message.TestRun()
       errors = []
@@ -698,17 +693,13 @@ class LocalTestRunner(object):
         return False
     elif result_url_parts[0] == 'file':
       file_path = '%s%s' % (result_url_parts[1], result_url_parts[2])
-      output_file = None
       try:
-        output_file = open(file_path, 'w')
-        output_file.write(result_string)
+        with open(file_path, 'wb') as f:
+          f.write(result_string)
       except IOError, e:
         logging.exception('Can\'t write result to file %s.\nException: %s',
                           file_path, e)
         return False
-      finally:
-        if output_file:
-          output_file.close()
     elif result_url_parts[0] == 'mailto':
       # TODO(user): Implement this!
       pass
@@ -726,7 +717,7 @@ class LocalTestRunner(object):
     self.logging_file_handler.close()
 
     try:
-      with open(self.log_file_name) as f:
+      with open(self.log_file_name, 'rb') as f:
         log_data = f.read()
     except IOError:
       log_data = 'local_test_runner was unable to read its logs.'

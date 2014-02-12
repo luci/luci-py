@@ -15,8 +15,7 @@ import test_env
 test_env.setup_test_env()
 
 import test_case
-from common import file_chunks
-from common import swarm_constants
+from server import file_chunks
 
 
 class FileTest(test_case.TestCase):
@@ -47,7 +46,7 @@ class FileTest(test_case.TestCase):
     # chunks.
     file_id = 'file_id'
     expected_file = 'start'
-    expected_file += 'script' * swarm_constants.MAX_CHUNK_SIZE
+    expected_file += 'script' * file_chunks.MAX_CHUNK_SIZE
     expected_file += 'end'
 
     file_chunks.StoreFile(file_id, expected_file)

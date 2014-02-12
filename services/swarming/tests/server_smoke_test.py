@@ -29,7 +29,7 @@ import urlparse
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT_DIR)
 
-from common import swarm_constants
+from common import bot_archive
 from common import url_helper
 
 import test_env
@@ -40,16 +40,25 @@ import find_gae_sdk
 
 # The script to start the slave with. The python script is passed in because
 # during tests, sys.executable was sometimes failing to find python.
-START_SLAVE = """import os
-import subprocess
-import sys
-
-subprocess.call([sys.executable, '%(slave_script)s',
-                 '-a', '%(server_address)s', '-p', '%(server_port)s',
-                 '-d', '%(slave_directory)s',
-                 '-l', os.path.join('%(slave_directory)s', 'slave.log'),
-                 '%(config_file)s'])
-"""
+# Starting up /path/to/slave_machine.py will be printed exactly twice. Once for
+# the initial start up, a second time after the upgrade.
+START_SLAVE = (
+    "import os\n"
+    "import subprocess\n"
+    "import sys\n"
+    "\n"
+    "print('Starting up %(slave_script)s')\n"
+    "sys.stdout.flush()\n"
+    "cmd = [\n"
+    "    sys.executable, '%(slave_script)s',\n"
+    "    '-a', '%(server_address)s', '-p', '%(server_port)s',\n"
+    "    '-d', '%(slave_directory)s',\n"
+    "    '-l', '%(log_file)s',\n"
+    "    '-v',\n"
+    "    %(extra_args)s\n"
+    "    '%(config_file)s',\n"
+    "]\n"
+    "sys.exit(subprocess.call(cmd))\n")
 
 # Location of the test files.
 TEST_DATA_DIR = os.path.join(ROOT_DIR, 'tests', 'test_files')
@@ -132,18 +141,13 @@ def setup_bot(swarm_bot_dir, start_slave_content):
   # TODO(maruel): Only the actual swarm_bot code + common.
   copy_tree(ROOT_DIR, swarm_bot_dir)
 
-  # Move the slave_machine.py script to its correct home.
-  # TODO(maruel): Make this unnecessary.
-  os.rename(
-      os.path.join(swarm_bot_dir, swarm_constants.TEST_RUNNER_DIR,
-                   swarm_constants.SLAVE_MACHINE_SCRIPT),
-      os.path.join(swarm_bot_dir, swarm_constants.SLAVE_MACHINE_SCRIPT))
+  for src, dst in bot_archive.MAPPED.iteritems():
+    os.rename(
+        os.path.join(swarm_bot_dir, src), os.path.join(swarm_bot_dir, dst))
 
   # Remove the local test runner script to ensure the slave is out of date
   # and is updated.
-  os.remove(
-      os.path.join(swarm_bot_dir, swarm_constants.TEST_RUNNER_DIR,
-                   swarm_constants.TEST_RUNNER_SCRIPT))
+  os.remove(os.path.join(swarm_bot_dir, 'swarm_bot', 'local_test_runner.py'))
 
   with open(os.path.join(swarm_bot_dir, 'start_slave.py'), 'wb') as f:
     f.write(start_slave_content)
@@ -157,12 +161,9 @@ class SwarmingTestCase(unittest.TestCase):
     self._bot_proc = None
     self.tmpdir = tempfile.mkdtemp(prefix='swarming')
     self.swarm_bot_dir = os.path.join(self.tmpdir, 'bot')
+    self.log_dir = os.path.join(self.tmpdir, 'logs')
     os.mkdir(self.swarm_bot_dir)
-
-    kwargs = {}
-    if not VERBOSE:
-      kwargs['stdout'] = open(os.path.join(self.tmpdir, 'slave.log'), 'wb')
-      kwargs['stderr'] = subprocess.STDOUT
+    os.mkdir(self.log_dir)
 
     server_addr = 'http://localhost'
     server_port = find_free_port('localhost', 9000)
@@ -180,20 +181,25 @@ class SwarmingTestCase(unittest.TestCase):
       # the test is run because the random generator is always given the
       # same seed.
       '--datastore_consistency_policy', 'random',
+      '--log_level', 'debug' if VERBOSE else 'info',
       ROOT_DIR,
     ]
 
     # Start the server first since it is a tad slow to start.
-    self._server_proc = subprocess.Popen(
-        cmd, cwd=self.tmpdir, preexec_fn=os.setsid, **kwargs)
+    # TODO(maruel): Use CREATE_NEW_PROCESS_GROUP on Windows.
+    with open(os.path.join(self.log_dir, 'server.log'), 'wb') as f:
+      self._server_proc = subprocess.Popen(
+          cmd, cwd=self.tmpdir, preexec_fn=os.setsid,
+          stdout=f, stderr=subprocess.STDOUT)
 
     start_slave_content = START_SLAVE % {
       'config_file': TEST_SLAVE_CONFIG,
+      'extra_args': "'-v'," if VERBOSE else '',
+      'log_file': os.path.join(self.log_dir, 'slave_machine.log'),
       'server_address': server_addr,
       'server_port': server_port,
       'slave_directory': self.swarm_bot_dir,
-      'slave_script': os.path.join(self.swarm_bot_dir,
-                                    swarm_constants.SLAVE_MACHINE_SCRIPT),
+      'slave_script': os.path.join(self.swarm_bot_dir, 'slave_machine.py'),
     }
     setup_bot(self.swarm_bot_dir, start_slave_content)
 
@@ -208,35 +214,54 @@ class SwarmingTestCase(unittest.TestCase):
 
     # Start the slave machine script to start polling for tests.
     cmd = [sys.executable, os.path.join(self.swarm_bot_dir, 'start_slave.py')]
-    if not VERBOSE:
-      kwargs['stdout'] = open(os.path.join(self.tmpdir, 'server.log'), 'wb')
-    #if VERBOSE:
-    #  cmd.append('-v')
-    self._bot_proc = subprocess.Popen(
-        cmd, cwd=self.swarm_bot_dir, preexec_fn=os.setsid, **kwargs)
+    if VERBOSE:
+      cmd.append('-v')
+    with open(os.path.join(self.log_dir, 'start_slave.log'), 'wb') as f:
+      self._bot_proc = subprocess.Popen(
+          cmd, cwd=self.swarm_bot_dir, preexec_fn=os.setsid,
+          stdout=f, stderr=subprocess.STDOUT)
 
   def tearDown(self):
+    # Kill bot, kill server, print logs if failed, delete tmpdir, call super.
     try:
-      # TODO(maruel): This code doesn't work, the slave is restarting itself,
-      # so the pid changed.
-      if self._bot_proc and self._bot_proc.poll() is None:
-        try:
-          os.killpg(self._bot_proc.pid, signal.SIGKILL)
-          self._bot_proc.wait()
-        except OSError:
-          pass
-
-      if self._server_proc and self._server_proc.poll() is None:
-        try:
-          os.killpg(self._server_proc.pid, signal.SIGKILL)
-          self._server_proc.wait()
-        except OSError:
-          pass
-    finally:
       try:
-        shutil.rmtree(self.tmpdir)
+        try:
+          try:
+            if self._bot_proc:
+              if self._bot_proc.poll() is None:
+                try:
+                  # TODO(maruel): os.killpg() doesn't exist on Windows.
+                  os.killpg(self._bot_proc.pid, signal.SIGKILL)
+                  self._bot_proc.wait()
+                except OSError:
+                  pass
+              else:
+                # The bot should have quit normally when it self-updates.
+                self.assertEqual(0, self._bot_proc.returncode)
+          finally:
+            if self._server_proc and self._server_proc.poll() is None:
+              try:
+                os.killpg(self._server_proc.pid, signal.SIGKILL)
+                self._server_proc.wait()
+              except OSError:
+                pass
+        finally:
+          if self.has_failed() or VERBOSE:
+            # Print out the logs before deleting them.
+            for i in sorted(os.listdir(self.log_dir)):
+              sys.stderr.write('\n%s:\n' % i)
+              with open(os.path.join(self.log_dir, i), 'rb') as f:
+                for l in f:
+                  sys.stderr.write('  ' + l)
       finally:
-        super(SwarmingTestCase, self).tearDown()
+        # In the end, delete the temporary directory.
+        shutil.rmtree(self.tmpdir)
+    finally:
+      super(SwarmingTestCase, self).tearDown()
+
+  def has_failed(self):
+    # pylint: disable=E1101
+    return not self._resultForDoCleanups.wasSuccessful()
 
   def get_swarm_files(self):
     swarm_files = []
@@ -331,4 +356,6 @@ if __name__ == '__main__':
   logging.disable(logging.CRITICAL)
   VERBOSE = '-v' in sys.argv
   logging.basicConfig(level=logging.INFO if VERBOSE else logging.ERROR)
+  if VERBOSE:
+    unittest.TestCase.maxDiff = None
   unittest.main()

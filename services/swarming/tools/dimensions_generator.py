@@ -52,14 +52,11 @@ class DimensionsGenerator(object):
       True if the file was succesfully written to.
     """
     try:
-      dimensions_file = open(filename, mode='w')
+      with open(filename, 'wb') as f:
+        json.dump(self.GetDimensions(), f)
     except IOError:
       logging.error('Cannot open file %s.', filename)
       return False
-
-    json.dump(self.GetDimensions(), dimensions_file)
-    dimensions_file.close()
-
     return True
 
 
