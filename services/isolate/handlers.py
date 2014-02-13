@@ -631,7 +631,7 @@ class InternalTagWorkerHandler(webapp2.RequestHandler):
     except (
         datastore_errors.InternalError,
         datastore_errors.Timeout,
-        datastore_errors.TransactionFailedError):
+        datastore_errors.TransactionFailedError) as e:
       # No need to print a stack trace. Return 500 so it is retried
       # automatically. Disable this from an error reporting standpoint because
       # we can't do anything about it.
