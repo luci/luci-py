@@ -199,12 +199,16 @@ def get_content_by_hash(namespace, hash_key):
     return None
 
   try:
-    return ContentEntry.get_by_id(
-        hash_key, parent=ndb.Key(ContentNamespace, namespace))
+    return entry_key(namespace, hash_key).get()
   except ndb.KindError:
     pass
 
   return None
+
+
+def entry_key(namespace, hash_key):
+  """Returns a valid ndb.Key for a ContentEntry."""
+  return ndb.Key(ContentNamespace, namespace, ContentEntry, hash_key)
 
 
 def create_entry(namespace, hash_key):
@@ -224,7 +228,7 @@ def create_entry(namespace, hash_key):
 
   future_namespace = ContentNamespace.get_or_insert_async(
       namespace, is_testing=namespace.startswith('temporary'))
-  key = ndb.Key(ContentNamespace, namespace, ContentEntry, hash_key)
+  key = entry_key(namespace, hash_key)
   # TODO(maruel): Profile to see if it is faster to fetch the whole entity so
   # the cache is used.
   future_entry = ContentEntry.query(ContentEntry.key == key).get_async(
@@ -597,10 +601,8 @@ class InternalTagWorkerHandler(webapp2.RequestHandler):
       today = datetime.date(int(year), int(month), int(day))
       # Requests all the entities at once.
       futures = ndb.get_multi_async(
-        ndb.Key(
-            ContentNamespace, namespace,
-            ContentEntry, binascii.hexlify(raw_hash_digest))
-        for raw_hash_digest in raw_hash_digests)
+          entry_key(namespace, binascii.hexlify(d)) for d in raw_hash_digests)
+
       to_save = []
       while futures:
         # Return opportunistically the first entity that can be retrieved.
@@ -1114,10 +1116,6 @@ class PreUploadContentHandler(ProtocolHandler):
 
     Yields pairs (EntryInfo object, True if such entry exists in Datastore).
     """
-    # No need to verify the entity is present, no object exists nor will be
-    # found if the ancestor doesn't exist.
-    namespace_key = ndb.Key(ContentNamespace, namespace)
-
     # Context options for NDB calls.
     ctx_options = {
         # Don't bother with in-process cache, it's not going to be used.
@@ -1129,7 +1127,7 @@ class PreUploadContentHandler(ProtocolHandler):
     # Kick off all queries in parallel. Build mapping Future -> digest.
     futures = {}
     for entry in entries:
-      key = ndb.Key(ContentEntry, entry.digest, parent=namespace_key)
+      key = entry_key(namespace, entry.digest)
       futures[key.get_async(**ctx_options)] = entry
 
     # Pick first one that finishes and yield it, rinse, repeat.
