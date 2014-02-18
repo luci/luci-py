@@ -3,9 +3,16 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
+import base64
+import datetime
+import logging
+import os
 import sys
+import time
 import unittest
 import urllib
+
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 import test_env
 test_env.setup_test_env()
@@ -19,6 +26,9 @@ import test_case
 import handlers
 
 from components import auth
+
+# Access to a protected member _XXX of a client class
+# pylint: disable=W0212
 
 
 def _ErrorRecord(**kwargs):
@@ -50,16 +60,37 @@ def _ErrorRecord(**kwargs):
   return handlers.ereporter2.ErrorRecord(**default_values)
 
 
+def gen_item(content):
+  """Returns data to send to /pre-upload to upload 'content'."""
+  h = handlers.get_hash_algo('default')
+  h.update(content)
+  # REMOVE ME logging.info('%s: %s', content, h.hexdigest())
+  return {
+    'h': h.hexdigest(),
+    'i': 0,
+    's': len(content),
+  }
+
+
 class MainTest(test_case.TestCase):
   """Tests the handlers."""
   def setUp(self):
     """Creates a new app instance for every test case."""
     super(MainTest, self).setUp()
     self.testbed.init_modules_stub()
-    app = handlers.CreateApplication()
+    self.testbed.init_taskqueue_stub()
+    self.taskqueue_stub = self.testbed.get_stub(
+        test_case.testbed.TASKQUEUE_SERVICE_NAME)
+    self.taskqueue_stub._root_path = ROOT_DIR
+
+    # When called during a taskqueue, the call to get_app_version() may fail so
+    # pre-fetch it.
+    version = handlers.config.get_app_version()
+    self.mock(handlers.config, 'get_task_queue_host', lambda: version)
     self.source_ip = '127.0.0.1'
     self.testapp = webtest.TestApp(
-        app, extra_environ={'REMOTE_ADDR': self.source_ip})
+        handlers.CreateApplication(),
+        extra_environ={'REMOTE_ADDR': self.source_ip})
 
   def whitelist_self(self):
     handlers.acl.WhitelistedIP(
@@ -75,20 +106,46 @@ class MainTest(test_case.TestCase):
       'pusher': True,
     }
     req = self.testapp.post_json('/content-gs/handshake', data)
-    return req.json['access_token']
+    return urllib.quote(req.json['access_token'])
 
-  @staticmethod
-  def preupload_foo():
-    """Returns data to send to /pre-upload to upload 'foo'."""
-    h = handlers.get_hash_algo('default')
-    h.update('foo')
-    return [
-      {
-        'h': h.hexdigest(),
-        's': 3,
-        'i': 0,
-      },
-    ]
+  def execute_tasks(self):
+    """Executes enqueued tasks that are ready to run and return the number run.
+
+    A task may trigger another task.
+
+    Sadly, taskqueue_stub implementation does not provide a nice way to run
+    them so run the pending tasks manually.
+    """
+    self.assertEqual([None], self.taskqueue_stub._queues.keys())
+    ran_total = 0
+    while True:
+      # Do multiple loops until no task was run.
+      ran = 0
+      for queue in self.taskqueue_stub.GetQueues():
+        for task in self.taskqueue_stub.GetTasks(queue['name']):
+          # Remove 2 seconds for jitter.
+          eta = task['eta_usec'] / 1e6 - 2
+          if eta >= time.time():
+            continue
+          self.assertEqual('POST', task['method'])
+          logging.info('Task: %s', task['url'])
+
+          # Not 100% sure why the Content-Length hack is needed:
+          body = base64.b64decode(task['body'])
+          headers = dict(task['headers'])
+          headers['Content-Length'] = str(len(body))
+          try:
+            response = self.testapp.post(task['url'], body, headers=headers)
+          except:
+            logging.error(task)
+            raise
+          # TODO(maruel): Implement task failure.
+          self.assertEqual(200, response.status_code)
+          self.taskqueue_stub.DeleteTask(queue['name'], task['name'])
+          ran += 1
+      if not ran:
+        return ran_total
+      ran_total += ran
 
   def test_internal_cron_ereporter2_mail_not_cron(self):
     response = self.testapp.get(
@@ -142,8 +199,8 @@ class MainTest(test_case.TestCase):
 
   def test_pre_upload_ok(self):
     req = self.testapp.post_json(
-        '/content-gs/pre-upload/a?token=%s' % urllib.quote(self.handshake()),
-        self.preupload_foo())
+        '/content-gs/pre-upload/a?token=%s' % self.handshake(),
+        [gen_item('foo')])
     self.assertEqual(1, len(req.json))
     self.assertEqual(2, len(req.json[0]))
     # ['url', None]
@@ -152,15 +209,109 @@ class MainTest(test_case.TestCase):
 
   def test_pre_upload_invalid_namespace(self):
     req = self.testapp.post_json(
-        '/content-gs/pre-upload/[?token=%s' % urllib.quote(self.handshake()),
-        self.preupload_foo(),
+        '/content-gs/pre-upload/[?token=%s' % self.handshake(),
+        [gen_item('foo')],
         expect_errors=True)
     self.assertTrue(
         'Invalid namespace; allowed keys must pass regexp "[a-z0-9A-Z\-._]+"' in
         req.body)
 
+  def put_content(self, url, content):
+    """Simulare isolateserver.py archive."""
+    req = self.testapp.put(
+        url, content_type='application/octet-stream', params=content)
+    self.assertEqual(200, req.status_code)
+    self.assertEqual({'entry':{}}, req.json)
+
+  def test_upload_tag_expire(self):
+    # Complete integration test that ensures tagged items are properly saved and
+    # non tagged items are dumped.
+    # Use small objects so it doesn't exercise the GS code path.
+    items = ['bar', 'foo']
+    now = datetime.datetime(2012, 01, 02, 03, 04, 05, 06)
+    self.mock(handlers, 'utcnow', lambda: now)
+    self.mock(handlers.ndb.DateTimeProperty, '_now', lambda _: now)
+    self.mock(handlers.ndb.DateProperty, '_now', lambda _: now.date())
+
+    r = self.testapp.post_json(
+        '/content-gs/pre-upload/default?token=%s' % self.handshake(),
+        [gen_item(i) for i in items])
+    self.assertEqual(len(items), len(r.json))
+    self.assertEqual(0, len(list(handlers.ContentNamespace.query())))
+    self.assertEqual(0, len(list(handlers.ContentEntry.query())))
+
+    for content, urls in zip(items, r.json):
+      self.assertEqual(2, len(urls))
+      self.assertEqual(None, urls[1])
+      self.put_content(urls[0], content)
+    self.assertEqual(1, len(list(handlers.ContentNamespace.query())))
+    self.assertEqual(2, len(list(handlers.ContentEntry.query())))
+    expiration = 7*24*60*60
+    self.assertEqual(0, self.execute_tasks())
+
+    # Advance time, tag the first item.
+    now += datetime.timedelta(seconds=2*expiration)
+    self.assertEqual(
+        datetime.datetime(2012, 01, 16, 03, 04, 05, 06), handlers.utcnow())
+    r = self.testapp.post_json(
+        '/content-gs/pre-upload/default?token=%s' % self.handshake(),
+        [gen_item(items[0])])
+    self.assertEqual(200, r.status_code)
+    self.assertEqual([None], r.json)
+    self.assertEqual(1, self.execute_tasks())
+    self.assertEqual(2, len(list(handlers.ContentEntry.query())))
+
+    # 'bar' was kept, 'foo' was cleared out.
+    resp = self.testapp.get('/restricted/cleanup/trigger/old')
+    self.assertEqual(200, resp.status_code)
+    self.assertEqual([None], r.json)
+    self.assertEqual(1, self.execute_tasks())
+    self.assertEqual(1, len(list(handlers.ContentNamespace.query())))
+    self.assertEqual(1, len(list(handlers.ContentEntry.query())))
+    self.assertEqual('bar', handlers.ContentEntry.query().get().content)
+
+    # Advance time and force cleanup. This deletes 'bar' too.
+    now += datetime.timedelta(seconds=2*expiration)
+    resp = self.testapp.get('/restricted/cleanup/trigger/old')
+    self.assertEqual(200, resp.status_code)
+    self.assertEqual([None], r.json)
+    self.assertEqual(1, self.execute_tasks())
+    self.assertEqual(1, len(list(handlers.ContentNamespace.query())))
+    self.assertEqual(0, len(list(handlers.ContentEntry.query())))
+
+    # Advance time and force cleanup.
+    now += datetime.timedelta(seconds=2*expiration)
+    resp = self.testapp.get('/restricted/cleanup/trigger/old')
+    self.assertEqual(200, resp.status_code)
+    self.assertEqual([None], r.json)
+    self.assertEqual(1, self.execute_tasks())
+    # TODO(maruel): This should delete the namespace but doesn't.
+    self.assertEqual(1, len(list(handlers.ContentNamespace.query())))
+    self.assertEqual(0, len(list(handlers.ContentEntry.query())))
+
+  def test_ancestor_assumption(self):
+    prefix = '1234'
+    suffix = 40 - len(prefix)
+    c = handlers.create_entry('n', prefix + '0' * suffix)
+    self.assertEqual(1, len(list(handlers.ContentNamespace.query())))
+    self.assertEqual(0, len(list(handlers.ContentEntry.query())))
+    c.put()
+    self.assertEqual(1, len(list(handlers.ContentEntry.query())))
+
+    c = handlers.create_entry('n', prefix + '1' * suffix)
+    self.assertEqual(1, len(list(handlers.ContentNamespace.query())))
+    self.assertEqual(1, len(list(handlers.ContentEntry.query())))
+    c.put()
+    self.assertEqual(2, len(list(handlers.ContentEntry.query())))
+
+    k = handlers.ndb.Key(handlers.ContentNamespace, 'n')
+    self.assertEqual(2, len(list(handlers.ContentEntry.query(ancestor=k))))
+
 
 if __name__ == '__main__':
   if '-v' in sys.argv:
     unittest.TestCase.maxDiff = None
+    logging.basicConfig(level=logging.DEBUG)
+  else:
+    logging.basicConfig(level=logging.FATAL)
   unittest.main()

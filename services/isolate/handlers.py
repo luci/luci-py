@@ -186,6 +186,11 @@ class Accumulator(object):
       del i
 
 
+def utcnow():
+  """Returns a datetime, used for testing."""
+  return datetime.datetime.utcnow()
+
+
 def get_content_by_hash(namespace, hash_key):
   """Returns the ContentEntry with the given hex encoded SHA-1 hash |hash_key|.
 
@@ -497,7 +502,7 @@ class InternalCleanupOldEntriesWorkerHandler(webapp2.RequestHandler):
     if not self.request.headers.get('X-AppEngine-QueueName'):
       self.abort(405, detail='Only internal task queue tasks can do this')
     logging.info('Deleting old datastore entries')
-    old_cutoff = datetime.datetime.today() - datetime.timedelta(
+    old_cutoff = utcnow().date() - datetime.timedelta(
         days=config.settings().retention_days)
 
     incremental_delete(
@@ -517,7 +522,7 @@ class InternalCleanupTestingEntriesWorkerHandler(webapp2.RequestHandler):
     if not self.request.headers.get('X-AppEngine-QueueName'):
       self.abort(405, detail='Only internal task queue tasks can do this')
     logging.info('Deleting testing entries')
-    old_cutoff_testing = datetime.datetime.today() - datetime.timedelta(days=1)
+    old_cutoff_testing = utcnow().date() - datetime.timedelta(days=1)
     # For each testing namespace.
     namespace_query = ContentNamespace.query(
         ContentNamespace.is_testing == True)
@@ -578,7 +583,7 @@ class InternalCleanupTriggerHandler(webapp2.RequestHandler):
       # The push task queue name must be unique over a ~7 days period so use
       # the date at second precision, there's no point in triggering each of
       # time more than once a second anyway.
-      now = datetime.datetime.utcnow().strftime('%Y-%m-%d_%I-%M-%S')
+      now = utcnow().strftime('%Y-%m-%d_%I-%M-%S')
       if enqueue_task(url, 'cleanup', name=name + '_' + now):
         self.response.out.write('Triggered %s' % url)
       else:
@@ -1138,7 +1143,7 @@ class PreUploadContentHandler(ProtocolHandler):
   @staticmethod
   def tag_entries(entries, namespace):
     """Enqueues a task to update last_access time for given entries."""
-    url = '/internal/taskqueue/tag/%s/%s' % (namespace, datetime.date.today())
+    url = '/internal/taskqueue/tag/%s/%s' % (namespace, utcnow().date())
     payload = ''.join(binascii.unhexlify(e.digest) for e in entries)
     return enqueue_task(url, 'tag', payload=payload)
 
