@@ -8,3 +8,4 @@
 # pylint: disable=W0401,W0403
 
 from rest_api import *
+from ui import *

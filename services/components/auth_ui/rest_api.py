@@ -2,18 +2,19 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
-"""ACL management REST API."""
+"""Auth management REST API."""
 
 import json
 import webapp2
 
+from google.appengine.ext import ndb
+
 from components.auth import api
 from components.auth import handler
+from components.auth import model
 
 # Part of public API of 'auth_ui' component, exposed by this module.
-__all__ = [
-  'get_rest_api_routes',
-]
+__all__ = ['get_rest_api_routes']
 
 
 def get_rest_api_routes():
@@ -69,12 +70,46 @@ class OAuthConfigHandler(ApiHandler):
 
   @api.public
   def get(self):
-    auth_db = api.get_request_auth_db()
-    client_id, client_secret = auth_db.get_oauth_config()
+    client_id = None
+    client_secret = None
+    additional_ids = None
+
+    # Use most up-to-date data in datastore if requested. Used by management UI.
+    if self.request.headers.get('Cache-Control') == 'no-cache':
+      global_config = model.ROOT_KEY.get()
+      client_id = global_config.oauth_client_id
+      client_secret = global_config.oauth_client_secret
+      additional_ids = global_config.oauth_additional_client_ids
+    else:
+      # Faster call that uses cached config (that may be several minutes stale).
+      # Used by all client side scripts that just want to authenticate.
+      auth_db = api.get_request_auth_db()
+      client_id, client_secret, additional_ids = auth_db.get_oauth_config()
+
     self.send_response({
+      'additional_client_ids': additional_ids,
       'client_id': client_id,
       'client_not_so_secret': client_secret,
     })
+
+  @api.require(model.UPDATE, 'auth/management')
+  def post(self):
+    body = self.parse_body()
+    client_id = body['client_id']
+    client_secret = body['client_not_so_secret']
+    additional_client_ids = body['additional_client_ids']
+
+    @ndb.transactional
+    def update():
+      config = model.ROOT_KEY.get()
+      config.populate(
+          oauth_client_id=client_id,
+          oauth_client_secret=client_secret,
+          oauth_additional_client_ids=additional_client_ids)
+      config.put()
+
+    update()
+    self.send_response({'ok': True})
 
 
 class SelfHandler(ApiHandler):

@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<div class="row">
+  <div class="col-md-12">
+    <div class="panel panel-default">
+      <div class="panel-heading"><h3 class="panel-title">OAuth config</h3></div>
+      <div class="panel-body">
+        <div id="oauth-config-alerts"></div>
+        <form class="form" role="form" id="oauth-config-form">
+          <div class="form-group">
+            <label class="control-label">Primary client_id</label>
+            <div style="font-family:monospace;">
+              <input type="text" class="form-control"
+                     name="client_id" placeholder="Not set">
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="control-label">Client not-so-secret</label>
+            <div style="font-family:monospace;">
+              <input type="text" class="form-control"
+                     name="client_secret" placeholder="Not set">
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="control-label">Additional client_id's</label>
+            <div style="font-family:monospace;">
+              <textarea class="form-control"
+                        rows="5" name="more_ids"
+                        wrap="off"></textarea>
+            </div>
+          </div>
+          <div class="form-group">
+            <button type="submit" class="btn btn-primary">Submit</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock content %}

@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<!-- Copyright 2014 The Swarming Authors. All rights reserved.
+Use of this source code is governed by the Apache v2.0 license that can be
+found in the LICENSE file. -->
+<head>
+  <meta http-equiv="Content-type" content="text/html; charset=UTF-8">
+  <title>{{app_name}} - {{page_title}}</title>
+  <link href="/auth/static/third_party/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/auth/static/css/common.css" rel="stylesheet">
+  <script src="/auth/static/js/common.js"></script>
+</head>
+
+<body>
+  <div class="container">
+  {% block content %}
+  {% endblock %}
+  </div>
+  <script type="text/javascript">
+    // Expose 'config' as global js variable.
+    var config = {{config|safe}};
+  </script>
+</body>
+
+</html>

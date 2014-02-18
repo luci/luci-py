@@ -185,6 +185,7 @@ class MainTest(test_case.TestCase):
     # It walks over all AuthenticatedHandler routes and ensures @require
     # decorator use resources from this set.
     expected = {
+      'auth/management',
       'isolate/management',
       'isolate/namespaces/',
       'isolate/namespaces/{namespace}',

@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html>
+<!-- Copyright 2014 The Swarming Authors. All rights reserved.
+Use of this source code is governed by the Apache v2.0 license that can be
+found in the LICENSE file. -->
+<head>
+  <meta http-equiv="Content-type" content="text/html; charset=UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{app_name}} - {{page_title}}</title>
+
+  <link href="/auth/static/third_party/bootstrap/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/auth/static/css/common.css" rel="stylesheet">
+
+  {% if css_file %}
+    <link href="/auth/static/css/{{css_file}}" rel="stylesheet">
+  {% endif %}
+
+  <script src="/auth/static/third_party/jquery/jquery-1.11.0.min.js">
+  </script>
+  <script src="/auth/static/third_party/jquery.validate/jquery.validate.min.js">
+  </script>
+  <script src="/auth/static/third_party/bootstrap/js/bootstrap.min.js">
+  </script>
+  <script src="/auth/static/third_party/underscore/underscore-min.js">
+  </script>
+  <script src="/auth/static/third_party/handlebars/handlebars-v1.3.0.js">
+  </script>
+  <script src="/auth/static/js/common.js"></script>
+  <script src="/auth/static/js/api.js"></script>
+  {% if js_file %}
+    <script src="/auth/static/js/{{js_file}}"></script>
+  {% endif %}
+
+{% raw %}
+<!-- Template used by common.getAlertBoxHtml(...). -->
+<script id="alert-box-template" type="text/x-handlebars-template">
+  <div class="alert {{cls}} alert-dismissable">
+    <button type="button" class="close"
+            data-dismiss="alert" aria-hidden="true">&times;</button>
+    <strong>{{title}}</strong> {{message}}
+  </div>
+</script>
+{% endraw %}
+
+</head>
+
+<body>
+  <div class="container">
+    <div class="navbar navbar-default" role="navigation">
+      <div class="navbar-header">
+        <button type="button" class="navbar-toggle"
+                data-toggle="collapse" data-target=".navbar-collapse">
+          <span class="sr-only">Toggle navigation</span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+        </button>
+        <span class="navbar-brand">
+          <span id="progress-spinner" class="not-spinning">{{app_name}}</span>
+        </span>
+      </div>
+      <div class="navbar-collapse collapse">
+        <ul class="nav navbar-nav">
+          {% for tab_id, title, url in navbar %}
+            <li {% if navbar_tab_id == tab_id %}class="active"{% endif %}>
+              <a href="{{url}}">{{title}}</a>
+            </li>
+          {% endfor %}
+        </ul>
+        <p class="nav navbar-text navbar-right">
+          {% if not identity.is_anonymous %}
+            <span>{{identity.name}}</span>
+            <span> |</span>
+            <a href="javascript:common.logout();" class="navbar-link">Logout</a>
+          {% else %}
+            <a href="{{login_url}}" class="navbar-link">Login</a>
+          {% endif %}
+        </ul>
+      </div>
+    </div>
+
+    <div id="content-box" style="display:none">
+      {% block content %}
+      {% endblock %}
+    </div>
+
+    <div id="error-box" style="display:none">
+      <div class="panel panel-danger">
+        <div class="panel-heading"><h3 class="panel-title">Error</h3></div>
+        <div class="panel-body">
+          <pre id="error-message"></pre>
+        </div>
+      </div>
+    </div>
+
+    <footer>
+      <hr>
+      <p class="text-right" id="app-rev-block">
+        <small>Version:
+          {% if app_revision_url %}
+            <a href="{{app_revision_url}}">{{app_version}}</a>
+          {% else %}
+            <span>{{app_version}}</span>
+          {% endif %}
+        </small>
+      </p>
+    </footer>
+
+  </div>
+
+  <!-- JS bootstrap process. -->
+  <script type="text/javascript">
+    // Expose 'config' as global js variable.
+    var config = {{config|safe}};
+    {% if js_file %}
+    (function() {
+      // Strip '.js' to get module name.
+      var module = {{js_file[:-3]}};
+      api.setXSRFToken(config['xsrf_token']);
+      common.onContentLoaded();
+      if (module.hasOwnProperty('onContentLoaded'))
+        $(function() { module.onContentLoaded(); });
+    })();
+    {% else %}
+    common.presentContent();
+    {% endif %}
+  </script>
+</body>
+
+</html>

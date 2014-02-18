@@ -1571,8 +1571,16 @@ def CreateApplication():
     acl.whitelisted_ip_authentication,
   ])
 
-  # Routes with Auth REST API.
-  auth_routes = auth_ui.get_rest_api_routes()
+  # Customize auth UI to show that it's running on isolate server.
+  auth_ui.configure_ui(
+      app_name='Isolate Server',
+      app_version=config.get_app_version(),
+      app_revision_url=config.get_app_revision_url())
+
+  # Routes with Auth REST API and Auth UI.
+  auth_routes = []
+  auth_routes.extend(auth_ui.get_rest_api_routes())
+  auth_routes.extend(auth_ui.get_ui_routes())
 
   # Namespace can be letters, numbers, '-', '.' and '_'.
   namespace = r'/<namespace:%s>' % NAMESPACE_RE

@@ -1441,7 +1441,14 @@ def CreateApplication():
       ip_whitelist_authentication,
   ])
 
-  # Add routes with Auth REST API.
+  # Customize auth UI to show that it's running on swarming service.
+  auth_ui.configure_ui(
+      app_name='Swarming',
+      app_version=modules.get_current_version_name(),
+      app_revision_url=None)
+
+  # Add routes with Auth REST API and Auth UI.
   routes.extend(auth_ui.get_rest_api_routes())
+  routes.extend(auth_ui.get_ui_routes())
 
   return webapp2.WSGIApplication(routes, debug=True)

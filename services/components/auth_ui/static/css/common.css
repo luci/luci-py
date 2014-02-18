@@ -1,0 +1,36 @@
+/* Copyright 2014 The Swarming Authors. All rights reserved.
+ * Use of this source code is governed by the Apache v2.0 license that can be
+ * found in the LICENSE file.
+*/
+
+body {
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
+.navbar {
+  margin-bottom: 20px;
+}
+
+#progress-spinner.spinning {
+  background: url(/auth/static/img/gear.gif) no-repeat right center;
+  padding-right: 25px;
+  margin-right: -8px;
+}
+
+#progress-spinner.not-spinning {
+  padding-right: 25px;
+  margin-right: -8px;
+}
+
+footer hr {
+  margin: 10px 0px;
+}
+
+/* Version label */
+#app-rev-block {
+  color: #cccccc;
+}
+#app-rev-block a:link, #app-rev-block a:visited {
+  color: #acacff;
+}

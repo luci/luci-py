@@ -619,6 +619,7 @@ class AppTest(test_case.TestCase):
     # Handlers that are explicitly allowed to be called by anyone.
     allowed_urls = set([
         '/',
+        '/auth',
         '/graphs/daily_stats',
         '/runner_summary',
         '/server_ping',
@@ -861,6 +862,7 @@ class AppTest(test_case.TestCase):
     # It walks over all AuthenticatedHandler routes and ensures @require
     # decorator use resources from this set.
     expected = {
+        'auth/management',
         'swarming/bots',
         'swarming/clients',
         'swarming/management',

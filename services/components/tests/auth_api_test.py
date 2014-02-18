@@ -347,11 +347,7 @@ class TestAuthDBCache(test_case.TestCase):
 
   def setUp(self):
     super(TestAuthDBCache, self).setUp()
-    # Reset the state of all caches.
-    api._auth_db = None
-    api._auth_db_expiration = None
-    api._auth_db_fetching_thread = None
-    api._thread_local = threading.local()
+    api.reset_local_state()
 
   def set_time(self, ts):
     """Mocks time.time() to return |ts|."""

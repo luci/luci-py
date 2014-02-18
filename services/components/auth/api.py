@@ -285,12 +285,16 @@ class AuthDB(object):
     return client_id in allowed
 
   def get_oauth_config(self):
-    """Returns a tuple with OAuth2 config: (client_id, client_secret)."""
+    """Returns a tuple with OAuth2 config.
+
+    Format of the tuple: (client_id, client_secret, additional client ids list).
+    """
     if not self.global_config:
-      return None, None
+      return None, None, None
     return (
         self.global_config.oauth_client_id,
-        self.global_config.oauth_client_secret)
+        self.global_config.oauth_client_secret,
+        self.global_config.oauth_additional_client_ids)
 
 
 class RequestCache(object):
@@ -414,6 +418,18 @@ def fetch_auth_db(known_version=None):
 
   bootstrap()
   return fetch()
+
+
+def reset_local_state():
+  """Resets all local caches to an initial state. Only for testing."""
+  global _auth_db
+  global _auth_db_expiration
+  global _auth_db_fetching_thread
+  global _lazy_bootstrap_ran
+  _auth_db = None
+  _auth_db_expiration = None
+  _auth_db_fetching_thread = None
+  _lazy_bootstrap_ran = False
 
 
 def get_process_auth_db():

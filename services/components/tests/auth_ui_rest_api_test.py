@@ -39,6 +39,12 @@ def call_post(request_handler, body, content_type, expect_errors=False):
       path, body, content_type=content_type, expect_errors=expect_errors)
 
 
+def make_xsrf_token(identity=model.Anonymous, xsrf_token_data=None):
+  """Returns XSRF token that can be used in tests."""
+  # See handler.AuthenticatingHandler.generate
+  return handler.XSRFToken.generate([identity.to_bytes()], xsrf_token_data)
+
+
 class ApiHandlerClassTest(test_case.TestCase):
   """Tests for ApiHandler base class itself."""
 
@@ -221,12 +227,17 @@ class RestAPITestCase(test_case.TestCase):
     # Make webtest app that can execute REST API requests.
     self.app = webtest.TestApp(
         webapp2.WSGIApplication(rest_api.get_rest_api_routes()))
-    # Reset global config.
+    # Reset global config and cached state.
     handler.configure([])
+    api.reset_local_state()
     # Catch errors in log.
     self.errors = []
     self.mock(handler.logging, 'error',
         lambda *args, **kwargs: self.errors.append((args, kwargs)))
+    # Pairs of (action, resource) that defined allowed permission in test.
+    self.mocked_permissions = []
+    self.mock(rest_api.api, 'has_permission',
+        lambda action, resource: (action, resource) in self.mocked_permissions)
 
   def _make_request(
       self, method, path, params=None, headers=None, expect_errors=False):
@@ -238,8 +249,8 @@ class RestAPITestCase(test_case.TestCase):
         'application/json; charset=UTF-8')
     return response.status_int, json.loads(response.body)
 
-  def get(self, path):
-    return self._make_request('GET', path)
+  def get(self, path, headers=None):
+    return self._make_request('GET', path, headers=headers)
 
   def post(self, path, body=None, headers=None, expect_errors=False):
     if body:
@@ -255,25 +266,98 @@ class RestAPITestCase(test_case.TestCase):
 
 class OAuthConfigHandlerTest(RestAPITestCase):
   def test_non_configured_works(self):
+    expected = {
+      'additional_client_ids': [],
+      'client_id': None,
+      'client_not_so_secret': None,
+    }
     status, body = self.get('/auth/api/v1/server/oauth_config')
     self.assertEqual(200, status)
-    self.assertEqual({'client_id': None, 'client_not_so_secret': None}, body)
+    self.assertEqual(expected, body)
 
   def test_configured_works(self):
     # Mock auth_db.get_oauth_config().
     fake_config = model.AuthGlobalConfig(
         oauth_client_id='some-client-id',
-        oauth_client_secret='some-secret')
+        oauth_client_secret='some-secret',
+        oauth_additional_client_ids=['a', 'b', 'c'])
     self.mock(rest_api.api, 'get_request_auth_db',
         lambda: api.AuthDB(global_config=fake_config))
     # Call should return this data.
     expected = {
+      'additional_client_ids': ['a', 'b', 'c'],
       'client_id': 'some-client-id',
       'client_not_so_secret': 'some-secret',
     }
     status, body = self.get('/auth/api/v1/server/oauth_config')
     self.assertEqual(200, status)
     self.assertEqual(expected, body)
+
+  def test_no_cache_works(self):
+    # Put something into DB.
+    config_in_db = model.AuthGlobalConfig(
+        key=model.ROOT_KEY,
+        oauth_client_id='config-from-db',
+        oauth_client_secret='some-secret-db',
+        oauth_additional_client_ids=['a', 'b'])
+    config_in_db.put()
+
+    # Put another version into auth DB cache.
+    config_in_cache = model.AuthGlobalConfig(
+        oauth_client_id='config-from-cache',
+        oauth_client_secret='some-secret-cache',
+        oauth_additional_client_ids=['c', 'd'])
+    self.mock(rest_api.api, 'get_request_auth_db',
+        lambda: api.AuthDB(global_config=config_in_cache))
+
+    # Without cache control header a cached version is used.
+    expected = {
+      'additional_client_ids': ['c', 'd'],
+      'client_id': 'config-from-cache',
+      'client_not_so_secret': 'some-secret-cache',
+    }
+    status, body = self.get('/auth/api/v1/server/oauth_config')
+    self.assertEqual(200, status)
+    self.assertEqual(expected, body)
+
+    # Allow access to 'auth/management' (required for 'no-cache' oauth_config).
+    self.mocked_permissions = [(model.READ, 'auth/management')]
+
+    # With cache control header a version from DB is used.
+    expected = {
+      'additional_client_ids': ['a', 'b'],
+      'client_id': 'config-from-db',
+      'client_not_so_secret': 'some-secret-db',
+    }
+    status, body = self.get(
+        '/auth/api/v1/server/oauth_config',
+        headers={'Cache-Control': 'no-cache'})
+    self.assertEqual(200, status)
+    self.assertEqual(expected, body)
+
+  def test_post_works(self):
+    # Required permission.
+    self.mocked_permissions = [(model.UPDATE, 'auth/management')]
+
+    # Send POST.
+    request_body = {
+      'additional_client_ids': ['1', '2', '3'],
+      'client_id': 'some-client-id',
+      'client_not_so_secret': 'some-secret',
+    }
+    headers = {
+      'X-XSRF-Token': make_xsrf_token(),
+    }
+    status, response = self.post(
+        '/auth/api/v1/server/oauth_config', body=request_body, headers=headers)
+    self.assertEqual(200, status)
+    self.assertEqual({'ok': True}, response)
+
+    # Ensure it modified the state in DB.
+    config = model.ROOT_KEY.get()
+    self.assertEqual('some-client-id', config.oauth_client_id)
+    self.assertEqual('some-secret', config.oauth_client_secret)
+    self.assertEqual(['1', '2', '3'], config.oauth_additional_client_ids)
 
 
 class SelfHandlerTest(RestAPITestCase):
