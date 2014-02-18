@@ -12,6 +12,13 @@ import tempfile
 import unittest
 import zipfile
 
+# Import everything that does not require sys.path hack first.
+
+import local_test_runner
+
+from common import swarm_constants
+from common import test_request_message
+
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT_DIR)
 
@@ -19,9 +26,6 @@ import test_env
 
 test_env.setup_test_env()
 
-import local_test_runner
-from common import swarm_constants
-from common import test_request_message
 from third_party.mox import mox
 
 DATA_FILE_REGEX = r'\S*/%s/%s'

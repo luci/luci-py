@@ -12,6 +12,13 @@ import sys
 import time
 import unittest
 
+# Import everything that does not need sys.path hack first.
+import slave_machine
+from common import bot_archive
+from common import rpc
+from common import swarm_constants
+from common import url_helper
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(BASE_DIR)
 sys.path.insert(0, ROOT_DIR)
@@ -20,29 +27,8 @@ import test_env
 
 test_env.setup_test_env()
 
-import slave_machine
-from common import bot_archive
-from common import rpc
-from common import swarm_constants
-from common import url_helper
 from depot_tools import auto_stub
 from third_party.mox import mox
-
-# The slave script being tested.
-SLAVE_SCRIPT_FILE = os.path.join(BASE_DIR, 'slave_machine.py')
-
-MACHINE_ID_1 = '12345678-12345678-12345678-12345678'
-MACHINE_ID_2 = '87654321-87654321-87654321-87654321'
-VALID_ATTRIBUTES = {
-    'dimensions': {'os': ['Linux']}
-}
-
-
-def _CreateValidAttribs(try_count=0):
-  attributes = VALID_ATTRIBUTES.copy()
-  attributes['id'] = socket.getfqdn().lower()
-  attributes['try_count'] = try_count
-  return {'attributes': json.dumps(attributes)}
 
 
 def _CreateResponse(come_back=None, try_count=1, commands=None, result_url=None,
@@ -61,7 +47,6 @@ def _CreateResponse(come_back=None, try_count=1, commands=None, result_url=None,
     response['result_url'] = result_url
 
   return json.dumps(response)
-
 
 
 def _SetPollJobAndPostFailExpectations(response, result_url, result_string,
@@ -83,7 +68,6 @@ def _SetPollJobAndPostFailExpectations(response, result_url, result_string,
                          None if bad_url else 'Success')
 
 
-
 def UrlOpenExpectations(response, url, data):
   url_helper.UrlOpen(
       url, data=data, max_tries=mox.IgnoreArg()).AndReturn(response)
@@ -101,19 +85,25 @@ class TestSlaveMachine(auto_stub.TestCase):
     self.mock(logging, 'error', lambda *_: None)
     self.mock(logging, 'exception', lambda *_: None)
 
-    with open(slave_machine.START_SLAVE_SCRIPT_PATH, 'r') as f:
+    with open(os.path.join(BASE_DIR, 'start_slave.py'), 'rb') as f:
       start_slave_contents = f.read()
     additionals = {
-        'start_slave.py': start_slave_contents,
+      'start_slave.py': start_slave_contents,
     }
-    # TODO(maruel): This is effectively an invalid version. It should be passed
-    # False but the test fails in this case.
-    VALID_ATTRIBUTES['version'] = bot_archive.GenerateSlaveVersion(
-        additionals, True)
+    self.attributes = {
+      'dimensions': {'os': ['Linux']},
+      'version': bot_archive.GenerateSlaveVersion(BASE_DIR, additionals),
+    }
 
   def tearDown(self):
     self._mox.UnsetStubs()
     super(TestSlaveMachine, self).tearDown()
+
+  def _CreateValidAttribs(self, try_count=0):
+    attributes = self.attributes.copy()
+    attributes['id'] = socket.getfqdn().lower()
+    attributes['try_count'] = try_count
+    return {'attributes': json.dumps(attributes)}
 
   # Mock slave_machine._PostFailedExecuteResults.
   def _MockPostFailedExecuteResults(self, slave, result_string):
@@ -180,13 +170,13 @@ class TestSlaveMachine(auto_stub.TestCase):
     # Initial server ping.
     url_helper.UrlOpen(mox.IgnoreArg(), method='GET').AndReturn('')
 
-    data = _CreateValidAttribs()
+    data = self._CreateValidAttribs()
 
     UrlOpenExpectations(
         'blah blah blah', 'https://localhost:443/poll_for_test', data)
     self._mox.ReplayAll()
 
-    slave = slave_machine.SlaveMachine(attributes=VALID_ATTRIBUTES)
+    slave = slave_machine.SlaveMachine(attributes=self.attributes)
     slave.Start(iterations=1)
 
     self._mox.VerifyAll()
@@ -196,14 +186,14 @@ class TestSlaveMachine(auto_stub.TestCase):
     # Initial server ping.
     url_helper.UrlOpen(mox.IgnoreArg(), method='GET').AndReturn('')
 
-    data = _CreateValidAttribs()
+    data = self._CreateValidAttribs()
 
     UrlOpenExpectations(
         'blah blah blah', 'http://www.google.ca/poll_for_test', data)
     self._mox.ReplayAll()
 
     slave = slave_machine.SlaveMachine(url='http://www.google.ca',
-                                       attributes=VALID_ATTRIBUTES)
+                                       attributes=self.attributes)
     slave.Start(iterations=1)
 
     self._mox.VerifyAll()

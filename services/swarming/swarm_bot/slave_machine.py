@@ -32,7 +32,7 @@ from common import swarm_constants
 from common import url_helper
 
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # The zip file to contain the zipped slave code.
 ZIPPED_SLAVE_FILES = 'slave_files.zip'
@@ -40,8 +40,6 @@ ZIPPED_SLAVE_FILES = 'slave_files.zip'
 # The name of a user added file that can be used to specify conditions under
 # which a slave should stop querying for work.
 CHECK_REQUIREMENTS_FILE = 'check_requirements.py'
-
-START_SLAVE_SCRIPT_PATH = os.path.join(BASE_DIR, 'start_slave.py')
 
 # The code to unzip the slave code and start the slave back up. This needs to be
 # a separate script so that the update process can overwrite it and then run
@@ -59,7 +57,7 @@ try:
 finally:
   f.close()
 
-os.execl(sys.executable, sys.executable, '%(start_slave)s',
+os.execl(sys.executable, sys.executable, %(start_slave)r,
          '--swarm-server=%(swarming_server)s',
          '--port=%(server_port)s')
 """
@@ -233,7 +231,7 @@ class SlaveMachine(object):
     self._max_url_tries = max_url_tries
 
     try:
-      with open(START_SLAVE_SCRIPT_PATH, 'rb') as script:
+      with open(os.path.join(ROOT_DIR, 'start_slave.py'), 'rb') as script:
         start_slave_contents = script.read()
     except IOError:
       start_slave_contents = ''
@@ -242,7 +240,7 @@ class SlaveMachine(object):
       'start_slave.py': start_slave_contents,
     }
     self._attributes['version'] = bot_archive.GenerateSlaveVersion(
-        additionals, True)
+        ROOT_DIR, additionals)
 
   def Start(self, iterations=-1):
     """Starts the slave, which polls the Swarm server for jobs until it dies.
@@ -601,13 +599,9 @@ class SlaveMachine(object):
     url_parts = urlparse.urlparse(self._url)
     server = url_parts.scheme + '://' + url_parts.hostname
 
-    # Since we are writing to a file, make sure all '\'s are properly escaped,
-    # so the file won't contain unexpected escapes.
-    escaped_start_slave_path = START_SLAVE_SCRIPT_PATH.replace('\\', '\\\\')
-
     slave_setup_script_contents = SLAVE_SETUP_SCRIPT % {
         'server_port': url_parts.port,
-        'start_slave': escaped_start_slave_path,
+        'start_slave': os.path.join(ROOT_DIR, 'start_slave.py'),
         'swarming_server': server,
         'zipped_slave_files': ZIPPED_SLAVE_FILES
     }

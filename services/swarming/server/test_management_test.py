@@ -826,8 +826,6 @@ class TestManagementTest(test_case.TestCase):
 
       for i in bot_archive.FILES:
         self.assertTrue(os.path.isfile(os.path.join(temp_dir, i)), i)
-      for i in bot_archive.MAPPED.itervalues():
-        self.assertTrue(os.path.isfile(os.path.join(temp_dir, i)), i)
 
       # Try running the slave and ensure it can import the required files.
       # (It would crash if it failed to import them).

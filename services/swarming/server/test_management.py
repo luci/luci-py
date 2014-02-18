@@ -8,7 +8,6 @@ The Test Management files contains the pipe functions to setup and run tests
 through the TestRunner and TestRequest classes.
 """
 
-
 import datetime
 import logging
 import math
@@ -28,6 +27,9 @@ from server import file_chunks
 from server import test_request
 from server import test_runner
 from stats import machine_stats
+
+
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # The amount of time to wait after recieving a runners last message before
 # considering the runner to have run for too long. Runners that run for too
@@ -590,7 +592,7 @@ def _GetTestRunnerCommands(runner, server_url):
 
   # Define how to run the scripts.
   command_to_execute = [
-      os.path.join('swarm_bot', 'local_test_runner.py'),
+      os.path.join('local_test_runner.py'),
       '-f', os.path.join(test_run.working_dir, _TEST_RUN_SWARM_FILE_NAME),
   ]
 
@@ -657,7 +659,8 @@ def SlaveVersion():
   additionals = {
     'start_slave.py': file_chunks.RetrieveFile(START_SLAVE_SCRIPT_KEY) or '',
   }
-  slave_version = bot_archive.GenerateSlaveVersion(additionals, False)
+  slave_version = bot_archive.GenerateSlaveVersion(
+      os.path.join(ROOT_DIR, 'swarm_bot'), additionals)
   memcache.set('slave_version', slave_version,
                namespace=os.environ['CURRENT_VERSION_ID'])
   return slave_version
@@ -674,4 +677,5 @@ def SlaveCodeZipped():
   additionals = {
     'start_slave.py': file_chunks.RetrieveFile(START_SLAVE_SCRIPT_KEY) or '',
   }
-  return bot_archive.SlaveCodeZipped(additionals)
+  return bot_archive.SlaveCodeZipped(
+      os.path.join(ROOT_DIR, 'swarm_bot'), additionals)

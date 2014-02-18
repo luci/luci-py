@@ -60,12 +60,6 @@ START_SLAVE = (
     "]\n"
     "sys.exit(subprocess.call(cmd))\n")
 
-# Location of the test files.
-TEST_DATA_DIR = os.path.join(ROOT_DIR, 'tests', 'test_files')
-
-TEST_SLAVE_CONFIG = os.path.join(ROOT_DIR, 'tests', 'machine_config.txt')
-
-SLAVE_MACHINE = os.path.join(ROOT_DIR, 'swarm_bot', 'slave_machine.py')
 
 VERBOSE = False
 
@@ -89,22 +83,6 @@ def find_free_port(host, base_port):
       return base_port
     base_port += 1
   assert False, 'Failed to find an available port starting at %d' % base_port
-
-
-def copy_tree(src, dst):
-  """Copies a directory like shutil.copy_tree without keeping access control
-  bits.
-
-  This allows making a copy of a read-only build folder that can then be
-  modified.
-  """
-  if not os.path.isdir(dst):
-    os.mkdir(dst)
-  for item in os.listdir(src):
-    if os.path.isdir(os.path.join(src, item)):
-      copy_tree(os.path.join(src, item), os.path.join(dst, item))
-    else:
-      shutil.copyfile(os.path.join(src, item), os.path.join(dst, item))
 
 
 def wait_for_server_up(server_url):
@@ -138,16 +116,17 @@ def whitelist_and_install_cookie_jar(server_url):
 
 def setup_bot(swarm_bot_dir, start_slave_content):
   """Setups the slave code in a temporary directory so it can be modified."""
-  # TODO(maruel): Only the actual swarm_bot code + common.
-  copy_tree(ROOT_DIR, swarm_bot_dir)
-
-  for src, dst in bot_archive.MAPPED.iteritems():
-    os.rename(
-        os.path.join(swarm_bot_dir, src), os.path.join(swarm_bot_dir, dst))
+  for i in bot_archive.FILES:
+    dst = os.path.join(swarm_bot_dir, i)
+    dstdir = os.path.dirname(dst)
+    if not os.path.isdir(dstdir):
+      os.mkdir(dstdir)
+    src = os.path.join(ROOT_DIR, 'swarm_bot', i)
+    shutil.copyfile(src, dst)
 
   # Remove the local test runner script to ensure the slave is out of date
   # and is updated.
-  os.remove(os.path.join(swarm_bot_dir, 'swarm_bot', 'local_test_runner.py'))
+  os.remove(os.path.join(swarm_bot_dir, 'local_test_runner.py'))
 
   with open(os.path.join(swarm_bot_dir, 'start_slave.py'), 'wb') as f:
     f.write(start_slave_content)
@@ -193,7 +172,7 @@ class SwarmingTestCase(unittest.TestCase):
           stdout=f, stderr=subprocess.STDOUT)
 
     start_slave_content = START_SLAVE % {
-      'config_file': TEST_SLAVE_CONFIG,
+      'config_file': os.path.join(ROOT_DIR, 'tests', 'machine_config.txt'),
       'extra_args': "'-v'," if VERBOSE else '',
       'log_file': os.path.join(self.log_dir, 'slave_machine.log'),
       'server_address': server_addr,
@@ -265,11 +244,13 @@ class SwarmingTestCase(unittest.TestCase):
 
   def get_swarm_files(self):
     swarm_files = []
-    for dirpath, _, filenames in os.walk(TEST_DATA_DIR):
+    # Location of the test files.
+    test_data_dir = os.path.join(ROOT_DIR, 'tests', 'test_files')
+    for dirpath, _, filenames in os.walk(test_data_dir):
       for filename in filenames:
         if os.path.splitext(filename)[1].lower() == '.swarm':
           swarm_files.append(os.path.join(dirpath, filename))
-    self.assertTrue(swarm_files, 'No swarm files found in %s' % TEST_DATA_DIR)
+    self.assertTrue(swarm_files, 'No swarm files found in %s' % test_data_dir)
     logging.info('Found: %s', ' '.join(swarm_files))
     return swarm_files
 
