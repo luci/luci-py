@@ -165,8 +165,7 @@ def get_app_revision_url():
   Returns None if a version is tainted or has unexpected name.
   """
   rev = re.match(r'\d+-([a-f0-9]+)$', get_app_version())
-  template = ('https://code.google.com/p'
-    '/swarming/source/detail?repo=isolate-server&r=%s')
+  template = 'https://code.google.com/p/swarming/source/detail?r=%s'
   return template % rev.group(1) if rev else None
 
 
