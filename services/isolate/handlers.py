@@ -141,9 +141,6 @@ class ContentEntry(ndb.Model):
                 content key is the hash of the uncompressed data, not the
                 compressed one. That is why it is in a separate namespace.
   """
-  # The GS filename.
-  filename = ndb.StringProperty()
-
   # Cache the file size for statistics purposes.
   compressed_size = ndb.IntegerProperty(indexed=False)
 
@@ -179,18 +176,6 @@ class ContentEntry(ndb.Model):
     """
     return self.key.parent().id().endswith(('-bzip2', '-deflate', '-gzip'))
 
-  @property
-  def namespace(self):
-    return self.key.id().rsplit('-', 1)[0]
-
-  @property
-  def gs_filepath(self):
-    """Returns the full path of an object saved in GS."""
-    if self.content:
-      return None
-    # namespace/hash_key.
-    return u'%s/%s' % (self.namespace, self.filename)
-
 
 ### Utility
 
@@ -213,32 +198,6 @@ def utcnow():
   return datetime.datetime.utcnow()
 
 
-def validate_key(namespace, hash_key):
-  """Returns True if the namespace/hash_key pair is sensible."""
-  length = get_hash_algo(namespace).digest_size * 2
-  if not re.match(r'[a-f0-9]{' + str(length) + r'}', hash_key):
-    logging.error('Given an invalid key, %s', hash_key)
-    return False
-  return True
-
-
-def get_content_by_hash(namespace, hash_key):
-  """Returns the ContentEntry with the given hex encoded SHA-1 hash |hash_key|.
-
-  This function is synchronous.
-
-  Returns None if it no ContentEntry matches.
-  """
-  if not validate_key(namespace, hash_key):
-    return None
-  try:
-    return entry_key(namespace, hash_key).get()
-  except ndb.KindError:
-    pass
-
-  return None
-
-
 def check_hash(hash_key, length):
   """Checks the validity of an hash_key. Doesn't use a regexp for speed.
 
@@ -252,12 +211,17 @@ def check_hash(hash_key, length):
 def entry_key(namespace, hash_key):
   """Returns a valid ndb.Key for a ContentEntry."""
   check_hash(hash_key, get_hash_algo(namespace).digest_size * 2)
-  key_id = '%s-%s' % (namespace, hash_key)
+  return entry_key_from_id('%s/%s' % (namespace, hash_key))
+
+
+def entry_key_from_id(key_id):
+  """Returns the ndb.Key for the key_id."""
+  hash_key = key_id.rsplit('/', 1)[1]
   shard = config.settings().sharding_letters
   return ndb.Key(ContentShard, hash_key[:shard], ContentEntry, key_id)
 
 
-def create_entry(namespace, hash_key):
+def create_entry(key):
   """Generates a new ContentEntry from the request if one doesn't exist.
 
   This function is synchronous.
@@ -265,9 +229,6 @@ def create_entry(namespace, hash_key):
   Returns None if there is a problem generating the entry or if an entry already
   exists with the given hex encoded SHA-1 hash |hash_key|.
   """
-  if not validate_key(namespace, hash_key):
-    return None
-  key = entry_key(namespace, hash_key)
   # Strangely, ContentShard doesn't have to exist in the DB to be a valid entity
   # group. Only the fact it is used as a parent key is sufficient.
 
@@ -288,19 +249,20 @@ def expiration_jitter(now, expiration):
   return expiration, next_tag
 
 
-def delete_entry_and_gs_entry(to_delete):
+def delete_entry_and_gs_entry(keys_to_delete):
   """Deletes synchronously a list of ContentEntry and their GS files.
 
   It deletes the ContentEntry first, then the files in GS. The worst case is
   that the GS files are left behind and will be reaped by a lost GS task
-  queue. The reverse is much worse, having a ContentEntry.filename pointing to a
+  queue. The reverse is much worse, having a ContentEntry pointing to a
   deleted GS entry will lead to lookup failures.
   """
   try:
-    # Note all the files to delete.
-    gs_files_to_delete = filter(None, (i.gs_filepath for i in to_delete))
-    ndb.delete_multi(i.key for i in to_delete)
-    gcs.delete_files(config.settings().gs_bucket, gs_files_to_delete)
+    # Always delete ContentEntry first.
+    ndb.delete_multi(keys_to_delete)
+    # Deleting files that do not exist is not a problem.
+    gcs.delete_files(
+        config.settings().gs_bucket, (i.id() for i in keys_to_delete))
     return []
   except:
     logging.error('Failed to delete items! DB will be inconsistent!')
@@ -394,11 +356,6 @@ def hash_content(content, namespace):
     raise ValueError('Data is corrupted: %s' % e)
 
 
-def to_blobkey(bucket, filename):
-  """Given GS bucket and filename returns Blobstore blob key."""
-  return u'/gs/%s/%s' % (bucket, filename)
-
-
 def delete_blobinfo_async(blobinfos):
   """Deletes BlobInfo properly.
 
@@ -406,6 +363,9 @@ def delete_blobinfo_async(blobinfos):
   BlobKey.
 
   Returns a list of Rpc objects.
+
+  TODO(maruel): Remove this function once all instance had their blobstore
+  objects deleted.
   """
   return [blobstore.delete_async((b.key() for b in blobinfos))]
 
@@ -548,7 +508,8 @@ class InternalCleanupOldEntriesWorkerHandler(webapp2.RequestHandler):
     if not self.request.headers.get('X-AppEngine-QueueName'):
       self.abort(405, detail='Only internal task queue tasks can do this')
     total = incremental_delete(
-        ContentEntry.query(ContentEntry.expiration_ts < utcnow()),
+        ContentEntry.query(
+            ContentEntry.expiration_ts < utcnow()).iter(keys_only=True),
         delete=delete_entry_and_gs_entry)
     logging.info('Deleting %s expired entries', total)
 
@@ -566,9 +527,12 @@ class InternalObliterateOldWorkerHandler(webapp2.RequestHandler):
       self.abort(405, detail='Only internal task queue tasks can do this')
     for namespace in ContentNamespace.query().iter(keys_only=True):
       logging.info('Deleting Namespace %s', namespace.id())
+      # Do *not* delete the GS files. The reason is that ContentEntry changed
+      # and ContentEntry.filename doesn't exist anymore. The GS files will be
+      # reaped by trim_old.
       incremental_delete(
-          ContentEntry.query(ancestor=namespace),
-          delete=delete_entry_and_gs_entry)
+          ContentEntry.query(ancestor=namespace).iter(keys_only=True),
+          delete=ndb.delete_multi_async)
       ndb.delete_multi([namespace])
 
     logging.info('Deleting blobs')
@@ -591,14 +555,10 @@ class InternalObliterateWorkerHandler(webapp2.RequestHandler):
     incremental_delete(
         ContentEntry.query().iter(keys_only=True), ndb.delete_multi_async)
 
-    logging.info('Deleting ContentShard')
-    incremental_delete(
-        ContentShard.query().iter(keys_only=True), ndb.delete_multi_async)
-
     gs_bucket = config.settings().gs_bucket
     logging.info('Deleting GS bucket %s', gs_bucket)
     incremental_delete(
-        gcs.list_files(gs_bucket),
+        (i[0] for i in gcs.list_files(gs_bucket)),
         lambda filenames: gcs.delete_files(gs_bucket, filenames))
 
     logging.info('Flushing memcache')
@@ -608,10 +568,64 @@ class InternalObliterateWorkerHandler(webapp2.RequestHandler):
     logging.info('Finally done!')
 
 
+class InternalCleanupTrimLostWorkerHandler(webapp2.RequestHandler):
+  """Removes the GS files that are not referenced anymore.
+
+  It can happen for example when a ContentEntry is deleted without the file
+  properly deleted.
+
+  Only a task queue task can use this handler.
+  """
+  def post(self):
+    """Enumerates all GS files and delete those that do not have an associated
+    ContentEntry.
+    """
+    if not self.request.headers.get('X-AppEngine-QueueName'):
+      self.abort(405, detail='Only internal task queue tasks can do this')
+    gs_bucket = config.settings().gs_bucket
+
+    def filter_missing():
+      futures = {}
+      cutoff = time.time() - 60*60
+      for filepath, filestats in gcs.list_files(gs_bucket):
+        # If the file was uploaded in the last hour, ignore it.
+        if filestats.st_ctime >= cutoff:
+          continue
+
+        # This must match the logic in entry_key(). Since this request will in
+        # practice touch every item, do not use memcache since it'll mess it up
+        # by loading every items in it.
+        # TODO(maruel): Batch requests to use get_multi_async() similar to
+        # component_utils.page_queries().
+        future = entry_key_from_id(filepath).get_async(
+            use_cache=False, use_memcache=False)
+        futures[future] = filepath
+
+        if len(futures) > 20:
+          future = ndb.Future.wait_any(futures)
+          filepath = futures.pop(future)
+          if future.get_result():
+            continue
+          yield filepath
+      while futures:
+        future = ndb.Future.wait_any(futures)
+        filepath = futures.pop(future)
+        if future.get_result():
+          continue
+        yield filepath
+
+    gs_delete = lambda filenames: gcs.delete_files(gs_bucket, filenames)
+    total = incremental_delete(filter_missing(), gs_delete)
+    logging.info('Deleted %d lost GS files', total)
+    # TODO(maruel): Find all the empty directories that are old and remove them.
+    # We need to safe guard against the race condition where a user would upload
+    # to this directory.
+
+
 class InternalCleanupTriggerHandler(webapp2.RequestHandler):
   """Triggers a taskqueue to clean up."""
   def get(self, name):
-    if name in ('obliterate', 'obliterate_old', 'old', 'orphaned'):
+    if name in ('obliterate', 'obliterate_old', 'old', 'orphaned', 'trim_lost'):
       url = '/internal/taskqueue/cleanup/' + name
       # The push task queue name must be unique over a ~7 days period so use
       # the date at second precision, there's no point in triggering each of
@@ -680,14 +694,14 @@ class InternalVerifyWorkerHandler(webapp2.RequestHandler):
   def purge_entry(entry, message, *args):
     """Logs error message, deletes |entry| from datastore and GS."""
     logging.error(
-        'Verification failed for %s: %s', entry.gs_filepath, message % args)
-    ndb.Future.wait_all(delete_entry_and_gs_entry([entry]))
+        'Verification failed for %s: %s', entry.key.id(), message % args)
+    ndb.Future.wait_all(delete_entry_and_gs_entry([entry.key]))
 
   def post(self, namespace, hash_key):
     if not self.request.headers.get('X-AppEngine-QueueName'):
       self.abort(405, detail='Only internal task queue tasks can do this')
 
-    entry = get_content_by_hash(namespace, hash_key)
+    entry = entry_key(namespace, hash_key).get()
     if not entry:
       logging.error('Failed to find entity')
       return
@@ -700,8 +714,7 @@ class InternalVerifyWorkerHandler(webapp2.RequestHandler):
 
     # Get GS file size.
     gs_bucket = config.settings().gs_bucket
-    gs_filepath = entry.gs_filepath
-    gs_file_info = gcs.get_file_info(gs_bucket, gs_filepath)
+    gs_file_info = gcs.get_file_info(gs_bucket, entry.key.id())
 
     # It's None if file is missing.
     if not gs_file_info:
@@ -726,7 +739,7 @@ class InternalVerifyWorkerHandler(webapp2.RequestHandler):
 
     try:
       # Start a loop where it reads the data in block.
-      stream = gcs.read_file(gs_bucket, gs_filepath)
+      stream = gcs.read_file(gs_bucket, entry.key.id())
       if save_to_memcache:
         # Wraps stream with a generator that accumulates the data.
         stream = Accumulator(stream)
@@ -1138,30 +1151,22 @@ class PreUploadContentHandler(ProtocolHandler):
       raise ValueError('Bad body: %s' % exc)
 
   @staticmethod
-  def check_entries(entries, namespace):
-    """Generator that checks for entries existence.
+  def check_entry_infos(entries, namespace):
+    """Generator that checks for EntryInfo entries existence.
 
     Yields pairs (EntryInfo object, True if such entry exists in Datastore).
     """
-    # Context options for NDB calls.
-    ctx_options = {
-        # Don't bother with in-process cache, it's not going to be used.
-        'use_cache': False,
-        # Make sure queries for ~100 items always use single RPC.
-        'max_memcache_items': 200,
-    }
-
     # Kick off all queries in parallel. Build mapping Future -> digest.
     futures = {}
-    for entry in entries:
-      key = entry_key(namespace, entry.digest)
-      futures[key.get_async(**ctx_options)] = entry
+    for entry_info in entries:
+      key = entry_key(namespace, entry_info.digest)
+      futures[key.get_async(use_cache=False)] = entry_info
 
     # Pick first one that finishes and yield it, rinse, repeat.
     while futures:
       future = ndb.Future.wait_any(futures)
       # TODO(maruel): For items that were present, make sure
-      # future.get_result().compressed_size == entry.size.
+      # future.get_result().compressed_size == entry_info.size.
       yield futures.pop(future), bool(future.get_result())
 
   @staticmethod
@@ -1173,13 +1178,13 @@ class PreUploadContentHandler(ProtocolHandler):
     return enqueue_task(url, 'tag', payload=payload)
 
   @staticmethod
-  def should_push_to_gs(entry):
+  def should_push_to_gs(entry_info):
     """True to direct client to upload given EntryInfo directly to GS."""
     # Relatively small *.isolated files go through app engine to cache them.
-    if entry.is_isolated and entry.compressed_size <= MAX_MEMCACHE_ISOLATED:
+    if entry_info.is_isolated and entry_info.size <= MAX_MEMCACHE_ISOLATED:
       return False
     # All other large enough files go through GS.
-    return entry.size >= MIN_SIZE_FOR_DIRECT_GS
+    return entry_info.size >= MIN_SIZE_FOR_DIRECT_GS
 
   @property
   def gs_url_signer(self):
@@ -1192,27 +1197,27 @@ class PreUploadContentHandler(ProtocolHandler):
           settings.gs_private_key)
     return self._gs_url_signer
 
-  def generate_store_url(self, entry, namespace, http_verb, uploaded_to_gs,
+  def generate_store_url(self, entry_info, namespace, http_verb, uploaded_to_gs,
                          expiration):
     """Generates a signed URL to /content-gs/store method.
 
     Arguments:
-      entry: A EntryInfo instance.
+      entry_info: A EntryInfo instance.
     """
     # Data that goes into request parameters and signature.
     expiration_ts = str(int(time.time() + expiration.total_seconds()))
-    item_size = str(entry.size)
-    is_isolated = str(int(entry.is_isolated))
+    item_size = str(entry_info.size)
+    is_isolated = str(int(entry_info.is_isolated))
     uploaded_to_gs = str(int(uploaded_to_gs))
 
     # Generate signature.
     sig = StoreContentHandler.generate_signature(
         config.settings().global_secret, http_verb, expiration_ts, namespace,
-        entry.digest, item_size, is_isolated, uploaded_to_gs)
+        entry_info.digest, item_size, is_isolated, uploaded_to_gs)
 
     # Bare full URL to /content-gs/store endpoint.
     url_base = self.uri_for(
-        'store-gs', namespace=namespace, hash_key=entry.digest, _full=True)
+        'store-gs', namespace=namespace, hash_key=entry_info.digest, _full=True)
 
     # Construct url with query parameters, reuse auth token.
     params = {
@@ -1225,8 +1230,10 @@ class PreUploadContentHandler(ProtocolHandler):
     }
     return '%s?%s' % (url_base, urllib.urlencode(params))
 
-  def generate_push_urls(self, entry, namespace):
+  def generate_push_urls(self, entry_info, namespace):
     """Generates a pair of URLs to be used by clients to upload an item.
+
+    The GS filename is exactly ContentEntry.key.id().
 
     URL's being generated are 'upload URL' and 'finalize URL'. Client uploads
     an item to upload URL (via PUT request) and then POST status of the upload
@@ -1234,21 +1241,22 @@ class PreUploadContentHandler(ProtocolHandler):
 
     Finalize URL may be optional (it's None in that case).
     """
-    if self.should_push_to_gs(entry):
+    if self.should_push_to_gs(entry_info):
       # Store larger stuff in Google Storage.
+      key = entry_key(namespace, entry_info.digest)
       upload_url = self.gs_url_signer.get_upload_url(
-          filename='%s/%s' % (namespace, entry.digest),
+          filename=key.id(),
           content_type='application/octet-stream',
           expiration=self.DEFAULT_LINK_EXPIRATION)
       finalize_url = self.generate_store_url(
-          entry, namespace,
+          entry_info, namespace,
           http_verb='POST',
           uploaded_to_gs=True,
           expiration=self.DEFAULT_LINK_EXPIRATION)
     else:
       # Store smallish entries and *.isolated in Datastore directly.
       upload_url = self.generate_store_url(
-          entry, namespace,
+          entry_info, namespace,
           http_verb='PUT',
           uploaded_to_gs=False,
           expiration=self.DEFAULT_LINK_EXPIRATION)
@@ -1273,14 +1281,15 @@ class PreUploadContentHandler(ProtocolHandler):
     # Generate push_urls for missing entries.
     push_urls = {}
     existing = []
-    for entry, exists in self.check_entries(entries, namespace):
+    for entry_info, exists in self.check_entry_infos(entries, namespace):
       if exists:
-        existing.append(entry)
+        existing.append(entry_info)
       else:
-        push_urls[entry.digest] = self.generate_push_urls(entry, namespace)
+        push_urls[entry_info.digest] = self.generate_push_urls(
+            entry_info, namespace)
 
     # Send back the response.
-    self.send_json([push_urls.get(entry.digest) for entry in entries])
+    self.send_json([push_urls.get(entry_info.digest) for entry_info in entries])
 
     # Log stats, enqueue tagging task that updates last access time.
     stats.log(stats.LOOKUP, len(entries), len(existing))
@@ -1323,35 +1332,29 @@ class RetrieveContentHandler(ProtocolHandler):
       stats.log(stats.RETURN, len(memcache_entry) - offset, 'memcache')
       return
 
-    entry = get_content_by_hash(namespace, hash_key)
+    entry = entry_key(namespace, hash_key).get()
     if not entry:
-      return self.send_error(
-          'Unable to find an entry.\nKey is \'%s\'.' % hash_key, http_code=404)
+      return self.send_error('Unable to retrieve the entry.', http_code=404)
 
     if entry.content is not None:
       self.send_data(entry.content, filename=hash_key, offset=offset)
       stats.log(stats.RETURN, len(entry.content) - offset, 'inline')
       return
 
-    if not entry.filename:
-      # Corrupted entry. Delete.
-      entry.delete()
-      return self.send_error(
-          'Found corrupted entry.\nKey is \'%s\'.' % hash_key, http_code=404)
-
     # Generate signed download URL.
     settings = config.settings()
     # TODO(maruel): The GS object may not exist anymore. Handle this.
     signer = gcs.URLSigner(settings.gs_bucket,
         settings.gs_client_id_email, settings.gs_private_key)
-    signed_url = signer.get_download_url(entry.gs_filepath)
+    # The entry key is the GS filepath.
+    signed_url = signer.get_download_url(entry.key.id())
 
     # Redirect client to this URL. If 'Range' header is used, client will
     # correctly pass it to Google Storage to fetch only subrange of file,
     # so update stats accordingly.
     self.redirect(signed_url)
     stats.log(
-        stats.RETURN, entry.compressed_size - offset, 'GS; %s' % entry.filename)
+        stats.RETURN, entry.compressed_size - offset, 'GS; %s' % entry.key.id())
 
 
 class StoreContentHandler(ProtocolHandler):
@@ -1466,7 +1469,7 @@ class StoreContentHandler(ProtocolHandler):
 
     # Info about corresponding GS entry (if it exists).
     gs_bucket = config.settings().gs_bucket
-    gs_filepath = '%s/%s' % (namespace, hash_key)
+    key = entry_key(namespace, hash_key)
 
     # Verify the data while at it since it's already in memory but before
     # storing it in memcache and datastore.
@@ -1489,24 +1492,21 @@ class StoreContentHandler(ProtocolHandler):
       needs_verification = False
     else:
       # Fetch size of the stored file.
-      file_info = gcs.get_file_info(gs_bucket, gs_filepath)
+      file_info = gcs.get_file_info(gs_bucket, key.id())
       if not file_info:
+        # TODO(maruel): Do not fail yet. If the request got up to here, the file
+        # is likely there but the service may have trouble fetching the metadata
+        # from GS.
         return self.send_error(
-            'File should be in Google Storage.\nFile: \'%s\'.' % gs_filepath)
+            'File should be in Google Storage.\nFile: \'%s\' Size: %d.' %
+            (key.id(), item_size))
       compressed_size = file_info.size
       needs_verification = True
-
-    if item_size != compressed_size:
-      # Do not delete the GS file, it will be reaped by the clean up job.
-      return self.send_error(
-          'Invalid item size, expected %d, got %d' %
-            (item_size, compressed_size),
-          http_code=503)
 
     # Data is here and it's too large for DS, so put it in GS. It is likely
     # between MIN_SIZE_FOR_GS <= len(content) < MIN_SIZE_FOR_DIRECT_GS
     if content is not None and len(content) >= MIN_SIZE_FOR_GS:
-      if not gcs.write_file(gs_bucket, gs_filepath, [content]):
+      if not gcs.write_file(gs_bucket, key.id(), [content]):
         # Returns 503 so the client automatically retries.
         return self.send_error(
             'Unable to save the content to GS.', http_code=503)
@@ -1514,7 +1514,7 @@ class StoreContentHandler(ProtocolHandler):
       uploaded_to_gs = True
 
     # Can create entity now, everything appears to be legit.
-    entry = create_entry(namespace, hash_key)
+    entry = create_entry(key)
     if not entry:
       self.send_json({'entry': {}})
       stats.log(stats.DUPE, compressed_size, 'inline')
@@ -1526,7 +1526,6 @@ class StoreContentHandler(ProtocolHandler):
       entry.content = content
 
     # Start saving Datastore entry.
-    entry.filename = hash_key if uploaded_to_gs else None
     entry.is_isolated = is_isolated
     entry.compressed_size = compressed_size
     entry.expanded_size = -1 if needs_verification else item_size
@@ -1542,7 +1541,7 @@ class StoreContentHandler(ProtocolHandler):
       futures.append(save_in_memcache(namespace, hash_key, content, async=True))
 
     # Log stats.
-    where = 'GS; ' + entry.filename if entry.filename else 'inline'
+    where = 'GS; ' + 'inline' if entry.content is not None else entry.key.id()
 
     # Verification task will be accessing the entity, so ensure it exists.
     ndb.Future.wait_all(futures)
@@ -1644,6 +1643,9 @@ def CreateApplication():
       webapp2.Route(
           r'/internal/taskqueue/cleanup/obliterate',
           InternalObliterateWorkerHandler),
+      webapp2.Route(
+          r'/internal/taskqueue/cleanup/trim_lost',
+          InternalCleanupTrimLostWorkerHandler),
 
       # Tasks triggered by other request handlers.
       webapp2.Route(

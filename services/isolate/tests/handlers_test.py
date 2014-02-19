@@ -60,13 +60,16 @@ def _ErrorRecord(**kwargs):
   return handlers.ereporter2.ErrorRecord(**default_values)
 
 
-def gen_item(content):
-  """Returns data to send to /pre-upload to upload 'content'."""
+def hash_item(content):
   h = handlers.get_hash_algo('default')
   h.update(content)
-  # REMOVE ME logging.info('%s: %s', content, h.hexdigest())
+  return h.hexdigest()
+
+
+def gen_item(content):
+  """Returns data to send to /pre-upload to upload 'content'."""
   return {
-    'h': h.hexdigest(),
+    'h': hash_item(content),
     'i': 0,
     's': len(content),
   }
@@ -147,6 +150,24 @@ class MainTest(test_case.TestCase):
         return ran_total
       ran_total += ran
 
+  def mock_delete_files(self):
+    deleted = []
+    def delete_files(bucket, files):
+      self.assertEquals('isolateserver-dev', bucket)
+      deleted.extend(files)
+      return []
+    self.mock(handlers.gcs, 'delete_files', delete_files)
+    return deleted
+
+  def put_content(self, url, content):
+    """Simulare isolateserver.py archive."""
+    req = self.testapp.put(
+        url, content_type='application/octet-stream', params=content)
+    self.assertEqual(200, req.status_code)
+    self.assertEqual({'entry':{}}, req.json)
+
+  # Test cases.
+
   def test_internal_cron_ereporter2_mail_not_cron(self):
     response = self.testapp.get(
         '/internal/cron/ereporter2/mail', expect_errors=True)
@@ -217,17 +238,11 @@ class MainTest(test_case.TestCase):
         'Invalid namespace; allowed keys must pass regexp "[a-z0-9A-Z\-._]+"' in
         req.body)
 
-  def put_content(self, url, content):
-    """Simulare isolateserver.py archive."""
-    req = self.testapp.put(
-        url, content_type='application/octet-stream', params=content)
-    self.assertEqual(200, req.status_code)
-    self.assertEqual({'entry':{}}, req.json)
-
   def test_upload_tag_expire(self):
     # Complete integration test that ensures tagged items are properly saved and
     # non tagged items are dumped.
     # Use small objects so it doesn't exercise the GS code path.
+    deleted = self.mock_delete_files()
     items = ['bar', 'foo']
     now = datetime.datetime(2012, 01, 02, 03, 04, 05, 06)
     self.mock(handlers, 'utcnow', lambda: now)
@@ -289,16 +304,22 @@ class MainTest(test_case.TestCase):
     self.assertEqual(0, len(list(handlers.ContentShard.query())))
     self.assertEqual(0, len(list(handlers.ContentEntry.query())))
 
+    # All items expired are tried to be deleted from GS. This is the trade off
+    # between having to fetch the items vs doing unneeded requests to GS for the
+    # inlined objects.
+    expected = sorted('default/' + hash_item(i) for i in items)
+    self.assertEqual(expected, sorted(deleted))
+
   def test_ancestor_assumption(self):
     prefix = '1234'
     suffix = 40 - len(prefix)
-    c = handlers.create_entry('n', prefix + '0' * suffix)
+    c = handlers.create_entry(handlers.entry_key('n', prefix + '0' * suffix))
     self.assertEqual(0, len(list(handlers.ContentShard.query())))
     self.assertEqual(0, len(list(handlers.ContentEntry.query())))
     c.put()
     self.assertEqual(1, len(list(handlers.ContentEntry.query())))
 
-    c = handlers.create_entry('n', prefix + '1' * suffix)
+    c = handlers.create_entry(handlers.entry_key('n', prefix + '1' * suffix))
     self.assertEqual(0, len(list(handlers.ContentShard.query())))
     self.assertEqual(1, len(list(handlers.ContentEntry.query())))
     c.put()
@@ -307,6 +328,75 @@ class MainTest(test_case.TestCase):
     actual_prefix = c.key.parent().id()
     k = handlers.ndb.Key(handlers.ContentShard, actual_prefix)
     self.assertEqual(2, len(list(handlers.ContentEntry.query(ancestor=k))))
+
+  def test_trim_missing(self):
+    deleted = self.mock_delete_files()
+    def gen_file(i, t=0):
+      return (i, handlers.gcs.cloudstorage.GCSFileStat(i, 100, 'etag', t))
+    mock_files = [
+        # Was touched.
+        gen_file('d/' + '0' * 40),
+        # Is deleted.
+        gen_file('d/' + '1' * 40),
+        # Too recent.
+        gen_file('d/' + '2' * 40, time.time() - 60),
+    ]
+    self.mock(handlers.gcs, 'list_files', lambda _: mock_files)
+
+    handlers.ContentEntry(key=handlers.entry_key('d', '0' * 40)).put()
+    self.testapp.get('/restricted/cleanup/trigger/trim_lost')
+    self.assertEqual(1, self.execute_tasks())
+    self.assertEqual(['d/' + '1' * 40], deleted)
+
+  def test_verify(self):
+    # Upload a file larger than MIN_SIZE_FOR_DIRECT_GS and ensure the verify
+    # task works.
+    data = '0' * handlers.MIN_SIZE_FOR_DIRECT_GS
+    req = self.testapp.post_json(
+        '/content-gs/pre-upload/default?token=%s' % self.handshake(),
+        [gen_item(data)])
+    self.assertEqual(1, len(req.json))
+    self.assertEqual(2, len(req.json[0]))
+    # ['url', 'url']
+    self.assertTrue(req.json[0][0])
+    # Fake the upload by calling the second function.
+    self.mock(
+        handlers.gcs, 'get_file_info',
+        lambda _b, _f: handlers.gcs.FileInfo(size=len(data)))
+    req = self.testapp.post(req.json[0][1], '')
+
+    self.mock(handlers.gcs, 'read_file', lambda _b, _f: [data])
+    self.assertEqual(1, self.execute_tasks())
+
+    # Assert the object is still there.
+    self.assertEqual(1, len(list(handlers.ContentEntry.query())))
+
+  def test_verify_corrupted(self):
+    # Upload a file larger than MIN_SIZE_FOR_DIRECT_GS and ensure the verify
+    # task works.
+    data = '0' * handlers.MIN_SIZE_FOR_DIRECT_GS
+    req = self.testapp.post_json(
+        '/content-gs/pre-upload/default?token=%s' % self.handshake(),
+        [gen_item(data)])
+    self.assertEqual(1, len(req.json))
+    self.assertEqual(2, len(req.json[0]))
+    # ['url', 'url']
+    self.assertTrue(req.json[0][0])
+    # Fake the upload by calling the second function.
+    self.mock(
+        handlers.gcs, 'get_file_info',
+        lambda _b, _f: handlers.gcs.FileInfo(size=len(data)))
+    req = self.testapp.post(req.json[0][1], '')
+
+    # Fake corruption
+    data_corrupted = '1' * handlers.MIN_SIZE_FOR_DIRECT_GS
+    self.mock(handlers.gcs, 'read_file', lambda _b, _f: [data_corrupted])
+    deleted = self.mock_delete_files()
+    self.assertEqual(1, self.execute_tasks())
+
+    # Assert the object is gone.
+    self.assertEqual(0, len(list(handlers.ContentEntry.query())))
+    self.assertEqual(['default/' + hash_item(data)], deleted)
 
 
 if __name__ == '__main__':

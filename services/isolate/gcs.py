@@ -51,7 +51,7 @@ FileInfo = collections.namedtuple('FileInfo', ['size'])
 
 
 def list_files(bucket, subdir=None, batch_size=100):
-  """Yields filenames of files inside subdirectory of some bucket.
+  """Yields filenames and stats of files inside subdirectory of a bucket.
 
   It always lists directories recursively.
 
@@ -60,26 +60,32 @@ def list_files(bucket, subdir=None, batch_size=100):
     subdir: subdirectory to list files from or None for an entire bucket.
 
   Yields:
-    Files names relative to the bucket root directory.
+    Tuples of (filename, stats), where filename is relative to the bucket root
+    directory.
   """
   # When listing an entire bucket, gcs expects /<bucket> without ending '/'.
   path_prefix = '/%s/%s' % (bucket, subdir) if subdir else '/%s' % bucket
   bucket_prefix = '/%s/' % bucket
   marker = None
   while True:
-    stats = cloudstorage.listbucket(
+    files_stats = cloudstorage.listbucket(
         path_prefix=path_prefix,
         marker=marker,
         max_keys=batch_size)
-    # |stats| is an iterable, need to iterate through it to figure out
+    # |files_stats| is an iterable, need to iterate through it to figure out
     # whether it's empty or not.
     empty = True
-    for stat in stats:
-      empty = False
-      assert stat.filename.startswith(bucket_prefix)
-      yield stat.filename[len(bucket_prefix):]
+    for stat in files_stats:
       # Restart next listing from the last fetched file.
       marker = stat.filename
+
+      # pylint: disable=C0301
+      # https://developers.google.com/appengine/docs/python/googlecloudstorageclient/gcsfilestat_class
+      if stat.is_dir:
+        continue
+      empty = False
+      assert stat.filename.startswith(bucket_prefix)
+      yield stat.filename[len(bucket_prefix):], stat
     # Last batch was empty -> listed all files.
     if empty:
       break

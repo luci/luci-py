@@ -4,6 +4,11 @@ cron:
   url: /restricted/cleanup/trigger/old
   schedule: every 9 minutes
 
+- description: Trim lost files on GS that are not referenced by a ContentEntry anymore.
+  target: backend
+  url: /restricted/cleanup/trigger/trim_lost
+  schedule: every day 4:00
+
 - description: Cron job that gathers statistics
   target: backend
   url: /restricted/stats/update
