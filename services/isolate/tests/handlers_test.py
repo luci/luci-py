@@ -238,14 +238,14 @@ class MainTest(test_case.TestCase):
         '/content-gs/pre-upload/default?token=%s' % self.handshake(),
         [gen_item(i) for i in items])
     self.assertEqual(len(items), len(r.json))
-    self.assertEqual(0, len(list(handlers.ContentNamespace.query())))
+    self.assertEqual(0, len(list(handlers.ContentShard.query())))
     self.assertEqual(0, len(list(handlers.ContentEntry.query())))
 
     for content, urls in zip(items, r.json):
       self.assertEqual(2, len(urls))
       self.assertEqual(None, urls[1])
       self.put_content(urls[0], content)
-    self.assertEqual(1, len(list(handlers.ContentNamespace.query())))
+    self.assertEqual(0, len(list(handlers.ContentShard.query())))
     self.assertEqual(2, len(list(handlers.ContentEntry.query())))
     expiration = 7*24*60*60
     self.assertEqual(0, self.execute_tasks())
@@ -267,7 +267,7 @@ class MainTest(test_case.TestCase):
     self.assertEqual(200, resp.status_code)
     self.assertEqual([None], r.json)
     self.assertEqual(1, self.execute_tasks())
-    self.assertEqual(1, len(list(handlers.ContentNamespace.query())))
+    self.assertEqual(0, len(list(handlers.ContentShard.query())))
     self.assertEqual(1, len(list(handlers.ContentEntry.query())))
     self.assertEqual('bar', handlers.ContentEntry.query().get().content)
 
@@ -277,7 +277,7 @@ class MainTest(test_case.TestCase):
     self.assertEqual(200, resp.status_code)
     self.assertEqual([None], r.json)
     self.assertEqual(1, self.execute_tasks())
-    self.assertEqual(1, len(list(handlers.ContentNamespace.query())))
+    self.assertEqual(0, len(list(handlers.ContentShard.query())))
     self.assertEqual(0, len(list(handlers.ContentEntry.query())))
 
     # Advance time and force cleanup.
@@ -286,26 +286,26 @@ class MainTest(test_case.TestCase):
     self.assertEqual(200, resp.status_code)
     self.assertEqual([None], r.json)
     self.assertEqual(1, self.execute_tasks())
-    # TODO(maruel): This should delete the namespace but doesn't.
-    self.assertEqual(1, len(list(handlers.ContentNamespace.query())))
+    self.assertEqual(0, len(list(handlers.ContentShard.query())))
     self.assertEqual(0, len(list(handlers.ContentEntry.query())))
 
   def test_ancestor_assumption(self):
     prefix = '1234'
     suffix = 40 - len(prefix)
     c = handlers.create_entry('n', prefix + '0' * suffix)
-    self.assertEqual(1, len(list(handlers.ContentNamespace.query())))
+    self.assertEqual(0, len(list(handlers.ContentShard.query())))
     self.assertEqual(0, len(list(handlers.ContentEntry.query())))
     c.put()
     self.assertEqual(1, len(list(handlers.ContentEntry.query())))
 
     c = handlers.create_entry('n', prefix + '1' * suffix)
-    self.assertEqual(1, len(list(handlers.ContentNamespace.query())))
+    self.assertEqual(0, len(list(handlers.ContentShard.query())))
     self.assertEqual(1, len(list(handlers.ContentEntry.query())))
     c.put()
     self.assertEqual(2, len(list(handlers.ContentEntry.query())))
 
-    k = handlers.ndb.Key(handlers.ContentNamespace, 'n')
+    actual_prefix = c.key.parent().id()
+    k = handlers.ndb.Key(handlers.ContentShard, actual_prefix)
     self.assertEqual(2, len(list(handlers.ContentEntry.query(ancestor=k))))
 
 

@@ -48,10 +48,21 @@ STATS_MODULES = ('default',)
 
 class GlobalConfig(ndb.Model):
   """Application wide settings."""
-  # The number of days a cache entry must be kept for before it is evicted.
-  # Note: this doesn't applies to namespaces where is_temporary is True. For
-  # these, the retention is always 1 day.
-  retention_days = ndb.IntegerProperty(indexed=False, default=7)
+  # The number of seconds a cache entry must be kept for before it is evicted.
+  default_expiration = ndb.IntegerProperty(indexed=False, default=7*24*60*60)
+
+  # This determines the number of initial letters from the ContentEntry hash
+  # value to use as buckets in ContentShard. This is to even out writes across
+  # multiple entity groups. The goal is to get into the range of ~1 write per
+  # second per bucket.
+  #
+  # Each letter represent 4 bits of information, so the number of ContentShard
+  # will be 16**N. Nominal values are:
+  #   1: 16 buckets
+  #   2: 256 buckets
+  #   3: 4096 buckets
+  #   4: 65536 buckets
+  sharding_letters = ndb.IntegerProperty(indexed=False, default=1)
 
   # Secret key used to generate XSRF tokens and signatures.
   global_secret = ndb.BlobProperty()

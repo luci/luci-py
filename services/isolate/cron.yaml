@@ -2,12 +2,7 @@ cron:
 - description: old data cleanup
   target: backend
   url: /restricted/cleanup/trigger/old
-  schedule: every day 01:50
-
-- description: testing data cleanup
-  target: backend
-  url: /restricted/cleanup/trigger/testing
-  schedule: every day 09:50
+  schedule: every 9 minutes
 
 - description: Cron job that gathers statistics
   target: backend
