@@ -1542,8 +1542,7 @@ class RootHandler(webapp2.RequestHandler):
 
 class WarmupHandler(webapp2.RequestHandler):
   def get(self):
-    # Generate/precache settings.
-    config.settings()
+    config.warmup()
     auth.warmup()
     self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
     self.response.write('ok')

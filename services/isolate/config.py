@@ -189,3 +189,13 @@ def get_task_queue_host():
     value = modules.get_hostname(module=TASK_QUEUE_MODULE)
     memcache.set(cache_key, value)
   return value
+
+
+def warmup():
+  """Precaches configuration in local memory, to be called from warmup handler.
+
+  This call is optional. Everything works even if 'warmup' is never called.
+  """
+  settings()
+  get_app_version()
+  get_task_queue_host()
