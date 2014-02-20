@@ -73,9 +73,10 @@ class OAuthConfigHandler(ApiHandler):
     client_id = None
     client_secret = None
     additional_ids = None
+    cache_control = self.request.headers.get('Cache-Control')
 
     # Use most up-to-date data in datastore if requested. Used by management UI.
-    if self.request.headers.get('Cache-Control') == 'no-cache':
+    if cache_control in ('no-cache', 'max-age=0'):
       global_config = model.ROOT_KEY.get()
       client_id = global_config.oauth_client_id
       client_secret = global_config.oauth_client_secret
@@ -97,7 +98,7 @@ class OAuthConfigHandler(ApiHandler):
     body = self.parse_body()
     client_id = body['client_id']
     client_secret = body['client_not_so_secret']
-    additional_client_ids = body['additional_client_ids']
+    additional_client_ids = filter(bool, body['additional_client_ids'])
 
     @ndb.transactional
     def update():

@@ -23,7 +23,7 @@ exports.onContentLoaded = function() {
     // Grab data from the form.
     var id = $('input[name="client_id"]', $form).val();
     var secret = $('input[name="client_secret"]', $form).val();
-    var more_ids = $('textarea[name="more_ids"]', $form).text().split('\n');
+    var more_ids = $('textarea[name="more_ids"]', $form).val().split('\n');
 
     // Disable UI while request is in flight.
     common.setInteractionDisabled($form, true);
@@ -47,7 +47,7 @@ exports.onContentLoaded = function() {
     var config = response.data;
     $('input[name="client_id"]', $form).val(config.client_id);
     $('input[name="client_secret"]', $form).val(config.client_not_so_secret);
-    $('textarea[name="more_ids"]', $form).text(
+    $('textarea[name="more_ids"]', $form).val(
         (config.additional_client_ids || []).join('\n'));
     common.presentContent();
   }, function(error) {
