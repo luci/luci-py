@@ -5,7 +5,7 @@
 
 """Unit tests for the SwarmGenerator class."""
 
-
+import StringIO
 import logging
 import os
 import shutil
@@ -21,11 +21,12 @@ import test_env
 
 test_env.setup_test_env()
 
+from depot_tools import auto_stub
 from tools import dimensions
 from tools import swarm_generator
 
 
-class SwarmGeneratorTest(unittest.TestCase):
+class SwarmGeneratorTest(auto_stub.TestCase):
   """A test case class for the SwarmGenerator class."""
 
   class DerivedSwarmGeneratorBase(swarm_generator.SwarmGenerator):
@@ -306,6 +307,7 @@ class SwarmGeneratorTest(unittest.TestCase):
             self.valid_test_array[1:]))
 
   def testMain(self):
+    self.mock(sys, 'stdout', StringIO.StringIO())
     # The base class doesn't implement GetTestsArray and this raises an error.
     self.derived_swarm_generator_base.options.local_root = self.valid_local_root
     self.assertRaises(AttributeError, self.derived_swarm_generator_base.Main)

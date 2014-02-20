@@ -4,6 +4,7 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
+import StringIO
 import logging
 import os
 import subprocess
@@ -26,17 +27,24 @@ import test_env
 
 test_env.setup_test_env()
 
+from depot_tools import auto_stub
 from third_party.mox import mox
 
 DATA_FILE_REGEX = r'\S*/%s/%s'
 DATA_FOLDER_REGEX = r'\S*/%s'
 
 
-class TestLocalTestRunner(unittest.TestCase):
+class TestLocalTestRunner(auto_stub.TestCase):
   """Test class for the LocalTestRunner class."""
 
   def setUp(self):
     super(TestLocalTestRunner, self).setUp()
+    # We don't want the application logs to interfere with our own messages.
+    # You can comment it out or change for more information when debugging.
+    # This is a global variable because some tests need to know what this
+    # value is.
+    self.logging_level = logging.FATAL
+    logging.disable(self.logging_level)
     self.result_url = 'http://a.com/result'
     self.ping_url = 'http://a.com/ping'
     self.ping_delay = 10
@@ -752,6 +760,8 @@ class TestLocalTestRunner(unittest.TestCase):
     try:
       # This test requires logging to be enabled.
       logging.disable(logging.NOTSET)
+      for i in logging.getLogger().handlers:
+        self.mock(i, 'stream', StringIO.StringIO())
 
       self.CreateValidFile()
       self._mox.StubOutWithMock(local_test_runner.url_helper, 'UrlOpen')
@@ -771,7 +781,7 @@ class TestLocalTestRunner(unittest.TestCase):
         return exception_text in url_files[0][2]
 
       local_test_runner.url_helper.UrlOpen(
-          self.result_url,
+          unicode(self.result_url),
           data=mox.ContainsKeyValue('o', True),
           files=mox.Func(ValidateInternalErrorsResult),
           max_tries=max_url_retries,
@@ -785,7 +795,7 @@ class TestLocalTestRunner(unittest.TestCase):
 
       self._mox.VerifyAll()
     finally:
-      logging.disable(_logging_level)
+      logging.disable(self.logging_level)
 
   def testShutdownOrReturn(self):
     self.CreateValidFile()
@@ -810,12 +820,5 @@ class TestLocalTestRunner(unittest.TestCase):
                      runner.ReturnExitCode(return_value))
 
 
-# We don't want the application logs to interfere with our own messages.
-# You can comment it out or change for more information when debugging.
-# This is a global variable because some tests need to know what this
-# value is.
-_logging_level = logging.FATAL
-
 if __name__ == '__main__':
-  logging.disable(_logging_level)
   unittest.main()

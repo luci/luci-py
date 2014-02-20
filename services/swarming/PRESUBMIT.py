@@ -38,10 +38,7 @@ def CommonChecks(input_api, output_api):
       join('tools'),
   ]
 
-  blacklist = [
-    # post_test.py isn't a test, it it meant to post a test to the server.
-    'post_test.py',
-  ]
+  blacklist = []
   if not input_api.is_committing:
     # Skip smoke tests on upload.
     blacklist.append(r'.+_smoke_test\.py$')
