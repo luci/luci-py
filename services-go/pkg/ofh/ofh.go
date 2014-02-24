@@ -6,14 +6,11 @@
 //
 // It supports both 'installed app' and 'service account' flows. The user can
 // use each of these seamlessly.
-//
-// For an AppEngine based OAuth2 client, see OAuth2Client() in
-// pkg/abtraction/appengine.go.
 package ofh
 
 import (
+	"errors"
 	"net/http"
-	"sync"
 )
 
 // OAuth2ClientProvider is a reference to an OAuth2 enabled *http.Client
@@ -26,4 +23,24 @@ type OAuth2ClientProvider interface {
 	// the specified http.RoundTripper. If r is nil, a default transport will be
 	// used.
 	GetClient(scope string, r http.RoundTripper) (*http.Client, error)
+}
+
+// StubProvider implements OAuth2ClientProvider but doesn't do anything, it is
+// only meant for testing.
+type StubProvider struct {
+	client *http.Client
+	Scopes []string
+}
+
+// MakeStubProvider returns an initialized StubProvider.
+func MakeStubProvider(client *http.Client) *StubProvider {
+	return &StubProvider{client, []string{}}
+}
+
+func (s *StubProvider) GetClient(scope string, r http.RoundTripper) (*http.Client, error) {
+	s.Scopes = append(s.Scopes, scope)
+	if s.client == nil {
+		return nil, errors.New("No client")
+	}
+	return s.client, nil
 }
