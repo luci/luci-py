@@ -3,73 +3,13 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
-"""A command line script/class to run tests on a local configuration.
+"""Runs a Swarming task.
 
-Given a test request file with information about a set of tests to run
-on a given configuration with a set of URL to zip files to download,
-the LocalTestRunner takes care of downloading the necessary files,
-run the tests and saves the output at a specified location.
-
-You can find more details about the test runner here:
-http://goto/gforce//test-runner
-
-The test request file format is described in more details here:
-http://goto/gforce/test-request-format
-
-The decorated output has the following format:
-
---------------------------------------------------------------------------------
-For each test in the test_run:
-[ RUN      ] <test_run_name>.<test_name>
-<actions output>
-If test action returned 0:
-[       OK ] <test_run_name>.<test_name> (XX ms)
-If test action returned a non-0 exit code:
-[  FAILED  ] <test_run_name>.<test_name> (XX ms)
-
-And at the end:
-[----------] <test_run_name> summary
-[==========] WW tests ran. (XX ms total)
-[  PASSED  ] YY tests.
-[  FAILED  ] ZZ tests, listed below:
-
-for each test action that returned a non-0 exit code :
-[  FAILED  ] <test_run_name>.<test_name>
-
- ZZ FAILED TESTS
---------------------------------------------------------------------------------
-
-This is highly inspired by the gtest output format
-(http://code.google.com/p/googletest/wiki/GoogleTestAdvancedGuide).
-Some tests may identify that they don't want their output to be decorated since
-they already follow the gtest format.
-
-Running this file from the command line, you must specify the request file name
-using the -f or --request_file_name command line argument.
-
-You can also import this file as a module and use the LocalTestRunner class
-on its own. You must initialize it with a valid request file name (otherwise it
-will raise an Error exception). After that, you can simply ask it to download
-and exploded the data specified in the test format file and then execute the
-commands, also found within the test request file.
-
-Since the most common usage of this file is to upload it on a remote server to
-execute tests on a given configuration, we try to minimize its dependencies on
-home grown modules. It currently only depends on the downloader.py file which
-must also be uploaded to the server so that the LocalTestRunner can download
-the data needed to run the tests locally.
-
-Classes:
-  Error: A simple error exception properly scoped to this module.
-  LocalTestRunner: Parses a text file, downloads the data and runs the tests.
-
-Top level Functions:
-  main: Parses the command line output to properly initialize an instance of
-        the LocalTestRunner and then calls DownloadAndExplodeData on it as well
-        as RunTests.
+It uploads all results back to the Swarming server.
 """
 
-import exceptions
+__version__ = '0.1'
+
 import logging
 import logging.handlers
 import optparse
@@ -90,13 +30,21 @@ from common import test_request_message
 from common import url_helper
 
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+
 # The amount of characters to read in each pass inside _RunCommand,
 # this helps to ensure that the _RunCommand function doesn't ignore
 # its other functions because it is too busy reading input.
 CHARACTERS_TO_READ_PER_PASS = 2000
 
+
 # The file name of the local rotating log file to store all test results to.
 LOCAL_TEST_RUNNER_CONSTANT_LOG_FILE = 'local_test_runner.log'
+
+
+# Common log format to use.
+LOG_FMT = '%(name)-12s %(levelname)-5s %(message)s'
 
 
 def EnqueueOutput(out, queue):
@@ -144,6 +92,7 @@ def _DeleteFileOrDirectory(name):
   Returns:
     True if the file or directory is successfully deleted.
   """
+  # TODO(maruel): Reuse the code from run_isolated.py.
   for _ in range(5):
     try:
       if os.path.exists(name):
@@ -152,8 +101,8 @@ def _DeleteFileOrDirectory(name):
         else:
           os.remove(name)
       break
-    except (OSError, exceptions.WindowsError) as e:
-      logging.exception('Exception deleting "%s": %s', name, e)
+    except OSError:
+      logging.exception('Exception deleting "%s"', name)
       time.sleep(1)
   if os.path.exists(name):
     logging.error('File not deleted: %s', name)
@@ -164,6 +113,97 @@ def _DeleteFileOrDirectory(name):
 class Error(Exception):
   """Simple error exception properly scoped here."""
   pass
+
+
+def _ParseRequestFile(request_file_name):
+  """Parses and validates the given request file and store the result test_run.
+
+  Args:
+    request_file_name: The name of the request file to parse and validate.
+
+  Returns:
+    TestRun instance.
+  """
+  try:
+    with open(request_file_name, 'rb') as f:
+      content = f.read()
+    errors = []
+    test_run = test_request_message.TestRun()
+    if not test_run.ParseTestRequestMessageText(content, errors):
+      raise Error('Invalid Request File %s: %s' % (request_file_name,
+        '\n'.join(errors)))
+    return test_run
+  except IOError as e:
+    raise Error('Missing Request File %s: %s' % (request_file_name, e))
+  except test_request_message.Error as e:
+    raise Error('Invalid Request File %s: %s' % (request_file_name, e))
+
+
+def _ExpandEnv(argument, env):
+  """Expands any environment variables that may exist in argument.
+
+  Any '%%env%%' will be replaced by the corresponding environment variable.
+
+  Args:
+    argument: The command line argument that may contain an environment
+        variable.
+    env: The dictionary of environment variables to use for the expansion.
+
+  Returns:
+    The expanded argument with environment variables replaced by their value.
+  """
+  for match in re.findall(r'%(\S+)%', argument):
+    value = env.get(match, None)
+    if value is not None:
+      argument = argument.replace('%%' + match + '%%', value)
+  return argument
+
+
+class CaptureLogs(object):
+  """Captures all the logs in a context."""
+  def __init__(self):
+    (handle, self._file_name) = tempfile.mkstemp(
+        prefix='local_test_runner', suffix='.log')
+    os.close(handle)
+    self._logging_handler = logging.FileHandler(self._file_name, 'w')
+    self._logging_handler.setLevel(logging.DEBUG)
+    self._logging_handler.setFormatter(
+        logging.Formatter('%(asctime)s ' + LOG_FMT))
+    logging.getLogger().addHandler(self._logging_handler)
+    assert logging.getLogger().isEnabledFor(logging.DEBUG)
+
+  def get_log(self):
+    """Returns the current content of the logs.
+
+    This also closes the log capture so future logs will not be captured.
+    """
+    self._disconnect()
+    assert self._file_name
+    try:
+      with open(self._file_name, 'rb') as f:
+        return f.read()
+    except IOError as e:
+      return 'Failed to read %s: %s' % (self._file_name, e)
+
+  def close(self):
+    """Closes and delete the log."""
+    self._disconnect()
+    if self._file_name:
+      if not _DeleteFileOrDirectory(self._file_name):
+        logging.error('Could not delete file "%s"', self._file_name)
+      self._file_name = None
+
+  def __enter__(self):
+    return self
+
+  def __exit__(self, _exc_type, _exc_value, _traceback):
+    self.close()
+
+  def _disconnect(self):
+    if self._logging_handler:
+      self._logging_handler.close()
+      logging.getLogger().removeHandler(self._logging_handler)
+      self._logging_handler = None
 
 
 class LocalTestRunner(object):
@@ -177,9 +217,6 @@ class LocalTestRunner(object):
     test_run: The information about the tests to run as
         described on http://goto/gforce/test-request-format.
   """
-  # A cached regular expresion used to find environment variables.
-  _ENV_VAR_RE = re.compile(r'%(\S+)%')
-
   # An array to properly index the success/failure decorated text based on
   # "not exit_code".
   _SUCCESS_DISPLAY_STRING = [' FAILED ', '      OK']
@@ -187,17 +224,17 @@ class LocalTestRunner(object):
   # An array to properly index the pending/success/failure CGI strings.
   _SUCCESS_CGI_STRING = ['success', 'failure', 'pending']
 
-  def __init__(self, request_file_name, verbose=False, data_folder_name=None,
+  def __init__(self, request_file_name, log=None, data_folder_name='',
                max_url_retries=1, restart_on_failure=False):
     """Inits LocalTestRunner with a request file.
 
     Args:
-      request_file_name: The path to the file containing the request.
-      verbose: True to get INFO level logging, False to get ERROR level.
-      data_folder_name: The name of an optional subfolder where to explode the
+      request_file_name: path to the file containing the request.
+      log: CaptureLogs instance that collects logs.
+      data_folder_name: optional name of a subdirectory where to explode the
           downloaded zip data so that they can be cleaned by the 'data' option
-          of the cleanup field of a test run object in a Swarm file.
-      max_url_retries: The maximum number of times any urlopen call will get
+          of the cleanup field of a TestRun object in a Swarming file.
+      max_url_retries: maximum number of times any urlopen call will get
           retried if it encounters an error.
       restart_on_failure: True to have this machine restart if any of the tests
          fail (although it waits for all the tests to run and the results to
@@ -206,116 +243,43 @@ class LocalTestRunner(object):
     Raises:
       Error: When request_file_name or data_folder_name is invalid.
     """
-    # Set up logging to file so we can send our errors to the result URL.
-    logging.getLogger().setLevel(logging.DEBUG)
+    if any(badchar in data_folder_name for badchar in r'.\/'):
+      raise Error('The specified data folder name must be a simple non-empty '
+                  'string with no periods or slashes.')
 
-    (log_file_descriptor, self.log_file_name) = tempfile.mkstemp()
-    os.close(log_file_descriptor)
-    self.logging_file_handler = logging.FileHandler(self.log_file_name, 'w')
-    self.logging_file_handler.setLevel(logging.DEBUG)
-    self.logging_file_handler.setFormatter(logging.Formatter(
-        '%(asctime)s %(name)-12s %(levelname)-8s %(message)s'))
-    logging.getLogger('').addHandler(self.logging_file_handler)
+    self._log = log
+    self.data_dir = None
+    self.max_url_retries = max_url_retries
+    self.restart_on_failure = restart_on_failure
+    self.success = False
+    self.data_dir = (
+        os.path.join(BASE_DIR, data_folder_name)
+        if data_folder_name else BASE_DIR)
+    self.last_ping_time = time.time()
 
-    # Setup the logger for the console ouput.
-    logging_console = logging.StreamHandler()
-    logging_console.setFormatter(
-        logging.Formatter('%(name)-12s: %(levelname)-8s %(message)s'))
-    if verbose:
-      logging_console.setLevel(logging.INFO)
-    else:
-      logging_console.setLevel(logging.ERROR)
-    logging.getLogger('').addHandler(logging_console)
-
-    if not self._ParseRequestFile(request_file_name):
-      raise Error('Invalid Request File: %s' % request_file_name)
+    self.test_run = _ParseRequestFile(request_file_name)
 
     if not data_folder_name and self.test_run.cleanup == 'data':
       raise Error('You must specify a data folder name if you want to cleanup '
                   'data and not the rest of the root folder content.')
-    if (data_folder_name and
-        any([badchar in data_folder_name for badchar in r'.\/'])):
-      raise Error('The specified data folder name must be a simple non-empty '
-                  'string with no periods or slashes.')
-    self.data_dir = os.path.abspath(os.path.dirname(__file__))
-    if data_folder_name:
-      self.data_dir = os.path.join(self.data_dir, data_folder_name)
+
     if os.path.exists(self.data_dir) and not os.path.isdir(self.data_dir):
       raise Error('The specified data folder already exists, but is a regular '
                   'file rather than a folder.')
     if not os.path.exists(self.data_dir):
       os.mkdir(self.data_dir)
 
-    self.max_url_retries = max_url_retries
-    self.restart_on_failure = restart_on_failure
-    self.success = False
-    self.last_ping_time = time.time()
+  def __enter__(self):
+    return self
 
-  def __del__(self):
-    if self.log_file_name:
-      self.logging_file_handler.close()  # In case it hasn't been closed yet.
-      if not _DeleteFileOrDirectory(self.log_file_name):
-        logging.error('Could not delete file "%s"', self.log_file_name)
+  def __exit__(self, _exc_type, _exc_value, _traceback):
+    self.close()
 
-    if self.test_run.cleanup == 'data':  # Implies cleanup zip.
+  def close(self):
+    # 'data' implies cleanup zip.
+    if self.test_run.cleanup == 'data':
       if not _DeleteFileOrDirectory(self.data_dir):
         logging.error('Could not delete data directory "%s"', self.data_dir)
-
-
-
-  def _ExpandEnv(self, argument, env):
-    """Expands any environment variables that may exist in argument.
-
-    For example self._ExpandEnv('%%programfiles%%\\Google\\Chrome')
-    would return 'c:\\program files\\internet explorer\\iexplore.exe'
-    As mentioned in the documentation, we must use double % (e.g., %%ENV_VAR%%)
-    so that the env-var doesn't get confisued with a Swarm Format Variable.
-    see http://goto/swarm/design-doc/test-request-format for more details.
-
-    Args:
-      argument: The command line argument that may contain an environment
-          variable.
-      env: The dictionary of environment variables to use for the expansion.
-
-    Returns:
-      The expanded argument with environment variables replaced by their value.
-    """
-    matches = self._ENV_VAR_RE.findall(argument)
-    for match in matches:
-      env_var = '%%%%%s%%%%' % match
-      if match in env:
-        value = env[match]
-        if value is not None:
-          argument = argument.replace(env_var, value)
-    return argument
-
-  def _ParseRequestFile(self, request_file_name):
-    """Parse and validate the given request file and store the result test_run.
-
-    Args:
-      request_file_name: The name of the request file to parse and validate.
-
-    Returns:
-      True if the parsed request file was validated, False othewise.
-    """
-    try:
-      with open(request_file_name, 'rb') as f:
-        request_data = f.read()
-    except IOError, e:
-      logging.exception('Failed to open file %s.\nException: %s',
-                        request_file_name, e)
-      return False
-    try:
-      self.test_run = test_request_message.TestRun()
-      errors = []
-      if not self.test_run.ParseTestRequestMessageText(request_data, errors):
-        logging.error('Errors while parsing text file: %s', errors)
-        return False
-    except test_request_message.Error, e:
-      logging.exception('Failed to evaluate %s\'s file content.\nException: %s',
-                        request_file_name, e)
-      return False
-    return True
 
   def _PostOutput(self, upload_url, output, result):
     """Posts incremental output.
@@ -326,9 +290,11 @@ class LocalTestRunner(object):
       result: the value of the CGI param 's' which should be from the
           self._SUCCESS_CGI_STRING array.
     """
-    data = {'n': self.test_run.test_run_name,
-            'c': self.test_run.configuration.config_name,
-            's': result}
+    data = {
+        'c': self.test_run.configuration.config_name,
+        'n': self.test_run.test_run_name,
+        's': result,
+    }
     files = [(swarm_constants.RESULT_STRING_KEY,
               swarm_constants.RESULT_STRING_KEY,
               output)]
@@ -364,28 +330,18 @@ class LocalTestRunner(object):
     """
     assert isinstance(hard_time_out, (int, float))
     assert isinstance(io_time_out, (int, float))
-    parsed_command = [self._ExpandEnv(arg, env) for arg in command]
+    parsed_command = [_ExpandEnv(arg, env) for arg in command]
 
-    # Temporarily change to the specified data directory in order to run
-    # the command, then change back afterward.  We cannot use the "cwd"
-    # parameter of Popen() for this because this changes the working directory
-    # for the subprocess only after it starts running.  In order to invoke the
-    # command in the first place (which is assumed to be specified relative to
-    # the data directory), the current working directory must already be set to
-    # the data directory.
-    orig_dir = os.getcwd()
-    os.chdir(self.data_dir)
     logging.info('Executing: %s\ncwd: %s', parsed_command, self.data_dir)
     try:
-      proc = subprocess.Popen(parsed_command, stdout=subprocess.PIPE,
-                              env=env, bufsize=1, stderr=subprocess.STDOUT,
-                              stdin=subprocess.PIPE, universal_newlines=True)
-    except OSError, e:
-      logging.exception('Execution of %s raised exception: %s.',
-                        parsed_command, e)
+      proc = subprocess.Popen(
+          parsed_command, stdout=subprocess.PIPE,
+          env=env, bufsize=1, stderr=subprocess.STDOUT,
+          stdin=subprocess.PIPE, universal_newlines=True,
+          cwd=self.data_dir)
+    except OSError as e:
+      logging.exception('Execution of %s raised exception.', parsed_command)
       return (1, e)
-    finally:
-      os.chdir(orig_dir)
 
     stdout_queue = Queue.Queue()
     stdout_thread = threading.Thread(target=EnqueueOutput,
@@ -410,9 +366,9 @@ class LocalTestRunner(object):
     while not hit_hard_time_out and not hit_io_time_out:
       try:
         exit_code = proc.poll()
-      except OSError, e:
-        logging.exception('Polling execution of %s raised exception: %s.',
-                          parsed_command, e)
+      except OSError as e:
+        logging.exception(
+            'Polling execution of %s raised exception.', parsed_command)
         return (1, e)
 
       current_content = ''
@@ -518,8 +474,8 @@ class LocalTestRunner(object):
       try:
         zip_file = zipfile.ZipFile(local_file)
         zip_file.extractall(self.data_dir)
-      except (zipfile.error, zipfile.BadZipfile, IOError, RuntimeError), e:
-        logging.exception('Failed to unzip %s\nException: %s', local_file, e)
+      except (zipfile.error, zipfile.BadZipfile, IOError, RuntimeError):
+        logging.exception('Failed to unzip %s.', local_file)
         return False
       if zip_file:
         zip_file.close()
@@ -527,9 +483,8 @@ class LocalTestRunner(object):
       if self.test_run.cleanup == 'zip':  # Implied by cleanup data.
         try:
           os.remove(local_file)
-        except OSError, e:
-          logging.exception('Couldn\'t remove %s.\nException: %s',
-                            local_file, e)
+        except OSError:
+          logging.exception('Couldn\'t remove %s.', local_file)
     return True
 
   def RunTests(self):
@@ -594,10 +549,12 @@ class LocalTestRunner(object):
       result_string = '%s\n%s' % (result_string, stdout_string)
       result_codes.append(exit_code)
 
-      if exit_code:  # 0 is SUCCESS
+      if exit_code:
         logging.warning('Execution error %d: %s', exit_code, stdout_string)
 
       if test.decorate_output:
+        # TODO(maruel): Remove all the gtest faking outputs.
+        # https://code.google.com/p/swarming/issues/detail?id=87
         test_case_timing = time.time() - test_case_start_time
         result_string = ('%s\n[ %s ] %s.%s (%d ms)' %
                          (result_string,
@@ -692,9 +649,8 @@ class LocalTestRunner(object):
       try:
         with open(file_path, 'wb') as f:
           f.write(result_string)
-      except IOError, e:
-        logging.exception('Can\'t write result to file %s.\nException: %s',
-                          file_path, e)
+      except IOError:
+        logging.exception('Can\'t write result to file %s.', file_path)
         return False
     elif result_url_parts[0] == 'mailto':
       # TODO(user): Implement this!
@@ -707,19 +663,7 @@ class LocalTestRunner(object):
   def PublishInternalErrors(self):
     """Get the current log data and publish it."""
     logging.debug('Publishing internal errors')
-    # All future log data will only get stored in the rotating logs, it
-    # won't get published.
-    self.logging_file_handler.flush()
-    self.logging_file_handler.close()
-
-    try:
-      with open(self.log_file_name, 'rb') as f:
-        log_data = f.read()
-    except IOError:
-      log_data = 'local_test_runner was unable to read its logs.'
-      logging.exception(log_data)
-
-    self.PublishResults(False, [], log_data, overwrite=True)
+    self.PublishResults(False, [], self._log.get_log(), overwrite=True)
 
   def RetrieveDataAndRunTests(self):
     """Get the data required to run the tests, then run and publish the results.
@@ -734,19 +678,6 @@ class LocalTestRunner(object):
     (success, result_codes, result_string) = self.RunTests()
 
     return self.PublishResults(success, result_codes, result_string)
-
-  def TestLogException(self, message):
-    """Logs the given message as an exception. This is useful for tests.
-
-    Args:
-      message: The message to log as an exception.
-    """
-    # This looks a bit strange, but logging.exception should only be called
-    # from within an exception handler.
-    try:
-      raise Error(message)
-    except Error as e:
-      logging.exception(e)
 
   def ReturnExitCode(self, return_value):
     """Return the restart exit code if the machine should restart.
@@ -776,34 +707,24 @@ class LocalTestRunner(object):
 
 
 def main():
-  """For when the script is used directly on the command line."""
-  parser = optparse.OptionParser()
-  parser.add_option('-f', '--request_file_name',
-                    help='The name of the request file.')
-  parser.add_option('-d', '--data_folder_name',
-                    help='The name of a subfolder to create in the directory '
-                    'containing the test runner to use for setting up and '
-                    'running the tests. Defaults to None.')
-  parser.add_option('-r', '--max_url_retries', default=15, type='int',
-                    help='The maximum number of times url messages will '
-                    'attemp to be sent before accepting failure. Defaults to '
-                    '%default')
-  parser.add_option('--restart_on_failure', action='store_true',
-                    help='Have this script restart the machine if any of the '
-                    'tests fail.')
-  parser.add_option('-v', '--verbose', action='store_true',
-                    help='Set logging level to INFO. Optional. Defaults to '
-                    'ERROR level.', default=False)
-
-  # Setup up logging to a constant file so we can debug issues where
-  # the results aren't properly sent to the result URL.
-  logging_rotating_file = logging.handlers.RotatingFileHandler(
-      LOCAL_TEST_RUNNER_CONSTANT_LOG_FILE,
-      maxBytes=10 * 1024 * 1024, backupCount=5)
-  logging_rotating_file.setLevel(logging.DEBUG)
-  logging_rotating_file.setFormatter(logging.Formatter(
-      '%(asctime)s %(levelname)-8s %(module)15s(%(lineno)4d): %(message)s'))
-  logging.getLogger('').addHandler(logging_rotating_file)
+  parser = optparse.OptionParser(
+      description=sys.modules['__main__'].__doc__,
+      version=__version__)
+  parser.add_option(
+      '-f', '--request_file_name',
+      help='name of the request file')
+  parser.add_option(
+      '-d', '--data_folder_name', default='',
+      help='name of a subdirectory to use to dump the task inputs into')
+  parser.add_option(
+      '-r', '--max_url_retries', default=15, type='int',
+      help='maximum number of HTTP request retries. Default: %default')
+  parser.add_option(
+      '--restart_on_failure', action='store_true',
+      help='tries to restart the machine if the task fails')
+  parser.add_option(
+      '-v', '--verbose', action='store_true',
+      help='Set logging level to INFO')
 
   (options, args) = parser.parse_args()
   if not options.request_file_name:
@@ -811,33 +732,53 @@ def main():
   if args:
     logging.warning('Ignoring unknown args: %s', args)
 
-  runner = None
-  try:
-    runner = LocalTestRunner(options.request_file_name, verbose=options.verbose,
-                             data_folder_name=options.data_folder_name,
-                             max_url_retries=options.max_url_retries,
-                             restart_on_failure=options.restart_on_failure)
-  except Error as e:
-    logging.exception('Can\'t create TestRunner with file: %s.\nException: %s',
-                      options.request_file_name, e)
-    published = False
-    if runner:
-      published = runner.PublishInternalErrors()
-    return int(not published)
+  # Setup the logger for the console ouput.
+  console = logging.StreamHandler()
+  console.setFormatter(logging.Formatter(LOG_FMT))
+  console.setLevel(logging.INFO if options.verbose else logging.ERROR)
+  logging.getLogger().addHandler(console)
 
   try:
-    if runner.RetrieveDataAndRunTests():
-      return runner.ReturnExitCode(0)
-  except Exception as e:
-    # We want to catch all so that we can report all errors, even internal ones.
-    logging.exception(e)
+    with CaptureLogs() as log:
+      with LocalTestRunner(
+          options.request_file_name,
+          log=log,
+          data_folder_name=options.data_folder_name,
+          max_url_retries=options.max_url_retries,
+          restart_on_failure=options.restart_on_failure) as runner:
+        try:
+          if runner.RetrieveDataAndRunTests():
+            return runner.ReturnExitCode(0)
+        except Exception:
+          # We want to catch all so that we can report all errors, even internal
+          # ones.
+          logging.exception('Failed to run test')
 
-  try:
-    runner.PublishInternalErrors()
-  except Exception as e:
-    logging.exception('Unable to publish internal errors')
-  return runner.ReturnExitCode(1)
+        try:
+          runner.PublishInternalErrors()
+        except Exception:
+          logging.exception('Unable to publish internal errors')
+        return runner.ReturnExitCode(1)
+  except Exception:
+    logging.exception('Internal failure')
+    return 1
+
+
+def PrepareLogging():
+  # It is a requirement that the root logger is set to DEBUG, so the messages
+  # are not lost.
+  logging.getLogger().setLevel(logging.DEBUG)
+
+  # Setup up logging to a constant file so we can debug issues where
+  # the results aren't properly sent to the result URL.
+  rotating_file = logging.handlers.RotatingFileHandler(
+      LOCAL_TEST_RUNNER_CONSTANT_LOG_FILE,
+      maxBytes=10 * 1024 * 1024, backupCount=5)
+  rotating_file.setLevel(logging.DEBUG)
+  rotating_file.setFormatter(logging.Formatter('%(asctime)s ' + LOG_FMT))
+  logging.getLogger().addHandler(rotating_file)
 
 
 if __name__ == '__main__':
+  PrepareLogging()
   sys.exit(main())

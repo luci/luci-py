@@ -39,12 +39,6 @@ class TestLocalTestRunner(auto_stub.TestCase):
 
   def setUp(self):
     super(TestLocalTestRunner, self).setUp()
-    # We don't want the application logs to interfere with our own messages.
-    # You can comment it out or change for more information when debugging.
-    # This is a global variable because some tests need to know what this
-    # value is.
-    self.logging_level = logging.FATAL
-    logging.disable(self.logging_level)
     self.result_url = 'http://a.com/result'
     self.ping_url = 'http://a.com/ping'
     self.ping_delay = 10
@@ -52,10 +46,13 @@ class TestLocalTestRunner(auto_stub.TestCase):
     self.test_run_name = 'TestRunName'
     self.config_name = 'ConfigName'
     self._mox = mox.Mox()
-    (data_file_descriptor, self.data_file_name) = tempfile.mkstemp()
-    os.close(data_file_descriptor)
+    self._mox.StubOutWithMock(local_test_runner, 'url_helper')
+    self._mox.StubOutWithMock(local_test_runner, 'zipfile')
+
+    (handle, self.data_file_name) = tempfile.mkstemp(
+        prefix='local_test_runner_test')
+    os.close(handle)
     self.files_to_remove = [self.data_file_name]
-    os.mkdir = lambda _: None
 
     self.result_string = 'This is a result string'
     self.result_codes = [1, 42, 3, 0]
@@ -121,9 +118,8 @@ class TestLocalTestRunner(auto_stub.TestCase):
     def TestInvalidContent(file_content):
       with open(self.data_file_name, 'wb') as f:
         f.write(file_content)
-      self.assertRaises(local_test_runner.Error,
-                        local_test_runner.LocalTestRunner,
-                        self.data_file_name)
+      with self.assertRaises(local_test_runner.Error):
+        local_test_runner.LocalTestRunner(self.data_file_name)
     TestInvalidContent('')
     TestInvalidContent('{}')
     TestInvalidContent('{\'a\':}')
@@ -139,13 +135,14 @@ class TestLocalTestRunner(auto_stub.TestCase):
     self.CreateValidFile()
     # This will raise an exception, which will make the test fail,
     # if there is a problem.
-    _ = local_test_runner.LocalTestRunner(self.data_file_name)
+    with local_test_runner.LocalTestRunner(self.data_file_name):
+      pass
 
   def testInvalidDataFolderName(self):
     def TestInvalidName(name):
-      self.assertRaises(local_test_runner.Error,
-                        local_test_runner.LocalTestRunner,
-                        self.data_file_name, data_folder_name=name)
+      with self.assertRaises(local_test_runner.Error):
+        local_test_runner.LocalTestRunner(
+            self.data_file_name, data_folder_name=name)
     self.CreateValidFile()
     TestInvalidName('.')
     TestInvalidName('..')
@@ -156,9 +153,13 @@ class TestLocalTestRunner(auto_stub.TestCase):
     self.mock_proc = self._mox.CreateMock(subprocess.Popen)
     self._mox.StubOutWithMock(local_test_runner.subprocess, 'Popen')
     local_test_runner.subprocess.Popen(
-        cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=None,
-        bufsize=1, stdin=subprocess.PIPE,
-        universal_newlines=True).AndReturn(self.mock_proc)
+        cmd,
+        env=None,
+        bufsize=1,
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+        stdin=subprocess.PIPE,
+        universal_newlines=True,
+        cwd=local_test_runner.BASE_DIR).AndReturn(self.mock_proc)
 
     (output_pipe, input_pipe) = os.pipe()
     self.mock_proc.stdin_handle = os.fdopen(input_pipe, 'wb')
@@ -175,14 +176,11 @@ class TestLocalTestRunner(auto_stub.TestCase):
     self.mock_proc.poll().AndReturn(None)
     self.mock_proc.poll().WithSideEffects(
         self.mock_proc.stdin_handle.close()).AndReturn(exit_code)
-    self._mox.StubOutWithMock(os, 'chdir')
-    os.chdir(mox.IsA(str)).AndReturn(None)
-    os.chdir(mox.IsA(str)).AndReturn(None)
     self._mox.ReplayAll()
 
     self.CreateValidFile()
-    runner = local_test_runner.LocalTestRunner(self.data_file_name)
-    (exit_code_ret, result_string_ret) = runner._RunCommand(cmd, 0, 0)
+    with local_test_runner.LocalTestRunner(self.data_file_name) as runner:
+      (exit_code_ret, result_string_ret) = runner._RunCommand(cmd, 0, 0)
     self.assertEqual(exit_code_ret, exit_code)
     self.assertEqual(result_string_ret, self.result_string)
 
@@ -194,9 +192,6 @@ class TestLocalTestRunner(auto_stub.TestCase):
 
     self.mock_proc.pid = 42
     self.mock_proc.poll().AndReturn(None)
-    self._mox.StubOutWithMock(os, 'chdir')
-    os.chdir(mox.IsA(str)).AndReturn(None)
-    os.chdir(mox.IsA(str)).AndReturn(None)
 
     self._mox.StubOutWithMock(local_test_runner, '_TimedOut')
     # Ensure the hard limit is hit.
@@ -209,8 +204,8 @@ class TestLocalTestRunner(auto_stub.TestCase):
     self._mox.ReplayAll()
 
     self.CreateValidFile()
-    runner = local_test_runner.LocalTestRunner(self.data_file_name)
-    (exit_code, result_string) = runner._RunCommand(cmd, 1, 0)
+    with local_test_runner.LocalTestRunner(self.data_file_name) as runner:
+      (exit_code, result_string) = runner._RunCommand(cmd, 1, 0)
     self.assertNotEqual(exit_code, 0)
     self.assertTrue(result_string)
     self.assertIn(str(self.mock_proc.pid), result_string)
@@ -223,9 +218,6 @@ class TestLocalTestRunner(auto_stub.TestCase):
 
     self.mock_proc.pid = 42
     self.mock_proc.poll().AndReturn(None)
-    self._mox.StubOutWithMock(os, 'chdir')
-    os.chdir(mox.IsA(str)).AndReturn(None)
-    os.chdir(mox.IsA(str)).AndReturn(None)
 
     self._mox.StubOutWithMock(local_test_runner, '_TimedOut')
     # The hard limit isn't hit
@@ -238,8 +230,8 @@ class TestLocalTestRunner(auto_stub.TestCase):
     self._mox.ReplayAll()
 
     self.CreateValidFile()
-    runner = local_test_runner.LocalTestRunner(self.data_file_name)
-    (exit_code, result_string) = runner._RunCommand(cmd, 1, 0)
+    with local_test_runner.LocalTestRunner(self.data_file_name) as runner:
+      (exit_code, result_string) = runner._RunCommand(cmd, 1, 0)
     self.assertNotEqual(exit_code, 0)
     self.assertTrue(result_string)
     self.assertIn(str(self.mock_proc.pid), result_string)
@@ -251,13 +243,8 @@ class TestLocalTestRunner(auto_stub.TestCase):
     exit_code = 42
     self.PrepareRunCommandCall(cmd)
 
-    self._mox.StubOutWithMock(os, 'chdir')
-    os.chdir(mox.IsA(str)).AndReturn(None)
-    os.chdir(mox.IsA(str)).AndReturn(None)
-
     # Ensure that the first the server is pinged after both poll because
     # the require ping delay will have elapsed.
-    self._mox.StubOutWithMock(local_test_runner.url_helper, 'UrlOpen')
     self.mock_proc.stdin_handle.write(self.result_string)
     self.mock_proc.poll().AndReturn(None)
     local_test_runner.url_helper.UrlOpen(self.ping_url).AndReturn('')
@@ -270,14 +257,14 @@ class TestLocalTestRunner(auto_stub.TestCase):
     self.ping_delay = 0
 
     self.CreateValidFile()
-    runner = local_test_runner.LocalTestRunner(self.data_file_name)
-    (exit_code_ret, result_string_ret) = runner._RunCommand(cmd, 0, 0)
+    with local_test_runner.LocalTestRunner(self.data_file_name) as runner:
+      (exit_code_ret, result_string_ret) = runner._RunCommand(cmd, 0, 0)
     self.assertEqual(exit_code_ret, exit_code)
     self.assertEqual(result_string_ret, self.result_string)
 
     self._mox.VerifyAll()
 
-  def PrepareDownloadCall(self, cleanup=None, data_folder_name=None):
+  def PrepareDownloadCall(self, cleanup=None, data_folder_name=''):
     self.local_file1 = 'foo'
     self.local_file2 = 'bar'
     data_url = 'http://a.com/%s' % self.local_file1
@@ -285,11 +272,10 @@ class TestLocalTestRunner(auto_stub.TestCase):
                                 self.local_file2)
     self.CreateValidFile(test_run_data=[data_url, data_url_with_local_name],
                          test_run_cleanup=cleanup)
-    self.runner = local_test_runner.LocalTestRunner(
-        self.data_file_name, data_folder_name=data_folder_name)
 
-    self._mox.StubOutWithMock(local_test_runner, 'url_helper')
-    data_dir = os.path.basename(self.runner.data_dir)
+    runner = local_test_runner.LocalTestRunner(
+      self.data_file_name, data_folder_name=data_folder_name)
+    data_dir = os.path.basename(runner.data_dir)
     local_test_runner.url_helper.DownloadFile(
         mox.Regex(DATA_FILE_REGEX % (data_dir, self.local_file1)),
         data_url).AndReturn(True)
@@ -297,7 +283,6 @@ class TestLocalTestRunner(auto_stub.TestCase):
         mox.Regex(DATA_FILE_REGEX % (data_dir, self.local_file2)),
         data_url_with_local_name[0]).AndReturn(True)
 
-    self._mox.StubOutWithMock(local_test_runner, 'zipfile')
     self.mock_zipfile = self._mox.CreateMock(zipfile.ZipFile)
     local_test_runner.zipfile.ZipFile(
         mox.Regex(DATA_FILE_REGEX %
@@ -309,44 +294,31 @@ class TestLocalTestRunner(auto_stub.TestCase):
     self.mock_zipfile.close()
     self.mock_zipfile.extractall(mox.Regex(DATA_FOLDER_REGEX % data_dir))
     self.mock_zipfile.close()
+    return runner
 
   def testDownloadAndExplode(self):
-    self.PrepareDownloadCall()
-
-    self._mox.ReplayAll()
-    self.assertTrue(self.runner.DownloadAndExplodeData())
+    with self.PrepareDownloadCall() as runner:
+      self._mox.ReplayAll()
+      self.assertTrue(runner.DownloadAndExplodeData())
 
     self._mox.VerifyAll()
 
   def testDownloadExplodeAndCleanupZip(self):
-    self.PrepareDownloadCall(cleanup='zip')
-    self._mox.StubOutWithMock(local_test_runner, 'os')
-    data_dir = os.path.basename(self.runner.data_dir)
-    local_test_runner.os.remove(
-        mox.Regex(DATA_FILE_REGEX % (data_dir,
-                                     self.local_file1))).AndReturn(None)
-    local_test_runner.os.remove(
-        mox.Regex(DATA_FILE_REGEX % (data_dir,
-                                     self.local_file2))).AndReturn(None)
-
-    self._mox.ReplayAll()
-    self.assertTrue(self.runner.DownloadAndExplodeData())
+    with self.PrepareDownloadCall(cleanup='zip') as runner:
+      self._mox.ReplayAll()
+      self.assertTrue(runner.DownloadAndExplodeData())
 
     self._mox.VerifyAll()
 
   def testDownloadExplodeAndCleanupData(self):
-    self.PrepareDownloadCall(cleanup='data', data_folder_name='data')
-    self._mox.StubOutWithMock(local_test_runner, '_DeleteFileOrDirectory')
-    local_test_runner._DeleteFileOrDirectory(mox.IsA(str)).AndReturn(None)
-    local_test_runner._DeleteFileOrDirectory(mox.IsA(str)).AndReturn(None)
-
-    self._mox.ReplayAll()
-    self.assertTrue(self.runner.DownloadAndExplodeData())
-    self.runner.__del__()
+    with self.PrepareDownloadCall(
+        cleanup='data', data_folder_name='data') as runner:
+      self._mox.ReplayAll()
+      self.assertTrue(runner.DownloadAndExplodeData())
 
     self._mox.VerifyAll()
 
-  def PrepareRunTestsCall(self, decorate_output=None, results=None,
+  def PrepareRunTestsCall(self, log=None, decorate_output=None, results=None,
                           encoding=None, test_names=None, test_run_env=None,
                           config_env=None, slave_test_env=None):
     if not decorate_output:
@@ -371,9 +343,9 @@ class TestLocalTestRunner(auto_stub.TestCase):
     self.CreateValidFile(test_objects_data=test_objects_data,
                          test_run_env=test_run_env, config_env=config_env,
                          test_encoding=encoding)
-    self.runner = local_test_runner.LocalTestRunner(self.data_file_name)
 
-    self._mox.StubOutWithMock(self.runner, '_RunCommand')
+    runner = local_test_runner.LocalTestRunner(self.data_file_name, log=log)
+    self._mox.StubOutWithMock(runner, '_RunCommand')
     env_items = os.environ.items()
     if config_env:
       env_items += config_env.items()
@@ -383,16 +355,18 @@ class TestLocalTestRunner(auto_stub.TestCase):
 
     if test0_env:
       env = dict(env_items + test0_env.items())
-    self.runner._RunCommand(self.action1, 60, 0, env=env).AndReturn(results[0])
+    runner._RunCommand(self.action1, 60, 0, env=env).AndReturn(results[0])
 
     if test1_env:
       env = dict(env_items + test1_env.items())
-    self.runner._RunCommand(self.action2, 60, 9, env=env).AndReturn(results[1])
+    runner._RunCommand(self.action2, 60, 9, env=env).AndReturn(results[1])
+    return runner
 
   def testRunTests(self):
-    self.PrepareRunTestsCall(decorate_output=[True, True])
-    self._mox.ReplayAll()
-    (success, result_codes, result_string) = self.runner.RunTests()
+    with self.PrepareRunTestsCall(
+        decorate_output=[True, True]) as runner:
+      self._mox.ReplayAll()
+      (success, result_codes, result_string) = runner.RunTests()
     self.assertTrue(success)
     self.assertEqual([0, 0], result_codes)
     self.assertIn('[==========] Running 2 tests from %s test run.' %
@@ -415,12 +389,13 @@ class TestLocalTestRunner(auto_stub.TestCase):
     test1_env = {'var7': 'value7', 'var8': 'value8'}
     self._mox.StubOutWithMock(local_test_runner.sys, 'platform')
     local_test_runner.sys.platform = platform
-    self.PrepareRunTestsCall(decorate_output=[True, True],
-                             config_env=config_env, test_run_env=test_run_env,
-                             slave_test_env=[test0_env, test1_env])
-
-    self._mox.ReplayAll()
-    (success, result_codes, result_string) = self.runner.RunTests()
+    with self.PrepareRunTestsCall(
+        decorate_output=[True, True],
+        config_env=config_env,
+        test_run_env=test_run_env,
+        slave_test_env=[test0_env, test1_env]) as runner:
+      self._mox.ReplayAll()
+      (success, result_codes, result_string) = runner.RunTests()
     self.assertTrue(success)
     self.assertEqual([0, 0], result_codes)
     self.assertIn('[==========] Running 2 tests from %s test run.' %
@@ -448,10 +423,10 @@ class TestLocalTestRunner(auto_stub.TestCase):
   def testRunFailedTests(self):
     ok_str = 'OK'
     not_ok_str = 'NOTOK'
-    self.PrepareRunTestsCall(results=[(1, not_ok_str), (0, ok_str)])
-    self._mox.ReplayAll()
-
-    (success, result_codes, result_string) = self.runner.RunTests()
+    with self.PrepareRunTestsCall(
+        results=[(1, not_ok_str), (0, ok_str)]) as runner:
+      self._mox.ReplayAll()
+      (success, result_codes, result_string) = runner.RunTests()
     self.assertFalse(success)
     self.assertEqual([1, 0], result_codes)
     self.assertIn('[==========] Running 2 tests from %s test run.' %
@@ -478,11 +453,11 @@ class TestLocalTestRunner(auto_stub.TestCase):
   def testRunDecoratedTests(self):
     ok_str = 'OK'
     not_ok_str = 'NOTOK'
-    self.PrepareRunTestsCall(results=[(1, not_ok_str), (0, ok_str)],
-                             decorate_output=[False, True])
-    self._mox.ReplayAll()
-
-    (success, result_codes, result_string) = self.runner.RunTests()
+    with self.PrepareRunTestsCall(
+        results=[(1, not_ok_str), (0, ok_str)],
+        decorate_output=[False, True]) as runner:
+      self._mox.ReplayAll()
+      (success, result_codes, result_string) = runner.RunTests()
     self.assertFalse(success)
     self.assertEqual([1, 0], result_codes)
     self.assertIn('[==========] Running 2 tests from %s test run.' %
@@ -520,14 +495,16 @@ class TestLocalTestRunner(auto_stub.TestCase):
     self.test_run_name = u'Unicode Test Runâ-\xe2\x98\x83'
     encoding = 'utf-8'
 
-    self.PrepareRunTestsCall(decorate_output=[True, False],
-                             results=[(0, unicode_string_valid_utf8),
-                                      (0, unicode_string_invalid_utf8)],
-                             test_names=test_names,
-                             encoding=encoding)
-    self._mox.ReplayAll()
-
-    (success, result_codes, result_string) = self.runner.RunTests()
+    with local_test_runner.CaptureLogs() as log:
+      with self.PrepareRunTestsCall(
+          log,
+          decorate_output=[True, False],
+          results=[(0, unicode_string_valid_utf8),
+                  (0, unicode_string_invalid_utf8)],
+          test_names=test_names,
+          encoding=encoding) as runner:
+        self._mox.ReplayAll()
+        (success, result_codes, result_string) = runner.RunTests()
     self.assertTrue(success)
     self.assertEqual([0, 0], result_codes)
     self.assertEqual(unicode, type(result_string))
@@ -565,10 +542,6 @@ class TestLocalTestRunner(auto_stub.TestCase):
       self.mock_proc.poll().WithSideEffects(WriteStdoutContent).AndReturn(None)
     self.mock_proc.poll().WithSideEffects(WriteStdoutContent).AndReturn(
         exit_code)
-    self._mox.StubOutWithMock(os, 'chdir')
-    os.chdir(mox.IsA(str)).AndReturn(None)
-    os.chdir(mox.IsA(str)).AndReturn(None)
-    self._mox.ReplayAll()
 
     self.output_destination['url'] = 'http://blabla.com'
     self.output_destination['size'] = 1
@@ -593,7 +566,6 @@ class TestLocalTestRunner(auto_stub.TestCase):
       self.streamed_output += files[0][2]
       return True
 
-    self._mox.StubOutWithMock(local_test_runner.url_helper, 'UrlOpen')
     local_test_runner.url_helper.UrlOpen(self.output_destination['url'],
                                          data=mox.Func(ValidateUrlData),
                                          files=mox.Func(ValidateUrlFiles),
@@ -603,8 +575,8 @@ class TestLocalTestRunner(auto_stub.TestCase):
 
     self._mox.ReplayAll()
 
-    runner = local_test_runner.LocalTestRunner(self.data_file_name)
-    (exit_code_ret, result_string_ret) = runner._RunCommand(cmd, 0, 0)
+    with local_test_runner.LocalTestRunner(self.data_file_name) as runner:
+      (exit_code_ret, result_string_ret) = runner._RunCommand(cmd, 0, 0)
     self.assertEqual(exit_code_ret, exit_code)
     self.assertEqual(result_string_ret, 'No output!')
     self.assertEqual(self.streamed_output, ''.join(stdout_contents))
@@ -615,7 +587,6 @@ class TestLocalTestRunner(auto_stub.TestCase):
     self.output_destination['url'] = 'http://blabla.com'
     self.result_url = None
     self.CreateValidFile()
-    self._mox.StubOutWithMock(local_test_runner.url_helper, 'UrlOpen')
     data = {'n': self.test_run_name, 'c': self.config_name, 's': 'success'}
     files = [(swarm_constants.RESULT_STRING_KEY,
               swarm_constants.RESULT_STRING_KEY,
@@ -636,21 +607,21 @@ class TestLocalTestRunner(auto_stub.TestCase):
         method='POSTFORM').AndReturn('')
     self._mox.ReplayAll()
 
-    self.runner = local_test_runner.LocalTestRunner(
-        self.data_file_name, max_url_retries=max_url_retries)
-    self.assertTrue(self.runner.PublishResults(True, [], 'Not used'))
+    with local_test_runner.LocalTestRunner(
+        self.data_file_name, max_url_retries=max_url_retries) as runner:
+      self.assertTrue(runner.PublishResults(True, [], 'Not used'))
 
     # Also test with other CGI param in the URL.
     self.output_destination['url'] = '%s?1=2' % self.output_destination['url']
-    self.CreateValidFile()  # Recreate the request file with new value.
-    self.runner = local_test_runner.LocalTestRunner(self.data_file_name)
-    self.assertTrue(self.runner.PublishResults(False, [], 'Not used'))
+    # Recreate the request file with new value.
+    self.CreateValidFile()
+    with local_test_runner.LocalTestRunner(self.data_file_name) as runner:
+      self.assertTrue(runner.PublishResults(False, [], 'Not used'))
 
     self._mox.VerifyAll()
 
   def testPublishResults(self):
     self.CreateValidFile()
-    self._mox.StubOutWithMock(local_test_runner.url_helper, 'UrlOpen')
     max_url_retries = 1
     local_test_runner.url_helper.UrlOpen(
         self.result_url,
@@ -678,23 +649,22 @@ class TestLocalTestRunner(auto_stub.TestCase):
         max_tries=max_url_retries).AndReturn('')
     self._mox.ReplayAll()
 
-    self.runner = local_test_runner.LocalTestRunner(
-        self.data_file_name, max_url_retries=max_url_retries)
-    self.assertTrue(self.runner.PublishResults(True, self.result_codes,
-                                               self.result_string))
+    with local_test_runner.LocalTestRunner(
+        self.data_file_name, max_url_retries=max_url_retries) as runner:
+      self.assertTrue(runner.PublishResults(
+        True, self.result_codes, self.result_string))
 
     # Also test with other CGI param in the URL.
     self.result_url = '%s?1=2' % self.result_url
     self.CreateValidFile()  # Recreate the request file with new value.
-    self.runner = local_test_runner.LocalTestRunner(self.data_file_name)
-    self.assertTrue(self.runner.PublishResults(False, self.result_codes,
-                                               self.result_string))
+    with local_test_runner.LocalTestRunner(self.data_file_name) as runner:
+      self.assertTrue(runner.PublishResults(
+        False, self.result_codes, self.result_string))
 
     self._mox.VerifyAll()
 
   def testPublishResultsUnableToReachResultUrl(self):
     self.CreateValidFile()
-    self._mox.StubOutWithMock(local_test_runner.url_helper, 'UrlOpen')
     max_url_retries = 1
     local_test_runner.url_helper.UrlOpen(
         self.result_url,
@@ -710,16 +680,15 @@ class TestLocalTestRunner(auto_stub.TestCase):
         method='POSTFORM').AndReturn(None)
     self._mox.ReplayAll()
 
-    self.runner = local_test_runner.LocalTestRunner(
-        self.data_file_name, max_url_retries=max_url_retries)
-    self.assertFalse(self.runner.PublishResults(True, self.result_codes,
-                                                self.result_string))
+    with local_test_runner.LocalTestRunner(
+        self.data_file_name, max_url_retries=max_url_retries) as runner:
+      self.assertFalse(runner.PublishResults(
+        True, self.result_codes, self.result_string))
 
     self._mox.VerifyAll()
 
   def testPublishResultsHTTPS(self):
     self.CreateValidFile()
-    self._mox.StubOutWithMock(local_test_runner.url_helper, 'UrlOpen')
     self.result_url = 'https://secure.com/result'
 
     max_url_retries = 1
@@ -738,87 +707,101 @@ class TestLocalTestRunner(auto_stub.TestCase):
     self._mox.ReplayAll()
 
     self.CreateValidFile()
-    self.runner = local_test_runner.LocalTestRunner(
-        self.data_file_name, max_url_retries=max_url_retries)
-    self.assertTrue(self.runner.PublishResults(True, self.result_codes,
-                                               self.result_string))
+    with local_test_runner.LocalTestRunner(
+        self.data_file_name, max_url_retries=max_url_retries) as runner:
+      self.assertTrue(runner.PublishResults(
+        True, self.result_codes, self.result_string))
 
     self._mox.VerifyAll()
 
   def testPublishResultsToFile(self):
-    (result_file_descriptor, result_file_path) = tempfile.mkstemp()
+    (handle, result_file_path) = tempfile.mkstemp(
+        prefix='local_test_runner_test')
+    os.close(handle)
     self.files_to_remove.append(result_file_path)
-    os.close(result_file_descriptor)
     self.result_url = 'file://%s' % result_file_path.replace('\\', '/')
     self.CreateValidFile()  # Recreate the request file with new value.
-    self.runner = local_test_runner.LocalTestRunner(self.data_file_name)
-    self.assertTrue(self.runner.PublishResults(True, [], self.result_string))
+    with local_test_runner.LocalTestRunner(self.data_file_name) as runner:
+      self.assertTrue(runner.PublishResults(True, [], self.result_string))
     with open(result_file_path, 'rb') as f:
       self.assertEqual(f.read(), self.result_string)
 
   def testPublishInternalErrors(self):
-    try:
-      # This test requires logging to be enabled.
-      logging.disable(logging.NOTSET)
-      for i in logging.getLogger().handlers:
-        self.mock(i, 'stream', StringIO.StringIO())
+    logging.basicConfig(level=logging.FATAL)
+    for i in logging.getLogger().handlers:
+      self.mock(i, 'stream', StringIO.StringIO())
 
-      self.CreateValidFile()
-      self._mox.StubOutWithMock(local_test_runner.url_helper, 'UrlOpen')
-      exception_text = 'Bad MAD, no cookie!'
-      max_url_retries = 1
+    self.CreateValidFile()
+    exception_text = 'Bad MAD, no cookie!'
+    max_url_retries = 1
 
-      # We use this function to check if exception_text is properly published
-      # and that the overwrite value is True.
-      def ValidateInternalErrorsResult(url_files):
-        if len(url_files) != 1:
-          return False
+    # We use this function to check if exception_text is properly published
+    # and that the overwrite value is True.
+    def ValidateInternalErrorsResult(url_files):
+      if len(url_files) != 1:
+        return False
 
-        if (url_files[0][0] != swarm_constants.RESULT_STRING_KEY or
-            url_files[0][1] != swarm_constants.RESULT_STRING_KEY):
-          return False
+      if (url_files[0][0] != swarm_constants.RESULT_STRING_KEY or
+          url_files[0][1] != swarm_constants.RESULT_STRING_KEY):
+        return False
 
-        return exception_text in url_files[0][2]
+      return exception_text in url_files[0][2]
 
-      local_test_runner.url_helper.UrlOpen(
-          unicode(self.result_url),
-          data=mox.ContainsKeyValue('o', True),
-          files=mox.Func(ValidateInternalErrorsResult),
-          max_tries=max_url_retries,
-          method='POSTFORM').AndReturn('')
-      self._mox.ReplayAll()
+    local_test_runner.url_helper.UrlOpen(
+        unicode(self.result_url),
+        data=mox.ContainsKeyValue('o', True),
+        files=mox.Func(ValidateInternalErrorsResult),
+        max_tries=max_url_retries,
+        method='POSTFORM').AndReturn('')
+    self._mox.ReplayAll()
 
-      self.runner = local_test_runner.LocalTestRunner(
-          self.data_file_name, max_url_retries=max_url_retries)
-      self.runner.TestLogException(exception_text)
-      self.runner.PublishInternalErrors()
+    with local_test_runner.CaptureLogs() as log:
+      with local_test_runner.LocalTestRunner(
+          self.data_file_name,
+          log=log,
+          max_url_retries=max_url_retries) as runner:
+        # This looks a bit strange, but logging.exception should only be
+        # called from within an exception handler.
+        # TODO(maruel): Make it not print to stderr.
+        try:
+          raise local_test_runner.Error(exception_text)
+        except local_test_runner.Error as e:
+          logging.exception(e)
+        runner.PublishInternalErrors()
 
-      self._mox.VerifyAll()
-    finally:
-      logging.disable(self.logging_level)
+    self._mox.VerifyAll()
 
   def testShutdownOrReturn(self):
     self.CreateValidFile()
-    runner = local_test_runner.LocalTestRunner(self.data_file_name,
-                                               restart_on_failure=False)
     return_value = 0
+    with local_test_runner.LocalTestRunner(
+        self.data_file_name, restart_on_failure=False) as runner:
+      # No test failures and restart on failure disabled.
+      runner.success = True
+      self.assertEqual(return_value, runner.ReturnExitCode(return_value))
 
-    # No test failures and restart on failure disabled.
-    runner.success = True
-    self.assertEqual(return_value, runner.ReturnExitCode(return_value))
+      # Test failures with restart on failure disabled.
+      self.assertEqual(return_value, runner.ReturnExitCode(return_value))
 
-    # Test failures with restart on failure disabled.
-    self.assertEqual(return_value, runner.ReturnExitCode(return_value))
+      # No test failures with restart on failure enabled.
+      runner.restart_on_failure = True
+      self.assertEqual(return_value, runner.ReturnExitCode(return_value))
 
-    # No test failures with restart on failure enabled.
-    runner.restart_on_failure = True
-    self.assertEqual(return_value, runner.ReturnExitCode(return_value))
+      # Test failures with restart of feature enabled.
+      runner.success = False
+      self.assertEqual(swarm_constants.RESTART_EXIT_CODE,
+                      runner.ReturnExitCode(return_value))
 
-    # Test failures with restart of feature enabled.
-    runner.success = False
-    self.assertEqual(swarm_constants.RESTART_EXIT_CODE,
-                     runner.ReturnExitCode(return_value))
+
+def PrepareLogging():
+  """Removes the noise when running the test normally."""
+  logging.getLogger().setLevel(logging.DEBUG)
+  console = logging.StreamHandler()
+  console.setFormatter(logging.Formatter(local_test_runner.LOG_FMT))
+  console.setLevel(logging.INFO if '-v' in sys.argv else logging.FATAL)
+  logging.getLogger().addHandler(console)
 
 
 if __name__ == '__main__':
+  PrepareLogging()
   unittest.main()
