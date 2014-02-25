@@ -9,6 +9,7 @@ on a given machine.
 """
 
 import datetime
+import json
 import logging
 import urlparse
 
@@ -229,22 +230,19 @@ class TestRunner(ndb.Model):
 
     return (self.started - self.created).total_seconds()
 
-  def GetMessage(self):
-    """Get the message string representing this test runner.
+  def GetAsDict(self):
+    """Returns the object as a dict that can be serialized for the user.
 
-    Returns:
-      A string represent this test runner request.
+    The return value is means to be returned to the user.
     """
-    message = ['Test Request Message:']
-    message.append(self.request.get().message)
-
-    message.append('')
-    message.append('Test Runner Message:')
-    message.append('Configuration Name: ' + self.config_name)
-    message.append('Configuration Instance Index: %d / %d' %
-                   (self.config_instance_index, self.num_config_instances))
-
-    return '\n'.join(message)
+    return {
+      'config_instance_index': self.config_instance_index,
+      'config_name': self.config_name,
+      'num_config_instances': self.num_config_instances,
+      # TODO(maruel): It is a tad inefficient to decode the json to reencode it
+      # right away. Double check if it is necessary at all.
+      'request': json.loads(self.request.get().message),
+    }
 
   def ClearRunnerRun(self):
     """Clear the status of any previous run from this runner."""

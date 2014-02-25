@@ -371,9 +371,9 @@ class TestRunnerTest(test_case.TestCase):
                      results['num_config_instances'])
     self.assertEqual(runner.GetResultString(), results['output'])
 
-  def testGetMessage(self):
+  def testGetAsDict(self):
     runner = test_helper.CreatePendingRunner()
-    runner.GetMessage()
+    runner.GetAsDict()
 
   def testRunnerCallerMachineIdMismatch(self):
     self._mox.StubOutWithMock(test_management.logging, 'warning')

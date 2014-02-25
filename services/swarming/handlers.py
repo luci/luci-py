@@ -865,15 +865,16 @@ class ShowMessageHandler(auth.AuthenticatingHandler):
 
   @auth.require(auth.READ, 'swarming/management')
   def get(self):
-    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
+    self.response.headers['Content-Type'] = 'application/json; charset=utf-8'
 
     runner_key = self.request.get('r', '')
     runner = test_runner.GetRunnerFromUrlSafeKey(runner_key)
 
     if runner:
-      self.response.out.write(runner.GetMessage())
+      json.dump(runner.GetAsDict(), self.response, indent=2, sort_keys=True)
     else:
-      self.response.out.write('Cannot find message for: %s' % runner_key)
+      self.response.set_status(404)
+      self.response.out.write('{}')
 
 
 class UploadStartSlaveHandler(auth.AuthenticatingHandler):

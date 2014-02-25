@@ -7,6 +7,7 @@ import datetime
 import json
 import logging
 import os
+import sys
 import unittest
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -299,35 +300,13 @@ class AppTest(test_case.TestCase):
     # Act under admin identity.
     self._ReplaceCurrentUser(ADMIN_EMAIL)
 
-    response = self.app.get('/secure/show_message', {'r': 'fake_key'})
-    self.assertEqual('200 OK', response.status)
-    self.assertTrue(
-        response.body.startswith('Cannot find message'), response.body)
+    response = self.app.get('/secure/show_message', {'r': 'fake_key'},
+        status=404)
 
     runner = test_helper.CreatePendingRunner()
     response = self.app.get('/secure/show_message',
                             {'r': runner.key.urlsafe()})
-    expected = (
-        'Test Request Message:\n'
-        '{"admin": false,"cleanup": null,"configurations": ['
-        '{"additional_instances": 0,"config_name": "c1","data": '
-        '["http://b.ina.ry/files2.zip"],"deadline_to_run": 86400,'
-        '"dimensions": {"browser": "Unknown", "cpu": "Unknown", '
-        '"os": "win-xp"},"env_vars": null,"min_instances": 1,"priority": 10,'
-        '"tests": [{"action": ["ignore-me-too.exe"],"decorate_output": true,'
-        '"env_vars": null,"hard_time_out": 3600.0,"io_time_out": 1200.0,'
-        '"test_name": "t2"}]}],"data": [],"encoding": "ascii","env_vars": null,'
-        '"failure_email": "john@doe.com","label": null,'
-        '"output_destination": null,"requestor": "unknown",'
-        '"restart_on_failure": false,'
-        '"result_url": "http://all.your.resul.ts/are/belong/to/us",'
-        '"store_result": "all","test_case_name": "tc","tests": [{"action": '
-        '["ignore-me.exe"],"decorate_output": true,"env_vars": null,'
-        '"hard_time_out": 3600.0,"io_time_out": 1200.0,"test_name": "t1"}],'
-        '"verbose": false,"working_dir": "c:\\\\swarm_tests"}'
-        '\n\nTest Runner Message:\nConfiguration Name: c1\nConfiguration '
-        'Instance Index: 0 / 1')
-    self.assertResponse(response, '200 OK', expected)
+    self.assertEqual(runner.GetAsDict(), response.json)
 
   def testUploadStartSlaveHandler(self):
     # Act under admin identity.
@@ -878,4 +857,6 @@ class AppTest(test_case.TestCase):
 
 if __name__ == '__main__':
   logging.disable(logging.ERROR)
+  if '-v' in sys.argv:
+    unittest.TestCase.maxDiff = None
   unittest.main()
