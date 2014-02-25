@@ -21,7 +21,6 @@ Uploading to AppEngine
 ----------------------
 
   $ tools/goapp deploy -application my-isolate-server -version go-test .
-TODO(maruel): Add the script.
 
 
 Smoke testing

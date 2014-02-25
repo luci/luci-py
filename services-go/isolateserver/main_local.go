@@ -18,6 +18,7 @@ import (
 )
 
 func runServer() int {
+
 	log.SetFlags(log.Ldate | log.Lmicroseconds)
 
 	// Notes:
