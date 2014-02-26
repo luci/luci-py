@@ -173,9 +173,12 @@ class TestManagementTest(test_case.TestCase):
 
   def testRunnersWithDifferentPriorities(self):
     test_management.ExecuteTestRequest(test_helper.GetRequestMessage(
+        request_name='low-priority',
         priority=100))
     test_management.ExecuteTestRequest(
-        test_helper.GetRequestMessage(priority=1))
+        test_helper.GetRequestMessage(request_name='high-priority',
+                                      priority=1))
+    self.assertEqual(2, test_request.TestRequest.query().count())
 
     self._ExecuteRegister(MACHINE_IDS[0])
 
@@ -195,6 +198,76 @@ class TestManagementTest(test_case.TestCase):
     # though it is newer.
     self.assertEqual(None, old_low_priority_runner.started)
     self.assertNotEqual(None, new_high_priority_runner.started)
+
+  def testTestRequestMismatchFailedRunner(self):
+    request = test_helper.GetRequestMessage(failure_email=None,
+                                            min_instances=2,
+                                            result_url=None)
+
+    test_management.ExecuteTestRequest(request)
+    runner = test_runner.TestRunner.query().get()
+    test_runner.DeleteRunner(runner)
+
+    # The new request won't use the old request since one of its runners is
+    # gone.
+    test_management.ExecuteTestRequest(request)
+
+    # Ensure that we created a new test request and two new runner.
+    self.assertEqual(2, test_request.TestRequest.query().count())
+    self.assertEqual(3, test_runner.TestRunner.query().count())
+
+  def testTestRequestMismatchDeletedRunner(self):
+    request = test_helper.GetRequestMessage(failure_email=None,
+                                            result_url=None)
+
+    test_management.ExecuteTestRequest(request)
+    runner = test_runner.TestRunner.query().get()
+    runner.done = True
+    runner.ran_successfully = False
+    runner.put()
+
+    # The new request won't use the old request since its runner failed.
+    test_management.ExecuteTestRequest(request)
+
+    # Ensure that we created a new test request and a new runner.
+    self.assertEqual(2, test_request.TestRequest.query().count())
+    self.assertEqual(2, test_runner.TestRunner.query().count())
+
+  def testTestRequestMatch(self):
+    request = test_helper.GetRequestMessage(failure_email=None,
+                                            result_url=None)
+
+    response = test_management.ExecuteTestRequest(request)
+
+    # The new request will just merge with the old request.
+    merged_response = test_management.ExecuteTestRequest(request)
+
+    # Ensure we actually return the same values.
+    self.assertEqual(response, merged_response)
+
+    # Ensure that we don't create any new values.
+    self.assertEqual(1, test_request.TestRequest.query().count())
+    self.assertEqual(1, test_runner.TestRunner.query().count())
+
+  def testTestRequestMatchMultipleConfigs(self):
+    num_configs = 2
+    request = test_helper.GetRequestMessage(failure_email=None,
+                                            result_url=None,
+                                            num_configs=num_configs)
+
+    response = test_management.ExecuteTestRequest(request)
+    self.assertEqual(1, test_request.TestRequest.query().count())
+
+    # The new request will just merge with the old request since it is the old
+    # request.
+    merged_response = test_management.ExecuteTestRequest(request)
+
+    # Ensure we actually return the same values.
+    self.assertEqual(response, merged_response)
+
+    # Ensure that we don't create any new values.
+    self.assertEqual(1, test_request.TestRequest.query().count())
+    self.assertEqual(num_configs, test_runner.TestRunner.query().count())
 
   def _AssignPendingRequestsTest(self, instances=1):
     test_management.ExecuteTestRequest(

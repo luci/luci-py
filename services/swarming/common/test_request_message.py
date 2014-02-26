@@ -757,6 +757,79 @@ class TestCase(TestRequestMessageBase):
     self.ConvertDictionariesToObjectType(self.tests, TestObject)
     self.ConvertDictionariesToObjectType(self.configurations, TestConfiguration)
 
+  def Equivalent(self, test_case):
+    """Checks to see if the given test case is equivalent.
+
+    Equivalent in this case just means they would produce the same output,
+    not that they are completely equal.
+
+    Args:
+      test_case: The new test case being considered.
+
+    Returns:
+      True if the given test case could use the results from this request.
+    """
+    # All of the following values must be the same for the test output to be
+    # equal.
+    equal_keys = [
+        'admin',
+        'data',
+        'encoding',
+        'env_vars',
+        'store_result',
+        'tests',
+        'verbose',
+    ]
+
+    for equal_key in equal_keys:
+      if getattr(self, equal_key) != getattr(test_case, equal_key):
+        return False
+
+    # The following keys must not be set for a TestRequest to be equivalent,
+    # because they all have side effects.
+    side_effect_keys = [
+      'failure_email',
+      'output_destination',
+      'result_url',
+    ]
+
+    for side_effect_key in side_effect_keys:
+      if (getattr(self, side_effect_key) !=
+          getattr(test_case, side_effect_key)):
+        return False
+
+    # The configs must be in the same order before we can begin to compare them.
+    def sort_configs(x, y):
+      return cmp(x.config_name, y.config_name)
+
+    sorted_configs = sorted(test_case.configurations, sort_configs)
+    self_sorted_configs = sorted(self.configurations, sort_configs)
+
+    if (self_sorted_configs != sorted_configs):
+      return False
+
+    # Keys that have no impact on the test output and can be safely ignored.
+    ignored_keys = [
+        'cleanup',
+        'label',
+        'restart_on_failure',
+        'requestor',
+        'test_case_name',
+        'working_dir',
+    ]
+
+    # A sanity check to ensure all values were considered. If a new value is
+    # added to TestRequest and not added here, the TestRequest tests should
+    # fail here.
+    examined_keys = set(['configurations'] + equal_keys + side_effect_keys +
+                          ignored_keys)
+    missing_keys = examined_keys.symmetric_difference(
+        set(test_case.__dict__))
+    if missing_keys:
+      raise Error(missing_keys)
+
+    return True
+
 
 class TestRun(TestRequestMessageBase):
   """The object to hold on and validate attributes for a test run.

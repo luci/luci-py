@@ -198,3 +198,25 @@ def GetAllMatchingTestRequests(test_case_name):
   query = ndb.transaction(GetMatches)
 
   return [request for request in query]
+
+
+def GetNewestMatchingTestRequest(test_case_name):
+  """Returns a the newest Test Request that matchs the given test_case_name.
+
+  Args:
+    test_case_name: The test case name to search for.
+
+  Returns:
+    The newest Test Request that has |test_case_name| as its name.
+  """
+  parent_model = GetTestRequestParent(test_case_name)
+
+  # Perform the query in a transaction to ensure that it gets the most recent
+  # data, otherwise it is possible for one machine to add tests, and then be
+  # unable to find them through this function after.
+  def GetMatches():
+    return TestRequest.query(TestRequest.name == test_case_name,
+                             ancestor=parent_model.key).order(
+      -TestRequest.requested_time).get()
+
+  return ndb.transaction(GetMatches)

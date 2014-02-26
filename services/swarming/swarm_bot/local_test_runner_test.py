@@ -14,7 +14,7 @@ import unittest
 import zipfile
 
 # Import everything that does not require sys.path hack first.
-
+# pylint: disable-msg=W0403
 import local_test_runner
 
 from common import swarm_constants

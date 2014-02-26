@@ -36,6 +36,13 @@ indexes:
   - name: success
   - name: timed_out
 
+- kind: TestRequest
+  ancestor: yes
+  properties:
+  - name: name
+  - name: requested_time
+    direction: desc
+
 - kind: TestRunner
   properties:
   - name: automatic_retry_count

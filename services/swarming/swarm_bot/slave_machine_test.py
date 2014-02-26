@@ -13,6 +13,7 @@ import time
 import unittest
 
 # Import everything that does not need sys.path hack first.
+# pylint: disable-msg=W0403
 import slave_machine
 from common import bot_archive
 from common import rpc

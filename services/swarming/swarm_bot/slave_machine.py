@@ -26,6 +26,7 @@ import sys
 import time
 import urlparse
 
+# pylint: disable-msg=W0403
 from common import bot_archive
 from common import rpc
 from common import swarm_constants

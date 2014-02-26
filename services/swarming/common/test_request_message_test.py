@@ -793,6 +793,71 @@ class TestCaseTest(TestHelper):
         test_request_message.Stringize(full_object, json_readable=True))
     self.assertEqual(new_object, full_object)
 
+  def testEquivalent(self):
+    test_case = test_request_message.TestCase()
+    self.assertTrue(test_case.Equivalent(test_case))
+
+    # Test that certain values don't affect equivalence
+    equivalent_test_case = test_request_message.TestCase()
+    self.assertTrue(test_case.Equivalent(equivalent_test_case))
+
+    equivalent_test_case.cleanup = 'root'
+    self.assertTrue(test_case.Equivalent(equivalent_test_case))
+
+    equivalent_test_case.label = 'important'
+    self.assertTrue(test_case.Equivalent(equivalent_test_case))
+
+    equivalent_test_case.requestor = 'chris'
+    self.assertTrue(test_case.Equivalent(equivalent_test_case))
+
+    equivalent_test_case.working_dir = 'new_folder'
+    self.assertTrue(test_case.Equivalent(equivalent_test_case))
+
+    # Test that we can get failures.
+    equivalent_test_case.admin = not equivalent_test_case.admin
+    self.assertFalse(test_case.Equivalent(equivalent_test_case))
+
+  def testEquivalentsDifferentConfigs(self):
+    test_case = test_request_message.TestCase(
+      configurations=[test_request_message.TestConfiguration()])
+    different_test_case = test_request_message.TestCase(
+      configurations=[test_request_message.TestConfiguration()])
+
+    self.assertTrue(test_case.Equivalent(different_test_case))
+
+    # Ensure that a request with the same name, but a different config will
+    # fail.
+    different_test_case.configurations[0].config_name = 'different_name'
+    self.assertFalse(test_case.Equivalent(different_test_case))
+    different_test_case.configurations[0].config_name = (
+        test_case.configurations[0].config_name)
+
+    # Ensure that a request with a matching config, but additional configs as
+    # well, fails.
+    different_test_case.configurations.append(
+        different_test_case.configurations[0])
+    self.assertFalse(test_case.Equivalent(different_test_case))
+
+  def testEquivalentMultipleConfigs(self):
+    num_configs = 2
+    test_case = test_request_message.TestCase()
+    for i in range(num_configs):
+      test_case.configurations.append(
+          test_request_message.TestConfiguration(config_name=str(i)))
+
+    self.assertTrue(test_case.Equivalent(test_case))
+    # Change the position of the position of the configs and ensure they are
+    # still equivalent.
+    equivalent_test_case = test_request_message.TestCase()
+    for i in range(num_configs):
+      equivalent_test_case.configurations.append(
+          test_request_message.TestConfiguration(config_name=str(i)))
+
+    equivalent_test_case.configurations = list(reversed(
+        equivalent_test_case.configurations))
+
+    self.assertTrue(test_case.Equivalent(equivalent_test_case))
+
 
 class TestRunTest(TestHelper):
   def setUp(self):

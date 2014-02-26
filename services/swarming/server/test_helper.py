@@ -12,8 +12,11 @@ from server import test_request
 from server import test_runner
 
 
-REQUEST_MESSAGE_CONFIG_NAME = 'c1'
+# The default root for all configs in a test request. The index value of the
+# config is appended to the end to make the full default name.
+REQUEST_MESSAGE_CONFIG_NAME_ROOT = 'c1'
 
+# The default name for a TestRequest.
 REQUEST_MESSAGE_TEST_CASE_NAME = 'tc'
 
 DEFAULT_RESULT_URL = 'http://all.your.resul.ts/are/belong/to/us'
@@ -43,18 +46,30 @@ def _CreateRunner(request, config_name):
   return runner
 
 
-def GetRequestMessage(min_instances=1, additional_instances=0,
-                      env_vars=None, result_url=DEFAULT_RESULT_URL,
-                      store_result='all', restart_on_failure=False,
-                      platform='win-xp', priority=10):
+def GetRequestMessage(request_name=REQUEST_MESSAGE_TEST_CASE_NAME,
+                      config_name_root=REQUEST_MESSAGE_CONFIG_NAME_ROOT,
+                      min_instances=1,
+                      additional_instances=0,
+                      env_vars=None,
+                      result_url=DEFAULT_RESULT_URL,
+                      failure_email=DEFAULT_FAILURE_EMAIL,
+                      store_result='all',
+                      restart_on_failure=False,
+                      platform='win-xp',
+                      priority=10,
+                      num_configs=1):
   """Return a properly formatted request message text.
 
   Args:
+    request_name: The name of the test request.
+    config_name_root: The base name of each config (it will have the instance
+        number appended to it).
     min_instances: The minimum number of instance of the given config.
     additional_instances: The number of additional instances for of the given
         config.
     env_vars: A dictionary of environment variables for the request.
     result_url: The result url to use.
+    failure_email: The email address to send failure messages to.
     store_result: Identifies which Runner and Request data should stay in
         storage after the tests are done running (fail means only the failures
         are kept).
@@ -62,36 +77,37 @@ def GetRequestMessage(min_instances=1, additional_instances=0,
         of its tests fail.
     platform: The os to require in the test's configuration.
     priority: The priority given to this request.
+    num_configs: The number of configs to have in the request message.
 
   Returns:
     A properly formatted request message text.
   """
-  request = test_request_message.TestCase()
-  request.test_case_name = REQUEST_MESSAGE_TEST_CASE_NAME
+  request = test_request_message.TestCase(
+      failure_email=failure_email,
+      restart_on_failure=restart_on_failure,
+      result_url=result_url,
+      store_result=store_result,
+      test_case_name=request_name,
+    )
   request.tests = [test_request_message.TestObject(
       test_name='t1', action=['ignore-me.exe'])]
-  request.configurations = [
-      test_request_message.TestConfiguration(
-          config_name=REQUEST_MESSAGE_CONFIG_NAME, os=platform,
-          cpu='Unknown', data=['http://b.ina.ry/files2.zip'],
-          browser='Unknown',
-          min_instances=min_instances,
-          additional_instances=additional_instances,
-          priority=priority,
-          tests=[test_request_message.TestObject(
-              test_name='t2', action=['ignore-me-too.exe'])])]
+  for i in range(num_configs):
+    request.configurations.append(test_request_message.TestConfiguration(
+        config_name=config_name_root + '_' + str(i), os=platform,
+        cpu='Unknown', data=['http://b.ina.ry/files2.zip'],
+        browser='Unknown',
+        min_instances=min_instances,
+        additional_instances=additional_instances,
+        priority=priority,
+        tests=[test_request_message.TestObject(
+            test_name='t2', action=['ignore-me-too.exe'])]))
   if env_vars:
     request.env_vars = env_vars.copy()
-  request.result_url = result_url
-  request.failure_email = DEFAULT_FAILURE_EMAIL
-  request.store_result = store_result
-  request.restart_on_failure = restart_on_failure
 
   return test_request_message.Stringize(request, json_readable=True)
 
 
-def CreatePendingRunner(config_name=REQUEST_MESSAGE_CONFIG_NAME,
-                        machine_id=None, exit_codes=None):
+def CreatePendingRunner(config_name=None, machine_id=None, exit_codes=None):
   """Create a basic pending TestRunner.
 
   Args:
@@ -104,6 +120,9 @@ def CreatePendingRunner(config_name=REQUEST_MESSAGE_CONFIG_NAME,
   Returns:
     The pending runner created.
   """
+  if not config_name:
+    config_name = REQUEST_MESSAGE_CONFIG_NAME_ROOT + '_0'
+
   request = test_request.TestRequest(message=GetRequestMessage(),
                                      name=REQUEST_MESSAGE_TEST_CASE_NAME)
   request.put()
@@ -141,7 +160,7 @@ def CreateRequest(num_instances):
   request.put()
 
   for i in range(num_instances):
-    runner = _CreateRunner(request, REQUEST_MESSAGE_CONFIG_NAME)
+    runner = _CreateRunner(request, REQUEST_MESSAGE_CONFIG_NAME_ROOT + '_0')
     runner.config_instance_index = i
     runner.num_config_instances = num_instances
     runner.put()

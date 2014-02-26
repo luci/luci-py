@@ -117,10 +117,42 @@ def ExecuteTestRequest(request_message):
   test_case = test_request.GetTestCase(request_message)
   request = test_request.TestRequest(name=test_case.test_case_name,
                                      message=request_message)
-  request.put()
-
   test_keys = {'test_case_name': test_case.test_case_name,
                'test_keys': []}
+
+  def AddRunnerToKeys(runner):
+    test_keys['test_keys'].append({
+        'config_name': runner.config_name,
+        'instance_index': runner.config_instance_index,
+        'num_instances': runner.num_config_instances,
+        'test_key': runner.key.urlsafe()})
+
+  matching_request = test_request.GetNewestMatchingTestRequest(
+      test_case.test_case_name)
+  if matching_request:
+    if not matching_request.GetTestCase().Equivalent(test_case):
+      raise test_request_message.Error(
+          'The test case name, %s, has already been used by another test case '
+          'which doesn\'t have equivalent values. Please select a new test '
+          'case name.' % test_case.test_case_name)
+
+    # Check that the old request still has all it's test runners (we can't use
+    # the old values if they were already deleted).
+    required_runners = sum(test.min_instances
+                           for test in test_case.configurations)
+    if len(matching_request.runner_keys) == required_runners:
+      matching_runners = ndb.get_multi(matching_request.runner_keys)
+
+      # Reuse the old runner if none of them have failed, otherwise rerun them
+      # all.
+      if (all(runner and not runner.done or runner.ran_successfully
+              for runner in matching_runners)):
+        for runner in matching_runners:
+          AddRunnerToKeys(runner)
+        return test_keys
+
+  # Only store the request if we are actually going to use it.
+  request.put()
 
   for config in test_case.configurations:
     logging.debug('Creating runners for request=%s config=%s',
@@ -142,10 +174,7 @@ def ExecuteTestRequest(request_message):
       config.instance_index = instance_index
       runner = _QueueTestRequestConfig(request, config, config_hash)
 
-      test_keys['test_keys'].append({'config_name': config.config_name,
-                                     'instance_index': instance_index,
-                                     'num_instances': config.num_instances,
-                                     'test_key': runner.key.urlsafe()})
+      AddRunnerToKeys(runner)
       # Ensure that the request has the keys of all its runners.
       request.runner_keys.append(runner.key)
 

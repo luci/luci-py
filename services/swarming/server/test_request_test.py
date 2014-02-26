@@ -24,7 +24,7 @@ from server import test_request
 
 class TestRequestTest(test_case.TestCase):
   def testGetTestRequestKeys(self):
-   # Ensure that matching works even when the datastore is not being
+    # Ensure that matching works even when the datastore is not being
     # consistent.
     self.policy = datastore_stub_util.PseudoRandomHRConsistencyPolicy(
         probability=0)
@@ -51,7 +51,6 @@ class TestRequestTest(test_case.TestCase):
     self.testbed.init_datastore_v3_stub(consistency_policy=self.policy)
 
     # Ensure it works with no matches.
-    self.assertNotEqual('unknown', test_helper.REQUEST_MESSAGE_TEST_CASE_NAME)
     matches = test_request.GetAllMatchingTestRequests('unknown')
     self.assertEqual(0, len(matches))
 
@@ -68,6 +67,31 @@ class TestRequestTest(test_case.TestCase):
     matches = test_request.GetAllMatchingTestRequests(
         test_helper.REQUEST_MESSAGE_TEST_CASE_NAME)
     self.assertEqual(2, len(matches))
+
+  def testGetNewestMatchingTestRequest(self):
+    # Ensure that matching works even when the datastore is not being
+    # consistent.
+    self.policy = datastore_stub_util.PseudoRandomHRConsistencyPolicy(
+        probability=0)
+    self.testbed.init_datastore_v3_stub(consistency_policy=self.policy)
+
+    # Ensure it works with no matches.
+    match = test_request.GetNewestMatchingTestRequest('unknown')
+    self.assertEqual(None, match)
+
+    # Check with one matching request.
+    old_request = test_helper.CreateRequest(1)
+
+    match = test_request.GetNewestMatchingTestRequest(
+        test_helper.REQUEST_MESSAGE_TEST_CASE_NAME)
+    self.assertEqual(old_request, match)
+
+    # Add another request to ensure it works with multiple requests.
+    newest_request = test_helper.CreateRequest(1)
+
+    match = test_request.GetNewestMatchingTestRequest(
+        test_helper.REQUEST_MESSAGE_TEST_CASE_NAME)
+    self.assertEqual(newest_request, match)
 
   def testDeleteIfNoMoreRunner(self):
     # Create a request with no runners and ensure it gets deleted.

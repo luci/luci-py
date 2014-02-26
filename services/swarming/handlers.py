@@ -921,7 +921,7 @@ class StatsHandler(webapp2.RequestHandler):
 
 
 class GetMatchingTestCasesHandler(auth.AuthenticatingHandler):
-  """Get all the keys for any test runner that match a given test case name."""
+  """Get all the keys for any test runners that match a given test case name."""
 
   @auth.require(auth.READ, 'swarming/clients')
   def get(self):
@@ -933,6 +933,26 @@ class GetMatchingTestCasesHandler(auth.AuthenticatingHandler):
       keys.extend(key.urlsafe() for key in match.runner_keys)
 
     logging.info('Found %d keys in %d TestRequests', len(keys), len(matches))
+    self.response.headers['Content-Type'] = 'application/json; charset=utf-8'
+    if keys:
+      self.response.out.write(json.dumps(keys))
+    else:
+      self.response.set_status(404)
+      self.response.out.write('[]')
+
+
+class GetNewestMatchingTestCasesHandler(auth.AuthenticatingHandler):
+  """Gets all the runner keys owned by the newest test request with this name.
+  """
+
+  @auth.require(auth.READ, 'swarming/clients')
+  def get(self):
+    test_case_name = self.request.get('name', '')
+
+    match = test_request.GetNewestMatchingTestRequests(test_case_name)
+    keys = [key.urlsafe() for key in match.runner_keys]
+
+    logging.info('Found %d keys in the newest TestRequests', len(keys))
     self.response.headers['Content-Type'] = 'application/json; charset=utf-8'
     if keys:
       self.response.out.write(json.dumps(keys))
@@ -1389,6 +1409,7 @@ def CreateApplication():
       ('/', RedirectToMainHandler),
       ('/cleanup_results', CleanupResultsHandler),
       ('/get_matching_test_cases', GetMatchingTestCasesHandler),
+      ('/get_newest_matching_test_cases', GetNewestMatchingTestCasesHandler),
       ('/get_result', GetResultHandler),
       ('/get_slave_code', GetSlaveCodeHandler),
       ('/graphs/daily_stats', DailyStatsGraphHandler),
