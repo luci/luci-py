@@ -62,10 +62,7 @@ def GetTestCase(request_message):
     test_request_message.Error: If the request's message isn't valid.
   """
   request_object = test_request_message.TestCase()
-  errors = []
-  if not request_object.ParseTestRequestMessageText(request_message, errors):
-    raise test_request_message.Error('\n'.join(errors))
-
+  request_object.ParseTestRequestMessageText(request_message)
   return request_object
 
 

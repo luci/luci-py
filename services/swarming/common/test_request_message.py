@@ -103,20 +103,6 @@ class TestRequestMessageBase(object):
   the Test Request Format.
   """
 
-  @staticmethod
-  def LogError(error_text, error_list):
-    """Logs an error message and adds it to the given list.
-
-    Will only log when error_list is not None.
-
-    Args:
-      error_text: The text of the error.
-      error_list: The list where to append the error after we logged it.
-    """
-    if error_list is not None:  # Explicit compare to None in case it is [].
-      logging.error(error_text)
-      error_list.append(error_text)
-
   def __str__(self, json_readable=False):
     """Returns the request text after validating it.
 
@@ -127,11 +113,8 @@ class TestRequestMessageBase(object):
         json.loads().
 
     Returns:
-      The text string representing the request, or an empty string on errors.
+      The text string representing the request.
     """
-    if not self.IsValid(errors=None):
-      return ''
-
     request_text_entries = ['{']
     # We sort the dictionary to ensure the string is always printed the same.
     for item in sorted(self.__dict__):
@@ -161,79 +144,55 @@ class TestRequestMessageBase(object):
     """
     return type(self) == type(other) and self.__dict__ == other.__dict__
 
-  def AreValidValues(self, value_keys, value_type, required=False, errors=None):
-    """Checks if all the values at the given keys are of the right type.
-
-    This method also takes care of logging the error and append it to errors
-    if errors is not left to None.
+  def AreValidValues(self, value_keys, value_type, required=False):
+    """Raises if any of the values at the given keys are not of the right type.
 
     Args:
       value_keys: The key names of the values to validate.
       value_type: The type that all the values should be.
       required: An optional flag identifying if the value is required to be
           non-empty. Defaults to False.
-      errors: An array where we can append error messages.
-
-    Returns:
-      True if all values are of the right type, False othewise.
     """
     for value_key in value_keys:
       if value_key not in self.__dict__:
-        self.LogError('%s must have a value for %s' %
-                      (self.__class__.__name__, value_key), errors)
-        return False
+        raise Error(
+            '%s must have a value for %s' %
+            (self.__class__.__name__, value_key))
 
       value = self.__dict__[value_key]
       # Since 0 is an acceptable required value, but (not 0 == True), we
       # explicity check against 0.
       if required and (not value and value != 0):
-        self.LogError('%s must have a non-empty value' % value_key, errors)
-        return False
+        raise Error('%s must have a non-empty value' % value_key)
       # If the value is not required, it could be None, which would
       # not likely be of the value_type. If it is required and None, we would
       # have returned False above.
       if value is not None and not isinstance(value, value_type):
-        self.LogError('Invalid %s: %s' % (value_key,
-                                          self.__dict__[value_key]), errors)
-        return False
-    return True
+        raise Error('Invalid %s: %s' % (value_key, self.__dict__[value_key]))
 
-  def AreValidLists(self, list_keys, value_type, required=False, errors=None):
-    """Checks if all the values at the given list keys are of the right type.
-
-    This method also takes care of logging the error and append it to errors
-    if errors is not left to None.
+  def AreValidLists(self, list_keys, value_type, required=False):
+    """Raises if any of the values at the given list keys are not of the right
+    type.
 
     Args:
       list_keys: The key names of the value lists to validate.
       value_type: The type that all the values in the lists should be.
       required: An optional flag identifying if the list is required to be
           non-empty. Defaults to False.
-      errors: An array where we can append error messages.
-
-    Returns:
-      True if all values in all lists are all of the right type, False othewise.
     """
-    if not self.AreValidValues(list_keys, list, required, errors):
-      return False
+    self.AreValidValues(list_keys, list, required)
 
     for value_key in list_keys:
       if self.__dict__[value_key]:
         for value in self.__dict__[value_key]:
           if not isinstance(value, value_type):
-            self.LogError('Invalid entry in list %s: %s' % (value_key, value),
-                          errors)
-            return False
-      else:
-        assert not required
-    return True
+            raise Error('Invalid entry in list %s: %s' % (value_key, value))
+      elif required:
+        raise Error('Missing required %s' % value_key)
 
-  def AreValidDicts(self, list_keys, key_type, value_type, required=False,
-                    errors=None):
-    """Checks if all the values at the given list keys are of the right type.
-
-    This method also takes care of logging the error and append it to errors
-    if errors is not left to None.
+  def AreValidDicts(self, list_keys, key_type, value_type, required=False):
+    """Raises if any of the values at the given list keys are not of the right
+    type.
 
     Args:
       list_keys: The key names of the value lists to validate.
@@ -241,33 +200,21 @@ class TestRequestMessageBase(object):
       value_type: The type that all the values in the dict should be.
       required: An optional flag identifying if the dict is required to be
           non-empty. Defaults to False.
-      errors: An array where we can append error messages.
-
-    Returns:
-      True if all key, value pairs in all dicts are all of the right type,
-      False othewise.
     """
-    if not self.AreValidValues(list_keys, dict, required, errors):
-      return False
+    self.AreValidValues(list_keys, dict, required)
 
     for value_key in list_keys:
       if self.__dict__[value_key]:
         for key, value in self.__dict__[value_key].iteritems():
           if (not isinstance(key, key_type) or
               not isinstance(value, value_type)):
-            self.LogError('Invalid entry in dict %s: %s' % (value_key, value),
-                          errors)
-            return False
-      else:
-        assert not required
-    return True
+            raise Error('Invalid entry in dict %s: %s' % (value_key, value))
+      elif required:
+        raise Error('Missing required %s' % value_key)
 
   def AreValidObjectLists(self, list_keys, object_type, required=False,
-                          unique_value_keys=None, errors=None):
-    """Checks if all the objects of the given lists are valid.
-
-    This method also takes care of logging the error and append it to errors
-    if errors is not left to None.
+                          unique_value_keys=None):
+    """Raises if any of the objects of the given lists are not valid.
 
     Args:
       list_keys: The key names of the value lists to validate.
@@ -275,13 +222,8 @@ class TestRequestMessageBase(object):
       required: An optional flag identifying if the list is required to be
           non-empty. Defaults to False.
       unique_value_keys: An optional list of keys to values that must be unique.
-      errors: An array where we can append error messages.
-
-    Returns:
-      True if all values in all lists are all of the right type, False othewise.
     """
-    if not self.AreValidLists(list_keys, object_type, required, errors):
-      return False
+    self.AreValidLists(list_keys, object_type, required)
 
     # We use this dictionary of sets to make sure some values are unique.
     unique_values = {}
@@ -299,82 +241,46 @@ class TestRequestMessageBase(object):
             if unique_key in object_value.__dict__:
               unique_value = object_value.__dict__[unique_key]
               if unique_value in unique_values[unique_key]:
-                self.LogError('Duplicate entry with same value %s: %s in %s'
-                              % (unique_key, unique_value, list_key), errors)
-                return False
-              else:
-                unique_values[unique_key].add(unique_value)
+                raise Error(
+                    'Duplicate entry with same value %s: %s in %s' %
+                    (unique_key, unique_value, list_key))
+              unique_values[unique_key].add(unique_value)
         # Now we validate the whole object.
-        if not object_value.IsValid(errors):
-          self.LogError('Invalid entry in %s' % list_key, errors)
-          return False
-    return True
+        object_value.IsValid()
 
-  def IsValidUrl(self, value, errors=None):
-    """Checks if the given value is a valid URL.
+  def IsValidUrl(self, url):
+    """Raises if the given value is not a valid URL."""
+    if not isinstance(url, basestring):
+      raise Error('Unsupported url type, %s, must be a string' % url)
 
-    Args:
-      value: The potential URL to validate.
-      errors: An array where we can append error messages.
-
-    Returns:
-      True if the URL is valid, false otherwise.
-    """
-    if not isinstance(value, basestring):
-      self.LogError('Unsupported url scheme, %s, must be a string' % value,
-                    errors)
-      return False
-
-    url_parts = urlparse.urlsplit(value)
+    url_parts = urlparse.urlsplit(url)
     if url_parts[0] not in VALID_URL_SCHEMES:
-      self.LogError('Unsupported url scheme, %s' % url_parts[0], errors)
-      return False
+      raise Error('Unsupported url scheme, %s' % url_parts[0])
 
-    return True
+  def AreValidUrls(self, url_keys):
+    """Raises if any of the value at value_key are not a valid URL."""
+    for url_key in url_keys:
+      self.IsValidUrl(self.__dict__[url_key])
 
-  def AreValidUrls(self, value_keys, errors=None):
-    """Checks if the value at value_key is a valid URL.
-
-    Args:
-      value_keys: The key names of the values to validate.
-      errors: An array where we can append error messages.
-
-    Returns:
-      True if the URL is valid, False othewise.
-    """
-    for value_key in value_keys:
-      if not self.IsValidUrl(self.__dict__[value_key], errors=errors):
-        return False
-    return True
-
-  def AreValidUrlLists(self, list_keys, required=False, errors=None):
-    """Checks if all the values in the given lists are valid urls.
+  def AreValidUrlLists(self, list_keys, required=False):
+    """Raises if any of the values in the given lists is not a valid url.
 
     Args:
       list_keys: The key names of the value lists to validate.
       required: An optional flag identifying if the list is required to be
           non-empty. Defaults to False.
-      errors: An array where we can append error messages.
-
-    Returns:
-      True if all the values are valid urls, False otherwise.
     """
-    if not self.AreValidLists(list_keys, basestring, required, errors):
-      return False
+    self.AreValidValues(list_keys, list, required)
 
     for list_key in list_keys:
       if self.__dict__[list_key]:
         for value in self.__dict__[list_key]:
-          if not self.IsValidUrl(value, errors):
-            return False
+          self.IsValidUrl(value)
       elif required:
-        self.LogError('Missing list %s' % list_key, errors)
-        return False
+        raise Error('Missing list %s' % list_key)
 
-    return True
-
-  def AreValidDataLists(self, list_keys, required=False, errors=None):
-    """Checks if all the values in the given lists are valid data.
+  def AreValidDataLists(self, list_keys, required=False):
+    """Raises if any of the values in the given lists are not valid 'data'.
 
     Valid data is either a tuple/list of (valid url, local file name)
     or just a valid url.
@@ -383,168 +289,110 @@ class TestRequestMessageBase(object):
       list_keys: The key names of the value lists to validate.
       required: An optional flag identifying if the list is required to be
           non-empty. Defaults to False.
-      errors: An array where we can append error messages.
-
-    Returns:
-      True if all the values are valid data elements.
     """
-    if not self.AreValidValues(list_keys, list, required, errors):
-      return False
+    self.AreValidValues(list_keys, list, required)
 
     for list_key in list_keys:
       if self.__dict__[list_key]:
         for value in self.__dict__[list_key]:
           if not isinstance(value, (basestring, list, tuple)):
-            self.LogError('Data list wrong type, must be tuple or basestring, '
-                          'got %s' % type(value), errors)
-            return False
+            raise Error(
+                'Data list wrong type, must be tuple or basestring, got %s' %
+                type(value))
 
           if isinstance(value, basestring):
-            if not self.IsValidUrl(value, errors):
-              return False
+            self.IsValidUrl(value)
           else:
             if len(value) != 2:
-              self.LogError('Incorrect length, should be 2 but was '
-                            '%d' % len(value), errors)
-              return False
-            if not self.IsValidUrl(value[0], errors):
-              return False
+              raise Error(
+                  'Incorrect length, should be 2 but is %d' % len(value))
+            self.IsValidUrl(value[0])
             if not isinstance(value[1], basestring):
-              self.LogError('Local path should be of type basestring, got %s' %
-                            type(value[1]), errors)
-              return False
+              raise Error(
+                  'Local path should be of type basestring, got %s' %
+                  type(value[1]))
       elif required:
-        self.LogError('Missing list %s' % list_key, errors)
-        return False
+        raise Error('Missing list %s' % list_key)
 
-    return True
+  def IsValidInteger(self, value):
+    """Raises if the given value is not castable to a valid integer.
 
-  def IsValidInteger(self, value, errors=None):
-    """Checks if the given value is castable to a valid integer.
-
-      It value must not only be castable to a valid integer, but it
-      must also be a whole number (i.e. 8.0 is valid but 8.5 is not).
-
-    Args:
-      value: The potential integer to validate.
-      errors: An array where we can append error messages.
-
-    Returns:
-      True if the value is castable to valid integer, false otherwise.
+    The value must not only be castable to a valid integer, but it must also be
+    a whole number (i.e. 8.0 is valid but 8.5 is not).
     """
     try:
       long(value)
     except ValueError:
-      self.LogError('Invalid value for size, %s, must be int castable'
-                    % value, errors)
-      return False
+      raise Error('Invalid value for size, %s, must be long castable' % value)
 
     if isinstance(value, float) and int(value) != value:
-      self.LogError('Size in output destination must be a whole number, '
-                    'was given %s'% value, errors)
-      return False
+      raise Error(
+          'Size in output destination must be a whole number, was given %s' %
+          value)
 
-    return True
-
-  def AreValidOutputDestinations(self, value_keys, errors=None):
-    """Checks if the values at value_keys are valid output_destinations.
+  def AreValidOutputDestinations(self, value_keys):
+    """Raises if any of the values at value_keys are not valid a
+    output_destinations.
 
     Args:
       value_keys: The key names of the values to validate.
-      errors: An array where we can append error messages.
-
-    Returns:
-      True if the output_destinations are value, False otherwise.
     """
     for value_key in value_keys:
       output_destination = self.__dict__[value_key]
       if output_destination is None:
         continue
       if not isinstance(output_destination, dict):
-        self.LogError('Output destination must be a dictionary, was given: %s'
-                      % output_destination, errors)
-        return False
+        raise Error(
+            'Output destination must be a dictionary, was given: %s' %
+            output_destination)
 
       for key, value in output_destination.iteritems():
         if key == 'size':
-          if not self.IsValidInteger(value, errors):
-            self.LogError('Invalid size in output destination, %s' % value,
-                          errors)
-            return False
+          self.IsValidInteger(value)
           if isinstance(value, basestring):
             # If we reach here then value is a valid integer, just in string
-            # form, so we convert it to an int to prevent problems with later
-            # code not using it correctly.
-            output_destination[key] = int(value)
+            # form, so we convert it to an long to prevent problems with later
+            # code not using it correctly. int may be too short for large files
+            # on 32 bits platforms.
+            output_destination[key] = long(value)
         elif key == 'url':
-          if not self.IsValidUrl(value, errors=errors):
-            self.LogError('Invalid url in output destination, %s' % value,
-                          errors)
-            return False
+          self.IsValidUrl(value)
         else:
-          self.LogError('Invalid key, %s, in output destination' % key, errors)
-          return False
-    return True
+          raise Error('Invalid key, %s, in output destination' % key)
 
-  def IsValidEncoding(self, encoding, errors):
-    """Identifies if the given encoding is valid.
-
-    Args:
-      encoding: The encoding to check.
-      errors: An array where we can append error messages.
-
-    Returns:
-      True if the encoding is valid.
-    """
+  def IsValidEncoding(self, encoding):
+    """Raises if the given encoding is not valid."""
     try:
       unicode('0', encoding)
-      return True
     except LookupError:
-      self.LogError('Invalid encoding %s' % encoding, errors)
-      return False
+      raise Error('Invalid encoding %s' % encoding)
 
-  def IsValid(self, errors=None):
-    """Identifies if the current content is valid.
-
-    Note that the base class always returns False, this is to be implemented
-    in all derived classes (we assert that we are called on an instance of the
-    base class to make sure).
-
-    Args:
-      errors: A list to which we can append error messages if any.
-
-    Returns:
-      True if the current content is valid, False otherwise.
-    """
-    # This must be overriden by the derived classes and they shouldn't call us.
-    assert self.__class__.__name__ is 'TestRequestMessageBase'
-    self.LogError('TestRequestMessageBase class can\'t be used on its own',
-                  errors)
-    return False
+  def IsValid(self):
+    """Raises if the current content is not valid."""
+    raise NotImplementedError()
 
   @staticmethod
-  def ConvertDictionaryToObjectType(dictionary, object_type, errors):
+  def ConvertDictionaryToObjectType(dictionary, object_type):
     """Convert a dictionary to an object instance.
 
     Args:
       dictionary: The dictionary to convert to objects.
       object_type: The type of objects the list entries must be converted to.
           This type of object must expose a ParseDictionary() method.
-      errors: A list to which we can append error messages if any.
 
     Returns:
-      An object of the specified type, or None if there was an error while
-      parsing the dictionary.
+      An object of the specified type.
+
+    Raises:
+      Error: If the dictionary has type errors. The text of the Error exception
+          will be set with the type error text message.
     """
     new_object = object_type()
-    if not new_object.ParseDictionary(dictionary, errors):
-      TestRequestMessageBase.LogError('Invalid dictionary for: %s\n%s' %
-                                      (object_type, dictionary), errors)
-      return None
+    new_object.ParseDictionary(dictionary)
     return new_object
 
   @staticmethod
-  def ConvertDictionariesToObjectType(dict_list, object_type, errors):
+  def ConvertDictionariesToObjectType(dict_list, object_type):
     """Convert all dictionaries in the given list to an object instance.
 
     Args:
@@ -553,28 +401,21 @@ class TestRequestMessageBase(object):
           replaced by object instances.
       object_type: The type of objects the list entries must be converted to.
           This type of object must expose a ParseDictionary() method.
-      errors: A list to which we can append error messages if any.
 
-    Returns:
-      True if all entries could successfully be converted (though not validated
-      yet), and False otherwise (e.g., ParseDictionary returned False)
+    Raises:
+      Error: If dict_list has type errors. The text of the Error exception will
+          be set with the type error text message.
     """
     for index in range(len(dict_list)):
       dictionary = dict_list[index]
       dict_list[index] = TestRequestMessageBase.ConvertDictionaryToObjectType(
-          dictionary, object_type, errors)
+          dictionary, object_type)
       if dict_list[index] is None:
-        TestRequestMessageBase.LogError('Invalid dictionary for: %s\n%s' %
-                                        (object_type, dictionary), errors)
-        return False
-    return True
+        raise Error(
+            'Invalid dictionary for: %s\n%s' % (object_type, dictionary))
 
   def ExpandVariables(self, variables):
-    """Expand the provided variables in all our text fields.
-
-    Args:
-      variables: A dictionary containing the variable values.
-    """
+    """Expand the provided variables in all our text fields."""
 
     def ExpandVariable(value):
       """Expand the given value with outer variables dictionary.
@@ -615,34 +456,25 @@ class TestRequestMessageBase(object):
 
     ExpandVariable(self.__dict__)
 
-  def ParseDictionary(self, dictionary, errors=None):
+  def ParseDictionary(self, dictionary):
     """Parses the given dictionary and merge it into our __dict__.
 
-    Args:
-      dictionary: The dictionary to be parsed and merged into __dict__.
-      errors: A list to which we can append error messages if any.
-
-    Returns:
-      False if dictionary is not a dict. True otherwise.
+    Raises:
+      Error: If the dictionary has type errors. The text of the Error exception
+          will be set with the type error text message.
     """
     # We only want to get the values that are meaningful for us.
     if not isinstance(dictionary, dict):
-      self.LogError('Invalid dictionary not a dict: %s' % dictionary, errors)
-      return False
+      raise Error('Invalid dictionary not a dict: %s' % dictionary)
     for item in self.__dict__:
       if item in dictionary:
         self.__dict__[item] = dictionary[item]
-    return True
 
-  def ParseTestRequestMessageText(self, message_text, errors=None):
+  def ParseTestRequestMessageText(self, message_text):
     """Parses the given text, convert it to a test request and validate it.
 
     Args:
       message_text: The text to be parsed as a Test Request Message.
-      errors: A list to which we can append error messages if any.
-
-    Returns:
-      True if the text is valid. And False otherwise.
 
     Raises:
       Error: If the text has syntax or type errors. The text of the Error
@@ -655,11 +487,8 @@ class TestRequestMessageBase(object):
                  'Exception: %s' % (message_text, e))
       logging.exception(message)
       raise Error(message)
-    if (not self.ParseDictionary(test_request, errors) or
-        not self.IsValid(errors)):
-      self.LogError('Invalid request not a dict: %s' % test_request, errors)
-      return False
-    return True
+    self.ParseDictionary(test_request)
+    self.IsValid()
 
 
 class TestObject(TestRequestMessageBase):
@@ -691,32 +520,16 @@ class TestObject(TestRequestMessageBase):
     self.hard_time_out = hard_time_out
     self.io_time_out = io_time_out
 
-  def IsValid(self, errors=None):
-    """Identifies if the current content is valid.
-
-    Args:
-      errors: A list to which we can append error messages if any.
-          Can be left None if caller is not interested in errors.
-
-    Returns:
-      True if the current content is valid, False otherwise.
-    """
-    if (not self.AreValidValues(['test_name'], basestring,
-                                required=True, errors=errors) or
-        not self.AreValidDicts(['env_vars'], basestring, basestring,
-                               errors=errors) or
-        not self.AreValidLists(['action'], basestring, required=True,
-                               errors=errors) or
-        not self.AreValidValues(['hard_time_out', 'io_time_out'],
-                                (int, long, float), errors=errors)):
-      self.LogError('Invalid TestObject: %s' % self.__dict__, errors)
-      return False
+  def IsValid(self):
+    """Raises if the current content is not valid."""
+    self.AreValidValues(['test_name'], basestring, required=True)
+    self.AreValidDicts(['env_vars'], basestring, basestring)
+    self.AreValidLists(['action'], basestring, required=True)
+    self.AreValidValues(['hard_time_out', 'io_time_out'], (int, long, float))
 
     # self.decorate_output doesn't need to be validated since we only need
     # to evaluate it to True/False which can be done with any type.
-
     logging.debug('Successfully validated request: %s', self.__dict__)
-    return True
 
 
 class TestConfiguration(TestRequestMessageBase):
@@ -770,66 +583,49 @@ class TestConfiguration(TestRequestMessageBase):
     # when the list of configuration dimensions changes.
     self.dimensions = dimensions
 
-  def IsValid(self, errors=None):
-    """Identifies if the current content is valid.
+  def IsValid(self):
+    """Raises if the current content is not valid."""
+    self.AreValidValues(['config_name'], basestring, required=True)
+    self.AreValidDicts(['env_vars'], basestring, basestring)
+    self.AreValidDataLists(['data'])
+    self.AreValidObjectLists(
+        ['tests'], TestObject, unique_value_keys=['test_name'])
+    # required=True to make sure the caller doesn't set it to None.
+    self.AreValidValues(
+        ['min_instances', 'additional_instances', 'deadline_to_run',
+          'priority'],
+        (int, long), required=True)
 
-    Args:
-      errors: A list to which we can append error messages if any.
-
-    Returns:
-      True if the current content is valid, False otherwise.
-    """
-    if (not self.AreValidValues(['config_name'], basestring,
-                                required=True, errors=errors) or
-        not self.AreValidDicts(['env_vars'], basestring, basestring,
-                               errors=errors) or
-        not self.AreValidDataLists(['data'], errors=errors) or
-        not self.AreValidObjectLists(['tests'], TestObject,
-                                     unique_value_keys=['test_name'],
-                                     errors=errors) or
-        # required=True to make sure the caller doesn't set it to None.
-        not self.AreValidValues(['min_instances', 'additional_instances',
-                                 'deadline_to_run', 'priority'],
-                                (int, long), required=True, errors=errors) or
-        self.min_instances < 1 or self.additional_instances < 0 or
+    if (self.min_instances < 1 or self.additional_instances < 0 or
         self.deadline_to_run < 0 or self.priority < 0 or
         self.priority > MAX_PRIORITY_VALUE):
-      self.LogError('Invalid TestConfiguration: %s' % self.__dict__, errors)
-      return False
+      raise Error('Invalid TestConfiguration: %s' % self.__dict__)
 
     if not isinstance(self.dimensions, dict):
-      self.LogError('Invalid TestConfiguration dimension type: %s' %
-                    type(self.dimensions), errors)
-      return False
+      raise Error(
+          'Invalid TestConfiguration dimension type: %s' %
+          type(self.dimensions))
     for values in self.dimensions.values():
       if not isinstance(values, (list, tuple)):
         values = [values]
       for value in values:
         if not value or not isinstance(value, basestring):
-          self.LogError('Invalid TestConfiguration dimension value: %s' % value,
-                        errors)
-          return False
+          raise Error('Invalid TestConfiguration dimension value: %s' % value)
 
-    logging.debug('Successfully validated request: %s', self.__dict__)
-    return True
-
-  def ParseDictionary(self, dictionary, errors=None):
+  def ParseDictionary(self, dictionary):
     """Parses the given dictionary and merge it into our __dict__.
 
     We override the base class behavior to create instances of TestOjbects.
 
     Args:
       dictionary: The dictionary to be parsed and merged into __dict__.
-      errors: A list to which we can append error messages if any.
 
-    Returns:
-      False if dictionary is not a dict. True otherwise.
+    Raises:
+      Error: If the dictionary has type errors. The text of the Error exception
+          will be set with the type error text message.
     """
-    if not super(TestConfiguration, self).ParseDictionary(dictionary, errors):
-      return False
-    if not self.ConvertDictionariesToObjectType(self.tests, TestObject, errors):
-      return False
-    return True
+    super(TestConfiguration, self).ParseDictionary(dictionary)
+    self.ConvertDictionariesToObjectType(self.tests, TestObject)
 
 
 class TestCase(TestRequestMessageBase):
@@ -911,48 +707,34 @@ class TestCase(TestRequestMessageBase):
     self.label = label
     self.verbose = verbose
 
-  def IsValid(self, errors=None):
-    """Identifies if the current content is valid.
+  def IsValid(self):
+    """Raises if the current content is not valid."""
+    self.AreValidValues(['test_case_name'], basestring, required=True)
+    self.AreValidValues(
+        ['requestor', 'working_dir', 'failure_email', 'result_url', 'label'],
+        basestring)
+    self.AreValidDicts(['env_vars'], basestring, basestring)
+    self.AreValidObjectLists(
+        ['configurations'], TestConfiguration, required=True,
+        unique_value_keys=['config_name'])
+    self.AreValidDataLists(['data'])
+    self.AreValidObjectLists(
+        ['tests'], TestObject, unique_value_keys=['test_name'])
+    self.AreValidOutputDestinations(['output_destination'])
 
-    Args:
-      errors: A list to which we can append error messages if any.
+    if self.encoding:
+      self.IsValidEncoding(self.encoding)
+    if self.result_url:
+      self.AreValidUrls(['result_url'])
 
-    Returns:
-      True if the current content is valid, False otherwise.
-    """
-    if (not self.AreValidValues(['test_case_name'], basestring,
-                                required=True, errors=errors) or
-        not self.AreValidValues(['requestor'], basestring, errors=errors) or
-        not self.AreValidDicts(['env_vars'], basestring, basestring,
-                               errors=errors) or
-        not self.AreValidObjectLists(['configurations'], TestConfiguration,
-                                     required=True,
-                                     unique_value_keys=['config_name'],
-                                     errors=errors) or
-        not self.AreValidDataLists(['data'], errors=errors) or
-        not self.AreValidObjectLists(['tests'], TestObject,
-                                     unique_value_keys=['test_name'],
-                                     errors=errors) or
-        not self.AreValidOutputDestinations(['output_destination'],
-                                            errors=errors) or
-        self.cleanup not in TestRun.VALID_CLEANUP_VALUES or
-        not self.AreValidValues(['working_dir', 'failure_email', 'result_url',
-                                 'label'],
-                                basestring, errors=errors) or
-        (self.encoding and
-         not self.IsValidEncoding(self.encoding, errors=errors)) or
-        (self.result_url and not self.AreValidUrls(['result_url'], errors)) or
+    if (self.cleanup not in TestRun.VALID_CLEANUP_VALUES or
         self.store_result not in TestCase.VALID_STORE_RESULT_VALUES):
-      self.LogError('Invalid TestCase: %s' % self.__dict__, errors)
-      return False
+      raise Error('Invalid TestCase: %s' % self.__dict__)
 
     # self.verbose and self.admin don't need to be validated since we only need
     # to evaluate them to True/False which can be done with any type.
 
-    logging.debug('Successfully validated request: %s', self.__dict__)
-    return True
-
-  def ParseDictionary(self, dictionary, errors=None):
+  def ParseDictionary(self, dictionary):
     """Parses the given dictionary and merge it into our __dict__.
 
     We override the base class behavior to create instances of TestOjbects and
@@ -960,19 +742,14 @@ class TestCase(TestRequestMessageBase):
 
     Args:
       dictionary: The dictionary to be parsed and merged into __dict__.
-      errors: A list to which we can append error messages if any.
 
-    Returns:
-      False if dictionary is not a dict. True otherwise.
+    Raises:
+      Error: If the dictionary has type errors. The text of the Error exception
+          will be set with the type error text message.
     """
-    if not super(TestCase, self).ParseDictionary(dictionary, errors):
-      return False
-    if not self.ConvertDictionariesToObjectType(self.tests, TestObject, errors):
-      return False
-    if not self.ConvertDictionariesToObjectType(self.configurations,
-                                                TestConfiguration, errors):
-      return False
-    return True
+    super(TestCase, self).ParseDictionary(dictionary)
+    self.ConvertDictionariesToObjectType(self.tests, TestObject)
+    self.ConvertDictionariesToObjectType(self.configurations, TestConfiguration)
 
 
 class TestRun(TestRequestMessageBase):
@@ -1047,50 +824,36 @@ class TestRun(TestRequestMessageBase):
     self.restart_on_failure = restart_on_failure
     self.encoding = encoding
 
-  def IsValid(self, errors=None):
-    """Identifies if the current content is valid.
+  def IsValid(self):
+    """Raises if the current content is not valid."""
+    self.AreValidValues(['test_run_name'], basestring, required=True)
+    self.AreValidDicts(['env_vars'], basestring, basestring)
+    if self.result_url:
+      self.IsValidUrl(self.result_url)
+    self.IsValidUrl(self.ping_url)
+    self.AreValidValues(['ping_delay'], (int, long), required=True)
+    self.AreValidDataLists(['data'])
+    self.AreValidObjectLists(
+        ['tests'], TestObject, unique_value_keys=['test_name'])
+    self.AreValidOutputDestinations(['output_destination'])
+    self.AreValidValues(
+        ['working_dir', 'result_url', 'ping_url'], basestring)
+    self.AreValidValues(['instance_index', 'num_instances'], (int, long))
+    self.IsValidEncoding(self.encoding)
 
-    Args:
-      errors: A list to which we can append error messages if any.
-
-    Returns:
-      True if the current content is valid, False otherwise.
-    """
-    if (not self.AreValidValues(['test_run_name'], basestring,
-                                required=True, errors=errors) or
-        not self.AreValidDicts(['env_vars'], basestring, basestring,
-                               errors=errors) or
-        not self.configuration or
+    if (not self.configuration or
         not isinstance(self.configuration, TestConfiguration) or
-        not self.configuration.IsValid(errors) or
-        not self.AreValidDataLists(['data'], errors=errors) or
-        not self.AreValidObjectLists(['tests'], TestObject,
-                                     unique_value_keys=['test_name'],
-                                     errors=errors) or
-        not self.AreValidOutputDestinations(['output_destination'],
-                                            errors=errors) or
-        not self.AreValidValues(['working_dir', 'result_url', 'ping_url'],
-                                basestring, errors=errors) or
-        (self.result_url and not self.IsValidUrl(self.result_url, errors)) or
-        not self.IsValidUrl(self.ping_url, errors) or
-        not self.AreValidValues(['ping_delay'], (int, long), required=True,
-                                errors=errors) or
         self.ping_delay < 0 or
         self.cleanup not in TestRun.VALID_CLEANUP_VALUES or
-        not self.AreValidValues(['instance_index', 'num_instances'],
-                                (int, long), errors=errors) or
-        not self.IsValidEncoding(self.encoding, errors=errors) or
         (self.instance_index is not None and self.num_instances is None) or
         (self.num_instances is not None and self.instance_index is None) or
         (self.num_instances is not None and
          self.instance_index >= self.num_instances)):  # zero based index.
-      self.LogError('Invalid TestRun: %s' % self.__dict__, errors)
-      return False
+      raise Error('Invalid TestRun: %s' % self.__dict__)
 
-    logging.debug('Successfully validated request: %s', self.__dict__)
-    return True
+    self.configuration.IsValid()
 
-  def ParseDictionary(self, dictionary, errors=None):
+  def ParseDictionary(self, dictionary):
     """Parses the given dictionary and merge it into our __dict__.
 
     We override the base class behavior to create instances of TestOjbects and
@@ -1098,17 +861,14 @@ class TestRun(TestRequestMessageBase):
 
     Args:
       dictionary: The dictionary to be parsed and merged into __dict__.
-      errors: A list to which we can append error messages if any.
 
-    Returns:
-      False if dictionary is not a dict. True otherwise.
+    Raises:
+      Error: If the dictionary has type errors. The text of the Error exception
+          will be set with the type error text message.
     """
-    if not super(TestRun, self).ParseDictionary(dictionary, errors):
-      return False
-    if not self.ConvertDictionariesToObjectType(self.tests, TestObject, errors):
-      return False
+    super(TestRun, self).ParseDictionary(dictionary)
+    self.ConvertDictionariesToObjectType(self.tests, TestObject)
     self.configuration = self.ConvertDictionaryToObjectType(
-        self.configuration, TestConfiguration, errors)
+        self.configuration, TestConfiguration)
     if self.configuration is None:
-      return False
-    return True
+      raise Error('Missing configuration')

@@ -127,11 +127,11 @@ def _ParseRequestFile(request_file_name):
   try:
     with open(request_file_name, 'rb') as f:
       content = f.read()
-    errors = []
     test_run = test_request_message.TestRun()
-    if not test_run.ParseTestRequestMessageText(content, errors):
-      raise Error('Invalid Request File %s: %s' % (request_file_name,
-        '\n'.join(errors)))
+    try:
+      test_run.ParseTestRequestMessageText(content)
+    except test_request_message as e:
+      raise Error('Invalid Request File %s: %s' % (request_file_name, e))
     return test_run
   except IOError as e:
     raise Error('Missing Request File %s: %s' % (request_file_name, e))

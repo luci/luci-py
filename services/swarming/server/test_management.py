@@ -223,8 +223,7 @@ def _BuildTestRun(runner, server_url):
       'instance_index': runner.config_instance_index,
       'num_instances': runner.num_config_instances,
   })
-  errors = []
-  assert test_run.IsValid(errors), errors
+  test_run.IsValid()
   return test_run
 
 

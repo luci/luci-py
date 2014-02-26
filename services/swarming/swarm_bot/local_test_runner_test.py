@@ -107,8 +107,7 @@ class TestLocalTestRunner(auto_stub.TestCase):
 
     # Check that the message is valid, otherwise the test will fail when trying
     # to load it.
-    errors = []
-    self.assertTrue(test_run.IsValid(errors), errors)
+    test_run.IsValid()
 
     data = test_request_message.Stringize(test_run, json_readable=True)
     with open(self.data_file_name, 'wb') as f:
