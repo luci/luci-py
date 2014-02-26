@@ -94,6 +94,43 @@ def Stringize(value, json_readable=False):
   return value
 
 
+def ExpandVariable(value, variables):
+  """Expands the given value with outer variables dictionary.
+
+  Args:
+    value: The value to be expanded
+  Returns:
+    The resulting expanded value.
+  """
+  if isinstance(value, basestring):
+    # Because it is possible for some url paths to contain '%' without referring
+    # to variables that should be expanded, we unescape them before expanding
+    # the variables and then escape them again before returning.
+    unquoted = urllib.unquote(value)
+    was_quoted = (value != unquoted)
+    if was_quoted:
+      value = unquoted
+    value %= variables
+
+    # Since the contents of the expanded variables aren't guaranteed to get
+    # escaped, they should not require escaping.
+    if was_quoted:
+      # Don't escape ':' or '/' as doing so will break the format of url
+      # strings.
+      value = urllib.quote(value, ':/')
+  elif isinstance(value, list):
+    value = [ExpandVariable(v, variables) for v in value]
+  elif isinstance(value, tuple):
+    value = tuple(ExpandVariable(v, variables) for v in value)
+  elif isinstance(value, TestRequestMessageBase):
+    value.ExpandVariables(variables)
+  elif isinstance(value, dict):
+    for name, val in value.iteritems():
+      value[name] = ExpandVariable(val, variables)
+  # We must passthru for all non string types, since they can't be expanded.
+  return value
+
+
 class TestRequestMessageBase(object):
   """A Test Request Message base class to provide generic methods.
 
@@ -415,46 +452,15 @@ class TestRequestMessageBase(object):
             'Invalid dictionary for: %s\n%s' % (object_type, dictionary))
 
   def ExpandVariables(self, variables):
-    """Expand the provided variables in all our text fields."""
+    """Expands the provided variables in all our text fields.
 
-    def ExpandVariable(value):
-      """Expand the given value with outer variables dictionary.
+    Warning: This modifies the instance in-place.
 
-      Args:
-        value: The value to be expanded
-      Returns:
-        The resulting expanded value.
-      """
-      if isinstance(value, basestring):
-        # Because it is possible for some url paths to contain '%' without
-        # referring to variables that should be expanded, we unescape them
-        # before expanding the variables and then escape them again
-        # before returning.
-        unquoted = urllib.unquote(value)
-        was_quoted = (value != unquoted)
-        if was_quoted:
-          value = unquoted
-        value %= variables
-
-        # Since the contents of the expanded variables aren't guaranteed
-        # to get escaped, they should not require escaping.
-        if was_quoted:
-          # Don't escape ':' or '/' as doing so will break the format of
-          # url strings.
-          value = urllib.quote(value, ':/')
-      elif isinstance(value, list):
-        value = map(ExpandVariable, value)
-      elif isinstance(value, tuple):
-        value = tuple(map(ExpandVariable, value))
-      elif isinstance(value, TestRequestMessageBase):
-        value.ExpandVariables(variables)
-      elif isinstance(value, dict):
-        for name, val in value.iteritems():
-          value[name] = ExpandVariable(val)
-      # We must passthru for all non string types, since they can't be expanded.
-      return value
-
-    ExpandVariable(self.__dict__)
+    Args:
+      variables: A dictionary containing the variable values.
+    """
+    # TODO(maruel): This is very weird.
+    ExpandVariable(self.__dict__, variables)
 
   def ParseDictionary(self, dictionary):
     """Parses the given dictionary and merge it into our __dict__.
