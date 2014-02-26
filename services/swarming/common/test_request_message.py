@@ -139,6 +139,10 @@ class TestRequestMessageBase(object):
   it should have no other instance data members then the ones that are part of
   the Test Request Format.
   """
+  def __init__(self, **kwargs):
+    if kwargs:
+      # Cheezy but this will go away with SerializableModelMixin.
+      logging.warning('Ignored arguments: %r', kwargs)
 
   def __str__(self, json_readable=False):
     """Returns the request text after validating it.
@@ -408,14 +412,25 @@ class TestRequestMessageBase(object):
     """Raises if the current content is not valid."""
     raise NotImplementedError()
 
-  @staticmethod
-  def ConvertDictionaryToObjectType(dictionary, object_type):
-    """Convert a dictionary to an object instance.
+  @classmethod
+  def FromJSON(cls, data):
+    """Parses the given JSON encoded data into an object instance.
+
+    Raises:
+      Error: If the data has syntax or type errors.
+    """
+    try:
+      data = json.loads(data)
+    except (TypeError, ValueError) as e:
+      raise Error('Invalid json: %s' % e)
+    return cls.FromDict(data)
+
+  @classmethod
+  def FromDict(cls, dictionary):
+    """Converts a dictionary to an object instance.
 
     Args:
       dictionary: The dictionary to convert to objects.
-      object_type: The type of objects the list entries must be converted to.
-          This type of object must expose a ParseDictionary() method.
 
     Returns:
       An object of the specified type.
@@ -424,32 +439,23 @@ class TestRequestMessageBase(object):
       Error: If the dictionary has type errors. The text of the Error exception
           will be set with the type error text message.
     """
-    new_object = object_type()
-    new_object.ParseDictionary(dictionary)
-    return new_object
+    try:
+      out = cls(**dictionary)
+      out.Validate()
+      return out
+    except (TypeError, ValueError) as e:
+      raise Error('Failed to create %s: %s' % (cls.__name__, e))
 
-  @staticmethod
-  def ConvertDictionariesToObjectType(dict_list, object_type):
+  @classmethod
+  def FromDictList(cls, dict_list):
     """Convert all dictionaries in the given list to an object instance.
 
     Args:
       dict_list: The list of dictionaries to convert to objects.
-          The list is updated in place where the dictionaries in the list are
-          replaced by object instances.
-      object_type: The type of objects the list entries must be converted to.
-          This type of object must expose a ParseDictionary() method.
-
-    Raises:
-      Error: If dict_list has type errors. The text of the Error exception will
-          be set with the type error text message.
+      cls: The type of objects the list entries must be converted to. This type
+          of object must expose a FromDict() method.
     """
-    for index in range(len(dict_list)):
-      dictionary = dict_list[index]
-      dict_list[index] = TestRequestMessageBase.ConvertDictionaryToObjectType(
-          dictionary, object_type)
-      if dict_list[index] is None:
-        raise Error(
-            'Invalid dictionary for: %s\n%s' % (object_type, dictionary))
+    return [cls.FromDict(d) for d in dict_list]
 
   def ExpandVariables(self, variables):
     """Expands the provided variables in all our text fields.
@@ -461,40 +467,6 @@ class TestRequestMessageBase(object):
     """
     # TODO(maruel): This is very weird.
     ExpandVariable(self.__dict__, variables)
-
-  def ParseDictionary(self, dictionary):
-    """Parses the given dictionary and merge it into our __dict__.
-
-    Raises:
-      Error: If the dictionary has type errors. The text of the Error exception
-          will be set with the type error text message.
-    """
-    # We only want to get the values that are meaningful for us.
-    if not isinstance(dictionary, dict):
-      raise Error('Invalid dictionary not a dict: %s' % dictionary)
-    for item in self.__dict__:
-      if item in dictionary:
-        self.__dict__[item] = dictionary[item]
-
-  def ParseTestRequestMessageText(self, message_text):
-    """Parses the given text, convert it to a test request and validate it.
-
-    Args:
-      message_text: The text to be parsed as a Test Request Message.
-
-    Raises:
-      Error: If the text has syntax or type errors. The text of the Error
-          exception will be set with the syntax/type error text message.
-    """
-    try:
-      test_request = json.loads(message_text)
-    except (TypeError, ValueError), e:
-      message = ('Failed to evaluate text:\n-----\n%s\n-----\n'
-                 'Exception: %s' % (message_text, e))
-      logging.exception(message)
-      raise Error(message)
-    self.ParseDictionary(test_request)
-    self.Validate()
 
 
 class TestObject(TestRequestMessageBase):
@@ -511,8 +483,9 @@ class TestObject(TestRequestMessageBase):
   """
 
   def __init__(self, test_name=None, env_vars=None, action=None,
-               decorate_output=True, hard_time_out=3600.0, io_time_out=1200.0):
-    super(TestObject, self).__init__()
+               decorate_output=True, hard_time_out=3600.0, io_time_out=1200.0,
+               **kwargs):
+    super(TestObject, self).__init__(**kwargs)
     self.test_name = test_name
     if env_vars:
       self.env_vars = env_vars.copy()
@@ -565,8 +538,8 @@ class TestConfiguration(TestRequestMessageBase):
   def __init__(self, config_name=None, env_vars=None, data=None, tests=None,
                min_instances=1, additional_instances=0,
                deadline_to_run=SWARM_RUNNER_MAX_WAIT_SECS,
-               priority=100, **dimensions):
-    super(TestConfiguration, self).__init__()
+               priority=100, dimensions=None, **kwargs):
+    super(TestConfiguration, self).__init__(**kwargs)
     self.config_name = config_name
     if env_vars:
       self.env_vars = env_vars.copy()
@@ -584,10 +557,7 @@ class TestConfiguration(TestRequestMessageBase):
     self.additional_instances = additional_instances
     self.deadline_to_run = deadline_to_run
     self.priority = priority
-
-    # Dimensions are kept dynamic so that we don't have to update this code
-    # when the list of configuration dimensions changes.
-    self.dimensions = dimensions
+    self.dimensions = (dimensions or {}).copy()
 
   def Validate(self):
     """Raises if the current content is not valid."""
@@ -618,20 +588,15 @@ class TestConfiguration(TestRequestMessageBase):
         if not value or not isinstance(value, basestring):
           raise Error('Invalid TestConfiguration dimension value: %s' % value)
 
-  def ParseDictionary(self, dictionary):
-    """Parses the given dictionary and merge it into our __dict__.
+  @classmethod
+  def FromDict(cls, dictionary):
+    """Converts a dictionary to an object instance.
 
     We override the base class behavior to create instances of TestOjbects.
-
-    Args:
-      dictionary: The dictionary to be parsed and merged into __dict__.
-
-    Raises:
-      Error: If the dictionary has type errors. The text of the Error exception
-          will be set with the type error text message.
     """
-    super(TestConfiguration, self).ParseDictionary(dictionary)
-    self.ConvertDictionariesToObjectType(self.tests, TestObject)
+    dictionary = dictionary.copy()
+    dictionary['tests'] = TestObject.FromDictList(dictionary.get('tests', []))
+    return super(TestConfiguration, cls).FromDict(dictionary)
 
 
 class TestCase(TestRequestMessageBase):
@@ -676,8 +641,8 @@ class TestCase(TestRequestMessageBase):
                admin=False, tests=None, result_url=None, store_result=None,
                restart_on_failure=None, output_destination=None,
                encoding=DEFAULT_ENCODING, cleanup=None, failure_email=None,
-               label=None, verbose=False):
-    super(TestCase, self).__init__()
+               label=None, verbose=False, **kwargs):
+    super(TestCase, self).__init__(**kwargs)
     self.test_case_name = test_case_name
     # TODO(csharp): Stop using a default so test requests that don't give a
     # requestor are rejected.
@@ -740,22 +705,18 @@ class TestCase(TestRequestMessageBase):
     # self.verbose and self.admin don't need to be validated since we only need
     # to evaluate them to True/False which can be done with any type.
 
-  def ParseDictionary(self, dictionary):
-    """Parses the given dictionary and merge it into our __dict__.
+  @classmethod
+  def FromDict(cls, dictionary):
+    """Converts a dictionary to an object instance.
 
     We override the base class behavior to create instances of TestOjbects and
     TestConfiguration.
-
-    Args:
-      dictionary: The dictionary to be parsed and merged into __dict__.
-
-    Raises:
-      Error: If the dictionary has type errors. The text of the Error exception
-          will be set with the type error text message.
     """
-    super(TestCase, self).ParseDictionary(dictionary)
-    self.ConvertDictionariesToObjectType(self.tests, TestObject)
-    self.ConvertDictionariesToObjectType(self.configurations, TestConfiguration)
+    dictionary = dictionary.copy()
+    dictionary['tests'] = TestObject.FromDictList(dictionary.get('tests', []))
+    dictionary['configurations'] = TestConfiguration.FromDictList(
+        dictionary.get('configurations', []))
+    return super(TestCase, cls).FromDict(dictionary)
 
   def Equivalent(self, test_case):
     """Checks to see if the given test case is equivalent.
@@ -873,8 +834,8 @@ class TestRun(TestRequestMessageBase):
                instance_index=None, num_instances=None, result_url=None,
                ping_url=None, ping_delay=None, output_destination=None,
                cleanup=None, restart_on_failure=None,
-               encoding=DEFAULT_ENCODING):
-    super(TestRun, self).__init__()
+               encoding=DEFAULT_ENCODING, **kwargs):
+    super(TestRun, self).__init__(**kwargs)
     self.test_run_name = test_run_name
     if env_vars:
       self.env_vars = env_vars.copy()
@@ -932,22 +893,15 @@ class TestRun(TestRequestMessageBase):
 
     self.configuration.Validate()
 
-  def ParseDictionary(self, dictionary):
-    """Parses the given dictionary and merge it into our __dict__.
+  @classmethod
+  def FromDict(cls, dictionary):
+    """Converts a dictionary to an object instance.
 
     We override the base class behavior to create instances of TestOjbects and
     TestConfiguration.
-
-    Args:
-      dictionary: The dictionary to be parsed and merged into __dict__.
-
-    Raises:
-      Error: If the dictionary has type errors. The text of the Error exception
-          will be set with the type error text message.
     """
-    super(TestRun, self).ParseDictionary(dictionary)
-    self.ConvertDictionariesToObjectType(self.tests, TestObject)
-    self.configuration = self.ConvertDictionaryToObjectType(
-        self.configuration, TestConfiguration)
-    if self.configuration is None:
-      raise Error('Missing configuration')
+    dictionary = dictionary.copy()
+    dictionary['tests'] = TestObject.FromDictList(dictionary.get('tests', []))
+    dictionary['configuration'] = TestConfiguration.FromDict(
+        dictionary.get('configuration', {}))
+    return super(TestRun, cls).FromDict(dictionary)

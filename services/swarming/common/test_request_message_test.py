@@ -23,6 +23,59 @@ test_env.setup_test_env()
 from common import test_request_message
 
 
+class ParseResults(test_request_message.TestRequestMessageBase):
+  def __init__(
+      self,
+      str_value='a',
+      int_value=1,
+      int_array_value=None,
+      str_array_value=None,
+      dict_value=None,
+      **kwargs):
+    super(ParseResults, self).__init__(**kwargs)
+    self.str_value = str_value
+    self.int_value = int_value
+    self.int_array_value = (
+        [1, 2] if int_array_value is None else int_array_value)
+    self.str_array_value = (
+        ['a', 'b', r'a\b', r'\a\t']
+        if str_array_value is None else str_array_value)
+    self.dict_value = (
+        {'a': 1, 'b': 2} if dict_value is None else dict_value)
+
+  def Validate(self):
+    if not (
+        isinstance(self.str_value, basestring) and
+        isinstance(self.int_value, int) and
+        isinstance(self.int_array_value, list) and
+        not sum([not isinstance(i, int) for i in self.int_array_value]) and
+        isinstance(self.str_array_value, list) and
+        not sum([not isinstance(i, basestring)
+                  for i in self.str_array_value]) and
+        isinstance(self.dict_value, dict)):
+      raise test_request_message.Error('Oops')
+
+
+class OuterParseResults(test_request_message.TestRequestMessageBase):
+  def __init__(
+      self, str_value='a', parsed_result=None, results=None, dict_value=None,
+      **kwargs):
+    super(OuterParseResults, self).__init__(**kwargs)
+    self.str_value = str_value
+    self.parsed_result = (
+        ParseResults() if parsed_result is None else parsed_result)
+    self.results = (
+        [ParseResults(), ParseResults()] if results is None else results)
+    self.dict_value = (
+        {1: 'a', 'b': 2} if dict_value is None else dict_value)
+
+  def Validate(self):
+    self.parsed_result.Validate()
+    if (not isinstance(self.str_value, basestring) or
+        not isinstance(self.dict_value, dict)):
+      raise test_request_message.Error('Oops')
+
+
 class TestRequestMessageBaseTest(unittest.TestCase):
   def setUp(self):
     self.trm = test_request_message.TestRequestMessageBase()
@@ -183,52 +236,30 @@ class TestRequestMessageBaseTest(unittest.TestCase):
     self.assertEqual(url, self.trm.f)
     self.assertEqual(url + 'one', self.trm.g)
 
-  class ParseResults(test_request_message.TestRequestMessageBase):
-    def __init__(self):
-      self.str_value = 'a'
-      self.int_value = 1
-      self.int_array_value = [1, 2]
-      self.str_array_value = ['a', 'b', r'a\b', r'\a\t']
-      self.dict_value = {'a': 1, 'b': 2}
-
-    def Validate(self):
-      if not (
-          isinstance(self.str_value, basestring) and
-          isinstance(self.int_value, int) and
-          isinstance(self.int_array_value, list) and
-          not sum([not isinstance(i, int) for i in self.int_array_value]) and
-          isinstance(self.str_array_value, list) and
-          not sum([not isinstance(i, basestring)
-                   for i in self.str_array_value]) and
-          isinstance(self.dict_value, dict)):
-        raise test_request_message.Error('Oops')
-
-  def testParseTestRequestMessageText(self):
+  def testFromJSON(self):
     # Start with the exception raising tests.
-    self.assertRaises(test_request_message.Error,
-                      self.trm.ParseTestRequestMessageText,
-                      'name error')
-    self.assertRaises(test_request_message.Error,
-                      self.trm.ParseTestRequestMessageText,
-                      'syntax_error =')
-    self.assertRaises(test_request_message.Error,
-                      self.trm.ParseTestRequestMessageText,
-                      'type_error = 1 + "2"')
+    with self.assertRaises(test_request_message.Error):
+      test_request_message.TestRequestMessageBase.FromJSON('name error')
+    with self.assertRaises(test_request_message.Error):
+      test_request_message.TestRequestMessageBase.FromJSON('syntax_error =')
+    with self.assertRaises(test_request_message.Error):
+      test_request_message.TestRequestMessageBase.FromJSON(
+          'type_error = 1 + "2"')
 
     # Success stories.
-    parse_results = TestRequestMessageBaseTest.ParseResults()
-    naked_results = TestRequestMessageBaseTest.ParseResults()
-    text_request = '{}'
-    parse_results.ParseTestRequestMessageText(text_request)
+    naked_results = ParseResults()
+    parse_results = ParseResults.FromJSON('{}')
     # Make sure no members were added or lost.
     self.assertEqual(len(parse_results.__dict__), len(naked_results.__dict__))
-    text_request = json.dumps({'ignored_member': 1})
-    parse_results.ParseTestRequestMessageText(text_request)
+
+    parse_results = ParseResults.FromJSON(json.dumps({'ignored_member': 1}))
     self.assertEqual(len(parse_results.__dict__), len(naked_results.__dict__))
-    text_request = json.dumps({'str_value': 'new value'})
-    parse_results.ParseTestRequestMessageText(text_request)
+
+    parse_results = ParseResults.FromJSON(
+        json.dumps({'str_value': 'new value'}))
     self.assertEqual(len(parse_results.__dict__), len(naked_results.__dict__))
     self.assertEqual(parse_results.str_value, 'new value')
+
     text_request = json.dumps({
         'str_value': 'newer value',
         'int_value': 2,
@@ -236,7 +267,7 @@ class TestRequestMessageBaseTest(unittest.TestCase):
         'str_array_value': ['cc', 'dd', 'mm\nn'],
         'dict_value': {'cc': 3, 'dd': 4},
       })
-    parse_results.ParseTestRequestMessageText(text_request)
+    parse_results = ParseResults.FromJSON(text_request)
     self.assertEqual(len(parse_results.__dict__), len(naked_results.__dict__))
     self.assertEqual(parse_results.str_value, 'newer value')
     self.assertEqual(parse_results.int_value, 2)
@@ -245,18 +276,15 @@ class TestRequestMessageBaseTest(unittest.TestCase):
     self.assertEqual(parse_results.dict_value, {u'cc': 3, u'dd': 4})
 
     # Now try a few invalid types.
-    text_request = json.dumps({'int_value': 'new value'})
     with self.assertRaises(test_request_message.Error):
-      parse_results.ParseTestRequestMessageText(text_request)
-    self.assertEqual(len(parse_results.__dict__), len(naked_results.__dict__))
-    text_request = json.dumps({'str_value': 42})
+      ParseResults.FromJSON(json.dumps({'int_value': 'new value'}))
+
     with self.assertRaises(test_request_message.Error):
-      parse_results.ParseTestRequestMessageText(text_request)
-    self.assertEqual(len(parse_results.__dict__), len(naked_results.__dict__))
+      ParseResults.FromJSON(json.dumps({'str_value': 42}))
 
   def testRequestText(self):
     # Success stories.
-    parse_results = TestRequestMessageBaseTest.ParseResults()
+    parse_results = ParseResults()
     expected_text = ("""{'dict_value': {'a': 1, 'b': 2},"""
                      """'int_array_value': [1, 2],'int_value': 1,"""
                      """'str_array_value': ['a', 'b', 'a\\b', '\\a\\t'],"""
@@ -270,20 +298,6 @@ class TestRequestMessageBaseTest(unittest.TestCase):
     self.assertEqual(expected_text, str(parse_results))
 
     # Now test embedded cases.
-    class OuterParseResults(test_request_message.TestRequestMessageBase):
-      def __init__(self):
-        self.str_value = 'a'
-        self.parsed_result = TestRequestMessageBaseTest.ParseResults()
-        self.results = [TestRequestMessageBaseTest.ParseResults(),
-                        TestRequestMessageBaseTest.ParseResults()]
-        self.dict_value = {1: 'a', 'b': 2}
-
-      def Validate(self):
-        self.parsed_result.Validate()
-        if (not isinstance(self.str_value, basestring) or
-            not isinstance(self.dict_value, dict)):
-          raise test_request_message.Error('Oops')
-
     outer_parse_result = OuterParseResults()
     outer_expected_text = ("""{'dict_value': {1: 'a', 'b': 2},"""
                            """'parsed_result': %s,"""
@@ -441,16 +455,14 @@ class TestObjectTest(TestHelper):
 
   def testStringize(self):
     # Vanilla object.
-    new_object = test_request_message.TestObject()
-    new_object.ParseTestRequestMessageText(
+    new_object = test_request_message.TestObject.FromJSON(
         test_request_message.Stringize(self.test_request, json_readable=True))
     self.assertEqual(new_object, self.test_request)
 
     # Full object
     full_object = TestObjectTest.GetFullObject()
     full_object.Validate()
-    new_object = test_request_message.TestObject()
-    new_object.ParseTestRequestMessageText(
+    new_object = test_request_message.TestObject.FromJSON(
         test_request_message.Stringize(full_object, json_readable=True))
     self.assertEqual(new_object, full_object)
 
@@ -458,13 +470,16 @@ class TestObjectTest(TestHelper):
 class TestConfigurationTest(TestHelper):
   def setUp(self):
     # Always start with a valid case, and make it explicitly invalid as needed.
+    dimensions = dict(os='a', browser='a', cpu='a')
     self.test_request = test_request_message.TestConfiguration(
-        config_name='a', os='a', browser='a', cpu='a')
+        config_name='a', dimensions=dimensions)
 
   @staticmethod
   def GetFullObject():
+    dimensions = dict(os='a', browser='a', cpu='a')
     return test_request_message.TestConfiguration(
-        config_name='a', os='a', browser='a', cpu='a',
+        config_name='a',
+        dimensions=dimensions,
         env_vars=TestHelper.VALID_ENV_VARS[-1],
         data=TestHelper.VALID_URL_LIST_VALUES[-1],
         tests=[TestObjectTest.GetFullObject()],
@@ -584,16 +599,14 @@ class TestConfigurationTest(TestHelper):
 
   def testStringize(self):
     # Vanilla object.
-    new_object = test_request_message.TestConfiguration()
-    new_object.ParseTestRequestMessageText(
+    new_object = test_request_message.TestConfiguration.FromJSON(
         test_request_message.Stringize(self.test_request, json_readable=True))
     self.assertEqual(new_object, self.test_request)
 
     # Full object
     full_object = TestConfigurationTest.GetFullObject()
     full_object.Validate()
-    new_object = test_request_message.TestConfiguration()
-    new_object.ParseTestRequestMessageText(
+    new_object = test_request_message.TestConfiguration.FromJSON(
         test_request_message.Stringize(full_object, json_readable=True))
     self.assertEqual(new_object, full_object)
 
@@ -601,10 +614,13 @@ class TestConfigurationTest(TestHelper):
 class TestCaseTest(TestHelper):
   def setUp(self):
     # Always start with a valid case, and make it explicitly invalid as needed.
+    dimensions = dict(os='a', browser='a', cpu='a')
     self.test_request = test_request_message.TestCase(
         test_case_name='a',
-        configurations=[test_request_message.TestConfiguration(
-            config_name='a', os='a', browser='a', cpu='a')])
+        configurations=[
+          test_request_message.TestConfiguration(
+              config_name='a', dimensions=dimensions),
+        ])
 
   @staticmethod
   def GetFullObject():
@@ -678,11 +694,13 @@ class TestCaseTest(TestHelper):
                                      [test_object1]])
     self.test_request.tests = [TestObjectTest.GetFullObject()]
 
+    dimensions = dict(os='a', browser='a', cpu='a')
     test_config1 = test_request_message.TestConfiguration(
-        config_name='a', os='a', browser='a', cpu='a')
+        config_name='a', dimensions=dimensions)
     test_config1.Validate()
+    dimensions = dict(os='b', browser='b', cpu='b')
     test_config2 = test_request_message.TestConfiguration(
-        config_name='b', os='b', browser='b', cpu='b',
+        config_name='b', dimensions=dimensions,
         data=['http://a.com', 'file://here'])
     test_config2.Validate()
     self.AssertValidValues('configurations', [[test_config1, test_config2],
@@ -743,8 +761,9 @@ class TestCaseTest(TestHelper):
     self.AssertInvalidValues('configurations', [[test_config1, test_config2],
                                                 [test_config1]])
     # Put the value back to a valid value, to test invalidity of other values.
+    dimensions = dict(os='a', browser='a', cpu='a')
     valid_config = test_request_message.TestConfiguration(
-        config_name='a', os='a', browser='a', cpu='a')
+        config_name='a', dimensions=dimensions)
     self.test_request.configurations = [valid_config]
 
     self.AssertInvalidValues('result_url', TestHelper.INVALID_URL_VALUES)
@@ -780,16 +799,14 @@ class TestCaseTest(TestHelper):
 
   def testStringize(self):
     # Vanilla object.
-    new_object = test_request_message.TestCase()
-    new_object.ParseTestRequestMessageText(
+    new_object = test_request_message.TestCase.FromJSON(
         test_request_message.Stringize(self.test_request, json_readable=True))
     self.assertEqual(new_object, self.test_request)
 
     # Full object
     full_object = TestCaseTest.GetFullObject()
     full_object.Validate()
-    new_object = test_request_message.TestCase()
-    new_object.ParseTestRequestMessageText(
+    new_object = test_request_message.TestCase.FromJSON(
         test_request_message.Stringize(full_object, json_readable=True))
     self.assertEqual(new_object, full_object)
 
@@ -862,10 +879,11 @@ class TestCaseTest(TestHelper):
 class TestRunTest(TestHelper):
   def setUp(self):
     # Always start with a valid case, and make it explicitly invalid as needed.
+    dimensions = dict(os='a', browser='a', cpu='a')
     self.test_request = test_request_message.TestRun(
         test_run_name='a',
         configuration=test_request_message.TestConfiguration(
-            config_name='a', os='a', browser='a', cpu='a'),
+            config_name='a', dimensions=dimensions),
         result_url=TestHelper.VALID_URL_VALUES[0],
         ping_url=TestHelper.VALID_URL_VALUES[0],
         ping_delay=TestHelper.VALID_INT_VALUES[0],
@@ -939,8 +957,9 @@ class TestRunTest(TestHelper):
     self.AssertValidValues('num_instances',
                            TestHelper.NON_ZERO_VALID_INT_VALUES)
 
+    dimensions = dict(os='a', browser='a', cpu='a')
     test_config = test_request_message.TestConfiguration(
-        config_name='a', os='a', browser='a', cpu='a')
+        config_name='a', dimensions=dimensions)
     test_config.Validate()
     self.AssertValidValues('configuration', [test_config])
     self.test_request.configuration = (
@@ -1034,8 +1053,7 @@ class TestRunTest(TestHelper):
 
   def testStringize(self):
     # Vanilla object.
-    new_object = test_request_message.TestRun()
-    new_object.ParseTestRequestMessageText(
+    new_object = test_request_message.TestRun.FromJSON(
         test_request_message.Stringize(self.test_request, json_readable=True))
     self.assertEqual(new_object, self.test_request)
 
@@ -1043,8 +1061,7 @@ class TestRunTest(TestHelper):
     full_object = TestRunTest.GetFullObject()
     full_object.Validate()
 
-    new_object = test_request_message.TestRun()
-    new_object.ParseTestRequestMessageText(
+    new_object = test_request_message.TestRun.FromJSON(
         test_request_message.Stringize(full_object, json_readable=True))
     self.assertEqual(new_object, full_object)
 

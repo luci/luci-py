@@ -127,13 +127,9 @@ def _ParseRequestFile(request_file_name):
   """
   try:
     with open(request_file_name, 'rb') as f:
-      content = f.read()
-    test_run = test_request_message.TestRun()
-    try:
-      test_run.ParseTestRequestMessageText(content)
-    except test_request_message as e:
-      raise Error('Invalid Request File %s: %s' % (request_file_name, e))
-    return test_run
+      return test_request_message.TestRun.FromJSON(f.read())
+  except test_request_message as e:
+    raise Error('Invalid Request File %s: %s' % (request_file_name, e))
   except IOError as e:
     raise Error('Missing Request File %s: %s' % (request_file_name, e))
   except test_request_message.Error as e:

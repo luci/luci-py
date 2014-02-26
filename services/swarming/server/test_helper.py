@@ -91,16 +91,19 @@ def GetRequestMessage(request_name=REQUEST_MESSAGE_TEST_CASE_NAME,
     )
   request.tests = [test_request_message.TestObject(
       test_name='t1', action=['ignore-me.exe'])]
+  dimensions = dict(os=platform, cpu='Unknown', browser='Unknown')
   for i in range(num_configs):
     request.configurations.append(test_request_message.TestConfiguration(
-        config_name=config_name_root + '_' + str(i), os=platform,
-        cpu='Unknown', data=['http://b.ina.ry/files2.zip'],
-        browser='Unknown',
+        config_name=config_name_root + '_' + str(i),
+        data=['http://b.ina.ry/files2.zip'],
+        dimensions=dimensions,
         min_instances=min_instances,
         additional_instances=additional_instances,
         priority=priority,
-        tests=[test_request_message.TestObject(
-            test_name='t2', action=['ignore-me-too.exe'])]))
+        tests=[
+          test_request_message.TestObject(
+              test_name='t2', action=['ignore-me-too.exe']),
+        ]))
   if env_vars:
     request.env_vars = env_vars.copy()
 

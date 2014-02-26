@@ -89,9 +89,10 @@ class TestLocalTestRunner(auto_stub.TestCase):
     if not test_encoding:
       test_encoding = 'ascii'
 
+    dimensions = dict(os='a', browser='a', cpu='a')
     test_config = test_request_message.TestConfiguration(
-        env_vars=config_env, config_name=self.config_name, os='a', browser='a',
-        cpu='a')
+        env_vars=config_env, config_name=self.config_name,
+        dimensions=dimensions)
     test_objects = []
     for test_object_data in test_objects_data:
       test_objects.append(test_request_message.TestObject(

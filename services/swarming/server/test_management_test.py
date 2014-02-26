@@ -56,11 +56,13 @@ class TestManagementTest(test_case.TestCase):
     self._mox = mox.Mox()
 
     # Create default configurations.
+    dimensions = dict(os='win-xp', browser='Unknown', cpu='Unknown')
     self._config_win = test_request_message.TestConfiguration(
-        config_name='Windows', os='win-xp', browser='Unknown', cpu='Unknown')
+        config_name='Windows', dimensions=dimensions)
 
+    dimensions = dict(os='linux', browser='Unknown', cpu='Unknown')
     self._config_linux = test_request_message.TestConfiguration(
-        config_name='Linux', os='linux', browser='Unknown', cpu='Unknown')
+        config_name='Linux', dimensions=dimensions)
 
     self._request_message_config_name = 'c1'
     self._request_message_test_case_name = 'tc'

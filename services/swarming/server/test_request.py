@@ -49,21 +49,13 @@ class TestRequestParent(ndb.Model):
   pass
 
 
-def GetTestCase(request_message):
-  """Returns a TestCase object representing this Test Request message.
-
-  Args:
-    request_message: The request message to convert.
-
-  Returns:
-    A TestCase object representing this Test Request.
+def GetTestCase(text):
+  """Deserializes a TestCase object encoded as json.
 
   Raises:
     test_request_message.Error: If the request's message isn't valid.
   """
-  request_object = test_request_message.TestCase()
-  request_object.ParseTestRequestMessageText(request_message)
-  return request_object
+  return test_request_message.TestCase.FromJSON(text)
 
 
 def GetTestRequestParent(test_case_name):
@@ -83,7 +75,8 @@ def GetTestRequestParent(test_case_name):
 class TestRequest(ndb.Model):
   # The message received from the caller, formatted as a Test Case as
   # specified in
-  # http://code.google.com/p/swarming/wiki/SwarmFileFormat.
+  # http://code.google.com/p/swarming/wiki/SwarmingFileFormat. It is actually
+  # JSON.
   message = ndb.TextProperty()
 
   # The time at which this request was received.

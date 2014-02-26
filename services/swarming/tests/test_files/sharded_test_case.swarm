@@ -17,7 +17,6 @@
     {
       "config_name": "WinXP32-enUS-sharded",
       "min_instances": 3,
-      "max_instances": 3,
       "dimensions": {
         "lang": "en-US",
         "os": "win-xp"
@@ -26,7 +25,6 @@
     {
       "config_name": "Vista32-enUS-sharded",
       "min_instances": 2,
-      "max_instances": 2,
       "dimensions": {
         "lang": "en-US",
         "os": "win-vista"
