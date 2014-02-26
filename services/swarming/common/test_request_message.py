@@ -181,7 +181,7 @@ class TestRequestMessageBase(object):
     """
     return type(self) == type(other) and self.__dict__ == other.__dict__
 
-  def AreValidValues(self, value_keys, value_type, required=False):
+  def ValidateValues(self, value_keys, value_type, required=False):
     """Raises if any of the values at the given keys are not of the right type.
 
     Args:
@@ -207,7 +207,7 @@ class TestRequestMessageBase(object):
       if value is not None and not isinstance(value, value_type):
         raise Error('Invalid %s: %s' % (value_key, self.__dict__[value_key]))
 
-  def AreValidLists(self, list_keys, value_type, required=False):
+  def ValidateLists(self, list_keys, value_type, required=False):
     """Raises if any of the values at the given list keys are not of the right
     type.
 
@@ -217,7 +217,7 @@ class TestRequestMessageBase(object):
       required: An optional flag identifying if the list is required to be
           non-empty. Defaults to False.
     """
-    self.AreValidValues(list_keys, list, required)
+    self.ValidateValues(list_keys, list, required)
 
     for value_key in list_keys:
       if self.__dict__[value_key]:
@@ -227,7 +227,7 @@ class TestRequestMessageBase(object):
       elif required:
         raise Error('Missing required %s' % value_key)
 
-  def AreValidDicts(self, list_keys, key_type, value_type, required=False):
+  def ValidateDicts(self, list_keys, key_type, value_type, required=False):
     """Raises if any of the values at the given list keys are not of the right
     type.
 
@@ -238,7 +238,7 @@ class TestRequestMessageBase(object):
       required: An optional flag identifying if the dict is required to be
           non-empty. Defaults to False.
     """
-    self.AreValidValues(list_keys, dict, required)
+    self.ValidateValues(list_keys, dict, required)
 
     for value_key in list_keys:
       if self.__dict__[value_key]:
@@ -249,7 +249,7 @@ class TestRequestMessageBase(object):
       elif required:
         raise Error('Missing required %s' % value_key)
 
-  def AreValidObjectLists(self, list_keys, object_type, required=False,
+  def ValidateObjectLists(self, list_keys, object_type, required=False,
                           unique_value_keys=None):
     """Raises if any of the objects of the given lists are not valid.
 
@@ -260,7 +260,7 @@ class TestRequestMessageBase(object):
           non-empty. Defaults to False.
       unique_value_keys: An optional list of keys to values that must be unique.
     """
-    self.AreValidLists(list_keys, object_type, required)
+    self.ValidateLists(list_keys, object_type, required)
 
     # We use this dictionary of sets to make sure some values are unique.
     unique_values = {}
@@ -283,9 +283,9 @@ class TestRequestMessageBase(object):
                     (unique_key, unique_value, list_key))
               unique_values[unique_key].add(unique_value)
         # Now we validate the whole object.
-        object_value.IsValid()
+        object_value.Validate()
 
-  def IsValidUrl(self, url):
+  def ValidateUrl(self, url):
     """Raises if the given value is not a valid URL."""
     if not isinstance(url, basestring):
       raise Error('Unsupported url type, %s, must be a string' % url)
@@ -294,12 +294,12 @@ class TestRequestMessageBase(object):
     if url_parts[0] not in VALID_URL_SCHEMES:
       raise Error('Unsupported url scheme, %s' % url_parts[0])
 
-  def AreValidUrls(self, url_keys):
+  def ValidateUrls(self, url_keys):
     """Raises if any of the value at value_key are not a valid URL."""
     for url_key in url_keys:
-      self.IsValidUrl(self.__dict__[url_key])
+      self.ValidateUrl(self.__dict__[url_key])
 
-  def AreValidUrlLists(self, list_keys, required=False):
+  def ValidateUrlLists(self, list_keys, required=False):
     """Raises if any of the values in the given lists is not a valid url.
 
     Args:
@@ -307,16 +307,16 @@ class TestRequestMessageBase(object):
       required: An optional flag identifying if the list is required to be
           non-empty. Defaults to False.
     """
-    self.AreValidValues(list_keys, list, required)
+    self.ValidateValues(list_keys, list, required)
 
     for list_key in list_keys:
       if self.__dict__[list_key]:
         for value in self.__dict__[list_key]:
-          self.IsValidUrl(value)
+          self.ValidateUrl(value)
       elif required:
         raise Error('Missing list %s' % list_key)
 
-  def AreValidDataLists(self, list_keys, required=False):
+  def ValidateDataLists(self, list_keys, required=False):
     """Raises if any of the values in the given lists are not valid 'data'.
 
     Valid data is either a tuple/list of (valid url, local file name)
@@ -327,7 +327,7 @@ class TestRequestMessageBase(object):
       required: An optional flag identifying if the list is required to be
           non-empty. Defaults to False.
     """
-    self.AreValidValues(list_keys, list, required)
+    self.ValidateValues(list_keys, list, required)
 
     for list_key in list_keys:
       if self.__dict__[list_key]:
@@ -338,12 +338,12 @@ class TestRequestMessageBase(object):
                 type(value))
 
           if isinstance(value, basestring):
-            self.IsValidUrl(value)
+            self.ValidateUrl(value)
           else:
             if len(value) != 2:
               raise Error(
                   'Incorrect length, should be 2 but is %d' % len(value))
-            self.IsValidUrl(value[0])
+            self.ValidateUrl(value[0])
             if not isinstance(value[1], basestring):
               raise Error(
                   'Local path should be of type basestring, got %s' %
@@ -351,7 +351,7 @@ class TestRequestMessageBase(object):
       elif required:
         raise Error('Missing list %s' % list_key)
 
-  def IsValidInteger(self, value):
+  def ValidateInteger(self, value):
     """Raises if the given value is not castable to a valid integer.
 
     The value must not only be castable to a valid integer, but it must also be
@@ -367,7 +367,7 @@ class TestRequestMessageBase(object):
           'Size in output destination must be a whole number, was given %s' %
           value)
 
-  def AreValidOutputDestinations(self, value_keys):
+  def ValidateOutputDestinations(self, value_keys):
     """Raises if any of the values at value_keys are not valid a
     output_destinations.
 
@@ -385,7 +385,7 @@ class TestRequestMessageBase(object):
 
       for key, value in output_destination.iteritems():
         if key == 'size':
-          self.IsValidInteger(value)
+          self.ValidateInteger(value)
           if isinstance(value, basestring):
             # If we reach here then value is a valid integer, just in string
             # form, so we convert it to an long to prevent problems with later
@@ -393,18 +393,18 @@ class TestRequestMessageBase(object):
             # on 32 bits platforms.
             output_destination[key] = long(value)
         elif key == 'url':
-          self.IsValidUrl(value)
+          self.ValidateUrl(value)
         else:
           raise Error('Invalid key, %s, in output destination' % key)
 
-  def IsValidEncoding(self, encoding):
+  def ValidateEncoding(self, encoding):
     """Raises if the given encoding is not valid."""
     try:
       unicode('0', encoding)
     except LookupError:
       raise Error('Invalid encoding %s' % encoding)
 
-  def IsValid(self):
+  def Validate(self):
     """Raises if the current content is not valid."""
     raise NotImplementedError()
 
@@ -494,7 +494,7 @@ class TestRequestMessageBase(object):
       logging.exception(message)
       raise Error(message)
     self.ParseDictionary(test_request)
-    self.IsValid()
+    self.Validate()
 
 
 class TestObject(TestRequestMessageBase):
@@ -526,12 +526,12 @@ class TestObject(TestRequestMessageBase):
     self.hard_time_out = hard_time_out
     self.io_time_out = io_time_out
 
-  def IsValid(self):
+  def Validate(self):
     """Raises if the current content is not valid."""
-    self.AreValidValues(['test_name'], basestring, required=True)
-    self.AreValidDicts(['env_vars'], basestring, basestring)
-    self.AreValidLists(['action'], basestring, required=True)
-    self.AreValidValues(['hard_time_out', 'io_time_out'], (int, long, float))
+    self.ValidateValues(['test_name'], basestring, required=True)
+    self.ValidateDicts(['env_vars'], basestring, basestring)
+    self.ValidateLists(['action'], basestring, required=True)
+    self.ValidateValues(['hard_time_out', 'io_time_out'], (int, long, float))
 
     # self.decorate_output doesn't need to be validated since we only need
     # to evaluate it to True/False which can be done with any type.
@@ -589,15 +589,15 @@ class TestConfiguration(TestRequestMessageBase):
     # when the list of configuration dimensions changes.
     self.dimensions = dimensions
 
-  def IsValid(self):
+  def Validate(self):
     """Raises if the current content is not valid."""
-    self.AreValidValues(['config_name'], basestring, required=True)
-    self.AreValidDicts(['env_vars'], basestring, basestring)
-    self.AreValidDataLists(['data'])
-    self.AreValidObjectLists(
+    self.ValidateValues(['config_name'], basestring, required=True)
+    self.ValidateDicts(['env_vars'], basestring, basestring)
+    self.ValidateDataLists(['data'])
+    self.ValidateObjectLists(
         ['tests'], TestObject, unique_value_keys=['test_name'])
     # required=True to make sure the caller doesn't set it to None.
-    self.AreValidValues(
+    self.ValidateValues(
         ['min_instances', 'additional_instances', 'deadline_to_run',
           'priority'],
         (int, long), required=True)
@@ -713,25 +713,25 @@ class TestCase(TestRequestMessageBase):
     self.label = label
     self.verbose = verbose
 
-  def IsValid(self):
+  def Validate(self):
     """Raises if the current content is not valid."""
-    self.AreValidValues(['test_case_name'], basestring, required=True)
-    self.AreValidValues(
+    self.ValidateValues(['test_case_name'], basestring, required=True)
+    self.ValidateValues(
         ['requestor', 'working_dir', 'failure_email', 'result_url', 'label'],
         basestring)
-    self.AreValidDicts(['env_vars'], basestring, basestring)
-    self.AreValidObjectLists(
+    self.ValidateDicts(['env_vars'], basestring, basestring)
+    self.ValidateObjectLists(
         ['configurations'], TestConfiguration, required=True,
         unique_value_keys=['config_name'])
-    self.AreValidDataLists(['data'])
-    self.AreValidObjectLists(
+    self.ValidateDataLists(['data'])
+    self.ValidateObjectLists(
         ['tests'], TestObject, unique_value_keys=['test_name'])
-    self.AreValidOutputDestinations(['output_destination'])
+    self.ValidateOutputDestinations(['output_destination'])
 
     if self.encoding:
-      self.IsValidEncoding(self.encoding)
+      self.ValidateEncoding(self.encoding)
     if self.result_url:
-      self.AreValidUrls(['result_url'])
+      self.ValidateUrls(['result_url'])
 
     if (self.cleanup not in TestRun.VALID_CLEANUP_VALUES or
         self.store_result not in TestCase.VALID_STORE_RESULT_VALUES):
@@ -830,22 +830,22 @@ class TestRun(TestRequestMessageBase):
     self.restart_on_failure = restart_on_failure
     self.encoding = encoding
 
-  def IsValid(self):
+  def Validate(self):
     """Raises if the current content is not valid."""
-    self.AreValidValues(['test_run_name'], basestring, required=True)
-    self.AreValidDicts(['env_vars'], basestring, basestring)
+    self.ValidateValues(['test_run_name'], basestring, required=True)
+    self.ValidateDicts(['env_vars'], basestring, basestring)
     if self.result_url:
-      self.IsValidUrl(self.result_url)
-    self.IsValidUrl(self.ping_url)
-    self.AreValidValues(['ping_delay'], (int, long), required=True)
-    self.AreValidDataLists(['data'])
-    self.AreValidObjectLists(
+      self.ValidateUrl(self.result_url)
+    self.ValidateUrl(self.ping_url)
+    self.ValidateValues(['ping_delay'], (int, long), required=True)
+    self.ValidateDataLists(['data'])
+    self.ValidateObjectLists(
         ['tests'], TestObject, unique_value_keys=['test_name'])
-    self.AreValidOutputDestinations(['output_destination'])
-    self.AreValidValues(
+    self.ValidateOutputDestinations(['output_destination'])
+    self.ValidateValues(
         ['working_dir', 'result_url', 'ping_url'], basestring)
-    self.AreValidValues(['instance_index', 'num_instances'], (int, long))
-    self.IsValidEncoding(self.encoding)
+    self.ValidateValues(['instance_index', 'num_instances'], (int, long))
+    self.ValidateEncoding(self.encoding)
 
     if (not self.configuration or
         not isinstance(self.configuration, TestConfiguration) or
@@ -857,7 +857,7 @@ class TestRun(TestRequestMessageBase):
          self.instance_index >= self.num_instances)):  # zero based index.
       raise Error('Invalid TestRun: %s' % self.__dict__)
 
-    self.configuration.IsValid()
+    self.configuration.Validate()
 
   def ParseDictionary(self, dictionary):
     """Parses the given dictionary and merge it into our __dict__.

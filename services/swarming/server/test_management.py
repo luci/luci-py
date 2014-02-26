@@ -223,7 +223,7 @@ def _BuildTestRun(runner, server_url):
       'instance_index': runner.config_instance_index,
       'num_instances': runner.num_config_instances,
   })
-  test_run.IsValid()
+  test_run.Validate()
   return test_run
 
 

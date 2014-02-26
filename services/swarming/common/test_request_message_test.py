@@ -27,66 +27,66 @@ class TestRequestMessageBaseTest(unittest.TestCase):
   def setUp(self):
     self.trm = test_request_message.TestRequestMessageBase()
 
-  def testAreValidValues(self):
+  def testValidateValues(self):
     self.trm.a = 1
     self.trm.b = ''
     with self.assertRaises(test_request_message.Error):
-      self.trm.AreValidValues(['a'], str)
+      self.trm.ValidateValues(['a'], str)
     with self.assertRaises(test_request_message.Error):
-      self.trm.AreValidValues(['b'], str, required=True)
+      self.trm.ValidateValues(['b'], str, required=True)
     with self.assertRaises(test_request_message.Error):
-      self.trm.AreValidValues(['c'], str, required=True)
+      self.trm.ValidateValues(['c'], str, required=True)
     with self.assertRaises(test_request_message.Error):
-      self.trm.AreValidValues(['a', 'b'], int, required=True)
+      self.trm.ValidateValues(['a', 'b'], int, required=True)
     with self.assertRaises(test_request_message.Error):
-      self.trm.AreValidValues(['b', 'a'], str)
+      self.trm.ValidateValues(['b', 'a'], str)
     with self.assertRaises(test_request_message.Error):
-      self.trm.AreValidValues(['b', 'c'], str)
+      self.trm.ValidateValues(['b', 'c'], str)
 
     self.trm.c = 3
     self.trm.d = 'a'
-    self.trm.AreValidValues(['a', 'c'], int, required=True)
-    self.trm.AreValidValues(['a', 'c'], int)
-    self.trm.AreValidValues(['b', 'd'], str)
+    self.trm.ValidateValues(['a', 'c'], int, required=True)
+    self.trm.ValidateValues(['a', 'c'], int)
+    self.trm.ValidateValues(['b', 'd'], str)
 
-  def testAreValidLists(self):
+  def testValidateLists(self):
     self.trm.a = 1
     self.trm.b = ''
     self.trm.c = []
     self.trm.d = [1]
     self.trm.e = ['a']
     with self.assertRaises(test_request_message.Error):
-      self.trm.AreValidLists(['a'], int, required=True)
+      self.trm.ValidateLists(['a'], int, required=True)
     with self.assertRaises(test_request_message.Error):
-      self.trm.AreValidLists(['b'], str)
+      self.trm.ValidateLists(['b'], str)
     with self.assertRaises(test_request_message.Error):
-      self.trm.AreValidLists(['c'], str, required=True)
+      self.trm.ValidateLists(['c'], str, required=True)
     with self.assertRaises(test_request_message.Error):
-      self.trm.AreValidLists(['d'], str)
+      self.trm.ValidateLists(['d'], str)
     with self.assertRaises(test_request_message.Error):
-      self.trm.AreValidLists(['e'], int, required=True)
+      self.trm.ValidateLists(['e'], int, required=True)
     with self.assertRaises(test_request_message.Error):
-      self.trm.AreValidLists(['d', 'e'], int)
+      self.trm.ValidateLists(['d', 'e'], int)
     with self.assertRaises(test_request_message.Error):
-      self.trm.AreValidLists(['e', 'd'], str, required=True)
+      self.trm.ValidateLists(['e', 'd'], str, required=True)
 
-    self.trm.AreValidLists(['c'], int)
-    self.trm.AreValidLists(['c', 'd'], int)
-    self.trm.AreValidLists(['e', 'c'], str)
-    self.trm.AreValidLists(['d'], int, required=True)
-    self.trm.AreValidLists(['e'], str, required=True)
+    self.trm.ValidateLists(['c'], int)
+    self.trm.ValidateLists(['c', 'd'], int)
+    self.trm.ValidateLists(['e', 'c'], str)
+    self.trm.ValidateLists(['d'], int, required=True)
+    self.trm.ValidateLists(['e'], str, required=True)
 
-  def testAreValidObjectLists(self):
+  def testValidateObjectLists(self):
     class Validatable(test_request_message.TestRequestMessageBase):
       def __init__(self, is_valid=True):
         self.is_valid = is_valid
 
-      def IsValid(self):
+      def Validate(self):
         if not self.is_valid:
           raise test_request_message.Error('Oops')
 
     class InvalidObject(test_request_message.TestRequestMessageBase):
-      def IsValid(self):
+      def Validate(self):
         raise test_request_message.Error('Oops')
 
     self.trm.a = Validatable()
@@ -98,39 +98,39 @@ class TestRequestMessageBaseTest(unittest.TestCase):
     self.trm.g = [Validatable(), Validatable()]
 
     with self.assertRaises(test_request_message.Error):
-      self.trm.AreValidObjectLists(['a'], Validatable, False)
+      self.trm.ValidateObjectLists(['a'], Validatable, False)
     with self.assertRaises(test_request_message.Error):
-      self.trm.AreValidObjectLists(['b'], InvalidObject, True)
+      self.trm.ValidateObjectLists(['b'], InvalidObject, True)
     with self.assertRaises(test_request_message.Error):
-      self.trm.AreValidObjectLists(['c'], InvalidObject, False)
+      self.trm.ValidateObjectLists(['c'], InvalidObject, False)
     with self.assertRaises(test_request_message.Error):
-      self.trm.AreValidObjectLists(['d'], Validatable, True)
+      self.trm.ValidateObjectLists(['d'], Validatable, True)
     with self.assertRaises(test_request_message.Error):
-      self.trm.AreValidObjectLists(['e'], Validatable, False)
+      self.trm.ValidateObjectLists(['e'], Validatable, False)
     with self.assertRaises(test_request_message.Error):
-      self.trm.AreValidObjectLists(['f'], Validatable, True)
+      self.trm.ValidateObjectLists(['f'], Validatable, True)
 
     # Success!
-    self.trm.AreValidObjectLists(['b'], Validatable, True)
-    self.trm.AreValidObjectLists(['f'], Validatable, False)
-    self.trm.AreValidObjectLists(['g'], Validatable, False)
+    self.trm.ValidateObjectLists(['b'], Validatable, True)
+    self.trm.ValidateObjectLists(['f'], Validatable, False)
+    self.trm.ValidateObjectLists(['g'], Validatable, False)
 
     # Not unique names.
     self.trm.g[0].a = 'a'
     self.trm.g[1].a = 'a'
     with self.assertRaises(test_request_message.Error):
-      self.trm.AreValidObjectLists(['g'], Validatable, False, ['a'])
+      self.trm.ValidateObjectLists(['g'], Validatable, False, ['a'])
     self.trm.g[1].a = 'b'
-    self.trm.AreValidObjectLists(['g'], Validatable, False, ['a'])
+    self.trm.ValidateObjectLists(['g'], Validatable, False, ['a'])
 
     with self.assertRaises(test_request_message.Error):
-      self.trm.AreValidObjectLists(['a'], Validatable, False, [])
+      self.trm.ValidateObjectLists(['a'], Validatable, False, [])
     with self.assertRaises(test_request_message.Error):
-      self.trm.AreValidObjectLists(['b'], InvalidObject, True, [])
+      self.trm.ValidateObjectLists(['b'], InvalidObject, True, [])
     with self.assertRaises(test_request_message.Error):
-      self.trm.AreValidObjectLists(['c'], InvalidObject, False, [])
+      self.trm.ValidateObjectLists(['c'], InvalidObject, False, [])
 
-  def testAreValidUrlLists(self):
+  def testValidateUrlLists(self):
     self.trm.a = []
     self.trm.b = ['http://localhost:9001']
     self.trm.c = ['http://www.google.com']
@@ -138,24 +138,24 @@ class TestRequestMessageBaseTest(unittest.TestCase):
     self.trm.e = ['http://www.google.com', 'a']
     self.trm.f = 1
 
-    self.trm.AreValidUrlLists(['a'])
-    self.trm.AreValidUrlLists(['b'])
-    self.trm.AreValidUrlLists(['c'])
-    self.trm.AreValidUrlLists(['a', 'b'])
-    self.trm.AreValidUrlLists(['b', 'c'])
+    self.trm.ValidateUrlLists(['a'])
+    self.trm.ValidateUrlLists(['b'])
+    self.trm.ValidateUrlLists(['c'])
+    self.trm.ValidateUrlLists(['a', 'b'])
+    self.trm.ValidateUrlLists(['b', 'c'])
 
     with self.assertRaises(test_request_message.Error):
-      self.trm.AreValidUrlLists(['a'], required=True)
+      self.trm.ValidateUrlLists(['a'], required=True)
     with self.assertRaises(test_request_message.Error):
-      self.trm.AreValidUrlLists(['d'])
+      self.trm.ValidateUrlLists(['d'])
     with self.assertRaises(test_request_message.Error):
-      self.trm.AreValidUrlLists(['e'])
+      self.trm.ValidateUrlLists(['e'])
     with self.assertRaises(test_request_message.Error):
-      self.trm.AreValidUrlLists(['f'])
+      self.trm.ValidateUrlLists(['f'])
     with self.assertRaises(test_request_message.Error):
-      self.trm.AreValidUrlLists(['d'], True)
+      self.trm.ValidateUrlLists(['d'], True)
     with self.assertRaises(test_request_message.Error):
-      self.trm.AreValidUrlLists(['d', 'e'], False)
+      self.trm.ValidateUrlLists(['d', 'e'], False)
 
   def testExpandVariables(self):
     self.trm.a = '%(var1)s'
@@ -191,7 +191,7 @@ class TestRequestMessageBaseTest(unittest.TestCase):
       self.str_array_value = ['a', 'b', r'a\b', r'\a\t']
       self.dict_value = {'a': 1, 'b': 2}
 
-    def IsValid(self):
+    def Validate(self):
       if not (
           isinstance(self.str_value, basestring) and
           isinstance(self.int_value, int) and
@@ -278,8 +278,8 @@ class TestRequestMessageBaseTest(unittest.TestCase):
                         TestRequestMessageBaseTest.ParseResults()]
         self.dict_value = {1: 'a', 'b': 2}
 
-      def IsValid(self):
-        self.parsed_result.IsValid()
+      def Validate(self):
+        self.parsed_result.Validate()
         if (not isinstance(self.str_value, basestring) or
             not isinstance(self.dict_value, dict)):
           raise test_request_message.Error('Oops')
@@ -371,18 +371,18 @@ class TestHelper(unittest.TestCase):
     for value in values:
       setattr(self.test_request, value_key, value)
       logging.info('Validating %s with %s', value_key, value)
-      self.test_request.IsValid()
+      self.test_request.Validate()
 
   def AssertInvalidValues(self, value_key, values):
     # First check that the test request is valid, otherwise we are failing
     # due to errors other than we intended.
-    self.test_request.IsValid()
+    self.test_request.Validate()
 
     for value in values:
       setattr(self.test_request, value_key, value)
       logging.info('Validating %s with %s', value_key, value)
       with self.assertRaises(test_request_message.Error):
-        self.test_request.IsValid()
+        self.test_request.Validate()
 
 
 class TestObjectTest(TestHelper):
@@ -411,9 +411,9 @@ class TestObjectTest(TestHelper):
     env_vars['a'] = 2
     self.assertNotEqual(env_vars, test_object.env_vars)
 
-  def testIsValid(self):
+  def testValidate(self):
     # Start with default success.
-    self.test_request.IsValid()
+    self.test_request.Validate()
 
     # And then a few more valid values
     self.AssertValidValues('test_name', TestHelper.VALID_STRING_VALUES)
@@ -448,7 +448,7 @@ class TestObjectTest(TestHelper):
 
     # Full object
     full_object = TestObjectTest.GetFullObject()
-    full_object.IsValid()
+    full_object.Validate()
     new_object = test_request_message.TestObject()
     new_object.ParseTestRequestMessageText(
         test_request_message.Stringize(full_object, json_readable=True))
@@ -495,9 +495,9 @@ class TestConfigurationTest(TestHelper):
     dimensions['c'] = 'd'
     self.assertNotEqual(dimensions, test_configurations.dimensions)
 
-  def testIsValid(self):
+  def testValidate(self):
     # Start with default success.
-    self.test_request.IsValid()
+    self.test_request.Validate()
 
     # And then a few more valid values
     self.AssertValidValues('config_name',
@@ -506,10 +506,10 @@ class TestConfigurationTest(TestHelper):
                            TestHelper.VALID_URL_LOCAL_PATH_TUPLES_LISTS)
 
     test_object1 = test_request_message.TestObject(test_name='a', action=['a'])
-    test_object1.IsValid()
+    test_object1.Validate()
     test_object2 = test_request_message.TestObject(
         test_name='b', action=['b', 'c'], decorate_output=False)
-    test_object2.IsValid()
+    test_object2.Validate()
     self.AssertValidValues('tests', [[test_object1, test_object2],
                                      [test_object1]])
     self.test_request.tests = []
@@ -529,7 +529,7 @@ class TestConfigurationTest(TestHelper):
 
     for value in TestHelper.VALID_STRING_VALUES:
       self.test_request.dimensions[value] = value
-    self.test_request.IsValid()
+    self.test_request.Validate()
 
     # Now try invalid values.
     self.AssertInvalidValues('config_name',
@@ -550,10 +550,10 @@ class TestConfigurationTest(TestHelper):
 
     test_object1.io_time_out = 'never'
     with self.assertRaises(test_request_message.Error):
-      test_object1.IsValid()
+      test_object1.Validate()
     test_object2.action = 'None'
     with self.assertRaises(test_request_message.Error):
-      test_object2.IsValid()
+      test_object2.Validate()
     self.AssertInvalidValues('tests', [[test_object1, test_object2],
                                        [test_object1]])
     self.test_request.tests = []
@@ -580,7 +580,7 @@ class TestConfigurationTest(TestHelper):
     for value in TestHelper.INVALID_REQUIRED_STRING_VALUES:
       self.test_request.dimensions[str(value)] = value
     with self.assertRaises(test_request_message.Error):
-      self.test_request.IsValid()
+      self.test_request.Validate()
 
   def testStringize(self):
     # Vanilla object.
@@ -591,7 +591,7 @@ class TestConfigurationTest(TestHelper):
 
     # Full object
     full_object = TestConfigurationTest.GetFullObject()
-    full_object.IsValid()
+    full_object.Validate()
     new_object = test_request_message.TestConfiguration()
     new_object.ParseTestRequestMessageText(
         test_request_message.Stringize(full_object, json_readable=True))
@@ -656,9 +656,9 @@ class TestCaseTest(TestHelper):
     output_destination['size'] = 2
     self.assertNotEqual(output_destination, test_case.output_destination)
 
-  def testIsValid(self):
+  def testValidate(self):
     # Start with default success.
-    self.test_request.IsValid()
+    self.test_request.Validate()
     # And then a few more valid values
     self.AssertValidValues('test_case_name',
                            TestHelper.VALID_STRING_VALUES)
@@ -670,21 +670,21 @@ class TestCaseTest(TestHelper):
     self.AssertValidValues('admin', TestHelper.VALID_BOOLEAN_VALUES)
 
     test_object1 = test_request_message.TestObject(test_name='a', action=['a'])
-    test_object1.IsValid()
+    test_object1.Validate()
     test_object2 = test_request_message.TestObject(
         test_name='b', action=['b', 'c'], decorate_output=False)
-    test_object2.IsValid()
+    test_object2.Validate()
     self.AssertValidValues('tests', [[test_object1, test_object2],
                                      [test_object1]])
     self.test_request.tests = [TestObjectTest.GetFullObject()]
 
     test_config1 = test_request_message.TestConfiguration(
         config_name='a', os='a', browser='a', cpu='a')
-    test_config1.IsValid()
+    test_config1.Validate()
     test_config2 = test_request_message.TestConfiguration(
         config_name='b', os='b', browser='b', cpu='b',
         data=['http://a.com', 'file://here'])
-    test_config2.IsValid()
+    test_config2.Validate()
     self.AssertValidValues('configurations', [[test_config1, test_config2],
                                               [test_config1]])
     self.test_request.configurations = [TestConfigurationTest.GetFullObject()]
@@ -722,24 +722,24 @@ class TestCaseTest(TestHelper):
     self.AssertInvalidValues('data', TestHelper.INVALID_URL_LIST_VALUES +
                              TestHelper.INVALID_URL_LOCAL_PATH_TUPLES_LISTS)
     self.test_request.data = TestHelper.VALID_URL_LIST_VALUES[-1]
-    self.test_request.IsValid()
+    self.test_request.Validate()
 
     test_object1.io_time_out = 'never'
     with self.assertRaises(test_request_message.Error):
-      test_object1.IsValid()
+      test_object1.Validate()
     test_object2.action = 'None'
     with self.assertRaises(test_request_message.Error):
-      test_object2.IsValid()
+      test_object2.Validate()
     self.AssertInvalidValues('tests', [[test_object1, test_object2],
                                        [test_object1]])
     self.test_request.tests = []
 
     test_config1.dimensions = [42]
     with self.assertRaises(test_request_message.Error):
-      test_config1.IsValid()
+      test_config1.Validate()
     test_config2.tests = 'None'
     with self.assertRaises(test_request_message.Error):
-      test_config2.IsValid()
+      test_config2.Validate()
     self.AssertInvalidValues('configurations', [[test_config1, test_config2],
                                                 [test_config1]])
     # Put the value back to a valid value, to test invalidity of other values.
@@ -787,7 +787,7 @@ class TestCaseTest(TestHelper):
 
     # Full object
     full_object = TestCaseTest.GetFullObject()
-    full_object.IsValid()
+    full_object.Validate()
     new_object = test_request_message.TestCase()
     new_object.ParseTestRequestMessageText(
         test_request_message.Stringize(full_object, json_readable=True))
@@ -849,9 +849,9 @@ class TestRunTest(TestHelper):
     output_destination['size'] = 2
     self.assertNotEqual(output_destination, test_run.output_destination)
 
-  def testIsValid(self):
+  def testValidate(self):
     # Start with default success.
-    self.test_request.IsValid()
+    self.test_request.Validate()
 
     # And then a few more valid values
     self.AssertValidValues('test_run_name',
@@ -860,10 +860,10 @@ class TestRunTest(TestHelper):
                            TestHelper.VALID_URL_LOCAL_PATH_TUPLES_LISTS)
 
     test_object1 = test_request_message.TestObject(test_name='a', action=['a'])
-    test_object1.IsValid()
+    test_object1.Validate()
     test_object2 = test_request_message.TestObject(
         test_name='b', action=['b', 'c'], decorate_output=False)
-    test_object2.IsValid()
+    test_object2.Validate()
     self.AssertValidValues('tests', [[test_object1, test_object2],
                                      [test_object1]])
     self.test_request.tests = [TestObjectTest.GetFullObject()]
@@ -876,7 +876,7 @@ class TestRunTest(TestHelper):
 
     test_config = test_request_message.TestConfiguration(
         config_name='a', os='a', browser='a', cpu='a')
-    test_config.IsValid()
+    test_config.Validate()
     self.AssertValidValues('configuration', [test_config])
     self.test_request.configuration = (
         TestConfigurationTest.GetFullObject())
@@ -907,10 +907,10 @@ class TestRunTest(TestHelper):
 
     test_object1.io_time_out = 'never'
     with self.assertRaises(test_request_message.Error):
-      test_object1.IsValid()
+      test_object1.Validate()
     test_object2.action = 'None'
     with self.assertRaises(test_request_message.Error):
-      test_object2.IsValid()
+      test_object2.Validate()
     self.AssertInvalidValues('tests', [[test_object1, test_object2],
                                        [test_object1]])
     self.test_request.tests = []
@@ -923,19 +923,19 @@ class TestRunTest(TestHelper):
     self.test_request.instance_index = 2
     self.test_request.num_instances = 1
     with self.assertRaises(test_request_message.Error):
-      self.test_request.IsValid()
+      self.test_request.Validate()
 
     self.test_request.instance_index = 2
     self.test_request.num_instances = 2
     with self.assertRaises(test_request_message.Error):
-      self.test_request.IsValid()
+      self.test_request.Validate()
 
     self.test_request.instance_index = 1
     self.test_request.num_instances = 2
 
     test_config.dimensions = [42]
     with self.assertRaises(test_request_message.Error):
-      test_config.IsValid()
+      test_config.Validate()
     test_config.dimensions = {'a': 42}
     self.AssertInvalidValues('configuration', [test_config])
     self.test_request.configuration = TestConfigurationTest.GetFullObject()
@@ -976,7 +976,7 @@ class TestRunTest(TestHelper):
 
     # Full object
     full_object = TestRunTest.GetFullObject()
-    full_object.IsValid()
+    full_object.Validate()
 
     new_object = test_request_message.TestRun()
     new_object.ParseTestRequestMessageText(
