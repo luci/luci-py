@@ -16,10 +16,6 @@ VALID_URL_SCHEMES = ['http', 'https', 'file', 'mailto']
 # The default encoding to assume for the test output.
 DEFAULT_ENCODING = 'ascii'
 
-# The default working directory.
-# TODO(user): Change this value if the system isn't windows.
-DEFAULT_WORKING_DIR = r'c:\swarm_tests'
-
 # The maximum priority value that a runner can have.
 MAX_PRIORITY_VALUE = 1000
 
@@ -607,7 +603,7 @@ class TestCase(TestRequestMessageBase):
   VALID_STORE_RESULT_VALUES = (None, '', 'all', 'fail', 'none')
 
   def __init__(self, test_case_name=None, requestor=None, env_vars=None,
-               configurations=None, data=None, working_dir=DEFAULT_WORKING_DIR,
+               configurations=None, data=None, working_dir=None,
                admin=False, tests=None, result_url=None, store_result=None,
                restart_on_failure=None, output_destination=None,
                encoding=DEFAULT_ENCODING, cleanup=None, failure_email=None,
@@ -789,7 +785,7 @@ class TestRun(TestRequestMessageBase):
 
   def __init__(self, test_run_name=None, env_vars=None,
                configuration=None, data=None,
-               working_dir=DEFAULT_WORKING_DIR, tests=None,
+               working_dir=None, tests=None,
                instance_index=None, num_instances=None, result_url=None,
                ping_url=None, ping_delay=None, output_destination=None,
                cleanup=None, restart_on_failure=None,

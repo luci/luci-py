@@ -612,16 +612,20 @@ def _GetTestRunnerCommands(runner, server_url):
   # Prepare the manifest file for downloading. The format is (directory,
   # filename, file contents).
   files_to_upload = [
-      (test_run.working_dir, _TEST_RUN_SWARM_FILE_NAME,
+      (test_run.working_dir or '', _TEST_RUN_SWARM_FILE_NAME,
        test_request_message.Stringize(test_run, json_readable=True))
   ]
 
   output_commands.append(rpc.BuildRPC('StoreFiles', files_to_upload))
 
   # Define how to run the scripts.
+  swarm_file_path = _TEST_RUN_SWARM_FILE_NAME
+  if test_run.working_dir:
+    swarm_file_path = os.path.join(
+        test_run.working_dir, _TEST_RUN_SWARM_FILE_NAME)
   command_to_execute = [
       os.path.join('local_test_runner.py'),
-      '-f', os.path.join(test_run.working_dir, _TEST_RUN_SWARM_FILE_NAME),
+      '-f', swarm_file_path,
   ]
 
   test_case = runner.request.get().GetTestCase()
