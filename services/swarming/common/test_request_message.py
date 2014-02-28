@@ -10,12 +10,6 @@ import urllib
 import urlparse
 
 
-# All the accepted url schemes.
-VALID_URL_SCHEMES = ['http', 'https', 'file', 'mailto']
-
-# The default encoding to assume for the test output.
-DEFAULT_ENCODING = 'ascii'
-
 # The maximum priority value that a runner can have.
 MAX_PRIORITY_VALUE = 1000
 
@@ -268,7 +262,7 @@ class TestRequestMessageBase(object):
       raise Error('Unsupported url type, %s, must be a string' % url)
 
     url_parts = urlparse.urlsplit(url)
-    if url_parts[0] not in VALID_URL_SCHEMES:
+    if url_parts[0] not in ('file', 'http', 'https', 'mailto'):
       raise Error('Unsupported url scheme, %s' % url_parts[0])
 
   def ValidateUrls(self, url_keys):
@@ -592,7 +586,7 @@ class TestCase(TestRequestMessageBase):
         output of this test case as well as the size of the chunks to use. The
         key for the URL is 'url' and the value must be a valid URL string. The
         key for the chunk size is 'size'. It must be a whole number.
-    encoding: The encoding of the tests output.
+    encoding: The encoding of the tests output. Default to utf-8.
     cleanup: The key to access the test run's cleanup string.
     failure_email: An optional email where to broadcast failures for this test
         case. TODO(maruel): Remove me.
@@ -606,7 +600,7 @@ class TestCase(TestRequestMessageBase):
                configurations=None, data=None, working_dir=None,
                admin=False, tests=None, result_url=None, store_result=None,
                restart_on_failure=None, output_destination=None,
-               encoding=DEFAULT_ENCODING, cleanup=None, failure_email=None,
+               encoding='utf-8', cleanup=None, failure_email=None,
                label=None, verbose=False, **kwargs):
     super(TestCase, self).__init__(**kwargs)
     self.test_case_name = test_case_name
@@ -779,7 +773,8 @@ class TestRun(TestRequestMessageBase):
     cleanup: The key to access the test run's cleanup string.
     restart_on_failure: An optional value indicating if the machine running the
         tests should restart if any of the tests fail.
-    encoding: The character encoding to use. 'utf-8' is recommended.
+    encoding: The character encoding to use. Default to 'utf-8' and is
+        recommended.
   """
   VALID_CLEANUP_VALUES = (None, '', 'zip', 'data', 'root')
 
@@ -789,7 +784,7 @@ class TestRun(TestRequestMessageBase):
                instance_index=None, num_instances=None, result_url=None,
                ping_url=None, ping_delay=None, output_destination=None,
                cleanup=None, restart_on_failure=None,
-               encoding=DEFAULT_ENCODING, **kwargs):
+               encoding='utf-8', **kwargs):
     super(TestRun, self).__init__(**kwargs)
     self.test_run_name = test_run_name
     self.env_vars = env_vars.copy() if env_vars else {}
