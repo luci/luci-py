@@ -2,30 +2,7 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
-"""A function to manage a Test Request Message to/from text.
-
-Using test request format as described in more details here:
-http://goto/gforce/test-request-format, this class converts and validate a
-string into a Test Request Message.
-
-There are classes for all types of messages so that you can validate that
-a text message is properly formatted for that specific test request message
-type. An API is also available on each of these classes to allow creation
-of new test request messages and convert them to text.
-
-Note that the data members of the classes must use the exact same names as
-the dictionary keys in the Test Request Format so that we can interact with
-them using the __dict__ of the class.
-
-Classes:
-  Error: A simple error exception properly scoped to this module.
-  TestRequestMessageBase: Base class with methods common to all messages.
-  TestObject: For the simple Test Object to be used in other messages.
-  TestConfiguration: For the Configuration object to be used in other messages.
-  TestCase: For the Test Case messages.
-  TestRun: For the Test Run messages.
-"""
-
+"""Defines all the objects used by the Swarming API and its serialization."""
 
 import json
 import logging
@@ -470,16 +447,19 @@ class TestRequestMessageBase(object):
 
 
 class TestObject(TestRequestMessageBase):
-  """The object to hold on and validate attributes for a test.
+  """Describes a command to run, including the command line.
+
+  A 'task' as described by TestCase can include multiple commands to run. The
+  user provides an instance of this class inside a TestCase.
 
   Attributes:
     test_name: The name of this test object.
     env_vars: An optional dictionary for environment variables.
-    action: The action list of this test object.
+    action: The command line to run.
     decorate_output: The output decoration flag of this test object.
     hard_time_out: The maximum time this test can take.
-    io_time_out: The maximum time this test can take (resetting anytime the
-        test writes to stdout).
+    io_time_out: The maximum time this test can take (resetting anytime the test
+        writes to stdout).
   """
 
   def __init__(self, test_name=None, env_vars=None, action=None,
@@ -487,14 +467,8 @@ class TestObject(TestRequestMessageBase):
                **kwargs):
     super(TestObject, self).__init__(**kwargs)
     self.test_name = test_name
-    if env_vars:
-      self.env_vars = env_vars.copy()
-    else:
-      self.env_vars = None
-    if action:
-      self.action = action
-    else:
-      self.action = []
+    self.env_vars = env_vars.copy() if env_vars else {}
+    self.action = action[:] if action else []
     self.decorate_output = decorate_output
     self.hard_time_out = hard_time_out
     self.io_time_out = io_time_out
@@ -512,52 +486,47 @@ class TestObject(TestRequestMessageBase):
 
 
 class TestConfiguration(TestRequestMessageBase):
-  """The object to hold on and validate attributes for a configuration.
+  """Describes how to choose swarming bot to execute a requests.
+
+  It defines the dimensions that are required and the number of swarming bot
+  instances that are going to be used to run this list of 'tests', which is
+  actually a task. The user provides an instance of this class inside a
+  TestCase.
 
   Attributes:
     config_name: The name of this configuration.
     env_vars: An optional dictionary for environment variables.
-    data: An optional data list for this configuration. The strings must be
-        valid urls.
+    data: An optional 'data list' for this configuration.
     tests: An optional tests list for this configuration.
     min_instances: An optional integer specifying the minimum number of
-        instances of this configuration we want. Defaults to 1.
-        Must be greater than 0.
+        instances of this configuration we want. Defaults to 1. Must be greater
+        than 0.
     additional_instances: An optional integer specifying the maximum number of
-        additional instances of this configuration we want. Defaults to 0.
-        Must be greater than 0.
-    deadline_to_run: An optional value that specifies how long the test can
-        wait before it is aborted (in seconds). Defaults to
-        SWARM_RUNNER_MAX_WAIT_SECS if no value is given.
+        additional instances of this configuration we want. Defaults to 0. Must
+        be greater than 0. Eh.
+        https://code.google.com/p/swarming/issues/detail?id=88
+    deadline_to_run: An optional value that specifies how long the test can wait
+        before it is aborted (in seconds). Defaults to
+        SWARM_RUNNER_MAX_WAIT_SECS.
     priority: The priority of this configuartion, used to determine execute
         order (a lower number is higher priority). Defaults to 10, the
         acceptable values are [0, MAX_PRIORITY_VALUE].
     dimensions: A dictionary of strings or list of strings for dimensions.
   """
-
   def __init__(self, config_name=None, env_vars=None, data=None, tests=None,
                min_instances=1, additional_instances=0,
                deadline_to_run=SWARM_RUNNER_MAX_WAIT_SECS,
                priority=100, dimensions=None, **kwargs):
     super(TestConfiguration, self).__init__(**kwargs)
     self.config_name = config_name
-    if env_vars:
-      self.env_vars = env_vars.copy()
-    else:
-      self.env_vars = None
-    if data:
-      self.data = data[:]
-    else:
-      self.data = []
-    if tests:
-      self.tests = tests[:]
-    else:
-      self.tests = []
+    self.env_vars = env_vars.copy() if env_vars else {}
+    self.data = data[:] if data else []
+    self.tests = tests[:] if tests else []
     self.min_instances = min_instances
     self.additional_instances = additional_instances
     self.deadline_to_run = deadline_to_run
     self.priority = priority
-    self.dimensions = (dimensions or {}).copy()
+    self.dimensions = dimensions.copy() if dimensions else {}
 
   def Validate(self):
     """Raises if the current content is not valid."""
@@ -600,7 +569,11 @@ class TestConfiguration(TestRequestMessageBase):
 
 
 class TestCase(TestRequestMessageBase):
-  """The object to hold on and validate attributes for a test case.
+  """Describes a task to run.
+
+  It defines the inputs and outputs to run a task on a single swarming bot. The
+  task is a list of TestObject commands to run in order. The user provides an
+  instance of this class to trigger a Swarming task.
 
   Attributes:
     test_case_name: The name of this test case.
@@ -608,33 +581,30 @@ class TestCase(TestRequestMessageBase):
         address).
     env_vars: An optional dictionary for environment variables.
     configurations: A list of configurations for this test case.
-    data: An optional data list for this test case. The strings must be
-        valid urls.
-    working_dir: An optional path string for where to download/run tests.
-        This must be an absolute path though we don't validate it since this
-        script may run on a different platform than the one that will use the
-        path. Defaults to c:\\swarm_tests.
-        TODO(user): Also support other platforms.
+    data: An optional 'data list' for this configuration.
+    working_dir: An optional path string for where to download/run tests. This
+        must be an absolute path though we don't validate it since this script
+        may run on a different platform than the one that will use the path.
     admin: An optional boolean value that specifies if the tests should be run
-        with admin privilege or not.
-    tests: An optional tests list for this test case.
+        with admin privilege or not. TODO(maruel): Remove me.
+    tests: An list of TestObject to run for this task.
     result_url: An optional URL where to post the results of this test case.
     store_result: The key to access the test run's storage string.
     restart_on_failure: An optional value indicating if the machine running the
         tests should restart if any of the tests fail.
     output_destination: An optional dictionary with a URL where to post the
-        output of this test case as well as the size of the chunks to use.
-        The key for the URL is 'url' and the value must be a valid URL string.
-        The key for the chunk size is 'size'. It must be a whole number.
+        output of this test case as well as the size of the chunks to use. The
+        key for the URL is 'url' and the value must be a valid URL string. The
+        key for the chunk size is 'size'. It must be a whole number.
     encoding: The encoding of the tests output.
     cleanup: The key to access the test run's cleanup string.
     failure_email: An optional email where to broadcast failures for this test
-        case.
+        case. TODO(maruel): Remove me.
     label: An optional string that can be used to label this test case.
     verbose: An optional boolean value that specifies if logging should be
-        verbose or not.
+        verbose.
   """
-  VALID_STORE_RESULT_VALUES = [None, '', 'all', 'fail', 'none']
+  VALID_STORE_RESULT_VALUES = (None, '', 'all', 'fail', 'none')
 
   def __init__(self, test_case_name=None, requestor=None, env_vars=None,
                configurations=None, data=None, working_dir=DEFAULT_WORKING_DIR,
@@ -647,31 +617,17 @@ class TestCase(TestRequestMessageBase):
     # TODO(csharp): Stop using a default so test requests that don't give a
     # requestor are rejected.
     self.requestor = requestor or 'unknown'
-    if env_vars:
-      self.env_vars = env_vars.copy()
-    else:
-      self.env_vars = None
-    if configurations:
-      self.configurations = configurations[:]
-    else:
-      self.configurations = []
-    if data:
-      self.data = data[:]
-    else:
-      self.data = []
+    self.env_vars = env_vars.copy() if env_vars else {}
+    self.configurations = configurations[:] if configurations else []
+    self.data = data[:] if data else []
     self.working_dir = working_dir
     self.admin = admin
-    if tests:
-      self.tests = tests[:]
-    else:
-      self.tests = []
+    self.tests = tests[:] if tests else []
     self.result_url = result_url
     self.store_result = store_result
     self.restart_on_failure = restart_on_failure
-    if output_destination:
-      self.output_destination = output_destination.copy()
-    else:
-      self.output_destination = None
+    self.output_destination = (
+        output_destination.copy() if output_destination else {})
     self.encoding = encoding
     self.cleanup = cleanup
     self.failure_email = failure_email
@@ -793,43 +749,46 @@ class TestCase(TestRequestMessageBase):
 
 
 class TestRun(TestRequestMessageBase):
-  """The object to hold on and validate attributes for a test run.
+  """Contains results of a task execution.
+
+  TODO(maruel): Contains a lot of duplicated fields from TestCase, even if it
+  reference them via 'tests'. Should be refactored.
+
+  The Swarming server generates instance of this class for consumption by
+  local_test_runner.py. The user does not interact with this API.
 
   Attributes:
     test_run_name: The name of the test run.
     env_vars: An optional dictionary for environment variables.
     configuration: An optional configuration object for this test run.
-    data: An optional data list for this test run.
-    working_dir: An optional path string for where to download/run tests.
-        This must be an absolute path though we don't validate it since this
-        script may run on a different platform than the one that will use the
-        path. Defaults to c:\\swarm_tests.
-        TODO(user): Also support other platforms.
-    tests: An optional tests list for this test run.
+    data: An optional 'data list' for this test run.
+    working_dir: An optional path string for where to download/run tests. This
+        must NOT be an absolute path.
+    tests: optional(!?) list of TestObject for this test run.
     instance_index: An optional integer specifying the zero based index of this
-        test run instance of the given configuration. Defaults to None.
-        Must be specified if num_instances is specified.
+        test run instance of the given configuration. Defaults to None. Must be
+        specified if num_instances is specified.
     num_instances: An optional integer specifying the number of test run
         instances of this configuration that have been shared. Defaults to None.
-        Must be greater than instance_index.
-        Must be specified if instance_index is specified.
+        Must be greater than instance_index. Must be specified if instance_index
+        is specified.
     result_url: An optional URL where to post the results of this test run.
-    ping_url: A required URL that tells the test run where to ping to let the
-        server know that it is still active.
+    ping_url: An URL that tells the test run where to ping to let the server
+        know that it is still active.
     ping_delay: The amount of time to wait between pings (in seconds).
     output_destination: An optional dictionary with a URL where to post the
-        output of this test case as well as the size of the chunks to use.
-        The key for the URL is 'url' and the value must be a valid URL string.
-        The key for the chunk size is 'size'. It must be a whole number.
+        output of this test case as well as the size of the chunks to use. The
+        key for the URL is 'url' and the value must be a valid URL string.  The
+        key for the chunk size is 'size'. It must be a whole number.
     cleanup: The key to access the test run's cleanup string.
     restart_on_failure: An optional value indicating if the machine running the
         tests should restart if any of the tests fail.
-    encoding: The character encoding to use.
+    encoding: The character encoding to use. 'utf-8' is recommended.
   """
-  VALID_CLEANUP_VALUES = [None, '', 'zip', 'data', 'root']
+  VALID_CLEANUP_VALUES = (None, '', 'zip', 'data', 'root')
 
   def __init__(self, test_run_name=None, env_vars=None,
-               configuration=TestConfiguration(), data=None,
+               configuration=None, data=None,
                working_dir=DEFAULT_WORKING_DIR, tests=None,
                instance_index=None, num_instances=None, result_url=None,
                ping_url=None, ping_delay=None, output_destination=None,
@@ -837,29 +796,18 @@ class TestRun(TestRequestMessageBase):
                encoding=DEFAULT_ENCODING, **kwargs):
     super(TestRun, self).__init__(**kwargs)
     self.test_run_name = test_run_name
-    if env_vars:
-      self.env_vars = env_vars.copy()
-    else:
-      self.env_vars = env_vars
+    self.env_vars = env_vars.copy() if env_vars else {}
     self.configuration = configuration
-    if data:
-      self.data = data[:]
-    else:
-      self.data = []
+    self.data = data[:] if data else []
     self.working_dir = working_dir
-    if tests:
-      self.tests = tests[:]
-    else:
-      self.tests = []
+    self.tests = tests[:] if tests else []
     self.instance_index = instance_index
     self.num_instances = num_instances
     self.result_url = result_url
     self.ping_url = ping_url
     self.ping_delay = ping_delay
-    if output_destination:
-      self.output_destination = output_destination.copy()
-    else:
-      self.output_destination = None
+    self.output_destination = (
+        output_destination.copy() if output_destination else {})
     self.cleanup = cleanup
     self.restart_on_failure = restart_on_failure
     self.encoding = encoding
