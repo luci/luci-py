@@ -78,30 +78,31 @@ def GetRequestMessage(request_name=REQUEST_MESSAGE_TEST_CASE_NAME,
   Returns:
     A properly formatted request message text.
   """
-  request = test_request_message.TestCase(
-      restart_on_failure=restart_on_failure,
-      result_url=result_url,
-      store_result=store_result,
-      test_case_name=request_name,
-    )
-  request.tests = [test_request_message.TestObject(
-      test_name='t1', action=['ignore-me.exe'])]
-  dimensions = dict(os=platform, cpu='Unknown', browser='Unknown')
-  for i in range(num_configs):
-    request.configurations.append(test_request_message.TestConfiguration(
+  tests = [
+    test_request_message.TestObject(test_name='t1', action=['ignore-me.exe']),
+  ]
+  configurations = [
+    test_request_message.TestConfiguration(
         config_name=config_name_root + '_' + str(i),
         data=['http://b.ina.ry/files2.zip'],
-        dimensions=dimensions,
+        dimensions=dict(os=platform, cpu='Unknown', browser='Unknown'),
         min_instances=min_instances,
         additional_instances=additional_instances,
         priority=priority,
         tests=[
           test_request_message.TestObject(
               test_name='t2', action=['ignore-me-too.exe']),
-        ]))
-  if env_vars:
-    request.env_vars = env_vars.copy()
-
+        ])
+    for i in range(num_configs)
+  ]
+  request = test_request_message.TestCase(
+      restart_on_failure=restart_on_failure,
+      result_url=result_url,
+      store_result=store_result,
+      test_case_name=request_name,
+      configurations=configurations,
+      env_vars=env_vars,
+      tests=tests)
   return test_request_message.Stringize(request, json_readable=True)
 
 

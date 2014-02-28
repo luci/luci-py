@@ -105,10 +105,6 @@ class TestLocalTestRunner(auto_stub.TestCase):
         ping_delay=self.ping_delay,
         tests=test_objects, cleanup=test_run_cleanup, encoding=test_encoding)
 
-    # Check that the message is valid, otherwise the test will fail when trying
-    # to load it.
-    test_run.Validate()
-
     data = test_request_message.Stringize(test_run, json_readable=True)
     with open(self.data_file_name, 'wb') as f:
       f.write(data.encode('utf-8'))

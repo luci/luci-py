@@ -404,11 +404,12 @@ class TestObjectTest(TestHelper):
 
   def testNoReferences(self):
     # Ensure that Test Object makes copies of its input, not references.
-    env_vars = {'a': 1}
+    env_vars = {'a': '1'}
 
-    test_object = test_request_message.TestObject(env_vars=env_vars)
+    test_object = test_request_message.TestObject(
+        test_name='a', action=['echo', 'hello'], env_vars=env_vars)
 
-    env_vars['a'] = 2
+    env_vars['a'] = '2'
     self.assertNotEqual(env_vars, test_object.env_vars)
 
   def testValidate(self):
@@ -476,15 +477,16 @@ class TestConfigurationTest(TestHelper):
 
   def testNoReferences(self):
     # Ensure that Test Configuration makes copies of its input, not references.
-    env_vars = {'a': 1}
-    data = ['data']
-    tests = ['test']
+    env_vars = {'a': '1'}
+    data = ['http://localhost']
+    tests = [TestObjectTest.GetFullObject()]
     dimensions = {'a': ['b']}
 
     test_configurations = test_request_message.TestConfiguration(
-        env_vars=env_vars, data=data, tests=tests, dimensions=dimensions)
+        config_name='a', env_vars=env_vars, data=data, tests=tests,
+        dimensions=dimensions)
 
-    env_vars['a'] = 2
+    env_vars['a'] = '2'
     self.assertNotEqual(env_vars, test_configurations.env_vars)
 
     data.append('data2')
@@ -630,7 +632,7 @@ class TestCaseTest(TestHelper):
 
   def testNoReferences(self):
     # Ensure that Test Case makes copies of its input, not references.
-    env_vars = {'a': 1}
+    env_vars = {'a': '1'}
     configurations = [TestConfigurationTest.GetFullObject()]
     data = ['http://localhost']
     tests = [TestObjectTest.GetFullObject()]
@@ -639,7 +641,7 @@ class TestCaseTest(TestHelper):
         test_case_name='foo', env_vars=env_vars, configurations=configurations,
         data=data, tests=tests)
 
-    env_vars['a'] = 2
+    env_vars['a'] = '2'
     self.assertNotEqual(env_vars, test_case.env_vars)
 
     configurations.append(TestConfigurationTest.GetFullObject())
@@ -777,11 +779,19 @@ class TestCaseTest(TestHelper):
     self.assertEqual(new_object, full_object)
 
   def testEquivalent(self):
-    test_case = test_request_message.TestCase()
+    test_case = test_request_message.TestCase(
+        test_case_name='a',
+        configurations=[
+          test_request_message.TestConfiguration(config_name='b'),
+        ])
     self.assertTrue(test_case.Equivalent(test_case))
 
     # Test that certain values don't affect equivalence
-    equivalent_test_case = test_request_message.TestCase()
+    equivalent_test_case = test_request_message.TestCase(
+        test_case_name='a',
+        configurations=[
+          test_request_message.TestConfiguration(config_name='b'),
+        ])
     self.assertTrue(test_case.Equivalent(equivalent_test_case))
 
     equivalent_test_case.cleanup = 'root'
@@ -802,9 +812,15 @@ class TestCaseTest(TestHelper):
 
   def testEquivalentsDifferentConfigs(self):
     test_case = test_request_message.TestCase(
-      configurations=[test_request_message.TestConfiguration()])
+        test_case_name='a',
+        configurations=[
+          test_request_message.TestConfiguration(config_name='b'),
+        ])
     different_test_case = test_request_message.TestCase(
-      configurations=[test_request_message.TestConfiguration()])
+        test_case_name='a',
+        configurations=[
+          test_request_message.TestConfiguration(config_name='b'),
+        ])
 
     self.assertTrue(test_case.Equivalent(different_test_case))
 
@@ -823,7 +839,11 @@ class TestCaseTest(TestHelper):
 
   def testEquivalentMultipleConfigs(self):
     num_configs = 2
-    test_case = test_request_message.TestCase()
+    test_case = test_request_message.TestCase(
+        test_case_name='a',
+        configurations=[
+          test_request_message.TestConfiguration(config_name='b'),
+        ])
     for i in range(num_configs):
       test_case.configurations.append(
           test_request_message.TestConfiguration(config_name=str(i)))
@@ -831,7 +851,11 @@ class TestCaseTest(TestHelper):
     self.assertTrue(test_case.Equivalent(test_case))
     # Change the position of the position of the configs and ensure they are
     # still equivalent.
-    equivalent_test_case = test_request_message.TestCase()
+    equivalent_test_case = test_request_message.TestCase(
+        test_case_name='a',
+        configurations=[
+          test_request_message.TestConfiguration(config_name='b'),
+        ])
     for i in range(num_configs):
       equivalent_test_case.configurations.append(
           test_request_message.TestConfiguration(config_name=str(i)))

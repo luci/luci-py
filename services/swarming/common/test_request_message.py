@@ -432,6 +432,7 @@ class TestObject(TestRequestMessageBase):
     self.decorate_output = decorate_output
     self.hard_time_out = hard_time_out
     self.io_time_out = io_time_out
+    self.Validate()
 
   def Validate(self):
     """Raises if the current content is not valid."""
@@ -487,6 +488,7 @@ class TestConfiguration(TestRequestMessageBase):
     self.deadline_to_run = deadline_to_run
     self.priority = priority
     self.dimensions = dimensions.copy() if dimensions else {}
+    self.Validate()
 
   def Validate(self):
     """Raises if the current content is not valid."""
@@ -584,6 +586,7 @@ class TestCase(TestRequestMessageBase):
     self.cleanup = cleanup
     self.label = label
     self.verbose = verbose
+    self.Validate()
 
   def Validate(self):
     """Raises if the current content is not valid."""
@@ -751,6 +754,7 @@ class TestRun(TestRequestMessageBase):
     self.cleanup = cleanup
     self.restart_on_failure = restart_on_failure
     self.encoding = encoding
+    self.Validate()
 
   def Validate(self):
     """Raises if the current content is not valid."""
