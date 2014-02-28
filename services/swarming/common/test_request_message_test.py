@@ -319,27 +319,24 @@ class TestHelper(unittest.TestCase):
   VALID_OPTIONAL_STRING_VALUES = (VALID_STRING_VALUES +
                                   EXTRA_OPTIONAL_STRING_VALUES)
 
-  VALID_URL_VALUES = ['http://a.com', 'https://safe.a.com', 'file://here']
+  VALID_URL_VALUES = ['http://a.com', 'https://safe.a.com']
   VALID_OPTIONAL_URL_VALUES = VALID_URL_VALUES + EXTRA_OPTIONAL_STRING_VALUES
-  INVALID_URL_VALUES = ['httpx://a.com', 'shttps://safe.a.com', 'nfile://here',
+  INVALID_URL_VALUES = ['file://a.com', 'mailto:foo@localhost',
                         ] + INVALID_STRING_VALUES
 
-  VALID_URL_LIST_VALUES = [['http://a.com'],
-                           ['https://safe.a.com', 'file://here']]
+  VALID_URL_LIST_VALUES = [['http://a.com'], ['https://safe.a.com']]
   VALID_OPTIONAL_URL_LIST_VALUES = VALID_URL_LIST_VALUES + [None, []]
-  INVALID_URL_LIST_VALUES = [['httpx://a.com'],
-                             ['shttps://safe.a.com', 'nfile://here'],
-                             [55]]
+  INVALID_URL_LIST_VALUES = [['httpx://a.com'], ['shttps://safe.a.com'], [55]]
 
-  VALID_URL_LOCAL_PATH_TUPLES_LISTS = [[('http://a.com', 'a')],
-                                       [['https://safe.a.com', 'b'],
-                                        ('file://my_file', 'local/state')]]
+  VALID_URL_LOCAL_PATH_TUPLES_LISTS = [
+      [('http://a.com', 'a')], [['https://safe.a.com', 'b']],
+  ]
   INVALID_URL_LOCAL_PATH_TUPLES_LISTS = [
     '',
     1,
     ('hello'),
     [('asd', 'a')],
-    [['hps://safe.a.com', 'b'], ('nfile://my_file', 'local/state')],
+    [['hps://safe.a.com', 'b'], ('local/state',)],
     [('http://www.google.com', 5)],
     [('http://a.com', 'b', 'c')],
   ]
@@ -699,14 +696,12 @@ class TestCaseTest(TestHelper):
                                      [test_object1]])
     self.test_request.tests = [TestObjectTest.GetFullObject()]
 
-    dimensions = dict(os='a', browser='a', cpu='a')
     test_config1 = test_request_message.TestConfiguration(
-        config_name='a', dimensions=dimensions)
+        config_name='a', dimensions=dict(os='a', browser='a', cpu='a'))
     test_config1.Validate()
-    dimensions = dict(os='b', browser='b', cpu='b')
     test_config2 = test_request_message.TestConfiguration(
-        config_name='b', dimensions=dimensions,
-        data=['http://a.com', 'file://here'])
+        config_name='b', dimensions=dict(os='b', browser='b', cpu='b'),
+        data=['http://a.com'])
     test_config2.Validate()
     self.AssertValidValues('configurations', [[test_config1, test_config2],
                                               [test_config1]])

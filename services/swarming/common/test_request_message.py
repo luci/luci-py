@@ -262,7 +262,7 @@ class TestRequestMessageBase(object):
       raise Error('Unsupported url type, %s, must be a string' % url)
 
     url_parts = urlparse.urlsplit(url)
-    if url_parts[0] not in ('file', 'http', 'https'):
+    if url_parts[0] not in ('http', 'https'):
       raise Error('Unsupported url scheme, %s' % url_parts[0])
 
   def ValidateUrls(self, url_keys):

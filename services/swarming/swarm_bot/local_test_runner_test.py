@@ -714,18 +714,6 @@ class TestLocalTestRunner(auto_stub.TestCase):
 
     self._mox.VerifyAll()
 
-  def testPublishResultsToFile(self):
-    (handle, result_file_path) = tempfile.mkstemp(
-        prefix='local_test_runner_test')
-    os.close(handle)
-    self.files_to_remove.append(result_file_path)
-    self.result_url = 'file://%s' % result_file_path.replace('\\', '/')
-    self.CreateValidFile()  # Recreate the request file with new value.
-    with local_test_runner.LocalTestRunner(self.data_file_name) as runner:
-      self.assertTrue(runner.PublishResults(True, [], self.result_string))
-    with open(result_file_path, 'rb') as f:
-      self.assertEqual(f.read(), self.result_string)
-
   def testPublishInternalErrors(self):
     logging.basicConfig(level=logging.FATAL)
     for i in logging.getLogger().handlers:

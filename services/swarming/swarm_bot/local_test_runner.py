@@ -22,7 +22,6 @@ import sys
 import tempfile
 import threading
 import time
-import urlparse
 import zipfile
 
 # pylint: disable-msg=W0403
@@ -620,37 +619,26 @@ class LocalTestRunner(object):
                        self._SUCCESS_CGI_STRING[not success])
     if not self.test_run.result_url:
       return True
-    result_url_parts = urlparse.urlsplit(self.test_run.result_url)
-    if result_url_parts[0] == 'http' or result_url_parts[0] == 'https':
-      data = {'n': self.test_run.test_run_name,
-              'c': self.test_run.configuration.config_name,
-              'x': ', '.join([str(i) for i in result_codes]),
-              's': success,
-              'o': overwrite}
-      # Pass the output as a file to ensure the server handler doesn't
-      # incorrectly convert the output to unicode.
-      files = [(swarm_constants.RESULT_STRING_KEY,
-                swarm_constants.RESULT_STRING_KEY,
-                result_string)]
-
-      url_results = url_helper.UrlOpen(self.test_run.result_url, data=data,
-                                       files=files,
-                                       max_tries=self.max_url_retries,
-                                       method='POSTFORM')
-      if url_results is None:
-        logging.error('Failed to publish results to given url, %s',
-                      self.test_run.result_url)
-        return False
-    elif result_url_parts[0] == 'file':
-      file_path = '%s%s' % (result_url_parts[1], result_url_parts[2])
-      try:
-        with open(file_path, 'wb') as f:
-          f.write(result_string)
-      except IOError:
-        logging.exception('Can\'t write result to file %s.', file_path)
-        return False
-    else:
-      assert False  # We should have validated that in TestRun
+    data = {
+        'c': self.test_run.configuration.config_name,
+        'n': self.test_run.test_run_name,
+        'o': overwrite,
+        's': success,
+        # TODO(maruel): Keep as int.
+        'x': ', '.join(str(i) for i in result_codes),
+    }
+    # Pass the output as a file to ensure the server handler doesn't
+    # incorrectly convert the output to unicode.
+    key = swarm_constants.RESULT_STRING_KEY
+    url_results = url_helper.UrlOpen(
+        self.test_run.result_url,
+        data=data,
+        files=[(key, key, result_string)],
+        max_tries=self.max_url_retries,
+        method='POSTFORM')
+    if url_results is None:
+      logging.error('Failed to publish results to given url, %s',
+                    self.test_run.result_url)
       return False
     return True
 
