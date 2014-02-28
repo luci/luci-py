@@ -262,7 +262,7 @@ class TestRequestMessageBase(object):
       raise Error('Unsupported url type, %s, must be a string' % url)
 
     url_parts = urlparse.urlsplit(url)
-    if url_parts[0] not in ('file', 'http', 'https', 'mailto'):
+    if url_parts[0] not in ('file', 'http', 'https'):
       raise Error('Unsupported url scheme, %s' % url_parts[0])
 
   def ValidateUrls(self, url_keys):
@@ -588,8 +588,6 @@ class TestCase(TestRequestMessageBase):
         key for the chunk size is 'size'. It must be a whole number.
     encoding: The encoding of the tests output. Default to utf-8.
     cleanup: The key to access the test run's cleanup string.
-    failure_email: An optional email where to broadcast failures for this test
-        case. TODO(maruel): Remove me.
     label: An optional string that can be used to label this test case.
     verbose: An optional boolean value that specifies if logging should be
         verbose.
@@ -600,7 +598,7 @@ class TestCase(TestRequestMessageBase):
                configurations=None, data=None, working_dir=None,
                admin=False, tests=None, result_url=None, store_result=None,
                restart_on_failure=None, output_destination=None,
-               encoding='utf-8', cleanup=None, failure_email=None,
+               encoding='utf-8', cleanup=None,
                label=None, verbose=False, **kwargs):
     super(TestCase, self).__init__(**kwargs)
     self.test_case_name = test_case_name
@@ -620,7 +618,6 @@ class TestCase(TestRequestMessageBase):
         output_destination.copy() if output_destination else {})
     self.encoding = encoding
     self.cleanup = cleanup
-    self.failure_email = failure_email
     self.label = label
     self.verbose = verbose
 
@@ -628,8 +625,7 @@ class TestCase(TestRequestMessageBase):
     """Raises if the current content is not valid."""
     self.ValidateValues(['test_case_name'], basestring, required=True)
     self.ValidateValues(
-        ['requestor', 'working_dir', 'failure_email', 'result_url', 'label'],
-        basestring)
+        ['requestor', 'working_dir', 'result_url', 'label'], basestring)
     self.ValidateDicts(['env_vars'], basestring, basestring)
     self.ValidateObjectLists(
         ['configurations'], TestConfiguration, required=True,
@@ -695,7 +691,6 @@ class TestCase(TestRequestMessageBase):
     # The following keys must not be set for a TestRequest to be equivalent,
     # because they all have side effects.
     side_effect_keys = [
-      'failure_email',
       'output_destination',
       'result_url',
     ]

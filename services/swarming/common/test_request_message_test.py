@@ -319,15 +319,13 @@ class TestHelper(unittest.TestCase):
   VALID_OPTIONAL_STRING_VALUES = (VALID_STRING_VALUES +
                                   EXTRA_OPTIONAL_STRING_VALUES)
 
-  VALID_URL_VALUES = ['http://a.com', 'https://safe.a.com', 'file://here',
-                      'mailto://me@there.com']
+  VALID_URL_VALUES = ['http://a.com', 'https://safe.a.com', 'file://here']
   VALID_OPTIONAL_URL_VALUES = VALID_URL_VALUES + EXTRA_OPTIONAL_STRING_VALUES
   INVALID_URL_VALUES = ['httpx://a.com', 'shttps://safe.a.com', 'nfile://here',
-                        'mailtoo://me@there.com'] + INVALID_STRING_VALUES
+                        ] + INVALID_STRING_VALUES
 
   VALID_URL_LIST_VALUES = [['http://a.com'],
-                           ['https://safe.a.com', 'file://here'],
-                           ['mailto://me@there.com']]
+                           ['https://safe.a.com', 'file://here']]
   VALID_OPTIONAL_URL_LIST_VALUES = VALID_URL_LIST_VALUES + [None, []]
   INVALID_URL_LIST_VALUES = [['httpx://a.com'],
                              ['shttps://safe.a.com', 'nfile://here'],
@@ -336,19 +334,27 @@ class TestHelper(unittest.TestCase):
   VALID_URL_LOCAL_PATH_TUPLES_LISTS = [[('http://a.com', 'a')],
                                        [['https://safe.a.com', 'b'],
                                         ('file://my_file', 'local/state')]]
-  INVALID_URL_LOCAL_PATH_TUPLES_LISTS = ['', 1, ('hello'), [('asd', 'a')],
-                                         [['hps://safe.a.com', 'b'],
-                                          ('nfile://my_file', 'local/state')],
-                                         [('http://www.google.com', 5)],
-                                         [('http://a.com', 'b', 'c')]]
+  INVALID_URL_LOCAL_PATH_TUPLES_LISTS = [
+    '',
+    1,
+    ('hello'),
+    [('asd', 'a')],
+    [['hps://safe.a.com', 'b'], ('nfile://my_file', 'local/state')],
+    [('http://www.google.com', 5)],
+    [('http://a.com', 'b', 'c')],
+  ]
 
-  VALID_OPTIONAL_OUTPUT_DESTINATION_VALUES = [{}, None, {'size': 10.0},
-                                              {'size': 5}, {'size': '12'},
-                                              {'size': -5}, {'size': '0'},
-                                              {'size': '-5'},
-                                              {'url': 'mailto:joe@doe.com'},
-                                              {'url': 'http://a.b.com',
-                                               'size': 1024}]
+  VALID_OPTIONAL_OUTPUT_DESTINATION_VALUES = [
+    {},
+    None,
+    {'size': 10.0},
+    {'size': 5},
+    {'size': '12'},
+    {'size': -5},
+    {'size': '0'},
+    {'size': '-5'},
+    {'url': 'http://a.b.com', 'size': 1024},
+  ]
   INVALID_OUTPUT_DESTINATION_VALUES = ['', 1, 'a', [], {'a': ['b']},
                                        {'a': {1: 2}}, {1: 2}, {'size': 0.5},
                                        {'size': 'size'},
@@ -640,7 +646,6 @@ class TestCaseTest(TestHelper):
         TestHelper.VALID_OPTIONAL_OUTPUT_DESTINATION_VALUES[-1],
         encoding=TestHelper.VALID_ENCODING_VALUES[-1],
         cleanup=test_request_message.TestRun.VALID_CLEANUP_VALUES[-1],
-        failure_email=TestHelper.VALID_OPTIONAL_STRING_VALUES[-1],
         label=TestHelper.VALID_OPTIONAL_STRING_VALUES[-1],
         verbose=TestHelper.VALID_BOOLEAN_VALUES[-1],
         configurations=[TestConfigurationTest.GetFullObject()])
@@ -720,8 +725,6 @@ class TestCaseTest(TestHelper):
 
     self.AssertValidValues('cleanup',
                            test_request_message.TestRun.VALID_CLEANUP_VALUES)
-    self.AssertValidValues('failure_email',
-                           TestHelper.VALID_OPTIONAL_STRING_VALUES)
     self.AssertValidValues('label',
                            TestHelper.VALID_OPTIONAL_STRING_VALUES)
     self.AssertValidValues('working_dir',
@@ -781,9 +784,6 @@ class TestCaseTest(TestHelper):
 
     self.AssertInvalidValues('encoding', TestHelper.INVALID_ENCODING_VALUES)
     self.test_request.encoding = TestHelper.VALID_ENCODING_VALUES[-1]
-
-    self.AssertInvalidValues('failure_email', TestHelper.INVALID_STRING_VALUES)
-    self.test_request.failure_email = None
 
     self.AssertInvalidValues('label', TestHelper.INVALID_STRING_VALUES)
     self.test_request.label = None

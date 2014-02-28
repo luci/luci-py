@@ -649,9 +649,6 @@ class LocalTestRunner(object):
       except IOError:
         logging.exception('Can\'t write result to file %s.', file_path)
         return False
-    elif result_url_parts[0] == 'mailto':
-      # TODO(user): Implement this!
-      pass
     else:
       assert False  # We should have validated that in TestRun
       return False

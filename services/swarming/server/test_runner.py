@@ -14,7 +14,6 @@ import logging
 import urlparse
 
 from google.appengine.api import datastore_errors
-from google.appengine.api import mail
 from google.appengine.datastore import datastore_query
 from google.appengine.ext import ndb
 
@@ -343,14 +342,7 @@ class TestRunner(ndb.Model):
     logging.info('Successfully updated the results of runner %s.',
                  self.key.urlsafe())
 
-    # If the test didn't run successfully, we send an email if one was
-    # requested via the test request.
     test_case = self.request.get().GetTestCase()
-    if not self.ran_successfully and test_case.failure_email:
-      # TODO(user): Provide better info for failure. E.g., if we don't have a
-      # web_request.body, we should have info like: Failed to upload files.
-      self._EmailTestResults(test_case.failure_email)
-
     update_successful = True
     if test_case.result_url:
       result_url_parts = urlparse.urlsplit(test_case.result_url)
@@ -367,11 +359,6 @@ class TestRunner(ndb.Model):
           logging.exception('Could not send results back to sender at %s',
                             test_case.result_url)
           update_successful = False
-      elif result_url_parts.scheme == 'mailto':
-        # Only send an email if we didn't send a failure email earlier to
-        # prevent repeats.
-        if self.ran_successfully or not test_case.failure_email:
-          self._EmailTestResults(result_url_parts.netloc)
       else:
         logging.exception('Unsupported scheme "%s" in url "%s"',
                           result_url_parts.scheme, test_case.result_url)
@@ -386,45 +373,6 @@ class TestRunner(ndb.Model):
       DeleteRunner(self)
 
     return update_successful
-
-  def _EmailTestResults(self, send_to):
-    """Emails the test result.
-
-    Args:
-      send_to: The email address to send the result to. This must be a valid
-          email address.
-    """
-    if not mail.is_email_valid(send_to):
-      logging.error('Invalid email passed to result_url, %s', send_to)
-      return
-
-    if self.ran_successfully:
-      subject = '%s succeeded.' % self.name
-    else:
-      subject = '%s failed.' % self.name
-
-    message_body_parts = [
-        'Test Request Name: ' + self.request.get().name,
-        'Configuration Name: ' + self.config_name,
-        'Configuration Instance Index: ' + str(self.config_instance_index),
-        'Number of Configurations: ' + str(self.num_config_instances),
-        'Exit Code: ' + str(self.exit_codes),
-        'Success: ' + str(self.ran_successfully),
-        'Result Output: ' + self.GetResultString()]
-    message_body = '\n'.join(message_body_parts)
-
-    try:
-      mail.send_mail(sender='Test Request Server <no_reply@google.com>',
-                     to=send_to,
-                     subject=subject,
-                     body=message_body,
-                     html='<pre>%s</pre>' % message_body)
-    except Exception as e:
-      # We catch all errors thrown because mail.send_mail can throw errors
-      # that it doesn't list in its description, but that are caused by our
-      # inputs (such as unauthorized sender).
-      logging.exception(
-          'An exception was thrown when attemping to send mail\n%s', e)
 
 
 @ndb.transactional

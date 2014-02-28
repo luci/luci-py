@@ -23,7 +23,6 @@ import test_env
 
 test_env.setup_test_env()
 
-from google.appengine.api import mail
 from google.appengine.ext import ndb
 
 import test_case
@@ -115,15 +114,6 @@ class TestManagementTest(test_case.TestCase):
 
     return attributes
 
-  def _SetupSendMailExpectations(self):
-    mail.send_mail(sender='Test Request Server <no_reply@google.com>',
-                   to='john@doe.com',
-                   subject='%s:%s failed.' %
-                   (self._request_message_test_case_name,
-                    self._request_message_config_name),
-                   body=mox.IgnoreArg(),
-                   html=mox.IgnoreArg())
-
   def _ExecuteRegister(self, machine_id, try_count=0, platform='win-xp',
                        register_should_match=True):
     register_request = self._GetMachineRegisterRequest(machine_id=machine_id,
@@ -202,8 +192,7 @@ class TestManagementTest(test_case.TestCase):
     self.assertNotEqual(None, new_high_priority_runner.started)
 
   def testTestRequestMismatchFailedRunner(self):
-    request = test_helper.GetRequestMessage(failure_email=None,
-                                            min_instances=2,
+    request = test_helper.GetRequestMessage(min_instances=2,
                                             result_url=None)
 
     test_management.ExecuteTestRequest(request)
@@ -219,8 +208,7 @@ class TestManagementTest(test_case.TestCase):
     self.assertEqual(3, test_runner.TestRunner.query().count())
 
   def testTestRequestMismatchDeletedRunner(self):
-    request = test_helper.GetRequestMessage(failure_email=None,
-                                            result_url=None)
+    request = test_helper.GetRequestMessage(result_url=None)
 
     test_management.ExecuteTestRequest(request)
     runner = test_runner.TestRunner.query().get()
@@ -236,8 +224,7 @@ class TestManagementTest(test_case.TestCase):
     self.assertEqual(2, test_runner.TestRunner.query().count())
 
   def testTestRequestMatch(self):
-    request = test_helper.GetRequestMessage(failure_email=None,
-                                            result_url=None)
+    request = test_helper.GetRequestMessage(result_url=None)
 
     response = test_management.ExecuteTestRequest(request)
 
@@ -253,8 +240,7 @@ class TestManagementTest(test_case.TestCase):
 
   def testTestRequestMatchMultipleConfigs(self):
     num_configs = 2
-    request = test_helper.GetRequestMessage(failure_email=None,
-                                            result_url=None,
+    request = test_helper.GetRequestMessage(result_url=None,
                                             num_configs=num_configs)
 
     response = test_management.ExecuteTestRequest(request)
@@ -330,18 +316,9 @@ class TestManagementTest(test_case.TestCase):
 
   def _AddTestRunWithResultsExpectation(self, result_url, result_string):
     # Setup expectations for HandleTestResults().
-    if result_url.startswith('mailto'):
-      mail.send_mail(sender='Test Request Server <no_reply@google.com>',
-                     to=result_url.split('//')[1],
-                     subject='%s:%s succeeded.' %
-                     (self._request_message_test_case_name,
-                      self._request_message_config_name),
-                     body=mox.StrContains(result_string),
-                     html=mox.IgnoreArg())
-    else:
-      url_helper.UrlOpen(
-          result_url,
-          data=mox.ContainsKeyValue('r', result_string)).AndReturn('response')
+    url_helper.UrlOpen(
+        result_url,
+        data=mox.ContainsKeyValue('r', result_string)).AndReturn('response')
 
   def _SetupHandleTestResults(self, result_url=test_helper.DEFAULT_RESULT_URL,
                               result_string='results', test_instances=1):
@@ -349,7 +326,6 @@ class TestManagementTest(test_case.TestCase):
 
     # Setup expectations for ExecuteTestRequest() and AssignPendingRequests().
     self._mox.StubOutWithMock(url_helper, 'UrlOpen')
-    self._mox.StubOutWithMock(mail, 'send_mail')
 
     for _ in range(test_instances):
       self._AddTestRunWithResultsExpectation(result_url, result_string)
@@ -422,7 +398,6 @@ class TestManagementTest(test_case.TestCase):
 
   def testHandleFailedTestResults(self):
     self._SetupHandleTestResults()
-    self._SetupSendMailExpectations()
     self._mox.ReplayAll()
 
     self.ExecuteHandleTestResults(success=False)
@@ -437,9 +412,6 @@ class TestManagementTest(test_case.TestCase):
                                   result_url=result_url)
 
     self._mox.VerifyAll()
-
-  def testEmailAsResultURL(self):
-    self._SetupAndExecuteTestResults('mailto://john@doe.com')
 
   def testPostResultasHTTPS(self):
     self._SetupAndExecuteTestResults('https://secure.com/results')
@@ -466,7 +438,6 @@ class TestManagementTest(test_case.TestCase):
 
   def testClearingFailedRunnerAndRequestFailed(self):
     self._SetupHandleTestResults()
-    self._SetupSendMailExpectations()
     self._mox.ReplayAll()
 
     self.ExecuteHandleTestResults(success=False, store_result='fail')
@@ -554,8 +525,6 @@ class TestManagementTest(test_case.TestCase):
     self._mox.StubOutWithMock(url_helper, 'UrlOpen')
     url_helper.UrlOpen(test_helper.DEFAULT_RESULT_URL,
                        data=mox.IgnoreArg()).AndReturn('response')
-    self._mox.StubOutWithMock(mail, 'send_mail')
-    self._SetupSendMailExpectations()
     self._mox.ReplayAll()
 
     test_management.ExecuteTestRequest(test_helper.GetRequestMessage())

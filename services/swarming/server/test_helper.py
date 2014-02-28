@@ -21,8 +21,6 @@ REQUEST_MESSAGE_TEST_CASE_NAME = 'tc'
 
 DEFAULT_RESULT_URL = 'http://all.your.resul.ts/are/belong/to/us'
 
-DEFAULT_FAILURE_EMAIL = 'john@doe.com'
-
 
 def _CreateRunner(request, config_name):
   """Create a basic runner.
@@ -52,7 +50,6 @@ def GetRequestMessage(request_name=REQUEST_MESSAGE_TEST_CASE_NAME,
                       additional_instances=0,
                       env_vars=None,
                       result_url=DEFAULT_RESULT_URL,
-                      failure_email=DEFAULT_FAILURE_EMAIL,
                       store_result='all',
                       restart_on_failure=False,
                       platform='win-xp',
@@ -69,7 +66,6 @@ def GetRequestMessage(request_name=REQUEST_MESSAGE_TEST_CASE_NAME,
         config.
     env_vars: A dictionary of environment variables for the request.
     result_url: The result url to use.
-    failure_email: The email address to send failure messages to.
     store_result: Identifies which Runner and Request data should stay in
         storage after the tests are done running (fail means only the failures
         are kept).
@@ -83,7 +79,6 @@ def GetRequestMessage(request_name=REQUEST_MESSAGE_TEST_CASE_NAME,
     A properly formatted request message text.
   """
   request = test_request_message.TestCase(
-      failure_email=failure_email,
       restart_on_failure=restart_on_failure,
       result_url=result_url,
       store_result=store_result,

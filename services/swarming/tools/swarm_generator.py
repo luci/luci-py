@@ -108,9 +108,6 @@ http://goto/swarm.
                            help='Where to copy the data files.')
     self.parser.add_option('-u', '--http_base_url',
                            help='Where to load the data files from.')
-    self.parser.add_option('-m', '--failure_email',
-                           help='The email where to send failed results. '
-                           'Optional.')
     self.parser.add_option('-o', '--result_url',
                            help='Where to post the results of the tests. '
                            'Optional. Defaults to %s.' %
@@ -372,7 +369,6 @@ http://goto/swarm.
         'data': self.GetAllDataFileUrls(),
         'tests': tests_array,
         'result_url': self.options.result_url,
-        'failure_email': self.options.failure_email,  # OK to be None.
         'verbose': self.options.verbose_test,
     }
 

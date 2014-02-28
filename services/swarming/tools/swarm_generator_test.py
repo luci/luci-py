@@ -55,7 +55,6 @@ class SwarmGeneratorTest(auto_stub.TestCase):
       self.options.target = 'Debug'
       self.options.unc_base_path = self.GetDefaultDataBaseUncPath()
       self.options.http_base_url = self.GetDefaultDataBaseUrl()
-      self.options.failure_email = None
       self.options.result_url = self.GetDefaultResultUrl()
       self.options.destination_path = '.'
       self.options.verbose_test = False
@@ -165,12 +164,6 @@ class SwarmGeneratorTest(auto_stub.TestCase):
     self.derived_swarm_generator.options.config = None
     self.assertTrue(self.derived_swarm_generator.ValidateOptions())
 
-    self.derived_swarm_generator.options.failure_email = 'me@there.com'
-    self.assertTrue(self.derived_swarm_generator.ValidateOptions())
-
-    self.derived_swarm_generator.options.failure_email = None
-    self.assertTrue(self.derived_swarm_generator.ValidateOptions())
-
   def testCreateAndUploadZipFile(self):
     self.derived_swarm_generator.options.local_root = os.path.dirname(
         self.temp_file_name)
@@ -244,7 +237,6 @@ class SwarmGeneratorTest(auto_stub.TestCase):
          'tests': [0],
          'data': [],
          'result_url': self.derived_swarm_generator.GetDefaultResultUrl(),
-         'failure_email': None,
          'configuration': {
              'config_name': config_names[0],
              'dimensions': dimensions.DIMENSIONS[config_names[0]]},
@@ -260,7 +252,6 @@ class SwarmGeneratorTest(auto_stub.TestCase):
          'tests': [7],
          'data': [],
          'result_url': self.derived_swarm_generator.GetDefaultResultUrl(),
-         'failure_email': None,
          'configuration': {
              'config_name': config_names[3],
              'dimensions': dimensions.DIMENSIONS[config_names[3]]},
@@ -282,7 +273,6 @@ class SwarmGeneratorTest(auto_stub.TestCase):
          'tests': self.valid_test_array,
          'data': ['data1', 'data2'],
          'result_url': self.derived_swarm_generator.GetDefaultResultUrl(),
-         'failure_email': None,
          'configurations': [
              {'config_name': config_names[1],
               'dimensions': dimensions.DIMENSIONS[config_names[1]]},
@@ -298,7 +288,6 @@ class SwarmGeneratorTest(auto_stub.TestCase):
          'tests': self.valid_test_array[1:],
          'data': ['data1', 'data2'],
          'result_url': self.derived_swarm_generator.GetDefaultResultUrl(),
-         'failure_email': None,
          'configurations': [{
              'config_name': config_names[0],
              'dimensions': dimensions.DIMENSIONS[config_names[0]]}],
