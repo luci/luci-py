@@ -242,7 +242,6 @@ def _BuildTestRun(runner, server_url):
                                                runner.key.urlsafe(),
                                                runner.machine_id)),
       ping_delay=(_TIMEOUT_FACTOR / _MISSED_PINGS_BEFORE_TIMEOUT),
-      output_destination=request.output_destination,
       cleanup=request.cleanup,
       data=(request.data + config.data),
       tests=request.tests + config.tests,

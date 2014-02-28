@@ -277,33 +277,6 @@ class LocalTestRunner(object):
       if not _DeleteFileOrDirectory(self.data_dir):
         logging.error('Could not delete data directory "%s"', self.data_dir)
 
-  def _PostOutput(self, upload_url, output, result):
-    """Posts incremental output.
-
-    Args:
-      upload_url: Where to post the output.
-      output: the output to be posted.
-      result: the value of the CGI param 's' which should be from the
-          self._SUCCESS_CGI_STRING array.
-    """
-    data = {
-        'c': self.test_run.configuration.config_name,
-        'n': self.test_run.test_run_name,
-        's': result,
-    }
-    files = [(swarm_constants.RESULT_STRING_KEY,
-              swarm_constants.RESULT_STRING_KEY,
-              output)]
-    if (hasattr(self.test_run, 'instance_index') and
-        self.test_run.instance_index is not None):
-      assert hasattr(self.test_run, 'num_instances')
-      assert self.test_run.num_instances is not None
-      data['i'] = self.test_run.instance_index
-      data['m'] = self.test_run.num_instances
-
-    url_helper.UrlOpen(upload_url, data=data, files=files,
-                       max_tries=self.max_url_retries, method='POSTFORM')
-
   def _RunCommand(self, command, hard_time_out, io_time_out, env=None):
     """Runs the given command.
 
@@ -350,14 +323,6 @@ class LocalTestRunner(object):
     io_time_out_start_time = time.time()
     hit_io_time_out = False
     stdout_string = ''
-    current_chunk_to_upload = ''
-    upload_chunk_size = 0
-    upload_url = None
-    if (self.test_run.output_destination and
-        'url' in self.test_run.output_destination):
-      upload_url = self.test_run.output_destination['url']
-      if 'size' in self.test_run.output_destination:
-        upload_chunk_size = self.test_run.output_destination['size']
 
     while not hit_hard_time_out and not hit_io_time_out:
       try:
@@ -367,6 +332,8 @@ class LocalTestRunner(object):
             'Polling execution of %s raised exception.', parsed_command)
         return (1, e)
 
+      # TODO(maruel): Add back support to stream content but only to the
+      # Swarming server this time.
       current_content = ''
       got_output = False
       for _ in range(CHARACTERS_TO_READ_PER_PASS):
@@ -395,29 +362,12 @@ class LocalTestRunner(object):
             # Queue could still potentially contain more input later.
             pass
 
-      # Give some local feedback of progress and potentially upload to
-      # output_destination if any.
       if current_content:
         logging.info(current_content)
 
-      if upload_url and upload_chunk_size > 0:
-        current_chunk_to_upload += current_content
-        if ((exit_code is not None and len(current_chunk_to_upload)) or
-            len(current_chunk_to_upload) >= upload_chunk_size):
-          self._PostOutput(upload_url, current_chunk_to_upload,
-                           self._SUCCESS_CGI_STRING[2])
-          current_chunk_to_upload = ''
-      else:
-        stdout_string += current_content
+      stdout_string += current_content
 
       if exit_code is not None:
-        if not stdout_string:
-          stdout_string = 'No output!'
-        if upload_url and upload_chunk_size <= 0:
-          self._PostOutput(upload_url, stdout_string,
-                           self._SUCCESS_CGI_STRING[2])
-          stdout_string = 'No output!'
-
         return (exit_code, stdout_string)
 
       # We sleep a little to give the child process a chance to move forward
@@ -613,10 +563,6 @@ class LocalTestRunner(object):
       True if we succeeded or had nothing to do, False otherwise.
     """
     logging.debug('Publishing Results')
-    if (self.test_run.output_destination and
-        'url' in self.test_run.output_destination):
-      self._PostOutput(self.test_run.output_destination['url'], '',
-                       self._SUCCESS_CGI_STRING[not success])
     if not self.test_run.result_url:
       return True
     data = {

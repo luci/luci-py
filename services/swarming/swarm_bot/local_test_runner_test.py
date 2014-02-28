@@ -39,10 +39,9 @@ class TestLocalTestRunner(auto_stub.TestCase):
 
   def setUp(self):
     super(TestLocalTestRunner, self).setUp()
-    self.result_url = 'http://a.com/result'
-    self.ping_url = 'http://a.com/ping'
+    self.result_url = 'http://::2:2/result'
+    self.ping_url = 'http://::2:2/ping'
     self.ping_delay = 10
-    self.output_destination = {}
     self.test_run_name = 'TestRunName'
     self.config_name = 'ConfigName'
     self._mox = mox.Mox()
@@ -103,7 +102,7 @@ class TestLocalTestRunner(auto_stub.TestCase):
         test_run_name=self.test_run_name, env_vars=test_run_env,
         data=test_run_data, configuration=test_config,
         result_url=self.result_url, ping_url=self.ping_url,
-        ping_delay=self.ping_delay, output_destination=self.output_destination,
+        ping_delay=self.ping_delay,
         tests=test_objects, cleanup=test_run_cleanup, encoding=test_encoding)
 
     # Check that the message is valid, otherwise the test will fail when trying
@@ -517,106 +516,6 @@ class TestLocalTestRunner(auto_stub.TestCase):
         '! Output contains characters not valid in %s encoding !\n%s' %
         (encoding, unicode_string_invalid_utf8.decode(encoding, 'replace')))
     self.assertIn(string_invalid_output, result_string)
-
-    self._mox.VerifyAll()
-
-  def testPostIncrementalOutput(self):
-    cmd = ['a']
-    exit_code = 42
-    self.PrepareRunCommandCall(cmd)
-
-    # Setup incremental content to be written to the stdout file used to
-    # communicate between the command execution and the runner.
-    stdout_contents = ['initial_content', 'other_content',
-                       'more_content', 'even_more_content']
-    stdout_contents_stack = stdout_contents[:]
-
-    def WriteStdoutContent():
-      # This will be called everytime we poll for the status of the command.
-      self.mock_proc.stdin_handle.write(stdout_contents_stack.pop(0))
-
-      if not stdout_contents_stack:
-        self.mock_proc.stdin_handle.close()
-
-    for _ in range(len(stdout_contents) - 1):
-      self.mock_proc.poll().WithSideEffects(WriteStdoutContent).AndReturn(None)
-    self.mock_proc.poll().WithSideEffects(WriteStdoutContent).AndReturn(
-        exit_code)
-
-    self.output_destination['url'] = 'http://blabla.com'
-    self.output_destination['size'] = 1
-    self.result_url = None
-    self.CreateValidFile()
-
-    self.streamed_output = ''
-
-    def ValidateUrlData(data):
-      self.assertEqual(self.test_run_name, data['n'])
-      self.assertEqual(self.config_name, data['c'])
-      self.assertEqual('pending', data['s'])
-      return True
-
-    def ValidateUrlFiles(files):
-      self.assertEqual(1, len(files))
-      self.assertEqual(3, len(files[0]))
-
-      self.assertEqual(swarm_constants.RESULT_STRING_KEY, files[0][0])
-      self.assertEqual(swarm_constants.RESULT_STRING_KEY, files[0][1])
-
-      self.streamed_output += files[0][2]
-      return True
-
-    local_test_runner.url_helper.UrlOpen(self.output_destination['url'],
-                                         data=mox.Func(ValidateUrlData),
-                                         files=mox.Func(ValidateUrlFiles),
-                                         max_tries=1,
-                                         method='POSTFORM').AndReturn(
-                                             'Accepted')
-
-    self._mox.ReplayAll()
-
-    with local_test_runner.LocalTestRunner(self.data_file_name) as runner:
-      (exit_code_ret, result_string_ret) = runner._RunCommand(cmd, 0, 0)
-    self.assertEqual(exit_code_ret, exit_code)
-    self.assertEqual(result_string_ret, 'No output!')
-    self.assertEqual(self.streamed_output, ''.join(stdout_contents))
-
-    self._mox.VerifyAll()
-
-  def testPostFinalOutput(self):
-    self.output_destination['url'] = 'http://blabla.com'
-    self.result_url = None
-    self.CreateValidFile()
-    data = {'n': self.test_run_name, 'c': self.config_name, 's': 'success'}
-    files = [(swarm_constants.RESULT_STRING_KEY,
-              swarm_constants.RESULT_STRING_KEY,
-              '')]
-    max_url_retries = 1
-    local_test_runner.url_helper.UrlOpen(
-        self.output_destination['url'],
-        data=data.copy(),
-        files=files[:],
-        max_tries=max_url_retries,
-        method='POSTFORM').AndReturn('')
-    data['s'] = 'failure'
-    local_test_runner.url_helper.UrlOpen(
-        ('%s?1=2' % self.output_destination['url']),
-        data=data.copy(),
-        files=files[:],
-        max_tries=max_url_retries,
-        method='POSTFORM').AndReturn('')
-    self._mox.ReplayAll()
-
-    with local_test_runner.LocalTestRunner(
-        self.data_file_name, max_url_retries=max_url_retries) as runner:
-      self.assertTrue(runner.PublishResults(True, [], 'Not used'))
-
-    # Also test with other CGI param in the URL.
-    self.output_destination['url'] = '%s?1=2' % self.output_destination['url']
-    # Recreate the request file with new value.
-    self.CreateValidFile()
-    with local_test_runner.LocalTestRunner(self.data_file_name) as runner:
-      self.assertTrue(runner.PublishResults(False, [], 'Not used'))
 
     self._mox.VerifyAll()
 

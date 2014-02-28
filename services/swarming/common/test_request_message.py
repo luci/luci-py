@@ -338,36 +338,6 @@ class TestRequestMessageBase(object):
           'Size in output destination must be a whole number, was given %s' %
           value)
 
-  def ValidateOutputDestinations(self, value_keys):
-    """Raises if any of the values at value_keys are not valid a
-    output_destinations.
-
-    Args:
-      value_keys: The key names of the values to validate.
-    """
-    for value_key in value_keys:
-      output_destination = self.__dict__[value_key]
-      if output_destination is None:
-        continue
-      if not isinstance(output_destination, dict):
-        raise Error(
-            'Output destination must be a dictionary, was given: %s' %
-            output_destination)
-
-      for key, value in output_destination.iteritems():
-        if key == 'size':
-          self.ValidateInteger(value)
-          if isinstance(value, basestring):
-            # If we reach here then value is a valid integer, just in string
-            # form, so we convert it to an long to prevent problems with later
-            # code not using it correctly. int may be too short for large files
-            # on 32 bits platforms.
-            output_destination[key] = long(value)
-        elif key == 'url':
-          self.ValidateUrl(value)
-        else:
-          raise Error('Invalid key, %s, in output destination' % key)
-
   def ValidateEncoding(self, encoding):
     """Raises if the given encoding is not valid."""
     try:
@@ -582,10 +552,6 @@ class TestCase(TestRequestMessageBase):
     store_result: The key to access the test run's storage string.
     restart_on_failure: An optional value indicating if the machine running the
         tests should restart if any of the tests fail.
-    output_destination: An optional dictionary with a URL where to post the
-        output of this test case as well as the size of the chunks to use. The
-        key for the URL is 'url' and the value must be a valid URL string. The
-        key for the chunk size is 'size'. It must be a whole number.
     encoding: The encoding of the tests output. Default to utf-8.
     cleanup: The key to access the test run's cleanup string.
     label: An optional string that can be used to label this test case.
@@ -597,7 +563,7 @@ class TestCase(TestRequestMessageBase):
   def __init__(self, test_case_name=None, requestor=None, env_vars=None,
                configurations=None, data=None, working_dir=None,
                admin=False, tests=None, result_url=None, store_result=None,
-               restart_on_failure=None, output_destination=None,
+               restart_on_failure=None,
                encoding='utf-8', cleanup=None,
                label=None, verbose=False, **kwargs):
     super(TestCase, self).__init__(**kwargs)
@@ -614,8 +580,6 @@ class TestCase(TestRequestMessageBase):
     self.result_url = result_url
     self.store_result = store_result
     self.restart_on_failure = restart_on_failure
-    self.output_destination = (
-        output_destination.copy() if output_destination else {})
     self.encoding = encoding
     self.cleanup = cleanup
     self.label = label
@@ -633,10 +597,7 @@ class TestCase(TestRequestMessageBase):
     self.ValidateDataLists(['data'])
     self.ValidateObjectLists(
         ['tests'], TestObject, unique_value_keys=['test_name'])
-    self.ValidateOutputDestinations(['output_destination'])
-
-    if self.encoding:
-      self.ValidateEncoding(self.encoding)
+    self.ValidateEncoding(self.encoding)
     if self.result_url:
       self.ValidateUrls(['result_url'])
 
@@ -691,7 +652,6 @@ class TestCase(TestRequestMessageBase):
     # The following keys must not be set for a TestRequest to be equivalent,
     # because they all have side effects.
     side_effect_keys = [
-      'output_destination',
       'result_url',
     ]
 
@@ -757,14 +717,10 @@ class TestRun(TestRequestMessageBase):
         instances of this configuration that have been shared. Defaults to None.
         Must be greater than instance_index. Must be specified if instance_index
         is specified.
-    result_url: An optional URL where to post the results of this test run.
-    ping_url: An URL that tells the test run where to ping to let the server
+    result_url: The URL where to post the results of this test run.
+    ping_url: The URL that tells the test run where to ping to let the server
         know that it is still active.
     ping_delay: The amount of time to wait between pings (in seconds).
-    output_destination: An optional dictionary with a URL where to post the
-        output of this test case as well as the size of the chunks to use. The
-        key for the URL is 'url' and the value must be a valid URL string.  The
-        key for the chunk size is 'size'. It must be a whole number.
     cleanup: The key to access the test run's cleanup string.
     restart_on_failure: An optional value indicating if the machine running the
         tests should restart if any of the tests fail.
@@ -777,7 +733,7 @@ class TestRun(TestRequestMessageBase):
                configuration=None, data=None,
                working_dir=None, tests=None,
                instance_index=None, num_instances=None, result_url=None,
-               ping_url=None, ping_delay=None, output_destination=None,
+               ping_url=None, ping_delay=None,
                cleanup=None, restart_on_failure=None,
                encoding='utf-8', **kwargs):
     super(TestRun, self).__init__(**kwargs)
@@ -792,8 +748,6 @@ class TestRun(TestRequestMessageBase):
     self.result_url = result_url
     self.ping_url = ping_url
     self.ping_delay = ping_delay
-    self.output_destination = (
-        output_destination.copy() if output_destination else {})
     self.cleanup = cleanup
     self.restart_on_failure = restart_on_failure
     self.encoding = encoding
@@ -802,14 +756,12 @@ class TestRun(TestRequestMessageBase):
     """Raises if the current content is not valid."""
     self.ValidateValues(['test_run_name'], basestring, required=True)
     self.ValidateDicts(['env_vars'], basestring, basestring)
-    if self.result_url:
-      self.ValidateUrl(self.result_url)
+    self.ValidateUrl(self.result_url)
     self.ValidateUrl(self.ping_url)
     self.ValidateValues(['ping_delay'], (int, long), required=True)
     self.ValidateDataLists(['data'])
     self.ValidateObjectLists(
         ['tests'], TestObject, unique_value_keys=['test_name'])
-    self.ValidateOutputDestinations(['output_destination'])
     self.ValidateValues(
         ['working_dir', 'result_url', 'ping_url'], basestring)
     self.ValidateValues(['instance_index', 'num_instances'], (int, long))

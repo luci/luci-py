@@ -341,23 +341,6 @@ class TestHelper(unittest.TestCase):
     [('http://a.com', 'b', 'c')],
   ]
 
-  VALID_OPTIONAL_OUTPUT_DESTINATION_VALUES = [
-    {},
-    None,
-    {'size': 10.0},
-    {'size': 5},
-    {'size': '12'},
-    {'size': -5},
-    {'size': '0'},
-    {'size': '-5'},
-    {'url': 'http://a.b.com', 'size': 1024},
-  ]
-  INVALID_OUTPUT_DESTINATION_VALUES = ['', 1, 'a', [], {'a': ['b']},
-                                       {'a': {1: 2}}, {1: 2}, {'size': 0.5},
-                                       {'size': 'size'},
-                                       {'url': 'svn://c/test'},
-                                       {'url': 5}, {'url': 'invalid'}]
-
   INVALID_STRING_LIST_VALUES = [[1], ['str', 1], 1, {}]
   INVALID_REQUIRED_STRING_LIST_VALUES = (INVALID_STRING_LIST_VALUES +
                                          [[]])
@@ -381,8 +364,8 @@ class TestHelper(unittest.TestCase):
   INVALID_CLEANUP_VALUES = (INVALID_STRING_VALUES +
                             ['mad', '7zip', 'binaries', 'tests'])
 
-  VALID_ENCODING_VALUES = ['ascii', 'utf_8', 'latin_1']
-  INVALID_ENCODING_VALUES = ['mad', 'my_encoding', 'None', 'unicode']
+  VALID_ENCODING_VALUES = ('ascii', 'utf_8', 'utf-8', 'latin_1')
+  INVALID_ENCODING_VALUES = ('mad', 'my_encoding', 'None', 'unicode')
 
   def AssertValidValues(self, value_key, values):
     for value in values:
@@ -639,9 +622,7 @@ class TestCaseTest(TestHelper):
         store_result=
         test_request_message.TestCase.VALID_STORE_RESULT_VALUES[-1],
         restart_on_failure=TestHelper.VALID_BOOLEAN_VALUES[-1],
-        output_destination=
-        TestHelper.VALID_OPTIONAL_OUTPUT_DESTINATION_VALUES[-1],
-        encoding=TestHelper.VALID_ENCODING_VALUES[-1],
+        encoding='utf-8',
         cleanup=test_request_message.TestRun.VALID_CLEANUP_VALUES[-1],
         label=TestHelper.VALID_OPTIONAL_STRING_VALUES[-1],
         verbose=TestHelper.VALID_BOOLEAN_VALUES[-1],
@@ -651,13 +632,12 @@ class TestCaseTest(TestHelper):
     # Ensure that Test Case makes copies of its input, not references.
     env_vars = {'a': 1}
     configurations = [TestConfigurationTest.GetFullObject()]
-    data = ['data']
-    tests = ['test']
-    output_destination = {'url': 'http://www.google.com', 'size': 1}
+    data = ['http://localhost']
+    tests = [TestObjectTest.GetFullObject()]
 
     test_case = test_request_message.TestCase(
-        env_vars=env_vars, configurations=configurations, data=data,
-        tests=tests, output_destination=output_destination)
+        test_case_name='foo', env_vars=env_vars, configurations=configurations,
+        data=data, tests=tests)
 
     env_vars['a'] = 2
     self.assertNotEqual(env_vars, test_case.env_vars)
@@ -670,9 +650,6 @@ class TestCaseTest(TestHelper):
 
     tests.append('tests2')
     self.assertNotEqual(tests, test_case.tests)
-
-    output_destination['size'] = 2
-    self.assertNotEqual(output_destination, test_case.output_destination)
 
   def testValidate(self):
     # Start with default success.
@@ -713,8 +690,6 @@ class TestCaseTest(TestHelper):
 
     self.AssertValidValues('restart_on_failure',
                            TestHelper.VALID_BOOLEAN_VALUES)
-    self.AssertValidValues('output_destination',
-                           TestHelper.VALID_OPTIONAL_OUTPUT_DESTINATION_VALUES)
     self.AssertValidValues('encoding',
                            TestHelper.VALID_ENCODING_VALUES)
 
@@ -772,10 +747,6 @@ class TestCaseTest(TestHelper):
     self.assertFalse(any(i in valid_store_result for i in invalid_store_result))
     self.AssertInvalidValues('store_result', invalid_store_result)
     self.test_request.store_result = None
-
-    self.AssertInvalidValues('output_destination',
-                             TestHelper.INVALID_OUTPUT_DESTINATION_VALUES)
-    self.test_request.output_destination = None
 
     self.AssertInvalidValues('encoding', TestHelper.INVALID_ENCODING_VALUES)
     self.test_request.encoding = TestHelper.VALID_ENCODING_VALUES[-1]
@@ -874,15 +845,14 @@ class TestCaseTest(TestHelper):
 class TestRunTest(TestHelper):
   def setUp(self):
     # Always start with a valid case, and make it explicitly invalid as needed.
-    dimensions = dict(os='a', browser='a', cpu='a')
     self.test_request = test_request_message.TestRun(
         test_run_name='a',
         configuration=test_request_message.TestConfiguration(
-            config_name='a', dimensions=dimensions),
-        result_url=TestHelper.VALID_URL_VALUES[0],
-        ping_url=TestHelper.VALID_URL_VALUES[0],
-        ping_delay=TestHelper.VALID_INT_VALUES[0],
-        encoding=TestHelper.VALID_ENCODING_VALUES[0])
+            config_name='a', dimensions=dict(os='a', browser='a', cpu='a')),
+        result_url='http://localhost:1',
+        ping_url='http://localhost:2',
+        ping_delay=1,
+        encoding='ascii')
 
   @staticmethod
   def GetFullObject():
@@ -895,25 +865,29 @@ class TestRunTest(TestHelper):
         tests=[TestObjectTest.GetFullObject()],
         instance_index=1,
         num_instances=2,
-        result_url=TestHelper.VALID_URL_VALUES[-1],
-        ping_url=TestHelper.VALID_URL_VALUES[-1],
+        result_url='http://localhost:1',
+        ping_url='http://localhost:2',
         ping_delay=TestHelper.VALID_INT_VALUES[-1],
-        output_destination=
-        TestHelper.VALID_OPTIONAL_OUTPUT_DESTINATION_VALUES[-1],
         cleanup=test_request_message.TestRun.VALID_CLEANUP_VALUES[-1],
         restart_on_failure=TestHelper.VALID_BOOLEAN_VALUES[-1],
-        encoding=TestHelper.VALID_ENCODING_VALUES[-1])
+        encoding='utf-8')
 
   def testNoReferences(self):
     # Ensure that Test Run makes copies of its input, not references.
-    env_vars = {'a': 1}
-    data = ['data']
-    tests = ['test']
-    output_destination = {'url': 'http://www.google.com', 'size': 1}
+    env_vars = {'a': '1'}
+    data = ['http://localhost']
+    tests = [TestObjectTest.GetFullObject()]
 
     test_run = test_request_message.TestRun(
-        env_vars=env_vars, data=data, tests=tests,
-        output_destination=output_destination)
+        env_vars=env_vars,
+        data=data,
+        tests=tests,
+        result_url='http://localhost:1',
+        ping_url='http://localhost:2',
+        test_run_name='bar',
+        ping_delay=10,
+        configuration=test_request_message.TestConfiguration(
+            config_name='a', dimensions=dict(os='a')))
 
     env_vars['a'] = 2
     self.assertNotEqual(env_vars, test_run.env_vars)
@@ -923,9 +897,6 @@ class TestRunTest(TestHelper):
 
     tests.append('tests2')
     self.assertNotEqual(tests, test_run.tests)
-
-    output_destination['size'] = 2
-    self.assertNotEqual(output_destination, test_run.output_destination)
 
   def testValidate(self):
     # Start with default success.
@@ -960,11 +931,9 @@ class TestRunTest(TestHelper):
     self.test_request.configuration = (
         TestConfigurationTest.GetFullObject())
 
-    self.AssertValidValues('result_url', TestHelper.VALID_OPTIONAL_URL_VALUES)
+    self.AssertValidValues('result_url', TestHelper.VALID_URL_VALUES)
     self.AssertValidValues('ping_url', TestHelper.VALID_URL_VALUES)
     self.AssertValidValues('ping_delay', TestHelper.VALID_INT_VALUES)
-    self.AssertValidValues('output_destination',
-                           TestHelper.VALID_OPTIONAL_OUTPUT_DESTINATION_VALUES)
     self.AssertValidValues('working_dir',
                            TestHelper.VALID_OPTIONAL_STRING_VALUES)
 
@@ -1028,11 +997,6 @@ class TestRunTest(TestHelper):
     self.AssertInvalidValues('ping_delay',
                              TestHelper.INVALID_POSITIVE_INT_VALUES)
     self.test_request.ping_delay = TestHelper.VALID_INT_VALUES[0]
-
-    self.AssertInvalidValues('output_destination',
-                             TestHelper.INVALID_OUTPUT_DESTINATION_VALUES)
-    self.test_request.output_destination = (
-        TestHelper.VALID_OPTIONAL_OUTPUT_DESTINATION_VALUES[-1])
 
     self.AssertInvalidValues('working_dir', TestHelper.INVALID_STRING_VALUES)
     self.test_request.working_dir = None
