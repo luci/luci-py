@@ -470,8 +470,7 @@ class TestConfigurationTest(TestHelper):
         env_vars=TestHelper.VALID_ENV_VARS[-1],
         data=TestHelper.VALID_URL_LIST_VALUES[-1],
         tests=[TestObjectTest.GetFullObject()],
-        min_instances=1,
-        additional_instances=1,
+        num_instances=1,
         deadline_to_run=1,
         priority=1)
 
@@ -517,10 +516,9 @@ class TestConfigurationTest(TestHelper):
                                      [test_object1]])
     self.test_request.tests = []
 
-    self.AssertValidValues('min_instances',
-                           TestHelper.NON_ZERO_VALID_INT_VALUES)
-    self.AssertValidValues('additional_instances',
-                           TestHelper.VALID_INT_VALUES)
+    self.AssertValidValues('num_instances',
+                           [i for i in TestHelper.NON_ZERO_VALID_INT_VALUES
+                            if test_request_message.MAX_NUM_INSTANCES > i])
 
     self.AssertValidValues('deadline_to_run',
                            TestHelper.VALID_INT_VALUES)
@@ -561,12 +559,9 @@ class TestConfigurationTest(TestHelper):
                                        [test_object1]])
     self.test_request.tests = []
 
-    self.AssertInvalidValues('min_instances',
+    self.AssertInvalidValues('num_instances',
                              TestHelper.NON_ZERO_INVALID_POSITIVE_INT_VALUES)
-    self.test_request.min_instances = 1
-    self.AssertInvalidValues('additional_instances',
-                             TestHelper.INVALID_POSITIVE_INT_VALUES)
-    self.test_request.additional_instances = 0
+    self.test_request.num_instances = 1
 
     self.AssertInvalidValues('deadline_to_run',
                              TestHelper.INVALID_POSITIVE_INT_VALUES)

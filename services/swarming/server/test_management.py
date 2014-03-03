@@ -138,7 +138,7 @@ def ExecuteTestRequest(request_message):
 
     # Check that the old request still has all it's test runners (we can't use
     # the old values if they were already deleted).
-    required_runners = sum(test.min_instances
+    required_runners = sum(test.num_instances
                            for test in test_case.configurations)
     if len(matching_request.runner_keys) == required_runners:
       matching_runners = ndb.get_multi(matching_request.runner_keys)
@@ -167,10 +167,7 @@ def ExecuteTestRequest(request_message):
       # DimensionMapping automatically updates last_seen when put() is called.
       dimension.put()
 
-    # TODO(user): deal with addition_instances later.
-    assert config.min_instances > 0
-    config.num_instances = config.min_instances
-    for instance_index in range(config.min_instances):
+    for instance_index in range(config.num_instances):
       config.instance_index = instance_index
       runner = _QueueTestRequestConfig(request, config, config_hash)
 

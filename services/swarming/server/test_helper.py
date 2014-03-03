@@ -46,8 +46,7 @@ def _CreateRunner(request, config_name):
 
 def GetRequestMessage(request_name=REQUEST_MESSAGE_TEST_CASE_NAME,
                       config_name_root=REQUEST_MESSAGE_CONFIG_NAME_ROOT,
-                      min_instances=1,
-                      additional_instances=0,
+                      num_instances=1,
                       env_vars=None,
                       result_url=DEFAULT_RESULT_URL,
                       store_result='all',
@@ -61,9 +60,7 @@ def GetRequestMessage(request_name=REQUEST_MESSAGE_TEST_CASE_NAME,
     request_name: The name of the test request.
     config_name_root: The base name of each config (it will have the instance
         number appended to it).
-    min_instances: The minimum number of instance of the given config.
-    additional_instances: The number of additional instances for of the given
-        config.
+    num_instances: The number of instance for the given config.
     env_vars: A dictionary of environment variables for the request.
     result_url: The result url to use.
     store_result: Identifies which Runner and Request data should stay in
@@ -86,8 +83,7 @@ def GetRequestMessage(request_name=REQUEST_MESSAGE_TEST_CASE_NAME,
         config_name=config_name_root + '_' + str(i),
         data=['http://b.ina.ry/files2.zip'],
         dimensions=dict(os=platform, cpu='Unknown', browser='Unknown'),
-        min_instances=min_instances,
-        additional_instances=additional_instances,
+        num_instances=num_instances,
         priority=priority,
         tests=[
           test_request_message.TestObject(

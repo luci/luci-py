@@ -13,6 +13,10 @@ import urlparse
 # The maximum priority value that a runner can have.
 MAX_PRIORITY_VALUE = 1000
 
+# The maximum number of instances that can be requested for a single test
+# configuration.
+MAX_NUM_INSTANCES = 50
+
 # The time (in seconds) to wait after receiving a runner before aborting it.
 # This is intended to delete runners that will never run because they will
 # never find a matching machine.
@@ -459,15 +463,10 @@ class TestConfiguration(TestRequestMessageBase):
     env_vars: An optional dictionary for environment variables.
     data: An optional 'data list' for this configuration.
     tests: An optional tests list for this configuration.
-    min_instances: An optional integer specifying the minimum number of
-        instances of this configuration we want. Defaults to 1. Must be greater
-        than 0.
-    additional_instances: An optional integer specifying the maximum number of
-        additional instances of this configuration we want. Defaults to 0. Must
-        be greater than 0. Eh.
-        https://code.google.com/p/swarming/issues/detail?id=88
-    deadline_to_run: An optional value that specifies how long the test can wait
-        before it is aborted (in seconds). Defaults to
+    num_instances: An optional integer specifying the number of instances
+        of this configuration we want. Defaults to 1. Must be greater than 0.
+    deadline_to_run: An optional value that specifies how long the test can
+        wait before it is aborted (in seconds). Defaults to
         SWARM_RUNNER_MAX_WAIT_SECS.
     priority: The priority of this configuartion, used to determine execute
         order (a lower number is higher priority). Defaults to 10, the
@@ -475,7 +474,7 @@ class TestConfiguration(TestRequestMessageBase):
     dimensions: A dictionary of strings or list of strings for dimensions.
   """
   def __init__(self, config_name=None, env_vars=None, data=None, tests=None,
-               min_instances=1, additional_instances=0,
+               num_instances=None, min_instances=1,
                deadline_to_run=SWARM_RUNNER_MAX_WAIT_SECS,
                priority=100, dimensions=None, **kwargs):
     super(TestConfiguration, self).__init__(**kwargs)
@@ -483,8 +482,7 @@ class TestConfiguration(TestRequestMessageBase):
     self.env_vars = env_vars.copy() if env_vars else {}
     self.data = data[:] if data else []
     self.tests = tests[:] if tests else []
-    self.min_instances = min_instances
-    self.additional_instances = additional_instances
+    self.num_instances = num_instances if num_instances else min_instances
     self.deadline_to_run = deadline_to_run
     self.priority = priority
     self.dimensions = dimensions.copy() if dimensions else {}
@@ -499,13 +497,13 @@ class TestConfiguration(TestRequestMessageBase):
         ['tests'], TestObject, unique_value_keys=['test_name'])
     # required=True to make sure the caller doesn't set it to None.
     self.ValidateValues(
-        ['min_instances', 'additional_instances', 'deadline_to_run',
+        ['num_instances', 'deadline_to_run',
           'priority'],
         (int, long), required=True)
 
-    if (self.min_instances < 1 or self.additional_instances < 0 or
-        self.deadline_to_run < 0 or self.priority < 0 or
-        self.priority > MAX_PRIORITY_VALUE):
+    if (self.num_instances < 1 or self.num_instances > MAX_NUM_INSTANCES or
+        self.deadline_to_run < 0 or
+        self.priority < 0 or self.priority > MAX_PRIORITY_VALUE):
       raise Error('Invalid TestConfiguration: %s' % self.__dict__)
 
     if not isinstance(self.dimensions, dict):

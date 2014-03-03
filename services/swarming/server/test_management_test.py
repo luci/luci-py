@@ -192,8 +192,7 @@ class TestManagementTest(test_case.TestCase):
     self.assertNotEqual(None, new_high_priority_runner.started)
 
   def testTestRequestMismatchFailedRunner(self):
-    request = test_helper.GetRequestMessage(min_instances=2,
-                                            result_url=None)
+    request = test_helper.GetRequestMessage(num_instances=2)
 
     test_management.ExecuteTestRequest(request)
     runner = test_runner.TestRunner.query().get()
@@ -259,7 +258,7 @@ class TestManagementTest(test_case.TestCase):
 
   def _AssignPendingRequestsTest(self, instances=1):
     test_management.ExecuteTestRequest(
-        test_helper.GetRequestMessage(min_instances=instances))
+        test_helper.GetRequestMessage(num_instances=instances))
 
     # Execute the runners.
     self.assertLessEqual(instances, len(MACHINE_IDS))
@@ -273,7 +272,7 @@ class TestManagementTest(test_case.TestCase):
     num_indexes = 2
 
     request_message = test_helper.GetRequestMessage(
-        min_instances=num_indexes, env_vars={'index': '%(instance_index)s'})
+        num_instances=num_indexes, env_vars={'index': '%(instance_index)s'})
 
     test_management.ExecuteTestRequest(request_message)
 
@@ -336,7 +335,7 @@ class TestManagementTest(test_case.TestCase):
                                store_result='all', test_instances=1,
                                store_results_successfully=True):
     test_management.ExecuteTestRequest(
-        test_helper.GetRequestMessage(min_instances=test_instances,
+        test_helper.GetRequestMessage(num_instances=test_instances,
                                       result_url=result_url,
                                       store_result=store_result))
 
