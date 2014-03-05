@@ -30,9 +30,20 @@ MAP_REDUCE_JOBS = {
     'reader_spec': 'mapreduce.input_readers.DatastoreInputReader',
     'mapper_parameters': {
       'entity_kind': 'handlers.ContentEntry',
-      'batch_size': 50,
+      'batch_size': 20,
     },
-    'shard_count': 32,
+    'shard_count': 16,
+    'queue_name': MAP_REDUCE_TASK_QUEUE,
+  },
+  'delete_broken_entries': {
+    'name': 'Delete entries that do not have corresponding GS files',
+    'handler_spec': 'map_reduce_jobs.delete_broken_entries_mapper',
+    'reader_spec': 'mapreduce.input_readers.DatastoreInputReader',
+    'mapper_parameters': {
+      'entity_kind': 'handlers.ContentEntry',
+      'batch_size': 20,
+    },
+    'shard_count': 16,
     'queue_name': MAP_REDUCE_TASK_QUEUE,
   },
 }
@@ -45,19 +56,37 @@ def launch_job(job_id):
   return control.start_map(base_path='/internal/mapreduce', **job_def)
 
 
+def is_good_content_entry(entry):
+  """True if ContentEntry is not broken.
+
+  ContentEntry is broken if it is in old format (before content namespace
+  were sharded) or corresponding Google Storage file doesn't exist.
+  """
+  # New entries use GS file path as ids. File path is always <namespace>/<hash>.
+  entry_id = entry.key.id()
+  if '/' not in entry_id:
+    return False
+  # Content is inline, entity doesn't have GS file attached -> it is fine.
+  if entry.content is not None:
+    return True
+  # Ensure GS file exists.
+  return bool(gcs.get_file_info(config.settings().gs_bucket, entry_id))
+
+
 ### Actual mappers
 
 
 def detect_missing_gs_file_mapper(entry):
   """Mapper that takes ContentEntry and logs to output if GS file is missing."""
-  # Content is inline and entity doesn't have GS file attached -> skip.
-  if entry.content is not None:
-    return
-  # Check whether GS file exists.
-  gs_bucket = config.settings().gs_bucket
-  exists = bool(gcs.get_file_info(gs_bucket, entry.gs_filepath))
-  if not exists:
-    logging.warning('MR: missing GS file %s', entry.gs_filepath)
+  if not is_good_content_entry(entry):
+    logging.error('MR: found bad entry\n%s', entry.key.id())
+
+
+def delete_broken_entries_mapper(entry):
+  """Mapper that deletes ContentEntry entities that are broken."""
+  if not is_good_content_entry(entry):
+    entry.key.delete()
+    logging.error('MR: deleted bad entry\n%s', entry.key.id())
 
 
 # Export mapreduce WSGI application as 'app'.
