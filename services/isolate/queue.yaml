@@ -17,8 +17,8 @@ queue:
     task_age_limit: 1d
 
 - name: map-reduce-jobs
-  rate: 30/s
-  bucket_size: 10
+  bucket_size: 100
+  rate: 200/s
   retry_parameters:
     task_age_limit: 2h
     min_backoff_seconds: 1

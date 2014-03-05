@@ -32,7 +32,7 @@ MAP_REDUCE_JOBS = {
       'entity_kind': 'handlers.ContentEntry',
       'batch_size': 20,
     },
-    'shard_count': 16,
+    'shard_count': 64,
     'queue_name': MAP_REDUCE_TASK_QUEUE,
   },
   'delete_broken_entries': {
@@ -43,7 +43,7 @@ MAP_REDUCE_JOBS = {
       'entity_kind': 'handlers.ContentEntry',
       'batch_size': 20,
     },
-    'shard_count': 16,
+    'shard_count': 64,
     'queue_name': MAP_REDUCE_TASK_QUEUE,
   },
 }
@@ -85,7 +85,10 @@ def detect_missing_gs_file_mapper(entry):
 def delete_broken_entries_mapper(entry):
   """Mapper that deletes ContentEntry entities that are broken."""
   if not is_good_content_entry(entry):
-    entry.key.delete()
+    # MR framework disables memcache on a context level. Explicitly request
+    # to cleanup memcache, otherwise the rest of the isolate service will still
+    # think that entity exists.
+    entry.key.delete(use_memcache=True)
     logging.error('MR: deleted bad entry\n%s', entry.key.id())
 
 
