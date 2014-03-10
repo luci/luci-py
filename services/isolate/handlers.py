@@ -25,7 +25,6 @@ from google.appengine import runtime
 from google.appengine.api import datastore_errors
 from google.appengine.api import memcache
 from google.appengine.api import taskqueue
-from google.appengine.ext import blobstore
 from google.appengine.ext import ndb
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -356,20 +355,6 @@ def hash_content(content, namespace):
     raise ValueError('Data is corrupted: %s' % e)
 
 
-def delete_blobinfo_async(blobinfos):
-  """Deletes BlobInfo properly.
-
-  blobstore.delete*() do not accept a list of BlobInfo, they only accept a list
-  BlobKey.
-
-  Returns a list of Rpc objects.
-
-  TODO(maruel): Remove this function once all instance had their blobstore
-  objects deleted.
-  """
-  return [blobstore.delete_async((b.key() for b in blobinfos))]
-
-
 def incremental_delete(query, delete, check=None):
   """Applies |delete| to objects in a query asynchrously.
 
@@ -514,38 +499,6 @@ class InternalCleanupOldEntriesWorkerHandler(webapp2.RequestHandler):
     logging.info('Deleting %s expired entries', total)
 
 
-class InternalObliterateOldWorkerHandler(webapp2.RequestHandler):
-  """Deletes all the old stuff.
-
-  This removes the old ContentNamespace/ContentEntry hierarchy once the code is
-  switched over to use ContentShard/ContentEntry.
-
-  TODO(maruel): Remove this once all the instances have been cleared up.
-  """
-  def post(self):
-    if not self.request.headers.get('X-AppEngine-QueueName'):
-      self.abort(405, detail='Only internal task queue tasks can do this')
-    for namespace in ContentNamespace.query().iter(keys_only=True):
-      logging.info('Deleting Namespace %s', namespace.id())
-      # Do *not* delete the GS files. The reason is that ContentEntry changed
-      # and ContentEntry.filename doesn't exist anymore. The GS files will be
-      # reaped by trim_old.
-      incremental_delete(
-          ContentEntry.query(ancestor=namespace).iter(keys_only=True),
-          delete=ndb.delete_multi_async)
-      ndb.delete_multi([namespace])
-
-    logging.info('Deleting blobs')
-    # TODO(maruel): Delete this once we are done creating blobs.
-    incremental_delete(blobstore.BlobInfo.all(), delete_blobinfo_async)
-
-    logging.info('Flushing memcache')
-    # High priority (.isolated files) are cached explicitly. Make sure ghosts
-    # are zapped too.
-    memcache.flush_all()
-    logging.info('Finally done!')
-
-
 class InternalObliterateWorkerHandler(webapp2.RequestHandler):
   """Deletes all the stuff."""
   def post(self):
@@ -625,7 +578,7 @@ class InternalCleanupTrimLostWorkerHandler(webapp2.RequestHandler):
 class InternalCleanupTriggerHandler(webapp2.RequestHandler):
   """Triggers a taskqueue to clean up."""
   def get(self, name):
-    if name in ('obliterate', 'obliterate_old', 'old', 'orphaned', 'trim_lost'):
+    if name in ('obliterate', 'old', 'orphaned', 'trim_lost'):
       url = '/internal/taskqueue/cleanup/' + name
       # The push task queue name must be unique over a ~7 days period so use
       # the date at second precision, there's no point in triggering each of
@@ -1637,9 +1590,6 @@ def CreateApplication():
       webapp2.Route(
           r'/internal/taskqueue/cleanup/old',
           InternalCleanupOldEntriesWorkerHandler),
-      webapp2.Route(
-          r'/internal/taskqueue/cleanup/obliterate_old',
-          InternalObliterateOldWorkerHandler),
       webapp2.Route(
           r'/internal/taskqueue/cleanup/obliterate',
           InternalObliterateWorkerHandler),
