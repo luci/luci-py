@@ -844,19 +844,23 @@ class TestManagementTest(test_case.TestCase):
   def testGetUpdateWhenPollingForWork(self):
     # Drop the last character of the version string to ensure a version
     # mismatch.
-    version = test_management.SlaveVersion()[:-1]
-
+    version = test_management.SlaveVersion()
     response = test_management.ExecuteRegisterRequest(
-        self._GetMachineRegisterRequest(version=version),
+        self._GetMachineRegisterRequest(version=version[:-1]),
         self._SERVER_URL)
 
     self.assertTrue('try_count' in response)
     self.assertTrue('commands' in response)
     self.assertTrue('result_url' in response)
 
-    self.assertEqual([{'args': self._SERVER_URL + 'get_slave_code',
-                       'function': 'UpdateSlave'}],
-                     response['commands'])
+    self.assertEqual(
+        [
+          {
+            'args': self._SERVER_URL + 'get_slave_code/' + version,
+            'function': 'UpdateSlave',
+          },
+        ],
+        response['commands'])
     self.assertEqual(self._SERVER_URL + 'remote_error', response['result_url'])
 
   def testSlaveCodeZipped(self):

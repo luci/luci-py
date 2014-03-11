@@ -979,11 +979,25 @@ class GetResultHandler(auth.AuthenticatingHandler):
 
 
 class GetSlaveCodeHandler(auth.AuthenticatingHandler):
-  """Returns a zip file with all the files required by a slave."""
+  """Returns a zip file with all the files required by a slave.
+
+  Optionally specify the hash version to download. If so, the returned data is
+  cacheable.
+  """
 
   @auth.require(auth.READ, 'swarming/bots')
-  def get(self):
+  def get(self, version=None):
+    if version:
+      expected = test_management.SlaveVersion()
+      if version != expected:
+        logging.error('Requested Swarming bot %s, have %s', version, expected)
+        self.abort(404)
+      self.response.headers['Cache-Control'] = 'public, max-age=3600'
+    else:
+      self.response.headers['Cache-Control'] = 'no-cache, no-store'
     self.response.headers['Content-Type'] = 'application/octet-stream'
+    self.response.headers['Content-Disposition'] = (
+        'attachment; filename="swarm_bot.zip"')
     self.response.out.write(test_management.SlaveCodeZipped())
 
 
@@ -1412,6 +1426,7 @@ def CreateApplication():
       ('/get_newest_matching_test_cases', GetNewestMatchingTestCasesHandler),
       ('/get_result', GetResultHandler),
       ('/get_slave_code', GetSlaveCodeHandler),
+      ('/get_slave_code/<version:[0-9a-f]{40}>', GetSlaveCodeHandler),
       ('/graphs/daily_stats', DailyStatsGraphHandler),
       ('/poll_for_test', RegisterHandler),
       ('/remote_error', RemoteErrorHandler),

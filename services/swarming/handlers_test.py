@@ -199,6 +199,19 @@ class AppTest(test_case.TestCase):
   def testGetSlaveCode(self):
     response = self.app.get('/get_slave_code')
     self.assertEqual('200 OK', response.status)
+    self.assertEqual(
+        len(test_management.SlaveCodeZipped()), response.content_length)
+
+  def testGetSlaveCodeHash(self):
+    response = self.app.get(
+        '/get_slave_code/%s' % test_management.SlaveVersion())
+    self.assertEqual('200 OK', response.status)
+    self.assertEqual(
+        len(test_management.SlaveCodeZipped()), response.content_length)
+
+  def testGetSlaveCodeInvalidHash(self):
+    response = self.app.get('/get_slave_code/' + '1' * 40, expect_errors=True)
+    self.assertEqual('404 Not Found', response.status)
 
   def testMachineList(self):
     # Act under admin identity.
@@ -592,6 +605,8 @@ class AppTest(test_case.TestCase):
     # protected by GAE itself via 'login: admin' in app.yaml.
     allowed_paths = (
         '/auth/',
+        # It's protected but not accessible as-is.
+        '/get_slave_code/<version:[0-9a-f]{40}>',
         '/secure/',
     )
 

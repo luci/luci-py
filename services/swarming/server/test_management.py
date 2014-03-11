@@ -375,7 +375,7 @@ def ExecuteRegisterRequest(attributes, server_url):
           expected_version, attributes['version'], attributes['id'])
       response['commands'] = [rpc.BuildRPC(
           'UpdateSlave',
-          server_url.rstrip('/') + '/get_slave_code')]
+          server_url.rstrip('/') + '/get_slave_code/' + expected_version)]
       response['try_count'] = 0
       # The only time a slave would have results to send here would be if
       # the machine failed to update.
