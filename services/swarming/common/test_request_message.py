@@ -46,10 +46,10 @@ def Stringize(value, json_readable=False):
   if isinstance(value, (list, tuple)):
     value = '[%s]' % ', '.join([Stringize(i, json_readable) for i in value])
   elif isinstance(value, dict):
-    value = '{%s}' % ', '.join([('%s: %s' % (Stringize(i, json_readable),
-                                             Stringize(value[i],
-                                                       json_readable)))
-                                for i in sorted(value)])
+    value = '{%s}' % ', '.join(
+        ('%s: %s' % (Stringize(i, json_readable),
+                     Stringize(value[i], json_readable)))
+        for i in sorted(value))
   elif isinstance(value, TestRequestMessageBase):
     value = value.__str__(json_readable)
   elif isinstance(value, basestring):
