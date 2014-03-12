@@ -7,8 +7,8 @@
 The model of the Machine Stats, and various helper functions.
 """
 
-
 import datetime
+import json
 import logging
 
 from google.appengine.api import app_identity
@@ -35,6 +35,11 @@ ACCEPTABLE_SORTS = {
 }
 
 
+def utcnow():
+  """To be mocked in tests."""
+  return datetime.datetime.utcnow()
+
+
 class MachineStats(ndb.Model):
   """A machine's stats."""
   # The tag of the machine polling.
@@ -55,7 +60,18 @@ class MachineStats(ndb.Model):
   def _pre_put_hook(self):
     """Stores the creation time for this model."""
     if not self.last_seen:
-      self.last_seen = datetime.datetime.utcnow()
+      self.last_seen = utcnow()
+
+  def to_dict(self):
+    """Converts dimensions from json to dict."""
+    out = super(MachineStats, self).to_dict()
+    try:
+      out['dimensions'] = json.loads(out['dimensions'] or '{}')
+    except ValueError:
+      # TODO(maruel): Disallow creating entities with bad 'dimensions' values.
+      # For now, cope with the current entities.
+      logging.error('Failed to encode %s', repr(out.get('dimensions')))
+    return out
 
 
 def FindDeadMachines():
@@ -64,7 +80,7 @@ def FindDeadMachines():
   Returns:
     A list of the dead machines.
   """
-  dead_machine_cutoff = (datetime.datetime.utcnow() - MACHINE_DEATH_TIMEOUT)
+  dead_machine_cutoff = (utcnow() - MACHINE_DEATH_TIMEOUT)
 
   return list(MachineStats.gql('WHERE last_seen < :1', dead_machine_cutoff))
 
@@ -92,24 +108,29 @@ def NotifyAdminsOfDeadMachines(dead_machines):
   return admin_user.EmailAdmins(subject, body)
 
 
-def RecordMachineQueriedForWork(machine_id, dimensions_str, machine_tag):
+def RecordMachineQueriedForWork(machine_id, dimensions, machine_tag):
   """Records when a machine has queried for work.
 
   Args:
     machine_id: The machine id of the machine.
-    dimensions_str: The string representation of the machines dimensions.
+    dimensions: The machine dimensions.
     machine_tag: The tag identifier of the machine.
   """
-  machine_stats = MachineStats.get_or_insert(machine_id)
+  # TODO(maruel): Put the entities into an entity group.
+  dimensions_str = json.dumps(dimensions, sort_keys=True, separators=(',', ':'))
 
-  if (machine_stats.dimensions != dimensions_str or
-      (machine_stats.last_seen + MACHINE_UPDATE_TIME <
-       datetime.datetime.utcnow()) or
-      machine_stats.tag != machine_tag):
-    machine_stats.dimensions = dimensions_str
-    machine_stats.last_seen = datetime.datetime.utcnow()
-    machine_stats.tag = machine_tag
-    machine_stats.put()
+  machine_stats = MachineStats.get_by_id(machine_id)
+  if (machine_stats and
+      (machine_stats.last_seen + MACHINE_UPDATE_TIME >= utcnow()) and
+      machine_stats.dimensions == dimensions_str and
+      machine_stats.tag == machine_tag):
+    return
+  if not machine_stats:
+    machine_stats = MachineStats(id=machine_id)
+  machine_stats.dimensions = dimensions_str
+  machine_stats.last_seen = utcnow()
+  machine_stats.tag = machine_tag
+  machine_stats.put()
 
 
 def DeleteMachineStats(key):

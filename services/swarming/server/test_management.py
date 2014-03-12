@@ -9,7 +9,6 @@ through the TestRunner and TestRequest classes.
 """
 
 import datetime
-import json
 import logging
 import math
 import os.path
@@ -391,7 +390,7 @@ def ExecuteRegisterRequest(attributes, server_url):
 
   machine_stats.RecordMachineQueriedForWork(
       attribs['id'],
-      json.dumps(attribs['dimensions'], sort_keys=True, separators=(',', ':')),
+      attribs['dimensions'],
       attributes.get('tag', None))
 
   # Since the following commands are part of a GQL query, we can't use

@@ -538,8 +538,8 @@ class MachineListHandler(auth.AuthenticatingHandler):
     self.response.out.write(template.get('machine_list.html').render(params))
 
 
-class MachineListJsonHandler(auth.AuthenticatingHandler):
-  """Returns the list of known swarming bot as json data."""
+class ApiBots(auth.AuthenticatingHandler):
+  """Returns the list of known swarming bots."""
 
   @auth.require(auth.READ, 'swarming/management')
   def get(self):
@@ -549,6 +549,7 @@ class MachineListJsonHandler(auth.AuthenticatingHandler):
         'machines': [m.to_dict() for m in machine_stats.MachineStats.query()],
     }
     self.response.headers['Content-Type'] = 'application/json; charset=utf-8'
+    self.response.headers['Cache-Control'] = 'no-cache, no-store'
     self.response.out.write(utils.SmartJsonEncoder().encode(params))
 
 
@@ -1445,7 +1446,6 @@ def CreateApplication():
       ('/secure/ereporter2/request/<request_id:[0-9a-fA-F]+>',
           Ereporter2RequestHandler),
       ('/secure/machine_list', MachineListHandler),
-      ('/secure/machine_list/json', MachineListJsonHandler),
       ('/secure/retry', RetryHandler),
       ('/secure/show_message', ShowMessageHandler),
       ('/secure/task_queues/cleanup_data', TaskCleanupDataHandler),
@@ -1464,6 +1464,9 @@ def CreateApplication():
       (_SECURE_GET_RESULTS_URL, SecureGetResultHandler),
       (_SECURE_MAIN_URL, MainHandler),
       (_SECURE_USER_PROFILE_URL, UserProfileHandler),
+
+      # The new APIs:
+      ('/swarming/api/v1/bots', ApiBots),
   ]
 
   # Upgrade to Route objects so regexp work.

@@ -126,6 +126,22 @@ class MachineStatsTest(test_case.TestCase):
     machine_stats.RecordMachineQueriedForWork(MACHINE_IDS[0], dimensions, tag)
     self.assertEqual(tag, machine_stats.GetMachineTag(MACHINE_IDS[0]))
 
+  def testToDict(self):
+    now = datetime.datetime(2014, 3, 12, 15, 5, 0, 165565)
+    self.mock(machine_stats, 'utcnow', lambda: now)
+    machine_stats.RecordMachineQueriedForWork(
+        'id', {'foo': ['bar', 'baz']}, 'tag')
+    expected = [
+      {
+        'dimensions': {u'foo': [u'bar', u'baz']},
+        'last_seen': now,
+        'machine_id': 'id',
+        'tag': u'tag',
+      },
+    ]
+    self.assertEqual(
+        expected, [i.to_dict() for i in machine_stats.GetAllMachines()])
+
 
 if __name__ == '__main__':
   # We don't want the application logs to interfere with our own messages.

@@ -226,7 +226,7 @@ class AppTest(test_case.TestCase):
 
     self._mox.VerifyAll()
 
-  def testMachineListJson(self):
+  def testApiBots(self):
     # Act under admin identity.
     self._ReplaceCurrentUser(ADMIN_EMAIL)
 
@@ -236,22 +236,21 @@ class AppTest(test_case.TestCase):
         last_seen=datetime.datetime(2000, 1, 2, 3, 4, 5, 6),
         dimensions='{"foo": "bar"}').put()
 
-    response = self.app.get('/secure/machine_list/json')
+    response = self.app.get('/swarming/api/v1/bots')
     self.assertEqual('200 OK', response.status)
-    actual = json.loads(response.body)
     expected = {
         u'machine_death_timeout': 10800,
         u'machine_update_time': 3600,
         u'machines': [
           {
-            u'dimensions': u'{"foo": "bar"}',
+            u'dimensions': {'foo': 'bar'},
             u'last_seen': u'2000-01-02 03:04:05',
             u'machine_id': u'12345678-12345678-12345678-12345678',
             u'tag': u'tag',
           },
        ],
     }
-    self.assertEqual(expected, actual)
+    self.assertEqual(expected, response.json)
 
   def testDeleteMachineStats(self):
     # Act under admin identity.
