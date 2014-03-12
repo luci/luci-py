@@ -77,9 +77,7 @@ func Decorate(s string) string {
 
 // AssertEqual verifies that two objects are equals and fails the test case
 // otherwise.
-//
-// TODO(maruel): testing.TB is 1.2+
-func AssertEqual(t *testing.T, expected, actual interface{}) {
+func AssertEqual(t testing.TB, expected, actual interface{}) {
 	AssertEqualf(t, expected, actual, "assertEqual() failure.\nExpected: %#v\nActual:   %#v", expected, actual)
 }
 
@@ -89,7 +87,7 @@ func AssertEqual(t *testing.T, expected, actual interface{}) {
 // It is meant to be used in loops where a list of intrant->expected is
 // processed so the assert failure message contains the index of the failing
 // expectation.
-func AssertEqualIndex(t *testing.T, index int, expected, actual interface{}) {
+func AssertEqualIndex(t testing.TB, index int, expected, actual interface{}) {
 	AssertEqualf(t, expected, actual, "assertEqual() failure.\nIndex: %d\nExpected: %#v\nActual:   %#v", index, expected, actual)
 }
 
@@ -97,7 +95,7 @@ func AssertEqualIndex(t *testing.T, index int, expected, actual interface{}) {
 // otherwise.
 //
 // This functions enables specifying an arbitrary string on failure.
-func AssertEqualf(t *testing.T, expected, actual interface{}, format string, items ...interface{}) {
+func AssertEqualf(t testing.TB, expected, actual interface{}, format string, items ...interface{}) {
 	if !reflect.DeepEqual(actual, expected) {
 		t.Fatalf(Decorate(format), items...)
 	}

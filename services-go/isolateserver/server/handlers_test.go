@@ -21,18 +21,17 @@ func newServer() *httptest.Server {
 	return httptest.NewServer(m)
 }
 
-// TODO(maruel): testing.TB is 1.2+
-func get(t *testing.T, ts *httptest.Server, resource string, status int) string {
+func get(t testing.TB, ts *httptest.Server, resource string, status int) string {
 	r, err := http.Get(ts.URL + resource)
 	return commonRequest(t, r, err, status)
 }
 
-func post(t *testing.T, ts *httptest.Server, resource, contentType string, body io.Reader, status int) string {
+func post(t testing.TB, ts *httptest.Server, resource, contentType string, body io.Reader, status int) string {
 	r, err := http.Post(ts.URL+resource, contentType, body)
 	return commonRequest(t, r, err, status)
 }
 
-func commonRequest(t *testing.T, r *http.Response, err error, status int) string {
+func commonRequest(t testing.TB, r *http.Response, err error, status int) string {
 	if err != nil {
 		t.Fatal(err)
 	}
