@@ -565,8 +565,6 @@ class LocalTestRunner(object):
       True if we succeeded or had nothing to do, False otherwise.
     """
     logging.debug('Publishing Results')
-    if not self.test_run.result_url:
-      return True
     data = {
         'c': self.test_run.configuration.config_name,
         'n': self.test_run.test_run_name,

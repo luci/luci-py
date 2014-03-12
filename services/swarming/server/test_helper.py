@@ -19,8 +19,6 @@ REQUEST_MESSAGE_CONFIG_NAME_ROOT = 'c1'
 # The default name for a TestRequest.
 REQUEST_MESSAGE_TEST_CASE_NAME = 'tc'
 
-DEFAULT_RESULT_URL = 'http://all.your.resul.ts/are/belong/to/us'
-
 
 def _CreateRunner(request, config_name):
   """Create a basic runner.
@@ -48,8 +46,6 @@ def GetRequestMessage(request_name=REQUEST_MESSAGE_TEST_CASE_NAME,
                       config_name_root=REQUEST_MESSAGE_CONFIG_NAME_ROOT,
                       num_instances=1,
                       env_vars=None,
-                      result_url=DEFAULT_RESULT_URL,
-                      store_result='all',
                       restart_on_failure=False,
                       platform='win-xp',
                       priority=10,
@@ -62,10 +58,6 @@ def GetRequestMessage(request_name=REQUEST_MESSAGE_TEST_CASE_NAME,
         number appended to it).
     num_instances: The number of instance for the given config.
     env_vars: A dictionary of environment variables for the request.
-    result_url: The result url to use.
-    store_result: Identifies which Runner and Request data should stay in
-        storage after the tests are done running (fail means only the failures
-        are kept).
     restart_on_failure: Identifies if the slave should be restarted if any
         of its tests fail.
     platform: The os to require in the test's configuration.
@@ -93,8 +85,6 @@ def GetRequestMessage(request_name=REQUEST_MESSAGE_TEST_CASE_NAME,
   ]
   request = test_request_message.TestCase(
       restart_on_failure=restart_on_failure,
-      result_url=result_url,
-      store_result=store_result,
       test_case_name=request_name,
       configurations=configurations,
       env_vars=env_vars,

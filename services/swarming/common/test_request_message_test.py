@@ -615,9 +615,6 @@ class TestCaseTest(TestHelper):
         working_dir=TestHelper.VALID_STRING_VALUES[-1],
         admin=TestHelper.VALID_BOOLEAN_VALUES[-1],
         tests=[TestObjectTest.GetFullObject()],
-        result_url=TestHelper.VALID_URL_VALUES[-1],
-        store_result=
-        test_request_message.TestCase.VALID_STORE_RESULT_VALUES[-1],
         restart_on_failure=TestHelper.VALID_BOOLEAN_VALUES[-1],
         encoding='utf-8',
         cleanup=test_request_message.TestRun.VALID_CLEANUP_VALUES[-1],
@@ -681,10 +678,6 @@ class TestCaseTest(TestHelper):
                                               [test_config1]])
     self.test_request.configurations = [TestConfigurationTest.GetFullObject()]
 
-    self.AssertValidValues('result_url', TestHelper.VALID_OPTIONAL_URL_VALUES)
-    valid_store_result = test_request_message.TestCase.VALID_STORE_RESULT_VALUES
-    self.AssertValidValues('store_result', valid_store_result)
-
     self.AssertValidValues('restart_on_failure',
                            TestHelper.VALID_BOOLEAN_VALUES)
     self.AssertValidValues('encoding',
@@ -735,15 +728,6 @@ class TestCaseTest(TestHelper):
     valid_config = test_request_message.TestConfiguration(
         config_name='a', dimensions=dimensions)
     self.test_request.configurations = [valid_config]
-
-    self.AssertInvalidValues('result_url', TestHelper.INVALID_URL_VALUES)
-    self.test_request.result_url = TestHelper.VALID_URL_VALUES[0]
-
-    invalid_store_result = (TestHelper.INVALID_STRING_VALUES +
-                            ['all_results', 'some', 'mine'])
-    self.assertFalse(any(i in valid_store_result for i in invalid_store_result))
-    self.AssertInvalidValues('store_result', invalid_store_result)
-    self.test_request.store_result = None
 
     self.AssertInvalidValues('encoding', TestHelper.INVALID_ENCODING_VALUES)
     self.test_request.encoding = TestHelper.VALID_ENCODING_VALUES[-1]
@@ -950,7 +934,6 @@ class TestRunTest(TestHelper):
     self.test_request.configuration = (
         TestConfigurationTest.GetFullObject())
 
-    self.AssertValidValues('result_url', TestHelper.VALID_URL_VALUES)
     self.AssertValidValues('ping_url', TestHelper.VALID_URL_VALUES)
     self.AssertValidValues('ping_delay', TestHelper.VALID_INT_VALUES)
     self.AssertValidValues('working_dir',

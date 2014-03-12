@@ -20,7 +20,6 @@ from google.appengine.api import datastore_errors
 from google.appengine.ext import ndb
 
 import test_case
-from common import url_helper
 from server import result_helper
 from server import test_helper
 from server import test_management
@@ -41,8 +40,6 @@ class TestRunnerTest(test_case.TestCase):
   def setUp(self):
     super(TestRunnerTest, self).setUp()
     self._mox = mox.Mox()
-
-    self._mox.StubOutWithMock(url_helper, 'UrlOpen')
 
   def tearDown(self):
     self._mox.UnsetStubs()
@@ -390,10 +387,6 @@ class TestRunnerTest(test_case.TestCase):
     self._mox.VerifyAll()
 
   def testRunnerCallerOldMachine(self):
-    url_helper.UrlOpen(mox.IgnoreArg(), data=mox.IgnoreArg()).AndReturn(
-        'response')
-    self._mox.ReplayAll()
-
     runner = test_helper.CreatePendingRunner(machine_id=MACHINE_IDS[0])
     runner.machine_id = MACHINE_IDS[0]
     runner.old_machine_ids = [MACHINE_IDS[1]]
@@ -406,13 +399,7 @@ class TestRunnerTest(test_case.TestCase):
     self.assertEqual([MACHINE_IDS[0]], runner.old_machine_ids)
     self.assertTrue(runner.done)
 
-    self._mox.VerifyAll()
-
   def testRunnerCallerOldMachineWithNoCurrent(self):
-    url_helper.UrlOpen(mox.IgnoreArg(), data=mox.IgnoreArg()).AndReturn(
-        'response')
-    self._mox.ReplayAll()
-
     runner = test_helper.CreatePendingRunner(machine_id=MACHINE_IDS[0])
     runner.machine_id = None
     runner.old_machine_ids = [MACHINE_IDS[1]]
@@ -425,8 +412,6 @@ class TestRunnerTest(test_case.TestCase):
     self.assertEqual([], runner.old_machine_ids)
     self.assertTrue(runner.done)
 
-    self._mox.VerifyAll()
-
   def testHandleOverwriteTestResults(self):
     messages = [
         'first-message',
@@ -436,17 +421,8 @@ class TestRunnerTest(test_case.TestCase):
 
     self._mox.StubOutWithMock(logging, 'error')
 
-    url_helper.UrlOpen(test_helper.DEFAULT_RESULT_URL,
-                       data=mox.ContainsKeyValue('r', messages[0])).AndReturn(
-                           'response')
     logging.error(mox.StrContains('additional response'), mox.IgnoreArg(),
                   mox.IgnoreArg())
-    url_helper.UrlOpen(test_helper.DEFAULT_RESULT_URL,
-                       data=mox.ContainsKeyValue('r', messages[2])).AndReturn(
-                           'response')
-    url_helper.UrlOpen(test_helper.DEFAULT_RESULT_URL,
-                       data=mox.ContainsKeyValue('r', messages[0])).AndReturn(
-                           'response')
     self._mox.ReplayAll()
 
     runner = test_helper.CreatePendingRunner(machine_id=MACHINE_IDS[0])

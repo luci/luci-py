@@ -216,8 +216,7 @@ def _BuildTestRun(runner, server_url):
 
   Args:
     runner: A TestRunner object for this test run.
-    server_url: The URL to the Swarm server so that we can set the
-        result_url in the Swarm file we upload to the machines.
+    server_url: The URL to the Swarming server.
 
   Raises:
     test_request_message.Error: If the request's message isn't valid.
@@ -354,8 +353,7 @@ def ExecuteRegisterRequest(attributes, server_url):
   Args:
     attributes: A dictionary representing the attributes of the machine
         registering itself.
-    server_url: The URL to the Swarm server so that we can set the
-        result_url in the Swarm file we upload to the machines.
+    server_url: The URL to the Swarming server.
 
   Raises:
     test_request_message.Error: If the request format/attributes aren't valid.

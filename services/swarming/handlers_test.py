@@ -406,9 +406,6 @@ class AppTest(test_case.TestCase):
 
   def testResultHandler(self):
     self._mox.StubOutWithMock(url_helper, 'UrlOpen')
-    url_helper.UrlOpen(
-        test_helper.DEFAULT_RESULT_URL, data=mox.IgnoreArg()).AndReturn(
-            'response')
     self._mox.ReplayAll()
 
     runner = test_helper.CreatePendingRunner(machine_id=MACHINE_ID)
@@ -693,9 +690,6 @@ class AppTest(test_case.TestCase):
                 ]
 
     self._mox.StubOutWithMock(url_helper, 'UrlOpen')
-    url_helper.UrlOpen(
-        test_helper.DEFAULT_RESULT_URL, data=mox.IgnoreArg()).AndReturn(
-            'response')
     self._mox.ReplayAll()
 
     # Create a pending, active and done runner.
@@ -836,8 +830,6 @@ class AppTest(test_case.TestCase):
     self._ReplaceCurrentUser(ADMIN_EMAIL)
 
     self._mox.StubOutWithMock(url_helper, 'UrlOpen')
-    url_helper.UrlOpen(mox.IgnoreArg(), data=mox.IgnoreArg()).AndReturn(
-        'response')
     self._mox.ReplayAll()
 
     response = self.app.post(handlers._SECURE_CANCEL_URL, {'r': 'invalid_key'})

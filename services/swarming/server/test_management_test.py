@@ -29,7 +29,6 @@ import test_case
 from common import bot_archive
 from common import rpc
 from common import test_request_message
-from common import url_helper
 from server import dimensions_utils
 from server import result_helper
 from server import test_helper
@@ -207,7 +206,7 @@ class TestManagementTest(test_case.TestCase):
     self.assertEqual(3, test_runner.TestRunner.query().count())
 
   def testTestRequestMismatchDeletedRunner(self):
-    request = test_helper.GetRequestMessage(result_url=None)
+    request = test_helper.GetRequestMessage()
 
     test_management.ExecuteTestRequest(request)
     runner = test_runner.TestRunner.query().get()
@@ -223,7 +222,7 @@ class TestManagementTest(test_case.TestCase):
     self.assertEqual(2, test_runner.TestRunner.query().count())
 
   def testTestRequestMatch(self):
-    request = test_helper.GetRequestMessage(result_url=None)
+    request = test_helper.GetRequestMessage()
 
     response = test_management.ExecuteTestRequest(request)
 
@@ -239,8 +238,7 @@ class TestManagementTest(test_case.TestCase):
 
   def testTestRequestMatchMultipleConfigs(self):
     num_configs = 2
-    request = test_helper.GetRequestMessage(result_url=None,
-                                            num_configs=num_configs)
+    request = test_helper.GetRequestMessage(num_configs=num_configs)
 
     response = test_management.ExecuteTestRequest(request)
     self.assertEqual(1, test_request.TestRequest.query().count())
@@ -313,31 +311,12 @@ class TestManagementTest(test_case.TestCase):
   def testRestartOnFailurePropagated(self):
     self._TestForRestartOnFailurePresence(True)
 
-  def _AddTestRunWithResultsExpectation(self, result_url, result_string):
-    # Setup expectations for HandleTestResults().
-    url_helper.UrlOpen(
-        result_url,
-        data=mox.ContainsKeyValue('r', result_string)).AndReturn('response')
-
-  def _SetupHandleTestResults(self, result_url=test_helper.DEFAULT_RESULT_URL,
-                              result_string='results', test_instances=1):
-    # Setup a valid request waiting for completion from the runner.
-
-    # Setup expectations for ExecuteTestRequest() and AssignPendingRequests().
-    self._mox.StubOutWithMock(url_helper, 'UrlOpen')
-
-    for _ in range(test_instances):
-      self._AddTestRunWithResultsExpectation(result_url, result_string)
-
   def ExecuteHandleTestResults(self, success,
-                               result_url=test_helper.DEFAULT_RESULT_URL,
                                result_string='results',
-                               store_result='all', test_instances=1,
+                               test_instances=1,
                                store_results_successfully=True):
     test_management.ExecuteTestRequest(
-        test_helper.GetRequestMessage(num_instances=test_instances,
-                                      result_url=result_url,
-                                      store_result=store_result))
+        test_helper.GetRequestMessage(num_instances=test_instances))
 
     # Execute the tests by having a machine poll for them.
     for _ in range(test_instances):
@@ -357,11 +336,6 @@ class TestManagementTest(test_case.TestCase):
                                                results=results,
                                                success=success))
 
-      # If results aren't being stored we can't check the runner data because
-      # it will have been deleted.
-      if store_result == 'none' or (store_result == 'fail' and success):
-        continue
-
       self.assertEqual(success, runner.ran_successfully)
       self.assertTrue(runner.done)
 
@@ -376,74 +350,10 @@ class TestManagementTest(test_case.TestCase):
       self.assertEqual(original_end_time, runner.ended)
 
   def testHandleSucceededStoreAllResults(self):
-    self._SetupHandleTestResults()
-    self._mox.ReplayAll()
-
     self.ExecuteHandleTestResults(success=True)
 
-    self._mox.VerifyAll()
-
-  def testHandleSucceededStoreNoResults(self):
-    self._SetupHandleTestResults(test_instances=1)
-    self._mox.ReplayAll()
-
-    self.ExecuteHandleTestResults(success=True, store_result='none',
-                                  test_instances=1)
-    # Check that the test instance has been handled by the single machine
-    # and had its results cleared.
-    self.assertEqual(0, test_runner.TestRunner.query().count())
-
-    self._mox.VerifyAll()
-
   def testHandleFailedTestResults(self):
-    self._SetupHandleTestResults()
-    self._mox.ReplayAll()
-
     self.ExecuteHandleTestResults(success=False)
-
-    self._mox.VerifyAll()
-
-  def _SetupAndExecuteTestResults(self, result_url):
-    self._SetupHandleTestResults(result_url=result_url)
-    self._mox.ReplayAll()
-
-    self.ExecuteHandleTestResults(success=True,
-                                  result_url=result_url)
-
-    self._mox.VerifyAll()
-
-  def testPostResultasHTTPS(self):
-    self._SetupAndExecuteTestResults('https://secure.com/results')
-
-  def testClearingAllRunnerAndRequest(self):
-    self._SetupHandleTestResults()
-    self._mox.ReplayAll()
-
-    self.ExecuteHandleTestResults(success=True, store_result='none')
-    self._mox.VerifyAll()
-
-    self.assertEqual(0, test_runner.TestRunner.query().count())
-    self.assertEqual(0, test_request.TestRequest.query().count())
-
-  def testClearingFailedRunnerAndRequestSucceeded(self):
-    self._SetupHandleTestResults()
-    self._mox.ReplayAll()
-
-    self.ExecuteHandleTestResults(success=True, store_result='fail')
-    self._mox.VerifyAll()
-
-    self.assertEqual(0, test_runner.TestRunner.query().count())
-    self.assertEqual(0, test_request.TestRequest.query().count())
-
-  def testClearingFailedRunnerAndRequestFailed(self):
-    self._SetupHandleTestResults()
-    self._mox.ReplayAll()
-
-    self.ExecuteHandleTestResults(success=False, store_result='fail')
-    self._mox.VerifyAll()
-
-    self.assertNotEqual(0, test_runner.TestRunner.query().count())
-    self.assertNotEqual(0, test_request.TestRequest.query().count())
 
   def _GenerateFutureTimeExpectation(self):
     """Set the current time to way in the future and return it."""
@@ -474,9 +384,6 @@ class TestManagementTest(test_case.TestCase):
     self._mox.VerifyAll()
 
   def testAbortStaleRunnerWaitingForMachine(self):
-    # No UrlOpen call shall succeed.
-    self.mock(url_helper, 'UrlOpen', lambda *args, **kwargs: None)
-
     self._AssignPendingRequestsTest()
     runner = test_runner.TestRunner.query().get()
 
@@ -520,10 +427,6 @@ class TestManagementTest(test_case.TestCase):
     for _ in range(attempts_to_reach_abort):
       self._GenerateFutureTimeExpectation()
 
-    # Setup the functions when the runner is aborted because it is stale.
-    self._mox.StubOutWithMock(url_helper, 'UrlOpen')
-    url_helper.UrlOpen(test_helper.DEFAULT_RESULT_URL,
-                       data=mox.IgnoreArg()).AndReturn('response')
     self._mox.ReplayAll()
 
     test_management.ExecuteTestRequest(test_helper.GetRequestMessage())
@@ -586,17 +489,10 @@ class TestManagementTest(test_case.TestCase):
     self._mox.VerifyAll()
 
   def testResultWithUnicode(self):
-    self._mox.StubOutWithMock(url_helper, 'UrlOpen')
-    self._AddTestRunWithResultsExpectation(test_helper.DEFAULT_RESULT_URL,
-                                           mox.IgnoreArg())
-    self._mox.ReplayAll()
-
     # Make sure we can handle results with unicode in them.
     runner = test_helper.CreatePendingRunner(machine_id=MACHINE_IDS[0])
 
     test_management.AbortRunner(runner, u'\u04bb')
-
-    self._mox.VerifyAll()
 
   def testAssignSinglePendingRequest(self):
     # Test when there is 1 test request then 1 machine registers itself.

@@ -548,8 +548,6 @@ class TestCase(TestRequestMessageBase):
     admin: An optional boolean value that specifies if the tests should be run
         with admin privilege or not. TODO(maruel): Remove me.
     tests: An list of TestObject to run for this task.
-    result_url: An optional URL where to post the results of this test case.
-    store_result: The key to access the test run's storage string.
     restart_on_failure: An optional value indicating if the machine running the
         tests should restart if any of the tests fail.
     encoding: The encoding of the tests output. Default to utf-8.
@@ -558,11 +556,9 @@ class TestCase(TestRequestMessageBase):
     verbose: An optional boolean value that specifies if logging should be
         verbose.
   """
-  VALID_STORE_RESULT_VALUES = (None, '', 'all', 'fail', 'none')
-
   def __init__(self, test_case_name=None, requestor=None, env_vars=None,
                configurations=None, data=None, working_dir=None,
-               admin=False, tests=None, result_url=None, store_result=None,
+               admin=False, tests=None,
                restart_on_failure=None,
                encoding='utf-8', cleanup=None,
                label=None, verbose=False, **kwargs):
@@ -577,8 +573,6 @@ class TestCase(TestRequestMessageBase):
     self.working_dir = working_dir
     self.admin = admin
     self.tests = tests[:] if tests else []
-    self.result_url = result_url
-    self.store_result = store_result
     self.restart_on_failure = restart_on_failure
     self.encoding = encoding
     self.cleanup = cleanup
@@ -589,8 +583,7 @@ class TestCase(TestRequestMessageBase):
   def Validate(self):
     """Raises if the current content is not valid."""
     self.ValidateValues(['test_case_name'], basestring, required=True)
-    self.ValidateValues(
-        ['requestor', 'working_dir', 'result_url', 'label'], basestring)
+    self.ValidateValues(['requestor', 'working_dir', 'label'], basestring)
     self.ValidateDicts(['env_vars'], basestring, basestring)
     self.ValidateObjectLists(
         ['configurations'], TestConfiguration, required=True,
@@ -599,11 +592,8 @@ class TestCase(TestRequestMessageBase):
     self.ValidateObjectLists(
         ['tests'], TestObject, unique_value_keys=['test_name'])
     self.ValidateEncoding(self.encoding)
-    if self.result_url:
-      self.ValidateUrls(['result_url'])
 
-    if (self.cleanup not in TestRun.VALID_CLEANUP_VALUES or
-        self.store_result not in TestCase.VALID_STORE_RESULT_VALUES):
+    if self.cleanup not in TestRun.VALID_CLEANUP_VALUES:
       raise Error('Invalid TestCase: %s' % self.__dict__)
 
     # self.verbose and self.admin don't need to be validated since we only need
@@ -641,24 +631,12 @@ class TestCase(TestRequestMessageBase):
         'data',
         'encoding',
         'env_vars',
-        'store_result',
         'tests',
         'verbose',
     ]
 
     for equal_key in equal_keys:
       if getattr(self, equal_key) != getattr(test_case, equal_key):
-        return False
-
-    # The following keys must not be set for a TestRequest to be equivalent,
-    # because they all have side effects.
-    side_effect_keys = [
-      'result_url',
-    ]
-
-    for side_effect_key in side_effect_keys:
-      if (getattr(self, side_effect_key) !=
-          getattr(test_case, side_effect_key)):
         return False
 
     # The configs must be in the same order before we can begin to compare them.
@@ -684,8 +662,7 @@ class TestCase(TestRequestMessageBase):
     # A sanity check to ensure all values were considered. If a new value is
     # added to TestRequest and not added here, the TestRequest tests should
     # fail here.
-    examined_keys = set(['configurations'] + equal_keys + side_effect_keys +
-                          ignored_keys)
+    examined_keys = set(['configurations'] + equal_keys + ignored_keys)
     missing_keys = examined_keys.symmetric_difference(
         set(test_case.__dict__))
     if missing_keys:

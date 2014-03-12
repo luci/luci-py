@@ -11,14 +11,12 @@ on a given machine.
 import datetime
 import json
 import logging
-import urlparse
 
 from google.appengine.api import datastore_errors
 from google.appengine.datastore import datastore_query
 from google.appengine.ext import ndb
 
 from common import test_request_message
-from common import url_helper
 from server import result_helper
 from stats import machine_stats
 from stats import requestor_daily_stats
@@ -342,37 +340,10 @@ class TestRunner(ndb.Model):
     logging.info('Successfully updated the results of runner %s.',
                  self.key.urlsafe())
 
-    test_case = self.request.get().GetTestCase()
-    update_successful = True
-    if test_case.result_url:
-      result_url_parts = urlparse.urlsplit(test_case.result_url)
-      if result_url_parts.scheme in('http', 'https'):
-        # Send the result to the requested destination.
-        data = {'n': self.request.get().name,
-                'c': self.config_name,
-                'i': self.config_instance_index,
-                'm': self.num_config_instances,
-                'x': self.exit_codes,
-                's': self.ran_successfully,
-                'r': self.GetResultString()}
-        if not url_helper.UrlOpen(test_case.result_url, data=data):
-          logging.exception('Could not send results back to sender at %s',
-                            test_case.result_url)
-          update_successful = False
-      else:
-        logging.exception('Unsupported scheme "%s" in url "%s"',
-                          result_url_parts.scheme, test_case.result_url)
-        update_successful = False
-
     # Record the basic stats and usage from this runner.
     runner_stats.RecordRunnerStats(self)
     requestor_daily_stats.UpdateDailyStats(self)
-
-    if (test_case.store_result == 'none' or
-        (test_case.store_result == 'fail' and self.ran_successfully)):
-      DeleteRunner(self)
-
-    return update_successful
+    return True
 
 
 @ndb.transactional
