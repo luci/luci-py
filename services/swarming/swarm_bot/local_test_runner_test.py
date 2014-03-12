@@ -675,6 +675,33 @@ class TestLocalTestRunner(auto_stub.TestCase):
       self.assertEqual(swarm_constants.RESTART_EXIT_CODE,
                       runner.ReturnExitCode(return_value))
 
+  def testMainBadFile(self):
+    self.mock(logging.getLogger(), 'addHandler', lambda _: None)
+    with open(self.data_file_name, 'wb') as f:
+      f.write('a')
+
+    # Test the case where the swarm file itself is corrupted.
+    args = [
+        '--request_file_name', self.data_file_name,
+        '--max_url_retries', '0',
+    ]
+    result = local_test_runner.main(args)
+    self.assertEqual(1, result)
+
+  def testMainBadFileRestart(self):
+    self.mock(logging.getLogger(), 'addHandler', lambda _: None)
+    with open(self.data_file_name, 'wb') as f:
+      f.write('a')
+
+    # Test the case where the swarm file itself is corrupted.
+    args = [
+        '--request_file_name', self.data_file_name,
+        '--max_url_retries', '0',
+        '--restart_on_failure',
+    ]
+    result = local_test_runner.main(args)
+    self.assertEqual(swarm_constants.RESTART_EXIT_CODE, result)
+
 
 def PrepareLogging():
   """Removes the noise when running the test normally."""

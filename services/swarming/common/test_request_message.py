@@ -385,7 +385,7 @@ class TestRequestMessageBase(object):
       out.Validate()
       return out
     except (TypeError, ValueError) as e:
-      raise Error('Failed to create %s: %s' % (cls.__name__, e))
+      raise Error('Failed to create %s: %s\n%s' % (cls.__name__, e, dictionary))
 
   @classmethod
   def FromDictList(cls, dict_list):

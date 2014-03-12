@@ -75,5 +75,5 @@ def GenerateSlaveVersion(root_dir, additionals):
   for _, content in sorted(additionals.iteritems()):
     result.update(content)
   d = result.hexdigest()
-  logging.info('GenerateSlaveVersion(%s) = %s', additionals, d)
+  logging.info('GenerateSlaveVersion(%s) = %s', additionals.keys(), d)
   return d

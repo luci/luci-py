@@ -126,13 +126,15 @@ def _ParseRequestFile(request_file_name):
   """
   try:
     with open(request_file_name, 'rb') as f:
-      return test_request_message.TestRun.FromJSON(f.read())
-  except test_request_message as e:
-    raise Error('Invalid Request File %s: %s' % (request_file_name, e))
+      content = f.read()
   except IOError as e:
     raise Error('Missing Request File %s: %s' % (request_file_name, e))
+
+  try:
+    return test_request_message.TestRun.FromJSON(content)
   except test_request_message.Error as e:
-    raise Error('Invalid Request File %s: %s' % (request_file_name, e))
+    raise Error(
+        'Invalid Request File %s: %s\n%s' % (request_file_name, e, content))
 
 
 def _ExpandEnv(argument, env):
@@ -634,9 +636,9 @@ class LocalTestRunner(object):
     return return_value
 
 
-def main():
+def main(args):
   parser = optparse.OptionParser(
-      description=sys.modules['__main__'].__doc__,
+      description=sys.modules[__name__].__doc__,
       version=__version__)
   parser.add_option(
       '-f', '--request_file_name',
@@ -654,7 +656,7 @@ def main():
       '-v', '--verbose', action='store_true',
       help='Set logging level to INFO')
 
-  (options, args) = parser.parse_args()
+  (options, args) = parser.parse_args(args)
   if not options.request_file_name:
     parser.error('You must provide the request file name.')
   if args:
@@ -689,6 +691,8 @@ def main():
         return runner.ReturnExitCode(1)
   except Exception:
     logging.exception('Internal failure')
+    if options.restart_on_failure:
+      return swarm_constants.RESTART_EXIT_CODE
     return 1
 
 
@@ -709,4 +713,4 @@ def PrepareLogging():
 
 if __name__ == '__main__':
   PrepareLogging()
-  sys.exit(main())
+  sys.exit(main(None))
