@@ -76,165 +76,168 @@ class OuterParseResults(test_request_message.TestRequestMessageBase):
       raise test_request_message.Error('Oops')
 
 
+class Validatable(test_request_message.TestRequestMessageBase):
+  def __init__(self, is_valid=True):
+    self.is_valid = is_valid
+
+  def Validate(self):
+    if not self.is_valid:
+      raise test_request_message.Error('Oops')
+
+
+class TestObj(test_request_message.TestRequestMessageBase):
+  def __init__(self, **kwargs):
+    super(TestObj, self).__init__()
+    for k, v in kwargs.iteritems():
+      setattr(self, k, v)
+
+  def Validate(self):
+    pass
+
+
 class TestRequestMessageBaseTest(unittest.TestCase):
-  def setUp(self):
-    self.trm = test_request_message.TestRequestMessageBase()
-
   def testValidateValues(self):
-    self.trm.a = 1
-    self.trm.b = ''
+    trm = TestObj(a=1, b='')
     with self.assertRaises(test_request_message.Error):
-      self.trm.ValidateValues(['a'], str)
+      trm.ValidateValues(['a'], str)
     with self.assertRaises(test_request_message.Error):
-      self.trm.ValidateValues(['b'], str, required=True)
+      trm.ValidateValues(['b'], str, required=True)
     with self.assertRaises(test_request_message.Error):
-      self.trm.ValidateValues(['c'], str, required=True)
+      trm.ValidateValues(['c'], str, required=True)
     with self.assertRaises(test_request_message.Error):
-      self.trm.ValidateValues(['a', 'b'], int, required=True)
+      trm.ValidateValues(['a', 'b'], int, required=True)
     with self.assertRaises(test_request_message.Error):
-      self.trm.ValidateValues(['b', 'a'], str)
+      trm.ValidateValues(['b', 'a'], str)
     with self.assertRaises(test_request_message.Error):
-      self.trm.ValidateValues(['b', 'c'], str)
+      trm.ValidateValues(['b', 'c'], str)
 
-    self.trm.c = 3
-    self.trm.d = 'a'
-    self.trm.ValidateValues(['a', 'c'], int, required=True)
-    self.trm.ValidateValues(['a', 'c'], int)
-    self.trm.ValidateValues(['b', 'd'], str)
+    trm.c = 3
+    trm.d = 'a'
+    trm.ValidateValues(['a', 'c'], int, required=True)
+    trm.ValidateValues(['a', 'c'], int)
+    trm.ValidateValues(['b', 'd'], str)
 
   def testValidateLists(self):
-    self.trm.a = 1
-    self.trm.b = ''
-    self.trm.c = []
-    self.trm.d = [1]
-    self.trm.e = ['a']
+    trm = TestObj(a=1, b='', c=[], d=[1], e=['a'])
     with self.assertRaises(test_request_message.Error):
-      self.trm.ValidateLists(['a'], int, required=True)
+      trm.ValidateLists(['a'], int, required=True)
     with self.assertRaises(test_request_message.Error):
-      self.trm.ValidateLists(['b'], str)
+      trm.ValidateLists(['b'], str)
     with self.assertRaises(test_request_message.Error):
-      self.trm.ValidateLists(['c'], str, required=True)
+      trm.ValidateLists(['c'], str, required=True)
     with self.assertRaises(test_request_message.Error):
-      self.trm.ValidateLists(['d'], str)
+      trm.ValidateLists(['d'], str)
     with self.assertRaises(test_request_message.Error):
-      self.trm.ValidateLists(['e'], int, required=True)
+      trm.ValidateLists(['e'], int, required=True)
     with self.assertRaises(test_request_message.Error):
-      self.trm.ValidateLists(['d', 'e'], int)
+      trm.ValidateLists(['d', 'e'], int)
     with self.assertRaises(test_request_message.Error):
-      self.trm.ValidateLists(['e', 'd'], str, required=True)
+      trm.ValidateLists(['e', 'd'], str, required=True)
 
-    self.trm.ValidateLists(['c'], int)
-    self.trm.ValidateLists(['c', 'd'], int)
-    self.trm.ValidateLists(['e', 'c'], str)
-    self.trm.ValidateLists(['d'], int, required=True)
-    self.trm.ValidateLists(['e'], str, required=True)
+    trm.ValidateLists(['c'], int)
+    trm.ValidateLists(['c', 'd'], int)
+    trm.ValidateLists(['e', 'c'], str)
+    trm.ValidateLists(['d'], int, required=True)
+    trm.ValidateLists(['e'], str, required=True)
 
   def testValidateObjectLists(self):
-    class Validatable(test_request_message.TestRequestMessageBase):
-      def __init__(self, is_valid=True):
-        self.is_valid = is_valid
-
-      def Validate(self):
-        if not self.is_valid:
-          raise test_request_message.Error('Oops')
-
-    class InvalidObject(test_request_message.TestRequestMessageBase):
-      def Validate(self):
-        raise test_request_message.Error('Oops')
-
-    self.trm.a = Validatable()
-    self.trm.b = [Validatable()]
-    self.trm.c = [InvalidObject()]
-    self.trm.d = [Validatable(), InvalidObject()]
-    self.trm.e = [Validatable(), Validatable(False)]
-    self.trm.f = []
-    self.trm.g = [Validatable(), Validatable()]
+    trm = TestObj(
+        a=Validatable(),
+        b=[Validatable()],
+        c=[Validatable(is_valid=False)],
+        d=[Validatable(), Validatable(is_valid=False)],
+        e=[Validatable(), Validatable(False)],
+        f=[],
+        g=[Validatable(), Validatable()])
 
     with self.assertRaises(test_request_message.Error):
-      self.trm.ValidateObjectLists(['a'], Validatable, False)
+      trm.ValidateObjectLists(['a'], Validatable, False)
     with self.assertRaises(test_request_message.Error):
-      self.trm.ValidateObjectLists(['b'], InvalidObject, True)
+      trm.ValidateObjectLists(['b'], TestObj, True)
     with self.assertRaises(test_request_message.Error):
-      self.trm.ValidateObjectLists(['c'], InvalidObject, False)
+      trm.ValidateObjectLists(['c'], Validatable, False)
     with self.assertRaises(test_request_message.Error):
-      self.trm.ValidateObjectLists(['d'], Validatable, True)
+      trm.ValidateObjectLists(['d'], Validatable, True)
     with self.assertRaises(test_request_message.Error):
-      self.trm.ValidateObjectLists(['e'], Validatable, False)
+      trm.ValidateObjectLists(['e'], Validatable, False)
     with self.assertRaises(test_request_message.Error):
-      self.trm.ValidateObjectLists(['f'], Validatable, True)
+      trm.ValidateObjectLists(['f'], Validatable, True)
 
     # Success!
-    self.trm.ValidateObjectLists(['b'], Validatable, True)
-    self.trm.ValidateObjectLists(['f'], Validatable, False)
-    self.trm.ValidateObjectLists(['g'], Validatable, False)
+    trm.ValidateObjectLists(['b'], Validatable, True)
+    trm.ValidateObjectLists(['f'], Validatable, False)
+    trm.ValidateObjectLists(['g'], Validatable, False)
 
     # Not unique names.
-    self.trm.g[0].a = 'a'
-    self.trm.g[1].a = 'a'
+    trm.g[0].a = 'a'
+    trm.g[1].a = 'a'
     with self.assertRaises(test_request_message.Error):
-      self.trm.ValidateObjectLists(['g'], Validatable, False, ['a'])
-    self.trm.g[1].a = 'b'
-    self.trm.ValidateObjectLists(['g'], Validatable, False, ['a'])
+      trm.ValidateObjectLists(['g'], Validatable, False, ['a'])
+    trm.g[1].a = 'b'
+    trm.ValidateObjectLists(['g'], Validatable, False, ['a'])
 
     with self.assertRaises(test_request_message.Error):
-      self.trm.ValidateObjectLists(['a'], Validatable, False, [])
+      trm.ValidateObjectLists(['a'], Validatable, False, [])
     with self.assertRaises(test_request_message.Error):
-      self.trm.ValidateObjectLists(['b'], InvalidObject, True, [])
+      trm.ValidateObjectLists(['b'], TestObj, True, [])
     with self.assertRaises(test_request_message.Error):
-      self.trm.ValidateObjectLists(['c'], InvalidObject, False, [])
+      trm.ValidateObjectLists(['c'], Validatable, False, [])
 
   def testValidateUrlLists(self):
-    self.trm.a = []
-    self.trm.b = ['http://localhost:9001']
-    self.trm.c = ['http://www.google.com']
-    self.trm.d = [1]
-    self.trm.e = ['http://www.google.com', 'a']
-    self.trm.f = 1
+    trm = TestObj(
+        a=[],
+        b=['http://localhost:9001'],
+        c=['http://www.google.com'],
+        d=[1],
+        e=['http://www.google.com', 'a'],
+        f=1)
 
-    self.trm.ValidateUrlLists(['a'])
-    self.trm.ValidateUrlLists(['b'])
-    self.trm.ValidateUrlLists(['c'])
-    self.trm.ValidateUrlLists(['a', 'b'])
-    self.trm.ValidateUrlLists(['b', 'c'])
+    trm.ValidateUrlLists(['a'])
+    trm.ValidateUrlLists(['b'])
+    trm.ValidateUrlLists(['c'])
+    trm.ValidateUrlLists(['a', 'b'])
+    trm.ValidateUrlLists(['b', 'c'])
 
     with self.assertRaises(test_request_message.Error):
-      self.trm.ValidateUrlLists(['a'], required=True)
+      trm.ValidateUrlLists(['a'], required=True)
     with self.assertRaises(test_request_message.Error):
-      self.trm.ValidateUrlLists(['d'])
+      trm.ValidateUrlLists(['d'])
     with self.assertRaises(test_request_message.Error):
-      self.trm.ValidateUrlLists(['e'])
+      trm.ValidateUrlLists(['e'])
     with self.assertRaises(test_request_message.Error):
-      self.trm.ValidateUrlLists(['f'])
+      trm.ValidateUrlLists(['f'])
     with self.assertRaises(test_request_message.Error):
-      self.trm.ValidateUrlLists(['d'], True)
+      trm.ValidateUrlLists(['d'], True)
     with self.assertRaises(test_request_message.Error):
-      self.trm.ValidateUrlLists(['d', 'e'], False)
+      trm.ValidateUrlLists(['d', 'e'], False)
 
   def testExpandVariables(self):
-    self.trm.a = '%(var1)s'
-    self.trm.b = ['%(var1)s', '%(var2)d']
-    self.trm.c = test_request_message.TestRequestMessageBase()
-    self.trm.c.a = '%(var3)d'
-    self.trm.c.b = [('%(var4)s',), ('%(var1)s', '%(var2)d', '%(var3)d')]
-    self.trm.c.c = 42
-    self.trm.d = None
-    self.trm.e = {'%(var4)s': '%(var1)s', '%(var2)d': '%(var3)d'}
     url = 'http://www.google.com/hi%20world'
-    self.trm.f = url
-    self.trm.g = url + '%(var1)s'
+    c = TestObj(
+        a='%(var3)d',
+        b=[('%(var4)s',), ('%(var1)s', '%(var2)d', '%(var3)d')],
+        c=42)
+    trm = TestObj(
+        a='%(var1)s',
+        b=['%(var1)s', '%(var2)d'],
+        c=c,
+        d=None,
+        e={'%(var4)s': '%(var1)s', '%(var2)d': '%(var3)d'},
+        f=url,
+        g=url + '%(var1)s')
 
-    self.trm.ExpandVariables({'var1': 'one', 'var2': 22, 'var3': 333,
-                              'var4': 'four'})
-    self.assertEqual('one', self.trm.a)
-    self.assertEqual(['one', '22'], self.trm.b)
-    self.assertEqual('333', self.trm.c.a)
-    self.assertEqual([('four',), ('one', '22', '333')], self.trm.c.b)
-    self.assertEqual(42, self.trm.c.c)
-    self.assertEqual(None, self.trm.d)
+    trm.ExpandVariables(
+        {'var1': 'one', 'var2': 22, 'var3': 333, 'var4': 'four'})
+    self.assertEqual('one', trm.a)
+    self.assertEqual(['one', '22'], trm.b)
+    self.assertEqual('333', trm.c.a)
+    self.assertEqual([('four',), ('one', '22', '333')], trm.c.b)
+    self.assertEqual(42, trm.c.c)
+    self.assertEqual(None, trm.d)
     # We intentionnaly don't expand key names, just values!
-    self.assertEqual({'%(var4)s': 'one', '%(var2)d': '333'}, self.trm.e)
-    self.assertEqual(url, self.trm.f)
-    self.assertEqual(url + 'one', self.trm.g)
+    self.assertEqual({'%(var4)s': 'one', '%(var2)d': '333'}, trm.e)
+    self.assertEqual(url, trm.f)
+    self.assertEqual(url + 'one', trm.g)
 
   def testFromJSON(self):
     # Start with the exception raising tests.
