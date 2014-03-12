@@ -12,13 +12,25 @@ import (
 	"code.google.com/p/swarming/services-go/pkg/ofh"
 	"code.google.com/p/swarming/services-go/third_party/code.google.com/p/leveldb-go/leveldb/memdb"
 	"net/http"
+	"time"
 )
 
-// NewAppMock returns an AppContext to be used in unit tests.
+type AppContextImplMock struct {
+	Timestamp time.Time
+}
+
+func (a AppContextImplMock) Now() time.Time {
+	return a.Timestamp
+}
+
+// NewAppMock returns an aedmz.AppContext to be used in unit tests.
 //
 // It has AppID "Yo" and version "v1".
-func NewAppMock() aedmz.AppContext {
-	return aedmz.NewApp("Yo", "v1", &bytes.Buffer{}, ofh.MakeStubProvider(http.DefaultClient), memdb.New(nil))
+func NewAppMock(a aedmz.AppContextImpl) aedmz.AppContext {
+	if a == nil {
+		a = &AppContextImplMock{}
+	}
+	return aedmz.NewAppInternal("Yo", "v1", &bytes.Buffer{}, ofh.MakeStubProvider(http.DefaultClient), memdb.New(nil), a)
 }
 
 // CloseRequest closes a testing aedmz.RequestContext.

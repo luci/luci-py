@@ -14,9 +14,9 @@ import (
 	"net/http"
 )
 
-type appContextImplMock struct{}
+type AppContextImplMock struct{}
 
-func (a appContextImplMock) NewContext(r *http.Request) appengine.Context {
+func (a AppContextImplMock) NewContext(r *http.Request) appengine.Context {
 	// https://developers.google.com/appengine/docs/go/tools/localunittesting
 	//
 	// The call to aetest.NewContext will start dev_appserver.py in a subprocess,
@@ -39,8 +39,11 @@ func (a appContextImplMock) NewContext(r *http.Request) appengine.Context {
 // NewAppMock returns an AppContext to be used in unit tests.
 //
 // It has AppID "Yo" and version "v1".
-func NewAppMock() aedmz.AppContext {
-	return aedmz.NewAppInternal("Yo", "v1", appContextImplMock{})
+func NewAppMock(a aedmz.AppContextImpl) aedmz.AppContext {
+	if a == nil {
+		a = &AppContextImplMock{}
+	}
+	return aedmz.NewAppInternal("Yo", "v1", a)
 }
 
 // CloseRequest closes a testing aedmz.RequestContext.

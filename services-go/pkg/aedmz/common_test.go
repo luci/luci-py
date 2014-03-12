@@ -11,7 +11,7 @@ import (
 )
 
 func TestAppIdentity(t *testing.T) {
-	app := NewAppMock()
+	app := newAppMock(nil)
 	req, err := http.NewRequest("GET", "http://localhost/", nil)
 	ut.AssertEqual(t, nil, err)
 	c := app.NewContext(req)
@@ -22,7 +22,7 @@ func TestAppIdentity(t *testing.T) {
 }
 
 func TestConnectivity(t *testing.T) {
-	app := NewAppMock()
+	app := newAppMock(nil)
 	req, err := http.NewRequest("GET", "http://localhost/", nil)
 	ut.AssertEqual(t, nil, err)
 	c := app.NewContext(req)

@@ -25,7 +25,7 @@ func (a appContextImplMock) NewContext(r *http.Request) appengine.Context {
 	// This means it's costly.
 	//
 	// aetest.NewContext() won't use by default the 'application' specified in
-	// app.yaml. NewAppMock() prefills appContext.appID so appengine.AppID() is
+	// app.yaml. newAppMock() prefills appContext.appID so appengine.AppID() is
 	// never called in RequestContext.AppID(). If this becomes an issue, pass
 	// aetest.Options{AppID:"Yo"} instead of nil.
 	c, err := aetest.NewContext(nil)
@@ -35,14 +35,17 @@ func (a appContextImplMock) NewContext(r *http.Request) appengine.Context {
 	return c
 }
 
-// NewAppMock returns an *appContext to be used in unit tests.
+// newAppMock returns an *appContext to be used in unit tests.
 //
 // It has AppID "Yo" and version "v1".
 //
 // It is impossible to import aedmztest here because it would cause an import
 // cycle.
-func NewAppMock() *appContext {
-	return NewAppInternal("Yo", "v1", appContextImplMock{}).(*appContext)
+func newAppMock(a AppContextImpl) *appContext {
+	if a == nil {
+		a = &appContextImplMock{}
+	}
+	return NewAppInternal("Yo", "v1", a).(*appContext)
 }
 
 func CloseRequest(r RequestContext) {

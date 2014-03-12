@@ -17,7 +17,7 @@ import (
 
 func newServer() *httptest.Server {
 	m := http.NewServeMux()
-	SetupHandlers(m, aedmztest.NewAppMock())
+	SetupHandlers(m, aedmztest.NewAppMock(nil))
 	return httptest.NewServer(m)
 }
 

@@ -13,6 +13,16 @@ import (
 	gorillaContext "code.google.com/p/swarming/services-go/third_party/github.com/gorilla/context"
 	"errors"
 	"net/http"
+	"time"
+)
+
+const (
+	// Same values as google_appengine/google/appengine/api/logservice/logservice.py
+	LOG_LEVEL_DEBUG = iota
+	LOG_LEVEL_INFO
+	LOG_LEVEL_WARNING
+	LOG_LEVEL_ERROR
+	LOG_LEVEL_CRITICAL
 )
 
 // ErrNotFound is returned when a object requested in DB or Cache is not found.
@@ -39,6 +49,27 @@ type AppContext interface {
 	InjectContext(handler http.HandlerFunc) http.HandlerFunc
 }
 
+// Abstract contextual logging.
+type Logger interface {
+	Debugf(format string, args ...interface{})
+	Infof(format string, args ...interface{})
+	Warningf(format string, args ...interface{})
+	Errorf(format string, args ...interface{})
+}
+
+// LogService is an interface to read back the logs.
+type LogService interface {
+	// ScanLogs scans the logs by time and returns the items found in the channel.
+	// The Record returned in the channel will be inclusively between [start,
+	// end]. If minLevel is -1, it is ignored. Otherwise, it specifies an AppLog
+	// entry with the minimum log level must be present in the Record to be
+	// returned. versions, if specified, is a whitelist of the versions to
+	// enumerate.
+	ScanLogs(start, end time.Time, minLevel int, versions []string, logs chan<- *Record)
+	// GetLogEntry returns one or many specific requests logs.
+	GetLogEntry(requestIDs []string, logs chan<- *Record)
+}
+
 // AppIdentity exposes the application's identity.
 type AppIdentity interface {
 	AppID() string
@@ -61,6 +92,8 @@ type Connectivity interface {
 type RequestContext interface {
 	AppIdentity
 	Connectivity
+	Logger
+	LogService
 }
 
 // GetContext returns the framework Context associated with the request.

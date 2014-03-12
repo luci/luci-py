@@ -10,6 +10,7 @@ package aedmz
 
 import (
 	"appengine"
+	"appengine/log"
 	"appengine/urlfetch"
 	"code.google.com/p/swarming/services-go/third_party/code.google.com/p/goauth2/oauth"
 	gorillaContext "code.google.com/p/swarming/services-go/third_party/github.com/gorilla/context"
@@ -175,4 +176,47 @@ func (r *requestContext) OAuth2HttpClient(scope string) (*http.Client, error) {
 		Transport: r.getTransport(),
 	}
 	return transport.Client(), nil
+}
+
+// Logging: Nothing to implement, the interface is implemented by
+// appengine.Context.
+
+// LogService.
+
+type AppLog log.AppLog
+type Record log.Record
+
+func (r *requestContext) run(q *log.Query, entries chan<- *Record) {
+	result := q.Run(r.Context)
+	for {
+		record, _ := result.Next()
+		if record == nil {
+			break
+		}
+		entries <- (*Record)(record)
+	}
+}
+
+func (r *requestContext) ScanLogs(start, end time.Time, minLevel int, versions []string, entries chan<- *Record) {
+	r.run(
+		&log.Query{
+			StartTime:     start,
+			EndTime:       end,
+			Incomplete:    true,
+			AppLogs:       true,
+			ApplyMinLevel: (minLevel >= 0),
+			MinLevel:      minLevel,
+			Versions:      versions,
+		},
+		entries)
+}
+
+func (r *requestContext) GetLogEntry(requestIDs []string, entries chan<- *Record) {
+	r.run(
+		&log.Query{
+			Incomplete: true,
+			AppLogs:    true,
+			RequestIDs: requestIDs,
+		},
+		entries)
 }
