@@ -30,7 +30,10 @@ ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT_DIR)
 
 from common import bot_archive
-from common import url_helper
+
+sys.path.insert(0, os.path.join(ROOT_DIR, 'swarm_bot'))
+
+import url_helper
 
 import test_env
 

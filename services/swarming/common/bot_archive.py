@@ -22,9 +22,9 @@ FILES = (
     'common/rpc.py',
     'common/swarm_constants.py',
     'common/test_request_message.py',
-    'common/url_helper.py',
     'local_test_runner.py',
     'slave_machine.py',
+    'url_helper.py',
 )
 
 

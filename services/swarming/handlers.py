@@ -28,7 +28,6 @@ from google.appengine.ext import ndb
 
 from common import swarm_constants
 from common import test_request_message
-from common import url_helper
 from components import auth
 from components import auth_ui
 from components import ereporter2
@@ -604,7 +603,7 @@ class ResultHandler(auth.AuthenticatingHandler):
   def post(self):
     # TODO(user): Share this code between all the request handlers so we
     # can always see how often a request is being sent.
-    connection_attempt = self.request.get(url_helper.COUNT_KEY)
+    connection_attempt = self.request.get(swarm_constants.COUNT_KEY)
     if connection_attempt:
       logging.info('This is the %s connection attempt from this machine to '
                    'POST these results', connection_attempt)

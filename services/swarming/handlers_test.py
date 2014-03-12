@@ -26,7 +26,6 @@ import test_case
 import webtest
 
 from common import swarm_constants
-from common import url_helper
 from server import admin_user
 from server import dimension_mapping
 from server import dimensions_utils
@@ -405,7 +404,6 @@ class AppTest(test_case.TestCase):
                          expect_errors=expect_errors)
 
   def testResultHandler(self):
-    self._mox.StubOutWithMock(url_helper, 'UrlOpen')
     self._mox.ReplayAll()
 
     runner = test_helper.CreatePendingRunner(machine_id=MACHINE_ID)
@@ -689,9 +687,6 @@ class AppTest(test_case.TestCase):
                  '/waits_by_minute',
                 ]
 
-    self._mox.StubOutWithMock(url_helper, 'UrlOpen')
-    self._mox.ReplayAll()
-
     # Create a pending, active and done runner.
     test_helper.CreatePendingRunner()
     test_helper.CreatePendingRunner(machine_id=MACHINE_ID)
@@ -715,8 +710,6 @@ class AppTest(test_case.TestCase):
     for stat_url in stat_urls:
       response = self.app.get(stat_url)
       self.assertEqual('200 OK', response.status)
-
-    self._mox.VerifyAll()
 
   def testTestRequest(self):
     # Ensure that a test request fails without a request.
@@ -829,9 +822,6 @@ class AppTest(test_case.TestCase):
     # Act under admin identity.
     self._ReplaceCurrentUser(ADMIN_EMAIL)
 
-    self._mox.StubOutWithMock(url_helper, 'UrlOpen')
-    self._mox.ReplayAll()
-
     response = self.app.post(handlers._SECURE_CANCEL_URL, {'r': 'invalid_key'})
     self.assertEqual('200 OK', response.status)
     self.assertTrue('Cannot find runner' in response.body, response.body)
@@ -840,8 +830,6 @@ class AppTest(test_case.TestCase):
     response = self.app.post(handlers._SECURE_CANCEL_URL,
                              {'r': runner.key.urlsafe()})
     self.assertResponse(response, '200 OK', 'Runner canceled.')
-
-    self._mox.VerifyAll()
 
   def testKnownAuthResources(self):
     # This test is supposed to catch typos and new types of auth resources.

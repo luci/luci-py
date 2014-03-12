@@ -4,7 +4,6 @@
 
 """A helper script for wrapping url calls."""
 
-
 import hashlib
 import httplib
 import logging
@@ -17,8 +16,8 @@ import urllib
 import urllib2
 import urlparse
 
+from common import swarm_constants
 
-COUNT_KEY = 'UrlOpenAttempt'
 
 # The index of the query elements from urlparse.
 QUERY_INDEX = 4
@@ -63,13 +62,14 @@ def UrlOpen(url, data=None, files=None, max_tries=5, wait_duration=None,
 
   data = data or {}
 
-  if COUNT_KEY in data:
-    logging.error('UrlOpen(%s): key \'%s\' is duplicate.', url, COUNT_KEY)
+  if swarm_constants.COUNT_KEY in data:
+    logging.error(
+        'UrlOpen(%s): key \'%s\' is duplicate.', url, swarm_constants.COUNT_KEY)
     return None
 
   url_response = None
   for attempt in range(max_tries):
-    data[COUNT_KEY] = attempt
+    data[swarm_constants.COUNT_KEY] = attempt
     try:
       # urlencode requires that all strings be in ASCII form.
       for key, value in data.iteritems():

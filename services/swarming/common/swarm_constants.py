@@ -4,6 +4,9 @@
 
 """Various swarm constants used by both the server and the bot code."""
 
+# Query parameter key used when doing requests by the bot.
+COUNT_KEY = 'UrlOpenAttempt'
+
 # The exit code to return when the machine should restart.
 # TODO(maruel): This is only needed by swarm_bot/ so move it there.
 RESTART_EXIT_CODE = 99

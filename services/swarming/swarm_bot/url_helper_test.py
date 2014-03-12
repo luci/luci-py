@@ -25,8 +25,9 @@ import test_env
 test_env.setup_test_env()
 
 from depot_tools import auto_stub
-from common import url_helper
 from third_party.mox import mox
+
+import url_helper
 
 
 class UrlHelperTest(auto_stub.TestCase):
@@ -164,7 +165,7 @@ class UrlHelperTest(auto_stub.TestCase):
   def testEnsureCountKeyIncludedInOpen(self):
     attempts = 5
     for i in range(attempts):
-      encoded_data = urllib.urlencode({url_helper.COUNT_KEY: i})
+      encoded_data = urllib.urlencode({url_helper.swarm_constants.COUNT_KEY: i})
 
       url_helper.urllib2.urlopen(
           mox.IgnoreArg(), encoded_data, timeout=mox.IgnoreArg()).AndRaise(
@@ -177,7 +178,7 @@ class UrlHelperTest(auto_stub.TestCase):
     self._mox.VerifyAll()
 
   def testCountKeyInData(self):
-    data = {url_helper.COUNT_KEY: 1}
+    data = {url_helper.swarm_constants.COUNT_KEY: 1}
     self._mox.ReplayAll()
 
     self.assertEqual(url_helper.UrlOpen('url', data=data), None)

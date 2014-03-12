@@ -15,10 +15,11 @@ import unittest
 # Import everything that does not need sys.path hack first.
 # pylint: disable-msg=W0403
 import slave_machine
+import url_helper
+
 from common import bot_archive
 from common import rpc
 from common import swarm_constants
-from common import url_helper
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(BASE_DIR)

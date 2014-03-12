@@ -27,7 +27,8 @@ import zipfile
 # pylint: disable-msg=W0403
 from common import swarm_constants
 from common import test_request_message
-from common import url_helper
+
+import url_helper
 
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
