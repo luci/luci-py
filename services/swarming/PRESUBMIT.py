@@ -35,7 +35,6 @@ def CommonChecks(input_api, output_api):
       join('server'),
       join('stats'),
       join('swarm_bot'),
-      join('tools'),
   ]
 
   blacklist = []
