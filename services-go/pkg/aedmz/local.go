@@ -4,9 +4,9 @@
 
 // +build !appengine
 
-// AppEngine abstraction layer when running locally.
-
 package aedmz
+
+// AppEngine abstraction layer when running locally.
 
 import (
 	"bytes"
@@ -222,15 +222,15 @@ func asLines(text string) []string {
 
 func levelToStr(level int) string {
 	switch level {
-	case LOG_LEVEL_DEBUG:
+	case LogLevelDebug:
 		return "D"
-	case LOG_LEVEL_INFO:
+	case LogLevelInfo:
 		return "I"
-	case LOG_LEVEL_WARNING:
+	case LogLevelWarning:
 		return "W"
-	case LOG_LEVEL_ERROR:
+	case LogLevelError:
 		return "E"
-	case LOG_LEVEL_CRITICAL:
+	case LogLevelCritical:
 		return "C"
 	default:
 		return "x"
@@ -238,19 +238,19 @@ func levelToStr(level int) string {
 }
 
 func (r *requestContext) Debugf(format string, args ...interface{}) {
-	r.record.logf(LOG_LEVEL_DEBUG, format, args...)
+	r.record.logf(LogLevelDebug, format, args...)
 }
 
 func (r *requestContext) Infof(format string, args ...interface{}) {
-	r.record.logf(LOG_LEVEL_INFO, format, args...)
+	r.record.logf(LogLevelInfo, format, args...)
 }
 
 func (r *requestContext) Warningf(format string, args ...interface{}) {
-	r.record.logf(LOG_LEVEL_WARNING, format, args...)
+	r.record.logf(LogLevelWarning, format, args...)
 }
 
 func (r *requestContext) Errorf(format string, args ...interface{}) {
-	r.record.logf(LOG_LEVEL_ERROR, format, args...)
+	r.record.logf(LogLevelError, format, args...)
 }
 
 // LogService.

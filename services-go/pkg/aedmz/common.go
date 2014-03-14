@@ -2,12 +2,12 @@
 // Use of this source code is governed by the Apache v2.0 license that can be
 // found in the LICENSE file.
 
+package aedmz
+
 // AppEngine aedmz layer.
 //
 // This file contains code and interfaces that is common between a local server
 // and an AppEngine server.
-
-package aedmz
 
 import (
 	gorillaContext "code.google.com/p/swarming/services-go/third_party/github.com/gorilla/context"
@@ -18,11 +18,11 @@ import (
 
 const (
 	// Same values as google_appengine/google/appengine/api/logservice/logservice.py
-	LOG_LEVEL_DEBUG = iota
-	LOG_LEVEL_INFO
-	LOG_LEVEL_WARNING
-	LOG_LEVEL_ERROR
-	LOG_LEVEL_CRITICAL
+	LogLevelDebug = iota
+	LogLevelInfo
+	LogLevelWarning
+	LogLevelError
+	LogLevelCritical
 )
 
 // ErrNotFound is returned when a object requested in DB or Cache is not found.

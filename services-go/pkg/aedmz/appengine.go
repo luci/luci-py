@@ -4,9 +4,9 @@
 
 // +build appengine
 
-// AppEngine abstraction layer.
-
 package aedmz
+
+// AppEngine abstraction layer.
 
 import (
 	"appengine"

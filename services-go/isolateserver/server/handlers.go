@@ -2,9 +2,9 @@
 // Use of this source code is governed by the Apache v2.0 license that can be
 // found in the LICENSE file.
 
-// This module defines all the HTTP handlers the isolate server supports.
-
 package server
+
+// This module defines all the HTTP handlers the isolate server supports.
 
 import (
 	"code.google.com/p/swarming/services-go/pkg/aedmz"
