@@ -629,10 +629,13 @@ class InternalTagWorkerHandler(webapp2.RequestHandler):
     except (
         datastore_errors.InternalError,
         datastore_errors.Timeout,
-        datastore_errors.TransactionFailedError) as e:
+        datastore_errors.TransactionFailedError,
+        runtime.DeadlineExceededError) as e:
       # No need to print a stack trace. Return 500 so it is retried
       # automatically. Disable this from an error reporting standpoint because
       # we can't do anything about it.
+      # TODO(maruel): Split the request in smaller chunk, since it seems to
+      # timeout frequently.
       logging.warning('Failed to stamp %d entries: %s', len(digests), e)
       self.abort(500, detail='Timed out while tagging.')
     except Exception as e:
