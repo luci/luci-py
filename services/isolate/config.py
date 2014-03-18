@@ -69,8 +69,7 @@ class GlobalConfig(ndb.Model):
 
   # The Google Cloud Storage bucket where to save the data. By default it's the
   # name of the application instance.
-  gs_bucket = ndb.StringProperty(
-      indexed=False, default=app_identity.get_application_id())
+  gs_bucket = ndb.StringProperty(indexed=False)
 
   # Email address of Service account used to access Google Storage.
   gs_client_id_email = ndb.StringProperty(indexed=False, default='')
@@ -114,6 +113,10 @@ def settings():
     # transaction but in practice it's fine.
     for key, default in missing.iteritems():
       setattr(config, key, default)
+    config.put()
+
+  if not config.gs_bucket:
+    config.gs_bucket = app_identity.get_application_id()
     config.put()
 
   return config
