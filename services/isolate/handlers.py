@@ -22,6 +22,7 @@ import zlib
 
 import webapp2
 from google.appengine import runtime
+from google.appengine.api import app_identity
 from google.appengine.api import datastore_errors
 from google.appengine.api import memcache
 from google.appengine.api import taskqueue
@@ -813,8 +814,11 @@ class InternalEreporter2Mail(webapp2.RequestHandler):
     if 'true' != self.request.headers.get('X-AppEngine-Cron'):
       self.abort(403, 'Must be a cron request.')
 
-    request_id_url = self.request.host_url + '/restricted/ereporter2/request/'
-    report_url = self.request.host_url + '/restricted/ereporter2/report'
+    # Do not use self.request.host_url because it will be http:// and will point
+    # to the backend, with an host format that breaks the SSL certificate.
+    host_url = 'https://%s.appspot.com' % app_identity.get_application_id()
+    request_id_url = host_url + '/restricted/ereporter2/request/'
+    report_url = host_url + '/restricted/ereporter2/report'
     recipients = self.request.get(
         'recipients', config.settings().monitoring_recipients)
     result = ereporter2.generate_and_email_report(
