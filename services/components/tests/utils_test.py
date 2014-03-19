@@ -26,6 +26,12 @@ class Rambling(ndb.Model):
   c = ndb.DateTimeProperty()
   d = ndb.DateProperty()
 
+  def to_dict(self):
+    out = super(Rambling, self).to_dict()
+    out['e'] = datetime.timedelta(seconds=1.1)
+    out['f'] = '\xc4\xa9'
+    return out
+
 
 def int_ceil_div(value, divisor):
   """Returns the ceil() value of a integer based division."""
@@ -33,20 +39,24 @@ def int_ceil_div(value, divisor):
 
 
 class UtilsTest(test_case.TestCase):
-  def test_smart_json(self):
+  def test_json(self):
     r = Rambling(
         a=2,
         b=0.2,
         c=datetime.datetime(2012, 1, 2, 3, 4, 5, 6),
         d=datetime.date(2012, 1, 2))
-    actual = utils.SmartJsonEncoder().encode([r])
+    actual = utils.to_json_encodable([r])
     # Confirm that default is tight encoding and sorted keys.
-    expected = (
-        '[{"a":2,'
-        '"b":0.2,'
-        '"c":"2012-01-02 03:04:05",'
-        '"d":"2012-01-02"'
-        '}]')
+    expected = [
+      {
+        'a': 2,
+        'b': 0.2,
+        'c': u'2012-01-02 03:04:05',
+        'd': u'2012-01-02',
+        'e': 1,
+        'f': u'\u0129',
+      },
+    ]
     self.assertEqual(expected, actual)
 
   def test_pop_future(self):

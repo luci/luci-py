@@ -231,6 +231,8 @@ class TestRunner(ndb.Model):
     """Returns the object as a dict that can be serialized for the user.
 
     The return value is means to be returned to the user.
+
+    TODO(maruel): Remove me and use to_dict().
     """
     return {
       'config_instance_index': self.config_instance_index,

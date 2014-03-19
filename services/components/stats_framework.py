@@ -18,9 +18,21 @@ import logging
 from google.appengine.ext import ndb
 from google.appengine.runtime import DeadlineExceededError
 
+from components import utils
+
 
 # Formatting a datetime instance to the minute.
 TIME_FORMAT = '%Y-%m-%d %H:%M'
+
+
+# Logs prefix.
+PREFIX = 'Stats: '
+
+
+# Number of minutes to ignore because they are too fresh. This is done so that
+# eventual log consistency doesn't have to be managed explicitly. On the dev
+# server, there's no eventual inconsistency so process up to the last minute.
+TOO_RECENT = 5 if not utils.is_local_dev_server() else 1
 
 
 class StatisticsFramework(object):
@@ -392,6 +404,63 @@ def accumulate(lhs, rhs):
       default = lhs._properties[key]._default
       total = getattr(lhs, key, default) + getattr(rhs, key, default)
       setattr(lhs, key, total)
+
+
+def generate_stats_data(days, hours, minutes, now, stats_handler):
+  """Returns a dict for data requested in the query."""
+  now = now or datetime.datetime.utcnow()
+  today = now.date()
+
+  # Fire up all the datastore requests.
+  future_days = []
+  if days:
+    future_days = ndb.get_multi_async(
+        stats_handler.day_key(today - datetime.timedelta(days=i))
+        for i in range(days + 1))
+
+  future_hours = []
+  if hours:
+    future_hours = ndb.get_multi_async(
+        stats_handler.hour_key(now - datetime.timedelta(hours=i))
+        for i in range(hours + 1))
+
+  future_minutes = []
+  if minutes:
+    future_minutes = ndb.get_multi_async(
+        stats_handler.minute_key(now - datetime.timedelta(minutes=i))
+        for i in range(minutes + 1))
+
+  def filterout(futures):
+    """Filters out inexistent entities."""
+    intermediary = (i.get_result() for i in futures)
+    return [i for i in intermediary if i]
+
+  return {
+    'days': filterout(future_days),
+    'hours': filterout(future_hours),
+    'minutes': filterout(future_minutes),
+    'now': now.strftime(TIME_FORMAT),
+  }
+
+
+def generate_stats_data_from_request(request, stats_handler):
+  """Returns a dict for data requested in the query."""
+  DEFAULT_DAYS = 5
+  DEFAULT_HOURS = 48
+  DEFAULT_MINUTES = 120
+  MIN_VALUE = 0
+  MAX_DAYS = 367
+  MAX_HOURS = 480
+  MAX_MINUTES = 480
+
+  days = utils.get_request_as_int(
+      request, 'days', DEFAULT_DAYS, MIN_VALUE, MAX_DAYS)
+  hours = utils.get_request_as_int(
+      request, 'hours', DEFAULT_HOURS, MIN_VALUE, MAX_HOURS)
+  minutes = utils.get_request_as_int(
+      request, 'minutes', DEFAULT_MINUTES, MIN_VALUE, MAX_MINUTES)
+  now = utils.get_request_as_datetime(request, 'now')
+  return generate_stats_data(days, hours, minutes, now, stats_handler)
 
 
 def _lowest_missing_bit(bitmap):

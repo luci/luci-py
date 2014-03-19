@@ -11,34 +11,158 @@
 # pylint: disable=R0201
 
 import datetime
+import functools
 import json
+import os
+import threading
+import time
 
 from google.appengine.ext import ndb
 
 
-class SmartJsonEncoder(json.JSONEncoder):
-  """json encoder that supports ndb.Model and datetime serialization."""
-  def __init__(self, **kwargs):
-    """Changes default."""
-    kwargs.setdefault('separators', (',',':'))
-    kwargs.setdefault('sort_keys', True)
-    super(SmartJsonEncoder, self).__init__(self, **kwargs)
+def is_local_dev_server():
+  """Returns True if running on local development server."""
+  return os.environ.get('SERVER_SOFTWARE', '').startswith('Development')
 
-  def default(self, obj):  # pylint: disable=E0202
-    if isinstance(obj, datetime.datetime):
-      # Convert datetime objects into a string, stripping off milliseconds.
-      # Only accept naive objects.
-      if obj.tzinfo is not None:
-        raise ValueError('Can only serialize naive datetime instance')
-      return obj.strftime('%Y-%m-%d %H:%M:%S')
-    if isinstance(obj, datetime.date):
-      return obj.strftime('%Y-%m-%d')
-    if isinstance(obj, datetime.timedelta):
-      # Convert timedelta into seconds, stripping off milliseconds.
-      return int(obj.total_seconds())
-    if isinstance(obj, ndb.Model):
-      return obj.to_dict()
-    return super(SmartJsonEncoder, self).default(obj)
+
+def to_units(number):
+  """Convert a string to numbers."""
+  UNITS = ('', 'k', 'm', 'g', 't', 'p', 'e', 'z', 'y')
+  unit = 0
+  while number >= 1024.:
+    unit += 1
+    number = number / 1024.
+    if unit == len(UNITS) - 1:
+      break
+  if unit:
+    return '%.2f%s' % (number, UNITS[unit])
+  return '%d' % number
+
+
+def get_request_as_int(request, key, default, min_value, max_value):
+  """Returns a request value as int."""
+  value = request.params.get(key, '')
+  try:
+    value = int(value)
+  except ValueError:
+    return default
+  return min(max_value, max(min_value, value))
+
+
+def get_request_as_datetime(request, key):
+  value_text = request.params.get(key)
+  if value_text:
+    FORMATS = ('%Y-%m-%d', '%Y-%m-%d %H:%M')
+    for f in FORMATS:
+      try:
+        return datetime.datetime.strptime(value_text, f)
+      except ValueError:
+        continue
+  return None
+
+
+### Cache
+
+
+class _Cache(object):
+  """Holds state of a cache for cache_with_expiration and cache decorators."""
+
+  def __init__(self, func, expiration_sec):
+    self.func = func
+    self.expiration_sec = expiration_sec
+    self.lock = threading.Lock()
+    self.value = None
+    self.value_is_set = False
+    self.expires = None
+
+  def get_value(self):
+    """Returns a cached value refreshing it if it has expired."""
+    with self.lock:
+      if not self.value_is_set or (self.expires and time.time() > self.expires):
+        self.value = self.func()
+        self.value_is_set = True
+        if self.expiration_sec:
+          self.expires = time.time() + self.expiration_sec
+      return self.value
+
+  def get_wrapper(self):
+    """Returns a callable object that can be used in place of |func|.
+
+    It's basically self.get_value, updated by functools.wraps to look more like
+    original function.
+    """
+    # functools.wraps doesn't like 'instancemethod', use lambda as a proxy.
+    # pylint: disable=W0108
+    return functools.wraps(self.func)(lambda: self.get_value())
+
+
+def cache(func):
+  """Decorator that implements permanent cache of a zero-parameter function."""
+  return _Cache(func, None).get_wrapper()
+
+
+def cache_with_expiration(expiration_sec):
+  """Decorator that implements in-memory cache for a zero-parameter function."""
+  def decorator(func):
+    return _Cache(func, expiration_sec).get_wrapper()
+  return decorator
+
+
+def constant_time_equals(a, b):
+  """Compares two strings in constant time regardless of theirs content."""
+  if len(a) != len(b):
+    return False
+  result = 0
+  for x, y in zip(a, b):
+    result |= ord(x) ^ ord(y)
+  return result == 0
+
+
+## JSON
+
+
+def to_json_encodable(data):
+  """Converts data into json-compatible data."""
+  if isinstance(data, unicode) or data is None:
+    return data
+  if isinstance(data, str):
+    return data.decode('utf-8')
+  if isinstance(data, (int, float, long)):
+    # Note: overflowing is an issue with int and long.
+    return data
+  if isinstance(data, (list, set, tuple)):
+    return [to_json_encodable(i) for i in data]
+  if isinstance(data, dict):
+    assert all(isinstance(k, basestring) for k in data), data
+    return {
+      to_json_encodable(k): to_json_encodable(v) for k, v in data.iteritems()
+    }
+
+  if isinstance(data, datetime.datetime):
+    # Convert datetime objects into a string, stripping off milliseconds. Only
+    # accept naive objects.
+    if data.tzinfo is not None:
+      raise ValueError('Can only serialize naive datetime instance')
+    return data.strftime(u'%Y-%m-%d %H:%M:%S')
+  if isinstance(data, datetime.date):
+    return data.strftime(u'%Y-%m-%d')
+  if isinstance(data, datetime.timedelta):
+    # Convert timedelta into seconds, stripping off milliseconds.
+    return int(data.total_seconds())
+
+  if hasattr(data, 'to_dict') and callable(data.to_dict):
+    # This takes care of ndb.Model.
+    return to_json_encodable(data.to_dict())
+  assert False, 'Don\'t know how to handle %r' % data
+
+
+def encode_to_json(data):
+  """Converts any data as a json string."""
+  return json.dumps(
+      to_json_encodable(data),
+      sort_keys=True,
+      separators=(',', ':'),
+      encoding='utf-8')
 
 
 # Use field when converting entity to a serializable dict.

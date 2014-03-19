@@ -38,6 +38,7 @@ from cloudstorage.errors import (
     TransientError)
 
 import config
+from components import utils
 
 
 # The limit is 32 megs but it's a tad on the large side. Use 512kb chunks
@@ -221,7 +222,7 @@ class URLSigner(object):
     Returns:
       List of webapp2.Routes objects to add to the application.
     """
-    assert config.is_local_dev_server(), 'Must not be run in production'
+    assert utils.is_local_dev_server(), 'Must not be run in production'
     if not URLSigner.DEV_MODE_ENABLED:
       # Replace GS_URL with a mocked one.
       URLSigner.GS_URL = (

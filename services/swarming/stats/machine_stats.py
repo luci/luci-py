@@ -15,6 +15,7 @@ from google.appengine.api import app_identity
 from google.appengine.ext import ndb
 
 import template
+from components import utils
 from server import admin_user
 
 
@@ -117,7 +118,7 @@ def RecordMachineQueriedForWork(machine_id, dimensions, machine_tag):
     machine_tag: The tag identifier of the machine.
   """
   # TODO(maruel): Put the entities into an entity group.
-  dimensions_str = json.dumps(dimensions, sort_keys=True, separators=(',', ':'))
+  dimensions_str = utils.encode_to_json(dimensions)
 
   machine_stats = MachineStats.get_by_id(machine_id)
   if (machine_stats and

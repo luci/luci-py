@@ -32,16 +32,15 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(BASE_DIR, 'third_party'))
 
 import acl
-from components import ereporter2
-from components import auth
-from components import auth_ui
-from components import utils as components_utils
 import config
 import gcs
 import map_reduce_jobs
 import stats
 import template
-import utils
+from components import ereporter2
+from components import auth
+from components import auth_ui
+from components import utils
 
 
 # Version of isolate protocol returned to clients in /handshake request.
@@ -604,7 +603,7 @@ class InternalTagWorkerHandler(webapp2.RequestHandler):
       self.abort(405, detail='Only internal task queue tasks can do this')
 
     digests = []
-    now = components_utils.timestamp_to_datetime(long(timestamp))
+    now = utils.timestamp_to_datetime(long(timestamp))
     expiration = config.settings().default_expiration
     try:
       digests = payload_to_hashes(self, namespace)
@@ -884,7 +883,7 @@ class RestrictedEreporter2Request(auth.AuthenticatingHandler):
     if not data:
       self.abort(404, detail='Request id was not found.')
     self.response.headers['Content-Type'] = 'application/json; charset=utf-8'
-    json.dump(data, self.response, indent=2, sort_keys=True)
+    self.response.write(utils.encode_to_json(data))
 
 
 ### Mapreduce related handlers
@@ -909,7 +908,7 @@ class RestrictedLaunchMapReduceJob(auth.AuthenticatingHandler):
     success = enqueue_task(
         url='/internal/taskqueue/mapreduce/launch/%s' % job_id,
         queue_name=map_reduce_jobs.MAP_REDUCE_TASK_QUEUE,
-        use_dedicated_module=not config.is_local_dev_server())
+        use_dedicated_module=not utils.is_local_dev_server())
     # New tasks should show up on the status page.
     if success:
       self.redirect('/internal/mapreduce/status')
@@ -938,7 +937,7 @@ class ProtocolHandler(auth.AuthenticatingHandler):
     """Serializes |body| into JSON and sends it as a response."""
     self.response.set_status(http_code)
     self.response.headers['Content-Type'] = 'application/json; charset=utf-8'
-    json.dump(body, self.response.out, separators=(',', ':'))
+    self.response.write(utils.encode_to_json(body))
 
   def send_error(self, message, http_code=400):
     """Sends a error message and aborts the request, logs the error."""
@@ -1133,7 +1132,7 @@ class PreUploadContentHandler(ProtocolHandler):
   def tag_entries(entries, namespace):
     """Enqueues a task to update the timestamp for given entries."""
     url = '/internal/taskqueue/tag/%s/%s' % (
-        namespace, components_utils.datetime_to_timestamp(utcnow()))
+        namespace, utils.datetime_to_timestamp(utcnow()))
     payload = ''.join(binascii.unhexlify(e.digest) for e in entries)
     return enqueue_task(url, 'tag', payload=payload)
 
@@ -1553,7 +1552,7 @@ def CreateApplication():
   """
   # Routes added to WSGIApplication only a dev mode.
   dev_routes = []
-  if config.is_local_dev_server():
+  if utils.is_local_dev_server():
     dev_routes.extend(gcs.URLSigner.switch_to_dev_mode())
 
   # Supported authentication mechanisms.

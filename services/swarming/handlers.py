@@ -550,7 +550,7 @@ class ApiBots(auth.AuthenticatingHandler):
     }
     self.response.headers['Content-Type'] = 'application/json; charset=utf-8'
     self.response.headers['Cache-Control'] = 'no-cache, no-store'
-    self.response.out.write(utils.SmartJsonEncoder().encode(params))
+    self.response.write(utils.encode_to_json(params))
 
 
 class DeleteMachineStatsHandler(auth.AuthenticatingHandler):
@@ -871,7 +871,7 @@ class ShowMessageHandler(auth.AuthenticatingHandler):
     runner = test_runner.GetRunnerFromUrlSafeKey(runner_key)
 
     if runner:
-      json.dump(runner.GetAsDict(), self.response, indent=2, sort_keys=True)
+      self.response.write(utils.encode_to_json(runner.GetAsDict()))
     else:
       self.response.set_status(404)
       self.response.out.write('{}')
@@ -935,10 +935,10 @@ class GetMatchingTestCasesHandler(auth.AuthenticatingHandler):
     logging.info('Found %d keys in %d TestRequests', len(keys), len(matches))
     self.response.headers['Content-Type'] = 'application/json; charset=utf-8'
     if keys:
-      self.response.out.write(json.dumps(keys))
+      self.response.write(utils.encode_to_json(keys))
     else:
       self.response.set_status(404)
-      self.response.out.write('[]')
+      self.response.write('[]')
 
 
 class GetNewestMatchingTestCasesHandler(auth.AuthenticatingHandler):
@@ -955,10 +955,10 @@ class GetNewestMatchingTestCasesHandler(auth.AuthenticatingHandler):
     logging.info('Found %d keys in the newest TestRequests', len(keys))
     self.response.headers['Content-Type'] = 'application/json; charset=utf-8'
     if keys:
-      self.response.out.write(json.dumps(keys))
+      self.response.write(utils.encode_to_json(keys))
     else:
       self.response.set_status(404)
-      self.response.out.write('[]')
+      self.response.write('[]')
 
 
 # TODO(vadimsh): Remove once final ACLs structure is in place.

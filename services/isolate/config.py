@@ -27,7 +27,7 @@ from google.appengine.api import memcache
 from google.appengine.api import modules
 from google.appengine.ext import ndb
 
-import utils
+from components import utils
 
 
 # App engine module to run task queue tasks on.
@@ -152,14 +152,9 @@ def get_module_version_list(module_list, tainted):
   return result
 
 
-def is_local_dev_server():
-  """Returns True if running on local development server."""
-  return os.environ.get('SERVER_SOFTWARE', '').startswith('Development')
-
-
 def get_local_dev_server_host():
   """Returns 'hostname:port' for a default module on a local dev server."""
-  assert is_local_dev_server()
+  assert utils.is_local_dev_server()
   return modules.get_hostname(module='default')
 
 

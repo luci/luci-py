@@ -9,8 +9,6 @@ for general performance concerns. Each http handler should strive to do only one
 log entry at info level per request.
 """
 
-import datetime
-import json
 import logging
 
 import webapp2
@@ -18,10 +16,10 @@ from google.appengine.api import logservice
 from google.appengine.ext import ndb
 from google.appengine.runtime import DeadlineExceededError
 
-from components import stats_framework
 import config
 import template
-import utils
+from components import stats_framework
+from components import utils
 
 
 ### Public API
@@ -37,21 +35,9 @@ def log(action, number, where):
   The format is simple enough that it doesn't require a regexp for faster
   processing.
   """
-  logging.info('%s%s; %d; %s', _PREFIX, _ACTION_NAMES[action], number, where)
-
-
-def to_units(number):
-  """Convert a string to numbers."""
-  UNITS = ('', 'k', 'm', 'g', 't', 'p', 'e', 'z', 'y')
-  unit = 0
-  while number >= 1024.:
-    unit += 1
-    number = number / 1024.
-    if unit == len(UNITS) - 1:
-      break
-  if unit:
-    return '%.2f%s' % (number, UNITS[unit])
-  return '%d' % number
+  logging.info(
+      '%s%s; %d; %s', stats_framework.PREFIX, _ACTION_NAMES[action], number,
+      where)
 
 
 ### Models
@@ -79,18 +65,23 @@ class Snapshot(ndb.Model):
 
   def requests_as_text(self):
     return '%s (%s failed)' % (
-      to_units(self.requests), to_units(self.failures))
+      utils.to_units(self.requests),
+      utils.to_units(self.failures))
 
   def downloads_as_text(self):
     return '%s (%sb)' % (
-        to_units(self.downloads), to_units(self.downloads_bytes))
+        utils.to_units(self.downloads),
+        utils.to_units(self.downloads_bytes))
 
   def uploads_as_text(self):
-    return '%s (%sb)' % (to_units(self.uploads), to_units(self.uploads_bytes))
+    return '%s (%sb)' % (
+        utils.to_units(self.uploads),
+        utils.to_units(self.uploads_bytes))
 
   def lookups_as_text(self):
     return '%s (%s items)' % (
-        to_units(self.contains_requests), to_units(self.contains_lookups))
+        utils.to_units(self.contains_requests),
+        utils.to_units(self.contains_lookups))
 
 
 ### Utility
@@ -107,22 +98,12 @@ def get_stats_handler():
 _ACTION_NAMES = ['store', 'return', 'lookup', 'dupe']
 
 
-# Logs prefix.
-_PREFIX = 'Stats: '
-
-
-# Number of minutes to ignore because they are too fresh. This is done so that
-# eventual log consistency doesn't have to be managed explicitly. On the dev
-# server, there's no eventual inconsistency so process up to the last minute.
-_TOO_RECENT = 5 if not config.is_local_dev_server() else 1
-
-
 def _parse_line(line, values):
   """Updates a Snapshot instance with a processed statistics line if relevant.
   """
-  if not line.startswith(_PREFIX):
+  if not line.startswith(stats_framework.PREFIX):
     return
-  line = line[len(_PREFIX):]
+  line = line[len(stats_framework.PREFIX):]
   if line.count(';') < 2:
     return
   action_id, measurement, _rest = line.split('; ', 2)
@@ -170,100 +151,10 @@ def _extract_snapshot_from_logs(start_time, end_time):
   return values
 
 
-def _get_request_as_int(request, key, default, min_value, max_value):
-  """Returns a request value as int."""
-  value = request.params.get(key, '')
-  try:
-    value = int(value)
-  except ValueError:
-    return default
-  return min(max_value, max(min_value, value))
-
-
 def _generate_stats_data(request):
-  """Returns a dict for data requested in the query."""
-  DEFAULT_DAYS = 5
-  DEFAULT_HOURS = 48
-  DEFAULT_MINUTES = 120
-  MIN_VALUE = 0
-  MAX_DAYS = 367
-  MAX_HOURS = 480
-  MAX_MINUTES = 480
+  return stats_framework.generate_stats_data_from_request(
+      request, get_stats_handler())
 
-  limit_days = _get_request_as_int(
-      request, 'days', DEFAULT_DAYS, MIN_VALUE, MAX_DAYS)
-  limit_hours = _get_request_as_int(
-      request, 'hours', DEFAULT_HOURS, MIN_VALUE, MAX_HOURS)
-  limit_minutes = _get_request_as_int(
-      request, 'minutes', DEFAULT_MINUTES, MIN_VALUE, MAX_MINUTES)
-
-  now_text = request.params.get('now')
-  now = None
-  if now_text:
-    FORMATS = ('%Y-%m-%d', '%Y-%m-%d %H:%M')
-    for f in FORMATS:
-      try:
-        now = datetime.datetime.strptime(now_text, f)
-        break
-      except ValueError:
-        continue
-  if not now:
-    now = datetime.datetime.utcnow()
-  today = now.date()
-
-  # Fire up all the datastore requests.
-  stats_handler = get_stats_handler()
-
-  future_days = []
-  if limit_days:
-    future_days = ndb.get_multi_async(
-        stats_handler.day_key(today - datetime.timedelta(days=i))
-        for i in range(limit_days + 1))
-
-  future_hours = []
-  if limit_hours:
-    future_hours = ndb.get_multi_async(
-        stats_handler.hour_key(now - datetime.timedelta(hours=i))
-        for i in range(limit_hours + 1))
-
-  future_minutes = []
-  if limit_minutes:
-    future_minutes = ndb.get_multi_async(
-        stats_handler.minute_key(now - datetime.timedelta(minutes=i))
-        for i in range(limit_minutes + 1))
-
-  def filterout(futures):
-    """Filters out inexistent entities."""
-    intermediary = (i.get_result() for i in futures)
-    return [i for i in intermediary if i]
-
-  return {
-    'days': filterout(future_days),
-    'hours': filterout(future_hours),
-    'minutes': filterout(future_minutes),
-    'now': now.strftime(stats_framework.TIME_FORMAT),
-  }
-
-
-def _to_json(data):
-  """Converts data into json-compatible data."""
-  if isinstance(data, unicode):
-    return data
-  elif isinstance(data, str):
-    return data.decode('utf-8')
-  if isinstance(data, dict):
-    return dict((_to_json(k), _to_json(v)) for k, v in data.iteritems())
-  elif isinstance(data, ndb.Model):
-    return _to_json(data.to_dict())
-  elif isinstance(data, (list, tuple)):
-    return [_to_json(i) for i in data]
-  elif isinstance(data, datetime.datetime):
-    return unicode(str(data))
-  elif isinstance(data, (int, float, long)):
-    # Note: overflowing is an issue with int and long.
-    return data
-  else:
-    assert False, 'Don\'t know how to handle %r' % data
 
 
 ### Handlers
@@ -274,7 +165,7 @@ class InternalStatsUpdateHandler(webapp2.RequestHandler):
   def get(self):
     self.response.headers['Content-Type'] = 'text/plain'
     try:
-      i = get_stats_handler().process_next_chunk(_TOO_RECENT)
+      i = get_stats_handler().process_next_chunk(stats_framework.TOO_RECENT)
     except DeadlineExceededError:
       self.response.status_code = 500
       return
@@ -290,15 +181,12 @@ class StatsHandler(webapp2.RequestHandler):
     data = _generate_stats_data(self.request)
     to_render = template.get('stats.html')
     self.response.write(to_render.render(data))
-    self.response.headers['Content-Type'] = 'text/html'
 
 
 class StatsJsonHandler(webapp2.RequestHandler):
   """Returns the statistic data."""
   def get(self):
-    data = _to_json(_generate_stats_data(self.request))
-
-    # Make it json-compatible.
-    self.response.write(json.dumps(data, separators=(',',':')))
-    self.response.headers['Content-Type'] = 'application/json'
+    data = _generate_stats_data(self.request)
+    self.response.headers['Content-Type'] = 'application/json; charset=utf-8'
     self.response.headers['Access-Control-Allow-Origin'] = '*'
+    self.response.write(utils.encode_to_json(data))
