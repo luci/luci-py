@@ -71,6 +71,11 @@ indexes:
 - kind: TestRunner
   properties:
   - name: done
+  - name: ended
+
+- kind: TestRunner
+  properties:
+  - name: done
   - name: machine_id
 
 - kind: TestRunner
