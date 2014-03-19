@@ -128,7 +128,7 @@ def _parse_line(line, values):
 def _extract_snapshot_from_logs(start_time, end_time):
   """Processes the logs to harvest data and return a Snapshot instance."""
   values = Snapshot()
-  module_versions = config.get_module_version_list(config.STATS_MODULES, True)
+  module_versions = utils.get_module_version_list(config.STATS_MODULES, True)
   for entry in logservice.fetch(
       start_time=start_time,
       end_time=end_time,

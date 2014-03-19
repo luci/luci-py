@@ -17,7 +17,14 @@ import os
 import threading
 import time
 
+from google.appengine.api import memcache
+from google.appengine.api import modules
 from google.appengine.ext import ndb
+
+
+DATETIME_FORMAT = u'%Y-%m-%d %H:%M:%S'
+DATE_FORMAT = u'%Y-%m-%d'
+VALID_DATETIME_FORMATS = ('%Y-%m-%d', '%Y-%m-%d %H:%M', '%Y-%m-%d %H:%M:%S')
 
 
 def is_local_dev_server():
@@ -52,8 +59,7 @@ def get_request_as_int(request, key, default, min_value, max_value):
 def get_request_as_datetime(request, key):
   value_text = request.params.get(key)
   if value_text:
-    FORMATS = ('%Y-%m-%d', '%Y-%m-%d %H:%M')
-    for f in FORMATS:
+    for f in VALID_DATETIME_FORMATS:
       try:
         return datetime.datetime.strptime(value_text, f)
       except ValueError:
@@ -118,6 +124,36 @@ def constant_time_equals(a, b):
   return result == 0
 
 
+def get_module_version_list(module_list, tainted):
+  """Returns a list of pairs (module name, version name) to fetch logs for.
+
+  Arguments:
+    module_list: list of modules to list, defaults to all modules.
+    tainted: if False, excludes versions with '-tainted' in their name.
+  """
+  result = []
+  if not module_list:
+    # If the function it called too often, it'll raise a OverQuotaError. So
+    # cache it for 10 minutes.
+    module_list = memcache.get('modules_list')
+    if not module_list:
+      module_list = modules.get_modules()
+      memcache.set('modules_list', module_list, time=10*60)
+
+  for module in module_list:
+    # If the function it called too often, it'll raise a OverQuotaError.
+    # Versions is a bit more tricky since we'll loose data, since versions are
+    # changed much more often than modules. So cache it for 1 minute.
+    key = 'modules_list-' + module
+    version_list = memcache.get(key)
+    if not version_list:
+      version_list = modules.get_versions(module)
+      memcache.set(key, version_list, time=60)
+    result.extend(
+        (module, v) for v in version_list if tainted or '-tainted' not in v)
+  return result
+
+
 ## JSON
 
 
@@ -143,9 +179,9 @@ def to_json_encodable(data):
     # accept naive objects.
     if data.tzinfo is not None:
       raise ValueError('Can only serialize naive datetime instance')
-    return data.strftime(u'%Y-%m-%d %H:%M:%S')
+    return data.strftime(DATETIME_FORMAT)
   if isinstance(data, datetime.date):
-    return data.strftime(u'%Y-%m-%d')
+    return data.strftime(DATE_FORMAT)
   if isinstance(data, datetime.timedelta):
     # Convert timedelta into seconds, stripping off milliseconds.
     return int(data.total_seconds())

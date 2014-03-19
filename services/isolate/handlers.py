@@ -821,7 +821,7 @@ class InternalEreporter2Mail(webapp2.RequestHandler):
     recipients = self.request.get(
         'recipients', config.settings().monitoring_recipients)
     result = ereporter2.generate_and_email_report(
-        config.get_module_version_list(None, False),
+        utils.get_module_version_list(None, False),
         should_ignore_error_record,
         recipients,
         request_id_url,
@@ -860,7 +860,7 @@ class RestrictedEreporter2Report(auth.AuthenticatingHandler):
     if modules:
       modules = modules.split(',')
     tainted = bool(int(self.request.get('tainted', '0')))
-    module_versions = config.get_module_version_list(modules, tainted)
+    module_versions = utils.get_module_version_list(modules, tainted)
     report, ignored = ereporter2.generate_report(
         start, end, module_versions, should_ignore_error_record)
     env = ereporter2.get_template_env(start, end, module_versions)

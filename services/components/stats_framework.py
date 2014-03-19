@@ -21,10 +21,6 @@ from google.appengine.runtime import DeadlineExceededError
 from components import utils
 
 
-# Formatting a datetime instance to the minute.
-TIME_FORMAT = '%Y-%m-%d %H:%M'
-
-
 # Logs prefix.
 PREFIX = 'Stats: '
 
@@ -33,6 +29,11 @@ PREFIX = 'Stats: '
 # eventual log consistency doesn't have to be managed explicitly. On the dev
 # server, there's no eventual inconsistency so process up to the last minute.
 TOO_RECENT = 5 if not utils.is_local_dev_server() else 1
+
+
+def utcnow():
+  """To be mocked in tests."""
+  return datetime.datetime.utcnow()
 
 
 class StatisticsFramework(object):
@@ -75,7 +76,7 @@ class StatisticsFramework(object):
     # The root entity is used for transactions so make sure it exists.
     self.stats_root_cls.get_or_insert(self.root_key_id)
 
-  def process_next_chunk(self, up_to, get_now=None):
+  def process_next_chunk(self, up_to):
     """Processes as much minutes starting at a specific time.
 
     This class should be called from a non-synchronized cron job, so it will
@@ -85,15 +86,12 @@ class StatisticsFramework(object):
     Arguments:
     - up_to: number of minutes to buffer between 'now' and the last minute to
              process. Will usually be in the range of 1 to 10.
-    - get_now: optional argument that returns a 'now' value. Mostly to be used
-               in test to hard code the value of 'now'.
 
     Returns the number of self.stats_minute_cls generated, e.g. the number of
     minutes processed successfully by self_generate_snapshot.
     """
-    get_now = get_now or datetime.datetime.utcnow
     try:
-      now = get_now()
+      now = utcnow()
       original_minute = self._get_next_minute_to_process(now)
       next_minute = original_minute
       count = 0
@@ -104,7 +102,7 @@ class StatisticsFramework(object):
         if self.MAX_MINUTES_PER_PROCESS == count:
           break
         next_minute = next_minute + datetime.timedelta(minutes=1)
-        now = get_now()
+        now = utcnow()
       return count
     except DeadlineExceededError:
       msg = (
@@ -394,21 +392,35 @@ class StatisticsFramework(object):
 def accumulate(lhs, rhs):
   """Adds the values from rhs into lhs.
 
+  Both must be an ndb.Model.
+
   rhs._properties not in lhs._properties are lost.
   lhs._properties not in rhs._properties are untouched.
   """
+  assert isinstance(lhs, ndb.Model), lhs
+  assert isinstance(rhs, ndb.Model), rhs
+
   # Access to a protected member NNN of a client class
   # pylint: disable=W0212
   for key in set(lhs._properties).intersection(rhs._properties):
     if hasattr(lhs, key) and hasattr(rhs, key):
       default = lhs._properties[key]._default
-      total = getattr(lhs, key, default) + getattr(rhs, key, default)
+      lhs_value = getattr(lhs, key, default)
+      rhs_value = getattr(rhs, key, default)
+      if hasattr(lhs_value, 'accumulate'):
+        assert callable(lhs_value.accumulate), lhs_value
+        lhs_value.accumulate(rhs_value)
+        # Enforce setting back the property, so it works even if lhs_value ==
+        # default.
+        total = lhs_value
+      else:
+        total = lhs_value + rhs_value
       setattr(lhs, key, total)
 
 
 def generate_stats_data(days, hours, minutes, now, stats_handler):
   """Returns a dict for data requested in the query."""
-  now = now or datetime.datetime.utcnow()
+  now = now or utcnow()
   today = now.date()
 
   # Fire up all the datastore requests.
@@ -439,7 +451,7 @@ def generate_stats_data(days, hours, minutes, now, stats_handler):
     'days': filterout(future_days),
     'hours': filterout(future_hours),
     'minutes': filterout(future_minutes),
-    'now': now.strftime(TIME_FORMAT),
+    'now': now.strftime(utils.DATETIME_FORMAT),
   }
 
 

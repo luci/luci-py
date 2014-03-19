@@ -15,18 +15,27 @@ from google.appengine.ext import ndb
 from google.appengine.ext import testbed
 
 from components import stats_framework
+from depot_tools import auto_stub
 
 
-class Snapshot(ndb.Model):
-  """Fake statistics."""
-  a = ndb.IntegerProperty(default=0)
-  b = ndb.FloatProperty(default=0)
+class InnerSnapshot(ndb.Model):
+  c = ndb.StringProperty(default='', indexed=False)
 
   def accumulate(self, rhs):
     return stats_framework.accumulate(self, rhs)
 
 
-class StatsFrameworkTest(unittest.TestCase):
+class Snapshot(ndb.Model):
+  """Fake statistics."""
+  a = ndb.IntegerProperty(default=0, indexed=False)
+  b = ndb.FloatProperty(default=0, indexed=False)
+  inner = ndb.LocalStructuredProperty(InnerSnapshot, default=InnerSnapshot())
+
+  def accumulate(self, rhs):
+    return stats_framework.accumulate(self, rhs)
+
+
+class StatsFrameworkTest(auto_stub.TestCase):
   def setUp(self):
     super(StatsFrameworkTest, self).setUp()
     self.testbed = testbed.Testbed()
@@ -47,17 +56,18 @@ class StatsFrameworkTest(unittest.TestCase):
       """Returns fake statistics."""
       self.assertEqual(start + 60, end)
       called.append(start)
-      return Snapshot(a=1, b=1)
+      return Snapshot(a=1, b=1, inner=InnerSnapshot(c='%d,' % len(called)))
 
     handler = stats_framework.StatisticsFramework(
         'test_framework', Snapshot, gen_data)
 
     now = datetime.datetime.utcnow()
+    self.mock(stats_framework, 'utcnow', lambda: now)
     start_date = now - datetime.timedelta(
         days=stats_framework.StatisticsFramework.MAX_BACKTRACK)
     limit = handler.MAX_MINUTES_PER_PROCESS
 
-    i = handler.process_next_chunk(5, lambda: now)
+    i = handler.process_next_chunk(5)
     self.assertEqual(limit, i)
 
     # Fresh new stats gathering always starts at midnight.
@@ -68,7 +78,18 @@ class StatsFrameworkTest(unittest.TestCase):
     ]
     self.assertEqual(expected_calls, called)
 
-    expected = [{'hours_bitmap': 3, 'values': {'a': limit, 'b': float(limit)}}]
+    expected = [
+      {
+        'hours_bitmap': 3,
+        'values': {
+          'a': limit,
+          'b': float(limit),
+          'inner': {
+            'c': u''.join('%d,' % i for i in xrange(1, limit + 1)),
+          },
+        },
+      }
+    ]
     actual = [d.to_dict() for d in handler.stats_day_cls.query().fetch()]
     for i in actual:
       i.pop('created')
@@ -76,15 +97,35 @@ class StatsFrameworkTest(unittest.TestCase):
     self.assertEqual(expected, actual)
 
     expected = [
-      {'minutes_bitmap': (1<<60)-1, 'values': {'a': 60, 'b': 60.}}
-      for _ in range(limit / 60)
+      {
+        'minutes_bitmap': (1<<60)-1,
+        'values': {
+          'a': 60,
+          'b': 60.,
+          'inner': {
+            'c': u''.join(
+                '%d,' % i for i in xrange(60 * i + 1, 60 * (i + 1) + 1)),
+          },
+        },
+      }
+      for i in range(limit / 60)
     ]
     actual = [d.to_dict() for d in handler.stats_hour_cls.query().fetch()]
     for i in actual:
       i.pop('created')
     self.assertEqual(expected, actual)
 
-    expected = [{'values': {'a': 1, 'b': 1.}} for i in range(limit)]
+    expected = [
+      {
+        'values': {
+          'a': 1,
+          'b': 1.,
+          'inner': {
+            'c': u'%d,' % (i + 1),
+          },
+        },
+      } for i in range(limit)
+    ]
     actual = [d.to_dict() for d in handler.stats_minute_cls.query().fetch()]
     for i in actual:
       i.pop('created')
