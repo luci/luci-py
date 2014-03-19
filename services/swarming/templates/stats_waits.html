@@ -1,17 +1,8 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <title>Runner Wait Times Broken Down By Minute</title>
-  <link rel="stylesheet" type="text/css" href="/swarm_style.css"/>
-</head>
-<body>
+{% extends "base.html" %}
 
-<div style="text-align: right;">
-  <p>{{topbar|safe}}</br>
-  {{stat_links|safe}}
-</div>
-
-<div style="text-align: right;">
+{% block body %}
+<h1>Waits per minute</h1>
+<div>
   Days to Show:
   <select id="days_to_show"
       onchange="document.location.href='?days=' + this.value">
@@ -40,13 +31,4 @@
     </tbody>
   </table>
 {% endfor %}
-
-<div style="float: left;"><p>
-  <a target="_blank" href="https://code.google.com/appengine/"><img border="0"
-   src="https://code.google.com/appengine/images/appengine-noborder-120x30.gif"
-   alt="Powered by Google App Engine" /></a>
- </p></p>
-</div>
-
-</body>
-</html>
+{% endblock %}

@@ -40,3 +40,8 @@ table.alterning_background tbody .dead_machine {
 table.alterning_background tbody .failed_test {
   background-color: #ffdddd !important;
 }
+
+.top_right_links {
+  display: inline-block;
+  float: right;
+}

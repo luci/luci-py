@@ -23,7 +23,6 @@ from google.appengine.api import app_identity
 from google.appengine.api import datastore_errors
 from google.appengine.api import modules
 from google.appengine.api import taskqueue
-from google.appengine.api import users
 from google.appengine.ext import ndb
 
 from common import swarm_constants
@@ -50,11 +49,6 @@ import template
 
 _NUM_USER_TEST_RUNNERS_PER_PAGE = 50
 _NUM_RECENT_ERRORS_TO_DISPLAY = 10
-
-_HOME_LINK = '<a href=/secure/main>Home</a>'
-_MACHINE_LIST_LINK = '<a href=/secure/machine_list>Machine List</a>'
-_PROFILE_LINK = '<a href=/secure/user_profile>Profile</a>'
-_STATS_LINK = '<a href=/stats>Stats</a>'
 
 _DELETE_MACHINE_STATS_URL = '/delete_machine_stats'
 
@@ -84,42 +78,6 @@ IGNORED_EXCEPTIONS = (
 # Function that is used to determine if an error entry should be ignored.
 should_ignore_error_record = functools.partial(
     ereporter2.should_ignore_error_record, IGNORED_LINES, IGNORED_EXCEPTIONS)
-
-
-def GenerateTopbar():
-  """Generate the topbar to display on all server pages.
-
-  Returns:
-    The topbar to display.
-  """
-  if users.get_current_user():
-    topbar = ('%s |  <a href="%s">Sign out</a><br/>' %
-              (users.get_current_user().nickname(),
-               users.create_logout_url('/')))
-
-    if users.is_current_user_admin():
-      topbar += (' %s | %s | %s | %s' %
-                 (_HOME_LINK,
-                  _PROFILE_LINK,
-                  _MACHINE_LIST_LINK,
-                  _STATS_LINK))
-  else:
-    topbar = '<a href="%s">Sign in</a>' % users.create_login_url('/')
-
-  return topbar
-
-
-def GenerateStatLinks():
-  """Generate the stat links to display on all stats pages.
-
-  Returns:
-    The stat links to display.
-  """
-  stat_links = (
-      '<a href="/graphs/daily_stats">Graph of Daily Stats</a><br/>'
-      '<a href="/runner_summary"">Pending and Waiting Summary</a>')
-
-  return stat_links
 
 
 def GenerateButtonWithHiddenForm(button_text, url, form_id):
@@ -426,25 +384,24 @@ class MainHandler(auth.AuthenticatingHandler):
     page = min(page, total_pages + 1)
 
     params = {
-        'topbar': GenerateTopbar(),
-        'runners': runners,
-        'errors': errors,
-        'sorted_by_message': sorted_by_message,
-        'sort_options': sort_options,
-        'selected_sort': selected_sort,
         'current_page': page,
+        'errors': errors,
+        'filter_selects': self.FilterSelectsHTML(),
+        'machine_id_filter': self.machine_id_filter,
+        'runners': runners,
+        'selected_sort': selected_sort,
+        'sort_options': sort_options,
+        'sorted_by_message': sorted_by_message,
+        'test_name_filter': self.test_name_filter,
         # Add 1 so the pages are 1-indexed.
         'total_pages': map(str, range(1, total_pages + 1, 1)),
+        'url_no_filters': self.GeneratePageUrl(page, sort_by),
         'url_no_page': self.GeneratePageUrl(sort_by=sort_by,
                                             include_filters=True),
         'url_no_sort_by_or_filters': self.GeneratePageUrl(
             page, include_filters=False),
-        'url_no_filters': self.GeneratePageUrl(page, sort_by),
-        'filter_selects': self.FilterSelectsHTML(),
-        'machine_id_filter': self.machine_id_filter,
-        'test_name_filter': self.test_name_filter,
     }
-    self.response.out.write(template.get('index.html').render(params))
+    self.response.out.write(template.render('index.html', params))
 
   def _GetDisplayableRunnerTemplate(self, runner):
     """Puts different aspects of the runner in a displayable format.
@@ -533,9 +490,8 @@ class MachineListHandler(auth.AuthenticatingHandler):
         'machines': machines,
         'selected_sort': sort_by,
         'sort_options': sort_options,
-        'topbar': GenerateTopbar(),
     }
-    self.response.out.write(template.get('machine_list.html').render(params))
+    self.response.out.write(template.render('machine_list.html', params))
 
 
 class ApiBots(auth.AuthenticatingHandler):
@@ -843,7 +799,7 @@ class Ereporter2ReportHandler(auth.AuthenticatingHandler):
         ereporter2.REPORT_HEADER_TEMPLATE,
         ereporter2.REPORT_CONTENT_TEMPLATE,
         request_id_url, env)
-    out = template.get('ereporter2_report.html').render({'content': content})
+    out = template.render('ereporter2_report.html', {'content': content})
     self.response.write(out)
 
 
@@ -910,14 +866,12 @@ class StatsHandler(webapp2.RequestHandler):
     max_days_to_show = min(daily_stats.DAILY_STATS_LIFE_IN_DAYS,
                            runner_summary.WAIT_SUMMARY_LIFE_IN_DAYS)
     params = {
-        'topbar': GenerateTopbar(),
-        'stat_links': GenerateStatLinks(),
         'daily_stats': weeks_daily_stats,
         'days_to_show': days_to_show,
         'max_days_to_show': range(1, max_days_to_show),
         'runner_wait_stats': runner_summary.GetRunnerWaitStats(days_to_show),
     }
-    self.response.out.write(template.get('stats.html').render(params))
+    self.response.out.write(template.render('stats.html', params))
 
 
 class GetMatchingTestCasesHandler(auth.AuthenticatingHandler):
@@ -1160,7 +1114,7 @@ def GenerateHistoryHoursSelect():
       (options_hours, options_days))
 
 
-class RunnerSummaryHandler(webapp2.RequestHandler):
+class StatsTasksHandler(webapp2.RequestHandler):
   """Handler for displaying a summary of the current runners."""
 
   def get(self):
@@ -1209,16 +1163,14 @@ class RunnerSummaryHandler(webapp2.RequestHandler):
         'hours_select': GenerateHistoryHoursSelect(),
         'runner_summary_graphs': runner_summary_graphs.values(),
         'snapshot_summary': snapshot_summary,
-        'stat_links': GenerateStatLinks(),
         'time_frame': time_frame,
-        'topbar': GenerateTopbar(),
         'total_pending_runners': total_pending,
         'total_running_runners': total_running,
     }
-    self.response.out.write(template.get('runner_summary.html').render(params))
+    self.response.out.write(template.render('stats_tasks.html', params))
 
 
-class DailyStatsGraphHandler(webapp2.RequestHandler):
+class StatsDailyHandler(webapp2.RequestHandler):
   """Handler for generating the html page to display the daily stats."""
 
   # A mapping of the element's variable name, and the name that should be
@@ -1264,10 +1216,23 @@ class DailyStatsGraphHandler(webapp2.RequestHandler):
             datetime.datetime.utcnow().date() -
             datetime.timedelta(days=days_to_show))),
         'max_days_to_show': range(1, daily_stats.DAILY_STATS_LIFE_IN_DAYS),
-        'stat_links': GenerateStatLinks(),
-        'topbar': GenerateTopbar(),
     }
-    self.response.out.write(template.get('graph.html').render(params))
+    self.response.out.write(template.render('stats_daily.html', params))
+
+
+class StatsWaitsHandler(webapp2.RequestHandler):
+  """Handler for displaying the wait times, broken by minute, per dimensions."""
+
+  def get(self):
+    days_to_show = DaysToShow(self.request)
+
+    params = {
+        'days_to_show': days_to_show,
+        'max_days_to_show': range(1, runner_summary.WAIT_SUMMARY_LIFE_IN_DAYS),
+        'wait_breakdown': runner_summary.GetRunnerWaitStatsBreakdown(
+            days_to_show),
+    }
+    self.response.out.write(template.render('stats_waits.html', params))
 
 
 class ServerPingHandler(webapp2.RequestHandler):
@@ -1302,10 +1267,9 @@ class UserProfileHandler(auth.AuthenticatingHandler):
 
     params = {
         'change_whitelist_url': _SECURE_CHANGE_WHITELIST_URL,
-        'topbar': GenerateTopbar(),
         'whitelists': display_whitelists,
     }
-    self.response.out.write(template.get('user_profile.html').render(params))
+    self.response.out.write(template.render('user_profile.html', params))
 
 
 class ChangeWhitelistHandler(auth.AuthenticatingHandler):
@@ -1349,23 +1313,6 @@ class RemoteErrorHandler(auth.AuthenticatingHandler):
 
     self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
     self.response.out.write('Success.')
-
-
-class WaitsByMinuteHandler(webapp2.RequestHandler):
-  """Handler for displaying the wait times, broken by minute, per dimensions."""
-
-  def get(self):
-    days_to_show = DaysToShow(self.request)
-
-    params = {
-        'days_to_show': days_to_show,
-        'max_days_to_show': range(1, runner_summary.WAIT_SUMMARY_LIFE_IN_DAYS),
-        'stat_links': GenerateStatLinks(),
-        'topbar': GenerateTopbar(),
-        'wait_breakdown': runner_summary.GetRunnerWaitStatsBreakdown(
-            days_to_show),
-    }
-    self.response.out.write(template.get('waits_by_minute.html').render(params))
 
 
 def ip_whitelist_authentication(request):
@@ -1427,12 +1374,11 @@ def CreateApplication():
       ('/get_result', GetResultHandler),
       ('/get_slave_code', GetSlaveCodeHandler),
       ('/get_slave_code/<version:[0-9a-f]{40}>', GetSlaveCodeHandler),
-      ('/graphs/daily_stats', DailyStatsGraphHandler),
       ('/poll_for_test', RegisterHandler),
       ('/remote_error', RemoteErrorHandler),
       ('/result', ResultHandler),
       ('/runner_ping', RunnerPingHandler),
-      ('/runner_summary', RunnerSummaryHandler),
+
       ('/secure/cron/abort_stale_runners', CronAbortStaleRunnersHandler),
       ('/secure/cron/detect_dead_machines', CronDetectDeadMachinesHandler),
       ('/secure/cron/detect_hanging_runners', CronDetectHangingRunnersHandler),
@@ -1453,11 +1399,15 @@ def CreateApplication():
           TaskGenerateDailyStatsHandler),
       ('/secure/task_queues/generate_recent_stats',
           TaskGenerateRecentStatsHandler),
-      ('/server_ping', ServerPingHandler),
+
       ('/stats', StatsHandler),
+      ('/stats/daily', StatsDailyHandler),
+      ('/stats/tasks', StatsTasksHandler),
+      ('/stats/waits', StatsWaitsHandler),
+
+      ('/server_ping', ServerPingHandler),
       ('/test', TestRequestHandler),
       ('/upload_start_slave', UploadStartSlaveHandler),
-      ('/waits_by_minute', WaitsByMinuteHandler),
       (_DELETE_MACHINE_STATS_URL, DeleteMachineStatsHandler),
       (_SECURE_CANCEL_URL, CancelHandler),
       (_SECURE_CHANGE_WHITELIST_URL, ChangeWhitelistHandler),

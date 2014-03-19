@@ -608,11 +608,11 @@ class AppTest(test_case.TestCase):
     allowed_urls = set([
         '/',
         '/auth',
-        '/graphs/daily_stats',
-        '/runner_summary',
         '/server_ping',
         '/stats',
-        '/waits_by_minute',
+        '/stats/daily',
+        '/stats/tasks',
+        '/stats/waits',
     ])
 
     # Grab the set of all routes.
@@ -680,11 +680,12 @@ class AppTest(test_case.TestCase):
     self.assertResponse(response, '200 OK', 'Success.')
 
   def testStatPages(self):
-    stat_urls = ['/graphs/daily_stats',
-                 '/runner_summary',
-                 '/stats',
-                 '/waits_by_minute',
-                ]
+    stat_urls = [
+        '/stats',
+        '/stats/daily',
+        '/stats/tasks',
+        '/stats/waits',
+    ]
 
     # Create a pending, active and done runner.
     test_helper.CreatePendingRunner()

@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<!-- Copyright 2014 The Swarming Authors. All rights reserved.
+Use of this source code is governed by the Apache v2.0 license that can be
+found in the LICENSE file. -->
+<head>
+  <meta http-equiv="Content-type" content="text/html;charset=UTF-8">
+  <title>{{ title or "Swarming Server" }}</title>
+  <link rel="stylesheet" type="text/css" href="/default.css"/>
+  {% block headers %}
+  {% endblock %}
+</head>
+<body>
+  <div class="top_right_links">
+    {% if nickname %}
+      {{ nickname }}
+    {% else %}
+      <a href="{{signin_link|safe }}">Sign in</a>
+    {% endif %}
+    <br>
+    <a href="/stats">Stats</a> &#124
+    <a href="/stats/daily">Daily</a> &#124
+    <a href="/stats/tasks">Tasks</a> &#124
+    <a href="/stats/waits">Waits</a>
+    <br>
+    {% if user_is_admin %}
+      <!-- TODO(maruel): Home should be accessible to anyone, so they can see
+      their tasks -->
+      <a href=/secure/main>Home</a> &#124
+      <a href=/secure/machine_list>Machine List</a> &#124
+      <a href=/secure/user_profile>Profile</a>
+    {% endif %}
+  </div>
+
+  {% block body %}
+  {% endblock %}
+
+  <hr>
+  <div style="float: left;"><p>
+    <a target="_blank" href="https://code.google.com/appengine/"><img border="0"
+    src="https://code.google.com/appengine/images/appengine-noborder-120x30.gif"
+    alt="Powered by Google App Engine" /></a></p>
+  </div>
+  {% if app_version %}
+    <div style="float: right; text-align: right;">
+      <div style="margin-top: 1.2em; color: #777; font-size: 14px;">
+        Server version
+        {% if app_revision_url %}
+          <a href="{{app_revision_url}}" target="_blank">{{app_version}}</a>
+        {% else %}
+          {{app_version}}
+        {% endif %}
+      </div>
+    </div>
+  {% endif %}
+</body>
+</html>

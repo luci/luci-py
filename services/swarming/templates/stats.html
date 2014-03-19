@@ -1,17 +1,8 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <title>Stats</title>
-  <link rel="stylesheet" type="text/css" href="/swarm_style.css"/>
-</head>
-<body>
+{% extends "base.html" %}
 
-<div style="text-align: right;">
-  <p>{{topbar|safe}}</br>
-  {{stat_links|safe}}
-</div>
-
-<div style="text-align: right;">
+{% block body %}
+<h1>Stats Summary</h1>
+<div>
   Days to Show:
   <select id="days_to_show"
       onchange="document.location.href='?days=' + this.value">
@@ -49,7 +40,6 @@
 
 
 <h1>Runner Wait Times in the Last {{days_to_show}} Days</h1>
-<a href="/waits_by_minute">Minute by Minute Breakdown</a>
 <table id="runner-wait-table" class="alterning_background"
     summary="This table lists the wait times of all the runner, grouped by dimensions.">
   <thead>
@@ -69,13 +59,4 @@
     {% endfor %}
   </tbody>
 </table>
-
-<div style="float: left;"><p>
-  <a target="_blank" href="https://code.google.com/appengine/"><img border="0"
-   src="https://code.google.com/appengine/images/appengine-noborder-120x30.gif"
-   alt="Powered by Google App Engine" /></a>
- </p></p>
-</div>
-
-</body>
-</html>
+{% endblock %}

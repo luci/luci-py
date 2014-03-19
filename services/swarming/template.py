@@ -8,6 +8,8 @@ import os
 
 import jinja2
 
+from google.appengine.api import users
+
 
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -20,13 +22,25 @@ JINJA = jinja2.Environment(
 # Registers library custom filters.
 
 
-def datetimeformat(value, f='%Y-%m-%d %H:%M'):
+def datetimeformat(value, f='%Y-%m-%d %H:%M:%S'):
   return value.strftime(f)
 
 
 JINJA.filters['datetimeformat'] = datetimeformat
 
 
-def get(*args, **kwargs):
-  """Shorthand to load a template."""
-  return JINJA.get_template(*args, **kwargs)
+def get_defaults():
+  """Returns parameters used by templates/base.html."""
+  account = users.get_current_user()
+  return {
+    'nickname': account.email() if account else None,
+    'signin_link': users.create_login_url('/') if not account else None,
+    'user_is_admin': users.is_current_user_admin(),
+  }
+
+
+def render(name, params):
+  """Shorthand to render a template."""
+  data = get_defaults()
+  data.update(params)
+  return JINJA.get_template(name).render(data)
