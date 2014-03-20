@@ -166,7 +166,8 @@ class InternalStatsUpdateHandler(webapp2.RequestHandler):
     self.response.headers['Content-Type'] = 'text/plain'
     try:
       i = get_stats_handler().process_next_chunk(stats_framework.TOO_RECENT)
-    except DeadlineExceededError:
+    except (DeadlineExceededError, logservice.Error):
+      # The job will be retried.
       self.response.status_code = 500
       return
     msg = 'Processed %d minutes' % i
