@@ -290,14 +290,14 @@ indexes:
   properties:
   - name: done
   - name: started
-  - name: run_by
+  - name: machine_id
+    direction: desc
 
 - kind: TestRunner
   properties:
   - name: done
   - name: started
-  - name: machine_id
-    direction: desc
+  - name: run_by
 
 - kind: TestRunner
   properties:
