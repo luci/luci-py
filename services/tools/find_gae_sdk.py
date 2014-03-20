@@ -53,9 +53,14 @@ def setup_gae_sdk(sdk_path):
   dev_appserver.fix_sys_path()
 
 
-def setup_env(app_dir, app_id, version, module_id):
+def setup_env(app_dir, app_id, version, module_id, remote_api=False):
   """Setups os.environ so GAE code works."""
-  os.environ['SERVER_SOFTWARE'] = 'Development yo dawg/1.0'
+  # GCS library behaves differently when running under remote_api. It uses
+  # SERVER_SOFTWARE to figure this out. See cloudstorage/common.py, local_run().
+  if remote_api:
+    os.environ['SERVER_SOFTWARE'] = 'remote_api'
+  else:
+    os.environ['SERVER_SOFTWARE'] = 'Development yo dawg/1.0'
   if app_dir:
     app_id = app_id or default_app_id(app_dir)
     version = version or default_version(app_dir, module_id)

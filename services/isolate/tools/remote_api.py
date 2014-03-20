@@ -176,7 +176,7 @@ def load_context(sdk_path, app_dir, host, app_id, version, module_id):
     # https://developers.google.com/appengine/docs/python/modules/
     prefixes = filter(None, (version, module_id, app_id))
     host = '%s.appspot.com' % '-dot-'.join(prefixes)
-  find_gae_sdk.setup_env(app_dir, app_id, version, module_id)
+  find_gae_sdk.setup_env(app_dir, app_id, version, module_id, remote_api=True)
   return setup_env(host), app_id
 
 
