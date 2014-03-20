@@ -35,7 +35,7 @@ _auth_methods = ()
 
 class XSRFToken(tokens.TokenKind):
   """XSRF token parameters."""
-  expiration_sec = 2 * 3600
+  expiration_sec = 4 * 3600
   secret_key = api.SecretKey('xsrf_token', scope='local')
   version = 1
 
