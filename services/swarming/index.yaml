@@ -10,13 +10,6 @@ indexes:
 # automatically uploaded to the admin console when you next deploy
 # your application using appcfg.py.
 
-- kind: ExceptionRecord
-  properties:
-  - name: date
-  - name: major_version
-  - name: minor_version
-    direction: desc
-
 - kind: MachineStats
   properties:
   - name: machine_id
