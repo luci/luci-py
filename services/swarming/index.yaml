@@ -290,6 +290,12 @@ indexes:
   properties:
   - name: done
   - name: started
+  - name: run_by
+
+- kind: TestRunner
+  properties:
+  - name: done
+  - name: started
   - name: machine_id
     direction: desc
 
