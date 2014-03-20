@@ -445,10 +445,6 @@ class TestObject(TestRequestMessageBase):
     self.ValidateLists(['action'], basestring, required=True)
     self.ValidateValues(['hard_time_out', 'io_time_out'], (int, long, float))
 
-    # self.decorate_output doesn't need to be validated since we only need
-    # to evaluate it to True/False which can be done with any type.
-    logging.debug('Successfully validated request: %s', self.__dict__)
-
 
 class TestConfiguration(TestRequestMessageBase):
   """Describes how to choose swarming bot to execute a requests.
