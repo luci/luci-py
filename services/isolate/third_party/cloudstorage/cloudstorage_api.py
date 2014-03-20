@@ -1,4 +1,16 @@
 # Copyright 2012 Google Inc. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+# either express or implied. See the License for the specific
+# language governing permissions and limitations under the License.
 
 """File Interface for Google Cloud Storage."""
 
@@ -66,7 +78,8 @@ def open(filename,
       in reading mode.
   """
   common.validate_file_path(filename)
-  api = _get_storage_api(retry_params=retry_params, account_id=_account_id)
+  api = storage_api._get_storage_api(retry_params=retry_params,
+                                     account_id=_account_id)
   filename = api_utils._quote_filename(filename)
 
   if mode == 'w':
@@ -95,11 +108,13 @@ def delete(filename, retry_params=None, _account_id=None):
   Raises:
     errors.NotFoundError: if the file doesn't exist prior to deletion.
   """
-  api = _get_storage_api(retry_params=retry_params, account_id=_account_id)
+  api = storage_api._get_storage_api(retry_params=retry_params,
+                                     account_id=_account_id)
   common.validate_file_path(filename)
   filename = api_utils._quote_filename(filename)
-  status, resp_headers, _ = api.delete_object(filename)
-  errors.check_status(status, [204], filename, resp_headers=resp_headers)
+  status, resp_headers, content = api.delete_object(filename)
+  errors.check_status(status, [204], filename, resp_headers=resp_headers,
+                      body=content)
 
 
 def stat(filename, retry_params=None, _account_id=None):
@@ -119,9 +134,12 @@ def stat(filename, retry_params=None, _account_id=None):
     errors.NotFoundError: if an object that's expected to exist doesn't.
   """
   common.validate_file_path(filename)
-  api = _get_storage_api(retry_params=retry_params, account_id=_account_id)
-  status, headers, _ = api.head_object(api_utils._quote_filename(filename))
-  errors.check_status(status, [200], filename, resp_headers=headers)
+  api = storage_api._get_storage_api(retry_params=retry_params,
+                                     account_id=_account_id)
+  status, headers, content = api.head_object(
+      api_utils._quote_filename(filename))
+  errors.check_status(status, [200], filename, resp_headers=headers,
+                      body=content)
   file_stat = common.GCSFileStat(
       filename=filename,
       st_size=headers.get('content-length'),
@@ -133,14 +151,16 @@ def stat(filename, retry_params=None, _account_id=None):
   return file_stat
 
 
-def _copy2(src, dst, retry_params=None):
-  """Copy the file content and metadata from src to dst.
+def _copy2(src, dst, metadata=None, retry_params=None):
+  """Copy the file content from src to dst.
 
   Internal use only!
 
   Args:
     src: /bucket/filename
     dst: /bucket/filename
+    metadata: a dict of metadata for this copy. If None, old metadata is copied.
+      For example, {'x-goog-meta-foo': 'bar'}.
     retry_params: An api_utils.RetryParams for this call to GCS. If None,
       the default one is used.
 
@@ -150,14 +170,19 @@ def _copy2(src, dst, retry_params=None):
   """
   common.validate_file_path(src)
   common.validate_file_path(dst)
-  if src == dst:
-    return
 
-  api = _get_storage_api(retry_params=retry_params)
-  headers = {'x-goog-copy-source': src, 'Content-Length': '0'}
-  status, resp_headers, _ = api.put_object(
-      api_utils._quote_filename(dst), headers=headers)
-  errors.check_status(status, [200], src, headers, resp_headers)
+  if metadata is None:
+    metadata = {}
+    copy_meta = 'COPY'
+  else:
+    copy_meta = 'REPLACE'
+  metadata.update({'x-goog-copy-source': src,
+                   'x-goog-metadata-directive': copy_meta})
+
+  api = storage_api._get_storage_api(retry_params=retry_params)
+  status, resp_headers, content = api.put_object(
+      api_utils._quote_filename(dst), headers=metadata)
+  errors.check_status(status, [200], src, metadata, resp_headers, body=content)
 
 
 def listbucket(path_prefix, marker=None, prefix=None, max_keys=None,
@@ -233,7 +258,8 @@ def listbucket(path_prefix, marker=None, prefix=None, max_keys=None,
   if marker and marker.startswith(bucket):
     marker = marker[len(bucket) + 1:]
 
-  api = _get_storage_api(retry_params=retry_params, account_id=_account_id)
+  api = storage_api._get_storage_api(retry_params=retry_params,
+                                     account_id=_account_id)
   options = {}
   if marker:
     options['marker'] = marker
@@ -295,7 +321,7 @@ class _Bucket(object):
     while self._get_bucket_fut:
       status, resp_headers, content = self._get_bucket_fut.get_result()
       errors.check_status(status, [200], self._path, resp_headers=resp_headers,
-                          extras=self._options)
+                          body=content, extras=self._options)
 
       if self._should_get_another_batch(content):
         self._get_bucket_fut = self._api.get_bucket_async(
@@ -423,28 +449,3 @@ class _Bucket(object):
         element_mapping[e.tag] = e.text
         elements.remove(e.tag)
     return element_mapping
-
-
-def _get_storage_api(retry_params, account_id=None):
-  """Returns storage_api instance for API methods.
-
-  Args:
-    retry_params: An instance of api_utils.RetryParams.
-    account_id: Internal-use only.
-
-  Returns:
-    A storage_api instance to handle urlfetch work to GCS.
-    On dev appserver, this instance by default will talk to a local stub
-    unless common.ACCESS_TOKEN is set. That token will be used to talk
-    to the real GCS.
-  """
-
-
-  api = storage_api._StorageApi(storage_api._StorageApi.full_control_scope,
-                                service_account_id=account_id,
-                                retry_params=retry_params)
-  if common.local_run() and not common.get_access_token():
-    api.api_url = 'http://' + common.LOCAL_API_HOST
-  if common.get_access_token():
-    api.token = common.get_access_token()
-  return api

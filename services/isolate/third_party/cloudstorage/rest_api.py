@@ -1,4 +1,16 @@
 # Copyright 2012 Google Inc. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+# either express or implied. See the License for the specific
+# language governing permissions and limitations under the License.
 
 """Base and helper classes for Google RESTful APIs."""
 
@@ -9,6 +21,7 @@
 __all__ = ['add_sync_methods']
 
 import httplib
+import random
 import time
 
 from . import api_utils
@@ -100,6 +113,8 @@ class _RestApi(object):
   WARNING: Do NOT directly use this api. It's an implementation detail
   and is subject to change at any release.
   """
+
+  _TOKEN_EXPIRATION_HEADROOM = random.randint(60, 600)
 
   def __init__(self, scopes, service_account_id=None, token_maker=None,
                retry_params=None):
@@ -200,12 +215,11 @@ class _RestApi(object):
     if self.token is not None and not refresh:
       raise ndb.Return(self.token)
     key = '%s,%s' % (self.service_account_id, ','.join(self.scopes))
-    ts = None
-    if not refresh:
-      ts = yield _AE_TokenStorage_.get_by_id_async(
-          key, use_cache=True, use_memcache=True,
-          use_datastore=self.retry_params.save_access_token)
-    if ts is None or ts.expires < (time.time() + 60):
+    ts = yield _AE_TokenStorage_.get_by_id_async(
+        key, use_cache=True, use_memcache=True,
+        use_datastore=self.retry_params.save_access_token)
+    if ts is None or ts.expires < (time.time() +
+                                   self._TOKEN_EXPIRATION_HEADROOM):
       token, expires_at = yield self.make_token_async(
           self.scopes, self.service_account_id)
       timeout = int(expires_at - time.time())

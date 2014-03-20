@@ -1,4 +1,16 @@
 # Copyright 2013 Google Inc. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+# either express or implied. See the License for the specific
+# language governing permissions and limitations under the License.
 
 """Util functions and classes for cloudstorage_api."""
 
@@ -71,6 +83,20 @@ def _quote_filename(filename):
   return urllib.quote(filename)
 
 
+def _unquote_filename(filename):
+  """Unquotes a valid URI path back to its filename.
+
+  This is the opposite of _quote_filename.
+
+  Args:
+    filename: a quoted filename. /bucket/some%20filename.
+
+  Returns:
+    The filename unquoted.
+  """
+  return urllib.unquote(filename)
+
+
 def _should_retry(resp):
   """Given a urlfetch response, decide whether to retry that request."""
   return (resp.status_code == httplib.REQUEST_TIMEOUT or
@@ -86,8 +112,8 @@ class RetryParams(object):
                backoff_factor=2.0,
                initial_delay=0.1,
                max_delay=10.0,
-               min_retries=2,
-               max_retries=5,
+               min_retries=3,
+               max_retries=6,
                max_retry_period=30.0,
                urlfetch_timeout=None,
                save_access_token=False):
@@ -108,7 +134,8 @@ class RetryParams(object):
       max_retries: max number of times to retry. Set this to 0 for no retry.
       max_retry_period: max total seconds spent on retry. Retry stops when
         this period passed AND min_retries has been attempted.
-      urlfetch_timeout: timeout for urlfetch in seconds. Could be None.
+      urlfetch_timeout: timeout for urlfetch in seconds. Could be None,
+        in which case the value will be chosen by urlfetch module.
       save_access_token: persist access token to datastore to avoid
         excessive usage of GetAccessToken API. Usually the token is cached
         in process and in memcache. In some cases, memcache isn't very
@@ -219,9 +246,11 @@ def _retry_fetch(url, retry_params, **kwds):
   if delay <= 0:
     return
 
+  logging.info('Will retry request to %s.', url)
   while delay > 0:
     resp = None
     try:
+      logging.info('Retry in %s seconds.', delay)
       time.sleep(delay)
       resp = urlfetch.fetch(url, **kwds)
     except runtime.DeadlineExceededError:
@@ -238,18 +267,15 @@ def _retry_fetch(url, retry_params, **kwds):
       break
     elif resp:
       logging.info(
-          'Got status %s from GCS when fetching with url %s. '
-          'Will retry in %s seconds.',
-          resp.status_code, url, delay)
+          'Got status %s from GCS.', resp.status_code)
     else:
       logging.info(
-          'Got exception "%r" while contacting GCS. Will retry in %s seconds.',
-          e, delay)
+          'Got exception "%r" while contacting GCS.', e)
 
   if resp:
     return resp
 
-  logging.info('Urlfetch retry %s failed after %s seconds total',
+  logging.info('Urlfetch failed after %s retries and %s seconds in total.',
                n - 1, time.time() - start_time)
   raise
 
@@ -269,7 +295,7 @@ def _run_until_rpc():
   when the dependent future fulfills. If the value if a RPC, set up a
   callback _on_rpc_complete to invoke _help_tasklet_along when the RPC fulfills.
   Thus _help_tasklet_along drills down
-  the the chain of futures until some future is blocked by RPC. El runs
+  the chain of futures until some future is blocked by RPC. El runs
   all callbacks and constantly check pending RPC status.
   """
   el = eventloop.get_event_loop()

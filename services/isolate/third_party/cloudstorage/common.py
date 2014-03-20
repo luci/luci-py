@@ -1,4 +1,16 @@
 # Copyright 2012 Google Inc. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+# either express or implied. See the License for the specific
+# language governing permissions and limitations under the License.
 
 """Helpers shared by cloudstorage_stub and cloudstorage_api."""
 
@@ -9,7 +21,8 @@
 __all__ = ['CS_XML_NS',
            'CSFileStat',
            'dt_str_to_posix',
-           'LOCAL_API_HOST',
+           'local_api_url',
+           'LOCAL_GCS_ENDPOINT',
            'local_run',
            'get_access_token',
            'get_metadata',
@@ -50,7 +63,7 @@ _GCS_METADATA = ['x-goog-meta-',
                  'content-encoding']
 _GCS_OPTIONS = _GCS_METADATA + ['x-goog-acl']
 CS_XML_NS = 'http://doc.s3.amazonaws.com/2006-03-01'
-LOCAL_API_HOST = 'gcs-magicstring.appspot.com'
+LOCAL_GCS_ENDPOINT = '/_ah/gcs'
 _access_token = ''
 
 
@@ -275,7 +288,7 @@ def validate_options(options):
       raise ValueError('option %s is not supported.' % k)
     if not isinstance(v, basestring):
       raise TypeError('value %r for option %s should be of type basestring.' %
-                      v, k)
+                      (v, k))
 
 
 def http_time_to_posix(http_time):
@@ -361,6 +374,11 @@ def local_run():
   if server_software.startswith(('Development', 'testutil')):
     return True
   return False
+
+
+def local_api_url():
+  """Return URL for GCS emulation on dev appserver."""
+  return 'http://%s%s' % (os.environ.get('HTTP_HOST'), LOCAL_GCS_ENDPOINT)
 
 
 def memory_usage(method):
