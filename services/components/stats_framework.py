@@ -46,9 +46,6 @@ class StatisticsFramework(object):
   def __init__(self, root_key_id, snapshot_cls, generate_snapshot):
     """Creates an instance to do bookkeeping of statistics.
 
-    Warning: this class will do a datastore operation upon creation to ensure
-    the root entity exists.
-
     Arguments:
     - root_key_id: Root key id of the entity to use for transaction. It must be
                    unique to the instance and application.
@@ -58,6 +55,10 @@ class StatisticsFramework(object):
                     have sensible default value.
     - generate_snapshot: Function taking (start_time, end_time) as epoch and
                          returning a snapshot_cls instance for this time frame.
+
+    ndb access to self.root_key is using both local cache and memcache but
+    access to stats_day_cls, stats_hour_cls and stats_minute_cls does not use
+    ndb's memcache.
     """
     # All these members should be considered constants. This class is
     # thread-safe since it is never mutated.
@@ -72,9 +73,6 @@ class StatisticsFramework(object):
     self.stats_day_cls = self._generate_stats_day_cls(self.snapshot_cls)
     self.stats_hour_cls = self._generate_stats_hour_cls(self.snapshot_cls)
     self.stats_minute_cls = self._generate_stats_minute_cls(self.snapshot_cls)
-
-    # The root entity is used for transactions so make sure it exists.
-    self.stats_root_cls.get_or_insert(self.root_key_id)
 
   def process_next_chunk(self, up_to):
     """Processes as much minutes starting at a specific time.
@@ -193,6 +191,15 @@ class StatisticsFramework(object):
       # Used for queries.
       SEALED_BITMAP = 0xFFFFFF
 
+      def to_dict(self):
+        """Adds the key and remove cruft not necessary for the user."""
+        out = super(StatsDay, self).to_dict()
+        out.pop('created')
+        out.pop('modified')
+        out.pop('hours_bitmap')
+        out['key'] = self.key.id()
+        return out
+
       def to_date(self):
         """Returns the datetime.date instance for this instance."""
         year, month, day = self.key.id().split('-', 2)
@@ -221,6 +228,16 @@ class StatisticsFramework(object):
       # Used for queries.
       SEALED_BITMAP = 0xFFFFFFFFFFFFFFF
 
+      def to_dict(self):
+        """Adds the key and remove cruft not necessary for the user."""
+        out = super(StatsHour, self).to_dict()
+        out.pop('created')
+        out.pop('minutes_bitmap')
+        # Technically, the trailing ':00' shouldn't be added but it's less
+        # readable.
+        out['key'] = '%s %s:00' % (self.key.parent().id(), self.key.id())
+        return out
+
     return StatsHour
 
   @staticmethod
@@ -237,10 +254,21 @@ class StatisticsFramework(object):
       created = ndb.DateTimeProperty(indexed=False, auto_now=True)
       values = ndb.LocalStructuredProperty(snapshot_cls, default=snapshot_cls())
 
+      def to_dict(self):
+        """Adds the key and remove cruft not necessary for the user."""
+        out = super(StatsMinute, self).to_dict()
+        out.pop('created')
+        out['key'] = '%s %s:%s' % (
+            self.key.parent().parent().id(), self.key.parent().id(),
+            self.key.id())
+        return out
+
     return StatsMinute
 
   def _set_last_processed_time(self, moment):
     """Saves the last minute processed."""
+    assert moment.second == 0, moment
+    assert moment.microsecond == 0, moment
     root = self.root_key.get()
     if not root:
       # This is bad, someone deleted the root entity.
@@ -258,18 +286,19 @@ class StatisticsFramework(object):
     It doesn't look at self.stats_minute_cls so the entity for the minute could
     exist.
     """
-    # This is bad, someone deleted the root entity. The root entity is used
-    # for transactions so make sure it exists.
-    root = self.stats_root_cls.get_or_insert(self.root_key_id)
-    if root.timestamp:
+    root = self.root_key.get()
+    if root and root.timestamp:
       # Returns the minute right after.
-      minute_after = root.timestamp + datetime.timedelta(minutes=1)
-      if minute_after.date() != root.timestamp.date():
+      # Zap seconds and microseconds from root.timestamp to be much more strict
+      # about the processing.
+      timestamp = datetime.datetime(*root.timestamp.timetuple()[:5], second=0)
+      minute_after = timestamp + datetime.timedelta(minutes=1)
+      if minute_after.date() != timestamp.date():
         # That was 23:59. Make sure day for 00:00 exists.
         self.stats_day_cls.get_or_insert(
             str(minute_after.date()), parent=self.root_key)
 
-      if minute_after.hour != root.timestamp.hour:
+      if minute_after.hour != timestamp.hour:
         # That was NN:59.
         self.stats_hour_cls.get_or_insert(
             '%02d' % minute_after.hour,
@@ -336,13 +365,16 @@ class StatisticsFramework(object):
     """
     minute_key_id = '%02d' % moment.minute
 
-    # Fetch the entities.
+    # Fetch the entities. Do not use ndb's memcache but use in-process local
+    # cache.
+    opts = ndb.ContextOptions(use_memcache=False)
     future_day = self.stats_day_cls.get_or_insert_async(
-        str(moment.date()), parent=self.root_key)
+        str(moment.date()), parent=self.root_key, context_options=opts)
     future_hour = self.stats_hour_cls.get_or_insert_async(
-        '%02d' % moment.hour, parent=self.day_key(moment.date()))
+        '%02d' % moment.hour, parent=self.day_key(moment.date()),
+        context_options=opts)
     future_minute = self.stats_minute_cls.get_by_id_async(
-        minute_key_id, parent=self.hour_key(moment))
+        minute_key_id, parent=self.hour_key(moment), use_memcache=False)
 
     day = future_day.get_result()
     hour = future_hour.get_result()
@@ -358,7 +390,7 @@ class StatisticsFramework(object):
 
       minute = self.stats_minute_cls(
           id=minute_key_id, parent=hour.key, values=minute_values)
-      futures.append(minute.put_async())
+      futures.append(minute.put_async(use_memcache=False))
     else:
       minute_values = minute.values
 
@@ -367,7 +399,7 @@ class StatisticsFramework(object):
     if not minute_bit_is_set:
       hour.values.accumulate(minute_values)
       hour.minutes_bitmap |= minute_bit
-      futures.append(hour.put_async())
+      futures.append(hour.put_async(use_memcache=False))
       if hour.minutes_bitmap == self.stats_hour_cls.SEALED_BITMAP:
         logging.info(
             '%s Hour is sealed: %s-%s',
@@ -380,7 +412,7 @@ class StatisticsFramework(object):
       if not hour_bit_is_set:
         day.values.accumulate(hour.values)
         day.hours_bitmap |= hour_bit
-        futures.append(day.put_async())
+        futures.append(day.put_async(use_memcache=False))
         if day.hours_bitmap == self.stats_day_cls.SEALED_BITMAP:
           logging.info(
               '%s Day is sealed: %s', self.root_key_id, day.key.id())
@@ -419,28 +451,38 @@ def accumulate(lhs, rhs):
 
 
 def generate_stats_data(days, hours, minutes, now, stats_handler):
-  """Returns a dict for data requested in the query."""
+  """Returns a dict for data requested in the query.
+
+  The values are returned in reverse chronological order.
+  TODO(maruel): Does it make sense?
+
+  Disables ndb's local cache and memcache usage.
+  """
   now = now or utcnow()
   today = now.date()
 
   # Fire up all the datastore requests.
   future_days = []
   if days:
-    future_days = ndb.get_multi_async(
+    gen = (
         stats_handler.day_key(today - datetime.timedelta(days=i))
         for i in range(days + 1))
+    future_days = ndb.get_multi_async(gen, use_cache=False, use_memcache=False)
 
   future_hours = []
   if hours:
-    future_hours = ndb.get_multi_async(
+    gen = (
         stats_handler.hour_key(now - datetime.timedelta(hours=i))
         for i in range(hours + 1))
+    future_hours = ndb.get_multi_async(gen, use_cache=False, use_memcache=False)
 
   future_minutes = []
   if minutes:
-    future_minutes = ndb.get_multi_async(
+    gen = (
         stats_handler.minute_key(now - datetime.timedelta(minutes=i))
         for i in range(minutes + 1))
+    future_minutes = ndb.get_multi_async(
+        gen, use_cache=False, use_memcache=False)
 
   def filterout(futures):
     """Filters out inexistent entities."""

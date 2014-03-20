@@ -17,6 +17,8 @@ from google.appengine.ext import testbed
 from components import stats_framework
 from depot_tools import auto_stub
 
+# pylint: disable=W0212
+
 
 class InnerSnapshot(ndb.Model):
   c = ndb.StringProperty(default='', indexed=False)
@@ -35,6 +37,20 @@ class Snapshot(ndb.Model):
     return stats_framework.accumulate(self, rhs)
 
 
+def get_now():
+  """Returns an hard coded 'utcnow'.
+
+  It is important because the timestamp near the hour or day limit could induce
+  the creation of additional 'hours' stats, which would make the test flaky.
+  """
+  return datetime.datetime(2010, 1, 2, 3, 4, 5, 6)
+
+
+def strip_seconds(timestamp):
+  """Returns timestamp with seconds and microseconds stripped."""
+  return datetime.datetime(*timestamp.timetuple()[:5], second=0)
+
+
 class StatsFrameworkTest(auto_stub.TestCase):
   def setUp(self):
     super(StatsFrameworkTest, self).setUp()
@@ -47,7 +63,41 @@ class StatsFrameworkTest(auto_stub.TestCase):
     self.testbed.deactivate()
     super(StatsFrameworkTest, self).tearDown()
 
-  def test_framework(self):
+  def mock_now(self, now, seconds):
+    now = now + datetime.timedelta(seconds=seconds)
+    self.mock(stats_framework, 'utcnow', lambda: now)
+    self.mock(ndb.DateTimeProperty, '_now', lambda _: now)
+    self.mock(ndb.DateProperty, '_now', lambda _: now.date())
+
+  def test_empty(self):
+    handler = stats_framework.StatisticsFramework(
+        'global_stats', Snapshot, lambda *_: self.fail())
+
+    self.assertEqual(0, handler.stats_root_cls.query().count())
+    self.assertEqual(0, handler.stats_day_cls.query().count())
+    self.assertEqual(0, handler.stats_hour_cls.query().count())
+    self.assertEqual(0, handler.stats_minute_cls.query().count())
+
+  def test_too_recent(self):
+    # Other tests assumes TOO_RECENT == 1. Update accordingly if needed.
+    self.assertEquals(1, stats_framework.TOO_RECENT)
+
+  def test_framework_empty(self):
+    handler = stats_framework.StatisticsFramework(
+        'test_framework', Snapshot, self.fail)
+    now = get_now()
+    self.mock_now(now, 0)
+    handler._set_last_processed_time(strip_seconds(now))
+    i = handler.process_next_chunk(0)
+    self.assertEqual(0, i)
+    self.assertEqual(1, handler.stats_root_cls.query().count())
+    self.assertEqual(0, handler.stats_day_cls.query().count())
+    self.assertEqual(0, handler.stats_hour_cls.query().count())
+    self.assertEqual(0, handler.stats_minute_cls.query().count())
+    root = handler.root_key.get()
+    self.assertEqual(strip_seconds(now), root.timestamp)
+
+  def test_framework_fresh(self):
     # Ensures the processing will run for 120 minutes starting
     # StatisticsFramework.MAX_BACKTRACK days ago.
     called = []
@@ -61,8 +111,8 @@ class StatsFrameworkTest(auto_stub.TestCase):
     handler = stats_framework.StatisticsFramework(
         'test_framework', Snapshot, gen_data)
 
-    now = datetime.datetime.utcnow()
-    self.mock(stats_framework, 'utcnow', lambda: now)
+    now = get_now()
+    self.mock_now(now, 0)
     start_date = now - datetime.timedelta(
         days=stats_framework.StatisticsFramework.MAX_BACKTRACK)
     limit = handler.MAX_MINUTES_PER_PROCESS
@@ -78,9 +128,22 @@ class StatsFrameworkTest(auto_stub.TestCase):
     ]
     self.assertEqual(expected_calls, called)
 
+    # Verify root.
+    root = handler.stats_root_cls.query().fetch()
+    self.assertEqual(1, len(root))
+    # When timestamp is not set, it starts at the begining of the day,
+    # MAX_BACKTRACK days ago, then process MAX_MINUTES_PER_PROCESS.
+    timestamp = midnight + datetime.timedelta(seconds=(limit - 1)*60)
+    expected = {
+      'created': now,
+      'timestamp': timestamp,
+    }
+    self.assertEqual(expected, root[0].to_dict())
+
+    # Verify days.
     expected = [
       {
-        'hours_bitmap': 3,
+        'key': midnight.strftime('%Y-%m-%d'),
         'values': {
           'a': limit,
           'b': float(limit),
@@ -90,15 +153,18 @@ class StatsFrameworkTest(auto_stub.TestCase):
         },
       }
     ]
-    actual = [d.to_dict() for d in handler.stats_day_cls.query().fetch()]
-    for i in actual:
-      i.pop('created')
-      i.pop('modified')
-    self.assertEqual(expected, actual)
+    days = handler.stats_day_cls.query().fetch()
+    self.assertEqual(expected, [d.to_dict() for d in days])
+    # These are left out from .to_dict().
+    self.assertEqual(now, days[0].created)
+    self.assertEqual(now, days[0].modified)
+    self.assertEqual(3, days[0].hours_bitmap)
 
+    # Verify hours.
     expected = [
       {
-        'minutes_bitmap': (1<<60)-1,
+        'key': (midnight + datetime.timedelta(seconds=i*60*60)).strftime(
+            '%Y-%m-%-d %H:%M'),
         'values': {
           'a': 60,
           'b': 60.,
@@ -110,13 +176,18 @@ class StatsFrameworkTest(auto_stub.TestCase):
       }
       for i in range(limit / 60)
     ]
-    actual = [d.to_dict() for d in handler.stats_hour_cls.query().fetch()]
-    for i in actual:
-      i.pop('created')
-    self.assertEqual(expected, actual)
+    hours = handler.stats_hour_cls.query().fetch()
+    self.assertEqual(expected, [d.to_dict() for d in hours])
+    for h in hours:
+      # These are left out from .to_dict().
+      self.assertEqual(now, h.created)
+      self.assertEqual((1<<60)-1, h.minutes_bitmap)
 
+    # Verify minutes.
     expected = [
       {
+        'key': (midnight + datetime.timedelta(seconds=i*60)).strftime(
+            '%Y-%m-%-d %H:%M'),
         'values': {
           'a': 1,
           'b': 1.,
@@ -126,10 +197,94 @@ class StatsFrameworkTest(auto_stub.TestCase):
         },
       } for i in range(limit)
     ]
-    actual = [d.to_dict() for d in handler.stats_minute_cls.query().fetch()]
-    for i in actual:
-      i.pop('created')
-    self.assertEqual(expected, actual)
+    minutes = handler.stats_minute_cls.query().fetch()
+    self.assertEqual(expected, [d.to_dict() for d in minutes])
+    for m in minutes:
+      # These are left out from .to_dict().
+      self.assertEqual(now, m.created)
+
+  def test_framework_last_few(self):
+    called = []
+
+    def gen_data(start, end):
+      """Returns fake statistics."""
+      self.assertEqual(start + 60, end)
+      called.append(start)
+      return Snapshot(a=1, b=1, inner=InnerSnapshot(c='%d,' % len(called)))
+
+    handler = stats_framework.StatisticsFramework(
+        'test_framework', Snapshot, gen_data)
+
+    now = get_now()
+    self.mock_now(now, 0)
+    handler._set_last_processed_time(
+        strip_seconds(now) - datetime.timedelta(seconds=3*60))
+    i = handler.process_next_chunk(1)
+    self.assertEqual(2, i)
+    self.assertEqual(1, handler.stats_root_cls.query().count())
+    self.assertEqual(1, handler.stats_day_cls.query().count())
+    self.assertEqual(1, handler.stats_hour_cls.query().count())
+    self.assertEqual(2, handler.stats_minute_cls.query().count())
+    root = handler.root_key.get()
+    self.assertEqual(
+        strip_seconds(now) - datetime.timedelta(seconds=60), root.timestamp)
+
+    # Trying to process more won't do anything.
+    i = handler.process_next_chunk(1)
+    self.assertEqual(0, i)
+    root = handler.root_key.get()
+    self.assertEqual(
+        strip_seconds(now) - datetime.timedelta(seconds=60), root.timestamp)
+
+    out = stats_framework.generate_stats_data(100, 100, 100, now, handler)
+    for key in ('days', 'hours', 'minutes'):
+      out[key] = [i.to_dict() for i in out[key]]
+    expected = {
+      'days': [
+        {
+          'key': now.strftime('%Y-%m-%d'),
+          'values': {'a': 0, 'b': 0.0, 'inner': {'c': u''}},
+        },
+      ],
+      'hours': [
+        {
+          'key': now.strftime('%Y-%m-%d %H:00'),
+          'values': {'a': 2, 'b': 2.0, 'inner': {'c': u'1,2,'}},
+        },
+      ],
+      'minutes': [
+        {
+          'key': (now - datetime.timedelta(seconds=60)).strftime(
+              '%Y-%m-%d %H:%M'),
+          'values': {'a': 1, 'b': 1.0, 'inner': {'c': u'2,'}},
+        },
+        {
+          'key': (now - datetime.timedelta(seconds=120)).strftime(
+              '%Y-%m-%d %H:%M'),
+          'values': {'a': 1, 'b': 1.0, 'inner': {'c': u'1,'}},
+        },
+      ],
+      'now': '2010-01-02 03:04:05',
+    }
+    self.assertEqual(expected, out)
+
+    # Limit the number of items returned.
+    out = stats_framework.generate_stats_data(0, 0, 1, now, handler)
+    for key in ('days', 'hours', 'minutes'):
+      out[key] = [i.to_dict() for i in out[key]]
+    expected = {
+      'days': [],
+      'hours': [],
+      'minutes': [
+        {
+          'key': (now - datetime.timedelta(seconds=60)).strftime(
+              '%Y-%m-%d %H:%M'),
+          'values': {'a': 1, 'b': 1.0, 'inner': {'c': u'2,'}},
+        },
+      ],
+      'now': '2010-01-02 03:04:05',
+    }
+    self.assertEqual(expected, out)
 
   def test_keys(self):
     handler = stats_framework.StatisticsFramework(
