@@ -40,6 +40,7 @@ import template
 from components import ereporter2
 from components import auth
 from components import auth_ui
+from components import sharding
 from components import utils
 
 
@@ -103,27 +104,10 @@ HASH_LETTERS = set('0123456789abcdef')
 #### Models
 
 
-class ContentNamespace(ndb.Model):
-  """Kept to be able to delete stale instance.
-
-  TODO(maruel): Delete once all instances are migrated.
-  """
-  pass
-
-
-class ContentShard(ndb.Model):
-  """Entity group to improve performance.
-
-  Key id is the first N items in the hash key.
-  """
-  pass
-
-
 class ContentEntry(ndb.Model):
   """Represents the content, keyed by its SHA-1 hash.
 
-  Parent is a ContentShard. The ContentShard's key is the first N letters of
-  this item's hash value.
+  Parent is a ContentShard.
 
   Key is '<namespace>-<hash>'.
 
@@ -216,8 +200,10 @@ def entry_key(namespace, hash_key):
 def entry_key_from_id(key_id):
   """Returns the ndb.Key for the key_id."""
   hash_key = key_id.rsplit('/', 1)[1]
-  shard = config.settings().sharding_letters
-  return ndb.Key(ContentShard, hash_key[:shard], ContentEntry, key_id)
+  N = config.settings().sharding_letters
+  return ndb.Key(
+      ContentEntry, key_id,
+      parent=sharding.shard_key(hash_key, N, 'ContentShard'))
 
 
 def create_entry(key):
@@ -228,9 +214,6 @@ def create_entry(key):
   Returns None if there is a problem generating the entry or if an entry already
   exists with the given hex encoded SHA-1 hash |hash_key|.
   """
-  # Strangely, ContentShard doesn't have to exist in the DB to be a valid entity
-  # group. Only the fact it is used as a parent key is sufficient.
-
   # Entity was present, can't insert.
   if key.get():
     return None
