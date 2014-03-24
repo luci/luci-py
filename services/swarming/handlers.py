@@ -240,7 +240,7 @@ class MainHandler(auth.AuthenticatingHandler):
 
   def ParseFilters(self):
     """Parse the filters from the request."""
-    self.status = self.request.get('status', '')
+    self.status = self.request.get('status', 'all')
 
     # Compare to 'False' so that the default value for invalid user input
     # is True.

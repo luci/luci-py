@@ -683,8 +683,8 @@ class TestManagementTest(test_case.TestCase):
   def testRequestBeforeResult(self):
     self._mox.StubOutWithMock(logging, 'warning')
 
-    logging.warning(mox.StrContains('unfinished test'), mox.IgnoreArg(),
-                    mox.IgnoreArg())
+    logging.error(
+        mox.StrContains('unfinished test'), mox.IgnoreArg(), mox.IgnoreArg())
     self._mox.ReplayAll()
 
     test_management.ExecuteTestRequest(test_helper.GetRequestMessage())

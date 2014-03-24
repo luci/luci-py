@@ -111,7 +111,7 @@ def ExecuteTestRequest(request_message):
     A dictionary containing the test_case_name field and an array of
     dictionaries containing the config_name and test_id_key fields.
   """
-  logging.debug('TRM.ExecuteTestRequest msg=%s', request_message)
+  logging.debug('ExecuteTestRequest(%s)', request_message)
 
   # This will raise on an invalid request.
   test_case = test_request.GetTestCase(request_message)
@@ -266,15 +266,13 @@ def _AbortUnfullfilledRunner(runner):
 
 
 def AbortStaleRunners():
-  """Abort any runners are taking too long to run or too long to find a match.
+  """Aborts any runners are taking too long to run or too long to find a match.
 
-  If the runner is aborted because the machine timed out, it will
-  automatically be retried if it hasn't been aborted more than
-  MAX_AUTOMATIC_RETRY times.
-  If a runner is aborted because it hasn't hasn't found any machine to run it
-  in over SWARM_RUNNER_MAX_WAIT_SECS seconds, there is no automatic retry.
+  If the runner is aborted because the machine timed out, it will automatically
+  be retried if it hasn't been aborted more than MAX_AUTOMATIC_RETRY times. If a
+  runner is aborted because it hasn't hasn't found any machine to run it in over
+  SWARM_RUNNER_MAX_WAIT_SECS seconds, there is no automatic retry.
   """
-  logging.debug('TRM.AbortStaleRunners starting')
   now = _GetCurrentTime()
   # If any active runner hasn't recieved a ping in the last _TIMEOUT_FACTOR
   # seconds then we consider it stale and abort it.
@@ -285,6 +283,8 @@ def AbortStaleRunners():
   def HandleStaleRunner(runner):
     # Get the most updated version of the runner.
     try:
+      # TODO(maruel): TestRunner doesn't have an entity group so transactions do
+      # not work in HRD.
       runner = ndb.transaction(runner.key.get)
     except datastore_errors.TransactionFailedError:
       # If we can't get the newest version of the runner, don't worry about
@@ -297,18 +297,36 @@ def AbortStaleRunners():
 
     if test_runner.ShouldAutomaticallyRetryRunner(runner):
       if test_runner.AutomaticallyRetryRunner(runner):
-        logging.warning('TRM.AbortStaleRunners retrying runner %s on machine '
-                        '%s with key %s. Attempt %d', runner.name,
-                        runner.machine_id, runner.key.urlsafe(),
-                        runner.automatic_retry_count)
+        # TODO(maruel): Lower to info(), increased level to see how often it
+        # happens for a few day for a few days.
+        logging.error(
+            'AbortStaleRunners retrying runner\n'
+            'Runner: %s\n'
+            'Bot: %s\n'
+            'Key: %s\n'
+            'Attempt %d',
+            runner.name,
+            runner.machine_id,
+            runner.key.urlsafe(),
+            runner.automatic_retry_count)
       else:
-        logging.info('TRM.AbortStaleRunner unable to retry runner with key '
-                     '%s on machine %s even though it can. Skipping for now.',
-                     runner.key.urlsafe(), runner.machine_id)
+        logging.error(
+            'AbortStaleRunner unable to retry runner\n'
+            'Runner: %s\n'
+            'Bot: %s\n'
+            'Key: %s',
+            runner.name,
+            runner.machine_id,
+            runner.key.urlsafe())
     else:
-      logging.error('TRM.AbortStaleRunners aborting runner %s on machine %s '
-                    'with key %s', runner.name, runner.machine_id,
-                    runner.key.urlsafe())
+      logging.error(
+          'AbortStaleRunners aborting runner\n'
+          'Runner: %s\n'
+          'Bot: %s\n'
+          'Key: %s',
+          runner.name,
+          runner.machine_id,
+          runner.key.urlsafe())
       AbortRunner(runner, reason='Runner has become stale.')
 
   query = test_runner.TestRunner.gql(
@@ -321,13 +339,11 @@ def AbortStaleRunners():
                                      'and done = :3', now, None, False)
   unfullfilled_rpc = query.map_async(_AbortUnfullfilledRunner)
 
-  logging.debug('TRM.AbortStaleRunners done')
-
   ndb.Future.wait_all([stale_runner_rpc, unfullfilled_rpc])
 
 
-def AbortRunner(runner, reason='Not specified.'):
-  """Abort the given test runner.
+def AbortRunner(runner, reason):
+  """Aborts the given TestRunner.
 
   Args:
     runner: An instance of TestRunner to be aborted.
@@ -337,6 +353,10 @@ def AbortRunner(runner, reason='Not specified.'):
            reason.encode('ascii', 'xmlcharrefreplace'))
 
   # The cancellation time should count as the time the runner started.
+  # TODO(maruel): Should have an aborted timestamp instead of having 'started'
+  # mean two different things.
+  # TODO(maruel): This is not done as a transaction either, this is
+  # inconsistent.
   runner.started = datetime.datetime.utcnow()
   runner.put()
 
@@ -381,9 +401,9 @@ def ExecuteRegisterRequest(attributes, server_url):
 
       return response
   else:
-    logging.warning('%s(%s) is querying for work but it is too old to '
-                    'automatically update. Please manually update the slave.',
-                    attribs['id'], attributes.get('tag', None))
+    logging.error(
+        'Bot is too old to update, please manually update\n%s(%s)',
+        attribs['id'], attributes.get('tag', None))
 
   dimension_hashes = dimensions_utils.GenerateAllDimensionHashes(
       attribs['dimensions'])
@@ -399,14 +419,19 @@ def ExecuteRegisterRequest(attributes, server_url):
       test_runner.TestRunner.machine_id == attribs['id'],
       test_runner.TestRunner.done == False).get(keys_only=True)
   if unfinished_test_key:
-    logging.warning('A machine is asking for a new test, but there still '
-                    'seems to be an unfinished test with key, %s, running on '
-                    'a machine with the same id, %s. This might just be due '
-                    'to app engine being only eventually consistent',
-                    unfinished_test_key.urlsafe(), attribs['id'])
+    # When this happens, something is broken. Examples:
+    # - the bot hard rebooted, thus forgot about the job
+    # - two bots share the same identity, fighting each other
+    # In any case, this situation must be fixed. In the first case, calling
+    # AbortRunner() on each unfinished_test_key is likely the best idea.
+    logging.error(
+        'Bot asked for new test but is already registered as running one\n'
+        'Bot: %s\n'
+        'Running key: %s\n',
+        attribs['id'], unfinished_test_key.urlsafe())
 
-  # Try assigning machine to a runner 10 times before we give up.
-  # TODO(user): Tune this parameter somehow.
+  # Try assigning bot to a runner 10 times before we give up.
+  # TODO(maruel): Tune this parameter somehow.
   assigned_runner = False
   for _ in range(10):
     # Try to find a matching test runner for the machine.

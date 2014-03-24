@@ -543,7 +543,7 @@ def GetTestRunners(sort_by='machine_id', ascending=True, limit=None,
   return query
 
 
-def ApplyFilters(query, status='', show_successfully_completed=True,
+def ApplyFilters(query, status='all', show_successfully_completed=True,
                  test_name='', machine_id=''):
   """Applies the required filters to the given query.
 
@@ -572,6 +572,9 @@ def ApplyFilters(query, status='', show_successfully_completed=True,
                          TestRunner.done == False)
   elif status == 'done':
     query = query.filter(TestRunner.done == True)
+
+  else:
+    assert status == 'all', status
 
   if not show_successfully_completed:
     query = query.filter(ndb.OR(TestRunner.done == False,

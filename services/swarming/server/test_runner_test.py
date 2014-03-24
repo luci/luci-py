@@ -240,10 +240,10 @@ class TestRunnerTest(test_case.TestCase):
 
     # Hung runner, aborted without ever running.
     hung_runner = test_helper.CreatePendingRunner()
-    test_management.AbortRunner(hung_runner)
+    test_management.AbortRunner(hung_runner, 'Hung')
 
     aborted_runner = test_helper.CreatePendingRunner(machine_id=MACHINE_IDS[1])
-    test_management.AbortRunner(aborted_runner)
+    test_management.AbortRunner(aborted_runner, 'Aborted')
 
     failed_runner = test_helper.CreatePendingRunner(machine_id=MACHINE_IDS[1])
     failed_runner.done = True
@@ -324,7 +324,7 @@ class TestRunnerTest(test_case.TestCase):
     # Create a runner that was aborted before running.
     aborted_runner = test_helper.CreatePendingRunner()
     aborted_runner.created = old_time
-    test_management.AbortRunner(aborted_runner)
+    test_management.AbortRunner(aborted_runner, 'Aborted')
     self.assertEqual([], test_runner.GetHangingRunners())
 
     # Create an older runner that will be marked as hanging.
