@@ -12,10 +12,6 @@ cron:
   url: /secure/cron/ereporter2/mail
   schedule: every 1 hours synchronized
 
-- description: Detect dead machines
-  url: /secure/cron/detect_dead_machines
-  schedule: every 1 hours
-
 - description: Detect hanging runners
   url: /secure/cron/detect_hanging_runners
   schedule: every 10 minutes

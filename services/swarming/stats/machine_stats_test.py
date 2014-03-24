@@ -17,7 +17,6 @@ import test_env
 test_env.setup_test_env()
 
 import test_case
-from server import admin_user
 from stats import machine_stats
 
 
@@ -26,32 +25,6 @@ MACHINE_IDS = ['12345678-12345678-12345678-12345678',
 
 
 class MachineStatsTest(test_case.TestCase):
-  def testDetectDeadMachines(self):
-    self.assertEqual([], machine_stats.FindDeadMachines())
-
-    m_stats = machine_stats.MachineStats.get_or_insert('id1', tag='machine')
-    m_stats.put()
-    self.assertEqual([], machine_stats.FindDeadMachines())
-
-    # Make the machine old and ensure it is marked as dead.
-    m_stats.last_seen = (datetime.datetime.utcnow() -
-                         2 * machine_stats.MACHINE_DEATH_TIMEOUT)
-    m_stats.put()
-
-    dead_machines = machine_stats.FindDeadMachines()
-    self.assertEqual(1, len(dead_machines))
-    self.assertEqual('id1', dead_machines[0].machine_id)
-    self.assertEqual('machine', dead_machines[0].tag)
-
-  def testNotifyAdminsOfDeadMachines(self):
-    dead_machine = machine_stats.MachineStats.get_or_insert('id', tag='tag')
-    dead_machine.put()
-
-    # Set an admin and ensure emails can get sent to them.
-    user = admin_user.AdminUser(email='fake@email.com')
-    user.put()
-    self.assertTrue(machine_stats.NotifyAdminsOfDeadMachines([dead_machine]))
-
   def testRecordMachineQueries(self):
     dimensions = 'dimensions'
     machine_tag = 'tag'

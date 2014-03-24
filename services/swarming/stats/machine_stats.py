@@ -11,12 +11,9 @@ import datetime
 import json
 import logging
 
-from google.appengine.api import app_identity
 from google.appengine.ext import ndb
 
-import template
 from components import utils
-from server import admin_user
 
 
 # The number of hours that have to pass before a machine is considered dead.
@@ -73,40 +70,6 @@ class MachineStats(ndb.Model):
       # For now, cope with the current entities.
       logging.error('Failed to encode %s', repr(out.get('dimensions')))
     return out
-
-
-def FindDeadMachines():
-  """Finds all dead machines.
-
-  Returns:
-    A list of the dead machines.
-  """
-  dead_machine_cutoff = (utcnow() - MACHINE_DEATH_TIMEOUT)
-
-  return list(MachineStats.gql('WHERE last_seen < :1', dead_machine_cutoff))
-
-
-def NotifyAdminsOfDeadMachines(dead_machines):
-  """Notifies the admins of the dead_machines detected.
-
-  Args:
-    dead_machines: The list of the currently dead machines.
-
-  Returns:
-    True if the email was successfully sent.
-  """
-  death_list = (
-      '  %s (%s)   %s' % (
-        m.machine_id, m.tag, template.datetimeformat(m.last_seen))
-      for m in dead_machines)
-
-  body = (
-    'The following registered machines haven\'t been active in at least %s.\n'
-    'They are assumed to be dead:\n'
-    '%s\n') % (MACHINE_DEATH_TIMEOUT, '\n'.join(sorted(death_list)))
-
-  subject = 'Dead Machines on %s' % app_identity.get_application_id()
-  return admin_user.EmailAdmins(subject, body)
 
 
 def RecordMachineQueriedForWork(machine_id, dimensions, machine_tag):

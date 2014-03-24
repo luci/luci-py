@@ -613,6 +613,7 @@ class AppTest(test_case.TestCase):
         '/stats/daily',
         '/stats/tasks',
         '/stats/waits',
+        '/swarming/api/v1/bots/dead/count',
     ])
 
     # Grab the set of all routes.
@@ -848,6 +849,17 @@ class AppTest(test_case.TestCase):
             expected.issuperset(resource for _, resource in permissions),
             msg='Unexpected auth resource in %s of %s: %s' %
                 (method, route, permissions))
+
+  def test_dead_machines_count(self):
+    self.assertEqual('0', self.app.get('/swarming/api/v1/bots/dead/count').body)
+    bot = handlers.machine_stats.MachineStats.get_or_insert(
+        'id1', tag='machine')
+    self.assertEqual('0', self.app.get('/swarming/api/v1/bots/dead/count').body)
+    # Make the machine old and ensure it is marked as dead.
+    bot.last_seen = (
+        datetime.datetime.utcnow() - 2 * machine_stats.MACHINE_DEATH_TIMEOUT)
+    bot.put()
+    self.assertEqual('1', self.app.get('/swarming/api/v1/bots/dead/count').body)
 
 
 if __name__ == '__main__':

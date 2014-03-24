@@ -689,19 +689,13 @@ class CronTriggerGenerateRecentStats(webapp2.RequestHandler):
     self.response.out.write('Success.')
 
 
-class CronDetectDeadMachinesHandler(webapp2.RequestHandler):
-  """Emails reports of dead machines."""
-
-  @require_cronjob
+class DeadBotsCountHandler(webapp2.RequestHandler):
   def get(self):
     self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
-    dead_machines = machine_stats.FindDeadMachines()
-    if dead_machines:
-      logging.warning(
-          '%d dead machines were detected, emailing admins.',
-          len(dead_machines))
-      machine_stats.NotifyAdminsOfDeadMachines(dead_machines)
-    self.response.out.write('Success.')
+    cutoff = machine_stats.utcnow() - machine_stats.MACHINE_DEATH_TIMEOUT
+    count = machine_stats.MachineStats.query().filter(
+        machine_stats.MachineStats.last_seen < cutoff).count()
+    self.response.out.write(str(count))
 
 
 class CronDetectHangingRunnersHandler(webapp2.RequestHandler):
@@ -1380,7 +1374,6 @@ def CreateApplication():
       ('/runner_ping', RunnerPingHandler),
 
       ('/secure/cron/abort_stale_runners', CronAbortStaleRunnersHandler),
-      ('/secure/cron/detect_dead_machines', CronDetectDeadMachinesHandler),
       ('/secure/cron/detect_hanging_runners', CronDetectHangingRunnersHandler),
       ('/secure/cron/trigger_cleanup_data', CronTriggerCleanupDataHandler),
       ('/secure/cron/trigger_generate_daily_stats',
@@ -1417,6 +1410,7 @@ def CreateApplication():
 
       # The new APIs:
       ('/swarming/api/v1/bots', ApiBots),
+      ('/swarming/api/v1/bots/dead/count', DeadBotsCountHandler),
   ]
 
   # Upgrade to Route objects so regexp work.
