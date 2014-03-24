@@ -135,21 +135,21 @@ def ExecuteTestRequest(request_message):
           'The test case name, %s, has already been used by another test case '
           'which doesn\'t have equivalent values. Please select a new test '
           'case name.' % test_case.test_case_name)
-
+    # TODO(csharp): Enable once Swarm's health improves.
     # Check that the old request still has all it's test runners (we can't use
     # the old values if they were already deleted).
-    required_runners = sum(test.num_instances
-                           for test in test_case.configurations)
-    if len(matching_request.runner_keys) == required_runners:
-      matching_runners = ndb.get_multi(matching_request.runner_keys)
-
-      # Reuse the old runner if none of them have failed, otherwise rerun them
-      # all.
-      if (all(runner and not runner.done or runner.ran_successfully
-              for runner in matching_runners)):
-        for runner in matching_runners:
-          AddRunnerToKeys(runner)
-        return test_keys
+    # required_runners = sum(test.num_instances
+    #                        for test in test_case.configurations)
+    # if len(matching_request.runner_keys) == required_runners:
+    #   matching_runners = ndb.get_multi(matching_request.runner_keys)
+    #
+    #   # Reuse the old runner if none of them have failed, otherwise rerun them
+    #   # all.
+    #   if (all(runner and not runner.done or runner.ran_successfully
+    #           for runner in matching_runners)):
+    #     for runner in matching_runners:
+    #       AddRunnerToKeys(runner)
+    #     return test_keys
 
   # Only store the request if we are actually going to use it.
   request.put()

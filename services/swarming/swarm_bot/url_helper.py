@@ -16,7 +16,7 @@ import urllib
 import urllib2
 import urlparse
 
-from common import swarm_constants
+from common import swarm_constants  # pylint: disable=W0403
 
 
 # The index of the query elements from urlparse.

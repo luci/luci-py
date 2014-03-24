@@ -221,7 +221,8 @@ class TestManagementTest(test_case.TestCase):
     self.assertEqual(2, test_request.TestRequest.query().count())
     self.assertEqual(2, test_runner.TestRunner.query().count())
 
-  def testTestRequestMatch(self):
+  # TODO(csharp): Renable once request merging is enabled again.
+  def disabled_testTestRequestMatch(self):
     request = test_helper.GetRequestMessage()
 
     response = test_management.ExecuteTestRequest(request)
@@ -236,7 +237,8 @@ class TestManagementTest(test_case.TestCase):
     self.assertEqual(1, test_request.TestRequest.query().count())
     self.assertEqual(1, test_runner.TestRunner.query().count())
 
-  def testTestRequestMatchMultipleConfigs(self):
+  # TODO(csharp): Renable once request merging is enabled again.
+  def disabled_testTestRequestMatchMultipleConfigs(self):
     num_configs = 2
     request = test_helper.GetRequestMessage(num_configs=num_configs)
 
