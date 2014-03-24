@@ -4,6 +4,7 @@
 
 """Setups jinja2 environment."""
 
+import datetime
 import os
 
 import jinja2
@@ -26,7 +27,21 @@ def datetimeformat(value, f='%Y-%m-%d %H:%M:%S'):
   return value.strftime(f)
 
 
+def datetime_human(dt):
+  """Converts a datetime.datetime to a user-friendly string."""
+  if not dt:
+    return '--'
+  dt_date = dt.date()
+  today = datetime.datetime.utcnow().date()
+  if dt_date == today:
+    return dt.strftime('Today, %H:%M:%S')
+  if dt_date == today - datetime.timedelta(days=1):
+    return dt.strftime('Yesterday, %H:%M:%S')
+  return dt.strftime('%Y-%m-%d %H:%M:%S')
+
+
 JINJA.filters['datetimeformat'] = datetimeformat
+JINJA.filters['datetime_human'] = datetime_human
 
 
 def get_defaults():

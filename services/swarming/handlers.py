@@ -162,6 +162,40 @@ def require_taskqueue(task_name):
   return decorator
 
 
+def make_runner_view(runner):
+  """Returns a html template friendly dict from a TestRunner."""
+  out = runner.to_dict()
+  out['key_string'] = runner.key.urlsafe()
+  out['status_string'] = '&nbsp;'
+  out['command_string'] = '&nbsp;'
+  out['class_string'] = ''
+
+  if runner.done:
+    # TODO(maruel): All this should be done in the template instead.
+    if runner.ran_successfully:
+      out['status_string'] = (
+          '<a title="Click to see results" href="%s?r=%s">Succeeded</a>' %
+          (_SECURE_GET_RESULTS_URL, out['key_string']))
+    else:
+      out['class_string'] = 'failed_test'
+      out['command_string'] = GenerateButtonWithHiddenForm(
+          'Retry',
+          '/secure/retry?r=%s' % out['key_string'],
+          out['key_string'])
+      out['status_string'] = (
+          '<a title="Click to see results" href="%s?r=%s">Failed</a>' %
+          (_SECURE_GET_RESULTS_URL, out['key_string']))
+  elif runner.started:
+    out['status_string'] = 'Running on %s' % runner.machine_id
+  else:
+    out['status_string'] = 'Pending'
+    out['command_string'] = GenerateButtonWithHiddenForm(
+        'Cancel',
+        '%s?r=%s' % (_SECURE_CANCEL_URL, out['key_string']),
+        out['key_string'])
+  return out
+
+
 ### Handlers
 
 
@@ -170,31 +204,6 @@ class MainHandler(auth.AuthenticatingHandler):
 
   This handler lists all pending requests and allows callers to manage them.
   """
-
-  def GetTimeString(self, dt):
-    """Convert the datetime object to a user-friendly string.
-
-    Arguments:
-      dt: a datetime.datetime object.
-
-    Returns:
-      A string representing the datetime object to show in the web UI.
-    """
-    s = '--'
-
-    if dt:
-      midnight_today = datetime.datetime.utcnow().replace(hour=0, minute=0,
-                                                          second=0,
-                                                          microsecond=0)
-      midnight_yesterday = midnight_today - datetime.timedelta(days=1)
-      if dt > midnight_today:
-        s = dt.strftime('Today at %H:%M')
-      elif dt > midnight_yesterday:
-        s = dt.strftime('Yesterday at %H:%M')
-      else:
-        s = dt.strftime('%d %b at %H:%M')
-
-    return s
 
   def GeneratePageUrl(self, current_page=None, sort_by=None,
                       include_filters=False):
@@ -349,23 +358,18 @@ class MainHandler(auth.AuthenticatingHandler):
     except ValueError:
       page = 1
 
-    runners = []
-    for runner in self.GetTestRunners(
-        sort_key,
-        ascending=ascending,
-        limit=_NUM_USER_TEST_RUNNERS_PER_PAGE,
-        offset=_NUM_USER_TEST_RUNNERS_PER_PAGE * (page - 1)).fetch():
-      self._GetDisplayableRunnerTemplate(runner)
-      runners.append(runner)
-
-    errors = []
-    query = test_management.SwarmError.query(
+    runners = [
+      make_runner_view(runner)
+      for runner in self.GetTestRunners(
+          sort_key,
+          ascending=ascending,
+          limit=_NUM_USER_TEST_RUNNERS_PER_PAGE,
+          offset=_NUM_USER_TEST_RUNNERS_PER_PAGE * (page - 1))
+    ]
+    errors = test_management.SwarmError.query(
         default_options=ndb.QueryOptions(
-            limit=_NUM_RECENT_ERRORS_TO_DISPLAY)).order(
-                -test_management.SwarmError.created)
-    for error in query:
-      error.log_time = self.GetTimeString(error.created)
-      errors.append(error)
+          limit=_NUM_RECENT_ERRORS_TO_DISPLAY)).order(
+              -test_management.SwarmError.created).fetch()
 
     sort_options = []
     for key, value in test_runner.ACCEPTABLE_SORTS.iteritems():
@@ -402,50 +406,6 @@ class MainHandler(auth.AuthenticatingHandler):
             page, include_filters=False),
     }
     self.response.out.write(template.render('index.html', params))
-
-  def _GetDisplayableRunnerTemplate(self, runner):
-    """Puts different aspects of the runner in a displayable format.
-
-    Args:
-      runner: TestRunner object which will be displayed in Swarm server webpage.
-    """
-    runner.name_string = runner.name
-    runner.key_string = str(runner.key.urlsafe())
-    runner.status_string = '&nbsp;'
-    runner.requested_on_string = self.GetTimeString(runner.created)
-    runner.started_string = '--'
-    runner.ended_string = '--'
-    runner.machine_id_used = '&nbsp'
-    runner.command_string = '&nbsp;'
-    runner.failed_test_class_string = ''
-
-    if runner.done:
-      runner.started_string = self.GetTimeString(runner.started)
-      runner.ended_string = self.GetTimeString(runner.ended)
-
-      runner.machine_id_used = runner.machine_id
-
-      if runner.ran_successfully:
-        runner.status_string = (
-            '<a title="Click to see results" href="%s?r=%s">Succeeded</a>' %
-            (_SECURE_GET_RESULTS_URL, runner.key_string))
-      else:
-        runner.failed_test_class_string = 'failed_test'
-        runner.command_string = GenerateButtonWithHiddenForm(
-            'Retry', '/secure/retry?r=%s' % runner.key_string,
-            runner.key_string)
-        runner.status_string = (
-            '<a title="Click to see results" href="%s?r=%s">Failed</a>' %
-            (_SECURE_GET_RESULTS_URL, runner.key_string))
-    elif runner.started:
-      runner.status_string = 'Running on machine %s' % runner.machine_id
-      runner.started_string = self.GetTimeString(runner.started)
-      runner.machine_id_used = runner.machine_id
-    else:
-      runner.status_string = 'Pending'
-      runner.command_string = GenerateButtonWithHiddenForm(
-          'Cancel', '%s?r=%s' % (_SECURE_CANCEL_URL, runner.key_string),
-          runner.key_string)
 
 
 class RedirectToMainHandler(webapp2.RequestHandler):
