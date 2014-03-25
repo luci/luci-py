@@ -476,7 +476,6 @@ class DeleteMachineStatsHandler(auth.AuthenticatingHandler):
   xsrf_token_enforce_on = ()
 
   @auth.require(auth.UPDATE, 'swarming/clients')
-  @auth.require(auth.UPDATE, 'swarming/management')
   def post(self):
     key = self.request.get('r')
 
