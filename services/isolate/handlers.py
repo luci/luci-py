@@ -12,10 +12,8 @@ import hashlib
 import hmac
 import json
 import logging
-import os
 import random
 import re
-import sys
 import time
 import urllib
 import zlib
@@ -27,9 +25,6 @@ from google.appengine.api import datastore_errors
 from google.appengine.api import memcache
 from google.appengine.api import taskqueue
 from google.appengine.ext import ndb
-
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.join(BASE_DIR, 'third_party'))
 
 import acl
 import config
