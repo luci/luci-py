@@ -33,18 +33,6 @@ from components import utils
 # App engine module to run task queue tasks on.
 TASK_QUEUE_MODULE = 'backend'
 
-# Requests that can possibly produce stats log entries.
-STATS_REQUEST_PATHS = (
-    # TODO(maruel): Remove once rolled out to prod.
-    '/content/',
-    '/content-gs/',
-    # TODO(maruel): Remove once rolled out to prod.
-    '/restricted/content/',
-)
-
-# Modules that can possibly produce stats log entries.
-STATS_MODULES = ('default',)
-
 
 class GlobalConfig(ndb.Model):
   """Application wide settings."""

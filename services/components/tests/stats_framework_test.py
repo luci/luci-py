@@ -6,16 +6,24 @@
 import calendar
 import datetime
 import sys
+import time
 import unittest
 
 import test_env
 test_env.setup_test_env()
 
+import webapp2
 from google.appengine.ext import ndb
-from google.appengine.ext import testbed
 
 from components import stats_framework
-from depot_tools import auto_stub
+from components import stats_framework_mock
+
+# From tools/third_party/
+import webtest
+
+# For TestCase.
+import test_case
+
 
 # pylint: disable=W0212
 
@@ -29,11 +37,21 @@ class InnerSnapshot(ndb.Model):
 
 class Snapshot(ndb.Model):
   """Fake statistics."""
-  a = ndb.IntegerProperty(default=0, indexed=False)
+  requests = ndb.IntegerProperty(default=0, indexed=False)
   b = ndb.FloatProperty(default=0, indexed=False)
-  inner = ndb.LocalStructuredProperty(InnerSnapshot, default=InnerSnapshot())
+  inner = ndb.LocalStructuredProperty(InnerSnapshot)
+
+  def __init__(self, **kwargs):
+    # This is the recommended way to use ndb.LocalStructuredProperty inside a
+    # snapshot.
+    #
+    # Warning: The only reason it works is because Snapshot is itself inside a
+    # ndb.LocalStructuredProperty.
+    kwargs.setdefault('inner', InnerSnapshot())
+    super(Snapshot, self).__init__(**kwargs)
 
   def accumulate(self, rhs):
+    # accumulate() specifically handles where default value is a class instance.
     return stats_framework.accumulate(self, rhs)
 
 
@@ -51,27 +69,10 @@ def strip_seconds(timestamp):
   return datetime.datetime(*timestamp.timetuple()[:5], second=0)
 
 
-class StatsFrameworkTest(auto_stub.TestCase):
-  def setUp(self):
-    super(StatsFrameworkTest, self).setUp()
-    self.testbed = testbed.Testbed()
-    self.testbed.activate()
-    self.testbed.init_datastore_v3_stub()
-    self.testbed.init_memcache_stub()
-
-  def tearDown(self):
-    self.testbed.deactivate()
-    super(StatsFrameworkTest, self).tearDown()
-
-  def mock_now(self, now, seconds):
-    now = now + datetime.timedelta(seconds=seconds)
-    self.mock(stats_framework, 'utcnow', lambda: now)
-    self.mock(ndb.DateTimeProperty, '_now', lambda _: now)
-    self.mock(ndb.DateProperty, '_now', lambda _: now.date())
-
+class StatsFrameworkTest(test_case.TestCase, stats_framework_mock.MockMixIn):
   def test_empty(self):
     handler = stats_framework.StatisticsFramework(
-        'global_stats', Snapshot, lambda *_: self.fail())
+        'test_framework', Snapshot, self.fail)
 
     self.assertEqual(0, handler.stats_root_cls.query().count())
     self.assertEqual(0, handler.stats_day_cls.query().count())
@@ -106,7 +107,8 @@ class StatsFrameworkTest(auto_stub.TestCase):
       """Returns fake statistics."""
       self.assertEqual(start + 60, end)
       called.append(start)
-      return Snapshot(a=1, b=1, inner=InnerSnapshot(c='%d,' % len(called)))
+      return Snapshot(
+          requests=1, b=1, inner=InnerSnapshot(c='%d,' % len(called)))
 
     handler = stats_framework.StatisticsFramework(
         'test_framework', Snapshot, gen_data)
@@ -145,7 +147,7 @@ class StatsFrameworkTest(auto_stub.TestCase):
       {
         'key': midnight.strftime('%Y-%m-%d'),
         'values': {
-          'a': limit,
+          'requests': limit,
           'b': float(limit),
           'inner': {
             'c': u''.join('%d,' % i for i in xrange(1, limit + 1)),
@@ -166,7 +168,7 @@ class StatsFrameworkTest(auto_stub.TestCase):
         'key': (midnight + datetime.timedelta(seconds=i*60*60)).strftime(
             '%Y-%m-%-d %H:%M'),
         'values': {
-          'a': 60,
+          'requests': 60,
           'b': 60.,
           'inner': {
             'c': u''.join(
@@ -189,7 +191,7 @@ class StatsFrameworkTest(auto_stub.TestCase):
         'key': (midnight + datetime.timedelta(seconds=i*60)).strftime(
             '%Y-%m-%-d %H:%M'),
         'values': {
-          'a': 1,
+          'requests': 1,
           'b': 1.,
           'inner': {
             'c': u'%d,' % (i + 1),
@@ -210,7 +212,8 @@ class StatsFrameworkTest(auto_stub.TestCase):
       """Returns fake statistics."""
       self.assertEqual(start + 60, end)
       called.append(start)
-      return Snapshot(a=1, b=1, inner=InnerSnapshot(c='%d,' % len(called)))
+      return Snapshot(
+          requests=1, b=1, inner=InnerSnapshot(c='%d,' % len(called)))
 
     handler = stats_framework.StatisticsFramework(
         'test_framework', Snapshot, gen_data)
@@ -243,25 +246,25 @@ class StatsFrameworkTest(auto_stub.TestCase):
       'days': [
         {
           'key': now.strftime('%Y-%m-%d'),
-          'values': {'a': 0, 'b': 0.0, 'inner': {'c': u''}},
+          'values': {'requests': 0, 'b': 0.0, 'inner': {'c': u''}},
         },
       ],
       'hours': [
         {
           'key': now.strftime('%Y-%m-%d %H:00'),
-          'values': {'a': 2, 'b': 2.0, 'inner': {'c': u'1,2,'}},
+          'values': {'requests': 2, 'b': 2.0, 'inner': {'c': u'1,2,'}},
         },
       ],
       'minutes': [
         {
           'key': (now - datetime.timedelta(seconds=60)).strftime(
               '%Y-%m-%d %H:%M'),
-          'values': {'a': 1, 'b': 1.0, 'inner': {'c': u'2,'}},
+          'values': {'requests': 1, 'b': 1.0, 'inner': {'c': u'2,'}},
         },
         {
           'key': (now - datetime.timedelta(seconds=120)).strftime(
               '%Y-%m-%d %H:%M'),
-          'values': {'a': 1, 'b': 1.0, 'inner': {'c': u'1,'}},
+          'values': {'requests': 1, 'b': 1.0, 'inner': {'c': u'1,'}},
         },
       ],
       'now': '2010-01-02 03:04:05',
@@ -269,7 +272,8 @@ class StatsFrameworkTest(auto_stub.TestCase):
     self.assertEqual(expected, out)
 
     # Limit the number of items returned.
-    out = stats_framework.generate_stats_data(0, 0, 1, now, handler)
+    out = stats_framework.generate_stats_data(
+        0, 0, 1, now - datetime.timedelta(seconds=60), handler)
     for key in ('days', 'hours', 'minutes'):
       out[key] = [i.to_dict() for i in out[key]]
     expected = {
@@ -279,16 +283,16 @@ class StatsFrameworkTest(auto_stub.TestCase):
         {
           'key': (now - datetime.timedelta(seconds=60)).strftime(
               '%Y-%m-%d %H:%M'),
-          'values': {'a': 1, 'b': 1.0, 'inner': {'c': u'2,'}},
+          'values': {'requests': 1, 'b': 1.0, 'inner': {'c': u'2,'}},
         },
       ],
-      'now': '2010-01-02 03:04:05',
+      'now': '2010-01-02 03:03:05',
     }
     self.assertEqual(expected, out)
 
   def test_keys(self):
     handler = stats_framework.StatisticsFramework(
-        'test_framework', Snapshot, None)
+        'test_framework', Snapshot, self.fail)
     date = datetime.datetime(2010, 1, 2)
     self.assertEqual(
         ndb.Key('StatsRoot', 'test_framework', 'StatsDay', '2010-01-02'),
@@ -307,6 +311,205 @@ class StatsFrameworkTest(auto_stub.TestCase):
           'StatsHour', '00',
           'StatsMinute', '00'),
         handler.minute_key(date))
+
+  def test_yield_empty(self):
+    self.assertEqual(
+        0, len(list(stats_framework.yield_entries(None, None))))
+
+
+def generate_snapshot(start_time, end_time):
+  values = Snapshot()
+  for entry in stats_framework.yield_entries(start_time, end_time):
+    values.requests += 1
+    for l in entry.entries:
+      values.inner.c += l
+  return values
+
+
+class StatsFrameworkLogTest(test_case.TestCase, stats_framework_mock.MockMixIn):
+  def setUp(self):
+    super(StatsFrameworkLogTest, self).setUp()
+    stats_framework_mock.configure(self)
+    self.h = stats_framework.StatisticsFramework(
+        'test_framework', Snapshot, generate_snapshot)
+
+    # pylint: disable=E0213
+    class GenerateHandler(webapp2.RequestHandler):
+      def get(self2):
+        stats_framework.add_entry('Hello')
+        self2.response.write('Yay')
+
+    class JsonHandler(webapp2.RequestHandler):
+      def get(self2):
+        self2.response.headers['Content-Type'] = (
+            'application/json; charset=utf-8')
+        data = stats_framework.generate_stats_data_from_request(
+            self2.request, self.h)
+        self2.response.write(stats_framework.utils.encode_to_json(data))
+
+    routes = [
+        ('/generate', GenerateHandler),
+        ('/json', JsonHandler),
+    ]
+    real_app = webapp2.WSGIApplication(routes, debug=True)
+    self.app = webtest.TestApp(
+        real_app, extra_environ={'REMOTE_ADDR': 'fake-ip'})
+    self.now = datetime.datetime(2010, 1, 2, 3, 4, 5, 6)
+    self.mock_now(self.now, 0)
+
+  def test_yield_entries(self):
+    stats_framework_mock.reset_timestamp(self.h, self.now)
+
+    self.assertEqual(
+        0, len(list(stats_framework.yield_entries(None, None))))
+    self.assertEqual(
+        0, len(list(stats_framework.yield_entries(1, time.time()))))
+
+    self.assertEqual('Yay', self.app.get('/generate').body)
+
+    self.assertEqual(
+        1, len(list(stats_framework.yield_entries(None, None))))
+    self.assertEqual(
+        1, len(list(stats_framework.yield_entries(1, time.time()))))
+    self.assertEqual(
+        0, len(list(stats_framework.yield_entries(
+          None, stats_framework_mock.now_epoch()))))
+
+  def test_json_empty(self):
+    stats_framework_mock.reset_timestamp(self.h, self.now)
+    expected = {
+      u'days': [],
+      u'hours': [],
+      u'minutes': [],
+      u'now': u'2010-01-02 03:04:05',
+    }
+    self.assertEqual(expected, self.app.get('/json').json)
+
+  def test_json_empty_processed(self):
+    stats_framework_mock.reset_timestamp(self.h, self.now)
+    self.h.process_next_chunk(0)
+    expected = {
+      u'days': [
+        {
+          u'key': u'2010-01-02',
+          u'values': {u'b': 0.0, u'inner': {u'c': u''}, u'requests': 0},
+        },
+      ],
+      u'hours': [
+        {
+          u'key': u'2010-01-02 03:00',
+          u'values': {u'b': 0.0, u'inner': {u'c': u''}, u'requests': 0},
+        },
+        {
+          u'key': u'2010-01-02 02:00',
+          u'values': {u'b': 0.0, u'inner': {u'c': u''}, u'requests': 0},
+        },
+      ],
+      u'minutes': [
+        {
+          u'key': u'2010-01-02 03:04',
+          u'values': {u'b': 0.0, u'inner': {u'c': u''}, u'requests': 0},
+        },
+        {
+          u'key': u'2010-01-02 03:03',
+          u'values': {u'b': 0.0, u'inner': {u'c': u''}, u'requests': 0},
+        },
+        {
+          u'key': u'2010-01-02 03:02',
+          u'values': {u'b': 0.0, u'inner': {u'c': u''}, u'requests': 0},
+        },
+        {
+          u'key': u'2010-01-02 03:01',
+          u'values': {u'b': 0.0, u'inner': {u'c': u''}, u'requests': 0},
+        },
+        {
+          u'key': u'2010-01-02 03:00',
+          u'values': {u'b': 0.0, u'inner': {u'c': u''}, u'requests': 0},
+        },
+        {
+          u'key': u'2010-01-02 02:59',
+          u'values': {u'b': 0.0, u'inner': {u'c': u''}, u'requests': 0},
+        },
+        {
+          u'key': u'2010-01-02 02:58',
+          u'values': {u'b': 0.0, u'inner': {u'c': u''}, u'requests': 0},
+        },
+        {
+          u'key': u'2010-01-02 02:57',
+          u'values': {u'b': 0.0, u'inner': {u'c': u''}, u'requests': 0},
+        },
+        {
+          u'key': u'2010-01-02 02:56',
+          u'values': {u'b': 0.0, u'inner': {u'c': u''}, u'requests': 0},
+        },
+        {
+          u'key': u'2010-01-02 02:55',
+          u'values': {u'b': 0.0, u'inner': {u'c': u''}, u'requests': 0},
+        },
+      ],
+      u'now': u'2010-01-02 03:04:05',
+    }
+    self.assertEqual(expected, self.app.get('/json').json)
+
+  def test_json_empty_processed_limit(self):
+    stats_framework_mock.reset_timestamp(self.h, self.now)
+    self.h.process_next_chunk(0)
+    expected = {
+      u'days': [
+      ],
+      u'hours': [
+        {
+          u'key': u'2010-01-02 03:00',
+          u'values': {u'b': 0.0, u'inner': {u'c': u''}, u'requests': 0},
+        },
+      ],
+      u'minutes': [
+        {
+          u'key': u'2010-01-02 03:04',
+          u'values': {u'b': 0.0, u'inner': {u'c': u''}, u'requests': 0},
+        },
+      ],
+      u'now': u'2010-01-02 03:04:05',
+    }
+    self.assertEqual(
+        expected, self.app.get('/json?days=0&hours=1&minutes=1').json)
+
+  def test_json_two(self):
+    stats_framework_mock.reset_timestamp(self.h, self.now)
+    self.assertEqual('Yay', self.app.get('/generate').body)
+    self.assertEqual('Yay', self.app.get('/generate').body)
+    self.h.process_next_chunk(0)
+    expected = {
+      u'days': [
+        {
+          u'key': u'2010-01-02',
+          u'values': {u'b': 0.0, u'inner': {u'c': u''}, u'requests': 0},
+        },
+      ],
+      u'hours': [
+        {
+          u'key': u'2010-01-02 03:00',
+          u'values': {
+            u'b': 0.0,
+            u'inner': {u'c': u'HelloHello'},
+            u'requests': 2,
+          },
+        },
+      ],
+      u'minutes': [
+        {
+          u'key': u'2010-01-02 03:04',
+          u'values': {
+            u'b': 0.0,
+            u'inner': {u'c': u'HelloHello'},
+            u'requests': 2,
+          },
+        },
+      ],
+      u'now': u'2010-01-02 03:04:05',
+    }
+    self.assertEqual(
+        expected, self.app.get('/json?days=1&hours=1&minutes=1').json)
 
 
 if __name__ == '__main__':

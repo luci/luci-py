@@ -19,6 +19,7 @@ class TestCase(auto_stub.TestCase):
     self.testbed.activate()
     # Using init_all_stubs() costs ~10ms more to run all the tests.
     self.testbed.init_datastore_v3_stub()
+    self.testbed.init_logservice_stub()
     self.testbed.init_memcache_stub()
     self.testbed.init_mail_stub()
     self.mail_stub = self.testbed.get_stub(testbed.MAIL_SERVICE_NAME)

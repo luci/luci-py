@@ -1234,7 +1234,7 @@ class PreUploadContentHandler(ProtocolHandler):
     self.send_json([push_urls.get(entry_info.digest) for entry_info in entries])
 
     # Log stats, enqueue tagging task that updates last access time.
-    stats.log(stats.LOOKUP, len(entries), len(existing))
+    stats.add_entry(stats.LOOKUP, len(entries), len(existing))
     if existing:
       # Ignore errors in a call below. They happen when task queue service has
       # a bad time and doesn't accept tagging tasks. We don't want isolate
@@ -1271,7 +1271,7 @@ class RetrieveContentHandler(ProtocolHandler):
     memcache_entry = memcache.get(hash_key, namespace='table_%s' % namespace)
     if memcache_entry is not None:
       self.send_data(memcache_entry, filename=hash_key, offset=offset)
-      stats.log(stats.RETURN, len(memcache_entry) - offset, 'memcache')
+      stats.add_entry(stats.RETURN, len(memcache_entry) - offset, 'memcache')
       return
 
     entry = entry_key(namespace, hash_key).get()
@@ -1280,7 +1280,7 @@ class RetrieveContentHandler(ProtocolHandler):
 
     if entry.content is not None:
       self.send_data(entry.content, filename=hash_key, offset=offset)
-      stats.log(stats.RETURN, len(entry.content) - offset, 'inline')
+      stats.add_entry(stats.RETURN, len(entry.content) - offset, 'inline')
       return
 
     # Generate signed download URL.
@@ -1295,7 +1295,7 @@ class RetrieveContentHandler(ProtocolHandler):
     # correctly pass it to Google Storage to fetch only subrange of file,
     # so update stats accordingly.
     self.redirect(signed_url)
-    stats.log(
+    stats.add_entry(
         stats.RETURN, entry.compressed_size - offset, 'GS; %s' % entry.key.id())
 
 
@@ -1459,7 +1459,7 @@ class StoreContentHandler(ProtocolHandler):
     entry = create_entry(key)
     if not entry:
       self.send_json({'entry': {}})
-      stats.log(stats.DUPE, compressed_size, 'inline')
+      stats.add_entry(stats.DUPE, compressed_size, 'inline')
       return
 
     # If it's not in GS then put it inline.
@@ -1504,7 +1504,7 @@ class StoreContentHandler(ProtocolHandler):
 
     # TODO(vadimsh): Fill in details about the entry, such as expiration time.
     self.send_json({'entry': {}})
-    stats.log(stats.STORE, entry.compressed_size, where)
+    stats.add_entry(stats.STORE, entry.compressed_size, where)
 
 
 ###

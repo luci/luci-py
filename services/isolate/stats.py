@@ -16,7 +16,6 @@ from google.appengine.api import logservice
 from google.appengine.ext import ndb
 from google.appengine.runtime import DeadlineExceededError
 
-import config
 import template
 from components import stats_framework
 from components import utils
@@ -29,15 +28,14 @@ from components import utils
 STORE, RETURN, LOOKUP, DUPE = range(4)
 
 
-def log(action, number, where):
+def add_entry(action, number, where):
   """Formatted statistics log entry so it can be processed for daily stats.
 
   The format is simple enough that it doesn't require a regexp for faster
   processing.
   """
-  logging.info(
-      '%s%s; %d; %s', stats_framework.PREFIX, _ACTION_NAMES[action], number,
-      where)
+  stats_framework.add_entry(
+      '%s; %d; %s' % (_ACTION_NAMES[action], number, where))
 
 
 ### Models
@@ -101,9 +99,6 @@ _ACTION_NAMES = ['store', 'return', 'lookup', 'dupe']
 def _parse_line(line, values):
   """Updates a Snapshot instance with a processed statistics line if relevant.
   """
-  if not line.startswith(stats_framework.PREFIX):
-    return
-  line = line[len(stats_framework.PREFIX):]
   if line.count(';') < 2:
     return
   action_id, measurement, _rest = line.split('; ', 2)
@@ -126,28 +121,17 @@ def _parse_line(line, values):
 
 
 def _extract_snapshot_from_logs(start_time, end_time):
-  """Processes the logs to harvest data and return a Snapshot instance."""
+  """Returns a Snapshot from the processed logs for the specified interval.
+
+  The data is retrieved from logservice via stats_framework.
+  """
   values = Snapshot()
-  module_versions = utils.get_module_version_list(config.STATS_MODULES, True)
-  for entry in logservice.fetch(
-      start_time=start_time,
-      end_time=end_time,
-      minimum_log_level=logservice.LOG_LEVEL_INFO,
-      include_incomplete=True,
-      include_app_logs=True,
-      module_versions=module_versions):
-    # Ignore other urls.
-    if not entry.resource.startswith(config.STATS_REQUEST_PATHS):
-      continue
-
+  for entry in stats_framework.yield_entries(start_time, end_time):
     values.requests += 1
-    if entry.status >= 400:
+    if entry.request.status >= 400:
       values.failures += 1
-
-    for log_line in entry.app_logs:
-      if log_line.level != logservice.LOG_LEVEL_INFO:
-        continue
-      _parse_line(log_line.message, values)
+    for l in entry.entries:
+      _parse_line(l, values)
   return values
 
 

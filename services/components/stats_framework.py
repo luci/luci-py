@@ -12,9 +12,11 @@ measurements saved and presentations must be supplied by the user.
 """
 
 import calendar
+import collections
 import datetime
 import logging
 
+from google.appengine.api import logservice
 from google.appengine.ext import ndb
 from google.appengine.runtime import DeadlineExceededError
 
@@ -34,6 +36,54 @@ TOO_RECENT = 5 if not utils.is_local_dev_server() else 1
 def utcnow():
   """To be mocked in tests."""
   return datetime.datetime.utcnow()
+
+
+def add_entry(message):
+  """Adds an entry for the current request.
+
+  Meant to be mocked in tests.
+  """
+  logging.debug(PREFIX + message)
+
+
+# One handled HTTP request and the associated statistics if any.
+StatsEntry = collections.namedtuple('StatsEntry', ('request', 'entries'))
+
+
+def _yield_logs(start_time, end_time):
+  """Yields logservice.RequestLogs for the requested time interval.
+
+  Meant to be mocked in tests.
+  """
+  for request in logservice.fetch(
+      start_time=start_time - 1 if start_time else start_time,
+      end_time=end_time + 1 if end_time else end_time,
+      include_app_logs=True):
+    yield request
+
+
+def yield_entries(start_time, end_time):
+  """Yields StatsEntry in this time interval.
+
+  Look at requests that *ended* between [start_time, end_time[. Ignore the start
+  time of the request. This is because the parameters start_time and end_time of
+  logserver.fetch() filters on the completion time of the request.
+  """
+  offset = len(PREFIX)
+  for request in _yield_logs(start_time, end_time):
+    if not request.finished or not request.end_time:
+      continue
+    if start_time and request.end_time < start_time:
+      continue
+    if end_time and request.end_time >= end_time:
+      continue
+
+    # Gathers all the entries added via add_entry().
+    entries = [
+      l.message[offset:] for l in request.app_logs
+      if l.level <= logservice.LOG_LEVEL_INFO and l.message.startswith(PREFIX)
+    ]
+    yield StatsEntry(request, entries)
 
 
 class StatisticsFramework(object):
@@ -182,7 +232,7 @@ class StatisticsFramework(object):
       modified = ndb.DateTimeProperty(indexed=False, auto_now_add=True)
 
       # Statistics for the day.
-      values = ndb.LocalStructuredProperty(snapshot_cls, default=snapshot_cls())
+      values = ndb.LocalStructuredProperty(snapshot_cls)
 
       # Hours that have been summed. A complete day will be set to (1<<24)-1,
       # e.g.  0xFFFFFF, e.g. 24 bits or 6x4 bits.
@@ -219,7 +269,8 @@ class StatisticsFramework(object):
       generated under a transaction, so ~1 transaction per minute.
       """
       created = ndb.DateTimeProperty(indexed=False, auto_now=True)
-      values = ndb.LocalStructuredProperty(snapshot_cls, default=snapshot_cls())
+      # Statistics for the hour.
+      values = ndb.LocalStructuredProperty(snapshot_cls)
 
       # Minutes that have been summed. A complete hour will be set to (1<<60)-1,
       # e.g. 0xFFFFFFFFFFFFFFF, e.g. 60 bits or 15x4 bits.
@@ -252,7 +303,8 @@ class StatisticsFramework(object):
       definition.
       """
       created = ndb.DateTimeProperty(indexed=False, auto_now=True)
-      values = ndb.LocalStructuredProperty(snapshot_cls, default=snapshot_cls())
+      # Statistics for one minute.
+      values = ndb.LocalStructuredProperty(snapshot_cls)
 
       def to_dict(self):
         """Adds the key and remove cruft not necessary for the user."""
@@ -266,7 +318,10 @@ class StatisticsFramework(object):
     return StatsMinute
 
   def _set_last_processed_time(self, moment):
-    """Saves the last minute processed."""
+    """Saves the last minute processed.
+
+    Occasionally used in tests to bound the search for statistics.
+    """
     assert moment.second == 0, moment
     assert moment.microsecond == 0, moment
     root = self.root_key.get()
@@ -296,13 +351,15 @@ class StatisticsFramework(object):
       if minute_after.date() != timestamp.date():
         # That was 23:59. Make sure day for 00:00 exists.
         self.stats_day_cls.get_or_insert(
-            str(minute_after.date()), parent=self.root_key)
+            str(minute_after.date()), parent=self.root_key,
+            values=self.snapshot_cls())
 
       if minute_after.hour != timestamp.hour:
         # That was NN:59.
         self.stats_hour_cls.get_or_insert(
             '%02d' % minute_after.hour,
-            parent=self.day_key(minute_after.date()))
+            parent=self.day_key(minute_after.date()),
+            values=self.snapshot_cls())
       return minute_after
     return self._guess_earlier_minute_to_process(now)
 
@@ -327,21 +384,23 @@ class StatisticsFramework(object):
         # midnight to regenerate stats. It will be resource intensive.
         today = now.date()
         key_id = str(today - datetime.timedelta(days=self.MAX_BACKTRACK))
-        day = self.stats_day_cls.get_or_insert(key_id, parent=self.root_key)
+        day = self.stats_day_cls.get_or_insert(
+            key_id, parent=self.root_key, values=self.snapshot_cls())
     else:
       # Take the next unsealed day. Note that if there's a non-sealed, sealed,
       # sealed sequence of self.stats_day_cls, the non-sealed entity will be
       # skipped.
       # TODO(maruel): Fix this.
       key_id = str(last_sealed_day.to_date() + datetime.timedelta(days=1))
-      day = self.stats_day_cls.get_or_insert(key_id)
+      day = self.stats_day_cls.get_or_insert(
+          key_id, parent=self.root_key, values=self.snapshot_cls())
 
     # TODO(maruel): Should we trust it all the time or do an explicit query? For
     # now, trust the bitmap.
     hour_bit = _lowest_missing_bit(day.hours_bitmap)
     assert hour_bit < 24, hour_bit
     hour = self.stats_hour_cls.get_or_insert(
-        '%02d' % hour_bit, parent=day.key)
+        '%02d' % hour_bit, parent=day.key, values=self.snapshot_cls())
     minute_bit = _lowest_missing_bit(hour.minutes_bitmap)
     assert minute_bit < 60, minute_bit
     date = day.to_date()
@@ -369,9 +428,12 @@ class StatisticsFramework(object):
     # cache.
     opts = ndb.ContextOptions(use_memcache=False)
     future_day = self.stats_day_cls.get_or_insert_async(
-        str(moment.date()), parent=self.root_key, context_options=opts)
+        str(moment.date()), parent=self.root_key,
+        values=self.snapshot_cls(),
+        context_options=opts)
     future_hour = self.stats_hour_cls.get_or_insert_async(
         '%02d' % moment.hour, parent=self.day_key(moment.date()),
+        values=self.snapshot_cls(),
         context_options=opts)
     future_minute = self.stats_minute_cls.get_by_id_async(
         minute_key_id, parent=self.hour_key(moment), use_memcache=False)
@@ -424,10 +486,14 @@ class StatisticsFramework(object):
 def accumulate(lhs, rhs):
   """Adds the values from rhs into lhs.
 
-  Both must be an ndb.Model.
+  Both must be an ndb.Model. lhs is modified. rhs is not.
 
   rhs._properties not in lhs._properties are lost.
   lhs._properties not in rhs._properties are untouched.
+
+  This function has specific handling for ndb.LocalStructuredProperty, it
+  refuses any instance with a default value. THIS IS A TRAP. The default object
+  instance will be aliased one way or another. It's just not worth the risk.
   """
   assert isinstance(lhs, ndb.Model), lhs
   assert isinstance(rhs, ndb.Model), rhs
@@ -440,14 +506,16 @@ def accumulate(lhs, rhs):
       lhs_value = getattr(lhs, key, default)
       rhs_value = getattr(rhs, key, default)
       if hasattr(lhs_value, 'accumulate'):
-        assert callable(lhs_value.accumulate), lhs_value
+        # Do not use ndb.LocalStructuredProperty(MyClass, default=MyClass())
+        # since any object created without specifying a object for this property
+        # will get the exact instance provided as the default argument, it's
+        # dangerous aliasing. See the unit test for a way to set a default value
+        # that is safe.
+        assert default is None, key
+        assert callable(lhs_value.accumulate), key
         lhs_value.accumulate(rhs_value)
-        # Enforce setting back the property, so it works even if lhs_value ==
-        # default.
-        total = lhs_value
       else:
-        total = lhs_value + rhs_value
-      setattr(lhs, key, total)
+        setattr(lhs, key, lhs_value + rhs_value)
 
 
 def generate_stats_data(days, hours, minutes, now, stats_handler):
@@ -466,21 +534,21 @@ def generate_stats_data(days, hours, minutes, now, stats_handler):
   if days:
     gen = (
         stats_handler.day_key(today - datetime.timedelta(days=i))
-        for i in range(days + 1))
+        for i in xrange(days))
     future_days = ndb.get_multi_async(gen, use_cache=False, use_memcache=False)
 
   future_hours = []
   if hours:
     gen = (
         stats_handler.hour_key(now - datetime.timedelta(hours=i))
-        for i in range(hours + 1))
+        for i in xrange(hours))
     future_hours = ndb.get_multi_async(gen, use_cache=False, use_memcache=False)
 
   future_minutes = []
   if minutes:
     gen = (
         stats_handler.minute_key(now - datetime.timedelta(minutes=i))
-        for i in range(minutes + 1))
+        for i in xrange(minutes))
     future_minutes = ndb.get_multi_async(
         gen, use_cache=False, use_memcache=False)
 
