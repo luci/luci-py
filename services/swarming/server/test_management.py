@@ -358,6 +358,7 @@ def AbortRunner(runner, reason):
   # TODO(maruel): This is not done as a transaction either, this is
   # inconsistent.
   runner.started = datetime.datetime.utcnow()
+  runner.machine_needed = False
   runner.put()
 
   runner.UpdateTestResult(runner.machine_id, errors=r_str)
@@ -565,10 +566,11 @@ def _FindMatchingRunnerUsingHashes(attrib_hashes):
   for i in range(number_of_queries):
     # We use a format argument for None, because putting None in the string
     # doesn't work.
-    query_runner = test_runner.TestRunner.gql(
-        'WHERE started = :1 and config_hash IN :2 ORDER BY '
-        'priority_and_created LIMIT 1',
-        None, attrib_hashes[i * 30:(i + 1) * 30]).get()
+    query_runner = test_runner.TestRunner.query(
+        test_runner.TestRunner.machine_needed == True,
+        test_runner.TestRunner.config_hash.IN(attrib_hashes[
+            i * 30:(i + 1) * 30]),
+        ).order(test_runner.TestRunner.priority_and_created).get()
 
     # Use this runner if it is older than our currently held runner.
     if not runner:
@@ -592,11 +594,9 @@ def _FindMatchingRunnerUsingAttribs(attribs):
   # all the tasks all the time.
 
   # Assign test runners from earliest to latest.
-  # We use a format argument for None, because putting None in the string
-  # doesn't work.
-  query = test_runner.TestRunner.gql('WHERE started = :1 ORDER BY '
-                                     'priority_and_created',
-                                     None)
+  query = test_runner.TestRunner.query(
+      test_runner.TestRunner.machine_needed == True
+      ).order(test_runner.TestRunner.priority_and_created)
   for runner in query:
     runner_dimensions = runner.GetConfiguration().dimensions
     (match, output) = dimensions_utils.MatchDimensions(runner_dimensions,

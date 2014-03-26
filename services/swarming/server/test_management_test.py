@@ -412,6 +412,7 @@ class TestManagementTest(test_case.TestCase):
     test_management.AbortStaleRunners()
 
     runner = test_runner.TestRunner.query().get()
+    self.assertFalse(runner.machine_needed)
     self.assertIsNotNone(runner.started)
     self.assertIsNotNone(runner.ended)
     self.assertTrue(runner.done)

@@ -124,9 +124,10 @@ class TestRunner(ndb.Model):
 
     return priority_str + created_str
 
-  # The time at which this runner was executed on a remote machine.  If the
-  # runner isn't executing or ended, then the value is None and we use the
-  # fact that it is None to identify if a test was started or not.
+  # True if this runner is looking for a machine to run on.
+  machine_needed = ndb.BooleanProperty(default=True)
+
+  # The time at which this runner was executed on a remote machine.
   started = ndb.DateTimeProperty()
 
   # The number of times that this runner has been retried for swarm failures
@@ -249,20 +250,20 @@ class TestRunner(ndb.Model):
 
   def ClearRunnerRun(self):
     """Clear the status of any previous run from this runner."""
-    self.started = None
-    self.machine_id = None
-    self.old_machine_ids = []
-    self.done = False
-    self.started = None
     self.automatic_retry_count = 0
-    self.ping = None
+    self.done = False
     self.ended = None
-    self.ran_successfully = False
     self.exit_codes = None
     self.errors = None
+    self.machine_id = None
+    self.machine_needed = True
+    self.old_machine_ids = []
+    self.ping = None
+    self.ran_successfully = False
     if self.results_reference:
       self.results_reference.delete()
       self.results_reference = None
+    self.started = None
 
     self.put()
 
@@ -368,9 +369,10 @@ def AtomicAssignID(key, machine_id):
   """
   runner = key.get()
   if runner and not runner.started:
+    runner.machine_needed = False
     runner.machine_id = str(machine_id)
-    runner.started = datetime.datetime.utcnow()
     runner.ping = datetime.datetime.utcnow()
+    runner.started = datetime.datetime.utcnow()
     runner.put()
   else:
     # Tell caller to abort this operation.

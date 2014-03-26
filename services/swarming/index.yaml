@@ -46,7 +46,7 @@ indexes:
 - kind: TestRunner
   properties:
   - name: config_hash
-  - name: started
+  - name: machine_needed
   - name: priority_and_created
 
 - kind: TestRunner
@@ -351,6 +351,11 @@ indexes:
   - name: started
   - name: created
     direction: desc
+
+- kind: TestRunner
+  properties:
+  - name: machine_needed
+  - name: priority_and_created
 
 - kind: TestRunner
   properties:
