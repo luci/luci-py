@@ -614,8 +614,11 @@ def require(action, resource):
   |resource|, this decorator will happily allow it as well.
 
   Multiple @require decorators can be safely nested on top of each other to
-  check multiple permissions. Also it's safe to mix them with NDB decorators
-  such as ndb.transactional.
+  check multiple permissions. In that case a current identity needs to have all
+  specified permissions to pass the check, i.e. permissions checks are combined
+  using logical AND operation.
+
+  It's safe to mix @require with NDB decorators such as @ndb.transactional.
 
   Usage example:
 

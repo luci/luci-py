@@ -234,25 +234,43 @@ class RestAPITestCase(test_case.TestCase):
     self.errors = []
     self.mock(handler.logging, 'error',
         lambda *args, **kwargs: self.errors.append((args, kwargs)))
-    # Pairs of (action, resource) that defined allowed permission in test.
-    self.mocked_permissions = []
-    self.mock(rest_api.api, 'has_permission',
-        lambda action, resource: (action, resource) in self.mocked_permissions)
 
   def _make_request(
-      self, method, path, params=None, headers=None, expect_errors=False):
+      self, method, path, params=None, headers=None,
+      expect_errors=False, expected_auth_checks=()):
+    # Catch calls to has_permissions and compare it to next expected check.
+    expected_auth_checks = list(expected_auth_checks)
+    def has_permission_mock(action, resource):
+      self.assertTrue(expected_auth_checks)
+      self.assertEqual(expected_auth_checks[0], (action, resource))
+      expected_auth_checks.pop(0)
+      return True
+    self.mock(rest_api.api, 'has_permission', has_permission_mock)
+
+    # Do the call.
     response = getattr(self.app, method.lower())(
         path, params=params, headers=headers, expect_errors=expect_errors)
+    # Ensure all expected auth checks were executed.
+    self.assertFalse(expected_auth_checks)
+
     # All REST API responses should be in JSON. Even errors.
     self.assertEqual(
         response.headers['Content-Type'],
         'application/json; charset=UTF-8')
     return response.status_int, json.loads(response.body)
 
-  def get(self, path, headers=None):
-    return self._make_request('GET', path, headers=headers)
+  def get(
+      self, path, headers=None, expect_errors=False, expected_auth_checks=()):
+    return self._make_request(
+        'GET',
+        path,
+        headers=headers,
+        expect_errors=expect_errors,
+        expected_auth_checks=expected_auth_checks)
 
-  def post(self, path, body=None, headers=None, expect_errors=False):
+  def post(
+      self, path, body=None, headers=None,
+      expect_errors=False, expected_auth_checks=()):
     if body:
       headers = dict(headers or {})
       headers['Content-Type'] = 'application/json; charset=UTF-8'
@@ -261,7 +279,8 @@ class RestAPITestCase(test_case.TestCase):
         path,
         params=json.dumps(body) if body else '',
         headers=headers,
-        expect_errors=expect_errors)
+        expect_errors=expect_errors,
+        expected_auth_checks=expected_auth_checks)
 
 
 class OAuthConfigHandlerTest(RestAPITestCase):
@@ -320,9 +339,6 @@ class OAuthConfigHandlerTest(RestAPITestCase):
     self.assertEqual(200, status)
     self.assertEqual(expected, body)
 
-    # Allow access to 'auth/management' (required for 'no-cache' oauth_config).
-    self.mocked_permissions = [(model.READ, 'auth/management')]
-
     # With cache control header a version from DB is used.
     expected = {
       'additional_client_ids': ['a', 'b'],
@@ -330,15 +346,12 @@ class OAuthConfigHandlerTest(RestAPITestCase):
       'client_not_so_secret': 'some-secret-db',
     }
     status, body = self.get(
-        '/auth/api/v1/server/oauth_config',
+        path='/auth/api/v1/server/oauth_config',
         headers={'Cache-Control': 'no-cache'})
     self.assertEqual(200, status)
     self.assertEqual(expected, body)
 
   def test_post_works(self):
-    # Required permission.
-    self.mocked_permissions = [(model.UPDATE, 'auth/management')]
-
     # Send POST.
     request_body = {
       'additional_client_ids': ['1', '2', '3'],
@@ -349,7 +362,10 @@ class OAuthConfigHandlerTest(RestAPITestCase):
       'X-XSRF-Token': make_xsrf_token(),
     }
     status, response = self.post(
-        '/auth/api/v1/server/oauth_config', body=request_body, headers=headers)
+        path='/auth/api/v1/server/oauth_config',
+        body=request_body,
+        headers=headers,
+        expected_auth_checks=[(model.UPDATE, 'auth/management')])
     self.assertEqual(200, status)
     self.assertEqual({'ok': True}, response)
 
@@ -378,14 +394,15 @@ class SelfHandlerTest(RestAPITestCase):
 class XSRFHandlerTest(RestAPITestCase):
   def test_works(self):
     status, body = self.post(
-        '/auth/api/v1/accounts/self/xsrf_token',
+        path='/auth/api/v1/accounts/self/xsrf_token',
         headers={'X-XSRF-Token-Request': '1'})
     self.assertEqual(200, status)
     self.assertTrue(isinstance(body.get('xsrf_token'), basestring))
 
   def test_requires_header(self):
     status, body = self.post(
-        '/auth/api/v1/accounts/self/xsrf_token', expect_errors=True)
+        path='/auth/api/v1/accounts/self/xsrf_token',
+        expect_errors=True)
     self.assertEqual(403, status)
     self.assertEqual({'text': 'Missing required XSRF request header'}, body)
 
