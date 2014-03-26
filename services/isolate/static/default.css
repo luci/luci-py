@@ -48,6 +48,10 @@ hr {
   background-color: #ffdddd;
 }
 
+.data_table tr:not(:first-child) {
+  font-family: "Courier New", monospace;
+}
+
 .graph {
   height: 600px;
   width: 100%;
