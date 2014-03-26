@@ -152,7 +152,8 @@ class MainTest(test_case.TestCase):
 
   def mock_delete_files(self):
     deleted = []
-    def delete_files(bucket, files):
+    def delete_files(bucket, files, ignore_missing=False):
+      # pylint: disable=W0613
       self.assertEquals('isolateserver-dev', bucket)
       deleted.extend(files)
       return []

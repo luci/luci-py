@@ -68,11 +68,13 @@ def list_files(bucket, subdir=None, batch_size=100):
   path_prefix = '/%s/%s' % (bucket, subdir) if subdir else '/%s' % bucket
   bucket_prefix = '/%s/' % bucket
   marker = None
+  retry_params = _make_retry_params()
   while True:
     files_stats = cloudstorage.listbucket(
         path_prefix=path_prefix,
         marker=marker,
-        max_keys=batch_size)
+        max_keys=batch_size,
+        retry_params=retry_params)
     # |files_stats| is an iterable, need to iterate through it to figure out
     # whether it's empty or not.
     empty = True
@@ -92,12 +94,14 @@ def list_files(bucket, subdir=None, batch_size=100):
       break
 
 
-def delete_files(bucket, filenames):
+def delete_files(bucket, filenames, ignore_missing=False):
   """Deletes multiple files stored in GS.
 
   Arguments:
     bucket: a bucket that contains the files.
     filenames: list of file paths to delete (relative to a bucket root).
+    ignore_missing: if True, will silently skip missing files, otherwise will
+        print a warning to log.
 
   Returns:
     An empty list so this function can be used with functions that expect
@@ -105,13 +109,16 @@ def delete_files(bucket, filenames):
   """
   # Sadly Google Cloud Storage client library doesn't support batch deletes,
   # so do it one by one.
+  retry_params = _make_retry_params()
   for filename in filenames:
     try:
-      cloudstorage.delete('/%s/%s' % (bucket, filename))
+      cloudstorage.delete(
+          '/%s/%s' % (bucket, filename), retry_params=retry_params)
     except cloudstorage.errors.NotFoundError:
-      logging.warning(
-          'Trying to delete a GS file that\'s not there: /%s/%s',
-          bucket, filename)
+      if not ignore_missing:
+        logging.warning(
+            'Trying to delete a GS file that\'s not there: /%s/%s',
+            bucket, filename)
   return []
 
 
@@ -126,7 +133,8 @@ def get_file_info(bucket, filename):
     FileInfo object or None if no such file.
   """
   try:
-    stat = cloudstorage.stat('/%s/%s' % (bucket, filename))
+    stat = cloudstorage.stat(
+        '/%s/%s' % (bucket, filename), retry_params=_make_retry_params())
     return FileInfo(size=stat.st_size)
   except cloudstorage.errors.NotFoundError:
     return None
@@ -148,7 +156,10 @@ def read_file(bucket, filename, chunk_size=CHUNK_SIZE):
   data = None
   file_ref = None
   try:
-    with cloudstorage.open(path, read_buffer_size=chunk_size) as file_ref:
+    with cloudstorage.open(
+        path,
+        read_buffer_size=chunk_size,
+        retry_params=_make_retry_params()) as file_ref:
       while True:
         data = file_ref.read(chunk_size)
         if not data:
@@ -187,7 +198,9 @@ def write_file(bucket, filename, content):
   written = 0
   last_chunk_size = 0
   try:
-    with cloudstorage.open('/%s/%s' % (bucket, filename), 'w') as f:
+    with cloudstorage.open(
+        '/%s/%s' % (bucket, filename), 'w',
+        retry_params=_make_retry_params()) as f:
       for chunk in content:
         last_chunk_size = len(chunk)
         f.write(chunk)
@@ -199,8 +212,18 @@ def write_file(bucket, filename, content):
         '\'/%s/%s\', wrote %d bytes, failed at writting %d bytes: %s %s',
         bucket, filename, written, last_chunk_size, exc.__class__.__name__, exc)
     # Delete an incomplete file.
-    delete_files(bucket, [filename])
+    delete_files(bucket, [filename], ignore_missing=True)
     return False
+
+
+def _make_retry_params():
+  """RetryParams structure configured to store access token in Datastore."""
+  # Note that 'cloudstorage.set_default_retry_params' function stores retry
+  # params in per-request thread local storage, which means it needs to be
+  # called for each request. Since we are wrapping all cloudstorage library
+  # calls anyway, it's more convenient just to pass RetryParams explicitly,
+  # instead of making it a default for request with 'set_default_retry_params'.
+  return cloudstorage.RetryParams(save_access_token=True)
 
 
 class URLSigner(object):
