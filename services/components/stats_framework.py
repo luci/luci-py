@@ -247,7 +247,7 @@ class StatisticsFramework(object):
         out.pop('created')
         out.pop('modified')
         out.pop('hours_bitmap')
-        out['key'] = self.key.id()
+        out['key'] = self.to_date()
         return out
 
       def to_date(self):
@@ -284,10 +284,15 @@ class StatisticsFramework(object):
         out = super(StatsHour, self).to_dict()
         out.pop('created')
         out.pop('minutes_bitmap')
-        # Technically, the trailing ':00' shouldn't be added but it's less
-        # readable.
-        out['key'] = '%s %s:00' % (self.key.parent().id(), self.key.id())
+        out['key'] = self.to_datetime()
         return out
+
+      def to_datetime(self):
+        """Returns the datetime.datetime instance for this instance."""
+        key = self.key
+        year, month, day = key.parent().id().split('-', 2)
+        return datetime.datetime(
+            int(year), int(month), int(day), int(key.id()))
 
     return StatsHour
 
@@ -310,10 +315,16 @@ class StatisticsFramework(object):
         """Adds the key and remove cruft not necessary for the user."""
         out = super(StatsMinute, self).to_dict()
         out.pop('created')
-        out['key'] = '%s %s:%s' % (
-            self.key.parent().parent().id(), self.key.parent().id(),
-            self.key.id())
+        out['key'] = self.to_datetime()
         return out
+
+      def to_datetime(self):
+        """Returns the datetime.datetime instance for this instance."""
+        key = self.key
+        year, month, day = key.parent().parent().id().split('-', 2)
+        hour = key.parent().id()
+        return datetime.datetime(
+            int(year), int(month), int(day), int(hour), int(key.id()))
 
     return StatsMinute
 
@@ -518,7 +529,57 @@ def accumulate(lhs, rhs):
         setattr(lhs, key, lhs_value + rhs_value)
 
 
-def generate_stats_data(days, hours, minutes, now, stats_handler):
+def filterout(futures):
+  """Filters out inexistent entities."""
+  intermediary = (i.get_result() for i in futures)
+  return [i for i in intermediary if i]
+
+
+def get_days_async(handler, now, num_days):
+  if not num_days:
+    return []
+  now = now or utcnow()
+  today = now.date()
+  gen = (
+    handler.day_key(today - datetime.timedelta(days=i))
+    for i in xrange(num_days)
+  )
+  return ndb.get_multi_async(gen, use_cache=False, use_memcache=False)
+
+
+def get_days(handler, now, num_days):
+  return filterout(get_days_async(handler, now, num_days))
+
+
+def get_hours_async(handler, now, num_hours):
+  if not num_hours:
+    return []
+  now = now or utcnow()
+  gen = (
+      handler.hour_key(now - datetime.timedelta(hours=i))
+      for i in xrange(num_hours))
+  return ndb.get_multi_async(gen, use_cache=False, use_memcache=False)
+
+
+def get_hours(handler, now, num_hours):
+  return filterout(get_hours_async(handler, now, num_hours))
+
+
+def get_minutes_async(handler, now, num_minutes):
+  if not num_minutes:
+    return []
+  now = now or utcnow()
+  gen = (
+      handler.minute_key(now - datetime.timedelta(minutes=i))
+      for i in xrange(num_minutes))
+  return ndb.get_multi_async(gen, use_cache=False, use_memcache=False)
+
+
+def get_minutes(handler, now, num_minutes):
+  return filterout(get_minutes_async(handler, now, num_minutes))
+
+
+def generate_stats_data(num_days, num_hours, num_minutes, now, stats_handler):
   """Returns a dict for data requested in the query.
 
   The values are returned in reverse chronological order.
@@ -526,42 +587,15 @@ def generate_stats_data(days, hours, minutes, now, stats_handler):
 
   Disables ndb's local cache and memcache usage.
   """
-  now = now or utcnow()
-  today = now.date()
-
   # Fire up all the datastore requests.
-  future_days = []
-  if days:
-    gen = (
-        stats_handler.day_key(today - datetime.timedelta(days=i))
-        for i in xrange(days))
-    future_days = ndb.get_multi_async(gen, use_cache=False, use_memcache=False)
-
-  future_hours = []
-  if hours:
-    gen = (
-        stats_handler.hour_key(now - datetime.timedelta(hours=i))
-        for i in xrange(hours))
-    future_hours = ndb.get_multi_async(gen, use_cache=False, use_memcache=False)
-
-  future_minutes = []
-  if minutes:
-    gen = (
-        stats_handler.minute_key(now - datetime.timedelta(minutes=i))
-        for i in xrange(minutes))
-    future_minutes = ndb.get_multi_async(
-        gen, use_cache=False, use_memcache=False)
-
-  def filterout(futures):
-    """Filters out inexistent entities."""
-    intermediary = (i.get_result() for i in futures)
-    return [i for i in intermediary if i]
-
+  future_days = get_days_async(stats_handler, now, num_days)
+  future_hours = get_hours_async(stats_handler, now, num_hours)
+  future_minutes = get_minutes_async(stats_handler, now, num_minutes)
   return {
     'days': filterout(future_days),
     'hours': filterout(future_hours),
     'minutes': filterout(future_minutes),
-    'now': now.strftime(utils.DATETIME_FORMAT),
+    'now': (now or utcnow()).strftime(utils.DATETIME_FORMAT),
   }
 
 

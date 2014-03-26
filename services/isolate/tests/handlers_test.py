@@ -92,7 +92,7 @@ class MainTest(test_case.TestCase):
     self.mock(handlers.config, 'get_task_queue_host', lambda: version)
     self.source_ip = '127.0.0.1'
     self.testapp = webtest.TestApp(
-        handlers.CreateApplication(),
+        handlers.CreateApplication(debug=True),
         extra_environ={'REMOTE_ADDR': self.source_ip})
 
   def whitelist_self(self):

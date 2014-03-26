@@ -89,7 +89,7 @@ class StatsTest(test_case.TestCase, stats_framework_mock.MockMixIn):
         'Processed 10 minutes', self.app.get('/generate_stats').body)
     url = '/results?days=0&hours=0&minutes=1&now=2010-01-02 03:04:05'
     minute = {
-      u'key': u'2010-01-02 03:04',
+      u'key': u'2010-01-02 03:04:00',
       u'values': {
         u'contains_lookups': 0,
         u'contains_requests': 0,

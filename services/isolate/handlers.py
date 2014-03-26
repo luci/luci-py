@@ -1519,7 +1519,7 @@ class WarmupHandler(webapp2.RequestHandler):
     self.response.write('ok')
 
 
-def CreateApplication():
+def CreateApplication(debug=False):
   """Creates the url router.
 
   The basic layouts is as follow:
@@ -1651,4 +1651,5 @@ def CreateApplication():
 
       # Must be last.
       webapp2.Route(r'/', RootHandler),
-  ])
+  ],
+  debug=debug)

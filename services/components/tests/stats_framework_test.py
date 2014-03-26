@@ -145,7 +145,7 @@ class StatsFrameworkTest(test_case.TestCase, stats_framework_mock.MockMixIn):
     # Verify days.
     expected = [
       {
-        'key': midnight.strftime('%Y-%m-%d'),
+        'key': midnight.date(),
         'values': {
           'requests': limit,
           'b': float(limit),
@@ -165,8 +165,7 @@ class StatsFrameworkTest(test_case.TestCase, stats_framework_mock.MockMixIn):
     # Verify hours.
     expected = [
       {
-        'key': (midnight + datetime.timedelta(seconds=i*60*60)).strftime(
-            '%Y-%m-%-d %H:%M'),
+        'key': (midnight + datetime.timedelta(seconds=i*60*60)),
         'values': {
           'requests': 60,
           'b': 60.,
@@ -188,8 +187,7 @@ class StatsFrameworkTest(test_case.TestCase, stats_framework_mock.MockMixIn):
     # Verify minutes.
     expected = [
       {
-        'key': (midnight + datetime.timedelta(seconds=i*60)).strftime(
-            '%Y-%m-%-d %H:%M'),
+        'key': (midnight + datetime.timedelta(seconds=i*60)),
         'values': {
           'requests': 1,
           'b': 1.,
@@ -245,25 +243,25 @@ class StatsFrameworkTest(test_case.TestCase, stats_framework_mock.MockMixIn):
     expected = {
       'days': [
         {
-          'key': now.strftime('%Y-%m-%d'),
+          'key': now.date(),
           'values': {'requests': 0, 'b': 0.0, 'inner': {'c': u''}},
         },
       ],
       'hours': [
         {
-          'key': now.strftime('%Y-%m-%d %H:00'),
+          'key': datetime.datetime(*now.timetuple()[:4]),
           'values': {'requests': 2, 'b': 2.0, 'inner': {'c': u'1,2,'}},
         },
       ],
       'minutes': [
         {
-          'key': (now - datetime.timedelta(seconds=60)).strftime(
-              '%Y-%m-%d %H:%M'),
+          'key': datetime.datetime(
+              *(now - datetime.timedelta(seconds=60)).timetuple()[:5]),
           'values': {'requests': 1, 'b': 1.0, 'inner': {'c': u'2,'}},
         },
         {
-          'key': (now - datetime.timedelta(seconds=120)).strftime(
-              '%Y-%m-%d %H:%M'),
+          'key': datetime.datetime(
+              *(now - datetime.timedelta(seconds=120)).timetuple()[:5]),
           'values': {'requests': 1, 'b': 1.0, 'inner': {'c': u'1,'}},
         },
       ],
@@ -281,8 +279,8 @@ class StatsFrameworkTest(test_case.TestCase, stats_framework_mock.MockMixIn):
       'hours': [],
       'minutes': [
         {
-          'key': (now - datetime.timedelta(seconds=60)).strftime(
-              '%Y-%m-%d %H:%M'),
+          'key': datetime.datetime(
+              *(now - datetime.timedelta(seconds=60)).timetuple()[:5]),
           'values': {'requests': 1, 'b': 1.0, 'inner': {'c': u'2,'}},
         },
       ],
@@ -397,53 +395,53 @@ class StatsFrameworkLogTest(test_case.TestCase, stats_framework_mock.MockMixIn):
       ],
       u'hours': [
         {
-          u'key': u'2010-01-02 03:00',
+          u'key': u'2010-01-02 03:00:00',
           u'values': {u'b': 0.0, u'inner': {u'c': u''}, u'requests': 0},
         },
         {
-          u'key': u'2010-01-02 02:00',
+          u'key': u'2010-01-02 02:00:00',
           u'values': {u'b': 0.0, u'inner': {u'c': u''}, u'requests': 0},
         },
       ],
       u'minutes': [
         {
-          u'key': u'2010-01-02 03:04',
+          u'key': u'2010-01-02 03:04:00',
           u'values': {u'b': 0.0, u'inner': {u'c': u''}, u'requests': 0},
         },
         {
-          u'key': u'2010-01-02 03:03',
+          u'key': u'2010-01-02 03:03:00',
           u'values': {u'b': 0.0, u'inner': {u'c': u''}, u'requests': 0},
         },
         {
-          u'key': u'2010-01-02 03:02',
+          u'key': u'2010-01-02 03:02:00',
           u'values': {u'b': 0.0, u'inner': {u'c': u''}, u'requests': 0},
         },
         {
-          u'key': u'2010-01-02 03:01',
+          u'key': u'2010-01-02 03:01:00',
           u'values': {u'b': 0.0, u'inner': {u'c': u''}, u'requests': 0},
         },
         {
-          u'key': u'2010-01-02 03:00',
+          u'key': u'2010-01-02 03:00:00',
           u'values': {u'b': 0.0, u'inner': {u'c': u''}, u'requests': 0},
         },
         {
-          u'key': u'2010-01-02 02:59',
+          u'key': u'2010-01-02 02:59:00',
           u'values': {u'b': 0.0, u'inner': {u'c': u''}, u'requests': 0},
         },
         {
-          u'key': u'2010-01-02 02:58',
+          u'key': u'2010-01-02 02:58:00',
           u'values': {u'b': 0.0, u'inner': {u'c': u''}, u'requests': 0},
         },
         {
-          u'key': u'2010-01-02 02:57',
+          u'key': u'2010-01-02 02:57:00',
           u'values': {u'b': 0.0, u'inner': {u'c': u''}, u'requests': 0},
         },
         {
-          u'key': u'2010-01-02 02:56',
+          u'key': u'2010-01-02 02:56:00',
           u'values': {u'b': 0.0, u'inner': {u'c': u''}, u'requests': 0},
         },
         {
-          u'key': u'2010-01-02 02:55',
+          u'key': u'2010-01-02 02:55:00',
           u'values': {u'b': 0.0, u'inner': {u'c': u''}, u'requests': 0},
         },
       ],
@@ -459,13 +457,13 @@ class StatsFrameworkLogTest(test_case.TestCase, stats_framework_mock.MockMixIn):
       ],
       u'hours': [
         {
-          u'key': u'2010-01-02 03:00',
+          u'key': u'2010-01-02 03:00:00',
           u'values': {u'b': 0.0, u'inner': {u'c': u''}, u'requests': 0},
         },
       ],
       u'minutes': [
         {
-          u'key': u'2010-01-02 03:04',
+          u'key': u'2010-01-02 03:04:00',
           u'values': {u'b': 0.0, u'inner': {u'c': u''}, u'requests': 0},
         },
       ],
@@ -488,7 +486,7 @@ class StatsFrameworkLogTest(test_case.TestCase, stats_framework_mock.MockMixIn):
       ],
       u'hours': [
         {
-          u'key': u'2010-01-02 03:00',
+          u'key': u'2010-01-02 03:00:00',
           u'values': {
             u'b': 0.0,
             u'inner': {u'c': u'HelloHello'},
@@ -498,7 +496,7 @@ class StatsFrameworkLogTest(test_case.TestCase, stats_framework_mock.MockMixIn):
       ],
       u'minutes': [
         {
-          u'key': u'2010-01-02 03:04',
+          u'key': u'2010-01-02 03:04:00',
           u'values': {
             u'b': 0.0,
             u'inner': {u'c': u'HelloHello'},
