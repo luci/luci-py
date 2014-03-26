@@ -195,7 +195,7 @@ class TestManagementTest(test_case.TestCase):
 
     test_management.ExecuteTestRequest(request)
     runner = test_runner.TestRunner.query().get()
-    test_runner.DeleteRunner(runner)
+    runner.key.delete()
 
     # The new request won't use the old request since one of its runners is
     # gone.

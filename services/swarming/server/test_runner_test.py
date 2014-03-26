@@ -349,7 +349,7 @@ class TestRunnerTest(test_case.TestCase):
         runner.key,
         test_runner.GetRunnerFromUrlSafeKey(runner.key.urlsafe()).key)
 
-    test_runner.DeleteRunner(runner)
+    runner.key.delete()
     self.assertEqual(None,
                      test_runner.GetRunnerFromUrlSafeKey(runner.key.urlsafe()))
 
@@ -495,7 +495,7 @@ class TestRunnerTest(test_case.TestCase):
     # Ensure the runner is deleted and that the request is deleted (since it
     # has no remaining runners).
     runner = test_runner.TestRunner.query().get()
-    test_runner.DeleteRunner(runner)
+    runner.key.delete()
     self.assertEqual(0, test_runner.TestRunner.query().count())
     self.assertEqual(0, test_request.TestRequest.query().count())
 

@@ -177,6 +177,10 @@ class TestRunner(ndb.Model):
     if runner.results_reference:
       runner.results_reference.delete()
 
+    request = runner.request.get()
+    if request:
+      request.RemoveRunner(key)
+
   def _pre_put_hook(self):
     """Ensure that all runner values are properly set."""
     if not self.dimensions:
@@ -663,20 +667,9 @@ def DeleteRunnerFromKey(key):
     logging.debug('No matching Test Runner found for key, %s', key)
     return False
 
-  DeleteRunner(runner)
+  runner.key.delete()
 
   return True
-
-
-def DeleteRunner(runner):
-  """Delete the given runner.
-
-  Args:
-    runner: The runner to delete.
-  """
-  request = runner.request
-  runner.key.delete()
-  request.get().RemoveRunner(runner.key)
 
 
 def QueryOldRunners():
