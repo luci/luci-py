@@ -1,79 +1,176 @@
 {% set title = 'Isolate Server Stats' %}
 {% extends "base.html" %}
 
+{% block header %}
+<script type="text/javascript" src="//www.google.com/jsapi"></script>
+<script type="text/javascript">
+  {# Ref: https://developers.google.com/chart/interactive/docs/reference
+  # TODO(maruel): Do not reload the page to add or remove data, use AJAX;
+  #   See section: "Adding and removing rows" and "Changing the view window".
+  #   https://developers.google.com/chart/interactive/docs/animation
+  #
+  # TODO(maruel): Integrate hours + days in two layered graphs ala GFinance;
+  #   See section: "google.visualization.ChartRangeFilter" and
+  #   "google.visualization.DateRangeFilter", NumberRangeFilter.
+  #   https://developers.google.com/chart/interactive/docs/gallery/controls
+  #
+  # TODO(maruel): Add control to toggle chart.getOptions().vAxis.logScale on
+  # the graphs.
+  #
+  # TODO(maruel): Add control to toggle chart.getOptions().focusTarget on
+  # the graphs between 'category' and 'datum' (default).
+  #
+  # TODO(maruel): Use AnnotatedTimeLine to integrate ereporter2 errors. That'd
+  # be awesome but that represents an info leak so it can only be presented to
+  # admins.
+  #
+  # TODO(maruel): Create an ease:out animation when loading the data, e.g.
+  # show the graph immediately empty then add the data as it is loaded via
+  # XHR.
+  #}
+  var local = (function() {
+    google.load(
+        "visualization", "1",
+        {
+          callback: loaded,
+          packages: ["corechart"]
+        });
+
+    var current_resolution = 'hours';
+    var duration = 120;
+    var chart_requests = null;
+    var chart_io = null;
+    var chart_table = null;
+    var current_query = null;
+
+    // Reloads the data with a new resolution.
+    function set_resolution(res) {
+      document.getElementById('resolution_days').checked = false;
+      document.getElementById('resolution_hours').checked = false;
+      document.getElementById('resolution_minutes').checked = false;
+      document.getElementById('resolution_' + res).checked = true;
+      current_resolution = res;
+      sendQuery();
+    }
+
+    // Sends a single query to feed data to two charts.
+    function sendQuery() {
+      // TODO(maruel): Make it configurable.
+      var url = '/isolate/api/v1/stats/' + current_resolution + '?duration=' +
+        duration;
+
+      if (current_query != null) {
+        current_query.abort();
+      }
+      current_query = new google.visualization.Query(url);
+      current_query.send(
+        function(response) {
+          if (response.isError()) {
+            alert('Error in query: ' + response.getMessage() + ' ' +
+                response.getDetailedMessage());
+            return;
+          }
+          var data = response.getDataTable();
+
+          // TODO(maruel): Enable by name instead of hardcoding by index.
+          // TODO(maruel): setTitle() with range covered.
+          var view = new google.visualization.DataView(data);
+          view.setColumns([0, 1, 2, 3, 4, 5, 6]);
+          chart_requests.setDataTable(view.toDataTable());
+          chart_requests.draw();
+
+          var view = new google.visualization.DataView(data);
+          view.setColumns([0, 7, 8, 9]);
+          chart_io.setDataTable(view.toDataTable());
+          chart_io.draw();
+
+          // Convert data to human readable units.
+          chart_table.setDataTable(data);
+          chart_table.draw();
+        });
+    }
+
+    // Now the actual work.
+    // Callback when google viz is ready. Loads each graph.
+    function loaded() {
+      var data = new google.visualization.DataTable();
+      chart_requests = new google.visualization.ChartWrapper(
+        {
+          chartType: 'LineChart',
+          dataTable: data,
+          containerId: 'request_graph',
+          options: {
+            animation: {
+              duration: 500,
+              easing: 'out'
+            },
+            height: '100%',
+            title: 'Requests',
+            width: '100%'
+          },
+        });
+      chart_io = new google.visualization.ChartWrapper(
+        {
+          chartType: 'LineChart',
+          dataTable: data,
+          containerId: 'io_graph',
+          options: {
+            animation: {
+              duration: 500,
+              easing: 'out'
+            },
+            height: '100%',
+            title: 'I/O summary',
+            width: '100%'
+          },
+        });
+      chart_table = new google.visualization.ChartWrapper(
+        {
+          chartType: 'Table',
+          dataTable: data,
+          containerId: 'raw_data_table',
+          options: {
+            animation: {
+              duration: 500,
+              easing: 'out'
+            },
+            height: '100%',
+            title: 'Raw data',
+            width: '100%'
+          },
+        });
+
+      // Do not draw yet, since it would fail because of the empty DataTable.
+      // sendQuery() will call draw.
+      set_resolution('hours');
+    }
+
+    // Public interface.
+    return {
+      set_resolution: set_resolution
+    }
+  })();
+</script>
+{% endblock %}
+
 {% block body %}
 
-<div style="float: right;">
-  {{now}}
-</div>
+  <div style="float: right;">
+    {{now}}
+  </div>
 
-{% if days %}
-  <h1>Activity in the Last {{days|length}} Days</h1>
-  <table id="daily-stats-table"
-    summary="This table lists the server statistics on each day.">
-    <thead>
-      <th>Date</th>
-      <th>Requests</th>
-      <th>Downloads</th>
-      <th>Uploads</th>
-      <th>Lookups</th>
-    </thead>
-    {% for stats in days %}
-    <tr class="request">
-      <td>{{stats.key.id()}}</td>
-      <td>{{stats.values.requests_as_text()}}</td>
-      <td>{{stats.values.downloads_as_text()}}</td>
-      <td>{{stats.values.uploads_as_text()}}</td>
-      <td>{{stats.values.lookups_as_text()}}</td>
-    </tr>
-    {% endfor %}
-  </table>
-{% endif %}
+  <h1>Statistics</h1>
 
-{% if hours %}
-  <h1>Hourly stats</h1>
-  <table id="hourly-stats-table"
-      summary="This table lists the server statistics at each hour.">
-    <thead>
-      <th>Hour</th>
-      <th>Requests</th>
-      <th>Downloads</th>
-      <th>Uploads</th>
-      <th>Lookups</th>
-    </thead>
-    {% for stats in hours %}
-    <tr class="request">
-      <td>{{stats.key.parent().id()}} {{stats.key.id()}}:00</td>
-      <td>{{stats.values.requests_as_text()}}</td>
-      <td>{{stats.values.downloads_as_text()}}</td>
-      <td>{{stats.values.uploads_as_text()}}</td>
-      <td>{{stats.values.lookups_as_text()}}</td>
-    </tr>
-    {% endfor %}
-  </table>
-{% endif %}
+  Resolution:
+  <input type="checkbox" id=resolution_days onclick="local.set_resolution('days')">Day</input>
+  <input type="checkbox" id=resolution_hours onclick="local.set_resolution('hours')">Hour</input>
+  <input type="checkbox" id=resolution_minutes onclick="local.set_resolution('minutes')">Minute</input>
 
-{% if minutes %}
-  <h1>Minute stats</h1>
-  <table id="minute-stats-table"
-      summary="This table lists the server statistics at each minute.">
-    <thead>
-      <th>Minute</th>
-      <th>Requests</th>
-      <th>Downloads</th>
-      <th>Uploads</th>
-      <th>Lookups</th>
-    </thead>
-    {% for stats in minutes %}
-    <tr class="request">
-      <td>{{stats.key.parent().parent().id()}} {{stats.key.parent().id()}}:{{stats.key.id()}}</td>
-      <td>{{stats.values.requests_as_text()}}</td>
-      <td>{{stats.values.downloads_as_text()}}</td>
-      <td>{{stats.values.uploads_as_text()}}</td>
-      <td>{{stats.values.lookups_as_text()}}</td>
-    </tr>
-    {% endfor %}
-  </table>
-{% endif %}
+  <hr/>
+  <div id="request_graph" class="graph">(Loading...)</div>
+  <hr/>
+  <div id="io_graph" class="graph">(Loading...)</div>
+  <hr/>
+  <div id="raw_data_table" class="graph">(Loading...)</div>
 
 {% endblock %}

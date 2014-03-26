@@ -1643,8 +1643,13 @@ def CreateApplication(debug=False):
           name='store-gs'),
 
       # Public stats.
-      webapp2.Route(r'/stats/json', stats.StatsJsonHandler),
       webapp2.Route(r'/stats', stats.StatsHandler),
+      webapp2.Route(
+          r'/isolate/api/v1/stats/days', stats.ApiStatsGvizDaysHandler),
+      webapp2.Route(
+          r'/isolate/api/v1/stats/hours', stats.ApiStatsGvizHoursHandler),
+      webapp2.Route(
+          r'/isolate/api/v1/stats/minutes', stats.ApiStatsGvizMinutesHandler),
 
       # AppEngine-specific url:
       webapp2.Route(r'/_ah/warmup', WarmupHandler),

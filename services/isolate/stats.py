@@ -19,6 +19,7 @@ from google.appengine.runtime import DeadlineExceededError
 import template
 from components import stats_framework
 from components import utils
+from gviz import gviz_api
 
 
 ### Public API
@@ -160,18 +161,141 @@ class InternalStatsUpdateHandler(webapp2.RequestHandler):
 
 
 class StatsHandler(webapp2.RequestHandler):
-  """Returns the statistics page."""
+  """Returns the statistics web page."""
   def get(self):
-    """Presents nice recent statistics."""
-    data = _generate_stats_data(self.request)
-    to_render = template.get('stats.html')
-    self.response.write(to_render.render(data))
+    """Presents nice recent statistics.
+
+    It fetches data from the 'JSON' API.
+    """
+    self.response.write(template.get('stats.html').render({}))
 
 
-class StatsJsonHandler(webapp2.RequestHandler):
-  """Returns the statistic data."""
+class ApiStatsGvizHandlerBase(webapp2.RequestHandler):
+  """Returns the statistic data as a Google Visualization compatible reply.
+
+  The return can be either JSON or JSONP, depending if the header
+  'X-DataSource-Auth' is set in the request.
+
+  Note that this is not real JSON, as explained in
+  developers.google.com/chart/interactive/docs/dev/implementing_data_source
+  """
+  DATA_DESCRIPTION_COMMON = {
+    'failures': ('number', 'Failures'),
+    'requests': ('number', 'Total'),
+    'other_requests': ('number', 'Other'),
+    'uploads': ('number', 'Uploads'),
+    'uploads_bytes': ('number', 'Uploaded'),
+    'downloads': ('number', 'Downloads'),
+    'downloads_bytes': ('number', 'Downloaded'),
+    'contains_requests': ('number', 'Lookups'),
+    'contains_lookups': ('number', 'Items looked up'),
+  }
+
+  # TODO(maruel): Modifying the order here must update templates/stats.html.
+  # Make it smart.
+  REQUESTS_COLUMNS_ORDER = (
+    'key',
+    'requests',
+    'other_requests',
+    'failures',
+    'uploads',
+    'downloads',
+    'contains_requests',
+    'uploads_bytes',
+    'downloads_bytes',
+    'contains_lookups',
+  )
+
+  # To be overriden in subclass.
+  KEY = None
+
   def get(self):
-    data = _generate_stats_data(self.request)
-    self.response.headers['Content-Type'] = 'application/json; charset=utf-8'
+    """Exposes as described at
+    https://developers.google.com/chart/interactive/docs/reference#dataparam
+    and
+    https://developers.google.com/chart/interactive/docs/querylanguage
+    """
+    kwargs = {}
+    for arg in self.request.params.get('tqx', '').split(';'):
+      if ':' not in arg:
+        continue
+      key, value = arg.split(':', 1)
+      if key == 'out':
+        if value != 'json':
+          self.abort(400, 'Unsupported \'out\' argument')
+      elif key == 'reqId':
+        kwargs['req_id'] = value
+      elif key == 'responseHandler':
+        kwargs['response_handler'] = value
+      else:
+        logging.warning('Unknown query parameter %s', arg)
+
+    # TODO(maruel): Implement: self.request.params.get('tq')
+    duration = utils.get_request_as_int(self.request, 'duration', 120, 1, 256)
+    now = utils.get_request_as_datetime(self.request, 'now')
+
+    def fix_up(d):
+      """Mangles to make it easier to graph."""
+      i = d.to_dict()
+      i['values']['key'] = i['key']
+      o = i['values']
+      o['other_requests'] = (
+          o['requests'] - o['downloads'] - o['contains_requests'] -
+          o['uploads'] - o['failures'])
+      return o
+
+    table = [fix_up(d) for d in self.get_data(now, duration)]
+    description = self.DATA_DESCRIPTION_COMMON.copy()
+    description.update(self.KEY)
+
     self.response.headers['Access-Control-Allow-Origin'] = '*'
-    self.response.write(utils.encode_to_json(data))
+    if self.request.headers.get('X-DataSource-Auth'):
+      # Client requested JSON.
+      self.response.headers['Content-Type'] = (
+          'application/json; charset=utf-8')
+      # TODO(maruel): This manual packaging is annoying, figure out a way to
+      # make this cleaner.
+      # pylint: disable=W0212
+      response_obj = {
+        'reqId': str(kwargs.get('req_id', 0)),
+        'status': 'ok',
+        'table': gviz_api.DataTable(description, table)._ToJSonObj(
+            columns_order=self.REQUESTS_COLUMNS_ORDER),
+        'version': '0.6',
+      }
+      encoder = gviz_api.DataTableJSONEncoder()
+      self.response.write(encoder.encode(response_obj).encode('utf-8'))
+    else:
+      # Client requested JSONP.
+      self.response.headers['Content-Type'] = (
+          'application/javascript; charset=utf-8')
+      self.response.write(
+          gviz_api.DataTable(description, table).ToJSonResponse(
+              columns_order=self.REQUESTS_COLUMNS_ORDER, **kwargs))
+
+  def get_data(self, now, duration):
+    raise NotImplementedError()
+
+
+class ApiStatsGvizDaysHandler(ApiStatsGvizHandlerBase):
+  KEY = {
+    'key': ('date', 'Day'),
+  }
+  def get_data(self, now, duration):
+    return stats_framework.get_days(get_stats_handler(), now, duration)
+
+
+class ApiStatsGvizHoursHandler(ApiStatsGvizHandlerBase):
+  KEY = {
+    'key': ('datetime', 'Time'),
+  }
+  def get_data(self, now, duration):
+    return stats_framework.get_hours(get_stats_handler(), now, duration)
+
+
+class ApiStatsGvizMinutesHandler(ApiStatsGvizHandlerBase):
+  KEY = {
+    'key': ('datetime', 'Time'),
+  }
+  def get_data(self, now, duration):
+    return stats_framework.get_minutes(get_stats_handler(), now, duration)

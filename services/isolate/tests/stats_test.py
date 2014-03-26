@@ -67,7 +67,9 @@ class StatsTest(test_case.TestCase, stats_framework_mock.MockMixIn):
         ('/lookup', Lookup),
         ('/dupe', Dupe),
         ('/generate_stats', stats.InternalStatsUpdateHandler),
-        ('/results', stats.StatsJsonHandler),
+        ('/results/days', stats.ApiStatsGvizDaysHandler),
+        ('/results/hours', stats.ApiStatsGvizHoursHandler),
+        ('/results/minutes', stats.ApiStatsGvizMinutesHandler),
     ]
     real_app = stats.webapp2.WSGIApplication(routes, debug=True)
     self.app = webtest.TestApp(
@@ -87,53 +89,117 @@ class StatsTest(test_case.TestCase, stats_framework_mock.MockMixIn):
     self.mock_now(self.now, 60)
     self.assertEqual(
         'Processed 10 minutes', self.app.get('/generate_stats').body)
-    url = '/results?days=0&hours=0&minutes=1&now=2010-01-02 03:04:05'
-    minute = {
-      u'key': u'2010-01-02 03:04:00',
-      u'values': {
-        u'contains_lookups': 0,
-        u'contains_requests': 0,
-        u'downloads': 0,
-        u'downloads_bytes': 0,
-        u'failures': 0,
-        u'requests': 1,
-        u'uploads': 0,
-        u'uploads_bytes': 0,
-      },
-    }
-    minute['values'].update(added_data)
+    url = '/results/minutes?duration=1&now=2010-01-02 03:04:05'
     expected = {
-      u'days': [],
-      u'hours': [],
-      u'minutes': [minute],
-      u'now': u'2010-01-02 03:04:05',
+      u'reqId': u'0',
+      u'status': u'ok',
+      u'table': {
+        u'cols': [
+          {
+            u'id': u'key',
+            u'label': u'Time',
+            u'type': u'datetime',
+          },
+          {
+            u'id': u'requests',
+            u'label': u'Total',
+            u'type': u'number',
+          },
+          {
+            u'id': u'other_requests',
+            u'label': u'Other',
+            u'type': u'number',
+          },
+          {
+            u'id': u'failures',
+            u'label': u'Failures',
+            u'type': u'number',
+          },
+          {
+            u'id': u'uploads',
+            u'label': u'Uploads',
+            u'type': u'number',
+          },
+          {
+            u'id': u'downloads',
+            u'label': u'Downloads',
+            u'type': u'number',
+          },
+          {
+            u'id': u'contains_requests',
+            u'label': u'Lookups',
+            u'type': u'number',
+          },
+          {
+            u'id': u'uploads_bytes',
+            u'label': u'Uploaded',
+            u'type': u'number',
+          },
+          {
+            u'id': u'downloads_bytes',
+            u'label': u'Downloaded',
+            u'type': u'number',
+          },
+          {
+            u'id': u'contains_lookups',
+            u'label': u'Items looked up',
+            u'type': u'number',
+          },
+        ],
+        u'rows': [
+          {
+            u'c': [
+              {u'v': u'Date(2010,0,2,3,4,0)'},
+              {u'v': 0},
+              {u'v': 0},
+              {u'v': 0},
+              {u'v': 0},
+              {u'v': 0},
+              {u'v': 0},
+              {u'v': 0},
+              {u'v': 0},
+              {u'v': 0},
+            ],
+          },
+        ],
+      },
+      u'version': u'0.6',
     }
-    self.assertEqual(expected, self.app.get(url).json)
+    # TODO(maruel): Use column names instead of indexes. The javascript should
+    # be fixed at the same time.
+    for i, v in added_data.iteritems():
+      expected['table']['rows'][0]['c'][i]['v'] = v
+    self.assertEqual(
+        expected, self.app.get(url, headers={'X-DataSource-Auth': '1'}).json)
 
   def test_store(self):
     expected = {
-      u'uploads': 1,
-      u'uploads_bytes': 2048,
+      1: 1,
+      4: 1,
+      7: 2048,
     }
     self._test_handler('/store', expected)
 
   def test_return(self):
     expected = {
-      u'downloads': 1,
-      u'downloads_bytes': 4096,
+      1: 1,
+      5: 1,
+      8: 4096,
     }
     self._test_handler('/return', expected)
 
   def test_lookup(self):
     expected = {
-      u'contains_lookups': 200,
-      u'contains_requests': 1,
+      1: 1,
+      6: 1,
+      9: 200,
     }
     self._test_handler('/lookup', expected)
 
   def test_dupe(self):
-    # It is currently ignored.
     expected = {
+      1: 1,
+      2: 1,
     }
     self._test_handler('/dupe', expected)
 

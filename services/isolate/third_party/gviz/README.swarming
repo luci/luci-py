@@ -1,0 +1,12 @@
+Name: Google visualization Python API
+Short Name: google-visualization-python
+URL: https://code.google.com/p/google-visualization-python/
+Revision: 27
+License: Apache License, Version 2.0
+
+Description:
+This project is a helper python library for providers who want to implement a
+data source for visualizations built on the Google Visualization API.
+
+Local Modifications:
+Kept only in trunk/: __init__.py, gzip_api.py and COPYRIGHT.

@@ -7,6 +7,10 @@ found in the LICENSE file. -->
   <meta http-equiv="Content-type" content="text/html;charset=UTF-8">
   <title>{{ title or "Isolate Server" }}</title>
   <link rel="stylesheet" type="text/css" href="/default.css"/>
+
+  {% block header %}
+    {# Page specific headers goes there. #}
+  {% endblock %}
 </head>
 <body>
   {% block body %}

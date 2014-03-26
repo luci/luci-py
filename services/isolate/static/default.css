@@ -47,3 +47,8 @@ hr {
 .failed_test {
   background-color: #ffdddd;
 }
+
+.graph {
+  height: 600px;
+  width: 100%;
+}
