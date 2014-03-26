@@ -49,14 +49,14 @@ Always sorted by reverse created.
       <tr class="request {{runner.class_string}}">
         <td>
           <a title="Click to see full message"
-            href="show_message?r={{runner.key}}">{{runner.name}}
+            href="show_message?r={{runner.key_string}}">{{runner.name}}
           </a>
         </td>
         <td>{{runner.status_string|safe}}</td>
         <td>{{runner.created|datetime_human}}</td>
         <td>{{runner.started|datetime_human}}</td>
         <td>{{runner.ended|datetime_human}}</td>
-        <td>{{runner.machine}}</td>
+        <td>{{runner.machine_id}}</td>
         <td>{{runner.command_string|safe}}</td>
       </tr>
     {% endfor %}
