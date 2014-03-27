@@ -208,6 +208,7 @@ class MainTest(test_case.TestCase):
     # decorator use resources from this set.
     expected = {
       'auth/management',
+      'auth/management/groups/{group}',
       'isolate/management',
       'isolate/namespaces/',
       'isolate/namespaces/{namespace}',

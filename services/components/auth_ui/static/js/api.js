@@ -159,9 +159,15 @@ exports.updateOAuthConfig = function(client_id, client_secret, additional_ids) {
 };
 
 
-// List all known user groups.
+// Lists all known user groups.
 exports.groups = function() {
   return call('GET', '/auth/api/v1/groups');
+};
+
+
+// Fetches detailed information about a group.
+exports.groupRead = function(name) {
+  return call('GET', '/auth/api/v1/groups/' + name);
 };
 
 

@@ -838,6 +838,7 @@ class AppTest(test_case.TestCase):
     # decorator use resources from this set.
     expected = {
         'auth/management',
+        'auth/management/groups/{group}',
         'swarming/bots',
         'swarming/clients',
         'swarming/management',

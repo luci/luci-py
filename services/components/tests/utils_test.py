@@ -156,6 +156,11 @@ class UtilsTest(test_case.TestCase):
     actual.sort(key=lambda x: (x.key.id, x.to_dict()))
     self.assertEqual(expected, actual)
 
+  def test_datetime_to_rfc2822(self):
+    self.assertEqual(
+      'Mon, 02 Jan 2012 11:04:05 -0000',
+      utils.datetime_to_rfc2822(datetime.datetime(2012, 1, 2, 3, 4, 5)))
+
 
 class SerializableModelTest(test_case.TestCase):
   """Tests for utils.SerializableModelMixin and related property converters."""

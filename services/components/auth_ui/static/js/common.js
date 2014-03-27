@@ -47,13 +47,13 @@ exports.getAlertBoxHtml = function(type, title, message) {
   var cls = (type == 'success') ? 'alert-success' : 'alert-danger';
   return exports.render(
       'alert-box-template', {cls: cls, title: title, message: message});
-}
+};
 
 
 // Disables or enabled input controls in an element.
 exports.setInteractionDisabled = function($element, disabled) {
   $('button, input, textarea', $element).attr('disabled', disabled);
-}
+};
 
 
 // Called during initial page load to show contents of a page once
@@ -77,6 +77,17 @@ exports.logout = function() {
   if (confirm('You\'ll be signed out from ALL your google accounts.')) {
     window.location = config.logout_url;
   }
+};
+
+
+// Shows confirmation modal dialog. Returns deferred.
+exports.confirm = function(message) {
+  var defer = $.Deferred();
+  if (window.confirm(message))
+    defer.resolve();
+  else
+    defer.reject();
+  return defer.promise();
 };
 
 

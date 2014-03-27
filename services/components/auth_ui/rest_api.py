@@ -13,16 +13,21 @@ from components.auth import api
 from components.auth import handler
 from components.auth import model
 
+from components import utils
+
 # Part of public API of 'auth_ui' component, exposed by this module.
 __all__ = ['get_rest_api_routes']
 
 
 def get_rest_api_routes():
   """Return a list of webapp2 routes with auth REST API handlers."""
+  assert model.GROUP_NAME_RE.pattern[0] == '^'
+  group_re = model.GROUP_NAME_RE.pattern[1:]
   return [
     webapp2.Route('/auth/api/v1/accounts/self', SelfHandler),
     webapp2.Route('/auth/api/v1/accounts/self/xsrf_token', XSRFHandler),
     webapp2.Route('/auth/api/v1/groups', GroupsHandler),
+    webapp2.Route('/auth/api/v1/groups/<group:%s>' % group_re, GroupHandler),
     webapp2.Route('/auth/api/v1/server/oauth_config', OAuthConfigHandler),
   ]
 
@@ -115,6 +120,35 @@ class GroupsHandler(ApiHandler):
         for g in sorted(groups, key=lambda x: x.key.string_id())
       ],
     })
+
+
+class GroupHandler(ApiHandler):
+  """Creating, reading, updating and deleting a single group."""
+
+  @api.require(model.READ, 'auth/management/groups/{group}')
+  def get(self, group):
+    """Fetches all information about an existing group give its name."""
+    obj = model.AuthGroup.get_by_id(group, parent=model.ROOT_KEY)
+    if not obj:
+      self.abort_with_error(404, text='No such group')
+    self.send_response(
+        response={'group': obj.to_serializable_dict(with_id_as='name')},
+        headers={'Last-Modified': utils.datetime_to_rfc2822(obj.modified_ts)})
+
+  @api.require(model.UPDATE, 'auth/management/groups/{group}')
+  def put(self, group):
+    """Updates existing group."""
+    raise NotImplementedError()
+
+  @api.require(model.CREATE, 'auth/management/groups/{group}')
+  def post(self, group):
+    """Creates a new group, ensuring it's indeed new (no overwrites)."""
+    raise NotImplementedError()
+
+  @api.require(model.DELETE, 'auth/management/groups/{group}')
+  def delete(self, group):
+    """Deletes a group."""
+    raise NotImplementedError()
 
 
 class OAuthConfigHandler(ApiHandler):

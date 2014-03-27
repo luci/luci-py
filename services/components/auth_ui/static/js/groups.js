@@ -209,7 +209,7 @@ GroupForm.prototype.hide = function() {
 };
 
 
-// Load contents of this from from the server.
+// Load contents of this from the server.
 // Returns deferred.
 GroupForm.prototype.load = function() {
   // Subclasses implement this. Base class just returns resolved deferred.
@@ -226,6 +226,70 @@ GroupForm.prototype.setInteractionDisabled = function(disabled) {
 
 
 ////////////////////////////////////////////////////////////////////////////////
+// Form to view\edit existing group.
+
+
+EditGroupForm = function(groupName) {
+  // Call parent constructor.
+  GroupForm.call(this, null);
+  // Name of the group this form operates on.
+  this.groupName = groupName;
+  // Last-Modified header of content (once loaded).
+  this.lastModified = null;
+  // Called when 'Delete group' action is invoked.
+  this.onDeleteGroup = null;
+  // Called when group form is submitted.
+  this.onUpdateGroup = null;
+};
+
+
+// Inherit from GroupForm.
+EditGroupForm.prototype = Object.create(GroupForm.prototype);
+
+
+// Loads contents of this from the server.
+EditGroupForm.prototype.load = function() {
+  var self = this;
+  var defer = api.groupRead(this.groupName);
+  defer.then(function(response) {
+    self.buildForm(response.data.group, response.headers['Last-Modified']);
+  });
+  return defer;
+};
+
+
+// Builds DOM element with this form given group object.
+EditGroupForm.prototype.buildForm = function(group, lastModified) {
+  // Convert fields to text.
+  group = _.clone(group);
+  group.created_ts = common.utcTimestampToString(group.created_ts);
+  group.members = (group.members || []).join('\n') + '\n';
+  group.globs = (group.globs || []).join('\n') + '\n';
+  group.nested = (group.nested || []).join('\n') + '\n';
+
+  // Build the actual DOM element.
+  this.$element = $(common.render('edit-group-form-template', group));
+  this.lastModified = lastModified;
+
+  // 'Delete' button handler. Asks confirmation and calls 'onDeleteGroup'.
+  var self = this;
+  $('#delete-btn', this.$element).click(function() {
+    common.confirm('Delete this group?').done(function() {
+      self.onDeleteGroup(self.groupName, self.lastModified);
+    });
+  });
+
+  // Submit handler.
+  $('form', this.$element).submit(function() {
+    // TODO(vadimsh): Validate the form, extract group information from it.
+    var group = {};
+    self.onUpdateGroup(group, self.lastModified);
+    return false;
+  });
+};
+
+
+////////////////////////////////////////////////////////////////////////////////
 // Main entry point, sets up all high-level UI logic.
 
 
@@ -237,13 +301,21 @@ exports.onContentLoaded = function() {
   // Called to setup 'Create new group' flow.
   var startNewGroupFlow = function() {
     // TODO(vadimsh): Implement.
-    mainFrame.loadContent(new GroupForm($("<div>New group</div>")));
+    mainFrame.loadContent(new GroupForm($('<div>New group</div>')));
   };
 
   // Called to setup 'Edit the group' flow (including deletion of a group).
   var startEditGroupFlow = function(groupName) {
-    // TODO(vadimsh): Implement.
-    mainFrame.loadContent(new GroupForm($("<div>Edit group</div>")));
+    var form = new EditGroupForm(groupName);
+    form.onDeleteGroup = function(groupName, lastModified) {
+      // TODO(vadimsh): Implement group deletion.
+      alert('Not implemented');
+    };
+    form.onUpdateGroup = function(groupObj, lastModified) {
+      // TODO(vadimsh): Implement group updates.
+      alert('Not implemented');
+    };
+    mainFrame.loadContent(form);
   };
 
   // Attach event handlers.

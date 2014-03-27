@@ -17,6 +17,8 @@ import os
 import threading
 import time
 
+from email import utils
+
 from google.appengine.api import memcache
 from google.appengine.api import modules
 from google.appengine.ext import ndb
@@ -65,6 +67,12 @@ def get_request_as_datetime(request, key):
       except ValueError:
         continue
   return None
+
+
+def datetime_to_rfc2822(dt):
+  """datetime -> string value for Last-Modified header as defined by RFC2822."""
+  assert dt.tzinfo is None, 'Expecting UTC timestamp: %s' % dt
+  return utils.formatdate(time.mktime(dt.timetuple()))
 
 
 ### Cache
