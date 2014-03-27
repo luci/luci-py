@@ -17,6 +17,8 @@ import test_case
 import webapp2
 import webtest
 
+from components import utils
+
 from components.auth import api
 from components.auth import handler
 from components.auth import model
@@ -235,6 +237,11 @@ class RestAPITestCase(test_case.TestCase):
     self.mock(handler.logging, 'error',
         lambda *args, **kwargs: self.errors.append((args, kwargs)))
 
+  def mock_ndb_now(self, now):
+    """Makes properties with |auto_now| and |auto_now_add| use mocked time."""
+    self.mock(model.ndb.DateTimeProperty, '_now', lambda _: now)
+    self.mock(model.ndb.DateProperty, '_now', lambda _: now.date())
+
   def _make_request(
       self, method, path, params=None, headers=None,
       expect_errors=False, expected_auth_checks=()):
@@ -281,6 +288,86 @@ class RestAPITestCase(test_case.TestCase):
         headers=headers,
         expect_errors=expect_errors,
         expected_auth_checks=expected_auth_checks)
+
+
+################################################################################
+## Test cases for REST end points.
+
+
+class SelfHandlerTest(RestAPITestCase):
+  def test_anonymous(self):
+    status, body = self.get('/auth/api/v1/accounts/self')
+    self.assertEqual(200, status)
+    self.assertEqual({'identity': 'anonymous:anonymous'}, body)
+
+  def test_non_anonymous(self):
+    # Add fake authenticator.
+    handler.configure([
+        lambda _req: model.Identity(model.IDENTITY_USER, 'joe@example.com')])
+    status, body = self.get('/auth/api/v1/accounts/self')
+    self.assertEqual(200, status)
+    self.assertEqual({'identity': 'user:joe@example.com'}, body)
+
+
+class XSRFHandlerTest(RestAPITestCase):
+  def test_works(self):
+    status, body = self.post(
+        path='/auth/api/v1/accounts/self/xsrf_token',
+        headers={'X-XSRF-Token-Request': '1'})
+    self.assertEqual(200, status)
+    self.assertTrue(isinstance(body.get('xsrf_token'), basestring))
+
+  def test_requires_header(self):
+    status, body = self.post(
+        path='/auth/api/v1/accounts/self/xsrf_token',
+        expect_errors=True)
+    self.assertEqual(403, status)
+    self.assertEqual({'text': 'Missing required XSRF request header'}, body)
+
+
+class GroupsHandlerTest(RestAPITestCase):
+  def test_empty_list(self):
+    status, body = self.get(
+        path='/auth/api/v1/groups',
+        expected_auth_checks=[(model.READ, 'auth/management')])
+    self.assertEqual(200, status)
+    self.assertEqual({'groups': []}, body)
+
+  def test_non_empty_list(self):
+    # Freeze time in NDB's |auto_now| properties.
+    self.mock_ndb_now(utils.timestamp_to_datetime(1300000000000000))
+
+    # Create a bunch of groups with all kinds of members.
+    for i in xrange(0, 5):
+      group = model.AuthGroup(
+          id='Test group %d' % i,
+          parent=model.ROOT_KEY,
+          created_by=model.Identity.from_bytes('user:creator@example.com'),
+          description='Group for testing, #%d' % i,
+          modified_by=model.Identity.from_bytes('user:modifier@example.com'),
+          members=[model.Identity.from_bytes('user:joe@example.com')],
+          globs=[model.IdentityGlob.from_bytes('user:*@example.com')])
+      group.put()
+
+    # Group Listing should return all groups. Member lists should be omitted.
+    # Order is alphabetical by name,
+    status, body = self.get(
+        path='/auth/api/v1/groups',
+        expected_auth_checks=[(model.READ, 'auth/management')])
+    self.assertEqual(200, status)
+    self.assertEqual(
+      {
+        'groups': [
+          {
+            'created_by': 'user:creator@example.com',
+            'created_ts': 1300000000000000,
+            'description': 'Group for testing, #%d' % i,
+            'modified_by': 'user:modifier@example.com',
+            'modified_ts': 1300000000000000,
+            'name': 'Test group %d' % i,
+          } for i in xrange(0, 5)
+        ],
+      }, body)
 
 
 class OAuthConfigHandlerTest(RestAPITestCase):
@@ -374,37 +461,6 @@ class OAuthConfigHandlerTest(RestAPITestCase):
     self.assertEqual('some-client-id', config.oauth_client_id)
     self.assertEqual('some-secret', config.oauth_client_secret)
     self.assertEqual(['1', '2', '3'], config.oauth_additional_client_ids)
-
-
-class SelfHandlerTest(RestAPITestCase):
-  def test_anonymous(self):
-    status, body = self.get('/auth/api/v1/accounts/self')
-    self.assertEqual(200, status)
-    self.assertEqual({'identity': 'anonymous:anonymous'}, body)
-
-  def test_non_anonymous(self):
-    # Add fake authenticator.
-    handler.configure([
-        lambda _req: model.Identity(model.IDENTITY_USER, 'joe@example.com')])
-    status, body = self.get('/auth/api/v1/accounts/self')
-    self.assertEqual(200, status)
-    self.assertEqual({'identity': 'user:joe@example.com'}, body)
-
-
-class XSRFHandlerTest(RestAPITestCase):
-  def test_works(self):
-    status, body = self.post(
-        path='/auth/api/v1/accounts/self/xsrf_token',
-        headers={'X-XSRF-Token-Request': '1'})
-    self.assertEqual(200, status)
-    self.assertTrue(isinstance(body.get('xsrf_token'), basestring))
-
-  def test_requires_header(self):
-    status, body = self.post(
-        path='/auth/api/v1/accounts/self/xsrf_token',
-        expect_errors=True)
-    self.assertEqual(403, status)
-    self.assertEqual({'text': 'Missing required XSRF request header'}, body)
 
 
 if __name__ == '__main__':

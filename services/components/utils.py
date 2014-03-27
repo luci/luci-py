@@ -228,7 +228,7 @@ class SerializableModelMixin(object):
   # and writable.
   serializable_properties = None
 
-  def to_serializable_dict(self, with_id_as=None):
+  def to_serializable_dict(self, with_id_as=None, exclude=None):
     """Converts this entity to a serializable dictionary.
 
     Operates only on properties that have READABLE flag set in
@@ -237,12 +237,14 @@ class SerializableModelMixin(object):
 
     Args:
       with_id_as: name of the optional dict key to put entity's string_id() to.
+      exclude: list of fields to exclude from the dict.
     """
     # TODO(vadimsh): Add 'include' and 'exclude' support when needed.
     conv = _ModelDictConverter(
         property_converters=_rich_to_simple_converters,
         field_mode_predicate=lambda mode: bool(mode & READABLE))
-    serializable_dict = conv.convert_dict(self.__class__, self.to_dict())
+    serializable_dict = conv.convert_dict(
+        self.__class__, self.to_dict(exclude=exclude))
     if with_id_as:
       assert isinstance(with_id_as, basestring)
       serializable_dict[with_id_as] = self.key.string_id()

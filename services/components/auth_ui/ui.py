@@ -2,42 +2,7 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
-"""Auth management UI handlers.
-
-It's mostly client side Javascript application that uses service's REST API.
-
-UI is represented by a set of tabs in a navigation bar, each tab is a separate
-HTML page (see http://getbootstrap.com/components/#navbar) served by some
-handler is this file.
-
-Each page has a javascript module associated with it that implements all UI
-logic. Entry point in such module is 'onContentLoaded' function that is called
-once main page body is loaded. Anatomy of a javascript module defined in
-module_name.js:
-
-var module_name = (function() {
-var exports = {};
-
-exports.symbol = ....
-
-return exports;
-}());
-
-Code in base.html relies on correspondence of javascript file name and name of
-a module object it exports.
-
-Each module have access to several global objects (loaded in base.html):
- * $ - jQuery library.
- * _ - underscore library.
- * Handlebars - handlebars library.
- * common - a module with utility functions, see common.js.
- * api - a module with wrappers around auth service REST API, see api.js.
- * config - an object with page configuration passed from python code,
-      see UIHandler class below.
-
-Javascript code uses REST API (defined in rest_api.py) via wrappers implemented
-in api.js. api.js takes care of XSRF tokens and other low level details.
-"""
+"""Auth management UI handlers."""
 
 import jinja2
 import json
@@ -61,7 +26,8 @@ JINJA = jinja2.Environment(
 
 # Top navigation bar links as tuples (id, title, url).
 NAVBAR_TABS = (
-    ('oauth_config', 'OAuth', '/auth/oauth_config'),
+  ('groups', 'Groups', '/auth/groups'),
+  ('oauth_config', 'OAuth', '/auth/oauth_config'),
 )
 
 
@@ -83,6 +49,7 @@ def get_ui_routes():
   """Returns a list of webapp2 routes with auth REST API handlers."""
   return [
     webapp2.Route(r'/auth', MainHandler),
+    webapp2.Route(r'/auth/groups', GroupsHandler),
     webapp2.Route(r'/auth/oauth_config', OAuthConfigHandler),
   ]
 
@@ -162,6 +129,18 @@ class MainHandler(UIHandler):
   @auth.require(auth.READ, 'auth/management')
   def get(self):
     self.redirect(NAVBAR_TABS[0][2])
+
+
+class GroupsHandler(UIHandler):
+  """Page with Groups management."""
+  @auth.require(auth.READ, 'auth/management')
+  def get(self):
+    env = {
+      'js_file': 'groups.js',
+      'navbar_tab_id': 'groups',
+      'page_title': 'Groups',
+    }
+    self.reply('groups.html', env=env)
 
 
 class OAuthConfigHandler(UIHandler):

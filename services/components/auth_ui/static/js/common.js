@@ -90,18 +90,20 @@ var ProgressSpinner = function() {
 // Shows progress indicator.
 ProgressSpinner.prototype.show = function() {
   this.counter += 1;
-  if (this.counter == 1)
+  if (this.counter == 1) {
     this.$element.removeClass('not-spinning').addClass('spinning');
+  }
 };
 
 
 // Hides progress indicator.
 ProgressSpinner.prototype.hide = function() {
-  if (this.counter == 0)
-    return;
-  this.counter -= 1;
-  if (this.counter == 0)
-    this.$element.removeClass('spinning').addClass('not-spinning');
+  if (this.counter != 0) {
+    this.counter -= 1;
+    if (this.counter == 0) {
+      this.$element.removeClass('spinning').addClass('not-spinning');
+    }
+  }
 };
 
 

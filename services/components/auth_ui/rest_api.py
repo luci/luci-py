@@ -22,6 +22,7 @@ def get_rest_api_routes():
   return [
     webapp2.Route('/auth/api/v1/accounts/self', SelfHandler),
     webapp2.Route('/auth/api/v1/accounts/self/xsrf_token', XSRFHandler),
+    webapp2.Route('/auth/api/v1/groups', GroupsHandler),
     webapp2.Route('/auth/api/v1/server/oauth_config', OAuthConfigHandler),
   ]
 
@@ -63,6 +64,57 @@ class ApiHandler(handler.AuthenticatingHandler):
     except ValueError:
       self.abort_with_error(400, text='Not a valid json dict body')
     return body
+
+
+class SelfHandler(ApiHandler):
+  """Returns identity of a caller."""
+
+  @api.public
+  def get(self):
+    self.send_response({'identity': api.get_current_identity().to_bytes()})
+
+
+class XSRFHandler(ApiHandler):
+  """Generates XSRF token on demand.
+
+  Should be used only by client scripts or Ajax calls. Requires header
+  'X-XSRF-Token-Request' to be present (actual value doesn't matter).
+  """
+
+  # Don't enforce prior XSRF token, it might not be known yet.
+  xsrf_token_enforce_on = ()
+
+  @api.public
+  def post(self):
+    if not self.request.headers.get('X-XSRF-Token-Request'):
+      raise api.AuthorizationError('Missing required XSRF request header')
+    self.send_response({'xsrf_token': self.generate_xsrf_token()})
+
+
+class GroupsHandler(ApiHandler):
+  """Lists all registered groups.
+
+  Returns a list of groups, sorted by name. Each entry in a list is a dict with
+  all details about the group except the actual list of members
+  (which may be large).
+  """
+
+  @api.require(model.READ, 'auth/management')
+  def get(self):
+    # Currently AuthGroup entity contains a list of group members in the entity
+    # body. It's an implementation detail that should not be relied upon.
+    # Generally speaking, fetching a list of group members can be an expensive
+    # operation, and group listing call shouldn't do it all the time. So throw
+    # away all fields that enumerate group members.
+    groups = model.AuthGroup.query(ancestor=model.ROOT_KEY).fetch()
+    self.send_response({
+      'groups': [
+        g.to_serializable_dict(
+            with_id_as='name',
+            exclude=('members', 'globs', 'nested'))
+        for g in sorted(groups, key=lambda x: x.key.string_id())
+      ],
+    })
 
 
 class OAuthConfigHandler(ApiHandler):
@@ -111,28 +163,3 @@ class OAuthConfigHandler(ApiHandler):
 
     update()
     self.send_response({'ok': True})
-
-
-class SelfHandler(ApiHandler):
-  """Returns identity of a caller."""
-
-  @api.public
-  def get(self):
-    self.send_response({'identity': api.get_current_identity().to_bytes()})
-
-
-class XSRFHandler(ApiHandler):
-  """Generates XSRF token on demand.
-
-  Should be used only by client scripts or Ajax calls. Requires header
-  'X-XSRF-Token-Request' to be present (actual value doesn't matter).
-  """
-
-  # Don't enforce prior XSRF token, it might not be known yet.
-  xsrf_token_enforce_on = ()
-
-  @api.public
-  def post(self):
-    if not self.request.headers.get('X-XSRF-Token-Request'):
-      raise api.AuthorizationError('Missing required XSRF request header')
-    self.send_response({'xsrf_token': self.generate_xsrf_token()})

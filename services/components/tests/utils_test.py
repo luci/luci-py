@@ -371,6 +371,18 @@ class SerializableModelTest(test_case.TestCase):
     """Test handling of LocalStructuredProperty(repeated=True)."""
     self._test_repeated_structured_properties_class(ndb.LocalStructuredProperty)
 
+  def test_exclude_works(self):
+    """|exclude| argument of to_serializable_dict() is respected."""
+    class Entity(ndb.Model, utils.SerializableModelMixin):
+      prop1 = ndb.IntegerProperty()
+      prop2 = ndb.IntegerProperty()
+      prop3 = ndb.IntegerProperty()
+
+    entity = Entity(prop1=1, prop2=2, prop3=3)
+    self.assertEqual(
+        {'prop1': 1, 'prop3': 3},
+        entity.to_serializable_dict(exclude=['prop2']))
+
 
 class BytesSerializableObject(utils.BytesSerializable):
   def __init__(self, payload):  # pylint: disable=W0231

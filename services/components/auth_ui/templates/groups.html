@@ -1,0 +1,47 @@
+{% extends 'base.html' %}
+{% block content %}
+
+{# BEWARE: The following templates in 'raw' section are handled by handlebars
+javascript library and not jinja2. #}
+
+{% raw %}
+
+<script id="group-chooser-item-template" type="text/x-handlebars-template">
+  <a href="#" class="list-group-item">
+    <h5 class="list-group-item-heading">{{name}}</h5>
+    <small class="list-group-item-text">{{description}}</small>
+  </a>
+</script>
+
+<script id="group-chooser-button-template" type="text/x-handlebars-template">
+  <a href="#" class="list-group-item">
+    <b>Create a new group</b>
+  </a>
+</script>
+
+<script id="frame-error-pane" type="text/x-handlebars-template">
+  <div class="panel panel-danger">
+    <div class="panel-heading"><h3 class="panel-title">Error</h3></div>
+    <div class="panel-body"><pre>{{text}}</pre></div>
+  </div>
+</script>
+
+{% endraw %}
+
+<div class="row">
+  <!-- Group chooser + 'Create new group' button. -->
+  <div class="col-md-4">
+    <!-- Populated by js. -->
+    <div id="group-chooser">
+    </div>
+  </div>
+
+  <!-- Details of some single group. -->
+  <div class="col-md-8">
+    <!-- Populated by js. -->
+    <div id="main-content-pane">
+    </div>
+  </div>
+</div>
+
+{% endblock %}

@@ -32,8 +32,9 @@ var extractHeaders = function(jqXHR) {
 var call = function(type, url, data, headers) {
   // Append XSRF token header to the request if known.
   headers = _.clone(headers || {});
-  if (xsrf_token)
+  if (xsrf_token) {
     headers['X-XSRF-Token'] = xsrf_token;
+  }
 
   // Launch the request.
   var request = $.ajax({
@@ -72,8 +73,9 @@ var call = function(type, url, data, headers) {
     if (contentType.indexOf('application/json') != -1) {
       try {
         errorObj = $.parseJSON(jqXHR.responseText);
-        if (_.has(errorObj, 'text'))
+        if (_.has(errorObj, 'text')) {
           errorMsg = errorObj.text;
+        }
       } catch (err) {
         // Server tricked us by giving incorrect content type. Use response
         // string as error object.
@@ -154,6 +156,12 @@ exports.updateOAuthConfig = function(client_id, client_secret, additional_ids) {
     client_id: client_id,
     client_not_so_secret: client_secret
   });
+};
+
+
+// List all known user groups.
+exports.groups = function() {
+  return call('GET', '/auth/api/v1/groups');
 };
 
 
