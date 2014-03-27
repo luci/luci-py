@@ -1132,7 +1132,7 @@ class StatsDailyHandler(webapp2.RequestHandler):
   ELEMENTS_TO_GRAPH = [
       ('shards_failed', 'Shards Failed'),
       ('shards_finished', 'Shards Finished'),
-      ('shards_timed_out', 'Shards Timed Out'),
+      ('shards_aborted', 'Shards Aborted'),
       ('total_running_time', 'Total Running Time'),
       ('total_wait_time', 'Total Wait Time'),
   ]

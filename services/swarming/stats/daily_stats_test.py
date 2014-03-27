@@ -28,14 +28,19 @@ WAIT_TIME = 2
 RUNNING_TIME = 3
 
 
-def _AddRunner(end_time, success, timeout):
-  assigned_time = end_time - datetime.timedelta(minutes=RUNNING_TIME)
-  created_time = assigned_time - datetime.timedelta(minutes=WAIT_TIME)
+def _AddRunner(end_time, success, aborted):
+  created_time = end_time - datetime.timedelta(
+      minutes=WAIT_TIME + RUNNING_TIME)
+  if aborted:
+    assigned_time = None
+  else:
+    assigned_time = end_time - datetime.timedelta(minutes=RUNNING_TIME)
+
 
   runner = runner_stats.RunnerStats(
       test_case_name='name', dimensions='xp', num_instances=0,
       instance_index=0, created_time=created_time, assigned_time=assigned_time,
-      end_time=end_time, success=success, timed_out=timeout,
+      end_time=end_time, success=success, aborted=aborted,
       automatic_retry_count=0)
   runner.put()
 
@@ -52,23 +57,23 @@ class DailyStatsTest(test_case.TestCase):
   def testGenerateDailyStatsWithBasicInfo(self):
     current_day = datetime.datetime.utcnow().date()
 
-    # Add 1 sucess, 2 regular failures, and 1 failure due to a timeout.
+    # Add 1 sucess, 2 regular failures, and 1 abort.
     _AddRunner(datetime.datetime.combine(current_day, datetime.time()),
-               success=True, timeout=False)
+               success=True, aborted=False)
     _AddRunner(datetime.datetime.combine(current_day, datetime.time()),
-               success=False, timeout=False)
+               success=False, aborted=False)
     _AddRunner(datetime.datetime.combine(current_day, datetime.time()),
-               success=False, timeout=False)
+               success=False, aborted=False)
     _AddRunner(datetime.datetime.combine(current_day, datetime.time()),
-               success=False, timeout=True)
-
+               success=False, aborted=True)
+    self.assertEqual(4, runner_stats.RunnerStats.query().count())
     # Add a runner from yesterday and tomorrow and ensure they are ignored.
     _AddRunner(datetime.datetime.combine(
         current_day + datetime.timedelta(days=1), datetime.time()),
-               success=True, timeout=False)
+               success=True, aborted=False)
     _AddRunner(datetime.datetime.combine(
         current_day - datetime.timedelta(days=1), datetime.time()),
-               success=True, timeout=False)
+               success=True, aborted=False)
 
     self.assertTrue(daily_stats.GenerateDailyStats(current_day))
     self.assertEqual(1, daily_stats.DailyStats.query().count())
@@ -76,25 +81,29 @@ class DailyStatsTest(test_case.TestCase):
     daily_stat = daily_stats.DailyStats.query().get()
     self.assertEqual(4, daily_stat.shards_finished)
     self.assertEqual(2, daily_stat.shards_failed)
-    self.assertEqual(1, daily_stat.shards_timed_out)
-    self.assertEqual(WAIT_TIME * 4, daily_stat.total_wait_time)
-    self.assertEqual(RUNNING_TIME * 4, daily_stat.total_running_time)
+    self.assertEqual(1, daily_stat.shards_aborted)
+    # The aborted runner adds its running time to the wait, since it doesn't
+    # actually run.
+    self.assertEqual(WAIT_TIME * 4 + RUNNING_TIME, daily_stat.total_wait_time)
+    self.assertEqual(RUNNING_TIME * 3, daily_stat.total_running_time)
 
   def testGenerateDailyStatsWithAbortedRunner(self):
     current_day = datetime.datetime.utcnow().date()
 
     runner = _AddRunner(datetime.datetime.combine(current_day, datetime.time()),
-                        success=False, timeout=False)
+                        success=False, aborted=False)
 
     # If a runner is never run and is aborted because we never see a machine
     # that can run it, it will lack an assigned time.
     runner.assigned_time = None
+    runner.aborted = True
     runner.put()
 
     self.assertTrue(daily_stats.GenerateDailyStats(current_day))
 
     daily_stat = daily_stats.DailyStats.query().get()
-    self.assertEqual(0, daily_stat.shards_finished)
+    self.assertEqual(1, daily_stat.shards_finished)
+    self.assertEqual(1, daily_stat.shards_aborted)
 
   def testGetDailyStats(self):
     current_day = datetime.datetime.utcnow().date()

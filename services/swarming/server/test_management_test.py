@@ -413,9 +413,10 @@ class TestManagementTest(test_case.TestCase):
 
     runner = test_runner.TestRunner.query().get()
     self.assertFalse(runner.machine_needed)
-    self.assertIsNotNone(runner.started)
+    self.assertIsNone(runner.started)
     self.assertIsNotNone(runner.ended)
     self.assertTrue(runner.done)
+    self.assertTrue(runner.aborted)
     self.assertIn('Runner was unable to find a machine to run it within',
                   runner.GetResultString())
 

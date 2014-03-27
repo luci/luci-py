@@ -327,7 +327,9 @@ def AbortStaleRunners():
           runner.name,
           runner.machine_id,
           runner.key.urlsafe())
-      AbortRunner(runner, reason='Runner has become stale.')
+      AbortRunner(runner,
+                  reason='Runner has become stale. Last ping was %s and cutoff '
+                  'time was %s' % (runner.ping, timeout_cutoff))
 
   query = test_runner.TestRunner.gql(
       'WHERE done = :1 AND ping != :2 AND ping < :3',
@@ -349,19 +351,16 @@ def AbortRunner(runner, reason):
     runner: An instance of TestRunner to be aborted.
     reason: A string message indicating why the TestRunner is being aborted.
   """
-  r_str = ('Tests aborted. AbortRunner() called. Reason: %s' %
+  r_str = ('Task aborted. AbortRunner() called. Reason: %s' %
            reason.encode('ascii', 'xmlcharrefreplace'))
 
   # The cancellation time should count as the time the runner started.
-  # TODO(maruel): Should have an aborted timestamp instead of having 'started'
-  # mean two different things.
   # TODO(maruel): This is not done as a transaction either, this is
   # inconsistent.
-  runner.started = datetime.datetime.utcnow()
   runner.machine_needed = False
   runner.put()
 
-  runner.UpdateTestResult(runner.machine_id, errors=r_str)
+  runner.UpdateTestResult(runner.machine_id, errors=r_str, aborted=True)
 
 
 def ExecuteRegisterRequest(attributes, server_url):

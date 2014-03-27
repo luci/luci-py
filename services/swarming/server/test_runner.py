@@ -96,6 +96,9 @@ class TestRunner(ndb.Model):
   # Used to indicate if the runner has finished, either successfully or not.
   done = ndb.BooleanProperty(default=False)
 
+  # Used to indicate if the runner was aborted, either by a user or the server.
+  aborted = ndb.BooleanProperty(default=False)
+
   # The time at which this runner was created.  The runner may not have
   # started executing yet.
   # Don't use auto_now_add so we control exactly what the time is set to
@@ -144,9 +147,8 @@ class TestRunner(ndb.Model):
   # unspecified.
   ended = ndb.DateTimeProperty()
 
-  # True if the test run finished and succeeded.  This attribute is valid only
-  # when the runner has ended. Until then, the value is unspecified.
-  ran_successfully = ndb.BooleanProperty()
+  # True if the test run finished and succeeded.
+  ran_successfully = ndb.BooleanProperty(default=False)
 
   # The stringized array of exit_codes for each actions of the test.
   exit_codes = ndb.StringProperty(indexed=False)
@@ -268,7 +270,8 @@ class TestRunner(ndb.Model):
     self.put()
 
   def UpdateTestResult(self, machine_id, success=False, exit_codes='',
-                       results=None, errors=None, overwrite=False):
+                       results=None, errors=None, aborted=False,
+                       overwrite=False):
     """Update the runner with results of a test run.
 
     Args:
@@ -277,6 +280,7 @@ class TestRunner(ndb.Model):
       exit_codes: A string containing the array of exit codes of the test run.
       results: A Results class containing the results.
       errors: A string explaining why we failed to get the actual result string.
+      aborted: A boolean indicating whether the test was aborted or not.
       overwrite: A boolean indicating if we should always record this result,
           even if a result had been previously recorded.
 
@@ -331,6 +335,7 @@ class TestRunner(ndb.Model):
       self.errors = None
 
     self.ran_successfully = success
+    self.aborted = aborted
     self.exit_codes = exit_codes
     self.done = True
     self.ended = datetime.datetime.utcnow()

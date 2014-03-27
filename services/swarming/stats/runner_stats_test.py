@@ -34,7 +34,7 @@ def _CreateRunnerStats():
                                   end_time=datetime.datetime.utcnow(),
                                   machine_id='id',
                                   success=True,
-                                  timed_out=False,
+                                  aborted=False,
                                   automatic_retry_count=0)
 
 
@@ -53,26 +53,10 @@ class StatManagerTest(test_case.TestCase):
     r_stats = runner_stats.RunnerStats.query().get()
     self.assertEqual(None, r_stats)
 
-    # Create stats from a runner that didn't timeout.
-    runner = test_helper.CreatePendingRunner()
+    runner = test_helper.CreatePendingRunner(ran_successfully=True)
     r_stats = runner_stats.RecordRunnerStats(runner)
-    self.assertFalse(r_stats.timed_out)
-
-    # Record stats from a runner that did timeout.
-    runner.errors = 'Runner has become stale'
-    r_stats = runner_stats.RecordRunnerStats(runner)
-    self.assertTrue(r_stats.timed_out)
-
-  def testRecordInvalidRunnerStats(self):
-    # Create stats from a runner timed out, but was also successful.
-    runner = test_helper.CreatePendingRunner()
-    runner.errors = 'Runner has become stale'
-    runner.ran_successfully = True
-    runner.put()
-
-    r_stats = runner_stats.RecordRunnerStats(runner)
-    self.assertTrue(r_stats.timed_out)
-    self.assertFalse(r_stats.success)
+    self.assertFalse(r_stats.aborted)
+    self.assertTrue(r_stats.success)
 
   def testSwarmDeleteOldRunnerStats(self):
     self._mox.StubOutWithMock(runner_stats, '_GetCurrentTime')

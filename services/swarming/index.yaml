@@ -51,6 +51,11 @@ indexes:
 
 - kind: TestRunner
   properties:
+  - name: machine_needed
+  - name: priority_and_created
+
+- kind: TestRunner
+  properties:
   - name: dimensions
   - name: done
   - name: started
@@ -351,11 +356,6 @@ indexes:
   - name: started
   - name: created
     direction: desc
-
-- kind: TestRunner
-  properties:
-  - name: machine_needed
-  - name: priority_and_created
 
 - kind: TestRunner
   properties:

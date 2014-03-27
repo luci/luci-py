@@ -42,7 +42,7 @@ def _CreateRunnerStats(dimensions='dimensions'):
                                   end_time=datetime.datetime.utcnow(),
                                   machine_id='id',
                                   success=True,
-                                  timed_out=False,
+                                  aborted=False,
                                   automatic_retry_count=0)
 
 

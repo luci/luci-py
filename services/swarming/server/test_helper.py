@@ -92,13 +92,15 @@ def GetRequestMessage(request_name=REQUEST_MESSAGE_TEST_CASE_NAME,
   return test_request_message.Stringize(request, json_readable=True)
 
 
-def CreatePendingRunner(config_name=None, machine_id=None, exit_codes=None):
+def CreatePendingRunner(config_name=None, machine_id=None,
+                        ran_successfully=None, exit_codes=None):
   """Create a basic pending TestRunner.
 
   Args:
     config_name: The config name for the runner.
     machine_id: The machine id for the runner. Also, if this is given the
       runner is marked as having started.
+    ran_succesfully: True if the runner ran successfully.
     exit_codes: The exit codes for the runner. Also, if this is given the
       runner is marked as having finished.
 
@@ -120,6 +122,9 @@ def CreatePendingRunner(config_name=None, machine_id=None, exit_codes=None):
     runner.machine_id = machine_id
     runner.started = datetime.datetime.utcnow()
     runner.ping = runner.started
+
+  if ran_successfully:
+    runner.ran_successfully = ran_successfully
 
   if exit_codes:
     runner.done = True

@@ -10,8 +10,6 @@ stats that are related to just a single runner (i.e. how long a runner waited).
 
 
 import datetime
-import logging
-
 
 from google.appengine.ext import ndb
 
@@ -52,13 +50,11 @@ class RunnerStats(ndb.Model):
   # runner has been assigned. If the runner never ran, this value can be empty.
   machine_id = ndb.StringProperty()
 
-  # Indicates if the runner tasks were successful . This is valid only once the
-  # runner has finished or timed out.
+  # Indicates if the runner tasks were successful.
   success = ndb.BooleanProperty(required=True)
 
-  # Indicates if the runner timed out. This is valid only once the runner has
-  # finished or timed out.
-  timed_out = ndb.BooleanProperty(required=True)
+  # Indicates if the runner was aborted.
+  aborted = ndb.BooleanProperty(required=True)
 
   # The number of times the runner for this stats has been automatically retried
   # (each retry has its own RunnerStats).
@@ -74,8 +70,6 @@ def RecordRunnerStats(runner):
   Returns:
     The newly created RunnerStats.
   """
-  timed_out = bool(runner.errors and 'Runner has become stale' in runner.errors)
-
   runner_stats = RunnerStats(
       test_case_name=runner.name,
       dimensions=runner.dimensions,
@@ -85,14 +79,9 @@ def RecordRunnerStats(runner):
       assigned_time=runner.started,
       end_time=runner.ended,
       machine_id=runner.machine_id,
-      success=runner.ran_successfully or False,
-      timed_out=timed_out,
+      success=runner.ran_successfully,
+      aborted=runner.aborted,
       automatic_retry_count=runner.automatic_retry_count)
-
-  if runner_stats.timed_out and runner_stats.success:
-    logging.error('Runner, %s, was sucessful and timed out, trying as failure',
-                  runner.name)
-    runner_stats.success = False
   runner_stats.put()
 
   return runner_stats

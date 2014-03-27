@@ -94,10 +94,19 @@ def UpdateDailyStats(runner):
       hashlib.sha1(requestor).hexdigest()[:HEXDIGEST_DIGITS_TO_USE])
 
   model_id = '%s-%s' % (requestor, runner.created.date().isoformat())
-  time_waiting = int(round(
-      (runner.started - runner.created).total_seconds() / 60))
-  time_running_tests = int(round(
-      (runner.ended - runner.started).total_seconds() / 60))
+  if runner.started:
+    time_waiting = int(round(
+        (runner.started - runner.created).total_seconds() / 60))
+    time_running_tests = int(round(
+        (runner.ended - runner.started).total_seconds() / 60))
+  else:
+    # If there is no started value, the runner only waited.
+    if not runner.aborted:
+      logging.error('A runner(%s) wasn\'t aborted but finished without '
+                    'starting' % runner.key.urlsafe())
+    time_waiting = int(round(
+        (runner.ended - runner.created).total_seconds() / 60))
+    time_running_tests = 0
 
   try:
     UpdateDailyStatsTransaction(parent.key, model_id, requestor,

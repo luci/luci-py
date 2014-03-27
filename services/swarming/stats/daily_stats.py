@@ -32,8 +32,8 @@ class DailyStats(ndb.Model):
   # failures due to internal timeouts).
   shards_failed = ndb.IntegerProperty(default=0, indexed=False)
 
-  # The number of shards that failed due to internal timeouts.
-  shards_timed_out = ndb.IntegerProperty(default=0, indexed=False)
+  # The number of shards that were aborted.
+  shards_aborted = ndb.IntegerProperty(default=0, indexed=False)
 
   # The total amount of time (in minutes) that all the runners waited to run.
   total_wait_time = ndb.IntegerProperty(default=0, indexed=False)
@@ -78,20 +78,21 @@ def GenerateDailyStats(day):
 
   def ComputeRunnerStats(runner):
     """Add the stats from the given runner into the daily stats."""
-    # If there is no assigned time, the runner never ran, so ignore it.
-    if not runner.assigned_time:
-      return
-
     # Update the time spent waiting and running.
-    daily_stats.total_wait_time += _TimeDeltaToMinutes(
-        runner.assigned_time - runner.created_time)
-    daily_stats.total_running_time += _TimeDeltaToMinutes(
-        runner.end_time - runner.assigned_time)
+    if runner.assigned_time:
+      daily_stats.total_wait_time += _TimeDeltaToMinutes(
+          runner.assigned_time - runner.created_time)
+      daily_stats.total_running_time += _TimeDeltaToMinutes(
+          runner.end_time - runner.assigned_time)
+    else:
+      # If there is no assigned time, the runner only waited.
+      daily_stats.total_wait_time += _TimeDeltaToMinutes(
+          runner.end_time - runner.created_time)
 
     # Update the raw counts.
     daily_stats.shards_finished += 1
-    if runner.timed_out:
-      daily_stats.shards_timed_out += 1
+    if runner.aborted:
+      daily_stats.shards_aborted += 1
     elif not runner.success:
       daily_stats.shards_failed += 1
 
@@ -102,7 +103,7 @@ def GenerateDailyStats(day):
       runner_stats.RunnerStats.end_time < next_day_midnight,
       default_options=ndb.QueryOptions(
           projection=('assigned_time', 'created_time', 'end_time', 'success',
-                      'timed_out')))
+                      'aborted')))
 
   query.map_async(ComputeRunnerStats).get_result()
   daily_stats.put()
