@@ -241,7 +241,7 @@ class ApiStatsGvizHandlerBase(webapp2.RequestHandler):
       o = i['values']
       o['other_requests'] = (
           o['requests'] - o['downloads'] - o['contains_requests'] -
-          o['uploads'] - o['failures'])
+          o['uploads'])
       return o
 
     table = [fix_up(d) for d in self.get_data(now, duration)]
