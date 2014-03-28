@@ -296,28 +296,19 @@ def AbortStaleRunners():
       return
 
     if test_runner.ShouldAutomaticallyRetryRunner(runner):
-      if test_runner.AutomaticallyRetryRunner(runner):
-        # TODO(maruel): Lower to info(), increased level to see how often it
-        # happens for a few day for a few days.
-        logging.error(
-            'AbortStaleRunners retrying runner\n'
-            'Runner: %s\n'
-            'Bot: %s\n'
-            'Key: %s\n'
-            'Attempt %d',
-            runner.name,
-            runner.machine_id,
-            runner.key.urlsafe(),
-            runner.automatic_retry_count)
-      else:
-        logging.error(
-            'AbortStaleRunner unable to retry runner\n'
-            'Runner: %s\n'
-            'Bot: %s\n'
-            'Key: %s',
-            runner.name,
-            runner.machine_id,
-            runner.key.urlsafe())
+      test_runner.AutomaticallyRetryRunner(runner)
+      # TODO(maruel): Lower to info(), increased level to see how often it
+      # happens for a few day for a few days.
+      logging.error(
+          'AbortStaleRunners retrying runner\n'
+          'Runner: %s\n'
+          'Bot: %s\n'
+          'Key: %s\n'
+          'Attempt %d',
+          runner.name,
+          runner.machine_id,
+          runner.key.urlsafe(),
+          runner.automatic_retry_count)
     else:
       logging.error(
           'AbortStaleRunners aborting runner\n'
