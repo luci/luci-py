@@ -10,6 +10,7 @@ import webapp2
 from google.appengine.ext import ndb
 
 from components.auth import api
+from components.auth import groups
 from components.auth import handler
 from components.auth import model
 
@@ -111,13 +112,13 @@ class GroupsHandler(ApiHandler):
     # Generally speaking, fetching a list of group members can be an expensive
     # operation, and group listing call shouldn't do it all the time. So throw
     # away all fields that enumerate group members.
-    groups = model.AuthGroup.query(ancestor=model.ROOT_KEY).fetch()
+    group_list = model.AuthGroup.query(ancestor=model.ROOT_KEY).fetch()
     self.send_response({
       'groups': [
         g.to_serializable_dict(
             with_id_as='name',
             exclude=('members', 'globs', 'nested'))
-        for g in sorted(groups, key=lambda x: x.key.string_id())
+        for g in sorted(group_list, key=lambda x: x.key.string_id())
       ],
     })
 
@@ -146,9 +147,51 @@ class GroupHandler(ApiHandler):
     raise NotImplementedError()
 
   @api.require(model.DELETE, 'auth/management/groups/{group}')
+  @ndb.transactional
   def delete(self, group):
-    """Deletes a group."""
-    raise NotImplementedError()
+    """Deletes a group.
+
+    Respects 'If-Unmodified-Since' header. If it is set, verifies the group
+    has exact same modification timestamp as specified in the header before
+    deleting it. Returns 'HTTP Error 412: Precondition failed' otherwise.
+
+    Will also check that the group is not referenced in any ACL rules or other
+    groups (as a nested group). If it does, request returns
+    'HTTP Error 409: Conflict', providing information about what depends on
+    this group in the response body.
+    """
+    # Ensure group exists before running heavy 'find_references' call.
+    entity = model.AuthGroup.get_by_id(group, parent=model.ROOT_KEY)
+    expected_ts = self.request.headers.get('If-Unmodified-Since')
+    if entity is None:
+      if expected_ts:
+        # Precondition was used? Group was expected to exist.
+        self.abort_with_error(412, text='Group was deleted by someone else')
+      else:
+        # Unconditionally deleting it, and it's already gone -> success.
+        self.send_response({'ok': True})
+      return
+
+    # Check the precondition if required.
+    if (expected_ts and
+        utils.datetime_to_rfc2822(entity.modified_ts) != expected_ts):
+      self.abort_with_error(412, text='Group was modified by someone else')
+
+    # Check the group is not used, it's a heavy call that enumerates all rules.
+    referencing_groups, referencing_services = groups.find_references(group)
+    if referencing_groups or referencing_services:
+      self.abort_with_error(
+          http_code=409,
+          text='Group is being referenced in rules or other groups',
+          details={
+            'groups': list(referencing_groups),
+            'services': list(referencing_services),
+          }
+      )
+
+    # Ok, good to delete.
+    entity.key.delete()
+    self.send_response({'ok': True})
 
 
 class OAuthConfigHandler(ApiHandler):

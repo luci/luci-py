@@ -242,9 +242,32 @@ class RestAPITestCase(test_case.TestCase):
     self.mock(model.ndb.DateTimeProperty, '_now', lambda _: now)
     self.mock(model.ndb.DateProperty, '_now', lambda _: now.date())
 
-  def _make_request(
-      self, method, path, params=None, headers=None,
-      expect_errors=False, expected_auth_checks=()):
+  def make_request(
+      self,
+      method,
+      path,
+      params=None,
+      headers=None,
+      expect_errors=False,
+      expect_xsrf_token_check=False,
+      expected_auth_checks=()):
+    """Sends a request to the app via webtest framework.
+
+    Args:
+      method: HTTP method of a request (like 'GET' or 'POST').
+      path: request path.
+      params: for GET, it's a query string, for POST/PUT its a body, etc. See
+          webtest docs.
+      headers: a dict with request headers.
+      expect_errors: True if call is expected to end with some HTTP error code.
+      expect_xsrf_token_check: if True, will append X-XSRF-Token header to the
+          request and will verify that request handler checked it.
+      expected_auth_checks: a list of pairs (<action>, <resource name>) that
+          specifies expected ACL checks.
+
+    Returns:
+      Tuple (status code, deserialized JSON response, response headers).
+    """
     # Catch calls to has_permissions and compare it to next expected check.
     expected_auth_checks = list(expected_auth_checks)
     def has_permission_mock(action, resource):
@@ -254,9 +277,31 @@ class RestAPITestCase(test_case.TestCase):
       return True
     self.mock(rest_api.api, 'has_permission', has_permission_mock)
 
-    # Do the call.
-    response = getattr(self.app, method.lower())(
-        path, params=params, headers=headers, expect_errors=expect_errors)
+    # Add XSRF header if required.
+    headers = dict(headers or {})
+    if expect_xsrf_token_check:
+      assert 'X-XSRF-Token' not in headers
+      headers['X-XSRF-Token'] = make_xsrf_token()
+
+    # Hook XSRF token check to verify it's called.
+    original_validate = handler.XSRFToken.validate
+    xsrf_token_validate_calls = []
+    def mocked_validate(*args, **kwargs):
+      xsrf_token_validate_calls.append((args, kwargs))
+      return original_validate(*args, **kwargs)
+    self.mock(handler.XSRFToken, 'validate', staticmethod(mocked_validate))
+
+    # Do the call. Pass |params| only if not None, otherwise use whatever
+    # webtest method uses by default (for 'DELETE' it's something called
+    # utils.NoDefault and it's treated differently from None).
+    kwargs = {'headers': headers, 'expect_errors': expect_errors}
+    if params is not None:
+      kwargs['params'] = params
+    response = getattr(self.app, method.lower())(path, **kwargs)
+
+    # Ensure XSRF token was checked.
+    if expect_xsrf_token_check:
+      self.assertEqual(1, len(xsrf_token_validate_calls))
 
     # Ensure all expected auth checks were executed.
     self.assertFalse(expected_auth_checks)
@@ -270,36 +315,32 @@ class RestAPITestCase(test_case.TestCase):
         msg=response.body)
     return response.status_int, json.loads(response.body), response.headers
 
-  def get(
-      self, path, headers=None, expect_errors=False, expected_auth_checks=()):
+  def get(self, path, **kwargs):
     """Sends GET request to REST API endpoint.
 
     Returns tuple (status code, deserialized JSON response, response headers).
     """
-    return self._make_request(
-        'GET',
-        path,
-        headers=headers,
-        expect_errors=expect_errors,
-        expected_auth_checks=expected_auth_checks)
+    return self.make_request('GET', path, **kwargs)
 
-  def post(
-      self, path, body=None, headers=None,
-      expect_errors=False, expected_auth_checks=()):
+  def post(self, path, body=None, **kwargs):
     """Sends POST request to REST API endpoint.
 
     Returns tuple (status code, deserialized JSON response, response headers).
     """
+    assert 'params' not in kwargs
+    headers = dict(kwargs.pop('headers', None) or {})
     if body:
-      headers = dict(headers or {})
       headers['Content-Type'] = 'application/json; charset=UTF-8'
-    return self._make_request(
-        'POST',
-        path,
-        params=json.dumps(body) if body else '',
-        headers=headers,
-        expect_errors=expect_errors,
-        expected_auth_checks=expected_auth_checks)
+    kwargs['headers'] = headers
+    kwargs['params'] = json.dumps(body) if body is not None else ''
+    return self.make_request('POST', path, **kwargs)
+
+  def delete(self, path, **kwargs):
+    """Sends DELETE request to REST API endpoint.
+
+    Returns tuple (status code, deserialized JSON response, response headers).
+    """
+    return self.make_request('DELETE', path, **kwargs)
 
 
 ################################################################################
@@ -428,6 +469,127 @@ class GroupHandlerTest(RestAPITestCase):
     self.assertEqual(
         'Sun, 13 Mar 2011 07:06:40 -0000',
         headers['Last-Modified'])
+
+  def test_delete_existing(self):
+    # Create a group.
+    group = model.AuthGroup(id='A Group', parent=model.ROOT_KEY)
+    group.put()
+
+    # Delete it via API.
+    status, body, _ = self.delete(
+        path='/auth/api/v1/groups/A%20Group',
+        expect_xsrf_token_check=True,
+        expected_auth_checks=[(model.DELETE, 'auth/management/groups/A Group')])
+    self.assertEqual(200, status)
+    self.assertEqual({'ok': True}, body)
+
+    # It is gone.
+    self.assertFalse(
+        model.AuthGroup.get_by_id(id='A Group', parent=model.ROOT_KEY))
+
+  def test_delete_existing_with_condition_ok(self):
+    # Create a group.
+    group = model.AuthGroup(id='A Group', parent=model.ROOT_KEY)
+    group.put()
+
+    # Delete it via API using passing If-Unmodified-Since condition.
+    status, body, _ = self.delete(
+        path='/auth/api/v1/groups/A%20Group',
+        headers={
+          'If-Unmodified-Since': utils.datetime_to_rfc2822(group.modified_ts),
+        },
+        expect_xsrf_token_check=True,
+        expected_auth_checks=[(model.DELETE, 'auth/management/groups/A Group')])
+    self.assertEqual(200, status)
+    self.assertEqual({'ok': True}, body)
+
+    # It is gone.
+    self.assertFalse(
+        model.AuthGroup.get_by_id(id='A Group', parent=model.ROOT_KEY))
+
+  def test_delete_existing_with_condition_fail(self):
+    # Create a group.
+    group = model.AuthGroup(id='A Group', parent=model.ROOT_KEY)
+    group.put()
+
+    # Try to delete it via API using failing If-Unmodified-Since condition.
+    status, body, _ = self.delete(
+        path='/auth/api/v1/groups/A%20Group',
+        headers={
+          'If-Unmodified-Since': 'Sun, 1 Mar 1990 00:00:00 -0000',
+        },
+        expect_errors=True,
+        expect_xsrf_token_check=True,
+        expected_auth_checks=[(model.DELETE, 'auth/management/groups/A Group')])
+    self.assertEqual(412, status)
+    self.assertEqual({'text': 'Group was modified by someone else'}, body)
+
+    # It is still there.
+    self.assertTrue(
+        model.AuthGroup.get_by_id(id='A Group', parent=model.ROOT_KEY))
+
+  def test_delete_referenced_group(self):
+    # Create a group.
+    group = model.AuthGroup(id='A Group', parent=model.ROOT_KEY)
+    group.put()
+
+    # Create another group that includes first one as nested.
+    another = model.AuthGroup(
+        id='Another group',
+        parent=model.ROOT_KEY,
+        nested=['A Group'])
+    another.put()
+
+    # Create a service that uses the group in its ACL rules.
+    service = model.AuthServiceConfig(
+        id='Some service',
+        parent=model.ROOT_KEY,
+        rules=[
+          model.AccessRule(model.ALLOW_RULE, 'A Group', [model.READ], '^.*$')
+        ])
+    service.put()
+
+    # Try to delete it via API.
+    status, body, _ = self.delete(
+        path='/auth/api/v1/groups/A%20Group',
+        expect_errors=True,
+        expect_xsrf_token_check=True,
+        expected_auth_checks=[(model.DELETE, 'auth/management/groups/A Group')])
+    self.assertEqual(409, status)
+    self.assertEqual(
+        {
+          'text': 'Group is being referenced in rules or other groups',
+          'details': {
+            'groups': ['Another group'],
+            'services': ['Some service'],
+          },
+        }, body)
+
+    # It is still there.
+    self.assertTrue(
+        model.AuthGroup.get_by_id(id='A Group', parent=model.ROOT_KEY))
+
+  def test_delete_missing(self):
+    # Unconditionally deleting a group that's not there is ok.
+    status, body, _ = self.delete(
+        path='/auth/api/v1/groups/A Group',
+        expect_xsrf_token_check=True,
+        expected_auth_checks=[(model.DELETE, 'auth/management/groups/A Group')])
+    self.assertEqual(200, status)
+    self.assertEqual({'ok': True}, body)
+
+  def test_delete_missing_with_condition(self):
+    # Deleting missing group with condition is a error.
+    status, body, _ = self.delete(
+        path='/auth/api/v1/groups/A%20Group',
+        headers={
+          'If-Unmodified-Since': 'Sun, 1 Mar 1990 00:00:00 -0000',
+        },
+        expect_errors=True,
+        expect_xsrf_token_check=True,
+        expected_auth_checks=[(model.DELETE, 'auth/management/groups/A Group')])
+    self.assertEqual(412, status)
+    self.assertEqual({'text': 'Group was deleted by someone else'}, body)
 
 
 class OAuthConfigHandlerTest(RestAPITestCase):

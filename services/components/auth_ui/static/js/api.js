@@ -85,10 +85,10 @@ var call = function(type, url, data, headers) {
     }
 
     // Assemble all know information into human readable multiline string.
-    var readableText = String.format(
+    var verboseText = String.format(
         'Request to \'{0}\' failed ({1}) with code {2}.\n{3}',
         url, textStatus, jqXHR.status, errorMsg);
-    console.error(readableText);
+    console.error(verboseText);
 
     // And return that to waiting caller.
     defer.reject({
@@ -96,7 +96,8 @@ var call = function(type, url, data, headers) {
       code: jqXHR.status,
       error: errorObj,
       headers: extractHeaders(jqXHR),
-      text: readableText
+      text: errorMsg,
+      verbose: verboseText
     });
   });
 
@@ -168,6 +169,16 @@ exports.groups = function() {
 // Fetches detailed information about a group.
 exports.groupRead = function(name) {
   return call('GET', '/auth/api/v1/groups/' + name);
+};
+
+
+// Deletes a group.
+exports.groupDelete = function(name, lastModified) {
+  var headers = {};
+  if (lastModified) {
+    headers['If-Unmodified-Since'] = lastModified;
+  }
+  return call('DELETE', '/auth/api/v1/groups/' + name, null, headers);
 };
 
 

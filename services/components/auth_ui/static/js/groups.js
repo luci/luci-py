@@ -225,6 +225,19 @@ GroupForm.prototype.setInteractionDisabled = function(disabled) {
 };
 
 
+// Shows a message on a form. |type| can be 'success' or 'error'.
+GroupForm.prototype.showMessage = function(type, title, message) {
+  $('#alerts', this.$element).html(
+      common.getAlertBoxHtml(type, title, message));
+};
+
+
+// Hides a message previously shown with 'showMessage'.
+GroupForm.prototype.hideMessage = function() {
+  $('#alerts', this.$element).empty();
+};
+
+
 ////////////////////////////////////////////////////////////////////////////////
 // Form to view\edit existing group.
 
@@ -293,6 +306,45 @@ EditGroupForm.prototype.buildForm = function(group, lastModified) {
 // Main entry point, sets up all high-level UI logic.
 
 
+// Wrapper around a REST API call that originated from some form.
+// Locks UI while call is running, refreshes a list of groups once it completes.
+var waitForResult = function(defer, groupChooser, form) {
+  // Deferred triggered when update is finished (successfully or not). Return
+  // values of this function.
+  var done = $.Deferred();
+
+  // Lock UI while running the request, unlock once it finishes.
+  groupChooser.setInteractionDisabled(true);
+  form.setInteractionDisabled(true);
+  done.always(function() {
+    groupChooser.setInteractionDisabled(false);
+    form.setInteractionDisabled(false);
+  });
+
+  // Hide previous error message (if any).
+  form.hideMessage();
+
+  // Wait for request to finish, refetch the list of groups and trigger |done|.
+  defer.then(function(response) {
+    // Call succeeded: refetch the list of groups and return the result.
+    groupChooser.refetchGroups().then(function() {
+      done.resolve(response);
+    }, function(error) {
+      // Show page-wide error message, since without the list of groups the page
+      // is useless.
+      common.presentError(error.text);
+      done.reject(error);
+    });
+  }, function(error) {
+    // Show error message on the form, since it's local error with the request.
+    form.showMessage('error', 'Oh snap!', error.text);
+    done.reject(error);
+  });
+
+  return done.promise();
+};
+
+
 exports.onContentLoaded = function() {
   // Setup global UI elements.
   var groupChooser = new GroupChooser($('#group-chooser'));
@@ -307,14 +359,21 @@ exports.onContentLoaded = function() {
   // Called to setup 'Edit the group' flow (including deletion of a group).
   var startEditGroupFlow = function(groupName) {
     var form = new EditGroupForm(groupName);
+
+    // Called when 'Delete' button is clicked.
     form.onDeleteGroup = function(groupName, lastModified) {
-      // TODO(vadimsh): Implement group deletion.
-      alert('Not implemented');
+      var request = api.groupDelete(groupName, lastModified);
+      waitForResult(request, groupChooser, form).done(function() {
+        groupChooser.selectDefault();
+      });
     };
+
+    // Called when 'Update' button is clicked.
     form.onUpdateGroup = function(groupObj, lastModified) {
       // TODO(vadimsh): Implement group updates.
       alert('Not implemented');
     };
+
     mainFrame.loadContent(form);
   };
 
