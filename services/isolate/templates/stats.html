@@ -200,6 +200,8 @@
           chart.getOptions().vAxis.ticks = ticks;
         } else {
           // If axe_indexes is specified, vAxes must be defined.
+          chart.getOptions().vAxes = chart.getOptions().vAxes || [];
+          chart.getOptions().vAxes[axe_index] = chart.getOptions().vAxes[axe_index] || {};
           chart.getOptions().vAxes[axe_index].ticks = ticks;
         }
         // Draw a second time.
@@ -302,6 +304,13 @@
               easing: 'out'
             },
             height: '100%',
+            series: [
+              {},
+              {},
+              {
+                color: 'red',
+              },
+            ],
             title: 'Requests',
             width: '100%'
           },
