@@ -311,6 +311,7 @@ class StatsFrameworkTest(test_case.TestCase, stats_framework_mock.MockMixIn):
         handler.minute_key(date))
 
   def test_yield_empty(self):
+    self.testbed.init_modules_stub()
     self.assertEqual(
         0, len(list(stats_framework.yield_entries(None, None))))
 

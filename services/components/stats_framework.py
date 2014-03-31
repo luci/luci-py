@@ -55,10 +55,14 @@ def _yield_logs(start_time, end_time):
 
   Meant to be mocked in tests.
   """
+  # If module_versions is not specified, it will default to the current version
+  # on current module, which is not what we want.
+  module_versions = utils.get_module_version_list(None, True)
   for request in logservice.fetch(
       start_time=start_time - 1 if start_time else start_time,
       end_time=end_time + 1 if end_time else end_time,
-      include_app_logs=True):
+      include_app_logs=True,
+      module_versions=module_versions):
     yield request
 
 
@@ -376,28 +380,43 @@ class StatisticsFramework(object):
 
   def _guess_earlier_minute_to_process(self, now):
     """Searches backward in time for the last sealed day."""
-    logging.info('Guessing for earliest day')
+    logging.info(
+        '%s.timestamp is missing or invalid; searching for last sealed day',
+        self.root_key)
+    # Use a loop to find it. In practice it would require an index but it's
+    # better to not have the index and make this code slower. We do it by
+    # counting all the entities and fetching the last one.
     q = self.stats_day_cls.query(ancestor=self.root_key)
     # TODO(maruel): It should search for recent unsealed day, that is still
     # reachable from the logs, e.g. the logs for that day hasn't been expurged
     # yet.
     q.filter(
         self.stats_day_cls.hours_bitmap == self.stats_day_cls.SEALED_BITMAP)
-    q.order(-self.stats_day_cls.key)
-    last_sealed_day = q.get()
-    if not last_sealed_day:
+    # Can't use .order(-self.stats_day_cls.key) without an index. So use a cheap
+    # tricky with offset=count-1.
+    # TODO(maruel): that this won't work on very large history, likely after 3
+    # years worth of history. Fix this accordingly by 2016.
+    count = q.count()
+    if not count:
+      logging.info('Failed to find sealed day')
       # Maybe there's an non-sealed day. Get the latest one.
       q = self.stats_day_cls.query(ancestor=self.root_key)
       q.order(-self.stats_day_cls.key)
       day = q.get()
       if not day:
+        logging.info('Failed to find a day at all')
         # We are bootstrapping as there is no entity at all. Use ~5 days ago at
         # midnight to regenerate stats. It will be resource intensive.
         today = now.date()
         key_id = str(today - datetime.timedelta(days=self.MAX_BACKTRACK))
         day = self.stats_day_cls.get_or_insert(
             key_id, parent=self.root_key, values=self.snapshot_cls())
+        logging.info('Selected/created: %s', key_id)
+      else:
+        logging.info('Selected: %s', day.key)
     else:
+      last_sealed_day = q.get(offset=count-1)
+      assert last_sealed_day
       # Take the next unsealed day. Note that if there's a non-sealed, sealed,
       # sealed sequence of self.stats_day_cls, the non-sealed entity will be
       # skipped.
@@ -405,18 +424,22 @@ class StatisticsFramework(object):
       key_id = str(last_sealed_day.to_date() + datetime.timedelta(days=1))
       day = self.stats_day_cls.get_or_insert(
           key_id, parent=self.root_key, values=self.snapshot_cls())
+      logging.info('Selected: %s', key_id)
 
     # TODO(maruel): Should we trust it all the time or do an explicit query? For
     # now, trust the bitmap.
     hour_bit = _lowest_missing_bit(day.hours_bitmap)
-    assert hour_bit < 24, hour_bit
+    assert hour_bit < 24, (hour_bit, day.to_date())
+
     hour = self.stats_hour_cls.get_or_insert(
         '%02d' % hour_bit, parent=day.key, values=self.snapshot_cls())
     minute_bit = _lowest_missing_bit(hour.minutes_bitmap)
     assert minute_bit < 60, minute_bit
     date = day.to_date()
-    return datetime.datetime(
+    result = datetime.datetime(
         date.year, date.month, date.day, hour_bit, minute_bit)
+    logging.info('Using: %s', result)
+    return result
 
   def _process_one_minute(self, moment):
     """Generates exactly one self.stats_minute_cls.
@@ -475,7 +498,7 @@ class StatisticsFramework(object):
       futures.append(hour.put_async(use_memcache=False))
       if hour.minutes_bitmap == self.stats_hour_cls.SEALED_BITMAP:
         logging.info(
-            '%s Hour is sealed: %s-%s',
+            '%s Hour is sealed: %s %s:00',
             self.root_key_id, day.key.id(), hour.key.id())
 
     # Adds data for the past hour back into day.
