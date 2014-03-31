@@ -4,11 +4,10 @@
 
 """Defines the application."""
 
-import os
-
 from google.appengine.ext.appstats import recording
 
 from components import ereporter2
+from components import utils
 import handlers
 
 
@@ -18,7 +17,7 @@ def CreateApplication():
   # In theory we'd want to take the output of app_identity.get_application_id().
   # Sadly, this function does an RPC call and may contribute to cause time out
   # on the initial load.
-  if os.environ['APPLICATION_ID'].endswith('-dev'):
+  if utils.is_canary():
     a = recording.appstats_wsgi_middleware(a)
   return a
 

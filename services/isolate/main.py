@@ -14,6 +14,7 @@ sys.path.insert(0, os.path.join(BASE_DIR, 'third_party'))
 
 import acl
 from components import ereporter2
+from components import utils
 import handlers
 
 
@@ -28,7 +29,7 @@ def CreateApplication():
   # Doing it here instead of appengine_config.py reduce the scope of appstats
   # recording. To clarify, this means mapreduces started with map_reduce_jobs.py
   # won't be instrumented, which is actually what we want in practice.
-  if os.environ['APPLICATION_ID'].endswith('-dev'):
+  if utils.is_canary():
     a = recording.appstats_wsgi_middleware(a)
   return a
 

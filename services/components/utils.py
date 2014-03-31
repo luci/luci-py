@@ -30,8 +30,22 @@ VALID_DATETIME_FORMATS = ('%Y-%m-%d', '%Y-%m-%d %H:%M', '%Y-%m-%d %H:%M:%S')
 
 
 def is_local_dev_server():
-  """Returns True if running on local development server."""
+  """Returns True if running on local development server.
+
+  This function is safe to run outside the scope of a HTTP request.
+  """
   return os.environ.get('SERVER_SOFTWARE', '').startswith('Development')
+
+
+def is_canary():
+  """Returns True if the server is running a canary instance.
+
+  We define a 'canary instance' any instance that has the suffix '-dev' in its
+  instance name.
+
+  This function is safe to run outside the scope of a HTTP request.
+  """
+  return os.environ['APPLICATION_ID'].endswith('-dev')
 
 
 def to_units(number):
