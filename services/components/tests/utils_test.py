@@ -158,7 +158,7 @@ class UtilsTest(test_case.TestCase):
 
   def test_datetime_to_rfc2822(self):
     self.assertEqual(
-      'Mon, 02 Jan 2012 11:04:05 -0000',
+      'Mon, 02 Jan 2012 03:04:05 -0000',
       utils.datetime_to_rfc2822(datetime.datetime(2012, 1, 2, 3, 4, 5)))
 
 

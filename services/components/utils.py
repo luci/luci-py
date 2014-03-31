@@ -72,7 +72,7 @@ def get_request_as_datetime(request, key):
 def datetime_to_rfc2822(dt):
   """datetime -> string value for Last-Modified header as defined by RFC2822."""
   assert dt.tzinfo is None, 'Expecting UTC timestamp: %s' % dt
-  return utils.formatdate(time.mktime(dt.timetuple()))
+  return utils.formatdate(datetime_to_timestamp(dt) / 1000000.0)
 
 
 ### Cache

@@ -426,7 +426,7 @@ class GroupHandlerTest(RestAPITestCase):
         },
       }, body)
     self.assertEqual(
-        'Sun, 13 Mar 2011 14:06:40 -0000',
+        'Sun, 13 Mar 2011 07:06:40 -0000',
         headers['Last-Modified'])
 
 
