@@ -447,11 +447,13 @@ class LocalTestRunner(object):
                  self.test_run.test_run_name)
 
     # Apply the test_run/config environment variables for all tests.
-    env_vars = os.environ.items()
+    env_vars = os.environ.copy()
     if self.test_run.env_vars:
-      env_vars += self.test_run.env_vars.items()
-    if self.test_run.configuration.env_vars:
-      env_vars += self.test_run.configuration.env_vars.items()
+      env_vars.update(
+          {
+            k.encode('utf-8'): v.encode('utf-8')
+            for k, v in self.test_run.env_vars.iteritems()
+          })
 
     # Write the header of the whole test run
     tests_to_run = self.test_run.tests
@@ -472,18 +474,11 @@ class LocalTestRunner(object):
         result_string = ('%s\n[ RUN      ] %s.%s' %
                          (result_string, self.test_run.test_run_name,
                           test.test_name))
-      test_env_vars = env_vars[:]
-      if test.env_vars:
-        test_env_vars += test.env_vars.items()
-
-      # Windows can't accept environment variables that are unicode.
-      if sys.platform in ('win32', 'cygwin'):
-        test_env_vars = [(str(x[0]), str(x[1])) for x in test_env_vars]
 
       (exit_code, stdout_string) = self._RunCommand(test.action,
                                                     test.hard_time_out,
                                                     test.io_time_out,
-                                                    env=dict(test_env_vars))
+                                                    env=env_vars)
 
       try:
         stdout_string = stdout_string.decode(self.test_run.encoding)

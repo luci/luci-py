@@ -73,20 +73,16 @@ def GetRequestMessage(request_name=REQUEST_MESSAGE_TEST_CASE_NAME,
   configurations = [
     test_request_message.TestConfiguration(
         config_name=config_name_root + '_' + str(i),
-        data=['http://b.ina.ry/files2.zip'],
         dimensions=dict(os=platform, cpu='Unknown', browser='Unknown'),
         num_instances=num_instances,
-        priority=priority,
-        tests=[
-          test_request_message.TestObject(
-              test_name='t2', action=['ignore-me-too.exe']),
-        ])
+        priority=priority)
     for i in range(num_configs)
   ]
   request = test_request_message.TestCase(
       restart_on_failure=restart_on_failure,
       test_case_name=request_name,
       configurations=configurations,
+      data=['http://b.ina.ry/files2.zip'],
       env_vars=env_vars,
       tests=tests)
   return test_request_message.Stringize(request, json_readable=True)

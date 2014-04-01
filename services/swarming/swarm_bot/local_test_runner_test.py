@@ -66,7 +66,7 @@ class TestLocalTestRunner(auto_stub.TestCase):
     super(TestLocalTestRunner, self).tearDown()
 
   def CreateValidFile(self, test_objects_data=None, test_run_data=None,
-                      test_run_cleanup=None, config_env=None,
+                      test_run_cleanup=None,
                       test_run_env=None, test_encoding=None):
     """Creates a text file that the local_test_runner can load.
 
@@ -76,28 +76,24 @@ class TestLocalTestRunner(auto_stub.TestCase):
           A TestObject will be created for each of them.
       test_run_data: The data list to be passed to the TestRun object.
       test_run_cleanup: The cleanup string to be passed to the TestRun object.
-      config_env: The dictionary to be used for the configuration's env_vars.
       test_run_env: The dictionary to be used for the test run's env_vars.
       test_encoding: The enocding to use for the test's output.
     """
-    if not test_objects_data:
-      test_objects_data = [('a', ['a'], None, None, 0, 0)]
-    if not test_run_data:
-      test_run_data = []
-
-    if not test_encoding:
-      test_encoding = 'ascii'
+    test_objects_data = test_objects_data or [('a', ['a'], None, 0, 0)]
+    test_run_data = test_run_data or []
+    test_encoding = test_encoding or 'ascii'
 
     dimensions = dict(os='a', browser='a', cpu='a')
     test_config = test_request_message.TestConfiguration(
-        env_vars=config_env, config_name=self.config_name,
-        dimensions=dimensions)
+        config_name=self.config_name, dimensions=dimensions)
     test_objects = []
     for test_object_data in test_objects_data:
+      assert len(test_object_data) == 5, test_object_data
       test_objects.append(test_request_message.TestObject(
           test_name=test_object_data[0], action=test_object_data[1],
-          decorate_output=test_object_data[2], env_vars=test_object_data[3],
-          hard_time_out=test_object_data[4], io_time_out=test_object_data[5]))
+          decorate_output=test_object_data[2],
+          hard_time_out=test_object_data[3], io_time_out=test_object_data[4]))
+
     test_run = test_request_message.TestRun(
         test_run_name=self.test_run_name, env_vars=test_run_env,
         data=test_run_data, configuration=test_config,
@@ -314,8 +310,7 @@ class TestLocalTestRunner(auto_stub.TestCase):
     self._mox.VerifyAll()
 
   def PrepareRunTestsCall(self, log=None, decorate_output=None, results=None,
-                          encoding=None, test_names=None, test_run_env=None,
-                          config_env=None, slave_test_env=None):
+                          encoding=None, test_names=None, test_run_env=None):
     if not decorate_output:
       decorate_output = [False, False]
     if not results:
@@ -325,35 +320,22 @@ class TestLocalTestRunner(auto_stub.TestCase):
     if not test_names:
       test_names = [self.test_name1, self.test_name2]
     self.assertEqual(len(results), 2)
-    test0_env = test1_env = None
-    if slave_test_env:
-      assert len(slave_test_env) == 2
-      test0_env = slave_test_env[0]
-      test1_env = slave_test_env[1]
     test_objects_data = [
-        (test_names[0], self.action1, decorate_output[0], test0_env, 60, 0),
-        (test_names[1], self.action2, decorate_output[1], test1_env, 60, 9)
+        (test_names[0], self.action1, decorate_output[0], 60, 0),
+        (test_names[1], self.action2, decorate_output[1], 60, 9)
     ]
     self.assertEqual(len(decorate_output), len(results))
     self.CreateValidFile(test_objects_data=test_objects_data,
-                         test_run_env=test_run_env, config_env=config_env,
-                         test_encoding=encoding)
+                         test_run_env=test_run_env, test_encoding=encoding)
 
     runner = local_test_runner.LocalTestRunner(self.data_file_name, log=log)
     self._mox.StubOutWithMock(runner, '_RunCommand')
     env_items = os.environ.items()
-    if config_env:
-      env_items += config_env.items()
     if test_run_env:
       env_items += test_run_env.items()
     env = dict(env_items)
 
-    if test0_env:
-      env = dict(env_items + test0_env.items())
     runner._RunCommand(self.action1, 60, 0, env=env).AndReturn(results[0])
-
-    if test1_env:
-      env = dict(env_items + test1_env.items())
     runner._RunCommand(self.action2, 60, 9, env=env).AndReturn(results[1])
     return runner
 
@@ -378,17 +360,11 @@ class TestLocalTestRunner(auto_stub.TestCase):
     self._mox.VerifyAll()
 
   def _RunTestsWithEnvVars(self, platform):
-    config_env = {'var1': 'value1', 'var2': 'value2'}
     test_run_env = {'var3': 'value3', 'var4': 'value4'}
-    test0_env = {'var5': 'value5', 'var6': 'value6'}
-    test1_env = {'var7': 'value7', 'var8': 'value8'}
     self._mox.StubOutWithMock(local_test_runner.sys, 'platform')
     local_test_runner.sys.platform = platform
     with self.PrepareRunTestsCall(
-        decorate_output=[True, True],
-        config_env=config_env,
-        test_run_env=test_run_env,
-        slave_test_env=[test0_env, test1_env]) as runner:
+        decorate_output=[True, True], test_run_env=test_run_env) as runner:
       self._mox.ReplayAll()
       (success, result_codes, result_string) = runner.RunTests()
     self.assertTrue(success)

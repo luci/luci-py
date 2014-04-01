@@ -273,9 +273,7 @@ class TestManagementTest(test_case.TestCase):
 
     request_message = test_helper.GetRequestMessage(
         num_instances=num_indexes, env_vars={'index': '%(instance_index)s'})
-
     test_management.ExecuteTestRequest(request_message)
-
     for i in range(num_indexes):
       response = self._ExecuteRegister(MACHINE_IDS[i])
 

@@ -418,7 +418,6 @@ class TestObject(TestRequestMessageBase):
 
   Attributes:
     test_name: The name of this test object.
-    env_vars: An optional dictionary for environment variables.
     action: The command line to run.
     decorate_output: The output decoration flag of this test object.
     hard_time_out: The maximum time this test can take.
@@ -426,12 +425,10 @@ class TestObject(TestRequestMessageBase):
         writes to stdout).
   """
 
-  def __init__(self, test_name=None, env_vars=None, action=None,
-               decorate_output=True, hard_time_out=3600.0, io_time_out=1200.0,
-               **kwargs):
+  def __init__(self, test_name=None, action=None, decorate_output=True,
+               hard_time_out=3600.0, io_time_out=1200.0, **kwargs):
     super(TestObject, self).__init__(**kwargs)
     self.test_name = test_name
-    self.env_vars = env_vars.copy() if env_vars else {}
     self.action = action[:] if action else []
     self.decorate_output = decorate_output
     self.hard_time_out = hard_time_out
@@ -441,7 +438,6 @@ class TestObject(TestRequestMessageBase):
   def Validate(self):
     """Raises if the current content is not valid."""
     self.ValidateValues(['test_name'], basestring, required=True)
-    self.ValidateDicts(['env_vars'], basestring, basestring)
     self.ValidateLists(['action'], basestring, required=True)
     self.ValidateValues(['hard_time_out', 'io_time_out'], (int, long, float))
 
@@ -456,9 +452,6 @@ class TestConfiguration(TestRequestMessageBase):
 
   Attributes:
     config_name: The name of this configuration.
-    env_vars: An optional dictionary for environment variables.
-    data: An optional 'data list' for this configuration.
-    tests: An optional tests list for this configuration.
     num_instances: An optional integer specifying the number of instances
         of this configuration we want. Defaults to 1. Must be greater than 0.
     deadline_to_run: An optional value that specifies how long the test can
@@ -469,15 +462,11 @@ class TestConfiguration(TestRequestMessageBase):
         acceptable values are [0, MAX_PRIORITY_VALUE].
     dimensions: A dictionary of strings or list of strings for dimensions.
   """
-  def __init__(self, config_name=None, env_vars=None, data=None, tests=None,
-               num_instances=None, min_instances=1,
-               deadline_to_run=SWARM_RUNNER_MAX_WAIT_SECS,
-               priority=100, dimensions=None, **kwargs):
+  def __init__(self, config_name=None, num_instances=None, min_instances=1,
+               deadline_to_run=SWARM_RUNNER_MAX_WAIT_SECS, priority=100,
+               dimensions=None, **kwargs):
     super(TestConfiguration, self).__init__(**kwargs)
     self.config_name = config_name
-    self.env_vars = env_vars.copy() if env_vars else {}
-    self.data = data[:] if data else []
-    self.tests = tests[:] if tests else []
     self.num_instances = num_instances if num_instances else min_instances
     self.deadline_to_run = deadline_to_run
     self.priority = priority
@@ -487,14 +476,9 @@ class TestConfiguration(TestRequestMessageBase):
   def Validate(self):
     """Raises if the current content is not valid."""
     self.ValidateValues(['config_name'], basestring, required=True)
-    self.ValidateDicts(['env_vars'], basestring, basestring)
-    self.ValidateDataLists(['data'])
-    self.ValidateObjectLists(
-        ['tests'], TestObject, unique_value_keys=['test_name'])
     # required=True to make sure the caller doesn't set it to None.
     self.ValidateValues(
-        ['num_instances', 'deadline_to_run',
-          'priority'],
+        ['num_instances', 'deadline_to_run', 'priority'],
         (int, long), required=True)
 
     if (self.num_instances < 1 or self.num_instances > MAX_NUM_INSTANCES or
@@ -512,16 +496,6 @@ class TestConfiguration(TestRequestMessageBase):
       for value in values:
         if not value or not isinstance(value, basestring):
           raise Error('Invalid TestConfiguration dimension value: %s' % value)
-
-  @classmethod
-  def FromDict(cls, dictionary):
-    """Converts a dictionary to an object instance.
-
-    We override the base class behavior to create instances of TestOjbects.
-    """
-    dictionary = dictionary.copy()
-    dictionary['tests'] = TestObject.FromDictList(dictionary.get('tests', []))
-    return super(TestConfiguration, cls).FromDict(dictionary)
 
 
 class TestCase(TestRequestMessageBase):
@@ -541,8 +515,6 @@ class TestCase(TestRequestMessageBase):
     working_dir: An optional path string for where to download/run tests. This
         must be an absolute path though we don't validate it since this script
         may run on a different platform than the one that will use the path.
-    admin: An optional boolean value that specifies if the tests should be run
-        with admin privilege or not. TODO(maruel): Remove me.
     tests: An list of TestObject to run for this task.
     restart_on_failure: An optional value indicating if the machine running the
         tests should restart if any of the tests fail.
@@ -553,10 +525,8 @@ class TestCase(TestRequestMessageBase):
         verbose.
   """
   def __init__(self, test_case_name=None, requestor=None, env_vars=None,
-               configurations=None, data=None, working_dir=None,
-               admin=False, tests=None,
-               restart_on_failure=None,
-               encoding='utf-8', cleanup=None,
+               configurations=None, data=None, working_dir=None, tests=None,
+               restart_on_failure=None, encoding='utf-8', cleanup=None,
                label=None, verbose=False, **kwargs):
     super(TestCase, self).__init__(**kwargs)
     self.test_case_name = test_case_name
@@ -567,7 +537,6 @@ class TestCase(TestRequestMessageBase):
     self.configurations = configurations[:] if configurations else []
     self.data = data[:] if data else []
     self.working_dir = working_dir
-    self.admin = admin
     self.tests = tests[:] if tests else []
     self.restart_on_failure = restart_on_failure
     self.encoding = encoding
@@ -584,6 +553,8 @@ class TestCase(TestRequestMessageBase):
     self.ValidateObjectLists(
         ['configurations'], TestConfiguration, required=True,
         unique_value_keys=['config_name'])
+    if len(self.configurations) != 1:
+      raise Error('Currently only support 1 configuration')
     self.ValidateDataLists(['data'])
     self.ValidateObjectLists(
         ['tests'], TestObject, unique_value_keys=['test_name'])
@@ -592,7 +563,7 @@ class TestCase(TestRequestMessageBase):
     if self.cleanup not in TestRun.VALID_CLEANUP_VALUES:
       raise Error('Invalid TestCase: %s' % self.__dict__)
 
-    # self.verbose and self.admin don't need to be validated since we only need
+    # self.verbose doesn't need to be validated since we only need
     # to evaluate them to True/False which can be done with any type.
 
   @classmethod
@@ -623,7 +594,6 @@ class TestCase(TestRequestMessageBase):
     # All of the following values must be the same for the test output to be
     # equal.
     equal_keys = [
-        'admin',
         'data',
         'encoding',
         'env_vars',
@@ -703,12 +673,10 @@ class TestRun(TestRequestMessageBase):
   """
   VALID_CLEANUP_VALUES = (None, '', 'zip', 'data', 'root')
 
-  def __init__(self, test_run_name=None, env_vars=None,
-               configuration=None, data=None,
-               working_dir=None, tests=None,
-               instance_index=None, num_instances=None, result_url=None,
-               ping_url=None, ping_delay=None,
-               cleanup=None, restart_on_failure=None,
+  def __init__(self, test_run_name=None, env_vars=None, configuration=None,
+               data=None, working_dir=None, tests=None, instance_index=None,
+               num_instances=None, result_url=None, ping_url=None,
+               ping_delay=None, cleanup=None, restart_on_failure=None,
                encoding='utf-8', **kwargs):
     super(TestRun, self).__init__(**kwargs)
     self.test_run_name = test_run_name

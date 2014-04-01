@@ -21,14 +21,6 @@
         "lang": "en-US",
         "os": "win-xp"
       }
-    },
-    {
-      "config_name": "Vista32-enUS-sharded",
-      "min_instances": 2,
-      "dimensions": {
-        "lang": "en-US",
-        "os": "win-vista"
-      }
     }
   ]
 }

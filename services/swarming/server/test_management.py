@@ -239,8 +239,8 @@ def _BuildTestRun(runner, server_url):
                                                runner.machine_id)),
       ping_delay=(_TIMEOUT_FACTOR / _MISSED_PINGS_BEFORE_TIMEOUT),
       cleanup=request.cleanup,
-      data=(request.data + config.data),
-      tests=request.tests + config.tests,
+      data=request.data,
+      tests=request.tests,
       working_dir=request.working_dir,
       encoding=request.encoding)
   test_run.ExpandVariables({
