@@ -211,6 +211,11 @@ def to_json_encodable(data):
   if hasattr(data, 'to_dict') and callable(data.to_dict):
     # This takes care of ndb.Model.
     return to_json_encodable(data.to_dict())
+
+  if hasattr(data, 'urlsafe') and callable(data.urlsafe):
+    # This takes care of ndb.Key.
+    return to_json_encodable(data.urlsafe())
+
   assert False, 'Don\'t know how to handle %r' % data
 
 
