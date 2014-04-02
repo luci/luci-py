@@ -19,6 +19,7 @@ import time
 
 from email import utils
 
+from google.appengine.api import datastore_errors
 from google.appengine.api import memcache
 from google.appengine.api import modules
 from google.appengine.ext import ndb
@@ -278,12 +279,25 @@ class SerializableModelMixin(object):
     return serializable_dict
 
   @classmethod
-  def from_serializable_dict(cls, serializable_dict):
-    """Makes a new entity with properties populated from |serializable_dict|.
+  def from_serializable_dict(cls, serializable_dict, **props):
+    """Makes an entity with properties from |serializable_dict| and |props|.
 
-    See doc string for 'convert_serializable_dict' method for more details.
+    Properties from |serializable_dict| are converted from simple types to
+    rich types first (e.g. int -> DateTimeProperty). See doc string for
+    'convert_serializable_dict' method for more details.
+
+    Properties from |props| are passed to entity constructor as is. Values in
+    |props| override values from |serializable_dict|.
+
+    Raises ValueError if types or structure of |serializable_dict| doesn't match
+    entity schema.
     """
-    return cls(**cls.convert_serializable_dict(serializable_dict))
+    try:
+      all_props = cls.convert_serializable_dict(serializable_dict)
+      all_props.update(props)
+      return cls(**all_props)
+    except datastore_errors.BadValueError as e:
+      raise ValueError(e)
 
   @classmethod
   def convert_serializable_dict(cls, serializable_dict):
@@ -368,7 +382,9 @@ class _ModelDictConverter(object):
       New dictionary that structurally is a subset of |model_dict|, but with
       values of different type (defined by |property_converters|).
     """
-    assert isinstance(model_dict, dict)
+    if not isinstance(model_dict, dict):
+      raise ValueError(
+          'Expecting a dict, got \'%s\' instead' % type(model_dict).__name__)
     allowed_properties = self.get_allowed_properties(model_cls)
     result = {}
     for key, value in model_dict.iteritems():
@@ -388,14 +404,21 @@ class _ModelDictConverter(object):
       Uses |prop| and |property_converters| to figure out how to perform the
       conversion.
     """
+    if prop._repeated:
+      # Do not allow None here. NDB doesn't accept None as a valid value for
+      # repeated property in populate(...) or entity constructor.
+      if not isinstance(value, (list, tuple)):
+        raise ValueError(
+            'Expecting a list or tuple for \'%s\', got \'%s\' instead' % (
+                prop._name, type(value).__name__))
+      converter = self.get_property_converter(prop)
+      return [converter(prop, x) for x in value]
+
+    # For singular properties pass None as is.
     if value is None:
       return None
     converter = self.get_property_converter(prop)
-    if prop._repeated:
-      assert isinstance(value, list)
-      return [converter(prop, x) for x in value]
-    else:
-      return converter(prop, value)
+    return converter(prop, value)
 
   def get_allowed_properties(self, model_cls):
     """Returns a set of property names to consider when converting a dictionary.
@@ -508,6 +531,9 @@ _EPOCH = datetime.datetime.utcfromtimestamp(0)
 
 def datetime_to_timestamp(value):
   """Converts UTC datetime to integer timestamp in microseconds since epoch."""
+  if not isinstance(value, datetime.datetime):
+    raise ValueError(
+        'Expecting datetime object, got %s instead' % type(value).__name__)
   if value.tzinfo is not None:
     raise ValueError('Only UTC datetime is supported')
   dt = value - _EPOCH
@@ -516,6 +542,9 @@ def datetime_to_timestamp(value):
 
 def timestamp_to_datetime(value):
   """Converts integer timestamp in microseconds since epoch to UTC datetime."""
+  if not isinstance(value, (int, long, float)):
+    raise ValueError(
+        'Expecting a number, got %s instead' % type(value).__name__)
   return _EPOCH + datetime.timedelta(microseconds=value)
 
 

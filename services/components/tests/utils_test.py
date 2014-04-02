@@ -286,6 +286,78 @@ class SerializableModelTest(test_case.TestCase):
         {'prop1': 1, 'prop3': 3},
         entity.to_serializable_dict(exclude=['prop2']))
 
+  def test_from_serializable_dict_kwargs_work(self):
+    """Keyword arguments in from_serializable_dict are passed to constructor."""
+    class Entity(ndb.Model, utils.SerializableModelMixin):
+      prop = ndb.IntegerProperty()
+
+    # Pass entity key via keyword parameters.
+    entity = Entity.from_serializable_dict(
+        {'prop': 123}, id='my id', parent=ndb.Key('Fake', 'parent'))
+    self.assertEqual(123, entity.prop)
+    self.assertEqual(ndb.Key('Fake', 'parent', 'Entity', 'my id'), entity.key)
+
+  def test_from_serializable_dict_kwargs_precedence(self):
+    """Keyword arguments in from_serializable_dict take precedence."""
+    class Entity(ndb.Model, utils.SerializableModelMixin):
+      prop = ndb.IntegerProperty()
+
+    # Pass |prop| via serialized dict and as a keyword arg.
+    entity = Entity.from_serializable_dict({'prop': 123}, prop=456)
+    # Keyword arg wins.
+    self.assertEqual(456, entity.prop)
+
+  def test_bad_type_in_from_serializable_dict(self):
+    """from_serializable_dict raises ValueError when seeing unexpected type."""
+    class Entity(ndb.Model, utils.SerializableModelMixin):
+      pass
+
+    # Pass a list instead of dict.
+    with self.assertRaises(ValueError):
+      Entity.from_serializable_dict([])
+
+  def test_bad_type_for_repeated_property(self):
+    """Trying to deserialize repeated property not from a list -> ValueError."""
+    class Entity(ndb.Model, utils.SerializableModelMixin):
+      prop = ndb.IntegerProperty(repeated=True)
+
+    # A list, tuple or nothing should work.
+    Entity.from_serializable_dict({'prop': [1]})
+    Entity.from_serializable_dict({'prop': (1,)})
+    Entity.from_serializable_dict({})
+
+    # A single item shouldn't.
+    with self.assertRaises(ValueError):
+      Entity.from_serializable_dict({'prop': 1})
+    # 'None' shouldn't.
+    with self.assertRaises(ValueError):
+      Entity.from_serializable_dict({'prop': None})
+    # Dict shouldn't.
+    with self.assertRaises(ValueError):
+      Entity.from_serializable_dict({'prop': {}})
+
+  def test_bad_type_for_simple_property(self):
+    """Trying to deserialize non-number into IntegerProperty -> ValueError."""
+    class Entity(ndb.Model, utils.SerializableModelMixin):
+      prop = ndb.IntegerProperty()
+
+    # Works.
+    Entity.from_serializable_dict({'prop': 123})
+    # Doesn't.
+    with self.assertRaises(ValueError):
+      Entity.from_serializable_dict({'prop': 'abc'})
+
+  def test_bad_type_for_datetime_property(self):
+    """Trying to deserialize non-number into DateTimeProperty -> ValueError."""
+    class Entity(ndb.Model, utils.SerializableModelMixin):
+      prop = ndb.DateTimeProperty()
+
+    # Works.
+    Entity.from_serializable_dict({'prop': 123})
+    # Doesn't.
+    with self.assertRaises(ValueError):
+      Entity.from_serializable_dict({'prop': 'abc'})
+
 
 class BytesSerializableObject(utils.BytesSerializable):
   def __init__(self, payload):  # pylint: disable=W0231
