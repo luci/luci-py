@@ -35,7 +35,7 @@ import template
 from components import ereporter2
 from components import auth
 from components import auth_ui
-from components import sharding
+from components import datastore_utils
 from components import utils
 
 
@@ -198,7 +198,7 @@ def entry_key_from_id(key_id):
   N = config.settings().sharding_letters
   return ndb.Key(
       ContentEntry, key_id,
-      parent=sharding.shard_key(hash_key, N, 'ContentShard'))
+      parent=datastore_utils.shard_key(hash_key, N, 'ContentShard'))
 
 
 def create_entry(key):
@@ -534,7 +534,7 @@ class InternalCleanupTrimLostWorkerHandler(webapp2.RequestHandler):
         # practice touch every item, do not use memcache since it'll mess it up
         # by loading every items in it.
         # TODO(maruel): Batch requests to use get_multi_async() similar to
-        # component_utils.page_queries().
+        # datastore_utils.page_queries().
         future = entry_key_from_id(filepath).get_async(
             use_cache=False, use_memcache=False)
         futures[future] = filepath

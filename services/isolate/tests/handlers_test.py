@@ -321,7 +321,7 @@ class MainTest(test_case.TestCase):
     self.assertEqual(2, len(list(handlers.ContentEntry.query())))
 
     actual_prefix = c.key.parent().id()
-    k = handlers.sharding.shard_key(
+    k = handlers.datastore_utils.shard_key(
         actual_prefix, len(actual_prefix), 'ContentShard')
     self.assertEqual(2, len(list(handlers.ContentEntry.query(ancestor=k))))
 
