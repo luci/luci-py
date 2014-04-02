@@ -13,3 +13,4 @@ overall developer experience.
 
 Local Modifications:
 Kept only src/cloudstorage/. Stripped test/ and demo/.
+See also MODIFICATIONS.diff.

@@ -114,7 +114,17 @@ class _RestApi(object):
   and is subject to change at any release.
   """
 
-  _TOKEN_EXPIRATION_HEADROOM = random.randint(60, 600)
+  # Upper bound here should be less than 5 min. If you have a token that expires
+  # at the moment X, and at the moment X - 5 min (or earlier) ask app engine to
+  # give you a new token, app engine still can return same old token with same
+  # expiration time X. If _TOKEN_EXPIRATION_HEADROOM happens to be > 5 min and
+  # get_token_async() is called sometime within time interval
+  # [X - _TOKEN_EXPIRATION_HEADROOM, X - 5], it would make perform RPC, but
+  # would not in fact get a new token. If get_token_async() is called frequently
+  # enough during this time frame (which happens when calling api.delete() in
+  # a loop to delete a bunch of files, for example), app engine may raise
+  # OverQuotaError.
+  _TOKEN_EXPIRATION_HEADROOM = random.randint(60, 240)
 
   def __init__(self, scopes, service_account_id=None, token_maker=None,
                retry_params=None):
