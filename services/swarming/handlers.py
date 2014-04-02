@@ -29,6 +29,7 @@ from common import swarm_constants
 from common import test_request_message
 from components import auth
 from components import auth_ui
+from components import datastore_utils
 from components import ereporter2
 from components import utils
 from server import admin_user
@@ -595,7 +596,8 @@ class TaskCleanupDataHandler(webapp2.RequestHandler):
           result_helper.QueryOldResults(),
           result_helper.QueryOldResultChunks(),
       ]
-      utils.incremental_map(queries, ndb.delete_multi_async, max_inflight=50)
+      datastore_utils.incremental_map(
+          queries, ndb.delete_multi_async, max_inflight=50)
     except datastore_errors.Timeout:
       logging.info('Ran out of time while cleaning up data. Triggering '
                    'another cleanup.')
