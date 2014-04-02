@@ -256,33 +256,23 @@ class TestLocalTestRunner(auto_stub.TestCase):
     self._mox.VerifyAll()
 
   def PrepareDownloadCall(self, cleanup=None, data_folder_name=''):
-    self.local_file1 = 'foo'
-    self.local_file2 = 'bar'
-    data_url = 'http://a.com/%s' % self.local_file1
+    local_file2 = 'bar'
     data_url_with_local_name = ('http://b.com/download_key',
-                                self.local_file2)
-    self.CreateValidFile(test_run_data=[data_url, data_url_with_local_name],
+                                local_file2)
+    self.CreateValidFile(test_run_data=[data_url_with_local_name],
                          test_run_cleanup=cleanup)
 
     runner = local_test_runner.LocalTestRunner(
       self.data_file_name, data_folder_name=data_folder_name)
     data_dir = os.path.basename(runner.data_dir)
     local_test_runner.url_helper.DownloadFile(
-        mox.Regex(DATA_FILE_REGEX % (data_dir, self.local_file1)),
-        data_url).AndReturn(True)
-    local_test_runner.url_helper.DownloadFile(
-        mox.Regex(DATA_FILE_REGEX % (data_dir, self.local_file2)),
+        mox.Regex(DATA_FILE_REGEX % (data_dir, local_file2)),
         data_url_with_local_name[0]).AndReturn(True)
 
     self.mock_zipfile = self._mox.CreateMock(zipfile.ZipFile)
     local_test_runner.zipfile.ZipFile(
         mox.Regex(DATA_FILE_REGEX %
-                  (data_dir, self.local_file1))).AndReturn(self.mock_zipfile)
-    local_test_runner.zipfile.ZipFile(
-        mox.Regex(DATA_FILE_REGEX %
-                  (data_dir, self.local_file2))).AndReturn(self.mock_zipfile)
-    self.mock_zipfile.extractall(mox.Regex(DATA_FOLDER_REGEX % data_dir))
-    self.mock_zipfile.close()
+                  (data_dir, local_file2))).AndReturn(self.mock_zipfile)
     self.mock_zipfile.extractall(mox.Regex(DATA_FOLDER_REGEX % data_dir))
     self.mock_zipfile.close()
     return runner

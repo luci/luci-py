@@ -548,7 +548,7 @@ class TestCaseTest(TestHelper):
         test_case_name='a',
         requestor='user@swarm.com',
         env_vars=TestHelper.VALID_ENV_VARS[-1],
-        data=TestHelper.VALID_URL_LIST_VALUES[-1],
+        data=TestHelper.VALID_URL_LOCAL_PATH_TUPLES_LISTS[-1],
         working_dir=TestHelper.VALID_STRING_VALUES[-1],
         tests=[TestObjectTest.GetFullObject()],
         restart_on_failure=TestHelper.VALID_BOOLEAN_VALUES[-1],
@@ -562,7 +562,7 @@ class TestCaseTest(TestHelper):
     # Ensure that Test Case makes copies of its input, not references.
     env_vars = {'a': '1'}
     configurations = [TestConfigurationTest.GetFullObject()]
-    data = ['http://localhost']
+    data = [('http://localhost/foo', 'foo.zip')]
     tests = [TestObjectTest.GetFullObject()]
 
     test_case = test_request_message.TestCase(
@@ -590,8 +590,7 @@ class TestCaseTest(TestHelper):
     # TODO(csharp): requestor should change to be required, not optional.
     self.AssertValidValues('requestor',
                            TestHelper.VALID_OPTIONAL_STRING_VALUES)
-    self.AssertValidValues('data', TestHelper.VALID_OPTIONAL_URL_LIST_VALUES +
-                           TestHelper.VALID_URL_LOCAL_PATH_TUPLES_LISTS)
+    self.AssertValidValues('data', TestHelper.VALID_URL_LOCAL_PATH_TUPLES_LISTS)
 
     test_object1 = test_request_message.TestObject(test_name='a', action=['a'])
     test_object1.Validate()
@@ -607,7 +606,7 @@ class TestCaseTest(TestHelper):
     test_config1.Validate()
     test_config2 = test_request_message.TestConfiguration(
         config_name='b', dimensions=dict(os='b', browser='b', cpu='b'),
-        data=['http://a.com'])
+        data=[('http://a.com/foo', 'foo.zip')])
     test_config2.Validate()
     self.AssertValidValues('configurations', [[test_config1]])
     self.AssertInvalidValues('configurations', [[test_config1, test_config2]])
@@ -635,9 +634,9 @@ class TestCaseTest(TestHelper):
     self.AssertInvalidValues('requestor',
                              TestHelper.INVALID_STRING_VALUES)
     self.test_request.requestor = 'user@swarm.com'
-    self.AssertInvalidValues('data', TestHelper.INVALID_URL_LIST_VALUES +
-                             TestHelper.INVALID_URL_LOCAL_PATH_TUPLES_LISTS)
-    self.test_request.data = TestHelper.VALID_URL_LIST_VALUES[-1]
+    self.AssertInvalidValues(
+        'data', TestHelper.INVALID_URL_LOCAL_PATH_TUPLES_LISTS)
+    self.test_request.data = TestHelper.VALID_URL_LOCAL_PATH_TUPLES_LISTS[-1]
     self.test_request.Validate()
 
     test_object1.io_time_out = 'never'
@@ -795,7 +794,7 @@ class TestRunTest(TestHelper):
         test_run_name=TestHelper.VALID_STRING_VALUES[-1],
         configuration=TestConfigurationTest.GetFullObject(),
         env_vars=TestHelper.VALID_ENV_VARS[-1],
-        data=TestHelper.VALID_URL_LIST_VALUES[-1],
+        data=TestHelper.VALID_URL_LOCAL_PATH_TUPLES_LISTS[-1],
         working_dir=TestHelper.VALID_STRING_VALUES[-1],
         tests=[TestObjectTest.GetFullObject()],
         instance_index=1,
@@ -810,7 +809,7 @@ class TestRunTest(TestHelper):
   def testNoReferences(self):
     # Ensure that Test Run makes copies of its input, not references.
     env_vars = {'a': '1'}
-    data = ['http://localhost']
+    data = [('http://localhost/foo', 'foo.zip')]
     tests = [TestObjectTest.GetFullObject()]
 
     test_run = test_request_message.TestRun(
@@ -840,8 +839,7 @@ class TestRunTest(TestHelper):
     # And then a few more valid values
     self.AssertValidValues('test_run_name',
                            TestHelper.VALID_STRING_VALUES)
-    self.AssertValidValues('data', TestHelper.VALID_OPTIONAL_URL_LIST_VALUES +
-                           TestHelper.VALID_URL_LOCAL_PATH_TUPLES_LISTS)
+    self.AssertValidValues('data', TestHelper.VALID_URL_LOCAL_PATH_TUPLES_LISTS)
 
     test_object1 = test_request_message.TestObject(test_name='a', action=['a'])
     test_object1.Validate()
@@ -883,9 +881,9 @@ class TestRunTest(TestHelper):
                              TestHelper.INVALID_REQUIRED_STRING_VALUES)
     # Put the value back to a valid value, to test invalidity of other values.
     self.test_request.test_run_name = TestHelper.VALID_STRING_VALUES[0]
-    self.AssertInvalidValues('data', TestHelper.INVALID_URL_LIST_VALUES +
-                             TestHelper.INVALID_URL_LOCAL_PATH_TUPLES_LISTS)
-    self.test_request.data = TestHelper.VALID_URL_LIST_VALUES[-1]
+    self.AssertInvalidValues(
+        'data', TestHelper.INVALID_URL_LOCAL_PATH_TUPLES_LISTS)
+    self.test_request.data = TestHelper.VALID_URL_LOCAL_PATH_TUPLES_LISTS[-1]
 
     test_object1.io_time_out = 'never'
     with self.assertRaises(test_request_message.Error):

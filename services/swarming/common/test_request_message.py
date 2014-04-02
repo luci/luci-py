@@ -294,8 +294,7 @@ class TestRequestMessageBase(object):
   def ValidateDataLists(self, list_keys, required=False):
     """Raises if any of the values in the given lists are not valid 'data'.
 
-    Valid data is either a tuple/list of (valid url, local file name)
-    or just a valid url.
+    Valid data is a list of tuple (valid url, local file name).
 
     Args:
       list_keys: The key names of the value lists to validate.
@@ -307,22 +306,18 @@ class TestRequestMessageBase(object):
     for list_key in list_keys:
       if self.__dict__[list_key]:
         for value in self.__dict__[list_key]:
-          if not isinstance(value, (basestring, list, tuple)):
+          if not isinstance(value, (list, tuple)):
             raise Error(
-                'Data list wrong type, must be tuple or basestring, got %s' %
-                type(value))
+                'Data list wrong type, must be tuple, got %s' % type(value))
 
-          if isinstance(value, basestring):
-            self.ValidateUrl(value)
-          else:
-            if len(value) != 2:
-              raise Error(
-                  'Incorrect length, should be 2 but is %d' % len(value))
-            self.ValidateUrl(value[0])
-            if not isinstance(value[1], basestring):
-              raise Error(
-                  'Local path should be of type basestring, got %s' %
-                  type(value[1]))
+          if len(value) != 2:
+            raise Error(
+                'Incorrect length, should be 2 but is %d' % len(value))
+          self.ValidateUrl(value[0])
+          if not isinstance(value[1], basestring):
+            raise Error(
+                'Local path should be of type basestring, got %s' %
+                type(value[1]))
       elif required:
         raise Error('Missing list %s' % list_key)
 
