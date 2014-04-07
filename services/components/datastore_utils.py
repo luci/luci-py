@@ -18,6 +18,19 @@ from google.appengine.ext import ndb
 _HEX = frozenset(string.hexdigits.lower())
 
 
+class BytesComputedProperty(ndb.ComputedProperty):
+  """Adds support to ComputedProperty for raw binary data.
+
+  Use this class instead of ComputedProperty if the returned data is raw binary
+  and not utf-8 compatible, as ComputedProperty assumes.
+  """
+  # pylint: disable=R0201
+  def _db_set_value(self, v, p, value):
+    # From BlobProperty.
+    p.set_meaning(ndb.google_imports.entity_pb.Property.BYTESTRING)
+    v.set_stringvalue(value)
+
+
 def shard_key(key, number_of_letters, root_entity_type):
   """Returns an ndb.Key to a virtual entity of type |root_entity_type|.
 
