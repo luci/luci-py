@@ -4,7 +4,6 @@
 # found in the LICENSE file.
 
 import datetime
-import json
 import logging
 import os
 import sys
@@ -157,79 +156,6 @@ class TaskRequestApiTest(test_case.TestCase):
       task_request.new_request(_gen_request_data(shards=51))
     with self.assertRaises(ValueError):
       task_request.new_request(_gen_request_data(scheduling_expiration=29))
-
-  def test_new_request_old_api(self):
-    deadline_to_run = 63
-    data = {
-      'configurations': [
-        {
-          'config_name': 'ignored',
-          'deadline_to_run': deadline_to_run,
-          'dimensions': {
-            'OS': 'Windows-3.1.1',
-            'hostname': 'localhost',
-          },
-          'num_instances': 23,
-          'priority': 50,
-        },
-      ],
-      'data': [
-        ('http://localhost/foo', 'foo.zip'),
-        ('http://localhost/bar', 'bar.zip'),
-      ],
-      'env_vars': {
-        'foo': 'bar',
-        'joe': '2',
-      },
-      'requestor': 'Jesus',
-      'test_case_name': 'Request name',
-      'tests': [
-        {
-          'action': ['command1', 'arg1'],
-          'hard_time_out': 66.1,
-          'io_time_out': 68.1,
-          'test_name': 'very ignored',
-        },
-        {
-          'action': ['command2', 'arg2'],
-          'test_name': 'very ignored but must be different',
-          'hard_time_out': 60000000,
-          'io_time_out': 60000000,
-        },
-      ],
-    }
-    request = task_request.new_request_old_api(
-        json.dumps(data))
-    expected_properties = {
-      'commands': [
-        [u'command1', u'arg1'],
-        [u'command2', u'arg2'],
-      ],
-      'data': [
-        # Items were sorted.
-        [u'http://localhost/bar', u'bar.zip'],
-        [u'http://localhost/foo', u'foo.zip'],
-      ],
-      'dimensions': {u'OS': u'Windows-3.1.1', u'hostname': u'localhost'},
-      'env': {u'foo': u'bar', u'joe': u'2'},
-      'execution_timeout_secs': 66,
-      'io_timeout_secs': 68,
-      'sharding': 23,
-    }
-    expected_request = {
-      'name': u'Request name',
-      'priority': 50,
-      'properties': expected_properties,
-      'properties_hash': 'c80f64ebd5f08f14738209f9456c1e4277b356be',
-      'user': u'Jesus',
-    }
-    actual = request.to_dict()
-    # expiration_ts - created_ts == deadline_to_run.
-    created = actual.pop('created_ts')
-    expiration = actual.pop('expiration_ts')
-    self.assertEqual(
-        int(round((expiration - created).total_seconds())), deadline_to_run)
-    self.assertEqual(expected_request, actual)
 
 
 if __name__ == '__main__':

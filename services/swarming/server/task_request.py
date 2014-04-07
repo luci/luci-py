@@ -23,11 +23,11 @@ Overview of transactions:
 
 
 Graph of the schema:
-+----------------+
-|TaskRequestShard|
-+----------------+
-        ^
-        |
+    +----------------+
+    |TaskRequestShard|
+    +----------------+
+            ^
+            |
   +---------------------+
   |TaskRequest          |
   |    +--------------+ |
@@ -36,7 +36,7 @@ Graph of the schema:
   +---------------------+
         ^
         |
-  <see task_scheduler.py>
+  <See task_shard_to_run.py and task_result.py>
 
 TaskProperties is embedded in TaskRequest. TaskProperties is still declared as a
 separate entity to clearly declare the boundary for task request deduplication.
@@ -51,7 +51,6 @@ import random
 
 from google.appengine.ext import ndb
 
-from common import test_request_message
 from components import datastore_utils
 from components import utils
 
@@ -406,31 +405,3 @@ def new_request(data):
   if _put_task_request(request):
     return request
   return None
-
-
-def new_request_old_api(data):
-  """Constructs a TaskProperties out of a test_request_message.TestCase.
-
-  This code is kept for compatibility with the previous API. See new_request()
-  for more details.
-  """
-  test_case = test_request_message.TestCase.FromJSON(data)
-  # TODO(maruel): Add missing mapping and delete obsolete ones.
-  assert len(test_case.configurations) == 1, test_case.configurations
-  config = test_case.configurations[0]
-
-  # Ignore all the settings that are deprecated.
-  new_format = {
-    'name': test_case.test_case_name,
-    'user': test_case.requestor,
-    'commands': [c.action for c in test_case.tests],
-    'data': test_case.data,
-    'dimensions': config.dimensions,
-    'env': test_case.env_vars,
-    'shards': config.num_instances,
-    'priority': config.priority,
-    'scheduling_expiration': config.deadline_to_run,
-    'execution_timeout': int(round(test_case.tests[0].hard_time_out)),
-    'io_timeout': int(round(test_case.tests[0].io_time_out)),
-  }
-  return new_request(new_format)

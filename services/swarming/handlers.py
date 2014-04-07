@@ -35,9 +35,8 @@ from components import utils
 from server import admin_user
 from server import dimension_mapping
 from server import result_helper
+from server import task_glue
 from server import test_management
-from server import test_request
-from server import test_runner
 from server import user_manager
 from stats import daily_stats
 from stats import machine_stats
@@ -278,13 +277,15 @@ class MainHandler(auth.AuthenticatingHandler):
     # inequality be the first sorts that are applied to the query.
     sort_by_first = 'started' if self.status == 'running' else None
 
-    query = test_runner.GetTestRunners(sort_by, ascending, limit, offset,
-                                       sort_by_first)
+    query = task_glue.GetTestRunners(
+        sort_by, ascending, limit, offset,sort_by_first)
 
-    return test_runner.ApplyFilters(query, self.status,
-                                    self.show_successfully_completed,
-                                    self.test_name_filter,
-                                    self.machine_id_filter)
+    return task_glue.ApplyFilters(
+        query,
+        self.status,
+        self.show_successfully_completed,
+        self.test_name_filter,
+        self.machine_id_filter)
 
   def FilterSelectsHTML(self):
     """Generates the HTML filter select values, with the proper defaults set.
@@ -340,14 +341,14 @@ class MainHandler(auth.AuthenticatingHandler):
     sort_key = sort_split[1] if len(sort_split) > 1 else ''
 
     # Make sure that the sort key is a valid option.
-    if sort_key not in test_runner.ACCEPTABLE_SORTS:
+    if sort_key not in task_glue.ACCEPTABLE_SORTS:
       sort_key = 'created'
       ascending = False
 
     sorted_by_message = '<p>Currently sorted by: '
     if not ascending:
       sorted_by_message += 'Reverse '
-    sorted_by_message += test_runner.ACCEPTABLE_SORTS[sort_key] + '</p>'
+    sorted_by_message += task_glue.ACCEPTABLE_SORTS[sort_key] + '</p>'
 
     # Prase and load the filters
     self.ParseFilters()
@@ -373,7 +374,7 @@ class MainHandler(auth.AuthenticatingHandler):
               -test_management.SwarmError.created).fetch()
 
     sort_options = []
-    for key, value in test_runner.ACCEPTABLE_SORTS.iteritems():
+    for key, value in task_glue.ACCEPTABLE_SORTS.iteritems():
       # Add the leading _ to the non-reversed key to show it is not to be
       # reversed.
       sort_options.append(SortOptions('_' + key, value))
@@ -501,7 +502,7 @@ class TestRequestHandler(auth.AuthenticatingHandler):
 
     # TODO(vadimsh): Store identity of a user that posted the request.
     try:
-      result = test_management.ExecuteTestRequest(self.request.get('request'))
+      result = task_glue.ExecuteTestRequest(self.request.get('request'))
     except test_request_message.Error as e:
       message = str(e)
       logging.error(message)
@@ -531,7 +532,7 @@ class ResultHandler(auth.AuthenticatingHandler):
     # TODO(vadimsh): Check that machine that posts the result is same as
     # machine that claimed the runner.
     runner_key = self.request.get('r', '')
-    runner = test_runner.GetRunnerFromUrlSafeKey(runner_key)
+    runner = task_glue.GetRunnerFromUrlSafeKey(runner_key)
 
     if not runner:
       # If the runner is gone, it probably already received results from
@@ -564,10 +565,11 @@ class ResultHandler(auth.AuthenticatingHandler):
 
     # Mark the runner as pinging now to prevent it from timing out while
     # the results are getting stored.
-    test_runner.PingRunner(runner.key.urlsafe(), machine_id)
+    task_glue.PingRunner(runner.key.urlsafe(), machine_id)
 
     results = result_helper.StoreResults(result_string)
-    if not runner.UpdateTestResult(
+    if not task_glue.UpdateTestResult(
+        runner,
         machine_id,
         success=success,
         exit_codes=exit_codes,
@@ -588,7 +590,7 @@ class TaskCleanupDataHandler(webapp2.RequestHandler):
       queries = [
           test_management.QueryOldErrors(),
           dimension_mapping.QueryOldDimensionMapping(),
-          test_runner.QueryOldRunners(),
+          task_glue.QueryOldRunners(),
           daily_stats.QueryOldDailyStats(),
           requestor_daily_stats.QueryOldRequestorDailyStats(),
           runner_stats.QueryOldRunnerStats(),
@@ -612,7 +614,7 @@ class CronAbortStaleRunnersHandler(webapp2.RequestHandler):
 
   @require_cronjob
   def get(self):
-    test_management.AbortStaleRunners()
+    task_glue.AbortStaleRunners()
     self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
     self.response.out.write('Success.')
 
@@ -665,14 +667,14 @@ class CronDetectHangingRunnersHandler(webapp2.RequestHandler):
 
   @require_cronjob
   def get(self):
-    hanging_runners = test_runner.GetHangingRunners()
+    hanging_runners = task_glue.GetHangingRunners()
     if hanging_runners:
       subject = 'Hanging Runners on %s' % app_identity.get_application_id()
 
       hanging_dimensions = set(runner.dimensions for runner in hanging_runners)
       body = ('The following dimensions have hanging runners (runners that '
               'have been waiting more than %d minutes to run).\n' % (
-                  test_runner.TIME_BEFORE_RUNNER_HANGING_IN_MINS) +
+                  task_glue.TIME_BEFORE_RUNNER_HANGING_IN_MINS) +
               '\n'.join(hanging_dimensions) +
               '\n\nHere are the hanging runner names:\n' +
               '\n'.join(runner.name for runner in hanging_runners)
@@ -780,7 +782,7 @@ class ShowMessageHandler(auth.AuthenticatingHandler):
     self.response.headers['Content-Type'] = 'application/json; charset=utf-8'
 
     runner_key = self.request.get('r', '')
-    runner = test_runner.GetRunnerFromUrlSafeKey(runner_key)
+    runner = task_glue.GetRunnerFromUrlSafeKey(runner_key)
 
     if runner:
       self.response.write(utils.encode_to_json(runner.GetAsDict()))
@@ -837,7 +839,7 @@ class GetMatchingTestCasesHandler(auth.AuthenticatingHandler):
   def get(self):
     test_case_name = self.request.get('name', '')
 
-    matches = test_request.GetAllMatchingTestRequests(test_case_name)
+    matches = task_glue.GetAllMatchingTestRequests(test_case_name)
     keys = []
     for match in matches:
       keys.extend(key.urlsafe() for key in match.runner_keys)
@@ -859,7 +861,7 @@ class GetNewestMatchingTestCasesHandler(auth.AuthenticatingHandler):
   def get(self):
     test_case_name = self.request.get('name', '')
 
-    match = test_request.GetNewestMatchingTestRequests(test_case_name)
+    match = task_glue.GetNewestMatchingTestRequests(test_case_name)
     keys = [key.urlsafe() for key in match.runner_keys]
 
     logging.info('Found %d keys in the newest TestRequests', len(keys))
@@ -922,7 +924,7 @@ class CleanupResultsHandler(auth.AuthenticatingHandler):
     self.response.headers['Content-Type'] = 'test/plain'
 
     key = self.request.get('r', '')
-    if test_runner.DeleteRunnerFromKey(key):
+    if task_glue.DeleteRunnerFromKey(key):
       self.response.out.write('Key deleted.')
     else:
       self.response.out.write('Key deletion failed.')
@@ -940,11 +942,11 @@ class CancelHandler(auth.AuthenticatingHandler):
     self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
 
     runner_key = self.request.get('r', '')
-    runner = test_runner.GetRunnerFromUrlSafeKey(runner_key)
+    runner = task_glue.GetRunnerFromUrlSafeKey(runner_key)
 
     # Make sure found runner is not yet running.
     if runner and not runner.started:
-      test_management.AbortRunner(runner, reason='Runner cancelled by user.')
+      task_glue.AbortRunner(runner, reason='Runner cancelled by user.')
       self.response.out.write('Runner canceled.')
     else:
       # TODO(maruel): Return HTTP 400.
@@ -961,7 +963,7 @@ class RetryHandler(auth.AuthenticatingHandler):
   @auth.require(auth.UPDATE, 'swarming/management')
   def post(self):
     runner_key = self.request.get('r', '')
-    runner = test_runner.GetRunnerFromUrlSafeKey(runner_key)
+    runner = task_glue.GetRunnerFromUrlSafeKey(runner_key)
 
     if runner:
       runner.ClearRunnerRun()
@@ -1004,8 +1006,7 @@ class RegisterHandler(auth.AuthenticatingHandler):
     # to authenticate the request (i.e. auth.get_current_identity()).
     try:
       response = json.dumps(
-          test_management.ExecuteRegisterRequest(attributes,
-                                                 self.request.host_url))
+          task_glue.ExecuteRegisterRequest(attributes, self.request.host_url))
     except runtime.DeadlineExceededError as e:
       # If the timeout happened before a runner was assigned there are no
       # problems. If the timeout occurred after a runner was assigned, that
@@ -1041,7 +1042,7 @@ class RunnerPingHandler(auth.AuthenticatingHandler):
     # auth.get_current_identity()).
     key = self.request.get('r', '')
     machine_id = self.request.get('id', '')
-    if not test_runner.PingRunner(key, machine_id):
+    if not task_glue.PingRunner(key, machine_id):
       self.abort(400, 'Runner failed to ping.')
 
     self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
@@ -1307,7 +1308,7 @@ def SendRunnerResults(response, key):
     response: Response to be sent to remote machine.
     key: Key identifying the runner.
   """
-  results = test_runner.GetRunnerResults(key)
+  results = task_glue.GetRunnerResults(key)
 
   if results:
     # Convert the output to utf-8 to ensure that the JSON library can
