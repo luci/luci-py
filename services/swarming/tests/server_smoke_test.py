@@ -332,7 +332,8 @@ class SwarmingTestCase(unittest.TestCase):
           running_tests.remove(running_test_key)
 
       if running_tests:
-        time.sleep(0.1)
+        # Throttle query rate in verbose to reduce the noise.
+        time.sleep(2 if VERBOSE else 0.1)
     self.assertEqual([], running_tests)
 
 
