@@ -382,14 +382,42 @@ class AppTest(test_case.TestCase):
         'either malformed or otherwise incorrect.\n\n'
         ' Missing mandatory attribute: dimensions  ')
 
-    # Valid attributes.
-    attributes = ('{"dimensions": {"os": ["win-xp"]},'
-                  '"id": "%s"}' % MACHINE_ID)
-    response = self.app.post('/poll_for_test', {'attributes': attributes})
+  def testRegisterHandlerNoVersion(self):
+    attributes = {
+      'dimensions': {'os': ['win-xp']},
+      'id': MACHINE_ID,
+    }
+    response = self.app.post(
+        '/poll_for_test', {'attributes': json.dumps(attributes)})
     self.assertEqual('200 OK', response.status)
-    response = json.loads(response.body)
-    self.assertEqual(sorted(['try_count', 'come_back']),
-                     sorted(response.keys()))
+    expected = {
+      u'commands': [
+        {
+          u'args':
+              u'http://localhost/get_slave_code/%s' %
+              bot_management.SlaveVersion(),
+          u'function': u'UpdateSlave',
+        },
+      ],
+      u'result_url': u'http://localhost/remote_error',
+      u'try_count': 0,
+    }
+    self.assertEqual(expected, response.json)
+
+  def testRegisterHandlerVersion(self):
+    attributes = {
+      'dimensions': {'os': ['win-xp']},
+      'id': MACHINE_ID,
+      'version': bot_management.SlaveVersion(),
+    }
+    response = self.app.post(
+        '/poll_for_test', {'attributes': json.dumps(attributes)})
+    self.assertEqual('200 OK', response.status)
+    # See _ComputeComebackValue() in test_management.py. The bots are randomly
+    # asked to come back more quickly.
+    expected_1 = {u'come_back': 1.0, u'try_count': 1}
+    expected_2 = {u'come_back': 2.25, u'try_count': 1}
+    self.assertTrue(response.json in (expected_1, expected_2))
 
   def _PostResults(self, runner_key, machine_id, result, expect_errors=False):
     url_parameters = {

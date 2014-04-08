@@ -321,6 +321,26 @@ def AbortRunner(runner, reason):
   runner.UpdateTestResult(runner.machine_id, errors=r_str, aborted=True)
 
 
+def CheckVersion(attributes, server_url):
+  """Checks the slave version, forcing it to update if required."""
+  expected_version = bot_management.SlaveVersion()
+  if attributes.get('version') != expected_version:
+    logging.info(
+        '%s != %s, Updating slave %s',
+        expected_version, attributes.get('version', 'N/A'), attributes['id'])
+    return {
+      'commands': [rpc.BuildRPC(
+          'UpdateSlave',
+        server_url.rstrip('/') + '/get_slave_code/' + expected_version),
+      ],
+      # The only time a slave would have results to send here would be if
+      # the machine failed to update.
+      'result_url': server_url.rstrip('/') + '/remote_error',
+      'try_count': 0,
+    }
+  return {}
+
+
 def ExecuteRegisterRequest(attributes, server_url):
   """Attempts to match the requesting machine with an existing TestRunner.
 
@@ -340,29 +360,9 @@ def ExecuteRegisterRequest(attributes, server_url):
   """
   # Validate and fix machine attributes. Will throw exception on errors.
   attribs = ValidateAndFixAttributes(attributes)
-  response = {}
-
-  # Check the slave version, forcing it to update if required.
-  if 'version' in attributes:
-    expected_version = bot_management.SlaveVersion()
-    if attributes['version'] != expected_version:
-      logging.info(
-          '%s != %s, Forcing slave %s update',
-          expected_version, attributes['version'], attributes['id'])
-      response['commands'] = [rpc.BuildRPC(
-          'UpdateSlave',
-          server_url.rstrip('/') + '/get_slave_code/' + expected_version)]
-      response['try_count'] = 0
-      # The only time a slave would have results to send here would be if
-      # the machine failed to update.
-      response['result_url'] = server_url.rstrip('/') + '/remote_error'
-
-      return response
-  else:
-    logging.error(
-        'Bot is too old to update, please manually update\n%s(%s)',
-        attribs['id'], attributes.get('tag', None))
-
+  response = CheckVersion(attributes, server_url)
+  if response:
+    return response
   dimension_hashes = dimensions_utils.GenerateAllDimensionHashes(
       attribs['dimensions'])
 
