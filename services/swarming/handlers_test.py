@@ -27,11 +27,12 @@ import webtest
 
 from common import swarm_constants
 from server import admin_user
+from server import bot_management
 from server import dimension_mapping
 from server import dimensions_utils
+from server import errors
 from server import result_helper
 from server import test_helper
-from server import test_management
 from server import test_request
 from server import test_runner
 from server import user_manager
@@ -199,14 +200,14 @@ class AppTest(test_case.TestCase):
     response = self.app.get('/get_slave_code')
     self.assertEqual('200 OK', response.status)
     self.assertEqual(
-        len(test_management.SlaveCodeZipped()), response.content_length)
+        len(bot_management.SlaveCodeZipped()), response.content_length)
 
   def testGetSlaveCodeHash(self):
     response = self.app.get(
-        '/get_slave_code/%s' % test_management.SlaveVersion())
+        '/get_slave_code/%s' % bot_management.SlaveVersion())
     self.assertEqual('200 OK', response.status)
     self.assertEqual(
-        len(test_management.SlaveCodeZipped()), response.content_length)
+        len(bot_management.SlaveCodeZipped()), response.content_length)
 
   def testGetSlaveCodeInvalidHash(self):
     response = self.app.get('/get_slave_code/' + '1' * 40, expect_errors=True)
@@ -653,15 +654,15 @@ class AppTest(test_case.TestCase):
       CheckProtected(route, 'POST')
 
   def testRemoteErrorHandler(self):
-    self.assertEqual(0, test_management.SwarmError.query().count())
+    self.assertEqual(0, errors.SwarmError.query().count())
 
     error_message = 'error message'
 
     response = self.app.post('/remote_error', {'m': error_message})
     self.assertResponse(response, '200 OK', 'Success.')
 
-    self.assertEqual(1, test_management.SwarmError.query().count())
-    error = test_management.SwarmError.query().get()
+    self.assertEqual(1, errors.SwarmError.query().count())
+    error = errors.SwarmError.query().get()
     self.assertEqual(error.message, error_message)
 
   def testRunnerPing(self):

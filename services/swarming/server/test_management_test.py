@@ -8,13 +8,8 @@ import hashlib
 import json
 import logging
 import os
-import shutil
-import StringIO
-import subprocess
 import sys
-import tempfile
 import unittest
-import zipfile
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT_DIR)
@@ -23,12 +18,10 @@ import test_env
 
 test_env.setup_test_env()
 
-from google.appengine.ext import ndb
-
 import test_case
-from common import bot_archive
 from common import rpc
 from common import test_request_message
+from server import bot_management
 from server import dimensions_utils
 from server import result_helper
 from server import test_helper
@@ -96,7 +89,7 @@ class TestManagementTest(test_case.TestCase):
     config_dimensions = {'os': platform, 'cpu': 'Unknown', 'browser': 'Unknown'}
     attributes = {
         'dimensions': config_dimensions,
-        'version': test_management.SlaveVersion()
+        'version': bot_management.SlaveVersion()
     }
     if machine_id:
       attributes['id'] = str(machine_id)
@@ -426,6 +419,8 @@ class TestManagementTest(test_case.TestCase):
     self._mox.StubOutWithMock(test_management, '_GetCurrentTime')
     attempts_to_reach_abort = test_runner.MAX_AUTOMATIC_RETRIES + 1
 
+    test_management._GetCurrentTime().AndReturn(datetime.datetime.utcnow())
+    test_management._GetCurrentTime().AndReturn(datetime.datetime.utcnow())
     for _ in range(attempts_to_reach_abort):
       self._GenerateFutureTimeExpectation()
 
@@ -456,37 +451,6 @@ class TestManagementTest(test_case.TestCase):
         self.assertIsNone(runner.started)
         self.assertEqual(i + 1, runner.automatic_retry_count)
         self.assertEqual([MACHINE_IDS[0]] * (i + 1), runner.old_machine_ids)
-
-    self._mox.VerifyAll()
-
-  def testSwarmErrorDeleteOldErrors(self):
-    # Create error.
-    error = test_management.SwarmError(
-        name='name', message='msg', info='info')
-    error.put()
-    self.assertEqual(1, test_management.SwarmError.query().count())
-
-    self._mox.StubOutWithMock(test_management, '_GetCurrentTime')
-
-    # Set the current time to the future, but not too much.
-    mock_now = (datetime.datetime.utcnow() + datetime.timedelta(
-        days=test_management.SWARM_ERROR_TIME_TO_LIVE_DAYS - 1))
-    test_management._GetCurrentTime().AndReturn(mock_now)
-
-    # Set the current time to way in the future.
-    mock_now = (datetime.datetime.utcnow() + datetime.timedelta(
-        days=test_management.SWARM_ERROR_TIME_TO_LIVE_DAYS + 1))
-    test_management._GetCurrentTime().AndReturn(mock_now)
-
-    self._mox.ReplayAll()
-
-    # First call shouldn't delete the error since its not stale yet.
-    ndb.delete_multi(test_management.QueryOldErrors())
-    self.assertEqual(1, test_management.SwarmError.query().count())
-
-    # Second call should remove the now stale error.
-    ndb.delete_multi(test_management.QueryOldErrors())
-    self.assertEqual(0, test_management.SwarmError.query().count())
 
     self._mox.VerifyAll()
 
@@ -729,20 +693,10 @@ class TestManagementTest(test_case.TestCase):
         self._SERVER_URL)
     self.assertEqual(2, machine_stats.MachineStats.query().count())
 
-  def testStoreStartSlaveScriptClearCache(self):
-    # When a new start slave script is uploaded, we should recalculate the
-    # version hash since it will have changed.
-    old_version = test_management.SlaveVersion()
-
-    test_management.StoreStartSlaveScript('dummy_script')
-
-    self.assertNotEqual(old_version,
-                        test_management.SlaveVersion())
-
   def testGetUpdateWhenPollingForWork(self):
     # Drop the last character of the version string to ensure a version
     # mismatch.
-    version = test_management.SlaveVersion()
+    version = bot_management.SlaveVersion()
     response = test_management.ExecuteRegisterRequest(
         self._GetMachineRegisterRequest(version=version[:-1]),
         self._SERVER_URL)
@@ -760,24 +714,6 @@ class TestManagementTest(test_case.TestCase):
         ],
         response['commands'])
     self.assertEqual(self._SERVER_URL + 'remote_error', response['result_url'])
-
-  def testSlaveCodeZipped(self):
-    zipped_code = test_management.SlaveCodeZipped()
-
-    temp_dir = tempfile.mkdtemp(prefix='swarming')
-    try:
-      with zipfile.ZipFile(StringIO.StringIO(zipped_code), 'r') as zip_file:
-        zip_file.extractall(temp_dir)
-
-      for i in bot_archive.FILES:
-        self.assertTrue(os.path.isfile(os.path.join(temp_dir, i)), i)
-
-      # Try running the slave and ensure it can import the required files.
-      # (It would crash if it failed to import them).
-      subprocess.check_output(
-          [sys.executable, os.path.join(temp_dir, 'slave_machine.py'), '-h'])
-    finally:
-      shutil.rmtree(temp_dir)
 
 
 if __name__ == '__main__':

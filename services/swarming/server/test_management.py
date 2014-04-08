@@ -15,21 +15,17 @@ import os.path
 import random
 
 from google.appengine.api import datastore_errors
-from google.appengine.api import memcache
 from google.appengine.ext import ndb
 
-from common import bot_archive
 from common import rpc
 from common import test_request_message
+from server import bot_management
 from server import dimension_mapping
 from server import dimensions_utils
-from server import file_chunks
 from server import test_request
 from server import test_runner
 from stats import machine_stats
 
-
-ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # The amount of time to wait after recieving a runners last message before
 # considering the runner to have run for too long. Runners that run for too
@@ -64,35 +60,6 @@ QUICK_COMEBACK_SECS = 1.0
 # The amount of time we want a machine to wait before calling back after seeing
 # a server error.
 COMEBACK_AFTER_SERVER_ERROR_SECS = 10.0
-
-# Number of days to keep error logs around.
-SWARM_ERROR_TIME_TO_LIVE_DAYS = 7
-
-# The key to use to access the start slave script file model.
-START_SLAVE_SCRIPT_KEY = 'start_slave_script'
-
-
-class SwarmError(ndb.Model):
-  """A datastore entry representing an error in Swarm."""
-  # The name of the error.
-  name = ndb.StringProperty(indexed=False)
-
-  # A description of the error.
-  message = ndb.StringProperty(indexed=False)
-
-  # Optional details about the specific error instance.
-  info = ndb.StringProperty(indexed=False)
-
-  # The time at which this error was logged.  Used to clean up old errors.
-  # Don't use auto_now_add so we control exactly what the time is set to
-  # (since we later need to compare this value, so we need to know if it was
-  # made with .now() or .utcnow()).
-  created = ndb.DateTimeProperty()
-
-  def _pre_put_hook(self):
-    """Stores the creation time for this model."""
-    if not self.created:
-      self.created = datetime.datetime.utcnow()
 
 
 def ExecuteTestRequest(request_message):
@@ -163,7 +130,7 @@ def ExecuteTestRequest(request_message):
     dimension = dimension_mapping.DimensionMapping.get_or_insert(
         config_hash,
         dimensions=test_request_message.Stringize(config.dimensions))
-    if dimension.last_seen != datetime.datetime.utcnow().date():
+    if dimension.last_seen != _GetCurrentTime().date():
       # DimensionMapping automatically updates last_seen when put() is called.
       dimension.put()
 
@@ -201,7 +168,7 @@ def _QueueTestRequestConfig(request, config, config_hash):
       config_name=config.config_name, config_hash=config_hash,
       config_instance_index=config.instance_index,
       num_config_instances=config.num_instances,
-      run_by = datetime.datetime.utcnow() + datetime.timedelta(
+      run_by = _GetCurrentTime() + datetime.timedelta(
           seconds=config.deadline_to_run),
       priority=config.priority)
 
@@ -377,7 +344,7 @@ def ExecuteRegisterRequest(attributes, server_url):
 
   # Check the slave version, forcing it to update if required.
   if 'version' in attributes:
-    expected_version = SlaveVersion()
+    expected_version = bot_management.SlaveVersion()
     if attributes['version'] != expected_version:
       logging.info(
           '%s != %s, Forcing slave %s update',
@@ -659,65 +626,3 @@ def _GetCurrentTime():
     The current time as a datetime.datetime object.
   """
   return datetime.datetime.utcnow()
-
-
-def QueryOldErrors():
-  """Returns keys for errors older than SWARM_ERROR_TIME_TO_LIVE_DAYS."""
-  old_cutoff = (
-      _GetCurrentTime() -
-      datetime.timedelta(days=SWARM_ERROR_TIME_TO_LIVE_DAYS))
-  return SwarmError.query(
-      SwarmError.created < old_cutoff,
-      default_options=ndb.QueryOptions(keys_only=True))
-
-
-def StoreStartSlaveScript(script):
-  """Stores the given script as the new start slave script for all slave.
-
-  Args:
-    script: The contents of the new start slave script.
-  """
-  file_chunks.StoreFile(START_SLAVE_SCRIPT_KEY, script)
-
-  # Clear the cached version value since it has now changed.
-  memcache.delete('slave_version', namespace=os.environ['CURRENT_VERSION_ID'])
-
-
-def SlaveVersion():
-  """Retrieves the slave version loaded on this server.
-
-  The memcache is first checked for the version, otherwise the value
-  is generated and then stored in the memcache.
-
-  Returns:
-    The hash of the current slave version.
-  """
-  slave_version = memcache.get('slave_version',
-                               namespace=os.environ['CURRENT_VERSION_ID'])
-  if slave_version:
-    return slave_version
-  # Get the start slave script from the database, if present. Pass an empty
-  # file if the files isn't present.
-  additionals = {
-    'start_slave.py': file_chunks.RetrieveFile(START_SLAVE_SCRIPT_KEY) or '',
-  }
-  slave_version = bot_archive.GenerateSlaveVersion(
-      os.path.join(ROOT_DIR, 'swarm_bot'), additionals)
-  memcache.set('slave_version', slave_version,
-               namespace=os.environ['CURRENT_VERSION_ID'])
-  return slave_version
-
-
-def SlaveCodeZipped():
-  """Returns a zipped file of all the files a slave needs to run.
-
-  Returns:
-    A string representing the zipped file's contents.
-  """
-  # Get the start slave script from the database, if present. Pass an empty
-  # file if the files isn't present.
-  additionals = {
-    'start_slave.py': file_chunks.RetrieveFile(START_SLAVE_SCRIPT_KEY) or '',
-  }
-  return bot_archive.SlaveCodeZipped(
-      os.path.join(ROOT_DIR, 'swarm_bot'), additionals)

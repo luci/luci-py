@@ -33,10 +33,11 @@ from components import datastore_utils
 from components import ereporter2
 from components import utils
 from server import admin_user
+from server import bot_management
 from server import dimension_mapping
+from server import errors
 from server import result_helper
 from server import task_glue
-from server import test_management
 from server import user_manager
 from stats import daily_stats
 from stats import machine_stats
@@ -368,10 +369,10 @@ class MainHandler(auth.AuthenticatingHandler):
           limit=_NUM_USER_TEST_RUNNERS_PER_PAGE,
           offset=_NUM_USER_TEST_RUNNERS_PER_PAGE * (page - 1))
     ]
-    errors = test_management.SwarmError.query(
+    errors_found = errors.SwarmError.query(
         default_options=ndb.QueryOptions(
           limit=_NUM_RECENT_ERRORS_TO_DISPLAY)).order(
-              -test_management.SwarmError.created).fetch()
+              -errors.SwarmError.created).fetch()
 
     sort_options = []
     for key, value in task_glue.ACCEPTABLE_SORTS.iteritems():
@@ -391,7 +392,7 @@ class MainHandler(auth.AuthenticatingHandler):
 
     params = {
         'current_page': page,
-        'errors': errors,
+        'errors': errors_found,
         'filter_selects': self.FilterSelectsHTML(),
         'machine_id_filter': self.machine_id_filter,
         'runners': runners,
@@ -588,7 +589,7 @@ class TaskCleanupDataHandler(webapp2.RequestHandler):
     try:
       # All the things that need to be deleted.
       queries = [
-          test_management.QueryOldErrors(),
+          errors.QueryOldErrors(),
           dimension_mapping.QueryOldDimensionMapping(),
           task_glue.QueryOldRunners(),
           daily_stats.QueryOldDailyStats(),
@@ -803,7 +804,7 @@ class UploadStartSlaveHandler(auth.AuthenticatingHandler):
     if not script:
       self.abort(400, 'No script uploaded')
 
-    test_management.StoreStartSlaveScript(script)
+    bot_management.StoreStartSlaveScript(script)
     self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
     self.response.out.write('Success.')
 
@@ -900,7 +901,7 @@ class GetSlaveCodeHandler(auth.AuthenticatingHandler):
   @auth.require(auth.READ, 'swarming/bots')
   def get(self, version=None):
     if version:
-      expected = test_management.SlaveVersion()
+      expected = bot_management.SlaveVersion()
       if version != expected:
         logging.error('Requested Swarming bot %s, have %s', version, expected)
         self.abort(404)
@@ -910,7 +911,7 @@ class GetSlaveCodeHandler(auth.AuthenticatingHandler):
     self.response.headers['Content-Type'] = 'application/octet-stream'
     self.response.headers['Content-Disposition'] = (
         'attachment; filename="swarm_bot.zip"')
-    self.response.out.write(test_management.SlaveCodeZipped())
+    self.response.out.write(bot_management.SlaveCodeZipped())
 
 
 class CleanupResultsHandler(auth.AuthenticatingHandler):
@@ -1263,7 +1264,7 @@ class RemoteErrorHandler(auth.AuthenticatingHandler):
   def post(self):
     # TODO(vadimsh): Log machine identity as well.
     error_message = self.request.get('m', '')
-    error = test_management.SwarmError(
+    error = errors.SwarmError(
         name='Remote Error Report', message=error_message,
         info='Remote machine address: %s' % self.request.remote_addr)
     error.put()
@@ -1293,7 +1294,7 @@ def ip_whitelist_authentication(request):
         auth.IDENTITY_BOT, request.remote_addr.replace(':', '-'))
 
   # Log the error.
-  error = test_management.SwarmError(
+  error = errors.SwarmError(
       name='Authentication Failure', message='Handler: %s' % request.url,
       info='Remote machine address: %s' % request.remote_addr)
   error.put()
