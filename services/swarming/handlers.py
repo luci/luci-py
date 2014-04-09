@@ -566,7 +566,7 @@ class ResultHandler(auth.AuthenticatingHandler):
 
     # Mark the runner as pinging now to prevent it from timing out while
     # the results are getting stored.
-    task_glue.PingRunner(runner.key.urlsafe(), machine_id)
+    task_glue.PingRunner(runner_key, machine_id)
 
     results = result_helper.StoreResults(result_string)
     if not task_glue.UpdateTestResult(
@@ -943,16 +943,12 @@ class CancelHandler(auth.AuthenticatingHandler):
     self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
 
     runner_key = self.request.get('r', '')
-    runner = task_glue.GetRunnerFromUrlSafeKey(runner_key)
-
     # Make sure found runner is not yet running.
-    if runner and not runner.started:
-      task_glue.AbortRunner(runner, reason='Runner cancelled by user.')
+    if task_glue.AbortRunner(runner_key, reason='Runner cancelled by user.'):
       self.response.out.write('Runner canceled.')
     else:
-      # TODO(maruel): Return HTTP 400.
-      self.response.out.write('Cannot find runner or too late to cancel: %s' %
-                              runner_key)
+      self.response.out.write('Unable to cancel runner')
+      self.response.set_status(400)
 
 
 class RetryHandler(auth.AuthenticatingHandler):
@@ -964,20 +960,14 @@ class RetryHandler(auth.AuthenticatingHandler):
   @auth.require(auth.UPDATE, 'swarming/management')
   def post(self):
     runner_key = self.request.get('r', '')
-    runner = task_glue.GetRunnerFromUrlSafeKey(runner_key)
-
-    if runner:
-      runner.ClearRunnerRun()
-
-      # Update the created time to make sure that retrying the runner does not
-      # make it jump the queue and get executed before other runners for
-      # requests added before the user pressed the retry button.
-      runner.created = datetime.datetime.utcnow()
-      runner.put()
+    if task_glue.RetryRunner(runner_key):
+      # TODO(maruel): Return the new TaskRequest key.
+      # TODO(maruel): Use json encoded return values for the APIs.
       self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
       self.response.out.write('Runner set for retry.')
     else:
-      self.response.set_status(204)
+      self.response.out.write('Unable to retry runner')
+      self.response.set_status(400)
 
 
 class RegisterHandler(auth.AuthenticatingHandler):

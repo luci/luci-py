@@ -299,8 +299,10 @@ class AppTest(test_case.TestCase):
     self._ReplaceCurrentUser(ADMIN_EMAIL)
 
     # Test when no matching key
-    response = self.app.post('/secure/retry', {'r': 'fake_key'}, status=204)
-    self.assertResponse(response, '204 No Content', '')
+    response = self.app.post(
+        '/secure/retry', {'r': 'fake_key'}, expect_errors=True)
+    self.assertEqual('400 Bad Request', response.status)
+    self.assertEqual('Unable to retry runner', response.body)
 
     # Test with matching key.
     runner = test_helper.CreatePendingRunner(exit_codes='[0]')
@@ -852,9 +854,11 @@ class AppTest(test_case.TestCase):
     # Act under admin identity.
     self._ReplaceCurrentUser(ADMIN_EMAIL)
 
-    response = self.app.post(handlers._SECURE_CANCEL_URL, {'r': 'invalid_key'})
-    self.assertEqual('200 OK', response.status)
-    self.assertTrue('Cannot find runner' in response.body, response.body)
+    response = self.app.post(
+        handlers._SECURE_CANCEL_URL, {'r': 'invalid_key'},
+        expect_errors=True)
+    self.assertEqual('400 Bad Request', response.status)
+    self.assertEqual('Unable to cancel runner', response.body)
 
     runner = test_helper.CreatePendingRunner()
     response = self.app.post(handlers._SECURE_CANCEL_URL,

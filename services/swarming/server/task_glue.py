@@ -26,6 +26,8 @@ The goal is to make tests/server_smoke_test.py pass, not handlers_test.py, since
 handlers_test.py edits the DB directly.
 """
 
+import datetime
+
 from common import test_request_message
 from server import test_management
 from server import test_request
@@ -67,9 +69,13 @@ def _convert_test_case(data):
 ### test_manager.py public API.
 
 
-def AbortRunner(runner, reason):
+def AbortRunner(runner_key_urlsafe, reason):
   if _USE_OLD_API:
-    return test_management.AbortRunner(runner, reason)
+    runner = GetRunnerFromUrlSafeKey(runner_key_urlsafe)
+    if not runner or runner.started:
+      return False
+    test_management.AbortRunner(runner, reason)
+    return True
   raise NotImplementedError()
 
 
@@ -88,6 +94,21 @@ def ExecuteTestRequest(test_case):
 def ExecuteRegisterRequest(attributes, server_url):
   if _USE_OLD_API:
     return test_management.ExecuteRegisterRequest(attributes, server_url)
+  raise NotImplementedError()
+
+
+def RetryRunner(runner_key_urlsafe):
+  if _USE_OLD_API:
+    runner = GetRunnerFromUrlSafeKey(runner_key_urlsafe)
+    if not runner:
+      return False
+    runner.ClearRunnerRun()
+    # Update the created time to make sure that retrying the runner does not
+    # make it jump the queue and get executed before other runners for requests
+    # added before the user pressed the retry button.
+    runner.created = datetime.datetime.utcnow()
+    runner.put()
+    return True
   raise NotImplementedError()
 
 
