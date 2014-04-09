@@ -20,34 +20,37 @@ import test_case
 from server import task_request
 
 
-def _gen_request_data(**kwargs):
+def _gen_request_data(properties=None, **kwargs):
   base_data = {
     'name': 'Request name',
     'user': 'Jesus',
-    'commands': [
-      [u'command1', u'arg1'],
-      [u'command2', u'arg2'],
-    ],
-    'data': [
-      ['http://localhost/foo', 'foo.zip'],
-      ['http://localhost/bar', 'bar.zip'],
-    ],
-    'dimensions':{'OS': 'Windows-3.1.1', 'hostname': 'localhost'},
-    'env': {'foo': 'bar', 'joe': '2'},
-    'shards': 1,
+    'properties': {
+      'commands': [
+        ['command1', 'arg1'],
+        ['command2', 'arg2'],
+      ],
+      'data': [
+        ['http://localhost/foo', 'foo.zip'],
+        ['http://localhost/bar', 'bar.zip'],
+      ],
+      'dimensions': {'OS': 'Windows-3.1.1', 'hostname': 'localhost'},
+      'env': {'foo': 'bar', 'joe': '2'},
+      'number_shards': 1,
+      'execution_timeout_secs': 30,
+      'io_timeout_secs': None,
+    },
     'priority': 50,
-    'scheduling_expiration': 30,
-    'execution_timeout': 30,
-    'io_timeout': None,
+    'scheduling_expiration_secs': 30,
   }
   base_data.update(kwargs)
+  base_data['properties'].update(properties or {})
   return base_data
 
 
 class TaskRequestPrivateTest(test_case.TestCase):
   def test_new_task_request_key(self):
     for _ in xrange(3):
-      epoch = task_request.utcnow() - task_request._EPOCH
+      epoch = task_request.utcnow() - task_request._UNIX_EPOCH
       now = int(round(epoch.total_seconds() * 1000))
       key = task_request._new_task_request_key()
       key_id = key.integer_id()
@@ -61,11 +64,23 @@ class TaskRequestPrivateTest(test_case.TestCase):
       self.fail('Failed to find randomness')
 
   def test_new_task_request_key_no_random(self):
-    self.mock(task_request.random, 'getrandbits', lambda _: 0x8877)
-    now = task_request._EPOCH + datetime.timedelta(seconds=100)
+    def getrandbits(i):
+      self.assertEqual(i, 8)
+      return 0x77
+    self.mock(task_request.random, 'getrandbits', getrandbits)
+    days_until_end_of_the_world = 2**47 / 24. / 60. / 60. / 1000.
+    num_days = int(days_until_end_of_the_world)
+    # Remove 1ms to not overflow.
+    num_seconds = (
+        (days_until_end_of_the_world - num_days) * 24. * 60. * 60. - 0.001)
+    self.assertEqual(1628906, num_days)
+    now = task_request._UNIX_EPOCH + datetime.timedelta(
+        days=num_days, seconds=num_seconds)
     self.mock(task_request, 'utcnow', lambda: now)
     key = task_request._new_task_request_key()
-    self.assertEqual(0x186a08877, key.integer_id())
+    # Last 0x00 is reserved for shard numbers.
+    # Next to last 0x77 is the random bits.
+    self.assertEqual('0x7fffffffffff7700', '0x%016x' % key.integer_id())
 
 
 class TaskRequestApiTest(test_case.TestCase):
@@ -84,10 +99,10 @@ class TaskRequestApiTest(test_case.TestCase):
     with self.assertRaises(ValueError):
       task_request.validate_priority(-1)
     with self.assertRaises(ValueError):
-      task_request.validate_priority(task_request._MAXIMUM_PRIORITY)
+      task_request.validate_priority(task_request._MAXIMUM_PRIORITY+1)
     task_request.validate_priority(0)
     task_request.validate_priority(1)
-    task_request.validate_priority(task_request._MAXIMUM_PRIORITY-1)
+    task_request.validate_priority(task_request._MAXIMUM_PRIORITY)
 
   def test_task_request_key(self):
     self.assertEqual(
@@ -96,7 +111,7 @@ class TaskRequestApiTest(test_case.TestCase):
 
   def test_new_request(self):
     deadline_to_run = 31
-    data = _gen_request_data(scheduling_expiration=deadline_to_run)
+    data = _gen_request_data(scheduling_expiration_secs=deadline_to_run)
     request = task_request.new_request(data)
     expected_properties = {
       'commands': [
@@ -112,13 +127,13 @@ class TaskRequestApiTest(test_case.TestCase):
       'env': {u'foo': u'bar', u'joe': u'2'},
       'execution_timeout_secs': 30,
       'io_timeout_secs': None,
-      'sharding': 1,
+      'number_shards': 1,
     }
     expected_request = {
       'name': u'Request name',
       'priority': 50,
       'properties': expected_properties,
-      'properties_hash': '6ddbca38241daa62e660fb5e9188d04f164d0add',
+      'properties_hash': '6d049340771e2197a4ab3f7202bb569e5fa248c3',
       'user': u'Jesus',
     }
     actual = request.to_dict()
@@ -135,27 +150,42 @@ class TaskRequestApiTest(test_case.TestCase):
     request_2 = task_request.new_request(
         _gen_request_data(
             name='Other', user='Other', priority=201,
-            scheduling_expiration=129))
+            scheduling_expiration_secs=129))
     self.assertEqual(request_1.properties_hash, request_2.properties_hash)
 
   def test_different(self):
     # Two TestRequest with different properties.
     request_1 = task_request.new_request(
-        _gen_request_data(execution_timeout=30))
+        _gen_request_data(properties=dict(execution_timeout_secs=30)))
     request_2 = task_request.new_request(
-        _gen_request_data(execution_timeout=129))
+        _gen_request_data(properties=dict(execution_timeout_secs=129)))
     self.assertNotEqual(request_1.properties_hash, request_2.properties_hash)
 
   def test_bad_values(self):
     with self.assertRaises(ValueError):
-      task_request.new_request(_gen_request_data(commands=None))
+      task_request.new_request(
+          _gen_request_data(properties=dict(commands=None)))
+    task_request.new_request(
+        _gen_request_data(properties=dict(commands=[])))
     with self.assertRaises(ValueError):
       task_request.new_request(
-          _gen_request_data(priority=task_request._MAXIMUM_PRIORITY))
+          _gen_request_data(priority=task_request._MAXIMUM_PRIORITY+1))
+    task_request.new_request(
+        _gen_request_data(priority=task_request._MAXIMUM_PRIORITY))
     with self.assertRaises(ValueError):
-      task_request.new_request(_gen_request_data(shards=51))
+      task_request.new_request(
+          _gen_request_data(
+              properties=dict(number_shards=task_request._MAXIMUM_SHARDS+1)))
+    task_request.new_request(
+        _gen_request_data(
+            properties=dict(number_shards=task_request._MAXIMUM_SHARDS)))
     with self.assertRaises(ValueError):
-      task_request.new_request(_gen_request_data(scheduling_expiration=29))
+      task_request.new_request(
+          _gen_request_data(
+              scheduling_expiration_secs=task_request._MIN_TIMEOUT_SECS-1))
+    task_request.new_request(
+        _gen_request_data(
+            scheduling_expiration_secs=task_request._MIN_TIMEOUT_SECS))
 
 
 if __name__ == '__main__':

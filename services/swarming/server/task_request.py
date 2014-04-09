@@ -46,7 +46,6 @@ separate entity to clearly declare the boundary for task request deduplication.
 import datetime
 import hashlib
 import json
-import math
 import random
 
 from google.appengine.ext import ndb
@@ -74,8 +73,8 @@ from components import utils
 _SHARDING_LEVEL = 1 if utils.is_canary() else 5
 
 
-# The world started in 2014.
-_EPOCH = datetime.datetime(2014, 1, 1)
+# Used to encode time.
+_UNIX_EPOCH = datetime.datetime(1970, 1, 1)
 
 
 # One day in seconds. Add 10s to account for small jitter.
@@ -86,9 +85,24 @@ _ONE_DAY_SECS = 24*60*60 + 10
 _MIN_TIMEOUT_SECS = 30
 
 
-# Maximum acceptable priority value.
-# TODO(maruel): Could be lowered eventually, 2**16 is probably more sensible.
-_MAXIMUM_PRIORITY = 2**23
+# Maximum acceptable priority value, which is effectively the lowest priority.
+_MAXIMUM_PRIORITY = 255
+
+
+# Maximum number of shards for a single request.
+_MAXIMUM_SHARDS = 255
+
+
+# Parameters for new_request().
+# The content of the 'data' parameter. This relates to the context of the
+# request, e.g. who wants to run a task.
+_DATA_KEYS = frozenset(
+    ['name', 'priority', 'properties', 'scheduling_expiration_secs', 'user'])
+# The content of 'properties' inside the 'data' parameter. This relates to the
+# task itself, e.g. what to run.
+_PROPERTIES_KEYS = frozenset(
+    ['commands', 'data', 'dimensions', 'env', 'execution_timeout_secs',
+     'io_timeout_secs', 'number_shards'])
 
 
 class TaskProperties(ndb.Model):
@@ -132,7 +146,7 @@ class TaskProperties(ndb.Model):
   env_json = ndb.StringProperty(indexed=False)
 
   # Number of instances to split this task into.
-  sharding = ndb.IntegerProperty(indexed=False)
+  number_shards = ndb.IntegerProperty(indexed=False)
 
   # Maximum duration the bot can take to run a shard of this task.
   execution_timeout_secs = ndb.IntegerProperty(indexed=True)
@@ -162,7 +176,7 @@ class TaskProperties(ndb.Model):
       'env': self.env(),
       'execution_timeout_secs': self.execution_timeout_secs,
       'io_timeout_secs': self.io_timeout_secs,
-      'sharding': self.sharding,
+      'number_shards': self.number_shards,
     }
 
   def _pre_put_hook(self):
@@ -221,8 +235,10 @@ class TaskProperties(ndb.Model):
           'env encoding is not what was expected. Got %r, expected %r' %
           (self.env_json, expected))
 
-    if 0 >= self.sharding or 50 < self.sharding:
-      raise ValueError('sharding must be between 1 and 50')
+    if 0 >= self.number_shards or _MAXIMUM_SHARDS < self.number_shards:
+      raise ValueError(
+          'number_shards(%d) must be between 1 and %s (inclusive)' %
+          (self.number_shards, _MAXIMUM_SHARDS))
 
     if (_MIN_TIMEOUT_SECS > self.execution_timeout_secs or
         _ONE_DAY_SECS < self.execution_timeout_secs):
@@ -241,13 +257,9 @@ class TaskProperties(ndb.Model):
 class TaskRequest(ndb.Model):
   """Contains a user request.
 
-  The key is a increasing integer based on time since _EPOCH plus some
-  randomness on the low order bits.
-
-  Timeouts are part of this entity, not TaskProperties. It is because a task
-  execution failure will not be deduped, so if time outs are tweaked, the task
-  should be rerun only if not successful, independent of the previous timeout
-  parameters used.
+  The key is a increasing integer based on time since _UNIX_EPOCH plus some
+  randomness on 8 low order bits then lower 8 bits set to 0. See
+  _new_task_request_key() for the complete gory details.
 
   This model is immutable.
   """
@@ -273,8 +285,14 @@ class TaskRequest(ndb.Model):
   priority = ndb.IntegerProperty(indexed=False)
 
   # If the task request is not scheduled by this moment, it will be aborted by a
-  # cron job.
+  # cron job. It is saved instead of scheduling_expiration_secs so finding
+  # expired jobs is a simple query.
   expiration_ts = ndb.DateTimeProperty(indexed=False)
+
+  @property
+  def scheduling_expiration_secs(self):
+    """Reconstructs this value from expiration_ts and created_ts."""
+    return (self.expiration_ts - self.created_ts).total_seconds()
 
   def to_dict(self):
     """Converts properties_hash to hex so it is json serializable."""
@@ -306,18 +324,23 @@ class TaskRequest(ndb.Model):
 def _new_task_request_key():
   """Returns a valid ndb.Key for this entity.
 
-  It is a 63 bit integer, with 47 bits for the representation of epoch at 1ms
-  resolution and 16 bits of pure randomness. Keep the highest order bit set to 0
-  to keep the value positive.
-
-  So every call should return a different value with a 2**-15 probability and
-  gets us going for a thousand years.
+  It is a 63 bit integer, the highest order bit set to 0 to keep the value
+  positive, 47 following bits for the representation of epoch at 1ms resolution,
+  8 bits of randomness on the next bits and the last 8 bits set to zero.
+  - 1 bit highest order bit to detect overflow.
+  - 47 bits at 1ms resolution is 2**47 / 365 / 24 / 60 / 60 / 1000 = 4462 years.
+  - 8 bits of randomness reduces to 2**-7 the probability of collision on exact
+    same timestamp at 1ms resolution, so a maximum theoretical rate of 256000
+    requests per second but an effective rate likely in the range of ~2560
+    requests per second without too much transaction conflicts.
+  - The last 8 bits are used for sharding on TaskShardToRun and are kept to 0
+    here for key compatibility.
   """
-  now = int(round((utcnow() - _EPOCH).total_seconds() * 1000))
+  now = int(round((utcnow() - _UNIX_EPOCH).total_seconds() * 1000))
   assert 1 <= now < 2**47, now
-  suffix = random.getrandbits(16)
-  assert 0 <= suffix <= 0xFFFF
-  value = (now << 16) | suffix
+  suffix = random.getrandbits(8)
+  assert 0 <= suffix <= 0xFF
+  value = (now << 16) | (suffix << 8)
   return task_request_key(value)
 
 
@@ -342,15 +365,15 @@ def utcnow():
 
 
 def validate_priority(priority):
-  if 0 > priority or _MAXIMUM_PRIORITY <= priority:
+  """Throws ValueError if priority is not a valid value."""
+  if 0 > priority or _MAXIMUM_PRIORITY < priority:
     raise ValueError(
-        'Priority (%d) must be between 0 and 2^%d' %
-        (priority, int(round(math.log(_MAXIMUM_PRIORITY, 2)))))
+        'priority (%d) must be between 0 and %d (inclusive)' %
+        (priority, _MAXIMUM_PRIORITY))
 
 
 def task_request_key(task_id):
   """Returns the ndb.Key for a TaskRequest id."""
-  # Technically could use shard_key() since the bottom 16 bits is random.
   parent = datastore_utils.hashed_shard_key(
       str(task_id), _SHARDING_LEVEL, 'TaskRequestShard')
   return ndb.Key(TaskRequest, task_id, parent=parent)
@@ -363,45 +386,61 @@ def new_request(data):
   - data: dict with:
     - name
     - user
-    - commands
-    - data
-    - dimensions
-    - env
-    - shards
+    - properties
+      - commands
+      - data
+      - dimensions
+      - env
+      - execution_timeout_secs
+      - io_timeout_secs
+      - number_shards
     - priority
-    - scheduling_expiration
-    - execution_timeout
-    - io_timeout
+    - scheduling_expiration_secs
 
   Returns:
     The newly created TaskRequest.
   """
+  # Save ourself headaches with typos and refuses unexpected values.
+  set_data = set(data)
+  if set_data != _DATA_KEYS:
+    raise ValueError(
+        'Unexpected parameters for new_request(): %s\nExpected: %s' % (
+            ', '.join(sorted(_DATA_KEYS.symmetric_difference(set_data))),
+            ', '.join(sorted(_DATA_KEYS))))
+  data_properties = data['properties']
+  set_data_properties = set(data_properties)
+  if set_data_properties != _PROPERTIES_KEYS:
+    raise ValueError(
+        'Unexpected properties for new_request(): %s\nExpected: %s' % (
+            ', '.join(sorted(
+                _PROPERTIES_KEYS.symmetric_difference(set_data_properties))),
+            ', '.join(sorted(_PROPERTIES_KEYS))))
 
   # The following is very important to be deterministic. Keys must be sorted,
   # encoding must be deterministic.
-  commands_json = utils.encode_to_json(data['commands'])
-  data_json = utils.encode_to_json(sorted(data['data']))
-  dimensions_json = utils.encode_to_json(data['dimensions'])
-  env_json = utils.encode_to_json(data['env'])
+  commands_json = utils.encode_to_json(data_properties['commands'])
+  data_json = utils.encode_to_json(sorted(data_properties['data']))
+  dimensions_json = utils.encode_to_json(data_properties['dimensions'])
+  env_json = utils.encode_to_json(data_properties['env'])
   properties = TaskProperties(
       commands_json=commands_json,
       data_json=data_json,
       dimensions_json=dimensions_json,
       env_json=env_json,
-      sharding=data['shards'],
-      execution_timeout_secs=data['execution_timeout'],
-      io_timeout_secs=data['io_timeout'])
+      number_shards=data_properties['number_shards'],
+      execution_timeout_secs=data_properties['execution_timeout_secs'],
+      io_timeout_secs=data_properties['io_timeout_secs'])
 
   now = utcnow()
-  deadline = now + datetime.timedelta(
-      seconds=data['scheduling_expiration'])
+  expiration_ts = now + datetime.timedelta(
+      seconds=data['scheduling_expiration_secs'])
   request = TaskRequest(
       created_ts=now,
       name=data['name'],
       user=data['user'],
       properties=properties,
       priority=data['priority'],
-      expiration_ts=deadline)
+      expiration_ts=expiration_ts)
   if _put_task_request(request):
     return request
   return None
