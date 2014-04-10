@@ -17,6 +17,7 @@ import test_env
 test_env.setup_test_env()
 
 import test_case
+from server import task_common
 from server import task_request
 
 
@@ -50,8 +51,7 @@ def _gen_request_data(properties=None, **kwargs):
 class TaskRequestPrivateTest(test_case.TestCase):
   def test_new_task_request_key(self):
     for _ in xrange(3):
-      epoch = task_request.utcnow() - task_request._UNIX_EPOCH
-      now = int(round(epoch.total_seconds() * 1000))
+      now = task_common.milliseconds_since_epoch(None)
       key = task_request._new_task_request_key()
       key_id = key.integer_id()
       timestamp = key_id >> 16
@@ -74,9 +74,9 @@ class TaskRequestPrivateTest(test_case.TestCase):
     num_seconds = (
         (days_until_end_of_the_world - num_days) * 24. * 60. * 60. - 0.001)
     self.assertEqual(1628906, num_days)
-    now = task_request._UNIX_EPOCH + datetime.timedelta(
+    now = task_common.UNIX_EPOCH + datetime.timedelta(
         days=num_days, seconds=num_seconds)
-    self.mock(task_request, 'utcnow', lambda: now)
+    self.mock(task_common, 'utcnow', lambda: now)
     key = task_request._new_task_request_key()
     # Last 0x00 is reserved for shard numbers.
     # Next to last 0x77 is the random bits.
@@ -85,29 +85,20 @@ class TaskRequestPrivateTest(test_case.TestCase):
 
 class TaskRequestApiTest(test_case.TestCase):
   def test_all_apis_are_tested(self):
-    actual = set(i[5:] for i in dir(self) if i.startswith('test_'))
-    # Contains the list of all public APIs.
+    # Ensures there's a test for each public API.
+    module = task_request
     expected = set(
-        i for i in dir(task_request)
-        if i[0] != '_' and hasattr(getattr(task_request, i), 'func_name'))
-    missing = expected - actual - set(['utcnow'])
+        i for i in dir(module)
+        if i[0] != '_' and hasattr(getattr(module, i), 'func_name'))
+    missing = expected - set(i[5:] for i in dir(self) if i.startswith('test_'))
     self.assertFalse(missing)
 
-  def test_validate_priority(self):
-    with self.assertRaises(TypeError):
-      task_request.validate_priority('1')
-    with self.assertRaises(ValueError):
-      task_request.validate_priority(-1)
-    with self.assertRaises(ValueError):
-      task_request.validate_priority(task_request._MAXIMUM_PRIORITY+1)
-    task_request.validate_priority(0)
-    task_request.validate_priority(1)
-    task_request.validate_priority(task_request._MAXIMUM_PRIORITY)
-
-  def test_task_request_key(self):
+  def test_id_to_request_key(self):
     self.assertEqual(
-        "Key('TaskRequestShard', 'c4ca4', 'TaskRequest', 1)",
-        str(task_request.task_request_key(1)))
+        "Key('TaskRequestShard', 'f7184', 'TaskRequest', 256)",
+        str(task_request.id_to_request_key(0x100)))
+    with self.assertRaises(ValueError):
+      task_request.id_to_request_key(1)
 
   def test_new_request(self):
     deadline_to_run = 31
@@ -169,16 +160,16 @@ class TaskRequestApiTest(test_case.TestCase):
         _gen_request_data(properties=dict(commands=[])))
     with self.assertRaises(ValueError):
       task_request.new_request(
-          _gen_request_data(priority=task_request._MAXIMUM_PRIORITY+1))
+          _gen_request_data(priority=task_common.MAXIMUM_PRIORITY+1))
     task_request.new_request(
-        _gen_request_data(priority=task_request._MAXIMUM_PRIORITY))
+        _gen_request_data(priority=task_common.MAXIMUM_PRIORITY))
     with self.assertRaises(ValueError):
       task_request.new_request(
           _gen_request_data(
-              properties=dict(number_shards=task_request._MAXIMUM_SHARDS+1)))
+              properties=dict(number_shards=task_common.MAXIMUM_SHARDS+1)))
     task_request.new_request(
         _gen_request_data(
-            properties=dict(number_shards=task_request._MAXIMUM_SHARDS)))
+            properties=dict(number_shards=task_common.MAXIMUM_SHARDS)))
     with self.assertRaises(ValueError):
       task_request.new_request(
           _gen_request_data(

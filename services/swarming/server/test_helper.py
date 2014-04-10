@@ -4,10 +4,12 @@
 
 """Some helper test functions."""
 
-
 import datetime
 
+from google.appengine.ext import ndb
+
 from common import test_request_message
+from server import task_common
 from server import test_request
 from server import test_runner
 
@@ -152,3 +154,15 @@ def CreateRequest(num_instances):
     runner.put()
 
   return request
+
+
+def mock_now(test, now):
+  """Mocks utcnow() and ndb properties.
+
+  In particular handles when auto_now and auto_now_add are used.
+
+  To be used in tests only.
+  """
+  test.mock(task_common, 'utcnow', lambda: now)
+  test.mock(ndb.DateTimeProperty, '_now', lambda _: now)
+  test.mock(ndb.DateProperty, '_now', lambda _: now.date())

@@ -23,7 +23,7 @@ Overview of transactions:
 
 
 Graph of the schema:
-    +----------------+
+    +------Root------+
     |TaskRequestShard|
     +----------------+
             ^
@@ -52,29 +52,7 @@ from google.appengine.ext import ndb
 
 from components import datastore_utils
 from components import utils
-
-
-# Intentionally starve the canary server by using only 16 root entities. This
-# will force transaction conflicts. On the production server, use 16**5 (~1
-# million) root entities to reduce the number of transaction conflict.
-#
-# The production server must handle up to 1000 task requests per second. The
-# number of root entities must be a few orders of magnitude higher. The goal is
-# to almost completely get rid of transactions conflicts. This means that the
-# probability of two transactions happening on the same shard must be very low.
-# This relates to number of transactions per second * seconds per transaction /
-# number of shard.
-#
-# Each task request creation incurs 1 transaction:
-# - TaskRequest creation.
-#
-# Each task request shard incurs transactions when executed, see
-# task_scheduler.py.
-_SHARDING_LEVEL = 1 if utils.is_canary() else 5
-
-
-# Used to encode time.
-_UNIX_EPOCH = datetime.datetime(1970, 1, 1)
+from server import task_common
 
 
 # One day in seconds. Add 10s to account for small jitter.
@@ -83,14 +61,6 @@ _ONE_DAY_SECS = 24*60*60 + 10
 
 # Minimum value for timeouts.
 _MIN_TIMEOUT_SECS = 30
-
-
-# Maximum acceptable priority value, which is effectively the lowest priority.
-_MAXIMUM_PRIORITY = 255
-
-
-# Maximum number of shards for a single request.
-_MAXIMUM_SHARDS = 255
 
 
 # Parameters for new_request().
@@ -235,10 +205,11 @@ class TaskProperties(ndb.Model):
           'env encoding is not what was expected. Got %r, expected %r' %
           (self.env_json, expected))
 
-    if 0 >= self.number_shards or _MAXIMUM_SHARDS < self.number_shards:
+    if (0 >= self.number_shards or
+        task_common.MAXIMUM_SHARDS < self.number_shards):
       raise ValueError(
           'number_shards(%d) must be between 1 and %s (inclusive)' %
-          (self.number_shards, _MAXIMUM_SHARDS))
+          (self.number_shards, task_common.MAXIMUM_SHARDS))
 
     if (_MIN_TIMEOUT_SECS > self.execution_timeout_secs or
         _ONE_DAY_SECS < self.execution_timeout_secs):
@@ -257,8 +228,8 @@ class TaskProperties(ndb.Model):
 class TaskRequest(ndb.Model):
   """Contains a user request.
 
-  The key is a increasing integer based on time since _UNIX_EPOCH plus some
-  randomness on 8 low order bits then lower 8 bits set to 0. See
+  The key is a increasing integer based on time since task_common.UNIX_EPOCH
+  plus some randomness on 8 low order bits then lower 8 bits set to 0. See
   _new_task_request_key() for the complete gory details.
 
   This model is immutable.
@@ -311,8 +282,8 @@ class TaskRequest(ndb.Model):
 
   def _pre_put_hook(self):
     """Ensures internal consistency."""
-    validate_priority(self.priority)
-    now = utcnow()
+    task_common.validate_priority(self.priority)
+    now = task_common.utcnow()
     offset = int(round((self.expiration_ts - now).total_seconds()))
     if _MIN_TIMEOUT_SECS > offset or _ONE_DAY_SECS < offset:
       raise ValueError(
@@ -324,11 +295,10 @@ class TaskRequest(ndb.Model):
 def _new_task_request_key():
   """Returns a valid ndb.Key for this entity.
 
-  It is a 63 bit integer, the highest order bit set to 0 to keep the value
-  positive, 47 following bits for the representation of epoch at 1ms resolution,
-  8 bits of randomness on the next bits and the last 8 bits set to zero.
+  Key id is a 64 bit integer:
   - 1 bit highest order bit to detect overflow.
-  - 47 bits at 1ms resolution is 2**47 / 365 / 24 / 60 / 60 / 1000 = 4462 years.
+  - 47 bits is time since epoch at 1ms resolution is
+    2**47 / 365 / 24 / 60 / 60 / 1000 = 4462 years.
   - 8 bits of randomness reduces to 2**-7 the probability of collision on exact
     same timestamp at 1ms resolution, so a maximum theoretical rate of 256000
     requests per second but an effective rate likely in the range of ~2560
@@ -336,12 +306,12 @@ def _new_task_request_key():
   - The last 8 bits are used for sharding on TaskShardToRun and are kept to 0
     here for key compatibility.
   """
-  now = int(round((utcnow() - _UNIX_EPOCH).total_seconds() * 1000))
+  now = task_common.milliseconds_since_epoch(None)
   assert 1 <= now < 2**47, now
   suffix = random.getrandbits(8)
   assert 0 <= suffix <= 0xFF
   value = (now << 16) | (suffix << 8)
-  return task_request_key(value)
+  return id_to_request_key(value)
 
 
 def _put_task_request(request):
@@ -359,23 +329,12 @@ def _put_task_request(request):
 ### Public API.
 
 
-def utcnow():
-  """To be mocked in tests."""
-  return datetime.datetime.utcnow()
-
-
-def validate_priority(priority):
-  """Throws ValueError if priority is not a valid value."""
-  if 0 > priority or _MAXIMUM_PRIORITY < priority:
-    raise ValueError(
-        'priority (%d) must be between 0 and %d (inclusive)' %
-        (priority, _MAXIMUM_PRIORITY))
-
-
-def task_request_key(task_id):
+def id_to_request_key(task_id):
   """Returns the ndb.Key for a TaskRequest id."""
+  if task_id & 0xFF:
+    raise ValueError('Unexpected low order byte is set')
   parent = datastore_utils.hashed_shard_key(
-      str(task_id), _SHARDING_LEVEL, 'TaskRequestShard')
+      str(task_id), task_common.SHARDING_LEVEL, 'TaskRequestShard')
   return ndb.Key(TaskRequest, task_id, parent=parent)
 
 
@@ -431,7 +390,7 @@ def new_request(data):
       execution_timeout_secs=data_properties['execution_timeout_secs'],
       io_timeout_secs=data_properties['io_timeout_secs'])
 
-  now = utcnow()
+  now = task_common.utcnow()
   expiration_ts = now + datetime.timedelta(
       seconds=data['scheduling_expiration_secs'])
   request = TaskRequest(
