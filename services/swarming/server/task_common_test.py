@@ -25,11 +25,12 @@ class TaskCommonApiTest(test_case.TestCase):
   def test_all_apis_are_tested(self):
     # Ensures there's a test for each public API.
     module = task_common
-    expected = set(
+    expected = frozenset(
         i for i in dir(module)
         if i[0] != '_' and hasattr(getattr(module, i), 'func_name'))
-    missing = expected - set(i[5:] for i in dir(self) if i.startswith('test_'))
-    self.assertFalse(missing - set(['utcnow']))
+    missing = expected - frozenset(
+        i[5:] for i in dir(self) if i.startswith('test_'))
+    self.assertFalse(missing - frozenset(['utcnow']))
 
   def test_validate_priority(self):
     with self.assertRaises(TypeError):

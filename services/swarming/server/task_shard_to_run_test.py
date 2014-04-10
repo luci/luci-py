@@ -4,6 +4,7 @@
 # found in the LICENSE file.
 
 import datetime
+import hashlib
 import os
 import sys
 import unittest
@@ -56,9 +57,9 @@ def _convert(i):
 
 def _yield_next_available_shard_to_dispatch(bot_dimensions):
   return [
-    _convert(i)
-    for i in task_shard_to_run.yield_next_available_shard_to_dispatch(
-        bot_dimensions)
+    _convert(shard_to_run)
+    for _request, shard_to_run in
+        task_shard_to_run.yield_next_available_shard_to_dispatch(bot_dimensions)
   ]
 
 
@@ -71,8 +72,7 @@ def _gen_new_shards_to_run(**kwargs):
 
 
 def _hash_dimensions(dimensions):
-  return task_shard_to_run.TaskShardToRun.DIMENSIONS_HASHING_ALGO(
-        utils.encode_to_json(dimensions)).hexdigest()
+  return task_shard_to_run._hash_dimensions(utils.encode_to_json(dimensions))
 
 
 class TaskShardToRunPrivateTest(test_case.TestCase):
@@ -152,6 +152,15 @@ class TaskShardToRunPrivateTest(test_case.TestCase):
       actual = list(task_shard_to_run._powerset(inputs))
       self.assertEquals(expected, actual)
 
+  def test_hash_dimensions(self):
+    dimensions = 'this is not json'
+    as_hex = hashlib.md5(dimensions).digest()[:4].encode('hex')
+    actual = task_shard_to_run._hash_dimensions(dimensions)
+    # It is exactly the same bytes reversed (little endian). It's positive even
+    # with bit 31 set because python stores it internally as a int64.
+    self.assertEqual('711d0bf1', as_hex)
+    self.assertEqual(0xf10b1d71, actual)
+
 
 class TaskShardToRunApiTest(test_case.TestCase):
   def setUp(self):
@@ -163,9 +172,9 @@ class TaskShardToRunApiTest(test_case.TestCase):
     self.expiration_ts = self.now + datetime.timedelta(seconds=60)
 
   def test_all_apis_are_tested(self):
-    actual = set(i[5:] for i in dir(self) if i.startswith('test_'))
+    actual = frozenset(i[5:] for i in dir(self) if i.startswith('test_'))
     # Contains the list of all public APIs.
-    expected = set(
+    expected = frozenset(
         i for i in dir(task_shard_to_run)
         if i[0] != '_' and hasattr(getattr(task_shard_to_run, i), 'func_name'))
     missing = expected - actual
@@ -211,8 +220,6 @@ class TaskShardToRunApiTest(test_case.TestCase):
     ndb.put_multi(shards)
 
     dimensions_hash = _hash_dimensions(request_dimensions)
-    self.assertEqual(
-        '8441306129c86d82da6e535ec06b418cd631ab37', dimensions_hash)
     expected = [
       {
         'dimensions_hash': dimensions_hash,

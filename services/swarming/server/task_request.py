@@ -360,14 +360,14 @@ def new_request(data):
     The newly created TaskRequest.
   """
   # Save ourself headaches with typos and refuses unexpected values.
-  set_data = set(data)
+  set_data = frozenset(data)
   if set_data != _DATA_KEYS:
     raise ValueError(
         'Unexpected parameters for new_request(): %s\nExpected: %s' % (
             ', '.join(sorted(_DATA_KEYS.symmetric_difference(set_data))),
             ', '.join(sorted(_DATA_KEYS))))
   data_properties = data['properties']
-  set_data_properties = set(data_properties)
+  set_data_properties = frozenset(data_properties)
   if set_data_properties != _PROPERTIES_KEYS:
     raise ValueError(
         'Unexpected properties for new_request(): %s\nExpected: %s' % (

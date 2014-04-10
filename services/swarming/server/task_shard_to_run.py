@@ -35,6 +35,7 @@ import datetime
 import hashlib
 import itertools
 import logging
+import struct
 
 from google.appengine.ext import ndb
 
@@ -62,11 +63,9 @@ class TaskShardToRun(ndb.Model):
   Warning: ordering by key is not useful. This is because of the root entity
   sharding, which shuffle the base key.
   """
-  # Algorithm used to hash dimensions.
-  DIMENSIONS_HASHING_ALGO = hashlib.sha1
-
-  # The SHA-1 hash of TaskRequests.dimensions_json.
-  dimensions_hash = ndb.BlobProperty(indexed=False)
+  # The shortened hash of TaskRequests.dimensions_json. This value is generated
+  # with _hash_dimensions().
+  dimensions_hash = ndb.IntegerProperty(indexed=False)
 
   # Moment by which the task has to be requested by a bot. Copy of TaskRequest's
   # TaskRequest.expiration_ts to enable queries when cleaning up stale jobs.
@@ -96,7 +95,6 @@ class TaskShardToRun(ndb.Model):
   def to_dict(self):
     """Encodes .dimension_has as hex to make it json compatible."""
     out = super(TaskShardToRun, self).to_dict()
-    out['dimensions_hash'] = out['dimensions_hash'].encode('hex')
     out['shard_number'] = self.shard_number
     return out
 
@@ -137,12 +135,13 @@ def _explode_list(values):
   - values={'a': [1, 2], 'b': [3, 4]} yields {'a': 1, 'b': 3}, {'a': 2, 'b': 3},
     {'a': 1, 'b': 4}, {'a': 2, 'b': 4}
   """
-  key_has_list = set(k for k, v in values.iteritems() if isinstance(v, list))
+  key_has_list = frozenset(
+      k for k, v in values.iteritems() if isinstance(v, list))
   if not key_has_list:
     yield values
     return
 
-  all_keys = set(values)
+  all_keys = frozenset(values)
   key_others = all_keys - key_has_list
   non_list_dict = {k: values[k] for k in key_others}
   options = [[(k, v) for v in values[k]] for k in sorted(key_has_list)]
@@ -184,6 +183,32 @@ def _put_shard_to_run(shard_to_run_key, queue_number):
     return False
   shard_to_run.queue_number = queue_number
   shard_to_run.put()
+  return True
+
+
+def _hash_dimensions(dimensions_json):
+  """Returns a 32 bits int that is a hash of the dimensions specified.
+
+  dimensions_json must already be encoded as json. This is because
+  TaskProperties already has the json encoded data available.
+  """
+  digest = hashlib.md5(dimensions_json).digest()
+  # Note that 'L' means C++ unsigned long which is (usually) 32 bits and
+  # python's int is 64 bits.
+  return int(struct.unpack('<L', digest[:4])[0])
+
+
+def _match_dimensions(request_dimensions, bot_dimensions):
+  """Returns True if the bot dimensions satisfies the request."""
+  if frozenset(request_dimensions).difference(bot_dimensions):
+    return False
+  for key, required in request_dimensions.iteritems():
+    bot_value = bot_dimensions[key]
+    if isinstance(bot_value, (list, tuple)):
+      if required not in bot_value:
+        return False
+    elif required != bot_value:
+      return False
   return True
 
 
@@ -239,21 +264,20 @@ def new_shards_to_run_for_request(request):
   Returns:
     Yet to be stored TaskShardToRun entities.
   """
-  dimensions_hash = TaskShardToRun.DIMENSIONS_HASHING_ALGO(
-      request.properties.dimensions_json).digest()
   return [
     TaskShardToRun(
         key=request_key_to_shard_to_run_key(request.key, i+1),
         queue_number=_gen_queue_number_key(
           request.created_ts, request.priority, i+1),
-        dimensions_hash=dimensions_hash,
+        dimensions_hash=_hash_dimensions(request.properties.dimensions_json),
         expiration_ts=request.expiration_ts)
     for i in xrange(request.properties.number_shards)
   ]
 
 
 def yield_next_available_shard_to_dispatch(bot_dimensions):
-  """Yields next available TaskShardToRun in decreasing order of priority.
+  """Yields next available (TaskRequest, TaskShardToRun) in decreasing order of
+  priority.
 
   Once the caller determines the shard is suitable to execute, it must update
   TaskShardToRun.queue_number to None to mark that it is not to be scheduled
@@ -264,8 +288,8 @@ def yield_next_available_shard_to_dispatch(bot_dimensions):
       matched.
   """
   # List of all the valid dimensions hashed.
-  accepted_dimensions = set(
-      TaskShardToRun.DIMENSIONS_HASHING_ALGO(utils.encode_to_json(i)).digest()
+  accepted_dimensions = frozenset(
+      _hash_dimensions(utils.encode_to_json(i))
       for i in _powerset(bot_dimensions))
   now = task_common.utcnow()
   for shard_to_run in TaskShardToRun.query().order(TaskShardToRun.queue_number):
@@ -273,15 +297,20 @@ def yield_next_available_shard_to_dispatch(bot_dimensions):
     # in a transaction, no problem.
     if not shard_to_run.queue_number:
       continue
-    # It expired. A cron job will cancel it eventually.
+    # It expired. A cron job will cancel it eventually. Since 'now' is saved
+    # before the query, an expired task may still be reaped even if technically
+    # expired if the query is very slow. This is on purpose so slow queries do
+    # not cause exagerate expirations.
     if shard_to_run.expiration_ts < now:
       continue
     if shard_to_run.dimensions_hash in accepted_dimensions:
-      logging.info(
-          'Chose %d-%d',
-          shard_to_run_key_to_request_key(shard_to_run.key),
-          shard_to_run.key.integer_id())
-      yield shard_to_run
+      # The hash may have conflicts. Ensure the dimensions actually match by
+      # verifying the TaskRequest. There's a probability of 2**-31 of conflicts,
+      # which is low enough for our purpose.
+      request = shard_to_run.request_key.get()
+      if _match_dimensions(request.properties.dimensions(), bot_dimensions):
+        logging.info('Chose %d', shard_to_run.key.integer_id())
+        yield request, shard_to_run
 
 
 def all_expired_shard_to_run():

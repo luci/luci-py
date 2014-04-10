@@ -87,10 +87,11 @@ class TaskRequestApiTest(test_case.TestCase):
   def test_all_apis_are_tested(self):
     # Ensures there's a test for each public API.
     module = task_request
-    expected = set(
+    expected = frozenset(
         i for i in dir(module)
         if i[0] != '_' and hasattr(getattr(module, i), 'func_name'))
-    missing = expected - set(i[5:] for i in dir(self) if i.startswith('test_'))
+    missing = expected - frozenset(
+        i[5:] for i in dir(self) if i.startswith('test_'))
     self.assertFalse(missing)
 
   def test_id_to_request_key(self):
