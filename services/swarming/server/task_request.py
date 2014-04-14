@@ -75,6 +75,84 @@ _PROPERTIES_KEYS = frozenset(
      'io_timeout_secs', 'number_shards'])
 
 
+### Properties validators must come before the models.
+
+
+def _validate_is_json_internal(prop, value, required):
+  """Validates and enforce the data is in expected json encoded format."""
+  decoded = json.loads(value)
+  if not decoded and required:
+    raise ValueError('%s is required' % prop._name)
+  # Reencodes as strict internal encoding.
+  return utils.encode_to_json(decoded), decoded
+
+
+def _validate_command(prop, value):
+  """Validates TaskProperties.command_json."""
+  encoded, decoded = _validate_is_json_internal(prop, value, True)
+  if (not isinstance(decoded, list) or
+      not all(isinstance(i, list) for i in decoded)):
+    raise ValueError(
+        '%s must be a list of commands, each a list of arguments' % prop._name)
+  return encoded
+
+
+def _validate_data(prop, value):
+  """Validates TaskProperties.data_json."""
+  decoded = json.loads(value)
+  if (not isinstance(decoded, list) or
+      not all(isinstance(i, list) and len(i) == 2 for i in decoded)):
+    raise ValueError('%s must be a list of (url, file)' % prop._name)
+  # Reencodes as strict internal encoding.
+  return utils.encode_to_json(sorted(decoded))
+
+
+def _validate_dict_of_strings(prop, value):
+  """Validates TaskProperties.dimension_json and TaskProperties.env_json."""
+  encoded, decoded = _validate_is_json_internal(prop, value, False)
+  if (not isinstance(decoded, dict) or
+      not all(
+        isinstance(k, unicode) and isinstance(v, unicode)
+        for k, v in decoded.iteritems())):
+    raise ValueError('%s must be a dict of strings' % prop._name)
+  return encoded
+
+
+def _validate_number_shards(prop, value):
+  if (0 >= value or task_common.MAXIMUM_SHARDS < value):
+    raise ValueError(
+        '%s (%d) must be between 1 and %s (inclusive)' %
+        (prop._name, value, task_common.MAXIMUM_SHARDS))
+  return value
+
+
+def _validate_timeout(prop, value):
+  """Validates timeouts in seconds in TaskProperties."""
+  if _MIN_TIMEOUT_SECS > value or _ONE_DAY_SECS < value:
+    raise ValueError(
+        '%s (%ds) must be between %ds and one day' %
+            (prop._name, value, _MIN_TIMEOUT_SECS))
+
+
+def _validate_priority(_prop, value):
+  """Validates TaskRequest.priority."""
+  task_common.validate_priority(value)
+  return value
+
+
+def _validate_expiration(prop, value):
+  now = task_common.utcnow()
+  offset = int(round((value - now).total_seconds()))
+  if _MIN_TIMEOUT_SECS > offset or _ONE_DAY_SECS < offset:
+    raise ValueError(
+        '%s (%s, %ds from now) must effectively be between %ds and one day '
+        'from now (%s)' %
+        (prop._name, value, offset, _MIN_TIMEOUT_SECS, now))
+
+
+### Models.
+
+
 class TaskProperties(ndb.Model):
   """Defines all the properties of a task to be run on the Swarming
   infrastructure.
@@ -101,30 +179,35 @@ class TaskProperties(ndb.Model):
 
   # Commands to run. It is a list of lists. Each command is run one after the
   # other. Encoded json.
-  commands_json = ndb.StringProperty(indexed=False)
+  commands_json = ndb.StringProperty(indexed=False, validator=_validate_command)
 
   # List of (URLs, local file) for the bot to download. Encoded as json. Must be
   # sorted by URLs. Optional.
-  data_json = ndb.StringProperty(indexed=False)
+  data_json = ndb.StringProperty(indexed=False, validator=_validate_data)
 
   # Filter to use to determine the required properties on the bot to run on. For
   # example, Windows or hostname. Encoded as json. Optional but highly
   # recommended.
-  dimensions_json = ndb.StringProperty(indexed=False)
+  dimensions_json = ndb.StringProperty(
+      indexed=False, validator=_validate_dict_of_strings)
 
   # Environment variables. Encoded as json. Optional.
-  env_json = ndb.StringProperty(indexed=False)
+  env_json = ndb.StringProperty(
+      indexed=False, validator=_validate_dict_of_strings)
 
   # Number of instances to split this task into.
-  number_shards = ndb.IntegerProperty(indexed=False)
+  number_shards = ndb.IntegerProperty(
+      indexed=False, validator=_validate_number_shards)
 
   # Maximum duration the bot can take to run a shard of this task.
-  execution_timeout_secs = ndb.IntegerProperty(indexed=True)
+  execution_timeout_secs = ndb.IntegerProperty(
+      indexed=True, validator=_validate_timeout)
 
   # Bot controlled timeout for new bytes from the subprocess. If a subprocess
   # doesn't output new data to stdout for .io_timeout_secs, consider the command
   # timed out. Optional.
-  io_timeout_secs = ndb.IntegerProperty(indexed=False)
+  io_timeout_secs = ndb.IntegerProperty(
+      indexed=True, validator=_validate_timeout)
 
   def commands(self):
     return json.loads(self.commands_json)
@@ -149,88 +232,13 @@ class TaskProperties(ndb.Model):
       'number_shards': self.number_shards,
     }
 
-  def _pre_put_hook(self):
-    """Ensures internal consistency."""
-    # TODO(maruel): Stop decoding and reencoding the json data here, it's not
-    # efficient. Change the infrastructure to verify this at an higher level.
-
-    # Validate commands_json.
-    if not self.commands_json:
-      raise ValueError('A command is required')
-    commands = self.commands()
-    if (not isinstance(commands, list) or
-        not all(isinstance(c, list) for c in commands)):
-      raise ValueError(
-          'command must be a list of commands, each a list of arguments')
-    expected = utils.encode_to_json(commands)
-    if self.commands_json != expected:
-      raise ValueError(
-          'Command encoding is not what was expected. Got %r, expected %r' %
-          (self.commands_json, expected))
-
-    # Validate data_json.
-    data = self.data()
-    if (not isinstance(data, list) or
-        not all(isinstance(d, list) and len(d) == 2 for d in data)):
-      raise ValueError('data must be a list of (url, file)')
-    expected = utils.encode_to_json(sorted(data))
-    if self.data_json != expected:
-      raise ValueError(
-          'data encoding is not what was expected. Got %r, expected %r' %
-          (self.data_json, expected))
-
-    # Validate dimensions_json.
-    dimensions = self.dimensions()
-    if (not isinstance(dimensions, dict) or
-        not all(
-          isinstance(k, unicode) and isinstance(v, unicode)
-          for k, v in dimensions.iteritems())):
-      raise ValueError('dimensions must be a dict of strings')
-    expected = utils.encode_to_json(dimensions)
-    if self.dimensions_json != expected:
-      raise ValueError(
-          'dimensions encoding is not what was expected. Got %r, expected %r' %
-          (self.dimensions_json, expected))
-
-    # Validate env_json.
-    env = self.env()
-    if (not isinstance(env, dict) or
-        not all(
-          isinstance(k, unicode) and isinstance(v, unicode)
-          for k, v in env.iteritems())):
-      raise ValueError('env must be a dict of strings')
-    expected = utils.encode_to_json(env)
-    if self.env_json != expected:
-      raise ValueError(
-          'env encoding is not what was expected. Got %r, expected %r' %
-          (self.env_json, expected))
-
-    if (0 >= self.number_shards or
-        task_common.MAXIMUM_SHARDS < self.number_shards):
-      raise ValueError(
-          'number_shards(%d) must be between 1 and %s (inclusive)' %
-          (self.number_shards, task_common.MAXIMUM_SHARDS))
-
-    if (_MIN_TIMEOUT_SECS > self.execution_timeout_secs or
-        _ONE_DAY_SECS < self.execution_timeout_secs):
-      raise ValueError(
-          'Execution timeout (%d) must be between %ds and one day' %
-              (_MIN_TIMEOUT_SECS, self.execution_timeout_secs))
-
-    if (self.io_timeout_secs and
-        (_MIN_TIMEOUT_SECS > self.io_timeout_secs or
-          _ONE_DAY_SECS < self.io_timeout_secs)):
-      raise ValueError(
-          'I/O timeout (%d) must be between 0 or %ds and one day' %
-              (_MIN_TIMEOUT_SECS, self.io_timeout_secs))
-
 
 class TaskRequest(ndb.Model):
   """Contains a user request.
 
   The key is a increasing integer based on time since task_common.UNIX_EPOCH
   plus some randomness on 8 low order bits then lower 8 bits set to 0. See
-  _new_task_request_key() for the complete gory details.
+  _new_request_key() for the complete gory details.
 
   This model is immutable.
   """
@@ -253,12 +261,13 @@ class TaskRequest(ndb.Model):
 
   # Priority of the task to be run. A lower number is higher priority, thus will
   # preempt requests with lower priority (higher numbers).
-  priority = ndb.IntegerProperty(indexed=False)
+  priority = ndb.IntegerProperty(indexed=False, validator=_validate_priority)
 
   # If the task request is not scheduled by this moment, it will be aborted by a
   # cron job. It is saved instead of scheduling_expiration_secs so finding
   # expired jobs is a simple query.
-  expiration_ts = ndb.DateTimeProperty(indexed=False)
+  expiration_ts = ndb.DateTimeProperty(
+      indexed=True, validator=_validate_expiration)
 
   @property
   def scheduling_expiration_secs(self):
@@ -280,19 +289,8 @@ class TaskRequest(ndb.Model):
     return self.properties.HASHING_ALGO(
         utils.encode_to_json(self.properties)).digest()
 
-  def _pre_put_hook(self):
-    """Ensures internal consistency."""
-    task_common.validate_priority(self.priority)
-    now = task_common.utcnow()
-    offset = int(round((self.expiration_ts - now).total_seconds()))
-    if _MIN_TIMEOUT_SECS > offset or _ONE_DAY_SECS < offset:
-      raise ValueError(
-          'Expiration (%d) must be between %ds and one day from now' %
-          (offset, _MIN_TIMEOUT_SECS))
-    self.properties._pre_put_hook()
 
-
-def _new_task_request_key():
+def _new_request_key():
   """Returns a valid ndb.Key for this entity.
 
   Key id is a 64 bit integer:
@@ -314,7 +312,7 @@ def _new_task_request_key():
   return id_to_request_key(value)
 
 
-def _put_task_request(request):
+def _put_request(request):
   """Puts the new TaskRequest in the DB.
 
   Returns:
@@ -322,8 +320,8 @@ def _put_task_request(request):
     to the user.
   """
   assert not request.key
-  request.key = _new_task_request_key()
-  return datastore_utils.insert(request, _new_task_request_key)
+  request.key = _new_request_key()
+  return datastore_utils.insert(request, _new_request_key)
 
 
 ### Public API.
@@ -400,6 +398,6 @@ def new_request(data):
       properties=properties,
       priority=data['priority'],
       expiration_ts=expiration_ts)
-  if _put_task_request(request):
+  if _put_request(request):
     return request
   return None

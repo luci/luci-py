@@ -49,10 +49,10 @@ def _gen_request_data(properties=None, **kwargs):
 
 
 class TaskRequestPrivateTest(test_case.TestCase):
-  def test_new_task_request_key(self):
+  def test_new_request_key(self):
     for _ in xrange(3):
       now = task_common.milliseconds_since_epoch(None)
-      key = task_request._new_task_request_key()
+      key = task_request._new_request_key()
       key_id = key.integer_id()
       timestamp = key_id >> 16
       randomness = key_id & 0xFFFF
@@ -63,7 +63,7 @@ class TaskRequestPrivateTest(test_case.TestCase):
     else:
       self.fail('Failed to find randomness')
 
-  def test_new_task_request_key_no_random(self):
+  def test_new_request_key_no_random(self):
     def getrandbits(i):
       self.assertEqual(i, 8)
       return 0x77
@@ -77,7 +77,7 @@ class TaskRequestPrivateTest(test_case.TestCase):
     now = task_common.UNIX_EPOCH + datetime.timedelta(
         days=num_days, seconds=num_seconds)
     self.mock(task_common, 'utcnow', lambda: now)
-    key = task_request._new_task_request_key()
+    key = task_request._new_request_key()
     # Last 0x00 is reserved for shard numbers.
     # Next to last 0x77 is the random bits.
     self.assertEqual('0x7fffffffffff7700', '0x%016x' % key.integer_id())
@@ -154,16 +154,22 @@ class TaskRequestApiTest(test_case.TestCase):
     self.assertNotEqual(request_1.properties_hash, request_2.properties_hash)
 
   def test_bad_values(self):
+    # commands are required and must be a list.
     with self.assertRaises(ValueError):
       task_request.new_request(
           _gen_request_data(properties=dict(commands=None)))
-    task_request.new_request(
-        _gen_request_data(properties=dict(commands=[])))
+    with self.assertRaises(ValueError):
+      task_request.new_request(
+          _gen_request_data(properties=dict(commands=[])))
+
+    # .priority
     with self.assertRaises(ValueError):
       task_request.new_request(
           _gen_request_data(priority=task_common.MAXIMUM_PRIORITY+1))
     task_request.new_request(
         _gen_request_data(priority=task_common.MAXIMUM_PRIORITY))
+
+    # .number_shards
     with self.assertRaises(ValueError):
       task_request.new_request(
           _gen_request_data(
@@ -171,6 +177,8 @@ class TaskRequestApiTest(test_case.TestCase):
     task_request.new_request(
         _gen_request_data(
             properties=dict(number_shards=task_common.MAXIMUM_SHARDS)))
+
+    # .scheduling_expiration_secs
     with self.assertRaises(ValueError):
       task_request.new_request(
           _gen_request_data(
