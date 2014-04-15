@@ -36,7 +36,7 @@ from server import test_runner
 
 # Global switch to use the old or new DB. Note unit tests that directly access
 # the DB won't pass with the new DB.
-_USE_OLD_API = True
+USE_OLD_API = True
 
 
 def _convert_test_case(data):
@@ -70,7 +70,7 @@ def _convert_test_case(data):
 
 
 def AbortRunner(runner_key_urlsafe, reason):
-  if _USE_OLD_API:
+  if USE_OLD_API:
     runner = GetRunnerFromUrlSafeKey(runner_key_urlsafe)
     if not runner or runner.started:
       return False
@@ -80,25 +80,25 @@ def AbortRunner(runner_key_urlsafe, reason):
 
 
 def AbortStaleRunners():
-  if _USE_OLD_API:
+  if USE_OLD_API:
     return test_management.AbortStaleRunners()
   raise NotImplementedError()
 
 
 def ExecuteTestRequest(test_case):
-  if _USE_OLD_API:
+  if USE_OLD_API:
     return test_management.ExecuteTestRequest(test_case)
   raise NotImplementedError()
 
 
 def ExecuteRegisterRequest(attributes, server_url):
-  if _USE_OLD_API:
+  if USE_OLD_API:
     return test_management.ExecuteRegisterRequest(attributes, server_url)
   raise NotImplementedError()
 
 
 def RetryRunner(runner_key_urlsafe):
-  if _USE_OLD_API:
+  if USE_OLD_API:
     runner = GetRunnerFromUrlSafeKey(runner_key_urlsafe)
     if not runner:
       return False
@@ -116,13 +116,13 @@ def RetryRunner(runner_key_urlsafe):
 
 
 def GetAllMatchingTestRequests(test_case_name):
-  if _USE_OLD_API:
+  if USE_OLD_API:
     return test_request.GetAllMatchingTestRequests(test_case_name)
   raise NotImplementedError()
 
 
 def GetNewestMatchingTestRequests(test_case_name):
-  if _USE_OLD_API:
+  if USE_OLD_API:
     return test_request.GetNewestMatchingTestRequests(test_case_name)
   raise NotImplementedError()
 
@@ -136,7 +136,7 @@ TIME_BEFORE_RUNNER_HANGING_IN_MINS = (
 
 
 def GetTestRunners(sort_by, ascending, limit, offset, sort_by_first):
-  if _USE_OLD_API:
+  if USE_OLD_API:
     return test_runner.GetTestRunners(
         sort_by, ascending, limit, offset, sort_by_first)
   # TODO(maruel): Once migration is complete, remove limit and offset, replace
@@ -146,7 +146,7 @@ def GetTestRunners(sort_by, ascending, limit, offset, sort_by_first):
 
 def ApplyFilters(query, status, show_successfully_completed, test_name_filter,
                  machine_id_filter):
-  if _USE_OLD_API:
+  if USE_OLD_API:
     return test_runner.ApplyFilters(
         query, status, show_successfully_completed, test_name_filter,
         machine_id_filter)
@@ -154,13 +154,13 @@ def ApplyFilters(query, status, show_successfully_completed, test_name_filter,
 
 
 def GetRunnerFromUrlSafeKey(runner_key_urlsafe):
-  if _USE_OLD_API:
+  if USE_OLD_API:
     return test_runner.GetRunnerFromUrlSafeKey(runner_key_urlsafe)
   raise NotImplementedError()
 
 
 def PingRunner(runner_key_urlsafe, machine_id):
-  if _USE_OLD_API:
+  if USE_OLD_API:
     return test_runner.PingRunner(runner_key_urlsafe, machine_id)
   raise NotImplementedError()
 
@@ -170,26 +170,26 @@ def QueryOldRunners():
 
 
 def GetHangingRunners():
-  if _USE_OLD_API:
+  if USE_OLD_API:
     return test_runner.GetHangingRunners()
   raise NotImplementedError()
 
 
 def DeleteRunnerFromKey(key):
-  if _USE_OLD_API:
+  if USE_OLD_API:
     return test_runner.DeleteRunnerFromKey(key)
   raise NotImplementedError()
 
 
 def GetRunnerResults(runner_key_urlsafe):
-  if _USE_OLD_API:
+  if USE_OLD_API:
     return test_runner.GetRunnerResults(runner_key_urlsafe)
   raise NotImplementedError()
 
 
 def UpdateTestResult(runner, machine_id, success, exit_codes, results,
                      overwrite):
-  if _USE_OLD_API:
+  if USE_OLD_API:
     return runner.UpdateTestResult(
         machine_id, success, exit_codes=exit_codes, results=results,
         overwrite=overwrite)
