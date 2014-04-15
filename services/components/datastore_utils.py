@@ -67,7 +67,7 @@ def hashed_shard_key(key, number_of_letters, root_entity_type):
       hashlib.md5(key).hexdigest(), number_of_letters, root_entity_type)
 
 
-@ndb.transactional
+@ndb.transactional(retries=0)  # pylint: disable=E1120
 def _insert(entity):
   """Guarantees insertion and return True on success.
 

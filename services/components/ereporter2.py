@@ -412,6 +412,10 @@ def _extract_exceptions_from_logs(start_time, end_time, module_versions):
     msgs = []
     log_time = None
     for log_line in entry.app_logs:
+      # TODO(maruel): Specifically handle:
+      # 'Request was aborted after waiting too long to attempt to service your
+      # request.'
+      # For an unknown reason, it is logged at level info (!?)
       if log_line.level < logservice.LOG_LEVEL_ERROR:
         continue
       msg = log_line.message.strip('\n')

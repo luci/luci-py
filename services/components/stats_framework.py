@@ -57,6 +57,8 @@ def _yield_logs(start_time, end_time):
   """
   # If module_versions is not specified, it will default to the current version
   # on current module, which is not what we want.
+  # TODO(maruel): Keep request.offset and use it to resume the query by using it
+  # instead of using start_time/end_time.
   module_versions = utils.get_module_version_list(None, True)
   for request in logservice.fetch(
       start_time=start_time - 1 if start_time else start_time,
@@ -536,6 +538,7 @@ def accumulate(lhs, rhs):
   # pylint: disable=W0212
   for key in set(lhs._properties).intersection(rhs._properties):
     if hasattr(lhs, key) and hasattr(rhs, key):
+      assert not lhs._properties[key]._repeated
       default = lhs._properties[key]._default
       lhs_value = getattr(lhs, key, default)
       rhs_value = getattr(rhs, key, default)
