@@ -46,6 +46,7 @@ def CommonChecks(input_api, output_api):
     sys.path = [
       # To support 'from components import ...'
       join('..'),
+      join('third_party'),
       join('tests'),
       # See tests/test_env.py for more information.
       join('..', 'tools', 'third_party'),

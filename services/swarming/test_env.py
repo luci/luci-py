@@ -8,6 +8,8 @@ import sys
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(APP_DIR)
 
+sys.path.insert(0, os.path.join(APP_DIR, 'components', 'third_party'))
+
 
 def setup_test_env():
   """Sets up system path to allow importing the AE files."""

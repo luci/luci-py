@@ -164,7 +164,7 @@ def _powerset(dimensions):
       yield i
 
 
-@ndb.transactional(retries=1)
+@ndb.transactional(retries=1)  # pylint: disable=E1120
 def _put_shard_to_run(shard_to_run_key, queue_number):
   """Updates a TaskShardToRun.queue_number value.
 

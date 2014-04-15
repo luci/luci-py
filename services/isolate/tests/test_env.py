@@ -17,6 +17,7 @@ sys.path.insert(0, os.path.join(ROOT_DIR, 'tools', 'third_party'))
 sys.path.insert(0, os.path.join(ROOT_DIR, 'tools'))
 # For unit tests not importing main.py, which should be ALL unit tests.
 sys.path.insert(0, os.path.join(APP_DIR, 'third_party'))
+sys.path.insert(0, os.path.join(APP_DIR, 'components', 'third_party'))
 
 import find_gae_sdk
 

@@ -4,7 +4,14 @@
 
 """Defines the application."""
 
+import os
+import sys
+
 from google.appengine.ext.appstats import recording
+
+APP_DIR = os.path.dirname(os.path.abspath(__file__))
+
+sys.path.insert(0, os.path.join(APP_DIR, 'components', 'third_party'))
 
 from components import ereporter2
 from components import utils

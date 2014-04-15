@@ -141,7 +141,6 @@ def _generate_stats_data(request):
       request, get_stats_handler())
 
 
-
 ### Handlers
 
 
