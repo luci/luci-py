@@ -28,6 +28,9 @@ from server import test_runner
 from stats import runner_stats
 from third_party.mox import mox
 
+# pylint: disable=W0212
+
+
 MACHINE_IDS = [
     '12345678-12345678-12345678-12345678',
     '23456789-23456789-23456789-23456789',
@@ -131,6 +134,7 @@ class TestRunnerTest(test_case.TestCase):
   def testAutomaticallyRetryMachineIdNone(self):
     runner = test_helper.CreatePendingRunner(machine_id=None)
     test_runner.AutomaticallyRetryRunner(runner)
+    self.assertTrue(runner)
 
   def testRecordRunnerStatsAfterAutoRetry(self):
     runner = test_helper.CreatePendingRunner(machine_id=MACHINE_IDS[0])
@@ -370,7 +374,7 @@ class TestRunnerTest(test_case.TestCase):
 
   def testGetAsDict(self):
     runner = test_helper.CreatePendingRunner()
-    runner.GetAsDict()
+    self.assertTrue(runner.GetAsDict())
 
   def testRunnerCallerMachineIdMismatch(self):
     self._mox.StubOutWithMock(test_management.logging, 'warning')

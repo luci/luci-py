@@ -19,6 +19,8 @@ test_env.setup_test_env()
 import test_case
 from server import task_glue
 
+# pylint: disable=W0212
+
 
 class TaskGlueTest(test_case.TestCase):
   def test_convert_test_case(self):

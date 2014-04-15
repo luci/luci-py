@@ -26,9 +26,8 @@ class TestRequestTest(test_case.TestCase):
   def testGetTestRequestKeys(self):
     # Ensure that matching works even when the datastore is not being
     # consistent.
-    self.policy = datastore_stub_util.PseudoRandomHRConsistencyPolicy(
-        probability=0)
-    self.testbed.init_datastore_v3_stub(consistency_policy=self.policy)
+    policy = datastore_stub_util.PseudoRandomHRConsistencyPolicy(probability=0)
+    self.testbed.init_datastore_v3_stub(consistency_policy=policy)
 
     # Ensure it works with no keys.
     empty_test_request = test_helper.CreateRequest(num_instances=0)
@@ -46,9 +45,8 @@ class TestRequestTest(test_case.TestCase):
   def testGetMatchingTestRequests(self):
     # Ensure that matching works even when the datastore is not being
     # consistent.
-    self.policy = datastore_stub_util.PseudoRandomHRConsistencyPolicy(
-        probability=0)
-    self.testbed.init_datastore_v3_stub(consistency_policy=self.policy)
+    policy = datastore_stub_util.PseudoRandomHRConsistencyPolicy(probability=0)
+    self.testbed.init_datastore_v3_stub(consistency_policy=policy)
 
     # Ensure it works with no matches.
     matches = test_request.GetAllMatchingTestRequests('unknown')
@@ -71,9 +69,8 @@ class TestRequestTest(test_case.TestCase):
   def testGetNewestMatchingTestRequest(self):
     # Ensure that matching works even when the datastore is not being
     # consistent.
-    self.policy = datastore_stub_util.PseudoRandomHRConsistencyPolicy(
-        probability=0)
-    self.testbed.init_datastore_v3_stub(consistency_policy=self.policy)
+    policy = datastore_stub_util.PseudoRandomHRConsistencyPolicy(probability=0)
+    self.testbed.init_datastore_v3_stub(consistency_policy=policy)
 
     # Ensure it works with no matches.
     match = test_request.GetNewestMatchingTestRequest('unknown')

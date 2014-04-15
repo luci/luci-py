@@ -103,9 +103,6 @@ class AppTest(test_case.TestCase):
         r.template for r in self.app.app.router.match_routes
     ]
 
-  def _GetRequest(self):
-    return test_request.TestRequest.query().get()
-
   def _ReplaceCurrentUser(self, email, **kwargs):
     if email:
       self.testbed.setup_env(USER_EMAIL=email, overwrite=True, **kwargs)
@@ -119,9 +116,9 @@ class AppTest(test_case.TestCase):
   def testMatchingTestCasesHandler(self):
     # Ensure that matching works even when the datastore is not being
     # consistent.
-    self.policy = datastore_stub_util.PseudoRandomHRConsistencyPolicy(
+    policy = datastore_stub_util.PseudoRandomHRConsistencyPolicy(
         probability=0)
-    self.testbed.init_datastore_v3_stub(consistency_policy=self.policy)
+    self.testbed.init_datastore_v3_stub(consistency_policy=policy)
 
     # Mock out all the authentication, since it doesn't work with the server
     # being only eventually consistent (but it is ok for the machines to take
@@ -176,8 +173,10 @@ class AppTest(test_case.TestCase):
 
     # Invalid key.
     for handler in handler_urls:
+      # E.g. use a TestRequest instead of a TestRunner.
+      request = test_request.TestRequest.query().get()
       response = self.app.get(handler,
-                              {'r': self._GetRequest().key.urlsafe()})
+                              {'r': request.key.urlsafe()})
       self.assertTrue('204' in response.status)
 
     # Valid key.
@@ -855,14 +854,12 @@ class AppTest(test_case.TestCase):
     self._ReplaceCurrentUser(ADMIN_EMAIL)
 
     response = self.app.post(
-        handlers._SECURE_CANCEL_URL, {'r': 'invalid_key'},
-        expect_errors=True)
+        '/secure/cancel', {'r': 'invalid_key'}, expect_errors=True)
     self.assertEqual('400 Bad Request', response.status)
     self.assertEqual('Unable to cancel runner', response.body)
 
     runner = test_helper.CreatePendingRunner()
-    response = self.app.post(handlers._SECURE_CANCEL_URL,
-                             {'r': runner.key.urlsafe()})
+    response = self.app.post('/secure/cancel', {'r': runner.key.urlsafe()})
     self.assertResponse(response, '200 OK', 'Runner canceled.')
 
   def testKnownAuthResources(self):

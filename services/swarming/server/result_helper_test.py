@@ -21,6 +21,8 @@ import test_case
 from server import result_helper
 from third_party.mox import mox
 
+# pylint: disable=W0212
+
 
 class ResultHelperTest(test_case.TestCase):
   def setUp(self):
@@ -32,7 +34,7 @@ class ResultHelperTest(test_case.TestCase):
     super(ResultHelperTest, self).tearDown()
 
   def testStoreEmpty(self):
-    result_helper.StoreResults('')
+    self.assertTrue(result_helper.StoreResults(''))
 
   def testStoreAndGetResults(self):
     results = result_helper.Results()

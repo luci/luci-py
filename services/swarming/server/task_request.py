@@ -82,6 +82,7 @@ def _validate_is_json_internal(prop, value, required):
   """Validates and enforce the data is in expected json encoded format."""
   decoded = json.loads(value)
   if not decoded and required:
+    # pylint: disable=W0212
     raise ValueError('%s is required' % prop._name)
   # Reencodes as strict internal encoding.
   return utils.encode_to_json(decoded), decoded
@@ -92,6 +93,7 @@ def _validate_command(prop, value):
   encoded, decoded = _validate_is_json_internal(prop, value, True)
   if (not isinstance(decoded, list) or
       not all(isinstance(i, list) for i in decoded)):
+    # pylint: disable=W0212
     raise ValueError(
         '%s must be a list of commands, each a list of arguments' % prop._name)
   return encoded
@@ -102,6 +104,7 @@ def _validate_data(prop, value):
   decoded = json.loads(value)
   if (not isinstance(decoded, list) or
       not all(isinstance(i, list) and len(i) == 2 for i in decoded)):
+    # pylint: disable=W0212
     raise ValueError('%s must be a list of (url, file)' % prop._name)
   # Reencodes as strict internal encoding.
   return utils.encode_to_json(sorted(decoded))
@@ -114,12 +117,14 @@ def _validate_dict_of_strings(prop, value):
       not all(
         isinstance(k, unicode) and isinstance(v, unicode)
         for k, v in decoded.iteritems())):
+    # pylint: disable=W0212
     raise ValueError('%s must be a dict of strings' % prop._name)
   return encoded
 
 
 def _validate_number_shards(prop, value):
   if (0 >= value or task_common.MAXIMUM_SHARDS < value):
+    # pylint: disable=W0212
     raise ValueError(
         '%s (%d) must be between 1 and %s (inclusive)' %
         (prop._name, value, task_common.MAXIMUM_SHARDS))
@@ -129,6 +134,7 @@ def _validate_number_shards(prop, value):
 def _validate_timeout(prop, value):
   """Validates timeouts in seconds in TaskProperties."""
   if _MIN_TIMEOUT_SECS > value or _ONE_DAY_SECS < value:
+    # pylint: disable=W0212
     raise ValueError(
         '%s (%ds) must be between %ds and one day' %
             (prop._name, value, _MIN_TIMEOUT_SECS))
@@ -144,6 +150,7 @@ def _validate_expiration(prop, value):
   now = task_common.utcnow()
   offset = int(round((value - now).total_seconds()))
   if _MIN_TIMEOUT_SECS > offset or _ONE_DAY_SECS < offset:
+    # pylint: disable=W0212
     raise ValueError(
         '%s (%s, %ds from now) must effectively be between %ds and one day '
         'from now (%s)' %
@@ -254,7 +261,7 @@ class TaskRequest(ndb.Model):
   # uniquely identify the TaskProperties instance for an eventual deduplication
   # by the task scheduler.
   properties_hash = datastore_utils.BytesComputedProperty(
-      lambda self: self._calculate_hash())
+      lambda self: self._calculate_hash())  # pylint: disable=W0212
 
   # The actual properties are embedded in this model.
   properties = ndb.LocalStructuredProperty(TaskProperties, compressed=True)

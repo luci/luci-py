@@ -78,6 +78,7 @@ class OuterParseResults(test_request_message.TestRequestMessageBase):
 
 class Validatable(test_request_message.TestRequestMessageBase):
   def __init__(self, is_valid=True):
+    super(Validatable, self).__init__()
     self.is_valid = is_valid
 
   def Validate(self):
@@ -111,6 +112,7 @@ class TestRequestMessageBaseTest(unittest.TestCase):
     with self.assertRaises(test_request_message.Error):
       trm.ValidateValues(['b', 'c'], str)
 
+    # pylint: disable=W0201
     trm.c = 3
     trm.d = 'a'
     trm.ValidateValues(['a', 'c'], int, required=True)

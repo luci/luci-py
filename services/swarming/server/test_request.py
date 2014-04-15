@@ -92,6 +92,10 @@ class TestRequest(ndb.Model):
   # The runners associated with this runner.
   runner_keys = ndb.KeyProperty(kind='TestRunner', repeated=True)
 
+  # Transient cache of the test request message to keep from evaluating it all
+  # the time.
+  _request_object = None
+
   def __init__(self, *args, **kwargs):
     # 'parent' can be the first arg or a keyword, only add a parent if there
     # isn't one.
@@ -119,15 +123,9 @@ class TestRequest(ndb.Model):
     Raises:
       test_request_message.Error: If the request's message isn't valid.
     """
-    # NOTE: because _request_object is not declared with db.Property, it will
-    # not be persisted to the data store.  This is used as a transient cache of
-    # the test request message to keep from evaluating it all the time
-    request_object = getattr(self, '_request_object', None)
-    if not request_object:
-      request_object = GetTestCase(self.message)
-      self._request_object = request_object
-
-    return request_object
+    if not self._request_object:
+      self._request_object = GetTestCase(self.message)
+    return self._request_object
 
   def GetConfiguration(self, config_name):
     """Gets the named configuration.

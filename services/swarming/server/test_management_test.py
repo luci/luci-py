@@ -31,11 +31,66 @@ from server import test_runner
 from stats import machine_stats
 from third_party.mox import mox
 
+# pylint: disable=W0212
+
 
 MACHINE_IDS = ['12345678-12345678-12345678-12345678',
                '23456789-23456789-23456789-23456789',
                '34567890-34567890-34567890-34567890',
                '87654321-87654321-87654321-87654321']
+
+
+def _GetInvalidRequestMessage():
+  """Return an improperly formatted request message text."""
+  return 'this is a bad request.'
+
+
+def _GetMachineRegisterRequest(machine_id=MACHINE_IDS[0], username=None,
+                               password=None, tag=None, try_count=None,
+                               version=None, platform='win-xp'):
+  """Returns a properly formatted register machine request.
+
+  Args:
+    machine_id: If provided, the id of the machine will be set to this.
+    username: If provided, the user_name of the machine will be set to this.
+    password: If provided, the password of the machine will be set to this.
+    tag: If provided, the tag of the machine will be set to this.
+    try_count: If provided, the try_count of the machine will be set to this.
+    version: If provided, the version of the machine will be set to this.
+    platform: The value of the os to use in the dimensions.
+
+  Returns:
+    A dictionary which can be fed into
+    test_management.ExecuteRegisterRequest().
+  """
+
+  config_dimensions = {'os': platform, 'cpu': 'Unknown', 'browser': 'Unknown'}
+  attributes = {
+      'dimensions': config_dimensions,
+      'version': bot_management.SlaveVersion()
+  }
+  if machine_id:
+    attributes['id'] = str(machine_id)
+  if username:
+    attributes['username'] = username
+  if password:
+    attributes['password'] = password
+  if tag:
+    attributes['tag'] = tag
+  if try_count:
+    attributes['try_count'] = try_count
+  if version:
+    attributes['version'] = version
+  return attributes
+
+
+def _GenerateFutureTimeExpectation():
+  """Set the current time to way in the future and return it."""
+  future_time = (
+      datetime.datetime.utcnow() +
+      datetime.timedelta(seconds=(test_management._TIMEOUT_FACTOR + 1000)))
+  test_management._GetCurrentTime().AndReturn(future_time)
+  return future_time
 
 
 class TestManagementTest(test_case.TestCase):
@@ -62,55 +117,10 @@ class TestManagementTest(test_case.TestCase):
     self._mox.UnsetStubs()
     super(TestManagementTest, self).tearDown()
 
-  def _GetInvalidRequestMessage(self):
-    """Return an improperly formatted request message text."""
-
-    return 'this is a bad request.'
-
-  def _GetMachineRegisterRequest(self, machine_id=MACHINE_IDS[0], username=None,
-                                 password=None, tag=None, try_count=None,
-                                 version=None, platform='win-xp'):
-    """Return a properly formatted register machine request.
-
-    Args:
-      machine_id: If provided, the id of the machine will be set to this.
-      username: If provided, the user_name of the machine will be set to this.
-      password: If provided, the password of the machine will be set to this.
-      tag: If provided, the tag of the machine will be set to this.
-      try_count: If provided, the try_count of the machine will be set to this.
-      version: If provided, the version of the machine will be set to this.
-      platform: The value of the os to use in the dimensions.
-
-    Returns:
-      A dictionary which can be fed into
-      test_management.ExecuteRegisterRequest().
-    """
-
-    config_dimensions = {'os': platform, 'cpu': 'Unknown', 'browser': 'Unknown'}
-    attributes = {
-        'dimensions': config_dimensions,
-        'version': bot_management.SlaveVersion()
-    }
-    if machine_id:
-      attributes['id'] = str(machine_id)
-    if username:
-      attributes['username'] = username
-    if password:
-      attributes['password'] = password
-    if tag:
-      attributes['tag'] = tag
-    if try_count:
-      attributes['try_count'] = try_count
-    if version:
-      attributes['version'] = version
-
-    return attributes
-
   def _ExecuteRegister(self, machine_id, try_count=0, platform='win-xp',
                        register_should_match=True):
-    register_request = self._GetMachineRegisterRequest(machine_id=machine_id,
-                                                       try_count=try_count,
-                                                       platform=platform)
+    register_request = _GetMachineRegisterRequest(
+        machine_id=machine_id, try_count=try_count, platform=platform)
     response = test_management.ExecuteRegisterRequest(register_request,
                                                       self._SERVER_URL)
 
@@ -348,15 +358,6 @@ class TestManagementTest(test_case.TestCase):
   def testHandleFailedTestResults(self):
     self.ExecuteHandleTestResults(success=False)
 
-  def _GenerateFutureTimeExpectation(self):
-    """Set the current time to way in the future and return it."""
-    future_time = (datetime.datetime.utcnow() +
-                   datetime.timedelta(
-                       seconds=(test_management._TIMEOUT_FACTOR + 1000)))
-    test_management._GetCurrentTime().AndReturn(future_time)
-
-    return future_time
-
   def testOnlyAbortStaleRunningRunner(self):
     self._AssignPendingRequestsTest()
     runner = test_runner.TestRunner.query().get()
@@ -364,7 +365,7 @@ class TestManagementTest(test_case.TestCase):
     # Mark the runner as having pinged so it won't be considered stale and it
     # won't be aborted.
     self._mox.StubOutWithMock(test_management, '_GetCurrentTime')
-    runner.ping = self._GenerateFutureTimeExpectation()
+    runner.ping = _GenerateFutureTimeExpectation()
     runner.put()
     self._mox.ReplayAll()
 
@@ -422,7 +423,7 @@ class TestManagementTest(test_case.TestCase):
     test_management._GetCurrentTime().AndReturn(datetime.datetime.utcnow())
     test_management._GetCurrentTime().AndReturn(datetime.datetime.utcnow())
     for _ in range(attempts_to_reach_abort):
-      self._GenerateFutureTimeExpectation()
+      _GenerateFutureTimeExpectation()
 
     self._mox.ReplayAll()
 
@@ -457,8 +458,8 @@ class TestManagementTest(test_case.TestCase):
   def testResultWithUnicode(self):
     # Make sure we can handle results with unicode in them.
     runner = test_helper.CreatePendingRunner(machine_id=MACHINE_IDS[0])
-
     test_management.AbortRunner(runner, u'\u04bb')
+    self.assertTrue(runner)
 
   def testAssignSinglePendingRequest(self):
     # Test when there is 1 test request then 1 machine registers itself.
@@ -544,7 +545,7 @@ class TestManagementTest(test_case.TestCase):
     # An invalid machine register request is received which should raise
     # an exception.
 
-    request_message = self._GetInvalidRequestMessage()
+    request_message = _GetInvalidRequestMessage()
     self.assertRaisesRegexp(test_request_message.Error,
                             r'No JSON object could be decoded',
                             test_management.ExecuteTestRequest,
@@ -655,7 +656,7 @@ class TestManagementTest(test_case.TestCase):
 
     test_management.ExecuteTestRequest(test_helper.GetRequestMessage())
 
-    register_request = self._GetMachineRegisterRequest()
+    register_request = _GetMachineRegisterRequest()
     test_management.ExecuteRegisterRequest(register_request, self._SERVER_URL)
     test_management.ExecuteRegisterRequest(register_request, self._SERVER_URL)
 
@@ -681,15 +682,15 @@ class TestManagementTest(test_case.TestCase):
     # Ensure query is recorded, even though there was no match.
     nonmatching_config = 'win-vista'
     test_management.ExecuteRegisterRequest(
-        self._GetMachineRegisterRequest(machine_id=MACHINE_IDS[0],
-                                        platform=nonmatching_config),
+        _GetMachineRegisterRequest(
+            machine_id=MACHINE_IDS[0], platform=nonmatching_config),
         self._SERVER_URL)
     self.assertEqual(1, machine_stats.MachineStats.query().count())
 
     # Ensure the query is recorded.
     test_management.ExecuteRegisterRequest(
-        self._GetMachineRegisterRequest(machine_id=MACHINE_IDS[1],
-                                        platform=matching_config),
+        _GetMachineRegisterRequest(
+            machine_id=MACHINE_IDS[1], platform=matching_config),
         self._SERVER_URL)
     self.assertEqual(2, machine_stats.MachineStats.query().count())
 
@@ -698,7 +699,7 @@ class TestManagementTest(test_case.TestCase):
     # mismatch.
     version = bot_management.SlaveVersion()
     response = test_management.ExecuteRegisterRequest(
-        self._GetMachineRegisterRequest(version=version[:-1]),
+        _GetMachineRegisterRequest(version=version[:-1]),
         self._SERVER_URL)
 
     self.assertTrue('try_count' in response)

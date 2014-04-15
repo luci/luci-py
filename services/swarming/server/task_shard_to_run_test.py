@@ -25,6 +25,8 @@ from server import task_request
 from server import task_shard_to_run
 from server import test_helper
 
+# pylint: disable=W0212
+
 
 def _gen_request_data(properties=None, **kwargs):
   base_data = {

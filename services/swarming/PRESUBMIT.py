@@ -50,16 +50,6 @@ def CommonChecks(input_api, output_api):
       join('..', 'tools', 'third_party'),
     ] + sys.path
     disabled_warnings = [
-      'E0611', # No name X in module Y
-      'F0401', # Unable to import X
-      'W0232', # Class has no __init__ method
-      #TODO (csharp): Enable the warnings below.
-      'E1002',
-      'R0201',
-      'W0201',
-      'W0212',
-      'W0222',
-      'W0231',
     ]
     output.extend(input_api.canned_checks.RunPylint(
         input_api, output_api, disabled_warnings=disabled_warnings))
@@ -67,11 +57,11 @@ def CommonChecks(input_api, output_api):
     sys.path = old_sys_path
 
   test_directories = [
-      input_api.PresubmitLocalPath(),
-      join('common'),
-      join('server'),
-      join('stats'),
-      join('swarm_bot'),
+    input_api.PresubmitLocalPath(),
+    join('common'),
+    join('server'),
+    join('stats'),
+    join('swarm_bot'),
   ]
 
   blacklist = []

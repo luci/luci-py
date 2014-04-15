@@ -14,7 +14,6 @@ import unittest
 import zipfile
 
 # Import everything that does not require sys.path hack first.
-# pylint: disable-msg=W0403
 import local_test_runner
 
 from common import swarm_constants
@@ -29,6 +28,9 @@ test_env.setup_test_env()
 
 from depot_tools import auto_stub
 from third_party.mox import mox
+
+# pylint: disable=W0212
+
 
 DATA_FILE_REGEX = r'\S*/%s/%s'
 DATA_FOLDER_REGEX = r'\S*/%s'
@@ -58,6 +60,8 @@ class TestLocalTestRunner(auto_stub.TestCase):
 
     self.test_name1 = 'test1'
     self.test_name2 = 'test2'
+    self.mock_proc = None
+    self.mock_zipfile = None
 
   def tearDown(self):
     self._mox.UnsetStubs()
@@ -305,14 +309,14 @@ class TestLocalTestRunner(auto_stub.TestCase):
       decorate_output = [False, False]
     if not results:
       results = [(0, 'success'), (0, 'success')]
-    self.action1 = ['foo']
-    self.action2 = ['bar', 'foo', 'bar']
+    action1 = ['foo']
+    action2 = ['bar', 'foo', 'bar']
     if not test_names:
       test_names = [self.test_name1, self.test_name2]
     self.assertEqual(len(results), 2)
     test_objects_data = [
-        (test_names[0], self.action1, decorate_output[0], 60, 0),
-        (test_names[1], self.action2, decorate_output[1], 60, 9)
+        (test_names[0], action1, decorate_output[0], 60, 0),
+        (test_names[1], action2, decorate_output[1], 60, 9)
     ]
     self.assertEqual(len(decorate_output), len(results))
     self.CreateValidFile(test_objects_data=test_objects_data,
@@ -325,8 +329,8 @@ class TestLocalTestRunner(auto_stub.TestCase):
       env_items += test_run_env.items()
     env = dict(env_items)
 
-    runner._RunCommand(self.action1, 60, 0, env=env).AndReturn(results[0])
-    runner._RunCommand(self.action2, 60, 9, env=env).AndReturn(results[1])
+    runner._RunCommand(action1, 60, 0, env=env).AndReturn(results[0])
+    runner._RunCommand(action2, 60, 9, env=env).AndReturn(results[1])
     return runner
 
   def testRunTests(self):

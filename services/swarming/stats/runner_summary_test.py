@@ -27,6 +27,8 @@ from stats import runner_stats
 from stats import runner_summary
 from third_party.mox import mox
 
+# pylint: disable=W0212
+
 
 def _AddSecondsToDateTime(date_time, seconds):
   return date_time + datetime.timedelta(seconds=seconds)

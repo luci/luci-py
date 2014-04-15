@@ -53,7 +53,6 @@ _NUM_RECENT_ERRORS_TO_DISPLAY = 10
 
 _DELETE_MACHINE_STATS_URL = '/delete_machine_stats'
 
-_SECURE_CANCEL_URL = '/secure/cancel'
 _SECURE_CHANGE_WHITELIST_URL = '/secure/change_whitelist'
 _SECURE_GET_RESULTS_URL = '/secure/get_result'
 _SECURE_MAIN_URL = '/secure/main'
@@ -191,8 +190,7 @@ def make_runner_view(runner):
   else:
     out['status_string'] = 'Pending'
     out['command_string'] = GenerateButtonWithHiddenForm(
-        'Cancel',
-        '%s?r=%s' % (_SECURE_CANCEL_URL, out['key_string']),
+        'Cancel', '/secure/cancel?r=%s' % (out['key_string']),
         out['key_string'])
   return out
 
@@ -200,15 +198,19 @@ def make_runner_view(runner):
 ### Handlers
 
 
-class MainHandler(auth.AuthenticatingHandler):
-  """Handler for the main page of the web server.
+class FilterParams(object):
+  def __init__(
+      self, status, test_name_filter, show_successfully_completed,
+      machine_id_filter):
+    self.status = status
+    self.test_name_filter = test_name_filter
+    self.show_successfully_completed = show_successfully_completed
+    self.machine_id_filter = machine_id_filter
 
-  This handler lists all pending requests and allows callers to manage them.
-  """
-
-  def GeneratePageUrl(self, current_page=None, sort_by=None,
-                      include_filters=False):
-    """Generate a URL that points to the current page (it has the same options).
+  def generate_page_url(
+      self, current_page=None, sort_by=None,
+      include_filters=False):
+    """Generates an URL that points to the current page with similar options.
 
     If an option is listed as None, don't include it to allow the html page to
     ensure it can add its desired option.
@@ -219,50 +221,27 @@ class MainHandler(auth.AuthenticatingHandler):
       include_filters: True if the filters should be included in the url.
 
     Returns:
-      The user for the described page.
+      query url page for the requested filtering settings.
     """
-    url = '?'
-
+    params = {}
     if current_page:
-      url += 'page=' + str(current_page) + '&'
-
+      params['page'] = str(current_page)
     if sort_by:
-      url += 'sort_by=' + sort_by + '&'
-
+      params['sort_by'] = sort_by
     if include_filters:
       if self.status is not None:
-        url += 'status=' + self.status + '&'
-
+        params['status'] = self.status
       if self.show_successfully_completed is not None:
-        url += ('show_successfully_completed=' +
-                str(self.show_successfully_completed) +'&')
-
+        params['show_successfully_completed'] = str(
+            self.show_successfully_completed)
       if self.test_name_filter is not None:
-        url += 'test_name_filter=' + self.test_name_filter + '&'
-
+        params['test_name_filter'] = self.test_name_filter
       if self.machine_id_filter is not None:
-        url += 'machine_id_filter=' + self.machine_id_filter + '&'
+        params['machine_id_filter'] = self.machine_id_filter
+    return '?' + urllib.urlencode(params)
 
-    # Remove the trailing &.
-    url = url[:-1]
-
-    return url
-
-  def ParseFilters(self):
-    """Parse the filters from the request."""
-    self.status = self.request.get('status', 'all')
-
-    # Compare to 'False' so that the default value for invalid user input
-    # is True.
-    self.show_successfully_completed = (
-        self.request.get('show_successfully_completed', '') != 'False')
-
-    self.test_name_filter = self.request.get('test_name_filter', '')
-    self.machine_id_filter = self.request.get('machine_id_filter', '')
-
-  def GetTestRunners(self, sort_by=None, ascending=None, limit=None,
-                     offset=None):
-    """Get a query with the given parameters, also applying the filters.
+  def get_shards(self, sort_by=None, ascending=None, limit=None, offset=None):
+    """Returns a query with the given parameters, also applying the filters.
 
     Args:
       sort_by: The value to sort the runners by.
@@ -273,13 +252,14 @@ class MainHandler(auth.AuthenticatingHandler):
     Returns:
       The TestRunner query that is properly adjusted and filtered.
     """
+    # TODO(maruel): Use cursors!
     # If we are filtering for running runners, then we will test for inequality
     # on the started field. App engine requires any fields used in an
     # inequality be the first sorts that are applied to the query.
     sort_by_first = 'started' if self.status == 'running' else None
 
     query = task_glue.GetTestRunners(
-        sort_by, ascending, limit, offset,sort_by_first)
+        sort_by, ascending, limit, offset, sort_by_first)
 
     return task_glue.ApplyFilters(
         query,
@@ -288,12 +268,13 @@ class MainHandler(auth.AuthenticatingHandler):
         self.test_name_filter,
         self.machine_id_filter)
 
-  def FilterSelectsHTML(self):
+  def filter_selects_as_html(self):
     """Generates the HTML filter select values, with the proper defaults set.
 
     Returns:
       The HTML representing the filter select options.
     """
+    # TODO(maruel): Use jinja2 instead.
     html = ('Ran Successfully:'
             '<select name="show_successfully_completed" form="filter">')
 
@@ -330,8 +311,23 @@ class MainHandler(auth.AuthenticatingHandler):
                '<option value="done">Done Only</option>')
 
     html += '</select>'
-
     return html
+
+
+class MainHandler(auth.AuthenticatingHandler):
+  """Handler for the main page of the web server.
+
+  This handler lists all pending requests and allows callers to manage them.
+  """
+  def parse_filters(self):
+    """Parse the filters from the request."""
+    return FilterParams(
+      self.request.get('status', 'all'),
+      self.request.get('test_name_filter', ''),
+      # Compare to 'False' so that the default value for invalid user input
+      # is True.
+      self.request.get('show_successfully_completed', '') != 'False',
+      self.request.get('machine_id_filter', ''))
 
   @auth.require(auth.READ, 'swarming/management')
   def get(self):
@@ -352,18 +348,20 @@ class MainHandler(auth.AuthenticatingHandler):
     sorted_by_message += task_glue.ACCEPTABLE_SORTS[sort_key] + '</p>'
 
     # Prase and load the filters
-    self.ParseFilters()
+    params = self.parse_filters()
 
-    runner_count_async = self.GetTestRunners().count_async()
+    runner_count_async = params.get_shards().count_async()
 
     try:
       page = int(self.request.get('page', 1))
     except ValueError:
+      # TODO(maruel): Stop silently ignoring invalid values (in general,
+      # everywhere).
       page = 1
 
     runners = [
       make_runner_view(runner)
-      for runner in self.GetTestRunners(
+      for runner in params.get_shards(
           sort_key,
           ascending=ascending,
           limit=_NUM_USER_TEST_RUNNERS_PER_PAGE,
@@ -391,22 +389,22 @@ class MainHandler(auth.AuthenticatingHandler):
     page = min(page, total_pages + 1)
 
     params = {
-        'current_page': page,
-        'errors': errors_found,
-        'filter_selects': self.FilterSelectsHTML(),
-        'machine_id_filter': self.machine_id_filter,
-        'runners': runners,
-        'selected_sort': selected_sort,
-        'sort_options': sort_options,
-        'sorted_by_message': sorted_by_message,
-        'test_name_filter': self.test_name_filter,
-        # Add 1 so the pages are 1-indexed.
-        'total_pages': map(str, range(1, total_pages + 1, 1)),
-        'url_no_filters': self.GeneratePageUrl(page, sort_by),
-        'url_no_page': self.GeneratePageUrl(sort_by=sort_by,
-                                            include_filters=True),
-        'url_no_sort_by_or_filters': self.GeneratePageUrl(
-            page, include_filters=False),
+      'current_page': page,
+      'errors': errors_found,
+      'filter_selects': params.filter_selects_as_html(),
+      'machine_id_filter': params.machine_id_filter,
+      'runners': runners,
+      'selected_sort': selected_sort,
+      'sort_options': sort_options,
+      'sorted_by_message': sorted_by_message,
+      'test_name_filter': params.test_name_filter,
+      # Add 1 so the pages are 1-indexed.
+      'total_pages': map(str, range(1, total_pages + 1, 1)),
+      'url_no_filters': params.generate_page_url(page, sort_by),
+      'url_no_page': params.generate_page_url(
+          sort_by=sort_by, include_filters=True),
+      'url_no_sort_by_or_filters': params.generate_page_url(
+          page, include_filters=False),
     }
     self.response.out.write(template.render('index.html', params))
 
@@ -1131,11 +1129,11 @@ class StatsDailyHandler(webapp2.RequestHandler):
       ('total_wait_time', 'Total Wait Time'),
   ]
 
-  def _GetGraphableDailyStats(self, stats):
+  def _GetGraphableDailyStats(self, days):
     """Convert the daily_stats into a list of graphs objects for visualization.
 
     Args:
-      stats: A list of daily stats to split into components.
+      days: A list of daily stats to split into components.
 
     Returns:
       A list of dictionaries with the graph title and an array that can be
@@ -1148,7 +1146,7 @@ class StatsDailyHandler(webapp2.RequestHandler):
           'title': title_name,
         } for element_name, title_name in self.ELEMENTS_TO_GRAPH
     ]
-    for stat in stats:
+    for stat in days:
       date_str = stat.date.isoformat()
       for i, element in enumerate(self.ELEMENTS_TO_GRAPH):
         graphs_to_show[i]['data_array'].append(
@@ -1304,11 +1302,12 @@ def SendRunnerResults(response, key):
   if results:
     # Convert the output to utf-8 to ensure that the JSON library can
     # handle it without problems.
+    # TODO(maruel): It is decoding from utf-8 to unicode. This is confused.
     results['output'] = results['output'].decode('utf-8', 'replace')
-
     response.headers['Content-Type'] = 'application/json; charset=utf-8'
     response.out.write(json.dumps(results))
   else:
+    # TODO(maruel): Use 404 if not present.
     response.set_status(204)
     logging.info('Unable to provide runner results [key: %s]', key)
 
@@ -1356,7 +1355,7 @@ def CreateApplication():
       ('/test', TestRequestHandler),
       ('/upload_start_slave', UploadStartSlaveHandler),
       (_DELETE_MACHINE_STATS_URL, DeleteMachineStatsHandler),
-      (_SECURE_CANCEL_URL, CancelHandler),
+      ('/secure/cancel', CancelHandler),
       (_SECURE_CHANGE_WHITELIST_URL, ChangeWhitelistHandler),
       (_SECURE_GET_RESULTS_URL, SecureGetResultHandler),
       (_SECURE_MAIN_URL, MainHandler),

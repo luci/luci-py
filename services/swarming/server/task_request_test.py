@@ -20,6 +20,8 @@ import test_case
 from server import task_common
 from server import task_request
 
+# pylint: disable=W0212
+
 
 def _gen_request_data(properties=None, **kwargs):
   base_data = {

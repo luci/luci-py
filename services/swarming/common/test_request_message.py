@@ -260,7 +260,8 @@ class TestRequestMessageBase(object):
         # Now we validate the whole object.
         object_value.Validate()
 
-  def ValidateUrl(self, url):
+  @staticmethod
+  def ValidateUrl(url):
     """Raises if the given value is not a valid URL."""
     if not isinstance(url, basestring):
       raise Error('Unsupported url type, %s, must be a string' % url)
@@ -321,23 +322,8 @@ class TestRequestMessageBase(object):
       elif required:
         raise Error('Missing list %s' % list_key)
 
-  def ValidateInteger(self, value):
-    """Raises if the given value is not castable to a valid integer.
-
-    The value must not only be castable to a valid integer, but it must also be
-    a whole number (i.e. 8.0 is valid but 8.5 is not).
-    """
-    try:
-      long(value)
-    except ValueError:
-      raise Error('Invalid value for size, %s, must be long castable' % value)
-
-    if isinstance(value, float) and int(value) != value:
-      raise Error(
-          'Size in output destination must be a whole number, was given %s' %
-          value)
-
-  def ValidateEncoding(self, encoding):
+  @staticmethod
+  def ValidateEncoding(encoding):
     """Raises if the given encoding is not valid."""
     try:
       unicode('0', encoding)

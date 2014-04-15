@@ -12,8 +12,6 @@ import sys
 import time
 import unittest
 
-# Import everything that does not need sys.path hack first.
-# pylint: disable-msg=W0403
 import slave_machine
 import url_helper
 
@@ -31,6 +29,8 @@ test_env.setup_test_env()
 
 from depot_tools import auto_stub
 from third_party.mox import mox
+
+# pylint: disable=W0212
 
 
 def _CreateResponse(come_back=None, try_count=1, commands=None, result_url=None,
@@ -114,25 +114,25 @@ class TestSlaveMachine(auto_stub.TestCase):
     slave._PostFailedExecuteResults(result_string)
 
   # Mocks slave_machine._MakeDirectory to either throw exception or not.
-  def _MockMakeDirectory(self, slave, path, exception=False,
+  def _MockMakeDirectory(self, path, exception=False,
                          exception_message='Some error message'):
-    self._mox.StubOutWithMock(slave, '_MakeDirectory')
+    self._mox.StubOutWithMock(slave_machine, '_MakeDirectory')
 
     if exception:
-      slave._MakeDirectory(path).AndRaise(os.error(exception_message))
+      slave_machine._MakeDirectory(path).AndRaise(os.error(exception_message))
     else:
-      slave._MakeDirectory(path)
+      slave_machine._MakeDirectory(path)
 
   # Mocks slave_machine._StoreFile to either throw exception or not.
-  def _MockStoreFile(self, slave, path, name, contents, exception=False,
+  def _MockStoreFile(self, path, name, contents, exception=False,
                      exception_message='Some error message'):
-    self._mox.StubOutWithMock(slave, '_StoreFile')
+    self._mox.StubOutWithMock(slave_machine, '_StoreFile')
 
     if exception:
-      slave._StoreFile(
+      slave_machine._StoreFile(
           path, name, contents).AndRaise(IOError(exception_message))
     else:
-      slave._StoreFile(path, name, contents)
+      slave_machine._StoreFile(path, name, contents)
 
   # Mocks subprocess.check_call and raises exception if specified.
   def _MockSubprocessCheckCall(self, commands, exit_code=0):
@@ -346,12 +346,12 @@ class TestSlaveMachine(auto_stub.TestCase):
     # Initial server ping.
     url_helper.UrlOpen(mox.IgnoreArg(), method='GET').AndReturn('')
 
-    commands = [rpc.BuildRPC('LogRPC', None)]
+    commands = [rpc.BuildRPC('RunCommands', None)]
     _SetPollJobAndPostFailExpectations(
         _CreateResponse(commands=commands, result_url='here.com'),
         'here.com',
-        'Invalid arg types to LogRPC: <type \'NoneType\'> (expected str or '
-        'unicode)')
+        'Invalid RunCommands arg type: <type \'NoneType\'> (expected list of '
+        'str or unicode)')
     self._mox.ReplayAll()
 
     slave = slave_machine.SlaveMachine()
@@ -364,13 +364,14 @@ class TestSlaveMachine(auto_stub.TestCase):
     # Initial server ping.
     url_helper.UrlOpen(mox.IgnoreArg(), method='GET').AndReturn('')
 
-    function_name = 'LogRPC'
-    args = 'these are some arg not argS'
+    function_name = 'RunCommands'
+    args = ['--version']
     commands = [rpc.BuildRPC(function_name, args)]
 
     UrlOpenExpectations(
         _CreateResponse(commands=commands, result_url='here.com'),
         mox.IgnoreArg(), mox.IgnoreArg())
+    self._MockSubprocessCheckCall([sys.executable, '--version'])
     self._mox.ReplayAll()
 
     slave = slave_machine.SlaveMachine()
@@ -535,7 +536,7 @@ class TestSlaveMachine(auto_stub.TestCase):
 
     exception_message = 'makedirs exception'
     self._MockMakeDirectory(
-        slave, args[0][0], exception=True, exception_message=exception_message)
+        args[0][0], exception=True, exception_message=exception_message)
     self._MockPostFailedExecuteResults(
         slave, 'MakeDirectory exception: %s' % exception_message)
 
@@ -562,8 +563,8 @@ class TestSlaveMachine(auto_stub.TestCase):
         ).AndReturn(response)
 
     exception_message = 'storefile exception'
-    self._MockMakeDirectory(slave, args[0][0], exception=False)
-    self._MockStoreFile(slave, args[0][0], args[0][1], args[0][2],
+    self._MockMakeDirectory(args[0][0], exception=False)
+    self._MockStoreFile(args[0][0], args[0][1], args[0][2],
                         exception=True, exception_message=exception_message)
     self._MockPostFailedExecuteResults(
         slave, 'StoreFile exception: %s' % exception_message)
@@ -590,9 +591,8 @@ class TestSlaveMachine(auto_stub.TestCase):
         mox.IgnoreArg(), data=mox.IgnoreArg(), max_tries=mox.IgnoreArg()
         ).AndReturn(response)
 
-    self._MockMakeDirectory(slave, args[0][0], exception=False)
-    self._MockStoreFile(
-        slave, args[0][0], args[0][1], args[0][2], exception=False)
+    self._MockMakeDirectory(args[0][0], exception=False)
+    self._MockStoreFile(args[0][0], args[0][1], args[0][2], exception=False)
 
     self._mox.ReplayAll()
 

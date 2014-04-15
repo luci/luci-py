@@ -210,6 +210,37 @@ def ValidateCommand(commands, error_prefix='', errors=None):
   return valid
 
 
+def _MakeDirectory(path):
+  """Creates requested folder if it doesn't exist.
+
+  Args:
+    path: The folder path to create recursively.
+
+  Raises:
+    os.error: If the directory can't be created.
+  """
+  if path and not os.path.exists(path):
+    os.makedirs(path)
+    logging.debug('Created file path: ' + path)
+
+
+def _StoreFile(file_path, file_name, file_contents):
+  """Stores file_contents in given path and name.
+
+  Args:
+    file_path: The folder the file should go in.
+    file_name: The file name.
+    file_contents: Contents of the file to store.
+
+  Raises:
+    IOError: the file can't be opened.
+  """
+  full_name = os.path.join(file_path, file_name)
+  with open(full_name, 'wb') as f:
+    f.write(file_contents)
+  logging.debug('File stored: %s', full_name)
+
+
 class SlaveMachine(object):
   """Creates a slave that continuously polls the Swarm server for jobs."""
 
@@ -346,6 +377,7 @@ class SlaveMachine(object):
     Returns:
       The result of the execute function.
     """
+    # TODO(maruel): Limit the scope about which functions can be called.
     return getattr(self, name)(args)
 
   def _ParseResponse(self, response):
@@ -446,25 +478,8 @@ class SlaveMachine(object):
                        max_tries=self._max_url_tries,
                        method='POSTFORM')
 
-  def LogRPC(self, args):
-    """Logs given args to logging.debug.
-
-    Args:
-      args: A string or unicode to be logged.
-
-    Raises:
-      SlaveRPCError: If args are invalid will include an error message.
-    """
-    # Validate args.
-    if not isinstance(args, basestring):
-      raise SlaveRPCError(
-          'Invalid arg types to LogRPC: %s (expected str or unicode)' %
-          str(type(args)))
-
-    # Execute functionality.
-    logging.info(args)
-
-  def StoreFiles(self, args):
+  @staticmethod
+  def StoreFiles(args):
     """Stores the given file contents to specified directory.
 
     Args:
@@ -502,45 +517,17 @@ class SlaveMachine(object):
       logging.debug('Received file name: ' + file_name)
 
       try:
-        self._MakeDirectory(file_path)
+        _MakeDirectory(file_path)
       except os.error as e:
         raise SlaveRPCError('MakeDirectory exception: ' + str(e))
 
       try:
-        self._StoreFile(file_path, file_name, file_contents)
+        _StoreFile(file_path, file_name, file_contents)
       except IOError as e:
         raise SlaveRPCError('StoreFile exception: ' + str(e))
 
-  def _MakeDirectory(self, path):
-    """Creates requested folder if it doesn't exist.
-
-    Args:
-      path: The folder path to create recursively.
-
-    Raises:
-      os.error: If the directory can't be created.
-    """
-    if path and not os.path.exists(path):
-      os.makedirs(path)
-      logging.debug('Created file path: ' + path)
-
-  def _StoreFile(self, file_path, file_name, file_contents):
-    """Stores file_contents in given path and name.
-
-    Args:
-      file_path: The folder the file should go in.
-      file_name: The file name.
-      file_contents: Contents of the file to store.
-
-    Raises:
-      IOError: the file can't be opened.
-    """
-    full_name = os.path.join(file_path, file_name)
-    with open(full_name, 'wb') as f:
-      f.write(file_contents)
-    logging.debug('File stored: %s', full_name)
-
-  def RunCommands(self, args):
+  @staticmethod
+  def RunCommands(args):
     """Checks type of args to be correct.
 
     Args:

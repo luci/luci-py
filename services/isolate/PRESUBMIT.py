@@ -52,8 +52,6 @@ def CommonChecks(input_api, output_api):
       join('..', 'tools', 'third_party'),
     ] + sys.path
     disabled_warnings = [
-        'E1101', # Instance X has no member Y
-        'W0232', # Class has no __init__ method
     ]
     output.extend(input_api.canned_checks.RunPylint(
         input_api, output_api, disabled_warnings=disabled_warnings))
