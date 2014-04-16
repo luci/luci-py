@@ -10,20 +10,30 @@ TESTS_DIR = os.path.dirname(os.path.abspath(__file__))
 APP_DIR = os.path.dirname(TESTS_DIR)
 ROOT_DIR = os.path.dirname(APP_DIR)
 
-sys.path.insert(0, APP_DIR)
-# For webtest, depot_tools/auto_stub.py and friends.
-sys.path.insert(0, os.path.join(ROOT_DIR, 'tools', 'third_party'))
-# For find_gae_sdk.py and test_case.py
-sys.path.insert(0, os.path.join(ROOT_DIR, 'tools'))
-# For unit tests not importing main.py, which should be ALL unit tests.
-sys.path.insert(0, os.path.join(APP_DIR, 'third_party'))
-sys.path.insert(0, os.path.join(APP_DIR, 'components', 'third_party'))
-
-import find_gae_sdk
+_INITIALIZED = False
 
 
 def setup_test_env():
-  """Sets up App Engine/Django test environment."""
-  gae_dir = find_gae_sdk.find_gae_sdk()
-  find_gae_sdk.setup_gae_sdk(gae_dir)
+  """Sets up App Engine test environment."""
+  global _INITIALIZED
+  if _INITIALIZED:
+    raise Exception('Do not call test_env.setup_test_env() twice.')
+  _INITIALIZED = True
+
+  # For find_gae_sdk.py and test_case.py.
+  sys.path.insert(0, os.path.join(ROOT_DIR, 'tools'))
+
+  import find_gae_sdk  # pylint: disable=F0401
+  gae_sdk_dir = find_gae_sdk.find_gae_sdk()
+  if not gae_sdk_dir:
+    raise Exception('Unable to find gae sdk path, aborting test.')
+
+  find_gae_sdk.setup_gae_sdk(gae_sdk_dir)
   find_gae_sdk.setup_env(APP_DIR, None, None, None)
+
+  # For webtest, depot_tools/auto_stub.py and friends.
+  sys.path.insert(0, os.path.join(ROOT_DIR, 'tools', 'third_party'))
+  # For unit tests not importing main.py, which should be ALL unit tests.
+  sys.path.insert(0, os.path.join(APP_DIR, 'components', 'third_party'))
+  # For cloudstorage and mapreduce.
+  sys.path.insert(0, os.path.join(APP_DIR, 'third_party'))
