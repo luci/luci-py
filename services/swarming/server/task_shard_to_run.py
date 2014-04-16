@@ -37,6 +37,8 @@ import itertools
 import logging
 import struct
 
+from google.appengine.api import datastore_errors
+from google.appengine.api import memcache
 from google.appengine.ext import ndb
 
 from components import datastore_utils
@@ -164,11 +166,11 @@ def _powerset(dimensions):
       yield i
 
 
-@ndb.transactional(retries=1)  # pylint: disable=E1120
 def _put_shard_to_run(shard_to_run_key, queue_number):
   """Updates a TaskShardToRun.queue_number value.
 
-  This function enforces that TaskShardToRun.queue_number member is toggled.
+  This function enforces that TaskShardToRun.queue_number member is toggled and
+  this function must run inside a transaction.
 
   Arguments:
   - shard_to_run_key: ndb.Key to TaskShardToRun entity to update.
@@ -178,8 +180,11 @@ def _put_shard_to_run(shard_to_run_key, queue_number):
     True if succeeded, False if no modification was committed to the DB.
   """
   assert isinstance(shard_to_run_key, ndb.Key), shard_to_run_key
+  assert ndb.in_transaction()
+  # Refresh the item.
   shard_to_run = shard_to_run_key.get()
   if bool(queue_number) == bool(shard_to_run.queue_number):
+    # Too bad, someone else reaped it in the meantime.
     return False
   shard_to_run.queue_number = queue_number
   shard_to_run.put()
@@ -212,6 +217,32 @@ def _match_dimensions(request_dimensions, bot_dimensions):
   return True
 
 
+def _set_lookup_cache(shard_to_run_key, is_available_to_schedule):
+  """Updates the quick lookup cache to mark an item as available or not.
+
+  This cache is a blacklist of items that are already reaped, so it is not worth
+  trying to reap it with a DB transaction. This saves on DB contention when a
+  high number (>1000) of concurrent bots with similar dimension are reaping
+  tasks simultaneously. In this case, there is a high likelihood that multiple
+  concurrent HTTP handlers are trying to reap the exact same task
+  simultaneously. This blacklist helps reduce the contention.
+  """
+  key = '%x' % shard_to_run_key.integer_id()
+  if is_available_to_schedule:
+    # The item is now available, so remove it from memcache.
+    memcache.delete(key, namespace='shard_to_run')
+  else:
+    # Save the item for 5 minutes. This copes with significant index
+    # inconsistency but do not clog the memcache server with unneeded keys.
+    memcache.set(key, True, time=300, namespace='shard_to_run')
+
+
+def _lookup_cache_is_taken(shard_to_run_key):
+  """Queries the quick lookup cache to reduce DB operations."""
+  key = '%x' % shard_to_run_key.integer_id()
+  return bool(memcache.get(key, namespace='shard_to_run'))
+
+
 ### Public API.
 
 
@@ -233,7 +264,11 @@ def request_key_to_shard_to_run_key(request_key, shard_id):
 
 def shard_id_to_key(key_id):
   """Returns the ndb.Key for a TaskShardToRun from a key to a raw id."""
-  assert key_id & 0xFF
+  # key_id is likely to be user-provided.
+  if not (key_id & 0xFF):
+    raise ValueError('Can\'t pass a request id as a shard id')
+  if key_id < 0x100 or key_id >= 2**64:
+    raise ValueError('Invalid shard id')
   parent = datastore_utils.hashed_shard_key(
       str(key_id), task_common.SHARDING_LEVEL, 'TaskShardToRunShard')
   return ndb.Key(TaskShardToRun, key_id, parent=parent)
@@ -283,34 +318,109 @@ def yield_next_available_shard_to_dispatch(bot_dimensions):
   TaskShardToRun.queue_number to None to mark that it is not to be scheduled
   anymore.
 
+  Performance is the top most priority here.
+
   Arguments:
   - bot_dimensions: dimensions (as a dict) defined by the bot that can be
       matched.
   """
   # List of all the valid dimensions hashed.
-  accepted_dimensions = frozenset(
+  accepted_dimensions_hash = frozenset(
       _hash_dimensions(utils.encode_to_json(i))
       for i in _powerset(bot_dimensions))
   now = task_common.utcnow()
-  for shard_to_run in TaskShardToRun.query().order(TaskShardToRun.queue_number):
-    # It is possible for the index to be inconsistent since it is not executed
-    # in a transaction, no problem.
-    if not shard_to_run.queue_number:
-      continue
-    # It expired. A cron job will cancel it eventually. Since 'now' is saved
-    # before the query, an expired task may still be reaped even if technically
-    # expired if the query is very slow. This is on purpose so slow queries do
-    # not cause exagerate expirations.
-    if shard_to_run.expiration_ts < now:
-      continue
-    if shard_to_run.dimensions_hash in accepted_dimensions:
+  broken = 0
+  cache_lookup = 0
+  expired = 0
+  hash_mismatch = 0
+  ignored = 0
+  no_queue = 0
+  real_mismatch = 0
+  total = 0
+  # Be very aggressive in fetching the largest amount of items as possible. Note
+  # that we use the default ndb.EVENTUAL_CONSISTENCY so stale items may be
+  # returned. It's handled specifically.
+  # - 100/200 gives 2s~40s of query time for 1275 items.
+  # - 250/500 gives 2s~50s of query time for 1275 items.
+  # - 50/500 gives 3s~20s of query time for 1275 items. (Slower but less
+  #   variance). Spikes in 20s~40s are rarer.
+  # The problem here are:
+  # - Outliers, some shards are simply slower at executing the query.
+  # - Median time, which we should optimize.
+  # - Abusing batching will slow down this query.
+  #
+  # TODO(maruel): Measure query performance with stats_framework!!
+  # TODO(maruel): Use a keys_only=True query + fetch_page_async() +
+  # ndb.get_multi_async() + memcache.get_multi_async() to do pipelined
+  # processing. Should greatly reduce the effect of latency on the total
+  # duration of this function. I also suspect using ndb.get_multi() will return
+  # fresher objects than what is returned by the query.
+  opts = ndb.QueryOptions(batch_size=50, prefetch_size=500)
+  try:
+    # Interestingly, the filter on .queue_number>0 is required otherwise all the
+    # None items are returned first.
+    q = TaskShardToRun.query(default_options=opts).order(
+        TaskShardToRun.queue_number).filter(TaskShardToRun.queue_number > 0)
+    for shard_to_run in q:
+      total += 1
+      # Verify TaskRequestShard is what is expected. Play defensive here.
+      shard_to_run_shard_key = shard_to_run.key.parent()
+      if (not shard_to_run_shard_key.string_id() or
+          len(shard_to_run_shard_key.string_id()) !=
+              task_common.SHARDING_LEVEL):
+        logging.error(
+            'Found %s which is not on proper sharding level %d',
+            shard_to_run.key, task_common.SHARDING_LEVEL)
+        broken += 1
+        continue
+
+      # It is possible for the index to be inconsistent since it is not executed
+      # in a transaction, no problem.
+      if not shard_to_run.queue_number:
+        no_queue += 1
+        continue
+      # It expired. A cron job will cancel it eventually. Since 'now' is saved
+      # before the query, an expired task may still be reaped even if
+      # technically expired if the query is very slow. This is on purpose so
+      # slow queries do not cause exagerate expirations.
+      if shard_to_run.expiration_ts < now:
+        expired += 1
+        continue
+      if shard_to_run.dimensions_hash not in accepted_dimensions_hash:
+        hash_mismatch += 1
+        continue
+
+      # Do this after the basic weeding out but before fetching TaskRequest.
+      if _lookup_cache_is_taken(shard_to_run.key):
+        cache_lookup += 1
+        continue
+
       # The hash may have conflicts. Ensure the dimensions actually match by
       # verifying the TaskRequest. There's a probability of 2**-31 of conflicts,
       # which is low enough for our purpose.
       request = shard_to_run.request_key.get()
-      if _match_dimensions(request.properties.dimensions(), bot_dimensions):
-        logging.info('Chose %d', shard_to_run.key.integer_id())
-        yield request, shard_to_run
+      if not _match_dimensions(request.properties.dimensions(), bot_dimensions):
+        real_mismatch += 1
+        continue
+
+      yield request, shard_to_run
+      ignored += 1
+  finally:
+    duration = (task_common.utcnow() - now).total_seconds()
+    logging.info(
+        '%d/%s in %5.2fs: %d total, %d exp %d no_queue, %d hash mismatch, '
+        '%d cache negative, %d dimensions mismatch, %d ignored, %d broken',
+        opts.batch_size,
+        opts.prefetch_size,
+        duration,
+        total,
+        expired,
+        no_queue,
+        cache_lookup,
+        hash_mismatch,
+        real_mismatch,
+        ignored,
+        broken)
 
 
 def all_expired_shard_to_run():
@@ -346,8 +456,13 @@ def retry_shard_to_run(shard_to_run_key):
       request.priority,
       shard_to_run_key_to_shard_number(shard_to_run_key) + 1)
   try:
-    return _put_shard_to_run(shard_to_run_key, queue_number)
-  except ndb.TransactionFailedError:
+    result = ndb.transaction(
+        lambda: _put_shard_to_run(shard_to_run_key, queue_number),
+        retries=1)
+    if result:
+      _set_lookup_cache(shard_to_run_key, True)
+    return result
+  except datastore_errors.TransactionFailedError:
     return False
 
 
@@ -365,8 +480,17 @@ def reap_shard_to_run(shard_to_run_key):
   """
   assert isinstance(shard_to_run_key, ndb.Key), shard_to_run_key
   try:
-    return _put_shard_to_run(shard_to_run_key, None)
-  except ndb.TransactionFailedError:
+    # Don't retry, it's not worth. Just move on to the next task shard.
+    result = ndb.transaction(
+        lambda: _put_shard_to_run(shard_to_run_key, None),
+        retries=0)
+    if result:
+      # Notes this fact immediately in memcache to reduce DB contention.
+      _set_lookup_cache(shard_to_run_key, False)
+    return result
+  except datastore_errors.TransactionFailedError:
+    # Ignore transaction failures, it's seen as if the object had been reaped by
+    # another bot concurrently.
     return False
 
 
@@ -382,4 +506,5 @@ def abort_shard_to_run(shard_to_run):
   assert isinstance(shard_to_run, TaskShardToRun), shard_to_run
   shard_to_run.queue_number = None
   shard_to_run.put()
+  _set_lookup_cache(shard_to_run.key, False)
   return True

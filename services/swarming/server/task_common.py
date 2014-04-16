@@ -16,10 +16,11 @@ from components import utils
 # This relates to number of transactions per second * seconds per transaction /
 # number of shard.
 #
-# Intentionally starve the canary server by using only 16 root entities. This
+# Intentionally starve the canary server by using only 256 root entities. This
 # will force transaction conflicts. On the production server, use 16**5 (~1
 # million) root entities to reduce the number of transaction conflict.
-SHARDING_LEVEL = 1 if utils.is_canary() else 5
+# TODO(maruel): Testing for load test, 5 on canary.
+SHARDING_LEVEL = 2 if utils.is_canary() else 5
 
 
 # Used to encode time.

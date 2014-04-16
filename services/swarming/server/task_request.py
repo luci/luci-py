@@ -249,7 +249,7 @@ class TaskRequest(ndb.Model):
 
   This model is immutable.
   """
-  created_ts = ndb.DateTimeProperty(indexed=False)
+  created_ts = ndb.DateTimeProperty()
 
   # The name for this test request.
   name = ndb.StringProperty()
