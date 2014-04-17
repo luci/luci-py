@@ -312,7 +312,11 @@ class SwarmingTestCase(unittest.TestCase):
         url = urlparse.urljoin(
             self.server_url,
             'secure/get_result?r=' + running_test_key['test_key'])
-        results = json.load(urllib2.urlopen(url))
+        response = urllib2.urlopen(url).read()
+        try:
+          results = json.loads(response)
+        except ValueError:
+          self.fail('Failed to parse: %r' % response)
         if not results['exit_codes']:
           # The test hasn't finished yet
           continue
