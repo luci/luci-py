@@ -182,5 +182,17 @@ exports.groupDelete = function(name, lastModified) {
 };
 
 
+// Creates a new group.
+exports.groupCreate = function(group) {
+  return call('POST', '/auth/api/v1/groups/' + group.name, {
+    name: group.name,
+    description: group.description,
+    members: group.members || [],
+    globs: group.globs || [],
+    nested: group.nested || []
+  });
+};
+
+
 return exports;
 }());

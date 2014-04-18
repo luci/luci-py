@@ -5,6 +5,7 @@
 """Auth management REST API."""
 
 import json
+import urllib
 import webapp2
 
 from google.appengine.ext import ndb
@@ -144,7 +145,56 @@ class GroupHandler(ApiHandler):
   @api.require(model.CREATE, 'auth/management/groups/{group}')
   def post(self, group):
     """Creates a new group, ensuring it's indeed new (no overwrites)."""
-    raise NotImplementedError()
+    # Deserialize a body into the entity.
+    try:
+      body = self.parse_body()
+      name = body.pop('name', None)
+      if not name or name != group:
+        raise ValueError('Missing or mismatching group name in request body')
+      entity = model.AuthGroup.from_serializable_dict(
+          serializable_dict=body,
+          id=group,
+          parent=model.ROOT_KEY,
+          created_by=api.get_current_identity(),
+          modified_by=api.get_current_identity())
+    except (ValueError, TypeError) as err:
+      self.abort_with_error(400, text=str(err))
+
+    @ndb.transactional
+    def put_new(entity):
+      # The group should be new.
+      if entity.key.get():
+        return False, {'text': 'Such group already exists'}
+
+      # All nested groups should exist. Try to fetch them to verify.
+      nested = ndb.get_multi(
+          ndb.Key(model.AuthGroup, name, parent=model.ROOT_KEY)
+          for name in entity.nested)
+
+      # Collect names of groups that are not present.
+      missing = [name for name, ent in zip(entity.nested, nested) if not ent]
+      if missing:
+        return False, {
+          'text': 'Referencing a nested group that doesn\'t exist',
+          'details': {'missing': missing},
+        }
+
+      # Ok, good enough.
+      entity.put()
+      return True, None
+
+    success, error_details = put_new(entity)
+    if not success:
+      self.abort_with_error(409, **error_details)
+
+    self.send_response(
+        response={'ok': True},
+        http_code=201,
+        headers={
+          'Last-Modified': utils.datetime_to_rfc2822(entity.modified_ts),
+          'Location': '/auth/api/v1/groups/%s' % urllib.quote(entity.key.id()),
+        }
+    )
 
   @api.require(model.DELETE, 'auth/management/groups/{group}')
   @ndb.transactional

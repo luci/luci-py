@@ -238,6 +238,66 @@ GroupForm.prototype.hideMessage = function() {
 };
 
 
+// Adds validators and submit handlers to the form.
+GroupForm.prototype.setupSubmitHandler = function(submitCallback) {
+  $('form', this.$element).validate({
+    // Submit handler is only called if form passes validation.
+    submitHandler: function($form) {
+      // Extract data from the form.
+      var name = $('input[name=name]', $form).val();
+      var description = $('input[name=description]', $form).val();
+      var members = $('textarea[name=members]', $form).val();
+      var globs = $('textarea[name=globs]', $form).val();
+      var nested = $('textarea[name=nested]', $form).val();
+
+      // Splits 'value' on lines boundaries, trims spaces and returns lines
+      // as an array of strings. Helper function used below.
+      var splitItemList = function(value) {
+        var trimmed = _.map(value.split('\n'), function(item) {
+          return item.trim();
+        });
+        return _.filter(trimmed, function(item) {
+          return !!item;
+        });
+      };
+
+      // Pass data to callback. Never allow actual POST by always returning
+      // false. POST is done via asynchronous request in the submit handler.
+      try {
+        submitCallback({
+          name: name.trim(),
+          description: description.trim(),
+          members: splitItemList(members),
+          globs: splitItemList(globs),
+          nested: splitItemList(nested)
+        });
+      } finally {
+        return false;
+      }
+    },
+    // Validation rules, uses validators defined in registerFormValidators.
+    rules: {
+      'name': {
+        required: true,
+        groupName: true
+      },
+      'description': {
+        required: true
+      },
+      'members': {
+        memberList: true
+      },
+      'globs': {
+        globList: true
+      },
+      'nested': {
+        groupList: true
+      }
+    }
+  });
+};
+
+
 ////////////////////////////////////////////////////////////////////////////////
 // Form to view\edit existing group.
 
@@ -292,14 +352,30 @@ EditGroupForm.prototype.buildForm = function(group, lastModified) {
     });
   });
 
-  // Submit handler.
-  $('form', this.$element).submit(function() {
-    // TODO(vadimsh): Validate the form, extract group information from it.
-    var group = {};
-    self.onUpdateGroup(group, self.lastModified);
-    return false;
+  // Add validation and submit handler.
+  this.setupSubmitHandler(function(group) {
+    self.onUpdateGroup(group, self.lastModified)
   });
 };
+
+
+////////////////////////////////////////////////////////////////////////////////
+// 'Create new group' form.
+
+
+var NewGroupForm = function(onSubmitGroup) {
+  // Call parent constructor.
+  GroupForm.call(this, $(common.render('new-group-form-template')));
+
+  // Add validation and submit handler.
+  this.setupSubmitHandler(function(group) {
+    onSubmitGroup(group);
+  });
+};
+
+
+// Inherit from GroupForm.
+NewGroupForm.prototype = Object.create(GroupForm.prototype);
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -345,15 +421,65 @@ var waitForResult = function(defer, groupChooser, form) {
 };
 
 
+// Sets up jQuery.validate validators for group form fields.
+var registerFormValidators = function() {
+  // Regular expressions for form fields.
+  var groupRe = /^[0-9a-zA-Z_\-\. ]{3,40}$/;
+  var memberRe = /^(user|bot|service|anonymous)\:[\w\-\+\%\.\@]+$/;
+  var globRe = /^(user|bot|service|anonymous)\:[\w\-\+\%\.\@\*]+$/;
+
+  // Splits |value| on lines boundary and checks that each line matches 're'.
+  // Helper function use in validators below.
+  var validateItemList = function(re, value) {
+    return _.reduce(value.split('\n'), function(acc, item) {
+      return acc && (!item || re.test(item));
+    }, true);
+  };
+
+  // ID (as used in 'rules' section of $form.validate) -> [checker, error msg].
+  var validators = {
+    'groupName': [
+      function(value, element) { return groupRe.test(value); },
+      'Invalid group name'
+    ],
+    'memberList': [
+      _.partial(validateItemList, memberRe),
+      'Invalid member entry, expected format is <b>type</b>:<b>id</b>'
+    ],
+    'globList': [
+      _.partial(validateItemList, globRe),
+      'Invalid pattern entry, expected format is <b>type</b>:<b>glob</b>'
+    ],
+    'groupList': [
+      _.partial(validateItemList, groupRe),
+      'Invalid group name'
+    ]
+  };
+
+  // Actually register them all.
+  _.each(validators, function(value, key) {
+    $.validator.addMethod(key, value[0], value[1]);
+  });
+};
+
+
 exports.onContentLoaded = function() {
   // Setup global UI elements.
   var groupChooser = new GroupChooser($('#group-chooser'));
   var mainFrame = new ContentFrame($('#main-content-pane'));
 
+  // Setup form validators used in group forms.
+  registerFormValidators();
+
   // Called to setup 'Create new group' flow.
   var startNewGroupFlow = function() {
-    // TODO(vadimsh): Implement.
-    mainFrame.loadContent(new GroupForm($('<div>New group</div>')));
+    var form = new NewGroupForm(function(groupObj) {
+      var request = api.groupCreate(groupObj);
+      waitForResult(request, groupChooser, form).done(function() {
+        groupChooser.setSelection(groupObj.name);
+      });
+    });
+    mainFrame.loadContent(form);
   };
 
   // Called to setup 'Edit the group' flow (including deletion of a group).

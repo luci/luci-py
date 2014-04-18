@@ -228,10 +228,11 @@ class RestAPITestCase(test_case.TestCase):
     super(RestAPITestCase, self).setUp()
     # Make webtest app that can execute REST API requests.
     self.app = webtest.TestApp(
-        webapp2.WSGIApplication(rest_api.get_rest_api_routes()))
+        webapp2.WSGIApplication(rest_api.get_rest_api_routes(), debug=True))
     # Reset global config and cached state.
     handler.configure([])
     api.reset_local_state()
+    self.mocked_identity = model.Anonymous
     # Catch errors in log.
     self.errors = []
     self.mock(handler.logging, 'error',
@@ -241,6 +242,11 @@ class RestAPITestCase(test_case.TestCase):
     """Makes properties with |auto_now| and |auto_now_add| use mocked time."""
     self.mock(model.ndb.DateTimeProperty, '_now', lambda _: now)
     self.mock(model.ndb.DateProperty, '_now', lambda _: now.date())
+
+  def mock_current_identity(self, identity):
+    """Makes api.get_current_identity() return predefined value."""
+    self.mocked_identity = identity
+    self.mock(api, 'get_current_identity', lambda: identity)
 
   def make_request(
       self,
@@ -281,7 +287,7 @@ class RestAPITestCase(test_case.TestCase):
     headers = dict(headers or {})
     if expect_xsrf_token_check:
       assert 'X-XSRF-Token' not in headers
-      headers['X-XSRF-Token'] = make_xsrf_token()
+      headers['X-XSRF-Token'] = make_xsrf_token(self.mocked_identity)
 
     # Hook XSRF token check to verify it's called.
     original_validate = handler.XSRFToken.validate
@@ -590,6 +596,126 @@ class GroupHandlerTest(RestAPITestCase):
         expected_auth_checks=[(model.DELETE, 'auth/management/groups/A Group')])
     self.assertEqual(412, status)
     self.assertEqual({'text': 'Group was deleted by someone else'}, body)
+
+  def test_post_success(self):
+    frozen_time = utils.timestamp_to_datetime(1300000000000000)
+    creator_identity = model.Identity.from_bytes('user:creator@example.com')
+
+    # Freeze time in NDB's |auto_now| properties.
+    self.mock_ndb_now(frozen_time)
+    # get_current_identity is used for 'created_by' and 'modified_by'.
+    self.mock_current_identity(creator_identity)
+
+    # Create a group to act as a nested one.
+    group = model.AuthGroup(id='Nested Group', parent=model.ROOT_KEY)
+    group.put()
+
+    # Create the group using REST API.
+    status, body, headers = self.post(
+        path='/auth/api/v1/groups/A%20Group',
+        body={
+          'description': 'Test group',
+          'globs': ['user:*@example.com'],
+          'members': ['bot:some-bot', 'user:some@example.com'],
+          'name': 'A Group',
+          'nested': ['Nested Group'],
+        },
+        expect_xsrf_token_check=True,
+        expected_auth_checks=[(model.CREATE, 'auth/management/groups/A Group')])
+    self.assertEqual(201, status)
+    self.assertEqual({'ok': True}, body)
+    self.assertEqual(
+        'Sun, 13 Mar 2011 07:06:40 -0000', headers['Last-Modified'])
+    self.assertEqual(
+        'http://localhost/auth/api/v1/groups/A%20Group', headers['Location'])
+
+    # Ensure it's there and all fields are set.
+    entity = model.AuthGroup.get_by_id('A Group', parent=model.ROOT_KEY)
+    self.assertTrue(entity)
+    expected = {
+      'created_by': model.Identity(kind='user', name='creator@example.com'),
+      'created_ts': frozen_time,
+      'description': 'Test group',
+      'globs': [model.IdentityGlob(kind='user', pattern='*@example.com')],
+      'members': [
+        model.Identity(kind='bot', name='some-bot'),
+        model.Identity(kind='user', name='some@example.com'),
+      ],
+      'modified_by': model.Identity(kind='user', name='creator@example.com'),
+      'modified_ts': frozen_time,
+      'nested': ['Nested Group']
+    }
+    self.assertEqual(expected, entity.to_dict())
+
+  def test_post_minimal_body(self):
+    # Posting just a name is enough to create an empty group.
+    status, body, _ = self.post(
+        path='/auth/api/v1/groups/A%20Group',
+        body={'name': 'A Group'},
+        expect_xsrf_token_check=True,
+        expected_auth_checks=[(model.CREATE, 'auth/management/groups/A Group')])
+    self.assertEqual(201, status)
+    self.assertEqual({'ok': True}, body)
+
+  def test_post_mismatching_name(self):
+    # 'name' key and name in URL should match.
+    status, body, _ = self.post(
+        path='/auth/api/v1/groups/A%20Group',
+        body={'name': 'Another name here'},
+        expect_errors=True,
+        expect_xsrf_token_check=True,
+        expected_auth_checks=[(model.CREATE, 'auth/management/groups/A Group')])
+    self.assertEqual(400, status)
+    self.assertEqual(
+        {'text': 'Missing or mismatching group name in request body'}, body)
+
+  def test_post_bad_body(self):
+    # Posting invalid body ('members' should be a list, not a dict).
+    status, body, _ = self.post(
+        path='/auth/api/v1/groups/A%20Group',
+        body={'name': 'A Group', 'members': {}},
+        expect_errors=True,
+        expect_xsrf_token_check=True,
+        expected_auth_checks=[(model.CREATE, 'auth/management/groups/A Group')])
+    self.assertEqual(400, status)
+    self.assertEqual(
+        {
+          'text':
+            'Expecting a list or tuple for \'members\', got \'dict\' instead',
+        },
+        body)
+
+  def test_post_already_exists(self):
+    # Make a group first.
+    group = model.AuthGroup(id='A Group', parent=model.ROOT_KEY)
+    group.put()
+
+    # Now try to recreate it again via API. Should fail with HTTP 409.
+    status, body, _ = self.post(
+        path='/auth/api/v1/groups/A%20Group',
+        body={'name': 'A Group'},
+        expect_errors=True,
+        expect_xsrf_token_check=True,
+        expected_auth_checks=[(model.CREATE, 'auth/management/groups/A Group')])
+    self.assertEqual(409, status)
+    self.assertEqual({'text': 'Such group already exists'}, body)
+
+  def test_post_missing_nested(self):
+    # Try to create a group that references non-existing nested group.
+    status, body, _ = self.post(
+        path='/auth/api/v1/groups/A%20Group',
+        body={'name': 'A Group', 'nested': ['Missing group']},
+        expect_errors=True,
+        expect_xsrf_token_check=True,
+        expected_auth_checks=[(model.CREATE, 'auth/management/groups/A Group')])
+    self.assertEqual(409, status)
+    self.assertEqual(
+      {
+        'text': 'Referencing a nested group that doesn\'t exist',
+        'details': {
+          'missing': ['Missing group'],
+        }
+      }, body)
 
 
 class OAuthConfigHandlerTest(RestAPITestCase):

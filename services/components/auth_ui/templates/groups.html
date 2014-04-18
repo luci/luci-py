@@ -93,6 +93,53 @@ javascript library and not jinja2. #}
   </div>
 </script>
 
+<script id="new-group-form-template" type="text/x-handlebars-template">
+  <div class="panel panel-default">
+    <div class="panel-body">
+      <div id="alerts"></div>
+      <form class="form-horizontal" role="form">
+        <div class="form-group">
+          <label class="col-sm-2">Group name</label>
+          <div class="col-sm-10">
+            <input type="text" class="form-control" name="name">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="col-sm-2">Description</label>
+          <div class="col-sm-10">
+            <input type="text" class="form-control" name="description">
+          </div>
+        </div>
+        <hr>
+        <div class="form-group">
+          <label class="col-sm-2 control-label">Members</label>
+          <div class="col-sm-10" style="font-family:monospace;">
+            <textarea class="form-control" rows="6" name="members"></textarea>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="col-sm-2 control-label">Patterns</label>
+          <div class="col-sm-10" style="font-family:monospace;">
+            <textarea class="form-control" rows="3" name="globs"></textarea>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="col-sm-2 control-label">Nested</label>
+          <div class="col-sm-10" style="font-family:monospace;">
+            <textarea class="form-control" rows="3" name="nested"></textarea>
+          </div>
+        </div>
+        <hr>
+        <div class="form-group">
+          <div class="col-sm-12">
+            <button type="submit" class="btn btn-primary">Create group</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+</script>
+
 {% endraw %}
 
 <div class="row">

@@ -19,9 +19,9 @@ String.format = function(format) {
 };
 
 
-// Converts UTC timestamp (in milliseconds) to a readable string in local TZ.
+// Converts UTC timestamp (in microseconds) to a readable string in local TZ.
 exports.utcTimestampToString = function(utc) {
-  return (new Date(Number(utc))).toLocaleString();
+  return (new Date(Number(utc / 1000.0))).toLocaleString();
 };
 
 
