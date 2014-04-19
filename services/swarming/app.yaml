@@ -15,7 +15,8 @@ handlers:
   upload: static/(.+)\.(css|ico|txt)
   secure: always
 
-- url: /secure/.*
+# TODO(maruel): Move /internal/ to module-backend.yaml.
+- url: /(internal|secure)/.*
   script: main.app
   secure: always
   login: admin
@@ -27,6 +28,9 @@ handlers:
 builtins:
 - appstats: on
 - remote_api: on
+
+inbound_services:
+- warmup
 
 libraries:
 - name: jinja2

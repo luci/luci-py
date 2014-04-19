@@ -628,22 +628,23 @@ class AppTest(test_case.TestCase):
     # swarming app code. It may be routes that do not require login or routes
     # protected by GAE itself via 'login: admin' in app.yaml.
     allowed_paths = (
-        '/auth/',
-        # It's protected but not accessible as-is.
-        '/get_slave_code/<version:[0-9a-f]{40}>',
-        '/secure/',
+      '/auth/',
+      # It's protected but not accessible as-is.
+      '/get_slave_code/<version:[0-9a-f]{40}>',
+      '/secure/',
     )
 
     # Handlers that are explicitly allowed to be called by anyone.
     allowed_urls = set([
-        '/',
-        '/auth',
-        '/server_ping',
-        '/stats',
-        '/stats/daily',
-        '/stats/tasks',
-        '/stats/waits',
-        '/swarming/api/v1/bots/dead/count',
+      '/',
+      '/_ah/warmup',
+      '/auth',
+      '/server_ping',
+      '/stats',
+      '/stats/daily',
+      '/stats/tasks',
+      '/stats/waits',
+      '/swarming/api/v1/bots/dead/count',
     ])
 
     # Grab the set of all routes.
@@ -774,9 +775,9 @@ class AppTest(test_case.TestCase):
 
   def testCronTriggerTask(self):
     triggers = [
-        ('cleanup', '/secure/cron/trigger_cleanup_data'),
-        ('stats', '/secure/cron/trigger_generate_daily_stats'),
-        ('stats', '/secure/cron/trigger_generate_recent_stats'),
+        ('cleanup', '/internal/cron/trigger_cleanup_data'),
+        ('stats', '/internal/cron/trigger_generate_daily_stats'),
+        ('stats', '/internal/cron/trigger_generate_recent_stats'),
     ]
 
     for i, (task_name, url) in enumerate(triggers):
@@ -791,26 +792,26 @@ class AppTest(test_case.TestCase):
 
   def testTaskQueueUrls(self):
     # Tests all the cron tasks are securely handled.
-    task_queue_urls = [
-        r for r in self._GetRoutes() if r.startswith('/secure/task_queues/')
-    ]
+    task_queue_urls = sorted(
+      r for r in self._GetRoutes() if r.startswith('/internal/taskqueue/')
+    )
     task_queues = [
-        ('cleanup', '/secure/task_queues/cleanup_data'),
-        ('stats', '/secure/task_queues/generate_daily_stats'),
-        ('stats', '/secure/task_queues/generate_recent_stats'),
+      ('cleanup', '/internal/taskqueue/cleanup_data'),
+      ('stats', '/internal/taskqueue/generate_daily_stats'),
+      ('stats', '/internal/taskqueue/generate_recent_stats'),
     ]
-    self.assertEqual(len(task_queues), len(task_queue_urls), task_queue_urls)
+    self.assertEqual(sorted(zip(*task_queues)[1]), task_queue_urls)
 
     for task_name, url in task_queues:
-      response = self.app.post(url,
-                               headers={'X-AppEngine-QueueName': task_name})
+      response = self.app.post(
+          url, headers={'X-AppEngine-QueueName': task_name})
       self.assertResponse(response, '200 OK', 'Success.')
       self.assertEqual([], self.taskqueue_stub.get_filtered_tasks())
 
   def testCronJobTasks(self):
     # Tests all the cron tasks are securely handled.
     cron_job_urls = [
-        r for r in self._GetRoutes() if r.startswith('/secure/cron/')
+        r for r in self._GetRoutes() if r.startswith('/internal/cron/')
     ]
     self.assertTrue(cron_job_urls, cron_job_urls)
 
@@ -829,7 +830,7 @@ class AppTest(test_case.TestCase):
           'Only internal cron jobs can do this  ')
 
   def testDetectHangingRunners(self):
-    response = self.app.get('/secure/cron/detect_hanging_runners',
+    response = self.app.get('/internal/cron/detect_hanging_runners',
                             headers={'X-AppEngine-Cron': 'true'})
     self.assertResponse(response, '200 OK', 'Success.')
 
@@ -839,13 +840,13 @@ class AppTest(test_case.TestCase):
         minutes=2 * test_runner.TIME_BEFORE_RUNNER_HANGING_IN_MINS)
     runner.put()
 
-    response = self.app.get('/secure/cron/detect_hanging_runners',
+    response = self.app.get('/internal/cron/detect_hanging_runners',
                             headers={'X-AppEngine-Cron': 'true'})
     self.assertResponse(response, '200 OK', 'Success.')
 
   def testSendEReporter(self):
     self._ReplaceCurrentUser(ADMIN_EMAIL)
-    response = self.app.get('/secure/cron/ereporter2/mail',
+    response = self.app.get('/internal/cron/ereporter2/mail',
                             headers={'X-AppEngine-Cron': 'true'})
     self.assertResponse(response, '200 OK', 'Success.')
 

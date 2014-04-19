@@ -602,7 +602,7 @@ class TaskCleanupDataHandler(webapp2.RequestHandler):
     except datastore_errors.Timeout:
       logging.info('Ran out of time while cleaning up data. Triggering '
                    'another cleanup.')
-      taskqueue.add(method='POST', url='/secure/task_queues/cleanup_data',
+      taskqueue.add(method='POST', url='/internal/taskqueue/cleanup_data',
                     queue_name='cleanup')
     self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
     self.response.out.write('Success.')
@@ -623,7 +623,7 @@ class CronTriggerCleanupDataHandler(webapp2.RequestHandler):
 
   @require_cronjob
   def get(self):
-    taskqueue.add(method='POST', url='/secure/task_queues/cleanup_data',
+    taskqueue.add(method='POST', url='/internal/taskqueue/cleanup_data',
                   queue_name='cleanup')
     self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
     self.response.out.write('Success.')
@@ -634,7 +634,7 @@ class CronTriggerGenerateDailyStats(webapp2.RequestHandler):
 
   @require_cronjob
   def get(self):
-    taskqueue.add(method='POST', url='/secure/task_queues/generate_daily_stats',
+    taskqueue.add(method='POST', url='/internal/taskqueue/generate_daily_stats',
                   queue_name='stats')
     self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
     self.response.out.write('Success.')
@@ -646,7 +646,7 @@ class CronTriggerGenerateRecentStats(webapp2.RequestHandler):
   @require_cronjob
   def get(self):
     taskqueue.add(method='POST',
-                  url='/secure/task_queues/generate_recent_stats',
+                  url='/internal/taskqueue/generate_recent_stats',
                   queue_name='stats')
     self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
     self.response.out.write('Success.')
@@ -1312,6 +1312,13 @@ def SendRunnerResults(response, key):
     logging.info('Unable to provide runner results [key: %s]', key)
 
 
+class WarmupHandler(webapp2.RequestHandler):
+  def get(self):
+    auth.warmup()
+    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
+    self.response.write('ok')
+
+
 def CreateApplication():
   urls = [
       ('/', RedirectToMainHandler),
@@ -1326,25 +1333,12 @@ def CreateApplication():
       ('/result', ResultHandler),
       ('/runner_ping', RunnerPingHandler),
 
-      ('/secure/cron/abort_stale_runners', CronAbortStaleRunnersHandler),
-      ('/secure/cron/detect_hanging_runners', CronDetectHangingRunnersHandler),
-      ('/secure/cron/trigger_cleanup_data', CronTriggerCleanupDataHandler),
-      ('/secure/cron/trigger_generate_daily_stats',
-          CronTriggerGenerateDailyStats),
-      ('/secure/cron/trigger_generate_recent_stats',
-          CronTriggerGenerateRecentStats),
-      ('/secure/cron/ereporter2/mail', CronSendEreporter2MailHandler),
       ('/secure/ereporter2/report', Ereporter2ReportHandler),
       ('/secure/ereporter2/request/<request_id:[0-9a-fA-F]+>',
           Ereporter2RequestHandler),
       ('/secure/machine_list', MachineListHandler),
       ('/secure/retry', RetryHandler),
       ('/secure/show_message', ShowMessageHandler),
-      ('/secure/task_queues/cleanup_data', TaskCleanupDataHandler),
-      ('/secure/task_queues/generate_daily_stats',
-          TaskGenerateDailyStatsHandler),
-      ('/secure/task_queues/generate_recent_stats',
-          TaskGenerateRecentStatsHandler),
 
       ('/stats', StatsHandler),
       ('/stats/daily', StatsDailyHandler),
@@ -1364,6 +1358,28 @@ def CreateApplication():
       # The new APIs:
       ('/swarming/api/v1/bots', ApiBots),
       ('/swarming/api/v1/bots/dead/count', DeadBotsCountHandler),
+
+      # Internal urls.
+
+      # Cron jobs.
+      ('/internal/cron/abort_stale_runners', CronAbortStaleRunnersHandler),
+      ('/internal/cron/detect_hanging_runners',
+          CronDetectHangingRunnersHandler),
+      ('/internal/cron/ereporter2/mail', CronSendEreporter2MailHandler),
+      ('/internal/cron/trigger_cleanup_data', CronTriggerCleanupDataHandler),
+      ('/internal/cron/trigger_generate_daily_stats',
+          CronTriggerGenerateDailyStats),
+      ('/internal/cron/trigger_generate_recent_stats',
+          CronTriggerGenerateRecentStats),
+
+      # Task queues.
+      ('/internal/taskqueue/cleanup_data', TaskCleanupDataHandler),
+      ('/internal/taskqueue/generate_daily_stats',
+          TaskGenerateDailyStatsHandler),
+      ('/internal/taskqueue/generate_recent_stats',
+          TaskGenerateRecentStatsHandler),
+
+      ('/_ah/warmup', WarmupHandler),
   ]
 
   # Upgrade to Route objects so regexp work.
