@@ -144,11 +144,12 @@ class StatisticsFramework(object):
     Returns the number of self.stats_minute_cls generated, e.g. the number of
     minutes processed successfully by self_generate_snapshot.
     """
+    count = 0
+    original_minute = None
     try:
       now = utcnow()
       original_minute = self._get_next_minute_to_process(now)
       next_minute = original_minute
-      count = 0
       while now - next_minute >= datetime.timedelta(minutes=up_to):
         self._process_one_minute(next_minute)
         self._set_last_processed_time(next_minute)
