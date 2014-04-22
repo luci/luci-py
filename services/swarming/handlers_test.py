@@ -171,12 +171,10 @@ class AppTest(test_case.TestCase):
     runner.results_reference = results.key
     runner.put()
 
-    # Invalid key.
+    # Invalid key. E.g. use a TestRequest instead of a TestRunner.
+    request = test_request.TestRequest.query().get()
     for handler in handler_urls:
-      # E.g. use a TestRequest instead of a TestRunner.
-      request = test_request.TestRequest.query().get()
-      response = self.app.get(handler,
-                              {'r': request.key.urlsafe()})
+      response = self.app.get(handler, {'r': request.key.urlsafe()})
       self.assertTrue('204' in response.status)
 
     # Valid key.

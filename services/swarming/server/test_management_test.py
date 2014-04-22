@@ -459,7 +459,7 @@ class TestManagementTest(test_case.TestCase):
     # Make sure we can handle results with unicode in them.
     runner = test_helper.CreatePendingRunner(machine_id=MACHINE_IDS[0])
     test_management.AbortRunner(runner, u'\u04bb')
-    self.assertTrue(runner)
+    self.assertIsNotNone(runner)
 
   def testAssignSinglePendingRequest(self):
     # Test when there is 1 test request then 1 machine registers itself.

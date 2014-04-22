@@ -134,7 +134,7 @@ class TestRunnerTest(test_case.TestCase):
   def testAutomaticallyRetryMachineIdNone(self):
     runner = test_helper.CreatePendingRunner(machine_id=None)
     test_runner.AutomaticallyRetryRunner(runner)
-    self.assertTrue(runner)
+    self.assertIsNotNone(runner)
 
   def testRecordRunnerStatsAfterAutoRetry(self):
     runner = test_helper.CreatePendingRunner(machine_id=MACHINE_IDS[0])

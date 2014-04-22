@@ -156,7 +156,6 @@ class TaskRequestApiTest(test_case.TestCase):
     self.assertNotEqual(request_1.properties_hash, request_2.properties_hash)
 
   def test_bad_values(self):
-    # commands are required and must be a list.
     with self.assertRaises(ValueError):
       task_request.new_request(
           _gen_request_data(properties=dict(commands=None)))
@@ -164,14 +163,12 @@ class TaskRequestApiTest(test_case.TestCase):
       task_request.new_request(
           _gen_request_data(properties=dict(commands=[])))
 
-    # .priority
     with self.assertRaises(ValueError):
       task_request.new_request(
           _gen_request_data(priority=task_common.MAXIMUM_PRIORITY+1))
     task_request.new_request(
         _gen_request_data(priority=task_common.MAXIMUM_PRIORITY))
 
-    # .number_shards
     with self.assertRaises(ValueError):
       task_request.new_request(
           _gen_request_data(
@@ -180,7 +177,6 @@ class TaskRequestApiTest(test_case.TestCase):
         _gen_request_data(
             properties=dict(number_shards=task_common.MAXIMUM_SHARDS)))
 
-    # .scheduling_expiration_secs
     with self.assertRaises(ValueError):
       task_request.new_request(
           _gen_request_data(
