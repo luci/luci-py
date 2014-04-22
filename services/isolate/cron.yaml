@@ -1,15 +1,15 @@
 cron:
 - description: old data cleanup
   target: backend
-  url: /restricted/cleanup/trigger/old
+  url: /internal/cron/cleanup/trigger/old
   schedule: every 9 minutes
 
 - description: Cron job that gathers statistics
   target: backend
-  url: /restricted/stats/update
+  url: /internal/cron/stats/update
   schedule: every 1 minutes
 
 - description: Mail exception report via ereporter2
   target: backend
-  url: /restricted/cron/ereporter2/mail
+  url: /internal/cron/ereporter2/mail
   schedule: every 1 hours synchronized

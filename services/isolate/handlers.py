@@ -1572,10 +1572,6 @@ def CreateApplication(debug=False):
       webapp2.Route(
           r'/internal/cron/cleanup/trigger/<name:[a-z_]+>',
           InternalCleanupTriggerHandler),
-      # TODO(maruel): Remove me.
-      webapp2.Route(
-          r'/restricted/cleanup/trigger/<name:[a-z_]+>',
-          InternalCleanupTriggerHandler),
 
       # Cleanup tasks.
       webapp2.Route(
@@ -1598,9 +1594,6 @@ def CreateApplication(debug=False):
 
      webapp2.Route(
           r'/internal/cron/ereporter2/mail', InternalEreporter2Mail),
-     # TODO(maruel): Remove me.
-     webapp2.Route(
-          r'/restricted/cron/ereporter2/mail', InternalEreporter2Mail),
      webapp2.Route(
           r'/restricted/ereporter2/report',
           RestrictedEreporter2Report),
@@ -1612,10 +1605,6 @@ def CreateApplication(debug=False):
       # Stats
       webapp2.Route(
           r'/internal/cron/stats/update',
-          stats.InternalStatsUpdateHandler),
-     # TODO(maruel): Remove me.
-      webapp2.Route(
-          r'/restricted/stats/update',
           stats.InternalStatsUpdateHandler),
 
       # Administrative urls.

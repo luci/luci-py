@@ -278,7 +278,7 @@ class MainTest(test_case.TestCase):
     self.assertEqual(2, len(list(handlers.ContentEntry.query())))
 
     # 'bar' was kept, 'foo' was cleared out.
-    resp = self.testapp.get('/restricted/cleanup/trigger/old')
+    resp = self.testapp.get('/internal/cron/cleanup/trigger/old')
     self.assertEqual(200, resp.status_code)
     self.assertEqual([None], r.json)
     self.assertEqual(1, self.execute_tasks())
@@ -287,7 +287,7 @@ class MainTest(test_case.TestCase):
 
     # Advance time and force cleanup. This deletes 'bar' too.
     now += datetime.timedelta(seconds=2*expiration)
-    resp = self.testapp.get('/restricted/cleanup/trigger/old')
+    resp = self.testapp.get('/internal/cron/cleanup/trigger/old')
     self.assertEqual(200, resp.status_code)
     self.assertEqual([None], r.json)
     self.assertEqual(1, self.execute_tasks())
@@ -295,7 +295,7 @@ class MainTest(test_case.TestCase):
 
     # Advance time and force cleanup.
     now += datetime.timedelta(seconds=2*expiration)
-    resp = self.testapp.get('/restricted/cleanup/trigger/old')
+    resp = self.testapp.get('/internal/cron/cleanup/trigger/old')
     self.assertEqual(200, resp.status_code)
     self.assertEqual([None], r.json)
     self.assertEqual(1, self.execute_tasks())
@@ -340,7 +340,7 @@ class MainTest(test_case.TestCase):
     self.mock(handlers.gcs, 'list_files', lambda _: mock_files)
 
     handlers.ContentEntry(key=handlers.entry_key('d', '0' * 40)).put()
-    self.testapp.get('/restricted/cleanup/trigger/trim_lost')
+    self.testapp.get('/internal/cron/cleanup/trigger/trim_lost')
     self.assertEqual(1, self.execute_tasks())
     self.assertEqual(['d/' + '1' * 40], deleted)
 
