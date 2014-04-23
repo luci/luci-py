@@ -1,4 +1,4 @@
 Scripts in this directory are not isolate-server specific.
 
 These modules must not be necessary for the AppEngine instance to run. Anything
-that is necessary to run an AppEngine instance must be in common/.
+that is necessary to run an AppEngine instance must be in components/.

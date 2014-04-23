@@ -11,7 +11,7 @@ import os
 import sys
 
 APP_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, os.path.join(APP_DIR, '..', 'tools'))
+sys.path.insert(0, os.path.join(APP_DIR, '..', 'components', 'tools'))
 
 import update_instance
 

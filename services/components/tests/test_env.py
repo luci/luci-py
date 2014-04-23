@@ -6,13 +6,13 @@ import os
 import sys
 
 TESTS_DIR = os.path.dirname(os.path.abspath(__file__))
-COMPONENTS_DIR = os.path.dirname(TESTS_DIR)
-ROOT_DIR = os.path.dirname(COMPONENTS_DIR)
+ROOT_DIR = os.path.dirname(TESTS_DIR)
+COMPONENTS_DIR = os.path.join(ROOT_DIR, 'components')
 
 # For 'from components import ...'.
 sys.path.insert(0, ROOT_DIR)
 # For depot_tools/auto_stub.py.
-sys.path.insert(0, os.path.join(ROOT_DIR, 'tools', 'third_party'))
+sys.path.insert(0, os.path.join(ROOT_DIR, 'third_party'))
 # For find_gae_sdk.py.
 sys.path.insert(0, os.path.join(ROOT_DIR, 'tools'))
 

@@ -8,7 +8,8 @@ import sys
 
 # swarming/
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
-ROOT_DIR = os.path.dirname(APP_DIR)
+# components/
+COMPONENTS_DIR = os.path.join(os.path.dirname(APP_DIR), 'components')
 
 _INITIALIZED = False
 
@@ -21,7 +22,7 @@ def setup_test_env():
   _INITIALIZED = True
 
   # For find_gae_sdk.py and test_case.py.
-  sys.path.insert(0, os.path.join(ROOT_DIR, 'tools'))
+  sys.path.insert(0, os.path.join(COMPONENTS_DIR, 'tools'))
 
   import find_gae_sdk  # pylint: disable=F0401
   gae_sdk_dir = find_gae_sdk.find_gae_sdk()
@@ -32,7 +33,7 @@ def setup_test_env():
   find_gae_sdk.setup_env(APP_DIR, None, None, None)
 
   # For webtest, depot_tools/auto_stub.py and friends.
-  sys.path.insert(0, os.path.join(ROOT_DIR, 'tools', 'third_party'))
+  sys.path.insert(0, os.path.join(COMPONENTS_DIR, 'third_party'))
   # For unit tests not importing main.py, which should be ALL unit tests.
   sys.path.insert(0, os.path.join(APP_DIR, 'components', 'third_party'))
   # For mox.

@@ -1,4 +1,17 @@
-Modules in this directory are shared between isolate and swarmings servers.
+Modules and tools in this directory are shared between isolate and swarming
+servers.
 
-These modules must be necessary for the AppEngine instance to run. Anything that
-is not necessary to run an AppEngine instance must be in tools/.
+Contents of this directory:
+* components/ - contains reusable code that can be used from AppEngine
+  application. 'components' directory should be symlinked to an app directory
+  (under same name 'components'). Must contain only code that needs to be
+  deployed to GAE.
+* components/third_party/ - third party code that gets deployed to GAE together
+  with components. Contains third party dependencies of components code.
+* tests/ - tests for components/, depends on third party code from
+  third_party/. This code should not be deployed to GAE.
+* tools/ - utilities to manage applications on GAE, depends on third_party/.
+  This code should not be deployed to GAE.
+* third_party/ - third party dependencies of tests and tools. This code should
+  not be deployed to GAE. See components/third_party/ for third party
+  dependencies that are deployed.

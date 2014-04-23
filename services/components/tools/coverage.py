@@ -17,7 +17,7 @@ import find_gae_sdk
 
 def coverage_module(directory, omitted, env):
   offset = len(os.path.dirname(directory)) + 1
-  for root, dirs, files in os.walk(directory):
+  for root, _, files in os.walk(directory):
     for test in files:
       if test.endswith('_smoke_test.py'):
         continue

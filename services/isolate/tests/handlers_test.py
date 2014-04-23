@@ -17,10 +17,10 @@ ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 import test_env
 test_env.setup_test_env()
 
-# From tools/third_party/
+# From components/third_party/
 import webtest
 
-# For TestCase.
+# From components/tools/, for TestCase.
 import test_case
 
 import handlers

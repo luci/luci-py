@@ -16,7 +16,7 @@ def FindAppEngineSDK(input_api):
   try:
     # Add 'tools' to sys.path to be able to import find_gae_sdk.
     tools_dir = input_api.os_path.join(
-        input_api.PresubmitLocalPath(), '..', 'tools')
+        input_api.PresubmitLocalPath(), 'tools')
     sys.path = [tools_dir] + sys.path
     # pylint: disable=F0401
     import find_gae_sdk
@@ -44,17 +44,13 @@ def CommonChecks(input_api, output_api):
     appcfg.fix_sys_path()
     # Add project specific paths to sys.path
     sys.path = [
-      # To support 'from components import ...'
-      join('..'),
       join('third_party'),
       join('tests'),
-      # See tests/test_env.py for more information.
-      join('..', 'tools', 'third_party'),
-      join('..', 'tools'),
+      join('tools'),
     ] + sys.path
     disabled_warnings = [
-        'E1101', # Instance X has no member Y
-        'W0232', # Class has no __init__ method
+      'E1101', # Instance X has no member Y
+      'W0232', # Class has no __init__ method
     ]
     output.extend(input_api.canned_checks.RunPylint(
         input_api, output_api, disabled_warnings=disabled_warnings))

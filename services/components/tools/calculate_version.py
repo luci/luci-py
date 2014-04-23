@@ -3,9 +3,7 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
-"""Updates an AppEngine instance with the version derived from the current git
-checkout state.
-"""
+"""Given current git checkout state return version string to use for an app."""
 
 import logging
 import optparse
@@ -13,8 +11,8 @@ import os
 import subprocess
 import sys
 
-TOOLS_DIR = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.join(TOOLS_DIR, 'third_party'))
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(ROOT_DIR, 'third_party'))
 
 from depot_tools import git_number
 from depot_tools import git_common

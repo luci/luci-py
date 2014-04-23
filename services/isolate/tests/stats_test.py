@@ -14,7 +14,7 @@ import stats
 
 from components import stats_framework_mock
 
-# From tools/third_party/
+# From components/third_party/
 import webtest
 
 # For TestCase.

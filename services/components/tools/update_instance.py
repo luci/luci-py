@@ -8,7 +8,6 @@ checkout state.
 
 import logging
 import optparse
-import os
 import sys
 
 import calculate_version
