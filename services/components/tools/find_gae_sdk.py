@@ -48,6 +48,9 @@ def setup_gae_sdk(sdk_path):
   permanent.
   """
   sys.path.insert(0, sdk_path)
+  # Sadly, coverage may inject google.protobuf in the path. Forcibly expulse it.
+  if 'google' in sys.modules:
+    del sys.modules['google']
 
   import dev_appserver
   dev_appserver.fix_sys_path()
