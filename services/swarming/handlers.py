@@ -1103,7 +1103,7 @@ class StatsTasksHandler(webapp2.RequestHandler):
             [summary.time.isoformat(), summary.pending, summary.running])
       else:
         logging.error('\'%s\' wasn\'t in set of runner summaries [%s]',
-                      summary.dimension, runner_summary_graphs.keys())
+                      summary.dimensions, runner_summary_graphs.keys())
 
     params = {
         'hours_select': GenerateHistoryHoursSelect(),
