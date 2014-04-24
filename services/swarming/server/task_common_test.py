@@ -16,6 +16,8 @@ import test_env
 
 test_env.setup_test_env()
 
+from google.appengine.api import datastore_errors
+
 import test_case
 from server import task_common
 from server import test_helper
@@ -35,9 +37,9 @@ class TaskCommonApiTest(test_case.TestCase):
   def test_validate_priority(self):
     with self.assertRaises(TypeError):
       task_common.validate_priority('1')
-    with self.assertRaises(ValueError):
+    with self.assertRaises(datastore_errors.BadValueError):
       task_common.validate_priority(-1)
-    with self.assertRaises(ValueError):
+    with self.assertRaises(datastore_errors.BadValueError):
       task_common.validate_priority(task_common.MAXIMUM_PRIORITY+1)
     task_common.validate_priority(0)
     task_common.validate_priority(1)

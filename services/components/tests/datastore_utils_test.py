@@ -27,6 +27,32 @@ def int_ceil_div(value, divisor):
   return (value + divisor - 1) / divisor
 
 
+class BP(ndb.Model):
+  bar = datastore_utils.BytesComputedProperty(lambda _: '\x00')
+
+
+class DJP(ndb.Model):
+  bar = datastore_utils.DeterministicJsonProperty(json_type=dict)
+
+
+class BytesComputedPropertyTest(test_case.TestCase):
+  def test_all(self):
+    self.assertEqual('\x00', BP().bar)
+    BP().put()
+    self.assertEqual('\x00', BP.query().get().bar)
+
+
+class DeterministicJsonPropertyTest(test_case.TestCase):
+  def test_all(self):
+    self.assertEqual({'a': 1}, DJP(bar={'a': 1}).bar)
+
+    DJP(bar={'a': 1}).put()
+    self.assertEqual({'a': 1}, DJP.query().get().bar)
+
+    with self.assertRaises(TypeError):
+      DJP(bar=[])
+
+
 class ShardingTest(test_case.TestCase):
   def test_shard_key(self):
     actual = datastore_utils.shard_key('1234', 2, 'Root')

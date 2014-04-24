@@ -6,6 +6,8 @@
 
 import datetime
 
+from google.appengine.api import datastore_errors
+
 from components import utils
 
 
@@ -38,7 +40,7 @@ MAXIMUM_SHARDS = 255
 def validate_priority(priority):
   """Throws ValueError if priority is not a valid value."""
   if 0 > priority or MAXIMUM_PRIORITY < priority:
-    raise ValueError(
+    raise datastore_errors.BadValueError(
         'priority (%d) must be between 0 and %d (inclusive)' %
         (priority, MAXIMUM_PRIORITY))
 

@@ -11,9 +11,12 @@ TODO(maruel): Extract ndb related code from utils.py back in here.
 """
 
 import hashlib
+import json
 import string
 
 from google.appengine.ext import ndb
+
+from components import utils
 
 _HEX = frozenset(string.hexdigits.lower())
 
@@ -29,6 +32,40 @@ class BytesComputedProperty(ndb.ComputedProperty):
     # From BlobProperty.
     p.set_meaning(ndb.google_imports.entity_pb.Property.BYTESTRING)
     v.set_stringvalue(value)
+
+
+class DeterministicJsonProperty(ndb.BlobProperty):
+  """Makes JsonProperty encoding deterministic where the same data results in
+  the same blob all the time.
+
+  For example, a dict is guaranteed to have its keys sorted, the whitespace
+  separators are stripped, encoding is set to utf-8 so the output is constant.
+
+  Sadly, we can't inherit from JsonProperty because it would result in
+  duplicate encoding. So copy-paste the class from SDK v1.9.0 here.
+  """
+  _json_type = None
+
+  # pylint: disable=W0212,E1002,R0201
+  @ndb.utils.positional(1 + ndb.BlobProperty._positional)
+  def __init__(self, name=None, compressed=False, json_type=None, **kwds):
+    super(DeterministicJsonProperty, self).__init__(
+        name=name, compressed=compressed, **kwds)
+    self._json_type = json_type
+
+  def _validate(self, value):
+    if self._json_type is not None and not isinstance(value, self._json_type):
+      # Add the property name, otherwise it's annoying to try to figure out
+      # which property is incorrect.
+      raise TypeError(
+          'Property %s must be a %s' % (self._name, self._json_type))
+
+  def _to_base_type(self, value):
+    """Makes it deterministic compared to ndb.JsonProperty._to_base_type()."""
+    return utils.encode_to_json(value)
+
+  def _from_base_type(self, value):
+    return json.loads(value)
 
 
 def shard_key(key, number_of_letters, root_entity_type):

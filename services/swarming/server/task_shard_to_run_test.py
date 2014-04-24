@@ -33,7 +33,7 @@ def _gen_request_data(properties=None, **kwargs):
     'name': 'Request name',
     'user': 'Jesus',
     'properties': {
-      'commands': [['command1']],
+      'commands': [[u'command1']],
       'data': [],
       'dimensions': {},
       'env': {},
@@ -206,13 +206,13 @@ class TaskShardToRunApiTest(test_case.TestCase):
     self.assertEqual(expected, str(actual))
 
   def test_new_shards_to_run_for_request(self):
-    request_dimensions = {'OS': 'Windows-3.1.1'}
+    request_dimensions = {u'OS': u'Windows-3.1.1'}
     data = _gen_request_data(
         properties={
-          'commands': [['command1', 'arg1']],
-          'data': [['http://localhost/foo', 'foo.zip']],
+          'commands': [[u'command1', u'arg1']],
+          'data': [[u'http://localhost/foo', u'foo.zip']],
           'dimensions': request_dimensions,
-          'env': {'foo': 'bar'},
+          'env': {u'foo': u'bar'},
           'number_shards': 3,
           'execution_timeout_secs': 30,
         },
@@ -262,7 +262,7 @@ class TaskShardToRunApiTest(test_case.TestCase):
 
   def test_yield_next_available_shard_to_dispatch_none(self):
     _gen_new_shards_to_run(
-        properties=dict(number_shards=3, dimensions={'OS': 'Windows-3.1.1'}))
+        properties=dict(number_shards=3, dimensions={u'OS': u'Windows-3.1.1'}))
     # Bot declares no dimensions, so it will fail to match.
     bot_dimensions = {}
     actual = _yield_next_available_shard_to_dispatch(bot_dimensions)
@@ -270,7 +270,7 @@ class TaskShardToRunApiTest(test_case.TestCase):
 
   def test_yield_next_available_shard_to_dispatch_none_mismatch(self):
     _gen_new_shards_to_run(
-        properties=dict(number_shards=3, dimensions={'OS': 'Windows-3.1.1'}))
+        properties=dict(number_shards=3, dimensions={u'OS': u'Windows-3.1.1'}))
     # Bot declares other dimensions, so it will fail to match.
     bot_dimensions = {'OS': 'Windows-3.0'}
     actual = _yield_next_available_shard_to_dispatch(bot_dimensions)
@@ -278,7 +278,7 @@ class TaskShardToRunApiTest(test_case.TestCase):
 
   def test_yield_next_available_shard_to_dispatch(self):
     request_dimensions = {
-      'OS': 'Windows-3.1.1', 'hostname': 'localhost', 'foo': 'bar',
+      u'OS': u'Windows-3.1.1', u'hostname': u'localhost', u'foo': u'bar',
     }
     _gen_new_shards_to_run(
         properties=dict(number_shards=1, dimensions=request_dimensions))
@@ -296,12 +296,12 @@ class TaskShardToRunApiTest(test_case.TestCase):
     self.assertEqual(expected, actual)
 
   def test_yield_next_available_shard_to_dispatch_subset(self):
-    request_dimensions = {'OS': 'Windows-3.1.1', 'foo': 'bar'}
+    request_dimensions = {u'OS': u'Windows-3.1.1', u'foo': u'bar'}
     _gen_new_shards_to_run(
         properties=dict(number_shards=1, dimensions=request_dimensions))
     # Bot declares more dimensions than needed, this is fine and it matches.
     bot_dimensions = {
-      'OS': 'Windows-3.1.1', 'hostname': 'localhost', 'foo': 'bar',
+      u'OS': u'Windows-3.1.1', u'hostname': u'localhost', u'foo': u'bar',
     }
     actual = _yield_next_available_shard_to_dispatch(bot_dimensions)
     expected = [
@@ -316,7 +316,7 @@ class TaskShardToRunApiTest(test_case.TestCase):
 
   def test_yield_next_available_shard_shard(self):
     # Task has 2 shards.
-    request_dimensions = {'OS': 'Windows-3.1.1', 'foo': 'bar'}
+    request_dimensions = {u'OS': u'Windows-3.1.1', u'foo': u'bar'}
     _gen_new_shards_to_run(
         properties=dict(number_shards=2, dimensions=request_dimensions))
     bot_dimensions = request_dimensions
@@ -339,12 +339,14 @@ class TaskShardToRunApiTest(test_case.TestCase):
     self.assertEqual(expected, actual)
 
   def test_yield_next_available_shard_to_dispatch_subset_multivalue(self):
-    request_dimensions = {'OS': 'Windows-3.1.1', 'foo': 'bar'}
+    request_dimensions = {u'OS': u'Windows-3.1.1', u'foo': u'bar'}
     _gen_new_shards_to_run(
         properties=dict(number_shards=1, dimensions=request_dimensions))
     # Bot declares more dimensions than needed.
     bot_dimensions = {
-      'OS': ['Windows', 'Windows-3.1.1'], 'hostname': 'localhost', 'foo': 'bar',
+      u'OS': [u'Windows', u'Windows-3.1.1'],
+      u'hostname': u'localhost',
+      u'foo': u'bar',
     }
     actual = _yield_next_available_shard_to_dispatch(bot_dimensions)
     expected = [
@@ -359,18 +361,18 @@ class TaskShardToRunApiTest(test_case.TestCase):
 
   def test_yield_next_available_shard_to_dispatch_multi_normal(self):
     # Task added one after the other, normal case.
-    request_dimensions_1 = {'OS': 'Windows-3.1.1', 'foo': 'bar'}
+    request_dimensions_1 = {u'OS': u'Windows-3.1.1', u'foo': u'bar'}
     _gen_new_shards_to_run(
         properties=dict(number_shards=1, dimensions=request_dimensions_1))
 
     # It's normally time ordered.
     test_helper.mock_now(self, self.now + datetime.timedelta(seconds=1))
-    request_dimensions_2 = {'hostname': 'localhost'}
+    request_dimensions_2 = {u'hostname': u'localhost'}
     _gen_new_shards_to_run(
         properties=dict(number_shards=2, dimensions=request_dimensions_2))
 
     bot_dimensions = {
-      'OS': 'Windows-3.1.1', 'hostname': 'localhost', 'foo': 'bar',
+      u'OS': u'Windows-3.1.1', u'hostname': u'localhost', u'foo': u'bar',
     }
     actual = _yield_next_available_shard_to_dispatch(bot_dimensions)
     expected = [
@@ -401,19 +403,19 @@ class TaskShardToRunApiTest(test_case.TestCase):
     # desynchronization between machines) still returns the items in the
     # timestamp order, e.g. priority is done based on timestamps and priority
     # only.
-    request_dimensions_1 = {'OS': 'Windows-3.1.1', 'foo': 'bar'}
+    request_dimensions_1 = {u'OS': u'Windows-3.1.1', u'foo': u'bar'}
     _gen_new_shards_to_run(
         properties=dict(number_shards=1, dimensions=request_dimensions_1))
 
     # The second shard is added before the first, potentially because of a
     # desynchronized clock. It'll have higher priority.
     test_helper.mock_now(self, self.now - datetime.timedelta(seconds=1))
-    request_dimensions_2 = {'hostname': 'localhost'}
+    request_dimensions_2 = {u'hostname': u'localhost'}
     _gen_new_shards_to_run(
         properties=dict(number_shards=2, dimensions=request_dimensions_2))
 
     bot_dimensions = {
-      'OS': 'Windows-3.1.1', 'hostname': 'localhost', 'foo': 'bar',
+      u'OS': u'Windows-3.1.1', u'hostname': u'localhost', u'foo': u'bar',
     }
     actual = _yield_next_available_shard_to_dispatch(bot_dimensions)
     expected = [
@@ -441,13 +443,13 @@ class TaskShardToRunApiTest(test_case.TestCase):
 
   def test_yield_next_available_shard_to_dispatch_priority(self):
     # Task added later but with higher priority are returned first.
-    request_dimensions_1 = {'OS': 'Windows-3.1.1'}
+    request_dimensions_1 = {u'OS': u'Windows-3.1.1'}
     _gen_new_shards_to_run(
         properties=dict(number_shards=3, dimensions=request_dimensions_1))
 
     # This one is later but has higher priority.
     test_helper.mock_now(self, self.now + datetime.timedelta(seconds=60))
-    request_dimensions_2 = {'OS': 'Windows-3.1.1'}
+    request_dimensions_2 = {u'OS': u'Windows-3.1.1'}
     _gen_new_shards_to_run(
         properties=dict(number_shards=2, dimensions=request_dimensions_2),
         priority=10)
@@ -485,7 +487,7 @@ class TaskShardToRunApiTest(test_case.TestCase):
         'shard_number': 2,
       },
     ]
-    bot_dimensions = {'OS': 'Windows-3.1.1', 'hostname': 'localhost'}
+    bot_dimensions = {u'OS': u'Windows-3.1.1', u'hostname': u'localhost'}
     actual = _yield_next_available_shard_to_dispatch(bot_dimensions)
     self.assertEqual(expected, actual)
 
@@ -506,8 +508,8 @@ class TaskShardToRunApiTest(test_case.TestCase):
 
   def test_reap_shard_to_run(self):
     shards = _gen_new_shards_to_run(
-        properties=dict(number_shards=2, dimensions={'OS': 'Windows-3.1.1'}))
-    bot_dimensions = {'OS': 'Windows-3.1.1', 'hostname': 'localhost'}
+        properties=dict(number_shards=2, dimensions={u'OS': u'Windows-3.1.1'}))
+    bot_dimensions = {u'OS': u'Windows-3.1.1', u'hostname': u'localhost'}
     self.assertEqual(
         2, len(_yield_next_available_shard_to_dispatch(bot_dimensions)))
 
@@ -529,8 +531,8 @@ class TaskShardToRunApiTest(test_case.TestCase):
 
   def test_retry_shard_to_run(self):
     shards = _gen_new_shards_to_run(
-        properties=dict(number_shards=2, dimensions={'OS': 'Windows-3.1.1'}))
-    bot_dimensions = {'OS': 'Windows-3.1.1', 'hostname': 'localhost'}
+        properties=dict(number_shards=2, dimensions={u'OS': u'Windows-3.1.1'}))
+    bot_dimensions = {u'OS': u'Windows-3.1.1', u'hostname': u'localhost'}
     # Grabs the 2 available shards so no shard is available afterward.
     task_shard_to_run.reap_shard_to_run(shards[0].key)
     task_shard_to_run.reap_shard_to_run(shards[1].key)
@@ -556,8 +558,8 @@ class TaskShardToRunApiTest(test_case.TestCase):
 
   def test_abort_shard_to_run(self):
     shards = _gen_new_shards_to_run(
-        properties=dict(number_shards=2, dimensions={'OS': 'Windows-3.1.1'}))
-    bot_dimensions = {'OS': 'Windows-3.1.1', 'hostname': 'localhost'}
+        properties=dict(number_shards=2, dimensions={u'OS': u'Windows-3.1.1'}))
+    bot_dimensions = {u'OS': u'Windows-3.1.1', u'hostname': u'localhost'}
     self.assertEqual(
         True, task_shard_to_run.abort_shard_to_run(shards[0]))
 

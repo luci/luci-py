@@ -67,11 +67,11 @@ class TaskShardToRun(ndb.Model):
   """
   # The shortened hash of TaskRequests.dimensions_json. This value is generated
   # with _hash_dimensions().
-  dimensions_hash = ndb.IntegerProperty(indexed=False)
+  dimensions_hash = ndb.IntegerProperty(indexed=False, required=True)
 
   # Moment by which the task has to be requested by a bot. Copy of TaskRequest's
   # TaskRequest.expiration_ts to enable queries when cleaning up stale jobs.
-  expiration_ts = ndb.DateTimeProperty()
+  expiration_ts = ndb.DateTimeProperty(required=True)
 
   # Everything above is immutable, everything below is mutable.
 
@@ -299,12 +299,13 @@ def new_shards_to_run_for_request(request):
   Returns:
     Yet to be stored TaskShardToRun entities.
   """
+  dimensions_json = utils.encode_to_json(request.properties.dimensions)
   return [
     TaskShardToRun(
         key=request_key_to_shard_to_run_key(request.key, i+1),
         queue_number=_gen_queue_number_key(
           request.created_ts, request.priority, i+1),
-        dimensions_hash=_hash_dimensions(request.properties.dimensions_json),
+        dimensions_hash=_hash_dimensions(dimensions_json),
         expiration_ts=request.expiration_ts)
     for i in xrange(request.properties.number_shards)
   ]
@@ -399,7 +400,7 @@ def yield_next_available_shard_to_dispatch(bot_dimensions):
       # verifying the TaskRequest. There's a probability of 2**-31 of conflicts,
       # which is low enough for our purpose.
       request = shard_to_run.request_key.get()
-      if not _match_dimensions(request.properties.dimensions(), bot_dimensions):
+      if not _match_dimensions(request.properties.dimensions, bot_dimensions):
         real_mismatch += 1
         continue
 
