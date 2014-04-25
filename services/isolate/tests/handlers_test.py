@@ -401,18 +401,19 @@ class MainTest(test_case.TestCase):
     for i in xrange(10):
       s = handlers.stats.Snapshot(requests=100 + i)
       day = (now - datetime.timedelta(days=i)).date()
-      handler.stats_day_cls(key=handler.day_key(day), values=s).put()
+      handler.stats_day_cls(key=handler.day_key(day), values_compressed=s).put()
 
     for i in xrange(10):
       s = handlers.stats.Snapshot(requests=10 + i)
       timestamp = (now - datetime.timedelta(hours=i))
-      handler.stats_hour_cls(key=handler.hour_key(timestamp), values=s).put()
+      handler.stats_hour_cls(
+          key=handler.hour_key(timestamp), values_compressed=s).put()
 
     for i in xrange(10):
       s = handlers.stats.Snapshot(requests=1 + i)
       timestamp = (now - datetime.timedelta(minutes=i))
       handler.stats_minute_cls(
-          key=handler.minute_key(timestamp), values=s).put()
+          key=handler.minute_key(timestamp), values_compressed=s).put()
 
   def test_stats(self):
     self._gen_stats()
