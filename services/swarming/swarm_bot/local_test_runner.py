@@ -447,10 +447,10 @@ class LocalTestRunner(object):
     env_vars = os.environ.copy()
     if self.test_run.env_vars:
       env_vars.update(
-          {
-            k.encode('utf-8'): v.encode('utf-8')
+          dict(
+            (k.encode('utf-8'), v.encode('utf-8'))
             for k, v in self.test_run.env_vars.iteritems()
-          })
+          ))
 
     # Write the header of the whole test run
     tests_to_run = self.test_run.tests
