@@ -36,17 +36,17 @@ def main(args, app_dir=None):
   options, args = parser.parse_args(args)
   logging.basicConfig(level=logging.DEBUG if options.verbose else logging.ERROR)
 
-  # If |app_dir| is not provided, it must be passed via command line. Happens
-  # when update.py is directly executed as a CLI tool.
-  if not app_dir:
+  if app_dir:
+    # If |app_dir| is provided, it must NOT be passed via command line. Happens
+    # when 'main' is called from a wrapper script.
+    if args:
+      parser.error('Unknown arguments: %s' % args)
+  else:
+    # If |app_dir| is not provided, it must be passed via command line. Happens
+    # when remote_api.py is directly executed as a CLI tool.
     if len(args) != 1:
       parser.error('Expecting a path to a GAE application directory')
     app_dir = args[0]
-  else:
-    # If |app_dir| is provided , it must NOT be passed via command line. Happens
-    # when 'main' is called from a wrapper script.
-    if args:
-      parser.error('Unknown arguments, %s' % args)
 
   # Ensure app_dir points to a directory with app.yaml.
   app_dir = os.path.abspath(app_dir)
