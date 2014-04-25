@@ -9,8 +9,8 @@ import unittest
 import test_env
 test_env.setup_test_env()
 
-import test_case
 from components.auth import model
+from support import test_case
 
 
 class IdentityTest(test_case.TestCase):

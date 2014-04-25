@@ -15,8 +15,8 @@ test_env.setup_test_env()
 
 from google.appengine.ext import ndb
 
-import test_case
 from components import utils
+from support import test_case
 
 
 class Rambling(ndb.Model):

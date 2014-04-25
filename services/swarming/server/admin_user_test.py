@@ -15,8 +15,8 @@ import test_env
 
 test_env.setup_test_env()
 
-import test_case
 from server import admin_user
+from support import test_case
 
 
 class AdminUserTest(test_case.TestCase):

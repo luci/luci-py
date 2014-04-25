@@ -17,7 +17,8 @@ test_env.setup_test_env()
 
 from google.appengine.ext import ndb
 
-import test_case
+from support import test_case
+
 from components.auth import api
 from components.auth import model
 

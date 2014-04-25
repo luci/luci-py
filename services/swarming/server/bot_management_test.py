@@ -20,9 +20,9 @@ import test_env
 
 test_env.setup_test_env()
 
-import test_case
 from common import bot_archive
 from server import bot_management
+from support import test_case
 
 
 class BotManagementTest(test_case.TestCase):

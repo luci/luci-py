@@ -14,13 +14,13 @@ def FindAppEngineSDK(input_api):
   import sys
   old_sys_path = sys.path
   try:
-    # Add 'tools' to sys.path to be able to import find_gae_sdk.
-    tools_dir = input_api.os_path.join(
-        input_api.PresubmitLocalPath(), '..', 'components', 'tools')
-    sys.path = [tools_dir] + sys.path
+    # Add 'components' to sys.path to be able to import gae_sdk_utils.
+    components_dir = input_api.os_path.join(
+        input_api.PresubmitLocalPath(), '..', 'components')
+    sys.path = [components_dir] + sys.path
     # pylint: disable=F0401
-    import find_gae_sdk
-    return find_gae_sdk.find_gae_sdk()
+    from support import gae_sdk_utils
+    return gae_sdk_utils.find_gae_sdk()
   finally:
     sys.path = old_sys_path
 
@@ -46,7 +46,7 @@ def CommonChecks(input_api, output_api):
     sys.path = [
       join('components', 'third_party'),
       join('swarm_bot'),
-      join('..', 'components', 'tools'),
+      join('..', 'components'),
       join('..', 'components', 'third_party'),
     ] + sys.path
     disabled_warnings = [

@@ -12,10 +12,8 @@ test_env.setup_test_env()
 
 from google.appengine.ext import ndb
 
-# For TestCase.
-import test_case
-
 from components import datastore_utils
+from support import test_case
 
 
 class Entity(ndb.Model):

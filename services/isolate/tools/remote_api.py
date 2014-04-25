@@ -28,15 +28,15 @@ except ImportError:
   gnomekeyring = None
 
 
-import app_config
+APP_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ROOT_DIR = os.path.dirname(APP_DIR)
 
-ROOT_DIR = os.path.dirname(app_config.APP_DIR)
-sys.path.insert(0, os.path.join(ROOT_DIR, 'components', 'tools'))
+sys.path.insert(0, os.path.join(ROOT_DIR, 'components'))
+sys.path.insert(0, os.path.join(ROOT_DIR, 'components', 'third_party'))
+sys.path.insert(0, APP_DIR)
+sys.path.insert(0, os.path.join(APP_DIR, 'third_party'))
 
-import find_gae_sdk
-
-sys.path.insert(0, app_config.APP_DIR)
-sys.path.insert(0, os.path.join(app_config.APP_DIR, 'third_party'))
+from support import gae_sdk_utils
 
 
 def unlock_keyring():
@@ -133,7 +133,7 @@ class KeyringAuth(DefaultAuth):
 
 def load_context(sdk_path, app_dir, host, app_id, version, module_id):
   """Returns a closure where the GAE SDK is initialized."""
-  find_gae_sdk.setup_gae_sdk(sdk_path)
+  gae_sdk_utils.setup_gae_sdk(sdk_path)
 
   # Import GAE's SDK modules as needed.
   from google.appengine.ext.remote_api import remote_api_stub
@@ -171,16 +171,16 @@ def load_context(sdk_path, app_dir, host, app_id, version, module_id):
     predefined_vars = locals().copy()
     return predefined_vars
 
-  app_id = app_id or find_gae_sdk.default_app_id(app_dir)
+  app_id = app_id or gae_sdk_utils.default_app_id(app_dir)
   if not host:
     # https://developers.google.com/appengine/docs/python/modules/
     prefixes = filter(None, (version, module_id, app_id))
     host = '%s.appspot.com' % '-dot-'.join(prefixes)
-  find_gae_sdk.setup_env(app_dir, app_id, version, module_id, remote_api=True)
+  gae_sdk_utils.setup_env(app_dir, app_id, version, module_id, remote_api=True)
   return setup_env(host), app_id
 
 
-def Main():
+def main():
   parser = optparse.OptionParser(description=sys.modules[__name__].__doc__)
   parser.add_option('-v', '--verbose', action='store_true')
   parser.add_option('-A', '--app-id', help='Defaults to name in app.yaml')
@@ -201,13 +201,12 @@ def Main():
 
   if args:
     parser.error('Unknown arguments, %s' % args)
-  options.sdk_path = options.sdk_path or find_gae_sdk.find_gae_sdk(
-      app_config.APP_DIR)
+  options.sdk_path = options.sdk_path or gae_sdk_utils.find_gae_sdk(APP_DIR)
   if not options.sdk_path:
     parser.error('Failed to find the AppEngine SDK. Pass --sdk-path argument.')
 
   predefined_vars, app_id = load_context(
-      options.sdk_path, app_config.APP_DIR,
+      options.sdk_path, APP_DIR,
       options.host, options.app_id, options.version, options.module)
   if not predefined_vars:
     return 1
@@ -219,4 +218,4 @@ def Main():
 
 
 if __name__ == '__main__':
-  sys.exit(Main())
+  sys.exit(main())

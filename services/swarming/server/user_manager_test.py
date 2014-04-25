@@ -15,8 +15,8 @@ import test_env
 
 test_env.setup_test_env()
 
-import test_case
 from server import user_manager
+from support import test_case
 from third_party.mox import mox
 
 IP = ['192.168.0.1', '192.168.0.2']

@@ -11,7 +11,7 @@ import test_env
 test_env.setup_test_env()
 
 from components import ereporter2
-import test_case
+from support import test_case
 
 
 class ErrorRecordStub(object):

@@ -13,16 +13,15 @@ import unittest
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 
 import test_env
-
 test_env.setup_test_env()
 
 from google.appengine.datastore import datastore_stub_util
 from google.appengine.ext import testbed
 
 from components import auth
+from support import test_case
 
 import handlers
-import test_case
 import webtest
 
 from common import swarm_constants

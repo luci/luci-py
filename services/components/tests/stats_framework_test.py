@@ -13,17 +13,14 @@ import test_env
 test_env.setup_test_env()
 
 import webapp2
+import webtest
+
 from google.appengine.ext import ndb
+
+from support import test_case
 
 from components import stats_framework
 from components import stats_framework_mock
-
-# From tools/third_party/
-import webtest
-
-# For TestCase.
-import test_case
-
 
 # pylint: disable=W0212
 

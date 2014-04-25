@@ -13,10 +13,10 @@ import unittest
 import test_env
 test_env.setup_test_env()
 
-import test_case
 import webapp2
 import webtest
 
+from support import test_case
 from components import utils
 
 from components.auth import api

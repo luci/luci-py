@@ -18,9 +18,9 @@ test_env.setup_test_env()
 
 from google.appengine.api import datastore_errors
 
-import test_case
 from server import task_common
 from server import task_request
+from support import test_case
 
 # pylint: disable=W0212
 

@@ -18,9 +18,9 @@ test_env.setup_test_env()
 
 from google.appengine.api import datastore_errors
 
-import test_case
 from server import task_common
 from server import test_helper
+from support import test_case
 
 
 class TaskCommonApiTest(test_case.TestCase):

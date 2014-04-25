@@ -11,15 +11,11 @@ import os
 import sys
 
 APP_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, os.path.join(APP_DIR, '..', 'components', 'tools'))
+sys.path.insert(0, os.path.join(APP_DIR, '..', 'components'))
+sys.path.insert(0, os.path.join(APP_DIR, '..', 'components', 'third_party'))
 
-import update_instance
-
-
-def main():
-  return update_instance.main(
-      sys.argv[1:], APP_DIR, [os.path.join(APP_DIR, 'app.yaml')])
+from tools import update
 
 
 if __name__ == '__main__':
-  sys.exit(main())
+  sys.exit(update.main(sys.argv[1:], APP_DIR))

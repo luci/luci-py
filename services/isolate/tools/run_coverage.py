@@ -7,9 +7,10 @@ import os
 import sys
 
 APP_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, os.path.join(APP_DIR, '..', 'components', 'tools'))
+sys.path.insert(0, os.path.join(APP_DIR, '..', 'components'))
+sys.path.insert(0, os.path.join(APP_DIR, '..', 'components', 'third_party'))
 
-import run_coverage  # pylint: disable=W0406
+from tools import run_coverage
 
 
 if __name__ == '__main__':

@@ -20,12 +20,11 @@ test_env.setup_test_env()
 # From components/third_party/
 import webtest
 
-# From components/tools/, for TestCase.
-import test_case
+from components import auth
+from support import test_case
 
 import handlers
 
-from components import auth
 
 # Access to a protected member _XXX of a client class
 # pylint: disable=W0212

@@ -17,9 +17,9 @@ test_env.setup_test_env()
 
 from google.appengine.ext import ndb
 
-import test_case
 from stats import daily_stats
 from stats import runner_stats
+from support import test_case
 
 # The amount of time (in minutes) that every runner took to get assigned.
 WAIT_TIME = 2

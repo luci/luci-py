@@ -10,12 +10,11 @@ import optparse
 import os
 import sys
 
-import app_config
+APP_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(APP_DIR, '..', 'components'))
+sys.path.insert(0, os.path.join(APP_DIR, '..', 'components', 'third_party'))
 
-ROOT_DIR = os.path.dirname(app_config.APP_DIR)
-sys.path.insert(0, os.path.join(ROOT_DIR, 'components', 'tools'))
-
-import find_gae_sdk
+from support import gae_sdk_utils
 
 
 def main():
@@ -31,18 +30,17 @@ def main():
   logging.basicConfig(level=logging.DEBUG if options.verbose else logging.ERROR)
 
   options.sdk_path = (
-      options.sdk_path or find_gae_sdk.find_gae_sdk())
+      options.sdk_path or gae_sdk_utils.find_gae_sdk())
   if not options.sdk_path:
     parser.error('Failed to find the AppEngine SDK. Pass --sdk-path argument.')
 
-  find_gae_sdk.setup_gae_sdk(options.sdk_path)
-  options.app_id = (
-      options.app_id or find_gae_sdk.default_app_id(app_config.APP_DIR))
+  gae_sdk_utils.setup_gae_sdk(options.sdk_path)
+  options.app_id = options.app_id or gae_sdk_utils.default_app_id(APP_DIR)
 
   if len(args) != 1:
     print('Specify a version to switch to, uploaded versions:\n')
-    find_gae_sdk.appcfg(
-        app_config.APP_DIR,
+    gae_sdk_utils.appcfg(
+        APP_DIR,
         ['list_versions', '.'],
         options.sdk_path,
         options.app_id,
@@ -51,7 +49,7 @@ def main():
     return 1
 
   version = args[0]
-  modules = find_gae_sdk.get_app_modules(app_config.APP_DIR, app_config.MODULES)
+  modules = gae_sdk_utils.get_app_modules(APP_DIR)
 
   print('Switching default version:')
   print('  App: %s' % options.app_id)
@@ -61,8 +59,8 @@ def main():
     print('Aborted.')
     return 0
 
-  return find_gae_sdk.appcfg(
-      app_config.APP_DIR,
+  return gae_sdk_utils.appcfg(
+      APP_DIR,
       ['set_default_version', '--module', ','.join(modules)],
       options.sdk_path,
       options.app_id,

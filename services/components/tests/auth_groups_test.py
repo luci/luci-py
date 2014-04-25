@@ -9,7 +9,8 @@ import unittest
 import test_env
 test_env.setup_test_env()
 
-import test_case
+from support import test_case
+
 from components.auth import groups
 from components.auth import model
 

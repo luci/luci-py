@@ -19,12 +19,12 @@ test_env.setup_test_env()
 
 from google.appengine.ext import ndb
 
-import test_case
 from common import test_request_message
 from server import dimension_mapping
 from server import test_helper
 from stats import runner_stats
 from stats import runner_summary
+from support import test_case
 from third_party.mox import mox
 
 # pylint: disable=W0212

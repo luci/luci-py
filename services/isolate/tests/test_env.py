@@ -5,10 +5,9 @@
 import os
 import sys
 
-TESTS_DIR = os.path.dirname(os.path.abspath(__file__))
 # isolate/
-APP_DIR = os.path.dirname(TESTS_DIR)
-# components/
+APP_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# components/ (NOT isolate/components/).
 COMPONENTS_DIR = os.path.join(os.path.dirname(APP_DIR), 'components')
 
 _INITIALIZED = False
@@ -21,22 +20,22 @@ def setup_test_env():
     raise Exception('Do not call test_env.setup_test_env() twice.')
   _INITIALIZED = True
 
-  # For find_gae_sdk.py and test_case.py.
-  sys.path.insert(0, os.path.join(COMPONENTS_DIR, 'tools'))
-
-  import find_gae_sdk  # pylint: disable=F0401
-  gae_sdk_dir = find_gae_sdk.find_gae_sdk()
-  if not gae_sdk_dir:
-    raise Exception('Unable to find gae sdk path, aborting test.')
-
-  find_gae_sdk.setup_gae_sdk(gae_sdk_dir)
-  find_gae_sdk.setup_env(APP_DIR, None, None, None)
-
-  # For webtest, depot_tools/auto_stub.py and friends.
+  # For 'from support import ...'
+  sys.path.insert(0, COMPONENTS_DIR)
+  # For dependencies of support code.
   sys.path.insert(0, os.path.join(COMPONENTS_DIR, 'third_party'))
+
   # For unit tests not importing main.py, which should be ALL unit tests.
   sys.path.insert(0, os.path.join(APP_DIR, 'components', 'third_party'))
-  # For cloudstorage and mapreduce.
+  # For dependencies of app itself.
   sys.path.insert(0, os.path.join(APP_DIR, 'third_party'))
   # For application modules.
   sys.path.insert(0, APP_DIR)
+
+  from support import gae_sdk_utils
+  gae_sdk_dir = gae_sdk_utils.find_gae_sdk()
+  if not gae_sdk_dir:
+    raise Exception('Unable to find gae sdk path, aborting test.')
+
+  gae_sdk_utils.setup_gae_sdk(gae_sdk_dir)
+  gae_sdk_utils.setup_env(APP_DIR, None, None, None)

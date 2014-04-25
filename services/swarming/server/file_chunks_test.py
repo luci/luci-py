@@ -14,8 +14,8 @@ import test_env
 
 test_env.setup_test_env()
 
-import test_case
 from server import file_chunks
+from support import test_case
 
 
 class FileTest(test_case.TestCase):

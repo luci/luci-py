@@ -18,8 +18,8 @@ test_env.setup_test_env()
 
 from google.appengine.ext import ndb
 
-import test_case
 from server import errors
+from support import test_case
 
 
 class TestManagementTest(test_case.TestCase):

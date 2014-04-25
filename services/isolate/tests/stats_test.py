@@ -12,14 +12,11 @@ test_env.setup_test_env()
 
 import stats
 
-from components import stats_framework_mock
-
 # From components/third_party/
 import webtest
 
-# For TestCase.
-import test_case
-
+from components import stats_framework_mock
+from support import test_case
 
 # pylint: disable=R0201
 

@@ -25,21 +25,18 @@ import urllib
 import urllib2
 import urlparse
 
-# Add swarming folder to system path.
-ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, ROOT_DIR)
+APP_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, APP_DIR)
+sys.path.insert(0, os.path.join(APP_DIR, 'swarm_bot'))
+
+import test_env
+test_env.setup_test_env()
 
 from common import bot_archive
 
-sys.path.insert(0, os.path.join(ROOT_DIR, 'swarm_bot'))
-
 import url_helper
 
-import test_env
-
-test_env.setup_test_env()
-
-import find_gae_sdk
+from support import gae_sdk_utils
 
 # The script to start the slave with. The python script is passed in because
 # during tests, sys.executable was sometimes failing to find python.
@@ -124,7 +121,7 @@ def setup_bot(swarm_bot_dir, start_slave_content):
     dstdir = os.path.dirname(dst)
     if not os.path.isdir(dstdir):
       os.mkdir(dstdir)
-    src = os.path.join(ROOT_DIR, 'swarm_bot', i)
+    src = os.path.join(APP_DIR, 'swarm_bot', i)
     shutil.copyfile(src, dst)
 
   # Remove the local test runner script to ensure the slave is out of date
@@ -154,7 +151,7 @@ class SwarmingTestCase(unittest.TestCase):
     gaedb_dir = os.path.join(self.tmpdir, 'gaedb')
     os.mkdir(gaedb_dir)
     cmd = [
-      find_gae_sdk.find_gae_dev_server(),
+      gae_sdk_utils.find_gae_dev_server(),
       '--port', str(server_port),
       '--admin_port', str(find_free_port('localhost', server_port + 1)),
       '--storage', gaedb_dir,
@@ -164,7 +161,7 @@ class SwarmingTestCase(unittest.TestCase):
       # same seed.
       '--datastore_consistency_policy', 'random',
       '--log_level', 'debug' if VERBOSE else 'info',
-      ROOT_DIR,
+      APP_DIR,
     ]
 
     # Start the server first since it is a tad slow to start.
@@ -175,7 +172,7 @@ class SwarmingTestCase(unittest.TestCase):
           stdout=f, stderr=subprocess.STDOUT)
 
     start_slave_content = START_SLAVE % {
-      'config_file': os.path.join(ROOT_DIR, 'tests', 'machine_config.txt'),
+      'config_file': os.path.join(APP_DIR, 'tests', 'machine_config.txt'),
       'extra_args': "'-v'," if VERBOSE else '',
       'log_file': os.path.join(self.log_dir, 'slave_machine.log'),
       'server_address': server_addr,
@@ -248,7 +245,7 @@ class SwarmingTestCase(unittest.TestCase):
   def get_swarm_files(self):
     swarm_files = []
     # Location of the test files.
-    test_data_dir = os.path.join(ROOT_DIR, 'tests', 'test_files')
+    test_data_dir = os.path.join(APP_DIR, 'tests', 'test_files')
     for dirpath, _, filenames in os.walk(test_data_dir):
       for filename in filenames:
         if os.path.splitext(filename)[1].lower() == '.swarm':

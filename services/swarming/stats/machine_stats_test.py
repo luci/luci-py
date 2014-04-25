@@ -16,8 +16,8 @@ import test_env
 
 test_env.setup_test_env()
 
-import test_case
 from stats import machine_stats
+from support import test_case
 
 
 MACHINE_IDS = ['12345678-12345678-12345678-12345678',

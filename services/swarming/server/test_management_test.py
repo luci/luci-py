@@ -18,7 +18,6 @@ import test_env
 
 test_env.setup_test_env()
 
-import test_case
 from common import rpc
 from common import test_request_message
 from server import bot_management
@@ -29,6 +28,7 @@ from server import test_management
 from server import test_request
 from server import test_runner
 from stats import machine_stats
+from support import test_case
 from third_party.mox import mox
 
 # pylint: disable=W0212

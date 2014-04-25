@@ -14,8 +14,8 @@ import test_env
 
 test_env.setup_test_env()
 
-import test_case
 from server import dimensions_utils
+from support import test_case
 
 
 def AreDimensionsInMachineDimensions(dimensions, machine_dimensions):

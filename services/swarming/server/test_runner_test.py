@@ -19,13 +19,13 @@ test_env.setup_test_env()
 from google.appengine.api import datastore_errors
 from google.appengine.ext import ndb
 
-import test_case
 from server import result_helper
 from server import test_helper
 from server import test_management
 from server import test_request
 from server import test_runner
 from stats import runner_stats
+from support import test_case
 from third_party.mox import mox
 
 # pylint: disable=W0212

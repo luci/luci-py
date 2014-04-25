@@ -4,6 +4,7 @@
 
 """Finds AppEngine SDK."""
 
+import glob
 import os
 import subprocess
 import sys
@@ -39,6 +40,23 @@ def find_gae_dev_server(search_dir=TOOLS_DIR):
   gae_sdk = find_gae_sdk(search_dir)
   if gae_sdk:
     return os.path.join(gae_sdk, 'dev_appserver.py')
+
+
+def find_module_yamls(app_dir):
+  """Searches |app_dir| for YAML files with module definitions.
+
+  Returns a list of absolute paths to the yamls (app.yaml in front).
+  """
+  if not is_application_directory(app_dir):
+    raise ValueError('Not a GAE application directory: %s' % app_dir)
+  yamls = [os.path.join(app_dir, 'app.yaml')]
+  yamls.extend(glob.glob(os.path.join(app_dir, 'module-*.yaml')))
+  return yamls
+
+
+def is_application_directory(app_dir):
+  """Returns True if |app_dir| is a directory with app.yaml inside."""
+  return os.path.isfile(os.path.join(app_dir, 'app.yaml'))
 
 
 def setup_gae_sdk(sdk_path):
@@ -100,13 +118,13 @@ def default_version(app_dir, module_id=None):
   return load_module_yaml(app_dir, module_id)['version']
 
 
-def get_app_modules(app_dir, module_files):
-  """Returns a list of app module names (fetched from |module_files| yamls)."""
+def get_app_modules(app_dir):
+  """Returns a list of app module names."""
   import yaml
 
   modules = []
-  for name in module_files:
-    with open(os.path.join(app_dir, name)) as f:
+  for yaml_path in find_module_yamls(app_dir):
+    with open(yaml_path) as f:
       modules.append(yaml.load(f)['module'])
   return modules
 
@@ -114,10 +132,10 @@ def get_app_modules(app_dir, module_files):
 def appcfg(app_dir, args, sdk_path, app_id=None, version=None, verbose=False):
   """Runs appcfg.py subcommand in |app_dir| and returns its exit code."""
   cmd = [
-      sys.executable,
-      os.path.join(sdk_path, 'appcfg.py'),
-      '--oauth2',
-      '--noauth_local_webserver',
+    sys.executable,
+    os.path.join(sdk_path, 'appcfg.py'),
+    '--oauth2',
+    '--noauth_local_webserver',
   ]
   if version:
     cmd.extend(('--version', version))

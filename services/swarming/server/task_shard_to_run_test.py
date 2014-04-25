@@ -18,12 +18,12 @@ test_env.setup_test_env()
 
 from google.appengine.ext import ndb
 
-import test_case
 from components import utils
 from server import task_common
 from server import task_request
 from server import task_shard_to_run
 from server import test_helper
+from support import test_case
 
 # pylint: disable=W0212
 

@@ -18,8 +18,8 @@ test_env.setup_test_env()
 
 from google.appengine.ext import ndb
 
-import test_case
 from server import dimension_mapping
+from support import test_case
 
 
 class DimensionMappingTest(test_case.TestCase):

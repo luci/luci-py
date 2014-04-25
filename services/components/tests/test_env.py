@@ -5,22 +5,18 @@
 import os
 import sys
 
-TESTS_DIR = os.path.dirname(os.path.abspath(__file__))
-ROOT_DIR = os.path.dirname(TESTS_DIR)
-COMPONENTS_DIR = os.path.join(ROOT_DIR, 'components')
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-# For 'from components import ...'.
+# For 'from components import ...' and 'from support import ...'.
 sys.path.insert(0, ROOT_DIR)
 # For depot_tools/auto_stub.py.
 sys.path.insert(0, os.path.join(ROOT_DIR, 'third_party'))
-# For find_gae_sdk.py.
-sys.path.insert(0, os.path.join(ROOT_DIR, 'tools'))
 
-import find_gae_sdk
+from support import gae_sdk_utils
 
 
 def setup_test_env():
   """Sets up App Engine/Django test environment."""
-  gae_dir = find_gae_sdk.find_gae_sdk()
-  find_gae_sdk.setup_gae_sdk(gae_dir)
-  find_gae_sdk.setup_env(None, 'sample-app', 'v1a', None)
+  gae_dir = gae_sdk_utils.find_gae_sdk()
+  gae_sdk_utils.setup_gae_sdk(gae_dir)
+  gae_sdk_utils.setup_env(None, 'sample-app', 'v1a', None)

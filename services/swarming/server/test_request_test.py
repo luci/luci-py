@@ -17,9 +17,9 @@ test_env.setup_test_env()
 
 from google.appengine.datastore import datastore_stub_util
 
-import test_case
 from server import test_helper
 from server import test_request
+from support import test_case
 
 
 class TestRequestTest(test_case.TestCase):

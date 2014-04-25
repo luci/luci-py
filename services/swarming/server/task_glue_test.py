@@ -16,8 +16,8 @@ import test_env
 
 test_env.setup_test_env()
 
-import test_case
 from server import task_glue
+from support import test_case
 
 # pylint: disable=W0212
 
