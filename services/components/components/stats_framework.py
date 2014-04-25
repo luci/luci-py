@@ -16,6 +16,7 @@ import collections
 import datetime
 import logging
 
+from google.appengine.api import datastore_errors
 from google.appengine.api import logservice
 from google.appengine.ext import ndb
 from google.appengine.runtime import DeadlineExceededError
@@ -239,7 +240,11 @@ class StatisticsFramework(object):
       modified = ndb.DateTimeProperty(indexed=False, auto_now_add=True)
 
       # Statistics for the day.
-      values = ndb.LocalStructuredProperty(snapshot_cls)
+      values_compressed = ndb.LocalStructuredProperty(
+          snapshot_cls, compressed=True, name='values_c')
+      # This is needed for backward compatibility
+      values_uncompressed = ndb.LocalStructuredProperty(
+          snapshot_cls, name='values')
 
       # Hours that have been summed. A complete day will be set to (1<<24)-1,
       # e.g.  0xFFFFFF, e.g. 24 bits or 6x4 bits.
@@ -248,19 +253,24 @@ class StatisticsFramework(object):
       # Used for queries.
       SEALED_BITMAP = 0xFFFFFF
 
+      @property
+      def values(self):
+        return self.values_compressed or self.values_uncompressed
+
       def to_dict(self):
-        """Adds the key and remove cruft not necessary for the user."""
-        out = super(StatsDay, self).to_dict()
-        out.pop('created')
-        out.pop('modified')
-        out.pop('hours_bitmap')
-        out['key'] = self.to_date()
-        return out
+        return {
+          'key': self.to_date(),
+          'values': self.values.to_dict(),
+        }
 
       def to_date(self):
         """Returns the datetime.date instance for this instance."""
         year, month, day = self.key.id().split('-', 2)
         return datetime.date(int(year), int(month), int(day))
+
+      def _pre_put_hook(self):
+        if bool(self.values_compressed) == bool(self.values_uncompressed):
+          raise datastore_errors.BadValueError('Invalid object')
 
     return StatsDay
 
@@ -277,7 +287,11 @@ class StatisticsFramework(object):
       """
       created = ndb.DateTimeProperty(indexed=False, auto_now=True)
       # Statistics for the hour.
-      values = ndb.LocalStructuredProperty(snapshot_cls)
+      values_compressed = ndb.LocalStructuredProperty(
+          snapshot_cls, compressed=True, name='values_c')
+      # This is needed for backward compatibility
+      values_uncompressed = ndb.LocalStructuredProperty(
+          snapshot_cls, name='values')
 
       # Minutes that have been summed. A complete hour will be set to (1<<60)-1,
       # e.g. 0xFFFFFFFFFFFFFFF, e.g. 60 bits or 15x4 bits.
@@ -286,13 +300,15 @@ class StatisticsFramework(object):
       # Used for queries.
       SEALED_BITMAP = 0xFFFFFFFFFFFFFFF
 
+      @property
+      def values(self):
+        return self.values_compressed or self.values_uncompressed
+
       def to_dict(self):
-        """Adds the key and remove cruft not necessary for the user."""
-        out = super(StatsHour, self).to_dict()
-        out.pop('created')
-        out.pop('minutes_bitmap')
-        out['key'] = self.to_datetime()
-        return out
+        return {
+          'key': self.to_datetime(),
+          'values': self.values.to_dict(),
+        }
 
       def to_datetime(self):
         """Returns the datetime.datetime instance for this instance."""
@@ -300,6 +316,10 @@ class StatisticsFramework(object):
         year, month, day = key.parent().id().split('-', 2)
         return datetime.datetime(
             int(year), int(month), int(day), int(key.id()))
+
+      def _pre_put_hook(self):
+        if bool(self.values_compressed) == bool(self.values_uncompressed):
+          raise datastore_errors.BadValueError('Invalid object')
 
     return StatsHour
 
@@ -316,14 +336,21 @@ class StatisticsFramework(object):
       """
       created = ndb.DateTimeProperty(indexed=False, auto_now=True)
       # Statistics for one minute.
-      values = ndb.LocalStructuredProperty(snapshot_cls)
+      values_compressed = ndb.LocalStructuredProperty(
+          snapshot_cls, compressed=True, name='values_c')
+      # This is needed for backward compatibility
+      values_uncompressed = ndb.LocalStructuredProperty(
+          snapshot_cls, name='values')
+
+      @property
+      def values(self):
+        return self.values_compressed or self.values_uncompressed
 
       def to_dict(self):
-        """Adds the key and remove cruft not necessary for the user."""
-        out = super(StatsMinute, self).to_dict()
-        out.pop('created')
-        out['key'] = self.to_datetime()
-        return out
+        return {
+          'key': self.to_datetime(),
+          'values': self.values.to_dict(),
+        }
 
       def to_datetime(self):
         """Returns the datetime.datetime instance for this instance."""
@@ -332,6 +359,10 @@ class StatisticsFramework(object):
         hour = key.parent().id()
         return datetime.datetime(
             int(year), int(month), int(day), int(hour), int(key.id()))
+
+      def _pre_put_hook(self):
+        if bool(self.values_compressed) == bool(self.values_uncompressed):
+          raise datastore_errors.BadValueError('Invalid object')
 
     return StatsMinute
 
@@ -370,14 +401,14 @@ class StatisticsFramework(object):
         # That was 23:59. Make sure day for 00:00 exists.
         self.stats_day_cls.get_or_insert(
             str(minute_after.date()), parent=self.root_key,
-            values=self.snapshot_cls())
+            values_compressed=self.snapshot_cls())
 
       if minute_after.hour != timestamp.hour:
         # That was NN:59.
         self.stats_hour_cls.get_or_insert(
             '%02d' % minute_after.hour,
             parent=self.day_key(minute_after.date()),
-            values=self.snapshot_cls())
+            values_compressed=self.snapshot_cls())
       return minute_after
     return self._guess_earlier_minute_to_process(now)
 
@@ -413,7 +444,7 @@ class StatisticsFramework(object):
         today = now.date()
         key_id = str(today - datetime.timedelta(days=self.MAX_BACKTRACK))
         day = self.stats_day_cls.get_or_insert(
-            key_id, parent=self.root_key, values=self.snapshot_cls())
+            key_id, parent=self.root_key, values_compressed=self.snapshot_cls())
         logging.info('Selected/created: %s', key_id)
       else:
         logging.info('Selected: %s', day.key)
@@ -426,7 +457,7 @@ class StatisticsFramework(object):
       # TODO(maruel): Fix this.
       key_id = str(last_sealed_day.to_date() + datetime.timedelta(days=1))
       day = self.stats_day_cls.get_or_insert(
-          key_id, parent=self.root_key, values=self.snapshot_cls())
+          key_id, parent=self.root_key, values_compressed=self.snapshot_cls())
       logging.info('Selected: %s', key_id)
 
     # TODO(maruel): Should we trust it all the time or do an explicit query? For
@@ -435,7 +466,8 @@ class StatisticsFramework(object):
     assert hour_bit < 24, (hour_bit, day.to_date())
 
     hour = self.stats_hour_cls.get_or_insert(
-        '%02d' % hour_bit, parent=day.key, values=self.snapshot_cls())
+        '%02d' % hour_bit, parent=day.key,
+        values_compressed=self.snapshot_cls())
     minute_bit = _lowest_missing_bit(hour.minutes_bitmap)
     assert minute_bit < 60, minute_bit
     date = day.to_date()
@@ -466,11 +498,11 @@ class StatisticsFramework(object):
     opts = ndb.ContextOptions(use_memcache=False)
     future_day = self.stats_day_cls.get_or_insert_async(
         str(moment.date()), parent=self.root_key,
-        values=self.snapshot_cls(),
+        values_compressed=self.snapshot_cls(),
         context_options=opts)
     future_hour = self.stats_hour_cls.get_or_insert_async(
         '%02d' % moment.hour, parent=self.day_key(moment.date()),
-        values=self.snapshot_cls(),
+        values_compressed=self.snapshot_cls(),
         context_options=opts)
     future_minute = self.stats_minute_cls.get_by_id_async(
         minute_key_id, parent=self.hour_key(moment), use_memcache=False)
@@ -488,7 +520,7 @@ class StatisticsFramework(object):
           calendar.timegm(moment.timetuple()), calendar.timegm(end.timetuple()))
 
       minute = self.stats_minute_cls(
-          id=minute_key_id, parent=hour.key, values=minute_values)
+          id=minute_key_id, parent=hour.key, values_compressed=minute_values)
       futures.append(minute.put_async(use_memcache=False))
     else:
       minute_values = minute.values
