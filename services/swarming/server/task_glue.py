@@ -24,11 +24,20 @@ Plan of attack:
 
 The goal is to make tests/server_smoke_test.py pass, not handlers_test.py, since
 handlers_test.py edits the DB directly.
+
+Entities translation is:
+  TestRequest -> TaskRequest
+  TestRunner -> TaskShardResult
+The translation is not 1:1 and has patches accordingly until we get rid of the
+old ones.
 """
 
 import datetime
 
 from common import test_request_message
+from server import task_request
+from server import task_result
+from server import task_scheduler
 from server import test_management
 from server import test_request
 from server import test_runner
@@ -115,6 +124,13 @@ def RetryRunner(runner_key_urlsafe):
 ### test_request.py public API.
 
 
+def UrlSafe(runner_key):
+  """Returns an urlsafe encoded key. What it is depends on old vs new."""
+  if USE_OLD_API:
+    return runner_key.urlsafe()
+  return task_scheduler.pack_shard_result_key(runner_key)
+
+
 def GetAllMatchingTestRequests(test_case_name):
   if USE_OLD_API:
     return test_request.GetAllMatchingTestRequests(test_case_name)
@@ -195,3 +211,83 @@ def UpdateTestResult(runner, machine_id, success, exit_codes, results,
         overwrite=overwrite)
   assert not overwrite
   raise NotImplementedError()
+
+
+### UI code that should be in jinja2 templates
+
+
+def GenerateButtonWithHiddenForm(button_text, url, form_id):
+  """Generate a button that when used will post to the given url.
+
+  Args:
+    button_text: The text to display on the button.
+    url: The url to post to.
+    form_id: The id to give the form.
+
+  Returns:
+    The html text to display the button.
+  """
+  button_html = '<form id="%s" method="post" action=%s>' % (form_id, url)
+  button_html += (
+      '<button onclick="document.getElementById(%s).submit()">%s</button>' %
+      (form_id, button_text))
+  button_html += '</form>'
+
+  return button_html
+
+
+def make_runner_view(runner):
+  """Returns a html template friendly dict from a TestRunner."""
+  # TODO(maruel): This belongs to a jinja2 template, not here.
+  if USE_OLD_API:
+    out = runner.to_dict()
+    out['class_string'] = ''
+    out['command_string'] = '&nbsp;'
+    out['key_string'] = UrlSafe(runner.key)
+    out['status_string'] = '&nbsp;'
+    out['user'] = out['requestor']
+    if runner.done:
+      # TODO(maruel): All this should be done in the template instead.
+      if runner.ran_successfully:
+        out['status_string'] = (
+            '<a title="Click to see results" href="%s?r=%s">Succeeded</a>' %
+            ('/secure/get_result', out['key_string']))
+      else:
+        out['class_string'] = 'failed_test'
+        out['command_string'] = GenerateButtonWithHiddenForm(
+            'Retry',
+            '/secure/retry?r=%s' % out['key_string'],
+            out['key_string'])
+        out['status_string'] = (
+            '<a title="Click to see results" href="%s?r=%s">Failed</a>' %
+            ('/secure/get_result', out['key_string']))
+    elif runner.started:
+      out['status_string'] = 'Running on %s' % runner.machine_id
+    else:
+      out['status_string'] = 'Pending'
+      out['command_string'] = GenerateButtonWithHiddenForm(
+          'Cancel',
+          '%s?r=%s' % ('/secure/cancel', out['key_string']),
+          out['key_string'])
+    return out
+
+  # Simulate the old properties until the templates are updated.
+  request, result = runner
+  assert isinstance(request, task_request.TaskRequest), request
+  assert isinstance(result, task_result.TaskResultSummary), result
+  out = {
+    # TODO(maruel): out['class_string'] = 'failed_test'
+    'class_string': '',
+    'command_string': 'TODO',
+    'created': request.created_ts,
+    'ended': result.done_ts,
+    'key_string': '%x' % request.key.integer_id(),
+    # TODO(maruel):
+    # 'machine_id': ','.join(i.bot_id for i in runner.shards if i.bot_id),
+    'machine_id': 'TODO',
+    'name': request.name,
+    'started': min(i.started_ts for i in result.shards),
+    'status_string': result.to_string(),
+    'user': request.user,
+  }
+  return out

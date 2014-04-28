@@ -80,26 +80,6 @@ should_ignore_error_record = functools.partial(
     ereporter2.should_ignore_error_record, IGNORED_LINES, IGNORED_EXCEPTIONS)
 
 
-def GenerateButtonWithHiddenForm(button_text, url, form_id):
-  """Generate a button that when used will post to the given url.
-
-  Args:
-    button_text: The text to display on the button.
-    url: The url to post to.
-    form_id: The id to give the form.
-
-  Returns:
-    The html text to display the button.
-  """
-  button_html = '<form id="%s" method="post" action=%s>' % (form_id, url)
-  button_html += (
-      '<button onclick="document.getElementById(%s).submit()">%s</button>' %
-      (form_id, button_text))
-  button_html += '</form>'
-
-  return button_html
-
-
 def DaysToShow(request):
   """Find the number of days to show, according to the request.
 
@@ -160,39 +140,6 @@ def require_taskqueue(task_name):
       return f(self, *args, **kwargs)
     return hook
   return decorator
-
-
-def make_runner_view(runner):
-  """Returns a html template friendly dict from a TestRunner."""
-  out = runner.to_dict()
-  out['key_string'] = runner.key.urlsafe()
-  out['status_string'] = '&nbsp;'
-  out['command_string'] = '&nbsp;'
-  out['class_string'] = ''
-
-  if runner.done:
-    # TODO(maruel): All this should be done in the template instead.
-    if runner.ran_successfully:
-      out['status_string'] = (
-          '<a title="Click to see results" href="%s?r=%s">Succeeded</a>' %
-          (_SECURE_GET_RESULTS_URL, out['key_string']))
-    else:
-      out['class_string'] = 'failed_test'
-      out['command_string'] = GenerateButtonWithHiddenForm(
-          'Retry',
-          '/secure/retry?r=%s' % out['key_string'],
-          out['key_string'])
-      out['status_string'] = (
-          '<a title="Click to see results" href="%s?r=%s">Failed</a>' %
-          (_SECURE_GET_RESULTS_URL, out['key_string']))
-  elif runner.started:
-    out['status_string'] = 'Running on %s' % runner.machine_id
-  else:
-    out['status_string'] = 'Pending'
-    out['command_string'] = GenerateButtonWithHiddenForm(
-        'Cancel', '/secure/cancel?r=%s' % (out['key_string']),
-        out['key_string'])
-  return out
 
 
 ### Handlers
@@ -360,7 +307,7 @@ class MainHandler(auth.AuthenticatingHandler):
       page = 1
 
     runners = [
-      make_runner_view(runner)
+      task_glue.make_runner_view(runner)
       for runner in params.get_shards(
           sort_key,
           ascending=ascending,
@@ -437,7 +384,8 @@ class MachineListHandler(auth.AuthenticatingHandler):
       m['html_class'] = (
           'dead_machine' if machine.last_seen < dead_machine_cutoff else '')
       # Add a delete option for each machine assignment.
-      m['command_string'] = GenerateButtonWithHiddenForm(
+      # TODO(maruel): This should not be generated via python.
+      m['command_string'] = task_glue.GenerateButtonWithHiddenForm(
           'Delete',
           '%s?r=%s' % (_DELETE_MACHINE_STATS_URL, machine.key.string_id()),
           machine.key.string_id())
