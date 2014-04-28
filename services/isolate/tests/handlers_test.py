@@ -20,6 +20,7 @@ test_env.setup_test_env()
 import webtest
 
 from components import auth
+from components import stats_framework_mock
 from support import test_case
 
 import handlers
@@ -353,7 +354,7 @@ class MainTest(test_case.TestCase):
   def _gen_stats(self):
     # Generates data for the last 10 days, last 10 hours and last 10 minutes.
     now = datetime.datetime(2010, 1, 2, 3, 4, 5, 6)
-    self.mock(handlers.stats.stats_framework, 'utcnow', lambda: now)
+    stats_framework_mock.mock_now(self, now, 0)
     handler = handlers.stats.get_stats_handler()
     for i in xrange(10):
       s = handlers.stats.Snapshot(requests=100 + i)
