@@ -54,6 +54,10 @@ class UtilsTest(test_case.TestCase):
     ]
     self.assertEqual(expected, actual)
 
+    self.assertEqual([0, 1], utils.to_json_encodable(range(2)))
+    self.assertEqual([0, 1], utils.to_json_encodable(i for i in (0, 1)))
+    self.assertEqual([0, 1], utils.to_json_encodable(xrange(2)))
+
   def test_datetime_to_rfc2822(self):
     self.assertEqual(
       'Mon, 02 Jan 2012 03:04:05 -0000',

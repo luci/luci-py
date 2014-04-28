@@ -12,6 +12,7 @@
 
 import datetime
 import functools
+import inspect
 import json
 import os
 import threading
@@ -216,6 +217,11 @@ def to_json_encodable(data):
   if hasattr(data, 'urlsafe') and callable(data.urlsafe):
     # This takes care of ndb.Key.
     return to_json_encodable(data.urlsafe())
+
+  if inspect.isgenerator(data) or isinstance(data, xrange):
+    # Handle it like a list. Sadly, xrange is not a proper generator so it has
+    # to be checked manually.
+    return [to_json_encodable(i) for i in data]
 
   assert False, 'Don\'t know how to handle %r' % data
 
