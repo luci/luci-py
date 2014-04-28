@@ -17,7 +17,8 @@ import webtest
 
 def now_epoch():
   """Returns the equivalent of time.time() as mocked if applicable."""
-  return calendar.timegm(stats_framework.utcnow().timetuple())
+  # pylint: disable=W0212
+  return calendar.timegm(stats_framework._utcnow().timetuple())
 
 
 class RequestLog(object):
@@ -31,12 +32,12 @@ class RequestLog(object):
 
 
 def mock_now(test, now, seconds):
-  """Mocks utcnow() and ndb properties.
+  """Mocks _utcnow() and ndb properties.
 
   In particular handles when auto_now and auto_now_add are used.
   """
   now = now + datetime.timedelta(seconds=seconds)
-  test.mock(stats_framework, 'utcnow', lambda: now)
+  test.mock(stats_framework, '_utcnow', lambda: now)
   test.mock(stats_framework.ndb.DateTimeProperty, '_now', lambda _: now)
   test.mock(stats_framework.ndb.DateProperty, '_now', lambda _: now.date())
 

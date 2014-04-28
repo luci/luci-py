@@ -34,63 +34,8 @@ PREFIX = 'Stats: '
 TOO_RECENT = 5 if not utils.is_local_dev_server() else 1
 
 
-def utcnow():
-  """To be mocked in tests."""
-  return datetime.datetime.utcnow()
-
-
-def add_entry(message):
-  """Adds an entry for the current request.
-
-  Meant to be mocked in tests.
-  """
-  logging.debug(PREFIX + message)
-
-
 # One handled HTTP request and the associated statistics if any.
 StatsEntry = collections.namedtuple('StatsEntry', ('request', 'entries'))
-
-
-def _yield_logs(start_time, end_time):
-  """Yields logservice.RequestLogs for the requested time interval.
-
-  Meant to be mocked in tests.
-  """
-  # If module_versions is not specified, it will default to the current version
-  # on current module, which is not what we want.
-  # TODO(maruel): Keep request.offset and use it to resume the query by using it
-  # instead of using start_time/end_time.
-  module_versions = utils.get_module_version_list(None, True)
-  for request in logservice.fetch(
-      start_time=start_time - 1 if start_time else start_time,
-      end_time=end_time + 1 if end_time else end_time,
-      include_app_logs=True,
-      module_versions=module_versions):
-    yield request
-
-
-def yield_entries(start_time, end_time):
-  """Yields StatsEntry in this time interval.
-
-  Look at requests that *ended* between [start_time, end_time[. Ignore the start
-  time of the request. This is because the parameters start_time and end_time of
-  logserver.fetch() filters on the completion time of the request.
-  """
-  offset = len(PREFIX)
-  for request in _yield_logs(start_time, end_time):
-    if not request.finished or not request.end_time:
-      continue
-    if start_time and request.end_time < start_time:
-      continue
-    if end_time and request.end_time >= end_time:
-      continue
-
-    # Gathers all the entries added via add_entry().
-    entries = [
-      l.message[offset:] for l in request.app_logs
-      if l.level <= logservice.LOG_LEVEL_INFO and l.message.startswith(PREFIX)
-    ]
-    yield StatsEntry(request, entries)
 
 
 class StatisticsFramework(object):
@@ -148,7 +93,7 @@ class StatisticsFramework(object):
     count = 0
     original_minute = None
     try:
-      now = utcnow()
+      now = _utcnow()
       original_minute = self._get_next_minute_to_process(now)
       next_minute = original_minute
       while now - next_minute >= datetime.timedelta(minutes=up_to):
@@ -158,7 +103,7 @@ class StatisticsFramework(object):
         if self.MAX_MINUTES_PER_PROCESS == count:
           break
         next_minute = next_minute + datetime.timedelta(minutes=1)
-        now = utcnow()
+        now = _utcnow()
       return count
     except DeadlineExceededError:
       msg = (
@@ -552,6 +497,55 @@ class StatisticsFramework(object):
       ndb.Future.wait_all(futures)
 
 
+### Private stuff.
+
+
+def _lowest_missing_bit(bitmap):
+  """For a bitmap, returns the lowest missing bit.
+
+  Do not check the sign bit. If all bits are set, return the sign bit. It's the
+  caller to handle this case.
+  """
+  for i in xrange(64):
+    if not (bitmap & (1 << i)):
+      return i
+  return 64
+
+
+def _utcnow():
+  """To be mocked in tests."""
+  return datetime.datetime.utcnow()
+
+
+def _yield_logs(start_time, end_time):
+  """Yields logservice.RequestLogs for the requested time interval.
+
+  Meant to be mocked in tests.
+  """
+  # If module_versions is not specified, it will default to the current version
+  # on current module, which is not what we want.
+  # TODO(maruel): Keep request.offset and use it to resume the query by using it
+  # instead of using start_time/end_time.
+  module_versions = utils.get_module_version_list(None, True)
+  for request in logservice.fetch(
+      start_time=start_time - 1 if start_time else start_time,
+      end_time=end_time + 1 if end_time else end_time,
+      include_app_logs=True,
+      module_versions=module_versions):
+    yield request
+
+
+### Public API.
+
+
+def add_entry(message):
+  """Adds an entry for the current request.
+
+  Meant to be mocked in tests.
+  """
+  logging.debug(PREFIX + message)
+
+
 def accumulate(lhs, rhs):
   """Adds the values from rhs into lhs.
 
@@ -588,6 +582,30 @@ def accumulate(lhs, rhs):
         setattr(lhs, key, lhs_value + rhs_value)
 
 
+def yield_entries(start_time, end_time):
+  """Yields StatsEntry in this time interval.
+
+  Look at requests that *ended* between [start_time, end_time[. Ignore the start
+  time of the request. This is because the parameters start_time and end_time of
+  logserver.fetch() filters on the completion time of the request.
+  """
+  offset = len(PREFIX)
+  for request in _yield_logs(start_time, end_time):
+    if not request.finished or not request.end_time:
+      continue
+    if start_time and request.end_time < start_time:
+      continue
+    if end_time and request.end_time >= end_time:
+      continue
+
+    # Gathers all the entries added via add_entry().
+    entries = [
+      l.message[offset:] for l in request.app_logs
+      if l.level <= logservice.LOG_LEVEL_INFO and l.message.startswith(PREFIX)
+    ]
+    yield StatsEntry(request, entries)
+
+
 def filterout(futures):
   """Filters out inexistent entities."""
   intermediary = (i.get_result() for i in futures)
@@ -597,7 +615,7 @@ def filterout(futures):
 def get_days_async(handler, now, num_days):
   if not num_days:
     return []
-  now = now or utcnow()
+  now = now or _utcnow()
   today = now.date()
   gen = (
     handler.day_key(today - datetime.timedelta(days=i))
@@ -613,7 +631,7 @@ def get_days(handler, now, num_days):
 def get_hours_async(handler, now, num_hours):
   if not num_hours:
     return []
-  now = now or utcnow()
+  now = now or _utcnow()
   gen = (
       handler.hour_key(now - datetime.timedelta(hours=i))
       for i in xrange(num_hours))
@@ -627,7 +645,7 @@ def get_hours(handler, now, num_hours):
 def get_minutes_async(handler, now, num_minutes):
   if not num_minutes:
     return []
-  now = now or utcnow()
+  now = now or _utcnow()
   gen = (
       handler.minute_key(now - datetime.timedelta(minutes=i))
       for i in xrange(num_minutes))
@@ -654,7 +672,7 @@ def generate_stats_data(num_days, num_hours, num_minutes, now, stats_handler):
     'days': filterout(future_days),
     'hours': filterout(future_hours),
     'minutes': filterout(future_minutes),
-    'now': (now or utcnow()).strftime(utils.DATETIME_FORMAT),
+    'now': (now or _utcnow()).strftime(utils.DATETIME_FORMAT),
   }
 
 
@@ -676,15 +694,3 @@ def generate_stats_data_from_request(request, stats_handler):
       request, 'minutes', DEFAULT_MINUTES, MIN_VALUE, MAX_MINUTES)
   now = utils.get_request_as_datetime(request, 'now')
   return generate_stats_data(days, hours, minutes, now, stats_handler)
-
-
-def _lowest_missing_bit(bitmap):
-  """For a bitmap, returns the lowest missing bit.
-
-  Do not check the sign bit. If all bits are set, return the sign bit. It's the
-  caller to handle this case.
-  """
-  for i in xrange(64):
-    if not (bitmap & (1 << i)):
-      return i
-  return 64
