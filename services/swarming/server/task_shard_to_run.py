@@ -424,8 +424,8 @@ def yield_next_available_shard_to_dispatch(bot_dimensions):
         broken)
 
 
-def all_expired_shard_to_run():
-  """Returns an ndb.Query for all the available expired TaskShardToRun."""
+def yield_expired_shard_to_run():
+  """Yields all the expired TaskShardToRun still marked as available."""
   # Do not use a projection query, since the TaskShardToRun entities are hot,
   # thus are likely to be found in cache and projection queries disable the
   # cache.
@@ -439,7 +439,7 @@ def all_expired_shard_to_run():
 def retry_shard_to_run(shard_to_run_key):
   """Updates a TaskShardToRun to note it should run again.
 
-  Runs it in a transaction to ensure .queue_number is toggled.
+  The modification is done in a transaction to ensure .queue_number is toggled.
 
   Uses the original timestamp for priority, so the task shard request doesn't
   get starved on retries.
@@ -451,6 +451,7 @@ def retry_shard_to_run(shard_to_run_key):
     True if succeeded.
   """
   assert isinstance(shard_to_run_key, ndb.Key), shard_to_run_key
+  assert not ndb.in_transaction()
   request = shard_to_run_key_to_request_key(shard_to_run_key).get()
   queue_number = _gen_queue_number_key(
       request.created_ts,
@@ -470,7 +471,8 @@ def retry_shard_to_run(shard_to_run_key):
 def reap_shard_to_run(shard_to_run_key):
   """Updates a TaskShardToRun to note it should not be run again.
 
-  Runs it in a transaction to ensure .queue_number is toggled.
+  If running inside a transaction, reuse it. Otherwise runs it in a transaction
+  to ensure .queue_number is toggled.
 
   Arguments:
   - shard_to_run_key: ndb.Key to TaskShardToRun entity to update.
@@ -480,19 +482,23 @@ def reap_shard_to_run(shard_to_run_key):
     True if succeeded.
   """
   assert isinstance(shard_to_run_key, ndb.Key), shard_to_run_key
-  try:
-    # Don't retry, it's not worth. Just move on to the next task shard.
-    result = ndb.transaction(
-        lambda: _put_shard_to_run(shard_to_run_key, None),
-        retries=0)
-    if result:
-      # Notes this fact immediately in memcache to reduce DB contention.
-      _set_lookup_cache(shard_to_run_key, False)
-    return result
-  except datastore_errors.TransactionFailedError:
-    # Ignore transaction failures, it's seen as if the object had been reaped by
-    # another bot concurrently.
-    return False
+  if ndb.in_transaction():
+    result = _put_shard_to_run(shard_to_run_key, None)
+  else:
+    try:
+      # Don't retry, it's not worth. Just move on to the next task shard.
+      result = ndb.transaction(
+          lambda: _put_shard_to_run(shard_to_run_key, None),
+          retries=0)
+    except datastore_errors.TransactionFailedError:
+      # Ignore transaction failures, it's seen if the object had been reaped by
+      # another bot concurrently.
+      return False
+
+  if result:
+    # Note this fact immediately in memcache to reduce DB contention.
+    _set_lookup_cache(shard_to_run_key, False)
+  return result
 
 
 def abort_shard_to_run(shard_to_run):
@@ -504,6 +510,7 @@ def abort_shard_to_run(shard_to_run):
   Returns:
     Always True.
   """
+  assert not ndb.in_transaction()
   assert isinstance(shard_to_run, TaskShardToRun), shard_to_run
   shard_to_run.queue_number = None
   shard_to_run.put()

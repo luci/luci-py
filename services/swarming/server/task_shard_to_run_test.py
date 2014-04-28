@@ -491,12 +491,12 @@ class TaskShardToRunApiTest(test_case.TestCase):
     actual = _yield_next_available_shard_to_dispatch(bot_dimensions)
     self.assertEqual(expected, actual)
 
-  def test_all_expired_shard_to_run(self):
+  def test_yield_expired_shard_to_run(self):
     _gen_new_shards_to_run(
         properties=dict(number_shards=3), scheduling_expiration_secs=60)
     self.assertEqual(3, len(_yield_next_available_shard_to_dispatch({})))
     self.assertEqual(
-        0, len(list(task_shard_to_run.all_expired_shard_to_run())))
+        0, len(list(task_shard_to_run.yield_expired_shard_to_run())))
 
     # All tasks are now expired. Note that even if they still have .queue_number
     # set because the cron job wasn't run, they are still not yielded by
@@ -504,7 +504,7 @@ class TaskShardToRunApiTest(test_case.TestCase):
     test_helper.mock_now(self, self.now + datetime.timedelta(seconds=61))
     self.assertEqual(0, len(_yield_next_available_shard_to_dispatch({})))
     self.assertEqual(
-        3, len(list(task_shard_to_run.all_expired_shard_to_run())))
+        3, len(list(task_shard_to_run.yield_expired_shard_to_run())))
 
   def test_reap_shard_to_run(self):
     shards = _gen_new_shards_to_run(
