@@ -31,33 +31,43 @@ block depends on the previous ones:
 ## Overall schema graph of a task request with 2 shards
 
        +------Root------+
-       |TaskRequestShard|                                     task_request.py
+       |TaskRequestShard|                                        task_request.py
        +----------------+
                ^
                |
     +---------------------+
     |TaskRequest          |
-    |    +--------------+ |<..........................+       task_request.py
-    |    |TaskProperties| |                           .
-    |    +--------------+ |<..+                       .
-    +---------------------+   .                       .
-     ^                        .                       .
-     | +--------Root-------+  . +--------Root-------+ .
-     | |TaskShardToRunShard|  . |TaskShardToRunShard| .  task_shard_to_run.py
-     | +-------------------+  . +-------------------+ .
-     |             ^          .          ^            .
-     |             |          .          |            .
-     |      +--------------+  .   +--------------+    .
-     |      |TaskShardToRun|..+   |TaskShardToRun|....+  task_shard_to_run.py
+    |    +--------------+ |<....implicit.reference.....+         task_request.py
+    |    |TaskProperties| |                            .
+    |    +--------------+ |<..+                        .
+    +---------------------+   .                        .
+     ^                        .                        .
+     | +--------Root-------+  . +--------Root-------+  .
+     | |TaskShardToRunShard|  . |TaskShardToRunShard|  .    task_shard_to_run.py
+     | +-------------------+  . +-------------------+  .
+     |             ^          .          ^             .
+     |             |          .          |             .
+     |      +--------------+  .   +--------------+     .
+     |      |TaskShardToRun|..+   |TaskShardToRun|.....+    task_shard_to_run.py
      |      +--------------+      +--------------+
-     |                     ^                 ^
-     |                     |                 |
-    +-----------------+    +---------------+ +---------------+
-    |TaskResultSummary|    |TaskShardResult| |TaskShardResult|    task_result.py
-    +-----------------+    +---------------+ +---------------+
-            .                       ^           ^
-            .                       .           .
-            +.......................+...........+
+     |                   ^                     ^
+     |                   |                     |
+     |                   +------+              +--+
+     |                          |                 |
+    +-----------------------+ +---------------+ +---------------+
+    |TaskResultSummary      | |TaskShardResult| |TaskShardResult| task_result.py
+    |                       | +---------------+ +---------------+
+    | +--------------------+|          ^               ^
+    | |TaskShardResultInner||          .               .
+    | +--------------------+|          .               .
+    |                       |          .               .
+    | +--------------------+|          .               .
+    | |TaskShardResultInner||          .               .
+    | +--------------------+|          .               .
+    |  (...)                |          .               .
+    +-----------------------+          .               .
+              .                        .               .
+              +...implicit.reference...+...............+
 
 ### Notes
 

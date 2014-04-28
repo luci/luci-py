@@ -37,6 +37,11 @@ MAXIMUM_PRIORITY = 255
 MAXIMUM_SHARDS = 255
 
 
+# Amount of time after which a bot is considered dead. In short, if a bot has
+# not ping in the last 5 minutes while running a task, it is considered dead.
+BOT_PING_TOLERANCE = datetime.timedelta(seconds=5*60)
+
+
 def validate_priority(priority):
   """Throws ValueError if priority is not a valid value."""
   if 0 > priority or MAXIMUM_PRIORITY < priority:

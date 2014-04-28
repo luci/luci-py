@@ -9,3 +9,13 @@ queue:
   rate: 2/m
   retry_parameters:
     task_retry_limit: 0
+
+# Triggered by task_result.enqueue_update_result_summary() to update the
+# corresponding TaskResultSummary asynchronously.
+- name: update-result-summary
+  bucket_size: 100
+  # If this becomes problematic, one work around is to create -0, -1, -2, ...
+  # queues to increases the total quota available.
+  rate: 500/s
+  retry_parameters:
+    task_age_limit: 1d

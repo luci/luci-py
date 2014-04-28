@@ -3,7 +3,6 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
-import base64
 import datetime
 import logging
 import os
@@ -80,19 +79,16 @@ class MainTest(test_case.TestCase):
     """Creates a new app instance for every test case."""
     super(MainTest, self).setUp()
     self.testbed.init_modules_stub()
-    self.testbed.init_taskqueue_stub()
-    self.taskqueue_stub = self.testbed.get_stub(
-        test_case.testbed.TASKQUEUE_SERVICE_NAME)
-    self.taskqueue_stub._root_path = ROOT_DIR
 
     # When called during a taskqueue, the call to get_app_version() may fail so
     # pre-fetch it.
     version = handlers.config.get_app_version()
     self.mock(handlers.config, 'get_task_queue_host', lambda: version)
     self.source_ip = '127.0.0.1'
-    self.testapp = webtest.TestApp(
+    self.app = webtest.TestApp(
         handlers.CreateApplication(debug=True),
         extra_environ={'REMOTE_ADDR': self.source_ip})
+    self.enable_task_queue(ROOT_DIR)
 
   def whitelist_self(self):
     handlers.acl.WhitelistedIP(
@@ -107,47 +103,8 @@ class MainTest(test_case.TestCase):
       'protocol_version': handlers.ISOLATE_PROTOCOL_VERSION,
       'pusher': True,
     }
-    req = self.testapp.post_json('/content-gs/handshake', data)
+    req = self.app.post_json('/content-gs/handshake', data)
     return urllib.quote(req.json['access_token'])
-
-  def execute_tasks(self):
-    """Executes enqueued tasks that are ready to run and return the number run.
-
-    A task may trigger another task.
-
-    Sadly, taskqueue_stub implementation does not provide a nice way to run
-    them so run the pending tasks manually.
-    """
-    self.assertEqual([None], self.taskqueue_stub._queues.keys())
-    ran_total = 0
-    while True:
-      # Do multiple loops until no task was run.
-      ran = 0
-      for queue in self.taskqueue_stub.GetQueues():
-        for task in self.taskqueue_stub.GetTasks(queue['name']):
-          # Remove 2 seconds for jitter.
-          eta = task['eta_usec'] / 1e6 - 2
-          if eta >= time.time():
-            continue
-          self.assertEqual('POST', task['method'])
-          logging.info('Task: %s', task['url'])
-
-          # Not 100% sure why the Content-Length hack is needed:
-          body = base64.b64decode(task['body'])
-          headers = dict(task['headers'])
-          headers['Content-Length'] = str(len(body))
-          try:
-            response = self.testapp.post(task['url'], body, headers=headers)
-          except:
-            logging.error(task)
-            raise
-          # TODO(maruel): Implement task failure.
-          self.assertEqual(200, response.status_code)
-          self.taskqueue_stub.DeleteTask(queue['name'], task['name'])
-          ran += 1
-      if not ran:
-        return ran_total
-      ran_total += ran
 
   def mock_delete_files(self):
     deleted = []
@@ -161,7 +118,7 @@ class MainTest(test_case.TestCase):
 
   def put_content(self, url, content):
     """Simulare isolateserver.py archive."""
-    req = self.testapp.put(
+    req = self.app.put(
         url, content_type='application/octet-stream', params=content)
     self.assertEqual(200, req.status_code)
     self.assertEqual({'entry':{}}, req.json)
@@ -169,7 +126,7 @@ class MainTest(test_case.TestCase):
   # Test cases.
 
   def test_internal_cron_ereporter2_mail_not_cron(self):
-    response = self.testapp.get(
+    response = self.app.get(
         '/internal/cron/ereporter2/mail', expect_errors=True)
     self.assertEqual(response.status_int, 403)
     self.assertEqual(
@@ -185,7 +142,7 @@ class MainTest(test_case.TestCase):
     self.mock(
         handlers.ereporter2, '_extract_exceptions_from_logs', lambda *_: data)
     headers = {'X-AppEngine-Cron': 'true'}
-    response = self.testapp.get(
+    response = self.app.get(
         '/internal/cron/ereporter2/mail', headers=headers)
     self.assertEqual(response.status_int, 200)
     self.assertEqual(response.normal_body, 'Success.')
@@ -221,7 +178,7 @@ class MainTest(test_case.TestCase):
                 (method, route, permissions))
 
   def test_pre_upload_ok(self):
-    req = self.testapp.post_json(
+    req = self.app.post_json(
         '/content-gs/pre-upload/a?token=%s' % self.handshake(),
         [gen_item('foo')])
     self.assertEqual(1, len(req.json))
@@ -231,7 +188,7 @@ class MainTest(test_case.TestCase):
     self.assertEqual(None, req.json[0][1])
 
   def test_pre_upload_invalid_namespace(self):
-    req = self.testapp.post_json(
+    req = self.app.post_json(
         '/content-gs/pre-upload/[?token=%s' % self.handshake(),
         [gen_item('foo')],
         expect_errors=True)
@@ -250,7 +207,7 @@ class MainTest(test_case.TestCase):
     self.mock(handlers.ndb.DateTimeProperty, '_now', lambda _: now)
     self.mock(handlers.ndb.DateProperty, '_now', lambda _: now.date())
 
-    r = self.testapp.post_json(
+    r = self.app.post_json(
         '/content-gs/pre-upload/default?token=%s' % self.handshake(),
         [gen_item(i) for i in items])
     self.assertEqual(len(items), len(r.json))
@@ -268,7 +225,7 @@ class MainTest(test_case.TestCase):
     now += datetime.timedelta(seconds=2*expiration)
     self.assertEqual(
         datetime.datetime(2012, 01, 16, 03, 04, 05, 06), handlers.utcnow())
-    r = self.testapp.post_json(
+    r = self.app.post_json(
         '/content-gs/pre-upload/default?token=%s' % self.handshake(),
         [gen_item(items[0])])
     self.assertEqual(200, r.status_code)
@@ -277,7 +234,7 @@ class MainTest(test_case.TestCase):
     self.assertEqual(2, len(list(handlers.ContentEntry.query())))
 
     # 'bar' was kept, 'foo' was cleared out.
-    resp = self.testapp.get('/internal/cron/cleanup/trigger/old')
+    resp = self.app.get('/internal/cron/cleanup/trigger/old')
     self.assertEqual(200, resp.status_code)
     self.assertEqual([None], r.json)
     self.assertEqual(1, self.execute_tasks())
@@ -286,7 +243,7 @@ class MainTest(test_case.TestCase):
 
     # Advance time and force cleanup. This deletes 'bar' too.
     now += datetime.timedelta(seconds=2*expiration)
-    resp = self.testapp.get('/internal/cron/cleanup/trigger/old')
+    resp = self.app.get('/internal/cron/cleanup/trigger/old')
     self.assertEqual(200, resp.status_code)
     self.assertEqual([None], r.json)
     self.assertEqual(1, self.execute_tasks())
@@ -294,7 +251,7 @@ class MainTest(test_case.TestCase):
 
     # Advance time and force cleanup.
     now += datetime.timedelta(seconds=2*expiration)
-    resp = self.testapp.get('/internal/cron/cleanup/trigger/old')
+    resp = self.app.get('/internal/cron/cleanup/trigger/old')
     self.assertEqual(200, resp.status_code)
     self.assertEqual([None], r.json)
     self.assertEqual(1, self.execute_tasks())
@@ -339,7 +296,7 @@ class MainTest(test_case.TestCase):
     self.mock(handlers.gcs, 'list_files', lambda _: mock_files)
 
     handlers.ContentEntry(key=handlers.entry_key('d', '0' * 40)).put()
-    self.testapp.get('/internal/cron/cleanup/trigger/trim_lost')
+    self.app.get('/internal/cron/cleanup/trigger/trim_lost')
     self.assertEqual(1, self.execute_tasks())
     self.assertEqual(['d/' + '1' * 40], deleted)
 
@@ -347,7 +304,7 @@ class MainTest(test_case.TestCase):
     # Upload a file larger than MIN_SIZE_FOR_DIRECT_GS and ensure the verify
     # task works.
     data = '0' * handlers.MIN_SIZE_FOR_DIRECT_GS
-    req = self.testapp.post_json(
+    req = self.app.post_json(
         '/content-gs/pre-upload/default?token=%s' % self.handshake(),
         [gen_item(data)])
     self.assertEqual(1, len(req.json))
@@ -358,7 +315,7 @@ class MainTest(test_case.TestCase):
     self.mock(
         handlers.gcs, 'get_file_info',
         lambda _b, _f: handlers.gcs.FileInfo(size=len(data)))
-    req = self.testapp.post(req.json[0][1], '')
+    req = self.app.post(req.json[0][1], '')
 
     self.mock(handlers.gcs, 'read_file', lambda _b, _f: [data])
     self.assertEqual(1, self.execute_tasks())
@@ -370,7 +327,7 @@ class MainTest(test_case.TestCase):
     # Upload a file larger than MIN_SIZE_FOR_DIRECT_GS and ensure the verify
     # task works.
     data = '0' * handlers.MIN_SIZE_FOR_DIRECT_GS
-    req = self.testapp.post_json(
+    req = self.app.post_json(
         '/content-gs/pre-upload/default?token=%s' % self.handshake(),
         [gen_item(data)])
     self.assertEqual(1, len(req.json))
@@ -381,7 +338,7 @@ class MainTest(test_case.TestCase):
     self.mock(
         handlers.gcs, 'get_file_info',
         lambda _b, _f: handlers.gcs.FileInfo(size=len(data)))
-    req = self.testapp.post(req.json[0][1], '')
+    req = self.app.post(req.json[0][1], '')
 
     # Fake corruption
     data_corrupted = '1' * handlers.MIN_SIZE_FOR_DIRECT_GS
@@ -417,7 +374,7 @@ class MainTest(test_case.TestCase):
 
   def test_stats(self):
     self._gen_stats()
-    response = self.testapp.get('/stats')
+    response = self.app.get('/stats')
     # Just ensure something is returned.
     self.assertGreater(response.content_length, 4000)
 
@@ -437,7 +394,7 @@ class MainTest(test_case.TestCase):
         'id":"downloads_bytes","label":"Downloaded"},{"type":"number","id":"con'
         'tains_lookups","label":"Items looked up"}]},"reqId":"0","version":"0.6'
         '"});')
-    response = self.testapp.get('/isolate/api/v1/stats/days?duration=1')
+    response = self.app.get('/isolate/api/v1/stats/days?duration=1')
     self.assertEqual(expected, response.body)
 
   def test_api_stats_hours(self):
@@ -456,7 +413,7 @@ class MainTest(test_case.TestCase):
         'number","id":"downloads_bytes","label":"Downloaded"},{"type":"number",'
         '"id":"contains_lookups","label":"Items looked up"}]},"reqId":"0","vers'
         'ion":"0.6"});')
-    response = self.testapp.get('/isolate/api/v1/stats/hours?duration=1&now=')
+    response = self.app.get('/isolate/api/v1/stats/hours?duration=1&now=')
     self.assertEqual(expected, response.body)
 
   def test_api_stats_minutes(self):
@@ -475,7 +432,7 @@ class MainTest(test_case.TestCase):
         'mber","id":"downloads_bytes","label":"Downloaded"},{"type":"number","i'
         'd":"contains_lookups","label":"Items looked up"}]},"reqId":"0","versio'
         'n":"0.6"});')
-    response = self.testapp.get('/isolate/api/v1/stats/minutes?duration=1')
+    response = self.app.get('/isolate/api/v1/stats/minutes?duration=1')
     self.assertEqual(expected, response.body)
 
 
