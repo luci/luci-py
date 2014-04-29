@@ -33,6 +33,10 @@ old ones.
 """
 
 import datetime
+import logging
+
+from google.appengine.datastore import datastore_query
+from google.appengine.ext import ndb
 
 from common import test_request_message
 from server import task_request
@@ -146,33 +150,126 @@ def GetNewestMatchingTestRequests(test_case_name):
 ### test_runner.py public API.
 
 
-ACCEPTABLE_SORTS = test_runner.ACCEPTABLE_SORTS
+if USE_OLD_API:
+  ACCEPTABLE_SORTS = test_runner.ACCEPTABLE_SORTS
+  DEFAULT_SORT = 'created'
+else:
+  ACCEPTABLE_SORTS =  {
+    'created_ts': 'Created',
+    'done_ts': 'Ended',
+    'modified_ts': 'Last updated',
+    'name': 'Name',
+    'user': 'User',
+  }
+  DEFAULT_SORT = 'created_ts'
+
+  # These sort are done on the TaskRequest.
+  SORT_REQUEST = frozenset(('created_ts', 'name', 'user'))
+
+  # These sort are done on the TaskResultSummary.
+  SORT_RESULT = frozenset(('done_ts', 'modified_ts'))
+
+  assert SORT_REQUEST | SORT_RESULT == frozenset(ACCEPTABLE_SORTS)
+
+
 TIME_BEFORE_RUNNER_HANGING_IN_MINS = (
     test_runner.TIME_BEFORE_RUNNER_HANGING_IN_MINS)
 
 
-def GetTestRunners(sort_by, ascending, limit, offset, sort_by_first):
+def GetTestRunnersWithFilters(
+    sort_by, ascending, limit, offset, status, show_successfully_completed,
+    test_name_filter, machine_id_filter):
+  """Returns a ndb.Future that will return the items in the DB."""
   if USE_OLD_API:
-    return test_runner.GetTestRunners(
+    sort_by_first = 'started' if status == 'running' else None
+    query = test_runner.GetTestRunners(
         sort_by, ascending, limit, offset, sort_by_first)
-  # TODO(maruel): Once migration is complete, remove limit and offset, replace
-  # with cursor.
-  raise NotImplementedError()
-
-
-def ApplyFilters(query, status, show_successfully_completed, test_name_filter,
-                 machine_id_filter):
-  if USE_OLD_API:
     return test_runner.ApplyFilters(
         query, status, show_successfully_completed, test_name_filter,
-        machine_id_filter)
-  raise NotImplementedError()
+        machine_id_filter).fetch_async()
+
+  assert sort_by in ACCEPTABLE_SORTS, (
+      'This should have been validated at a higher level')
+  opts = ndb.QueryOptions(limit=limit, offset=offset)
+  direction = (
+      datastore_query.PropertyOrder.ASCENDING
+      if ascending else datastore_query.PropertyOrder.DESCENDING)
+
+  fetch_request = bool(sort_by in SORT_REQUEST)
+  if fetch_request:
+    base_type = task_request.TaskRequest
+  else:
+    base_type = task_result.TaskResultSummary
+
+  # The future returned to the user:
+  final = ndb.Future()
+
+  # Phase 1: initiates the fetch.
+  logging.info(
+      'GetTestRunnersWithFilters(%s, %s, %s, %s), %s',
+      sort_by, ascending, limit, offset, fetch_request)
+  initial_future = base_type.query(default_options=opts).order(
+      datastore_query.PropertyOrder(sort_by, direction)).fetch_async()
+
+  def phase2_fetch_complement(future):
+    """Initiates the async fetch for the other object.
+
+    If base_type is TaskRequest, it will fetch the corresponding
+    TaskResultSummary.
+    If base_type is TaskResultSummary, it will fetch the corresponding
+    TaskRequest.
+    """
+    entities = future.get_result()
+    if not entities:
+      # Skip through if no entity was returned by the Query.
+      final.set_result(entities)
+      return
+
+    if fetch_request:
+      keys = (
+        task_result.request_key_to_result_summary_key(i.key) for i in entities
+      )
+    else:
+      keys = (i.request_key for i in entities)
+
+    # Convert a list of Future into a MultiFuture.
+    second_future = ndb.MultiFuture()
+    map(second_future.add_dependent, ndb.get_multi_async(keys))
+    second_future.complete()
+    second_future.add_immediate_callback(
+        phase3_merge_complementatry_models, entities, second_future)
+
+  def phase3_merge_complementatry_models(entities, future):
+    """Merge the results together to yield (TaskRequest, TaskResultSummary)."""
+    # See make_runner_view() for the real conversion to simulate the old DB
+    # entities.
+    if fetch_request:
+      out = zip(entities, future.get_result())
+    else:
+      # Reverse the order.
+      out = zip(future.get_result(), entities)
+    # Filter out inconsistent items.
+    final.set_result([i for i in out if i[0] and i[1]])
+
+  # ndb.Future.add_immediate_callback() adds a callback that is immediately
+  # called when self.set_result() is called.
+  initial_future.add_immediate_callback(phase2_fetch_complement, initial_future)
+  return final
 
 
 def GetRunnerFromUrlSafeKey(runner_key_urlsafe):
   if USE_OLD_API:
     return test_runner.GetRunnerFromUrlSafeKey(runner_key_urlsafe)
   raise NotImplementedError()
+
+
+def CountRequestsAsync():
+  """Returns a ndb.Future that will return the number of requests in the DB."""
+  if USE_OLD_API:
+    return test_runner.GetTestRunners(
+        None, False, None, None, None).count_async()
+  # TODO(maruel): Shards or requests? The old API returns the number of shards.
+  return task_request.TaskRequest.query().count_async()
 
 
 def PingRunner(runner_key_urlsafe, machine_id):
@@ -211,6 +308,12 @@ def UpdateTestResult(runner, machine_id, success, exit_codes, results,
         overwrite=overwrite)
   assert not overwrite
   raise NotImplementedError()
+
+
+def GetEncoding(runner):
+  if USE_OLD_API:
+    return runner.request.get().GetTestCase().encoding
+  return 'utf-8'
 
 
 ### UI code that should be in jinja2 templates

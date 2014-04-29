@@ -30,9 +30,10 @@ Always sorted by reverse created.
   <input type="text" name="machine_id_filter" value="{{machine_id_filter}}">
   <!--Add the page and sort_by values so they don't get lost-->
   <input type="hidden" name="page" value="{{current_page}}">
-  <input type="hidden" name="sort_by" value="reverse_created">
+  <input type="hidden" name="sort_by" value="{{sort_by}}">
   <input type="submit" name="Filter">
 </form>
+
 <table id="request-table" class="alterning_background"
     summary="This table lists all test requests">
   <thead>

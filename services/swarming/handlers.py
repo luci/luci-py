@@ -201,19 +201,9 @@ class FilterParams(object):
       The TestRunner query that is properly adjusted and filtered.
     """
     # TODO(maruel): Use cursors!
-    # If we are filtering for running runners, then we will test for inequality
-    # on the started field. App engine requires any fields used in an
-    # inequality be the first sorts that are applied to the query.
-    sort_by_first = 'started' if self.status == 'running' else None
-
-    query = task_glue.GetTestRunners(
-        sort_by, ascending, limit, offset, sort_by_first)
-
-    return task_glue.ApplyFilters(
-        query,
-        self.status,
-        self.show_successfully_completed,
-        self.test_name_filter,
+    return task_glue.GetTestRunnersWithFilters(
+        sort_by, ascending, limit, offset, self.status,
+        self.show_successfully_completed, self.test_name_filter,
         self.machine_id_filter)
 
   def filter_selects_as_html(self):
@@ -279,75 +269,62 @@ class MainHandler(auth.AuthenticatingHandler):
 
   @auth.require(auth.READ, 'swarming/management')
   def get(self):
-    # Build info for test requests table.
-    sort_by = self.request.get('sort_by')
-    sort_split = sort_by.split('_', 1)
-    ascending = not sort_split[0]
-    sort_key = sort_split[1] if len(sort_split) > 1 else ''
+    # TODO(maruel): Convert to Google Graph API.
+    # TODO(maruel): Once migration is complete, remove limit and offset, replace
+    # with cursor.
+    page_length = int(self.request.get('length', 50))
+    page = int(self.request.get('page', 1))
 
-    # Make sure that the sort key is a valid option.
+    sort_by = self.request.get('sort_by', 'D' + task_glue.DEFAULT_SORT)
+    ascending = bool(sort_by[0] == 'A')
+    sort_key = sort_by[1:]
     if sort_key not in task_glue.ACCEPTABLE_SORTS:
-      sort_key = 'created'
-      ascending = False
+      self.abort(400, 'Invalid sort key')
 
+    # TODO(maruel): Stop doing HTML in python.
     sorted_by_message = '<p>Currently sorted by: '
     if not ascending:
       sorted_by_message += 'Reverse '
     sorted_by_message += task_glue.ACCEPTABLE_SORTS[sort_key] + '</p>'
+    sort_options = []
+    # TODO(maruel): Use an order that makes sense instead of whatever the dict
+    # happens to be.
+    for key, value in task_glue.ACCEPTABLE_SORTS.iteritems():
+      # Add 'A' for ascending and 'D' for descending order.
+      sort_options.append(SortOptions('A' + key, value))
+      sort_options.append(SortOptions('D' + key, 'Reverse ' + value))
 
-    # Prase and load the filters
+    # Parse and load the filters.
     params = self.parse_filters()
 
-    runner_count_async = params.get_shards().count_async()
+    # Fire up all the queries in parallel.
+    tasks_future = params.get_shards(
+        sort_key,
+        ascending=ascending,
+        limit=page_length,
+        offset=page_length * (page - 1))
+    total_task_count_future = task_glue.CountRequestsAsync()
 
-    try:
-      page = int(self.request.get('page', 1))
-    except ValueError:
-      # TODO(maruel): Stop silently ignoring invalid values (in general,
-      # everywhere).
-      page = 1
+    opts = ndb.QueryOptions(limit=10)
+    errors_found_future = errors.SwarmError.query(
+        default_options=opts).order(-errors.SwarmError.created).fetch_async()
 
     runners = [
-      task_glue.make_runner_view(runner)
-      for runner in params.get_shards(
-          sort_key,
-          ascending=ascending,
-          limit=_NUM_USER_TEST_RUNNERS_PER_PAGE,
-          offset=_NUM_USER_TEST_RUNNERS_PER_PAGE * (page - 1))
+      task_glue.make_runner_view(r) for r in tasks_future.get_result()
     ]
-    errors_found = errors.SwarmError.query(
-        default_options=ndb.QueryOptions(
-          limit=_NUM_RECENT_ERRORS_TO_DISPLAY)).order(
-              -errors.SwarmError.created).fetch()
-
-    sort_options = []
-    for key, value in task_glue.ACCEPTABLE_SORTS.iteritems():
-      # Add the leading _ to the non-reversed key to show it is not to be
-      # reversed.
-      sort_options.append(SortOptions('_' + key, value))
-      sort_options.append(SortOptions('reverse_' + key, 'Reverse ' + value))
-
-    selected_sort = '_' if ascending else 'reverse_'
-    selected_sort += sort_key
-
-    total_pages = (runner_count_async.get_result() /
-                   _NUM_USER_TEST_RUNNERS_PER_PAGE)
-
-    # Ensure the shown page is capped to a page with content.
-    page = min(page, total_pages + 1)
 
     params = {
       'current_page': page,
-      'errors': errors_found,
+      'errors': errors_found_future.get_result(),
       'filter_selects': params.filter_selects_as_html(),
       'machine_id_filter': params.machine_id_filter,
       'runners': runners,
-      'selected_sort': selected_sort,
+      'selected_sort': ('A' if ascending else 'D') + sort_key,
       'sort_options': sort_options,
+      'sort_by': sort_by,
       'sorted_by_message': sorted_by_message,
       'test_name_filter': params.test_name_filter,
-      # Add 1 so the pages are 1-indexed.
-      'total_pages': map(str, range(1, total_pages + 1, 1)),
+      'total_tasks': total_task_count_future.get_result(),
       'url_no_filters': params.generate_page_url(page, sort_by),
       'url_no_page': params.generate_page_url(
           sort_by=sort_by, include_filters=True),
@@ -508,8 +485,7 @@ class ResultHandler(auth.AuthenticatingHandler):
     result_string = urllib.unquote_plus(self.request.get(
         swarm_constants.RESULT_STRING_KEY))
     if isinstance(result_string, unicode):
-      result_string = result_string.encode(
-          runner.request.get().GetTestCase().encoding)
+      result_string = result_string.encode(task_glue.GetEncoding(runner))
 
     # Mark the runner as pinging now to prevent it from timing out while
     # the results are getting stored.
