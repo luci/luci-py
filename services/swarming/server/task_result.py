@@ -407,6 +407,9 @@ def _task_update_result_summary(request_id):
   request_key = task_request.id_to_request_key(request_id)
   summary_key = request_key_to_result_summary_key(request_key)
   request, result_summary = ndb.get_multi((request_key, summary_key))
+  if request is None:
+    logging.error('TaskRequest doesn\'t exist anymore.\n%s', request_key)
+    return None
   # TODO(maruel): An option is to use
   # TaskShardResult.query(ancestor=request_key). It is much less efficient but
   # works to get all the needed data even in case of retries. Retries are a
