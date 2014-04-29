@@ -48,6 +48,8 @@ def _AddRunner(end_time, success, aborted):
 
 
 class DailyStatsTest(test_case.TestCase):
+  APP_DIR = ROOT_DIR
+
   def testGenerateDailyStatsTwice(self):
     current_day = datetime.datetime.utcnow().date()
 

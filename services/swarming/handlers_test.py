@@ -16,7 +16,6 @@ import test_env
 test_env.setup_test_env()
 
 from google.appengine.datastore import datastore_stub_util
-from google.appengine.ext import testbed
 
 from components import auth
 from support import test_case
@@ -57,15 +56,11 @@ FAKE_IP = 'fake-ip'
 
 
 class AppTest(test_case.TestCase):
+  APP_DIR = APP_DIR
+
   def setUp(self):
     super(AppTest, self).setUp()
-    self.testbed.init_logservice_stub()
-    self.testbed.init_taskqueue_stub()
     self.testbed.init_user_stub()
-
-    # Ensure the test can find queue.yaml.
-    self.taskqueue_stub = self.testbed.get_stub(testbed.TASKQUEUE_SERVICE_NAME)
-    self.taskqueue_stub._root_path = APP_DIR
 
     # By default requests in tests are coming from bot with fake IP.
     self.app = webtest.TestApp(
@@ -117,7 +112,8 @@ class AppTest(test_case.TestCase):
     # consistent.
     policy = datastore_stub_util.PseudoRandomHRConsistencyPolicy(
         probability=0)
-    self.testbed.init_datastore_v3_stub(consistency_policy=policy)
+    self.testbed.init_datastore_v3_stub(
+        require_indexes=True, consistency_policy=policy, root_path=self.APP_DIR)
 
     # Mock out all the authentication, since it doesn't work with the server
     # being only eventually consistent (but it is ok for the machines to take
@@ -771,21 +767,16 @@ class AppTest(test_case.TestCase):
     self.assertEquals('200 OK', response.status)
 
   def testCronTriggerTask(self):
-    triggers = [
-        ('cleanup', '/internal/cron/trigger_cleanup_data'),
-        ('stats', '/internal/cron/trigger_generate_daily_stats'),
-        ('stats', '/internal/cron/trigger_generate_recent_stats'),
-    ]
+    triggers = (
+      '/internal/cron/trigger_cleanup_data',
+      '/internal/cron/trigger_generate_daily_stats',
+      '/internal/cron/trigger_generate_recent_stats',
+    )
 
-    for i, (task_name, url) in enumerate(triggers):
+    for url in triggers:
       response = self.app.get(url, headers={'X-AppEngine-Cron': 'true'})
       self.assertResponse(response, '200 OK', 'Success.')
-      tasks = self.taskqueue_stub.get_filtered_tasks()
-      self.assertEqual(i + 1, len(tasks))
-      task = tasks[-1]
-      self.assertEqual('POST', task.method)
-      # I'm not sure why but task.queue_name is always None
-      self.assertEqual(task_name, task.headers['X-AppEngine-QueueName'])
+      self.assertEqual(1, self.execute_tasks())
 
   def testTaskQueueUrls(self):
     # Tests all the cron tasks are securely handled.
@@ -803,7 +794,6 @@ class AppTest(test_case.TestCase):
       response = self.app.post(
           url, headers={'X-AppEngine-QueueName': task_name})
       self.assertResponse(response, '200 OK', 'Success.')
-      self.assertEqual([], self.taskqueue_stub.get_filtered_tasks())
 
   def testCronJobTasks(self):
     # Tests all the cron tasks are securely handled.
@@ -825,6 +815,8 @@ class AppTest(test_case.TestCase):
           response, '403 Forbidden',
           '403 Forbidden\n\nAccess was denied to this resource.\n\n '
           'Only internal cron jobs can do this  ')
+    # The actual number doesn't matter, just make sure they are unqueued.
+    self.execute_tasks()
 
   def testDetectHangingRunners(self):
     response = self.app.get('/internal/cron/detect_hanging_runners',

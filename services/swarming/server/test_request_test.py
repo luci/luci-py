@@ -23,11 +23,14 @@ from support import test_case
 
 
 class TestRequestTest(test_case.TestCase):
+  APP_DIR = ROOT_DIR
+
   def testGetTestRequestKeys(self):
     # Ensure that matching works even when the datastore is not being
     # consistent.
     policy = datastore_stub_util.PseudoRandomHRConsistencyPolicy(probability=0)
-    self.testbed.init_datastore_v3_stub(consistency_policy=policy)
+    self.testbed.init_datastore_v3_stub(
+       require_indexes=True, consistency_policy=policy, root_path=self.APP_DIR)
 
     # Ensure it works with no keys.
     empty_test_request = test_helper.CreateRequest(num_instances=0)
@@ -46,7 +49,8 @@ class TestRequestTest(test_case.TestCase):
     # Ensure that matching works even when the datastore is not being
     # consistent.
     policy = datastore_stub_util.PseudoRandomHRConsistencyPolicy(probability=0)
-    self.testbed.init_datastore_v3_stub(consistency_policy=policy)
+    self.testbed.init_datastore_v3_stub(
+        require_indexes=True, consistency_policy=policy, root_path=self.APP_DIR)
 
     # Ensure it works with no matches.
     matches = test_request.GetAllMatchingTestRequests('unknown')
@@ -70,7 +74,8 @@ class TestRequestTest(test_case.TestCase):
     # Ensure that matching works even when the datastore is not being
     # consistent.
     policy = datastore_stub_util.PseudoRandomHRConsistencyPolicy(probability=0)
-    self.testbed.init_datastore_v3_stub(consistency_policy=policy)
+    self.testbed.init_datastore_v3_stub(
+        require_indexes=True, consistency_policy=policy, root_path=self.APP_DIR)
 
     # Ensure it works with no matches.
     match = test_request.GetNewestMatchingTestRequest('unknown')

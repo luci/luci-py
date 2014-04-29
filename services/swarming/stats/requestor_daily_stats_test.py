@@ -18,11 +18,10 @@ import test_env
 test_env.setup_test_env()
 
 from google.appengine.ext import ndb
-from google.appengine.ext import testbed
 
 from server import test_helper
 from stats import requestor_daily_stats
-
+from support import test_case
 
 # The expected wait and run times for all runners.
 EXPECTED_WAIT_TIME = 5
@@ -35,20 +34,7 @@ REQUESTOR = [
 ]
 
 
-class RequestorStatsTest(unittest.TestCase):
-  def setUp(self):
-    super(RequestorStatsTest, self).setUp()
-
-    # Setup the app engine test bed.
-    self.testbed = testbed.Testbed()
-    self.testbed.activate()
-    self.testbed.init_all_stubs()
-
-  def tearDown(self):
-    self.testbed.deactivate()
-
-    super(RequestorStatsTest, self).tearDown()
-
+class RequestorStatsTest(test_case.TestCase):
   def testAddStatsWithNoRequestor(self):
     self.assertEqual(0,
                      requestor_daily_stats.RequestorDailyStats.query().count())

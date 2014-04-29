@@ -18,6 +18,14 @@ indexes:
 - kind: RunnerStats
   properties:
   - name: end_time
+  - name: aborted
+  - name: assigned_time
+  - name: created_time
+  - name: success
+
+- kind: RunnerStats
+  properties:
+  - name: end_time
   - name: assigned_time
   - name: created_time
   - name: success
@@ -28,6 +36,11 @@ indexes:
   - name: end_time
   - name: success
   - name: timed_out
+
+- kind: TaskShardResult
+  properties:
+  - name: task_state
+  - name: modified_ts
 
 - kind: TestRequest
   ancestor: yes
@@ -271,6 +284,11 @@ indexes:
   - name: started
   - name: machine_id
     direction: desc
+
+- kind: TestRunner
+  properties:
+  - name: done
+  - name: started
 
 - kind: TestRunner
   properties:

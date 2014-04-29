@@ -76,10 +76,11 @@ def gen_item(content):
 
 class MainTest(test_case.TestCase):
   """Tests the handlers."""
+  APP_DIR = ROOT_DIR
+
   def setUp(self):
     """Creates a new app instance for every test case."""
     super(MainTest, self).setUp()
-    self.testbed.init_modules_stub()
 
     # When called during a taskqueue, the call to get_app_version() may fail so
     # pre-fetch it.
@@ -89,7 +90,6 @@ class MainTest(test_case.TestCase):
     self.app = webtest.TestApp(
         handlers.CreateApplication(debug=True),
         extra_environ={'REMOTE_ADDR': self.source_ip})
-    self.enable_task_queue(ROOT_DIR)
 
   def whitelist_self(self):
     handlers.acl.WhitelistedIP(

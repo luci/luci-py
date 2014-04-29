@@ -392,6 +392,7 @@ class TestHelper(unittest.TestCase):
 
 class TestObjectTest(TestHelper):
   def setUp(self):
+    super(TestObjectTest, self).setUp()
     # Always start with a valid case, and make it explicitly invalid as needed.
     self.test_request = test_request_message.TestObject(
         test_name=TestHelper.VALID_STRING_VALUES[0],
@@ -448,6 +449,7 @@ class TestObjectTest(TestHelper):
 
 class TestConfigurationTest(TestHelper):
   def setUp(self):
+    super(TestConfigurationTest, self).setUp()
     # Always start with a valid case, and make it explicitly invalid as needed.
     dimensions = dict(os='a', browser='a', cpu='a')
     self.test_request = test_request_message.TestConfiguration(
@@ -535,6 +537,7 @@ class TestConfigurationTest(TestHelper):
 
 class TestCaseTest(TestHelper):
   def setUp(self):
+    super(TestCaseTest, self).setUp()
     # Always start with a valid case, and make it explicitly invalid as needed.
     dimensions = dict(os='a', browser='a', cpu='a')
     self.test_request = test_request_message.TestCase(
@@ -780,6 +783,7 @@ class TestCaseTest(TestHelper):
 
 class TestRunTest(TestHelper):
   def setUp(self):
+    super(TestRunTest, self).setUp()
     # Always start with a valid case, and make it explicitly invalid as needed.
     self.test_request = test_request_message.TestRun(
         test_run_name='a',

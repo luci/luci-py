@@ -71,6 +71,8 @@ def get_shard_results(request_key):
 
 
 class TaskSchedulerApiTest(test_case.TestCase):
+  APP_DIR = ROOT_DIR
+
   def setUp(self):
     super(TaskSchedulerApiTest, self).setUp()
     self.now = datetime.datetime(2014, 1, 2, 3, 4, 5, 6)
@@ -81,7 +83,6 @@ class TaskSchedulerApiTest(test_case.TestCase):
           'REMOTE_ADDR': '1.0.1.2',
           'SERVER_SOFTWARE': os.environ['SERVER_SOFTWARE'],
         })
-    self.enable_task_queue(ROOT_DIR)
 
   def test_all_apis_are_tested(self):
     # Ensures there's a test for each public API.
@@ -107,6 +108,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
     self.assertEqual(request_1, request_2)
     self.assertEqual('localhost', shard_result.bot_id)
     self.assertEqual(None, shard_result.key.parent().get().queue_number)
+    self.assertEqual(1, self.execute_tasks())
 
   def test_exponential_backoff(self):
     self.mock(
@@ -315,6 +317,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
     actual = task_scheduler.pack_shard_result_key(shard_result.key)
     # 0xbb8 = 3000ms = 3 secs; 0x02 = random;  0x01 = shard;  -1 = try_number.
     self.assertEqual('bb80201-1', actual)
+    self.assertEqual(1, self.execute_tasks())
 
   def test_unpack_shard_result_key(self):
     actual = task_scheduler.unpack_shard_result_key('bb80201-1')
@@ -342,6 +345,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
     after_delay = self.now + datetime.timedelta(seconds=expiration+1)
     test_helper.mock_now(self, after_delay)
     self.assertEqual(1, task_scheduler.cron_abort_expired_shard_to_run())
+    self.assertEqual(2, self.execute_tasks())
 
   def test_cron_abort_bot_died(self):
     data = _gen_request_data(
@@ -358,6 +362,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
         datetime.timedelta(seconds=1))
     test_helper.mock_now(self, after_delay)
     self.assertEqual(1, task_scheduler.cron_abort_bot_died())
+    self.assertEqual(2, self.execute_tasks())
 
   def test_cron_sync_all_result_summary(self):
     ran = []

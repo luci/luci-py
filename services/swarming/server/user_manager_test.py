@@ -23,6 +23,8 @@ IP = ['192.168.0.1', '192.168.0.2']
 
 
 class UserManagerTest(test_case.TestCase):
+  APP_DIR = ROOT_DIR
+
   def setUp(self):
     super(UserManagerTest, self).setUp()
     self._mox = mox.Mox()

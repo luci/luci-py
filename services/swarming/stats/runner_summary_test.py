@@ -60,6 +60,8 @@ def _CreateWaitSummary(start_time=None, end_time=None):
 
 
 class RunnerSummaryTest(test_case.TestCase):
+  APP_DIR = ROOT_DIR
+
   def setUp(self):
     super(RunnerSummaryTest, self).setUp()
     self._mox = mox.Mox()

@@ -40,6 +40,8 @@ MACHINE_IDS = [
 
 
 class TestRunnerTest(test_case.TestCase):
+  APP_DIR = ROOT_DIR
+
   def setUp(self):
     super(TestRunnerTest, self).setUp()
     self._mox = mox.Mox()

@@ -94,7 +94,7 @@ def _GenerateFutureTimeExpectation():
 
 
 class TestManagementTest(test_case.TestCase):
-
+  APP_DIR = ROOT_DIR
   _SERVER_URL = 'http://my.server.com/'
 
   def setUp(self):
