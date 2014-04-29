@@ -33,11 +33,10 @@
         });
 
     // Display parameters.
-    var current_resolution = 'hours';
-    var duration = 120;
+    var current_resolution = '{{resolution}}';
+    var duration = {{duration}};
     var show_as_raw = false;
     // Common shared data.
-    // TODO(maruel): Preload with real data to save a round-trip.
     var data_table = null;
     // The three graphs.
     var chart_requests = null;
@@ -46,15 +45,17 @@
     // Current on-going HTTP request.
     var current_query = null;
 
-    // Reloads the data with a new resolution.
-    function set_resolution(res) {
-      // Reset the current datatable to 0 values to create a nicer
-      // animation when changing resolution.
+    function set_resolution_internal(res) {
       document.getElementById('resolution_days').checked = false;
       document.getElementById('resolution_hours').checked = false;
       document.getElementById('resolution_minutes').checked = false;
       document.getElementById('resolution_' + res).checked = true;
       current_resolution = res;
+    }
+
+    // Reloads the data with a new resolution.
+    function set_resolution(res) {
+      set_resolution_internal(res);
       // Refresh the data even if the user requested the same res.
       sendQuery();
     }
@@ -293,6 +294,7 @@
     // Now the actual work.
     // Callback when google viz is ready. Loads each graph.
     function loaded() {
+      data_table = new google.visualization.DataTable({{initial_data|safe}});
       chart_requests = new google.visualization.ChartWrapper(
         {
           chartType: 'LineChart',
@@ -363,9 +365,15 @@
           },
           });
 
-      // Do not draw yet, since it would fail because of the empty DataTable.
-      // sendQuery() will call .draw() on each chart.
-      set_resolution('hours');
+      if (data_table != null) {
+        // Data was preloaded. Update the UI checkboxes.
+        set_resolution_internal(current_resolution);
+        redrawCharts();
+      } else {
+        // Do not draw yet, since it would fail because of the empty DataTable.
+        // sendQuery() will call .draw() on each chart.
+        set_resolution('hours');
+      }
     }
 
     // Public interface.

@@ -8,7 +8,38 @@ import webapp2
 
 import stats
 import template
+from components import stats_framework
 from components import stats_framework_gviz
+from components import utils
+from gviz import gviz_api
+
+
+# GViz data description.
+_GVIZ_DESCRIPTION = {
+  'failures': ('number', 'Failures'),
+  'requests': ('number', 'Total'),
+  'other_requests': ('number', 'Other'),
+  'uploads': ('number', 'Uploads'),
+  'uploads_bytes': ('number', 'Uploaded'),
+  'downloads': ('number', 'Downloads'),
+  'downloads_bytes': ('number', 'Downloaded'),
+  'contains_requests': ('number', 'Lookups'),
+  'contains_lookups': ('number', 'Items looked up'),
+}
+
+# Warning: modifying the order here requires updating templates/stats.html.
+_GVIZ_COLUMNS_ORDER = (
+  'key',
+  'requests',
+  'other_requests',
+  'failures',
+  'uploads',
+  'downloads',
+  'contains_requests',
+  'uploads_bytes',
+  'downloads_bytes',
+  'contains_lookups',
+)
 
 
 ### Handlers
@@ -21,41 +52,28 @@ class StatsHandler(webapp2.RequestHandler):
 
     It fetches data from the 'JSON' API.
     """
-    self.response.write(template.get('stats.html').render({}))
+    # Preloads the data to save a complete request.
+    resolution = self.request.params.get('resolution', 'hours')
+    duration = utils.get_request_as_int(self.request, 'duration', 120, 1, 1000)
+
+    description = _GVIZ_DESCRIPTION.copy()
+    description.update(stats_framework_gviz.get_description_key(resolution))
+    table = stats_framework.get_stats(
+        stats.get_stats_handler(), resolution, None, duration)
+    params = {
+      'duration': duration,
+      'initial_data': gviz_api.DataTable(description, table).ToJSon(
+          columns_order=_GVIZ_COLUMNS_ORDER),
+      'resolution': resolution,
+    }
+    self.response.write(template.get('stats.html').render(params))
 
 
 class StatsGvizHandlerBase(webapp2.RequestHandler):
   RESOLUTION = None
 
-  # GViz data description.
-  GVIZ_DESCRIPTION = {
-    'failures': ('number', 'Failures'),
-    'requests': ('number', 'Total'),
-    'other_requests': ('number', 'Other'),
-    'uploads': ('number', 'Uploads'),
-    'uploads_bytes': ('number', 'Uploaded'),
-    'downloads': ('number', 'Downloads'),
-    'downloads_bytes': ('number', 'Downloaded'),
-    'contains_requests': ('number', 'Lookups'),
-    'contains_lookups': ('number', 'Items looked up'),
-  }
-
-  # Warning: modifying the order here requires updating templates/stats.html.
-  GVIZ_COLUMNS_ORDER = (
-    'key',
-    'requests',
-    'other_requests',
-    'failures',
-    'uploads',
-    'downloads',
-    'contains_requests',
-    'uploads_bytes',
-    'downloads_bytes',
-    'contains_lookups',
-  )
-
   def get(self):
-    description = self.GVIZ_DESCRIPTION.copy()
+    description = _GVIZ_DESCRIPTION.copy()
     description.update(
         stats_framework_gviz.get_description_key(self.RESOLUTION))
     try:
@@ -65,7 +83,7 @@ class StatsGvizHandlerBase(webapp2.RequestHandler):
           stats.get_stats_handler(),
           self.RESOLUTION,
           description,
-          self.GVIZ_COLUMNS_ORDER)
+          _GVIZ_COLUMNS_ORDER)
     except ValueError as e:
       self.abort(400, str(e))
 
