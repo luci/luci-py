@@ -31,6 +31,7 @@ import config
 import gcs
 import map_reduce_jobs
 import stats
+import stats_gviz
 import template
 from components import ereporter2
 from components import auth
@@ -1639,13 +1640,13 @@ def CreateApplication(debug=False):
           name='store-gs'),
 
       # Public stats.
-      webapp2.Route(r'/stats', stats.StatsHandler),
+      webapp2.Route(r'/stats', stats_gviz.StatsHandler),
       webapp2.Route(
-          r'/isolate/api/v1/stats/days', stats.ApiStatsGvizDaysHandler),
+          r'/isolate/api/v1/stats/days', stats_gviz.StatsGvizDaysHandler),
       webapp2.Route(
-          r'/isolate/api/v1/stats/hours', stats.ApiStatsGvizHoursHandler),
+          r'/isolate/api/v1/stats/hours', stats_gviz.StatsGvizHoursHandler),
       webapp2.Route(
-          r'/isolate/api/v1/stats/minutes', stats.ApiStatsGvizMinutesHandler),
+          r'/isolate/api/v1/stats/minutes', stats_gviz.StatsGvizMinutesHandler),
 
       # AppEngine-specific url:
       webapp2.Route(r'/_ah/warmup', WarmupHandler),

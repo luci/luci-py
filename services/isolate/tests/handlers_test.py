@@ -353,6 +353,8 @@ class MainTest(test_case.TestCase):
 
   def _gen_stats(self):
     # Generates data for the last 10 days, last 10 hours and last 10 minutes.
+    # TODO(maruel): Stop accessing the DB directly. Use stats_framework_mock to
+    # generate it.
     now = datetime.datetime(2010, 1, 2, 3, 4, 5, 6)
     stats_framework_mock.mock_now(self, now, 0)
     handler = handlers.stats.get_stats_handler()

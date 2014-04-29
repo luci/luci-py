@@ -2,7 +2,7 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
-"""Generates statistics out of logs.
+"""Generates statistics out of logs. Contains the backend code.
 
 The first 100mb of logs read is free. It's important to keep logs concise also
 for general performance concerns. Each http handler should strive to do only one
@@ -16,10 +16,8 @@ from google.appengine.api import logservice
 from google.appengine.ext import ndb
 from google.appengine.runtime import DeadlineExceededError
 
-import template
 from components import stats_framework
 from components import utils
-from gviz import gviz_api
 
 
 ### Public API
@@ -58,6 +56,14 @@ class Snapshot(ndb.Model):
   requests = ndb.IntegerProperty(default=0, indexed=False)
   # Number of non-200 requests.
   failures = ndb.IntegerProperty(default=0, indexed=False)
+
+  def to_dict(self):
+    """Mangles to make it easier to graph."""
+    out = super(Snapshot, self).to_dict()
+    out['other_requests'] = (
+        out['requests'] - out['downloads'] - out['contains_requests'] -
+        out['uploads'])
+    return out
 
   def accumulate(self, rhs):
     return stats_framework.accumulate(self, rhs)
@@ -157,144 +163,3 @@ class InternalStatsUpdateHandler(webapp2.RequestHandler):
     msg = 'Processed %d minutes' % i
     logging.info(msg)
     self.response.write(msg)
-
-
-class StatsHandler(webapp2.RequestHandler):
-  """Returns the statistics web page."""
-  def get(self):
-    """Presents nice recent statistics.
-
-    It fetches data from the 'JSON' API.
-    """
-    self.response.write(template.get('stats.html').render({}))
-
-
-class ApiStatsGvizHandlerBase(webapp2.RequestHandler):
-  """Returns the statistic data as a Google Visualization compatible reply.
-
-  The return can be either JSON or JSONP, depending if the header
-  'X-DataSource-Auth' is set in the request.
-
-  Note that this is not real JSON, as explained in
-  developers.google.com/chart/interactive/docs/dev/implementing_data_source
-  """
-  DATA_DESCRIPTION_COMMON = {
-    'failures': ('number', 'Failures'),
-    'requests': ('number', 'Total'),
-    'other_requests': ('number', 'Other'),
-    'uploads': ('number', 'Uploads'),
-    'uploads_bytes': ('number', 'Uploaded'),
-    'downloads': ('number', 'Downloads'),
-    'downloads_bytes': ('number', 'Downloaded'),
-    'contains_requests': ('number', 'Lookups'),
-    'contains_lookups': ('number', 'Items looked up'),
-  }
-
-  # TODO(maruel): Modifying the order here must update templates/stats.html.
-  # Make it smart.
-  REQUESTS_COLUMNS_ORDER = (
-    'key',
-    'requests',
-    'other_requests',
-    'failures',
-    'uploads',
-    'downloads',
-    'contains_requests',
-    'uploads_bytes',
-    'downloads_bytes',
-    'contains_lookups',
-  )
-
-  # To be overriden in subclass.
-  KEY = None
-
-  def get(self):
-    """Exposes as described at
-    https://developers.google.com/chart/interactive/docs/reference#dataparam
-    and
-    https://developers.google.com/chart/interactive/docs/querylanguage
-    """
-    kwargs = {}
-    for arg in self.request.params.get('tqx', '').split(';'):
-      if ':' not in arg:
-        continue
-      key, value = arg.split(':', 1)
-      if key == 'out':
-        if value != 'json':
-          self.abort(400, 'Unsupported \'out\' argument')
-      elif key == 'reqId':
-        kwargs['req_id'] = value
-      elif key == 'responseHandler':
-        kwargs['response_handler'] = value
-      else:
-        logging.warning('Unknown query parameter %s', arg)
-
-    # TODO(maruel): Implement: self.request.params.get('tq')
-    duration = utils.get_request_as_int(self.request, 'duration', 120, 1, 256)
-    now = utils.get_request_as_datetime(self.request, 'now')
-
-    def fix_up(d):
-      """Mangles to make it easier to graph."""
-      i = d.to_dict()
-      i['values']['key'] = i['key']
-      o = i['values']
-      o['other_requests'] = (
-          o['requests'] - o['downloads'] - o['contains_requests'] -
-          o['uploads'])
-      return o
-
-    table = [fix_up(d) for d in self.get_data(now, duration)]
-    description = self.DATA_DESCRIPTION_COMMON.copy()
-    description.update(self.KEY)
-
-    self.response.headers['Access-Control-Allow-Origin'] = '*'
-    if self.request.headers.get('X-DataSource-Auth'):
-      # Client requested JSON.
-      self.response.headers['Content-Type'] = (
-          'application/json; charset=utf-8')
-      # TODO(maruel): This manual packaging is annoying, figure out a way to
-      # make this cleaner.
-      # pylint: disable=W0212
-      response_obj = {
-        'reqId': str(kwargs.get('req_id', 0)),
-        'status': 'ok',
-        'table': gviz_api.DataTable(description, table)._ToJSonObj(
-            columns_order=self.REQUESTS_COLUMNS_ORDER),
-        'version': '0.6',
-      }
-      encoder = gviz_api.DataTableJSONEncoder()
-      self.response.write(encoder.encode(response_obj).encode('utf-8'))
-    else:
-      # Client requested JSONP.
-      self.response.headers['Content-Type'] = (
-          'application/javascript; charset=utf-8')
-      self.response.write(
-          gviz_api.DataTable(description, table).ToJSonResponse(
-              columns_order=self.REQUESTS_COLUMNS_ORDER, **kwargs))
-
-  def get_data(self, now, duration):
-    raise NotImplementedError()
-
-
-class ApiStatsGvizDaysHandler(ApiStatsGvizHandlerBase):
-  KEY = {
-    'key': ('date', 'Day'),
-  }
-  def get_data(self, now, duration):
-    return stats_framework.get_days(get_stats_handler(), now, duration)
-
-
-class ApiStatsGvizHoursHandler(ApiStatsGvizHandlerBase):
-  KEY = {
-    'key': ('datetime', 'Time'),
-  }
-  def get_data(self, now, duration):
-    return stats_framework.get_hours(get_stats_handler(), now, duration)
-
-
-class ApiStatsGvizMinutesHandler(ApiStatsGvizHandlerBase):
-  KEY = {
-    'key': ('datetime', 'Time'),
-  }
-  def get_data(self, now, duration):
-    return stats_framework.get_minutes(get_stats_handler(), now, duration)

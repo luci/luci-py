@@ -11,6 +11,7 @@ import test_env
 test_env.setup_test_env()
 
 import stats
+import stats_gviz
 
 # From components/third_party/
 import webtest
@@ -64,9 +65,9 @@ class StatsTest(test_case.TestCase, stats_framework_mock.MockMixIn):
         ('/lookup', Lookup),
         ('/dupe', Dupe),
         ('/generate_stats', stats.InternalStatsUpdateHandler),
-        ('/results/days', stats.ApiStatsGvizDaysHandler),
-        ('/results/hours', stats.ApiStatsGvizHoursHandler),
-        ('/results/minutes', stats.ApiStatsGvizMinutesHandler),
+        ('/results/days', stats_gviz.StatsGvizDaysHandler),
+        ('/results/hours', stats_gviz.StatsGvizHoursHandler),
+        ('/results/minutes', stats_gviz.StatsGvizMinutesHandler),
     ]
     real_app = stats.webapp2.WSGIApplication(routes, debug=True)
     self.app = webtest.TestApp(

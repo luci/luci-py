@@ -9,6 +9,7 @@ ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # For 'from components import ...' and 'from support import ...'.
 sys.path.insert(0, ROOT_DIR)
+sys.path.insert(0, os.path.join(ROOT_DIR, 'components', 'third_party'))
 # For depot_tools/auto_stub.py.
 sys.path.insert(0, os.path.join(ROOT_DIR, 'third_party'))
 

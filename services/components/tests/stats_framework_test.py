@@ -17,10 +17,9 @@ import webtest
 
 from google.appengine.ext import ndb
 
-from support import test_case
-
 from components import stats_framework
 from components import stats_framework_mock
+from support import test_case
 
 # pylint: disable=W0212
 
@@ -143,12 +142,10 @@ class StatsFrameworkTest(test_case.TestCase, stats_framework_mock.MockMixIn):
     expected = [
       {
         'key': midnight.date(),
-        'values': {
-          'requests': limit,
-          'b': float(limit),
-          'inner': {
-            'c': u''.join('%d,' % i for i in xrange(1, limit + 1)),
-          },
+        'requests': limit,
+        'b': float(limit),
+        'inner': {
+          'c': u''.join('%d,' % i for i in xrange(1, limit + 1)),
         },
       }
     ]
@@ -163,13 +160,11 @@ class StatsFrameworkTest(test_case.TestCase, stats_framework_mock.MockMixIn):
     expected = [
       {
         'key': (midnight + datetime.timedelta(seconds=i*60*60)),
-        'values': {
-          'requests': 60,
-          'b': 60.,
-          'inner': {
-            'c': u''.join(
-                '%d,' % i for i in xrange(60 * i + 1, 60 * (i + 1) + 1)),
-          },
+        'requests': 60,
+        'b': 60.,
+        'inner': {
+          'c': u''.join(
+              '%d,' % i for i in xrange(60 * i + 1, 60 * (i + 1) + 1)),
         },
       }
       for i in range(limit / 60)
@@ -185,12 +180,10 @@ class StatsFrameworkTest(test_case.TestCase, stats_framework_mock.MockMixIn):
     expected = [
       {
         'key': (midnight + datetime.timedelta(seconds=i*60)),
-        'values': {
-          'requests': 1,
-          'b': 1.,
-          'inner': {
-            'c': u'%d,' % (i + 1),
-          },
+        'requests': 1,
+        'b': 1.,
+        'inner': {
+          'c': u'%d,' % (i + 1),
         },
       } for i in range(limit)
     ]
@@ -234,56 +227,46 @@ class StatsFrameworkTest(test_case.TestCase, stats_framework_mock.MockMixIn):
     self.assertEqual(
         strip_seconds(now) - datetime.timedelta(seconds=60), root.timestamp)
 
-    out = stats_framework.generate_stats_data(100, 100, 100, now, handler)
-    for key in ('days', 'hours', 'minutes'):
-      out[key] = [i.to_dict() for i in out[key]]
-    expected = {
-      'days': [
-        {
-          'key': now.date(),
-          'values': {'requests': 0, 'b': 0.0, 'inner': {'c': u''}},
-        },
-      ],
-      'hours': [
-        {
-          'key': datetime.datetime(*now.timetuple()[:4]),
-          'values': {'requests': 2, 'b': 2.0, 'inner': {'c': u'1,2,'}},
-        },
-      ],
-      'minutes': [
-        {
-          'key': datetime.datetime(
-              *(now - datetime.timedelta(seconds=60)).timetuple()[:5]),
-          'values': {'requests': 1, 'b': 1.0, 'inner': {'c': u'2,'}},
-        },
-        {
-          'key': datetime.datetime(
-              *(now - datetime.timedelta(seconds=120)).timetuple()[:5]),
-          'values': {'requests': 1, 'b': 1.0, 'inner': {'c': u'1,'}},
-        },
-      ],
-      'now': '2010-01-02 03:04:05',
-    }
-    self.assertEqual(expected, out)
+    expected = [
+      {
+        'key': now.date(),
+        'requests': 0,
+        'b': 0.0,
+        'inner': {'c': u''},
+      },
+    ]
+    self.assertEqual(
+        expected, stats_framework.get_stats(handler, 'days', now, 100))
 
-    # Limit the number of items returned.
-    out = stats_framework.generate_stats_data(
-        0, 0, 1, now - datetime.timedelta(seconds=60), handler)
-    for key in ('days', 'hours', 'minutes'):
-      out[key] = [i.to_dict() for i in out[key]]
-    expected = {
-      'days': [],
-      'hours': [],
-      'minutes': [
-        {
-          'key': datetime.datetime(
-              *(now - datetime.timedelta(seconds=60)).timetuple()[:5]),
-          'values': {'requests': 1, 'b': 1.0, 'inner': {'c': u'2,'}},
-        },
-      ],
-      'now': '2010-01-02 03:03:05',
-    }
-    self.assertEqual(expected, out)
+    expected = [
+      {
+        'key': datetime.datetime(*now.timetuple()[:4]),
+        'requests': 2,
+        'b': 2.0,
+        'inner': {'c': u'1,2,'},
+      },
+    ]
+    self.assertEqual(
+        expected, stats_framework.get_stats(handler, 'hours', now, 100))
+
+    expected = [
+      {
+        'key': datetime.datetime(
+            *(now - datetime.timedelta(seconds=60)).timetuple()[:5]),
+        'requests': 1,
+        'b': 1.0,
+        'inner': {'c': u'2,'},
+      },
+      {
+        'key': datetime.datetime(
+            *(now - datetime.timedelta(seconds=120)).timetuple()[:5]),
+        'requests': 1,
+        'b': 1.0,
+        'inner': {'c': u'1,'},
+      },
+    ]
+    self.assertEqual(
+        expected, stats_framework.get_stats(handler, 'minutes', now, 100))
 
   def test_keys(self):
     handler = stats_framework.StatisticsFramework(
@@ -339,8 +322,10 @@ class StatsFrameworkLogTest(test_case.TestCase, stats_framework_mock.MockMixIn):
       def get(self2):
         self2.response.headers['Content-Type'] = (
             'application/json; charset=utf-8')
-        data = stats_framework.generate_stats_data_from_request(
-            self2.request, self.h)
+        duration = int(self2.request.get('duration', 120))
+        now = self2.request.get('now')
+        resolution = self2.request.get('resolution')
+        data = stats_framework.get_stats(self.h, resolution, now, duration)
         self2.response.write(stats_framework.utils.encode_to_json(data))
 
     routes = [
@@ -371,141 +356,194 @@ class StatsFrameworkLogTest(test_case.TestCase, stats_framework_mock.MockMixIn):
         0, len(list(stats_framework.yield_entries(
           None, stats_framework_mock.now_epoch()))))
 
-  def test_json_empty(self):
+  def test_json_empty_days(self):
     stats_framework_mock.reset_timestamp(self.h, self.now)
-    expected = {
-      u'days': [],
-      u'hours': [],
-      u'minutes': [],
-      u'now': u'2010-01-02 03:04:05',
-    }
-    self.assertEqual(expected, self.app.get('/json').json)
+    self.assertEqual([], self.app.get('/json?resolution=days&duration=9').json)
 
-  def test_json_empty_processed(self):
+  def test_json_empty_hours(self):
     stats_framework_mock.reset_timestamp(self.h, self.now)
-    self.h.process_next_chunk(0)
-    expected = {
-      u'days': [
-        {
-          u'key': u'2010-01-02',
-          u'values': {u'b': 0.0, u'inner': {u'c': u''}, u'requests': 0},
-        },
-      ],
-      u'hours': [
-        {
-          u'key': u'2010-01-02 03:00:00',
-          u'values': {u'b': 0.0, u'inner': {u'c': u''}, u'requests': 0},
-        },
-        {
-          u'key': u'2010-01-02 02:00:00',
-          u'values': {u'b': 0.0, u'inner': {u'c': u''}, u'requests': 0},
-        },
-      ],
-      u'minutes': [
-        {
-          u'key': u'2010-01-02 03:04:00',
-          u'values': {u'b': 0.0, u'inner': {u'c': u''}, u'requests': 0},
-        },
-        {
-          u'key': u'2010-01-02 03:03:00',
-          u'values': {u'b': 0.0, u'inner': {u'c': u''}, u'requests': 0},
-        },
-        {
-          u'key': u'2010-01-02 03:02:00',
-          u'values': {u'b': 0.0, u'inner': {u'c': u''}, u'requests': 0},
-        },
-        {
-          u'key': u'2010-01-02 03:01:00',
-          u'values': {u'b': 0.0, u'inner': {u'c': u''}, u'requests': 0},
-        },
-        {
-          u'key': u'2010-01-02 03:00:00',
-          u'values': {u'b': 0.0, u'inner': {u'c': u''}, u'requests': 0},
-        },
-        {
-          u'key': u'2010-01-02 02:59:00',
-          u'values': {u'b': 0.0, u'inner': {u'c': u''}, u'requests': 0},
-        },
-        {
-          u'key': u'2010-01-02 02:58:00',
-          u'values': {u'b': 0.0, u'inner': {u'c': u''}, u'requests': 0},
-        },
-        {
-          u'key': u'2010-01-02 02:57:00',
-          u'values': {u'b': 0.0, u'inner': {u'c': u''}, u'requests': 0},
-        },
-        {
-          u'key': u'2010-01-02 02:56:00',
-          u'values': {u'b': 0.0, u'inner': {u'c': u''}, u'requests': 0},
-        },
-        {
-          u'key': u'2010-01-02 02:55:00',
-          u'values': {u'b': 0.0, u'inner': {u'c': u''}, u'requests': 0},
-        },
-      ],
-      u'now': u'2010-01-02 03:04:05',
-    }
-    self.assertEqual(expected, self.app.get('/json').json)
+    self.assertEqual([], self.app.get('/json?resolution=hours&duration=9').json)
 
-  def test_json_empty_processed_limit(self):
+  def test_json_empty_minutes(self):
     stats_framework_mock.reset_timestamp(self.h, self.now)
-    self.h.process_next_chunk(0)
-    expected = {
-      u'days': [
-      ],
-      u'hours': [
-        {
-          u'key': u'2010-01-02 03:00:00',
-          u'values': {u'b': 0.0, u'inner': {u'c': u''}, u'requests': 0},
-        },
-      ],
-      u'minutes': [
-        {
-          u'key': u'2010-01-02 03:04:00',
-          u'values': {u'b': 0.0, u'inner': {u'c': u''}, u'requests': 0},
-        },
-      ],
-      u'now': u'2010-01-02 03:04:05',
-    }
     self.assertEqual(
-        expected, self.app.get('/json?days=0&hours=1&minutes=1').json)
+        [], self.app.get('/json?resolution=minutes&duration=9').json)
 
-  def test_json_two(self):
+  def test_json_empty_processed_days(self):
+    stats_framework_mock.reset_timestamp(self.h, self.now)
+    self.h.process_next_chunk(0)
+    expected = [
+      {
+        u'key': u'2010-01-02',
+        u'b': 0.0,
+        u'inner': {u'c': u''},
+        u'requests': 0,
+      },
+    ]
+    self.assertEqual(
+        expected, self.app.get('/json?resolution=days&duration=9').json)
+
+  def test_json_empty_processed_hours(self):
+    stats_framework_mock.reset_timestamp(self.h, self.now)
+    self.h.process_next_chunk(0)
+    expected = [
+      {
+        u'key': u'2010-01-02 03:00:00',
+        u'b': 0.0,
+        u'inner': {u'c': u''},
+        u'requests': 0,
+      },
+      {
+        u'key': u'2010-01-02 02:00:00',
+        u'b': 0.0,
+        u'inner': {u'c': u''},
+        u'requests': 0,
+      },
+    ]
+    self.assertEqual(
+        expected, self.app.get('/json?resolution=hours&duration=9').json)
+
+  def test_json_empty_processed_minutes(self):
+    stats_framework_mock.reset_timestamp(self.h, self.now)
+    self.h.process_next_chunk(0)
+    expected = [
+      {
+        u'key': u'2010-01-02 03:04:00',
+        u'b': 0.0,
+        u'inner': {u'c': u''},
+        u'requests': 0,
+      },
+      {
+        u'key': u'2010-01-02 03:03:00',
+        u'b': 0.0,
+        u'inner': {u'c': u''},
+        u'requests': 0,
+      },
+      {
+        u'key': u'2010-01-02 03:02:00',
+        u'b': 0.0,
+        u'inner': {u'c': u''},
+        u'requests': 0,
+      },
+      {
+        u'key': u'2010-01-02 03:01:00',
+        u'b': 0.0,
+        u'inner': {u'c': u''},
+        u'requests': 0,
+      },
+      {
+        u'key': u'2010-01-02 03:00:00',
+        u'b': 0.0,
+        u'inner': {u'c': u''},
+        u'requests': 0,
+      },
+      {
+        u'key': u'2010-01-02 02:59:00',
+        u'b': 0.0,
+        u'inner': {u'c': u''},
+        u'requests': 0,
+      },
+      {
+        u'key': u'2010-01-02 02:58:00',
+        u'b': 0.0,
+        u'inner': {u'c': u''},
+        u'requests': 0,
+      },
+      {
+        u'key': u'2010-01-02 02:57:00',
+        u'b': 0.0,
+        u'inner': {u'c': u''},
+        u'requests': 0,
+      },
+      {
+        u'key': u'2010-01-02 02:56:00',
+        u'b': 0.0,
+        u'inner': {u'c': u''},
+        u'requests': 0,
+      },
+      {
+        u'key': u'2010-01-02 02:55:00',
+        u'b': 0.0,
+        u'inner': {u'c': u''},
+        u'requests': 0,
+      },
+    ]
+    self.assertEqual(
+        expected, self.app.get('/json?resolution=minutes&duration=11').json)
+
+  def test_json_empty_processed_minutes_limited(self):
+    stats_framework_mock.reset_timestamp(self.h, self.now)
+    self.h.process_next_chunk(0)
+    expected = [
+      {
+        u'key': u'2010-01-02 03:04:00',
+        u'b': 0.0,
+        u'inner': {u'c': u''},
+        u'requests': 0,
+      },
+      {
+        u'key': u'2010-01-02 03:03:00',
+        u'b': 0.0,
+        u'inner': {u'c': u''},
+        u'requests': 0,
+      },
+      {
+        u'key': u'2010-01-02 03:02:00',
+        u'b': 0.0,
+        u'inner': {u'c': u''},
+        u'requests': 0,
+      },
+    ]
+    self.assertEqual(
+        expected, self.app.get('/json?resolution=minutes&duration=3').json)
+
+  def test_json_two_days(self):
     stats_framework_mock.reset_timestamp(self.h, self.now)
     self.assertEqual('Yay', self.app.get('/generate').body)
     self.assertEqual('Yay', self.app.get('/generate').body)
     self.h.process_next_chunk(0)
-    expected = {
-      u'days': [
-        {
-          u'key': u'2010-01-02',
-          u'values': {u'b': 0.0, u'inner': {u'c': u''}, u'requests': 0},
-        },
-      ],
-      u'hours': [
-        {
-          u'key': u'2010-01-02 03:00:00',
-          u'values': {
-            u'b': 0.0,
-            u'inner': {u'c': u'HelloHello'},
-            u'requests': 2,
-          },
-        },
-      ],
-      u'minutes': [
-        {
-          u'key': u'2010-01-02 03:04:00',
-          u'values': {
-            u'b': 0.0,
-            u'inner': {u'c': u'HelloHello'},
-            u'requests': 2,
-          },
-        },
-      ],
-      u'now': u'2010-01-02 03:04:05',
-    }
+    expected = [
+      {
+        u'key': u'2010-01-02',
+        u'b': 0.0,
+        u'inner': {u'c': u''},
+        u'requests': 0,
+      },
+    ]
     self.assertEqual(
-        expected, self.app.get('/json?days=1&hours=1&minutes=1').json)
+        expected, self.app.get('/json?resolution=days&duration=9').json)
+
+  def test_json_two_hours(self):
+    stats_framework_mock.reset_timestamp(self.h, self.now)
+    self.assertEqual('Yay', self.app.get('/generate').body)
+    self.assertEqual('Yay', self.app.get('/generate').body)
+    self.h.process_next_chunk(0)
+    expected = [
+      {
+        u'key': u'2010-01-02 03:00:00',
+        u'b': 0.0,
+        u'inner': {u'c': u'HelloHello'},
+        u'requests': 2,
+      },
+    ]
+    self.assertEqual(
+        expected, self.app.get('/json?resolution=hours&duration=1').json)
+
+  def test_json_two_minutes(self):
+    stats_framework_mock.reset_timestamp(self.h, self.now)
+    self.assertEqual('Yay', self.app.get('/generate').body)
+    self.assertEqual('Yay', self.app.get('/generate').body)
+    self.h.process_next_chunk(0)
+    expected = [
+      {
+        u'key': u'2010-01-02 03:04:00',
+        u'b': 0.0,
+        u'inner': {u'c': u'HelloHello'},
+        u'requests': 2,
+      },
+    ]
+    self.assertEqual(
+        expected, self.app.get('/json?resolution=minutes&duration=1').json)
 
 
 if __name__ == '__main__':

@@ -203,10 +203,9 @@ class StatisticsFramework(object):
         return self.values_compressed or self.values_uncompressed
 
       def to_dict(self):
-        return {
-          'key': self.to_date(),
-          'values': self.values.to_dict(),
-        }
+        out = self.values.to_dict()
+        out['key'] = self.to_date()
+        return out
 
       def to_date(self):
         """Returns the datetime.date instance for this instance."""
@@ -250,10 +249,9 @@ class StatisticsFramework(object):
         return self.values_compressed or self.values_uncompressed
 
       def to_dict(self):
-        return {
-          'key': self.to_datetime(),
-          'values': self.values.to_dict(),
-        }
+        out = self.values.to_dict()
+        out['key'] = self.to_datetime()
+        return out
 
       def to_datetime(self):
         """Returns the datetime.datetime instance for this instance."""
@@ -292,10 +290,9 @@ class StatisticsFramework(object):
         return self.values_compressed or self.values_uncompressed
 
       def to_dict(self):
-        return {
-          'key': self.to_datetime(),
-          'values': self.values.to_dict(),
-        }
+        out = self.values.to_dict()
+        out['key'] = self.to_datetime()
+        return out
 
       def to_datetime(self):
         """Returns the datetime.datetime instance for this instance."""
@@ -535,6 +532,27 @@ def _yield_logs(start_time, end_time):
     yield request
 
 
+def _get_snapshot_as_dict_future(keys):
+  """Gets post-processed entities referenced by keys.
+
+  Returns:
+    list of ndb.Future returning the to_dict() value (instead of the entity
+    itself) of the entities present or None if the entity doesn't exist.
+  """
+  def _fix_future(future, out):
+    """Converts a ndb.Future to a StatisticsFramework entity into a dict of the
+    snapshot.
+    """
+    result = future.get_result()
+    out.set_result(result.to_dict() if result else None)
+
+  tmp = ndb.get_multi_async(keys, use_cache=False, use_memcache=False)
+  out = [ndb.Future() for _ in xrange(len(tmp))]
+  for i, f in enumerate(tmp):
+    f.add_immediate_callback(_fix_future, f, out[i])
+  return out
+
+
 ### Public API.
 
 
@@ -606,91 +624,52 @@ def yield_entries(start_time, end_time):
     yield StatsEntry(request, entries)
 
 
-def filterout(futures):
-  """Filters out inexistent entities."""
-  intermediary = (i.get_result() for i in futures)
-  return [i for i in intermediary if i]
-
-
 def get_days_async(handler, now, num_days):
+  """Returns a list of ndb.Future to dict representing Snapshot instances."""
   if not num_days:
     return []
-  now = now or _utcnow()
-  today = now.date()
-  gen = (
-    handler.day_key(today - datetime.timedelta(days=i))
-    for i in xrange(num_days)
-  )
-  return ndb.get_multi_async(gen, use_cache=False, use_memcache=False)
-
-
-def get_days(handler, now, num_days):
-  return filterout(get_days_async(handler, now, num_days))
+  today = (now or _utcnow()).date()
+  return _get_snapshot_as_dict_future(
+      handler.day_key(today - datetime.timedelta(days=i))
+      for i in xrange(num_days))
 
 
 def get_hours_async(handler, now, num_hours):
+  """Returns a list of ndb.Future to dict representing Snapshot instances."""
   if not num_hours:
     return []
   now = now or _utcnow()
-  gen = (
-      handler.hour_key(now - datetime.timedelta(hours=i))
-      for i in xrange(num_hours))
-  return ndb.get_multi_async(gen, use_cache=False, use_memcache=False)
-
-
-def get_hours(handler, now, num_hours):
-  return filterout(get_hours_async(handler, now, num_hours))
+  return _get_snapshot_as_dict_future(
+        handler.hour_key(now - datetime.timedelta(hours=i))
+        for i in xrange(num_hours))
 
 
 def get_minutes_async(handler, now, num_minutes):
+  """Returns a list of ndb.Future to dict representing Snapshot instances."""
   if not num_minutes:
     return []
   now = now or _utcnow()
-  gen = (
+  return _get_snapshot_as_dict_future(
       handler.minute_key(now - datetime.timedelta(minutes=i))
       for i in xrange(num_minutes))
-  return ndb.get_multi_async(gen, use_cache=False, use_memcache=False)
 
 
-def get_minutes(handler, now, num_minutes):
-  return filterout(get_minutes_async(handler, now, num_minutes))
+def get_stats(handler, resolution, now, num_items):
+  """Wrapper calls that returns items for the specified resolution.
 
-
-def generate_stats_data(num_days, num_hours, num_minutes, now, stats_handler):
-  """Returns a dict for data requested in the query.
-
-  The values are returned in reverse chronological order.
-  TODO(maruel): Does it make sense?
-
-  Disables ndb's local cache and memcache usage.
+  Arguments:
+  - handler: Instance of StatisticsFramework.
+  - resolution: One of 'days', 'hours' or 'minutes'
+  - now: datetime.datetime or None.
+  - num_items: Maximum number of items to return ending at 'now'.
   """
-  # Fire up all the datastore requests.
-  future_days = get_days_async(stats_handler, now, num_days)
-  future_hours = get_hours_async(stats_handler, now, num_hours)
-  future_minutes = get_minutes_async(stats_handler, now, num_minutes)
-  return {
-    'days': filterout(future_days),
-    'hours': filterout(future_hours),
-    'minutes': filterout(future_minutes),
-    'now': (now or _utcnow()).strftime(utils.DATETIME_FORMAT),
+  mapping = {
+    'days': get_days_async,
+    'hours': get_hours_async,
+    'minutes': get_minutes_async,
   }
-
-
-def generate_stats_data_from_request(request, stats_handler):
-  """Returns a dict for data requested in the query."""
-  DEFAULT_DAYS = 5
-  DEFAULT_HOURS = 48
-  DEFAULT_MINUTES = 120
-  MIN_VALUE = 0
-  MAX_DAYS = 367
-  MAX_HOURS = 480
-  MAX_MINUTES = 480
-
-  days = utils.get_request_as_int(
-      request, 'days', DEFAULT_DAYS, MIN_VALUE, MAX_DAYS)
-  hours = utils.get_request_as_int(
-      request, 'hours', DEFAULT_HOURS, MIN_VALUE, MAX_HOURS)
-  minutes = utils.get_request_as_int(
-      request, 'minutes', DEFAULT_MINUTES, MIN_VALUE, MAX_MINUTES)
-  now = utils.get_request_as_datetime(request, 'now')
-  return generate_stats_data(days, hours, minutes, now, stats_handler)
+  fn = mapping[resolution]
+  return [
+    i.get_result() for i in fn(handler, now, num_items)
+    if i.get_result()
+  ]
