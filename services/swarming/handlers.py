@@ -38,6 +38,7 @@ from server import dimension_mapping
 from server import errors
 from server import result_helper
 from server import task_glue
+from server import task_scheduler
 from server import user_manager
 from stats import daily_stats
 from stats import machine_stats
@@ -562,6 +563,30 @@ class CronAbortStaleRunnersHandler(webapp2.RequestHandler):
   @require_cronjob
   def get(self):
     task_glue.AbortStaleRunners()
+    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
+    self.response.out.write('Success.')
+
+
+class CronAbortBotDiedHandler(webapp2.RequestHandler):
+  @require_cronjob
+  def get(self):
+    task_scheduler.cron_abort_bot_died()
+    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
+    self.response.out.write('Success.')
+
+
+class CronAbortExpiredShardToRunHandler(webapp2.RequestHandler):
+  @require_cronjob
+  def get(self):
+    task_scheduler.cron_abort_expired_shard_to_run()
+    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
+    self.response.out.write('Success.')
+
+
+class CronSyncAllResultSummaryHandler(webapp2.RequestHandler):
+  @require_cronjob
+  def get(self):
+    task_scheduler.cron_sync_all_result_summary()
     self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
     self.response.out.write('Success.')
 
@@ -1310,6 +1335,12 @@ def CreateApplication():
       # Internal urls.
 
       # Cron jobs.
+      ('/internal/cron/abort_bot_died', CronAbortBotDiedHandler),
+      ('/internal/cron/abort_expired_shard_to_run',
+          CronAbortExpiredShardToRunHandler),
+      ('/internal/cron/sync_all_result_summary',
+          CronSyncAllResultSummaryHandler),
+
       ('/internal/cron/abort_stale_runners', CronAbortStaleRunnersHandler),
       ('/internal/cron/detect_hanging_runners',
           CronDetectHangingRunnersHandler),

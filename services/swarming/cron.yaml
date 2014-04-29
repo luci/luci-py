@@ -1,10 +1,6 @@
 # TODO(maruel): Use a backend and use everywhere:
 #  target: backend
 cron:
-- description: Abort stale runners
-  url: /internal/cron/abort_stale_runners
-  schedule: every 1 minutes
-
 - description: Trigger the cleanup of old data and orphaned blobs
   url: /internal/cron/trigger_cleanup_data
   schedule: every 6 hours
@@ -13,10 +9,6 @@ cron:
   url: /internal/cron/ereporter2/mail
   schedule: every 1 hours synchronized
 
-- description: Detect hanging runners
-  url: /internal/cron/detect_hanging_runners
-  schedule: every 10 minutes
-
 - description: Generate daily stats
   url: /internal/cron/trigger_generate_daily_stats
   schedule: every day 00:30
@@ -24,3 +16,28 @@ cron:
 - description: Generate recent stats
   url: /internal/cron/trigger_generate_recent_stats
   schedule: every 5 minutes
+
+# Old DB.
+
+- description: Abort stale runners
+  url: /internal/cron/abort_stale_runners
+  schedule: every 1 minutes
+
+- description: Detect hanging runners
+  url: /internal/cron/detect_hanging_runners
+  schedule: every 10 minutes
+
+# New DB.
+
+- description:
+    Catch TaskShardResult where the bot died and failed sending updates.
+  url: /internal/cron/abort_bot_died
+  schedule: every 1 minutes
+
+- description: Catch TaskShardToRun that are expired.
+  url: /internal/cron/abort_expired_shard_to_run
+  schedule: every 1 minutes
+
+- description: Catch inconsistent TaskResultSummary and update them.
+  url: /internal/cron/sync_all_result_summary
+  schedule: every 5 minutes synchronized
