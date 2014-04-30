@@ -30,6 +30,7 @@ from common import test_request_message
 from components import auth
 from components import auth_ui
 from components import datastore_utils
+from components import decorators
 from components import ereporter2
 from components import utils
 from server import admin_user
@@ -111,36 +112,6 @@ def GetModulesVersions():
 
 # Helper class for displaying the sort options in html templates.
 SortOptions = collections.namedtuple('SortOptions', ['key', 'name'])
-
-
-def require_cronjob(f):
-  """Enforces cronjob."""
-  @functools.wraps(f)
-  def hook(self, *args, **kwargs):
-    if self.request.headers.get('X-AppEngine-Cron') != 'true':
-      self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
-      msg = 'Only internal cron jobs can do this'
-      logging.error(msg)
-      self.abort(403, msg)
-      return
-    return f(self, *args, **kwargs)
-  return hook
-
-
-def require_taskqueue(task_name):
-  """Enforces the task is run with a specific task queue."""
-  def decorator(f):
-    @functools.wraps(f)
-    def hook(self, *args, **kwargs):
-      if self.request.headers.get('X-AppEngine-QueueName') != task_name:
-        self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
-        msg = 'Only internal task %s can do this' % task_name
-        logging.error(msg)
-        self.abort(403, msg)
-        return
-      return f(self, *args, **kwargs)
-    return hook
-  return decorator
 
 
 ### Handlers
@@ -507,7 +478,7 @@ class ResultHandler(auth.AuthenticatingHandler):
 class TaskCleanupDataHandler(webapp2.RequestHandler):
   """Deletes orphaned blobs."""
 
-  @require_taskqueue('cleanup')
+  @decorators.require_taskqueue('cleanup')
   def post(self):
     try:
       # All the things that need to be deleted.
@@ -536,7 +507,7 @@ class TaskCleanupDataHandler(webapp2.RequestHandler):
 class CronAbortStaleRunnersHandler(webapp2.RequestHandler):
   """Aborts stale runners."""
 
-  @require_cronjob
+  @decorators.require_cronjob
   def get(self):
     task_glue.AbortStaleRunners()
     self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
@@ -544,7 +515,7 @@ class CronAbortStaleRunnersHandler(webapp2.RequestHandler):
 
 
 class CronAbortBotDiedHandler(webapp2.RequestHandler):
-  @require_cronjob
+  @decorators.require_cronjob
   def get(self):
     task_scheduler.cron_abort_bot_died()
     self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
@@ -552,7 +523,7 @@ class CronAbortBotDiedHandler(webapp2.RequestHandler):
 
 
 class CronAbortExpiredShardToRunHandler(webapp2.RequestHandler):
-  @require_cronjob
+  @decorators.require_cronjob
   def get(self):
     task_scheduler.cron_abort_expired_shard_to_run()
     self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
@@ -560,7 +531,7 @@ class CronAbortExpiredShardToRunHandler(webapp2.RequestHandler):
 
 
 class CronSyncAllResultSummaryHandler(webapp2.RequestHandler):
-  @require_cronjob
+  @decorators.require_cronjob
   def get(self):
     task_scheduler.cron_sync_all_result_summary()
     self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
@@ -570,7 +541,7 @@ class CronSyncAllResultSummaryHandler(webapp2.RequestHandler):
 class CronTriggerCleanupDataHandler(webapp2.RequestHandler):
   """Triggers task to delete orphaned blobs."""
 
-  @require_cronjob
+  @decorators.require_cronjob
   def get(self):
     taskqueue.add(method='POST', url='/internal/taskqueue/cleanup_data',
                   queue_name='cleanup')
@@ -581,7 +552,7 @@ class CronTriggerCleanupDataHandler(webapp2.RequestHandler):
 class CronTriggerGenerateDailyStats(webapp2.RequestHandler):
   """Triggers task to generate daily stats."""
 
-  @require_cronjob
+  @decorators.require_cronjob
   def get(self):
     taskqueue.add(method='POST', url='/internal/taskqueue/generate_daily_stats',
                   queue_name='stats')
@@ -592,7 +563,7 @@ class CronTriggerGenerateDailyStats(webapp2.RequestHandler):
 class CronTriggerGenerateRecentStats(webapp2.RequestHandler):
   """Triggers task to generate recent stats."""
 
-  @require_cronjob
+  @decorators.require_cronjob
   def get(self):
     taskqueue.add(method='POST',
                   url='/internal/taskqueue/generate_recent_stats',
@@ -613,7 +584,7 @@ class DeadBotsCountHandler(webapp2.RequestHandler):
 class CronDetectHangingRunnersHandler(webapp2.RequestHandler):
   """Emails reports of runners that have been waiting too long."""
 
-  @require_cronjob
+  @decorators.require_cronjob
   def get(self):
     hanging_runners = task_glue.GetHangingRunners()
     if hanging_runners:
@@ -636,7 +607,7 @@ class CronDetectHangingRunnersHandler(webapp2.RequestHandler):
 class TaskGenerateDailyStatsHandler(webapp2.RequestHandler):
   """Generates new daily stats."""
 
-  @require_taskqueue('stats')
+  @decorators.require_taskqueue('stats')
   def post(self):
     yesterday = datetime.datetime.utcnow().date() - datetime.timedelta(days=1)
     daily_stats.GenerateDailyStats(yesterday)
@@ -647,7 +618,7 @@ class TaskGenerateDailyStatsHandler(webapp2.RequestHandler):
 class TaskGenerateRecentStatsHandler(webapp2.RequestHandler):
   """Generates new recent stats."""
 
-  @require_taskqueue('stats')
+  @decorators.require_taskqueue('stats')
   def post(self):
     runner_summary.GenerateSnapshotSummary()
     runner_summary.GenerateWaitSummary()
@@ -658,7 +629,7 @@ class TaskGenerateRecentStatsHandler(webapp2.RequestHandler):
 class CronSendEreporter2MailHandler(webapp2.RequestHandler):
   """Sends email containing the errors found in logservice."""
 
-  @require_cronjob
+  @decorators.require_cronjob
   def get(self):
     request_id_url = self.request.host_url + '/secure/ereporter2/request/'
     report_url = self.request.host_url + '/secure/ereporter2/report'

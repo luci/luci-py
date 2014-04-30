@@ -130,10 +130,6 @@ class MainTest(test_case.TestCase):
     response = self.app.get(
         '/internal/cron/ereporter2/mail', expect_errors=True)
     self.assertEqual(response.status_int, 403)
-    self.assertEqual(
-        response.normal_body,
-        '403 Forbidden Access was denied to this resource. Must be a cron '
-        'request. ')
     self.assertEqual(response.content_type, 'text/plain')
     # Verify no email was sent.
     self.assertEqual([], self.mail_stub.get_sent_messages())
@@ -235,7 +231,9 @@ class MainTest(test_case.TestCase):
     self.assertEqual(2, len(list(handlers.ContentEntry.query())))
 
     # 'bar' was kept, 'foo' was cleared out.
-    resp = self.app.get('/internal/cron/cleanup/trigger/old')
+    headers = {'X-AppEngine-Cron': 'true'}
+    resp = self.app.get(
+        '/internal/cron/cleanup/trigger/old', headers=headers)
     self.assertEqual(200, resp.status_code)
     self.assertEqual([None], r.json)
     self.assertEqual(1, self.execute_tasks())
@@ -244,7 +242,9 @@ class MainTest(test_case.TestCase):
 
     # Advance time and force cleanup. This deletes 'bar' too.
     now += datetime.timedelta(seconds=2*expiration)
-    resp = self.app.get('/internal/cron/cleanup/trigger/old')
+    headers = {'X-AppEngine-Cron': 'true'}
+    resp = self.app.get(
+        '/internal/cron/cleanup/trigger/old', headers=headers)
     self.assertEqual(200, resp.status_code)
     self.assertEqual([None], r.json)
     self.assertEqual(1, self.execute_tasks())
@@ -252,7 +252,9 @@ class MainTest(test_case.TestCase):
 
     # Advance time and force cleanup.
     now += datetime.timedelta(seconds=2*expiration)
-    resp = self.app.get('/internal/cron/cleanup/trigger/old')
+    headers = {'X-AppEngine-Cron': 'true'}
+    resp = self.app.get(
+        '/internal/cron/cleanup/trigger/old', headers=headers)
     self.assertEqual(200, resp.status_code)
     self.assertEqual([None], r.json)
     self.assertEqual(1, self.execute_tasks())
@@ -297,7 +299,10 @@ class MainTest(test_case.TestCase):
     self.mock(handlers.gcs, 'list_files', lambda _: mock_files)
 
     handlers.ContentEntry(key=handlers.entry_key('d', '0' * 40)).put()
-    self.app.get('/internal/cron/cleanup/trigger/trim_lost')
+    headers = {'X-AppEngine-Cron': 'true'}
+    resp = self.app.get(
+        '/internal/cron/cleanup/trigger/trim_lost', headers=headers)
+    self.assertEqual(200, resp.status_code)
     self.assertEqual(1, self.execute_tasks())
     self.assertEqual(['d/' + '1' * 40], deleted)
 

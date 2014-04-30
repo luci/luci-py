@@ -33,10 +33,11 @@ import map_reduce_jobs
 import stats
 import stats_gviz
 import template
-from components import ereporter2
 from components import auth
 from components import auth_ui
 from components import datastore_utils
+from components import decorators
+from components import ereporter2
 from components import utils
 
 
@@ -475,9 +476,8 @@ class InternalCleanupOldEntriesWorkerHandler(webapp2.RequestHandler):
 
   Only a task queue task can use this handler.
   """
-  def post(self):
-    if not self.request.headers.get('X-AppEngine-QueueName'):
-      self.abort(405, detail='Only internal task queue tasks can do this')
+  @decorators.require_taskqueue('cleanup')
+  def post(self):  # pylint: disable=R0201
     total = incremental_delete(
         ContentEntry.query(
             ContentEntry.expiration_ts < utcnow()).iter(keys_only=True),
@@ -487,9 +487,8 @@ class InternalCleanupOldEntriesWorkerHandler(webapp2.RequestHandler):
 
 class InternalObliterateWorkerHandler(webapp2.RequestHandler):
   """Deletes all the stuff."""
-  def post(self):
-    if not self.request.headers.get('X-AppEngine-QueueName'):
-      self.abort(405, detail='Only internal task queue tasks can do this')
+  @decorators.require_taskqueue('cleanup')
+  def post(self):  # pylint: disable=R0201
     logging.info('Deleting ContentEntry')
     incremental_delete(
         ContentEntry.query().iter(keys_only=True), ndb.delete_multi_async)
@@ -515,12 +514,11 @@ class InternalCleanupTrimLostWorkerHandler(webapp2.RequestHandler):
 
   Only a task queue task can use this handler.
   """
-  def post(self):
+  @decorators.require_taskqueue('cleanup')
+  def post(self):  # pylint: disable=R0201
     """Enumerates all GS files and delete those that do not have an associated
     ContentEntry.
     """
-    if not self.request.headers.get('X-AppEngine-QueueName'):
-      self.abort(405, detail='Only internal task queue tasks can do this')
     gs_bucket = config.settings().gs_bucket
 
     def filter_missing():
@@ -563,6 +561,7 @@ class InternalCleanupTrimLostWorkerHandler(webapp2.RequestHandler):
 
 class InternalCleanupTriggerHandler(webapp2.RequestHandler):
   """Triggers a taskqueue to clean up."""
+  @decorators.require_cronjob
   def get(self, name):
     if name in ('obliterate', 'old', 'orphaned', 'trim_lost'):
       url = '/internal/taskqueue/cleanup/' + name
@@ -584,10 +583,8 @@ class InternalTagWorkerHandler(webapp2.RequestHandler):
 
   This makes sure they are not evicted from the LRU cache too fast.
   """
+  @decorators.require_taskqueue('tag')
   def post(self, namespace, timestamp):
-    if not self.request.headers.get('X-AppEngine-QueueName'):
-      self.abort(405, detail='Only internal task queue tasks can do this')
-
     digests = []
     now = utils.timestamp_to_datetime(long(timestamp))
     expiration = config.settings().default_expiration
@@ -639,10 +636,8 @@ class InternalVerifyWorkerHandler(webapp2.RequestHandler):
         'Verification failed for %s: %s', entry.key.id(), message % args)
     ndb.Future.wait_all(delete_entry_and_gs_entry([entry.key]))
 
+  @decorators.require_taskqueue('verify')
   def post(self, namespace, hash_key):
-    if not self.request.headers.get('X-AppEngine-QueueName'):
-      self.abort(405, detail='Only internal task queue tasks can do this')
-
     entry = entry_key(namespace, hash_key).get()
     if not entry:
       logging.error('Failed to find entity')
@@ -793,12 +788,9 @@ class RestrictedGoogleStorageConfig(auth.AuthenticatingHandler):
 
 class InternalEreporter2Mail(webapp2.RequestHandler):
   """Handler class to generate and email an exception report."""
+  @decorators.require_cronjob
   def get(self):
     """Sends email(s) containing the errors logged."""
-    # Must be run from a cron job.
-    if 'true' != self.request.headers.get('X-AppEngine-Cron'):
-      self.abort(403, 'Must be a cron request.')
-
     # Do not use self.request.host_url because it will be http:// and will point
     # to the backend, with an host format that breaks the SSL certificate.
     host_url = 'https://%s.appspot.com' % app_identity.get_application_id()
@@ -904,9 +896,8 @@ class RestrictedLaunchMapReduceJob(auth.AuthenticatingHandler):
 
 class InternalLaunchMapReduceJobWorkerHandler(webapp2.RequestHandler):
   """Called via task queue or cron to start a map reduce job."""
-  def post(self, job_id):
-    if not self.request.headers.get('X-AppEngine-QueueName'):
-      self.abort(405, detail='Only internal task queue tasks can do this')
+  @decorators.require_taskqueue(map_reduce_jobs.MAP_REDUCE_TASK_QUEUE)
+  def post(self, job_id):  # pylint: disable=R0201
     map_reduce_jobs.launch_job(job_id)
 
 

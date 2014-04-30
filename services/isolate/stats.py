@@ -16,6 +16,7 @@ from google.appengine.api import logservice
 from google.appengine.ext import ndb
 from google.appengine.runtime import DeadlineExceededError
 
+from components import decorators
 from components import stats_framework
 from components import utils
 
@@ -152,6 +153,7 @@ def _generate_stats_data(request):
 
 class InternalStatsUpdateHandler(webapp2.RequestHandler):
   """Called every few minutes to update statistics."""
+  @decorators.require_cronjob
   def get(self):
     self.response.headers['Content-Type'] = 'text/plain'
     try:

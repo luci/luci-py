@@ -85,8 +85,9 @@ class StatsTest(test_case.TestCase, stats_framework_mock.MockMixIn):
         1, len(list(stats.stats_framework.yield_entries(None, None))))
 
     self.mock_now(self.now, 60)
-    self.assertEqual(
-        'Processed 10 minutes', self.app.get('/generate_stats').body)
+    headers = {'X-AppEngine-Cron': 'true'}
+    resp = self.app.get('/generate_stats', headers=headers, status=200)
+    self.assertEqual('Processed 10 minutes', resp.body)
     url = '/results/minutes?duration=1&now=2010-01-02 03:04:05'
     expected = {
       u'reqId': u'0',
