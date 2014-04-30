@@ -51,7 +51,7 @@ class TestRunnerTest(test_case.TestCase):
     super(TestRunnerTest, self).tearDown()
 
   def testGetResultStringFromEmptyRunner(self):
-    runner = test_helper.CreatePendingRunner()
+    runner = test_helper.CreateRunner()
 
     # Since the request hasn't been run yet there should be just be an
     # empty string for the result string.
@@ -66,7 +66,7 @@ class TestRunnerTest(test_case.TestCase):
         test_runner.TxRunnerAlreadyAssignedError,
     ]
 
-    runner = test_helper.CreatePendingRunner()
+    runner = test_helper.CreateRunner()
     for e in exceptions:
       def _Raise(_key, _machine_id):
         raise e
@@ -79,7 +79,7 @@ class TestRunnerTest(test_case.TestCase):
 
     # Create some pending runners.
     for _ in range(0, 2):
-      runners.append(test_helper.CreatePendingRunner())
+      runners.append(test_helper.CreateRunner())
 
     # Make sure it assigns machine_id correctly.
     test_runner.AtomicAssignID(runners[0].key, MACHINE_IDS[0])
@@ -97,7 +97,7 @@ class TestRunnerTest(test_case.TestCase):
 
   # Test with an exception.
   def testAssignRunnerToMachineFull(self):
-    runner = test_helper.CreatePendingRunner()
+    runner = test_helper.CreateRunner()
 
     # First assignment should work correctly.
     self.assertTrue(test_runner.AssignRunnerToMachine(
@@ -116,7 +116,7 @@ class TestRunnerTest(test_case.TestCase):
 
   # Test the case where the runner is deleted before the transaction is done.
   def testAssignDeletedRunnerToMachine(self):
-    runner = test_helper.CreatePendingRunner()
+    runner = test_helper.CreateRunner()
     runner.key.delete()
 
     # Assignment should fail without an exception.
@@ -124,7 +124,7 @@ class TestRunnerTest(test_case.TestCase):
         MACHINE_IDS[0], runner, test_runner.AtomicAssignID))
 
   def testShouldAutomaticallyRetryRunner(self):
-    runner = test_helper.CreatePendingRunner()
+    runner = test_helper.CreateRunner()
     self.assertTrue(test_runner.ShouldAutomaticallyRetryRunner(runner))
 
     runner.automatic_retry_count = test_runner.MAX_AUTOMATIC_RETRIES
@@ -134,12 +134,12 @@ class TestRunnerTest(test_case.TestCase):
   # calling AutomaticallyRetryRunner. It is unclear how this is possible, so
   # handle this case gracefully.
   def testAutomaticallyRetryMachineIdNone(self):
-    runner = test_helper.CreatePendingRunner(machine_id=None)
+    runner = test_helper.CreateRunner(machine_id=None)
     test_runner.AutomaticallyRetryRunner(runner)
     self.assertIsNotNone(runner)
 
   def testRecordRunnerStatsAfterAutoRetry(self):
-    runner = test_helper.CreatePendingRunner(machine_id=MACHINE_IDS[0])
+    runner = test_helper.CreateRunner(machine_id=MACHINE_IDS[0])
 
     test_runner.AutomaticallyRetryRunner(runner)
 
@@ -154,7 +154,7 @@ class TestRunnerTest(test_case.TestCase):
     self.assertFalse(test_runner.PingRunner('2', None))
 
     # Tests with a valid key
-    runner = test_helper.CreatePendingRunner()
+    runner = test_helper.CreateRunner()
 
     # Runner hasn't started.
     self.assertFalse(test_runner.PingRunner(runner.key.urlsafe(), None))
@@ -182,7 +182,7 @@ class TestRunnerTest(test_case.TestCase):
                                             MACHINE_IDS[0]))
 
   def testAbortRunnerThenReattach(self):
-    runner = test_helper.CreatePendingRunner(machine_id=MACHINE_IDS[0])
+    runner = test_helper.CreateRunner(machine_id=MACHINE_IDS[0])
 
     # Retry the runner since its taken too long to ping.
     test_runner.AutomaticallyRetryRunner(runner)
@@ -209,7 +209,7 @@ class TestRunnerTest(test_case.TestCase):
     # Create some test requests.
     test_runner_count = 3
     for i in range(test_runner_count):
-      runner = test_helper.CreatePendingRunner()
+      runner = test_helper.CreateRunner()
       runner.config_instance_index = i
       # Ensure the created times are far enough apart that we can reliably
       # sort the runners by it.
@@ -241,22 +241,22 @@ class TestRunnerTest(test_case.TestCase):
 
   def testFilterTestRunners(self):
     # Add a runner in each state (pending, running, failed, successful).
-    pending_runner = test_helper.CreatePendingRunner()
-    running_runner = test_helper.CreatePendingRunner(machine_id=MACHINE_IDS[0])
+    pending_runner = test_helper.CreateRunner()
+    running_runner = test_helper.CreateRunner(machine_id=MACHINE_IDS[0])
 
     # Hung runner, aborted without ever running.
-    hung_runner = test_helper.CreatePendingRunner()
+    hung_runner = test_helper.CreateRunner()
     test_management.AbortRunner(hung_runner, 'Hung')
 
-    aborted_runner = test_helper.CreatePendingRunner(machine_id=MACHINE_IDS[1])
+    aborted_runner = test_helper.CreateRunner(machine_id=MACHINE_IDS[1])
     test_management.AbortRunner(aborted_runner, 'Aborted')
 
-    failed_runner = test_helper.CreatePendingRunner(machine_id=MACHINE_IDS[1])
+    failed_runner = test_helper.CreateRunner(machine_id=MACHINE_IDS[1])
     failed_runner.done = True
     failed_runner.ran_successfully = False
     failed_runner.put()
 
-    successful_runner = test_helper.CreatePendingRunner(
+    successful_runner = test_helper.CreateRunner(
         machine_id=MACHINE_IDS[2])
     successful_runner.done = True
     successful_runner.ran_successfully = True
@@ -306,14 +306,14 @@ class TestRunnerTest(test_case.TestCase):
   def testGetHangingRunners(self):
     self.assertEqual([], test_runner.GetHangingRunners())
 
-    test_helper.CreatePendingRunner()
+    test_helper.CreateRunner()
     self.assertEqual([], test_runner.GetHangingRunners())
 
     old_time = datetime.datetime.utcnow() - datetime.timedelta(
         minutes=2 * test_runner.TIME_BEFORE_RUNNER_HANGING_IN_MINS)
 
     # Create an older runner that is running and isn't hanging.
-    old_runner = test_helper.CreatePendingRunner()
+    old_runner = test_helper.CreateRunner()
     old_runner.created = old_time
     old_runner.started = datetime.datetime.utcnow()
     old_runner.put()
@@ -321,20 +321,20 @@ class TestRunnerTest(test_case.TestCase):
 
     # Create a runner that was automatically restart, and can never be viewed
     # as hanging.
-    retried_runner = test_helper.CreatePendingRunner()
+    retried_runner = test_helper.CreateRunner()
     retried_runner.created = old_time
     retried_runner.automatic_retry_count = 1
     retried_runner.put()
     self.assertEqual([], test_runner.GetHangingRunners())
 
     # Create a runner that was aborted before running.
-    aborted_runner = test_helper.CreatePendingRunner()
+    aborted_runner = test_helper.CreateRunner()
     aborted_runner.created = old_time
     test_management.AbortRunner(aborted_runner, 'Aborted')
     self.assertEqual([], test_runner.GetHangingRunners())
 
     # Create an older runner that will be marked as hanging.
-    hanging_runner = test_helper.CreatePendingRunner()
+    hanging_runner = test_helper.CreateRunner()
     hanging_runner.created = old_time
     hanging_runner.put()
 
@@ -343,7 +343,7 @@ class TestRunnerTest(test_case.TestCase):
     self.assertEqual(hanging_runner.key, found_hanging_runners[0].key)
 
   def testGetRunnerFromUrlSafeKey(self):
-    runner = test_helper.CreatePendingRunner()
+    runner = test_helper.CreateRunner()
 
     self.assertEqual(None, test_runner.GetRunnerFromUrlSafeKey(''))
     self.assertEqual(None, test_runner.GetRunnerFromUrlSafeKey('fake_key'))
@@ -362,7 +362,7 @@ class TestRunnerTest(test_case.TestCase):
   def testGetRunnerResult(self):
     self.assertEqual(None, test_runner.GetRunnerResults('invalid key'))
 
-    runner = test_helper.CreatePendingRunner(machine_id=MACHINE_IDS[0])
+    runner = test_helper.CreateRunner(machine_id=MACHINE_IDS[0])
 
     results = test_runner.GetRunnerResults(runner.key.urlsafe())
     self.assertNotEqual(None, results)
@@ -375,7 +375,7 @@ class TestRunnerTest(test_case.TestCase):
     self.assertEqual(runner.GetResultString(), results['output'])
 
   def testGetAsDict(self):
-    runner = test_helper.CreatePendingRunner()
+    runner = test_helper.CreateRunner()
     self.assertTrue(runner.GetAsDict())
 
   def testRunnerCallerMachineIdMismatch(self):
@@ -387,13 +387,13 @@ class TestRunnerTest(test_case.TestCase):
     self._mox.ReplayAll()
 
     test_management.ExecuteTestRequest(test_helper.GetRequestMessage())
-    runner = test_helper.CreatePendingRunner(machine_id=MACHINE_IDS[0])
+    runner = test_helper.CreateRunner(machine_id=MACHINE_IDS[0])
 
     self.assertFalse(runner.UpdateTestResult(MACHINE_IDS[1]))
     self._mox.VerifyAll()
 
   def testRunnerCallerOldMachine(self):
-    runner = test_helper.CreatePendingRunner(machine_id=MACHINE_IDS[0])
+    runner = test_helper.CreateRunner(machine_id=MACHINE_IDS[0])
     runner.machine_id = MACHINE_IDS[0]
     runner.old_machine_ids = [MACHINE_IDS[1]]
     runner.put()
@@ -406,7 +406,7 @@ class TestRunnerTest(test_case.TestCase):
     self.assertTrue(runner.done)
 
   def testRunnerCallerOldMachineWithNoCurrent(self):
-    runner = test_helper.CreatePendingRunner(machine_id=MACHINE_IDS[0])
+    runner = test_helper.CreateRunner(machine_id=MACHINE_IDS[0])
     runner.machine_id = None
     runner.old_machine_ids = [MACHINE_IDS[1]]
     runner.put()
@@ -431,7 +431,7 @@ class TestRunnerTest(test_case.TestCase):
                   mox.IgnoreArg())
     self._mox.ReplayAll()
 
-    runner = test_helper.CreatePendingRunner(machine_id=MACHINE_IDS[0])
+    runner = test_helper.CreateRunner(machine_id=MACHINE_IDS[0])
 
     # First results, always accepted.
     self.assertTrue(runner.UpdateTestResult(
@@ -478,7 +478,7 @@ class TestRunnerTest(test_case.TestCase):
 
   def testRecordRunnerStats(self):
     # Create a pending runner and execute it.
-    runner = test_helper.CreatePendingRunner(machine_id=MACHINE_IDS[0])
+    runner = test_helper.CreateRunner(machine_id=MACHINE_IDS[0])
     self.assertEqual(0, runner_stats.RunnerStats.query().count())
 
     # Return the results for the test and ensure the stats are updated.
@@ -492,7 +492,7 @@ class TestRunnerTest(test_case.TestCase):
     self.assertTrue(r_stats.success)
 
   def testDeleteRunner(self):
-    test_helper.CreatePendingRunner()
+    test_helper.CreateRunner()
 
     # Make sure the request and the runner are stored.
     self.assertEqual(1, test_runner.TestRunner.query().count())
@@ -506,7 +506,7 @@ class TestRunnerTest(test_case.TestCase):
     self.assertEqual(0, test_request.TestRequest.query().count())
 
   def testDeleteRunnerFromKey(self):
-    test_helper.CreatePendingRunner()
+    test_helper.CreateRunner()
 
     # Make sure the request and the runner are stored.
     self.assertEqual(1, test_runner.TestRunner.query().count())
@@ -545,7 +545,7 @@ class TestRunnerTest(test_case.TestCase):
     test_runner._GetCurrentTime().AndReturn(mock_now)
     self._mox.ReplayAll()
 
-    runner = test_helper.CreatePendingRunner()
+    runner = test_helper.CreateRunner()
     runner.done = True
     runner.ended = datetime.datetime.utcnow()
     runner.put()

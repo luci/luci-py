@@ -39,7 +39,7 @@ class RequestorStatsTest(test_case.TestCase):
     self.assertEqual(0,
                      requestor_daily_stats.RequestorDailyStats.query().count())
 
-    runner = test_helper.CreatePendingRunner(machine_id='1',
+    runner = test_helper.CreateRunner(machine_id='1',
                                              exit_codes='0')
     requestor_daily_stats.UpdateDailyStats(runner)
 
@@ -47,14 +47,10 @@ class RequestorStatsTest(test_case.TestCase):
                      requestor_daily_stats.RequestorDailyStats.query().count())
 
   def testAddStat(self):
-    runner = test_helper.CreatePendingRunner()
-    runner.started = runner.created + datetime.timedelta(
-        minutes=EXPECTED_WAIT_TIME)
-    runner.ended = runner.started + datetime.timedelta(
-        minutes=EXPECTED_RUN_TIME)
-
-    runner.requestor = REQUESTOR[0]
-    runner.put()
+    runner = test_helper.CreateRunner(
+        started=datetime.timedelta(minutes=EXPECTED_WAIT_TIME),
+        ended=datetime.timedelta(minutes=EXPECTED_RUN_TIME),
+        requestor=REQUESTOR[0])
     requestor_daily_stats.UpdateDailyStats(runner)
 
     self.assertEqual(1,
@@ -68,14 +64,11 @@ class RequestorStatsTest(test_case.TestCase):
     self.assertEqual(EXPECTED_RUN_TIME, daily_stats.time_running_tests)
 
   def TestAddMultipleStats(self):
-    runner = test_helper.CreatePendingRunner()
-    runner.started = runner.created + datetime.timedelta(
-        minutes=EXPECTED_WAIT_TIME)
-    runner.ended = runner.started + datetime.timedelta(
-        minutes=EXPECTED_RUN_TIME)
+    runner = test_helper.CreateRunner(
+        started=datetime.timedelta(minutes=EXPECTED_WAIT_TIME),
+        ended=datetime.timedelta(minutes=EXPECTED_RUN_TIME),
+        requestor=REQUESTOR[0])
 
-    runner.requestor = REQUESTOR[0]
-    runner.put()
     requestor_daily_stats.UpdateDailyStats(runner)
 
     # Record the runner a second time to double the usage on the same day.
@@ -91,15 +84,12 @@ class RequestorStatsTest(test_case.TestCase):
     self.assertEqual(2 * EXPECTED_RUN_TIME, daily_stats.time_running_tests)
 
   def testAddMultipleRequestors(self):
-    runner = test_helper.CreatePendingRunner()
-    runner.started = runner.created + datetime.timedelta(
-        minutes=EXPECTED_WAIT_TIME)
-    runner.ended = runner.started + datetime.timedelta(
-        minutes=EXPECTED_RUN_TIME)
-
     # Add the first requestor.
-    runner.requestor = REQUESTOR[0]
-    runner.put()
+    runner = test_helper.CreateRunner(
+        started=datetime.timedelta(minutes=EXPECTED_WAIT_TIME),
+        ended=datetime.timedelta(minutes=EXPECTED_RUN_TIME),
+        requestor=REQUESTOR[0])
+
     requestor_daily_stats.UpdateDailyStats(runner)
 
     # Add the other requestor
@@ -123,14 +113,10 @@ class RequestorStatsTest(test_case.TestCase):
       self.assertEqual(EXPECTED_RUN_TIME, daily_stats.time_running_tests)
 
   def testMultipleDays(self):
-    runner = test_helper.CreatePendingRunner()
-    runner.started = runner.created + datetime.timedelta(
-        minutes=EXPECTED_WAIT_TIME)
-    runner.ended = runner.started + datetime.timedelta(
-        minutes=EXPECTED_RUN_TIME)
-
-    runner.requestor = REQUESTOR[0]
-    runner.put()
+    runner = test_helper.CreateRunner(
+        started=datetime.timedelta(minutes=EXPECTED_WAIT_TIME),
+        ended=datetime.timedelta(minutes=EXPECTED_RUN_TIME),
+        requestor=REQUESTOR[0])
     requestor_daily_stats.UpdateDailyStats(runner)
 
     # Add the usage for the next day.

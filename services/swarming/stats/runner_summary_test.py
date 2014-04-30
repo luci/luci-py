@@ -76,7 +76,7 @@ class RunnerSummaryTest(test_case.TestCase):
     self.assertEqual(0, runner_summary.RunnerSummary.query().count())
 
     # Add a single pending runner.
-    pending_runner = test_helper.CreatePendingRunner()
+    pending_runner = test_helper.CreateRunner()
     dimensions = pending_runner.dimensions
     dimension_mapping.DimensionMapping(dimensions=dimensions).put()
 
@@ -217,7 +217,7 @@ class RunnerSummaryTest(test_case.TestCase):
     self.assertEqual({}, runner_summary.GetRunnerSummaryByDimension())
 
     # Add a pending runner and its dimensions.
-    pending_runner = test_helper.CreatePendingRunner()
+    pending_runner = test_helper.CreateRunner()
     dimensions = pending_runner.dimensions
     dimension_mapping.DimensionMapping(dimensions=dimensions).put()
 
@@ -225,7 +225,7 @@ class RunnerSummaryTest(test_case.TestCase):
                      runner_summary.GetRunnerSummaryByDimension())
 
     # Add a running runner.
-    running_runner = test_helper.CreatePendingRunner()
+    running_runner = test_helper.CreateRunner()
     running_runner.started = datetime.datetime.utcnow()
     running_runner.put()
 
@@ -236,7 +236,7 @@ class RunnerSummaryTest(test_case.TestCase):
     new_dimensions = running_runner.dimensions + 'extra dimensions'
     dimension_mapping.DimensionMapping(dimensions=new_dimensions).put()
 
-    new_dimension_runner = test_helper.CreatePendingRunner()
+    new_dimension_runner = test_helper.CreateRunner()
     new_dimension_runner.dimensions = new_dimensions
     new_dimension_runner.put()
 

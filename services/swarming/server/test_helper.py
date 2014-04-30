@@ -9,9 +9,16 @@ import datetime
 from google.appengine.ext import ndb
 
 from common import test_request_message
+from server import result_helper
 from server import task_common
+from server import task_glue
+from server import task_result
+from server import task_shard_to_run
+from server import task_scheduler
 from server import test_request
 from server import test_runner
+
+# pylint: disable=W0212
 
 
 # The default root for all configs in a test request. The index value of the
@@ -51,7 +58,8 @@ def GetRequestMessage(request_name=REQUEST_MESSAGE_TEST_CASE_NAME,
                       restart_on_failure=False,
                       platform='win-xp',
                       priority=10,
-                      num_configs=1):
+                      num_configs=1,
+                      requestor=None):
   """Return a properly formatted request message text.
 
   Args:
@@ -82,6 +90,7 @@ def GetRequestMessage(request_name=REQUEST_MESSAGE_TEST_CASE_NAME,
   ]
   request = test_request_message.TestCase(
       restart_on_failure=restart_on_failure,
+      requestor=requestor,
       test_case_name=request_name,
       configurations=configurations,
       data=[('http://b.ina.ry/files2.zip', 'files2.zip')],
@@ -90,9 +99,15 @@ def GetRequestMessage(request_name=REQUEST_MESSAGE_TEST_CASE_NAME,
   return test_request_message.Stringize(request, json_readable=True)
 
 
-def CreatePendingRunner(config_name=None, machine_id=None,
-                        ran_successfully=None, exit_codes=None):
-  """Create a basic pending TestRunner.
+def CreateRunner(config_name=None, machine_id=None,
+                 ran_successfully=None, exit_codes=None, started=None,
+                 ended=None, requestor=None, results=None):
+  """Creates entities to represent a new task request and a bot running it.
+
+  For the old DB, it's a TestRequest and TestRunner pair
+  For the new DB, it's a TaskRequest and friends.
+
+  The entity may be in a pending, running or completed state.
 
   Args:
     config_name: The config name for the runner.
@@ -101,37 +116,78 @@ def CreatePendingRunner(config_name=None, machine_id=None,
     ran_succesfully: True if the runner ran successfully.
     exit_codes: The exit codes for the runner. Also, if this is given the
       runner is marked as having finished.
+    started: timedelta from .created to when the task execution started.
+    ended: timedelta from .started to when the bot completed the task.
+    requestor: string representing the user name that requested the task.
+    results: string that represents stdout the bot sent back.
 
   Returns:
     The pending runner created.
   """
-  if not config_name:
-    config_name = REQUEST_MESSAGE_CONFIG_NAME_ROOT + '_0'
+  config_name = config_name or (REQUEST_MESSAGE_CONFIG_NAME_ROOT + '_0')
+  request_message = GetRequestMessage(requestor=requestor)
+  if task_glue.USE_OLD_API:
+    request = test_request.TestRequest(
+        message=request_message,
+        name=REQUEST_MESSAGE_TEST_CASE_NAME)
+    request.put()
 
-  request = test_request.TestRequest(message=GetRequestMessage(),
-                                     name=REQUEST_MESSAGE_TEST_CASE_NAME)
-  request.put()
+    runner = _CreateRunner(request, config_name)
+    runner.config_instance_index = 0
+    runner.num_config_instances = 1
+    runner.requestor = requestor
 
-  runner = _CreateRunner(request, config_name)
-  runner.config_instance_index = 0
-  runner.num_config_instances = 1
+    if machine_id:
+      runner.machine_id = machine_id
+      runner.started = datetime.datetime.utcnow()
+      runner.ping = runner.started
 
-  if machine_id:
-    runner.machine_id = machine_id
-    runner.started = datetime.datetime.utcnow()
-    runner.ping = runner.started
+    if ran_successfully:
+      runner.ran_successfully = ran_successfully
 
-  if ran_successfully:
-    runner.ran_successfully = ran_successfully
+    if exit_codes:
+      runner.done = True
+      runner.ended = datetime.datetime.utcnow()
+      runner.exit_codes = exit_codes
 
-  if exit_codes:
-    runner.done = True
-    runner.ended = datetime.datetime.utcnow()
-    runner.exit_codes = exit_codes
+    if started:
+      runner.started = runner.created + started
 
-  runner.put()
+    if ended:
+      runner.ended = runner.started + ended
 
-  return runner
+    if results:
+      results_obj = result_helper.StoreResults(results)
+      runner.results_reference = results_obj.key
+
+    runner.put()
+    return runner
+
+  data = task_glue._convert_test_case(request_message)
+  request, shard_runs = task_scheduler.new_request(data)
+  shard_to_run_key = shard_runs[0].key
+  # This is in running state. Pending state is not supported here.
+  task_shard_to_run.reap_shard_to_run(shard_to_run_key)
+
+  machine_id = machine_id or 'localhost'
+  shard_result = task_result.new_shard_result(shard_to_run_key, 1, machine_id)
+  if started:
+    shard_result.started_ts += started
+  if ended:
+    shard_result.completed_ts = shard_result.started_ts + ended
+
+  if ran_successfully or exit_codes:
+    data = {
+      'exit_codes': exit_codes or [0],
+    }
+    task_scheduler.bot_update_task(shard_result.key, data, machine_id)
+
+  # Call it manually because at this level, there is no visibility for the
+  # taskqueue.
+  task_result._task_update_result_summary(request.key.integer_id())
+
+  # Returns a TaskShardResult.
+  return shard_result
 
 
 def CreateRequest(num_instances):

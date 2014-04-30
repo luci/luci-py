@@ -23,6 +23,7 @@ from common import test_request_message
 from server import bot_management
 from server import dimensions_utils
 from server import result_helper
+from server import task_glue
 from server import test_helper
 from server import test_management
 from server import test_request
@@ -99,6 +100,8 @@ class TestManagementTest(test_case.TestCase):
 
   def setUp(self):
     super(TestManagementTest, self).setUp()
+    # Obviously, this test can't pass with the new DB.
+    self.mock(task_glue, 'USE_OLD_API', True)
     self._mox = mox.Mox()
 
     # Create default configurations.
@@ -457,7 +460,7 @@ class TestManagementTest(test_case.TestCase):
 
   def testResultWithUnicode(self):
     # Make sure we can handle results with unicode in them.
-    runner = test_helper.CreatePendingRunner(machine_id=MACHINE_IDS[0])
+    runner = test_helper.CreateRunner(machine_id=MACHINE_IDS[0])
     test_management.AbortRunner(runner, u'\u04bb')
     self.assertIsNotNone(runner)
 
@@ -481,7 +484,7 @@ class TestManagementTest(test_case.TestCase):
   def _AssignPendingRequests(self, num_tests=1, num_machines=1):
     num_running = min(num_tests, num_machines)
     for _ in range(num_tests):
-      test_helper.CreatePendingRunner()
+      test_helper.CreateRunner()
 
     # Assign different ids to the machines if requested, or have the same
     # machine do all the tests.

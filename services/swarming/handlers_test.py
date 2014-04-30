@@ -29,7 +29,6 @@ from server import bot_management
 from server import dimension_mapping
 from server import dimensions_utils
 from server import errors
-from server import result_helper
 from server import task_glue
 from server import test_helper
 from server import test_runner
@@ -128,7 +127,7 @@ class AppTest(test_case.TestCase):
     self.assertResponse(response, '404 Not Found', '[]')
 
     # Test with a single matching runner.
-    runner = test_helper.CreatePendingRunner()
+    runner = test_helper.CreateRunner()
     response = self.app.get(
         '/get_matching_test_cases',
         {'name': test_helper.REQUEST_MESSAGE_TEST_CASE_NAME})
@@ -137,7 +136,7 @@ class AppTest(test_case.TestCase):
         str(task_glue.UrlSafe(runner.key)) in response.body, response.body)
 
     # Test with a multiple matching runners.
-    additional_test_runner = test_helper.CreatePendingRunner()
+    additional_test_runner = test_helper.CreateRunner()
 
     response = self.app.get(
         '/get_matching_test_cases',
@@ -162,11 +161,10 @@ class AppTest(test_case.TestCase):
       response = self.app.get(handler, {'r': 'fake_key'}, status=204)
 
     # Create test and runner.
-    runner = test_helper.CreatePendingRunner(machine_id=MACHINE_ID,
-                                             exit_codes='[0]')
-    results = result_helper.StoreResults('\xe9 Invalid utf-8 string')
-    runner.results_reference = results.key
-    runner.put()
+    runner = test_helper.CreateRunner(
+        machine_id=MACHINE_ID,
+        exit_codes='[0]',
+        results='\xe9 Invalid utf-8 string')
 
     # Valid key.
     for handler in handler_urls:
@@ -272,7 +270,7 @@ class AppTest(test_case.TestCase):
     self._mox.ReplayAll()
 
     # Add a test runner to show on the page.
-    test_helper.CreatePendingRunner()
+    test_helper.CreateRunner()
 
     response = self.app.get('/secure/main')
     self.assertEqual('200 OK', response.status)
@@ -289,7 +287,7 @@ class AppTest(test_case.TestCase):
     self.assertResponse(response, '200 OK', 'Key deletion failed.')
 
     # Try to clean up with a valid key.
-    runner = test_helper.CreatePendingRunner()
+    runner = test_helper.CreateRunner()
     response = self.app.post(
         '/cleanup_results', {'r': task_glue.UrlSafe(runner.key)})
     self.assertResponse(response, '200 OK', 'Key deleted.')
@@ -305,7 +303,7 @@ class AppTest(test_case.TestCase):
     self.assertEqual('Unable to retry runner', response.body)
 
     # Test with matching key.
-    runner = test_helper.CreatePendingRunner(exit_codes='[0]')
+    runner = test_helper.CreateRunner(exit_codes='[0]')
 
     response = self.app.post(
         '/secure/retry', {'r': task_glue.UrlSafe(runner.key)})
@@ -318,7 +316,7 @@ class AppTest(test_case.TestCase):
     response = self.app.get('/secure/show_message', {'r': 'fake_key'},
         status=404)
 
-    runner = test_helper.CreatePendingRunner()
+    runner = test_helper.CreateRunner()
     response = self.app.get('/secure/show_message',
                             {'r': task_glue.UrlSafe(runner.key)})
     self.assertEqual(runner.GetAsDict(), response.json)
@@ -436,7 +434,7 @@ class AppTest(test_case.TestCase):
 
   def testResultHandler(self):
     # TODO(maruel): Stop using the DB directly.
-    runner = test_helper.CreatePendingRunner(machine_id=MACHINE_ID)
+    runner = test_helper.CreateRunner(machine_id=MACHINE_ID)
     if not task_glue.USE_OLD_API:
       # Side effect of hacking around instead of using HTTP handler.
       runner.put()
@@ -710,7 +708,7 @@ class AppTest(test_case.TestCase):
         ' Runner failed to ping.  ')
 
     # Start a test and successfully ping it
-    runner = test_helper.CreatePendingRunner(machine_id=MACHINE_ID)
+    runner = test_helper.CreateRunner(machine_id=MACHINE_ID)
     if not task_glue.USE_OLD_API:
       runner.put()
     response = self.app.post(
@@ -727,9 +725,9 @@ class AppTest(test_case.TestCase):
     ]
 
     # Create a pending, active and done runner.
-    test_helper.CreatePendingRunner()
-    test_helper.CreatePendingRunner(machine_id=MACHINE_ID)
-    runner = test_helper.CreatePendingRunner(machine_id=MACHINE_ID)
+    test_helper.CreateRunner()
+    test_helper.CreateRunner(machine_id=MACHINE_ID)
+    runner = test_helper.CreateRunner(machine_id=MACHINE_ID)
     if task_glue.USE_OLD_API:
       runner.UpdateTestResult(machine_id=MACHINE_ID)
       # Ensure the dimension mapping is created.
@@ -740,7 +738,7 @@ class AppTest(test_case.TestCase):
       runner_summary.GenerateWaitSummary()
 
       # Add some basic stats items to ensure the loop bodies are executed.
-      runner = test_helper.CreatePendingRunner()
+      runner = test_helper.CreateRunner()
       runner_stats.RecordRunnerStats(runner)
       daily_stats.DailyStats(date=datetime.datetime.utcnow().date()).put()
     else:
@@ -839,7 +837,7 @@ class AppTest(test_case.TestCase):
     self.assertResponse(response, '200 OK', 'Success.')
 
     # Test when there is a hanging runner.
-    runner = test_helper.CreatePendingRunner()
+    runner = test_helper.CreateRunner()
     runner.put()
 
     test_helper.mock_now(
@@ -866,7 +864,7 @@ class AppTest(test_case.TestCase):
     self.assertEqual('400 Bad Request', response.status)
     self.assertEqual('Unable to cancel runner', response.body)
 
-    runner = test_helper.CreatePendingRunner()
+    runner = test_helper.CreateRunner()
     response = self.app.post('/secure/cancel',
                              {'r': task_glue.UrlSafe(runner.key)})
     self.assertResponse(response, '200 OK', 'Runner canceled.')

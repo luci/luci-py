@@ -55,7 +55,7 @@ class StatManagerTest(test_case.TestCase):
     r_stats = runner_stats.RunnerStats.query().get()
     self.assertEqual(None, r_stats)
 
-    runner = test_helper.CreatePendingRunner(ran_successfully=True)
+    runner = test_helper.CreateRunner(ran_successfully=True)
     r_stats = runner_stats.RecordRunnerStats(runner)
     self.assertFalse(r_stats.aborted)
     self.assertTrue(r_stats.success)
