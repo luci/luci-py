@@ -362,20 +362,20 @@ class MainTest(test_case.TestCase):
     # generate it.
     now = datetime.datetime(2010, 1, 2, 3, 4, 5, 6)
     stats_framework_mock.mock_now(self, now, 0)
-    handler = handlers.stats.get_stats_handler()
+    handler = handlers.stats.STATS_HANDLER
     for i in xrange(10):
-      s = handlers.stats.Snapshot(requests=100 + i)
+      s = handlers.stats._Snapshot(requests=100 + i)
       day = (now - datetime.timedelta(days=i)).date()
       handler.stats_day_cls(key=handler.day_key(day), values_compressed=s).put()
 
     for i in xrange(10):
-      s = handlers.stats.Snapshot(requests=10 + i)
+      s = handlers.stats._Snapshot(requests=10 + i)
       timestamp = (now - datetime.timedelta(hours=i))
       handler.stats_hour_cls(
           key=handler.hour_key(timestamp), values_compressed=s).put()
 
     for i in xrange(10):
-      s = handlers.stats.Snapshot(requests=1 + i)
+      s = handlers.stats._Snapshot(requests=1 + i)
       timestamp = (now - datetime.timedelta(minutes=i))
       handler.stats_minute_cls(
           key=handler.minute_key(timestamp), values_compressed=s).put()

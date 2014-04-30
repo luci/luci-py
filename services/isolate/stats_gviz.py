@@ -59,7 +59,7 @@ class StatsHandler(webapp2.RequestHandler):
     description = _GVIZ_DESCRIPTION.copy()
     description.update(stats_framework_gviz.get_description_key(resolution))
     table = stats_framework.get_stats(
-        stats.get_stats_handler(), resolution, None, duration)
+        stats.STATS_HANDLER, resolution, None, duration)
     params = {
       'duration': duration,
       'initial_data': gviz_api.DataTable(description, table).ToJSon(
@@ -80,7 +80,7 @@ class StatsGvizHandlerBase(webapp2.RequestHandler):
       stats_framework_gviz.get_json(
           self.request,
           self.response,
-          stats.get_stats_handler(),
+          stats.STATS_HANDLER,
           self.RESOLUTION,
           description,
           _GVIZ_COLUMNS_ORDER)

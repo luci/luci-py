@@ -70,7 +70,7 @@ class StatsFrameworkTest(test_case.TestCase, stats_framework_mock.MockMixIn):
     handler = stats_framework.StatisticsFramework(
         'test_framework', Snapshot, self.fail)
 
-    self.assertEqual(0, handler.stats_root_cls.query().count())
+    self.assertEqual(0, stats_framework.StatsRoot.query().count())
     self.assertEqual(0, handler.stats_day_cls.query().count())
     self.assertEqual(0, handler.stats_hour_cls.query().count())
     self.assertEqual(0, handler.stats_minute_cls.query().count())
@@ -87,7 +87,7 @@ class StatsFrameworkTest(test_case.TestCase, stats_framework_mock.MockMixIn):
     handler._set_last_processed_time(strip_seconds(now))
     i = handler.process_next_chunk(0)
     self.assertEqual(0, i)
-    self.assertEqual(1, handler.stats_root_cls.query().count())
+    self.assertEqual(1, stats_framework.StatsRoot.query().count())
     self.assertEqual(0, handler.stats_day_cls.query().count())
     self.assertEqual(0, handler.stats_hour_cls.query().count())
     self.assertEqual(0, handler.stats_minute_cls.query().count())
@@ -112,8 +112,8 @@ class StatsFrameworkTest(test_case.TestCase, stats_framework_mock.MockMixIn):
     now = get_now()
     self.mock_now(now, 0)
     start_date = now - datetime.timedelta(
-        days=stats_framework.StatisticsFramework.MAX_BACKTRACK)
-    limit = handler.MAX_MINUTES_PER_PROCESS
+        days=handler._max_backtrack_days)
+    limit = handler._max_minutes_per_process
 
     i = handler.process_next_chunk(5)
     self.assertEqual(limit, i)
@@ -127,7 +127,7 @@ class StatsFrameworkTest(test_case.TestCase, stats_framework_mock.MockMixIn):
     self.assertEqual(expected_calls, called)
 
     # Verify root.
-    root = handler.stats_root_cls.query().fetch()
+    root = stats_framework.StatsRoot.query().fetch()
     self.assertEqual(1, len(root))
     # When timestamp is not set, it starts at the begining of the day,
     # MAX_BACKTRACK days ago, then process MAX_MINUTES_PER_PROCESS.
@@ -212,7 +212,7 @@ class StatsFrameworkTest(test_case.TestCase, stats_framework_mock.MockMixIn):
         strip_seconds(now) - datetime.timedelta(seconds=3*60))
     i = handler.process_next_chunk(1)
     self.assertEqual(2, i)
-    self.assertEqual(1, handler.stats_root_cls.query().count())
+    self.assertEqual(1, stats_framework.StatsRoot.query().count())
     self.assertEqual(1, handler.stats_day_cls.query().count())
     self.assertEqual(1, handler.stats_hour_cls.query().count())
     self.assertEqual(2, handler.stats_minute_cls.query().count())

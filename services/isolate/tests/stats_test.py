@@ -77,7 +77,7 @@ class StatsTest(test_case.TestCase, stats_framework_mock.MockMixIn):
     self.mock_now(self.now, 0)
 
   def _test_handler(self, url, added_data):
-    stats_framework_mock.reset_timestamp(stats.get_stats_handler(), self.now)
+    stats_framework_mock.reset_timestamp(stats.STATS_HANDLER, self.now)
 
     self.assertEqual('Yay', self.app.get(url).body)
 

@@ -39,42 +39,45 @@ StatsEntry = collections.namedtuple('StatsEntry', ('request', 'entries'))
 
 
 class StatisticsFramework(object):
-  # Maximum number of days to look back to generate stats when starting fresh.
-  # It will always start looking at 00:00 on the given day in UTC time.
-  MAX_BACKTRACK = 5
-  # Process at maximum 2 hours at a time.
-  MAX_MINUTES_PER_PROCESS = 120
-
-  def __init__(self, root_key_id, snapshot_cls, generate_snapshot):
+  def __init__(
+      self, root_key_id, snapshot_cls, generate_snapshot,
+      max_backtrack_days=5, max_minutes_per_process=120):
     """Creates an instance to do bookkeeping of statistics.
 
     Arguments:
     - root_key_id: Root key id of the entity to use for transaction. It must be
-                   unique to the instance and application.
+          unique to the instance and application.
     - snapshot_cls: Snapshot class that contains all the data. It must have an
-                    accumulate() member function to sum the values from one
-                    instance into another. It is important that all properties
-                    have sensible default value.
+          accumulate() member function to sum the values from one instance into
+          another. It is important that all properties have sensible default
+          value.
     - generate_snapshot: Function taking (start_time, end_time) as epoch and
-                         returning a snapshot_cls instance for this time frame.
+          returning a snapshot_cls instance for this time frame.
+    - max_backtrack_days: Maximum number of days to look back to generate stats
+          when starting fresh. It will always start looking at 00:00 on the
+          given day in UTC time.
+    - max_minutes_per_process: Maximum number of minutes to process at a time.
 
     ndb access to self.root_key is using both local cache and memcache but
     access to stats_day_cls, stats_hour_cls and stats_minute_cls does not use
     ndb's memcache.
+
+    All members are constants. This class is thread-safe since it is never
+    mutated.
     """
-    # All these members should be considered constants. This class is
-    # thread-safe since it is never mutated.
-    self.root_key_id = root_key_id
+    assert isinstance(max_backtrack_days, int)
+    assert isinstance(max_minutes_per_process, int)
     self.snapshot_cls = snapshot_cls
     self._generate_snapshot = generate_snapshot
+    self._max_backtrack_days = max_backtrack_days
+    self._max_minutes_per_process = max_minutes_per_process
 
     # Generate the model classes. The factories are members so they can be
     # overriden if necessary.
-    self.stats_root_cls = self._generate_stats_root_cls()
-    self.root_key = ndb.Key(self.stats_root_cls, self.root_key_id)
-    self.stats_day_cls = self._generate_stats_day_cls(self.snapshot_cls)
-    self.stats_hour_cls = self._generate_stats_hour_cls(self.snapshot_cls)
-    self.stats_minute_cls = self._generate_stats_minute_cls(self.snapshot_cls)
+    self.root_key = ndb.Key(StatsRoot, root_key_id)
+    self.stats_day_cls = _generate_stats_day_cls(self.snapshot_cls)
+    self.stats_hour_cls = _generate_stats_hour_cls(self.snapshot_cls)
+    self.stats_minute_cls = _generate_stats_minute_cls(self.snapshot_cls)
 
   def process_next_chunk(self, up_to):
     """Processes as much minutes starting at a specific time.
@@ -100,7 +103,7 @@ class StatisticsFramework(object):
         self._process_one_minute(next_minute)
         self._set_last_processed_time(next_minute)
         count += 1
-        if self.MAX_MINUTES_PER_PROCESS == count:
+        if self._max_minutes_per_process == count:
           break
         next_minute = next_minute + datetime.timedelta(minutes=1)
         now = _utcnow()
@@ -126,9 +129,7 @@ class StatisticsFramework(object):
       - day is a datetime.date instance.
     """
     assert day.__class__ is datetime.date
-    return ndb.Key(
-        self.stats_root_cls, self.root_key_id,
-        self.stats_day_cls, str(day))
+    return ndb.Key(self.stats_day_cls, str(day), parent=self.root_key)
 
   def hour_key(self, hour):
     """Returns the complete entity key for a specific hour stats.
@@ -138,9 +139,8 @@ class StatisticsFramework(object):
     """
     assert isinstance(hour, datetime.datetime)
     return ndb.Key(
-        self.stats_root_cls, self.root_key_id,
-        self.stats_day_cls, str(hour.date()),
-        self.stats_hour_cls, '%02d' % hour.hour)
+        self.stats_hour_cls, '%02d' % hour.hour,
+        parent=self.day_key(hour.date()))
 
   def minute_key(self, minute):
     """Returns the complete entity key for a specific minute stats.
@@ -150,163 +150,10 @@ class StatisticsFramework(object):
     """
     assert isinstance(minute, datetime.datetime)
     return ndb.Key(
-        self.stats_root_cls, self.root_key_id,
-        self.stats_day_cls, str(minute.date()),
-        self.stats_hour_cls, '%02d' % minute.hour,
-        self.stats_minute_cls, '%02d' % minute.minute)
+        self.stats_minute_cls, '%02d' % minute.minute,
+        parent=self.hour_key(minute))
 
   ### Protected code.
-
-  @staticmethod
-  def _generate_stats_root_cls():
-    class StatsRoot(ndb.Model):
-      """Used as a base class for transaction coherency.
-
-      It will be updated once every X minutes when the cron job runs to gather
-      new data.
-      """
-      created = ndb.DateTimeProperty(indexed=False, auto_now=True)
-      timestamp = ndb.DateTimeProperty(indexed=False)
-
-    return StatsRoot
-
-  @staticmethod
-  def _generate_stats_day_cls(snapshot_cls):
-    class StatsDay(ndb.Model):
-      """Statistics for the whole day.
-
-      The Key format is YYYY-MM-DD with 0 prefixes so the key sort naturally.
-      Ancestor is self.stats_root_cls with key id self.root_key_id.
-
-      This entity is updated every time a new self.stats_hour_cls is sealed,
-      so ~1 update per hour.
-      """
-      created = ndb.DateTimeProperty(indexed=False, auto_now=True)
-      modified = ndb.DateTimeProperty(indexed=False, auto_now_add=True)
-
-      # Statistics for the day.
-      values_compressed = ndb.LocalStructuredProperty(
-          snapshot_cls, compressed=True, name='values_c')
-      # This is needed for backward compatibility
-      values_uncompressed = ndb.LocalStructuredProperty(
-          snapshot_cls, name='values')
-
-      # Hours that have been summed. A complete day will be set to (1<<24)-1,
-      # e.g.  0xFFFFFF, e.g. 24 bits or 6x4 bits.
-      hours_bitmap = ndb.IntegerProperty(default=0)
-
-      # Used for queries.
-      SEALED_BITMAP = 0xFFFFFF
-
-      @property
-      def values(self):
-        return self.values_compressed or self.values_uncompressed
-
-      def to_dict(self):
-        out = self.values.to_dict()
-        out['key'] = self.to_date()
-        return out
-
-      def to_date(self):
-        """Returns the datetime.date instance for this instance."""
-        year, month, day = self.key.id().split('-', 2)
-        return datetime.date(int(year), int(month), int(day))
-
-      def _pre_put_hook(self):
-        if bool(self.values_compressed) == bool(self.values_uncompressed):
-          raise datastore_errors.BadValueError('Invalid object')
-
-    return StatsDay
-
-  @staticmethod
-  def _generate_stats_hour_cls(snapshot_cls):
-    class StatsHour(ndb.Model):
-      """Statistics for a single hour.
-
-      The Key format is HH with 0 prefix so the key sort naturally. Ancestor is
-      self.stats_day_cls.
-
-      This entity is updated every time a new self.stats_minute_cls is
-      generated under a transaction, so ~1 transaction per minute.
-      """
-      created = ndb.DateTimeProperty(indexed=False, auto_now=True)
-      # Statistics for the hour.
-      values_compressed = ndb.LocalStructuredProperty(
-          snapshot_cls, compressed=True, name='values_c')
-      # This is needed for backward compatibility
-      values_uncompressed = ndb.LocalStructuredProperty(
-          snapshot_cls, name='values')
-
-      # Minutes that have been summed. A complete hour will be set to (1<<60)-1,
-      # e.g. 0xFFFFFFFFFFFFFFF, e.g. 60 bits or 15x4 bits.
-      minutes_bitmap = ndb.IntegerProperty(indexed=False, default=0)
-
-      # Used for queries.
-      SEALED_BITMAP = 0xFFFFFFFFFFFFFFF
-
-      @property
-      def values(self):
-        return self.values_compressed or self.values_uncompressed
-
-      def to_dict(self):
-        out = self.values.to_dict()
-        out['key'] = self.to_datetime()
-        return out
-
-      def to_datetime(self):
-        """Returns the datetime.datetime instance for this instance."""
-        key = self.key
-        year, month, day = key.parent().id().split('-', 2)
-        return datetime.datetime(
-            int(year), int(month), int(day), int(key.id()))
-
-      def _pre_put_hook(self):
-        if bool(self.values_compressed) == bool(self.values_uncompressed):
-          raise datastore_errors.BadValueError('Invalid object')
-
-    return StatsHour
-
-  @staticmethod
-  def _generate_stats_minute_cls(snapshot_cls):
-    class StatsMinute(ndb.Model):
-      """Statistics for a single minute.
-
-      The Key format is MM with 0 prefix so the key sort naturally. Ancestor is
-      self.stats_hour_cls.
-
-      This entity is written once and never modified so it is sealed by
-      definition.
-      """
-      created = ndb.DateTimeProperty(indexed=False, auto_now=True)
-      # Statistics for one minute.
-      values_compressed = ndb.LocalStructuredProperty(
-          snapshot_cls, compressed=True, name='values_c')
-      # This is needed for backward compatibility
-      values_uncompressed = ndb.LocalStructuredProperty(
-          snapshot_cls, name='values')
-
-      @property
-      def values(self):
-        return self.values_compressed or self.values_uncompressed
-
-      def to_dict(self):
-        out = self.values.to_dict()
-        out['key'] = self.to_datetime()
-        return out
-
-      def to_datetime(self):
-        """Returns the datetime.datetime instance for this instance."""
-        key = self.key
-        year, month, day = key.parent().parent().id().split('-', 2)
-        hour = key.parent().id()
-        return datetime.datetime(
-            int(year), int(month), int(day), int(hour), int(key.id()))
-
-      def _pre_put_hook(self):
-        if bool(self.values_compressed) == bool(self.values_uncompressed):
-          raise datastore_errors.BadValueError('Invalid object')
-
-    return StatsMinute
 
   def _set_last_processed_time(self, moment):
     """Saves the last minute processed.
@@ -315,10 +162,7 @@ class StatisticsFramework(object):
     """
     assert moment.second == 0, moment
     assert moment.microsecond == 0, moment
-    root = self.root_key.get()
-    if not root:
-      # This is bad, someone deleted the root entity.
-      root = self.stats_root_cls(id=self.root_key_id)
+    root = self.root_key.get() or StatsRoot(key=self.root_key)
     root.timestamp = moment
     root.put()
 
@@ -384,7 +228,7 @@ class StatisticsFramework(object):
         # We are bootstrapping as there is no entity at all. Use ~5 days ago at
         # midnight to regenerate stats. It will be resource intensive.
         today = now.date()
-        key_id = str(today - datetime.timedelta(days=self.MAX_BACKTRACK))
+        key_id = str(today - datetime.timedelta(days=self._max_backtrack_days))
         day = self.stats_day_cls.get_or_insert(
             key_id, parent=self.root_key, values_compressed=self.snapshot_cls())
         logging.info('Selected/created: %s', key_id)
@@ -476,7 +320,7 @@ class StatisticsFramework(object):
       if hour.minutes_bitmap == self.stats_hour_cls.SEALED_BITMAP:
         logging.info(
             '%s Hour is sealed: %s %s:00',
-            self.root_key_id, day.key.id(), hour.key.id())
+            self.root_key.id(), day.key.id(), hour.key.id())
 
     # Adds data for the past hour back into day.
     if hour.minutes_bitmap == self.stats_hour_cls.SEALED_BITMAP:
@@ -488,13 +332,161 @@ class StatisticsFramework(object):
         futures.append(day.put_async(use_memcache=False))
         if day.hours_bitmap == self.stats_day_cls.SEALED_BITMAP:
           logging.info(
-              '%s Day is sealed: %s', self.root_key_id, day.key.id())
+              '%s Day is sealed: %s', self.root_key.id(), day.key.id())
 
     if futures:
       ndb.Future.wait_all(futures)
 
 
 ### Private stuff.
+
+
+class StatsRoot(ndb.Model):
+  """Used as a base class for transaction coherency.
+
+  It will be updated once every X minutes when the cron job runs to gather new
+  data.
+  """
+  created = ndb.DateTimeProperty(indexed=False, auto_now=True)
+  timestamp = ndb.DateTimeProperty(indexed=False)
+
+
+def _generate_stats_day_cls(snapshot_cls):
+  class StatsDay(ndb.Model):
+    """Statistics for the whole day.
+
+    The Key format is YYYY-MM-DD with 0 prefixes so the key sort naturally.
+    Ancestor is StatsRoot.
+
+    This entity is updated every time a new self.stats_hour_cls is sealed, so ~1
+    update per hour.
+    """
+    created = ndb.DateTimeProperty(indexed=False, auto_now=True)
+    modified = ndb.DateTimeProperty(indexed=False, auto_now_add=True)
+
+    # Statistics for the day.
+    values_compressed = ndb.LocalStructuredProperty(
+        snapshot_cls, compressed=True, name='values_c')
+    # This is needed for backward compatibility
+    values_uncompressed = ndb.LocalStructuredProperty(
+        snapshot_cls, name='values')
+
+    # Hours that have been summed. A complete day will be set to (1<<24)-1, e.g.
+    # 0xFFFFFF, e.g. 24 bits or 6x4 bits.
+    hours_bitmap = ndb.IntegerProperty(default=0)
+
+    # Used for queries.
+    SEALED_BITMAP = 0xFFFFFF
+
+    @property
+    def values(self):
+      return self.values_compressed or self.values_uncompressed
+
+    def to_dict(self):
+      out = self.values.to_dict()
+      out['key'] = self.to_date()
+      return out
+
+    def to_date(self):
+      """Returns the datetime.date instance for this instance."""
+      year, month, day = self.key.id().split('-', 2)
+      return datetime.date(int(year), int(month), int(day))
+
+    def _pre_put_hook(self):
+      if bool(self.values_compressed) == bool(self.values_uncompressed):
+        raise datastore_errors.BadValueError('Invalid object')
+
+  return StatsDay
+
+
+def _generate_stats_hour_cls(snapshot_cls):
+  class StatsHour(ndb.Model):
+    """Statistics for a single hour.
+
+    The Key format is HH with 0 prefix so the key sort naturally. Ancestor is
+    self.stats_day_cls.
+
+    This entity is updated every time a new self.stats_minute_cls is generated
+    under a transaction, so ~1 transaction per minute.
+    """
+    created = ndb.DateTimeProperty(indexed=False, auto_now=True)
+    # Statistics for the hour.
+    values_compressed = ndb.LocalStructuredProperty(
+        snapshot_cls, compressed=True, name='values_c')
+    # This is needed for backward compatibility
+    values_uncompressed = ndb.LocalStructuredProperty(
+        snapshot_cls, name='values')
+
+    # Minutes that have been summed. A complete hour will be set to (1<<60)-1,
+    # e.g. 0xFFFFFFFFFFFFFFF, e.g. 60 bits or 15x4 bits.
+    minutes_bitmap = ndb.IntegerProperty(indexed=False, default=0)
+
+    # Used for queries.
+    SEALED_BITMAP = 0xFFFFFFFFFFFFFFF
+
+    @property
+    def values(self):
+      return self.values_compressed or self.values_uncompressed
+
+    def to_dict(self):
+      out = self.values.to_dict()
+      out['key'] = self.to_datetime()
+      return out
+
+    def to_datetime(self):
+      """Returns the datetime.datetime instance for this instance."""
+      key = self.key
+      year, month, day = key.parent().id().split('-', 2)
+      return datetime.datetime(
+          int(year), int(month), int(day), int(key.id()))
+
+    def _pre_put_hook(self):
+      if bool(self.values_compressed) == bool(self.values_uncompressed):
+        raise datastore_errors.BadValueError('Invalid object')
+
+  return StatsHour
+
+
+def _generate_stats_minute_cls(snapshot_cls):
+  class StatsMinute(ndb.Model):
+    """Statistics for a single minute.
+
+    The Key format is MM with 0 prefix so the key sort naturally. Ancestor is
+    self.stats_hour_cls.
+
+    This entity is written once and never modified so it is sealed by
+    definition.
+    """
+    created = ndb.DateTimeProperty(indexed=False, auto_now=True)
+    # Statistics for one minute.
+    values_compressed = ndb.LocalStructuredProperty(
+        snapshot_cls, compressed=True, name='values_c')
+    # This is needed for backward compatibility
+    values_uncompressed = ndb.LocalStructuredProperty(
+        snapshot_cls, name='values')
+
+    @property
+    def values(self):
+      return self.values_compressed or self.values_uncompressed
+
+    def to_dict(self):
+      out = self.values.to_dict()
+      out['key'] = self.to_datetime()
+      return out
+
+    def to_datetime(self):
+      """Returns the datetime.datetime instance for this instance."""
+      key = self.key
+      year, month, day = key.parent().parent().id().split('-', 2)
+      hour = key.parent().id()
+      return datetime.datetime(
+          int(year), int(month), int(day), int(hour), int(key.id()))
+
+    def _pre_put_hook(self):
+      if bool(self.values_compressed) == bool(self.values_uncompressed):
+        raise datastore_errors.BadValueError('Invalid object')
+
+  return StatsMinute
 
 
 def _lowest_missing_bit(bitmap):

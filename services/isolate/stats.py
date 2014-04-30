@@ -21,27 +21,10 @@ from components import stats_framework
 from components import utils
 
 
-### Public API
-
-
-# Action to log.
-STORE, RETURN, LOOKUP, DUPE = range(4)
-
-
-def add_entry(action, number, where):
-  """Formatted statistics log entry so it can be processed for daily stats.
-
-  The format is simple enough that it doesn't require a regexp for faster
-  processing.
-  """
-  stats_framework.add_entry(
-      '%s; %d; %s' % (_ACTION_NAMES[action], number, where))
-
-
 ### Models
 
 
-class Snapshot(ndb.Model):
+class _Snapshot(ndb.Model):
   """A snapshot of statistics, to be embedded in another entity."""
   # Number of individual uploads and total amount of bytes. Same for downloads.
   uploads = ndb.IntegerProperty(default=0, indexed=False)
@@ -60,7 +43,7 @@ class Snapshot(ndb.Model):
 
   def to_dict(self):
     """Mangles to make it easier to graph."""
-    out = super(Snapshot, self).to_dict()
+    out = super(_Snapshot, self).to_dict()
     out['other_requests'] = (
         out['requests'] - out['downloads'] - out['contains_requests'] -
         out['uploads'])
@@ -93,19 +76,12 @@ class Snapshot(ndb.Model):
 ### Utility
 
 
-@utils.cache
-def get_stats_handler():
-  """Returns a global stats bookkeeper, lazily initializing it."""
-  return stats_framework.StatisticsFramework(
-    'global_stats', Snapshot, _extract_snapshot_from_logs)
-
-
 # Text to store for the corresponding actions.
 _ACTION_NAMES = ['store', 'return', 'lookup', 'dupe']
 
 
 def _parse_line(line, values):
-  """Updates a Snapshot instance with a processed statistics line if relevant.
+  """Updates a _Snapshot instance with a processed statistics line if relevant.
   """
   if line.count(';') < 2:
     return
@@ -129,11 +105,11 @@ def _parse_line(line, values):
 
 
 def _extract_snapshot_from_logs(start_time, end_time):
-  """Returns a Snapshot from the processed logs for the specified interval.
+  """Returns a _Snapshot from the processed logs for the specified interval.
 
   The data is retrieved from logservice via stats_framework.
   """
-  values = Snapshot()
+  values = _Snapshot()
   for entry in stats_framework.yield_entries(start_time, end_time):
     values.requests += 1
     if entry.request.status >= 400:
@@ -143,9 +119,25 @@ def _extract_snapshot_from_logs(start_time, end_time):
   return values
 
 
-def _generate_stats_data(request):
-  return stats_framework.generate_stats_data_from_request(
-      request, get_stats_handler())
+### Public API
+
+
+STATS_HANDLER = stats_framework.StatisticsFramework(
+    'global_stats', _Snapshot, _extract_snapshot_from_logs)
+
+
+# Action to log.
+STORE, RETURN, LOOKUP, DUPE = range(4)
+
+
+def add_entry(action, number, where):
+  """Formatted statistics log entry so it can be processed for daily stats.
+
+  The format is simple enough that it doesn't require a regexp for faster
+  processing.
+  """
+  stats_framework.add_entry(
+      '%s; %d; %s' % (_ACTION_NAMES[action], number, where))
 
 
 ### Handlers
@@ -157,7 +149,7 @@ class InternalStatsUpdateHandler(webapp2.RequestHandler):
   def get(self):
     self.response.headers['Content-Type'] = 'text/plain'
     try:
-      i = get_stats_handler().process_next_chunk(stats_framework.TOO_RECENT)
+      i = STATS_HANDLER.process_next_chunk(stats_framework.TOO_RECENT)
     except (DeadlineExceededError, logservice.Error):
       # The job will be retried.
       self.response.status_code = 500
