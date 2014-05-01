@@ -99,8 +99,8 @@ def GetRequestMessage(request_name=REQUEST_MESSAGE_TEST_CASE_NAME,
   return test_request_message.Stringize(request, json_readable=True)
 
 
-def CreateRunner(config_name=None, machine_id=None,
-                 ran_successfully=None, exit_codes=None, started=None,
+def CreateRunner(config_name=None, machine_id=None, ran_successfully=None,
+                 exit_codes=None, created=None, started=None,
                  ended=None, requestor=None, results=None):
   """Creates entities to represent a new task request and a bot running it.
 
@@ -116,6 +116,7 @@ def CreateRunner(config_name=None, machine_id=None,
     ran_succesfully: True if the runner ran successfully.
     exit_codes: The exit codes for the runner. Also, if this is given the
       runner is marked as having finished.
+    created: timedelta from now to mark this request was created in the future.
     started: timedelta from .created to when the task execution started.
     ended: timedelta from .started to when the bot completed the task.
     requestor: string representing the user name that requested the task.
@@ -137,9 +138,12 @@ def CreateRunner(config_name=None, machine_id=None,
     runner.num_config_instances = 1
     runner.requestor = requestor
 
+    if created:
+      runner.created = datetime.datetime.utcnow() + created
+
     if machine_id:
       runner.machine_id = machine_id
-      runner.started = datetime.datetime.utcnow()
+      runner.started = runner.created
       runner.ping = runner.started
 
     if ran_successfully:
@@ -147,7 +151,7 @@ def CreateRunner(config_name=None, machine_id=None,
 
     if exit_codes:
       runner.done = True
-      runner.ended = datetime.datetime.utcnow()
+      runner.ended = runner.created
       runner.exit_codes = exit_codes
 
     if started:
@@ -165,25 +169,41 @@ def CreateRunner(config_name=None, machine_id=None,
 
   data = task_glue._convert_test_case(request_message)
   request, shard_runs = task_scheduler.new_request(data)
+  if created:
+    # For some reason, pylint is being obnoxious here and generates a W0201
+    # warning that cannot be disabled. See http://www.logilab.org/19607
+    setattr(request, 'created_ts', datetime.datetime.utcnow() + created)
+    request.put()
+
   shard_to_run_key = shard_runs[0].key
   # This is in running state. Pending state is not supported here.
   task_shard_to_run.reap_shard_to_run(shard_to_run_key)
 
   machine_id = machine_id or 'localhost'
   shard_result = task_result.new_shard_result(shard_to_run_key, 1, machine_id)
-  if started:
-    shard_result.started_ts += started
-  if ended:
-    shard_result.completed_ts = shard_result.started_ts + ended
 
   if ran_successfully or exit_codes:
     data = {
-      'exit_codes': exit_codes or [0],
+      'exit_codes': map(int, exit_codes.split(',')) if exit_codes else [0],
     }
-    task_scheduler.bot_update_task(shard_result.key, data, machine_id)
+    # The entity needs to be saved before it can be updated, since
+    # bot_update_task() accepts the key of the entity.
+    ndb.transaction(shard_result.put)
+    if not task_scheduler.bot_update_task(shard_result.key, data, machine_id):
+      assert False
+    # Refresh it from the DB.
+
+  if started:
+    shard_result.started_ts = shard_result.created + started
+  if ended:
+    shard_result.completed_ts = shard_result.started_ts + ended
 
   # Call it manually because at this level, there is no visibility for the
-  # taskqueue.
+  # taskqueue. The DB put() needs to happen in a transaction, normally it is
+  # because a task queue is added as part of the transaction because this put
+  # does a fair amount of work, and we need to ensure the function doesn't fail
+  # halfway through and leave shard_result in an inconsistent state
+  ndb.transaction(shard_result.put)
   task_result._task_update_result_summary(request.key.integer_id())
 
   # Returns a TaskShardResult.

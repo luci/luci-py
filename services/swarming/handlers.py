@@ -703,7 +703,10 @@ class ShowMessageHandler(auth.AuthenticatingHandler):
     self.response.headers['Content-Type'] = 'application/json; charset=utf-8'
 
     runner_key = self.request.get('r', '')
-    runner = task_glue.GetRunnerFromUrlSafeKey(runner_key)
+    try:
+      runner = task_glue.GetRunnerFromUrlSafeKey(runner_key)
+    except ValueError:
+      runner = None
 
     if runner:
       self.response.write(utils.encode_to_json(runner.GetAsDict()))

@@ -87,8 +87,8 @@ class RunnerSummaryTest(test_case.TestCase):
     summary = runner_summary.RunnerSummary.query().get()
     self.assertEqual(test_request_message.Stringize(pending_runner.dimensions),
                      summary.dimensions)
-    self.assertEqual(1, summary.pending)
-    self.assertEqual(0, summary.running)
+    self.assertEqual(1, summary.pending, summary.to_dict())
+    self.assertEqual(0, summary.running, summary.to_dict())
 
   def testGenerateWaitSummaryForOneRunnerStats(self):
     dimensions = 'machine_dimensions'

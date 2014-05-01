@@ -266,9 +266,9 @@ def shard_id_to_key(key_id):
   """Returns the ndb.Key for a TaskShardToRun from a key to a raw id."""
   # key_id is likely to be user-provided.
   if not (key_id & 0xFF):
-    raise ValueError('Can\'t pass a request id as a shard id')
+    raise ValueError('Can\'t pass request id %s as a shard id' % key_id)
   if key_id < 0x100 or key_id >= 2**64:
-    raise ValueError('Invalid shard id')
+    raise ValueError('Invalid shard id %s' % key_id)
   parent = datastore_utils.hashed_shard_key(
       str(key_id), task_common.SHARDING_LEVEL, 'TaskShardToRunShard')
   return ndb.Key(TaskShardToRun, key_id, parent=parent)

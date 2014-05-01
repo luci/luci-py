@@ -16,6 +16,7 @@ import test_env
 test_env.setup_test_env()
 
 from google.appengine.datastore import datastore_stub_util
+from google.appengine.ext import deferred
 
 from components import auth
 from support import test_case
@@ -62,9 +63,14 @@ class AppTest(test_case.TestCase):
     self.testbed.init_user_stub()
 
     # By default requests in tests are coming from bot with fake IP.
+    app = handlers.CreateApplication()
+    app.router.add(('/_ah/queue/deferred', deferred.TaskHandler))
     self.app = webtest.TestApp(
-        handlers.CreateApplication(),
-        extra_environ={'REMOTE_ADDR': FAKE_IP})
+        app,
+        extra_environ={
+          'REMOTE_ADDR': FAKE_IP,
+          'SERVER_SOFTWARE': os.environ['SERVER_SOFTWARE'],
+        })
 
     # Whitelist that fake bot.
     user_manager.AddWhitelist(FAKE_IP)
@@ -163,7 +169,7 @@ class AppTest(test_case.TestCase):
     # Create test and runner.
     runner = test_helper.CreateRunner(
         machine_id=MACHINE_ID,
-        exit_codes='[0]',
+        exit_codes='0',
         results='\xe9 Invalid utf-8 string')
 
     # Valid key.
@@ -183,11 +189,15 @@ class AppTest(test_case.TestCase):
             'utf-8', 'replace')
       else:
         self.assertEqual(
-            ','.join(map(int, runner.exit_codes)), results['exit_codes'])
+            ','.join(map(str, runner.exit_codes)),
+            ''.join(results['exit_codes']))
         self.assertEqual(runner.bot_id, results['machine_id'])
         expected_result_string = '\n'.join(
             o.GetResults().decode('utf-8', 'replace') for o in runner.outputs)
       self.assertEqual(expected_result_string, results['output'])
+    if not task_glue.USE_OLD_API:
+      # The new API will cause a TaskResultSummary task queue.
+      self.assertEqual(1, self.execute_tasks())
 
   def testGetSlaveCode(self):
     response = self.app.get('/get_slave_code')
@@ -284,6 +294,7 @@ class AppTest(test_case.TestCase):
 
     # Try to clean up with an invalid key.
     response = self.app.post('/cleanup_results', {'r': 'fake_key'})
+    # TODO(maruel): If it fails, it shouldn't be 200.
     self.assertResponse(response, '200 OK', 'Key deletion failed.')
 
     # Try to clean up with a valid key.
@@ -303,11 +314,14 @@ class AppTest(test_case.TestCase):
     self.assertEqual('Unable to retry runner', response.body)
 
     # Test with matching key.
-    runner = test_helper.CreateRunner(exit_codes='[0]')
+    runner = test_helper.CreateRunner(exit_codes='0')
 
     response = self.app.post(
         '/secure/retry', {'r': task_glue.UrlSafe(runner.key)})
     self.assertResponse(response, '200 OK', 'Runner set for retry.')
+    if not task_glue.USE_OLD_API:
+      # The new API will cause a TaskResultSummary task queue.
+      self.assertEqual(1, self.execute_tasks())
 
   def testShowMessageHandler(self):
     # Act under admin identity.
@@ -435,9 +449,6 @@ class AppTest(test_case.TestCase):
   def testResultHandler(self):
     # TODO(maruel): Stop using the DB directly.
     runner = test_helper.CreateRunner(machine_id=MACHINE_ID)
-    if not task_glue.USE_OLD_API:
-      # Side effect of hacking around instead of using HTTP handler.
-      runner.put()
     result = 'result string'
     response = self._PostResults(
         task_glue.UrlSafe(runner.key), runner.machine_id, result)
@@ -461,7 +472,18 @@ class AppTest(test_case.TestCase):
       self.assertTrue(
           response.body.startswith('The runner, with key '), response.body)
     else:
-      self.fail('Implement me')
+      self.assertEqual(2, self.execute_tasks())
+      resp = self.app.get(
+          '/get_result?r=%s' % task_glue.UrlSafe(runner.key), status=200)
+      expected = {
+        'config_instance_index': 0,
+        'exit_codes': '',
+        'machine_id': '12345678-12345678-12345678-12345678',
+        'machine_tag': 'Unknown',
+        'num_config_instances': 1,
+        'output': 'result string',
+      }
+      self.assertEqual(expected, resp.json)
 
   def testUserProfile(self):
     # Act under admin identity.
@@ -701,7 +723,7 @@ class AppTest(test_case.TestCase):
     error = errors.SwarmError.query().get()
     self.assertEqual(error.message, error_message)
 
-  def testRunnerPing(self):
+  def testRunnerPingFail(self):
     # Try with an invalid runner key
     response = self.app.post('/runner_ping', {'r': '1'}, expect_errors=True)
     self.assertResponse(
@@ -711,14 +733,16 @@ class AppTest(test_case.TestCase):
         'malformed or otherwise incorrect.\n\n'
         ' Runner failed to ping.  ')
 
+  def testRunnerPing(self):
     # Start a test and successfully ping it
     runner = test_helper.CreateRunner(machine_id=MACHINE_ID)
-    if not task_glue.USE_OLD_API:
-      runner.put()
     response = self.app.post(
         '/runner_ping',
         {'r': task_glue.UrlSafe(runner.key), 'id': runner.machine_id})
     self.assertResponse(response, '200 OK', 'Success.')
+    if not task_glue.USE_OLD_API:
+      # The new API will cause a TaskResultSummary task queue.
+      self.assertEqual(1, self.execute_tasks())
 
   def testStatPages(self):
     stat_urls = [
@@ -841,8 +865,7 @@ class AppTest(test_case.TestCase):
     self.assertResponse(response, '200 OK', 'Success.')
 
     # Test when there is a hanging runner.
-    runner = test_helper.CreateRunner()
-    runner.put()
+    test_helper.CreateRunner()
 
     test_helper.mock_now(
         self,

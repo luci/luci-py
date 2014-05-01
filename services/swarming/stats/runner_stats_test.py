@@ -16,8 +16,11 @@ import test_env
 
 test_env.setup_test_env()
 
+import webtest
+from google.appengine.ext import deferred
 from google.appengine.ext import ndb
 
+from server import task_glue
 from server import test_helper
 from stats import runner_stats
 from support import test_case
@@ -41,11 +44,17 @@ def _CreateRunnerStats():
 
 
 class StatManagerTest(test_case.TestCase):
+  APP_DIR = ROOT_DIR
+
   def setUp(self):
     super(StatManagerTest, self).setUp()
     self._mox = mox.Mox()
-
-    self.config_name = 'c1'
+    self.app = webtest.TestApp(
+        deferred.application,
+        extra_environ={
+          'REMOTE_ADDR': '1.0.1.2',
+          'SERVER_SOFTWARE': os.environ['SERVER_SOFTWARE'],
+        })
 
   def tearDown(self):
     self._mox.UnsetStubs()
@@ -59,6 +68,9 @@ class StatManagerTest(test_case.TestCase):
     r_stats = runner_stats.RecordRunnerStats(runner)
     self.assertFalse(r_stats.aborted)
     self.assertTrue(r_stats.success)
+    if not task_glue.USE_OLD_API:
+      # The new API will cause a TaskResultSummary task queue.
+      self.assertEqual(1, self.execute_tasks())
 
   def testSwarmDeleteOldRunnerStats(self):
     self._mox.StubOutWithMock(runner_stats, '_GetCurrentTime')

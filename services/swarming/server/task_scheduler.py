@@ -63,13 +63,20 @@ def new_request(data):
 
 def pack_shard_result_key(shard_result_key):
   """Returns the encoded key that is safe to use in HTTP requests."""
+  if shard_result_key.kind() != 'TaskShardResult':
+    raise ValueError(
+        'Can only pack TaskShardResult key, got type %s' %
+        shard_result_key.kind())
   shard_to_run_key = shard_result_key.parent()
   return '%x-%d' % (
       shard_to_run_key.integer_id(), shard_result_key.integer_id())
 
 
 def unpack_shard_result_key(packed_key):
-  """Returns the TaskShardResult ndb.Key from a packed key."""
+  """Returns the TaskShardResult ndb.Key from a packed key.
+
+  The expected format of |packed_key| is %x-%d.
+  """
   if '-' in packed_key:
     shard_key_id, try_number = packed_key.split('-', 1)
     shard_key_id = int(shard_key_id, 16)

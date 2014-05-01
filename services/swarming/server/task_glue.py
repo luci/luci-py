@@ -455,8 +455,8 @@ def PingRunner(runner_key, machine_id):
   try:
     shard_result_key = task_scheduler.unpack_shard_result_key(runner_key)
     return task_scheduler.bot_update_task(shard_result_key, {}, machine_id)
-  except ValueError:
-    logging.error('Failed to accept value')
+  except ValueError as e:
+    logging.error('Failed to accept value %s: %s', runner_key, e)
     return False
 
 
@@ -482,11 +482,14 @@ def GetRunnerResults(runner_key_urlsafe):
   if USE_OLD_API:
     return test_runner.GetRunnerResults(runner_key_urlsafe)
 
-  shard_result = GetRunnerFromUrlSafeKey(runner_key_urlsafe)
+  try:
+    shard_result = GetRunnerFromUrlSafeKey(runner_key_urlsafe)
+  except ValueError:
+    return None
   if not shard_result:
     # TODO(maruel): Implement in next CL.
     return {
-      'exit_codes': [],
+      'exit_codes': '',
       'machine_id': None,
       'machine_tag': None,
       'output': '',

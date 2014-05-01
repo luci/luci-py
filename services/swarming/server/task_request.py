@@ -229,6 +229,9 @@ class TaskRequest(ndb.Model):
 
   This model is immutable.
   """
+  # Time this request was registered. It is set manually instead of using
+  # auto_now_add=True so that expiration_ts can be set very precisely relative
+  # to this property.
   created_ts = ndb.DateTimeProperty(required=True)
 
   # The name for this test request.

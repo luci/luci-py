@@ -210,8 +210,28 @@ class TaskShardResult(ndb.Model):
     return self.started_ts
 
   @property
+  def ended(self):
+    return self.completed_ts or self.abandoned_ts
+
+  @property
+  def ran_successfully(self):
+    return not self.task_failure
+
+  @property
+  def aborted(self):
+    return self.task_state in State.STATES_ABANDONED
+
+  @property
   def requestor(self):
     return self.request_key.get().user
+
+  @property
+  def config_instance_index(self):
+    return self.shard_number
+
+  @property
+  def num_config_instances(self):
+    return self.request_key.get().properties.number_shards
 
   automatic_retry_count = 0
 
