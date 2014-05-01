@@ -1,3 +1,4 @@
+# coding: utf-8
 # Copyright 2014 The Swarming Authors. All rights reserved.
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
@@ -18,11 +19,11 @@ from components import utils
 # This relates to number of transactions per second * seconds per transaction /
 # number of shard.
 #
-# Intentionally starve the canary server by using only 256 root entities. This
-# will force transaction conflicts. On the production server, use 16**5 (~1
-# million) root entities to reduce the number of transaction conflict.
-# TODO(maruel): Testing for load test, 5 on canary.
-SHARDING_LEVEL = 2 if utils.is_canary() else 5
+# Intentionally starve the canary server by using only 16³=4096 root entities.
+# This will cause mild transaction conflicts during load tests. On the
+# production server, use 16**5 (~1 million) root entities to reduce the number
+# of transaction conflict.
+SHARDING_LEVEL = 3 if utils.is_canary() else 5
 
 
 # Used to encode time.
