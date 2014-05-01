@@ -14,6 +14,7 @@ import hashlib
 import json
 import string
 
+from google.appengine.api import datastore_errors
 from google.appengine.ext import ndb
 
 from components import utils
@@ -147,9 +148,13 @@ def insert(entity, new_key_callback=None):
     while entity.key and entity.key.get():
       entity.key = new_key_callback()
 
-    if not entity.key or _insert(entity):
+    if not entity.key:
       break
-
+    try:
+      if _insert(entity):
+        break
+    except datastore_errors.TransactionFailedError:
+      pass
     # Entity existed. Get the next key.
     entity.key = new_key_callback()
   return entity.key
