@@ -55,6 +55,7 @@ from google.appengine.api import datastore_errors
 from google.appengine.ext import deferred
 from google.appengine.ext import ndb
 
+from components import utils
 from server import result_helper
 from server import task_common
 from server import task_request
@@ -191,13 +192,34 @@ class TaskShardResult(ndb.Model):
   # Aggregated exit codes. Ordered by command.
   exit_codes = ndb.IntegerProperty(repeated=True, indexed=False)
 
+  # TODO(maruel): Remove, for compatibility with old code only. \/ \/ \/
+  @property
+  def created(self):
+    return self.request_key.get().created_ts
+
+  @property
+  def dimensions(self):
+    return utils.encode_to_json(self.request_key.get().properties.dimensions)
+
+  @property
+  def name(self):
+    return self.request_key.get().name
+
+  @property
+  def started(self):
+    return self.started_ts
+
+  @property
+  def requestor(self):
+    return self.request_key.get().user
+
+  automatic_retry_count = 0
+
   @property
   def machine_id(self):
-    # TODO(maruel): Remove, for compatibility with old code only.
     return self.bot_id
 
   def GetAsDict(self):
-    # TODO(maruel): Remove, for compatibility with old code only.
     request = self.request_key.get()
     return {
       'config_instance_index': self.shard_number,
@@ -205,6 +227,7 @@ class TaskShardResult(ndb.Model):
       'num_config_instances': request.properties.number_shards,
       'request': {},
     }
+  # TODO(maruel): Remove, for compatibility with old code only. ^^^^
 
   @property
   def request_key(self):

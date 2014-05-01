@@ -39,7 +39,7 @@ def exponential_backoff(attempt_num):
   if random.random() < _PROBABILITY_OF_QUICK_COMEBACK:
     # Randomly ask the bot to return quickly.
     return 1.0
-  return min(60.0, math.pow(1.5, min(attempt_num + 1, 10) + 1))
+  return min(60.0, math.pow(1.5, min(attempt_num, 10) + 1))
 
 
 def new_request(data):

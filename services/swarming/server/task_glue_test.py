@@ -64,23 +64,25 @@ class TaskGlueTest(test_case.TestCase):
     }
     actual = task_glue._convert_test_case(json.dumps(data))
     expected = {
-      'commands': [
-        [u'command1', u'arg1'],
-        [u'command2', u'arg2'],
-      ],
-      'data': [
-        [u'http://localhost/foo', u'foo.zip'],
-        [u'http://localhost/bar', u'bar.zip'],
-      ],
-      'dimensions': {u'OS': u'Windows-3.1.1', u'hostname': u'localhost'},
-      'env': {u'foo': u'bar', u'joe': u'2'},
-      'execution_timeout': 66,
-      'io_timeout': 68,
       'name': u'Request name',
-      'priority': 50,
-      'scheduling_expiration': 63,
-      'shards': 23,
       'user': u'Jesus',
+      'properties': {
+        'commands': [
+          [u'command1', u'arg1'],
+          [u'command2', u'arg2'],
+        ],
+        'data': [
+          [u'http://localhost/foo', u'foo.zip'],
+          [u'http://localhost/bar', u'bar.zip'],
+        ],
+        'dimensions': {u'OS': u'Windows-3.1.1', u'hostname': u'localhost'},
+        'env': {u'foo': u'bar', u'joe': u'2'},
+        'execution_timeout_secs': 66,
+        'io_timeout_secs': 68,
+        'number_shards': 23,
+      },
+      'priority': 50,
+      'scheduling_expiration_secs': 63,
     }
     self.assertEqual(expected, actual)
 

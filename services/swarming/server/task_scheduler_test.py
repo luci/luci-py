@@ -116,21 +116,21 @@ class TaskSchedulerApiTest(test_case.TestCase):
         lambda: task_scheduler._PROBABILITY_OF_QUICK_COMEBACK)
     data = [
       (0, 2),
-      (1, 3),
-      (2, 5),
-      (3, 8),
-      (4, 11),
-      (5, 17),
-      (6, 26),
-      (7, 38),
-      (8, 58),
-      (9, 60),
+      (1, 2),
+      (2, 3),
+      (3, 5),
+      (4, 8),
+      (5, 11),
+      (6, 17),
+      (7, 26),
+      (8, 38),
+      (9, 58),
       (10, 60),
       (11, 60),
     ]
     for value, expected in data:
-      self.assertEqual(
-          expected, int(round(task_scheduler.exponential_backoff(value))))
+      actual = int(round(task_scheduler.exponential_backoff(value)))
+      self.assertEqual(expected, actual, (value, expected, actual))
 
   def test_exponential_backoff_quick(self):
     self.mock(

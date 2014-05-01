@@ -400,7 +400,7 @@ class TestRequestHandler(auth.AuthenticatingHandler):
 
     # TODO(vadimsh): Store identity of a user that posted the request.
     try:
-      result = task_glue.ExecuteTestRequest(self.request.get('request'))
+      result = task_glue.RegisterNewRequest(self.request.get('request'))
     except test_request_message.Error as e:
       message = str(e)
       logging.error(message)
@@ -760,32 +760,8 @@ class GetMatchingTestCasesHandler(auth.AuthenticatingHandler):
   def get(self):
     test_case_name = self.request.get('name', '')
 
-    matches = task_glue.GetAllMatchingTestRequests(test_case_name)
-    keys = []
-    for match in matches:
-      keys.extend(key.urlsafe() for key in match.runner_keys)
-
-    logging.info('Found %d keys in %d TestRequests', len(keys), len(matches))
-    self.response.headers['Content-Type'] = 'application/json; charset=utf-8'
-    if keys:
-      self.response.write(utils.encode_to_json(keys))
-    else:
-      self.response.set_status(404)
-      self.response.write('[]')
-
-
-class GetNewestMatchingTestCasesHandler(auth.AuthenticatingHandler):
-  """Gets all the runner keys owned by the newest test request with this name.
-  """
-
-  @auth.require(auth.READ, 'swarming/clients')
-  def get(self):
-    test_case_name = self.request.get('name', '')
-
-    match = task_glue.GetNewestMatchingTestRequests(test_case_name)
-    keys = [key.urlsafe() for key in match.runner_keys]
-
-    logging.info('Found %d keys in the newest TestRequests', len(keys))
+    keys = task_glue.GetAllMatchingTestCases(test_case_name)
+    logging.info('Found %d keys', len(keys))
     self.response.headers['Content-Type'] = 'application/json; charset=utf-8'
     if keys:
       self.response.write(utils.encode_to_json(keys))
@@ -917,7 +893,7 @@ class RegisterHandler(auth.AuthenticatingHandler):
     # to authenticate the request (i.e. auth.get_current_identity()).
     try:
       response = json.dumps(
-          task_glue.ExecuteRegisterRequest(attributes, self.request.host_url))
+          task_glue.RequestWorkItem(attributes, self.request.host_url))
     except runtime.DeadlineExceededError as e:
       # If the timeout happened before a runner was assigned there are no
       # problems. If the timeout occurred after a runner was assigned, that
@@ -1246,7 +1222,6 @@ def CreateApplication():
       ('/', RedirectToMainHandler),
       ('/cleanup_results', CleanupResultsHandler),
       ('/get_matching_test_cases', GetMatchingTestCasesHandler),
-      ('/get_newest_matching_test_cases', GetNewestMatchingTestCasesHandler),
       ('/get_result', GetResultHandler),
       ('/get_slave_code', GetSlaveCodeHandler),
       ('/get_slave_code/<version:[0-9a-f]{40}>', GetSlaveCodeHandler),

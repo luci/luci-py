@@ -34,17 +34,24 @@ old ones.
 
 import datetime
 import logging
+import os
 
 from google.appengine.datastore import datastore_query
 from google.appengine.ext import ndb
 
+from google.appengine.datastore import datastore_query
+from google.appengine.ext import ndb
+
+from common import rpc
 from common import test_request_message
 from server import task_request
 from server import task_result
+from server import task_shard_to_run
 from server import task_scheduler
 from server import test_management
 from server import test_request
 from server import test_runner
+from stats import machine_stats
 
 
 # Global switch to use the old or new DB. Note unit tests that directly access
@@ -63,19 +70,28 @@ def _convert_test_case(data):
   assert len(test_case.configurations) == 1, test_case.configurations
   config = test_case.configurations[0]
 
+  if test_case.tests:
+    execution_timeout_secs = int(round(test_case.tests[0].hard_time_out))
+    io_timeout_secs = int(round(test_case.tests[0].io_time_out))
+  else:
+    execution_timeout_secs = 2*60*60
+    io_timeout_secs = 60*60
+
   # Ignore all the settings that are deprecated.
   return {
     'name': test_case.test_case_name,
     'user': test_case.requestor,
-    'commands': [c.action for c in test_case.tests],
-    'data': test_case.data,
-    'dimensions': config.dimensions,
-    'env': test_case.env_vars,
-    'shards': config.num_instances,
+    'properties': {
+      'commands': [c.action for c in test_case.tests],
+      'data': test_case.data,
+      'dimensions': config.dimensions,
+      'env': test_case.env_vars,
+      'number_shards': config.num_instances,
+      'execution_timeout_secs': execution_timeout_secs,
+      'io_timeout_secs': io_timeout_secs,
+    },
     'priority': config.priority,
-    'scheduling_expiration': config.deadline_to_run,
-    'execution_timeout': int(round(test_case.tests[0].hard_time_out)),
-    'io_timeout': int(round(test_case.tests[0].io_time_out)),
+    'scheduling_expiration_secs': config.deadline_to_run,
   }
 
 
@@ -89,25 +105,138 @@ def AbortRunner(runner_key_urlsafe, reason):
       return False
     test_management.AbortRunner(runner, reason)
     return True
-  raise NotImplementedError()
+  try:
+    shard_result_key = task_scheduler.unpack_shard_result_key(
+        runner_key_urlsafe)
+  except ValueError:
+    return False
+  return task_shard_to_run.abort_shard_to_run(shard_result_key.parent().get())
 
 
 def AbortStaleRunners():
   if USE_OLD_API:
     return test_management.AbortStaleRunners()
-  raise NotImplementedError()
+  # TODO(maruel): Not relevant on new API. The cron job is different.
+  return True
 
 
-def ExecuteTestRequest(test_case):
+def RegisterNewRequest(test_case):
   if USE_OLD_API:
     return test_management.ExecuteTestRequest(test_case)
-  raise NotImplementedError()
+  request_properties = _convert_test_case(test_case)
+  request, shard_runs = task_scheduler.new_request(request_properties)
+
+  def to_packed_key(i):
+    return task_scheduler.pack_shard_result_key(
+        task_result.shard_to_run_key_to_shard_result_key(
+            shard_runs[i].key, 1))
+
+  return {
+    'test_case_name': request.name,
+    'test_keys': [
+      {
+        'config_name': request.name,
+        'instance_index': shard_index,
+        'num_instances': request.properties.number_shards,
+        'test_key': to_packed_key(shard_index),
+      }
+      for shard_index in xrange(request.properties.number_shards)
+    ],
+  }
 
 
-def ExecuteRegisterRequest(attributes, server_url):
+def RequestWorkItem(attributes, server_url):
   if USE_OLD_API:
     return test_management.ExecuteRegisterRequest(attributes, server_url)
-  raise NotImplementedError()
+
+  attribs = test_management.ValidateAndFixAttributes(attributes)
+  response = test_management.CheckVersion(attributes, server_url)
+  if response:
+    return response
+
+  request, shard_result = task_scheduler.bot_reap_task(
+      attribs['dimensions'], attribs['id'])
+  if not request:
+    try_count = attribs['try_count'] + 1
+    return {
+      'come_back': task_scheduler.exponential_backoff(try_count),
+      'try_count': try_count,
+    }
+
+  runner_key = task_scheduler.pack_shard_result_key(shard_result.key)
+  test_objects = [
+    test_request_message.TestObject(
+        test_name=str(i),
+        action=command,
+        hard_time_out=request.properties.execution_timeout_secs,
+        io_time_out=request.properties.io_timeout_secs)
+    for i, command in enumerate(request.properties.commands)
+  ]
+  # pylint: disable=W0212
+  test_run = test_request_message.TestRun(
+      test_run_name=request.name,
+      env_vars=request.properties.env,
+      instance_index=shard_result.shard_number,
+      num_instances=request.properties.number_shards,
+      configuration=test_request_message.TestConfiguration(
+          config_name=request.name,
+          num_instances=request.properties.number_shards),
+      result_url=('%s/result?r=%s&id=%s' % (server_url,
+                                            runner_key,
+                                            shard_result.bot_id)),
+      ping_url=('%s/runner_ping?r=%s&id=%s' % (server_url,
+                                              runner_key,
+                                              shard_result.bot_id)),
+      ping_delay=(test_management._TIMEOUT_FACTOR /
+          test_management._MISSED_PINGS_BEFORE_TIMEOUT),
+      data=request.properties.data,
+      tests=test_objects)
+  test_run.ExpandVariables({
+      'instance_index': shard_result.shard_number,
+      'num_instances': request.properties.number_shards,
+  })
+  test_run.Validate()
+
+  # See test_management._GetTestRunnerCommands() for the expected format.
+  files_to_upload = [
+      (test_run.working_dir or '', test_management._TEST_RUN_SWARM_FILE_NAME,
+      test_request_message.Stringize(test_run, json_readable=True))
+  ]
+
+  # Define how to run the scripts.
+  swarm_file_path = test_management._TEST_RUN_SWARM_FILE_NAME
+  if test_run.working_dir:
+    swarm_file_path = os.path.join(
+        test_run.working_dir, test_management._TEST_RUN_SWARM_FILE_NAME)
+  command_to_execute = [
+      os.path.join('local_test_runner.py'),
+      '-f', swarm_file_path,
+  ]
+
+  # TODO(maruel): Decide at what level we are going to support these flags.
+  # Punted for the next CL. :)
+  #test_case = runner.request.get().GetTestCase()
+  #if test_case.verbose:
+  #  command_to_execute.append('-v')
+  #if test_case.restart_on_failure:
+  #  command_to_execute.append('--restart_on_failure')
+
+  # TODO(maruel): Always on?
+  #command_to_execute.append('--restart_on_failure')
+  # TODO(maruel): Always off?
+  command_to_execute.append('-v')
+
+  rpc_commands = [
+    rpc.BuildRPC('StoreFiles', files_to_upload),
+    rpc.BuildRPC('RunCommands', command_to_execute),
+  ]
+  # The Swarming bot uses an hand rolled RPC system and 'commands' is actual the
+  # custom RPC commands. See test_management._BuildTestRun()
+  return {
+    'commands': rpc_commands,
+    'result_url': test_run.result_url,
+    'try_count': 0,
+  }
 
 
 def RetryRunner(runner_key_urlsafe):
@@ -122,7 +251,37 @@ def RetryRunner(runner_key_urlsafe):
     runner.created = datetime.datetime.utcnow()
     runner.put()
     return True
-  raise NotImplementedError()
+
+  # Do not 'retry' the original request, duplicate the request, only changing
+  # the ownership to the user that requested the retry. TaskProperties is
+  # unchanged.
+  try:
+    shard_result_key = task_scheduler.unpack_shard_result_key(
+        runner_key_urlsafe)
+  except ValueError:
+    return False
+  request = task_result.shard_result_key_to_request_key(shard_result_key).get()
+  # TODO(maruel): Decide if it will be supported, and if so create a proper
+  # function to 'duplicate' a TaskRequest in task_request.py.
+  # TODO(maruel): Delete.
+  data = {
+    'name': request.name,
+    'user': request.user,
+    'properties': {
+      'commands': request.properties.commands,
+      'data': request.properties.data,
+      'dimensions': request.properties.dimensions,
+      'env': request.properties.env,
+      'number_shards': request.properties.number_shards,
+      'execution_timeout_secs': request.properties.execution_timeout_secs,
+      'io_timeout_secs': request.properties.io_timeout_secs,
+    },
+    'priority': request.priority,
+    'scheduling_expiration_secs': request.scheduling_expiration_secs,
+  }
+  task_scheduler.new_request(data)
+  return True
+
 
 
 ### test_request.py public API.
@@ -135,16 +294,28 @@ def UrlSafe(runner_key):
   return task_scheduler.pack_shard_result_key(runner_key)
 
 
-def GetAllMatchingTestRequests(test_case_name):
+def GetAllMatchingTestCases(test_case_name):
+  """Returns a list of TestRequest or TaskRequest."""
   if USE_OLD_API:
-    return test_request.GetAllMatchingTestRequests(test_case_name)
-  raise NotImplementedError()
+    matches = test_request.GetAllMatchingTestRequests(test_case_name)
+    keys = []
+    for match in matches:
+      keys.extend(UrlSafe(key) for key in match.runner_keys)
+    return keys
 
-
-def GetNewestMatchingTestRequests(test_case_name):
-  if USE_OLD_API:
-    return test_request.GetNewestMatchingTestRequests(test_case_name)
-  raise NotImplementedError()
+  # Find the matching TaskRequest, then return all the valid keys.
+  q = task_request.TaskRequest.query().filter(
+      task_request.TaskRequest.name == test_case_name)
+  out = []
+  for request in q:
+    # Then return all the relevant shard_ids.
+    # TODO(maruel): It's hacked up. This needs to fetch TaskResultSummary to get
+    # the try_numbers.
+    try_number = 1
+    out.extend(
+        '%x-%s' % (request.key.integer_id()+i+1, try_number)
+        for i in xrange(request.properties.number_shards))
+  return out
 
 
 ### test_runner.py public API.
@@ -176,6 +347,20 @@ TIME_BEFORE_RUNNER_HANGING_IN_MINS = (
     test_runner.TIME_BEFORE_RUNNER_HANGING_IN_MINS)
 
 
+def GetRunnerFromUrlSafeKey(runner_key):
+  """Returns a TestRunner or a TaskShardResult."""
+  if USE_OLD_API:
+    return test_runner.GetRunnerFromUrlSafeKey(runner_key)
+
+  try:
+    shard_result_key = task_scheduler.unpack_shard_result_key(
+        runner_key)
+  except ValueError:
+    return None
+  result = shard_result_key.get()
+  return result
+
+
 def GetTestRunnersWithFilters(
     sort_by, ascending, limit, offset, status, show_successfully_completed,
     test_name_filter, machine_id_filter):
@@ -205,9 +390,6 @@ def GetTestRunnersWithFilters(
   final = ndb.Future()
 
   # Phase 1: initiates the fetch.
-  logging.info(
-      'GetTestRunnersWithFilters(%s, %s, %s, %s), %s',
-      sort_by, ascending, limit, offset, fetch_request)
   initial_future = base_type.query(default_options=opts).order(
       datastore_query.PropertyOrder(sort_by, direction)).fetch_async()
 
@@ -257,12 +439,6 @@ def GetTestRunnersWithFilters(
   return final
 
 
-def GetRunnerFromUrlSafeKey(runner_key_urlsafe):
-  if USE_OLD_API:
-    return test_runner.GetRunnerFromUrlSafeKey(runner_key_urlsafe)
-  raise NotImplementedError()
-
-
 def CountRequestsAsync():
   """Returns a ndb.Future that will return the number of requests in the DB."""
   if USE_OLD_API:
@@ -272,10 +448,16 @@ def CountRequestsAsync():
   return task_request.TaskRequest.query().count_async()
 
 
-def PingRunner(runner_key_urlsafe, machine_id):
+def PingRunner(runner_key, machine_id):
   if USE_OLD_API:
-    return test_runner.PingRunner(runner_key_urlsafe, machine_id)
-  raise NotImplementedError()
+    return test_runner.PingRunner(runner_key, machine_id)
+
+  try:
+    shard_result_key = task_scheduler.unpack_shard_result_key(runner_key)
+    return task_scheduler.bot_update_task(shard_result_key, {}, machine_id)
+  except ValueError:
+    logging.error('Failed to accept value')
+    return False
 
 
 def QueryOldRunners():
@@ -285,29 +467,64 @@ def QueryOldRunners():
 def GetHangingRunners():
   if USE_OLD_API:
     return test_runner.GetHangingRunners()
-  raise NotImplementedError()
+  # Not applicable.
+  return []
 
 
 def DeleteRunnerFromKey(key):
   if USE_OLD_API:
     return test_runner.DeleteRunnerFromKey(key)
-  raise NotImplementedError()
+  # TODO(maruel): Remove this API.
+  return True
 
 
 def GetRunnerResults(runner_key_urlsafe):
   if USE_OLD_API:
     return test_runner.GetRunnerResults(runner_key_urlsafe)
-  raise NotImplementedError()
+
+  shard_result = GetRunnerFromUrlSafeKey(runner_key_urlsafe)
+  if not shard_result:
+    # TODO(maruel): Implement in next CL.
+    return {
+      'exit_codes': [],
+      'machine_id': None,
+      'machine_tag': None,
+      'output': '',
+    }
+  return {
+    'exit_codes': ','.join(map(str, shard_result.exit_codes)),
+    'machine_id': shard_result.bot_id,
+    # TODO(maruel): Likely unnecessary.
+    'machine_tag': machine_stats.GetMachineTag(shard_result.bot_id),
+    'config_instance_index': shard_result.shard_number,
+    'num_config_instances':
+        shard_result.request_key.get().properties.number_shards,
+    # TODO(maruel): Return each output independently. Figure out a way to
+    # describe what is important in the steps and what should be ditched.
+    'output': '\n'.join(i.get().GetResults() for i in shard_result.outputs),
+  }
 
 
-def UpdateTestResult(runner, machine_id, success, exit_codes, results,
-                     overwrite):
+def UpdateTestResult(
+    runner, machine_id, success, exit_codes, results, overwrite):
   if USE_OLD_API:
     return runner.UpdateTestResult(
         machine_id, success, exit_codes=exit_codes, results=results,
         overwrite=overwrite)
+
   assert not overwrite
-  raise NotImplementedError()
+  if runner.bot_id != machine_id:
+    raise ValueError('Expected %s, got %s', runner.bot_id, machine_id)
+
+  # Ignore the argument 'success'.
+  exit_codes = filter(None, (i.strip() for i in exit_codes.split(',')))
+  data = {
+    'exit_codes': map(int, exit_codes),
+    # TODO(maruel): Store output for each command individually.
+    'outputs': [results.key],
+  }
+  task_scheduler.bot_update_task(runner.key, data, machine_id)
+  return True
 
 
 def GetEncoding(runner):

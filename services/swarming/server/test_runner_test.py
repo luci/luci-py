@@ -20,6 +20,7 @@ from google.appengine.api import datastore_errors
 from google.appengine.ext import ndb
 
 from server import result_helper
+from server import task_glue
 from server import test_helper
 from server import test_management
 from server import test_request
@@ -44,6 +45,8 @@ class TestRunnerTest(test_case.TestCase):
 
   def setUp(self):
     super(TestRunnerTest, self).setUp()
+    # Obviously, this test can't pass with the new DB.
+    self.mock(task_glue, 'USE_OLD_API', True)
     self._mox = mox.Mox()
 
   def tearDown(self):
