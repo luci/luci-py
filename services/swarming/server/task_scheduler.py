@@ -20,6 +20,7 @@ import random
 
 from google.appengine.ext import ndb
 
+from server import stats_new as stats
 from server import task_common
 from server import task_request
 from server import task_result
@@ -56,6 +57,7 @@ def new_request(data):
   shard_runs = task_shard_to_run.new_shards_to_run_for_request(request)
   items = [task_result.new_result_summary(request)] + shard_runs
   ndb.put_multi(items)
+  stats.add_entry('shard_enqueued', request.properties.number_shards)
   return request, shard_runs
 
 
@@ -133,6 +135,7 @@ def bot_reap_task(dimensions, bot_id):
           failures,
           total_skipped,
           wait_time)
+      stats.add_entry('shard_assigned', int(round(wait_time * 1000.)))
       return request, shard_result
     except:
       logging.error('Lost TaskShardToRun %s', shard_to_run.key)
@@ -169,10 +172,13 @@ def bot_update_task(shard_result_key, data, bot_id):
     shard_result.completed_ts = now
     shard_result.exit_codes.extend(data['exit_codes'])
     duration = (now - shard_result.started_ts).total_seconds()
-    logging.debug('Was running for %.2fs', duration)
   if 'outputs' in data:
     shard_result.outputs.extend(data['outputs'])
   task_result.put_shard_result(shard_result)
+  if completed:
+    stats.add_entry('shard_completed', int(round(duration * 1000.)))
+  else:
+    stats.add_entry('shard_updated', pack_shard_result_key(shard_result.key))
   return True
 
 
@@ -204,6 +210,8 @@ def cron_abort_expired_shard_to_run():
         shard_result = task_result.new_shard_result(shard_to_run.key, 1, None)
         task_result.terminate_shard_result(
             shard_result, task_result.State.EXPIRED)
+        stats.add_entry(
+            'shard_request_expired', pack_shard_result_key(shard_result.key))
       else:
         # It's not a big deal, the bot will continue running.
         skipped += 1
@@ -223,6 +231,7 @@ def cron_abort_bot_died():
     for shard_result in task_result.yield_shard_results_without_update():
       task_result.terminate_shard_result(
           shard_result, task_result.State.BOT_DIED)
+      stats.add_entry('shard_bot_died', pack_shard_result_key(shard_result.key))
       total += 1
   finally:
     # TODO(maruel): Use stats_framework.

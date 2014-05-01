@@ -643,10 +643,14 @@ class AppTest(test_case.TestCase):
       '/auth',
       '/server_ping',
       '/stats',
+      '/stats_new',
       '/stats/daily',
       '/stats/tasks',
       '/stats/waits',
       '/swarming/api/v1/bots/dead/count',
+      '/swarming/api/v1/stats/days',
+      '/swarming/api/v1/stats/hours',
+      '/swarming/api/v1/stats/minutes',
     ])
 
     # Grab the set of all routes.

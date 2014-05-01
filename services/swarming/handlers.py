@@ -38,6 +38,8 @@ from server import bot_management
 from server import dimension_mapping
 from server import errors
 from server import result_helper
+from server import stats_gviz
+from server import stats_new as stats
 from server import task_glue
 from server import task_scheduler
 from server import user_manager
@@ -1274,10 +1276,14 @@ def CreateApplication():
       (_SECURE_GET_RESULTS_URL, SecureGetResultHandler),
       (_SECURE_MAIN_URL, MainHandler),
       (_SECURE_USER_PROFILE_URL, UserProfileHandler),
+      ('/stats_new', stats_gviz.StatsHandler),
 
       # The new APIs:
       ('/swarming/api/v1/bots', ApiBots),
       ('/swarming/api/v1/bots/dead/count', DeadBotsCountHandler),
+      ('/swarming/api/v1/stats/days', stats_gviz.StatsGvizDaysHandler),
+      ('/swarming/api/v1/stats/hours', stats_gviz.StatsGvizHoursHandler),
+      ('/swarming/api/v1/stats/minutes', stats_gviz.StatsGvizMinutesHandler),
 
       # Internal urls.
 
@@ -1292,6 +1298,7 @@ def CreateApplication():
       ('/internal/cron/detect_hanging_runners',
           CronDetectHangingRunnersHandler),
       ('/internal/cron/ereporter2/mail', CronSendEreporter2MailHandler),
+      ('/internal/cron/stats/update', stats.InternalStatsUpdateHandler),
       ('/internal/cron/trigger_cleanup_data', CronTriggerCleanupDataHandler),
       ('/internal/cron/trigger_generate_daily_stats',
           CronTriggerGenerateDailyStats),

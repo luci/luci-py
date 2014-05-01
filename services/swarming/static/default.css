@@ -45,3 +45,12 @@ table.alterning_background tbody .failed_test {
   display: inline-block;
   float: right;
 }
+
+.data_table tr:not(:first-child) {
+  font-family: "Courier New", monospace;
+}
+
+.graph {
+  height: 600px;
+  width: 100%;
+}

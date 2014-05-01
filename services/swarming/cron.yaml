@@ -17,6 +17,10 @@ cron:
   url: /internal/cron/trigger_generate_recent_stats
   schedule: every 5 minutes
 
+- description: Gathers statistics from the logs
+  url: /internal/cron/stats/update
+  schedule: every 1 minutes
+
 # Old DB.
 
 - description: Abort stale runners
