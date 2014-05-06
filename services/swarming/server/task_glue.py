@@ -598,6 +598,7 @@ def make_runner_view(runner):
   request, result = runner
   assert isinstance(request, task_request.TaskRequest), request
   assert isinstance(result, task_result.TaskResultSummary), result
+  started = [i.started_ts for i in result.shards if i.started_ts]
   out = {
     # TODO(maruel): out['class_string'] = 'failed_test'
     'class_string': '',
@@ -609,7 +610,7 @@ def make_runner_view(runner):
     # 'machine_id': ','.join(i.bot_id for i in runner.shards if i.bot_id),
     'machine_id': 'TODO',
     'name': request.name,
-    'started': min(i.started_ts for i in result.shards),
+    'started': min(started) if started else None,
     'status_string': result.to_string(),
     'user': request.user,
   }

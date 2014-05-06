@@ -109,7 +109,7 @@ def DeleteMachineStats(key):
   try:
     key = ndb.Key(MachineStats, key)
     if not key.get():
-      logging.error('No MachineStats has key: %s', str(key))
+      logging.warning('No MachineStats has key: %s', str(key))
       return False
   except Exception:
     # All exceptions must be caught because some exceptions can only be caught
