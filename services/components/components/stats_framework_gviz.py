@@ -78,7 +78,7 @@ def get_json(request, response, handler, resolution, description, order):
   duration = utils.get_request_as_int(request, 'duration', 120, 1, 256)
   now = utils.get_request_as_datetime(request, 'now')
 
-  table = stats_framework.get_stats(handler, resolution, now, duration)
+  table = stats_framework.get_stats(handler, resolution, now, duration, True)
 
   if request.headers.get('X-DataSource-Auth'):
     # Client requested JSON.

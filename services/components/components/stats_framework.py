@@ -545,6 +545,33 @@ def _get_snapshot_as_dict_future(keys):
   return out
 
 
+def _get_days_keys(handler, now, num_days):
+  """Returns a list of ndb.Key to Snapshot instances."""
+  today = (now or _utcnow()).date()
+  return [
+    handler.day_key(today - datetime.timedelta(days=i))
+    for i in xrange(num_days)
+  ]
+
+
+def _get_hours_keys(handler, now, num_hours):
+  """Returns a list of ndb.Key to Snapshot instances."""
+  now = now or _utcnow()
+  return [
+    handler.hour_key(now - datetime.timedelta(hours=i))
+    for i in xrange(num_hours)
+  ]
+
+
+def _get_minutes_keys(handler, now, num_minutes):
+  """Returns a list of ndb.Key to Snapshot instances."""
+  now = now or _utcnow()
+  return [
+    handler.minute_key(now - datetime.timedelta(minutes=i))
+    for i in xrange(num_minutes)
+  ]
+
+
 ### Public API.
 
 
@@ -636,37 +663,7 @@ def yield_entries(start_time, end_time):
     yield StatsEntry(request, entries)
 
 
-def get_days_async(handler, now, num_days):
-  """Returns a list of ndb.Future to dict representing Snapshot instances."""
-  if not num_days:
-    return []
-  today = (now or _utcnow()).date()
-  return _get_snapshot_as_dict_future(
-      handler.day_key(today - datetime.timedelta(days=i))
-      for i in xrange(num_days))
-
-
-def get_hours_async(handler, now, num_hours):
-  """Returns a list of ndb.Future to dict representing Snapshot instances."""
-  if not num_hours:
-    return []
-  now = now or _utcnow()
-  return _get_snapshot_as_dict_future(
-        handler.hour_key(now - datetime.timedelta(hours=i))
-        for i in xrange(num_hours))
-
-
-def get_minutes_async(handler, now, num_minutes):
-  """Returns a list of ndb.Future to dict representing Snapshot instances."""
-  if not num_minutes:
-    return []
-  now = now or _utcnow()
-  return _get_snapshot_as_dict_future(
-      handler.minute_key(now - datetime.timedelta(minutes=i))
-      for i in xrange(num_minutes))
-
-
-def get_stats(handler, resolution, now, num_items):
+def get_stats(handler, resolution, now, num_items, as_dict):
   """Wrapper calls that returns items for the specified resolution.
 
   Arguments:
@@ -674,14 +671,18 @@ def get_stats(handler, resolution, now, num_items):
   - resolution: One of 'days', 'hours' or 'minutes'
   - now: datetime.datetime or None.
   - num_items: Maximum number of items to return ending at 'now'.
+  - as_dict: When True, preprocess the entities to convert them to_dict(). If
+        False, returns the raw objects that needs to be handled manually.
   """
   mapping = {
-    'days': get_days_async,
-    'hours': get_hours_async,
-    'minutes': get_minutes_async,
+    'days': _get_days_keys,
+    'hours': _get_hours_keys,
+    'minutes': _get_minutes_keys,
   }
-  fn = mapping[resolution]
-  return [
-    i.get_result() for i in fn(handler, now, num_items)
-    if i.get_result()
-  ]
+  keys = mapping[resolution](handler, now, num_items)
+  if as_dict:
+    return [
+      i.get_result() for i in _get_snapshot_as_dict_future(keys)
+      if i.get_result()
+    ]
+  return [i for i in ndb.get_multi(keys) if i]

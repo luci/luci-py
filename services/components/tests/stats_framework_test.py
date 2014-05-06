@@ -241,7 +241,7 @@ class StatsFrameworkTest(test_case.TestCase, stats_framework_mock.MockMixIn):
       },
     ]
     self.assertEqual(
-        expected, stats_framework.get_stats(handler, 'days', now, 100))
+        expected, stats_framework.get_stats(handler, 'days', now, 100, True))
 
     expected = [
       {
@@ -253,7 +253,7 @@ class StatsFrameworkTest(test_case.TestCase, stats_framework_mock.MockMixIn):
       },
     ]
     self.assertEqual(
-        expected, stats_framework.get_stats(handler, 'hours', now, 100))
+        expected, stats_framework.get_stats(handler, 'hours', now, 100, True))
 
     expected = [
       {
@@ -274,7 +274,7 @@ class StatsFrameworkTest(test_case.TestCase, stats_framework_mock.MockMixIn):
       },
     ]
     self.assertEqual(
-        expected, stats_framework.get_stats(handler, 'minutes', now, 100))
+        expected, stats_framework.get_stats(handler, 'minutes', now, 100, True))
 
   def test_keys(self):
     handler = stats_framework.StatisticsFramework(
@@ -333,7 +333,8 @@ class StatsFrameworkLogTest(test_case.TestCase, stats_framework_mock.MockMixIn):
         duration = int(self2.request.get('duration', 120))
         now = self2.request.get('now')
         resolution = self2.request.get('resolution')
-        data = stats_framework.get_stats(self.h, resolution, now, duration)
+        data = stats_framework.get_stats(
+            self.h, resolution, now, duration, True)
         self2.response.write(stats_framework.utils.encode_to_json(data))
 
     routes = [
