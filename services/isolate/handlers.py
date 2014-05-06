@@ -476,8 +476,14 @@ class InternalCleanupOldEntriesWorkerHandler(webapp2.RequestHandler):
 
   Only a task queue task can use this handler.
   """
+  # pylint: disable=R0201
+  @decorators.silence(
+      datastore_errors.InternalError,
+      datastore_errors.Timeout,
+      datastore_errors.TransactionFailedError,
+      runtime.DeadlineExceededError)
   @decorators.require_taskqueue('cleanup')
-  def post(self):  # pylint: disable=R0201
+  def post(self):
     total = incremental_delete(
         ContentEntry.query(
             ContentEntry.expiration_ts < utcnow()).iter(keys_only=True),
@@ -487,8 +493,14 @@ class InternalCleanupOldEntriesWorkerHandler(webapp2.RequestHandler):
 
 class InternalObliterateWorkerHandler(webapp2.RequestHandler):
   """Deletes all the stuff."""
+  # pylint: disable=R0201
+  @decorators.silence(
+      datastore_errors.InternalError,
+      datastore_errors.Timeout,
+      datastore_errors.TransactionFailedError,
+      runtime.DeadlineExceededError)
   @decorators.require_taskqueue('cleanup')
-  def post(self):  # pylint: disable=R0201
+  def post(self):
     logging.info('Deleting ContentEntry')
     incremental_delete(
         ContentEntry.query().iter(keys_only=True), ndb.delete_multi_async)
@@ -514,8 +526,14 @@ class InternalCleanupTrimLostWorkerHandler(webapp2.RequestHandler):
 
   Only a task queue task can use this handler.
   """
+  # pylint: disable=R0201
+  @decorators.silence(
+      datastore_errors.InternalError,
+      datastore_errors.Timeout,
+      datastore_errors.TransactionFailedError,
+      runtime.DeadlineExceededError)
   @decorators.require_taskqueue('cleanup')
-  def post(self):  # pylint: disable=R0201
+  def post(self):
     """Enumerates all GS files and delete those that do not have an associated
     ContentEntry.
     """
@@ -561,6 +579,11 @@ class InternalCleanupTrimLostWorkerHandler(webapp2.RequestHandler):
 
 class InternalCleanupTriggerHandler(webapp2.RequestHandler):
   """Triggers a taskqueue to clean up."""
+  @decorators.silence(
+      datastore_errors.InternalError,
+      datastore_errors.Timeout,
+      datastore_errors.TransactionFailedError,
+      runtime.DeadlineExceededError)
   @decorators.require_cronjob
   def get(self, name):
     if name in ('obliterate', 'old', 'orphaned', 'trim_lost'):
@@ -583,6 +606,11 @@ class InternalTagWorkerHandler(webapp2.RequestHandler):
 
   This makes sure they are not evicted from the LRU cache too fast.
   """
+  @decorators.silence(
+      datastore_errors.InternalError,
+      datastore_errors.Timeout,
+      datastore_errors.TransactionFailedError,
+      runtime.DeadlineExceededError)
   @decorators.require_taskqueue('tag')
   def post(self, namespace, timestamp):
     digests = []
@@ -609,18 +637,6 @@ class InternalTagWorkerHandler(webapp2.RequestHandler):
         ndb.put_multi(to_save)
       logging.info(
           'Timestamped %d entries out of %s', len(to_save), len(digests))
-    except (
-        datastore_errors.InternalError,
-        datastore_errors.Timeout,
-        datastore_errors.TransactionFailedError,
-        runtime.DeadlineExceededError) as e:
-      # No need to print a stack trace. Return 500 so it is retried
-      # automatically. Disable this from an error reporting standpoint because
-      # we can't do anything about it.
-      # TODO(maruel): Split the request in smaller chunk, since it seems to
-      # timeout frequently.
-      logging.warning('Failed to stamp %d entries: %s', len(digests), e)
-      self.abort(500, detail='Timed out while tagging.')
     except Exception as e:
       logging.error('Failed to stamp %d entries: %s', len(digests), e)
       raise
@@ -636,6 +652,7 @@ class InternalVerifyWorkerHandler(webapp2.RequestHandler):
         'Verification failed for %s: %s', entry.key.id(), message % args)
     ndb.Future.wait_all(delete_entry_and_gs_entry([entry.key]))
 
+  @decorators.silence(gcs.TransientError, runtime.DeadlineExceededError)
   @decorators.require_taskqueue('verify')
   def post(self, namespace, hash_key):
     entry = entry_key(namespace, hash_key).get()
@@ -694,25 +711,10 @@ class InternalVerifyWorkerHandler(webapp2.RequestHandler):
             entry.compressed_size, expanded_size)
         return
 
-    except runtime.DeadlineExceededError:
-      # Failed to read it through. If it's compressed, at least no zlib error
-      # was thrown so the object is fine.
-      logging.warning('Got DeadlineExceededError, giving up')
-      # Abort so the job is retried automatically.
-      return self.abort(500)
-
     except gcs.NotFoundError as e:
       # Somebody deleted a file between get_file_info and read_file calls.
       self.purge_entry(entry, 'File was unexpectedly deleted')
       return
-
-    except gcs.TransientError as e:
-      # Don't delete the file yet since it's an API issue.
-      logging.warning(
-          'CloudStorage is acting up (%s): %s', e.__class__.__name__, e)
-      # Abort so the job is retried automatically.
-      return self.abort(500)
-
     except (gcs.ForbiddenError, gcs.AuthorizationError) as e:
       # Misconfiguration in Google Storage ACLs. Don't delete an entry, it may
       # be fine. Maybe ACL problems would be fixed before the next retry.
@@ -720,10 +722,9 @@ class InternalVerifyWorkerHandler(webapp2.RequestHandler):
           'CloudStorage auth issues (%s): %s', e.__class__.__name__, e)
       # Abort so the job is retried automatically.
       return self.abort(500)
-
-    # ForbiddenError and AuthorizationError inherit FatalError, so this except
-    # block should be last.
     except (gcs.FatalError, zlib.error, IOError) as e:
+      # ForbiddenError and AuthorizationError inherit FatalError, so this except
+      # block should be last.
       # It's broken or unreadable.
       self.purge_entry(entry,
           'Failed to read the file (%s): %s', e.__class__.__name__, e)
@@ -779,6 +780,7 @@ class RestrictedGoogleStorageConfig(auth.AuthenticatingHandler):
       # Ensure key is correct, it's easy to make a mistake when creating it.
       gcs.URLSigner.load_private_key(settings.gs_private_key)
     except Exception as exc:
+      # TODO(maruel): Handling Exception is too generic. And add self.abort(400)
       self.response.write('Bad private key: %s' % exc)
       return
     # Store the settings.

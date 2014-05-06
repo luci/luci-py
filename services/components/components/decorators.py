@@ -8,6 +8,24 @@ import functools
 import logging
 
 
+def silence(*exceptions):
+  """Eats the exceptions listed and log a warning instead of an error.
+
+  Sets the error code to HTTP 500. This will cause taskqueue to be automatically
+  retried.
+  """
+  def decorator(f):
+    @functools.wraps(f)
+    def hook(self, *args, **kwargs):
+      try:
+        return f(self, *args, **kwargs)
+      except tuple(exceptions) as e:
+        logging.warning('Silencing exception %s', e)
+        self.abort(500)
+    return hook
+  return decorator
+
+
 def require_cronjob(f):
   """Enforces cronjob."""
   @functools.wraps(f)
