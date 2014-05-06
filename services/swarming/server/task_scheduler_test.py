@@ -21,7 +21,9 @@ from google.appengine.ext import ndb
 # From tools/third_party/
 import webtest
 
+from components import stats_framework
 from server import result_helper
+from server import stats_new as stats
 from server import task_scheduler
 from server import test_helper
 from support import test_case
@@ -83,6 +85,12 @@ class TaskSchedulerApiTest(test_case.TestCase):
           'REMOTE_ADDR': '1.0.1.2',
           'SERVER_SOFTWARE': os.environ['SERVER_SOFTWARE'],
         })
+    self.mock(stats_framework, 'add_entry', self._parse_line)
+
+  def _parse_line(self, line):
+    # pylint: disable=W0212
+    actual = stats._parse_line(line, stats._Snapshot(), {}, {})
+    self.assertIs(True, actual, line)
 
   def test_all_apis_are_tested(self):
     # Ensures there's a test for each public API.
@@ -104,7 +112,8 @@ class TaskSchedulerApiTest(test_case.TestCase):
       u'hostname': u'localhost',
       u'foo': u'bar',
     }
-    request_2, shard_result = task_scheduler.bot_reap_task(bot_dimensions, None)
+    request_2, shard_result = task_scheduler.bot_reap_task(
+        bot_dimensions, 'localhost')
     self.assertEqual(request_1, request_2)
     self.assertEqual('localhost', shard_result.bot_id)
     self.assertEqual(None, shard_result.key.parent().get().queue_number)

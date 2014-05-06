@@ -25,11 +25,13 @@ import handlers
 import webtest
 
 from common import swarm_constants
+from components import stats_framework
 from server import admin_user
 from server import bot_management
 from server import dimension_mapping
 from server import dimensions_utils
 from server import errors
+from server import stats_new as stats
 from server import task_glue
 from server import test_helper
 from server import test_runner
@@ -91,10 +93,18 @@ class AppTest(test_case.TestCase):
     self.mock(auth.api, 'has_permission', mocked_has_permission)
 
     self._mox = mox.Mox()
+    self.mock(stats_framework, 'add_entry', self._parse_line)
+
+  def _parse_line(self, line):
+    # pylint: disable=W0212
+    actual = stats._parse_line(line, stats._Snapshot(), {}, {})
+    self.assertEqual(True, actual, line)
 
   def tearDown(self):
-    self._mox.UnsetStubs()
-    super(AppTest, self).tearDown()
+    try:
+      self._mox.UnsetStubs()
+    finally:
+      super(AppTest, self).tearDown()
 
   def _GetRoutes(self):
     """Returns the list of all routes handled."""

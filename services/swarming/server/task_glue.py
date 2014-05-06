@@ -44,6 +44,7 @@ from google.appengine.ext import ndb
 
 from common import rpc
 from common import test_request_message
+from server import stats_new as stats
 from server import task_request
 from server import task_result
 from server import task_shard_to_run
@@ -154,8 +155,12 @@ def RequestWorkItem(attributes, server_url):
   if response:
     return response
 
-  request, shard_result = task_scheduler.bot_reap_task(
-      attribs['dimensions'], attribs['id'])
+  dimensions = attribs['dimensions']
+  bot_id = attribs['id'] or dimensions['hostname']
+  stats.add_entry(
+      'bot_active', bot_id=bot_id,
+      dimensions=stats.pack_dimensions(dimensions))
+  request, shard_result = task_scheduler.bot_reap_task(dimensions, bot_id)
   if not request:
     try_count = attribs['try_count'] + 1
     return {
@@ -222,9 +227,9 @@ def RequestWorkItem(attributes, server_url):
   #  command_to_execute.append('--restart_on_failure')
 
   # TODO(maruel): Always on?
-  #command_to_execute.append('--restart_on_failure')
+  command_to_execute.append('--restart_on_failure')
   # TODO(maruel): Always off?
-  command_to_execute.append('-v')
+  #command_to_execute.append('-v')
 
   rpc_commands = [
     rpc.BuildRPC('StoreFiles', files_to_upload),

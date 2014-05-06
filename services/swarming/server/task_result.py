@@ -275,6 +275,16 @@ class TaskShardResult(ndb.Model):
     out['exit_codes'] = out['exit_codes'] or []
     return out
 
+  def duration(self):
+    """Returns the runtime for this shard or None if not applicable.
+
+    Shards abandoned or not started yet are not applicable and return None.
+    """
+    if self.abandoned_ts:
+      return None
+    end = self.completed_ts or task_common.utcnow()
+    return end - self.started_ts
+
   def to_string(self):
     return state_to_string(self)
 

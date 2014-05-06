@@ -27,7 +27,15 @@ from server import task_result
 from server import task_shard_to_run
 
 
+### Private stuff.
+
+
 _PROBABILITY_OF_QUICK_COMEBACK = 0.05
+
+
+def _secs_to_ms(value):
+  """Converts a seconds value in float to the number of ms as an integer."""
+  return int(round(value * 1000.))
 
 
 ### Public API.
@@ -57,7 +65,11 @@ def new_request(data):
   shard_runs = task_shard_to_run.new_shards_to_run_for_request(request)
   items = [task_result.new_result_summary(request)] + shard_runs
   ndb.put_multi(items)
-  stats.add_entry('shard_enqueued', request.properties.number_shards)
+  stats.add_request_entry(
+      'request_enqueued', request.key,
+      dimensions=stats.pack_dimensions(request.properties.dimensions),
+      shards=request.properties.number_shards,
+      user=request.user)
   return request, shard_runs
 
 
@@ -99,7 +111,6 @@ def bot_reap_task(dimensions, bot_id):
   Returns:
     tuple of (TaskShardToRun, TaskShardResult) for the shard that was reaped.
   """
-  bot_id = bot_id or dimensions['hostname']
   q = task_shard_to_run.yield_next_available_shard_to_dispatch(dimensions)
   # When a large number of bots try to reap hundreds of tasks simultaneously,
   # they'll constantly fail to call reap_shard_to_run() as they'll get preempted
@@ -135,14 +146,17 @@ def bot_reap_task(dimensions, bot_id):
       # TODO(maruel): Use datastore_util.insert() to create the new try_number.
       shard_result = task_result.new_shard_result(shard_to_run.key, 1, bot_id)
       task_result.put_shard_result(shard_result)
-      wait_time = (task_common.utcnow() - request.created_ts).total_seconds()
-      logging.info(
-          'Chose %s (failed %d, skipped %d) waited %.2fs',
-          pack_shard_result_key(shard_result.key),
-          failures,
-          total_skipped,
-          wait_time)
-      stats.add_entry('shard_assigned', int(round(wait_time * 1000.)))
+
+      # Try to optimize these values but do not add as formal stats (yet).
+      logging.info('failed %d, skipped %d', failures, total_skipped)
+
+      pending_time = shard_result.started_ts - request.created_ts
+      stats.add_shard_entry(
+          'shard_started', shard_result.key,
+          bot_id=bot_id,
+          dimensions=stats.pack_dimensions(request.properties.dimensions),
+          pending_ms=_secs_to_ms(pending_time.total_seconds()),
+          user=request.user)
       return request, shard_result
     except:
       logging.error('Lost TaskShardToRun %s', shard_to_run.key)
@@ -171,6 +185,7 @@ def bot_update_task(shard_result_key, data, bot_id):
         bot_id, shard_result.bot_id, shard_result.key)
     return False
 
+  request_future = shard_result.request_key.get_async()
   # TODO(maruel): Wrong but that's the current behavior of the swarming bots.
   # Eventually change the bot protocol to be able to send more details.
   completed = 'exit_codes' in data
@@ -178,14 +193,21 @@ def bot_update_task(shard_result_key, data, bot_id):
     shard_result.task_state = task_result.State.COMPLETED
     shard_result.completed_ts = now
     shard_result.exit_codes.extend(data['exit_codes'])
-    duration = (now - shard_result.started_ts).total_seconds()
   if 'outputs' in data:
     shard_result.outputs.extend(data['outputs'])
   task_result.put_shard_result(shard_result)
+  request = request_future.get_result()
   if completed:
-    stats.add_entry('shard_completed', int(round(duration * 1000.)))
+    stats.add_shard_entry(
+        'shard_completed', shard_result.key,
+        bot_id=bot_id,
+        dimensions=stats.pack_dimensions(request.properties.dimensions),
+        runtime_ms=_secs_to_ms(shard_result.duration().total_seconds()),
+        user=request.user)
   else:
-    stats.add_entry('shard_updated', pack_shard_result_key(shard_result.key))
+    stats.add_shard_entry(
+        'shard_updated', shard_result.key, bot_id=bot_id,
+        dimensions=stats.pack_dimensions(request.properties.dimensions))
   return True
 
 
@@ -214,11 +236,15 @@ def cron_abort_expired_shard_to_run():
       if task_shard_to_run.reap_shard_to_run(shard_to_run.key):
         # Create the TaskShardResult and kill it immediately.
         killed += 1
+        request_future = shard_to_run.request_key.get_async()
         shard_result = task_result.new_shard_result(shard_to_run.key, 1, None)
         task_result.terminate_shard_result(
             shard_result, task_result.State.EXPIRED)
-        stats.add_entry(
-            'shard_request_expired', pack_shard_result_key(shard_result.key))
+        request = request_future.get_result()
+        stats.add_shard_entry(
+            'shard_request_expired', shard_result.key,
+            dimensions=stats.pack_dimensions(request.properties.dimensions),
+            user=request.user)
       else:
         # It's not a big deal, the bot will continue running.
         skipped += 1
@@ -236,9 +262,15 @@ def cron_abort_bot_died():
   total = 0
   try:
     for shard_result in task_result.yield_shard_results_without_update():
+      request_future = shard_result.request_key.get_async()
       task_result.terminate_shard_result(
           shard_result, task_result.State.BOT_DIED)
-      stats.add_entry('shard_bot_died', pack_shard_result_key(shard_result.key))
+      request = request_future.get_result()
+      stats.add_shard_entry(
+          'shard_bot_died', shard_result.key,
+          bot_id=shard_result.bot_id,
+          dimensions=stats.pack_dimensions(request.properties.dimensions),
+          user=request.user)
       total += 1
   finally:
     # TODO(maruel): Use stats_framework.

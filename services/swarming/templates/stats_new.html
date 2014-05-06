@@ -21,6 +21,7 @@
     // The three graphs.
     var chart_http_requests = null;
     var chart_work = null;
+    var chart_times = null;
     var chart_table = null;
     // Current on-going HTTP request.
     var current_query = null;
@@ -237,6 +238,24 @@
         resetFormattedData(data_table);
       }
 
+      var formatter_key;
+      if (current_resolution == 'days') {
+        formatter_key = new google.visualization.DateFormat(
+            {pattern: 'yyyy/MM/dd'});
+      } else {
+        formatter_key = new google.visualization.DateFormat(
+            {pattern: 'MM/dd HH:mm'});
+      }
+      // These indexes are relative to stats_gviz._GVIZ_COLUMNS_ORDER.
+      formatter_key.format(data_table, 0);
+
+      var round3 = new google.visualization.NumberFormat(
+          {decimalSymbol:'.', fractionDigits:3});
+      // These indexes are relative to stats_gviz._GVIZ_COLUMNS_ORDER.
+      round3.format(data_table, 9);
+      round3.format(data_table, 10);
+      round3.format(data_table, 11);
+
       // HTTP request graph.
       clearCustomTicks(chart_http_requests);
       var view = new google.visualization.DataView(data_table);
@@ -252,12 +271,23 @@
       clearCustomTicks(chart_work);
       var view = new google.visualization.DataView(data_table);
       // These indexes are relative to stats_gviz._GVIZ_COLUMNS_ORDER.
-      view.setColumns([0, 3, 4, 5, 6, 7, 8]);
+      view.setColumns([0, 3, 4, 12, 13]);
       chart_work.setDataTable(view.toDataTable());
       if (show_as_raw == false) {
         setAxisTicksToUnitsOnNextDraw(chart_work, false);
       }
       chart_work.draw();
+
+      // Times graph.
+      clearCustomTicks(chart_times);
+      var view = new google.visualization.DataView(data_table);
+      // These indexes are relative to stats_gviz._GVIZ_COLUMNS_ORDER.
+      view.setColumns([0, 9, 10, 11]);
+      chart_times.setDataTable(view.toDataTable());
+      if (show_as_raw == false) {
+        setAxisTicksToUnitsOnNextDraw(chart_times, false);
+      }
+      chart_times.draw();
 
       // Bottom raw data table.
       chart_table.setDataTable(data_table);
@@ -279,7 +309,7 @@
               easing: 'out'
             },
             height: '100%',
-            // These indexes are relative to stats_gviz._GVIZ_COLUMNS_ORDER.
+            // These indexes are relative to view.setColumns().
             series: [
               {},
               // http_failures.
@@ -303,6 +333,21 @@
             },
             height: '100%',
             title: 'Shards activity',
+            width: '100%'
+          },
+        });
+      chart_times = new google.visualization.ChartWrapper(
+        {
+          chartType: 'LineChart',
+          dataTable: data_table,
+          containerId: 'times_graph',
+          options: {
+            animation: {
+              duration: 500,
+              easing: 'out'
+            },
+            height: '100%',
+            title: 'Times (s)',
             width: '100%'
           },
         });
@@ -339,6 +384,7 @@
       set_show_as_raw: set_show_as_raw,
 
       // For debugging.
+      chart_times: function() { return chart_times; },
       chart_work: function() { return chart_work; },
       chart_http_requests: function() { return chart_http_requests; },
       chart_table: function() { return chart_table; },
@@ -372,6 +418,8 @@
   <div id="http_request_graph" class="graph">(Loading...)</div>
   <hr/>
   <div id="work_graph" class="graph">(Loading...)</div>
+  <hr/>
+  <div id="times_graph" class="graph">(Loading...)</div>
   <hr/>
   <div id="raw_data_table" class="data_table">(Loading...)</div>
 
