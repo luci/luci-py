@@ -50,7 +50,7 @@ class _Snapshot(ndb.Model):
     return out
 
   def accumulate(self, rhs):
-    return stats_framework.accumulate(self, rhs)
+    return stats_framework.accumulate(self, rhs, [])
 
   def requests_as_text(self):
     return '%s (%s failed)' % (

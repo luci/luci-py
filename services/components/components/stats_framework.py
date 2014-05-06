@@ -556,8 +556,13 @@ def add_entry(message):
   logging.debug(PREFIX + message)
 
 
-def accumulate(lhs, rhs):
+def accumulate(lhs, rhs, skip):
   """Adds the values from rhs into lhs.
+
+  Arguments:
+  - lhs: in/out ndb.Model that the sum is accumulated into.
+  - rhs: in ndb.Model that is accumulated to lhs.
+  - skip: list or set of property names to skip.
 
   Both must be an ndb.Model. lhs is modified. rhs is not.
 
@@ -574,8 +579,11 @@ def accumulate(lhs, rhs):
   # Access to a protected member NNN of a client class
   # pylint: disable=W0212
   for key in set(lhs._properties).intersection(rhs._properties):
+    if key in skip:
+      continue
     if hasattr(lhs, key) and hasattr(rhs, key):
-      assert not lhs._properties[key]._repeated
+      # Repeated properties have to be handled manually.
+      assert not lhs._properties[key]._repeated, key
       default = lhs._properties[key]._default
       lhs_value = getattr(lhs, key, default)
       rhs_value = getattr(rhs, key, default)
@@ -589,7 +597,19 @@ def accumulate(lhs, rhs):
         assert callable(lhs_value.accumulate), key
         lhs_value.accumulate(rhs_value)
       else:
-        setattr(lhs, key, lhs_value + rhs_value)
+        # Assume X + None == X for any type.
+        if lhs_value is None:
+          value = rhs_value
+        elif rhs_value is None:
+          value = lhs_value
+        else:
+          value = lhs_value + rhs_value
+        try:
+          setattr(lhs, key, value)
+        except AttributeError:
+          # This happens when a structure changes and the old entity is being
+          # summed to.
+          logging.error('Couldn\'t set %s to %s', key, value)
 
 
 def yield_entries(start_time, end_time):

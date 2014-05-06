@@ -37,7 +37,7 @@ class _Snapshot(ndb.Model):
   shards_updated = ndb.IntegerProperty(default=0)
 
   def accumulate(self, rhs):
-    stats_framework.accumulate(self, rhs)
+    stats_framework.accumulate(self, rhs, [])
 
 
 ### Utility

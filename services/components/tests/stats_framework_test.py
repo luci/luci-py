@@ -28,7 +28,7 @@ class InnerSnapshot(ndb.Model):
   c = ndb.StringProperty(default='', indexed=False)
 
   def accumulate(self, rhs):
-    return stats_framework.accumulate(self, rhs)
+    return stats_framework.accumulate(self, rhs, [])
 
 
 class Snapshot(ndb.Model):
@@ -36,6 +36,7 @@ class Snapshot(ndb.Model):
   requests = ndb.IntegerProperty(default=0, indexed=False)
   b = ndb.FloatProperty(default=0, indexed=False)
   inner = ndb.LocalStructuredProperty(InnerSnapshot)
+  d = ndb.StringProperty(repeated=True)
 
   def __init__(self, **kwargs):
     # This is the recommended way to use ndb.LocalStructuredProperty inside a
@@ -48,7 +49,7 @@ class Snapshot(ndb.Model):
 
   def accumulate(self, rhs):
     # accumulate() specifically handles where default value is a class instance.
-    return stats_framework.accumulate(self, rhs)
+    return stats_framework.accumulate(self, rhs, ['d'])
 
 
 def get_now():
@@ -144,6 +145,7 @@ class StatsFrameworkTest(test_case.TestCase, stats_framework_mock.MockMixIn):
         'key': midnight.date(),
         'requests': limit,
         'b': float(limit),
+        'd': [],
         'inner': {
           'c': u''.join('%d,' % i for i in xrange(1, limit + 1)),
         },
@@ -162,6 +164,7 @@ class StatsFrameworkTest(test_case.TestCase, stats_framework_mock.MockMixIn):
         'key': (midnight + datetime.timedelta(seconds=i*60*60)),
         'requests': 60,
         'b': 60.,
+        'd': [],
         'inner': {
           'c': u''.join(
               '%d,' % i for i in xrange(60 * i + 1, 60 * (i + 1) + 1)),
@@ -182,6 +185,7 @@ class StatsFrameworkTest(test_case.TestCase, stats_framework_mock.MockMixIn):
         'key': (midnight + datetime.timedelta(seconds=i*60)),
         'requests': 1,
         'b': 1.,
+        'd': [],
         'inner': {
           'c': u'%d,' % (i + 1),
         },
@@ -232,6 +236,7 @@ class StatsFrameworkTest(test_case.TestCase, stats_framework_mock.MockMixIn):
         'key': now.date(),
         'requests': 0,
         'b': 0.0,
+        'd': [],
         'inner': {'c': u''},
       },
     ]
@@ -243,6 +248,7 @@ class StatsFrameworkTest(test_case.TestCase, stats_framework_mock.MockMixIn):
         'key': datetime.datetime(*now.timetuple()[:4]),
         'requests': 2,
         'b': 2.0,
+        'd': [],
         'inner': {'c': u'1,2,'},
       },
     ]
@@ -255,6 +261,7 @@ class StatsFrameworkTest(test_case.TestCase, stats_framework_mock.MockMixIn):
             *(now - datetime.timedelta(seconds=60)).timetuple()[:5]),
         'requests': 1,
         'b': 1.0,
+        'd': [],
         'inner': {'c': u'2,'},
       },
       {
@@ -262,6 +269,7 @@ class StatsFrameworkTest(test_case.TestCase, stats_framework_mock.MockMixIn):
             *(now - datetime.timedelta(seconds=120)).timetuple()[:5]),
         'requests': 1,
         'b': 1.0,
+        'd': [],
         'inner': {'c': u'1,'},
       },
     ]
@@ -376,6 +384,7 @@ class StatsFrameworkLogTest(test_case.TestCase, stats_framework_mock.MockMixIn):
       {
         u'key': u'2010-01-02',
         u'b': 0.0,
+        u'd': [],
         u'inner': {u'c': u''},
         u'requests': 0,
       },
@@ -390,12 +399,14 @@ class StatsFrameworkLogTest(test_case.TestCase, stats_framework_mock.MockMixIn):
       {
         u'key': u'2010-01-02 03:00:00',
         u'b': 0.0,
+        u'd': [],
         u'inner': {u'c': u''},
         u'requests': 0,
       },
       {
         u'key': u'2010-01-02 02:00:00',
         u'b': 0.0,
+        u'd': [],
         u'inner': {u'c': u''},
         u'requests': 0,
       },
@@ -410,60 +421,70 @@ class StatsFrameworkLogTest(test_case.TestCase, stats_framework_mock.MockMixIn):
       {
         u'key': u'2010-01-02 03:04:00',
         u'b': 0.0,
+        u'd': [],
         u'inner': {u'c': u''},
         u'requests': 0,
       },
       {
         u'key': u'2010-01-02 03:03:00',
         u'b': 0.0,
+        u'd': [],
         u'inner': {u'c': u''},
         u'requests': 0,
       },
       {
         u'key': u'2010-01-02 03:02:00',
         u'b': 0.0,
+        u'd': [],
         u'inner': {u'c': u''},
         u'requests': 0,
       },
       {
         u'key': u'2010-01-02 03:01:00',
         u'b': 0.0,
+        u'd': [],
         u'inner': {u'c': u''},
         u'requests': 0,
       },
       {
         u'key': u'2010-01-02 03:00:00',
         u'b': 0.0,
+        u'd': [],
         u'inner': {u'c': u''},
         u'requests': 0,
       },
       {
         u'key': u'2010-01-02 02:59:00',
         u'b': 0.0,
+        u'd': [],
         u'inner': {u'c': u''},
         u'requests': 0,
       },
       {
         u'key': u'2010-01-02 02:58:00',
         u'b': 0.0,
+        u'd': [],
         u'inner': {u'c': u''},
         u'requests': 0,
       },
       {
         u'key': u'2010-01-02 02:57:00',
         u'b': 0.0,
+        u'd': [],
         u'inner': {u'c': u''},
         u'requests': 0,
       },
       {
         u'key': u'2010-01-02 02:56:00',
         u'b': 0.0,
+        u'd': [],
         u'inner': {u'c': u''},
         u'requests': 0,
       },
       {
         u'key': u'2010-01-02 02:55:00',
         u'b': 0.0,
+        u'd': [],
         u'inner': {u'c': u''},
         u'requests': 0,
       },
@@ -478,18 +499,21 @@ class StatsFrameworkLogTest(test_case.TestCase, stats_framework_mock.MockMixIn):
       {
         u'key': u'2010-01-02 03:04:00',
         u'b': 0.0,
+        u'd': [],
         u'inner': {u'c': u''},
         u'requests': 0,
       },
       {
         u'key': u'2010-01-02 03:03:00',
         u'b': 0.0,
+        u'd': [],
         u'inner': {u'c': u''},
         u'requests': 0,
       },
       {
         u'key': u'2010-01-02 03:02:00',
         u'b': 0.0,
+        u'd': [],
         u'inner': {u'c': u''},
         u'requests': 0,
       },
@@ -506,6 +530,7 @@ class StatsFrameworkLogTest(test_case.TestCase, stats_framework_mock.MockMixIn):
       {
         u'key': u'2010-01-02',
         u'b': 0.0,
+        u'd': [],
         u'inner': {u'c': u''},
         u'requests': 0,
       },
@@ -522,6 +547,7 @@ class StatsFrameworkLogTest(test_case.TestCase, stats_framework_mock.MockMixIn):
       {
         u'key': u'2010-01-02 03:00:00',
         u'b': 0.0,
+        u'd': [],
         u'inner': {u'c': u'HelloHello'},
         u'requests': 2,
       },
@@ -538,12 +564,33 @@ class StatsFrameworkLogTest(test_case.TestCase, stats_framework_mock.MockMixIn):
       {
         u'key': u'2010-01-02 03:04:00',
         u'b': 0.0,
+        u'd': [],
         u'inner': {u'c': u'HelloHello'},
         u'requests': 2,
       },
     ]
     self.assertEqual(
         expected, self.app.get('/json?resolution=minutes&duration=1').json)
+
+  def test_accumulate(self):
+    a = Snapshot(
+        requests=23,
+        b=0.1,
+        inner=InnerSnapshot(c='foo'),
+        d=['a', 'b'])
+    b = Snapshot(
+        requests=None,
+        b=None,
+        inner=InnerSnapshot(c=None),
+        d=['c', 'd'])
+    a.accumulate(b)
+    expected = {
+      'b': 0.1,
+      'd': ['a', 'b'],
+      'inner': {'c': 'foo'},
+      'requests': 23,
+    }
+    self.assertEqual(expected, a.to_dict())
 
 
 if __name__ == '__main__':
