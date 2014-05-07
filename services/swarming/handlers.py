@@ -116,6 +116,33 @@ def GetModulesVersions():
 SortOptions = collections.namedtuple('SortOptions', ['key', 'name'])
 
 
+def ipv4_to_int(ip):
+  values = [int(i) for i in ip.split('.')]
+  factor = 256
+  value = 0L
+  for i in values:
+    value = value * factor + i
+  return value
+
+
+def int_to_ipv4(integer):
+  values = []
+  factor = 256
+  for _ in range(4):
+    values.append(integer % factor)
+    integer = integer / factor
+  return '.'.join(str(i) for i in reversed(values))
+
+
+def expand_subnet(ip, mask):
+  """Returns all the IP addressed comprised in a range."""
+  if mask == 32:
+    return [ip]
+  bit = 1 << (32 - mask)
+  return [int_to_ipv4(ipv4_to_int(ip) + r) for r in range(bit)]
+
+
+
 ### Handlers
 
 
@@ -1128,15 +1155,22 @@ class ChangeWhitelistHandler(auth.AuthenticatingHandler):
   @auth.require(auth.UPDATE, 'swarming/management')
   def post(self):
     ip = self.request.get('i', self.request.remote_addr)
+    mask = 32
+    if '/' in ip:
+      ip, mask = ip.split('/', 1)
+      mask = int(mask)
+    ips = expand_subnet(ip, mask)
 
     # Make sure a password '' sent by the form is stored as None.
     password = self.request.get('p', None) or None
 
     add = self.request.get('a')
     if add == 'True':
-      user_manager.AddWhitelist(ip, password)
+      for ip in ips:
+        user_manager.AddWhitelist(ip, password)
     elif add == 'False':
-      user_manager.DeleteWhitelist(ip)
+      for ip in ips:
+        user_manager.DeleteWhitelist(ip)
     else:
       self.abort(400, 'Invalid \'a\' parameter.')
 
