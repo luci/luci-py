@@ -20,10 +20,13 @@ test_env.setup_test_env()
 import webtest
 
 from components import auth
+from components import datastore_utils
 from components import stats_framework_mock
 from support import test_case
 
 import handlers
+import handlers_common
+import model
 
 
 # Access to a protected member _XXX of a client class
@@ -60,7 +63,7 @@ def _ErrorRecord(**kwargs):
 
 
 def hash_item(content):
-  h = handlers.get_hash_algo('default')
+  h = model.get_hash_algo('default')
   h.update(content)
   return h.hexdigest()
 
@@ -200,7 +203,7 @@ class MainTest(test_case.TestCase):
     deleted = self.mock_delete_files()
     items = ['bar', 'foo']
     now = datetime.datetime(2012, 01, 02, 03, 04, 05, 06)
-    self.mock(handlers, 'utcnow', lambda: now)
+    self.mock(handlers_common, 'utcnow', lambda: now)
     self.mock(handlers.ndb.DateTimeProperty, '_now', lambda _: now)
     self.mock(handlers.ndb.DateProperty, '_now', lambda _: now.date())
 
@@ -208,27 +211,28 @@ class MainTest(test_case.TestCase):
         '/content-gs/pre-upload/default?token=%s' % self.handshake(),
         [gen_item(i) for i in items])
     self.assertEqual(len(items), len(r.json))
-    self.assertEqual(0, len(list(handlers.ContentEntry.query())))
+    self.assertEqual(0, len(list(model.ContentEntry.query())))
 
     for content, urls in zip(items, r.json):
       self.assertEqual(2, len(urls))
       self.assertEqual(None, urls[1])
       self.put_content(urls[0], content)
-    self.assertEqual(2, len(list(handlers.ContentEntry.query())))
+    self.assertEqual(2, len(list(model.ContentEntry.query())))
     expiration = 7*24*60*60
     self.assertEqual(0, self.execute_tasks())
 
     # Advance time, tag the first item.
     now += datetime.timedelta(seconds=2*expiration)
     self.assertEqual(
-        datetime.datetime(2012, 01, 16, 03, 04, 05, 06), handlers.utcnow())
+        datetime.datetime(2012, 01, 16, 03, 04, 05, 06),
+        handlers_common.utcnow())
     r = self.app.post_json(
         '/content-gs/pre-upload/default?token=%s' % self.handshake(),
         [gen_item(items[0])])
     self.assertEqual(200, r.status_code)
     self.assertEqual([None], r.json)
     self.assertEqual(1, self.execute_tasks())
-    self.assertEqual(2, len(list(handlers.ContentEntry.query())))
+    self.assertEqual(2, len(list(model.ContentEntry.query())))
 
     # 'bar' was kept, 'foo' was cleared out.
     headers = {'X-AppEngine-Cron': 'true'}
@@ -237,8 +241,8 @@ class MainTest(test_case.TestCase):
     self.assertEqual(200, resp.status_code)
     self.assertEqual([None], r.json)
     self.assertEqual(1, self.execute_tasks())
-    self.assertEqual(1, len(list(handlers.ContentEntry.query())))
-    self.assertEqual('bar', handlers.ContentEntry.query().get().content)
+    self.assertEqual(1, len(list(model.ContentEntry.query())))
+    self.assertEqual('bar', model.ContentEntry.query().get().content)
 
     # Advance time and force cleanup. This deletes 'bar' too.
     now += datetime.timedelta(seconds=2*expiration)
@@ -248,7 +252,7 @@ class MainTest(test_case.TestCase):
     self.assertEqual(200, resp.status_code)
     self.assertEqual([None], r.json)
     self.assertEqual(1, self.execute_tasks())
-    self.assertEqual(0, len(list(handlers.ContentEntry.query())))
+    self.assertEqual(0, len(list(model.ContentEntry.query())))
 
     # Advance time and force cleanup.
     now += datetime.timedelta(seconds=2*expiration)
@@ -258,7 +262,7 @@ class MainTest(test_case.TestCase):
     self.assertEqual(200, resp.status_code)
     self.assertEqual([None], r.json)
     self.assertEqual(1, self.execute_tasks())
-    self.assertEqual(0, len(list(handlers.ContentEntry.query())))
+    self.assertEqual(0, len(list(model.ContentEntry.query())))
 
     # All items expired are tried to be deleted from GS. This is the trade off
     # between having to fetch the items vs doing unneeded requests to GS for the
@@ -269,20 +273,20 @@ class MainTest(test_case.TestCase):
   def test_ancestor_assumption(self):
     prefix = '1234'
     suffix = 40 - len(prefix)
-    c = handlers.create_entry(handlers.entry_key('n', prefix + '0' * suffix))
-    self.assertEqual(0, len(list(handlers.ContentEntry.query())))
+    c = model.create_entry(model.entry_key('n', prefix + '0' * suffix))
+    self.assertEqual(0, len(list(model.ContentEntry.query())))
     c.put()
-    self.assertEqual(1, len(list(handlers.ContentEntry.query())))
+    self.assertEqual(1, len(list(model.ContentEntry.query())))
 
-    c = handlers.create_entry(handlers.entry_key('n', prefix + '1' * suffix))
-    self.assertEqual(1, len(list(handlers.ContentEntry.query())))
+    c = model.create_entry(model.entry_key('n', prefix + '1' * suffix))
+    self.assertEqual(1, len(list(model.ContentEntry.query())))
     c.put()
-    self.assertEqual(2, len(list(handlers.ContentEntry.query())))
+    self.assertEqual(2, len(list(model.ContentEntry.query())))
 
     actual_prefix = c.key.parent().id()
-    k = handlers.datastore_utils.shard_key(
+    k = datastore_utils.shard_key(
         actual_prefix, len(actual_prefix), 'ContentShard')
-    self.assertEqual(2, len(list(handlers.ContentEntry.query(ancestor=k))))
+    self.assertEqual(2, len(list(model.ContentEntry.query(ancestor=k))))
 
   def test_trim_missing(self):
     deleted = self.mock_delete_files()
@@ -298,7 +302,7 @@ class MainTest(test_case.TestCase):
     ]
     self.mock(handlers.gcs, 'list_files', lambda _: mock_files)
 
-    handlers.ContentEntry(key=handlers.entry_key('d', '0' * 40)).put()
+    model.ContentEntry(key=model.entry_key('d', '0' * 40)).put()
     headers = {'X-AppEngine-Cron': 'true'}
     resp = self.app.get(
         '/internal/cron/cleanup/trigger/trim_lost', headers=headers)
@@ -327,7 +331,7 @@ class MainTest(test_case.TestCase):
     self.assertEqual(1, self.execute_tasks())
 
     # Assert the object is still there.
-    self.assertEqual(1, len(list(handlers.ContentEntry.query())))
+    self.assertEqual(1, len(list(model.ContentEntry.query())))
 
   def test_verify_corrupted(self):
     # Upload a file larger than MIN_SIZE_FOR_DIRECT_GS and ensure the verify
@@ -353,7 +357,7 @@ class MainTest(test_case.TestCase):
     self.assertEqual(1, self.execute_tasks())
 
     # Assert the object is gone.
-    self.assertEqual(0, len(list(handlers.ContentEntry.query())))
+    self.assertEqual(0, len(list(model.ContentEntry.query())))
     self.assertEqual(['default/' + hash_item(data)], deleted)
 
   def _gen_stats(self):

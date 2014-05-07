@@ -7,12 +7,10 @@
 import binascii
 import collections
 import datetime
-import functools
 import hashlib
 import hmac
 import json
 import logging
-import random
 import re
 import time
 import urllib
@@ -23,19 +21,19 @@ from google.appengine import runtime
 from google.appengine.api import app_identity
 from google.appengine.api import datastore_errors
 from google.appengine.api import memcache
-from google.appengine.api import taskqueue
 from google.appengine.ext import ndb
 
 import acl
 import config
 import gcs
+import handlers_common
 import map_reduce_jobs
+import model
 import stats
 import stats_gviz
 import template
 from components import auth
 from components import auth_ui
-from components import datastore_utils
 from components import decorators
 from components import ereporter2
 from components import utils
@@ -44,9 +42,6 @@ from components import utils
 # Version of isolate protocol returned to clients in /handshake request.
 ISOLATE_PROTOCOL_VERSION = '1.0'
 
-
-# The maximum number of entries that can be queried in a single request.
-MAX_KEYS_PER_CALL = 1000
 
 # The minimum size, in bytes, an entry must be before it gets stored in Google
 # Cloud Storage, otherwise it is stored as a blob property.
@@ -66,96 +61,6 @@ ITEMS_TO_DELETE_ASYNC = 100
 # TODO(csharp): Find a way to support namespaces greater than 29 characters.
 MAX_NAMESPACE_LEN = 29
 
-# Maximum size of file stored in GS to be saved in memcache. The value must be
-# small enough so that the whole content can safely fit in memory.
-MAX_MEMCACHE_ISOLATED = 500*1024
-
-
-# Ignore these failures, there's nothing to do.
-# TODO(maruel): Store them in the db and make this runtime configurable.
-IGNORED_LINES = (
-  # And..?
-  '/base/data/home/runtimes/python27/python27_lib/versions/1/google/'
-      'appengine/_internal/django/template/__init__.py:729: UserWarning: '
-      'api_milliseconds does not return a meaningful value',
-)
-
-# Ignore these exceptions.
-IGNORED_EXCEPTIONS = (
-  'CancelledError',
-  'DeadlineExceededError',
-  # These are DeadlineExceededError wrapped up by
-  # third_party/cloudstorage/storage_api.py.
-  'TimeoutError',
-  ereporter2.SOFT_MEMORY,
-)
-
-
-# Valid namespace key.
-NAMESPACE_RE = r'[a-z0-9A-Z\-._]+'
-
-# Valid hash keys.
-HASH_LETTERS = set('0123456789abcdef')
-
-
-#### Models
-
-
-class ContentEntry(ndb.Model):
-  """Represents the content, keyed by its SHA-1 hash.
-
-  Parent is a ContentShard.
-
-  Key is '<namespace>-<hash>'.
-
-  Eventually, the table name could have a prefix to determine the hashing
-  algorithm, like 'sha1-'.
-
-  There's usually only one table name:
-    - default:    The default CAD.
-    - temporary*: This family of namespace is a discardable namespace for
-                  testing purpose only.
-
-  The table name can have suffix:
-    - -deflate: The namespace contains the content in deflated format. The
-                content key is the hash of the uncompressed data, not the
-                compressed one. That is why it is in a separate namespace.
-  """
-  # Cache the file size for statistics purposes.
-  compressed_size = ndb.IntegerProperty(indexed=False)
-
-  # The value is the Cache the expanded file size for statistics purposes. Its
-  # value is different from size *only* in compressed namespaces. It may be -1
-  # if yet unknown.
-  expanded_size = ndb.IntegerProperty(indexed=False)
-
-  # Set to True once the entry's content has been verified to match the hash.
-  is_verified = ndb.BooleanProperty()
-
-  # The content stored inline. This is only valid if the content was smaller
-  # than MIN_SIZE_FOR_GS.
-  content = ndb.BlobProperty()
-
-  # Moment when this item expires and should be cleared. This is the only
-  # property that has to be indexed.
-  expiration_ts = ndb.DateTimeProperty()
-
-  # Moment when this item should have its expiration time updatd.
-  next_tag_ts = ndb.DateTimeProperty()
-
-  # Moment when this item was created.
-  creation_ts = ndb.DateTimeProperty(indexed=False, auto_now=True)
-
-  # It is an important item, normally .isolated file.
-  is_isolated = ndb.BooleanProperty(default=False)
-
-  @property
-  def is_compressed(self):
-    """Is it the raw data or was it modified in any form, e.g. compressed, so
-    that the SHA-1 doesn't match.
-    """
-    return self.key.parent().id().endswith(('-bzip2', '-deflate', '-gzip'))
-
 
 ### Utility
 
@@ -171,94 +76,6 @@ class Accumulator(object):
       self.accumulated.append(i)
       yield i
       del i
-
-
-def utcnow():
-  """Returns a datetime, used for testing."""
-  return datetime.datetime.utcnow()
-
-
-def check_hash(hash_key, length):
-  """Checks the validity of an hash_key. Doesn't use a regexp for speed.
-
-  Raises in case of non-validity.
-  """
-  # It is faster than running a regexp.
-  if len(hash_key) != length or not HASH_LETTERS.issuperset(hash_key):
-    raise ValueError('Invalid \'%s\' as ContentEntry key' % hash_key)
-
-
-def entry_key(namespace, hash_key):
-  """Returns a valid ndb.Key for a ContentEntry."""
-  check_hash(hash_key, get_hash_algo(namespace).digest_size * 2)
-  return entry_key_from_id('%s/%s' % (namespace, hash_key))
-
-
-def entry_key_from_id(key_id):
-  """Returns the ndb.Key for the key_id."""
-  hash_key = key_id.rsplit('/', 1)[1]
-  N = config.settings().sharding_letters
-  return ndb.Key(
-      ContentEntry, key_id,
-      parent=datastore_utils.shard_key(hash_key, N, 'ContentShard'))
-
-
-def create_entry(key):
-  """Generates a new ContentEntry from the request if one doesn't exist.
-
-  This function is synchronous.
-
-  Returns None if there is a problem generating the entry or if an entry already
-  exists with the given hex encoded SHA-1 hash |hash_key|.
-  """
-  # Entity was present, can't insert.
-  if key.get():
-    return None
-  # Entity was not present. Create a new one.
-  expiration, next_tag = expiration_jitter(
-      utcnow(), config.settings().default_expiration)
-  return ContentEntry(key=key, expiration_ts=expiration, next_tag_ts=next_tag)
-
-
-def expiration_jitter(now, expiration):
-  """Returns expiration/next_tag pair to set in a ContentEntry."""
-  jittered = random.uniform(1, 1.2) * expiration
-  expiration = now + datetime.timedelta(seconds=jittered)
-  next_tag = now + datetime.timedelta(seconds=jittered*0.1)
-  return expiration, next_tag
-
-
-def delete_entry_and_gs_entry(keys_to_delete):
-  """Deletes synchronously a list of ContentEntry and their GS files.
-
-  It deletes the ContentEntry first, then the files in GS. The worst case is
-  that the GS files are left behind and will be reaped by a lost GS task
-  queue. The reverse is much worse, having a ContentEntry pointing to a
-  deleted GS entry will lead to lookup failures.
-  """
-  try:
-    # Always delete ContentEntry first.
-    ndb.delete_multi(keys_to_delete)
-    # Note that some content entries may NOT have corresponding GS files. That
-    # happens for small entries stored inline in the datastore or memcache.
-    # Since this function operates only on keys, it can't distinguish "large"
-    # entries stored in GS from "small" ones stored inline. So instead it tries
-    # to delete all corresponding GS files, silently skipping ones that
-    # are not there.
-    gcs.delete_files(
-        config.settings().gs_bucket,
-        (i.id() for i in keys_to_delete),
-        ignore_missing=True)
-    return []
-  except:
-    logging.error('Failed to delete items! DB will be inconsistent!')
-    raise
-
-
-def get_hash_algo(_namespace):
-  """Returns an instance of the hashing algorithm for the namespace."""
-  # TODO(maruel): Support other algorithms.
-  return hashlib.sha1()
 
 
 def split_payload(request, chunk_size, max_chunks):
@@ -291,35 +108,9 @@ def split_payload(request, chunk_size, max_chunks):
 def payload_to_hashes(request, namespace):
   """Converts a raw payload into SHA-1 hashes as bytes."""
   return split_payload(
-      request, get_hash_algo(namespace).digest_size, MAX_KEYS_PER_CALL)
-
-
-def expand_content(namespace, source):
-  """Yields expanded data from source."""
-  # TODO(maruel): Add bzip2.
-  # TODO(maruel): Remove '-gzip' since it's a misnomer.
-  if namespace.endswith(('-deflate', '-gzip')):
-    zlib_state = zlib.decompressobj()
-    for i in source:
-      data = zlib_state.decompress(i, gcs.CHUNK_SIZE)
-      yield data
-      del data
-      while zlib_state.unconsumed_tail:
-        data = zlib_state.decompress(
-            zlib_state.unconsumed_tail, gcs.CHUNK_SIZE)
-        yield data
-        del data
-      del i
-    data = zlib_state.flush()
-    yield data
-    del data
-    # Forcibly delete the state.
-    del zlib_state
-  else:
-    # Returns the source as-is.
-    for i in source:
-      yield i
-      del i
+      request,
+      model.get_hash_algo(namespace).digest_size,
+      model.MAX_KEYS_PER_DB_OPS)
 
 
 def hash_content(content, namespace):
@@ -330,9 +121,9 @@ def hash_content(content, namespace):
   Raises ValueError in case of errors.
   """
   expanded_size = 0
-  digest = get_hash_algo(namespace)
+  digest = model.get_hash_algo(namespace)
   try:
-    for data in expand_content(namespace, [content]):
+    for data in model.expand_content(namespace, [content]):
       expanded_size += len(data)
       digest.update(data)
       # Make sure the data is GC'ed.
@@ -389,60 +180,6 @@ def incremental_delete(query, delete, check=None):
   return deleted_count
 
 
-def save_in_memcache(namespace, hash_key, content, async=False):
-  namespace_key = 'table_%s' % namespace
-  if async:
-    return ndb.get_context().memcache_set(
-        hash_key, content, namespace=namespace_key)
-  try:
-    if not memcache.set(hash_key, content, namespace=namespace_key):
-      msg = 'Failed to save content to memcache.\n%s\\%s %d bytes' % (
-          namespace_key, hash_key, len(content))
-      if len(content) < 100*1024:
-        logging.error(msg)
-      else:
-        logging.warning(msg)
-  except ValueError as e:
-    logging.error(e)
-
-
-def enqueue_task(url, queue_name, payload=None, name=None,
-                 use_dedicated_module=True):
-  """Adds a task to a task queue.
-
-  If |use_dedicated_module| is True (default) a task will be executed by
-  a separate backend module instance that runs same version as currently
-  executing instance. Otherwise it will run on a current version of default
-  module.
-
-  Returns True if a task was successfully added, logs error and returns False
-  if task queue is acting up.
-  """
-  try:
-    headers = None
-    if use_dedicated_module:
-      headers = {'Host': config.get_task_queue_host()}
-    # Note that just using 'target=module' here would redirect task request to
-    # a default version of a module, not the currently executing one.
-    taskqueue.add(
-        url=url,
-        queue_name=queue_name,
-        payload=payload,
-        name=name,
-        headers=headers)
-    return True
-  except (
-      taskqueue.Error,
-      runtime.DeadlineExceededError,
-      runtime.apiproxy_errors.CancelledError,
-      runtime.apiproxy_errors.DeadlineExceededError,
-      runtime.apiproxy_errors.OverQuotaError) as e:
-    logging.warning(
-        'Problem adding task \'%s\' to task queue \'%s\' (%s): %s',
-        url, queue_name, e.__class__.__name__, e)
-    return False
-
-
 def render_template(template_path, env=None):
   """Renders a template with some common variables in template env.
 
@@ -464,10 +201,6 @@ def render_template(template_path, env=None):
   return template.get(template_path).render(default_env)
 
 
-should_ignore_error_record = functools.partial(
-    ereporter2.should_ignore_error_record, IGNORED_LINES, IGNORED_EXCEPTIONS)
-
-
 ### Restricted handlers
 
 
@@ -484,10 +217,10 @@ class InternalCleanupOldEntriesWorkerHandler(webapp2.RequestHandler):
       runtime.DeadlineExceededError)
   @decorators.require_taskqueue('cleanup')
   def post(self):
-    total = incremental_delete(
-        ContentEntry.query(
-            ContentEntry.expiration_ts < utcnow()).iter(keys_only=True),
-        delete=delete_entry_and_gs_entry)
+    q = model.ContentEntry.query(
+        model.ContentEntry.expiration_ts < handlers_common.utcnow()
+        ).iter(keys_only=True)
+    total = incremental_delete(q, delete=model.delete_entry_and_gs_entry)
     logging.info('Deleting %s expired entries', total)
 
 
@@ -503,7 +236,8 @@ class InternalObliterateWorkerHandler(webapp2.RequestHandler):
   def post(self):
     logging.info('Deleting ContentEntry')
     incremental_delete(
-        ContentEntry.query().iter(keys_only=True), ndb.delete_multi_async)
+        model.ContentEntry.query().iter(keys_only=True),
+        ndb.delete_multi_async)
 
     gs_bucket = config.settings().gs_bucket
     logging.info('Deleting GS bucket %s', gs_bucket)
@@ -547,12 +281,12 @@ class InternalCleanupTrimLostWorkerHandler(webapp2.RequestHandler):
         if filestats.st_ctime >= cutoff:
           continue
 
-        # This must match the logic in entry_key(). Since this request will in
-        # practice touch every item, do not use memcache since it'll mess it up
-        # by loading every items in it.
+        # This must match the logic in model.entry_key(). Since this request
+        # will in practice touch every item, do not use memcache since it'll
+        # mess it up by loading every items in it.
         # TODO(maruel): Batch requests to use get_multi_async() similar to
         # datastore_utils.page_queries().
-        future = entry_key_from_id(filepath).get_async(
+        future = model.entry_key_from_id(filepath).get_async(
             use_cache=False, use_memcache=False)
         futures[future] = filepath
 
@@ -591,8 +325,8 @@ class InternalCleanupTriggerHandler(webapp2.RequestHandler):
       # The push task queue name must be unique over a ~7 days period so use
       # the date at second precision, there's no point in triggering each of
       # time more than once a second anyway.
-      now = utcnow().strftime('%Y-%m-%d_%I-%M-%S')
-      if enqueue_task(url, 'cleanup', name=name + '_' + now):
+      now = handlers_common.utcnow().strftime('%Y-%m-%d_%I-%M-%S')
+      if handlers_common.enqueue_task(url, 'cleanup', name=name + '_' + now):
         self.response.out.write('Triggered %s' % url)
       else:
         self.abort(500, 'Failed to enqueue a cleanup task, see logs')
@@ -620,7 +354,7 @@ class InternalTagWorkerHandler(webapp2.RequestHandler):
       digests = payload_to_hashes(self, namespace)
       # Requests all the entities at once.
       futures = ndb.get_multi_async(
-          entry_key(namespace, binascii.hexlify(d)) for d in digests)
+          model.entry_key(namespace, binascii.hexlify(d)) for d in digests)
 
       to_save = []
       while futures:
@@ -630,7 +364,7 @@ class InternalTagWorkerHandler(webapp2.RequestHandler):
         item = future.get_result()
         if item and item.next_tag_ts < now:
           # Update the timestamp. Add a bit of pseudo randomness.
-          item.expiration_ts, item.next_tag_ts = expiration_jitter(
+          item.expiration_ts, item.next_tag_ts = model.expiration_jitter(
               now, expiration)
           to_save.append(item)
       if to_save:
@@ -650,12 +384,12 @@ class InternalVerifyWorkerHandler(webapp2.RequestHandler):
     """Logs error message, deletes |entry| from datastore and GS."""
     logging.error(
         'Verification failed for %s: %s', entry.key.id(), message % args)
-    ndb.Future.wait_all(delete_entry_and_gs_entry([entry.key]))
+    ndb.Future.wait_all(model.delete_entry_and_gs_entry([entry.key]))
 
   @decorators.silence(gcs.TransientError, runtime.DeadlineExceededError)
   @decorators.require_taskqueue('verify')
   def post(self, namespace, hash_key):
-    entry = entry_key(namespace, hash_key).get()
+    entry = model.entry_key(namespace, hash_key).get()
     if not entry:
       logging.error('Failed to find entity')
       return
@@ -686,9 +420,10 @@ class InternalVerifyWorkerHandler(webapp2.RequestHandler):
       return
 
     save_to_memcache = (
-        entry.compressed_size <= MAX_MEMCACHE_ISOLATED and entry.is_isolated)
+        entry.compressed_size <= model.MAX_MEMCACHE_ISOLATED and
+        entry.is_isolated)
     expanded_size = 0
-    digest = get_hash_algo(namespace)
+    digest = model.get_hash_algo(namespace)
     data = None
 
     try:
@@ -698,7 +433,7 @@ class InternalVerifyWorkerHandler(webapp2.RequestHandler):
         # Wraps stream with a generator that accumulates the data.
         stream = Accumulator(stream)
 
-      for data in expand_content(namespace, stream):
+      for data in model.expand_content(namespace, stream):
         expanded_size += len(data)
         digest.update(data)
         # Make sure the data is GC'ed.
@@ -738,7 +473,7 @@ class InternalVerifyWorkerHandler(webapp2.RequestHandler):
         '%d bytes (%d bytes expanded) verified',
         entry.compressed_size, expanded_size)
     if save_to_memcache:
-      save_in_memcache(namespace, hash_key, ''.join(stream.accumulated))
+      model.save_in_memcache(namespace, hash_key, ''.join(stream.accumulated))
     future.wait()
 
 
@@ -802,7 +537,7 @@ class InternalEreporter2Mail(webapp2.RequestHandler):
         'recipients', config.settings().monitoring_recipients)
     result = ereporter2.generate_and_email_report(
         utils.get_module_version_list(None, False),
-        should_ignore_error_record,
+        handlers_common.should_ignore_error_record,
         recipients,
         request_id_url,
         report_url,
@@ -842,7 +577,7 @@ class RestrictedEreporter2Report(auth.AuthenticatingHandler):
     tainted = bool(int(self.request.get('tainted', '0')))
     module_versions = utils.get_module_version_list(modules, tainted)
     report, ignored = ereporter2.generate_report(
-        start, end, module_versions, should_ignore_error_record)
+        start, end, module_versions, handlers_common.should_ignore_error_record)
     env = ereporter2.get_template_env(start, end, module_versions)
     content = ereporter2.report_to_html(
         report, ignored,
@@ -885,7 +620,7 @@ class RestrictedLaunchMapReduceJob(auth.AuthenticatingHandler):
     # Do not use 'backend' module when running from dev appserver. Mapreduce
     # generates URLs that are incompatible with dev appserver URL routing when
     # using custom modules.
-    success = enqueue_task(
+    success = handlers_common.enqueue_task(
         url='/internal/taskqueue/mapreduce/launch/%s' % job_id,
         queue_name=map_reduce_jobs.MAP_REDUCE_TASK_QUEUE,
         use_dedicated_module=not utils.is_local_dev_server())
@@ -1075,7 +810,7 @@ class PreUploadContentHandler(ProtocolHandler):
   @staticmethod
   def parse_request(body, namespace):
     """Parses a request body into a list of EntryInfo objects."""
-    hex_digest_size = get_hash_algo(namespace).digest_size * 2
+    hex_digest_size = model.get_hash_algo(namespace).digest_size * 2
     try:
       out = [
         PreUploadContentHandler.EntryInfo(
@@ -1083,7 +818,7 @@ class PreUploadContentHandler(ProtocolHandler):
         for m in json.loads(body)
       ]
       for i in out:
-        check_hash(i.digest, hex_digest_size)
+        model.check_hash(i.digest, hex_digest_size)
       return out
     except (ValueError, KeyError, TypeError) as exc:
       raise ValueError('Bad body: %s' % exc)
@@ -1097,7 +832,7 @@ class PreUploadContentHandler(ProtocolHandler):
     # Kick off all queries in parallel. Build mapping Future -> digest.
     futures = {}
     for entry_info in entries:
-      key = entry_key(namespace, entry_info.digest)
+      key = model.entry_key(namespace, entry_info.digest)
       futures[key.get_async(use_cache=False)] = entry_info
 
     # Pick first one that finishes and yield it, rinse, repeat.
@@ -1111,15 +846,16 @@ class PreUploadContentHandler(ProtocolHandler):
   def tag_entries(entries, namespace):
     """Enqueues a task to update the timestamp for given entries."""
     url = '/internal/taskqueue/tag/%s/%s' % (
-        namespace, utils.datetime_to_timestamp(utcnow()))
+        namespace, utils.datetime_to_timestamp(handlers_common.utcnow()))
     payload = ''.join(binascii.unhexlify(e.digest) for e in entries)
-    return enqueue_task(url, 'tag', payload=payload)
+    return handlers_common.enqueue_task(url, 'tag', payload=payload)
 
   @staticmethod
   def should_push_to_gs(entry_info):
     """True to direct client to upload given EntryInfo directly to GS."""
     # Relatively small *.isolated files go through app engine to cache them.
-    if entry_info.is_isolated and entry_info.size <= MAX_MEMCACHE_ISOLATED:
+    if (entry_info.is_isolated and
+        entry_info.size <= model.MAX_MEMCACHE_ISOLATED):
       return False
     # All other large enough files go through GS.
     return entry_info.size >= MIN_SIZE_FOR_DIRECT_GS
@@ -1181,7 +917,7 @@ class PreUploadContentHandler(ProtocolHandler):
     """
     if self.should_push_to_gs(entry_info):
       # Store larger stuff in Google Storage.
-      key = entry_key(namespace, entry_info.digest)
+      key = model.entry_key(namespace, entry_info.digest)
       upload_url = self.gs_url_signer.get_upload_url(
           filename=key.id(),
           content_type='application/octet-stream',
@@ -1204,10 +940,10 @@ class PreUploadContentHandler(ProtocolHandler):
   @auth.require(auth.UPDATE, 'isolate/namespaces/{namespace}')
   def post(self, namespace):
     """Reads body with items to upload and replies with URLs to upload to."""
-    if not re.match(r'^%s$' % NAMESPACE_RE, namespace):
+    if not re.match(r'^%s$' % model.NAMESPACE_RE, namespace):
       self.send_error(
           'Invalid namespace; allowed keys must pass regexp "%s"' %
-          NAMESPACE_RE)
+          model.NAMESPACE_RE)
 
     # Parse a body into list of EntryInfo objects.
     try:
@@ -1270,7 +1006,7 @@ class RetrieveContentHandler(ProtocolHandler):
       stats.add_entry(stats.RETURN, len(memcache_entry) - offset, 'memcache')
       return
 
-    entry = entry_key(namespace, hash_key).get()
+    entry = model.entry_key(namespace, hash_key).get()
     if not entry:
       return self.send_error('Unable to retrieve the entry.', http_code=404)
 
@@ -1407,7 +1143,7 @@ class StoreContentHandler(ProtocolHandler):
 
     # Info about corresponding GS entry (if it exists).
     gs_bucket = config.settings().gs_bucket
-    key = entry_key(namespace, hash_key)
+    key = model.entry_key(namespace, hash_key)
 
     # Verify the data while at it since it's already in memory but before
     # storing it in memcache and datastore.
@@ -1452,7 +1188,7 @@ class StoreContentHandler(ProtocolHandler):
       uploaded_to_gs = True
 
     # Can create entity now, everything appears to be legit.
-    entry = create_entry(key)
+    entry = model.create_entry(key)
     if not entry:
       self.send_json({'entry': {}})
       stats.add_entry(stats.DUPE, compressed_size, 'inline')
@@ -1474,9 +1210,13 @@ class StoreContentHandler(ProtocolHandler):
     # Start saving *.isolated into memcache iff its content is available and
     # it's not in Datastore: there's no point in saving inline blobs in memcache
     # because ndb already memcaches them.
-    if (content is not None and entry.content is None and
-        entry.is_isolated and entry.compressed_size <= MAX_MEMCACHE_ISOLATED):
-      futures.append(save_in_memcache(namespace, hash_key, content, async=True))
+    if (content is not None and
+        entry.content is None and
+        entry.is_isolated and
+        entry.compressed_size <= model.MAX_MEMCACHE_ISOLATED):
+      futures.append(
+          model.save_in_memcache(
+              namespace, hash_key, content, async=True))
 
     # Log stats.
     where = 'GS; ' + 'inline' if entry.content is not None else entry.key.id()
@@ -1487,7 +1227,7 @@ class StoreContentHandler(ProtocolHandler):
     # Trigger a verification task for files in the GS.
     if needs_verification:
       url = '/internal/taskqueue/verify/%s/%s' % (namespace, hash_key)
-      if not enqueue_task(url, 'verify'):
+      if not handlers_common.enqueue_task(url, 'verify'):
         # TODO(vadimsh): Don't fail whole request here, because several RPCs are
         # required to roll it back and there isn't much time left
         # (after DeadlineExceededError is already caught) to perform them.
@@ -1554,7 +1294,7 @@ def CreateApplication(debug=False):
   auth_routes.extend(auth_ui.get_ui_routes())
 
   # Namespace can be letters, numbers, '-', '.' and '_'.
-  namespace = r'/<namespace:%s>' % NAMESPACE_RE
+  namespace = r'/<namespace:%s>' % model.NAMESPACE_RE
   # Do not enforce a length limit to support different hashing algorithm. This
   # should represent a valid hex value.
   hashkey = r'/<hash_key:[a-f0-9]{4,}>'

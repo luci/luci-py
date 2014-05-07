@@ -27,10 +27,12 @@ def setup_context():
   import config
   import gcs
   import handlers
+  import handlers_common
+  import model
   import stats
 
   from components import auth
-  from handlers import ContentEntry
+  from model import ContentEntry
 
   return locals().copy()
 
