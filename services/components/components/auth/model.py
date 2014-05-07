@@ -68,7 +68,7 @@ import re
 
 from google.appengine.ext import ndb
 
-from components import utils
+from components import datastore_utils
 
 # Part of public API of 'auth' component, exposed by this module.
 __all__ = [
@@ -132,7 +132,7 @@ ROOT_KEY = ndb.Key('AuthGlobalConfig', 'root')
 
 
 class Identity(
-    utils.BytesSerializable,
+    datastore_utils.BytesSerializable,
     collections.namedtuple('Identity', 'kind, name')):
   """Represents a caller that makes requests. Immutable.
 
@@ -198,7 +198,7 @@ class Identity(
 Anonymous = Identity(IDENTITY_ANONYMOUS, 'anonymous')
 
 
-class IdentityProperty(utils.BytesSerializableProperty):
+class IdentityProperty(datastore_utils.BytesSerializableProperty):
   """NDB model property for Identity values.
 
   Identities are stored as indexed short blobs internally.
@@ -208,7 +208,7 @@ class IdentityProperty(utils.BytesSerializableProperty):
 
 
 class IdentityGlob(
-    utils.BytesSerializable,
+    datastore_utils.BytesSerializable,
     collections.namedtuple('IdentityGlob', 'kind, pattern')):
   """Glob-like pattern that matches subset of identities. Immutable.
 
@@ -250,7 +250,7 @@ class IdentityGlob(
     return fnmatch.fnmatchcase(identity.name, self.pattern)
 
 
-class IdentityGlobProperty(utils.BytesSerializableProperty):
+class IdentityGlobProperty(datastore_utils.BytesSerializableProperty):
   """NDB model property for IdentityGlob values.
 
   IdentityGlobs are stored as short indexed blobs internally.
@@ -264,7 +264,7 @@ class IdentityGlobProperty(utils.BytesSerializableProperty):
 
 
 class AccessRule(
-    utils.JsonSerializable,
+    datastore_utils.JsonSerializable,
     collections.namedtuple('AccessRule', 'kind, group, actions, resource')):
   """Single access rule definition. Immutable.
 
@@ -328,7 +328,7 @@ DenyAllRule = AccessRule(DENY_RULE, GROUP_ALL, ALLOWED_ACTIONS, '^.*$')
 AllowAllRule = AccessRule(ALLOW_RULE, GROUP_ALL, ALLOWED_ACTIONS, '^.*$')
 
 
-class AccessRuleProperty(utils.JsonSerializableProperty):
+class AccessRuleProperty(datastore_utils.JsonSerializableProperty):
   """NDB model property for AccessRule values.
 
   Stored as JSON blob internally.
@@ -368,7 +368,7 @@ class AuthGlobalConfig(ndb.Model):
   oauth_additional_client_ids = ndb.StringProperty(repeated=True, indexed=False)
 
 
-class AuthServiceConfig(ndb.Model, utils.SerializableModelMixin):
+class AuthServiceConfig(ndb.Model, datastore_utils.SerializableModelMixin):
   """Holds ACL Rules for a single service.
 
   Parent is AuthGlobalConfig entity keyed at ROOT_KEY.
@@ -383,9 +383,9 @@ class AuthServiceConfig(ndb.Model, utils.SerializableModelMixin):
   """
   # How to convert this entity to or from serializable dict.
   serializable_properties = {
-    'rules': utils.READABLE | utils.WRITABLE,
-    'modified_ts': utils.READABLE,
-    'modified_by': utils.READABLE,
+    'rules': datastore_utils.READABLE | datastore_utils.WRITABLE,
+    'modified_ts': datastore_utils.READABLE,
+    'modified_by': datastore_utils.READABLE,
    }
 
   # All ACL rules. Order is important.
@@ -396,7 +396,7 @@ class AuthServiceConfig(ndb.Model, utils.SerializableModelMixin):
   modified_by = IdentityProperty(indexed=False)
 
 
-class AuthGroup(ndb.Model, utils.SerializableModelMixin):
+class AuthGroup(ndb.Model, datastore_utils.SerializableModelMixin):
   """A group of identities, entity id is a group name.
 
   Parent is AuthGlobalConfig entity keyed at ROOT_KEY.
@@ -406,14 +406,14 @@ class AuthGroup(ndb.Model, utils.SerializableModelMixin):
   """
   # How to convert this entity to or from serializable dict.
   serializable_properties = {
-    'members': utils.READABLE | utils.WRITABLE,
-    'globs': utils.READABLE | utils.WRITABLE,
-    'nested': utils.READABLE | utils.WRITABLE,
-    'description': utils.READABLE | utils.WRITABLE,
-    'created_ts': utils.READABLE,
-    'created_by': utils.READABLE,
-    'modified_ts': utils.READABLE,
-    'modified_by': utils.READABLE,
+    'members': datastore_utils.READABLE | datastore_utils.WRITABLE,
+    'globs': datastore_utils.READABLE | datastore_utils.WRITABLE,
+    'nested': datastore_utils.READABLE | datastore_utils.WRITABLE,
+    'description': datastore_utils.READABLE | datastore_utils.WRITABLE,
+    'created_ts': datastore_utils.READABLE,
+    'created_by': datastore_utils.READABLE,
+    'modified_ts': datastore_utils.READABLE,
+    'modified_by': datastore_utils.READABLE,
   }
 
   # List of members that are explicitly in this group. Indexed.
