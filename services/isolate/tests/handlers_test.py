@@ -19,14 +19,20 @@ test_env.setup_test_env()
 # From components/third_party/
 import webtest
 
+from google.appengine.ext import ndb
+
+import acl
+import config
+import gcs
+import handlers_common
+import handlers_frontend
+import model
+import stats
 from components import auth
 from components import datastore_utils
+from components import ereporter2
 from components import stats_framework_mock
 from support import test_case
-
-import handlers
-import handlers_common
-import model
 
 
 # Access to a protected member _XXX of a client class
@@ -59,7 +65,7 @@ def _ErrorRecord(**kwargs):
       'message': 'Failed',
   }
   default_values.update(kwargs)
-  return handlers.ereporter2.ErrorRecord(**default_values)
+  return ereporter2.ErrorRecord(**default_values)
 
 
 def hash_item(content):
@@ -87,24 +93,23 @@ class MainTest(test_case.TestCase):
 
     # When called during a taskqueue, the call to get_app_version() may fail so
     # pre-fetch it.
-    version = handlers.config.get_app_version()
-    self.mock(handlers.config, 'get_task_queue_host', lambda: version)
+    version = config.get_app_version()
+    self.mock(config, 'get_task_queue_host', lambda: version)
     self.source_ip = '127.0.0.1'
     self.app = webtest.TestApp(
-        handlers.CreateApplication(debug=True),
+        handlers_frontend.CreateApplication(debug=True),
         extra_environ={'REMOTE_ADDR': self.source_ip})
 
   def whitelist_self(self):
-    handlers.acl.WhitelistedIP(
-        id=handlers.acl.ip_to_str(*handlers.acl.parse_ip(self.source_ip)),
-        ip='127.0.0.1').put()
+    acl.WhitelistedIP(
+        id=acl.ip_to_str(*acl.parse_ip(self.source_ip)), ip='127.0.0.1').put()
 
   def handshake(self):
     self.whitelist_self()
     data = {
       'client_app_version': '0.2',
       'fetcher': True,
-      'protocol_version': handlers.ISOLATE_PROTOCOL_VERSION,
+      'protocol_version': handlers_frontend.ISOLATE_PROTOCOL_VERSION,
       'pusher': True,
     }
     req = self.app.post_json('/content-gs/handshake', data)
@@ -117,7 +122,7 @@ class MainTest(test_case.TestCase):
       self.assertEquals('isolateserver-dev', bucket)
       deleted.extend(files)
       return []
-    self.mock(handlers.gcs, 'delete_files', delete_files)
+    self.mock(gcs, 'delete_files', delete_files)
     return deleted
 
   def put_content(self, url, content):
@@ -139,8 +144,7 @@ class MainTest(test_case.TestCase):
 
   def test_internal_cron_ereporter2_mail(self):
     data = [_ErrorRecord()]
-    self.mock(
-        handlers.ereporter2, '_extract_exceptions_from_logs', lambda *_: data)
+    self.mock(ereporter2, '_extract_exceptions_from_logs', lambda *_: data)
     headers = {'X-AppEngine-Cron': 'true'}
     response = self.app.get(
         '/internal/cron/ereporter2/mail', headers=headers)
@@ -169,7 +173,8 @@ class MainTest(test_case.TestCase):
       'isolate/namespaces/',
       'isolate/namespaces/{namespace}',
     }
-    for route in auth.get_authenticated_routes(handlers.CreateApplication()):
+    for route in auth.get_authenticated_routes(
+        handlers_frontend.CreateApplication()):
       per_method = route.handler.get_methods_permissions()
       for method, permissions in per_method.iteritems():
         self.assertTrue(
@@ -204,8 +209,8 @@ class MainTest(test_case.TestCase):
     items = ['bar', 'foo']
     now = datetime.datetime(2012, 01, 02, 03, 04, 05, 06)
     self.mock(handlers_common, 'utcnow', lambda: now)
-    self.mock(handlers.ndb.DateTimeProperty, '_now', lambda _: now)
-    self.mock(handlers.ndb.DateProperty, '_now', lambda _: now.date())
+    self.mock(ndb.DateTimeProperty, '_now', lambda _: now)
+    self.mock(ndb.DateProperty, '_now', lambda _: now.date())
 
     r = self.app.post_json(
         '/content-gs/pre-upload/default?token=%s' % self.handshake(),
@@ -291,7 +296,7 @@ class MainTest(test_case.TestCase):
   def test_trim_missing(self):
     deleted = self.mock_delete_files()
     def gen_file(i, t=0):
-      return (i, handlers.gcs.cloudstorage.GCSFileStat(i, 100, 'etag', t))
+      return (i, gcs.cloudstorage.GCSFileStat(i, 100, 'etag', t))
     mock_files = [
         # Was touched.
         gen_file('d/' + '0' * 40),
@@ -300,7 +305,7 @@ class MainTest(test_case.TestCase):
         # Too recent.
         gen_file('d/' + '2' * 40, time.time() - 60),
     ]
-    self.mock(handlers.gcs, 'list_files', lambda _: mock_files)
+    self.mock(gcs, 'list_files', lambda _: mock_files)
 
     model.ContentEntry(key=model.entry_key('d', '0' * 40)).put()
     headers = {'X-AppEngine-Cron': 'true'}
@@ -313,7 +318,7 @@ class MainTest(test_case.TestCase):
   def test_verify(self):
     # Upload a file larger than MIN_SIZE_FOR_DIRECT_GS and ensure the verify
     # task works.
-    data = '0' * handlers.MIN_SIZE_FOR_DIRECT_GS
+    data = '0' * handlers_frontend.MIN_SIZE_FOR_DIRECT_GS
     req = self.app.post_json(
         '/content-gs/pre-upload/default?token=%s' % self.handshake(),
         [gen_item(data)])
@@ -322,12 +327,10 @@ class MainTest(test_case.TestCase):
     # ['url', 'url']
     self.assertTrue(req.json[0][0])
     # Fake the upload by calling the second function.
-    self.mock(
-        handlers.gcs, 'get_file_info',
-        lambda _b, _f: handlers.gcs.FileInfo(size=len(data)))
+    self.mock(gcs, 'get_file_info', lambda _b, _f: gcs.FileInfo(size=len(data)))
     req = self.app.post(req.json[0][1], '')
 
-    self.mock(handlers.gcs, 'read_file', lambda _b, _f: [data])
+    self.mock(gcs, 'read_file', lambda _b, _f: [data])
     self.assertEqual(1, self.execute_tasks())
 
     # Assert the object is still there.
@@ -336,7 +339,7 @@ class MainTest(test_case.TestCase):
   def test_verify_corrupted(self):
     # Upload a file larger than MIN_SIZE_FOR_DIRECT_GS and ensure the verify
     # task works.
-    data = '0' * handlers.MIN_SIZE_FOR_DIRECT_GS
+    data = '0' * handlers_frontend.MIN_SIZE_FOR_DIRECT_GS
     req = self.app.post_json(
         '/content-gs/pre-upload/default?token=%s' % self.handshake(),
         [gen_item(data)])
@@ -345,14 +348,12 @@ class MainTest(test_case.TestCase):
     # ['url', 'url']
     self.assertTrue(req.json[0][0])
     # Fake the upload by calling the second function.
-    self.mock(
-        handlers.gcs, 'get_file_info',
-        lambda _b, _f: handlers.gcs.FileInfo(size=len(data)))
+    self.mock(gcs, 'get_file_info', lambda _b, _f: gcs.FileInfo(size=len(data)))
     req = self.app.post(req.json[0][1], '')
 
     # Fake corruption
-    data_corrupted = '1' * handlers.MIN_SIZE_FOR_DIRECT_GS
-    self.mock(handlers.gcs, 'read_file', lambda _b, _f: [data_corrupted])
+    data_corrupted = '1' * handlers_frontend.MIN_SIZE_FOR_DIRECT_GS
+    self.mock(gcs, 'read_file', lambda _b, _f: [data_corrupted])
     deleted = self.mock_delete_files()
     self.assertEqual(1, self.execute_tasks())
 
@@ -366,20 +367,20 @@ class MainTest(test_case.TestCase):
     # generate it.
     now = datetime.datetime(2010, 1, 2, 3, 4, 5, 6)
     stats_framework_mock.mock_now(self, now, 0)
-    handler = handlers.stats.STATS_HANDLER
+    handler = stats.STATS_HANDLER
     for i in xrange(10):
-      s = handlers.stats._Snapshot(requests=100 + i)
+      s = stats._Snapshot(requests=100 + i)
       day = (now - datetime.timedelta(days=i)).date()
       handler.stats_day_cls(key=handler.day_key(day), values_compressed=s).put()
 
     for i in xrange(10):
-      s = handlers.stats._Snapshot(requests=10 + i)
+      s = stats._Snapshot(requests=10 + i)
       timestamp = (now - datetime.timedelta(hours=i))
       handler.stats_hour_cls(
           key=handler.hour_key(timestamp), values_compressed=s).put()
 
     for i in xrange(10):
-      s = handlers.stats._Snapshot(requests=1 + i)
+      s = stats._Snapshot(requests=1 + i)
       timestamp = (now - datetime.timedelta(minutes=i))
       handler.stats_minute_cls(
           key=handler.minute_key(timestamp), values_compressed=s).put()

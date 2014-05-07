@@ -26,7 +26,7 @@ def setup_context():
   import acl
   import config
   import gcs
-  import handlers
+  import handlers_frontend
   import handlers_common
   import model
   import stats

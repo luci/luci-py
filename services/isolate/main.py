@@ -16,14 +16,14 @@ sys.path.insert(0, os.path.join(BASE_DIR, 'components', 'third_party'))
 import acl
 from components import ereporter2
 from components import utils
-import handlers
+import handlers_frontend
 
 
 def CreateApplication():
   """Bootstraps the app and creates the url router."""
   ereporter2.register_formatter()
   acl.bootstrap()
-  a = handlers.CreateApplication()
+  a = handlers_frontend.CreateApplication()
   # In theory we'd want to take the output of app_identity.get_application_id().
   # Sadly, this function does an RPC call and may contribute to cause time out
   # on the initial load.
