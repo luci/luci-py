@@ -507,28 +507,23 @@ class ResultHandler(auth.AuthenticatingHandler):
 class TaskCleanupDataHandler(webapp2.RequestHandler):
   """Deletes orphaned blobs."""
 
+  @decorators.silence(datastore_errors.Timeout)
   @decorators.require_taskqueue('cleanup')
   def post(self):
-    try:
-      # All the things that need to be deleted.
-      queries = [
-          errors.QueryOldErrors(),
-          dimension_mapping.QueryOldDimensionMapping(),
-          task_glue.QueryOldRunners(),
-          daily_stats.QueryOldDailyStats(),
-          requestor_daily_stats.QueryOldRequestorDailyStats(),
-          runner_stats.QueryOldRunnerStats(),
-          runner_summary.QueryOldWaitSummaries(),
-          result_helper.QueryOldResults(),
-          result_helper.QueryOldResultChunks(),
-      ]
-      datastore_utils.incremental_map(
-          queries, ndb.delete_multi_async, max_inflight=50)
-    except datastore_errors.Timeout:
-      logging.info('Ran out of time while cleaning up data. Triggering '
-                   'another cleanup.')
-      taskqueue.add(method='POST', url='/internal/taskqueue/cleanup_data',
-                    queue_name='cleanup')
+    # All the things that need to be deleted.
+    queries = [
+        errors.QueryOldErrors(),
+        dimension_mapping.QueryOldDimensionMapping(),
+        task_glue.QueryOldRunners(),
+        daily_stats.QueryOldDailyStats(),
+        requestor_daily_stats.QueryOldRequestorDailyStats(),
+        runner_stats.QueryOldRunnerStats(),
+        runner_summary.QueryOldWaitSummaries(),
+        result_helper.QueryOldResults(),
+        result_helper.QueryOldResultChunks(),
+    ]
+    datastore_utils.incremental_map(
+        queries, ndb.delete_multi_async, max_inflight=50)
     self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
     self.response.out.write('Success.')
 

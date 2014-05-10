@@ -1,9 +1,7 @@
 queue:
 - name: cleanup
   max_concurrent_requests: 1
-  rate: 6/h
-  retry_parameters:
-    task_retry_limit: 0
+  rate: 1/m
 
 - name: stats
   rate: 2/m
