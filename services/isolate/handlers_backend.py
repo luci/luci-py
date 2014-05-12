@@ -111,7 +111,7 @@ def incremental_delete(query, delete, check=None):
     deleted_count += 1
     if len(to_delete) == ITEMS_TO_DELETE_ASYNC:
       logging.info('Deleting %s entries', len(to_delete))
-      futures.extend(delete(to_delete))
+      futures.extend(delete(to_delete) or [])
       to_delete = []
 
     # That's a lot of on-going operations which could take a significant amount
@@ -123,7 +123,7 @@ def incremental_delete(query, delete, check=None):
 
   if to_delete:
     logging.info('Deleting %s entries', len(to_delete))
-    futures.extend(delete(to_delete))
+    futures.extend(delete(to_delete) or [])
 
   ndb.Future.wait_all(futures)
   return deleted_count
@@ -312,7 +312,7 @@ class InternalVerifyWorkerHandler(webapp2.RequestHandler):
     """Logs error message, deletes |entry| from datastore and GS."""
     logging.error(
         'Verification failed for %s: %s', entry.key.id(), message % args)
-    ndb.Future.wait_all(model.delete_entry_and_gs_entry([entry.key]))
+    model.delete_entry_and_gs_entry([entry.key])
 
   @decorators.silence(gcs.TransientError, runtime.DeadlineExceededError)
   @decorators.require_taskqueue('verify')

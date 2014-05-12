@@ -210,20 +210,14 @@ def delete_entry_and_gs_entry(keys_to_delete):
   queue. The reverse is much worse, having a ContentEntry pointing to a
   deleted GS entry will lead to lookup failures.
   """
-  try:
-    # Always delete ContentEntry first.
-    ndb.delete_multi(keys_to_delete)
-    # Note that some content entries may NOT have corresponding GS files. That
-    # happens for small entries stored inline in the datastore or memcache.
-    # Since this function operates only on keys, it can't distinguish "large"
-    # entries stored in GS from "small" ones stored inline. So instead it tries
-    # to delete all corresponding GS files, silently skipping ones that
-    # are not there.
-    gcs.delete_files(
-        config.settings().gs_bucket,
-        (i.id() for i in keys_to_delete),
-        ignore_missing=True)
-    return []
-  except:
-    logging.error('Failed to delete items! DB will be inconsistent!')
-    raise
+  # Always delete ContentEntry first.
+  ndb.delete_multi(keys_to_delete)
+  # Note that some content entries may NOT have corresponding GS files. That
+  # happens for small entries stored inline in the datastore or memcache. Since
+  # this function operates only on keys, it can't distinguish "large" entries
+  # stored in GS from "small" ones stored inline. So instead it tries to delete
+  # all corresponding GS files, silently skipping ones that are not there.
+  gcs.delete_files(
+      config.settings().gs_bucket,
+      (i.id() for i in keys_to_delete),
+      ignore_missing=True)
