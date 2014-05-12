@@ -157,9 +157,7 @@ def RequestWorkItem(attributes, server_url):
 
   dimensions = attribs['dimensions']
   bot_id = attribs['id'] or dimensions['hostname']
-  stats.add_entry(
-      'bot_active', bot_id=bot_id,
-      dimensions=stats.pack_dimensions(dimensions))
+  stats.add_entry(action='bot_active', bot_id=bot_id, dimensions=dimensions)
   request, shard_result = task_scheduler.bot_reap_task(dimensions, bot_id)
   if not request:
     try_count = attribs['try_count'] + 1

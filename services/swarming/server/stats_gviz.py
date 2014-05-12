@@ -4,6 +4,7 @@
 
 """Frontend handlers for statistics."""
 
+import itertools
 import webapp2
 
 import template
@@ -14,105 +15,349 @@ from gviz import gviz_api
 from server import stats_new as stats
 
 
-_GVIZ_DESCRIPTION_SUMMARY = {
-  'http_failures': ('number', 'HTTP Failures'),
-  'http_requests': ('number', 'Total HTTP requests'),
-
-  'bots_active': ('number', 'Bots active'),
-  'shards_active': ('number', 'Shards active'),
-
-  'request_enqueued': ('number', 'Requests enqueued'),
-  'shards_enqueued': ('number', 'Shards enqueued'),
-
-  'shards_started': ('number', 'Shards started'),
-  'shards_avg_pending_secs': ('number', 'Average shard pending time (s)'),
-
-  'shards_completed': ('number', 'Shards completed'),
-  'shards_total_runtime_secs': ('number', 'Shards total runtime (s)'),
-  'shards_avg_runtime_secs': ('number', 'Average shard runtime (s)'),
-
-  'shards_bot_died': ('number', 'Shards where the bot died'),
-  'shards_request_expired': ('number', 'Shards requests expired'),
-}
+### Private Stuff.
 
 
-# Warning: modifying the order here requires updating templates/stats.html.
-_GVIZ_COLUMNS_ORDER_SUMMARY = (
-  'key',
-  'http_requests',
-  'http_failures',
+class _Dimensions(object):
+  TEMPLATE = 'stats_bucket.html'
 
-  'bots_active',
-  'shards_active',
+  DESCRIPTION = {
+    'bots_active': ('number', 'Bots active'),
+    'shards_active': ('number', 'Shards active'),
 
-  'request_enqueued',
-  'shards_enqueued',
+    'requests_enqueued': ('number', 'Requests enqueued'),
+    'requests_completed': ('number', 'Requests completed'),
+    'shards_enqueued': ('number', 'Shards enqueued'),
 
-  'shards_started',
+    'shards_started': ('number', 'Shards started'),
+    'shards_avg_pending_secs': ('number', 'Average shard pending time (s)'),
 
-  'shards_completed',
-  'shards_avg_pending_secs',
-  'shards_total_runtime_secs',
-  'shards_avg_runtime_secs',
+    'shards_completed': ('number', 'Shards completed'),
+    'shards_total_runtime_secs': ('number', 'Shards total runtime (s)'),
+    'shards_avg_runtime_secs': ('number', 'Average shard runtime (s)'),
 
-  'shards_bot_died',
-  'shards_request_expired',
-)
+    'shards_bot_died': ('number', 'Shards where the bot died'),
+    'shards_request_expired': ('number', 'Shards requests expired'),
+  }
+
+  # Warning: modifying the order here requires updating cls.TEMPLATE.
+  ORDER = (
+    'key',
+
+    'bots_active',
+    'shards_active',
+
+    'requests_enqueued',
+    'shards_enqueued',
+
+    'shards_started',  # 5th element.
+
+    'shards_completed',
+    'requests_completed',
+    'shards_avg_pending_secs',
+    'shards_total_runtime_secs',
+    'shards_avg_runtime_secs',  # 10th element.
+
+    'shards_bot_died',
+    'shards_request_expired',
+  )
+
+
+class _Summary(object):
+  TEMPLATE = 'stats_new.html'
+
+  DESCRIPTION = {
+    'http_failures': ('number', 'HTTP Failures'),
+    'http_requests': ('number', 'Total HTTP requests'),
+
+    'bots_active': ('number', 'Bots active'),
+    'shards_active': ('number', 'Shards active'),
+
+    'requests_enqueued': ('number', 'Requests enqueued'),
+    'requests_completed': ('number', 'Requests completed'),
+    'shards_enqueued': ('number', 'Shards enqueued'),
+
+    'shards_started': ('number', 'Shards started'),
+    'shards_avg_pending_secs': ('number', 'Average shard pending time (s)'),
+
+    'shards_completed': ('number', 'Shards completed'),
+    'shards_total_runtime_secs': ('number', 'Shards total runtime (s)'),
+    'shards_avg_runtime_secs': ('number', 'Average shard runtime (s)'),
+
+    'shards_bot_died': ('number', 'Shards where the bot died'),
+    'shards_request_expired': ('number', 'Shards requests expired'),
+  }
+
+  # Warning: modifying the order here requires updating cls.TEMPLATE.
+  ORDER = (
+    'key',
+    'http_requests',
+    'http_failures',
+
+    'bots_active',
+    'shards_active',
+
+    'requests_enqueued',  # 5th element.
+    'shards_enqueued',
+
+    'shards_started',
+
+    'shards_completed',
+    'requests_completed',
+
+    'shards_avg_pending_secs',  # 10th element.
+    'shards_total_runtime_secs',
+    'shards_avg_runtime_secs',
+
+    'shards_bot_died',
+    'shards_request_expired',
+  )
+
+
+class _User(object):
+  TEMPLATE = 'stats_user.html'
+
+  DESCRIPTION = {
+    'shards_active': ('number', 'Shards active'),
+
+    'requests_enqueued': ('number', 'Requests enqueued'),
+    'requests_completed': ('number', 'Requests completed'),
+    'shards_enqueued': ('number', 'Shards enqueued'),
+
+    'shards_started': ('number', 'Shards started'),
+    'shards_avg_pending_secs': ('number', 'Average shard pending time (s)'),
+
+    'shards_completed': ('number', 'Shards completed'),
+    'shards_total_runtime_secs': ('number', 'Shards total runtime (s)'),
+    'shards_avg_runtime_secs': ('number', 'Average shard runtime (s)'),
+
+    'shards_bot_died': ('number', 'Shards where the bot died'),
+    'shards_request_expired': ('number', 'Shards requests expired'),
+  }
+
+  # Warning: modifying the order here requires updating cls.TEMPLATE.
+  ORDER = (
+    'key',
+
+    'shards_active',
+
+    'requests_enqueued',
+    'shards_enqueued',
+
+    'shards_started',
+
+    'shards_completed',  # 5th element.
+    'requests_completed',
+    'shards_avg_pending_secs',
+    'shards_total_runtime_secs',
+    'shards_avg_runtime_secs',
+
+    'shards_bot_died',  # 10th element.
+    'shards_request_expired',
+  )
+
+
+def _stats_data_to_summary(stats_data):
+  """Converts StatsMinute/StatsHour/StatsDay into a dict."""
+  return (i.to_dict() for i in stats_data)
+
+
+def _stats_data_to_dimensions(stats_data, dimensions):
+  """Converts StatsMinute/StatsHour/StatsDay into a dict for the particular
+  dimensions.
+  """
+  def fix(line):
+    for bucket in line.values.buckets:
+      if dimensions == bucket.dimensions:
+        item = bucket
+        break
+    else:
+      # pylint: disable=W0212
+      item = stats._SnapshotForDimensions(dimensions=dimensions)
+    out = item.to_dict()
+    out['key'] = line.get_timestamp()
+    return out
+
+  return (j for j in (fix(i) for i in stats_data) if j)
+
+
+def _stats_data_to_user(stats_data, user):
+  """Converts StatsMinute/StatsHour/StatsDay into a dict for the particular
+  user.
+  """
+  def fix(line):
+    for user_bucket in line.values.users:
+      if user == user_bucket.user:
+        item = user_bucket
+        break
+    else:
+      # pylint: disable=W0212
+      item = stats._SnapshotForUser(user=user)
+    out = item.to_dict()
+    out['key'] = line.get_timestamp()
+    return out
+
+  return (j for j in (fix(i) for i in stats_data) if j)
 
 
 ### Handlers
 
 
-class StatsHandler(webapp2.RequestHandler):
+class StatsHandlerBase(webapp2.RequestHandler):
   """Returns the statistics web page."""
-  def get(self):
+
+  def send_response(self, res_type_info):
     """Presents nice recent statistics.
 
-    It fetches data from the 'JSON' API.
+    It preloads data in the template for maximum responsiveness and
+    interactively fetches data from the JSON API.
     """
     # Preloads the data to save a complete request.
     resolution = self.request.params.get('resolution', 'hours')
-    duration = utils.get_request_as_int(self.request, 'duration', 120, 1, 1000)
+    if resolution not in stats_framework.RESOLUTIONS:
+      self.abort(404)
+    duration = utils.get_request_as_int(
+        self.request, 'duration', default=120, min_value=1, max_value=1000)
+    now = utils.get_request_as_datetime(self.request, 'now')
 
-    description = _GVIZ_DESCRIPTION_SUMMARY.copy()
+    description = res_type_info.DESCRIPTION.copy()
     description.update(stats_framework_gviz.get_description_key(resolution))
-    table = stats_framework.get_stats(
-        stats.STATS_HANDLER, resolution, None, duration, True)
-    params = {
-      'duration': duration,
+    stats_data = stats_framework.get_stats(
+        stats.STATS_HANDLER, resolution, now, duration, False)
+    template_data = self.process_data(description, stats_data)
+    template_data['duration'] = duration
+    # TODO(maruel): Implement 'now' properly.
+    template_data['now'] = now
+    template_data['resolution'] = resolution
+    self.response.write(template.render(res_type_info.TEMPLATE, template_data))
+
+
+class StatsSummaryHandler(StatsHandlerBase):
+  def get(self):
+    self.send_response(_Summary)
+
+  @staticmethod
+  def process_data(description, stats_data):
+    def sorted_unique_list_from_itr(i):
+      return sorted(set(itertools.chain.from_iterable(i)))
+
+    bots = sorted_unique_list_from_itr(
+        line.values.bot_ids for line in stats_data)
+    dimensions = sorted_unique_list_from_itr(
+        (i.dimensions for i in line.values.buckets) for line in stats_data)
+    users = sorted_unique_list_from_itr(
+        (i.user for i in line.values.users) for line in stats_data)
+    table = _stats_data_to_summary(stats_data)
+    # TODO(maruel): 'bots', 'dimensions' and 'users' should be updated when the
+    # user changes the resolution at which the data is displayed.
+    return {
+      'bots': bots,
+      'dimensions': dimensions,
       'initial_data': gviz_api.DataTable(description, table).ToJSon(
-          columns_order=_GVIZ_COLUMNS_ORDER_SUMMARY),
-      'resolution': resolution,
+          columns_order=_Summary.ORDER),
+      'users': users,
     }
-    self.response.write(template.render('stats_new.html', params))
+
+
+class StatsDimensionsHandler(StatsHandlerBase):
+  dimensions = None
+
+  def get(self, dimensions):
+    # Save it for later use in self.process_data().
+    self.dimensions = dimensions
+    self.send_response(_Dimensions)
+
+  def process_data(self, description, stats_data):
+    bots = set()
+    for line in stats_data:
+      for bucket in line.values.buckets:
+        if self.dimensions == bucket.dimensions:
+          bots.update(bucket.bot_ids)
+          break
+
+    table = _stats_data_to_dimensions(stats_data, self.dimensions)
+    # TODO(maruel): 'bots' and 'dimensions' should be updated when the user
+    # changes the resolution at which the data is displayed.
+    return {
+      'bots': sorted(bots),
+      'dimensions': self.dimensions,
+      'initial_data': gviz_api.DataTable(description, table).ToJSon(
+          columns_order=_Dimensions.ORDER),
+    }
+
+
+class StatsUserHandler(StatsHandlerBase):
+  user = None
+
+  def get(self, user):
+    # Save it for later use in self.process_data().
+    self.user = user
+    self.send_response(_User)
+
+  def process_data(self, description, stats_data):
+    table = _stats_data_to_user(stats_data, self.user)
+    return {
+      'initial_data': gviz_api.DataTable(description, table).ToJSon(
+          columns_order=_User.ORDER),
+      'user': self.user,
+    }
 
 
 class StatsGvizHandlerBase(webapp2.RequestHandler):
-  RESOLUTION = None
+  def send_response(self, res_type_info, resolution):
+    if resolution not in stats_framework.RESOLUTIONS:
+      self.abort(404)
 
-  def get(self):
-    description = _GVIZ_DESCRIPTION_SUMMARY.copy()
+    duration = utils.get_request_as_int(
+        self.request, 'duration', default=120, min_value=1, max_value=1000)
+    now = utils.get_request_as_datetime(self.request, 'now')
+    description = res_type_info.DESCRIPTION.copy()
     description.update(
-        stats_framework_gviz.get_description_key(self.RESOLUTION))
+        stats_framework_gviz.get_description_key(resolution))
+    stats_data = stats_framework.get_stats(
+        stats.STATS_HANDLER, resolution, now, duration, False)
+    tqx_args = tqx_args = stats_framework_gviz.process_tqx(
+        self.request.params.get('tqx', ''))
     try:
-      stats_framework_gviz.get_json(
+      stats_framework_gviz.get_json_raw(
           self.request,
           self.response,
-          stats.STATS_HANDLER,
-          self.RESOLUTION,
+          self.get_table(stats_data),
           description,
-          _GVIZ_COLUMNS_ORDER_SUMMARY)
+          res_type_info.ORDER,
+          tqx_args)
     except ValueError as e:
       self.abort(400, str(e))
 
 
-class StatsGvizDaysHandler(StatsGvizHandlerBase):
-  RESOLUTION = 'days'
+class StatsGvizSummaryHandler(StatsGvizHandlerBase):
+  def get(self, resolution):
+    self.send_response(_Summary, resolution)
+
+  @staticmethod
+  def get_table(stats_data):
+    return _stats_data_to_summary(stats_data)
 
 
-class StatsGvizHoursHandler(StatsGvizHandlerBase):
-  RESOLUTION = 'hours'
+class StatsGvizDimensionsHandler(StatsGvizHandlerBase):
+  dimensions = None
+
+  def get(self, dimensions, resolution):
+    # Save it for later use in self.process_data().
+    self.dimensions = dimensions
+    self.send_response(_Dimensions, resolution)
+
+  def get_table(self, stats_data):
+    return _stats_data_to_dimensions(stats_data, self.dimensions)
 
 
-class StatsGvizMinutesHandler(StatsGvizHandlerBase):
-  RESOLUTION = 'minutes'
+class StatsGvizUserHandler(StatsGvizHandlerBase):
+  user = None
+
+  def get(self, user, resolution):
+    # Save it for later use in self.process_data().
+    self.user = user
+    self.send_response(_User, resolution)
+
+  def get_table(self, stats_data):
+    return _stats_data_to_user(stats_data, self.user)

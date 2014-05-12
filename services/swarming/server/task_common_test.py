@@ -50,6 +50,28 @@ class TaskCommonApiTest(test_case.TestCase):
     delta = task_common.milliseconds_since_epoch(None)
     self.assertEqual(97445007, delta)
 
+  def test_match_dimensions(self):
+    data_true = (
+      ({}, {}),
+      ({}, {'a': 'b'}),
+      ({'a': 'b'}, {'a': 'b'}),
+      ({'os': 'amiga'}, {'os': ['amiga', 'amiga-3.1']}),
+      ( {'os': 'amiga', 'foo': 'bar'},
+        {'os': ['amiga', 'amiga-3.1'], 'a': 'b', 'foo': 'bar'}),
+    )
+
+    for request_dimensions, bot_dimensions in data_true:
+      self.assertEqual(
+          True,
+          task_common.match_dimensions(request_dimensions, bot_dimensions))
+
+    data_false = (
+      ({'os': 'amiga'}, {'os': ['Win', 'Win-3.1']}),
+    )
+    for request_dimensions, bot_dimensions in data_false:
+      self.assertEqual(
+          False,
+          task_common.match_dimensions(request_dimensions, bot_dimensions))
 
 if __name__ == '__main__':
   if '-v' in sys.argv:

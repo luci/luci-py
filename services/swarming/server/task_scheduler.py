@@ -67,8 +67,8 @@ def new_request(data):
   ndb.put_multi(items)
   stats.add_request_entry(
       'request_enqueued', request.key,
-      dimensions=stats.pack_dimensions(request.properties.dimensions),
-      shards=request.properties.number_shards,
+      dimensions=request.properties.dimensions,
+      number_shards=request.properties.number_shards,
       user=request.user)
   return request, shard_runs
 
@@ -154,7 +154,7 @@ def bot_reap_task(dimensions, bot_id):
       stats.add_shard_entry(
           'shard_started', shard_result.key,
           bot_id=bot_id,
-          dimensions=stats.pack_dimensions(request.properties.dimensions),
+          dimensions=request.properties.dimensions,
           pending_ms=_secs_to_ms(pending_time.total_seconds()),
           user=request.user)
       return request, shard_result
@@ -201,13 +201,13 @@ def bot_update_task(shard_result_key, data, bot_id):
     stats.add_shard_entry(
         'shard_completed', shard_result.key,
         bot_id=bot_id,
-        dimensions=stats.pack_dimensions(request.properties.dimensions),
+        dimensions=request.properties.dimensions,
         runtime_ms=_secs_to_ms(shard_result.duration().total_seconds()),
         user=request.user)
   else:
     stats.add_shard_entry(
         'shard_updated', shard_result.key, bot_id=bot_id,
-        dimensions=stats.pack_dimensions(request.properties.dimensions))
+        dimensions=request.properties.dimensions)
   return True
 
 
@@ -243,7 +243,7 @@ def cron_abort_expired_shard_to_run():
         request = request_future.get_result()
         stats.add_shard_entry(
             'shard_request_expired', shard_result.key,
-            dimensions=stats.pack_dimensions(request.properties.dimensions),
+            dimensions=request.properties.dimensions,
             user=request.user)
       else:
         # It's not a big deal, the bot will continue running.
@@ -269,7 +269,7 @@ def cron_abort_bot_died():
       stats.add_shard_entry(
           'shard_bot_died', shard_result.key,
           bot_id=shard_result.bot_id,
-          dimensions=stats.pack_dimensions(request.properties.dimensions),
+          dimensions=request.properties.dimensions,
           user=request.user)
       total += 1
   finally:

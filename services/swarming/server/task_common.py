@@ -60,3 +60,19 @@ def milliseconds_since_epoch(now):
   """Returns the number of milliseconds since unix epoch as an int."""
   now = now or utcnow()
   return int(round((now - UNIX_EPOCH).total_seconds() * 1000.))
+
+
+def match_dimensions(request_dimensions, bot_dimensions):
+  """Returns True if the bot dimensions satisfies the request dimensions."""
+  assert isinstance(request_dimensions, dict), request_dimensions
+  assert isinstance(bot_dimensions, dict), bot_dimensions
+  if frozenset(request_dimensions).difference(bot_dimensions):
+    return False
+  for key, required in request_dimensions.iteritems():
+    bot_value = bot_dimensions[key]
+    if isinstance(bot_value, (list, tuple)):
+      if required not in bot_value:
+        return False
+    elif required != bot_value:
+      return False
+  return True

@@ -6,6 +6,7 @@
 
 import datetime
 import os
+import urllib
 
 import jinja2
 
@@ -40,8 +41,16 @@ def datetime_human(dt):
   return dt.strftime('%Y-%m-%d %H:%M:%S')
 
 
+def urlquote(s):
+  # TODO(maruel): Remove once jinja is upgraded to 2.7.
+  if isinstance(s, jinja2.Markup):
+    s = s.unescape()
+  return jinja2.Markup(urllib.quote_plus(s.encode('utf8')))
+
+
 JINJA.filters['datetimeformat'] = datetimeformat
 JINJA.filters['datetime_human'] = datetime_human
+JINJA.filters['urlquote'] = urlquote
 
 
 def get_defaults():

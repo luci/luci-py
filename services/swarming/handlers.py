@@ -1283,14 +1283,22 @@ def CreateApplication():
       (_SECURE_GET_RESULTS_URL, SecureGetResultHandler),
       (_SECURE_MAIN_URL, MainHandler),
       (_SECURE_USER_PROFILE_URL, UserProfileHandler),
-      ('/stats_new', stats_gviz.StatsHandler),
+      ('/stats_new', stats_gviz.StatsSummaryHandler),
+      ('/stats_new/dimensions/<dimensions:.+>',
+        stats_gviz.StatsDimensionsHandler),
+      ('/stats_new/user/<user:.+>',
+        stats_gviz.StatsUserHandler),
 
       # The new APIs:
       ('/swarming/api/v1/bots', ApiBots),
       ('/swarming/api/v1/bots/dead/count', DeadBotsCountHandler),
-      ('/swarming/api/v1/stats/days', stats_gviz.StatsGvizDaysHandler),
-      ('/swarming/api/v1/stats/hours', stats_gviz.StatsGvizHoursHandler),
-      ('/swarming/api/v1/stats/minutes', stats_gviz.StatsGvizMinutesHandler),
+      ('/swarming/api/v1/stats/summary/<resolution:[a-z]+>',
+        stats_gviz.StatsGvizSummaryHandler),
+      ('/swarming/api/v1/stats/dimensions/<dimensions:.+>/<resolution:[a-z]+>',
+        stats_gviz.StatsGvizDimensionsHandler),
+      ('/swarming/api/v1/stats/user/<user:.+>/<resolution:[a-z]+>',
+        stats_gviz.StatsGvizUserHandler),
+
 
       # Internal urls.
 

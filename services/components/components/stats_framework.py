@@ -28,6 +28,11 @@ from components import utils
 PREFIX = 'Stats: '
 
 
+# Supported resolutions. In theory, 'weeks' and 'months' could be added one day
+# if desired.
+RESOLUTIONS = ('days', 'hours', 'minutes')
+
+
 # Number of minutes to ignore because they are too fresh. This is done so that
 # eventual log consistency doesn't have to be managed explicitly. On the dev
 # server, there's no eventual inconsistency so process up to the last minute.
@@ -382,9 +387,12 @@ def _generate_stats_day_cls(snapshot_cls):
     def values(self):
       return self.values_compressed or self.values_uncompressed
 
+    def get_timestamp(self):
+      return self.to_date()
+
     def to_dict(self):
       out = self.values.to_dict()
-      out['key'] = self.to_date()
+      out['key'] = self.get_timestamp()
       return out
 
     def to_date(self):
@@ -428,9 +436,12 @@ def _generate_stats_hour_cls(snapshot_cls):
     def values(self):
       return self.values_compressed or self.values_uncompressed
 
+    def get_timestamp(self):
+      return self.to_datetime()
+
     def to_dict(self):
       out = self.values.to_dict()
-      out['key'] = self.to_datetime()
+      out['key'] = self.get_timestamp()
       return out
 
     def to_datetime(self):
@@ -469,9 +480,12 @@ def _generate_stats_minute_cls(snapshot_cls):
     def values(self):
       return self.values_compressed or self.values_uncompressed
 
+    def get_timestamp(self):
+      return self.to_datetime()
+
     def to_dict(self):
       out = self.values.to_dict()
-      out['key'] = self.to_datetime()
+      out['key'] = self.get_timestamp()
       return out
 
     def to_datetime(self):

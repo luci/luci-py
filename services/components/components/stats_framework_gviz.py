@@ -11,10 +11,10 @@ from components import utils
 from gviz import gviz_api
 
 
-### Private stuff.
+### Public API.
 
 
-def _process_tqx(tqx):
+def process_tqx(tqx):
   """Processes the tqx gviz arguments."""
   kwargs = {}
   for arg in tqx.split(';'):
@@ -34,9 +34,6 @@ def _process_tqx(tqx):
     else:
       logging.warning('Unknown query parameter %s', arg)
   return kwargs
-
-
-### Public API.
 
 
 def get_description_key(resolution):
@@ -74,12 +71,39 @@ def get_json(request, response, handler, resolution, description, order):
   Raises:
     ValueError if a 400 should be returned.
   """
-  kwargs = _process_tqx(request.params.get('tqx', ''))
+  tqx_args = process_tqx(request.params.get('tqx', ''))
   duration = utils.get_request_as_int(request, 'duration', 120, 1, 256)
   now = utils.get_request_as_datetime(request, 'now')
 
   table = stats_framework.get_stats(handler, resolution, now, duration, True)
+  return get_json_raw(request, response, table, description, order, tqx_args)
 
+
+def get_json_raw(request, response, table, description, order, tqx_args):
+  """Returns the statistic data as a Google Visualization compatible reply.
+
+  The return can be either JSON or JSONP, depending if the header
+  'X-DataSource-Auth' is set in the request.
+
+  Note that this is not real JSON, as explained in
+  developers.google.com/chart/interactive/docs/dev/implementing_data_source
+
+  Exposes the data in the format described at
+  https://developers.google.com/chart/interactive/docs/reference#dataparam
+  and
+  https://developers.google.com/chart/interactive/docs/querylanguage
+
+  Arguments:
+  - request: A webapp2.Request.
+  - response: A webapp2.Response.
+  - table: Raw data ready to be sent back.
+  - description: Dict describing the columns.
+  - order: List describing the order to use for the columns.
+  - tqx_args: Dict of flags used in the tqx query parameter.
+
+  Raises:
+    ValueError if a 400 should be returned.
+  """
   if request.headers.get('X-DataSource-Auth'):
     # Client requested JSON.
     response.headers['Content-Type'] = 'application/json; charset=utf-8'
@@ -87,7 +111,7 @@ def get_json(request, response, handler, resolution, description, order):
     # make this cleaner.
     # pylint: disable=W0212
     response_obj = {
-      'reqId': str(kwargs.get('req_id', 0)),
+      'reqId': str(tqx_args.get('req_id', 0)),
       'status': 'ok',
       'table': gviz_api.DataTable(description, table)._ToJSonObj(
           columns_order=order),
@@ -101,4 +125,4 @@ def get_json(request, response, handler, resolution, description, order):
         'application/javascript; charset=utf-8')
     response.write(
         gviz_api.DataTable(description, table).ToJSonResponse(
-            columns_order=order, **kwargs))
+            columns_order=order, **tqx_args))

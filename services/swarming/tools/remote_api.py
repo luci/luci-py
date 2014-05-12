@@ -28,6 +28,7 @@ def setup_context():
   from server import admin_user
   from server import dimension_mapping
   from server import dimensions_utils
+  from server import stats_new as stats
   from server import test_management
   from server import test_request
   from server import test_runner

@@ -8,6 +8,7 @@ It's important to keep logs concise for general performance concerns. Each http
 handler should strive to do only one stats log entry per request.
 """
 
+import json
 import logging
 
 import webapp2
@@ -17,6 +18,8 @@ from google.appengine.runtime import DeadlineExceededError
 
 from components import decorators
 from components import stats_framework
+from components import utils
+from server import task_common
 
 
 ### Models
@@ -76,6 +79,8 @@ class _SnapshotForUser(_SnapshotBucketBase):
 
 class _SnapshotForDimensions(_SnapshotBucketBase):
   """Statistics for a specific bucket of TaskRequest.properties.dimensions."""
+  # Dimensions are saved as json encoded. JSONProperty is not used so it is
+  # easier to compare and sort entries containing dicts.
   dimensions = ndb.StringProperty()
 
   # TODO(maruel): This will become large (thousands). Something like a
@@ -105,6 +110,8 @@ class _Snapshot(ndb.Model):
 
   It has references to _SnapshotForDimensions which holds the
   dimensions-specific data.
+
+  TODO(maruel): Add requests_total_runtime_secs, requests_avg_runtime_secs.
   """
   # General HTTP details.
   http_requests = ndb.IntegerProperty(default=0)
@@ -116,7 +123,9 @@ class _Snapshot(ndb.Model):
   # and determine if it becomes a problem.
   bot_ids = ndb.StringProperty(repeated=True)
 
+  # Buckets the statistics per dimensions.
   buckets = ndb.LocalStructuredProperty(_SnapshotForDimensions, repeated=True)
+  # Per user statistics.
   users = ndb.LocalStructuredProperty(_SnapshotForUser, repeated=True)
 
   @property
@@ -187,52 +196,72 @@ class _Snapshot(ndb.Model):
       return round(runtime_secs / float(completed), 3)
     return 0.
 
-  def get_dimensions(self, dimensions):
+  def get_dimensions(self, dimensions_json):
     """Returns a _SnapshotForDimensions instance for this dimensions key.
+
+    Arguments:
+      dimensions_json: json encoded dict representing the dimensions.
 
     Creates one if necessary and keeps self.buckets sorted.
     """
-    dimensions_map = dict((i.dimensions, i) for i in self.buckets)
-    if not dimensions in dimensions_map:
-      i = _SnapshotForDimensions(dimensions=dimensions)
-      self.buckets.append(i)
-      self.buckets.sort(key=lambda i: i.dimensions)
-      return i
-    return dimensions_map[dimensions]
+    # TODO(maruel): A binary search could be done since the list is always
+    # sorted.
+    for i in self.buckets:
+      if i.dimensions == dimensions_json:
+        return i
+
+    new_item = _SnapshotForDimensions(dimensions=dimensions_json)
+    self.buckets.append(new_item)
+    self.buckets.sort(key=lambda i: i.dimensions)
+    return new_item
 
   def get_user(self, user):
     """Returns a _SnapshotForUser instance for this user.
 
     Creates one if necessary and keeps self.users sorted.
     """
-    user_map = dict((i.user, i) for i in self.users)
-    if not user in user_map:
-      i = _SnapshotForUser(user=user)
-      self.users.append(i)
-      self.users.sort(key=lambda i: i.user)
-      return i
-    return user_map[user]
+    # TODO(maruel): A binary search could be done since the list is always
+    # sorted.
+    for i in self.users:
+      if i.user == user:
+        return i
+
+    new_item = _SnapshotForUser(user=user)
+    self.users.append(new_item)
+    self.users.sort(key=lambda i: i.user)
+    return new_item
 
   def accumulate(self, rhs):
-    # TODO(maruel): Pre-populate all dimensions being used in the past N hours.
-    # In particular, pre-populate the list of bot_ids available per popular
-    # request types, like 'os=foo'.
+    """Accumulates data from rhs into self."""
     stats_framework.accumulate(self, rhs, ['bot_ids', 'buckets', 'users'])
     self.bot_ids = sorted(set(self.bot_ids) | set(rhs.bot_ids))
     lhs_dimensions = dict((i.dimensions, i) for i in self.buckets)
     rhs_dimensions = dict((i.dimensions, i) for i in rhs.buckets)
-    for key in set(lhs_dimensions) | set(rhs_dimensions):
+    for key in set(rhs_dimensions):
       if key not in lhs_dimensions:
-        lhs_dimensions[key] = rhs_dimensions[key]
-      elif key in rhs_dimensions:
+        # Make a copy of the right hand side so no aliasing occurs.
+        lhs_dimensions[key] = rhs_dimensions[key].__class__()
+        lhs_dimensions[key].populate(**rhs_dimensions.to_dict())
+      else:
         lhs_dimensions[key].accumulate(rhs_dimensions[key])
-    self.buckets = lhs_dimensions.values()
+    self.buckets = sorted(
+        lhs_dimensions.itervalues(), key=lambda i: i.dimensions)
+
+    lhs_users = dict((i.user, i) for i in self.users)
+    rhs_users = dict((i.user, i) for i in rhs.users)
+    for key in set(rhs_users):
+      if key not in lhs_users:
+        # Make a copy of the right hand side so no aliasing occurs.
+        lhs_users[key] = rhs_users[key].__class__()
+        lhs_users[key].populate(**rhs_users[key].to_dict())
+      else:
+        lhs_users[key].accumulate(rhs_users[key])
+    self.users = sorted(lhs_users.itervalues(), key=lambda i: i.user)
 
   def to_dict(self):
     """Returns the summary only, not the buckets."""
     return {
       'bots_active': self.bots_active,
-      'dimensions': [i.dimensions for i in self.buckets],
       'http_failures': self.http_failures,
       'http_requests': self.http_requests,
       'requests_completed': self.requests_completed,
@@ -247,13 +276,13 @@ class _Snapshot(ndb.Model):
       'shards_request_expired': self.shards_request_expired,
       'shards_total_runtime_secs': self.shards_total_runtime_secs,
       'shards_started': self.shards_started,
-      'users': [i.user for i in self.users],
     }
 
 
 ### Utility
 
 
+# Valid actions that can be logged.
 _VALID_ACTIONS = frozenset(
   [
     'bot_active',
@@ -266,6 +295,21 @@ _VALID_ACTIONS = frozenset(
     'shard_updated',
   ])
 
+# Mapping from long to compact key names. This reduces space usage.
+_KEY_MAPPING = {
+  'action': 'a',
+  'bot_id': 'bid',
+  'dimensions': 'd',
+  'pending_ms': 'pms',
+  'req_id': 'rid',
+  'runtime_ms': 'rms',
+  'number_shards': 'ns',
+  'shard_id': 'sid',
+  'user': 'u',
+}
+
+_REVERSE_KEY_MAPPING = {v:k for k, v in _KEY_MAPPING.iteritems()}
+
 
 def _assert_list(actual, expected):
   actual = sorted(actual)
@@ -276,7 +320,8 @@ def _assert_list(actual, expected):
 def _mark_bot_and_shard_as_active(extras, bots_active, shards_active):
   """Notes both the bot id and the shard id as active in this time span."""
   bots_active.setdefault(extras['bot_id'], extras['dimensions'])
-  shards_active.setdefault(extras['dimensions'], set()).add(extras['shard_id'])
+  dimensions_json = utils.encode_to_json(extras['dimensions'])
+  shards_active.setdefault(dimensions_json, set()).add(extras['shard_id'])
 
 
 def _ms_to_secs(raw):
@@ -287,6 +332,25 @@ def _ms_to_secs(raw):
   return float(raw) * 0.001
 
 
+def _pack_entry(**kwargs):
+  """Packs an entry so it can be logged as a statistic in the logs.
+
+  Specifically process 'dimensions' if present to remove the key 'hostname'.
+  """
+  assert kwargs['action'] in _VALID_ACTIONS, kwargs
+  dimensions = kwargs.get('dimensions')
+  if dimensions:
+    kwargs['dimensions'] = {
+      k: v for k, v in dimensions.iteritems() if k != 'hostname'
+    }
+  packed = {_KEY_MAPPING[k]: v for k, v in kwargs.iteritems()}
+  return utils.encode_to_json(packed)
+
+
+def _unpack_entry(line):
+  return {_REVERSE_KEY_MAPPING[k]: v for k, v in json.loads(line).iteritems()}
+
+
 def _parse_line(line, values, bots_active, shards_active):
   """Updates a Snapshot instance with a processed statistics line if relevant.
 
@@ -294,14 +358,21 @@ def _parse_line(line, values, bots_active, shards_active):
   it is relatively easy to read, as long as the keys are kept sorted!
   """
   try:
-    data = line.split('; ')
-    action = data.pop(0)
-    extras = dict(i.split('=', 1) for i in data)
+    try:
+      extras = _unpack_entry(line)
+      action = extras.pop('action')
+    except (KeyError, ValueError):
+      data = line.split('; ')
+      action = data.pop(0)
+      extras = dict(i.split('=', 1) for i in data)
 
     # Preemptively reduce copy-paste.
     d = None
-    if 'dimensions' in extras:
-      d = values.get_dimensions(extras['dimensions'])
+    if 'dimensions' in extras and action != 'bot_active':
+      # Skip bot_active because we don't want complex dimensions to be created
+      # implicitly.
+      dimensions_json = utils.encode_to_json(extras['dimensions'])
+      d = values.get_dimensions(dimensions_json)
     u = None
     if 'user' in extras:
       u = values.get_user(extras['user'])
@@ -315,12 +386,12 @@ def _parse_line(line, values, bots_active, shards_active):
       return True
 
     if action == 'request_enqueued':
-      _assert_list(extras, ['dimensions', 'req_id', 'shards', 'user'])
+      _assert_list(extras, ['dimensions', 'number_shards', 'req_id', 'user'])
       # Convert the request id to shard ids.
-      num_shards = int(extras['shards'])
+      num_shards = int(extras['number_shards'])
       req_id = int(extras['req_id'], 16)
       for i in xrange(num_shards):
-        shards_active.setdefault(extras['dimensions'], set()).add(
+        shards_active.setdefault(dimensions_json, set()).add(
             '%x-1' % (req_id + i + 1))
       d.requests_enqueued += 1
       d.shards_enqueued += num_shards
@@ -379,15 +450,21 @@ def _parse_line(line, values, bots_active, shards_active):
 
 
 def _post_process(snapshot, bots_active, shards_active):
-  snapshot.bot_ids = sorted(bots_active)
-  for dimensions, shards in shards_active.iteritems():
-    snapshot.get_dimensions(dimensions).shards_active = len(shards)
+  """Completes the _Snapshot instance with additional data."""
+  for dimensions_json, shards in shards_active.iteritems():
+    snapshot.get_dimensions(dimensions_json).shards_active = len(shards)
 
-  # Ignore hostname dimension requests. These are usually maintenance requests
-  # and are not useful.
-  for bucket in snapshot.buckets[:]:
-    if bucket.dimensions.startswith('hostname_'):
-      snapshot.buckets.remove(bucket)
+  snapshot.bot_ids = sorted(bots_active)
+  for bot_id, dimensions in bots_active.iteritems():
+    # Looks at the current buckets, do not create one.
+    for bucket in snapshot.buckets:
+      # If this bot matches these dimensions, mark it as a member of this group.
+      if task_common.match_dimensions(
+          json.loads(bucket.dimensions), dimensions):
+        # This bot could be used for requests on this dimensions filter.
+        if not bot_id in bucket.bot_ids:
+          bucket.bot_ids.append(bot_id)
+          bucket.bot_ids.sort()
 
 
 def _extract_snapshot_from_logs(start_time, end_time):
@@ -424,27 +501,17 @@ STATS_HANDLER = stats_framework.StatisticsFramework(
     'global_stats', _Snapshot, _extract_snapshot_from_logs)
 
 
-def add_entry(action, **kwargs):
-  """Formatted statistics log entry so it can be processed for daily stats.
-
-  The format is simple enough that it doesn't require a regexp for faster
-  processing.
-  """
-  assert action in _VALID_ACTIONS, action
-  # The stats framework doesn't do escaping yet, so refuse separator '; ' in the
-  # values.
-  assert not any(
-      ';' in k or ';' in str(v) for k, v in kwargs.iteritems()), kwargs
-  cmd = action + ''.join(
-      '; %s=%s' % (k, v) for k, v in sorted(kwargs.iteritems()))
-  stats_framework.add_entry(cmd)
+def add_entry(**kwargs):
+  """Formatted statistics log entry so it can be processed for statistics."""
+  stats_framework.add_entry(_pack_entry(**kwargs))
 
 
 def add_request_entry(action, request_key, **kwargs):
   """Action about a TaskRequest."""
   assert action.startswith('request_'), action
   assert request_key.kind() == 'TaskRequest', request_key
-  return add_entry(action, req_id='%x' % request_key.integer_id(), **kwargs)
+  return add_entry(
+      action=action, req_id='%x' % request_key.integer_id(), **kwargs)
 
 
 def add_shard_entry(action, shard_result_key, **kwargs):
@@ -453,14 +520,7 @@ def add_shard_entry(action, shard_result_key, **kwargs):
   assert shard_result_key.kind() == 'TaskShardResult', shard_result_key
   shard_id = '%x-%d' % (
       shard_result_key.parent().integer_id(), shard_result_key.integer_id())
-  return add_entry(action, shard_id=shard_id, **kwargs)
-
-
-def pack_dimensions(dimensions):
-  """Returns densely packed dimensions. Always ignore 'hostname'."""
-  return '/'.join(
-      '%s_%s' % (k, v)
-      for k, v in sorted(dimensions.iteritems()) if k != 'hostname')
+  return add_entry(action=action, shard_id=shard_id, **kwargs)
 
 
 ### Handlers

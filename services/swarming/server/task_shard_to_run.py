@@ -203,20 +203,6 @@ def _hash_dimensions(dimensions_json):
   return int(struct.unpack('<L', digest[:4])[0])
 
 
-def _match_dimensions(request_dimensions, bot_dimensions):
-  """Returns True if the bot dimensions satisfies the request."""
-  if frozenset(request_dimensions).difference(bot_dimensions):
-    return False
-  for key, required in request_dimensions.iteritems():
-    bot_value = bot_dimensions[key]
-    if isinstance(bot_value, (list, tuple)):
-      if required not in bot_value:
-        return False
-    elif required != bot_value:
-      return False
-  return True
-
-
 def _set_lookup_cache(shard_to_run_key, is_available_to_schedule):
   """Updates the quick lookup cache to mark an item as available or not.
 
@@ -400,7 +386,8 @@ def yield_next_available_shard_to_dispatch(bot_dimensions):
       # verifying the TaskRequest. There's a probability of 2**-31 of conflicts,
       # which is low enough for our purpose.
       request = shard_to_run.request_key.get()
-      if not _match_dimensions(request.properties.dimensions, bot_dimensions):
+      if not task_common.match_dimensions(
+          request.properties.dimensions, bot_dimensions):
         real_mismatch += 1
         continue
 

@@ -9,6 +9,7 @@ import logging
 import os
 import sys
 import unittest
+import urllib
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -676,13 +677,15 @@ class AppTest(test_case.TestCase):
       '/server_ping',
       '/stats',
       '/stats_new',
+      '/stats_new/dimensions/<dimensions:.+>',
+      '/stats_new/user/<user:.+>',
       '/stats/daily',
       '/stats/tasks',
       '/stats/waits',
       '/swarming/api/v1/bots/dead/count',
-      '/swarming/api/v1/stats/days',
-      '/swarming/api/v1/stats/hours',
-      '/swarming/api/v1/stats/minutes',
+      '/swarming/api/v1/stats/summary/<resolution:[a-z]+>',
+      '/swarming/api/v1/stats/dimensions/<dimensions:.+>/<resolution:[a-z]+>',
+      '/swarming/api/v1/stats/user/<user:.+>/<resolution:[a-z]+>',
     ])
 
     # Grab the set of all routes.
@@ -720,6 +723,25 @@ class AppTest(test_case.TestCase):
     for route in routes_to_check:
       CheckProtected(route, 'GET')
       CheckProtected(route, 'POST')
+
+  def testStatsUrls(self):
+    quoted = urllib.quote('{"os":"amiga"}')
+    urls = (
+      '/stats_new',
+      '/stats_new/dimensions/' + quoted,
+      '/stats_new/user/joe',
+      '/swarming/api/v1/stats/summary/days',
+      '/swarming/api/v1/stats/summary/hours',
+      '/swarming/api/v1/stats/summary/minutes',
+      '/swarming/api/v1/stats/dimensions/%s/days' % quoted,
+      '/swarming/api/v1/stats/dimensions/%s/hours' % quoted,
+      '/swarming/api/v1/stats/dimensions/%s/minutes' % quoted,
+      '/swarming/api/v1/stats/user/joe/days',
+      '/swarming/api/v1/stats/user/joe/hours',
+      '/swarming/api/v1/stats/user/joe/minutes',
+    )
+    for url in urls:
+      self.app.get(url, status=200)
 
   def testRemoteErrorHandler(self):
     self.assertEqual(0, errors.SwarmError.query().count())

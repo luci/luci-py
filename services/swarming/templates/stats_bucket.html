@@ -18,28 +18,21 @@
     var show_as_raw = false;
     // Common shared data.
     var data_table = null;
-    // The graphs.
-    var chart_http_requests = null;
+    // The three graphs.
     var chart_work = null;
     var chart_times = null;
     var chart_table = null;
     // Current on-going HTTP request.
     var current_query = null;
 
-    function set_resolution_internal(res) {
-      document.getElementById('resolution_days').checked = false;
-      document.getElementById('resolution_hours').checked = false;
-      document.getElementById('resolution_minutes').checked = false;
-      document.getElementById('resolution_' + res).checked = true;
-      current_resolution = res;
-    }
+{% include 'stats_common.js' %}
 
     // Reloads the data with a new resolution.
     function set_resolution(res) {
       set_resolution_internal(res);
       // Refresh the data even if the user requested the same res.
-      var url = '/swarming/api/v1/stats/summary/' + current_resolution +
-          '?duration=' + duration;
+      var url = '/swarming/api/v1/stats/dimensions/{{dimensions|urlquote}}/' +
+          current_resolution + '?duration=' + duration;
       sendQuery(url, redrawCharts);
     }
 
@@ -53,8 +46,6 @@
       }
     }
 
-{% include 'stats_common.js' %}
-
     // Redraws all the charts. This can happen in two situations; new data
     // arrived via sendQuery() or the raw data toggle was changed.
     function redrawCharts(new_table) {
@@ -64,43 +55,26 @@
         return;
       }
       // Reformat some of the columns.
-      if (show_as_raw == false) {
-        // TODO(maruel): Enable by name instead of hardcoding by index.
-        // These indexes are relative to stats_gviz._Summary.ORDER.
-        // https://code.google.com/p/swarming/issues/detail?id=100
-        formatDataColumnToIsoUnit(data_table, 1);
-        formatDataColumnToIsoUnit(data_table, 2);
-      } else {
+      if (show_as_raw == true) {
         resetFormattedData(data_table);
       }
 
       var formatter_key = get_key_formatter();
-      // These indexes are relative to stats_gviz._Summary.ORDER.
+      // These indexes are relative to stats_gviz._Dimension.ORDER.
       formatter_key.format(data_table, 0);
 
       var round3 = new google.visualization.NumberFormat(
           {decimalSymbol:'.', fractionDigits:3});
-      // These indexes are relative to stats_gviz._GVIZ_COLUMNS_ORDER.
+      // These indexes are relative to stats_gviz._Dimension.ORDER.
+      round3.format(data_table, 8);
+      round3.format(data_table, 9);
       round3.format(data_table, 10);
-      round3.format(data_table, 11);
-      round3.format(data_table, 12);
-
-      // HTTP request graph.
-      clearCustomTicks(chart_http_requests);
-      var view = new google.visualization.DataView(data_table);
-      // These indexes are relative to stats_gviz._Summary.ORDER.
-      view.setColumns([0, 1, 2]);
-      chart_http_requests.setDataTable(view.toDataTable());
-      if (show_as_raw == false) {
-        setAxisTicksToUnitsOnNextDraw(chart_http_requests, false);
-      }
-      chart_http_requests.draw();
 
       // Work graph.
       clearCustomTicks(chart_work);
       var view = new google.visualization.DataView(data_table);
-      // These indexes are relative to stats_gviz._Summary.ORDER.
-      view.setColumns([0, 3, 4, 13, 14]);
+      // These indexes are relative to stats_gviz._Dimension.ORDER.
+      view.setColumns([0, 1, 2, 11, 12]);
       chart_work.setDataTable(view.toDataTable());
       if (show_as_raw == false) {
         setAxisTicksToUnitsOnNextDraw(chart_work, false);
@@ -110,8 +84,8 @@
       // Times graph.
       clearCustomTicks(chart_times);
       var view = new google.visualization.DataView(data_table);
-      // These indexes are relative to stats_gviz._Summary.ORDER.
-      view.setColumns([0, 10, 11, 12]);
+      // These indexes are relative to stats_gviz._Dimension.ORDER.
+      view.setColumns([0, 8, 9, 10]);
       chart_times.setDataTable(view.toDataTable());
       if (show_as_raw == false) {
         setAxisTicksToUnitsOnNextDraw(chart_times, false);
@@ -127,29 +101,6 @@
     // Callback when google viz is ready. Loads each graph.
     function loaded() {
       data_table = new google.visualization.DataTable({{initial_data|safe}});
-      chart_http_requests = new google.visualization.ChartWrapper(
-        {
-          chartType: 'LineChart',
-          dataTable: data_table,
-          containerId: 'http_request_graph',
-          options: {
-            animation: {
-              duration: 500,
-              easing: 'out'
-            },
-            height: '100%',
-            // These indexes are relative to view.setColumns().
-            series: [
-              {},
-              // http_failures.
-              {
-                color: 'red',
-              },
-            ],
-            title: 'Requests',
-            width: '100%'
-          },
-        });
       chart_work = new google.visualization.ChartWrapper(
         {
           chartType: 'LineChart',
@@ -215,7 +166,6 @@
       // For debugging.
       chart_times: function() { return chart_times; },
       chart_work: function() { return chart_work; },
-      chart_http_requests: function() { return chart_http_requests; },
       chart_table: function() { return chart_table; },
       current_query: function() { return current_query; },
       current_resolution: function() { return current_resolution; },
@@ -233,37 +183,10 @@
     {{now}}
   </div>
 
-  <h1>Statistics</h1>
-
-  {# TODO(maruel): Regenerate this table when the resolution is changed. #}
-  <table>
-    <thead>
-      <td>Dimensions</td>
-      <td>User</td>
-    </thead>
-    <tr>
-      <td>
-        <ul>
-          {% for item in dimensions %}
-            {# TODO(maruel): Keep duration, current_resolution and maybe 'now'.
-            #}
-            <li><a href="/stats_new/dimensions/{{item}}">{{item}}</a></li>
-          {% endfor %}
-        </ul>
-      </td>
-      <td>
-        <ul>
-          {% for user in users %}
-            {# TODO(maruel): Keep duration, current_resolution and maybe 'now'.
-            #}
-            <li><a href="/stats_new/user/{{item}}">{{item}}</a></li>
-          {% endfor %}
-        </ul>
-      </td>
-    </tr>
-  </table>
-
-  <hr />
+  <h1>Statistics for dimensions {{dimensions}}</h1>
+  {# TODO(maruel): Keep duration, current_resolution and maybe 'now'. #}
+  <a href="/stats_new">Go back to summary</a>
+  <p>
   Resolution:
   <input type="checkbox" id=resolution_days
     onclick="local.set_resolution('days')">Day</input>
@@ -276,8 +199,6 @@
     Show as raw</input>
 
   <hr>
-  <div id="http_request_graph" class="graph">(Loading...)</div>
-  <hr>
   <div id="work_graph" class="graph">(Loading...)</div>
   <hr>
   <div id="times_graph" class="graph">(Loading...)</div>
@@ -288,8 +209,7 @@
   Bots:<br>
   <ul>
     {% for item in bots %}
-      {# Get dimensions of each bot #}
-      <li>{{item}}</li>
+    <li>{{item}}</li>
     {% endfor %}
   </ul>
 
