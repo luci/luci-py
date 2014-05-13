@@ -12,9 +12,7 @@ import json
 import logging
 
 import webapp2
-from google.appengine.api import logservice
 from google.appengine.ext import ndb
-from google.appengine.runtime import DeadlineExceededError
 
 from components import decorators
 from components import stats_framework
@@ -531,13 +529,8 @@ class InternalStatsUpdateHandler(webapp2.RequestHandler):
   @decorators.require_cronjob
   def get(self):
     self.response.headers['Content-Type'] = 'text/plain'
-    try:
-      i = STATS_HANDLER.process_next_chunk(stats_framework.TOO_RECENT)
-    except (DeadlineExceededError, logservice.Error):
-      # The job will be retried.
-      self.response.status_code = 500
-      return
-
-    msg = 'Processed %d minutes' % i
-    logging.info(msg)
-    self.response.write(msg)
+    i = STATS_HANDLER.process_next_chunk(stats_framework.TOO_RECENT)
+    if i is not None:
+      msg = 'Processed %d minutes' % i
+      logging.info(msg)
+      self.response.write(msg)

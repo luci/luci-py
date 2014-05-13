@@ -95,8 +95,10 @@ class StatisticsFramework(object):
     - up_to: number of minutes to buffer between 'now' and the last minute to
              process. Will usually be in the range of 1 to 10.
 
-    Returns the number of self.stats_minute_cls generated, e.g. the number of
-    minutes processed successfully by self_generate_snapshot.
+    Returns:
+      Number of self.stats_minute_cls generated, e.g. the number of minutes
+      processed successfully by self_generate_snapshot. Returns None in case of
+      failure.
     """
     count = 0
     original_minute = None
@@ -106,24 +108,32 @@ class StatisticsFramework(object):
       next_minute = original_minute
       while now - next_minute >= datetime.timedelta(minutes=up_to):
         self._process_one_minute(next_minute)
-        self._set_last_processed_time(next_minute)
         count += 1
+        self._set_last_processed_time(next_minute)
         if self._max_minutes_per_process == count:
           break
         next_minute = next_minute + datetime.timedelta(minutes=1)
         now = _utcnow()
       return count
-    except DeadlineExceededError:
+    except (
+        datastore_errors.TransactionFailedError,
+        logservice.Error,
+        DeadlineExceededError) as e:
       msg = (
-          'Got DeadlineExceededError while processing stats.\n'
+          'Got an error while processing stats.\n'
           'Processing started at %s; tried to get up to %smins from now; '
-          'Processed %dmins') % (
-          original_minute, up_to, count)
+          'Processed %dmins\n%s') % (
+          original_minute, up_to, count, e)
       if not count:
         logging.error(msg)
+        # This is bad, it means that for the lifespan of the cron handler
+        # (currently 10 minutes), it was unable to even process a single minute
+        # worth of statistics.
+        return None
       else:
         logging.warning(msg)
-      raise
+        # At least something was processed, so it's fine.
+        return count
 
   def day_key(self, day):
     """Returns the complete entity key for a specific day stats.
