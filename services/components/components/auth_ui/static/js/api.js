@@ -105,6 +105,18 @@ var call = function(type, url, data, headers) {
 };
 
 
+// Group object -> group object with all necessary fields present.
+var normalizeGroupObj = function(group) {
+  return {
+    name: group.name,
+    description: group.description,
+    members: group.members || [],
+    globs: group.globs || [],
+    nested: group.nested || []
+  };
+};
+
+
 // Sets XSRF token.
 exports.setXSRFToken = function(token) {
   xsrf_token = token;
@@ -184,13 +196,24 @@ exports.groupDelete = function(name, lastModified) {
 
 // Creates a new group.
 exports.groupCreate = function(group) {
-  return call('POST', '/auth/api/v1/groups/' + group.name, {
-    name: group.name,
-    description: group.description,
-    members: group.members || [],
-    globs: group.globs || [],
-    nested: group.nested || []
-  });
+  return call(
+      'POST',
+      '/auth/api/v1/groups/' + group.name,
+      normalizeGroupObj(group));
+};
+
+
+// Updates an existing group.
+exports.groupUpdate = function(group, lastModified) {
+  var headers = {};
+  if (lastModified) {
+    headers['If-Unmodified-Since'] = lastModified;
+  }
+  return call(
+      'PUT',
+      '/auth/api/v1/groups/' + group.name,
+      normalizeGroupObj(group),
+      headers);
 };
 
 

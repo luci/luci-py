@@ -34,7 +34,7 @@ GroupChooser.prototype.refetchGroups = function() {
 };
 
 
-// Updates DOM of a group chooser.
+// Updates DOM of a group chooser, resets current selection.
 GroupChooser.prototype.setGroupList = function(groups) {
   var self = this;
 
@@ -64,7 +64,7 @@ GroupChooser.prototype.setGroupList = function(groups) {
   // Setup click event handlers. Clicks change selection.
   $('.chooser-element', self.$element).click(function() {
     if (!self.interactionDisabled) {
-      self.setSelection($(this).data('group-name'));
+      self.setSelection($(this).data('group-name'), null);
     }
     return false;
   });
@@ -82,8 +82,8 @@ GroupChooser.prototype.getSelection = function() {
 
 // Highlights a group as chosen in group list.
 // If |name| is null, then highlights 'Create new group' button.
-// Also triggers 'selectionChanged' event.
-GroupChooser.prototype.setSelection = function(name) {
+// Also triggers 'selectionChanged' event, passing |state| to the handlers.
+GroupChooser.prototype.setSelection = function(name, state) {
   // Nothing to do?
   if (this.getSelection() === name) {
     return;
@@ -98,7 +98,8 @@ GroupChooser.prototype.setSelection = function(name) {
     }
   });
   if (selectionMade) {
-    this.$element.triggerHandler('selectionChanged', {group: name});
+    this.$element.triggerHandler(
+        'selectionChanged', {group: name, state: state});
   }
 };
 
@@ -107,7 +108,7 @@ GroupChooser.prototype.setSelection = function(name) {
 GroupChooser.prototype.selectDefault = function() {
   var elements = $('.chooser-element', self.$element);
   if (elements.length) {
-    this.setSelection(elements.first().data('group-name'));
+    this.setSelection(elements.first().data('group-name'), null);
   }
 };
 
@@ -115,7 +116,7 @@ GroupChooser.prototype.selectDefault = function() {
 // Registers new event listener that is called whenever selection changes.
 GroupChooser.prototype.onSelectionChanged = function(listener) {
   this.$element.on('selectionChanged', function(event, selection) {
-    listener(selection.group);
+    listener(selection.group, selection.state);
   });
 };
 
@@ -170,7 +171,7 @@ ContentFrame.prototype.loadContent = function(content) {
     self.content.setInteractionDisabled(true);
   }
   self.loading = content;
-  content.load().then(function() {
+  var defer = content.load().then(function() {
     // Switch content only if another 'loadContent' wasn't called before.
     if (self.loading == content) {
       self.setContent(content);
@@ -182,6 +183,7 @@ ContentFrame.prototype.loadContent = function(content) {
       self.$element.append($(common.render('frame-error-pane', error)));
     }
   });
+  return defer;
 };
 
 
@@ -336,6 +338,7 @@ EditGroupForm.prototype.buildForm = function(group, lastModified) {
   // Convert fields to text.
   group = _.clone(group);
   group.created_ts = common.utcTimestampToString(group.created_ts);
+  group.modified_ts = common.utcTimestampToString(group.modified_ts);
   group.members = (group.members || []).join('\n') + '\n';
   group.globs = (group.globs || []).join('\n') + '\n';
   group.nested = (group.nested || []).join('\n') + '\n';
@@ -476,14 +479,19 @@ exports.onContentLoaded = function() {
     var form = new NewGroupForm(function(groupObj) {
       var request = api.groupCreate(groupObj);
       waitForResult(request, groupChooser, form).done(function() {
-        groupChooser.setSelection(groupObj.name);
+        // Pass 'CREATE' as |state| to group chooser. It will eventually
+        // be passed to 'startEditGroupFlow' after group form for new group
+        // loads.
+        groupChooser.setSelection(groupObj.name, 'CREATE');
       });
     });
     mainFrame.loadContent(form);
   };
 
   // Called to setup 'Edit the group' flow (including deletion of a group).
-  var startEditGroupFlow = function(groupName) {
+  // |state| is whatever was passed to 'groupChooser.setSelection' as a second
+  // argument or null if selection changed due to user action.
+  var startEditGroupFlow = function(groupName, state) {
     var form = new EditGroupForm(groupName);
 
     // Called when 'Delete' button is clicked.
@@ -496,19 +504,31 @@ exports.onContentLoaded = function() {
 
     // Called when 'Update' button is clicked.
     form.onUpdateGroup = function(groupObj, lastModified) {
-      // TODO(vadimsh): Implement group updates.
-      alert('Not implemented');
+      var request = api.groupUpdate(groupObj, lastModified);
+      waitForResult(request, groupChooser, form).done(function() {
+        // Pass 'UPDATE' as |state| to group chooser. It will eventually
+        // be passed to 'startEditGroupFlow' after group form reloads.
+        groupChooser.setSelection(groupObj.name, 'UPDATE');
+      });
     };
 
-    mainFrame.loadContent(form);
+    // Once group loads, show status message based on the operation performed.
+    // It is passed as |state| here.
+    mainFrame.loadContent(form).done(function() {
+      if (state == 'CREATE') {
+        form.showMessage('success', 'Group created.', '');
+      } else if (state == 'UPDATE') {
+        form.showMessage('success', 'Group updated.', '');
+      }
+    });
   };
 
   // Attach event handlers.
-  groupChooser.onSelectionChanged(function(selection) {
+  groupChooser.onSelectionChanged(function(selection, state) {
     if (selection === null) {
       startNewGroupFlow();
     } else {
-      startEditGroupFlow(selection);
+      startEditGroupFlow(selection, state);
     }
   });
 

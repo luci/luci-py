@@ -139,8 +139,76 @@ class GroupHandler(ApiHandler):
 
   @api.require(model.UPDATE, 'auth/management/groups/{group}')
   def put(self, group):
-    """Updates existing group."""
-    raise NotImplementedError()
+    """Updates an existing group."""
+    # Deserialize and validate the body.
+    try:
+      body = self.parse_body()
+      name = body.pop('name', None)
+      if not name or name != group:
+        raise ValueError('Missing or mismatching group name in request body')
+      group_params = model.AuthGroup.convert_serializable_dict(body)
+    except (TypeError, ValueError) as err:
+      self.abort_with_error(400, text=str(err))
+
+    @ndb.transactional
+    def update(params, modified_by, expected_ts):
+      # Missing?
+      entity = model.AuthGroup.get_by_id(group, parent=model.ROOT_KEY)
+      if not entity:
+        return None, {'http_code': 404, 'text': 'No such group'}
+
+      # Check the precondition if required.
+      if (expected_ts and
+          utils.datetime_to_rfc2822(entity.modified_ts) != expected_ts):
+        return None, {
+          'http_code': 412,
+          'text': 'Group was modified by someone else',
+        }
+
+      # If adding new nested groups, need to ensure they exist.
+      added_nested_groups = set(params['nested']) - set(entity.nested)
+      if added_nested_groups:
+        missing = groups.get_missing_groups(added_nested_groups)
+        if missing:
+          return None, {
+            'http_code': 409,
+            'text': 'Referencing a nested group that doesn\'t exist',
+            'details': {'missing': missing},
+          }
+
+      # Update in place.
+      entity.populate(**params)
+      entity.modified_by = modified_by
+
+      # Now make sure updated group is not a part of new group dependency cycle.
+      if added_nested_groups:
+        cycle = groups.find_dependency_cycle(entity)
+        if cycle:
+          return None, {
+            'http_code': 409,
+            'text': 'Groups can not have cyclic dependencies',
+            'details': {'cycle': cycle},
+          }
+
+      # Looks good.
+      entity.put()
+      return entity, None
+
+    # Run the transaction.
+    entity, error_details = update(
+        group_params,
+        api.get_current_identity(),
+        self.request.headers.get('If-Unmodified-Since'))
+    if entity is None:
+      self.abort_with_error(**error_details)
+
+    self.send_response(
+        response={'ok': True},
+        http_code=200,
+        headers={
+          'Last-Modified': utils.datetime_to_rfc2822(entity.modified_ts),
+        }
+    )
 
   @api.require(model.CREATE, 'auth/management/groups/{group}')
   def post(self, group):
@@ -157,7 +225,7 @@ class GroupHandler(ApiHandler):
           parent=model.ROOT_KEY,
           created_by=api.get_current_identity(),
           modified_by=api.get_current_identity())
-    except (ValueError, TypeError) as err:
+    except (TypeError, ValueError) as err:
       self.abort_with_error(400, text=str(err))
 
     @ndb.transactional
@@ -166,13 +234,8 @@ class GroupHandler(ApiHandler):
       if entity.key.get():
         return False, {'text': 'Such group already exists'}
 
-      # All nested groups should exist. Try to fetch them to verify.
-      nested = ndb.get_multi(
-          ndb.Key(model.AuthGroup, name, parent=model.ROOT_KEY)
-          for name in entity.nested)
-
-      # Collect names of groups that are not present.
-      missing = [name for name, ent in zip(entity.nested, nested) if not ent]
+      # All nested groups should exist.
+      missing = groups.get_missing_groups(entity.nested)
       if missing:
         return False, {
           'text': 'Referencing a nested group that doesn\'t exist',

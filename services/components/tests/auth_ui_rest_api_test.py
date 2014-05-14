@@ -341,6 +341,19 @@ class RestAPITestCase(test_case.TestCase):
     kwargs['params'] = json.dumps(body) if body is not None else ''
     return self.make_request('POST', path, **kwargs)
 
+  def put(self, path, body=None, **kwargs):
+    """Sends PUT request to REST API endpoint.
+
+    Returns tuple (status code, deserialized JSON response, response headers).
+    """
+    assert 'params' not in kwargs
+    headers = dict(kwargs.pop('headers', None) or {})
+    if body:
+      headers['Content-Type'] = 'application/json; charset=UTF-8'
+    kwargs['headers'] = headers
+    kwargs['params'] = json.dumps(body) if body is not None else ''
+    return self.make_request('PUT', path, **kwargs)
+
   def delete(self, path, **kwargs):
     """Sends DELETE request to REST API endpoint.
 
@@ -716,6 +729,197 @@ class GroupHandlerTest(RestAPITestCase):
           'missing': ['Missing group'],
         }
       }, body)
+
+  def test_put_success(self):
+    frozen_time = utils.timestamp_to_datetime(1300000000000000)
+    creator_identity = model.Identity.from_bytes('user:creator@example.com')
+
+    # Freeze time in NDB's |auto_now| properties.
+    self.mock_ndb_now(frozen_time)
+    # get_current_identity is used for 'created_by' and 'modified_by'.
+    self.mock_current_identity(creator_identity)
+
+    # Create a group to act as a nested one.
+    nested = model.AuthGroup(id='Nested Group', parent=model.ROOT_KEY)
+    nested.put()
+
+    # Create a group.
+    group = model.AuthGroup(id='A Group', parent=model.ROOT_KEY)
+    group.put()
+
+    # Update it via API.
+    status, body, headers = self.put(
+        path='/auth/api/v1/groups/A%20Group',
+        body={
+          'description': 'Test group',
+          'globs': ['user:*@example.com'],
+          'members': ['bot:some-bot', 'user:some@example.com'],
+          'name': 'A Group',
+          'nested': ['Nested Group'],
+        },
+        expect_xsrf_token_check=True,
+        expected_auth_checks=[(model.UPDATE, 'auth/management/groups/A Group')])
+    self.assertEqual(200, status)
+    self.assertEqual({'ok': True}, body)
+    self.assertEqual(
+        'Sun, 13 Mar 2011 07:06:40 -0000', headers['Last-Modified'])
+
+    # Ensure it is updated.
+    entity = model.AuthGroup.get_by_id('A Group', parent=model.ROOT_KEY)
+    self.assertTrue(entity)
+    expected = {
+      'created_by': None,
+      'created_ts': frozen_time,
+      'description': 'Test group',
+      'globs': [model.IdentityGlob(kind='user', pattern='*@example.com')],
+      'members': [
+        model.Identity(kind='bot', name='some-bot'),
+        model.Identity(kind='user', name='some@example.com'),
+      ],
+      'modified_by': model.Identity(kind='user', name='creator@example.com'),
+      'modified_ts': frozen_time,
+      'nested': ['Nested Group']
+    }
+    self.assertEqual(expected, entity.to_dict())
+
+  def test_put_mismatching_name(self):
+    # Create a group.
+    group = model.AuthGroup(id='A Group', parent=model.ROOT_KEY)
+    group.put()
+
+    # Update it via API, pass bad name.
+    status, body, _ = self.put(
+        path='/auth/api/v1/groups/A%20Group',
+        body={
+          'description': 'Test group',
+          'globs': [],
+          'members': [],
+          'name': 'Bad group name',
+        },
+        expect_errors=True,
+        expect_xsrf_token_check=True,
+        expected_auth_checks=[(model.UPDATE, 'auth/management/groups/A Group')])
+    self.assertEqual(400, status)
+    self.assertEqual(
+        {'text': 'Missing or mismatching group name in request body'}, body)
+
+  def test_put_bad_body(self):
+    # Create a group.
+    group = model.AuthGroup(id='A Group', parent=model.ROOT_KEY)
+    group.put()
+
+    # Update it via API, pass a bad body ('globs' should be a list, not a dict).
+    status, body, _ = self.put(
+        path='/auth/api/v1/groups/A%20Group',
+        body={
+          'description': 'Test group',
+          'globs': {},
+          'members': [],
+          'name': 'A Group',
+        },
+        expect_errors=True,
+        expect_xsrf_token_check=True,
+        expected_auth_checks=[(model.UPDATE, 'auth/management/groups/A Group')])
+    self.assertEqual(400, status)
+    self.assertEqual(
+        {
+          'text':
+            'Expecting a list or tuple for \'globs\', got \'dict\' instead'
+        }, body)
+
+  def test_put_missing(self):
+    # Try to update a group that doesn't exist.
+    status, body, _ = self.put(
+        path='/auth/api/v1/groups/A%20Group',
+        body={
+          'description': 'Test group',
+          'globs': [],
+          'members': [],
+          'name': 'A Group',
+          'nested': [],
+        },
+        expect_errors=True,
+        expect_xsrf_token_check=True,
+        expected_auth_checks=[(model.UPDATE, 'auth/management/groups/A Group')])
+    self.assertEqual(404, status)
+    self.assertEqual({'text': 'No such group'}, body)
+
+  def test_put_bad_precondition(self):
+    # Freeze time in NDB's |auto_now| properties.
+    self.mock_ndb_now(utils.timestamp_to_datetime(1300000000000000))
+
+    # Create a group.
+    group = model.AuthGroup(id='A Group', parent=model.ROOT_KEY)
+    group.put()
+
+    # Try to update it. Pass incorrect If-Modified-Since header.
+    status, body, _ = self.put(
+        path='/auth/api/v1/groups/A%20Group',
+        body={
+          'description': 'Test group',
+          'globs': [],
+          'members': [],
+          'name': 'A Group',
+          'nested': [],
+        },
+        headers={
+          'If-Unmodified-Since': 'Sun, 1 Mar 1990 00:00:00 -0000',
+        },
+        expect_errors=True,
+        expect_xsrf_token_check=True,
+        expected_auth_checks=[(model.UPDATE, 'auth/management/groups/A Group')])
+    self.assertEqual(412, status)
+    self.assertEqual({'text': 'Group was modified by someone else'}, body)
+
+  def test_put_missing_nested(self):
+    # Create a group.
+    group = model.AuthGroup(id='A Group', parent=model.ROOT_KEY)
+    group.put()
+
+    # Try to update it. Pass missing group as a nested group.
+    status, body, _ = self.put(
+        path='/auth/api/v1/groups/A%20Group',
+        body={
+          'description': 'Test group',
+          'globs': [],
+          'members': [],
+          'name': 'A Group',
+          'nested': ['Missing group'],
+        },
+        expect_errors=True,
+        expect_xsrf_token_check=True,
+        expected_auth_checks=[(model.UPDATE, 'auth/management/groups/A Group')])
+    self.assertEqual(409, status)
+    self.assertEqual(
+        {
+          'text': 'Referencing a nested group that doesn\'t exist',
+          'details': {'missing': ['Missing group']},
+        }, body)
+
+  def test_put_dependency_cycle(self):
+    # Create a group.
+    group = model.AuthGroup(id='A Group', parent=model.ROOT_KEY)
+    group.put()
+
+    # Try to update it. Reference itself as a nested group.
+    status, body, _ = self.put(
+        path='/auth/api/v1/groups/A%20Group',
+        body={
+          'description': 'Test group',
+          'globs': [],
+          'members': [],
+          'name': 'A Group',
+          'nested': ['A Group'],
+        },
+        expect_errors=True,
+        expect_xsrf_token_check=True,
+        expected_auth_checks=[(model.UPDATE, 'auth/management/groups/A Group')])
+    self.assertEqual(409, status)
+    self.assertEqual(
+        {
+          'text': 'Groups can not have cyclic dependencies',
+          'details': {'cycle': ['A Group']},
+        }, body)
 
 
 class OAuthConfigHandlerTest(RestAPITestCase):
