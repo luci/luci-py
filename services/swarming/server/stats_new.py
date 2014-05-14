@@ -239,7 +239,7 @@ class _Snapshot(ndb.Model):
       if key not in lhs_dimensions:
         # Make a copy of the right hand side so no aliasing occurs.
         lhs_dimensions[key] = rhs_dimensions[key].__class__()
-        lhs_dimensions[key].populate(**rhs_dimensions.to_dict())
+        lhs_dimensions[key].populate(**rhs_dimensions[key].to_dict())
       else:
         lhs_dimensions[key].accumulate(rhs_dimensions[key])
     self.buckets = sorted(
