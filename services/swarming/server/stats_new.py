@@ -62,10 +62,6 @@ class _SnapshotBucketBase(ndb.Model):
     out['shards_avg_runtime_secs'] = self.shards_avg_runtime_secs
     return out
 
-  def to_dict_internal(self):
-    """Used by _Snapshot.accumulate() to dealias objects."""
-    return super(_SnapshotBucketBase, self).to_dict()
-
 
 class _SnapshotForUser(_SnapshotBucketBase):
   """Statistics for a specific bucket of TaskRequest.user.
@@ -105,10 +101,6 @@ class _SnapshotForDimensions(_SnapshotBucketBase):
     out['bots_active'] = self.bots_active
     del out['bot_ids']
     return out
-
-  def to_dict_internal(self):
-    """Used by _Snapshot.accumulate() to dealias objects."""
-    return super(_SnapshotForDimensions, self).to_dict_internal()
 
 
 class _Snapshot(ndb.Model):
@@ -247,7 +239,8 @@ class _Snapshot(ndb.Model):
       if key not in lhs_dimensions:
         # Make a copy of the right hand side so no aliasing occurs.
         lhs_dimensions[key] = rhs_dimensions[key].__class__()
-        lhs_dimensions[key].populate(**rhs_dimensions[key].to_dict_internal())
+        # Call the root method directly so 'enhancements' do not get in the way.
+        lhs_dimensions[key].populate(**ndb.Model.to_dict(rhs_dimensions[key]))
       else:
         lhs_dimensions[key].accumulate(rhs_dimensions[key])
     self.buckets = sorted(
@@ -259,7 +252,8 @@ class _Snapshot(ndb.Model):
       if key not in lhs_users:
         # Make a copy of the right hand side so no aliasing occurs.
         lhs_users[key] = rhs_users[key].__class__()
-        lhs_users[key].populate(**rhs_users[key].to_dict_internal())
+        # Call the root method directly so 'enhancements' do not get in the way.
+        lhs_users[key].populate(**ndb.Model.to_dict(lhs_users[key]))
       else:
         lhs_users[key].accumulate(rhs_users[key])
     self.users = sorted(lhs_users.itervalues(), key=lambda i: i.user)
