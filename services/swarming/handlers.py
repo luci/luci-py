@@ -19,7 +19,6 @@ import urllib
 import webapp2
 
 from google.appengine import runtime
-from google.appengine.api import app_identity
 from google.appengine.api import datastore_errors
 from google.appengine.api import modules
 from google.appengine.api import taskqueue
@@ -43,11 +42,7 @@ from server import stats_new as stats
 from server import task_glue
 from server import task_scheduler
 from server import user_manager
-from stats import daily_stats
 from stats import machine_stats
-from stats import requestor_daily_stats
-from stats import runner_stats
-from stats import runner_summary
 
 import template
 
@@ -82,26 +77,6 @@ IGNORED_EXCEPTIONS = (
 # Function that is used to determine if an error entry should be ignored.
 should_ignore_error_record = functools.partial(
     ereporter2.should_ignore_error_record, IGNORED_LINES, IGNORED_EXCEPTIONS)
-
-
-def DaysToShow(request):
-  """Find the number of days to show, according to the request.
-
-  Args:
-    request: A dictionary that might contain the days value, otherwise return
-        the default days_to_show value.
-
-  Returns:
-    The number of days to show.
-  """
-  days_to_show = 7
-  try:
-    days_to_show = int(request.get('days', days_to_show))
-  except ValueError:
-    # Stick with the default value.
-    pass
-
-  return days_to_show
 
 
 def GetModulesVersions():
@@ -514,25 +489,11 @@ class TaskCleanupDataHandler(webapp2.RequestHandler):
     queries = [
         errors.QueryOldErrors(),
         dimension_mapping.QueryOldDimensionMapping(),
-        daily_stats.QueryOldDailyStats(),
-        requestor_daily_stats.QueryOldRequestorDailyStats(),
-        runner_stats.QueryOldRunnerStats(),
-        runner_summary.QueryOldWaitSummaries(),
         result_helper.QueryOldResults(),
         result_helper.QueryOldResultChunks(),
     ]
     datastore_utils.incremental_map(
         queries, ndb.delete_multi_async, max_inflight=50)
-    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
-    self.response.out.write('Success.')
-
-
-class CronAbortStaleRunnersHandler(webapp2.RequestHandler):
-  """Aborts stale runners."""
-
-  @decorators.require_cronjob
-  def get(self):
-    task_glue.AbortStaleRunners()
     self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
     self.response.out.write('Success.')
 
@@ -572,29 +533,6 @@ class CronTriggerCleanupDataHandler(webapp2.RequestHandler):
     self.response.out.write('Success.')
 
 
-class CronTriggerGenerateDailyStats(webapp2.RequestHandler):
-  """Triggers task to generate daily stats."""
-
-  @decorators.require_cronjob
-  def get(self):
-    taskqueue.add(method='POST', url='/internal/taskqueue/generate_daily_stats',
-                  queue_name='stats')
-    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
-    self.response.out.write('Success.')
-
-
-class CronTriggerGenerateRecentStats(webapp2.RequestHandler):
-  """Triggers task to generate recent stats."""
-
-  @decorators.require_cronjob
-  def get(self):
-    taskqueue.add(method='POST',
-                  url='/internal/taskqueue/generate_recent_stats',
-                  queue_name='stats')
-    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
-    self.response.out.write('Success.')
-
-
 class DeadBotsCountHandler(webapp2.RequestHandler):
   def get(self):
     self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
@@ -602,51 +540,6 @@ class DeadBotsCountHandler(webapp2.RequestHandler):
     count = machine_stats.MachineStats.query().filter(
         machine_stats.MachineStats.last_seen < cutoff).count()
     self.response.out.write(str(count))
-
-
-class CronDetectHangingRunnersHandler(webapp2.RequestHandler):
-  """Emails reports of runners that have been waiting too long."""
-
-  @decorators.require_cronjob
-  def get(self):
-    hanging_runners = task_glue.GetHangingRunners()
-    if hanging_runners:
-      subject = 'Hanging Runners on %s' % app_identity.get_application_id()
-
-      hanging_dimensions = set(runner.dimensions for runner in hanging_runners)
-      body = ('The following dimensions have hanging runners (runners that '
-              'have been waiting more than %d minutes to run).\n' % (
-                  task_glue.TIME_BEFORE_RUNNER_HANGING_IN_MINS) +
-              '\n'.join(hanging_dimensions) +
-              '\n\nHere are the hanging runner names:\n' +
-              '\n'.join(runner.name for runner in hanging_runners)
-             )
-
-      admin_user.EmailAdmins(subject, body)
-    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
-    self.response.out.write('Success.')
-
-
-class TaskGenerateDailyStatsHandler(webapp2.RequestHandler):
-  """Generates new daily stats."""
-
-  @decorators.require_taskqueue('stats')
-  def post(self):
-    yesterday = datetime.datetime.utcnow().date() - datetime.timedelta(days=1)
-    daily_stats.GenerateDailyStats(yesterday)
-    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
-    self.response.out.write('Success.')
-
-
-class TaskGenerateRecentStatsHandler(webapp2.RequestHandler):
-  """Generates new recent stats."""
-
-  @decorators.require_taskqueue('stats')
-  def post(self):
-    runner_summary.GenerateSnapshotSummary()
-    runner_summary.GenerateWaitSummary()
-    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
-    self.response.out.write('Success.')
 
 
 class CronSendEreporter2MailHandler(webapp2.RequestHandler):
@@ -751,30 +644,6 @@ class UploadStartSlaveHandler(auth.AuthenticatingHandler):
     bot_management.StoreStartSlaveScript(script)
     self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
     self.response.out.write('Success.')
-
-
-class StatsHandler(webapp2.RequestHandler):
-  """Show all the collected swarm stats."""
-
-  def get(self):
-    days_to_show = DaysToShow(self.request)
-
-    weeks_daily_stats = daily_stats.GetDailyStats(
-        datetime.datetime.utcnow().date() -
-        datetime.timedelta(days=days_to_show))
-    # Reverse the daily stats so that the newest data is listed first, which
-    # makes more sense when listing these values in a table.
-    weeks_daily_stats.reverse()
-
-    max_days_to_show = min(daily_stats.DAILY_STATS_LIFE_IN_DAYS,
-                           runner_summary.WAIT_SUMMARY_LIFE_IN_DAYS)
-    params = {
-        'daily_stats': weeks_daily_stats,
-        'days_to_show': days_to_show,
-        'max_days_to_show': range(1, max_days_to_show),
-        'runner_wait_stats': runner_summary.GetRunnerWaitStats(days_to_show),
-    }
-    self.response.out.write(template.render('stats.html', params))
 
 
 class GetMatchingTestCasesHandler(auth.AuthenticatingHandler):
@@ -960,149 +829,6 @@ class RunnerPingHandler(auth.AuthenticatingHandler):
     self.response.out.write('Success.')
 
 
-# A basic helper class for holding the runner summary for a dimension.
-RunnerSummary = collections.namedtuple(
-    'RunnerSummary', ['dimensions', 'pending_runners', 'running_runners'])
-
-
-def GenerateHistoryHoursSelect():
-  """Returns the HTML to generate a select box for the hours to show."""
-  # Allow up to a day, by the hour.
-  options_hours = ''.join(
-      '<option value=\'%d\'>%d hours</option>' % (i, i) for i in range(1, 25))
-
-  # Allow multiple days, up to 4 weeks.
-  options_days = ''.join(
-      '<option value=\'%d\'>%d days</option>' % (i * 24, i)
-      for i in range(2, 29))
-
-  return (
-      '<select id="hours_to_show" onchange="document.location.href=\'?hours=\' '
-      '+ this.value"><option>-</option>%s%s</select>' %
-      (options_hours, options_days))
-
-
-class StatsTasksHandler(webapp2.RequestHandler):
-  """Handler for displaying a summary of the current runners."""
-
-  def get(self):
-    try:
-      hours = int(self.request.get('hours', '24'))
-    except ValueError:
-      self.abort(400, 'Invalid hours')
-
-    if hours <= 24:
-      time_frame = '%d hours' % hours
-    else:
-      time_frame = '%d days' % (hours/24)
-
-    # Start querying all the summaries for the graph.
-    summary_cutoff_time = (datetime.datetime.utcnow() -
-                           datetime.timedelta(hours=hours))
-    summaries_future = runner_summary.RunnerSummary.query(
-        runner_summary.RunnerSummary.time > summary_cutoff_time).fetch_async()
-
-    # Get a snapshot of the current state of pending and running runners.
-    snapshot_summary = [
-        RunnerSummary(test_request_message.Stringize(d), s[0], s[1])
-        for d, s in runner_summary.GetRunnerSummaryByDimension().iteritems()
-    ]
-    total_pending = sum(r.pending_runners for r in snapshot_summary)
-    total_running = sum(r.running_runners for r in snapshot_summary)
-
-    # Start the graph dict for each dimension.
-    runner_summary_graphs = dict(
-        (s.dimensions, {'data': [], 'id': i, 'title': s.dimensions})
-        for i, s in enumerate(snapshot_summary))
-
-    # Convert the runner summaries to the graph array.
-    for summary in summaries_future.get_result():
-      # It seems possible to get a summary that we don't have a snapshot for.
-      # Got crashes but unable to repo, so add logging to try and catch
-      # this case.
-      if summary.dimensions in runner_summary_graphs:
-        runner_summary_graphs[summary.dimensions]['data'].append(
-            [summary.time.isoformat(), summary.pending, summary.running])
-      else:
-        logging.error('\'%s\' wasn\'t in set of runner summaries [%s]',
-                      summary.dimensions, runner_summary_graphs.keys())
-
-    params = {
-        'hours_select': GenerateHistoryHoursSelect(),
-        'runner_summary_graphs': runner_summary_graphs.values(),
-        'snapshot_summary': snapshot_summary,
-        'time_frame': time_frame,
-        'total_pending_runners': total_pending,
-        'total_running_runners': total_running,
-    }
-    self.response.out.write(template.render('stats_tasks.html', params))
-
-
-class StatsDailyHandler(webapp2.RequestHandler):
-  """Handler for generating the html page to display the daily stats."""
-
-  # A mapping of the element's variable name, and the name that should be
-  # displayed to the user.
-  ELEMENTS_TO_GRAPH = [
-      ('shards_failed', 'Shards Failed'),
-      ('shards_finished', 'Shards Finished'),
-      ('shards_aborted', 'Shards Aborted'),
-      ('total_running_time', 'Total Running Time'),
-      ('total_wait_time', 'Total Wait Time'),
-  ]
-
-  def _GetGraphableDailyStats(self, days):
-    """Convert the daily_stats into a list of graphs objects for visualization.
-
-    Args:
-      days: A list of daily stats to split into components.
-
-    Returns:
-      A list of dictionaries with the graph title and an array that can be
-      passed to the data visualization tool.
-    """
-    graphs_to_show = [
-        {
-          'data_array': [['Date', title_name]],
-          'element_id': element_name,
-          'title': title_name,
-        } for element_name, title_name in self.ELEMENTS_TO_GRAPH
-    ]
-    for stat in days:
-      date_str = stat.date.isoformat()
-      for i, element in enumerate(self.ELEMENTS_TO_GRAPH):
-        graphs_to_show[i]['data_array'].append(
-            [date_str, int(getattr(stat, element[0]))])
-
-    return graphs_to_show
-
-  def get(self):
-    days_to_show = DaysToShow(self.request)
-
-    params = {
-        'graphs': self._GetGraphableDailyStats(daily_stats.GetDailyStats(
-            datetime.datetime.utcnow().date() -
-            datetime.timedelta(days=days_to_show))),
-        'max_days_to_show': range(1, daily_stats.DAILY_STATS_LIFE_IN_DAYS),
-    }
-    self.response.out.write(template.render('stats_daily.html', params))
-
-
-class StatsWaitsHandler(webapp2.RequestHandler):
-  """Handler for displaying the wait times, broken by minute, per dimensions."""
-
-  def get(self):
-    days_to_show = DaysToShow(self.request)
-
-    params = {
-        'days_to_show': days_to_show,
-        'max_days_to_show': range(1, runner_summary.WAIT_SUMMARY_LIFE_IN_DAYS),
-        'wait_breakdown': runner_summary.GetRunnerWaitStatsBreakdown(
-            days_to_show),
-    }
-    self.response.out.write(template.render('stats_waits.html', params))
-
-
 class ServerPingHandler(webapp2.RequestHandler):
   """Handler to ping when checking if the server is up.
 
@@ -1268,11 +994,6 @@ def CreateApplication():
       ('/secure/retry', RetryHandler),
       ('/secure/show_message', ShowMessageHandler),
 
-      ('/stats', StatsHandler),
-      ('/stats/daily', StatsDailyHandler),
-      ('/stats/tasks', StatsTasksHandler),
-      ('/stats/waits', StatsWaitsHandler),
-
       ('/server_ping', ServerPingHandler),
       ('/test', TestRequestHandler),
       ('/upload_start_slave', UploadStartSlaveHandler),
@@ -1282,11 +1003,9 @@ def CreateApplication():
       (_SECURE_GET_RESULTS_URL, SecureGetResultHandler),
       (_SECURE_MAIN_URL, MainHandler),
       (_SECURE_USER_PROFILE_URL, UserProfileHandler),
-      ('/stats_new', stats_gviz.StatsSummaryHandler),
-      ('/stats_new/dimensions/<dimensions:.+>',
-        stats_gviz.StatsDimensionsHandler),
-      ('/stats_new/user/<user:.+>',
-        stats_gviz.StatsUserHandler),
+      ('/stats', stats_gviz.StatsSummaryHandler),
+      ('/stats/dimensions/<dimensions:.+>', stats_gviz.StatsDimensionsHandler),
+      ('/stats/user/<user:.+>', stats_gviz.StatsUserHandler),
 
       # The new APIs:
       ('/swarming/api/v1/bots', ApiBots),
@@ -1308,23 +1027,12 @@ def CreateApplication():
       ('/internal/cron/sync_all_result_summary',
           CronSyncAllResultSummaryHandler),
 
-      ('/internal/cron/abort_stale_runners', CronAbortStaleRunnersHandler),
-      ('/internal/cron/detect_hanging_runners',
-          CronDetectHangingRunnersHandler),
       ('/internal/cron/ereporter2/mail', CronSendEreporter2MailHandler),
       ('/internal/cron/stats/update', stats.InternalStatsUpdateHandler),
       ('/internal/cron/trigger_cleanup_data', CronTriggerCleanupDataHandler),
-      ('/internal/cron/trigger_generate_daily_stats',
-          CronTriggerGenerateDailyStats),
-      ('/internal/cron/trigger_generate_recent_stats',
-          CronTriggerGenerateRecentStats),
 
       # Task queues.
       ('/internal/taskqueue/cleanup_data', TaskCleanupDataHandler),
-      ('/internal/taskqueue/generate_daily_stats',
-          TaskGenerateDailyStatsHandler),
-      ('/internal/taskqueue/generate_recent_stats',
-          TaskGenerateRecentStatsHandler),
 
       ('/_ah/warmup', WarmupHandler),
   ]

@@ -34,7 +34,6 @@ from server import errors
 from server import stats_new as stats
 from server import task_glue
 from server import test_helper
-from server import test_runner
 from server import user_manager
 from stats import machine_stats
 from third_party.mox import mox
@@ -630,12 +629,8 @@ class AppTest(test_case.TestCase):
       '/auth',
       '/server_ping',
       '/stats',
-      '/stats_new',
-      '/stats_new/dimensions/<dimensions:.+>',
-      '/stats_new/user/<user:.+>',
-      '/stats/daily',
-      '/stats/tasks',
-      '/stats/waits',
+      '/stats/dimensions/<dimensions:.+>',
+      '/stats/user/<user:.+>',
       '/swarming/api/v1/bots/dead/count',
       '/swarming/api/v1/stats/summary/<resolution:[a-z]+>',
       '/swarming/api/v1/stats/dimensions/<dimensions:.+>/<resolution:[a-z]+>',
@@ -681,9 +676,9 @@ class AppTest(test_case.TestCase):
   def testStatsUrls(self):
     quoted = urllib.quote('{"os":"amiga"}')
     urls = (
-      '/stats_new',
-      '/stats_new/dimensions/' + quoted,
-      '/stats_new/user/joe',
+      '/stats',
+      '/stats/dimensions/' + quoted,
+      '/stats/user/joe',
       '/swarming/api/v1/stats/summary/days',
       '/swarming/api/v1/stats/summary/hours',
       '/swarming/api/v1/stats/summary/minutes',
@@ -761,8 +756,6 @@ class AppTest(test_case.TestCase):
   def testCronTriggerTask(self):
     triggers = (
       '/internal/cron/trigger_cleanup_data',
-      '/internal/cron/trigger_generate_daily_stats',
-      '/internal/cron/trigger_generate_recent_stats',
     )
 
     for url in triggers:
@@ -777,8 +770,6 @@ class AppTest(test_case.TestCase):
     )
     task_queues = [
       ('cleanup', '/internal/taskqueue/cleanup_data'),
-      ('stats', '/internal/taskqueue/generate_daily_stats'),
-      ('stats', '/internal/taskqueue/generate_recent_stats'),
     ]
     self.assertEqual(sorted(zip(*task_queues)[1]), task_queue_urls)
 
@@ -809,23 +800,6 @@ class AppTest(test_case.TestCase):
           'Only internal cron jobs can do this  ')
     # The actual number doesn't matter, just make sure they are unqueued.
     self.execute_tasks()
-
-  def testDetectHangingRunners(self):
-    response = self.app.get('/internal/cron/detect_hanging_runners',
-                            headers={'X-AppEngine-Cron': 'true'})
-    self.assertResponse(response, '200 OK', 'Success.')
-
-    # Test when there is a hanging runner.
-    test_helper.CreateRunner()
-
-    test_helper.mock_now(
-        self,
-        datetime.datetime.utcnow() + datetime.timedelta(
-            minutes=test_runner.TIME_BEFORE_RUNNER_HANGING_IN_MINS+1))
-
-    response = self.app.get('/internal/cron/detect_hanging_runners',
-                            headers={'X-AppEngine-Cron': 'true'})
-    self.assertResponse(response, '200 OK', 'Success.')
 
   def testSendEReporter(self):
     self._ReplaceCurrentUser(ADMIN_EMAIL)

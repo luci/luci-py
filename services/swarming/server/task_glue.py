@@ -105,11 +105,6 @@ def AbortRunner(runner_key_urlsafe, reason):
   return task_shard_to_run.abort_shard_to_run(shard_result_key.parent().get())
 
 
-def AbortStaleRunners():
-  # TODO(maruel): Not relevant on new API. The cron job is different.
-  return True
-
-
 def RegisterNewRequest(test_case):
   request_properties = _convert_test_case(test_case)
   request, shard_runs = task_scheduler.new_request(request_properties)
@@ -397,11 +392,6 @@ def PingRunner(runner_key, machine_id):
   except ValueError as e:
     logging.error('Failed to accept value %s: %s', runner_key, e)
     return False
-
-
-def GetHangingRunners():
-  # Not applicable.
-  return []
 
 
 def DeleteRunnerFromKey(_key):

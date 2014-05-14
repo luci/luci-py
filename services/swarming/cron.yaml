@@ -9,29 +9,9 @@ cron:
   url: /internal/cron/ereporter2/mail
   schedule: every 1 hours synchronized
 
-- description: Generate daily stats
-  url: /internal/cron/trigger_generate_daily_stats
-  schedule: every day 00:30
-
-- description: Generate recent stats
-  url: /internal/cron/trigger_generate_recent_stats
-  schedule: every 5 minutes
-
 - description: Gathers statistics from the logs
   url: /internal/cron/stats/update
   schedule: every 1 minutes
-
-# Old DB.
-
-- description: Abort stale runners
-  url: /internal/cron/abort_stale_runners
-  schedule: every 1 minutes
-
-- description: Detect hanging runners
-  url: /internal/cron/detect_hanging_runners
-  schedule: every 10 minutes
-
-# New DB.
 
 - description:
     Catch TaskShardResult where the bot died and failed sending updates.
