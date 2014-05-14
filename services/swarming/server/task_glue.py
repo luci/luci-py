@@ -32,7 +32,6 @@ The translation is not 1:1 and has patches accordingly until we get rid of the
 old ones.
 """
 
-import datetime
 import logging
 import os
 
@@ -50,14 +49,12 @@ from server import task_result
 from server import task_shard_to_run
 from server import task_scheduler
 from server import test_management
-from server import test_request
 from server import test_runner
 from stats import machine_stats
 
 
-# Global switch to use the old or new DB. Note unit tests that directly access
-# the DB won't pass with the new DB so they should mock this value.
-USE_OLD_API = False
+# Temporary, as the API is refactored while the old code is being deleted.
+# pylint: disable=W0613
 
 
 def _convert_test_case(data):
@@ -100,12 +97,6 @@ def _convert_test_case(data):
 
 
 def AbortRunner(runner_key_urlsafe, reason):
-  if USE_OLD_API:
-    runner = GetRunnerFromUrlSafeKey(runner_key_urlsafe)
-    if not runner or runner.started:
-      return False
-    test_management.AbortRunner(runner, reason)
-    return True
   try:
     shard_result_key = task_scheduler.unpack_shard_result_key(
         runner_key_urlsafe)
@@ -115,15 +106,11 @@ def AbortRunner(runner_key_urlsafe, reason):
 
 
 def AbortStaleRunners():
-  if USE_OLD_API:
-    return test_management.AbortStaleRunners()
   # TODO(maruel): Not relevant on new API. The cron job is different.
   return True
 
 
 def RegisterNewRequest(test_case):
-  if USE_OLD_API:
-    return test_management.ExecuteTestRequest(test_case)
   request_properties = _convert_test_case(test_case)
   request, shard_runs = task_scheduler.new_request(request_properties)
 
@@ -147,9 +134,6 @@ def RegisterNewRequest(test_case):
 
 
 def RequestWorkItem(attributes, server_url):
-  if USE_OLD_API:
-    return test_management.ExecuteRegisterRequest(attributes, server_url)
-
   attribs = test_management.ValidateAndFixAttributes(attributes)
   response = test_management.CheckVersion(attributes, server_url)
   if response:
@@ -243,18 +227,6 @@ def RequestWorkItem(attributes, server_url):
 
 
 def RetryRunner(runner_key_urlsafe):
-  if USE_OLD_API:
-    runner = GetRunnerFromUrlSafeKey(runner_key_urlsafe)
-    if not runner:
-      return False
-    runner.ClearRunnerRun()
-    # Update the created time to make sure that retrying the runner does not
-    # make it jump the queue and get executed before other runners for requests
-    # added before the user pressed the retry button.
-    runner.created = datetime.datetime.utcnow()
-    runner.put()
-    return True
-
   # Do not 'retry' the original request, duplicate the request, only changing
   # the ownership to the user that requested the retry. TaskProperties is
   # unchanged.
@@ -292,20 +264,11 @@ def RetryRunner(runner_key_urlsafe):
 
 def UrlSafe(runner_key):
   """Returns an urlsafe encoded key. What it is depends on old vs new."""
-  if USE_OLD_API:
-    return runner_key.urlsafe()
   return task_scheduler.pack_shard_result_key(runner_key)
 
 
 def GetAllMatchingTestCases(test_case_name):
   """Returns a list of TestRequest or TaskRequest."""
-  if USE_OLD_API:
-    matches = test_request.GetAllMatchingTestRequests(test_case_name)
-    keys = []
-    for match in matches:
-      keys.extend(UrlSafe(key) for key in match.runner_keys)
-    return keys
-
   # Find the matching TaskRequest, then return all the valid keys.
   q = task_request.TaskRequest.query().filter(
       task_request.TaskRequest.name == test_case_name)
@@ -324,26 +287,22 @@ def GetAllMatchingTestCases(test_case_name):
 ### test_runner.py public API.
 
 
-if USE_OLD_API:
-  ACCEPTABLE_SORTS = test_runner.ACCEPTABLE_SORTS
-  DEFAULT_SORT = 'created'
-else:
-  ACCEPTABLE_SORTS =  {
-    'created_ts': 'Created',
-    'done_ts': 'Ended',
-    'modified_ts': 'Last updated',
-    'name': 'Name',
-    'user': 'User',
-  }
-  DEFAULT_SORT = 'created_ts'
+ACCEPTABLE_SORTS =  {
+  'created_ts': 'Created',
+  'done_ts': 'Ended',
+  'modified_ts': 'Last updated',
+  'name': 'Name',
+  'user': 'User',
+}
+DEFAULT_SORT = 'created_ts'
 
-  # These sort are done on the TaskRequest.
-  SORT_REQUEST = frozenset(('created_ts', 'name', 'user'))
+# These sort are done on the TaskRequest.
+SORT_REQUEST = frozenset(('created_ts', 'name', 'user'))
 
-  # These sort are done on the TaskResultSummary.
-  SORT_RESULT = frozenset(('done_ts', 'modified_ts'))
+# These sort are done on the TaskResultSummary.
+SORT_RESULT = frozenset(('done_ts', 'modified_ts'))
 
-  assert SORT_REQUEST | SORT_RESULT == frozenset(ACCEPTABLE_SORTS)
+assert SORT_REQUEST | SORT_RESULT == frozenset(ACCEPTABLE_SORTS)
 
 
 TIME_BEFORE_RUNNER_HANGING_IN_MINS = (
@@ -351,10 +310,7 @@ TIME_BEFORE_RUNNER_HANGING_IN_MINS = (
 
 
 def GetRunnerFromUrlSafeKey(runner_key):
-  """Returns a TestRunner or a TaskShardResult."""
-  if USE_OLD_API:
-    return test_runner.GetRunnerFromUrlSafeKey(runner_key)
-
+  """Returns a TaskShardResult."""
   shard_result_key = task_scheduler.unpack_shard_result_key(runner_key)
   return shard_result_key.get()
 
@@ -363,14 +319,6 @@ def GetTestRunnersWithFilters(
     sort_by, ascending, limit, offset, status, show_successfully_completed,
     test_name_filter, machine_id_filter):
   """Returns a ndb.Future that will return the items in the DB."""
-  if USE_OLD_API:
-    sort_by_first = 'started' if status == 'running' else None
-    query = test_runner.GetTestRunners(
-        sort_by, ascending, limit, offset, sort_by_first)
-    return test_runner.ApplyFilters(
-        query, status, show_successfully_completed, test_name_filter,
-        machine_id_filter).fetch_async()
-
   assert sort_by in ACCEPTABLE_SORTS, (
       'This should have been validated at a higher level')
   opts = ndb.QueryOptions(limit=limit, offset=offset)
@@ -439,17 +387,10 @@ def GetTestRunnersWithFilters(
 
 def CountRequestsAsync():
   """Returns a ndb.Future that will return the number of requests in the DB."""
-  if USE_OLD_API:
-    return test_runner.GetTestRunners(
-        None, False, None, None, None).count_async()
-  # TODO(maruel): Shards or requests? The old API returns the number of shards.
   return task_request.TaskRequest.query().count_async()
 
 
 def PingRunner(runner_key, machine_id):
-  if USE_OLD_API:
-    return test_runner.PingRunner(runner_key, machine_id)
-
   try:
     shard_result_key = task_scheduler.unpack_shard_result_key(runner_key)
     return task_scheduler.bot_update_task(shard_result_key, {}, machine_id)
@@ -458,28 +399,17 @@ def PingRunner(runner_key, machine_id):
     return False
 
 
-def QueryOldRunners():
-  return test_runner.QueryOldRunners()
-
-
 def GetHangingRunners():
-  if USE_OLD_API:
-    return test_runner.GetHangingRunners()
   # Not applicable.
   return []
 
 
-def DeleteRunnerFromKey(key):
-  if USE_OLD_API:
-    return test_runner.DeleteRunnerFromKey(key)
+def DeleteRunnerFromKey(_key):
   # TODO(maruel): Remove this API.
   return True
 
 
 def GetRunnerResults(runner_key_urlsafe):
-  if USE_OLD_API:
-    return test_runner.GetRunnerResults(runner_key_urlsafe)
-
   try:
     shard_result = GetRunnerFromUrlSafeKey(runner_key_urlsafe)
   except ValueError:
@@ -508,11 +438,6 @@ def GetRunnerResults(runner_key_urlsafe):
 
 def UpdateTestResult(
     runner, machine_id, success, exit_codes, results, overwrite):
-  if USE_OLD_API:
-    return runner.UpdateTestResult(
-        machine_id, success, exit_codes=exit_codes, results=results,
-        overwrite=overwrite)
-
   assert not overwrite
   if runner.bot_id != machine_id:
     raise ValueError('Expected %s, got %s', runner.bot_id, machine_id)
@@ -529,8 +454,6 @@ def UpdateTestResult(
 
 
 def GetEncoding(runner):
-  if USE_OLD_API:
-    return runner.request.get().GetTestCase().encoding
   return 'utf-8'
 
 
@@ -560,38 +483,6 @@ def GenerateButtonWithHiddenForm(button_text, url, form_id):
 def make_runner_view(runner):
   """Returns a html template friendly dict from a TestRunner."""
   # TODO(maruel): This belongs to a jinja2 template, not here.
-  if USE_OLD_API:
-    out = runner.to_dict()
-    out['class_string'] = ''
-    out['command_string'] = '&nbsp;'
-    out['key_string'] = UrlSafe(runner.key)
-    out['status_string'] = '&nbsp;'
-    out['user'] = out['requestor']
-    if runner.done:
-      # TODO(maruel): All this should be done in the template instead.
-      if runner.ran_successfully:
-        out['status_string'] = (
-            '<a title="Click to see results" href="%s?r=%s">Succeeded</a>' %
-            ('/secure/get_result', out['key_string']))
-      else:
-        out['class_string'] = 'failed_test'
-        out['command_string'] = GenerateButtonWithHiddenForm(
-            'Retry',
-            '/secure/retry?r=%s' % out['key_string'],
-            out['key_string'])
-        out['status_string'] = (
-            '<a title="Click to see results" href="%s?r=%s">Failed</a>' %
-            ('/secure/get_result', out['key_string']))
-    elif runner.started:
-      out['status_string'] = 'Running on %s' % runner.machine_id
-    else:
-      out['status_string'] = 'Pending'
-      out['command_string'] = GenerateButtonWithHiddenForm(
-          'Cancel',
-          '%s?r=%s' % ('/secure/cancel', out['key_string']),
-          out['key_string'])
-    return out
-
   # Simulate the old properties until the templates are updated.
   request, result = runner
   assert isinstance(request, task_request.TaskRequest), request

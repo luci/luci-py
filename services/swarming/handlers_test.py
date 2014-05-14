@@ -29,7 +29,6 @@ from common import swarm_constants
 from components import stats_framework
 from server import admin_user
 from server import bot_management
-from server import dimension_mapping
 from server import dimensions_utils
 from server import errors
 from server import stats_new as stats
@@ -37,10 +36,7 @@ from server import task_glue
 from server import test_helper
 from server import test_runner
 from server import user_manager
-from stats import daily_stats
 from stats import machine_stats
-from stats import runner_stats
-from stats import runner_summary
 from third_party.mox import mox
 
 
@@ -193,22 +189,15 @@ class AppTest(test_case.TestCase):
       except (ValueError, TypeError), e:
         self.fail(e)
       # TODO(maruel): Stop using the DB directly in HTTP handlers test.
-      if task_glue.USE_OLD_API:
-        self.assertEqual(runner.exit_codes, results['exit_codes'])
-        self.assertEqual(runner.machine_id, results['machine_id'])
-        expected_result_string = runner.GetResultString().decode(
-            'utf-8', 'replace')
-      else:
-        self.assertEqual(
-            ','.join(map(str, runner.exit_codes)),
-            ''.join(results['exit_codes']))
-        self.assertEqual(runner.bot_id, results['machine_id'])
-        expected_result_string = '\n'.join(
-            o.GetResults().decode('utf-8', 'replace') for o in runner.outputs)
+      self.assertEqual(
+          ','.join(map(str, runner.exit_codes)),
+          ''.join(results['exit_codes']))
+      self.assertEqual(runner.bot_id, results['machine_id'])
+      expected_result_string = '\n'.join(
+          o.get().GetResults().decode('utf-8', 'replace')
+          for o in runner.outputs)
       self.assertEqual(expected_result_string, results['output'])
-    if not task_glue.USE_OLD_API:
-      # The new API will cause a TaskResultSummary task queue.
-      self.assertEqual(1, self.execute_tasks())
+    self.assertEqual(1, self.execute_tasks())
 
   def testGetSlaveCode(self):
     response = self.app.get('/get_slave_code')
@@ -298,22 +287,6 @@ class AppTest(test_case.TestCase):
 
     self._mox.VerifyAll()
 
-  def testCleanupResultsHandler(self):
-    if not task_glue.USE_OLD_API:
-      # This code will be removed with the new API. It's unnecessary.
-      return
-
-    # Try to clean up with an invalid key.
-    response = self.app.post('/cleanup_results', {'r': 'fake_key'})
-    # TODO(maruel): If it fails, it shouldn't be 200.
-    self.assertResponse(response, '200 OK', 'Key deletion failed.')
-
-    # Try to clean up with a valid key.
-    runner = test_helper.CreateRunner()
-    response = self.app.post(
-        '/cleanup_results', {'r': task_glue.UrlSafe(runner.key)})
-    self.assertResponse(response, '200 OK', 'Key deleted.')
-
   def testRetryHandler(self):
     # Act under admin identity.
     self._ReplaceCurrentUser(ADMIN_EMAIL)
@@ -330,9 +303,7 @@ class AppTest(test_case.TestCase):
     response = self.app.post(
         '/secure/retry', {'r': task_glue.UrlSafe(runner.key)})
     self.assertResponse(response, '200 OK', 'Runner set for retry.')
-    if not task_glue.USE_OLD_API:
-      # The new API will cause a TaskResultSummary task queue.
-      self.assertEqual(1, self.execute_tasks())
+    self.assertEqual(1, self.execute_tasks())
 
   def testShowMessageHandler(self):
     # Act under admin identity.
@@ -466,35 +437,18 @@ class AppTest(test_case.TestCase):
     self.assertResponse(
         response, '200 OK', 'Successfully update the runner results.')
 
-    if task_glue.USE_OLD_API:
-      # Get the lastest version of the runner and ensure it has the correct
-      # values.
-      runner = test_runner.TestRunner.query().get()
-      self.assertTrue(runner.ran_successfully)
-      self.assertEqual(result, runner.GetResultString())
-
-      # Delete the runner and try posting the results again. This can happen
-      # if two machines are running the same test (due to flaky connections),
-      # and the results were then deleted before the second machine returned.
-      runner.key.delete()
-      response = self._PostResults(
-          task_glue.UrlSafe(runner.key), runner.machine_id, result)
-      self.assertEqual('200 OK', response.status)
-      self.assertTrue(
-          response.body.startswith('The runner, with key '), response.body)
-    else:
-      self.assertEqual(2, self.execute_tasks())
-      resp = self.app.get(
-          '/get_result?r=%s' % task_glue.UrlSafe(runner.key), status=200)
-      expected = {
-        'config_instance_index': 0,
-        'exit_codes': '',
-        'machine_id': '12345678-12345678-12345678-12345678',
-        'machine_tag': 'Unknown',
-        'num_config_instances': 1,
-        'output': 'result string',
-      }
-      self.assertEqual(expected, resp.json)
+    self.assertEqual(2, self.execute_tasks())
+    resp = self.app.get(
+        '/get_result?r=%s' % task_glue.UrlSafe(runner.key), status=200)
+    expected = {
+      'config_instance_index': 0,
+      'exit_codes': '',
+      'machine_id': '12345678-12345678-12345678-12345678',
+      'machine_tag': 'Unknown',
+      'num_config_instances': 1,
+      'output': 'result string',
+    }
+    self.assertEqual(expected, resp.json)
 
   def testUserProfile(self):
     # Act under admin identity.
@@ -772,42 +726,7 @@ class AppTest(test_case.TestCase):
         '/runner_ping',
         {'r': task_glue.UrlSafe(runner.key), 'id': runner.machine_id})
     self.assertResponse(response, '200 OK', 'Success.')
-    if not task_glue.USE_OLD_API:
-      # The new API will cause a TaskResultSummary task queue.
-      self.assertEqual(1, self.execute_tasks())
-
-  def testStatPages(self):
-    stat_urls = [
-        '/stats',
-        '/stats/daily',
-        '/stats/tasks',
-        '/stats/waits',
-    ]
-
-    # Create a pending, active and done runner.
-    test_helper.CreateRunner()
-    test_helper.CreateRunner(machine_id=MACHINE_ID)
-    runner = test_helper.CreateRunner(machine_id=MACHINE_ID)
-    if task_glue.USE_OLD_API:
-      runner.UpdateTestResult(machine_id=MACHINE_ID)
-      # Ensure the dimension mapping is created.
-      dimension_mapping.DimensionMapping(dimensions=runner.dimensions).put()
-      # Ensure a RunnerSummary is created.
-      runner_summary.GenerateSnapshotSummary()
-      # Ensure wait stats are generated.
-      runner_summary.GenerateWaitSummary()
-
-      # Add some basic stats items to ensure the loop bodies are executed.
-      runner = test_helper.CreateRunner()
-      runner_stats.RecordRunnerStats(runner)
-      daily_stats.DailyStats(date=datetime.datetime.utcnow().date()).put()
-    else:
-      # TODO(maruel): Implement via calling HTTP handlers.
-      pass
-
-    for stat_url in stat_urls:
-      response = self.app.get(stat_url)
-      self.assertEqual('200 OK', response.status)
+    self.assertEqual(1, self.execute_tasks())
 
   def testTestRequest(self):
     # Ensure that a test request fails without a request.

@@ -514,7 +514,6 @@ class TaskCleanupDataHandler(webapp2.RequestHandler):
     queries = [
         errors.QueryOldErrors(),
         dimension_mapping.QueryOldDimensionMapping(),
-        task_glue.QueryOldRunners(),
         daily_stats.QueryOldDailyStats(),
         requestor_daily_stats.QueryOldRequestorDailyStats(),
         runner_stats.QueryOldRunnerStats(),

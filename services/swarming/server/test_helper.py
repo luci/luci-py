@@ -15,8 +15,6 @@ from server import task_glue
 from server import task_result
 from server import task_shard_to_run
 from server import task_scheduler
-from server import test_request
-from server import test_runner
 
 # pylint: disable=W0212
 
@@ -27,28 +25,6 @@ REQUEST_MESSAGE_CONFIG_NAME_ROOT = 'c1'
 
 # The default name for a TestRequest.
 REQUEST_MESSAGE_TEST_CASE_NAME = 'tc'
-
-
-def _CreateRunner(request, config_name):
-  """Create a basic runner.
-
-  Args:
-    request: The TestRequest that owns this runner.
-    config_name: The config name for the runner.
-
-  Returns:
-    The newly created runner.
-  """
-  runner = test_runner.TestRunner(
-      request=request.key,
-      config_name=config_name,
-      config_hash=request.GetConfigurationDimensionHash(config_name))
-  runner.put()
-
-  request.runner_keys.append(runner.key)
-  request.put()
-
-  return runner
 
 
 def GetRequestMessage(request_name=REQUEST_MESSAGE_TEST_CASE_NAME,
@@ -127,46 +103,6 @@ def CreateRunner(config_name=None, machine_id=None, ran_successfully=None,
   """
   config_name = config_name or (REQUEST_MESSAGE_CONFIG_NAME_ROOT + '_0')
   request_message = GetRequestMessage(requestor=requestor)
-  if task_glue.USE_OLD_API:
-    request = test_request.TestRequest(
-        message=request_message,
-        name=REQUEST_MESSAGE_TEST_CASE_NAME)
-    request.put()
-
-    runner = _CreateRunner(request, config_name)
-    runner.config_instance_index = 0
-    runner.num_config_instances = 1
-    runner.requestor = requestor
-
-    if created:
-      runner.created = datetime.datetime.utcnow() + created
-
-    if machine_id:
-      runner.machine_id = machine_id
-      runner.started = runner.created
-      runner.ping = runner.started
-
-    if ran_successfully:
-      runner.ran_successfully = ran_successfully
-
-    if exit_codes:
-      runner.done = True
-      runner.ended = runner.created
-      runner.exit_codes = exit_codes
-
-    if started:
-      runner.started = runner.created + started
-
-    if ended:
-      runner.ended = runner.started + ended
-
-    if results:
-      results_obj = result_helper.StoreResults(results)
-      runner.results_reference = results_obj.key
-
-    runner.put()
-    return runner
-
   data = task_glue._convert_test_case(request_message)
   request, shard_runs = task_scheduler.new_request(data)
   if created:
@@ -186,6 +122,8 @@ def CreateRunner(config_name=None, machine_id=None, ran_successfully=None,
     data = {
       'exit_codes': map(int, exit_codes.split(',')) if exit_codes else [0],
     }
+    if results:
+      data['outputs'] = [result_helper.StoreResults(results).key]
     # The entity needs to be saved before it can be updated, since
     # bot_update_task() accepts the key of the entity.
     ndb.transaction(shard_result.put)
@@ -208,28 +146,6 @@ def CreateRunner(config_name=None, machine_id=None, ran_successfully=None,
 
   # Returns a TaskShardResult.
   return shard_result
-
-
-def CreateRequest(num_instances):
-  """Creates a basic request with the specified number of runners.
-
-  Args:
-    num_instances: The number of runner instances to give this request.
-
-  Returns:
-    The newly created request.
-  """
-  request = test_request.TestRequest(message=GetRequestMessage(),
-                                     name=REQUEST_MESSAGE_TEST_CASE_NAME)
-  request.put()
-
-  for i in range(num_instances):
-    runner = _CreateRunner(request, REQUEST_MESSAGE_CONFIG_NAME_ROOT + '_0')
-    runner.config_instance_index = i
-    runner.num_config_instances = num_instances
-    runner.put()
-
-  return request
 
 
 def mock_now(test, now):
