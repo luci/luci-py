@@ -21,6 +21,7 @@ from google.appengine.ext import ndb
 
 from common import test_request_message
 from server import dimension_mapping
+from server import task_glue
 from server import test_helper
 from stats import runner_stats
 from stats import runner_summary
@@ -64,6 +65,8 @@ class RunnerSummaryTest(test_case.TestCase):
 
   def setUp(self):
     super(RunnerSummaryTest, self).setUp()
+    # Support for this code was not implemented in the new DB.
+    self.mock(task_glue, 'USE_OLD_API', True)
     self._mox = mox.Mox()
 
   def tearDown(self):

@@ -56,8 +56,8 @@ from stats import machine_stats
 
 
 # Global switch to use the old or new DB. Note unit tests that directly access
-# the DB won't pass with the new DB.
-USE_OLD_API = True
+# the DB won't pass with the new DB so they should mock this value.
+USE_OLD_API = False
 
 
 def _convert_test_case(data):
@@ -355,13 +355,8 @@ def GetRunnerFromUrlSafeKey(runner_key):
   if USE_OLD_API:
     return test_runner.GetRunnerFromUrlSafeKey(runner_key)
 
-  try:
-    shard_result_key = task_scheduler.unpack_shard_result_key(
-        runner_key)
-  except ValueError:
-    return None
-  result = shard_result_key.get()
-  return result
+  shard_result_key = task_scheduler.unpack_shard_result_key(runner_key)
+  return shard_result_key.get()
 
 
 def GetTestRunnersWithFilters(

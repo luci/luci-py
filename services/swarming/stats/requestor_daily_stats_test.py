@@ -19,6 +19,7 @@ test_env.setup_test_env()
 
 from google.appengine.ext import ndb
 
+from server import task_glue
 from server import test_helper
 from stats import requestor_daily_stats
 from support import test_case
@@ -36,6 +37,11 @@ REQUESTOR = [
 
 class RequestorStatsTest(test_case.TestCase):
   APP_DIR = ROOT_DIR
+
+  def setUp(self):
+    super(RequestorStatsTest, self).setUp()
+    # Support for this code was not implemented in the new DB.
+    self.mock(task_glue, 'USE_OLD_API', True)
 
   def testAddStatsWithNoRequestor(self):
     self.assertEqual(0,
