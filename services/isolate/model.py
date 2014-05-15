@@ -185,21 +185,15 @@ def save_in_memcache(namespace, hash_key, content, async=False):
     logging.error(e)
 
 
-def create_entry(key):
-  """Generates a new ContentEntry from the request if one doesn't exist.
+def new_content_entry(key, **kwargs):
+  """Generates a new ContentEntry for the request.
 
-  This function is synchronous.
-
-  Returns None if there is a problem generating the entry or if an entry already
-  exists with the given hex encoded SHA-1 hash |hash_key|.
+  Doesn't store it. Just creates a new ContentEntry instance.
   """
-  # Entity was present, can't insert.
-  if key.get():
-    return None
-  # Entity was not present. Create a new one.
   expiration, next_tag = expiration_jitter(
       handlers_common.utcnow(), config.settings().default_expiration)
-  return ContentEntry(key=key, expiration_ts=expiration, next_tag_ts=next_tag)
+  return ContentEntry(
+      key=key, expiration_ts=expiration, next_tag_ts=next_tag, **kwargs)
 
 
 def delete_entry_and_gs_entry(keys_to_delete):

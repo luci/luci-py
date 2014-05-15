@@ -278,12 +278,12 @@ class MainTest(test_case.TestCase):
   def test_ancestor_assumption(self):
     prefix = '1234'
     suffix = 40 - len(prefix)
-    c = model.create_entry(model.entry_key('n', prefix + '0' * suffix))
+    c = model.new_content_entry(model.entry_key('n', prefix + '0' * suffix))
     self.assertEqual(0, len(list(model.ContentEntry.query())))
     c.put()
     self.assertEqual(1, len(list(model.ContentEntry.query())))
 
-    c = model.create_entry(model.entry_key('n', prefix + '1' * suffix))
+    c = model.new_content_entry(model.entry_key('n', prefix + '1' * suffix))
     self.assertEqual(1, len(list(model.ContentEntry.query())))
     c.put()
     self.assertEqual(2, len(list(model.ContentEntry.query())))

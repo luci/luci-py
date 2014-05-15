@@ -17,7 +17,10 @@ import urllib
 import zlib
 
 import webapp2
+from google.appengine import runtime
+from google.appengine.api import datastore_errors
 from google.appengine.api import memcache
+from google.appengine.api import taskqueue
 from google.appengine.ext import ndb
 
 import acl
@@ -773,59 +776,82 @@ class StoreContentHandler(ProtocolHandler):
       uploaded_to_gs = True
 
     # Can create entity now, everything appears to be legit.
-    entry = model.create_entry(key)
-    if not entry:
-      self.send_json({'entry': {}})
-      stats.add_entry(stats.DUPE, compressed_size, 'inline')
-      return
+    entry = model.new_content_entry(
+        key=key,
+        is_isolated=is_isolated,
+        compressed_size=compressed_size,
+        expanded_size=-1 if needs_verification else item_size,
+        is_verified = not needs_verification)
 
     # If it's not in GS then put it inline.
     if not uploaded_to_gs:
       assert content is not None and len(content) < MIN_SIZE_FOR_GS
       entry.content = content
 
-    # Start saving Datastore entry.
-    entry.is_isolated = is_isolated
-    entry.compressed_size = compressed_size
-    entry.expanded_size = -1 if needs_verification else item_size
-    entry.is_verified = not needs_verification
-
-    futures = [entry.put_async()]
-
     # Start saving *.isolated into memcache iff its content is available and
     # it's not in Datastore: there's no point in saving inline blobs in memcache
     # because ndb already memcaches them.
+    memcache_store_future = None
     if (content is not None and
         entry.content is None and
         entry.is_isolated and
         entry.compressed_size <= model.MAX_MEMCACHE_ISOLATED):
-      futures.append(
-          model.save_in_memcache(
-              namespace, hash_key, content, async=True))
+      memcache_store_future = model.save_in_memcache(
+          namespace, hash_key, content, async=True)
 
-    # Log stats.
-    where = 'GS; ' + 'inline' if entry.content is not None else entry.key.id()
+    try:
+      # If entry was already verified above (i.e. it is a small inline entry),
+      # store it right away, possibly overriding existing entity. Most of
+      # the time it is a new entry anyway (since clients try to upload only
+      # new entries).
+      if not needs_verification:
+        entry.put()
+      else:
+        # For large entries (that require expensive verification) be more
+        # careful and check that it is indeed a new entity. No need to do it in
+        # transaction: a race condition would lead to redundant verification
+        # task enqueued, no big deal.
+        existing = entry.key.get()
+        if existing:
+          if existing.is_verified:
+            logging.info('Entity exists and already verified')
+          else:
+            logging.info('Entity exists, but not yet verified')
+        else:
+          # New entity. Store it and enqueue verification task, transactionally.
+          try:
+            @ndb.transactional
+            def store_and_enqueue_verify_task(entry, task_queue_host):
+              entry.put()
+              taskqueue.add(
+                  url='/internal/taskqueue/verify/%s' % entry.key.id(),
+                  queue_name='verify',
+                  headers={'Host': task_queue_host},
+                  transactional=True)
+            store_and_enqueue_verify_task(entry, config.get_task_queue_host())
+          except (
+              datastore_errors.Error,
+              runtime.apiproxy_errors.CancelledError,
+              runtime.apiproxy_errors.DeadlineExceededError,
+              runtime.apiproxy_errors.OverQuotaError,
+              runtime.DeadlineExceededError,
+              taskqueue.Error) as e:
+            return self.send_error(
+                'Unable to store the entity: %s.' % e.__class__.__name__,
+                http_code=503)
 
-    # Verification task will be accessing the entity, so ensure it exists.
-    ndb.Future.wait_all(futures)
+      # TODO(vadimsh): Fill in details about the entry, such as expiration time.
+      self.send_json({'entry': {}})
 
-    # Trigger a verification task for files in the GS.
-    if needs_verification:
-      url = '/internal/taskqueue/verify/%s/%s' % (namespace, hash_key)
-      if not handlers_common.enqueue_task(url, 'verify'):
-        # TODO(vadimsh): Don't fail whole request here, because several RPCs are
-        # required to roll it back and there isn't much time left
-        # (after DeadlineExceededError is already caught) to perform them.
-        # AppEngine gives less then a second to handle DeadlineExceededError.
-        # It's unreliable. We need some other mechanism that can detect
-        # unverified entities and launch verification tasks, for instance
-        # a datastore index on 'is_verified' boolean field and a cron task that
-        # verifies all unverified entities.
-        logging.error('Unable to add task to verify uploaded content.')
+      # Log stats.
+      where = 'GS; ' + 'inline' if entry.content is not None else entry.key.id()
+      stats.add_entry(stats.STORE, entry.compressed_size, where)
 
-    # TODO(vadimsh): Fill in details about the entry, such as expiration time.
-    self.send_json({'entry': {}})
-    stats.add_entry(stats.STORE, entry.compressed_size, where)
+    finally:
+      # Do not keep dangling futures. Note that error here is ignored,
+      # memcache is just an optimization.
+      if memcache_store_future:
+        memcache_store_future.wait()
 
 
 ###
