@@ -94,7 +94,7 @@ class TaskResultApiTest(test_case.TestCase):
     for i in task_result.State.STATES:
       self.assertTrue(task_result.State.to_string(i))
     with self.assertRaises(ValueError):
-      task_result.State.to_string(task_state=0)
+      task_result.State.to_string(0)
 
     self.assertEqual(
         set(task_result.State._NAMES), set(task_result.State.STATES))
@@ -147,7 +147,7 @@ class TaskResultApiTest(test_case.TestCase):
     self.assertEqual(request_key, actual)
 
   def test_new_result_summary(self):
-    request = task_request.new_request(
+    request = task_request.make_request(
         _gen_request_data(properties=dict(number_shards=1)))
     actual = task_result.new_result_summary(request)
     expected = {
@@ -172,7 +172,7 @@ class TaskResultApiTest(test_case.TestCase):
     self.assertEqual(expected, actual.to_dict())
 
   def test_new_shard_result(self):
-    request = task_request.new_request(
+    request = task_request.make_request(
         _gen_request_data(properties=dict(number_shards=1)))
     shards = task_shard_to_run.new_shards_to_run_for_request(request)
     self.assertEqual(1, len(shards))
@@ -194,7 +194,7 @@ class TaskResultApiTest(test_case.TestCase):
 
   def test_task_update_result_summary_end_to_end(self):
     # Creates 2 shards, ensure they are all synchronized properly.
-    request = task_request.new_request(
+    request = task_request.make_request(
         _gen_request_data(properties=dict(number_shards=2)))
     result_summary = task_result.new_result_summary(request)
     shards = task_shard_to_run.new_shards_to_run_for_request(request)
@@ -305,7 +305,7 @@ class TaskResultApiTest(test_case.TestCase):
     self.assertEqual(4, self.execute_tasks())
 
   def test_task_update_result_summary_completed(self):
-    request = task_request.new_request(
+    request = task_request.make_request(
         _gen_request_data(properties=dict(number_shards=2)))
     result_summary = task_result.new_result_summary(request)
     shards = task_shard_to_run.new_shards_to_run_for_request(request)
@@ -400,7 +400,7 @@ class TaskResultApiTest(test_case.TestCase):
   def test_task_update_result_summary(self):
     # Tests task_result.sync_all_result_summary(). It is basically a
     # wrapper around _task_update_result_summary() which is tested above.
-    request = task_request.new_request(
+    request = task_request.make_request(
         _gen_request_data(properties=dict(number_shards=1)))
     result_summary = task_result.new_result_summary(request)
     result_summary.put()
@@ -454,7 +454,7 @@ class TaskResultApiTest(test_case.TestCase):
     self.assertEqual(1, self.execute_tasks())
 
   def test_terminate_shard_result(self):
-    request = task_request.new_request(
+    request = task_request.make_request(
         _gen_request_data(properties=dict(number_shards=1)))
     shards = task_shard_to_run.new_shards_to_run_for_request(request)
     shard_to_run = shards[0]
@@ -478,7 +478,7 @@ class TaskResultApiTest(test_case.TestCase):
 
   def test_yield_shard_results_without_update(self):
     # One is completed, one died.
-    request = task_request.new_request(
+    request = task_request.make_request(
         _gen_request_data(properties=dict(number_shards=2)))
     shards = task_shard_to_run.new_shards_to_run_for_request(request)
     shard_result_0 = task_result.new_shard_result(shards[0].key, 1, 'localhost')
@@ -524,19 +524,19 @@ class TaskResultApiTest(test_case.TestCase):
   def test_sync_all_result_summary(self):
     # It is basically a wrapper around _task_update_result_summary() which is
     # tested above.
-    request = task_request.new_request(
+    request = task_request.make_request(
         _gen_request_data(properties=dict(number_shards=1)))
     result_summary = task_result.new_result_summary(request)
     result_summary.put()
     self.run_sync_all_result_summary(request)
 
   def test_task_update_result_summary_skip_task_missing_summary(self):
-    request = task_request.new_request(
+    request = task_request.make_request(
         _gen_request_data(properties=dict(number_shards=1)))
     self.run_sync_all_result_summary(request)
 
   def test_task_update_result_summary_fine(self):
-    request = task_request.new_request(
+    request = task_request.make_request(
         _gen_request_data(properties=dict(number_shards=1)))
     result_summary = task_result.new_result_summary(request)
     result_summary.put()
@@ -554,7 +554,7 @@ class TaskResultApiTest(test_case.TestCase):
     self.assertEqual(0, task_result.sync_all_result_summary())
 
   def test_enqueue_update_result_summary(self):
-    request = task_request.new_request(
+    request = task_request.make_request(
         _gen_request_data(properties=dict(number_shards=1)))
     shards = task_shard_to_run.new_shards_to_run_for_request(request)
     self.assertEqual(1, len(shards))

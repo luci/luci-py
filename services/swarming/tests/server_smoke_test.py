@@ -259,6 +259,7 @@ class SwarmingTestCase(unittest.TestCase):
     with open(swarm_file, 'rb') as f:
       request = f.read()
 
+    # Trigger the test.
     data = urllib.urlencode({'request': request})
     url = urlparse.urljoin(self.server_url, 'test')
     test_keys = json.load(urllib2.urlopen(url, data=data))
@@ -277,11 +278,18 @@ class SwarmingTestCase(unittest.TestCase):
                     test_key['test_key'])
 
     # Make sure that we can actually find the keys from just the test names.
+    # Loop because the index is eventually consistent, so the initial request(s)
+    # could fail and return nothing.
     data = urllib.urlencode({'name': test_keys['test_case_name']})
-    # Append the data to the url so the request is a GET request as required.
-    url = urlparse.urljoin(
-        self.server_url, 'get_matching_test_cases') + '?' + data
-    matching_keys = json.load(urllib2.urlopen(url))
+    for i in xrange(10):
+      # Append the data to the url so the request is a GET request as required.
+      url = urlparse.urljoin(
+          self.server_url, 'get_matching_test_cases') + '?' + data
+      matching_keys = json.load(urllib2.urlopen(url))
+      if matching_keys:
+        break
+      # Last sleep is 2 seconds.
+      time.sleep(0.1 * (2*(i+1)))
     self.assertEqual(set(matching_keys), set(current_test_keys))
 
   def test_integration(self):

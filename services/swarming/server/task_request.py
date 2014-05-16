@@ -63,7 +63,7 @@ _ONE_DAY_SECS = 24*60*60 + 10
 _MIN_TIMEOUT_SECS = 30
 
 
-# Parameters for new_request().
+# Parameters for make_request().
 # The content of the 'data' parameter. This relates to the context of the
 # request, e.g. who wants to run a task.
 _DATA_KEYS = frozenset(
@@ -313,12 +313,14 @@ def id_to_request_key(task_id):
   """Returns the ndb.Key for a TaskRequest id."""
   if task_id & 0xFF:
     raise ValueError('Unexpected low order byte is set')
+  if not task_id:
+    raise ValueError('Invalid null key')
   parent = datastore_utils.hashed_shard_key(
       str(task_id), task_common.SHARDING_LEVEL, 'TaskRequestShard')
   return ndb.Key(TaskRequest, task_id, parent=parent)
 
 
-def new_request(data):
+def make_request(data):
   """Constructs a TaskRequest out of a yet-to-be-specified API.
 
   Argument:
@@ -343,14 +345,14 @@ def new_request(data):
   set_data = frozenset(data)
   if set_data != _DATA_KEYS:
     raise ValueError(
-        'Unexpected parameters for new_request(): %s\nExpected: %s' % (
+        'Unexpected parameters for make_request(): %s\nExpected: %s' % (
             ', '.join(sorted(_DATA_KEYS.symmetric_difference(set_data))),
             ', '.join(sorted(_DATA_KEYS))))
   data_properties = data['properties']
   set_data_properties = frozenset(data_properties)
   if set_data_properties != _PROPERTIES_KEYS:
     raise ValueError(
-        'Unexpected properties for new_request(): %s\nExpected: %s' % (
+        'Unexpected properties for make_request(): %s\nExpected: %s' % (
             ', '.join(sorted(
                 _PROPERTIES_KEYS.symmetric_difference(set_data_properties))),
             ', '.join(sorted(_PROPERTIES_KEYS))))

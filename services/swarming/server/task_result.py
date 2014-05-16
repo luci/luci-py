@@ -74,13 +74,14 @@ class State(object):
   EXPIRED = 0x30
   TIMED_OUT = 0x40
   BOT_DIED = 0x50
-  COMPLETED = 0x60
+  CANCELED = 0x60
+  COMPLETED = 0x70
 
-  STATES = (RUNNING, PENDING, EXPIRED, TIMED_OUT, BOT_DIED, COMPLETED)
+  STATES = (RUNNING, PENDING, EXPIRED, TIMED_OUT, BOT_DIED, CANCELED, COMPLETED)
   STATES_RUNNING = (RUNNING, PENDING)
-  STATES_NOT_RUNNING = (EXPIRED, TIMED_OUT, BOT_DIED, COMPLETED)
+  STATES_NOT_RUNNING = (EXPIRED, TIMED_OUT, BOT_DIED, CANCELED, COMPLETED)
   STATES_DONE = (TIMED_OUT, COMPLETED)
-  STATES_ABANDONED = (EXPIRED, BOT_DIED)
+  STATES_ABANDONED = (EXPIRED, BOT_DIED, CANCELED)
 
   _NAMES = {
     RUNNING: 'Running',
@@ -89,15 +90,16 @@ class State(object):
     TIMED_OUT: 'One of the executed command timed out',
     BOT_DIED: 'Bot died while running the task. Either the task killed the bot '
       'or the bot suicided',
+    CANCELED: 'User canceled the request',
     COMPLETED: 'Completed',
   }
 
   @classmethod
-  def to_string(cls, task_state):
+  def to_string(cls, state):
     """Returns a user-readable string representing a State."""
-    if task_state not in cls._NAMES:
-      raise ValueError('Invalid state %s' % task_state)
-    return cls._NAMES[task_state]
+    if state not in cls._NAMES:
+      raise ValueError('Invalid state %s' % state)
+    return cls._NAMES[state]
 
 
 class StateProperty(ndb.IntegerProperty):

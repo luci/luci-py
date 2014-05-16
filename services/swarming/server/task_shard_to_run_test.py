@@ -68,7 +68,7 @@ def _yield_next_available_shard_to_dispatch(bot_dimensions):
 def _gen_new_shards_to_run(**kwargs):
   data = _gen_request_data(**kwargs)
   shards = task_shard_to_run.new_shards_to_run_for_request(
-      task_request.new_request(data))
+      task_request.make_request(data))
   ndb.put_multi(shards)
   return shards
 
@@ -217,7 +217,7 @@ class TaskShardToRunApiTest(test_case.TestCase):
           'execution_timeout_secs': 30,
         },
         scheduling_expiration_secs=31)
-    request = task_request.new_request(data)
+    request = task_request.make_request(data)
     shards = task_shard_to_run.new_shards_to_run_for_request(request)
     ndb.put_multi(shards)
 

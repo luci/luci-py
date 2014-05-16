@@ -105,10 +105,10 @@ class TaskRequestApiTest(test_case.TestCase):
     with self.assertRaises(ValueError):
       task_request.id_to_request_key(1)
 
-  def test_new_request(self):
+  def test_make_request(self):
     deadline_to_run = 31
     data = _gen_request_data(scheduling_expiration_secs=deadline_to_run)
-    request = task_request.new_request(data)
+    request = task_request.make_request(data)
     expected_properties = {
       'commands': [
         [u'command1', u'arg1'],
@@ -143,8 +143,8 @@ class TaskRequestApiTest(test_case.TestCase):
 
   def test_duped(self):
     # Two TestRequest with the same properties.
-    request_1 = task_request.new_request(_gen_request_data())
-    request_2 = task_request.new_request(
+    request_1 = task_request.make_request(_gen_request_data())
+    request_2 = task_request.make_request(
         _gen_request_data(
             name='Other', user='Other', priority=201,
             scheduling_expiration_secs=129))
@@ -152,85 +152,85 @@ class TaskRequestApiTest(test_case.TestCase):
 
   def test_different(self):
     # Two TestRequest with different properties.
-    request_1 = task_request.new_request(
+    request_1 = task_request.make_request(
         _gen_request_data(properties=dict(execution_timeout_secs=30)))
-    request_2 = task_request.new_request(
+    request_2 = task_request.make_request(
         _gen_request_data(properties=dict(execution_timeout_secs=129)))
     self.assertNotEqual(request_1.properties_hash, request_2.properties_hash)
 
   def test_bad_values(self):
     with self.assertRaises(ValueError):
-      task_request.new_request({})
+      task_request.make_request({})
     with self.assertRaises(ValueError):
-      task_request.new_request(_gen_request_data(properties={'foo': 'bar'}))
-    task_request.new_request(_gen_request_data())
+      task_request.make_request(_gen_request_data(properties={'foo': 'bar'}))
+    task_request.make_request(_gen_request_data())
 
     with self.assertRaises(datastore_errors.BadValueError):
-      task_request.new_request(
+      task_request.make_request(
           _gen_request_data(properties=dict(commands=None)))
     with self.assertRaises(datastore_errors.BadValueError):
-      task_request.new_request(
+      task_request.make_request(
           _gen_request_data(properties=dict(commands=[])))
     with self.assertRaises(TypeError):
-      task_request.new_request(
+      task_request.make_request(
           _gen_request_data(properties=dict(commands={})))
     with self.assertRaises(TypeError):
-      task_request.new_request(
+      task_request.make_request(
           _gen_request_data(properties=dict(commands=['python'])))
     with self.assertRaises(TypeError):
-      task_request.new_request(
+      task_request.make_request(
           _gen_request_data(properties=dict(commands=[['python']])))
-    task_request.new_request(
+    task_request.make_request(
         _gen_request_data(properties=dict(commands=[[u'python']])))
 
     with self.assertRaises(TypeError):
-      task_request.new_request(
+      task_request.make_request(
           _gen_request_data(properties=dict(env=[])))
     with self.assertRaises(TypeError):
-      task_request.new_request(
+      task_request.make_request(
           _gen_request_data(properties=dict(env={u'a': 1})))
-    task_request.new_request(_gen_request_data(properties=dict(env={})))
+    task_request.make_request(_gen_request_data(properties=dict(env={})))
 
     with self.assertRaises(TypeError):
-      task_request.new_request(
+      task_request.make_request(
           _gen_request_data(properties=dict(data=[['a',]])))
     with self.assertRaises(TypeError):
-      task_request.new_request(
+      task_request.make_request(
           _gen_request_data(properties=dict(data=[('a', '1')])))
     with self.assertRaises(TypeError):
-      task_request.new_request(
+      task_request.make_request(
           _gen_request_data(properties=dict(data=[(u'a', u'1')])))
-    task_request.new_request(
+    task_request.make_request(
         _gen_request_data(properties=dict(data=[[u'a', u'1']])))
 
     with self.assertRaises(datastore_errors.BadValueError):
-      task_request.new_request(
+      task_request.make_request(
           _gen_request_data(priority=task_common.MAXIMUM_PRIORITY+1))
-    task_request.new_request(
+    task_request.make_request(
         _gen_request_data(priority=task_common.MAXIMUM_PRIORITY))
 
     with self.assertRaises(datastore_errors.BadValueError):
-      task_request.new_request(
+      task_request.make_request(
           _gen_request_data(
               properties=dict(
                   execution_timeout_secs=task_request._ONE_DAY_SECS+1)))
-    task_request.new_request(
+    task_request.make_request(
         _gen_request_data(
             properties=dict(execution_timeout_secs=task_request._ONE_DAY_SECS)))
 
     with self.assertRaises(datastore_errors.BadValueError):
-      task_request.new_request(
+      task_request.make_request(
           _gen_request_data(
               properties=dict(number_shards=task_common.MAXIMUM_SHARDS+1)))
-    task_request.new_request(
+    task_request.make_request(
         _gen_request_data(
             properties=dict(number_shards=task_common.MAXIMUM_SHARDS)))
 
     with self.assertRaises(datastore_errors.BadValueError):
-      task_request.new_request(
+      task_request.make_request(
           _gen_request_data(
               scheduling_expiration_secs=task_request._MIN_TIMEOUT_SECS-1))
-    task_request.new_request(
+    task_request.make_request(
         _gen_request_data(
             scheduling_expiration_secs=task_request._MIN_TIMEOUT_SECS))
 

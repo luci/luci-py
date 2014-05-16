@@ -655,8 +655,8 @@ class TestRun(TestRequestMessageBase):
   VALID_CLEANUP_VALUES = (None, '', 'zip', 'data', 'root')
 
   def __init__(self, test_run_name=None, env_vars=None, configuration=None,
-               data=None, working_dir=None, tests=None, instance_index=None,
-               num_instances=None, result_url=None, ping_url=None,
+               data=None, working_dir=None, tests=None, instance_index=0,
+               num_instances=1, result_url=None, ping_url=None,
                ping_delay=None, cleanup=None, restart_on_failure=None,
                encoding='utf-8', **kwargs):
     super(TestRun, self).__init__(**kwargs)

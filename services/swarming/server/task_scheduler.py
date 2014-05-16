@@ -50,16 +50,16 @@ def exponential_backoff(attempt_num):
   return min(60.0, math.pow(1.5, min(attempt_num, 10) + 1))
 
 
-def new_request(data):
+def make_request(data):
   """Creates and store all the entities for a new task request.
 
   The number of entities created is N+2 where N is the number of shards, one
   TaskRequest, one TaskResultSummary and N TaskShardToRun.
 
   Arguments:
-  - data: is in the format expected by task_request.new_request().
+  - data: is in the format expected by task_request.make_request().
   """
-  request = task_request.new_request(data)
+  request = task_request.make_request(data)
   # Creates the entities TaskShardToRun and TaskResultSummary.
   # TaskShardResult will be created once a bot starts it.
   shard_runs = task_shard_to_run.new_shards_to_run_for_request(request)

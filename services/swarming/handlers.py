@@ -659,6 +659,8 @@ class GetMatchingTestCasesHandler(auth.AuthenticatingHandler):
     if keys:
       self.response.write(utils.encode_to_json(keys))
     else:
+      # TODO(maruel): This is semantically incorrect if you think about this API
+      # as a search API.
       self.response.set_status(404)
       self.response.write('[]')
 

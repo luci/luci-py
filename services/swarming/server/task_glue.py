@@ -60,7 +60,7 @@ from stats import machine_stats
 def _convert_test_case(data):
   """Constructs a TaskProperties out of a test_request_message.TestCase.
 
-  This code is kept for compatibility with the previous API. See new_request()
+  This code is kept for compatibility with the previous API. See make_request()
   for more details.
   """
   test_case = test_request_message.TestCase.FromJSON(data)
@@ -107,7 +107,7 @@ def AbortRunner(runner_key_urlsafe, reason):
 
 def RegisterNewRequest(test_case):
   request_properties = _convert_test_case(test_case)
-  request, shard_runs = task_scheduler.new_request(request_properties)
+  request, shard_runs = task_scheduler.make_request(request_properties)
 
   def to_packed_key(i):
     return task_scheduler.pack_shard_result_key(
@@ -249,7 +249,7 @@ def RetryRunner(runner_key_urlsafe):
     'priority': request.priority,
     'scheduling_expiration_secs': request.scheduling_expiration_secs,
   }
-  task_scheduler.new_request(data)
+  task_scheduler.make_request(data)
   return True
 
 

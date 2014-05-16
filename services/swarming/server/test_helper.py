@@ -104,7 +104,7 @@ def CreateRunner(config_name=None, machine_id=None, ran_successfully=None,
   config_name = config_name or (REQUEST_MESSAGE_CONFIG_NAME_ROOT + '_0')
   request_message = GetRequestMessage(requestor=requestor)
   data = task_glue._convert_test_case(request_message)
-  request, shard_runs = task_scheduler.new_request(data)
+  request, shard_runs = task_scheduler.make_request(data)
   if created:
     # For some reason, pylint is being obnoxious here and generates a W0201
     # warning that cannot be disabled. See http://www.logilab.org/19607
