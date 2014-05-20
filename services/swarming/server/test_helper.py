@@ -16,8 +16,6 @@ from server import task_result
 from server import task_shard_to_run
 from server import task_scheduler
 
-# pylint: disable=W0212
-
 
 # The default root for all configs in a test request. The index value of the
 # config is appended to the end to make the full default name.
@@ -103,7 +101,7 @@ def CreateRunner(config_name=None, machine_id=None, ran_successfully=None,
   """
   config_name = config_name or (REQUEST_MESSAGE_CONFIG_NAME_ROOT + '_0')
   request_message = GetRequestMessage(requestor=requestor)
-  data = task_glue._convert_test_case(request_message)
+  data = task_glue.convert_test_case(request_message)
   request, shard_runs = task_scheduler.make_request(data)
   if created:
     # For some reason, pylint is being obnoxious here and generates a W0201
@@ -142,6 +140,7 @@ def CreateRunner(config_name=None, machine_id=None, ran_successfully=None,
   # does a fair amount of work, and we need to ensure the function doesn't fail
   # halfway through and leave shard_result in an inconsistent state
   ndb.transaction(shard_result.put)
+  # pylint: disable=W0212
   task_result._task_update_result_summary(request.key.integer_id())
 
   # Returns a TaskShardResult.

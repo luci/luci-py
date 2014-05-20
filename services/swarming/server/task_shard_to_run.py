@@ -493,13 +493,9 @@ def abort_shard_to_run(shard_to_run):
 
   Arguments:
   - shard_to_run: TaskShardToRun entity to update.
-
-  Returns:
-    Always True.
   """
   assert not ndb.in_transaction()
   assert isinstance(shard_to_run, TaskShardToRun), shard_to_run
   shard_to_run.queue_number = None
   shard_to_run.put()
   _set_lookup_cache(shard_to_run.key, False)
-  return True

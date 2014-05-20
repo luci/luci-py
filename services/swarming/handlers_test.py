@@ -32,7 +32,7 @@ from server import bot_management
 from server import dimensions_utils
 from server import errors
 from server import stats_new as stats
-from server import task_glue
+from server import task_scheduler
 from server import test_helper
 from server import user_manager
 from stats import machine_stats
@@ -144,8 +144,8 @@ class AppTest(test_case.TestCase):
         '/get_matching_test_cases',
         {'name': test_helper.REQUEST_MESSAGE_TEST_CASE_NAME})
     self.assertEqual('200 OK', response.status)
-    self.assertTrue(
-        str(task_glue.UrlSafe(runner.key)) in response.body, response.body)
+    self.assertIn(
+        task_scheduler.pack_shard_result_key(runner.key), response.body)
 
     # Test with a multiple matching runners.
     additional_test_runner = test_helper.CreateRunner()
@@ -154,10 +154,10 @@ class AppTest(test_case.TestCase):
         '/get_matching_test_cases',
         {'name': test_helper.REQUEST_MESSAGE_TEST_CASE_NAME})
     self.assertEqual('200 OK', response.status)
-    self.assertTrue(
-        str(task_glue.UrlSafe(runner.key)) in response.body, response.body)
-    self.assertTrue(
-        str(task_glue.UrlSafe(additional_test_runner.key)) in response.body,
+    self.assertIn(
+        task_scheduler.pack_shard_result_key(runner.key), response.body)
+    self.assertIn(
+        task_scheduler.pack_shard_result_key(additional_test_runner.key),
         response.body)
 
     self._mox.VerifyAll()
@@ -180,7 +180,9 @@ class AppTest(test_case.TestCase):
 
     # Valid key.
     for handler in handler_urls:
-      response = self.app.get(handler, {'r': task_glue.UrlSafe(runner.key)})
+      response = self.app.get(
+          handler,
+          {'r': task_scheduler.pack_shard_result_key(runner.key)})
       self.assertEqual('200 OK', response.status)
 
       try:
@@ -300,7 +302,8 @@ class AppTest(test_case.TestCase):
     runner = test_helper.CreateRunner(exit_codes='0')
 
     response = self.app.post(
-        '/secure/retry', {'r': task_glue.UrlSafe(runner.key)})
+        '/secure/retry',
+        {'r': task_scheduler.pack_shard_result_key(runner.key)})
     self.assertResponse(response, '200 OK', 'Runner set for retry.')
     self.assertEqual(1, self.execute_tasks())
 
@@ -312,8 +315,9 @@ class AppTest(test_case.TestCase):
         status=404)
 
     runner = test_helper.CreateRunner()
-    response = self.app.get('/secure/show_message',
-                            {'r': task_glue.UrlSafe(runner.key)})
+    response = self.app.get(
+        '/secure/show_message',
+        {'r': task_scheduler.pack_shard_result_key(runner.key)})
     self.assertEqual(runner.GetAsDict(), response.json)
 
   def testUploadStartSlaveHandler(self):
@@ -432,13 +436,15 @@ class AppTest(test_case.TestCase):
     runner = test_helper.CreateRunner(machine_id=MACHINE_ID)
     result = 'result string'
     response = self._PostResults(
-        task_glue.UrlSafe(runner.key), runner.machine_id, result)
+        task_scheduler.pack_shard_result_key(runner.key),
+        runner.machine_id,
+        result)
     self.assertResponse(
         response, '200 OK', 'Successfully update the runner results.')
 
     self.assertEqual(2, self.execute_tasks())
-    resp = self.app.get(
-        '/get_result?r=%s' % task_glue.UrlSafe(runner.key), status=200)
+    url = '/get_result?r=%s' % task_scheduler.pack_shard_result_key(runner.key)
+    resp = self.app.get(url, status=200)
     expected = {
       'config_instance_index': 0,
       'exit_codes': '',
@@ -717,9 +723,11 @@ class AppTest(test_case.TestCase):
   def testRunnerPing(self):
     # Start a test and successfully ping it
     runner = test_helper.CreateRunner(machine_id=MACHINE_ID)
-    response = self.app.post(
-        '/runner_ping',
-        {'r': task_glue.UrlSafe(runner.key), 'id': runner.machine_id})
+    data = {
+      'r': task_scheduler.pack_shard_result_key(runner.key),
+      'id': runner.machine_id,
+    }
+    response = self.app.post('/runner_ping', data)
     self.assertResponse(response, '200 OK', 'Success.')
     self.assertEqual(1, self.execute_tasks())
 
@@ -817,8 +825,9 @@ class AppTest(test_case.TestCase):
     self.assertEqual('Unable to cancel runner', response.body)
 
     runner = test_helper.CreateRunner()
-    response = self.app.post('/secure/cancel',
-                             {'r': task_glue.UrlSafe(runner.key)})
+    response = self.app.post(
+        '/secure/cancel',
+        {'r': task_scheduler.pack_shard_result_key(runner.key)})
     self.assertResponse(response, '200 OK', 'Runner canceled.')
 
   def testKnownAuthResources(self):

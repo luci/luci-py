@@ -19,8 +19,6 @@ test_env.setup_test_env()
 from server import task_glue
 from support import test_case
 
-# pylint: disable=W0212
-
 
 class TaskGlueTest(test_case.TestCase):
   def test_convert_test_case(self):
@@ -62,7 +60,7 @@ class TaskGlueTest(test_case.TestCase):
         },
       ],
     }
-    actual = task_glue._convert_test_case(json.dumps(data))
+    actual = task_glue.convert_test_case(json.dumps(data))
     expected = {
       'name': u'Request name',
       'user': u'Jesus',

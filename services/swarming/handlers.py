@@ -13,6 +13,7 @@ import datetime
 import functools
 import json
 import logging
+import os
 import time
 import urllib
 
@@ -22,8 +23,10 @@ from google.appengine import runtime
 from google.appengine.api import datastore_errors
 from google.appengine.api import modules
 from google.appengine.api import taskqueue
+from google.appengine.datastore import datastore_query
 from google.appengine.ext import ndb
 
+from common import rpc
 from common import swarm_constants
 from common import test_request_message
 from components import auth
@@ -40,7 +43,11 @@ from server import result_helper
 from server import stats_gviz
 from server import stats_new as stats
 from server import task_glue
+from server import task_request
+from server import task_result
 from server import task_scheduler
+from server import task_shard_to_run
+from server import test_management
 from server import user_manager
 from stats import machine_stats
 
@@ -56,6 +63,24 @@ _SECURE_CHANGE_WHITELIST_URL = '/secure/change_whitelist'
 _SECURE_GET_RESULTS_URL = '/secure/get_result'
 _SECURE_MAIN_URL = '/secure/main'
 _SECURE_USER_PROFILE_URL = '/secure/user_profile'
+
+
+ACCEPTABLE_SORTS =  {
+  'created_ts': 'Created',
+  'done_ts': 'Ended',
+  'modified_ts': 'Last updated',
+  'name': 'Name',
+  'user': 'User',
+}
+DEFAULT_SORT = 'created_ts'
+
+# These sort are done on the TaskRequest.
+SORT_REQUEST = frozenset(('created_ts', 'name', 'user'))
+
+# These sort are done on the TaskResultSummary.
+SORT_RESULT = frozenset(('done_ts', 'modified_ts'))
+
+assert SORT_REQUEST | SORT_RESULT == frozenset(ACCEPTABLE_SORTS)
 
 
 # Ignore these failures, there's nothing to do.
@@ -117,6 +142,146 @@ def expand_subnet(ip, mask):
   return [int_to_ipv4(ipv4_to_int(ip) + r) for r in range(bit)]
 
 
+def request_work_item(attributes, server_url):
+  # TODO(maruel): Split it out a little.
+  attribs = test_management.ValidateAndFixAttributes(attributes)
+  response = test_management.CheckVersion(attributes, server_url)
+  if response:
+    return response
+
+  dimensions = attribs['dimensions']
+  bot_id = attribs['id'] or dimensions['hostname']
+  stats.add_entry(action='bot_active', bot_id=bot_id, dimensions=dimensions)
+  request, shard_result = task_scheduler.bot_reap_task(dimensions, bot_id)
+  if not request:
+    try_count = attribs['try_count'] + 1
+    return {
+      'come_back': task_scheduler.exponential_backoff(try_count),
+      'try_count': try_count,
+    }
+
+  runner_key = task_scheduler.pack_shard_result_key(shard_result.key)
+  test_objects = [
+    test_request_message.TestObject(
+        test_name=str(i),
+        action=command,
+        hard_time_out=request.properties.execution_timeout_secs,
+        io_time_out=request.properties.io_timeout_secs)
+    for i, command in enumerate(request.properties.commands)
+  ]
+  # pylint: disable=W0212
+  test_run = test_request_message.TestRun(
+      test_run_name=request.name,
+      env_vars=request.properties.env,
+      instance_index=shard_result.shard_number,
+      num_instances=request.properties.number_shards,
+      configuration=test_request_message.TestConfiguration(
+          config_name=request.name,
+          num_instances=request.properties.number_shards),
+      result_url=('%s/result?r=%s&id=%s' % (server_url,
+                                            runner_key,
+                                            shard_result.bot_id)),
+      ping_url=('%s/runner_ping?r=%s&id=%s' % (server_url,
+                                              runner_key,
+                                              shard_result.bot_id)),
+      ping_delay=(test_management._TIMEOUT_FACTOR /
+          test_management._MISSED_PINGS_BEFORE_TIMEOUT),
+      data=request.properties.data,
+      tests=test_objects)
+  test_run.ExpandVariables({
+      'instance_index': shard_result.shard_number,
+      'num_instances': request.properties.number_shards,
+  })
+  test_run.Validate()
+
+  # See test_management._GetTestRunnerCommands() for the expected format.
+  files_to_upload = [
+      (test_run.working_dir or '', test_management._TEST_RUN_SWARM_FILE_NAME,
+      test_request_message.Stringize(test_run, json_readable=True))
+  ]
+
+  # Define how to run the scripts.
+  swarm_file_path = test_management._TEST_RUN_SWARM_FILE_NAME
+  if test_run.working_dir:
+    swarm_file_path = os.path.join(
+        test_run.working_dir, test_management._TEST_RUN_SWARM_FILE_NAME)
+  command_to_execute = [
+    os.path.join('local_test_runner.py'),
+    '-f', swarm_file_path,
+    '--restart_on_failure',
+  ]
+
+  rpc_commands = [
+    rpc.BuildRPC('StoreFiles', files_to_upload),
+    rpc.BuildRPC('RunCommands', command_to_execute),
+  ]
+  # The Swarming bot uses an hand rolled RPC system and 'commands' is actual the
+  # custom RPC commands. See test_management._BuildTestRun()
+  return {
+    'commands': rpc_commands,
+    'result_url': test_run.result_url,
+    'try_count': 0,
+  }
+
+
+def ping_runner(runner_key, machine_id):
+  # TODO(maruel): Delete this function.
+  try:
+    shard_result_key = task_scheduler.unpack_shard_result_key(runner_key)
+    return task_scheduler.bot_update_task(shard_result_key, {}, machine_id)
+  except ValueError as e:
+    logging.error('Failed to accept value %s: %s', runner_key, e)
+    return False
+
+
+### UI code that should be in jinja2 templates
+
+
+def generate_button_with_hidden_form(button_text, url, form_id):
+  """Generates a button that when used will post to the given url.
+
+  Args:
+    button_text: The text to display on the button.
+    url: The url to post to.
+    form_id: The id to give the form.
+
+  Returns:
+    The html text to display the button.
+  """
+  button_html = '<form id="%s" method="post" action=%s>' % (form_id, url)
+  button_html += (
+      '<button onclick="document.getElementById(%s).submit()">%s</button>' %
+      (form_id, button_text))
+  button_html += '</form>'
+
+  return button_html
+
+
+def make_runner_view(runner):
+  """Returns a html template friendly dict from a TestRunner."""
+  # Simulate the old properties until the templates are updated.
+  request, result = runner
+  assert isinstance(request, task_request.TaskRequest), request
+  assert isinstance(result, task_result.TaskResultSummary), result
+  started = [i.started_ts for i in result.shards if i.started_ts]
+  out = {
+    # TODO(maruel): out['class_string'] = 'failed_test'
+    'class_string': '',
+    'command_string': 'TODO',
+    'created': request.created_ts,
+    'ended': result.done_ts,
+    'key_string': '%x' % request.key.integer_id(),
+    # TODO(maruel):
+    # 'machine_id': ','.join(i.bot_id for i in runner.shards if i.bot_id),
+    'machine_id': 'TODO',
+    'name': request.name,
+    'started': min(started) if started else None,
+    'status_string': result.to_string(),
+    'user': request.user,
+  }
+  return out
+
+
 
 ### Handlers
 
@@ -163,7 +328,8 @@ class FilterParams(object):
         params['machine_id_filter'] = self.machine_id_filter
     return '?' + urllib.urlencode(params)
 
-  def get_shards(self, sort_by=None, ascending=None, limit=None, offset=None):
+  @staticmethod
+  def get_shards(sort_by, ascending, limit, offset):
     """Returns a query with the given parameters, also applying the filters.
 
     Args:
@@ -173,13 +339,77 @@ class FilterParams(object):
       offset: Number of queries to skip.
 
     Returns:
-      The TestRunner query that is properly adjusted and filtered.
+      A ndb.Future that will return the items in the DB from a query that is
+      properly adjusted and filtered.
     """
     # TODO(maruel): Use cursors!
-    return task_glue.GetTestRunnersWithFilters(
-        sort_by, ascending, limit, offset, self.status,
-        self.show_successfully_completed, self.test_name_filter,
-        self.machine_id_filter)
+    # TODO(maruel): Use self.status, self.show_successfully_completed,
+    # self.test_name_filter, self.machine_id_filter.
+    assert sort_by in ACCEPTABLE_SORTS, (
+        'This should have been validated at a higher level')
+    opts = ndb.QueryOptions(limit=limit, offset=offset)
+    direction = (
+        datastore_query.PropertyOrder.ASCENDING
+        if ascending else datastore_query.PropertyOrder.DESCENDING)
+
+    fetch_request = bool(sort_by in SORT_REQUEST)
+    if fetch_request:
+      base_type = task_request.TaskRequest
+    else:
+      base_type = task_result.TaskResultSummary
+
+    # The future returned to the user:
+    final = ndb.Future()
+
+    # Phase 1: initiates the fetch.
+    initial_future = base_type.query(default_options=opts).order(
+        datastore_query.PropertyOrder(sort_by, direction)).fetch_async()
+
+    def phase2_fetch_complement(future):
+      """Initiates the async fetch for the other object.
+
+      If base_type is TaskRequest, it will fetch the corresponding
+      TaskResultSummary.
+      If base_type is TaskResultSummary, it will fetch the corresponding
+      TaskRequest.
+      """
+      entities = future.get_result()
+      if not entities:
+        # Skip through if no entity was returned by the Query.
+        final.set_result(entities)
+        return
+
+      if fetch_request:
+        keys = (
+          task_result.request_key_to_result_summary_key(i.key) for i in entities
+        )
+      else:
+        keys = (i.request_key for i in entities)
+
+      # Convert a list of Future into a MultiFuture.
+      second_future = ndb.MultiFuture()
+      map(second_future.add_dependent, ndb.get_multi_async(keys))
+      second_future.complete()
+      second_future.add_immediate_callback(
+          phase3_merge_complementatry_models, entities, second_future)
+
+    def phase3_merge_complementatry_models(entities, future):
+      """Merge the results together to yield (TaskRequest,
+      TaskResultSummary).
+      """
+      if fetch_request:
+        out = zip(entities, future.get_result())
+      else:
+        # Reverse the order.
+        out = zip(future.get_result(), entities)
+      # Filter out inconsistent items.
+      final.set_result([i for i in out if i[0] and i[1]])
+
+    # ndb.Future.add_immediate_callback() adds a callback that is immediately
+    # called when self.set_result() is called.
+    initial_future.add_immediate_callback(
+        phase2_fetch_complement, initial_future)
+    return final
 
   def filter_selects_as_html(self):
     """Generates the HTML filter select values, with the proper defaults set.
@@ -250,21 +480,21 @@ class MainHandler(auth.AuthenticatingHandler):
     page_length = int(self.request.get('length', 50))
     page = int(self.request.get('page', 1))
 
-    sort_by = self.request.get('sort_by', 'D' + task_glue.DEFAULT_SORT)
+    sort_by = self.request.get('sort_by', 'D' + DEFAULT_SORT)
     ascending = bool(sort_by[0] == 'A')
     sort_key = sort_by[1:]
-    if sort_key not in task_glue.ACCEPTABLE_SORTS:
+    if sort_key not in ACCEPTABLE_SORTS:
       self.abort(400, 'Invalid sort key')
 
     # TODO(maruel): Stop doing HTML in python.
     sorted_by_message = '<p>Currently sorted by: '
     if not ascending:
       sorted_by_message += 'Reverse '
-    sorted_by_message += task_glue.ACCEPTABLE_SORTS[sort_key] + '</p>'
+    sorted_by_message += ACCEPTABLE_SORTS[sort_key] + '</p>'
     sort_options = []
     # TODO(maruel): Use an order that makes sense instead of whatever the dict
     # happens to be.
-    for key, value in task_glue.ACCEPTABLE_SORTS.iteritems():
+    for key, value in ACCEPTABLE_SORTS.iteritems():
       # Add 'A' for ascending and 'D' for descending order.
       sort_options.append(SortOptions('A' + key, value))
       sort_options.append(SortOptions('D' + key, 'Reverse ' + value))
@@ -278,14 +508,14 @@ class MainHandler(auth.AuthenticatingHandler):
         ascending=ascending,
         limit=page_length,
         offset=page_length * (page - 1))
-    total_task_count_future = task_glue.CountRequestsAsync()
+    total_task_count_future = task_request.TaskRequest.query().count_async()
 
     opts = ndb.QueryOptions(limit=10)
     errors_found_future = errors.SwarmError.query(
         default_options=opts).order(-errors.SwarmError.created).fetch_async()
 
     runners = [
-      task_glue.make_runner_view(r) for r in tasks_future.get_result()
+      make_runner_view(r) for r in tasks_future.get_result()
     ]
 
     params = {
@@ -338,7 +568,7 @@ class MachineListHandler(auth.AuthenticatingHandler):
           'dead_machine' if machine.last_seen < dead_machine_cutoff else '')
       # Add a delete option for each machine assignment.
       # TODO(maruel): This should not be generated via python.
-      m['command_string'] = task_glue.GenerateButtonWithHiddenForm(
+      m['command_string'] = generate_button_with_hidden_form(
           'Delete',
           '%s?r=%s' % (_DELETE_MACHINE_STATS_URL, machine.key.string_id()),
           machine.key.string_id())
@@ -401,15 +631,34 @@ class TestRequestHandler(auth.AuthenticatingHandler):
       self.abort(400, 'No request parameter found.')
 
     # TODO(vadimsh): Store identity of a user that posted the request.
+    test_case = self.request.get('request')
     try:
-      result = task_glue.RegisterNewRequest(self.request.get('request'))
+      request_properties = task_glue.convert_test_case(test_case)
     except test_request_message.Error as e:
       message = str(e)
       logging.error(message)
       self.abort(400, message)
 
+    def to_packed_key(i):
+      return task_scheduler.pack_shard_result_key(
+          task_result.shard_to_run_key_to_shard_result_key(
+              shard_runs[i].key, 1))
+
+    request, shard_runs = task_scheduler.make_request(request_properties)
+    out = {
+      'test_case_name': request.name,
+      'test_keys': [
+        {
+          'config_name': request.name,
+          'instance_index': shard_index,
+          'num_instances': request.properties.number_shards,
+          'test_key': to_packed_key(shard_index),
+        }
+        for shard_index in xrange(request.properties.number_shards)
+      ],
+    }
     self.response.headers['Content-Type'] = 'application/json; charset=utf-8'
-    self.response.out.write(json.dumps(result))
+    self.response.out.write(json.dumps(out))
 
 
 class ResultHandler(auth.AuthenticatingHandler):
@@ -432,7 +681,8 @@ class ResultHandler(auth.AuthenticatingHandler):
     # TODO(vadimsh): Check that machine that posts the result is same as
     # machine that claimed the runner.
     runner_key = self.request.get('r', '')
-    runner = task_glue.GetRunnerFromUrlSafeKey(runner_key)
+    shard_result_key = task_scheduler.unpack_shard_result_key(runner_key)
+    runner = shard_result_key.get()
 
     if not runner:
       # If the runner is gone, it probably already received results from
@@ -447,34 +697,34 @@ class ResultHandler(auth.AuthenticatingHandler):
 
     # Find the high level success/failure from the URL. We assume failure if
     # we can't find the success parameter in the request.
-    success = self.request.get('s', 'False') == 'True'
     exit_codes = urllib.unquote_plus(self.request.get('x'))
-    overwrite = self.request.get('o', 'False') == 'True'
     machine_id = urllib.unquote_plus(self.request.get('id'))
 
     # TODO(vadimsh): Verify machine_id matches credentials that are used for
     # current request (i.e. auth.get_current_identity()).
+    if runner.bot_id != machine_id:
+      self.abort(400, 'Expected bot id %s, got %s', runner.bot_id, machine_id)
 
     # TODO(user): The result string should probably be in the body of the
     # request.
     result_string = urllib.unquote_plus(self.request.get(
         swarm_constants.RESULT_STRING_KEY))
     if isinstance(result_string, unicode):
-      result_string = result_string.encode(task_glue.GetEncoding(runner))
+      result_string = result_string.encode('utf-8')
 
     # Mark the runner as pinging now to prevent it from timing out while
     # the results are getting stored.
-    task_glue.PingRunner(runner_key, machine_id)
+    ping_runner(runner_key, machine_id)
 
     results = result_helper.StoreResults(result_string)
-    if not task_glue.UpdateTestResult(
-        runner,
-        machine_id,
-        success=success,
-        exit_codes=exit_codes,
-        results=results,
-        overwrite=overwrite):
-      self.abort(400, 'Failed to update the runner results.')
+    # Ignore the argument 'success'.
+    exit_codes = filter(None, (i.strip() for i in exit_codes.split(',')))
+    data = {
+      'exit_codes': map(int, exit_codes),
+      # TODO(maruel): Store output for each command individually.
+      'outputs': [results.key],
+    }
+    task_scheduler.bot_update_task(runner.key, data, machine_id)
     self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
     self.response.out.write('Successfully update the runner results.')
 
@@ -618,7 +868,8 @@ class ShowMessageHandler(auth.AuthenticatingHandler):
 
     runner_key = self.request.get('r', '')
     try:
-      runner = task_glue.GetRunnerFromUrlSafeKey(runner_key)
+      shard_result_key = task_scheduler.unpack_shard_result_key(runner_key)
+      runner = shard_result_key.get()
     except ValueError:
       runner = None
 
@@ -653,7 +904,19 @@ class GetMatchingTestCasesHandler(auth.AuthenticatingHandler):
   def get(self):
     test_case_name = self.request.get('name', '')
 
-    keys = task_glue.GetAllMatchingTestCases(test_case_name)
+    # Find the matching TaskRequest, then return all the valid keys.
+    q = task_request.TaskRequest.query().filter(
+        task_request.TaskRequest.name == test_case_name)
+    keys = []
+    for request in q:
+      # Then return all the relevant shard_ids.
+      # TODO(maruel): It's hacked up. This needs to fetch TaskResultSummary to
+      # get the try_numbers.
+      try_number = 1
+      keys.extend(
+          '%x-%s' % (request.key.integer_id()+i+1, try_number)
+          for i in xrange(request.properties.number_shards))
+
     logging.info('Found %d keys', len(keys))
     self.response.headers['Content-Type'] = 'application/json; charset=utf-8'
     if keys:
@@ -713,14 +976,9 @@ class CleanupResultsHandler(auth.AuthenticatingHandler):
 
   @auth.require(auth.UPDATE, 'swarming/bots')
   def post(self):
+    # TODO(maruel): Remove this API.
     self.response.headers['Content-Type'] = 'test/plain'
-
-    key = self.request.get('r', '')
-    if task_glue.DeleteRunnerFromKey(key):
-      self.response.out.write('Key deleted.')
-    else:
-      self.response.out.write('Key deletion failed.')
-      logging.warning('Unable to delete runner [key: %s]', str(key))
+    self.response.out.write('Key deleted.')
 
 
 class CancelHandler(auth.AuthenticatingHandler):
@@ -735,11 +993,15 @@ class CancelHandler(auth.AuthenticatingHandler):
 
     runner_key = self.request.get('r', '')
     # Make sure found runner is not yet running.
-    if task_glue.AbortRunner(runner_key, reason='Runner cancelled by user.'):
-      self.response.out.write('Runner canceled.')
-    else:
-      self.response.out.write('Unable to cancel runner')
+    try:
+      shard_result_key = task_scheduler.unpack_shard_result_key(runner_key)
+    except ValueError:
       self.response.set_status(400)
+      self.response.write('Unable to cancel runner')
+      return
+
+    task_shard_to_run.abort_shard_to_run(shard_result_key.parent().get())
+    self.response.out.write('Runner canceled.')
 
 
 class RetryHandler(auth.AuthenticatingHandler):
@@ -750,15 +1012,45 @@ class RetryHandler(auth.AuthenticatingHandler):
 
   @auth.require(auth.UPDATE, 'swarming/management')
   def post(self):
+    """Duplicates the original request into a new one.
+
+    Only change the ownership to the user that requested the retry.
+    TaskProperties is unchanged.
+    """
     runner_key = self.request.get('r', '')
-    if task_glue.RetryRunner(runner_key):
-      # TODO(maruel): Return the new TaskRequest key.
-      # TODO(maruel): Use json encoded return values for the APIs.
-      self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
-      self.response.out.write('Runner set for retry.')
-    else:
-      self.response.out.write('Unable to retry runner')
+    try:
+      shard_result_key = task_scheduler.unpack_shard_result_key(runner_key)
+    except ValueError:
       self.response.set_status(400)
+      self.response.write('Unable to retry runner')
+      return
+
+    request = task_result.shard_result_key_to_request_key(
+        shard_result_key).get()
+    # TODO(maruel): Decide if it will be supported, and if so create a proper
+    # function to 'duplicate' a TaskRequest in task_request.py.
+    # TODO(maruel): Delete.
+    data = {
+      'name': request.name,
+      'user': request.user,
+      'properties': {
+        'commands': request.properties.commands,
+        'data': request.properties.data,
+        'dimensions': request.properties.dimensions,
+        'env': request.properties.env,
+        'number_shards': request.properties.number_shards,
+        'execution_timeout_secs': request.properties.execution_timeout_secs,
+        'io_timeout_secs': request.properties.io_timeout_secs,
+      },
+      'priority': request.priority,
+      'scheduling_expiration_secs': request.scheduling_expiration_secs,
+    }
+    # TODO(maruel): Return the new TaskRequest key.
+    task_scheduler.make_request(data)
+
+    # TODO(maruel): Use json encoded return values for the APIs.
+    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
+    self.response.out.write('Runner set for retry.')
 
 
 class RegisterHandler(auth.AuthenticatingHandler):
@@ -788,7 +1080,7 @@ class RegisterHandler(auth.AuthenticatingHandler):
     # to authenticate the request (i.e. auth.get_current_identity()).
     try:
       response = json.dumps(
-          task_glue.RequestWorkItem(attributes, self.request.host_url))
+          request_work_item(attributes, self.request.host_url))
     except runtime.DeadlineExceededError as e:
       # If the timeout happened before a runner was assigned there are no
       # problems. If the timeout occurred after a runner was assigned, that
@@ -824,7 +1116,7 @@ class RunnerPingHandler(auth.AuthenticatingHandler):
     # auth.get_current_identity()).
     key = self.request.get('r', '')
     machine_id = self.request.get('id', '')
-    if not task_glue.PingRunner(key, machine_id):
+    if not ping_runner(key, machine_id):
       self.abort(400, 'Runner failed to ping.')
 
     self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
@@ -954,7 +1246,32 @@ def SendRunnerResults(response, key):
     response: Response to be sent to remote machine.
     key: Key identifying the runner.
   """
-  results = task_glue.GetRunnerResults(key)
+  try:
+    shard_result_key = task_scheduler.unpack_shard_result_key(key)
+    shard_result = shard_result_key.get()
+    if not shard_result:
+      # TODO(maruel): Implement in next CL.
+      results = {
+        'exit_codes': '',
+        'machine_id': None,
+        'machine_tag': None,
+        'output': '',
+      }
+    else:
+      results = {
+        'exit_codes': ','.join(map(str, shard_result.exit_codes)),
+        'machine_id': shard_result.bot_id,
+        # TODO(maruel): Likely unnecessary.
+        'machine_tag': machine_stats.GetMachineTag(shard_result.bot_id),
+        'config_instance_index': shard_result.shard_number,
+        'num_config_instances':
+            shard_result.request_key.get().properties.number_shards,
+        # TODO(maruel): Return each output independently. Figure out a way to
+        # describe what is important in the steps and what should be ditched.
+        'output': '\n'.join(i.get().GetResults() for i in shard_result.outputs),
+      }
+  except ValueError:
+    results = None
 
   if results:
     # Convert the output to utf-8 to ensure that the JSON library can

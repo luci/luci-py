@@ -560,12 +560,10 @@ class TaskShardToRunApiTest(test_case.TestCase):
     shards = _gen_new_shards_to_run(
         properties=dict(number_shards=2, dimensions={u'OS': u'Windows-3.1.1'}))
     bot_dimensions = {u'OS': u'Windows-3.1.1', u'hostname': u'localhost'}
-    self.assertEqual(
-        True, task_shard_to_run.abort_shard_to_run(shards[0]))
+    task_shard_to_run.abort_shard_to_run(shards[0])
 
     # Aborting an aborted task shard is just fine.
-    self.assertEqual(
-        True, task_shard_to_run.abort_shard_to_run(shards[0]))
+    task_shard_to_run.abort_shard_to_run(shards[0])
     self.assertEqual(
         1, len(_yield_next_available_shard_to_dispatch(bot_dimensions)))
 
