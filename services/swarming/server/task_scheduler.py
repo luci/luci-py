@@ -68,7 +68,7 @@ def make_request(data):
   stats.add_request_entry(
       'request_enqueued', request.key,
       dimensions=request.properties.dimensions,
-      number_shards=request.properties.number_shards,
+      number_shards=1,
       user=request.user)
   return request, shard_runs
 

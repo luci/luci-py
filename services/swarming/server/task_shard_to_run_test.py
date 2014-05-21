@@ -19,7 +19,6 @@ test_env.setup_test_env()
 from google.appengine.ext import ndb
 
 from components import utils
-from server import task_common
 from server import task_request
 from server import task_shard_to_run
 from server import test_helper
@@ -37,7 +36,6 @@ def _gen_request_data(properties=None, **kwargs):
       'data': [],
       'dimensions': {},
       'env': {},
-      'number_shards': 1,
       'execution_timeout_secs': 24*60*60,
       'io_timeout_secs': None,
     },
@@ -167,7 +165,6 @@ class TaskShardToRunPrivateTest(test_case.TestCase):
 class TaskShardToRunApiTest(test_case.TestCase):
   def setUp(self):
     super(TaskShardToRunApiTest, self).setUp()
-    self.mock(task_request.random, 'getrandbits', lambda _: 0x88)
     self.now = datetime.datetime(2014, 01, 02, 03, 04, 05, 06)
     test_helper.mock_now(self, self.now)
     # The default scheduling_expiration_secs for _gen_request_data().
@@ -185,27 +182,24 @@ class TaskShardToRunApiTest(test_case.TestCase):
   def test_request_key_to_shard_to_run_key(self):
     parent = task_request.id_to_request_key(0x100)
     expected = (
-        "Key('TaskShardToRunShard', '502e4', 'TaskShardToRun', 258)")
+        "Key('TaskShardToRunShard', 'd9640', 'TaskShardToRun', 257)")
     self.assertEqual(
         expected,
-        str(task_shard_to_run.request_key_to_shard_to_run_key(parent, 2)))
+        str(task_shard_to_run.request_key_to_shard_to_run_key(parent, 1)))
     with self.assertRaises(ValueError):
       task_shard_to_run.request_key_to_shard_to_run_key(parent, 0)
     with self.assertRaises(ValueError):
-      # The maximum number of shards is encoded on a single byte.
-      task_shard_to_run.request_key_to_shard_to_run_key(
-          parent, task_common.MAXIMUM_SHARDS+1)
-    # The acceptable range is [1, 255]:
+      task_shard_to_run.request_key_to_shard_to_run_key(parent, 2)
+    # The acceptable range is [1, 1] since sharding support is being removed:
     task_shard_to_run.request_key_to_shard_to_run_key(parent, 1)
-    task_shard_to_run.request_key_to_shard_to_run_key(
-        parent, task_common.MAXIMUM_SHARDS)
 
   def test_shard_id_to_key(self):
-    actual = task_shard_to_run.shard_id_to_key(258)
-    expected = "Key('TaskShardToRunShard', '502e4', 'TaskShardToRun', 258)"
+    actual = task_shard_to_run.shard_id_to_key(257)
+    expected = "Key('TaskShardToRunShard', 'd9640', 'TaskShardToRun', 257)"
     self.assertEqual(expected, str(actual))
 
   def test_new_shards_to_run_for_request(self):
+    self.mock(task_request.random, 'getrandbits', lambda _: 0x88)
     request_dimensions = {u'OS': u'Windows-3.1.1'}
     data = _gen_request_data(
         properties={
@@ -213,7 +207,6 @@ class TaskShardToRunApiTest(test_case.TestCase):
           'data': [[u'http://localhost/foo', u'foo.zip']],
           'dimensions': request_dimensions,
           'env': {u'foo': u'bar'},
-          'number_shards': 3,
           'execution_timeout_secs': 30,
         },
         scheduling_expiration_secs=31)
@@ -229,20 +222,6 @@ class TaskShardToRunApiTest(test_case.TestCase):
         'key': '0x014350e868888801',
         'queue_number': '0x19014350e8688801',
         'shard_number': 0,
-      },
-      {
-        'dimensions_hash': dimensions_hash,
-        'expiration_ts': self.now + datetime.timedelta(seconds=31),
-        'key': '0x014350e868888802',
-        'queue_number': '0x19014350e8688802',
-        'shard_number': 1,
-      },
-      {
-        'dimensions_hash': dimensions_hash,
-        'expiration_ts': self.now + datetime.timedelta(seconds=31),
-        'key': '0x014350e868888803',
-        'queue_number': '0x19014350e8688803',
-        'shard_number': 2,
       },
     ]
 
@@ -262,7 +241,7 @@ class TaskShardToRunApiTest(test_case.TestCase):
 
   def test_yield_next_available_shard_to_dispatch_none(self):
     _gen_new_shards_to_run(
-        properties=dict(number_shards=3, dimensions={u'OS': u'Windows-3.1.1'}))
+        properties=dict(dimensions={u'OS': u'Windows-3.1.1'}))
     # Bot declares no dimensions, so it will fail to match.
     bot_dimensions = {}
     actual = _yield_next_available_shard_to_dispatch(bot_dimensions)
@@ -270,7 +249,7 @@ class TaskShardToRunApiTest(test_case.TestCase):
 
   def test_yield_next_available_shard_to_dispatch_none_mismatch(self):
     _gen_new_shards_to_run(
-        properties=dict(number_shards=3, dimensions={u'OS': u'Windows-3.1.1'}))
+        properties=dict(dimensions={u'OS': u'Windows-3.1.1'}))
     # Bot declares other dimensions, so it will fail to match.
     bot_dimensions = {'OS': 'Windows-3.0'}
     actual = _yield_next_available_shard_to_dispatch(bot_dimensions)
@@ -281,7 +260,7 @@ class TaskShardToRunApiTest(test_case.TestCase):
       u'OS': u'Windows-3.1.1', u'hostname': u'localhost', u'foo': u'bar',
     }
     _gen_new_shards_to_run(
-        properties=dict(number_shards=1, dimensions=request_dimensions))
+        properties=dict(dimensions=request_dimensions))
     # Bot declares exactly same dimensions so it matches.
     bot_dimensions = request_dimensions
     actual = _yield_next_available_shard_to_dispatch(bot_dimensions)
@@ -298,7 +277,7 @@ class TaskShardToRunApiTest(test_case.TestCase):
   def test_yield_next_available_shard_to_dispatch_subset(self):
     request_dimensions = {u'OS': u'Windows-3.1.1', u'foo': u'bar'}
     _gen_new_shards_to_run(
-        properties=dict(number_shards=1, dimensions=request_dimensions))
+        properties=dict(dimensions=request_dimensions))
     # Bot declares more dimensions than needed, this is fine and it matches.
     bot_dimensions = {
       u'OS': u'Windows-3.1.1', u'hostname': u'localhost', u'foo': u'bar',
@@ -314,34 +293,10 @@ class TaskShardToRunApiTest(test_case.TestCase):
     ]
     self.assertEqual(expected, actual)
 
-  def test_yield_next_available_shard_shard(self):
-    # Task has 2 shards.
-    request_dimensions = {u'OS': u'Windows-3.1.1', u'foo': u'bar'}
-    _gen_new_shards_to_run(
-        properties=dict(number_shards=2, dimensions=request_dimensions))
-    bot_dimensions = request_dimensions
-    actual = _yield_next_available_shard_to_dispatch(bot_dimensions)
-    # Ensure shards are returned in order for reaping.
-    expected = [
-      {
-        'dimensions_hash': _hash_dimensions(request_dimensions),
-        'expiration_ts': self.expiration_ts,
-        'queue_number': '0x19014350e8688801',
-        'shard_number': 0,
-      },
-      {
-        'dimensions_hash': _hash_dimensions(request_dimensions),
-        'expiration_ts': self.expiration_ts,
-        'queue_number': '0x19014350e8688802',
-        'shard_number': 1,
-      },
-    ]
-    self.assertEqual(expected, actual)
-
   def test_yield_next_available_shard_to_dispatch_subset_multivalue(self):
     request_dimensions = {u'OS': u'Windows-3.1.1', u'foo': u'bar'}
     _gen_new_shards_to_run(
-        properties=dict(number_shards=1, dimensions=request_dimensions))
+        properties=dict(dimensions=request_dimensions))
     # Bot declares more dimensions than needed.
     bot_dimensions = {
       u'OS': [u'Windows', u'Windows-3.1.1'],
@@ -363,13 +318,13 @@ class TaskShardToRunApiTest(test_case.TestCase):
     # Task added one after the other, normal case.
     request_dimensions_1 = {u'OS': u'Windows-3.1.1', u'foo': u'bar'}
     _gen_new_shards_to_run(
-        properties=dict(number_shards=1, dimensions=request_dimensions_1))
+        properties=dict(dimensions=request_dimensions_1))
 
     # It's normally time ordered.
     test_helper.mock_now(self, self.now + datetime.timedelta(seconds=1))
     request_dimensions_2 = {u'hostname': u'localhost'}
     _gen_new_shards_to_run(
-        properties=dict(number_shards=2, dimensions=request_dimensions_2))
+        properties=dict(dimensions=request_dimensions_2))
 
     bot_dimensions = {
       u'OS': u'Windows-3.1.1', u'hostname': u'localhost', u'foo': u'bar',
@@ -388,12 +343,6 @@ class TaskShardToRunApiTest(test_case.TestCase):
         'queue_number': '0x19014350e86c7001',
         'shard_number': 0,
       },
-      {
-        'dimensions_hash': _hash_dimensions(request_dimensions_2),
-        'expiration_ts': self.expiration_ts + datetime.timedelta(seconds=1),
-        'queue_number': '0x19014350e86c7002',
-        'shard_number': 1,
-      },
     ]
     self.assertEqual(expected, actual)
 
@@ -405,14 +354,14 @@ class TaskShardToRunApiTest(test_case.TestCase):
     # only.
     request_dimensions_1 = {u'OS': u'Windows-3.1.1', u'foo': u'bar'}
     _gen_new_shards_to_run(
-        properties=dict(number_shards=1, dimensions=request_dimensions_1))
+        properties=dict(dimensions=request_dimensions_1))
 
     # The second shard is added before the first, potentially because of a
     # desynchronized clock. It'll have higher priority.
     test_helper.mock_now(self, self.now - datetime.timedelta(seconds=1))
     request_dimensions_2 = {u'hostname': u'localhost'}
     _gen_new_shards_to_run(
-        properties=dict(number_shards=2, dimensions=request_dimensions_2))
+        properties=dict(dimensions=request_dimensions_2))
 
     bot_dimensions = {
       u'OS': u'Windows-3.1.1', u'hostname': u'localhost', u'foo': u'bar',
@@ -427,12 +376,6 @@ class TaskShardToRunApiTest(test_case.TestCase):
         'shard_number': 0,
       },
       {
-        'dimensions_hash': _hash_dimensions(request_dimensions_2),
-        'expiration_ts': self.expiration_ts - datetime.timedelta(seconds=1),
-        'queue_number': '0x19014350e864a002',
-        'shard_number': 1,
-      },
-      {
         'dimensions_hash': _hash_dimensions(request_dimensions_1),
         'expiration_ts': self.expiration_ts,
         'queue_number': '0x19014350e8688801',
@@ -445,13 +388,13 @@ class TaskShardToRunApiTest(test_case.TestCase):
     # Task added later but with higher priority are returned first.
     request_dimensions_1 = {u'OS': u'Windows-3.1.1'}
     _gen_new_shards_to_run(
-        properties=dict(number_shards=3, dimensions=request_dimensions_1))
+        properties=dict(dimensions=request_dimensions_1))
 
     # This one is later but has higher priority.
     test_helper.mock_now(self, self.now + datetime.timedelta(seconds=60))
     request_dimensions_2 = {u'OS': u'Windows-3.1.1'}
     _gen_new_shards_to_run(
-        properties=dict(number_shards=2, dimensions=request_dimensions_2),
+        properties=dict(dimensions=request_dimensions_2),
         priority=10)
 
     # It should return them all, in the expected order.
@@ -463,28 +406,10 @@ class TaskShardToRunApiTest(test_case.TestCase):
         'shard_number': 0,
       },
       {
-        'dimensions_hash': _hash_dimensions(request_dimensions_1),
-        'expiration_ts': datetime.datetime(2014, 1, 2, 3, 6, 5, 6),
-        'queue_number': '0x05014350e952e802',
-        'shard_number': 1,
-      },
-      {
         'dimensions_hash': _hash_dimensions(request_dimensions_2),
         'expiration_ts': datetime.datetime(2014, 1, 2, 3, 5, 5, 6),
         'queue_number': '0x19014350e8688801',
         'shard_number': 0,
-      },
-      {
-        'dimensions_hash': _hash_dimensions(request_dimensions_2),
-        'expiration_ts': datetime.datetime(2014, 1, 2, 3, 5, 5, 6),
-        'queue_number': '0x19014350e8688802',
-        'shard_number': 1,
-      },
-      {
-        'dimensions_hash': _hash_dimensions(request_dimensions_2),
-        'expiration_ts': datetime.datetime(2014, 1, 2, 3, 5, 5, 6),
-        'queue_number': '0x19014350e8688803',
-        'shard_number': 2,
       },
     ]
     bot_dimensions = {u'OS': u'Windows-3.1.1', u'hostname': u'localhost'}
@@ -492,9 +417,8 @@ class TaskShardToRunApiTest(test_case.TestCase):
     self.assertEqual(expected, actual)
 
   def test_yield_expired_shard_to_run(self):
-    _gen_new_shards_to_run(
-        properties=dict(number_shards=3), scheduling_expiration_secs=60)
-    self.assertEqual(3, len(_yield_next_available_shard_to_dispatch({})))
+    _gen_new_shards_to_run(scheduling_expiration_secs=60)
+    self.assertEqual(1, len(_yield_next_available_shard_to_dispatch({})))
     self.assertEqual(
         0, len(list(task_shard_to_run.yield_expired_shard_to_run())))
 
@@ -504,84 +428,95 @@ class TaskShardToRunApiTest(test_case.TestCase):
     test_helper.mock_now(self, self.now + datetime.timedelta(seconds=61))
     self.assertEqual(0, len(_yield_next_available_shard_to_dispatch({})))
     self.assertEqual(
-        3, len(list(task_shard_to_run.yield_expired_shard_to_run())))
+        1, len(list(task_shard_to_run.yield_expired_shard_to_run())))
 
   def test_reap_shard_to_run(self):
-    shards = _gen_new_shards_to_run(
-        properties=dict(number_shards=2, dimensions={u'OS': u'Windows-3.1.1'}))
+    shard_0 = _gen_new_shards_to_run(
+        properties=dict(dimensions={u'OS': u'Windows-3.1.1'}))[0]
+    shard_1 = _gen_new_shards_to_run(
+        properties=dict(dimensions={u'OS': u'Windows-3.1.1'}))[0]
     bot_dimensions = {u'OS': u'Windows-3.1.1', u'hostname': u'localhost'}
     self.assertEqual(
         2, len(_yield_next_available_shard_to_dispatch(bot_dimensions)))
 
     # A bot is assigned a task shard.
     self.assertEqual(
-        True, task_shard_to_run.reap_shard_to_run(shards[0].key))
+        True, task_shard_to_run.reap_shard_to_run(shard_0.key))
     self.assertEqual(
         1, len(_yield_next_available_shard_to_dispatch(bot_dimensions)))
 
     # This task shard cannot be assigned anymore.
     self.assertEqual(
-        False, task_shard_to_run.reap_shard_to_run(shards[0].key))
+        False, task_shard_to_run.reap_shard_to_run(shard_0.key))
     self.assertEqual(
         1, len(_yield_next_available_shard_to_dispatch(bot_dimensions)))
     self.assertEqual(
-        True, task_shard_to_run.reap_shard_to_run(shards[1].key))
+        True, task_shard_to_run.reap_shard_to_run(shard_1.key))
     self.assertEqual(
         0, len(_yield_next_available_shard_to_dispatch(bot_dimensions)))
 
   def test_retry_shard_to_run(self):
-    shards = _gen_new_shards_to_run(
-        properties=dict(number_shards=2, dimensions={u'OS': u'Windows-3.1.1'}))
+    shard_0 = _gen_new_shards_to_run(
+        properties=dict(dimensions={u'OS': u'Windows-3.1.1'}))[0]
+    shard_1 = _gen_new_shards_to_run(
+        properties=dict(dimensions={u'OS': u'Windows-3.1.1'}))[0]
     bot_dimensions = {u'OS': u'Windows-3.1.1', u'hostname': u'localhost'}
     # Grabs the 2 available shards so no shard is available afterward.
-    task_shard_to_run.reap_shard_to_run(shards[0].key)
-    task_shard_to_run.reap_shard_to_run(shards[1].key)
+    task_shard_to_run.reap_shard_to_run(shard_0.key)
+    task_shard_to_run.reap_shard_to_run(shard_1.key)
 
     # Calling retry_shard_to_run() puts the shard back as available for
     # dispatch.
     self.assertEqual(
-        True, task_shard_to_run.retry_shard_to_run(shards[0].key))
+        True, task_shard_to_run.retry_shard_to_run(shard_0.key))
     self.assertEqual(
         1, len(_yield_next_available_shard_to_dispatch(bot_dimensions)))
 
     # Can't retry a shard already available to be dispatched to a bot.
     self.assertEqual(
-        False, task_shard_to_run.retry_shard_to_run(shards[0].key))
+        False, task_shard_to_run.retry_shard_to_run(shard_0.key))
     self.assertEqual(
         1, len(_yield_next_available_shard_to_dispatch(bot_dimensions)))
 
     # Retry the second shard too.
     self.assertEqual(
-        True, task_shard_to_run.retry_shard_to_run(shards[1].key))
+        True, task_shard_to_run.retry_shard_to_run(shard_1.key))
     self.assertEqual(
         2, len(_yield_next_available_shard_to_dispatch(bot_dimensions)))
 
   def test_abort_shard_to_run(self):
-    shards = _gen_new_shards_to_run(
-        properties=dict(number_shards=2, dimensions={u'OS': u'Windows-3.1.1'}))
+    shard_0 = _gen_new_shards_to_run(
+        properties=dict(dimensions={u'OS': u'Windows-3.1.1'}))[0]
+    _gen_new_shards_to_run(
+        properties=dict(dimensions={u'OS': u'Windows-3.1.1'}))
     bot_dimensions = {u'OS': u'Windows-3.1.1', u'hostname': u'localhost'}
-    task_shard_to_run.abort_shard_to_run(shards[0])
+    self.assertEqual(
+        2, len(_yield_next_available_shard_to_dispatch(bot_dimensions)))
+    task_shard_to_run.abort_shard_to_run(shard_0)
+    self.assertEqual(
+        1, len(_yield_next_available_shard_to_dispatch(bot_dimensions)))
 
     # Aborting an aborted task shard is just fine.
-    task_shard_to_run.abort_shard_to_run(shards[0])
+    task_shard_to_run.abort_shard_to_run(shard_0)
     self.assertEqual(
         1, len(_yield_next_available_shard_to_dispatch(bot_dimensions)))
 
   def test_shard_to_run_key_to_request_key(self):
     request_key = task_request.id_to_request_key(0x100)
     shard_to_run_key = task_shard_to_run.request_key_to_shard_to_run_key(
-        request_key, 23)
-    key_id = 0x100 + 23
+        request_key, 1)
+    key_id = 0x100 + 1
     expected = (
-        "Key('TaskShardToRunShard', 'd3957', 'TaskShardToRun', %s)" % key_id)
+        "Key('TaskShardToRunShard', 'd9640', 'TaskShardToRun', %s)" % key_id)
     self.assertEqual(expected, str(shard_to_run_key))
 
   def test_shard_to_run_key_to_shard_number(self):
-    shards = _gen_new_shards_to_run(properties=dict(number_shards=2))
+    shard_0 = _gen_new_shards_to_run()[0]
+    shard_1 = _gen_new_shards_to_run()[0]
     self.assertEqual(
-        0, task_shard_to_run.shard_to_run_key_to_shard_number(shards[0].key))
+        0, task_shard_to_run.shard_to_run_key_to_shard_number(shard_0.key))
     self.assertEqual(
-        1, task_shard_to_run.shard_to_run_key_to_shard_number(shards[1].key))
+        0, task_shard_to_run.shard_to_run_key_to_shard_number(shard_1.key))
 
 
 if __name__ == '__main__':

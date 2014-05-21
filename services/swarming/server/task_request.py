@@ -72,7 +72,7 @@ _DATA_KEYS = frozenset(
 # task itself, e.g. what to run.
 _PROPERTIES_KEYS = frozenset(
     ['commands', 'data', 'dimensions', 'env', 'execution_timeout_secs',
-     'io_timeout_secs', 'number_shards'])
+     'io_timeout_secs'])
 
 
 ### Properties validators must come before the models.
@@ -112,15 +112,6 @@ def _validate_dict_of_strings(prop, value):
          for k, v in value.iteritems()):
     # pylint: disable=W0212
     raise TypeError('%s must be a dict of strings' % prop._name)
-
-
-def _validate_number_shards(prop, value):
-  if (0 >= value or task_common.MAXIMUM_SHARDS < value):
-    # pylint: disable=W0212
-    raise datastore_errors.BadValueError(
-        '%s (%d) must be between 1 and %s (inclusive)' %
-        (prop._name, value, task_common.MAXIMUM_SHARDS))
-  return value
 
 
 def _validate_timeout(prop, value):
@@ -204,10 +195,6 @@ class TaskProperties(ndb.Model):
   # Environment variables. Encoded as json. Optional.
   env = datastore_utils.DeterministicJsonProperty(
       validator=_validate_dict_of_strings, json_type=dict)
-
-  # Number of instances to split this task into.
-  number_shards = ndb.IntegerProperty(
-      indexed=False, validator=_validate_number_shards, required=True)
 
   # Maximum duration the bot can take to run a shard of this task.
   execution_timeout_secs = ndb.IntegerProperty(
@@ -334,7 +321,6 @@ def make_request(data):
       - env
       - execution_timeout_secs
       - io_timeout_secs
-      - number_shards
     - priority
     - scheduling_expiration_secs
 
@@ -363,7 +349,6 @@ def make_request(data):
       data=data_properties['data'],
       dimensions=data_properties['dimensions'],
       env=data_properties['env'],
-      number_shards=data_properties['number_shards'],
       execution_timeout_secs=data_properties['execution_timeout_secs'],
       io_timeout_secs=data_properties['io_timeout_secs'])
 

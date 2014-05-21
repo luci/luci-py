@@ -173,11 +173,8 @@ def request_work_item(attributes, server_url):
   test_run = test_request_message.TestRun(
       test_run_name=request.name,
       env_vars=request.properties.env,
-      instance_index=shard_result.shard_number,
-      num_instances=request.properties.number_shards,
       configuration=test_request_message.TestConfiguration(
-          config_name=request.name,
-          num_instances=request.properties.number_shards),
+          config_name=request.name),
       result_url=('%s/result?r=%s&id=%s' % (server_url,
                                             runner_key,
                                             shard_result.bot_id)),
@@ -188,9 +185,10 @@ def request_work_item(attributes, server_url):
           test_management._MISSED_PINGS_BEFORE_TIMEOUT),
       data=request.properties.data,
       tests=test_objects)
+  # TODO(maruel): Remove me.
   test_run.ExpandVariables({
-      'instance_index': shard_result.shard_number,
-      'num_instances': request.properties.number_shards,
+      'instance_index': 0,
+      'num_instances': 1,
   })
   test_run.Validate()
 
@@ -639,22 +637,19 @@ class TestRequestHandler(auth.AuthenticatingHandler):
       logging.error(message)
       self.abort(400, message)
 
-    def to_packed_key(i):
-      return task_scheduler.pack_shard_result_key(
-          task_result.shard_to_run_key_to_shard_result_key(
-              shard_runs[i].key, 1))
-
     request, shard_runs = task_scheduler.make_request(request_properties)
     out = {
       'test_case_name': request.name,
       'test_keys': [
         {
           'config_name': request.name,
-          'instance_index': shard_index,
-          'num_instances': request.properties.number_shards,
-          'test_key': to_packed_key(shard_index),
-        }
-        for shard_index in xrange(request.properties.number_shards)
+          # TODO(maruel): Remove this.
+          'instance_index': 0,
+          'num_instances': 1,
+          'test_key': task_scheduler.pack_shard_result_key(
+              task_result.shard_to_run_key_to_shard_result_key(
+                  shard_runs[0].key, 1)),
+        },
       ],
     }
     self.response.headers['Content-Type'] = 'application/json; charset=utf-8'
@@ -913,9 +908,7 @@ class GetMatchingTestCasesHandler(auth.AuthenticatingHandler):
       # TODO(maruel): It's hacked up. This needs to fetch TaskResultSummary to
       # get the try_numbers.
       try_number = 1
-      keys.extend(
-          '%x-%s' % (request.key.integer_id()+i+1, try_number)
-          for i in xrange(request.properties.number_shards))
+      keys.append('%x-%s' % (request.key.integer_id()+1, try_number))
 
     logging.info('Found %d keys', len(keys))
     self.response.headers['Content-Type'] = 'application/json; charset=utf-8'
@@ -1038,7 +1031,6 @@ class RetryHandler(auth.AuthenticatingHandler):
         'data': request.properties.data,
         'dimensions': request.properties.dimensions,
         'env': request.properties.env,
-        'number_shards': request.properties.number_shards,
         'execution_timeout_secs': request.properties.execution_timeout_secs,
         'io_timeout_secs': request.properties.io_timeout_secs,
       },
@@ -1263,9 +1255,8 @@ def SendRunnerResults(response, key):
         'machine_id': shard_result.bot_id,
         # TODO(maruel): Likely unnecessary.
         'machine_tag': machine_stats.GetMachineTag(shard_result.bot_id),
-        'config_instance_index': shard_result.shard_number,
-        'num_config_instances':
-            shard_result.request_key.get().properties.number_shards,
+        'config_instance_index': 0,
+        'num_config_instances': 1,
         # TODO(maruel): Return each output independently. Figure out a way to
         # describe what is important in the steps and what should be ditched.
         'output': '\n'.join(i.get().GetResults() for i in shard_result.outputs),

@@ -19,13 +19,12 @@ test_env.setup_test_env()
 from google.appengine.datastore import datastore_stub_util
 from google.appengine.ext import deferred
 
-from components import auth
-from support import test_case
-
-import handlers
 import webtest
 
+import handlers
+
 from common import swarm_constants
+from components import auth
 from components import stats_framework
 from server import admin_user
 from server import bot_management
@@ -36,6 +35,7 @@ from server import task_scheduler
 from server import test_helper
 from server import user_manager
 from stats import machine_stats
+from support import test_case
 from third_party.mox import mox
 
 
@@ -159,8 +159,6 @@ class AppTest(test_case.TestCase):
     self.assertIn(
         task_scheduler.pack_shard_result_key(additional_test_runner.key),
         response.body)
-
-    self._mox.VerifyAll()
 
   def testGetResultHandler(self):
     handler_urls = ['/get_result', '/secure/get_result']

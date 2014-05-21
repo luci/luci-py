@@ -34,10 +34,6 @@ UNIX_EPOCH = datetime.datetime(1970, 1, 1)
 MAXIMUM_PRIORITY = 255
 
 
-# Maximum number of shards for a single request.
-MAXIMUM_SHARDS = 255
-
-
 # Amount of time after which a bot is considered dead. In short, if a bot has
 # not ping in the last 5 minutes while running a task, it is considered dead.
 BOT_PING_TOLERANCE = datetime.timedelta(seconds=5*60)

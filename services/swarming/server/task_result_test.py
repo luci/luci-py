@@ -41,7 +41,6 @@ def _gen_request_data(properties=None, **kwargs):
       'data': [],
       'dimensions': {},
       'env': {},
-      'number_shards': 1,
       'execution_timeout_secs': 24*60*60,
       'io_timeout_secs': None,
     },
@@ -70,7 +69,6 @@ class TaskResultApiTest(test_case.TestCase):
     super(TaskResultApiTest, self).setUp()
     self.now = datetime.datetime(2014, 1, 2, 3, 4, 5, 6)
     test_helper.mock_now(self, self.now)
-    self.mock(task_request.random, 'getrandbits', lambda _: 0x88)
     self.app = webtest.TestApp(
         deferred.application,
         extra_environ={
@@ -147,8 +145,7 @@ class TaskResultApiTest(test_case.TestCase):
     self.assertEqual(request_key, actual)
 
   def test_new_result_summary(self):
-    request = task_request.make_request(
-        _gen_request_data(properties=dict(number_shards=1)))
+    request = task_request.make_request(_gen_request_data())
     actual = task_result.new_result_summary(request)
     expected = {
       'done_ts': None,
@@ -172,8 +169,7 @@ class TaskResultApiTest(test_case.TestCase):
     self.assertEqual(expected, actual.to_dict())
 
   def test_new_shard_result(self):
-    request = task_request.make_request(
-        _gen_request_data(properties=dict(number_shards=1)))
+    request = task_request.make_request(_gen_request_data())
     shards = task_shard_to_run.new_shards_to_run_for_request(request)
     self.assertEqual(1, len(shards))
     shard_to_run = shards[0]
@@ -193,9 +189,7 @@ class TaskResultApiTest(test_case.TestCase):
     self.assertEqual(expected, actual.to_dict())
 
   def test_task_update_result_summary_end_to_end(self):
-    # Creates 2 shards, ensure they are all synchronized properly.
-    request = task_request.make_request(
-        _gen_request_data(properties=dict(number_shards=2)))
+    request = task_request.make_request(_gen_request_data())
     result_summary = task_result.new_result_summary(request)
     shards = task_shard_to_run.new_shards_to_run_for_request(request)
     ndb.put_multi([result_summary] + shards)
@@ -204,16 +198,6 @@ class TaskResultApiTest(test_case.TestCase):
       'internal_failure': False,
       'modified_ts': None,
       'shards': [
-        {
-          'abandoned_ts': None,
-          'completed_ts': None,
-          'internal_failure': False,
-          'modified_ts': None,
-          'started_ts': None,
-          'task_failure': False,
-          'task_state': task_result.State.PENDING,
-          'try_number': None,
-        },
         {
           'abandoned_ts': None,
           'completed_ts': None,
@@ -241,8 +225,8 @@ class TaskResultApiTest(test_case.TestCase):
     reap_ts = self.now + datetime.timedelta(seconds=4)
     test_helper.mock_now(self, reap_ts)
     self.assertEqual(True, task_shard_to_run.reap_shard_to_run(shards[0].key))
-    shard_result_0 = task_result.new_shard_result(shards[0].key, 1, 'localhost')
-    task_result.put_shard_result(shard_result_0)
+    shard_result = task_result.new_shard_result(shards[0].key, 1, 'localhost')
+    task_result.put_shard_result(shard_result)
     task_result._task_update_result_summary(request.key.integer_id())
     expected['modified_ts'] = reap_ts
     expected['shards'][0]['modified_ts'] = reap_ts
@@ -252,66 +236,33 @@ class TaskResultApiTest(test_case.TestCase):
     expected['task_state'] = task_result.State.RUNNING
     self.assertEqual(expected, result_summary.to_dict())
 
-    # Shard #1 is reaped after 2 seconds (6 secs total).
-    reap_ts = self.now + datetime.timedelta(seconds=6)
-    test_helper.mock_now(self, reap_ts)
-    self.assertEqual(True, task_shard_to_run.reap_shard_to_run(shards[1].key))
-    shard_result_1 = task_result.new_shard_result(shards[1].key, 1, '127.0.0.1')
-    task_result.put_shard_result(shard_result_1)
-    task_result._task_update_result_summary(request.key.integer_id())
-    expected['modified_ts'] = reap_ts
-    expected['shards'][1]['modified_ts'] = reap_ts
-    expected['shards'][1]['started_ts'] = reap_ts
-    expected['shards'][1]['task_state'] = task_result.State.RUNNING
-    expected['shards'][1]['try_number'] = 1
-    self.assertEqual(expected, result_summary.to_dict())
-
     # Shard #0 is completed after 2 seconds (8 secs total).
     complete_ts = self.now + datetime.timedelta(seconds=8)
     test_helper.mock_now(self, complete_ts)
-    shard_result_0.completed_ts = complete_ts
-    shard_result_0.exit_codes.append(0)
-    shard_result_0.task_state = task_result.State.COMPLETED
+    shard_result.completed_ts = complete_ts
+    shard_result.exit_codes.append(0)
+    shard_result.task_state = task_result.State.COMPLETED
     results_key = result_helper.StoreResults('foo').key
-    shard_result_0.outputs.append(results_key)
-    task_result.put_shard_result(shard_result_0)
+    shard_result.outputs.append(results_key)
+    task_result.put_shard_result(shard_result)
     task_result._task_update_result_summary(request.key.integer_id())
+    expected['done_ts'] = complete_ts
     expected['modified_ts'] = complete_ts
+    expected['task_state'] = task_result.State.COMPLETED
     expected['shards'][0]['completed_ts'] = complete_ts
     expected['shards'][0]['modified_ts'] = complete_ts
     expected['shards'][0]['task_state'] = task_result.State.COMPLETED
     self.assertEqual(expected, result_summary.to_dict())
 
-    # Shard #1 is completed after 2 seconds (10 secs total).
-    complete_ts = self.now + datetime.timedelta(seconds=10)
-    test_helper.mock_now(self, complete_ts)
-    shard_result_1.completed_ts = complete_ts
-    shard_result_1.exit_codes.append(0)
-    shard_result_1.task_state = task_result.State.COMPLETED
-    results_key = result_helper.StoreResults('bar').key
-    shard_result_1.outputs.append(results_key)
-    task_result.put_shard_result(shard_result_1)
-    task_result._task_update_result_summary(request.key.integer_id())
-    expected['done_ts'] = complete_ts
-    expected['modified_ts'] = complete_ts
-    expected['shards'][1]['completed_ts'] = complete_ts
-    expected['shards'][1]['modified_ts'] = complete_ts
-    expected['shards'][1]['task_state'] = task_result.State.COMPLETED
-    expected['task_state'] = task_result.State.COMPLETED
-    self.assertEqual(expected, result_summary.to_dict())
-    self.assertEqual(datetime.timedelta(seconds=8), result_summary.duration())
-
     # They accumulated from put_shard_result() calls.
-    self.assertEqual(4, self.execute_tasks())
+    self.assertEqual(2, self.execute_tasks())
 
   def test_task_update_result_summary_completed(self):
-    request = task_request.make_request(
-        _gen_request_data(properties=dict(number_shards=2)))
+    request = task_request.make_request(_gen_request_data())
     result_summary = task_result.new_result_summary(request)
     shards = task_shard_to_run.new_shards_to_run_for_request(request)
     shard_results = [
       task_result.new_shard_result(shards[0].key, 1, 'localhost1'),
-      task_result.new_shard_result(shards[1].key, 1, 'localhost2'),
     ]
     ndb.put_multi([result_summary] + shards)
     for shard_result in shard_results:
@@ -323,9 +274,6 @@ class TaskResultApiTest(test_case.TestCase):
     shard_results[0].abandoned_ts = self.now
     shard_results[0].task_state = task_result.State.BOT_DIED
     shard_results[0].internal_failure = True
-    shard_results[1].completed_ts = self.now
-    shard_results[1].task_state = task_result.State.COMPLETED
-    shard_results[1].task_failure = True
     for shard_result in shard_results:
       task_result.put_shard_result(shard_result)
     task_result._task_update_result_summary(request.key.integer_id())
@@ -346,18 +294,8 @@ class TaskResultApiTest(test_case.TestCase):
             'task_state': task_result.State.BOT_DIED,
             'try_number': 1,
           },
-          {
-            'abandoned_ts': None,
-            'completed_ts': self.now,
-            'internal_failure': False,
-            'modified_ts': now_1,
-            'started_ts': self.now,
-            'task_failure': True,
-            'task_state': task_result.State.COMPLETED,
-            'try_number': 1,
-          },
         ],
-        'task_failure': True,
+        'task_failure': False,
         'task_state': task_result.State.BOT_DIED,
       },
     ]
@@ -375,18 +313,6 @@ class TaskResultApiTest(test_case.TestCase):
         'task_failure': False,
         'task_state': task_result.State.BOT_DIED,
       },
-      {
-        'abandoned_ts': None,
-        'bot_id': u'localhost2',
-        'completed_ts': self.now,
-        'exit_codes': [],
-        'internal_failure': False,
-        'modified_ts': now_1,
-        'outputs': [],
-        'started_ts': self.now,
-        'task_failure': True,
-        'task_state': task_result.State.COMPLETED,
-      },
     ]
     self.assertEntities(expected, task_result.TaskShardResult)
     self.assertEqual(
@@ -395,13 +321,12 @@ class TaskResultApiTest(test_case.TestCase):
         shard_results[0].to_string())
 
     # They accumulated from put_shard_result() calls.
-    self.assertEqual(4, self.execute_tasks())
+    self.assertEqual(2, self.execute_tasks())
 
   def test_task_update_result_summary(self):
     # Tests task_result.sync_all_result_summary(). It is basically a
     # wrapper around _task_update_result_summary() which is tested above.
-    request = task_request.make_request(
-        _gen_request_data(properties=dict(number_shards=1)))
+    request = task_request.make_request(_gen_request_data())
     result_summary = task_result.new_result_summary(request)
     result_summary.put()
 
@@ -454,8 +379,7 @@ class TaskResultApiTest(test_case.TestCase):
     self.assertEqual(1, self.execute_tasks())
 
   def test_terminate_shard_result(self):
-    request = task_request.make_request(
-        _gen_request_data(properties=dict(number_shards=1)))
+    request = task_request.make_request(_gen_request_data())
     shards = task_shard_to_run.new_shards_to_run_for_request(request)
     shard_to_run = shards[0]
     shard_result = task_result.new_shard_result(
@@ -478,11 +402,15 @@ class TaskResultApiTest(test_case.TestCase):
 
   def test_yield_shard_results_without_update(self):
     # One is completed, one died.
-    request = task_request.make_request(
-        _gen_request_data(properties=dict(number_shards=2)))
-    shards = task_shard_to_run.new_shards_to_run_for_request(request)
-    shard_result_0 = task_result.new_shard_result(shards[0].key, 1, 'localhost')
-    shard_result_1 = task_result.new_shard_result(shards[1].key, 1, 'localhost')
+    request_0 = task_request.make_request(_gen_request_data())
+    shards = task_shard_to_run.new_shards_to_run_for_request(request_0)
+    shard_0 = shards[0]
+    request_1 = task_request.make_request(_gen_request_data(user='foo'))
+    shards = task_shard_to_run.new_shards_to_run_for_request(request_1)
+    shard_1 = shards[0]
+
+    shard_result_0 = task_result.new_shard_result(shard_0.key, 1, 'localhost')
+    shard_result_1 = task_result.new_shard_result(shard_1.key, 1, 'localhost')
     shard_result_0.task_state = task_result.State.COMPLETED
     shard_result_0.completed_ts = self.now
     task_result.put_shard_result(shard_result_0)
@@ -524,20 +452,17 @@ class TaskResultApiTest(test_case.TestCase):
   def test_sync_all_result_summary(self):
     # It is basically a wrapper around _task_update_result_summary() which is
     # tested above.
-    request = task_request.make_request(
-        _gen_request_data(properties=dict(number_shards=1)))
+    request = task_request.make_request(_gen_request_data())
     result_summary = task_result.new_result_summary(request)
     result_summary.put()
     self.run_sync_all_result_summary(request)
 
   def test_task_update_result_summary_skip_task_missing_summary(self):
-    request = task_request.make_request(
-        _gen_request_data(properties=dict(number_shards=1)))
+    request = task_request.make_request(_gen_request_data())
     self.run_sync_all_result_summary(request)
 
   def test_task_update_result_summary_fine(self):
-    request = task_request.make_request(
-        _gen_request_data(properties=dict(number_shards=1)))
+    request = task_request.make_request(_gen_request_data())
     result_summary = task_result.new_result_summary(request)
     result_summary.put()
 
@@ -554,8 +479,7 @@ class TaskResultApiTest(test_case.TestCase):
     self.assertEqual(0, task_result.sync_all_result_summary())
 
   def test_enqueue_update_result_summary(self):
-    request = task_request.make_request(
-        _gen_request_data(properties=dict(number_shards=1)))
+    request = task_request.make_request(_gen_request_data())
     shards = task_shard_to_run.new_shards_to_run_for_request(request)
     self.assertEqual(1, len(shards))
     shard_to_run = shards[0]

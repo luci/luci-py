@@ -42,7 +42,6 @@ def _gen_request_data(properties=None, **kwargs):
       'data': [],
       'dimensions': {},
       'env': {},
-      'number_shards': 1,
       'execution_timeout_secs': 24*60*60,
       'io_timeout_secs': None,
     },
@@ -64,11 +63,7 @@ def get_shard_results(request_key):
       request_key).get()
   if not result_summary:
     return result_summary, []
-  keys = (
-    result_summary.shard_result_key(i+1)
-    for i in xrange(result_summary.number_shards)
-  )
-  keys = [k for k in keys if k]
+  keys = [k for k in [result_summary.shard_result_key(1)] if k]
   return result_summary, ndb.get_multi(keys) if keys else []
 
 
@@ -104,9 +99,9 @@ class TaskSchedulerApiTest(test_case.TestCase):
 
   def test_bot_reap_task(self):
     data = _gen_request_data(
-        properties=dict(number_shards=2, dimensions={u'OS': u'Windows-3.1.1'}))
+        properties=dict(dimensions={u'OS': u'Windows-3.1.1'}))
     request_1, shard_runs = task_scheduler.make_request(data)
-    self.assertEqual(2, len(shard_runs))
+    self.assertEqual(1, len(shard_runs))
     bot_dimensions = {
       u'OS': [u'Windows', u'Windows-3.1.1'],
       u'hostname': u'localhost',
@@ -152,7 +147,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
     created_ts = self.now
     test_helper.mock_now(self, created_ts)
     data = _gen_request_data(
-        properties=dict(number_shards=2, dimensions={u'OS': u'Windows-3.1.1'}))
+        properties=dict(dimensions={u'OS': u'Windows-3.1.1'}))
     request, _ = task_scheduler.make_request(data)
 
     reaped_ts = self.now + datetime.timedelta(seconds=60)
@@ -169,16 +164,6 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'internal_failure': False,
       'modified_ts': None,
       'shards': [
-        {
-          'abandoned_ts': None,
-          'completed_ts': None,
-          'internal_failure': False,
-          'modified_ts': None,
-          'started_ts': None,
-          'task_failure': False,
-          'task_state': State.PENDING,
-          'try_number': None,
-        },
         {
           'abandoned_ts': None,
           'completed_ts': None,
@@ -215,16 +200,6 @@ class TaskSchedulerApiTest(test_case.TestCase):
           'task_state': State.RUNNING,
           'try_number': 1,
         },
-        {
-          'abandoned_ts': None,
-          'completed_ts': None,
-          'internal_failure': False,
-          'modified_ts': None,
-          'started_ts': None,
-          'task_failure': False,
-          'task_state': State.PENDING,
-          'try_number': None,
-        },
       ],
       'task_failure': False,
       'task_state': State.RUNNING,
@@ -260,7 +235,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
     self.assertEquals(1, self.execute_tasks())
     result_summary, shard_results = get_shard_results(request.key)
     expected = {
-      'done_ts': None,
+      'done_ts': done_ts,
       'internal_failure': False,
       'modified_ts': done_ts,
       'shards': [
@@ -274,19 +249,9 @@ class TaskSchedulerApiTest(test_case.TestCase):
           'task_state': State.COMPLETED,
           'try_number': 1,
         },
-        {
-          'abandoned_ts': None,
-          'completed_ts': None,
-          'internal_failure': False,
-          'modified_ts': None,
-          'started_ts': None,
-          'task_failure': False,
-          'task_state': State.PENDING,
-          'try_number': None,
-        },
       ],
       'task_failure': False,
-      'task_state': State.PENDING,
+      'task_state': State.COMPLETED,
     }
     self.assertEqual(expected, result_summary.to_dict())
     expected = [
@@ -307,7 +272,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
 
   def test_make_request(self):
     data = _gen_request_data(
-        properties=dict(number_shards=2, dimensions={u'OS': u'Windows-3.1.1'}))
+        properties=dict(dimensions={u'OS': u'Windows-3.1.1'}))
     # It is tested indirectly in the other functions.
     self.assertTrue(task_scheduler.make_request(data))
 
@@ -342,8 +307,11 @@ class TaskSchedulerApiTest(test_case.TestCase):
   def test_cron_abort_expired_shard_to_run(self):
     # Create two shards, one is properly reaped, the other is expired.
     data = _gen_request_data(
-        properties=dict(number_shards=2, dimensions={u'OS': u'Windows-3.1.1'}))
+        properties=dict(dimensions={u'OS': u'Windows-3.1.1'}))
     task_scheduler.make_request(data)
+    data_1 = _gen_request_data(
+        properties=dict(dimensions={u'OS': u'Windows-3.1.1'}))
+    task_scheduler.make_request(data_1)
     bot_dimensions = {
       u'OS': [u'Windows', u'Windows-3.1.1'],
       u'hostname': u'localhost',
@@ -358,7 +326,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
 
   def test_cron_abort_bot_died(self):
     data = _gen_request_data(
-        properties=dict(number_shards=2, dimensions={u'OS': u'Windows-3.1.1'}))
+        properties=dict(dimensions={u'OS': u'Windows-3.1.1'}))
     task_scheduler.make_request(data)
     bot_dimensions = {
       u'OS': [u'Windows', u'Windows-3.1.1'],

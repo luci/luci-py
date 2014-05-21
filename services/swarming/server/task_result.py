@@ -227,14 +227,6 @@ class TaskShardResult(ndb.Model):
   def requestor(self):
     return self.request_key.get().user
 
-  @property
-  def config_instance_index(self):
-    return self.shard_number
-
-  @property
-  def num_config_instances(self):
-    return self.request_key.get().properties.number_shards
-
   automatic_retry_count = 0
 
   @property
@@ -244,9 +236,9 @@ class TaskShardResult(ndb.Model):
   def GetAsDict(self):
     request = self.request_key.get()
     return {
-      'config_instance_index': self.shard_number,
+      'config_instance_index': 0,
       'config_name': request.name,
-      'num_config_instances': request.properties.number_shards,
+      'num_config_instances': 1,
       'request': {},
     }
   # TODO(maruel): Remove, for compatibility with old code only. ^^^^
@@ -255,11 +247,6 @@ class TaskShardResult(ndb.Model):
   def request_key(self):
     """Returns the TaskRequest ndb.Key that is related to this shard."""
     return shard_result_key_to_request_key(self.key)
-
-  @property
-  def shard_number(self):
-    """Returns the shard number for which this result is for."""
-    return (self.shard_to_run_key.integer_id() - 1) & 0xFF
 
   @property
   def shard_to_run_key(self):
@@ -408,10 +395,6 @@ class TaskResultSummary(ndb.Model):
     """Returns the TaskRequest ndb.Key that is parent of this result summary."""
     return self.key.parent()
 
-  @property
-  def number_shards(self):
-    return len(self.shards)
-
   def shard_result_key(self, shard_id):
     """Returns the ndb.Key for the corresponding TaskShardResult.
 
@@ -472,9 +455,7 @@ def _task_update_result_summary(request_id):
   # which we do not want since we only care about the last execution.
   keys = [
     shard_to_run_key_to_shard_result_key(
-        task_shard_to_run.request_key_to_shard_to_run_key(request_key, i + 1),
-        1)
-    for i in xrange(request.properties.number_shards)
+        task_shard_to_run.request_key_to_shard_to_run_key(request_key, 1), 1),
   ]
 
   changed = False
@@ -612,10 +593,7 @@ def new_result_summary(request):
 
   The caller must save it in the DB.
   """
-  shards = [
-    TaskShardResultInner()
-    for _ in xrange(request.properties.number_shards)
-  ]
+  shards = [TaskShardResultInner()]
   return TaskResultSummary(
       key=request_key_to_result_summary_key(request.key), shards=shards)
 

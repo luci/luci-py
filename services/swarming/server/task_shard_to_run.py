@@ -239,8 +239,8 @@ def request_key_to_shard_to_run_key(request_key, shard_id):
   - request_key: ndb.Key to a TaskRequest.
   - shard_id: must be 1 based.
   """
-  if shard_id < 1 or shard_id > task_common.MAXIMUM_SHARDS:
-    raise ValueError('shard_id must be 1 based and fit a single byte.')
+  if shard_id != 1:
+    raise ValueError('shard_id must be 1.')
   request_id = request_key.integer_id()
   # Ensure shard_id fits a single byte and that this bit is free in request_id.
   assert not (request_id & 0xFF) and not (shard_id & ~0xFF)
@@ -288,12 +288,11 @@ def new_shards_to_run_for_request(request):
   dimensions_json = utils.encode_to_json(request.properties.dimensions)
   return [
     TaskShardToRun(
-        key=request_key_to_shard_to_run_key(request.key, i+1),
+        key=request_key_to_shard_to_run_key(request.key, 1),
         queue_number=_gen_queue_number_key(
-          request.created_ts, request.priority, i+1),
+            request.created_ts, request.priority, 1),
         dimensions_hash=_hash_dimensions(dimensions_json),
-        expiration_ts=request.expiration_ts)
-    for i in xrange(request.properties.number_shards)
+        expiration_ts=request.expiration_ts),
   ]
 
 

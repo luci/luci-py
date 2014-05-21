@@ -35,10 +35,6 @@ old ones.
 from common import test_request_message
 
 
-# Temporary, as the API is refactored while the old code is being deleted.
-# pylint: disable=W0613
-
-
 def convert_test_case(data):
   """Constructs a TaskProperties out of a test_request_message.TestCase.
 
@@ -66,7 +62,6 @@ def convert_test_case(data):
       'data': test_case.data,
       'dimensions': config.dimensions,
       'env': test_case.env_vars,
-      'number_shards': config.num_instances,
       'execution_timeout_secs': execution_timeout_secs,
       'io_timeout_secs': io_timeout_secs,
     },

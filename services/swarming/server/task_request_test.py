@@ -40,7 +40,6 @@ def _gen_request_data(properties=None, **kwargs):
       ],
       'dimensions': {u'OS': u'Windows-3.1.1', u'hostname': u'localhost'},
       'env': {u'foo': u'bar', u'joe': u'2'},
-      'number_shards': 1,
       'execution_timeout_secs': 30,
       'io_timeout_secs': None,
     },
@@ -123,13 +122,12 @@ class TaskRequestApiTest(test_case.TestCase):
       'env': {u'foo': u'bar', u'joe': u'2'},
       'execution_timeout_secs': 30,
       'io_timeout_secs': None,
-      'number_shards': 1,
     }
     expected_request = {
       'name': u'Request name',
       'priority': 50,
       'properties': expected_properties,
-      'properties_hash': '6d049340771e2197a4ab3f7202bb569e5fa248c3',
+      'properties_hash': '939ee4f5b97c56a003cae8bf52d07725b6eadafd',
       'user': u'Jesus',
     }
     actual = request.to_dict()
@@ -217,14 +215,6 @@ class TaskRequestApiTest(test_case.TestCase):
     task_request.make_request(
         _gen_request_data(
             properties=dict(execution_timeout_secs=task_request._ONE_DAY_SECS)))
-
-    with self.assertRaises(datastore_errors.BadValueError):
-      task_request.make_request(
-          _gen_request_data(
-              properties=dict(number_shards=task_common.MAXIMUM_SHARDS+1)))
-    task_request.make_request(
-        _gen_request_data(
-            properties=dict(number_shards=task_common.MAXIMUM_SHARDS)))
 
     with self.assertRaises(datastore_errors.BadValueError):
       task_request.make_request(
