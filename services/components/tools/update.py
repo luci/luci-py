@@ -7,7 +7,6 @@
 checkout state.
 """
 
-import logging
 import optparse
 import os
 import sys
@@ -23,66 +22,42 @@ from tools import calculate_version
 def main(args, app_dir=None):
   parser = optparse.OptionParser(
       description=sys.modules['__main__'].__doc__,
-      usage='%prog [options]' + (' <app dir>' if app_dir is None else ''))
-  parser.add_option('-v', '--verbose', action='store_true')
-  parser.add_option('-A', '--app-id', help='Defaults to name in app.yaml')
+      usage='%prog [options]')
   parser.add_option(
-      '-m', '--module', action='append', help='Module yaml to update')
+      '-m', '--module', action='append', help='Module id to update')
   parser.add_option(
       '-t', '--tag', help='Tag to attach to a tainted version')
-  parser.add_option(
-      '-s', '--sdk-path',
-      help='Path to AppEngine SDK. Will try to find by itself.')
+
+  gae_sdk_utils.app_sdk_options(parser, app_dir)
   options, args = parser.parse_args(args)
-  logging.basicConfig(level=logging.DEBUG if options.verbose else logging.ERROR)
+  app = gae_sdk_utils.process_sdk_options(parser, options, app_dir)
+  if args:
+    parser.error('Unknown arguments: %s' % args)
+  version = calculate_version.calculate_version(app.app_dir, options.tag)
 
-  if app_dir:
-    # If |app_dir| is provided, it must NOT be passed via command line. Happens
-    # when 'main' is called from a wrapper script.
-    if args:
-      parser.error('Unknown arguments: %s' % args)
-  else:
-    # If |app_dir| is not provided, it must be passed via command line. Happens
-    # when remote_api.py is directly executed as a CLI tool.
-    if len(args) != 1:
-      parser.error('Expecting a path to a GAE application directory')
-    app_dir = args[0]
-
-  # Ensure app_dir points to a directory with app.yaml.
-  app_dir = os.path.abspath(app_dir)
-  if not gae_sdk_utils.is_application_directory(app_dir):
-    parser.error('Not a GAE application directory: %s' % app_dir)
-
-  options.sdk_path = options.sdk_path or gae_sdk_utils.find_gae_sdk()
-  if not options.sdk_path:
-    parser.error('Failed to find the AppEngine SDK. Pass --sdk-path argument.')
-
-  gae_sdk_utils.setup_gae_sdk(options.sdk_path)
-  options.app_id = options.app_id or gae_sdk_utils.default_app_id(app_dir)
-
-  version = calculate_version.calculate_version(app_dir, options.tag)
-  modules = options.module or gae_sdk_utils.find_module_yamls(app_dir)
+  # Updating indexes, queues, etc is a disruptive operation. Confirm.
+  approved = gae_sdk_utils.confirm(
+      'Deploy new version, update indexes, queues and cron jobs?', app, version)
+  if not approved:
+    print('Aborted.')
+    return 0
 
   # 'appcfg.py update <list of modules>' does not update the rest of app engine
   # app like 'appcfg.py update <app dir>' does. It updates only modules. So do
   # index, queues, etc. updates manually afterwards.
-  commands = (
-    ['update'] + modules,
-    ['update_indexes', '.'],
-    ['update_queues', '.'],
-    ['update_cron', '.'],
-  )
+  app.update_modules(version, options.module)
+  app.update_indexes()
+  app.update_queues()
+  app.update_cron()
 
-  for cmd in commands:
-    ret = gae_sdk_utils.appcfg(
-        app_dir, cmd, options.sdk_path, options.app_id, version,
-        options.verbose)
-    if ret:
-      print('Command \'%s\' failed with code %d' % (' '.join(cmd), ret))
-      return ret
-
-  print(' https://%s-dot-%s.appspot.com' % (version, options.app_id))
-  print(' https://appengine.google.com/deployment?app_id=s~' + options.app_id)
+  print('-' * 80)
+  print('New version:')
+  print('  %s' % version)
+  print('Deployed as:')
+  print('  https://%s-dot-%s.appspot.com' % (version, app.app_id))
+  print('Manage at:')
+  print('  https://appengine.google.com/deployment?app_id=s~' + app.app_id)
+  print('-' * 80)
   return 0
 
 

@@ -151,7 +151,7 @@ class SwarmingTestCase(unittest.TestCase):
     gaedb_dir = os.path.join(self.tmpdir, 'gaedb')
     os.mkdir(gaedb_dir)
     cmd = [
-      gae_sdk_utils.find_gae_dev_server(),
+      os.path.join(gae_sdk_utils.find_gae_sdk(), 'dev_appserver.py'),
       '--port', str(server_port),
       '--admin_port', str(find_free_port('localhost', server_port + 1)),
       '--storage', gaedb_dir,
