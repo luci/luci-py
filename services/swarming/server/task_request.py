@@ -1,3 +1,4 @@
+# coding: utf-8
 # Copyright 2014 The Swarming Authors. All rights reserved.
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
@@ -23,20 +24,20 @@ Overview of transactions:
 
 
 Graph of the schema:
-    +------Root------+
-    |TaskRequestShard|
-    +----------------+
-            ^
-            |
-  +---------------------+
-  |TaskRequest          |
-  |    +--------------+ |
-  |    |TaskProperties| |
-  |    +--------------+ |
-  +---------------------+
-        ^
-        |
-  <See task_shard_to_run.py and task_result.py>
+      +------Root------+
+      |TaskRequestShard|
+      +----------------+
+              ^
+              |
+    +---------------------+
+    |TaskRequest          |
+    |    +--------------+ |
+    |    |TaskProperties| |
+    |    +--------------+ |
+    +---------------------+
+               ^
+               |
+    <See task_shard_to_run.py and task_result.py>
 
 TaskProperties is embedded in TaskRequest. TaskProperties is still declared as a
 separate entity to clearly declare the boundary for task request deduplication.
@@ -73,6 +74,20 @@ _DATA_KEYS = frozenset(
 _PROPERTIES_KEYS = frozenset(
     ['commands', 'data', 'dimensions', 'env', 'execution_timeout_secs',
      'io_timeout_secs'])
+
+
+# The production server must handle up to 1000 task requests per second. The
+# number of root entities must be a few orders of magnitude higher. The goal is
+# to almost completely get rid of transactions conflicts. This means that the
+# probability of two transactions happening on the same shard must be very low.
+# This relates to number of transactions per second * seconds per transaction /
+# number of shard.
+#
+# Intentionally starve the canary server by using only 16³=4096 root entities.
+# This will cause mild transaction conflicts during load tests. On the
+# production server, use 16**6 (~16 million) root entities to reduce the number
+# of transaction conflict.
+_SHARDING_LEVEL = 3 if utils.is_canary() else 6
 
 
 ### Properties validators must come before the models.
@@ -196,7 +211,7 @@ class TaskProperties(ndb.Model):
   env = datastore_utils.DeterministicJsonProperty(
       validator=_validate_dict_of_strings, json_type=dict)
 
-  # Maximum duration the bot can take to run a shard of this task.
+  # Maximum duration the bot can take to run this task.
   execution_timeout_secs = ndb.IntegerProperty(
       indexed=True, validator=_validate_timeout, required=True)
 
@@ -270,8 +285,7 @@ def _new_request_key():
     same timestamp at 1ms resolution, so a maximum theoretical rate of 256000
     requests per second but an effective rate likely in the range of ~2560
     requests per second without too much transaction conflicts.
-  - The last 8 bits are used for sharding on TaskShardToRun and are kept to 0
-    here for key compatibility.
+  - The last 8 bits are unused and set to 0.
   """
   now = task_common.milliseconds_since_epoch(None)
   assert 1 <= now < 2**47, now
@@ -303,8 +317,34 @@ def id_to_request_key(task_id):
   if not task_id:
     raise ValueError('Invalid null key')
   parent = datastore_utils.hashed_shard_key(
-      str(task_id), task_common.SHARDING_LEVEL, 'TaskRequestShard')
+      str(task_id), _SHARDING_LEVEL, 'TaskRequestShard')
   return ndb.Key(TaskRequest, task_id, parent=parent)
+
+
+def validate_request_key(request_key):
+  if request_key.kind() != 'TaskRequest':
+    raise ValueError('Expected key to TaskRequest, got %s' % request_key.kind())
+  task_id = request_key.integer_id()
+  if not task_id:
+    raise ValueError('Invalid null TaskRequest key')
+  if task_id & 0xFF:
+    raise ValueError('Unexpected low order byte is set')
+
+  # Check the shard.
+  request_shard_key = request_key.parent()
+  if not request_shard_key:
+    raise ValueError('Expected parent key for TaskRequest, got nothing')
+  if request_shard_key.kind() != 'TaskRequestShard':
+    raise ValueError(
+        'Expected key to TaskRequestShard, got %s' % request_shard_key.kind())
+  root_entity_shard_id = request_shard_key.string_id()
+  if not root_entity_shard_id or len(root_entity_shard_id) != _SHARDING_LEVEL:
+    raise ValueError(
+        'Expected root entity key (used for sharding) to be of length %d but '
+        'length was only %d (key value %r)' % (
+            _SHARDING_LEVEL,
+            len(root_entity_shard_id or ''),
+            root_entity_shard_id))
 
 
 def make_request(data):

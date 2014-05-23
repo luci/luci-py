@@ -22,16 +22,16 @@ from google.appengine.ext import deferred
 import webtest
 
 import handlers
-
 from common import swarm_constants
 from components import auth
 from components import stats_framework
+from components import utils
 from server import admin_user
 from server import bot_management
 from server import dimensions_utils
 from server import errors
 from server import stats_new as stats
-from server import task_scheduler
+from server import task_common
 from server import test_helper
 from server import user_manager
 from stats import machine_stats
@@ -139,25 +139,28 @@ class AppTest(test_case.TestCase):
     self.assertResponse(response, '404 Not Found', '[]')
 
     # Test with a single matching runner.
-    runner = test_helper.CreateRunner()
+    result_summary, _run_result = test_helper.CreateRunner()
     response = self.app.get(
         '/get_matching_test_cases',
         {'name': test_helper.REQUEST_MESSAGE_TEST_CASE_NAME})
     self.assertEqual('200 OK', response.status)
     self.assertIn(
-        task_scheduler.pack_shard_result_key(runner.key), response.body)
+        task_common.pack_result_summary_key(result_summary.key),
+        response.body)
 
     # Test with a multiple matching runners.
-    additional_test_runner = test_helper.CreateRunner()
+    result_summary_2, _run_result = test_helper.CreateRunner(
+        machine_id='foo', exit_codes='0', results='Rock on')
 
     response = self.app.get(
         '/get_matching_test_cases',
         {'name': test_helper.REQUEST_MESSAGE_TEST_CASE_NAME})
     self.assertEqual('200 OK', response.status)
     self.assertIn(
-        task_scheduler.pack_shard_result_key(runner.key), response.body)
+        task_common.pack_result_summary_key(result_summary.key),
+        response.body)
     self.assertIn(
-        task_scheduler.pack_shard_result_key(additional_test_runner.key),
+        task_common.pack_result_summary_key(result_summary_2.key),
         response.body)
 
   def testGetResultHandler(self):
@@ -168,19 +171,18 @@ class AppTest(test_case.TestCase):
 
     # Test when no matching key
     for handler in handler_urls:
-      response = self.app.get(handler, {'r': 'fake_key'}, status=204)
+      response = self.app.get(handler, {'r': 'fake_key'}, status=400)
 
     # Create test and runner.
-    runner = test_helper.CreateRunner(
+    result_summary, run_result = test_helper.CreateRunner(
         machine_id=MACHINE_ID,
         exit_codes='0',
         results='\xe9 Invalid utf-8 string')
 
     # Valid key.
     for handler in handler_urls:
-      response = self.app.get(
-          handler,
-          {'r': task_scheduler.pack_shard_result_key(runner.key)})
+      packed = task_common.pack_result_summary_key(result_summary.key)
+      response = self.app.get(handler, {'r': packed})
       self.assertEqual('200 OK', response.status)
 
       try:
@@ -189,14 +191,13 @@ class AppTest(test_case.TestCase):
         self.fail(e)
       # TODO(maruel): Stop using the DB directly in HTTP handlers test.
       self.assertEqual(
-          ','.join(map(str, runner.exit_codes)),
+          ','.join(map(str, run_result.exit_codes)),
           ''.join(results['exit_codes']))
-      self.assertEqual(runner.bot_id, results['machine_id'])
+      self.assertEqual(result_summary.bot_id, results['machine_id'])
       expected_result_string = '\n'.join(
           o.get().GetResults().decode('utf-8', 'replace')
-          for o in runner.outputs)
+          for o in result_summary.outputs)
       self.assertEqual(expected_result_string, results['output'])
-    self.assertEqual(1, self.execute_tasks())
 
   def testGetSlaveCode(self):
     response = self.app.get('/get_slave_code')
@@ -297,13 +298,10 @@ class AppTest(test_case.TestCase):
     self.assertEqual('Unable to retry runner', response.body)
 
     # Test with matching key.
-    runner = test_helper.CreateRunner(exit_codes='0')
-
-    response = self.app.post(
-        '/secure/retry',
-        {'r': task_scheduler.pack_shard_result_key(runner.key)})
+    result_summary, _run_result = test_helper.CreateRunner(exit_codes='0')
+    packed = task_common.pack_result_summary_key(result_summary.key)
+    response = self.app.post('/secure/retry', {'r': packed})
     self.assertResponse(response, '200 OK', 'Runner set for retry.')
-    self.assertEqual(1, self.execute_tasks())
 
   def testShowMessageHandler(self):
     # Act under admin identity.
@@ -312,11 +310,12 @@ class AppTest(test_case.TestCase):
     response = self.app.get('/secure/show_message', {'r': 'fake_key'},
         status=404)
 
-    runner = test_helper.CreateRunner()
-    response = self.app.get(
-        '/secure/show_message',
-        {'r': task_scheduler.pack_shard_result_key(runner.key)})
-    self.assertEqual(runner.GetAsDict(), response.json)
+    result_summary, _run_result = test_helper.CreateRunner()
+    # TODO(maruel): Must support sending back individual tries.
+    packed = task_common.pack_result_summary_key(result_summary.key)
+    response = self.app.get('/secure/show_message', {'r': packed})
+    self.assertEqual(
+        utils.to_json_encodable(result_summary.to_dict()), response.json)
 
   def testUploadStartSlaveHandler(self):
     # Act under admin identity.
@@ -417,12 +416,11 @@ class AppTest(test_case.TestCase):
     expected_2 = {u'come_back': 2.25, u'try_count': 1}
     self.assertTrue(response.json in (expected_1, expected_2), response.json)
 
-  def _PostResults(self, runner_key, machine_id, result, expect_errors=False):
+  def _PostResults(self, run_result, result, expect_errors=False):
     url_parameters = {
-        'r': runner_key,
-        'id': machine_id,
-        's': True,
-        }
+      'id': run_result.bot_id,
+      'r': task_common.pack_run_result_key(run_result.key),
+    }
     files = [(swarm_constants.RESULT_STRING_KEY,
               swarm_constants.RESULT_STRING_KEY,
               result)]
@@ -431,18 +429,14 @@ class AppTest(test_case.TestCase):
 
   def testResultHandler(self):
     # TODO(maruel): Stop using the DB directly.
-    runner = test_helper.CreateRunner(machine_id=MACHINE_ID)
+    result_summary, run_result = test_helper.CreateRunner(machine_id=MACHINE_ID)
     result = 'result string'
-    response = self._PostResults(
-        task_scheduler.pack_shard_result_key(runner.key),
-        runner.machine_id,
-        result)
+    response = self._PostResults(run_result, result)
     self.assertResponse(
         response, '200 OK', 'Successfully update the runner results.')
 
-    self.assertEqual(2, self.execute_tasks())
-    url = '/get_result?r=%s' % task_scheduler.pack_shard_result_key(runner.key)
-    resp = self.app.get(url, status=200)
+    packed = task_common.pack_result_summary_key(result_summary.key)
+    resp = self.app.get('/get_result?r=%s' % packed, status=200)
     expected = {
       'config_instance_index': 0,
       'exit_codes': '',
@@ -720,14 +714,12 @@ class AppTest(test_case.TestCase):
 
   def testRunnerPing(self):
     # Start a test and successfully ping it
-    runner = test_helper.CreateRunner(machine_id=MACHINE_ID)
-    data = {
-      'r': task_scheduler.pack_shard_result_key(runner.key),
-      'id': runner.machine_id,
-    }
-    response = self.app.post('/runner_ping', data)
+    _result_summary, run_result = test_helper.CreateRunner(
+        machine_id=MACHINE_ID)
+    packed = task_common.pack_run_result_key(run_result.key)
+    response = self.app.post(
+        '/runner_ping', {'r': packed, 'id': run_result.bot_id})
     self.assertResponse(response, '200 OK', 'Success.')
-    self.assertEqual(1, self.execute_tasks())
 
   def testTestRequest(self):
     # Ensure that a test request fails without a request.
@@ -822,10 +814,9 @@ class AppTest(test_case.TestCase):
     self.assertEqual('400 Bad Request', response.status)
     self.assertEqual('Unable to cancel runner', response.body)
 
-    runner = test_helper.CreateRunner()
-    response = self.app.post(
-        '/secure/cancel',
-        {'r': task_scheduler.pack_shard_result_key(runner.key)})
+    result_summary, _run_result = test_helper.CreateRunner()
+    packed = task_common.pack_result_summary_key(result_summary.key)
+    response = self.app.post('/secure/cancel', {'r': packed})
     self.assertResponse(response, '200 OK', 'Runner canceled.')
 
   def testKnownAuthResources(self):

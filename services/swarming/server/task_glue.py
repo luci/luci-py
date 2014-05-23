@@ -27,7 +27,7 @@ handlers_test.py edits the DB directly.
 
 Entities translation is:
   TestRequest -> TaskRequest
-  TestRunner -> TaskShardResult
+  TestRunner -> TaskResultSummary
 The translation is not 1:1 and has patches accordingly until we get rid of the
 old ones.
 """

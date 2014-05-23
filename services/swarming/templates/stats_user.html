@@ -66,15 +66,15 @@
       var round3 = new google.visualization.NumberFormat(
           {decimalSymbol:'.', fractionDigits:3});
       // These indexes are relative to stats_gviz._User.ORDER.
+      round3.format(data_table, 5);
+      round3.format(data_table, 6);
       round3.format(data_table, 7);
-      round3.format(data_table, 8);
-      round3.format(data_table, 9);
 
       // Work graph.
       clearCustomTicks(chart_work);
       var view = new google.visualization.DataView(data_table);
       // These indexes are relative to stats_gviz._User.ORDER.
-      view.setColumns([0, 1, 2, 10, 11]);
+      view.setColumns([0, 1, 2, 3, 4, 8, 9]);
       chart_work.setDataTable(view.toDataTable());
       if (show_as_raw == false) {
         setAxisTicksToUnitsOnNextDraw(chart_work, false);
@@ -85,7 +85,7 @@
       clearCustomTicks(chart_times);
       var view = new google.visualization.DataView(data_table);
       // These indexes are relative to stats_gviz._User.ORDER.
-      view.setColumns([0, 7, 8, 9]);
+      view.setColumns([0, 5, 6, 7]);
       chart_times.setDataTable(view.toDataTable());
       if (show_as_raw == false) {
         setAxisTicksToUnitsOnNextDraw(chart_times, false);

@@ -14,14 +14,10 @@ cron:
   schedule: every 1 minutes
 
 - description:
-    Catch TaskShardResult where the bot died and failed sending updates.
+    Catch TaskRunResult's where the bot died and failed sending updates.
   url: /internal/cron/abort_bot_died
   schedule: every 1 minutes
 
-- description: Catch TaskShardToRun that are expired.
-  url: /internal/cron/abort_expired_shard_to_run
+- description: Catch TaskToRun's that are expired.
+  url: /internal/cron/abort_expired_task_to_run
   schedule: every 1 minutes
-
-- description: Catch inconsistent TaskResultSummary and update them.
-  url: /internal/cron/sync_all_result_summary
-  schedule: every 5 minutes synchronized

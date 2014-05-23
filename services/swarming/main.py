@@ -7,6 +7,7 @@
 import os
 import sys
 
+from google.appengine.api import logservice
 from google.appengine.ext.appstats import recording
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -16,6 +17,13 @@ sys.path.insert(0, os.path.join(APP_DIR, 'components', 'third_party'))
 from components import ereporter2
 from components import utils
 import handlers
+
+
+# Aggressively flush the logs, on the canary appstats gets in the way and
+# crashes right when the handler is about to return. Saw it happen on prod too,
+# especially when there's a fest of "suspended generator transaction" log
+# entries.
+logservice.AUTOFLUSH_EVERY_LINES = 1
 
 
 def CreateApplication():

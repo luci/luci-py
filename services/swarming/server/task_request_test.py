@@ -17,6 +17,7 @@ import test_env
 test_env.setup_test_env()
 
 from google.appengine.api import datastore_errors
+from google.appengine.ext import ndb
 
 from server import task_common
 from server import task_request
@@ -99,10 +100,24 @@ class TaskRequestApiTest(test_case.TestCase):
 
   def test_id_to_request_key(self):
     self.assertEqual(
-        "Key('TaskRequestShard', 'f7184', 'TaskRequest', 256)",
+        "Key('TaskRequestShard', 'f71849', 'TaskRequest', 256)",
         str(task_request.id_to_request_key(0x100)))
     with self.assertRaises(ValueError):
       task_request.id_to_request_key(1)
+
+  def test_validate_request_key(self):
+    task_request.validate_request_key(task_request.id_to_request_key(0x100))
+    task_request.validate_request_key(
+        ndb.Key(
+            'TaskRequestShard', 'a' * task_request._SHARDING_LEVEL,
+            'TaskRequest', 0x100))
+    with self.assertRaises(ValueError):
+      task_request.validate_request_key(ndb.Key('TaskRequest', 1))
+    with self.assertRaises(ValueError):
+      task_request.validate_request_key(
+          ndb.Key(
+              'TaskRequestShard', 'a' * (task_request._SHARDING_LEVEL + 1),
+              'TaskRequest', 0x100))
 
   def test_make_request(self):
     deadline_to_run = 31

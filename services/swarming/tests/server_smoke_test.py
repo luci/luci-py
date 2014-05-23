@@ -285,7 +285,10 @@ class SwarmingTestCase(unittest.TestCase):
       # Append the data to the url so the request is a GET request as required.
       url = urlparse.urljoin(
           self.server_url, 'get_matching_test_cases') + '?' + data
-      matching_keys = json.load(urllib2.urlopen(url))
+      try:
+        matching_keys = json.load(urllib2.urlopen(url))
+      except urllib2.HTTPError:
+        matching_keys = None
       if matching_keys:
         break
       # Last sleep is 2 seconds.

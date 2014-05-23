@@ -6,6 +6,7 @@
 import datetime
 import logging
 import os
+import random
 import sys
 import unittest
 
@@ -19,8 +20,30 @@ test_env.setup_test_env()
 from google.appengine.api import datastore_errors
 
 from server import task_common
+from server import task_scheduler
 from server import test_helper
 from support import test_case
+
+
+def _gen_request_data(properties=None, **kwargs):
+  # TODO(maruel): Move all the copies of this function in test_helper.
+  base_data = {
+    'name': 'Request name',
+    'user': 'Jesus',
+    'properties': {
+      'commands': [[u'command1']],
+      'data': [],
+      'dimensions': {},
+      'env': {},
+      'execution_timeout_secs': 24*60*60,
+      'io_timeout_secs': None,
+    },
+    'priority': 50,
+    'scheduling_expiration_secs': 60,
+  }
+  base_data.update(kwargs)
+  base_data['properties'].update(properties or {})
+  return base_data
 
 
 class TaskCommonApiTest(test_case.TestCase):
@@ -72,6 +95,49 @@ class TaskCommonApiTest(test_case.TestCase):
       self.assertEqual(
           False,
           task_common.match_dimensions(request_dimensions, bot_dimensions))
+
+  def test_pack_result_summary_key(self):
+    def getrandbits(i):
+      self.assertEqual(i, 8)
+      return 0x02
+    self.mock(random, 'getrandbits', getrandbits)
+    test_helper.mock_now(
+      self, task_common.UNIX_EPOCH + datetime.timedelta(seconds=3))
+
+    _request, result_summary = task_scheduler.make_request(_gen_request_data())
+    bot_dimensions = {'hostname': 'localhost'}
+    _request, to_run_result = task_scheduler.bot_reap_task(
+        bot_dimensions, 'localhost')
+
+    actual = task_common.pack_result_summary_key(result_summary.key)
+    # 0xbb8 = 3000ms = 3 secs; 0x02 = random;  0x00 = try_number, e.g. it is a
+    # TaskResultSummary.
+    self.assertEqual('bb80200', actual)
+
+    with self.assertRaises(AssertionError):
+      task_common.pack_result_summary_key(to_run_result.key)
+
+  def test_pack_run_result_key(self):
+    def getrandbits(i):
+      self.assertEqual(i, 8)
+      return 0x02
+    self.mock(random, 'getrandbits', getrandbits)
+    test_helper.mock_now(
+      self, task_common.UNIX_EPOCH + datetime.timedelta(seconds=3))
+
+    _request, result_summary = task_scheduler.make_request(_gen_request_data())
+    bot_dimensions = {'hostname': 'localhost'}
+    _request, to_run_result = task_scheduler.bot_reap_task(
+        bot_dimensions, 'localhost')
+
+    actual = task_common.pack_run_result_key(to_run_result.key)
+    # 0xbb8 = 3000ms = 3 secs; 0x02 = random;  0x01 = try_number, e.g. it is a
+    # TaskRunResult.
+    self.assertEqual('bb80201', actual)
+
+    with self.assertRaises(AssertionError):
+      task_common.pack_run_result_key(result_summary.key)
+
 
 if __name__ == '__main__':
   if '-v' in sys.argv:

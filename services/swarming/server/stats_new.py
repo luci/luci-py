@@ -25,41 +25,45 @@ from server import task_common
 
 class _SnapshotBucketBase(ndb.Model):
   """Statistics for a specific bucket, meant to be subclassed.
+
+  TODO(maruel): Add data about the runs (TaskRunResult), which will be higher
+  than the number of tasks (TaskResultSummary) in case of retries. Until
+  implemented, both values will match.
+
+  TODO(maruel): Use sampling to get median, average, 95%, 99%, 99.9% instead of
+  the raw sum for a few values. The average is not much representative.
   """
-  requests_enqueued = ndb.IntegerProperty(default=0)
-  shards_enqueued = ndb.IntegerProperty(default=0)
+  tasks_enqueued = ndb.IntegerProperty(default=0)
 
-  # TODO(maruel): Use sampling to get median, average, etc instead of the raw
-  # sum.
-  shards_started = ndb.IntegerProperty(default=0)
-  shards_pending_secs = ndb.FloatProperty(default=0)
+  tasks_started = ndb.IntegerProperty(default=0)
+  tasks_pending_secs = ndb.FloatProperty(default=0)
 
-  shards_active = ndb.IntegerProperty(default=0)
+  tasks_active = ndb.IntegerProperty(default=0)
 
-  requests_completed = ndb.IntegerProperty(default=0)
-  shards_completed = ndb.IntegerProperty(default=0)
-  shards_total_runtime_secs = ndb.FloatProperty(default=0)
+  tasks_completed = ndb.IntegerProperty(default=0)
+  tasks_completed = ndb.IntegerProperty(default=0)
+  tasks_total_runtime_secs = ndb.FloatProperty(default=0)
 
-  shards_bot_died = ndb.IntegerProperty(default=0)
-  shards_request_expired = ndb.IntegerProperty(default=0)
+  tasks_bot_died = ndb.IntegerProperty(default=0)
+  tasks_request_expired = ndb.IntegerProperty(default=0)
 
   @property
-  def shards_avg_pending_secs(self):
-    if self.shards_started:
-      return round(self.shards_pending_secs / float(self.shards_started), 3)
+  def tasks_avg_pending_secs(self):
+    if self.tasks_started:
+      return round(self.tasks_pending_secs / float(self.tasks_started), 3)
     return 0.
 
   @property
-  def shards_avg_runtime_secs(self):
-    if self.shards_completed:
+  def tasks_avg_runtime_secs(self):
+    if self.tasks_completed:
       return round(
-          self.shards_total_runtime_secs / float(self.shards_completed), 3)
+          self.tasks_total_runtime_secs / float(self.tasks_completed), 3)
     return 0.
 
   def to_dict(self):
     out = super(_SnapshotBucketBase, self).to_dict()
-    out['shards_avg_pending_secs'] = self.shards_avg_pending_secs
-    out['shards_avg_runtime_secs'] = self.shards_avg_runtime_secs
+    out['tasks_avg_pending_secs'] = self.tasks_avg_pending_secs
+    out['tasks_avg_runtime_secs'] = self.tasks_avg_runtime_secs
     return out
 
 
@@ -109,7 +113,7 @@ class _Snapshot(ndb.Model):
   It has references to _SnapshotForDimensions which holds the
   dimensions-specific data.
 
-  TODO(maruel): Add requests_total_runtime_secs, requests_avg_runtime_secs.
+  TODO(maruel): Add tasks_total_runtime_secs, tasks_avg_runtime_secs.
   """
   # General HTTP details.
   http_requests = ndb.IntegerProperty(default=0)
@@ -133,63 +137,55 @@ class _Snapshot(ndb.Model):
   # Sums.
 
   @property
-  def requests_enqueued(self):
-    return sum(i.requests_enqueued for i in self.buckets)
+  def tasks_enqueued(self):
+    return sum(i.tasks_enqueued for i in self.buckets)
 
   @property
-  def requests_completed(self):
-    return sum(i.requests_completed for i in self.buckets)
+  def tasks_started(self):
+    return sum(i.tasks_started for i in self.buckets)
 
   @property
-  def shards_enqueued(self):
-    return sum(i.shards_enqueued for i in self.buckets)
+  def tasks_pending_secs(self):
+    return sum(i.tasks_pending_secs for i in self.buckets)
 
   @property
-  def shards_started(self):
-    return sum(i.shards_started for i in self.buckets)
+  def tasks_active(self):
+    return sum(i.tasks_active for i in self.buckets)
 
   @property
-  def shards_pending_secs(self):
-    return sum(i.shards_pending_secs for i in self.buckets)
+  def tasks_completed(self):
+    return sum(i.tasks_completed for i in self.buckets)
 
   @property
-  def shards_active(self):
-    return sum(i.shards_active for i in self.buckets)
+  def tasks_total_runtime_secs(self):
+    return sum(i.tasks_total_runtime_secs for i in self.buckets)
 
   @property
-  def shards_completed(self):
-    return sum(i.shards_completed for i in self.buckets)
+  def tasks_bot_died(self):
+    return sum(i.tasks_bot_died for i in self.buckets)
 
   @property
-  def shards_total_runtime_secs(self):
-    return sum(i.shards_total_runtime_secs for i in self.buckets)
+  def tasks_request_expired(self):
+    return sum(i.tasks_request_expired for i in self.buckets)
 
   @property
-  def shards_bot_died(self):
-    return sum(i.shards_bot_died for i in self.buckets)
-
-  @property
-  def shards_request_expired(self):
-    return sum(i.shards_request_expired for i in self.buckets)
-
-  @property
-  def shards_avg_pending_secs(self):
+  def tasks_avg_pending_secs(self):
     started = 0
     pending_secs = 0.
     for i in self.buckets:
-      started += i.shards_started
-      pending_secs += i.shards_pending_secs
+      started += i.tasks_started
+      pending_secs += i.tasks_pending_secs
     if started:
       return round(pending_secs / float(started), 3)
     return 0.
 
   @property
-  def shards_avg_runtime_secs(self):
+  def tasks_avg_runtime_secs(self):
     completed = 0
     runtime_secs = 0.
     for i in self.buckets:
-      completed += i.shards_completed
-      runtime_secs += i.shards_total_runtime_secs
+      completed += i.tasks_completed
+      runtime_secs += i.tasks_total_runtime_secs
     if completed:
       return round(runtime_secs / float(completed), 3)
     return 0.
@@ -264,18 +260,16 @@ class _Snapshot(ndb.Model):
       'bots_active': self.bots_active,
       'http_failures': self.http_failures,
       'http_requests': self.http_requests,
-      'requests_completed': self.requests_completed,
-      'requests_enqueued': self.requests_enqueued,
-      'shards_active': self.shards_active,
-      'shards_avg_pending_secs': self.shards_avg_pending_secs,
-      'shards_avg_runtime_secs': self.shards_avg_runtime_secs,
-      'shards_bot_died': self.shards_bot_died,
-      'shards_completed': self.shards_completed,
-      'shards_enqueued': self.shards_enqueued,
-      'shards_pending_secs': self.shards_pending_secs,
-      'shards_request_expired': self.shards_request_expired,
-      'shards_total_runtime_secs': self.shards_total_runtime_secs,
-      'shards_started': self.shards_started,
+      'tasks_active': self.tasks_active,
+      'tasks_avg_pending_secs': self.tasks_avg_pending_secs,
+      'tasks_avg_runtime_secs': self.tasks_avg_runtime_secs,
+      'tasks_bot_died': self.tasks_bot_died,
+      'tasks_completed': self.tasks_completed,
+      'tasks_enqueued': self.tasks_enqueued,
+      'tasks_pending_secs': self.tasks_pending_secs,
+      'tasks_request_expired': self.tasks_request_expired,
+      'tasks_started': self.tasks_started,
+      'tasks_total_runtime_secs': self.tasks_total_runtime_secs,
     }
 
 
@@ -286,13 +280,17 @@ class _Snapshot(ndb.Model):
 _VALID_ACTIONS = frozenset(
   [
     'bot_active',
-    'request_enqueued',
-    'request_completed',
-    'shard_bot_died',
-    'shard_completed',
-    'shard_request_expired',
-    'shard_started',
-    'shard_updated',
+    # run_* relates to a TaskRunResult. It can happen multiple time for a single
+    # task, when the task is retried automatically.
+    'run_bot_died',
+    'run_completed',
+    # TODO(maruel): Add: 'run_enqueued'.
+    'run_started',
+    'run_updated',
+    # task_* relates to a TaskResultSummary.
+    'task_completed',  # Comes after a non-retried 'run_completed'.
+    'task_enqueued',  # Implies run_enqueued.
+    'task_request_expired',
   ])
 
 # Mapping from long to compact key names. This reduces space usage.
@@ -301,10 +299,9 @@ _KEY_MAPPING = {
   'bot_id': 'bid',
   'dimensions': 'd',
   'pending_ms': 'pms',
-  'req_id': 'rid',
+  'run_id': 'rid',
   'runtime_ms': 'rms',
-  'number_shards': 'ns',
-  'shard_id': 'sid',
+  'task_id': 'tid',
   'user': 'u',
 }
 
@@ -317,11 +314,20 @@ def _assert_list(actual, expected):
     raise ValueError('%s != %s' % (','.join(actual), ','.join(expected)))
 
 
-def _mark_bot_and_shard_as_active(extras, bots_active, shards_active):
-  """Notes both the bot id and the shard id as active in this time span."""
-  bots_active.setdefault(extras['bot_id'], extras['dimensions'])
+def _mark_task_as_active(extras, tasks_active):
+  task_id = extras.get('task_id')
+  if not task_id:
+    # Crudely zap out the retries for now.
+    # https://code.google.com/p/swarming/issues/detail?id=108
+    task_id = extras['run_id'][:-2] + '00'
   dimensions_json = utils.encode_to_json(extras['dimensions'])
-  shards_active.setdefault(dimensions_json, set()).add(extras['shard_id'])
+  tasks_active.setdefault(dimensions_json, set()).add(task_id)
+
+
+def _mark_bot_and_task_as_active(extras, bots_active, tasks_active):
+  """Notes both the bot id and the task id as active in this time span."""
+  bots_active.setdefault(extras['bot_id'], extras['dimensions'])
+  _mark_task_as_active(extras, tasks_active)
 
 
 def _ms_to_secs(raw):
@@ -351,7 +357,7 @@ def _unpack_entry(line):
   return {_REVERSE_KEY_MAPPING[k]: v for k, v in json.loads(line).iteritems()}
 
 
-def _parse_line(line, values, bots_active, shards_active):
+def _parse_line(line, values, bots_active, tasks_active):
   """Updates a Snapshot instance with a processed statistics line if relevant.
 
   This function is a big switch case, so while it is long and will get longer,
@@ -385,61 +391,59 @@ def _parse_line(line, values, bots_active, shards_active):
       bots_active[extras['bot_id']] = extras['dimensions']
       return True
 
-    if action == 'request_enqueued':
-      _assert_list(extras, ['dimensions', 'number_shards', 'req_id', 'user'])
-      # Convert the request id to shard ids.
-      num_shards = int(extras['number_shards'])
-      req_id = int(extras['req_id'], 16)
-      for i in xrange(num_shards):
-        shards_active.setdefault(dimensions_json, set()).add(
-            '%x-1' % (req_id + i + 1))
-      d.requests_enqueued += 1
-      d.shards_enqueued += num_shards
-      u.requests_enqueued += 1
-      u.shards_enqueued += num_shards
+    if action == 'run_bot_died':
+      _assert_list(extras, ['bot_id', 'dimensions', 'run_id', 'user'])
+      d.tasks_bot_died += 1
+      u.tasks_bot_died += 1
       return True
 
-    if action == 'request_completed':
-      _assert_list(extras, ['dimensions', 'req_id', 'user'])
-      d.requests_completed += 1
-      u.requests_completed += 1
-      return True
-
-    if action == 'shard_bot_died':
-      _assert_list(extras, ['bot_id', 'dimensions', 'shard_id', 'user'])
-      d.shards_bot_died += 1
-      u.shards_bot_died += 1
-      return True
-
-    if action == 'shard_completed':
+    if action == 'run_completed':
       _assert_list(
-          extras, ['bot_id', 'dimensions', 'runtime_ms', 'shard_id', 'user'])
-      _mark_bot_and_shard_as_active(extras, bots_active, shards_active)
-      d.shards_completed += 1
-      d.shards_total_runtime_secs += _ms_to_secs(extras['runtime_ms'])
-      u.shards_completed += 1
-      u.shards_total_runtime_secs += _ms_to_secs(extras['runtime_ms'])
+          extras, ['bot_id', 'dimensions', 'run_id', 'runtime_ms', 'user'])
+      _mark_bot_and_task_as_active(extras, bots_active, tasks_active)
+      d.tasks_completed += 1
+      d.tasks_total_runtime_secs += _ms_to_secs(extras['runtime_ms'])
+      u.tasks_completed += 1
+      u.tasks_total_runtime_secs += _ms_to_secs(extras['runtime_ms'])
       return True
 
-    if action == 'shard_request_expired':
-      _assert_list(extras, ['dimensions', 'shard_id', 'user'])
-      d.shards_request_expired += 1
-      u.shards_request_expired += 1
-      return True
-
-    if action == 'shard_started':
+    if action == 'run_started':
       _assert_list(
-          extras, ['bot_id', 'dimensions', 'pending_ms', 'shard_id', 'user'])
-      _mark_bot_and_shard_as_active(extras, bots_active, shards_active)
-      d.shards_started += 1
-      d.shards_pending_secs += _ms_to_secs(extras['pending_ms'])
-      u.shards_started += 1
-      u.shards_pending_secs += _ms_to_secs(extras['pending_ms'])
+          extras, ['bot_id', 'dimensions', 'pending_ms', 'run_id', 'user'])
+      _mark_bot_and_task_as_active(extras, bots_active, tasks_active)
+      d.tasks_started += 1
+      d.tasks_pending_secs += _ms_to_secs(extras['pending_ms'])
+      u.tasks_started += 1
+      u.tasks_pending_secs += _ms_to_secs(extras['pending_ms'])
       return True
 
-    if action == 'shard_updated':
-      _assert_list(extras, ['bot_id', 'dimensions', 'shard_id'])
-      _mark_bot_and_shard_as_active(extras, bots_active, shards_active)
+    if action == 'run_updated':
+      _assert_list(extras, ['bot_id', 'dimensions', 'run_id'])
+      _mark_bot_and_task_as_active(extras, bots_active, tasks_active)
+      return True
+
+    # TODO(maruel): Ignore task_completed for now, since it is a duplicate of
+    # run_completed.
+    if action == 'task_completed':
+      _assert_list(extras, ['dimensions', 'pending_ms', 'task_id', 'user'])
+      # TODO(maruel): Add pending_ms as the total latency to run tasks, versus
+      # the amount of time that was spent actually running the task. This gives
+      # the infrastructure wall-clock time overhead.
+      #d.tasks_completed += 1
+      #u.tasks_completed += 1
+      return True
+
+    if action == 'task_enqueued':
+      _assert_list(extras, ['dimensions', 'task_id', 'user'])
+      _mark_task_as_active(extras, tasks_active)
+      d.tasks_enqueued += 1
+      u.tasks_enqueued += 1
+      return True
+
+    if action == 'task_request_expired':
+      _assert_list(extras, ['dimensions', 'task_id', 'user'])
+      d.tasks_request_expired += 1
+      u.tasks_request_expired += 1
       return True
 
     logging.error('Unknown stats action\n%s', line)
@@ -449,10 +453,10 @@ def _parse_line(line, values, bots_active, shards_active):
     return False
 
 
-def _post_process(snapshot, bots_active, shards_active):
+def _post_process(snapshot, bots_active, tasks_active):
   """Completes the _Snapshot instance with additional data."""
-  for dimensions_json, shards in shards_active.iteritems():
-    snapshot.get_dimensions(dimensions_json).shards_active = len(shards)
+  for dimensions_json, tasks in tasks_active.iteritems():
+    snapshot.get_dimensions(dimensions_json).tasks_active = len(tasks)
 
   snapshot.bot_ids = sorted(bots_active)
   for bot_id, dimensions in bots_active.iteritems():
@@ -476,7 +480,7 @@ def _extract_snapshot_from_logs(start_time, end_time):
   total_lines = 0
   parse_errors = 0
   bots_active = {}
-  shards_active = {}
+  tasks_active = {}
 
   for entry in stats_framework.yield_entries(start_time, end_time):
     snapshot.http_requests += 1
@@ -484,12 +488,12 @@ def _extract_snapshot_from_logs(start_time, end_time):
       snapshot.http_failures += 1
 
     for l in entry.entries:
-      if _parse_line(l, snapshot, bots_active, shards_active):
+      if _parse_line(l, snapshot, bots_active, tasks_active):
         total_lines += 1
       else:
         parse_errors += 1
 
-  _post_process(snapshot, bots_active, shards_active)
+  _post_process(snapshot, bots_active, tasks_active)
   logging.debug('Parsed %d lines, %d errors', total_lines, parse_errors)
   return snapshot
 
@@ -506,21 +510,18 @@ def add_entry(**kwargs):
   stats_framework.add_entry(_pack_entry(**kwargs))
 
 
-def add_request_entry(action, request_key, **kwargs):
-  """Action about a TaskRequest."""
-  assert action.startswith('request_'), action
-  assert request_key.kind() == 'TaskRequest', request_key
-  return add_entry(
-      action=action, req_id='%x' % request_key.integer_id(), **kwargs)
+def add_run_entry(action, run_result_key, **kwargs):
+  """Action about a TaskRunResult."""
+  assert action.startswith('run_'), action
+  run_id = task_common.pack_run_result_key(run_result_key)
+  return add_entry(action=action, run_id=run_id, **kwargs)
 
 
-def add_shard_entry(action, shard_result_key, **kwargs):
-  """Action about a TaskShardResult."""
-  assert action.startswith('shard_'), action
-  assert shard_result_key.kind() == 'TaskShardResult', shard_result_key
-  shard_id = '%x-%d' % (
-      shard_result_key.parent().integer_id(), shard_result_key.integer_id())
-  return add_entry(action=action, shard_id=shard_id, **kwargs)
+def add_task_entry(action, result_summary_key, **kwargs):
+  """Action about a TaskRequest/TaskResultSummary."""
+  assert action.startswith('task_'), action
+  task_id = task_common.pack_result_summary_key(result_summary_key)
+  return add_entry(action=action, task_id=task_id, **kwargs)
 
 
 ### Handlers

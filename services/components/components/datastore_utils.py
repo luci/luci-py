@@ -14,6 +14,7 @@ import string
 
 from google.appengine.api import datastore_errors
 from google.appengine.ext import ndb
+from google.appengine.runtime import apiproxy_errors
 
 from components import utils
 
@@ -555,7 +556,12 @@ def insert(entity, new_key_callback=None):
     try:
       if _insert(entity):
         break
-    except datastore_errors.TransactionFailedError:
+    except (
+        apiproxy_errors.CancelledError,
+        datastore_errors.BadRequestError,
+        datastore_errors.Timeout,
+        datastore_errors.TransactionFailedError,
+        RuntimeError):
       pass
     # Entity existed. Get the next key.
     entity.key = new_key_callback()

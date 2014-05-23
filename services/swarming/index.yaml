@@ -15,9 +15,9 @@ indexes:
   - name: machine_id
   - name: tag
 
-- kind: TaskShardResult
+- kind: TaskRunResult
   properties:
-  - name: task_state
+  - name: state
   - name: modified_ts
 
 - kind: UserManager

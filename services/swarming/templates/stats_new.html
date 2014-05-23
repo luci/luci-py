@@ -81,9 +81,9 @@
       var round3 = new google.visualization.NumberFormat(
           {decimalSymbol:'.', fractionDigits:3});
       // These indexes are relative to stats_gviz._GVIZ_COLUMNS_ORDER.
+      round3.format(data_table, 8);
+      round3.format(data_table, 9);
       round3.format(data_table, 10);
-      round3.format(data_table, 11);
-      round3.format(data_table, 12);
 
       // HTTP request graph.
       clearCustomTicks(chart_http_requests);
@@ -100,7 +100,7 @@
       clearCustomTicks(chart_work);
       var view = new google.visualization.DataView(data_table);
       // These indexes are relative to stats_gviz._Summary.ORDER.
-      view.setColumns([0, 3, 4, 13, 14]);
+      view.setColumns([0, 3, 4, 11, 12]);
       chart_work.setDataTable(view.toDataTable());
       if (show_as_raw == false) {
         setAxisTicksToUnitsOnNextDraw(chart_work, false);
@@ -111,7 +111,7 @@
       clearCustomTicks(chart_times);
       var view = new google.visualization.DataView(data_table);
       // These indexes are relative to stats_gviz._Summary.ORDER.
-      view.setColumns([0, 10, 11, 12]);
+      view.setColumns([0, 8, 9, 10]);
       chart_times.setDataTable(view.toDataTable());
       if (show_as_raw == false) {
         setAxisTicksToUnitsOnNextDraw(chart_times, false);

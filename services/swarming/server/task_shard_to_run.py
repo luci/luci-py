@@ -2,33 +2,26 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
-"""Tasks shard entities that describe when a shard is to be scheduled.
+"""Task entity that describe when a task is to be scheduled.
 
-This module doesn't do the scheduling itself. It only describes the shards to
-ready to be scheduled.
+This module doesn't do the scheduling itself. It only describes the tasks ready
+to be scheduled.
 
 Graph of the schema:
-   <See task_request.py>
-             ^
-             |
-  +---------------------+
-  |TaskRequest          |  (task_request.py)
-  |    +--------------+ |<..........................+
-  |    |TaskProperties| |                           .
-  |    +--------------+ |<..+                       .
-  +---------------------+   .                       .
-                            .                       .
-     +--------Root-------+  . +--------Root-------+ .
-     |TaskShardToRunShard|  . |TaskShardToRunShard| .
-     +-------------------+  . +-------------------+ .
-               ^            .          ^            .
-               |            .          |            .
-        +--------------+    .   +--------------+    .
-        |TaskShardToRun|....+   |TaskShardToRun|....+
-        +--------------+        +--------------+
-                    ^              ^
-                    |              |
-                   <See task_result.py>
+     <See task_request.py>
+               ^
+               |
+    +---------------------+
+    |TaskRequest          |  (task_request.py)
+    |    +--------------+ |
+    |    |TaskProperties| |
+    |    +--------------+ |
+    +---------------------+
+               ^
+               |
+          +---------+
+          |TaskToRun|
+          +---------+
 """
 
 import datetime
@@ -40,18 +33,19 @@ import struct
 from google.appengine.api import datastore_errors
 from google.appengine.api import memcache
 from google.appengine.ext import ndb
+from google.appengine.runtime import apiproxy_errors
 
-from components import datastore_utils
 from components import utils
 from server import task_common
 from server import task_request
 
 
-class TaskShardToRun(ndb.Model):
-  """Defines a shard to run for a TaskRequest.
+class TaskToRun(ndb.Model):
+  """Defines a TaskRequest ready to be scheduled on a bot.
 
-  This specific request for a specific shard can be executed multiple times,
-  each execution will create a new child task_result.TaskShardResult.
+  This specific request for a specific task can be executed multiple times,
+  each execution will create a new child task_result.TaskResult of
+  task_result.TaskResultSummary.
 
   This entity must be kept small and contain the minimum data to enable the
   queries for two reasons:
@@ -59,11 +53,7 @@ class TaskShardToRun(ndb.Model):
     bot gets assigned this task item to work on.
   - all the ones currently active are fetched at once in a cron job.
 
-  The key is derived from TaskRequest's key. The low order byte is the shard
-  number + 1.
-
-  Warning: ordering by key is not useful. This is because of the root entity
-  sharding, which shuffle the base key.
+  The key id 1 one, parent is TaskRequest.
   """
   # The shortened hash of TaskRequests.dimensions_json. This value is generated
   # with _hash_dimensions().
@@ -79,37 +69,24 @@ class TaskShardToRun(ndb.Model):
   # to order the results by this field to allow sorting by priority first, and
   # then timestamp. See _gen_queue_number_key() for details. This value is only
   # set when the task is available to run, i.e.
-  # ndb.TaskShardResult.query(ancestor=self.key).get().state==AVAILABLE.
-  # If this task shard it not ready to be scheduled, it must be None.
+  # ndb.TaskResult.query(ancestor=self.key).get().state==AVAILABLE.
+  # If this task it not ready to be scheduled, it must be None.
   queue_number = ndb.IntegerProperty()
 
   @property
-  def shard_number(self):
-    """Returns a 0-based number that determines the subset of the task to run.
-    """
-    return shard_to_run_key_to_shard_number(self.key)
-
-  @property
   def request_key(self):
-    """Returns the TaskRequest ndb.Key that is related to shard to run."""
-    return shard_to_run_key_to_request_key(self.key)
-
-  def to_dict(self):
-    """Encodes .dimension_has as hex to make it json compatible."""
-    out = super(TaskShardToRun, self).to_dict()
-    out['shard_number'] = self.shard_number
-    return out
+    """Returns the TaskRequest ndb.Key that is parent to the task to run."""
+    return task_to_run_key_to_request_key(self.key)
 
 
-def _gen_queue_number_key(timestamp, priority, shard_id):
-  """Generates a 64 bit packed value used for TaskShardToRun.queue_number.
+def _gen_queue_number_key(timestamp, priority):
+  """Generates a 64 bit packed value used for TaskToRun.queue_number.
 
   The lower value the higher importance.
 
   Arguments:
   - timestamp: datetime.datetime when the TaskRequest was filed in.
   - priority: priority of the TaskRequest.
-  - shard_id: 1-based shard id.
 
   Returns:
     queue_number is a 64 bit integer:
@@ -117,16 +94,14 @@ def _gen_queue_number_key(timestamp, priority, shard_id):
     - 8 bits of priority.
     - 47 bits at 1ms resolution is 2**47 / 365 / 24 / 60 / 60 / 1000 = 4462
       years.
-    - The last 8 bits is the shard number.
+    - The last 8 bits is currently unused and set to 0.
   """
   assert isinstance(timestamp, datetime.datetime)
   task_common.validate_priority(priority)
-  # shard_id must fit a single byte.
-  assert 1 <= shard_id and not (shard_id & ~0xFF)
   now = task_common.milliseconds_since_epoch(timestamp)
   assert 0 <= now < 2**47, hex(now)
   # Assumes the system runs a 64 bits version of python.
-  return priority << 55 | now << 8 | shard_id
+  return priority << 55 | now << 8
 
 
 def _explode_list(values):
@@ -157,7 +132,7 @@ def _powerset(dimensions):
   """Yields the product of all the possible permutations in dimensions.
 
   Starts with the most restrictive set and goes down to the less restrictive
-  ones. See unit test TaskShardToRunPrivateTest.test_powerset for examples.
+  ones. See unit test TaskToRunPrivateTest.test_powerset for examples.
   """
   keys = sorted(dimensions)
   for i in itertools.chain.from_iterable(
@@ -166,28 +141,30 @@ def _powerset(dimensions):
       yield i
 
 
-def _put_shard_to_run(shard_to_run_key, queue_number):
-  """Updates a TaskShardToRun.queue_number value.
+def _put_task_to_run(task_key, queue_number):
+  """Updates a TaskToRun.queue_number value.
 
-  This function enforces that TaskShardToRun.queue_number member is toggled and
-  this function must run inside a transaction.
+  This function enforces that TaskToRun.queue_number member is toggled and runs
+  inside a transaction.
 
   Arguments:
-  - shard_to_run_key: ndb.Key to TaskShardToRun entity to update.
-  - queue_number: new queue_number value.
+  - task_key: ndb.Key to TaskToRun entity to update.
+  - queue_number: new queue_number value. Can be either None to mark that the
+    task is not available anymore or an int so this task becomes (r)enabled for
+    reaping.
 
   Returns:
     True if succeeded, False if no modification was committed to the DB.
   """
-  assert isinstance(shard_to_run_key, ndb.Key), shard_to_run_key
+  assert task_key.kind() == 'TaskToRun', task_key
   assert ndb.in_transaction()
   # Refresh the item.
-  shard_to_run = shard_to_run_key.get()
-  if bool(queue_number) == bool(shard_to_run.queue_number):
+  task = task_key.get()
+  if bool(queue_number) == bool(task.queue_number):
     # Too bad, someone else reaped it in the meantime.
     return False
-  shard_to_run.queue_number = queue_number
-  shard_to_run.put()
+  task.queue_number = queue_number
+  task.put()
   return True
 
 
@@ -203,7 +180,13 @@ def _hash_dimensions(dimensions_json):
   return int(struct.unpack('<L', digest[:4])[0])
 
 
-def _set_lookup_cache(shard_to_run_key, is_available_to_schedule):
+def _memcache_to_run_key(task_key):
+  """Functional equivalent of task_common.pack_result_summary_key()."""
+  request_key = task_to_run_key_to_request_key(task_key)
+  return '%x' % request_key.integer_id()
+
+
+def _set_lookup_cache(task_key, is_available_to_schedule):
   """Updates the quick lookup cache to mark an item as available or not.
 
   This cache is a blacklist of items that are already reaped, so it is not worth
@@ -213,96 +196,70 @@ def _set_lookup_cache(shard_to_run_key, is_available_to_schedule):
   concurrent HTTP handlers are trying to reap the exact same task
   simultaneously. This blacklist helps reduce the contention.
   """
-  key = '%x' % shard_to_run_key.integer_id()
+  # Set the expiration time for items in the negative cache as 2 minutes. This
+  # copes with significant index inconsistency but do not clog the memcache
+  # server with unneeded keys.
+  cache_lifetime = 120
+
+  key = _memcache_to_run_key(task_key)
   if is_available_to_schedule:
     # The item is now available, so remove it from memcache.
-    memcache.delete(key, namespace='shard_to_run')
+    memcache.delete(key, namespace='task_to_run')
   else:
-    # Save the item for 5 minutes. This copes with significant index
-    # inconsistency but do not clog the memcache server with unneeded keys.
-    memcache.set(key, True, time=300, namespace='shard_to_run')
+    memcache.set(key, True, time=cache_lifetime, namespace='task_to_run')
 
 
-def _lookup_cache_is_taken(shard_to_run_key):
+def _lookup_cache_is_taken(task_key):
   """Queries the quick lookup cache to reduce DB operations."""
-  key = '%x' % shard_to_run_key.integer_id()
-  return bool(memcache.get(key, namespace='shard_to_run'))
+  key = _memcache_to_run_key(task_key)
+  return bool(memcache.get(key, namespace='task_to_run'))
 
 
 ### Public API.
 
 
-def request_key_to_shard_to_run_key(request_key, shard_id):
-  """Returns the ndb.Key for a TaskShardToRun from a TaskRequest key.
-
-  Arguments:
-  - request_key: ndb.Key to a TaskRequest.
-  - shard_id: must be 1 based.
-  """
-  if shard_id != 1:
-    raise ValueError('shard_id must be 1.')
-  request_id = request_key.integer_id()
-  # Ensure shard_id fits a single byte and that this bit is free in request_id.
-  assert not (request_id & 0xFF) and not (shard_id & ~0xFF)
-  key_id = request_id | shard_id
-  return shard_id_to_key(key_id)
+def request_key_to_task_to_run_key(request_key):
+  """Returns the ndb.Key for a TaskToRun from a TaskRequest key."""
+  assert request_key.kind() == 'TaskRequest', request_key
+  return ndb.Key(TaskToRun, 1, parent=request_key)
 
 
-def shard_id_to_key(key_id):
-  """Returns the ndb.Key for a TaskShardToRun from a key to a raw id."""
-  # key_id is likely to be user-provided.
-  if not (key_id & 0xFF):
-    raise ValueError('Can\'t pass request id %s as a shard id' % key_id)
-  if key_id < 0x100 or key_id >= 2**64:
-    raise ValueError('Invalid shard id %s' % key_id)
-  parent = datastore_utils.hashed_shard_key(
-      str(key_id), task_common.SHARDING_LEVEL, 'TaskShardToRunShard')
-  return ndb.Key(TaskShardToRun, key_id, parent=parent)
+def task_to_run_key_to_request_key(task_key):
+  """Returns the ndb.Key for a TaskToRun from a TaskRequest key."""
+  if task_key.kind() != 'TaskToRun':
+    raise ValueError('Expected key to TaskToRun, got %s' % task_key.kind())
+  return task_key.parent()
 
 
-def shard_to_run_key_to_request_key(shard_to_run_key):
-  """Returns the ndb.Key for a TaskShardToRun from a TaskRequest key.
-
-  Arguments:
-  - request_key: ndb.Key to a TaskRequest.
-  """
-  # Mask the low order byte.
-  return task_request.id_to_request_key(
-      shard_to_run_key.integer_id() & 0xFFFFFFFFFFFFFF00)
-
-
-def shard_to_run_key_to_shard_number(shard_to_run_key):
-  """Returns the 0-based shard number for a ndb.Key to a TaskShardToRun."""
-  return (shard_to_run_key.integer_id() - 1) & 0xFF
-
-
-def new_shards_to_run_for_request(request):
-  """Returns a fresh new TaskShardToRun for each shard ready to be scheduled.
-
-  Each shard has a slightly less priority so the shard will be reaped in order.
-  This makes more sense.
+def new_task_to_run(request):
+  """Returns a fresh new TaskToRun for the task ready to be scheduled.
 
   Returns:
-    Yet to be stored TaskShardToRun entities.
+    Unsaved TaskToRun entity.
   """
   dimensions_json = utils.encode_to_json(request.properties.dimensions)
-  return [
-    TaskShardToRun(
-        key=request_key_to_shard_to_run_key(request.key, 1),
-        queue_number=_gen_queue_number_key(
-            request.created_ts, request.priority, 1),
-        dimensions_hash=_hash_dimensions(dimensions_json),
-        expiration_ts=request.expiration_ts),
-  ]
+  return TaskToRun(
+      key=request_key_to_task_to_run_key(request.key),
+      queue_number=_gen_queue_number_key(request.created_ts, request.priority),
+      dimensions_hash=_hash_dimensions(dimensions_json),
+      expiration_ts=request.expiration_ts)
 
 
-def yield_next_available_shard_to_dispatch(bot_dimensions):
-  """Yields next available (TaskRequest, TaskShardToRun) in decreasing order of
+def validate_to_run_key(task_key):
+  """Validates a ndb.Key to a TaskToRun entity. Raises ValueError if invalid."""
+  # This also validates the key kind.
+  request_key = task_to_run_key_to_request_key(task_key)
+  if task_key.integer_id() != 1:
+    raise ValueError('TaskToRun key id should be 1, found %s' % task_key.id())
+  task_request.validate_request_key(request_key)
+
+
+def yield_next_available_task_to_dispatch(bot_dimensions):
+  """Yields next available (TaskRequest, TaskToRun) in decreasing order of
   priority.
 
-  Once the caller determines the shard is suitable to execute, it must update
-  TaskShardToRun.queue_number to None to mark that it is not to be scheduled
-  anymore.
+  Once the caller determines the task is suitable to execute, it must use
+  reap_task_to_run(task.key) to mark that it is not to be scheduled anymore.
 
   Performance is the top most priority here.
 
@@ -341,56 +298,66 @@ def yield_next_available_shard_to_dispatch(bot_dimensions):
   # processing. Should greatly reduce the effect of latency on the total
   # duration of this function. I also suspect using ndb.get_multi() will return
   # fresher objects than what is returned by the query.
-  opts = ndb.QueryOptions(batch_size=50, prefetch_size=500)
+  opts = ndb.QueryOptions(batch_size=50, prefetch_size=500, use_cache=False)
   try:
     # Interestingly, the filter on .queue_number>0 is required otherwise all the
     # None items are returned first.
-    q = TaskShardToRun.query(default_options=opts).order(
-        TaskShardToRun.queue_number).filter(TaskShardToRun.queue_number > 0)
-    for shard_to_run in q:
+    q = TaskToRun.query(default_options=opts).order(
+        TaskToRun.queue_number).filter(TaskToRun.queue_number > 0)
+    for task in q:
+      duration = (task_common.utcnow() - now).total_seconds()
+      if duration > 40.:
+        # Stop searching after too long, since the odds of the request blowing
+        # up right after succeeding in reaping a task is not worth the dangling
+        # task request that will stay in limbo until the cron job reaps it and
+        # retry it. The current handlers are given 60s to complete. By using
+        # 40s, it gives 20s to complete the reaping and complete the HTTP
+        # request.
+        return
+
       total += 1
-      # Verify TaskRequestShard is what is expected. Play defensive here.
-      shard_to_run_shard_key = shard_to_run.key.parent()
-      if (not shard_to_run_shard_key.string_id() or
-          len(shard_to_run_shard_key.string_id()) !=
-              task_common.SHARDING_LEVEL):
-        logging.error(
-            'Found %s which is not on proper sharding level %d',
-            shard_to_run.key, task_common.SHARDING_LEVEL)
+      # Verify TaskToRun is what is expected. Play defensive here.
+      try:
+        validate_to_run_key(task.key)
+      except ValueError as e:
+        logging.error(str(e))
         broken += 1
         continue
 
       # It is possible for the index to be inconsistent since it is not executed
       # in a transaction, no problem.
-      if not shard_to_run.queue_number:
+      if not task.queue_number:
         no_queue += 1
         continue
       # It expired. A cron job will cancel it eventually. Since 'now' is saved
       # before the query, an expired task may still be reaped even if
       # technically expired if the query is very slow. This is on purpose so
       # slow queries do not cause exagerate expirations.
-      if shard_to_run.expiration_ts < now:
+      if task.expiration_ts < now:
         expired += 1
         continue
-      if shard_to_run.dimensions_hash not in accepted_dimensions_hash:
+      if task.dimensions_hash not in accepted_dimensions_hash:
         hash_mismatch += 1
         continue
 
       # Do this after the basic weeding out but before fetching TaskRequest.
-      if _lookup_cache_is_taken(shard_to_run.key):
+      if _lookup_cache_is_taken(task.key):
         cache_lookup += 1
         continue
 
       # The hash may have conflicts. Ensure the dimensions actually match by
       # verifying the TaskRequest. There's a probability of 2**-31 of conflicts,
-      # which is low enough for our purpose.
-      request = shard_to_run.request_key.get()
+      # which is low enough for our purpose. The reason use_cache=False is
+      # otherwise it'll create a buffer bloat.
+      request = task.request_key.get(use_cache=False)
       if not task_common.match_dimensions(
           request.properties.dimensions, bot_dimensions):
         real_mismatch += 1
         continue
 
-      yield request, shard_to_run
+      # It's a valid task! Note that in the meantime, another bot may have
+      # reaped it.
+      yield request, task
       ignored += 1
   finally:
     duration = (task_common.utcnow() - now).total_seconds()
@@ -410,91 +377,81 @@ def yield_next_available_shard_to_dispatch(bot_dimensions):
         broken)
 
 
-def yield_expired_shard_to_run():
-  """Yields all the expired TaskShardToRun still marked as available."""
-  # Do not use a projection query, since the TaskShardToRun entities are hot,
-  # thus are likely to be found in cache and projection queries disable the
-  # cache.
-  q = TaskShardToRun.query().filter(TaskShardToRun.queue_number > 0)
+def yield_expired_task_to_run():
+  """Yields all the expired TaskToRun still marked as available."""
   now = task_common.utcnow()
-  for shard_to_run in q:
-    if shard_to_run.expiration_ts < now:
-      yield shard_to_run
+  for task in TaskToRun.query().filter(TaskToRun.queue_number > 0):
+    if task.expiration_ts < now:
+      yield task
 
 
-def retry_shard_to_run(shard_to_run_key):
-  """Updates a TaskShardToRun to note it should run again.
+def retry_task_to_run(task_key):
+  """Updates a TaskToRun to note it should run again.
 
   The modification is done in a transaction to ensure .queue_number is toggled.
 
-  Uses the original timestamp for priority, so the task shard request doesn't
-  get starved on retries.
+  Uses the original timestamp for priority, so the task request doesn't get
+  starved on retries.
 
   Arguments:
-  - shard_to_run_key: ndb.Key to TaskShardToRun entity to update.
+  - task_key: ndb.Key to TaskToRun entity to update.
 
   Returns:
     True if succeeded.
   """
-  assert isinstance(shard_to_run_key, ndb.Key), shard_to_run_key
+  assert task_key.kind() == 'TaskToRun', task_key
   assert not ndb.in_transaction()
-  request = shard_to_run_key_to_request_key(shard_to_run_key).get()
-  queue_number = _gen_queue_number_key(
-      request.created_ts,
-      request.priority,
-      shard_to_run_key_to_shard_number(shard_to_run_key) + 1)
+  request = task_to_run_key_to_request_key(task_key).get()
+  queue_number = _gen_queue_number_key(request.created_ts, request.priority)
   try:
     result = ndb.transaction(
-        lambda: _put_shard_to_run(shard_to_run_key, queue_number),
-        retries=1)
+        lambda: _put_task_to_run(task_key, queue_number), retries=1)
     if result:
-      _set_lookup_cache(shard_to_run_key, True)
+      _set_lookup_cache(task_key, True)
     return result
-  except datastore_errors.TransactionFailedError:
+  except (
+      apiproxy_errors.CancelledError,
+      datastore_errors.BadRequestError,
+      datastore_errors.Timeout,
+      datastore_errors.TransactionFailedError,
+      RuntimeError):
     return False
 
 
-def reap_shard_to_run(shard_to_run_key):
-  """Updates a TaskShardToRun to note it should not be run again.
+def reap_task_to_run(task_key):
+  """Updates a TaskToRun to note it should not be run again.
 
-  If running inside a transaction, reuse it. Otherwise runs it in a transaction
-  to ensure .queue_number is toggled.
+  It must run inside a transaction to ensure .queue_number is toggled. The
+  transaction should have retries=0 but this is not enforced here.
 
   Arguments:
-  - shard_to_run_key: ndb.Key to TaskShardToRun entity to update.
+  - task_key: ndb.Key to TaskToRun entity to update.
   - request: TaskRequest with necessary details.
 
   Returns:
     True if succeeded.
   """
-  assert isinstance(shard_to_run_key, ndb.Key), shard_to_run_key
-  if ndb.in_transaction():
-    result = _put_shard_to_run(shard_to_run_key, None)
-  else:
-    try:
-      # Don't retry, it's not worth. Just move on to the next task shard.
-      result = ndb.transaction(
-          lambda: _put_shard_to_run(shard_to_run_key, None),
-          retries=0)
-    except datastore_errors.TransactionFailedError:
-      # Ignore transaction failures, it's seen if the object had been reaped by
-      # another bot concurrently.
-      return False
-
+  assert task_key.kind() == 'TaskToRun', task_key
+  assert ndb.in_transaction()
+  result = _put_task_to_run(task_key, None)
   if result:
     # Note this fact immediately in memcache to reduce DB contention.
-    _set_lookup_cache(shard_to_run_key, False)
+    _set_lookup_cache(task_key, False)
   return result
 
 
-def abort_shard_to_run(shard_to_run):
-  """Updates a TaskShardToRun to note it should not be scheduled for work.
+def abort_task_to_run(task):
+  """Updates a TaskToRun to note it should not be scheduled for work.
 
   Arguments:
-  - shard_to_run: TaskShardToRun entity to update.
+  - task: TaskToRun entity to update.
   """
+  # TODO(maruel): Add support to kill an on-going task and update the
+  # corresponding TaskRunResult.
+  # TODO(maruel): Add stats.
   assert not ndb.in_transaction()
-  assert isinstance(shard_to_run, TaskShardToRun), shard_to_run
-  shard_to_run.queue_number = None
-  shard_to_run.put()
-  _set_lookup_cache(shard_to_run.key, False)
+  assert isinstance(task, TaskToRun), task
+  task.queue_number = None
+  task.put()
+  # Add it to the negative cache.
+  _set_lookup_cache(task.key, False)

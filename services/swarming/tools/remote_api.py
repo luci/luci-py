@@ -23,13 +23,16 @@ def setup_context():
 
   # Unused variable 'XXX'; they are accessed via locals().
   # pylint: disable=W0612
+  import handlers
   from common import swarm_constants
   from components import auth
   from server import admin_user
   from server import stats_new as stats
+  from server import task_request
+  from server import task_shard_to_run as task_to_run
+  from server import task_result
+  from server import task_scheduler
   from server import user_manager
-
-  import main
 
   return locals().copy()
 

@@ -6,11 +6,11 @@
 
 This is the interface closest to the HTTP handlers.
 
-It supports sharding, retries* and deduping*.
+It supports retries* and deduping*.
 TODO(maruel): * is not implemented and gratitious vaporware.
 
 Overview of transactions:
-- bot_reap_task() mutate a TaskShardToRun in a transaction.
+- bot_reap_task() mutate a TaskToRun in a transaction.
 - cron_abort_stale() uses transactions when aborting tasks.
 """
 
@@ -18,13 +18,15 @@ import logging
 import math
 import random
 
+from google.appengine.api import datastore_errors
 from google.appengine.ext import ndb
+from google.appengine.runtime import apiproxy_errors
 
 from server import stats_new as stats
 from server import task_common
 from server import task_request
 from server import task_result
-from server import task_shard_to_run
+from server import task_shard_to_run as task_to_run
 
 
 ### Private stuff.
@@ -36,6 +38,37 @@ _PROBABILITY_OF_QUICK_COMEBACK = 0.05
 def _secs_to_ms(value):
   """Converts a seconds value in float to the number of ms as an integer."""
   return int(round(value * 1000.))
+
+
+def _update_task(task, request, bot_id):
+  """Internal transactional function to reap a task and insert the result
+  entity.
+
+  If bot_id is None, the task is cancelled.
+
+  Returns:
+    TaskRunResult if successful, None otherwise.
+  """
+  def run():
+    if not task_to_run.reap_task_to_run(task.key):
+      return None
+    # TODO(maruel): Use datastore_util.insert() to create the new try_number.
+    run_result = task_result.new_run_result(request, 1, bot_id)
+    if bot_id:
+      task_result.put_run_result(run_result)
+    else:
+      task_result.terminate_result(run_result, task_result.State.EXPIRED)
+    return run_result
+
+  try:
+    return ndb.transaction(run, retries=0)
+  except (
+      apiproxy_errors.CancelledError,
+      datastore_errors.BadRequestError,
+      datastore_errors.Timeout,
+      datastore_errors.TransactionFailedError,
+      RuntimeError):
+    return None
 
 
 ### Public API.
@@ -53,86 +86,88 @@ def exponential_backoff(attempt_num):
 def make_request(data):
   """Creates and store all the entities for a new task request.
 
-  The number of entities created is N+2 where N is the number of shards, one
-  TaskRequest, one TaskResultSummary and N TaskShardToRun.
+  The number of entities created is 3: TaskRequest, TaskResultSummary and
+  TaskToRun.
 
   Arguments:
   - data: is in the format expected by task_request.make_request().
+
+  Returns:
+    tuple(TaskRequest, TaskResultSummary). TaskToRun is not returned.
   """
   request = task_request.make_request(data)
-  # Creates the entities TaskShardToRun and TaskResultSummary.
-  # TaskShardResult will be created once a bot starts it.
-  shard_runs = task_shard_to_run.new_shards_to_run_for_request(request)
-  items = [task_result.new_result_summary(request)] + shard_runs
-  ndb.put_multi(items)
-  stats.add_request_entry(
-      'request_enqueued', request.key,
+  # Creates the entities TaskToRun and TaskResultSummary.
+  # TaskRunResult will be created once a bot starts it.
+  task = task_to_run.new_task_to_run(request)
+  result_summary = task_result.new_result_summary(request)
+  ndb.put_multi([result_summary, task])
+  stats.add_task_entry(
+      'task_enqueued', result_summary.key,
       dimensions=request.properties.dimensions,
-      number_shards=1,
       user=request.user)
-  return request, shard_runs
+  return request, result_summary
 
 
-def pack_shard_result_key(shard_result_key):
-  """Returns the encoded key that is safe to use in HTTP requests."""
-  if shard_result_key.kind() != 'TaskShardResult':
-    raise ValueError(
-        'Can only pack TaskShardResult key, got type %s' %
-        shard_result_key.kind())
-  shard_to_run_key = shard_result_key.parent()
-  return '%x-%d' % (
-      shard_to_run_key.integer_id(), shard_result_key.integer_id())
+def unpack_result_summary_key(packed_key):
+  """Returns the TaskResultSummary ndb.Key from a packed key.
 
-
-def unpack_shard_result_key(packed_key):
-  """Returns the TaskShardResult ndb.Key from a packed key.
-
-  The expected format of |packed_key| is %x-%d.
+  The expected format of |packed_key| is %x.
   """
-  if '-' in packed_key:
-    shard_key_id, try_number = packed_key.split('-', 1)
-    shard_key_id = int(shard_key_id, 16)
-    try_number = int(try_number)
-  else:
-    shard_key_id = int(packed_key, 16)
-    # TODO(maruel): Fetch it from TaskResultSummary.
-    try_number = 1
-  shard_to_run_key = task_shard_to_run.shard_id_to_key(shard_key_id)
-  return task_result.shard_to_run_key_to_shard_result_key(
-      shard_to_run_key, try_number)
+  key_id = int(packed_key, 16)
+  if key_id & 0xff:
+    raise ValueError('Can\'t reference to a specific try result.')
+  request_key = task_request.id_to_request_key(key_id)
+  return task_result.request_key_to_result_summary_key(request_key)
+
+
+def unpack_run_result_key(packed_key):
+  """Returns the TaskRunResult ndb.Key from a packed key.
+
+  The expected format of |packed_key| is %x.
+  """
+  key_id = int(packed_key, 16)
+  run_id = key_id & 0xff
+  if not run_id:
+    raise ValueError('Can\'t reference to the overall task result.')
+  result_summary_key = unpack_result_summary_key('%x' % (key_id & ~0xff))
+  return task_result.result_summary_key_to_run_result_key(
+      result_summary_key, run_id)
 
 
 def bot_reap_task(dimensions, bot_id):
-  """Reaps a TaskShardToRun if one is available.
+  """Reaps a TaskToRun if one is available.
 
-  The process is to find a TaskShardToRun where its .queue_number is set, then
-  create a TaskShardResult for it.
+  The process is to find a TaskToRun where its .queue_number is set, then
+  create a TaskRunResult for it.
 
   Returns:
-    tuple of (TaskShardToRun, TaskShardResult) for the shard that was reaped.
+    tuple of (TaskRequest, TaskRunResult) for the task that was reaped.
+    The TaskToRun involved is not returned.
   """
-  q = task_shard_to_run.yield_next_available_shard_to_dispatch(dimensions)
+  assert bot_id
+  q = task_to_run.yield_next_available_task_to_dispatch(dimensions)
   # When a large number of bots try to reap hundreds of tasks simultaneously,
-  # they'll constantly fail to call reap_shard_to_run() as they'll get preempted
+  # they'll constantly fail to call reap_task_to_run() as they'll get preempted
   # by other bots. So randomly jump farther in the queue when the number of
   # failures is too large.
   failures = 0
   to_skip = 0
   total_skipped = 0
-  for request, shard_to_run in q:
+  for request, task in q:
     if to_skip:
       to_skip -= 1
       total_skipped += 1
       continue
 
-    if not task_shard_to_run.reap_shard_to_run(shard_to_run.key):
+    run_result = _update_task(task, request, bot_id)
+    if not run_result:
       failures += 1
-      #logging.warning('Failed to reap %d', shard_to_run.key.integer_id())
+      #logging.warning('Failed to reap %d', task.key.integer_id())
       # TODO(maruel): Add unit test!
       # Every 3 failures starting on the very first one, jump randomly ahead of
       # the pack. This reduces the contention where hundreds of bots fight for
-      # exactly the same shards while there's many ready to be run waiting in
-      # the queue.
+      # exactly the same task while there's many ready to be run waiting in the
+      # queue.
       if (failures % 3) == 1:
         # TODO(maruel): Choose curve that makes the most sense. The tricky part
         # is finding a good heuristic to guess the load without much information
@@ -142,71 +177,71 @@ def bot_reap_task(dimensions, bot_id):
         # it should have an initial bump but then slow down on skipping.
         to_skip = min(int(round(random.gammavariate(3, 1))), 30)
       continue
-    try:
-      # TODO(maruel): Use datastore_util.insert() to create the new try_number.
-      shard_result = task_result.new_shard_result(shard_to_run.key, 1, bot_id)
-      task_result.put_shard_result(shard_result)
 
-      # Try to optimize these values but do not add as formal stats (yet).
-      logging.info('failed %d, skipped %d', failures, total_skipped)
+    # Try to optimize these values but do not add as formal stats (yet).
+    logging.info('failed %d, skipped %d', failures, total_skipped)
 
-      pending_time = shard_result.started_ts - request.created_ts
-      stats.add_shard_entry(
-          'shard_started', shard_result.key,
-          bot_id=bot_id,
-          dimensions=request.properties.dimensions,
-          pending_ms=_secs_to_ms(pending_time.total_seconds()),
-          user=request.user)
-      return request, shard_result
-    except:
-      logging.error('Lost TaskShardToRun %s', shard_to_run.key)
-      raise
+    pending_time = run_result.started_ts - request.created_ts
+    stats.add_run_entry(
+        'run_started', run_result.key,
+        bot_id=bot_id,
+        dimensions=request.properties.dimensions,
+        pending_ms=_secs_to_ms(pending_time.total_seconds()),
+        user=request.user)
+    return request, run_result
   if failures:
     logging.info(
         'Chose nothing (failed %d, skipped %d)', failures, total_skipped)
   return None, None
 
 
-def bot_update_task(shard_result_key, data, bot_id):
-  """Updates a TaskShardResult entity with the latest info from the bot."""
+def bot_update_task(run_result_key, data, bot_id):
+  """Updates a TaskRunResult entity with the latest info from the bot."""
   now = task_common.utcnow()
-  shard_result = shard_result_key.get()
-  if not shard_result:
-    logging.error('No shard result found for %s', shard_result_key)
+  run_result = run_result_key.get()
+  if not run_result:
+    logging.error('No result found for %s', run_result_key)
     return False
-  if shard_result.task_state not in task_result.State.STATES_RUNNING:
+  if run_result.state not in task_result.State.STATES_RUNNING:
     logging.error(
         'A zombie bot reappeared after the time out.\n%s; %s',
-        shard_result.bot_id, shard_result.task_state)
+        run_result.bot_id, run_result.state)
     return False
-  if shard_result.bot_id != bot_id:
+  if run_result.bot_id != bot_id:
     logging.error(
         'Bot %s sent updated for task %s owned by bot %s',
-        bot_id, shard_result.bot_id, shard_result.key)
+        bot_id, run_result.bot_id, run_result.key)
     return False
 
-  request_future = shard_result.request_key.get_async()
+  request_future = run_result.request_key.get_async()
   # TODO(maruel): Wrong but that's the current behavior of the swarming bots.
   # Eventually change the bot protocol to be able to send more details.
   completed = 'exit_codes' in data
   if completed:
-    shard_result.task_state = task_result.State.COMPLETED
-    shard_result.completed_ts = now
-    shard_result.exit_codes.extend(data['exit_codes'])
+    run_result.state = task_result.State.COMPLETED
+    run_result.completed_ts = now
+    run_result.exit_codes.extend(data['exit_codes'])
   if 'outputs' in data:
-    shard_result.outputs.extend(data['outputs'])
-  task_result.put_shard_result(shard_result)
+    run_result.outputs.extend(data['outputs'])
+  task_result.put_run_result(run_result)
   request = request_future.get_result()
   if completed:
-    stats.add_shard_entry(
-        'shard_completed', shard_result.key,
+    stats.add_run_entry(
+        'run_completed', run_result.key,
         bot_id=bot_id,
         dimensions=request.properties.dimensions,
-        runtime_ms=_secs_to_ms(shard_result.duration().total_seconds()),
+        runtime_ms=_secs_to_ms(run_result.duration().total_seconds()),
+        user=request.user)
+    stats.add_task_entry(
+        'task_completed',
+        task_result.request_key_to_result_summary_key(request.key),
+        dimensions=request.properties.dimensions,
+        pending_ms=_secs_to_ms(
+            (run_result.completed_ts - request.created_ts).total_seconds()),
         user=request.user)
   else:
-    stats.add_shard_entry(
-        'shard_updated', shard_result.key, bot_id=bot_id,
+    stats.add_run_entry(
+        'run_updated', run_result.key, bot_id=bot_id,
         dimensions=request.properties.dimensions)
   return True
 
@@ -214,8 +249,8 @@ def bot_update_task(shard_result_key, data, bot_id):
 ### Cron job.
 
 
-def cron_abort_expired_shard_to_run():
-  """Aborts expired TaskShardToRun requests to execute a TaskRequest on a bot.
+def cron_abort_expired_task_to_run():
+  """Aborts expired TaskToRun requests to execute a TaskRequest on a bot.
 
   Three reasons can cause this situation:
   - Higher throughput of task requests incoming than the rate task requests
@@ -231,18 +266,15 @@ def cron_abort_expired_shard_to_run():
   killed = 0
   skipped = 0
   try:
-    for shard_to_run in task_shard_to_run.yield_expired_shard_to_run():
-      # TODO(maruel): Run all this inside a single transaction.
-      if task_shard_to_run.reap_shard_to_run(shard_to_run.key):
-        # Create the TaskShardResult and kill it immediately.
+    for task in task_to_run.yield_expired_task_to_run():
+      # Create the TaskRunResult and kill it immediately.
+      request = task.request_key.get()
+      if _update_task(task, request, None):
         killed += 1
-        request_future = shard_to_run.request_key.get_async()
-        shard_result = task_result.new_shard_result(shard_to_run.key, 1, None)
-        task_result.terminate_shard_result(
-            shard_result, task_result.State.EXPIRED)
-        request = request_future.get_result()
-        stats.add_shard_entry(
-            'shard_request_expired', shard_result.key,
+        stats.add_task_entry(
+            'task_request_expired',
+            task_result.request_key_to_result_summary_key(
+                request.key),
             dimensions=request.properties.dimensions,
             user=request.user)
       else:
@@ -255,20 +287,22 @@ def cron_abort_expired_shard_to_run():
 
 
 def cron_abort_bot_died():
-  """Aborts stale TaskShardResult where the bot stopped sending updates.
+  """Aborts stale TaskRunResult where the bot stopped sending updates.
 
   Basically, sets the task result to Stae.BOT_DIED in this case.
   """
   total = 0
   try:
-    for shard_result in task_result.yield_shard_results_without_update():
-      request_future = shard_result.request_key.get_async()
-      task_result.terminate_shard_result(
-          shard_result, task_result.State.BOT_DIED)
+    for run_result in task_result.yield_run_results_with_dead_bot():
+      # Implement automatic retry;
+      # https://code.google.com/p/swarming/issues/detail?id=108
+      request_future = run_result.request_key.get_async()
+      task_result.terminate_result(
+          run_result, task_result.State.BOT_DIED)
       request = request_future.get_result()
-      stats.add_shard_entry(
-          'shard_bot_died', shard_result.key,
-          bot_id=shard_result.bot_id,
+      stats.add_run_entry(
+          'run_bot_died', run_result.key,
+          bot_id=run_result.bot_id,
           dimensions=request.properties.dimensions,
           user=request.user)
       total += 1
@@ -276,8 +310,3 @@ def cron_abort_bot_died():
     # TODO(maruel): Use stats_framework.
     logging.info('Killed %d task', total)
   return total
-
-
-def cron_sync_all_result_summary():
-  """Ensures consistency between TaskShardResult and TaskResultSummary."""
-  return task_result.sync_all_result_summary()

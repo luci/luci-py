@@ -31,7 +31,9 @@ class TaskGlueTest(test_case.TestCase):
             'OS': 'Windows-3.1.1',
             'hostname': 'localhost',
           },
-          'num_instances': 1,
+          # Do not block sharded requests, simply ignore the sharding request
+          # and run it as a single shard.
+          'num_instances': 23,
           'priority': 50,
         },
       ],

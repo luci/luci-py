@@ -9,22 +9,6 @@ import datetime
 
 from google.appengine.api import datastore_errors
 
-from components import utils
-
-
-# The production server must handle up to 1000 task requests per second. The
-# number of root entities must be a few orders of magnitude higher. The goal is
-# to almost completely get rid of transactions conflicts. This means that the
-# probability of two transactions happening on the same shard must be very low.
-# This relates to number of transactions per second * seconds per transaction /
-# number of shard.
-#
-# Intentionally starve the canary server by using only 16³=4096 root entities.
-# This will cause mild transaction conflicts during load tests. On the
-# production server, use 16**5 (~1 million) root entities to reduce the number
-# of transaction conflict.
-SHARDING_LEVEL = 3 if utils.is_canary() else 5
-
 
 # Used to encode time.
 UNIX_EPOCH = datetime.datetime(1970, 1, 1)
@@ -72,3 +56,26 @@ def match_dimensions(request_dimensions, bot_dimensions):
     elif required != bot_value:
       return False
   return True
+
+
+def pack_result_summary_key(result_summary_key):
+  """Returns TaskResultSummary ndb.Key encoded, safe to use in HTTP requests.
+
+  Defined here because it is needed in stats_new.py and defining it in
+  task_result.py would cause a circular dependency.
+  """
+  assert result_summary_key.kind() == 'TaskResultSummary'
+  return '%x' % result_summary_key.parent().integer_id()
+
+
+def pack_run_result_key(run_result_key):
+  """Returns TaskRunResult ndb.Key encoded, safe to use in HTTP requests.
+
+  Defined here because it is needed in stats_new.py and defining it in
+  task_result.py would cause a circular dependency.
+  """
+  assert run_result_key.kind() == 'TaskRunResult'
+  key_id = (
+      run_result_key.parent().parent().integer_id() +
+      run_result_key.integer_id())
+  return '%x' % key_id

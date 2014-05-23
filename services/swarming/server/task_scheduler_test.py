@@ -16,7 +16,6 @@ import test_env
 test_env.setup_test_env()
 
 from google.appengine.ext import deferred
-from google.appengine.ext import ndb
 
 # From tools/third_party/
 import webtest
@@ -24,6 +23,8 @@ import webtest
 from components import stats_framework
 from server import result_helper
 from server import stats_new as stats
+from server import task_result
+from server import task_shard_to_run as task_to_run
 from server import task_scheduler
 from server import test_helper
 from support import test_case
@@ -53,18 +54,22 @@ def _gen_request_data(properties=None, **kwargs):
   return base_data
 
 
-def get_shard_results(request_key):
-  """Fetches all TaskShardResult's for a specified TaskRequest ndb.Key.
+def get_results(request_key):
+  """Fetches all task results for a specified TaskRequest ndb.Key.
 
   Returns:
-    tuple(TaskResultSummary, list of TaskShardResult that exist).
+    tuple(TaskResultSummary, list of TaskRunResult that exist).
   """
-  result_summary = task_scheduler.task_result.request_key_to_result_summary_key(
-      request_key).get()
-  if not result_summary:
-    return result_summary, []
-  keys = [k for k in [result_summary.shard_result_key(1)] if k]
-  return result_summary, ndb.get_multi(keys) if keys else []
+  result_summary_key = task_result.request_key_to_result_summary_key(
+      request_key)
+  result_summary = result_summary_key.get()
+  # There's two way to look at it, either use a DB query or fetch all the
+  # entities that could exist, at most 255. In general, there will be <3
+  # entities so just fetching them by key would be faster. This function is
+  # exclusively used in unit tests so it's not performance critical.
+  q = task_result.TaskRunResult.query(ancestor=result_summary_key)
+  q = q.order(task_result.TaskRunResult.key)
+  return result_summary, q.fetch()
 
 
 class TaskSchedulerApiTest(test_case.TestCase):
@@ -100,19 +105,17 @@ class TaskSchedulerApiTest(test_case.TestCase):
   def test_bot_reap_task(self):
     data = _gen_request_data(
         properties=dict(dimensions={u'OS': u'Windows-3.1.1'}))
-    request_1, shard_runs = task_scheduler.make_request(data)
-    self.assertEqual(1, len(shard_runs))
+    request, _result_summary = task_scheduler.make_request(data)
     bot_dimensions = {
       u'OS': [u'Windows', u'Windows-3.1.1'],
       u'hostname': u'localhost',
       u'foo': u'bar',
     }
-    request_2, shard_result = task_scheduler.bot_reap_task(
+    actual_request, run_result  = task_scheduler.bot_reap_task(
         bot_dimensions, 'localhost')
-    self.assertEqual(request_1, request_2)
-    self.assertEqual('localhost', shard_result.bot_id)
-    self.assertEqual(None, shard_result.key.parent().get().queue_number)
-    self.assertEqual(1, self.execute_tasks())
+    self.assertEqual(request, actual_request)
+    self.assertEqual('localhost', run_result.bot_id)
+    self.assertEqual(None, task_to_run.TaskToRun.query().get().queue_number)
 
   def test_exponential_backoff(self):
     self.mock(
@@ -142,67 +145,59 @@ class TaskSchedulerApiTest(test_case.TestCase):
         lambda: task_scheduler._PROBABILITY_OF_QUICK_COMEBACK - 0.01)
     self.assertEqual(1.0, task_scheduler.exponential_backoff(235))
 
-  def test_get_shard_results(self):
+  def test_get_results(self):
     # TODO(maruel): Split in more focused tests.
     created_ts = self.now
     test_helper.mock_now(self, created_ts)
     data = _gen_request_data(
         properties=dict(dimensions={u'OS': u'Windows-3.1.1'}))
-    request, _ = task_scheduler.make_request(data)
+    request, _result_summary = task_scheduler.make_request(data)
 
-    reaped_ts = self.now + datetime.timedelta(seconds=60)
-    test_helper.mock_now(self, reaped_ts)
-    self.assertEquals(0, self.execute_tasks())
-
-    _, shard_result = task_scheduler.bot_reap_task(
-        {'OS': 'Windows-3.1.1'}, 'localhost')
-    self.assertTrue(shard_result)
-    result_summary, shard_results = get_shard_results(request.key)
-    # Results are stale until the task queue is executed.
+    # The TaskRequest was enqueued, the TaskResultSummary was created but no
+    # TaskRunResult exist yet since the task was not scheduled on any bot.
+    result_summary, run_results = get_results(request.key)
     expected = {
-      'done_ts': None,
+      'abandoned_ts': None,
+      'bot_id': None,
+      'created_ts': created_ts,
+      'completed_ts': None,
+      'exit_codes': [],
+      'failure': False,
       'internal_failure': False,
-      'modified_ts': None,
-      'shards': [
-        {
-          'abandoned_ts': None,
-          'completed_ts': None,
-          'internal_failure': False,
-          'modified_ts': None,
-          'started_ts': None,
-          'task_failure': False,
-          'task_state': State.PENDING,
-          'try_number': None,
-        },
-      ],
-      'task_failure': False,
-      'task_state': State.PENDING,
+      'modified_ts': created_ts,
+      'name': u'Request name',
+      'outputs': [],
+      'started_ts': None,
+      'state': State.PENDING,
+      'try_number': None,
+      'user': u'Jesus',
     }
     self.assertEqual(expected, result_summary.to_dict())
-    self.assertEqual([], shard_results)
+    self.assertEqual([], run_results)
 
-    # task_result._task_update_result_summary() was enqueued by
-    # task_result.put_shard_result() via bot_reap_task().
-    self.assertEquals(1, self.execute_tasks())
-    result_summary, shard_results = get_shard_results(request.key)
+    # A bot reaps the TaskToRun.
+    reaped_ts = self.now + datetime.timedelta(seconds=60)
+    test_helper.mock_now(self, reaped_ts)
+    reaped_request, run_result = task_scheduler.bot_reap_task(
+        {'OS': 'Windows-3.1.1'}, 'localhost')
+    self.assertEqual(request, reaped_request)
+    self.assertTrue(run_result)
+    result_summary, run_results = get_results(request.key)
     expected = {
-      'done_ts': None,
+      'abandoned_ts': None,
+      'bot_id': u'localhost',
+      'created_ts': created_ts,  # Time the TaskRequest was created.
+      'completed_ts': None,
+      'exit_codes': [],
+      'failure': False,
       'internal_failure': False,
       'modified_ts': reaped_ts,
-      'shards': [
-        {
-          'abandoned_ts': None,
-          'completed_ts': None,
-          'internal_failure': False,
-          'modified_ts': reaped_ts,
-          'started_ts': reaped_ts,
-          'task_failure': False,
-          'task_state': State.RUNNING,
-          'try_number': 1,
-        },
-      ],
-      'task_failure': False,
-      'task_state': State.RUNNING,
+      'name': u'Request name',
+      'outputs': [],
+      'started_ts': reaped_ts,
+      'state': State.RUNNING,
+      'try_number': 1,
+      'user': u'Jesus',
     }
     self.assertEqual(expected, result_summary.to_dict())
     expected = [
@@ -215,12 +210,14 @@ class TaskSchedulerApiTest(test_case.TestCase):
         'modified_ts': reaped_ts,
         'outputs': [],
         'started_ts': reaped_ts,
-        'task_failure': False,
-        'task_state': State.RUNNING,
+        'failure': False,
+        'state': State.RUNNING,
+        'try_number': 1,
       },
     ]
-    self.assertEqual(expected, [t.to_dict() for t in shard_results])
+    self.assertEqual(expected, [i.to_dict() for i in run_results])
 
+    # The bot completes the task.
     done_ts = self.now + datetime.timedelta(seconds=120)
     test_helper.mock_now(self, done_ts)
     output_keys = [
@@ -231,27 +228,23 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'exit_codes': [0, 0],
       'outputs': output_keys,
     }
-    task_scheduler.bot_update_task(shard_results[0].key, data, 'localhost')
-    self.assertEquals(1, self.execute_tasks())
-    result_summary, shard_results = get_shard_results(request.key)
+    task_scheduler.bot_update_task(run_result.key, data, 'localhost')
+    result_summary, run_results = get_results(request.key)
     expected = {
-      'done_ts': done_ts,
+      'abandoned_ts': None,
+      'bot_id': u'localhost',
+      'created_ts': created_ts,
+      'completed_ts': done_ts,
+      'exit_codes': [0, 0],
+      'failure': False,
       'internal_failure': False,
       'modified_ts': done_ts,
-      'shards': [
-        {
-          'abandoned_ts': None,
-          'completed_ts': done_ts,
-          'internal_failure': False,
-          'modified_ts': done_ts,
-          'started_ts': reaped_ts,
-          'task_failure': False,
-          'task_state': State.COMPLETED,
-          'try_number': 1,
-        },
-      ],
-      'task_failure': False,
-      'task_state': State.COMPLETED,
+      'name': u'Request name',
+      'outputs': output_keys,
+      'started_ts': reaped_ts,
+      'state': State.COMPLETED,
+      'try_number': 1,
+      'user': u'Jesus',
     }
     self.assertEqual(expected, result_summary.to_dict())
     expected = [
@@ -260,15 +253,16 @@ class TaskSchedulerApiTest(test_case.TestCase):
         'bot_id': u'localhost',
         'completed_ts': done_ts,
         'exit_codes': [0, 0],
+        'failure': False,
         'internal_failure': False,
         'modified_ts': done_ts,
         'outputs': output_keys,
         'started_ts': reaped_ts,
-        'task_failure': False,
-        'task_state': State.COMPLETED,
+        'state': State.COMPLETED,
+        'try_number': 1,
       },
     ]
-    self.assertEqual(expected, [t.to_dict() for t in shard_results])
+    self.assertEqual(expected, [t.to_dict() for t in run_results])
 
   def test_make_request(self):
     data = _gen_request_data(
@@ -276,53 +270,54 @@ class TaskSchedulerApiTest(test_case.TestCase):
     # It is tested indirectly in the other functions.
     self.assertTrue(task_scheduler.make_request(data))
 
-  def test_pack_shard_result_key(self):
-    def getrandbits(i):
-      self.assertEqual(i, 8)
-      return 0x02
-    self.mock(task_scheduler.random, 'getrandbits', getrandbits)
-    test_helper.mock_now(
-      self,
-      task_scheduler.task_common.UNIX_EPOCH + datetime.timedelta(seconds=3))
-
-    _, shards = task_scheduler.make_request(_gen_request_data())
-    bot_dimensions = {'hostname': 'localhost'}
-    _, shard_result = task_scheduler.bot_reap_task(bot_dimensions, None)
-    actual = task_scheduler.pack_shard_result_key(shard_result.key)
-    # 0xbb8 = 3000ms = 3 secs; 0x02 = random;  0x01 = shard;  -1 = try_number.
-    self.assertEqual('bb80201-1', actual)
-    self.assertEqual(1, self.execute_tasks())
-
-  def test_unpack_shard_result_key(self):
-    actual = task_scheduler.unpack_shard_result_key('bb80201-1')
+  def test_unpack_result_summary_key(self):
+    actual = task_scheduler.unpack_result_summary_key('bb80200')
     expected = (
-        "Key('TaskShardToRunShard', '5d82f', 'TaskShardToRun', 196608513, "
-        "'TaskShardResult', 1)")
+        "Key('TaskRequestShard', '6f4236', 'TaskRequest', 196608512, "
+        "'TaskResultSummary', 1)")
     self.assertEqual(expected, str(actual))
 
+    with self.assertRaises(ValueError):
+      task_scheduler.unpack_result_summary_key('0')
+    with self.assertRaises(ValueError):
+      task_scheduler.unpack_result_summary_key('g')
+    with self.assertRaises(ValueError):
+      task_scheduler.unpack_result_summary_key('bb80201')
+
+  def test_unpack_run_result_key(self):
+    actual = task_scheduler.unpack_run_result_key('bb80201')
+    expected = (
+        "Key('TaskRequestShard', '6f4236', 'TaskRequest', 196608512, "
+        "'TaskResultSummary', 1, 'TaskRunResult', 1)")
+    self.assertEqual(expected, str(actual))
+
+    with self.assertRaises(ValueError):
+      task_scheduler.unpack_run_result_key('1')
+    with self.assertRaises(ValueError):
+      task_scheduler.unpack_run_result_key('g')
+    with self.assertRaises(ValueError):
+      task_scheduler.unpack_run_result_key('bb80200')
+    with self.assertRaises(NotImplementedError):
+      task_scheduler.unpack_run_result_key('bb80202')
+
   def test_bot_update_task(self):
-    # See test_get_shard_results.
+    # See test_get_results.
     pass
 
-  def test_cron_abort_expired_shard_to_run(self):
+  def test_cron_abort_expired_task_to_run(self):
     # Create two shards, one is properly reaped, the other is expired.
     data = _gen_request_data(
         properties=dict(dimensions={u'OS': u'Windows-3.1.1'}))
     task_scheduler.make_request(data)
-    data_1 = _gen_request_data(
-        properties=dict(dimensions={u'OS': u'Windows-3.1.1'}))
-    task_scheduler.make_request(data_1)
     bot_dimensions = {
       u'OS': [u'Windows', u'Windows-3.1.1'],
       u'hostname': u'localhost',
       u'foo': u'bar',
     }
-    _, shard_result = task_scheduler.bot_reap_task(bot_dimensions, None)
     expiration = data['scheduling_expiration_secs']
     after_delay = self.now + datetime.timedelta(seconds=expiration+1)
     test_helper.mock_now(self, after_delay)
-    self.assertEqual(1, task_scheduler.cron_abort_expired_shard_to_run())
-    self.assertEqual(2, self.execute_tasks())
+    self.assertEqual(1, task_scheduler.cron_abort_expired_task_to_run())
 
   def test_cron_abort_bot_died(self):
     data = _gen_request_data(
@@ -333,21 +328,13 @@ class TaskSchedulerApiTest(test_case.TestCase):
       u'hostname': u'localhost',
       u'foo': u'bar',
     }
-    _, shard_result = task_scheduler.bot_reap_task(bot_dimensions, None)
+    _request, _run_result = task_scheduler.bot_reap_task(
+        bot_dimensions, 'localhost')
     after_delay = (
         self.now + task_scheduler.task_common.BOT_PING_TOLERANCE +
         datetime.timedelta(seconds=1))
     test_helper.mock_now(self, after_delay)
     self.assertEqual(1, task_scheduler.cron_abort_bot_died())
-    self.assertEqual(2, self.execute_tasks())
-
-  def test_cron_sync_all_result_summary(self):
-    ran = []
-    self.mock(
-        task_scheduler.task_result, 'sync_all_result_summary',
-        lambda *args: ran.append(args))
-    task_scheduler.cron_sync_all_result_summary()
-    self.assertEqual([()], ran)
 
 
 if __name__ == '__main__':

@@ -13,7 +13,7 @@ from server import result_helper
 from server import task_common
 from server import task_glue
 from server import task_result
-from server import task_shard_to_run
+from server import task_shard_to_run as task_to_run
 from server import task_scheduler
 
 
@@ -102,19 +102,20 @@ def CreateRunner(config_name=None, machine_id=None, ran_successfully=None,
   config_name = config_name or (REQUEST_MESSAGE_CONFIG_NAME_ROOT + '_0')
   request_message = GetRequestMessage(requestor=requestor)
   data = task_glue.convert_test_case(request_message)
-  request, shard_runs = task_scheduler.make_request(data)
+  request, result_summary = task_scheduler.make_request(data)
   if created:
     # For some reason, pylint is being obnoxious here and generates a W0201
     # warning that cannot be disabled. See http://www.logilab.org/19607
     setattr(request, 'created_ts', datetime.datetime.utcnow() + created)
     request.put()
 
-  shard_to_run_key = shard_runs[0].key
-  # This is in running state. Pending state is not supported here.
-  task_shard_to_run.reap_shard_to_run(shard_to_run_key)
+  # The task is reaped by a bot, so it is in a running state. Pending state is
+  # not supported here.
+  task_key = task_to_run.request_key_to_task_to_run_key(request.key)
+  ndb.transaction(lambda: task_to_run.reap_task_to_run(task_key))
 
   machine_id = machine_id or 'localhost'
-  shard_result = task_result.new_shard_result(shard_to_run_key, 1, machine_id)
+  run_result = task_result.new_run_result(request, 1, machine_id)
 
   if ran_successfully or exit_codes:
     data = {
@@ -124,27 +125,21 @@ def CreateRunner(config_name=None, machine_id=None, ran_successfully=None,
       data['outputs'] = [result_helper.StoreResults(results).key]
     # The entity needs to be saved before it can be updated, since
     # bot_update_task() accepts the key of the entity.
-    ndb.transaction(shard_result.put)
-    if not task_scheduler.bot_update_task(shard_result.key, data, machine_id):
-      assert False
+    task_result.put_run_result(run_result)
+    if not task_scheduler.bot_update_task(run_result.key, data, machine_id):
+      assert False, (
+          'Expected to reap the TaskToRun that was created lines above')
     # Refresh it from the DB.
 
   if started:
-    shard_result.started_ts = shard_result.created + started
+    run_result.started_ts = run_result.created + started
   if ended:
-    shard_result.completed_ts = shard_result.started_ts + ended
+    run_result.completed_ts = run_result.started_ts + ended
 
-  # Call it manually because at this level, there is no visibility for the
-  # taskqueue. The DB put() needs to happen in a transaction, normally it is
-  # because a task queue is added as part of the transaction because this put
-  # does a fair amount of work, and we need to ensure the function doesn't fail
-  # halfway through and leave shard_result in an inconsistent state
-  ndb.transaction(shard_result.put)
-  # pylint: disable=W0212
-  task_result._task_update_result_summary(request.key.integer_id())
+  # Mark the job as at least running.
+  task_result.put_run_result(run_result)
 
-  # Returns a TaskShardResult.
-  return shard_result
+  return result_summary, run_result
 
 
 def mock_now(test, now):

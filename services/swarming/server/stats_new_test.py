@@ -25,42 +25,53 @@ from support import test_case
 class StatsPrivateTest(test_case.TestCase):
   def _gen_data(self):
     dimensions = {'os': 'Amiga', 'hostname': 'host3'}
+    # Description of the log entries:
+    # - host3 is idle
+    # - 100 was enqueue
+    # - 101 was started by host2
+    # - 101 was completed by host2
+    # - 201 had bot host1 died on it
+    # - 300 expired
+    # - 402 is running on host4
     data = (
       stats._pack_entry(action='bot_active', bot_id='host3', dimensions={}),
+
       stats._pack_entry(
-          action='request_enqueued', req_id='100', dimensions={},
-          number_shards=3, user='me'),
+          action='task_enqueued', task_id='100', dimensions={}, user='me'),
       stats._pack_entry(
-          action='request_completed', dimensions=dimensions, req_id='200',
-          user='you'),
-      stats._pack_entry(
-          action='shard_bot_died', shard_id='101-1', bot_id='host1',
-          dimensions=dimensions, user='me'),
-      stats._pack_entry(
-          action='shard_completed', shard_id='102-1', bot_id='host2',
-          dimensions={}, runtime_ms=6000, user='me'),
-      stats._pack_entry(
-          action='shard_request_expired', shard_id='103-1', dimensions={},
-          user='me'),
-      stats._pack_entry(
-          action='shard_started', shard_id='102-1', bot_id='host2',
+          action='run_started', run_id='101', bot_id='host2',
           dimensions={}, pending_ms=1500, user='me'),
       stats._pack_entry(
-          action='shard_updated', shard_id='202-1', bot_id='host4',
+          action='run_completed', run_id='101', bot_id='host2',
+          dimensions={}, runtime_ms=6000, user='me'),
+      stats._pack_entry(
+          action='task_completed', task_id='100',
+          dimensions={}, pending_ms=6000, user='me'),
+
+      stats._pack_entry(
+          action='run_bot_died', run_id='201', bot_id='host1',
+          dimensions=dimensions, user='joe'),
+
+      stats._pack_entry(
+          action='task_request_expired', task_id='300', dimensions={},
+          user='you'),
+
+      stats._pack_entry(
+          action='run_updated', run_id='402', bot_id='host4',
           dimensions={}),
     )
     actions_tested = sorted(stats._unpack_entry(i)['action'] for i in data)
-    self.assertEqual(sorted(stats._VALID_ACTIONS), actions_tested)
+    self.assertEqual(sorted(map(unicode, stats._VALID_ACTIONS)), actions_tested)
 
     snapshot = stats._Snapshot()
     bots_active = {}
-    shards_active = {}
+    tasks_active = {}
     for line in data:
       actual = stats._parse_line(
-          line, snapshot, bots_active, shards_active)
-      self.assertIs(True, actual)
+          line, snapshot, bots_active, tasks_active)
+      self.assertIs(True, actual, line)
 
-    stats._post_process(snapshot, bots_active, shards_active)
+    stats._post_process(snapshot, bots_active, tasks_active)
     return snapshot
 
   def test_parse_summary(self):
@@ -69,18 +80,16 @@ class StatsPrivateTest(test_case.TestCase):
       'bots_active': 3,
       'http_failures': 0,
       'http_requests': 0,
-      'requests_completed': 1,
-      'requests_enqueued': 1,
-      'shards_active': 4,  # due to request_enqueued=3 and 202-1
-      'shards_avg_pending_secs': 1.5,
-      'shards_avg_runtime_secs': 6.0,
-      'shards_bot_died': 1,
-      'shards_completed': 1,
-      'shards_enqueued': 3,
-      'shards_pending_secs': 1.5,
-      'shards_request_expired': 1,
-      'shards_total_runtime_secs': 6.0,
-      'shards_started': 1,
+      'tasks_active': 2,
+      'tasks_avg_pending_secs': 1.5,
+      'tasks_avg_runtime_secs': 6.0,
+      'tasks_bot_died': 1,
+      'tasks_completed': 1,
+      'tasks_enqueued': 1,
+      'tasks_pending_secs': 1.5,
+      'tasks_request_expired': 1,
+      'tasks_total_runtime_secs': 6.0,
+      'tasks_started': 1,
     }
     self.assertEqual(expected, snapshot.to_dict())
     self.assertEqual(['host2', 'host3', 'host4'], snapshot.bot_ids)
@@ -91,34 +100,30 @@ class StatsPrivateTest(test_case.TestCase):
       {
         'bots_active': 0,
         'dimensions': '{"os":"Amiga"}',
-        'requests_completed': 1,
-        'requests_enqueued': 0,
-        'shards_active': 0,
-        'shards_avg_pending_secs': 0.0,
-        'shards_avg_runtime_secs': 0.0,
-        'shards_bot_died': 1,
-        'shards_completed': 0,
-        'shards_enqueued': 0,
-        'shards_pending_secs': 0,
-        'shards_request_expired': 0,
-        'shards_total_runtime_secs': 0,
-        'shards_started': 0,
+        'tasks_active': 0,
+        'tasks_avg_pending_secs': 0.0,
+        'tasks_avg_runtime_secs': 0.0,
+        'tasks_bot_died': 1,
+        'tasks_completed': 0,
+        'tasks_enqueued': 0,
+        'tasks_pending_secs': 0,
+        'tasks_request_expired': 0,
+        'tasks_total_runtime_secs': 0,
+        'tasks_started': 0,
       },
       {
         'bots_active': 3,
         'dimensions': '{}',
-        'requests_completed': 0,
-        'requests_enqueued': 1,
-        'shards_active': 4,
-        'shards_avg_pending_secs': 1.5,
-        'shards_avg_runtime_secs': 6.0,
-        'shards_bot_died': 0,
-        'shards_completed': 1,
-        'shards_enqueued': 3,
-        'shards_pending_secs': 1.5,
-        'shards_request_expired': 1,
-        'shards_total_runtime_secs': 6.0,
-        'shards_started': 1,
+        'tasks_active': 2,
+        'tasks_avg_pending_secs': 1.5,
+        'tasks_avg_runtime_secs': 6.0,
+        'tasks_bot_died': 0,
+        'tasks_completed': 1,
+        'tasks_enqueued': 1,
+        'tasks_pending_secs': 1.5,
+        'tasks_request_expired': 1,
+        'tasks_total_runtime_secs': 6.0,
+        'tasks_started': 1,
       },
     ]
     self.assertEqual(expected, [i.to_dict() for i in snapshot.buckets])
@@ -132,50 +137,59 @@ class StatsPrivateTest(test_case.TestCase):
     snapshot = self._gen_data()
     expected = [
       {
-        'requests_completed': 0,
-        'requests_enqueued': 1,
-        'shards_active': 0,
-        'shards_avg_pending_secs': 1.5,
-        'shards_avg_runtime_secs': 6.0,
-        'shards_bot_died': 1,
-        'shards_completed': 1,
-        'shards_enqueued': 3,
-        'shards_pending_secs': 1.5,
-        'shards_request_expired': 1,
-        'shards_total_runtime_secs': 6.0,
-        'shards_started': 1,
-        'user': 'me',
+        'tasks_active': 0,
+        'tasks_avg_pending_secs': 0.0,
+        'tasks_avg_runtime_secs': 0.0,
+        'tasks_bot_died': 1,
+        'tasks_completed': 0,
+        'tasks_enqueued': 0,
+        'tasks_pending_secs': 0,
+        'tasks_request_expired': 0,
+        'tasks_total_runtime_secs': 0,
+        'tasks_started': 0,
+        'user': u'joe',
       },
       {
-        'requests_completed': 1,
-        'requests_enqueued': 0,
-        'shards_active': 0,
-        'shards_avg_pending_secs': 0.0,
-        'shards_avg_runtime_secs': 0.0,
-        'shards_bot_died': 0,
-        'shards_completed': 0,
-        'shards_enqueued': 0,
-        'shards_pending_secs': 0,
-        'shards_request_expired': 0,
-        'shards_total_runtime_secs': 0,
-        'shards_started': 0,
-        'user': 'you',
+        'tasks_active': 0,
+        'tasks_avg_pending_secs': 1.5,
+        'tasks_avg_runtime_secs': 6.0,
+        'tasks_bot_died': 0,
+        'tasks_completed': 1,
+        'tasks_enqueued': 1,
+        'tasks_pending_secs': 1.5,
+        'tasks_request_expired': 0,
+        'tasks_total_runtime_secs': 6.0,
+        'tasks_started': 1,
+        'user': u'me',
+      },
+      {
+        'tasks_active': 0,
+        'tasks_avg_pending_secs': 0.0,
+        'tasks_avg_runtime_secs': 0.0,
+        'tasks_bot_died': 0,
+        'tasks_completed': 0,
+        'tasks_enqueued': 0,
+        'tasks_pending_secs': 0,
+        'tasks_request_expired': 1,
+        'tasks_total_runtime_secs': 0,
+        'tasks_started': 0,
+        'user': u'you',
       },
     ]
     self.assertEqual(expected, [i.to_dict() for i in snapshot.users])
 
-  def test_parse_shard_active(self):
+  def test_parse_task_active(self):
     # It is important to note that it is the request properties that are logged,
     # not the bot properties.
     data = (
       stats._pack_entry(
-          action='shard_updated', shard_id='202-1', bot_id='host1',
+          action='run_updated', run_id='201', bot_id='host1',
           dimensions={'os': 'Linux'}),
       stats._pack_entry(
-          action='shard_updated', shard_id='202-1', bot_id='host1',
+          action='run_updated', run_id='201', bot_id='host1',
           dimensions={'os': 'Linux'}),
       stats._pack_entry(
-          action='shard_updated', shard_id='302-1', bot_id='host2',
+          action='run_updated', run_id='301', bot_id='host2',
           dimensions={'os': 'Windows'}),
       stats._pack_entry(
           action='bot_active', bot_id='host3',
@@ -187,12 +201,11 @@ class StatsPrivateTest(test_case.TestCase):
 
     snapshot = stats._Snapshot()
     bots_active = {}
-    shards_active = {}
+    tasks_active = {}
     for line in data:
-      actual = stats._parse_line(
-          line, snapshot, bots_active, shards_active)
+      actual = stats._parse_line(line, snapshot, bots_active, tasks_active)
       self.assertEqual(True, actual)
-    stats._post_process(snapshot, bots_active, shards_active)
+    stats._post_process(snapshot, bots_active, tasks_active)
 
     expected = [
       '{"os":"Linux"}',

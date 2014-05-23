@@ -23,8 +23,9 @@ from google.appengine.ext import ndb
 
 from components import utils
 from server import result_helper
+from server import task_common
 from server import task_request
-from server import task_shard_to_run
+from server import task_shard_to_run as task_to_run
 from server import task_result
 from server import test_helper
 from support import test_case
@@ -69,6 +70,7 @@ class TaskResultApiTest(test_case.TestCase):
     super(TaskResultApiTest, self).setUp()
     self.now = datetime.datetime(2014, 1, 2, 3, 4, 5, 6)
     test_helper.mock_now(self, self.now)
+    self.mock(task_request.random, 'getrandbits', lambda _: 0x88)
     self.app = webtest.TestApp(
         deferred.application,
         extra_environ={
@@ -109,415 +111,240 @@ class TaskResultApiTest(test_case.TestCase):
     # Same code as State.to_string() except that it works for
     # TaskResultSummary too.
     class Foo(ndb.Model):
-      task_state = task_result.StateProperty()
-      task_failure = ndb.BooleanProperty(default=False)
+      state = task_result.StateProperty()
+      failure = ndb.BooleanProperty(default=False)
       internal_failure = ndb.BooleanProperty(default=False)
 
     for i in task_result.State.STATES:
       self.assertTrue(task_result.State.to_string(i))
     for i in task_result.State.STATES:
-      self.assertTrue(task_result.state_to_string(Foo(task_state=i)))
+      self.assertTrue(task_result.state_to_string(Foo(state=i)))
 
   def test_request_key_to_result_summary_key(self):
     request_key = task_request.id_to_request_key(256)
-    result_summary_key = task_result.request_key_to_result_summary_key(
+    result_key = task_result.request_key_to_result_summary_key(
         request_key)
     expected = (
-        "Key('TaskRequestShard', 'f7184', 'TaskRequest', 256, "
+        "Key('TaskRequestShard', 'f71849', 'TaskRequest', 256, "
         "'TaskResultSummary', 1)")
-    self.assertEqual(expected, str(result_summary_key))
+    self.assertEqual(expected, str(result_key))
 
-  def test_shard_to_run_key_to_shard_result_key(self):
-    shard_to_run_key = task_shard_to_run.shard_id_to_key(257)
-    shard_result_key = task_result.shard_to_run_key_to_shard_result_key(
-        shard_to_run_key, 1)
-    expected = (
-        "Key('TaskShardToRunShard', 'd9640', 'TaskShardToRun', 257, "
-        "'TaskShardResult', 1)")
-    self.assertEqual(expected, str(shard_result_key))
-
-  def test_shard_result_key_to_request_key(self):
+  def test_result_summary_key_to_request_key(self):
     request_key = task_request.id_to_request_key(0x100)
-    shard_to_run_key = task_shard_to_run.shard_id_to_key(0x101)
-    shard_result_key = task_result.shard_to_run_key_to_shard_result_key(
-        shard_to_run_key, 1)
-    actual = task_result.shard_result_key_to_request_key(shard_result_key)
+    result_summary_key = task_result.request_key_to_result_summary_key(
+        request_key)
+    actual = task_result.result_summary_key_to_request_key(result_summary_key)
     self.assertEqual(request_key, actual)
+
+  def test_result_summary_key_to_run_result_key(self):
+    request_key = task_request.id_to_request_key(0x100)
+    result_summary_key = task_result.request_key_to_result_summary_key(
+        request_key)
+    run_result_key = task_result.result_summary_key_to_run_result_key(
+        result_summary_key, 1)
+    expected = (
+        "Key('TaskRequestShard', 'f71849', 'TaskRequest', 256, "
+        "'TaskResultSummary', 1, 'TaskRunResult', 1)")
+    self.assertEqual(expected, str(run_result_key))
+
+    with self.assertRaises(ValueError):
+      task_result.result_summary_key_to_run_result_key(result_summary_key, 0)
+    with self.assertRaises(NotImplementedError):
+      task_result.result_summary_key_to_run_result_key(result_summary_key, 2)
+
+  def test_run_result_key_to_result_summary_key(self):
+    request_key = task_request.id_to_request_key(0x100)
+    result_summary_key = task_result.request_key_to_result_summary_key(
+        request_key)
+    run_result_key = task_result.result_summary_key_to_run_result_key(
+        result_summary_key, 1)
+    self.assertEqual(
+        result_summary_key,
+        task_result.run_result_key_to_result_summary_key(run_result_key))
 
   def test_new_result_summary(self):
     request = task_request.make_request(_gen_request_data())
     actual = task_result.new_result_summary(request)
     expected = {
-      'done_ts': None,
+      'abandoned_ts': None,
+      'bot_id': None,
+      'completed_ts': None,
+      'created_ts': self.now,
+      'exit_codes': [],
+      'failure': False,
       'internal_failure': False,
       'modified_ts': None,
-      'shards': [
-        {
-          'abandoned_ts': None,
-          'completed_ts': None,
-          'internal_failure': False,
-          'modified_ts': None,
-          'started_ts': None,
-          'task_failure': False,
-          'task_state': task_result.State.PENDING,
-          'try_number': None,
-        },
-      ],
-      'task_failure': False,
-      'task_state': task_result.State.PENDING,
+      'name': u'Request name',
+      'outputs': [],
+      'started_ts': None,
+      'state': task_result.State.PENDING,
+      'try_number': None,
+      'user': u'Jesus',
     }
     self.assertEqual(expected, actual.to_dict())
 
-  def test_new_shard_result(self):
+  def test_new_run_result(self):
     request = task_request.make_request(_gen_request_data())
-    shards = task_shard_to_run.new_shards_to_run_for_request(request)
-    self.assertEqual(1, len(shards))
-    shard_to_run = shards[0]
-    actual = task_result.new_shard_result(shard_to_run.key, 1, 'localhost')
+    actual = task_result.new_run_result(request, 1, 'localhost')
     expected = {
       'abandoned_ts': None,
-      'bot_id': 'localhost',
+      'bot_id': u'localhost',
       'completed_ts': None,
       'exit_codes': [],
+      'failure': False,
       'internal_failure': False,
       'modified_ts': None,
       'outputs': [],
-      'started_ts': None,
-      'task_failure': False,
-      'task_state': task_result.State.RUNNING,
+      'started_ts': self.now,
+      'state': task_result.State.RUNNING,
+      'try_number': 1,
     }
     self.assertEqual(expected, actual.to_dict())
 
-  def test_task_update_result_summary_end_to_end(self):
+  def test_integration(self):
+    # Creates a TaskRequest, along its TaskResultSummary and TaskToRun. Have a
+    # bot reap the task, and complete the task. Ensure the resulting
+    # TaskResultSummary and TaskRunResult are properly updated.
     request = task_request.make_request(_gen_request_data())
     result_summary = task_result.new_result_summary(request)
-    shards = task_shard_to_run.new_shards_to_run_for_request(request)
-    ndb.put_multi([result_summary] + shards)
+    task = task_to_run.new_task_to_run(request)
+    ndb.put_multi([result_summary, task])
     expected = {
-      'done_ts': None,
+      'abandoned_ts': None,
+      'bot_id': None,
+      'exit_codes': [],
+      'completed_ts': None,
+      'created_ts': self.now,
       'internal_failure': False,
-      'modified_ts': None,
-      'shards': [
-        {
-          'abandoned_ts': None,
-          'completed_ts': None,
-          'internal_failure': False,
-          'modified_ts': None,
-          'started_ts': None,
-          'task_failure': False,
-          'task_state': task_result.State.PENDING,
-          'try_number': None,
-        },
-      ],
-      'task_failure': False,
-      'task_state': task_result.State.PENDING,
+      'modified_ts': self.now,
+      'name': u'Request name',
+      'outputs': [],
+      'started_ts': None,
+      'failure': False,
+      'state': task_result.State.PENDING,
+      'try_number': None,
+      'user': u'Jesus',
     }
     self.assertEqual(expected, result_summary.to_dict())
 
     # Nothing changed 2 secs later except latency.
     test_helper.mock_now(self, self.now + datetime.timedelta(seconds=2))
-    self.assertEqual(0, self.execute_tasks())
     self.assertEqual(expected, result_summary.to_dict())
 
-    # Shard #0 is reaped after 2 seconds (4 secs total).
-    # TODO(maruel): This code has potential to be refactored to reduce the code
-    # duplication. Please do at first occasion.
+    # Task is reaped after 2 seconds (4 secs total).
     reap_ts = self.now + datetime.timedelta(seconds=4)
     test_helper.mock_now(self, reap_ts)
-    self.assertEqual(True, task_shard_to_run.reap_shard_to_run(shards[0].key))
-    shard_result = task_result.new_shard_result(shards[0].key, 1, 'localhost')
-    task_result.put_shard_result(shard_result)
-    task_result._task_update_result_summary(request.key.integer_id())
-    expected['modified_ts'] = reap_ts
-    expected['shards'][0]['modified_ts'] = reap_ts
-    expected['shards'][0]['started_ts'] = reap_ts
-    expected['shards'][0]['task_state'] = task_result.State.RUNNING
-    expected['shards'][0]['try_number'] = 1
-    expected['task_state'] = task_result.State.RUNNING
-    self.assertEqual(expected, result_summary.to_dict())
-
-    # Shard #0 is completed after 2 seconds (8 secs total).
-    complete_ts = self.now + datetime.timedelta(seconds=8)
-    test_helper.mock_now(self, complete_ts)
-    shard_result.completed_ts = complete_ts
-    shard_result.exit_codes.append(0)
-    shard_result.task_state = task_result.State.COMPLETED
-    results_key = result_helper.StoreResults('foo').key
-    shard_result.outputs.append(results_key)
-    task_result.put_shard_result(shard_result)
-    task_result._task_update_result_summary(request.key.integer_id())
-    expected['done_ts'] = complete_ts
-    expected['modified_ts'] = complete_ts
-    expected['task_state'] = task_result.State.COMPLETED
-    expected['shards'][0]['completed_ts'] = complete_ts
-    expected['shards'][0]['modified_ts'] = complete_ts
-    expected['shards'][0]['task_state'] = task_result.State.COMPLETED
-    self.assertEqual(expected, result_summary.to_dict())
-
-    # They accumulated from put_shard_result() calls.
-    self.assertEqual(2, self.execute_tasks())
-
-  def test_task_update_result_summary_completed(self):
-    request = task_request.make_request(_gen_request_data())
-    result_summary = task_result.new_result_summary(request)
-    shards = task_shard_to_run.new_shards_to_run_for_request(request)
-    shard_results = [
-      task_result.new_shard_result(shards[0].key, 1, 'localhost1'),
-    ]
-    ndb.put_multi([result_summary] + shards)
-    for shard_result in shard_results:
-      task_result.put_shard_result(shard_result)
-
-    # Time must advance for the lookup to happen again.
-    now_1 = self.now + datetime.timedelta(seconds=1)
-    test_helper.mock_now(self, now_1)
-    shard_results[0].abandoned_ts = self.now
-    shard_results[0].task_state = task_result.State.BOT_DIED
-    shard_results[0].internal_failure = True
-    for shard_result in shard_results:
-      task_result.put_shard_result(shard_result)
-    task_result._task_update_result_summary(request.key.integer_id())
-
-    expected = [
-      {
-        'done_ts': now_1,
-        'internal_failure': True,
-        'modified_ts': now_1,
-        'shards': [
-          {
-            'abandoned_ts': self.now,
-            'completed_ts': None,
-            'internal_failure': True,
-            'modified_ts': now_1,
-            'started_ts': self.now,
-            'task_failure': False,
-            'task_state': task_result.State.BOT_DIED,
-            'try_number': 1,
-          },
-        ],
-        'task_failure': False,
-        'task_state': task_result.State.BOT_DIED,
-      },
-    ]
-    self.assertEntities(expected, task_result.TaskResultSummary)
-    expected = [
-      {
-        'abandoned_ts': self.now,
-        'bot_id': u'localhost1',
-        'completed_ts': None,
-        'exit_codes': [],
-        'internal_failure': True,
-        'modified_ts': now_1,
-        'outputs': [],
-        'started_ts': self.now,
-        'task_failure': False,
-        'task_state': task_result.State.BOT_DIED,
-      },
-    ]
-    self.assertEntities(expected, task_result.TaskShardResult)
     self.assertEqual(
-        'Bot died while running the task. Either the task killed the bot or '
-        'the bot suicided (Internal failure)',
-        shard_results[0].to_string())
+        True,
+        ndb.transaction(lambda: task_to_run.reap_task_to_run(task.key)))
+    run_result = task_result.new_run_result(request, 1, 'localhost')
+    task_result.put_run_result(run_result)
+    expected = {
+      'abandoned_ts': None,
+      'bot_id': u'localhost',
+      'completed_ts': None,
+      'created_ts': self.now,
+      'exit_codes': [],
+      'internal_failure': False,
+      'modified_ts': reap_ts,
+      'name': u'Request name',
+      'outputs': [],
+      'started_ts': reap_ts,
+      'failure': False,
+      'state': task_result.State.RUNNING,
+      'try_number': 1,
+      'user': u'Jesus',
+    }
+    self.assertEqual(expected, result_summary.to_dict())
 
-    # They accumulated from put_shard_result() calls.
-    self.assertEqual(2, self.execute_tasks())
+    # Task completed after 2 seconds (6 secs total), the task has been running
+    # for 2 seconds.
+    complete_ts = self.now + datetime.timedelta(seconds=6)
+    test_helper.mock_now(self, complete_ts)
+    run_result.completed_ts = complete_ts
+    run_result.exit_codes.append(0)
+    run_result.state = task_result.State.COMPLETED
+    results_key = result_helper.StoreResults('foo').key
+    run_result.outputs.append(results_key)
+    task_result.put_run_result(run_result)
+    expected = {
+      'abandoned_ts': None,
+      'bot_id': u'localhost',
+      'completed_ts': complete_ts,
+      'created_ts': self.now,
+      'exit_codes': [0],
+      'failure': False,
+      'internal_failure': False,
+      'modified_ts': complete_ts,
+      'name': u'Request name',
+      'outputs': [results_key],
+      'started_ts': reap_ts,
+      'state': task_result.State.COMPLETED,
+      'try_number': 1,
+      'user': u'Jesus',
+    }
+    self.assertEqual(expected, result_summary.to_dict())
+    self.assertEqual(datetime.timedelta(seconds=2), result_summary.duration())
 
-  def test_task_update_result_summary(self):
-    # Tests task_result.sync_all_result_summary(). It is basically a
-    # wrapper around _task_update_result_summary() which is tested above.
+  def test_terminate_result(self):
     request = task_request.make_request(_gen_request_data())
     result_summary = task_result.new_result_summary(request)
     result_summary.put()
-
-    shards = task_shard_to_run.new_shards_to_run_for_request(request)
-    self.assertEqual(1, len(shards))
-    shard_to_run = shards[0]
-    shard_to_run.put()
-    shard_result = task_result.new_shard_result(
-        shard_to_run.key, 1, 'localhost')
-    task_result.put_shard_result(shard_result)
-    task_result._task_update_result_summary(request.key.integer_id())
-    self.assertEqual(0, task_result.sync_all_result_summary())
-    expected = [
-      {
-        'abandoned_ts': None,
-        'bot_id': u'localhost',
-        'completed_ts': None,
-        'exit_codes': [],
-        'internal_failure': False,
-        'modified_ts': self.now,
-        'outputs': [],
-        'started_ts': self.now,
-        'task_failure': False,
-        'task_state': task_result.State.RUNNING,
-      },
-    ]
-    self.assertEntities(expected, task_result.TaskShardResult)
-    expected = [
-      {
-        'done_ts': None,
-        'internal_failure': False,
-        'modified_ts': self.now,
-        'shards': [
-          {
-            'abandoned_ts': None,
-            'completed_ts': None,
-            'internal_failure': False,
-            'modified_ts': self.now,
-            'started_ts': self.now,
-            'task_failure': False,
-            'task_state': task_result.State.RUNNING,
-            'try_number': 1,
-          },
-        ],
-        'task_failure': False,
-        'task_state': task_result.State.RUNNING,
-      },
-    ]
-    self.assertEntities(expected, task_result.TaskResultSummary)
-    self.assertEqual(1, self.execute_tasks())
-
-  def test_terminate_shard_result(self):
-    request = task_request.make_request(_gen_request_data())
-    shards = task_shard_to_run.new_shards_to_run_for_request(request)
-    shard_to_run = shards[0]
-    shard_result = task_result.new_shard_result(
-        shard_to_run.key, 1, 'localhost')
-    task_result.terminate_shard_result(shard_result, task_result.State.BOT_DIED)
-    self.assertEqual(1, self.execute_tasks())
+    run_result = task_result.new_run_result(request, 1, 'localhost')
+    task_result.terminate_result(run_result, task_result.State.BOT_DIED)
     expected = {
       'abandoned_ts': self.now,
       'bot_id': u'localhost',
       'completed_ts': None,
       'exit_codes': [],
+      'failure': False,
       'internal_failure': False,
       'modified_ts': self.now,
       'outputs': [],
       'started_ts': self.now,
-      'task_failure': False,
-      'task_state': task_result.State.BOT_DIED,
+      'state': task_result.State.BOT_DIED,
+      'try_number': 1,
     }
-    self.assertEqual(expected, shard_result.key.get().to_dict())
+    self.assertEqual(expected, run_result.key.get().to_dict())
 
-  def test_yield_shard_results_without_update(self):
-    # One is completed, one died.
-    request_0 = task_request.make_request(_gen_request_data())
-    shards = task_shard_to_run.new_shards_to_run_for_request(request_0)
-    shard_0 = shards[0]
-    request_1 = task_request.make_request(_gen_request_data(user='foo'))
-    shards = task_shard_to_run.new_shards_to_run_for_request(request_1)
-    shard_1 = shards[0]
-
-    shard_result_0 = task_result.new_shard_result(shard_0.key, 1, 'localhost')
-    shard_result_1 = task_result.new_shard_result(shard_1.key, 1, 'localhost')
-    shard_result_0.task_state = task_result.State.COMPLETED
-    shard_result_0.completed_ts = self.now
-    task_result.put_shard_result(shard_result_0)
-    task_result.put_shard_result(shard_result_1)
-    self.assertEqual(2, self.execute_tasks())
-
-    test_helper.mock_now(self, self.now + datetime.timedelta(seconds=5*60+1))
-    self.assertEqual(
-        [shard_result_1],
-        list(task_result.yield_shard_results_without_update()))
-
-  def run_sync_all_result_summary(self, request):
-    self.assertEqual(0, task_result.sync_all_result_summary())
-    test_helper.mock_now(self, self.now + datetime.timedelta(seconds=1))
-    shards = task_shard_to_run.new_shards_to_run_for_request(request)
-    self.assertEqual(1, len(shards))
-    shard_to_run = shards[0]
-    shard_to_run.put()
-    shard_result = task_result.new_shard_result(
-        shard_to_run.key, 1, 'localhost')
-    task_result.put_shard_result(shard_result)
-
-    # The cron job is run before the taskqueue but has no effect.
-    test_helper.mock_now(self, self.now + datetime.timedelta(seconds=2*60-1))
-    self.assertEqual(0, task_result.sync_all_result_summary())
-
-    # Get over the 2 minutes tolerance for the cron job. This means the task
-    # queue has trouble running.
-    test_helper.mock_now(self, self.now + datetime.timedelta(seconds=2*60+1))
-    self.assertEqual(1, task_result.sync_all_result_summary())
-    expected = get_entities(task_result.TaskResultSummary)
-
-    test_helper.mock_now(self, self.now + datetime.timedelta(seconds=2))
-    # The taskqueue has no effect.
-    self.assertEqual(1, self.execute_tasks())
-    actual = get_entities(task_result.TaskResultSummary)
-    self.assertEqual(expected, actual)
-
-  def test_sync_all_result_summary(self):
-    # It is basically a wrapper around _task_update_result_summary() which is
-    # tested above.
-    request = task_request.make_request(_gen_request_data())
-    result_summary = task_result.new_result_summary(request)
-    result_summary.put()
-    self.run_sync_all_result_summary(request)
-
-  def test_task_update_result_summary_skip_task_missing_summary(self):
-    request = task_request.make_request(_gen_request_data())
-    self.run_sync_all_result_summary(request)
-
-  def test_task_update_result_summary_fine(self):
-    request = task_request.make_request(_gen_request_data())
-    result_summary = task_result.new_result_summary(request)
-    result_summary.put()
-
-    test_helper.mock_now(self, self.now + datetime.timedelta(seconds=1))
-    shards = task_shard_to_run.new_shards_to_run_for_request(request)
-    self.assertEqual(1, len(shards))
-    shard_to_run = shards[0]
-    shard_to_run.put()
-    shard_result = task_result.new_shard_result(
-        shard_to_run.key, 1, 'localhost')
-    task_result.put_shard_result(shard_result)
-    test_helper.mock_now(self, self.now + datetime.timedelta(seconds=2))
-    self.assertEqual(1, self.execute_tasks())
-    self.assertEqual(0, task_result.sync_all_result_summary())
-
-  def test_enqueue_update_result_summary(self):
-    request = task_request.make_request(_gen_request_data())
-    shards = task_shard_to_run.new_shards_to_run_for_request(request)
-    self.assertEqual(1, len(shards))
-    shard_to_run = shards[0]
-    shard_to_run.put()
-    shard_result = task_result.new_shard_result(
-        shard_to_run.key, 1, 'localhost')
-    shard_result.task_state = task_result.State.COMPLETED
-    shard_result.internal_failure = True
-    task_result.put_shard_result(shard_result)
-    result_summary = task_result.request_key_to_result_summary_key(
-        request.key).get()
-    self.assertEqual(None, result_summary)
-
-    self.assertEqual(1, self.execute_tasks())
-    result_summary = task_result.request_key_to_result_summary_key(
-        request.key).get()
     expected = {
-      'done_ts': self.now,
-      'internal_failure': True,
+      'abandoned_ts': self.now,
+      'bot_id': u'localhost',
+      'completed_ts': None,
+      'created_ts': self.now,
+      'exit_codes': [],
+      'failure': False,
+      'internal_failure': False,
       'modified_ts': self.now,
-      'shards': [
-        {
-          'abandoned_ts': None,
-          'completed_ts': None,
-          'internal_failure': True,
-          'modified_ts': self.now,
-          'started_ts': self.now,
-          'task_failure': False,
-          'task_state': task_result.State.COMPLETED,
-          'try_number': 1,
-        },
-      ],
-      'task_failure': False,
-      'task_state': task_result.State.COMPLETED,
+      'name': u'Request name',
+      'outputs': [],
+      'started_ts': self.now,
+      'state': task_result.State.BOT_DIED,
+      'try_number': 1,
+      'user': u'Jesus',
     }
-    self.assertEqual(expected, result_summary.to_dict())
+    self.assertEqual(expected, result_summary.key.get().to_dict())
 
-  def test_put_shard_result(self):
+  def test_yield_run_results_with_dead_bot(self):
+    request = task_request.make_request(_gen_request_data())
+    result_summary = task_result.new_result_summary(request)
+    result_summary.put()
+    run_result = task_result.new_run_result(request, 1, 'localhost')
+    run_result.completed_ts = self.now
+    task_result.put_run_result(run_result)
+
+    just_before = self.now + task_common.BOT_PING_TOLERANCE
+    test_helper.mock_now(self, just_before)
+    self.assertEqual([], list(task_result.yield_run_results_with_dead_bot()))
+
+    late = (
+        self.now + task_common.BOT_PING_TOLERANCE +
+        datetime.timedelta(seconds=1))
+    test_helper.mock_now(self, late)
+    self.assertEqual(
+        [run_result], list(task_result.yield_run_results_with_dead_bot()))
+
+  def test_put_run_result(self):
     # Tested indirectly.
     pass
 

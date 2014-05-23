@@ -23,21 +23,18 @@ class _Dimensions(object):
 
   DESCRIPTION = {
     'bots_active': ('number', 'Bots active'),
-    'shards_active': ('number', 'Shards active'),
+    'tasks_active': ('number', 'Tasks active'),
 
-    'requests_enqueued': ('number', 'Requests enqueued'),
-    'requests_completed': ('number', 'Requests completed'),
-    'shards_enqueued': ('number', 'Shards enqueued'),
+    'tasks_enqueued': ('number', 'Tasks enqueued'),
+    'tasks_started': ('number', 'Tasks started'),
+    'tasks_completed': ('number', 'Tasks completed'),
 
-    'shards_started': ('number', 'Shards started'),
-    'shards_avg_pending_secs': ('number', 'Average shard pending time (s)'),
+    'tasks_avg_pending_secs': ('number', 'Average shard pending time (s)'),
+    'tasks_total_runtime_secs': ('number', 'Tasks total runtime (s)'),
+    'tasks_avg_runtime_secs': ('number', 'Average shard runtime (s)'),
 
-    'shards_completed': ('number', 'Shards completed'),
-    'shards_total_runtime_secs': ('number', 'Shards total runtime (s)'),
-    'shards_avg_runtime_secs': ('number', 'Average shard runtime (s)'),
-
-    'shards_bot_died': ('number', 'Shards where the bot died'),
-    'shards_request_expired': ('number', 'Shards requests expired'),
+    'tasks_bot_died': ('number', 'Tasks where the bot died'),
+    'tasks_request_expired': ('number', 'Tasks requests expired'),
   }
 
   # Warning: modifying the order here requires updating cls.TEMPLATE.
@@ -45,21 +42,18 @@ class _Dimensions(object):
     'key',
 
     'bots_active',
-    'shards_active',
+    'tasks_active',
 
-    'requests_enqueued',
-    'shards_enqueued',
+    'tasks_enqueued',
+    'tasks_started',
+    'tasks_completed',  # 5th element.
 
-    'shards_started',  # 5th element.
+    'tasks_avg_pending_secs',
+    'tasks_total_runtime_secs',
+    'tasks_avg_runtime_secs',
 
-    'shards_completed',
-    'requests_completed',
-    'shards_avg_pending_secs',
-    'shards_total_runtime_secs',
-    'shards_avg_runtime_secs',  # 10th element.
-
-    'shards_bot_died',
-    'shards_request_expired',
+    'tasks_bot_died',
+    'tasks_request_expired',  # 10th element.
   )
 
 
@@ -71,21 +65,19 @@ class _Summary(object):
     'http_requests': ('number', 'Total HTTP requests'),
 
     'bots_active': ('number', 'Bots active'),
-    'shards_active': ('number', 'Shards active'),
+    'tasks_active': ('number', 'Tasks active'),
 
-    'requests_enqueued': ('number', 'Requests enqueued'),
-    'requests_completed': ('number', 'Requests completed'),
-    'shards_enqueued': ('number', 'Shards enqueued'),
+    'tasks_enqueued': ('number', 'Tasks enqueued'),
 
-    'shards_started': ('number', 'Shards started'),
-    'shards_avg_pending_secs': ('number', 'Average shard pending time (s)'),
+    'tasks_started': ('number', 'Tasks started'),
+    'tasks_avg_pending_secs': ('number', 'Average shard pending time (s)'),
 
-    'shards_completed': ('number', 'Shards completed'),
-    'shards_total_runtime_secs': ('number', 'Shards total runtime (s)'),
-    'shards_avg_runtime_secs': ('number', 'Average shard runtime (s)'),
+    'tasks_completed': ('number', 'Tasks completed'),
+    'tasks_total_runtime_secs': ('number', 'Tasks total runtime (s)'),
+    'tasks_avg_runtime_secs': ('number', 'Average shard runtime (s)'),
 
-    'shards_bot_died': ('number', 'Shards where the bot died'),
-    'shards_request_expired': ('number', 'Shards requests expired'),
+    'tasks_bot_died': ('number', 'Tasks where the bot died'),
+    'tasks_request_expired': ('number', 'Tasks requests expired'),
   }
 
   # Warning: modifying the order here requires updating cls.TEMPLATE.
@@ -95,22 +87,18 @@ class _Summary(object):
     'http_failures',
 
     'bots_active',
-    'shards_active',
+    'tasks_active',
 
-    'requests_enqueued',  # 5th element.
-    'shards_enqueued',
+    'tasks_enqueued',  # 5th element.
+    'tasks_started',
+    'tasks_completed',
 
-    'shards_started',
+    'tasks_avg_pending_secs',
+    'tasks_total_runtime_secs',
+    'tasks_avg_runtime_secs',  # 10th element.
 
-    'shards_completed',
-    'requests_completed',
-
-    'shards_avg_pending_secs',  # 10th element.
-    'shards_total_runtime_secs',
-    'shards_avg_runtime_secs',
-
-    'shards_bot_died',
-    'shards_request_expired',
+    'tasks_bot_died',
+    'tasks_request_expired',
   )
 
 
@@ -118,42 +106,37 @@ class _User(object):
   TEMPLATE = 'stats_user.html'
 
   DESCRIPTION = {
-    'shards_active': ('number', 'Shards active'),
+    'tasks_active': ('number', 'Tasks active'),
 
-    'requests_enqueued': ('number', 'Requests enqueued'),
-    'requests_completed': ('number', 'Requests completed'),
-    'shards_enqueued': ('number', 'Shards enqueued'),
+    'tasks_enqueued': ('number', 'Tasks enqueued'),
 
-    'shards_started': ('number', 'Shards started'),
-    'shards_avg_pending_secs': ('number', 'Average shard pending time (s)'),
+    'tasks_started': ('number', 'Tasks started'),
+    'tasks_avg_pending_secs': ('number', 'Average shard pending time (s)'),
 
-    'shards_completed': ('number', 'Shards completed'),
-    'shards_total_runtime_secs': ('number', 'Shards total runtime (s)'),
-    'shards_avg_runtime_secs': ('number', 'Average shard runtime (s)'),
+    'tasks_completed': ('number', 'Tasks completed'),
+    'tasks_total_runtime_secs': ('number', 'Tasks total runtime (s)'),
+    'tasks_avg_runtime_secs': ('number', 'Average shard runtime (s)'),
 
-    'shards_bot_died': ('number', 'Shards where the bot died'),
-    'shards_request_expired': ('number', 'Shards requests expired'),
+    'tasks_bot_died': ('number', 'Tasks where the bot died'),
+    'tasks_request_expired': ('number', 'Tasks requests expired'),
   }
 
   # Warning: modifying the order here requires updating cls.TEMPLATE.
   ORDER = (
     'key',
 
-    'shards_active',
+    'tasks_active',
 
-    'requests_enqueued',
-    'shards_enqueued',
+    'tasks_enqueued',
+    'tasks_started',
+    'tasks_completed',
 
-    'shards_started',
+    'tasks_avg_pending_secs',  # 5th element.
+    'tasks_total_runtime_secs',
+    'tasks_avg_runtime_secs',
 
-    'shards_completed',  # 5th element.
-    'requests_completed',
-    'shards_avg_pending_secs',
-    'shards_total_runtime_secs',
-    'shards_avg_runtime_secs',
-
-    'shards_bot_died',  # 10th element.
-    'shards_request_expired',
+    'tasks_bot_died',
+    'tasks_request_expired',  # 10th element.
   )
 
 
