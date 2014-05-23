@@ -4,7 +4,7 @@ The task scheduling core has to be read in order like a story in 4 parts; each
 block depends on the previous ones:
 
 * task_request.py
-* task_shard_to_run.py
+* task_to_run.py
 * task_result.py
 * task_scheduler.py
 
@@ -45,7 +45,7 @@ block depends on the previous ones:
          ^           ^
          |           |
     +---------+      |
-    |TaskToRun|      |                                      task_shard_to_run.py
+    |TaskToRun|      |                                            task_to_run.py
     +---------+      |
                      |
                      |

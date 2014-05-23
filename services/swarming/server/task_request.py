@@ -37,7 +37,7 @@ Graph of the schema:
     +---------------------+
                ^
                |
-    <See task_shard_to_run.py and task_result.py>
+    <See task_to_run.py and task_result.py>
 
 TaskProperties is embedded in TaskRequest. TaskProperties is still declared as a
 separate entity to clearly declare the boundary for task request deduplication.

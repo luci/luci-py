@@ -20,7 +20,7 @@ from google.appengine.ext import ndb
 
 from components import utils
 from server import task_request
-from server import task_shard_to_run as task_to_run
+from server import task_to_run
 from server import test_helper
 from support import test_case
 

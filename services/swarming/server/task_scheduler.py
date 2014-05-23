@@ -26,7 +26,7 @@ from server import stats_new as stats
 from server import task_common
 from server import task_request
 from server import task_result
-from server import task_shard_to_run as task_to_run
+from server import task_to_run
 
 
 ### Private stuff.

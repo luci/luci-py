@@ -13,8 +13,8 @@ from server import result_helper
 from server import task_common
 from server import task_glue
 from server import task_result
-from server import task_shard_to_run as task_to_run
 from server import task_scheduler
+from server import task_to_run
 
 
 # The default root for all configs in a test request. The index value of the

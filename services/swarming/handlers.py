@@ -47,7 +47,7 @@ from server import task_glue
 from server import task_request
 from server import task_result
 from server import task_scheduler
-from server import task_shard_to_run as task_to_run
+from server import task_to_run
 from server import test_management
 from server import user_manager
 from stats import machine_stats
