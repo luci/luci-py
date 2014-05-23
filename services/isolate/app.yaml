@@ -11,18 +11,8 @@ automatic_scaling:
   max_pending_latency: 250ms
 
 handlers:
-- url: /internal/mapreduce(/.*)?
-  script: map_reduce_jobs.app
-  secure: always
-  login: admin
-
-- url: /internal.*
-  script: main.app
-  secure: always
-  login: admin
-
 - url: /restricted.*
-  script: main.app
+  script: main_frontend.app
   secure: always
   login: admin
 
@@ -41,7 +31,7 @@ handlers:
   secure: always
 
 - url: /.*
-  script: main.app
+  script: main_frontend.app
   secure: always
 
 builtins:

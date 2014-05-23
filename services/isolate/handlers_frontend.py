@@ -2,7 +2,7 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
-"""This module defines Isolate Server url handlers for the backend."""
+"""This module defines Isolate Server frontend url handlers."""
 
 import binascii
 import collections
@@ -26,7 +26,6 @@ from google.appengine.ext import ndb
 import acl
 import config
 import gcs
-import handlers_backend
 import handlers_common
 import map_reduce_jobs
 import model
@@ -933,11 +932,10 @@ def get_routes():
   ]
 
 
-def CreateApplication(debug=False):
+def create_application(debug=False):
   """Creates the url router.
 
   The basic layouts is as follow:
-  - /internal/.* requires being an instance administrator.
   - /restricted/.* requires being an instance administrator.
   - /content/.* has the public HTTP API.
   - /stats/.* has statistics.
@@ -966,8 +964,5 @@ def CreateApplication(debug=False):
   auth_routes.extend(auth_ui.get_rest_api_routes())
   auth_routes.extend(auth_ui.get_ui_routes())
 
-  # TODO(maruel): The backend must have its own application.
-  backend_routes = handlers_backend.get_routes()
   return webapp2.WSGIApplication(
-      dev_routes + auth_routes + backend_routes + get_routes(),
-      debug=debug)
+      dev_routes + auth_routes + get_routes(), debug=debug)

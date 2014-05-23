@@ -24,6 +24,7 @@ from google.appengine.ext import ndb
 import acl
 import config
 import gcs
+import handlers_backend
 import handlers_common
 import handlers_frontend
 import model
@@ -32,8 +33,16 @@ from components import auth
 from components import datastore_utils
 from components import ereporter2
 from components import stats_framework_mock
+from components import ereporter2
 from support import test_case
 
+import acl
+import config
+import gcs
+import handlers_backend
+import handlers_common
+import handlers_frontend
+import stats
 
 # Access to a protected member _XXX of a client class
 # pylint: disable=W0212
@@ -96,13 +105,19 @@ class MainTest(test_case.TestCase):
     version = config.get_app_version()
     self.mock(config, 'get_task_queue_host', lambda: version)
     self.source_ip = '127.0.0.1'
-    self.app = webtest.TestApp(
-        handlers_frontend.CreateApplication(debug=True),
+    self.app_frontend = webtest.TestApp(
+        handlers_frontend.create_application(debug=True),
         extra_environ={'REMOTE_ADDR': self.source_ip})
+    self.app_backend = webtest.TestApp(
+        handlers_backend.create_application(debug=True),
+        extra_environ={'REMOTE_ADDR': self.source_ip})
+    # Tasks are enqueued on the backend.
+    self.app = self.app_backend
 
   def whitelist_self(self):
     acl.WhitelistedIP(
-        id=acl.ip_to_str(*acl.parse_ip(self.source_ip)), ip='127.0.0.1').put()
+        id=acl.ip_to_str(*acl.parse_ip(self.source_ip)),
+        ip=self.source_ip).put()
 
   def handshake(self):
     self.whitelist_self()
@@ -112,7 +127,7 @@ class MainTest(test_case.TestCase):
       'protocol_version': handlers_frontend.ISOLATE_PROTOCOL_VERSION,
       'pusher': True,
     }
-    req = self.app.post_json('/content-gs/handshake', data)
+    req = self.app_frontend.post_json('/content-gs/handshake', data)
     return urllib.quote(req.json['access_token'])
 
   def mock_delete_files(self):
@@ -127,7 +142,7 @@ class MainTest(test_case.TestCase):
 
   def put_content(self, url, content):
     """Simulare isolateserver.py archive."""
-    req = self.app.put(
+    req = self.app_frontend.put(
         url, content_type='application/octet-stream', params=content)
     self.assertEqual(200, req.status_code)
     self.assertEqual({'entry':{}}, req.json)
@@ -135,7 +150,7 @@ class MainTest(test_case.TestCase):
   # Test cases.
 
   def test_internal_cron_ereporter2_mail_not_cron(self):
-    response = self.app.get(
+    response = self.app_backend.get(
         '/internal/cron/ereporter2/mail', expect_errors=True)
     self.assertEqual(response.status_int, 403)
     self.assertEqual(response.content_type, 'text/plain')
@@ -146,7 +161,7 @@ class MainTest(test_case.TestCase):
     data = [_ErrorRecord()]
     self.mock(ereporter2, '_extract_exceptions_from_logs', lambda *_: data)
     headers = {'X-AppEngine-Cron': 'true'}
-    response = self.app.get(
+    response = self.app_backend.get(
         '/internal/cron/ereporter2/mail', headers=headers)
     self.assertEqual(response.status_int, 200)
     self.assertEqual(response.normal_body, 'Success.')
@@ -174,7 +189,7 @@ class MainTest(test_case.TestCase):
       'isolate/namespaces/{namespace}',
     }
     for route in auth.get_authenticated_routes(
-        handlers_frontend.CreateApplication()):
+        handlers_frontend.create_application()):
       per_method = route.handler.get_methods_permissions()
       for method, permissions in per_method.iteritems():
         self.assertTrue(
@@ -183,7 +198,7 @@ class MainTest(test_case.TestCase):
                 (method, route, permissions))
 
   def test_pre_upload_ok(self):
-    req = self.app.post_json(
+    req = self.app_frontend.post_json(
         '/content-gs/pre-upload/a?token=%s' % self.handshake(),
         [gen_item('foo')])
     self.assertEqual(1, len(req.json))
@@ -193,7 +208,7 @@ class MainTest(test_case.TestCase):
     self.assertEqual(None, req.json[0][1])
 
   def test_pre_upload_invalid_namespace(self):
-    req = self.app.post_json(
+    req = self.app_frontend.post_json(
         '/content-gs/pre-upload/[?token=%s' % self.handshake(),
         [gen_item('foo')],
         expect_errors=True)
@@ -212,7 +227,7 @@ class MainTest(test_case.TestCase):
     self.mock(ndb.DateTimeProperty, '_now', lambda _: now)
     self.mock(ndb.DateProperty, '_now', lambda _: now.date())
 
-    r = self.app.post_json(
+    r = self.app_frontend.post_json(
         '/content-gs/pre-upload/default?token=%s' % self.handshake(),
         [gen_item(i) for i in items])
     self.assertEqual(len(items), len(r.json))
@@ -231,7 +246,7 @@ class MainTest(test_case.TestCase):
     self.assertEqual(
         datetime.datetime(2012, 01, 16, 03, 04, 05, 06),
         handlers_common.utcnow())
-    r = self.app.post_json(
+    r = self.app_frontend.post_json(
         '/content-gs/pre-upload/default?token=%s' % self.handshake(),
         [gen_item(items[0])])
     self.assertEqual(200, r.status_code)
@@ -241,7 +256,7 @@ class MainTest(test_case.TestCase):
 
     # 'bar' was kept, 'foo' was cleared out.
     headers = {'X-AppEngine-Cron': 'true'}
-    resp = self.app.get(
+    resp = self.app_backend.get(
         '/internal/cron/cleanup/trigger/old', headers=headers)
     self.assertEqual(200, resp.status_code)
     self.assertEqual([None], r.json)
@@ -252,7 +267,7 @@ class MainTest(test_case.TestCase):
     # Advance time and force cleanup. This deletes 'bar' too.
     now += datetime.timedelta(seconds=2*expiration)
     headers = {'X-AppEngine-Cron': 'true'}
-    resp = self.app.get(
+    resp = self.app_backend.get(
         '/internal/cron/cleanup/trigger/old', headers=headers)
     self.assertEqual(200, resp.status_code)
     self.assertEqual([None], r.json)
@@ -262,7 +277,7 @@ class MainTest(test_case.TestCase):
     # Advance time and force cleanup.
     now += datetime.timedelta(seconds=2*expiration)
     headers = {'X-AppEngine-Cron': 'true'}
-    resp = self.app.get(
+    resp = self.app_backend.get(
         '/internal/cron/cleanup/trigger/old', headers=headers)
     self.assertEqual(200, resp.status_code)
     self.assertEqual([None], r.json)
@@ -309,7 +324,7 @@ class MainTest(test_case.TestCase):
 
     model.ContentEntry(key=model.entry_key('d', '0' * 40)).put()
     headers = {'X-AppEngine-Cron': 'true'}
-    resp = self.app.get(
+    resp = self.app_backend.get(
         '/internal/cron/cleanup/trigger/trim_lost', headers=headers)
     self.assertEqual(200, resp.status_code)
     self.assertEqual(1, self.execute_tasks())
@@ -319,7 +334,7 @@ class MainTest(test_case.TestCase):
     # Upload a file larger than MIN_SIZE_FOR_DIRECT_GS and ensure the verify
     # task works.
     data = '0' * handlers_frontend.MIN_SIZE_FOR_DIRECT_GS
-    req = self.app.post_json(
+    req = self.app_frontend.post_json(
         '/content-gs/pre-upload/default?token=%s' % self.handshake(),
         [gen_item(data)])
     self.assertEqual(1, len(req.json))
@@ -328,7 +343,7 @@ class MainTest(test_case.TestCase):
     self.assertTrue(req.json[0][0])
     # Fake the upload by calling the second function.
     self.mock(gcs, 'get_file_info', lambda _b, _f: gcs.FileInfo(size=len(data)))
-    req = self.app.post(req.json[0][1], '')
+    req = self.app_frontend.post(req.json[0][1], '')
 
     self.mock(gcs, 'read_file', lambda _b, _f: [data])
     self.assertEqual(1, self.execute_tasks())
@@ -340,7 +355,7 @@ class MainTest(test_case.TestCase):
     # Upload a file larger than MIN_SIZE_FOR_DIRECT_GS and ensure the verify
     # task works.
     data = '0' * handlers_frontend.MIN_SIZE_FOR_DIRECT_GS
-    req = self.app.post_json(
+    req = self.app_frontend.post_json(
         '/content-gs/pre-upload/default?token=%s' % self.handshake(),
         [gen_item(data)])
     self.assertEqual(1, len(req.json))
@@ -349,7 +364,7 @@ class MainTest(test_case.TestCase):
     self.assertTrue(req.json[0][0])
     # Fake the upload by calling the second function.
     self.mock(gcs, 'get_file_info', lambda _b, _f: gcs.FileInfo(size=len(data)))
-    req = self.app.post(req.json[0][1], '')
+    req = self.app_frontend.post(req.json[0][1], '')
 
     # Fake corruption
     data_corrupted = '1' * handlers_frontend.MIN_SIZE_FOR_DIRECT_GS
@@ -387,7 +402,7 @@ class MainTest(test_case.TestCase):
 
   def test_stats(self):
     self._gen_stats()
-    response = self.app.get('/stats')
+    response = self.app_frontend.get('/stats')
     # Just ensure something is returned.
     self.assertGreater(response.content_length, 4000)
 
@@ -407,7 +422,7 @@ class MainTest(test_case.TestCase):
         'id":"downloads_bytes","label":"Downloaded"},{"type":"number","id":"con'
         'tains_lookups","label":"Items looked up"}]},"reqId":"0","version":"0.6'
         '"});')
-    response = self.app.get('/isolate/api/v1/stats/days?duration=1')
+    response = self.app_frontend.get('/isolate/api/v1/stats/days?duration=1')
     self.assertEqual(expected, response.body)
 
   def test_api_stats_hours(self):
@@ -426,7 +441,8 @@ class MainTest(test_case.TestCase):
         'number","id":"downloads_bytes","label":"Downloaded"},{"type":"number",'
         '"id":"contains_lookups","label":"Items looked up"}]},"reqId":"0","vers'
         'ion":"0.6"});')
-    response = self.app.get('/isolate/api/v1/stats/hours?duration=1&now=')
+    response = self.app_frontend.get(
+        '/isolate/api/v1/stats/hours?duration=1&now=')
     self.assertEqual(expected, response.body)
 
   def test_api_stats_minutes(self):
@@ -445,7 +461,7 @@ class MainTest(test_case.TestCase):
         'mber","id":"downloads_bytes","label":"Downloaded"},{"type":"number","i'
         'd":"contains_lookups","label":"Items looked up"}]},"reqId":"0","versio'
         'n":"0.6"});')
-    response = self.app.get('/isolate/api/v1/stats/minutes?duration=1')
+    response = self.app_frontend.get('/isolate/api/v1/stats/minutes?duration=1')
     self.assertEqual(expected, response.body)
 
 

@@ -12,20 +12,13 @@ handlers:
   login: admin
 
 - url: /internal.*
-  script: main.app
+  script: main_backend.app
   secure: always
   login: admin
 
-- url: /restricted.*
-  script: main.app
-  secure: always
-  login: admin
-
-- url: /_ah/warmup
-  script: main.app
-
-inbound_services:
-- warmup
+builtins:
+- appstats: on
+- remote_api: on
 
 # https://developers.google.com/appengine/docs/python/tools/libraries27
 # As the doc says, serious applications should specify the third party versions.

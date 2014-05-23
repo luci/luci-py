@@ -2,7 +2,7 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
-"""This module defines Isolate Server url handlers for the backend."""
+"""This module defines Isolate Server backend url handlers."""
 
 import binascii
 import logging
@@ -495,3 +495,11 @@ def get_routes():
         r'/internal/taskqueue/mapreduce/launch/<job_id:[^\/]+>',
         InternalLaunchMapReduceJobWorkerHandler),
   ]
+
+
+def create_application(debug=False):
+  """Creates the url router for the backend.
+
+  The backend only implements urls under /internal/.
+  """
+  return webapp2.WSGIApplication(get_routes(), debug=debug)
