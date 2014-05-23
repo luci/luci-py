@@ -55,17 +55,6 @@ from stats import machine_stats
 import template
 
 
-_NUM_USER_TEST_RUNNERS_PER_PAGE = 50
-_NUM_RECENT_ERRORS_TO_DISPLAY = 10
-
-_DELETE_MACHINE_STATS_URL = '/delete_machine_stats'
-
-_SECURE_CHANGE_WHITELIST_URL = '/secure/change_whitelist'
-_SECURE_GET_RESULTS_URL = '/secure/get_result'
-_SECURE_MAIN_URL = '/secure/main'
-_SECURE_USER_PROFILE_URL = '/secure/user_profile'
-
-
 ACCEPTABLE_SORTS =  {
   'created_ts': 'Created',
   'done_ts': 'Ended',
@@ -470,7 +459,7 @@ class RedirectToMainHandler(webapp2.RequestHandler):
   """Handler to redirect requests to base page secured main page."""
 
   def get(self):
-    self.redirect(_SECURE_MAIN_URL)
+    self.redirect('/secure/main')
 
 
 class MachineListHandler(auth.AuthenticatingHandler):
@@ -497,7 +486,7 @@ class MachineListHandler(auth.AuthenticatingHandler):
       # TODO(maruel): This should not be generated via python.
       m['command_string'] = generate_button_with_hidden_form(
           'Delete',
-          '%s?r=%s' % (_DELETE_MACHINE_STATS_URL, machine.key.string_id()),
+          '%s?r=%s' % ('/delete_machine_stats', machine.key.string_id()),
           machine.key.string_id())
       machines.append(m)
 
@@ -1062,12 +1051,12 @@ class UserProfileHandler(auth.AuthenticatingHandler):
             'ip': w.ip,
             'key': w.key.id,
             'password': w.password,
-            'url': _SECURE_CHANGE_WHITELIST_URL,
+            'url': '/secure/change_whitelist',
           } for w in user_manager.MachineWhitelist().query()),
         key=lambda x: x['ip'])
 
     params = {
-        'change_whitelist_url': _SECURE_CHANGE_WHITELIST_URL,
+        'change_whitelist_url': '/secure/change_whitelist',
         'whitelists': display_whitelists,
     }
     self.response.out.write(template.render('user_profile.html', params))
@@ -1101,7 +1090,7 @@ class ChangeWhitelistHandler(auth.AuthenticatingHandler):
     else:
       self.abort(400, 'Invalid \'a\' parameter.')
 
-    self.redirect(_SECURE_USER_PROFILE_URL, permanent=True)
+    self.redirect('/secure/user_profile', permanent=True)
 
 
 class RemoteErrorHandler(auth.AuthenticatingHandler):
@@ -1206,36 +1195,41 @@ class WarmupHandler(webapp2.RequestHandler):
 
 def CreateApplication():
   urls = [
+      # Frontend pages, they return HTML or what should be HTML.
       ('/', RedirectToMainHandler),
+      ('/secure/ereporter2/report', Ereporter2ReportHandler),
+      ('/secure/ereporter2/request/<request_id:[0-9a-fA-F]+>',
+          Ereporter2RequestHandler),
+      ('/secure/machine_list', MachineListHandler),
+      ('/secure/main', MainHandler),
+      ('/secure/show_message', ShowMessageHandler),
+      ('/secure/user_profile', UserProfileHandler),
+      ('/stats', stats_gviz.StatsSummaryHandler),
+      ('/stats/dimensions/<dimensions:.+>', stats_gviz.StatsDimensionsHandler),
+      ('/stats/user/<user:.+>', stats_gviz.StatsUserHandler),
+      ('/upload_start_slave', UploadStartSlaveHandler),
+
+      # Client API, in some cases also indirectly used by the frontend.
       ('/cleanup_results', CleanupResultsHandler),
       ('/get_matching_test_cases', GetMatchingTestCasesHandler),
       ('/get_result', GetResultHandler),
+      ('/secure/cancel', CancelHandler),
+      ('/secure/change_whitelist', ChangeWhitelistHandler),
+      ('/secure/get_result', SecureGetResultHandler),
+      ('/secure/retry', RetryHandler),
+      ('/test', TestRequestHandler),
+
+      # Bot API.
       ('/get_slave_code', GetSlaveCodeHandler),
       ('/get_slave_code/<version:[0-9a-f]{40}>', GetSlaveCodeHandler),
       ('/poll_for_test', RegisterHandler),
       ('/remote_error', RemoteErrorHandler),
       ('/result', ResultHandler),
       ('/runner_ping', RunnerPingHandler),
-
-      ('/secure/ereporter2/report', Ereporter2ReportHandler),
-      ('/secure/ereporter2/request/<request_id:[0-9a-fA-F]+>',
-          Ereporter2RequestHandler),
-      ('/secure/machine_list', MachineListHandler),
-      ('/secure/retry', RetryHandler),
-      ('/secure/show_message', ShowMessageHandler),
-
       ('/server_ping', ServerPingHandler),
-      ('/test', TestRequestHandler),
-      ('/upload_start_slave', UploadStartSlaveHandler),
-      (_DELETE_MACHINE_STATS_URL, DeleteMachineStatsHandler),
-      ('/secure/cancel', CancelHandler),
-      (_SECURE_CHANGE_WHITELIST_URL, ChangeWhitelistHandler),
-      (_SECURE_GET_RESULTS_URL, SecureGetResultHandler),
-      (_SECURE_MAIN_URL, MainHandler),
-      (_SECURE_USER_PROFILE_URL, UserProfileHandler),
-      ('/stats', stats_gviz.StatsSummaryHandler),
-      ('/stats/dimensions/<dimensions:.+>', stats_gviz.StatsDimensionsHandler),
-      ('/stats/user/<user:.+>', stats_gviz.StatsUserHandler),
+
+      # Both Client and Bot API.
+      ('/delete_machine_stats', DeleteMachineStatsHandler),
 
       # The new APIs:
       ('/swarming/api/v1/bots', ApiBots),
@@ -1246,7 +1240,6 @@ def CreateApplication():
         stats_gviz.StatsGvizDimensionsHandler),
       ('/swarming/api/v1/stats/user/<user:.+>/<resolution:[a-z]+>',
         stats_gviz.StatsGvizUserHandler),
-
 
       # Internal urls.
 
