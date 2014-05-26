@@ -527,7 +527,7 @@ class SlaveMachine(object):
         raise SlaveRPCError('StoreFile exception: ' + str(e))
 
   @staticmethod
-  def RunCommands(args):
+  def RunManifest(args):
     """Checks type of args to be correct.
 
     Args:
@@ -538,23 +538,20 @@ class SlaveMachine(object):
       if executing the commands fails.
     """
     # Validate args.
-    if not isinstance(args, list):
-      raise SlaveRPCError(
-          'Invalid RunCommands arg type: %s (expected list of str or'
-          ' unicode)'%str(type(args)))
-
-    for command in args:
-      if not isinstance(command, basestring):
-        raise SlaveRPCError(
-            'Invalid element type in RunCommands args: %s (expected'
-            ' str or unicode)'% str(type(command)))
+    if not isinstance(args, basestring):
+      raise SlaveRPCError('Invalid RunManifest arg: %r (expected str)' % args)
 
     # Execute functionality.
-    commands = [sys.executable] + args
+    # TODO(maruel): It's not the job to handle --restart_on_failure,
+    # this script should handle this.
+    command = [
+      sys.executable, 'local_test_runner.py', '--restart_on_failure', '-f',
+      args,
+    ]
 
     try:
-      logging.debug('Running command: %s', commands)
-      subprocess.check_call(commands)
+      logging.debug('Running command: %s', command)
+      subprocess.check_call(command)
     except subprocess.CalledProcessError as e:
       if e.returncode == swarm_constants.RESTART_EXIT_CODE:
         Restart()

@@ -185,15 +185,10 @@ def request_work_item(attributes, server_url):
   if test_run.working_dir:
     swarm_file_path = os.path.join(
         test_run.working_dir, test_management._TEST_RUN_SWARM_FILE_NAME)
-  command_to_execute = [
-    os.path.join('local_test_runner.py'),
-    '-f', swarm_file_path,
-    '--restart_on_failure',
-  ]
 
   rpc_commands = [
     rpc.BuildRPC('StoreFiles', files_to_upload),
-    rpc.BuildRPC('RunCommands', command_to_execute),
+    rpc.BuildRPC('RunManifest', swarm_file_path),
   ]
   # The Swarming bot uses an hand rolled RPC system and 'commands' is actual the
   # custom RPC commands. See test_management._BuildTestRun()

@@ -341,44 +341,6 @@ class TestSlaveMachine(auto_stub.TestCase):
 
     self._mox.VerifyAll()
 
-  # Test with correct RPC function name but wrong arg type.
-  def testBadCommandsParseRPCArgType(self):
-    # Initial server ping.
-    url_helper.UrlOpen(mox.IgnoreArg(), method='GET').AndReturn('')
-
-    commands = [rpc.BuildRPC('RunCommands', None)]
-    _SetPollJobAndPostFailExpectations(
-        _CreateResponse(commands=commands, result_url='here.com'),
-        'here.com',
-        'Invalid RunCommands arg type: <type \'NoneType\'> (expected list of '
-        'str or unicode)')
-    self._mox.ReplayAll()
-
-    slave = slave_machine.SlaveMachine()
-    slave.Start(iterations=1)
-
-    self._mox.VerifyAll()
-
-  # Test with correct RPC function name and arg type.
-  def testGoodCommands(self):
-    # Initial server ping.
-    url_helper.UrlOpen(mox.IgnoreArg(), method='GET').AndReturn('')
-
-    function_name = 'RunCommands'
-    args = ['--version']
-    commands = [rpc.BuildRPC(function_name, args)]
-
-    UrlOpenExpectations(
-        _CreateResponse(commands=commands, result_url='here.com'),
-        mox.IgnoreArg(), mox.IgnoreArg())
-    self._MockSubprocessCheckCall([sys.executable, '--version'])
-    self._mox.ReplayAll()
-
-    slave = slave_machine.SlaveMachine()
-    slave.Start(iterations=1)
-
-    self._mox.VerifyAll()
-
   # Test with both fields in response: come_back and commands.
   def testInvalidBothCommandsAndComeback(self):
     # Initial server ping.
@@ -600,45 +562,28 @@ class TestSlaveMachine(auto_stub.TestCase):
 
     self._mox.VerifyAll()
 
-  def testRunCommandsRPCValidate(self):
+  def testRunManifestRPCValidate(self):
     # Initial server ping.
     url_helper.UrlOpen(mox.IgnoreArg(), method='GET').AndReturn('')
 
-    function_name = 'RunCommands'
-    invalid_args = [None, u'some arg', [[u'another arg']], ['123', 1]]
-
-    expected_error = [
-        ('Invalid %s arg type: %s (expected list of str or'
-         ' unicode)'% (function_name, str(type(invalid_args[0])))),
-        ('Invalid %s arg type: %s (expected list of str or'
-         ' unicode)'% (function_name, str(type(invalid_args[1])))),
-        ('Invalid element type in %s args: %s (expected str or unicode)'%
-         (function_name, str(type(invalid_args[2][0])))),
-        ('Invalid element type in %s args: %s (expected str or unicode)'%
-         (function_name, str(type(invalid_args[3][1]))))]
-
-    self.assertEqual(len(invalid_args), len(expected_error))
-
-    for i in range(0, len(invalid_args)):
-      commands = [rpc.BuildRPC(function_name, invalid_args[i])]
-      response = _CreateResponse(commands=commands, result_url='here.com')
-
-      _SetPollJobAndPostFailExpectations(
-          response, 'here.com', expected_error[i])
-
+    commands = [rpc.BuildRPC('RunManifest', None)]
+    _SetPollJobAndPostFailExpectations(
+        _CreateResponse(commands=commands, result_url='here.com'),
+        'here.com',
+        'Invalid RunManifest arg: None (expected str)')
     self._mox.ReplayAll()
 
     slave = slave_machine.SlaveMachine()
-    slave.Start(iterations=len(invalid_args))
+    slave.Start(iterations=1)
 
     self._mox.VerifyAll()
 
-  def testRunCommandsRPCExecuteSubprocessException(self):
+  def testRunManifestRPCExecuteSubprocessException(self):
     # Initial server ping.
     url_helper.UrlOpen(mox.IgnoreArg(), method='GET').AndReturn('')
 
-    function_name = 'RunCommands'
-    args = [u'is an', u'awesome', u'language']
+    function_name = 'RunManifest'
+    args = u'language'
 
     slave = slave_machine.SlaveMachine()
     commands = [rpc.BuildRPC(function_name, args)]
@@ -650,14 +595,17 @@ class TestSlaveMachine(auto_stub.TestCase):
         ).AndReturn(response)
 
     # Mock subprocess to raise exception.
-    full_commands = [sys.executable] + args
+    full_command = [
+      sys.executable, 'local_test_runner.py', '--restart_on_failure', '-f',
+      args,
+    ]
     exit_code = -1
-    self._MockSubprocessCheckCall(commands=full_commands, exit_code=exit_code)
+    self._MockSubprocessCheckCall(commands=full_command, exit_code=exit_code)
 
     # Mock the call to post failed results.
     self._MockPostFailedExecuteResults(
         slave, "Command '%s' returned non-zero exit status %d"
-        % (str(full_commands), exit_code))
+        % (str(full_command), exit_code))
 
     self._mox.ReplayAll()
 
@@ -665,12 +613,12 @@ class TestSlaveMachine(auto_stub.TestCase):
 
     self._mox.VerifyAll()
 
-  def testRunCommandsRPCExecuteNoException(self):
+  def testRunManifestRPCExecuteNoException(self):
     # Initial server ping.
     url_helper.UrlOpen(mox.IgnoreArg(), method='GET').AndReturn('')
 
-    function_name = 'RunCommands'
-    args = [u'is an', u'awesome', u'language']
+    function_name = 'RunManifest'
+    args = u'language'
 
     slave = slave_machine.SlaveMachine()
     commands = [rpc.BuildRPC(function_name, args)]
@@ -682,7 +630,11 @@ class TestSlaveMachine(auto_stub.TestCase):
         ).AndReturn(response)
 
     # Mock subprocess to raise exception.
-    self._MockSubprocessCheckCall(commands=[sys.executable]+args)
+    expected = [
+      sys.executable, 'local_test_runner.py', '--restart_on_failure', '-f',
+      args,
+    ]
+    self._MockSubprocessCheckCall(commands=expected)
 
     self._mox.ReplayAll()
 
@@ -690,12 +642,12 @@ class TestSlaveMachine(auto_stub.TestCase):
 
     self._mox.VerifyAll()
 
-  def testRunCommandsRPCRestartFails(self):
+  def testRunManifestRPCRestartFails(self):
     # Initial server ping.
     url_helper.UrlOpen(mox.IgnoreArg(), method='GET').AndReturn('')
 
-    function_name = 'RunCommands'
-    args = [u'is an', u'awesome', u'language']
+    function_name = 'RunManifest'
+    args = 'language'
 
     slave = slave_machine.SlaveMachine()
     commands = [rpc.BuildRPC(function_name, args)]
@@ -707,8 +659,12 @@ class TestSlaveMachine(auto_stub.TestCase):
         ).AndReturn(response)
 
     # Mock subprocess to raise exception and signal a restart.
+    expected = [
+      sys.executable, 'local_test_runner.py', '--restart_on_failure', '-f',
+      args,
+    ]
     self._MockSubprocessCheckCall(
-        commands=[sys.executable]+args,
+        commands=expected,
         exit_code=swarm_constants.RESTART_EXIT_CODE)
 
     # Mock out the the restart attempt to raise a subprocess exception.
