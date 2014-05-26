@@ -314,7 +314,12 @@ class InternalVerifyWorkerHandler(webapp2.RequestHandler):
         'Verification failed for %s: %s', entry.key.id(), message % args)
     model.delete_entry_and_gs_entry([entry.key])
 
-  @decorators.silence(gcs.TransientError, runtime.DeadlineExceededError)
+  @decorators.silence(
+      datastore_errors.InternalError,
+      datastore_errors.Timeout,
+      datastore_errors.TransactionFailedError,
+      gcs.TransientError,
+      runtime.DeadlineExceededError)
   @decorators.require_taskqueue('verify')
   def post(self, namespace, hash_key):
     entry = model.entry_key(namespace, hash_key).get()
