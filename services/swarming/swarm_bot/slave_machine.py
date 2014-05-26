@@ -38,10 +38,6 @@ ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 # The zip file to contain the zipped slave code.
 ZIPPED_SLAVE_FILES = 'slave_files.zip'
 
-# The name of a user added file that can be used to specify conditions under
-# which a slave should stop querying for work.
-CHECK_REQUIREMENTS_FILE = 'check_requirements.py'
-
 # The code to unzip the slave code and start the slave back up. This needs to be
 # a separate script so that the update process can overwrite it and then run
 # it without the rest of the slave running, otherwise the slave files will be
@@ -91,27 +87,6 @@ def Restart():
 
   # The machine should be shutdown by now.
   raise SlaveError('Unable to restart machine')
-
-
-def ShouldRun(remaining_iterations):
-  """Do some basic checks to determine if the slave should run.
-
-  Args:
-    remaining_iterations: The remaining number of iterations to do (or -1 to
-        never stop).
-
-  Returns:
-     True if this machine should continue running.
-  """
-  if remaining_iterations == 0:
-    return False
-
-  # If a CHECK_REQUIREMENT_FILE is present, call it to give slaves a way of
-  # determining if they should still communicate with the server or not.
-  if os.path.exists(CHECK_REQUIREMENTS_FILE):
-    return not bool(subprocess.call([sys.executable, CHECK_REQUIREMENTS_FILE]))
-
-  return True
 
 
 def ValidateBasestring(x, error_prefix='', errors=None):
@@ -274,19 +249,18 @@ class SlaveMachine(object):
     self._attributes['version'] = bot_archive.GenerateSlaveVersion(
         ROOT_DIR, additionals)
 
-  def Start(self, iterations=-1):
+  def Start(self, iterations):
     """Starts the slave, which polls the Swarm server for jobs until it dies.
 
     Args:
-      iterations: Number of times to poll the Swarm server. -1 indicates
+      iterations: Purely used for test to make it cleanly exit. -1 indicates
           infinitely. Failing to connect to the server DOES NOT count as an
           iteration. This is useful for testing the slave and having an exit
           condition.
 
     Raises:
       SlaveError: If the slave in unable to connect to the provided URL after
-      the given number of tries, or an invalid number of iterations were
-      requested.
+      the given number of tries.
     """
     # Ping the swarm server before trying to find the fqdn below to ensure
     # that we have acquired our fqdn (otherwise getfqdn() below maybe return
@@ -303,7 +277,6 @@ class SlaveMachine(object):
     self._attributes['id'] = socket.getfqdn().lower()
 
     url = self._url + '/poll_for_test'
-    remaining_iterations = iterations
 
     while True:
       request = {
@@ -321,7 +294,6 @@ class SlaveMachine(object):
                          'connect after %d attempts.'
                          % (url, self._max_url_tries))
 
-      response = None
       try:
         response = json.loads(response_str)
       except ValueError:
@@ -330,12 +302,10 @@ class SlaveMachine(object):
         logging.debug('Valid server response:\n %s', response_str)
         self._ProcessResponse(response)
 
-      if remaining_iterations > 0:
-        remaining_iterations -= 1
-
-      if not ShouldRun(remaining_iterations):
-        logging.debug('No more iterations to run, stopping slave.')
-        break
+      if iterations > 0:
+        iterations -= 1
+        if not iterations:
+          break
 
   def _ProcessResponse(self, response):
     """Deals with processing the response sent to slave machine.
@@ -637,9 +607,6 @@ def main():
                     'forever.')
   parser.add_option('-v', '--verbose', action='count', default=0,
                     help='Set logging level to INFO, twice for DEBUG.')
-  parser.add_option('-i', '--iterations', default=-1, type='int',
-                    help='Number of iterations to request jobs from '
-                    'Swarm server. Defaults to %default (infinite).')
   parser.add_option('-d', '--directory', default='.',
                     help='Sets the working directory of the slave. '
                     'Defaults to %default. ')
@@ -651,9 +618,6 @@ def main():
   # Parser handles exiting this script after logging the error.
   if len(args) > 1:
     parser.error('Must specify only one filename')
-
-  if options.iterations < -1 or options.iterations == 0:
-    parser.error('Number of iterations must be -1 or a positive number')
 
   logging.basicConfig()
   log_file = logging.handlers.RotatingFileHandler(options.log_file,
@@ -695,7 +659,7 @@ def main():
   while True:
     # Start requesting jobs.
     try:
-      slave.Start(iterations=options.iterations)
+      slave.Start(-1)
     except (rpc.RPCError, SlaveError) as e:
       logging.exception('Slave start threw an exception:\n%s', e)
 
