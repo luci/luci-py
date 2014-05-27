@@ -29,7 +29,6 @@ from components import utils
 from server import admin_user
 from server import bot_management
 from server import bots_list
-from server import dimensions_utils
 from server import errors
 from server import stats_new as stats
 from server import task_common
@@ -72,9 +71,6 @@ class AppTest(test_case.TestCase):
 
     # Whitelist that fake bot.
     user_manager.AddWhitelist(FAKE_IP)
-
-    # A basic config hash to use when creating runners.
-    self.config_hash = dimensions_utils.GenerateDimensionHash({})
 
     # Mock expected permission structure.
     def mocked_has_permission(_action, resource):

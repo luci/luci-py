@@ -13,7 +13,6 @@ from components import datastore_utils
 from components import decorators
 from components import ereporter2
 from server import admin_user
-from server import dimension_mapping
 from server import result_helper
 from server import errors
 from server import task_scheduler
@@ -58,7 +57,6 @@ class TaskCleanupDataHandler(webapp2.RequestHandler):
     # All the things that need to be deleted.
     queries = [
         errors.QueryOldErrors(),
-        dimension_mapping.QueryOldDimensionMapping(),
         result_helper.QueryOldResults(),
         result_helper.QueryOldResultChunks(),
     ]
