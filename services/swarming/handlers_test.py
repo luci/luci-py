@@ -21,7 +21,7 @@ from google.appengine.ext import deferred
 
 import webtest
 
-import handlers
+import handlers_frontend
 from common import swarm_constants
 from components import auth
 from components import stats_framework
@@ -61,7 +61,7 @@ class AppTest(test_case.TestCase):
     self.testbed.init_user_stub()
 
     # By default requests in tests are coming from bot with fake IP.
-    app = handlers.CreateApplication()
+    app = handlers_frontend.CreateApplication()
     app.router.add(('/_ah/queue/deferred', deferred.TaskHandler))
     self.app = webtest.TestApp(
         app,
@@ -129,7 +129,7 @@ class AppTest(test_case.TestCase):
     # Mock out all the authentication, since it doesn't work with the server
     # being only eventually consistent (but it is ok for the machines to take
     # a while to appear).
-    self.mock(handlers.user_manager, 'IsWhitelistedMachine', lambda *_arg: True)
+    self.mock(user_manager, 'IsWhitelistedMachine', lambda *_arg: True)
 
     # Test when no matching tests.
     response = self.app.get(
@@ -830,7 +830,8 @@ class AppTest(test_case.TestCase):
         'swarming/clients',
         'swarming/management',
     }
-    for route in auth.get_authenticated_routes(handlers.CreateApplication()):
+    for route in auth.get_authenticated_routes(
+        handlers_frontend.CreateApplication()):
       per_method = route.handler.get_methods_permissions()
       for method, permissions in per_method.iteritems():
         self.assertTrue(
@@ -840,8 +841,7 @@ class AppTest(test_case.TestCase):
 
   def test_dead_machines_count(self):
     self.assertEqual('0', self.app.get('/swarming/api/v1/bots/dead/count').body)
-    bot = handlers.machine_stats.MachineStats.get_or_insert(
-        'id1', tag='machine')
+    bot = machine_stats.MachineStats.get_or_insert('id1', tag='machine')
     self.assertEqual('0', self.app.get('/swarming/api/v1/bots/dead/count').body)
     # Make the machine old and ensure it is marked as dead.
     bot.last_seen = (

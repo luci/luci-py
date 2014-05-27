@@ -10,7 +10,6 @@ implemented using the webapp2 framework.
 
 import collections
 import datetime
-import functools
 import json
 import logging
 import os
@@ -20,9 +19,7 @@ import urllib
 import webapp2
 
 from google.appengine import runtime
-from google.appengine.api import datastore_errors
 from google.appengine.api import modules
-from google.appengine.api import taskqueue
 from google.appengine.datastore import datastore_query
 from google.appengine.ext import ndb
 
@@ -31,13 +28,9 @@ from common import swarm_constants
 from common import test_request_message
 from components import auth
 from components import auth_ui
-from components import datastore_utils
-from components import decorators
 from components import ereporter2
 from components import utils
-from server import admin_user
 from server import bot_management
-from server import dimension_mapping
 from server import errors
 from server import result_helper
 from server import stats_gviz
@@ -52,6 +45,8 @@ from server import test_management
 from server import user_manager
 from stats import machine_stats
 
+import handlers_backend
+import handlers_common
 import template
 
 
@@ -63,27 +58,6 @@ ACCEPTABLE_SORTS =  {
   'user': 'User',
 }
 DEFAULT_SORT = 'created_ts'
-
-
-# Ignore these failures, there's nothing to do.
-# TODO(maruel): Store them in the db and make this runtime configurable.
-IGNORED_LINES = (
-  # Probably originating from appstats.
-  '/base/data/home/runtimes/python27/python27_lib/versions/1/google/'
-      'appengine/_internal/django/template/__init__.py:729: UserWarning: '
-      'api_milliseconds does not return a meaningful value',
-)
-
-# Ignore these exceptions.
-IGNORED_EXCEPTIONS = (
-  'DeadlineExceededError',
-  # These occurs during a transaction.
-  'Timeout',
-)
-
-# Function that is used to determine if an error entry should be ignored.
-should_ignore_error_record = functools.partial(
-    ereporter2.should_ignore_error_record, IGNORED_LINES, IGNORED_EXCEPTIONS)
 
 
 def GetModulesVersions():
@@ -621,52 +595,6 @@ class ResultHandler(auth.AuthenticatingHandler):
     self.response.out.write('Successfully update the runner results.')
 
 
-class TaskCleanupDataHandler(webapp2.RequestHandler):
-  """Deletes orphaned blobs."""
-
-  @decorators.silence(datastore_errors.Timeout)
-  @decorators.require_taskqueue('cleanup')
-  def post(self):
-    # All the things that need to be deleted.
-    queries = [
-        errors.QueryOldErrors(),
-        dimension_mapping.QueryOldDimensionMapping(),
-        result_helper.QueryOldResults(),
-        result_helper.QueryOldResultChunks(),
-    ]
-    datastore_utils.incremental_map(
-        queries, ndb.delete_multi_async, max_inflight=50)
-    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
-    self.response.out.write('Success.')
-
-
-class CronAbortBotDiedHandler(webapp2.RequestHandler):
-  @decorators.require_cronjob
-  def get(self):
-    task_scheduler.cron_abort_bot_died()
-    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
-    self.response.out.write('Success.')
-
-
-class CronAbortExpiredShardToRunHandler(webapp2.RequestHandler):
-  @decorators.require_cronjob
-  def get(self):
-    task_scheduler.cron_abort_expired_task_to_run()
-    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
-    self.response.out.write('Success.')
-
-
-class CronTriggerCleanupDataHandler(webapp2.RequestHandler):
-  """Triggers task to delete orphaned blobs."""
-
-  @decorators.require_cronjob
-  def get(self):
-    taskqueue.add(method='POST', url='/internal/taskqueue/cleanup_data',
-                  queue_name='cleanup')
-    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
-    self.response.out.write('Success.')
-
-
 class DeadBotsCountHandler(webapp2.RequestHandler):
   def get(self):
     self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
@@ -674,30 +602,6 @@ class DeadBotsCountHandler(webapp2.RequestHandler):
     count = machine_stats.MachineStats.query().filter(
         machine_stats.MachineStats.last_seen < cutoff).count()
     self.response.out.write(str(count))
-
-
-class CronSendEreporter2MailHandler(webapp2.RequestHandler):
-  """Sends email containing the errors found in logservice."""
-
-  @decorators.require_cronjob
-  def get(self):
-    request_id_url = self.request.host_url + '/secure/ereporter2/request/'
-    report_url = self.request.host_url + '/secure/ereporter2/report'
-    result = ereporter2.generate_and_email_report(
-        None,
-        should_ignore_error_record,
-        admin_user.GetAdmins(),
-        request_id_url,
-        report_url,
-        ereporter2.REPORT_TITLE_TEMPLATE,
-        ereporter2.REPORT_CONTENT_TEMPLATE,
-        {})
-    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
-    if result:
-      self.response.write('Success.')
-    else:
-      # Do not HTTP 500 since we do not want it to be retried.
-      self.response.write('Failed.')
 
 
 class Ereporter2ReportHandler(auth.AuthenticatingHandler):
@@ -719,7 +623,7 @@ class Ereporter2ReportHandler(auth.AuthenticatingHandler):
         ereporter2.get_default_start_time() or 0)
     module_versions = GetModulesVersions()
     report, ignored = ereporter2.generate_report(
-        start, end, module_versions, should_ignore_error_record)
+        start, end, module_versions, handlers_common.should_ignore_error_record)
     env = ereporter2.get_template_env(start, end, module_versions)
     content = ereporter2.report_to_html(
         report, ignored,
@@ -1236,20 +1140,6 @@ def CreateApplication():
       ('/swarming/api/v1/stats/user/<user:.+>/<resolution:[a-z]+>',
         stats_gviz.StatsGvizUserHandler),
 
-      # Internal urls.
-
-      # Cron jobs.
-      ('/internal/cron/abort_bot_died', CronAbortBotDiedHandler),
-      ('/internal/cron/abort_expired_task_to_run',
-          CronAbortExpiredShardToRunHandler),
-
-      ('/internal/cron/ereporter2/mail', CronSendEreporter2MailHandler),
-      ('/internal/cron/stats/update', stats.InternalStatsUpdateHandler),
-      ('/internal/cron/trigger_cleanup_data', CronTriggerCleanupDataHandler),
-
-      # Task queues.
-      ('/internal/taskqueue/cleanup_data', TaskCleanupDataHandler),
-
       ('/_ah/warmup', WarmupHandler),
   ]
 
@@ -1273,5 +1163,6 @@ def CreateApplication():
   # Add routes with Auth REST API and Auth UI.
   routes.extend(auth_ui.get_rest_api_routes())
   routes.extend(auth_ui.get_ui_routes())
+  routes.extend(handlers_backend.get_routes())
 
   return webapp2.WSGIApplication(routes, debug=True)

@@ -16,7 +16,7 @@ sys.path.insert(0, os.path.join(APP_DIR, 'components', 'third_party'))
 
 from components import ereporter2
 from components import utils
-import handlers
+import handlers_frontend
 
 
 # Aggressively flush the logs, on the canary appstats gets in the way and
@@ -28,7 +28,7 @@ logservice.AUTOFLUSH_EVERY_LINES = 1
 
 def CreateApplication():
   ereporter2.register_formatter()
-  a = handlers.CreateApplication()
+  a = handlers_frontend.CreateApplication()
   # In theory we'd want to take the output of app_identity.get_application_id().
   # Sadly, this function does an RPC call and may contribute to cause time out
   # on the initial load.
