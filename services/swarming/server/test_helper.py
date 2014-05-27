@@ -111,8 +111,9 @@ def CreateRunner(config_name=None, machine_id=None, ran_successfully=None,
 
   # The task is reaped by a bot, so it is in a running state. Pending state is
   # not supported here.
-  task_key = task_to_run.request_key_to_task_to_run_key(request.key)
-  ndb.transaction(lambda: task_to_run.reap_task_to_run(task_key))
+  task_key = task_to_run.request_to_task_to_run_key(request)
+  task = task_to_run.is_task_reapable(task_key, None)
+  task.put()
 
   machine_id = machine_id or 'localhost'
   run_result = task_result.new_run_result(request, 1, machine_id)

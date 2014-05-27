@@ -893,7 +893,7 @@ class CancelHandler(auth.AuthenticatingHandler):
     # TODO(maruel): Move this code into task_scheduler.py.
     request_key = task_result.result_summary_key_to_request_key(
         result_summary_key)
-    task_key = task_to_run.request_key_to_task_to_run_key(request_key)
+    task_key = task_to_run.request_to_task_to_run_key(request_key.get())
     task_to_run.abort_task_to_run(task_key.get())
     result_summary = result_summary_key.get()
     result_summary.state = task_result.State.CANCELED

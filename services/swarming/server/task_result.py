@@ -379,11 +379,3 @@ def put_run_result(run_result):
   result_summary = run_result.result_summary_key.get()
   result_summary.set_from_run_result(run_result)
   ndb.put_multi([run_result, result_summary])
-
-
-def terminate_result(run_result, state):
-  """Puts a TaskRunResult in dead state."""
-  assert state in State.STATES_ABANDONED, state
-  run_result.state = state
-  run_result.abandoned_ts = task_common.utcnow()
-  put_run_result(run_result)

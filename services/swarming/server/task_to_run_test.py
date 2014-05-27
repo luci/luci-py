@@ -178,21 +178,23 @@ class TaskToRunApiTest(test_case.TestCase):
     self.assertFalse(missing)
 
   def test_task_to_run_key_to_request_key(self):
-    request_key = task_request.id_to_request_key(256)
-    task_key = task_to_run.request_key_to_task_to_run_key(request_key)
+    request = task_request.make_request(_gen_request_data())
+    task_key = task_to_run.request_to_task_to_run_key(request)
     actual = task_to_run.task_to_run_key_to_request_key(task_key)
-    self.assertEqual(request_key, actual)
+    self.assertEqual(request.key, actual)
 
-  def test_request_key_to_task_to_run_key(self):
-    task_key = task_to_run.request_key_to_task_to_run_key(
-        task_request.id_to_request_key(256))
+  def test_request_to_task_to_run_key(self):
+    self.mock(task_request.random, 'getrandbits', lambda _: 0x88)
+    request = task_request.make_request(_gen_request_data())
+    task_key = task_to_run.request_to_task_to_run_key(request)
     expected = (
-        "Key('TaskRequestShard', 'f71849', 'TaskRequest', 256, 'TaskToRun', 1)")
+        "Key('TaskRequestShard', '0c152f', 'TaskRequest', 91005376593954816, "
+        "'TaskToRun', 2471203225)")
     self.assertEqual(expected, str(task_key))
 
   def test_validate_to_run_key(self):
-    task_key = task_to_run.request_key_to_task_to_run_key(
-        task_request.id_to_request_key(256))
+    request = task_request.make_request(_gen_request_data())
+    task_key = task_to_run.request_to_task_to_run_key(request)
     task_to_run.validate_to_run_key(task_key)
     with self.assertRaises(ValueError):
       task_to_run.validate_to_run_key(ndb.Key('TaskRequest', 1, 'TaskToRun', 1))
@@ -232,7 +234,6 @@ class TaskToRunApiTest(test_case.TestCase):
         'expiration_ts': self.now + datetime.timedelta(seconds=31),
         # random 8-15 bits = 23 as mocked above.
         'request_key': '0x014350e868882300',
-        'key': '1',
         # Lower priority value means higher priority.
         'queue_number': '0x05014350e8688800',
       },
@@ -241,7 +242,6 @@ class TaskToRunApiTest(test_case.TestCase):
         'expiration_ts': self.now + datetime.timedelta(seconds=31),
         # random 8-15 bits = 12 as mocked above.
         'request_key': '0x014350e868881200',
-        'key': '1',
         'queue_number': '0x0a014350e8688800',
       },
     ]
@@ -249,7 +249,6 @@ class TaskToRunApiTest(test_case.TestCase):
     def flatten(i):
       out = _task_to_run_to_dict(i)
       out['request_key'] = '0x%016x' % i.request_key.integer_id()
-      out['key'] = '%x' % i.key.integer_id()
       return out
 
     # Warning: Ordering by key doesn't work because of TaskToRunShard; e.g.
@@ -447,63 +446,41 @@ class TaskToRunApiTest(test_case.TestCase):
     self.assertEqual(
         1, len(list(task_to_run.yield_expired_task_to_run())))
 
-  def test_reap_task_to_run(self):
-    to_run_1 = _gen_new_task_to_run(
-        properties=dict(dimensions={u'OS': u'Windows-3.1.1'}))
-    to_run_2 = _gen_new_task_to_run(
-        properties=dict(dimensions={u'OS': u'Windows-3.1.1'}))
+  def test_is_task_reapable(self):
+    req_dimensions = {u'OS': u'Windows-3.1.1'}
+    task_1 = _gen_new_task_to_run(properties=dict(dimensions=req_dimensions))
+    task_2 = _gen_new_task_to_run(properties=dict(dimensions=req_dimensions))
     bot_dimensions = {u'OS': u'Windows-3.1.1', u'hostname': u'localhost'}
     self.assertEqual(
         2, len(_yield_next_available_task_to_dispatch(bot_dimensions)))
 
     # A bot is assigned a task shard.
-    self.assertEqual(
-        True,
-        ndb.transaction(lambda: task_to_run.reap_task_to_run(to_run_1.key)))
+    task = task_to_run.is_task_reapable(task_1.key, None)
+    task.queue_number = None
+    task.put()
     self.assertEqual(
         1, len(_yield_next_available_task_to_dispatch(bot_dimensions)))
 
     # This task shard cannot be assigned anymore.
-    self.assertEqual(
-        False,
-        ndb.transaction(lambda: task_to_run.reap_task_to_run(to_run_1.key)))
+    self.assertEqual(None, task_to_run.is_task_reapable(task_1.key, None))
     self.assertEqual(
         1, len(_yield_next_available_task_to_dispatch(bot_dimensions)))
-    self.assertEqual(
-        True,
-        ndb.transaction(lambda: task_to_run.reap_task_to_run(to_run_2.key)))
+    task = task_to_run.is_task_reapable(task_2.key, None)
+    task.queue_number = None
+    task.put()
     self.assertEqual(
         0, len(_yield_next_available_task_to_dispatch(bot_dimensions)))
 
-  def test_retry_task_to_run(self):
-    to_run_1 = _gen_new_task_to_run(
+  def test_set_lookup_cache(self):
+    task = _gen_new_task_to_run(
         properties=dict(dimensions={u'OS': u'Windows-3.1.1'}))
-    to_run_2 = _gen_new_task_to_run(
-        properties=dict(dimensions={u'OS': u'Windows-3.1.1'}))
-    bot_dimensions = {u'OS': u'Windows-3.1.1', u'hostname': u'localhost'}
-    # Grabs the 2 available tasks so no task is available afterward.
-    ndb.transaction(lambda: task_to_run.reap_task_to_run(to_run_1.key))
-    ndb.transaction(lambda: task_to_run.reap_task_to_run(to_run_2.key))
-    self.assertEqual(
-        0, len(_yield_next_available_task_to_dispatch(bot_dimensions)))
-
-    # Calling retry_task_to_run() puts the task back as available for
-    # dispatch.
-    self.assertIs(True, task_to_run.retry_task_to_run(to_run_1.key))
-    self.assertEqual(
-        1, len(_yield_next_available_task_to_dispatch(bot_dimensions)))
-
-    # Can't retry a task already available to be dispatched to a bot.
-    self.assertEqual(
-        False, task_to_run.retry_task_to_run(to_run_1.key))
-    self.assertEqual(
-        1, len(_yield_next_available_task_to_dispatch(bot_dimensions)))
-
-    # Retry the second task too.
-    self.assertEqual(
-        True, task_to_run.retry_task_to_run(to_run_2.key))
-    self.assertEqual(
-        2, len(_yield_next_available_task_to_dispatch(bot_dimensions)))
+    self.assertEqual(False, task_to_run._lookup_cache_is_taken(task.key))
+    task_to_run.set_lookup_cache(task.key, True)
+    self.assertEqual(False, task_to_run._lookup_cache_is_taken(task.key))
+    task_to_run.set_lookup_cache(task.key, False)
+    self.assertEqual(True, task_to_run._lookup_cache_is_taken(task.key))
+    task_to_run.set_lookup_cache(task.key, True)
+    self.assertEqual(False, task_to_run._lookup_cache_is_taken(task.key))
 
   def test_abort_task_to_run(self):
     task = _gen_new_task_to_run(

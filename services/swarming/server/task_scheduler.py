@@ -40,28 +40,46 @@ def _secs_to_ms(value):
   return int(round(value * 1000.))
 
 
-def _update_task(task, request, bot_id):
-  """Internal transactional function to reap a task and insert the result
-  entity.
+def _update_task(task_key, request, bot_id):
+  """Reaps a task and insert the results entity.
 
-  If bot_id is None, the task is cancelled.
+  If bot_id is None, the task is declared EXPIRED.
 
   Returns:
     TaskRunResult if successful, None otherwise.
   """
+  assert request.key == task_to_run.task_to_run_key_to_request_key(task_key)
+  result_summary_future = task_result.request_key_to_result_summary_key(
+      request.key).get_async()
+
+  # Look if the TaskToRun is reapable once before doing the check inside the
+  # transaction. This reduces the likelihood of failing this check inside
+  # the transaction, which is an order of magnitude more costly.
+  if not task_to_run.is_task_reapable(task_key, None):
+    result_summary_future.wait()
+    return None
+
+  result_summary = result_summary_future.get_result()
+
   def run():
-    if not task_to_run.reap_task_to_run(task.key):
-      return None
+    task = task_to_run.is_task_reapable(task_key, None)
+    if not task:
+      return None, None
+    task.queue_number = None
     # TODO(maruel): Use datastore_util.insert() to create the new try_number.
     run_result = task_result.new_run_result(request, 1, bot_id)
-    if bot_id:
-      task_result.put_run_result(run_result)
-    else:
-      task_result.terminate_result(run_result, task_result.State.EXPIRED)
-    return run_result
+    if not bot_id:
+      run_result.state = task_result.State.EXPIRED
+      run_result.abandoned_ts = task_common.utcnow()
+    result_summary.set_from_run_result(run_result)
+    ndb.put_multi([task, run_result, result_summary])
+    return run_result, task
 
   try:
-    return ndb.transaction(run, retries=0)
+    run_result, task = ndb.transaction(run, retries=0)
+    if task:
+      task_to_run.set_lookup_cache(task.key, False)
+    return run_result
   except (
       apiproxy_errors.CancelledError,
       datastore_errors.BadRequestError,
@@ -159,7 +177,7 @@ def bot_reap_task(dimensions, bot_id):
       total_skipped += 1
       continue
 
-    run_result = _update_task(task, request, bot_id)
+    run_result = _update_task(task.key, request, bot_id)
     if not run_result:
       failures += 1
       #logging.warning('Failed to reap %d', task.key.integer_id())
@@ -269,7 +287,7 @@ def cron_abort_expired_task_to_run():
     for task in task_to_run.yield_expired_task_to_run():
       # Create the TaskRunResult and kill it immediately.
       request = task.request_key.get()
-      if _update_task(task, request, None):
+      if _update_task(task.key, request, None):
         killed += 1
         stats.add_task_entry(
             'task_request_expired',
@@ -297,8 +315,9 @@ def cron_abort_bot_died():
       # Implement automatic retry;
       # https://code.google.com/p/swarming/issues/detail?id=108
       request_future = run_result.request_key.get_async()
-      task_result.terminate_result(
-          run_result, task_result.State.BOT_DIED)
+      run_result.state = task_result.State.BOT_DIED
+      run_result.abandoned_ts = task_common.utcnow()
+      task_result.put_run_result(run_result)
       request = request_future.get_result()
       stats.add_run_entry(
           'run_bot_died', run_result.key,

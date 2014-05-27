@@ -234,9 +234,9 @@ class TaskResultApiTest(test_case.TestCase):
     # Task is reaped after 2 seconds (4 secs total).
     reap_ts = self.now + datetime.timedelta(seconds=4)
     test_helper.mock_now(self, reap_ts)
-    self.assertEqual(
-        True,
-        ndb.transaction(lambda: task_to_run.reap_task_to_run(task.key)))
+    task = task_to_run.is_task_reapable(task.key, None)
+    task.queue_number = None
+    task.put()
     run_result = task_result.new_run_result(request, 1, 'localhost')
     task_result.put_run_result(run_result)
     expected = {
@@ -285,45 +285,6 @@ class TaskResultApiTest(test_case.TestCase):
     }
     self.assertEqual(expected, result_summary.to_dict())
     self.assertEqual(datetime.timedelta(seconds=2), result_summary.duration())
-
-  def test_terminate_result(self):
-    request = task_request.make_request(_gen_request_data())
-    result_summary = task_result.new_result_summary(request)
-    result_summary.put()
-    run_result = task_result.new_run_result(request, 1, 'localhost')
-    task_result.terminate_result(run_result, task_result.State.BOT_DIED)
-    expected = {
-      'abandoned_ts': self.now,
-      'bot_id': u'localhost',
-      'completed_ts': None,
-      'exit_codes': [],
-      'failure': False,
-      'internal_failure': False,
-      'modified_ts': self.now,
-      'outputs': [],
-      'started_ts': self.now,
-      'state': task_result.State.BOT_DIED,
-      'try_number': 1,
-    }
-    self.assertEqual(expected, run_result.key.get().to_dict())
-
-    expected = {
-      'abandoned_ts': self.now,
-      'bot_id': u'localhost',
-      'completed_ts': None,
-      'created_ts': self.now,
-      'exit_codes': [],
-      'failure': False,
-      'internal_failure': False,
-      'modified_ts': self.now,
-      'name': u'Request name',
-      'outputs': [],
-      'started_ts': self.now,
-      'state': task_result.State.BOT_DIED,
-      'try_number': 1,
-      'user': u'Jesus',
-    }
-    self.assertEqual(expected, result_summary.key.get().to_dict())
 
   def test_yield_run_results_with_dead_bot(self):
     request = task_request.make_request(_gen_request_data())
