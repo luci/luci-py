@@ -2,9 +2,9 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
-"""Machine Stats.
+"""Bots Stats.
 
-The model of the Machine Stats, and various helper functions.
+The model of the Bots Stats, and various helper functions.
 """
 
 import datetime
@@ -14,14 +14,16 @@ import logging
 from google.appengine.ext import ndb
 
 from components import utils
-
+from server import task_common
 
 # The number of hours that have to pass before a machine is considered dead.
-MACHINE_DEATH_TIMEOUT = datetime.timedelta(hours=3)
+MACHINE_DEATH_TIMEOUT = datetime.timedelta(seconds=30*60)
+
 
 # The amount of time that needs to pass before the last_seen field of
 # MachineStats will update for a given machine, to prevent too many puts.
-MACHINE_UPDATE_TIME = datetime.timedelta(hours=1)
+MACHINE_UPDATE_TIME = datetime.timedelta(seconds=120)
+
 
 # The dict of acceptable keys to sort MachineStats by, with the key as the key
 # and the value as the human readable name.
@@ -31,11 +33,6 @@ ACCEPTABLE_SORTS = {
     'machine_id': 'Machine ID',
     'tag': 'Tag',
 }
-
-
-def utcnow():
-  """To be mocked in tests."""
-  return datetime.datetime.utcnow()
 
 
 class MachineStats(ndb.Model):
@@ -58,7 +55,7 @@ class MachineStats(ndb.Model):
   def _pre_put_hook(self):
     """Stores the creation time for this model."""
     if not self.last_seen:
-      self.last_seen = utcnow()
+      self.last_seen = task_common.utcnow()
 
   def to_dict(self):
     """Converts dimensions from json to dict."""
@@ -85,14 +82,14 @@ def RecordMachineQueriedForWork(machine_id, dimensions, machine_tag):
 
   machine_stats = MachineStats.get_by_id(machine_id)
   if (machine_stats and
-      (machine_stats.last_seen + MACHINE_UPDATE_TIME >= utcnow()) and
+      machine_stats.last_seen + MACHINE_UPDATE_TIME >= task_common.utcnow() and
       machine_stats.dimensions == dimensions_str and
       machine_stats.tag == machine_tag):
     return
   if not machine_stats:
     machine_stats = MachineStats(id=machine_id)
   machine_stats.dimensions = dimensions_str
-  machine_stats.last_seen = utcnow()
+  machine_stats.last_seen = task_common.utcnow()
   machine_stats.tag = machine_tag
   machine_stats.put()
 

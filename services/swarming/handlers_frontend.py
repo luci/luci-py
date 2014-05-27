@@ -9,7 +9,6 @@ implemented using the webapp2 framework.
 """
 
 import collections
-import datetime
 import json
 import logging
 import os
@@ -23,6 +22,9 @@ from google.appengine.api import modules
 from google.appengine.datastore import datastore_query
 from google.appengine.ext import ndb
 
+import handlers_backend
+import handlers_common
+import template
 from common import rpc
 from common import swarm_constants
 from common import test_request_message
@@ -31,6 +33,7 @@ from components import auth_ui
 from components import ereporter2
 from components import utils
 from server import bot_management
+from server import bots_list
 from server import errors
 from server import result_helper
 from server import stats_gviz
@@ -43,11 +46,6 @@ from server import task_scheduler
 from server import task_to_run
 from server import test_management
 from server import user_manager
-from stats import machine_stats
-
-import handlers_backend
-import handlers_common
-import template
 
 
 # Default Test Run Swarm filename. This file provides parameters for the
@@ -451,13 +449,12 @@ class MachineListHandler(auth.AuthenticatingHandler):
   @auth.require(auth.READ, 'swarming/management')
   def get(self):
     sort_by = self.request.get('sort_by', 'machine_id')
-    if sort_by not in machine_stats.ACCEPTABLE_SORTS:
+    if sort_by not in bots_list.ACCEPTABLE_SORTS:
       self.abort(400, 'Invalid sort_by query parameter')
 
-    dead_machine_cutoff = (
-        datetime.datetime.utcnow() - machine_stats.MACHINE_DEATH_TIMEOUT)
+    dead_machine_cutoff = task_common.utcnow() - bots_list.MACHINE_DEATH_TIMEOUT
     machines = []
-    for machine in machine_stats.GetAllMachines(sort_by):
+    for machine in bots_list.GetAllMachines(sort_by):
       m = machine.to_dict()
       m['html_class'] = (
           'dead_machine' if machine.last_seen < dead_machine_cutoff else '')
@@ -470,10 +467,10 @@ class MachineListHandler(auth.AuthenticatingHandler):
       machines.append(m)
 
     sort_options = [
-        SortOptions(k, v) for k, v in machine_stats.ACCEPTABLE_SORTS.iteritems()
+        SortOptions(k, v) for k, v in bots_list.ACCEPTABLE_SORTS.iteritems()
     ]
     params = {
-        'machine_update_time': machine_stats.MACHINE_UPDATE_TIME,
+        'machine_update_time': bots_list.MACHINE_UPDATE_TIME,
         'machines': machines,
         'selected_sort': sort_by,
         'sort_options': sort_options,
@@ -487,9 +484,9 @@ class ApiBots(auth.AuthenticatingHandler):
   @auth.require(auth.READ, 'swarming/management')
   def get(self):
     params = {
-        'machine_death_timeout': machine_stats.MACHINE_DEATH_TIMEOUT,
-        'machine_update_time': machine_stats.MACHINE_UPDATE_TIME,
-        'machines': [m.to_dict() for m in machine_stats.MachineStats.query()],
+        'machine_death_timeout': bots_list.MACHINE_DEATH_TIMEOUT,
+        'machine_update_time': bots_list.MACHINE_UPDATE_TIME,
+        'machines': [m.to_dict() for m in bots_list.MachineStats.query()],
     }
     self.response.headers['Content-Type'] = 'application/json; charset=utf-8'
     self.response.headers['Cache-Control'] = 'no-cache, no-store'
@@ -506,7 +503,7 @@ class DeleteMachineStatsHandler(auth.AuthenticatingHandler):
   def post(self):
     key = self.request.get('r')
 
-    if key and machine_stats.DeleteMachineStats(key):
+    if key and bots_list.DeleteMachineStats(key):
       self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
       self.response.out.write('Machine Assignment removed.')
     else:
@@ -608,9 +605,9 @@ class ResultHandler(auth.AuthenticatingHandler):
 class DeadBotsCountHandler(webapp2.RequestHandler):
   def get(self):
     self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
-    cutoff = machine_stats.utcnow() - machine_stats.MACHINE_DEATH_TIMEOUT
-    count = machine_stats.MachineStats.query().filter(
-        machine_stats.MachineStats.last_seen < cutoff).count()
+    cutoff = task_common.utcnow() - bots_list.MACHINE_DEATH_TIMEOUT
+    count = bots_list.MachineStats.query().filter(
+        bots_list.MachineStats.last_seen < cutoff).count()
     self.response.out.write(str(count))
 
 
@@ -1081,7 +1078,7 @@ def SendRunnerResults(response, key_id):
     'exit_codes': ','.join(map(str, result.exit_codes)),
     'machine_id': result.bot_id,
     # TODO(maruel): Likely unnecessary.
-    'machine_tag': machine_stats.GetMachineTag(result.bot_id),
+    'machine_tag': bots_list.GetMachineTag(result.bot_id),
     'config_instance_index': 0,
     'num_config_instances': 1,
     # TODO(maruel): Return each output independently. Figure out a way to

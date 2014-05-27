@@ -28,13 +28,13 @@ from components import stats_framework
 from components import utils
 from server import admin_user
 from server import bot_management
+from server import bots_list
 from server import dimensions_utils
 from server import errors
 from server import stats_new as stats
 from server import task_common
 from server import test_helper
 from server import user_manager
-from stats import machine_stats
 from support import test_case
 from third_party.mox import mox
 
@@ -223,7 +223,7 @@ class AppTest(test_case.TestCase):
     self._mox.ReplayAll()
 
     # Add a machine to display.
-    machine_stats.MachineStats.get_or_insert(MACHINE_ID, tag='tag')
+    bots_list.MachineStats.get_or_insert(MACHINE_ID, tag='tag')
 
     response = self.app.get('/secure/machine_list')
     self.assertTrue('200' in response.status)
@@ -234,7 +234,7 @@ class AppTest(test_case.TestCase):
     # Act under admin identity.
     self._ReplaceCurrentUser(ADMIN_EMAIL)
 
-    machine_stats.MachineStats(
+    bots_list.MachineStats(
         id=MACHINE_ID,
         tag='tag',
         last_seen=datetime.datetime(2000, 1, 2, 3, 4, 5, 6),
@@ -243,8 +243,9 @@ class AppTest(test_case.TestCase):
     response = self.app.get('/swarming/api/v1/bots')
     self.assertEqual('200 OK', response.status)
     expected = {
-        u'machine_death_timeout': 10800,
-        u'machine_update_time': 3600,
+        u'machine_death_timeout':
+            bots_list.MACHINE_DEATH_TIMEOUT.total_seconds(),
+        u'machine_update_time': bots_list.MACHINE_UPDATE_TIME.total_seconds(),
         u'machines': [
           {
             u'dimensions': {'foo': 'bar'},
@@ -261,7 +262,7 @@ class AppTest(test_case.TestCase):
     self._ReplaceCurrentUser(ADMIN_EMAIL)
 
     # Add a machine assignment to delete.
-    m_stats = machine_stats.MachineStats.get_or_insert(MACHINE_ID)
+    m_stats = bots_list.MachineStats.get_or_insert(MACHINE_ID)
 
     # Delete the machine assignment.
     response = self.app.post('/delete_machine_stats?r=%s' %
@@ -841,11 +842,10 @@ class AppTest(test_case.TestCase):
 
   def test_dead_machines_count(self):
     self.assertEqual('0', self.app.get('/swarming/api/v1/bots/dead/count').body)
-    bot = machine_stats.MachineStats.get_or_insert('id1', tag='machine')
+    bot = bots_list.MachineStats.get_or_insert('id1', tag='machine')
     self.assertEqual('0', self.app.get('/swarming/api/v1/bots/dead/count').body)
     # Make the machine old and ensure it is marked as dead.
-    bot.last_seen = (
-        datetime.datetime.utcnow() - 2 * machine_stats.MACHINE_DEATH_TIMEOUT)
+    bot.last_seen = task_common.utcnow() - 2 * bots_list.MACHINE_DEATH_TIMEOUT
     bot.put()
     self.assertEqual('1', self.app.get('/swarming/api/v1/bots/dead/count').body)
 

@@ -60,7 +60,6 @@ def CommonChecks(input_api, output_api):
     input_api.PresubmitLocalPath(),
     join('common'),
     join('server'),
-    join('stats'),
     join('swarm_bot'),
   ]
 
