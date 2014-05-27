@@ -50,6 +50,11 @@ import handlers_common
 import template
 
 
+# Default Test Run Swarm filename. This file provides parameters for the
+# instance running tests.
+TEST_RUN_SWARM_FILE_NAME = 'test_run.swarm'
+
+
 ACCEPTABLE_SORTS =  {
   'created_ts': 'Created',
   'done_ts': 'Ended',
@@ -116,6 +121,7 @@ def request_work_item(attributes, server_url):
       'try_count': try_count,
     }
 
+  assert bot_id == run_result.bot_id
   packed = task_common.pack_run_result_key(run_result.key)
   test_objects = [
     test_request_message.TestObject(
@@ -125,22 +131,26 @@ def request_work_item(attributes, server_url):
         io_time_out=request.properties.io_timeout_secs)
     for i, command in enumerate(request.properties.commands)
   ]
-  # pylint: disable=W0212
+  result_url = '%s/result?r=%s&id=%s' % (server_url, packed, bot_id)
+  ping_url = '%s/runner_ping?r=%s&id=%s' % (server_url, packed, bot_id)
+  # Ask the slave to ping every 55 seconds. The main reason is to make sure that
+  # the majority of the time, the stats of active shards has a ping in every
+  # minute window.
+  # TODO(maruel): Have the slave stream the stdout on the fly, so there won't be
+  # need for ping unless there's no stdout. The slave will decide this instead
+  # of the master.
+  ping_delay = 55
   test_run = test_request_message.TestRun(
       test_run_name=request.name,
       env_vars=request.properties.env,
       configuration=test_request_message.TestConfiguration(
           config_name=request.name),
-      result_url=('%s/result?r=%s&id=%s' % (server_url,
-                                            packed,
-                                            run_result.bot_id)),
-      ping_url=('%s/runner_ping?r=%s&id=%s' % (server_url,
-                                               packed,
-                                               run_result.bot_id)),
-      ping_delay=(test_management._TIMEOUT_FACTOR /
-          test_management._MISSED_PINGS_BEFORE_TIMEOUT),
+      result_url=result_url,
+      ping_url=ping_url,
+      ping_delay=ping_delay,
       data=request.properties.data,
       tests=test_objects)
+
   # TODO(maruel): Remove me.
   test_run.ExpandVariables({
       'instance_index': 0,
@@ -150,15 +160,15 @@ def request_work_item(attributes, server_url):
 
   # See test_management._GetTestRunnerCommands() for the expected format.
   files_to_upload = [
-      (test_run.working_dir or '', test_management._TEST_RUN_SWARM_FILE_NAME,
+      (test_run.working_dir or '', TEST_RUN_SWARM_FILE_NAME,
       test_request_message.Stringize(test_run, json_readable=True))
   ]
 
   # Define how to run the scripts.
-  swarm_file_path = test_management._TEST_RUN_SWARM_FILE_NAME
+  swarm_file_path = TEST_RUN_SWARM_FILE_NAME
   if test_run.working_dir:
     swarm_file_path = os.path.join(
-        test_run.working_dir, test_management._TEST_RUN_SWARM_FILE_NAME)
+        test_run.working_dir, TEST_RUN_SWARM_FILE_NAME)
 
   rpc_commands = [
     rpc.BuildRPC('StoreFiles', files_to_upload),

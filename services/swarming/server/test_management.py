@@ -12,22 +12,6 @@ from common import test_request_message
 from server import bot_management
 
 
-# The amount of time to wait after recieving a runners last message before
-# considering the runner to have run for too long. Runners that run for too
-# long will be aborted automatically.
-# Specified in number of seconds.
-_TIMEOUT_FACTOR = 300
-
-# The number of pings that need to be missed before a runner is considered to
-# have timed out. |_TIMEOUT_FACTOR| / |this| will determine the desired delay
-# between pings.
-_MISSED_PINGS_BEFORE_TIMEOUT = 10
-
-# Default Test Run Swarm filename.  This file provides parameters
-# for the instance running tests.
-_TEST_RUN_SWARM_FILE_NAME = 'test_run.swarm'
-
-
 def CheckVersion(attributes, server_url):
   """Checks the slave version, forcing it to update if required."""
   expected_version = bot_management.SlaveVersion()
