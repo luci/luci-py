@@ -805,19 +805,6 @@ def SendRunnerResults(response, key_id):
   response.out.write(json.dumps(results))
 
 
-class CleanupResultsHandler(auth.AuthenticatingHandler):
-  """Delete the Test Runner with the given key."""
-
-  # TODO(vadimsh): Implement XSRF token support.
-  xsrf_token_enforce_on = ()
-
-  @auth.require(auth.UPDATE, 'swarming/bots')
-  def post(self):
-    # TODO(maruel): Remove this API.
-    self.response.headers['Content-Type'] = 'test/plain'
-    self.response.out.write('Key deleted.')
-
-
 class CancelHandler(auth.AuthenticatingHandler):
   """Cancel a test runner that is not already running."""
 
@@ -1127,7 +1114,6 @@ def CreateApplication():
       ('/upload_start_slave', UploadStartSlaveHandler),
 
       # Client API, in some cases also indirectly used by the frontend.
-      ('/cleanup_results', CleanupResultsHandler),
       ('/get_matching_test_cases', GetMatchingTestCasesHandler),
       ('/get_result', GetResultHandler),
       ('/secure/cancel', CancelHandler),

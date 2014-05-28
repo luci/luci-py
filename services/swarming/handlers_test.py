@@ -526,7 +526,6 @@ class AppTest(test_case.TestCase):
 
     # List of non-secure handlers and their method.
     handlers_to_check = [
-        ('/cleanup_results', self.app.post),
         ('/get_matching_test_cases', self.app.get),
         ('/get_result', self.app.get),
         ('/get_slave_code', self.app.get),
@@ -568,11 +567,12 @@ class AppTest(test_case.TestCase):
                ('/test', self.app.post)]
 
     # List of non-secure handlers that should not be accessible to the user.
-    forbidden = [('/cleanup_results', self.app.post),
-                 ('/get_slave_code', self.app.get),
-                 ('/poll_for_test', self.app.post),
-                 ('/remote_error', self.app.post),
-                 ('/result', self.app.post)]
+    forbidden = [
+        ('/get_slave_code', self.app.get),
+        ('/poll_for_test', self.app.post),
+        ('/remote_error', self.app.post),
+        ('/result', self.app.post),
+    ]
 
     # Reset state to non-whitelisted, anonymous machine.
     user_manager.DeleteWhitelist(FAKE_IP)
