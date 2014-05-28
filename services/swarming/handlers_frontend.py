@@ -101,6 +101,35 @@ def expand_subnet(ip, mask):
   return [int_to_ipv4(ipv4_to_int(ip) + r) for r in range(bit)]
 
 
+def ip_whitelist_authentication(request):
+  """Check to see if the request is from a whitelisted machine.
+
+  Will use the remote machine's IP and provided password (if any).
+
+  Args:
+    request: WebAPP request sent by remote machine.
+
+  Returns:
+    auth.Identity of a machine if IP is whitelisted, None otherwise.
+  """
+  assert request.remote_addr
+  is_whitelisted = user_manager.IsWhitelistedMachine(
+      request.remote_addr, request.get('password', None))
+
+  # IP v6 addresses contain ':' that is not allowed in identity name.
+  if is_whitelisted:
+    return auth.Identity(
+        auth.IDENTITY_BOT, request.remote_addr.replace(':', '-'))
+
+  # Log the error.
+  error = errors.SwarmError(
+      name='Authentication Failure', message='Handler: %s' % request.url,
+      info='Remote machine address: %s' % request.remote_addr)
+  error.put()
+
+  return None
+
+
 def request_work_item(attributes, server_url):
   # TODO(maruel): Split it out a little.
   attribs = test_management.ValidateAndFixAttributes(attributes)
@@ -233,9 +262,6 @@ def make_runner_view(result_summary):
   }
 
 
-### Handlers
-
-
 class FilterParams(object):
   def __init__(
       self, status, test_name_filter, show_successfully_completed,
@@ -350,7 +376,12 @@ class FilterParams(object):
     return html
 
 
-class MainHandler(auth.AuthenticatingHandler):
+### Restricted handlers.
+
+# TODO(maruel): Sort the handlers once they got their final name.
+
+
+class TasksHandler(auth.AuthenticatingHandler):
   """Handler for the main page of the web server.
 
   This handler lists all pending requests and allows callers to manage them.
@@ -432,13 +463,6 @@ class MainHandler(auth.AuthenticatingHandler):
     self.response.out.write(template.render('index.html', params))
 
 
-class RedirectToMainHandler(webapp2.RequestHandler):
-  """Handler to redirect requests to base page secured main page."""
-
-  def get(self):
-    self.redirect('/secure/main')
-
-
 class MachineListHandler(auth.AuthenticatingHandler):
   """Handler for the machine list page of the web server.
 
@@ -476,139 +500,6 @@ class MachineListHandler(auth.AuthenticatingHandler):
         'sort_options': sort_options,
     }
     self.response.out.write(template.render('machine_list.html', params))
-
-
-class ApiBots(auth.AuthenticatingHandler):
-  """Returns the list of known swarming bots."""
-
-  @auth.require(auth.READ, 'swarming/management')
-  def get(self):
-    params = {
-        'machine_death_timeout': bots_list.MACHINE_DEATH_TIMEOUT,
-        'machine_update_time': bots_list.MACHINE_UPDATE_TIME,
-        'machines': [m.to_dict() for m in bots_list.MachineStats.query()],
-    }
-    self.response.headers['Content-Type'] = 'application/json; charset=utf-8'
-    self.response.headers['Cache-Control'] = 'no-cache, no-store'
-    self.response.write(utils.encode_to_json(params))
-
-
-class DeleteMachineStatsHandler(auth.AuthenticatingHandler):
-  """Handler to delete a machine assignment."""
-
-  # TODO(vadimsh): Implement XSRF token support.
-  xsrf_token_enforce_on = ()
-
-  @auth.require(auth.UPDATE, 'swarming/clients')
-  def post(self):
-    key = self.request.get('r')
-
-    if key and bots_list.DeleteMachineStats(key):
-      self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
-      self.response.out.write('Machine Assignment removed.')
-    else:
-      self.response.set_status(204)
-
-
-class TestRequestHandler(auth.AuthenticatingHandler):
-  """Handles test requests from clients."""
-
-  # TODO(vadimsh): Implement XSRF token support.
-  xsrf_token_enforce_on = ()
-
-  @auth.require(auth.UPDATE, 'swarming/clients')
-  def post(self):
-    # Validate the request.
-    if not self.request.get('request'):
-      self.abort(400, 'No request parameter found.')
-
-    # TODO(vadimsh): Store identity of a user that posted the request.
-    test_case = self.request.get('request')
-    try:
-      request_properties = task_glue.convert_test_case(test_case)
-    except test_request_message.Error as e:
-      message = str(e)
-      logging.error(message)
-      self.abort(400, message)
-
-    _, result_summary = task_scheduler.make_request(request_properties)
-    out = {
-      'test_case_name': result_summary.name,
-      'test_keys': [
-        {
-          'config_name': result_summary.name,
-          # TODO(maruel): Remove this.
-          'instance_index': 0,
-          'num_instances': 1,
-          'test_key': task_common.pack_result_summary_key(result_summary.key),
-        }
-      ],
-    }
-    self.response.headers['Content-Type'] = 'application/json; charset=utf-8'
-    self.response.out.write(json.dumps(out))
-
-
-class ResultHandler(auth.AuthenticatingHandler):
-  """Handles test results from remote test runners."""
-
-  # TODO(vadimsh): Implement XSRF token support.
-  xsrf_token_enforce_on = ()
-
-  @auth.require(auth.UPDATE, 'swarming/bots')
-  def post(self):
-    # TODO(user): Share this code between all the request handlers so we
-    # can always see how often a request is being sent.
-    connection_attempt = self.request.get(swarm_constants.COUNT_KEY)
-    if connection_attempt:
-      logging.info('This is the %s connection attempt from this machine to '
-                   'POST these results', connection_attempt)
-
-    packed = self.request.get('r', '')
-    run_result_key = task_scheduler.unpack_run_result_key(packed)
-    bot_id = urllib.unquote_plus(self.request.get('id'))
-    run_result = run_result_key.get()
-    # TODO(vadimsh): Verify bot_id matches credentials that are used for
-    # current request (i.e. auth.get_current_identity()). Or shorter, just use
-    # auth.get_current_identity() and have the bot stops passing id=foo at all.
-    if bot_id != run_result.bot_id:
-      # Check that machine that posts the result is same as machine that claimed
-      # the task.
-      msg = 'Expected bot id %s, got %s' % (run_result.bot_id, bot_id)
-      logging.error(msg)
-      self.abort(404, msg)
-
-    exit_codes = urllib.unquote_plus(self.request.get('x'))
-    exit_codes = filter(None, (i.strip() for i in exit_codes.split(',')))
-
-    # TODO(maruel): Get rid of this: the result string should probably be in the
-    # body of the request.
-    result_string = urllib.unquote_plus(self.request.get(
-        swarm_constants.RESULT_STRING_KEY))
-    if isinstance(result_string, unicode):
-      # Zap out any binary content on stdout.
-      result_string = result_string.encode('utf-8', 'replace')
-
-    results = result_helper.StoreResults(result_string)
-
-    data = {
-      'exit_codes': map(int, exit_codes),
-      # TODO(maruel): Store output for each command individually.
-      'outputs': [results.key],
-    }
-    task_scheduler.bot_update_task(run_result.key, data, bot_id)
-
-    # TODO(maruel): Return JSON.
-    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
-    self.response.out.write('Successfully update the runner results.')
-
-
-class DeadBotsCountHandler(webapp2.RequestHandler):
-  def get(self):
-    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
-    cutoff = task_common.utcnow() - bots_list.MACHINE_DEATH_TIMEOUT
-    count = bots_list.MachineStats.query().filter(
-        bots_list.MachineStats.last_seen < cutoff).count()
-    self.response.out.write(str(count))
 
 
 class Ereporter2ReportHandler(auth.AuthenticatingHandler):
@@ -698,6 +589,135 @@ class UploadStartSlaveHandler(auth.AuthenticatingHandler):
     self.response.out.write('Success.')
 
 
+class UserProfileHandler(auth.AuthenticatingHandler):
+  """Handler for the user profile page of the web server.
+
+  This handler lists user info, such as their IP whitelist and settings.
+  """
+
+  @auth.require(auth.READ, 'swarming/management')
+  def get(self):
+    display_whitelists = sorted(
+        (
+          {
+            'ip': w.ip,
+            'key': w.key.id,
+            'password': w.password,
+            'url': '/secure/change_whitelist',
+          } for w in user_manager.MachineWhitelist().query()),
+        key=lambda x: x['ip'])
+
+    params = {
+        'change_whitelist_url': '/secure/change_whitelist',
+        'whitelists': display_whitelists,
+    }
+    self.response.out.write(template.render('user_profile.html', params))
+
+
+class ChangeWhitelistHandler(auth.AuthenticatingHandler):
+  """Handler for making changes to a user whitelist."""
+
+  # TODO(vadimsh): Implement XSRF token support.
+  xsrf_token_enforce_on = ()
+
+  @auth.require(auth.UPDATE, 'swarming/management')
+  def post(self):
+    ip = self.request.get('i', self.request.remote_addr)
+    mask = 32
+    if '/' in ip:
+      ip, mask = ip.split('/', 1)
+      mask = int(mask)
+    ips = expand_subnet(ip, mask)
+
+    # Make sure a password '' sent by the form is stored as None.
+    password = self.request.get('p', None) or None
+
+    add = self.request.get('a')
+    if add == 'True':
+      for ip in ips:
+        user_manager.AddWhitelist(ip, password)
+    elif add == 'False':
+      for ip in ips:
+        user_manager.DeleteWhitelist(ip)
+    else:
+      self.abort(400, 'Invalid \'a\' parameter.')
+
+    self.redirect('/secure/user_profile', permanent=True)
+
+
+### Client APIs.
+
+
+class ApiBots(auth.AuthenticatingHandler):
+  """Returns the list of known swarming bots."""
+
+  @auth.require(auth.READ, 'swarming/management')
+  def get(self):
+    params = {
+        'machine_death_timeout': bots_list.MACHINE_DEATH_TIMEOUT,
+        'machine_update_time': bots_list.MACHINE_UPDATE_TIME,
+        'machines': [m.to_dict() for m in bots_list.MachineStats.query()],
+    }
+    self.response.headers['Content-Type'] = 'application/json; charset=utf-8'
+    self.response.headers['Cache-Control'] = 'no-cache, no-store'
+    self.response.write(utils.encode_to_json(params))
+
+
+class DeleteMachineStatsHandler(auth.AuthenticatingHandler):
+  """Handler to delete a machine assignment."""
+
+  # TODO(vadimsh): Implement XSRF token support.
+  xsrf_token_enforce_on = ()
+
+  @auth.require(auth.UPDATE, 'swarming/clients')
+  def post(self):
+    key = self.request.get('r')
+
+    if key and bots_list.DeleteMachineStats(key):
+      self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
+      self.response.out.write('Machine Assignment removed.')
+    else:
+      self.response.set_status(204)
+
+
+class TestRequestHandler(auth.AuthenticatingHandler):
+  """Handles test requests from clients."""
+
+  # TODO(vadimsh): Implement XSRF token support.
+  xsrf_token_enforce_on = ()
+
+  @auth.require(auth.UPDATE, 'swarming/clients')
+  def post(self):
+    # Validate the request.
+    if not self.request.get('request'):
+      self.abort(400, 'No request parameter found.')
+
+    # TODO(vadimsh): Store identity of a user that posted the request.
+    test_case = self.request.get('request')
+    try:
+      request_properties = task_glue.convert_test_case(test_case)
+    except test_request_message.Error as e:
+      message = str(e)
+      logging.error(message)
+      self.abort(400, message)
+
+    _, result_summary = task_scheduler.make_request(request_properties)
+    out = {
+      'test_case_name': result_summary.name,
+      'test_keys': [
+        {
+          'config_name': result_summary.name,
+          # TODO(maruel): Remove this.
+          'instance_index': 0,
+          'num_instances': 1,
+          'test_key': task_common.pack_result_summary_key(result_summary.key),
+        }
+      ],
+    }
+    self.response.headers['Content-Type'] = 'application/json; charset=utf-8'
+    self.response.out.write(json.dumps(out))
+
+
 class GetMatchingTestCasesHandler(auth.AuthenticatingHandler):
   """Get all the keys for any test runners that match a given test case name."""
 
@@ -740,27 +760,49 @@ class GetResultHandler(auth.AuthenticatingHandler):
     SendRunnerResults(self.response, self.request.get('r', ''))
 
 
-class GetSlaveCodeHandler(auth.AuthenticatingHandler):
-  """Returns a zip file with all the files required by a slave.
+def SendRunnerResults(response, key_id):
+  """Sends the results of the runner specified by key.
 
-  Optionally specify the hash version to download. If so, the returned data is
-  cacheable.
+  Args:
+    response: Response to be sent to remote machine.
+    key: Key identifying the runner.
   """
+  # TODO(maruel): Formalize returning data for a specific try or the overall
+  # results.
+  key = None
+  try:
+    key = task_scheduler.unpack_result_summary_key(key_id)
+  except ValueError:
+    try:
+      key = task_scheduler.unpack_run_result_key(key_id)
+    except ValueError:
+      response.set_status(400)
+      response.out.write('Invalid key')
+      return
 
-  @auth.require(auth.READ, 'swarming/bots')
-  def get(self, version=None):
-    if version:
-      expected = bot_management.SlaveVersion()
-      if version != expected:
-        logging.error('Requested Swarming bot %s, have %s', version, expected)
-        self.abort(404)
-      self.response.headers['Cache-Control'] = 'public, max-age=3600'
-    else:
-      self.response.headers['Cache-Control'] = 'no-cache, no-store'
-    self.response.headers['Content-Type'] = 'application/octet-stream'
-    self.response.headers['Content-Disposition'] = (
-        'attachment; filename="swarm_bot.zip"')
-    self.response.out.write(bot_management.SlaveCodeZipped())
+  result = key.get()
+  if not result:
+    # TODO(maruel): Use 404 if not present.
+    response.set_status(204)
+    logging.info('Unable to provide runner results [key: %s]', key_id)
+    return
+
+  results = {
+    'exit_codes': ','.join(map(str, result.exit_codes)),
+    'machine_id': result.bot_id,
+    # TODO(maruel): Likely unnecessary.
+    'machine_tag': bots_list.GetMachineTag(result.bot_id),
+    'config_instance_index': 0,
+    'num_config_instances': 1,
+    # TODO(maruel): Return each output independently. Figure out a way to
+    # describe what is important in the steps and what should be ditched.
+    'output': u'\n'.join(
+        i.get().GetResults().decode('utf-8', 'replace')
+        for i in result.outputs),
+  }
+
+  response.headers['Content-Type'] = 'application/json; charset=utf-8'
+  response.out.write(json.dumps(results))
 
 
 class CleanupResultsHandler(auth.AuthenticatingHandler):
@@ -861,6 +903,44 @@ class RetryHandler(auth.AuthenticatingHandler):
     self.response.out.write('Runner set for retry.')
 
 
+### Bot APIs.
+
+
+class GetSlaveCodeHandler(auth.AuthenticatingHandler):
+  """Returns a zip file with all the files required by a slave.
+
+  Optionally specify the hash version to download. If so, the returned data is
+  cacheable.
+  """
+
+  @auth.require(auth.READ, 'swarming/bots')
+  def get(self, version=None):
+    if version:
+      expected = bot_management.SlaveVersion()
+      if version != expected:
+        logging.error('Requested Swarming bot %s, have %s', version, expected)
+        self.abort(404)
+      self.response.headers['Cache-Control'] = 'public, max-age=3600'
+    else:
+      self.response.headers['Cache-Control'] = 'no-cache, no-store'
+    self.response.headers['Content-Type'] = 'application/octet-stream'
+    self.response.headers['Content-Disposition'] = (
+        'attachment; filename="swarm_bot.zip"')
+    self.response.out.write(bot_management.SlaveCodeZipped())
+
+
+class ServerPingHandler(webapp2.RequestHandler):
+  """Handler to ping when checking if the server is up.
+
+  This handler should be extremely lightweight. It shouldn't do any
+  computations, it should just state that the server is up.
+  """
+
+  def get(self):
+    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
+    self.response.out.write('Server up')
+
+
 class RegisterHandler(auth.AuthenticatingHandler):
   """Handler for the register_machine of the Swarm server.
 
@@ -931,72 +1011,58 @@ class RunnerPingHandler(auth.AuthenticatingHandler):
     self.response.out.write('Success.')
 
 
-class ServerPingHandler(webapp2.RequestHandler):
-  """Handler to ping when checking if the server is up.
-
-  This handler should be extremely lightweight. It shouldn't do any
-  computations, it should just state that the server is up.
-  """
-
-  def get(self):
-    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
-    self.response.out.write('Server up')
-
-
-class UserProfileHandler(auth.AuthenticatingHandler):
-  """Handler for the user profile page of the web server.
-
-  This handler lists user info, such as their IP whitelist and settings.
-  """
-
-  @auth.require(auth.READ, 'swarming/management')
-  def get(self):
-    display_whitelists = sorted(
-        (
-          {
-            'ip': w.ip,
-            'key': w.key.id,
-            'password': w.password,
-            'url': '/secure/change_whitelist',
-          } for w in user_manager.MachineWhitelist().query()),
-        key=lambda x: x['ip'])
-
-    params = {
-        'change_whitelist_url': '/secure/change_whitelist',
-        'whitelists': display_whitelists,
-    }
-    self.response.out.write(template.render('user_profile.html', params))
-
-
-class ChangeWhitelistHandler(auth.AuthenticatingHandler):
-  """Handler for making changes to a user whitelist."""
+class ResultHandler(auth.AuthenticatingHandler):
+  """Handles test results from remote test runners."""
 
   # TODO(vadimsh): Implement XSRF token support.
   xsrf_token_enforce_on = ()
 
-  @auth.require(auth.UPDATE, 'swarming/management')
+  @auth.require(auth.UPDATE, 'swarming/bots')
   def post(self):
-    ip = self.request.get('i', self.request.remote_addr)
-    mask = 32
-    if '/' in ip:
-      ip, mask = ip.split('/', 1)
-      mask = int(mask)
-    ips = expand_subnet(ip, mask)
+    # TODO(user): Share this code between all the request handlers so we
+    # can always see how often a request is being sent.
+    connection_attempt = self.request.get(swarm_constants.COUNT_KEY)
+    if connection_attempt:
+      logging.info('This is the %s connection attempt from this machine to '
+                   'POST these results', connection_attempt)
 
-    # Make sure a password '' sent by the form is stored as None.
-    password = self.request.get('p', None) or None
+    packed = self.request.get('r', '')
+    run_result_key = task_scheduler.unpack_run_result_key(packed)
+    bot_id = urllib.unquote_plus(self.request.get('id'))
+    run_result = run_result_key.get()
+    # TODO(vadimsh): Verify bot_id matches credentials that are used for
+    # current request (i.e. auth.get_current_identity()). Or shorter, just use
+    # auth.get_current_identity() and have the bot stops passing id=foo at all.
+    if bot_id != run_result.bot_id:
+      # Check that machine that posts the result is same as machine that claimed
+      # the task.
+      msg = 'Expected bot id %s, got %s' % (run_result.bot_id, bot_id)
+      logging.error(msg)
+      self.abort(404, msg)
 
-    add = self.request.get('a')
-    if add == 'True':
-      for ip in ips:
-        user_manager.AddWhitelist(ip, password)
-    elif add == 'False':
-      for ip in ips:
-        user_manager.DeleteWhitelist(ip)
-    else:
-      self.abort(400, 'Invalid \'a\' parameter.')
+    exit_codes = urllib.unquote_plus(self.request.get('x'))
+    exit_codes = filter(None, (i.strip() for i in exit_codes.split(',')))
 
-    self.redirect('/secure/user_profile', permanent=True)
+    # TODO(maruel): Get rid of this: the result string should probably be in the
+    # body of the request.
+    result_string = urllib.unquote_plus(self.request.get(
+        swarm_constants.RESULT_STRING_KEY))
+    if isinstance(result_string, unicode):
+      # Zap out any binary content on stdout.
+      result_string = result_string.encode('utf-8', 'replace')
+
+    results = result_helper.StoreResults(result_string)
+
+    data = {
+      'exit_codes': map(int, exit_codes),
+      # TODO(maruel): Store output for each command individually.
+      'outputs': [results.key],
+    }
+    task_scheduler.bot_update_task(run_result.key, data, bot_id)
+
+    # TODO(maruel): Return JSON.
+    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
+    self.response.out.write('Successfully update the runner results.')
 
 
 class RemoteErrorHandler(auth.AuthenticatingHandler):
@@ -1018,78 +1084,23 @@ class RemoteErrorHandler(auth.AuthenticatingHandler):
     self.response.out.write('Success.')
 
 
-def ip_whitelist_authentication(request):
-  """Check to see if the request is from a whitelisted machine.
-
-  Will use the remote machine's IP and provided password (if any).
-
-  Args:
-    request: WebAPP request sent by remote machine.
-
-  Returns:
-    auth.Identity of a machine if IP is whitelisted, None otherwise.
-  """
-  assert request.remote_addr
-  is_whitelisted = user_manager.IsWhitelistedMachine(
-      request.remote_addr, request.get('password', None))
-
-  # IP v6 addresses contain ':' that is not allowed in identity name.
-  if is_whitelisted:
-    return auth.Identity(
-        auth.IDENTITY_BOT, request.remote_addr.replace(':', '-'))
-
-  # Log the error.
-  error = errors.SwarmError(
-      name='Authentication Failure', message='Handler: %s' % request.url,
-      info='Remote machine address: %s' % request.remote_addr)
-  error.put()
-
-  return None
+### Public pages.
 
 
-def SendRunnerResults(response, key_id):
-  """Sends the results of the runner specified by key.
+class RootHandler(webapp2.RequestHandler):
+  """Handler to redirect requests to base page secured main page."""
 
-  Args:
-    response: Response to be sent to remote machine.
-    key: Key identifying the runner.
-  """
-  # TODO(maruel): Formalize returning data for a specific try or the overall
-  # results.
-  key = None
-  try:
-    key = task_scheduler.unpack_result_summary_key(key_id)
-  except ValueError:
-    try:
-      key = task_scheduler.unpack_run_result_key(key_id)
-    except ValueError:
-      response.set_status(400)
-      response.out.write('Invalid key')
-      return
+  def get(self):
+    self.redirect('/secure/main')
 
-  result = key.get()
-  if not result:
-    # TODO(maruel): Use 404 if not present.
-    response.set_status(204)
-    logging.info('Unable to provide runner results [key: %s]', key_id)
-    return
 
-  results = {
-    'exit_codes': ','.join(map(str, result.exit_codes)),
-    'machine_id': result.bot_id,
-    # TODO(maruel): Likely unnecessary.
-    'machine_tag': bots_list.GetMachineTag(result.bot_id),
-    'config_instance_index': 0,
-    'num_config_instances': 1,
-    # TODO(maruel): Return each output independently. Figure out a way to
-    # describe what is important in the steps and what should be ditched.
-    'output': u'\n'.join(
-        i.get().GetResults().decode('utf-8', 'replace')
-        for i in result.outputs),
-  }
-
-  response.headers['Content-Type'] = 'application/json; charset=utf-8'
-  response.out.write(json.dumps(results))
+class DeadBotsCountHandler(webapp2.RequestHandler):
+  def get(self):
+    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
+    cutoff = task_common.utcnow() - bots_list.MACHINE_DEATH_TIMEOUT
+    count = bots_list.MachineStats.query().filter(
+        bots_list.MachineStats.last_seen < cutoff).count()
+    self.response.out.write(str(count))
 
 
 class WarmupHandler(webapp2.RequestHandler):
@@ -1102,12 +1113,12 @@ class WarmupHandler(webapp2.RequestHandler):
 def CreateApplication():
   urls = [
       # Frontend pages, they return HTML or what should be HTML.
-      ('/', RedirectToMainHandler),
+      ('/', RootHandler),
       ('/secure/ereporter2/report', Ereporter2ReportHandler),
       ('/secure/ereporter2/request/<request_id:[0-9a-fA-F]+>',
           Ereporter2RequestHandler),
       ('/secure/machine_list', MachineListHandler),
-      ('/secure/main', MainHandler),
+      ('/secure/main', TasksHandler),
       ('/secure/show_message', ShowMessageHandler),
       ('/secure/user_profile', UserProfileHandler),
       ('/stats', stats_gviz.StatsSummaryHandler),
