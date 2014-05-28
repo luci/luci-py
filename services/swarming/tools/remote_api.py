@@ -29,7 +29,7 @@ def setup_context():
   from common import swarm_constants
   from components import auth
   from server import admin_user
-  from server import stats_new as stats
+  from server import stats
   from server import task_request
   from server import task_result
   from server import task_scheduler

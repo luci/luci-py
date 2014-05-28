@@ -12,7 +12,7 @@ from components import stats_framework
 from components import stats_framework_gviz
 from components import utils
 from gviz import gviz_api
-from server import stats_new as stats
+from server import stats
 
 
 ### Private Stuff.

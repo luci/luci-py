@@ -36,8 +36,8 @@ from server import bot_management
 from server import bots_list
 from server import errors
 from server import result_helper
+from server import stats
 from server import stats_gviz
-from server import stats_new as stats
 from server import task_common
 from server import task_glue
 from server import task_request

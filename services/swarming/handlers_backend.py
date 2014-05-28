@@ -13,10 +13,10 @@ from components import datastore_utils
 from components import decorators
 from components import ereporter2
 from server import admin_user
-from server import result_helper
 from server import errors
+from server import result_helper
+from server import stats
 from server import task_scheduler
-from server import stats_new as stats
 
 import handlers_common
 

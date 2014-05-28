@@ -15,7 +15,7 @@ import test_env
 
 test_env.setup_test_env()
 
-from server import stats_new as stats
+from server import stats
 from support import test_case
 
 

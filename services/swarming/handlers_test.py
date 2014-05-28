@@ -30,7 +30,7 @@ from server import admin_user
 from server import bot_management
 from server import bots_list
 from server import errors
-from server import stats_new as stats
+from server import stats
 from server import task_common
 from server import test_helper
 from server import user_manager

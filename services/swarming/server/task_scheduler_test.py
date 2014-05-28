@@ -22,7 +22,7 @@ import webtest
 
 from components import stats_framework
 from server import result_helper
-from server import stats_new as stats
+from server import stats
 from server import task_result
 from server import task_scheduler
 from server import task_to_run

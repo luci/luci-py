@@ -61,7 +61,7 @@ def match_dimensions(request_dimensions, bot_dimensions):
 def pack_result_summary_key(result_summary_key):
   """Returns TaskResultSummary ndb.Key encoded, safe to use in HTTP requests.
 
-  Defined here because it is needed in stats_new.py and defining it in
+  Defined here because it is needed in stats.py and defining it in
   task_result.py would cause a circular dependency.
   """
   assert result_summary_key.kind() == 'TaskResultSummary'
@@ -71,7 +71,7 @@ def pack_result_summary_key(result_summary_key):
 def pack_run_result_key(run_result_key):
   """Returns TaskRunResult ndb.Key encoded, safe to use in HTTP requests.
 
-  Defined here because it is needed in stats_new.py and defining it in
+  Defined here because it is needed in stats.py and defining it in
   task_result.py would cause a circular dependency.
   """
   assert run_result_key.kind() == 'TaskRunResult'

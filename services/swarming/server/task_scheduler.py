@@ -22,7 +22,7 @@ from google.appengine.api import datastore_errors
 from google.appengine.ext import ndb
 from google.appengine.runtime import apiproxy_errors
 
-from server import stats_new as stats
+from server import stats
 from server import task_common
 from server import task_request
 from server import task_result
