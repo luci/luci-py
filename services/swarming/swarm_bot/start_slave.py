@@ -12,8 +12,15 @@ This script is called to restart the slave if the slave version is updated
 by the server.
 """
 
-
 import logging
+import sys
 
-logging.error('start_slave.py doesn\'t know what machine configurations to '
-              'use, not restarting slave.')
+
+def main(_args):
+  logging.error('start_slave.py doesn\'t know what machine configurations to '
+                'use, not restarting slave.')
+  return 0
+
+
+if __name__ == '__main__':
+  sys.exit(main(None))

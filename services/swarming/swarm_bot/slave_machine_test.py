@@ -12,12 +12,13 @@ import sys
 import time
 import unittest
 
+# Import them first before manipulating sys.path to ensure they can load fine.
 import slave_machine
 import url_helper
 
-from common import bot_archive
 from common import rpc
 from common import swarm_constants
+from server import bot_archive
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(BASE_DIR)
@@ -89,13 +90,14 @@ class TestSlaveMachine(auto_stub.TestCase):
 
     with open(os.path.join(BASE_DIR, 'start_slave.py'), 'rb') as f:
       start_slave_contents = f.read()
-    additionals = {
-      'start_slave.py': start_slave_contents,
-    }
+    additionals = {'start_slave.py': start_slave_contents}
+    self.version = bot_archive.get_swarming_bot_version(BASE_DIR, additionals)
     self.attributes = {
       'dimensions': {'os': ['Linux']},
-      'version': bot_archive.GenerateSlaveVersion(BASE_DIR, additionals),
+      'version': self.version,
     }
+    # slave_machine.generate_version() is tested via the smoke test.
+    self.mock(slave_machine, 'generate_version', lambda: self.version)
 
   def tearDown(self):
     self._mox.UnsetStubs()
@@ -135,14 +137,14 @@ class TestSlaveMachine(auto_stub.TestCase):
       slave_machine._StoreFile(path, name, contents)
 
   # Mocks subprocess.check_call and raises exception if specified.
-  def _MockSubprocessCheckCall(self, commands, exit_code=0):
+  def _MockSubprocessCheckCall(self, args, exit_code=0):
     self._mox.StubOutWithMock(subprocess, 'check_call')
 
     if exit_code:
-      subprocess.check_call(
-          commands).AndRaise(subprocess.CalledProcessError(exit_code, commands))
+      subprocess.check_call(args, cwd=BASE_DIR).AndRaise(
+          subprocess.CalledProcessError(exit_code, args))
     else:
-      subprocess.check_call(commands)
+      subprocess.check_call(args, cwd=BASE_DIR)
 
   # Test with an invalid URL and try until it raises an exception.
   def testInvalidURLWithException(self):
@@ -596,11 +598,13 @@ class TestSlaveMachine(auto_stub.TestCase):
 
     # Mock subprocess to raise exception.
     full_command = [
-      sys.executable, 'local_test_runner.py', '--restart_on_failure', '-f',
-      args,
+      sys.executable,
+      os.path.abspath(sys.argv[0]),
+      'local_test_runner',
+      '--restart_on_failure', '-f', args,
     ]
     exit_code = -1
-    self._MockSubprocessCheckCall(commands=full_command, exit_code=exit_code)
+    self._MockSubprocessCheckCall(full_command, exit_code=exit_code)
 
     # Mock the call to post failed results.
     self._MockPostFailedExecuteResults(
@@ -631,10 +635,12 @@ class TestSlaveMachine(auto_stub.TestCase):
 
     # Mock subprocess to raise exception.
     expected = [
-      sys.executable, 'local_test_runner.py', '--restart_on_failure', '-f',
-      args,
+      sys.executable,
+      os.path.abspath(sys.argv[0]),
+      'local_test_runner',
+      '--restart_on_failure', '-f', args,
     ]
-    self._MockSubprocessCheckCall(commands=expected)
+    self._MockSubprocessCheckCall(expected)
 
     self._mox.ReplayAll()
 
@@ -660,11 +666,13 @@ class TestSlaveMachine(auto_stub.TestCase):
 
     # Mock subprocess to raise exception and signal a restart.
     expected = [
-      sys.executable, 'local_test_runner.py', '--restart_on_failure', '-f',
-      args,
+      sys.executable,
+      os.path.abspath(sys.argv[0]),
+      'local_test_runner',
+      '--restart_on_failure', '-f', args,
     ]
     self._MockSubprocessCheckCall(
-        commands=expected,
+        expected,
         exit_code=swarm_constants.RESTART_EXIT_CODE)
 
     # Mock out the the restart attempt to raise a subprocess exception.

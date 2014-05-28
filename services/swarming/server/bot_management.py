@@ -8,7 +8,7 @@ import os.path
 
 from google.appengine.api import memcache
 
-from common import bot_archive
+from server import bot_archive
 from server import file_chunks
 
 
@@ -48,14 +48,14 @@ def SlaveVersion():
   additionals = {
     'start_slave.py': file_chunks.RetrieveFile(START_SLAVE_SCRIPT_KEY) or '',
   }
-  slave_version = bot_archive.GenerateSlaveVersion(
+  slave_version = bot_archive.get_swarming_bot_version(
       os.path.join(ROOT_DIR, 'swarm_bot'), additionals)
   memcache.set('slave_version', slave_version,
                namespace=os.environ['CURRENT_VERSION_ID'])
   return slave_version
 
 
-def SlaveCodeZipped():
+def get_swarming_bot_zip():
   """Returns a zipped file of all the files a slave needs to run.
 
   Returns:
@@ -66,5 +66,5 @@ def SlaveCodeZipped():
   additionals = {
     'start_slave.py': file_chunks.RetrieveFile(START_SLAVE_SCRIPT_KEY) or '',
   }
-  return bot_archive.SlaveCodeZipped(
+  return bot_archive.get_swarming_bot_zip(
       os.path.join(ROOT_DIR, 'swarm_bot'), additionals)

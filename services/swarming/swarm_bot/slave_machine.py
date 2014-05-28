@@ -15,6 +15,7 @@ as a subset of the python syntax to a dictionary object. See
 http://code.google.com/p/swarming/wiki/MachineProvider for complete details.
 """
 
+import hashlib
 import json
 import logging
 import logging.handlers
@@ -24,40 +25,20 @@ import socket
 import subprocess
 import sys
 import time
-import urlparse
+import zipfile
 
 # pylint: disable-msg=W0403
 import url_helper
-from common import bot_archive
+import zipped_archive
 from common import rpc
 from common import swarm_constants
 
 
-ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
+# Path to this file or the zip containing this file.
+THIS_FILE = os.path.abspath(zipped_archive.get_main_script_path())
 
-# The zip file to contain the zipped slave code.
-ZIPPED_SLAVE_FILES = 'slave_files.zip'
-
-# The code to unzip the slave code and start the slave back up. This needs to be
-# a separate script so that the update process can overwrite it and then run
-# it without the rest of the slave running, otherwise the slave files will be
-# protected and it won't be possible to replace them with the new zipped file
-# version.
-SLAVE_SETUP_SCRIPT = """
-import os
-import sys
-import zipfile
-
-f = zipfile.ZipFile('%(zipped_slave_files)s')
-try:
-  f.extractall()
-finally:
-  f.close()
-
-os.execl(sys.executable, sys.executable, %(start_slave)r,
-         '--swarm-server=%(swarming_server)s',
-         '--port=%(server_port)s')
-"""
+# Root directory containing this file or the zip containing this file.
+ROOT_DIR = os.path.dirname(THIS_FILE)
 
 
 def Restart():
@@ -216,6 +197,20 @@ def _StoreFile(file_path, file_name, file_contents):
   logging.debug('File stored: %s', full_name)
 
 
+def generate_version():
+  result = hashlib.sha1()
+  with zipfile.ZipFile(THIS_FILE, 'r') as z:
+    for item in sorted(z.namelist()):
+      with z.open(item) as f:
+        result.update(item)
+        result.update('\x00')
+        result.update(f.read())
+        result.update('\x00')
+  out = result.hexdigest()
+  logging.info('generate_version() = %s', out)
+  return out
+
+
 class SlaveMachine(object):
   """Creates a slave that continuously polls the Swarm server for jobs."""
 
@@ -236,18 +231,7 @@ class SlaveMachine(object):
     self._attributes['try_count'] = 0
     self._come_back = 0
     self._max_url_tries = max_url_tries
-
-    try:
-      with open(os.path.join(ROOT_DIR, 'start_slave.py'), 'rb') as script:
-        start_slave_contents = script.read()
-    except IOError:
-      start_slave_contents = ''
-
-    additionals = {
-      'start_slave.py': start_slave_contents,
-    }
-    self._attributes['version'] = bot_archive.GenerateSlaveVersion(
-        ROOT_DIR, additionals)
+    self._attributes['version'] = generate_version()
 
   def Start(self, iterations):
     """Starts the slave, which polls the Swarm server for jobs until it dies.
@@ -515,13 +499,13 @@ class SlaveMachine(object):
     # TODO(maruel): It's not the job to handle --restart_on_failure,
     # this script should handle this.
     command = [
-      sys.executable, 'local_test_runner.py', '--restart_on_failure', '-f',
-      args,
+      sys.executable, THIS_FILE, 'local_test_runner', '--restart_on_failure',
+      '-f', args,
     ]
 
     try:
       logging.debug('Running command: %s', command)
-      subprocess.check_call(command)
+      subprocess.check_call(command, cwd=ROOT_DIR)
     except subprocess.CalledProcessError as e:
       if e.returncode == swarm_constants.RESTART_EXIT_CODE:
         Restart()
@@ -533,7 +517,8 @@ class SlaveMachine(object):
       # At this point the script called by subprocess has handled any further
       # communication with the swarm server.
 
-  def UpdateSlave(self, args):
+  @staticmethod
+  def UpdateSlave(args):
     """Download the current version of the slave code and then run it.
 
     Args:
@@ -547,32 +532,14 @@ class SlaveMachine(object):
           'Invalid arg types to UpdateSlave: %s (expected str or unicode)' %
           str(type(args)))
 
-    if not url_helper.DownloadFile(ZIPPED_SLAVE_FILES, args):
+    swarming_bot_zip = 'swarming_bot.zip'
+    if not url_helper.DownloadFile(swarming_bot_zip, args):
       logging.error('Unable to download required slave files.')
       return
 
-    url_parts = urlparse.urlparse(self._url)
-    server = url_parts.scheme + '://' + url_parts.hostname
-
-    slave_setup_script_contents = SLAVE_SETUP_SCRIPT % {
-        'server_port': url_parts.port,
-        'start_slave': os.path.join(ROOT_DIR, 'start_slave.py'),
-        'swarming_server': server,
-        'zipped_slave_files': ZIPPED_SLAVE_FILES
-    }
-
-    with open('slave_setup.py', 'wb') as f:
-      f.write(slave_setup_script_contents)
-
-    logging.info(
-        'Updateslave() slave_setup.py is %d bytes',
-        len(slave_setup_script_contents))
-
     sys.stdout.flush()
     sys.stderr.flush()
-    # Repeat sys.executable since the first one is what we call, and the
-    # second one is arg[0].
-    os.execl(sys.executable, sys.executable, 'slave_setup.py')
+    os.execv(sys.executable, [sys.executable] + sys.argv)
 
 
 class SlaveError(Exception):
@@ -585,7 +552,7 @@ class SlaveRPCError(Exception):
   pass
 
 
-def main():
+def main(args):
   parser = optparse.OptionParser(
       usage='%prog [options] [filename]',
       description='Initialize the machine as a swarm slave. The dimensions of '
@@ -613,7 +580,7 @@ def main():
   parser.add_option('-l', '--log_file', default='slave_machine.log',
                     help='Set the name of the file to log to. '
                     'Defaults to %default.')
-  (options, args) = parser.parse_args()
+  (options, args) = parser.parse_args(args)
 
   # Parser handles exiting this script after logging the error.
   if len(args) > 1:
@@ -669,4 +636,4 @@ def main():
 
 
 if __name__ == '__main__':
-  sys.exit(main())
+  sys.exit(main(None))

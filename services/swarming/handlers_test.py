@@ -199,14 +199,14 @@ class AppTest(test_case.TestCase):
     response = self.app.get('/get_slave_code')
     self.assertEqual('200 OK', response.status)
     self.assertEqual(
-        len(bot_management.SlaveCodeZipped()), response.content_length)
+        len(bot_management.get_swarming_bot_zip()), response.content_length)
 
   def testGetSlaveCodeHash(self):
     response = self.app.get(
         '/get_slave_code/%s' % bot_management.SlaveVersion())
     self.assertEqual('200 OK', response.status)
     self.assertEqual(
-        len(bot_management.SlaveCodeZipped()), response.content_length)
+        len(bot_management.get_swarming_bot_zip()), response.content_length)
 
   def testGetSlaveCodeInvalidHash(self):
     response = self.app.get('/get_slave_code/' + '1' * 40, expect_errors=True)

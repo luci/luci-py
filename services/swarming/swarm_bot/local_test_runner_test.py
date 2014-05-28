@@ -19,7 +19,8 @@ import local_test_runner
 from common import swarm_constants
 from common import test_request_message
 
-ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+ROOT_DIR = os.path.dirname(BASE_DIR)
 sys.path.insert(0, ROOT_DIR)
 
 import test_env
@@ -154,7 +155,7 @@ class TestLocalTestRunner(auto_stub.TestCase):
         stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
         stdin=subprocess.PIPE,
         universal_newlines=True,
-        cwd=local_test_runner.BASE_DIR).AndReturn(self.mock_proc)
+        cwd=BASE_DIR).AndReturn(self.mock_proc)
 
     (output_pipe, input_pipe) = os.pipe()
     self.mock_proc.stdin_handle = os.fdopen(input_pipe, 'wb')

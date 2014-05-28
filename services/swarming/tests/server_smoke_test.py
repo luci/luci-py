@@ -24,41 +24,42 @@ import unittest
 import urllib
 import urllib2
 import urlparse
+import zipfile
 
 APP_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+BOT_DIR = os.path.join(APP_DIR, 'swarm_bot')
 sys.path.insert(0, APP_DIR)
-sys.path.insert(0, os.path.join(APP_DIR, 'swarm_bot'))
+sys.path.insert(0, BOT_DIR)
 
 import test_env
 test_env.setup_test_env()
 
-from common import bot_archive
-
 import url_helper
-
+from server import bot_archive
 from support import gae_sdk_utils
 
-# The script to start the slave with. The python script is passed in because
-# during tests, sys.executable was sometimes failing to find python.
-# Starting up /path/to/slave_machine.py will be printed exactly twice. Once for
-# the initial start up, a second time after the upgrade.
+# The script to start the slave with. 'Starting up swarming_bot' will be printed
+# exactly twice. Once for the initial start up, a second time after the upgrade.
 START_SLAVE = (
     "import os\n"
     "import subprocess\n"
     "import sys\n"
     "\n"
-    "print('Starting up %(slave_script)s')\n"
-    "sys.stdout.flush()\n"
-    "cmd = [\n"
-    "    sys.executable, '%(slave_script)s',\n"
-    "    '-a', '%(server_address)s', '-p', '%(server_port)s',\n"
-    "    '-d', '%(slave_directory)s',\n"
-    "    '-l', '%(log_file)s',\n"
-    "    '-v',\n"
-    "    %(extra_args)s\n"
-    "    '%(config_file)s',\n"
-    "]\n"
-    "sys.exit(subprocess.call(cmd))\n")
+    "def main(_args):\n"
+    "  print('Starting up swarming_bot')\n"
+    "  sys.stdout.flush()\n"
+    "  cmd = [\n"
+    "      sys.executable, 'swarming_bot.zip', 'start_bot',\n"
+    "      '-a', '%(server_address)s', '-p', '%(server_port)s',\n"
+    "      '-l', '%(log_file)s',\n"
+    "      '-v',\n"
+    "      %(extra_args)s\n"
+    "      '%(config_file)s',\n"
+    "  ]\n"
+    "  return subprocess.call(cmd)\n"
+    "\n"
+    "if __name__ == '__main__':\n"
+    "  sys.exit(main(None))\n")
 
 
 VERBOSE = False
@@ -114,22 +115,21 @@ def whitelist_and_install_cookie_jar(server_url):
               urllib.urlencode({'a': True}))
 
 
-def setup_bot(swarm_bot_dir, start_slave_content):
+def setup_bot(swarming_bot_dir, start_slave_content):
   """Setups the slave code in a temporary directory so it can be modified."""
-  for i in bot_archive.FILES:
-    dst = os.path.join(swarm_bot_dir, i)
-    dstdir = os.path.dirname(dst)
-    if not os.path.isdir(dstdir):
-      os.mkdir(dstdir)
-    src = os.path.join(APP_DIR, 'swarm_bot', i)
-    shutil.copyfile(src, dst)
+  # Creates a functional but invalid swarming_bot.zip.
+  swarming_bot_zip = os.path.join(swarming_bot_dir, 'swarming_bot.zip')
+  with zipfile.ZipFile(swarming_bot_zip, 'w') as zip_file:
+    for item in bot_archive.FILES:
+      if item == 'local_test_runner.py':
+        # Make sure this file is missing.
+        continue
+      zip_file.write(os.path.join(BOT_DIR, item), item)
+    zip_file.writestr('start_slave.py', start_slave_content)
 
-  # Remove the local test runner script to ensure the slave is out of date
-  # and is updated.
-  os.remove(os.path.join(swarm_bot_dir, 'local_test_runner.py'))
-
-  with open(os.path.join(swarm_bot_dir, 'start_slave.py'), 'wb') as f:
-    f.write(start_slave_content)
+  logging.info(
+      'Generated %s (%d bytes)',
+      swarming_bot_zip, os.stat(swarming_bot_zip).st_size)
 
 
 class SwarmingTestCase(unittest.TestCase):
@@ -139,15 +139,16 @@ class SwarmingTestCase(unittest.TestCase):
     self._server_proc = None
     self._bot_proc = None
     self.tmpdir = tempfile.mkdtemp(prefix='swarming')
-    self.swarm_bot_dir = os.path.join(self.tmpdir, 'bot')
+    self.swarming_bot_dir = os.path.join(self.tmpdir, 'swarming_bot')
     self.log_dir = os.path.join(self.tmpdir, 'logs')
-    os.mkdir(self.swarm_bot_dir)
+    os.mkdir(self.swarming_bot_dir)
     os.mkdir(self.log_dir)
 
     server_addr = 'http://localhost'
     server_port = find_free_port('localhost', 9000)
     self.server_url = '%s:%s' % (server_addr, server_port)
 
+    # TODO(maruel): Use tools/run_dev_appserver.py.
     gaedb_dir = os.path.join(self.tmpdir, 'gaedb')
     os.mkdir(gaedb_dir)
     cmd = [
@@ -167,6 +168,8 @@ class SwarmingTestCase(unittest.TestCase):
     # Start the server first since it is a tad slow to start.
     # TODO(maruel): Use CREATE_NEW_PROCESS_GROUP on Windows.
     with open(os.path.join(self.log_dir, 'server.log'), 'wb') as f:
+      f.write('Running: %s\n' % cmd)
+      f.flush()
       self._server_proc = subprocess.Popen(
           cmd, cwd=self.tmpdir, preexec_fn=os.setsid,
           stdout=f, stderr=subprocess.STDOUT)
@@ -177,10 +180,8 @@ class SwarmingTestCase(unittest.TestCase):
       'log_file': os.path.join(self.log_dir, 'slave_machine.log'),
       'server_address': server_addr,
       'server_port': server_port,
-      'slave_directory': self.swarm_bot_dir,
-      'slave_script': os.path.join(self.swarm_bot_dir, 'slave_machine.py'),
     }
-    setup_bot(self.swarm_bot_dir, start_slave_content)
+    setup_bot(self.swarming_bot_dir, start_slave_content)
 
     self.assertTrue(
         wait_for_server_up(self.server_url), 'Failed to start server')
@@ -192,12 +193,18 @@ class SwarmingTestCase(unittest.TestCase):
         files=[('script', 'script', start_slave_content)], method='POSTFORM')
 
     # Start the slave machine script to start polling for tests.
-    cmd = [sys.executable, os.path.join(self.swarm_bot_dir, 'start_slave.py')]
+    cmd = [
+      sys.executable,
+      os.path.join(self.swarming_bot_dir, 'swarming_bot.zip'),
+      'start_slave',
+    ]
     if VERBOSE:
       cmd.append('-v')
     with open(os.path.join(self.log_dir, 'start_slave.log'), 'wb') as f:
+      f.write('Running: %s\n' % cmd)
+      f.flush()
       self._bot_proc = subprocess.Popen(
-          cmd, cwd=self.swarm_bot_dir, preexec_fn=os.setsid,
+          cmd, cwd=self.swarming_bot_dir, preexec_fn=os.setsid,
           stdout=f, stderr=subprocess.STDOUT)
 
   def tearDown(self):
@@ -350,7 +357,6 @@ class SwarmingTestCase(unittest.TestCase):
 
 
 if __name__ == '__main__':
-  logging.disable(logging.CRITICAL)
   VERBOSE = '-v' in sys.argv
   logging.basicConfig(level=logging.INFO if VERBOSE else logging.ERROR)
   if VERBOSE:

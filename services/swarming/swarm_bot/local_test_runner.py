@@ -25,13 +25,17 @@ import time
 import zipfile
 
 # pylint: disable-msg=W0403
+import url_helper
+import zipped_archive
 from common import swarm_constants
 from common import test_request_message
 
-import url_helper
 
+# Path to this file or the zip containing this file.
+THIS_FILE = os.path.abspath(zipped_archive.get_main_script_path())
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# Root directory containing this file or the zip containing this file.
+ROOT_DIR = os.path.dirname(THIS_FILE)
 
 
 # The amount of characters to read in each pass inside _RunCommand,
@@ -252,8 +256,8 @@ class LocalTestRunner(object):
     self.restart_on_failure = restart_on_failure
     self.success = False
     self.data_dir = (
-        os.path.join(BASE_DIR, data_folder_name)
-        if data_folder_name else BASE_DIR)
+        os.path.join(ROOT_DIR, data_folder_name)
+        if data_folder_name else ROOT_DIR)
     self.last_ping_time = time.time()
 
     self.test_run = _ParseRequestFile(request_file_name)

@@ -925,8 +925,8 @@ class GetSlaveCodeHandler(auth.AuthenticatingHandler):
       self.response.headers['Cache-Control'] = 'no-cache, no-store'
     self.response.headers['Content-Type'] = 'application/octet-stream'
     self.response.headers['Content-Disposition'] = (
-        'attachment; filename="swarm_bot.zip"')
-    self.response.out.write(bot_management.SlaveCodeZipped())
+        'attachment; filename="swarming_bot.zip"')
+    self.response.out.write(bot_management.get_swarming_bot_zip())
 
 
 class ServerPingHandler(webapp2.RequestHandler):

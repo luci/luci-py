@@ -20,7 +20,7 @@ import test_env
 
 test_env.setup_test_env()
 
-from common import bot_archive
+from server import bot_archive
 from server import bot_management
 from support import test_case
 
@@ -36,8 +36,8 @@ class BotManagementTest(test_case.TestCase):
     self.assertNotEqual(old_version,
                         bot_management.SlaveVersion())
 
-  def testSlaveCodeZipped(self):
-    zipped_code = bot_management.SlaveCodeZipped()
+  def testget_swarming_bot_zip(self):
+    zipped_code = bot_management.get_swarming_bot_zip()
 
     temp_dir = tempfile.mkdtemp(prefix='swarming')
     try:
