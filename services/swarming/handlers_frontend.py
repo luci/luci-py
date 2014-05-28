@@ -104,7 +104,7 @@ def expand_subnet(ip, mask):
 def ip_whitelist_authentication(request):
   """Check to see if the request is from a whitelisted machine.
 
-  Will use the remote machine's IP and provided password (if any).
+  Will use the remote machine's IP.
 
   Args:
     request: WebAPP request sent by remote machine.
@@ -113,8 +113,7 @@ def ip_whitelist_authentication(request):
     auth.Identity of a machine if IP is whitelisted, None otherwise.
   """
   assert request.remote_addr
-  is_whitelisted = user_manager.IsWhitelistedMachine(
-      request.remote_addr, request.get('password', None))
+  is_whitelisted = user_manager.IsWhitelistedMachine(request.remote_addr)
 
   # IP v6 addresses contain ':' that is not allowed in identity name.
   if is_whitelisted:
@@ -602,7 +601,6 @@ class UserProfileHandler(auth.AuthenticatingHandler):
           {
             'ip': w.ip,
             'key': w.key.id,
-            'password': w.password,
             'url': '/secure/change_whitelist',
           } for w in user_manager.MachineWhitelist().query()),
         key=lambda x: x['ip'])
@@ -629,13 +627,10 @@ class ChangeWhitelistHandler(auth.AuthenticatingHandler):
       mask = int(mask)
     ips = expand_subnet(ip, mask)
 
-    # Make sure a password '' sent by the form is stored as None.
-    password = self.request.get('p', None) or None
-
     add = self.request.get('a')
     if add == 'True':
       for ip in ips:
-        user_manager.AddWhitelist(ip, password)
+        user_manager.AddWhitelist(ip)
     elif add == 'False':
       for ip in ips:
         user_manager.DeleteWhitelist(ip)

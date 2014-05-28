@@ -19,25 +19,15 @@ class MachineWhitelist(ndb.Model):
   # The IP of the machine to whitelist.
   ip = ndb.StringProperty()
 
-  # An optional password (NOT necessarily equal to the actual user
-  # account password) used to ensure requests coming from a remote machine
-  # are indeed valid. Defaults to None.
-  password = ndb.StringProperty()
 
-
-def AddWhitelist(ip, password=None):
-  """Adds the given ip to the whitelist.
-
-  Args:
-    ip: The ip to be added. Ignores duplicate ips regardless of the password.
-    password: Optional password to associate with the machine.
-  """
+def AddWhitelist(ip):
+  """Adds the given IP address to the whitelist."""
   if MachineWhitelist.query().filter(MachineWhitelist.ip == ip).count(1):
     # Ignore duplicate requests. Note that the password is silently ignored.
     logging.info('Ignored duplicate whitelist request for ip: %s', ip)
     return
 
-  MachineWhitelist(ip=ip, password=password).put()
+  MachineWhitelist(ip=ip).put()
   logging.debug('Stored ip: %s', ip)
 
 
@@ -58,17 +48,12 @@ def DeleteWhitelist(ip):
   logging.debug('Removed ip: %s', ip)
 
 
-def IsWhitelistedMachine(ip, password):
-  """Return True if the given ip and password are whitelisted.
-
-  Args:
-    ip: IP of the client making the request.
-    password: The password provided by the client making the request.
+def IsWhitelistedMachine(ip):
+  """Return True if the given IP is whitelisted.
 
   Returns:
     True if the machine referenced is whitelisted.
   """
   entries = MachineWhitelist.query().filter(
-      MachineWhitelist.ip == ip).filter(
-          MachineWhitelist.password == password).count(1)
+      MachineWhitelist.ip == ip).count(1)
   return bool(entries)

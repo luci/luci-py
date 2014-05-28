@@ -459,13 +459,13 @@ class AppTest(test_case.TestCase):
     # Make sure the link redirects to the right place.
     # setUp adds one item.
     self.assertEqual(
-        [{'ip': FAKE_IP, 'password': None}],
+        [{'ip': FAKE_IP}],
         [t.to_dict() for t in user_manager.MachineWhitelist.query().fetch()])
     response = self.app.post(
         '/secure/change_whitelist', {'a': 'True'},
         extra_environ={'REMOTE_ADDR': 'foo'})
     self.assertEqual(
-        [{'ip': FAKE_IP, 'password': None}, {'ip': u'foo', 'password': None}],
+        [{'ip': FAKE_IP}, {'ip': u'foo'}],
         [t.to_dict() for t in user_manager.MachineWhitelist.query().fetch()])
     self.assertEqual('301 Moved Permanently', response.status)
     self.assertEqual(
@@ -475,17 +475,14 @@ class AppTest(test_case.TestCase):
     self.app.post('/secure/change_whitelist', {'i': ''}, expect_errors=True)
     self.app.post('/secure/change_whitelist', {'i': '123'}, expect_errors=True)
     self.app.post(
-        '/secure/change_whitelist', {'p': 'password'}, expect_errors=True)
-    self.app.post(
         '/secure/change_whitelist', {'i': '123', 'a': 'true'},
         expect_errors=True)
     self.assertEqual(
-        [{'ip': FAKE_IP, 'password': None}, {'ip': u'foo', 'password': None}],
+        [{'ip': FAKE_IP}, {'ip': u'foo'}],
         [t.to_dict() for t in user_manager.MachineWhitelist.query().fetch()])
 
   def testChangeWhitelistHandler(self):
-    ip = ['123', '456']
-    password = [None, 'pa$$w0rd']
+    ip = ['1.2.3.4', '1:2:3:4:5:6:7:8']
 
     # Act under admin identity.
     self._ReplaceCurrentUser(ADMIN_EMAIL)
@@ -493,37 +490,24 @@ class AppTest(test_case.TestCase):
     user_manager.DeleteWhitelist(FAKE_IP)
     self.assertEqual(0, user_manager.MachineWhitelist.query().count())
 
-    # Whitelist an ip.
+    # Whitelist IPs.
     self.app.post('/secure/change_whitelist', {'i': ip[0], 'a': 'True'})
-
     self.assertEqual(1, user_manager.MachineWhitelist.query().count())
-
-    # Whitelist an ip with a password.
-    self.app.post(
-        '/secure/change_whitelist', {'i': ip[1], 'a': 'True', 'p': password[1]})
+    self.app.post('/secure/change_whitelist', {'i': ip[1], 'a': 'True'})
     self.assertEqual(2, user_manager.MachineWhitelist.query().count())
 
-    # Make sure ips & passwords are sorted correctly.
     for i in range(2):
       whitelist = user_manager.MachineWhitelist.query().filter(
-          user_manager.MachineWhitelist.ip == ip[i]).filter(
-              user_manager.MachineWhitelist.password == password[i])
+          user_manager.MachineWhitelist.ip == ip[i])
       self.assertEqual(1, whitelist.count(), msg='Iteration %d' % i)
 
     # Remove whitelisted ip.
     self.app.post('/secure/change_whitelist', {'i': ip[0], 'a': 'False'})
     self.assertEqual(1, user_manager.MachineWhitelist.query().count())
 
-    # Make sure whitelists are removed based on IP and not password.
-    self.app.post(
-        '/secure/change_whitelist', {'i': ip[1], 'a': 'False', 'p': 'Invalid'})
-    self.assertEqual(0, user_manager.MachineWhitelist.query().count())
-
   def testUnsecureHandlerMachineAuthentication(self):
     # Test non-secure handlers to make sure they check the remote machine to be
     # whitelisted before allowing them to perform the task.
-    password = '4321'
-
     # List of non-secure handlers and their method.
     handlers_to_check = [
         ('/get_matching_test_cases', self.app.get),
@@ -543,19 +527,12 @@ class AppTest(test_case.TestCase):
           '403 Forbidden', response.status, msg='Handler: ' + handler)
 
     # Whitelist a machine.
-    user_manager.AddWhitelist(FAKE_IP, password=password)
+    user_manager.AddWhitelist(FAKE_IP)
 
     # Make sure whitelisted requests are accepted.
     for handler, method in handlers_to_check:
-      response = method(handler, {'password': password}, expect_errors=True)
+      response = method(handler, {}, expect_errors=True)
       self.assertNotEqual(
-          '403 Forbidden', response.status, msg='Handler: ' + handler)
-
-    # Make sure invalid passwords are rejected.
-    for handler, method in handlers_to_check:
-      response = method(
-          handler, {'password': 'something else'}, expect_errors=True)
-      self.assertEqual(
           '403 Forbidden', response.status, msg='Handler: ' + handler)
 
   # Test that some specific non-secure handlers allow access to authenticated

@@ -6,14 +6,12 @@
     summary="This table lists all test requests">
   <thead>
     <th>IP</th>
-    <th>Password</th>
     <th>Action</th>
   </thead>
   <tbody>
     {% for whitelist in whitelists %}
       <tr class="request">
         <td>{{whitelist.ip}}</td>
-        <td>{{whitelist.password}}</td>
         <td>
           <form id="remove_{{whitelist.key}}" method="post"
               action={{whitelist.url}}>
@@ -31,8 +29,7 @@
 <div>
   <h1>Add New:</h1>
   <form name="input" action="{{change_whitelist_url|safe}}" method="post">
-    IP (x.x.x.x): <input type="text" name="i" />
-    Password: <input type="text" name="p" />
+    IP address: <input type="text" name="i" />
     <input type="hidden" name="a" value="True">
     <input type="submit" value="Submit" />
   </form>
