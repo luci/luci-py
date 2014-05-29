@@ -50,7 +50,7 @@ START_SLAVE = (
     "  sys.stdout.flush()\n"
     "  cmd = [\n"
     "      sys.executable, 'swarming_bot.zip', 'start_bot',\n"
-    "      '-a', '%(server_address)s', '-p', '%(server_port)s',\n"
+    "      '-a', '%(server_address)s',\n"
     "      '-l', '%(log_file)s',\n"
     "      '-v',\n"
     "      %(extra_args)s\n"
@@ -190,8 +190,7 @@ class SwarmingTestCase(unittest.TestCase):
       'config_file': os.path.join(APP_DIR, 'tests', 'machine_config.txt'),
       'extra_args': "'-v'," if VERBOSE else '',
       'log_file': os.path.join(self.log_dir, 'slave_machine.log'),
-      'server_address': server_addr,
-      'server_port': server_port,
+      'server_address': self.server_url,
     }
     setup_bot(self.swarming_bot_dir, start_slave_content)
 

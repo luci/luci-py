@@ -564,31 +564,36 @@ class SlaveMachine(object):
 
 
 def main(args):
+  # TODO(maruel): Get rid of all flags and support no option at all.
+  # https://code.google.com/p/swarming/issues/detail?id=111
   parser = optparse.OptionParser(
       usage='%prog [options] [filename]',
       description='Initialize the machine as a swarm slave. The dimensions of '
       'the machine are either given through a file (if provided) or read from '
       'stdin. See http://code.google.com/p/swarming/wiki/MachineProvider for '
       'complete details.')
+  # TODO(maruel): Embed this information in the .zip file itself.
   parser.add_option('-a', '--address', default='https://localhost',
                     help='Address of the Swarm server to connect to. '
                     'Defaults to %default. ')
-  # TODO(maruel): Get rid of this flag.
-  parser.add_option('-p', '--port', default='443', type='int',
-                    help='Port of the Swarm server. '
-                    'Defaults to %default, which is the default https port.')
+  parser.add_option('-p', '--port', help=optparse.SUPPRESS_HELP)
+  # TODO(maruel): Use a sane value and hardcode it.
   parser.add_option('-r', '--max_url_tries', default=10, type='int',
                     help='The maximum number of times url messages will '
                     'attempt to be sent before accepting failure. Defaults '
                     'to %default')
+  # TODO(maruel): Always True.
   parser.add_option('--keep_alive', action='store_true',
                     help='Have the slave swallow all exceptions and run'
                     'forever.')
+  # TODO(maruel): Always True.
   parser.add_option('-v', '--verbose', action='count', default=0,
                     help='Set logging level to INFO, twice for DEBUG.')
+  # TODO(maruel): Always use the path containing the .zip file.
   parser.add_option('-d', '--directory', default='.',
                     help='Sets the working directory of the slave. '
                     'Defaults to %default. ')
+  # TODO(maruel): Always use slave_machine.log.
   parser.add_option('-l', '--log_file', default='slave_machine.log',
                     help='Set the name of the file to log to. '
                     'Defaults to %default.')
@@ -609,6 +614,8 @@ def main(args):
   levels = [logging.WARNING, logging.INFO, logging.DEBUG]
   logging.getLogger().setLevel(levels[min(options.verbose, len(levels)-1)])
 
+  # TODO(maruel): Remove this and use the information in start_slave.py to
+  # generate the dimensions on bot startup.
   # Open the specified file, or stdin.
   if not args:
     source = sys.stdin
@@ -625,8 +632,7 @@ def main(args):
   source.close()
 
   # TODO(maruel): Stop hacking this way.
-  url = '%s:%d' % (options.address.rstrip('/'), options.port)
-  slave = SlaveMachine(url=url, attributes=attributes,
+  slave = SlaveMachine(url=options.address, attributes=attributes,
                        max_url_tries=options.max_url_tries)
 
   # Change the working directory to specified path.
