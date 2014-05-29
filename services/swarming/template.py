@@ -12,6 +12,8 @@ import jinja2
 
 from google.appengine.api import users
 
+from components import utils
+
 
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -51,6 +53,7 @@ def urlquote(s):
 JINJA.filters['datetimeformat'] = datetimeformat
 JINJA.filters['datetime_human'] = datetime_human
 JINJA.filters['urlquote'] = urlquote
+JINJA.filters['encode_to_json'] = utils.encode_to_json
 
 
 def get_defaults():

@@ -28,7 +28,6 @@ from components import stats_framework
 from components import utils
 from server import admin_user
 from server import bot_management
-from server import bots_list
 from server import errors
 from server import stats
 from server import task_common
@@ -208,7 +207,7 @@ class AppTest(test_case.TestCase):
 
   def testGetSlaveCodeHash(self):
     response = self.app.get(
-        '/get_slave_code/%s' % bot_management.SlaveVersion())
+        '/get_slave_code/%s' % bot_management.get_slave_version())
     self.assertEqual('200 OK', response.status)
     self.assertEqual(
         len(bot_management.get_swarming_bot_zip()), response.content_length)
@@ -221,38 +220,33 @@ class AppTest(test_case.TestCase):
     # Act under admin identity.
     self._ReplaceCurrentUser(ADMIN_EMAIL)
 
-    self._mox.ReplayAll()
-
     # Add a machine to display.
-    bots_list.MachineStats.get_or_insert(MACHINE_ID, tag='tag')
+    bot_management.tag_bot_seen('id1', 'localhost', {})
 
     response = self.app.get('/restricted/bots')
     self.assertTrue('200' in response.status)
-
-    self._mox.VerifyAll()
 
   def testApiBots(self):
     # Act under admin identity.
     self._ReplaceCurrentUser(ADMIN_EMAIL)
 
-    bots_list.MachineStats(
-        id=MACHINE_ID,
-        tag='tag',
-        last_seen=datetime.datetime(2000, 1, 2, 3, 4, 5, 6),
-        dimensions='{"foo": "bar"}').put()
+    bot = bot_management.tag_bot_seen('id1', 'localhost', {'foo': 'bar'})
+    bot.last_seen = datetime.datetime(2000, 1, 2, 3, 4, 5, 6)
+    bot.put()
 
     response = self.app.get('/swarming/api/v1/bots')
     self.assertEqual('200 OK', response.status)
     expected = {
         u'machine_death_timeout':
-            bots_list.MACHINE_DEATH_TIMEOUT.total_seconds(),
-        u'machine_update_time': bots_list.MACHINE_UPDATE_TIME.total_seconds(),
+            int(bot_management.MACHINE_DEATH_TIMEOUT.total_seconds()),
+        u'machine_update_time':
+            int(bot_management.MACHINE_UPDATE_TIME.total_seconds()),
         u'machines': [
           {
-            u'dimensions': {'foo': 'bar'},
+            u'dimensions': {u'foo': u'bar'},
+            u'hostname': u'localhost',
+            u'id': u'id1',
             u'last_seen': u'2000-01-02 03:04:05',
-            u'machine_id': u'12345678-12345678-12345678-12345678',
-            u'tag': u'tag',
           },
        ],
     }
@@ -263,16 +257,14 @@ class AppTest(test_case.TestCase):
     self._ReplaceCurrentUser(ADMIN_EMAIL)
 
     # Add a machine assignment to delete.
-    m_stats = bots_list.MachineStats.get_or_insert(MACHINE_ID)
+    bot_management.tag_bot_seen('id1', 'localhost', {'foo': 'bar'})
 
     # Delete the machine assignment.
-    response = self.app.post('/delete_machine_stats?r=%s' %
-                             m_stats.key.string_id())
+    response = self.app.post('/delete_machine_stats', {'r': 'id1'})
     self.assertResponse(response, '200 OK', 'Machine Assignment removed.')
 
-    # Attempt to delete the assignment again and fail.
-    response = self.app.post('/delete_machine_stats?r=%s' %
-                             m_stats.key.string_id())
+    # Attempt to delete the assignment again and silently pass.
+    response = self.app.post('/delete_machine_stats', {'r': 'id1'})
     self.assertResponse(response, '204 No Content', '')
 
   def testMainHandler(self):
@@ -402,7 +394,7 @@ class AppTest(test_case.TestCase):
         {
           u'args':
               u'http://localhost/get_slave_code/%s' %
-              bot_management.SlaveVersion(),
+              bot_management.get_slave_version(),
           u'function': u'UpdateSlave',
         },
       ],
@@ -415,7 +407,7 @@ class AppTest(test_case.TestCase):
     attributes = {
       'dimensions': {'os': ['win-xp']},
       'id': MACHINE_ID,
-      'version': bot_management.SlaveVersion(),
+      'version': bot_management.get_slave_version(),
     }
     response = self.app.post(
         '/poll_for_test', {'attributes': json.dumps(attributes)})
@@ -448,12 +440,12 @@ class AppTest(test_case.TestCase):
     packed = task_common.pack_result_summary_key(result_summary.key)
     resp = self.app.get('/get_result?r=%s' % packed, status=200)
     expected = {
-      'config_instance_index': 0,
-      'exit_codes': '',
-      'machine_id': '12345678-12345678-12345678-12345678',
-      'machine_tag': 'Unknown',
-      'num_config_instances': 1,
-      'output': 'result string',
+      u'config_instance_index': 0,
+      u'exit_codes': u'',
+      u'machine_id': u'12345678-12345678-12345678-12345678',
+      u'machine_tag': u'12345678-12345678-12345678-12345678',
+      u'num_config_instances': 1,
+      u'output': u'result string',
     }
     self.assertEqual(expected, resp.json)
 
@@ -834,11 +826,21 @@ class AppTest(test_case.TestCase):
                 (method, route, permissions))
 
   def test_dead_machines_count(self):
+    # TODO(maruel): Convert this test case to mock time and use the APIs instead
+    # of editing the DB directly.
     self.assertEqual('0', self.app.get('/swarming/api/v1/bots/dead/count').body)
-    bot = bots_list.MachineStats.get_or_insert('id1', tag='machine')
+    bot = bot_management.tag_bot_seen('id1', 'localhost', {})
     self.assertEqual('0', self.app.get('/swarming/api/v1/bots/dead/count').body)
+
+    # Borderline. If this test becomes flaky, increase the 1 second value.
+    bot.last_seen = (
+        task_common.utcnow() - bot_management.MACHINE_DEATH_TIMEOUT +
+        datetime.timedelta(seconds=1))
+    bot.put()
+    self.assertEqual('0', self.app.get('/swarming/api/v1/bots/dead/count').body)
+
     # Make the machine old and ensure it is marked as dead.
-    bot.last_seen = task_common.utcnow() - 2 * bots_list.MACHINE_DEATH_TIMEOUT
+    bot.last_seen = task_common.utcnow() - bot_management.MACHINE_DEATH_TIMEOUT
     bot.put()
     self.assertEqual('1', self.app.get('/swarming/api/v1/bots/dead/count').body)
 

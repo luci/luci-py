@@ -3,10 +3,12 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
+import StringIO
+import datetime
 import logging
 import os
+import re
 import shutil
-import StringIO
 import subprocess
 import sys
 import tempfile
@@ -26,33 +28,56 @@ from support import test_case
 
 
 class BotManagementTest(test_case.TestCase):
-  def testStoreStartSlaveScriptClearCache(self):
+  def test_store_start_slave(self):
     # When a new start slave script is uploaded, we should recalculate the
     # version hash since it will have changed.
-    old_version = bot_management.SlaveVersion()
-
-    bot_management.StoreStartSlaveScript('dummy_script')
-
+    old_version = bot_management.get_slave_version()
+    bot_management.store_start_slave('dummy_script')
     self.assertNotEqual(old_version,
-                        bot_management.SlaveVersion())
+                        bot_management.get_slave_version())
 
-  def testget_swarming_bot_zip(self):
+  def test_get_slave_version(self):
+    actual = bot_management.get_slave_version()
+    self.assertTrue(re.match(r'^[0-9a-f]{40}$', actual), actual)
+
+  def test_get_swarming_bot_zip(self):
     zipped_code = bot_management.get_swarming_bot_zip()
+    # Ensure the zip is valid and all the expected files are present.
+    with zipfile.ZipFile(StringIO.StringIO(zipped_code), 'r') as zip_file:
+      for i in bot_archive.FILES:
+        with zip_file.open(i) as f:
+          content = f.read()
+          if os.path.basename(i) == '__init__.py':
+            self.assertEqual('', content)
+          else:
+            self.assertTrue(content, i)
 
     temp_dir = tempfile.mkdtemp(prefix='swarming')
     try:
-      with zipfile.ZipFile(StringIO.StringIO(zipped_code), 'r') as zip_file:
-        zip_file.extractall(temp_dir)
-
-      for i in bot_archive.FILES:
-        self.assertTrue(os.path.isfile(os.path.join(temp_dir, i)), i)
-
-      # Try running the slave and ensure it can import the required files.
-      # (It would crash if it failed to import them).
-      subprocess.check_output(
-          [sys.executable, os.path.join(temp_dir, 'slave_machine.py'), '-h'])
+      # Try running the slave and ensure it can import the required files. (It
+      # would crash if it failed to import them).
+      bot_path = os.path.join(temp_dir, 'swarming_bot.zip')
+      with open(bot_path, 'wb') as f:
+        f.write(zipped_code)
+      subprocess.check_output([sys.executable, bot_path, 'start_bot', '-h'])
     finally:
       shutil.rmtree(temp_dir)
+
+  def test_get_bot_key(self):
+    self.assertEqual(
+        "Key('Bot', 'f-a:1')", str(bot_management.get_bot_key('f-a:1')))
+
+  def test_tag_bot_seen(self):
+    bot = bot_management.tag_bot_seen('id1', 'localhost', {'foo': 'bar'})
+    self.assertTrue(bot.last_seen)
+    bot.last_seen = datetime.datetime(2010, 1, 2, 3, 4, 5, 6)
+    expected = {
+      'dimensions': {u'foo': u'bar'},
+      'hostname': u'localhost',
+      'id': 'id1',
+      'last_seen': datetime.datetime(2010, 1, 2, 3, 4, 5, 6),
+    }
+    self.assertEqual(expected, bot.to_dict())
 
 
 if __name__ == '__main__':

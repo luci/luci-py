@@ -33,7 +33,6 @@ from components import auth_ui
 from components import ereporter2
 from components import utils
 from server import bot_management
-from server import bots_list
 from server import errors
 from server import result_helper
 from server import stats
@@ -53,14 +52,13 @@ from server import user_manager
 TEST_RUN_SWARM_FILE_NAME = 'test_run.swarm'
 
 
-ACCEPTABLE_SORTS =  {
+ACCEPTABLE_TASKS_SORTS = {
   'created_ts': 'Created',
   'done_ts': 'Ended',
   'modified_ts': 'Last updated',
   'name': 'Name',
   'user': 'User',
 }
-DEFAULT_SORT = 'created_ts'
 
 
 def GetModulesVersions():
@@ -138,7 +136,12 @@ def request_work_item(attributes, server_url):
 
   dimensions = attribs['dimensions']
   bot_id = attribs['id'] or dimensions['hostname']
+  # Note its existence at two places, one for stats at 1 minute resolution, the
+  # other for the list of known bots.
   stats.add_entry(action='bot_active', bot_id=bot_id, dimensions=dimensions)
+  bot_management.tag_bot_seen(
+      bot_id, dimensions.get('hostname', bot_id), dimensions)
+
   request, run_result = task_scheduler.bot_reap_task(dimensions, bot_id)
   if not request:
     try_count = attribs['try_count'] + 1
@@ -209,37 +212,7 @@ def request_work_item(attributes, server_url):
   }
 
 
-def ping_runner(packed_run_result_key, machine_id):
-  # TODO(maruel): Delete this function.
-  try:
-    run_result_key = task_scheduler.unpack_run_result_key(packed_run_result_key)
-    return task_scheduler.bot_update_task(run_result_key, {}, machine_id)
-  except ValueError as e:
-    logging.error('Failed to accept value %s: %s', packed_run_result_key, e)
-    return False
-
-
 ### UI code that should be in jinja2 templates
-
-
-def generate_button_with_hidden_form(button_text, url, form_id):
-  """Generates a button that when used will post to the given url.
-
-  Args:
-    button_text: The text to display on the button.
-    url: The url to post to.
-    form_id: The id to give the form.
-
-  Returns:
-    The html text to display the button.
-  """
-  button_html = '<form id="%s" method="post" action=%s>' % (form_id, url)
-  button_html += (
-      '<button onclick="document.getElementById(%s).submit()">%s</button>' %
-      (form_id, button_text))
-  button_html += '</form>'
-
-  return button_html
 
 
 def make_runner_view(result_summary):
@@ -320,7 +293,7 @@ class FilterParams(object):
     # TODO(maruel): Use cursors!
     # TODO(maruel): Use self.status, self.show_successfully_completed,
     # self.test_name_filter, self.machine_id_filter.
-    assert sort_by in ACCEPTABLE_SORTS, (
+    assert sort_by in ACCEPTABLE_TASKS_SORTS, (
         'This should have been validated at a higher level')
     opts = ndb.QueryOptions(limit=limit, offset=offset)
     direction = (
@@ -409,21 +382,22 @@ class TasksHandler(auth.AuthenticatingHandler):
     page_length = int(self.request.get('length', 50))
     page = int(self.request.get('page', 1))
 
-    sort_by = self.request.get('sort_by', 'D' + DEFAULT_SORT)
+    default_sort = 'created_ts'
+    sort_by = self.request.get('sort_by', 'D' + default_sort)
     ascending = bool(sort_by[0] == 'A')
     sort_key = sort_by[1:]
-    if sort_key not in ACCEPTABLE_SORTS:
+    if sort_key not in ACCEPTABLE_TASKS_SORTS:
       self.abort(400, 'Invalid sort key')
 
     # TODO(maruel): Stop doing HTML in python.
     sorted_by_message = '<p>Currently sorted by: '
     if not ascending:
       sorted_by_message += 'Reverse '
-    sorted_by_message += ACCEPTABLE_SORTS[sort_key] + '</p>'
+    sorted_by_message += ACCEPTABLE_TASKS_SORTS[sort_key] + '</p>'
     sort_options = []
     # TODO(maruel): Use an order that makes sense instead of whatever the dict
     # happens to be.
-    for key, value in ACCEPTABLE_SORTS.iteritems():
+    for key, value in ACCEPTABLE_TASKS_SORTS.iteritems():
       # Add 'A' for ascending and 'D' for descending order.
       sort_options.append(SortOptions('A' + key, value))
       sort_options.append(SortOptions('D' + key, 'Reverse ' + value))
@@ -470,35 +444,41 @@ class TasksHandler(auth.AuthenticatingHandler):
 
 class BotsListHandler(auth.AuthenticatingHandler):
   """Presents the list of known bots."""
+  ACCEPTABLE_BOTS_SORTS = {
+    'dimensions': 'Dimensions',
+    'last_seen': 'Last Seen',
+    'hostname': 'Hostname',
+    'id': 'ID',
+  }
 
   @auth.require(auth.READ, 'swarming/management')
   def get(self):
-    sort_by = self.request.get('sort_by', 'machine_id')
-    if sort_by not in bots_list.ACCEPTABLE_SORTS:
+    sort_by = self.request.get('sort_by', 'id')
+    if sort_by not in self.ACCEPTABLE_BOTS_SORTS:
       self.abort(400, 'Invalid sort_by query parameter')
 
-    dead_machine_cutoff = task_common.utcnow() - bots_list.MACHINE_DEATH_TIMEOUT
-    machines = []
-    for machine in bots_list.GetAllMachines(sort_by):
-      m = machine.to_dict()
-      m['html_class'] = (
-          'dead_machine' if machine.last_seen < dead_machine_cutoff else '')
-      # Add a delete option for each machine assignment.
-      # TODO(maruel): This should not be generated via python.
-      m['command_string'] = generate_button_with_hidden_form(
-          'Delete',
-          '%s?r=%s' % ('/delete_machine_stats', machine.key.string_id()),
-          machine.key.string_id())
-      machines.append(m)
+    dead_machine_cutoff = (
+        task_common.utcnow() - bot_management.MACHINE_DEATH_TIMEOUT)
+
+    bots = []
+    for bot in bot_management.Bot.query().fetch():
+      b = bot.to_dict()
+      b['html_class'] = (
+          'dead_machine' if bot.last_seen < dead_machine_cutoff else '')
+      bots.append(b)
+    # TODO(maruel): Do the sorting via javascript so no need to reload the page
+    # at all.
+    bots.sort(key=lambda i: i[sort_by])
 
     sort_options = [
-        SortOptions(k, v) for k, v in bots_list.ACCEPTABLE_SORTS.iteritems()
+      SortOptions(k, v)
+      for k, v in sorted(self.ACCEPTABLE_BOTS_SORTS.iteritems())
     ]
     params = {
-        'machine_update_time': bots_list.MACHINE_UPDATE_TIME,
-        'machines': machines,
-        'selected_sort': sort_by,
-        'sort_options': sort_options,
+      'update_delay': bot_management.MACHINE_UPDATE_TIME,
+      'bots': bots,
+      'selected_sort': sort_by,
+      'sort_options': sort_options,
     }
     self.response.out.write(
         template.render('restricted_botslist.html', params))
@@ -591,7 +571,7 @@ class UploadStartSlaveHandler(auth.AuthenticatingHandler):
     if not script:
       self.abort(400, 'No script uploaded')
 
-    bot_management.StoreStartSlaveScript(script)
+    bot_management.store_start_slave(script)
     self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
     self.response.out.write('Success.')
 
@@ -646,9 +626,11 @@ class ApiBots(auth.AuthenticatingHandler):
   @auth.require(auth.READ, 'swarming/management')
   def get(self):
     params = {
-        'machine_death_timeout': bots_list.MACHINE_DEATH_TIMEOUT,
-        'machine_update_time': bots_list.MACHINE_UPDATE_TIME,
-        'machines': [m.to_dict() for m in bots_list.MachineStats.query()],
+        'machine_death_timeout':
+            int(bot_management.MACHINE_DEATH_TIMEOUT.total_seconds()),
+        'machine_update_time':
+            int(bot_management.MACHINE_UPDATE_TIME.total_seconds()),
+        'machines': sorted(m.to_dict() for m in bot_management.Bot.query()),
     }
     self.response.headers['Content-Type'] = 'application/json; charset=utf-8'
     self.response.headers['Cache-Control'] = 'no-cache, no-store'
@@ -663,9 +645,9 @@ class DeleteMachineStatsHandler(auth.AuthenticatingHandler):
 
   @auth.require(auth.UPDATE, 'swarming/clients')
   def post(self):
-    key = self.request.get('r')
-
-    if key and bots_list.DeleteMachineStats(key):
+    bot_key = bot_management.get_bot_key(self.request.get('r', ''))
+    if bot_key.get():
+      bot_key.delete()
       self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
       self.response.out.write('Machine Assignment removed.')
     else:
@@ -781,9 +763,9 @@ def SendRunnerResults(response, key_id):
 
   results = {
     'exit_codes': ','.join(map(str, result.exit_codes)),
+    # TODO(maruel): Refactor these to make sense.
     'machine_id': result.bot_id,
-    # TODO(maruel): Likely unnecessary.
-    'machine_tag': bots_list.GetMachineTag(result.bot_id),
+    'machine_tag': result.bot_id,
     'config_instance_index': 0,
     'num_config_instances': 1,
     # TODO(maruel): Return each output independently. Figure out a way to
@@ -895,7 +877,7 @@ class GetSlaveCodeHandler(auth.AuthenticatingHandler):
   @auth.require(auth.READ, 'swarming/bots')
   def get(self, version=None):
     if version:
-      expected = bot_management.SlaveVersion()
+      expected = bot_management.get_slave_version()
       if version != expected:
         logging.error('Requested Swarming bot %s, have %s', version, expected)
         self.abort(404)
@@ -981,9 +963,15 @@ class RunnerPingHandler(auth.AuthenticatingHandler):
     # TODO(vadimsh): Any machine can send ping on behalf of any other machine.
     # Ensure 'id' matches credentials used to authenticate the request (i.e.
     # auth.get_current_identity()).
-    key = self.request.get('r', '')
+    packed_run_result_key = self.request.get('r', '')
     machine_id = self.request.get('id', '')
-    if not ping_runner(key, machine_id):
+    try:
+      run_result_key = task_scheduler.unpack_run_result_key(
+          packed_run_result_key)
+      task_scheduler.bot_update_task(run_result_key, {}, machine_id)
+      bot_management.tag_bot_seen(machine_id, None, None)
+    except ValueError as e:
+      logging.error('Failed to accept value %s: %s', packed_run_result_key, e)
       self.abort(400, 'Runner failed to ping.')
 
     self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
@@ -1077,9 +1065,9 @@ class RootHandler(webapp2.RequestHandler):
 class DeadBotsCountHandler(webapp2.RequestHandler):
   def get(self):
     self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
-    cutoff = task_common.utcnow() - bots_list.MACHINE_DEATH_TIMEOUT
-    count = bots_list.MachineStats.query().filter(
-        bots_list.MachineStats.last_seen < cutoff).count()
+    cutoff = task_common.utcnow() - bot_management.MACHINE_DEATH_TIMEOUT
+    count = bot_management.Bot.query().filter(
+        bot_management.Bot.last_seen < cutoff).count()
     self.response.out.write(str(count))
 
 
