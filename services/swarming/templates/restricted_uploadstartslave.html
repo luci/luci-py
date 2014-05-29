@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+
+{% block body %}
+<form method="post" enctype="multipart/form-data"
+    action="/restricted/upload_start_slave">
+  Upload a new start_slave.py file:<br>
+  <input type="file" name="script" /><br>
+  <input type="hidden" name="xsrf_token" value="{{xsrf_token}}" />
+  <input type="submit" value="Upload" />
+</form>
+{% endblock %}

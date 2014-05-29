@@ -17,16 +17,6 @@ found in the LICENSE file. -->
     {% else %}
       <a href="{{signin_link|safe }}">Sign in</a>
     {% endif %}
-    <br>
-    <a href="/stats">Stats</a>
-    <br>
-    {% if user_is_admin %}
-      <!-- TODO(maruel): Home should be accessible to anyone, so they can see
-      their tasks -->
-      <a href=/secure/main>Home</a> &#124
-      <a href=/secure/machine_list>Machine List</a> &#124
-      <a href=/secure/user_profile>Profile</a>
-    {% endif %}
   </div>
 
   {% block body %}

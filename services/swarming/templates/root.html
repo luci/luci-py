@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+
+{% block body %}
+
+<h1>Swarming Server</h1>
+Swarming Server is an open task distribution service written in python running
+on AppEngine.
+<p>
+<ul class="spaced">
+  <li>
+    <a href="/stats">Usage stats</a> is visible to everyone.
+  </li>
+  <li>
+    <a href="/restricted">Admin pages</a>, well, if you are an admin of this
+    instance.
+  </li>
+  <li>
+    To start a bot, run:
+    <pre style="margin-bottom:0">
+    mkdir bot
+    cd bot
+    curl -sSLOJ https://{{host}}/get_slave_code
+    python swarming_bot.zip start_slave -s https://{{host}}/ -p 443
+    </pre>
+    Don't forget if swarming_bot.zip was already present, curl won't overwrite
+    it so "rm swarming_bot.zip" first if necessary.
+  </li>
+  <li>See the project's page for code and help pages:
+    <a href="https://code.google.com/p/swarming/">
+      https://code.google.com/p/swarming/</a>
+  </li>
+</ul>
+
+{% endblock %}

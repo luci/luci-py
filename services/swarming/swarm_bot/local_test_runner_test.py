@@ -555,7 +555,7 @@ class TestLocalTestRunner(auto_stub.TestCase):
 
   def testPublishResultsHTTPS(self):
     self.CreateValidFile()
-    self.result_url = 'https://secure.com/result'
+    self.result_url = 'https://localhost/result'
 
     max_url_retries = 1
     local_test_runner.url_helper.UrlOpen(

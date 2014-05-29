@@ -114,6 +114,11 @@ class AppTest(test_case.TestCase):
     self.assertEqual(status, response.status, response.status)
     self.assertEqual(body, response.body, repr(response.body))
 
+  def getXsrfToken(self):
+    return self.app.post(
+        '/auth/api/v1/accounts/self/xsrf_token',
+        headers={'X-XSRF-Token-Request': '1'}).json['xsrf_token']
+
   def testMatchingTestCasesHandler(self):
     # Ensure that matching works even when the datastore is not being
     # consistent.
@@ -160,7 +165,7 @@ class AppTest(test_case.TestCase):
         response.body)
 
   def testGetResultHandler(self):
-    handler_urls = ['/get_result', '/secure/get_result']
+    handler_urls = ['/get_result', '/restricted/get_result']
 
     # Act under admin identity.
     self._ReplaceCurrentUser(ADMIN_EMAIL)
@@ -212,7 +217,7 @@ class AppTest(test_case.TestCase):
     response = self.app.get('/get_slave_code/' + '1' * 40, expect_errors=True)
     self.assertEqual('404 Not Found', response.status)
 
-  def testMachineList(self):
+  def testBots(self):
     # Act under admin identity.
     self._ReplaceCurrentUser(ADMIN_EMAIL)
 
@@ -221,7 +226,7 @@ class AppTest(test_case.TestCase):
     # Add a machine to display.
     bots_list.MachineStats.get_or_insert(MACHINE_ID, tag='tag')
 
-    response = self.app.get('/secure/machine_list')
+    response = self.app.get('/restricted/bots')
     self.assertTrue('200' in response.status)
 
     self._mox.VerifyAll()
@@ -271,6 +276,10 @@ class AppTest(test_case.TestCase):
     self.assertResponse(response, '204 No Content', '')
 
   def testMainHandler(self):
+    response = self.app.get('/')
+    self.assertEqual('200 OK', response.status)
+
+  def testRestrictedHandler(self):
     # Act under admin identity.
     self._ReplaceCurrentUser(ADMIN_EMAIL)
 
@@ -279,7 +288,7 @@ class AppTest(test_case.TestCase):
     # Add a test runner to show on the page.
     test_helper.CreateRunner()
 
-    response = self.app.get('/secure/main')
+    response = self.app.get('/restricted')
     self.assertEqual('200 OK', response.status)
 
     self._mox.VerifyAll()
@@ -290,27 +299,27 @@ class AppTest(test_case.TestCase):
 
     # Test when no matching key
     response = self.app.post(
-        '/secure/retry', {'r': 'fake_key'}, expect_errors=True)
+        '/restricted/retry', {'r': 'fake_key'}, expect_errors=True)
     self.assertEqual('400 Bad Request', response.status)
     self.assertEqual('Unable to retry runner', response.body)
 
     # Test with matching key.
     result_summary, _run_result = test_helper.CreateRunner(exit_codes='0')
     packed = task_common.pack_result_summary_key(result_summary.key)
-    response = self.app.post('/secure/retry', {'r': packed})
+    response = self.app.post('/restricted/retry', {'r': packed})
     self.assertResponse(response, '200 OK', 'Runner set for retry.')
 
   def testShowMessageHandler(self):
     # Act under admin identity.
     self._ReplaceCurrentUser(ADMIN_EMAIL)
 
-    response = self.app.get('/secure/show_message', {'r': 'fake_key'},
+    response = self.app.get('/restricted/show_message', {'r': 'fake_key'},
         status=404)
 
     result_summary, _run_result = test_helper.CreateRunner()
     # TODO(maruel): Must support sending back individual tries.
     packed = task_common.pack_result_summary_key(result_summary.key)
-    response = self.app.get('/secure/show_message', {'r': packed})
+    response = self.app.get('/restricted/show_message', {'r': packed})
     self.assertEqual(
         utils.to_json_encodable(result_summary.to_dict()), response.json)
 
@@ -318,7 +327,11 @@ class AppTest(test_case.TestCase):
     # Act under admin identity.
     self._ReplaceCurrentUser(ADMIN_EMAIL)
 
-    response = self.app.post('/upload_start_slave', expect_errors=True)
+    xsrf_token = self.getXsrfToken()
+    response = self.app.get('/restricted/upload_start_slave')
+    response = self.app.post(
+        '/restricted/upload_start_slave?xsrf_token=%s' % xsrf_token,
+        expect_errors=True)
     self.assertResponse(
         response, '400 Bad Request',
         '400 Bad Request\n\nThe server could not comply with the request since '
@@ -326,7 +339,7 @@ class AppTest(test_case.TestCase):
         '  ')
 
     response = self.app.post(
-        '/upload_start_slave',
+        '/restricted/upload_start_slave?xsrf_token=%s' % xsrf_token,
         upload_files=[('script', 'script', 'script_body')])
     self.assertResponse(response, '200 OK', 'Success.')
 
@@ -444,17 +457,14 @@ class AppTest(test_case.TestCase):
     }
     self.assertEqual(expected, resp.json)
 
-  def testUserProfile(self):
+  def testWhitelistIPHandlerParams(self):
     # Act under admin identity.
     self._ReplaceCurrentUser(ADMIN_EMAIL)
 
     # Make sure the template renders.
-    response = self.app.get('/secure/user_profile', {})
+    response = self.app.get('/restricted/whitelist_ip', {})
     self.assertEqual('200 OK', response.status)
-
-  def testChangeWhitelistHandlerParams(self):
-    # Act under admin identity.
-    self._ReplaceCurrentUser(ADMIN_EMAIL)
+    xsrf_token = self.getXsrfToken()
 
     # Make sure the link redirects to the right place.
     # setUp adds one item.
@@ -462,26 +472,29 @@ class AppTest(test_case.TestCase):
         [{'ip': FAKE_IP}],
         [t.to_dict() for t in user_manager.MachineWhitelist.query().fetch()])
     response = self.app.post(
-        '/secure/change_whitelist', {'a': 'True'},
+        '/restricted/whitelist_ip', {'a': 'True', 'xsrf_token': xsrf_token},
         extra_environ={'REMOTE_ADDR': 'foo'})
     self.assertEqual(
         [{'ip': FAKE_IP}, {'ip': u'foo'}],
         [t.to_dict() for t in user_manager.MachineWhitelist.query().fetch()])
-    self.assertEqual('301 Moved Permanently', response.status)
-    self.assertEqual(
-        'http://localhost/secure/user_profile', response.location)
+    self.assertEqual(200, response.status_code)
 
     # All of these requests are invalid so none of them modify entites.
-    self.app.post('/secure/change_whitelist', {'i': ''}, expect_errors=True)
-    self.app.post('/secure/change_whitelist', {'i': '123'}, expect_errors=True)
     self.app.post(
-        '/secure/change_whitelist', {'i': '123', 'a': 'true'},
+        '/restricted/whitelist_ip', {'i': '', 'xsrf_token': xsrf_token},
+        expect_errors=True)
+    self.app.post(
+        '/restricted/whitelist_ip', {'i': '123', 'xsrf_token': xsrf_token},
+        expect_errors=True)
+    self.app.post(
+        '/restricted/whitelist_ip',
+        {'i': '123', 'a': 'true', 'xsrf_token': xsrf_token},
         expect_errors=True)
     self.assertEqual(
         [{'ip': FAKE_IP}, {'ip': u'foo'}],
         [t.to_dict() for t in user_manager.MachineWhitelist.query().fetch()])
 
-  def testChangeWhitelistHandler(self):
+  def testWhitelistIPHandler(self):
     ip = ['1.2.3.4', '1:2:3:4:5:6:7:8']
 
     # Act under admin identity.
@@ -489,11 +502,16 @@ class AppTest(test_case.TestCase):
 
     user_manager.DeleteWhitelist(FAKE_IP)
     self.assertEqual(0, user_manager.MachineWhitelist.query().count())
+    xsrf_token = self.getXsrfToken()
 
     # Whitelist IPs.
-    self.app.post('/secure/change_whitelist', {'i': ip[0], 'a': 'True'})
+    self.app.post(
+        '/restricted/whitelist_ip',
+        {'i': ip[0], 'a': 'True', 'xsrf_token': xsrf_token})
     self.assertEqual(1, user_manager.MachineWhitelist.query().count())
-    self.app.post('/secure/change_whitelist', {'i': ip[1], 'a': 'True'})
+    self.app.post(
+        '/restricted/whitelist_ip',
+        {'i': ip[1], 'a': 'True', 'xsrf_token': xsrf_token})
     self.assertEqual(2, user_manager.MachineWhitelist.query().count())
 
     for i in range(2):
@@ -502,7 +520,9 @@ class AppTest(test_case.TestCase):
       self.assertEqual(1, whitelist.count(), msg='Iteration %d' % i)
 
     # Remove whitelisted ip.
-    self.app.post('/secure/change_whitelist', {'i': ip[0], 'a': 'False'})
+    self.app.post(
+        '/restricted/whitelist_ip',
+        {'i': ip[0], 'a': 'False', 'xsrf_token': xsrf_token})
     self.assertEqual(1, user_manager.MachineWhitelist.query().count())
 
   def testUnsecureHandlerMachineAuthentication(self):
@@ -591,7 +611,7 @@ class AppTest(test_case.TestCase):
       '/auth/',
       # It's protected but not accessible as-is.
       '/get_slave_code/<version:[0-9a-f]{40}>',
-      '/secure/',
+      '/restricted/',
     )
 
     # Handlers that are explicitly allowed to be called by anyone.
@@ -784,13 +804,13 @@ class AppTest(test_case.TestCase):
     self._ReplaceCurrentUser(ADMIN_EMAIL)
 
     response = self.app.post(
-        '/secure/cancel', {'r': 'invalid_key'}, expect_errors=True)
+        '/restricted/cancel', {'r': 'invalid_key'}, expect_errors=True)
     self.assertEqual('400 Bad Request', response.status)
     self.assertEqual('Unable to cancel runner', response.body)
 
     result_summary, _run_result = test_helper.CreateRunner()
     packed = task_common.pack_result_summary_key(result_summary.key)
-    response = self.app.post('/secure/cancel', {'r': packed})
+    response = self.app.post('/restricted/cancel', {'r': packed})
     self.assertResponse(response, '200 OK', 'Runner canceled.')
 
   def testKnownAuthResources(self):

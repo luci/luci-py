@@ -54,3 +54,7 @@ table.alterning_background tbody .failed_test {
   height: 600px;
   width: 100%;
 }
+
+ul li {
+  padding-top: 5px;
+}

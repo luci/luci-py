@@ -15,8 +15,13 @@ handlers:
   upload: static/(.+)\.(css|ico|txt)
   secure: always
 
+- url: /restricted(|/.*)
+  script: main.app
+  secure: always
+  login: admin
+
 # TODO(maruel): Move /internal/ to module-backend.yaml.
-- url: /(internal|secure)/.*
+- url: /internal/.+
   script: main.app
   secure: always
   login: admin

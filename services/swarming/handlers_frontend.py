@@ -380,6 +380,12 @@ class FilterParams(object):
 # TODO(maruel): Sort the handlers once they got their final name.
 
 
+class RestrictedHandler(auth.AuthenticatingHandler):
+  @auth.require(auth.READ, 'swarming/management')
+  def get(self):
+    self.response.out.write(template.render('restricted.html', {}))
+
+
 class TasksHandler(auth.AuthenticatingHandler):
   """Handler for the main page of the web server.
 
@@ -459,15 +465,11 @@ class TasksHandler(auth.AuthenticatingHandler):
       'url_no_sort_by_or_filters': params.generate_page_url(
           page, include_filters=False),
     }
-    self.response.out.write(template.render('index.html', params))
+    self.response.out.write(template.render('restricted_tasks.html', params))
 
 
-class MachineListHandler(auth.AuthenticatingHandler):
-  """Handler for the machine list page of the web server.
-
-  This handler lists all the machines that have ever polled the server and
-  some basic information about them.
-  """
+class BotsListHandler(auth.AuthenticatingHandler):
+  """Presents the list of known bots."""
 
   @auth.require(auth.READ, 'swarming/management')
   def get(self):
@@ -498,7 +500,8 @@ class MachineListHandler(auth.AuthenticatingHandler):
         'selected_sort': sort_by,
         'sort_options': sort_options,
     }
-    self.response.out.write(template.render('machine_list.html', params))
+    self.response.out.write(
+        template.render('restricted_botslist.html', params))
 
 
 class Ereporter2ReportHandler(auth.AuthenticatingHandler):
@@ -513,7 +516,7 @@ class Ereporter2ReportHandler(auth.AuthenticatingHandler):
              last email.
       end: epoch time to stop looking at. Defaults to now.
     """
-    request_id_url = '/secure/ereporter2/request/'
+    request_id_url = '/restricted/ereporter2/request/'
     end = int(float(self.request.get('end', 0)) or time.time())
     start = int(
         float(self.request.get('start', 0)) or
@@ -574,8 +577,13 @@ class ShowMessageHandler(auth.AuthenticatingHandler):
 class UploadStartSlaveHandler(auth.AuthenticatingHandler):
   """Accept a new start slave script."""
 
-  # TODO(vadimsh): Implement XSRF token support.
-  xsrf_token_enforce_on = ()
+  @auth.require(auth.UPDATE, 'swarming/management')
+  def get(self):
+    params = {
+      'xsrf_token': self.generate_xsrf_token(),
+    }
+    self.response.out.write(
+        template.render('restricted_uploadstartslave.html', params))
 
   @auth.require(auth.UPDATE, 'swarming/management')
   def post(self):
@@ -588,12 +596,7 @@ class UploadStartSlaveHandler(auth.AuthenticatingHandler):
     self.response.out.write('Success.')
 
 
-class UserProfileHandler(auth.AuthenticatingHandler):
-  """Handler for the user profile page of the web server.
-
-  This handler lists user info, such as their IP whitelist and settings.
-  """
-
+class WhitelistIPHandler(auth.AuthenticatingHandler):
   @auth.require(auth.READ, 'swarming/management')
   def get(self):
     display_whitelists = sorted(
@@ -601,22 +604,17 @@ class UserProfileHandler(auth.AuthenticatingHandler):
           {
             'ip': w.ip,
             'key': w.key.id,
-            'url': '/secure/change_whitelist',
+            'url': self.request.path_url,
           } for w in user_manager.MachineWhitelist().query()),
         key=lambda x: x['ip'])
 
     params = {
-        'change_whitelist_url': '/secure/change_whitelist',
-        'whitelists': display_whitelists,
+      'post_url': self.request.path_url,
+      'whitelists': display_whitelists,
+      'xsrf_token': self.generate_xsrf_token(),
     }
-    self.response.out.write(template.render('user_profile.html', params))
-
-
-class ChangeWhitelistHandler(auth.AuthenticatingHandler):
-  """Handler for making changes to a user whitelist."""
-
-  # TODO(vadimsh): Implement XSRF token support.
-  xsrf_token_enforce_on = ()
+    self.response.out.write(
+        template.render('restricted_whitelistip.html', params))
 
   @auth.require(auth.UPDATE, 'swarming/management')
   def post(self):
@@ -636,8 +634,7 @@ class ChangeWhitelistHandler(auth.AuthenticatingHandler):
         user_manager.DeleteWhitelist(ip)
     else:
       self.abort(400, 'Invalid \'a\' parameter.')
-
-    self.redirect('/secure/user_profile', permanent=True)
+    self.get()
 
 
 ### Client APIs.
@@ -1070,10 +1067,11 @@ class RemoteErrorHandler(auth.AuthenticatingHandler):
 
 
 class RootHandler(webapp2.RequestHandler):
-  """Handler to redirect requests to base page secured main page."""
-
   def get(self):
-    self.redirect('/secure/main')
+    params = {
+      'host': self.request.host,
+    }
+    self.response.out.write(template.render('root.html', params))
 
 
 class DeadBotsCountHandler(webapp2.RequestHandler):
@@ -1094,27 +1092,33 @@ class WarmupHandler(webapp2.RequestHandler):
 
 def CreateApplication():
   urls = [
-      # Frontend pages, they return HTML or what should be HTML.
+      # Frontend pages. They return HTML.
       ('/', RootHandler),
-      ('/secure/ereporter2/report', Ereporter2ReportHandler),
-      ('/secure/ereporter2/request/<request_id:[0-9a-fA-F]+>',
-          Ereporter2RequestHandler),
-      ('/secure/machine_list', MachineListHandler),
-      ('/secure/main', TasksHandler),
-      ('/secure/show_message', ShowMessageHandler),
-      ('/secure/user_profile', UserProfileHandler),
       ('/stats', stats_gviz.StatsSummaryHandler),
       ('/stats/dimensions/<dimensions:.+>', stats_gviz.StatsDimensionsHandler),
       ('/stats/user/<user:.+>', stats_gviz.StatsUserHandler),
-      ('/upload_start_slave', UploadStartSlaveHandler),
+
+      # Frontend admin pages.
+      ('/restricted', RestrictedHandler),
+      ('/restricted/bots', BotsListHandler),
+      # TODO(maruel): This is an API, not a endpoint.
+      ('/restricted/show_message', ShowMessageHandler),
+      ('/restricted/tasks', TasksHandler),
+      ('/restricted/ereporter2/report', Ereporter2ReportHandler),
+      # TODO(maruel): This is an API, not a endpoint.
+      ('/restricted/ereporter2/request/<request_id:[0-9a-fA-F]+>',
+          Ereporter2RequestHandler),
+      ('/restricted/whitelist_ip', WhitelistIPHandler),
+      ('/restricted/upload_start_slave', UploadStartSlaveHandler),
+
+      # Eventually accessible for client.
+      ('/restricted/cancel', CancelHandler),
+      ('/restricted/get_result', SecureGetResultHandler),
+      ('/restricted/retry', RetryHandler),
 
       # Client API, in some cases also indirectly used by the frontend.
       ('/get_matching_test_cases', GetMatchingTestCasesHandler),
       ('/get_result', GetResultHandler),
-      ('/secure/cancel', CancelHandler),
-      ('/secure/change_whitelist', ChangeWhitelistHandler),
-      ('/secure/get_result', SecureGetResultHandler),
-      ('/secure/retry', RetryHandler),
       ('/test', TestRequestHandler),
 
       # Bot API.
@@ -1130,6 +1134,7 @@ def CreateApplication():
       ('/delete_machine_stats', DeleteMachineStatsHandler),
 
       # The new APIs:
+      # TODO(maruel): Move into restricted/
       ('/swarming/api/v1/bots', ApiBots),
       ('/swarming/api/v1/bots/dead/count', DeadBotsCountHandler),
       ('/swarming/api/v1/stats/summary/<resolution:[a-z]+>',

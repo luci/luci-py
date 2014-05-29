@@ -71,8 +71,8 @@ class CronSendEreporter2MailHandler(webapp2.RequestHandler):
 
   @decorators.require_cronjob
   def get(self):
-    request_id_url = self.request.host_url + '/secure/ereporter2/request/'
-    report_url = self.request.host_url + '/secure/ereporter2/report'
+    request_id_url = self.request.host_url + '/restricted/ereporter2/request/'
+    report_url = self.request.host_url + '/restricted/ereporter2/report'
     result = ereporter2.generate_and_email_report(
         None,
         handlers_common.should_ignore_error_record,

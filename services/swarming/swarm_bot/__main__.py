@@ -7,6 +7,7 @@
 
 __version__ = '0.1'
 
+import os
 import sys
 
 
@@ -30,7 +31,12 @@ def main():
     return slave_machine.main(rest)
 
   if cmd == 'start_slave':
+    # start_slave.py needs helps to know what the base directory is.
+    # TODO(maruel): Make this clear. Likely use os.getcwd() instead.
+    import zipped_archive
     import start_slave
+    this_file = os.path.abspath(zipped_archive.get_main_script_path())
+    start_slave.BASE_DIR = os.path.dirname(this_file)
     return start_slave.main(rest)
 
   print >> sys.stderr, 'Unknown script %s' % cmd

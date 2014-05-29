@@ -17,6 +17,7 @@
               action={{whitelist.url}}>
             <input type="hidden" name="a" value="False"/>
             <input type="hidden" name="i" value="{{whitelist.ip}}" />
+            <input type="hidden" name="xsrf_token" value="{{xsrf_token}}" />
             <button onclick="document.getElementById('remove_{{whitelist.key}}').submit()">
               remove</button>
           </form>
@@ -28,9 +29,10 @@
 
 <div>
   <h1>Add New:</h1>
-  <form name="input" action="{{change_whitelist_url|safe}}" method="post">
+  <form name="input" action="{{post_url|safe}}" method="post">
     IP address: <input type="text" name="i" />
     <input type="hidden" name="a" value="True">
+    <input type="hidden" name="xsrf_token" value="{{xsrf_token}}" />
     <input type="submit" value="Submit" />
   </form>
 </div>

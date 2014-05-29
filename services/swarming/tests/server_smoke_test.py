@@ -110,9 +110,21 @@ def whitelist_and_install_cookie_jar(server_url):
   # Make this opener the default so we can use url_helper.UrlOpen and still
   # have the cookies present.
   urllib2.install_opener(opener)
+  # Do a dev_appserver login.
   opener.open(get_admin_url(server_url))
-  opener.open(urlparse.urljoin(server_url, 'secure/change_whitelist'),
-              urllib.urlencode({'a': True}))
+
+  # Get the XSRF token.
+  req = urllib2.Request(
+      urlparse.urljoin(server_url, '/auth/api/v1/accounts/self/xsrf_token'), '')
+  req.add_header('X-XSRF-Token-Request', '1')
+  # Add it to every request by default. It does no harm even if not needed.
+  xsrf_token = json.load(opener.open(req))['xsrf_token']
+  opener.addheaders.append(('X-XSRF-Token', xsrf_token))
+
+  # Whitelist ourself.
+  opener.open(
+      urlparse.urljoin(server_url, '/restricted/whitelist_ip'),
+      urllib.urlencode({'a': True, 'xsrf_token': xsrf_token}))
 
 
 def setup_bot(swarming_bot_dir, start_slave_content):
@@ -189,7 +201,7 @@ class SwarmingTestCase(unittest.TestCase):
 
     # Upload the start slave script to the server.
     url_helper.UrlOpen(
-        urlparse.urljoin(self.server_url, 'upload_start_slave'),
+        urlparse.urljoin(self.server_url, '/restricted/upload_start_slave'),
         files=[('script', 'script', start_slave_content)], method='POSTFORM')
 
     # Start the slave machine script to start polling for tests.
@@ -310,7 +322,7 @@ class SwarmingTestCase(unittest.TestCase):
       self.trigger_swarm_file(swarm_file, running_tests, tests_to_cancel)
 
     # Cancel all the tests that are suppose to be cancelled.
-    url = urlparse.urljoin(self.server_url, 'secure/cancel')
+    url = urlparse.urljoin(self.server_url, '/restricted/cancel')
     for test in tests_to_cancel:
       data = urllib.urlencode({'r': test['test_key']})
       resp = urllib2.urlopen(url, data=data).read()
@@ -326,7 +338,7 @@ class SwarmingTestCase(unittest.TestCase):
       for running_test_key in running_tests[:]:
         url = urlparse.urljoin(
             self.server_url,
-            'secure/get_result?r=' + running_test_key['test_key'])
+            '/restricted/get_result?r=' + running_test_key['test_key'])
         response = urllib2.urlopen(url).read()
         try:
           results = json.loads(response)
@@ -343,7 +355,7 @@ class SwarmingTestCase(unittest.TestCase):
         # If we haven't retried a runner yet, do that with this runner.
         if not triggered_retry:
           logging.info('Retrying test %s', running_test_key['test_key'])
-          url = urlparse.urljoin(self.server_url, 'secure/retry')
+          url = urlparse.urljoin(self.server_url, '/restricted/retry')
           data = urllib.urlencode({'r': running_test_key['test_key']})
           urllib2.urlopen(url, data=data)
           triggered_retry = True

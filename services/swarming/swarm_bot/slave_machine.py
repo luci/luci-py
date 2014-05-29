@@ -562,6 +562,7 @@ def main(args):
   parser.add_option('-a', '--address', default='https://localhost',
                     help='Address of the Swarm server to connect to. '
                     'Defaults to %default. ')
+  # TODO(maruel): Get rid of this flag.
   parser.add_option('-p', '--port', default='443', type='int',
                     help='Port of the Swarm server. '
                     'Defaults to %default, which is the default https port.')
@@ -612,7 +613,8 @@ def main(args):
   attributes = json.load(source)
   source.close()
 
-  url = '%s:%d' % (options.address, options.port)
+  # TODO(maruel): Stop hacking this way.
+  url = '%s:%d' % (options.address.rstrip('/'), options.port)
   slave = SlaveMachine(url=url, attributes=attributes,
                        max_url_tries=options.max_url_tries)
 
