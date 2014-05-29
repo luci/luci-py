@@ -564,6 +564,9 @@ class SlaveMachine(object):
 
 
 def main(args):
+  # Always change to the directory containing this file.
+  os.chdir(ROOT_DIR)
+
   # TODO(maruel): Get rid of all flags and support no option at all.
   # https://code.google.com/p/swarming/issues/detail?id=111
   parser = optparse.OptionParser(
