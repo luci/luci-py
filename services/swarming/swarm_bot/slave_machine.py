@@ -41,6 +41,16 @@ THIS_FILE = os.path.abspath(zipped_archive.get_main_script_path())
 ROOT_DIR = os.path.dirname(THIS_FILE)
 
 
+class SlaveError(Exception):
+  """Simple error exception properly scoped here."""
+  pass
+
+
+class SlaveRPCError(Exception):
+  """Simple error exception properly scoped here."""
+  pass
+
+
 def Restart():
   """Restarts this machine.
 
@@ -312,7 +322,9 @@ class SlaveMachine(object):
       for rpc_packet in commands:
         function_name, args = rpc.ParseRPC(rpc_packet)
         try:
-          self._ExecuteRPC(function_name, args)
+          # Execute the function.
+          fn = getattr(self, 'rpc_%s' % function_name)
+          fn(args)
         except SlaveRPCError as e:
           self._PostFailedExecuteResults(str(e))
           break
@@ -320,19 +332,6 @@ class SlaveMachine(object):
           self._PostFailedExecuteResults(
               'Unsupported RPC function name: ' + function_name)
           break
-
-  def _ExecuteRPC(self, name, args):
-    """Execute the function with given args.
-
-    Args:
-      name: Function name to call.
-      args: Arguments to pass to function.
-
-    Returns:
-      The result of the execute function.
-    """
-    # TODO(maruel): Limit the scope about which functions can be called.
-    return getattr(self, name)(args)
 
   def _ParseResponse(self, response):
     """Stores relevant fields from response to slave machine.
@@ -433,7 +432,7 @@ class SlaveMachine(object):
                        method='POSTFORM')
 
   @staticmethod
-  def StoreFiles(args):
+  def rpc_StoreFiles(args):
     """Stores the given file contents to specified directory.
 
     Args:
@@ -481,7 +480,7 @@ class SlaveMachine(object):
         raise SlaveRPCError('StoreFile exception: ' + str(e))
 
   @staticmethod
-  def RunManifest(args):
+  def rpc_RunManifest(args):
     """Checks type of args to be correct.
 
     Args:
@@ -518,7 +517,7 @@ class SlaveMachine(object):
       # communication with the swarm server.
 
   @staticmethod
-  def UpdateSlave(args):
+  def rpc_UpdateSlave(args):
     """Download the current version of the slave code and then run it.
 
     Args:
@@ -532,24 +531,36 @@ class SlaveMachine(object):
           'Invalid arg types to UpdateSlave: %s (expected str or unicode)' %
           str(type(args)))
 
-    swarming_bot_zip = 'swarming_bot.zip'
-    if not url_helper.DownloadFile(swarming_bot_zip, args):
-      logging.error('Unable to download required slave files.')
+    # Download as a new file, then replace the previous one.
+    new_zip = 'swarming_bot.new.zip'
+    if not url_helper.DownloadFile(new_zip, args):
+      logging.error('Unable to download required slave files to self-update.')
       return
+
+    # It succeeded, now rename it. If the following operations fails, the bot
+    # will fail to come back by itself.
+    current_zip = 'swarming_bot.zip'
+    if sys.platform in ('cygwin', 'win32') and os.path.isfile(current_zip):
+      # On Windows, os.rename() cannot overwrite an existing file so delete it
+      # first. It is not a problem on other real OSes.
+      try:
+        # This can throw if there's a file lock on it. Too bad in that case. It
+        # can happen for many reasons, like an AV.
+        os.remove(current_zip)
+      except OSError as e:
+        logging.error('Unexpected failure to delete %s: %s', current_zip, e)
+        # Rebooting may help. #thisiswindows
+        Restart()
+
+    try:
+      os.rename(new_zip, current_zip)
+    except OSError as e:
+      logging.error(
+          'Unexpected failure to rename %s to %s: %s', new_zip, current_zip, e)
 
     sys.stdout.flush()
     sys.stderr.flush()
     os.execv(sys.executable, [sys.executable] + sys.argv)
-
-
-class SlaveError(Exception):
-  """Simple error exception properly scoped here."""
-  pass
-
-
-class SlaveRPCError(Exception):
-  """Simple error exception properly scoped here."""
-  pass
 
 
 def main(args):
