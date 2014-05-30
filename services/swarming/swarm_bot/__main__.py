@@ -18,6 +18,13 @@ def main():
     print >> sys.stderr, 'Expected to be run as a bot (too few arguments).'
     return 1
 
+  # Always make the current working directory the directory containing this
+  # file. It simplifies assumptions.
+  import zipped_archive
+  root_dir = os.path.dirname(
+      os.path.abspath(zipped_archive.get_main_script_path()))
+  os.chdir(root_dir)
+
   # sys.argv[0] is the zip file itself.
   print('Running: %s' % sys.argv)
   cmd = sys.argv[1]
@@ -36,11 +43,9 @@ def main():
   if cmd == 'start_slave':
     logging_utils.prepare_logging('start_slave.log')
     # start_slave.py needs helps to know what the base directory is.
-    # TODO(maruel): Make this clear. Likely use os.getcwd() instead.
-    import zipped_archive
+    # TODO(maruel): Remove.
     import start_slave
-    this_file = os.path.abspath(zipped_archive.get_main_script_path())
-    start_slave.BASE_DIR = os.path.dirname(this_file)
+    start_slave.BASE_DIR = root_dir
     return start_slave.main(rest)
 
   print >> sys.stderr, 'Unknown script %s' % cmd

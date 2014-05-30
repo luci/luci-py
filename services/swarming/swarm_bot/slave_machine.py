@@ -3,16 +3,11 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
-"""Slave Machine.
+"""Swarming bot.
 
-A machine running this script is identified as a slave machine that may be
-used to run Swarm tests on. It knows the protocol of how to connect to the
-Swarm server, get tests and binaries, run them locally and post the results.
-
-The slave needs to be told about its attributes and capabilities which can be
-read from a given file or stdin. They are described using strings formatted
-as a subset of the python syntax to a dictionary object. See
-http://code.google.com/p/swarming/wiki/MachineProvider for complete details.
+This is the program that communicates with the Swarming server, ensures the code
+is always up to date and executes a child process to run tasks and upload
+results back.
 """
 
 import hashlib
@@ -565,38 +560,24 @@ class SlaveMachine(object):
 
 
 def main(args):
-  # Always change to the directory containing this file.
-  os.chdir(ROOT_DIR)
-
   # TODO(maruel): Get rid of all flags and support no option at all.
   # https://code.google.com/p/swarming/issues/detail?id=111
   parser = optparse.OptionParser(
       usage='%prog [options] [filename]',
-      description='Initialize the machine as a swarm slave. The dimensions of '
-      'the machine are either given through a file (if provided) or read from '
-      'stdin. See http://code.google.com/p/swarming/wiki/MachineProvider for '
-      'complete details.')
+      description=sys.modules[__name__].__doc__)
   # TODO(maruel): Embed this information in the .zip file itself.
-  parser.add_option('-a', '--address', default='https://localhost',
-                    help='Address of the Swarm server to connect to. '
-                    'Defaults to %default. ')
-  parser.add_option('-p', '--port', help=optparse.SUPPRESS_HELP)
-  # TODO(maruel): Use a sane value and hardcode it.
-  parser.add_option('-r', '--max_url_tries', default=10, type='int',
-                    help='The maximum number of times url messages will '
-                    'attempt to be sent before accepting failure. Defaults '
-                    'to %default')
-  # TODO(maruel): Always True.
-  parser.add_option('--keep_alive', action='store_true',
-                    help='Have the slave swallow all exceptions and run'
-                    'forever.')
+  parser.add_option('-a', '--address', help='Swarming server URL')
   # TODO(maruel): Always True.
   parser.add_option('-v', '--verbose', action='count', default=0,
                     help='Set logging level to INFO, twice for DEBUG.')
-  # TODO(maruel): Always use the path containing the .zip file.
-  parser.add_option('-d', '--directory', default='.',
-                    help='Sets the working directory of the slave. '
-                    'Defaults to %default. ')
+
+  # TODO(maruel): Remove these once callers are fixed.
+  parser.add_option('-p', '--port', help=optparse.SUPPRESS_HELP)
+  parser.add_option(
+      '-r', '--max_url_tries', type='int', help=optparse.SUPPRESS_HELP)
+  parser.add_option(
+      '--keep_alive', action='store_true', help=optparse.SUPPRESS_HELP)
+  parser.add_option('-d', '--directory', help=optparse.SUPPRESS_HELP)
   parser.add_option('-l', '--log_file', help=optparse.SUPPRESS_HELP)
   (options, args) = parser.parse_args(args)
 
@@ -625,11 +606,8 @@ def main(args):
   source.close()
 
   # TODO(maruel): Stop hacking this way.
-  slave = SlaveMachine(url=options.address, attributes=attributes,
-                       max_url_tries=options.max_url_tries)
-
-  # Change the working directory to specified path.
-  os.chdir(options.directory)
+  slave = SlaveMachine(
+      url=options.address, attributes=attributes, max_url_tries=40)
 
   # Add SWARMING_HEADLESS into environ so subcommands know that they are running
   # in a headless (non-interactive) mode.
@@ -641,10 +619,7 @@ def main(args):
       slave.Start(-1)
     except (rpc.RPCError, SlaveError) as e:
       logging.exception('Slave start threw an exception:\n%s', e)
-
-    if not options.keep_alive:
-      break
-    logging.info('Slave is set to stay alive, starting again.')
+    logging.warning('Slave returned. Starting again.')
 
 
 if __name__ == '__main__':
