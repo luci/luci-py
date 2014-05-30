@@ -28,6 +28,7 @@ import time
 import zipfile
 
 # pylint: disable-msg=W0403
+import logging_utils
 import url_helper
 import zipped_archive
 from common import rpc
@@ -596,26 +597,15 @@ def main(args):
   parser.add_option('-d', '--directory', default='.',
                     help='Sets the working directory of the slave. '
                     'Defaults to %default. ')
-  # TODO(maruel): Always use slave_machine.log.
-  parser.add_option('-l', '--log_file', default='slave_machine.log',
-                    help='Set the name of the file to log to. '
-                    'Defaults to %default.')
+  parser.add_option('-l', '--log_file', help=optparse.SUPPRESS_HELP)
   (options, args) = parser.parse_args(args)
 
   # Parser handles exiting this script after logging the error.
   if len(args) > 1:
     parser.error('Must specify only one filename')
 
-  logging.basicConfig()
-  log_file = logging.handlers.RotatingFileHandler(options.log_file,
-                                                  maxBytes=10 * 1024 *1024,
-                                                  backupCount=5)
-  log_file.setFormatter(
-      logging.Formatter('%(asctime)s %(name)-12s %(levelname)-8s %(message)s'))
-  logging.getLogger().addHandler(log_file)
-
   levels = [logging.WARNING, logging.INFO, logging.DEBUG]
-  logging.getLogger().setLevel(levels[min(options.verbose, len(levels)-1)])
+  logging_utils.set_console_level(levels[min(options.verbose, len(levels)-1)])
 
   # TODO(maruel): Remove this and use the information in start_slave.py to
   # generate the dimensions on bot startup.
@@ -658,4 +648,5 @@ def main(args):
 
 
 if __name__ == '__main__':
+  logging_utils.prepare_logging('swarming_bot.log')
   sys.exit(main(None))

@@ -10,6 +10,8 @@ __version__ = '0.1'
 import os
 import sys
 
+import logging_utils
+
 
 def main():
   if len(sys.argv) < 2:
@@ -22,15 +24,17 @@ def main():
   rest = sys.argv[2:]
 
   if cmd == 'local_test_runner':
+    logging_utils.prepare_logging('local_test_runner.log')
     import local_test_runner
-    local_test_runner.PrepareLogging()
     return local_test_runner.main(rest)
 
   if cmd == 'start_bot':
+    logging_utils.prepare_logging('swarming_bot.log')
     import slave_machine
     return slave_machine.main(rest)
 
   if cmd == 'start_slave':
+    logging_utils.prepare_logging('start_slave.log')
     # start_slave.py needs helps to know what the base directory is.
     # TODO(maruel): Make this clear. Likely use os.getcwd() instead.
     import zipped_archive

@@ -29,6 +29,7 @@ FILES = (
     'common/swarm_constants.py',
     'common/test_request_message.py',
     'local_test_runner.py',
+    'logging_utils.py',
     'slave_machine.py',
     'url_helper.py',
     'zipped_archive.py',

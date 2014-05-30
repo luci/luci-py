@@ -19,12 +19,12 @@ import re
 import shutil
 import subprocess
 import sys
-import tempfile
 import threading
 import time
 import zipfile
 
 # pylint: disable-msg=W0403
+import logging_utils
 import url_helper
 import zipped_archive
 from common import swarm_constants
@@ -42,14 +42,6 @@ ROOT_DIR = os.path.dirname(THIS_FILE)
 # this helps to ensure that the _RunCommand function doesn't ignore
 # its other functions because it is too busy reading input.
 CHARACTERS_TO_READ_PER_PASS = 2000
-
-
-# The file name of the local rotating log file to store all test results to.
-LOCAL_TEST_RUNNER_CONSTANT_LOG_FILE = 'local_test_runner.log'
-
-
-# Common log format to use.
-LOG_FMT = '%(name)-12s %(levelname)-5s %(message)s'
 
 
 def EnqueueOutput(out, queue):
@@ -160,53 +152,6 @@ def _ExpandEnv(argument, env):
     if value is not None:
       argument = argument.replace('%%' + match + '%%', value)
   return argument
-
-
-class CaptureLogs(object):
-  """Captures all the logs in a context."""
-  def __init__(self):
-    (handle, self._file_name) = tempfile.mkstemp(
-        prefix='local_test_runner', suffix='.log')
-    os.close(handle)
-    self._logging_handler = logging.FileHandler(self._file_name, 'w')
-    self._logging_handler.setLevel(logging.DEBUG)
-    self._logging_handler.setFormatter(
-        logging.Formatter('%(asctime)s ' + LOG_FMT))
-    logging.getLogger().addHandler(self._logging_handler)
-    assert logging.getLogger().isEnabledFor(logging.DEBUG)
-
-  def get_log(self):
-    """Returns the current content of the logs.
-
-    This also closes the log capture so future logs will not be captured.
-    """
-    self._disconnect()
-    assert self._file_name
-    try:
-      with open(self._file_name, 'rb') as f:
-        return f.read()
-    except IOError as e:
-      return 'Failed to read %s: %s' % (self._file_name, e)
-
-  def close(self):
-    """Closes and delete the log."""
-    self._disconnect()
-    if self._file_name:
-      if not _DeleteFileOrDirectory(self._file_name):
-        logging.error('Could not delete file "%s"', self._file_name)
-      self._file_name = None
-
-  def __enter__(self):
-    return self
-
-  def __exit__(self, _exc_type, _exc_value, _traceback):
-    self.close()
-
-  def _disconnect(self):
-    if self._logging_handler:
-      self._logging_handler.close()
-      logging.getLogger().removeHandler(self._logging_handler)
-      self._logging_handler = None
 
 
 class LocalTestRunner(object):
@@ -588,7 +533,7 @@ class LocalTestRunner(object):
   def PublishInternalErrors(self):
     """Get the current log data and publish it."""
     logging.debug('Publishing internal errors')
-    self.PublishResults(False, [], self._log.get_log(), overwrite=True)
+    self.PublishResults(False, [], self._log.read(), overwrite=True)
 
   def RetrieveDataAndRunTests(self):
     """Get the data required to run the tests, then run and publish the results.
@@ -658,13 +603,11 @@ def main(args):
     logging.warning('Ignoring unknown args: %s', args)
 
   # Setup the logger for the console ouput.
-  console = logging.StreamHandler()
-  console.setFormatter(logging.Formatter(LOG_FMT))
-  console.setLevel(logging.INFO if options.verbose else logging.ERROR)
-  logging.getLogger().addHandler(console)
+  logging_utils.set_console_level(
+      logging.INFO if options.verbose else logging.ERROR)
 
   try:
-    with CaptureLogs() as log:
+    with logging_utils.CaptureLogs('local_test_runner') as log:
       with LocalTestRunner(
           options.request_file_name,
           log=log,
@@ -691,21 +634,6 @@ def main(args):
     return 1
 
 
-def PrepareLogging():
-  # It is a requirement that the root logger is set to DEBUG, so the messages
-  # are not lost.
-  logging.getLogger().setLevel(logging.DEBUG)
-
-  # Setup up logging to a constant file so we can debug issues where
-  # the results aren't properly sent to the result URL.
-  rotating_file = logging.handlers.RotatingFileHandler(
-      LOCAL_TEST_RUNNER_CONSTANT_LOG_FILE,
-      maxBytes=10 * 1024 * 1024, backupCount=5)
-  rotating_file.setLevel(logging.DEBUG)
-  rotating_file.setFormatter(logging.Formatter('%(asctime)s ' + LOG_FMT))
-  logging.getLogger().addHandler(rotating_file)
-
-
 if __name__ == '__main__':
-  PrepareLogging()
+  logging_utils.prepare_logging('local_test_runner.log')
   sys.exit(main(None))

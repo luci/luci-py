@@ -15,6 +15,7 @@ import zipfile
 
 # Import everything that does not require sys.path hack first.
 import local_test_runner
+import logging_utils
 
 from common import swarm_constants
 from common import test_request_message
@@ -63,6 +64,7 @@ class TestLocalTestRunner(auto_stub.TestCase):
     self.test_name2 = 'test2'
     self.mock_proc = None
     self.mock_zipfile = None
+    self.mock(logging_utils, 'set_console_level', lambda _: None)
 
   def tearDown(self):
     self._mox.UnsetStubs()
@@ -461,7 +463,7 @@ class TestLocalTestRunner(auto_stub.TestCase):
     self.test_run_name = u'Unicode Test Runâ-\xe2\x98\x83'
     encoding = 'utf-8'
 
-    with local_test_runner.CaptureLogs() as log:
+    with logging_utils.CaptureLogs('local_test_runner_test.log') as log:
       with self.PrepareRunTestsCall(
           log,
           decorate_output=[True, False],
@@ -609,7 +611,7 @@ class TestLocalTestRunner(auto_stub.TestCase):
         method='POSTFORM').AndReturn('')
     self._mox.ReplayAll()
 
-    with local_test_runner.CaptureLogs() as log:
+    with logging_utils.CaptureLogs('local_test_runner_test.log') as log:
       with local_test_runner.LocalTestRunner(
           self.data_file_name,
           log=log,
@@ -674,15 +676,8 @@ class TestLocalTestRunner(auto_stub.TestCase):
     self.assertEqual(swarm_constants.RESTART_EXIT_CODE, result)
 
 
-def PrepareLogging():
-  """Removes the noise when running the test normally."""
-  logging.getLogger().setLevel(logging.DEBUG)
-  console = logging.StreamHandler()
-  console.setFormatter(logging.Formatter(local_test_runner.LOG_FMT))
-  console.setLevel(logging.INFO if '-v' in sys.argv else logging.FATAL)
-  logging.getLogger().addHandler(console)
-
-
 if __name__ == '__main__':
-  PrepareLogging()
+  logging_utils.prepare_logging(None)
+  logging_utils.set_console_level(
+      logging.DEBUG if '-v' in sys.argv else logging.CRITICAL+1)
   unittest.main()

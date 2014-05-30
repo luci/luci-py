@@ -18,7 +18,6 @@ import url_helper
 
 from common import rpc
 from common import swarm_constants
-from server import bot_archive
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(BASE_DIR)
@@ -29,6 +28,7 @@ import test_env
 test_env.setup_test_env()
 
 from depot_tools import auto_stub
+from server import bot_archive
 from third_party.mox import mox
 
 # pylint: disable=W0212
