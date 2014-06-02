@@ -220,8 +220,7 @@ def generate_version():
 class SlaveMachine(object):
   """Creates a slave that continuously polls the Swarm server for jobs."""
 
-  def __init__(self, url='https://localhost:443', attributes=None,
-               max_url_tries=1):
+  def __init__(self, url, attributes, max_url_tries=1):
     """Sets the parameters of the slave.
 
     Args:
@@ -231,8 +230,8 @@ class SlaveMachine(object):
       max_url_tries: The maximum number of consecutive url errors to accept
           before throwing an exception.
     """
-    self._url = url
-    self._attributes = attributes.copy() if attributes else {}
+    self._url = url.rstrip('/')
+    self._attributes = attributes.copy()
     self._result_url = None
     self._attributes['try_count'] = 0
     self._come_back = 0

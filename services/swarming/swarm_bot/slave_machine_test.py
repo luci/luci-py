@@ -91,7 +91,8 @@ class TestSlaveMachine(auto_stub.TestCase):
     with open(os.path.join(BASE_DIR, 'start_slave.py'), 'rb') as f:
       start_slave_contents = f.read()
     additionals = {'start_slave.py': start_slave_contents}
-    self.version = bot_archive.get_swarming_bot_version(BASE_DIR, additionals)
+    self.version = bot_archive.get_swarming_bot_version(
+        BASE_DIR, 'http://localhost', additionals)
     self.attributes = {
       'dimensions': {'os': ['Linux']},
       'version': self.version,
@@ -159,10 +160,10 @@ class TestSlaveMachine(auto_stub.TestCase):
 
     self._mox.ReplayAll()
 
-    slave = slave_machine.SlaveMachine(max_url_tries=max_url_tries)
+    slave = slave_machine.SlaveMachine('http://localhost', {}, max_url_tries)
 
     expected_exception_str = (r'Error when connecting to Swarm server, '
-                              'https://localhost:443/poll_for_test, failed to '
+                              'http://localhost/poll_for_test, failed to '
                               'connect after 5 attempts.')
     self.assertRaisesRegexp(slave_machine.SlaveError,
                             expected_exception_str,
@@ -177,10 +178,10 @@ class TestSlaveMachine(auto_stub.TestCase):
     data = self._CreateValidAttribs()
 
     UrlOpenExpectations(
-        'blah blah blah', 'https://localhost:443/poll_for_test', data)
+        'blah blah blah', 'http://localhost/poll_for_test', data)
     self._mox.ReplayAll()
 
-    slave = slave_machine.SlaveMachine(attributes=self.attributes)
+    slave = slave_machine.SlaveMachine('http://localhost', self.attributes)
     slave.Start(iterations=1)
 
     self._mox.VerifyAll()
@@ -193,11 +194,10 @@ class TestSlaveMachine(auto_stub.TestCase):
     data = self._CreateValidAttribs()
 
     UrlOpenExpectations(
-        'blah blah blah', 'http://www.google.ca/poll_for_test', data)
+        'blah blah blah', 'http://localhost/poll_for_test', data)
     self._mox.ReplayAll()
 
-    slave = slave_machine.SlaveMachine(url='http://www.google.ca',
-                                       attributes=self.attributes)
+    slave = slave_machine.SlaveMachine('http://localhost', self.attributes)
     slave.Start(iterations=1)
 
     self._mox.VerifyAll()
@@ -210,7 +210,7 @@ class TestSlaveMachine(auto_stub.TestCase):
     UrlOpenExpectations(_CreateResponse(), mox.IgnoreArg(), mox.IgnoreArg())
     self._mox.ReplayAll()
 
-    slave = slave_machine.SlaveMachine()
+    slave = slave_machine.SlaveMachine('http://localhost', {})
     slave.Start(iterations=1)
 
     self._mox.VerifyAll()
@@ -225,7 +225,7 @@ class TestSlaveMachine(auto_stub.TestCase):
         mox.IgnoreArg())
     self._mox.ReplayAll()
 
-    slave = slave_machine.SlaveMachine()
+    slave = slave_machine.SlaveMachine('http://localhost', {})
     slave.Start(iterations=1)
 
     self._mox.VerifyAll()
@@ -238,7 +238,7 @@ class TestSlaveMachine(auto_stub.TestCase):
     UrlOpenExpectations(_CreateResponse(), mox.IgnoreArg(), mox.IgnoreArg())
     self._mox.ReplayAll()
 
-    slave = slave_machine.SlaveMachine()
+    slave = slave_machine.SlaveMachine('http://localhost', {})
     slave.Start(iterations=1)
 
     self._mox.VerifyAll()
@@ -256,7 +256,7 @@ class TestSlaveMachine(auto_stub.TestCase):
     time.sleep(come_back)
     self._mox.ReplayAll()
 
-    slave = slave_machine.SlaveMachine()
+    slave = slave_machine.SlaveMachine('http://localhost', {})
     slave.Start(iterations=1)
 
     self._mox.VerifyAll()
@@ -271,7 +271,7 @@ class TestSlaveMachine(auto_stub.TestCase):
         mox.IgnoreArg(), mox.IgnoreArg())
     self._mox.ReplayAll()
 
-    slave = slave_machine.SlaveMachine()
+    slave = slave_machine.SlaveMachine('http://localhost', {})
     slave.Start(iterations=1)
 
     self._mox.VerifyAll()
@@ -287,7 +287,7 @@ class TestSlaveMachine(auto_stub.TestCase):
         mox.IgnoreArg(), mox.IgnoreArg())
     self._mox.ReplayAll()
 
-    slave = slave_machine.SlaveMachine()
+    slave = slave_machine.SlaveMachine('http://localhost', {})
     slave.Start(iterations=1)
 
     self._mox.VerifyAll()
@@ -304,7 +304,7 @@ class TestSlaveMachine(auto_stub.TestCase):
         "Invalid type: <type \\'unicode\\'> instead of <type \\'list\\'>\']")
     self._mox.ReplayAll()
 
-    slave = slave_machine.SlaveMachine()
+    slave = slave_machine.SlaveMachine('http://localhost', {})
     slave.Start(iterations=1)
 
     self._mox.VerifyAll()
@@ -322,7 +322,7 @@ class TestSlaveMachine(auto_stub.TestCase):
 
     self._mox.ReplayAll()
 
-    slave = slave_machine.SlaveMachine()
+    slave = slave_machine.SlaveMachine('http://localhost', {})
     slave.Start(iterations=1)
 
     self._mox.VerifyAll()
@@ -338,7 +338,7 @@ class TestSlaveMachine(auto_stub.TestCase):
         'here.com', 'Unsupported RPC function name: WrongFunc')
     self._mox.ReplayAll()
 
-    slave = slave_machine.SlaveMachine()
+    slave = slave_machine.SlaveMachine('http://localhost', {})
     slave.Start(iterations=1)
 
     self._mox.VerifyAll()
@@ -353,7 +353,7 @@ class TestSlaveMachine(auto_stub.TestCase):
         mox.IgnoreArg(), mox.IgnoreArg())
     self._mox.ReplayAll()
 
-    slave = slave_machine.SlaveMachine()
+    slave = slave_machine.SlaveMachine('http://localhost', {})
     slave.Start(iterations=1)
 
     self._mox.VerifyAll()
@@ -367,7 +367,7 @@ class TestSlaveMachine(auto_stub.TestCase):
         _CreateResponse(come_back='3'), mox.IgnoreArg(), mox.IgnoreArg())
     self._mox.ReplayAll()
 
-    slave = slave_machine.SlaveMachine()
+    slave = slave_machine.SlaveMachine('http://localhost', {})
     slave.Start(iterations=1)
 
     self._mox.VerifyAll()
@@ -381,7 +381,7 @@ class TestSlaveMachine(auto_stub.TestCase):
         _CreateResponse(come_back=-3.0), mox.IgnoreArg(), mox.IgnoreArg())
     self._mox.ReplayAll()
 
-    slave = slave_machine.SlaveMachine()
+    slave = slave_machine.SlaveMachine('http://localhost', {})
     slave.Start(iterations=1)
 
     self._mox.VerifyAll()
@@ -396,7 +396,7 @@ class TestSlaveMachine(auto_stub.TestCase):
         mox.IgnoreArg(), mox.IgnoreArg())
     self._mox.ReplayAll()
 
-    slave = slave_machine.SlaveMachine()
+    slave = slave_machine.SlaveMachine('http://localhost', {})
     slave.Start(iterations=1)
 
     self._mox.VerifyAll()
@@ -411,7 +411,7 @@ class TestSlaveMachine(auto_stub.TestCase):
         mox.IgnoreArg(), mox.IgnoreArg())
     self._mox.ReplayAll()
 
-    slave = slave_machine.SlaveMachine()
+    slave = slave_machine.SlaveMachine('http://localhost', {})
     slave.Start(iterations=1)
 
     self._mox.VerifyAll()
@@ -440,7 +440,7 @@ class TestSlaveMachine(auto_stub.TestCase):
 
     self._mox.ReplayAll()
 
-    slave = slave_machine.SlaveMachine()
+    slave = slave_machine.SlaveMachine('http://localhost', {})
     slave.Start(iterations=len(response))
 
     self._mox.VerifyAll()
@@ -477,7 +477,7 @@ class TestSlaveMachine(auto_stub.TestCase):
 
     self._mox.ReplayAll()
 
-    slave = slave_machine.SlaveMachine()
+    slave = slave_machine.SlaveMachine('http://localhost', {})
     slave.Start(iterations=len(invalid_args))
 
     self._mox.VerifyAll()
@@ -486,7 +486,7 @@ class TestSlaveMachine(auto_stub.TestCase):
     # Initial server ping.
     url_helper.UrlOpen(mox.IgnoreArg(), method='GET').AndReturn('')
 
-    slave = slave_machine.SlaveMachine()
+    slave = slave_machine.SlaveMachine('http://localhost', {})
     function_name = 'StoreFiles'
     args = [(u'file path', u'file name', u'file contents')]
 
@@ -514,7 +514,7 @@ class TestSlaveMachine(auto_stub.TestCase):
     # Initial server ping.
     url_helper.UrlOpen(mox.IgnoreArg(), method='GET').AndReturn('')
 
-    slave = slave_machine.SlaveMachine()
+    slave = slave_machine.SlaveMachine('http://localhost', {})
     function_name = 'StoreFiles'
     args = [(u'file path', u'file name', u'file contents')]
 
@@ -543,7 +543,7 @@ class TestSlaveMachine(auto_stub.TestCase):
     # Initial server ping.
     url_helper.UrlOpen(mox.IgnoreArg(), method='GET').AndReturn('')
 
-    slave = slave_machine.SlaveMachine()
+    slave = slave_machine.SlaveMachine('http://localhost', {})
     function_name = 'StoreFiles'
     args = [(u'file path', u'file name', u'file contents')]
 
@@ -575,7 +575,7 @@ class TestSlaveMachine(auto_stub.TestCase):
         'Invalid RunManifest arg: None (expected str)')
     self._mox.ReplayAll()
 
-    slave = slave_machine.SlaveMachine()
+    slave = slave_machine.SlaveMachine('http://localhost', {})
     slave.Start(iterations=1)
 
     self._mox.VerifyAll()
@@ -587,7 +587,7 @@ class TestSlaveMachine(auto_stub.TestCase):
     function_name = 'RunManifest'
     args = u'language'
 
-    slave = slave_machine.SlaveMachine()
+    slave = slave_machine.SlaveMachine('http://localhost', {})
     commands = [rpc.BuildRPC(function_name, args)]
     response = _CreateResponse(commands=commands, result_url='here.com')
 
@@ -624,7 +624,7 @@ class TestSlaveMachine(auto_stub.TestCase):
     function_name = 'RunManifest'
     args = u'language'
 
-    slave = slave_machine.SlaveMachine()
+    slave = slave_machine.SlaveMachine('http://localhost', {})
     commands = [rpc.BuildRPC(function_name, args)]
     response = _CreateResponse(commands=commands, result_url='here.com')
 
@@ -655,7 +655,7 @@ class TestSlaveMachine(auto_stub.TestCase):
     function_name = 'RunManifest'
     args = 'language'
 
-    slave = slave_machine.SlaveMachine()
+    slave = slave_machine.SlaveMachine('http://localhost', {})
     commands = [rpc.BuildRPC(function_name, args)]
     response = _CreateResponse(commands=commands, result_url='here.com')
 
@@ -708,7 +708,7 @@ class TestSlaveMachine(auto_stub.TestCase):
 
     self._mox.ReplayAll()
 
-    slave = slave_machine.SlaveMachine()
+    slave = slave_machine.SlaveMachine('http://localhost', {})
     slave.Start(iterations=3)
 
     self._mox.VerifyAll()

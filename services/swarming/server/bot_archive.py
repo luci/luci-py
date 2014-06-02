@@ -10,6 +10,7 @@ code.
 """
 
 import hashlib
+import json
 import logging
 import os
 import StringIO
@@ -36,10 +37,14 @@ FILES = (
 )
 
 
-def yield_swarming_bot_files(root_dir, additionals):
-  """Yields all the files to map as tuple(filename, content)."""
+def yield_swarming_bot_files(root_dir, host, additionals):
+  """Yields all the files to map as tuple(filename, content).
+
+  config.json is injected with json data about the server.
+  """
   items = {i: None for i in FILES}
   items.update(additionals)
+  items['config.json'] = json.dumps({'server': host.rstrip('/')})
   for item, content in sorted(items.iteritems()):
     if content is not None:
       yield item, content
@@ -48,7 +53,7 @@ def yield_swarming_bot_files(root_dir, additionals):
         yield item, f.read()
 
 
-def get_swarming_bot_zip(root_dir, additionals):
+def get_swarming_bot_zip(root_dir, host, additionals):
   """Returns a zipped file of all the files a slave needs to run.
 
   Arguments:
@@ -61,7 +66,7 @@ def get_swarming_bot_zip(root_dir, additionals):
   """
   zip_memory_file = StringIO.StringIO()
   with zipfile.ZipFile(zip_memory_file, 'w') as zip_file:
-    for item, content in yield_swarming_bot_files(root_dir, additionals):
+    for item, content in yield_swarming_bot_files(root_dir, host, additionals):
       zip_file.writestr(item, content)
 
   data = zip_memory_file.getvalue()
@@ -69,7 +74,7 @@ def get_swarming_bot_zip(root_dir, additionals):
   return data
 
 
-def get_swarming_bot_version(root_dir, additionals):
+def get_swarming_bot_version(root_dir, host, additionals):
   """Returns the SHA1 hash of the slave code, representing the version.
 
   Arguments:
@@ -81,7 +86,7 @@ def get_swarming_bot_version(root_dir, additionals):
   """
   result = hashlib.sha1()
   try:
-    for item, content in yield_swarming_bot_files(root_dir, additionals):
+    for item, content in yield_swarming_bot_files(root_dir, host, additionals):
       result.update(item)
       result.update('\x00')
       result.update(content)
@@ -100,12 +105,20 @@ def main():
         'directory. This script doesn\'t accept any argument.')
     return 1
 
+  with open(os.path.join(ROOT_DIR, 'swarm_bot', 'config.json'), 'rb') as f:
+    config = json.load(f) or {}
+  expected = ['server']
+  actual = sorted(config)
+  if expected != actual:
+    print >> sys.stderr, 'Only expected keys \'%s\', got \'%s\'' % (
+    ','.join(expected), ','.join(actual))
   swarm_bot_dir = os.path.join(ROOT_DIR, 'swarm_bot')
+
   zip_file = os.path.join(ROOT_DIR, 'swarming_bot.zip')
   with open(os.path.join(swarm_bot_dir, 'start_slave.py'), 'rb') as f:
     additionals = {'start_slave.py': f.read()}
   with open(zip_file, 'wb') as f:
-    f.write(get_swarming_bot_zip(swarm_bot_dir, additionals))
+    f.write(get_swarming_bot_zip(swarm_bot_dir, config['server'], additionals))
   return 0
 
 

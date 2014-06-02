@@ -61,6 +61,21 @@ class Bot(ndb.Model):
     return out
 
 
+### Private stuff.
+
+def _get_start_slave():
+  """Returns the start_slave.py content to be used in the zip.
+
+  First fetch it from the database, if present. Pass the one in the tree
+  otherwise.
+  """
+  content = file_chunks.RetrieveFile(START_SLAVE_SCRIPT_KEY)
+  if content:
+    return content
+  with open(os.path.join(ROOT_DIR, 'swarm_bot', 'start_slave.py'), 'rb') as f:
+    return f.read()
+
+
 ### Public APIs.
 
 
@@ -72,11 +87,14 @@ def store_start_slave(script):
   """
   file_chunks.StoreFile(START_SLAVE_SCRIPT_KEY, script)
 
-  # Clear the cached version value since it has now changed.
-  memcache.delete('slave_version', namespace=os.environ['CURRENT_VERSION_ID'])
+  # Clear the cached version value since it has now changed. This is *super*
+  # aggressive to flush all memcache but that's the only safe way to not send
+  # old code by accident.
+  while not memcache.flush_all():
+    pass
 
 
-def get_slave_version():
+def get_slave_version(host):
   """Retrieves the slave version loaded on this server.
 
   The memcache is first checked for the version, otherwise the value
@@ -85,23 +103,21 @@ def get_slave_version():
   Returns:
     The hash of the current slave version.
   """
-  slave_version = memcache.get('slave_version',
-                               namespace=os.environ['CURRENT_VERSION_ID'])
-  if slave_version:
-    return slave_version
-  # Get the start slave script from the database, if present. Pass an empty
-  # file if the files isn't present.
-  additionals = {
-    'start_slave.py': file_chunks.RetrieveFile(START_SLAVE_SCRIPT_KEY) or '',
-  }
-  slave_version = bot_archive.get_swarming_bot_version(
-      os.path.join(ROOT_DIR, 'swarm_bot'), additionals)
-  memcache.set('slave_version', slave_version,
-               namespace=os.environ['CURRENT_VERSION_ID'])
-  return slave_version
+  namespace = os.environ['CURRENT_VERSION_ID']
+  key = 'bot_version' + host
+  bot_version = memcache.get(key, namespace=namespace)
+  if bot_version:
+    return bot_version
+
+  # Need to calculate it.
+  additionals = {'start_slave.py': _get_start_slave()}
+  bot_dir = os.path.join(ROOT_DIR, 'swarm_bot')
+  bot_version = bot_archive.get_swarming_bot_version(bot_dir, host, additionals)
+  memcache.set(key, bot_version, namespace=namespace)
+  return bot_version
 
 
-def get_swarming_bot_zip():
+def get_swarming_bot_zip(host):
   """Returns a zipped file of all the files a slave needs to run.
 
   Returns:
@@ -109,11 +125,9 @@ def get_swarming_bot_zip():
   """
   # Get the start slave script from the database, if present. Pass an empty
   # file if the files isn't present.
-  additionals = {
-    'start_slave.py': file_chunks.RetrieveFile(START_SLAVE_SCRIPT_KEY) or '',
-  }
-  return bot_archive.get_swarming_bot_zip(
-      os.path.join(ROOT_DIR, 'swarm_bot'), additionals)
+  additionals = {'start_slave.py': _get_start_slave()}
+  bot_dir = os.path.join(ROOT_DIR, 'swarm_bot')
+  return bot_archive.get_swarming_bot_zip(bot_dir, host, additionals)
 
 
 def get_bot_key(bot_id):

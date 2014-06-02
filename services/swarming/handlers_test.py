@@ -203,14 +203,17 @@ class AppTest(test_case.TestCase):
     response = self.app.get('/get_slave_code')
     self.assertEqual('200 OK', response.status)
     self.assertEqual(
-        len(bot_management.get_swarming_bot_zip()), response.content_length)
+        len(bot_management.get_swarming_bot_zip('http://localhost')),
+        response.content_length)
 
   def testGetSlaveCodeHash(self):
     response = self.app.get(
-        '/get_slave_code/%s' % bot_management.get_slave_version())
+        '/get_slave_code/%s' %
+        bot_management.get_slave_version('http://localhost'))
     self.assertEqual('200 OK', response.status)
     self.assertEqual(
-        len(bot_management.get_swarming_bot_zip()), response.content_length)
+        len(bot_management.get_swarming_bot_zip('http://localhost')),
+        response.content_length)
 
   def testGetSlaveCodeInvalidHash(self):
     response = self.app.get('/get_slave_code/' + '1' * 40, expect_errors=True)
@@ -394,7 +397,7 @@ class AppTest(test_case.TestCase):
         {
           u'args':
               u'http://localhost/get_slave_code/%s' %
-              bot_management.get_slave_version(),
+              bot_management.get_slave_version('http://localhost'),
           u'function': u'UpdateSlave',
         },
       ],
@@ -407,7 +410,7 @@ class AppTest(test_case.TestCase):
     attributes = {
       'dimensions': {'os': ['win-xp']},
       'id': MACHINE_ID,
-      'version': bot_management.get_slave_version(),
+      'version': bot_management.get_slave_version('http://localhost'),
     }
     response = self.app.post(
         '/poll_for_test', {'attributes': json.dumps(attributes)})

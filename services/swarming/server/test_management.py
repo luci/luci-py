@@ -14,7 +14,7 @@ from server import bot_management
 
 def CheckVersion(attributes, server_url):
   """Checks the slave version, forcing it to update if required."""
-  expected_version = bot_management.get_slave_version()
+  expected_version = bot_management.get_slave_version(server_url)
   if attributes.get('version') != expected_version:
     logging.info(
         '%s != %s, Updating slave %s',

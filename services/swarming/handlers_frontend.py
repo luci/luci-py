@@ -877,7 +877,7 @@ class GetSlaveCodeHandler(auth.AuthenticatingHandler):
   @auth.require(auth.READ, 'swarming/bots')
   def get(self, version=None):
     if version:
-      expected = bot_management.get_slave_version()
+      expected = bot_management.get_slave_version(self.request.host_url)
       if version != expected:
         logging.error('Requested Swarming bot %s, have %s', version, expected)
         self.abort(404)
@@ -887,7 +887,8 @@ class GetSlaveCodeHandler(auth.AuthenticatingHandler):
     self.response.headers['Content-Type'] = 'application/octet-stream'
     self.response.headers['Content-Disposition'] = (
         'attachment; filename="swarming_bot.zip"')
-    self.response.out.write(bot_management.get_swarming_bot_zip())
+    self.response.out.write(
+        bot_management.get_swarming_bot_zip(self.request.host_url))
 
 
 class ServerPingHandler(webapp2.RequestHandler):
@@ -1057,7 +1058,7 @@ class RemoteErrorHandler(auth.AuthenticatingHandler):
 class RootHandler(webapp2.RequestHandler):
   def get(self):
     params = {
-      'host': self.request.host,
+      'host_url': self.request.host_url,
     }
     self.response.out.write(template.render('root.html', params))
 
