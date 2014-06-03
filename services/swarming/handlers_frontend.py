@@ -43,7 +43,6 @@ from server import task_request
 from server import task_result
 from server import task_scheduler
 from server import task_to_run
-from server import test_management
 from server import user_manager
 
 
@@ -129,8 +128,8 @@ def ip_whitelist_authentication(request):
 
 def request_work_item(attributes, server_url):
   # TODO(maruel): Split it out a little.
-  attribs = test_management.ValidateAndFixAttributes(attributes)
-  response = test_management.CheckVersion(attributes, server_url)
+  attribs = bot_management.validate_and_fix_attributes(attributes)
+  response = bot_management.check_version(attributes, server_url)
   if response:
     return response
 
@@ -187,7 +186,6 @@ def request_work_item(attributes, server_url):
   })
   test_run.Validate()
 
-  # See test_management._GetTestRunnerCommands() for the expected format.
   files_to_upload = [
       (test_run.working_dir or '', TEST_RUN_SWARM_FILE_NAME,
       test_request_message.Stringize(test_run, json_readable=True))
@@ -204,7 +202,7 @@ def request_work_item(attributes, server_url):
     rpc.BuildRPC('RunManifest', swarm_file_path),
   ]
   # The Swarming bot uses an hand rolled RPC system and 'commands' is actual the
-  # custom RPC commands. See test_management._BuildTestRun()
+  # custom RPC commands.
   return {
     'commands': rpc_commands,
     'result_url': test_run.result_url,

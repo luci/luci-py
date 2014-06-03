@@ -8,12 +8,15 @@ Includes management of the swarming_bot.zip code and the list of known bots.
 """
 
 import datetime
+import logging
 import os.path
 
 from google.appengine.api import memcache
 from google.appengine.ext import ndb
 
 from components import datastore_utils
+from common import rpc
+from common import test_request_message
 from server import bot_archive
 from server import file_chunks
 from server import task_common
@@ -165,3 +168,68 @@ def tag_bot_seen(bot_id, hostname, dimensions):
     bot.hostname = hostname
   bot.put()
   return bot
+
+
+def check_version(attributes, server_url):
+  """Checks the slave version, forcing it to update if required."""
+  expected_version = get_slave_version(server_url)
+  if attributes.get('version', '') != expected_version:
+    logging.info(
+        '%s != %s, Updating slave %s',
+        expected_version, attributes.get('version', 'N/A'), attributes['id'])
+    url = server_url.rstrip('/') + '/get_slave_code/' + expected_version
+    return {
+      'commands': [rpc.BuildRPC('UpdateSlave', url)],
+      # The only time a bot would have results to send here would be if it
+      # failed to update.
+      'result_url': server_url.rstrip('/') + '/remote_error',
+      'try_count': 0,
+    }
+  return {}
+
+
+def validate_and_fix_attributes(attributes):
+  """Validates and fixes the attributes of the requesting machine.
+
+  Args:
+    attributes: A dictionary representing the machine attributes.
+
+  Raises:
+    test_request_message.Error: If the request format/attributes aren't valid.
+
+  Returns:
+    A dictionary containing the fixed attributes of the machine.
+  """
+  # Parse given attributes.
+  for attrib, value in attributes.items():
+    if attrib == 'dimensions':
+      if not isinstance(value, dict):
+        raise test_request_message.Error('Invalid attrib value for dimensions')
+
+    elif attrib == 'id':
+      if not isinstance(value, basestring):
+        raise test_request_message.Error('Invalid attrib value for id')
+
+    elif attrib in ('password', 'tag', 'username', 'version'):
+      if not isinstance(value, (str, unicode)):
+        raise test_request_message.Error(
+            'Invalid attrib value type for ' + attrib)
+
+    elif attrib == 'try_count':
+      if not isinstance(value, int):
+        raise test_request_message.Error(
+            'Invalid attrib value type for try_count')
+      if value < 0:
+        raise test_request_message.Error(
+            'Invalid negative value for try_count')
+
+    else:
+      raise test_request_message.Error(
+          'Invalid attribute to machine: ' + attrib)
+
+  if 'dimensions' not in attributes:
+    raise test_request_message.Error('Missing mandatory attribute: dimensions')
+  if 'id' not in attributes:
+    raise test_request_message.Error('Missing mandatory attribute: id')
+  attributes.setdefault('try_count', 0)
+  return attributes

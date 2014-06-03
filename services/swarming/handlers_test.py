@@ -415,8 +415,6 @@ class AppTest(test_case.TestCase):
     response = self.app.post(
         '/poll_for_test', {'attributes': json.dumps(attributes)})
     self.assertEqual('200 OK', response.status)
-    # See _ComputeComebackValue() in test_management.py. The bots are randomly
-    # asked to come back more quickly.
     expected_1 = {u'come_back': 1.0, u'try_count': 1}
     expected_2 = {u'come_back': 2.25, u'try_count': 1}
     self.assertTrue(response.json in (expected_1, expected_2), response.json)
