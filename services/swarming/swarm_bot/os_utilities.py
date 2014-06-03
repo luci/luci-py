@@ -212,7 +212,8 @@ def get_attributes(tag):
   'tag' is used to uniquely identify the bot.
   'dimensions' is used for task selection.
   """
-  hostname = socket.getfqdn()
+  # Windows enjoys putting random case in there. Enforces lower case for sanity.
+  hostname = socket.getfqdn().lower()
   os_name = get_os_name()
   cpu_type = get_cpu_type()
   return {
