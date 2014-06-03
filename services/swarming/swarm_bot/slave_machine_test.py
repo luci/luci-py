@@ -89,8 +89,7 @@ class TestSlaveMachine(auto_stub.TestCase):
     self._mox.StubOutWithMock(subprocess, 'call')
     self._mox.StubOutWithMock(subprocess, 'check_call')
     self._mox.StubOutWithMock(os_utilities, 'restart')
-    self._mox.StubOutWithMock(slave_machine, '_MakeDirectory')
-    self._mox.StubOutWithMock(slave_machine, '_StoreFile')
+    self.mock(slave_machine, '_store_file', lambda _filepath, _content: None)
     self.mock(logging, 'warning', lambda *_: None)
     self.mock(logging, 'error', lambda *_: None)
     self.mock(logging, 'exception', lambda *_: None)
@@ -443,123 +442,6 @@ class TestSlaveMachine(auto_stub.TestCase):
 
     self._mox.VerifyAll()
 
-  def testSetStoreFilesRPCValidate(self):
-    # Initial server ping.
-    url_helper.UrlOpen(mox.IgnoreArg(), method='GET').AndReturn('')
-
-    function_name = 'StoreFiles'
-    invalid_args = [None, u'some arg', [u'another arg'], [[123, 1]],
-                    [('113', 113, '311')]]
-
-    expected_error = [
-        ('Invalid %s arg type: %s (expected list of str or'
-         ' unicode tuples)'% (function_name, str(type(invalid_args[0])))),
-        ('Invalid %s arg type: %s (expected list of str or'
-         ' unicode tuples)'% (function_name, str(type(invalid_args[1])))),
-        ('Invalid element type in %s args: %s (expected str or'
-         ' unicode tuple)'% (function_name, str(type(invalid_args[2][0])))),
-        ('Invalid element len (%d != 3) in %s args: %s'%
-         (len(invalid_args[3][0]), function_name, str(invalid_args[3][0]))),
-        ('Invalid tuple element type: %s (expected str or unicode)'%
-         str(type(invalid_args[4][0][1])))]
-
-    self.assertEqual(len(invalid_args), len(expected_error))
-
-    for i in range(0, len(invalid_args)):
-      commands = [rpc.BuildRPC(function_name, invalid_args[i])]
-      response = _CreateResponse(commands=commands, result_url='localhost')
-
-      _SetPollJobAndPostFailExpectations(
-          response, 'localhost', expected_error[i])
-
-    self._mox.ReplayAll()
-
-    slave = slave_machine.SlaveMachine('http://localhost', {})
-    slave.Start(iterations=len(invalid_args))
-
-    self._mox.VerifyAll()
-
-  def testSetStoreFilesRPCExecuteMakeDirException(self):
-    # Initial server ping.
-    url_helper.UrlOpen(mox.IgnoreArg(), method='GET').AndReturn('')
-
-    slave = slave_machine.SlaveMachine('http://localhost', {})
-    function_name = 'StoreFiles'
-    args = [(u'file path', u'file name', u'file contents')]
-
-    commands = [rpc.BuildRPC(function_name, args)]
-    response = _CreateResponse(commands=commands, result_url='localhost')
-
-    # Mock initial job request.
-    url_helper.UrlOpen(
-        mox.IgnoreArg(), data=mox.IgnoreArg(), max_tries=mox.IgnoreArg()
-        ).AndReturn(response)
-
-    exception_message = 'makedirs exception'
-    self._MockMakeDirectory(args[0][0], exception_message=exception_message)
-    self._MockPostFailedExecuteResults(
-        slave, 'MakeDirectory exception: %s' % exception_message)
-
-    self._mox.ReplayAll()
-
-    slave.Start(iterations=1)
-
-    self._mox.VerifyAll()
-
-  def testSetStoreFilesRPCExecuteStoreFileException(self):
-    # Initial server ping.
-    url_helper.UrlOpen(mox.IgnoreArg(), method='GET').AndReturn('')
-
-    slave = slave_machine.SlaveMachine('http://localhost', {})
-    function_name = 'StoreFiles'
-    args = [(u'file path', u'file name', u'file contents')]
-
-    commands = [rpc.BuildRPC(function_name, args)]
-    response = _CreateResponse(commands=commands, result_url='localhost')
-
-    # Mock initial job request.
-    url_helper.UrlOpen(
-        mox.IgnoreArg(), data=mox.IgnoreArg(), max_tries=mox.IgnoreArg()
-        ).AndReturn(response)
-
-    exception_message = 'storefile exception'
-    self._MockMakeDirectory(args[0][0])
-    self._MockStoreFile(
-        args[0][0], args[0][1], args[0][2], exception_message=exception_message)
-    self._MockPostFailedExecuteResults(
-        slave, 'StoreFile exception: %s' % exception_message)
-
-    self._mox.ReplayAll()
-
-    slave.Start(iterations=1)
-
-    self._mox.VerifyAll()
-
-  def testSetStoreFilesRPCExecuteNoException(self):
-    # Initial server ping.
-    url_helper.UrlOpen(mox.IgnoreArg(), method='GET').AndReturn('')
-
-    slave = slave_machine.SlaveMachine('http://localhost', {})
-    function_name = 'StoreFiles'
-    args = [(u'file path', u'file name', u'file contents')]
-
-    commands = [rpc.BuildRPC(function_name, args)]
-    response = _CreateResponse(commands=commands, result_url='localhost')
-
-    # Mock initial job request.
-    url_helper.UrlOpen(
-        mox.IgnoreArg(), data=mox.IgnoreArg(), max_tries=mox.IgnoreArg()
-        ).AndReturn(response)
-
-    self._MockMakeDirectory(args[0][0])
-    self._MockStoreFile(args[0][0], args[0][1], args[0][2])
-
-    self._mox.ReplayAll()
-
-    slave.Start(iterations=1)
-
-    self._mox.VerifyAll()
-
   def testRunManifestRPCValidate(self):
     # Initial server ping.
     url_helper.UrlOpen(mox.IgnoreArg(), method='GET').AndReturn('')
@@ -581,7 +463,7 @@ class TestSlaveMachine(auto_stub.TestCase):
     url_helper.UrlOpen(mox.IgnoreArg(), method='GET').AndReturn('')
 
     function_name = 'RunManifest'
-    args = u'language'
+    args = u'{}'
 
     slave = slave_machine.SlaveMachine('http://localhost', {})
     commands = [rpc.BuildRPC(function_name, args)]
@@ -597,7 +479,7 @@ class TestSlaveMachine(auto_stub.TestCase):
       sys.executable,
       os.path.abspath(sys.argv[0]),
       'local_test_runner',
-      '-f', args,
+      '-f', 'work/test_run.json',
     ]
     self._MockSubprocessCheckCall(full_command, exit_code=-1)
 
@@ -614,7 +496,7 @@ class TestSlaveMachine(auto_stub.TestCase):
     url_helper.UrlOpen(mox.IgnoreArg(), method='GET').AndReturn('')
 
     function_name = 'RunManifest'
-    args = u'language'
+    args = u'{}'
 
     slave = slave_machine.SlaveMachine('http://localhost', {})
     commands = [rpc.BuildRPC(function_name, args)]
@@ -630,7 +512,7 @@ class TestSlaveMachine(auto_stub.TestCase):
       sys.executable,
       os.path.abspath(sys.argv[0]),
       'local_test_runner',
-      '-f', args,
+      '-f', 'work/test_run.json',
     ]
     self._MockSubprocessCheckCall(expected)
 
@@ -645,7 +527,7 @@ class TestSlaveMachine(auto_stub.TestCase):
     url_helper.UrlOpen(mox.IgnoreArg(), method='GET').AndReturn('')
 
     function_name = 'RunManifest'
-    args = 'language'
+    args = '{}'
 
     slave = slave_machine.SlaveMachine('http://localhost', {})
     commands = [rpc.BuildRPC(function_name, args)]
@@ -661,7 +543,7 @@ class TestSlaveMachine(auto_stub.TestCase):
       sys.executable,
       os.path.abspath(sys.argv[0]),
       'local_test_runner',
-      '-f', args,
+      '-f', 'work/test_run.json',
     ]
     self._MockSubprocessCheckCall(
         expected,

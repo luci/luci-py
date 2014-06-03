@@ -148,35 +148,13 @@ def ValidateCommand(commands, error_prefix='', errors=None):
   return valid
 
 
-def _MakeDirectory(path):
-  """Creates requested folder if it doesn't exist.
-
-  Args:
-    path: The folder path to create recursively.
-
-  Raises:
-    os.error: If the directory can't be created.
-  """
-  if path and not os.path.exists(path):
+def _store_file(filepath, content):
+  """Stores a file and create directories if needed."""
+  path = os.path.dirname(filepath)
+  if not os.path.isdir(path):
     os.makedirs(path)
-    logging.debug('Created file path: ' + path)
-
-
-def _StoreFile(file_path, file_name, file_contents):
-  """Stores file_contents in given path and name.
-
-  Args:
-    file_path: The folder the file should go in.
-    file_name: The file name.
-    file_contents: Contents of the file to store.
-
-  Raises:
-    IOError: the file can't be opened.
-  """
-  full_name = os.path.join(file_path, file_name)
-  with open(full_name, 'wb') as f:
-    f.write(file_contents)
-  logging.debug('File stored: %s', full_name)
+  with open(filepath, 'wb') as f:
+    f.write(content)
 
 
 class SlaveMachine(object):
@@ -384,59 +362,11 @@ class SlaveMachine(object):
                        method='POSTFORM')
 
   @staticmethod
-  def rpc_StoreFiles(args):
-    """Stores the given file contents to specified directory.
-
-    Args:
-      args: A list of string tuples: (file path, file name, file contents).
-
-    Raises:
-      SlaveRPCError: If args are invalid will include an error message, or
-      if any of the files can't be stored in given folder, or the directory
-      can't be created.
-    """
-    # Validate args.
-    if not isinstance(args, list):
-      raise SlaveRPCError(
-          'Invalid StoreFiles arg type: %s (expected list of str or unicode'
-          ' tuples)' % str(type(args)))
-
-    for file_tuple in args:
-      if not isinstance(file_tuple, list):
-        raise SlaveRPCError(
-            'Invalid element type in StoreFiles args: %s (expected str or'
-            ' unicode tuple)' % str(type(file_tuple)))
-      if len(file_tuple) != 3:
-        raise SlaveRPCError(
-            'Invalid element len (%d != 3) in StoreFiles args: %s' %
-            (len(file_tuple), str(file_tuple)))
-
-      for string in file_tuple:
-        if not isinstance(string, basestring):
-          raise SlaveRPCError(
-              'Invalid tuple element type: %s (expected str or unicode)' %
-              str(type(string)))
-
-    # Execute functionality.
-    for file_path, file_name, file_contents in args:
-      logging.debug('Received file name: ' + file_name)
-
-      try:
-        _MakeDirectory(file_path)
-      except os.error as e:
-        raise SlaveRPCError('MakeDirectory exception: ' + str(e))
-
-      try:
-        _StoreFile(file_path, file_name, file_contents)
-      except IOError as e:
-        raise SlaveRPCError('StoreFile exception: ' + str(e))
-
-  @staticmethod
   def rpc_RunManifest(args):
     """Checks type of args to be correct.
 
     Args:
-      args: A list of strings to pass to the python executable to run.
+      args: json serialized TestRun.
 
     Raises:
       SlaveRPCError: If args are invalid will include an error message, or
@@ -445,9 +375,14 @@ class SlaveMachine(object):
     # Validate args.
     if not isinstance(args, basestring):
       raise SlaveRPCError('Invalid RunManifest arg: %r (expected str)' % args)
+    try:
+      json.loads(args)
+    except ValueError as e:
+      raise SlaveRPCError('Invalid json data for TestRun: %s' % e)
 
-    # Execute functionality.
-    command = [sys.executable, THIS_FILE, 'local_test_runner', '-f', args]
+    path = os.path.join('work', 'test_run.json')
+    _store_file(path, args)
+    command = [sys.executable, THIS_FILE, 'local_test_runner', '-f', path]
     logging.debug('Running command: %s', command)
     try:
       subprocess.check_call(command, cwd=ROOT_DIR)

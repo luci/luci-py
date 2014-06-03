@@ -11,7 +11,6 @@ implemented using the webapp2 framework.
 import collections
 import json
 import logging
-import os
 import time
 import urllib
 
@@ -44,11 +43,6 @@ from server import task_result
 from server import task_scheduler
 from server import task_to_run
 from server import user_manager
-
-
-# Default Test Run Swarm filename. This file provides parameters for the
-# instance running tests.
-TEST_RUN_SWARM_FILE_NAME = 'test_run.swarm'
 
 
 ACCEPTABLE_TASKS_SORTS = {
@@ -226,32 +220,11 @@ def request_work_item(attributes, server_url):
       data=request.properties.data,
       tests=test_objects)
 
-  # TODO(maruel): Remove me.
-  test_run.ExpandVariables({
-      'instance_index': 0,
-      'num_instances': 1,
-  })
-  test_run.Validate()
-
-  files_to_upload = [
-      (test_run.working_dir or '', TEST_RUN_SWARM_FILE_NAME,
-      test_request_message.Stringize(test_run, json_readable=True))
-  ]
-
-  # Define how to run the scripts.
-  swarm_file_path = TEST_RUN_SWARM_FILE_NAME
-  if test_run.working_dir:
-    swarm_file_path = os.path.join(
-        test_run.working_dir, TEST_RUN_SWARM_FILE_NAME)
-
-  rpc_commands = [
-    rpc.BuildRPC('StoreFiles', files_to_upload),
-    rpc.BuildRPC('RunManifest', swarm_file_path),
-  ]
+  content = test_request_message.Stringize(test_run, json_readable=True)
   # The Swarming bot uses an hand rolled RPC system and 'commands' is actual the
   # custom RPC commands.
   return {
-    'commands': rpc_commands,
+    'commands': [rpc.BuildRPC('RunManifest', content)],
     'result_url': test_run.result_url,
     'try_count': 0,
   }

@@ -213,34 +213,6 @@ class TestRequestMessageBaseTest(unittest.TestCase):
     with self.assertRaises(test_request_message.Error):
       trm.ValidateUrlLists(['d', 'e'], False)
 
-  def testExpandVariables(self):
-    url = 'http://www.google.com/hi%20world'
-    c = TestObj(
-        a='%(var3)d',
-        b=[('%(var4)s',), ('%(var1)s', '%(var2)d', '%(var3)d')],
-        c=42)
-    trm = TestObj(
-        a='%(var1)s',
-        b=['%(var1)s', '%(var2)d'],
-        c=c,
-        d=None,
-        e={'%(var4)s': '%(var1)s', '%(var2)d': '%(var3)d'},
-        f=url,
-        g=url + '%(var1)s')
-
-    trm.ExpandVariables(
-        {'var1': 'one', 'var2': 22, 'var3': 333, 'var4': 'four'})
-    self.assertEqual('one', trm.a)
-    self.assertEqual(['one', '22'], trm.b)
-    self.assertEqual('333', trm.c.a)
-    self.assertEqual([('four',), ('one', '22', '333')], trm.c.b)
-    self.assertEqual(42, trm.c.c)
-    self.assertEqual(None, trm.d)
-    # We intentionnaly don't expand key names, just values!
-    self.assertEqual({'%(var4)s': 'one', '%(var2)d': '333'}, trm.e)
-    self.assertEqual(url, trm.f)
-    self.assertEqual(url + 'one', trm.g)
-
   def testFromJSON(self):
     # Start with the exception raising tests.
     with self.assertRaises(test_request_message.Error):
