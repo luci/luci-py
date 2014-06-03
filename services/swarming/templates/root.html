@@ -22,7 +22,15 @@ on AppEngine.
     python swarming_bot.zip
     </pre>
     Don't forget if swarming_bot.zip was already present, curl won't overwrite
-    it so "rm swarming_bot.zip" first if necessary.
+    it so "rm swarming_bot.zip" first if necessary. But here's an even shorter
+    command when you like to live dangerously:
+    <pre style="margin-bottom:0">
+    python -c "import urllib; exec urllib.urlopen('{{host_url}}/bootstrap').read()"
+    </pre>
+    The escaped version to pass as a ssh argument:
+    <pre>
+    'python -c "import urllib; exec urllib.urlopen('"'{{host_url}}/bootstrap'"').read()"'
+    </pre>
   </li>
   <li>See the project's page for code and help pages:
     <a href="https://code.google.com/p/swarming/">

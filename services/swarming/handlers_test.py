@@ -336,7 +336,7 @@ class AppTest(test_case.TestCase):
     response = self.app.post(
         '/restricted/upload_start_slave?xsrf_token=%s' % xsrf_token,
         upload_files=[('script', 'script', 'script_body')])
-    self.assertResponse(response, '200 OK', 'Success.')
+    self.assertEqual('11 bytes stored.', response.body)
 
   def testRegisterHandler(self):
     # Missing attributes field.
@@ -844,6 +844,29 @@ class AppTest(test_case.TestCase):
     bot.last_seen = task_common.utcnow() - bot_management.MACHINE_DEATH_TIMEOUT
     bot.put()
     self.assertEqual('1', self.app.get('/swarming/api/v1/bots/dead/count').body)
+
+  def test_bootstrap_default(self):
+    actual = self.app.get('/bootstrap').body
+    with open('swarm_bot/bootstrap.py', 'rb') as f:
+      expected = f.read()
+    header = 'host_url = \'http://localhost\'\n'
+    self.assertEqual(header + expected, actual)
+
+  def test_bootstrap_custom(self):
+    # Act under admin identity.
+    self._ReplaceCurrentUser(ADMIN_EMAIL)
+
+    self.app.get('/restricted/upload_bootstrap')
+    data = {
+      'script': 'foo',
+      'xsrf_token': self.getXsrfToken(),
+    }
+    r = self.app.post('/restricted/upload_bootstrap', data)
+    self.assertEqual('3 bytes stored.', r.body)
+
+    actual = self.app.get('/bootstrap').body
+    expected = 'host_url = \'http://localhost\'\nfoo'
+    self.assertEqual(expected, actual)
 
 
 if __name__ == '__main__':

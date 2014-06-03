@@ -34,6 +34,7 @@ from components import ereporter2
 from components import utils
 from server import bot_management
 from server import errors
+from server import file_chunks
 from server import result_helper
 from server import stats
 from server import stats_gviz
@@ -558,6 +559,7 @@ class UploadStartSlaveHandler(auth.AuthenticatingHandler):
   @auth.require(auth.UPDATE, 'swarming/management')
   def get(self):
     params = {
+      'path': self.request.path,
       'xsrf_token': self.generate_xsrf_token(),
     }
     self.response.out.write(
@@ -571,7 +573,28 @@ class UploadStartSlaveHandler(auth.AuthenticatingHandler):
 
     bot_management.store_start_slave(script)
     self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
-    self.response.out.write('Success.')
+    self.response.out.write('%d bytes stored.' % len(script))
+
+
+class UploadBootstrapHandler(auth.AuthenticatingHandler):
+  @auth.require(auth.READ, 'swarming/management')
+  def get(self):
+    params = {
+      'path': self.request.path,
+      'xsrf_token': self.generate_xsrf_token(),
+    }
+    self.response.out.write(
+        template.render('restricted_uploadbootstrap.html', params))
+
+  @auth.require(auth.UPDATE, 'swarming/management')
+  def post(self):
+    script = self.request.get('script', '')
+    if not script:
+      self.abort(400, 'No script uploaded')
+
+    file_chunks.StoreFile('bootstrap.py', script.encode('utf-8'))
+    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
+    self.response.out.write('%d bytes stored.' % len(script))
 
 
 class WhitelistIPHandler(auth.AuthenticatingHandler):
@@ -865,6 +888,23 @@ class RetryHandler(auth.AuthenticatingHandler):
 ### Bot APIs.
 
 
+class BootstrapHandler(auth.AuthenticatingHandler):
+  """Returns python code to run to bootstrap a swarming bot."""
+  @auth.require(auth.READ, 'swarming/bots')
+  def get(self):
+    content = file_chunks.RetrieveFile('bootstrap.py')
+    if not content:
+      # Fallback to the one embedded in the tree.
+      with open('swarm_bot/bootstrap.py', 'rb') as f:
+        content = f.read()
+
+    self.response.headers['Content-Type'] = 'text/x-python'
+    self.response.headers['Content-Disposition'] = (
+        'attachment; filename="swarming_bot_bootstrap.py"')
+    header = 'host_url = %r\n' % self.request.host_url
+    self.response.out.write(header + content)
+
+
 class GetSlaveCodeHandler(auth.AuthenticatingHandler):
   """Returns a zip file with all the files required by a slave.
 
@@ -1097,6 +1137,7 @@ def CreateApplication():
           Ereporter2RequestHandler),
       ('/restricted/whitelist_ip', WhitelistIPHandler),
       ('/restricted/upload_start_slave', UploadStartSlaveHandler),
+      ('/restricted/upload_bootstrap', UploadBootstrapHandler),
 
       # Eventually accessible for client.
       ('/restricted/cancel', CancelHandler),
@@ -1109,6 +1150,7 @@ def CreateApplication():
       ('/test', TestRequestHandler),
 
       # Bot API.
+      ('/bootstrap', BootstrapHandler),
       ('/get_slave_code', GetSlaveCodeHandler),
       ('/get_slave_code/<version:[0-9a-f]{40}>', GetSlaveCodeHandler),
       ('/poll_for_test', RegisterHandler),
