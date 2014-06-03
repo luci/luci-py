@@ -13,6 +13,7 @@ __version__ = '0.2'
 
 import logging
 import os
+import shutil
 import subprocess
 import sys
 import zipfile
@@ -92,6 +93,15 @@ def main():
   # Always make the current working directory the directory containing this
   # file. It simplifies assumptions.
   os.chdir(os.path.dirname(THIS_FILE))
+
+  if os.path.basename(THIS_FILE) == 'swarming_bot.zip':
+    # Self-replicate itself right away as swarming_bot.1.zip and restart as it.
+    print >> sys.stderr, 'Self replicating.'
+    if os.path.isfile('swarming_bot.1.zip'):
+      os.remove('swarming_bot.1.zip')
+    shutil.copyfile('swarming_bot.zip', 'swarming_bot.1.zip')
+    cmd = [sys.executable, 'swarming_bot.1.zip'] + sys.argv[1:]
+    return subprocess.call(cmd)
 
   # sys.argv[0] is the zip file itself.
   cmd = 'start_slave'

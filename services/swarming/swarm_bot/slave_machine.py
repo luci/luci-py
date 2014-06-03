@@ -464,6 +464,7 @@ class SlaveMachine(object):
       subprocess.check_call(command, cwd=ROOT_DIR)
     except subprocess.CalledProcessError as e:
       if e.returncode == swarm_constants.RESTART_EXIT_CODE:
+        logging.info('local_test_runner asked for restart')
         os_utilities.restart()
       # The exception message will contain the commands that were
       # run and error code returned.
