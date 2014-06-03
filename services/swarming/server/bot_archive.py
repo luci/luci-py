@@ -31,6 +31,7 @@ FILES = (
     'common/test_request_message.py',
     'local_test_runner.py',
     'logging_utils.py',
+    'os_utilities.py',
     'slave_machine.py',
     'url_helper.py',
     'zipped_archive.py',

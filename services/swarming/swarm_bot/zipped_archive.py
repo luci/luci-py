@@ -8,8 +8,10 @@ TODO(maruel): Copied from client/utils/zip_package.py, dedupe once bug 109 is
 completed.
 """
 
-import sys
+import hashlib
 import pkgutil
+import sys
+import zipfile
 import zipimport
 
 
@@ -34,3 +36,20 @@ def get_main_script_path():
   # If running from interactive console __file__ is not defined.
   main = sys.modules['__main__']
   return get_module_zip_archive(main) or getattr(main, '__file__', None)
+
+
+def generate_version():
+  """Generates the sha-1 based on the content of this zip."""
+  result = hashlib.sha1()
+  # TODO(maruel): This function still has to be compatible with python 2.6. Use
+  # a with statement once every slaves are upgraded to 2.7.
+  z = zipfile.ZipFile(get_main_script_path(), 'r')
+  for item in sorted(z.namelist()):
+    f = z.open(item)
+    result.update(item)
+    result.update('\x00')
+    result.update(f.read())
+    result.update('\x00')
+    f.close()
+  z.close()
+  return result.hexdigest()

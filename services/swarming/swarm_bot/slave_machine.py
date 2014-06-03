@@ -10,7 +10,6 @@ is always up to date and executes a child process to run tasks and upload
 results back.
 """
 
-import hashlib
 import json
 import logging
 import logging.handlers
@@ -24,6 +23,7 @@ import zipfile
 
 # pylint: disable-msg=W0403
 import logging_utils
+import os_utilities
 import url_helper
 import zipped_archive
 from common import rpc
@@ -37,6 +37,11 @@ THIS_FILE = os.path.abspath(zipped_archive.get_main_script_path())
 ROOT_DIR = os.path.dirname(THIS_FILE)
 
 
+# TODO(maruel): Temporary to be compatible with Chromium's start_slave.py. I'll
+# send a separate CL to update it, then I'll remove this line.
+Restart = os_utilities.restart
+
+
 class SlaveError(Exception):
   """Simple error exception properly scoped here."""
   pass
@@ -45,35 +50,6 @@ class SlaveError(Exception):
 class SlaveRPCError(Exception):
   """Simple error exception properly scoped here."""
   pass
-
-
-def Restart():
-  """Restarts this machine.
-
-  Raises:
-    Exception: When it is unable to restart the machine.
-  """
-  restart_cmd = None
-  if sys.platform == 'win32':
-    restart_cmd = ['shutdown', '-r', '-f', '-t', '1']
-  elif sys.platform == 'cygwin':
-    restart_cmd = ['shutdown', '-r', '-f', '1']
-  elif sys.platform == 'linux2' or sys.platform == 'darwin':
-    restart_cmd = ['sudo', '/sbin/shutdown', '-r', 'now']
-
-  if restart_cmd:
-    logging.info('Restarting machine with command %s', restart_cmd)
-    try:
-      subprocess.call(restart_cmd)
-    except OSError as e:
-      logging.exception(e)
-
-  # Sleep for 300 seconds to ensure we don't try to do anymore work while
-  # the OS is preparing to shutdown.
-  time.sleep(300)
-
-  # The machine should be shutdown by now.
-  raise SlaveError('Unable to restart machine')
 
 
 def ValidateBasestring(x, error_prefix='', errors=None):
@@ -203,20 +179,6 @@ def _StoreFile(file_path, file_name, file_contents):
   logging.debug('File stored: %s', full_name)
 
 
-def generate_version():
-  result = hashlib.sha1()
-  with zipfile.ZipFile(THIS_FILE, 'r') as z:
-    for item in sorted(z.namelist()):
-      with z.open(item) as f:
-        result.update(item)
-        result.update('\x00')
-        result.update(f.read())
-        result.update('\x00')
-  out = result.hexdigest()
-  logging.info('generate_version() = %s', out)
-  return out
-
-
 class SlaveMachine(object):
   """Creates a slave that continuously polls the Swarm server for jobs."""
 
@@ -236,7 +198,7 @@ class SlaveMachine(object):
     self._attributes['try_count'] = 0
     self._come_back = 0
     self._max_url_tries = max_url_tries
-    self._attributes['version'] = generate_version()
+    self._attributes['version'] = zipped_archive.generate_version()
 
   def Start(self, iterations):
     """Starts the slave, which polls the Swarm server for jobs until it dies.
@@ -502,7 +464,7 @@ class SlaveMachine(object):
       subprocess.check_call(command, cwd=ROOT_DIR)
     except subprocess.CalledProcessError as e:
       if e.returncode == swarm_constants.RESTART_EXIT_CODE:
-        Restart()
+        os_utilities.restart()
       # The exception message will contain the commands that were
       # run and error code returned.
       raise SlaveRPCError(str(e))
@@ -515,6 +477,10 @@ class SlaveMachine(object):
   def rpc_UpdateSlave(args):
     """Download the current version of the slave code and then run it.
 
+    Use an alterning methods; first load swarming_bot.1.zip, then
+    swarming_bot.2.zip, never touching swarming_bot.zip which was the originally
+    bootstrapped file.
+
     Args:
       args: The url for the slave code.
 
@@ -526,51 +492,53 @@ class SlaveMachine(object):
           'Invalid arg types to UpdateSlave: %s (expected str or unicode)' %
           str(type(args)))
 
-    # Download as a new file, then replace the previous one.
-    new_zip = 'swarming_bot.new.zip'
+    # Alternate between .1.zip and .2.zip.
+    this_file = os.path.basename(THIS_FILE)
+    new_zip = 'swarming_bot.1.zip'
+    if this_file == new_zip:
+      new_zip = 'swarming_bot.2.zip'
+
+    # Download as a new file.
     if not url_helper.DownloadFile(new_zip, args):
-      logging.error('Unable to download required slave files to self-update.')
+      logging.error('Unable to download %s from %s.', new_zip, args)
       return
 
-    # It succeeded, now rename it. If the following operations fails, the bot
-    # will fail to come back by itself.
-    current_zip = 'swarming_bot.zip'
-    if sys.platform in ('cygwin', 'win32') and os.path.isfile(current_zip):
-      # On Windows, os.rename() cannot overwrite an existing file so delete it
-      # first. It is not a problem on other real OSes.
-      try:
-        # This can throw if there's a file lock on it. Too bad in that case. It
-        # can happen for many reasons, like an AV.
-        os.remove(current_zip)
-      except OSError as e:
-        logging.error('Unexpected failure to delete %s: %s', current_zip, e)
-        # Rebooting may help. #thisiswindows
-        Restart()
-
-    try:
-      os.rename(new_zip, current_zip)
-    except OSError as e:
-      logging.error(
-          'Unexpected failure to rename %s to %s: %s', new_zip, current_zip, e)
-
+    logging.info('Restarting the new code.')
     sys.stdout.flush()
     sys.stderr.flush()
-    os.execv(sys.executable, [sys.executable] + sys.argv)
+    # This will force the reinstallation if necessary.
+    os.execv(sys.executable, [sys.executable, new_zip])
+
+
+def get_config():
+  """Returns the data from config.json.
+
+  First try the config.json inside the zip. If not present or not running inside
+  swarming_bot.zip, use the one beside the file.
+  """
+  with zipfile.ZipFile(THIS_FILE, 'r') as f:
+    return json.load(f.open('config.json'))
+
+  with open('config.json', 'r') as f:
+    return json.load(f)
 
 
 def main(args):
+  # Add SWARMING_HEADLESS into environ so subcommands know that they are running
+  # in a headless (non-interactive) mode.
+  os.environ['SWARMING_HEADLESS'] = '1'
+
   # TODO(maruel): Get rid of all flags and support no option at all.
   # https://code.google.com/p/swarming/issues/detail?id=111
   parser = optparse.OptionParser(
-      usage='%prog [options] [filename]',
+      usage='%prog [options]',
       description=sys.modules[__name__].__doc__)
-  # TODO(maruel): Embed this information in the .zip file itself.
-  parser.add_option('-a', '--address', help='Swarming server URL')
   # TODO(maruel): Always True.
   parser.add_option('-v', '--verbose', action='count', default=0,
                     help='Set logging level to INFO, twice for DEBUG.')
 
   # TODO(maruel): Remove these once callers are fixed.
+  parser.add_option('-a', '--address', help=optparse.SUPPRESS_HELP)
   parser.add_option('-p', '--port', help=optparse.SUPPRESS_HELP)
   parser.add_option(
       '-r', '--max_url_tries', type='int', help=optparse.SUPPRESS_HELP)
@@ -587,30 +555,13 @@ def main(args):
   levels = [logging.WARNING, logging.INFO, logging.DEBUG]
   logging_utils.set_console_level(levels[min(options.verbose, len(levels)-1)])
 
-  # TODO(maruel): Remove this and use the information in start_slave.py to
-  # generate the dimensions on bot startup.
-  # Open the specified file, or stdin.
-  if not args:
-    source = sys.stdin
-  else:
-    filename = args[0]
-    try:
-      source = open(filename)
-    except IOError:
-      logging.error('Cannot open file: %s', filename)
-      return
+  # Importing this administrator provided script could have side-effects on
+  # startup. That is why it is late imported.
+  import start_slave
+  attributes = start_slave.get_attributes()
 
-  # Read machine informations.
-  attributes = json.load(source)
-  source.close()
-
-  # TODO(maruel): Stop hacking this way.
-  slave = SlaveMachine(
-      url=options.address, attributes=attributes, max_url_tries=40)
-
-  # Add SWARMING_HEADLESS into environ so subcommands know that they are running
-  # in a headless (non-interactive) mode.
-  os.environ['SWARMING_HEADLESS'] = '1'
+  config = get_config()
+  slave = SlaveMachine(config['server'], attributes, max_url_tries=40)
 
   while True:
     # Start requesting jobs.
@@ -619,8 +570,11 @@ def main(args):
     except (rpc.RPCError, SlaveError) as e:
       logging.exception('Slave start threw an exception:\n%s', e)
     logging.warning('Slave returned. Starting again.')
+  print >> sys.stderr, 'Should never reach here.'
+  return 1
 
 
 if __name__ == '__main__':
   logging_utils.prepare_logging('swarming_bot.log')
+  os.chdir(ROOT_DIR)
   sys.exit(main(None))

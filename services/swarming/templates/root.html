@@ -17,10 +17,9 @@ on AppEngine.
   <li>
     To start a bot, run:
     <pre style="margin-bottom:0">
-    mkdir bot
-    cd bot
-    curl -sSLOJ https://{{host}}/get_slave_code
-    python swarming_bot.zip start_slave -s https://{{host}}/ -p 443
+    mkdir bot; cd bot
+    curl -sSLOJ {{host_url}}/get_slave_code
+    python swarming_bot.zip
     </pre>
     Don't forget if swarming_bot.zip was already present, curl won't overwrite
     it so "rm swarming_bot.zip" first if necessary.

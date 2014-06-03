@@ -1,1 +1,0 @@
-{"dimensions": {"os": ["win-xp", "win-vista"], "lang": ["en-US"]}}

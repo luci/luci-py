@@ -13,8 +13,10 @@ import time
 import unittest
 
 # Import them first before manipulating sys.path to ensure they can load fine.
+import os_utilities
 import slave_machine
 import url_helper
+import zipped_archive
 
 from common import rpc
 from common import swarm_constants
@@ -84,6 +86,11 @@ class TestSlaveMachine(auto_stub.TestCase):
     self._mox = mox.Mox()
     self._mox.StubOutWithMock(url_helper, 'UrlOpen')
     self._mox.StubOutWithMock(time, 'sleep')
+    self._mox.StubOutWithMock(subprocess, 'call')
+    self._mox.StubOutWithMock(subprocess, 'check_call')
+    self._mox.StubOutWithMock(os_utilities, 'restart')
+    self._mox.StubOutWithMock(slave_machine, '_MakeDirectory')
+    self._mox.StubOutWithMock(slave_machine, '_StoreFile')
     self.mock(logging, 'warning', lambda *_: None)
     self.mock(logging, 'error', lambda *_: None)
     self.mock(logging, 'exception', lambda *_: None)
@@ -98,7 +105,7 @@ class TestSlaveMachine(auto_stub.TestCase):
       'version': self.version,
     }
     # slave_machine.generate_version() is tested via the smoke test.
-    self.mock(slave_machine, 'generate_version', lambda: self.version)
+    self.mock(zipped_archive, 'generate_version', lambda: self.version)
 
   def tearDown(self):
     self._mox.UnsetStubs()
@@ -113,34 +120,25 @@ class TestSlaveMachine(auto_stub.TestCase):
   # Mock slave_machine._PostFailedExecuteResults.
   def _MockPostFailedExecuteResults(self, slave, result_string):
     self._mox.StubOutWithMock(slave, '_PostFailedExecuteResults')
-
     slave._PostFailedExecuteResults(result_string)
 
-  # Mocks slave_machine._MakeDirectory to either throw exception or not.
-  def _MockMakeDirectory(self, path, exception=False,
-                         exception_message='Some error message'):
-    self._mox.StubOutWithMock(slave_machine, '_MakeDirectory')
-
-    if exception:
+  @staticmethod
+  def _MockMakeDirectory(path, exception_message=None):
+    if exception_message:
       slave_machine._MakeDirectory(path).AndRaise(os.error(exception_message))
     else:
       slave_machine._MakeDirectory(path)
 
-  # Mocks slave_machine._StoreFile to either throw exception or not.
-  def _MockStoreFile(self, path, name, contents, exception=False,
-                     exception_message='Some error message'):
-    self._mox.StubOutWithMock(slave_machine, '_StoreFile')
-
-    if exception:
+  @staticmethod
+  def _MockStoreFile(path, name, contents, exception_message=None):
+    if exception_message:
       slave_machine._StoreFile(
           path, name, contents).AndRaise(IOError(exception_message))
     else:
       slave_machine._StoreFile(path, name, contents)
 
-  # Mocks subprocess.check_call and raises exception if specified.
-  def _MockSubprocessCheckCall(self, args, exit_code=0):
-    self._mox.StubOutWithMock(subprocess, 'check_call')
-
+  @staticmethod
+  def _MockSubprocessCheckCall(args, exit_code=0):
     if exit_code:
       subprocess.check_call(args, cwd=BASE_DIR).AndRaise(
           subprocess.CalledProcessError(exit_code, args))
@@ -165,10 +163,10 @@ class TestSlaveMachine(auto_stub.TestCase):
     expected_exception_str = (r'Error when connecting to Swarm server, '
                               'http://localhost/poll_for_test, failed to '
                               'connect after 5 attempts.')
-    self.assertRaisesRegexp(slave_machine.SlaveError,
-                            expected_exception_str,
-                            slave.Start,
-                            iterations=-1)
+    with self.assertRaisesRegexp(
+        slave_machine.SlaveError, expected_exception_str):
+      slave.Start(iterations=-1)
+
     self._mox.VerifyAll()
 
   def testAttributesFormatBadString(self):
@@ -499,8 +497,7 @@ class TestSlaveMachine(auto_stub.TestCase):
         ).AndReturn(response)
 
     exception_message = 'makedirs exception'
-    self._MockMakeDirectory(
-        args[0][0], exception=True, exception_message=exception_message)
+    self._MockMakeDirectory(args[0][0], exception_message=exception_message)
     self._MockPostFailedExecuteResults(
         slave, 'MakeDirectory exception: %s' % exception_message)
 
@@ -527,9 +524,9 @@ class TestSlaveMachine(auto_stub.TestCase):
         ).AndReturn(response)
 
     exception_message = 'storefile exception'
-    self._MockMakeDirectory(args[0][0], exception=False)
-    self._MockStoreFile(args[0][0], args[0][1], args[0][2],
-                        exception=True, exception_message=exception_message)
+    self._MockMakeDirectory(args[0][0])
+    self._MockStoreFile(
+        args[0][0], args[0][1], args[0][2], exception_message=exception_message)
     self._MockPostFailedExecuteResults(
         slave, 'StoreFile exception: %s' % exception_message)
 
@@ -555,8 +552,8 @@ class TestSlaveMachine(auto_stub.TestCase):
         mox.IgnoreArg(), data=mox.IgnoreArg(), max_tries=mox.IgnoreArg()
         ).AndReturn(response)
 
-    self._MockMakeDirectory(args[0][0], exception=False)
-    self._MockStoreFile(args[0][0], args[0][1], args[0][2], exception=False)
+    self._MockMakeDirectory(args[0][0])
+    self._MockStoreFile(args[0][0], args[0][1], args[0][2])
 
     self._mox.ReplayAll()
 
@@ -675,15 +672,16 @@ class TestSlaveMachine(auto_stub.TestCase):
         expected,
         exit_code=swarm_constants.RESTART_EXIT_CODE)
 
-    # Mock out the the restart attempt to raise a subprocess exception.
-    self._mox.StubOutWithMock(subprocess, 'call')
-    subprocess.call(mox.IgnoreArg()).AndRaise(OSError('Invalid command'))
+    # Mock out the the restart attempt to raise an exception, otherwise it would
+    # start an infinite loop.
+    class Foo(Exception):
+      pass
+    os_utilities.restart().AndRaise(Foo)
 
-    # Handle the fallout from the failed restart.
-    time.sleep(mox.IgnoreArg())
     self._mox.ReplayAll()
 
-    self.assertRaises(slave_machine.SlaveError, slave.Start, iterations=1)
+    with self.assertRaises(Foo):
+      slave.Start(iterations=1)
 
     self._mox.VerifyAll()
 

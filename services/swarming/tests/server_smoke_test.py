@@ -10,6 +10,7 @@ ensure the system works end to end.
 """
 
 import cookielib
+import glob
 import json
 import logging
 import os
@@ -24,7 +25,6 @@ import unittest
 import urllib
 import urllib2
 import urlparse
-import zipfile
 
 APP_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BOT_DIR = os.path.join(APP_DIR, 'swarm_bot')
@@ -37,29 +37,6 @@ test_env.setup_test_env()
 import url_helper
 from server import bot_archive
 from support import gae_sdk_utils
-
-# The script to start the slave with. 'Starting up swarming_bot' will be printed
-# exactly twice. Once for the initial start up, a second time after the upgrade.
-START_SLAVE = (
-    "import os\n"
-    "import subprocess\n"
-    "import sys\n"
-    "\n"
-    "def main(_args):\n"
-    "  print('Starting up swarming_bot')\n"
-    "  sys.stdout.flush()\n"
-    "  cmd = [\n"
-    "      sys.executable, 'swarming_bot.zip', 'start_bot',\n"
-    "      '-a', '%(server_address)s',\n"
-    "      '-l', '%(log_file)s',\n"
-    "      '-v',\n"
-    "      %(extra_args)s\n"
-    "      '%(config_file)s',\n"
-    "  ]\n"
-    "  return subprocess.call(cmd)\n"
-    "\n"
-    "if __name__ == '__main__':\n"
-    "  sys.exit(main(None))\n")
 
 
 VERBOSE = False
@@ -127,18 +104,18 @@ def whitelist_and_install_cookie_jar(server_url):
       urllib.urlencode({'a': True, 'xsrf_token': xsrf_token}))
 
 
-def setup_bot(swarming_bot_dir, start_slave_content):
+def setup_bot(swarming_bot_dir, host):
   """Setups the slave code in a temporary directory so it can be modified."""
-  # Creates a functional but invalid swarming_bot.zip.
-  swarming_bot_zip = os.path.join(swarming_bot_dir, 'swarming_bot.zip')
-  with zipfile.ZipFile(swarming_bot_zip, 'w') as zip_file:
-    for item in bot_archive.FILES:
-      if item == 'local_test_runner.py':
-        # Make sure this file is missing.
-        continue
-      zip_file.write(os.path.join(BOT_DIR, item), item)
-    zip_file.writestr('start_slave.py', start_slave_content)
+  with open(os.path.join(BOT_DIR, 'start_slave.py'), 'rb') as f:
+    start_slave_content = f.read()
 
+  # Creates a functional but invalid swarming_bot.zip.
+  zip_content = bot_archive.get_swarming_bot_zip(
+      BOT_DIR, host, {'start_slave.py': start_slave_content, 'invalid': 'foo'})
+
+  swarming_bot_zip = os.path.join(swarming_bot_dir, 'swarming_bot.zip')
+  with open(swarming_bot_zip, 'wb') as f:
+    f.write(zip_content)
   logging.info(
       'Generated %s (%d bytes)',
       swarming_bot_zip, os.stat(swarming_bot_zip).st_size)
@@ -186,19 +163,16 @@ class SwarmingTestCase(unittest.TestCase):
           cmd, cwd=self.tmpdir, preexec_fn=os.setsid,
           stdout=f, stderr=subprocess.STDOUT)
 
-    start_slave_content = START_SLAVE % {
-      'config_file': os.path.join(APP_DIR, 'tests', 'machine_config.txt'),
-      'extra_args': "'-v'," if VERBOSE else '',
-      'log_file': os.path.join(self.log_dir, 'slave_machine.log'),
-      'server_address': self.server_url,
-    }
-    setup_bot(self.swarming_bot_dir, start_slave_content)
+    setup_bot(self.swarming_bot_dir, self.server_url)
 
     self.assertTrue(
         wait_for_server_up(self.server_url), 'Failed to start server')
     whitelist_and_install_cookie_jar(self.server_url)
 
-    # Upload the start slave script to the server.
+    # Upload the start slave script to the server. Uploads the exact code in the
+    # tree + a new line. This invalidates the bot's code.
+    with open(os.path.join(BOT_DIR, 'start_slave.py'), 'rb') as f:
+      start_slave_content = f.read() + '\n'
     url_helper.UrlOpen(
         urlparse.urljoin(self.server_url, '/restricted/upload_start_slave'),
         files=[('script', 'script', start_slave_content)], method='POSTFORM')
@@ -211,7 +185,7 @@ class SwarmingTestCase(unittest.TestCase):
     ]
     if VERBOSE:
       cmd.append('-v')
-    with open(os.path.join(self.log_dir, 'start_slave.log'), 'wb') as f:
+    with open(os.path.join(self.log_dir, 'start_slave_stdout.log'), 'wb') as f:
       f.write('Running: %s\n' % cmd)
       f.flush()
       self._bot_proc = subprocess.Popen(
@@ -250,6 +224,12 @@ class SwarmingTestCase(unittest.TestCase):
               with open(os.path.join(self.log_dir, i), 'rb') as f:
                 for l in f:
                   sys.stderr.write('  ' + l)
+            for i in sorted(
+                glob.glob(os.path.join(self.swarming_bot_dir, '*.log'))):
+              sys.stderr.write('\n%s:\n' % i)
+              with open(os.path.join(self.log_dir, i), 'rb') as f:
+                for l in f:
+                  sys.stderr.write('  ' + l)
       finally:
         # In the end, delete the temporary directory.
         shutil.rmtree(self.tmpdir)
@@ -273,6 +253,7 @@ class SwarmingTestCase(unittest.TestCase):
     return swarm_files
 
   def trigger_swarm_file(self, swarm_file, running_tests, tests_to_cancel):
+    # TODO(maruel): Stop hacking this up and use swarming.py trigger.
     logging.info('trigger_swarm_file(%s)', swarm_file)
     with open(swarm_file, 'rb') as f:
       request = f.read()
