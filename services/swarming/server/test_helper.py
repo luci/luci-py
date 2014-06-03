@@ -8,10 +8,10 @@ import datetime
 
 from google.appengine.ext import ndb
 
+import handlers_frontend
 from common import test_request_message
 from server import result_helper
 from server import task_common
-from server import task_glue
 from server import task_result
 from server import task_scheduler
 from server import task_to_run
@@ -78,8 +78,8 @@ def CreateRunner(config_name=None, machine_id=None, ran_successfully=None,
                  ended=None, requestor=None, results=None):
   """Creates entities to represent a new task request and a bot running it.
 
-  For the old DB, it's a TestRequest and TestRunner pair
-  For the new DB, it's a TaskRequest and friends.
+  The entities are TaskRequest, TaskToRun, TaskResultSummary, TaskRunResult,
+  ResultChunk and Results.
 
   The entity may be in a pending, running or completed state.
 
@@ -101,7 +101,7 @@ def CreateRunner(config_name=None, machine_id=None, ran_successfully=None,
   """
   config_name = config_name or (REQUEST_MESSAGE_CONFIG_NAME_ROOT + '_0')
   request_message = GetRequestMessage(requestor=requestor)
-  data = task_glue.convert_test_case(request_message)
+  data = handlers_frontend.convert_test_case(request_message)
   request, result_summary = task_scheduler.make_request(data)
   if created:
     # For some reason, pylint is being obnoxious here and generates a W0201

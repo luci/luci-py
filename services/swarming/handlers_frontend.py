@@ -39,7 +39,6 @@ from server import result_helper
 from server import stats
 from server import stats_gviz
 from server import task_common
-from server import task_glue
 from server import task_request
 from server import task_result
 from server import task_scheduler
@@ -125,6 +124,53 @@ def ip_whitelist_authentication(request):
   error.put()
 
   return None
+
+
+def convert_test_case(data):
+  """Constructs a TaskProperties out of a test_request_message.TestCase.
+
+  This code is kept for compatibility with the previous API. See make_request()
+  for more details.
+
+  Plan of attack:
+  - Create new bot API.
+  - Convert swarm_bot to use the new versioned API.
+  - Deploy servers.
+  - Delete old bot code.
+  - Create new client API.
+  - Deploy servers.
+  - Switch client code to use new API.
+  - Roll client code into chromium.
+  - Wait 1 month.
+  - Remove old client code API.
+  """
+  test_case = test_request_message.TestCase.FromJSON(data)
+  # TODO(maruel): Add missing mapping and delete obsolete ones.
+  assert len(test_case.configurations) == 1, test_case.configurations
+  config = test_case.configurations[0]
+
+  if test_case.tests:
+    execution_timeout_secs = int(round(test_case.tests[0].hard_time_out))
+    io_timeout_secs = int(round(test_case.tests[0].io_time_out))
+  else:
+    execution_timeout_secs = 2*60*60
+    io_timeout_secs = 60*60
+
+  # Ignore all the settings that are deprecated.
+  return {
+    'name': test_case.test_case_name,
+    'user': test_case.requestor,
+    'properties': {
+      'commands': [c.action for c in test_case.tests],
+      'data': test_case.data,
+      'dimensions': config.dimensions,
+      'env': test_case.env_vars,
+      'execution_timeout_secs': execution_timeout_secs,
+      'io_timeout_secs': io_timeout_secs,
+    },
+    'priority': config.priority,
+    'scheduling_expiration_secs': config.deadline_to_run,
+  }
 
 
 def request_work_item(attributes, server_url):
@@ -690,7 +736,7 @@ class TestRequestHandler(auth.AuthenticatingHandler):
     # TODO(vadimsh): Store identity of a user that posted the request.
     test_case = self.request.get('request')
     try:
-      request_properties = task_glue.convert_test_case(test_case)
+      request_properties = convert_test_case(test_case)
     except test_request_message.Error as e:
       message = str(e)
       logging.error(message)
