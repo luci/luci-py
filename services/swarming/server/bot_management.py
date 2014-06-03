@@ -159,7 +159,7 @@ def tag_bot_seen(bot_id, hostname, dimensions):
       (not hostname or bot.hostname == hostname)):
     return bot
 
-  bot = bot or Bot(key=key)
+  bot = bot or Bot(key=key, dimensions={})
   bot.last_seen = task_common.utcnow()
   if dimensions:
     bot.dimensions = dimensions

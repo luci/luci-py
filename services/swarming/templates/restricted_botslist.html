@@ -33,7 +33,13 @@ Note: Refreshing delay is: {{update_delay}}.
         <td>{{bot.id}}</td>
         <td>{{bot.hostname}}</td>
         <td>{{bot.last_seen|datetimeformat}}</td>
-        <td>{{bot.dimensions|encode_to_json}}</td>
+        <td>
+          {% for k, v in bot.dimensions.iteritems()|sort %}
+          {{k}}:
+          {% if v is string %}{{v}}{% else %}{{v|sort|join(' | ')}}{% endif %}
+          <br>
+          {% endfor %}
+        </td>
         <td>
           <form id="delete_{{bot.id}}" method="post"
             action="/delete_machine_stats?r={{bot.id}}">

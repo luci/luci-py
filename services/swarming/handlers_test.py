@@ -223,8 +223,9 @@ class AppTest(test_case.TestCase):
     # Act under admin identity.
     self._ReplaceCurrentUser(ADMIN_EMAIL)
 
-    # Add a machine to display.
+    # Add bots to display.
     bot_management.tag_bot_seen('id1', 'localhost', {})
+    bot_management.tag_bot_seen('id2', 'localhost:8080', {'foo': 'bar'})
 
     response = self.app.get('/restricted/bots')
     self.assertTrue('200' in response.status)
