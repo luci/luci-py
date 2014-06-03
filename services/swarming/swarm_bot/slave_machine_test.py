@@ -281,7 +281,7 @@ class TestSlaveMachine(auto_stub.TestCase):
 
     UrlOpenExpectations(
         _CreateResponse(commands=[rpc.BuildRPC('a', None)],
-                        result_url=['here.com']),
+                        result_url=['localhost']),
         mox.IgnoreArg(), mox.IgnoreArg())
     self._mox.ReplayAll()
 
@@ -296,8 +296,8 @@ class TestSlaveMachine(auto_stub.TestCase):
     url_helper.UrlOpen(mox.IgnoreArg(), method='GET').AndReturn('')
 
     _SetPollJobAndPostFailExpectations(
-        _CreateResponse(commands='do this', result_url='here.com'),
-        'here.com',
+        _CreateResponse(commands='do this', result_url='localhost'),
+        'localhost',
         '[u\'Failed to validate commands with value "do this": '
         "Invalid type: <type \\'unicode\\'> instead of <type \\'list\\'>\']")
     self._mox.ReplayAll()
@@ -313,8 +313,8 @@ class TestSlaveMachine(auto_stub.TestCase):
     url_helper.UrlOpen(mox.IgnoreArg(), method='GET').AndReturn('')
 
     _SetPollJobAndPostFailExpectations(
-        _CreateResponse(commands=['do this'], result_url='here.com'),
-        'here.com',
+        _CreateResponse(commands=['do this'], result_url='localhost'),
+        'localhost',
         '[\'Failed to validate commands with value "[u\\\'do this\\\']": '
         'Error when parsing RPC: Invalid RPC container\']')
 
@@ -332,8 +332,8 @@ class TestSlaveMachine(auto_stub.TestCase):
 
     commands = [rpc.BuildRPC('WrongFunc', None)]
     _SetPollJobAndPostFailExpectations(
-        _CreateResponse(commands=commands, result_url='here.com'),
-        'here.com', 'Unsupported RPC function name: WrongFunc')
+        _CreateResponse(commands=commands, result_url='localhost'),
+        'localhost', 'Unsupported RPC function name: WrongFunc')
     self._mox.ReplayAll()
 
     slave = slave_machine.SlaveMachine('http://localhost', {})
@@ -443,7 +443,6 @@ class TestSlaveMachine(auto_stub.TestCase):
 
     self._mox.VerifyAll()
 
-
   def testSetStoreFilesRPCValidate(self):
     # Initial server ping.
     url_helper.UrlOpen(mox.IgnoreArg(), method='GET').AndReturn('')
@@ -468,10 +467,10 @@ class TestSlaveMachine(auto_stub.TestCase):
 
     for i in range(0, len(invalid_args)):
       commands = [rpc.BuildRPC(function_name, invalid_args[i])]
-      response = _CreateResponse(commands=commands, result_url='here.com')
+      response = _CreateResponse(commands=commands, result_url='localhost')
 
       _SetPollJobAndPostFailExpectations(
-          response, 'here.com', expected_error[i])
+          response, 'localhost', expected_error[i])
 
     self._mox.ReplayAll()
 
@@ -489,7 +488,7 @@ class TestSlaveMachine(auto_stub.TestCase):
     args = [(u'file path', u'file name', u'file contents')]
 
     commands = [rpc.BuildRPC(function_name, args)]
-    response = _CreateResponse(commands=commands, result_url='here.com')
+    response = _CreateResponse(commands=commands, result_url='localhost')
 
     # Mock initial job request.
     url_helper.UrlOpen(
@@ -516,7 +515,7 @@ class TestSlaveMachine(auto_stub.TestCase):
     args = [(u'file path', u'file name', u'file contents')]
 
     commands = [rpc.BuildRPC(function_name, args)]
-    response = _CreateResponse(commands=commands, result_url='here.com')
+    response = _CreateResponse(commands=commands, result_url='localhost')
 
     # Mock initial job request.
     url_helper.UrlOpen(
@@ -545,7 +544,7 @@ class TestSlaveMachine(auto_stub.TestCase):
     args = [(u'file path', u'file name', u'file contents')]
 
     commands = [rpc.BuildRPC(function_name, args)]
-    response = _CreateResponse(commands=commands, result_url='here.com')
+    response = _CreateResponse(commands=commands, result_url='localhost')
 
     # Mock initial job request.
     url_helper.UrlOpen(
@@ -567,8 +566,8 @@ class TestSlaveMachine(auto_stub.TestCase):
 
     commands = [rpc.BuildRPC('RunManifest', None)]
     _SetPollJobAndPostFailExpectations(
-        _CreateResponse(commands=commands, result_url='here.com'),
-        'here.com',
+        _CreateResponse(commands=commands, result_url='localhost'),
+        'localhost',
         'Invalid RunManifest arg: None (expected str)')
     self._mox.ReplayAll()
 
@@ -586,7 +585,7 @@ class TestSlaveMachine(auto_stub.TestCase):
 
     slave = slave_machine.SlaveMachine('http://localhost', {})
     commands = [rpc.BuildRPC(function_name, args)]
-    response = _CreateResponse(commands=commands, result_url='here.com')
+    response = _CreateResponse(commands=commands, result_url='localhost')
 
     # Mock initial job request.
     url_helper.UrlOpen(
@@ -598,15 +597,11 @@ class TestSlaveMachine(auto_stub.TestCase):
       sys.executable,
       os.path.abspath(sys.argv[0]),
       'local_test_runner',
-      '--restart_on_failure', '-f', args,
+      '-f', args,
     ]
-    exit_code = -1
-    self._MockSubprocessCheckCall(full_command, exit_code=exit_code)
+    self._MockSubprocessCheckCall(full_command, exit_code=-1)
 
-    # Mock the call to post failed results.
-    self._MockPostFailedExecuteResults(
-        slave, "Command '%s' returned non-zero exit status %d"
-        % (str(full_command), exit_code))
+    os_utilities.restart().AndReturn(None)
 
     self._mox.ReplayAll()
 
@@ -623,7 +618,7 @@ class TestSlaveMachine(auto_stub.TestCase):
 
     slave = slave_machine.SlaveMachine('http://localhost', {})
     commands = [rpc.BuildRPC(function_name, args)]
-    response = _CreateResponse(commands=commands, result_url='here.com')
+    response = _CreateResponse(commands=commands, result_url='localhost')
 
     # Mock initial job request.
     url_helper.UrlOpen(
@@ -635,7 +630,7 @@ class TestSlaveMachine(auto_stub.TestCase):
       sys.executable,
       os.path.abspath(sys.argv[0]),
       'local_test_runner',
-      '--restart_on_failure', '-f', args,
+      '-f', args,
     ]
     self._MockSubprocessCheckCall(expected)
 
@@ -654,7 +649,7 @@ class TestSlaveMachine(auto_stub.TestCase):
 
     slave = slave_machine.SlaveMachine('http://localhost', {})
     commands = [rpc.BuildRPC(function_name, args)]
-    response = _CreateResponse(commands=commands, result_url='here.com')
+    response = _CreateResponse(commands=commands, result_url='localhost')
 
     # Mock initial job request.
     url_helper.UrlOpen(
@@ -666,7 +661,7 @@ class TestSlaveMachine(auto_stub.TestCase):
       sys.executable,
       os.path.abspath(sys.argv[0]),
       'local_test_runner',
-      '--restart_on_failure', '-f', args,
+      '-f', args,
     ]
     self._MockSubprocessCheckCall(
         expected,

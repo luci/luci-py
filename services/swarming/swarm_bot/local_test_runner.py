@@ -8,7 +8,7 @@
 It uploads all results back to the Swarming server.
 """
 
-__version__ = '0.1'
+__version__ = '0.2'
 
 import logging
 import logging.handlers
@@ -172,44 +172,21 @@ class LocalTestRunner(object):
   # An array to properly index the pending/success/failure CGI strings.
   _SUCCESS_CGI_STRING = ['success', 'failure', 'pending']
 
-  def __init__(self, request_file_name, log=None, data_folder_name='',
-               max_url_retries=1, restart_on_failure=False):
+  def __init__(self, request_file_name, log=None):
     """Inits LocalTestRunner with a request file.
 
     Args:
       request_file_name: path to the file containing the request.
       log: CaptureLogs instance that collects logs.
-      data_folder_name: optional name of a subdirectory where to explode the
-          downloaded zip data so that they can be cleaned by the 'data' option
-          of the cleanup field of a TestRun object in a Swarming file.
-      max_url_retries: maximum number of times any urlopen call will get
-          retried if it encounters an error.
-      restart_on_failure: True to have this machine restart if any of the tests
-         fail (although it waits for all the tests to run and the results to
-         have been uploaded first).
 
     Raises:
-      Error: When request_file_name or data_folder_name is invalid.
+      Error: When request_file_name is invalid.
     """
-    if any(badchar in data_folder_name for badchar in r'.\/'):
-      raise Error('The specified data folder name must be a simple non-empty '
-                  'string with no periods or slashes.')
-
     self._log = log
-    self.data_dir = None
-    self.max_url_retries = max_url_retries
-    self.restart_on_failure = restart_on_failure
-    self.success = False
-    self.data_dir = (
-        os.path.join(ROOT_DIR, data_folder_name)
-        if data_folder_name else ROOT_DIR)
+    self.data_dir = os.path.join(ROOT_DIR, 'work')
     self.last_ping_time = time.time()
 
     self.test_run = _ParseRequestFile(request_file_name)
-
-    if not data_folder_name and self.test_run.cleanup == 'data':
-      raise Error('You must specify a data folder name if you want to cleanup '
-                  'data and not the rest of the root folder content.')
 
     if os.path.exists(self.data_dir) and not os.path.isdir(self.data_dir):
       raise Error('The specified data folder already exists, but is a regular '
@@ -386,8 +363,8 @@ class LocalTestRunner(object):
     """Run the tests specified in the test run tests list and output results.
 
     Returns:
-      A (success, result_codes, result_string) tuple to identify success,
-      the result codes and also provide a detailed result_string
+      Tuple (result_codes, result_string) to identify the result codes and also
+      provide a detailed result_string.
     """
     logging.info('Running tests from %s test case',
                  self.test_run.test_run_name)
@@ -464,6 +441,7 @@ class LocalTestRunner(object):
     # We sum the number of exit codes that were non-zero for success.
     num_failures = num_results - sum([not int(x) for x in result_codes])
 
+    # TODO(maruel): Delete this.
     if decorate_output:
       result_string = '%s\n\n[----------] %s summary' % (
           result_string, self.test_run.test_run_name)
@@ -474,7 +452,7 @@ class LocalTestRunner(object):
           result_string, num_results - num_failures)
       result_string = '%s\n[  FAILED  ] %d tests' % (
           result_string, num_failures)
-      if num_failures > 0:
+      if num_failures:
         result_string = '%s, listed below:' % result_string
 
       # We finish by enumerating all failed individual tests.
@@ -486,18 +464,14 @@ class LocalTestRunner(object):
               tests_to_run[index].test_name)
 
       result_string += '\n\n %d FAILED TESTS\n' % num_failures
-    # Record the success or failure.
-    self.success = (num_failures == 0)
 
     # And append their total number before returning the result string.
-    return (self.success, result_codes, result_string)
+    return result_codes, result_string
 
-  def PublishResults(self, success, result_codes, result_string,
-                     overwrite=False):
+  def PublishResults(self, result_codes, result_string, overwrite=False):
     """Publish the given result string to the result_url if any.
 
     Args:
-      success: True if we must specify [?|&]s=true. False otherwise.
       result_codes: The array of exit codes to be published, one per action.
       result_string: The result to be published.
       overwrite: True if we should signal the server to overwrite any old
@@ -511,7 +485,6 @@ class LocalTestRunner(object):
         'c': self.test_run.configuration.config_name,
         'n': self.test_run.test_run_name,
         'o': overwrite,
-        's': success,
         # TODO(maruel): Keep as int.
         'x': ', '.join(str(i) for i in result_codes),
     }
@@ -522,7 +495,7 @@ class LocalTestRunner(object):
         self.test_run.result_url,
         data=data,
         files=[(key, key, result_string)],
-        max_tries=self.max_url_retries,
+        max_tries=15,
         method='POSTFORM')
     if url_results is None:
       logging.error('Failed to publish results to given url, %s',
@@ -533,47 +506,21 @@ class LocalTestRunner(object):
   def PublishInternalErrors(self):
     """Get the current log data and publish it."""
     logging.debug('Publishing internal errors')
-    self.PublishResults(False, [], self._log.read(), overwrite=True)
+    self.PublishResults([], self._log.read(), overwrite=True)
 
   def RetrieveDataAndRunTests(self):
     """Get the data required to run the tests, then run and publish the results.
 
     Returns:
-      True if we we got the data, ran the tests and successfully published
-      the results.
+      True if we we got the data, ran the tests successfully and successfully
+      published the results.
     """
     if not self.DownloadAndExplodeData():
       return False
 
-    (success, result_codes, result_string) = self.RunTests()
+    result_codes, result_string = self.RunTests()
 
-    return self.PublishResults(success, result_codes, result_string)
-
-  def ReturnExitCode(self, return_value):
-    """Return the restart exit code if the machine should restart.
-
-    If the machine shouldn't restart then just return the value passed in.
-    The machine is restarted if restart on failure was enable and at least
-    one test failed.
-
-    Args:
-      return_value: The value this function returns if the machine shouldn't
-          restart.
-
-    Returns:
-      return_value: Either the restart exit code or |return_value|.
-    """
-    if return_value == swarm_constants.RESTART_EXIT_CODE:
-      logging.error('return_value and restart exit code are the same, unable '
-                    'to signal no restart')
-
-    logging.info('Checking if restart required.')
-    if self.restart_on_failure and not self.success:
-      logging.info('Restart required.')
-      return_value = swarm_constants.RESTART_EXIT_CODE
-    else:
-      logging.info('No restart required.')
-    return return_value
+    return self.PublishResults(result_codes, result_string) or any(result_codes)
 
 
 def main(args):
@@ -584,15 +531,6 @@ def main(args):
       '-f', '--request_file_name',
       help='name of the request file')
   parser.add_option(
-      '-d', '--data_folder_name', default='',
-      help='name of a subdirectory to use to dump the task inputs into')
-  parser.add_option(
-      '-r', '--max_url_retries', default=15, type='int',
-      help='maximum number of HTTP request retries. Default: %default')
-  parser.add_option(
-      '--restart_on_failure', action='store_true',
-      help='tries to restart the machine if the task fails')
-  parser.add_option(
       '-v', '--verbose', action='store_true',
       help='Set logging level to INFO')
 
@@ -600,7 +538,7 @@ def main(args):
   if not options.request_file_name:
     parser.error('You must provide the request file name.')
   if args:
-    logging.warning('Ignoring unknown args: %s', args)
+    parser.error('Unknown args: %s' % args)
 
   # Setup the logger for the console ouput.
   logging_utils.set_console_level(
@@ -608,15 +546,10 @@ def main(args):
 
   try:
     with logging_utils.CaptureLogs('local_test_runner') as log:
-      with LocalTestRunner(
-          options.request_file_name,
-          log=log,
-          data_folder_name=options.data_folder_name,
-          max_url_retries=options.max_url_retries,
-          restart_on_failure=options.restart_on_failure) as runner:
+      with LocalTestRunner(options.request_file_name, log=log) as runner:
         try:
           if runner.RetrieveDataAndRunTests():
-            return runner.ReturnExitCode(0)
+            return 0
         except Exception:
           # We want to catch all so that we can report all errors, even internal
           # ones.
@@ -626,11 +559,9 @@ def main(args):
           runner.PublishInternalErrors()
         except Exception:
           logging.exception('Unable to publish internal errors')
-        return runner.ReturnExitCode(1)
+        return 1
   except Exception:
     logging.exception('Internal failure')
-    if options.restart_on_failure:
-      return swarm_constants.RESTART_EXIT_CODE
     return 1
 
 

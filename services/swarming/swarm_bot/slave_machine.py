@@ -230,13 +230,10 @@ class SlaveMachine(object):
     url = self._url + '/poll_for_test'
 
     while True:
-      request = {
-          'attributes': json.dumps(self._attributes)
-          }
-
       # Reset the result_url to avoid posting to the wrong place.
       self._result_url = None
 
+      request = {'attributes': json.dumps(self._attributes)}
       response_str = url_helper.UrlOpen(url, data=request,
                                         max_tries=self._max_url_tries)
 
@@ -328,9 +325,7 @@ class SlaveMachine(object):
 
     # Validate fields in the response. A response should have 'try_count'
     # and only either one of ('come_back') or ('commands', 'result_url').
-    required_fields = {
-        'try_count': ValidateNonNegativeInteger
-        }
+    required_fields = {'try_count': ValidateNonNegativeInteger}
 
     if 'commands' in response:
       required_fields['commands'] = ValidateCommand
@@ -367,8 +362,8 @@ class SlaveMachine(object):
       When a Swarm server sends commands to a slave machine, even though they
       could be completely wrong, the server assumes the job as running. Thus
       this function acts as the exception handler for incoming commands from
-      the Swarm server. If for any reason the local test runner script can not
-      be run successfully, this function is invoked.
+      the Swarming server. If for any reason the local test runner script can
+      not be run successfully, this function is invoked.
 
     Args:
       result_string: String representing the output of the error.
@@ -452,27 +447,16 @@ class SlaveMachine(object):
       raise SlaveRPCError('Invalid RunManifest arg: %r (expected str)' % args)
 
     # Execute functionality.
-    # TODO(maruel): It's not the job to handle --restart_on_failure,
-    # this script should handle this.
-    command = [
-      sys.executable, THIS_FILE, 'local_test_runner', '--restart_on_failure',
-      '-f', args,
-    ]
-
+    command = [sys.executable, THIS_FILE, 'local_test_runner', '-f', args]
+    logging.debug('Running command: %s', command)
     try:
-      logging.debug('Running command: %s', command)
       subprocess.check_call(command, cwd=ROOT_DIR)
-    except subprocess.CalledProcessError as e:
-      if e.returncode == swarm_constants.RESTART_EXIT_CODE:
-        logging.info('local_test_runner asked for restart')
-        os_utilities.restart()
-      # The exception message will contain the commands that were
-      # run and error code returned.
-      raise SlaveRPCError(str(e))
-    else:
-      logging.debug('done!')
-      # At this point the script called by subprocess has handled any further
-      # communication with the swarm server.
+    except (OSError, subprocess.CalledProcessError) as e:
+      logging.info('local_test_runner failed, restarting: %s', e)
+      os_utilities.restart()
+    logging.debug('done!')
+    # At this point the script called by subprocess has handled any further
+    # communication with the swarm server.
 
   @staticmethod
   def rpc_UpdateSlave(args):

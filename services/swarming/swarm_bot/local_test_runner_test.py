@@ -136,17 +136,6 @@ class TestLocalTestRunner(auto_stub.TestCase):
     with local_test_runner.LocalTestRunner(self.data_file_name):
       pass
 
-  def testInvalidDataFolderName(self):
-    def TestInvalidName(name):
-      with self.assertRaises(local_test_runner.Error):
-        local_test_runner.LocalTestRunner(
-            self.data_file_name, data_folder_name=name)
-    self.CreateValidFile()
-    TestInvalidName('.')
-    TestInvalidName('..')
-    TestInvalidName('c:\\tests')
-    TestInvalidName('data/')
-
   def PrepareRunCommandCall(self, cmd):
     self.mock_proc = self._mox.CreateMock(subprocess.Popen)
     self._mox.StubOutWithMock(local_test_runner.subprocess, 'Popen')
@@ -157,7 +146,7 @@ class TestLocalTestRunner(auto_stub.TestCase):
         stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
         stdin=subprocess.PIPE,
         universal_newlines=True,
-        cwd=BASE_DIR).AndReturn(self.mock_proc)
+        cwd=os.path.join(BASE_DIR, 'work')).AndReturn(self.mock_proc)
 
     (output_pipe, input_pipe) = os.pipe()
     self.mock_proc.stdin_handle = os.fdopen(input_pipe, 'wb')
@@ -219,11 +208,9 @@ class TestLocalTestRunner(auto_stub.TestCase):
 
     self._mox.StubOutWithMock(local_test_runner, '_TimedOut')
     # The hard limit isn't hit
-    local_test_runner._TimedOut(1, mox.IgnoreArg()).AndReturn(
-        False)
+    local_test_runner._TimedOut(1, mox.IgnoreArg()).AndReturn(False)
     # Ensure the IO time limit is hit.
-    local_test_runner._TimedOut(0, mox.IgnoreArg()).AndReturn(
-        True)
+    local_test_runner._TimedOut(0, mox.IgnoreArg()).AndReturn(True)
 
     self._mox.ReplayAll()
 
@@ -262,15 +249,14 @@ class TestLocalTestRunner(auto_stub.TestCase):
 
     self._mox.VerifyAll()
 
-  def PrepareDownloadCall(self, cleanup=None, data_folder_name=''):
+  def PrepareDownloadCall(self, cleanup=None):
     local_file2 = 'bar'
     data_url_with_local_name = ('http://b.com/download_key',
                                 local_file2)
     self.CreateValidFile(test_run_data=[data_url_with_local_name],
                          test_run_cleanup=cleanup)
 
-    runner = local_test_runner.LocalTestRunner(
-      self.data_file_name, data_folder_name=data_folder_name)
+    runner = local_test_runner.LocalTestRunner(self.data_file_name)
     data_dir = os.path.basename(runner.data_dir)
     local_test_runner.url_helper.DownloadFile(
         mox.Regex(DATA_FILE_REGEX % (data_dir, local_file2)),
@@ -299,8 +285,7 @@ class TestLocalTestRunner(auto_stub.TestCase):
     self._mox.VerifyAll()
 
   def testDownloadExplodeAndCleanupData(self):
-    with self.PrepareDownloadCall(
-        cleanup='data', data_folder_name='data') as runner:
+    with self.PrepareDownloadCall(cleanup='data') as runner:
       self._mox.ReplayAll()
       self.assertTrue(runner.DownloadAndExplodeData())
 
@@ -340,8 +325,7 @@ class TestLocalTestRunner(auto_stub.TestCase):
     with self.PrepareRunTestsCall(
         decorate_output=[True, True]) as runner:
       self._mox.ReplayAll()
-      (success, result_codes, result_string) = runner.RunTests()
-    self.assertTrue(success)
+      result_codes, result_string = runner.RunTests()
     self.assertEqual([0, 0], result_codes)
     self.assertIn('[==========] Running 2 tests from %s test run.' %
                   self.test_run_name, result_string)
@@ -363,8 +347,7 @@ class TestLocalTestRunner(auto_stub.TestCase):
     with self.PrepareRunTestsCall(
         decorate_output=[True, True], test_run_env=test_run_env) as runner:
       self._mox.ReplayAll()
-      (success, result_codes, result_string) = runner.RunTests()
-    self.assertTrue(success)
+      result_codes, result_string = runner.RunTests()
     self.assertEqual([0, 0], result_codes)
     self.assertIn('[==========] Running 2 tests from %s test run.' %
                   self.test_run_name, result_string)
@@ -394,8 +377,7 @@ class TestLocalTestRunner(auto_stub.TestCase):
     with self.PrepareRunTestsCall(
         results=[(1, not_ok_str), (0, ok_str)]) as runner:
       self._mox.ReplayAll()
-      (success, result_codes, result_string) = runner.RunTests()
-    self.assertFalse(success)
+      result_codes, result_string = runner.RunTests()
     self.assertEqual([1, 0], result_codes)
     self.assertIn('[==========] Running 2 tests from %s test run.' %
                   self.test_run_name, result_string)
@@ -425,8 +407,7 @@ class TestLocalTestRunner(auto_stub.TestCase):
         results=[(1, not_ok_str), (0, ok_str)],
         decorate_output=[False, True]) as runner:
       self._mox.ReplayAll()
-      (success, result_codes, result_string) = runner.RunTests()
-    self.assertFalse(success)
+      result_codes, result_string = runner.RunTests()
     self.assertEqual([1, 0], result_codes)
     self.assertIn('[==========] Running 2 tests from %s test run.' %
                   self.test_run_name, result_string)
@@ -472,8 +453,7 @@ class TestLocalTestRunner(auto_stub.TestCase):
           test_names=test_names,
           encoding=encoding) as runner:
         self._mox.ReplayAll()
-        (success, result_codes, result_string) = runner.RunTests()
-    self.assertTrue(success)
+        result_codes, result_string = runner.RunTests()
     self.assertEqual([0, 0], result_codes)
     self.assertEqual(unicode, type(result_string))
 
@@ -490,68 +470,68 @@ class TestLocalTestRunner(auto_stub.TestCase):
 
   def testPublishResults(self):
     self.CreateValidFile()
-    max_url_retries = 1
     local_test_runner.url_helper.UrlOpen(
         self.result_url,
-        data={'n': self.test_run_name,
-              'c': self.config_name,
-              'x': ', '.join([str(i) for i in self.result_codes]),
-              's': True,
-              'o': False},
+        data={
+          'c': self.config_name,
+          'n': self.test_run_name,
+          'o': False,
+          'x': ', '.join(str(i) for i in self.result_codes),
+        },
         files=[(swarm_constants.RESULT_STRING_KEY,
                 swarm_constants.RESULT_STRING_KEY,
                 self.result_string)],
-        max_tries=max_url_retries,
+        max_tries=15,
         method='POSTFORM').AndReturn('')
     local_test_runner.url_helper.UrlOpen(
         '%s?1=2' % self.result_url,
-        data={'n': self.test_run_name,
-              'c': self.config_name,
-              'x': ', '.join([str(i) for i in self.result_codes]),
-              's': False,
-              'o': False},
+        data={
+          'c': self.config_name,
+          'n': self.test_run_name,
+          'o': False,
+          'x': ', '.join(str(i) for i in self.result_codes),
+        },
         files=[(swarm_constants.RESULT_STRING_KEY,
                 swarm_constants.RESULT_STRING_KEY,
                 self.result_string)],
-        method='POSTFORM',
-        max_tries=max_url_retries).AndReturn('')
+        max_tries=15,
+        method='POSTFORM'
+        ).AndReturn('')
     self._mox.ReplayAll()
 
-    with local_test_runner.LocalTestRunner(
-        self.data_file_name, max_url_retries=max_url_retries) as runner:
-      self.assertTrue(runner.PublishResults(
-        True, self.result_codes, self.result_string))
+    with local_test_runner.LocalTestRunner(self.data_file_name) as runner:
+      self.assertTrue(
+          runner.PublishResults(self.result_codes, self.result_string))
 
     # Also test with other CGI param in the URL.
     self.result_url = '%s?1=2' % self.result_url
     self.CreateValidFile()  # Recreate the request file with new value.
     with local_test_runner.LocalTestRunner(self.data_file_name) as runner:
-      self.assertTrue(runner.PublishResults(
-        False, self.result_codes, self.result_string))
+      self.assertTrue(
+          runner.PublishResults(self.result_codes, self.result_string))
 
     self._mox.VerifyAll()
 
   def testPublishResultsUnableToReachResultUrl(self):
     self.CreateValidFile()
-    max_url_retries = 1
     local_test_runner.url_helper.UrlOpen(
         self.result_url,
-        data={'n': self.test_run_name,
-              'c': self.config_name,
-              'x': ', '.join([str(i) for i in self.result_codes]),
-              's': True,
-              'o': False},
+        data={
+          'c': self.config_name,
+          'n': self.test_run_name,
+          'o': False,
+          'x': ', '.join(str(i) for i in self.result_codes),
+        },
         files=[(swarm_constants.RESULT_STRING_KEY,
                 swarm_constants.RESULT_STRING_KEY,
                 self.result_string)],
-        max_tries=max_url_retries,
+        max_tries=15,
         method='POSTFORM').AndReturn(None)
     self._mox.ReplayAll()
 
-    with local_test_runner.LocalTestRunner(
-        self.data_file_name, max_url_retries=max_url_retries) as runner:
-      self.assertFalse(runner.PublishResults(
-        True, self.result_codes, self.result_string))
+    with local_test_runner.LocalTestRunner(self.data_file_name) as runner:
+      self.assertFalse(
+          runner.PublishResults(self.result_codes, self.result_string))
 
     self._mox.VerifyAll()
 
@@ -559,26 +539,25 @@ class TestLocalTestRunner(auto_stub.TestCase):
     self.CreateValidFile()
     self.result_url = 'https://localhost/result'
 
-    max_url_retries = 1
     local_test_runner.url_helper.UrlOpen(
         self.result_url,
-        data={'n': self.test_run_name,
-              'c': self.config_name,
-              'x': ', '.join([str(i) for i in self.result_codes]),
-              's': True,
-              'o': False},
+        data={
+          'c': self.config_name,
+          'n': self.test_run_name,
+          'o': False,
+          'x': ', '.join(str(i) for i in self.result_codes),
+        },
         files=[(swarm_constants.RESULT_STRING_KEY,
                 swarm_constants.RESULT_STRING_KEY,
                 self.result_string)],
-        max_tries=max_url_retries,
+        max_tries=15,
         method='POSTFORM').AndReturn('')
     self._mox.ReplayAll()
 
     self.CreateValidFile()
-    with local_test_runner.LocalTestRunner(
-        self.data_file_name, max_url_retries=max_url_retries) as runner:
-      self.assertTrue(runner.PublishResults(
-        True, self.result_codes, self.result_string))
+    with local_test_runner.LocalTestRunner(self.data_file_name) as runner:
+      self.assertTrue(
+          runner.PublishResults(self.result_codes, self.result_string))
 
     self._mox.VerifyAll()
 
@@ -589,7 +568,6 @@ class TestLocalTestRunner(auto_stub.TestCase):
 
     self.CreateValidFile()
     exception_text = 'Bad MAD, no cookie!'
-    max_url_retries = 1
 
     # We use this function to check if exception_text is properly published
     # and that the overwrite value is True.
@@ -607,15 +585,13 @@ class TestLocalTestRunner(auto_stub.TestCase):
         unicode(self.result_url),
         data=mox.ContainsKeyValue('o', True),
         files=mox.Func(ValidateInternalErrorsResult),
-        max_tries=max_url_retries,
+        max_tries=15,
         method='POSTFORM').AndReturn('')
     self._mox.ReplayAll()
 
     with logging_utils.CaptureLogs('local_test_runner_test.log') as log:
       with local_test_runner.LocalTestRunner(
-          self.data_file_name,
-          log=log,
-          max_url_retries=max_url_retries) as runner:
+          self.data_file_name, log=log) as runner:
         # This looks a bit strange, but logging.exception should only be
         # called from within an exception handler.
         # TODO(maruel): Make it not print to stderr.
@@ -627,27 +603,6 @@ class TestLocalTestRunner(auto_stub.TestCase):
 
     self._mox.VerifyAll()
 
-  def testShutdownOrReturn(self):
-    self.CreateValidFile()
-    return_value = 0
-    with local_test_runner.LocalTestRunner(
-        self.data_file_name, restart_on_failure=False) as runner:
-      # No test failures and restart on failure disabled.
-      runner.success = True
-      self.assertEqual(return_value, runner.ReturnExitCode(return_value))
-
-      # Test failures with restart on failure disabled.
-      self.assertEqual(return_value, runner.ReturnExitCode(return_value))
-
-      # No test failures with restart on failure enabled.
-      runner.restart_on_failure = True
-      self.assertEqual(return_value, runner.ReturnExitCode(return_value))
-
-      # Test failures with restart of feature enabled.
-      runner.success = False
-      self.assertEqual(swarm_constants.RESTART_EXIT_CODE,
-                      runner.ReturnExitCode(return_value))
-
   def testMainBadFile(self):
     self.mock(logging.getLogger(), 'addHandler', lambda _: None)
     with open(self.data_file_name, 'wb') as f:
@@ -655,8 +610,7 @@ class TestLocalTestRunner(auto_stub.TestCase):
 
     # Test the case where the swarm file itself is corrupted.
     args = [
-        '--request_file_name', self.data_file_name,
-        '--max_url_retries', '0',
+      '--request_file_name', self.data_file_name,
     ]
     result = local_test_runner.main(args)
     self.assertEqual(1, result)
@@ -667,13 +621,9 @@ class TestLocalTestRunner(auto_stub.TestCase):
       f.write('a')
 
     # Test the case where the swarm file itself is corrupted.
-    args = [
-        '--request_file_name', self.data_file_name,
-        '--max_url_retries', '0',
-        '--restart_on_failure',
-    ]
+    args = ['--request_file_name', self.data_file_name]
     result = local_test_runner.main(args)
-    self.assertEqual(swarm_constants.RESTART_EXIT_CODE, result)
+    self.assertEqual(1, result)
 
 
 if __name__ == '__main__':
