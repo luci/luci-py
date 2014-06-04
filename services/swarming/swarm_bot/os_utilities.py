@@ -11,9 +11,11 @@ Includes code:
 """
 
 import cgi
+import ctypes
 import logging
 import os
 import platform
+import re
 import socket
 import subprocess
 import sys
@@ -219,6 +221,72 @@ def get_ip():
   return ip
 
 
+def get_num_processors():
+  """Returns the number of processors.
+
+  Python on OSX 10.6 raises a NotImplementedError exception.
+  """
+  try:
+    # Multiprocessing
+    import multiprocessing
+    return multiprocessing.cpu_count()
+  except:  # pylint: disable=W0702
+    try:
+      # Mac OS 10.6
+      return int(os.sysconf('SC_NPROCESSORS_ONLN'))  # pylint: disable=E1101
+    except:
+      logging.error('get_num_processors() failed to query number of cores')
+      return 0
+
+
+def get_physical_ram():
+  """Returns the amount of installed RAM, rounded to the nearest number."""
+  if sys.platform == 'win32':
+    # https://msdn.microsoft.com/library/windows/desktop/aa366589.aspx
+    class MemoryStatusEx(ctypes.Structure):
+      _fields_ = [
+        ('dwLength', ctypes.c_ulong),
+        ('dwMemoryLoad', ctypes.c_ulong),
+        ('dwTotalPhys', ctypes.c_ulonglong),
+        ('dwAvailPhys', ctypes.c_ulonglong),
+        ('dwTotalPageFile', ctypes.c_ulonglong),
+        ('dwAvailPageFile', ctypes.c_ulonglong),
+        ('dwTotalVirtual', ctypes.c_ulonglong),
+        ('dwAvailVirtual', ctypes.c_ulonglong),
+        ('dwAvailExtendedVirtual', ctypes.c_ulonglong),
+      ]
+    stat = MemoryStatusEx()
+    stat.dwLength = ctypes.sizeof(MemoryStatusEx)  # pylint: disable=W0201
+    ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(stat))
+    return int(round(stat.dwTotalPhys / 1024. / 1024. / 1024.))
+
+  if sys.platform == 'darwin':
+    CTL_HW = 6
+    HW_MEMSIZE = 24
+    result = ctypes.c_uint64(0)
+    arr = (ctypes.c_int * 2)()
+    arr[0] = CTL_HW
+    arr[1] = HW_MEMSIZE
+    size = ctypes.c_size_t(ctypes.sizeof(result))
+    ctypes.cdll.LoadLibrary("libc.dylib")
+    libc = ctypes.CDLL("libc.dylib")
+    libc.sysctl(
+        arr, 2, ctypes.byref(result), ctypes.byref(size), None,
+        ctypes.c_size_t(0))
+    return int(round(result.value / 1024. / 1024. / 1024.))
+
+  if os.path.isfile('/proc/meminfo'):
+    # linux.
+    with open('/proc/meminfo') as f:
+      meminfo = f.read()
+    matched = re.search(r'^MemTotal:\s+(\d+) kB', meminfo)
+    if matched:
+      return int(round(int(matched.groups()[0]) / 1024. / 1024.))
+
+  logging.error('get_physical_ram() failed to query amount of physical RAM')
+  return 0
+
+
 def get_attributes(tag):
   """Returns the default Swarming dictionary of attributes for this bot.
 
@@ -231,15 +299,17 @@ def get_attributes(tag):
   cpu_type = get_cpu_type()
   return {
     'dimensions': {
-      'hostname': hostname,
+      'cores': str(get_num_processors()),
       'cpu': [
         cpu_type,
         cpu_type + '-' + get_cpu_bitness(),
       ],
+      'hostname': hostname,
       'os': [
         os_name,
         os_name + '-' + get_os_version(),
       ],
+      'ram': str(get_physical_ram()),
     },
     'ip': get_ip(),
     'tag': tag,

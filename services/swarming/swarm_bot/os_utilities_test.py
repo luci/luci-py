@@ -85,10 +85,19 @@ class TestOsUtilities(auto_stub.TestCase):
     ipv6 = r'^%s$' % ':'.join([r'[0-9a-f]{1,4}'] * 8)
     self.assertTrue(re.match(ipv4, ip) or re.match(ipv6, ip), ip)
 
+  def test_get_num_processors(self):
+    self.assertGreater(os_utilities.get_num_processors(), 0)
+
+  def test_get_physical_ram(self):
+    self.assertGreater(os_utilities.get_physical_ram(), 0)
+
   def test_get_attributes(self):
+    actual = os_utilities.get_attributes('id')
     expected = set(['dimensions', 'ip', 'tag'])
-    actual = set(os_utilities.get_attributes('id'))
-    self.assertEqual(expected, actual)
+    self.assertEqual(expected, set(actual))
+
+    expected_dimensions = set(['cores', 'cpu', 'hostname', 'os', 'ram'])
+    self.assertEqual(expected_dimensions, set(actual['dimensions']))
 
   def test_setup_auto_startup_win(self):
     # TODO(maruel): Figure out a way to test properly.
