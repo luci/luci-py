@@ -6,6 +6,7 @@
 
 import datetime
 import os
+import re
 import urllib
 
 import jinja2
@@ -56,10 +57,26 @@ JINJA.filters['urlquote'] = urlquote
 JINJA.filters['encode_to_json'] = utils.encode_to_json
 
 
-def get_defaults():
+@utils.cache
+def get_app_revision_url():
+  """Returns URL of a git revision page for currently running app version.
+
+  Works only for non-tainted versions uploaded with tools/update.py: app version
+  should look like '162-efaec47'.
+
+  Returns None if a version is tainted or has unexpected name.
+  """
+  rev = re.match(r'\d+-([a-f0-9]+)$', utils.get_app_version())
+  template = 'https://code.google.com/p/swarming/source/detail?r=%s'
+  return template % rev.group(1) if rev else None
+
+
+def _get_defaults():
   """Returns parameters used by templates/base.html."""
   account = users.get_current_user()
   return {
+    'app_version': utils.get_app_version(),
+    'app_revision_url': get_app_revision_url(),
     'nickname': account.email() if account else None,
     'signin_link': users.create_login_url('/') if not account else None,
     'user_is_admin': users.is_current_user_admin(),
@@ -68,6 +85,6 @@ def get_defaults():
 
 def render(name, params):
   """Shorthand to render a template."""
-  data = get_defaults()
+  data = _get_defaults()
   data.update(params)
   return JINJA.get_template(name).render(data)

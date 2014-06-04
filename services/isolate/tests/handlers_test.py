@@ -33,7 +33,7 @@ from components import auth
 from components import datastore_utils
 from components import ereporter2
 from components import stats_framework_mock
-from components import ereporter2
+from components import utils
 from support import test_case
 
 import acl
@@ -102,7 +102,7 @@ class MainTest(test_case.TestCase):
 
     # When called during a taskqueue, the call to get_app_version() may fail so
     # pre-fetch it.
-    version = config.get_app_version()
+    version = utils.get_app_version()
     self.mock(config, 'get_task_queue_host', lambda: version)
     self.source_ip = '127.0.0.1'
     self.app_frontend = webtest.TestApp(

@@ -89,8 +89,8 @@ def render_template(template_path, env=None):
     Rendered template as str.
   """
   default_env = {
-      'app_revision_url': config.get_app_revision_url(),
-      'app_version': config.get_app_version(),
+    'app_revision_url': config.get_app_revision_url(),
+    'app_version': utils.get_app_version(),
   }
   if env:
     default_env.update(env)
@@ -346,11 +346,12 @@ class HandshakeHandler(ProtocolHandler):
         for k in sorted(logging_info)))
 
     # Send back the response.
-    self.send_json({
-        'access_token': access_token,
-        'protocol_version': ISOLATE_PROTOCOL_VERSION,
-        'server_app_version': config.get_app_version(),
-    })
+    self.send_json(
+        {
+          'access_token': access_token,
+          'protocol_version': ISOLATE_PROTOCOL_VERSION,
+          'server_app_version': utils.get_app_version(),
+        })
 
 
 class PreUploadContentHandler(ProtocolHandler):
@@ -956,7 +957,7 @@ def create_application(debug=False):
   # Customize auth UI to show that it's running on isolate server.
   auth_ui.configure_ui(
       app_name='Isolate Server',
-      app_version=config.get_app_version(),
+      app_version=utils.get_app_version(),
       app_revision_url=config.get_app_revision_url())
 
   # Routes with Auth REST API and Auth UI.

@@ -117,12 +117,6 @@ def get_local_dev_server_host():
 
 
 @utils.cache
-def get_app_version():
-  """Returns currently running version (not necessary a default one)."""
-  return modules.get_current_version_name()
-
-
-@utils.cache
 def get_app_revision_url():
   """Returns URL of a git revision page for currently running app version.
 
@@ -131,7 +125,7 @@ def get_app_revision_url():
 
   Returns None if a version is tainted or has unexpected name.
   """
-  rev = re.match(r'\d+-([a-f0-9]+)$', get_app_version())
+  rev = re.match(r'\d+-([a-f0-9]+)$', utils.get_app_version())
   template = 'https://code.google.com/p/swarming/source/detail?r=%s'
   return template % rev.group(1) if rev else None
 
@@ -150,7 +144,7 @@ def get_task_queue_host():
   """
   # modules.get_hostname sometimes fails with unknown internal error.
   # Cache its result in a memcache to avoid calling it too often.
-  cache_key = 'task_queue_host:%s' % get_app_version()
+  cache_key = 'task_queue_host:%s' % utils.get_app_version()
   value = memcache.get(cache_key)
   if not value:
     value = modules.get_hostname(module=TASK_QUEUE_MODULE)
@@ -164,5 +158,5 @@ def warmup():
   This call is optional. Everything works even if 'warmup' is never called.
   """
   settings()
-  get_app_version()
   get_task_queue_host()
+  utils.get_app_version()

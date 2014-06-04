@@ -1147,6 +1147,7 @@ class WarmupHandler(webapp2.RequestHandler):
   def get(self):
     auth.warmup()
     bot_management.get_swarming_bot_zip(self.request.host_url)
+    utils.get_module_version_list(None, None)
     self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
     self.response.write('ok')
 
@@ -1224,8 +1225,8 @@ def CreateApplication():
   # Customize auth UI to show that it's running on swarming service.
   auth_ui.configure_ui(
       app_name='Swarming',
-      app_version=modules.get_current_version_name(),
-      app_revision_url=None)
+      app_version=utils.get_app_version(),
+      app_revision_url=template.get_app_revision_url())
 
   # Add routes with Auth REST API and Auth UI.
   routes.extend(auth_ui.get_rest_api_routes())
