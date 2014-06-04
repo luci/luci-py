@@ -167,7 +167,7 @@ def convert_test_case(data):
   }
 
 
-def request_work_item(attributes, server_url):
+def request_work_item(attributes, server_url, remote_addr):
   # TODO(maruel): Split it out a little.
   attribs = bot_management.validate_and_fix_attributes(attributes)
   response = bot_management.check_version(attributes, server_url)
@@ -180,7 +180,12 @@ def request_work_item(attributes, server_url):
   # other for the list of known bots.
   stats.add_entry(action='bot_active', bot_id=bot_id, dimensions=dimensions)
   bot_management.tag_bot_seen(
-      bot_id, dimensions.get('hostname', bot_id), dimensions)
+      bot_id,
+      dimensions.get('hostname', bot_id),
+      attribs['ip'],
+      remote_addr,
+      dimensions,
+      attribs['version'])
 
   request, run_result = task_scheduler.bot_reap_task(dimensions, bot_id)
   if not request:
@@ -240,7 +245,6 @@ def make_runner_view(result_summary):
       result_summary)
   return {
     'class_string': 'failed_test' if result_summary.failure else '',
-    'command_string': '',  # TODO(maruel): Add Retry and Abort when relevant.
     'created': result_summary.created_ts,
     'ended': result_summary.completed_ts or result_summary.abandoned_ts,
     'key_string': task_common.pack_result_summary_key(result_summary.key),
@@ -493,10 +497,13 @@ class BotsListHandler(auth.AuthenticatingHandler):
       for k, v in sorted(self.ACCEPTABLE_BOTS_SORTS.iteritems())
     ]
     params = {
-      'update_delay': bot_management.MACHINE_UPDATE_TIME,
       'bots': bots,
+      # TODO(maruel): it should be the default AppEngine url version.
+      'current_version':
+          bot_management.get_slave_version(self.request.host_url),
       'selected_sort': sort_by,
       'sort_options': sort_options,
+      'update_delay': bot_management.MACHINE_UPDATE_TIME,
     }
     self.response.out.write(
         template.render('restricted_botslist.html', params))
@@ -986,8 +993,9 @@ class RegisterHandler(auth.AuthenticatingHandler):
     # TODO(vadimsh): Ensure attributes['id'] matches credentials used
     # to authenticate the request (i.e. auth.get_current_identity()).
     try:
-      response = json.dumps(
-          request_work_item(attributes, self.request.host_url))
+      out = request_work_item(
+          attributes, self.request.host_url, self.request.remote_addr)
+      response = json.dumps(out)
     except runtime.DeadlineExceededError as e:
       # If the timeout happened before a runner was assigned there are no
       # problems. If the timeout occurred after a runner was assigned, that
@@ -1022,12 +1030,18 @@ class RunnerPingHandler(auth.AuthenticatingHandler):
     # Ensure 'id' matches credentials used to authenticate the request (i.e.
     # auth.get_current_identity()).
     packed_run_result_key = self.request.get('r', '')
-    machine_id = self.request.get('id', '')
+    bot_id = self.request.get('id', '')
     try:
       run_result_key = task_scheduler.unpack_run_result_key(
           packed_run_result_key)
-      task_scheduler.bot_update_task(run_result_key, {}, machine_id)
-      bot_management.tag_bot_seen(machine_id, None, None)
+      task_scheduler.bot_update_task(run_result_key, {}, bot_id)
+      bot_management.tag_bot_seen(
+          bot_id,
+          None,
+          None,
+          self.request.remote_addr,
+          None,
+          None)
     except ValueError as e:
       logging.error('Failed to accept value %s: %s', packed_run_result_key, e)
       self.abort(400, 'Runner failed to ping.')

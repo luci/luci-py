@@ -43,7 +43,6 @@ Always sorted by reverse created.
     <th>Started (UTC)</th>
     <th>Ended (UTC)</th>
     <th>Machine ID</th>
-    <th>&nbsp;</th>
   </thead>
   <tbody>
     {% for runner in runners %}
@@ -58,7 +57,6 @@ Always sorted by reverse created.
         <td>{{runner.started|datetime_human}}</td>
         <td>{{runner.ended|datetime_human}}</td>
         <td>{{runner.machine_id}}</td>
-        <td>{{runner.command_string|safe}}</td>
       </tr>
     {% endfor %}
   </tbody>

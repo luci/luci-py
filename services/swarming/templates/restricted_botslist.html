@@ -15,7 +15,9 @@
 </select>
 </p>
 <p>
-Note: Refreshing delay is: {{update_delay}}.
+Notes:<br>
+- Refreshing delay is: {{update_delay}}<br>
+- Current version is: {{current_version[:8]}}<br>
 </p>
 
 <table id="machine-table" class="alterning_background"
@@ -23,15 +25,20 @@ Note: Refreshing delay is: {{update_delay}}.
   <thead>
     <th>ID</th>
     <th>Hostname</th>
+    <th>Internal IP</th>
+    <th>External IP</th>
     <th>Last Seen</th>
     <th>Dimensions</th>
-    <th>&nbsp;</th>
+    <th>Version</th>
+    <th>Action</th>
   </thead>
   <tbody>
     {% for bot in bots %}
       <tr class="request {{bot.html_class}}">
         <td>{{bot.id}}</td>
         <td>{{bot.hostname}}</td>
+        <td>{{bot.internal_ip}}</td>
+        <td>{{bot.external_ip}}</td>
         <td>{{bot.last_seen|datetimeformat}}</td>
         <td>
           {% for k, v in bot.dimensions.iteritems()|sort %}
@@ -40,6 +47,7 @@ Note: Refreshing delay is: {{update_delay}}.
           <br>
           {% endfor %}
         </td>
+        <td>{{bot.version[:8]}}</td>
         <td>
           <form id="delete_{{bot.id}}" method="post"
             action="/delete_machine_stats?r={{bot.id}}">
@@ -49,7 +57,6 @@ Note: Refreshing delay is: {{update_delay}}.
             </button>
           </form>
         </td>
-        <td>{{bot.command_string|safe}}</td>
       </tr>
     {% endfor %}
   </tbody>

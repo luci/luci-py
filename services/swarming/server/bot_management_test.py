@@ -5,6 +5,7 @@
 
 import StringIO
 import datetime
+import hashlib
 import logging
 import os
 import re
@@ -73,14 +74,19 @@ class BotManagementTest(test_case.TestCase):
         "Key('Bot', 'f-a:1')", str(bot_management.get_bot_key('f-a:1')))
 
   def test_tag_bot_seen(self):
-    bot = bot_management.tag_bot_seen('id1', 'localhost', {'foo': 'bar'})
+    bot = bot_management.tag_bot_seen(
+        'id1', 'localhost', '127.0.0.1', '8.8.4.4', {'foo': 'bar'},
+        hashlib.sha1().hexdigest())
     self.assertTrue(bot.last_seen)
     bot.last_seen = datetime.datetime(2010, 1, 2, 3, 4, 5, 6)
     expected = {
       'dimensions': {u'foo': u'bar'},
+      'external_ip': u'8.8.4.4',
       'hostname': u'localhost',
       'id': 'id1',
+      'internal_ip': u'127.0.0.1',
       'last_seen': datetime.datetime(2010, 1, 2, 3, 4, 5, 6),
+      'version': u'da39a3ee5e6b4b0d3255bfef95601890afd80709',
     }
     self.assertEqual(expected, bot.to_dict())
 

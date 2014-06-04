@@ -224,8 +224,12 @@ class AppTest(test_case.TestCase):
     self._ReplaceCurrentUser(ADMIN_EMAIL)
 
     # Add bots to display.
-    bot_management.tag_bot_seen('id1', 'localhost', {})
-    bot_management.tag_bot_seen('id2', 'localhost:8080', {'foo': 'bar'})
+    bot_management.tag_bot_seen(
+        'id1', 'localhost', '127.0.0.1', '8.8.4.4', {}, '123456789')
+    bot_management.tag_bot_seen(
+        'id2', 'localhost:8080', '127.0.0.2', '8.8.8.8', {'foo': 'bar'},
+        '123456789')
+    bot_management.tag_bot_seen('id3', None, None, '8.8.8.8', None, None)
 
     response = self.app.get('/restricted/bots')
     self.assertTrue('200' in response.status)
@@ -234,7 +238,8 @@ class AppTest(test_case.TestCase):
     # Act under admin identity.
     self._ReplaceCurrentUser(ADMIN_EMAIL)
 
-    bot = bot_management.tag_bot_seen('id1', 'localhost', {'foo': 'bar'})
+    bot = bot_management.tag_bot_seen(
+        'id1', 'localhost', '127.0.0.1', '8.8.4.4', {'foo': 'bar'}, '123456789')
     bot.last_seen = datetime.datetime(2000, 1, 2, 3, 4, 5, 6)
     bot.put()
 
@@ -248,9 +253,12 @@ class AppTest(test_case.TestCase):
         u'machines': [
           {
             u'dimensions': {u'foo': u'bar'},
+            u'external_ip': u'8.8.4.4',
             u'hostname': u'localhost',
             u'id': u'id1',
+            u'internal_ip': u'127.0.0.1',
             u'last_seen': u'2000-01-02 03:04:05',
+            u'version': u'123456789',
           },
        ],
     }
@@ -261,7 +269,8 @@ class AppTest(test_case.TestCase):
     self._ReplaceCurrentUser(ADMIN_EMAIL)
 
     # Add a machine assignment to delete.
-    bot_management.tag_bot_seen('id1', 'localhost', {'foo': 'bar'})
+    bot_management.tag_bot_seen(
+        'id1', 'localhost', '127.0.0.1', '8.8.4.4', {'foo': 'bar'}, '123456789')
 
     # Delete the machine assignment.
     response = self.app.post('/delete_machine_stats', {'r': 'id1'})
@@ -411,6 +420,7 @@ class AppTest(test_case.TestCase):
     attributes = {
       'dimensions': {'os': ['win-xp']},
       'id': MACHINE_ID,
+      'ip': '8.8.4.4',
       'version': bot_management.get_slave_version('http://localhost'),
     }
     response = self.app.post(
@@ -831,7 +841,8 @@ class AppTest(test_case.TestCase):
     # TODO(maruel): Convert this test case to mock time and use the APIs instead
     # of editing the DB directly.
     self.assertEqual('0', self.app.get('/swarming/api/v1/bots/dead/count').body)
-    bot = bot_management.tag_bot_seen('id1', 'localhost', {})
+    bot = bot_management.tag_bot_seen(
+        'id1', 'localhost', '127.0.0.1', '8.8.4.4', {}, '123456789')
     self.assertEqual('0', self.app.get('/swarming/api/v1/bots/dead/count').body)
 
     # Borderline. If this test becomes flaky, increase the 1 second value.

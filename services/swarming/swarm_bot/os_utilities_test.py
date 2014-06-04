@@ -59,6 +59,7 @@ class TestOsUtilitiesPrivate(auto_stub.TestCase):
       actual = os_utilities._to_cygwin_path(inputs)
       self.assertEqual(expected, actual, (inputs, expected, actual, i))
 
+
 class TestOsUtilities(auto_stub.TestCase):
   def test_get_os_version(self):
     version = os_utilities.get_os_version()
@@ -77,9 +78,17 @@ class TestOsUtilities(auto_stub.TestCase):
     expected = ('32', '64')
     self.assertIn(os_utilities.get_cpu_bitness(), expected)
 
+  def test_get_ip(self):
+    ip = os_utilities.get_ip()
+    self.assertNotEqual('127.0.0.1', ip)
+    ipv4 = r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$'
+    ipv6 = r'^%s$' % ':'.join([r'[0-9a-f]{1,4}'] * 8)
+    self.assertTrue(re.match(ipv4, ip) or re.match(ipv6, ip), ip)
+
   def test_get_attributes(self):
-    # Just assert it's not empty, no need to verify each individual values.
-    self.assertTrue(os_utilities.get_attributes('id'))
+    expected = set(['dimensions', 'ip', 'tag'])
+    actual = set(os_utilities.get_attributes('id'))
+    self.assertEqual(expected, actual)
 
   def test_setup_auto_startup_win(self):
     # TODO(maruel): Figure out a way to test properly.

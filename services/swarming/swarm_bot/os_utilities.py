@@ -206,6 +206,19 @@ def get_cpu_bitness():
   return '64' if sys.maxsize > 2**32 else '32'
 
 
+def get_ip():
+  """Returns the IP that is the most likely to be used for TCP connections."""
+  # It's guesswork and could return the wrong IP. In particular an host can have
+  # multiple IPs.
+  s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+  # This doesn't actually connect to the Google DNS server but this forces the
+  # network system to figure out an IP interface to use.
+  s.connect(('8.8.8.8', 80))
+  ip = s.getsockname()[0]
+  s.close()
+  return ip
+
+
 def get_attributes(tag):
   """Returns the default Swarming dictionary of attributes for this bot.
 
@@ -228,6 +241,7 @@ def get_attributes(tag):
         os_name + '-' + get_os_version(),
       ],
     },
+    'ip': get_ip(),
     'tag': tag,
   }
 

@@ -55,8 +55,17 @@ class Bot(ndb.Model):
   # must be unique, the hostname doesn't have to.
   hostname = ndb.StringProperty()
 
+  # IP address as seen by the bot.
+  internal_ip = ndb.StringProperty()
+
+  # IP address as seen by the HTTP handler.
+  external_ip = ndb.StringProperty()
+
   # Use auto_now_add instead of auto_now to make unit testing easier.
   last_seen = ndb.DateTimeProperty(auto_now_add=True)
+
+  # Version the bot is currently at.
+  version = ndb.StringProperty(default='')
 
   def to_dict(self):
     out = super(Bot, self).to_dict()
@@ -140,23 +149,31 @@ def get_bot_key(bot_id):
   return ndb.Key(Bot, bot_id)
 
 
-def tag_bot_seen(bot_id, hostname, dimensions):
+def tag_bot_seen(
+    bot_id, hostname, internal_ip, external_ip, dimensions, version):
   """Records when a bot has queried for work.
 
   Arguments:
   - bot_id: ID of the bot. Usually the hostname but can be different if multiple
-    swarming bot run on a single host.
+        swarming bot run on a single host.
   - hostname: FQDN hostname that runs the bot or None if unspecified. It happens
-    on pings while running a job.
+        on pings while running a job.
+  - external_ip: IP address as seen by the HTTP handler.
+  - internal_ip: IP address as seen by the bot.
   - dimensions: Bot's dimensions or None if unspecified. It happens on pings
-    while running a job.
+        while running a job.
+  - version: swarming_bot.zip version. Used to spot if a bot failed to update
+        promptly.
   """
   key = get_bot_key(bot_id)
   bot = key.get()
   if (bot and
       bot.last_seen + MACHINE_UPDATE_TIME >= task_common.utcnow() and
+      (not hostname or bot.hostname == hostname) and
+      (not internal_ip or bot.internal_ip == internal_ip) and
+      (not external_ip or bot.external_ip == external_ip) and
       (not dimensions or bot.dimensions == dimensions) and
-      (not hostname or bot.hostname == hostname)):
+      (not version or bot.version == version)):
     return bot
 
   bot = bot or Bot(key=key, dimensions={})
@@ -166,6 +183,12 @@ def tag_bot_seen(bot_id, hostname, dimensions):
   if hostname:
     # TODO(maruel): Handle id-hostname mismatches better.
     bot.hostname = hostname
+  if external_ip:
+    bot.external_ip = external_ip
+  if internal_ip:
+    bot.internal_ip = internal_ip
+  if version:
+    bot.version = version
   bot.put()
   return bot
 
@@ -210,7 +233,7 @@ def validate_and_fix_attributes(attributes):
       if not isinstance(value, basestring):
         raise test_request_message.Error('Invalid attrib value for id')
 
-    elif attrib in ('password', 'tag', 'username', 'version'):
+    elif attrib in ('ip', 'tag', 'version'):
       if not isinstance(value, (str, unicode)):
         raise test_request_message.Error(
             'Invalid attrib value type for ' + attrib)
