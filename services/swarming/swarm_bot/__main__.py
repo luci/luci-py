@@ -13,6 +13,7 @@ __version__ = '0.2'
 
 import logging
 import os
+import optparse
 import shutil
 import subprocess
 import sys
@@ -50,10 +51,16 @@ def CMDstart_bot(args):
   return result
 
 
-def CMDstart_slave(_args):
+def CMDstart_slave(args):
   """Ill named command that actually sets up the bot."""
   logging_utils.prepare_logging('start_slave.log')
   logging_utils.set_console_level(logging.DEBUG)
+
+  parser = optparse.OptionParser()
+  parser.add_option(
+      '--survive', action='store_true',
+      help='Do not reboot the host even if start_slave.setup_bot() asked to')
+  options, args = parser.parse_args(args)
 
   # User provided start_slave.py
   logging.info(
@@ -61,8 +68,15 @@ def CMDstart_slave(_args):
       THIS_FILE, zipped_archive.generate_version())
   import start_slave
   if not start_slave.setup_bot():
-    # The code asked to exit.
-    return 0
+    # The code asked to not start the bot code right away. In that case, reboot
+    # the machine, unless a flag stated to not do it. The flag is provided when
+    # the bot code is updated in place. In that case it is unnecessary to
+    # restart the host.
+    if not options.survive:
+      # Return immediately to make update via ssh easier.
+      import os_utilities
+      os_utilities.restart_and_return()
+      return 0
 
   logging.info('Starting the bot: %s', THIS_FILE)
   result = subprocess.call([sys.executable, THIS_FILE, 'start_bot'])

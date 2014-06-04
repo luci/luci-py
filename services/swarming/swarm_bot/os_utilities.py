@@ -271,7 +271,7 @@ def setup_auto_startup_win(command, cwd, batch_name):
       '@echo off\r\n'
       ':: This file was generated automatically by os_utilities.py.\r\n'
       'cd /d %s\r\n'
-      '%s\r\n') % (cwd, ' '.join(command))
+      '%s 1>> swarming_bot_out.log 2>&1\r\n') % (cwd, ' '.join(command))
   return _write(batch_path, content)
 
 

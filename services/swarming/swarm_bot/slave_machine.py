@@ -423,11 +423,22 @@ class SlaveMachine(object):
       logging.error('Unable to download %s from %s.', new_zip, args)
       return
 
-    logging.info('Restarting the new code.')
+    logging.info('Restarting to %s.', new_zip)
     sys.stdout.flush()
     sys.stderr.flush()
-    # This will force the reinstallation if necessary.
-    os.execv(sys.executable, [sys.executable, new_zip])
+
+    cmd = [sys.executable, new_zip, 'start_slave', '--survive']
+    if sys.platform in ('cygwin', 'win32'):
+      # (Tentative) It is expected that subprocess.Popen() behave a tad better
+      # on Windows than os.exec*(), which has to be emulated since there's no OS
+      # provided implementation. This means processes will accumulate as the bot
+      # is restarted, which be a problem long term.
+      subprocess.call(cmd)
+    else:
+      # On OSX, launchd will be unhappy if we quit so the old code bot process
+      # has to outlive the new code child process. os.exec*() replaces the
+      # process so this is fine.
+      os.execv(sys.executable, cmd)
 
 
 def get_config():
