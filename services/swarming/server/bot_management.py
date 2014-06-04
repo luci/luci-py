@@ -135,11 +135,19 @@ def get_swarming_bot_zip(host):
   Returns:
     A string representing the zipped file's contents.
   """
+  namespace = os.environ['CURRENT_VERSION_ID']
+  key = 'bot_version-%s' + get_slave_version(host)
+  code = memcache.get(key, namespace=namespace)
+  if code:
+    return code
+
   # Get the start slave script from the database, if present. Pass an empty
   # file if the files isn't present.
   additionals = {'start_slave.py': _get_start_slave()}
   bot_dir = os.path.join(ROOT_DIR, 'swarm_bot')
-  return bot_archive.get_swarming_bot_zip(bot_dir, host, additionals)
+  code = bot_archive.get_swarming_bot_zip(bot_dir, host, additionals)
+  memcache.set(key, code, namespace=namespace)
+  return code
 
 
 def get_bot_key(bot_id):

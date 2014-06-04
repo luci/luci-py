@@ -1146,6 +1146,7 @@ class DeadBotsCountHandler(webapp2.RequestHandler):
 class WarmupHandler(webapp2.RequestHandler):
   def get(self):
     auth.warmup()
+    bot_management.get_swarming_bot_zip(self.request.host_url)
     self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
     self.response.write('ok')
 
