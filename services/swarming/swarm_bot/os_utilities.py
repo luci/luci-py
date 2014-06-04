@@ -22,6 +22,13 @@ import sys
 import time
 
 
+import zipped_archive
+
+
+ROOT_DIR = os.path.dirname(
+    os.path.abspath(zipped_archive.get_main_script_path()))
+
+
 ### Private stuff.
 
 
@@ -287,6 +294,19 @@ def get_physical_ram():
   return 0
 
 
+def get_free_disk():
+  """Gets free disk space in the partition containing the current file in GB."""
+  if sys.platform == 'win32':
+    free_bytes = ctypes.c_ulonglong(0)
+    ctypes.windll.kernel32.GetDiskFreeSpaceExW(
+        ctypes.c_wchar_p(ROOT_DIR), None, None, ctypes.pointer(free_bytes))
+    return int(round(free_bytes.value / 1024. / 1024. / 1024.))
+
+  # For OSes other than Windows.
+  f = os.statvfs(ROOT_DIR)  # pylint: disable=E1101
+  return int(round(f.f_bfree * f.f_frsize / 1024. / 1024. / 1024.))
+
+
 def get_attributes(tag):
   """Returns the default Swarming dictionary of attributes for this bot.
 
@@ -304,6 +324,7 @@ def get_attributes(tag):
         cpu_type,
         cpu_type + '-' + get_cpu_bitness(),
       ],
+      'disk': str(get_free_disk()),
       'hostname': hostname,
       'os': [
         os_name,
