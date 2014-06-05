@@ -24,7 +24,6 @@ Notes:<br>
     summary="This table lists all machines that have polled this server">
   <thead>
     <th>ID</th>
-    <th>Hostname</th>
     <th>Internal IP</th>
     <th>External IP</th>
     <th>Last Seen</th>
@@ -36,7 +35,6 @@ Notes:<br>
     {% for bot in bots %}
       <tr class="request {{bot.html_class}}">
         <td>{{bot.id}}</td>
-        <td>{{bot.hostname}}</td>
         <td>{{bot.internal_ip}}</td>
         <td>{{bot.external_ip}}</td>
         <td>{{bot.last_seen|datetimeformat}}</td>
