@@ -36,7 +36,6 @@ for one job, for example if a bot dies.
 from google.appengine.api import datastore_errors
 from google.appengine.ext import ndb
 
-from components import utils
 from server import result_helper
 from server import task_common
 from server import task_request
@@ -130,6 +129,10 @@ class _TaskResultCommon(ndb.Model):
   completed_ts = ndb.DateTimeProperty()
   abandoned_ts = ndb.DateTimeProperty()
 
+  @property
+  def ended_ts(self):
+    return self.completed_ts or self.abandoned_ts
+
   def duration(self):
     """Returns the runtime for this task or None if not applicable.
 
@@ -165,54 +168,9 @@ class TaskRunResult(_TaskResultCommon):
   # Current state of this task.
   state = StateProperty(default=State.RUNNING, validator=_validate_not_pending)
 
-  # TODO(maruel): Remove, for compatibility with old code only. \/ \/ \/
   @property
-  def created(self):
-    return self.request_key.get().created_ts
-
-  @property
-  def dimensions(self):
-    return utils.encode_to_json(self.request_key.get().properties.dimensions)
-
-  @property
-  def name(self):
-    return self.request_key.get().name
-
-  @property
-  def started(self):
-    return self.started_ts
-
-  @property
-  def ended(self):
-    return self.completed_ts or self.abandoned_ts
-
-  @property
-  def ran_successfully(self):
-    return not self.failure
-
-  @property
-  def aborted(self):
-    return self.state in State.STATES_ABANDONED
-
-  @property
-  def requestor(self):
-    return self.request_key.get().user
-
-  automatic_retry_count = 0
-
-  @property
-  def machine_id(self):
-    return self.bot_id
-
-  def GetAsDict(self):
-    request = self.request_key.get()
-    return {
-      'config_instance_index': 0,
-      'config_name': request.name,
-      'num_config_instances': 1,
-      'request': {},
-    }
-  # TODO(maruel): Remove, for compatibility with old code only. ^^^^
+  def key_string(self):
+    return task_common.pack_run_result_key(self.key)
 
   @property
   def request_key(self):
@@ -266,6 +224,10 @@ class TaskResultSummary(_TaskResultCommon):
 
   # Represent the last try attempt of the task. Starts at 1.
   try_number = ndb.IntegerProperty()
+
+  @property
+  def key_string(self):
+    return task_common.pack_result_summary_key(self.key)
 
   def set_from_run_result(self, rhs):
     """Copies all the properties from another instance deriving from

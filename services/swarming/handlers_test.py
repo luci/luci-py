@@ -52,6 +52,8 @@ FAKE_IP = 'fake-ip'
 
 
 class AppTest(test_case.TestCase):
+  # TODO(maruel): Make 3 test classes, one focused on bot API, one on client API
+  # and one on the web frontend and backend processing.
   APP_DIR = APP_DIR
 
   def setUp(self):
@@ -943,6 +945,37 @@ class AppTest(test_case.TestCase):
       'scheduling_expiration_secs': 63,
     }
     self.assertEqual(expected, actual)
+
+  def test_add_task_and_list(self):
+    # Add a task via the bot API, then assert it can be viewed.
+    request = {
+      'configurations': [
+        {'config_name': 'unused', 'dimensions': {'os': 'Amiga'}},
+      ],
+      'test_case_name': 'foo',
+      'tests':[
+        {'action': ['python', 'run_test.py'], 'test_name': 'Run Test'}
+      ],
+    }
+    actual = self.app.post('/test', {'request': json.dumps(request)}).json
+    expected = {
+      u'test_case_name': u'foo',
+      u'test_keys': [
+        {
+          u'config_name': u'foo',
+          u'instance_index': 0,
+          u'num_instances': 1,
+        },
+      ],
+    }
+    # The value is using both timestamp and random value, so it is not
+    # deterministic by definition.
+    key = actual['test_keys'][0].pop('test_key')
+    self.assertTrue(int(key, 16))
+    self.assertEqual(expected, actual)
+
+    self._ReplaceCurrentUser(ADMIN_EMAIL)
+    self.app.get('/restricted/tasks', status=200)
 
 
 if __name__ == '__main__':

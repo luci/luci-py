@@ -286,6 +286,15 @@ class TaskResultApiTest(test_case.TestCase):
     self.assertEqual(expected, result_summary.to_dict())
     self.assertEqual(datetime.timedelta(seconds=2), result_summary.duration())
 
+    self.assertEqual(
+        task_common.pack_result_summary_key(result_summary.key),
+        result_summary.key_string)
+    self.assertEqual(complete_ts, result_summary.ended_ts)
+    self.assertEqual(
+        task_common.pack_run_result_key(run_result.key),
+        run_result.key_string)
+    self.assertEqual(complete_ts, run_result.ended_ts)
+
   def test_yield_run_results_with_dead_bot(self):
     request = task_request.make_request(_gen_request_data())
     result_summary = task_result.new_result_summary(request)

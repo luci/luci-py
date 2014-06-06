@@ -45,18 +45,18 @@ Always sorted by reverse created.
     <th>Machine ID</th>
   </thead>
   <tbody>
-    {% for runner in runners %}
-      <tr class="request {{runner.class_string}}">
+    {% for task in tasks %}
+      <tr class="request {% if task.failure %}failed_test{% endif%}">
         <td>
           <a title="Click to see full message"
-            href="show_message?r={{runner.key_string}}">{{runner.name}}
+            href="show_message?r={{task.key_string}}">{{task.name}}
           </a>
         </td>
-        <td>{{runner.status_string|safe}}</td>
-        <td>{{runner.created|datetime_human}}</td>
-        <td>{{runner.started|datetime_human}}</td>
-        <td>{{runner.ended|datetime_human}}</td>
-        <td>{{runner.machine_id}}</td>
+        <td>{{task.to_string()|safe}}</td>
+        <td>{{task.created_ts|datetime_human}}</td>
+        <td>{{task.started_ts|datetime_human}}</td>
+        <td>{{task.ended_ts|datetime_human}}</td>
+        <td>{{task.bot_id}}</td>
       </tr>
     {% endfor %}
   </tbody>

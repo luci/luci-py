@@ -238,24 +238,6 @@ def request_work_item(attributes, server_url, remote_addr):
 ### UI code that should be in jinja2 templates
 
 
-def make_runner_view(result_summary):
-  """Returns a html template friendly dict from a TestRunner."""
-  # Simulate the old properties until the templates are updated.
-  assert isinstance(result_summary, task_result.TaskResultSummary), (
-      result_summary)
-  return {
-    'class_string': 'failed_test' if result_summary.failure else '',
-    'created': result_summary.created_ts,
-    'ended': result_summary.completed_ts or result_summary.abandoned_ts,
-    'key_string': task_common.pack_result_summary_key(result_summary.key),
-    'machine_id': result_summary.bot_id,
-    'name': result_summary.name,
-    'started': result_summary.started_ts,
-    'status_string': result_summary.to_string(),
-    'user': result_summary.user,
-  }
-
-
 class FilterParams(object):
   def __init__(
       self, status, test_name_filter, show_successfully_completed,
@@ -439,20 +421,16 @@ class TasksHandler(auth.AuthenticatingHandler):
     errors_found_future = errors.SwarmError.query(
         default_options=opts).order(-errors.SwarmError.created).fetch_async()
 
-    runners = [
-      make_runner_view(r) for r in tasks_future.get_result()
-    ]
-
     params = {
       'current_page': page,
       'errors': errors_found_future.get_result(),
       'filter_selects': params.filter_selects_as_html(),
       'machine_id_filter': params.machine_id_filter,
-      'runners': runners,
       'selected_sort': ('A' if ascending else 'D') + sort_key,
       'sort_options': sort_options,
       'sort_by': sort_by,
       'sorted_by_message': sorted_by_message,
+      'tasks': tasks_future.get_result(),
       'test_name_filter': params.test_name_filter,
       'total_tasks': total_task_count_future.get_result(),
       'url_no_filters': params.generate_page_url(page, sort_by),
