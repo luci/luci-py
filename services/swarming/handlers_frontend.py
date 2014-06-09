@@ -354,7 +354,7 @@ class FilterParams(object):
     return html
 
 
-### Restricted handlers.
+### Admin accessible pages.
 
 # TODO(maruel): Sort the handlers once they got their final name.
 
@@ -364,116 +364,6 @@ class RestrictedHandler(auth.AuthenticatingHandler):
   def get(self):
     self.response.out.write(template.render('restricted.html', {}))
 
-
-class TasksHandler(auth.AuthenticatingHandler):
-  """Lists all requests and allows callers to manage them."""
-
-  def parse_filters(self):
-    """Parse the filters from the request."""
-    return FilterParams(
-      self.request.get('status', 'all'),
-      self.request.get('test_name_filter', ''),
-      # Compare to 'False' so that the default value for invalid user input
-      # is True.
-      self.request.get('show_successfully_completed', '') != 'False',
-      self.request.get('machine_id_filter', ''))
-
-  @auth.require(auth.READ, 'swarming/management')
-  def get(self):
-    # TODO(maruel): Convert to Google Graph API.
-    # TODO(maruel): Once migration is complete, remove limit and offset, replace
-    # with cursor.
-    page_length = int(self.request.get('length', 50))
-    page = int(self.request.get('page', 1))
-
-    default_sort = 'created_ts'
-    sort_by = self.request.get('sort_by', 'D' + default_sort)
-    ascending = bool(sort_by[0] == 'A')
-    sort_key = sort_by[1:]
-    if sort_key not in ACCEPTABLE_TASKS_SORTS:
-      self.abort(400, 'Invalid sort key')
-
-    # TODO(maruel): Stop doing HTML in python.
-    sorted_by_message = '<p>Currently sorted by: '
-    if not ascending:
-      sorted_by_message += 'Reverse '
-    sorted_by_message += ACCEPTABLE_TASKS_SORTS[sort_key] + '</p>'
-    sort_options = []
-    # TODO(maruel): Use an order that makes sense instead of whatever the dict
-    # happens to be.
-    for key, value in ACCEPTABLE_TASKS_SORTS.iteritems():
-      # Add 'A' for ascending and 'D' for descending order.
-      sort_options.append(SortOptions('A' + key, value))
-      sort_options.append(SortOptions('D' + key, 'Reverse ' + value))
-
-    # Parse and load the filters.
-    params = self.parse_filters()
-
-    # Fire up all the queries in parallel.
-    tasks_future = params.get_shards(
-        sort_key,
-        ascending=ascending,
-        limit=page_length,
-        offset=page_length * (page - 1))
-    total_task_count_future = task_request.TaskRequest.query().count_async()
-
-    opts = ndb.QueryOptions(limit=10)
-    errors_found_future = errors.SwarmError.query(
-        default_options=opts).order(-errors.SwarmError.created).fetch_async()
-
-    params = {
-      'current_page': page,
-      'errors': errors_found_future.get_result(),
-      'filter_selects': params.filter_selects_as_html(),
-      'machine_id_filter': params.machine_id_filter,
-      'selected_sort': ('A' if ascending else 'D') + sort_key,
-      'sort_options': sort_options,
-      'sort_by': sort_by,
-      'sorted_by_message': sorted_by_message,
-      'tasks': tasks_future.get_result(),
-      'test_name_filter': params.test_name_filter,
-      'total_tasks': total_task_count_future.get_result(),
-      'url_no_filters': params.generate_page_url(page, sort_by),
-      'url_no_page': params.generate_page_url(
-          sort_by=sort_by, include_filters=True),
-      'url_no_sort_by_or_filters': params.generate_page_url(
-          page, include_filters=False),
-    }
-    self.response.out.write(template.render('restricted_tasks.html', params))
-
-
-class TaskHandler(auth.AuthenticatingHandler):
-  """Show the full text of a test request."""
-
-  @auth.require(auth.READ, 'swarming/management')
-  def get(self, key_id):
-    key = None
-    request_key = None
-    try:
-      key = task_scheduler.unpack_result_summary_key(key_id)
-      request_key = task_result.result_summary_key_to_request_key(key)
-    except ValueError:
-      try:
-        key = task_scheduler.unpack_run_result_key(key_id)
-        request_key = task_result.result_summary_key_to_request_key(
-            task_result.run_result_key_to_result_summary_key(key))
-      except ValueError:
-        self.abort(404, 'Invalid key format.')
-
-    # It can be either a TaskRunResult or TaskResultSummary.
-    result, request = ndb.get_multi([key, request_key])
-    if not result:
-      self.abort(404, 'Invalid key.')
-
-    bot = (
-      bot_management.get_bot_key(result.bot_id).get()
-      if result.bot_id else None)
-    params = {
-      'bot': bot,
-      'request': request,
-      'task': result,
-    }
-    self.response.out.write(template.render('restricted_task.html', params))
 
 class BotsListHandler(auth.AuthenticatingHandler):
   """Presents the list of known bots."""
@@ -646,6 +536,131 @@ class WhitelistIPHandler(auth.AuthenticatingHandler):
     else:
       self.abort(400, 'Invalid \'a\' parameter.')
     self.get()
+
+
+### User accessible pages.
+
+
+class UserHandler(auth.AuthenticatingHandler):
+  # TODO(maruel): We want swarming/user here.
+  @auth.require(auth.READ, 'swarming/clients')
+  def get(self):
+    self.response.out.write(template.render('user.html', {}))
+
+
+class TasksHandler(auth.AuthenticatingHandler):
+  """Lists all requests and allows callers to manage them."""
+
+  def parse_filters(self):
+    """Parse the filters from the request."""
+    return FilterParams(
+      self.request.get('status', 'all'),
+      self.request.get('test_name_filter', ''),
+      # Compare to 'False' so that the default value for invalid user input
+      # is True.
+      self.request.get('show_successfully_completed', '') != 'False',
+      self.request.get('machine_id_filter', ''))
+
+  # TODO(maruel): We want swarming/user here.
+  @auth.require(auth.READ, 'swarming/clients')
+  def get(self):
+    # TODO(maruel): Convert to Google Graph API.
+    # TODO(maruel): Once migration is complete, remove limit and offset, replace
+    # with cursor.
+    page_length = int(self.request.get('length', 50))
+    page = int(self.request.get('page', 1))
+
+    default_sort = 'created_ts'
+    sort_by = self.request.get('sort_by', 'D' + default_sort)
+    ascending = bool(sort_by[0] == 'A')
+    sort_key = sort_by[1:]
+    if sort_key not in ACCEPTABLE_TASKS_SORTS:
+      self.abort(400, 'Invalid sort key')
+
+    # TODO(maruel): Stop doing HTML in python.
+    sorted_by_message = '<p>Currently sorted by: '
+    if not ascending:
+      sorted_by_message += 'Reverse '
+    sorted_by_message += ACCEPTABLE_TASKS_SORTS[sort_key] + '</p>'
+    sort_options = []
+    # TODO(maruel): Use an order that makes sense instead of whatever the dict
+    # happens to be.
+    for key, value in ACCEPTABLE_TASKS_SORTS.iteritems():
+      # Add 'A' for ascending and 'D' for descending order.
+      sort_options.append(SortOptions('A' + key, value))
+      sort_options.append(SortOptions('D' + key, 'Reverse ' + value))
+
+    # Parse and load the filters.
+    params = self.parse_filters()
+
+    # Fire up all the queries in parallel.
+    tasks_future = params.get_shards(
+        sort_key,
+        ascending=ascending,
+        limit=page_length,
+        offset=page_length * (page - 1))
+    total_task_count_future = task_request.TaskRequest.query().count_async()
+
+    opts = ndb.QueryOptions(limit=10)
+    errors_found_future = errors.SwarmError.query(
+        default_options=opts).order(-errors.SwarmError.created).fetch_async()
+
+    params = {
+      'current_page': page,
+      'errors': errors_found_future.get_result(),
+      'filter_selects': params.filter_selects_as_html(),
+      'machine_id_filter': params.machine_id_filter,
+      'selected_sort': ('A' if ascending else 'D') + sort_key,
+      'sort_options': sort_options,
+      'sort_by': sort_by,
+      'sorted_by_message': sorted_by_message,
+      'tasks': tasks_future.get_result(),
+      'test_name_filter': params.test_name_filter,
+      'total_tasks': total_task_count_future.get_result(),
+      'url_no_filters': params.generate_page_url(page, sort_by),
+      'url_no_page': params.generate_page_url(
+          sort_by=sort_by, include_filters=True),
+      'url_no_sort_by_or_filters': params.generate_page_url(
+          page, include_filters=False),
+    }
+    # TODO(maruel): If admin or if the user is task's .user, show the Cancel
+    # button. Do not show otherwise.
+    self.response.out.write(template.render('user_tasks.html', params))
+
+
+class TaskHandler(auth.AuthenticatingHandler):
+  """Show the full text of a test request."""
+
+  # TODO(maruel): We want swarming/user here.
+  @auth.require(auth.READ, 'swarming/clients')
+  def get(self, key_id):
+    key = None
+    request_key = None
+    try:
+      key = task_scheduler.unpack_result_summary_key(key_id)
+      request_key = task_result.result_summary_key_to_request_key(key)
+    except ValueError:
+      try:
+        key = task_scheduler.unpack_run_result_key(key_id)
+        request_key = task_result.result_summary_key_to_request_key(
+            task_result.run_result_key_to_result_summary_key(key))
+      except ValueError:
+        self.abort(404, 'Invalid key format.')
+
+    # It can be either a TaskRunResult or TaskResultSummary.
+    result, request = ndb.get_multi([key, request_key])
+    if not result:
+      self.abort(404, 'Invalid key.')
+
+    bot = (
+      bot_management.get_bot_key(result.bot_id).get()
+      if result.bot_id else None)
+    params = {
+      'bot': bot,
+      'request': request,
+      'task': result,
+    }
+    self.response.out.write(template.render('user_task.html', params))
 
 
 ### Client APIs.
@@ -1143,16 +1158,20 @@ class WarmupHandler(webapp2.RequestHandler):
 def CreateApplication():
   urls = [
       # Frontend pages. They return HTML.
+      # Public pages.
       ('/', RootHandler),
       ('/stats', stats_gviz.StatsSummaryHandler),
       ('/stats/dimensions/<dimensions:.+>', stats_gviz.StatsDimensionsHandler),
       ('/stats/user/<user:.+>', stats_gviz.StatsUserHandler),
 
-      # Frontend admin pages.
+      # User pages.
+      ('/user', UserHandler),
+      ('/user/tasks', TasksHandler),
+      ('/user/task/<key_id:[0-9a-fA-F]+>', TaskHandler),
+
+      # Admin pages.
       ('/restricted', RestrictedHandler),
       ('/restricted/bots', BotsListHandler),
-      ('/restricted/tasks', TasksHandler),
-      ('/restricted/task/<key_id:[0-9a-fA-F]+>', TaskHandler),
       ('/restricted/ereporter2/report', Ereporter2ReportHandler),
       # TODO(maruel): This is an API, not a endpoint.
       ('/restricted/ereporter2/request/<request_id:[0-9a-fA-F]+>',

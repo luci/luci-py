@@ -7,12 +7,13 @@ Swarming Server is an open task distribution service written in python running
 on AppEngine.
 <p>
 <ul class="spaced">
+  <li><a href="/stats">Usage stats</a> is visible to everyone.</li>
   <li>
-    <a href="/stats">Usage stats</a> is visible to everyone.
-  </li>
-  <li>
-    <a href="/restricted">Admin pages</a>, well, if you are an admin of this
-    instance.
+    For user with proper access:
+    <ul>
+      <li><a href="/user">User pages</a>, for example to see on-going tasks</li>
+      <li><a href="/restricted">Admin pages</a>, for maintenance</li>
+    </ul>
   </li>
   <li>
     To start a bot, run:

@@ -49,7 +49,7 @@ Always sorted by reverse created.
       <tr class="request {% if task.failure %}failed_test{% endif%}">
         <td>
           <a title="Click to see full message"
-            href="/restricted/task/{{task.key_string}}">{{task.name}}
+            href="/user/task/{{task.key_string}}">{{task.name}}
           </a>
         </td>
         <td>{{task.to_string()|safe}}</td>
