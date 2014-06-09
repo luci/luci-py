@@ -25,7 +25,6 @@ import handlers_frontend
 from common import swarm_constants
 from components import auth
 from components import stats_framework
-from components import utils
 from server import admin_user
 from server import bot_management
 from server import errors
@@ -315,20 +314,6 @@ class AppTest(test_case.TestCase):
     packed = task_common.pack_result_summary_key(result_summary.key)
     response = self.app.post('/restricted/retry', {'r': packed})
     self.assertResponse(response, '200 OK', 'Runner set for retry.')
-
-  def testShowMessageHandler(self):
-    # Act under admin identity.
-    self._ReplaceCurrentUser(ADMIN_EMAIL)
-
-    response = self.app.get('/restricted/show_message', {'r': 'fake_key'},
-        status=404)
-
-    result_summary, _run_result = test_helper.CreateRunner()
-    # TODO(maruel): Must support sending back individual tries.
-    packed = task_common.pack_result_summary_key(result_summary.key)
-    response = self.app.get('/restricted/show_message', {'r': packed})
-    self.assertEqual(
-        utils.to_json_encodable(result_summary.to_dict()), response.json)
 
   def testUploadStartSlaveHandler(self):
     # Act under admin identity.
@@ -972,10 +957,14 @@ class AppTest(test_case.TestCase):
     # deterministic by definition.
     key = actual['test_keys'][0].pop('test_key')
     self.assertTrue(int(key, 16))
+    self.assertEqual('0', key[-1])
     self.assertEqual(expected, actual)
 
     self._ReplaceCurrentUser(ADMIN_EMAIL)
     self.app.get('/restricted/tasks', status=200)
+    self.app.get('/restricted/task/%s' % key, status=200)
+    # This can't work until a bot reaped the task.
+    #self.app.get('/restricted/task/%s' % key[:-1] + '1', status=200)
 
 
 if __name__ == '__main__':

@@ -133,6 +133,19 @@ class _TaskResultCommon(ndb.Model):
   def ended_ts(self):
     return self.completed_ts or self.abandoned_ts
 
+  @property
+  def pending(self):
+    """Returns the timedelta that the task has been pending to be scheduled or
+    None if not started yet.
+    """
+    if self.started_ts and self.created_ts:
+      return self.started_ts - self.created_ts
+
+  def get_outputs(self):
+    """Returns the actual outputs as strings in a list."""
+    # TODO(maruel): Rework this so all the entities can be fetched in parallel.
+    return [o.get().GetResults() for o in self.outputs]
+
   def duration(self):
     """Returns the runtime for this task or None if not applicable.
 
@@ -171,6 +184,14 @@ class TaskRunResult(_TaskResultCommon):
   @property
   def key_string(self):
     return task_common.pack_run_result_key(self.key)
+
+  @property
+  def created_ts(self):
+    # TODO(maruel): This property is not efficient at lookup time so it is
+    # probably better to duplicate the data. The trade off is that TaskRunResult
+    # is saved a lot. Maybe we'll need to rethink this, maybe TaskRunSummary
+    # wasn't a great idea after all.
+    return self.result_summary_key.get().created_ts
 
   @property
   def request_key(self):
@@ -228,6 +249,11 @@ class TaskResultSummary(_TaskResultCommon):
   @property
   def key_string(self):
     return task_common.pack_result_summary_key(self.key)
+
+  @property
+  def request_key(self):
+    """Returns the TaskRequest ndb.Key that is related to this entity."""
+    return result_summary_key_to_request_key(self.key)
 
   def set_from_run_result(self, rhs):
     """Copies all the properties from another instance deriving from

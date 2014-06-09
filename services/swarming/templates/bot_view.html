@@ -1,0 +1,9 @@
+{% macro bot_dimensions(bot) %}
+  {% if bot %}{{ render_dimensions(bot.dimensions) }}{% endif %}
+{% endmacro %}
+
+{% macro render_dimensions(dimensions) %}
+  {% for k, v in dimensions.iteritems()|sort %}
+    {{k}}: {% if v is string %}{{v}}{% else %}{{v|sort|join(' | ')}}{% endif %}<br>
+  {% endfor %}
+{% endmacro %}

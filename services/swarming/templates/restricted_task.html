@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+
+{% block headers %}
+<style>
+  table.property_table {
+    font-family: monospace;
+    border-spacing: 0;
+  }
+  table.property_table tbody tr:nth-child(even) {
+    background-color: #eeeeee;
+  }
+  table.property_table td {
+    padding-left: 1em;
+    padding-right: 1em;
+  }
+  table.property_table tbody tr:hover {
+    background-color: #eeffee;
+  }
+</style>
+{% endblock %}
+
+{% block body %}
+{% import 'bot_view.html' as bot_view %}
+
+<h1>Task summary</h1>
+<table class="property_table">
+  <tbody>
+    <tr>
+      <td>Name</td>
+      <td>{{request.name}}</td>
+    </tr>
+    <tr>
+      <td>User</td>
+      <td>{{request.user}}</td>
+    </tr>
+    <tr>
+      <td>Created</td>
+      <td>{{request.created_ts|datetimeformat}}</td>
+    </tr>
+    <tr>
+      <td>Started</td>
+      <td>{{task.started_ts|datetimeformat}}</td>
+    </tr>
+    <tr>
+      <td>Pending time</td>
+      <td>{{task.pending|default('--')}}</td>
+    </tr>
+    <tr>
+      <td>Completed</td>
+      <td>{{task.completed_ts|datetimeformat}}</td>
+    </tr>
+    <tr>
+      <td>Aborted</td>
+      <td>{{task.aborted_ts|datetimeformat}}</td>
+    </tr>
+    <tr>
+      <td>Duration</td>
+      <td>{{task.duration()}}</td>
+    </tr>
+    <tr>
+      <td>State</td>
+      <td>{{task.to_string()}} ({{task.state}})</td>
+    </tr>
+    <tr>
+      <td>Request dimensions</td>
+      <td>{{bot_view.render_dimensions(request.properties.dimensions)}}</td>
+    </tr>
+    <tr>
+      <td>Bot id</td>
+      <td>{{task.bot_id}}</td>
+    </tr>
+    <tr>
+      <td>Bot dimensions</td>
+      <td>{{bot_view.bot_dimensions(bot)}}</td>
+    </tr>
+    <tr>
+      <td>Failure</td>
+      <td>{{task.failure}}</td>
+    </tr>
+    <tr>
+      <td>Internal failure</td>
+      <td>{{task.internal_failure}}</td>
+    </tr>
+    <tr>
+      <td>Exit codes</td>
+      <td>{{task.exit_codes}}</td>
+    </tr>
+    <tr>
+      <td>Try number</td>
+      <td>{{task.try_number}}</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>Outputs:</h3>
+<pre>
+{% for out in task.get_outputs() %}Output:
+{{out}}{% endfor %}
+</pre>
+
+{% endblock %}

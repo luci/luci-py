@@ -28,6 +28,8 @@ JINJA = jinja2.Environment(
 
 
 def datetimeformat(value, f='%Y-%m-%d %H:%M:%S'):
+  if not value:
+    return '--'
   return value.strftime(f)
 
 

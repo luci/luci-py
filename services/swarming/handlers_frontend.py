@@ -364,10 +364,8 @@ class RestrictedHandler(auth.AuthenticatingHandler):
 
 
 class TasksHandler(auth.AuthenticatingHandler):
-  """Handler for the main page of the web server.
+  """Lists all requests and allows callers to manage them."""
 
-  This handler lists all pending requests and allows callers to manage them.
-  """
   def parse_filters(self):
     """Parse the filters from the request."""
     return FilterParams(
@@ -441,6 +439,39 @@ class TasksHandler(auth.AuthenticatingHandler):
     }
     self.response.out.write(template.render('restricted_tasks.html', params))
 
+
+class TaskHandler(auth.AuthenticatingHandler):
+  """Show the full text of a test request."""
+
+  @auth.require(auth.READ, 'swarming/management')
+  def get(self, key_id):
+    key = None
+    request_key = None
+    try:
+      key = task_scheduler.unpack_result_summary_key(key_id)
+      request_key = task_result.result_summary_key_to_request_key(key)
+    except ValueError:
+      try:
+        key = task_scheduler.unpack_run_result_key(key_id)
+        request_key = task_result.result_summary_key_to_request_key(
+            task_result.run_result_key_to_result_summary_key(key))
+      except ValueError:
+        self.abort(404, 'Invalid key format.')
+
+    # It can be either a TaskRunResult or TaskResultSummary.
+    result, request = ndb.get_multi([key, request_key])
+    if not result:
+      self.abort(404, 'Invalid key.')
+
+    bot = (
+      bot_management.get_bot_key(result.bot_id).get()
+      if result.bot_id else None)
+    params = {
+      'bot': bot,
+      'request': request,
+      'task': result,
+    }
+    self.response.out.write(template.render('restricted_task.html', params))
 
 class BotsListHandler(auth.AuthenticatingHandler):
   """Presents the list of known bots."""
@@ -528,33 +559,6 @@ class Ereporter2RequestHandler(auth.AuthenticatingHandler):
       self.abort(404, detail='Request id was not found.')
     self.response.headers['Content-Type'] = 'application/json; charset=utf-8'
     json.dump(data, self.response, indent=2, sort_keys=True)
-
-
-class ShowMessageHandler(auth.AuthenticatingHandler):
-  """Show the full text of a test request."""
-
-  @auth.require(auth.READ, 'swarming/management')
-  def get(self):
-    self.response.headers['Content-Type'] = 'application/json; charset=utf-8'
-    key_id = self.request.get('r', '')
-
-    # TODO(maruel): Formalize returning data for a specific try or the overall
-    # results.
-    key = None
-    try:
-      key = task_scheduler.unpack_result_summary_key(key_id)
-    except ValueError:
-      try:
-        key = task_scheduler.unpack_run_result_key(key_id)
-      except ValueError:
-        self.abort(404, 'Invalid key')
-
-    result = key.get()
-    if result:
-      self.response.write(utils.encode_to_json(result.to_dict()))
-    else:
-      self.response.set_status(404)
-      self.response.out.write('{}')
 
 
 class UploadStartSlaveHandler(auth.AuthenticatingHandler):
@@ -1141,9 +1145,8 @@ def CreateApplication():
       # Frontend admin pages.
       ('/restricted', RestrictedHandler),
       ('/restricted/bots', BotsListHandler),
-      # TODO(maruel): This is an API, not a endpoint.
-      ('/restricted/show_message', ShowMessageHandler),
       ('/restricted/tasks', TasksHandler),
+      ('/restricted/task/<key_id:[0-9a-fA-F]+>', TaskHandler),
       ('/restricted/ereporter2/report', Ereporter2ReportHandler),
       # TODO(maruel): This is an API, not a endpoint.
       ('/restricted/ereporter2/request/<request_id:[0-9a-fA-F]+>',

@@ -49,14 +49,14 @@ Always sorted by reverse created.
       <tr class="request {% if task.failure %}failed_test{% endif%}">
         <td>
           <a title="Click to see full message"
-            href="show_message?r={{task.key_string}}">{{task.name}}
+            href="/restricted/task/{{task.key_string}}">{{task.name}}
           </a>
         </td>
         <td>{{task.to_string()|safe}}</td>
         <td>{{task.created_ts|datetime_human}}</td>
         <td>{{task.started_ts|datetime_human}}</td>
         <td>{{task.ended_ts|datetime_human}}</td>
-        <td>{{task.bot_id}}</td>
+        <td>{{task.bot_id|default('--')}}</td>
       </tr>
     {% endfor %}
   </tbody>
