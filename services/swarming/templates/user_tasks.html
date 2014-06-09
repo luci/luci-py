@@ -1,5 +1,11 @@
 {% extends "base.html" %}
 
+
+{% block floating %}
+<br>{{now|datetimeformat}}
+{% endblock %}
+
+
 {% block body %}
 
 <h1>User Test Requests</h1>
@@ -33,16 +39,19 @@ Always sorted by reverse created.
   <input type="hidden" name="sort_by" value="{{sort_by}}">
   <input type="submit" name="Filter">
 </form>
+<br>
 
 <table id="request-table" class="alterning_background"
     summary="This table lists all test requests">
   <thead>
     <th>Name</th>
     <th>Status</th>
-    <th>Requested (UTC)</th>
-    <th>Started (UTC)</th>
-    <th>Ended (UTC)</th>
-    <th>Machine ID</th>
+    <th>Requested</th>
+    <th>Pending</th>
+    <th>Started</th>
+    <th>Ended</th>
+    <th>Duration</th>
+    <th>Bot</th>
   </thead>
   <tbody>
     {% for task in tasks %}
@@ -53,10 +62,12 @@ Always sorted by reverse created.
           </a>
         </td>
         <td>{{task.to_string()|safe}}</td>
-        <td>{{task.created_ts|datetime_human}}</td>
-        <td>{{task.started_ts|datetime_human}}</td>
-        <td>{{task.ended_ts|datetime_human}}</td>
-        <td>{{task.bot_id|default('--')}}</td>
+        <td nowrap align=center>{{task.created_ts|datetimeformat}}</td>
+        <td nowrap align=right>{{task.pending|timedeltaformat}}</td>
+        <td nowrap align=center>{{task.started_ts|datetimeformat}}</td>
+        <td nowrap align=center>{{task.ended_ts|datetimeformat}}</td>
+        <td nowrap align=right>{{task.duration()|timedeltaformat}}</td>
+        <td nowrap>{{task.bot_id|default('--')}}</td>
       </tr>
     {% endfor %}
   </tbody>

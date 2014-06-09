@@ -402,6 +402,7 @@ class BotsListHandler(auth.AuthenticatingHandler):
       # TODO(maruel): it should be the default AppEngine url version.
       'current_version':
           bot_management.get_slave_version(self.request.host_url),
+      'now': task_common.utcnow(),
       'selected_sort': sort_by,
       'sort_options': sort_options,
       'update_delay': bot_management.MACHINE_UPDATE_TIME,
@@ -610,6 +611,7 @@ class TasksHandler(auth.AuthenticatingHandler):
       'errors': errors_found_future.get_result(),
       'filter_selects': params.filter_selects_as_html(),
       'machine_id_filter': params.machine_id_filter,
+      'now': task_common.utcnow(),
       'selected_sort': ('A' if ascending else 'D') + sort_key,
       'sort_options': sort_options,
       'sort_by': sort_by,
@@ -657,6 +659,7 @@ class TaskHandler(auth.AuthenticatingHandler):
       if result.bot_id else None)
     params = {
       'bot': bot,
+      'now': task_common.utcnow(),
       'request': request,
       'task': result,
     }

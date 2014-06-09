@@ -4,6 +4,7 @@
 
 """Frontend handlers for statistics."""
 
+import datetime
 import itertools
 import webapp2
 
@@ -58,7 +59,7 @@ class _Dimensions(object):
 
 
 class _Summary(object):
-  TEMPLATE = 'stats_new.html'
+  TEMPLATE = 'stats.html'
 
   DESCRIPTION = {
     'http_failures': ('number', 'HTTP Failures'),
@@ -202,6 +203,7 @@ class StatsHandlerBase(webapp2.RequestHandler):
     duration = utils.get_request_as_int(
         self.request, 'duration', default=120, min_value=1, max_value=1000)
     now = utils.get_request_as_datetime(self.request, 'now')
+    now = now or datetime.datetime.utcnow()
 
     description = res_type_info.DESCRIPTION.copy()
     description.update(stats_framework_gviz.get_description_key(resolution))
@@ -209,7 +211,6 @@ class StatsHandlerBase(webapp2.RequestHandler):
         stats.STATS_HANDLER, resolution, now, duration, False)
     template_data = self.process_data(description, stats_data)
     template_data['duration'] = duration
-    # TODO(maruel): Implement 'now' properly.
     template_data['now'] = now
     template_data['resolution'] = resolution
     self.response.write(template.render(res_type_info.TEMPLATE, template_data))

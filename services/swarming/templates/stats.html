@@ -227,11 +227,13 @@
 </script>
 {% endblock %}
 
-{% block body %}
 
-  <div style="float: right;">
-    {{now}}
-  </div>
+{% block floating %}
+<br>{{now|datetimeformat}}
+{% endblock %}
+
+
+{% block body %}
 
   <h1>Statistics</h1>
 

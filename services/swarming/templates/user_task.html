@@ -19,6 +19,12 @@
 </style>
 {% endblock %}
 
+
+{% block floating %}
+<br>{{now|datetimeformat}}
+{% endblock %}
+
+
 {% block body %}
 {% import 'bot_view.html' as bot_view %}
 
@@ -43,7 +49,7 @@
     </tr>
     <tr>
       <td>Pending time</td>
-      <td>{{task.pending|default('--')}}</td>
+      <td>{{task.pending|timedeltaformat}}</td>
     </tr>
     <tr>
       <td>Completed</td>
@@ -55,7 +61,7 @@
     </tr>
     <tr>
       <td>Duration</td>
-      <td>{{task.duration()}}</td>
+      <td>{{task.duration()|timedeltaformat}}</td>
     </tr>
     <tr>
       <td>State</td>

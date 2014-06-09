@@ -46,6 +46,21 @@ def datetime_human(dt):
   return dt.strftime('%Y-%m-%d %H:%M:%S')
 
 
+def timedeltaformat(value):
+  """Formats a timedelta in a sane way. Ignores micro seconds, we're not that
+  fast.
+  """
+  if not value:
+    return '--'
+  hours, remainder = divmod(int(round(value.total_seconds())), 3600)
+  minutes, seconds = divmod(remainder, 60)
+  if hours:
+    return '%d:%02d:%02d' % (hours, minutes, seconds)
+  # Always prefix minutes, even if 0, otherwise this looks weird. Revisit this
+  # decision if bikeshedding is desired.
+  return '%d:%02d' % (minutes, seconds)
+
+
 def urlquote(s):
   # TODO(maruel): Remove once jinja is upgraded to 2.7.
   if isinstance(s, jinja2.Markup):
@@ -53,10 +68,11 @@ def urlquote(s):
   return jinja2.Markup(urllib.quote_plus(s.encode('utf8')))
 
 
-JINJA.filters['datetimeformat'] = datetimeformat
 JINJA.filters['datetime_human'] = datetime_human
-JINJA.filters['urlquote'] = urlquote
+JINJA.filters['datetimeformat'] = datetimeformat
 JINJA.filters['encode_to_json'] = utils.encode_to_json
+JINJA.filters['timedeltaformat'] = timedeltaformat
+JINJA.filters['urlquote'] = urlquote
 
 
 @utils.cache

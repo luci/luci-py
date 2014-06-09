@@ -1,5 +1,11 @@
 {% extends "base.html" %}
 
+
+{% block floating %}
+<br>{{now|datetimeformat}}
+{% endblock %}
+
+
 {% block body %}
 <h1>Known bots</h1>
 <p>Sort By:

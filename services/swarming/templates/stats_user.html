@@ -177,11 +177,13 @@
 </script>
 {% endblock %}
 
-{% block body %}
 
-  <div style="float: right;">
-    {{now}}
-  </div>
+{% block floating %}
+<br>{{now|datetimeformat}}
+{% endblock %}
+
+
+{% block body %}
 
   <h1>Statistics for user {{user}}</h1>
   {# TODO(maruel): Keep duration, current_resolution and maybe 'now'. #}

@@ -17,6 +17,8 @@ found in the LICENSE file. -->
     {% else %}
       <a href="{{signin_link|safe }}">Sign in</a>
     {% endif %}
+    {% block floating %}
+    {% endblock %}
   </div>
 
   {% block body %}
