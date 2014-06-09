@@ -17,6 +17,7 @@ import urllib
 import webapp2
 
 from google.appengine import runtime
+from google.appengine.api import datastore_errors
 from google.appengine.api import modules
 from google.appengine.datastore import datastore_query
 from google.appengine.ext import ndb
@@ -29,6 +30,7 @@ from common import swarm_constants
 from common import test_request_message
 from components import auth
 from components import auth_ui
+from components import decorators
 from components import ereporter2
 from components import utils
 from server import bot_management
@@ -958,6 +960,10 @@ class RegisterHandler(auth.AuthenticatingHandler):
   # TODO(vadimsh): Implement XSRF token support.
   xsrf_token_enforce_on = ()
 
+  @decorators.silence(
+      datastore_errors.InternalError,
+      datastore_errors.Timeout,
+      datastore_errors.TransactionFailedError)
   @auth.require(auth.UPDATE, 'swarming/bots')
   def post(self):
     # Validate the request.
