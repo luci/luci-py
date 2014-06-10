@@ -9,6 +9,7 @@ import itertools
 import webapp2
 
 import template
+from components import natsort
 from components import stats_framework
 from components import stats_framework_gviz
 from components import utils
@@ -223,7 +224,7 @@ class StatsSummaryHandler(StatsHandlerBase):
   @staticmethod
   def process_data(description, stats_data):
     def sorted_unique_list_from_itr(i):
-      return sorted(set(itertools.chain.from_iterable(i)))
+      return natsort.natsorted(set(itertools.chain.from_iterable(i)))
 
     bots = sorted_unique_list_from_itr(
         line.values.bot_ids for line in stats_data)
@@ -263,7 +264,7 @@ class StatsDimensionsHandler(StatsHandlerBase):
     # TODO(maruel): 'bots' and 'dimensions' should be updated when the user
     # changes the resolution at which the data is displayed.
     return {
-      'bots': sorted(bots),
+      'bots': natsort.natsorted(bots),
       'dimensions': self.dimensions,
       'initial_data': gviz_api.DataTable(description, table).ToJSon(
           columns_order=_Dimensions.ORDER),

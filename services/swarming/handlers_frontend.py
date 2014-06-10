@@ -32,6 +32,7 @@ from components import auth
 from components import auth_ui
 from components import decorators
 from components import ereporter2
+from components import natsort
 from components import utils
 from server import bot_management
 from server import errors
@@ -391,7 +392,7 @@ class BotsListHandler(auth.AuthenticatingHandler):
         return bot.key.string_id()
       return getattr(bot, sort_by)
 
-    bots = sorted(bot_management.Bot.query().fetch(), key=sort_bot)
+    bots = natsort.natsorted(bot_management.Bot.query().fetch(), key=sort_bot)
 
     sort_options = [
       SortOptions(k, v)

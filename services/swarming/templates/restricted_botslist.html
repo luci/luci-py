@@ -45,9 +45,9 @@ Current bot version is: {{current_version[:8]}}
         </td>
         <td>{{(now-bot.last_seen)|timedeltaformat}}</td>
         <td>
-          {% for k, v in bot.dimensions.iteritems()|sort %}
+          {% for k, v in bot.dimensions.iteritems()|natsort %}
           {{k}}:
-          {% if v is string %}{{v}}{% else %}{{v|sort|join(' | ')}}{% endif %}
+          {% if v is string %}{{v}}{% else %}{{v|natsort|join(' | ')}}{% endif %}
           <br>
           {% endfor %}
         </td>

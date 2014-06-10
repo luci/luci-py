@@ -13,6 +13,7 @@ import jinja2
 
 from google.appengine.api import users
 
+from components import natsort
 from components import utils
 
 
@@ -46,6 +47,11 @@ def datetime_human(dt):
   return dt.strftime('%Y-%m-%d %H:%M:%S')
 
 
+def natsorted(value):
+  """Accepts None transparently."""
+  return natsort.natsorted(value or [])
+
+
 def timedeltaformat(value):
   """Formats a timedelta in a sane way. Ignores micro seconds, we're not that
   fast.
@@ -71,6 +77,7 @@ def urlquote(s):
 JINJA.filters['datetime_human'] = datetime_human
 JINJA.filters['datetimeformat'] = datetimeformat
 JINJA.filters['encode_to_json'] = utils.encode_to_json
+JINJA.filters['natsort'] = natsorted
 JINJA.filters['timedeltaformat'] = timedeltaformat
 JINJA.filters['urlquote'] = urlquote
 
