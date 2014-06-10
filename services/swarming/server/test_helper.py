@@ -126,7 +126,7 @@ def CreateRunner(config_name=None, machine_id=None, ran_successfully=None,
       data['outputs'] = [result_helper.StoreResults(results).key]
     # The entity needs to be saved before it can be updated, since
     # bot_update_task() accepts the key of the entity.
-    task_result.put_run_result(run_result)
+    ndb.put_multi(task_result.prepare_put_run_result(run_result))
     if not task_scheduler.bot_update_task(run_result.key, data, machine_id):
       assert False, (
           'Expected to reap the TaskToRun that was created lines above')
@@ -138,7 +138,7 @@ def CreateRunner(config_name=None, machine_id=None, ran_successfully=None,
     run_result.completed_ts = run_result.started_ts + ended
 
   # Mark the job as at least running.
-  task_result.put_run_result(run_result)
+  ndb.put_multi(task_result.prepare_put_run_result(run_result))
 
   return result_summary, run_result
 

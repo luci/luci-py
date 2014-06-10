@@ -19,7 +19,6 @@ from common import rpc
 from common import test_request_message
 from server import bot_archive
 from server import file_chunks
-from server import task_common
 
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -31,11 +30,6 @@ START_SLAVE_SCRIPT_KEY = 'start_slave_script'
 
 # The amount of time that has to pass before a machine is considered dead.
 MACHINE_DEATH_TIMEOUT = datetime.timedelta(seconds=30*60)
-
-
-# The amount of time that needs to pass before the last_seen field of
-# MachineStats will update for a given machine, to prevent too many puts.
-MACHINE_UPDATE_TIME = datetime.timedelta(seconds=120)
 
 
 ### Models.
@@ -66,6 +60,14 @@ class Bot(ndb.Model):
 
   # Version the bot is currently at.
   version = ndb.StringProperty(default='')
+
+  task = ndb.KeyProperty(kind='TaskRunResult')
+
+  @property
+  def task_entity(self):
+    """Returns the TaskRunResult currently executing."""
+    # TODO(maruel): This is inefficient in View, fix.
+    return self.task.get() if self.task else None
 
   def to_dict(self):
     out = super(Bot, self).to_dict()
@@ -154,7 +156,10 @@ def get_bot_key(bot_id):
   """Returns the ndb.Key for a known Bot."""
   if not bot_id:
     raise ValueError('Bad id')
-  return ndb.Key(Bot, bot_id)
+  # Create a root entity so writes are not done on the root entity but a child
+  # entity. 'BotRoot' entity doesn't exist as an entity, it is only a root
+  # entity.
+  return ndb.Key('BotRoot', bot_id, Bot, bot_id)
 
 
 def tag_bot_seen(
@@ -164,39 +169,20 @@ def tag_bot_seen(
   Arguments:
   - bot_id: ID of the bot. Usually the hostname but can be different if multiple
         swarming bot run on a single host.
-  - hostname: FQDN hostname that runs the bot or None if unspecified. It happens
-        on pings while running a job.
+  - hostname: FQDN hostname that runs the bot.
   - external_ip: IP address as seen by the HTTP handler.
   - internal_ip: IP address as seen by the bot.
-  - dimensions: Bot's dimensions or None if unspecified. It happens on pings
-        while running a job.
+  - dimensions: Bot's dimensions.
   - version: swarming_bot.zip version. Used to spot if a bot failed to update
         promptly.
   """
-  key = get_bot_key(bot_id)
-  bot = key.get()
-  if (bot and
-      bot.last_seen + MACHINE_UPDATE_TIME >= task_common.utcnow() and
-      (not hostname or bot.hostname == hostname) and
-      (not internal_ip or bot.internal_ip == internal_ip) and
-      (not external_ip or bot.external_ip == external_ip) and
-      (not dimensions or bot.dimensions == dimensions) and
-      (not version or bot.version == version)):
-    return bot
-
-  bot = bot or Bot(key=key, dimensions={})
-  bot.last_seen = task_common.utcnow()
-  if dimensions:
-    bot.dimensions = dimensions
-  if hostname:
-    # TODO(maruel): Handle id-hostname mismatches better.
-    bot.hostname = hostname
-  if external_ip:
-    bot.external_ip = external_ip
-  if internal_ip:
-    bot.internal_ip = internal_ip
-  if version:
-    bot.version = version
+  bot = Bot(
+      key=get_bot_key(bot_id),
+      dimensions=dimensions or {},
+      hostname=hostname,
+      internal_ip=internal_ip,
+      external_ip=external_ip,
+      version=version)
   bot.put()
   return bot
 

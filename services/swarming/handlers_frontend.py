@@ -181,6 +181,9 @@ def request_work_item(attributes, server_url, remote_addr):
   # Note its existence at two places, one for stats at 1 minute resolution, the
   # other for the list of known bots.
   stats.add_entry(action='bot_active', bot_id=bot_id, dimensions=dimensions)
+
+  # The TaskRunResult will be referenced on the first ping, ensuring that the
+  # task was actually taken.
   bot_management.tag_bot_seen(
       bot_id,
       dimensions.get('hostname', bot_id),
@@ -383,15 +386,12 @@ class BotsListHandler(auth.AuthenticatingHandler):
     dead_machine_cutoff = (
         task_common.utcnow() - bot_management.MACHINE_DEATH_TIMEOUT)
 
-    bots = []
-    for bot in bot_management.Bot.query().fetch():
-      b = bot.to_dict()
-      b['html_class'] = (
-          'dead_machine' if bot.last_seen < dead_machine_cutoff else '')
-      bots.append(b)
-    # TODO(maruel): Do the sorting via javascript so no need to reload the page
-    # at all.
-    bots.sort(key=lambda i: i[sort_by])
+    def sort_bot(bot):
+      if sort_by == 'id':
+        return bot.key.string_id()
+      return getattr(bot, sort_by)
+
+    bots = sorted(bot_management.Bot.query().fetch(), key=sort_bot)
 
     sort_options = [
       SortOptions(k, v)
@@ -402,10 +402,10 @@ class BotsListHandler(auth.AuthenticatingHandler):
       # TODO(maruel): it should be the default AppEngine url version.
       'current_version':
           bot_management.get_slave_version(self.request.host_url),
+      'dead_machine_cutoff': dead_machine_cutoff,
       'now': task_common.utcnow(),
       'selected_sort': sort_by,
       'sort_options': sort_options,
-      'update_delay': bot_management.MACHINE_UPDATE_TIME,
     }
     self.response.out.write(
         template.render('restricted_botslist.html', params))
@@ -677,8 +677,6 @@ class ApiBots(auth.AuthenticatingHandler):
     params = {
         'machine_death_timeout':
             int(bot_management.MACHINE_DEATH_TIMEOUT.total_seconds()),
-        'machine_update_time':
-            int(bot_management.MACHINE_UPDATE_TIME.total_seconds()),
         'machines': sorted(m.to_dict() for m in bot_management.Bot.query()),
     }
     self.response.headers['Content-Type'] = 'application/json; charset=utf-8'
@@ -1041,13 +1039,6 @@ class RunnerPingHandler(auth.AuthenticatingHandler):
       run_result_key = task_scheduler.unpack_run_result_key(
           packed_run_result_key)
       task_scheduler.bot_update_task(run_result_key, {}, bot_id)
-      bot_management.tag_bot_seen(
-          bot_id,
-          None,
-          None,
-          self.request.remote_addr,
-          None,
-          None)
     except ValueError as e:
       logging.error('Failed to accept value %s: %s', packed_run_result_key, e)
       self.abort(400, 'Runner failed to ping.')

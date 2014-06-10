@@ -238,7 +238,7 @@ class TaskResultApiTest(test_case.TestCase):
     task.queue_number = None
     task.put()
     run_result = task_result.new_run_result(request, 1, 'localhost')
-    task_result.put_run_result(run_result)
+    ndb.put_multi(task_result.prepare_put_run_result(run_result))
     expected = {
       'abandoned_ts': None,
       'bot_id': u'localhost',
@@ -266,7 +266,7 @@ class TaskResultApiTest(test_case.TestCase):
     run_result.state = task_result.State.COMPLETED
     results_key = result_helper.StoreResults('foo').key
     run_result.outputs.append(results_key)
-    task_result.put_run_result(run_result)
+    ndb.put_multi(task_result.prepare_put_run_result(run_result))
     expected = {
       'abandoned_ts': None,
       'bot_id': u'localhost',
@@ -301,7 +301,7 @@ class TaskResultApiTest(test_case.TestCase):
     result_summary.put()
     run_result = task_result.new_run_result(request, 1, 'localhost')
     run_result.completed_ts = self.now
-    task_result.put_run_result(run_result)
+    ndb.put_multi(task_result.prepare_put_run_result(run_result))
 
     just_before = self.now + task_common.BOT_PING_TOLERANCE
     test_helper.mock_now(self, just_before)
@@ -314,7 +314,7 @@ class TaskResultApiTest(test_case.TestCase):
     self.assertEqual(
         [run_result], list(task_result.yield_run_results_with_dead_bot()))
 
-  def test_put_run_result(self):
+  def test_prepare_put_run_result(self):
     # Tested indirectly.
     pass
 

@@ -191,7 +191,15 @@ class TaskRunResult(_TaskResultCommon):
     # probably better to duplicate the data. The trade off is that TaskRunResult
     # is saved a lot. Maybe we'll need to rethink this, maybe TaskRunSummary
     # wasn't a great idea after all.
-    return self.result_summary_key.get().created_ts
+    return self.request_key.get().created_ts
+
+  @property
+  def name(self):
+    # TODO(maruel): This property is not efficient at lookup time so it is
+    # probably better to duplicate the data. The trade off is that TaskRunResult
+    # is saved a lot. Maybe we'll need to rethink this, maybe TaskRunSummary
+    # wasn't a great idea after all.
+    return self.request_key.get().name
 
   @property
   def request_key(self):
@@ -358,12 +366,15 @@ def yield_run_results_with_dead_bot():
   return q.filter(TaskRunResult.state == State.RUNNING)
 
 
-def put_run_result(run_result):
-  """Saves the updated TaskRunResult and TaskResultSummary."""
+def prepare_put_run_result(run_result):
+  """Prepares the entity to be saved.
+
+  It returns the updated TaskRunResult and TaskResultSummary to be saved.
+  """
   # TODO(maruel): Test the situation where a shard is retried, but the bot
   # running the previous try somehow reappears and reports success, the job
   # should still be marked as success, not as running.
   assert isinstance(run_result, TaskRunResult)
   result_summary = run_result.result_summary_key.get()
   result_summary.set_from_run_result(run_result)
-  ndb.put_multi([run_result, result_summary])
+  return (run_result, result_summary)

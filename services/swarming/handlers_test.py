@@ -230,7 +230,6 @@ class AppTest(test_case.TestCase):
     bot_management.tag_bot_seen(
         'id2', 'localhost:8080', '127.0.0.2', '8.8.8.8', {'foo': 'bar'},
         '123456789')
-    bot_management.tag_bot_seen('id3', None, None, '8.8.8.8', None, None)
 
     response = self.app.get('/restricted/bots')
     self.assertTrue('200' in response.status)
@@ -249,8 +248,6 @@ class AppTest(test_case.TestCase):
     expected = {
         u'machine_death_timeout':
             int(bot_management.MACHINE_DEATH_TIMEOUT.total_seconds()),
-        u'machine_update_time':
-            int(bot_management.MACHINE_UPDATE_TIME.total_seconds()),
         u'machines': [
           {
             u'dimensions': {u'foo': u'bar'},
@@ -259,6 +256,7 @@ class AppTest(test_case.TestCase):
             u'id': u'id1',
             u'internal_ip': u'127.0.0.1',
             u'last_seen': u'2000-01-02 03:04:05',
+            u'task': None,
             u'version': u'123456789',
           },
        ],

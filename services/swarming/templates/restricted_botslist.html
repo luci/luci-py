@@ -21,17 +21,14 @@
 </select>
 </p>
 <p>
-Notes:<br>
-- Refreshing delay is: {{update_delay}}<br>
-- Current version is: {{current_version[:8]}}<br>
+Current bot version is: {{current_version[:8]}}
 </p>
 
 <table id="machine-table" class="alterning_background"
     summary="This table lists all machines that have polled this server">
   <thead>
     <th>ID</th>
-    <th>Internal IP</th>
-    <th>External IP</th>
+    <th>Task</th>
     <th>Last Seen</th>
     <th>Dimensions</th>
     <th>Version</th>
@@ -39,11 +36,14 @@ Notes:<br>
   </thead>
   <tbody>
     {% for bot in bots %}
-      <tr class="request {{bot.html_class}}">
-        <td>{{bot.id}}</td>
-        <td>{{bot.internal_ip}}</td>
-        <td>{{bot.external_ip}}</td>
-        <td>{{bot.last_seen|datetimeformat}}</td>
+      <tr class="request {% if bot.last_seen < dead_machine_cutoff %}dead_machine{% endif %}">
+        <td>{{bot.key.id()}}</td>
+        <td>
+          {% if bot.task %}
+          <a href="/user/task/{{bot.task_entity.key_string}}">{{bot.task_entity.name}}</a>
+          {% else %}--{% endif%}
+        </td>
+        <td>{{(now-bot.last_seen)|timedeltaformat}}</td>
         <td>
           {% for k, v in bot.dimensions.iteritems()|sort %}
           {{k}}:

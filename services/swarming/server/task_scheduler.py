@@ -22,6 +22,7 @@ from google.appengine.api import datastore_errors
 from google.appengine.ext import ndb
 from google.appengine.runtime import apiproxy_errors
 
+from server import bot_management
 from server import stats
 from server import task_common
 from server import task_request
@@ -214,9 +215,18 @@ def bot_reap_task(dimensions, bot_id):
 
 
 def bot_update_task(run_result_key, data, bot_id):
-  """Updates a TaskRunResult entity with the latest info from the bot."""
+  """Updates a TaskRunResult and associated entities with the latest info from
+  the bot.
+
+  It does two DB RPCs, one get_multi() and one put_multi().
+  """
   now = task_common.utcnow()
-  run_result = run_result_key.get()
+  bot_key = bot_management.get_bot_key(bot_id)
+  request_key = task_result.result_summary_key_to_request_key(
+      task_result.run_result_key_to_result_summary_key(run_result_key))
+
+  run_result, request, bot = ndb.get_multi(
+      [run_result_key, request_key, bot_key])
   if not run_result:
     logging.error('No result found for %s', run_result_key)
     return False
@@ -231,7 +241,12 @@ def bot_update_task(run_result_key, data, bot_id):
         bot_id, run_result.bot_id, run_result.key)
     return False
 
-  request_future = run_result.request_key.get_async()
+  to_put = []
+  if bot:
+    bot.last_seen = now
+    bot.task = run_result_key
+    to_put.append(bot)
+
   # TODO(maruel): Wrong but that's the current behavior of the swarming bots.
   # Eventually change the bot protocol to be able to send more details.
   completed = 'exit_codes' in data
@@ -241,8 +256,10 @@ def bot_update_task(run_result_key, data, bot_id):
     run_result.exit_codes.extend(data['exit_codes'])
   if 'outputs' in data:
     run_result.outputs.extend(data['outputs'])
-  task_result.put_run_result(run_result)
-  request = request_future.get_result()
+  to_put.extend(task_result.prepare_put_run_result(run_result))
+  ndb.put_multi(to_put)
+
+  # Update stats.
   if completed:
     stats.add_run_entry(
         'run_completed', run_result.key,
@@ -317,7 +334,7 @@ def cron_abort_bot_died():
       request_future = run_result.request_key.get_async()
       run_result.state = task_result.State.BOT_DIED
       run_result.abandoned_ts = task_common.utcnow()
-      task_result.put_run_result(run_result)
+      ndb.put_multi(task_result.prepare_put_run_result(run_result))
       request = request_future.get_result()
       stats.add_run_entry(
           'run_bot_died', run_result.key,

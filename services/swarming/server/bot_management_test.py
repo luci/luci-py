@@ -71,7 +71,8 @@ class BotManagementTest(test_case.TestCase):
 
   def test_get_bot_key(self):
     self.assertEqual(
-        "Key('Bot', 'f-a:1')", str(bot_management.get_bot_key('f-a:1')))
+        "Key('BotRoot', 'f-a:1', 'Bot', 'f-a:1')",
+        str(bot_management.get_bot_key('f-a:1')))
 
   def test_tag_bot_seen(self):
     bot = bot_management.tag_bot_seen(
@@ -86,6 +87,7 @@ class BotManagementTest(test_case.TestCase):
       'id': 'id1',
       'internal_ip': u'127.0.0.1',
       'last_seen': datetime.datetime(2010, 1, 2, 3, 4, 5, 6),
+      'task': None,
       'version': u'da39a3ee5e6b4b0d3255bfef95601890afd80709',
     }
     self.assertEqual(expected, bot.to_dict())
