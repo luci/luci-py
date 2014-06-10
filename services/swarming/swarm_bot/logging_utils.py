@@ -8,12 +8,54 @@ TODO(maruel): Merge buffering and output related code from client/utils/tools.py
 in a single file.
 """
 
+import codecs
 import logging
 import logging.handlers
 import os
 import sys
 import tempfile
 import time
+
+
+# This works around file locking issue on Windows specifically in the case of
+# long lived child processes.
+#
+# Python opens files with inheritable handle and without file sharing by
+# default. This causes the RotatingFileHandler file handle to be duplicated in
+# the subprocesses even if the log file is not used in it. Because of this
+# handle in the child process, when the RotatingFileHandler tries to os.rename()
+# the file in the parent process, it fails with:
+#     WindowsError: [Error 32] The process cannot access the file because
+#     it is being used by another process
+if sys.platform == 'win32':
+  import msvcrt  # pylint: disable=F0401
+  import _subprocess  # pylint: disable=F0401
+
+  # TODO(maruel): Make it work in cygwin too if necessary. This would have to
+  # use ctypes.cdll.kernel32 instead of _subprocess and msvcrt.
+
+  def _duplicate(handle):
+    target_process = _subprocess.GetCurrentProcess()
+    return _subprocess.DuplicateHandle(
+        _subprocess.GetCurrentProcess(), handle, target_process,
+        0, False, _subprocess.DUPLICATE_SAME_ACCESS).Detach()
+
+
+  class NoInheritRotatingFileHandler(logging.handlers.RotatingFileHandler):
+    def _open(self):
+      """Opens the current file without handle inheritance."""
+      if self.encoding is None:
+        with open(self.baseFilename, self.mode) as stream:
+          newosf = _duplicate(msvcrt.get_osfhandle(stream.fileno()))
+          new_fd = msvcrt.open_osfhandle(newosf, os.O_APPEND)
+          return os.fdopen(new_fd, self.mode)
+      return codecs.open(self.baseFilename, self.mode, self.encoding)
+
+
+else:  # Not Windows.
+
+
+  NoInheritRotatingFileHandler = logging.handlers.RotatingFileHandler
 
 
 class CaptureLogs(object):
@@ -107,7 +149,7 @@ def prepare_logging(filename, root=None):
   # Setup up logging to a constant file so we can debug issues where
   # the results aren't properly sent to the result URL.
   if filename:
-    rotating_file = logging.handlers.RotatingFileHandler(
+    rotating_file = NoInheritRotatingFileHandler(
         filename, maxBytes=10 * 1024 * 1024, backupCount=5)
     rotating_file.setLevel(logging.DEBUG)
     rotating_file.setFormatter(formatter)
