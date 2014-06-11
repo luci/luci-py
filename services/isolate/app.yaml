@@ -41,6 +41,9 @@ builtins:
 inbound_services:
 - warmup
 
+includes:
+- components/static_third_party.yaml
+
 # https://developers.google.com/appengine/docs/python/tools/libraries27
 # As the doc says, serious applications should specify the third party versions.
 libraries:

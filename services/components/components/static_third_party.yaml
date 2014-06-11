@@ -1,0 +1,7 @@
+handlers:
+# TODO(maruel): Figure out why it has to be rooted to the app directory.
+- url: /third_party/(.+)\.(css|gif|ico|js|ttf|svg)
+  static_files: components/static/third_party/\1.\2
+  upload: components/static/third_party/(.+)\.(css|gif|ico|js|ttf|svg)
+  secure: always
+  expiration: 30d

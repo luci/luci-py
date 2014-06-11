@@ -38,6 +38,9 @@ builtins:
 inbound_services:
 - warmup
 
+includes:
+- components/static_third_party.yaml
+
 libraries:
 - name: jinja2
   version: "2.6"
