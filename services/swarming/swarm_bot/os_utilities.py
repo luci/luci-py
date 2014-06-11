@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # Copyright 2014 The Swarming Authors. All rights reserved.
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
@@ -16,18 +17,21 @@ import logging
 import multiprocessing
 import os
 import platform
+import pprint
 import re
 import socket
 import subprocess
 import sys
 import time
 
+try:
+  import zipped_archive
 
-import zipped_archive
+  THIS_FILE = os.path.abspath(zipped_archive.get_main_script_path() or __file__)
+except ImportError:
+  THIS_FILE = os.path.abspath(__file__)
 
-
-ROOT_DIR = os.path.dirname(
-    os.path.abspath(zipped_archive.get_main_script_path() or __file__))
+ROOT_DIR = os.path.dirname(THIS_FILE)
 
 
 ### Private stuff.
@@ -574,3 +578,16 @@ def restart_and_return():
     else:
       success = True
   return success
+
+
+def main():
+  """Prints out the output of get_attributes()."""
+  # Pass an empty tag, so pop it up since it has no significance.
+  attribs = get_attributes(tag='')
+  attribs.pop('tag')
+  pprint.pprint(attribs)
+  return 0
+
+
+if __name__ == '__main__':
+  sys.exit(main())
