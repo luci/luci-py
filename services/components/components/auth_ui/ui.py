@@ -49,6 +49,7 @@ def get_ui_routes():
   """Returns a list of webapp2 routes with auth REST API handlers."""
   return [
     webapp2.Route(r'/auth', MainHandler),
+    webapp2.Route(r'/auth/bootstrap', BootstrapHandler, name='bootstrap'),
     webapp2.Route(r'/auth/groups', GroupsHandler),
     webapp2.Route(r'/auth/oauth_config', OAuthConfigHandler),
   ]
@@ -114,26 +115,64 @@ class UIHandler(auth.AuthenticatingHandler):
 
   def authorization_error(self, error):
     """Redirects to login or shows 'Access Denied' page."""
+    # Not authenticated -> redirect to login.
     if auth.get_current_identity().is_anonymous:
       self.redirect(users.create_login_url(self.request.path))
-    else:
-      env = {
-        'page_title': 'Access Denied',
-        'error': error,
-      }
-      self.reply('access_denied.html', env=env, status=403)
+      return
+
+    # Admin group is empty -> redirect to bootstrap procedure to create it.
+    if auth.is_empty_group(auth.ADMIN_GROUP):
+      self.redirect_to('bootstrap')
+      return
+
+    # No access.
+    env = {
+      'page_title': 'Access Denied',
+      'error': error,
+    }
+    self.reply('access_denied.html', env=env, status=403)
 
 
 class MainHandler(UIHandler):
   """Redirects to first navbar tab."""
-  @auth.require(auth.READ, 'auth/management')
+  @auth.require(auth.is_admin)
   def get(self):
     self.redirect(NAVBAR_TABS[0][2])
 
 
+class BootstrapHandler(UIHandler):
+  """Creates Administrators group (if necessary) and adds current caller to it.
+
+  Requires Appengine level Admin access for its handlers, since Administrators
+  group may not exist yet. Used to bootstrap a new service instance.
+  """
+
+  @auth.require(users.is_current_user_admin)
+  def get(self):
+    self.reply(
+        'bootstrap.html',
+        env={
+          'page_title': 'Bootstrap',
+          'admin_group': auth.ADMIN_GROUP,
+        })
+
+  @auth.require(users.is_current_user_admin)
+  def post(self):
+    added = auth.bootstrap_group(
+        auth.ADMIN_GROUP, auth.get_current_identity(),
+        'Users that can manage groups')
+    self.reply(
+        'bootstrap_done.html',
+        env={
+          'page_title': 'Bootstrap',
+          'admin_group': auth.ADMIN_GROUP,
+          'added': added,
+        })
+
+
 class GroupsHandler(UIHandler):
   """Page with Groups management."""
-  @auth.require(auth.READ, 'auth/management')
+  @auth.require(auth.is_admin)
   def get(self):
     env = {
       'js_file': 'groups.js',
@@ -145,7 +184,7 @@ class GroupsHandler(UIHandler):
 
 class OAuthConfigHandler(UIHandler):
   """Page with OAuth configuration."""
-  @auth.require(auth.READ, 'auth/management')
+  @auth.require(auth.is_admin)
   def get(self):
     env = {
       'js_file': 'oauth_config.js',

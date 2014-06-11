@@ -1,0 +1,27 @@
+{% extends 'base_minimal.html' %}
+{% block content %}
+
+<h2>Add you to {{admin_group}} group?</h2>
+<p>You are logged in as <b>{{identity.name}}</b> and you'll be added to
+<b>{{admin_group}}</b> group.</p>
+<hr>
+<p>
+  <a class="btn btn-primary" href="#" onclick="javascript:submit(event);">
+    Proceed
+  </a>
+  <a class="btn btn-default" href="javascript:common.logout();">Logout</a>
+</p>
+
+<form name="token" method="POST">
+  <input type="hidden" name="xsrf_token" value="{{xsrf_token}}" />
+</form>
+
+<script type="text/javascript">
+function submit(event) {
+  document.token.submit();
+  event.preventDefault();
+  return false;
+}
+</script>
+
+{% endblock %}

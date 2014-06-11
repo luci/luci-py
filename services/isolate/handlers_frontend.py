@@ -53,6 +53,55 @@ MIN_SIZE_FOR_GS = 501
 MIN_SIZE_FOR_DIRECT_GS = MIN_SIZE_FOR_GS
 
 
+### ACLs
+
+
+# Names of groups.
+ADMINS_GROUP = 'isolate-admin-access'
+READERS_GROUP = 'isolate-read-access'
+WRITERS_GROUP = 'isolate-write-access'
+
+
+def isolate_admin():
+  """Returns True if current user can administer isolate server."""
+  return auth.is_group_member(ADMINS_GROUP) or auth.is_admin()
+
+
+def isolate_writable():
+  """Returns True if current user can write to isolate."""
+  # Admins have access by default.
+  return auth.is_group_member(WRITERS_GROUP) or isolate_admin()
+
+
+def isolate_readable():
+  """Returns True if current user can read from isolate."""
+  # Anyone that can write can also read.
+  return auth.is_group_member(READERS_GROUP) or isolate_writable()
+
+
+def bootstrap_dev_server_acls():
+  """Adds 127.0.0.1 as a whitelisted IP when testing."""
+  assert utils.is_local_dev_server()
+
+  # Add to IP whitelist.
+  access_id = acl.ip_to_str('v4', 2130706433)
+  acl.WhitelistedIP.get_or_insert(
+      access_id,
+      ip='127.0.0.1',
+      comment='automatic because of running on dev server')
+
+  # Add to Isolate groups.
+  ident = auth.Identity(auth.IDENTITY_BOT, access_id)
+  auth.bootstrap_group(READERS_GROUP, ident, 'Can read from Isolate')
+  auth.bootstrap_group(WRITERS_GROUP, ident, 'Can write to Isolate')
+
+  # Add a fake admin for local dev server.
+  auth.bootstrap_group(
+      auth.ADMIN_GROUP,
+      auth.Identity(auth.IDENTITY_USER, 'test@example.com'),
+      'Users that can manage groups')
+
+
 ### Utility
 
 
@@ -103,7 +152,7 @@ def render_template(template_path, env=None):
 class RestrictedAdminUIHandler(auth.AuthenticatingHandler):
   """Root admin UI page."""
 
-  @auth.require(auth.READ, 'isolate/management')
+  @auth.require(isolate_admin)
   def get(self):
     self.response.write(render_template('restricted.html', {
         'xsrf_token': self.generate_xsrf_token(),
@@ -117,7 +166,7 @@ class RestrictedAdminUIHandler(auth.AuthenticatingHandler):
 class RestrictedGoogleStorageConfig(auth.AuthenticatingHandler):
   """View and modify Google Storage config entries."""
 
-  @auth.require(auth.READ, 'isolate/management')
+  @auth.require(isolate_admin)
   def get(self):
     settings = config.settings()
     self.response.write(render_template('gs_config.html', {
@@ -127,7 +176,7 @@ class RestrictedGoogleStorageConfig(auth.AuthenticatingHandler):
         'xsrf_token': self.generate_xsrf_token(),
     }))
 
-  @auth.require(auth.UPDATE, 'isolate/management')
+  @auth.require(isolate_admin)
   def post(self):
     settings = config.settings()
     settings.gs_bucket = self.request.get('gs_bucket')
@@ -149,7 +198,7 @@ class RestrictedGoogleStorageConfig(auth.AuthenticatingHandler):
 class RestrictedEreporter2Report(auth.AuthenticatingHandler):
   """Returns all the recent errors as a web page."""
 
-  @auth.require(auth.READ, 'isolate/management')
+  @auth.require(isolate_admin)
   def get(self):
     """Reports the errors logged and ignored.
 
@@ -185,7 +234,7 @@ class RestrictedEreporter2Report(auth.AuthenticatingHandler):
 class RestrictedEreporter2Request(auth.AuthenticatingHandler):
   """Dumps information about single logged request."""
 
-  @auth.require(auth.READ, 'isolate/management')
+  @auth.require(isolate_admin)
   def get(self, request_id):
     # TODO(maruel): Add UI.
     data = ereporter2.log_request_id_to_dict(request_id)
@@ -207,7 +256,7 @@ class RestrictedLaunchMapReduceJob(auth.AuthenticatingHandler):
   on backend module.
   """
 
-  @auth.require(auth.UPDATE, 'isolate/management')
+  @auth.require(isolate_admin)
   def post(self):
     job_id = self.request.get('job_id')
     assert job_id in map_reduce_jobs.MAP_REDUCE_JOBS
@@ -316,7 +365,7 @@ class HandshakeHandler(ProtocolHandler):
   # This handler is called to get XSRF token, there's nothing to enforce yet.
   xsrf_token_enforce_on = ()
 
-  @auth.require(auth.READ, 'isolate/namespaces/')
+  @auth.require(isolate_readable)
   def post(self):
     """Responds with access token and server version."""
     try:
@@ -334,12 +383,12 @@ class HandshakeHandler(ProtocolHandler):
 
     # Log details of the handshake to the server log.
     logging_info = {
-        'Access Id': auth.get_current_identity().to_bytes(),
-        'Client app version': client_app_version,
-        'Client is fetcher': fetcher,
-        'Client is pusher': pusher,
-        'Client protocol version': client_protocol,
-        'Token': access_token,
+      'Access Id': auth.get_current_identity().to_bytes(),
+      'Client app version': client_app_version,
+      'Client is fetcher': fetcher,
+      'Client is pusher': pusher,
+      'Client protocol version': client_protocol,
+      'Token': access_token,
     }
     logging.info(
         '\n'.join('%s: %s' % (k, logging_info[k])
@@ -525,7 +574,7 @@ class PreUploadContentHandler(ProtocolHandler):
       finalize_url = None
     return upload_url, finalize_url
 
-  @auth.require(auth.UPDATE, 'isolate/namespaces/{namespace}')
+  @auth.require(isolate_writable)
   def post(self, namespace):
     """Reads body with items to upload and replies with URLs to upload to."""
     if not re.match(r'^%s$' % model.NAMESPACE_RE, namespace):
@@ -575,7 +624,7 @@ class RetrieveContentHandler(ProtocolHandler):
     * HTTP 416: requested byte range can not be satisfied.
   """
 
-  @auth.require(auth.READ, 'isolate/namespaces/{namespace}')
+  @auth.require(isolate_readable)
   def get(self, namespace, hash_key):  #pylint: disable=W0221
     # Parse 'Range' header if it's present to extract initial offset.
     # Only support single continuous range from some |offset| to the end.
@@ -675,12 +724,12 @@ class StoreContentHandler(ProtocolHandler):
     mac.update(data_to_sign)
     return mac.hexdigest()
 
-  @auth.require(auth.UPDATE, 'isolate/namespaces/{namespace}')
+  @auth.require(isolate_writable)
   def post(self, namespace, hash_key):
     """POST is used when finalizing upload to GS."""
     return self.handle(namespace, hash_key)
 
-  @auth.require(auth.UPDATE, 'isolate/namespaces/{namespace}')
+  @auth.require(isolate_writable)
   def put(self, namespace, hash_key):
     """PUT is used when uploading directly to datastore via this handler."""
     return self.handle(namespace, hash_key)
@@ -959,6 +1008,10 @@ def create_application(debug=False):
       app_name='Isolate Server',
       app_version=utils.get_app_version(),
       app_revision_url=config.get_app_revision_url())
+
+  # Add some predefined groups when running on local dev server.
+  if utils.is_local_dev_server():
+    bootstrap_dev_server_acls()
 
   # Routes with Auth REST API and Auth UI.
   auth_routes = []

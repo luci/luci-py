@@ -167,60 +167,6 @@ class IdentityGlobTest(test_case.TestCase):
         glob.match(model.Identity(model.IDENTITY_USER, 'a@test.com')))
 
 
-class AccessRuleTest(test_case.TestCase):
-  """Tests for AccessRule class."""
-
-  def test_immutable(self):
-    # See comment in IdentityTest.test_immutable regarding existing hole in
-    # immutability.
-    rule = model.AccessRule(model.ALLOW_RULE, 'Group', [model.READ], '^.*$')
-    self.assertTrue(isinstance(rule, tuple))
-    for attr in ('kind', 'group', 'actions', 'resource'):
-      with self.assertRaises(AttributeError):
-        setattr(rule, attr, 'value')
-
-  def test_equality(self):
-    rule1 = model.AccessRule(model.ALLOW_RULE, 'Group', [model.READ], '^.*$')
-    rule2 = model.AccessRule(model.ALLOW_RULE, 'Group', [model.READ], '^.*$')
-    rule3 = model.AccessRule(model.ALLOW_RULE, 'Group', [model.UPDATE], '^.*$')
-    self.assertEqual(rule1, rule2)
-    self.assertNotEqual(rule1, rule3)
-    # Ensure |actions| is treated like a set (order is ignored).
-    self.assertEqual(
-        model.AccessRule(model.ALLOW_RULE, 'Group',
-            [model.READ, model.UPDATE, model.READ], '^.*$'),
-        model.AccessRule(model.ALLOW_RULE, 'Group',
-            [model.UPDATE, model.READ], '^.*$'))
-
-  def test_validation(self):
-    # Good case.
-    model.AccessRule(model.ALLOW_RULE, 'Group', [model.READ], '^.*$')
-
-    # Bad cases, deviations from good case.
-    bad_cases = (
-      ('bad-kind', 'Group', [model.READ], '^.*$'),
-      (model.ALLOW_RULE, '   Bad Group  ', [model.READ], '^.*$'),
-      (model.ALLOW_RULE, 'Group', [], '^.*$'),
-      (model.ALLOW_RULE, 'Group', ['BAD_ACTION'], '^.*$'),
-      (model.ALLOW_RULE, 'Group', [model.READ], '^bad regexp****$'),
-      (model.ALLOW_RULE, 'Group', [model.READ], '^nodollar'),
-      (model.ALLOW_RULE, 'Group', [model.READ], 'nohat$'),
-    )
-    for kind, group, actions, regex in bad_cases:
-      with self.assertRaises(ValueError):
-        model.AccessRule(kind, group, actions, regex)
-
-  def test_serialization(self):
-    # Rule goes though serialization-deserialization unchanged.
-    rule = model.AccessRule(model.ALLOW_RULE, 'Group', [model.READ], '^.*$')
-    self.assertEqual(rule, model.AccessRule.from_jsonish(rule.to_jsonish()))
-
-    # Missing keys are bad.
-    with self.assertRaises(ValueError):
-      model.AccessRule.from_jsonish(
-          {'group': 'Group', 'kind': 'ALLOW', 'resource': '^.*$'})
-
-
 class AuthSecretTest(test_case.TestCase):
   """Tests for AuthSecret class."""
 

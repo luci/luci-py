@@ -57,7 +57,7 @@ class AuthenticatingHandler(webapp2.RequestHandler):
   """Base class for request handlers that use Auth system.
 
   Knows how to extract Identity from request data and how to initialize auth
-  request context, so that get_current_identity() and has_permission() work.
+  request context, so that get_current_identity() and is_group_member() work.
 
   All request handling methods (like 'get', 'post', etc) should be marked by
   either @require or @public decorators.
@@ -74,23 +74,6 @@ class AuthenticatingHandler(webapp2.RequestHandler):
   xsrf_token_request_param = 'xsrf_token'
   # Embedded data extracted from XSRF token of current request.
   xsrf_token_data = None
-
-  @classmethod
-  def get_methods_permissions(cls):
-    """Returns dictionary 'HTTP method name' -> list of permission requirements.
-
-    Each requirement is a pair (action, resource template) as passed to @require
-    decorator for corresponding handler. Outermost decorator comes first in
-    the list. For public methods the list is empty.
-
-    Intended to be used only for testing.
-    """
-    methods = {}
-    for method in webapp2.WSGIApplication.allowed_methods:
-      func = getattr(cls, method.lower(), None)
-      if func:
-        methods[method] = api.get_require_decorators(func)
-    return methods
 
   def dispatch(self):
     """Extracts and verifies Identity, sets up request auth context."""
@@ -109,7 +92,7 @@ class AuthenticatingHandler(webapp2.RequestHandler):
     identity = identity or model.Anonymous
 
     # Successfully extracted and validated an identity. Put it into request
-    # cache. It's later used by 'get_current_identity()' and 'has_permission()'.
+    # cache. It's later used by 'get_current_identity()' and other calls.
     assert isinstance(identity, model.Identity)
     api.get_request_cache().set_current_identity(identity)
 
@@ -197,9 +180,9 @@ class AuthenticatingHandler(webapp2.RequestHandler):
 def configure(auth_methods):
   """Sets a list of authentication methods to use for all requests.
 
-  Its a global configuration that will be used by all request handlers inherited
-  from AuthenticatingHandler. AuthenticatingHandler will try to apply auth
-  methods sequentially one by one by until it finds one that works.
+  It's a global configuration that will be used by all request handlers
+  inherited from AuthenticatingHandler. AuthenticatingHandler will try to apply
+  auth methods sequentially one by one by until it finds one that works.
 
   Args:
     auth_methods: list of authentication functions to use to authenticate

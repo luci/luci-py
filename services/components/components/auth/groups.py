@@ -10,32 +10,18 @@ from . import model
 
 
 def find_references(group):
-  """Finds services and groups that reference the specified group.
+  """Finds groups that reference the specified group.
 
-  Used to verify that |group| is safe to delete, i.e. nothing depends on it.
-  A service can reference group in its ACL rules. A group can reference
-  another group in its list of nested groups.
-
-  This function is slow and should not be used on performance critical paths.
+  Used to verify that |group| is safe to delete, i.e. no other group is
+  depending on it.
 
   Returns:
-    Pair (set(names of referencing groups), set(names of referencing services)).
+    Set of names of referencing groups.
   """
-  # Try to find this group as a nested one in some other group.
   referencing_groups = model.AuthGroup.query(
       model.AuthGroup.nested == group,
-      ancestor=model.ROOT_KEY).fetch_async(keys_only=True)
-
-  # While the query is running, search for services that mention
-  # the group in ACL rules.
-  referencing_services = set()
-  for service_config in model.AuthServiceConfig.query(ancestor=model.ROOT_KEY):
-    if any(rule.group == group for rule in service_config.rules):
-      referencing_services.add(service_config.key.id())
-
-  # Wait for AuthGroup query to finish, return the result.
-  referencing_groups = set(key.id() for key in referencing_groups.get_result())
-  return referencing_groups, referencing_services
+      ancestor=model.ROOT_KEY).fetch(keys_only=True)
+  return set(key.id() for key in referencing_groups)
 
 
 def get_missing_groups(groups):
@@ -43,9 +29,7 @@ def get_missing_groups(groups):
   # We need to iterate over |groups| twice. It won't work if |groups|
   # is a generator. So convert to list first.
   groups = list(groups)
-  entities = ndb.get_multi(
-      ndb.Key(model.AuthGroup, name, parent=model.ROOT_KEY)
-      for name in groups)
+  entities = ndb.get_multi(model.group_key(name) for name in groups)
   return [name for name, ent in zip(groups, entities) if not ent]
 
 
@@ -82,8 +66,7 @@ def find_dependency_cycle(group):
 
     # Load bodies of nested groups not seen so far into |groups|.
     entities = ndb.get_multi(
-        ndb.Key(model.AuthGroup, name, parent=model.ROOT_KEY)
-        for name in group.nested if name not in groups)
+        model.group_key(name) for name in group.nested if name not in groups)
     groups.update({entity.key.id(): entity for entity in entities if entity})
 
     visiting.append(group)

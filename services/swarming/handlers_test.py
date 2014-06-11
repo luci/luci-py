@@ -18,6 +18,7 @@ test_env.setup_test_env()
 
 from google.appengine.datastore import datastore_stub_util
 from google.appengine.ext import deferred
+from google.appengine.ext import ndb
 
 import webtest
 
@@ -50,6 +51,12 @@ ADMIN_EMAIL = 'admin@example.com'
 FAKE_IP = 'fake-ip'
 
 
+def clear_ip_whitelist():
+  """Removes all IPs from the whitelist."""
+  entries = user_manager.MachineWhitelist.query().fetch(keys_only=True)
+  ndb.delete_multi(entries)
+
+
 class AppTest(test_case.TestCase):
   # TODO(maruel): Make 3 test classes, one focused on bot API, one on client API
   # and one on the web frontend and backend processing.
@@ -73,17 +80,17 @@ class AppTest(test_case.TestCase):
     # Whitelist that fake bot.
     user_manager.AddWhitelist(FAKE_IP)
 
-    # Mock expected permission structure.
-    def mocked_has_permission(_action, resource):
-      ident = auth.get_current_identity()
-      # Admin has access to everything. Known users have access to client
-      # portion, unknown users are effectively anonymous (have no access).
-      if ident.is_user:
-        return (ident.name == ADMIN_EMAIL) or (ident.name == USER_EMAIL and
-            resource == 'swarming/clients')
-      # Bots have access to client and bot portions.
-      return ident.is_bot and resource in ('swarming/clients', 'swarming/bots')
-    self.mock(auth.api, 'has_permission', mocked_has_permission)
+    # Mock expected groups structure.
+    def mocked_is_group_member(group, identity=None):
+      identity = identity or auth.get_current_identity()
+      if group == handlers_frontend.ADMINS_GROUP:
+        return identity.is_user and identity.name == ADMIN_EMAIL
+      if group == handlers_frontend.USERS_GROUP:
+        return identity.is_user and identity.name == USER_EMAIL
+      if group == handlers_frontend.BOTS_GROUP:
+        return identity.is_bot
+      return False
+    self.mock(handlers_frontend.auth, 'is_group_member', mocked_is_group_member)
 
     self._mox = mox.Mox()
     self.mock(stats_framework, 'add_entry', self._parse_line)
@@ -484,6 +491,9 @@ class AppTest(test_case.TestCase):
     self.assertEqual(expected, resp.json)
 
   def testWhitelistIPHandlerParams(self):
+    # Start with clean IP whitelist. It removes FAKE_IP added in setUp.
+    clear_ip_whitelist()
+
     # Act under admin identity.
     self._ReplaceCurrentUser(ADMIN_EMAIL)
 
@@ -493,15 +503,14 @@ class AppTest(test_case.TestCase):
     xsrf_token = self.getXsrfToken()
 
     # Make sure the link redirects to the right place.
-    # setUp adds one item.
     self.assertEqual(
-        [{'ip': FAKE_IP}],
+        [],
         [t.to_dict() for t in user_manager.MachineWhitelist.query().fetch()])
     response = self.app.post(
         '/restricted/whitelist_ip', {'a': 'True', 'xsrf_token': xsrf_token},
         extra_environ={'REMOTE_ADDR': 'foo'})
     self.assertEqual(
-        [{'ip': FAKE_IP}, {'ip': u'foo'}],
+        [{'ip': u'foo'}],
         [t.to_dict() for t in user_manager.MachineWhitelist.query().fetch()])
     self.assertEqual(200, response.status_code)
 
@@ -517,7 +526,7 @@ class AppTest(test_case.TestCase):
         {'i': '123', 'a': 'true', 'xsrf_token': xsrf_token},
         expect_errors=True)
     self.assertEqual(
-        [{'ip': FAKE_IP}, {'ip': u'foo'}],
+        [{'ip': u'foo'}],
         [t.to_dict() for t in user_manager.MachineWhitelist.query().fetch()])
 
   def testWhitelistIPHandler(self):
@@ -526,7 +535,7 @@ class AppTest(test_case.TestCase):
     # Act under admin identity.
     self._ReplaceCurrentUser(ADMIN_EMAIL)
 
-    user_manager.DeleteWhitelist(FAKE_IP)
+    clear_ip_whitelist()
     self.assertEqual(0, user_manager.MachineWhitelist.query().count())
     xsrf_token = self.getXsrfToken()
 
@@ -837,26 +846,6 @@ class AppTest(test_case.TestCase):
     packed = task_common.pack_result_summary_key(result_summary.key)
     response = self.app.post('/restricted/cancel', {'r': packed})
     self.assertResponse(response, '200 OK', 'Runner canceled.')
-
-  def testKnownAuthResources(self):
-    # This test is supposed to catch typos and new types of auth resources. It
-    # walks over all AuthenticatedHandler routes and ensures @require decorator
-    # use resources from this set.
-    expected = frozenset([
-      'auth/management',
-      'auth/management/groups/{group}',
-      'swarming/bots',
-      'swarming/clients',
-      'swarming/management',
-    ])
-    for route in auth.get_authenticated_routes(
-        handlers_frontend.CreateApplication()):
-      per_method = route.handler.get_methods_permissions()
-      for method, permissions in per_method.iteritems():
-        self.assertTrue(
-            expected.issuperset(resource for _, resource in permissions),
-            msg='Unexpected auth resource in %s of %s: %s' %
-                (method, route, permissions))
 
   def test_dead_machines_count(self):
     # TODO(maruel): Convert this test case to mock time and use the APIs instead

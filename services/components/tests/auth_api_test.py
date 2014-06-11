@@ -7,6 +7,7 @@
 # pylint: disable=W0212,W0612,W0613
 
 
+import datetime
 import Queue
 import sys
 import threading
@@ -49,7 +50,7 @@ class AuthDBTest(test_case.TestCase):
 
     # Creates AuthDB with given list of groups and then runs the check.
     is_member = (lambda groups, identity, group:
-        api.AuthDB(groups=groups).is_group_member(identity, group))
+        api.AuthDB(groups=groups).is_group_member(group, identity))
 
     # Wildcard group includes everyone (even anonymous).
     self.assertTrue(is_member([], joe, '*'))
@@ -86,151 +87,8 @@ class AuthDBTest(test_case.TestCase):
     # This should not hang, but produce error message.
     auth_db = api.AuthDB(groups=[group1, group2])
     self.assertFalse(
-        auth_db.is_group_member(model.Anonymous, 'Group1'))
+        auth_db.is_group_member('Group1', model.Anonymous))
     self.assertEqual(1, len(errors))
-
-  def test_get_groups(self):
-    groups = [
-      model.AuthGroup(id='Group1', members=[model.Anonymous]),
-      model.AuthGroup(id='Group2'),
-    ]
-    auth_db = api.AuthDB(groups=groups)
-
-    # No identity given -> all known groups.
-    self.assertEqual(set(['Group1', 'Group2']), auth_db.get_groups())
-    # With identity -> only groups that identity belongs to.
-    self.assertEqual(set(['Group1']), auth_db.get_groups(model.Anonymous))
-
-  def test_get_matching_rules(self):
-    # Groups.
-    joe = model.Identity(model.IDENTITY_USER, 'joe@example.com')
-    groups = [
-      model.AuthGroup(id='WithJoe', members=[joe]),
-      model.AuthGroup(id='WithoutJoe'),
-    ]
-
-    # Rules.
-    allow_joe_create = model.AccessRule(
-        model.ALLOW_RULE, 'WithJoe', [model.CREATE], '^existing$')
-    allow_others_create = model.AccessRule(
-        model.ALLOW_RULE, 'WithoutJoe', [model.CREATE], '^existing$')
-    allow_joe_update = model.AccessRule(
-        model.ALLOW_RULE, 'WithJoe', [model.UPDATE], '^existing$')
-    allow_others_update = model.AccessRule(
-        model.ALLOW_RULE, 'WithoutJoe', [model.UPDATE], '^existing$')
-    another_resource = model.AccessRule(
-        model.ALLOW_RULE, 'WithoutJoe', [model.DELETE], '^another-.*$')
-
-    rules = [
-      allow_joe_create,
-      allow_joe_update,
-      allow_others_create,
-      allow_others_update,
-      another_resource,
-    ]
-
-    # AuthDB with groups and rules.
-    auth_db = api.AuthDB(
-        groups=groups,
-        service_config=model.AuthServiceConfig(rules=rules))
-
-    # If no query is given, returns all defined rules.
-    self.assertEqual(rules, auth_db.get_matching_rules())
-    # If full query is given and there's a matching rule, return only that rule.
-    self.assertEqual(
-        [allow_joe_create],
-        auth_db.get_matching_rules(joe, model.CREATE, 'existing'))
-    # If full query is given, and there is NO matching rule, return deny-all.
-    self.assertEqual(
-        [model.AccessRule(model.DENY_RULE, '*', model.ALLOWED_ACTIONS, '^.*$')],
-        auth_db.get_matching_rules(joe, model.CREATE, 'non-existing'))
-
-    # Only identity is given.
-    self.assertEqual(
-        [allow_joe_create, allow_joe_update],
-        auth_db.get_matching_rules(identity=joe))
-    # Only action is given.
-    self.assertEqual(
-        [allow_joe_create, allow_others_create],
-        auth_db.get_matching_rules(action=model.CREATE))
-    # Only resource is given.
-    self.assertEqual(
-        [another_resource],
-        auth_db.get_matching_rules(resource='another-resource'))
-
-  def test_has_permission(self):
-    # Groups.
-    joe = model.Identity(model.IDENTITY_USER, 'joe@example.com')
-    bob = model.Identity(model.IDENTITY_USER, 'bob@example.com')
-    tom = model.Identity(model.IDENTITY_USER, 'tom@example.com')
-    ned = model.Identity(model.IDENTITY_USER, 'ned@example.com')
-    groups = [
-      model.AuthGroup(id='Read', members=[joe, bob]),
-      model.AuthGroup(id='Write', members=[joe]),
-      model.AuthGroup(id='Ninjas', members=[tom]),
-      model.AuthGroup(id='Banned', members=[ned]),
-    ]
-
-    # Helpers to reduce amount of typing.
-    def make_rule(kind, group, actions, resource):
-      letter_to_action = {
-        'C': model.CREATE,
-        'D': model.DELETE,
-        'R': model.READ,
-        'U': model.UPDATE,
-      }
-      return model.AccessRule(
-          kind, group, [letter_to_action[c] for c in actions], resource)
-
-    def allow(group, actions, resource):
-      return make_rule(model.ALLOW_RULE, group, actions, resource)
-
-    def deny(group, actions, resource):
-      return make_rule(model.DENY_RULE, group, actions, resource)
-
-    # Rules.
-    rules = [
-      deny('Banned', 'CRUD', '^.*$'),
-      allow('Ninjas', 'CRUD', '^.*$'),
-      allow('Read', 'R', '^public/(.*)$'),
-      allow('Write', 'CRUD', '^public/(.*)$'),
-    ]
-
-    # AuthDB with groups and rules.
-    auth_db = api.AuthDB(
-        groups=groups,
-        service_config=model.AuthServiceConfig(rules=rules))
-
-    # Joe's permission.
-    self.assertEqual(set(['Read', 'Write']), auth_db.get_groups(joe))
-    self.assertTrue(auth_db.has_permission(joe, model.READ, 'public/stuff'))
-    self.assertTrue(auth_db.has_permission(joe, model.CREATE, 'public/stuff'))
-    self.assertFalse(auth_db.has_permission(joe, model.READ, 'private/stuff'))
-
-    # Bob's permission.
-    self.assertEqual(set(['Read']), auth_db.get_groups(bob))
-    self.assertTrue(auth_db.has_permission(bob, model.READ, 'public/stuff'))
-    self.assertFalse(auth_db.has_permission(bob, model.CREATE, 'public/stuff'))
-    self.assertFalse(auth_db.has_permission(bob, model.READ, 'private/stuff'))
-
-    # Tom's permission.
-    self.assertEqual(set(['Ninjas']), auth_db.get_groups(tom))
-    self.assertTrue(auth_db.has_permission(tom, model.READ, 'public/stuff'))
-    self.assertTrue(auth_db.has_permission(tom, model.CREATE, 'public/stuff'))
-    self.assertTrue(auth_db.has_permission(tom, model.READ, 'private/stuff'))
-
-    # Ned's permission.
-    self.assertEqual(set(['Banned']), auth_db.get_groups(ned))
-    self.assertFalse(auth_db.has_permission(ned, model.READ, 'public/stuff'))
-    self.assertFalse(auth_db.has_permission(ned, model.CREATE, 'public/stuff'))
-    self.assertFalse(auth_db.has_permission(ned, model.READ, 'private/stuff'))
-
-    # Anonymous permissions.
-    anon = model.Anonymous
-    self.assertEqual(set(), auth_db.get_groups(anon))
-    self.assertFalse(auth_db.has_permission(anon, model.READ, 'public/stuff'))
-    self.assertFalse(auth_db.has_permission(anon, model.CREATE, 'public/stuff'))
-    self.assertFalse(auth_db.has_permission(anon, model.READ, 'private/stuff'))
 
   def test_is_allowed_oauth_client_id(self):
     global_config = model.AuthGlobalConfig(
@@ -244,12 +102,8 @@ class AuthDBTest(test_case.TestCase):
     self.assertFalse(auth_db.is_allowed_oauth_client_id('4'))
 
   def test_fetch_auth_db_lazy_bootstrap(self):
-    local_conf_key = ndb.Key(
-        model.AuthServiceConfig, 'local', parent=model.ROOT_KEY)
-
     # Don't exist before the call.
     self.assertFalse(model.ROOT_KEY.get())
-    self.assertFalse(local_conf_key.get())
 
     # Run bootstrap.
     api._lazy_bootstrap_ran = False
@@ -257,10 +111,6 @@ class AuthDBTest(test_case.TestCase):
 
     # Exist now.
     self.assertTrue(model.ROOT_KEY.get())
-    self.assertTrue(local_conf_key.get())
-
-    # 'Allow all' rule is set.
-    self.assertEqual([model.AllowAllRule], local_conf_key.get().rules)
 
   def test_fetch_auth_db(self):
     # Create AuthGlobalConfig.
@@ -270,17 +120,10 @@ class AuthDBTest(test_case.TestCase):
     global_config.oauth_additional_client_ids = ['2', '3']
     global_config.put()
 
-    # Create local AuthServiceConfig.
-    service_config = model.AuthServiceConfig(id='local', parent=model.ROOT_KEY)
-    service_config.rules = [
-      model.AccessRule(model.ALLOW_RULE, '*', model.ALLOWED_ACTIONS, '^.*$'),
-    ]
-    service_config.put()
-
     # Create a bunch of (empty) groups.
     groups = [
-      model.AuthGroup(id='Group A', parent=model.ROOT_KEY),
-      model.AuthGroup(id='Group B', parent=model.ROOT_KEY),
+      model.AuthGroup(key=model.group_key('Group A')),
+      model.AuthGroup(key=model.group_key('Group B')),
     ]
     for group in groups:
       group.put()
@@ -296,7 +139,6 @@ class AuthDBTest(test_case.TestCase):
     # This all stuff should be fetched into AuthDB.
     auth_db = api.fetch_auth_db()
     self.assertEqual(global_config, auth_db.global_config)
-    self.assertEqual(service_config, auth_db.service_config)
     self.assertEqual(
         set(g.key.id() for g in groups),
         set(auth_db.groups))
@@ -547,14 +389,10 @@ class TestAuthDBCache(test_case.TestCase):
 class ApiTest(test_case.TestCase):
   """Test for publicly exported API."""
 
-  def mock_has_permission(self, permissions):
-    """Setup a mock for api.has_permission that collects calls."""
-    calls = []
-    def mocked(action, resource):
-      calls.append((action, resource))
-      return permissions[(action, resource)]
-    self.mock(api, 'has_permission', mocked)
-    return calls
+  def mock_ndb_now(self, now):
+    """Makes properties with |auto_now| and |auto_now_add| use mocked time."""
+    self.mock(model.ndb.DateTimeProperty, '_now', lambda _: now)
+    self.mock(model.ndb.DateProperty, '_now', lambda _: now.date())
 
   def test_get_current_identity_unitialized(self):
     """If set_current_identity wasn't called raises an exception."""
@@ -566,173 +404,169 @@ class ApiTest(test_case.TestCase):
     api.get_request_cache().set_current_identity(model.Anonymous)
     self.assertEqual(model.Anonymous, api.get_current_identity())
 
-  def test_has_permission_uninitialized(self):
-    """If set_current_identity wasn't called raises an exception."""
-    with self.assertRaises(api.UninitializedError):
-      api.has_permission(model.READ, 'stuff')
-
-  def test_has_permission(self):
-    """Ensure has_permission uses AuthDB."""
-    calls = []
-    def mock_auth_db_has_permission(identity, action, resource):
-      calls.append((identity, action, resource))
-      return True
-    auth_db = api.AuthDB()
-    self.mock(auth_db, 'has_permission', mock_auth_db_has_permission)
-    self.mock(api, 'get_request_auth_db', lambda: auth_db)
-
-    # Ensure api.has_permission uses mocked AuthDB.has_permission.
-    api.get_request_cache().set_current_identity(model.Anonymous)
-    self.assertTrue(api.has_permission(model.READ, 'some'))
-    self.assertEqual([(model.Anonymous, model.READ, 'some')], calls)
-
   def test_require_decorator_ok(self):
-    """@require calls 'has_permissions' and then decorated function."""
-    calls = self.mock_has_permission({(model.READ, 'some-resource'): True})
+    """@require calls the callback and then decorated function."""
+    callback_calls = []
+    def require_callback():
+      callback_calls.append(1)
+      return True
 
-    @api.require(model.READ, 'some-resource')
+    @api.require(require_callback)
     def allowed(*args, **kwargs):
       return (args, kwargs)
-    self.assertEqual(
-        [(model.READ, 'some-resource')], api.get_require_decorators(allowed))
+
     self.assertEqual(((1, 2), {'a': 3}), allowed(1, 2, a=3))
-    self.assertEqual([(model.READ, 'some-resource')], calls)
+    self.assertEqual(1, len(callback_calls))
 
   def test_require_decorator_fail(self):
     """@require raises exception and doesn't call decorated function."""
-    calls = self.mock_has_permission({(model.DELETE, 'some-resource'): False})
     forbidden_calls = []
 
-    @api.require(model.DELETE, 'some-resource')
+    @api.require(lambda: False)
     def forbidden():
       forbidden_calls.append(1)
+
     with self.assertRaises(api.AuthorizationError):
       forbidden()
     self.assertFalse(forbidden_calls)
-    self.assertEqual([(model.DELETE, 'some-resource')], calls)
 
   def test_require_decorator_nesting_ok(self):
     """Permission checks are called in order."""
-    calls = self.mock_has_permission({
-      (model.READ, 'A/value'): True,
-      (model.READ, 'B/value'): True,
-    })
+    calls = []
+    def check(name):
+      calls.append(name)
+      return True
 
-    @api.require(model.READ, 'A/{arg}')
-    @api.require(model.READ, 'B/{arg}')
+    @api.require(lambda: check('A'))
+    @api.require(lambda: check('B'))
     def allowed(arg):
       return arg
-    self.assertEqual(
-        [(model.READ, 'A/{arg}'), (model.READ, 'B/{arg}')],
-        api.get_require_decorators(allowed))
+
     self.assertEqual('value', allowed('value'))
-    self.assertEqual([(model.READ, 'A/value'), (model.READ, 'B/value')], calls)
+    self.assertEqual(['A', 'B'], calls)
 
   def test_require_decorator_nesting_first_deny(self):
     """First deny raises AuthorizationError."""
-    calls = self.mock_has_permission({
-      (model.DELETE, 'A/value'): False,
-      (model.READ, 'B/value'): True,
-    })
+    calls = []
+    def check(name, result):
+      calls.append(name)
+      return result
+
     forbidden_calls = []
 
-    @api.require(model.DELETE, 'A/{arg}')
-    @api.require(model.READ, 'B/{arg}')
+    @api.require(lambda: check('A', False))
+    @api.require(lambda: check('B', True))
     def forbidden(arg):
       forbidden_calls.append(1)
+
     with self.assertRaises(api.AuthorizationError):
       forbidden('value')
     self.assertFalse(forbidden_calls)
-    self.assertEqual([(model.DELETE, 'A/value')], calls)
+    self.assertEqual(['A'], calls)
 
   def test_require_decorator_nesting_non_first_deny(self):
     """Non-first deny also raises AuthorizationError."""
-    calls = self.mock_has_permission({
-      (model.READ, 'A/value'): True,
-      (model.DELETE, 'B/value'): False,
-    })
+    calls = []
+    def check(name, result):
+      calls.append(name)
+      return result
+
     forbidden_calls = []
 
-    @api.require(model.READ, 'A/{arg}')
-    @api.require(model.DELETE, 'B/{arg}')
+    @api.require(lambda: check('A', True))
+    @api.require(lambda: check('B', False))
     def forbidden(arg):
       forbidden_calls.append(1)
+
     with self.assertRaises(api.AuthorizationError):
       forbidden('value')
     self.assertFalse(forbidden_calls)
-    self.assertEqual(
-        [(model.READ, 'A/value'), (model.DELETE, 'B/value')], calls)
+    self.assertEqual(['A', 'B'], calls)
 
   def test_require_decorator_on_method(self):
-    calls = self.mock_has_permission({(model.READ, 'value'): True})
+    calls = []
+    def checker():
+      calls.append(1)
+      return True
 
     class Class(object):
-      @api.require(model.READ, '{arg}')
-      def method(self, arg):
-        return (self, arg)
+      @api.require(checker)
+      def method(self, *args, **kwargs):
+        return (self, args, kwargs)
 
     obj = Class()
-    self.assertEqual((obj, 'value'), obj.method('value'))
-    self.assertEqual([(model.READ, 'value')], calls)
+    self.assertEqual((obj, ('value',), {'a': 2}), obj.method('value', a=2))
+    self.assertEqual(1, len(calls))
 
   def test_require_decorator_on_static_method(self):
-    calls = self.mock_has_permission({(model.READ, 'value'): True})
+    calls = []
+    def checker():
+      calls.append(1)
+      return True
 
     class Class(object):
       @staticmethod
-      @api.require(model.READ, '{arg}')
-      def static_method(arg):
-        return arg
+      @api.require(checker)
+      def static_method(*args, **kwargs):
+        return (args, kwargs)
 
     obj = Class()
-    self.assertEqual('value', Class.static_method('value'))
-    self.assertEqual([(model.READ, 'value')], calls)
+    self.assertEqual((('value',), {'a': 2}), Class.static_method('value', a=2))
+    self.assertEqual(1, len(calls))
 
   def test_require_decorator_on_class_method(self):
-    calls = self.mock_has_permission({(model.READ, 'value'): True})
+    calls = []
+    def checker():
+      calls.append(1)
+      return True
 
     class Class(object):
       @classmethod
-      @api.require(model.READ, '{arg}')
-      def class_method(cls, arg):
-        return (cls, arg)
+      @api.require(checker)
+      def class_method(cls, *args, **kwargs):
+        return (cls, args, kwargs)
 
     obj = Class()
-    self.assertEqual((Class, 'value'), Class.class_method('value'))
-    self.assertEqual([(model.READ, 'value')], calls)
+    self.assertEqual(
+        (Class, ('value',), {'a': 2}), Class.class_method('value', a=2))
+    self.assertEqual(1, len(calls))
 
   def test_require_decorator_ndb_nesting_require_first(self):
-    calls = self.mock_has_permission({(model.READ, 'value'): True})
+    calls = []
+    def checker():
+      calls.append(1)
+      return True
 
-    @api.require(model.READ, '{arg}')
+    @api.require(checker)
     @ndb.non_transactional
-    def func(arg):
-      return arg
-    self.assertEqual([(model.READ, '{arg}')], api.get_require_decorators(func))
-    self.assertEqual('value', func('value'))
-    self.assertEqual([(model.READ, 'value')], calls)
+    def func(*args, **kwargs):
+      return (args, kwargs)
+    self.assertEqual((('value',), {'a': 2}), func('value', a=2))
+    self.assertEqual(1, len(calls))
 
   def test_require_decorator_ndb_nesting_require_last(self):
-    calls = self.mock_has_permission({(model.READ, 'value'): True})
+    calls = []
+    def checker():
+      calls.append(1)
+      return True
 
     @ndb.non_transactional
-    @api.require(model.READ, '{arg}')
-    def func(arg):
-      return arg
-    self.assertEqual([(model.READ, '{arg}')], api.get_require_decorators(func))
-    self.assertEqual('value', func('value'))
-    self.assertEqual([(model.READ, 'value')], calls)
+    @api.require(checker)
+    def func(*args, **kwargs):
+      return (args, kwargs)
+    self.assertEqual((('value',), {'a': 2}), func('value', a=2))
+    self.assertEqual(1, len(calls))
 
   def test_public_then_require_fails(self):
     with self.assertRaises(TypeError):
       @api.public
-      @api.require(model.READ, 'some')
+      @api.require(lambda: True)
       def func():
         pass
 
   def test_require_then_public_fails(self):
     with self.assertRaises(TypeError):
-      @api.require(model.READ, 'some')
+      @api.require(lambda: True)
       @api.public
       def func():
         pass
@@ -740,111 +574,30 @@ class ApiTest(test_case.TestCase):
   def test_is_decorated(self):
     self.assertTrue(api.is_decorated(api.public(lambda: None)))
     self.assertTrue(
-        api.is_decorated(api.require(model.READ, 'some')(lambda: None)))
+        api.is_decorated(api.require(lambda: True)(lambda: None)))
 
-  def test_get_require_decorators_on_undecorated(self):
-    self.assertEqual([], api.get_require_decorators(lambda: None))
+  def test_group_bootstrap(self):
+    ident = model.Identity(model.IDENTITY_USER, 'joe@example.com')
+    mocked_now = datetime.datetime(2014, 01, 01)
 
-  def test_get_require_decorators_on_public(self):
-    self.assertEqual([], api.get_require_decorators(api.public(lambda: None)))
+    self.mock_ndb_now(mocked_now)
 
+    added = api.bootstrap_group('some-group', ident, 'Blah description')
+    self.assertTrue(added)
 
-class TestResourceTemplateRenderer(test_case.TestCase):
-  """Tests for get_template_renderer function."""
-
-  def test_rejects_positional_format(self):
-    with self.assertRaises(ValueError):
-      api.get_template_renderer(lambda arg: None, '{0}')
-
-  def test_unknown_vars(self):
-    api.get_template_renderer(lambda arg: None, '{arg}')
-    with self.assertRaises(TypeError):
-      api.get_template_renderer(lambda another_arg: None, '{arg}')
-    with self.assertRaises(TypeError):
-      api.get_template_renderer(lambda *arg: None, '{arg}')
-    with self.assertRaises(TypeError):
-      api.get_template_renderer(lambda **kwargs: None, '{kwargs}')
-
-  def test_no_args(self):
-    renderer = api.get_template_renderer(lambda: None, 'not-a-template')
-    self.assertEqual('not-a-template', renderer())
-
-  def test_positional_args(self):
-    renderer = api.get_template_renderer(lambda a, b, c: None, '{a}/{b}/{c}')
-    self.assertEqual('1/2/3', renderer(1, 2, 3))
-
-  def test_positional_and_default_args(self):
-    renderer = api.get_template_renderer(lambda a, b, c=3: None, '{a}/{b}/{c}')
-    self.assertEqual('1/2/3', renderer(1, 2))
-    self.assertEqual('1/2/4', renderer(1, 2, 4))
-
-  def test_keyword_args(self):
-    renderer = api.get_template_renderer(lambda a, b, c: None, '{a}/{b}/{c}')
-    self.assertEqual('1/2/3', renderer(a=1, b=2, c=3))
-
-  def test_keyword_and_default_args(self):
-    renderer = api.get_template_renderer(lambda a, b, c=3: None, '{a}/{b}/{c}')
-    self.assertEqual('1/2/3', renderer(a=1, b=2))
-    self.assertEqual('1/2/4', renderer(a=1, b=2, c=4))
-
-  def test_positional_and_keyword_args(self):
-    renderer = api.get_template_renderer(lambda a, b, c: None, '{a}/{b}/{c}')
-    self.assertEqual('1/2/3', renderer(1, 2, c=3))
-
-  def test_positional_and_keyword_and_default_args(self):
-    renderer = api.get_template_renderer(lambda a, b, c=3: None, '{a}/{b}/{c}')
-    self.assertEqual('1/2/3', renderer(1, b=2))
-    self.assertEqual('1/2/4', renderer(1, b=2, c=4))
-
-  def test_many_defaults(self):
-    renderer = api.get_template_renderer(
-        lambda a=1, b=2, c=3: None, '{a}/{b}/{c}')
-    self.assertEqual('1/2/3', renderer())
-    self.assertEqual('4/2/3', renderer(4))
-    self.assertEqual('4/2/3', renderer(a=4))
-    self.assertEqual('1/4/3', renderer(b=4))
-    self.assertEqual('1/2/4', renderer(c=4))
-
-  def test_extra_args(self):
-    renderer = api.get_template_renderer(lambda a, b, c=3: None, '{c}')
-    self.assertEqual('3', renderer(1, 2))
-    self.assertEqual('4', renderer(1, 2, 4))
-    self.assertEqual('4', renderer(1, 2, c=4))
-
-  def test_missing_args(self):
-    renderer = api.get_template_renderer(lambda a, b, c: None, '{a}/{b}/{c}')
-    with self.assertRaises(TypeError):
-      renderer(1, 2)
-
-  def test_args_placeholder(self):
-    renderer = api.get_template_renderer(lambda a, b, *args: None, '{a}/{b}')
-    self.assertEqual('1/2', renderer(1, 2))
-    self.assertEqual('1/2', renderer(1, 2, 3, 4, 5))
-    self.assertEqual('1/2', renderer(1, b=2))
-
-  def test_kwargs_placeholder(self):
-    renderer = api.get_template_renderer(lambda a, b, **kwargs: None, '{a}/{b}')
-    self.assertEqual('1/2', renderer(1, 2))
-    self.assertEqual('1/2', renderer(1, 2, c=3, d=4))
-    self.assertEqual('1/2', renderer(1, b=2))
-    self.assertEqual('1/2', renderer(1, b=2, c=3, d=4))
-
-  def test_positional_keyword_args_overlap(self):
-    # Attempting to specify 'c' twice: as positional and as keyword arg.
-    renderer = api.get_template_renderer(
-        lambda a, b, c=3, d=4: None, '{a}/{b}/{c}/{d}')
-    with self.assertRaises(TypeError):
-      renderer(1, 2, 'x', c=3)
-
-  def test_index_in_format_string(self):
-    renderer = api.get_template_renderer(lambda a: None, '{a[0]}')
-    self.assertEqual('1', renderer([1]))
-
-  def test_attribute_in_format_string(self):
-    renderer = api.get_template_renderer(lambda a: None, '{a.name}')
+    ent = model.group_key('some-group').get()
     self.assertEqual(
-        'joe@example.com',
-        renderer(model.Identity(model.IDENTITY_USER, 'joe@example.com')))
+        {
+          'created_by': ident,
+          'created_ts': mocked_now,
+          'description': 'Blah description',
+          'globs': [],
+          'members': [ident],
+          'modified_by': ident,
+          'modified_ts': mocked_now,
+          'nested': []
+        },
+        ent.to_dict())
 
 
 if __name__ == '__main__':

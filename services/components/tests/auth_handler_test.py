@@ -43,7 +43,7 @@ class AuthenticatingHandlerMetaclassTest(test_case.TestCase):
 
     # @require is used.
     class TestHandler3(handler.AuthenticatingHandler):
-      @api.require(model.READ, 'some')
+      @api.require(lambda: True)
       def get(self):
         pass
 
@@ -160,11 +160,8 @@ class AuthenticatingHandlerTest(test_case.TestCase):
     test = self
     calls = []
 
-    # Forbid all access.
-    self.mock(handler.api, 'has_permission', lambda *_args: False)
-
     class Handler(handler.AuthenticatingHandler):
-      @api.require(model.READ, 'some')
+      @api.require(lambda: False)
       def get(self):
         test.fail('Handler code should not be called')
 
@@ -287,19 +284,6 @@ class AuthenticatingHandlerTest(test_case.TestCase):
     response = app.post('/request', expect_errors=True)
     self.assertEqual(403, response.status_int)
     self.assertFalse(calls)
-
-  def test_get_methods_permissions(self):
-    class Handler(handler.AuthenticatingHandler):
-      @api.require(model.READ, '{some}')
-      def get(self, some):
-        pass
-      @api.public
-      def post(self):
-        pass
-
-    self.assertEqual(
-        {'GET': [(model.READ, '{some}')], 'POST': []},
-        Handler.get_methods_permissions())
 
   def test_get_authenticated_routes(self):
     class Authenticated(handler.AuthenticatingHandler):

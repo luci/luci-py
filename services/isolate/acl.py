@@ -4,7 +4,6 @@
 
 import datetime
 import logging
-import os
 
 from google.appengine.ext import ndb
 
@@ -136,7 +135,7 @@ class RestrictedWhitelistIPHandler(auth.AuthenticatingHandler):
   This handler must have login:admin in app.yaml.
   """
 
-  @auth.require(auth.READ, 'isolate/management')
+  @auth.require(auth.is_admin)
   def get(self):
     # The user must authenticate with a user credential before being able to
     # whitelist the IP. This is done with login:admin.
@@ -152,7 +151,7 @@ class RestrictedWhitelistIPHandler(auth.AuthenticatingHandler):
     self.response.out.write(template.get('whitelistip.html').render(data))
     self.response.headers['Content-Type'] = 'text/html'
 
-  @auth.require(auth.UPDATE, 'isolate/management')
+  @auth.require(auth.is_admin)
   def post(self):
     comment = self.request.get('comment')
     group = self.request.get('group')
@@ -195,12 +194,3 @@ class RestrictedWhitelistIPHandler(auth.AuthenticatingHandler):
     }
     self.response.out.write(template.get('whitelistip.html').render(data))
     self.response.headers['Content-Type'] = 'text/html'
-
-
-def bootstrap():
-  """Adds 127.0.0.1 as a whitelisted IP when testing."""
-  if os.environ['SERVER_SOFTWARE'].startswith('Development'):
-    WhitelistedIP.get_or_insert(
-        ip_to_str('v4', 2130706433),
-        ip='127.0.0.1',
-        comment='automatic because of running on dev server')

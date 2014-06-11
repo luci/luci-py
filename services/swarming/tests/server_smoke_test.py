@@ -76,11 +76,13 @@ def wait_for_server_up(server_url):
 
 def get_admin_url(server_url):
   """"Returns url to login an admin user."""
+  # smoke-test@example.com is added to admin group in bootstrap_dev_server_acls.
   return urlparse.urljoin(
-      server_url, '_ah/login?email=john@doe.com&admin=True&action=Login')
+      server_url,
+      '_ah/login?email=smoke-test@example.com&admin=True&action=Login')
 
 
-def whitelist_and_install_cookie_jar(server_url):
+def install_cookie_jar(server_url):
   """Whitelists the machine to be allowed to run tests."""
   cj = cookielib.CookieJar()
   opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cj))
@@ -97,11 +99,6 @@ def whitelist_and_install_cookie_jar(server_url):
   # Add it to every request by default. It does no harm even if not needed.
   xsrf_token = json.load(opener.open(req))['xsrf_token']
   opener.addheaders.append(('X-XSRF-Token', xsrf_token))
-
-  # Whitelist ourself.
-  opener.open(
-      urlparse.urljoin(server_url, '/restricted/whitelist_ip'),
-      urllib.urlencode({'a': True, 'xsrf_token': xsrf_token}))
 
 
 def setup_bot(swarming_bot_dir, host):
@@ -156,7 +153,9 @@ class SwarmingTestCase(unittest.TestCase):
 
     # Start the server first since it is a tad slow to start.
     # TODO(maruel): Use CREATE_NEW_PROCESS_GROUP on Windows.
-    with open(os.path.join(self.log_dir, 'server.log'), 'wb') as f:
+    server_log = os.path.join(self.log_dir, 'server.log')
+    logging.info('Server log: %s', server_log)
+    with open(server_log, 'wb') as f:
       f.write('Running: %s\n' % cmd)
       f.flush()
       self._server_proc = subprocess.Popen(
@@ -167,30 +166,6 @@ class SwarmingTestCase(unittest.TestCase):
 
     self.assertTrue(
         wait_for_server_up(self.server_url), 'Failed to start server')
-    whitelist_and_install_cookie_jar(self.server_url)
-
-    # Upload the start slave script to the server. Uploads the exact code in the
-    # tree + a new line. This invalidates the bot's code.
-    with open(os.path.join(BOT_DIR, 'start_slave.py'), 'rb') as f:
-      start_slave_content = f.read() + '\n'
-    url_helper.UrlOpen(
-        urlparse.urljoin(self.server_url, '/restricted/upload_start_slave'),
-        files=[('script', 'script', start_slave_content)], method='POSTFORM')
-
-    # Start the slave machine script to start polling for tests.
-    cmd = [
-      sys.executable,
-      os.path.join(self.swarming_bot_dir, 'swarming_bot.zip'),
-      'start_slave',
-    ]
-    if VERBOSE:
-      cmd.append('-v')
-    with open(os.path.join(self.log_dir, 'start_slave_stdout.log'), 'wb') as f:
-      f.write('Running: %s\n' % cmd)
-      f.flush()
-      self._bot_proc = subprocess.Popen(
-          cmd, cwd=self.swarming_bot_dir, preexec_fn=os.setsid,
-          stdout=f, stderr=subprocess.STDOUT)
 
   def tearDown(self):
     # Kill bot, kill server, print logs if failed, delete tmpdir, call super.
@@ -235,6 +210,38 @@ class SwarmingTestCase(unittest.TestCase):
         shutil.rmtree(self.tmpdir)
     finally:
       super(SwarmingTestCase, self).tearDown()
+
+  def finish_setup(self):
+    """Uploads slave code and starts a slave.
+
+    Should be called from test_* method (not from setUp), since if setUp fails
+    tearDown is not getting called (and finish_setup can fail because it uses
+    various server endpoints).
+    """
+    install_cookie_jar(self.server_url)
+
+    # Upload the start slave script to the server. Uploads the exact code in the
+    # tree + a new line. This invalidates the bot's code.
+    with open(os.path.join(BOT_DIR, 'start_slave.py'), 'rb') as f:
+      start_slave_content = f.read() + '\n'
+    url_helper.UrlOpen(
+        urlparse.urljoin(self.server_url, '/restricted/upload_start_slave'),
+        files=[('script', 'script', start_slave_content)], method='POSTFORM')
+
+    # Start the slave machine script to start polling for tests.
+    cmd = [
+      sys.executable,
+      os.path.join(self.swarming_bot_dir, 'swarming_bot.zip'),
+      'start_slave',
+    ]
+    if VERBOSE:
+      cmd.append('-v')
+    with open(os.path.join(self.log_dir, 'start_slave_stdout.log'), 'wb') as f:
+      f.write('Running: %s\n' % cmd)
+      f.flush()
+      self._bot_proc = subprocess.Popen(
+          cmd, cwd=self.swarming_bot_dir, preexec_fn=os.setsid,
+          stdout=f, stderr=subprocess.STDOUT)
 
   def has_failed(self):
     # pylint: disable=E1101
@@ -295,6 +302,8 @@ class SwarmingTestCase(unittest.TestCase):
     self.assertEqual(set(matching_keys), set(current_test_keys))
 
   def test_integration(self):
+    self.finish_setup()
+
     # Sends a series of .swarm files to the server.
     running_tests = []
     tests_to_cancel = []

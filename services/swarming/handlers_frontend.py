@@ -123,6 +123,59 @@ def ip_whitelist_authentication(request):
   return None
 
 
+### ACLs
+
+# Names of groups.
+ADMINS_GROUP = 'swarming-admins'
+BOTS_GROUP = 'swarming-bots'
+USERS_GROUP = 'swarming-users'
+
+
+def swarming_admin():
+  """Returns True if current user can administer Swarming service."""
+  return auth.is_group_member(ADMINS_GROUP) or auth.is_admin()
+
+
+def swarming_bot():
+  """Returns True if current user can execute Swarming bot calls."""
+  # Administrators can run bot-side code for tests, etc.
+  return auth.is_group_member(BOTS_GROUP) or swarming_admin()
+
+
+def swarming_user():
+  """Returns True if current user can post tasks on Swarming service."""
+  return auth.is_group_member(USERS_GROUP) or swarming_admin()
+
+
+def swarming_bot_or_user():
+  """Returns True if current user can execute user-side and bot-side calls."""
+  return swarming_bot() or swarming_user()
+
+
+def bootstrap_dev_server_acls():
+  """Adds localhost to IP whitelist and Swarming groups."""
+  assert utils.is_local_dev_server()
+
+  # Add a bot.
+  user_manager.AddWhitelist('127.0.0.1')
+  bot = auth.Identity(auth.IDENTITY_BOT, '127.0.0.1')
+  auth.bootstrap_group(BOTS_GROUP, bot, 'Swarming bots')
+  auth.bootstrap_group(USERS_GROUP, bot, 'Swarming users')
+
+  # Add a swarming admin. smoke-test@example.com is used in server_smoke_test.py
+  admin = auth.Identity(auth.IDENTITY_USER, 'smoke-test@example.com')
+  auth.bootstrap_group(ADMINS_GROUP, admin, 'Swarming administrators')
+
+  # Add an instance admin (for easier manual testing when running dev server).
+  auth.bootstrap_group(
+      auth.ADMIN_GROUP,
+      auth.Identity(auth.IDENTITY_USER, 'test@example.com'),
+      'Users that can manage groups')
+
+
+###
+
+
 def convert_test_case(data):
   """Constructs a TaskProperties out of a test_request_message.TestCase.
 
@@ -364,7 +417,7 @@ class FilterParams(object):
 
 
 class RestrictedHandler(auth.AuthenticatingHandler):
-  @auth.require(auth.READ, 'swarming/management')
+  @auth.require(swarming_admin)
   def get(self):
     self.response.out.write(template.render('restricted.html', {}))
 
@@ -378,7 +431,7 @@ class BotsListHandler(auth.AuthenticatingHandler):
     'id': 'ID',
   }
 
-  @auth.require(auth.READ, 'swarming/management')
+  @auth.require(swarming_admin)
   def get(self):
     sort_by = self.request.get('sort_by', 'id')
     if sort_by not in self.ACCEPTABLE_BOTS_SORTS:
@@ -413,7 +466,7 @@ class BotsListHandler(auth.AuthenticatingHandler):
 
 
 class BotHandler(auth.AuthenticatingHandler):
-  @auth.require(auth.READ, 'swarming/management')
+  @auth.require(swarming_admin)
   def get(self, bot_id):
     limit = int(self.request.get('limit', 10))
     bot_future = bot_management.get_bot_key(bot_id).get_async()
@@ -433,7 +486,7 @@ class BotHandler(auth.AuthenticatingHandler):
 class Ereporter2ReportHandler(auth.AuthenticatingHandler):
   """Returns all the recent errors as a web page."""
 
-  @auth.require(auth.READ, 'swarming/management')
+  @auth.require(swarming_admin)
   def get(self):
     """Reports the errors logged and ignored.
 
@@ -463,7 +516,7 @@ class Ereporter2ReportHandler(auth.AuthenticatingHandler):
 class Ereporter2RequestHandler(auth.AuthenticatingHandler):
   """Dumps information about single logged request."""
 
-  @auth.require(auth.READ, 'swarming/management')
+  @auth.require(swarming_admin)
   def get(self, request_id):
     # TODO(maruel): Add UI.
     data = ereporter2.log_request_id_to_dict(request_id)
@@ -476,7 +529,7 @@ class Ereporter2RequestHandler(auth.AuthenticatingHandler):
 class UploadStartSlaveHandler(auth.AuthenticatingHandler):
   """Accept a new start slave script."""
 
-  @auth.require(auth.UPDATE, 'swarming/management')
+  @auth.require(swarming_admin)
   def get(self):
     params = {
       'path': self.request.path,
@@ -485,7 +538,7 @@ class UploadStartSlaveHandler(auth.AuthenticatingHandler):
     self.response.out.write(
         template.render('restricted_uploadstartslave.html', params))
 
-  @auth.require(auth.UPDATE, 'swarming/management')
+  @auth.require(swarming_admin)
   def post(self):
     script = self.request.get('script', '')
     if not script:
@@ -497,7 +550,7 @@ class UploadStartSlaveHandler(auth.AuthenticatingHandler):
 
 
 class UploadBootstrapHandler(auth.AuthenticatingHandler):
-  @auth.require(auth.READ, 'swarming/management')
+  @auth.require(swarming_admin)
   def get(self):
     params = {
       'path': self.request.path,
@@ -506,7 +559,7 @@ class UploadBootstrapHandler(auth.AuthenticatingHandler):
     self.response.out.write(
         template.render('restricted_uploadbootstrap.html', params))
 
-  @auth.require(auth.UPDATE, 'swarming/management')
+  @auth.require(swarming_admin)
   def post(self):
     script = self.request.get('script', '')
     if not script:
@@ -518,7 +571,7 @@ class UploadBootstrapHandler(auth.AuthenticatingHandler):
 
 
 class WhitelistIPHandler(auth.AuthenticatingHandler):
-  @auth.require(auth.READ, 'swarming/management')
+  @auth.require(swarming_admin)
   def get(self):
     display_whitelists = sorted(
         (
@@ -537,7 +590,7 @@ class WhitelistIPHandler(auth.AuthenticatingHandler):
     self.response.out.write(
         template.render('restricted_whitelistip.html', params))
 
-  @auth.require(auth.UPDATE, 'swarming/management')
+  @auth.require(swarming_admin)
   def post(self):
     ip = self.request.get('i', self.request.remote_addr)
     mask = 32
@@ -562,8 +615,7 @@ class WhitelistIPHandler(auth.AuthenticatingHandler):
 
 
 class UserHandler(auth.AuthenticatingHandler):
-  # TODO(maruel): We want swarming/user here.
-  @auth.require(auth.READ, 'swarming/clients')
+  @auth.require(swarming_user)
   def get(self):
     self.response.out.write(template.render('user.html', {}))
 
@@ -581,8 +633,7 @@ class TasksHandler(auth.AuthenticatingHandler):
       self.request.get('show_successfully_completed', '') != 'False',
       self.request.get('machine_id_filter', ''))
 
-  # TODO(maruel): We want swarming/user here.
-  @auth.require(auth.READ, 'swarming/clients')
+  @auth.require(swarming_user)
   def get(self):
     # TODO(maruel): Convert to Google Graph API.
     # TODO(maruel): Once migration is complete, remove limit and offset, replace
@@ -652,8 +703,7 @@ class TasksHandler(auth.AuthenticatingHandler):
 class TaskHandler(auth.AuthenticatingHandler):
   """Show the full text of a test request."""
 
-  # TODO(maruel): We want swarming/user here.
-  @auth.require(auth.READ, 'swarming/clients')
+  @auth.require(swarming_user)
   def get(self, key_id):
     key = None
     request_key = None
@@ -691,7 +741,7 @@ class TaskHandler(auth.AuthenticatingHandler):
 class ApiBots(auth.AuthenticatingHandler):
   """Returns the list of known swarming bots."""
 
-  @auth.require(auth.READ, 'swarming/management')
+  @auth.require(swarming_admin)
   def get(self):
     params = {
         'machine_death_timeout':
@@ -709,7 +759,7 @@ class DeleteMachineStatsHandler(auth.AuthenticatingHandler):
   # TODO(vadimsh): Implement XSRF token support.
   xsrf_token_enforce_on = ()
 
-  @auth.require(auth.UPDATE, 'swarming/clients')
+  @auth.require(swarming_bot_or_user)
   def post(self):
     bot_key = bot_management.get_bot_key(self.request.get('r', ''))
     if bot_key.get():
@@ -726,7 +776,7 @@ class TestRequestHandler(auth.AuthenticatingHandler):
   # TODO(vadimsh): Implement XSRF token support.
   xsrf_token_enforce_on = ()
 
-  @auth.require(auth.UPDATE, 'swarming/clients')
+  @auth.require(swarming_bot_or_user)
   def post(self):
     # Validate the request.
     if not self.request.get('request'):
@@ -761,7 +811,7 @@ class TestRequestHandler(auth.AuthenticatingHandler):
 class GetMatchingTestCasesHandler(auth.AuthenticatingHandler):
   """Get all the keys for any test runners that match a given test case name."""
 
-  @auth.require(auth.READ, 'swarming/clients')
+  @auth.require(swarming_bot_or_user)
   def get(self):
     """Returns a list of TaskResultSummary ndb.Key."""
     test_case_name = self.request.get('name', '')
@@ -787,7 +837,7 @@ class GetMatchingTestCasesHandler(auth.AuthenticatingHandler):
 class SecureGetResultHandler(auth.AuthenticatingHandler):
   """Show the full result string from a test runner."""
 
-  @auth.require(auth.READ, 'swarming/management')
+  @auth.require(swarming_admin)
   def get(self):
     SendRunnerResults(self.response, self.request.get('r', ''))
 
@@ -795,7 +845,7 @@ class SecureGetResultHandler(auth.AuthenticatingHandler):
 class GetResultHandler(auth.AuthenticatingHandler):
   """Show the full result string from a test runner."""
 
-  @auth.require(auth.READ, 'swarming/clients')
+  @auth.require(swarming_bot_or_user)
   def get(self):
     SendRunnerResults(self.response, self.request.get('r', ''))
 
@@ -851,7 +901,7 @@ class CancelHandler(auth.AuthenticatingHandler):
   # TODO(vadimsh): Implement XSRF token support.
   xsrf_token_enforce_on = ()
 
-  @auth.require(auth.UPDATE, 'swarming/management')
+  @auth.require(swarming_admin)
   def post(self):
     """Ensures that the associated TaskToRun is canceled and update the
     TaskResultSummary accordingly.
@@ -888,7 +938,7 @@ class RetryHandler(auth.AuthenticatingHandler):
   # TODO(vadimsh): Implement XSRF token support.
   xsrf_token_enforce_on = ()
 
-  @auth.require(auth.UPDATE, 'swarming/management')
+  @auth.require(swarming_admin)
   def post(self):
     """Duplicates the original request into a new one.
 
@@ -935,7 +985,8 @@ class RetryHandler(auth.AuthenticatingHandler):
 
 class BootstrapHandler(auth.AuthenticatingHandler):
   """Returns python code to run to bootstrap a swarming bot."""
-  @auth.require(auth.READ, 'swarming/bots')
+
+  @auth.require(swarming_bot)
   def get(self):
     content = file_chunks.RetrieveFile('bootstrap.py')
     if not content:
@@ -957,7 +1008,7 @@ class GetSlaveCodeHandler(auth.AuthenticatingHandler):
   cacheable.
   """
 
-  @auth.require(auth.READ, 'swarming/bots')
+  @auth.require(swarming_bot)
   def get(self, version=None):
     if version:
       expected = bot_management.get_slave_version(self.request.host_url)
@@ -999,7 +1050,7 @@ class RegisterHandler(auth.AuthenticatingHandler):
       datastore_errors.InternalError,
       datastore_errors.Timeout,
       datastore_errors.TransactionFailedError)
-  @auth.require(auth.UPDATE, 'swarming/bots')
+  @auth.require(swarming_bot)
   def post(self):
     # Validate the request.
     if not self.request.body:
@@ -1047,7 +1098,7 @@ class RunnerPingHandler(auth.AuthenticatingHandler):
   # TODO(vadimsh): Implement XSRF token support.
   xsrf_token_enforce_on = ()
 
-  @auth.require(auth.UPDATE, 'swarming/bots')
+  @auth.require(swarming_bot)
   def post(self):
     # TODO(vadimsh): Any machine can send ping on behalf of any other machine.
     # Ensure 'id' matches credentials used to authenticate the request (i.e.
@@ -1072,7 +1123,7 @@ class ResultHandler(auth.AuthenticatingHandler):
   # TODO(vadimsh): Implement XSRF token support.
   xsrf_token_enforce_on = ()
 
-  @auth.require(auth.UPDATE, 'swarming/bots')
+  @auth.require(swarming_bot)
   def post(self):
     # TODO(user): Share this code between all the request handlers so we
     # can always see how often a request is being sent.
@@ -1126,7 +1177,7 @@ class RemoteErrorHandler(auth.AuthenticatingHandler):
   # TODO(vadimsh): Implement XSRF token support.
   xsrf_token_enforce_on = ()
 
-  @auth.require(auth.UPDATE, 'swarming/bots')
+  @auth.require(swarming_bot)
   def post(self):
     # TODO(vadimsh): Log machine identity as well.
     error_message = self.request.get('m', '')
@@ -1247,6 +1298,11 @@ def CreateApplication():
       app_name='Swarming',
       app_version=utils.get_app_version(),
       app_revision_url=template.get_app_revision_url())
+
+  # If running on a local dev server, allow bots to connect without prior
+  # groups configuration. Useful when running smoke test.
+  if utils.is_local_dev_server():
+    bootstrap_dev_server_acls()
 
   # Add routes with Auth REST API and Auth UI.
   routes.extend(auth_ui.get_rest_api_routes())

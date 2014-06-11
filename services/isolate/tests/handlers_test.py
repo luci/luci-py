@@ -21,15 +21,6 @@ import webtest
 
 from google.appengine.ext import ndb
 
-import acl
-import config
-import gcs
-import handlers_backend
-import handlers_common
-import handlers_frontend
-import model
-import stats
-from components import auth
 from components import datastore_utils
 from components import ereporter2
 from components import stats_framework_mock
@@ -42,6 +33,7 @@ import gcs
 import handlers_backend
 import handlers_common
 import handlers_frontend
+import model
 import stats
 
 # Access to a protected member _XXX of a client class
@@ -119,8 +111,19 @@ class MainTest(test_case.TestCase):
         id=acl.ip_to_str(*acl.parse_ip(self.source_ip)),
         ip=self.source_ip).put()
 
+  def mock_acl_checks(self):
+    known_groups = (
+      handlers_frontend.READERS_GROUP,
+      handlers_frontend.WRITERS_GROUP,
+    )
+    self.mock(
+        handlers_frontend.auth,
+        'is_group_member',
+        lambda group: group in known_groups)
+
   def handshake(self):
     self.whitelist_self()
+    self.mock_acl_checks()
     data = {
       'client_app_version': '0.2',
       'fetcher': True,
@@ -176,26 +179,6 @@ class MainTest(test_case.TestCase):
       'Failed@v1\nmain.app\nGET localhost/foo (HTTP 200)\nFailed\n'
       '1 occurrences: Entry \n\n')
     self.assertEqual(expected_text, message.body.payload)
-
-  def test_known_auth_resources(self):
-    # This test is supposed to catch typos and new types of auth resources.
-    # It walks over all AuthenticatedHandler routes and ensures @require
-    # decorator use resources from this set.
-    expected = {
-      'auth/management',
-      'auth/management/groups/{group}',
-      'isolate/management',
-      'isolate/namespaces/',
-      'isolate/namespaces/{namespace}',
-    }
-    for route in auth.get_authenticated_routes(
-        handlers_frontend.create_application()):
-      per_method = route.handler.get_methods_permissions()
-      for method, permissions in per_method.iteritems():
-        self.assertTrue(
-            expected.issuperset(resource for _, resource in permissions),
-            msg='Unexpected auth resource in %s of %s: %s' %
-                (method, route, permissions))
 
   def test_pre_upload_ok(self):
     req = self.app_frontend.post_json(

@@ -5,8 +5,8 @@
 """NDB model classes used to model AuthDB relations.
 
 Models defined here are used by central authentication service (that stores all
-ACL rules, groups and bot credentials) and by services that implement some
-concrete functionality protected with ACLs (like isolate and swarming services).
+groups and bot credentials) and by services that implement some concrete
+functionality protected with ACLs (like isolate and swarming services).
 
 Central authentication service (called 'master service' below) holds
 authoritative copy of all ACL configuration and acts as a single source of
@@ -16,46 +16,18 @@ relevant subset of configuration (that they use to perform ACL checks).
 Master service is responsible for updating slave services' configuration via
 simple service-to-service replication protocol.
 
-Conceptually ACLs are defined as a set of 3-tuples (Identity, Resource, Action)
-of allowed operations where:
-  * Identity defines an actor making an action (it can be a real person, a bot,
-    an AppEngine application or special 'anonymous' identity).
-  * Resource is a string that identifies what object is being operated on. Its
-    meaning is application specific and is not precisely defined here.
-  * Action is what Identity wants to do with Resource: CREATE, READ, UPDATE or
-    DELETE. Precise meaning is also application specific.
-
-Each identity (including 'anonymous') can belong to zero or more Groups. Each
-Group has a unique name and is defined as union of 3 sets:
+AuthDB holds a list of groups. Each group has a unique name and is defined
+as union of 3 sets:
   1) Explicit enumeration of particular Identities e.g. 'user:alice@example.com'
   2) Set of glob-like identity patterns e.g. 'user:*@example.com'
   3) Set of nested Groups.
 
-ACL Rules represent ACL set in a compact form. ACL Rules is a list of
-ALLOW or DENY rules, evaluated in order until first match. If first matched
-rule is ALLOW rule, then access is granted, if it's DENY rule access is denied.
+Identity defines an actor making an action (it can be a real person, a bot,
+an AppEngine application or special 'anonymous' identity).
 
-In particular, each rule is a tuple (Kind, Group, Actions, ResourceRegex):
-  * Kind is 'ALLOW' for positive rule, 'DENY' for negative rule.
-  * Group is a name of the group the rule applies to or '*' to apply to all
-    identities (including 'anonymous').
-  * Actions is list of actions the rule applies to, i.e. subset of ('CREATE',
-    'READ', 'UPDATE', 'DELETE').
-  * ResourceRegex is a regular expression that defines all resources the rule
-    applies to.
-
-For example rule ('ALLOW', 'Bots', ['READ'], 'isolate/namespaces/(.*)$') means
-that all identities from group 'Bots' are allowed to perform 'READ' action with
-any resource that matches 'isolate/namespaces/(.*)$'.
-
-Another example is deny-all rule:
-  ('DENY', '*', ['CREATE', 'READ', 'UPDATE', 'DELETE'], '.*')
-
-Deny-all rule is always implicitly present at the end of ACL Rules list.
-
-Each service has its own list of ACL Rules, but they all share same set of
-Groups. Possible resource names are defined by each particular service
-implementation.
+In addition to that, AuthDB stores small amount of authentication related
+configuration data, such as OAuth2 client_id and client_secret and various
+secret keys.
 """
 
 # TODO(vadimsh): Implement ACL DB replication.
@@ -72,32 +44,21 @@ from components import datastore_utils
 
 # Part of public API of 'auth' component, exposed by this module.
 __all__ = [
+  'ADMIN_GROUP',
   'Anonymous',
-  'CREATE',
-  'DELETE',
   'Identity',
   'IDENTITY_ANONYMOUS',
   'IDENTITY_BOT',
   'IDENTITY_SERVICE',
   'IDENTITY_USER',
   'IdentityProperty',
-  'READ',
-  'UPDATE',
 ]
 
 
-# Rule types.
-ALLOW_RULE = 'ALLOW'
-DENY_RULE = 'DENY'
+# Name of a group whose members have access to Group management UI. It's the
+# only group needed to bootstrap everything else.
+ADMIN_GROUP = 'administrators'
 
-# Possible actions that can be applied to a resource.
-CREATE = 'CREATE'
-DELETE = 'DELETE'
-READ = 'READ'
-UPDATE = 'UPDATE'
-
-# Set of all allowed actions.
-ALLOWED_ACTIONS = (CREATE, DELETE, READ, UPDATE)
 
 # No identity information is provided. Identity name is always 'anonymous'.
 IDENTITY_ANONYMOUS = 'anonymous'
@@ -110,10 +71,10 @@ IDENTITY_USER = 'user'
 
 # All allowed identity kinds + regexps to validate identity name.
 ALLOWED_IDENTITY_KINDS = {
-    IDENTITY_ANONYMOUS: re.compile(r'^anonymous$'),
-    IDENTITY_BOT: re.compile(r'^[0-9a-zA-Z_\-\.@]+$'),
-    IDENTITY_SERVICE: re.compile(r'^[0-9a-zA-Z_\-]+$'),
-    IDENTITY_USER: re.compile(r'^[0-9a-zA-Z_\-\.@]+$'),
+  IDENTITY_ANONYMOUS: re.compile(r'^anonymous$'),
+  IDENTITY_BOT: re.compile(r'^[0-9a-zA-Z_\-\.@]+$'),
+  IDENTITY_SERVICE: re.compile(r'^[0-9a-zA-Z_\-]+$'),
+  IDENTITY_USER: re.compile(r'^[0-9a-zA-Z_\-\.@]+$'),
 }
 
 # Regular expression that matches group names. ASCII only, no leading or
@@ -122,6 +83,7 @@ GROUP_NAME_RE = re.compile(
     r'^[0-9a-zA-Z_][0-9a-zA-Z_\-\.\ ]{1,80}[0-9a-zA-Z_\-\.]$')
 # Special group name that means 'All possible users' (including anonymous!).
 GROUP_ALL = '*'
+
 
 # Global root key of auth models entity group.
 ROOT_KEY = ndb.Key('AuthGlobalConfig', 'root')
@@ -260,92 +222,13 @@ class IdentityGlobProperty(datastore_utils.BytesSerializableProperty):
 
 
 ################################################################################
-## AccessRule.
-
-
-class AccessRule(
-    datastore_utils.JsonSerializable,
-    collections.namedtuple('AccessRule', 'kind, group, actions, resource')):
-  """Single access rule definition. Immutable.
-
-  Tuple (kind, group, actions, resource) where:
-    kind - ALLOW_RULE for positive rule, DENY_RULE for negative rule.
-    group - name of a user group this rule applies to, or '*' for all users.
-    actions - set of actions this rule applies to, subset of ALLOWED_ACTIONS.
-    resource - regular expression for resource names this rule applies to.
-  """
-
-  # See comment for Identity.__new__ regarding use of __new__ here.
-  def __new__(cls, kind, group, actions, resource):
-    # Validate kind, convert to str.
-    if kind not in (ALLOW_RULE, DENY_RULE):
-      raise ValueError('Invalid access rule kind: %s' % kind)
-    kind = str(kind)
-
-    # Validate group name.
-    if not GROUP_NAME_RE.match(group) and group != GROUP_ALL:
-      raise ValueError('Invalid group name: %s' % group)
-
-    # Validate action list, convert to str.
-    if any(a not in ALLOWED_ACTIONS for a in actions):
-      raise ValueError('Invalid actions: %s' % (actions,))
-    actions = tuple(sorted(map(str, set(actions))))
-    if not actions:
-      raise ValueError('Action list can not be empty')
-
-    # Validate resource regular expression, prohibit open-ended patterns.
-    if not resource.startswith('^') or not resource.endswith('$'):
-      raise ValueError(
-          'Resource pattern should start with \'^\' and end '
-          'with \'$\': %s' % resource)
-    try:
-      re.compile(resource)
-    except re.error:
-      raise ValueError('Invalid resource regexp pattern: %s' % resource)
-
-    return super(AccessRule, cls).__new__(
-        cls, kind, str(group), actions, resource)
-
-  def to_jsonish(self):
-    return {
-      'actions': self.actions,
-      'group': self.group,
-      'kind': self.kind,
-      'resource': self.resource,
-    }
-
-  @classmethod
-  def from_jsonish(cls, obj):
-    try:
-      return cls(obj['kind'], obj['group'], obj['actions'], obj['resource'])
-    except KeyError as e:
-      raise ValueError('Missing key \'%s\' in  %r' % (e, obj))
-
-
-# Special rule 'deny all access' implicitly added to list of rules.
-DenyAllRule = AccessRule(DENY_RULE, GROUP_ALL, ALLOWED_ACTIONS, '^.*$')
-# Special rule 'allow all access' added to list of rules during bootstrap.
-AllowAllRule = AccessRule(ALLOW_RULE, GROUP_ALL, ALLOWED_ACTIONS, '^.*$')
-
-
-class AccessRuleProperty(datastore_utils.JsonSerializableProperty):
-  """NDB model property for AccessRule values.
-
-  Stored as JSON blob internally.
-  """
-  _value_type = AccessRule
-  _indexed = False
-
-
-################################################################################
-## Main models: AuthGlobalConfig, AuthServiceConfig and AuthGroup.
+## Main models: AuthGlobalConfig, AuthGroup.
 
 
 class AuthGlobalConfig(ndb.Model):
   """Acts as a root entity for auth models.
 
   In particular, entities that belong to this entity group are:
-   * AuthServiceConfig
    * AuthGroup
    * AuthSecretScope
    * AuthSecret
@@ -366,34 +249,6 @@ class AuthGlobalConfig(ndb.Model):
   oauth_client_secret = ndb.StringProperty(indexed=False)
   # Additional OAuth2 client_ids allowed to access the services.
   oauth_additional_client_ids = ndb.StringProperty(repeated=True, indexed=False)
-
-
-class AuthServiceConfig(ndb.Model, datastore_utils.SerializableModelMixin):
-  """Holds ACL Rules for a single service.
-
-  Parent is AuthGlobalConfig entity keyed at ROOT_KEY.
-
-  Master service have multiple entities of this kind for each slave service
-  (with entity id set to service name), while each slave service has only one
-  (with id set to 'local') that gets replicated from corresponding master's
-  entity.
-
-  Master service also have entity with id 'local', that defines ACL rules
-  for Master service itself.
-  """
-  # How to convert this entity to or from serializable dict.
-  serializable_properties = {
-    'rules': datastore_utils.READABLE | datastore_utils.WRITABLE,
-    'modified_ts': datastore_utils.READABLE,
-    'modified_by': datastore_utils.READABLE,
-   }
-
-  # All ACL rules. Order is important.
-  rules = AccessRuleProperty(repeated=True)
-  # When entity was modified last time.
-  modified_ts = ndb.DateTimeProperty(auto_now=True, indexed=False)
-  # Who modified the entity last time.
-  modified_by = IdentityProperty(indexed=False)
 
 
 class AuthGroup(ndb.Model, datastore_utils.SerializableModelMixin):
@@ -435,6 +290,11 @@ class AuthGroup(ndb.Model, datastore_utils.SerializableModelMixin):
   modified_ts = ndb.DateTimeProperty(auto_now=True)
   # Who modified the group last time.
   modified_by = IdentityProperty()
+
+
+def group_key(group):
+  """Returns ndb.Key for AuthGroup entity."""
+  return ndb.Key(AuthGroup, group, parent=ROOT_KEY)
 
 
 ################################################################################

@@ -13,7 +13,6 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(BASE_DIR, 'third_party'))
 sys.path.insert(0, os.path.join(BASE_DIR, 'components', 'third_party'))
 
-import acl
 from components import ereporter2
 from components import utils
 import handlers_frontend
@@ -22,7 +21,6 @@ import handlers_frontend
 def create_application():
   """Bootstraps the app and creates the url router."""
   ereporter2.register_formatter()
-  acl.bootstrap()
   a = handlers_frontend.create_application()
   # In theory we'd want to take the output of app_identity.get_application_id().
   # Sadly, this function does an RPC call and may contribute to cause time out

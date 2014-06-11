@@ -4,16 +4,13 @@
 
 """Defines main bulk of public API of auth component."""
 
-# Pylint doesn't like ndb.transactional(...) and access to __auth_require.
-# pylint: disable=E1120,W0212
+# Pylint doesn't like ndb.transactional(...).
+# pylint: disable=E1120
 
 import collections
 import functools
-import inspect
 import logging
 import os
-import re
-import string
 import threading
 import time
 
@@ -26,10 +23,13 @@ from . import model
 __all__ = [
   'AuthenticationError',
   'AuthorizationError',
+  'bootstrap_group',
   'Error',
   'get_current_identity',
   'get_secret',
-  'has_permission',
+  'is_admin',
+  'is_empty_group',
+  'is_group_member',
   'public',
   'require',
   'SecretKey',
@@ -92,8 +92,8 @@ SecretKey = collections.namedtuple('SecretKey', ['name', 'scope'])
 class AuthDB(object):
   """A read only in-memory database of ACL configuration for a service.
 
-  Holds ACL rules, User Groups, all secret keys (local and global) and
-  OAuth2 configuration.
+  Holds user groups, all secret keys (local and global) and OAuth2
+  configuration.
 
   Each instance process holds AuthDB object in memory and shares it between all
   requests, occasionally refetching it from Datastore.
@@ -102,25 +102,21 @@ class AuthDB(object):
   def __init__(
       self,
       global_config=None,
-      service_config=None,
       groups=None,
       secrets=None,
       entity_group_version=None):
     """
     Args:
       global_config: instance of AuthGlobalConfig entity.
-      service_config: instance of AuthServiceConfig with rules for a service.
       groups: list of AuthGroup entities.
       secrets: list of AuthSecret entities ('local' and 'global' in same list).
       entity_group_version: version of AuthGlobalConfig entity group at the
           moment when entities were fetched from it.
     """
     self.global_config = global_config or model.AuthGlobalConfig()
-    self.service_config = service_config or model.AuthServiceConfig()
     self.groups = {g.key.string_id(): g for g in (groups or [])}
     self.secrets = {'local': {}, 'global': {}}
     self.entity_group_version = entity_group_version
-    self._regexp_cache = {}
 
     # Split |secrets| into local and global ones based on parent key id.
     for secret in (secrets or []):
@@ -129,12 +125,14 @@ class AuthDB(object):
       assert secret.key.string_id() not in self.secrets[scope], secret.key
       self.secrets[scope][secret.key.string_id()] = secret
 
-  def is_group_member(self, identity, group):
-    """Returns True if |identity| belongs to group |group|."""
+  def is_group_member(self, group, identity):
+    """Returns True if |identity| belongs to group |group|.
 
+    Unknown groups are considered empty.
+    """
     # While the code to add groups refuses to add cycle, this code ensures that
     # it doesn't go in a cycle by keeping track of the groups visited in |seen|.
-    def is_group_member_internal(identity, group, seen):
+    def is_group_member_internal(group, identity, seen):
       # Wildcard group that matches all identities (including anonymous!).
       if group == model.GROUP_ALL:
         return True
@@ -160,97 +158,10 @@ class AuthDB(object):
 
       # Slowest nested group check last.
       return any(
-          is_group_member_internal(identity, nested, seen)
+          is_group_member_internal(nested, identity, seen)
           for nested in group_obj.nested)
 
-    return is_group_member_internal(identity, group, set())
-
-  def is_matching_resource(self, regexp, resource):
-    """True if |resource| name matches resource regexp from a rule."""
-    # There's a harmless race condition here.
-    if regexp not in self._regexp_cache:
-      self._regexp_cache[regexp] = re.compile(regexp)
-    return self._regexp_cache[regexp].match(resource)
-
-  def get_groups(self, identity=None):
-    """Returns a set of group names that contain |identity| as a member.
-
-    If |identity| is None, returns all known groups.
-    """
-    if not identity:
-      return set(self.groups)
-    return set(g for g in self.groups if self.is_group_member(identity, g))
-
-  def get_rules(self):
-    """Returns all defined AccessRules."""
-    return list(self.service_config.rules)
-
-  def get_matching_rules(self, identity=None, action=None, resource=None):
-    """Returns list of AccessRules related to given ACL query.
-
-    Used in implementation of 'Rules sandbox' UI that allows users to explore
-    which ACL rules are used to decide outcome of ACL query.
-
-    Input is a tuple (Identity, Action, Resource) with some elements possibly
-    omitted. This function returns all potential terminal rules that can show
-    up during ACL evaluation for that triple.
-
-    For example if ACL query is fully defined (i.e. all 3 elements are present),
-    this function always returns one rule - first matched ALLOW or DENY rule
-    that decides outcome of the ACL query.
-
-    If, for instance, Identity is None, then this function will return all rules
-    that mention Action and Resource (since any of them can potentially be a
-    terminal rule for a query with some concrete Identity).
-
-    Args:
-      identity: instance of Identity or None.
-      action: one of CREATE, READ, UPDATE, DELETE or None.
-      resource: some resource name or None.
-
-    Returns:
-      List of AccessRule objects.
-    """
-    assert identity or identity is None
-    assert action or action is None
-    assert resource or resource is None
-    rules = []
-    for rule in self.service_config.rules:
-      if action and action not in rule.actions:
-        continue
-      if resource and not self.is_matching_resource(rule.resource, resource):
-        continue
-      if identity and not self.is_group_member(identity, rule.group):
-        continue
-      # First matched rule terminates ACL evaluation, so if complete triple is
-      # given do not even process the rest of rules.
-      if identity and action and resource:
-        return [rule]
-      rules.append(rule)
-    # No rules match -> return default implicit 'deny all' rule.
-    return rules or [model.DenyAllRule]
-
-  def has_permission(self, identity, action, resource):
-    """True if |identity| can execute |action| against |resource|.
-
-    Each ACL Rule is evaluated in turn until first match. If first matched rule
-    is ALLOW rule, function returns True. If it's DENY rule, function returns
-    False.
-
-    ACL Rule (Kind, Group, Actions, Resource Regexp) matches a triple
-    (identity, action, resource) if |identity| is in group Group (explicitly or
-    via some nested group), |action| is in Actions set, and |resource| matches
-    Resource Regexp.
-
-    If no rules match, function returns False.
-    """
-    assert action in model.ALLOWED_ACTIONS
-    for rule in self.service_config.rules:
-      if (action in rule.actions and
-          self.is_matching_resource(rule.resource, resource) and
-          self.is_group_member(identity, rule.group)):
-        return rule.kind == model.ALLOW_RULE
-    return False
+    return is_group_member_internal(group, identity, set())
 
   def get_secret(self, secret_key):
     """Returns list of strings with last known values of a secret.
@@ -374,14 +285,8 @@ def fetch_auth_db(known_version=None):
       # service administrator then goes to ACL management UI and sets up correct
       # restrictive ACL rules and Groups. Without 'Allow all' rule he/she won't
       # be able to use management UI.
-      logging.info('Ensuring AuthDB root entities exist')
-      ndb.Future.wait_all([
-        model.AuthGlobalConfig.get_or_insert_async(root_key.string_id()),
-        model.AuthServiceConfig.get_or_insert_async(
-            'local',
-            rules=[model.AllowAllRule],
-            parent=root_key),
-      ])
+      logging.debug('Ensuring AuthDB root entity exists')
+      model.AuthGlobalConfig.get_or_insert(root_key.string_id())
       # Update _lazy_bootstrap_ran only when DB calls successfully finish.
       _lazy_bootstrap_ran = True
 
@@ -401,8 +306,6 @@ def fetch_auth_db(known_version=None):
 
     # Fetch all stuff in parallel. Fetch ALL groups and ALL secrets.
     global_config = root_key.get_async()
-    service_config = model.AuthServiceConfig.get_by_id_async(
-        'local', parent=root_key)
     groups = model.AuthGroup.query(ancestor=root_key).fetch_async()
     secrets = model.AuthSecret.query(ancestor=root_key).fetch_async()
 
@@ -411,7 +314,6 @@ def fetch_auth_db(known_version=None):
     # correspond to |current_version|.
     return AuthDB(
         global_config=global_config.get_result(),
-        service_config=service_config.get_result(),
         groups=groups.get_result(),
         secrets=secrets.get_result(),
         entity_group_version=current_version)
@@ -464,9 +366,8 @@ def get_process_auth_db():
     # stale copy instead right away.
     if _auth_db_fetching_thread is not None:
       logging.info(
-          'Using stale copy of AuthDB while tid %s is fetching a fresh one. '
-          'Cached copy expired %.1f sec ago.',
-          _auth_db_fetching_thread,
+          'Using stale copy of AuthDB while another thread is fetching '
+          'a fresh one. Cached copy expired %.1f sec ago.',
           time.time() - _auth_db_expiration)
       return _auth_db
 
@@ -476,7 +377,7 @@ def get_process_auth_db():
     _auth_db_fetching_thread = threading.current_thread()
     known_auth_db = _auth_db
     known_auth_db_version = _auth_db.entity_group_version
-    logging.info('Refetching AuthDB, tid is %s', _auth_db_fetching_thread)
+    logging.debug('Refetching AuthDB')
 
   # Do the actual fetch outside the lock. Be careful to handle any unexpected
   # exception by 'fixing' the global state before leaving this function.
@@ -551,17 +452,18 @@ def get_current_identity():
   return ident
 
 
-def has_permission(action, resource):
-  """True if Identity associated with the current request can perform an action.
+def is_group_member(group, identity=None):
+  """Returns True if |identity| (or current identity if None) is in |group|.
 
-  See comment for AuthDB.has_permission for description of how rules are
-  evaluated.
-
-  Raises UninitializedError if current request handler is not aware of 'auth'
-  component. See doc string for 'get_current_identity' for more info about that.
+  Unknown groups are considered empty.
   """
-  return get_request_auth_db().has_permission(
-      get_current_identity(), action, resource)
+  return get_request_auth_db().is_group_member(
+      group, identity or get_current_identity())
+
+
+def is_admin(identity=None):
+  """Returns True if |identity| (or current identity if None) is an admin."""
+  return is_group_member(model.ADMIN_GROUP, identity)
 
 
 def get_secret(secret_key):
@@ -595,23 +497,14 @@ def public(func):
   return func
 
 
-def require(action, resource):
+def require(callback):
   """Decorator that checks current identity's permissions.
 
   Args:
-    action: one of CREATE, READ, UPDATE, DELETE.
-    resource: concrete resource name (like 'isolate/namespaces/default') or a
-        template that can reference decorated function arguments by name, e.g.
-        'isolate/namespaces/{namespace}'. This template together with actual
-        arguments used in a decorated function invocation will be used to deduce
-        a resource name. Uses same syntax as builtin 'str.format' method.
-
-  If Identity associated with the current request can perform |action| against
-  resolved |resource|, calls decorated function. Otherwise raises
-  AuthorizationError exception.
-
-  Note that if ACL rules explicitly allow 'anonymous:anonymous' to access
-  |resource|, this decorator will happily allow it as well.
+    callback: callback that is called without arguments and returns True
+        to grant access to current identity (by calling decorated function) or
+        False to forbid it (by raising AuthorizationError). It can
+        use get_current_identity() (and other request state) to figure this out.
 
   Multiple @require decorators can be safely nested on top of each other to
   check multiple permissions. In that case a current identity needs to have all
@@ -623,8 +516,8 @@ def require(action, resource):
   Usage example:
 
   class MyHandler(auth.AuthenticatingHandler):
-    @auth.require(auth.READ, 'isolate/namespaces/{namespace}')
-    def get(self, namespace):
+    @auth.require(auth.is_admin)
+    def get(self):
       ....
   """
   def decorator(func):
@@ -633,29 +526,19 @@ def require(action, resource):
       raise TypeError('Can\'t use @public and @require on same function')
 
     # When nesting multiple decorators the information (argspec, name) about
-    # original function gets lost. Explicitly preserve reference to original
-    # function in __wrapped__. It is also what NDB does. So 'require' decorator
-    # plays nicely with ndb decorators.
+    # original function gets lost. __wrapped__ is used by NDB decorators
+    # to preserve reference to original function. Use it too.
     original = getattr(func, '__wrapped__', func)
-
-    # Build a function that can substitute variables in the resource template.
-    # Do it once when decorating. Always use original function as a source of
-    # information about arguments (since decorator wrappers use opaque *args
-    # and **kwargs not usable for introspection.
-    renderer = get_template_renderer(original, resource)
 
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
-      if not has_permission(action, renderer(*args, **kwargs)):
+      if not callback():
         raise AuthorizationError()
       return func(*args, **kwargs)
 
     # Propagate reference to original function, mark function as decorated.
     wrapper.__wrapped__ = original
-    wrapper.__auth_require = getattr(func, '__auth_require', [])
-
-    # Store requirements in __auth_require, used by 'get_require_decorators'.
-    wrapper.__auth_require.insert(0, (action, resource))
+    wrapper.__auth_require = True
 
     return wrapper
 
@@ -667,75 +550,28 @@ def is_decorated(func):
   return hasattr(func, '__auth_public') or hasattr(func, '__auth_require')
 
 
-def get_require_decorators(func):
-  """Given a function decorated with @require returns list of requirements.
+def is_empty_group(group):
+  """Returns True if group is missing or completely empty."""
+  group = model.group_key(group).get()
+  return not group or not(group.members or group.globs or group.nested)
 
-  Each requirement is a pair (action, resource template) as passed to @require
-  decorator. Outermost decorator comes first in the list.
 
-  Returns empty list for public or non-decorated function.
+@ndb.transactional
+def bootstrap_group(group, identity, description):
+  """Makes a group (if not yet exists) and adds an |identity| to it as a member.
+
+  Returns True if added |identity| to |group|, False if it is already there.
   """
-  return getattr(func, '__auth_require', [])
-
-
-def get_template_renderer(func, resource):
-  """Returns a function that renders a resource template into a resource name.
-
-  Resource template is a string that can reference |func| arguments by name in
-  a same way str.format can. It is used to produce some concrete resource name
-  protected by ACLs.
-
-  Returned function accepts positional and keyword arguments of invocation of
-  decorated function, and uses them to render |resource| template
-  via str.format. Note that |resource| can only use named fields (i.e.
-  positional fields like {0} are not allowed).
-
-  See also http://docs.python.org/2/library/string.html#format-examples
-
-  For example:
-    def func(arg, another='default'):
-      ...
-    renderer = get_template_renderer(func, 'test/{arg}/{another}')
-    assert renderer(1, 2) == 'test/1/2'
-    assert renderer(1) == 'test/1/default'
-    assert renderer(1, another='boom') == 'test/1/boom'
-  """
-  # Validate format string, extract names of all referenced arguments.
-  # See http://docs.python.org/2/library/string.html#string.Formatter
-  used_args = set()
-  for (_, field_name, _, _) in string.Formatter().parse(resource):
-    if not field_name:
-      continue
-    # |field_name| has the following format (we extract |arg_name| from it):
-    #   field_name ::= arg_name ("." attribute_name | "[" element_index "]")*
-    arg_name = ''
-    for c in field_name:
-      if c in ('.', '['):
-        break
-      arg_name += c
-    # Reject positional arguments. Only keyword ones are allowed.
-    assert arg_name
-    if arg_name[0] in string.digits:
-      raise ValueError(
-          'Positional argument \'%s\' is not allowed in resource '
-          'template \'%s\'' % (field_name, resource))
-    used_args.add(arg_name)
-
-  # Template is just a predefined static resource name?
-  # Don't bother trying to 'render' it.
-  if not used_args:
-    return lambda *_args, **_kwargs: resource
-
-  # All template args should be among explicit arguments of the function.
-  # Whatever additional arguments are passed via *args or **kwargs should not
-  # be used during template expansion.
-  defined_args = set(inspect.getargspec(func).args)
-  if not used_args.issubset(defined_args):
-    raise TypeError(
-        'Referencing unknown variable(s) \'%s\' in resource '
-        'template \'%s\'' % (used_args.difference(defined_args), resource))
-
-  # Get a dict 'arg name -> arg value' and use it to render the template.
-  # See http://docs.python.org/2/library/inspect.html#inspect.getcallargs.
-  return lambda *args, **kwargs: (
-      resource.format(**inspect.getcallargs(func, *args, **kwargs)))
+  key = model.group_key(group)
+  entity = key.get()
+  if entity and identity in entity.members:
+    return False
+  if not entity:
+    entity = model.AuthGroup(
+        key=key,
+        description=description,
+        created_by=identity,
+        modified_by=identity)
+  entity.members.append(identity)
+  entity.put()
+  return True

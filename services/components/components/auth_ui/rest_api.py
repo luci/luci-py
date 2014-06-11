@@ -106,7 +106,7 @@ class GroupsHandler(ApiHandler):
   (which may be large).
   """
 
-  @api.require(model.READ, 'auth/management')
+  @api.require(api.is_admin)
   def get(self):
     # Currently AuthGroup entity contains a list of group members in the entity
     # body. It's an implementation detail that should not be relied upon.
@@ -127,17 +127,17 @@ class GroupsHandler(ApiHandler):
 class GroupHandler(ApiHandler):
   """Creating, reading, updating and deleting a single group."""
 
-  @api.require(model.READ, 'auth/management/groups/{group}')
+  @api.require(api.is_admin)
   def get(self, group):
     """Fetches all information about an existing group give its name."""
-    obj = model.AuthGroup.get_by_id(group, parent=model.ROOT_KEY)
+    obj = model.group_key(group).get()
     if not obj:
       self.abort_with_error(404, text='No such group')
     self.send_response(
         response={'group': obj.to_serializable_dict(with_id_as='name')},
         headers={'Last-Modified': utils.datetime_to_rfc2822(obj.modified_ts)})
 
-  @api.require(model.UPDATE, 'auth/management/groups/{group}')
+  @api.require(api.is_admin)
   def put(self, group):
     """Updates an existing group."""
     # Deserialize and validate the body.
@@ -153,7 +153,7 @@ class GroupHandler(ApiHandler):
     @ndb.transactional
     def update(params, modified_by, expected_ts):
       # Missing?
-      entity = model.AuthGroup.get_by_id(group, parent=model.ROOT_KEY)
+      entity = model.group_key(group).get()
       if not entity:
         return None, {'http_code': 404, 'text': 'No such group'}
 
@@ -210,7 +210,7 @@ class GroupHandler(ApiHandler):
         }
     )
 
-  @api.require(model.CREATE, 'auth/management/groups/{group}')
+  @api.require(api.is_admin)
   def post(self, group):
     """Creates a new group, ensuring it's indeed new (no overwrites)."""
     # Deserialize a body into the entity.
@@ -221,8 +221,7 @@ class GroupHandler(ApiHandler):
         raise ValueError('Missing or mismatching group name in request body')
       entity = model.AuthGroup.from_serializable_dict(
           serializable_dict=body,
-          id=group,
-          parent=model.ROOT_KEY,
+          key=model.group_key(group),
           created_by=api.get_current_identity(),
           modified_by=api.get_current_identity())
     except (TypeError, ValueError) as err:
@@ -259,7 +258,7 @@ class GroupHandler(ApiHandler):
         }
     )
 
-  @api.require(model.DELETE, 'auth/management/groups/{group}')
+  @api.require(api.is_admin)
   @ndb.transactional
   def delete(self, group):
     """Deletes a group.
@@ -274,7 +273,7 @@ class GroupHandler(ApiHandler):
     this group in the response body.
     """
     # Ensure group exists before running heavy 'find_references' call.
-    entity = model.AuthGroup.get_by_id(group, parent=model.ROOT_KEY)
+    entity = model.group_key(group).get()
     expected_ts = self.request.headers.get('If-Unmodified-Since')
     if entity is None:
       if expected_ts:
@@ -291,14 +290,13 @@ class GroupHandler(ApiHandler):
       self.abort_with_error(412, text='Group was modified by someone else')
 
     # Check the group is not used, it's a heavy call that enumerates all rules.
-    referencing_groups, referencing_services = groups.find_references(group)
-    if referencing_groups or referencing_services:
+    referencing_groups = groups.find_references(group)
+    if referencing_groups:
       self.abort_with_error(
           http_code=409,
-          text='Group is being referenced in rules or other groups',
+          text='Group is being referenced in other groups',
           details={
             'groups': list(referencing_groups),
-            'services': list(referencing_services),
           }
       )
 
@@ -335,7 +333,7 @@ class OAuthConfigHandler(ApiHandler):
       'client_not_so_secret': client_secret,
     })
 
-  @api.require(model.UPDATE, 'auth/management')
+  @api.require(api.is_admin)
   def post(self):
     body = self.parse_body()
     client_id = body['client_id']

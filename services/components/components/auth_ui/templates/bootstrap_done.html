@@ -1,0 +1,15 @@
+{% extends 'base_minimal.html' %}
+{% block content %}
+
+{% if added %}
+<h2>You've been added to {{admin_group}} group.</h2>
+<p>Once this change propagates (~1 min) you should be able to access
+<a href="/auth">Admin UI</a>.</p>
+{% else %}
+<h2>You are already a member of {{admin_group}} group.</h2>
+<p>You should be able to access <a href="/auth">Admin UI</a>. It takes up to
+1 min for recent changes to propagate.</p>
+{% endif %}
+<hr>
+
+{% endblock %}
