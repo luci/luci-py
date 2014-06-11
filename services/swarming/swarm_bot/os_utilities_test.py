@@ -94,6 +94,9 @@ class TestOsUtilities(auto_stub.TestCase):
   def test_get_free_disk(self):
     self.assertGreater(os_utilities.get_free_disk(), 0)
 
+  def test_get_gpu(self):
+    self.assertTrue(os_utilities.get_gpu())
+
   def test_get_integrity_level_win(self):
     if sys.platform == 'win32':
       self.assertIsInstance(os_utilities.get_integrity_level_win(), basestring)
@@ -105,7 +108,8 @@ class TestOsUtilities(auto_stub.TestCase):
     expected = set(['dimensions', 'ip', 'tag'])
     self.assertEqual(expected, set(actual))
 
-    expected_dimensions = set(['cores', 'cpu', 'disk', 'hostname', 'os', 'ram'])
+    expected_dimensions = set(
+        ['cores', 'cpu', 'disk', 'gpu', 'hostname', 'os', 'ram'])
     if sys.platform in ('cygwin', 'win32'):
       expected_dimensions.add('cygwin')
     if sys.platform == 'win32':

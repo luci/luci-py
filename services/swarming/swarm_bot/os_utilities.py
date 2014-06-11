@@ -19,6 +19,7 @@ import os
 import platform
 import pprint
 import re
+import shlex
 import socket
 import subprocess
 import sys
@@ -141,6 +142,99 @@ def _generate_launchd_plist(command, cwd, plistname):
     '  </dict>\n'
     '</plist>\n')
   return header
+
+
+def _get_gpu_linux():
+  """Returns video device as listed by 'lspci'. See get_gpu()."""
+  try:
+    pci_devices = subprocess.check_output(['lspci', '-mm', '-nn']).splitlines()
+  except subprocess.CalledProcessError as e:
+    logging.error('Failed to run lspci: %s', e)
+    return ['ERROR']
+
+  out = set()
+  re_id = re.compile(r'^(.+?) \[([0-9a-f]{4})\]$')
+  for pci_device in pci_devices:
+    # Bus, Type, Vendor [ID], Device [ID], extra...
+    line = shlex.split(pci_device)
+    # Look for display class as noted at http://wiki.osdev.org/PCI
+    dev_type = re_id.match(line[1]).group(2)
+    if dev_type.startswith('03'):
+      vendor = re_id.match(line[2])
+      device = re_id.match(line[3])
+      ven_id = vendor.group(2)
+      out.add(ven_id)
+      out.add('%s:%s' % (ven_id, device.group(2)))
+      out.add('%s %s' % (vendor.group(1), device.group(1)))
+  return sorted(out)
+
+
+def _get_gpu_osx():
+  """Returns video device as listed by 'system_profiler'. See get_gpu()."""
+  import plistlib
+  sp = subprocess.check_output(
+      ['system_profiler', 'SPDisplaysDataType', '-xml'])
+  pl = plistlib.readPlistFromString(sp)
+  try:
+    out = set()
+    for card in pl[0]['_items']:
+      # Warning: the value provided depends on the driver manufacturer.
+      # Other interesting values: spdisplays_vram, spdisplays_revision-id
+      ven_id = 'UNKNOWN'
+      if 'spdisplays_vendor-id' in card:
+        # NVidia
+        ven_id = card['spdisplays_vendor-id'][2:]
+      elif 'spdisplays_vendor' in card:
+        # Intel and ATI
+        match = re.search(r'\(0x([0-9a-f]{4})\)', card['spdisplays_vendor'])
+        if match:
+          ven_id = match.group(1)
+      dev_id = card['spdisplays_device-id'][2:]
+      out.add(ven_id)
+      out.add('%s:%s' % (ven_id, dev_id))
+
+      # VMWare doesn't set it.
+      if 'sppci_model' in card:
+        out.add(card['sppci_model'])
+    return sorted(out)
+  except KeyError:
+    return ['ERROR']
+
+
+def _get_gpu_win():
+  """Returns video device as listed by WMI. See get_gpu()."""
+  try:
+    import win32com.client  # pylint: disable=F0401
+  except ImportError:
+    # win32com is included in pywin32, which is an optional package that is
+    # installed by Swarming devs. If you find yourself needing it to run without
+    # pywin32, for example in cygwin, please send us a CL with the
+    # implementation that doesn't use pywin32.
+    return ['ERROR']
+
+  wmi_service = win32com.client.Dispatch('WbemScripting.SWbemLocator')
+  wbem = wmi_service.ConnectServer('.', 'root\\cimv2')
+  out = set()
+  # https://msdn.microsoft.com/library/aa394512.aspx
+  for device in wbem.ExecQuery('SELECT * FROM Win32_VideoController'):
+    vp = device.VideoProcessor
+    if vp:
+      out.add(vp)
+
+    # The string looks like:
+    #  PCI\VEN_15AD&DEV_0405&SUBSYS_040515AD&REV_00\3&2B8E0B4B&0&78
+    pnp_string = device.PNPDeviceID
+    ven_id = 'UNKNOWN'
+    dev_id = 'UNKNOWN'
+    match = re.search(r'VEN_([0-9A-F]{4})', pnp_string)
+    if match:
+      ven_id = match.group(1).lower()
+    match = re.search(r'DEV_([0-9A-F]{4})', pnp_string)
+    if match:
+      dev_id = match.group(1).lower()
+    out.add(ven_id)
+    out.add('%s:%s' % (ven_id, dev_id))
+  return sorted(out)
 
 
 ### Public API.
@@ -317,6 +411,24 @@ def get_free_disk():
   return int(round(f.f_bfree * f.f_frsize / 1024. / 1024. / 1024.))
 
 
+def get_gpu():
+  """Returns the installed video card(s) name.
+
+  Returns:
+    All the video cards detected.
+
+  TODO(maruel): Add custom processing to normalize the string as much as
+  possible but differences will occur between OSes.
+  """
+  if sys.platform == 'darwin':
+    return _get_gpu_osx()
+  if sys.platform == 'linux2':
+    return _get_gpu_linux()
+  if sys.platform == 'win32':
+    return _get_gpu_win()
+  return ['IMPLEMENT_ME']
+
+
 def get_integrity_level_win():
   """Returns the integrity level of the current process as a string.
 
@@ -445,6 +557,7 @@ def get_dimensions():
       cpu_type + '-' + get_cpu_bitness(),
     ],
     'disk': str(get_free_disk()),
+    'gpu': get_gpu(),
     'hostname': get_hostname(),
     'os': [
       os_name,
