@@ -441,6 +441,32 @@ class SlaveMachine(object):
       os.execv(sys.executable, cmd)
 
 
+def get_attributes():
+  """Returns start_slave.py's get_attributes() dict."""
+  # Importing this administrator provided script could have side-effects on
+  # startup. That is why it is imported late.
+  try:
+    import start_slave
+    return start_slave.get_attributes()
+  except Exception as e:
+    logging.exception('Failed to call start_slave.get_attributes()')
+    # Catch all exceptions here so the bot doesn't die on startup, which is
+    # annoying to recover. In that case, we set a special property to catch
+    # these and help the admin fix the swarming_bot code more quickly.
+    # TODO(maruel): This should be part of the 'health check' and the bot
+    # shouldn't allow itself to upgrade in this condition.
+    # https://code.google.com/p/swarming/issues/detail?id=112
+    dimensions = {
+      'get_attributes_failed': '1',
+      'error': str(e),
+    }
+    return {
+      'dimensions': dimensions,
+      'ip': os_utilities.get_ip(),
+      'tag': os_utilities.get_hostname(),
+    }
+
+
 def get_config():
   """Returns the data from config.json.
 
@@ -486,11 +512,7 @@ def main(args):
   levels = [logging.WARNING, logging.INFO, logging.DEBUG]
   logging_utils.set_console_level(levels[min(options.verbose, len(levels)-1)])
 
-  # Importing this administrator provided script could have side-effects on
-  # startup. That is why it is late imported.
-  import start_slave
-  attributes = start_slave.get_attributes()
-
+  attributes = get_attributes()
   config = get_config()
   slave = SlaveMachine(config['server'], attributes, max_url_tries=40)
 

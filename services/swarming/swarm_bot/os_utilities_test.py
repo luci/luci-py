@@ -94,12 +94,22 @@ class TestOsUtilities(auto_stub.TestCase):
   def test_get_free_disk(self):
     self.assertGreater(os_utilities.get_free_disk(), 0)
 
+  def test_get_integrity_level_win(self):
+    if sys.platform == 'win32':
+      self.assertIsInstance(os_utilities.get_integrity_level_win(), basestring)
+    else:
+      self.assertIs(os_utilities.get_integrity_level_win(), None)
+
   def test_get_attributes(self):
     actual = os_utilities.get_attributes('id')
     expected = set(['dimensions', 'ip', 'tag'])
     self.assertEqual(expected, set(actual))
 
     expected_dimensions = set(['cores', 'cpu', 'disk', 'hostname', 'os', 'ram'])
+    if sys.platform in ('cygwin', 'win32'):
+      expected_dimensions.add('cygwin')
+    if sys.platform == 'win32':
+      expected_dimensions.add('integrity')
     self.assertEqual(expected_dimensions, set(actual['dimensions']))
 
   def test_setup_auto_startup_win(self):

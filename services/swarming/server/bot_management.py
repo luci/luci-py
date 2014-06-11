@@ -218,31 +218,33 @@ def validate_and_fix_attributes(attributes):
     A dictionary containing the fixed attributes of the machine.
   """
   # Parse given attributes.
-  for attrib, value in attributes.items():
-    if attrib == 'dimensions':
+  for key, value in attributes.iteritems():
+    if key == 'dimensions':
       if not isinstance(value, dict):
-        raise test_request_message.Error('Invalid attrib value for dimensions')
-
-    elif attrib == 'id':
-      if not isinstance(value, basestring):
-        raise test_request_message.Error('Invalid attrib value for id')
-
-    elif attrib in ('ip', 'tag', 'version'):
-      if not isinstance(value, (str, unicode)):
         raise test_request_message.Error(
-            'Invalid attrib value type for ' + attrib)
+            'Invalid value for %s: %s\n%s' % (key, value, attributes))
 
-    elif attrib == 'try_count':
+    elif key == 'id':
+      if not isinstance(value, basestring):
+        raise test_request_message.Error(
+            'Invalid value for %s: %s\n%s' % (key, value, attributes))
+
+    elif key in ('ip', 'tag', 'version'):
+      if not isinstance(value, basestring):
+        raise test_request_message.Error(
+            'Invalid value for %s: %s\n%s' % (key, value, attributes))
+
+    elif key == 'try_count':
       if not isinstance(value, int):
         raise test_request_message.Error(
-            'Invalid attrib value type for try_count')
+            'Invalid value for %s: %s\n%s' % (key, value, attributes))
       if value < 0:
         raise test_request_message.Error(
-            'Invalid negative value for try_count')
+            'Invalid value for %s: %s\n%s' % (key, value, attributes))
 
     else:
       raise test_request_message.Error(
-          'Invalid attribute to machine: ' + attrib)
+          'Invalid key %s\n%s' % (key, attributes))
 
   if 'dimensions' not in attributes:
     raise test_request_message.Error('Missing mandatory attribute: dimensions')

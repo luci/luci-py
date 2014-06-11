@@ -13,6 +13,7 @@ Includes code:
 import cgi
 import ctypes
 import logging
+import multiprocessing
 import os
 import platform
 import re
@@ -26,7 +27,7 @@ import zipped_archive
 
 
 ROOT_DIR = os.path.dirname(
-    os.path.abspath(zipped_archive.get_main_script_path()))
+    os.path.abspath(zipped_archive.get_main_script_path() or __file__))
 
 
 ### Private stuff.
@@ -228,6 +229,12 @@ def get_ip():
   return ip
 
 
+def get_hostname():
+  """Returns the machine's hostname."""
+  # Windows enjoys putting random case in there. Enforces lower case for sanity.
+  return socket.getfqdn().lower()
+
+
 def get_num_processors():
   """Returns the number of processors.
 
@@ -235,7 +242,6 @@ def get_num_processors():
   """
   try:
     # Multiprocessing
-    import multiprocessing
     return multiprocessing.cpu_count()
   except:  # pylint: disable=W0702
     try:
@@ -307,31 +313,156 @@ def get_free_disk():
   return int(round(f.f_bfree * f.f_frsize / 1024. / 1024. / 1024.))
 
 
+def get_integrity_level_win():
+  """Returns the integrity level of the current process as a string.
+
+  TODO(maruel): It'd be nice to make it work on cygwin. The problem is that
+  ctypes.windll is unaccessible and it is not known to the author how to use
+  stdcall convention through ctypes.cdll.
+  """
+  if sys.platform != 'win32':
+    return None
+
+  mapping = {
+    0x0000: 'untrusted',
+    0x1000: 'low',
+    0x2000: 'medium',
+    0x2100: 'medium high',
+    0x3000: 'high',
+    0x4000: 'system',
+    0x5000: 'protected process',
+  }
+
+  # This was specifically written this way to work on cygwin except for the
+  # windll part. If someone can come up with a way to do stdcall on cygwin, that
+  # would be appreciated.
+  BOOL = ctypes.c_long
+  DWORD = ctypes.c_ulong
+  HANDLE = ctypes.c_void_p
+  class SID_AND_ATTRIBUTES(ctypes.Structure):
+    _fields_ = [
+      ('Sid', ctypes.c_void_p),
+      ('Attributes', DWORD),
+    ]
+
+  class TOKEN_MANDATORY_LABEL(ctypes.Structure):
+    _fields_ = [
+      ('Label', SID_AND_ATTRIBUTES),
+    ]
+
+  TOKEN_READ = DWORD(0x20008)
+  # Use the same casing as in the C declaration:
+  # https://msdn.microsoft.com/library/windows/desktop/aa379626.aspx
+  TokenIntegrityLevel = ctypes.c_int(25)
+  ERROR_INSUFFICIENT_BUFFER = 122
+
+  # All the functions used locally. First open the process' token, then query
+  # the SID to know its integrity level.
+  ctypes.windll.kernel32.GetLastError.argtypes = ()
+  ctypes.windll.kernel32.GetLastError.restype = DWORD
+  ctypes.windll.kernel32.GetCurrentProcess.argtypes = ()
+  ctypes.windll.kernel32.GetCurrentProcess.restype = ctypes.c_void_p
+  ctypes.windll.advapi32.OpenProcessToken.argtypes = (
+      HANDLE, DWORD, ctypes.POINTER(HANDLE))
+  ctypes.windll.advapi32.OpenProcessToken.restype = BOOL
+  ctypes.windll.advapi32.GetTokenInformation.argtypes = (
+      HANDLE, ctypes.c_long, ctypes.c_void_p, DWORD, ctypes.POINTER(DWORD))
+  ctypes.windll.advapi32.GetTokenInformation.restype = BOOL
+  ctypes.windll.advapi32.GetSidSubAuthorityCount.argtypes = [ctypes.c_void_p]
+  ctypes.windll.advapi32.GetSidSubAuthorityCount.restype = ctypes.POINTER(
+      ctypes.c_ubyte)
+  ctypes.windll.advapi32.GetSidSubAuthority.argtypes = (ctypes.c_void_p, DWORD)
+  ctypes.windll.advapi32.GetSidSubAuthority.restype = ctypes.POINTER(DWORD)
+
+  # First open the current process token, query it, then close everything.
+  token = ctypes.c_void_p()
+  proc_handle = ctypes.windll.kernel32.GetCurrentProcess()
+  if not ctypes.windll.advapi32.OpenProcessToken(
+      proc_handle,
+      TOKEN_READ,
+      ctypes.byref(token)):
+    logging.error('Failed to get process\' token')
+    return None
+  if token.value == 0:
+    logging.error('Got a NULL token')
+    return None
+  try:
+    # The size of the structure is dynamic because the TOKEN_MANDATORY_LABEL
+    # used will have the SID appened right after the TOKEN_MANDATORY_LABEL in
+    # the heap allocated memory block, with .Label.Sid pointing to it.
+    info_size = DWORD()
+    if ctypes.windll.advapi32.GetTokenInformation(
+        token,
+        TokenIntegrityLevel,
+        ctypes.c_void_p(),
+        info_size,
+        ctypes.byref(info_size)):
+      logging.error('GetTokenInformation() failed expectation')
+      return None
+    if info_size.value == 0:
+      logging.error('GetTokenInformation() returned size 0')
+      return None
+    if ctypes.windll.kernel32.GetLastError() != ERROR_INSUFFICIENT_BUFFER:
+      logging.error(
+          'GetTokenInformation(): Unknown error: %d',
+          ctypes.windll.kernel32.GetLastError())
+      return None
+    token_info = TOKEN_MANDATORY_LABEL()
+    ctypes.resize(token_info, info_size.value)
+    if not ctypes.windll.advapi32.GetTokenInformation(
+        token,
+        TokenIntegrityLevel,
+        ctypes.byref(token_info),
+        info_size,
+        ctypes.byref(info_size)):
+      logging.error(
+          'GetTokenInformation(): Unknown error with buffer size %d: %d',
+          info_size.value,
+          ctypes.windll.kernel32.GetLastError())
+      return None
+    p_sid_size = ctypes.windll.advapi32.GetSidSubAuthorityCount(
+        token_info.Label.Sid)
+    res = ctypes.windll.advapi32.GetSidSubAuthority(
+        token_info.Label.Sid, p_sid_size.contents.value - 1)
+    value = res.contents.value
+    return mapping.get(value) or '0x%04x' % value
+  finally:
+    ctypes.windll.kernel32.CloseHandle(token)
+
+
+def get_dimensions():
+  """Returns the default dimensions."""
+  os_name = get_os_name()
+  cpu_type = get_cpu_type()
+  dimensions = {
+    'cores': str(get_num_processors()),
+    'cpu': [
+      cpu_type,
+      cpu_type + '-' + get_cpu_bitness(),
+    ],
+    'disk': str(get_free_disk()),
+    'hostname': get_hostname(),
+    'os': [
+      os_name,
+      os_name + '-' + get_os_version(),
+    ],
+    'ram': str(get_physical_ram()),
+  }
+  if sys.platform in ('cygwin', 'win32'):
+    dimensions['cygwin'] = str(int(sys.platform == 'cygwin'))
+  if sys.platform == 'win32':
+    dimensions['integrity'] = get_integrity_level_win()
+  return dimensions
+
+
 def get_attributes(tag):
   """Returns the default Swarming dictionary of attributes for this bot.
 
   'tag' is used to uniquely identify the bot.
   'dimensions' is used for task selection.
   """
-  # Windows enjoys putting random case in there. Enforces lower case for sanity.
-  hostname = socket.getfqdn().lower()
-  os_name = get_os_name()
-  cpu_type = get_cpu_type()
   return {
-    'dimensions': {
-      'cores': str(get_num_processors()),
-      'cpu': [
-        cpu_type,
-        cpu_type + '-' + get_cpu_bitness(),
-      ],
-      'disk': str(get_free_disk()),
-      'hostname': hostname,
-      'os': [
-        os_name,
-        os_name + '-' + get_os_version(),
-      ],
-      'ram': str(get_physical_ram()),
-    },
+    'dimensions': get_dimensions(),
     'ip': get_ip(),
     'tag': tag,
   }
