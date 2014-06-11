@@ -41,7 +41,7 @@ Current bot version is: {{current_version[:8]}}
         <td>
           {% if bot.task %}
           <a href="/user/task/{{bot.task_entity.key_string}}">{{bot.task_entity.name}}</a>
-          {% else %}--{% endif%}
+          {% else %}&#8209;&#8209;{% endif%}
         </td>
         <td>{{(now-bot.last_seen)|timedeltaformat}}</td>
         <td>

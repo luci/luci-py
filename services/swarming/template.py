@@ -17,6 +17,9 @@ from components import natsort
 from components import utils
 
 
+NON_BREAKING_HYPHEN = u'\u2011'
+
+
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 JINJA = jinja2.Environment(
@@ -30,14 +33,14 @@ JINJA = jinja2.Environment(
 
 def datetimeformat(value, f='%Y-%m-%d %H:%M:%S'):
   if not value:
-    return '--'
+    return NON_BREAKING_HYPHEN + NON_BREAKING_HYPHEN
   return value.strftime(f)
 
 
 def datetime_human(dt):
   """Converts a datetime.datetime to a user-friendly string."""
   if not dt:
-    return '--'
+    return NON_BREAKING_HYPHEN + NON_BREAKING_HYPHEN
   dt_date = dt.date()
   today = datetime.datetime.utcnow().date()
   if dt_date == today:
@@ -57,7 +60,7 @@ def timedeltaformat(value):
   fast.
   """
   if not value:
-    return '--'
+    return NON_BREAKING_HYPHEN + NON_BREAKING_HYPHEN
   hours, remainder = divmod(int(round(value.total_seconds())), 3600)
   minutes, seconds = divmod(remainder, 60)
   if hours:

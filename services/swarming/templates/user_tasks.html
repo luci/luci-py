@@ -65,7 +65,7 @@ Always sorted by reverse created.
         <td nowrap align=center>{{task.started_ts|datetimeformat}}</td>
         <td nowrap align=center>{{task.ended_ts|datetimeformat}}</td>
         <td nowrap align=right>{{task.duration()|timedeltaformat}}</td>
-        <td nowrap>{{task.bot_id|default('--')}}</td>
+        <td nowrap>{{task.bot_id|default('&#8209;&#8209;')}}</td>
       </tr>
     {% endfor %}
   </tbody>
