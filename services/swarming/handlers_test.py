@@ -838,7 +838,9 @@ class AppTest(test_case.TestCase):
     self.assertEqual('0', self.app.get('/swarming/api/v1/bots/dead/count').body)
 
     # Make the machine old and ensure it is marked as dead.
-    bot.last_seen = task_common.utcnow() - bot_management.MACHINE_DEATH_TIMEOUT
+    bot.last_seen = (
+        task_common.utcnow() - bot_management.MACHINE_DEATH_TIMEOUT -
+        datetime.timedelta(seconds=1))
     bot.put()
     self.assertEqual('1', self.app.get('/swarming/api/v1/bots/dead/count').body)
 

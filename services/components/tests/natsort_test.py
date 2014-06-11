@@ -9,11 +9,10 @@ import doctest
 import os
 import sys
 
-COMPONENTS_DIR = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'components')
-sys.path.insert(0, COMPONENTS_DIR)
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, ROOT_DIR)
 
-import natsort
+from components import natsort
 
 
 if __name__ == '__main__':
