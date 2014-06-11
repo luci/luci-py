@@ -57,6 +57,7 @@ class AppTest(test_case.TestCase):
 
   def setUp(self):
     super(AppTest, self).setUp()
+    self._version = None
     self.testbed.init_user_stub()
 
     # By default requests in tests are coming from bot with fake IP.
@@ -118,6 +119,42 @@ class AppTest(test_case.TestCase):
     return self.app.post(
         '/auth/api/v1/accounts/self/xsrf_token',
         headers={'X-XSRF-Token-Request': '1'}).json['xsrf_token']
+
+  def client_create_task(self, name):
+    """Simulate a client that creates a task."""
+    request = {
+      'configurations': [
+        {
+          'config_name': 'X',
+          'dimensions': {'os': 'Amiga'},
+        },
+      ],
+      'test_case_name': name,
+      'tests':[{'action': ['python', 'run_test.py'], 'test_name': 'Y'}],
+    }
+    return self.app.post('/test', {'request': json.dumps(request)}).json
+
+  def bot_poll(self, bot):
+    """Simulates a bot that polls for task."""
+    if not self._version:
+      attributes = {
+        'dimensions': {'cpu': '48', 'os': 'Amiga'},
+        'id': bot,
+        'ip': FAKE_IP,
+      }
+      result = self.app.post(
+          '/poll_for_test', {'attributes': json.dumps(attributes)}).json
+      self._version = result['commands'][0]['args'][-40:]
+
+    attributes = {
+      'dimensions': {'cpu': '48', 'os': 'Amiga'},
+      'id': bot,
+      'ip': FAKE_IP,
+      'version': self._version,
+    }
+    return self.app.post(
+        '/poll_for_test', {'attributes': json.dumps(attributes)}).json
+
 
   def testMatchingTestCasesHandler(self):
     # Ensure that matching works even when the datastore is not being
@@ -730,8 +767,7 @@ class AppTest(test_case.TestCase):
 
     # Ensure that valid requests are accepted.
     request['test_case_name'] = 'test_case'
-    response = self.app.post('/test', {'request': json.dumps(request)},
-                             expect_errors=True)
+    response = self.app.post('/test', {'request': json.dumps(request)})
     self.assertEquals('200 OK', response.status)
 
   def testCronTriggerTask(self):
@@ -931,41 +967,58 @@ class AppTest(test_case.TestCase):
     }
     self.assertEqual(expected, actual)
 
+  def test_task_list_empty(self):
+    # Just assert it doesn't throw.
+    self._ReplaceCurrentUser(ADMIN_EMAIL)
+    self.app.get('/user/tasks', status=200)
+    self.app.get('/user/task/12345', status=404)
+
   def test_add_task_and_list(self):
     # Add a task via the bot API, then assert it can be viewed.
-    request = {
-      'configurations': [
-        {'config_name': 'unused', 'dimensions': {'os': 'Amiga'}},
-      ],
-      'test_case_name': 'foo',
-      'tests':[
-        {'action': ['python', 'run_test.py'], 'test_name': 'Run Test'}
-      ],
-    }
-    actual = self.app.post('/test', {'request': json.dumps(request)}).json
+    task = self.client_create_task('hi')
+
+    # The value is using both timestamp and random value, so it is not
+    # deterministic by definition.
+    key = task['test_keys'][0].pop('test_key')
+    self.assertTrue(int(key, 16))
+    self.assertEqual('0', key[-1])
     expected = {
-      u'test_case_name': u'foo',
+      u'test_case_name': u'hi',
       u'test_keys': [
         {
-          u'config_name': u'foo',
+          u'config_name': u'hi',
           u'instance_index': 0,
           u'num_instances': 1,
         },
       ],
     }
-    # The value is using both timestamp and random value, so it is not
-    # deterministic by definition.
-    key = actual['test_keys'][0].pop('test_key')
-    self.assertTrue(int(key, 16))
-    self.assertEqual('0', key[-1])
-    self.assertEqual(expected, actual)
+    self.assertEqual(expected, task)
 
-    # TODO(maruel): Differentiate users and admins in test.
     self._ReplaceCurrentUser(ADMIN_EMAIL)
     self.app.get('/user/tasks', status=200)
     self.app.get('/user/task/%s' % key, status=200)
-    # This can't work until a bot reaped the task.
-    #self.app.get('/admin/task/%s' % key[:-1] + '1', status=200)
+
+    reaped = self.bot_poll('bot1')
+    self.assertEqual('RunManifest', reaped['commands'][0]['function'])
+    # This can only work once a bot reaped the task.
+    self.app.get('/user/task/%s' % (key[:-1] + '1'), status=200)
+
+  def test_bot_list_empty(self):
+    # Just assert it doesn't throw.
+    self._ReplaceCurrentUser(ADMIN_EMAIL)
+    self.app.get('/restricted/bots', status=200)
+    self.app.get('/restricted/bot/unknown_bot', status=200)
+
+  def test_bot_listing(self):
+    # Create a task, create 2 bots, one with a task assigned, the other without.
+    self.client_create_task('hi')
+    self.bot_poll('bot1')
+    self.bot_poll('bot2')
+
+    self._ReplaceCurrentUser(ADMIN_EMAIL)
+    self.app.get('/restricted/bots', status=200)
+    self.app.get('/restricted/bot/bot1', status=200)
+    self.app.get('/restricted/bot/bot2', status=200)
 
 
 if __name__ == '__main__':

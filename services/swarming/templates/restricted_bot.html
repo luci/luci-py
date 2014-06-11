@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+
+
+{% block headers %}
+<style>
+  table.property_table {
+    font-family: monospace;
+    border-spacing: 0;
+  }
+  table.property_table tbody tr:nth-child(even) {
+    background-color: #eeeeee;
+  }
+  table.property_table td {
+    padding-left: 1em;
+    padding-right: 1em;
+  }
+  table.property_table tbody tr:hover {
+    background-color: #eeffee;
+  }
+</style>
+{% endblock %}
+
+
+{% block body %}
+<h1>Bot details</h1>
+
+{% if bot %}
+  <table class="property_table">
+    <tbody>
+      <tr>
+        <td>ID</td>
+        <td>{{bot.key.id()}}</td>
+      </tr>
+      <tr>
+        <td>Internal IP</td>
+        <td>{{bot.internal_ip}}</td>
+      </tr>
+        <td>External IP</td>
+        <td>{{bot.external_ip}}</td>
+      </tr>
+      <tr>
+        <td>Last seen IP</td>
+        <td>{{(now-bot.last_seen)|timedeltaformat}}</td>
+      </tr>
+      <tr>
+        <td>Dimensions</td>
+        <td>
+          {% for k, v in bot.dimensions.iteritems()|sort %}
+          {{k}}:
+          {% if v is string %}{{v}}{% else %}{{v|sort|join(' | ')}}{% endif %}
+          <br>
+          {% endfor %}
+        </td>
+      </tr>
+      <tr>
+        <td>Version</td>
+        <td>{{bot.version}}</td>
+      </tr>
+      <tr>
+        <td>Expected version</td>
+        <td>{{current_version}}</td>
+      </tr>
+      <tr>
+        <td>Current task</td>
+        <td>{{bot.task}}</td>
+      </tr>
+    </tbody>
+  </table>
+  <p>
+
+  <h3>Previous tasks</h3>
+  <table class="property_table">
+    <thead>
+      <tr>
+        <th>Task</th>
+        <th>Duration</th>
+        <th>Result</th>
+        <th>Failure</th>
+        <th>Idle before previous task</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for run_result in run_results %}
+        <tr class="request {% if run_result.failure %}failed_test{% endif%}">
+          <td>
+            <a href="/user/task/{{run_result.key_string}}">{{run_result.name}}</a>
+          </td>
+          <td align=right>{{run_result.duration()|timedeltaformat}}</td>
+          <td>{{run_result.to_string()}}</td>
+          <td>{{run_result.failure}}</td>
+          <td align=right>TODO</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <p>
+
+  <form id="delete_{{bot.id}}" method="post"
+    action="/delete_machine_stats?r={{bot.id}}">
+    <button
+      onclick="document.getElementById("delete_{{bot.id}}").submit()">
+      Delete
+    </button>
+  </form>
+
+{% else %}
+
+  Bot {{bot_id}} not found.
+
+{% endif %}
+
+{% endblock %}

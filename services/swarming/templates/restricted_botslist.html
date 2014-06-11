@@ -37,7 +37,7 @@ Current bot version is: {{current_version[:8]}}
   <tbody>
     {% for bot in bots %}
       <tr class="request {% if bot.last_seen < dead_machine_cutoff %}dead_machine{% endif %}">
-        <td>{{bot.key.id()}}</td>
+        <td><a href="/restricted/bot/{{bot.key.id()}}">{{bot.key.id()}}</a></td>
         <td>
           {% if bot.task %}
           <a href="/user/task/{{bot.task_entity.key_string}}">{{bot.task_entity.name}}</a>

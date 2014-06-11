@@ -412,6 +412,24 @@ class BotsListHandler(auth.AuthenticatingHandler):
         template.render('restricted_botslist.html', params))
 
 
+class BotHandler(auth.AuthenticatingHandler):
+  @auth.require(auth.READ, 'swarming/management')
+  def get(self, bot_id):
+    limit = int(self.request.get('limit', 10))
+    bot_future = bot_management.get_bot_key(bot_id).get_async()
+    run_results = task_result.TaskRunResult.query(
+        task_result.TaskRunResult.bot_id == bot_id).fetch(limit)
+    params = {
+      'bot': bot_future.get_result(),
+      'bot_id': bot_id,
+      'current_version':
+          bot_management.get_slave_version(self.request.host_url),
+      'now': task_common.utcnow(),
+      'run_results': run_results,
+    }
+    self.response.out.write(template.render('restricted_bot.html', params))
+
+
 class Ereporter2ReportHandler(auth.AuthenticatingHandler):
   """Returns all the recent errors as a web page."""
 
@@ -647,10 +665,10 @@ class TaskHandler(auth.AuthenticatingHandler):
         key = task_scheduler.unpack_run_result_key(key_id)
         request_key = task_result.result_summary_key_to_request_key(
             task_result.run_result_key_to_result_summary_key(key))
-      except ValueError:
+      except (NotImplementedError, ValueError):
         self.abort(404, 'Invalid key format.')
 
-    # It can be either a TaskRunResult or TaskResultSummary.
+    # 'result' can be either a TaskRunResult or TaskResultSummary.
     result, request = ndb.get_multi([key, request_key])
     if not result:
       self.abort(404, 'Invalid key.')
@@ -1167,6 +1185,7 @@ def CreateApplication():
       # Admin pages.
       ('/restricted', RestrictedHandler),
       ('/restricted/bots', BotsListHandler),
+      ('/restricted/bot/<bot_id:.+>', BotHandler),
       ('/restricted/ereporter2/report', Ereporter2ReportHandler),
       # TODO(maruel): This is an API, not a endpoint.
       ('/restricted/ereporter2/request/<request_id:[0-9a-fA-F]+>',
