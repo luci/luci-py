@@ -216,7 +216,7 @@ class Application(object):
     Returns:
       Dict {module name -> [list of uploaded versions]}.
     """
-    return self.run_appcfg(['list_versions', '.'])
+    return self.run_appcfg(['list_versions'])
 
   def set_default_version(self, version, modules=None):
     """Switches default version of given |modules| to |version|."""
