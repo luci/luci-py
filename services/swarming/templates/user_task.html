@@ -10,11 +10,14 @@
     background-color: #eeeeee;
   }
   table.property_table td {
-    padding-left: 1em;
-    padding-right: 1em;
+    padding-left: 0.5em;
+    padding-right: 0.5em;
   }
   table.property_table tbody tr:hover {
     background-color: #eeffee;
+  }
+  table.property_table tbody tr td:first-child {
+    white-space: nowrap;
   }
 </style>
 {% endblock %}
@@ -40,8 +43,44 @@
       <td>{{request.user}}</td>
     </tr>
     <tr>
+      <td>Priority</td>
+      <td>{{request.priority}}</td>
+    </tr>
+    <tr>
+      <td>Request dimensions</td>
+      <td>{{bot_view.render_dimensions(request.properties.dimensions)}}</td>
+    </tr>
+    <tr>
+      <td>Execution timeout (s)</td>
+      <td>{{request.properties.execution_timeout_secs}}</td>
+    </tr>
+    <tr>
+      <td>I/O timeout (s)</td>
+      <td>{{request.properties.io_timeout_secs}}</td>
+    </tr>
+    <tr>
+      <td>Environment variables</td>
+      <td>
+        {% for k, v in request.properties.env.iteritems()|sort %}
+        {{k}}: {{v}}<br>
+        {% endfor %}
+      </td>
+    </tr>
+    <tr>
+      <td>Commands</td>
+      <td>
+        {% for cmd in request.properties.commands %}
+        {{cmd|join(' ')}}<br>
+        {% endfor %}
+      </td>
+    </tr>
+    <tr>
       <td>Created</td>
       <td>{{request.created_ts|datetimeformat}}</td>
+    </tr>
+    <tr>
+      <td>Expiration</td>
+      <td>{{request.expiration_ts|datetimeformat}}</td>
     </tr>
     <tr>
       <td>Started</td>
@@ -66,10 +105,6 @@
     <tr>
       <td>State</td>
       <td>{{task.to_string()}} ({{task.state}})</td>
-    </tr>
-    <tr>
-      <td>Request dimensions</td>
-      <td>{{bot_view.render_dimensions(request.properties.dimensions)}}</td>
     </tr>
     <tr>
       <td>Bot id</td>
