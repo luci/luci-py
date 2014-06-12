@@ -32,7 +32,9 @@ Current bot version is: {{current_version[:8]}}
     <th>Last Seen</th>
     <th>Dimensions</th>
     <th>Version</th>
+    {% if is_admin %}
     <th>Action</th>
+    {% endif %}
   </thead>
   <tbody>
     {% for bot in bots %}
@@ -52,6 +54,7 @@ Current bot version is: {{current_version[:8]}}
           {% endfor %}
         </td>
         <td>{{bot.version[:8]}}</td>
+        {% if is_admin %}
         <td>
           <form id="delete_{{bot.id}}" method="post"
             action="/delete_machine_stats?r={{bot.id}}">
@@ -61,6 +64,7 @@ Current bot version is: {{current_version[:8]}}
             </button>
           </form>
         </td>
+        {% endif %}
       </tr>
     {% endfor %}
   </tbody>

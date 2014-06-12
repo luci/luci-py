@@ -26,6 +26,7 @@ import handlers_frontend
 from common import swarm_constants
 from components import auth
 from components import stats_framework
+from server import acl
 from server import admin_user
 from server import bot_management
 from server import errors
@@ -81,13 +82,14 @@ class AppTest(test_case.TestCase):
     user_manager.AddWhitelist(FAKE_IP)
 
     # Mock expected groups structure.
+    # TODO(maruel): Mock privileged_user too.
     def mocked_is_group_member(group, identity=None):
       identity = identity or auth.get_current_identity()
-      if group == handlers_frontend.ADMINS_GROUP:
+      if group == acl.ADMINS_GROUP:
         return identity.is_user and identity.name == ADMIN_EMAIL
-      if group == handlers_frontend.USERS_GROUP:
+      if group == acl.USERS_GROUP:
         return identity.is_user and identity.name == USER_EMAIL
-      if group == handlers_frontend.BOTS_GROUP:
+      if group == acl.BOTS_GROUP:
         return identity.is_bot
       return False
     self.mock(handlers_frontend.auth, 'is_group_member', mocked_is_group_member)
@@ -209,14 +211,11 @@ class AppTest(test_case.TestCase):
         response.body)
 
   def testGetResultHandler(self):
-    handler_urls = ['/get_result', '/restricted/get_result']
-
     # Act under admin identity.
     self._ReplaceCurrentUser(ADMIN_EMAIL)
 
     # Test when no matching key
-    for handler in handler_urls:
-      response = self.app.get(handler, {'r': 'fake_key'}, status=400)
+    response = self.app.get('/get_result', {'r': 'fake_key'}, status=400)
 
     # Create test and runner.
     result_summary, run_result = test_helper.CreateRunner(
@@ -225,24 +224,22 @@ class AppTest(test_case.TestCase):
         results='\xe9 Invalid utf-8 string')
 
     # Valid key.
-    for handler in handler_urls:
-      packed = task_common.pack_result_summary_key(result_summary.key)
-      response = self.app.get(handler, {'r': packed})
-      self.assertEqual('200 OK', response.status)
-
-      try:
-        results = json.loads(response.body)
-      except (ValueError, TypeError), e:
-        self.fail(e)
-      # TODO(maruel): Stop using the DB directly in HTTP handlers test.
-      self.assertEqual(
-          ','.join(map(str, run_result.exit_codes)),
-          ''.join(results['exit_codes']))
-      self.assertEqual(result_summary.bot_id, results['machine_id'])
-      expected_result_string = '\n'.join(
-          o.get().GetResults().decode('utf-8', 'replace')
-          for o in result_summary.outputs)
-      self.assertEqual(expected_result_string, results['output'])
+    packed = task_common.pack_result_summary_key(result_summary.key)
+    response = self.app.get('/get_result', {'r': packed})
+    self.assertEqual('200 OK', response.status)
+    try:
+      results = json.loads(response.body)
+    except (ValueError, TypeError), e:
+      self.fail(e)
+    # TODO(maruel): Stop using the DB directly in HTTP handlers test.
+    self.assertEqual(
+        ','.join(map(str, run_result.exit_codes)),
+        ''.join(results['exit_codes']))
+    self.assertEqual(result_summary.bot_id, results['machine_id'])
+    expected_result_string = '\n'.join(
+        o.get().GetResults().decode('utf-8', 'replace')
+        for o in result_summary.outputs)
+    self.assertEqual(expected_result_string, results['output'])
 
   def testGetSlaveCode(self):
     response = self.app.get('/get_slave_code')
@@ -324,22 +321,9 @@ class AppTest(test_case.TestCase):
     self.assertResponse(response, '204 No Content', '')
 
   def testMainHandler(self):
+    self._ReplaceCurrentUser(ADMIN_EMAIL)
     response = self.app.get('/')
     self.assertEqual('200 OK', response.status)
-
-  def testRestrictedHandler(self):
-    # Act under admin identity.
-    self._ReplaceCurrentUser(ADMIN_EMAIL)
-
-    self._mox.ReplayAll()
-
-    # Add a test runner to show on the page.
-    test_helper.CreateRunner()
-
-    response = self.app.get('/restricted')
-    self.assertEqual('200 OK', response.status)
-
-    self._mox.VerifyAll()
 
   def testRetryHandler(self):
     # Act under admin identity.

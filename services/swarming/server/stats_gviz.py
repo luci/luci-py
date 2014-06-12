@@ -9,11 +9,13 @@ import itertools
 import webapp2
 
 import template
+from components import auth
 from components import natsort
 from components import stats_framework
 from components import stats_framework_gviz
 from components import utils
 from gviz import gviz_api
+from server import acl
 from server import stats
 
 
@@ -188,7 +190,7 @@ def _stats_data_to_user(stats_data, user):
 ### Handlers
 
 
-class StatsHandlerBase(webapp2.RequestHandler):
+class StatsHandlerBase(auth.AuthenticatingHandler):
   """Returns the statistics web page."""
 
   def send_response(self, res_type_info):
@@ -218,6 +220,7 @@ class StatsHandlerBase(webapp2.RequestHandler):
 
 
 class StatsSummaryHandler(StatsHandlerBase):
+  @auth.public
   def get(self):
     self.send_response(_Summary)
 
@@ -226,12 +229,21 @@ class StatsSummaryHandler(StatsHandlerBase):
     def sorted_unique_list_from_itr(i):
       return natsort.natsorted(set(itertools.chain.from_iterable(i)))
 
-    bots = sorted_unique_list_from_itr(
-        line.values.bot_ids for line in stats_data)
     dimensions = sorted_unique_list_from_itr(
         (i.dimensions for i in line.values.buckets) for line in stats_data)
-    users = sorted_unique_list_from_itr(
-        (i.user for i in line.values.users) for line in stats_data)
+
+    if acl.is_privileged_user():
+      bots = sorted_unique_list_from_itr(
+          line.values.bot_ids for line in stats_data)
+    else:
+      bots = []
+
+    if acl.is_privileged_user():
+      users = sorted_unique_list_from_itr(
+          (i.user for i in line.values.users) for line in stats_data)
+    else:
+      users = []
+
     table = _stats_data_to_summary(stats_data)
     # TODO(maruel): 'bots', 'dimensions' and 'users' should be updated when the
     # user changes the resolution at which the data is displayed.
@@ -247,18 +259,23 @@ class StatsSummaryHandler(StatsHandlerBase):
 class StatsDimensionsHandler(StatsHandlerBase):
   dimensions = None
 
+  @auth.public
   def get(self, dimensions):
     # Save it for later use in self.process_data().
     self.dimensions = dimensions
     self.send_response(_Dimensions)
 
   def process_data(self, description, stats_data):
+    """Returns the data but only show the list of bots if a privileged_user."""
+    # TODO(maruel): Add links to /restricted/bot/ or even better embed a small
+    # view of /restricted/bots.
     bots = set()
-    for line in stats_data:
-      for bucket in line.values.buckets:
-        if self.dimensions == bucket.dimensions:
-          bots.update(bucket.bot_ids)
-          break
+    if acl.is_privileged_user():
+      for line in stats_data:
+        for bucket in line.values.buckets:
+          if self.dimensions == bucket.dimensions:
+            bots.update(bucket.bot_ids)
+            break
 
     table = _stats_data_to_dimensions(stats_data, self.dimensions)
     # TODO(maruel): 'bots' and 'dimensions' should be updated when the user
@@ -274,6 +291,7 @@ class StatsDimensionsHandler(StatsHandlerBase):
 class StatsUserHandler(StatsHandlerBase):
   user = None
 
+  @auth.public
   def get(self, user):
     # Save it for later use in self.process_data().
     self.user = user

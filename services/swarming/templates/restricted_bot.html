@@ -94,8 +94,8 @@
     </tbody>
   </table>
 
+  {% if is_admin %}
   <p>
-
   <form id="delete_{{bot.id}}" method="post"
     action="/delete_machine_stats?r={{bot.id}}">
     <button
@@ -103,6 +103,7 @@
       Delete
     </button>
   </form>
+  {% endif %}
 
 {% else %}
 

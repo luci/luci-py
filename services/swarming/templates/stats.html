@@ -254,6 +254,8 @@
         </ul>
       </td>
       <td>
+        {# TODO(maruel): Make this nicer #}
+        {% if users %}
         <ul>
           {% for user in users %}
             {# TODO(maruel): Keep duration, current_resolution and maybe 'now'.
@@ -261,6 +263,7 @@
             <li><a href="/stats/user/{{item}}">{{item}}</a></li>
           {% endfor %}
         </ul>
+        {% endif %}
       </td>
     </tr>
   </table>
@@ -285,14 +288,17 @@
   <div id="times_graph" class="graph">(Loading...)</div>
   <hr>
   <div id="raw_data_table" class="data_table">(Loading...)</div>
+
+  {% if bots %}
   <hr>
   <p>
   Bots:<br>
   <ul>
-    {% for item in bots %}
-      {# Get dimensions of each bot #}
-      <li>{{item}}</li>
+    {% for bot in bots %}
+      {# Get dimensions of each bot aka a mini bots list #}
+      <li><a href="/restricted/bot/{{bot}}">{{bot}}</a></li>
     {% endfor %}
   </ul>
+  {% endif %}
 
 {% endblock %}

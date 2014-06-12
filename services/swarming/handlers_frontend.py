@@ -34,6 +34,7 @@ from components import decorators
 from components import ereporter2
 from components import natsort
 from components import utils
+from server import acl
 from server import bot_management
 from server import errors
 from server import file_chunks
@@ -122,55 +123,6 @@ def ip_whitelist_authentication(request):
 
   return None
 
-
-### ACLs
-
-# Names of groups.
-ADMINS_GROUP = 'swarming-admins'
-BOTS_GROUP = 'swarming-bots'
-USERS_GROUP = 'swarming-users'
-
-
-def swarming_admin():
-  """Returns True if current user can administer Swarming service."""
-  return auth.is_group_member(ADMINS_GROUP) or auth.is_admin()
-
-
-def swarming_bot():
-  """Returns True if current user can execute Swarming bot calls."""
-  # Administrators can run bot-side code for tests, etc.
-  return auth.is_group_member(BOTS_GROUP) or swarming_admin()
-
-
-def swarming_user():
-  """Returns True if current user can post tasks on Swarming service."""
-  return auth.is_group_member(USERS_GROUP) or swarming_admin()
-
-
-def swarming_bot_or_user():
-  """Returns True if current user can execute user-side and bot-side calls."""
-  return swarming_bot() or swarming_user()
-
-
-def bootstrap_dev_server_acls():
-  """Adds localhost to IP whitelist and Swarming groups."""
-  assert utils.is_local_dev_server()
-
-  # Add a bot.
-  user_manager.AddWhitelist('127.0.0.1')
-  bot = auth.Identity(auth.IDENTITY_BOT, '127.0.0.1')
-  auth.bootstrap_group(BOTS_GROUP, bot, 'Swarming bots')
-  auth.bootstrap_group(USERS_GROUP, bot, 'Swarming users')
-
-  # Add a swarming admin. smoke-test@example.com is used in server_smoke_test.py
-  admin = auth.Identity(auth.IDENTITY_USER, 'smoke-test@example.com')
-  auth.bootstrap_group(ADMINS_GROUP, admin, 'Swarming administrators')
-
-  # Add an instance admin (for easier manual testing when running dev server).
-  auth.bootstrap_group(
-      auth.ADMIN_GROUP,
-      auth.Identity(auth.IDENTITY_USER, 'test@example.com'),
-      'Users that can manage groups')
 
 
 ###
@@ -411,82 +363,15 @@ class FilterParams(object):
     return html
 
 
-### Admin accessible pages.
+### is_admin pages.
 
 # TODO(maruel): Sort the handlers once they got their final name.
-
-
-class RestrictedHandler(auth.AuthenticatingHandler):
-  @auth.require(swarming_admin)
-  def get(self):
-    self.response.out.write(template.render('restricted.html', {}))
-
-
-class BotsListHandler(auth.AuthenticatingHandler):
-  """Presents the list of known bots."""
-  ACCEPTABLE_BOTS_SORTS = {
-    'dimensions': 'Dimensions',
-    'last_seen': 'Last Seen',
-    'hostname': 'Hostname',
-    'id': 'ID',
-  }
-
-  @auth.require(swarming_admin)
-  def get(self):
-    sort_by = self.request.get('sort_by', 'id')
-    if sort_by not in self.ACCEPTABLE_BOTS_SORTS:
-      self.abort(400, 'Invalid sort_by query parameter')
-
-    dead_machine_cutoff = (
-        task_common.utcnow() - bot_management.MACHINE_DEATH_TIMEOUT)
-
-    def sort_bot(bot):
-      if sort_by == 'id':
-        return bot.key.string_id()
-      return getattr(bot, sort_by)
-
-    bots = natsort.natsorted(bot_management.Bot.query().fetch(), key=sort_bot)
-
-    sort_options = [
-      SortOptions(k, v)
-      for k, v in sorted(self.ACCEPTABLE_BOTS_SORTS.iteritems())
-    ]
-    params = {
-      'bots': bots,
-      # TODO(maruel): it should be the default AppEngine url version.
-      'current_version':
-          bot_management.get_slave_version(self.request.host_url),
-      'dead_machine_cutoff': dead_machine_cutoff,
-      'now': task_common.utcnow(),
-      'selected_sort': sort_by,
-      'sort_options': sort_options,
-    }
-    self.response.out.write(
-        template.render('restricted_botslist.html', params))
-
-
-class BotHandler(auth.AuthenticatingHandler):
-  @auth.require(swarming_admin)
-  def get(self, bot_id):
-    limit = int(self.request.get('limit', 10))
-    bot_future = bot_management.get_bot_key(bot_id).get_async()
-    run_results = task_result.TaskRunResult.query(
-        task_result.TaskRunResult.bot_id == bot_id).fetch(limit)
-    params = {
-      'bot': bot_future.get_result(),
-      'bot_id': bot_id,
-      'current_version':
-          bot_management.get_slave_version(self.request.host_url),
-      'now': task_common.utcnow(),
-      'run_results': run_results,
-    }
-    self.response.out.write(template.render('restricted_bot.html', params))
 
 
 class Ereporter2ReportHandler(auth.AuthenticatingHandler):
   """Returns all the recent errors as a web page."""
 
-  @auth.require(swarming_admin)
+  @auth.require(acl.is_admin)
   def get(self):
     """Reports the errors logged and ignored.
 
@@ -516,7 +401,7 @@ class Ereporter2ReportHandler(auth.AuthenticatingHandler):
 class Ereporter2RequestHandler(auth.AuthenticatingHandler):
   """Dumps information about single logged request."""
 
-  @auth.require(swarming_admin)
+  @auth.require(acl.is_admin)
   def get(self, request_id):
     # TODO(maruel): Add UI.
     data = ereporter2.log_request_id_to_dict(request_id)
@@ -529,7 +414,7 @@ class Ereporter2RequestHandler(auth.AuthenticatingHandler):
 class UploadStartSlaveHandler(auth.AuthenticatingHandler):
   """Accept a new start slave script."""
 
-  @auth.require(swarming_admin)
+  @auth.require(acl.is_admin)
   def get(self):
     params = {
       'path': self.request.path,
@@ -538,7 +423,7 @@ class UploadStartSlaveHandler(auth.AuthenticatingHandler):
     self.response.out.write(
         template.render('restricted_uploadstartslave.html', params))
 
-  @auth.require(swarming_admin)
+  @auth.require(acl.is_admin)
   def post(self):
     script = self.request.get('script', '')
     if not script:
@@ -550,7 +435,7 @@ class UploadStartSlaveHandler(auth.AuthenticatingHandler):
 
 
 class UploadBootstrapHandler(auth.AuthenticatingHandler):
-  @auth.require(swarming_admin)
+  @auth.require(acl.is_admin)
   def get(self):
     params = {
       'path': self.request.path,
@@ -559,7 +444,7 @@ class UploadBootstrapHandler(auth.AuthenticatingHandler):
     self.response.out.write(
         template.render('restricted_uploadbootstrap.html', params))
 
-  @auth.require(swarming_admin)
+  @auth.require(acl.is_admin)
   def post(self):
     script = self.request.get('script', '')
     if not script:
@@ -571,7 +456,7 @@ class UploadBootstrapHandler(auth.AuthenticatingHandler):
 
 
 class WhitelistIPHandler(auth.AuthenticatingHandler):
-  @auth.require(swarming_admin)
+  @auth.require(acl.is_admin)
   def get(self):
     display_whitelists = sorted(
         (
@@ -590,7 +475,7 @@ class WhitelistIPHandler(auth.AuthenticatingHandler):
     self.response.out.write(
         template.render('restricted_whitelistip.html', params))
 
-  @auth.require(swarming_admin)
+  @auth.require(acl.is_admin)
   def post(self):
     ip = self.request.get('i', self.request.remote_addr)
     mask = 32
@@ -611,13 +496,73 @@ class WhitelistIPHandler(auth.AuthenticatingHandler):
     self.get()
 
 
-### User accessible pages.
+### acl.is_privileged_user pages.
 
 
-class UserHandler(auth.AuthenticatingHandler):
-  @auth.require(swarming_user)
+class BotsListHandler(auth.AuthenticatingHandler):
+  """Presents the list of known bots."""
+  ACCEPTABLE_BOTS_SORTS = {
+    'dimensions': 'Dimensions',
+    'last_seen': 'Last Seen',
+    'hostname': 'Hostname',
+    'id': 'ID',
+  }
+
+  @auth.require(acl.is_privileged_user)
   def get(self):
-    self.response.out.write(template.render('user.html', {}))
+    sort_by = self.request.get('sort_by', 'id')
+    if sort_by not in self.ACCEPTABLE_BOTS_SORTS:
+      self.abort(400, 'Invalid sort_by query parameter')
+
+    dead_machine_cutoff = (
+        task_common.utcnow() - bot_management.MACHINE_DEATH_TIMEOUT)
+
+    def sort_bot(bot):
+      if sort_by == 'id':
+        return bot.key.string_id()
+      return getattr(bot, sort_by)
+
+    bots = natsort.natsorted(bot_management.Bot.query().fetch(), key=sort_bot)
+
+    sort_options = [
+      SortOptions(k, v)
+      for k, v in sorted(self.ACCEPTABLE_BOTS_SORTS.iteritems())
+    ]
+    params = {
+      'bots': bots,
+      # TODO(maruel): it should be the default AppEngine url version.
+      'current_version':
+          bot_management.get_slave_version(self.request.host_url),
+      'dead_machine_cutoff': dead_machine_cutoff,
+      'is_admin': acl.is_admin(),
+      'now': task_common.utcnow(),
+      'selected_sort': sort_by,
+      'sort_options': sort_options,
+    }
+    self.response.out.write(
+        template.render('restricted_botslist.html', params))
+
+
+class BotHandler(auth.AuthenticatingHandler):
+  @auth.require(acl.is_privileged_user)
+  def get(self, bot_id):
+    limit = int(self.request.get('limit', 10))
+    bot_future = bot_management.get_bot_key(bot_id).get_async()
+    run_results = task_result.TaskRunResult.query(
+        task_result.TaskRunResult.bot_id == bot_id).fetch(limit)
+    params = {
+      'bot': bot_future.get_result(),
+      'bot_id': bot_id,
+      'current_version':
+          bot_management.get_slave_version(self.request.host_url),
+      'is_admin': acl.is_admin(),
+      'now': task_common.utcnow(),
+      'run_results': run_results,
+    }
+    self.response.out.write(template.render('restricted_bot.html', params))
+
+
+### User accessible pages.
 
 
 class TasksHandler(auth.AuthenticatingHandler):
@@ -633,7 +578,7 @@ class TasksHandler(auth.AuthenticatingHandler):
       self.request.get('show_successfully_completed', '') != 'False',
       self.request.get('machine_id_filter', ''))
 
-  @auth.require(swarming_user)
+  @auth.require(acl.is_user)
   def get(self):
     # TODO(maruel): Convert to Google Graph API.
     # TODO(maruel): Once migration is complete, remove limit and offset, replace
@@ -680,6 +625,7 @@ class TasksHandler(auth.AuthenticatingHandler):
       'current_page': page,
       'errors': errors_found_future.get_result(),
       'filter_selects': params.filter_selects_as_html(),
+      'is_privileged_user': acl.is_privileged_user(),
       'machine_id_filter': params.machine_id_filter,
       'now': task_common.utcnow(),
       'selected_sort': ('A' if ascending else 'D') + sort_key,
@@ -703,7 +649,7 @@ class TasksHandler(auth.AuthenticatingHandler):
 class TaskHandler(auth.AuthenticatingHandler):
   """Show the full text of a test request."""
 
-  @auth.require(swarming_user)
+  @auth.require(acl.is_user)
   def get(self, key_id):
     key = None
     request_key = None
@@ -723,6 +669,9 @@ class TaskHandler(auth.AuthenticatingHandler):
     if not result:
       self.abort(404, 'Invalid key.')
 
+    if not acl.is_privileged_user():
+      self.abort(403, 'Implement access control based on the user')
+
     bot = (
       bot_management.get_bot_key(result.bot_id).get()
       if result.bot_id else None)
@@ -741,7 +690,7 @@ class TaskHandler(auth.AuthenticatingHandler):
 class ApiBots(auth.AuthenticatingHandler):
   """Returns the list of known swarming bots."""
 
-  @auth.require(swarming_admin)
+  @auth.require(acl.is_privileged_user)
   def get(self):
     params = {
         'machine_death_timeout':
@@ -759,8 +708,11 @@ class DeleteMachineStatsHandler(auth.AuthenticatingHandler):
   # TODO(vadimsh): Implement XSRF token support.
   xsrf_token_enforce_on = ()
 
-  @auth.require(swarming_bot_or_user)
+  @auth.require(acl.is_bot_or_admin)
   def post(self):
+    # TODO(maruel): Implement:
+    # - The bot can only delete itself.
+    # - The admin can delete any bot.
     bot_key = bot_management.get_bot_key(self.request.get('r', ''))
     if bot_key.get():
       bot_key.delete()
@@ -771,12 +723,12 @@ class DeleteMachineStatsHandler(auth.AuthenticatingHandler):
 
 
 class TestRequestHandler(auth.AuthenticatingHandler):
-  """Handles test requests from clients."""
+  """Handles task requests from clients."""
 
   # TODO(vadimsh): Implement XSRF token support.
   xsrf_token_enforce_on = ()
 
-  @auth.require(swarming_bot_or_user)
+  @auth.require(acl.is_bot_or_user)
   def post(self):
     # Validate the request.
     if not self.request.get('request'):
@@ -811,9 +763,11 @@ class TestRequestHandler(auth.AuthenticatingHandler):
 class GetMatchingTestCasesHandler(auth.AuthenticatingHandler):
   """Get all the keys for any test runners that match a given test case name."""
 
-  @auth.require(swarming_bot_or_user)
+  @auth.require(acl.is_bot_or_user)
   def get(self):
     """Returns a list of TaskResultSummary ndb.Key."""
+    # TODO(maruel): Users can only request their own task. Privileged users can
+    # request any task.
     test_case_name = self.request.get('name', '')
     q = task_result.TaskResultSummary.query().filter(
         task_result.TaskResultSummary.name == test_case_name)
@@ -833,66 +787,50 @@ class GetMatchingTestCasesHandler(auth.AuthenticatingHandler):
       self.response.write('[]')
 
 
-# TODO(vadimsh): Remove once final ACLs structure is in place.
-class SecureGetResultHandler(auth.AuthenticatingHandler):
-  """Show the full result string from a test runner."""
-
-  @auth.require(swarming_admin)
-  def get(self):
-    SendRunnerResults(self.response, self.request.get('r', ''))
-
-
 class GetResultHandler(auth.AuthenticatingHandler):
   """Show the full result string from a test runner."""
 
-  @auth.require(swarming_bot_or_user)
+  @auth.require(acl.is_bot_or_user)
   def get(self):
-    SendRunnerResults(self.response, self.request.get('r', ''))
-
-
-def SendRunnerResults(response, key_id):
-  """Sends the results of the runner specified by key.
-
-  Args:
-    response: Response to be sent to remote machine.
-    key: Key identifying the runner.
-  """
-  # TODO(maruel): Formalize returning data for a specific try or the overall
-  # results.
-  key = None
-  try:
-    key = task_scheduler.unpack_result_summary_key(key_id)
-  except ValueError:
+    # TODO(maruel): Users can only request their own task. Privileged users can
+    # request any task.
+    key_id = self.request.get('r', '')
+    # TODO(maruel): Formalize returning data for a specific try or the overall
+    # results.
+    key = None
     try:
-      key = task_scheduler.unpack_run_result_key(key_id)
+      key = task_scheduler.unpack_result_summary_key(key_id)
     except ValueError:
-      response.set_status(400)
-      response.out.write('Invalid key')
+      try:
+        key = task_scheduler.unpack_run_result_key(key_id)
+      except ValueError:
+        self.response.set_status(400)
+        self.response.out.write('Invalid key')
+        return
+
+    result = key.get()
+    if not result:
+      # TODO(maruel): Use 404 if not present.
+      self.response.set_status(204)
+      logging.info('Unable to provide runner results [key: %s]', key_id)
       return
 
-  result = key.get()
-  if not result:
-    # TODO(maruel): Use 404 if not present.
-    response.set_status(204)
-    logging.info('Unable to provide runner results [key: %s]', key_id)
-    return
+    results = {
+      'exit_codes': ','.join(map(str, result.exit_codes)),
+      # TODO(maruel): Refactor these to make sense.
+      'machine_id': result.bot_id,
+      'machine_tag': result.bot_id,
+      'config_instance_index': 0,
+      'num_config_instances': 1,
+      # TODO(maruel): Return each output independently. Figure out a way to
+      # describe what is important in the steps and what should be ditched.
+      'output': u'\n'.join(
+          i.get().GetResults().decode('utf-8', 'replace')
+          for i in result.outputs),
+    }
 
-  results = {
-    'exit_codes': ','.join(map(str, result.exit_codes)),
-    # TODO(maruel): Refactor these to make sense.
-    'machine_id': result.bot_id,
-    'machine_tag': result.bot_id,
-    'config_instance_index': 0,
-    'num_config_instances': 1,
-    # TODO(maruel): Return each output independently. Figure out a way to
-    # describe what is important in the steps and what should be ditched.
-    'output': u'\n'.join(
-        i.get().GetResults().decode('utf-8', 'replace')
-        for i in result.outputs),
-  }
-
-  response.headers['Content-Type'] = 'application/json; charset=utf-8'
-  response.out.write(json.dumps(results))
+    self.response.headers['Content-Type'] = 'application/json; charset=utf-8'
+    self.response.out.write(json.dumps(results))
 
 
 class CancelHandler(auth.AuthenticatingHandler):
@@ -901,7 +839,7 @@ class CancelHandler(auth.AuthenticatingHandler):
   # TODO(vadimsh): Implement XSRF token support.
   xsrf_token_enforce_on = ()
 
-  @auth.require(swarming_admin)
+  @auth.require(acl.is_admin)
   def post(self):
     """Ensures that the associated TaskToRun is canceled and update the
     TaskResultSummary accordingly.
@@ -909,6 +847,7 @@ class CancelHandler(auth.AuthenticatingHandler):
     TODO(maruel): If a bot is running the task, mark the TaskRunResult as
     canceled and tell the bot on the next ping to reboot itself.
     """
+    # TODO(maruel): Users can cancel their own task.
     self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
 
     runner_key = self.request.get('r', '')
@@ -938,13 +877,14 @@ class RetryHandler(auth.AuthenticatingHandler):
   # TODO(vadimsh): Implement XSRF token support.
   xsrf_token_enforce_on = ()
 
-  @auth.require(swarming_admin)
+  @auth.require(acl.is_admin)
   def post(self):
     """Duplicates the original request into a new one.
 
     Only change the ownership to the user that requested the retry.
     TaskProperties is unchanged.
     """
+    # TODO(maruel): Users can cancel their own task.
     runner_key = self.request.get('r', '')
     try:
       result_key = task_scheduler.unpack_result_summary_key(runner_key)
@@ -986,7 +926,7 @@ class RetryHandler(auth.AuthenticatingHandler):
 class BootstrapHandler(auth.AuthenticatingHandler):
   """Returns python code to run to bootstrap a swarming bot."""
 
-  @auth.require(swarming_bot)
+  @auth.require(acl.is_bot)
   def get(self):
     content = file_chunks.RetrieveFile('bootstrap.py')
     if not content:
@@ -1008,7 +948,7 @@ class GetSlaveCodeHandler(auth.AuthenticatingHandler):
   cacheable.
   """
 
-  @auth.require(swarming_bot)
+  @auth.require(acl.is_bot)
   def get(self, version=None):
     if version:
       expected = bot_management.get_slave_version(self.request.host_url)
@@ -1029,7 +969,8 @@ class ServerPingHandler(webapp2.RequestHandler):
   """Handler to ping when checking if the server is up.
 
   This handler should be extremely lightweight. It shouldn't do any
-  computations, it should just state that the server is up.
+  computations, it should just state that the server is up. It's open to
+  everyone for simplicity and performance.
   """
 
   def get(self):
@@ -1050,7 +991,7 @@ class RegisterHandler(auth.AuthenticatingHandler):
       datastore_errors.InternalError,
       datastore_errors.Timeout,
       datastore_errors.TransactionFailedError)
-  @auth.require(swarming_bot)
+  @auth.require(acl.is_bot)
   def post(self):
     # Validate the request.
     if not self.request.body:
@@ -1098,7 +1039,7 @@ class RunnerPingHandler(auth.AuthenticatingHandler):
   # TODO(vadimsh): Implement XSRF token support.
   xsrf_token_enforce_on = ()
 
-  @auth.require(swarming_bot)
+  @auth.require(acl.is_bot)
   def post(self):
     # TODO(vadimsh): Any machine can send ping on behalf of any other machine.
     # Ensure 'id' matches credentials used to authenticate the request (i.e.
@@ -1123,7 +1064,7 @@ class ResultHandler(auth.AuthenticatingHandler):
   # TODO(vadimsh): Implement XSRF token support.
   xsrf_token_enforce_on = ()
 
-  @auth.require(swarming_bot)
+  @auth.require(acl.is_bot)
   def post(self):
     # TODO(user): Share this code between all the request handlers so we
     # can always see how often a request is being sent.
@@ -1177,7 +1118,7 @@ class RemoteErrorHandler(auth.AuthenticatingHandler):
   # TODO(vadimsh): Implement XSRF token support.
   xsrf_token_enforce_on = ()
 
-  @auth.require(swarming_bot)
+  @auth.require(acl.is_bot)
   def post(self):
     # TODO(vadimsh): Log machine identity as well.
     error_message = self.request.get('m', '')
@@ -1193,10 +1134,16 @@ class RemoteErrorHandler(auth.AuthenticatingHandler):
 ### Public pages.
 
 
-class RootHandler(webapp2.RequestHandler):
+class RootHandler(auth.AuthenticatingHandler):
+  @auth.public
   def get(self):
     params = {
       'host_url': self.request.host_url,
+      'user_type': acl.get_user_type(),
+      'is_admin': acl.is_admin(),
+      'is_bot': acl.is_bot(),
+      'is_privileged_user': acl.is_privileged_user(),
+      'is_user': acl.is_user(),
     }
     self.response.out.write(template.render('root.html', params))
 
@@ -1229,14 +1176,14 @@ def CreateApplication():
       ('/stats/user/<user:.+>', stats_gviz.StatsUserHandler),
 
       # User pages.
-      ('/user', UserHandler),
       ('/user/tasks', TasksHandler),
       ('/user/task/<key_id:[0-9a-fA-F]+>', TaskHandler),
 
-      # Admin pages.
-      ('/restricted', RestrictedHandler),
+      # Privileged user pages.
       ('/restricted/bots', BotsListHandler),
       ('/restricted/bot/<bot_id:.+>', BotHandler),
+
+      # Admin pages.
       ('/restricted/ereporter2/report', Ereporter2ReportHandler),
       # TODO(maruel): This is an API, not a endpoint.
       ('/restricted/ereporter2/request/<request_id:[0-9a-fA-F]+>',
@@ -1247,7 +1194,6 @@ def CreateApplication():
 
       # Eventually accessible for client.
       ('/restricted/cancel', CancelHandler),
-      ('/restricted/get_result', SecureGetResultHandler),
       ('/restricted/retry', RetryHandler),
 
       # Client API, in some cases also indirectly used by the frontend.
@@ -1302,7 +1248,7 @@ def CreateApplication():
   # If running on a local dev server, allow bots to connect without prior
   # groups configuration. Useful when running smoke test.
   if utils.is_local_dev_server():
-    bootstrap_dev_server_acls()
+    acl.bootstrap_dev_server_acls()
 
   # Add routes with Auth REST API and Auth UI.
   routes.extend(auth_ui.get_rest_api_routes())

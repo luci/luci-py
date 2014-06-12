@@ -82,6 +82,7 @@ Always sorted by reverse created.
 </select>
 </p>
 
+{% if is_admin %}
 <h1>Recent Errors</h1>
 <table id="error-table" class="alterning_background"
     summary="This table lists most recent errors">
@@ -102,5 +103,6 @@ Always sorted by reverse created.
     {% endfor %}
   </tbody>
 </table>
+{% endif %}
 
 {% endblock %}

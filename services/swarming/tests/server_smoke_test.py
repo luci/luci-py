@@ -326,8 +326,7 @@ class SwarmingTestCase(unittest.TestCase):
     while running_tests and TIMEOUT > time.time() - started:
       for running_test_key in running_tests[:]:
         url = urlparse.urljoin(
-            self.server_url,
-            '/restricted/get_result?r=' + running_test_key['test_key'])
+            self.server_url, '/get_result?r=' + running_test_key['test_key'])
         response = urllib2.urlopen(url).read()
         try:
           results = json.loads(response)
