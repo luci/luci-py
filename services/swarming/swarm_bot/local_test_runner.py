@@ -15,8 +15,6 @@ import logging.handlers
 import optparse
 import os
 import Queue
-import re
-import shutil
 import subprocess
 import sys
 import threading
@@ -80,33 +78,6 @@ def _TimedOut(time_out, time_out_start):
   return time_out != 0 and time_out_start + time_out < current_time
 
 
-def _DeleteFileOrDirectory(name):
-  """Deletes a file/directory, trying several times in case we need to wait.
-
-  Args:
-    name: The name of the file or directory to delete.
-
-  Returns:
-    True if the file or directory is successfully deleted.
-  """
-  # TODO(maruel): Reuse the code from run_isolated.py.
-  for _ in range(5):
-    try:
-      if os.path.exists(name):
-        if os.path.isdir(name):
-          shutil.rmtree(name)
-        else:
-          os.remove(name)
-      break
-    except OSError:
-      logging.exception('Exception deleting "%s"', name)
-      time.sleep(1)
-  if os.path.exists(name):
-    logging.error('File not deleted: %s', name)
-    return False
-  return True
-
-
 class Error(Exception):
   """Simple error exception properly scoped here."""
   pass
@@ -134,43 +105,13 @@ def _ParseRequestFile(request_file_name):
         'Invalid Request File %s: %s\n%s' % (request_file_name, e, content))
 
 
-def _ExpandEnv(argument, env):
-  """Expands any environment variables that may exist in argument.
-
-  Any '%%env%%' will be replaced by the corresponding environment variable.
-
-  Args:
-    argument: The command line argument that may contain an environment
-        variable.
-    env: The dictionary of environment variables to use for the expansion.
-
-  Returns:
-    The expanded argument with environment variables replaced by their value.
-  """
-  for match in re.findall(r'%(\S+)%', argument):
-    value = env.get(match, None)
-    if value is not None:
-      argument = argument.replace('%%' + match + '%%', value)
-  return argument
-
-
 class LocalTestRunner(object):
-  """A Local Test Runner to dowload files and run commands.
+  """Dowloads files, runs the commands and uploads results back.
 
   Based on the information provided in the request file, the LocalTestRunner
   can download data from the URL provided in the test request file and unzip
   it locally. Then, it can execute the set of requested commands.
-
-  Attributes:
-    test_run: The information about the tests to run as
-        described on http://goto/gforce/test-request-format.
   """
-  # An array to properly index the success/failure decorated text based on
-  # "not exit_code".
-  _SUCCESS_DISPLAY_STRING = [' FAILED ', '      OK']
-
-  # An array to properly index the pending/success/failure CGI strings.
-  _SUCCESS_CGI_STRING = ['success', 'failure', 'pending']
 
   def __init__(self, request_file_name, log=None):
     """Inits LocalTestRunner with a request file.
@@ -194,39 +135,36 @@ class LocalTestRunner(object):
     if not os.path.exists(self.data_dir):
       os.mkdir(self.data_dir)
 
-  def _RunCommand(self, command, hard_time_out, io_time_out, env=None):
+  def _RunCommand(self, command, hard_time_out, io_time_out, env):
     """Runs the given command.
 
     Args:
       command: A list containing the command to execute and its arguments.
           These will be expanded looking for environment variables.
-
       hard_time_out: The maximum number of seconds to run this command for. If
           the command takes longer than this to finish, we kill the process
           and return an error.
-
       io_time_out: The number of seconds to wait for output from this command.
           If the command doesn't produce any output for |time_out| seconds,
           then we kill the process and return an error.
-
       env: A dictionary containing environment variables to be used when running
-          the command. Defaults to None.
+          the command.
+
     Returns:
-      A tuple containing the exit code and the stdout/stderr of the execution.
+      Tuple containing the exit code and the stdout/stderr of the execution.
     """
     assert isinstance(hard_time_out, (int, float))
     assert isinstance(io_time_out, (int, float))
-    parsed_command = [_ExpandEnv(arg, env) for arg in command]
 
-    logging.info('Executing: %s\ncwd: %s', parsed_command, self.data_dir)
+    logging.info('Executing: %s\ncwd: %s', command, self.data_dir)
     try:
       proc = subprocess.Popen(
-          parsed_command, stdout=subprocess.PIPE,
+          command, stdout=subprocess.PIPE,
           env=env, bufsize=1, stderr=subprocess.STDOUT,
           stdin=subprocess.PIPE, universal_newlines=True,
           cwd=self.data_dir)
     except OSError as e:
-      logging.exception('Execution of %s raised exception.', parsed_command)
+      logging.exception('Execution of %s raised exception.', command)
       return (1, e)
 
     stdout_queue = Queue.Queue()
@@ -245,8 +183,7 @@ class LocalTestRunner(object):
       try:
         exit_code = proc.poll()
       except OSError as e:
-        logging.exception(
-            'Polling execution of %s raised exception.', parsed_command)
+        logging.exception('Polling execution of %s raised exception.', command)
         return (1, e)
 
       # TODO(maruel): Add back support to stream content but only to the
@@ -300,11 +237,10 @@ class LocalTestRunner(object):
     # If we get here, it's because we timed out.
     if hit_hard_time_out:
       error_string = ('Execution of %s with pid: %d encountered a hard time '
-                      'out after %fs' % (parsed_command, proc.pid,
-                                         hard_time_out))
+                      'out after %fs' % (command, proc.pid, hard_time_out))
     else:
       error_string = ('Execution of %s with pid: %d timed out after %fs of no '
-                      'output!' % (parsed_command, proc.pid, io_time_out))
+                      'output!' % (command, proc.pid, io_time_out))
 
     logging.error(error_string)
 

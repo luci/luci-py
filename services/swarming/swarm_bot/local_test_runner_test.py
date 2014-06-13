@@ -163,7 +163,7 @@ class TestLocalTestRunner(auto_stub.TestCase):
 
     self.CreateValidFile()
     runner = local_test_runner.LocalTestRunner(self.data_file_name)
-    (exit_code_ret, result_string_ret) = runner._RunCommand(cmd, 0, 0)
+    (exit_code_ret, result_string_ret) = runner._RunCommand(cmd, 0, 0, None)
     self.assertEqual(exit_code_ret, exit_code)
     self.assertEqual(result_string_ret, self.result_string)
 
@@ -188,7 +188,7 @@ class TestLocalTestRunner(auto_stub.TestCase):
 
     self.CreateValidFile()
     runner = local_test_runner.LocalTestRunner(self.data_file_name)
-    (exit_code, result_string) = runner._RunCommand(cmd, 1, 0)
+    (exit_code, result_string) = runner._RunCommand(cmd, 1, 0, None)
     self.assertNotEqual(exit_code, 0)
     self.assertTrue(result_string)
     self.assertIn(str(self.mock_proc.pid), result_string)
@@ -212,7 +212,7 @@ class TestLocalTestRunner(auto_stub.TestCase):
 
     self.CreateValidFile()
     runner = local_test_runner.LocalTestRunner(self.data_file_name)
-    (exit_code, result_string) = runner._RunCommand(cmd, 1, 0)
+    (exit_code, result_string) = runner._RunCommand(cmd, 1, 0, None)
     self.assertNotEqual(exit_code, 0)
     self.assertTrue(result_string)
     self.assertIn(str(self.mock_proc.pid), result_string)
@@ -239,7 +239,7 @@ class TestLocalTestRunner(auto_stub.TestCase):
 
     self.CreateValidFile()
     runner = local_test_runner.LocalTestRunner(self.data_file_name)
-    (exit_code_ret, result_string_ret) = runner._RunCommand(cmd, 0, 0)
+    (exit_code_ret, result_string_ret) = runner._RunCommand(cmd, 0, 0, None)
     self.assertEqual(exit_code_ret, exit_code)
     self.assertEqual(result_string_ret, self.result_string)
 
