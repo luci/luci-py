@@ -322,45 +322,40 @@ class TestLocalTestRunner(auto_stub.TestCase):
     return runner
 
   def testRunTests(self):
-    with self.PrepareRunTestsCall(
-        decorate_output=[True, True]) as runner:
-      self._mox.ReplayAll()
-      result_codes, result_string = runner.RunTests()
-    self.assertEqual([0, 0], result_codes)
-    self.assertIn('[==========] Running 2 tests from %s test run.' %
-                  self.test_run_name, result_string)
-    self.assertIn('success', result_string)
-    self.assertIn('[----------] %s summary' % self.test_run_name, result_string)
-    self.assertIn('[==========] 2 tests ran.', result_string)
-    self.assertIn('[==========] 2 tests ran.', result_string)
-    self.assertIn('[==========] 2 tests ran.', result_string)
-    self.assertIn('[  PASSED  ] 2 tests.', result_string)
-    self.assertIn('[  FAILED  ] 0 tests', result_string)
-    self.assertIn('0 FAILED TESTS', result_string)
+    runner = self.PrepareRunTestsCall(decorate_output=[True, True])
+    self._mox.ReplayAll()
+    result_codes, result_string = runner.RunTests()
 
-    self._mox.VerifyAll()
+    self.assertEqual([0, 0], result_codes)
+    expected = (
+        u'[==========] Running: foo\n'
+        'success\n'
+        '(Step: 0 ms)\n'
+        '[==========] Running: bar foo bar\n'
+        'success\n'
+        '(Step: 0 ms)\n'
+        '(Total: 0 ms)')
+    self.assertEqual(expected, result_string)
 
   def _RunTestsWithEnvVars(self, platform):
     test_run_env = {'var3': 'value3', 'var4': 'value4'}
     self._mox.StubOutWithMock(local_test_runner.sys, 'platform')
     local_test_runner.sys.platform = platform
-    with self.PrepareRunTestsCall(
-        decorate_output=[True, True], test_run_env=test_run_env) as runner:
-      self._mox.ReplayAll()
-      result_codes, result_string = runner.RunTests()
-    self.assertEqual([0, 0], result_codes)
-    self.assertIn('[==========] Running 2 tests from %s test run.' %
-                  self.test_run_name, result_string)
-    self.assertIn('success', result_string)
-    self.assertIn('[----------] %s summary' % self.test_run_name, result_string)
-    self.assertIn('[==========] 2 tests ran.', result_string)
-    self.assertIn('[==========] 2 tests ran.', result_string)
-    self.assertIn('[==========] 2 tests ran.', result_string)
-    self.assertIn('[  PASSED  ] 2 tests.', result_string)
-    self.assertIn('[  FAILED  ] 0 tests', result_string)
-    self.assertIn('0 FAILED TESTS', result_string)
+    runner = self.PrepareRunTestsCall(
+        decorate_output=[True, True], test_run_env=test_run_env)
+    self._mox.ReplayAll()
+    result_codes, result_string = runner.RunTests()
 
-    self._mox.VerifyAll()
+    self.assertEqual([0, 0], result_codes)
+    expected = (
+        u'[==========] Running: foo\n'
+        'success\n'
+        '(Step: 0 ms)\n'
+        '[==========] Running: bar foo bar\n'
+        'success\n'
+        '(Step: 0 ms)\n'
+        '(Total: 0 ms)')
+    self.assertEqual(expected, result_string)
 
   def testRunTestsWithEnvVarsOnWindows(self):
     self._RunTestsWithEnvVars('win32')
@@ -374,63 +369,34 @@ class TestLocalTestRunner(auto_stub.TestCase):
   def testRunFailedTests(self):
     ok_str = 'OK'
     not_ok_str = 'NOTOK'
-    with self.PrepareRunTestsCall(
-        results=[(1, not_ok_str), (0, ok_str)]) as runner:
-      self._mox.ReplayAll()
-      result_codes, result_string = runner.RunTests()
-    self.assertEqual([1, 0], result_codes)
-    self.assertIn('[==========] Running 2 tests from %s test run.' %
-                  self.test_run_name, result_string)
-    self.assertIn(not_ok_str, result_string)
-    self.assertIn(ok_str, result_string)
-    # Should NOT be decorated:
-    self.assertNotIn('[ RUN      ] %s.%s' % (self.test_run_name,
-                                             self.test_name1), result_string)
-    self.assertNotIn('[ RUN      ] %s.%s' % (self.test_run_name,
-                                             self.test_name2), result_string)
-    self.assertNotIn('[----------] %s summary' % self.test_run_name,
-                     result_string)
-    self.assertNotIn('[==========] 2 tests ran.', result_string)
-    self.assertNotIn('[  PASSED  ] 1 tests.', result_string)
-    self.assertNotIn('[  FAILED  ] 1 tests, listed below:', result_string)
-    self.assertNotIn('[  FAILED  ] %s.%s' % (self.test_run_name,
-                                             self.test_name1),
-                     result_string)
-    self.assertNotIn('1 FAILED TESTS', result_string)
+    runner = self.PrepareRunTestsCall(results=[(1, not_ok_str), (0, ok_str)])
+    self._mox.ReplayAll()
+    result_codes, result_string = runner.RunTests()
 
-    self._mox.VerifyAll()
+    self.assertEqual([1, 0], result_codes)
+    expected = (
+        u'NOTOK\n'
+        'OK')
+    self.assertEqual(expected, result_string)
 
   def testRunDecoratedTests(self):
     ok_str = 'OK'
     not_ok_str = 'NOTOK'
-    with self.PrepareRunTestsCall(
-        results=[(1, not_ok_str), (0, ok_str)],
-        decorate_output=[False, True]) as runner:
-      self._mox.ReplayAll()
-      result_codes, result_string = runner.RunTests()
+    runner = self.PrepareRunTestsCall(
+        results=[(1, not_ok_str), (0, ok_str)], decorate_output=[False, True])
+    self._mox.ReplayAll()
+    result_codes, result_string = runner.RunTests()
+
     self.assertEqual([1, 0], result_codes)
-    self.assertIn('[==========] Running 2 tests from %s test run.' %
-                  self.test_run_name, result_string)
-    self.assertIn(not_ok_str, result_string)
-    # Should NOT be decorated:
-    self.assertNotIn('[ RUN      ] %s.%s' % (self.test_run_name,
-                                             self.test_name1), result_string)
-    self.assertIn('[ RUN      ] %s.%s' % (self.test_run_name, self.test_name2),
-                  result_string)
-    self.assertIn(ok_str, result_string)
-    self.assertIn('[       OK ] %s.%s' % (self.test_run_name, self.test_name2),
-                  result_string)
-    self.assertIn('[----------] %s summary' % self.test_run_name, result_string)
-    self.assertIn('[==========] 2 tests ran.', result_string)
-    self.assertIn('[==========] 2 tests ran.', result_string)
-    self.assertIn('[==========] 2 tests ran.', result_string)
-    self.assertIn('[  PASSED  ] 1 tests.', result_string)
-    self.assertIn('[  FAILED  ] 1 tests, listed below:', result_string)
-    # Should be there even when not decorated.
-    self.assertIn('[  FAILED  ] %s.%s' % (self.test_run_name, self.test_name1),
-                  result_string)
-    self.assertIn('1 FAILED TESTS', result_string)
-    self._mox.VerifyAll()
+    expected = (
+        u'[==========] Running: foo\n'
+        'NOTOK\n'
+        '(Step: 0 ms)\n'
+        '[==========] Running: bar foo bar\n'
+        'OK\n'
+        '(Step: 0 ms)\n'
+        '(Total: 0 ms)')
+    self.assertEqual(expected, result_string)
 
   def testRunTestsWithNonAsciiOutput(self):
     # This result string must be a byte string, not unicode, because that is
@@ -473,9 +439,6 @@ class TestLocalTestRunner(auto_stub.TestCase):
     local_test_runner.url_helper.UrlOpen(
         self.result_url,
         data={
-          'c': self.config_name,
-          'n': self.test_run_name,
-          'o': False,
           'x': ', '.join(str(i) for i in self.result_codes),
         },
         files=[(swarm_constants.RESULT_STRING_KEY,
@@ -486,9 +449,6 @@ class TestLocalTestRunner(auto_stub.TestCase):
     local_test_runner.url_helper.UrlOpen(
         '%s?1=2' % self.result_url,
         data={
-          'c': self.config_name,
-          'n': self.test_run_name,
-          'o': False,
           'x': ', '.join(str(i) for i in self.result_codes),
         },
         files=[(swarm_constants.RESULT_STRING_KEY,
@@ -517,9 +477,6 @@ class TestLocalTestRunner(auto_stub.TestCase):
     local_test_runner.url_helper.UrlOpen(
         self.result_url,
         data={
-          'c': self.config_name,
-          'n': self.test_run_name,
-          'o': False,
           'x': ', '.join(str(i) for i in self.result_codes),
         },
         files=[(swarm_constants.RESULT_STRING_KEY,
@@ -542,9 +499,6 @@ class TestLocalTestRunner(auto_stub.TestCase):
     local_test_runner.url_helper.UrlOpen(
         self.result_url,
         data={
-          'c': self.config_name,
-          'n': self.test_run_name,
-          'o': False,
           'x': ', '.join(str(i) for i in self.result_codes),
         },
         files=[(swarm_constants.RESULT_STRING_KEY,
@@ -583,7 +537,7 @@ class TestLocalTestRunner(auto_stub.TestCase):
 
     local_test_runner.url_helper.UrlOpen(
         unicode(self.result_url),
-        data=mox.ContainsKeyValue('o', True),
+        data={'x': ''},
         files=mox.Func(ValidateInternalErrorsResult),
         max_tries=15,
         method='POSTFORM').AndReturn('')

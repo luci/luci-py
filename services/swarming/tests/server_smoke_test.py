@@ -14,6 +14,7 @@ import glob
 import json
 import logging
 import os
+import re
 import shutil
 import signal
 import socket
@@ -337,8 +338,18 @@ class SwarmingTestCase(unittest.TestCase):
           continue
 
         logging.info('Test done for %s', running_test_key['config_name'])
-        if '0 FAILED TESTS' not in results['output']:
-          self.fail('Test failed.\n%s' % results)
+        expected = (
+          re.escape('[==========] Running: dir\n') +
+          re.escape('test_run.json\n') +
+          re.escape('\n') +
+          r'\(Step: \d+ ms\)' + '\n' +
+          re.escape('[==========] Running: dir\n') +
+          re.escape('test_run.json\n') +
+          re.escape('\n') +
+          r'\(Step\: \d+ ms\)' + '\n' +
+          r'\(Total\: \d+ ms\)')
+        self.assertTrue(
+            re.match(expected, results['output']), repr(results['output']))
 
         # If we haven't retried a runner yet, do that with this runner.
         if not triggered_retry:

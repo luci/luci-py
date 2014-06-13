@@ -332,8 +332,6 @@ class LocalTestRunner(object):
     Returns:
       True if we succeeded, False otherwise.
     """
-    logging.info('Test case: %s starting to download data',
-                 self.test_run.test_run_name)
     for data in self.test_run.data:
       assert isinstance(data, (list, tuple))
       (data_url, file_name) = data
@@ -366,9 +364,6 @@ class LocalTestRunner(object):
       Tuple (result_codes, result_string) to identify the result codes and also
       provide a detailed result_string.
     """
-    logging.info('Running tests from %s test case',
-                 self.test_run.test_run_name)
-
     # Apply the test_run/config environment variables for all tests.
     env_vars = os.environ.copy()
     if self.test_run.env_vars:
@@ -378,115 +373,66 @@ class LocalTestRunner(object):
             for k, v in self.test_run.env_vars.iteritems()
           ))
 
-    # Write the header of the whole test run
-    tests_to_run = self.test_run.tests
-    result_string = '[==========] Running %d tests from %s test run.' % (
-        len(tests_to_run), self.test_run.test_run_name)
+    # Any True will make everything wrapped up.
+    decorate_output = any(t.decorate_output for t in self.test_run.tests)
 
-    # We will accumulate the individual tests result codes.
+    result_string = ''
     result_codes = []
-
-    # We want to time to whole test run.
     test_run_start_time = time.time()
-    decorate_output = None
-    for test in tests_to_run:
-      logging.info('Test %s', test.test_name)
-      decorate_output = decorate_output or test.decorate_output
-      if test.decorate_output:
-        test_case_start_time = time.time()
-        result_string = ('%s\n[ RUN      ] %s.%s' %
-                         (result_string, self.test_run.test_run_name,
-                          test.test_name))
+    for test in self.test_run.tests:
+      test_case_start_time = time.time()
 
+      if decorate_output:
+        if result_string:
+          result_string += '\n'
+        result_string += '[==========] Running: %s' % ' '.join(test.action)
       (exit_code, stdout_string) = self._RunCommand(test.action,
                                                     test.hard_time_out,
                                                     test.io_time_out,
                                                     env=env_vars)
-
+      encoding = 'utf-8'
       try:
-        stdout_string = stdout_string.decode(self.test_run.encoding)
+        stdout_string = stdout_string.decode(encoding)
       except UnicodeDecodeError:
         stdout_string = (
             '! Output contains characters not valid in %s encoding !\n%s'
-            % (self.test_run.encoding, stdout_string.decode(
-                self.test_run.encoding,
-                'replace')))
+            % (encoding, stdout_string.decode(encoding, 'replace')))
 
       # We always accumulate the test output and exit code.
-      result_string = '%s\n%s' % (result_string, stdout_string)
+      if result_string:
+        result_string += '\n'
+      result_string += stdout_string
       result_codes.append(exit_code)
 
       if exit_code:
         logging.warning('Execution error %d: %s', exit_code, stdout_string)
 
-      if test.decorate_output:
-        # TODO(maruel): Remove all the gtest faking outputs.
-        # https://code.google.com/p/swarming/issues/detail?id=87
+      if decorate_output:
         test_case_timing = time.time() - test_case_start_time
-        result_string = ('%s\n[ %s ] %s.%s (%d ms)' %
-                         (result_string,
-                          self._SUCCESS_DISPLAY_STRING[not exit_code],
-                          self.test_run.test_run_name,
-                          test.test_name, test_case_timing * 1000))
+        result_string += '\n(Step: %d ms)' % (test_case_timing * 1000)
 
     # This is for the timing of running ALL tests.
-    test_run_timing = time.time() - test_run_start_time
-
-    # We MUST have as many results as we have tests, and they must all be int.
-    num_results = len(result_codes)
-    assert num_results == len(tests_to_run)
-    assert sum([1 for result_code in result_codes
-                if not isinstance(result_code, int)]) is 0
-
-    # We sum the number of exit codes that were non-zero for success.
-    num_failures = num_results - sum([not int(x) for x in result_codes])
-
-    # TODO(maruel): Delete this.
     if decorate_output:
-      result_string = '%s\n\n[----------] %s summary' % (
-          result_string, self.test_run.test_run_name)
-      result_string = '%s\n[==========] %d tests ran. (%d ms total)' % (
-          result_string, num_results, test_run_timing * 1000)
-
-      result_string = '%s\n[  PASSED  ] %d tests.' % (
-          result_string, num_results - num_failures)
-      result_string = '%s\n[  FAILED  ] %d tests' % (
-          result_string, num_failures)
-      if num_failures:
-        result_string = '%s, listed below:' % result_string
-
-      # We finish by enumerating all failed individual tests.
-      for index in range(min(len(result_codes), len(tests_to_run))):
-        if result_codes[index] is not 0:
-          result_string = '%s\n[  FAILED  ] %s.%s' % (
-              result_string,
-              self.test_run.test_run_name,
-              tests_to_run[index].test_name)
-
-      result_string += '\n\n %d FAILED TESTS\n' % num_failures
+      test_run_timing = time.time() - test_run_start_time
+      result_string += '\n(Total: %d ms)' % (test_run_timing * 1000)
 
     # And append their total number before returning the result string.
     return result_codes, result_string
 
-  def PublishResults(self, result_codes, result_string, overwrite=False):
+  def PublishResults(self, result_codes, result_string):
     """Publish the given result string to the result_url if any.
 
     Args:
       result_codes: The array of exit codes to be published, one per action.
       result_string: The result to be published.
-      overwrite: True if we should signal the server to overwrite any old
-          result data it may have.
 
     Returns:
       True if we succeeded or had nothing to do, False otherwise.
     """
     logging.debug('Publishing Results')
     data = {
-        'c': self.test_run.configuration.config_name,
-        'n': self.test_run.test_run_name,
-        'o': overwrite,
-        # TODO(maruel): Keep as int.
-        'x': ', '.join(str(i) for i in result_codes),
+      # TODO(maruel): Keep as int.
+      'x': ', '.join(str(i) for i in result_codes),
     }
     # Pass the output as a file to ensure the server handler doesn't
     # incorrectly convert the output to unicode.
@@ -506,7 +452,7 @@ class LocalTestRunner(object):
   def PublishInternalErrors(self):
     """Get the current log data and publish it."""
     logging.debug('Publishing internal errors')
-    self.PublishResults([], self._log.read(), overwrite=True)
+    self.PublishResults([], self._log.read())
 
   def RetrieveDataAndRunTests(self):
     """Get the data required to run the tests, then run and publish the results.
