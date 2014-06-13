@@ -1149,6 +1149,7 @@ class RootHandler(auth.AuthenticatingHandler):
       'host_url': self.request.host_url,
       'user_type': acl.get_user_type(),
       'is_admin': acl.is_admin(),
+      'is_super_admin': auth.is_admin(),
       'is_bot': acl.is_bot(),
       'is_privileged_user': acl.is_privileged_user(),
       'is_user': acl.is_user(),

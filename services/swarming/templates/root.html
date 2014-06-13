@@ -2,12 +2,6 @@
 
 {% block headers %}
 <style>
-  .user a {
-    {% if not is_user %}
-      color: gray;
-      text-decoration: line-through;
-    {% endif %}
-  }
   .admin a {
     {% if not is_admin %}
       color: gray;
@@ -16,6 +10,18 @@
   }
   .privileged_user a {
     {% if not is_privileged_user %}
+      color: gray;
+      text-decoration: line-through;
+    {% endif %}
+  }
+  .super_admin a {
+    {% if not is_super_admin %}
+      color: gray;
+      text-decoration: line-through;
+    {% endif %}
+  }
+  .user a {
+    {% if not is_user %}
       color: gray;
       text-decoration: line-through;
     {% endif %}
@@ -49,6 +55,7 @@ As a {{user_type}}, you are entitled to see these pages:
   <li><a href="/restricted/whitelist_ip">Whitelist IP</a></li>
   <li><a href="/restricted/upload_bootstrap">Upload new bootstrap.py</a></li>
   <li><a href="/restricted/upload_start_slave">Upload new start_slave.py</a></li>
+  <li><a href="/auth/groups">Manage user groups</a></li>
 </ul>
 
 <h3>Error reports</h3>
