@@ -177,11 +177,7 @@ class TaskProperties(ndb.Model):
   TODO(maruel): Determine which of the below that are necessary.
   Things not caried over from TestCase:
   - TestObject.decorate_output
-  - TestCase.cleanup, we always use the same value?
-  - TestCase.encoding, enforce utf-8
-  - TestCase.restart_on_failure, probably needed
   - TestCase.verbose, use env var instead.
-  - TestCase.working_dir, not sure. this is cheezy.
   - TestObject.hard_time_out, per command execution timeout, only global.
   - TestObject.io_time_out, I/O timeout, per command execution timeout, only
     global.

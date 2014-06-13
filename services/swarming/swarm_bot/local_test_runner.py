@@ -194,18 +194,6 @@ class LocalTestRunner(object):
     if not os.path.exists(self.data_dir):
       os.mkdir(self.data_dir)
 
-  def __enter__(self):
-    return self
-
-  def __exit__(self, _exc_type, _exc_value, _traceback):
-    self.close()
-
-  def close(self):
-    # 'data' implies cleanup zip.
-    if self.test_run.cleanup == 'data':
-      if not _DeleteFileOrDirectory(self.data_dir):
-        logging.error('Could not delete data directory "%s"', self.data_dir)
-
   def _RunCommand(self, command, hard_time_out, io_time_out, env=None):
     """Runs the given command.
 
@@ -349,12 +337,6 @@ class LocalTestRunner(object):
         return False
       if zip_file:
         zip_file.close()
-
-      if self.test_run.cleanup == 'zip':  # Implied by cleanup data.
-        try:
-          os.remove(local_file)
-        except OSError:
-          logging.exception('Couldn\'t remove %s.', local_file)
     return True
 
   def RunTests(self):
@@ -492,20 +474,20 @@ def main(args):
 
   try:
     with logging_utils.CaptureLogs('local_test_runner') as log:
-      with LocalTestRunner(options.request_file_name, log=log) as runner:
-        try:
-          if runner.RetrieveDataAndRunTests():
-            return 0
-        except Exception:
-          # We want to catch all so that we can report all errors, even internal
-          # ones.
-          logging.exception('Failed to run test')
+      runner = LocalTestRunner(options.request_file_name, log=log)
+      try:
+        if runner.RetrieveDataAndRunTests():
+          return 0
+      except Exception:
+        # We want to catch all so that we can report all errors, even internal
+        # ones.
+        logging.exception('Failed to run test')
 
-        try:
-          runner.PublishInternalErrors()
-        except Exception:
-          logging.exception('Unable to publish internal errors')
-        return 1
+      try:
+        runner.PublishInternalErrors()
+      except Exception:
+        logging.exception('Unable to publish internal errors')
+      return 1
   except Exception:
     logging.exception('Internal failure')
     return 1

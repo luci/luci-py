@@ -170,20 +170,12 @@ class TestRequestMessageBaseTest(unittest.TestCase):
     trm.ValidateObjectLists(['f'], Validatable, False)
     trm.ValidateObjectLists(['g'], Validatable, False)
 
-    # Not unique names.
-    trm.g[0].a = 'a'
-    trm.g[1].a = 'a'
     with self.assertRaises(test_request_message.Error):
-      trm.ValidateObjectLists(['g'], Validatable, False, ['a'])
-    trm.g[1].a = 'b'
-    trm.ValidateObjectLists(['g'], Validatable, False, ['a'])
-
+      trm.ValidateObjectLists(['a'], Validatable, False)
     with self.assertRaises(test_request_message.Error):
-      trm.ValidateObjectLists(['a'], Validatable, False, [])
+      trm.ValidateObjectLists(['b'], TestObj, True)
     with self.assertRaises(test_request_message.Error):
-      trm.ValidateObjectLists(['b'], TestObj, True, [])
-    with self.assertRaises(test_request_message.Error):
-      trm.ValidateObjectLists(['c'], Validatable, False, [])
+      trm.ValidateObjectLists(['c'], Validatable, False)
 
   def testValidateUrlLists(self):
     trm = TestObj(
@@ -338,12 +330,6 @@ class TestHelper(unittest.TestCase):
   INVALID_ENV_VARS = [{1: 2}, {'a': 'b', 1: 'b'}, {'a': 1},
                       {'a': None}]
 
-  INVALID_CLEANUP_VALUES = (INVALID_STRING_VALUES +
-                            ['mad', '7zip', 'binaries', 'tests'])
-
-  VALID_ENCODING_VALUES = ('ascii', 'utf_8', 'utf-8', 'latin_1')
-  INVALID_ENCODING_VALUES = ('mad', 'my_encoding', 'None', 'unicode')
-
   def AssertValidValues(self, value_key, values):
     for value in values:
       setattr(self.test_request, value_key, value)
@@ -367,13 +353,11 @@ class TestObjectTest(TestHelper):
     super(TestObjectTest, self).setUp()
     # Always start with a valid case, and make it explicitly invalid as needed.
     self.test_request = test_request_message.TestObject(
-        test_name=TestHelper.VALID_STRING_VALUES[0],
         action=TestHelper.VALID_REQUIRED_STRING_LIST_VALUES[0])
 
   @staticmethod
   def GetFullObject():
     return test_request_message.TestObject(
-        test_name=TestHelper.VALID_STRING_VALUES[-1],
         action=TestHelper.VALID_REQUIRED_STRING_LIST_VALUES[-1],
         decorate_output=TestHelper.VALID_BOOLEAN_VALUES[-1],
         hard_time_out=42,
@@ -384,7 +368,6 @@ class TestObjectTest(TestHelper):
     self.test_request.Validate()
 
     # And then a few more valid values
-    self.AssertValidValues('test_name', TestHelper.VALID_STRING_VALUES)
     self.AssertValidValues('action',
                            TestHelper.VALID_REQUIRED_STRING_LIST_VALUES)
     self.AssertValidValues('hard_time_out', [1.1, 3, 0, .00003])
@@ -393,12 +376,9 @@ class TestObjectTest(TestHelper):
     self.AssertValidValues('env_vars', TestHelper.VALID_ENV_VARS)
 
     # Now try invalid values.
-    self.AssertInvalidValues('test_name',
-                             TestHelper.INVALID_REQUIRED_STRING_VALUES)
-    # Put the value back to a valid value, to test invalidity of other values.
-    self.test_request.test_name = TestHelper.VALID_STRING_VALUES[0]
     self.AssertInvalidValues('action',
                              TestHelper.INVALID_REQUIRED_STRING_LIST_VALUES)
+    # Put the value back to a valid value, to test invalidity of other values.
     self.test_request.action = TestHelper.VALID_REQUIRED_STRING_LIST_VALUES[0]
     self.AssertInvalidValues('hard_time_out', ['never', '', {}, [], (1, 2)])
     self.test_request.hard_time_out = None
@@ -425,15 +405,13 @@ class TestConfigurationTest(TestHelper):
     # Always start with a valid case, and make it explicitly invalid as needed.
     dimensions = dict(os='a', browser='a', cpu='a')
     self.test_request = test_request_message.TestConfiguration(
-        config_name='a', dimensions=dimensions)
+        dimensions=dimensions)
 
   @staticmethod
   def GetFullObject():
     dimensions = dict(os='a', browser='a', cpu='a')
     return test_request_message.TestConfiguration(
-        config_name='a',
         dimensions=dimensions,
-        num_instances=1,
         deadline_to_run=1,
         priority=1)
 
@@ -442,7 +420,7 @@ class TestConfigurationTest(TestHelper):
     dimensions = {'a': ['b']}
 
     test_configurations = test_request_message.TestConfiguration(
-        config_name='a', dimensions=dimensions)
+        dimensions=dimensions)
 
     dimensions['c'] = 'd'
     self.assertNotEqual(dimensions, test_configurations.dimensions)
@@ -452,13 +430,6 @@ class TestConfigurationTest(TestHelper):
     self.test_request.Validate()
 
     # And then a few more valid values
-    self.AssertValidValues('config_name',
-                           TestHelper.VALID_STRING_VALUES)
-
-    self.AssertValidValues('num_instances',
-                           [i for i in TestHelper.NON_ZERO_VALID_INT_VALUES
-                            if test_request_message.MAX_NUM_INSTANCES > i])
-
     self.AssertValidValues('deadline_to_run',
                            TestHelper.VALID_INT_VALUES)
 
@@ -470,17 +441,9 @@ class TestConfigurationTest(TestHelper):
     self.test_request.Validate()
 
     # Now try invalid values.
-    self.AssertInvalidValues('config_name',
-                             TestHelper.INVALID_REQUIRED_STRING_VALUES)
-    # Put the value back to a valid value, to test invalidity of other values.
-    self.test_request.config_name = TestHelper.VALID_STRING_VALUES[0]
-
-    self.AssertInvalidValues('num_instances',
-                             TestHelper.NON_ZERO_INVALID_POSITIVE_INT_VALUES)
-    self.test_request.num_instances = 1
-
     self.AssertInvalidValues('deadline_to_run',
                              TestHelper.INVALID_POSITIVE_INT_VALUES)
+    # Put the value back to a valid value, to test invalidity of other values.
     self.test_request.deadline_to_run = 0
 
     self.AssertInvalidValues('priority',
@@ -515,8 +478,7 @@ class TestCaseTest(TestHelper):
     self.test_request = test_request_message.TestCase(
         test_case_name='a',
         configurations=[
-          test_request_message.TestConfiguration(
-              config_name='a', dimensions=dimensions),
+          test_request_message.TestConfiguration(dimensions=dimensions),
         ])
 
   @staticmethod
@@ -526,12 +488,7 @@ class TestCaseTest(TestHelper):
         requestor='user@swarm.com',
         env_vars=TestHelper.VALID_ENV_VARS[-1],
         data=TestHelper.VALID_URL_LOCAL_PATH_TUPLES_LISTS[-1],
-        working_dir=TestHelper.VALID_STRING_VALUES[-1],
         tests=[TestObjectTest.GetFullObject()],
-        restart_on_failure=TestHelper.VALID_BOOLEAN_VALUES[-1],
-        encoding='utf-8',
-        cleanup=test_request_message.TestRun.VALID_CLEANUP_VALUES[-1],
-        label=TestHelper.VALID_OPTIONAL_STRING_VALUES[-1],
         verbose=TestHelper.VALID_BOOLEAN_VALUES[-1],
         configurations=[TestConfigurationTest.GetFullObject()])
 
@@ -569,37 +526,26 @@ class TestCaseTest(TestHelper):
                            TestHelper.VALID_OPTIONAL_STRING_VALUES)
     self.AssertValidValues('data', TestHelper.VALID_URL_LOCAL_PATH_TUPLES_LISTS)
 
-    test_object1 = test_request_message.TestObject(test_name='a', action=['a'])
+    test_object1 = test_request_message.TestObject(action=['a'])
     test_object1.Validate()
     test_object2 = test_request_message.TestObject(
-        test_name='b', action=['b', 'c'], decorate_output=False)
+        action=['b', 'c'], decorate_output=False)
     test_object2.Validate()
     self.AssertValidValues('tests', [[test_object1, test_object2],
                                      [test_object1]])
     self.test_request.tests = [TestObjectTest.GetFullObject()]
 
     test_config1 = test_request_message.TestConfiguration(
-        config_name='a', dimensions=dict(os='a', browser='a', cpu='a'))
+        dimensions=dict(os='a', browser='a', cpu='a'))
     test_config1.Validate()
     test_config2 = test_request_message.TestConfiguration(
-        config_name='b', dimensions=dict(os='b', browser='b', cpu='b'),
+        dimensions=dict(os='b', browser='b', cpu='b'),
         data=[('http://a.com/foo', 'foo.zip')])
     test_config2.Validate()
     self.AssertValidValues('configurations', [[test_config1]])
     self.AssertInvalidValues('configurations', [[test_config1, test_config2]])
     self.test_request.configurations = [TestConfigurationTest.GetFullObject()]
 
-    self.AssertValidValues('restart_on_failure',
-                           TestHelper.VALID_BOOLEAN_VALUES)
-    self.AssertValidValues('encoding',
-                           TestHelper.VALID_ENCODING_VALUES)
-
-    self.AssertValidValues('cleanup',
-                           test_request_message.TestRun.VALID_CLEANUP_VALUES)
-    self.AssertValidValues('label',
-                           TestHelper.VALID_OPTIONAL_STRING_VALUES)
-    self.AssertValidValues('working_dir',
-                           TestHelper.VALID_OPTIONAL_STRING_VALUES)
     self.AssertValidValues('verbose', TestHelper.VALID_BOOLEAN_VALUES)
     self.AssertValidValues('env_vars', TestHelper.VALID_ENV_VARS)
 
@@ -634,20 +580,8 @@ class TestCaseTest(TestHelper):
     # Put the value back to a valid value, to test invalidity of other values.
     dimensions = dict(os='a', browser='a', cpu='a')
     valid_config = test_request_message.TestConfiguration(
-        config_name='a', dimensions=dimensions)
+        dimensions=dimensions)
     self.test_request.configurations = [valid_config]
-
-    self.AssertInvalidValues('encoding', TestHelper.INVALID_ENCODING_VALUES)
-    self.test_request.encoding = TestHelper.VALID_ENCODING_VALUES[-1]
-
-    self.AssertInvalidValues('label', TestHelper.INVALID_STRING_VALUES)
-    self.test_request.label = None
-
-    self.AssertInvalidValues('working_dir', TestHelper.INVALID_STRING_VALUES)
-    self.test_request.working_dir = None
-
-    self.AssertInvalidValues('cleanup', TestHelper.INVALID_CLEANUP_VALUES)
-    self.test_request.cleanup = None
 
     self.AssertInvalidValues('env_vars', TestHelper.INVALID_ENV_VARS)
     self.test_request.env_vars = None
@@ -665,124 +599,28 @@ class TestCaseTest(TestHelper):
         test_request_message.Stringize(full_object, json_readable=True))
     self.assertEqual(new_object, full_object)
 
-  def testEquivalent(self):
-    test_case = test_request_message.TestCase(
-        test_case_name='a',
-        configurations=[
-          test_request_message.TestConfiguration(config_name='b'),
-        ])
-    self.assertTrue(test_case.Equivalent(test_case))
-
-    # Test that certain values don't affect equivalence
-    equivalent_test_case = test_request_message.TestCase(
-        test_case_name='a',
-        configurations=[
-          test_request_message.TestConfiguration(config_name='b'),
-        ])
-    self.assertTrue(test_case.Equivalent(equivalent_test_case))
-
-    equivalent_test_case.cleanup = 'root'
-    self.assertTrue(test_case.Equivalent(equivalent_test_case))
-
-    equivalent_test_case.label = 'important'
-    self.assertTrue(test_case.Equivalent(equivalent_test_case))
-
-    equivalent_test_case.requestor = 'chris'
-    self.assertTrue(test_case.Equivalent(equivalent_test_case))
-
-    equivalent_test_case.working_dir = 'new_folder'
-    self.assertTrue(test_case.Equivalent(equivalent_test_case))
-
-    # Test that we can get failures.
-    equivalent_test_case.encoding += 'latin-1'
-    self.assertFalse(test_case.Equivalent(equivalent_test_case))
-
-  def testEquivalentsDifferentConfigs(self):
-    test_case = test_request_message.TestCase(
-        test_case_name='a',
-        configurations=[
-          test_request_message.TestConfiguration(config_name='b'),
-        ])
-    different_test_case = test_request_message.TestCase(
-        test_case_name='a',
-        configurations=[
-          test_request_message.TestConfiguration(config_name='b'),
-        ])
-
-    self.assertTrue(test_case.Equivalent(different_test_case))
-
-    # Ensure that a request with the same name, but a different config will
-    # fail.
-    different_test_case.configurations[0].config_name = 'different_name'
-    self.assertFalse(test_case.Equivalent(different_test_case))
-    different_test_case.configurations[0].config_name = (
-        test_case.configurations[0].config_name)
-
-    # Ensure that a request with a matching config, but additional configs as
-    # well, fails.
-    different_test_case.configurations.append(
-        different_test_case.configurations[0])
-    self.assertFalse(test_case.Equivalent(different_test_case))
-
-  def testEquivalentMultipleConfigs(self):
-    num_configs = 2
-    test_case = test_request_message.TestCase(
-        test_case_name='a',
-        configurations=[
-          test_request_message.TestConfiguration(config_name='b'),
-        ])
-    for i in range(num_configs):
-      test_case.configurations.append(
-          test_request_message.TestConfiguration(config_name=str(i)))
-
-    self.assertTrue(test_case.Equivalent(test_case))
-    # Change the position of the position of the configs and ensure they are
-    # still equivalent.
-    equivalent_test_case = test_request_message.TestCase(
-        test_case_name='a',
-        configurations=[
-          test_request_message.TestConfiguration(config_name='b'),
-        ])
-    for i in range(num_configs):
-      equivalent_test_case.configurations.append(
-          test_request_message.TestConfiguration(config_name=str(i)))
-
-    equivalent_test_case.configurations = list(reversed(
-        equivalent_test_case.configurations))
-
-    self.assertTrue(test_case.Equivalent(equivalent_test_case))
-
 
 class TestRunTest(TestHelper):
   def setUp(self):
     super(TestRunTest, self).setUp()
     # Always start with a valid case, and make it explicitly invalid as needed.
     self.test_request = test_request_message.TestRun(
-        test_run_name='a',
         configuration=test_request_message.TestConfiguration(
-            config_name='a', dimensions=dict(os='a', browser='a', cpu='a')),
+            dimensions=dict(os='a', browser='a', cpu='a')),
         result_url='http://localhost:1',
         ping_url='http://localhost:2',
-        ping_delay=1,
-        encoding='ascii')
+        ping_delay=1)
 
   @staticmethod
   def GetFullObject():
     return test_request_message.TestRun(
-        test_run_name=TestHelper.VALID_STRING_VALUES[-1],
         configuration=TestConfigurationTest.GetFullObject(),
         env_vars=TestHelper.VALID_ENV_VARS[-1],
         data=TestHelper.VALID_URL_LOCAL_PATH_TUPLES_LISTS[-1],
-        working_dir=TestHelper.VALID_STRING_VALUES[-1],
         tests=[TestObjectTest.GetFullObject()],
-        instance_index=1,
-        num_instances=2,
         result_url='http://localhost:1',
         ping_url='http://localhost:2',
-        ping_delay=TestHelper.VALID_INT_VALUES[-1],
-        cleanup=test_request_message.TestRun.VALID_CLEANUP_VALUES[-1],
-        restart_on_failure=TestHelper.VALID_BOOLEAN_VALUES[-1],
-        encoding='utf-8')
+        ping_delay=TestHelper.VALID_INT_VALUES[-1])
 
   def testNoReferences(self):
     # Ensure that Test Run makes copies of its input, not references.
@@ -796,10 +634,9 @@ class TestRunTest(TestHelper):
         tests=tests,
         result_url='http://localhost:1',
         ping_url='http://localhost:2',
-        test_run_name='bar',
         ping_delay=10,
         configuration=test_request_message.TestConfiguration(
-            config_name='a', dimensions=dict(os='a')))
+            dimensions=dict(os='a')))
 
     env_vars['a'] = 2
     self.assertNotEqual(env_vars, test_run.env_vars)
@@ -815,28 +652,20 @@ class TestRunTest(TestHelper):
     self.test_request.Validate()
 
     # And then a few more valid values
-    self.AssertValidValues('test_run_name',
-                           TestHelper.VALID_STRING_VALUES)
     self.AssertValidValues('data', TestHelper.VALID_URL_LOCAL_PATH_TUPLES_LISTS)
 
-    test_object1 = test_request_message.TestObject(test_name='a', action=['a'])
+    test_object1 = test_request_message.TestObject(action=['a'])
     test_object1.Validate()
     test_object2 = test_request_message.TestObject(
-        test_name='b', action=['b', 'c'], decorate_output=False)
+        action=['b', 'c'], decorate_output=False)
     test_object2.Validate()
     self.AssertValidValues('tests', [[test_object1, test_object2],
                                      [test_object1]])
     self.test_request.tests = [TestObjectTest.GetFullObject()]
 
-    self.test_request.num_instances = max(TestHelper.VALID_INT_VALUES) + 1
-    self.AssertValidValues('instance_index', TestHelper.VALID_INT_VALUES)
-    self.test_request.instance_index = 0
-    self.AssertValidValues('num_instances',
-                           TestHelper.NON_ZERO_VALID_INT_VALUES)
-
     dimensions = dict(os='a', browser='a', cpu='a')
     test_config = test_request_message.TestConfiguration(
-        config_name='a', dimensions=dimensions)
+        dimensions=dimensions)
     test_config.Validate()
     self.AssertValidValues('configuration', [test_config])
     self.test_request.configuration = (
@@ -844,23 +673,13 @@ class TestRunTest(TestHelper):
 
     self.AssertValidValues('ping_url', TestHelper.VALID_URL_VALUES)
     self.AssertValidValues('ping_delay', TestHelper.VALID_INT_VALUES)
-    self.AssertValidValues('working_dir',
-                           TestHelper.VALID_OPTIONAL_STRING_VALUES)
 
-    self.AssertValidValues('cleanup',
-                           test_request_message.TestRun.VALID_CLEANUP_VALUES)
     self.AssertValidValues('env_vars', TestHelper.VALID_ENV_VARS)
-    self.AssertValidValues('restart_on_failure',
-                           TestHelper.VALID_BOOLEAN_VALUES)
-    self.AssertValidValues('encoding', TestHelper.VALID_ENCODING_VALUES)
 
     # Now try invalid values.
-    self.AssertInvalidValues('test_run_name',
-                             TestHelper.INVALID_REQUIRED_STRING_VALUES)
-    # Put the value back to a valid value, to test invalidity of other values.
-    self.test_request.test_run_name = TestHelper.VALID_STRING_VALUES[0]
     self.AssertInvalidValues(
         'data', TestHelper.INVALID_URL_LOCAL_PATH_TUPLES_LISTS)
+    # Put the value back to a valid value, to test invalidity of other values.
     self.test_request.data = TestHelper.VALID_URL_LOCAL_PATH_TUPLES_LISTS[-1]
 
     test_object1.io_time_out = 'never'
@@ -872,24 +691,6 @@ class TestRunTest(TestHelper):
     self.AssertInvalidValues('tests', [[test_object1, test_object2],
                                        [test_object1]])
     self.test_request.tests = []
-
-    self.AssertInvalidValues('instance_index', TestHelper.INVALID_INT_VALUES)
-    self.test_request.instance_index = 0
-    self.AssertInvalidValues('num_instances',
-                             TestHelper.NON_ZERO_INVALID_INT_VALUES)
-
-    self.test_request.instance_index = 2
-    self.test_request.num_instances = 1
-    with self.assertRaises(test_request_message.Error):
-      self.test_request.Validate()
-
-    self.test_request.instance_index = 2
-    self.test_request.num_instances = 2
-    with self.assertRaises(test_request_message.Error):
-      self.test_request.Validate()
-
-    self.test_request.instance_index = 1
-    self.test_request.num_instances = 2
 
     test_config.dimensions = [42]
     with self.assertRaises(test_request_message.Error):
@@ -908,17 +709,8 @@ class TestRunTest(TestHelper):
                              TestHelper.INVALID_POSITIVE_INT_VALUES)
     self.test_request.ping_delay = TestHelper.VALID_INT_VALUES[0]
 
-    self.AssertInvalidValues('working_dir', TestHelper.INVALID_STRING_VALUES)
-    self.test_request.working_dir = None
-
-    self.AssertInvalidValues('cleanup', TestHelper.INVALID_CLEANUP_VALUES)
-    self.test_request.cleanup = None
-
     self.AssertInvalidValues('env_vars', TestHelper.INVALID_ENV_VARS)
     self.test_request.env_vars = None
-
-    self.AssertInvalidValues('encoding', TestHelper.INVALID_ENCODING_VALUES)
-    self.test_request.encoding = TestHelper.VALID_ENCODING_VALUES[-1]
 
   def testStringize(self):
     # Vanilla object.

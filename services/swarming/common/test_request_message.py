@@ -186,8 +186,7 @@ class TestRequestMessageBase(object):
       elif required:
         raise Error('Missing required %s' % value_key)
 
-  def ValidateObjectLists(self, list_keys, object_type, required=False,
-                          unique_value_keys=None):
+  def ValidateObjectLists(self, list_keys, object_type, required=False):
     """Raises if any of the objects of the given lists are not valid.
 
     Args:
@@ -195,31 +194,10 @@ class TestRequestMessageBase(object):
       object_type: The type of object to validate.
       required: An optional flag identifying if the list is required to be
           non-empty. Defaults to False.
-      unique_value_keys: An optional list of keys to values that must be unique.
     """
     self.ValidateLists(list_keys, object_type, required)
-
-    # We use this dictionary of sets to make sure some values are unique.
-    unique_values = {}
-    if unique_value_keys:
-      for unique_key in unique_value_keys:
-        unique_values[unique_key] = set()
-
     for list_key in list_keys:
       for object_value in self.__dict__[list_key]:
-        # Checks all the key name of values that should be unique to see if we
-        # have a duplicate, otherwise add this one to the set to make sure we
-        # don't see it again later
-        if unique_value_keys:
-          for unique_key in unique_value_keys:
-            if unique_key in object_value.__dict__:
-              unique_value = object_value.__dict__[unique_key]
-              if unique_value in unique_values[unique_key]:
-                raise Error(
-                    'Duplicate entry with same value %s: %s in %s' %
-                    (unique_key, unique_value, list_key))
-              unique_values[unique_key].add(unique_value)
-        # Now we validate the whole object.
         object_value.Validate()
 
   @staticmethod
@@ -349,7 +327,6 @@ class TestObject(TestRequestMessageBase):
   user provides an instance of this class inside a TestCase.
 
   Attributes:
-    test_name: The name of this test object.
     action: The command line to run.
     decorate_output: The output decoration flag of this test object.
     hard_time_out: The maximum time this test can take.
@@ -357,10 +334,9 @@ class TestObject(TestRequestMessageBase):
         writes to stdout).
   """
 
-  def __init__(self, test_name=None, action=None, decorate_output=True,
-               hard_time_out=3600.0, io_time_out=1200.0, **kwargs):
+  def __init__(self, action=None, decorate_output=True, hard_time_out=3600.0,
+               io_time_out=1200.0, **kwargs):
     super(TestObject, self).__init__(**kwargs)
-    self.test_name = test_name
     self.action = action[:] if action else []
     self.decorate_output = decorate_output
     self.hard_time_out = hard_time_out
@@ -369,7 +345,6 @@ class TestObject(TestRequestMessageBase):
 
   def Validate(self):
     """Raises if the current content is not valid."""
-    self.ValidateValues(['test_name'], basestring, required=True)
     self.ValidateLists(['action'], basestring, required=True)
     self.ValidateValues(['hard_time_out', 'io_time_out'], (int, long, float))
 
@@ -383,9 +358,6 @@ class TestConfiguration(TestRequestMessageBase):
   TestCase.
 
   Attributes:
-    config_name: The name of this configuration.
-    num_instances: An optional integer specifying the number of instances
-        of this configuration we want. Defaults to 1. Must be greater than 0.
     deadline_to_run: An optional value that specifies how long the test can
         wait before it is aborted (in seconds). Defaults to
         SWARM_RUNNER_MAX_WAIT_SECS.
@@ -394,12 +366,9 @@ class TestConfiguration(TestRequestMessageBase):
         acceptable values are [0, MAX_PRIORITY_VALUE].
     dimensions: A dictionary of strings or list of strings for dimensions.
   """
-  def __init__(self, config_name=None, num_instances=None, min_instances=1,
-               deadline_to_run=SWARM_RUNNER_MAX_WAIT_SECS, priority=100,
+  def __init__(self, deadline_to_run=SWARM_RUNNER_MAX_WAIT_SECS, priority=100,
                dimensions=None, **kwargs):
     super(TestConfiguration, self).__init__(**kwargs)
-    self.config_name = config_name
-    self.num_instances = num_instances if num_instances else min_instances
     self.deadline_to_run = deadline_to_run
     self.priority = priority
     self.dimensions = dimensions.copy() if dimensions else {}
@@ -407,14 +376,11 @@ class TestConfiguration(TestRequestMessageBase):
 
   def Validate(self):
     """Raises if the current content is not valid."""
-    self.ValidateValues(['config_name'], basestring, required=True)
     # required=True to make sure the caller doesn't set it to None.
     self.ValidateValues(
-        ['num_instances', 'deadline_to_run', 'priority'],
-        (int, long), required=True)
+        ['deadline_to_run', 'priority'], (int, long), required=True)
 
-    if (self.num_instances < 1 or self.num_instances > MAX_NUM_INSTANCES or
-        self.deadline_to_run < 0 or
+    if (self.deadline_to_run < 0 or
         self.priority < 0 or self.priority > MAX_PRIORITY_VALUE):
       raise Error('Invalid TestConfiguration: %s' % self.__dict__)
 
@@ -444,22 +410,13 @@ class TestCase(TestRequestMessageBase):
     env_vars: An optional dictionary for environment variables.
     configurations: A list of configurations for this test case.
     data: An optional 'data list' for this configuration.
-    working_dir: An optional path string for where to download/run tests. This
-        must be an absolute path though we don't validate it since this script
-        may run on a different platform than the one that will use the path.
     tests: An list of TestObject to run for this task.
-    restart_on_failure: An optional value indicating if the machine running the
-        tests should restart if any of the tests fail.
-    encoding: The encoding of the tests output. Default to utf-8.
-    cleanup: The key to access the test run's cleanup string.
-    label: An optional string that can be used to label this test case.
     verbose: An optional boolean value that specifies if logging should be
         verbose.
   """
   def __init__(self, test_case_name=None, requestor=None, env_vars=None,
-               configurations=None, data=None, working_dir=None, tests=None,
-               restart_on_failure=None, encoding='utf-8', cleanup=None,
-               label=None, verbose=False, **kwargs):
+               configurations=None, data=None, tests=None, verbose=False,
+               **kwargs):
     super(TestCase, self).__init__(**kwargs)
     self.test_case_name = test_case_name
     # TODO(csharp): Stop using a default so test requests that don't give a
@@ -468,32 +425,21 @@ class TestCase(TestRequestMessageBase):
     self.env_vars = env_vars.copy() if env_vars else {}
     self.configurations = configurations[:] if configurations else []
     self.data = data[:] if data else []
-    self.working_dir = working_dir
     self.tests = tests[:] if tests else []
-    self.restart_on_failure = restart_on_failure
-    self.encoding = encoding
-    self.cleanup = cleanup
-    self.label = label
     self.verbose = verbose
     self.Validate()
 
   def Validate(self):
     """Raises if the current content is not valid."""
     self.ValidateValues(['test_case_name'], basestring, required=True)
-    self.ValidateValues(['requestor', 'working_dir', 'label'], basestring)
+    self.ValidateValues(['requestor'], basestring)
     self.ValidateDicts(['env_vars'], basestring, basestring)
     self.ValidateObjectLists(
-        ['configurations'], TestConfiguration, required=True,
-        unique_value_keys=['config_name'])
+        ['configurations'], TestConfiguration, required=True)
     if len(self.configurations) != 1:
       raise Error('Currently only support 1 configuration')
     self.ValidateDataLists(['data'])
-    self.ValidateObjectLists(
-        ['tests'], TestObject, unique_value_keys=['test_name'])
-    self.ValidateEncoding(self.encoding)
-
-    if self.cleanup not in TestRun.VALID_CLEANUP_VALUES:
-      raise Error('Invalid TestCase: %s' % self.__dict__)
+    self.ValidateObjectLists(['tests'], TestObject)
 
     # self.verbose doesn't need to be validated since we only need
     # to evaluate them to True/False which can be done with any type.
@@ -511,63 +457,6 @@ class TestCase(TestRequestMessageBase):
         dictionary.get('configurations', []))
     return super(TestCase, cls).FromDict(dictionary)
 
-  def Equivalent(self, test_case):
-    """Checks to see if the given test case is equivalent.
-
-    Equivalent in this case just means they would produce the same output,
-    not that they are completely equal.
-
-    Args:
-      test_case: The new test case being considered.
-
-    Returns:
-      True if the given test case could use the results from this request.
-    """
-    # All of the following values must be the same for the test output to be
-    # equal.
-    equal_keys = [
-        'data',
-        'encoding',
-        'env_vars',
-        'tests',
-        'verbose',
-    ]
-
-    for equal_key in equal_keys:
-      if getattr(self, equal_key) != getattr(test_case, equal_key):
-        return False
-
-    # The configs must be in the same order before we can begin to compare them.
-    def sort_configs(x, y):
-      return cmp(x.config_name, y.config_name)
-
-    sorted_configs = sorted(test_case.configurations, sort_configs)
-    self_sorted_configs = sorted(self.configurations, sort_configs)
-
-    if (self_sorted_configs != sorted_configs):
-      return False
-
-    # Keys that have no impact on the test output and can be safely ignored.
-    ignored_keys = [
-        'cleanup',
-        'label',
-        'restart_on_failure',
-        'requestor',
-        'test_case_name',
-        'working_dir',
-    ]
-
-    # A sanity check to ensure all values were considered. If a new value is
-    # added to TestRequest and not added here, the TestRequest tests should
-    # fail here.
-    examined_keys = set(['configurations'] + equal_keys + ignored_keys)
-    missing_keys = examined_keys.symmetric_difference(
-        set(test_case.__dict__))
-    if missing_keys:
-      raise Error(missing_keys)
-
-    return True
-
 
 class TestRun(TestRequestMessageBase):
   """Contains results of a task execution.
@@ -579,77 +468,41 @@ class TestRun(TestRequestMessageBase):
   local_test_runner.py. The user does not interact with this API.
 
   Attributes:
-    test_run_name: The name of the test run.
     env_vars: An optional dictionary for environment variables.
     configuration: An optional configuration object for this test run.
     data: An optional 'data list' for this test run.
-    working_dir: An optional path string for where to download/run tests. This
-        must NOT be an absolute path.
     tests: optional(!?) list of TestObject for this test run.
-    instance_index: An optional integer specifying the zero based index of this
-        test run instance of the given configuration. Defaults to None. Must be
-        specified if num_instances is specified.
-    num_instances: An optional integer specifying the number of test run
-        instances of this configuration that have been shared. Defaults to None.
-        Must be greater than instance_index. Must be specified if instance_index
-        is specified.
     result_url: The URL where to post the results of this test run.
     ping_url: The URL that tells the test run where to ping to let the server
         know that it is still active.
     ping_delay: The amount of time to wait between pings (in seconds).
-    cleanup: The key to access the test run's cleanup string.
-    restart_on_failure: An optional value indicating if the machine running the
-        tests should restart if any of the tests fail.
-    encoding: The character encoding to use. Default to 'utf-8' and is
-        recommended.
   """
-  VALID_CLEANUP_VALUES = (None, '', 'zip', 'data', 'root')
-
-  def __init__(self, test_run_name=None, env_vars=None, configuration=None,
-               data=None, working_dir=None, tests=None, instance_index=0,
-               num_instances=1, result_url=None, ping_url=None,
-               ping_delay=None, cleanup=None, restart_on_failure=None,
-               encoding='utf-8', **kwargs):
+  def __init__(self, env_vars=None, configuration=None, data=None, tests=None,
+               result_url=None, ping_url=None, ping_delay=None, **kwargs):
     super(TestRun, self).__init__(**kwargs)
-    self.test_run_name = test_run_name
     self.env_vars = env_vars.copy() if env_vars else {}
     self.configuration = configuration
     self.data = data[:] if data else []
-    self.working_dir = working_dir
     self.tests = tests[:] if tests else []
-    self.instance_index = instance_index
-    self.num_instances = num_instances
     self.result_url = result_url
     self.ping_url = ping_url
     self.ping_delay = ping_delay
-    self.cleanup = cleanup
-    self.restart_on_failure = restart_on_failure
-    self.encoding = encoding
     self.Validate()
 
   def Validate(self):
     """Raises if the current content is not valid."""
-    self.ValidateValues(['test_run_name'], basestring, required=True)
     self.ValidateDicts(['env_vars'], basestring, basestring)
     self.ValidateUrl(self.result_url)
     self.ValidateUrl(self.ping_url)
     self.ValidateValues(['ping_delay'], (int, long), required=True)
     self.ValidateDataLists(['data'])
-    self.ValidateObjectLists(
-        ['tests'], TestObject, unique_value_keys=['test_name'])
+    self.ValidateObjectLists(['tests'], TestObject)
     self.ValidateValues(
-        ['working_dir', 'result_url', 'ping_url'], basestring)
-    self.ValidateValues(['instance_index', 'num_instances'], (int, long))
-    self.ValidateEncoding(self.encoding)
+        ['result_url', 'ping_url'], basestring)
 
     if (not self.configuration or
         not isinstance(self.configuration, TestConfiguration) or
-        self.ping_delay < 0 or
-        self.cleanup not in TestRun.VALID_CLEANUP_VALUES or
-        (self.instance_index is not None and self.num_instances is None) or
-        (self.num_instances is not None and self.instance_index is None) or
-        (self.num_instances is not None and
-         self.instance_index >= self.num_instances)):  # zero based index.
+        self.ping_delay < 0):
       raise Error('Invalid TestRun: %s' % self.__dict__)
 
     self.configuration.Validate()
