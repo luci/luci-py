@@ -743,8 +743,16 @@ class TestRequestHandler(auth.AuthenticatingHandler):
       logging.error(message)
       self.abort(400, message)
 
+    # If the priority is below 100, make the the user has right to do so.
+    if request_properties['priority'] < 100 and not acl.is_bot_or_admin():
+      # Silently drop the priority of normal users.
+      request_properties['priority'] = 100
+
     _, result_summary = task_scheduler.make_request(request_properties)
     out = {
+      # Return the priority actually used. This enables the client code to print
+      # a warning if the priority was dynamically lowered.
+      'priority': request_properties['priority'],
       'test_case_name': result_summary.name,
       'test_keys': [
         {

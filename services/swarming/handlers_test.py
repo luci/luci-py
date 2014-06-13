@@ -136,6 +136,7 @@ class AppTest(test_case.TestCase):
         {
           'config_name': 'X',
           'dimensions': {'os': 'Amiga'},
+          'priority': 10,
         },
       ],
       'test_case_name': name,
@@ -946,16 +947,14 @@ class AppTest(test_case.TestCase):
     self.app.get('/user/tasks', status=200)
     self.app.get('/user/task/12345', status=404)
 
-  def test_add_task_and_list(self):
-    # Add a task via the bot API, then assert it can be viewed.
-    task = self.client_create_task('hi')
-
+  def _check_task(self, task, priority):
     # The value is using both timestamp and random value, so it is not
     # deterministic by definition.
     key = task['test_keys'][0].pop('test_key')
     self.assertTrue(int(key, 16))
     self.assertEqual('0', key[-1])
     expected = {
+      u'priority': priority,
       u'test_case_name': u'hi',
       u'test_keys': [
         {
@@ -966,6 +965,26 @@ class AppTest(test_case.TestCase):
       ],
     }
     self.assertEqual(expected, task)
+    return key
+
+  def test_add_task_admin(self):
+    self._ReplaceCurrentUser(ADMIN_EMAIL)
+    task = self.client_create_task('hi')
+    self._check_task(task, 10)
+
+  def test_add_task_bot(self):
+    task = self.client_create_task('hi')
+    # The bot has access to use high priority. By default on dev server
+    # localhost is whitelisted as a bot.
+    self._check_task(task, 10)
+
+  def test_add_task_and_list_user(self):
+    # Add a task via the API as a user, then assert it can be viewed.
+    self._ReplaceCurrentUser(USER_EMAIL)
+    task = self.client_create_task('hi')
+    # Since the priority 10 was too high for a user (not an admin, neither a
+    # bot), it was reset to 100.
+    key = self._check_task(task, 100)
 
     self._ReplaceCurrentUser(ADMIN_EMAIL)
     self.app.get('/user/tasks', status=200)
