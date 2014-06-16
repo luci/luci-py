@@ -224,12 +224,7 @@ def validate_and_fix_attributes(attributes):
         raise test_request_message.Error(
             'Invalid value for %s: %s\n%s' % (key, value, attributes))
 
-    elif key == 'id':
-      if not isinstance(value, basestring):
-        raise test_request_message.Error(
-            'Invalid value for %s: %s\n%s' % (key, value, attributes))
-
-    elif key in ('ip', 'tag', 'version'):
+    elif key in ('id', 'ip', 'tag', 'version'):
       if not isinstance(value, basestring):
         raise test_request_message.Error(
             'Invalid value for %s: %s\n%s' % (key, value, attributes))
@@ -251,4 +246,3 @@ def validate_and_fix_attributes(attributes):
   if 'id' not in attributes:
     raise test_request_message.Error('Missing mandatory attribute: id')
   attributes.setdefault('try_count', 0)
-  return attributes

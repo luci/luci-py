@@ -177,13 +177,13 @@ def convert_test_case(data):
 
 def request_work_item(attributes, server_url, remote_addr):
   # TODO(maruel): Split it out a little.
-  attribs = bot_management.validate_and_fix_attributes(attributes)
+  bot_management.validate_and_fix_attributes(attributes)
   response = bot_management.check_version(attributes, server_url)
   if response:
     return response
 
-  dimensions = attribs['dimensions']
-  bot_id = attribs['id'] or dimensions['hostname']
+  dimensions = attributes['dimensions']
+  bot_id = attributes['id'] or dimensions['hostname']
   # Note its existence at two places, one for stats at 1 minute resolution, the
   # other for the list of known bots.
   stats.add_entry(action='bot_active', bot_id=bot_id, dimensions=dimensions)
@@ -193,14 +193,14 @@ def request_work_item(attributes, server_url, remote_addr):
   bot_management.tag_bot_seen(
       bot_id,
       dimensions.get('hostname', bot_id),
-      attribs['ip'],
+      attributes['ip'],
       remote_addr,
       dimensions,
-      attribs['version'])
+      attributes['version'])
 
   request, run_result = task_scheduler.bot_reap_task(dimensions, bot_id)
   if not request:
-    try_count = attribs['try_count'] + 1
+    try_count = attributes['try_count'] + 1
     return {
       'come_back': task_scheduler.exponential_backoff(try_count),
       'try_count': try_count,
