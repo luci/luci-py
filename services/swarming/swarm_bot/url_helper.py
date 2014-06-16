@@ -26,8 +26,40 @@ QUERY_INDEX = 4
 URL_OPEN_TIMEOUT = 5 * 60
 
 
+class XsrfRemote(object):
+  """Transparently adds XSRF token to requests."""
+
+  def __init__(self, url):
+    self.url = url.rstrip('/')
+    self.token = None
+    self.max_tries = 40
+
+  def url_read(self, resource, **kwargs):
+    url = self.url + resource
+    if kwargs.get('method') == 'GET':
+      return UrlOpen(url, max_tries=self.max_tries, **kwargs)
+
+    if not self.token:
+      self.token = self.refresh_token()
+    headers = {'X-XSRF-Token': self.token}
+    resp = UrlOpen(url, headers=headers, max_tries=self.max_tries, **kwargs)
+    if not resp:
+      # This includes 403 because the XSRF token expired. Renew the token.
+      # TODO(maruel): It'd be great if it were transparent.
+      headers = {'X-XSRF-Token': self.refresh_token()}
+      resp = UrlOpen(url, headers=headers, max_tries=self.max_tries, **kwargs)
+    return resp
+
+  def refresh_token(self):
+    """Returns a fresh token. Necessary as the token may expire after an hour.
+    """
+    url = self.url + '/auth/api/v1/accounts/self/xsrf_token'
+    self.token = UrlOpen(url, max_tries=self.max_tries, method='GET')
+    return self.token
+
+
 def UrlOpen(url, data=None, files=None, max_tries=5, wait_duration=None,
-            method='POST'):
+            method='POST', headers=None):
   """Attempts to open the given url multiple times.
 
   UrlOpen will attempt to open the the given url several times, stopping
@@ -47,6 +79,7 @@ def UrlOpen(url, data=None, files=None, max_tries=5, wait_duration=None,
         random value between 0.1 and 10 will be chosen each time (with
         exponential back off to give later retries a longer wait).
     method: Indicates if the request should be a GET or POST request.
+    headers: List of HTTP headers to add.
 
   Returns:
     The reponse from the url contacted. If it failed to connect or is given
@@ -86,17 +119,18 @@ def UrlOpen(url, data=None, files=None, max_tries=5, wait_duration=None,
         request = urllib2.Request(url, data=body)
         request.add_header('Content-Type', content_type)
         request.add_header('Content-Length', len(body))
-
-        url_response = urllib2.urlopen(request, timeout=URL_OPEN_TIMEOUT).read()
       elif method == 'POST':
         # Simply specifying data to urlopen makes it a POST.
-        url_response = urllib2.urlopen(url, encoded_data,
-                                       timeout=URL_OPEN_TIMEOUT).read()
+        request = urllib2.Request(url, encoded_data)
       else:
         url_parts = list(urlparse.urlparse(url))
         url_parts[QUERY_INDEX] = encoded_data
         url = urlparse.urlunparse(url_parts)
-        url_response = urllib2.urlopen(url, timeout=URL_OPEN_TIMEOUT).read()
+        request = urllib2.Request(url)
+
+      for header, value in (headers or {}).iteritems():
+        request.add_header(header, value)
+      url_response = urllib2.urlopen(request, timeout=URL_OPEN_TIMEOUT).read()
     except urllib2.HTTPError as e:
       if e.code >= 500:
         # The HTTPError was due to a server error, so retry the attempt.
