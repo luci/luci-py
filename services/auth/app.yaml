@@ -1,0 +1,42 @@
+application: chrome-infra-auth-dev
+module: default
+version: 1
+runtime: python27
+api_version: 1
+threadsafe: true
+
+handlers:
+- url: /.*
+  script: frontend.main.app
+  secure: always
+
+builtins:
+- appstats: on
+- remote_api: on
+
+inbound_services:
+- warmup
+
+# https://developers.google.com/appengine/docs/python/tools/libraries27
+# As the doc says, serious applications should specify the third party versions.
+libraries:
+- name: jinja2
+  version: "2.6"
+- name: webapp2
+  version: "2.5.2"
+- name: webob
+  version: "1.2.3"
+- name: yaml
+  version: "3.10"
+
+skip_files:
+- ^(.*/)?#.*#
+- ^(.*/)?.*~
+- ^(.*/)?.*\.py[co]
+- ^(.*/)?\..*
+- ^tests.*
+- ^tools.*
+- ^(.*/)?.*\.orig
+- ^(.*/)?.*\.rej
+- ^[A-Z]+
+- ^[A-Z]+\.[a-z]+

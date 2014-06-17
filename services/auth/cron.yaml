@@ -1,0 +1,5 @@
+cron:
+- description: Mail exception report via ereporter2
+  target: backend
+  url: /internal/cron/ereporter2/mail
+  schedule: every 1 hours synchronized
