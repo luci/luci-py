@@ -75,8 +75,6 @@
         <th>Task</th>
         <th>Duration</th>
         <th>Result</th>
-        <th>Failure</th>
-        <th>Idle before previous task</th>
       </tr>
     </thead>
     <tbody>
@@ -87,8 +85,6 @@
           </td>
           <td align=right>{{run_result.duration()|timedeltaformat}}</td>
           <td>{{run_result.to_string()}}</td>
-          <td>{{run_result.failure}}</td>
-          <td align=right>TODO</td>
         </tr>
       {% endfor %}
     </tbody>

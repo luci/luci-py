@@ -107,7 +107,7 @@ class _TaskResultCommon(ndb.Model):
 
   # Records that the task failed, e.g. one process had a non-zero exit code. The
   # task may be retried if desired to weed out flakiness.
-  failure = ndb.BooleanProperty(default=False)
+  failure = ndb.ComputedProperty(lambda self: any(self.exit_codes or []))
 
   # Internal infrastructure failure, in which case the task should be retried
   # automatically if possible.
@@ -268,6 +268,9 @@ class TaskResultSummary(_TaskResultCommon):
     _TaskResultCommon.
     """
     for property_name in _TaskResultCommon._properties:
+      if isinstance(
+          getattr(_TaskResultCommon, property_name), ndb.ComputedProperty):
+        continue
       setattr(self, property_name, getattr(rhs, property_name))
     # Include explicit support for 'state' and 'try_number'.
     # pylint: disable=W0201

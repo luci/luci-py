@@ -264,6 +264,55 @@ class TaskSchedulerApiTest(test_case.TestCase):
     ]
     self.assertEqual(expected, [t.to_dict() for t in run_results])
 
+  def test_exit_code_failure(self):
+    data = _gen_request_data(
+        properties=dict(dimensions={u'OS': u'Windows-3.1.1'}))
+    request, _result_summary = task_scheduler.make_request(data)
+    reaped_request, run_result = task_scheduler.bot_reap_task(
+        {'OS': 'Windows-3.1.1'}, 'localhost')
+    self.assertEqual(request, reaped_request)
+    data = {
+      'exit_codes': [0, 1],
+      'outputs': [],
+    }
+    task_scheduler.bot_update_task(run_result.key, data, 'localhost')
+    result_summary, run_results = get_results(request.key)
+
+    expected = {
+      'abandoned_ts': None,
+      'bot_id': u'localhost',
+      'created_ts': self.now,
+      'completed_ts': self.now,
+      'exit_codes': [0, 1],
+      'failure': True,
+      'internal_failure': False,
+      'modified_ts': self.now,
+      'name': u'Request name',
+      'outputs': [],
+      'started_ts': self.now,
+      'state': State.COMPLETED,
+      'try_number': 1,
+      'user': u'Jesus',
+    }
+    self.assertEqual(expected, result_summary.to_dict())
+
+    expected = [
+      {
+        'abandoned_ts': None,
+        'bot_id': u'localhost',
+        'completed_ts': self.now,
+        'exit_codes': [0, 1],
+        'failure': True,
+        'internal_failure': False,
+        'modified_ts': self.now,
+        'outputs': [],
+        'started_ts': self.now,
+        'state': State.COMPLETED,
+        'try_number': 1,
+      },
+    ]
+    self.assertEqual(expected, [t.to_dict() for t in run_results])
+
   def test_make_request(self):
     data = _gen_request_data(
         properties=dict(dimensions={u'OS': u'Windows-3.1.1'}))
