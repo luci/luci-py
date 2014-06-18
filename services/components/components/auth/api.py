@@ -2,7 +2,14 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
-"""Defines main bulk of public API of auth component."""
+"""Defines main bulk of public API of auth component.
+
+Functions defined here can be safely called often (multiple times per request),
+since they are using in-memory read only cache of Auth DB entities.
+
+Functions that operate on most current state of DB are in model.py. And they are
+generally should not be used outside of Auth components implementation.
+"""
 
 # Pylint doesn't like ndb.transactional(...).
 # pylint: disable=E1120
@@ -23,12 +30,10 @@ from . import model
 __all__ = [
   'AuthenticationError',
   'AuthorizationError',
-  'bootstrap_group',
   'Error',
   'get_current_identity',
   'get_secret',
   'is_admin',
-  'is_empty_group',
   'is_group_member',
   'public',
   'require',
@@ -90,7 +95,7 @@ SecretKey = collections.namedtuple('SecretKey', ['name', 'scope'])
 
 
 class AuthDB(object):
-  """A read only in-memory database of ACL configuration for a service.
+  """A read only in-memory database of auth configuration of a service.
 
   Holds user groups, all secret keys (local and global) and OAuth2
   configuration.
@@ -254,7 +259,7 @@ def get_request_cache():
 
 
 def fetch_auth_db(known_version=None):
-  """Returns instance of AuthDB with ACL rules for local service.
+  """Returns instance of AuthDB.
 
   If |known_version| is None, this function always returns a new instance.
 
@@ -280,14 +285,7 @@ def fetch_auth_db(known_version=None):
     # initial loading.
     global _lazy_bootstrap_ran
     if not _lazy_bootstrap_ran:
-      # Freshly created AuthServiceConfig contains single 'Allow all' rule that
-      # basically leaves service wide open for everyone. The idea is that
-      # service administrator then goes to ACL management UI and sets up correct
-      # restrictive ACL rules and Groups. Without 'Allow all' rule he/she won't
-      # be able to use management UI.
-      logging.debug('Ensuring AuthDB root entity exists')
       model.AuthGlobalConfig.get_or_insert(root_key.string_id())
-      # Update _lazy_bootstrap_ran only when DB calls successfully finish.
       _lazy_bootstrap_ran = True
 
   @ndb.transactional(propagation=ndb.TransactionOptions.INDEPENDENT)
@@ -408,8 +406,8 @@ def get_request_auth_db():
   """Returns instance of AuthDB from request-local cache.
 
   In a context of a single request this function always returns same
-  instance of AuthDB. So as long as request runs, ACL rules stay consistent and
-  don't change beneath your feet.
+  instance of AuthDB. So as long as request runs, auth config stay consistent
+  and don't change beneath your feet.
 
   Effectively request handler uses a snapshot of AuthDB at the moment request
   starts. If it somehow makes a call that initiates another request that uses
@@ -548,30 +546,3 @@ def require(callback):
 def is_decorated(func):
   """Return True if |func| is decorated by @public or @require decorators."""
   return hasattr(func, '__auth_public') or hasattr(func, '__auth_require')
-
-
-def is_empty_group(group):
-  """Returns True if group is missing or completely empty."""
-  group = model.group_key(group).get()
-  return not group or not(group.members or group.globs or group.nested)
-
-
-@ndb.transactional
-def bootstrap_group(group, identity, description):
-  """Makes a group (if not yet exists) and adds an |identity| to it as a member.
-
-  Returns True if added |identity| to |group|, False if it is already there.
-  """
-  key = model.group_key(group)
-  entity = key.get()
-  if entity and identity in entity.members:
-    return False
-  if not entity:
-    entity = model.AuthGroup(
-        key=key,
-        description=description,
-        created_by=identity,
-        modified_by=identity)
-  entity.members.append(identity)
-  entity.put()
-  return True

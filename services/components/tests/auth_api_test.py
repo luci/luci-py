@@ -7,7 +7,6 @@
 # pylint: disable=W0212,W0612,W0613
 
 
-import datetime
 import Queue
 import sys
 import threading
@@ -575,29 +574,6 @@ class ApiTest(test_case.TestCase):
     self.assertTrue(api.is_decorated(api.public(lambda: None)))
     self.assertTrue(
         api.is_decorated(api.require(lambda: True)(lambda: None)))
-
-  def test_group_bootstrap(self):
-    ident = model.Identity(model.IDENTITY_USER, 'joe@example.com')
-    mocked_now = datetime.datetime(2014, 01, 01)
-
-    self.mock_ndb_now(mocked_now)
-
-    added = api.bootstrap_group('some-group', ident, 'Blah description')
-    self.assertTrue(added)
-
-    ent = model.group_key('some-group').get()
-    self.assertEqual(
-        {
-          'created_by': ident,
-          'created_ts': mocked_now,
-          'description': 'Blah description',
-          'globs': [],
-          'members': [ident],
-          'modified_by': ident,
-          'modified_ts': mocked_now,
-          'nested': []
-        },
-        ent.to_dict())
 
 
 if __name__ == '__main__':

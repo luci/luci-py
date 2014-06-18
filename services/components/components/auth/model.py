@@ -46,12 +46,17 @@ from components import datastore_utils
 __all__ = [
   'ADMIN_GROUP',
   'Anonymous',
+  'bootstrap_group',
+  'find_group_dependency_cycle',
+  'find_referencing_groups',
+  'get_missing_groups',
   'Identity',
   'IDENTITY_ANONYMOUS',
   'IDENTITY_BOT',
   'IDENTITY_SERVICE',
   'IDENTITY_USER',
   'IdentityProperty',
+  'is_empty_group',
 ]
 
 
@@ -251,6 +256,10 @@ class AuthGlobalConfig(ndb.Model):
   oauth_additional_client_ids = ndb.StringProperty(repeated=True, indexed=False)
 
 
+################################################################################
+## Groups.
+
+
 class AuthGroup(ndb.Model, datastore_utils.SerializableModelMixin):
   """A group of identities, entity id is a group name.
 
@@ -295,6 +304,116 @@ class AuthGroup(ndb.Model, datastore_utils.SerializableModelMixin):
 def group_key(group):
   """Returns ndb.Key for AuthGroup entity."""
   return ndb.Key(AuthGroup, group, parent=ROOT_KEY)
+
+
+def is_empty_group(group):
+  """Returns True if group is missing or completely empty."""
+  group = group_key(group).get()
+  return not group or not(group.members or group.globs or group.nested)
+
+
+@ndb.transactional
+def bootstrap_group(group, identity, description):
+  """Makes a group (if not yet exists) and adds an |identity| to it as a member.
+
+  Returns True if added |identity| to |group|, False if it is already there.
+  """
+  key = group_key(group)
+  entity = key.get()
+  if entity and identity in entity.members:
+    return False
+  if not entity:
+    entity = AuthGroup(
+        key=key,
+        description=description,
+        created_by=identity,
+        modified_by=identity)
+  entity.members.append(identity)
+  entity.put()
+  return True
+
+
+def find_referencing_groups(group):
+  """Finds groups that reference the specified group as nested group.
+
+  Used to verify that |group| is safe to delete, i.e. no other group is
+  depending on it.
+
+  Returns:
+    Set of names of referencing groups.
+  """
+  referencing_groups = AuthGroup.query(
+      AuthGroup.nested == group, ancestor=ROOT_KEY).fetch(keys_only=True)
+  return set(key.id() for key in referencing_groups)
+
+
+def get_missing_groups(groups):
+  """Given a list of group names, returns a list of groups that do not exist."""
+  # We need to iterate over |groups| twice. It won't work if |groups|
+  # is a generator. So convert to list first.
+  groups = list(groups)
+  entities = ndb.get_multi(group_key(name) for name in groups)
+  return [name for name, ent in zip(groups, entities) if not ent]
+
+
+def find_group_dependency_cycle(group):
+  """Searches for dependency cycle between nested groups.
+
+  Traverses the dependency graph starting from |group|, fetching all necessary
+  groups from datastore along the way.
+
+  Args:
+    group: instance of AuthGroup to start traversing from. It doesn't have to be
+        committed to Datastore itself (but all its nested groups should be
+        there already).
+
+  Returns:
+    List of names of groups that form a cycle or empty list if no cycles.
+  """
+  # It is a depth-first search on a directed graph with back edge detection.
+  # See http://www.cs.nyu.edu/courses/summer04/G22.1170-001/6a-Graphs-More.pdf
+
+  # Cache of already fetched groups.
+  groups = {group.key.id(): group}
+
+  # List of groups that are completely explored (all subtree is traversed).
+  visited = []
+  # Stack of groups that are being explored now. In case cycle is detected
+  # it would contain that cycle.
+  visiting = []
+
+  def visit(group):
+    """Recursively explores |group| subtree, returns True if finds a cycle."""
+    assert group not in visiting
+    assert group not in visited
+
+    # Load bodies of nested groups not seen so far into |groups|.
+    entities = ndb.get_multi(
+        group_key(name) for name in group.nested if name not in groups)
+    groups.update({entity.key.id(): entity for entity in entities if entity})
+
+    visiting.append(group)
+    for nested in group.nested:
+      obj = groups.get(nested)
+      # Do not crash if non-existent group is referenced somehow.
+      if not obj:
+        continue
+      # Cross edge. Can happen in diamond-like graph, not a cycle.
+      if obj in visited:
+        continue
+      # Back edge: |group| references its own ancestor -> cycle.
+      if obj in visiting:
+        return True
+      # Explore subtree.
+      if visit(obj):
+        return True
+    visiting.pop()
+
+    visited.append(group)
+    return False
+
+  visit(group)
+  return [group.key.id() for group in visiting]
 
 
 ################################################################################

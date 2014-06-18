@@ -3,6 +3,7 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
+import datetime
 import sys
 import unittest
 
@@ -215,6 +216,123 @@ class AuthSecretTest(test_case.TestCase):
     ent.update('new-secret-2', ident, keep_previous=True, retention=2)
     self.assertEqual(ent.values, ['new-secret-2', 'new-secret-1', old_secret])
     self.assertEqual(ent.modified_by, ident)
+
+
+def make_group(group_id, nested=(), store=True):
+  """Makes a new AuthGroup to use in test, puts it in datastore."""
+  entity = model.AuthGroup(key=model.group_key(group_id), nested=nested)
+  if store:
+    entity.put()
+  return entity
+
+
+class GroupBootstrapTest(test_case.TestCase):
+  """Test for bootstrap_group function."""
+
+  def test_group_bootstrap(self):
+    ident = model.Identity(model.IDENTITY_USER, 'joe@example.com')
+
+    mocked_now = datetime.datetime(2014, 01, 01)
+    self.mock(model.ndb.DateTimeProperty, '_now', lambda _: mocked_now)
+    self.mock(model.ndb.DateProperty, '_now', lambda _: mocked_now.date())
+
+    added = model.bootstrap_group('some-group', ident, 'Blah description')
+    self.assertTrue(added)
+
+    ent = model.group_key('some-group').get()
+    self.assertEqual(
+        {
+          'created_by': ident,
+          'created_ts': mocked_now,
+          'description': 'Blah description',
+          'globs': [],
+          'members': [ident],
+          'modified_by': ident,
+          'modified_ts': mocked_now,
+          'nested': []
+        },
+        ent.to_dict())
+
+
+class FindGroupReferencesTest(test_case.TestCase):
+  """Tests for find_referencing_groups function."""
+
+  def test_missing_group(self):
+    """Non existent group is not references by anything."""
+    self.assertEqual(set(), model.find_referencing_groups('Missing group'))
+
+  def test_not_referenced(self):
+    """Existing orphaned groups is not referenced."""
+    # Some mix of groups with references.
+    make_group('Group 1')
+    make_group('Group 2')
+    make_group('Group 3', nested=('Group 1', 'Group 2'))
+    make_group('Group 4', nested=('Group 3',))
+
+    # And a group that is not referenced by anything.
+    make_group('Standalone')
+
+    # Should not be referenced.
+    self.assertEqual(set(), model.find_referencing_groups('Standalone'))
+
+  def test_referenced_as_nested_group(self):
+    """If group is nested into another group, it's referenced."""
+    # Some mix of groups with references, including group to be tested.
+    make_group('Referenced')
+    make_group('Group 1')
+    make_group('Group 2', nested=('Referenced', 'Group 1'))
+    make_group('Group 3', nested=('Group 2',))
+    make_group('Group 4', nested=('Referenced',))
+
+    # Only direct references are returned.
+    self.assertEqual(
+        set(['Group 2', 'Group 4']),
+        model.find_referencing_groups('Referenced'))
+
+
+class FindDependencyCycleTest(test_case.TestCase):
+  """Tests for find_group_dependency_cycle function."""
+
+  def test_empty(self):
+    group = make_group('A', store=False)
+    self.assertEqual([], model.find_group_dependency_cycle(group))
+
+  def test_no_cycles(self):
+    make_group('A')
+    make_group('B', nested=('A',))
+    group = make_group('C', nested=('B',), store=False)
+    self.assertEqual([], model.find_group_dependency_cycle(group))
+
+  def test_self_reference(self):
+    group = make_group('A', nested=('A',), store=False)
+    self.assertEqual(['A'], model.find_group_dependency_cycle(group))
+
+  def test_simple_cycle(self):
+    make_group('A', nested=('B',))
+    group = make_group('B', nested=('A',), store=False)
+    self.assertEqual(['B', 'A'], model.find_group_dependency_cycle(group))
+
+  def test_long_cycle(self):
+    make_group('A', nested=('B',))
+    make_group('B', nested=('C',))
+    make_group('C', nested=('D',))
+    group = make_group('D', nested=('A',), store=False)
+    self.assertEqual(
+        ['D', 'A', 'B', 'C'], model.find_group_dependency_cycle(group))
+
+  def test_diamond_no_cycles(self):
+    make_group('A')
+    make_group('B1', nested=('A',))
+    make_group('B2', nested=('A',))
+    group = make_group('C', nested=('B1', 'B2'), store=False)
+    self.assertEqual([], model.find_group_dependency_cycle(group))
+
+  def test_diamond_with_cycles(self):
+    make_group('A', nested=('C',))
+    make_group('B1', nested=('A',))
+    make_group('B2', nested=('A',))
+    group = make_group('C', nested=('B1', 'B2'), store=False)
+    self.assertEqual(['C', 'B1', 'A'], model.find_group_dependency_cycle(group))
 
 
 if __name__ == '__main__':

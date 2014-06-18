@@ -11,7 +11,6 @@ import webapp2
 from google.appengine.ext import ndb
 
 from components.auth import api
-from components.auth import groups
 from components.auth import handler
 from components.auth import model
 
@@ -168,7 +167,7 @@ class GroupHandler(ApiHandler):
       # If adding new nested groups, need to ensure they exist.
       added_nested_groups = set(params['nested']) - set(entity.nested)
       if added_nested_groups:
-        missing = groups.get_missing_groups(added_nested_groups)
+        missing = model.get_missing_groups(added_nested_groups)
         if missing:
           return None, {
             'http_code': 409,
@@ -182,7 +181,7 @@ class GroupHandler(ApiHandler):
 
       # Now make sure updated group is not a part of new group dependency cycle.
       if added_nested_groups:
-        cycle = groups.find_dependency_cycle(entity)
+        cycle = model.find_group_dependency_cycle(entity)
         if cycle:
           return None, {
             'http_code': 409,
@@ -234,7 +233,7 @@ class GroupHandler(ApiHandler):
         return False, {'text': 'Such group already exists'}
 
       # All nested groups should exist.
-      missing = groups.get_missing_groups(entity.nested)
+      missing = model.get_missing_groups(entity.nested)
       if missing:
         return False, {
           'text': 'Referencing a nested group that doesn\'t exist',
@@ -272,7 +271,6 @@ class GroupHandler(ApiHandler):
     'HTTP Error 409: Conflict', providing information about what depends on
     this group in the response body.
     """
-    # Ensure group exists before running heavy 'find_references' call.
     entity = model.group_key(group).get()
     expected_ts = self.request.headers.get('If-Unmodified-Since')
     if entity is None:
@@ -289,8 +287,8 @@ class GroupHandler(ApiHandler):
         utils.datetime_to_rfc2822(entity.modified_ts) != expected_ts):
       self.abort_with_error(412, text='Group was modified by someone else')
 
-    # Check the group is not used, it's a heavy call that enumerates all rules.
-    referencing_groups = groups.find_references(group)
+    # Check the group is not used by other groups.
+    referencing_groups = model.find_referencing_groups(group)
     if referencing_groups:
       self.abort_with_error(
           http_code=409,
