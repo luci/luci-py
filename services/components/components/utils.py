@@ -23,6 +23,7 @@ from email import utils as email_utils
 from google.appengine.api import memcache
 from google.appengine.api import modules
 
+THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 
 DATETIME_FORMAT = u'%Y-%m-%d %H:%M:%S'
 DATE_FORMAT = u'%Y-%m-%d'
@@ -262,3 +263,14 @@ def encode_to_json(data):
       sort_keys=True,
       separators=(',', ':'),
       encoding='utf-8')
+
+
+## Hacks
+
+
+def fix_protobuf_package():
+  """Modifies 'google' package to include path to 'google.protobuf' package."""
+  import google
+  protobuf_pkg = os.path.join(THIS_DIR, 'third_party', 'protobuf', 'google')
+  if protobuf_pkg not in google.__path__:
+    google.__path__.append(protobuf_pkg)
