@@ -705,16 +705,18 @@ class AppTest(test_case.TestCase):
       self.app.get(url, status=200)
 
   def testRemoteErrorHandler(self):
-    self.assertEqual(0, errors.SwarmError.query().count())
+    self.app.get('/restricted/errors', status=403)
 
     error_message = 'error message'
-
     response = self.app.post('/remote_error', {'m': error_message})
     self.assertResponse(response, '200 OK', 'Success.')
 
     self.assertEqual(1, errors.SwarmError.query().count())
     error = errors.SwarmError.query().get()
     self.assertEqual(error.message, error_message)
+
+    self._ReplaceCurrentUser(ADMIN_EMAIL)
+    self.app.get('/restricted/errors', status=200)
 
   def testRunnerPingFail(self):
     # Try with an invalid runner key

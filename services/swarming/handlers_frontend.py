@@ -562,6 +562,22 @@ class BotHandler(auth.AuthenticatingHandler):
     self.response.out.write(template.render('restricted_bot.html', params))
 
 
+class ErrorsHandler(auth.AuthenticatingHandler):
+  @auth.require(acl.is_privileged_user)
+  def get(self):
+    limit = int(self.request.get('limit', 100))
+    cursor = datastore_query.Cursor(urlsafe=self.request.get('cursor'))
+    errors_found, cursor, more = errors.SwarmError.query().order(
+        -errors.SwarmError.created).fetch_page(limit, start_cursor=cursor)
+    params = {
+      'cursor': cursor.urlsafe() if cursor and more else None,
+      'errors': errors_found,
+      'limit': limit,
+      'now': task_common.utcnow(),
+    }
+    self.response.out.write(template.render('restricted_errors.html', params))
+
+
 ### User accessible pages.
 
 
@@ -617,13 +633,8 @@ class TasksHandler(auth.AuthenticatingHandler):
         offset=page_length * (page - 1))
     total_task_count_future = task_request.TaskRequest.query().count_async()
 
-    opts = ndb.QueryOptions(limit=10)
-    errors_found_future = errors.SwarmError.query(
-        default_options=opts).order(-errors.SwarmError.created).fetch_async()
-
     params = {
       'current_page': page,
-      'errors': errors_found_future.get_result(),
       'filter_selects': params.filter_selects_as_html(),
       'is_privileged_user': acl.is_privileged_user(),
       'machine_id_filter': params.machine_id_filter,
@@ -1191,6 +1202,7 @@ def CreateApplication():
       # Privileged user pages.
       ('/restricted/bots', BotsListHandler),
       ('/restricted/bot/<bot_id:.+>', BotHandler),
+      ('/restricted/errors', ErrorsHandler),
 
       # Admin pages.
       ('/restricted/ereporter2/report', Ereporter2ReportHandler),
