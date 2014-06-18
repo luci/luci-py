@@ -7,3 +7,15 @@
     {{k}}: {% if v is string %}{{v}}{% else %}{{v|sort|join(' | ')}}{% endif %}<br>
   {% endfor %}
 {% endmacro %}
+
+{% macro bot_link(bot_id, is_privileged_user) %}
+  {% if bot_id %}
+    {% if is_privileged_user %}
+      <a href="/restricted/bot/{{bot_id}}">{{bot_id}}</a>
+    {% else %}
+      {{bot_id}}
+    {% endif %}
+  {% else %}
+    &#8209;&#8209;
+  {% endif %}
+{% endmacro %}

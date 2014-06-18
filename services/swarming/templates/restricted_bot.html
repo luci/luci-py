@@ -92,10 +92,10 @@
 
   {% if is_admin %}
   <p>
-  <form id="delete_{{bot.id}}" method="post"
-    action="/delete_machine_stats?r={{bot.id}}">
+  <form id="delete_{{bot.key.id()}}" method="post"
+    action="/delete_machine_stats?r={{bot.key.id()}}">
     <button
-      onclick="document.getElementById("delete_{{bot.id}}").submit()">
+      onclick="document.getElementById("delete_{{bot.key.id()}}").submit()">
       Delete
     </button>
   </form>

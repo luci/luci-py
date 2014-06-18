@@ -5,7 +5,9 @@ Use of this source code is governed by the Apache v2.0 license that can be
 found in the LICENSE file. -->
 <head>
   <meta http-equiv="Content-type" content="text/html;charset=UTF-8">
-  <title>{{ title or "Swarming Server" }}</title>
+  <title>
+    {% if title is defined %}{{title}}{% else %}Swarming Server{% endif %}
+  </title>
   <link rel="stylesheet" type="text/css" href="/default.css"/>
   {% block headers %}
   {% endblock %}

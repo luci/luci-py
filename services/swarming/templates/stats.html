@@ -234,6 +234,7 @@
 
 
 {% block body %}
+{% import 'bot_view.html' as bot_view %}
 
   <h1>Statistics</h1>
 
@@ -260,7 +261,7 @@
           {% for user in users %}
             {# TODO(maruel): Keep duration, current_resolution and maybe 'now'.
             #}
-            <li><a href="/stats/user/{{item}}">{{item}}</a></li>
+            <li><a href="/stats/user/{{user}}">{{user}}</a></li>
           {% endfor %}
         </ul>
         {% endif %}
@@ -296,7 +297,7 @@
   <ul>
     {% for bot in bots %}
       {# Get dimensions of each bot aka a mini bots list #}
-      <li><a href="/restricted/bot/{{bot}}">{{bot}}</a></li>
+      <li>{{bot_view.bot_link(bot, true)}}</li>
     {% endfor %}
   </ul>
   {% endif %}

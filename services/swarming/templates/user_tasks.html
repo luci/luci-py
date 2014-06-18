@@ -7,6 +7,7 @@
 
 
 {% block body %}
+{% import 'bot_view.html' as bot_view %}
 
 <h1>User Test Requests</h1>
 {{sorted_by_message|safe}}
@@ -65,21 +66,13 @@ Always sorted by reverse created.
         <td nowrap align=center>{{task.started_ts|datetimeformat}}</td>
         <td nowrap align=center>{{task.ended_ts|datetimeformat}}</td>
         <td nowrap align=right>{{task.duration()|timedeltaformat}}</td>
-        <td nowrap>{{task.bot_id|default('&#8209;&#8209;')}}</td>
+        <td nowrap>{{bot_view.bot_link(task.bot_id, is_privileged_user)}}</td>
       </tr>
     {% endfor %}
   </tbody>
 </table>
 
 <p>Currently on page: {{current_page}} </p>
-<p>Go To Page:
-<select id="new_page"
-  onchange="document.location.href='{{url_no_page}}&page=' + this.value">
-  <option value="">-</option>
-  {% for page in total_pages %}
-    <option value='{{page}}'>{{page}}</option>
-  {% endfor %}
-</select>
-</p>
+{# TODO(maruel): Implement cursor based pagination #}
 
 {% endblock %}

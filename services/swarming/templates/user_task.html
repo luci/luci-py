@@ -95,8 +95,8 @@
       <td>{{task.completed_ts|datetimeformat}}</td>
     </tr>
     <tr>
-      <td>Aborted</td>
-      <td>{{task.aborted_ts|datetimeformat}}</td>
+      <td>Abandoned</td>
+      <td>{{task.abandoned_ts|datetimeformat}}</td>
     </tr>
     <tr>
       <td>Duration</td>
@@ -107,8 +107,8 @@
       <td>{{task.to_string()}} ({{task.state}})</td>
     </tr>
     <tr>
-      <td>Bot id</td>
-      <td>{{task.bot_id}}</td>
+      <td>Bot</td>
+      <td>{{bot_view.bot_link(task.bot_id, is_privileged_user)}}</td>
     </tr>
     <tr>
       <td>Bot dimensions</td>

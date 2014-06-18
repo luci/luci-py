@@ -534,6 +534,7 @@ class BotsListHandler(auth.AuthenticatingHandler):
       'current_version':
           bot_management.get_slave_version(self.request.host_url),
       'dead_machine_cutoff': dead_machine_cutoff,
+      'is_privileged_user': acl.is_privileged_user(),
       'is_admin': acl.is_admin(),
       'now': task_common.utcnow(),
       'selected_sort': sort_by,
@@ -688,6 +689,7 @@ class TaskHandler(auth.AuthenticatingHandler):
       if result.bot_id else None)
     params = {
       'bot': bot,
+      'is_privileged_user': acl.is_privileged_user(),
       'now': task_common.utcnow(),
       'request': request,
       'task': result,

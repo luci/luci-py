@@ -7,6 +7,8 @@
 
 
 {% block body %}
+{% import 'bot_view.html' as bot_view %}
+
 <h1>Known bots</h1>
 <p>Sort By:
 <select id="sort" onchange="document.location.href='?sort_by=' + this.value">
@@ -39,7 +41,7 @@ Current bot version is: {{current_version[:8]}}
   <tbody>
     {% for bot in bots %}
       <tr class="request {% if bot.last_seen < dead_machine_cutoff %}dead_machine{% endif %}">
-        <td><a href="/restricted/bot/{{bot.key.id()}}">{{bot.key.id()}}</a></td>
+        <td>{{bot_view.bot_link(bot.key.id(), is_privileged_user)}}</td>
         <td>
           {% if bot.task %}
           <a href="/user/task/{{bot.task_entity.key_string}}">{{bot.task_entity.name}}</a>
@@ -56,10 +58,10 @@ Current bot version is: {{current_version[:8]}}
         <td>{{bot.version[:8]}}</td>
         {% if is_admin %}
         <td>
-          <form id="delete_{{bot.id}}" method="post"
-            action="/delete_machine_stats?r={{bot.id}}">
+          <form id="delete_{{bot.key.id()}}" method="post"
+            action="/delete_machine_stats?r={{bot.key.id()}}">
             <button
-              onclick="document.getElementById("delete_{{bot.id}}").submit()">
+              onclick="document.getElementById("delete_{{bot.key.id()}}").submit()">
               Delete
             </button>
           </form>
