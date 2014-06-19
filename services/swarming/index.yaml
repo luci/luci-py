@@ -10,11 +10,6 @@ indexes:
 # automatically uploaded to the admin console when you next deploy
 # your application using appcfg.py.
 
-- kind: MachineStats
-  properties:
-  - name: machine_id
-  - name: tag
-
 - kind: TaskResultSummary
   properties:
   - name: failure
