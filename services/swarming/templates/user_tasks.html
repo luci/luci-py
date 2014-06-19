@@ -12,16 +12,24 @@
     border-spacing: 0;
     font-family: monospace;
   }
+
   .layout_table thead {
     background-color: #C0C0C0;
     font-weight:bold;
   }
+
   table.layout_table tbody tr:nth-child(even) {
     background-color: #eeeeee;
   }
-  table.property_table td {
-    padding-left: 1em;
-    padding-right: 1em;
+
+  table.layout_table td:first-child {
+    border-color: black;
+    border-right: thin solid;
+    padding-right: 1.5em;
+  }
+
+  table.layout_table td:nth-child(2) {
+    padding-left: 2em;
   }
 </style>
 <script>
@@ -64,7 +72,7 @@
 <table class=layout_table>
   <thead>
     <tr>
-      <td>Sort</td>
+      <td align=center>Sort</td>
       <td></td>
       <td>Task state</td>
       <td></td>

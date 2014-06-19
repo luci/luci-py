@@ -459,8 +459,9 @@ class TasksHandler(auth.AuthenticatingHandler):
   """Lists all requests and allows callers to manage them."""
   SORT_CHOICES = [
     ('created_ts', 'Created'),
+    ('modified_ts', 'Last updated (Tasks recently active)'),
     ('completed_ts', 'Ended (Completed only)'),
-    ('modified_ts', 'Last updated (all tasks that have been touched)'),
+    ('abandoned_ts', 'Abandoned (We failed you)'),
   ]
 
   # TODO(maruel): Evaluate what the categories the users would like for
@@ -470,6 +471,7 @@ class TasksHandler(auth.AuthenticatingHandler):
       ('all', 'All states'),
       ('pending', 'Pending'),
       ('running', 'Running'),
+      ('pending_running', 'Pending or running'),
     ],
     [
       ('completed', 'Completed'),
@@ -502,8 +504,20 @@ class TasksHandler(auth.AuthenticatingHandler):
       # Revisit according to the user requests.
       state = 'all'
 
-    query = self._get_query(sort, state)
-    tasks, cursor, more = query.fetch_page(limit, start_cursor=cursor)
+    queries, query = self._get_query(sort, state)
+    if queries:
+      # When multiple queries are used, we can't use a cursor.
+      cursor = None
+      more = False
+
+      # Take the first |limit| items for each query. This is not efficient,
+      # worst case is fetching N * limit entities.
+      futures = [q.fetch_async(limit) for q in queries]
+      lists = sum((f.get_result() for f in futures), [])
+      tasks = sorted(lists, key=lambda i: i.created_ts, reverse=True)[:limit]
+    else:
+      # Normal efficient behavior.
+      tasks, cursor, more = query.fetch_page(limit, start_cursor=cursor)
 
     params = {
       'cursor': cursor.urlsafe() if cursor and more else None,
@@ -522,51 +536,64 @@ class TasksHandler(auth.AuthenticatingHandler):
     self.response.out.write(template.render('user_tasks.html', params))
 
   def _get_query(self, sort, state):
-    """Returns a TaskResultSummary query."""
+    """Returns one or many TaskResultSummary queries."""
     order = datastore_query.PropertyOrder(
         sort, datastore_query.PropertyOrder.DESCENDING)
     query = task_result.TaskResultSummary.query().order(order)
 
     if state == 'pending':
-      return query.filter(
+      return None, query.filter(
           task_result.TaskResultSummary.state == task_result.State.PENDING)
 
     if state == 'running':
-      return query.filter(
+      return None, query.filter(
           task_result.TaskResultSummary.state == task_result.State.RUNNING)
 
+    if state == 'pending_running':
+      # This is a special case that sends two concurrent queries under the hood.
+      # ndb.OR() doesn't work when order() is used, it requires __key__ sorting.
+      # This is not efficient, so the DB should be updated accordingly to be
+      # able to support pagination.
+      queries = [
+        query.filter(
+            task_result.TaskResultSummary.state == task_result.State.PENDING),
+        query.filter(
+            task_result.TaskResultSummary.state == task_result.State.RUNNING),
+      ]
+      return queries, None
+
     if state == 'completed':
-      return query.filter(
+      return None, query.filter(
           task_result.TaskResultSummary.state == task_result.State.COMPLETED)
 
     if state == 'completed_success':
       query = query.filter(
           task_result.TaskResultSummary.state == task_result.State.COMPLETED)
-      return query.filter(task_result.TaskResultSummary.failure == False)
+      return None, query.filter(task_result.TaskResultSummary.failure == False)
 
     if state == 'completed_failure':
       query = query.filter(
           task_result.TaskResultSummary.state == task_result.State.COMPLETED)
-      return query.filter(task_result.TaskResultSummary.failure == True)
+      return None, query.filter(task_result.TaskResultSummary.failure == True)
 
     if state == 'expired':
-      return query.filter(
+      return None, query.filter(
           task_result.TaskResultSummary.state == task_result.State.EXPIRED)
 
     if state == 'timed_out':
-      return query.filter(
+      return None, query.filter(
           task_result.TaskResultSummary.state == task_result.State.TIMED_OUT)
 
     if state == 'bot_died':
-      return query.filter(
+      return None, query.filter(
           task_result.TaskResultSummary.state == task_result.State.BOT_DIED)
 
     if state == 'canceled':
-      return query.filter(
+      return None, query.filter(
           task_result.TaskResultSummary.state == task_result.State.CANCELED)
 
     if state == 'all':
-      return query
+      return None, query
 
     self.abort(400, 'invalid state')
 
