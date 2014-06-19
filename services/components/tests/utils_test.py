@@ -63,6 +63,31 @@ class UtilsTest(test_case.TestCase):
       'Mon, 02 Jan 2012 03:04:05 -0000',
       utils.datetime_to_rfc2822(datetime.datetime(2012, 1, 2, 3, 4, 5)))
 
+  def test_cache(self):
+    calls = []
+
+    @utils.cache
+    def get_me():
+      calls.append(1)
+      return len(calls)
+
+    self.assertEqual(1, get_me())
+    self.assertEqual(1, get_me())
+    self.assertEqual(1, len(calls))
+
+  def test_clear_cache(self):
+    calls = []
+
+    @utils.cache
+    def get_me():
+      calls.append(1)
+      return len(calls)
+
+    self.assertEqual(1, get_me())
+    utils.clear_cache(get_me)
+    self.assertEqual(2, get_me())
+    self.assertEqual(2, len(calls))
+
 
 if __name__ == '__main__':
   if '-v' in sys.argv:

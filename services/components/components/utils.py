@@ -33,6 +33,10 @@ VALID_DATETIME_FORMATS = ('%Y-%m-%d', '%Y-%m-%d %H:%M', '%Y-%m-%d %H:%M:%S')
 # UTC datetime corresponding to zero Unix timestamp.
 _EPOCH = datetime.datetime.utcfromtimestamp(0)
 
+# Module to run task queue tasks on by default. Used by get_task_queue_host
+# function. Can be changed by 'set_task_queue_module' function.
+_task_queue_module = 'backend'
+
 
 def is_local_dev_server():
   """Returns True if running on local development server.
@@ -177,6 +181,13 @@ class _Cache(object):
           self.expires = time.time() + self.expiration_sec
       return self.value
 
+  def clear(self):
+    """Clears stored cached value."""
+    with self.lock:
+      self.value = None
+      self.value_is_set = False
+      self.expires = None
+
   def get_wrapper(self):
     """Returns a callable object that can be used in place of |func|.
 
@@ -185,7 +196,9 @@ class _Cache(object):
     """
     # functools.wraps doesn't like 'instancemethod', use lambda as a proxy.
     # pylint: disable=W0108
-    return functools.wraps(self.func)(lambda: self.get_value())
+    wrapper = functools.wraps(self.func)(lambda: self.get_value())
+    wrapper.__parent_cache__ = self
+    return wrapper
 
 
 def cache(func):
@@ -200,12 +213,53 @@ def cache_with_expiration(expiration_sec):
   return decorator
 
 
+def clear_cache(func):
+  """Given a function decorated with @cache, resets cached value."""
+  func.__parent_cache__.clear()
+
+
 @cache
 def get_app_version():
   """Returns currently running version (not necessary a default one)."""
   # Sadly, this causes an RPC and when called too frequently, throws quota
   # errors.
   return modules.get_current_version_name()
+
+
+@cache
+def get_task_queue_host():
+  """Returns domain name of app engine instance to run a task queue task on.
+
+  By default will use 'backend' module. Can be changed by calling
+  set_task_queue_module during application startup.
+
+  This domain name points to a matching version of appropriate app engine
+  module - <version>.<module>.<app-id>.appspot.com where:
+    version: version of the module that is calling this function.
+    module: app engine module to execute task on.
+
+  That way a task enqueued from version 'A' of default module would be executed
+  on same version 'A' of backend module.
+  """
+  # modules.get_hostname sometimes fails with unknown internal error.
+  # Cache its result in a memcache to avoid calling it too often.
+  cache_key = 'task_queue_host:%s:%s' % (_task_queue_module, get_app_version())
+  value = memcache.get(cache_key)
+  if not value:
+    value = modules.get_hostname(module=_task_queue_module)
+    memcache.set(cache_key, value)
+  return value
+
+
+def set_task_queue_module(module):
+  """Changes a module used by get_task_queue_host() function.
+
+  Should be called during application initialization if default 'backend' module
+  is not appropriate.
+  """
+  global _task_queue_module
+  _task_queue_module = module
+  clear_cache(get_task_queue_host)
 
 
 ## JSON

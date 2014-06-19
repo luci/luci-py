@@ -877,7 +877,7 @@ class StoreContentHandler(ProtocolHandler):
                   queue_name='verify',
                   headers={'Host': task_queue_host},
                   transactional=True)
-            store_and_enqueue_verify_task(entry, config.get_task_queue_host())
+            store_and_enqueue_verify_task(entry, utils.get_task_queue_host())
           except (
               datastore_errors.Error,
               runtime.apiproxy_errors.CancelledError,

@@ -23,15 +23,10 @@ import os
 import re
 
 from google.appengine.api import app_identity
-from google.appengine.api import memcache
 from google.appengine.api import modules
 from google.appengine.ext import ndb
 
 from components import utils
-
-
-# App engine module to run task queue tasks on.
-TASK_QUEUE_MODULE = 'backend'
 
 
 class GlobalConfig(ndb.Model):
@@ -130,33 +125,11 @@ def get_app_revision_url():
   return template % rev.group(1) if rev else None
 
 
-@utils.cache
-def get_task_queue_host():
-  """Returns domain name of app engine instance to run a task queue task on.
-
-  This domain name points to a matching version of appropriate app engine
-  module - <version>.<module>.isolateserver.appspot.com where:
-    version: version of the module that is calling this function.
-    module: app engine module to execute task on.
-
-  That way a task enqueued from version 'A' of default module would be executed
-  on same version 'A' of backend module.
-  """
-  # modules.get_hostname sometimes fails with unknown internal error.
-  # Cache its result in a memcache to avoid calling it too often.
-  cache_key = 'task_queue_host:%s' % utils.get_app_version()
-  value = memcache.get(cache_key)
-  if not value:
-    value = modules.get_hostname(module=TASK_QUEUE_MODULE)
-    memcache.set(cache_key, value)
-  return value
-
-
 def warmup():
   """Precaches configuration in local memory, to be called from warmup handler.
 
   This call is optional. Everything works even if 'warmup' is never called.
   """
   settings()
-  get_task_queue_host()
+  utils.get_task_queue_host()
   utils.get_app_version()

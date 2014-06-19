@@ -28,7 +28,6 @@ from components import utils
 from support import test_case
 
 import acl
-import config
 import gcs
 import handlers_backend
 import handlers_common
@@ -95,7 +94,7 @@ class MainTest(test_case.TestCase):
     # When called during a taskqueue, the call to get_app_version() may fail so
     # pre-fetch it.
     version = utils.get_app_version()
-    self.mock(config, 'get_task_queue_host', lambda: version)
+    self.mock(utils, 'get_task_queue_host', lambda: version)
     self.source_ip = '127.0.0.1'
     self.app_frontend = webtest.TestApp(
         handlers_frontend.create_application(debug=True),

@@ -11,8 +11,8 @@ import logging
 from google.appengine import runtime
 from google.appengine.api import taskqueue
 
-import config
 from components import ereporter2
+from components import utils
 
 
 # Ignore these failures, there's nothing to do.
@@ -62,7 +62,7 @@ def enqueue_task(url, queue_name, payload=None, name=None,
   try:
     headers = None
     if use_dedicated_module:
-      headers = {'Host': config.get_task_queue_host()}
+      headers = {'Host': utils.get_task_queue_host()}
     # Note that just using 'target=module' here would redirect task request to
     # a default version of a module, not the currently executing one.
     taskqueue.add(
