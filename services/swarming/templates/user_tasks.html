@@ -1,6 +1,55 @@
 {% extends "base.html" %}
 
 
+{% block headers %}
+<style>
+  h1 {
+    margin-top: 10px;
+    margin-bottom: 10px;
+  }
+
+  table.layout_table {
+    border-spacing: 0;
+    font-family: monospace;
+  }
+  .layout_table thead {
+    background-color: #C0C0C0;
+    font-weight:bold;
+  }
+  table.layout_table tbody tr:nth-child(even) {
+    background-color: #eeeeee;
+  }
+  table.property_table td {
+    padding-left: 1em;
+    padding-right: 1em;
+  }
+</style>
+<script>
+  function radio_value(field) {
+    var radios = document.getElementsByName(field);
+    for (var i = 0, length = radios.length; i < length; i++) {
+      if (radios[i].checked) {
+        return radios[i].value;
+      }
+    }
+  }
+
+  function update_sort() {
+    // This resets the cursor and filters.
+    var sort = radio_value("sort");
+    document.location.href = '/user/tasks?sort=' + sort;
+  }
+
+  function update_filter() {
+    // This resets the cursor and sort.
+    var state = radio_value("state");
+    var url = '/user/tasks?state=' + state;
+    document.location.href = url;
+  }
+</script>
+{% endblock %}
+
+
 {% block floating %}
 <br>{{now|datetimeformat}}
 {% endblock %}
@@ -9,70 +58,94 @@
 {% block body %}
 {% import 'bot_view.html' as bot_view %}
 
-<h1>User Test Requests</h1>
-{{sorted_by_message|safe}}
-Sort By (changing drops all current filters):
-<!--We don't allow sorting and filters to fully interact to prevent the server
-from requiring a huge number of indices, which would make runners.put() very
-expensive.-->
-<select id="sort"
-    onchange="document.location.href='{{url_no_sort_by_or_filters}}&sort_by=' + this.value">
-  {% for sort_option in sort_options %}
-    {% if sort_option.key == selected_sort %}
-      <option value="{{sort_option.key}}" selected="">{{sort_option.name}}
-      </option>
-    {% else %}
-      <option value="{{sort_option.key}}">{{sort_option.name}}</option>
-    {% endif %}
-  {% endfor %}
-</select>
+<h1>Tasks</h1>
 
-<h2>Filters:</h2>
-Always sorted by reverse created.
-<form id="filter" action="{{url_no_filters}}" method="get">
-  {{filter_selects|safe}}
-  Test Name (Full Matches Only):
-  <input type="text" name="test_name_filter" value="{{test_name_filter}}">
-  Machine ID (Full Matches Only):
-  <input type="text" name="machine_id_filter" value="{{machine_id_filter}}">
-  <!--Add the page and sort_by values so they don't get lost-->
-  <input type="hidden" name="page" value="{{current_page}}">
-  <input type="hidden" name="sort_by" value="{{sort_by}}">
-  <input type="submit" name="Filter">
+<form id="filter" name="filter">
+<table class=layout_table>
+  <thead>
+    <tr>
+      <td>Sort</td>
+      <td></td>
+      <td>Task state</td>
+      <td></td>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>
+        {% for key, name in sort_choices %}
+          <input type="radio" name="sort" value="{{key}}"
+              onchange="update_sort()"
+              {% if sort == key %}checked{%endif%}>
+            {{name}}
+          </input>
+          <br>
+        {% endfor %}
+      </td>
+      {% for state_column in state_choices %}
+        <td>
+          {% for key, name in state_column %}
+            <input type="radio" name="state" value="{{key}}"
+                onchange="update_filter()"
+                {% if state == key %}checked{%endif%}>
+              {{name}}
+            </input>
+            <br>
+          {% endfor %}
+        </td>
+      {% endfor %}
+{# TODO(maruel): To be added as a separate page
+      <td>
+        Task Name (Full Matches Only):
+        <input type="text" name="name" value="{{task_name}}">
+      </td>
+      <td>
+#}
+    </tr>
+  <tbody>
+</table>
 </form>
 <br>
 
-<table id="request-table" class="alterning_background"
-    summary="This table lists all test requests">
-  <thead>
-    <th>Name</th>
-    <th>Status</th>
-    <th>Requested</th>
-    <th>Pending</th>
-    <th>Started</th>
-    <th>Ended</th>
-    <th>Duration</th>
-    <th>Bot</th>
-  </thead>
-  <tbody>
-    {% for task in tasks %}
-      <tr class="request {% if task.failure %}failed_test{% endif%}">
-        <td>
-          <a href="/user/task/{{task.key_string}}">{{task.name}}</a>
-        </td>
-        <td>{{task.to_string()|safe}}</td>
-        <td nowrap align=center>{{task.created_ts|datetimeformat}}</td>
-        <td nowrap align=right>{{task.pending|timedeltaformat}}</td>
-        <td nowrap align=center>{{task.started_ts|datetimeformat}}</td>
-        <td nowrap align=center>{{task.ended_ts|datetimeformat}}</td>
-        <td nowrap align=right>{{task.duration()|timedeltaformat}}</td>
-        <td nowrap>{{bot_view.bot_link(task.bot_id, is_privileged_user)}}</td>
-      </tr>
-    {% endfor %}
-  </tbody>
-</table>
+{% if tasks %}
+  <table id="request-table" class="alterning_background"
+      summary="This table lists all test requests">
+    <thead>
+      <th>Name</th>
+      <th>Status</th>
+      <th>Requested</th>
+      <th>Pending</th>
+      <th>Started</th>
+      <th>Ended</th>
+      <th>Duration</th>
+      <th>Bot</th>
+      <th>Priority</th>
+    </thead>
+    <tbody>
+      {% for task in tasks %}
+        <tr class="request {% if task.failure %}failed_test{% endif%}">
+          <td>
+            <a href="/user/task/{{task.key_string}}">{{task.name}}</a>
+          </td>
+          <td>{{task.to_string()|safe}}</td>
+          <td nowrap align=center>{{task.created_ts|datetimeformat}}</td>
+          <td nowrap align=right>{{task.pending|timedeltaformat}}</td>
+          <td nowrap align=center>{{task.started_ts|datetimeformat}}</td>
+          <td nowrap align=center>{{task.ended_ts|datetimeformat}}</td>
+          <td nowrap align=right>{{task.duration()|timedeltaformat}}</td>
+          <td nowrap>{{bot_view.bot_link(task.bot_id, is_privileged_user)}}</td>
+          <td nowrap align=right>{{task.priority}}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% else %}
+  No data to show for this selection.
+{% endif %}
 
-<p>Currently on page: {{current_page}} </p>
-{# TODO(maruel): Implement cursor based pagination #}
+{% if cursor %}
+<p>
+<a href=/user/tasks?sort={{sort}}&cursor={{cursor}}">Next page</a>
+{% endif %}
 
 {% endblock %}

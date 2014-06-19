@@ -182,6 +182,7 @@ class TaskResultApiTest(test_case.TestCase):
       'user': u'Jesus',
     }
     self.assertEqual(expected, actual.to_dict())
+    self.assertEqual(50, actual.priority)
 
   def test_new_run_result(self):
     request = task_request.make_request(_gen_request_data())
@@ -200,6 +201,7 @@ class TaskResultApiTest(test_case.TestCase):
       'try_number': 1,
     }
     self.assertEqual(expected, actual.to_dict())
+    self.assertEqual(50, actual.priority)
 
   def test_integration(self):
     # Creates a TaskRequest, along its TaskResultSummary and TaskToRun. Have a

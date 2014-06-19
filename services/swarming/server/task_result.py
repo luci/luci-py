@@ -141,6 +141,14 @@ class _TaskResultCommon(ndb.Model):
     if self.started_ts and self.created_ts:
       return self.started_ts - self.created_ts
 
+  @property
+  def priority(self):
+    # TODO(maruel): This property is not efficient at lookup time so it is
+    # probably better to duplicate the data. The trade off is that TaskRunResult
+    # is saved a lot. Maybe we'll need to rethink this, maybe TaskRunSummary
+    # wasn't a great idea after all.
+    return self.request_key.get().priority
+
   def get_outputs(self):
     """Returns the actual outputs as strings in a list."""
     # TODO(maruel): Rework this so all the entities can be fetched in parallel.

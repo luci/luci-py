@@ -4,6 +4,7 @@
 # found in the LICENSE file.
 
 import datetime
+import itertools
 import json
 import logging
 import os
@@ -996,6 +997,27 @@ class AppTest(test_case.TestCase):
     self.assertEqual('RunManifest', reaped['commands'][0]['function'])
     # This can only work once a bot reaped the task.
     self.app.get('/user/task/%s' % (key[:-1] + '1'), status=200)
+
+  def test_task_list_query(self):
+    # Try all the combinations of task queries to ensure the index exist.
+    self._ReplaceCurrentUser(ADMIN_EMAIL)
+    self._check_task(self.client_create_task('hi'), 10)
+
+    sort_choices = [i[0] for i in handlers_frontend.TasksHandler.SORT_CHOICES]
+    state_choices = sum(
+        ([i[0] for i in j]
+          for j in handlers_frontend.TasksHandler.STATE_CHOICES),
+        [])
+
+    for sort, state in itertools.product(sort_choices, state_choices):
+      url = '/user/tasks?sort=%s&state=%s' % (sort, state)
+      # See require_index in ../components/support/test_case.py in case of
+      # NeedIndexError.
+      resp = self.app.get(url, expect_errors=True)
+      self.assertEqual(200, resp.status_code, (resp.body, sort, state))
+
+    self.app.get('/user/tasks?sort=foo', status=400)
+    self.app.get('/user/tasks?state=foo', status=400)
 
   def test_bot_list_empty(self):
     # Just assert it doesn't throw.

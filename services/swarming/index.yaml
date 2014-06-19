@@ -15,6 +15,25 @@ indexes:
   - name: machine_id
   - name: tag
 
+- kind: TaskResultSummary
+  properties:
+  - name: failure
+  - name: created_ts
+    direction: desc
+
+- kind: TaskResultSummary
+  properties:
+  - name: failure
+  - name: state
+  - name: created_ts
+    direction: desc
+
+- kind: TaskResultSummary
+  properties:
+  - name: state
+  - name: created_ts
+    direction: desc
+
 - kind: TaskRunResult
   properties:
   - name: state

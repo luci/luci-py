@@ -41,8 +41,15 @@ class TestCase(auto_stub.TestCase):
     super(TestCase, self).setUp()
     self.testbed = testbed.Testbed()
     self.testbed.activate()
+
+    # If you have a NeedIndexError, here is the switch you need to make to make
+    # the new required indexes to be automatically added. Change
+    # train_index_yaml to True to have index.yaml automatically updated, then
+    # run your test case. Do not forget to put it back to False.
+    train_index_yaml = False
+
     self.testbed.init_datastore_v3_stub(
-        require_indexes=True, root_path=self.APP_DIR)
+        require_indexes=not train_index_yaml, root_path=self.APP_DIR)
     self.testbed.init_logservice_stub()
     self.testbed.init_memcache_stub()
     self.testbed.init_modules_stub()

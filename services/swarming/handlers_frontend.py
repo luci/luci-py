@@ -42,20 +42,10 @@ from server import result_helper
 from server import stats
 from server import stats_gviz
 from server import task_common
-from server import task_request
 from server import task_result
 from server import task_scheduler
 from server import task_to_run
 from server import user_manager
-
-
-ACCEPTABLE_TASKS_SORTS = {
-  'created_ts': 'Created',
-  'done_ts': 'Ended',
-  'modified_ts': 'Last updated',
-  'name': 'Name',
-  'user': 'User',
-}
 
 
 def GetModulesVersions():
@@ -244,123 +234,6 @@ def request_work_item(attributes, server_url, remote_addr):
     'result_url': test_run.result_url,
     'try_count': 0,
   }
-
-
-### UI code that should be in jinja2 templates
-
-
-class FilterParams(object):
-  def __init__(
-      self, status, test_name_filter, show_successfully_completed,
-      machine_id_filter):
-    self.status = status
-    self.test_name_filter = test_name_filter
-    self.show_successfully_completed = show_successfully_completed
-    self.machine_id_filter = machine_id_filter
-
-  def generate_page_url(
-      self, current_page=None, sort_by=None,
-      include_filters=False):
-    """Generates an URL that points to the current page with similar options.
-
-    If an option is listed as None, don't include it to allow the html page to
-    ensure it can add its desired option.
-
-    Args:
-      current_page: The current page to display.
-      sort_by: The value to sort the runners by.
-      include_filters: True if the filters should be included in the url.
-
-    Returns:
-      query url page for the requested filtering settings.
-    """
-    params = {}
-    if current_page:
-      params['page'] = str(current_page)
-    if sort_by:
-      params['sort_by'] = sort_by
-    if include_filters:
-      if self.status is not None:
-        params['status'] = self.status
-      if self.show_successfully_completed is not None:
-        params['show_successfully_completed'] = str(
-            self.show_successfully_completed)
-      if self.test_name_filter is not None:
-        params['test_name_filter'] = self.test_name_filter
-      if self.machine_id_filter is not None:
-        params['machine_id_filter'] = self.machine_id_filter
-    return '?' + urllib.urlencode(params)
-
-  @staticmethod
-  def get_shards(sort_by, ascending, limit, offset):
-    """Returns a query with the given parameters, also applying the filters.
-
-    Args:
-      sort_by: The value to sort the runners by.
-      ascending: True if the runners should be sorted in ascending order.
-      limit: The maximum number of runners the query should return.
-      offset: Number of queries to skip.
-
-    Returns:
-      A ndb.Future that will return the items in the DB with a query that is
-      properly adjusted and filtered.
-    """
-    # TODO(maruel): Use cursors!
-    # TODO(maruel): Use self.status, self.show_successfully_completed,
-    # self.test_name_filter, self.machine_id_filter.
-    assert sort_by in ACCEPTABLE_TASKS_SORTS, (
-        'This should have been validated at a higher level')
-    opts = ndb.QueryOptions(limit=limit, offset=offset)
-    direction = (
-        datastore_query.PropertyOrder.ASCENDING
-        if ascending else datastore_query.PropertyOrder.DESCENDING)
-    return task_result.TaskResultSummary.query(default_options=opts).order(
-        datastore_query.PropertyOrder(sort_by, direction)).fetch_async()
-
-  def filter_selects_as_html(self):
-    """Generates the HTML filter select values, with the proper defaults set.
-
-    Returns:
-      The HTML representing the filter select options.
-    """
-    # TODO(maruel): Use jinja2 instead.
-    html = ('Ran Successfully:'
-            '<select name="show_successfully_completed" form="filter">')
-
-    if self.show_successfully_completed:
-      html += ('<option value="True" selected="True">Yes</option>'
-               '<option value="False">No</option>')
-    else:
-      html += ('<option value="True">Yes</option>'
-               '<option value="False" selected="True">No</option>')
-
-    html += ('</select>'
-             'Status:'
-             '<select name="status" form="filter">')
-
-    if self.status == 'pending':
-      html += ('<option value="all">All</option>'
-               '<option value="pending" selected="True">Pending Only</option>'
-               '<option value="running">Running Only</option>'
-               '<option value="done">Done Only</option>')
-    elif self.status == 'running':
-      html += ('<option value="all">All</option>'
-               '<option value="pending">Pending Only</option>'
-               '<option value="running" selected="True">Running Only</option>'
-               '<option value="done">Done Only</option>')
-    elif self.status == 'done':
-      html += ('<option value="all">All</option>'
-               '<option value="pending">Pending Only</option>'
-               '<option value="running">Running Only</option>'
-               '<option value="done" selected="True">Done Only</option>')
-    else:
-      html += ('<option value="all">All</option>'
-               '<option value="pending">Pending Only</option>'
-               '<option value="running">Running Only</option>'
-               '<option value="done">Done Only</option>')
-
-    html += '</select>'
-    return html
 
 
 ### is_admin pages.
@@ -584,78 +457,118 @@ class ErrorsHandler(auth.AuthenticatingHandler):
 
 class TasksHandler(auth.AuthenticatingHandler):
   """Lists all requests and allows callers to manage them."""
+  SORT_CHOICES = [
+    ('created_ts', 'Created'),
+    ('completed_ts', 'Ended (Completed only)'),
+    ('modified_ts', 'Last updated (all tasks that have been touched)'),
+  ]
 
-  def parse_filters(self):
-    """Parse the filters from the request."""
-    return FilterParams(
-      self.request.get('status', 'all'),
-      self.request.get('test_name_filter', ''),
-      # Compare to 'False' so that the default value for invalid user input
-      # is True.
-      self.request.get('show_successfully_completed', '') != 'False',
-      self.request.get('machine_id_filter', ''))
+  # TODO(maruel): Evaluate what the categories the users would like for
+  # diagnosis, then adapt the DB to enable efficient queries.
+  STATE_CHOICES = [
+    [
+      ('all', 'All states'),
+      ('pending', 'Pending'),
+      ('running', 'Running'),
+    ],
+    [
+      ('completed', 'Completed'),
+      ('completed_success', 'Completed (success only)'),
+      ('completed_failure', 'Completed (failure only)'),
+    ],
+    [
+      ('expired', 'Expired'),
+      ('timed_out', 'Timed out'),
+      ('bot_died', 'Bot died'),
+      ('canceled', 'Canceled'),
+    ],
+  ]
 
   @auth.require(acl.is_user)
   def get(self):
-    # TODO(maruel): Convert to Google Graph API.
-    # TODO(maruel): Once migration is complete, remove limit and offset, replace
-    # with cursor.
-    page_length = int(self.request.get('length', 50))
-    page = int(self.request.get('page', 1))
+    cursor = datastore_query.Cursor(urlsafe=self.request.get('cursor'))
+    limit = int(self.request.get('limit', 100))
+    sort = self.request.get('sort', self.SORT_CHOICES[0][0])
+    state = self.request.get('state', self.STATE_CHOICES[0][0][0])
+    task_name = self.request.get('task_name', '')
 
-    default_sort = 'created_ts'
-    sort_by = self.request.get('sort_by', 'D' + default_sort)
-    ascending = bool(sort_by[0] == 'A')
-    sort_key = sort_by[1:]
-    if sort_key not in ACCEPTABLE_TASKS_SORTS:
-      self.abort(400, 'Invalid sort key')
+    if not any(sort == i[0] for i in self.SORT_CHOICES):
+      self.abort(400, 'Invalid sort')
+    if not any(any(state == i[0] for i in j) for j in self.STATE_CHOICES):
+      self.abort(400, 'Invalid state')
 
-    # TODO(maruel): Stop doing HTML in python.
-    sorted_by_message = '<p>Currently sorted by: '
-    if not ascending:
-      sorted_by_message += 'Reverse '
-    sorted_by_message += ACCEPTABLE_TASKS_SORTS[sort_key] + '</p>'
-    sort_options = []
-    # TODO(maruel): Use an order that makes sense instead of whatever the dict
-    # happens to be.
-    for key, value in ACCEPTABLE_TASKS_SORTS.iteritems():
-      # Add 'A' for ascending and 'D' for descending order.
-      sort_options.append(SortOptions('A' + key, value))
-      sort_options.append(SortOptions('D' + key, 'Reverse ' + value))
+    if sort != 'created_ts':
+      # Zap all filters in this case to reduce the number of required indexes.
+      # Revisit according to the user requests.
+      state = 'all'
 
-    # Parse and load the filters.
-    params = self.parse_filters()
-
-    # Fire up all the queries in parallel.
-    tasks_future = params.get_shards(
-        sort_key,
-        ascending=ascending,
-        limit=page_length,
-        offset=page_length * (page - 1))
-    total_task_count_future = task_request.TaskRequest.query().count_async()
+    query = self._get_query(sort, state)
+    tasks, cursor, more = query.fetch_page(limit, start_cursor=cursor)
 
     params = {
-      'current_page': page,
-      'filter_selects': params.filter_selects_as_html(),
+      'cursor': cursor.urlsafe() if cursor and more else None,
       'is_privileged_user': acl.is_privileged_user(),
-      'machine_id_filter': params.machine_id_filter,
+      'limit': limit,
       'now': task_common.utcnow(),
-      'selected_sort': ('A' if ascending else 'D') + sort_key,
-      'sort_options': sort_options,
-      'sort_by': sort_by,
-      'sorted_by_message': sorted_by_message,
-      'tasks': tasks_future.get_result(),
-      'test_name_filter': params.test_name_filter,
-      'total_tasks': total_task_count_future.get_result(),
-      'url_no_filters': params.generate_page_url(page, sort_by),
-      'url_no_page': params.generate_page_url(
-          sort_by=sort_by, include_filters=True),
-      'url_no_sort_by_or_filters': params.generate_page_url(
-          page, include_filters=False),
+      'sort': sort,
+      'sort_choices': self.SORT_CHOICES,
+      'state': state,
+      'state_choices': self.STATE_CHOICES,
+      'tasks': tasks,
+      'task_name': task_name,
     }
     # TODO(maruel): If admin or if the user is task's .user, show the Cancel
     # button. Do not show otherwise.
     self.response.out.write(template.render('user_tasks.html', params))
+
+  def _get_query(self, sort, state):
+    """Returns a TaskResultSummary query."""
+    order = datastore_query.PropertyOrder(
+        sort, datastore_query.PropertyOrder.DESCENDING)
+    query = task_result.TaskResultSummary.query().order(order)
+
+    if state == 'pending':
+      return query.filter(
+          task_result.TaskResultSummary.state == task_result.State.PENDING)
+
+    if state == 'running':
+      return query.filter(
+          task_result.TaskResultSummary.state == task_result.State.RUNNING)
+
+    if state == 'completed':
+      return query.filter(
+          task_result.TaskResultSummary.state == task_result.State.COMPLETED)
+
+    if state == 'completed_success':
+      query = query.filter(
+          task_result.TaskResultSummary.state == task_result.State.COMPLETED)
+      return query.filter(task_result.TaskResultSummary.failure == False)
+
+    if state == 'completed_failure':
+      query = query.filter(
+          task_result.TaskResultSummary.state == task_result.State.COMPLETED)
+      return query.filter(task_result.TaskResultSummary.failure == True)
+
+    if state == 'expired':
+      return query.filter(
+          task_result.TaskResultSummary.state == task_result.State.EXPIRED)
+
+    if state == 'timed_out':
+      return query.filter(
+          task_result.TaskResultSummary.state == task_result.State.TIMED_OUT)
+
+    if state == 'bot_died':
+      return query.filter(
+          task_result.TaskResultSummary.state == task_result.State.BOT_DIED)
+
+    if state == 'canceled':
+      return query.filter(
+          task_result.TaskResultSummary.state == task_result.State.CANCELED)
+
+    if state == 'all':
+      return query
+
+    self.abort(400, 'invalid state')
 
 
 class TaskHandler(auth.AuthenticatingHandler):
