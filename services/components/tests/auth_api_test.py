@@ -72,6 +72,43 @@ class AuthDBTest(test_case.TestCase):
     self.assertFalse(
         is_member([with_nesting, with_listing], model.Anonymous, 'WithNesting'))
 
+  def test_list_group(self):
+    list_group = (lambda groups, group, recursive:
+        api.AuthDB(groups=groups).list_group(group, recursive))
+
+    grp_1 = model.AuthGroup(id='1')
+    grp_1.members.extend([
+      model.Identity(model.IDENTITY_USER, 'a@example.com'),
+      model.Identity(model.IDENTITY_USER, 'b@example.com'),
+    ])
+
+    grp_2 = model.AuthGroup(id='2')
+    grp_2.nested.append('1')
+    grp_2.members.extend([
+      # Specify 'b' again, even though it's in a nested group.
+      model.Identity(model.IDENTITY_USER, 'b@example.com'),
+      model.Identity(model.IDENTITY_USER, 'c@example.com'),
+    ])
+
+    # Unknown group.
+    self.assertEqual(set(), list_group([grp_1, grp_2], 'blah', False))
+    self.assertEqual(set(), list_group([grp_1, grp_2], 'blah', True))
+
+    # Non recursive.
+    expected = set([
+      model.Identity(model.IDENTITY_USER, 'b@example.com'),
+      model.Identity(model.IDENTITY_USER, 'c@example.com'),
+    ])
+    self.assertEqual(expected, list_group([grp_1, grp_2], '2', False))
+
+    # Recursive.
+    expected = set([
+      model.Identity(model.IDENTITY_USER, 'a@example.com'),
+      model.Identity(model.IDENTITY_USER, 'b@example.com'),
+      model.Identity(model.IDENTITY_USER, 'c@example.com'),
+    ])
+    self.assertEqual(expected, list_group([grp_1, grp_2], '2', True))
+
   def test_nested_groups_cycle(self):
     # Groups that nest each other.
     group1 = model.AuthGroup(id='Group1')

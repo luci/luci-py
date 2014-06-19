@@ -35,6 +35,7 @@ __all__ = [
   'get_secret',
   'is_admin',
   'is_group_member',
+  'list_group',
   'public',
   'require',
   'SecretKey',
@@ -130,28 +131,30 @@ class AuthDB(object):
       assert secret.key.string_id() not in self.secrets[scope], secret.key
       self.secrets[scope][secret.key.string_id()] = secret
 
-  def is_group_member(self, group, identity):
-    """Returns True if |identity| belongs to group |group|.
+  def is_group_member(self, group_name, identity):
+    """Returns True if |identity| belongs to group |group_name|.
 
     Unknown groups are considered empty.
     """
     # While the code to add groups refuses to add cycle, this code ensures that
     # it doesn't go in a cycle by keeping track of the groups visited in |seen|.
-    def is_group_member_internal(group, identity, seen):
+    seen = set()
+
+    def is_group_member_internal(group_name, identity):
       # Wildcard group that matches all identities (including anonymous!).
-      if group == model.GROUP_ALL:
+      if group_name == model.GROUP_ALL:
         return True
 
       # An unknown group is empty.
-      group_obj = self.groups.get(group)
+      group_obj = self.groups.get(group_name)
       if not group_obj:
         return False
 
       # Use |seen| to detect and avoid cycles in group nesting graph.
-      if group in seen:
-        logging.error('Cycle in a group graph\nInfo: %s, %s', group, seen)
+      if group_name in seen:
+        logging.error('Cycle in a group graph\nInfo: %s, %s', group_name, seen)
         return False
-      seen.add(group)
+      seen.add(group_name)
 
       # Globs first, there's usually a higher chance to find identity there.
       if any(glob.match(identity) for glob in group_obj.globs):
@@ -163,10 +166,47 @@ class AuthDB(object):
 
       # Slowest nested group check last.
       return any(
-          is_group_member_internal(nested, identity, seen)
+          is_group_member_internal(nested, identity)
           for nested in group_obj.nested)
 
-    return is_group_member_internal(group, identity, set())
+    return is_group_member_internal(group_name, identity)
+
+  def list_group(self, group_name, recursive=True):
+    """Returns a set of all identities in a group.
+
+    Args:
+      group_name: name of a group to list.
+      recursive: True to include nested group.
+
+    Returns:
+      Set of Identity objects. Unknown groups are considered empty.
+    """
+    if not recursive:
+      group_obj = self.groups.get(group_name)
+      return set(group_obj.members) if group_obj else set()
+
+    # While the code to add groups refuses to add cycle, this code ensures that
+    # it doesn't go in a cycle by keeping track of the groups visited in |seen|.
+    seen = set()
+
+    def list_group_internal(group_name):
+      # An unknown group is empty.
+      group_obj = self.groups.get(group_name)
+      if not group_obj:
+        return set()
+
+      # Use |seen| to detect and avoid cycles in group nesting graph.
+      if group_name in seen:
+        logging.error('Cycle in a group graph\nInfo: %s, %s', group_name, seen)
+        return set()
+      seen.add(group_name)
+
+      members = set(group_obj.members)
+      for nested in group_obj.nested:
+        members.update(list_group_internal(nested))
+      return members
+
+    return list_group_internal(group_name)
 
   def get_secret(self, secret_key):
     """Returns list of strings with last known values of a secret.
@@ -450,18 +490,23 @@ def get_current_identity():
   return ident
 
 
-def is_group_member(group, identity=None):
-  """Returns True if |identity| (or current identity if None) is in |group|.
+def is_group_member(group_name, identity=None):
+  """Returns True if |identity| (or current identity if None) is in the group.
 
   Unknown groups are considered empty.
   """
   return get_request_auth_db().is_group_member(
-      group, identity or get_current_identity())
+      group_name, identity or get_current_identity())
 
 
 def is_admin(identity=None):
   """Returns True if |identity| (or current identity if None) is an admin."""
   return is_group_member(model.ADMIN_GROUP, identity)
+
+
+def list_group(group_name, recursive=True):
+  """Returns a set of all Identity in a group."""
+  return get_request_auth_db().list_group(group_name, recursive)
 
 
 def get_secret(secret_key):
