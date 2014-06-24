@@ -420,19 +420,32 @@ class BotsListHandler(auth.AuthenticatingHandler):
 class BotHandler(auth.AuthenticatingHandler):
   @auth.require(acl.is_privileged_user)
   def get(self, bot_id):
-    limit = int(self.request.get('limit', 10))
+    limit = int(self.request.get('limit', 100))
+    cursor = datastore_query.Cursor(urlsafe=self.request.get('cursor'))
     bot_future = bot_management.get_bot_key(bot_id).get_async()
-    run_results = task_result.TaskRunResult.query(
-        task_result.TaskRunResult.bot_id == bot_id).fetch(limit)
+    run_results, cursor, more = task_result.TaskRunResult.query(
+        task_result.TaskRunResult.bot_id == bot_id).order(
+            -task_result.TaskRunResult.started_ts).fetch_page(
+                limit, start_cursor=cursor)
+    dead_bot_cutoff = (
+        task_common.utcnow() - bot_management.MACHINE_DEATH_TIMEOUT)
+    bot = bot_future.get_result()
+    is_dead = bot.last_seen < dead_bot_cutoff if bot else False
     params = {
-      'bot': bot_future.get_result(),
+      'bot': bot,
       'bot_id': bot_id,
       'current_version':
           bot_management.get_slave_version(self.request.host_url),
+      'cursor': cursor.urlsafe() if cursor and more else None,
+      'is_dead': is_dead,
       'is_admin': acl.is_admin(),
+      'limit': limit,
       'now': task_common.utcnow(),
       'run_results': run_results,
     }
+    # TODO(maruel): Make the delete link redirect to /restricted/bots. It would
+    # probably be preferable to not use /delete_machine_stats and create a UI
+    # specialized endpoint instead.
     self.response.out.write(template.render('restricted_bot.html', params))
 
 

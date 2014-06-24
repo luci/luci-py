@@ -3,26 +3,49 @@
 
 {% block headers %}
 <style>
+  h1 {
+    margin-top: 10px;
+    margin-bottom: 10px;
+  }
+
+  h3 {
+    margin-bottom: 5px;
+  }
+
   table.property_table {
     font-family: monospace;
     border-spacing: 0;
   }
+
   table.property_table tbody tr:nth-child(even) {
     background-color: #eeeeee;
   }
+
   table.property_table td {
     padding-left: 1em;
     padding-right: 1em;
   }
+
   table.property_table tbody tr:hover {
     background-color: #eeffee;
+  }
+
+  .dead_bot {
+    background-color: #ffdddd;
   }
 </style>
 {% endblock %}
 
 
+{% block floating %}
+<br>{{now|datetimeformat}}
+{% endblock %}
+
+
 {% block body %}
 <h1>Bot details</h1>
+<a href="/restricted/bots">Back to bots list</a>
+<p>
 
 {% if bot %}
   <table class="property_table">
@@ -40,7 +63,17 @@
       </tr>
       <tr>
         <td>Last seen IP</td>
-        <td>{{(now-bot.last_seen)|timedeltaformat}}</td>
+        <td nowrap {% if is_dead %}class="dead_bot"{% endif %}>
+          {{(now-bot.last_seen)|timedeltaformat}}
+          {% if is_admin and is_dead %}
+          &nbsp;&nbsp;
+          <form id="delete_{{bot.key.id()}}" method="post"
+              action="/delete_machine_stats">
+            <input type="hidden" name="r" value="{{bot.key.id()}}" />
+            <input type="submit" value="Delete" />
+          </form>
+          {% endif %}
+        </td>
       </tr>
       <tr>
         <td>Dimensions</td>
@@ -62,7 +95,14 @@
       </tr>
       <tr>
         <td>Current task</td>
-        <td>{{bot.task}}</td>
+        <td>
+          {% if bot.task %}
+            <a href="/user/task/{{bot.task_entity.key_string}}">
+              {{bot.task_entity.name}}</a>
+          {% else %}
+            &#8209;&#8209;
+          {% endif %}
+        </td>
       </tr>
     </tbody>
   </table>
@@ -73,32 +113,43 @@
     <thead>
       <tr>
         <th>Task</th>
+        <th>Started</th>
         <th>Duration</th>
+        <th>Idle time after</th>
         <th>Result</th>
       </tr>
     </thead>
     <tbody>
+      {% set previous = false %}
       {% for run_result in run_results %}
         <tr class="request {% if run_result.failure %}failed_test{% endif%}">
           <td>
-            <a href="/user/task/{{run_result.key_string}}">{{run_result.name}}</a>
+            <a href="/user/task/{{run_result.key_string}}">
+              {{run_result.name}}</a>
           </td>
-          <td align=right>{{run_result.duration()|timedeltaformat}}</td>
+          <td nowrap>{{run_result.started_ts|datetimeformat}}</td>
+          <td nowrap align=right>{{run_result.duration()|timedeltaformat}}</td>
+          <td nowrap align=right>
+            {% if previous %}
+              {# Note that tasks are listed in reverse order #}
+              {{(previous.started_ts - run_result.ended_ts)|timedeltaformat}}
+            {% elif run_result.ended_ts %}
+              {{(now - run_result.ended_ts)|timedeltaformat}}
+            {% else %}
+              (Still running)
+            {% endif %}
+          </td>
           <td>{{run_result.to_string()}}</td>
         </tr>
+        {% set previous = run_result %}
       {% endfor %}
     </tbody>
   </table>
 
-  {% if is_admin %}
-  <p>
-  <form id="delete_{{bot.key.id()}}" method="post"
-    action="/delete_machine_stats?r={{bot.key.id()}}">
-    <button
-      onclick="document.getElementById("delete_{{bot.key.id()}}").submit()">
-      Delete
-    </button>
-  </form>
+  {% if cursor %}
+  <br>
+  <a href="/restricted/bot/{{bot.key.id()}}?limit={{limit}}&cursor={{cursor}}"}>
+    Next page</a>
   {% endif %}
 
 {% else %}
