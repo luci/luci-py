@@ -47,6 +47,12 @@ def make_xsrf_token(identity=model.Anonymous, xsrf_token_data=None):
   return handler.XSRFToken.generate([identity.to_bytes()], xsrf_token_data)
 
 
+def get_auth_db_rev():
+  """Returns current version of AuthReplicationState.auth_db_rev."""
+  ent = model.REPLICATION_STATE_KEY.get()
+  return 0 if not ent else ent.auth_db_rev
+
+
 class ApiHandlerClassTest(test_case.TestCase):
   """Tests for ApiHandler base class itself."""
 
@@ -237,6 +243,20 @@ class RestAPITestCase(test_case.TestCase):
     self.errors = []
     self.mock(handler.logging, 'error',
         lambda *args, **kwargs: self.errors.append((args, kwargs)))
+    # Revision of AuthDB before the test. Used in tearDown().
+    self._initial_auth_db_rev = get_auth_db_rev()
+    self._auth_db_rev_inc = 0
+
+  def tearDown(self):
+    # Ensure auth_db_rev was changed expected number of times.
+    self.assertEqual(
+        self._initial_auth_db_rev + self._auth_db_rev_inc,
+        get_auth_db_rev())
+    super(RestAPITestCase, self).tearDown()
+
+  def expect_auth_db_rev_change(self, rev_inc=1):
+    """Instruct tearDown to verify that auth_db_rev has changed."""
+    self._auth_db_rev_inc += rev_inc
 
   def mock_ndb_now(self, now):
     """Makes properties with |auto_now| and |auto_now_add| use mocked time."""
@@ -495,6 +515,7 @@ class GroupHandlerTest(RestAPITestCase):
     group.put()
 
     # Delete it via API.
+    self.expect_auth_db_rev_change()
     status, body, _ = self.delete(
         path='/auth/api/v1/groups/A%20Group',
         expect_xsrf_token_check=True,
@@ -511,6 +532,7 @@ class GroupHandlerTest(RestAPITestCase):
     group.put()
 
     # Delete it via API using passing If-Unmodified-Since condition.
+    self.expect_auth_db_rev_change()
     status, body, _ = self.delete(
         path='/auth/api/v1/groups/A%20Group',
         headers={
@@ -617,6 +639,7 @@ class GroupHandlerTest(RestAPITestCase):
     group.put()
 
     # Create the group using REST API.
+    self.expect_auth_db_rev_change()
     status, body, headers = self.post(
         path='/auth/api/v1/groups/A%20Group',
         body={
@@ -655,6 +678,7 @@ class GroupHandlerTest(RestAPITestCase):
 
   def test_post_minimal_body(self):
     # Posting just a name is enough to create an empty group.
+    self.expect_auth_db_rev_change()
     status, body, _ = self.post(
         path='/auth/api/v1/groups/A%20Group',
         body={'name': 'A Group'},
@@ -750,6 +774,7 @@ class GroupHandlerTest(RestAPITestCase):
     group.put()
 
     # Update it via API.
+    self.expect_auth_db_rev_change()
     status, body, headers = self.put(
         path='/auth/api/v1/groups/A%20Group',
         body={
@@ -1008,6 +1033,7 @@ class OAuthConfigHandlerTest(RestAPITestCase):
       'client_id': 'some-client-id',
       'client_not_so_secret': 'some-secret',
     }
+    self.expect_auth_db_rev_change()
     status, response, _ = self.post(
         path='/auth/api/v1/server/oauth_config',
         body=request_body,

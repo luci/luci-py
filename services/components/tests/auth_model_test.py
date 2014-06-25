@@ -191,32 +191,6 @@ class AuthSecretTest(test_case.TestCase):
     with self.assertRaises(ValueError):
       model.AuthSecret.bootstrap('test_secret', 'bad-scope')
 
-  def test_update_keep_key(self):
-    # Update, keeping old key around.
-    ent = model.AuthSecret.bootstrap('test_secret', 'local')
-    ident = model.Identity(model.IDENTITY_USER, 'joe@example.com')
-    old_secret = ent.values[0]
-    ent.update('new-secret', ident, keep_previous=True, retention=1)
-    self.assertEqual(ent.values, ['new-secret', old_secret])
-    self.assertEqual(ent.modified_by, ident)
-
-  def test_update_forget_key(self):
-    # Update, forgetting old key around.
-    ent = model.AuthSecret.bootstrap('test_secret', 'local')
-    ident = model.Identity(model.IDENTITY_USER, 'joe@example.com')
-    ent.update('new-secret', ident, keep_previous=False, retention=1)
-    self.assertEqual(ent.values, ['new-secret'])
-    self.assertEqual(ent.modified_by, ident)
-
-  def test_update_retention(self):
-    ent = model.AuthSecret.bootstrap('test_secret', 'local')
-    ident = model.Identity(model.IDENTITY_USER, 'joe@example.com')
-    old_secret = ent.values[0]
-    ent.update('new-secret-1', ident, keep_previous=True, retention=2)
-    ent.update('new-secret-2', ident, keep_previous=True, retention=2)
-    self.assertEqual(ent.values, ['new-secret-2', 'new-secret-1', old_secret])
-    self.assertEqual(ent.modified_by, ident)
-
 
 def make_group(group_id, nested=(), store=True):
   """Makes a new AuthGroup to use in test, puts it in datastore."""

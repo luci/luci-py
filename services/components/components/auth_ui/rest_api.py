@@ -191,6 +191,7 @@ class GroupHandler(ApiHandler):
 
       # Looks good.
       entity.put()
+      model.replicate_auth_db()
       return entity, None
 
     # Run the transaction.
@@ -242,6 +243,7 @@ class GroupHandler(ApiHandler):
 
       # Ok, good enough.
       entity.put()
+      model.replicate_auth_db()
       return True, None
 
     success, error_details = put_new(entity)
@@ -300,6 +302,7 @@ class GroupHandler(ApiHandler):
 
     # Ok, good to delete.
     entity.key.delete()
+    model.replicate_auth_db()
     self.send_response({'ok': True})
 
 
@@ -346,6 +349,7 @@ class OAuthConfigHandler(ApiHandler):
           oauth_client_secret=client_secret,
           oauth_additional_client_ids=additional_client_ids)
       config.put()
+      model.replicate_auth_db()
 
     update()
     self.send_response({'ok': True})

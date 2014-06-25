@@ -5,16 +5,25 @@
 """NDB model classes used to model AuthDB relations.
 
 Models defined here are used by central authentication service (that stores all
-groups and bot credentials) and by services that implement some concrete
-functionality protected with ACLs (like isolate and swarming services).
+groups and secrets) and by services that implement some concrete functionality
+protected with ACLs (like isolate and swarming services).
 
-Central authentication service (called 'master service' below) holds
-authoritative copy of all ACL configuration and acts as a single source of
-truth for it. All other services (called 'slave service' below) hold copy of
-relevant subset of configuration (that they use to perform ACL checks).
+Applications that use auth component may work in 3 modes:
+  1. Standalone. Application is self contained and manages its own groups.
+     Useful when developing a new service or for simple installations.
+  2. Replica. Application uses a central authentication service. An application
+     can be dynamically switched from Standalone to Replica mode.
+  3. Primary. Application IS a central authentication service. Only 'auth'
+     service is running in this mode. 'configure_as_primary' call during startup
+     switches application to that mode.
 
-Master service is responsible for updating slave services' configuration via
-simple service-to-service replication protocol.
+Central authentication service (Primary) holds authoritative copy of all auth
+related information (groups, secrets, etc.) and acts as a single source of truth
+for it. All other services (Replicas) hold copies of a relevant subset of
+this information (that they use to perform authorization checks).
+
+Primary service is responsible for updating replicas' configuration via
+service-to-service push based replication protocol.
 
 AuthDB holds a list of groups. Each group has a unique name and is defined
 as union of 3 sets:
@@ -30,14 +39,13 @@ configuration data, such as OAuth2 client_id and client_secret and various
 secret keys.
 """
 
-# TODO(vadimsh): Implement ACL DB replication.
-
 import collections
 import fnmatch
 import logging
 import os
 import re
 
+from google.appengine.api import app_identity
 from google.appengine.ext import ndb
 
 from components import datastore_utils
@@ -47,6 +55,7 @@ __all__ = [
   'ADMIN_GROUP',
   'Anonymous',
   'bootstrap_group',
+  'configure_as_primary',
   'find_group_dependency_cycle',
   'find_referencing_groups',
   'get_missing_groups',
@@ -57,6 +66,10 @@ __all__ = [
   'IDENTITY_USER',
   'IdentityProperty',
   'is_empty_group',
+  'is_primary',
+  'is_replica',
+  'is_standalone',
+  'replicate_auth_db',
 ]
 
 
@@ -92,6 +105,12 @@ GROUP_ALL = '*'
 
 # Global root key of auth models entity group.
 ROOT_KEY = ndb.Key('AuthGlobalConfig', 'root')
+# Key of AuthReplicationState entity.
+REPLICATION_STATE_KEY = ndb.Key('AuthReplicationState', 'self', parent=ROOT_KEY)
+
+
+# Configuration of Primary service, set by 'configure_as_primary'.
+_replication_callback = None
 
 
 ################################################################################
@@ -227,26 +246,54 @@ class IdentityGlobProperty(datastore_utils.BytesSerializableProperty):
 
 
 ################################################################################
-## Main models: AuthGlobalConfig, AuthGroup.
+## Singleton entities and replication related models.
+
+
+def configure_as_primary(replication_callback):
+  """Registers a callback to be called when AuthDB changes.
+
+  Should be called during Primary application startup. The callback will be
+  called as 'replication_callback(AuthReplicationState)' from inside transaction
+  on ROOT_KEY entity group whenever replicate_auth_db() is called (i.e. on every
+  change to auth db that should be replication to replicas).
+  """
+  global _replication_callback
+  _replication_callback = replication_callback
+
+
+def is_primary():
+  """Returns True if current application was configured as Primary."""
+  return bool(_replication_callback)
+
+
+def is_replica():
+  """Returns True if application is in Replica mode."""
+  return not is_primary() and not is_standalone()
+
+
+def is_standalone():
+  """Returns True if application is in Standalone mode."""
+  ent = REPLICATION_STATE_KEY.get()
+  return not ent or not ent.primary_id
 
 
 class AuthGlobalConfig(ndb.Model):
   """Acts as a root entity for auth models.
 
-  In particular, entities that belong to this entity group are:
-   * AuthGroup
-   * AuthSecretScope
-   * AuthSecret
-
   There should be only one instance of this model in Datastore, with a key set
   to ROOT_KEY. A change to an entity group rooted at this key is a signal that
-  AuthDB has to be refetched (see 'fetch_auth_db' below).
+  AuthDB has to be refetched (see 'fetch_auth_db' in api.py).
 
   Entities that change often or associated with particular bot or user
-  (like bot's credentials) MUST NOT be in this entity group.
+  MUST NOT be in this entity group.
 
-  Content of this particular entity is replicated from master service to all
-  slave services.
+  Content of this particular entity is replicated from Primary service to all
+  Replicas.
+
+  Entities that belong to this entity group are:
+   * AuthGroup
+   * AuthReplicationState
+   * AuthSecret
   """
   # OAuth2 client_id to use to mint new OAuth2 tokens.
   oauth_client_id = ndb.StringProperty(indexed=False)
@@ -254,6 +301,88 @@ class AuthGlobalConfig(ndb.Model):
   oauth_client_secret = ndb.StringProperty(indexed=False)
   # Additional OAuth2 client_ids allowed to access the services.
   oauth_additional_client_ids = ndb.StringProperty(repeated=True, indexed=False)
+
+
+class AuthReplicationState(ndb.Model):
+  """Contains state used to control Primary -> Replica replication.
+
+  It's a singleton entity with key REPLICATION_STATE_KEY (in same entity groups
+  as ROOT_KEY). This entity should be small since it is updated (auth_db_rev is
+  incremented) whenever AuthDB changes.
+
+  Exists in any AuthDB (on Primary and Replicas). Primary updates it whenever
+  changes to AuthDB are made, Replica updates it whenever it receives a push
+  from Primary.
+  """
+  # For services in Standalone mode it is None.
+  # For services in Primary mode: own GAE application ID.
+  # For services in Replica mode it is a GAE application ID of Primary.
+  primary_id = ndb.StringProperty(indexed=False)
+
+  # Revision of auth DB. Increased by 1 with every change that should be
+  # propagate to replicas. Only services in Standalone or Primary mode
+  # update this property by themselves. Replicas receive it from Primary.
+  auth_db_rev = ndb.IntegerProperty(indexed=False)
+
+  # Last modification time. For informational purposes only.
+  modified_ts = ndb.DateTimeProperty(auto_now=True, indexed=False)
+
+
+def replicate_auth_db():
+  """Increments auth_db_rev by one.
+
+  It is a signal that Auth DB should be replicated to Replicas. If called from
+  inside a transaction, it inherits it and updates auth_db_rev only once (even
+  if called multiple times during that transaction).
+
+  Should only be called for services in Standalone or Primary modes. Will raise
+  ValueError if called on Replica. When called for service in Standalone mode,
+  will update auth_db_rev but won't kick any replication. For services in
+  Primary mode will also initiate replication by calling callback set in
+  'configure_as_primary'.
+
+  WARNING: This function relies on a valid transaction context. NDB hooks and
+  asynchronous operations are known to be buggy in this regard: NDB hook for
+  an async operation in a transaction may be called with a wrong context
+  (main event loop context instead of transaction context). One way to work
+  around that is to monkey patch NDB (as done here: https://goo.gl/1yASjL).
+  Another is to not use hooks at all. There's no way to differentiate between
+  sync and async modes of an NDB operation from inside a hook. And without a
+  strict assert it's very easy to forget about "Do not use put_async" warning.
+  For that reason _post_put_hook is NOT used and replicate_auth_db() should be
+  called explicitly whenever relevant part of ROOT_KEY entity group is updated.
+  """
+  def increment_revision_and_update_replicas():
+    """Does the actual job, called inside a transaction."""
+    # Update auth_db_rev. REPLICATION_STATE_KEY is in same group as ROOT_KEY.
+    state = REPLICATION_STATE_KEY.get()
+    if not state:
+      primary_id = app_identity.get_application_id() if is_primary() else None
+      state = AuthReplicationState(
+          key=REPLICATION_STATE_KEY,
+          primary_id=primary_id,
+          auth_db_rev=0)
+    # Assert Primary or Standalone. Replicas can't increment auth db revision.
+    if not is_primary() and state.primary_id:
+      raise ValueError('Can\'t modify Auth DB on Replica')
+    state.auth_db_rev += 1
+    state.put()
+    # Only Primary does active replication.
+    if is_primary():
+      _replication_callback(state)
+
+  # If not in a transaction, start a new one.
+  if not ndb.in_transaction():
+    ndb.transaction(increment_revision_and_update_replicas)
+    return
+
+  # If in a transaction, use transaction context to store "already did this"
+  # flag. Note that each transaction retry gets its own new transaction context,
+  # see ndb/context.py, 'transaction' tasklet, around line 982 (for SDK 1.9.6).
+  ctx = ndb.get_context()
+  if not getattr(ctx, '_auth_db_inc_called', False):
+    increment_revision_and_update_replicas()
+    ctx._auth_db_inc_called = True
 
 
 ################################################################################
@@ -265,8 +394,8 @@ class AuthGroup(ndb.Model, datastore_utils.SerializableModelMixin):
 
   Parent is AuthGlobalConfig entity keyed at ROOT_KEY.
 
-  Master service holds authoritative list of Groups, that gets replicated to
-  all slave services.
+  Primary service holds authoritative list of Groups, that gets replicated to
+  all Replicas.
   """
   # How to convert this entity to or from serializable dict.
   serializable_properties = {
@@ -295,7 +424,7 @@ class AuthGroup(ndb.Model, datastore_utils.SerializableModelMixin):
   # Who created the group.
   created_by = IdentityProperty()
 
-  # When group was modified last time.
+  # When the group was modified last time.
   modified_ts = ndb.DateTimeProperty(auto_now=True)
   # Who modified the group last time.
   modified_by = IdentityProperty()
@@ -330,6 +459,7 @@ def bootstrap_group(group, identity, description):
         modified_by=identity)
   entity.members.append(identity)
   entity.put()
+  replicate_auth_db()
   return True
 
 
@@ -429,13 +559,18 @@ class AuthSecretScope(ndb.Model):
   a parent. Possible scopes are 'local' and 'global'.
 
   Secrets in 'local' scope never leave Datastore they are stored in and they
-  are different for each slave service. Only service that generated a local
-  secret knows it.
+  are different for each service (even for Replicas). Only service that
+  generated a local secret knows it.
 
-  Secrets in 'global' scope are known to all services (via master -> slave
-  DB replication mechanism). Source of truth for global secrets is in master's
+  Secrets in 'global' scope are known to all services (via Primary -> Replica
+  DB replication mechanism). Source of truth for global secrets is in Primary's
   Datastore.
   """
+
+
+def secret_scope_key(scope):
+  """Key of AuthSecretScope entity for a given scope ('global' or 'local')."""
+  return ndb.Key(AuthSecretScope, scope, parent=ROOT_KEY)
 
 
 class AuthSecret(ndb.Model):
@@ -470,7 +605,7 @@ class AuthSecret(ndb.Model):
     Args:
       name: name of the secret.
       scope: 'local' or 'global', see doc string for AuthSecretScope. 'global'
-          scope should only be used on master service.
+          scope should only be used on Primary service.
       length: length of the secret to generate if secret doesn't exist yet.
 
     Returns:
@@ -481,7 +616,7 @@ class AuthSecret(ndb.Model):
     # time and entropy.
     if scope not in ('local', 'global'):
       raise ValueError('Invalid secret scope: %s' % scope)
-    key = ndb.Key(AuthSecretScope, scope, cls, name, parent=ROOT_KEY)
+    key = ndb.Key(cls, name, parent=secret_scope_key(scope))
     entity = key.get()
     if entity is not None:
       return entity
@@ -491,29 +626,13 @@ class AuthSecret(ndb.Model):
       if entity is not None:
         return entity
       logging.info('Creating new secret key %s in %s scope', name, scope)
+      # Global keys can only be created on Primary or Standalone service.
+      if scope == 'global' and is_replica():
+        raise ValueError('Can\'t bootstrap global key on Replica')
       entity = cls(key=key, values=[os.urandom(length)])
       entity.put()
+      # Only global keys are part of replicated state.
+      if scope == 'global':
+        replicate_auth_db()
       return entity
     return create()
-
-  def update(self, secret, identity, keep_previous=True, retention=1):
-    """Updates secret value, optionally remembering previous one.
-
-    Args:
-      secret: new value for a secret (arbitrary str blob).
-      identity: Identity that making this change.
-      keep_previous: True to store current value of key so it can still be used
-          to validate tokens, etc.
-      retention: how many historical values to keep (in addition to
-          current secret value).
-    """
-    values = list(self.values or [])
-    if keep_previous:
-      values = [secret] + values[:retention]
-    else:
-      if values:
-        values[0] = secret
-      else:
-        values = [secret]
-    self.values = values
-    self.modified_by = identity
