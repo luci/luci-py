@@ -92,6 +92,14 @@ def _validate_not_pending(prop, value):
     raise datastore_errors.BadValueError('%s cannot be PENDING' % prop._name)
 
 
+def _calculate_failure(result_common):
+  # When a command times out, there may not be any exit code, it is still a user
+  # process failure mode, not an infrastructure failure mode.
+  return (
+      any(result_common.exit_codes or []) or
+      result_common.state == State.TIMED_OUT)
+
+
 class _TaskResultCommon(ndb.Model):
   """Contains properties that is common to both TaskRunResult and
   TaskResultSummary.
@@ -107,7 +115,7 @@ class _TaskResultCommon(ndb.Model):
 
   # Records that the task failed, e.g. one process had a non-zero exit code. The
   # task may be retried if desired to weed out flakiness.
-  failure = ndb.ComputedProperty(lambda self: any(self.exit_codes or []))
+  failure = ndb.ComputedProperty(_calculate_failure)
 
   # Internal infrastructure failure, in which case the task should be retried
   # automatically if possible.
@@ -173,6 +181,20 @@ class _TaskResultCommon(ndb.Model):
     out['outputs'] = out['outputs'] or []
     return out
 
+  def _pre_put_hook(self):
+    """Use extra validation that cannot be validated throught 'validator'."""
+    super(_TaskResultCommon, self)._pre_put_hook()
+    if self.state == State.EXPIRED:
+      if self.failure or self.exit_codes:
+        raise datastore_errors.BadValueError(
+            'Unexpected State, a task can\'t fail if it hasn\'t started yet')
+      if not self.internal_failure:
+        raise datastore_errors.BadValueError(
+            'Unexpected State, EXPIRED is internal failure')
+
+    if self.state == State.TIMED_OUT and not self.failure:
+      raise datastore_errors.BadValueError('Timeout implies task failure')
+
 
 class TaskRunResult(_TaskResultCommon):
   """Contains the results for a TaskToRun scheduled on a bot.
@@ -228,15 +250,6 @@ class TaskRunResult(_TaskResultCommon):
     out = super(TaskRunResult, self).to_dict()
     out['try_number'] = self.try_number
     return out
-
-  def _pre_put_hook(self):
-    """Use extra validation that cannot be validated throught 'validator'."""
-    super(TaskRunResult, self)._pre_put_hook()
-    if self.state == State.EXPIRED and self.failure:
-      raise datastore_errors.BadValueError(
-          'Unexpected State, a task can\'t fail if it hasn\'t started yet')
-    if self.state == State.TIMED_OUT and not self.failure:
-      raise datastore_errors.BadValueError('Timeout implies task failure')
 
 
 class TaskResultSummary(_TaskResultCommon):
@@ -362,7 +375,7 @@ def new_run_result(request, try_number, bot_id):
   summary_key = request_key_to_result_summary_key(request.key)
   return TaskRunResult(
       key=result_summary_key_to_run_result_key(summary_key, try_number),
-      bot_id=unicode(bot_id),
+      bot_id=bot_id,
       started_ts=task_common.utcnow())
 
 

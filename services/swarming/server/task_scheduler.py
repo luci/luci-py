@@ -72,6 +72,7 @@ def _update_task(task_key, request, bot_id):
     if not bot_id:
       run_result.state = task_result.State.EXPIRED
       run_result.abandoned_ts = task_common.utcnow()
+      run_result.internal_failure = True
     result_summary.set_from_run_result(run_result)
     ndb.put_multi([task, run_result, result_summary])
     return run_result, task
@@ -324,7 +325,7 @@ def cron_abort_expired_task_to_run():
 def cron_abort_bot_died():
   """Aborts stale TaskRunResult where the bot stopped sending updates.
 
-  Basically, sets the task result to Stae.BOT_DIED in this case.
+  Basically, sets the task result to State.BOT_DIED in this case.
   """
   total = 0
   try:
@@ -333,6 +334,7 @@ def cron_abort_bot_died():
       # https://code.google.com/p/swarming/issues/detail?id=108
       request_future = run_result.request_key.get_async()
       run_result.state = task_result.State.BOT_DIED
+      run_result.internal_failure = True
       run_result.abandoned_ts = task_common.utcnow()
       ndb.put_multi(task_result.prepare_put_run_result(run_result))
       request = request_future.get_result()

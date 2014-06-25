@@ -43,6 +43,7 @@
 
 
 {% block body %}
+{% import 'bot_view.html' as bot_view %}
 <h1>Bot details</h1>
 <a href="/restricted/bots">Back to bots list</a>
 <p>
@@ -77,13 +78,7 @@
       </tr>
       <tr>
         <td>Dimensions</td>
-        <td>
-          {% for k, v in bot.dimensions.iteritems()|sort %}
-          {{k}}:
-          {% if v is string %}{{v}}{% else %}{{v|sort|join(' | ')}}{% endif %}
-          <br>
-          {% endfor %}
-        </td>
+        <td>{{bot_view.render_dimensions(bot.dimensions)}}</td>
       </tr>
       <tr>
         <td>Version</td>

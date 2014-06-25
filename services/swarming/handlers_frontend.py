@@ -490,12 +490,14 @@ class TasksHandler(auth.AuthenticatingHandler):
       ('completed', 'Completed'),
       ('completed_success', 'Completed (success only)'),
       ('completed_failure', 'Completed (failure only)'),
+      # TODO(maruel): This is never set until the new bot API is writen.
+      # https://code.google.com/p/swarming/issues/detail?id=117
+      #('timed_out', 'Execution timed out'),
     ],
     [
-      ('expired', 'Expired'),
-      ('timed_out', 'Timed out'),
-      ('bot_died', 'Bot died'),
-      ('canceled', 'Canceled'),
+      ('bot_died', 'Bot died during execution'),
+      ('expired', 'Request expired'),
+      ('canceled', 'Request canceled'),
     ],
   ]
 
@@ -532,6 +534,11 @@ class TasksHandler(auth.AuthenticatingHandler):
       # Normal efficient behavior.
       tasks, cursor, more = query.fetch_page(limit, start_cursor=cursor)
 
+    # Prefetch the TaskRequest all at once, so that ndb's in-process cache has
+    # it instead of fetching them one at a time indirectly when using
+    # TaskResultSummary.request_key.get().
+    futures = ndb.get_multi_async(t.request_key for t in tasks)
+
     params = {
       'cursor': cursor.urlsafe() if cursor and more else None,
       'is_privileged_user': acl.is_privileged_user(),
@@ -547,6 +554,7 @@ class TasksHandler(auth.AuthenticatingHandler):
     # TODO(maruel): If admin or if the user is task's .user, show the Cancel
     # button. Do not show otherwise.
     self.response.out.write(template.render('user_tasks.html', params))
+    ndb.Future.wait_all(futures)
 
   def _get_query(self, sort, state):
     """Returns one or many TaskResultSummary queries."""
@@ -593,6 +601,8 @@ class TasksHandler(auth.AuthenticatingHandler):
       return None, query.filter(
           task_result.TaskResultSummary.state == task_result.State.EXPIRED)
 
+    # TODO(maruel): This is never set until the new bot API is writen.
+    # https://code.google.com/p/swarming/issues/detail?id=117
     if state == 'timed_out':
       return None, query.filter(
           task_result.TaskResultSummary.state == task_result.State.TIMED_OUT)

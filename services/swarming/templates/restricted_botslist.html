@@ -1,6 +1,16 @@
 {% extends "base.html" %}
 
 
+{% block headers %}
+<style>
+  h1 {
+    margin-top: 10px;
+    margin-bottom: 10px;
+  }
+</style>
+{% endblock %}
+
+
 {% block floating %}
 <br>{{now|datetimeformat}}
 {% endblock %}
@@ -10,6 +20,9 @@
 {% import 'bot_view.html' as bot_view %}
 
 <h1>Known bots</h1>
+<a href="/">Back to root</a>
+<p>
+
 <p>Sort By:
 <select id="sort" onchange="document.location.href='?sort_by=' + this.value">
   {% for sort_option in sort_options %}

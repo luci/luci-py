@@ -1,23 +1,37 @@
 {% extends "base.html" %}
 
+
 {% block headers %}
 <style>
+  h1 {
+    margin-top: 10px;
+    margin-bottom: 10px;
+  }
+
   table.property_table {
     font-family: monospace;
     border-spacing: 0;
   }
+
   table.property_table tbody tr:nth-child(even) {
     background-color: #eeeeee;
   }
+
   table.property_table td {
     padding-left: 0.5em;
     padding-right: 0.5em;
   }
+
   table.property_table tbody tr:hover {
     background-color: #eeffee;
   }
+
   table.property_table tbody tr td:first-child {
     white-space: nowrap;
+  }
+
+  .failed_test {
+    background-color: #ffdddd;
   }
 </style>
 {% endblock %}
@@ -32,6 +46,9 @@
 {% import 'bot_view.html' as bot_view %}
 
 <h1>Task summary</h1>
+<a href="/user/tasks">Back to tasks list</a>
+<p>
+
 <table class="property_table">
   <tbody>
     <tr>
@@ -60,11 +77,7 @@
     </tr>
     <tr>
       <td>Environment variables</td>
-      <td>
-        {% for k, v in request.properties.env.iteritems()|sort %}
-        {{k}}: {{v}}<br>
-        {% endfor %}
-      </td>
+      <td>{{bot_view.render_dimensions(request.properties.env)}}</td>
     </tr>
     <tr>
       <td>Commands</td>
@@ -114,11 +127,11 @@
       <td>Bot dimensions</td>
       <td>{{bot_view.bot_dimensions(bot)}}</td>
     </tr>
-    <tr>
+    <tr class="{% if task.failure %}failed_test{% endif%}">
       <td>Failure</td>
       <td>{{task.failure}}</td>
     </tr>
-    <tr>
+    <tr class="{% if task.internal_failure %}failed_test{% endif%}">
       <td>Internal failure</td>
       <td>{{task.internal_failure}}</td>
     </tr>

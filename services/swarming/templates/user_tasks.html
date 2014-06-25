@@ -67,6 +67,8 @@
 {% import 'bot_view.html' as bot_view %}
 
 <h1>Tasks</h1>
+<a href="/">Back to root</a>
+<p>
 
 <form id="filter" name="filter">
 <table class=layout_table>
@@ -131,7 +133,7 @@
     </thead>
     <tbody>
       {% for task in tasks %}
-        <tr class="request {% if task.failure %}failed_test{% endif%}">
+        <tr class="request {% if task.failure or task.internal_failure %}failed_test{% endif%}">
           <td>
             <a href="/user/task/{{task.key_string}}">{{task.name}}</a>
           </td>
