@@ -68,6 +68,7 @@ class AppTest(test_case.TestCase):
     super(AppTest, self).setUp()
     self._version = None
     self.testbed.init_user_stub()
+    self.testbed.init_search_stub()
 
     # By default requests in tests are coming from bot with fake IP.
     app = handlers_frontend.CreateApplication()
@@ -1015,9 +1016,12 @@ class AppTest(test_case.TestCase):
       # NeedIndexError.
       resp = self.app.get(url, expect_errors=True)
       self.assertEqual(200, resp.status_code, (resp.body, sort, state))
+      self.app.get(url + '&task_name=hi', status=200)
 
     self.app.get('/user/tasks?sort=foo', status=400)
     self.app.get('/user/tasks?state=foo', status=400)
+
+    self.app.get('/user/tasks?task_name=hi', status=200)
 
   def test_bot_list_empty(self):
     # Just assert it doesn't throw.

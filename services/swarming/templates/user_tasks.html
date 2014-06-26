@@ -29,8 +29,19 @@
   }
 
   table.layout_table td:nth-child(2) {
-    padding-left: 2em;
+    padding-left: 1.5em;
   }
+
+  table.layout_table td:nth-child(4) {
+    border-color: black;
+    border-right: thin solid;
+    padding-right: 1.5em;
+  }
+
+  table.layout_table td:nth-child(5) {
+    padding-left: 1.5em;
+  }
+
 </style>
 <script>
   function radio_value(field) {
@@ -70,7 +81,7 @@
 <a href="/">Back to root</a>
 <p>
 
-<form id="filter" name="filter">
+<form id="filter" name="filter" method="GET">
 <table class=layout_table>
   <thead>
     <tr>
@@ -78,6 +89,7 @@
       <td></td>
       <td>Task state</td>
       <td></td>
+      <td>Search by word</td>
     </tr>
   </thead>
   <tbody>
@@ -103,14 +115,14 @@
             <br>
           {% endfor %}
         </td>
-      {% endfor %}
-{# TODO(maruel): To be added as a separate page
+        {% endfor %}
       <td>
-        Task Name (Full Matches Only):
-        <input type="text" name="name" value="{{task_name}}">
+        Task name (whole word only):
+        <br>
+        <input type="text" name="task_name" value="{{task_name}}">
+        <br>
+        <input type="submit" value="Search">
       </td>
-      <td>
-#}
     </tr>
   <tbody>
 </table>

@@ -47,6 +47,10 @@ def _gen_request_data(properties=None, **kwargs):
 
 
 class TaskCommonApiTest(test_case.TestCase):
+  def setUp(self):
+    super(TaskCommonApiTest, self).setUp()
+    self.testbed.init_search_stub()
+
   def test_all_apis_are_tested(self):
     # Ensures there's a test for each public API.
     module = task_common

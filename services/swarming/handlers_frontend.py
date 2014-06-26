@@ -472,7 +472,7 @@ class TasksHandler(auth.AuthenticatingHandler):
   """Lists all requests and allows callers to manage them."""
   SORT_CHOICES = [
     ('created_ts', 'Created'),
-    ('modified_ts', 'Last updated (Tasks recently active)'),
+    ('modified_ts', 'Last updated (Recently active)'),
     ('completed_ts', 'Ended (Completed only)'),
     ('abandoned_ts', 'Abandoned (We failed you)'),
   ]
@@ -503,11 +503,12 @@ class TasksHandler(auth.AuthenticatingHandler):
 
   @auth.require(acl.is_user)
   def get(self):
-    cursor = datastore_query.Cursor(urlsafe=self.request.get('cursor'))
+    """Handles both ndb.Query searches and search.Index().search() queries."""
+    cursor_str = self.request.get('cursor')
     limit = int(self.request.get('limit', 100))
     sort = self.request.get('sort', self.SORT_CHOICES[0][0])
     state = self.request.get('state', self.STATE_CHOICES[0][0][0])
-    task_name = self.request.get('task_name', '')
+    task_name = self.request.get('task_name', '').strip()
 
     if not any(sort == i[0] for i in self.SORT_CHOICES):
       self.abort(400, 'Invalid sort')
@@ -519,20 +520,29 @@ class TasksHandler(auth.AuthenticatingHandler):
       # Revisit according to the user requests.
       state = 'all'
 
-    queries, query = self._get_query(sort, state)
-    if queries:
-      # When multiple queries are used, we can't use a cursor.
-      cursor = None
-      more = False
-
-      # Take the first |limit| items for each query. This is not efficient,
-      # worst case is fetching N * limit entities.
-      futures = [q.fetch_async(limit) for q in queries]
-      lists = sum((f.get_result() for f in futures), [])
-      tasks = sorted(lists, key=lambda i: i.created_ts, reverse=True)[:limit]
+    if task_name:
+      # Word based search.
+      sort = 'created_ts'
+      state = 'all'
+      tasks, cursor_str = task_scheduler.search_by_name(
+          task_name, cursor_str, limit)
     else:
-      # Normal efficient behavior.
-      tasks, cursor, more = query.fetch_page(limit, start_cursor=cursor)
+      # Normal listing.
+      queries, query = self._get_query(sort, state)
+      if queries:
+        # When multiple queries are used, we can't use a cursor.
+        cursor_str = None
+
+        # Take the first |limit| items for each query. This is not efficient,
+        # worst case is fetching N * limit entities.
+        futures = [q.fetch_async(limit) for q in queries]
+        lists = sum((f.get_result() for f in futures), [])
+        tasks = sorted(lists, key=lambda i: i.created_ts, reverse=True)[:limit]
+      else:
+        # Normal efficient behavior.
+        cursor = datastore_query.Cursor(urlsafe=cursor_str)
+        tasks, cursor, more = query.fetch_page(limit, start_cursor=cursor)
+        cursor_str = cursor.urlsafe() if cursor and more else None
 
     # Prefetch the TaskRequest all at once, so that ndb's in-process cache has
     # it instead of fetching them one at a time indirectly when using
@@ -540,7 +550,7 @@ class TasksHandler(auth.AuthenticatingHandler):
     futures = ndb.get_multi_async(t.request_key for t in tasks)
 
     params = {
-      'cursor': cursor.urlsafe() if cursor and more else None,
+      'cursor': cursor_str,
       'is_privileged_user': acl.is_privileged_user(),
       'limit': limit,
       'now': task_common.utcnow(),

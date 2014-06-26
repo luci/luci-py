@@ -4,6 +4,7 @@
 # found in the LICENSE file.
 
 import datetime
+import inspect
 import os
 import sys
 import unittest
@@ -15,7 +16,9 @@ import test_env
 
 test_env.setup_test_env()
 
+from google.appengine.api import search
 from google.appengine.ext import deferred
+from google.appengine.ext import ndb
 
 # From tools/third_party/
 import webtest
@@ -23,6 +26,7 @@ import webtest
 from components import stats_framework
 from server import result_helper
 from server import stats
+from server import task_request
 from server import task_result
 from server import task_scheduler
 from server import task_to_run
@@ -34,9 +38,9 @@ from server.task_result import State
 # pylint: disable=W0212,W0612
 
 
-def _gen_request_data(properties=None, **kwargs):
+def _gen_request_data(name='Request name', properties=None, **kwargs):
   base_data = {
-    'name': 'Request name',
+    'name': name,
     'user': 'Jesus',
     'properties': {
       'commands': [[u'command1']],
@@ -77,6 +81,8 @@ class TaskSchedulerApiTest(test_case.TestCase):
 
   def setUp(self):
     super(TaskSchedulerApiTest, self).setUp()
+    self.testbed.init_search_stub()
+
     self.now = datetime.datetime(2014, 1, 2, 3, 4, 5, 6)
     test_helper.mock_now(self, self.now)
     self.app = webtest.TestApp(
@@ -384,6 +390,82 @@ class TaskSchedulerApiTest(test_case.TestCase):
         datetime.timedelta(seconds=1))
     test_helper.mock_now(self, after_delay)
     self.assertEqual(1, task_scheduler.cron_abort_bot_died())
+
+  def test_search_by_name(self):
+    data = _gen_request_data(
+        properties=dict(dimensions={u'OS': u'Windows-3.1.1'}))
+    _, result_summary = task_scheduler.make_request(data)
+
+    # Assert that search is not case-sensitive by using unexpected casing.
+    actual, _cursor = task_scheduler.search_by_name('requEST', None, 10)
+    self.assertEqual([result_summary], actual)
+    actual, _cursor = task_scheduler.search_by_name('name', None, 10)
+    self.assertEqual([result_summary], actual)
+
+  def test_search_by_name_failures(self):
+    data = _gen_request_data(
+        properties=dict(dimensions={u'OS': u'Windows-3.1.1'}))
+    _, result_summary = task_scheduler.make_request(data)
+
+    actual, _cursor = task_scheduler.search_by_name('foo', None, 10)
+    self.assertEqual([], actual)
+    # Partial match doesn't work.
+    actual, _cursor = task_scheduler.search_by_name('nam', None, 10)
+    self.assertEqual([], actual)
+
+  def test_search_by_name_broken_tasks(self):
+    # Create tasks where task_scheduler_make_request() fails in the middle. This
+    # is done by mocking the functions to fail every SKIP call and running it in
+    # a loop.
+    class RandomFailure(Exception):
+      pass
+
+    # First call fails ndb.put_multi(), second call fails search.Index.put(),
+    # third call work.
+    index = [0]
+    SKIP = 3
+    def put_multi(*args, **kwargs):
+      self.assertEqual('make_request', inspect.stack()[1][3])
+      if (index[0] % SKIP) == 1:
+        raise RandomFailure()
+      return old_put_multi(*args, **kwargs)
+
+    def put(*args, **kwargs):
+      self.assertEqual('make_request', inspect.stack()[1][3])
+      if (index[0] % SKIP) == 2:
+        raise RandomFailure()
+      return old_put(*args, **kwargs)
+
+    old_put_multi = self.mock(ndb, 'put_multi', put_multi)
+    old_put = self.mock(search.Index, 'put', put)
+
+    saved = []
+
+    for i in xrange(100):
+      index[0] = i
+      data = _gen_request_data(
+          name='Request %d' % i,
+          properties=dict(dimensions={u'OS': u'Windows-3.1.1'}))
+      try:
+        _, result_summary = task_scheduler.make_request(data)
+        saved.append(result_summary)
+      except RandomFailure:
+        pass
+
+    self.assertEqual(34, len(saved))
+    # The mocking doesn't affect TaskRequest since it uses
+    # datastore_utils.insert() which uses ndb.Model.put().
+    self.assertEqual(100, task_request.TaskRequest.query().count())
+    self.assertEqual(34, task_result.TaskResultSummary.query().count())
+
+    # Now the DB is full of half-corrupted entities.
+    cursor = None
+    actual, cursor = task_scheduler.search_by_name('Request', cursor, 31)
+    self.assertEqual(31, len(actual))
+    actual, cursor = task_scheduler.search_by_name('Request', cursor, 31)
+    self.assertEqual(3, len(actual))
+    actual, cursor = task_scheduler.search_by_name('Request', cursor, 31)
+    self.assertEqual(0, len(actual))
 
 
 if __name__ == '__main__':

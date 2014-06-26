@@ -19,6 +19,7 @@ import math
 import random
 
 from google.appengine.api import datastore_errors
+from google.appengine.api import search
 from google.appengine.ext import ndb
 from google.appengine.runtime import apiproxy_errors
 
@@ -109,6 +110,10 @@ def make_request(data):
   The number of entities created is 3: TaskRequest, TaskResultSummary and
   TaskToRun.
 
+  The TaskRequest is saved first as a DB transaction, then TaskResultSummary and
+  TaskToRun are saved as a single DB RPC. The Search index is also updated
+  in-between.
+
   Arguments:
   - data: is in the format expected by task_request.make_request().
 
@@ -116,10 +121,35 @@ def make_request(data):
     tuple(TaskRequest, TaskResultSummary). TaskToRun is not returned.
   """
   request = task_request.make_request(data)
-  # Creates the entities TaskToRun and TaskResultSummary.
-  # TaskRunResult will be created once a bot starts it.
+
+  # At this point, the request is now in the DB but not yet in a mode where it
+  # can be triggered or visible. Index it right away so it is searchable. If any
+  # of remaining calls in this function fail, the TaskRequest and Search
+  # Document will simply point to an incomplete task, which will be ignored.
+  #
+  # Creates the entities TaskToRun and TaskResultSummary but do not save them
+  # yet. TaskRunResult will be created once a bot starts it.
   task = task_to_run.new_task_to_run(request)
   result_summary = task_result.new_result_summary(request)
+
+  # Do not specify a doc_id, as they are guaranteed to be monotonically
+  # increasing and searches are done in reverse order, which fits exactly the
+  # created_ts ordering. This is useful because DateField is precise to the date
+  # (!) and NumberField is signed 32 bits so the best it could do with EPOCH is
+  # second resolution up to year 2038.
+  index = search.Index(name='requests')
+  packed = task_common.pack_result_summary_key(result_summary.key)
+  doc = search.Document(
+      fields=[
+        search.TextField(name='name', value=request.name),
+        search.AtomField(name='id', value=packed),
+      ])
+  # Even if it fails here, we're still fine, as the task is not "alive" yet.
+  index.put([doc])
+
+  # Storing these entities makes this task live. It is important at this point
+  # that the HTTP handler returns as fast as possible, otherwise the task will
+  # be run but the client will not know about it.
   ndb.put_multi([result_summary, task])
   stats.add_task_entry(
       'task_enqueued', result_summary.key,
@@ -280,6 +310,65 @@ def bot_update_task(run_result_key, data, bot_id):
         'run_updated', run_result.key, bot_id=bot_id,
         dimensions=request.properties.dimensions)
   return True
+
+
+def search_by_name(word, cursor_str, limit):
+  """Returns TaskResultSummary in -created_ts order containing the word."""
+  cursor = search.Cursor(web_safe_string=cursor_str, per_result=True)
+  index = search.Index(name='requests')
+
+  def item_to_id(item):
+    for field in item.fields:
+      if field.name == 'id':
+        return field.value
+
+  # The code is structured to handle incomplete entities but still return
+  # 'limit' items. This is done by fetching a few more entities than necessary,
+  # then keeping track of the cursor per item so the right cursor can be
+  # returned.
+  opts = search.QueryOptions(limit=limit + 5, cursor=cursor)
+  results = index.search(search.Query('name:%s' % word, options=opts))
+  result_summary_keys = []
+  cursors = []
+  for item in results.results:
+    value = item_to_id(item)
+    if value:
+      result_summary_keys.append(unpack_result_summary_key(value))
+      cursors.append(item.cursor)
+
+  # Handle None result value. See make_request() for details about how this can
+  # happen.
+  tasks = []
+  cursor = None
+  for task, c in zip(ndb.get_multi(result_summary_keys), cursors):
+    if task:
+      cursor = c
+      tasks.append(task)
+      if len(tasks) == limit:
+        # Drop the rest.
+        break
+  else:
+    if len(cursors) == limit + 5:
+      while len(tasks) < limit:
+        # Go into the slow path, seems like we got a lot of corrupted items.
+        opts = search.QueryOptions(limit=limit-len(tasks) + 5, cursor=cursor)
+        results = index.search(search.Query('name:%s' % word, options=opts))
+        if not results.results:
+          # Nothing else.
+          cursor = None
+          break
+        for item in results.results:
+          value = item_to_id(item)
+          if value:
+            cursor = item.cursor
+            task = unpack_result_summary_key(value).get()
+            if task:
+              tasks.append(task)
+              if len(tasks) == limit:
+                break
+
+  cursor_str = cursor.web_safe_string if cursor else None
+  return tasks, cursor_str
 
 
 ### Cron job.
