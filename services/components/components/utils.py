@@ -15,6 +15,7 @@ import functools
 import inspect
 import json
 import os
+import re
 import threading
 import time
 
@@ -224,6 +225,21 @@ def get_app_version():
   # Sadly, this causes an RPC and when called too frequently, throws quota
   # errors.
   return modules.get_current_version_name()
+
+
+@cache
+def get_app_revision_url():
+  """Returns URL of a git revision page for currently running app version.
+
+  Works only for non-tainted versions uploaded with tools/update.py: app version
+  should look like '162-efaec47'. Assumes all services that use 'components'
+  live in a single repository.
+
+  Returns None if a version is tainted or has unexpected name.
+  """
+  rev = re.match(r'\d+-([a-f0-9]+)$', get_app_version())
+  template = 'https://code.google.com/p/swarming/source/detail?r=%s'
+  return template % rev.group(1) if rev else None
 
 
 @cache

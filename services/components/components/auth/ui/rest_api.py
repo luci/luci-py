@@ -10,14 +10,11 @@ import webapp2
 
 from google.appengine.ext import ndb
 
-from components.auth import api
-from components.auth import handler
-from components.auth import model
-
 from components import utils
 
-# Part of public API of 'auth_ui' component, exposed by this module.
-__all__ = ['get_rest_api_routes']
+from .. import api
+from .. import handler
+from .. import model
 
 
 def get_rest_api_routes():

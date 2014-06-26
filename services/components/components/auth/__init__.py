@@ -20,3 +20,7 @@ from api import *
 from handler import *
 from model import *
 from tokens import *
+from ui.app import *
+
+# Import 'config' to register lib_config hook.
+import config

@@ -20,7 +20,6 @@ Workflow to edit a value:
 """
 
 import os
-import re
 
 from google.appengine.api import app_identity
 from google.appengine.api import modules
@@ -109,20 +108,6 @@ def get_local_dev_server_host():
   """Returns 'hostname:port' for a default module on a local dev server."""
   assert utils.is_local_dev_server()
   return modules.get_hostname(module='default')
-
-
-@utils.cache
-def get_app_revision_url():
-  """Returns URL of a git revision page for currently running app version.
-
-  Works only for non-tainted versions uploaded with tools/update.py: app version
-  should look like '162-efaec47'.
-
-  Returns None if a version is tainted or has unexpected name.
-  """
-  rev = re.match(r'\d+-([a-f0-9]+)$', utils.get_app_version())
-  template = 'https://code.google.com/p/swarming/source/detail?r=%s'
-  return template % rev.group(1) if rev else None
 
 
 def warmup():

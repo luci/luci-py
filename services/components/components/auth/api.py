@@ -24,6 +24,7 @@ import time
 from google.appengine.ext import ndb
 from google.appengine.ext.ndb import metadata
 
+from . import config
 from . import model
 
 # Part of public API of 'auth' component, exposed by this module.
@@ -392,9 +393,10 @@ def get_process_auth_db():
 
     # Fetching AuthDB for the first time ever? Do it under the lock because
     # there's nothing to return yet. All threads would have to wait for this
-    # initial fetch to complete.
+    # initial fetch to complete. Also ensure 'auth' component is configured.
     if _auth_db is None:
       logging.info('Initial fetch of AuthDB')
+      config.ensure_configured()
       _auth_db = fetch_auth_db()
       _auth_db_expiration = time.time() + PROCESS_CACHE_EXPIRATION_SEC
       return _auth_db

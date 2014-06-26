@@ -6,11 +6,6 @@ api_version: 1
 threadsafe: true
 
 handlers:
-- url: /auth/static/(.+)\.(css|gif|ico|js|svg|ttf)
-  static_files: components/auth_ui/static/\1.\2
-  upload: components/auth_ui/static/(.+)\.(css|gif|ico|js|svg|ttf)
-  secure: always
-
 - url: /.*
   script: frontend.main.app
   secure: always
@@ -20,6 +15,7 @@ builtins:
 - remote_api: on
 
 includes:
+- components/auth
 - components/static_third_party.yaml
 
 inbound_services:

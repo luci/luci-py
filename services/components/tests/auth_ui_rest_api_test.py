@@ -23,7 +23,7 @@ from components.auth import api
 from components.auth import handler
 from components.auth import model
 
-from components.auth_ui import rest_api
+from components.auth.ui import rest_api
 
 
 def call_get(request_handler, expect_errors=False):

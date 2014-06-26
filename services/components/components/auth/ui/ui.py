@@ -11,10 +11,11 @@ import webapp2
 
 from google.appengine.api import users
 
-from components import auth
+from components import utils
 
-# Part of public API of 'auth_ui' component, exposed by this module.
-__all__ = ['configure_ui', 'get_ui_routes']
+from .. import api
+from .. import handler
+from .. import model
 
 
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -33,16 +34,12 @@ NAVBAR_TABS = (
 
 # Global static configuration set in 'configure_ui'.
 _ui_app_name = 'Unknown'
-_ui_app_revision_url = None
-_ui_app_version = 'unknown'
 
 
-def configure_ui(app_name, app_version, app_revision_url):
+def configure_ui(app_name):
   """Global configuration of some UI parameters."""
-  global _ui_app_name, _ui_app_revision_url, _ui_app_version
+  global _ui_app_name
   _ui_app_name = app_name
-  _ui_app_version = app_version
-  _ui_app_revision_url = app_revision_url
 
 
 def get_ui_routes():
@@ -55,7 +52,7 @@ def get_ui_routes():
   ]
 
 
-class UIHandler(auth.AuthenticatingHandler):
+class UIHandler(handler.AuthenticatingHandler):
   """Renders Jinja templates extending base.html or base_minimal.html."""
 
   def reply(self, path, env=None, status=200):
@@ -84,17 +81,17 @@ class UIHandler(auth.AuthenticatingHandler):
 
     # This will be accessible from Javascript as global 'config' variable.
     js_config = {
-      'identity': auth.get_current_identity().to_bytes(),
+      'identity': api.get_current_identity().to_bytes(),
     }
     js_config.update(common)
 
     # Jinja2 environment to use to render a template.
     full_env = {
       'app_name': _ui_app_name,
-      'app_revision_url': _ui_app_revision_url,
-      'app_version': _ui_app_version,
+      'app_revision_url': utils.get_app_revision_url(),
+      'app_version': utils.get_app_version(),
       'config': json.dumps(js_config),
-      'identity': auth.get_current_identity(),
+      'identity': api.get_current_identity(),
       'navbar': NAVBAR_TABS,
     }
     full_env.update(common)
@@ -116,12 +113,12 @@ class UIHandler(auth.AuthenticatingHandler):
   def authorization_error(self, error):
     """Redirects to login or shows 'Access Denied' page."""
     # Not authenticated -> redirect to login.
-    if auth.get_current_identity().is_anonymous:
+    if api.get_current_identity().is_anonymous:
       self.redirect(users.create_login_url(self.request.path))
       return
 
     # Admin group is empty -> redirect to bootstrap procedure to create it.
-    if auth.is_empty_group(auth.ADMIN_GROUP):
+    if model.is_empty_group(model.ADMIN_GROUP):
       self.redirect_to('bootstrap')
       return
 
@@ -135,7 +132,7 @@ class UIHandler(auth.AuthenticatingHandler):
 
 class MainHandler(UIHandler):
   """Redirects to first navbar tab."""
-  @auth.require(auth.is_admin)
+  @api.require(api.is_admin)
   def get(self):
     self.redirect(NAVBAR_TABS[0][2])
 
@@ -147,32 +144,32 @@ class BootstrapHandler(UIHandler):
   group may not exist yet. Used to bootstrap a new service instance.
   """
 
-  @auth.require(users.is_current_user_admin)
+  @api.require(users.is_current_user_admin)
   def get(self):
     self.reply(
         'bootstrap.html',
         env={
           'page_title': 'Bootstrap',
-          'admin_group': auth.ADMIN_GROUP,
+          'admin_group': model.ADMIN_GROUP,
         })
 
-  @auth.require(users.is_current_user_admin)
+  @api.require(users.is_current_user_admin)
   def post(self):
-    added = auth.bootstrap_group(
-        auth.ADMIN_GROUP, auth.get_current_identity(),
+    added = model.bootstrap_group(
+        model.ADMIN_GROUP, api.get_current_identity(),
         'Users that can manage groups')
     self.reply(
         'bootstrap_done.html',
         env={
           'page_title': 'Bootstrap',
-          'admin_group': auth.ADMIN_GROUP,
+          'admin_group': model.ADMIN_GROUP,
           'added': added,
         })
 
 
 class GroupsHandler(UIHandler):
   """Page with Groups management."""
-  @auth.require(auth.is_admin)
+  @api.require(api.is_admin)
   def get(self):
     env = {
       'js_file': 'groups.js',
@@ -184,7 +181,7 @@ class GroupsHandler(UIHandler):
 
 class OAuthConfigHandler(UIHandler):
   """Page with OAuth configuration."""
-  @auth.require(auth.is_admin)
+  @api.require(api.is_admin)
   def get(self):
     env = {
       'js_file': 'oauth_config.js',

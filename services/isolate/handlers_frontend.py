@@ -33,7 +33,6 @@ import stats
 import stats_gviz
 import template
 from components import auth
-from components import auth_ui
 from components import ereporter2
 from components import utils
 
@@ -138,7 +137,7 @@ def render_template(template_path, env=None):
     Rendered template as str.
   """
   default_env = {
-    'app_revision_url': config.get_app_revision_url(),
+    'app_revision_url': utils.get_app_revision_url(),
     'app_version': utils.get_app_version(),
   }
   if env:
@@ -995,28 +994,8 @@ def create_application(debug=False):
   if utils.is_local_dev_server():
     dev_routes.extend(gcs.URLSigner.switch_to_dev_mode())
 
-  # Supported authentication mechanisms.
-  auth.configure([
-    auth.oauth_authentication,
-    auth.cookie_authentication,
-    auth.service_to_service_authentication,
-    acl.whitelisted_ip_authentication,
-  ])
-
-  # Customize auth UI to show that it's running on isolate server.
-  auth_ui.configure_ui(
-      app_name='Isolate Server',
-      app_version=utils.get_app_version(),
-      app_revision_url=config.get_app_revision_url())
-
   # Add some predefined groups when running on local dev server.
   if utils.is_local_dev_server():
     bootstrap_dev_server_acls()
 
-  # Routes with Auth REST API and Auth UI.
-  auth_routes = []
-  auth_routes.extend(auth_ui.get_rest_api_routes())
-  auth_routes.extend(auth_ui.get_ui_routes())
-
-  return webapp2.WSGIApplication(
-      dev_routes + auth_routes + get_routes(), debug=debug)
+  return webapp2.WSGIApplication(dev_routes + get_routes(), debug=debug)

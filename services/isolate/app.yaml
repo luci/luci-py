@@ -20,11 +20,6 @@ handlers:
   static_dir: third_party/mapreduce/lib/pipeline/ui/images
   secure: always
 
-- url: /auth/static/(.+)\.(css|gif|ico|js|ttf|svg)
-  static_files: components/auth_ui/static/\1.\2
-  upload: components/auth_ui/static/(.+)\.(css|gif|ico|js|ttf|svg)
-  secure: always
-
 - url: /(.+)\.(css|gif|ico|js|txt)
   static_files: static/\1.\2
   upload: static/(.+)\.(css|gif|ico|js|txt)
@@ -42,6 +37,7 @@ inbound_services:
 - warmup
 
 includes:
+- components/auth
 - components/static_third_party.yaml
 
 # https://developers.google.com/appengine/docs/python/tools/libraries27

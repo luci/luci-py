@@ -14,6 +14,7 @@ from google.appengine.api import oauth
 from google.appengine.api import users
 
 from . import api
+from . import config
 from . import model
 from . import tokens
 
@@ -77,6 +78,10 @@ class AuthenticatingHandler(webapp2.RequestHandler):
 
   def dispatch(self):
     """Extracts and verifies Identity, sets up request auth context."""
+    # Ensure auth component is configured before executing any code.
+    # Configuration may modify _auth_methods used below.
+    config.ensure_configured()
+
     identity = None
     for method_func in _auth_methods:
       try:

@@ -29,7 +29,6 @@ from common import rpc
 from common import swarm_constants
 from common import test_request_message
 from components import auth
-from components import auth_ui
 from components import decorators
 from components import ereporter2
 from components import natsort
@@ -1172,28 +1171,12 @@ def CreateApplication():
   # Upgrade to Route objects so regexp work.
   routes = [webapp2.Route(*i) for i in urls]
 
-  # Supported authentication mechanisms.
-  auth.configure([
-      auth.oauth_authentication,
-      auth.cookie_authentication,
-      auth.service_to_service_authentication,
-      acl.ip_whitelist_authentication,
-  ])
-
-  # Customize auth UI to show that it's running on swarming service.
-  auth_ui.configure_ui(
-      app_name='Swarming',
-      app_version=utils.get_app_version(),
-      app_revision_url=template.get_app_revision_url())
-
   # If running on a local dev server, allow bots to connect without prior
   # groups configuration. Useful when running smoke test.
   if utils.is_local_dev_server():
     acl.bootstrap_dev_server_acls()
 
-  # Add routes with Auth REST API and Auth UI.
-  routes.extend(auth_ui.get_rest_api_routes())
-  routes.extend(auth_ui.get_ui_routes())
+  # TODO(maruel): Split backend into a separate module. For now add routes here.
   routes.extend(handlers_backend.get_routes())
 
   return webapp2.WSGIApplication(routes, debug=True)

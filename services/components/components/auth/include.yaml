@@ -1,0 +1,13 @@
+handlers:
+- url: /auth/static/(.+)\.(css|gif|ico|js|ttf|svg)
+  static_files: components/auth/ui/static/\1.\2
+  upload: components/auth/ui/static/(.+)\.(css|gif|ico|js|ttf|svg)
+  secure: always
+
+- url: /auth.*
+  script: components.auth.main.APP
+  secure: always
+
+
+includes:
+- components/static_third_party.yaml

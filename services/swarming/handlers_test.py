@@ -80,6 +80,14 @@ class AppTest(test_case.TestCase):
           'SERVER_SOFTWARE': os.environ['SERVER_SOFTWARE'],
         })
 
+    # WSGI app that implements auth REST API.
+    self.auth_app = webtest.TestApp(
+        auth.create_wsgi_application(debug=True),
+        extra_environ={
+          'REMOTE_ADDR': FAKE_IP,
+          'SERVER_SOFTWARE': os.environ['SERVER_SOFTWARE'],
+        })
+
     # Whitelist that fake bot.
     user_manager.AddWhitelist(FAKE_IP)
 
@@ -127,7 +135,7 @@ class AppTest(test_case.TestCase):
     self.assertEqual(body, response.body, repr(response.body))
 
   def getXsrfToken(self):
-    return self.app.post(
+    return self.auth_app.post(
         '/auth/api/v1/accounts/self/xsrf_token',
         headers={'X-XSRF-Token-Request': '1'}).json['xsrf_token']
 

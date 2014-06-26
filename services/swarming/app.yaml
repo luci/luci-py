@@ -5,11 +5,6 @@ api_version: 1
 threadsafe: true
 
 handlers:
-- url: /auth/static/(.+)\.(css|gif|ico|js|ttf|svg)
-  static_files: components/auth_ui/static/\1.\2
-  upload: components/auth_ui/static/(.+)\.(css|gif|ico|js|ttf|svg)
-  secure: always
-
 - url: /([^/]+)\.(css|ico|txt)
   static_files: static/\1.\2
   upload: static/(.+)\.(css|ico|txt)
@@ -39,6 +34,7 @@ inbound_services:
 - warmup
 
 includes:
+- components/auth
 - components/static_third_party.yaml
 
 libraries:
