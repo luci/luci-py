@@ -3,15 +3,24 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
+import datetime
 import json
+import logging
+import os
 import sys
 import unittest
 
 import test_env
 test_env.setup_test_env()
 
-from components import ereporter2
+from google.appengine.ext import ndb
+
+from components.ereporter2 import api
+from components.ereporter2 import ui
 from support import test_case
+
+
+# Access to a protected member XXX of a client class - pylint: disable=W0212
 
 
 class ErrorRecordStub(object):
@@ -47,21 +56,32 @@ def ErrorRecord(**kwargs):
       'message': 'Failed',
   }
   default_values.update(kwargs)
-  return ereporter2.ErrorRecord(**default_values)
+  return api.ErrorRecord(**default_values)
 
 
 def ignorer(error_record):
-  return ereporter2.should_ignore_error_record(
+  return api.should_ignore_error_record(
       ['Process terminated because the request deadline was exceeded during a '
         'loading request.',],
       ['DeadlineExceededError'],
       error_record)
 
 
+def mock_now(test, now, seconds):
+  """Mocks _utcnow() and ndb properties.
+
+  In particular handles when auto_now and auto_now_add are used.
+  """
+  now = now + datetime.timedelta(seconds=seconds)
+  test.mock(api, '_utcnow', lambda: now)
+  test.mock(ndb.DateTimeProperty, '_now', lambda _: now)
+  test.mock(ndb.DateProperty, '_now', lambda _: now.date())
+
+
 class Ereporter2Test(test_case.TestCase):
   def setUp(self):
     super(Ereporter2Test, self).setUp()
-    self.mock(ereporter2, '_get_end_time_for_email', lambda: 1383000000)
+    self.mock(ui, '_get_end_time_for_email', lambda: 1383000000)
 
   def assertContent(self, message):
     self.assertEqual(
@@ -86,15 +106,15 @@ class Ereporter2Test(test_case.TestCase):
     data = [
       ErrorRecord(),
     ]
-    self.mock(ereporter2, '_extract_exceptions_from_logs', lambda *_: data)
-    result = ereporter2.generate_and_email_report(
+    self.mock(api, '_extract_exceptions_from_logs', lambda *_: data)
+    result = ui.generate_and_email_report(
         module_versions=[],
         ignorer=ignorer,
         recipients=None,
         request_id_url='http://foo/request/',
         report_url='http://foo/report',
-        title_template=ereporter2.REPORT_TITLE_TEMPLATE,
-        content_template=ereporter2.REPORT_CONTENT_TEMPLATE,
+        title_template=ui.REPORT_TITLE_TEMPLATE,
+        content_template=ui.REPORT_CONTENT_TEMPLATE,
         extras={})
     self.assertEqual(True, result)
 
@@ -109,15 +129,15 @@ class Ereporter2Test(test_case.TestCase):
     data = [
       ErrorRecord(),
     ]
-    self.mock(ereporter2, '_extract_exceptions_from_logs', lambda *_: data)
-    result = ereporter2.generate_and_email_report(
+    self.mock(api, '_extract_exceptions_from_logs', lambda *_: data)
+    result = ui.generate_and_email_report(
         module_versions=[],
         ignorer=ignorer,
         recipients='joe@example.com',
         request_id_url='http://foo/request/',
         report_url='http://foo/report',
-        title_template=ereporter2.REPORT_TITLE_TEMPLATE,
-        content_template=ereporter2.REPORT_CONTENT_TEMPLATE,
+        title_template=ui.REPORT_TITLE_TEMPLATE,
+        content_template=ui.REPORT_CONTENT_TEMPLATE,
         extras={})
     self.assertEqual(True, result)
 
@@ -170,11 +190,11 @@ class Ereporter2Test(test_case.TestCase):
       ),
       (
         ('\nTraceback (most recent call last):\n'
-        '  File \"ereporter2.py\", line 74\n'
+        '  File \"api.py\", line 74\n'
         '    class ErrorReportingInfo(ndb.Model):\n'
         '        ^\n'
         'SyntaxError: invalid syntax'),
-        'SyntaxError@ereporter2.py:74',
+        'SyntaxError@api.py:74',
         'SyntaxError',
         False,
       ),
@@ -190,10 +210,10 @@ class Ereporter2Test(test_case.TestCase):
     ]
     for (message, expected_signature, excepted_exception,
          expected_ignored) in messages:
-      signature, exception_type = ereporter2.signature_from_message(message)
+      signature, exception_type = api._signature_from_message(message)
       self.assertEqual(expected_signature, signature)
       self.assertEqual(excepted_exception, exception_type)
-      result = ereporter2.should_ignore_error_record(
+      result = api.should_ignore_error_record(
           IGNORED_LINES,
           IGNORED_EXCEPTIONS,
           ErrorRecordStub(message, exception_type))
@@ -202,36 +222,36 @@ class Ereporter2Test(test_case.TestCase):
   def assertEqualObj(self, a, b):
     """Makes complex objects easier to diff."""
     a_str = json.dumps(
-        ereporter2.serialize(a), indent=2, sort_keys=True).splitlines()
+        api.serialize(a), indent=2, sort_keys=True).splitlines()
     b_str = json.dumps(
-        ereporter2.serialize(b), indent=2, sort_keys=True).splitlines()
+        api.serialize(b), indent=2, sort_keys=True).splitlines()
     self.assertEqual(a_str, b_str)
 
   def test_generate_report(self):
-    msg = ereporter2.STACK_TRACE_MARKER + '\nDeadlineExceededError'
+    msg = api._STACK_TRACE_MARKER + '\nDeadlineExceededError'
     data = [
       ErrorRecord(),
       ErrorRecord(message=msg),
       ErrorRecord(),
     ]
-    self.mock(ereporter2, '_extract_exceptions_from_logs', lambda *_: data)
-    report, ignored = ereporter2.generate_report(10, 20, None, ignorer)
-    expected_report = ereporter2.ErrorCategory(
+    self.mock(api, '_extract_exceptions_from_logs', lambda *_: data)
+    report, ignored = api.generate_report(10, 20, None, ignorer)
+    expected_report = api._ErrorCategory(
         'Failed@v1', 'v1', 'default', 'Failed', '/foo')
-    expected_report.events = ereporter2.CappedList(
-        ereporter2.ERROR_LIST_HEAD_SIZE,
-        ereporter2.ERROR_LIST_TAIL_SIZE,
+    expected_report.events = api._CappedList(
+        api._ERROR_LIST_HEAD_SIZE,
+        api._ERROR_LIST_TAIL_SIZE,
         [
           ErrorRecord(),
           ErrorRecord(),
         ],
     )
     self.assertEqualObj([expected_report], report)
-    expected_ignored = ereporter2.ErrorCategory(
+    expected_ignored = api._ErrorCategory(
         'DeadlineExceededError@None:-1@v1', 'v1', 'default', msg, '/foo')
-    expected_ignored.events = ereporter2.CappedList(
-        ereporter2.ERROR_LIST_HEAD_SIZE,
-        ereporter2.ERROR_LIST_TAIL_SIZE,
+    expected_ignored.events = api._CappedList(
+        api._ERROR_LIST_HEAD_SIZE,
+        api._ERROR_LIST_TAIL_SIZE,
         [
           ErrorRecord(message=msg),
         ],
@@ -239,21 +259,21 @@ class Ereporter2Test(test_case.TestCase):
     self.assertEqualObj([expected_ignored], ignored)
 
   def test_report_to_html(self):
-    msg = ereporter2.STACK_TRACE_MARKER + '\nDeadlineExceededError'
+    msg = api._STACK_TRACE_MARKER + '\nDeadlineExceededError'
     data = [
       ErrorRecord(),
       ErrorRecord(message=msg),
       ErrorRecord(),
     ]
-    self.mock(ereporter2, '_extract_exceptions_from_logs', lambda *_: data)
+    self.mock(api, '_extract_exceptions_from_logs', lambda *_: data)
     module_versions = [('foo', 'bar')]
-    report, ignored = ereporter2.generate_report(
+    report, ignored = api.generate_report(
         10, 20, module_versions, ignorer)
-    env = ereporter2.get_template_env(10, 20, module_versions)
-    out = ereporter2.report_to_html(
+    env = ui.get_template_env(10, 20, module_versions)
+    out = ui.report_to_html(
         report, ignored,
-        ereporter2.REPORT_HEADER_TEMPLATE,
-        ereporter2.REPORT_CONTENT_TEMPLATE,
+        ui.REPORT_HEADER_TEMPLATE,
+        ui.REPORT_CONTENT_TEMPLATE,
         'http://foo/request_id', env)
     expected = (
       '<h2>Report for 1970-01-01 00:00:10 (10) to 1970-01-01 00:00:20 '
@@ -271,7 +291,7 @@ class Ereporter2Test(test_case.TestCase):
     self.assertEqual(expected, out)
 
   def test_capped_list(self):
-    l = ereporter2.CappedList(5, 10)
+    l = api._CappedList(5, 10)
 
     # Grow a bit, should go to head.
     for i in xrange(5):
@@ -296,8 +316,24 @@ class Ereporter2Test(test_case.TestCase):
     self.assertEqual(range(5), l.head)
     self.assertEqual(range(6, 16), list(l.tail))
 
+  def test_relative_path(self):
+    data = [
+      os.getcwd(),
+      os.path.dirname(os.path.dirname(os.path.dirname(api.runtime.__file__))),
+      os.path.dirname(os.path.dirname(os.path.dirname(api.webapp2.__file__))),
+      os.path.dirname(os.getcwd()),
+      '.',
+    ]
+    for value in data:
+      i = os.path.join(value, 'foo')
+      self.assertEqual('foo', api.relative_path(i))
+
+    self.assertEqual('bar/foo', api.relative_path('bar/foo'))
+
 
 if __name__ == '__main__':
   if '-v' in sys.argv:
     unittest.TestCase.maxDiff = None
+  logging.basicConfig(
+      level=logging.DEBUG if '-v' in sys.argv else logging.ERROR)
   unittest.main()

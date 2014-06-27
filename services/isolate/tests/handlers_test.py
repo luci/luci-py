@@ -161,7 +161,7 @@ class MainTest(test_case.TestCase):
 
   def test_internal_cron_ereporter2_mail(self):
     data = [_ErrorRecord()]
-    self.mock(ereporter2, '_extract_exceptions_from_logs', lambda *_: data)
+    self.mock(ereporter2.api, '_extract_exceptions_from_logs', lambda *_: data)
     headers = {'X-AppEngine-Cron': 'true'}
     response = self.app_backend.get(
         '/internal/cron/ereporter2/mail', headers=headers)
