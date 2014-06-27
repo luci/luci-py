@@ -5,6 +5,7 @@
 
 """Given current git checkout state return version string to use for an app."""
 
+import getpass
 import logging
 import optparse
 import os
@@ -53,7 +54,7 @@ def calculate_version(root, tag):
   """Returns a tag for a git checkout.
 
   Uses the pseudo revision number from the upstream commit this branch is based
-  on, the abbreviated commit hash. Adds -tainted if the code is not
+  on, the abbreviated commit hash. Adds -tainted-<username> if the code is not
   pristine and optionally adds a tag to further describe it.
   """
   pseudo_revision, mergebase = get_pseudo_revision(root, 'origin/master')
@@ -73,7 +74,7 @@ def calculate_version(root, tag):
   # overwhelming!
   version = '%s-%s' % (pseudo_revision, mergebase[:7])
   if not pristine:
-    version += '-tainted'
+    version += '-tainted-%s' % getpass.getuser()
   if tag:
     version += '-' + tag
   return version
