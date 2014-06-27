@@ -12,7 +12,7 @@ found in the LICENSE file. -->
   <link href="/auth/static/css/common.css" rel="stylesheet">
 
   {% if css_file %}
-    <link href="/auth/static/css/{{css_file}}" rel="stylesheet">
+    <link href="{{css_file}}" rel="stylesheet">
   {% endif %}
 
   <script src="/third_party/jquery/jquery-1.11.0.min.js">
@@ -28,7 +28,7 @@ found in the LICENSE file. -->
   <script src="/auth/static/js/common.js"></script>
   <script src="/auth/static/js/api.js"></script>
   {% if js_file %}
-    <script src="/auth/static/js/{{js_file}}"></script>
+    <script src="{{js_file}}"></script>
   {% endif %}
 
 {% raw %}
@@ -112,10 +112,9 @@ found in the LICENSE file. -->
   <script type="text/javascript">
     // Expose 'config' as global js variable.
     var config = {{config|safe}};
-    {% if js_file %}
+    {% if js_module_name %}
     (function() {
-      // Strip '.js' to get module name.
-      var module = {{js_file[:-3]}};
+      var module = {{js_module_name}};
       api.setXSRFToken(config['xsrf_token']);
       common.onContentLoaded();
       if (module.hasOwnProperty('onContentLoaded'))

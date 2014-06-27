@@ -33,8 +33,12 @@ _config_called = False
 _config = lib_config.register(
     'components_auth',
     {
-      'UI_APP_NAME': 'Auth',
+      # Callback that returns a list of functions.
       'CUSTOM_AUTHENTICATORS_HOOK': None,
+      # Title of the service to show in UI.
+      'UI_APP_NAME': 'Auth',
+      # True if application is calling 'configure_ui' manually.
+      'UI_CUSTOM_CONFIG': False,
     })
 
 
@@ -61,6 +65,7 @@ def ensure_configured():
         authenticators.extend(_config.CUSTOM_AUTHENTICATORS_HOOK())
       handler.configure(authenticators)
       # Customize auth UI to show where it's running.
-      ui.configure_ui(_config.UI_APP_NAME)
+      if not _config.UI_CUSTOM_CONFIG:
+        ui.configure_ui(_config.UI_APP_NAME)
       # Mark as successfully completed.
       _config_called = True

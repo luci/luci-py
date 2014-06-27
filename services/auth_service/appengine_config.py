@@ -9,4 +9,5 @@ https://developers.google.com/appengine/docs/python/tools/appengineconfig
 
 appstats_CALC_RPC_COSTS = False
 
-components_auth_UI_APP_NAME = 'Auth Service'
+# Auth component UI is tweaked manually, see frontend/handlers.py.
+components_auth_UI_CUSTOM_CONFIG = True
