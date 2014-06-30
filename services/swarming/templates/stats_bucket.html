@@ -1,5 +1,5 @@
 {% set title = 'Swarming Server Stats' %}
-{% extends "base.html" %}
+{% extends "swarming/base.html" %}
 
 {% block headers %}
 <script type="text/javascript" src="//www.google.com/jsapi"></script>
@@ -25,7 +25,7 @@
     // Current on-going HTTP request.
     var current_query = null;
 
-{% include 'stats_common.js' %}
+{% include 'swarming/stats_common.js' %}
 
     // Reloads the data with a new resolution.
     function set_resolution(res) {
@@ -184,7 +184,7 @@
 
 
 {% block body %}
-{% import 'bot_view.html' as bot_view %}
+{% import 'swarming/bot_view.html' as bot_view %}
 
   <h1>Statistics for dimensions {{dimensions}}</h1>
   {# TODO(maruel): Keep duration, current_resolution and maybe 'now'. #}

@@ -24,7 +24,15 @@ IGNORED_EXCEPTIONS = (
 )
 
 
-def should_ignore_error_record(error_record):
+def _should_ignore_error_record(error_record):
   """Callback used by ereporter2 to filter out unimportant errors."""
   return ereporter2.should_ignore_error_record(
       IGNORED_LINES, IGNORED_EXCEPTIONS, error_record)
+
+
+def configure():
+  """Configured ereporter2 globally for the process."""
+  # TODO(vadimsh): Fetch recipients from a group.
+  ereporter2.configure(
+      lambda: [],
+      _should_ignore_error_record)

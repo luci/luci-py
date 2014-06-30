@@ -8,10 +8,14 @@ import os
 import webapp2
 
 from components import auth
+from components import ereporter2
+from components import template
 from components import utils
 
 from components.auth.ui import rest_api
 from components.auth.ui import ui
+
+from common import ereporter2_config
 
 
 # Path to search for jinja templates.
@@ -32,12 +36,13 @@ class ServicesHandler(ui.UINavbarTabHandler):
   navbar_tab_id = 'services'
   navbar_tab_title = 'Services'
   js_file_url = '/auth_service/static/js/services.js'
-  template_file = 'services.html'
+  template_file = 'auth_service/services.html'
 
 
 def get_routes():
   # Auth service extends the basic UI and API provided by Auth component.
   routes = []
+  routes.extend(ereporter2.get_frontend_routes())
   routes.extend(rest_api.get_rest_api_routes())
   routes.extend(ui.get_ui_routes())
   routes.extend([
@@ -49,6 +54,8 @@ def get_routes():
 
 
 def create_application(debug=False):
+  ereporter2_config.configure()
+
   # Configure UI appearance, add all custom tabs.
   ui.configure_ui(
       app_name='Auth Service',
@@ -58,8 +65,8 @@ def create_application(debug=False):
         ui.OAuthConfigHandler,
         # Additional tabs available only on auth service.
         ServicesHandler,
-      ],
-      template_paths=[TEMPLATES_DIR])
+      ])
+  template.bootstrap({'auth_service': TEMPLATES_DIR})
 
   # Add a fake admin for local dev server.
   if utils.is_local_dev_server():

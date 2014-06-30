@@ -18,8 +18,9 @@ from .. import handler
 from .. import model
 
 
-# Directory with this file.
-THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+# templates/.
+TEMPLATES_DIR = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), 'templates')
 
 
 # Global static configuration set in 'configure_ui'.
@@ -27,14 +28,13 @@ _ui_app_name = 'Unknown'
 _ui_navbar_tabs = ()
 
 
-def configure_ui(app_name, ui_tabs=None, template_paths=None):
+def configure_ui(app_name, ui_tabs=None):
   """Modifies global configuration of Auth UI.
 
   Args:
     app_name: name of the service (visible in page headers, titles, etc.)
     ui_tabs: list of UINavbarTabHandler subclasses that define tabs to show, or
         None to show the standard set of tabs.
-    template_paths: a list of additional paths to search Jinja templates in.
   """
   global _ui_app_name
   global _ui_navbar_tabs
@@ -42,7 +42,7 @@ def configure_ui(app_name, ui_tabs=None, template_paths=None):
   if ui_tabs is not None:
     assert all(issubclass(cls, UINavbarTabHandler) for cls in ui_tabs)
     _ui_navbar_tabs = tuple(ui_tabs)
-  template.bootstrap(template_paths or [], {}, {})
+  template.bootstrap({'auth': TEMPLATES_DIR})
 
 
 def get_ui_routes():
@@ -129,7 +129,7 @@ class UIHandler(handler.AuthenticatingHandler):
       'page_title': 'Access Denied',
       'error': error,
     }
-    self.reply('access_denied.html', env=env, status=401)
+    self.reply('auth/access_denied.html', env=env, status=401)
 
   def authorization_error(self, error):
     """Redirects to login or shows 'Access Denied' page."""
@@ -148,7 +148,7 @@ class UIHandler(handler.AuthenticatingHandler):
       'page_title': 'Access Denied',
       'error': error,
     }
-    self.reply('access_denied.html', env=env, status=403)
+    self.reply('auth/access_denied.html', env=env, status=403)
 
 
 class MainHandler(UIHandler):
@@ -169,7 +169,7 @@ class BootstrapHandler(UIHandler):
   @api.require(users.is_current_user_admin)
   def get(self):
     self.reply(
-        'bootstrap.html',
+        'auth/bootstrap.html',
         env={
           'page_title': 'Bootstrap',
           'admin_group': model.ADMIN_GROUP,
@@ -181,7 +181,7 @@ class BootstrapHandler(UIHandler):
         model.ADMIN_GROUP, api.get_current_identity(),
         'Users that can manage groups')
     self.reply(
-        'bootstrap_done.html',
+        'auth/bootstrap_done.html',
         env={
           'page_title': 'Bootstrap',
           'admin_group': model.ADMIN_GROUP,
@@ -223,7 +223,7 @@ class GroupsHandler(UINavbarTabHandler):
   navbar_tab_id = 'groups'
   navbar_tab_title = 'Groups'
   js_file_url = '/auth/static/js/groups.js'
-  template_file = 'groups.html'
+  template_file = 'auth/groups.html'
 
 
 class OAuthConfigHandler(UINavbarTabHandler):
@@ -232,7 +232,7 @@ class OAuthConfigHandler(UINavbarTabHandler):
   navbar_tab_id = 'oauth_config'
   navbar_tab_title = 'OAuth'
   js_file_url = '/auth/static/js/oauth_config.js'
-  template_file = 'oauth_config.html'
+  template_file = 'auth/oauth_config.html'
 
 
 # Register them as default tabs.

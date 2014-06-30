@@ -69,7 +69,7 @@ class StatsHandler(webapp2.RequestHandler):
       'now': datetime.datetime.utcnow(),
       'resolution': resolution,
     }
-    self.response.write(template.render('stats.html', params))
+    self.response.write(template.render('isolate/stats.html', params))
 
 
 class StatsGvizHandlerBase(webapp2.RequestHandler):

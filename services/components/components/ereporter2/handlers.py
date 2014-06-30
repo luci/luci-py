@@ -50,11 +50,11 @@ class RestrictedEreporter2Report(auth.AuthenticatingHandler):
     env = ui.get_template_env(start, end, module_versions)
     content = ui.report_to_html(
         report, ignored,
-        'ereporter2_report_header.html',
-        'ereporter2_report_content.html',
+        'ereporter2/report_header.html',
+        'ereporter2/report_content.html',
         request_id_url, env)
     self.response.write(
-        template.render('ereporter2_report.html', {'content': content}))
+        template.render('ereporter2/report.html', {'content': content}))
 
 
 class RestrictedEreporter2Request(auth.AuthenticatingHandler):
@@ -66,7 +66,7 @@ class RestrictedEreporter2Request(auth.AuthenticatingHandler):
     if not data:
       self.abort(404, detail='Request id was not found.')
     self.response.write(
-        template.render('ereporter2_request.html', {'request': data}))
+        template.render('ereporter2/request.html', {'request': data}))
 
 
 class InternalEreporter2Mail(webapp2.RequestHandler):
@@ -88,8 +88,8 @@ class InternalEreporter2Mail(webapp2.RequestHandler):
         recipients,
         request_id_url,
         report_url,
-        'ereporter2_report_title.html',
-        'ereporter2_report_content.html',
+        'ereporter2/report_title.html',
+        'ereporter2/report_content.html',
         {})
     self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
     if result:

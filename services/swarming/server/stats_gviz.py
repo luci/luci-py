@@ -23,7 +23,7 @@ from server import stats
 
 
 class _Dimensions(object):
-  TEMPLATE = 'stats_bucket.html'
+  TEMPLATE = 'swarming/stats_bucket.html'
 
   DESCRIPTION = {
     'bots_active': ('number', 'Bots active'),
@@ -62,7 +62,7 @@ class _Dimensions(object):
 
 
 class _Summary(object):
-  TEMPLATE = 'stats.html'
+  TEMPLATE = 'swarming/stats.html'
 
   DESCRIPTION = {
     'http_failures': ('number', 'HTTP Failures'),
@@ -107,7 +107,7 @@ class _Summary(object):
 
 
 class _User(object):
-  TEMPLATE = 'stats_user.html'
+  TEMPLATE = 'swarming/stats_user.html'
 
   DESCRIPTION = {
     'tasks_active': ('number', 'Tasks active'),

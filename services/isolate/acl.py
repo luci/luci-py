@@ -148,7 +148,7 @@ class RestrictedWhitelistIPHandler(auth.AuthenticatingHandler):
       'xsrf_token': self.generate_xsrf_token(),
       'whitelistips': WhitelistedIP.query(),
     }
-    self.response.out.write(template.get('whitelistip.html').render(data))
+    self.response.out.write(template.render('isolate/whitelistip.html', data))
     self.response.headers['Content-Type'] = 'text/html'
 
   @auth.require(auth.is_admin)
@@ -192,5 +192,5 @@ class RestrictedWhitelistIPHandler(auth.AuthenticatingHandler):
       'xsrf_token': self.generate_xsrf_token(),
       'whitelistips': WhitelistedIP.query(),
     }
-    self.response.out.write(template.get('whitelistip.html').render(data))
+    self.response.out.write(template.render('whitelistip.html', data))
     self.response.headers['Content-Type'] = 'text/html'

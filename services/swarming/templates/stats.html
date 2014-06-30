@@ -1,5 +1,5 @@
 {% set title = 'Swarming Server Stats' %}
-{% extends "base.html" %}
+{% extends "swarming/base.html" %}
 
 {% block headers %}
 <script type="text/javascript" src="//www.google.com/jsapi"></script>
@@ -53,7 +53,7 @@
       }
     }
 
-{% include 'stats_common.js' %}
+{% include 'swarming/stats_common.js' %}
 
     // Redraws all the charts. This can happen in two situations; new data
     // arrived via sendQuery() or the raw data toggle was changed.
@@ -234,7 +234,7 @@
 
 
 {% block body %}
-{% import 'bot_view.html' as bot_view %}
+{% import 'swarming/bot_view.html' as bot_view %}
 
   <h1>Statistics</h1>
 

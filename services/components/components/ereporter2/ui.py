@@ -175,8 +175,8 @@ def generate_and_email_report(
         # Send an email to alert.
         more_extras['report_url'] = report_url
         subject_line = template.render(
-            'ereporter2_error_title.html', more_extras)
-        body = template.render('ereporter2_error_content.html', more_extras)
+            'ereporter2/error_title.html', more_extras)
+        body = template.render('ereporter2/error_content.html', more_extras)
         _email_html(recipients, subject_line, body)
     logging.info('New timestamp %s', end_time)
     api.ErrorReportingInfo(
@@ -201,4 +201,4 @@ def configure(get_admins, log_filter):
   _GET_ADMINS = get_admins
   _LOG_FILTER = log_filter
 
-  template.bootstrap([os.path.join(ROOT_DIR, 'templates')], {}, {})
+  template.bootstrap({'ereporter2': os.path.join(ROOT_DIR, 'templates')})

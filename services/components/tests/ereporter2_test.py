@@ -22,6 +22,7 @@ from google.appengine.ext import ndb
 import webtest
 
 from components import auth
+from components import template
 from components.ereporter2 import api
 from components.ereporter2 import handlers
 from components.ereporter2 import ui
@@ -107,6 +108,7 @@ class Ereporter2Test(test_case.TestCase):
     self.mock(ui, '_GET_ADMINS', None)
     self.mock(ui, '_LOG_FILTER', None)
     self.mock(ui, '_get_end_time_for_email', lambda: 1383000000)
+    template.reset()
     ui.configure(lambda: ['foo@localhost'], ignorer)
 
   def assertContent(self, message):
@@ -139,8 +141,8 @@ class Ereporter2Test(test_case.TestCase):
         recipients=None,
         request_id_url='http://foo/request/',
         report_url='http://foo/report',
-        title_template_name='ereporter2_report_title.html',
-        content_template_name='ereporter2_report_content.html',
+        title_template_name='ereporter2/report_title.html',
+        content_template_name='ereporter2/report_content.html',
         extras={})
     self.assertEqual(True, result)
 
@@ -162,8 +164,8 @@ class Ereporter2Test(test_case.TestCase):
         recipients='joe@example.com',
         request_id_url='http://foo/request/',
         report_url='http://foo/report',
-        title_template_name='ereporter2_report_title.html',
-        content_template_name='ereporter2_report_content.html',
+        title_template_name='ereporter2/report_title.html',
+        content_template_name='ereporter2/report_content.html',
         extras={})
     self.assertEqual(True, result)
 
@@ -298,8 +300,8 @@ class Ereporter2Test(test_case.TestCase):
     env = ui.get_template_env(10, 20, module_versions)
     out = ui.report_to_html(
         report, ignored,
-        'ereporter2_report_header.html',
-        'ereporter2_report_content.html',
+        'ereporter2/report_header.html',
+        'ereporter2/report_content.html',
         'http://foo/request_id', env)
     expected = (
       '<h2>Report for 1970-01-01 00:00:10 (10) to 1970-01-01 00:00:20 '

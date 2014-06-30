@@ -59,15 +59,8 @@ def _urlquote(s):
   return jinja2.Markup(urllib.quote_plus(s.encode('utf8')))
 
 
-# All the templates paths.
-_TEMPLATE_PATHS = []
-
-# Default variables.
-_GLOBAL_ENV = {
-}
-
-# Default filter helpers.
-_GLOBAL_FILTERS = {
+# Filters available by default.
+_DEFAULT_GLOBAL_FILTERS = {
   'datetimeformat': _datetimeformat,
   'encode_to_json': utils.encode_to_json,
   'epochformat': _epochformat,
@@ -77,50 +70,63 @@ _GLOBAL_FILTERS = {
 }
 
 
+# All the templates paths: prefix -> path.
+_TEMPLATE_PATHS = {}
+# Registered global variables.
+_GLOBAL_ENV = {}
+# Registered filters.
+_GLOBAL_FILTERS = _DEFAULT_GLOBAL_FILTERS.copy()
+
+
 ### Public API.
 
 
-def bootstrap(paths, global_env, filters):
+def bootstrap(paths, global_env=None, filters=None):
   """Resets cached Jinja2 env to pick up new template paths.
 
   This is purely additive. So consecutive calls to this functions with different
   arguments is fine.
+
+  Args:
+    paths: dict {prefix -> template_dir}, templates under template_dir would be
+        accessible as <prefix>/<path relative to template_dir>.
+    global_env: dict with variables to add to global template environment.
+    filters: dict with filters to add to global filter list.
   """
-  assert isinstance(paths, (list, tuple)), paths
-  assert all(os.path.isabs(p) for p in paths), paths
-  assert all(os.path.isdir(p) for p in paths), paths
+  assert isinstance(paths, dict), paths
+  assert all(k not in _TEMPLATE_PATHS for k in paths), paths
+  assert all(os.path.isabs(p) for p in paths.itervalues()), paths
+  assert all(os.path.isdir(p) for p in paths.itervalues()), paths
 
-  assert isinstance(global_env, dict), global_env
-  assert all(isinstance(k, str) for k, v in global_env.iteritems()), global_env
-  assert all(k not in _GLOBAL_ENV for k in global_env), global_env
+  if global_env is not None:
+    assert isinstance(global_env, dict), global_env
+    assert all(
+        isinstance(k, str) for k, v in global_env.iteritems()), global_env
+    assert all(k not in _GLOBAL_ENV for k in global_env), global_env
 
-  assert isinstance(filters, dict), filters
-  assert all(
-      isinstance(k, str) and callable(v)
-      for k, v in filters.iteritems()), filters
-  assert all(k not in _GLOBAL_FILTERS for k in filters), filters
+  if filters is not None:
+    assert isinstance(filters, dict), filters
+    assert all(
+        isinstance(k, str) and callable(v)
+        for k, v in filters.iteritems()), filters
+    assert all(k not in _GLOBAL_FILTERS for k in filters), filters
 
-  # Do not add items twice but still use a list so items are kept in order:
-  for path in paths:
-    if path not in _TEMPLATE_PATHS:
-      _TEMPLATE_PATHS.append(path)
-  _GLOBAL_ENV.update(global_env)
-  _GLOBAL_FILTERS.update(filters)
+  _TEMPLATE_PATHS.update(paths)
+  if global_env:
+    _GLOBAL_ENV.update(global_env)
+  if filters:
+    _GLOBAL_FILTERS.update(filters)
   utils.clear_cache(get_jinja_env)
 
 
 def reset():
   """To be used in tests only."""
+  global _TEMPLATE_PATHS
   global _GLOBAL_ENV
   global _GLOBAL_FILTERS
+  _TEMPLATE_PATHS = {}
   _GLOBAL_ENV = {}
-  _GLOBAL_FILTERS = {
-    'datetimeformat': _datetimeformat,
-    'encode_to_json': utils.encode_to_json,
-    'natsort': _natsorted,
-    'timedeltaformat': _timedeltaformat,
-    'urlquote': _urlquote,
-  }
+  _GLOBAL_FILTERS = _DEFAULT_GLOBAL_FILTERS.copy()
   utils.clear_cache(get_jinja_env)
 
 
@@ -130,7 +136,10 @@ def get_jinja_env():
   # TODO(maruel): Add lstrip_blocks=True when jinja2 2.7 becomes available in
   # the GAE SDK.
   env = jinja2.Environment(
-      loader=jinja2.FileSystemLoader(_TEMPLATE_PATHS),
+      loader=jinja2.PrefixLoader({
+        prefix: jinja2.FileSystemLoader(path)
+        for prefix, path in _TEMPLATE_PATHS.iteritems()
+      }),
       autoescape=True,
       extensions=['jinja2.ext.autoescape'],
       trim_blocks=True,

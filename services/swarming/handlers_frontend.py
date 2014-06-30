@@ -190,7 +190,7 @@ class UploadStartSlaveHandler(auth.AuthenticatingHandler):
       'xsrf_token': self.generate_xsrf_token(),
     }
     self.response.out.write(
-        template.render('restricted_uploadstartslave.html', params))
+        template.render('swarming/restricted_uploadstartslave.html', params))
 
   @auth.require(acl.is_admin)
   def post(self):
@@ -211,7 +211,7 @@ class UploadBootstrapHandler(auth.AuthenticatingHandler):
       'xsrf_token': self.generate_xsrf_token(),
     }
     self.response.out.write(
-        template.render('restricted_uploadbootstrap.html', params))
+        template.render('swarming/restricted_uploadbootstrap.html', params))
 
   @auth.require(acl.is_admin)
   def post(self):
@@ -242,7 +242,7 @@ class WhitelistIPHandler(auth.AuthenticatingHandler):
       'xsrf_token': self.generate_xsrf_token(),
     }
     self.response.out.write(
-        template.render('restricted_whitelistip.html', params))
+        template.render('swarming/restricted_whitelistip.html', params))
 
   @auth.require(acl.is_admin)
   def post(self):
@@ -310,7 +310,7 @@ class BotsListHandler(auth.AuthenticatingHandler):
       'sort_options': sort_options,
     }
     self.response.out.write(
-        template.render('restricted_botslist.html', params))
+        template.render('swarming/restricted_botslist.html', params))
 
 
 class BotHandler(auth.AuthenticatingHandler):
@@ -342,7 +342,8 @@ class BotHandler(auth.AuthenticatingHandler):
     # TODO(maruel): Make the delete link redirect to /restricted/bots. It would
     # probably be preferable to not use /delete_machine_stats and create a UI
     # specialized endpoint instead.
-    self.response.out.write(template.render('restricted_bot.html', params))
+    self.response.out.write(
+        template.render('swarming/restricted_bot.html', params))
 
 
 class ErrorsHandler(auth.AuthenticatingHandler):
@@ -358,7 +359,8 @@ class ErrorsHandler(auth.AuthenticatingHandler):
       'limit': limit,
       'now': task_common.utcnow(),
     }
-    self.response.out.write(template.render('restricted_errors.html', params))
+    self.response.out.write(
+        template.render('swarming/restricted_errors.html', params))
 
 
 ### User accessible pages.
@@ -459,7 +461,7 @@ class TasksHandler(auth.AuthenticatingHandler):
     }
     # TODO(maruel): If admin or if the user is task's .user, show the Cancel
     # button. Do not show otherwise.
-    self.response.out.write(template.render('user_tasks.html', params))
+    self.response.out.write(template.render('swarming/user_tasks.html', params))
     ndb.Future.wait_all(futures)
 
   def _get_query(self, sort, state):
@@ -563,7 +565,7 @@ class TaskHandler(auth.AuthenticatingHandler):
       'request': request,
       'task': result,
     }
-    self.response.out.write(template.render('user_task.html', params))
+    self.response.out.write(template.render('swarming/user_task.html', params))
 
 
 ### Client APIs.
@@ -1036,7 +1038,7 @@ class RootHandler(auth.AuthenticatingHandler):
       'is_privileged_user': acl.is_privileged_user(),
       'is_user': acl.is_user(),
     }
-    self.response.out.write(template.render('root.html', params))
+    self.response.out.write(template.render('swarming/root.html', params))
 
 
 class DeadBotsCountHandler(webapp2.RequestHandler):

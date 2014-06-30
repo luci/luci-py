@@ -29,11 +29,12 @@ def bootstrap():
     'app_version': utils.get_app_version(),
     'app_revision_url': utils.get_app_revision_url(),
   }
-  template.bootstrap([os.path.join(ROOT_DIR, 'templates')], global_env, {})
+  template.bootstrap(
+      {'swarming': os.path.join(ROOT_DIR, 'templates')}, global_env)
 
 
-def render(name, params):
+def render(name, params=None):
   """Shorthand to render a template."""
   data = _get_defaults()
-  data.update(params)
+  data.update(params or {})
   return template.render(name, data)

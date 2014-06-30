@@ -124,27 +124,6 @@ def hash_content(content, namespace):
     raise ValueError('Data is corrupted: %s' % e)
 
 
-def render_template(template_path, env=None):
-  """Renders a template with some common variables in template env.
-
-  Should be used for templates that extend base.html.
-
-  Parameters:
-    template_path: path to a template relative to templates/.
-    env: a dict that will be added to default template environment.
-
-  Returns:
-    Rendered template as str.
-  """
-  default_env = {
-    'app_revision_url': utils.get_app_revision_url(),
-    'app_version': utils.get_app_version(),
-  }
-  if env:
-    default_env.update(env)
-  return template.get(template_path).render(default_env)
-
-
 ### Restricted handlers
 
 
@@ -153,7 +132,7 @@ class RestrictedAdminUIHandler(auth.AuthenticatingHandler):
 
   @auth.require(isolate_admin)
   def get(self):
-    self.response.write(render_template('restricted.html', {
+    self.response.write(template.render('isolate/restricted.html', {
         'xsrf_token': self.generate_xsrf_token(),
         'map_reduce_jobs': [
             {'id': job_id, 'name': job_def['name']}
@@ -168,7 +147,7 @@ class RestrictedGoogleStorageConfig(auth.AuthenticatingHandler):
   @auth.require(isolate_admin)
   def get(self):
     settings = config.settings()
-    self.response.write(render_template('gs_config.html', {
+    self.response.write(template.render('isolate/gs_config.html', {
         'gs_bucket': settings.gs_bucket,
         'gs_client_id_email': settings.gs_client_id_email,
         'gs_private_key': settings.gs_private_key,
@@ -859,7 +838,7 @@ class StoreContentHandler(ProtocolHandler):
 class RootHandler(webapp2.RequestHandler):
   """Tells the user to RTM."""
   def get(self):
-    self.response.write(render_template('root.html'))
+    self.response.write(template.render('isolate/root.html'))
 
 
 class WarmupHandler(webapp2.RequestHandler):
