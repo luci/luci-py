@@ -362,19 +362,15 @@ def serialize(obj):
   return serialize(dict((k, getattr(obj, k)) for k in members))
 
 
-def log_request_id_to_dict(request_id):
-  """Returns the json representation of a request log entry.
-
-  Returns None if no request is found.
-  """
-  logging.info('log_request_id_to_dict(%r)', request_id)
+def log_request_id(request_id):
+  """Returns a logservice.RequestLog for a request id or None if not found."""
   request = list(logservice.fetch(
       include_incomplete=True, include_app_logs=True, request_ids=[request_id]))
   if not request:
     logging.info('Dang, didn\'t find the request_id %s', request_id)
     return None
-  assert len(request) == 1
-  return serialize(request[0])
+  assert len(request) == 1, request
+  return request[0]
 
 
 ### Formatter

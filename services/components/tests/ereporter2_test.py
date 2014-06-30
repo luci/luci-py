@@ -15,6 +15,7 @@ test_env.setup_test_env()
 
 import webapp2
 
+from google.appengine.api import logservice
 from google.appengine.ext import ndb
 
 # From components/third_party/
@@ -372,7 +373,11 @@ class Ereporter2Test(test_case.TestCase):
       if not route.template in exception:
         app_frontend.get(route.template, status=200)
 
-    self.mock(api, 'log_request_id_to_dict', lambda _: {'a': 1})
+    def gen_request(_request_id):
+      # TODO(maruel): Fill up with fake data if found necessary to test edge
+      # cases.
+      return logservice.RequestLog()
+    self.mock(api, 'log_request_id', gen_request)
     app_frontend.get('/restricted/ereporter2/request/123', status=200)
 
   def test_internal_cron_ereporter2_mail_not_cron(self):

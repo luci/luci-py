@@ -25,6 +25,13 @@ def _datetimeformat(value, f='%Y-%m-%d %H:%M:%S'):
   return value.strftime(f)
 
 
+def _epochformat(value, f='%Y-%m-%d %H:%M:%S'):
+  """Formats a float representing epoch to datetime."""
+  if not value:
+    return NON_BREAKING_HYPHEN + NON_BREAKING_HYPHEN
+  return _datetimeformat(utils.timestamp_to_datetime(value * 1000000), f)
+
+
 def _natsorted(value):
   """Accepts None transparently."""
   return natsort.natsorted(value or [])
@@ -63,6 +70,7 @@ _GLOBAL_ENV = {
 _GLOBAL_FILTERS = {
   'datetimeformat': _datetimeformat,
   'encode_to_json': utils.encode_to_json,
+  'epochformat': _epochformat,
   'natsort': _natsorted,
   'timedeltaformat': _timedeltaformat,
   'urlquote': _urlquote,

@@ -62,12 +62,11 @@ class RestrictedEreporter2Request(auth.AuthenticatingHandler):
 
   @auth.require(auth.is_admin)
   def get(self, request_id):
-    # TODO(maruel): Add UI.
-    data = api.log_request_id_to_dict(request_id)
+    data = api.log_request_id(request_id)
     if not data:
       self.abort(404, detail='Request id was not found.')
-    self.response.headers['Content-Type'] = 'application/json; charset=utf-8'
-    self.response.write(utils.encode_to_json(data))
+    self.response.write(
+        template.render('ereporter2_request.html', {'request': data}))
 
 
 class InternalEreporter2Mail(webapp2.RequestHandler):
