@@ -100,6 +100,9 @@ class MainTest(test_case.TestCase):
     self.app_frontend = webtest.TestApp(
         handlers_frontend.create_application(debug=True),
         extra_environ={'REMOTE_ADDR': self.source_ip})
+    # This is awkward but both the frontend and backend applications uses the
+    # same template variables.
+    template.reset()
     self.app_backend = webtest.TestApp(
         handlers_backend.create_application(debug=True),
         extra_environ={'REMOTE_ADDR': self.source_ip})

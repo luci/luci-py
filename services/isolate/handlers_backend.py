@@ -11,7 +11,6 @@ import zlib
 
 import webapp2
 from google.appengine import runtime
-from google.appengine.api import app_identity
 from google.appengine.api import datastore_errors
 from google.appengine.api import memcache
 from google.appengine.ext import ndb
@@ -22,6 +21,7 @@ import handlers_common
 import map_reduce_jobs
 import model
 import stats
+import template
 from components import decorators
 from components import ereporter2
 from components import utils
@@ -410,35 +410,6 @@ class InternalVerifyWorkerHandler(webapp2.RequestHandler):
     future.wait()
 
 
-class InternalEreporter2Mail(webapp2.RequestHandler):
-  """Handler class to generate and email an exception report."""
-  @decorators.require_cronjob
-  def get(self):
-    """Sends email(s) containing the errors logged."""
-    # Do not use self.request.host_url because it will be http:// and will point
-    # to the backend, with an host format that breaks the SSL certificate.
-    host_url = 'https://%s.appspot.com' % app_identity.get_application_id()
-    request_id_url = host_url + '/restricted/ereporter2/request/'
-    report_url = host_url + '/restricted/ereporter2/report'
-    recipients = self.request.get(
-        'recipients', config.settings().monitoring_recipients)
-    result = ereporter2.generate_and_email_report(
-        utils.get_module_version_list(None, False),
-        handlers_common.should_ignore_error_record,
-        recipients,
-        request_id_url,
-        report_url,
-        ereporter2.REPORT_TITLE_TEMPLATE,
-        ereporter2.REPORT_CONTENT_TEMPLATE,
-        {})
-    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
-    if result:
-      self.response.write('Success.')
-    else:
-      # Do not HTTP 500 since we do not want it to be retried.
-      self.response.write('Failed.')
-
-
 ### Mapreduce related handlers
 
 
@@ -487,9 +458,6 @@ def get_routes():
         r'/internal/taskqueue/verify%s' % namespace_key,
         InternalVerifyWorkerHandler),
 
-    webapp2.Route(
-        r'/internal/cron/ereporter2/mail', InternalEreporter2Mail),
-
     # Stats
     webapp2.Route(
         r'/internal/cron/stats/update',
@@ -507,4 +475,12 @@ def create_application(debug=False):
 
   The backend only implements urls under /internal/.
   """
-  return webapp2.WSGIApplication(get_routes(), debug=debug)
+  # Necessary due to email sent by cron job.
+  template.bootstrap()
+  ereporter2.configure(
+      lambda: config.settings().monitoring_recipients,
+      handlers_common.should_ignore_error_record)
+
+  routes = get_routes()
+  routes.extend(ereporter2.get_backend_routes())
+  return webapp2.WSGIApplication(routes, debug=debug)

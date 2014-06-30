@@ -12,13 +12,10 @@ from google.appengine.ext import ndb
 from components import datastore_utils
 from components import decorators
 from components import ereporter2
-from server import admin_user
 from server import errors
 from server import result_helper
 from server import stats
 from server import task_scheduler
-
-import handlers_common
 
 
 class CronAbortBotDiedHandler(webapp2.RequestHandler):
@@ -66,42 +63,20 @@ class TaskCleanupDataHandler(webapp2.RequestHandler):
     self.response.out.write('Success.')
 
 
-class CronSendEreporter2MailHandler(webapp2.RequestHandler):
-  """Sends email containing the errors found in logservice."""
-
-  @decorators.require_cronjob
-  def get(self):
-    request_id_url = self.request.host_url + '/restricted/ereporter2/request/'
-    report_url = self.request.host_url + '/restricted/ereporter2/report'
-    result = ereporter2.generate_and_email_report(
-        None,
-        handlers_common.should_ignore_error_record,
-        admin_user.GetAdmins(),
-        request_id_url,
-        report_url,
-        ereporter2.REPORT_TITLE_TEMPLATE,
-        ereporter2.REPORT_CONTENT_TEMPLATE,
-        {})
-    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
-    if result:
-      self.response.write('Success.')
-    else:
-      # Do not HTTP 500 since we do not want it to be retried.
-      self.response.write('Failed.')
-
-
 def get_routes():
   """Returns internal urls that should only be accessible via the backend."""
-  return [
+  routes = [
     # Cron jobs.
     ('/internal/cron/abort_bot_died', CronAbortBotDiedHandler),
     ('/internal/cron/abort_expired_task_to_run',
         CronAbortExpiredShardToRunHandler),
 
-    ('/internal/cron/ereporter2/mail', CronSendEreporter2MailHandler),
     ('/internal/cron/stats/update', stats.InternalStatsUpdateHandler),
     ('/internal/cron/trigger_cleanup_data', CronTriggerCleanupDataHandler),
 
     # Task queues.
     ('/internal/taskqueue/cleanup_data', TaskCleanupDataHandler),
   ]
+  routes = [webapp2.Route(*a) for a in routes]
+  routes.extend(ereporter2.get_backend_routes())
+  return routes

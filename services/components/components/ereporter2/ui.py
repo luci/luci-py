@@ -6,11 +6,10 @@
 
 import datetime
 import logging
+import os
 import re
 import time
 from xml.sax import saxutils
-
-import jinja2
 
 from google.appengine import runtime
 from google.appengine.api import app_identity
@@ -18,57 +17,21 @@ from google.appengine.api import mail
 from google.appengine.api import mail_errors
 
 from . import api
+from components import template
 
-
-# These are the default templates but any template can be used.
-REPORT_HEADER = (
-  '<h2>Report for {{start_str}} ({{start}}) to {{end_str}} ({{end}})</h2>\n'
-  'Modules-Versions:\n'
-  '<ul>{% for i in module_versions %}<li>{{i.0}} - {{i.1}}</li>\n{% endfor %}'
-  '</ul>\n')
-REPORT_HEADER_TEMPLATE = jinja2.Template(REPORT_HEADER)
-
-# Content of the exception report.
-# Unusual layout is to ensure template is useful with tags stripped for the bare
-# text format.
-REPORT_CONTENT = (
-  '<h3>{% if report_url %}<a href="{{report_url}}?start={{start}}&end={{end}}">'
-      '{% endif %}'
-      '{{occurrence_count}} occurrences of {{error_count}} errors across '
-      '{{version_count}} versions.'
-      '{% if ignored_count %}<br>\nIgnored {{ignored_count}} errors.{% endif %}'
-      '{% if report_url %}</a>{% endif %}</h3>\n'
-  '{% for category in errors %}\n'
-  '<span style="font-size:130%">{{category.signature}}</span><br>\n'
-  '{{category.events.head.0.handler_module}}<br>\n'
-  '{{category.events.head.0.method}} {{category.events.head.0.host}}'
-      '{{category.events.head.0.resource}} '
-      '(HTTP {{category.events.head.0.status}})<br>\n'
-  '<pre>{{category.events.head.0.message}}</pre>\n'
-  '{{category.events.total_count}} occurrences: '
-      '{% for event in category.events.head %}<a '
-      'href="{{request_id_url}}{{event.request_id}}">Entry</a> {% endfor %}'
-      '{% if category.events.has_gap %}&hellip;{% endif %}'
-      '{% for event in category.events.tail %}<a '
-      'href="{{request_id_url}}{{event.request_id}}">Entry</a> {% endfor %}'
-  '<p>\n'
-  '<br>\n'
-  '{% endfor %}'
-)
-REPORT_CONTENT_TEMPLATE = jinja2.Template(REPORT_CONTENT)
-
-
-REPORT_TITLE = 'Exceptions on "{{app_id}}"'
-REPORT_TITLE_TEMPLATE = jinja2.Template(REPORT_TITLE)
-
-ERROR_TITLE = 'Failed to email exceptions on "{{app_id}}"'
-ERROR_CONTENT = (
-    '<strong>Failed to email the report due to {{exception}}</strong>.<br>\n'
-    'Visit it online at <a href="{{report_url}}?start={{start}}&end={{end}}">'
-      '{{report_url}}?start={{start}}&end={{end}}</a>.\n')
+ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 ### Private stuff.
+
+
+# Function to be used to filter the log entries to only keep the interesting
+# ones.
+_LOG_FILTER = None
+
+# List of email addresses to use to email reports. It's a function so it doesn't
+# need to be loaded at process startup.
+_GET_ADMINS = None
 
 
 def _get_end_time_for_email():
@@ -88,7 +51,7 @@ def _time2str(t):
 
 
 def _records_to_html(
-    error_categories, ignored_count, request_id_url, report_url, template,
+    error_categories, ignored_count, request_id_url, report_url, template_name,
     extras):
   """Generates and returns an HTML error report.
 
@@ -97,8 +60,8 @@ def _records_to_html(
     ignored_count: number of errors not reported because ignored.
     request_id_url: base url to link to a specific request_id.
     report_url: base url to use to recreate this report.
-    template: precompiled jinja2 template. REPORT_CONTENT_TEMPLATE is
-              recommended.
+    template_name: jinja2 template. ereporter2_content_template.html is
+        recommended.
     extras: extra dict to use to render the template.
   """
   error_categories.sort(key=lambda e: (e.version, -e.events.total_count))
@@ -112,7 +75,7 @@ def _records_to_html(
     'version_count': len(set(e.version for e in error_categories)),
   }
   template_values.update(extras)
-  return template.render(template_values)
+  return template.render(template_name, template_values)
 
 
 def _email_html(to, subject, body):
@@ -153,16 +116,16 @@ def get_template_env(start_time, end_time, module_versions):
 
 
 def report_to_html(
-    report, ignored, header_template, content_template,
+    report, ignored, header_template_name, content_template_name,
     request_id_url, env):
   """Helper function to generate a full HTML report."""
-  header = header_template.render(env)
+  header = template.render(header_template_name, env)
   # Create two reports, the one for the actual error messages and another one
   # for the ignored messages.
   report_out = _records_to_html(
-      report, 0, request_id_url, None, content_template, env)
+      report, 0, request_id_url, None, content_template_name, env)
   ignored_out = _records_to_html(
-      ignored, 0, request_id_url, None, content_template, env)
+      ignored, 0, request_id_url, None, content_template_name, env)
   return ''.join((
       header,
       report_out,
@@ -172,7 +135,7 @@ def report_to_html(
 
 def generate_and_email_report(
     module_versions, ignorer, recipients, request_id_url,
-    report_url, title_template, content_template, extras):
+    report_url, title_template_name, content_template_name, extras):
   """Generates and emails an exception report.
 
   To be called from a cron_job.
@@ -183,10 +146,10 @@ def generate_and_email_report(
     recipients: str containing comma separated email addresses.
     request_id_url: base url to use to link to a specific request_id.
     report_url: base url to use to recreate this report.
-    title_template: precompiled jinja2 template to render the email subject.
-                      REPORT_TITLE_TEMPLATE is recommended.
-    content_template: precompiled jinja2 template to render the email content.
-                      REPORT_CONTENT_TEMPLATE is recommended.+
+    title_template_name: jinja2 template to render the email subject.
+        ereporter2_title.html is recommended.
+    content_template_name: jinja2 template to render the email content.
+        ereporter2_content.html is recommended.
     extras: extra dict to use to render the template.
 
   Returns:
@@ -205,14 +168,15 @@ def generate_and_email_report(
     more_extras.update(extras or {})
     body = _records_to_html(
         categories, sum(c.events.total_count for c in ignored), request_id_url,
-        report_url, content_template, more_extras)
+        report_url, content_template_name, more_extras)
     if categories:
-      subject_line = title_template.render(more_extras)
+      subject_line = template.render(title_template_name, more_extras)
       if not _email_html(recipients, subject_line, body):
         # Send an email to alert.
         more_extras['report_url'] = report_url
-        subject_line = jinja2.Template(ERROR_TITLE).render(more_extras)
-        body = jinja2.Template(ERROR_CONTENT).render(more_extras)
+        subject_line = template.render(
+            'ereporter2_error_title.html', more_extras)
+        body = template.render('ereporter2_error_content.html', more_extras)
         _email_html(recipients, subject_line, body)
     logging.info('New timestamp %s', end_time)
     api.ErrorReportingInfo(
@@ -228,3 +192,13 @@ def generate_and_email_report(
       len(categories),
       recipients)
   return result
+
+
+def configure(get_admins, log_filter):
+  global _GET_ADMINS
+  global _LOG_FILTER
+
+  _GET_ADMINS = get_admins
+  _LOG_FILTER = log_filter
+
+  template.bootstrap([os.path.join(ROOT_DIR, 'templates')], {}, {})

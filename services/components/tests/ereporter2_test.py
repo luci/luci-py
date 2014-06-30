@@ -13,11 +13,21 @@ import unittest
 import test_env
 test_env.setup_test_env()
 
+import webapp2
+
 from google.appengine.ext import ndb
 
+# From components/third_party/
+import webtest
+
+from components import auth
 from components.ereporter2 import api
+from components.ereporter2 import handlers
 from components.ereporter2 import ui
 from support import test_case
+
+
+ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 # Access to a protected member XXX of a client class - pylint: disable=W0212
@@ -59,6 +69,18 @@ def ErrorRecord(**kwargs):
   return api.ErrorRecord(**default_values)
 
 
+def get_backend():
+  return webtest.TestApp(
+      webapp2.WSGIApplication(handlers.get_backend_routes(), debug=True),
+      extra_environ={'REMOTE_ADDR': '127.0.0.1'})
+
+
+def get_frontend():
+  return webtest.TestApp(
+      webapp2.WSGIApplication(handlers.get_frontend_routes(), debug=True),
+      extra_environ={'REMOTE_ADDR': '127.0.0.1'})
+
+
 def ignorer(error_record):
   return api.should_ignore_error_record(
       ['Process terminated because the request deadline was exceeded during a '
@@ -81,7 +103,10 @@ def mock_now(test, now, seconds):
 class Ereporter2Test(test_case.TestCase):
   def setUp(self):
     super(Ereporter2Test, self).setUp()
+    self.mock(ui, '_GET_ADMINS', None)
+    self.mock(ui, '_LOG_FILTER', None)
     self.mock(ui, '_get_end_time_for_email', lambda: 1383000000)
+    ui.configure(lambda: ['foo@localhost'], ignorer)
 
   def assertContent(self, message):
     self.assertEqual(
@@ -113,8 +138,8 @@ class Ereporter2Test(test_case.TestCase):
         recipients=None,
         request_id_url='http://foo/request/',
         report_url='http://foo/report',
-        title_template=ui.REPORT_TITLE_TEMPLATE,
-        content_template=ui.REPORT_CONTENT_TEMPLATE,
+        title_template_name='ereporter2_report_title.html',
+        content_template_name='ereporter2_report_content.html',
         extras={})
     self.assertEqual(True, result)
 
@@ -136,8 +161,8 @@ class Ereporter2Test(test_case.TestCase):
         recipients='joe@example.com',
         request_id_url='http://foo/request/',
         report_url='http://foo/report',
-        title_template=ui.REPORT_TITLE_TEMPLATE,
-        content_template=ui.REPORT_CONTENT_TEMPLATE,
+        title_template_name='ereporter2_report_title.html',
+        content_template_name='ereporter2_report_content.html',
         extras={})
     self.assertEqual(True, result)
 
@@ -272,8 +297,8 @@ class Ereporter2Test(test_case.TestCase):
     env = ui.get_template_env(10, 20, module_versions)
     out = ui.report_to_html(
         report, ignored,
-        ui.REPORT_HEADER_TEMPLATE,
-        ui.REPORT_CONTENT_TEMPLATE,
+        'ereporter2_report_header.html',
+        'ereporter2_report_content.html',
         'http://foo/request_id', env)
     expected = (
       '<h2>Report for 1970-01-01 00:00:10 (10) to 1970-01-01 00:00:20 '
@@ -329,6 +354,56 @@ class Ereporter2Test(test_case.TestCase):
       self.assertEqual('foo', api.relative_path(i))
 
     self.assertEqual('bar/foo', api.relative_path('bar/foo'))
+
+  def test_frontend(self):
+    #ident = model.Identity(model.IDENTITY_USER, 'b@example.com')
+    #self.mock(auth.handler.api, 'get_current_identity', lambda: ident)
+
+    def is_group_member_mock(group, identity=None):
+      return group == auth.model.ADMIN_GROUP or original(group, identity)
+    original = self.mock(auth.api, 'is_group_member', is_group_member_mock)
+
+    app_frontend = get_frontend()
+
+    exception = (
+      '/restricted/ereporter2/request/<request_id:[0-9a-fA-F]+>',
+    )
+    for route in handlers.get_frontend_routes():
+      if not route.template in exception:
+        app_frontend.get(route.template, status=200)
+
+    self.mock(api, 'log_request_id_to_dict', lambda _: {'a': 1})
+    app_frontend.get('/restricted/ereporter2/request/123', status=200)
+
+  def test_internal_cron_ereporter2_mail_not_cron(self):
+    app_backend = get_backend()
+    response = app_backend.get(
+        '/internal/cron/ereporter2/mail', expect_errors=True)
+    self.assertEqual(response.status_int, 403)
+    self.assertEqual(response.content_type, 'text/plain')
+    # Verify no email was sent.
+    self.assertEqual([], self.mail_stub.get_sent_messages())
+
+  def test_internal_cron_ereporter2_mail(self):
+    app_backend = get_backend()
+    data = [ErrorRecord()]
+    self.mock(api, '_extract_exceptions_from_logs', lambda *_: data)
+    headers = {'X-AppEngine-Cron': 'true'}
+    response = app_backend.get(
+        '/internal/cron/ereporter2/mail', headers=headers)
+    self.assertEqual(response.status_int, 200)
+    self.assertEqual(response.normal_body, 'Success.')
+    self.assertEqual(response.content_type, 'text/plain')
+    # Verify the email was sent.
+    messages = self.mail_stub.get_sent_messages()
+    self.assertEqual(1, len(messages))
+    message = messages[0]
+    self.assertTrue(hasattr(message, 'to'))
+    expected_text = (
+      '1 occurrences of 1 errors across 1 versions.\n\n'
+      'Failed@v1\nmain.app\nGET localhost/foo (HTTP 200)\nFailed\n'
+      '1 occurrences: Entry \n\n')
+    self.assertEqual(expected_text, message.body.payload)
 
 
 if __name__ == '__main__':

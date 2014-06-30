@@ -194,55 +194,6 @@ class RestrictedGoogleStorageConfig(auth.AuthenticatingHandler):
     self.response.write('Done!')
 
 
-class RestrictedEreporter2Report(auth.AuthenticatingHandler):
-  """Returns all the recent errors as a web page."""
-
-  @auth.require(isolate_admin)
-  def get(self):
-    """Reports the errors logged and ignored.
-
-    Arguments:
-      start: epoch time to start looking at. Defaults to the messages since the
-             last email.
-      end: epoch time to stop looking at. Defaults to now.
-      modules: comma separated modules to look at.
-      tainted: 0 or 1, specifying if desiring tainted versions. Defaults to 0.
-    """
-    request_id_url = '/restricted/ereporter2/request/'
-    end = int(float(self.request.get('end', 0)) or time.time())
-    start = int(
-        float(self.request.get('start', 0)) or
-        ereporter2.get_default_start_time() or 0)
-    modules = self.request.get('modules')
-    if modules:
-      modules = modules.split(',')
-    tainted = bool(int(self.request.get('tainted', '0')))
-    module_versions = utils.get_module_version_list(modules, tainted)
-    report, ignored = ereporter2.generate_report(
-        start, end, module_versions, handlers_common.should_ignore_error_record)
-    env = ereporter2.get_template_env(start, end, module_versions)
-    content = ereporter2.report_to_html(
-        report, ignored,
-        ereporter2.REPORT_HEADER_TEMPLATE,
-        ereporter2.REPORT_CONTENT_TEMPLATE,
-        request_id_url, env)
-    out = render_template('ereporter2_report.html', {'content': content})
-    self.response.write(out)
-
-
-class RestrictedEreporter2Request(auth.AuthenticatingHandler):
-  """Dumps information about single logged request."""
-
-  @auth.require(isolate_admin)
-  def get(self, request_id):
-    # TODO(maruel): Add UI.
-    data = ereporter2.log_request_id_to_dict(request_id)
-    if not data:
-      self.abort(404, detail='Request id was not found.')
-    self.response.headers['Content-Type'] = 'application/json; charset=utf-8'
-    self.response.write(utils.encode_to_json(data))
-
-
 ### Mapreduce related handlers
 
 
@@ -929,13 +880,6 @@ def get_routes():
   namespace_key = namespace + hashkey
 
   return [
-     webapp2.Route(
-          r'/restricted/ereporter2/report',
-          RestrictedEreporter2Report),
-     webapp2.Route(
-          r'/restricted/ereporter2/request/<request_id:[0-9a-fA-F]+>',
-          RestrictedEreporter2Request),
-
       # Administrative urls.
       webapp2.Route(
           r'/restricted', RestrictedAdminUIHandler),
@@ -990,14 +934,18 @@ def create_application(debug=False):
   - /stats/.* has statistics.
   """
   template.bootstrap()
+  ereporter2.configure(
+      lambda: config.settings().monitoring_recipients,
+      handlers_common.should_ignore_error_record)
+
+  routes = get_routes()
+  routes.extend(ereporter2.get_frontend_routes())
 
   # Routes added to WSGIApplication only a dev mode.
-  dev_routes = []
   if utils.is_local_dev_server():
-    dev_routes.extend(gcs.URLSigner.switch_to_dev_mode())
+    routes.extend(gcs.URLSigner.switch_to_dev_mode())
 
   # Add some predefined groups when running on local dev server.
   if utils.is_local_dev_server():
     bootstrap_dev_server_acls()
-
-  return webapp2.WSGIApplication(dev_routes + get_routes(), debug=debug)
+  return webapp2.WSGIApplication(routes, debug=debug)

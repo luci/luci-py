@@ -11,14 +11,13 @@ implemented using the webapp2 framework.
 import collections
 import json
 import logging
-import time
+import os
 import urllib
 
 import webapp2
 
 from google.appengine import runtime
 from google.appengine.api import datastore_errors
-from google.appengine.api import modules
 from google.appengine.datastore import datastore_query
 from google.appengine.ext import ndb
 
@@ -34,6 +33,7 @@ from components import ereporter2
 from components import natsort
 from components import utils
 from server import acl
+from server import admin_user
 from server import bot_management
 from server import errors
 from server import file_chunks
@@ -47,12 +47,7 @@ from server import task_to_run
 from server import user_manager
 
 
-def GetModulesVersions():
-  """Returns the current versions on the instance.
-
-  TODO(maruel): Move in components/.
-  """
-  return [('default', i) for i in modules.get_versions()]
+ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 # Helper class for displaying the sort options in html templates.
@@ -183,49 +178,6 @@ def request_work_item(attributes, server_url, remote_addr):
 ### is_admin pages.
 
 # TODO(maruel): Sort the handlers once they got their final name.
-
-
-class Ereporter2ReportHandler(auth.AuthenticatingHandler):
-  """Returns all the recent errors as a web page."""
-
-  @auth.require(acl.is_admin)
-  def get(self):
-    """Reports the errors logged and ignored.
-
-    Arguments:
-      start: epoch time to start looking at. Defaults to the messages since the
-             last email.
-      end: epoch time to stop looking at. Defaults to now.
-    """
-    request_id_url = '/restricted/ereporter2/request/'
-    end = int(float(self.request.get('end', 0)) or time.time())
-    start = int(
-        float(self.request.get('start', 0)) or
-        ereporter2.get_default_start_time() or 0)
-    module_versions = GetModulesVersions()
-    report, ignored = ereporter2.generate_report(
-        start, end, module_versions, handlers_common.should_ignore_error_record)
-    env = ereporter2.get_template_env(start, end, module_versions)
-    content = ereporter2.report_to_html(
-        report, ignored,
-        ereporter2.REPORT_HEADER_TEMPLATE,
-        ereporter2.REPORT_CONTENT_TEMPLATE,
-        request_id_url, env)
-    out = template.render('ereporter2_report.html', {'content': content})
-    self.response.write(out)
-
-
-class Ereporter2RequestHandler(auth.AuthenticatingHandler):
-  """Dumps information about single logged request."""
-
-  @auth.require(acl.is_admin)
-  def get(self, request_id):
-    # TODO(maruel): Add UI.
-    data = ereporter2.log_request_id_to_dict(request_id)
-    if not data:
-      self.abort(404, detail='Request id was not found.')
-    self.response.headers['Content-Type'] = 'application/json; charset=utf-8'
-    json.dump(data, self.response, indent=2, sort_keys=True)
 
 
 class UploadStartSlaveHandler(auth.AuthenticatingHandler):
@@ -869,7 +821,7 @@ class BootstrapHandler(auth.AuthenticatingHandler):
     content = file_chunks.RetrieveFile('bootstrap.py')
     if not content:
       # Fallback to the one embedded in the tree.
-      with open('swarm_bot/bootstrap.py', 'rb') as f:
+      with open(os.path.join(ROOT_DIR, 'swarm_bot/bootstrap.py'), 'rb') as f:
         content = f.read()
 
     self.response.headers['Content-Type'] = 'text/x-python'
@@ -1105,10 +1057,12 @@ class WarmupHandler(webapp2.RequestHandler):
     self.response.write('ok')
 
 
-def CreateApplication():
+def create_application(debug):
   template.bootstrap()
+  ereporter2.configure(
+      admin_user.GetAdmins, handlers_common.should_ignore_error_record)
 
-  urls = [
+  routes = [
       # Frontend pages. They return HTML.
       # Public pages.
       ('/', RootHandler),
@@ -1126,10 +1080,6 @@ def CreateApplication():
       ('/restricted/errors', ErrorsHandler),
 
       # Admin pages.
-      ('/restricted/ereporter2/report', Ereporter2ReportHandler),
-      # TODO(maruel): This is an API, not a endpoint.
-      ('/restricted/ereporter2/request/<request_id:[0-9a-fA-F]+>',
-          Ereporter2RequestHandler),
       ('/restricted/whitelist_ip', WhitelistIPHandler),
       ('/restricted/upload_start_slave', UploadStartSlaveHandler),
       ('/restricted/upload_bootstrap', UploadBootstrapHandler),
@@ -1169,9 +1119,7 @@ def CreateApplication():
 
       ('/_ah/warmup', WarmupHandler),
   ]
-
-  # Upgrade to Route objects so regexp work.
-  routes = [webapp2.Route(*i) for i in urls]
+  routes = [webapp2.Route(*i) for i in routes]
 
   # If running on a local dev server, allow bots to connect without prior
   # groups configuration. Useful when running smoke test.
@@ -1180,5 +1128,6 @@ def CreateApplication():
 
   # TODO(maruel): Split backend into a separate module. For now add routes here.
   routes.extend(handlers_backend.get_routes())
+  routes.extend(ereporter2.get_frontend_routes())
 
-  return webapp2.WSGIApplication(routes, debug=True)
+  return webapp2.WSGIApplication(routes, debug=debug)

@@ -72,7 +72,7 @@ class AppTest(test_case.TestCase):
     self.testbed.init_search_stub()
 
     # By default requests in tests are coming from bot with fake IP.
-    app = handlers_frontend.CreateApplication()
+    app = handlers_frontend.create_application(True)
     app.router.add(('/_ah/queue/deferred', deferred.TaskHandler))
     self.app = webtest.TestApp(
         app,
@@ -870,7 +870,7 @@ class AppTest(test_case.TestCase):
 
   def test_bootstrap_default(self):
     actual = self.app.get('/bootstrap').body
-    with open('swarm_bot/bootstrap.py', 'rb') as f:
+    with open(os.path.join(APP_DIR, 'swarm_bot/bootstrap.py'), 'rb') as f:
       expected = f.read()
     header = 'host_url = \'http://localhost\'\n'
     self.assertEqual(header + expected, actual)

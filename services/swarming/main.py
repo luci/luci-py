@@ -28,7 +28,7 @@ logservice.AUTOFLUSH_EVERY_LINES = 1
 
 def CreateApplication():
   ereporter2.register_formatter()
-  a = handlers_frontend.CreateApplication()
+  a = handlers_frontend.create_application(False)
   # In theory we'd want to take the output of app_identity.get_application_id().
   # Sadly, this function does an RPC call and may contribute to cause time out
   # on the initial load.
