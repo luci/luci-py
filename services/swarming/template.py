@@ -4,101 +4,36 @@
 
 """Setups jinja2 environment."""
 
-import datetime
 import os
-import urllib
-
-import jinja2
 
 from google.appengine.api import users
 
-from components import natsort
 from components import utils
-
-
-NON_BREAKING_HYPHEN = u'\u2011'
+from components import template
 
 
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
-
-JINJA = jinja2.Environment(
-    loader=jinja2.FileSystemLoader(os.path.join(ROOT_DIR, 'templates')),
-    extensions=['jinja2.ext.autoescape'],
-    undefined=jinja2.StrictUndefined,
-    autoescape=True)
-
-
-# Registers library custom filters.
-
-
-def datetimeformat(value, f='%Y-%m-%d %H:%M:%S'):
-  if not value:
-    return NON_BREAKING_HYPHEN + NON_BREAKING_HYPHEN
-  return value.strftime(f)
-
-
-def datetime_human(dt):
-  """Converts a datetime.datetime to a user-friendly string."""
-  if not dt:
-    return NON_BREAKING_HYPHEN + NON_BREAKING_HYPHEN
-  dt_date = dt.date()
-  today = datetime.datetime.utcnow().date()
-  if dt_date == today:
-    return dt.strftime('Today, %H:%M:%S')
-  if dt_date == today - datetime.timedelta(days=1):
-    return dt.strftime('Yesterday, %H:%M:%S')
-  return dt.strftime('%Y-%m-%d %H:%M:%S')
-
-
-def natsorted(value):
-  """Accepts None transparently."""
-  return natsort.natsorted(value or [])
-
-
-def timedeltaformat(value):
-  """Formats a timedelta in a sane way. Ignores micro seconds, we're not that
-  fast.
-  """
-  if not value:
-    return NON_BREAKING_HYPHEN + NON_BREAKING_HYPHEN
-  hours, remainder = divmod(int(round(value.total_seconds())), 3600)
-  minutes, seconds = divmod(remainder, 60)
-  if hours:
-    return '%d:%02d:%02d' % (hours, minutes, seconds)
-  # Always prefix minutes, even if 0, otherwise this looks weird. Revisit this
-  # decision if bikeshedding is desired.
-  return '%d:%02d' % (minutes, seconds)
-
-
-def urlquote(s):
-  # TODO(maruel): Remove once jinja is upgraded to 2.7.
-  if isinstance(s, jinja2.Markup):
-    s = s.unescape()
-  return jinja2.Markup(urllib.quote_plus(s.encode('utf8')))
-
-
-JINJA.filters['datetime_human'] = datetime_human
-JINJA.filters['datetimeformat'] = datetimeformat
-JINJA.filters['encode_to_json'] = utils.encode_to_json
-JINJA.filters['natsort'] = natsorted
-JINJA.filters['timedeltaformat'] = timedeltaformat
-JINJA.filters['urlquote'] = urlquote
 
 
 def _get_defaults():
   """Returns parameters used by templates/base.html."""
   account = users.get_current_user()
   return {
-    'app_version': utils.get_app_version(),
-    'app_revision_url': utils.get_app_revision_url(),
     'nickname': account.email() if account else None,
     'signin_link': users.create_login_url('/') if not account else None,
-    'user_is_admin': users.is_current_user_admin(),
   }
+
+
+def bootstrap():
+  global_env = {
+    'app_version': utils.get_app_version(),
+    'app_revision_url': utils.get_app_revision_url(),
+  }
+  template.bootstrap([os.path.join(ROOT_DIR, 'templates')], global_env, {})
 
 
 def render(name, params):
   """Shorthand to render a template."""
   data = _get_defaults()
   data.update(params)
-  return JINJA.get_template(name).render(data)
+  return template.render(name, data)

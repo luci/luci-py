@@ -27,6 +27,7 @@ import handlers_frontend
 from common import swarm_constants
 from components import auth
 from components import stats_framework
+from components import template
 from server import acl
 from server import admin_user
 from server import bot_management
@@ -115,6 +116,7 @@ class AppTest(test_case.TestCase):
   def tearDown(self):
     try:
       self._mox.UnsetStubs()
+      template.reset()
     finally:
       super(AppTest, self).tearDown()
 

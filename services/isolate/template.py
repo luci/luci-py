@@ -4,20 +4,20 @@
 
 import os
 
-import jinja2
-
+from components import utils
+from components import template
 
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
-# TODO(maruel): Add lstrip_blocks=True when jinja2 2.7 becomes available in the
-# GAE SDK.
-JINJA = jinja2.Environment(
-    loader=jinja2.FileSystemLoader(os.path.join(ROOT_DIR, 'templates')),
-    extensions=['jinja2.ext.autoescape'],
-    autoescape=True,
-    trim_blocks=True)
+def bootstrap():
+  global_env = {
+    'app_version': utils.get_app_version(),
+    'app_revision_url': utils.get_app_revision_url(),
+  }
+  template.bootstrap([os.path.join(ROOT_DIR, 'templates')], global_env, {})
 
 
-def get(*args, **kwargs):
-  return JINJA.get_template(*args, **kwargs)
+def render(name, params):
+  """Shorthand to render a template."""
+  return template.render(name, params)

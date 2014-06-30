@@ -989,6 +989,8 @@ def create_application(debug=False):
   - /content/.* has the public HTTP API.
   - /stats/.* has statistics.
   """
+  template.bootstrap()
+
   # Routes added to WSGIApplication only a dev mode.
   dev_routes = []
   if utils.is_local_dev_server():

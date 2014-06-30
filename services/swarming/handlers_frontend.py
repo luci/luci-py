@@ -1106,6 +1106,8 @@ class WarmupHandler(webapp2.RequestHandler):
 
 
 def CreateApplication():
+  template.bootstrap()
+
   urls = [
       # Frontend pages. They return HTML.
       # Public pages.

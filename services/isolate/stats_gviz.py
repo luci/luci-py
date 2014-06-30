@@ -4,6 +4,8 @@
 
 """Frontend handlers for statistics."""
 
+import datetime
+
 import webapp2
 
 import stats
@@ -64,9 +66,10 @@ class StatsHandler(webapp2.RequestHandler):
       'duration': duration,
       'initial_data': gviz_api.DataTable(description, table).ToJSon(
           columns_order=_GVIZ_COLUMNS_ORDER),
+      'now': datetime.datetime.utcnow(),
       'resolution': resolution,
     }
-    self.response.write(template.get('stats.html').render(params))
+    self.response.write(template.render('stats.html', params))
 
 
 class StatsGvizHandlerBase(webapp2.RequestHandler):

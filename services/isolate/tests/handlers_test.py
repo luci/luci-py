@@ -24,6 +24,7 @@ from google.appengine.ext import ndb
 from components import datastore_utils
 from components import ereporter2
 from components import stats_framework_mock
+from components import template
 from components import utils
 from support import test_case
 
@@ -104,6 +105,10 @@ class MainTest(test_case.TestCase):
         extra_environ={'REMOTE_ADDR': self.source_ip})
     # Tasks are enqueued on the backend.
     self.app = self.app_backend
+
+  def tearDown(self):
+    template.reset()
+    super(MainTest, self).tearDown()
 
   def whitelist_self(self):
     acl.WhitelistedIP(

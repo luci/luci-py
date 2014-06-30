@@ -4,13 +4,13 @@
 
 """Auth management UI handlers."""
 
-import jinja2
 import json
 import os
 import webapp2
 
 from google.appengine.api import users
 
+from components import template
 from components import utils
 
 from .. import api
@@ -25,7 +25,6 @@ THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 # Global static configuration set in 'configure_ui'.
 _ui_app_name = 'Unknown'
 _ui_navbar_tabs = ()
-_ui_extra_template_paths = ()
 
 
 def configure_ui(app_name, ui_tabs=None, template_paths=None):
@@ -39,14 +38,11 @@ def configure_ui(app_name, ui_tabs=None, template_paths=None):
   """
   global _ui_app_name
   global _ui_navbar_tabs
-  global _ui_extra_template_paths
   _ui_app_name = app_name
   if ui_tabs is not None:
     assert all(issubclass(cls, UINavbarTabHandler) for cls in ui_tabs)
     _ui_navbar_tabs = tuple(ui_tabs)
-  _ui_extra_template_paths = tuple(template_paths or [])
-  # Reset cached Jinja2 env to pick up new template paths.
-  utils.clear_cache(get_jinja_env)
+  template.bootstrap(template_paths or [], {}, {})
 
 
 def get_ui_routes():
@@ -59,18 +55,6 @@ def get_ui_routes():
     webapp2.Route(r'/auth/bootstrap', BootstrapHandler, name='bootstrap'),
   ])
   return routes
-
-
-@utils.cache
-def get_jinja_env():
-  """Returns jinja2.Environment object that knows how to render templates."""
-  template_paths = [os.path.join(THIS_DIR, 'templates')]
-  template_paths.extend(_ui_extra_template_paths)
-  return jinja2.Environment(
-      loader=jinja2.FileSystemLoader(template_paths),
-      extensions=['jinja2.ext.autoescape'],
-      undefined=jinja2.StrictUndefined,
-      autoescape=True)
 
 
 class UIHandler(handler.AuthenticatingHandler):
@@ -137,7 +121,7 @@ class UIHandler(handler.AuthenticatingHandler):
     # Render it.
     self.response.set_status(status)
     self.response.headers['Content-Type'] = 'text/html; charset=UTF-8'
-    self.response.write(get_jinja_env().get_template(path).render(full_env))
+    self.response.write(template.render(path, full_env))
 
   def authentication_error(self, error):
     """Shows 'Access denied' page."""
