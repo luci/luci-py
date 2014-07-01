@@ -24,7 +24,7 @@ from components import utils
 class RestrictedEreporter2Report(auth.AuthenticatingHandler):
   """Returns all the recent errors as a web page."""
 
-  @auth.require(auth.is_admin)
+  @auth.require(ui.is_recipient_or_admin)
   def get(self):
     """Reports the errors logged and ignored.
 
@@ -60,7 +60,7 @@ class RestrictedEreporter2Report(auth.AuthenticatingHandler):
 class RestrictedEreporter2Request(auth.AuthenticatingHandler):
   """Dumps information about single logged request."""
 
-  @auth.require(auth.is_admin)
+  @auth.require(ui.is_recipient_or_admin)
   def get(self, request_id):
     data = api.log_request_id(request_id)
     if not data:
@@ -81,7 +81,7 @@ class InternalEreporter2Mail(webapp2.RequestHandler):
     host_url = 'https://%s.appspot.com' % app_identity.get_application_id()
     request_id_url = host_url + '/restricted/ereporter2/request/'
     report_url = host_url + '/restricted/ereporter2/report'
-    recipients = self.request.get('recipients', ui._GET_ADMINS())
+    recipients = self.request.get('recipients', ui.get_recipients())
     result = ui.generate_and_email_report(
         utils.get_module_version_list(None, False),
         ui._LOG_FILTER,

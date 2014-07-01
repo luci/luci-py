@@ -59,10 +59,6 @@ class GlobalConfig(ndb.Model):
   # Secret key used to sign Google Storage URLs: base64 encoded *.der file.
   gs_private_key = ndb.StringProperty(indexed=False, default='')
 
-  # Comma separated list of email addresses that will receive exception reports.
-  # If not set, all admins will receive the message.
-  monitoring_recipients = ndb.StringProperty(indexed=False, default='')
-
   def _pre_put_hook(self):
     """Generates global_secret only when necessary.
 

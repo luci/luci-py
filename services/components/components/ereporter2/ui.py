@@ -17,9 +17,14 @@ from google.appengine.api import mail
 from google.appengine.api import mail_errors
 
 from . import api
+from components import auth
 from components import template
 
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
+
+
+# Name of a group that lists users that receive ereporter2 reports.
+RECIPIENTS_AUTH_GROUP = 'ereporter2-reports'
 
 
 ### Private stuff.
@@ -28,10 +33,6 @@ ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 # Function to be used to filter the log entries to only keep the interesting
 # ones.
 _LOG_FILTER = None
-
-# List of email addresses to use to email reports. It's a function so it doesn't
-# need to be loaded at process startup.
-_GET_ADMINS = None
 
 
 def _get_end_time_for_email():
@@ -194,11 +195,20 @@ def generate_and_email_report(
   return result
 
 
-def configure(get_admins, log_filter):
-  global _GET_ADMINS
+def configure(log_filter):
   global _LOG_FILTER
-
-  _GET_ADMINS = get_admins
   _LOG_FILTER = log_filter
-
   template.bootstrap({'ereporter2': os.path.join(ROOT_DIR, 'templates')})
+
+
+def get_recipients():
+  """Returns list of emails to send reports to."""
+  return [x.name for x in auth.list_group(RECIPIENTS_AUTH_GROUP) if x.is_user]
+
+
+def is_recipient_or_admin():
+  """True if current user is in recipients list or is an admin."""
+  if auth.is_admin():
+    return True
+  ident = auth.get_current_identity()
+  return ident.is_user and ident.name in get_recipients()

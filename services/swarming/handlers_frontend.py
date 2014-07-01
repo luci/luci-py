@@ -33,7 +33,6 @@ from components import ereporter2
 from components import natsort
 from components import utils
 from server import acl
-from server import admin_user
 from server import bot_management
 from server import errors
 from server import file_chunks
@@ -1061,8 +1060,7 @@ class WarmupHandler(webapp2.RequestHandler):
 
 def create_application(debug):
   template.bootstrap()
-  ereporter2.configure(
-      admin_user.GetAdmins, handlers_common.should_ignore_error_record)
+  ereporter2.configure(handlers_common.should_ignore_error_record)
 
   routes = [
       # Frontend pages. They return HTML.

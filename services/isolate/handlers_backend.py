@@ -477,9 +477,7 @@ def create_application(debug=False):
   """
   # Necessary due to email sent by cron job.
   template.bootstrap()
-  ereporter2.configure(
-      lambda: config.settings().monitoring_recipients,
-      handlers_common.should_ignore_error_record)
+  ereporter2.configure(handlers_common.should_ignore_error_record)
 
   routes = get_routes()
   routes.extend(ereporter2.get_backend_routes())

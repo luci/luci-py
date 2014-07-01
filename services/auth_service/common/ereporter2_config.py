@@ -32,7 +32,4 @@ def _should_ignore_error_record(error_record):
 
 def configure():
   """Configured ereporter2 globally for the process."""
-  # TODO(vadimsh): Fetch recipients from a group.
-  ereporter2.configure(
-      lambda: [],
-      _should_ignore_error_record)
+  ereporter2.configure(_should_ignore_error_record)

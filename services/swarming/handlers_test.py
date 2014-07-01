@@ -29,7 +29,6 @@ from components import auth
 from components import stats_framework
 from components import template
 from server import acl
-from server import admin_user
 from server import bot_management
 from server import errors
 from server import stats
@@ -811,7 +810,6 @@ class AppTest(test_case.TestCase):
     self.assertTrue(cron_job_urls, cron_job_urls)
 
     # For ereporter.
-    admin_user.AdminUser(email='admin@denied.com').put()
     for cron_job_url in cron_job_urls:
       response = self.app.get(cron_job_url,
                               headers={'X-AppEngine-Cron': 'true'})

@@ -913,9 +913,7 @@ def create_application(debug=False):
   - /stats/.* has statistics.
   """
   template.bootstrap()
-  ereporter2.configure(
-      lambda: config.settings().monitoring_recipients,
-      handlers_common.should_ignore_error_record)
+  ereporter2.configure(handlers_common.should_ignore_error_record)
 
   routes = get_routes()
   routes.extend(ereporter2.get_frontend_routes())

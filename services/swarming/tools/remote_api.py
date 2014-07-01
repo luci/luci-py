@@ -28,7 +28,6 @@ def setup_context():
   import handlers_frontend
   from common import swarm_constants
   from components import auth
-  from server import admin_user
   from server import stats
   from server import task_request
   from server import task_result

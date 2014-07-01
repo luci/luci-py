@@ -105,11 +105,11 @@ def mock_now(test, now, seconds):
 class Ereporter2Test(test_case.TestCase):
   def setUp(self):
     super(Ereporter2Test, self).setUp()
-    self.mock(ui, '_GET_ADMINS', None)
     self.mock(ui, '_LOG_FILTER', None)
     self.mock(ui, '_get_end_time_for_email', lambda: 1383000000)
+    self.mock(ui, 'get_recipients', lambda: ['foo@localhost'])
     template.reset()
-    ui.configure(lambda: ['foo@localhost'], ignorer)
+    ui.configure(ignorer)
 
   def assertContent(self, message):
     self.assertEqual(
@@ -359,8 +359,6 @@ class Ereporter2Test(test_case.TestCase):
     self.assertEqual('bar/foo', api.relative_path('bar/foo'))
 
   def test_frontend(self):
-    #ident = model.Identity(model.IDENTITY_USER, 'b@example.com')
-    #self.mock(auth.handler.api, 'get_current_identity', lambda: ident)
 
     def is_group_member_mock(group, identity=None):
       return group == auth.model.ADMIN_GROUP or original(group, identity)
@@ -411,6 +409,17 @@ class Ereporter2Test(test_case.TestCase):
       'Failed@v1\nmain.app\nGET localhost/foo (HTTP 200)\nFailed\n'
       '1 occurrences: Entry \n\n')
     self.assertEqual(expected_text, message.body.payload)
+
+
+class Ereporter2RecipientsTest(test_case.TestCase):
+  def test_recipients_from_auth_group(self):
+    fake_group = [
+      auth.Identity(auth.IDENTITY_USER, 'a@example.com'),
+      auth.Identity(auth.IDENTITY_USER, 'b@example.com'),
+      auth.Identity(auth.IDENTITY_SERVICE, 'blah-service'),
+    ]
+    self.mock(auth, 'list_group', lambda _: fake_group)
+    self.assertEqual(['a@example.com', 'b@example.com'], ui.get_recipients())
 
 
 if __name__ == '__main__':
