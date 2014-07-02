@@ -12,7 +12,6 @@ from google.appengine.ext import ndb
 from components import datastore_utils
 from components import decorators
 from components import ereporter2
-from server import errors
 from server import result_helper
 from server import stats
 from server import task_scheduler
@@ -53,7 +52,6 @@ class TaskCleanupDataHandler(webapp2.RequestHandler):
   def post(self):
     # All the things that need to be deleted.
     queries = [
-        errors.QueryOldErrors(),
         result_helper.QueryOldResults(),
         result_helper.QueryOldResultChunks(),
     ]

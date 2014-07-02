@@ -34,7 +34,6 @@ from components import natsort
 from components import utils
 from server import acl
 from server import bot_management
-from server import errors
 from server import file_chunks
 from server import result_helper
 from server import stats
@@ -343,23 +342,6 @@ class BotHandler(auth.AuthenticatingHandler):
     # specialized endpoint instead.
     self.response.out.write(
         template.render('swarming/restricted_bot.html', params))
-
-
-class ErrorsHandler(auth.AuthenticatingHandler):
-  @auth.require(acl.is_privileged_user)
-  def get(self):
-    limit = int(self.request.get('limit', 100))
-    cursor = datastore_query.Cursor(urlsafe=self.request.get('cursor'))
-    errors_found, cursor, more = errors.SwarmError.query().order(
-        -errors.SwarmError.created).fetch_page(limit, start_cursor=cursor)
-    params = {
-      'cursor': cursor.urlsafe() if cursor and more else None,
-      'errors': errors_found,
-      'limit': limit,
-      'now': task_common.utcnow(),
-    }
-    self.response.out.write(
-        template.render('swarming/restricted_errors.html', params))
 
 
 ### User accessible pages.
@@ -1076,7 +1058,6 @@ def create_application(debug):
       # Privileged user pages.
       ('/restricted/bots', BotsListHandler),
       ('/restricted/bot/<bot_id:.+>', BotHandler),
-      ('/restricted/errors', ErrorsHandler),
 
       # Admin pages.
       ('/restricted/whitelist_ip', WhitelistIPHandler),
