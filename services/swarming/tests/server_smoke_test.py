@@ -9,7 +9,6 @@ It starts both a Swarming server and a swarming bot and triggers mock tests to
 ensure the system works end to end.
 """
 
-import cookielib
 import glob
 import json
 import logging
@@ -17,7 +16,6 @@ import os
 import re
 import shutil
 import signal
-import socket
 import subprocess
 import sys
 import tempfile
@@ -37,69 +35,14 @@ test_env.setup_test_env()
 
 import url_helper
 from server import bot_archive
-from support import gae_sdk_utils
+from support import local_app
 
 
+# Modified in "if __name__ == '__main__'" below.
 VERBOSE = False
 
 # Timeout for slow operations.
 TIMEOUT = 30
-
-
-def is_port_free(host, port):
-  """Returns True if the listening port number is available."""
-  s = socket.socket()
-  try:
-    return s.connect_ex((host, port)) == 0
-  finally:
-    s.close()
-
-
-def find_free_port(host, base_port):
-  """Finds a listening port free to listen to."""
-  while base_port < (2<<16):
-    if not is_port_free(host, base_port):
-      return base_port
-    base_port += 1
-  assert False, 'Failed to find an available port starting at %d' % base_port
-
-
-def wait_for_server_up(server_url):
-  started = time.time()
-  while TIMEOUT > time.time() - started:
-    try:
-      urllib2.urlopen(server_url)
-      return True
-    except urllib2.URLError:
-      time.sleep(0.1)
-  return False
-
-
-def get_admin_url(server_url):
-  """"Returns url to login an admin user."""
-  # smoke-test@example.com is added to admin group in bootstrap_dev_server_acls.
-  return urlparse.urljoin(
-      server_url,
-      '_ah/login?email=smoke-test@example.com&admin=True&action=Login')
-
-
-def install_cookie_jar(server_url):
-  """Whitelists the machine to be allowed to run tests."""
-  cj = cookielib.CookieJar()
-  opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cj))
-  # Make this opener the default so we can use url_helper.UrlOpen and still
-  # have the cookies present.
-  urllib2.install_opener(opener)
-  # Do a dev_appserver login.
-  opener.open(get_admin_url(server_url))
-
-  # Get the XSRF token.
-  req = urllib2.Request(
-      urlparse.urljoin(server_url, '/auth/api/v1/accounts/self/xsrf_token'), '')
-  req.add_header('X-XSRF-Token-Request', '1')
-  # Add it to every request by default. It does no harm even if not needed.
-  xsrf_token = json.load(opener.open(req))['xsrf_token']
-  opener.addheaders.append(('X-XSRF-Token', xsrf_token))
 
 
 def setup_bot(swarming_bot_dir, host):
@@ -123,50 +66,19 @@ class SwarmingTestCase(unittest.TestCase):
   """Test case class for Swarming integration tests."""
   def setUp(self):
     super(SwarmingTestCase, self).setUp()
-    self._server_proc = None
     self._bot_proc = None
+    self._server = local_app.LocalApplication(APP_DIR, 9050)
+
     self.tmpdir = tempfile.mkdtemp(prefix='swarming')
     self.swarming_bot_dir = os.path.join(self.tmpdir, 'swarming_bot')
     self.log_dir = os.path.join(self.tmpdir, 'logs')
     os.mkdir(self.swarming_bot_dir)
     os.mkdir(self.log_dir)
 
-    server_addr = 'http://localhost'
-    server_port = find_free_port('localhost', 9000)
-    self.server_url = '%s:%s' % (server_addr, server_port)
-
-    # TODO(maruel): Use tools/run_dev_appserver.py.
-    gaedb_dir = os.path.join(self.tmpdir, 'gaedb')
-    os.mkdir(gaedb_dir)
-    cmd = [
-      os.path.join(gae_sdk_utils.find_gae_sdk(), 'dev_appserver.py'),
-      '--port', str(server_port),
-      '--admin_port', str(find_free_port('localhost', server_port + 1)),
-      '--storage', gaedb_dir,
-      '--skip_sdk_update_check', 'True',
-      # Note: The random policy will provide the same consistency every time
-      # the test is run because the random generator is always given the
-      # same seed.
-      '--datastore_consistency_policy', 'random',
-      '--log_level', 'debug' if VERBOSE else 'info',
-      APP_DIR,
-    ]
-
     # Start the server first since it is a tad slow to start.
-    # TODO(maruel): Use CREATE_NEW_PROCESS_GROUP on Windows.
-    server_log = os.path.join(self.log_dir, 'server.log')
-    logging.info('Server log: %s', server_log)
-    with open(server_log, 'wb') as f:
-      f.write('Running: %s\n' % cmd)
-      f.flush()
-      self._server_proc = subprocess.Popen(
-          cmd, cwd=self.tmpdir, preexec_fn=os.setsid,
-          stdout=f, stderr=subprocess.STDOUT)
-
+    self._server.start()
     setup_bot(self.swarming_bot_dir, self.server_url)
-
-    self.assertTrue(
-        wait_for_server_up(self.server_url), 'Failed to start server')
+    self._server.ensure_serving()
 
   def tearDown(self):
     # Kill bot, kill server, print logs if failed, delete tmpdir, call super.
@@ -186,12 +98,7 @@ class SwarmingTestCase(unittest.TestCase):
                 # The bot should have quit normally when it self-updates.
                 self.assertEqual(0, self._bot_proc.returncode)
           finally:
-            if self._server_proc and self._server_proc.poll() is None:
-              try:
-                os.killpg(self._server_proc.pid, signal.SIGKILL)
-                self._server_proc.wait()
-              except OSError:
-                pass
+            self._server.stop()
         finally:
           if self.has_failed() or VERBOSE:
             # Print out the logs before deleting them.
@@ -206,11 +113,22 @@ class SwarmingTestCase(unittest.TestCase):
               with open(os.path.join(self.log_dir, i), 'rb') as f:
                 for l in f:
                   sys.stderr.write('  ' + l)
+            self._server.dump_log()
       finally:
         # In the end, delete the temporary directory.
         shutil.rmtree(self.tmpdir)
     finally:
       super(SwarmingTestCase, self).tearDown()
+
+  @property
+  def server_url(self):
+    """Localhost URL of swarming dev_appserver."""
+    return self._server.url
+
+  @property
+  def is_bot_alive(self):
+    """Returns True if bot process is still running."""
+    return self._bot_proc and self._bot_proc.poll() is None
 
   def finish_setup(self):
     """Uploads slave code and starts a slave.
@@ -219,7 +137,15 @@ class SwarmingTestCase(unittest.TestCase):
     tearDown is not getting called (and finish_setup can fail because it uses
     various server endpoints).
     """
-    install_cookie_jar(self.server_url)
+    # Obtain admin cookie.
+    self._server.client.login_as_admin('smoke-test@example.com')
+
+    # Replace default URL opener with one that has admin cookies, so we can
+    # use url_helper.UrlOpen and still have the cookies present. Add XSRF token
+    # to every request. It does no harm even if not needed.
+    opener = self._server.client.url_opener
+    opener.addheaders.append(('X-XSRF-Token', self._server.client.xsrf_token))
+    urllib2.install_opener(opener)
 
     # Upload the start slave script to the server. Uploads the exact code in the
     # tree + a new line. This invalidates the bot's code.
@@ -235,8 +161,6 @@ class SwarmingTestCase(unittest.TestCase):
       os.path.join(self.swarming_bot_dir, 'swarming_bot.zip'),
       'start_slave',
     ]
-    if VERBOSE:
-      cmd.append('-v')
     with open(os.path.join(self.log_dir, 'start_slave_stdout.log'), 'wb') as f:
       f.write('Running: %s\n' % cmd)
       f.flush()
@@ -324,7 +248,8 @@ class SwarmingTestCase(unittest.TestCase):
     # not completed, we report a failure.
     triggered_retry = False
     started = time.time()
-    while running_tests and TIMEOUT > time.time() - started:
+    deadline = started + TIMEOUT
+    while running_tests and time.time() < deadline and self.is_bot_alive:
       for running_test_key in running_tests[:]:
         url = urlparse.urljoin(
             self.server_url, '/get_result?r=' + running_test_key['test_key'])
@@ -364,6 +289,9 @@ class SwarmingTestCase(unittest.TestCase):
       if running_tests:
         # Throttle query rate in verbose to reduce the noise.
         time.sleep(2 if VERBOSE else 0.1)
+
+    if running_tests and not self.is_bot_alive:
+      self.fail('Swarm bot failed to start or unexpectedly died')
     self.assertEqual([], running_tests)
 
 
