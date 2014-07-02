@@ -104,18 +104,21 @@ def log(**kwargs):
       kwargs.setdefault('python_version', platform.python_version())
 
     error = Error(identity=identity, **kwargs)
-    logging.error('Error: %s', error)
     error.put()
-    return error.key.integer_id()
+    key_id = error.key.integer_id()
+    logging.error('Got a %s error\n%s\n%s', error.source, key_id, error.message)
+    return key_id
   except (datastore_errors.BadValueError, TypeError) as e:
     stack = api.reformat_stack(traceback.format_exc())
+    # That's the error about the error.
     error = Error(
         source='server',
         category='exception',
         message='log(%s) caused: %s' % (kwargs, str(e)),
         exception_type=str(type(e)),
         stack=stack)
-    logging.error('Error: %s', error)
     error.put()
-    # That's the error about the error.
-    return error.key.integer_id()
+    key_id = error.key.integer_id()
+    logging.error(
+        'Failed to log a %s error\n%s\n%s', error.source, key_id, error.message)
+    return key_id
