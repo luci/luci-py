@@ -585,7 +585,7 @@ class ErrorsTest(test_case.TestCase):
           u'  File "%s", line 0, in log\n'
           u'    error = Error(identity=identity, **kwargs)\n'
           u'  File "appengine/ext/ndb/model.py", line 0, in __init__\n' %
-            relpath_on_error,
+            relpath_on_error.replace('.pyc', '.py'),
       'user': None,
       'version': None,
     }
@@ -595,6 +595,8 @@ class ErrorsTest(test_case.TestCase):
     # verification is a tad deep insode ndb/model.py.
     actual['stack'] = ''.join(
         re.sub(r' \d+', ' 0', actual['stack']).splitlines(True)[:4])
+    # Also make no distinction between *.pyc and *.py files.
+    actual['stack'] = actual['stack'].replace('.pyc', '.py')
     self.assertEqual(expected, actual)
 
   def test_con_old_errors(self):
