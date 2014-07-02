@@ -15,7 +15,6 @@ import logging
 import logging.handlers
 import optparse
 import os
-import socket
 import subprocess
 import sys
 import time
@@ -199,11 +198,6 @@ class SlaveMachine(object):
       logging.error('Unable to make initial connection to the swarm server. '
                     'Aborting.')
       return
-
-    # The fully qualified domain name will uniquely identify this machine
-    # to the server, so we can use it to give a deterministic id for this slave.
-    # Also store as lower case, since it is already case-insensitive.
-    self._attributes['id'] = socket.getfqdn().lower()
 
     url = self._url + '/poll_for_test'
 
@@ -462,8 +456,8 @@ def get_attributes():
     }
     return {
       'dimensions': dimensions,
+      'id': os_utilities.get_hostname().split('.', 1)[0],
       'ip': os_utilities.get_ip(),
-      'tag': os_utilities.get_hostname(),
     }
 
 

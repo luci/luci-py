@@ -224,7 +224,13 @@ def validate_and_fix_attributes(attributes):
         raise test_request_message.Error(
             'Invalid value for %s: %s\n%s' % (key, value, attributes))
 
-    elif key in ('id', 'ip', 'tag', 'version'):
+    elif key == 'tag':
+      # TODO(maruel): 'tag' is now ignored but do not abort if present so
+      # upgrading can be done seamlessly. Delete this condition once all the
+      # servers and bots are upgraded.
+      pass
+
+    elif key in ('id', 'ip', 'version'):
       if not isinstance(value, basestring):
         raise test_request_message.Error(
             'Invalid value for %s: %s\n%s' % (key, value, attributes))

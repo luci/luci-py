@@ -105,7 +105,7 @@ class TestOsUtilities(auto_stub.TestCase):
 
   def test_get_attributes(self):
     actual = os_utilities.get_attributes('id')
-    expected = set(['dimensions', 'ip', 'tag'])
+    expected = set(['dimensions', 'id', 'ip'])
     self.assertEqual(expected, set(actual))
 
     expected_dimensions = set(

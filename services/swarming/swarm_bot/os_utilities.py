@@ -572,16 +572,16 @@ def get_dimensions():
   return dimensions
 
 
-def get_attributes(tag):
+def get_attributes(id_tag):
   """Returns the default Swarming dictionary of attributes for this bot.
 
-  'tag' is used to uniquely identify the bot.
+  'id' is used to uniquely identify the bot.
   'dimensions' is used for task selection.
   """
   return {
     'dimensions': get_dimensions(),
+    'id': id_tag if id_tag else get_hostname.split('.', 1)[0],
     'ip': get_ip(),
-    'tag': tag,
   }
 
 
@@ -696,8 +696,7 @@ def restart_and_return():
 def main():
   """Prints out the output of get_attributes()."""
   # Pass an empty tag, so pop it up since it has no significance.
-  attribs = get_attributes(tag='')
-  attribs.pop('tag')
+  attribs = get_attributes(None)
   pprint.pprint(attribs)
   return 0
 

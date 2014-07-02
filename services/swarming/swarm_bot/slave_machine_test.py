@@ -6,7 +6,6 @@
 import json
 import logging
 import os
-import socket
 import subprocess
 import sys
 import time
@@ -112,7 +111,6 @@ class TestSlaveMachine(auto_stub.TestCase):
 
   def _CreateValidAttribs(self, try_count=0):
     attributes = self.attributes.copy()
-    attributes['id'] = socket.getfqdn().lower()
     attributes['try_count'] = try_count
     return {'attributes': json.dumps(attributes)}
 
