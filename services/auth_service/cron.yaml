@@ -1,5 +1,13 @@
 cron:
-- description: Mail exception report via ereporter2
+
+### ereporter2
+
+- description: ereporter2 cleanup
+  target: backend
+  url: /internal/cron/ereporter2/cleanup
+  schedule: every 1 hours
+
+- description: ereporter2 mail exception report
   target: backend
   url: /internal/cron/ereporter2/mail
   schedule: every 1 hours synchronized

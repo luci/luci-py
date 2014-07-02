@@ -5,10 +5,6 @@ cron:
   url: /internal/cron/trigger_cleanup_data
   schedule: every 6 hours
 
-- description: Mail exception report via ereporter2
-  url: /internal/cron/ereporter2/mail
-  schedule: every 1 hours synchronized
-
 - description: Gathers statistics from the logs
   url: /internal/cron/stats/update
   schedule: every 1 minutes
@@ -21,3 +17,13 @@ cron:
 - description: Catch TaskToRun's that are expired.
   url: /internal/cron/abort_expired_task_to_run
   schedule: every 1 minutes
+
+### ereporter2
+
+- description: ereporter2 cleanup
+  url: /internal/cron/ereporter2/cleanup
+  schedule: every 1 hours
+
+- description: ereporter2 mail exception report
+  url: /internal/cron/ereporter2/mail
+  schedule: every 1 hours synchronized

@@ -5,8 +5,8 @@
 """Defines access groups."""
 
 from components import auth
+from components import ereporter2
 from components import utils
-from server import errors
 from server import user_manager
 
 
@@ -104,19 +104,17 @@ def ip_whitelist_authentication(request):
   Returns:
     auth.Identity of a machine if IP is whitelisted, None otherwise.
   """
-  assert request.remote_addr
-  is_whitelisted = user_manager.IsWhitelistedMachine(request.remote_addr)
-
-  # IP v6 addresses contain ':' that is not allowed in identity name.
-  if is_whitelisted:
+  if user_manager.IsWhitelistedMachine(request.remote_addr):
+    # IP v6 addresses contain ':' that is not allowed in identity name.
     return auth.Identity(
         auth.IDENTITY_BOT, request.remote_addr.replace(':', '-'))
 
-  # Log the error.
-  error = errors.SwarmError(
-      name='Authentication Failure', message='Handler: %s' % request.url,
-      info='Remote machine address: %s' % request.remote_addr)
-  error.put()
+  ereporter2.log(
+      source='server',
+      category='auth',
+      message='Authentication failure',
+      endpoint=request.url,
+      source_ip=request.remote_addr)
   return None
 
 

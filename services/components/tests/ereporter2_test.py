@@ -7,6 +7,8 @@ import datetime
 import json
 import logging
 import os
+import platform
+import re
 import sys
 import unittest
 
@@ -25,15 +27,18 @@ from components import auth
 from components import template
 from components.ereporter2 import api
 from components.ereporter2 import handlers
+from components.ereporter2 import on_error
 from components.ereporter2 import ui
 from support import test_case
 
 
-ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
+ABS_PATH = os.path.abspath(__file__)
+ROOT_DIR = os.path.dirname(ABS_PATH)
+ON_ERROR_PATH = os.path.abspath(on_error.__file__)
 
 
 # Access to a protected member XXX of a client class - pylint: disable=W0212
-
+# Method could be a function - pylint: disable=R0201
 
 class ErrorRecordStub(object):
   """Intentionally thin stub to test should_ignore_error_record()."""
@@ -108,8 +113,11 @@ class Ereporter2Test(test_case.TestCase):
     self.mock(ui, '_LOG_FILTER', None)
     self.mock(ui, '_get_end_time_for_email', lambda: 1383000000)
     self.mock(ui, 'get_recipients', lambda: ['foo@localhost'])
-    template.reset()
     ui.configure(ignorer)
+
+  def tearDown(self):
+    template.reset()
+    super(Ereporter2Test, self).tearDown()
 
   def assertContent(self, message):
     self.assertEqual(
@@ -367,6 +375,8 @@ class Ereporter2Test(test_case.TestCase):
     app_frontend = get_frontend()
 
     exception = (
+      '/ereporter2/api/v1/on_error',
+      r'/restricted/ereporter2/errors/<error_id:\d+>',
       '/restricted/ereporter2/request/<request_id:[0-9a-fA-F]+>',
     )
     for route in handlers.get_frontend_routes():
@@ -420,6 +430,261 @@ class Ereporter2RecipientsTest(test_case.TestCase):
     ]
     self.mock(auth, 'list_group', lambda _: fake_group)
     self.assertEqual(['a@example.com', 'b@example.com'], ui.get_recipients())
+
+
+class ErrorsTestNoAuth(test_case.TestCase):
+  def setUp(self):
+    super(ErrorsTestNoAuth, self).setUp()
+    self.mock(logging, 'error', lambda *_, **_kwargs: None)
+    self._now = datetime.datetime(2014, 6, 24, 20, 19, 42, 653775)
+    mock_now(self, self._now, 0)
+
+  def test_log(self):
+    # It must work even if auth is not initialized.
+    error_id = on_error.log(
+        source='bot', category='task_failure', message='Dang')
+    self.assertEqual(1, on_error.Error.query().count())
+    self.assertEqual(error_id, on_error.Error.query().get().key.integer_id())
+    expected = {
+      'args': [],
+      'category': u'task_failure',
+      'created_ts': self._now,
+      'cwd': None,
+      'duration': None,
+      'endpoint': None,
+      'env': None,
+      'exception_type': None,
+      'hostname': None,
+      'identity': None,
+      'message': u'Dang',
+      'os': None,
+      'python_version': None,
+      'source': u'bot',
+      'source_ip': None,
+      'stack': None,
+      'user': None,
+      'version': None,
+    }
+    self.assertEqual(expected, on_error.Error.query().get().to_dict())
+
+
+class ErrorsTest(test_case.TestCase):
+  def setUp(self):
+    super(ErrorsTest, self).setUp()
+    self.mock(logging, 'error', lambda *_, **_kwargs: None)
+    self._now = datetime.datetime(2014, 6, 24, 20, 19, 42, 653775)
+    mock_now(self, self._now, 0)
+    auth.configure([
+        auth.oauth_authentication,
+        auth.cookie_authentication,
+        auth.service_to_service_authentication,
+    ])
+
+    self.mock(ui, '_LOG_FILTER', None)
+    ui.configure(lambda *_: False)
+
+  def tearDown(self):
+    template.reset()
+    super(ErrorsTest, self).tearDown()
+
+  def test_log(self):
+    kwargs = dict((k, k) for k in on_error.VALID_ERROR_KEYS)
+    kwargs['args'] = ['args']
+    kwargs['category'] = 'exception'
+    kwargs['duration'] = 2.3
+    kwargs['env'] = {'foo': 'bar'}
+    kwargs['source'] = 'bot'
+    kwargs['source_ip'] = '0.0.0.0'
+    on_error.log(**kwargs)
+    self.assertEqual(1, on_error.Error.query().count())
+    expected = {
+      'args': [u'args'],
+      'category': u'exception',
+      'created_ts': self._now,
+      'cwd': u'cwd',
+      'duration': 2.3,
+      'endpoint': u'endpoint',
+      'env': {u'foo': u'bar'},
+      'exception_type': u'exception_type',
+      'hostname': u'hostname',
+      'identity': None,
+      'message': u'message',
+      'os': u'os',
+      'python_version': u'python_version',
+      'source': u'bot',
+      'source_ip': u'0.0.0.0',
+      'stack': u'stack',
+      'user': u'user',
+      'version': u'version',
+    }
+    self.assertEqual(expected, on_error.Error.query().get().to_dict())
+
+  def test_log_server(self):
+    # version is automatiaclly added.
+    on_error.log(source='server')
+    self.assertEqual(1, on_error.Error.query().count())
+    expected = dict((k, None) for k in on_error.VALID_ERROR_KEYS)
+    expected['args'] = []
+    expected['created_ts'] = self._now
+    expected['identity'] = None
+    expected['python_version'] = unicode(platform.python_version())
+    expected['source'] = u'server'
+    expected['source_ip'] = None
+    expected['version'] = u'v1a'
+    self.assertEqual(expected, on_error.Error.query().get().to_dict())
+
+  def test_ignored_flag(self):
+    on_error.log(foo='bar')
+    self.assertEqual(1, on_error.Error.query().count())
+    expected = {
+      'args': [],
+      'category': None,
+      'created_ts': self._now,
+      'cwd': None,
+      'duration': None,
+      'endpoint': None,
+      'env': None,
+      'exception_type': None,
+      'hostname': None,
+      'identity': None,
+      'message': None,
+      'os': None,
+      'python_version': None,
+      'source': u'unknown',
+      'source_ip': None,
+      'stack': None,
+      'user': None,
+      'version': None,
+    }
+    self.assertEqual(expected, on_error.Error.query().get().to_dict())
+
+  def test_exception(self):
+    on_error.log(env='str')
+    self.assertEqual(1, on_error.Error.query().count())
+    relpath_on_error = api.relative_path(ON_ERROR_PATH)
+    expected = {
+      'args': [],
+      'category': u'exception',
+      'created_ts': self._now,
+      'cwd': None,
+      'duration': None,
+      'endpoint': None,
+      'env': None,
+      'exception_type': u'<type \'exceptions.TypeError\'>',
+      'hostname': None,
+      'identity': None,
+      'message':
+          u'log({\'env\': \'str\'}) caused: JSON property must be a '
+          u'<type \'dict\'>',
+      'os': None,
+      'python_version': None,
+      'source': u'server',
+      'source_ip': None,
+      'stack':
+          u'Traceback (most recent call last):\n'
+          u'  File "%s", line 0, in log\n'
+          u'    error = Error(identity=identity, **kwargs)\n'
+          u'  File "appengine/ext/ndb/model.py", line 0, in __init__\n' %
+            relpath_on_error,
+      'user': None,
+      'version': None,
+    }
+    actual = on_error.Error.query().get().to_dict()
+    # Zap out line numbers to 0, it's annoying otherwise to update the unit test
+    # just for line move. Only keep the first 4 lines because json_dict
+    # verification is a tad deep insode ndb/model.py.
+    actual['stack'] = ''.join(
+        re.sub(r' \d+', ' 0', actual['stack']).splitlines(True)[:4])
+    self.assertEqual(expected, actual)
+
+  def test_con_old_errors(self):
+    kwargs = dict((k, k) for k in on_error.VALID_ERROR_KEYS)
+    kwargs['category'] = 'exception'
+    kwargs['duration'] = 2.3
+    kwargs['source'] = 'bot'
+    kwargs['source_ip'] = '0.0.0.0'
+    on_error.log(**kwargs)
+
+    # First call shouldn't delete the error since its not stale yet.
+    app_backend = get_backend()
+    headers = {'X-AppEngine-Cron': 'true'}
+    response = app_backend.get(
+        '/internal/cron/ereporter2/cleanup', headers=headers)
+    self.assertEqual('0', response.body)
+    self.assertEqual(1, on_error.Error.query().count())
+
+    # Set the current time to the future, but not too much.
+    now = self._now + on_error.ERROR_TIME_TO_LIVE
+    mock_now(self, now, -60)
+
+    headers = {'X-AppEngine-Cron': 'true'}
+    response = app_backend.get(
+        '/internal/cron/ereporter2/cleanup', headers=headers)
+    self.assertEqual('0', response.body)
+    self.assertEqual(1, on_error.Error.query().count())
+
+    # Set the current time to the future.
+    now = self._now + on_error.ERROR_TIME_TO_LIVE
+    mock_now(self, now, 60)
+
+    # Second call should remove the now stale error.
+    headers = {'X-AppEngine-Cron': 'true'}
+    response = app_backend.get(
+        '/internal/cron/ereporter2/cleanup', headers=headers)
+    self.assertEqual('1', response.body)
+    self.assertEqual(0, on_error.Error.query().count())
+
+  def test_on_error_handler(self):
+    app_frontend = get_frontend()
+    data = {
+      'foo': 'bar',
+    }
+    for key in on_error.VALID_ERROR_KEYS:
+      data[key] = 'bar %s' % key
+    data['category'] = 'auth'
+    data['duration'] = 2.3
+    data['source'] = 'run_isolated'
+    params = {
+      'r': data,
+      'v': '1',
+    }
+    response = app_frontend.post(
+        '/ereporter2/api/v1/on_error', json.dumps(params), status=200,
+        content_type='application/json; charset=utf-8').json
+
+    self.assertEqual(1, on_error.Error.query().count())
+    error_id = on_error.Error.query().get().key.integer_id()
+    expected = {
+      'id': error_id,
+      'url': u'http://localhost/restricted/ereporter2/errors/%d' % error_id,
+    }
+    self.assertEqual(expected, response)
+
+    def is_group_member_mock(group, identity=None):
+      return group == auth.model.ADMIN_GROUP or original(group, identity)
+    original = self.mock(auth.api, 'is_group_member', is_group_member_mock)
+    app_frontend.get('/restricted/ereporter2/errors')
+    app_frontend.get('/restricted/ereporter2/errors/%d' % error_id)
+
+  def test_on_error_handler_denied(self):
+    app_frontend = get_frontend()
+    app_frontend.get('/ereporter2/api/v1/on_error', status=405)
+
+  def test_on_error_handler_bad_type(self):
+    app_frontend = get_frontend()
+
+    params = {
+      # 'args' should be a list.
+      'r': {'args': 'bar'},
+      'v': '1',
+    }
+    response = app_frontend.post(
+        '/ereporter2/api/v1/on_error', json.dumps(params), status=200,
+        content_type='application/json; charset=utf-8').json
+    # There's still a response but it will be an error about the error.
+    self.assertEqual(1, on_error.Error.query().count())
+    error_id = on_error.Error.query().get().key.integer_id()
+    self.assertEqual(response.get('id'), error_id)
 
 
 if __name__ == '__main__':

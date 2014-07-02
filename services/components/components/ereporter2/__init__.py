@@ -13,4 +13,5 @@ only dependency is logservice.
 # Wildcard import - pylint: disable=W0401
 from .api import *
 from .handlers import *
+from .on_error import *
 from .ui import *

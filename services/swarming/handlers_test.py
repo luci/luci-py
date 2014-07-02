@@ -26,6 +26,7 @@ import webtest
 import handlers_frontend
 from common import swarm_constants
 from components import auth
+from components import ereporter2
 from components import stats_framework
 from components import template
 from server import acl
@@ -646,6 +647,7 @@ class AppTest(test_case.TestCase):
       '/',
       '/_ah/warmup',
       '/auth',
+      '/ereporter2/api/v1/on_error',
       '/server_ping',
       '/stats',
       '/stats/dimensions/<dimensions:.+>',
@@ -722,8 +724,9 @@ class AppTest(test_case.TestCase):
     response = self.app.post('/remote_error', {'m': error_message})
     self.assertResponse(response, '200 OK', 'Success.')
 
-    self.assertEqual(1, errors.SwarmError.query().count())
-    error = errors.SwarmError.query().get()
+    self.assertEqual(0, errors.SwarmError.query().count())
+    self.assertEqual(1, ereporter2.Error.query().count())
+    error = ereporter2.Error.query().get()
     self.assertEqual(error.message, error_message)
 
     self._ReplaceCurrentUser(ADMIN_EMAIL)

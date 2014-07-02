@@ -1004,19 +1004,18 @@ class ResultHandler(auth.AuthenticatingHandler):
 
 
 class RemoteErrorHandler(auth.AuthenticatingHandler):
-  """Handler to log an error reported by remote machine."""
+  """Handler to log an error reported by a bot."""
 
-  # TODO(vadimsh): Implement XSRF token support.
   xsrf_token_enforce_on = ()
 
   @auth.require(acl.is_bot)
   def post(self):
-    # TODO(vadimsh): Log machine identity as well.
-    error_message = self.request.get('m', '')
-    error = errors.SwarmError(
-        name='Remote Error Report', message=error_message,
-        info='Remote machine address: %s' % self.request.remote_addr)
-    error.put()
+    # TODO(maruel): Delete this old API.
+    ereporter2.log(
+        source='bot',
+        category='task_failure',
+        message=self.request.get('m', ''),
+        source_ip=self.request.remote_addr)
 
     self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
     self.response.out.write('Success.')
