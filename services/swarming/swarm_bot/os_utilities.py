@@ -580,7 +580,7 @@ def get_attributes(id_tag):
   """
   return {
     'dimensions': get_dimensions(),
-    'id': id_tag if id_tag else get_hostname.split('.', 1)[0],
+    'id': id_tag if id_tag else get_hostname().split('.', 1)[0],
     'ip': get_ip(),
   }
 

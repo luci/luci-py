@@ -116,6 +116,11 @@ class TestOsUtilities(auto_stub.TestCase):
       expected_dimensions.add('integrity')
     self.assertEqual(expected_dimensions, set(actual['dimensions']))
 
+  def test_get_attributes_none(self):
+    actual = os_utilities.get_attributes(None)
+    expected = set(['dimensions', 'id', 'ip'])
+    self.assertEqual(expected, set(actual))
+
   def test_setup_auto_startup_win(self):
     # TODO(maruel): Figure out a way to test properly.
     pass
