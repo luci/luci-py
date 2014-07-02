@@ -29,6 +29,7 @@ def header(input_api):
 def CommonChecks(input_api, output_api):
   return input_api.canned_checks.PanProjectChecks(
       input_api, output_api,
+      excluded_paths=[r'.*_pb2\.py$'],
       owners_check=False,
       license_header=header(input_api))
 

@@ -104,6 +104,9 @@ var call = function(type, url, data, headers) {
   return defer.promise();
 };
 
+// Also make 'call' available to clients of this module.
+exports.call = call;
+
 
 // Group object -> group object with all necessary fields present.
 var normalizeGroupObj = function(group) {

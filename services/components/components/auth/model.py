@@ -322,7 +322,7 @@ class AuthReplicationState(ndb.Model):
   # Revision of auth DB. Increased by 1 with every change that should be
   # propagate to replicas. Only services in Standalone or Primary mode
   # update this property by themselves. Replicas receive it from Primary.
-  auth_db_rev = ndb.IntegerProperty(indexed=False)
+  auth_db_rev = ndb.IntegerProperty(default=0, indexed=False)
 
   # Last modification time. For informational purposes only.
   modified_ts = ndb.DateTimeProperty(auto_now=True, indexed=False)

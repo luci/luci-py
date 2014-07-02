@@ -4,23 +4,34 @@
 
 """This module defines Auth Server frontend url handlers."""
 
+import datetime
 import os
 import webapp2
+
+from google.appengine.api import app_identity
 
 from components import auth
 from components import ereporter2
 from components import template
 from components import utils
 
+from components.auth import model
+from components.auth import tokens
+from components.auth.proto import replication_pb2
 from components.auth.ui import rest_api
 from components.auth.ui import ui
 
 from common import ereporter2_config
+from common import replication
 
 
 # Path to search for jinja templates.
 TEMPLATES_DIR = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), 'templates')
+
+
+################################################################################
+## UI handlers.
 
 
 class WarmupHandler(webapp2.RequestHandler):
@@ -39,16 +50,179 @@ class ServicesHandler(ui.UINavbarTabHandler):
   template_file = 'auth_service/services.html'
 
 
+################################################################################
+## API handlers.
+
+
+class LinkTicketToken(auth.TokenKind):
+  """Parameters for ServiceLinkTicket.ticket token."""
+  expiration_sec = 24 * 3600
+  secret_key = auth.SecretKey('link_ticket_token', scope='local')
+  version = 1
+
+
+@utils.cache_with_expiration(3600)
+def get_public_certificates():
+  """Returns jsonish object with services' public certificates."""
+  certs = app_identity.get_public_certificates()
+  return {
+    'certificates': [
+      {
+        'key_name': cert.key_name,
+        'x509_certificate_pem': cert.x509_certificate_pem,
+      }
+      for cert in certs
+    ],
+    'timestamp': utils.datetime_to_timestamp(datetime.datetime.utcnow()),
+  }
+
+
+class PublicCertificatesListing(rest_api.ApiHandler):
+  """Public certificates that service uses to sign blobs."""
+
+  # Available to anyone, there's no secrets here.
+  @auth.public
+  def get(self):
+    self.send_response(get_public_certificates())
+
+
+class ServiceListingHandler(rest_api.ApiHandler):
+  """Lists registered replicas with their state."""
+
+  @auth.require(auth.is_admin)
+  def get(self):
+    services = sorted(
+        replication.AuthReplicaState.query(
+            ancestor=replication.REPLICAS_ROOT_KEY),
+        key=lambda x: x.key.id())
+    last_auth_state = model.REPLICATION_STATE_KEY.get()
+    self.send_response({
+      'services': [
+        x.to_serializable_dict(with_id_as='app_id') for x in services
+      ],
+      'auth_db_rev': {
+        'rev': last_auth_state.auth_db_rev,
+        'ts': utils.datetime_to_timestamp(last_auth_state.modified_ts),
+      },
+      'now': utils.datetime_to_timestamp(datetime.datetime.utcnow()),
+    })
+
+
+class GenerateLinkingURL(rest_api.ApiHandler):
+  """Generates an URL that can be used to link a new replica.
+
+  See auth/proto/replication.proto for the description of the protocol.
+  """
+
+  @auth.require(auth.is_admin)
+  def post(self, app_id):
+    # On local dev server |app_id| may use @localhost:8080 to specify where
+    # app is running.
+    custom_host = None
+    if utils.is_local_dev_server():
+      app_id, _, custom_host = app_id.partition('@')
+
+    # Generate an opaque ticket that would be passed back to /link_replica.
+    # /link_replica will verify HMAC tag and will ensure the request came from
+    # application with ID |app_id|.
+    ticket = LinkTicketToken.generate([], {'app_id': app_id})
+
+    # ServiceLinkTicket contains information that is needed for Replica
+    # to figure out how to contact Primary.
+    link_msg = replication_pb2.ServiceLinkTicket()
+    link_msg.primary_id = app_identity.get_application_id()
+    link_msg.primary_url = self.request.host_url
+    link_msg.generated_by = auth.get_current_identity().to_bytes()
+    link_msg.ticket = ticket
+
+    # Special case for dev server to simplify local development.
+    if custom_host:
+      assert utils.is_local_dev_server()
+      host = 'http://%s' % custom_host
+    else:
+      host = 'https://%s.appspot.com' % app_id
+
+    # URL to a handler on Replica that initiates Replica <-> Primary handshake.
+    url = '%s/auth/link?t=%s' % (
+        host, tokens.base64_encode(link_msg.SerializeToString()))
+    self.send_response({'url': url}, http_code=201)
+
+
+class LinkRequestHandler(auth.AuthenticatingHandler):
+  """Called by a service that wants to become a Replica."""
+
+  # Handler uses X-Appengine-Inbound-Appid header protected by GAE.
+  xsrf_token_enforce_on = ()
+
+  def reply(self, status):
+    """Sends serialized ServiceLinkResponse as a response."""
+    msg = replication_pb2.ServiceLinkResponse()
+    msg.status = status
+    self.response.headers['Content-Type'] = 'application/octet-stream'
+    self.response.write(msg.SerializeToString())
+
+  # Check that the request came from some GAE app. It filters out most requests
+  # from script kiddies right away.
+  @auth.require(lambda: auth.get_current_identity().is_service)
+  def post(self):
+    # Deserialize the body. Dying here with 500 is ok, it should not happen, so
+    # if it is happening, it's nice to get an exception report.
+    request = replication_pb2.ServiceLinkRequest.FromString(self.request.body)
+
+    # Ensure the ticket was generated by us (by checking HMAC tag).
+    ticket_data = None
+    try:
+      ticket_data = LinkTicketToken.validate(request.ticket, [])
+    except tokens.InvalidTokenError:
+      self.reply(replication_pb2.ServiceLinkResponse.BAD_TICKET)
+      return
+
+    # Ensure the ticket was generated for the calling application.
+    replica_app_id = ticket_data['app_id']
+    expected_ident = auth.Identity(auth.IDENTITY_SERVICE, replica_app_id)
+    if auth.get_current_identity() != expected_ident:
+      self.reply(replication_pb2.ServiceLinkResponse.AUTH_ERROR)
+      return
+
+    # Register the replica. If it is already there, will reset its known state.
+    replication.register_replica(replica_app_id, request.replica_url)
+    self.reply(replication_pb2.ServiceLinkResponse.SUCCESS)
+
+
+################################################################################
+## Application routing boilerplate.
+
+
 def get_routes():
+  # Use special syntax on dev server to specify where app is running.
+  app_id_re = r'[0-9a-zA-Z_\-]*'
+  if utils.is_local_dev_server():
+    app_id_re += r'(@localhost:[0-9]+)?'
+
   # Auth service extends the basic UI and API provided by Auth component.
   routes = []
   routes.extend(ereporter2.get_frontend_routes())
   routes.extend(rest_api.get_rest_api_routes())
   routes.extend(ui.get_ui_routes())
   routes.extend([
+    # UI routes.
     webapp2.Route(
         r'/', webapp2.RedirectHandler, defaults={'_uri': '/auth/groups'}),
     webapp2.Route(r'/_ah/warmup', WarmupHandler),
+
+    # API routes.
+    webapp2.Route(
+        r'/auth_service/api/v1/certificates',
+        PublicCertificatesListing),
+    webapp2.Route(
+        r'/auth_service/api/v1/internal/link_replica',
+        LinkRequestHandler),
+    webapp2.Route(
+        r'/auth_service/api/v1/services',
+        ServiceListingHandler),
+    webapp2.Route(
+        r'/auth_service/api/v1/services/<app_id:%s>/linking_url' % app_id_re,
+        GenerateLinkingURL),
   ])
   return routes
 

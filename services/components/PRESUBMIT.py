@@ -46,12 +46,17 @@ def CommonChecks(input_api, output_api):
       join('third_party'),
       join('tests'),
     ] + sys.path
+    black_list = list(input_api.DEFAULT_BLACK_LIST) + [
+      r'.*_pb2\.py$',
+    ]
     disabled_warnings = [
       'E1101', # Instance X has no member Y
       'W0232', # Class has no __init__ method
     ]
     output.extend(input_api.canned_checks.RunPylint(
-        input_api, output_api, disabled_warnings=disabled_warnings))
+        input_api, output_api,
+        black_list=black_list,
+        disabled_warnings=disabled_warnings))
   finally:
     sys.path = old_sys_path
 

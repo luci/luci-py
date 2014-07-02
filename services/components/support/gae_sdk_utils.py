@@ -260,15 +260,16 @@ class Application(object):
     """Deploys new cron.yaml."""
     self.run_appcfg(['update_cron', '.'])
 
-  def run_dev_appserver(self, args, open_ports=False):
-    """Runs the application locally via dev_appserver.py.
+  def spawn_dev_appserver(self, args, open_ports=False, **kwargs):
+    """Launches subprocess with dev_appserver.py.
 
     Args:
       args: extra arguments to dev_appserver.py.
       open_ports: if True will bind TCP ports to 0.0.0.0 interface.
+      kwargs: passed as is to subprocess.Popen.
 
     Returns:
-      dev_appserver.py exit code.
+      Instance of subprocess.Popen.
     """
     cmd = [
       sys.executable,
@@ -280,7 +281,19 @@ class Application(object):
       cmd.extend(('--host', '0.0.0.0', '--admin_host', '0.0.0.0'))
     if self._verbose:
       cmd.extend(('--log_level', 'debug'))
-    return subprocess.call(cmd, cwd=self.app_dir)
+    return subprocess.Popen(cmd, cwd=self.app_dir, **kwargs)
+
+  def run_dev_appserver(self, args, open_ports=False):
+    """Runs the application locally via dev_appserver.py.
+
+    Args:
+      args: extra arguments to dev_appserver.py.
+      open_ports: if True will bind TCP ports to 0.0.0.0 interface.
+
+    Returns:
+      dev_appserver.py exit code.
+    """
+    return self.spawn_dev_appserver(args, open_ports).wait()
 
   def get_uploaded_versions(self, modules=None):
     """Returns list of versions that are deployed to all given |modules|.
