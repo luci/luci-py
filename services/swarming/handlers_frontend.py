@@ -1011,12 +1011,11 @@ class RootHandler(auth.AuthenticatingHandler):
   def get(self):
     params = {
       'host_url': self.request.host_url,
-      'user_type': acl.get_user_type(),
       'is_admin': acl.is_admin(),
-      'is_super_admin': auth.is_admin(),
       'is_bot': acl.is_bot(),
       'is_privileged_user': acl.is_privileged_user(),
       'is_user': acl.is_user(),
+      'user_type': acl.get_user_type(),
     }
     self.response.out.write(template.render('swarming/root.html', params))
 

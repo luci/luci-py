@@ -13,6 +13,9 @@ test_env.setup_test_env()
 import acl
 
 
+# Access to a protected member XXX of a client class - pylint: disable=W0212
+
+
 class IpUtilsTest(unittest.TestCase):
   def test_parse_ip(self):
     data = [
@@ -25,12 +28,12 @@ class IpUtilsTest(unittest.TestCase):
         'ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff',
         ('v6', 340282366920938463463374607431768211455L)),
     ]
-    actual = [(v, acl.parse_ip(v)) for v, _ in data]
+    actual = [(v, acl._parse_ip(v)) for v, _ in data]
     self.assertEqual(data, actual)
 
   def test_parse_ip_bad(self):
     with self.assertRaises(AssertionError):
-      acl.parse_ip('allo')
+      acl._parse_ip('allo')
 
   def test_ip_to_str(self):
     data = [
@@ -42,7 +45,7 @@ class IpUtilsTest(unittest.TestCase):
         ('v6', 340282366920938463463374607431768211455L),
         'v6-340282366920938463463374607431768211455'),
     ]
-    actual = [(v, acl.ip_to_str(*v)) for v, _ in data]
+    actual = [(v, acl._ip_to_str(*v)) for v, _ in data]
     self.assertEqual(data, actual)
 
 

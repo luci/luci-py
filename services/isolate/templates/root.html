@@ -1,21 +1,56 @@
 {% set title = 'Isolate Server' %}
 {% extends "isolate/base.html" %}
 
+{% block headers %}
+<style>
+  .admin a {
+    {% if not is_admin %}
+      color: gray;
+      text-decoration: line-through;
+    {% endif %}
+  }
+</style>
+{% endblock %}
+
 {% block body %}
 
 <h1>Welcome to an Isolate Server instance</h1>
 Isolate Server is a Content-Addressed Cache that is used by the Swarming
 project to distribute test execution accross a swarm of slaves.
 <p>
-Please visit <a
-  href="http://dev.chromium.org/developers/testing/isolated-testing">http://dev.chromium.org/developers/testing/isolated-testing</a>
-for more information.
-<p>
 
-<p>Usage stats are <a href="/stats">here</a>.</p>
+{% if not nickname %}
+Please <a href="{{signin_link|safe}}">sign in</a> for more access.
+{% else %}
+As a {{user_type}}, you are entitled to see these pages:
+{% endif %}
 
-<p>If you are an admin of this app engine instance you can use
-  <a href="/restricted">Admin pages</a>.
-</p>
+<h3>Service Status</h3>
+<ul>
+  <li><a href="/stats">Usage statistics</a></li>
+  <li class="admin"><a href="/restricted/ereporter2/errors">Recent ereporter2 errors</a></li>
+  <li class="admin"><a href="/restricted/ereporter2/report">Recent exceptions in server log</a></li>
+</ul>
+
+<h3>Configuration</h3>
+<ul class="admin">
+  <li><a href="/restricted/whitelistip">Whitelist IP</a></li>
+  <li><a href="/restricted/gs_config">Google Storage Config</a></li>
+  <li><a href="/auth/groups">Manage user groups</a></li>
+</ul>
+
+<h3>Map reduce jobs</h3>
+<ul class="admin">
+  <li><a href="/restricted/mapreduce/status">Map reduce jobs status</a></li>
+  {% for job in map_reduce_jobs %}
+    <li>
+      <form action="/restricted/launch_map_reduce" method="post">
+        <input type="hidden" name="xsrf_token" value="{{xsrf_token}}" />
+        <input type="hidden" name="job_id" value="{{job.id}}" />
+        <button type="submit">Launch '{{job.name}}'</button>
+      </form>
+    </li>
+  {% endfor %}
+</ul>
 
 {% endblock %}

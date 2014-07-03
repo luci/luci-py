@@ -21,6 +21,7 @@ from google.appengine import runtime
 from google.appengine.api import datastore_errors
 from google.appengine.api import memcache
 from google.appengine.api import taskqueue
+from google.appengine.api import users
 from google.appengine.ext import ndb
 
 import acl
@@ -52,59 +53,10 @@ MIN_SIZE_FOR_GS = 501
 MIN_SIZE_FOR_DIRECT_GS = MIN_SIZE_FOR_GS
 
 
-### ACLs
-
-
-# Names of groups.
-ADMINS_GROUP = 'isolate-admin-access'
-READERS_GROUP = 'isolate-read-access'
-WRITERS_GROUP = 'isolate-write-access'
-
-
-def isolate_admin():
-  """Returns True if current user can administer isolate server."""
-  return auth.is_group_member(ADMINS_GROUP) or auth.is_admin()
-
-
-def isolate_writable():
-  """Returns True if current user can write to isolate."""
-  # Admins have access by default.
-  return auth.is_group_member(WRITERS_GROUP) or isolate_admin()
-
-
-def isolate_readable():
-  """Returns True if current user can read from isolate."""
-  # Anyone that can write can also read.
-  return auth.is_group_member(READERS_GROUP) or isolate_writable()
-
-
-def bootstrap_dev_server_acls():
-  """Adds 127.0.0.1 as a whitelisted IP when testing."""
-  assert utils.is_local_dev_server()
-
-  # Add to IP whitelist.
-  access_id = acl.ip_to_str('v4', 2130706433)
-  acl.WhitelistedIP.get_or_insert(
-      access_id,
-      ip='127.0.0.1',
-      comment='automatic because of running on dev server')
-
-  # Add to Isolate groups.
-  ident = auth.Identity(auth.IDENTITY_BOT, access_id)
-  auth.bootstrap_group(READERS_GROUP, ident, 'Can read from Isolate')
-  auth.bootstrap_group(WRITERS_GROUP, ident, 'Can write to Isolate')
-
-  # Add a fake admin for local dev server.
-  auth.bootstrap_group(
-      auth.ADMIN_GROUP,
-      auth.Identity(auth.IDENTITY_USER, 'test@example.com'),
-      'Users that can manage groups')
-
-
 ### Utility
 
 
-def hash_content(content, namespace):
+def _hash_content(content, namespace):
   """Decompresses and hashes given |content|.
 
   Returns tuple (hex digest, expanded size).
@@ -127,24 +79,10 @@ def hash_content(content, namespace):
 ### Restricted handlers
 
 
-class RestrictedAdminUIHandler(auth.AuthenticatingHandler):
-  """Root admin UI page."""
-
-  @auth.require(isolate_admin)
-  def get(self):
-    self.response.write(template.render('isolate/restricted.html', {
-        'xsrf_token': self.generate_xsrf_token(),
-        'map_reduce_jobs': [
-            {'id': job_id, 'name': job_def['name']}
-            for job_id, job_def in map_reduce_jobs.MAP_REDUCE_JOBS.iteritems()
-        ],
-    }))
-
-
 class RestrictedGoogleStorageConfig(auth.AuthenticatingHandler):
   """View and modify Google Storage config entries."""
 
-  @auth.require(isolate_admin)
+  @auth.require(acl.isolate_admin)
   def get(self):
     settings = config.settings()
     self.response.write(template.render('isolate/gs_config.html', {
@@ -154,7 +92,7 @@ class RestrictedGoogleStorageConfig(auth.AuthenticatingHandler):
         'xsrf_token': self.generate_xsrf_token(),
     }))
 
-  @auth.require(isolate_admin)
+  @auth.require(acl.isolate_admin)
   def post(self):
     settings = config.settings()
     settings.gs_bucket = self.request.get('gs_bucket')
@@ -185,7 +123,7 @@ class RestrictedLaunchMapReduceJob(auth.AuthenticatingHandler):
   on backend module.
   """
 
-  @auth.require(isolate_admin)
+  @auth.require(acl.isolate_admin)
   def post(self):
     job_id = self.request.get('job_id')
     assert job_id in map_reduce_jobs.MAP_REDUCE_JOBS
@@ -198,7 +136,7 @@ class RestrictedLaunchMapReduceJob(auth.AuthenticatingHandler):
         use_dedicated_module=not utils.is_local_dev_server())
     # New tasks should show up on the status page.
     if success:
-      self.redirect('/internal/mapreduce/status')
+      self.redirect('/restricted/mapreduce/status')
     else:
       self.abort(500, 'Failed to launch the job')
 
@@ -294,7 +232,7 @@ class HandshakeHandler(ProtocolHandler):
   # This handler is called to get XSRF token, there's nothing to enforce yet.
   xsrf_token_enforce_on = ()
 
-  @auth.require(isolate_readable)
+  @auth.require(acl.isolate_readable)
   def post(self):
     """Responds with access token and server version."""
     try:
@@ -503,7 +441,7 @@ class PreUploadContentHandler(ProtocolHandler):
       finalize_url = None
     return upload_url, finalize_url
 
-  @auth.require(isolate_writable)
+  @auth.require(acl.isolate_writable)
   def post(self, namespace):
     """Reads body with items to upload and replies with URLs to upload to."""
     if not re.match(r'^%s$' % model.NAMESPACE_RE, namespace):
@@ -553,7 +491,7 @@ class RetrieveContentHandler(ProtocolHandler):
     * HTTP 416: requested byte range can not be satisfied.
   """
 
-  @auth.require(isolate_readable)
+  @auth.require(acl.isolate_readable)
   def get(self, namespace, hash_key):  #pylint: disable=W0221
     # Parse 'Range' header if it's present to extract initial offset.
     # Only support single continuous range from some |offset| to the end.
@@ -653,12 +591,12 @@ class StoreContentHandler(ProtocolHandler):
     mac.update(data_to_sign)
     return mac.hexdigest()
 
-  @auth.require(isolate_writable)
+  @auth.require(acl.isolate_writable)
   def post(self, namespace, hash_key):
     """POST is used when finalizing upload to GS."""
     return self.handle(namespace, hash_key)
 
-  @auth.require(isolate_writable)
+  @auth.require(acl.isolate_writable)
   def put(self, namespace, hash_key):
     """PUT is used when uploading directly to datastore via this handler."""
     return self.handle(namespace, hash_key)
@@ -716,7 +654,7 @@ class StoreContentHandler(ProtocolHandler):
     if content is not None:
       # Verify advertised hash matches the data.
       try:
-        hex_digest, expanded_size = hash_content(content, namespace)
+        hex_digest, expanded_size = _hash_content(content, namespace)
         if hex_digest != hash_key:
           raise ValueError(
               'Hash and data do not match, '
@@ -832,13 +770,30 @@ class StoreContentHandler(ProtocolHandler):
         memcache_store_future.wait()
 
 
-###
+###  Public pages.
 
 
-class RootHandler(webapp2.RequestHandler):
+class RootHandler(auth.AuthenticatingHandler):
   """Tells the user to RTM."""
+
+  @auth.public
   def get(self):
-    self.response.write(template.render('isolate/root.html'))
+    account = users.get_current_user()
+
+    params = {
+      'is_admin': acl.isolate_admin(),
+      'map_reduce_jobs': [],
+      'nickname': account.email() if account else None,
+      'signin_link': users.create_login_url('/') if not account else None,
+      'user_type': acl.get_user_type(),
+    }
+    if acl.isolate_admin():
+      params['map_reduce_jobs'] = [
+        {'id': job_id, 'name': job_def['name']}
+        for job_id, job_def in map_reduce_jobs.MAP_REDUCE_JOBS.iteritems()
+      ]
+      params['xsrf_token'] = self.generate_xsrf_token()
+    self.response.write(template.render('isolate/root.html', params))
 
 
 class WarmupHandler(webapp2.RequestHandler):
@@ -860,8 +815,6 @@ def get_routes():
 
   return [
       # Administrative urls.
-      webapp2.Route(
-          r'/restricted', RestrictedAdminUIHandler),
       webapp2.Route(
           r'/restricted/whitelistip', acl.RestrictedWhitelistIPHandler),
       webapp2.Route(
@@ -924,5 +877,5 @@ def create_application(debug=False):
 
   # Add some predefined groups when running on local dev server.
   if utils.is_local_dev_server():
-    bootstrap_dev_server_acls()
+    acl.bootstrap_dev_server_acls()
   return webapp2.WSGIApplication(routes, debug=debug)

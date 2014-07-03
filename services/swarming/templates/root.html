@@ -1,5 +1,6 @@
 {% extends "swarming/base.html" %}
 
+
 {% block headers %}
 <style>
   .admin a {
@@ -10,12 +11,6 @@
   }
   .privileged_user a {
     {% if not is_privileged_user %}
-      color: gray;
-      text-decoration: line-through;
-    {% endif %}
-  }
-  .super_admin a {
-    {% if not is_super_admin %}
       color: gray;
       text-decoration: line-through;
     {% endif %}
@@ -48,7 +43,8 @@ As a {{user_type}}, you are entitled to see these pages:
   <li><a href="/stats">Usage statistics</a></li>
   <li class="user"><a href="/user/tasks">Tasks list and search</a></li>
   <li class="privileged_user"><a href="/restricted/bots">Known bots</a></li>
-  <li class="privileged_user"><a href="/restricted/errors">Infrastructure errors</a></li>
+  <li class="admin"><a href="/restricted/ereporter2/errors">Recent ereporter2 errors</a></li>
+  <li class="admin"><a href="/restricted/ereporter2/report">Recent exceptions in server log</a></li>
 </ul>
 
 <h3>Configuration</h3>
@@ -57,11 +53,6 @@ As a {{user_type}}, you are entitled to see these pages:
   <li><a href="/restricted/upload_bootstrap">Upload new bootstrap.py</a></li>
   <li><a href="/restricted/upload_start_slave">Upload new start_slave.py</a></li>
   <li><a href="/auth/groups">Manage user groups</a></li>
-</ul>
-
-<h3>Error reports</h3>
-<ul class="admin">
-  <li><a href="/restricted/ereporter2/report">Recent ereporter2 errors</a></li>
 </ul>
 
 <h3>Running a bot</h3>

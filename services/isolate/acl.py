@@ -8,7 +8,14 @@ import logging
 from google.appengine.ext import ndb
 
 from components import auth
+from components import utils
 import template
+
+
+# Names of groups.
+ADMINS_GROUP = 'isolate-admin-access'
+READERS_GROUP = 'isolate-read-access'
+WRITERS_GROUP = 'isolate-write-access'
 
 
 ### Models
@@ -17,7 +24,7 @@ import template
 class WhitelistedIP(ndb.Model):
   """Items where the IP address is allowed.
 
-  The key is the ip as returned by ip_to_str(*parse_ip(ip)).
+  The key is the ip as returned by _ip_to_str(*_parse_ip(ip)).
   """
   # Logs who made the change.
   timestamp = ndb.DateTimeProperty(auto_now=True)
@@ -37,31 +44,10 @@ class WhitelistedIP(ndb.Model):
   comment = ndb.StringProperty(indexed=False)
 
 
-def whitelisted_ip_authentication(request):
-  """Returns bot Identity if request comes from known IP, or None otherwise."""
-  iptype, ipvalue = parse_ip(request.remote_addr)
-  whitelisted = WhitelistedIP.get_by_id(ip_to_str(iptype, ipvalue))
-  if not whitelisted:
-    logging.warning('Access from unknown IP: %s', request.remote_addr)
-    return None
-  if whitelisted.group:
-    # Any member of of the group can impersonate others. This is to enable
-    # support for slaves behind proxies with multiple IPs.
-    access_id = whitelisted.group
-  else:
-    access_id = ip_to_str(iptype, ipvalue)
-  return auth.Identity(auth.IDENTITY_BOT, access_id)
+### Private stuff.
 
 
-### Utility
-
-
-def htmlwrap(text):
-  """Wraps text in minimal HTML tags."""
-  return '<html><body>%s</body></html>' % text
-
-
-def parse_ip(ipstr):
+def _parse_ip(ipstr):
   """Returns a long number representing the IP and its type, 'v4' or 'v6'.
 
   This works around potentially different representations of the same value,
@@ -94,13 +80,13 @@ def parse_ip(ipstr):
   return iptype, value
 
 
-def ip_to_str(iptype, ipvalue):
+def _ip_to_str(iptype, ipvalue):
   if not iptype:
     return None
   return '%s-%d' % (iptype, ipvalue)
 
 
-def ipv4_to_int(ip):
+def _ipv4_to_int(ip):
   values = [int(i) for i in ip.split('.')]
   factor = 256
   value = 0L
@@ -109,7 +95,7 @@ def ipv4_to_int(ip):
   return value
 
 
-def int_to_ipv4(integer):
+def _int_to_ipv4(integer):
   values = []
   factor = 256
   for _ in range(4):
@@ -118,12 +104,80 @@ def int_to_ipv4(integer):
   return '.'.join(str(i) for i in reversed(values))
 
 
-def expand_subnet(ip, mask):
+def _expand_subnet(ip, mask):
   """Returns all the IP addressed comprised in a range."""
   if mask == 32:
     return [ip]
   bit = 1 << (32 - mask)
-  return [int_to_ipv4(ipv4_to_int(ip) + r) for r in range(bit)]
+  return [_int_to_ipv4(_ipv4_to_int(ip) + r) for r in range(bit)]
+
+
+### Public API.
+
+
+def whitelisted_ip_authentication(request):
+  """Returns bot Identity if request comes from known IP, or None otherwise."""
+  iptype, ipvalue = _parse_ip(request.remote_addr)
+  whitelisted = WhitelistedIP.get_by_id(_ip_to_str(iptype, ipvalue))
+  if not whitelisted:
+    logging.warning('Access from unknown IP: %s', request.remote_addr)
+    return None
+  if whitelisted.group:
+    # Any member of of the group can impersonate others. This is to enable
+    # support for slaves behind proxies with multiple IPs.
+    access_id = whitelisted.group
+  else:
+    access_id = _ip_to_str(iptype, ipvalue)
+  return auth.Identity(auth.IDENTITY_BOT, access_id)
+
+
+def isolate_admin():
+  """Returns True if current user can administer isolate server."""
+  return auth.is_group_member(ADMINS_GROUP) or auth.is_admin()
+
+
+def isolate_writable():
+  """Returns True if current user can write to isolate."""
+  # Admins have access by default.
+  return auth.is_group_member(WRITERS_GROUP) or isolate_admin()
+
+
+def isolate_readable():
+  """Returns True if current user can read from isolate."""
+  # Anyone that can write can also read.
+  return auth.is_group_member(READERS_GROUP) or isolate_writable()
+
+
+def get_user_type():
+  """Returns a string describing the current access control for the user."""
+  if isolate_admin():
+    return 'admin'
+  if isolate_writable():
+    return 'user'
+  return 'unknown user'
+
+
+def bootstrap_dev_server_acls():
+  """Adds 127.0.0.1 as a whitelisted IP when testing."""
+  assert utils.is_local_dev_server()
+
+  # Add to IP whitelist.
+  access_id = _ip_to_str('v4', 2130706433)
+  WhitelistedIP.get_or_insert(
+      access_id,
+      ip='127.0.0.1',
+      comment='automatic because of running on dev server')
+
+  # Add to Isolate groups.
+  ident = auth.Identity(auth.IDENTITY_BOT, access_id)
+  auth.bootstrap_group(READERS_GROUP, ident, 'Can read from Isolate')
+  auth.bootstrap_group(WRITERS_GROUP, ident, 'Can write to Isolate')
+
+  # Add a fake admin for local dev server.
+  auth.bootstrap_group(
+      auth.ADMIN_GROUP,
+      auth.Identity(auth.IDENTITY_USER, 'test@example.com'),
+      'Users that can manage groups')
 
 
 ### Handlers
@@ -163,12 +217,12 @@ class RestrictedWhitelistIPHandler(auth.AuthenticatingHandler):
       ip, mask = ip.split('/', 1)
       mask = int(mask)
 
-    if not all(ip_to_str(*parse_ip(i)) for i in expand_subnet(ip, mask)):
+    if not all(_ip_to_str(*_parse_ip(i)) for i in _expand_subnet(ip, mask)):
       self.abort(403, 'IP is invalid')
 
     note = []
-    for i in expand_subnet(ip, mask):
-      key = ip_to_str(*parse_ip(i))
+    for i in _expand_subnet(ip, mask):
+      key = _ip_to_str(*_parse_ip(i))
       item = WhitelistedIP.get_by_id(key)
       item_comment = comment
       if mask != 32:

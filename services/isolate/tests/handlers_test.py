@@ -115,13 +115,13 @@ class MainTest(test_case.TestCase):
 
   def whitelist_self(self):
     acl.WhitelistedIP(
-        id=acl.ip_to_str(*acl.parse_ip(self.source_ip)),
+        id=acl._ip_to_str(*acl._parse_ip(self.source_ip)),
         ip=self.source_ip).put()
 
   def mock_acl_checks(self):
     known_groups = (
-      handlers_frontend.READERS_GROUP,
-      handlers_frontend.WRITERS_GROUP,
+      acl.READERS_GROUP,
+      acl.WRITERS_GROUP,
     )
     self.mock(
         handlers_frontend.auth,
