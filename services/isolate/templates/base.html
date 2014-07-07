@@ -12,7 +12,9 @@ found in the LICENSE file. -->
     {# Page specific headers goes there. #}
   {% endblock %}
 </head>
-<body>
+<body
+  {% if onload is defined %}onload="{{onload}}"{% endif %}
+>
   {% block body %}
   {% endblock %}
   <hr>

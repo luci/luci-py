@@ -770,6 +770,19 @@ class StoreContentHandler(ProtocolHandler):
         memcache_store_future.wait()
 
 
+class BrowseHandler(auth.AuthenticatingHandler):
+  @auth.require(acl.isolate_readable)
+  def get(self):
+    namespace = self.request.get('namespace', 'default')
+    hash_value = self.request.get('hash', '')
+    params = {
+      'hash_value': hash_value,
+      'namespace': namespace,
+      'onload': 'update()' if hash_value else '',
+    }
+    self.response.write(template.render('isolate/browse.html', params))
+
+
 ###  Public pages.
 
 
@@ -782,6 +795,7 @@ class RootHandler(auth.AuthenticatingHandler):
 
     params = {
       'is_admin': acl.isolate_admin(),
+      'is_user': acl.isolate_readable(),
       'map_reduce_jobs': [],
       'nickname': account.email() if account else None,
       'signin_link': users.create_login_url('/') if not account else None,
@@ -839,6 +853,7 @@ def get_routes():
           r'/content-gs/store%s' % namespace_key,
           StoreContentHandler,
           name='store-gs'),
+      webapp2.Route(r'/browse', BrowseHandler),
 
       # Public stats.
       webapp2.Route(r'/stats', stats_gviz.StatsHandler),

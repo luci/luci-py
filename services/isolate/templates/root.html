@@ -9,6 +9,12 @@
       text-decoration: line-through;
     {% endif %}
   }
+  .user a {
+    {% if not is_user %}
+      color: gray;
+      text-decoration: line-through;
+    {% endif %}
+  }
 </style>
 {% endblock %}
 
@@ -28,6 +34,7 @@ As a {{user_type}}, you are entitled to see these pages:
 <h3>Service Status</h3>
 <ul>
   <li><a href="/stats">Usage statistics</a></li>
+  <li class="user"><a href="/browse">Browse online</a></li>
   <li class="admin"><a href="/restricted/ereporter2/errors">Recent ereporter2 errors</a></li>
   <li class="admin"><a href="/restricted/ereporter2/report">Recent exceptions in server log</a></li>
 </ul>
