@@ -12,26 +12,41 @@ represents the overall result for the TaskRequest taking in account retries.
 TaskRunResult represents the result for one 'try'. There can be multiple tries
 for one job, for example if a bot dies.
 
-      <See task_request.py>
+The stdout of each command in TaskResult.properties.commands is saved inside
+TaskOutput. It is chunked in TaskOutputChunk to fit the entity size limit.
+
+        <See task_request.py>
+                  ^
+                  |
+        +---------------------+
+        |TaskRequest          |
+        |    +--------------+ |
+        |    |TaskProperties| |
+        |    +--------------+ |
+        +---------------------+
+                   ^
+                   |
+          +-----------------+
+          |TaskResultSummary|
+          +-----------------+
+                ^      ^
+                |      |
+    +-------------+  +-------------+
+    |TaskRunResult|  |TaskRunResult|
+    +-------------+  +-------------+
                 ^
                 |
-      +---------------------+
-      |TaskRequest          |
-      |    +--------------+ |
-      |    |TaskProperties| |
-      |    +--------------+ |
-      +---------------------+
-                 ^
-                 |
-        +-----------------+
-        |TaskResultSummary|
-        +-----------------+
-              ^      ^
-              |      |
-  +-------------+  +-------------+
-  |TaskRunResult|  |TaskRunResult|
-  +-------------+  +-------------+
+              +----------+
+              |TaskOutput|
+              +----------+
+                ^       ^
+                |       |
+    +---------------+  +---------------+
+    |TaskOutputChunk|  |TaskOutputChunk|
+    +---------------+  +---------------+
 """
+
+import logging
 
 from google.appengine.api import datastore_errors
 from google.appengine.ext import ndb
@@ -100,6 +115,78 @@ def _calculate_failure(result_common):
       result_common.state == State.TIMED_OUT)
 
 
+class TaskOutput(ndb.Model):
+  """Phantom entity to represent a command output stored as small chunks.
+
+  Parent is TaskRunResult. Key id is the command's index + 1, because id 0 is
+  invalid.
+
+  Child entities TaskOutputChunk are aggregated for the whole output.
+
+  This entity doesn't actually exist in the DB. It only exists to make
+  categories.
+  """
+
+
+class TaskOutputChunk(ndb.Model):
+  """Represents a chunk of a command output.
+
+  Parent is TaskOutput. Key id is monotonically increasing.
+
+  Each entity except the last one must have exactly
+  len(self.chunk) == self.CHUNK_SIZE.
+  """
+  # The maximum size a chunk should be when creating chunk models. The rationale
+  # is that appending data to an entity requires reading it first, so it must
+  # not be too big. On the other hand, having thousands of small entities is
+  # pure overhead.
+  # TODO(maruel): This value was selected from guts feeling. Do proper load
+  # testing to find the best value.
+  CHUNK_SIZE = 102400
+
+  # Maximum content saved in a TaskOutput.
+  MAX_CONTENT = 16000*1024
+
+  # Maximum number of chunks.
+  MAX_CHUNKS = MAX_CONTENT / CHUNK_SIZE
+
+  # It is easier if there is no remainder for efficiency.
+  assert (MAX_CONTENT % CHUNK_SIZE) == 0
+
+  chunk = ndb.BlobProperty(default='', compressed=True)
+
+  # Integer sent by the client used to ensure the packets are written in order.
+  # The next packet must be self.packet_number + 1.
+  packet_number = ndb.IntegerProperty(default=0, indexed=False)
+
+  @property
+  def chunk_number(self):
+    return self.key.integer_id() - 1
+
+  @property
+  def is_output_full(self):
+    """True if the TaskOutput is completely full.
+
+    The return value is only valid on the last TaskOutputChunk of a TaskOutput.
+    """
+    return (
+        self.chunk_number == (self.MAX_CHUNKS-1) and
+        len(self.chunk) == self.CHUNK_SIZE)
+
+  def append(self, content, packet_number):
+    """Appends as much data as possible.
+
+    Returns:
+      tuple(remainder, bool if this instance was modified).
+    """
+    assert content
+    to_append = min(self.CHUNK_SIZE - len(self.chunk), len(content))
+    if to_append:
+      self.chunk += content[:to_append]
+      self.packet_number = packet_number
+    return content[to_append:], bool(to_append)
+
+
 class _TaskResultCommon(ndb.Model):
   """Contains properties that is common to both TaskRunResult and
   TaskResultSummary.
@@ -121,9 +208,18 @@ class _TaskResultCommon(ndb.Model):
   # automatically if possible.
   internal_failure = ndb.BooleanProperty(default=False)
 
+  # Only one of |outputs| or |stdout_chunks| can be set.
+
   # Aggregated outputs. Ordered by command.
   outputs = ndb.KeyProperty(
       repeated=True, kind=result_helper.Results, indexed=False)
+
+  # Number of chunks for each output for each command when the data is stored as
+  # TaskOutput instead of Results. Set to 0 when no output has been collected
+  # for a specific index. Ordered by command. This value refers to the number of
+  # TaskOutputChunk entities for each TaskOutput. Use _output_chunk_keys()
+  # generate the ndb.Key to get all the data at once.
+  stdout_chunks = ndb.IntegerProperty(repeated=True, indexed=False)
 
   # Aggregated exit codes. Ordered by command.
   exit_codes = ndb.IntegerProperty(repeated=True, indexed=False)
@@ -157,11 +253,6 @@ class _TaskResultCommon(ndb.Model):
     # wasn't a great idea after all.
     return self.request_key.get().priority
 
-  def get_outputs(self):
-    """Returns the actual outputs as strings in a list."""
-    # TODO(maruel): Rework this so all the entities can be fetched in parallel.
-    return [o.get().GetResults() for o in self.outputs]
-
   def duration(self):
     """Returns the runtime for this task or None if not applicable.
 
@@ -178,12 +269,21 @@ class _TaskResultCommon(ndb.Model):
   def to_dict(self):
     out = super(_TaskResultCommon, self).to_dict()
     out['exit_codes'] = out['exit_codes'] or []
-    out['outputs'] = out['outputs'] or []
+    out['outputs'] = self.get_outputs()
+    # Make the output consistent independent if using the old format or the new
+    # one.
+    # TODO(maruel): Remove the old format once the DBs have been cleared on the
+    # server.
+    del out['stdout_chunks']
     return out
 
   def _pre_put_hook(self):
     """Use extra validation that cannot be validated throught 'validator'."""
     super(_TaskResultCommon, self)._pre_put_hook()
+    if self.outputs and self.stdout_chunks:
+      raise datastore_errors.BadValueError(
+          'Only one of .outputs or .stdout_chunks can be set.')
+
     if self.state == State.EXPIRED:
       if self.failure or self.exit_codes:
         raise datastore_errors.BadValueError(
@@ -194,6 +294,58 @@ class _TaskResultCommon(ndb.Model):
 
     if self.state == State.TIMED_OUT and not self.failure:
       raise datastore_errors.BadValueError('Timeout implies task failure')
+
+  def _get_outputs(self, run_result_key):
+    """Returns the actual outputs as a list of strings."""
+    if not run_result_key:
+      # The task was not reaped yet.
+      return []
+
+    # TODO(maruel): Once support for self.outputs is removed, make this function
+    # async.
+    # https://code.google.com/p/swarming/issues/detail?id=116
+    if self.outputs:
+      # Old data.
+      return [o.get().GetResults() for o in self.outputs]
+
+    if self.stdout_chunks:
+      # Fetch everything in parallel.
+      futures = [
+        ndb.get_multi_async(
+            _output_chunk_keys(run_result_key, command_index, number_chunks))
+        for command_index, number_chunks in enumerate(self.stdout_chunks)
+      ]
+
+      return [
+        ''.join(chunk.get_result().chunk for chunk in future)
+        for future in futures
+      ]
+
+    return []
+
+  def _get_command_output(self, run_result_key, command_index):
+    """Returns the stdout for a single command."""
+    if not run_result_key:
+      # The task was not reaped yet.
+      return []
+
+    # TODO(maruel): Once support for self.outputs is removed, make this function
+    # async.
+    if self.outputs:
+      # Old data.
+      if command_index >= len(self.outputs):
+        return None
+      return self.outputs[command_index].get().GetResults()
+
+    if self.stdout_chunks:
+      if command_index >= len(self.stdout_chunks):
+        return None
+      number_chunks = self.stdout_chunks[command_index]
+      if not number_chunks:
+        return None
+      entities = ndb.get_multi(
+            _output_chunk_keys(run_result_key, command_index, number_chunks))
+      return ''.join(c.chunk for c in entities)
 
 
 class TaskRunResult(_TaskResultCommon):
@@ -246,6 +398,27 @@ class TaskRunResult(_TaskResultCommon):
     """Retry number this task. 1 based."""
     return self.key.integer_id()
 
+  def append_output(self, command_index, packet_number, content):
+    """Appends output to the stdout of the command.
+
+    Returns the entities to save.
+    """
+    while len(self.stdout_chunks) <= command_index:
+      # The reason for this to be a loop is that items could be handled out of
+      # order.
+      self.stdout_chunks.append(0)
+    entities, self.stdout_chunks[command_index] = _output_append(
+        _output_key(self.key, command_index), self.stdout_chunks[command_index],
+        packet_number, content)
+    assert self.stdout_chunks[command_index] <= TaskOutputChunk.MAX_CHUNKS
+    return entities
+
+  def get_outputs(self):
+    return self._get_outputs(self.key)
+
+  def get_command_output(self, command_index):
+    return self._get_command_output(self.key, command_index)
+
   def to_dict(self):
     out = super(TaskRunResult, self).to_dict()
     out['try_number'] = self.try_number
@@ -284,6 +457,18 @@ class TaskResultSummary(_TaskResultCommon):
     """Returns the TaskRequest ndb.Key that is related to this entity."""
     return result_summary_key_to_request_key(self.key)
 
+  @property
+  def run_result_key(self):
+    if not self.try_number:
+      return None
+    return result_summary_key_to_run_result_key(self.key, self.try_number)
+
+  def get_outputs(self):
+    return self._get_outputs(self.run_result_key)
+
+  def get_command_output(self, command_index):
+    return self._get_command_output(self.run_result_key, command_index)
+
   def set_from_run_result(self, rhs):
     """Copies all the properties from another instance deriving from
     _TaskResultCommon.
@@ -297,6 +482,109 @@ class TaskResultSummary(_TaskResultCommon):
     # pylint: disable=W0201
     self.state = rhs.state
     self.try_number = rhs.try_number
+
+
+### Private stuff.
+
+
+def _output_key(run_result_key, command_index):
+  """Returns a ndb.key to a TaskOutput. command_index is zero-indexed."""
+  assert run_result_key.kind() == 'TaskRunResult', run_result_key
+  assert command_index >= 0, command_index
+  return ndb.Key(TaskOutput, command_index+1, parent=run_result_key)
+
+
+def _output_chunk_key(output_key, chunk_number):
+  """Returns a ndb.key to a TaskOutputChunk.
+
+  Both command_index and chunk_number are zero-indexed.
+  """
+  assert output_key.kind() == 'TaskOutput', output_key
+  assert chunk_number >= 0, chunk_number
+  return ndb.Key(TaskOutputChunk, chunk_number+1, parent=output_key)
+
+
+def _output_chunk_keys(run_result_key, command_index, number_chunks):
+  """Returns the ndb.Key's to fetch all the TaskOutputChunk for a TaskOutput."""
+  return [
+    _output_chunk_key(_output_key(run_result_key, command_index), i)
+    for i in xrange(number_chunks)
+  ]
+
+
+def _output_append(output_key, number_chunks, packet_number, content):
+  """Appends content to a TaskOutput in TaskOutputChunk entities.
+
+  Creates new TaskOutputChunk entities as necessary as children of
+  TaskRunResult/TaskOutput.
+
+  It silently drops saving the content if it goes over ~16Mb. The hard limit is
+  32Mb but HTML escaping can expand the raw data a bit, so just store half of
+  the limit to be on the safe side.
+
+  TODO(maruel): This is because AppEngine can't do response over 32Mb and at
+  this point, it's probably just a ton of junk. Figure out a way to better
+  implement this if necessary.
+
+  Does one DB read by key and no puts. It's the responsibility of the caller to
+  save the entities.
+
+  Arguments:
+    output_key: ndb.Key to TaskOutput that is the parent of TaskOutputChunk.
+    number_chunks: Current number of TaskOutputChunk instances. If 0, this means
+        there is not data yet.
+    packet_number: 0-based index of the packet used to append to. It must be
+        monotonically incrementing. It is used to assert that data is not lost
+        or added out of order due to DB inconsistency.
+    content: Actual content to append.
+
+  Returns:
+    A tuple of (list of entities to save, number_chunks). The number_chunks is
+    the number of TaskOutputChunk instances for this content.
+  """
+  assert content and isinstance(content, str), content
+  assert output_key.kind() == 'TaskOutput', output_key
+
+  if bool(number_chunks) != bool(packet_number):
+    raise ValueError(
+        'Unexpected packet_number (%d) vs number_chunks (%d)' %
+        (packet_number, number_chunks))
+
+  if not number_chunks:
+    # This content is the first packet.
+    last_chunk = TaskOutputChunk(key=_output_chunk_key(output_key, 0))
+    number_chunks = 1
+  else:
+    last_chunk = _output_chunk_key(output_key, number_chunks - 1).get()
+    if not last_chunk:
+      raise ValueError('Unexpected missing chunk %d' % (number_chunks-1))
+
+    # |packet_number| is not updated once TaskOutput is full.
+    if (not last_chunk.is_output_full and
+        last_chunk.packet_number != packet_number - 1):
+      # Ensures content is written in order.
+      raise ValueError(
+          'Unexpected packet_number; %d != %d' %
+          (last_chunk.packet_number, packet_number - 1))
+
+  to_put = []
+  while True:
+    content, modified = last_chunk.append(content, packet_number)
+    if modified:
+      to_put.append(last_chunk)
+
+    if not content or last_chunk.is_output_full:
+      break
+
+    # More content and not yet full, need to create a new TaskOutputChunk.
+    last_chunk = TaskOutputChunk(
+      key=_output_chunk_key(output_key, number_chunks),
+      packet_number=packet_number)
+    number_chunks += 1
+
+  if content:
+    logging.error('Dropping %d bytes for %s', len(content), output_key)
+  return to_put, number_chunks
 
 
 ### Public API.

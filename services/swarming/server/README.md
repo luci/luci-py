@@ -58,6 +58,16 @@ block depends on the previous ones:
       +-------------+  +-------------+
       |TaskRunResult|  |TaskRunResult|                            task_result.py
       +-------------+  +-------------+
+                 ^
+                 |
+               +----------+
+               |TaskOutput|                                       task_result.py
+               +----------+
+                 ^      ^
+                 |      |
+    +---------------+  +---------------+
+    |TaskOutputChunk|  |TaskOutputChunk|                          task_result.py
+    +---------------+  +---------------+
 
 
 ## Keys

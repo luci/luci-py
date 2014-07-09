@@ -249,9 +249,10 @@ class AppTest(test_case.TestCase):
         ''.join(results['exit_codes']))
     self.assertEqual(result_summary.bot_id, results['machine_id'])
     expected_result_string = '\n'.join(
-        o.get().GetResults().decode('utf-8', 'replace')
-        for o in result_summary.outputs)
+        o.decode('utf-8', 'replace')
+        for o in result_summary.get_outputs())
     self.assertEqual(expected_result_string, results['output'])
+    self.assertEqual(u'\ufffd Invalid utf-8 string', results['output'])
 
   def testGetSlaveCode(self):
     response = self.app.get('/get_slave_code')

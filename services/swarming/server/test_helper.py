@@ -10,7 +10,6 @@ from google.appengine.ext import ndb
 
 import handlers_frontend
 from common import test_request_message
-from server import result_helper
 from server import task_common
 from server import task_result
 from server import task_scheduler
@@ -119,15 +118,12 @@ def CreateRunner(config_name=None, machine_id=None, ran_successfully=None,
   run_result = task_result.new_run_result(request, 1, machine_id)
 
   if ran_successfully or exit_codes:
-    data = {
-      'exit_codes': map(int, exit_codes.split(',')) if exit_codes else [0],
-    }
-    if results:
-      data['outputs'] = [result_helper.StoreResults(results).key]
+    exit_codes = map(int, exit_codes.split(',')) if exit_codes else [0]
     # The entity needs to be saved before it can be updated, since
     # bot_update_task() accepts the key of the entity.
     ndb.put_multi(task_result.prepare_put_run_result(run_result))
-    if not task_scheduler.bot_update_task(run_result.key, data, machine_id):
+    if not task_scheduler.bot_update_task(
+        run_result.key, machine_id, exit_codes, results):
       assert False, (
           'Expected to reap the TaskToRun that was created lines above')
     # Refresh it from the DB.

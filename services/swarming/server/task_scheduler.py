@@ -245,7 +245,7 @@ def bot_reap_task(dimensions, bot_id):
   return None, None
 
 
-def bot_update_task(run_result_key, data, bot_id):
+def bot_update_task(run_result_key, bot_id, exit_codes, stdout):
   """Updates a TaskRunResult and associated entities with the latest info from
   the bot.
 
@@ -280,13 +280,16 @@ def bot_update_task(run_result_key, data, bot_id):
 
   # TODO(maruel): Wrong but that's the current behavior of the swarming bots.
   # Eventually change the bot protocol to be able to send more details.
-  completed = 'exit_codes' in data
+  completed = bool(exit_codes)
   if completed:
     run_result.state = task_result.State.COMPLETED
     run_result.completed_ts = now
-    run_result.exit_codes.extend(data['exit_codes'])
-  if 'outputs' in data:
-    run_result.outputs.extend(data['outputs'])
+    assert all(isinstance(i, int) for i in exit_codes), exit_codes
+    run_result.exit_codes.extend(exit_codes)
+  if stdout is not None:
+    # https://code.google.com/p/swarming/issues/detail?id=116 requires
+    # https://code.google.com/p/swarming/issues/detail?id=117
+    to_put.extend(run_result.append_output(0, 0, stdout))
   to_put.extend(task_result.prepare_put_run_result(run_result))
   ndb.put_multi(to_put)
 

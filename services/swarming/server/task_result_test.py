@@ -4,6 +4,7 @@
 # found in the LICENSE file.
 
 import datetime
+import logging
 import os
 import sys
 import unittest
@@ -266,6 +267,8 @@ class TaskResultApiTest(test_case.TestCase):
     run_result.completed_ts = complete_ts
     run_result.exit_codes.append(0)
     run_result.state = task_result.State.COMPLETED
+    # This is the old way of storing data. Ensure this works too.
+    # https://code.google.com/p/swarming/issues/detail?id=116
     results_key = result_helper.StoreResults('foo').key
     run_result.outputs.append(results_key)
     ndb.put_multi(task_result.prepare_put_run_result(run_result))
@@ -279,13 +282,14 @@ class TaskResultApiTest(test_case.TestCase):
       'internal_failure': False,
       'modified_ts': complete_ts,
       'name': u'Request name',
-      'outputs': [results_key],
+      'outputs': ['foo'],
       'started_ts': reap_ts,
       'state': task_result.State.COMPLETED,
       'try_number': 1,
       'user': u'Jesus',
     }
     self.assertEqual(expected, result_summary.to_dict())
+    self.assertEqual(['foo'], result_summary.get_outputs())
     self.assertEqual(datetime.timedelta(seconds=2), result_summary.duration())
 
     self.assertEqual(
@@ -319,6 +323,99 @@ class TaskResultApiTest(test_case.TestCase):
   def test_prepare_put_run_result(self):
     # Tested indirectly.
     pass
+
+  def test_append_output(self):
+    # Test that one can stream output and it is returned fine.
+    request = task_request.make_request(_gen_request_data())
+    result_summary = task_result.new_result_summary(request)
+    result_summary.put()
+    run_result = task_result.new_run_result(request, 1, 'localhost')
+    ndb.put_multi(task_result.prepare_put_run_result(run_result))
+
+    def run(*args):
+      entities = run_result.append_output(*args)
+      self.assertEqual(1, len(entities))
+      ndb.put_multi(entities)
+    run(0, 0, 'Part1\n')
+    run(1, 0, 'Part2\n')
+    run(1, 1, 'Part3\n')
+    self.assertEqual(['Part1\n', 'Part2\nPart3\n'], run_result.get_outputs())
+    self.assertEqual('Part1\n', run_result.get_command_output(0))
+    self.assertEqual('Part2\nPart3\n', run_result.get_command_output(1))
+    self.assertEqual(None, run_result.get_command_output(2))
+
+  def test_append_output_out_of_order(self):
+    request = task_request.make_request(_gen_request_data())
+    result_summary = task_result.new_result_summary(request)
+    result_summary.put()
+    run_result = task_result.new_run_result(request, 1, 'localhost')
+    ndb.put_multi(task_result.prepare_put_run_result(run_result))
+
+    def run(*args):
+      entities = run_result.append_output(*args)
+      self.assertEqual(1, len(entities))
+      ndb.put_multi(entities)
+    run(1, 0, 'Part1\n')
+    with self.assertRaises(ValueError):
+      # It should have been run(1, 1, ...). Packet #2 will be refused until #1
+      # is received.
+      run(1, 2, 'Part2\n')
+    run(1, 1, 'Part3\n')
+    with self.assertRaises(ValueError):
+      # It should have been run(1, 2, ...). Packet #0 was already received.
+      run(1, 0, 'Part4\n')
+    run(1, 2, 'Part5\n')
+    self.assertEqual(['', 'Part1\nPart3\nPart5\n'], run_result.get_outputs())
+
+  def test_append_output_large(self):
+    self.mock(logging, 'error', lambda *_: None)
+    request = task_request.make_request(_gen_request_data())
+    result_summary = task_result.new_result_summary(request)
+    result_summary.put()
+    run_result = task_result.new_run_result(request, 1, 'localhost')
+    ndb.put_multi(task_result.prepare_put_run_result(run_result))
+
+    one_mb = '<3Google' * (1024*1024/8)
+
+    def run(*args):
+      entities = run_result.append_output(*args)
+      # Asserts at least one entity was created.
+      self.assertTrue(entities)
+      ndb.put_multi(entities)
+
+    for i in xrange(16):
+      run(0, i, one_mb)
+
+    # It can't take it anymore. It ignores the packet number at that point.
+    self.assertEqual([], run_result.append_output(0, 16, one_mb))
+    self.assertEqual([], run_result.append_output(0, 16, one_mb))
+    self.assertEqual([], run_result.append_output(0, 17, one_mb))
+
+    self.assertEqual(
+        task_result.TaskOutputChunk.MAX_CONTENT,
+        len(run_result.get_command_output(0)))
+
+  def test_append_output_max_chunk(self):
+    calls = []
+    self.mock(logging, 'error', lambda *args: calls.append(args))
+    request = task_request.make_request(_gen_request_data())
+    result_summary = task_result.new_result_summary(request)
+    result_summary.put()
+    run_result = task_result.new_run_result(request, 1, 'localhost')
+    ndb.put_multi(task_result.prepare_put_run_result(run_result))
+    max_chunk = 'x' * task_result.TaskOutputChunk.MAX_CONTENT
+    entities = run_result.append_output(0, 0, max_chunk)
+    self.assertEqual(task_result.TaskOutputChunk.MAX_CHUNKS, len(entities))
+    ndb.put_multi(entities)
+    self.assertEqual([], calls)
+
+    # Try with MAX_CONTENT + 1 bytes, so the last byte is discarded.
+    entities = run_result.append_output(1, 0, max_chunk + 'x')
+    self.assertEqual(task_result.TaskOutputChunk.MAX_CHUNKS, len(entities))
+    ndb.put_multi(entities)
+    self.assertEqual(1, len(calls))
+    self.assertTrue(calls[0][0].startswith('Dropping '), calls[0][0])
+    self.assertEqual(1, calls[0][1])
 
 
 if __name__ == '__main__':

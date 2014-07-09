@@ -34,7 +34,6 @@ from components import utils
 from server import acl
 from server import bot_management
 from server import file_chunks
-from server import result_helper
 from server import stats
 from server import stats_gviz
 from server import task_common
@@ -697,8 +696,7 @@ class GetResultHandler(auth.AuthenticatingHandler):
       # TODO(maruel): Return each output independently. Figure out a way to
       # describe what is important in the steps and what should be ditched.
       'output': u'\n'.join(
-          i.get().GetResults().decode('utf-8', 'replace')
-          for i in result.outputs),
+          i.decode('utf-8', 'replace') for i in result.get_outputs()),
     }
 
     self.response.headers['Content-Type'] = 'application/json; charset=utf-8'
@@ -921,7 +919,7 @@ class RunnerPingHandler(auth.AuthenticatingHandler):
     try:
       run_result_key = task_scheduler.unpack_run_result_key(
           packed_run_result_key)
-      task_scheduler.bot_update_task(run_result_key, {}, bot_id)
+      task_scheduler.bot_update_task(run_result_key, bot_id, None, None)
     except ValueError as e:
       logging.error('Failed to accept value %s: %s', packed_run_result_key, e)
       self.abort(400, 'Runner failed to ping.')
@@ -970,14 +968,8 @@ class ResultHandler(auth.AuthenticatingHandler):
       # Zap out any binary content on stdout.
       result_string = result_string.encode('utf-8', 'replace')
 
-    results = result_helper.StoreResults(result_string)
-
-    data = {
-      'exit_codes': map(int, exit_codes),
-      # TODO(maruel): Store output for each command individually.
-      'outputs': [results.key],
-    }
-    task_scheduler.bot_update_task(run_result.key, data, bot_id)
+    task_scheduler.bot_update_task(
+        run_result.key, bot_id, map(int, exit_codes), result_string)
 
     # TODO(maruel): Return JSON.
     self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'

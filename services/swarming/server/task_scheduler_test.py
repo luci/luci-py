@@ -24,7 +24,6 @@ from google.appengine.ext import ndb
 import webtest
 
 from components import stats_framework
-from server import result_helper
 from server import stats
 from server import task_request
 from server import task_result
@@ -226,15 +225,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
     # The bot completes the task.
     done_ts = self.now + datetime.timedelta(seconds=120)
     test_helper.mock_now(self, done_ts)
-    output_keys = [
-      result_helper.StoreResults('foo').key,
-      result_helper.StoreResults('bar').key,
-    ]
-    data = {
-      'exit_codes': [0, 0],
-      'outputs': output_keys,
-    }
-    task_scheduler.bot_update_task(run_result.key, data, 'localhost')
+    task_scheduler.bot_update_task(run_result.key, 'localhost', [0, 0], 'foo')
     result_summary, run_results = get_results(request.key)
     expected = {
       'abandoned_ts': None,
@@ -246,7 +237,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'internal_failure': False,
       'modified_ts': done_ts,
       'name': u'Request name',
-      'outputs': output_keys,
+      'outputs': ['foo'],
       'started_ts': reaped_ts,
       'state': State.COMPLETED,
       'try_number': 1,
@@ -262,7 +253,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
         'failure': False,
         'internal_failure': False,
         'modified_ts': done_ts,
-        'outputs': output_keys,
+        'outputs': ['foo'],
         'started_ts': reaped_ts,
         'state': State.COMPLETED,
         'try_number': 1,
@@ -277,11 +268,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
     reaped_request, run_result = task_scheduler.bot_reap_task(
         {'OS': 'Windows-3.1.1'}, 'localhost')
     self.assertEqual(request, reaped_request)
-    data = {
-      'exit_codes': [0, 1],
-      'outputs': [],
-    }
-    task_scheduler.bot_update_task(run_result.key, data, 'localhost')
+    task_scheduler.bot_update_task(run_result.key, 'localhost', [0, 1], None)
     result_summary, run_results = get_results(request.key)
 
     expected = {
@@ -356,8 +343,17 @@ class TaskSchedulerApiTest(test_case.TestCase):
       task_scheduler.unpack_run_result_key('bb80202')
 
   def test_bot_update_task(self):
-    # See test_get_results.
-    pass
+    data = _gen_request_data(
+        properties=dict(dimensions={u'OS': u'Windows-3.1.1'}))
+    request, _result_summary = task_scheduler.make_request(data)
+    reaped_request, run_result = task_scheduler.bot_reap_task(
+        {'OS': 'Windows-3.1.1'}, 'localhost')
+    task_scheduler.bot_update_task(run_result.key, 'localhost', None, 'foo')
+    with self.assertRaises(ValueError):
+      # Appending is currently not support at the API level.
+      # https://code.google.com/p/swarming/issues/detail?id=116
+      task_scheduler.bot_update_task(run_result.key, 'localhost', [0, 0], 'bar')
+    self.assertEqual(['foo'], run_result.get_outputs())
 
   def test_cron_abort_expired_task_to_run(self):
     # Create two shards, one is properly reaped, the other is expired.
