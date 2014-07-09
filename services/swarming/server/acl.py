@@ -112,7 +112,7 @@ def ip_whitelist_authentication(request):
   ereporter2.log(
       source='server',
       category='auth',
-      message='Authentication failure',
+      message='Authentication failure; params: %s' % request.params,
       endpoint=request.url,
       source_ip=request.remote_addr)
   return None
