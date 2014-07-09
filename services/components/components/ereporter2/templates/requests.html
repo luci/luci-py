@@ -1,0 +1,18 @@
+{% set title = 'Error Report' %}
+{% extends "ereporter2/base.html" %}
+
+{% block body %}
+<h2>Report for {{start|epochformat}} ({{start}}) to {{end|epochformat}} ({{end}})</h2>
+Modules-Versions:
+<ul>{% for i in module_versions %}<li>{{i.0}} - {{i.1}}</li>
+{% endfor %}
+</ul>
+
+{{report_out|safe}}
+
+<hr>
+<h2>Ignored reports</h2>
+
+{{ignored_out|safe}}
+
+{% endblock %}
