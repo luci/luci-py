@@ -2,6 +2,8 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
+import hashlib
+
 from google.appengine.ext import ndb
 
 
@@ -17,6 +19,33 @@ class ErrorReportingInfo(ndb.Model):
   @classmethod
   def primary_key(cls):
     return ndb.Key(cls, cls.KEY_ID)
+
+
+class ErrorReportingMonitoring(ndb.Model):
+  """Represents an error that should be limited in its verbosity.
+
+  Key name is the hash of the error name.
+  """
+  created_ts = ndb.DateTimeProperty(auto_now_add=True, indexed=False)
+
+  # The error string. Limited to 500 bytes. It can be either the exception type
+  # or a single line.
+  error = ndb.StringProperty(indexed=False)
+
+  # If True, this error is silenced and never reported.
+  silenced = ndb.BooleanProperty(default=False, indexed=False)
+
+  # Silence an error for a certain amount of time. This is useful to silence a
+  # error for an hour or a day when a known error condition occurs. Only one of
+  # |silenced| or |silenced_until| should be set.
+  silenced_until = ndb.DateTimeProperty(indexed=False)
+
+  # Minimum number of errors that must occurs before the error is reported.
+  threshold = ndb.IntegerProperty(default=0, indexed=False)
+
+  @classmethod
+  def error_to_key(cls, error):
+    return ndb.Key(cls, hashlib.sha1(error).hexdigest())
 
 
 class Error(ndb.Model):

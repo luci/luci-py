@@ -3,16 +3,68 @@
 
 {% block body %}
 <h2>Report for {{start|epochformat}} ({{start}}) to {{end|epochformat}} ({{end}})</h2>
+<a href="/restricted/ereporter2/report?start={{start-3600}}&end={{start}}">
+  Previous hour</a><br>
+<a href="/restricted/ereporter2/silence">Silenced errors</a>
+<p>
 Modules-Versions:
 <ul>{% for i in module_versions %}<li>{{i.0}} - {{i.1}}</li>
 {% endfor %}
 </ul>
 
-{{report_out|safe}}
+<h3>
+  {{errors_count}} occurrences of {{errors|length}} errors across
+  {{errors_version_count}} versions.
+</h3>
+
+{% for category in errors %}
+  <span style="font-size:130%">{{category.signature}}</span><br>
+  {{category.events.head.0.handler_module}}<br>
+  {{category.events.head.0.method}} {{category.events.head.0.host}}{{category.events.head.0.resource}} (HTTP {{category.events.head.0.status}})<br>
+  <pre>{{category.events.head.0.message}}</pre>
+  {{category.events.total_count}} occurrences:
+  {% for event in category.events.head %}
+    <a href="/restricted/ereporter2/request/{{event.request_id}}">Entry</a>
+    {% endfor %}
+  {% if category.events.has_gap %}&hellip;{% endif %}
+  {% for event in category.events.tail %}
+    <a href="/restricted/ereporter2/request/{{event.request_id}}">Entry</a>
+    {% endfor %}
+  <p>
+  <form method="POST" action="/restricted/ereporter2/silence">
+    <strong>Silencing</strong><br>
+    When under threshold: <input name=threshold></input><br>
+    <input type=checkbox name=silenced>Silence forever</input><br>
+    Silence up to (UTC): <input type="datetime-local" name=silenced_until></input><br>
+    <input type="hidden" name="error"
+        value="{{category.events.head.0.exception_type}}" />
+    <input type="hidden" name="xsrf_token" value="{{xsrf_token}}" />
+    <input type=submit value="Mute it!"></input>
+  </form>
+  <p>
+{% endfor %}
 
 <hr>
-<h2>Ignored reports</h2>
 
-{{ignored_out|safe}}
+<h3>
+  Ignored {{ignored_count}} occurrences of {{ignored|length}} errors across
+  {{ignored_version_count}} versions.
+</h3>
+
+{% for category in ignored %}
+  <span style="font-size:130%">{{category.signature}}</span><br>
+  {{category.events.head.0.handler_module}}<br>
+  {{category.events.head.0.method}} {{category.events.head.0.host}}{{category.events.head.0.resource}} (HTTP {{category.events.head.0.status}})<br>
+  <pre>{{category.events.head.0.message}}</pre>
+  {{category.events.total_count}} occurrences:
+  {% for event in category.events.head %}
+    <a href="/restricted/ereporter2/request/{{event.request_id}}">Entry</a>
+    {% endfor %}
+  {% if category.events.has_gap %}&hellip;{% endif %}
+  {% for event in category.events.tail %}
+    <a href="/restricted/ereporter2/request/{{event.request_id}}">Entry</a>
+  {% endfor %}<p>
+  <br>
+{% endfor %}
 
 {% endblock %}

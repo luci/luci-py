@@ -22,7 +22,6 @@ from google.appengine.datastore import datastore_query
 from google.appengine.ext import ndb
 
 import handlers_backend
-import handlers_common
 import template
 from common import rpc
 from common import swarm_constants
@@ -1040,7 +1039,7 @@ class WarmupHandler(webapp2.RequestHandler):
 
 def create_application(debug):
   template.bootstrap()
-  ereporter2.configure(handlers_common.should_ignore_error_record)
+  ereporter2.configure()
 
   routes = [
       # Frontend pages. They return HTML.

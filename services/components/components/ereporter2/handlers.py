@@ -4,6 +4,7 @@
 
 """HTTP Handlers."""
 
+import datetime
 import json
 import time
 
@@ -45,7 +46,6 @@ class RestrictedEreporter2Report(auth.AuthenticatingHandler):
       modules: comma separated modules to look at.
       tainted: 0 or 1, specifying if desiring tainted versions. Defaults to 1.
     """
-    request_id_url = '/restricted/ereporter2/request/'
     # TODO(maruel): Be consistent about using either epoch or human readable
     # formatted datetime.
     end = int(float(self.request.get('end', 0)) or time.time())
@@ -57,25 +57,19 @@ class RestrictedEreporter2Report(auth.AuthenticatingHandler):
       modules = modules.split(',')
     tainted = bool(int(self.request.get('tainted', '1')))
     module_versions = utils.get_module_version_list(modules, tainted)
-    report, ignored = logscraper._scrape_logs_for_errors(
+    errors, ignored = logscraper._scrape_logs_for_errors(
         start, end, module_versions)
-    env = ui._get_template_env(start, end, module_versions)
-
-    # Create two reports, the one for the actual error messages and another one
-    # for the ignored messages.
-    params = env.copy()
-    params.update(ui._records_to_params(report, 0, request_id_url, None))
-    report_out = template.render('ereporter2/report_content.html', params)
-
-    params = env.copy()
-    params.update(ui._records_to_params(ignored, 0, request_id_url, None))
-    ignored_out = template.render('ereporter2/report_content.html', params)
 
     params = {
-      'report_out': report_out,
-      'ignored_out': ignored_out,
+      'errors': errors,
+      'errors_count': sum(len(e.events) for e in errors),
+      'errors_version_count': len(set(e.version for e in errors)),
+      'ignored': ignored,
+      'ignored_count': sum(len(i.events) for i in ignored),
+      'ignored_version_count': len(set(i.version for i in ignored)),
+      'xsrf_token': self.generate_xsrf_token(),
     }
-    params.update(env)
+    params.update(ui._get_template_env(start, end, module_versions))
     self.response.write(template.render('ereporter2/requests.html', params))
 
 
@@ -122,6 +116,41 @@ class RestrictedEreporter2Error(auth.AuthenticatingHandler):
       'now': testing._utcnow(),
     }
     self.response.out.write(template.render('ereporter2/error.html', params))
+
+
+class RestrictedEreporter2Silence(auth.AuthenticatingHandler):
+  @auth.require(auth.is_admin)
+  def get(self):
+    items = models.ErrorReportingMonitoring.query().fetch()
+    params = {
+      'silenced': items,
+      'xsrf_token': self.generate_xsrf_token(),
+    }
+    self.response.out.write(template.render('ereporter2/silence.html', params))
+
+  @auth.require(auth.is_admin)
+  def post(self):
+    error = self.request.get('error')
+    if not error:
+      self.abort(400)
+    silenced = self.request.get('silenced')
+    silenced_until = self.request.get('silenced_until')
+    threshold = self.request.get('threshold')
+    key = models.ErrorReportingMonitoring.error_to_key(error)
+    if not silenced and not silenced_until and not threshold:
+      key.delete()
+    else:
+      item = models.ErrorReportingMonitoring(key=key, error=error)
+      if silenced:
+        item.silenced = True
+      if silenced_until:
+        item.silenced_until = datetime.datetime.strptime(
+            silenced_until, '%Y-%m-%dT%H:%M')
+      if threshold:
+        item.threshold = int(threshold)
+      item.put()
+
+    self.get()
 
 
 ### Cron jobs.
@@ -235,6 +264,9 @@ def get_frontend_routes():
     webapp2.Route(
         r'/restricted/ereporter2/request/<request_id:[0-9a-fA-F]+>',
         RestrictedEreporter2Request),
+    webapp2.Route(
+        r'/restricted/ereporter2/silence',
+        RestrictedEreporter2Silence),
 
     # Public API.
     webapp2.Route(

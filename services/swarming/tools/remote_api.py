@@ -24,7 +24,6 @@ def setup_context():
   # Unused variable 'XXX'; they are accessed via locals().
   # pylint: disable=W0612
   import handlers_backend
-  import handlers_common
   import handlers_frontend
   from common import swarm_constants
   from components import auth

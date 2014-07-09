@@ -1,4 +1,4 @@
-<h3>{% if report_url %}<a href="{{report_url}}?start={{start}}&end={{end}}">{% endif %}{{occurrence_count}} occurrences of {{error_count}} errors across {{version_count}} versions.{% if ignored_count %}<br>
+<h3><a href="{{report_url}}?start={{start}}&end={{end}}">{{occurrence_count}} occurrences of {{error_count}} errors across {{version_count}} versions.{% if ignored_count %}<br>
 Ignored {{ignored_count}} errors.{% endif %}{% if report_url %}</a>{% endif %}</h3>
 
 {% for category in errors %}<span style="font-size:130%">{{category.signature}}</span><br>

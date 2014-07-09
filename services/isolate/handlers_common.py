@@ -5,38 +5,12 @@
 """This module defines Isolate Server common code used in handlers."""
 
 import datetime
-import functools
 import logging
 
 from google.appengine import runtime
 from google.appengine.api import taskqueue
 
-from components import ereporter2
 from components import utils
-
-
-# Ignore these failures, there's nothing to do.
-# TODO(maruel): Store them in the db and make this runtime configurable.
-_IGNORED_LINES = (
-  # And..?
-  '/base/data/home/runtimes/python27/python27_lib/versions/1/google/'
-      'appengine/_internal/django/template/__init__.py:729: UserWarning: '
-      'api_milliseconds does not return a meaningful value',
-)
-
-# Ignore these exceptions.
-_IGNORED_EXCEPTIONS = (
-  'CancelledError',
-  'DeadlineExceededError',
-  # These are DeadlineExceededError wrapped up by
-  # third_party/cloudstorage/storage_api.py.
-  'TimeoutError',
-  ereporter2.SOFT_MEMORY,
-)
-
-
-should_ignore_error_record = functools.partial(
-    ereporter2.should_ignore_error_record, _IGNORED_LINES, _IGNORED_EXCEPTIONS)
 
 
 ### Utility

@@ -180,6 +180,5 @@ def _is_recipient_or_admin():
 ### Public API.
 
 
-def configure(log_filter):
-  logscraper._LOG_FILTER = log_filter
+def configure():
   template.bootstrap({'ereporter2': os.path.join(ROOT_DIR, 'templates')})

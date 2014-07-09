@@ -15,6 +15,8 @@ import webob
 from google.appengine.api import logservice
 
 from . import formatter
+from . import models
+from . import testing
 
 
 # Access to a protected member XXX of a client class - pylint: disable=W0212
@@ -22,8 +24,6 @@ from . import formatter
 
 # Handle this error message specifically.
 SOFT_MEMORY = 'Exceeded soft private memory limit'
-
-_LOG_FILTER = lambda *_: False
 
 
 ### Private constants.
@@ -288,6 +288,24 @@ def _extract_exceptions_from_logs(start_time, end_time, module_versions):
         entry.status, '\n'.join(msgs))
 
 
+def _should_ignore_error_category(error_category):
+  """Returns True if an _ErrorCategory should be ignored."""
+  error = error_category.exception_type or error_category.signature
+  monitoring = models.ErrorReportingMonitoring.error_to_key(error).get()
+  if not monitoring:
+    return False
+
+  if monitoring.silenced:
+    return True
+  if (monitoring.silenced_until and
+      monitoring.silenced_until >= testing._utcnow()):
+    return True
+  if (monitoring.threshold and len(error_category.events) <
+      monitoring.threshold):
+    return True
+  return False
+
+
 def _log_request_id(request_id):
   """Returns a logservice.RequestLog for a request id or None if not found."""
   request = list(logservice.fetch(
@@ -312,23 +330,19 @@ def _scrape_logs_for_errors(start_time, end_time, module_versions):
     the ones that should be ignored.
   """
   # Gather all the error categories.
-  categories = {}
-  ignored = {}
+  buckets = {}
   for error_record in _extract_exceptions_from_logs(
       start_time, end_time, module_versions):
-    buckets = ignored if _LOG_FILTER(error_record) else categories
     bucket = buckets.setdefault(
         error_record.signature, _ErrorCategory(error_record))
     bucket.append_error(error_record)
 
-  return categories.values(), ignored.values()
-
-
-### Public API.
-
-
-def should_ignore_error_record(ignored_lines, ignored_exceptions, error_record):
-  """Returns True if an ErrorRecord should be ignored."""
-  if any(l in ignored_lines for l in error_record.message.splitlines()):
-    return True
-  return error_record.exception_type in ignored_exceptions
+  # Filter them.
+  categories = []
+  ignored = []
+  for category in buckets.itervalues():
+    if _should_ignore_error_category(category):
+      ignored.append(category)
+    else:
+      categories.append(category)
+  return categories, ignored

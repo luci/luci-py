@@ -7,7 +7,6 @@
 import webapp2
 
 from components import ereporter2
-from common import ereporter2_config
 
 
 def get_routes():
@@ -17,5 +16,5 @@ def get_routes():
 
 
 def create_application(debug=False):
-  ereporter2_config.configure()
+  ereporter2.configure()
   return webapp2.WSGIApplication(get_routes(), debug=debug)

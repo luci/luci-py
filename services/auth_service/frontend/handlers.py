@@ -21,7 +21,6 @@ from components.auth.proto import replication_pb2
 from components.auth.ui import rest_api
 from components.auth.ui import ui
 
-from common import ereporter2_config
 from common import replication
 
 
@@ -228,7 +227,7 @@ def get_routes():
 
 
 def create_application(debug=False):
-  ereporter2_config.configure()
+  ereporter2.configure()
 
   # Configure UI appearance, add all custom tabs.
   ui.configure_ui(

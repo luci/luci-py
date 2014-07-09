@@ -14,6 +14,7 @@ test_env.setup_test_env()
 from support import test_case
 
 from components.ereporter2 import logscraper
+from components.ereporter2 import models
 from components.ereporter2 import testing
 
 
@@ -79,6 +80,52 @@ class Ereporter2LogscraperTest(test_case.TestCase):
       signature, exception_type = logscraper._signature_from_message(message)
       self.assertEqual(expected_signature, signature)
       self.assertEqual(excepted_exception, exception_type)
+
+  def test_silence(self):
+    record = ErrorRecordStub('failed', 'DeadlineExceededError')
+    category = logscraper._ErrorCategory(record)
+    category.append_error(record)
+    self.assertEqual(False, logscraper._should_ignore_error_category(category))
+
+    models.ErrorReportingMonitoring(
+        key=models.ErrorReportingMonitoring.error_to_key(
+            'DeadlineExceededError'),
+        error='DeadlineExceededError',
+        silenced=True).put()
+    self.assertEqual(True, logscraper._should_ignore_error_category(category))
+
+  def test_silence_until(self):
+    record = ErrorRecordStub('failed', 'DeadlineExceededError')
+    category = logscraper._ErrorCategory(record)
+    category.append_error(record)
+    self.assertEqual(False, logscraper._should_ignore_error_category(category))
+
+    models.ErrorReportingMonitoring(
+        key=models.ErrorReportingMonitoring.error_to_key(
+            'DeadlineExceededError'),
+        error='DeadlineExceededError',
+        silenced_until=self._now + datetime.timedelta(seconds=5)).put()
+    self.assertEqual(True, logscraper._should_ignore_error_category(category))
+
+    testing.mock_now(self, self._now, 10)
+    self.assertEqual(False, logscraper._should_ignore_error_category(category))
+
+  def test_silence_threshold(self):
+    record = ErrorRecordStub('failed', 'DeadlineExceededError')
+    category = logscraper._ErrorCategory(record)
+    category.append_error(record)
+    self.assertEqual(False, logscraper._should_ignore_error_category(category))
+
+    models.ErrorReportingMonitoring(
+        key=models.ErrorReportingMonitoring.error_to_key(
+            'DeadlineExceededError'),
+        error='DeadlineExceededError',
+        threshold=2).put()
+    self.assertEqual(True, logscraper._should_ignore_error_category(category))
+    category.append_error(record)
+    self.assertEqual(False, logscraper._should_ignore_error_category(category))
+    category.append_error(record)
+    self.assertEqual(False, logscraper._should_ignore_error_category(category))
 
   def test_capped_list(self):
     l = logscraper._CappedList(5, 10)

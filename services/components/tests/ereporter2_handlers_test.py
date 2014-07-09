@@ -67,7 +67,7 @@ class Base(test_case.TestCase):
     super(Base, self).setUp()
     self._now = datetime.datetime(2014, 6, 24, 20, 19, 42, 653775)
     testing.mock_now(self, self._now, 0)
-    ui.configure(lambda *_: False)
+    ui.configure()
 
   def tearDown(self):
     template.reset()
