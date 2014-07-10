@@ -483,19 +483,43 @@ class TaskResultSummary(_TaskResultCommon):
   def get_command_output(self, command_index):
     return self._get_command_output(self.run_result_key, command_index)
 
-  def set_from_run_result(self, rhs):
-    """Copies all the properties from another instance deriving from
-    _TaskResultCommon.
+  def set_from_run_result(self, run_result):
+    """Copies all the relevant properties from a TaskRunResult into this
+    TaskResultSummary.
     """
+    assert isinstance(run_result, TaskRunResult), run_result
     for property_name in _TaskResultCommon._properties:
       if isinstance(
           getattr(_TaskResultCommon, property_name), ndb.ComputedProperty):
         continue
-      setattr(self, property_name, getattr(rhs, property_name))
-    # Include explicit support for 'state' and 'try_number'.
+      setattr(self, property_name, getattr(run_result, property_name))
+    # Include explicit support for 'state' and 'try_number'. TaskRunResult.state
+    # is a ComputedProperty so it can't be copied as-is, and try_number is a
+    # generated property.
     # pylint: disable=W0201
-    self.state = rhs.state
-    self.try_number = rhs.try_number
+    self.state = run_result.state
+    self.try_number = run_result.try_number
+
+  def need_update_from_run_result(self, run_result):
+    """Returns True if set_from_run_result() would modify this instance.
+
+    E.g. they are different and TaskResultSummary needs to be updated from the
+    corresponding TaskRunResult.
+    """
+    assert isinstance(run_result, TaskRunResult), run_result
+    for property_name in _TaskResultCommon._properties:
+      if isinstance(
+          getattr(_TaskResultCommon, property_name), ndb.ComputedProperty):
+        continue
+      if getattr(self, property_name) != getattr(run_result, property_name):
+        return True
+    # Include explicit support for 'state' and 'try_number'. TaskRunResult.state
+    # is a ComputedProperty so it can't be copied as-is, and try_number is a
+    # generated property.
+    # pylint: disable=W0201
+    return (
+        self.state != run_result.state or
+        self.try_number != run_result.try_number)
 
 
 ### Private stuff.

@@ -348,11 +348,59 @@ class TaskSchedulerApiTest(test_case.TestCase):
     reaped_request, run_result = task_scheduler.bot_reap_task(
         {'OS': 'Windows-3.1.1'}, 'localhost')
     task_scheduler.bot_update_task(run_result.key, 'localhost', None, 'foo')
-    with self.assertRaises(ValueError):
-      # Appending is currently not support at the API level.
-      # https://code.google.com/p/swarming/issues/detail?id=116
-      task_scheduler.bot_update_task(run_result.key, 'localhost', [0, 0], 'bar')
     self.assertEqual(['foo'], run_result.get_outputs())
+
+    # Appending is currently not support at the API level. Output is
+    # overwritten.
+    # https://code.google.com/p/swarming/issues/detail?id=116
+    task_scheduler.bot_update_task(run_result.key, 'localhost', [0, 0], 'bar')
+    self.assertEqual(['bar'], run_result.get_outputs())
+
+  def _bot_update_task_partial_write(self, index, expected_length, put_multi):
+    """Tests that a partial write fails."""
+    class Foo(Exception):
+      pass
+
+    # Restore the original function by mocking over it.
+    self.mock(ndb, 'put_multi', put_multi)
+
+    data = _gen_request_data(
+        properties=dict(dimensions={u'OS': u'Windows-3.1.1'}))
+    request, _result_summary = task_scheduler.make_request(data)
+    reaped_request, run_result = task_scheduler.bot_reap_task(
+        {'OS': 'Windows-3.1.1'}, 'localhost')
+
+    # This first update runs a partial write and throws, which is reported to
+    # the client.
+    def put_multi_partial(items):
+      # Save one of the items, dump the rest!
+      self.assertEqual(expected_length, len(items))
+      items[index].put()
+      raise Foo('Ahah, got ya')
+    put_multi = self.mock(ndb, 'put_multi', put_multi_partial)
+    # Use a large amount of data to force multiple (3) TaskOutputChunk.
+    stdout = 'f' * (task_result.TaskOutputChunk.CHUNK_SIZE * 2 + 1)
+    with self.assertRaises(Foo):
+      task_scheduler.bot_update_task(run_result.key, 'localhost', None, stdout)
+
+    # The client retries, this time it works.
+    self.mock(ndb, 'put_multi', put_multi)
+    task_scheduler.bot_update_task(run_result.key, 'localhost', None, stdout)
+    self.assertEqual([stdout], run_result.get_outputs())
+
+    # The client retried even if it shouldn't have. No difference.
+    task_scheduler.bot_update_task(run_result.key, 'localhost', None, stdout)
+    self.assertEqual([stdout], run_result.get_outputs())
+
+  def test_bot_update_task_partial_write(self):
+    put_multi = ndb.put_multi
+    # The ndb.put_multi() mocks in _bot_update_task_partial_write receives:
+    #  1 * TaskRunResult, 1 * TaskResultSummary, 3 * TaskOutputChunk.
+    # This test case ensures that the code is behaving correctly, independent of
+    # which element was written to the DB.
+    number_elements = 5
+    for index in range(number_elements):
+      self._bot_update_task_partial_write(index, number_elements, put_multi)
 
   def test_cron_abort_expired_task_to_run(self):
     # Create two shards, one is properly reaped, the other is expired.

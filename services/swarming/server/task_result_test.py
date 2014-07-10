@@ -322,8 +322,16 @@ class TaskResultApiTest(test_case.TestCase):
         [run_result], list(task_result.yield_run_results_with_dead_bot()))
 
   def test_prepare_put_run_result(self):
-    # Tested indirectly.
-    pass
+    request = task_request.make_request(_gen_request_data())
+    result_summary = task_result.new_result_summary(request)
+    run_result = task_result.new_run_result(request, 1, 'localhost')
+    self.assertTrue(result_summary.need_update_from_run_result(run_result))
+    ndb.put_multi((result_summary, run_result))
+
+    self.assertTrue(result_summary.need_update_from_run_result(run_result))
+    ndb.put_multi(task_result.prepare_put_run_result(run_result))
+
+    self.assertFalse(result_summary.need_update_from_run_result(run_result))
 
   def test_append_output(self):
     # Test that one can stream output and it is returned fine.

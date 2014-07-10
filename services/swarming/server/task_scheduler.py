@@ -262,16 +262,21 @@ def bot_update_task(run_result_key, bot_id, exit_codes, stdout):
   if not run_result:
     logging.error('No result found for %s', run_result_key)
     return False
-  if run_result.state not in task_result.State.STATES_RUNNING:
-    logging.error(
-        'A zombie bot reappeared after the time out.\n%s; %s',
-        run_result.bot_id, run_result.state)
-    return False
   if run_result.bot_id != bot_id:
     logging.error(
         'Bot %s sent updated for task %s owned by bot %s',
         bot_id, run_result.bot_id, run_result.key)
     return False
+
+  if run_result.state not in task_result.State.STATES_RUNNING:
+    # It's possible that the ndb.put_multi() below failed in the last call, so
+    # that TaskRunResult was updated but not TaskResultsummary.
+    result_summary = run_result.result_summary_key.get()
+    if not result_summary.need_update_from_run_result(run_result):
+      logging.error(
+          'A zombie bot reappeared after the time out.\n%s; %s',
+          run_result.bot_id, run_result.state)
+      return False
 
   to_put = []
   if bot:
@@ -286,12 +291,20 @@ def bot_update_task(run_result_key, bot_id, exit_codes, stdout):
     run_result.state = task_result.State.COMPLETED
     run_result.completed_ts = now
     assert all(isinstance(i, int) for i in exit_codes), exit_codes
-    run_result.exit_codes.extend(exit_codes)
+    # Always overwrite until the new API is in use.
+    run_result.exit_codes = exit_codes
   if stdout is not None:
     # https://code.google.com/p/swarming/issues/detail?id=116 requires
     # https://code.google.com/p/swarming/issues/detail?id=117
+    # Always overwrite until the new API is in use. This is a bit gross but
+    # needed to support partial writes with the old API.
+    run_result.stdout_chunks = []
     to_put.extend(run_result.append_output(0, 0, stdout))
   to_put.extend(task_result.prepare_put_run_result(run_result))
+
+  # This will fail occasionally, in particular with partial writes. This is why
+  # the above must not be too aggressive in skipping writes to ensure the data
+  # is forcibly coherent.
   ndb.put_multi(to_put)
 
   # Update stats.
