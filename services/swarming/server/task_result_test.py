@@ -289,7 +289,13 @@ class TaskResultApiTest(test_case.TestCase):
     }
     self.assertEqual(expected, result_summary.to_dict())
     self.assertEqual(['foo'], result_summary.get_outputs())
-    self.assertEqual(datetime.timedelta(seconds=2), result_summary.duration())
+    self.assertEqual(datetime.timedelta(seconds=2), result_summary.duration)
+    self.assertEqual(
+        datetime.timedelta(seconds=2), result_summary.duration_now())
+    self.assertEqual(
+        datetime.timedelta(seconds=4), result_summary.pending)
+    self.assertEqual(
+        datetime.timedelta(seconds=4), result_summary.pending_now())
 
     self.assertEqual(
         task_common.pack_result_summary_key(result_summary.key),

@@ -150,11 +150,11 @@
             <a href="/user/task/{{task.key_string}}">{{task.name}}</a>
           </td>
           <td>{{task.to_string()|safe}}</td>
-          <td nowrap align=center>{{task.created_ts|datetimeformat}}</td>
-          <td nowrap align=right>{{task.pending|timedeltaformat}}</td>
-          <td nowrap align=center>{{task.started_ts|datetimeformat}}</td>
-          <td nowrap align=center>{{task.ended_ts|datetimeformat}}</td>
-          <td nowrap align=right>{{task.duration()|timedeltaformat}}</td>
+          <td nowrap align=center>{{task.created_ts|succinctdatetimeformat}}</td>
+          <td nowrap align=right>{{task.pending_now()|timedeltaformat}}</td>
+          <td nowrap align=center>{{task.started_ts|succinctdatetimeformat}}</td>
+          <td nowrap align=center>{{task.ended_ts|succinctdatetimeformat}}</td>
+          <td nowrap align=right>{{task.duration_now()|timedeltaformat}}</td>
           <td nowrap>{{bot_view.bot_link(task.bot_id, is_privileged_user)}}</td>
           <td nowrap align=right>{{task.priority}}</td>
         </tr>

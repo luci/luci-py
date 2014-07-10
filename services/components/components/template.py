@@ -25,6 +25,17 @@ def _datetimeformat(value, f='%Y-%m-%d %H:%M:%S'):
   return value.strftime(f)
 
 
+def _succinctdatetimeformat(value, f='%H:%M:%S'):
+  """Similar to datetimeformat but skips the dates when it's today."""
+  assert all(item not in f for item in ('%Y', '%m', '%d')), f
+  if not value:
+    return NON_BREAKING_HYPHEN + NON_BREAKING_HYPHEN
+  if utils.utcnow().date() != value.date():
+    # Prefix with the day.
+    f = '%Y-%m-%d ' + f
+  return value.strftime(f)
+
+
 def _epochformat(value, f='%Y-%m-%d %H:%M:%S'):
   """Formats a float representing epoch to datetime."""
   if not value:
@@ -65,6 +76,7 @@ _DEFAULT_GLOBAL_FILTERS = {
   'encode_to_json': utils.encode_to_json,
   'epochformat': _epochformat,
   'natsort': _natsorted,
+  'succinctdatetimeformat': _succinctdatetimeformat,
   'timedeltaformat': _timedeltaformat,
   'urlquote': _urlquote,
 }

@@ -122,8 +122,8 @@
             <a href="/user/task/{{run_result.key_string}}">
               {{run_result.name}}</a>
           </td>
-          <td nowrap>{{run_result.started_ts|datetimeformat}}</td>
-          <td nowrap align=right>{{run_result.duration()|timedeltaformat}}</td>
+          <td nowrap>{{run_result.started_ts|succinctdatetimeformat}}</td>
+          <td nowrap align=right>{{run_result.duration_now()|timedeltaformat}}</td>
           <td nowrap align=right>
             {% if previous %}
               {# Note that tasks are listed in reverse order #}

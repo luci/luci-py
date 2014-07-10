@@ -300,7 +300,7 @@ def bot_update_task(run_result_key, bot_id, exit_codes, stdout):
         'run_completed', run_result.key,
         bot_id=bot_id,
         dimensions=request.properties.dimensions,
-        runtime_ms=_secs_to_ms(run_result.duration().total_seconds()),
+        runtime_ms=_secs_to_ms(run_result.duration.total_seconds()),
         user=request.user)
     stats.add_task_entry(
         'task_completed',

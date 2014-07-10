@@ -240,11 +240,15 @@ class _TaskResultCommon(ndb.Model):
 
   @property
   def pending(self):
-    """Returns the timedelta that the task has been pending to be scheduled or
-    None if not started yet.
-    """
-    if self.started_ts and self.created_ts:
+    """Returns the timedelta the task spent pending to be scheduled or None if
+    not started yet."""
+    if self.started_ts:
       return self.started_ts - self.created_ts
+
+  def pending_now(self):
+    """Returns the timedelta the task spent pending to be scheduled as of now.
+    """
+    return (self.started_ts or utils.utcnow()) - self.created_ts
 
   @property
   def priority(self):
@@ -254,15 +258,24 @@ class _TaskResultCommon(ndb.Model):
     # wasn't a great idea after all.
     return self.request_key.get().priority
 
+  @property
   def duration(self):
-    """Returns the runtime for this task or None if not applicable.
+    """Returns the timedelta the task spent executing.
 
-    Task abandoned or not started yet are not applicable and return None.
+    Task abandoned or not yet completed are not applicable and return None.
+    """
+    if not self.started_ts or self.abandoned_ts or not self.completed_ts:
+      return None
+    return self.completed_ts - self.started_ts
+
+  def duration_now(self):
+    """Returns the timedelta the task spent executing as of now.
+
+    Task abandoned is not applicable and return None.
     """
     if not self.started_ts or self.abandoned_ts:
       return None
-    end = self.completed_ts or utils.utcnow()
-    return end - self.started_ts
+    return (self.completed_ts or utils.utcnow()) - self.started_ts
 
   def to_string(self):
     return state_to_string(self)
