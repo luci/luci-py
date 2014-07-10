@@ -376,15 +376,16 @@ class LocalTestRunner(object):
     """Get the data required to run the tests, then run and publish the results.
 
     Returns:
-      True if we we got the data, ran the tests successfully and successfully
-      published the results.
+      Process exit code to use.
     """
     if not self.DownloadAndExplodeData():
       return False
 
     result_codes, result_string = self.RunTests()
 
-    return self.PublishResults(result_codes, result_string) or any(result_codes)
+    if not self.PublishResults(result_codes, result_string):
+      return 1
+    return max(result_codes)
 
 
 def main(args):
@@ -412,8 +413,7 @@ def main(args):
     with logging_utils.CaptureLogs('local_test_runner') as log:
       runner = LocalTestRunner(options.request_file_name, log=log)
       try:
-        if runner.RetrieveDataAndRunTests():
-          return 0
+        return runner.RetrieveDataAndRunTests()
       except Exception:
         # We want to catch all so that we can report all errors, even internal
         # ones.
