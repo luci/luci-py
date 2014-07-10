@@ -7,18 +7,12 @@
 Implicitly depends on auto_stub.
 """
 
-import calendar
 import datetime
 
 from components import stats_framework
+from components import utils
 
 import webtest
-
-
-def now_epoch():
-  """Returns the equivalent of time.time() as mocked if applicable."""
-  # pylint: disable=W0212
-  return calendar.timegm(stats_framework._utcnow().timetuple())
 
 
 class RequestLog(object):
@@ -29,17 +23,6 @@ class RequestLog(object):
     self.end_time = None
     self.app_logs = []
     self.finished = True
-
-
-def mock_now(test, now, seconds):
-  """Mocks _utcnow() and ndb properties.
-
-  In particular handles when auto_now and auto_now_add are used.
-  """
-  now = now + datetime.timedelta(seconds=seconds)
-  test.mock(stats_framework, '_utcnow', lambda: now)
-  test.mock(stats_framework.ndb.DateTimeProperty, '_now', lambda _: now)
-  test.mock(stats_framework.ndb.DateProperty, '_now', lambda _: now.date())
 
 
 def configure(test):
@@ -64,7 +47,7 @@ def configure(test):
     finally:
       entry.status = response.status_code if response else 503
       entry.response_size = response.content_length if response else 0
-      entry.end_time = now_epoch()
+      entry.end_time = utils.time_time()
 
   def _yield_logs(_start_time, _end_time):
     """Returns fake RequestLog entities.
@@ -94,8 +77,5 @@ def reset_timestamp(handler, timestamp):
 
 
 class MockMixIn:
-  def mock_now(self, now, seconds):
-    mock_now(self, now, seconds)
-
   def configure(self):
     configure(self)

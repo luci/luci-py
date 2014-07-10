@@ -19,6 +19,7 @@ test_env.setup_test_env()
 from google.appengine.api import datastore_errors
 from google.appengine.ext import ndb
 
+from components import utils
 from server import task_common
 from server import task_request
 from support import test_case
@@ -78,9 +79,8 @@ class TaskRequestPrivateTest(test_case.TestCase):
     num_seconds = (
         (days_until_end_of_the_world - num_days) * 24. * 60. * 60. - 0.001)
     self.assertEqual(1628906, num_days)
-    now = task_common.UNIX_EPOCH + datetime.timedelta(
-        days=num_days, seconds=num_seconds)
-    self.mock(task_common, 'utcnow', lambda: now)
+    now = utils.EPOCH + datetime.timedelta(days=num_days, seconds=num_seconds)
+    self.mock_now(now)
     key = task_request._new_request_key()
     # Last 0x00 is reserved for shard numbers.
     # Next to last 0x77 is the random bits.

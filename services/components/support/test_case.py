@@ -3,15 +3,29 @@
 # found in the LICENSE file.
 
 import base64
+import datetime
 import logging
 import time
 
+from google.appengine.ext import ndb
 from google.appengine.ext import testbed
 
+from components import utils
 from depot_tools import auto_stub
 
 # W0212: Access to a protected member XXX of a client class
 # pylint: disable=W0212
+
+
+def mock_now(test, now, seconds):
+  """Mocks utcnow() and ndb properties.
+
+  In particular handles when auto_now and auto_now_add are used.
+  """
+  now = now + datetime.timedelta(seconds=seconds)
+  test.mock(utils, 'utcnow', lambda: now)
+  test.mock(ndb.DateTimeProperty, '_now', lambda _: now)
+  test.mock(ndb.DateProperty, '_now', lambda _: now.date())
 
 
 class TestCase(auto_stub.TestCase):
@@ -71,6 +85,9 @@ class TestCase(auto_stub.TestCase):
       self.testbed.deactivate()
     finally:
       super(TestCase, self).tearDown()
+
+  def mock_now(self, now, seconds=0):
+    mock_now(self, now, seconds)
 
   def _SendToAdmins(self, request, *args, **kwargs):
     """Make sure the request is logged.

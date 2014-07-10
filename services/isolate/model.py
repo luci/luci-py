@@ -15,8 +15,8 @@ from google.appengine.ext import ndb
 
 import config
 import gcs
-import handlers_common
 from components import datastore_utils
+from components import utils
 
 
 # The maximum number of entries that can be queried in a single request.
@@ -191,7 +191,7 @@ def new_content_entry(key, **kwargs):
   Doesn't store it. Just creates a new ContentEntry instance.
   """
   expiration, next_tag = expiration_jitter(
-      handlers_common.utcnow(), config.settings().default_expiration)
+      utils.utcnow(), config.settings().default_expiration)
   return ContentEntry(
       key=key, expiration_ts=expiration, next_tag_ts=next_tag, **kwargs)
 

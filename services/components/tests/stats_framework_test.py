@@ -18,7 +18,8 @@ import webtest
 from google.appengine.ext import ndb
 
 from components import stats_framework
-from components import stats_framework_mock
+from components import utils
+from support import stats_framework_mock
 from support import test_case
 
 # pylint: disable=W0212
@@ -363,7 +364,7 @@ class StatsFrameworkLogTest(test_case.TestCase, stats_framework_mock.MockMixIn):
         1, len(list(stats_framework.yield_entries(1, time.time()))))
     self.assertEqual(
         0, len(list(stats_framework.yield_entries(
-          None, stats_framework_mock.now_epoch()))))
+          None, utils.time_time()))))
 
   def test_json_empty_days(self):
     stats_framework_mock.reset_timestamp(self.h, self.now)

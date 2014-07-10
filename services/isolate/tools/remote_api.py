@@ -28,7 +28,6 @@ def setup_context():
   import gcs
   import handlers_backend
   import handlers_frontend
-  import handlers_common
   import model
   import stats
 

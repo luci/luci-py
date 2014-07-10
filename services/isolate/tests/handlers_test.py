@@ -22,7 +22,6 @@ import webtest
 from google.appengine.ext import ndb
 
 from components import datastore_utils
-from components import stats_framework_mock
 from components import template
 from components import utils
 from support import test_case
@@ -30,7 +29,6 @@ from support import test_case
 import acl
 import gcs
 import handlers_backend
-import handlers_common
 import handlers_frontend
 import model
 import stats
@@ -155,7 +153,7 @@ class MainTest(test_case.TestCase):
     deleted = self.mock_delete_files()
     items = ['bar', 'foo']
     now = datetime.datetime(2012, 01, 02, 03, 04, 05, 06)
-    self.mock(handlers_common, 'utcnow', lambda: now)
+    self.mock(utils, 'utcnow', lambda: now)
     self.mock(ndb.DateTimeProperty, '_now', lambda _: now)
     self.mock(ndb.DateProperty, '_now', lambda _: now.date())
 
@@ -176,8 +174,7 @@ class MainTest(test_case.TestCase):
     # Advance time, tag the first item.
     now += datetime.timedelta(seconds=2*expiration)
     self.assertEqual(
-        datetime.datetime(2012, 01, 16, 03, 04, 05, 06),
-        handlers_common.utcnow())
+        datetime.datetime(2012, 01, 16, 03, 04, 05, 06), utils.utcnow())
     r = self.app_frontend.post_json(
         '/content-gs/pre-upload/default?token=%s' % self.handshake(),
         [gen_item(items[0])])
@@ -313,7 +310,7 @@ class MainTest(test_case.TestCase):
     # TODO(maruel): Stop accessing the DB directly. Use stats_framework_mock to
     # generate it.
     now = datetime.datetime(2010, 1, 2, 3, 4, 5, 6)
-    stats_framework_mock.mock_now(self, now, 0)
+    self.mock_now(now, 0)
     handler = stats.STATS_HANDLER
     for i in xrange(10):
       s = stats._Snapshot(requests=100 + i)

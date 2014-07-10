@@ -19,9 +19,9 @@ test_env.setup_test_env()
 
 from google.appengine.api import datastore_errors
 
+from components import utils
 from server import task_common
 from server import task_scheduler
-from server import test_helper
 from support import test_case
 
 
@@ -73,7 +73,7 @@ class TaskCommonApiTest(test_case.TestCase):
     task_common.validate_priority(task_common.MAXIMUM_PRIORITY)
 
   def test_milliseconds_since_epoch(self):
-    test_helper.mock_now(self, datetime.datetime(1970, 1, 2, 3, 4, 5, 6789))
+    self.mock_now(datetime.datetime(1970, 1, 2, 3, 4, 5, 6789))
     delta = task_common.milliseconds_since_epoch(None)
     self.assertEqual(97445007, delta)
 
@@ -105,8 +105,7 @@ class TaskCommonApiTest(test_case.TestCase):
       self.assertEqual(i, 8)
       return 0x02
     self.mock(random, 'getrandbits', getrandbits)
-    test_helper.mock_now(
-      self, task_common.UNIX_EPOCH + datetime.timedelta(seconds=3))
+    self.mock_now(utils.EPOCH, 3)
 
     _request, result_summary = task_scheduler.make_request(_gen_request_data())
     bot_dimensions = {'hostname': 'localhost'}
@@ -126,8 +125,7 @@ class TaskCommonApiTest(test_case.TestCase):
       self.assertEqual(i, 8)
       return 0x02
     self.mock(random, 'getrandbits', getrandbits)
-    test_helper.mock_now(
-      self, task_common.UNIX_EPOCH + datetime.timedelta(seconds=3))
+    self.mock_now(utils.EPOCH, 3)
 
     _request, result_summary = task_scheduler.make_request(_gen_request_data())
     bot_dimensions = {'hostname': 'localhost'}

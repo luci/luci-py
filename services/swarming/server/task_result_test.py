@@ -28,7 +28,6 @@ from server import task_common
 from server import task_request
 from server import task_result
 from server import task_to_run
-from server import test_helper
 from support import test_case
 
 # pylint: disable=W0212
@@ -70,7 +69,7 @@ class TaskResultApiTest(test_case.TestCase):
   def setUp(self):
     super(TaskResultApiTest, self).setUp()
     self.now = datetime.datetime(2014, 1, 2, 3, 4, 5, 6)
-    test_helper.mock_now(self, self.now)
+    self.mock_now(self.now)
     self.mock(task_request.random, 'getrandbits', lambda _: 0x88)
     self.app = webtest.TestApp(
         deferred.application,
@@ -231,12 +230,12 @@ class TaskResultApiTest(test_case.TestCase):
     self.assertEqual(expected, result_summary.to_dict())
 
     # Nothing changed 2 secs later except latency.
-    test_helper.mock_now(self, self.now + datetime.timedelta(seconds=2))
+    self.mock_now(self.now, 2)
     self.assertEqual(expected, result_summary.to_dict())
 
     # Task is reaped after 2 seconds (4 secs total).
     reap_ts = self.now + datetime.timedelta(seconds=4)
-    test_helper.mock_now(self, reap_ts)
+    self.mock_now(reap_ts)
     task = task_to_run.is_task_reapable(task.key, None)
     task.queue_number = None
     task.put()
@@ -263,7 +262,7 @@ class TaskResultApiTest(test_case.TestCase):
     # Task completed after 2 seconds (6 secs total), the task has been running
     # for 2 seconds.
     complete_ts = self.now + datetime.timedelta(seconds=6)
-    test_helper.mock_now(self, complete_ts)
+    self.mock_now(complete_ts)
     run_result.completed_ts = complete_ts
     run_result.exit_codes.append(0)
     run_result.state = task_result.State.COMPLETED
@@ -309,14 +308,10 @@ class TaskResultApiTest(test_case.TestCase):
     run_result.completed_ts = self.now
     ndb.put_multi(task_result.prepare_put_run_result(run_result))
 
-    just_before = self.now + task_common.BOT_PING_TOLERANCE
-    test_helper.mock_now(self, just_before)
+    self.mock_now(self.now + task_common.BOT_PING_TOLERANCE)
     self.assertEqual([], list(task_result.yield_run_results_with_dead_bot()))
 
-    late = (
-        self.now + task_common.BOT_PING_TOLERANCE +
-        datetime.timedelta(seconds=1))
-    test_helper.mock_now(self, late)
+    self.mock_now(self.now + task_common.BOT_PING_TOLERANCE, 1)
     self.assertEqual(
         [run_result], list(task_result.yield_run_results_with_dead_bot()))
 

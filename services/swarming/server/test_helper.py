@@ -10,7 +10,6 @@ from google.appengine.ext import ndb
 
 import handlers_frontend
 from common import test_request_message
-from server import task_common
 from server import task_result
 from server import task_scheduler
 from server import task_to_run
@@ -137,15 +136,3 @@ def CreateRunner(config_name=None, machine_id=None, ran_successfully=None,
   ndb.put_multi(task_result.prepare_put_run_result(run_result))
 
   return result_summary, run_result
-
-
-def mock_now(test, now):
-  """Mocks utcnow() and ndb properties.
-
-  In particular handles when auto_now and auto_now_add are used.
-
-  To be used in tests only.
-  """
-  test.mock(task_common, 'utcnow', lambda: now)
-  test.mock(ndb.DateTimeProperty, '_now', lambda _: now)
-  test.mock(ndb.DateProperty, '_now', lambda _: now.date())

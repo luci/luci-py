@@ -21,7 +21,6 @@ from google.appengine.ext import ndb
 from components import utils
 from server import task_request
 from server import task_to_run
-from server import test_helper
 from support import test_case
 
 # pylint: disable=W0212
@@ -164,7 +163,7 @@ class TaskToRunApiTest(test_case.TestCase):
   def setUp(self):
     super(TaskToRunApiTest, self).setUp()
     self.now = datetime.datetime(2014, 01, 02, 03, 04, 05, 06)
-    test_helper.mock_now(self, self.now)
+    self.mock_now(self.now)
     # The default scheduling_expiration_secs for _gen_request_data().
     self.expiration_ts = self.now + datetime.timedelta(seconds=60)
 
@@ -349,7 +348,7 @@ class TaskToRunApiTest(test_case.TestCase):
     _gen_new_task_to_run(properties=dict(dimensions=request_dimensions_1))
 
     # It's normally time ordered.
-    test_helper.mock_now(self, self.now + datetime.timedelta(seconds=1))
+    self.mock_now(self.now, 1)
     request_dimensions_2 = {u'hostname': u'localhost'}
     _gen_new_task_to_run(properties=dict(dimensions=request_dimensions_2))
 
@@ -381,7 +380,7 @@ class TaskToRunApiTest(test_case.TestCase):
 
     # The second shard is added before the first, potentially because of a
     # desynchronized clock. It'll have higher priority.
-    test_helper.mock_now(self, self.now - datetime.timedelta(seconds=1))
+    self.mock_now(self.now, -1)
     request_dimensions_2 = {u'hostname': u'localhost'}
     _gen_new_task_to_run(properties=dict(dimensions=request_dimensions_2))
 
@@ -410,7 +409,7 @@ class TaskToRunApiTest(test_case.TestCase):
     _gen_new_task_to_run(properties=dict(dimensions=request_dimensions_1))
 
     # This one is later but has higher priority.
-    test_helper.mock_now(self, self.now + datetime.timedelta(seconds=60))
+    self.mock_now(self.now, 60)
     request_dimensions_2 = {u'OS': u'Windows-3.1.1'}
     _gen_new_task_to_run(
         properties=dict(dimensions=request_dimensions_2), priority=10)
@@ -441,7 +440,7 @@ class TaskToRunApiTest(test_case.TestCase):
     # All tasks are now expired. Note that even if they still have .queue_number
     # set because the cron job wasn't run, they are still not yielded by
     # yield_next_available_task_to_dispatch()
-    test_helper.mock_now(self, self.now + datetime.timedelta(seconds=61))
+    self.mock_now(self.now, 61)
     self.assertEqual(0, len(_yield_next_available_task_to_dispatch({})))
     self.assertEqual(
         1, len(list(task_to_run.yield_expired_task_to_run())))

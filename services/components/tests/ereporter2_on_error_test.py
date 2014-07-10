@@ -20,7 +20,6 @@ from components import auth
 from components.ereporter2 import formatter
 from components.ereporter2 import models
 from components.ereporter2 import on_error
-from components.ereporter2 import testing
 
 
 # Access to a protected member XXX of a client class - pylint: disable=W0212
@@ -34,7 +33,7 @@ class Ereporter2OnErrorTest(test_case.TestCase):
     super(Ereporter2OnErrorTest, self).setUp()
     self.mock(logging, 'error', lambda *_, **_kwargs: None)
     self._now = datetime.datetime(2014, 6, 24, 20, 19, 42, 653775)
-    testing.mock_now(self, self._now, 0)
+    self.mock_now(self._now, 0)
     auth.configure([
         auth.oauth_authentication,
         auth.cookie_authentication,
@@ -159,7 +158,7 @@ class Ereporter2OnErrorTestNoAuth(test_case.TestCase):
     super(Ereporter2OnErrorTestNoAuth, self).setUp()
     #self.mock(logging, 'error', lambda *_, **_kwargs: None)
     self._now = datetime.datetime(2014, 6, 24, 20, 19, 42, 653775)
-    testing.mock_now(self, self._now, 0)
+    self.mock_now(self._now, 0)
 
   def test_log(self):
     # It must work even if auth is not initialized.

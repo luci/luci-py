@@ -15,7 +15,6 @@ from support import test_case
 
 from components.ereporter2 import logscraper
 from components.ereporter2 import models
-from components.ereporter2 import testing
 
 
 # Access to a protected member XXX of a client class - pylint: disable=W0212
@@ -36,7 +35,7 @@ class Ereporter2LogscraperTest(test_case.TestCase):
   def setUp(self):
     super(Ereporter2LogscraperTest, self).setUp()
     self._now = datetime.datetime(2014, 6, 24, 20, 19, 42, 653775)
-    testing.mock_now(self, self._now, 0)
+    self.mock_now(self._now, 0)
 
   def test_signatures(self):
     messages = [
@@ -107,7 +106,7 @@ class Ereporter2LogscraperTest(test_case.TestCase):
         silenced_until=self._now + datetime.timedelta(seconds=5)).put()
     self.assertEqual(True, logscraper._should_ignore_error_category(category))
 
-    testing.mock_now(self, self._now, 10)
+    self.mock_now(self._now, 10)
     self.assertEqual(False, logscraper._should_ignore_error_category(category))
 
   def test_silence_threshold(self):

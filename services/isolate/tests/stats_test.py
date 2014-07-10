@@ -16,7 +16,7 @@ import stats_gviz
 # From components/third_party/
 import webtest
 
-from components import stats_framework_mock
+from support import stats_framework_mock
 from support import test_case
 
 # pylint: disable=R0201

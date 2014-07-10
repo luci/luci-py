@@ -15,7 +15,6 @@ test_env.setup_test_env()
 from components import auth
 from components import template
 from components.ereporter2 import logscraper
-from components.ereporter2 import testing
 from components.ereporter2 import ui
 from support import test_case
 
@@ -62,7 +61,7 @@ class Ereporter2Test(test_case.TestCase):
     self.mock(ui, '_get_end_time_for_email', lambda: 1383000000)
     self.mock(ui, '_get_recipients', lambda: ['foo@localhost'])
     self._now = datetime.datetime(2014, 6, 24, 20, 19, 42, 653775)
-    testing.mock_now(self, self._now, 0)
+    self.mock_now(self._now, 0)
     ui.configure()
 
   def tearDown(self):

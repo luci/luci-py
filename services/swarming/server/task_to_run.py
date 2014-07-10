@@ -275,7 +275,7 @@ def yield_next_available_task_to_dispatch(bot_dimensions):
   accepted_dimensions_hash = frozenset(
       _hash_dimensions(utils.encode_to_json(i))
       for i in _powerset(bot_dimensions))
-  now = task_common.utcnow()
+  now = utils.utcnow()
   broken = 0
   cache_lookup = 0
   expired = 0
@@ -309,7 +309,7 @@ def yield_next_available_task_to_dispatch(bot_dimensions):
     q = TaskToRun.query(default_options=opts).order(
         TaskToRun.queue_number).filter(TaskToRun.queue_number > 0)
     for task_key in q:
-      duration = (task_common.utcnow() - now).total_seconds()
+      duration = (utils.utcnow() - now).total_seconds()
       if duration > 40.:
         # Stop searching after too long, since the odds of the request blowing
         # up right after succeeding in reaping a task is not worth the dangling
@@ -375,7 +375,7 @@ def yield_next_available_task_to_dispatch(bot_dimensions):
       yield request, task
       ignored += 1
   finally:
-    duration = (task_common.utcnow() - now).total_seconds()
+    duration = (utils.utcnow() - now).total_seconds()
     logging.info(
         '%d/%s in %5.2fs: %d total, %d exp %d no_queue, %d hash mismatch, '
         '%d cache negative, %d dimensions mismatch, %d ignored, %d broken',
@@ -394,7 +394,7 @@ def yield_next_available_task_to_dispatch(bot_dimensions):
 
 def yield_expired_task_to_run():
   """Yields all the expired TaskToRun still marked as available."""
-  now = task_common.utcnow()
+  now = utils.utcnow()
   for task in TaskToRun.query().filter(TaskToRun.queue_number > 0):
     if task.expiration_ts < now:
       yield task

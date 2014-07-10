@@ -17,7 +17,6 @@ from google.appengine.ext import ndb
 
 import config
 import gcs
-import handlers_common
 import map_reduce_jobs
 import model
 import stats
@@ -146,7 +145,7 @@ class InternalCleanupOldEntriesWorkerHandler(webapp2.RequestHandler):
   @decorators.require_taskqueue('cleanup')
   def post(self):
     q = model.ContentEntry.query(
-        model.ContentEntry.expiration_ts < handlers_common.utcnow()
+        model.ContentEntry.expiration_ts < utils.utcnow()
         ).iter(keys_only=True)
     total = incremental_delete(q, delete=model.delete_entry_and_gs_entry)
     logging.info('Deleting %s expired entries', total)
@@ -253,8 +252,8 @@ class InternalCleanupTriggerHandler(webapp2.RequestHandler):
       # The push task queue name must be unique over a ~7 days period so use
       # the date at second precision, there's no point in triggering each of
       # time more than once a second anyway.
-      now = handlers_common.utcnow().strftime('%Y-%m-%d_%I-%M-%S')
-      if handlers_common.enqueue_task(url, 'cleanup', name=name + '_' + now):
+      now = utils.utcnow().strftime('%Y-%m-%d_%I-%M-%S')
+      if utils.enqueue_task(url, 'cleanup', name=name + '_' + now):
         self.response.out.write('Triggered %s' % url)
       else:
         self.abort(500, 'Failed to enqueue a cleanup task, see logs')

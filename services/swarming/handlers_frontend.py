@@ -279,8 +279,7 @@ class BotsListHandler(auth.AuthenticatingHandler):
     if sort_by not in self.ACCEPTABLE_BOTS_SORTS:
       self.abort(400, 'Invalid sort_by query parameter')
 
-    dead_machine_cutoff = (
-        task_common.utcnow() - bot_management.MACHINE_DEATH_TIMEOUT)
+    dead_machine_cutoff = utils.utcnow() - bot_management.MACHINE_DEATH_TIMEOUT
 
     def sort_bot(bot):
       if sort_by == 'id':
@@ -301,7 +300,7 @@ class BotsListHandler(auth.AuthenticatingHandler):
       'dead_machine_cutoff': dead_machine_cutoff,
       'is_privileged_user': acl.is_privileged_user(),
       'is_admin': acl.is_admin(),
-      'now': task_common.utcnow(),
+      'now': utils.utcnow(),
       'selected_sort': sort_by,
       'sort_options': sort_options,
     }
@@ -319,8 +318,7 @@ class BotHandler(auth.AuthenticatingHandler):
         task_result.TaskRunResult.bot_id == bot_id).order(
             -task_result.TaskRunResult.started_ts).fetch_page(
                 limit, start_cursor=cursor)
-    dead_bot_cutoff = (
-        task_common.utcnow() - bot_management.MACHINE_DEATH_TIMEOUT)
+    dead_bot_cutoff = utils.utcnow() - bot_management.MACHINE_DEATH_TIMEOUT
     bot = bot_future.get_result()
     is_dead = bot.last_seen < dead_bot_cutoff if bot else False
     params = {
@@ -332,7 +330,7 @@ class BotHandler(auth.AuthenticatingHandler):
       'is_dead': is_dead,
       'is_admin': acl.is_admin(),
       'limit': limit,
-      'now': task_common.utcnow(),
+      'now': utils.utcnow(),
       'run_results': run_results,
     }
     # TODO(maruel): Make the delete link redirect to /restricted/bots. It would
@@ -430,7 +428,7 @@ class TasksHandler(auth.AuthenticatingHandler):
       'cursor': cursor_str,
       'is_privileged_user': acl.is_privileged_user(),
       'limit': limit,
-      'now': task_common.utcnow(),
+      'now': utils.utcnow(),
       'sort': sort,
       'sort_choices': self.SORT_CHOICES,
       'state': state,
@@ -540,7 +538,7 @@ class TaskHandler(auth.AuthenticatingHandler):
     params = {
       'bot': bot,
       'is_privileged_user': acl.is_privileged_user(),
-      'now': task_common.utcnow(),
+      'now': utils.utcnow(),
       'request': request,
       'task': result,
     }
@@ -736,7 +734,7 @@ class CancelHandler(auth.AuthenticatingHandler):
     task_to_run.abort_task_to_run(task_key.get())
     result_summary = result_summary_key.get()
     result_summary.state = task_result.State.CANCELED
-    result_summary.abandoned_ts = task_common.utcnow()
+    result_summary.abandoned_ts = utils.utcnow()
     result_summary.put()
     self.response.out.write('Runner canceled.')
 
@@ -1014,7 +1012,7 @@ class RootHandler(auth.AuthenticatingHandler):
 class DeadBotsCountHandler(webapp2.RequestHandler):
   def get(self):
     self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
-    cutoff = task_common.utcnow() - bot_management.MACHINE_DEATH_TIMEOUT
+    cutoff = utils.utcnow() - bot_management.MACHINE_DEATH_TIMEOUT
     count = bot_management.Bot.query().filter(
         bot_management.Bot.last_seen < cutoff).count()
     self.response.out.write(str(count))

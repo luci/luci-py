@@ -7,7 +7,6 @@
 import logging
 import os
 import re
-import time
 from xml.sax import saxutils
 
 from google.appengine import runtime
@@ -17,6 +16,7 @@ from google.appengine.api import mail_errors
 
 from components import auth
 from components import template
+from components import utils
 
 from . import logscraper
 from . import models
@@ -49,8 +49,7 @@ def _get_end_time_for_email():
   level of logservice inconsistency. High levels of logservice inconsistencies
   will result in lost messages.
   """
-  # TODO(maruel): Use testing._utcnow() for consistency.
-  return int(time.time() - 5*60)
+  return int((utils.utcnow() - utils.EPOCH).total_seconds() - 5 * 60)
 
 
 def _records_to_params(categories, ignored_count, request_id_url, report_url):

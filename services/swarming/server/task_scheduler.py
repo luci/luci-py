@@ -23,6 +23,7 @@ from google.appengine.api import search
 from google.appengine.ext import ndb
 from google.appengine.runtime import apiproxy_errors
 
+from components import utils
 from server import bot_management
 from server import stats
 from server import task_common
@@ -72,7 +73,7 @@ def _update_task(task_key, request, bot_id):
     run_result = task_result.new_run_result(request, 1, bot_id)
     if not bot_id:
       run_result.state = task_result.State.EXPIRED
-      run_result.abandoned_ts = task_common.utcnow()
+      run_result.abandoned_ts = utils.utcnow()
       run_result.internal_failure = True
     result_summary.set_from_run_result(run_result)
     ndb.put_multi([task, run_result, result_summary])
@@ -251,7 +252,7 @@ def bot_update_task(run_result_key, bot_id, exit_codes, stdout):
 
   It does two DB RPCs, one get_multi() and one put_multi().
   """
-  now = task_common.utcnow()
+  now = utils.utcnow()
   bot_key = bot_management.get_bot_key(bot_id)
   request_key = task_result.result_summary_key_to_request_key(
       task_result.run_result_key_to_result_summary_key(run_result_key))
@@ -427,7 +428,7 @@ def cron_abort_bot_died():
       request_future = run_result.request_key.get_async()
       run_result.state = task_result.State.BOT_DIED
       run_result.internal_failure = True
-      run_result.abandoned_ts = task_common.utcnow()
+      run_result.abandoned_ts = utils.utcnow()
       ndb.put_multi(task_result.prepare_put_run_result(run_result))
       request = request_future.get_result()
       stats.add_run_entry(

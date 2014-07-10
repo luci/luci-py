@@ -145,7 +145,7 @@ def _validate_priority(_prop, value):
 
 
 def _validate_expiration(prop, value):
-  now = task_common.utcnow()
+  now = utils.utcnow()
   offset = int(round((value - now).total_seconds()))
   if _MIN_TIMEOUT_SECS > offset or _ONE_DAY_SECS < offset:
     # pylint: disable=W0212
@@ -221,8 +221,8 @@ class TaskProperties(ndb.Model):
 class TaskRequest(ndb.Model):
   """Contains a user request.
 
-  The key is a increasing integer based on time since task_common.UNIX_EPOCH
-  plus some randomness on 8 low order bits then lower 8 bits set to 0. See
+  The key is a increasing integer based on time since utils.EPOCH plus some
+  randomness on 8 low order bits then lower 8 bits set to 0. See
   _new_request_key() for the complete gory details.
 
   This model is immutable.
@@ -388,7 +388,7 @@ def make_request(data):
       execution_timeout_secs=data_properties['execution_timeout_secs'],
       io_timeout_secs=data_properties['io_timeout_secs'])
 
-  now = task_common.utcnow()
+  now = utils.utcnow()
   expiration_ts = now + datetime.timedelta(
       seconds=data['scheduling_expiration_secs'])
   request = TaskRequest(

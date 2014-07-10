@@ -51,6 +51,7 @@ import logging
 from google.appengine.api import datastore_errors
 from google.appengine.ext import ndb
 
+from components import utils
 from server import result_helper
 from server import task_common
 from server import task_request
@@ -260,7 +261,7 @@ class _TaskResultCommon(ndb.Model):
     """
     if not self.started_ts or self.abandoned_ts:
       return None
-    end = self.completed_ts or task_common.utcnow()
+    end = self.completed_ts or utils.utcnow()
     return end - self.started_ts
 
   def to_string(self):
@@ -664,7 +665,7 @@ def new_run_result(request, try_number, bot_id):
   return TaskRunResult(
       key=result_summary_key_to_run_result_key(summary_key, try_number),
       bot_id=bot_id,
-      started_ts=task_common.utcnow())
+      started_ts=utils.utcnow())
 
 
 def yield_run_results_with_dead_bot():
@@ -673,7 +674,7 @@ def yield_run_results_with_dead_bot():
   In practice it is returning a ndb.Query but this is equivalent.
   """
   # If a bot didn't ping recently, it is considered dead.
-  deadline = task_common.utcnow() - task_common.BOT_PING_TOLERANCE
+  deadline = utils.utcnow() - task_common.BOT_PING_TOLERANCE
   q = TaskRunResult.query().filter(TaskRunResult.modified_ts < deadline)
   return q.filter(TaskRunResult.state == State.RUNNING)
 

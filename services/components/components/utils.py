@@ -14,6 +14,7 @@ import datetime
 import functools
 import inspect
 import json
+import logging
 import os
 import re
 import threading
@@ -21,8 +22,10 @@ import time
 
 from email import utils as email_utils
 
+from google.appengine import runtime
 from google.appengine.api import memcache
 from google.appengine.api import modules
+from google.appengine.api import taskqueue
 
 THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -32,7 +35,7 @@ VALID_DATETIME_FORMATS = ('%Y-%m-%d', '%Y-%m-%d %H:%M', '%Y-%m-%d %H:%M:%S')
 
 
 # UTC datetime corresponding to zero Unix timestamp.
-_EPOCH = datetime.datetime.utcfromtimestamp(0)
+EPOCH = datetime.datetime.utcfromtimestamp(0)
 
 # Module to run task queue tasks on by default. Used by get_task_queue_host
 # function. Can be changed by 'set_task_queue_module' function.
@@ -133,6 +136,22 @@ def to_units(number):
   return '%d' % number
 
 
+### Time
+
+
+def utcnow():
+  """Returns datetime.utcnow(), used for testing.
+
+  Use this function so it can be mocked everywhere.
+  """
+  return datetime.datetime.utcnow()
+
+
+def time_time():
+  """Returns the equivalent of time.time() as mocked if applicable."""
+  return (utcnow() - EPOCH).total_seconds()
+
+
 def datetime_to_rfc2822(dt):
   """datetime -> string value for Last-Modified header as defined by RFC2822."""
   assert dt.tzinfo is None, 'Expecting UTC timestamp: %s' % dt
@@ -146,7 +165,7 @@ def datetime_to_timestamp(value):
         'Expecting datetime object, got %s instead' % type(value).__name__)
   if value.tzinfo is not None:
     raise ValueError('Only UTC datetime is supported')
-  dt = value - _EPOCH
+  dt = value - EPOCH
   return dt.microseconds + 1000 * 1000 * (dt.seconds + 24 * 3600 * dt.days)
 
 
@@ -155,7 +174,7 @@ def timestamp_to_datetime(value):
   if not isinstance(value, (int, long, float)):
     raise ValueError(
         'Expecting a number, got %s instead' % type(value).__name__)
-  return _EPOCH + datetime.timedelta(microseconds=value)
+  return EPOCH + datetime.timedelta(microseconds=value)
 
 
 ### Cache
@@ -242,6 +261,9 @@ def get_app_revision_url():
   return template % rev.group(1) if rev else None
 
 
+### Task queue
+
+
 @cache
 def get_task_queue_host():
   """Returns domain name of app engine instance to run a task queue task on.
@@ -276,6 +298,43 @@ def set_task_queue_module(module):
   global _task_queue_module
   _task_queue_module = module
   clear_cache(get_task_queue_host)
+
+
+def enqueue_task(url, queue_name, payload=None, name=None,
+                 use_dedicated_module=True):
+  """Adds a task to a task queue.
+
+  If |use_dedicated_module| is True (default) a task will be executed by
+  a separate backend module instance that runs same version as currently
+  executing instance. Otherwise it will run on a current version of default
+  module.
+
+  Returns True if a task was successfully added, logs error and returns False
+  if task queue is acting up.
+  """
+  try:
+    headers = None
+    if use_dedicated_module:
+      headers = {'Host': get_task_queue_host()}
+    # Note that just using 'target=module' here would redirect task request to
+    # a default version of a module, not the currently executing one.
+    taskqueue.add(
+        url=url,
+        queue_name=queue_name,
+        payload=payload,
+        name=name,
+        headers=headers)
+    return True
+  except (
+      taskqueue.Error,
+      runtime.DeadlineExceededError,
+      runtime.apiproxy_errors.CancelledError,
+      runtime.apiproxy_errors.DeadlineExceededError,
+      runtime.apiproxy_errors.OverQuotaError) as e:
+    logging.warning(
+        'Problem adding task \'%s\' to task queue \'%s\' (%s): %s',
+        url, queue_name, e.__class__.__name__, e)
+    return False
 
 
 ## JSON

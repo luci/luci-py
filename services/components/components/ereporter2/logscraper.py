@@ -14,9 +14,10 @@ import webob
 
 from google.appengine.api import logservice
 
+from components import utils
+
 from . import formatter
 from . import models
-from . import testing
 
 
 # Access to a protected member XXX of a client class - pylint: disable=W0212
@@ -298,7 +299,7 @@ def _should_ignore_error_category(error_category):
   if monitoring.silenced:
     return True
   if (monitoring.silenced_until and
-      monitoring.silenced_until >= testing._utcnow()):
+      monitoring.silenced_until >= utils.utcnow()):
     return True
   if (monitoring.threshold and len(error_category.events) <
       monitoring.threshold):

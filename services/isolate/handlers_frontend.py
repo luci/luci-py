@@ -27,7 +27,6 @@ from google.appengine.ext import ndb
 import acl
 import config
 import gcs
-import handlers_common
 import map_reduce_jobs
 import model
 import stats
@@ -130,7 +129,7 @@ class RestrictedLaunchMapReduceJob(auth.AuthenticatingHandler):
     # Do not use 'backend' module when running from dev appserver. Mapreduce
     # generates URLs that are incompatible with dev appserver URL routing when
     # using custom modules.
-    success = handlers_common.enqueue_task(
+    success = utils.enqueue_task(
         url='/internal/taskqueue/mapreduce/launch/%s' % job_id,
         queue_name=map_reduce_jobs.MAP_REDUCE_TASK_QUEUE,
         use_dedicated_module=not utils.is_local_dev_server())
@@ -350,9 +349,9 @@ class PreUploadContentHandler(ProtocolHandler):
   def tag_entries(entries, namespace):
     """Enqueues a task to update the timestamp for given entries."""
     url = '/internal/taskqueue/tag/%s/%s' % (
-        namespace, utils.datetime_to_timestamp(handlers_common.utcnow()))
+        namespace, utils.datetime_to_timestamp(utils.utcnow()))
     payload = ''.join(binascii.unhexlify(e.digest) for e in entries)
-    return handlers_common.enqueue_task(url, 'tag', payload=payload)
+    return utils.enqueue_task(url, 'tag', payload=payload)
 
   @staticmethod
   def should_push_to_gs(entry_info):

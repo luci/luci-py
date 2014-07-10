@@ -25,7 +25,6 @@ from components.ereporter2 import handlers
 from components.ereporter2 import logscraper
 from components.ereporter2 import models
 from components.ereporter2 import on_error
-from components.ereporter2 import testing
 from components.ereporter2 import ui
 from support import test_case
 
@@ -66,7 +65,7 @@ class Base(test_case.TestCase):
   def setUp(self):
     super(Base, self).setUp()
     self._now = datetime.datetime(2014, 6, 24, 20, 19, 42, 653775)
-    testing.mock_now(self, self._now, 0)
+    self.mock_now(self._now, 0)
     ui.configure()
 
   def tearDown(self):
@@ -208,7 +207,7 @@ class Ereporter2BackendTest(Base):
 
     # Set the current time to the future, but not too much.
     now = self._now + on_error.ERROR_TIME_TO_LIVE
-    testing.mock_now(self, now, -60)
+    self.mock_now(now, -60)
 
     headers = {'X-AppEngine-Cron': 'true'}
     response = self.app.get(
@@ -218,7 +217,7 @@ class Ereporter2BackendTest(Base):
 
     # Set the current time to the future.
     now = self._now + on_error.ERROR_TIME_TO_LIVE
-    testing.mock_now(self, now, 60)
+    self.mock_now(now, 60)
 
     # Second call should remove the now stale error.
     headers = {'X-AppEngine-Cron': 'true'}

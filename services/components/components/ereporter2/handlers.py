@@ -22,7 +22,6 @@ from components import utils
 from . import logscraper
 from . import models
 from . import on_error
-from . import testing
 from . import ui
 
 
@@ -98,7 +97,7 @@ class RestrictedEreporter2ErrorsList(auth.AuthenticatingHandler):
       'cursor': cursor.urlsafe() if cursor and more else None,
       'errors': errors_found,
       'limit': limit,
-      'now': testing._utcnow(),
+      'now': utils.utcnow(),
     }
     self.response.out.write(template.render('ereporter2/errors.html', params))
 
@@ -113,7 +112,7 @@ class RestrictedEreporter2Error(auth.AuthenticatingHandler):
       self.abort(404, 'Error not found')
     params = {
       'error': error,
-      'now': testing._utcnow(),
+      'now': utils.utcnow(),
     }
     self.response.out.write(template.render('ereporter2/error.html', params))
 
@@ -187,7 +186,7 @@ class CronEreporter2Cleanup(webapp2.RequestHandler):
   """Deletes old error reports."""
   @decorators.require_cronjob
   def get(self):
-    old_cutoff = testing._utcnow() - on_error.ERROR_TIME_TO_LIVE
+    old_cutoff = utils.utcnow() - on_error.ERROR_TIME_TO_LIVE
     items = models.Error.query(
         models.Error.created_ts < old_cutoff,
         default_options=ndb.QueryOptions(keys_only=True))

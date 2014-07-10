@@ -9,9 +9,7 @@ import datetime
 
 from google.appengine.api import datastore_errors
 
-
-# Used to encode time.
-UNIX_EPOCH = datetime.datetime(1970, 1, 1)
+from components import utils
 
 
 # Maximum acceptable priority value, which is effectively the lowest priority.
@@ -31,15 +29,10 @@ def validate_priority(priority):
         (priority, MAXIMUM_PRIORITY))
 
 
-def utcnow():
-  """To be mocked in tests."""
-  return datetime.datetime.utcnow()
-
-
 def milliseconds_since_epoch(now):
   """Returns the number of milliseconds since unix epoch as an int."""
-  now = now or utcnow()
-  return int(round((now - UNIX_EPOCH).total_seconds() * 1000.))
+  now = now or utils.utcnow()
+  return int(round((now - utils.EPOCH).total_seconds() * 1000.))
 
 
 def match_dimensions(request_dimensions, bot_dimensions):

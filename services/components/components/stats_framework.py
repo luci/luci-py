@@ -103,7 +103,7 @@ class StatisticsFramework(object):
     count = 0
     original_minute = None
     try:
-      now = _utcnow()
+      now = utils.utcnow()
       original_minute = self._get_next_minute_to_process(now)
       next_minute = original_minute
       while now - next_minute >= datetime.timedelta(minutes=up_to):
@@ -113,7 +113,7 @@ class StatisticsFramework(object):
         if self._max_minutes_per_process == count:
           break
         next_minute = next_minute + datetime.timedelta(minutes=1)
-        now = _utcnow()
+        now = utils.utcnow()
       return count
     except (
         datastore_errors.TransactionFailedError,
@@ -525,11 +525,6 @@ def _lowest_missing_bit(bitmap):
   return 64
 
 
-def _utcnow():
-  """To be mocked in tests."""
-  return datetime.datetime.utcnow()
-
-
 def _yield_logs(start_time, end_time):
   """Yields logservice.RequestLogs for the requested time interval.
 
@@ -571,7 +566,7 @@ def _get_snapshot_as_dict_future(keys):
 
 def _get_days_keys(handler, now, num_days):
   """Returns a list of ndb.Key to Snapshot instances."""
-  today = (now or _utcnow()).date()
+  today = (now or utils.utcnow()).date()
   return [
     handler.day_key(today - datetime.timedelta(days=i))
     for i in xrange(num_days)
@@ -580,7 +575,7 @@ def _get_days_keys(handler, now, num_days):
 
 def _get_hours_keys(handler, now, num_hours):
   """Returns a list of ndb.Key to Snapshot instances."""
-  now = now or _utcnow()
+  now = now or utils.utcnow()
   return [
     handler.hour_key(now - datetime.timedelta(hours=i))
     for i in xrange(num_hours)
@@ -589,7 +584,7 @@ def _get_hours_keys(handler, now, num_hours):
 
 def _get_minutes_keys(handler, now, num_minutes):
   """Returns a list of ndb.Key to Snapshot instances."""
-  now = now or _utcnow()
+  now = now or utils.utcnow()
   return [
     handler.minute_key(now - datetime.timedelta(minutes=i))
     for i in xrange(num_minutes)

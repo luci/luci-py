@@ -29,7 +29,6 @@ from server import task_request
 from server import task_result
 from server import task_scheduler
 from server import task_to_run
-from server import test_helper
 from support import test_case
 
 from server.task_result import State
@@ -83,7 +82,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
     self.testbed.init_search_stub()
 
     self.now = datetime.datetime(2014, 1, 2, 3, 4, 5, 6)
-    test_helper.mock_now(self, self.now)
+    self.mock_now(self.now)
     self.app = webtest.TestApp(
         deferred.application,
         extra_environ={
@@ -153,7 +152,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
   def test_get_results(self):
     # TODO(maruel): Split in more focused tests.
     created_ts = self.now
-    test_helper.mock_now(self, created_ts)
+    self.mock_now(created_ts)
     data = _gen_request_data(
         properties=dict(dimensions={u'OS': u'Windows-3.1.1'}))
     request, _result_summary = task_scheduler.make_request(data)
@@ -182,7 +181,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
 
     # A bot reaps the TaskToRun.
     reaped_ts = self.now + datetime.timedelta(seconds=60)
-    test_helper.mock_now(self, reaped_ts)
+    self.mock_now(reaped_ts)
     reaped_request, run_result = task_scheduler.bot_reap_task(
         {'OS': 'Windows-3.1.1'}, 'localhost')
     self.assertEqual(request, reaped_request)
@@ -224,7 +223,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
 
     # The bot completes the task.
     done_ts = self.now + datetime.timedelta(seconds=120)
-    test_helper.mock_now(self, done_ts)
+    self.mock_now(done_ts)
     task_scheduler.bot_update_task(run_result.key, 'localhost', [0, 0], 'foo')
     result_summary, run_results = get_results(request.key)
     expected = {
@@ -366,8 +365,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       u'foo': u'bar',
     }
     expiration = data['scheduling_expiration_secs']
-    after_delay = self.now + datetime.timedelta(seconds=expiration+1)
-    test_helper.mock_now(self, after_delay)
+    self.mock_now(self.now, expiration+1)
     self.assertEqual(1, task_scheduler.cron_abort_expired_task_to_run())
 
   def test_cron_abort_bot_died(self):
@@ -381,10 +379,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
     }
     _request, _run_result = task_scheduler.bot_reap_task(
         bot_dimensions, 'localhost')
-    after_delay = (
-        self.now + task_scheduler.task_common.BOT_PING_TOLERANCE +
-        datetime.timedelta(seconds=1))
-    test_helper.mock_now(self, after_delay)
+    self.mock_now(self.now + task_scheduler.task_common.BOT_PING_TOLERANCE, 1)
     self.assertEqual(1, task_scheduler.cron_abort_bot_died())
 
   def test_search_by_name(self):

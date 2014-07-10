@@ -29,6 +29,7 @@ from components import auth
 from components import ereporter2
 from components import stats_framework
 from components import template
+from components import utils
 from server import acl
 from server import bot_management
 from server import stats
@@ -858,14 +859,14 @@ class AppTest(test_case.TestCase):
 
     # Borderline. If this test becomes flaky, increase the 1 second value.
     bot.last_seen = (
-        task_common.utcnow() - bot_management.MACHINE_DEATH_TIMEOUT +
+        utils.utcnow() - bot_management.MACHINE_DEATH_TIMEOUT +
         datetime.timedelta(seconds=1))
     bot.put()
     self.assertEqual('0', self.app.get('/swarming/api/v1/bots/dead/count').body)
 
     # Make the machine old and ensure it is marked as dead.
     bot.last_seen = (
-        task_common.utcnow() - bot_management.MACHINE_DEATH_TIMEOUT -
+        utils.utcnow() - bot_management.MACHINE_DEATH_TIMEOUT -
         datetime.timedelta(seconds=1))
     bot.put()
     self.assertEqual('1', self.app.get('/swarming/api/v1/bots/dead/count').body)
