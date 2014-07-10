@@ -37,7 +37,8 @@ Modules-Versions:
     <input type=checkbox name=silenced>Silence forever</input><br>
     Silence up to (UTC): <input type="datetime-local" name=silenced_until></input><br>
     <input type="hidden" name="error"
-        value="{{category.events.head.0.exception_type}}" />
+        value="{{category.events.head.0.exception_type or
+                 category.events.head.0.signature}}" />
     <input type="hidden" name="xsrf_token" value="{{xsrf_token}}" />
     <input type=submit value="Mute it!"></input>
   </form>
