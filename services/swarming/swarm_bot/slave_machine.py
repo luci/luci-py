@@ -450,13 +450,15 @@ def get_attributes():
     # TODO(maruel): This should be part of the 'health check' and the bot
     # shouldn't allow itself to upgrade in this condition.
     # https://code.google.com/p/swarming/issues/detail?id=112
+    id_tag = os_utilities.get_hostname_short()
     dimensions = {
       'get_attributes_failed': '1',
       'error': str(e),
+      'id': id_tag,
     }
     return {
       'dimensions': dimensions,
-      'id': os_utilities.get_hostname().split('.', 1)[0],
+      'id': id_tag,
       'ip': os_utilities.get_ip(),
     }
 

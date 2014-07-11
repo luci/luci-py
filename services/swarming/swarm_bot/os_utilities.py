@@ -333,6 +333,11 @@ def get_hostname():
   return socket.getfqdn().lower()
 
 
+def get_hostname_short():
+  """Returns the base host name."""
+  return get_hostname().split('.', 1)[0]
+
+
 def get_num_processors():
   """Returns the number of processors.
 
@@ -578,9 +583,15 @@ def get_attributes(id_tag):
   'id' is used to uniquely identify the bot.
   'dimensions' is used for task selection.
   """
+  dimensions = get_dimensions()
+  id_tag = id_tag if id_tag else get_hostname_short()
+  # Also add the id as a dimension, so it's possible to trigger a task precisely
+  # by id, independent of things like hostname, especially in the case where a
+  # single host runs multiple Swarming bot.
+  dimensions['id'] = id_tag
   return {
-    'dimensions': get_dimensions(),
-    'id': id_tag if id_tag else get_hostname().split('.', 1)[0],
+    'dimensions': dimensions,
+    'id': id_tag,
     'ip': get_ip(),
   }
 
