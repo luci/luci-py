@@ -150,9 +150,11 @@ def request_work_item(attributes, server_url, remote_addr):
   # need for ping unless there's no stdout. The slave will decide this instead
   # of the master.
   ping_delay = 55
+  env = request.properties.env.copy()
+  env['SWARMING_TASK_ID'] = packed
   test_run = test_request_message.TestRun(
       test_run_name=request.name,
-      env_vars=request.properties.env,
+      env_vars=env,
       configuration=test_request_message.TestConfiguration(
           config_name=request.name),
       result_url=result_url,

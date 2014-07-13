@@ -1009,8 +1009,11 @@ class AppTest(test_case.TestCase):
 
     reaped = self.bot_poll('bot1')
     self.assertEqual('RunManifest', reaped['commands'][0]['function'])
+    manifest = json.loads(reaped['commands'][0]['args'])
+    run_key = key[:-1] + '1'
+    self.assertEqual({'SWARMING_TASK_ID': run_key}, manifest['env_vars'])
     # This can only work once a bot reaped the task.
-    self.app.get('/user/task/%s' % (key[:-1] + '1'), status=200)
+    self.app.get('/user/task/%s' % run_key, status=200)
 
   def test_task_list_query(self):
     # Try all the combinations of task queries to ensure the index exist.
