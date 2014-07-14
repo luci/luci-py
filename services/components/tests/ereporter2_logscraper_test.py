@@ -51,17 +51,34 @@ class Ereporter2LogscraperTest(test_case.TestCase):
         'DeadlineExceededError',
       ),
       (
+        ('\nTraceback (most recent call last):\n'
+        '  File \"handlers.py\", line 19, in get\n'
+        '    handler = _config_handle.add_wsgi_middleware(self._LoadHandler())'
+            '\n'
+        '  File \"appengine/runtime/wsgi.py\", line 239, in Handle\n'
+        '    handler = _config_handle.add_wsgi_middleware(self._LoadHandler())'
+            '\n'
+        '  File \"appengine/ext/ndb/utils.py\", line 28, in wrapping\n'
+        '    def wrapping_wrapper(wrapper):\n'
+        'DeadlineExceededError'),
+        'DeadlineExceededError@get',
+        'DeadlineExceededError',
+      ),
+      (
         ('\'error\' is undefined\n'
         'Traceback (most recent call last):\n'
-        '  File \"tp/webapp2-2.5/webapp2.py\", line 1535, in __call__\n'
+        '  File \"third_party/webapp2-2.5/webapp2.py\", line 1535, in __call__'
+            '\n'
         '    rv = self.handle_exception(request, response, e)\n'
-        '  File \"tp/jinja2-2.6/jinja2/environment.py\", line 894, in render\n'
+        '  File \"third_party/jinja2-2.6/jinja2/environment.py\", line 894, in '
+            'render\n'
         '    return self.environment.handle_exception(exc_info, True)\n'
         '  File \"<template>\", line 6, in top-level template code\n'
-        '  File \"tp/jinja2-2.6/jinja2/environment.py\", line 372, in getattr\n'
+        '  File \"third_party/jinja2-2.6/jinja2/environment.py\", line 372, in '
+            'getattr\n'
         '    return getattr(obj, attribute)\n'
         'UndefinedError: \'error\' is undefined'),
-        'UndefinedError@environment.py:372',
+        'UndefinedError@top-level template code',
         'UndefinedError',
       ),
       (

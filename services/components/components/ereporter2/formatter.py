@@ -32,7 +32,7 @@ PATHS_TO_STRIP = (
 
 _RE_STACK_TRACE_FILE = (
     r'^(?P<prefix>  File \")(?P<file>[^\"]+)(?P<suffix>\"\, line )'
-    r'(?P<line_no>\d+)(?P<rest>|\, in .+)$')
+    r'(?P<line_no>\d+)(?:|(?P<rest>\, in )(?P<function>.+))$')
 
 
 def _relative_path(path):

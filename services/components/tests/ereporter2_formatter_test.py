@@ -5,6 +5,7 @@
 
 import logging
 import os
+import re
 import sys
 import unittest
 
@@ -20,6 +21,58 @@ from components.ereporter2 import formatter
 
 
 class Ereporter2FormatterTest(test_case.TestCase):
+  def test_re_stack_trace(self):
+    data = [
+      (
+        '  File "appengine/ext/ndb/tasklets.py", line 336, in wait_any',
+        (
+          '  File "',
+          'appengine/ext/ndb/tasklets.py',
+          '", line ',
+          '336',
+          ', in ',
+          'wait_any',
+        ),
+      ),
+      (
+        '  File "appengine/api/memcache/__init__.py", line 955, in '
+        '_set_multi_async_with_policy',
+        (
+          '  File "',
+          'appengine/api/memcache/__init__.py',
+          '", line ',
+          '955',
+          ', in ',
+          '_set_multi_async_with_policy',
+        ),
+      ),
+      (
+        '  File "appengine/ext/ndb/eventloop.py", line 197',
+        (
+          '  File "',
+          'appengine/ext/ndb/eventloop.py',
+          '", line ',
+          '197',
+          None,
+          None,
+        ),
+      ),
+      (
+        '  File "templates/restricted_bot.html", line 86, in block_body',
+        (
+          '  File "',
+          'templates/restricted_bot.html',
+          '", line ',
+          '86',
+          ', in ',
+          'block_body',
+        ),
+      ),
+    ]
+    for line, expected in data:
+      match = re.match(formatter._RE_STACK_TRACE_FILE, line)
+      self.assertEqual(expected, match.groups())
+
   def test_relative_path(self):
     data = [
       os.getcwd(),

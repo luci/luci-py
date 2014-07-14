@@ -251,15 +251,23 @@ def _signature_from_message(message):
       return lines[0].strip(), None
     index -= 1
 
+  function = None
   path = None
   line_no = -1
   for l in reversed(stacktrace):
     m = re.match(formatter._RE_STACK_TRACE_FILE, l)
     if m:
-      path = os.path.basename(m.group('file'))
-      line_no = int(m.group('line_no'))
+      if not path:
+        path = os.path.basename(m.group('file'))
+        line_no = int(m.group('line_no'))
+      if m.group('file').startswith(('appengine', 'third_party')):
+        continue
+      function = m.group('function')
       break
-  signature = '%s@%s:%d' % (ex_type, path, line_no)
+  if function:
+    signature = '%s@%s' % (ex_type, function)
+  else:
+    signature = '%s@%s:%d' % (ex_type, path, line_no)
   if len(signature) > 256:
     signature = 'hash:%s' % hashlib.sha1(signature).hexdigest()
   return signature, ex_type
