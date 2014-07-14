@@ -75,7 +75,7 @@ class Ereporter2Test(test_case.TestCase):
     expected_html = (
         '<html><body><h3><a href="http://foo/report?start=0&end=1383000000">1 '
         'occurrences of 1 errors across 1 versions.</a></h3>\n\n'
-        '<span style="font-size:130%">Failed@v1</span><br>\nmain.app<br>\n'
+        '<span style="font-size:130%">Failed</span><br>\nmain.app<br>\n'
         'GET localhost/foo (HTTP 200)<br>\n<pre>Failed</pre>\n'
         '1 occurrences: <a href="http://foo/request/a">Entry</a> <p>\n<br>\n'
         '</body></html>')
@@ -83,7 +83,7 @@ class Ereporter2Test(test_case.TestCase):
         expected_html.splitlines(), message.html.payload.splitlines())
     expected_text = (
         '1 occurrences of 1 errors across 1 versions.\n\n'
-        'Failed@v1\nmain.app\nGET localhost/foo (HTTP 200)\nFailed\n'
+        'Failed\nmain.app\nGET localhost/foo (HTTP 200)\nFailed\n'
         '1 occurrences: Entry \n\n')
     self.assertEqual(expected_text, message.body.payload)
 

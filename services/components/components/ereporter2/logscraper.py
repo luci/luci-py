@@ -81,8 +81,17 @@ class _CappedList(object):
         self.tail.popleft()
       self.tail.append(item)
 
+  def __iter__(self):
+    for i in self.head:
+      yield i
+    for i in self.tail:
+      yield i
+
   def __len__(self):
     return self.total_count
+
+  def __neg__(self):
+    return not bool(self.total_count)
 
   @property
   def has_gap(self):
@@ -92,19 +101,37 @@ class _CappedList(object):
 
 class _ErrorCategory(object):
   """Describes a 'class' of error messages' according to an unique signature."""
-  def __init__(self, error_record):
-    self.signature = error_record.signature
-    self.version = error_record.version
-    self.module = error_record.module
-    self.message = error_record.message
-    self.resource = error_record.resource
-    self.exception_type = error_record.exception_type
+  def __init__(self, signature):
+    assert isinstance(signature, basestring), signature
+    # Remove the version embedded in the signature.
+    self.signature, self.version = signature.rsplit('@', 1)
+    self.original_signature = signature
     self.events = _CappedList(_ERROR_LIST_HEAD_SIZE, _ERROR_LIST_TAIL_SIZE)
+    self._exception_type = None
 
   def append_error(self, error):
-    assert error.exception_type == self.exception_type, (
-       error.exception_type, self.exception_type)
+    assert error.version == self.version
+    assert error.signature == self.original_signature
+    if not self.events:
+      assert self._exception_type is None
+      self._exception_type = error.exception_type
     self.events.append(error)
+
+  @property
+  def exception_type(self):
+    return self._exception_type
+
+  @property
+  def messages(self):
+    return sorted(set(e.message for e in self.events))
+
+  @property
+  def modules(self):
+    return sorted(set(e.module for e in self.events))
+
+  @property
+  def resources(self):
+    return sorted(set(e.resource for e in self.events))
 
 
 class _ErrorRecord(object):
@@ -116,7 +143,7 @@ class _ErrorRecord(object):
       'nickname', 'referrer', 'user_agent', 'host', 'resource', 'method',
       'task_queue_name', 'was_loading_request', 'version', 'module',
       'handler_module', 'gae_version', 'instance', 'status', 'message',
-      'short_signature', 'exception_type', 'signature')
+      'exception_type', 'signature')
 
   def __init__(
       self, request_id, start_time, exception_time, latency, mcycles,
@@ -161,8 +188,11 @@ class _ErrorRecord(object):
     self.message = message
 
     # Creates an unique signature string based on the message.
-    self.short_signature, self.exception_type = _signature_from_message(message)
-    self.signature = self.short_signature + '@' + version
+    self.signature, self.exception_type = _signature_from_message(message)
+    if not self.signature:
+      # Default the signature to the exception type if None.
+      self.signature = self.exception_type
+    self.signature += '@' + self.version
 
 
 def _signature_from_message(message):
@@ -335,7 +365,7 @@ def _scrape_logs_for_errors(start_time, end_time, module_versions):
   for error_record in _extract_exceptions_from_logs(
       start_time, end_time, module_versions):
     bucket = buckets.setdefault(
-        error_record.signature, _ErrorCategory(error_record))
+        error_record.signature, _ErrorCategory(error_record.signature))
     bucket.append_error(error_record)
 
   # Filter them.

@@ -6,6 +6,7 @@
 import datetime
 import json
 import logging
+import re
 import sys
 import unittest
 
@@ -35,7 +36,7 @@ from support import test_case
 def ErrorRecord(**kwargs):
   """Returns an ErrorRecord filled with default dummy values."""
   default_values = {
-      'request_id': 'a',
+      'request_id': '123',
       'start_time': None,
       'exception_time': None,
       'latency': 0,
@@ -80,11 +81,13 @@ class Ereporter2FrontendTest(Base):
         webapp2.WSGIApplication(handlers.get_frontend_routes(), debug=True),
         extra_environ={'REMOTE_ADDR': '127.0.0.1'})
 
-  def test_frontend(self):
+  def mock_as_admin(self):
     def is_group_member_mock(group, identity=None):
       return group == auth.model.ADMIN_GROUP or original(group, identity)
     original = self.mock(auth.api, 'is_group_member', is_group_member_mock)
 
+  def test_frontend_general(self):
+    self.mock_as_admin()
     exception = (
       '/ereporter2/api/v1/on_error',
       r'/restricted/ereporter2/errors/<error_id:\d+>',
@@ -94,9 +97,10 @@ class Ereporter2FrontendTest(Base):
       if not route.template in exception:
         self.app.get(route.template, status=200)
 
-    def gen_request(_request_id):
+    def gen_request(request_id):
       # TODO(maruel): Fill up with fake data if found necessary to test edge
       # cases.
+      self.assertEqual('123', request_id)
       return logservice.RequestLog()
     self.mock(logscraper, '_log_request_id', gen_request)
     self.app.get('/restricted/ereporter2/request/123', status=200)
@@ -127,9 +131,7 @@ class Ereporter2FrontendTest(Base):
     }
     self.assertEqual(expected, response)
 
-    def is_group_member_mock(group, identity=None):
-      return group == auth.model.ADMIN_GROUP or original(group, identity)
-    original = self.mock(auth.api, 'is_group_member', is_group_member_mock)
+    self.mock_as_admin()
     self.app.get('/restricted/ereporter2/errors')
     self.app.get('/restricted/ereporter2/errors/%d' % error_id)
 
@@ -150,6 +152,64 @@ class Ereporter2FrontendTest(Base):
     self.assertEqual(1, models.Error.query().count())
     error_id = models.Error.query().get().key.integer_id()
     self.assertEqual(response.get('id'), error_id)
+
+  def test_report_silence(self):
+    # Log an error, ensure it's returned, silence it, ensure it's silenced.
+    self.mock_as_admin()
+    exceptions = [ErrorRecord()]
+    self.mock(
+        logscraper, '_extract_exceptions_from_logs', lambda *_: exceptions[:])
+
+    resp = self.app.get('/restricted/ereporter2/report')
+    # Grep the form. This is crude parsing with assumption of the form layout.
+    # mechanize could be used if more complex parsing is needed.
+    forms = re.findall(r'(\<form .+?\<\/form\>)', resp.body, re.DOTALL)
+    self.assertEqual(1, len(forms))
+    form = forms[0]
+    silence_url = re.search(r'action\=\"(.+?)\"', form).group(1)
+    self.assertEqual('/restricted/ereporter2/silence', silence_url)
+
+    expected_inputs = {
+      'error': 'Failed',
+      'silenced': None,
+      'silenced_until': None,
+      'threshold': None,
+    }
+    actual_inputs = {}
+    for i in re.findall(r'(\<input .+?\<\/input\>)', form, re.DOTALL):
+      input_type = re.search(r'type\=\"(.+?)\"', i).group(1)
+      name_match = re.search(r'name\=\"(.+?)\"', i)
+      if input_type == 'submit':
+        self.assertEqual(None, name_match)
+        continue
+      self.assertTrue(name_match, i)
+      name = name_match.group(1)
+      value_match = re.search(r'value\=\"(.+)\"', i)
+      if name == 'xsrf_token':
+        expected_inputs[name] = value_match.group(1)
+      actual_inputs[name] = value_match.group(1) if value_match else None
+    self.assertEqual(expected_inputs, actual_inputs)
+
+    def gen_request(request_id):
+      for i in exceptions:
+        if i.request_id == request_id:
+          return logservice.RequestLog()
+      self.fail()
+    self.mock(logscraper, '_log_request_id', gen_request)
+    self.app.get('/restricted/ereporter2/request/123', status=200)
+
+    params = {k: (v or '') for k, v in actual_inputs.iteritems()}
+    # Silence it.
+    params['silenced'] = '1'
+    resp = self.app.post(silence_url, params=params)
+
+    silenced = models.ErrorReportingMonitoring().query().fetch()
+    self.assertEqual(1, len(silenced))
+
+    # Ensures silencing worked.
+    resp = self.app.get('/restricted/ereporter2/report')
+    self.assertIn('Found 0 occurrences of 0 errors across', resp.body)
+    self.assertIn('Ignored 1 occurrences of 1 errors across', resp.body)
 
 
 class Ereporter2BackendTest(Base):
@@ -185,7 +245,7 @@ class Ereporter2BackendTest(Base):
     self.assertTrue(hasattr(message, 'to'), message.html)
     expected_text = (
       '1 occurrences of 1 errors across 1 versions.\n\n'
-      'Failed@v1\nmain.app\nGET localhost/foo (HTTP 200)\nFailed\n'
+      'Failed\nmain.app\nGET localhost/foo (HTTP 200)\nFailed\n'
       '1 occurrences: Entry \n\n')
     self.assertEqual(expected_text, message.body.payload)
 

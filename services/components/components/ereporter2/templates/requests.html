@@ -13,7 +13,7 @@ Modules-Versions:
 </ul>
 
 <h3>
-  {{errors_count}} occurrences of {{errors|length}} errors across
+  Found {{errors_count}} occurrences of {{errors|length}} errors across
   {{errors_version_count}} versions.
 </h3>
 
@@ -33,14 +33,13 @@ Modules-Versions:
   <p>
   <form method="POST" action="/restricted/ereporter2/silence">
     <strong>Silencing</strong><br>
-    When under threshold: <input name=threshold></input><br>
-    <input type=checkbox name=silenced>Silence forever</input><br>
-    Silence up to (UTC): <input type="datetime-local" name=silenced_until></input><br>
-    <input type="hidden" name="error"
-        value="{{category.events.head.0.exception_type or
-                 category.events.head.0.signature}}" />
-    <input type="hidden" name="xsrf_token" value="{{xsrf_token}}" />
-    <input type=submit value="Mute it!"></input>
+    When under threshold: <input name="threshold" type="number"></input><br>
+    <input type="checkbox" name="silenced">Silence forever</input><br>
+    Silence up to (UTC): <input type="datetime-local" name="silenced_until">
+    </input><br>
+    <input type="hidden" name="error" value="{{category.signature}}"></input>
+    <input type="hidden" name="xsrf_token" value="{{xsrf_token}}"></input>
+    <input type="submit" value="Mute it!"></input>
   </form>
   <p>
 {% endfor %}

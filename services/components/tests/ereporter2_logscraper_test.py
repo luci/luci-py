@@ -22,13 +22,13 @@ from components.ereporter2 import models
 
 class ErrorRecordStub(object):
   """Intentionally thin stub to test should_ignore_error_record()."""
-  def __init__(self, message, exception_type):
-    self.signature = None
+  def __init__(self, message, exception_type, version='v1'):
+    self.signature = exception_type + '@' + version
     self.message = message
     self.exception_type = exception_type
     self.module = None
     self.resource = None
-    self.version = None
+    self.version = version
 
 
 class Ereporter2LogscraperTest(test_case.TestCase):
@@ -82,7 +82,7 @@ class Ereporter2LogscraperTest(test_case.TestCase):
 
   def test_silence(self):
     record = ErrorRecordStub('failed', 'DeadlineExceededError')
-    category = logscraper._ErrorCategory(record)
+    category = logscraper._ErrorCategory(record.signature)
     category.append_error(record)
     self.assertEqual(False, logscraper._should_ignore_error_category(category))
 
@@ -95,7 +95,7 @@ class Ereporter2LogscraperTest(test_case.TestCase):
 
   def test_silence_until(self):
     record = ErrorRecordStub('failed', 'DeadlineExceededError')
-    category = logscraper._ErrorCategory(record)
+    category = logscraper._ErrorCategory(record.signature)
     category.append_error(record)
     self.assertEqual(False, logscraper._should_ignore_error_category(category))
 
@@ -111,7 +111,7 @@ class Ereporter2LogscraperTest(test_case.TestCase):
 
   def test_silence_threshold(self):
     record = ErrorRecordStub('failed', 'DeadlineExceededError')
-    category = logscraper._ErrorCategory(record)
+    category = logscraper._ErrorCategory(record.signature)
     category.append_error(record)
     self.assertEqual(False, logscraper._should_ignore_error_category(category))
 
