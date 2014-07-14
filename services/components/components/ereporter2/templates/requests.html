@@ -19,7 +19,9 @@ Modules-Versions:
 
 {% for category in errors %}
   <span style="font-size:130%">{{category.signature}}</span><br>
-  {{category.events.head.0.handler_module}}<br>
+  Handler: {{category.events.head.0.handler_module}}<br>
+  Modules: {{category.modules|join(', ')}}<br>
+  Versions: {{category.versions|join(', ')}}<br>
   {{category.events.head.0.method}} {{category.events.head.0.host}}{{category.events.head.0.resource}} (HTTP {{category.events.head.0.status}})<br>
   <pre>{{category.events.head.0.message}}</pre>
   {{category.events.total_count}} occurrences:
@@ -53,7 +55,9 @@ Modules-Versions:
 
 {% for category in ignored %}
   <span style="font-size:130%">{{category.signature}}</span><br>
-  {{category.events.head.0.handler_module}}<br>
+  Handler: {{category.events.head.0.handler_module}}<br>
+  Modules: {{category.modules|join(', ')}}<br>
+  Versions: {{category.versions|join(', ')}}<br>
   {{category.events.head.0.method}} {{category.events.head.0.host}}{{category.events.head.0.resource}} (HTTP {{category.events.head.0.status}})<br>
   <pre>{{category.events.head.0.message}}</pre>
   {{category.events.total_count}} occurrences:

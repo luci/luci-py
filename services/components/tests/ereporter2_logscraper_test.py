@@ -23,7 +23,7 @@ from components.ereporter2 import models
 class ErrorRecordStub(object):
   """Intentionally thin stub to test should_ignore_error_record()."""
   def __init__(self, message, exception_type, version='v1'):
-    self.signature = exception_type + '@' + version
+    self.signature = exception_type + '@function_name'
     self.message = message
     self.exception_type = exception_type
     self.module = None
@@ -105,8 +105,8 @@ class Ereporter2LogscraperTest(test_case.TestCase):
 
     models.ErrorReportingMonitoring(
         key=models.ErrorReportingMonitoring.error_to_key(
-            'DeadlineExceededError'),
-        error='DeadlineExceededError',
+            'DeadlineExceededError@function_name'),
+        error='DeadlineExceededError@function_name',
         silenced=True).put()
     self.assertEqual(True, logscraper._should_ignore_error_category(category))
 
@@ -118,8 +118,8 @@ class Ereporter2LogscraperTest(test_case.TestCase):
 
     models.ErrorReportingMonitoring(
         key=models.ErrorReportingMonitoring.error_to_key(
-            'DeadlineExceededError'),
-        error='DeadlineExceededError',
+            'DeadlineExceededError@function_name'),
+        error='DeadlineExceededError@function_name',
         silenced_until=self._now + datetime.timedelta(seconds=5)).put()
     self.assertEqual(True, logscraper._should_ignore_error_category(category))
 
@@ -134,8 +134,8 @@ class Ereporter2LogscraperTest(test_case.TestCase):
 
     models.ErrorReportingMonitoring(
         key=models.ErrorReportingMonitoring.error_to_key(
-            'DeadlineExceededError'),
-        error='DeadlineExceededError',
+            'DeadlineExceededError@function_name'),
+        error='DeadlineExceededError@function_name',
         threshold=2).put()
     self.assertEqual(True, logscraper._should_ignore_error_category(category))
     category.append_error(record)

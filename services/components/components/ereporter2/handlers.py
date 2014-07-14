@@ -5,6 +5,7 @@
 """HTTP Handlers."""
 
 import datetime
+import itertools
 import json
 import time
 
@@ -62,10 +63,12 @@ class RestrictedEreporter2Report(auth.AuthenticatingHandler):
     params = {
       'errors': errors,
       'errors_count': sum(len(e.events) for e in errors),
-      'errors_version_count': len(set(e.version for e in errors)),
+      'errors_version_count':
+          len(set(itertools.chain.from_iterable(e.versions for e in errors))),
       'ignored': ignored,
       'ignored_count': sum(len(i.events) for i in ignored),
-      'ignored_version_count': len(set(i.version for i in ignored)),
+      'ignored_version_count':
+          len(set(itertools.chain.from_iterable(i.versions for i in ignored))),
       'xsrf_token': self.generate_xsrf_token(),
     }
     params.update(ui._get_template_env(start, end, module_versions))

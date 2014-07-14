@@ -104,14 +104,11 @@ class _ErrorCategory(object):
   def __init__(self, signature):
     assert isinstance(signature, basestring), signature
     # Remove the version embedded in the signature.
-    self.signature, self.version = signature.rsplit('@', 1)
-    self.original_signature = signature
+    self.signature = signature
     self.events = _CappedList(_ERROR_LIST_HEAD_SIZE, _ERROR_LIST_TAIL_SIZE)
     self._exception_type = None
 
   def append_error(self, error):
-    assert error.version == self.version
-    assert error.signature == self.original_signature
     if not self.events:
       assert self._exception_type is None
       self._exception_type = error.exception_type
@@ -132,6 +129,10 @@ class _ErrorCategory(object):
   @property
   def resources(self):
     return sorted(set(e.resource for e in self.events))
+
+  @property
+  def versions(self):
+    return sorted(set(e.version for e in self.events))
 
 
 class _ErrorRecord(object):
@@ -192,7 +193,6 @@ class _ErrorRecord(object):
     if not self.signature:
       # Default the signature to the exception type if None.
       self.signature = self.exception_type
-    self.signature += '@' + self.version
 
 
 def _signature_from_message(message):
@@ -329,8 +329,8 @@ def _extract_exceptions_from_logs(start_time, end_time, module_versions):
 
 def _should_ignore_error_category(error_category):
   """Returns True if an _ErrorCategory should be ignored."""
-  error = error_category.exception_type or error_category.signature
-  monitoring = models.ErrorReportingMonitoring.error_to_key(error).get()
+  signature = error_category.signature
+  monitoring = models.ErrorReportingMonitoring.error_to_key(signature).get()
   if not monitoring:
     return False
 

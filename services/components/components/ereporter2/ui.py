@@ -4,6 +4,7 @@
 
 """UI code to generate email and HTML reports."""
 
+import itertools
 import logging
 import os
 import re
@@ -62,7 +63,7 @@ def _records_to_params(categories, ignored_count, request_id_url, report_url):
     report_url: base url to use to recreate this report.
   """
   categories = sorted(
-      categories, key=lambda e: (e.version, -e.events.total_count))
+      categories, key=lambda e: (e.signature, -e.events.total_count))
   return {
     'error_count': len(categories),
     'errors': categories,
@@ -70,7 +71,8 @@ def _records_to_params(categories, ignored_count, request_id_url, report_url):
     'occurrence_count': sum(e.events.total_count for e in categories),
     'report_url': report_url,
     'request_id_url': request_id_url,
-    'version_count': len(set(e.version for e in categories)),
+    'version_count':
+        len(set(itertools.chain.from_iterable(e.versions for e in categories))),
   }
 
 

@@ -74,16 +74,28 @@ class Ereporter2Test(test_case.TestCase):
     self.assertEqual(u'Exceptions on "sample-app"', message.subject)
     expected_html = (
         '<html><body><h3><a href="http://foo/report?start=0&end=1383000000">1 '
-        'occurrences of 1 errors across 1 versions.</a></h3>\n\n'
-        '<span style="font-size:130%">Failed</span><br>\nmain.app<br>\n'
-        'GET localhost/foo (HTTP 200)<br>\n<pre>Failed</pre>\n'
-        '1 occurrences: <a href="http://foo/request/a">Entry</a> <p>\n<br>\n'
+        'occurrences of 1 errors across 1 versions.</a></h3>\n'
+        '\n'
+        '<span style="font-size:130%">Failed</span><br>\n'
+        'Handler: main.app<br>\n'
+        'Modules: default<br>\n'
+        'Versions: v1<br>\n'
+        'GET localhost/foo (HTTP 200)<br>\n'
+        '<pre>Failed</pre>\n'
+        '1 occurrences: <a href="http://foo/request/a">Entry</a> <p>\n'
+        '<br>\n'
         '</body></html>')
     self.assertEqual(
         expected_html.splitlines(), message.html.payload.splitlines())
     expected_text = (
-        '1 occurrences of 1 errors across 1 versions.\n\n'
-        'Failed\nmain.app\nGET localhost/foo (HTTP 200)\nFailed\n'
+        '1 occurrences of 1 errors across 1 versions.\n'
+        '\n'
+        'Failed\n'
+        'Handler: main.app\n'
+        'Modules: default\n'
+        'Versions: v1\n'
+        'GET localhost/foo (HTTP 200)\n'
+        'Failed\n'
         '1 occurrences: Entry \n\n')
     self.assertEqual(expected_text, message.body.payload)
 

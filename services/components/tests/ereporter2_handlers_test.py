@@ -56,7 +56,34 @@ def ErrorRecord(**kwargs):
       'gae_version': '1.9.0',
       'instance': '123',
       'status': 200,
-      'message': 'Failed',
+      'message': (
+          'Traceback (most recent call last):\n'
+          '  File "handlers_frontend.py", line 461, in post\n'
+          '    for entry_info, exists in self.check_entry_infos('
+              'entries, namespace):\n'
+          '  File "handlers_frontend.py", line 343, in check_entry_infos\n'
+          '    future = ndb.Future.wait_any(futures)\n'
+          '  File "appengine/ext/ndb/tasklets.py", line 338, in wait_any\n'
+          '    ev.run1()\n'
+          '  File "appengine/ext/ndb/eventloop.py", line 235, in run1\n'
+          '    delay = self.run0()\n'
+          '  File "appengine/ext/ndb/eventloop.py", line 197, in run0\n'
+          '    callback(*args, **kwds)\n'
+          '  File "appengine/ext/ndb/tasklets.py", line 474, in '
+              '_on_future_completion\n'
+          '    self._help_tasklet_along(ns, ds_conn, gen, val)\n'
+          '  File "appengine/ext/ndb/tasklets.py", line 371, in '
+              '_help_tasklet_along\n'
+          '    value = gen.send(val)\n'
+          '  File "appengine/ext/ndb/context.py", line 751, in get\n'
+          '    pbs = entity._to_pb(set_key=False).SerializePartialToString()\n'
+          '  File "appengine/ext/ndb/model.py", line 3069, in _to_pb\n'
+          '    prop._serialize(self, pb, projection=self._projection)\n'
+          '  File "appengine/ext/ndb/model.py", line 1374, in _serialize\n'
+          '    self._db_set_value(v, p, val)\n'
+          '  File "appengine/ext/ndb/model.py", line 2042, in _db_set_value\n'
+          '    p.set_meaning(entity_pb.Property.GD_WHEN)\n'
+          'DeadlineExceededError\n')
   }
   default_values.update(kwargs)
   return logscraper._ErrorRecord(**default_values)
@@ -170,7 +197,7 @@ class Ereporter2FrontendTest(Base):
     self.assertEqual('/restricted/ereporter2/silence', silence_url)
 
     expected_inputs = {
-      'error': 'Failed',
+      'error': 'DeadlineExceededError@check_entry_infos',
       'silenced': None,
       'silenced_until': None,
       'threshold': None,
@@ -243,9 +270,15 @@ class Ereporter2BackendTest(Base):
     self.assertEqual(1, len(messages))
     message = messages[0]
     self.assertTrue(hasattr(message, 'to'), message.html)
+    escaped = data[0].message.replace('"', '&#34;')
     expected_text = (
       '1 occurrences of 1 errors across 1 versions.\n\n'
-      'Failed\nmain.app\nGET localhost/foo (HTTP 200)\nFailed\n'
+      'DeadlineExceededError@check_entry_infos\n'
+      'Handler: main.app\n'
+      'Modules: default\n'
+      'Versions: v1\n'
+      'GET localhost/foo (HTTP 200)\n') + escaped + (
+      '\n'
       '1 occurrences: Entry \n\n')
     self.assertEqual(expected_text, message.body.payload)
 
