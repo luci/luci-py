@@ -99,47 +99,61 @@
           {% endif %}
         </td>
       </tr>
+      <tr>
+        <td>Total running time<br>for past {{ run_results|length }} tasks</td>
+        <td>{{run_time|timedeltaformat}}</td>
+      </tr>
+      <tr>
+        <td>Total idle time</td>
+        <td>{{idle_time|timedeltaformat}}</td>
+      </tr>
     </tbody>
   </table>
   <p>
 
-  <h3>Previous tasks</h3>
-  <table class="property_table">
-    <thead>
-      <tr>
-        <th>Task</th>
-        <th>Started</th>
-        <th>Duration</th>
-        <th>Idle time after</th>
-        <th>Result</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% set previous = false %}
-      {% for run_result in run_results %}
-        <tr class="request {% if run_result.failure %}failed_test{% endif%}">
-          <td>
-            <a href="/user/task/{{run_result.key_string}}">
-              {{run_result.name}}</a>
-          </td>
-          <td nowrap>{{run_result.started_ts|succinctdatetimeformat}}</td>
-          <td nowrap align=right>{{run_result.duration_now()|timedeltaformat}}</td>
-          <td nowrap align=right>
-            {% if previous %}
-              {# Note that tasks are listed in reverse order #}
-              {{(previous.started_ts - run_result.ended_ts)|timedeltaformat}}
-            {% elif run_result.ended_ts %}
-              {{(now - run_result.ended_ts)|timedeltaformat}}
-            {% else %}
-              (Still running)
-            {% endif %}
-          </td>
-          <td>{{run_result.to_string()}}</td>
+  {% if run_results %}
+    <h3>Previous tasks</h3>
+    <table class="property_table">
+      <thead>
+        <tr>
+          <th>Task</th>
+          <th>Started</th>
+          <th>Duration</th>
+          <th>Idle time after</th>
+          <th>Result</th>
         </tr>
-        {% set previous = run_result %}
-      {% endfor %}
-    </tbody>
-  </table>
+      </thead>
+      <tbody>
+        {% set previous = false %}
+        {% for run_result in run_results %}
+          <tr class="request {% if run_result.failure %}failed_test{% endif%}">
+            <td>
+              <a href="/user/task/{{run_result.key_string}}">
+                {{run_result.name}}</a>
+            </td>
+            <td nowrap>{{run_result.started_ts|succinctdatetimeformat}}</td>
+            <td nowrap align=right>{{run_result.duration_now()|timedeltaformat}}</td>
+            <td nowrap align=right>
+              {% if previous %}
+                {# Note that tasks are listed in reverse order #}
+                {{(previous.started_ts - run_result.ended_ts)|timedeltaformat}}
+              {% elif run_result.ended_ts %}
+                {% if not cursor %}
+                  {{(now - run_result.ended_ts)|timedeltaformat}}
+                {% else %}
+                  --
+                {% endif %}
+              {% else %}
+                (Still running)
+              {% endif %}
+            </td>
+            <td>{{run_result.to_string()}}</td>
+          </tr>
+          {% set previous = run_result %}
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
 
   {% if cursor %}
   <br>

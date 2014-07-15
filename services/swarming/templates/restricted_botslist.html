@@ -39,6 +39,7 @@
 Current bot version is: {{current_version[:8]}}
 </p>
 
+{% import 'swarming/bot_view.html' as bot_view %}
 <table id="machine-table" class="alterning_background"
     summary="This table lists all machines that have polled this server">
   <thead>
@@ -68,17 +69,7 @@ Current bot version is: {{current_version[:8]}}
             </form>
           {% endif %}
         </td>
-        <td>
-          {% for k, v in bot.dimensions.iteritems()|natsort %}
-            {{k}}:
-            {% if v is string %}
-              {{v}}
-            {% else %}
-              {{v|natsort|join(' | ')}}
-            {% endif %}
-            <br>
-          {% endfor %}
-        </td>
+        <td>{{bot_view.render_dimensions(bot.dimensions)}}</td>
         <td>{{bot.version[:8]}}</td>
       </tr>
     {% endfor %}

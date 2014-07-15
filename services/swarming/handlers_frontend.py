@@ -9,6 +9,7 @@ implemented using the webapp2 framework.
 """
 
 import collections
+import datetime
 import json
 import logging
 import os
@@ -323,17 +324,34 @@ class BotHandler(auth.AuthenticatingHandler):
     dead_bot_cutoff = utils.utcnow() - bot_management.MACHINE_DEATH_TIMEOUT
     bot = bot_future.get_result()
     is_dead = bot.last_seen < dead_bot_cutoff if bot else False
+    # Calculate the time this bot was idle.
+    idle_time = datetime.timedelta()
+    run_time = datetime.timedelta()
+    now = utils.utcnow()
+    if run_results:
+      run_time = run_results[0].duration_now()
+      if not cursor and run_results[0].state != task_result.State.RUNNING:
+        # Add idle time since last task completed. Do not do this when a cursor
+        # is used since it's not representative.
+        idle_time = utils.utcnow() - run_results[0].ended_ts
+      for index in xrange(1, len(run_results)):
+        idle_time += (
+            run_results[index-1].started_ts - run_results[index].ended_ts)
+        run_time += run_results[index].duration
+
     params = {
       'bot': bot,
       'bot_id': bot_id,
       'current_version':
           bot_management.get_slave_version(self.request.host_url),
       'cursor': cursor.urlsafe() if cursor and more else None,
+      'idle_time': idle_time,
       'is_dead': is_dead,
       'is_admin': acl.is_admin(),
       'limit': limit,
-      'now': utils.utcnow(),
+      'now': now,
       'run_results': run_results,
+      'run_time': run_time,
     }
     # TODO(maruel): Make the delete link redirect to /restricted/bots. It would
     # probably be preferable to not use /delete_machine_stats and create a UI
