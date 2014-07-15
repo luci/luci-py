@@ -35,6 +35,23 @@ except ImportError:
 ROOT_DIR = os.path.dirname(THIS_FILE)
 
 
+# Properties from an android device that should be kept as dimension.
+ANDROID_DETAILS = frozenset(
+    [
+      # Hardware details.
+      'ro.board.platform',
+      'ro.product.board',  # or ro.product.device?
+      'ro.product.cpu.abi',
+      'ro.product.cpu.abi2',
+
+      # OS details.
+      'ro.build.id',
+      'ro.build.tags',
+      'ro.build.type',
+      'ro.build.version.sdk',
+    ])
+
+
 ### Private stuff.
 
 
@@ -434,6 +451,9 @@ def get_gpu():
   return ['IMPLEMENT_ME']
 
 
+### Windows.
+
+
 def get_integrity_level_win():
   """Returns the integrity level of the current process as a string.
 
@@ -549,6 +569,64 @@ def get_integrity_level_win():
     return mapping.get(value) or '0x%04x' % value
   finally:
     ctypes.windll.kernel32.CloseHandle(token)
+
+
+### Android.
+
+
+def get_adb_list_devices(adb_path='adb'):
+  """Returns the list of devices available. This includes emulators."""
+  output = subprocess.check_output([adb_path, 'devices'])
+  devices = []
+  for line in output.splitlines():
+    if line.startswith(('*', 'List of')) or not line:
+      continue
+    # TODO(maruel): Handle 'offline', 'device' and 'no device'.
+    devices.append(line.split()[0])
+  return devices
+
+
+def get_adb_device_properties_raw(device_id, adb_path='adb'):
+  """Returns the system properties for a device."""
+  output = subprocess.check_output(
+      [adb_path, '-s', device_id, 'shell', 'cat', '/system/build.prop'])
+  properties = {}
+  for line in output.splitlines():
+    if line.startswith('#') or not line:
+      continue
+    key, value = line.split('=', 1)
+    properties[key] = value
+  return properties
+
+
+def get_dimensions_android(device_id, adb_path='adb'):
+  """Returns the default dimensions for an android device.
+
+  In this case, details are about the device, not about the host.
+  """
+  properties = get_adb_device_properties_raw(device_id, adb_path)
+  return dict((k, v) for k, v in properties.iteritems() if k in ANDROID_DETAILS)
+
+
+def get_attributes_android(device_id, adb_path='adb'):
+  """Returns the default Swarming dictionary of attributes for this android
+  device.
+  """
+  dimensions = get_dimensions_android(device_id, adb_path)
+  # Also add the id as a dimension, so it's possible to trigger a task precisely
+  # by device id, independent of things like hostname, especially in the case
+  # where a single host runs multiple Swarming bots for multiple android
+  # devices.
+  dimensions['id'] = device_id
+  return {
+    'dimensions': dimensions,
+    'id': device_id,
+    # This is the IP of the host, not the device.
+    'ip': get_ip(),
+  }
+
+
+###
 
 
 def get_dimensions():
