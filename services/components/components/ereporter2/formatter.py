@@ -23,6 +23,8 @@ PATHS_TO_STRIP = (
   os.path.dirname(os.path.dirname(os.path.dirname(webapp2.__file__))) + '/',
   # Fallback to stripping at appid.
   os.path.dirname(os.getcwd()) + '/',
+  # stdlib, will contain 'python2.7' as prefix.
+  os.path.dirname(os.path.dirname(os.__file__)),
   './',
 )
 

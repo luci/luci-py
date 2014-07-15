@@ -260,7 +260,7 @@ def _signature_from_message(message):
       if not path:
         path = os.path.basename(m.group('file'))
         line_no = int(m.group('line_no'))
-      if m.group('file').startswith(('appengine', 'third_party')):
+      if m.group('file').startswith(('appengine', 'python2.7', 'third_party')):
         continue
       function = m.group('function')
       break
