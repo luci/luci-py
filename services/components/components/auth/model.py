@@ -273,8 +273,13 @@ def is_replica():
 
 def is_standalone():
   """Returns True if application is in Standalone mode."""
-  ent = REPLICATION_STATE_KEY.get()
+  ent = get_replication_state()
   return not ent or not ent.primary_id
+
+
+def get_replication_state():
+  """Returns AuthReplicationState singleton entity if it exists."""
+  return REPLICATION_STATE_KEY.get()
 
 
 class AuthGlobalConfig(ndb.Model):
@@ -318,6 +323,9 @@ class AuthReplicationState(ndb.Model):
   # For services in Primary mode: own GAE application ID.
   # For services in Replica mode it is a GAE application ID of Primary.
   primary_id = ndb.StringProperty(indexed=False)
+
+  # For services in Replica mode, root URL of Primary, i.e https://<host>.
+  primary_url = ndb.StringProperty(indexed=False)
 
   # Revision of auth DB. Increased by 1 with every change that should be
   # propagate to replicas. Only services in Standalone or Primary mode

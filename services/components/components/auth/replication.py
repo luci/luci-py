@@ -97,5 +97,6 @@ def become_replica(ticket, initiated_by):
   # Become replica. Auth DB will be overwritten on a first push from Primary.
   # state = model.AuthReplicationState(
   #     key=model.REPLICATION_STATE_KEY,
-  #     primary_id=ticket.primary_id)
+  #     primary_id=ticket.primary_id,
+  #     primary_url=ticket.primary_url)
   # state.put()

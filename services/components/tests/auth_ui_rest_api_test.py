@@ -24,21 +24,27 @@ from components.auth import handler
 from components.auth import model
 
 from components.auth.ui import rest_api
+from components.auth.ui import ui
 
 
-def call_get(request_handler, expect_errors=False):
+def call_get(request_handler, expect_errors=False, uri=None):
   """Calls request_handler's 'get' in a context of webtest app."""
-  path = '/dummy_path'
+  uri = uri or '/dummy_path'
+  assert uri.startswith('/')
+  path = uri.rsplit('?', 1)[0]
   app = webtest.TestApp(webapp2.WSGIApplication([(path, request_handler)]))
-  return app.get(path, expect_errors=expect_errors)
+  return app.get(uri, expect_errors=expect_errors)
 
 
-def call_post(request_handler, body, content_type, expect_errors=False):
+def call_post(
+    request_handler, body, content_type, expect_errors=False, uri=None):
   """Calls request_handler's 'post' in a context of webtest app."""
-  path = '/dummy_path'
+  uri = uri or '/dummy_path'
+  assert uri.startswith('/')
+  path = uri.rsplit('?', 1)[0]
   app = webtest.TestApp(webapp2.WSGIApplication([(path, request_handler)]))
   return app.post(
-      path, body, content_type=content_type, expect_errors=expect_errors)
+      uri, body, content_type=content_type, expect_errors=expect_errors)
 
 
 def make_xsrf_token(identity=model.Anonymous, xsrf_token_data=None):
@@ -51,6 +57,21 @@ def get_auth_db_rev():
   """Returns current version of AuthReplicationState.auth_db_rev."""
   ent = model.REPLICATION_STATE_KEY.get()
   return 0 if not ent else ent.auth_db_rev
+
+
+def mock_replication_state(primary_url):
+  """Modifies AuthReplicationState to represent Replica or Standalone modes."""
+  if not primary_url:
+    # Convert to standalone by nuking AuthReplicationState.
+    model.REPLICATION_STATE_KEY.delete()
+    assert model.is_standalone()
+  else:
+    # Convert to replica by writing AuthReplicationState with primary_id set.
+    model.AuthReplicationState(
+        key=model.REPLICATION_STATE_KEY,
+        primary_id='mocked-primary',
+        primary_url=primary_url).put()
+    assert model.is_replica()
 
 
 class ApiHandlerClassTest(test_case.TestCase):
@@ -1056,6 +1077,99 @@ class OAuthConfigHandlerTest(RestAPITestCase):
         expect_errors=True)
     self.assertEqual(403, status)
     self.assertEqual({'text': 'Access is denied.'}, response)
+
+
+class ForbidApiOnReplicaTest(test_case.TestCase):
+  """Tests for rest_api.forbid_api_on_replica decorator."""
+
+  def test_allowed_on_non_replica(self):
+    class Handler(webapp2.RequestHandler):
+      @rest_api.forbid_api_on_replica
+      def get(self):
+        self.response.write('ok')
+
+    mock_replication_state(None)
+    self.assertEqual('ok', call_get(Handler).body)
+
+  def test_forbidden_on_replica(self):
+    calls = []
+
+    class Handler(webapp2.RequestHandler):
+      @rest_api.forbid_api_on_replica
+      def get(self):
+        calls.append(1)
+
+    mock_replication_state('https://primary-url')
+    response = call_get(Handler, expect_errors=True)
+
+    self.assertEqual(0, len(calls))
+    self.assertEqual(405, response.status_code)
+    expected = {
+      'primary_url': 'https://primary-url',
+      'text': 'Use Primary service for API requests',
+    }
+    self.assertEqual(expected, json.loads(response.body))
+
+
+class ForbidUiOnReplicaTest(test_case.TestCase):
+  """Tests for ui.forbid_ui_on_replica decorator."""
+
+  def test_allowed_on_non_replica(self):
+    class Handler(webapp2.RequestHandler):
+      @ui.forbid_ui_on_replica
+      def get(self):
+        self.response.write('ok')
+
+    mock_replication_state(None)
+    self.assertEqual('ok', call_get(Handler).body)
+
+  def test_forbidden_on_replica(self):
+    calls = []
+
+    class Handler(webapp2.RequestHandler):
+      @ui.forbid_ui_on_replica
+      def get(self):
+        calls.append(1)
+
+    mock_replication_state('https://primary-url')
+    response = call_get(Handler, expect_errors=True)
+
+    self.assertEqual(0, len(calls))
+    self.assertEqual(405, response.status_code)
+    self.assertEqual(
+        '405 Method Not Allowed\n\n'
+        'The method GET is not allowed for this resource. \n\n '
+        'Now allowed on a replica, see primary at https://primary-url',
+        response.body)
+
+
+class RedirectUiOnReplicaTest(test_case.TestCase):
+  """Tests for ui.redirect_ui_on_replica decorator."""
+
+  def test_allowed_on_non_replica(self):
+    class Handler(webapp2.RequestHandler):
+      @ui.redirect_ui_on_replica
+      def get(self):
+        self.response.write('ok')
+
+    mock_replication_state(None)
+    self.assertEqual('ok', call_get(Handler).body)
+
+  def test_redirects_on_replica(self):
+    calls = []
+
+    class Handler(webapp2.RequestHandler):
+      @ui.redirect_ui_on_replica
+      def get(self):
+        calls.append(1)
+
+    mock_replication_state('https://primary-url')
+    response = call_get(Handler, expect_errors=True, uri='/some/method?arg=1')
+
+    self.assertEqual(0, len(calls))
+    self.assertEqual(302, response.status_code)
+    self.assertEqual(
+        'https://primary-url/some/method?arg=1', response.headers['Location'])
 
 
 if __name__ == '__main__':

@@ -94,7 +94,7 @@ class ServiceListingHandler(rest_api.ApiHandler):
         replication.AuthReplicaState.query(
             ancestor=replication.REPLICAS_ROOT_KEY),
         key=lambda x: x.key.id())
-    last_auth_state = model.REPLICATION_STATE_KEY.get()
+    last_auth_state = model.get_replication_state()
     self.send_response({
       'services': [
         x.to_serializable_dict(with_id_as='app_id') for x in services

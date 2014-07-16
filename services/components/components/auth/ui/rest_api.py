@@ -4,6 +4,7 @@
 
 """Auth management REST API."""
 
+import functools
 import json
 import urllib
 import webapp2
@@ -28,6 +29,29 @@ def get_rest_api_routes():
     webapp2.Route('/auth/api/v1/groups/<group:%s>' % group_re, GroupHandler),
     webapp2.Route('/auth/api/v1/server/oauth_config', OAuthConfigHandler),
   ]
+
+
+def forbid_api_on_replica(method):
+  """Decorator for methods that are not allowed to be called on Replica.
+
+  If such method is called on a service in Replica mode, it would return
+  HTTP 405 "Method Not Allowed".
+  """
+  @functools.wraps(method)
+  def wrapper(self, *args, **kwargs):
+    assert isinstance(self, webapp2.RequestHandler)
+    if model.is_replica():
+      self.abort(
+          405,
+          json={
+            'primary_url': model.get_replication_state().primary_url,
+            'text': 'Use Primary service for API requests',
+          },
+          headers={
+            'Content-Type': 'application/json; charset=UTF-8',
+          })
+    return method(self, *args, **kwargs)
+  return wrapper
 
 
 class ApiHandler(handler.AuthenticatingHandler):
@@ -70,7 +94,10 @@ class ApiHandler(handler.AuthenticatingHandler):
 
 
 class SelfHandler(ApiHandler):
-  """Returns identity of a caller."""
+  """Returns identity of a caller.
+
+  Available in Standalone, Primary and Replica modes.
+  """
 
   @api.public
   def get(self):
@@ -82,6 +109,8 @@ class XSRFHandler(ApiHandler):
 
   Should be used only by client scripts or Ajax calls. Requires header
   'X-XSRF-Token-Request' to be present (actual value doesn't matter).
+
+  Available in Standalone, Primary and Replica modes.
   """
 
   # Don't enforce prior XSRF token, it might not be known yet.
@@ -100,8 +129,11 @@ class GroupsHandler(ApiHandler):
   Returns a list of groups, sorted by name. Each entry in a list is a dict with
   all details about the group except the actual list of members
   (which may be large).
+
+  Available only in Standalone and Primary modes.
   """
 
+  @forbid_api_on_replica
   @api.require(api.is_admin)
   def get(self):
     # Currently AuthGroup entity contains a list of group members in the entity
@@ -121,8 +153,12 @@ class GroupsHandler(ApiHandler):
 
 
 class GroupHandler(ApiHandler):
-  """Creating, reading, updating and deleting a single group."""
+  """Creating, reading, updating and deleting a single group.
 
+  Available only in Standalone and Primary modes.
+  """
+
+  @forbid_api_on_replica
   @api.require(api.is_admin)
   def get(self, group):
     """Fetches all information about an existing group give its name."""
@@ -133,6 +169,7 @@ class GroupHandler(ApiHandler):
         response={'group': obj.to_serializable_dict(with_id_as='name')},
         headers={'Last-Modified': utils.datetime_to_rfc2822(obj.modified_ts)})
 
+  @forbid_api_on_replica
   @api.require(api.is_admin)
   def put(self, group):
     """Updates an existing group."""
@@ -196,7 +233,7 @@ class GroupHandler(ApiHandler):
         group_params,
         api.get_current_identity(),
         self.request.headers.get('If-Unmodified-Since'))
-    if entity is None:
+    if not entity:
       self.abort_with_error(**error_details)
 
     self.send_response(
@@ -207,6 +244,7 @@ class GroupHandler(ApiHandler):
         }
     )
 
+  @forbid_api_on_replica
   @api.require(api.is_admin)
   def post(self, group):
     """Creates a new group, ensuring it's indeed new (no overwrites)."""
@@ -256,8 +294,8 @@ class GroupHandler(ApiHandler):
         }
     )
 
+  @forbid_api_on_replica
   @api.require(api.is_admin)
-  @ndb.transactional
   def delete(self, group):
     """Deletes a group.
 
@@ -270,41 +308,51 @@ class GroupHandler(ApiHandler):
     'HTTP Error 409: Conflict', providing information about what depends on
     this group in the response body.
     """
-    entity = model.group_key(group).get()
-    expected_ts = self.request.headers.get('If-Unmodified-Since')
-    if entity is None:
-      if expected_ts:
-        # Precondition was used? Group was expected to exist.
-        self.abort_with_error(412, text='Group was deleted by someone else')
-      else:
-        # Unconditionally deleting it, and it's already gone -> success.
-        self.send_response({'ok': True})
-      return
+    @ndb.transactional
+    def delete(expected_ts):
+      entity = model.group_key(group).get()
+      if not entity:
+        if expected_ts:
+          # Precondition was used? Group was expected to exist.
+          return False, {
+            'http_code': 412, 'text': 'Group was deleted by someone else'}
+        else:
+          # Unconditionally deleting it, and it's already gone -> success.
+          return True, None
 
-    # Check the precondition if required.
-    if (expected_ts and
-        utils.datetime_to_rfc2822(entity.modified_ts) != expected_ts):
-      self.abort_with_error(412, text='Group was modified by someone else')
+      # Check the precondition if required.
+      if (expected_ts and
+          utils.datetime_to_rfc2822(entity.modified_ts) != expected_ts):
+        return False, {
+            'http_code': 412, 'text': 'Group was modified by someone else'}
 
-    # Check the group is not used by other groups.
-    referencing_groups = model.find_referencing_groups(group)
-    if referencing_groups:
-      self.abort_with_error(
-          http_code=409,
-          text='Group is being referenced in other groups',
-          details={
-            'groups': list(referencing_groups),
-          }
-      )
+      # Check the group is not used by other groups.
+      referencing_groups = model.find_referencing_groups(group)
+      if referencing_groups:
+        return False, {
+          'http_code': 409,
+          'text': 'Group is being referenced in other groups',
+          'details': {'groups': list(referencing_groups)},
+        }
 
-    # Ok, good to delete.
-    entity.key.delete()
-    model.replicate_auth_db()
+      # Ok, good to delete.
+      entity.key.delete()
+      model.replicate_auth_db()
+      return True, None
+
+    success, error_details = delete(
+        self.request.headers.get('If-Unmodified-Since'))
+    if not success:
+      self.abort_with_error(**error_details)
     self.send_response({'ok': True})
 
 
 class OAuthConfigHandler(ApiHandler):
-  """Returns client_id and client_secret to use for OAuth2 login on a client."""
+  """Returns client_id and client_secret to use for OAuth2 login on a client.
+
+  GET is available in Standalone, Primary and Replica modes.
+  POST is available only in Standalone and Primary modes.
+  """
 
   @api.public
   def get(self):
@@ -331,6 +379,7 @@ class OAuthConfigHandler(ApiHandler):
       'client_not_so_secret': client_secret,
     })
 
+  @forbid_api_on_replica
   @api.require(api.is_admin)
   def post(self):
     body = self.parse_body()

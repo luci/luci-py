@@ -4,6 +4,7 @@
 
 """Auth management UI handlers."""
 
+import functools
 import json
 import os
 import webapp2
@@ -57,6 +58,43 @@ def get_ui_routes():
     webapp2.Route(r'/auth/link', LinkToPrimaryHandler),
   ])
   return routes
+
+
+def forbid_ui_on_replica(method):
+  """Decorator for methods that are not allowed to be called on Replica.
+
+  If such method is called on a service in Replica mode, it would return
+  HTTP 405 "Method Not Allowed".
+  """
+  @functools.wraps(method)
+  def wrapper(self, *args, **kwargs):
+    assert isinstance(self, webapp2.RequestHandler)
+    if model.is_replica():
+      primary_url = model.get_replication_state().primary_url
+      self.abort(
+          405,
+          detail='Now allowed on a replica, see primary at %s' % primary_url)
+    return method(self, *args, **kwargs)
+  return wrapper
+
+
+def redirect_ui_on_replica(method):
+  """Decorator for methods that redirect to Primary when called on replica.
+
+  If such method is called on a service in Replica mode, it would return
+  HTTP 302 redirect to corresponding method on Primary.
+  """
+  @functools.wraps(method)
+  def wrapper(self, *args, **kwargs):
+    assert isinstance(self, webapp2.RequestHandler)
+    assert self.request.method == 'GET'
+    if model.is_replica():
+      primary_url = model.get_replication_state().primary_url
+      assert primary_url and primary_url.startswith('https://'), primary_url
+      assert self.request.path_qs.startswith('/'), self.request.path_qs
+      self.redirect(primary_url.rstrip('/') + self.request.path_qs, abort=True)
+    return method(self, *args, **kwargs)
+  return wrapper
 
 
 class UIHandler(handler.AuthenticatingHandler):
@@ -155,6 +193,7 @@ class UIHandler(handler.AuthenticatingHandler):
 
 class MainHandler(UIHandler):
   """Redirects to first navbar tab."""
+  @redirect_ui_on_replica
   @api.require(api.is_admin)
   def get(self):
     assert _ui_navbar_tabs
@@ -168,6 +207,7 @@ class BootstrapHandler(UIHandler):
   group may not exist yet. Used to bootstrap a new service instance.
   """
 
+  @forbid_ui_on_replica
   @api.require(users.is_current_user_admin)
   def get(self):
     env = {
@@ -176,6 +216,7 @@ class BootstrapHandler(UIHandler):
     }
     self.reply('auth/bootstrap.html', env)
 
+  @forbid_ui_on_replica
   @api.require(users.is_current_user_admin)
   def post(self):
     added = model.bootstrap_group(
@@ -204,6 +245,7 @@ class LinkToPrimaryHandler(UIHandler):
       self.abort(400)
       return
 
+  @forbid_ui_on_replica
   @api.require(users.is_current_user_admin)
   def get(self):
     ticket = self.decode_link_ticket()
@@ -215,6 +257,7 @@ class LinkToPrimaryHandler(UIHandler):
     }
     self.reply('auth/linking.html', env)
 
+  @forbid_ui_on_replica
   @api.require(users.is_current_user_admin)
   def post(self):
     ticket = self.decode_link_ticket()
@@ -248,6 +291,7 @@ class UINavbarTabHandler(UIHandler):
   # Path to a Jinja2 template with tab's markup.
   template_file = None
 
+  @redirect_ui_on_replica
   @api.require(api.is_admin)
   def get(self):
     """Renders page HTML to HTTP response stream."""
