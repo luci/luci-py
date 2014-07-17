@@ -299,7 +299,7 @@ class InternalTagWorkerHandler(webapp2.RequestHandler):
       logging.info(
           'Timestamped %d entries out of %s', len(to_save), len(digests))
     except Exception as e:
-      logging.error('Failed to stamp %d entries: %s', len(digests), e)
+      logging.error('Failed to stamp entries: %s\n%d entries', e, len(digests))
       raise
 
 
