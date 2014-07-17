@@ -347,7 +347,12 @@ def get_ip():
 def get_hostname():
   """Returns the machine's hostname."""
   # Windows enjoys putting random case in there. Enforces lower case for sanity.
-  return socket.getfqdn().lower()
+  hostname = socket.getfqdn().lower()
+  if hostname.endswith('.in-addr.arpa'):
+    # The base name will be the IPv4 address reversed, which is not useful. This
+    # happens on OSX.
+    hostname = socket.gethostname()
+  return hostname
 
 
 def get_hostname_short():
