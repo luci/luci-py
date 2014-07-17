@@ -337,7 +337,9 @@ class BotHandler(auth.AuthenticatingHandler):
       for index in xrange(1, len(run_results)):
         idle_time += (
             run_results[index-1].started_ts - run_results[index].ended_ts)
-        run_time += run_results[index].duration
+        duration = run_results[index].duration
+        if duration:
+          run_time += duration
 
     params = {
       'bot': bot,
