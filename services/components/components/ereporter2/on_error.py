@@ -15,6 +15,7 @@ import platform
 import traceback
 
 from google.appengine.api import datastore_errors
+from google.appengine.api.logservice import logsutil
 
 from components import auth
 from components import utils
@@ -77,3 +78,14 @@ def log(**kwargs):
     logging.error(
         'Failed to log a %s error\n%s\n%s', error.source, key_id, error.message)
     return key_id
+
+
+def log_request(request, add_params=True, **kwargs):
+  """Adds an error. This should be used normally."""
+  kwargs['endpoint'] = request.path
+  kwargs['method'] = request.method
+  kwargs['request_id'] = logsutil.RequestID()
+  kwargs['source_ip'] = request.remote_addr
+  if add_params:
+    kwargs['params'] = request.params.mixed()
+  return log(**kwargs)

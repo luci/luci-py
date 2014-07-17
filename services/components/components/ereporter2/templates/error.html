@@ -75,10 +75,6 @@
       <td><pre>{{error.stack or '--'}}</pre></td>
     </tr>
     <tr>
-      <td>Source IP</td>
-      <td>{{error.source_ip or '--'}}</td>
-    </tr>
-    <tr>
       <td>Version</td>
       <td>{{error.version or '--'}}</td>
     </tr>
@@ -95,6 +91,30 @@
     <tr>
       <td>Endpoint</td>
       <td>{{error.endpoint or '--'}}</td>
+    </tr>
+    <tr>
+      <td>Method</td>
+      <td>{{error.method or '--'}}</td>
+    </tr>
+    <tr>
+      <td>Params</td>
+      <td>{{error.params or '--'}}</td>
+    </tr>
+    <tr>
+      <td>Request ID</td>
+      <td>
+        {% if error.request_id %}
+          <a href="/ereporter2/requests/{{error.request_id}}">
+            {{error.request_id}}
+          </a>
+        {% else %}
+          --
+        {% endif %}
+      </td>
+    </tr>
+    <tr>
+      <td>Source IP</td>
+      <td>{{error.source_ip or '--'}}</td>
     </tr>
   </tbody>
 </table>

@@ -14,12 +14,16 @@ import unittest
 import test_env
 test_env.setup_test_env()
 
-from support import test_case
+import webapp2
+
+# From components/third_party/
+import webtest
 
 from components import auth
 from components.ereporter2 import formatter
 from components.ereporter2 import models
 from components.ereporter2 import on_error
+from support import test_case
 
 
 # Access to a protected member XXX of a client class - pylint: disable=W0212
@@ -46,6 +50,7 @@ class Ereporter2OnErrorTest(test_case.TestCase):
     kwargs['category'] = 'exception'
     kwargs['duration'] = 2.3
     kwargs['env'] = {'foo': 'bar'}
+    kwargs['params'] = {'foo': 'bar'}
     kwargs['source'] = 'bot'
     kwargs['source_ip'] = '0.0.0.0'
     on_error.log(**kwargs)
@@ -62,8 +67,11 @@ class Ereporter2OnErrorTest(test_case.TestCase):
       'hostname': u'hostname',
       'identity': None,
       'message': u'message',
+      'method': u'method',
       'os': u'os',
+      'params': {u'foo': u'bar'},
       'python_version': u'python_version',
+      'request_id': u'request_id',
       'source': u'bot',
       'source_ip': u'0.0.0.0',
       'stack': u'stack',
@@ -101,8 +109,11 @@ class Ereporter2OnErrorTest(test_case.TestCase):
       'hostname': None,
       'identity': None,
       'message': None,
+      'method': None,
       'os': None,
+      'params': None,
       'python_version': None,
+      'request_id': None,
       'source': u'unknown',
       'source_ip': None,
       'stack': None,
@@ -129,8 +140,11 @@ class Ereporter2OnErrorTest(test_case.TestCase):
       'message':
           u'log({\'env\': \'str\'}) caused: JSON property must be a '
           u'<type \'dict\'>',
+      'method': None,
       'os': None,
+      'params': None,
       'python_version': None,
+      'request_id': None,
       'source': u'server',
       'source_ip': None,
       'stack':
@@ -152,16 +166,52 @@ class Ereporter2OnErrorTest(test_case.TestCase):
     actual['stack'] = actual['stack'].replace('.pyc', '.py')
     self.assertEqual(expected, actual)
 
+  def test_log_request(self):
+    # Create a small adhoc webapp2 instance and ensures logging works.
+    def handle(request):
+      on_error.log_request(request)
+    app = webtest.TestApp(webapp2.WSGIApplication([('/', handle)], debug=True))
+    app.get('/?foo=bar')
+    app.post('/?foo=bar', {'foo': 'baz'})
+    # Strip None values for clarity.
+    actual = [
+      {k: v for k, v in e.to_dict().iteritems() if v is not None}
+      for e in models.Error.query()
+    ]
+    # It happens this value is hardcoded on time.
+    request_id = u'7357B3D7091D'
+    expected = [
+      {
+        'args': [],
+        'created_ts': self._now,
+        'endpoint': u'/',
+        'method': u'GET',
+        'params': {u'foo': u'bar'},
+        'request_id': request_id,
+        'source': u'unknown',
+      },
+      {
+        'args': [],
+        'created_ts': self._now,
+        'endpoint': u'/',
+        'method': u'POST',
+        'params': {u'foo': [u'bar', u'baz']},
+        'request_id': request_id,
+        'source': u'unknown',
+      },
+    ]
+    self.assertEqual(expected, actual)
+
 
 class Ereporter2OnErrorTestNoAuth(test_case.TestCase):
   def setUp(self):
     super(Ereporter2OnErrorTestNoAuth, self).setUp()
-    #self.mock(logging, 'error', lambda *_, **_kwargs: None)
     self._now = datetime.datetime(2014, 6, 24, 20, 19, 42, 653775)
     self.mock_now(self._now, 0)
 
   def test_log(self):
     # It must work even if auth is not initialized.
+    self.mock(logging, 'error', lambda *_, **_kwargs: None)
     error_id = on_error.log(
         source='bot', category='task_failure', message='Dang')
     self.assertEqual(1, models.Error.query().count())
@@ -178,8 +228,11 @@ class Ereporter2OnErrorTestNoAuth(test_case.TestCase):
       'hostname': None,
       'identity': None,
       'message': u'Dang',
+      'method': None,
       'os': None,
+      'params': None,
       'python_version': None,
+      'request_id': None,
       'source': u'bot',
       'source_ip': None,
       'stack': None,

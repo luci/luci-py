@@ -109,12 +109,11 @@ def ip_whitelist_authentication(request):
     return auth.Identity(
         auth.IDENTITY_BOT, request.remote_addr.replace(':', '-'))
 
-  ereporter2.log(
+  ereporter2.log_request(
+      request=request,
       source='server',
       category='auth',
-      message='Authentication failure; params: %s' % request.params,
-      endpoint=request.url,
-      source_ip=request.remote_addr)
+      message='Authentication failure')
   return None
 
 

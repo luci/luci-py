@@ -77,9 +77,17 @@ class Error(ndb.Model):
   # Can be the client code version or the server version.
   version = ndb.StringProperty()
 
+  # Can be the client code version or the server version.
   python_version = ndb.StringProperty()
 
+  # Remote client details and endpoint accessed.
   source_ip = ndb.StringProperty()
+  # The resource accessed.
+  endpoint = ndb.StringProperty()
+  method = ndb.StringProperty()
+  params = ndb.JsonProperty(indexed=False, json_type=dict)
+  # To be able to find the log back via logservice.
+  request_id = ndb.StringProperty()
 
   # Only applicable for client-side reports.
   args = ndb.StringProperty(repeated=True)
@@ -91,5 +99,3 @@ class Error(ndb.Model):
   # The local user, orthogonal to authentication in self.identity.
   user = ndb.StringProperty()
 
-  # Only applicable to 'server' reports.
-  endpoint = ndb.StringProperty()

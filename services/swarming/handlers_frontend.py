@@ -1001,12 +1001,11 @@ class RemoteErrorHandler(auth.AuthenticatingHandler):
 
   @auth.require(acl.is_bot)
   def post(self):
-    # TODO(maruel): Delete this old API.
-    ereporter2.log(
+    ereporter2.log_request(
+        request=self.request,
         source='bot',
         category='task_failure',
-        message=self.request.get('m', ''),
-        source_ip=self.request.remote_addr)
+        message=self.request.get('m', ''))
 
     self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
     self.response.out.write('Success.')

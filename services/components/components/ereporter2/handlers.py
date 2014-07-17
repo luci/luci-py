@@ -240,8 +240,7 @@ class OnErrorHandler(auth.AuthenticatingHandler):
 
     kwargs = dict(
         (k, report[k]) for k in on_error.VALID_ERROR_KEYS if report.get(k))
-    kwargs['source_ip'] = self.request.remote_addr
-    report_id = on_error.log(**kwargs)
+    report_id = on_error.log_request(self.request, add_params=False, **kwargs)
     self.response.headers['Content-Type'] = 'application/json; charset=utf-8'
     body = {
       'id': report_id,
