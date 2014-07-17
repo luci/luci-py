@@ -333,15 +333,27 @@ def get_cpu_bitness():
 
 def get_ip():
   """Returns the IP that is the most likely to be used for TCP connections."""
-  # It's guesswork and could return the wrong IP. In particular an host can have
-  # multiple IPs.
-  s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-  # This doesn't actually connect to the Google DNS server but this forces the
-  # network system to figure out an IP interface to use.
-  s.connect(('8.8.8.8', 80))
-  ip = s.getsockname()[0]
-  s.close()
-  return ip
+  # Tries for ~0.5s then give up.
+  max_tries = 10
+  for i in xrange(10):
+    # It's guesswork and could return the wrong IP. In particular a host can
+    # have multiple IPs.
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    # This doesn't actually connect to the Google DNS server but this forces the
+    # network system to figure out an IP interface to use.
+    try:
+      s.connect(('8.8.8.8', 80))
+      return s.getsockname()[0]
+    except socket.error:
+      # Can raise "error: [Errno 10051] A socket operation was attempted to an
+      # unreachable network" if the network is still booting up. We don't want
+      # this function to crash.
+      if i == max_tries - 1:
+        # Can't determine the IP.
+        return '0.0.0.0'
+      time.sleep(0.05)
+    finally:
+      s.close()
 
 
 def get_hostname():
