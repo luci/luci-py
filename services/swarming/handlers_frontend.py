@@ -185,6 +185,7 @@ class UploadStartSlaveHandler(auth.AuthenticatingHandler):
   @auth.require(acl.is_admin)
   def get(self):
     params = {
+      'content': bot_management.get_start_slave(),
       'path': self.request.path,
       'xsrf_token': self.generate_xsrf_token(),
     }
@@ -198,14 +199,14 @@ class UploadStartSlaveHandler(auth.AuthenticatingHandler):
       self.abort(400, 'No script uploaded')
 
     bot_management.store_start_slave(script)
-    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
-    self.response.out.write('%d bytes stored.' % len(script))
+    self.get()
 
 
 class UploadBootstrapHandler(auth.AuthenticatingHandler):
   @auth.require(acl.is_admin)
   def get(self):
     params = {
+      'content': bot_management.get_bootstrap(self.request.host_url),
       'path': self.request.path,
       'xsrf_token': self.generate_xsrf_token(),
     }
@@ -219,8 +220,7 @@ class UploadBootstrapHandler(auth.AuthenticatingHandler):
       self.abort(400, 'No script uploaded')
 
     file_chunks.StoreFile('bootstrap.py', script.encode('utf-8'))
-    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
-    self.response.out.write('%d bytes stored.' % len(script))
+    self.get()
 
 
 class WhitelistIPHandler(auth.AuthenticatingHandler):
@@ -818,17 +818,10 @@ class BootstrapHandler(auth.AuthenticatingHandler):
 
   @auth.require(acl.is_bot)
   def get(self):
-    content = file_chunks.RetrieveFile('bootstrap.py')
-    if not content:
-      # Fallback to the one embedded in the tree.
-      with open(os.path.join(ROOT_DIR, 'swarm_bot/bootstrap.py'), 'rb') as f:
-        content = f.read()
-
     self.response.headers['Content-Type'] = 'text/x-python'
     self.response.headers['Content-Disposition'] = (
         'attachment; filename="swarming_bot_bootstrap.py"')
-    header = 'host_url = %r\n' % self.request.host_url
-    self.response.out.write(header + content)
+    self.response.out.write(bot_management.get_bootstrap(self.request.host_url))
 
 
 class GetSlaveCodeHandler(auth.AuthenticatingHandler):

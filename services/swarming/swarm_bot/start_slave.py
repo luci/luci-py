@@ -8,15 +8,15 @@ This file is uploaded the swarming server so the swarming bots can declare their
 dimensions and startup method easily.
 """
 
-import socket
-
 import os_utilities
 
 
 def get_attributes():
   """Returns the attributes for this bot."""
-  bot_id = socket.gethostname().lower().split('.', 1)[0]
-  return os_utilities.get_attributes(bot_id)
+  # The bot id will be automatically selected based on the hostname. If you want
+  # something more special, specify it in your start_slave.py. You can upload a
+  # new version via /restricted/upload_start_slave.
+  return os_utilities.get_attributes(None)
 
 
 def setup_bot():

@@ -75,9 +75,21 @@ class Bot(ndb.Model):
     return out
 
 
-### Private stuff.
+### Public APIs.
 
-def _get_start_slave():
+
+def get_bootstrap(host_url):
+  """Returns the mangled version of the utility script bootstrap.py."""
+  content = file_chunks.RetrieveFile('bootstrap.py')
+  if not content:
+    # Fallback to the one embedded in the tree.
+    with open(os.path.join(ROOT_DIR, 'swarm_bot/bootstrap.py'), 'rb') as f:
+      content = f.read()
+  header = 'host_url = %r\n' % host_url
+  return header + content
+
+
+def get_start_slave():
   """Returns the start_slave.py content to be used in the zip.
 
   First fetch it from the database, if present. Pass the one in the tree
@@ -88,9 +100,6 @@ def _get_start_slave():
     return content
   with open(os.path.join(ROOT_DIR, 'swarm_bot', 'start_slave.py'), 'rb') as f:
     return f.read()
-
-
-### Public APIs.
 
 
 def store_start_slave(script):
@@ -124,7 +133,7 @@ def get_slave_version(host):
     return bot_version
 
   # Need to calculate it.
-  additionals = {'start_slave.py': _get_start_slave()}
+  additionals = {'start_slave.py': get_start_slave()}
   bot_dir = os.path.join(ROOT_DIR, 'swarm_bot')
   bot_version = bot_archive.get_swarming_bot_version(bot_dir, host, additionals)
   memcache.set(key, bot_version, namespace=namespace)
@@ -145,7 +154,7 @@ def get_swarming_bot_zip(host):
 
   # Get the start slave script from the database, if present. Pass an empty
   # file if the files isn't present.
-  additionals = {'start_slave.py': _get_start_slave()}
+  additionals = {'start_slave.py': get_start_slave()}
   bot_dir = os.path.join(ROOT_DIR, 'swarm_bot')
   code = bot_archive.get_swarming_bot_zip(bot_dir, host, additionals)
   memcache.set(key, code, namespace=namespace)

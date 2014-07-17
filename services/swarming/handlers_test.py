@@ -373,7 +373,7 @@ class AppTest(test_case.TestCase):
     response = self.app.post(
         '/restricted/upload_start_slave?xsrf_token=%s' % xsrf_token,
         upload_files=[('script', 'script', 'script_body')])
-    self.assertEqual('11 bytes stored.', response.body)
+    self.assertIn('script_body', response.body)
 
   def testRegisterHandler(self):
     # Missing attributes field.
@@ -884,14 +884,14 @@ class AppTest(test_case.TestCase):
 
     self.app.get('/restricted/upload_bootstrap')
     data = {
-      'script': 'foo',
+      'script': 'script_body',
       'xsrf_token': self.getXsrfToken(),
     }
     r = self.app.post('/restricted/upload_bootstrap', data)
-    self.assertEqual('3 bytes stored.', r.body)
+    self.assertIn('script_body', r.body)
 
     actual = self.app.get('/bootstrap').body
-    expected = 'host_url = \'http://localhost\'\nfoo'
+    expected = 'host_url = \'http://localhost\'\nscript_body'
     self.assertEqual(expected, actual)
 
   def test_convert_test_case(self):
