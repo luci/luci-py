@@ -264,7 +264,7 @@ class _TaskResultCommon(ndb.Model):
 
     Task abandoned or not yet completed are not applicable and return None.
     """
-    if not self.started_ts or self.abandoned_ts or not self.completed_ts:
+    if not self.started_ts or not self.completed_ts:
       return None
     return self.completed_ts - self.started_ts
 

@@ -333,6 +333,19 @@ class TaskResultApiTest(test_case.TestCase):
 
     self.assertFalse(result_summary.need_update_from_run_result(run_result))
 
+  def test_run_result_duration(self):
+    run_result = task_result.TaskRunResult(
+        started_ts=datetime.datetime(2010, 1, 1, 0, 0, 0),
+        completed_ts=datetime.datetime(2010, 1, 1, 0, 2, 0))
+    self.assertEqual(datetime.timedelta(seconds=120), run_result.duration)
+    self.assertEqual(datetime.timedelta(seconds=120), run_result.duration_now())
+
+    run_result = task_result.TaskRunResult(
+        started_ts=datetime.datetime(2010, 1, 1, 0, 0, 0),
+        abandoned_ts=datetime.datetime(2010, 1, 1, 0, 1, 0))
+    self.assertEqual(None, run_result.duration)
+    self.assertEqual(None, run_result.duration_now())
+
   def test_append_output(self):
     # Test that one can stream output and it is returned fine.
     request = task_request.make_request(_gen_request_data())
