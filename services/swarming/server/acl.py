@@ -123,16 +123,19 @@ def bootstrap_dev_server_acls():
 
   # Add a bot.
   user_manager.AddWhitelist('127.0.0.1')
-  bot = auth.Identity(auth.IDENTITY_BOT, '127.0.0.1')
-  auth.bootstrap_group(BOTS_GROUP, bot, 'Swarming bots')
-  auth.bootstrap_group(USERS_GROUP, bot, 'Swarming users')
 
-  # Add a swarming admin. smoke-test@example.com is used in server_smoke_test.py
-  admin = auth.Identity(auth.IDENTITY_USER, 'smoke-test@example.com')
-  auth.bootstrap_group(ADMINS_GROUP, admin, 'Swarming administrators')
+  if not auth.is_replica():
+    bot = auth.Identity(auth.IDENTITY_BOT, '127.0.0.1')
+    auth.bootstrap_group(BOTS_GROUP, bot, 'Swarming bots')
+    auth.bootstrap_group(USERS_GROUP, bot, 'Swarming users')
 
-  # Add an instance admin (for easier manual testing when running dev server).
-  auth.bootstrap_group(
-      auth.ADMIN_GROUP,
-      auth.Identity(auth.IDENTITY_USER, 'test@example.com'),
-      'Users that can manage groups')
+    # Add a swarming admin. smoke-test@example.com is used in
+    # server_smoke_test.py
+    admin = auth.Identity(auth.IDENTITY_USER, 'smoke-test@example.com')
+    auth.bootstrap_group(ADMINS_GROUP, admin, 'Swarming administrators')
+
+    # Add an instance admin (for easier manual testing when running dev server).
+    auth.bootstrap_group(
+        auth.ADMIN_GROUP,
+        auth.Identity(auth.IDENTITY_USER, 'test@example.com'),
+        'Users that can manage groups')

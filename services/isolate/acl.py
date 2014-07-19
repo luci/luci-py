@@ -169,15 +169,16 @@ def bootstrap_dev_server_acls():
       comment='automatic because of running on dev server')
 
   # Add to Isolate groups.
-  ident = auth.Identity(auth.IDENTITY_BOT, access_id)
-  auth.bootstrap_group(READERS_GROUP, ident, 'Can read from Isolate')
-  auth.bootstrap_group(WRITERS_GROUP, ident, 'Can write to Isolate')
+  if not auth.is_replica():
+    ident = auth.Identity(auth.IDENTITY_BOT, access_id)
+    auth.bootstrap_group(READERS_GROUP, ident, 'Can read from Isolate')
+    auth.bootstrap_group(WRITERS_GROUP, ident, 'Can write to Isolate')
 
-  # Add a fake admin for local dev server.
-  auth.bootstrap_group(
-      auth.ADMIN_GROUP,
-      auth.Identity(auth.IDENTITY_USER, 'test@example.com'),
-      'Users that can manage groups')
+    # Add a fake admin for local dev server.
+    auth.bootstrap_group(
+        auth.ADMIN_GROUP,
+        auth.Identity(auth.IDENTITY_USER, 'test@example.com'),
+        'Users that can manage groups')
 
 
 ### Handlers
