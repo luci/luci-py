@@ -296,12 +296,12 @@ class TestAuthDBCache(test_case.TestCase):
     self.assertEqual(auth_db_v0, api.get_process_auth_db())
 
     # It doesn't expire for some time.
-    self.set_time(api.PROCESS_CACHE_EXPIRATION_SEC - 1)
+    self.set_time(api.get_process_cache_expiration_sec() - 1)
     self.set_fetched_auth_db(auth_db_v1)
     self.assertEqual(auth_db_v0, api.get_process_auth_db())
 
     # But eventually it does.
-    self.set_time(api.PROCESS_CACHE_EXPIRATION_SEC + 1)
+    self.set_time(api.get_process_cache_expiration_sec() + 1)
     self.set_fetched_auth_db(auth_db_v1)
     self.assertEqual(auth_db_v1, api.get_process_auth_db())
 
@@ -319,7 +319,7 @@ class TestAuthDBCache(test_case.TestCase):
     # Make cache expire, but setup fetch_auth_db to return a new instance of
     # AuthDB, but with same entity group version. Old known instance of AuthDB
     # should be reused.
-    self.set_time(api.PROCESS_CACHE_EXPIRATION_SEC + 1)
+    self.set_time(api.get_process_cache_expiration_sec() + 1)
     self.set_fetched_auth_db(auth_db_v0_again)
     self.assertTrue(api.get_process_auth_db() is auth_db_v0)
 
@@ -343,7 +343,7 @@ class TestAuthDBCache(test_case.TestCase):
     self.assertEqual(auth_db_v0, api.get_process_auth_db())
 
     # Make process cache expire.
-    self.set_time(api.PROCESS_CACHE_EXPIRATION_SEC + 1)
+    self.set_time(api.get_process_cache_expiration_sec() + 1)
 
     # Start fetching AuthDB from another thread, at some point it will call
     # 'fetch_auth_db', and we pause the thread then and resume main thread.
@@ -384,7 +384,7 @@ class TestAuthDBCache(test_case.TestCase):
     self.assertEqual(auth_db_v0, api.get_process_auth_db())
 
     # Make process cache expire.
-    self.set_time(api.PROCESS_CACHE_EXPIRATION_SEC + 1)
+    self.set_time(api.get_process_cache_expiration_sec() + 1)
 
     # Emulate an exception in fetch_auth_db.
     def mock_fetch_auth_db(*_kwargs):

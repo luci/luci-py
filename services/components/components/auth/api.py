@@ -31,8 +31,10 @@ from . import model
 __all__ = [
   'AuthenticationError',
   'AuthorizationError',
+  'disable_process_cache',
   'Error',
   'get_current_identity',
+  'get_process_cache_expiration_sec',
   'get_secret',
   'is_admin',
   'is_group_member',
@@ -46,9 +48,7 @@ __all__ = [
 
 
 # How soon process-global AuthDB cache expires, sec.
-PROCESS_CACHE_EXPIRATION_SEC = 30
-
-
+_process_cache_expiration_sec = 30
 # True if fetch_auth_db was called at least once and created all root entities.
 _lazy_bootstrap_ran = False
 
@@ -278,6 +278,20 @@ class RequestCache(object):
     self.auth_db = None
 
 
+def disable_process_cache():
+  """Disables in-process cache of AuthDB.
+
+  Useful in tests.
+  """
+  global _process_cache_expiration_sec
+  _process_cache_expiration_sec = 0
+
+
+def get_process_cache_expiration_sec():
+  """How long auth db is cached in process memory."""
+  return _process_cache_expiration_sec
+
+
 def get_request_cache():
   """Returns instance of RequestCache associated with the current request.
 
@@ -398,7 +412,7 @@ def get_process_auth_db():
       logging.info('Initial fetch of AuthDB')
       config.ensure_configured()
       _auth_db = fetch_auth_db()
-      _auth_db_expiration = time.time() + PROCESS_CACHE_EXPIRATION_SEC
+      _auth_db_expiration = time.time() + _process_cache_expiration_sec
       return _auth_db
 
     # We have a cached copy and it has expired. Maybe some thread is already
@@ -440,7 +454,7 @@ def get_process_auth_db():
     assert _auth_db_fetching_thread == threading.current_thread()
     _auth_db_fetching_thread = None
     _auth_db = fresh_copy
-    _auth_db_expiration = time.time() + PROCESS_CACHE_EXPIRATION_SEC
+    _auth_db_expiration = time.time() + _process_cache_expiration_sec
     return _auth_db
 
 

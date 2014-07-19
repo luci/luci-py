@@ -10,6 +10,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(BASE_DIR, 'components', 'third_party'))
 
 from components import auth
+from components import utils
 
 
 class WarmupHandler(webapp2.RequestHandler):
@@ -19,5 +20,16 @@ class WarmupHandler(webapp2.RequestHandler):
     self.response.write('ok')
 
 
+assert utils.is_local_dev_server()
+auth.disable_process_cache()
+
+# Add a fake admin for local dev server.
+if not auth.is_replica():
+  auth.bootstrap_group(
+      auth.ADMIN_GROUP,
+      auth.Identity(auth.IDENTITY_USER, 'test@example.com'),
+      'Users that can manage groups')
+
 # /_ah/warmup is used by the smoke test to detect that app is alive.
-app = webapp2.WSGIApplication([webapp2.Route(r'/_ah/warmup', WarmupHandler)])
+app = webapp2.WSGIApplication(
+    [webapp2.Route(r'/_ah/warmup', WarmupHandler)], debug=True)
