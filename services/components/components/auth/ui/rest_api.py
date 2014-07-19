@@ -28,6 +28,7 @@ def get_rest_api_routes():
     webapp2.Route('/auth/api/v1/groups', GroupsHandler),
     webapp2.Route('/auth/api/v1/groups/<group:%s>' % group_re, GroupHandler),
     webapp2.Route('/auth/api/v1/server/oauth_config', OAuthConfigHandler),
+    webapp2.Route('/auth/api/v1/server/state', ServerStateHandler),
   ]
 
 
@@ -130,10 +131,9 @@ class GroupsHandler(ApiHandler):
   all details about the group except the actual list of members
   (which may be large).
 
-  Available only in Standalone and Primary modes.
+  Available in Standalone, Primary and Replica modes.
   """
 
-  @forbid_api_on_replica
   @api.require(api.is_admin)
   def get(self):
     # Currently AuthGroup entity contains a list of group members in the entity
@@ -155,10 +155,10 @@ class GroupsHandler(ApiHandler):
 class GroupHandler(ApiHandler):
   """Creating, reading, updating and deleting a single group.
 
-  Available only in Standalone and Primary modes.
+  GET is available in Standalone, Primary and Replica modes.
+  Everything else is available only in Standalone and Primary modes.
   """
 
-  @forbid_api_on_replica
   @api.require(api.is_admin)
   def get(self, group):
     """Fetches all information about an existing group give its name."""
@@ -399,3 +399,22 @@ class OAuthConfigHandler(ApiHandler):
 
     update()
     self.send_response({'ok': True})
+
+
+class ServerStateHandler(ApiHandler):
+  """Reports replication state of a service."""
+
+  @api.require(api.is_admin)
+  def get(self):
+    if model.is_primary():
+      mode = 'primary'
+    elif model.is_replica():
+      mode = 'replica'
+    else:
+      assert model.is_standalone()
+      mode = 'standalone'
+    state = model.get_replication_state() or model.AuthReplicationState()
+    self.send_response({
+      'mode': mode,
+      'replication_state': state.to_serializable_dict(),
+    })

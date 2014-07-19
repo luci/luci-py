@@ -983,8 +983,8 @@ class OAuthConfigHandlerTest(RestAPITestCase):
   def test_non_configured_works(self):
     expected = {
       'additional_client_ids': [],
-      'client_id': None,
-      'client_not_so_secret': None,
+      'client_id': '',
+      'client_not_so_secret': '',
     }
     status, body, _ = self.get('/auth/api/v1/server/oauth_config')
     self.assertEqual(200, status)
@@ -1079,6 +1079,29 @@ class OAuthConfigHandlerTest(RestAPITestCase):
     self.assertEqual({'text': 'Access is denied.'}, response)
 
 
+class ServerStateHandlerTest(RestAPITestCase):
+  def test_works(self):
+    self.mock_ndb_now(utils.timestamp_to_datetime(1300000000000000))
+
+    # Configure as standalone.
+    state = model.AuthReplicationState(key=model.REPLICATION_STATE_KEY)
+    state.put()
+
+    expected = {
+      'mode': 'standalone',
+      'replication_state': {
+        'auth_db_rev': 0,
+        'modified_ts': 1300000000000000,
+        'primary_id': None,
+        'primary_url': None,
+      }
+    }
+    status, body, _ = self.get(
+        '/auth/api/v1/server/state', expect_admin_check=True)
+    self.assertEqual(200, status)
+    self.assertEqual(expected, body)
+
+
 class ForbidApiOnReplicaTest(test_case.TestCase):
   """Tests for rest_api.forbid_api_on_replica decorator."""
 
@@ -1099,13 +1122,13 @@ class ForbidApiOnReplicaTest(test_case.TestCase):
       def get(self):
         calls.append(1)
 
-    mock_replication_state('https://primary-url')
+    mock_replication_state('http://locahost:1234')
     response = call_get(Handler, expect_errors=True)
 
     self.assertEqual(0, len(calls))
     self.assertEqual(405, response.status_code)
     expected = {
-      'primary_url': 'https://primary-url',
+      'primary_url': 'http://locahost:1234',
       'text': 'Use Primary service for API requests',
     }
     self.assertEqual(expected, json.loads(response.body))
@@ -1131,7 +1154,7 @@ class ForbidUiOnReplicaTest(test_case.TestCase):
       def get(self):
         calls.append(1)
 
-    mock_replication_state('https://primary-url')
+    mock_replication_state('http://locahost:1234')
     response = call_get(Handler, expect_errors=True)
 
     self.assertEqual(0, len(calls))
@@ -1139,7 +1162,7 @@ class ForbidUiOnReplicaTest(test_case.TestCase):
     self.assertEqual(
         '405 Method Not Allowed\n\n'
         'The method GET is not allowed for this resource. \n\n '
-        'Now allowed on a replica, see primary at https://primary-url',
+        'Now allowed on a replica, see primary at http://locahost:1234',
         response.body)
 
 
@@ -1163,13 +1186,13 @@ class RedirectUiOnReplicaTest(test_case.TestCase):
       def get(self):
         calls.append(1)
 
-    mock_replication_state('https://primary-url')
+    mock_replication_state('http://locahost:1234')
     response = call_get(Handler, expect_errors=True, uri='/some/method?arg=1')
 
     self.assertEqual(0, len(calls))
     self.assertEqual(302, response.status_code)
     self.assertEqual(
-        'https://primary-url/some/method?arg=1', response.headers['Location'])
+        'http://locahost:1234/some/method?arg=1', response.headers['Location'])
 
 
 if __name__ == '__main__':

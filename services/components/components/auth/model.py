@@ -301,14 +301,14 @@ class AuthGlobalConfig(ndb.Model):
    * AuthSecret
   """
   # OAuth2 client_id to use to mint new OAuth2 tokens.
-  oauth_client_id = ndb.StringProperty(indexed=False)
+  oauth_client_id = ndb.StringProperty(indexed=False, default='')
   # OAuth2 client secret. Not so secret really, since it's passed to clients.
-  oauth_client_secret = ndb.StringProperty(indexed=False)
+  oauth_client_secret = ndb.StringProperty(indexed=False, default='')
   # Additional OAuth2 client_ids allowed to access the services.
   oauth_additional_client_ids = ndb.StringProperty(repeated=True, indexed=False)
 
 
-class AuthReplicationState(ndb.Model):
+class AuthReplicationState(ndb.Model, datastore_utils.SerializableModelMixin):
   """Contains state used to control Primary -> Replica replication.
 
   It's a singleton entity with key REPLICATION_STATE_KEY (in same entity groups
@@ -319,6 +319,14 @@ class AuthReplicationState(ndb.Model):
   changes to AuthDB are made, Replica updates it whenever it receives a push
   from Primary.
   """
+  # How to convert this entity to or from serializable dict.
+  serializable_properties = {
+    'primary_id': datastore_utils.READABLE,
+    'primary_url': datastore_utils.READABLE,
+    'auth_db_rev': datastore_utils.READABLE,
+    'modified_ts': datastore_utils.READABLE,
+  }
+
   # For services in Standalone mode it is None.
   # For services in Primary mode: own GAE application ID.
   # For services in Replica mode it is a GAE application ID of Primary.
