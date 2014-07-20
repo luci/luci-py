@@ -598,7 +598,8 @@ def get_adb_list_devices(adb_path='adb'):
   for line in output.splitlines():
     if line.startswith(('*', 'List of')) or not line:
       continue
-    # TODO(maruel): Handle 'offline', 'device' and 'no device'.
+    # TODO(maruel): Handle 'offline', 'device', 'no device' and
+    # 'unauthorized'.
     devices.append(line.split()[0])
   return devices
 
@@ -672,8 +673,8 @@ def get_dimensions():
   return dimensions
 
 
-def get_attributes(id_tag):
-  """Returns the default Swarming dictionary of attributes for this bot.
+def get_attributes_host(id_tag):
+  """Returns the default Swarming dictionary of attributes for this host.
 
   'id' is used to uniquely identify the bot.
   'dimensions' is used for task selection.
@@ -689,6 +690,20 @@ def get_attributes(id_tag):
     'id': id_tag,
     'ip': get_ip(),
   }
+
+
+def get_attributes(id_tag):
+  """Returns the default Swarming dictionary of attributes for this bot.
+
+  Automatically detects if an android device is being used depending on
+  environment variables, as driven by
+  ../tools/android/udev_start_bot_deferred.sh.
+  """
+  if id_tag is None:
+    device_id = os.environ.get('SWARMING_BOT_ANDROID')
+    if device_id:
+      return get_attributes_android(device_id)
+  return get_attributes_host(id_tag)
 
 
 def setup_auto_startup_win(command, cwd, batch_name):
