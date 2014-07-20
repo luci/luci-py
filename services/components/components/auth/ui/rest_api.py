@@ -16,6 +16,7 @@ from components import utils
 from .. import api
 from .. import handler
 from .. import model
+from .. import signature
 
 
 def get_rest_api_routes():
@@ -27,6 +28,7 @@ def get_rest_api_routes():
     webapp2.Route('/auth/api/v1/accounts/self/xsrf_token', XSRFHandler),
     webapp2.Route('/auth/api/v1/groups', GroupsHandler),
     webapp2.Route('/auth/api/v1/groups/<group:%s>' % group_re, GroupHandler),
+    webapp2.Route('/auth/api/v1/server/certificates', CertificatesHandler),
     webapp2.Route('/auth/api/v1/server/oauth_config', OAuthConfigHandler),
     webapp2.Route('/auth/api/v1/server/state', ServerStateHandler),
   ]
@@ -345,6 +347,19 @@ class GroupHandler(ApiHandler):
     if not success:
       self.abort_with_error(**error_details)
     self.send_response({'ok': True})
+
+
+class CertificatesHandler(ApiHandler):
+  """Public certificates that service uses to sign blobs.
+
+  May be used by other services when validating a signature of this service.
+  Used by signature.get_service_public_certificates() method.
+  """
+
+  # Available to anyone, there's no secrets here.
+  @api.public
+  def get(self):
+    self.send_response(signature.get_own_public_certificates())
 
 
 class OAuthConfigHandler(ApiHandler):

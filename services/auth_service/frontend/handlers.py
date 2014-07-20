@@ -60,31 +60,6 @@ class LinkTicketToken(auth.TokenKind):
   version = 1
 
 
-@utils.cache_with_expiration(3600)
-def get_public_certificates():
-  """Returns jsonish object with services' public certificates."""
-  certs = app_identity.get_public_certificates()
-  return {
-    'certificates': [
-      {
-        'key_name': cert.key_name,
-        'x509_certificate_pem': cert.x509_certificate_pem,
-      }
-      for cert in certs
-    ],
-    'timestamp': utils.datetime_to_timestamp(datetime.datetime.utcnow()),
-  }
-
-
-class PublicCertificatesListing(rest_api.ApiHandler):
-  """Public certificates that service uses to sign blobs."""
-
-  # Available to anyone, there's no secrets here.
-  @auth.public
-  def get(self):
-    self.send_response(get_public_certificates())
-
-
 class ServiceListingHandler(rest_api.ApiHandler):
   """Lists registered replicas with their state."""
 
@@ -210,9 +185,6 @@ def get_routes():
     webapp2.Route(r'/_ah/warmup', WarmupHandler),
 
     # API routes.
-    webapp2.Route(
-        r'/auth_service/api/v1/certificates',
-        PublicCertificatesListing),
     webapp2.Route(
         r'/auth_service/api/v1/internal/link_replica',
         LinkRequestHandler),

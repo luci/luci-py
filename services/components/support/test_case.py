@@ -62,6 +62,7 @@ class TestCase(auto_stub.TestCase):
     # run your test case. Do not forget to put it back to False.
     train_index_yaml = False
 
+    self.testbed.init_app_identity_stub()
     self.testbed.init_datastore_v3_stub(
         require_indexes=not train_index_yaml, root_path=self.APP_DIR)
     self.testbed.init_logservice_stub()

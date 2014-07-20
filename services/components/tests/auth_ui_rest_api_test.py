@@ -279,11 +279,6 @@ class RestAPITestCase(test_case.TestCase):
     """Instruct tearDown to verify that auth_db_rev has changed."""
     self._auth_db_rev_inc += rev_inc
 
-  def mock_ndb_now(self, now):
-    """Makes properties with |auto_now| and |auto_now_add| use mocked time."""
-    self.mock(model.ndb.DateTimeProperty, '_now', lambda _: now)
-    self.mock(model.ndb.DateProperty, '_now', lambda _: now.date())
-
   def mock_current_identity(self, identity):
     """Makes api.get_current_identity() return predefined value."""
     self.mocked_identity = identity
@@ -445,7 +440,7 @@ class GroupsHandlerTest(RestAPITestCase):
 
   def test_non_empty_list(self):
     # Freeze time in NDB's |auto_now| properties.
-    self.mock_ndb_now(utils.timestamp_to_datetime(1300000000000000))
+    self.mock_now(utils.timestamp_to_datetime(1300000000000000))
 
     # Create a bunch of groups with all kinds of members.
     for i in xrange(0, 5):
@@ -488,7 +483,7 @@ class GroupHandlerTest(RestAPITestCase):
 
   def test_get_existing(self):
     # Freeze time in NDB's |auto_now| properties.
-    self.mock_ndb_now(utils.timestamp_to_datetime(1300000000000000))
+    self.mock_now(utils.timestamp_to_datetime(1300000000000000))
 
     # Create a group with all kinds of members.
     group = model.AuthGroup(
@@ -651,7 +646,7 @@ class GroupHandlerTest(RestAPITestCase):
     creator_identity = model.Identity.from_bytes('user:creator@example.com')
 
     # Freeze time in NDB's |auto_now| properties.
-    self.mock_ndb_now(frozen_time)
+    self.mock_now(frozen_time)
     # get_current_identity is used for 'created_by' and 'modified_by'.
     self.mock_current_identity(creator_identity)
 
@@ -782,7 +777,7 @@ class GroupHandlerTest(RestAPITestCase):
     creator_identity = model.Identity.from_bytes('user:creator@example.com')
 
     # Freeze time in NDB's |auto_now| properties.
-    self.mock_ndb_now(frozen_time)
+    self.mock_now(frozen_time)
     # get_current_identity is used for 'created_by' and 'modified_by'.
     self.mock_current_identity(creator_identity)
 
@@ -894,7 +889,7 @@ class GroupHandlerTest(RestAPITestCase):
 
   def test_put_bad_precondition(self):
     # Freeze time in NDB's |auto_now| properties.
-    self.mock_ndb_now(utils.timestamp_to_datetime(1300000000000000))
+    self.mock_now(utils.timestamp_to_datetime(1300000000000000))
 
     # Create a group.
     group = model.AuthGroup(key=model.group_key('A Group'))
@@ -977,6 +972,19 @@ class GroupHandlerTest(RestAPITestCase):
         expect_xsrf_token_check=True)
     self.assertEqual(403, status)
     self.assertEqual({'text': 'Access is denied.'}, body)
+
+
+class CertificatesHandlerTest(RestAPITestCase):
+  def test_works(self):
+    # Test mostly for code coverage.
+    self.mock_now(utils.timestamp_to_datetime(1300000000000000))
+    status, body, _ = self.get('/auth/api/v1/server/certificates')
+    self.assertEqual(200, status)
+    self.assertEqual(1300000000000000, body['timestamp'])
+    self.assertTrue(body['certificates'])
+    for cert in body['certificates']:
+      self.assertTrue(isinstance(cert['key_name'], basestring))
+      self.assertTrue(isinstance(cert['x509_certificate_pem'], basestring))
 
 
 class OAuthConfigHandlerTest(RestAPITestCase):
@@ -1081,7 +1089,7 @@ class OAuthConfigHandlerTest(RestAPITestCase):
 
 class ServerStateHandlerTest(RestAPITestCase):
   def test_works(self):
-    self.mock_ndb_now(utils.timestamp_to_datetime(1300000000000000))
+    self.mock_now(utils.timestamp_to_datetime(1300000000000000))
 
     # Configure as standalone.
     state = model.AuthReplicationState(key=model.REPLICATION_STATE_KEY)

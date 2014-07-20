@@ -19,6 +19,7 @@ utils.fix_protobuf_package()
 from api import *
 from handler import *
 from model import *
+from signature import *
 from tokens import *
 from ui.app import *
 
