@@ -154,6 +154,9 @@ def time_time():
 
 def datetime_to_rfc2822(dt):
   """datetime -> string value for Last-Modified header as defined by RFC2822."""
+  if not isinstance(dt, datetime.datetime):
+    raise TypeError(
+        'Expecting datetime object, got %s instead' % type(dt).__name__)
   assert dt.tzinfo is None, 'Expecting UTC timestamp: %s' % dt
   return email_utils.formatdate(datetime_to_timestamp(dt) / 1000000.0)
 

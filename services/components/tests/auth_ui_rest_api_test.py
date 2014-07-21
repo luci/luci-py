@@ -270,10 +270,12 @@ class RestAPITestCase(test_case.TestCase):
 
   def tearDown(self):
     # Ensure auth_db_rev was changed expected number of times.
-    self.assertEqual(
-        self._initial_auth_db_rev + self._auth_db_rev_inc,
-        get_auth_db_rev())
-    super(RestAPITestCase, self).tearDown()
+    try:
+      self.assertEqual(
+          self._initial_auth_db_rev + self._auth_db_rev_inc,
+          get_auth_db_rev())
+    finally:
+      super(RestAPITestCase, self).tearDown()
 
   def expect_auth_db_rev_change(self, rev_inc=1):
     """Instruct tearDown to verify that auth_db_rev has changed."""

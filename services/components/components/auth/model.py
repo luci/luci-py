@@ -49,6 +49,7 @@ from google.appengine.api import app_identity
 from google.appengine.ext import ndb
 
 from components import datastore_utils
+from components import utils
 
 # Part of public API of 'auth' component, exposed by this module.
 __all__ = [
@@ -340,8 +341,10 @@ class AuthReplicationState(ndb.Model, datastore_utils.SerializableModelMixin):
   # update this property by themselves. Replicas receive it from Primary.
   auth_db_rev = ndb.IntegerProperty(default=0, indexed=False)
 
-  # Last modification time. For informational purposes only.
-  modified_ts = ndb.DateTimeProperty(auto_now=True, indexed=False)
+  # Time when auth_db_rev was created (by Primary clock). For informational
+  # purposes only. See comment at AuthGroup.modified_ts for explanation why
+  # auto_now is not used.
+  modified_ts = ndb.DateTimeProperty(auto_now_add=True, indexed=False)
 
 
 def replicate_auth_db():
@@ -382,6 +385,7 @@ def replicate_auth_db():
     if not is_primary() and state.primary_id:
       raise ValueError('Can\'t modify Auth DB on Replica')
     state.auth_db_rev += 1
+    state.modified_ts = utils.utcnow()
     state.put()
     # Only Primary does active replication.
     if is_primary():
@@ -440,8 +444,13 @@ class AuthGroup(ndb.Model, datastore_utils.SerializableModelMixin):
   # Who created the group.
   created_by = IdentityProperty()
 
-  # When the group was modified last time.
-  modified_ts = ndb.DateTimeProperty(auto_now=True)
+  # When the group was modified last time. Do not use 'auto_now' property since
+  # such property overrides any explicitly set value with now() during put. It's
+  # undesired when storing a copy of entity received from Primary (Replica
+  # should  have modified_ts be same as on Primary). Still use auto_now_add to
+  # ensure this property is always non None (and to simplify tests that create
+  # a lot of one off entities).
+  modified_ts = ndb.DateTimeProperty(auto_now_add=True)
   # Who modified the group last time.
   modified_by = IdentityProperty()
 
@@ -610,7 +619,7 @@ class AuthSecret(ndb.Model):
   values = ndb.BlobProperty(repeated=True, indexed=False)
 
   # When secret was modified last time.
-  modified_ts = ndb.DateTimeProperty(auto_now=True)
+  modified_ts = ndb.DateTimeProperty(auto_now_add=True)
   # Who modified the secret last time.
   modified_by = IdentityProperty()
 

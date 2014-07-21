@@ -213,6 +213,7 @@ class GroupHandler(ApiHandler):
 
       # Update in place.
       entity.populate(**params)
+      entity.modified_ts = utils.utcnow()
       entity.modified_by = modified_by
 
       # Now make sure updated group is not a part of new group dependency cycle.

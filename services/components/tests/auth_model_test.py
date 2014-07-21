@@ -207,8 +207,7 @@ class GroupBootstrapTest(test_case.TestCase):
     ident = model.Identity(model.IDENTITY_USER, 'joe@example.com')
 
     mocked_now = datetime.datetime(2014, 01, 01)
-    self.mock(model.ndb.DateTimeProperty, '_now', lambda _: mocked_now)
-    self.mock(model.ndb.DateProperty, '_now', lambda _: mocked_now.date())
+    self.mock_now(mocked_now)
 
     added = model.bootstrap_group('some-group', ident, 'Blah description')
     self.assertTrue(added)
