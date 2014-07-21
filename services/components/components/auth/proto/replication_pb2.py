@@ -13,7 +13,7 @@ from google.protobuf import descriptor_pb2
 DESCRIPTOR = _descriptor.FileDescriptor(
   name='replication.proto',
   package='components.auth.proto.replication',
-  serialized_pb='\n\x11replication.proto\x12!components.auth.proto.replication\"b\n\x11ServiceLinkTicket\x12\x12\n\nprimary_id\x18\x01 \x02(\t\x12\x13\n\x0bprimary_url\x18\x02 \x02(\t\x12\x14\n\x0cgenerated_by\x18\x03 \x02(\t\x12\x0e\n\x06ticket\x18\x04 \x02(\x0c\"O\n\x12ServiceLinkRequest\x12\x0e\n\x06ticket\x18\x01 \x02(\x0c\x12\x13\n\x0breplica_url\x18\x02 \x02(\t\x12\x14\n\x0cinitiated_by\x18\x03 \x02(\t\"\xb0\x01\n\x13ServiceLinkResponse\x12M\n\x06status\x18\x01 \x02(\x0e\x32=.components.auth.proto.replication.ServiceLinkResponse.Status\"J\n\x06Status\x12\x0b\n\x07SUCCESS\x10\x00\x12\x13\n\x0fTRANSPORT_ERROR\x10\x01\x12\x0e\n\nBAD_TICKET\x10\x02\x12\x0e\n\nAUTH_ERROR\x10\x03')
+  serialized_pb='\n\x11replication.proto\x12!components.auth.proto.replication\"b\n\x11ServiceLinkTicket\x12\x12\n\nprimary_id\x18\x01 \x02(\t\x12\x13\n\x0bprimary_url\x18\x02 \x02(\t\x12\x14\n\x0cgenerated_by\x18\x03 \x02(\t\x12\x0e\n\x06ticket\x18\x04 \x02(\x0c\"O\n\x12ServiceLinkRequest\x12\x0e\n\x06ticket\x18\x01 \x02(\x0c\x12\x13\n\x0breplica_url\x18\x02 \x02(\t\x12\x14\n\x0cinitiated_by\x18\x03 \x02(\t\"\xb0\x01\n\x13ServiceLinkResponse\x12M\n\x06status\x18\x01 \x02(\x0e\x32=.components.auth.proto.replication.ServiceLinkResponse.Status\"J\n\x06Status\x12\x0b\n\x07SUCCESS\x10\x00\x12\x13\n\x0fTRANSPORT_ERROR\x10\x01\x12\x0e\n\nBAD_TICKET\x10\x02\x12\x0e\n\nAUTH_ERROR\x10\x03\"\xb0\x01\n\tAuthGroup\x12\x0c\n\x04name\x18\x01 \x02(\t\x12\x0f\n\x07members\x18\x02 \x03(\t\x12\r\n\x05globs\x18\x03 \x03(\t\x12\x0e\n\x06nested\x18\x04 \x03(\t\x12\x13\n\x0b\x64\x65scription\x18\x05 \x02(\t\x12\x12\n\ncreated_ts\x18\x06 \x02(\x03\x12\x12\n\ncreated_by\x18\x07 \x02(\t\x12\x13\n\x0bmodified_ts\x18\x08 \x02(\x03\x12\x13\n\x0bmodified_by\x18\t \x02(\t\"T\n\nAuthSecret\x12\x0c\n\x04name\x18\x01 \x02(\t\x12\x0e\n\x06values\x18\x02 \x03(\x0c\x12\x13\n\x0bmodified_ts\x18\x03 \x02(\x03\x12\x13\n\x0bmodified_by\x18\x04 \x02(\t\"\xe1\x01\n\x06\x41uthDB\x12\x17\n\x0foauth_client_id\x18\x01 \x02(\t\x12\x1b\n\x13oauth_client_secret\x18\x02 \x02(\t\x12#\n\x1boauth_additional_client_ids\x18\x03 \x03(\t\x12<\n\x06groups\x18\x04 \x03(\x0b\x32,.components.auth.proto.replication.AuthGroup\x12>\n\x07secrets\x18\x05 \x03(\x0b\x32-.components.auth.proto.replication.AuthSecret')
 
 
 
@@ -166,11 +166,205 @@ _SERVICELINKRESPONSE = _descriptor.Descriptor(
   serialized_end=414,
 )
 
+
+_AUTHGROUP = _descriptor.Descriptor(
+  name='AuthGroup',
+  full_name='components.auth.proto.replication.AuthGroup',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='name', full_name='components.auth.proto.replication.AuthGroup.name', index=0,
+      number=1, type=9, cpp_type=9, label=2,
+      has_default_value=False, default_value=unicode("", "utf-8"),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='members', full_name='components.auth.proto.replication.AuthGroup.members', index=1,
+      number=2, type=9, cpp_type=9, label=3,
+      has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='globs', full_name='components.auth.proto.replication.AuthGroup.globs', index=2,
+      number=3, type=9, cpp_type=9, label=3,
+      has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='nested', full_name='components.auth.proto.replication.AuthGroup.nested', index=3,
+      number=4, type=9, cpp_type=9, label=3,
+      has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='description', full_name='components.auth.proto.replication.AuthGroup.description', index=4,
+      number=5, type=9, cpp_type=9, label=2,
+      has_default_value=False, default_value=unicode("", "utf-8"),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='created_ts', full_name='components.auth.proto.replication.AuthGroup.created_ts', index=5,
+      number=6, type=3, cpp_type=2, label=2,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='created_by', full_name='components.auth.proto.replication.AuthGroup.created_by', index=6,
+      number=7, type=9, cpp_type=9, label=2,
+      has_default_value=False, default_value=unicode("", "utf-8"),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='modified_ts', full_name='components.auth.proto.replication.AuthGroup.modified_ts', index=7,
+      number=8, type=3, cpp_type=2, label=2,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='modified_by', full_name='components.auth.proto.replication.AuthGroup.modified_by', index=8,
+      number=9, type=9, cpp_type=9, label=2,
+      has_default_value=False, default_value=unicode("", "utf-8"),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  options=None,
+  is_extendable=False,
+  extension_ranges=[],
+  serialized_start=417,
+  serialized_end=593,
+)
+
+
+_AUTHSECRET = _descriptor.Descriptor(
+  name='AuthSecret',
+  full_name='components.auth.proto.replication.AuthSecret',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='name', full_name='components.auth.proto.replication.AuthSecret.name', index=0,
+      number=1, type=9, cpp_type=9, label=2,
+      has_default_value=False, default_value=unicode("", "utf-8"),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='values', full_name='components.auth.proto.replication.AuthSecret.values', index=1,
+      number=2, type=12, cpp_type=9, label=3,
+      has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='modified_ts', full_name='components.auth.proto.replication.AuthSecret.modified_ts', index=2,
+      number=3, type=3, cpp_type=2, label=2,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='modified_by', full_name='components.auth.proto.replication.AuthSecret.modified_by', index=3,
+      number=4, type=9, cpp_type=9, label=2,
+      has_default_value=False, default_value=unicode("", "utf-8"),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  options=None,
+  is_extendable=False,
+  extension_ranges=[],
+  serialized_start=595,
+  serialized_end=679,
+)
+
+
+_AUTHDB = _descriptor.Descriptor(
+  name='AuthDB',
+  full_name='components.auth.proto.replication.AuthDB',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='oauth_client_id', full_name='components.auth.proto.replication.AuthDB.oauth_client_id', index=0,
+      number=1, type=9, cpp_type=9, label=2,
+      has_default_value=False, default_value=unicode("", "utf-8"),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='oauth_client_secret', full_name='components.auth.proto.replication.AuthDB.oauth_client_secret', index=1,
+      number=2, type=9, cpp_type=9, label=2,
+      has_default_value=False, default_value=unicode("", "utf-8"),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='oauth_additional_client_ids', full_name='components.auth.proto.replication.AuthDB.oauth_additional_client_ids', index=2,
+      number=3, type=9, cpp_type=9, label=3,
+      has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='groups', full_name='components.auth.proto.replication.AuthDB.groups', index=3,
+      number=4, type=11, cpp_type=10, label=3,
+      has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='secrets', full_name='components.auth.proto.replication.AuthDB.secrets', index=4,
+      number=5, type=11, cpp_type=10, label=3,
+      has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  options=None,
+  is_extendable=False,
+  extension_ranges=[],
+  serialized_start=682,
+  serialized_end=907,
+)
+
 _SERVICELINKRESPONSE.fields_by_name['status'].enum_type = _SERVICELINKRESPONSE_STATUS
 _SERVICELINKRESPONSE_STATUS.containing_type = _SERVICELINKRESPONSE;
+_AUTHDB.fields_by_name['groups'].message_type = _AUTHGROUP
+_AUTHDB.fields_by_name['secrets'].message_type = _AUTHSECRET
 DESCRIPTOR.message_types_by_name['ServiceLinkTicket'] = _SERVICELINKTICKET
 DESCRIPTOR.message_types_by_name['ServiceLinkRequest'] = _SERVICELINKREQUEST
 DESCRIPTOR.message_types_by_name['ServiceLinkResponse'] = _SERVICELINKRESPONSE
+DESCRIPTOR.message_types_by_name['AuthGroup'] = _AUTHGROUP
+DESCRIPTOR.message_types_by_name['AuthSecret'] = _AUTHSECRET
+DESCRIPTOR.message_types_by_name['AuthDB'] = _AUTHDB
 
 class ServiceLinkTicket(_message.Message):
   __metaclass__ = _reflection.GeneratedProtocolMessageType
@@ -189,6 +383,24 @@ class ServiceLinkResponse(_message.Message):
   DESCRIPTOR = _SERVICELINKRESPONSE
 
   # @@protoc_insertion_point(class_scope:components.auth.proto.replication.ServiceLinkResponse)
+
+class AuthGroup(_message.Message):
+  __metaclass__ = _reflection.GeneratedProtocolMessageType
+  DESCRIPTOR = _AUTHGROUP
+
+  # @@protoc_insertion_point(class_scope:components.auth.proto.replication.AuthGroup)
+
+class AuthSecret(_message.Message):
+  __metaclass__ = _reflection.GeneratedProtocolMessageType
+  DESCRIPTOR = _AUTHSECRET
+
+  # @@protoc_insertion_point(class_scope:components.auth.proto.replication.AuthSecret)
+
+class AuthDB(_message.Message):
+  __metaclass__ = _reflection.GeneratedProtocolMessageType
+  DESCRIPTOR = _AUTHDB
+
+  # @@protoc_insertion_point(class_scope:components.auth.proto.replication.AuthDB)
 
 
 # @@protoc_insertion_point(module_scope)
