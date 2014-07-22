@@ -9,7 +9,6 @@
 import logging
 import os
 import stat
-import StringIO
 import sys
 import tempfile
 import time
@@ -44,162 +43,71 @@ class UrlHelperTest(auto_stub.TestCase):
     self._mox.UnsetStubs()
 
   def testXsrfRemoteGET(self):
-    def assert_url(url):
-      def has_url(req):
-        self.assertEqual(url, req.get_full_url())
-        return True
-      return mox.Func(has_url)
-
-    urllib2.urlopen(
-        assert_url('http://localhost/a?UrlOpenAttempt=0'),
-        timeout=300).AndReturn(StringIO.StringIO('foo'))
-    self._mox.ReplayAll()
+    def url_read(req):
+      self.assertEqual('http://localhost/a', req)
+      return 'foo'
+    self.mock(url_helper, 'UrlOpen', url_read)
 
     remote = url_helper.XsrfRemote('http://localhost/')
     self.assertEqual('foo', remote.url_read('/a'))
-    self._mox.VerifyAll()
 
   def testXsrfRemoteSimple(self):
-    def assert_url(url):
-      def has_url(req):
-        self.assertEqual(url, req.get_full_url())
-        return True
-      return mox.Func(has_url)
+    reqs = [
+      (
+        ('http://localhost/auth/api/v1/accounts/self/xsrf_token',),
+        {},
+        'token',
+      ),
+      (
+        ('http://localhost/a',),
+        {'data': {'foo': 'bar'}, 'headers': {'X-XSRF-Token': 'token'}},
+        'foo',
+      ),
+    ]
 
-    xsrf_url = (
-      'http://localhost/auth/api/v1/accounts/self/xsrf_token?UrlOpenAttempt=0')
-    urllib2.urlopen(
-        assert_url(xsrf_url), timeout=300).AndReturn(StringIO.StringIO('token'))
-    urllib2.urlopen(
-        assert_url('http://localhost/a'),
-        timeout=300).AndReturn(StringIO.StringIO('foo'))
-    self._mox.ReplayAll()
+    def url_read(*args, **kwargs):
+      expected_args, expected_kwargs, result = reqs.pop(0)
+      self.assertEqual(expected_args, args)
+      self.assertEqual(expected_kwargs, kwargs)
+      return result
+    self.mock(url_helper, 'UrlOpen', url_read)
 
     remote = url_helper.XsrfRemote('http://localhost/')
     self.assertEqual('foo', remote.url_read('/a', data={'foo': 'bar'}))
-    self._mox.VerifyAll()
 
   def testXsrfRemoteRefresh(self):
-    self._mox.StubOutWithMock(url_helper, 'UrlOpen')
+    reqs = [
+      (
+        ('http://localhost/auth/api/v1/accounts/self/xsrf_token',),
+        {},
+        'token',
+      ),
+      (
+        ('http://localhost/a',),
+        {'data': {'foo': 'bar'}, 'headers': {'X-XSRF-Token': 'token'}},
+        None,
+      ),
+      (
+        ('http://localhost/auth/api/v1/accounts/self/xsrf_token',),
+        {},
+        'token2',
+      ),
+      (
+        ('http://localhost/a',),
+        {'data': {'foo': 'bar'}, 'headers': {'X-XSRF-Token': 'token2'}},
+        'foo',
+      ),
+    ]
 
-    url_helper.UrlOpen(
-        'http://localhost/auth/api/v1/accounts/self/xsrf_token'
-        ).AndReturn('token')
-    url_helper.UrlOpen(
-        'http://localhost/a', data={'foo': 'bar'},
-        headers={'X-XSRF-Token': 'token'}
-        ).AndReturn(None)
-    url_helper.UrlOpen(
-        'http://localhost/auth/api/v1/accounts/self/xsrf_token',
-        ).AndReturn('token2')
-    url_helper.UrlOpen(
-        'http://localhost/a', data={'foo': 'bar'},
-        headers={'X-XSRF-Token': 'token2'}
-        ).AndReturn('foo')
-    self._mox.ReplayAll()
+    def url_read(*args, **kwargs):
+      expected_args, expected_kwargs, result = reqs.pop(0)
+      self.assertEqual(expected_args, args)
+      self.assertEqual(expected_kwargs, kwargs)
+      return result
+    self.mock(url_helper, 'UrlOpen', url_read)
 
     remote = url_helper.XsrfRemote('http://localhost/')
     remote.url_read('/a', data={'foo': 'bar'})
-    #self.assertEqual('foo', remote.url_read('/a', data={'foo': 'bar'}))
-    self._mox.VerifyAll()
-
-  def testUrlOpenGETSuccess(self):
-    url = 'http://my.url.com'
-
-    response = 'True'
-    urllib2.urlopen(mox.IgnoreArg(), timeout=mox.IgnoreArg()).AndReturn(
-        StringIO.StringIO(response))
-
-    self._mox.ReplayAll()
-
-    self.assertEqual(url_helper.UrlOpen(url), response)
-
-    self._mox.VerifyAll()
-
-  def testUrlOpenPOSTSuccess(self):
-    url = 'http://my.url.com'
-
-    response = 'True'
-    urllib2.urlopen(mox.IgnoreArg(), timeout=mox.IgnoreArg()).AndReturn(
-        StringIO.StringIO(response))
-
-    self._mox.ReplayAll()
-
-    self.assertEqual(url_helper.UrlOpen(url, data=''), response)
-
-    self._mox.VerifyAll()
-
-  def testUrlOpenSuccessAfterFailure(self):
-    urllib2.urlopen(mox.IgnoreArg(), timeout=mox.IgnoreArg()).AndRaise(
-        urllib2.URLError('url'))
-    response = 'True'
-    urllib2.urlopen(mox.IgnoreArg(), timeout=mox.IgnoreArg()).AndReturn(
-        StringIO.StringIO(response))
-
-    self._mox.ReplayAll()
-
-    self.assertEqual(url_helper.UrlOpen('url'), response)
-
-    self._mox.VerifyAll()
-
-  def testUrlOpenFailure(self):
-    for _ in range(15):
-      urllib2.urlopen(mox.IgnoreArg(), timeout=mox.IgnoreArg()).AndRaise(
-          urllib2.URLError('url'))
-    self._mox.ReplayAll()
-
-    self.assertIsNone(url_helper.UrlOpen('url'))
-
-    self._mox.VerifyAll()
-
-  def testUrlOpenHTTPErrorNoRetry(self):
-    urllib2.urlopen(mox.IgnoreArg(), timeout=mox.IgnoreArg()).AndRaise(
-        urllib2.HTTPError('url', 400, 'error message', None, None))
-    self._mox.ReplayAll()
-
-    self.assertIsNone(url_helper.UrlOpen('url'))
-
-    self._mox.VerifyAll()
-
-  def testUrlOpenHTTPErrorWithRetry(self):
-    response = 'response'
-
-    # Urlopen failure attempt.
-    urllib2.urlopen(mox.IgnoreArg(), timeout=mox.IgnoreArg()).AndRaise(
-        urllib2.HTTPError('url', 500, 'error message', None, None))
-
-    # Urlopen success attempt.
-    urllib2.urlopen(mox.IgnoreArg(), timeout=mox.IgnoreArg()).AndReturn(
-        StringIO.StringIO(response))
-
-    self._mox.ReplayAll()
-
-    # Since the HTTPError was a server error, we should retry and get the
-    # desired response after the error.
-    self.assertEqual(response, url_helper.UrlOpen('url'))
-
-    self._mox.VerifyAll()
-
-  def testCountKeyInData(self):
-    data = {url_helper.COUNT_KEY: 1}
-    self._mox.ReplayAll()
-
-    self.assertEqual(url_helper.UrlOpen('url', data=data), None)
-    self._mox.VerifyAll()
-
-  def testNonAcsiiData(self):
-    data = {'r': u'not ascii \xa3 \u04bb'}
-    url = 'http://my.url.com'
-
-    response = 'True'
-    urllib2.urlopen(mox.IgnoreArg(), timeout=mox.IgnoreArg()).AndReturn(
-        StringIO.StringIO(response))
-
-    self._mox.ReplayAll()
-
-    self.assertEqual(url_helper.UrlOpen(url, data=data), response)
-
-    self._mox.VerifyAll()
 
   def testDownloadFile(self):
     local_file = tempfile.NamedTemporaryFile(delete=False)
@@ -256,7 +164,4 @@ class UrlHelperTest(auto_stub.TestCase):
 
 
 if __name__ == '__main__':
-  # We don't want the application logs to interfere with our own messages.
-  # You can comment it out for more information when debugging.
-  logging.disable(logging.FATAL)
   unittest.main()

@@ -21,8 +21,8 @@ import zipfile
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
-# List of files needed by the swarm bot. In practice, all files in common/ and
-# swarm_bot/ that are not unit tests are archived.
+# List of files needed by the swarming bot.
+# TODO(maruel): Make the list automatically generated?
 FILES = (
     '__main__.py',
     'common/__init__.py',
@@ -32,7 +32,67 @@ FILES = (
     'logging_utils.py',
     'os_utilities.py',
     'slave_machine.py',
+    'third_party/__init__.py',
+    'third_party/httplib2/__init__.py',
+    'third_party/httplib2/cacerts.txt',
+    'third_party/httplib2/iri2uri.py',
+    'third_party/httplib2/socks.py',
+    'third_party/oauth2client/__init__.py',
+    'third_party/oauth2client/anyjson.py',
+    'third_party/oauth2client/client.py',
+    'third_party/oauth2client/clientsecrets.py',
+    'third_party/oauth2client/crypt.py',
+    'third_party/oauth2client/file.py',
+    'third_party/oauth2client/gce.py',
+    'third_party/oauth2client/keyring_storage.py',
+    'third_party/oauth2client/locked_file.py',
+    'third_party/oauth2client/multistore_file.py',
+    'third_party/oauth2client/old_run.py',
+    'third_party/oauth2client/tools.py',
+    'third_party/oauth2client/util.py',
+    'third_party/oauth2client/xsrfutil.py',
+    'third_party/requests/__init__.py',
+    'third_party/requests/adapters.py',
+    'third_party/requests/api.py',
+    'third_party/requests/auth.py',
+    'third_party/requests/cacert.pem',
+    'third_party/requests/certs.py',
+    'third_party/requests/compat.py',
+    'third_party/requests/cookies.py',
+    'third_party/requests/exceptions.py',
+    'third_party/requests/hooks.py',
+    'third_party/requests/models.py',
+    'third_party/requests/packages/__init__.py',
+    'third_party/requests/packages/urllib3/__init__.py',
+    'third_party/requests/packages/urllib3/_collections.py',
+    'third_party/requests/packages/urllib3/connectionpool.py',
+    'third_party/requests/packages/urllib3/contrib/__init__.py',
+    'third_party/requests/packages/urllib3/contrib/ntlmpool.py',
+    'third_party/requests/packages/urllib3/contrib/pyopenssl.py',
+    'third_party/requests/packages/urllib3/exceptions.py',
+    'third_party/requests/packages/urllib3/fields.py',
+    'third_party/requests/packages/urllib3/filepost.py',
+    'third_party/requests/packages/urllib3/packages/__init__.py',
+    'third_party/requests/packages/urllib3/packages/ordered_dict.py',
+    'third_party/requests/packages/urllib3/packages/six.py',
+    'third_party/requests/packages/urllib3/packages/ssl_match_hostname/'
+        '__init__.py',
+    'third_party/requests/packages/urllib3/poolmanager.py',
+    'third_party/requests/packages/urllib3/request.py',
+    'third_party/requests/packages/urllib3/response.py',
+    'third_party/requests/packages/urllib3/util.py',
+    'third_party/requests/sessions.py',
+    'third_party/requests/status_codes.py',
+    'third_party/requests/structures.py',
+    'third_party/requests/utils.py',
+    'third_party/rietveld/__init__.py',
+    'third_party/rietveld/upload.py',
     'url_helper.py',
+    'utils/__init__.py',
+    'utils/net.py',
+    'utils/oauth.py',
+    'utils/tools.py',
+    'utils/zip_package.py',
     'zipped_archive.py',
 )
 
@@ -65,7 +125,8 @@ def get_swarming_bot_zip(root_dir, host, additionals):
     A string representing the zipped file's contents.
   """
   zip_memory_file = StringIO.StringIO()
-  with zipfile.ZipFile(zip_memory_file, 'w') as zip_file:
+  # TODO(maruel): Use client/utils/zipped_archive.py.
+  with zipfile.ZipFile(zip_memory_file, 'w', zipfile.ZIP_DEFLATED) as zip_file:
     for item, content in yield_swarming_bot_files(root_dir, host, additionals):
       zip_file.writestr(item, content)
 

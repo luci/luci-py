@@ -4,18 +4,16 @@
 
 """A helper script for wrapping url calls."""
 
-import httplib
 import json
 import logging
-import math
 import os
-import random
-import socket
-import time
-import urllib
-import urllib2
-import urlparse
+import sys
 
+THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+
+sys.path.insert(0, os.path.join(THIS_DIR, 'third_party'))
+
+from utils import net
 
 # The index of the query elements from urlparse.
 QUERY_INDEX = 4
@@ -25,6 +23,11 @@ URL_OPEN_TIMEOUT = 5 * 60
 
 # Query parameter key used when doing requests by the bot.
 COUNT_KEY = 'UrlOpenAttempt'
+
+
+# TODO(maruel): Remove it once switch over is complete. Note that it's actually
+# reading, not opening.
+UrlOpen = net.url_read
 
 
 class Error(Exception):
@@ -73,80 +76,6 @@ class XsrfRemote(object):
       raise Error('Failed to connect to %s' % url)
     return self.token
 
-
-def UrlOpen(url, data=None, headers=None):
-  """Attempts to open the given url multiple times.
-
-  UrlOpen will attempt to open the the given url several times, stopping
-  if it succeeds at reaching the url. It also includes an additional data pair
-  in the data that is sent to indicate how many times it has attempted to
-  connect so far.
-
-  Args:
-    url: The url to open.
-    data: The unencoded data to send to the url. This must be a mapping object.
-    headers: List of HTTP headers to add.
-
-  Returns:
-    The reponse from the url contacted. If it failed to connect or is given
-    invalid arguments, then it returns None.
-  """
-  method = 'POST' if data is not None else 'GET'
-  data = data or {}
-
-  if COUNT_KEY in data:
-    logging.error(
-        'UrlOpen(%s): key \'%s\' is duplicate.', url, COUNT_KEY)
-    return None
-
-  url_response = None
-  max_tries = 15
-  for attempt in range(max_tries):
-    data[COUNT_KEY] = attempt
-    try:
-      # urlencode requires that all strings be in ASCII form.
-      for key, value in data.iteritems():
-        if isinstance(value, basestring):
-          data[key] = value.encode('utf-8', 'xmlcharrefreplace')
-
-      encoded_data = urllib.urlencode(data)
-
-      if method == 'POST':
-        # Simply specifying data to urlopen makes it a POST.
-        request = urllib2.Request(url, encoded_data)
-      elif method == 'GET':
-        url_parts = list(urlparse.urlparse(url))
-        url_parts[QUERY_INDEX] = encoded_data
-        request = urllib2.Request(urlparse.urlunparse(url_parts))
-      else:
-        raise AssertionError('Unknown method: %s' % method)
-
-      for header, value in (headers or {}).iteritems():
-        request.add_header(header, value)
-      url_response = urllib2.urlopen(request, timeout=URL_OPEN_TIMEOUT).read()
-    except urllib2.HTTPError as e:
-      if e.code >= 500:
-        # The HTTPError was due to a server error, so retry the attempt.
-        logging.warning('UrlOpen(%s): attempt %d: %s ', url, attempt, e)
-      else:
-        # This HTTPError means we reached the server and there was a problem
-        # with the request, so don't retry.
-        logging.exception('UrlOpen(%s): %s', url, e)
-        return None
-    except (httplib.HTTPException, socket.error, urllib2.URLError) as e:
-      logging.warning('UrlOpen(%s): attempt %d: %s', url, attempt, e)
-
-    if url_response is not None:
-      logging.info('UrlOpen(%s) got %d bytes.', url, len(url_response))
-      return url_response
-    elif attempt != max_tries - 1:
-      # Only sleep if we are going to try and connect again.
-      duration = random.random() * 3 + math.pow(1.5, (attempt + 1))
-      duration = min(10, max(0.1, duration))
-      time.sleep(duration)
-
-  logging.error('UrlOpen(%s): Unable to open after %d attempts', url, max_tries)
-  return None
 
 
 def DownloadFile(local_file, url):

@@ -51,9 +51,7 @@ class BotManagementTest(test_case.TestCase):
       for i in bot_archive.FILES:
         with zip_file.open(i) as f:
           content = f.read()
-          if os.path.basename(i) == '__init__.py':
-            self.assertEqual('', content)
-          else:
+          if os.path.basename(i) != '__init__.py':
             self.assertTrue(content, i)
 
     temp_dir = tempfile.mkdtemp(prefix='swarming')
