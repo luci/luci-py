@@ -24,7 +24,6 @@ from google.appengine.ext import ndb
 import webtest
 
 import handlers_frontend
-from common import swarm_constants
 from components import auth
 from components import ereporter2
 from components import stats_framework
@@ -460,12 +459,10 @@ class AppTest(test_case.TestCase):
   def _PostResults(self, run_result, result, expect_errors=False):
     url_parameters = {
       'id': run_result.bot_id,
+      'o': result,
       'r': task_common.pack_run_result_key(run_result.key),
     }
-    files = [(swarm_constants.RESULT_STRING_KEY,
-              swarm_constants.RESULT_STRING_KEY,
-              result)]
-    return self.app.post('/result', url_parameters, upload_files=files,
+    return self.app.post('/result2', url_parameters,
                          expect_errors=expect_errors)
 
   def testResultHandler(self):
@@ -568,7 +565,7 @@ class AppTest(test_case.TestCase):
         ('/get_slave_code', self.app.get),
         ('/poll_for_test', self.app.post),
         ('/remote_error', self.app.post),
-        ('/result', self.app.post),
+        ('/result2', self.app.post),
         ('/test', self.app.post),
     ]
 
@@ -601,7 +598,7 @@ class AppTest(test_case.TestCase):
         ('/get_slave_code', self.app.get),
         ('/poll_for_test', self.app.post),
         ('/remote_error', self.app.post),
-        ('/result', self.app.post),
+        ('/result2', self.app.post),
     ]
 
     # Reset state to non-whitelisted, anonymous machine.

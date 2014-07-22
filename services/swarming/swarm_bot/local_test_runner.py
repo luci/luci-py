@@ -25,7 +25,6 @@ import zipfile
 import logging_utils
 import url_helper
 import zipped_archive
-from common import swarm_constants
 from common import test_request_message
 
 
@@ -349,18 +348,14 @@ class LocalTestRunner(object):
     """
     logging.debug('Publishing Results')
     data = {
-      # TODO(maruel): Keep as int.
+      'o': result_string,
       'x': ', '.join(str(i) for i in result_codes),
     }
-    # Pass the output as a file to ensure the server handler doesn't
-    # incorrectly convert the output to unicode.
-    key = swarm_constants.RESULT_STRING_KEY
     url_results = url_helper.UrlOpen(
         self.test_run.result_url,
         data=data,
-        files=[(key, key, result_string)],
         max_tries=15,
-        method='POSTFORM')
+        method='POST')
     if url_results is None:
       logging.error('Failed to publish results to given url, %s',
                     self.test_run.result_url)

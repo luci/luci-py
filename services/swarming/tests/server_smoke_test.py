@@ -151,9 +151,10 @@ class SwarmingTestCase(unittest.TestCase):
     # tree + a new line. This invalidates the bot's code.
     with open(os.path.join(BOT_DIR, 'start_slave.py'), 'rb') as f:
       start_slave_content = f.read() + '\n'
-    url_helper.UrlOpen(
-        urlparse.urljoin(self.server_url, '/restricted/upload_start_slave'),
-        files=[('script', 'script', start_slave_content)], method='POSTFORM')
+    res = url_helper.UrlOpen(
+        urlparse.urljoin(self.server_url, 'restricted/upload_start_slave'),
+        data={'script': start_slave_content}, method='POST')
+    self.assertTrue(res)
 
     # Start the slave machine script to start polling for tests.
     cmd = [
@@ -236,7 +237,7 @@ class SwarmingTestCase(unittest.TestCase):
       self.trigger_swarm_file(swarm_file, running_tests, tests_to_cancel)
 
     # Cancel all the tests that are suppose to be cancelled.
-    url = urlparse.urljoin(self.server_url, '/restricted/cancel')
+    url = urlparse.urljoin(self.server_url, 'restricted/cancel')
     for test in tests_to_cancel:
       data = urllib.urlencode({'r': test['test_key']})
       resp = urllib2.urlopen(url, data=data).read()
@@ -252,7 +253,7 @@ class SwarmingTestCase(unittest.TestCase):
     while running_tests and time.time() < deadline and self.is_bot_alive:
       for running_test_key in running_tests[:]:
         url = urlparse.urljoin(
-            self.server_url, '/get_result?r=' + running_test_key['test_key'])
+            self.server_url, 'get_result?r=' + running_test_key['test_key'])
         response = urllib2.urlopen(url).read()
         try:
           results = json.loads(response)
@@ -279,7 +280,7 @@ class SwarmingTestCase(unittest.TestCase):
         # If we haven't retried a runner yet, do that with this runner.
         if not triggered_retry:
           logging.info('Retrying test %s', running_test_key['test_key'])
-          url = urlparse.urljoin(self.server_url, '/restricted/retry')
+          url = urlparse.urljoin(self.server_url, 'restricted/retry')
           data = urllib.urlencode({'r': running_test_key['test_key']})
           urllib2.urlopen(url, data=data)
           triggered_retry = True

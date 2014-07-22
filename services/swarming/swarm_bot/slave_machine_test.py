@@ -18,7 +18,6 @@ import url_helper
 import zipped_archive
 
 from common import rpc
-from common import swarm_constants
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(BASE_DIR)
@@ -62,14 +61,14 @@ def _SetPollJobAndPostFailExpectations(response, result_url, result_string,
   """
   # Original register machine request.
   UrlOpenExpectations(response, mox.IgnoreArg(), mox.IgnoreArg())
-  data = {'x': str(result_code), 's': False}
-  files = [(swarm_constants.RESULT_STRING_KEY,
-            swarm_constants.RESULT_STRING_KEY,
-            result_string)]
-
-  url_helper.UrlOpen(result_url, data=data, files=files,
-                     max_tries=mox.IgnoreArg(), method='POSTFORM').AndReturn(
-                         None if bad_url else 'Success')
+  data = {
+    'o': result_string,
+    's': False,
+    'x': str(result_code),
+  }
+  url_helper.UrlOpen(
+      result_url, data=data, max_tries=mox.IgnoreArg(),
+      method='POST').AndReturn(None if bad_url else 'Success')
 
 
 def UrlOpenExpectations(response, url, data):
@@ -543,9 +542,7 @@ class TestSlaveMachine(auto_stub.TestCase):
       'local_test_runner',
       '-f', 'work/test_run.json',
     ]
-    self._MockSubprocessCheckCall(
-        expected,
-        exit_code=swarm_constants.RESTART_EXIT_CODE)
+    self._MockSubprocessCheckCall(expected, exit_code='99')
 
     # Mock out the the restart attempt to raise an exception, otherwise it would
     # start an infinite loop.

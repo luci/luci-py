@@ -17,7 +17,6 @@ import zipfile
 import local_test_runner
 import logging_utils
 
-from common import swarm_constants
 from common import test_request_message
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -43,7 +42,7 @@ class TestLocalTestRunner(auto_stub.TestCase):
 
   def setUp(self):
     super(TestLocalTestRunner, self).setUp()
-    self.result_url = 'http://::2:2/result'
+    self.result_url = 'http://::2:2/result2'
     self.ping_url = 'http://::2:2/ping'
     self.ping_delay = 10
     self.test_run_name = 'TestRunName'
@@ -421,23 +420,19 @@ class TestLocalTestRunner(auto_stub.TestCase):
     local_test_runner.url_helper.UrlOpen(
         self.result_url,
         data={
+          'o': self.result_string,
           'x': ', '.join(str(i) for i in self.result_codes),
         },
-        files=[(swarm_constants.RESULT_STRING_KEY,
-                swarm_constants.RESULT_STRING_KEY,
-                self.result_string)],
         max_tries=15,
-        method='POSTFORM').AndReturn('')
+        method='POST').AndReturn('')
     local_test_runner.url_helper.UrlOpen(
         '%s?1=2' % self.result_url,
         data={
+          'o': self.result_string,
           'x': ', '.join(str(i) for i in self.result_codes),
         },
-        files=[(swarm_constants.RESULT_STRING_KEY,
-                swarm_constants.RESULT_STRING_KEY,
-                self.result_string)],
         max_tries=15,
-        method='POSTFORM'
+        method='POST'
         ).AndReturn('')
     self._mox.ReplayAll()
 
@@ -459,13 +454,11 @@ class TestLocalTestRunner(auto_stub.TestCase):
     local_test_runner.url_helper.UrlOpen(
         self.result_url,
         data={
+          'o': self.result_string,
           'x': ', '.join(str(i) for i in self.result_codes),
         },
-        files=[(swarm_constants.RESULT_STRING_KEY,
-                swarm_constants.RESULT_STRING_KEY,
-                self.result_string)],
         max_tries=15,
-        method='POSTFORM').AndReturn(None)
+        method='POST').AndReturn(None)
     self._mox.ReplayAll()
 
     runner = local_test_runner.LocalTestRunner(self.data_file_name)
@@ -476,18 +469,16 @@ class TestLocalTestRunner(auto_stub.TestCase):
 
   def testPublishResultsHTTPS(self):
     self.CreateValidFile()
-    self.result_url = 'https://localhost/result'
+    self.result_url = 'https://localhost/result2'
 
     local_test_runner.url_helper.UrlOpen(
         self.result_url,
         data={
+          'o': self.result_string,
           'x': ', '.join(str(i) for i in self.result_codes),
         },
-        files=[(swarm_constants.RESULT_STRING_KEY,
-                swarm_constants.RESULT_STRING_KEY,
-                self.result_string)],
         max_tries=15,
-        method='POSTFORM').AndReturn('')
+        method='POST').AndReturn('')
     self._mox.ReplayAll()
 
     self.CreateValidFile()
@@ -505,24 +496,18 @@ class TestLocalTestRunner(auto_stub.TestCase):
     self.CreateValidFile()
     exception_text = 'Bad MAD, no cookie!'
 
-    # We use this function to check if exception_text is properly published
-    # and that the overwrite value is True.
-    def ValidateInternalErrorsResult(url_files):
-      if len(url_files) != 1:
-        return False
-
-      if (url_files[0][0] != swarm_constants.RESULT_STRING_KEY or
-          url_files[0][1] != swarm_constants.RESULT_STRING_KEY):
-        return False
-
-      return exception_text in url_files[0][2]
+    def Validate(data):
+      data = data.copy()
+      out = data.pop('o')
+      self.assertEqual({'x': ''}, data)
+      self.assertIn(exception_text, out)
+      return True
 
     local_test_runner.url_helper.UrlOpen(
         unicode(self.result_url),
-        data={'x': ''},
-        files=mox.Func(ValidateInternalErrorsResult),
+        data=mox.Func(Validate),
         max_tries=15,
-        method='POSTFORM').AndReturn('')
+        method='POST').AndReturn('')
     self._mox.ReplayAll()
 
     with logging_utils.CaptureLogs('local_test_runner_test.log') as log:

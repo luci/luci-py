@@ -25,7 +25,6 @@ from google.appengine.ext import ndb
 import handlers_backend
 import template
 from common import rpc
-from common import swarm_constants
 from common import test_request_message
 from components import auth
 from components import decorators
@@ -142,7 +141,7 @@ def request_work_item(attributes, server_url, remote_addr):
         io_time_out=request.properties.io_timeout_secs)
     for i, command in enumerate(request.properties.commands)
   ]
-  result_url = '%s/result?r=%s&id=%s' % (server_url, packed, bot_id)
+  result_url = '%s/result2?r=%s&id=%s' % (server_url, packed, bot_id)
   ping_url = '%s/runner_ping?r=%s&id=%s' % (server_url, packed, bot_id)
   # Ask the slave to ping every 55 seconds. The main reason is to make sure that
   # the majority of the time, the stats of active shards has a ping in every
@@ -198,7 +197,7 @@ class UploadStartSlaveHandler(auth.AuthenticatingHandler):
     if not script:
       self.abort(400, 'No script uploaded')
 
-    bot_management.store_start_slave(script)
+    bot_management.store_start_slave(script.encode('utf-8', 'replace'))
     self.get()
 
 
@@ -949,13 +948,6 @@ class ResultHandler(auth.AuthenticatingHandler):
 
   @auth.require(acl.is_bot)
   def post(self):
-    # TODO(user): Share this code between all the request handlers so we
-    # can always see how often a request is being sent.
-    connection_attempt = self.request.get(swarm_constants.COUNT_KEY)
-    if connection_attempt:
-      logging.info('This is the %s connection attempt from this machine to '
-                   'POST these results', connection_attempt)
-
     packed = self.request.get('r', '')
     run_result_key = task_scheduler.unpack_run_result_key(packed)
     bot_id = urllib.unquote_plus(self.request.get('id'))
@@ -975,8 +967,7 @@ class ResultHandler(auth.AuthenticatingHandler):
 
     # TODO(maruel): Get rid of this: the result string should probably be in the
     # body of the request.
-    result_string = urllib.unquote_plus(self.request.get(
-        swarm_constants.RESULT_STRING_KEY))
+    result_string = urllib.unquote_plus(self.request.get('result_output'))
     if isinstance(result_string, unicode):
       # Zap out any binary content on stdout.
       result_string = result_string.encode('utf-8', 'replace')
@@ -985,6 +976,34 @@ class ResultHandler(auth.AuthenticatingHandler):
         run_result.key, bot_id, map(int, exit_codes), result_string)
 
     # TODO(maruel): Return JSON.
+    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
+    self.response.out.write('Successfully update the runner results.')
+
+
+class Result2Handler(auth.AuthenticatingHandler):
+  """Handles test results from remote test runners."""
+
+  xsrf_token_enforce_on = ()
+
+  @auth.require(acl.is_bot)
+  def post(self):
+    packed = self.request.get('r', '')
+    run_result_key = task_scheduler.unpack_run_result_key(packed)
+    bot_id = urllib.unquote_plus(self.request.get('id'))
+    run_result = run_result_key.get()
+    if bot_id != run_result.bot_id:
+      # Check that machine that posts the result is same as machine that claimed
+      # the task.
+      msg = 'Expected bot id %s, got %s' % (run_result.bot_id, bot_id)
+      logging.error(msg)
+      self.abort(404, msg)
+
+    exit_codes = urllib.unquote_plus(self.request.get('x'))
+    exit_codes = filter(None, (i.strip() for i in exit_codes.split(',')))
+
+    result_string = self.request.get('o').encode('utf-8', 'replace')
+    task_scheduler.bot_update_task(
+        run_result.key, bot_id, map(int, exit_codes), result_string)
     self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
     self.response.out.write('Successfully update the runner results.')
 
@@ -1082,6 +1101,7 @@ def create_application(debug):
       ('/poll_for_test', RegisterHandler),
       ('/remote_error', RemoteErrorHandler),
       ('/result', ResultHandler),
+      ('/result2', Result2Handler),
       ('/runner_ping', RunnerPingHandler),
       ('/server_ping', ServerPingHandler),
 

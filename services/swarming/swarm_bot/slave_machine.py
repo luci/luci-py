@@ -26,7 +26,6 @@ import os_utilities
 import url_helper
 import zipped_archive
 from common import rpc
-from common import swarm_constants
 
 
 # Path to this file or the zip containing this file.
@@ -347,13 +346,13 @@ class SlaveMachine(object):
       logging.error('No URL to send results to!')
       return
 
-    data = {'x': str(result_code), 's': False}
-    files = [(swarm_constants.RESULT_STRING_KEY,
-              swarm_constants.RESULT_STRING_KEY,
-              result_string)]
-    url_helper.UrlOpen(self._result_url, data=data, files=files,
-                       max_tries=self._max_url_tries,
-                       method='POSTFORM')
+    data = {
+      'o': result_string,
+      's': False,
+      'x': str(result_code),
+    }
+    url_helper.UrlOpen(self._result_url, data=data,
+                       max_tries=self._max_url_tries, method='POST')
 
   @staticmethod
   def rpc_RunManifest(args):

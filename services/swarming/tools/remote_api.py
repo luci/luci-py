@@ -25,7 +25,6 @@ def setup_context():
   # pylint: disable=W0612
   import handlers_backend
   import handlers_frontend
-  from common import swarm_constants
   from components import auth
   from server import stats
   from server import task_request
