@@ -153,7 +153,7 @@ class SwarmingTestCase(unittest.TestCase):
       start_slave_content = f.read() + '\n'
     res = url_helper.UrlOpen(
         urlparse.urljoin(self.server_url, 'restricted/upload_start_slave'),
-        data={'script': start_slave_content}, method='POST')
+        data={'script': start_slave_content})
     self.assertTrue(res)
 
     # Start the slave machine script to start polling for tests.

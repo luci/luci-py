@@ -354,8 +354,7 @@ class LocalTestRunner(object):
     url_results = url_helper.UrlOpen(
         self.test_run.result_url,
         data=data,
-        max_tries=15,
-        method='POST')
+        max_tries=15)
     if url_results is None:
       logging.error('Failed to publish results to given url, %s',
                     self.test_run.result_url)

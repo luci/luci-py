@@ -5,6 +5,7 @@
 """A helper script for wrapping url calls."""
 
 import httplib
+import json
 import logging
 import math
 import os
@@ -26,6 +27,10 @@ URL_OPEN_TIMEOUT = 5 * 60
 COUNT_KEY = 'UrlOpenAttempt'
 
 
+class Error(Exception):
+  pass
+
+
 class XsrfRemote(object):
   """Transparently adds XSRF token to requests."""
 
@@ -36,7 +41,8 @@ class XsrfRemote(object):
 
   def url_read(self, resource, **kwargs):
     url = self.url + resource
-    if kwargs.get('method') == 'GET':
+    if kwargs.get('data') == None:
+      # No XSRF token for GET.
       return UrlOpen(url, max_tries=self.max_tries, **kwargs)
 
     if not self.token:
@@ -48,18 +54,28 @@ class XsrfRemote(object):
       # TODO(maruel): It'd be great if it were transparent.
       headers = {'X-XSRF-Token': self.refresh_token()}
       resp = UrlOpen(url, headers=headers, max_tries=self.max_tries, **kwargs)
+    if not resp:
+      raise Error('Failed to connect to %s' % url)
     return resp
+
+  def url_read_json(self, resource, **kwargs):
+    if kwargs.get('data') is not None:
+      kwargs['data'] = json.dumps(
+          kwargs['data'], sort_keys=True, separators=(',', ':'))
+      kwargs['content_type'] = 'application/json'
+    return self.url_read(resource, **kwargs)
 
   def refresh_token(self):
     """Returns a fresh token. Necessary as the token may expire after an hour.
     """
     url = self.url + '/auth/api/v1/accounts/self/xsrf_token'
-    self.token = UrlOpen(url, max_tries=self.max_tries, method='GET')
+    self.token = UrlOpen(url, max_tries=self.max_tries)
+    if not self.token:
+      raise Error('Failed to connect to %s' % url)
     return self.token
 
 
-def UrlOpen(url, data=None, max_tries=5, wait_duration=None,
-            method='POST', headers=None):
+def UrlOpen(url, data=None, max_tries=5, wait_duration=None, headers=None):
   """Attempts to open the given url multiple times.
 
   UrlOpen will attempt to open the the given url several times, stopping
@@ -76,7 +92,6 @@ def UrlOpen(url, data=None, max_tries=5, wait_duration=None,
         This must be greater than or equal to 0. If no value is given then a
         random value between 0.1 and 10 will be chosen each time (with
         exponential back off to give later retries a longer wait).
-    method: Indicates if the request should be a GET or POST request.
     headers: List of HTTP headers to add.
 
   Returns:
@@ -91,6 +106,7 @@ def UrlOpen(url, data=None, max_tries=5, wait_duration=None,
     logging.error('UrlOpen(%s): Invalid wait duration: %d', url, wait_duration)
     return None
 
+  method = 'POST' if data is not None else 'GET'
   data = data or {}
 
   if COUNT_KEY in data:
@@ -115,8 +131,7 @@ def UrlOpen(url, data=None, max_tries=5, wait_duration=None,
       elif method == 'GET':
         url_parts = list(urlparse.urlparse(url))
         url_parts[QUERY_INDEX] = encoded_data
-        url = urlparse.urlunparse(url_parts)
-        request = urllib2.Request(url)
+        request = urllib2.Request(urlparse.urlunparse(url_parts))
       else:
         raise AssertionError('Unknown method: %s' % method)
 
@@ -164,7 +179,7 @@ def DownloadFile(local_file, url):
   """
   local_file = os.path.abspath(local_file)
 
-  url_data = UrlOpen(url, method='GET')
+  url_data = UrlOpen(url)
 
   if url_data is None:
     return False

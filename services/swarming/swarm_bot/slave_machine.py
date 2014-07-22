@@ -193,7 +193,7 @@ class SlaveMachine(object):
     # that we have acquired our fqdn (otherwise getfqdn() below maybe return
     # an incorrect value).
     ping_url = self._url + '/server_ping'
-    if url_helper.UrlOpen(ping_url, method='GET') is None:
+    if url_helper.UrlOpen(ping_url) is None:
       logging.error('Unable to make initial connection to the swarm server. '
                     'Aborting.')
       return
@@ -352,7 +352,7 @@ class SlaveMachine(object):
       'x': str(result_code),
     }
     url_helper.UrlOpen(self._result_url, data=data,
-                       max_tries=self._max_url_tries, method='POST')
+                       max_tries=self._max_url_tries)
 
   @staticmethod
   def rpc_RunManifest(args):

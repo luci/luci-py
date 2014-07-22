@@ -14,7 +14,6 @@ import sys
 import tempfile
 import time
 import unittest
-import urllib
 import urllib2
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -57,7 +56,7 @@ class UrlHelperTest(auto_stub.TestCase):
     self._mox.ReplayAll()
 
     remote = url_helper.XsrfRemote('http://localhost/')
-    self.assertEqual('foo', remote.url_read('/a', method='GET'))
+    self.assertEqual('foo', remote.url_read('/a'))
     self._mox.VerifyAll()
 
   def testXsrfRemoteSimple(self):
@@ -85,14 +84,14 @@ class UrlHelperTest(auto_stub.TestCase):
 
     url_helper.UrlOpen(
         'http://localhost/auth/api/v1/accounts/self/xsrf_token',
-        max_tries=40, method='GET').AndReturn('token')
+        max_tries=40).AndReturn('token')
     url_helper.UrlOpen(
         'http://localhost/a', data={'foo': 'bar'}, max_tries=40,
         headers={'X-XSRF-Token': 'token'}
         ).AndReturn(None)
     url_helper.UrlOpen(
         'http://localhost/auth/api/v1/accounts/self/xsrf_token',
-        max_tries=40, method='GET').AndReturn('token2')
+        max_tries=40).AndReturn('token2')
     url_helper.UrlOpen(
         'http://localhost/a', data={'foo': 'bar'}, max_tries=40,
         headers={'X-XSRF-Token': 'token2'}
@@ -128,7 +127,7 @@ class UrlHelperTest(auto_stub.TestCase):
 
     self._mox.ReplayAll()
 
-    self.assertEqual(url_helper.UrlOpen(url, method='GET'), response)
+    self.assertEqual(url_helper.UrlOpen(url), response)
 
     self._mox.VerifyAll()
 
@@ -142,8 +141,7 @@ class UrlHelperTest(auto_stub.TestCase):
 
     self._mox.ReplayAll()
 
-    self.assertEqual(url_helper.UrlOpen(url, method='POST'),
-                     response)
+    self.assertEqual(url_helper.UrlOpen(url, data=''), response)
 
     self._mox.VerifyAll()
 
@@ -208,23 +206,24 @@ class UrlHelperTest(auto_stub.TestCase):
     self._mox.VerifyAll()
 
   def testEnsureCountKeyIncludedInOpen(self):
-    def assert_data(url):
+    def assert_data(index):
       def has_data(req):
-        self.assertEqual(url, req.get_data())
+        self.assertEqual(
+            'http://localhost?UrlOpenAttempt=%d' % index, req.get_full_url())
         return True
       return mox.Func(has_data)
 
     attempts = 5
     for i in range(attempts):
-      encoded_data = urllib.urlencode({url_helper.COUNT_KEY: i})
       url_helper.urllib2.urlopen(
-          assert_data(encoded_data), timeout=mox.IgnoreArg()).AndRaise(
+          assert_data(i), timeout=mox.IgnoreArg()).AndRaise(
               urllib2.URLError('url'))
       if i != attempts - 1:
         time.sleep(mox.IgnoreArg())
     self._mox.ReplayAll()
 
-    self.assertEqual(url_helper.UrlOpen('url', max_tries=attempts), None)
+    self.assertEqual(
+        None, url_helper.UrlOpen('http://localhost', max_tries=attempts))
     self._mox.VerifyAll()
 
   def testCountKeyInData(self):
@@ -250,14 +249,12 @@ class UrlHelperTest(auto_stub.TestCase):
     self._mox.VerifyAll()
 
   def testDownloadFile(self):
-    local_file = None
+    local_file = tempfile.NamedTemporaryFile(delete=False)
+    local_file.close()
     try:
-      local_file = tempfile.NamedTemporaryFile(delete=False)
-      local_file.close()
-
       self._mox.StubOutWithMock(url_helper, 'UrlOpen')
       file_data = 'data'
-      url_helper.UrlOpen(mox.IgnoreArg(), method='GET').AndReturn(file_data)
+      url_helper.UrlOpen(mox.IgnoreArg()).AndReturn(file_data)
       self._mox.ReplayAll()
 
       self.assertTrue(url_helper.DownloadFile(local_file.name,
@@ -267,15 +264,14 @@ class UrlHelperTest(auto_stub.TestCase):
 
       self._mox.VerifyAll()
     finally:
-      if local_file:
-        os.remove(local_file.name)
+      os.remove(local_file.name)
 
   def testDownloadFileDownloadError(self):
     try:
       fake_file = 'fake_local_file.fake'
 
       self._mox.StubOutWithMock(url_helper, 'UrlOpen')
-      url_helper.UrlOpen(mox.IgnoreArg(), method='GET').AndReturn(None)
+      url_helper.UrlOpen(mox.IgnoreArg()).AndReturn(None)
       self._mox.ReplayAll()
 
       self.assertFalse(url_helper.DownloadFile(fake_file,
@@ -294,7 +290,7 @@ class UrlHelperTest(auto_stub.TestCase):
 
       self._mox.StubOutWithMock(url_helper, 'UrlOpen')
 
-      url_helper.UrlOpen(mox.IgnoreArg(), method='GET').AndReturn('data')
+      url_helper.UrlOpen(mox.IgnoreArg()).AndReturn('data')
       self._mox.ReplayAll()
 
       self.assertFalse(url_helper.DownloadFile(file_readonly.name,

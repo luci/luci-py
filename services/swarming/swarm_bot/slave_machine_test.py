@@ -67,8 +67,8 @@ def _SetPollJobAndPostFailExpectations(response, result_url, result_string,
     'x': str(result_code),
   }
   url_helper.UrlOpen(
-      result_url, data=data, max_tries=mox.IgnoreArg(),
-      method='POST').AndReturn(None if bad_url else 'Success')
+      result_url, data=data, max_tries=mox.IgnoreArg()
+      ).AndReturn(None if bad_url else 'Success')
 
 
 def UrlOpenExpectations(response, url, data):
@@ -144,7 +144,7 @@ class TestSlaveMachine(auto_stub.TestCase):
   # Test with an invalid URL and try until it raises an exception.
   def testInvalidURLWithException(self):
     # Initial server ping.
-    url_helper.UrlOpen(mox.IgnoreArg(), method='GET').AndReturn('')
+    url_helper.UrlOpen(mox.IgnoreArg()).AndReturn('')
 
     max_url_tries = 5
 
@@ -167,7 +167,7 @@ class TestSlaveMachine(auto_stub.TestCase):
 
   def testAttributesFormatBadString(self):
     # Initial server ping.
-    url_helper.UrlOpen(mox.IgnoreArg(), method='GET').AndReturn('')
+    url_helper.UrlOpen(mox.IgnoreArg()).AndReturn('')
 
     data = self._CreateValidAttribs()
 
@@ -183,7 +183,7 @@ class TestSlaveMachine(auto_stub.TestCase):
   # Test how values specified in the constructor are reflected in the request.
   def testConstructor(self):
     # Initial server ping.
-    url_helper.UrlOpen(mox.IgnoreArg(), method='GET').AndReturn('')
+    url_helper.UrlOpen(mox.IgnoreArg()).AndReturn('')
 
     data = self._CreateValidAttribs()
 
@@ -199,7 +199,7 @@ class TestSlaveMachine(auto_stub.TestCase):
   # Test with missing mandatory fields in response: come_back.
   def testMissingAll(self):
     # Initial server ping.
-    url_helper.UrlOpen(mox.IgnoreArg(), method='GET').AndReturn('')
+    url_helper.UrlOpen(mox.IgnoreArg()).AndReturn('')
 
     UrlOpenExpectations(_CreateResponse(), mox.IgnoreArg(), mox.IgnoreArg())
     self._mox.ReplayAll()
@@ -212,7 +212,7 @@ class TestSlaveMachine(auto_stub.TestCase):
   # Test with missing mandatory fields in response: try_count.
   def testMissingTryCount(self):
     # Initial server ping.
-    url_helper.UrlOpen(mox.IgnoreArg(), method='GET').AndReturn('')
+    url_helper.UrlOpen(mox.IgnoreArg()).AndReturn('')
 
     UrlOpenExpectations(
         _CreateResponse(come_back=2, try_count=None), mox.IgnoreArg(),
@@ -227,7 +227,7 @@ class TestSlaveMachine(auto_stub.TestCase):
   # Test with both commands and come_back missing.
   def testMissingComeback(self):
     # Initial server ping.
-    url_helper.UrlOpen(mox.IgnoreArg(), method='GET').AndReturn('')
+    url_helper.UrlOpen(mox.IgnoreArg()).AndReturn('')
 
     UrlOpenExpectations(_CreateResponse(), mox.IgnoreArg(), mox.IgnoreArg())
     self._mox.ReplayAll()
@@ -241,7 +241,7 @@ class TestSlaveMachine(auto_stub.TestCase):
   # without an error.
   def testExtraResponseArgs(self):
     # Initial server ping.
-    url_helper.UrlOpen(mox.IgnoreArg(), method='GET').AndReturn('')
+    url_helper.UrlOpen(mox.IgnoreArg()).AndReturn('')
 
     come_back = 11.0
     UrlOpenExpectations(
@@ -258,7 +258,7 @@ class TestSlaveMachine(auto_stub.TestCase):
   # Test with missing mandatory fields in response: result_url.
   def testMissingResultURL(self):
     # Initial server ping.
-    url_helper.UrlOpen(mox.IgnoreArg(), method='GET').AndReturn('')
+    url_helper.UrlOpen(mox.IgnoreArg()).AndReturn('')
 
     UrlOpenExpectations(
         _CreateResponse(commands=[rpc.BuildRPC('a', None)]),
@@ -273,7 +273,7 @@ class TestSlaveMachine(auto_stub.TestCase):
   # Test with bad type for result_url.
   def testBadResultURLType(self):
     # Initial server ping.
-    url_helper.UrlOpen(mox.IgnoreArg(), method='GET').AndReturn('')
+    url_helper.UrlOpen(mox.IgnoreArg()).AndReturn('')
 
     UrlOpenExpectations(
         _CreateResponse(commands=[rpc.BuildRPC('a', None)],
@@ -289,7 +289,7 @@ class TestSlaveMachine(auto_stub.TestCase):
   # Test with bad type for commands.
   def testBadCommands(self):
     # Initial server ping.
-    url_helper.UrlOpen(mox.IgnoreArg(), method='GET').AndReturn('')
+    url_helper.UrlOpen(mox.IgnoreArg()).AndReturn('')
 
     _SetPollJobAndPostFailExpectations(
         _CreateResponse(commands='do this', result_url='localhost'),
@@ -306,7 +306,7 @@ class TestSlaveMachine(auto_stub.TestCase):
   # Test with wrong RPC format for commands.
   def testBadCommandsParseRPCFormat(self):
     # Initial server ping.
-    url_helper.UrlOpen(mox.IgnoreArg(), method='GET').AndReturn('')
+    url_helper.UrlOpen(mox.IgnoreArg()).AndReturn('')
 
     _SetPollJobAndPostFailExpectations(
         _CreateResponse(commands=['do this'], result_url='localhost'),
@@ -324,7 +324,7 @@ class TestSlaveMachine(auto_stub.TestCase):
   # Test with wrong RPC function name.
   def testBadCommandsParseRPCFunctionName(self):
     # Initial server ping.
-    url_helper.UrlOpen(mox.IgnoreArg(), method='GET').AndReturn('')
+    url_helper.UrlOpen(mox.IgnoreArg()).AndReturn('')
 
     commands = [rpc.BuildRPC('WrongFunc', None)]
     _SetPollJobAndPostFailExpectations(
@@ -340,7 +340,7 @@ class TestSlaveMachine(auto_stub.TestCase):
   # Test with both fields in response: come_back and commands.
   def testInvalidBothCommandsAndComeback(self):
     # Initial server ping.
-    url_helper.UrlOpen(mox.IgnoreArg(), method='GET').AndReturn('')
+    url_helper.UrlOpen(mox.IgnoreArg()).AndReturn('')
 
     UrlOpenExpectations(
         _CreateResponse(come_back=3, commands='do this'),
@@ -355,7 +355,7 @@ class TestSlaveMachine(auto_stub.TestCase):
   # Test invalid come_back type.
   def testInvalidComebackType(self):
     # Initial server ping.
-    url_helper.UrlOpen(mox.IgnoreArg(), method='GET').AndReturn('')
+    url_helper.UrlOpen(mox.IgnoreArg()).AndReturn('')
 
     UrlOpenExpectations(
         _CreateResponse(come_back='3'), mox.IgnoreArg(), mox.IgnoreArg())
@@ -369,7 +369,7 @@ class TestSlaveMachine(auto_stub.TestCase):
   # Test invalid come_back value.
   def testInvalidComebackValue(self):
     # Initial server ping.
-    url_helper.UrlOpen(mox.IgnoreArg(), method='GET').AndReturn('')
+    url_helper.UrlOpen(mox.IgnoreArg()).AndReturn('')
 
     UrlOpenExpectations(
         _CreateResponse(come_back=-3.0), mox.IgnoreArg(), mox.IgnoreArg())
@@ -383,7 +383,7 @@ class TestSlaveMachine(auto_stub.TestCase):
   # Test invalid try_count type.
   def testInvalidTryCountType(self):
     # Initial server ping.
-    url_helper.UrlOpen(mox.IgnoreArg(), method='GET').AndReturn('')
+    url_helper.UrlOpen(mox.IgnoreArg()).AndReturn('')
 
     UrlOpenExpectations(
         _CreateResponse(come_back=3.0, try_count='1'),
@@ -398,7 +398,7 @@ class TestSlaveMachine(auto_stub.TestCase):
   # Test invalid try_count value.
   def testInvalidTryCountValue(self):
     # Initial server ping.
-    url_helper.UrlOpen(mox.IgnoreArg(), method='GET').AndReturn('')
+    url_helper.UrlOpen(mox.IgnoreArg()).AndReturn('')
 
     UrlOpenExpectations(
         _CreateResponse(come_back=3.0, try_count=-1),
@@ -413,7 +413,7 @@ class TestSlaveMachine(auto_stub.TestCase):
   # Test 2 iterations of requests with nothing to do + 1 bad response.
   def testComeBack(self):
     # Initial server ping.
-    url_helper.UrlOpen(mox.IgnoreArg(), method='GET').AndReturn('')
+    url_helper.UrlOpen(mox.IgnoreArg()).AndReturn('')
 
     come_back = 1.0
     try_count = 0
@@ -441,7 +441,7 @@ class TestSlaveMachine(auto_stub.TestCase):
 
   def testRunManifestRPCValidate(self):
     # Initial server ping.
-    url_helper.UrlOpen(mox.IgnoreArg(), method='GET').AndReturn('')
+    url_helper.UrlOpen(mox.IgnoreArg()).AndReturn('')
 
     commands = [rpc.BuildRPC('RunManifest', None)]
     _SetPollJobAndPostFailExpectations(
@@ -457,7 +457,7 @@ class TestSlaveMachine(auto_stub.TestCase):
 
   def testRunManifestRPCExecuteSubprocessException(self):
     # Initial server ping.
-    url_helper.UrlOpen(mox.IgnoreArg(), method='GET').AndReturn('')
+    url_helper.UrlOpen(mox.IgnoreArg()).AndReturn('')
 
     function_name = 'RunManifest'
     args = u'{}'
@@ -490,7 +490,7 @@ class TestSlaveMachine(auto_stub.TestCase):
 
   def testRunManifestRPCExecuteNoException(self):
     # Initial server ping.
-    url_helper.UrlOpen(mox.IgnoreArg(), method='GET').AndReturn('')
+    url_helper.UrlOpen(mox.IgnoreArg()).AndReturn('')
 
     function_name = 'RunManifest'
     args = u'{}'
@@ -521,7 +521,7 @@ class TestSlaveMachine(auto_stub.TestCase):
 
   def testRunManifestRPCRestartFails(self):
     # Initial server ping.
-    url_helper.UrlOpen(mox.IgnoreArg(), method='GET').AndReturn('')
+    url_helper.UrlOpen(mox.IgnoreArg()).AndReturn('')
 
     function_name = 'RunManifest'
     args = '{}'
@@ -561,7 +561,7 @@ class TestSlaveMachine(auto_stub.TestCase):
   # job is requested.
   def testResultURLReset(self):
     # Initial server ping.
-    url_helper.UrlOpen(mox.IgnoreArg(), method='GET').AndReturn('')
+    url_helper.UrlOpen(mox.IgnoreArg()).AndReturn('')
 
     commands = [rpc.BuildRPC('WrongFunc', None)]
     response = [_CreateResponse(commands=commands, result_url='here1.com'),
