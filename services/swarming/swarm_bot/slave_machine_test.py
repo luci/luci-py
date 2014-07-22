@@ -29,7 +29,7 @@ test_env.setup_test_env()
 
 from depot_tools import auto_stub
 from server import bot_archive
-from third_party.mox import mox
+from mox import mox
 
 # pylint: disable=W0212
 

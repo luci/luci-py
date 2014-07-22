@@ -17,21 +17,12 @@ test_env.setup_test_env()
 
 from server import user_manager
 from support import test_case
-from third_party.mox import mox
 
 IP = ['192.168.0.1', '192.168.0.2']
 
 
 class UserManagerTest(test_case.TestCase):
   APP_DIR = ROOT_DIR
-
-  def setUp(self):
-    super(UserManagerTest, self).setUp()
-    self._mox = mox.Mox()
-
-  def tearDown(self):
-    self._mox.UnsetStubs()
-    super(UserManagerTest, self).tearDown()
 
   def testModifyUserProfileWhitelist(self):
     # Make multiple add requests, then a single remove request,

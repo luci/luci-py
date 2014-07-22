@@ -36,7 +36,6 @@ from server import task_common
 from server import test_helper
 from server import user_manager
 from support import test_case
-from third_party.mox import mox
 
 
 # A simple machine id constant to use in tests.
@@ -104,7 +103,6 @@ class AppTest(test_case.TestCase):
       return False
     self.mock(auth, 'is_group_member', mocked_is_group_member)
 
-    self._mox = mox.Mox()
     self.mock(stats_framework, 'add_entry', self._parse_line)
 
   def _parse_line(self, line):
@@ -114,7 +112,6 @@ class AppTest(test_case.TestCase):
 
   def tearDown(self):
     try:
-      self._mox.UnsetStubs()
       template.reset()
     finally:
       super(AppTest, self).tearDown()

@@ -24,7 +24,7 @@ import test_env
 test_env.setup_test_env()
 
 from depot_tools import auto_stub
-from third_party.mox import mox
+from mox import mox
 
 import url_helper  # pylint: disable=W0403
 
