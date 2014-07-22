@@ -67,13 +67,11 @@ def _SetPollJobAndPostFailExpectations(response, result_url, result_string,
     'x': str(result_code),
   }
   url_helper.UrlOpen(
-      result_url, data=data, max_tries=mox.IgnoreArg()
-      ).AndReturn(None if bad_url else 'Success')
+      result_url, data=data).AndReturn(None if bad_url else 'Success')
 
 
 def UrlOpenExpectations(response, url, data):
-  url_helper.UrlOpen(
-      url, data=data, max_tries=mox.IgnoreArg()).AndReturn(response)
+  url_helper.UrlOpen(url, data=data).AndReturn(response)
 
 
 class TestSlaveMachine(auto_stub.TestCase):
@@ -145,22 +143,16 @@ class TestSlaveMachine(auto_stub.TestCase):
   def testInvalidURLWithException(self):
     # Initial server ping.
     url_helper.UrlOpen(mox.IgnoreArg()).AndReturn('')
-
-    max_url_tries = 5
-
     url_helper.UrlOpen(mox.IgnoreArg(), data=mox.IgnoreArg(),
-                       max_tries=max_url_tries
                       ).AndReturn(None)
 
     self._mox.ReplayAll()
 
-    slave = slave_machine.SlaveMachine('http://localhost', {}, max_url_tries)
+    slave = slave_machine.SlaveMachine('http://localhost', {})
 
-    expected_exception_str = (r'Error when connecting to Swarm server, '
-                              'http://localhost/poll_for_test, failed to '
-                              'connect after 5 attempts.')
-    with self.assertRaisesRegexp(
-        slave_machine.SlaveError, expected_exception_str):
+    expected = (
+        'Error when connecting to Swarm server http://localhost/poll_for_test')
+    with self.assertRaisesRegexp(slave_machine.SlaveError, expected):
       slave.Start(iterations=-1)
 
     self._mox.VerifyAll()
@@ -426,8 +418,7 @@ class TestSlaveMachine(auto_stub.TestCase):
     for i in range(len(response)):
       if i < len(response) - 1:
         url_helper.UrlOpen(
-            mox.IgnoreArg(), data=mox.IgnoreArg(), max_tries=mox.IgnoreArg()
-            ).AndReturn(response[i])
+            mox.IgnoreArg(), data=mox.IgnoreArg()).AndReturn(response[i])
         time.sleep(come_back)
       else:
         UrlOpenExpectations(response[i], mox.IgnoreArg(), mox.IgnoreArg())
@@ -468,8 +459,7 @@ class TestSlaveMachine(auto_stub.TestCase):
 
     # Mock initial job request.
     url_helper.UrlOpen(
-        mox.IgnoreArg(), data=mox.IgnoreArg(), max_tries=mox.IgnoreArg()
-        ).AndReturn(response)
+        mox.IgnoreArg(), data=mox.IgnoreArg()).AndReturn(response)
 
     # Mock subprocess to raise exception.
     full_command = [
@@ -501,8 +491,7 @@ class TestSlaveMachine(auto_stub.TestCase):
 
     # Mock initial job request.
     url_helper.UrlOpen(
-        mox.IgnoreArg(), data=mox.IgnoreArg(), max_tries=mox.IgnoreArg()
-        ).AndReturn(response)
+        mox.IgnoreArg(), data=mox.IgnoreArg()).AndReturn(response)
 
     # Mock subprocess to raise exception.
     expected = [
@@ -532,8 +521,7 @@ class TestSlaveMachine(auto_stub.TestCase):
 
     # Mock initial job request.
     url_helper.UrlOpen(
-        mox.IgnoreArg(), data=mox.IgnoreArg(), max_tries=mox.IgnoreArg()
-        ).AndReturn(response)
+        mox.IgnoreArg(), data=mox.IgnoreArg()).AndReturn(response)
 
     # Mock subprocess to raise exception and signal a restart.
     expected = [

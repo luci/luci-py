@@ -158,22 +158,19 @@ def _store_file(filepath, content):
 class SlaveMachine(object):
   """Creates a slave that continuously polls the Swarm server for jobs."""
 
-  def __init__(self, url, attributes, max_url_tries=1):
+  def __init__(self, url, attributes):
     """Sets the parameters of the slave.
 
     Args:
       url: URL of the Swarm server.
       attributes: A dict of the attributes of the machine. Should include
           machine dimensions as well.
-      max_url_tries: The maximum number of consecutive url errors to accept
-          before throwing an exception.
     """
     self._url = url.rstrip('/')
     self._attributes = attributes.copy()
     self._result_url = None
     self._attributes['try_count'] = 0
     self._come_back = 0
-    self._max_url_tries = max_url_tries
     self._attributes['version'] = zipped_archive.generate_version()
 
   def Start(self, iterations):
@@ -205,13 +202,10 @@ class SlaveMachine(object):
       self._result_url = None
 
       request = {'attributes': json.dumps(self._attributes)}
-      response_str = url_helper.UrlOpen(url, data=request,
-                                        max_tries=self._max_url_tries)
+      response_str = url_helper.UrlOpen(url, data=request)
 
       if response_str is None:
-        raise SlaveError('Error when connecting to Swarm server, %s, failed to '
-                         'connect after %d attempts.'
-                         % (url, self._max_url_tries))
+        raise SlaveError('Error when connecting to Swarm server %s' % url)
 
       try:
         response = json.loads(response_str)
@@ -351,8 +345,7 @@ class SlaveMachine(object):
       's': False,
       'x': str(result_code),
     }
-    url_helper.UrlOpen(self._result_url, data=data,
-                       max_tries=self._max_url_tries)
+    url_helper.UrlOpen(self._result_url, data=data)
 
   @staticmethod
   def rpc_RunManifest(args):
@@ -509,7 +502,7 @@ def main(args):
 
   attributes = get_attributes()
   config = get_config()
-  slave = SlaveMachine(config['server'], attributes, max_url_tries=40)
+  slave = SlaveMachine(config['server'], attributes)
 
   while True:
     # Start requesting jobs.

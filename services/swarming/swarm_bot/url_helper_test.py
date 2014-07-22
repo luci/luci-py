@@ -37,7 +37,7 @@ class UrlHelperTest(auto_stub.TestCase):
     self.mock(logging, 'exception', lambda *_: None)
     self.mock(logging, 'info', lambda *_: None)
     self.mock(logging, 'warning', lambda *_: None)
-    self._mox.StubOutWithMock(time, 'sleep')
+    self.mock(time, 'sleep', lambda _: None)
     self._mox.StubOutWithMock(urllib2, 'urlopen')
 
   def tearDown(self):
@@ -50,7 +50,7 @@ class UrlHelperTest(auto_stub.TestCase):
         return True
       return mox.Func(has_url)
 
-    url_helper.urllib2.urlopen(
+    urllib2.urlopen(
         assert_url('http://localhost/a?UrlOpenAttempt=0'),
         timeout=300).AndReturn(StringIO.StringIO('foo'))
     self._mox.ReplayAll()
@@ -68,9 +68,9 @@ class UrlHelperTest(auto_stub.TestCase):
 
     xsrf_url = (
       'http://localhost/auth/api/v1/accounts/self/xsrf_token?UrlOpenAttempt=0')
-    url_helper.urllib2.urlopen(
+    urllib2.urlopen(
         assert_url(xsrf_url), timeout=300).AndReturn(StringIO.StringIO('token'))
-    url_helper.urllib2.urlopen(
+    urllib2.urlopen(
         assert_url('http://localhost/a'),
         timeout=300).AndReturn(StringIO.StringIO('foo'))
     self._mox.ReplayAll()
@@ -83,17 +83,17 @@ class UrlHelperTest(auto_stub.TestCase):
     self._mox.StubOutWithMock(url_helper, 'UrlOpen')
 
     url_helper.UrlOpen(
-        'http://localhost/auth/api/v1/accounts/self/xsrf_token',
-        max_tries=40).AndReturn('token')
+        'http://localhost/auth/api/v1/accounts/self/xsrf_token'
+        ).AndReturn('token')
     url_helper.UrlOpen(
-        'http://localhost/a', data={'foo': 'bar'}, max_tries=40,
+        'http://localhost/a', data={'foo': 'bar'},
         headers={'X-XSRF-Token': 'token'}
         ).AndReturn(None)
     url_helper.UrlOpen(
         'http://localhost/auth/api/v1/accounts/self/xsrf_token',
-        max_tries=40).AndReturn('token2')
+        ).AndReturn('token2')
     url_helper.UrlOpen(
-        'http://localhost/a', data={'foo': 'bar'}, max_tries=40,
+        'http://localhost/a', data={'foo': 'bar'},
         headers={'X-XSRF-Token': 'token2'}
         ).AndReturn('foo')
     self._mox.ReplayAll()
@@ -103,27 +103,12 @@ class UrlHelperTest(auto_stub.TestCase):
     #self.assertEqual('foo', remote.url_read('/a', data={'foo': 'bar'}))
     self._mox.VerifyAll()
 
-  def testUrlOpenInvalidTryCount(self):
-    self._mox.ReplayAll()
-
-    self.assertEqual(url_helper.UrlOpen('url', max_tries=-1), None)
-
-    self._mox.VerifyAll()
-
-  def testUrlOpenInvalidWaitDuration(self):
-    self._mox.ReplayAll()
-
-    self.assertEqual(url_helper.UrlOpen('url', wait_duration=-1), None)
-
-    self._mox.VerifyAll()
-
   def testUrlOpenGETSuccess(self):
     url = 'http://my.url.com'
 
     response = 'True'
-    url_helper.urllib2.urlopen(mox.IgnoreArg(),
-                               timeout=mox.IgnoreArg()).AndReturn(
-                                   StringIO.StringIO(response))
+    urllib2.urlopen(mox.IgnoreArg(), timeout=mox.IgnoreArg()).AndReturn(
+        StringIO.StringIO(response))
 
     self._mox.ReplayAll()
 
@@ -135,9 +120,8 @@ class UrlHelperTest(auto_stub.TestCase):
     url = 'http://my.url.com'
 
     response = 'True'
-    url_helper.urllib2.urlopen(
-        mox.IgnoreArg(), timeout=mox.IgnoreArg()).AndReturn(
-            StringIO.StringIO(response))
+    urllib2.urlopen(mox.IgnoreArg(), timeout=mox.IgnoreArg()).AndReturn(
+        StringIO.StringIO(response))
 
     self._mox.ReplayAll()
 
@@ -146,40 +130,34 @@ class UrlHelperTest(auto_stub.TestCase):
     self._mox.VerifyAll()
 
   def testUrlOpenSuccessAfterFailure(self):
-    url_helper.urllib2.urlopen(
-        mox.IgnoreArg(), timeout=mox.IgnoreArg()).AndRaise(
-            urllib2.URLError('url'))
-    time.sleep(mox.IgnoreArg())
+    urllib2.urlopen(mox.IgnoreArg(), timeout=mox.IgnoreArg()).AndRaise(
+        urllib2.URLError('url'))
     response = 'True'
-    url_helper.urllib2.urlopen(mox.IgnoreArg(),
-                               timeout=mox.IgnoreArg()).AndReturn(
-                                   StringIO.StringIO(response))
+    urllib2.urlopen(mox.IgnoreArg(), timeout=mox.IgnoreArg()).AndReturn(
+        StringIO.StringIO(response))
 
     self._mox.ReplayAll()
 
-    self.assertEqual(url_helper.UrlOpen('url', max_tries=2), response)
+    self.assertEqual(url_helper.UrlOpen('url'), response)
 
     self._mox.VerifyAll()
 
   def testUrlOpenFailure(self):
-    url_helper.urllib2.urlopen(
-        mox.IgnoreArg(), timeout=mox.IgnoreArg()).AndRaise(
-            urllib2.URLError('url'))
+    for _ in range(15):
+      urllib2.urlopen(mox.IgnoreArg(), timeout=mox.IgnoreArg()).AndRaise(
+          urllib2.URLError('url'))
     self._mox.ReplayAll()
 
-    self.assertIsNone(url_helper.UrlOpen('url', max_tries=1))
+    self.assertIsNone(url_helper.UrlOpen('url'))
 
     self._mox.VerifyAll()
 
   def testUrlOpenHTTPErrorNoRetry(self):
-    url_helper.urllib2.urlopen(
-        mox.IgnoreArg(), timeout=mox.IgnoreArg()).AndRaise(
-            urllib2.HTTPError('url', 400, 'error message', None, None))
+    urllib2.urlopen(mox.IgnoreArg(), timeout=mox.IgnoreArg()).AndRaise(
+        urllib2.HTTPError('url', 400, 'error message', None, None))
     self._mox.ReplayAll()
 
-    # Even though we set max_tries to 10, we should only try once since
-    # we get an HTTPError.
-    self.assertIsNone(url_helper.UrlOpen('url', max_tries=10))
+    self.assertIsNone(url_helper.UrlOpen('url'))
 
     self._mox.VerifyAll()
 
@@ -187,43 +165,19 @@ class UrlHelperTest(auto_stub.TestCase):
     response = 'response'
 
     # Urlopen failure attempt.
-    url_helper.urllib2.urlopen(
-        mox.IgnoreArg(), timeout=mox.IgnoreArg()).AndRaise(
-            urllib2.HTTPError('url', 500, 'error message', None, None))
-    time.sleep(mox.IgnoreArg())
+    urllib2.urlopen(mox.IgnoreArg(), timeout=mox.IgnoreArg()).AndRaise(
+        urllib2.HTTPError('url', 500, 'error message', None, None))
 
     # Urlopen success attempt.
-    url_helper.urllib2.urlopen(
-        mox.IgnoreArg(), timeout=mox.IgnoreArg()).AndReturn(
-            StringIO.StringIO(response))
+    urllib2.urlopen(mox.IgnoreArg(), timeout=mox.IgnoreArg()).AndReturn(
+        StringIO.StringIO(response))
 
     self._mox.ReplayAll()
 
     # Since the HTTPError was a server error, we should retry and get the
     # desired response after the error.
-    self.assertEqual(response, url_helper.UrlOpen('url', max_tries=10))
+    self.assertEqual(response, url_helper.UrlOpen('url'))
 
-    self._mox.VerifyAll()
-
-  def testEnsureCountKeyIncludedInOpen(self):
-    def assert_data(index):
-      def has_data(req):
-        self.assertEqual(
-            'http://localhost?UrlOpenAttempt=%d' % index, req.get_full_url())
-        return True
-      return mox.Func(has_data)
-
-    attempts = 5
-    for i in range(attempts):
-      url_helper.urllib2.urlopen(
-          assert_data(i), timeout=mox.IgnoreArg()).AndRaise(
-              urllib2.URLError('url'))
-      if i != attempts - 1:
-        time.sleep(mox.IgnoreArg())
-    self._mox.ReplayAll()
-
-    self.assertEqual(
-        None, url_helper.UrlOpen('http://localhost', max_tries=attempts))
     self._mox.VerifyAll()
 
   def testCountKeyInData(self):
@@ -238,9 +192,8 @@ class UrlHelperTest(auto_stub.TestCase):
     url = 'http://my.url.com'
 
     response = 'True'
-    url_helper.urllib2.urlopen(mox.IgnoreArg(),
-                               timeout=mox.IgnoreArg()).AndReturn(
-                                   StringIO.StringIO(response))
+    urllib2.urlopen(mox.IgnoreArg(), timeout=mox.IgnoreArg()).AndReturn(
+        StringIO.StringIO(response))
 
     self._mox.ReplayAll()
 

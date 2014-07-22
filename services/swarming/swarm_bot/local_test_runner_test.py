@@ -422,15 +422,13 @@ class TestLocalTestRunner(auto_stub.TestCase):
         data={
           'o': self.result_string,
           'x': ', '.join(str(i) for i in self.result_codes),
-        },
-        max_tries=15).AndReturn('')
+        }).AndReturn('')
     local_test_runner.url_helper.UrlOpen(
         '%s?1=2' % self.result_url,
         data={
           'o': self.result_string,
           'x': ', '.join(str(i) for i in self.result_codes),
-        },
-        max_tries=15).AndReturn('')
+        }).AndReturn('')
     self._mox.ReplayAll()
 
     runner = local_test_runner.LocalTestRunner(self.data_file_name)
@@ -453,8 +451,7 @@ class TestLocalTestRunner(auto_stub.TestCase):
         data={
           'o': self.result_string,
           'x': ', '.join(str(i) for i in self.result_codes),
-        },
-        max_tries=15).AndReturn(None)
+        }).AndReturn(None)
     self._mox.ReplayAll()
 
     runner = local_test_runner.LocalTestRunner(self.data_file_name)
@@ -472,8 +469,7 @@ class TestLocalTestRunner(auto_stub.TestCase):
         data={
           'o': self.result_string,
           'x': ', '.join(str(i) for i in self.result_codes),
-        },
-        max_tries=15).AndReturn('')
+        }).AndReturn('')
     self._mox.ReplayAll()
 
     self.CreateValidFile()
@@ -499,9 +495,8 @@ class TestLocalTestRunner(auto_stub.TestCase):
       return True
 
     local_test_runner.url_helper.UrlOpen(
-        unicode(self.result_url),
-        data=mox.Func(Validate),
-        max_tries=15).AndReturn('')
+        unicode(self.result_url), data=mox.Func(Validate)
+        ).AndReturn('')
     self._mox.ReplayAll()
 
     with logging_utils.CaptureLogs('local_test_runner_test.log') as log:

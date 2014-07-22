@@ -37,23 +37,22 @@ class XsrfRemote(object):
   def __init__(self, url):
     self.url = url.rstrip('/')
     self.token = None
-    self.max_tries = 40
 
   def url_read(self, resource, **kwargs):
     url = self.url + resource
     if kwargs.get('data') == None:
       # No XSRF token for GET.
-      return UrlOpen(url, max_tries=self.max_tries, **kwargs)
+      return UrlOpen(url, **kwargs)
 
     if not self.token:
       self.token = self.refresh_token()
     headers = {'X-XSRF-Token': self.token}
-    resp = UrlOpen(url, headers=headers, max_tries=self.max_tries, **kwargs)
+    resp = UrlOpen(url, headers=headers, **kwargs)
     if not resp:
       # This includes 403 because the XSRF token expired. Renew the token.
       # TODO(maruel): It'd be great if it were transparent.
       headers = {'X-XSRF-Token': self.refresh_token()}
-      resp = UrlOpen(url, headers=headers, max_tries=self.max_tries, **kwargs)
+      resp = UrlOpen(url, headers=headers, **kwargs)
     if not resp:
       raise Error('Failed to connect to %s' % url)
     return resp
@@ -69,13 +68,13 @@ class XsrfRemote(object):
     """Returns a fresh token. Necessary as the token may expire after an hour.
     """
     url = self.url + '/auth/api/v1/accounts/self/xsrf_token'
-    self.token = UrlOpen(url, max_tries=self.max_tries)
+    self.token = UrlOpen(url)
     if not self.token:
       raise Error('Failed to connect to %s' % url)
     return self.token
 
 
-def UrlOpen(url, data=None, max_tries=5, wait_duration=None, headers=None):
+def UrlOpen(url, data=None, headers=None):
   """Attempts to open the given url multiple times.
 
   UrlOpen will attempt to open the the given url several times, stopping
@@ -86,26 +85,12 @@ def UrlOpen(url, data=None, max_tries=5, wait_duration=None, headers=None):
   Args:
     url: The url to open.
     data: The unencoded data to send to the url. This must be a mapping object.
-    max_tries: The maximum number of times to try sending this data. Must be
-        greater than 0.
-    wait_duration: The number of seconds to wait between successive attempts.
-        This must be greater than or equal to 0. If no value is given then a
-        random value between 0.1 and 10 will be chosen each time (with
-        exponential back off to give later retries a longer wait).
     headers: List of HTTP headers to add.
 
   Returns:
     The reponse from the url contacted. If it failed to connect or is given
     invalid arguments, then it returns None.
   """
-  if max_tries <= 0:
-    logging.error('UrlOpen(%s): Invalid number of tries: %d', url, max_tries)
-    return None
-
-  if wait_duration and wait_duration < 0:
-    logging.error('UrlOpen(%s): Invalid wait duration: %d', url, wait_duration)
-    return None
-
   method = 'POST' if data is not None else 'GET'
   data = data or {}
 
@@ -115,6 +100,7 @@ def UrlOpen(url, data=None, max_tries=5, wait_duration=None, headers=None):
     return None
 
   url_response = None
+  max_tries = 15
   for attempt in range(max_tries):
     data[COUNT_KEY] = attempt
     try:
@@ -155,12 +141,8 @@ def UrlOpen(url, data=None, max_tries=5, wait_duration=None, headers=None):
       return url_response
     elif attempt != max_tries - 1:
       # Only sleep if we are going to try and connect again.
-      if wait_duration is None:
-        duration = random.random() * 3 + math.pow(1.5, (attempt + 1))
-        duration = min(10, max(0.1, duration))
-      else:
-        duration = wait_duration
-
+      duration = random.random() * 3 + math.pow(1.5, (attempt + 1))
+      duration = min(10, max(0.1, duration))
       time.sleep(duration)
 
   logging.error('UrlOpen(%s): Unable to open after %d attempts', url, max_tries)
