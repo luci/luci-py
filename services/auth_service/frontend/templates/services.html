@@ -11,6 +11,10 @@ javascript library and not jinja2. #}
     <thead>
       <tr>
         <th>Service</th>
+        <th>GAE admin</th>
+        <th>Ereporter2</th>
+        <th>Exceptions</th>
+        <th style="width:100px;">Lag</th>
         <th style="width:100px;" class="text-center">Status</th>
       </tr>
     </thead>
@@ -18,10 +22,29 @@ javascript library and not jinja2. #}
       {{#each services}}
       <tr>
         <td>
-          <a target="_blank" href="{{this.replica_url}}">{{this.app_id}}</a>
+          <a target="_blank" href="{{this.service_url}}">{{this.app_id}}</a>
         </td>
+        <td>
+          <a target="_blank" href="https://appengine.google.com/dashboard?&app_id=s~{{this.app_id}}">
+            view <span class="glyphicon glyphicon-share-alt"></span>
+          </a>
+        </td>
+        <td>
+          <a target="_blank" href="{{this.service_url}}restricted/ereporter2/errors">
+            view <span class="glyphicon glyphicon-share-alt"></span>
+          </a>
+        </td>
+        <td>
+          <a target="_blank" href="{{this.service_url}}restricted/ereporter2/report">
+            view <span class="glyphicon glyphicon-share-alt"></span>
+          </a>
+        </td>
+        <td style="width:100px;">{{this.lag_ms}}</td>
         <td style="width:100px;" class="text-center">
-          <span class="label label-{{status_label}}">{{status_text}}</span>
+          <span
+            class="label label-{{this.status.label}} status-label"
+            data-toggle="tooltip"
+            title="{{this.status.tooltip}}">{{this.status.text}}</span>
         </td>
       </tr>
       {{/each}}
@@ -47,7 +70,7 @@ javascript library and not jinja2. #}
   <div class="col-md-12">
     <div class="panel panel-default">
       <div class="panel-heading">
-        <h3 class="panel-title">Linked services</h3>
+        <h3 class="panel-title">Services</h3>
       </div>
       <div class="panel-body">
         <div id="services-list-alerts"></div>

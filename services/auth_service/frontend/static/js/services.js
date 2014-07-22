@@ -6,6 +6,10 @@ var services = (function() {
 var exports = {};
 
 
+// Should correspond to auth.api._process_cache_expiration_sec.
+var CACHE_LAG_SEC = 30;
+
+
 var listServices = function() {
   return api.call('GET', '/auth_service/api/v1/services');
 };
@@ -30,17 +34,71 @@ var updateServiceListing = function() {
   defer.then(function(result) {
     var services = [];
     var now = result.data['now'];
-    var auth_db_rev = result.data['auth_db_rev']['rev'];
+    var auth_db_rev = result.data['auth_db_rev'];
+
+    var getUpToDateStatus = function(updated_ts) {
+      var dt = Math.round((now - updated_ts) / 1000000);
+      if (dt < CACHE_LAG_SEC) {
+        return {
+          text: 'clearing cache',
+          tooltip: String.format(
+              'Cache clears in {0} sec.', CACHE_LAG_SEC - dt),
+          label: 'warning'
+        };
+      }
+      return {
+        text: 'up to date',
+        tooltip: '',
+        label: 'success'
+      };
+    };
+
+    var getReplicaStatus = function(service) {
+      if (service.auth_db_rev == auth_db_rev.rev) {
+        return getUpToDateStatus(service.push_finished_ts);
+      }
+      if (service.push_status == 0) {
+        return {
+          text: 'syncing',
+          tooltip: String.format(
+              '{0} rev behind', auth_db_rev.rev - service.auth_db_rev),
+          label: 'warning'
+        };
+      }
+      return {
+        text: 'syncing',
+        tooltip: service.push_error,
+        label: 'danger'
+      };
+    };
+
+    var getReplicationLag = function(service) {
+      if (!service.push_started_ts || !service.push_finished_ts)
+        return 'N/A';
+      var lag_microsec = service.push_finished_ts - service.push_started_ts;
+      return Math.round(lag_microsec / 1000.0) + ' ms';
+    };
+
+    // Add auth service itself to the list.
+    services.push({
+      app_id: auth_db_rev['primary_id'],
+      lag_ms: '0 ms',
+      service_url: '/',
+      status: getUpToDateStatus(auth_db_rev.ts)
+    });
+
+    // Add all replicas.
     _.each(result.data['services'], function(service) {
       services.push({
         app_id: service.app_id,
-        replica_url: service.replica_url,
-        status_label: 'default',
-        status_text: 'not implemented'
+        lag_ms: getReplicationLag(service),
+        service_url: service.replica_url + '/',
+        status: getReplicaStatus(service)
       });
     });
     $('#services-list').html(
         common.render('services-list-template', {services: services}));
+    $('#services-list .status-label').tooltip({});
     $('#services-list-alerts').empty();
   }, function(error) {
     $('#services-list-alerts').html(

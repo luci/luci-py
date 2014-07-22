@@ -74,6 +74,7 @@ class ServiceListingHandler(rest_api.ApiHandler):
         x.to_serializable_dict(with_id_as='app_id') for x in services
       ],
       'auth_db_rev': {
+        'primary_id': last_auth_state.primary_id,
         'rev': last_auth_state.auth_db_rev,
         'ts': utils.datetime_to_timestamp(last_auth_state.modified_ts),
       },
