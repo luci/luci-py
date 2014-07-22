@@ -1,0 +1,4 @@
+queue:
+- name: replication
+  max_concurrent_requests: 1
+  rate: 10/m

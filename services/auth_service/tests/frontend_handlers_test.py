@@ -17,6 +17,8 @@ test_env.setup_test_env()
 import webtest
 
 from support import test_case
+
+from common import replication
 from frontend import handlers
 
 
@@ -25,6 +27,8 @@ class FrontendHandlersTest(test_case.TestCase):
 
   def setUp(self):
     super(FrontendHandlersTest, self).setUp()
+    self.mock(
+        replication, 'trigger_replication', lambda *_args, **_kwargs: None)
     self.app = webtest.TestApp(handlers.create_application(debug=True))
 
   def test_warmup(self):

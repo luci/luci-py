@@ -4,7 +4,6 @@
 
 """This module defines Auth Server frontend url handlers."""
 
-import datetime
 import os
 import webapp2
 
@@ -78,7 +77,7 @@ class ServiceListingHandler(rest_api.ApiHandler):
         'rev': last_auth_state.auth_db_rev,
         'ts': utils.datetime_to_timestamp(last_auth_state.modified_ts),
       },
-      'now': utils.datetime_to_timestamp(datetime.datetime.utcnow()),
+      'now': utils.datetime_to_timestamp(utils.utcnow()),
     })
 
 
@@ -200,6 +199,7 @@ def get_routes():
 
 def create_application(debug=False):
   ereporter2.configure()
+  replication.configure_as_primary()
 
   # Configure UI appearance, add all custom tabs.
   ui.configure_ui(

@@ -207,6 +207,12 @@ class LocalApplication(object):
     print >> sys.stderr, '-' * 60
 
 
+class CustomHTTPErrorHandler(urllib2.HTTPDefaultErrorHandler):
+  """Swallows exceptions that would be thrown on >30x HTTP status."""
+  def http_error_default(self, _request, response, _code, _msg, _hdrs):
+    return response
+
+
 class HttpClient(object):
   """Makes HTTP requests to some instance of dev_appserver."""
 
@@ -217,6 +223,7 @@ class HttpClient(object):
   def __init__(self, url):
     self._url = url
     self._opener = urllib2.build_opener(
+        CustomHTTPErrorHandler(),
         urllib2.HTTPCookieProcessor(cookielib.CookieJar()))
     self._xsrf_token = None
 
@@ -224,22 +231,24 @@ class HttpClient(object):
     """Performs dev_appserver login as admin, modifies cookies."""
     self.request('/_ah/login?email=%s&admin=True&action=Login' % user)
 
-  def request(self, resource, body=None, headers=None):
+  def request(self, resource, body=None, headers=None, method=None):
     """Sends HTTP request."""
     if not resource.startswith(self._url):
       assert resource.startswith('/')
       resource = self._url + resource
     req = urllib2.Request(resource, body, headers=(headers or {}))
+    if method:
+      req.get_method = lambda: method
     resp = self._opener.open(req)
     return self.HttpResponse(resp.getcode(), resp.read(), resp.info())
 
-  def json_request(self, resource, body=None, headers=None):
+  def json_request(self, resource, body=None, headers=None, method=None):
     """Sends HTTP request and returns deserialized JSON."""
     if body is not None:
       body = json.dumps(body)
       headers = (headers or {}).copy()
       headers['Content-Type'] = 'application/json; charset=UTF-8'
-    resp = self.request(resource, body, headers=headers)
+    resp = self.request(resource, body, headers=headers, method=method)
     return self.HttpResponse(
         resp.http_code, json.loads(resp.body), resp.headers)
 

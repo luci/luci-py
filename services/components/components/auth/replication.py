@@ -16,6 +16,7 @@ from google.appengine.ext import ndb
 from components import utils
 
 from . import model
+from . import signature
 from . import tokens
 from .proto import replication_pb2
 
@@ -104,13 +105,12 @@ def become_replica(ticket, initiated_by):
         'Request to the primary failed with status %d.' % link_response.status)
     raise ProtocolError(link_response.status, message)
 
-  # TODO(vadimsh): Enable this once replication mechanism is implemented.
   # Become replica. Auth DB will be overwritten on a first push from Primary.
-  # state = model.AuthReplicationState(
-  #     key=model.REPLICATION_STATE_KEY,
-  #     primary_id=ticket.primary_id,
-  #     primary_url=ticket.primary_url)
-  # state.put()
+  state = model.AuthReplicationState(
+      key=model.REPLICATION_STATE_KEY,
+      primary_id=ticket.primary_id,
+      primary_url=ticket.primary_url)
+  state.put()
 
 
 @ndb.transactional
@@ -300,3 +300,51 @@ def replace_auth_db(auth_db_rev, modified_ts, snapshot):
 
   # Do the transactional update.
   return update_auth_db()
+
+
+def is_signed_by_primary(blob, key_name, sig):
+  """Verifies that |blob| was signed by Primary."""
+  # Assert that running on Replica.
+  state = model.get_replication_state()
+  assert state and state.primary_url, state
+  # Grab the cert from primary and verify the signature.
+  certs = signature.get_service_public_certificates(state.primary_url)
+  x509_certificate_pem = signature.get_x509_certificate_by_name(certs, key_name)
+  return signature.check_signature(blob, x509_certificate_pem, sig)
+
+
+def push_auth_db(revision, auth_db):
+  """Accepts AuthDB push from Primary and applies it to replica.
+
+  Args:
+    revision: replication_pb2.AuthDBRevision describing revision of pushed DB.
+    auth_db: replication_pb2.AuthDB with pushed DB.
+
+  Returns:
+    Tuple (True if update was applied, stored or updated AuthReplicationState).
+  """
+  # Already up-to-date? Check it first before doing heavy calls.
+  state = model.get_replication_state()
+  if (state.primary_id == revision.primary_id and
+      state.auth_db_rev >= revision.auth_db_rev):
+    return False, state
+
+  # Try to apply it, retry until success (or until some other task applies
+  # an even newer version of auth_db).
+  snapshot = proto_to_auth_db_snapshot(auth_db)
+  while True:
+    applied, current_state = replace_auth_db(
+        revision.auth_db_rev,
+        utils.timestamp_to_datetime(revision.modified_ts),
+        snapshot)
+
+    # Update was successfully applied.
+    if applied:
+      return True, current_state
+
+    # Some other task managed to apply the update already.
+    if current_state.auth_db_rev >= revision.auth_db_rev:
+      return False, current_state
+
+    # Need to retry. Try until success or deadline.
+    assert current_state.auth_db_rev < revision.auth_db_rev

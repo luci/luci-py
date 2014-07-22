@@ -4,8 +4,10 @@
 
 """Auth management REST API."""
 
+import base64
 import functools
 import json
+import logging
 import urllib
 import webapp2
 
@@ -16,7 +18,9 @@ from components import utils
 from .. import api
 from .. import handler
 from .. import model
+from .. import replication
 from .. import signature
+from ..proto import replication_pb2
 
 
 def get_rest_api_routes():
@@ -28,6 +32,7 @@ def get_rest_api_routes():
     webapp2.Route('/auth/api/v1/accounts/self/xsrf_token', XSRFHandler),
     webapp2.Route('/auth/api/v1/groups', GroupsHandler),
     webapp2.Route('/auth/api/v1/groups/<group:%s>' % group_re, GroupHandler),
+    webapp2.Route('/auth/api/v1/internal/replication', ReplicationHandler),
     webapp2.Route('/auth/api/v1/server/certificates', CertificatesHandler),
     webapp2.Route('/auth/api/v1/server/oauth_config', OAuthConfigHandler),
     webapp2.Route('/auth/api/v1/server/state', ServerStateHandler),
@@ -348,6 +353,80 @@ class GroupHandler(ApiHandler):
     if not success:
       self.abort_with_error(**error_details)
     self.send_response({'ok': True})
+
+
+class ReplicationHandler(handler.AuthenticatingHandler):
+  """Accepts AuthDB push from Primary."""
+
+  # Handler uses X-Appengine-Inbound-Appid header protected by GAE.
+  xsrf_token_enforce_on = ()
+
+  def send_response(self, response):
+    """Sends serialized ReplicationPushResponse as a response."""
+    assert isinstance(response, replication_pb2.ReplicationPushResponse)
+    self.response.headers['Content-Type'] = 'application/octet-stream'
+    self.response.write(response.SerializeToString())
+
+  def send_error(self, error_code):
+    """Sends ReplicationPushResponse with fatal error as a response."""
+    response = replication_pb2.ReplicationPushResponse()
+    response.status = replication_pb2.ReplicationPushResponse.FATAL_ERROR
+    response.error_code = error_code
+    self.send_response(response)
+
+  # Check that request came from some GAE app. More thorough check is inside.
+  @api.require(lambda: api.get_current_identity().is_service)
+  def post(self):
+    # Check that current service is a Replica.
+    if not model.is_replica():
+      self.send_error(replication_pb2.ReplicationPushResponse.NOT_A_REPLICA)
+      return
+
+    # Check that request came from expected Primary service.
+    expected_ident = model.Identity(
+        model.IDENTITY_SERVICE, model.get_replication_state().primary_id)
+    if api.get_current_identity() != expected_ident:
+      self.send_error(replication_pb2.ReplicationPushResponse.FORBIDDEN)
+      return
+
+    # Check the signature headers are present.
+    key_name = self.request.headers.get('X-AuthDB-SigKey-v1')
+    sign = self.request.headers.get('X-AuthDB-SigVal-v1')
+    if not key_name or not sign:
+      self.send_error(replication_pb2.ReplicationPushResponse.MISSING_SIGNATURE)
+      return
+
+    # Verify the signature.
+    body = self.request.body
+    sign = base64.b64decode(sign)
+    if not replication.is_signed_by_primary(body, key_name, sign):
+      self.send_error(replication_pb2.ReplicationPushResponse.BAD_SIGNATURE)
+      return
+
+    # Deserialize the request, check it is valid.
+    request = replication_pb2.ReplicationPushRequest.FromString(body)
+    if not request.HasField('revision') or not request.HasField('auth_db'):
+      self.send_error(replication_pb2.ReplicationPushResponse.BAD_REQUEST)
+      return
+
+    # Handle it.
+    logging.info('Received AuthDB push: rev %d', request.revision.auth_db_rev)
+    applied, state = replication.push_auth_db(request.revision, request.auth_db)
+    logging.info(
+        'AuthDB push %s: rev is %d',
+        'applied' if applied else 'skipped', state.auth_db_rev)
+
+    # Send the response.
+    response = replication_pb2.ReplicationPushResponse()
+    if applied:
+      response.status = replication_pb2.ReplicationPushResponse.APPLIED
+    else:
+      response.status = replication_pb2.ReplicationPushResponse.SKIPPED
+    response.current_revision.primary_id = state.primary_id
+    response.current_revision.auth_db_rev = state.auth_db_rev
+    response.current_revision.modified_ts = utils.datetime_to_timestamp(
+        state.modified_ts)
+    self.send_response(response)
 
 
 class CertificatesHandler(ApiHandler):

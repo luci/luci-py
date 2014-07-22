@@ -304,7 +304,7 @@ def set_task_queue_module(module):
 
 
 def enqueue_task(url, queue_name, payload=None, name=None,
-                 use_dedicated_module=True):
+                 use_dedicated_module=True, transactional=False):
   """Adds a task to a task queue.
 
   If |use_dedicated_module| is True (default) a task will be executed by
@@ -326,7 +326,8 @@ def enqueue_task(url, queue_name, payload=None, name=None,
         queue_name=queue_name,
         payload=payload,
         name=name,
-        headers=headers)
+        headers=headers,
+        transactional=transactional)
     return True
   except (
       taskqueue.Error,

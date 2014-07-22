@@ -12,6 +12,7 @@ up auth db replication between them.
 import logging
 import os
 import sys
+import time
 import unittest
 
 
@@ -43,19 +44,29 @@ class ReplicationTest(unittest.TestCase):
       app.client.login_as_admin()
 
   def tearDown(self):
-    self.auth_service.stop()
-    self.replica.stop()
-    if self.has_failed():
-      self.auth_service.dump_log()
-      self.replica.dump_log()
-    super(ReplicationTest, self).tearDown()
+    try:
+      self.auth_service.stop()
+      self.replica.stop()
+      if self.has_failed():
+        self.auth_service.dump_log()
+        self.replica.dump_log()
+    finally:
+      super(ReplicationTest, self).tearDown()
 
   def has_failed(self):
     # pylint: disable=E1101
     return not self._resultForDoCleanups.wasSuccessful()
 
-  def test_replication(self):
-    """Tests Replica <-> Primary linking flow."""
+  def test_replication_workflow(self):
+    """Tests full Replica <-> Primary flow (linking and replication)."""
+    self.link_replica_to_primary()
+    self.check_oauth_config_replication()
+    self.check_group_replication()
+
+  def link_replica_to_primary(self):
+    """Links replica to primary."""
+    logging.info('Linking replica to primary')
+
     # Verify initial state: no linked services on primary.
     linked_services = self.auth_service.client.json_request(
         '/auth_service/api/v1/services').body
@@ -92,7 +103,119 @@ class ReplicationTest(unittest.TestCase):
     self.assertEqual(self.replica.url, service['replica_url'])
 
     # Verify replica knows about the primary now.
-    # TODO(vadimsh): Test once implemented.
+    replica_state = self.replica.client.json_request(
+        '/auth/api/v1/server/state').body
+    self.assertEqual('replica', replica_state['mode'])
+    self.assertEqual(
+        self.auth_service.app_id,
+        replica_state['replication_state']['primary_id'])
+    self.assertEqual(
+        self.auth_service.url,
+        replica_state['replication_state']['primary_url'])
+
+  def wait_for_sync(self, timeout=4):
+    """Waits for replica to catch up to primary."""
+    logging.info('Waiting for replica to catch up to primary')
+    primary_rev = self.auth_service.client.json_request(
+        '/auth/api/v1/server/state').body['replication_state']['auth_db_rev']
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+      replica_rev = self.replica.client.json_request(
+        '/auth/api/v1/server/state').body['replication_state']['auth_db_rev']
+      if replica_rev == primary_rev:
+        return
+      time.sleep(0.1)
+    self.fail('Replica couldn\'t synchronize to primary fast enough')
+
+  def check_oauth_config_replication(self):
+    """Verifies changes to OAuth config propagate to replica."""
+    oauth_config = {
+      'client_id': 'some-id',
+      'client_not_so_secret': 'secret',
+      'additional_client_ids': ['a', 'b'],
+    }
+    response = self.auth_service.client.json_request(
+        resource='/auth/api/v1/server/oauth_config',
+        body=oauth_config,
+        headers={'X-XSRF-Token': self.auth_service.client.xsrf_token})
+    self.assertEqual(200, response.http_code)
+
+    # Ensure replica got the update.
+    self.wait_for_sync()
+    response = self.replica.client.json_request(
+        '/auth/api/v1/server/oauth_config')
+    self.assertEqual(200, response.http_code)
+    self.assertEqual(oauth_config, response.body)
+
+  def check_group_replication(self):
+    """Verifies changes to groups propagate to replica."""
+    logging.info('Creating group')
+    group = {
+      'name': 'some-group',
+      'members': ['user:jekyll@example.com', 'user:hyde@example.com'],
+      'globs': ['user:*@google.com'],
+      'nested': [],
+      'description': 'Blah',
+    }
+    response = self.auth_service.client.json_request(
+        resource='/auth/api/v1/groups/some-group',
+        body=group,
+        headers={'X-XSRF-Token': self.auth_service.client.xsrf_token})
+    self.assertEqual(201, response.http_code)
+
+    # Read it back from primary to grab created_ts and modified_ts.
+    response = self.auth_service.client.json_request(
+        '/auth/api/v1/groups/some-group')
+    self.assertEqual(200, response.http_code)
+    group = response.body
+
+    # Ensure replica got the update.
+    self.wait_for_sync()
+    response = self.replica.client.json_request(
+        '/auth/api/v1/groups/some-group')
+    self.assertEqual(200, response.http_code)
+    self.assertEqual(group, response.body)
+
+    logging.info('Modifying group')
+    group = {
+      'name': 'some-group',
+      'members': ['user:hyde@example.com'],
+      'globs': ['user:*@google.com'],
+      'nested': [],
+      'description': 'Some other blah',
+    }
+    response = self.auth_service.client.json_request(
+        resource='/auth/api/v1/groups/some-group',
+        body=group,
+        headers={'X-XSRF-Token': self.auth_service.client.xsrf_token},
+        method='PUT')
+    self.assertEqual(200, response.http_code)
+
+    # Read it back from primary to grab created_ts and modified_ts.
+    response = self.auth_service.client.json_request(
+        '/auth/api/v1/groups/some-group')
+    self.assertEqual(200, response.http_code)
+    group = response.body
+
+    # Ensure replica got the update.
+    self.wait_for_sync()
+    response = self.replica.client.json_request(
+        '/auth/api/v1/groups/some-group')
+    self.assertEqual(200, response.http_code)
+    self.assertEqual(group, response.body)
+
+    logging.info('Deleting group')
+    response = self.auth_service.client.json_request(
+        resource='/auth/api/v1/groups/some-group',
+        headers={'X-XSRF-Token': self.auth_service.client.xsrf_token},
+        method='DELETE')
+    self.assertEqual(200, response.http_code)
+
+    # Ensure replica got the update.
+    self.wait_for_sync()
+    response = self.replica.client.json_request(
+        '/auth/api/v1/groups/some-group')
+    self.assertEqual(404, response.http_code)
 
 
 if __name__ == '__main__':

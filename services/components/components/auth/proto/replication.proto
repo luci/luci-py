@@ -132,3 +132,64 @@ message AuthDB {
   // Global secrets shared between services.
   repeated AuthSecret secrets = 5;
 }
+
+
+// Information about some particular revision of auth DB.
+message AuthDBRevision {
+  // GAE App ID of a service holding primary copy of Auth DB.
+  required string primary_id = 1;
+  // Revision of Auth DB being pushed.
+  required int64 auth_db_rev = 2;
+  // Timestamp of that revision by Primary's clock, microseconds since epoch.
+  required int64 modified_ts = 3;
+}
+
+
+// Sent from Primary to Replica to update Replica's AuthDB.
+// Primary signs the entire serialized message with its private key and appends
+// two headers to HTTP request that carries the blob:
+//  X-AuthDB-SigKey-v1: <id of a public key>
+//  X-AuthDB-SigVal-v1: <base64 encoded RSA-SHA256(SHA512(blob)) signature>
+message ReplicationPushRequest {
+  // Revision that is being pushed.
+  optional AuthDBRevision revision = 1;
+  // An entire database of auth configuration for specific revision.
+  optional AuthDB auth_db = 2;
+}
+
+
+// Replica's response to ReplicationPushRequest.
+message ReplicationPushResponse {
+  // Overall status of the operation.
+  enum Status {
+    // Replica accepted the push request and updated its copy of auth db.
+    APPLIED = 0;
+    // Replica has a newer version of AuthDB, the push request is skipped.
+    SKIPPED = 1;
+    // Non fatal error happened, the push request may be retried.
+    TRANSIENT_ERROR = 2;
+    // Fatal error happened, the push request must not be retried.
+    FATAL_ERROR = 3;
+  }
+
+  // Error codes, for TRANSIENT_ERROR and FATAL_ERROR statuses.
+  enum ErrorCode {
+    // Trying to push an update to service that is not a replica.
+    NOT_A_REPLICA = 1;
+    // Replica doesn't know about the service that pushing the update.
+    FORBIDDEN = 2;
+    // Signature headers are missing.
+    MISSING_SIGNATURE = 3;
+    // Signature is not valid.
+    BAD_SIGNATURE = 4;
+    // Format of the request is not valid.
+    BAD_REQUEST = 5;
+  }
+
+  // Overall status of the operation.
+  required Status status = 1;
+  // Revision known by Replica (set for APPLIED and SKIPPED statuses).
+  optional AuthDBRevision current_revision = 2;
+  // Present for TRANSIENT_ERROR and FATAL_ERROR statuses.
+  optional ErrorCode error_code = 3;
+}
