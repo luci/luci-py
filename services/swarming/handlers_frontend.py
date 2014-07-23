@@ -121,7 +121,8 @@ def request_work_item(attributes, server_url, remote_addr):
       attributes['ip'],
       remote_addr,
       dimensions,
-      attributes['version'])
+      attributes['version'],
+      False)
 
   request, run_result = task_scheduler.bot_reap_task(dimensions, bot_id)
   if not request:

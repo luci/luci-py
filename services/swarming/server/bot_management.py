@@ -61,7 +61,11 @@ class Bot(ndb.Model):
   # Version the bot is currently at.
   version = ndb.StringProperty(default='')
 
+  # The current task being run on this bot.
   task = ndb.KeyProperty(kind='TaskRunResult')
+
+  # If set to True, no task is handed out to this bot.
+  quarantined = ndb.BooleanProperty()
 
   @property
   def task_entity(self):
@@ -172,7 +176,8 @@ def get_bot_key(bot_id):
 
 
 def tag_bot_seen(
-    bot_id, hostname, internal_ip, external_ip, dimensions, version):
+    bot_id, hostname, internal_ip, external_ip, dimensions, version,
+    quarantined):
   """Records when a bot has queried for work.
 
   Arguments:
@@ -184,14 +189,18 @@ def tag_bot_seen(
   - dimensions: Bot's dimensions.
   - version: swarming_bot.zip version. Used to spot if a bot failed to update
         promptly.
+  - quarantined: bool to signal if the bot should be exempted from running
+        tasks.
   """
+  # The primary reason for the write is to update .last_seen.
   bot = Bot(
       key=get_bot_key(bot_id),
       dimensions=dimensions or {},
       hostname=hostname,
       internal_ip=internal_ip,
       external_ip=external_ip,
-      version=version)
+      version=version,
+      quarantined=quarantined)
   bot.put()
   return bot
 

@@ -75,7 +75,7 @@ class BotManagementTest(test_case.TestCase):
   def test_tag_bot_seen(self):
     bot = bot_management.tag_bot_seen(
         'id1', 'localhost', '127.0.0.1', '8.8.4.4', {'foo': 'bar'},
-        hashlib.sha1().hexdigest())
+        hashlib.sha1().hexdigest(), False)
     self.assertTrue(bot.last_seen)
     bot.last_seen = datetime.datetime(2010, 1, 2, 3, 4, 5, 6)
     expected = {
@@ -85,6 +85,7 @@ class BotManagementTest(test_case.TestCase):
       'id': 'id1',
       'internal_ip': u'127.0.0.1',
       'last_seen': datetime.datetime(2010, 1, 2, 3, 4, 5, 6),
+      'quarantined': False,
       'task': None,
       'version': u'da39a3ee5e6b4b0d3255bfef95601890afd80709',
     }

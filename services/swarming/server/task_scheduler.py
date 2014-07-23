@@ -93,6 +93,47 @@ def _update_task(task_key, request, bot_id):
     return None
 
 
+def _fetch_for_update(run_result_key, bot_id):
+  """Fetches all the data for a bot task update."""
+  bot_key = bot_management.get_bot_key(bot_id)
+  request_key = task_result.result_summary_key_to_request_key(
+      task_result.run_result_key_to_result_summary_key(run_result_key))
+
+  run_result, request, bot = ndb.get_multi(
+      [run_result_key, request_key, bot_key])
+  if not run_result:
+    logging.error('No result found for %s', run_result_key)
+    return None, None, None
+  if run_result.bot_id != bot_id:
+    logging.error(
+        'Bot %s sent updated for task %s owned by bot %s',
+        bot_id, run_result.bot_id, run_result.key)
+    return None, None, None
+  return run_result, request, bot
+
+
+def _update_stats(run_result, bot_id, request, completed):
+  """Updates stats after a bot task update notification."""
+  if completed:
+    stats.add_run_entry(
+        'run_completed', run_result.key,
+        bot_id=bot_id,
+        dimensions=request.properties.dimensions,
+        runtime_ms=_secs_to_ms(run_result.duration.total_seconds()),
+        user=request.user)
+    stats.add_task_entry(
+        'task_completed',
+        task_result.request_key_to_result_summary_key(request.key),
+        dimensions=request.properties.dimensions,
+        pending_ms=_secs_to_ms(
+            (run_result.completed_ts - request.created_ts).total_seconds()),
+        user=request.user)
+  else:
+    stats.add_run_entry(
+        'run_updated', run_result.key, bot_id=bot_id,
+        dimensions=request.properties.dimensions)
+
+
 ### Public API.
 
 
@@ -106,7 +147,7 @@ def exponential_backoff(attempt_num):
 
 
 def make_request(data):
-  """Creates and store all the entities for a new task request.
+  """Creates and stores all the entities for a new task request.
 
   The number of entities created is 3: TaskRequest, TaskResultSummary and
   TaskToRun.
@@ -196,6 +237,10 @@ def bot_reap_task(dimensions, bot_id):
     The TaskToRun involved is not returned.
   """
   assert bot_id
+  bot = bot_management.get_bot_key(bot_id).get()
+  if bot and bot.quarantined:
+    return None, None
+
   q = task_to_run.yield_next_available_task_to_dispatch(dimensions)
   # When a large number of bots try to reap hundreds of tasks simultaneously,
   # they'll constantly fail to call reap_task_to_run() as they'll get preempted
@@ -252,22 +297,11 @@ def bot_update_task(run_result_key, bot_id, exit_codes, stdout):
 
   It does two DB RPCs, one get_multi() and one put_multi().
   """
-  now = utils.utcnow()
-  bot_key = bot_management.get_bot_key(bot_id)
-  request_key = task_result.result_summary_key_to_request_key(
-      task_result.run_result_key_to_result_summary_key(run_result_key))
-
-  run_result, request, bot = ndb.get_multi(
-      [run_result_key, request_key, bot_key])
+  run_result, request, bot = _fetch_for_update(run_result_key, bot_id)
   if not run_result:
-    logging.error('No result found for %s', run_result_key)
-    return False
-  if run_result.bot_id != bot_id:
-    logging.error(
-        'Bot %s sent updated for task %s owned by bot %s',
-        bot_id, run_result.bot_id, run_result.key)
     return False
 
+  now = utils.utcnow()
   if run_result.state not in task_result.State.STATES_RUNNING:
     # It's possible that the ndb.put_multi() below failed in the last call, so
     # that TaskRunResult was updated but not TaskResultsummary.
@@ -306,26 +340,7 @@ def bot_update_task(run_result_key, bot_id, exit_codes, stdout):
   # the above must not be too aggressive in skipping writes to ensure the data
   # is forcibly coherent.
   ndb.put_multi(to_put)
-
-  # Update stats.
-  if completed:
-    stats.add_run_entry(
-        'run_completed', run_result.key,
-        bot_id=bot_id,
-        dimensions=request.properties.dimensions,
-        runtime_ms=_secs_to_ms(run_result.duration.total_seconds()),
-        user=request.user)
-    stats.add_task_entry(
-        'task_completed',
-        task_result.request_key_to_result_summary_key(request.key),
-        dimensions=request.properties.dimensions,
-        pending_ms=_secs_to_ms(
-            (run_result.completed_ts - request.created_ts).total_seconds()),
-        user=request.user)
-  else:
-    stats.add_run_entry(
-        'run_updated', run_result.key, bot_id=bot_id,
-        dimensions=request.properties.dimensions)
+  _update_stats(run_result, bot_id, request, completed)
   return True
 
 

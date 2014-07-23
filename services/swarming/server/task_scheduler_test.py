@@ -24,6 +24,7 @@ from google.appengine.ext import ndb
 import webtest
 
 from components import stats_framework
+from server import bot_management
 from server import stats
 from server import task_request
 from server import task_result
@@ -120,6 +121,23 @@ class TaskSchedulerApiTest(test_case.TestCase):
     self.assertEqual(request, actual_request)
     self.assertEqual('localhost', run_result.bot_id)
     self.assertEqual(None, task_to_run.TaskToRun.query().get().queue_number)
+
+  def test_bot_reap_task_quarantined(self):
+    data = _gen_request_data(
+        properties=dict(dimensions={u'OS': u'Windows-3.1.1'}))
+    request, _result_summary = task_scheduler.make_request(data)
+    bot_dimensions = {
+      u'OS': [u'Windows', u'Windows-3.1.1'],
+      u'hostname': u'localhost',
+      u'foo': u'bar',
+    }
+    bot_management.tag_bot_seen(
+        'localhost', 'hostname', 'internal_ip', 'external_ip', bot_dimensions,
+        'version', True)
+    actual_request, run_result  = task_scheduler.bot_reap_task(
+        bot_dimensions, 'localhost')
+    self.assertEqual(None, actual_request)
+    self.assertEqual(None, run_result)
 
   def test_exponential_backoff(self):
     self.mock(

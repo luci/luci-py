@@ -277,10 +277,10 @@ class AppTest(test_case.TestCase):
 
     # Add bots to display.
     bot_management.tag_bot_seen(
-        'id1', 'localhost', '127.0.0.1', '8.8.4.4', {}, '123456789')
+        'id1', 'localhost', '127.0.0.1', '8.8.4.4', {}, '123456789', False)
     bot_management.tag_bot_seen(
         'id2', 'localhost:8080', '127.0.0.2', '8.8.8.8', {'foo': 'bar'},
-        '123456789')
+        '123456789', False)
 
     response = self.app.get('/restricted/bots')
     self.assertTrue('200' in response.status)
@@ -290,7 +290,8 @@ class AppTest(test_case.TestCase):
     self._ReplaceCurrentUser(ADMIN_EMAIL)
 
     bot = bot_management.tag_bot_seen(
-        'id1', 'localhost', '127.0.0.1', '8.8.4.4', {'foo': 'bar'}, '123456789')
+        'id1', 'localhost', '127.0.0.1', '8.8.4.4', {'foo': 'bar'}, '123456789',
+        False)
     bot.last_seen = datetime.datetime(2000, 1, 2, 3, 4, 5, 6)
     bot.put()
 
@@ -307,6 +308,7 @@ class AppTest(test_case.TestCase):
             u'id': u'id1',
             u'internal_ip': u'127.0.0.1',
             u'last_seen': u'2000-01-02 03:04:05',
+            u'quarantined': False,
             u'task': None,
             u'version': u'123456789',
           },
@@ -320,7 +322,8 @@ class AppTest(test_case.TestCase):
 
     # Add a machine assignment to delete.
     bot_management.tag_bot_seen(
-        'id1', 'localhost', '127.0.0.1', '8.8.4.4', {'foo': 'bar'}, '123456789')
+        'id1', 'localhost', '127.0.0.1', '8.8.4.4', {'foo': 'bar'}, '123456789',
+        False)
 
     # Delete the machine assignment.
     response = self.app.post('/delete_machine_stats', {'r': 'id1'})
@@ -848,7 +851,7 @@ class AppTest(test_case.TestCase):
     # of editing the DB directly.
     self.assertEqual('0', self.app.get('/swarming/api/v1/bots/dead/count').body)
     bot = bot_management.tag_bot_seen(
-        'id1', 'localhost', '127.0.0.1', '8.8.4.4', {}, '123456789')
+        'id1', 'localhost', '127.0.0.1', '8.8.4.4', {}, '123456789', False)
     self.assertEqual('0', self.app.get('/swarming/api/v1/bots/dead/count').body)
 
     # Borderline. If this test becomes flaky, increase the 1 second value.
