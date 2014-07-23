@@ -227,10 +227,10 @@ class TestLocalTestRunner(auto_stub.TestCase):
     # the require ping delay will have elapsed.
     self.mock_proc.stdin_handle.write(self.result_string)
     self.mock_proc.poll().AndReturn(None)
-    local_test_runner.url_helper.UrlOpen(self.ping_url).AndReturn('')
+    local_test_runner.url_helper.UrlOpen(self.ping_url, data='').AndReturn('')
     self.mock_proc.poll().WithSideEffects(
         self.mock_proc.stdin_handle.close()).AndReturn(exit_code)
-    local_test_runner.url_helper.UrlOpen(self.ping_url).AndReturn('')
+    local_test_runner.url_helper.UrlOpen(self.ping_url, data='').AndReturn('')
     self._mox.ReplayAll()
 
     # Set the ping delay to 0 to ensure we get a ping for this runner.

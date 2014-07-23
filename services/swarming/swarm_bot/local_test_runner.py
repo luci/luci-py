@@ -203,7 +203,7 @@ class LocalTestRunner(object):
       # If enough time has passed, let the server know that we are still
       # alive.
       if self.last_ping_time + self.test_run.ping_delay < time.time():
-        if url_helper.UrlOpen(self.test_run.ping_url) is not None:
+        if url_helper.UrlOpen(self.test_run.ping_url, data='') is not None:
           self.last_ping_time = time.time()
 
       # If the process has ended, then read all the output that it generated.
