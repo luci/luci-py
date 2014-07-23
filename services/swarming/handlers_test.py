@@ -155,13 +155,11 @@ def CreateRunner(config_name=None, machine_id=None, ran_successfully=None,
   return result_summary, run_result
 
 
-class AppTest(test_case.TestCase):
-  # TODO(maruel): Make 3 test classes, one focused on bot API, one on client API
-  # and one on the web frontend and backend processing.
+class AppTestBase(test_case.TestCase):
   APP_DIR = APP_DIR
 
   def setUp(self):
-    super(AppTest, self).setUp()
+    super(AppTestBase, self).setUp()
     self._version = None
     self.testbed.init_user_stub()
     self.testbed.init_search_stub()
@@ -211,13 +209,7 @@ class AppTest(test_case.TestCase):
     try:
       template.reset()
     finally:
-      super(AppTest, self).tearDown()
-
-  def _GetRoutes(self):
-    """Returns the list of all routes handled."""
-    return [
-        r.template for r in self.app.app.router.match_routes
-    ]
+      super(AppTestBase, self).tearDown()
 
   def _ReplaceCurrentUser(self, email, **kwargs):
     if email:
@@ -233,21 +225,6 @@ class AppTest(test_case.TestCase):
     return self.auth_app.post(
         '/auth/api/v1/accounts/self/xsrf_token',
         headers={'X-XSRF-Token-Request': '1'}).json['xsrf_token']
-
-  def client_create_task(self, name):
-    """Simulate a client that creates a task."""
-    request = {
-      'configurations': [
-        {
-          'config_name': 'X',
-          'dimensions': {'os': 'Amiga'},
-          'priority': 10,
-        },
-      ],
-      'test_case_name': name,
-      'tests':[{'action': ['python', 'run_test.py'], 'test_name': 'Y'}],
-    }
-    return self.app.post('/test', {'request': json.dumps(request)}).json
 
   def bot_poll(self, bot):
     """Simulates a bot that polls for task."""
@@ -271,102 +248,21 @@ class AppTest(test_case.TestCase):
         '/poll_for_test', {'attributes': json.dumps(attributes)}).json
 
 
-  def testMatchingTestCasesHandler(self):
-    # Ensure that matching works even when the datastore is not being
-    # consistent.
-    policy = datastore_stub_util.PseudoRandomHRConsistencyPolicy(
-        probability=0)
-    self.testbed.init_datastore_v3_stub(
-        require_indexes=True, consistency_policy=policy, root_path=self.APP_DIR)
-
-    # Mock out all the authentication, since it doesn't work with the server
-    # being only eventually consistent (but it is ok for the machines to take
-    # a while to appear).
-    self.mock(user_manager, 'IsWhitelistedMachine', lambda *_arg: True)
-
-    # Test when no matching tests.
-    response = self.app.get(
-        '/get_matching_test_cases',
-        {'name': 'tc'},
-        expect_errors=True)
-    self.assertResponse(response, '404 Not Found', '[]')
-
-    # Test with a single matching runner.
-    result_summary, _run_result = CreateRunner('tc')
-    response = self.app.get(
-        '/get_matching_test_cases',
-        {'name': 'tc'})
-    self.assertEqual('200 OK', response.status)
-    self.assertIn(
-        task_common.pack_result_summary_key(result_summary.key),
-        response.body)
-
-    # Test with a multiple matching runners.
-    result_summary_2, _run_result = CreateRunner(
-        machine_id='foo', exit_codes='0', results='Rock on')
-
-    response = self.app.get(
-        '/get_matching_test_cases',
-        {'name': 'tc'})
-    self.assertEqual('200 OK', response.status)
-    self.assertIn(
-        task_common.pack_result_summary_key(result_summary.key),
-        response.body)
-    self.assertIn(
-        task_common.pack_result_summary_key(result_summary_2.key),
-        response.body)
-
-  def testGetResultHandler(self):
-    # Act under admin identity.
-    self._ReplaceCurrentUser(ADMIN_EMAIL)
-
-    # Test when no matching key
-    response = self.app.get('/get_result', {'r': 'fake_key'}, status=400)
-
-    # Create test and runner.
-    result_summary, run_result = CreateRunner(
-        machine_id=MACHINE_ID,
-        exit_codes='0',
-        results='\xe9 Invalid utf-8 string')
-
-    # Valid key.
-    packed = task_common.pack_result_summary_key(result_summary.key)
-    response = self.app.get('/get_result', {'r': packed})
-    self.assertEqual('200 OK', response.status)
-    try:
-      results = json.loads(response.body)
-    except (ValueError, TypeError), e:
-      self.fail(e)
-    # TODO(maruel): Stop using the DB directly in HTTP handlers test.
-    self.assertEqual(
-        ','.join(map(str, run_result.exit_codes)),
-        ''.join(results['exit_codes']))
-    self.assertEqual(result_summary.bot_id, results['machine_id'])
-    expected_result_string = '\n'.join(
-        o.decode('utf-8', 'replace')
-        for o in result_summary.get_outputs())
-    self.assertEqual(expected_result_string, results['output'])
-    self.assertEqual(u'\ufffd Invalid utf-8 string', results['output'])
-
-  def testGetSlaveCode(self):
-    response = self.app.get('/get_slave_code')
-    self.assertEqual('200 OK', response.status)
-    self.assertEqual(
-        len(bot_management.get_swarming_bot_zip('http://localhost')),
-        response.content_length)
-
-  def testGetSlaveCodeHash(self):
-    response = self.app.get(
-        '/get_slave_code/%s' %
-        bot_management.get_slave_version('http://localhost'))
-    self.assertEqual('200 OK', response.status)
-    self.assertEqual(
-        len(bot_management.get_swarming_bot_zip('http://localhost')),
-        response.content_length)
-
-  def testGetSlaveCodeInvalidHash(self):
-    response = self.app.get('/get_slave_code/' + '1' * 40, expect_errors=True)
-    self.assertEqual('404 Not Found', response.status)
+class FrontendTest(AppTestBase):
+  def client_create_task(self, name):
+    """Simulate a client that creates a task."""
+    request = {
+      'configurations': [
+        {
+          'config_name': 'X',
+          'dimensions': {'os': 'Amiga'},
+          'priority': 10,
+        },
+      ],
+      'test_case_name': name,
+      'tests':[{'action': ['python', 'run_test.py'], 'test_name': 'Y'}],
+    }
+    return self.app.post('/test', {'request': json.dumps(request)}).json
 
   def testBots(self):
     # Act under admin identity.
@@ -381,37 +277,6 @@ class AppTest(test_case.TestCase):
 
     response = self.app.get('/restricted/bots')
     self.assertTrue('200' in response.status)
-
-  def testApiBots(self):
-    # Act under admin identity.
-    self._ReplaceCurrentUser(ADMIN_EMAIL)
-
-    bot = bot_management.tag_bot_seen(
-        'id1', 'localhost', '127.0.0.1', '8.8.4.4', {'foo': 'bar'}, '123456789',
-        False)
-    bot.last_seen = datetime.datetime(2000, 1, 2, 3, 4, 5, 6)
-    bot.put()
-
-    response = self.app.get('/swarming/api/v1/bots')
-    self.assertEqual('200 OK', response.status)
-    expected = {
-        u'machine_death_timeout':
-            int(bot_management.MACHINE_DEATH_TIMEOUT.total_seconds()),
-        u'machines': [
-          {
-            u'dimensions': {u'foo': u'bar'},
-            u'external_ip': u'8.8.4.4',
-            u'hostname': u'localhost',
-            u'id': u'id1',
-            u'internal_ip': u'127.0.0.1',
-            u'last_seen': u'2000-01-02 03:04:05',
-            u'quarantined': False,
-            u'task': None,
-            u'version': u'123456789',
-          },
-       ],
-    }
-    self.assertEqual(expected, response.json)
 
   def testDeleteMachineStats(self):
     # Act under admin identity.
@@ -435,22 +300,6 @@ class AppTest(test_case.TestCase):
     response = self.app.get('/')
     self.assertEqual('200 OK', response.status)
 
-  def testRetryHandler(self):
-    # Act under admin identity.
-    self._ReplaceCurrentUser(ADMIN_EMAIL)
-
-    # Test when no matching key
-    response = self.app.post(
-        '/restricted/retry', {'r': 'fake_key'}, expect_errors=True)
-    self.assertEqual('400 Bad Request', response.status)
-    self.assertEqual('Unable to retry runner', response.body)
-
-    # Test with matching key.
-    result_summary, _run_result = CreateRunner(exit_codes='0')
-    packed = task_common.pack_result_summary_key(result_summary.key)
-    response = self.app.post('/restricted/retry', {'r': packed})
-    self.assertResponse(response, '200 OK', 'Runner set for retry.')
-
   def testUploadStartSlaveHandler(self):
     # Act under admin identity.
     self._ReplaceCurrentUser(ADMIN_EMAIL)
@@ -470,117 +319,6 @@ class AppTest(test_case.TestCase):
         '/restricted/upload_start_slave?xsrf_token=%s' % xsrf_token,
         upload_files=[('script', 'script', 'script_body')])
     self.assertIn('script_body', response.body)
-
-  def testRegisterHandler(self):
-    # Missing attributes field.
-    response = self.app.post(
-        '/poll_for_test', {'something': 'nothing'}, expect_errors=True)
-    self.assertResponse(
-        response,
-        '400 Bad Request',
-        '400 Bad Request\n\n'
-        'The server could not comply with the request since it is either '
-        'malformed or otherwise incorrect.\n\n'
-        ' Invalid attributes: : No JSON object could be decoded  ')
-
-    # Invalid attributes field.
-    response = self.app.post(
-        '/poll_for_test', {'attributes': 'nothing'}, expect_errors=True)
-    self.assertResponse(
-        response,
-        '400 Bad Request',
-        '400 Bad Request\n\n'
-        'The server could not comply with the request since it is either '
-        'malformed or otherwise incorrect.\n\n'
-        ' Invalid attributes: nothing: No JSON object could be decoded  ')
-
-    # Invalid empty attributes field.
-    response = self.app.post(
-        '/poll_for_test', {'attributes': None}, expect_errors=True)
-    self.assertResponse(
-        response,
-        '400 Bad Request',
-        '400 Bad Request\n\n'
-        'The server could not comply with the request since it is either '
-        'malformed or otherwise incorrect.\n\n'
-        ' Invalid attributes: None: No JSON object could be decoded  ')
-
-    # Valid attributes but missing dimensions.
-    attributes = '{"id": "%s"}' % MACHINE_ID
-    response = self.app.post(
-        '/poll_for_test', {'attributes': attributes}, expect_errors=True)
-    self.assertResponse(
-        response,
-        '400 Bad Request',
-        '400 Bad Request\n\n'
-        'The server could not comply with the request since it is '
-        'either malformed or otherwise incorrect.\n\n'
-        ' Missing mandatory attribute: dimensions  ')
-
-  def testRegisterHandlerNoVersion(self):
-    attributes = {
-      'dimensions': {'os': ['win-xp']},
-      'id': MACHINE_ID,
-    }
-    response = self.app.post(
-        '/poll_for_test', {'attributes': json.dumps(attributes)})
-    self.assertEqual('200 OK', response.status)
-    expected = {
-      u'commands': [
-        {
-          u'args':
-              u'http://localhost/get_slave_code/%s' %
-              bot_management.get_slave_version('http://localhost'),
-          u'function': u'UpdateSlave',
-        },
-      ],
-      u'result_url': u'http://localhost/remote_error',
-      u'try_count': 0,
-    }
-    self.assertEqual(expected, response.json)
-
-  def testRegisterHandlerVersion(self):
-    attributes = {
-      'dimensions': {'os': ['win-xp']},
-      'id': MACHINE_ID,
-      'ip': '8.8.4.4',
-      'version': bot_management.get_slave_version('http://localhost'),
-    }
-    response = self.app.post(
-        '/poll_for_test', {'attributes': json.dumps(attributes)})
-    self.assertEqual('200 OK', response.status)
-    expected_1 = {u'come_back': 1.0, u'try_count': 1}
-    expected_2 = {u'come_back': 2.25, u'try_count': 1}
-    self.assertTrue(response.json in (expected_1, expected_2), response.json)
-
-  def _PostResults(self, run_result, result, expect_errors=False):
-    url_parameters = {
-      'id': run_result.bot_id,
-      'o': result,
-      'r': task_common.pack_run_result_key(run_result.key),
-    }
-    return self.app.post('/result2', url_parameters,
-                         expect_errors=expect_errors)
-
-  def testResultHandler(self):
-    # TODO(maruel): Stop using the DB directly.
-    result_summary, run_result = CreateRunner(machine_id=MACHINE_ID)
-    result = 'result string'
-    response = self._PostResults(run_result, result)
-    self.assertResponse(
-        response, '200 OK', 'Successfully update the runner results.')
-
-    packed = task_common.pack_result_summary_key(result_summary.key)
-    resp = self.app.get('/get_result?r=%s' % packed, status=200)
-    expected = {
-      u'config_instance_index': 0,
-      u'exit_codes': u'',
-      u'machine_id': u'12345678-12345678-12345678-12345678',
-      u'machine_tag': u'12345678-12345678-12345678-12345678',
-      u'num_config_instances': 1,
-      u'output': u'result string',
-    }
-    self.assertEqual(expected, resp.json)
 
   def testWhitelistIPHandlerParams(self):
     # Start with clean IP whitelist. It removes FAKE_IP added in setUp.
@@ -812,158 +550,6 @@ class AppTest(test_case.TestCase):
     for url in urls:
       self.app.get(url, status=200)
 
-  def testRemoteErrorHandler(self):
-    self.app.get('/restricted/ereporter2/errors', status=403)
-
-    error_message = 'error message'
-    response = self.app.post('/remote_error', {'m': error_message})
-    self.assertResponse(response, '200 OK', 'Success.')
-
-    self.assertEqual(1, ereporter2.Error.query().count())
-    error = ereporter2.Error.query().get()
-    self.assertEqual(error.message, error_message)
-
-    def is_group_member_mock(group, identity=None):
-      return group == auth.model.ADMIN_GROUP or original(group, identity)
-    original = self.mock(auth.api, 'is_group_member', is_group_member_mock)
-    self.app.get('/restricted/ereporter2/errors', status=200)
-
-  def testRunnerPingFail(self):
-    # Try with an invalid runner key
-    response = self.app.post('/runner_ping', {'r': '1'}, expect_errors=True)
-    self.assertResponse(
-        response, '400 Bad Request',
-        '400 Bad Request\n\n'
-        'The server could not comply with the request since it is either '
-        'malformed or otherwise incorrect.\n\n'
-        ' Runner failed to ping.  ')
-
-  def testRunnerPing(self):
-    # Start a test and successfully ping it
-    _result_summary, run_result = CreateRunner(machine_id=MACHINE_ID)
-    packed = task_common.pack_run_result_key(run_result.key)
-    response = self.app.post(
-        '/runner_ping', {'r': packed, 'id': run_result.bot_id})
-    self.assertResponse(response, '200 OK', 'Success.')
-
-  def testTestRequest(self):
-    # Ensure that a test request fails without a request.
-    response = self.app.post('/test', expect_errors=True)
-    self.assertResponse(response, '400 Bad Request',
-                        '400 Bad Request\n\nThe server could not comply with '
-                        'the request since it is either malformed or otherwise '
-                        'incorrect.\n\n No request parameter found.  ')
-
-    # Ensure invalid requests are rejected.
-    request = {
-        "configurations": [{
-            "config_name": "win",
-            "dimensions": {"os": "win"},
-        }],
-        "test_case_name": "",
-        "tests":[{
-            "action": ["python", "run_test.py"],
-            "test_name": "Run Test",
-        }],
-    }
-    response = self.app.post('/test', {'request': json.dumps(request)},
-                             expect_errors=True)
-    self.assertEquals('400 Bad Request', response.status)
-
-    # Ensure that valid requests are accepted.
-    request['test_case_name'] = 'test_case'
-    response = self.app.post('/test', {'request': json.dumps(request)})
-    self.assertEquals('200 OK', response.status)
-
-  def testCronTriggerTask(self):
-    triggers = (
-      '/internal/cron/trigger_cleanup_data',
-    )
-
-    for url in triggers:
-      response = self.app.get(url, headers={'X-AppEngine-Cron': 'true'})
-      self.assertResponse(response, '200 OK', 'Success.')
-      self.assertEqual(1, self.execute_tasks())
-
-  def testTaskQueueUrls(self):
-    # Tests all the cron tasks are securely handled.
-    task_queue_urls = sorted(
-      r for r in self._GetRoutes() if r.startswith('/internal/taskqueue/')
-    )
-    task_queues = [
-      ('cleanup', '/internal/taskqueue/cleanup_data'),
-    ]
-    self.assertEqual(sorted(zip(*task_queues)[1]), task_queue_urls)
-
-    for task_name, url in task_queues:
-      response = self.app.post(
-          url, headers={'X-AppEngine-QueueName': task_name})
-      self.assertResponse(response, '200 OK', 'Success.')
-
-  def testCronJobTasks(self):
-    # Tests all the cron tasks are securely handled.
-    cron_job_urls = [
-        r for r in self._GetRoutes() if r.startswith('/internal/cron/')
-    ]
-    self.assertTrue(cron_job_urls, cron_job_urls)
-
-    # For ereporter.
-    for cron_job_url in cron_job_urls:
-      response = self.app.get(cron_job_url,
-                              headers={'X-AppEngine-Cron': 'true'})
-      self.assertEqual(200, response.status_code)
-
-      # Only cron job requests can be gets for this handler.
-      response = self.app.get(cron_job_url, expect_errors=True)
-      self.assertResponse(
-          response, '403 Forbidden',
-          '403 Forbidden\n\nAccess was denied to this resource.\n\n '
-          'Only internal cron jobs can do this  ')
-    # The actual number doesn't matter, just make sure they are unqueued.
-    self.execute_tasks()
-
-  def testSendEReporter(self):
-    self._ReplaceCurrentUser(ADMIN_EMAIL)
-    response = self.app.get('/internal/cron/ereporter2/mail',
-                            headers={'X-AppEngine-Cron': 'true'})
-    self.assertResponse(response, '200 OK', 'Success.')
-
-  def testCancelHandler(self):
-    # Act under admin identity.
-    self._ReplaceCurrentUser(ADMIN_EMAIL)
-
-    response = self.app.post(
-        '/restricted/cancel', {'r': 'invalid_key'}, expect_errors=True)
-    self.assertEqual('400 Bad Request', response.status)
-    self.assertEqual('Unable to cancel runner', response.body)
-
-    result_summary, _run_result = CreateRunner()
-    packed = task_common.pack_result_summary_key(result_summary.key)
-    response = self.app.post('/restricted/cancel', {'r': packed})
-    self.assertResponse(response, '200 OK', 'Runner canceled.')
-
-  def test_dead_machines_count(self):
-    # TODO(maruel): Convert this test case to mock time and use the APIs instead
-    # of editing the DB directly.
-    self.assertEqual('0', self.app.get('/swarming/api/v1/bots/dead/count').body)
-    bot = bot_management.tag_bot_seen(
-        'id1', 'localhost', '127.0.0.1', '8.8.4.4', {}, '123456789', False)
-    self.assertEqual('0', self.app.get('/swarming/api/v1/bots/dead/count').body)
-
-    # Borderline. If this test becomes flaky, increase the 1 second value.
-    bot.last_seen = (
-        utils.utcnow() - bot_management.MACHINE_DEATH_TIMEOUT +
-        datetime.timedelta(seconds=1))
-    bot.put()
-    self.assertEqual('0', self.app.get('/swarming/api/v1/bots/dead/count').body)
-
-    # Make the machine old and ensure it is marked as dead.
-    bot.last_seen = (
-        utils.utcnow() - bot_management.MACHINE_DEATH_TIMEOUT -
-        datetime.timedelta(seconds=1))
-    bot.put()
-    self.assertEqual('1', self.app.get('/swarming/api/v1/bots/dead/count').body)
-
   def test_bootstrap_default(self):
     actual = self.app.get('/bootstrap').body
     with open(os.path.join(APP_DIR, 'swarm_bot/bootstrap.py'), 'rb') as f:
@@ -985,70 +571,6 @@ class AppTest(test_case.TestCase):
 
     actual = self.app.get('/bootstrap').body
     expected = 'host_url = \'http://localhost\'\nscript_body'
-    self.assertEqual(expected, actual)
-
-  def test_convert_test_case(self):
-    data = {
-      'configurations': [
-        {
-          'config_name': 'ignored',
-          'deadline_to_run': 63,
-          'dimensions': {
-            'OS': 'Windows-3.1.1',
-            'hostname': 'localhost',
-          },
-          # Do not block sharded requests, simply ignore the sharding request
-          # and run it as a single shard.
-          'num_instances': 23,
-          'priority': 50,
-        },
-      ],
-      'data': [
-        ('http://localhost/foo', 'foo.zip'),
-        ('http://localhost/bar', 'bar.zip'),
-      ],
-      'env_vars': {
-        'foo': 'bar',
-        'joe': '2',
-      },
-      'requestor': 'Jesus',
-      'test_case_name': 'Request name',
-      'tests': [
-        {
-          'action': ['command1', 'arg1'],
-          'hard_time_out': 66.1,
-          'io_time_out': 68.1,
-          'test_name': 'very ignored',
-        },
-        {
-          'action': ['command2', 'arg2'],
-          'test_name': 'very ignored but must be different',
-          'hard_time_out': 60000000,
-          'io_time_out': 60000000,
-        },
-      ],
-    }
-    actual = handlers_frontend.convert_test_case(json.dumps(data))
-    expected = {
-      'name': u'Request name',
-      'user': u'Jesus',
-      'properties': {
-        'commands': [
-          [u'command1', u'arg1'],
-          [u'command2', u'arg2'],
-        ],
-        'data': [
-          [u'http://localhost/foo', u'foo.zip'],
-          [u'http://localhost/bar', u'bar.zip'],
-        ],
-        'dimensions': {u'OS': u'Windows-3.1.1', u'hostname': u'localhost'},
-        'env': {u'foo': u'bar', u'joe': u'2'},
-        'execution_timeout_secs': 66,
-        'io_timeout_secs': 68,
-      },
-      'priority': 50,
-      'scheduling_expiration_secs': 63,
-    }
     self.assertEqual(expected, actual)
 
   def test_task_list_empty(self):
@@ -1148,6 +670,489 @@ class AppTest(test_case.TestCase):
     self.app.get('/restricted/bots', status=200)
     self.app.get('/restricted/bot/bot1', status=200)
     self.app.get('/restricted/bot/bot2', status=200)
+
+
+class BackendTest(AppTestBase):
+  def _GetRoutes(self):
+    """Returns the list of all routes handled."""
+    return [
+        r.template for r in self.app.app.router.match_routes
+    ]
+
+  def testCronJobTasks(self):
+    # Tests all the cron tasks are securely handled.
+    cron_job_urls = [
+        r for r in self._GetRoutes() if r.startswith('/internal/cron/')
+    ]
+    self.assertTrue(cron_job_urls, cron_job_urls)
+
+    # For ereporter.
+    for cron_job_url in cron_job_urls:
+      response = self.app.get(cron_job_url,
+                              headers={'X-AppEngine-Cron': 'true'})
+      self.assertEqual(200, response.status_code)
+
+      # Only cron job requests can be gets for this handler.
+      response = self.app.get(cron_job_url, expect_errors=True)
+      self.assertResponse(
+          response, '403 Forbidden',
+          '403 Forbidden\n\nAccess was denied to this resource.\n\n '
+          'Only internal cron jobs can do this  ')
+    # The actual number doesn't matter, just make sure they are unqueued.
+    self.execute_tasks()
+
+  def testSendEReporter(self):
+    self._ReplaceCurrentUser(ADMIN_EMAIL)
+    response = self.app.get('/internal/cron/ereporter2/mail',
+                            headers={'X-AppEngine-Cron': 'true'})
+    self.assertResponse(response, '200 OK', 'Success.')
+
+  def testCronTriggerTask(self):
+    triggers = (
+      '/internal/cron/trigger_cleanup_data',
+    )
+
+    for url in triggers:
+      response = self.app.get(url, headers={'X-AppEngine-Cron': 'true'})
+      self.assertResponse(response, '200 OK', 'Success.')
+      self.assertEqual(1, self.execute_tasks())
+
+  def testTaskQueueUrls(self):
+    # Tests all the cron tasks are securely handled.
+    task_queue_urls = sorted(
+      r for r in self._GetRoutes() if r.startswith('/internal/taskqueue/')
+    )
+    task_queues = [
+      ('cleanup', '/internal/taskqueue/cleanup_data'),
+    ]
+    self.assertEqual(sorted(zip(*task_queues)[1]), task_queue_urls)
+
+    for task_name, url in task_queues:
+      response = self.app.post(
+          url, headers={'X-AppEngine-QueueName': task_name})
+      self.assertResponse(response, '200 OK', 'Success.')
+
+
+class BotApiTest(AppTestBase):
+  def testGetSlaveCode(self):
+    response = self.app.get('/get_slave_code')
+    self.assertEqual('200 OK', response.status)
+    self.assertEqual(
+        len(bot_management.get_swarming_bot_zip('http://localhost')),
+        response.content_length)
+
+  def testGetSlaveCodeHash(self):
+    response = self.app.get(
+        '/get_slave_code/%s' %
+        bot_management.get_slave_version('http://localhost'))
+    self.assertEqual('200 OK', response.status)
+    self.assertEqual(
+        len(bot_management.get_swarming_bot_zip('http://localhost')),
+        response.content_length)
+
+  def testGetSlaveCodeInvalidHash(self):
+    response = self.app.get('/get_slave_code/' + '1' * 40, expect_errors=True)
+    self.assertEqual('404 Not Found', response.status)
+
+  def testRegisterHandler(self):
+    # Missing attributes field.
+    response = self.app.post(
+        '/poll_for_test', {'something': 'nothing'}, expect_errors=True)
+    self.assertResponse(
+        response,
+        '400 Bad Request',
+        '400 Bad Request\n\n'
+        'The server could not comply with the request since it is either '
+        'malformed or otherwise incorrect.\n\n'
+        ' Invalid attributes: : No JSON object could be decoded  ')
+
+    # Invalid attributes field.
+    response = self.app.post(
+        '/poll_for_test', {'attributes': 'nothing'}, expect_errors=True)
+    self.assertResponse(
+        response,
+        '400 Bad Request',
+        '400 Bad Request\n\n'
+        'The server could not comply with the request since it is either '
+        'malformed or otherwise incorrect.\n\n'
+        ' Invalid attributes: nothing: No JSON object could be decoded  ')
+
+    # Invalid empty attributes field.
+    response = self.app.post(
+        '/poll_for_test', {'attributes': None}, expect_errors=True)
+    self.assertResponse(
+        response,
+        '400 Bad Request',
+        '400 Bad Request\n\n'
+        'The server could not comply with the request since it is either '
+        'malformed or otherwise incorrect.\n\n'
+        ' Invalid attributes: None: No JSON object could be decoded  ')
+
+    # Valid attributes but missing dimensions.
+    attributes = '{"id": "%s"}' % MACHINE_ID
+    response = self.app.post(
+        '/poll_for_test', {'attributes': attributes}, expect_errors=True)
+    self.assertResponse(
+        response,
+        '400 Bad Request',
+        '400 Bad Request\n\n'
+        'The server could not comply with the request since it is '
+        'either malformed or otherwise incorrect.\n\n'
+        ' Missing mandatory attribute: dimensions  ')
+
+  def testRegisterHandlerNoVersion(self):
+    attributes = {
+      'dimensions': {'os': ['win-xp']},
+      'id': MACHINE_ID,
+    }
+    response = self.app.post(
+        '/poll_for_test', {'attributes': json.dumps(attributes)})
+    self.assertEqual('200 OK', response.status)
+    expected = {
+      u'commands': [
+        {
+          u'args':
+              u'http://localhost/get_slave_code/%s' %
+              bot_management.get_slave_version('http://localhost'),
+          u'function': u'UpdateSlave',
+        },
+      ],
+      u'result_url': u'http://localhost/remote_error',
+      u'try_count': 0,
+    }
+    self.assertEqual(expected, response.json)
+
+  def testRegisterHandlerVersion(self):
+    attributes = {
+      'dimensions': {'os': ['win-xp']},
+      'id': MACHINE_ID,
+      'ip': '8.8.4.4',
+      'version': bot_management.get_slave_version('http://localhost'),
+    }
+    response = self.app.post(
+        '/poll_for_test', {'attributes': json.dumps(attributes)})
+    self.assertEqual('200 OK', response.status)
+    expected_1 = {u'come_back': 1.0, u'try_count': 1}
+    expected_2 = {u'come_back': 2.25, u'try_count': 1}
+    self.assertTrue(response.json in (expected_1, expected_2), response.json)
+
+  def testRunnerPing(self):
+    # Start a test and successfully ping it
+    _result_summary, run_result = CreateRunner(machine_id=MACHINE_ID)
+    packed = task_common.pack_run_result_key(run_result.key)
+    response = self.app.post(
+        '/runner_ping', {'r': packed, 'id': run_result.bot_id})
+    self.assertResponse(response, '200 OK', 'Success.')
+
+  def testRemoteErrorHandler(self):
+    self.app.get('/restricted/ereporter2/errors', status=403)
+
+    error_message = 'error message'
+    response = self.app.post('/remote_error', {'m': error_message})
+    self.assertResponse(response, '200 OK', 'Success.')
+
+    self.assertEqual(1, ereporter2.Error.query().count())
+    error = ereporter2.Error.query().get()
+    self.assertEqual(error.message, error_message)
+
+    def is_group_member_mock(group, identity=None):
+      return group == auth.model.ADMIN_GROUP or original(group, identity)
+    original = self.mock(auth.api, 'is_group_member', is_group_member_mock)
+    self.app.get('/restricted/ereporter2/errors', status=200)
+
+  def testRunnerPingFail(self):
+    # Try with an invalid runner key
+    response = self.app.post('/runner_ping', {'r': '1'}, expect_errors=True)
+    self.assertResponse(
+        response, '400 Bad Request',
+        '400 Bad Request\n\n'
+        'The server could not comply with the request since it is either '
+        'malformed or otherwise incorrect.\n\n'
+        ' Runner failed to ping.  ')
+
+
+class ClientApiTest(AppTestBase):
+  def testMatchingTestCasesHandler(self):
+    # Ensure that matching works even when the datastore is not being
+    # consistent.
+    policy = datastore_stub_util.PseudoRandomHRConsistencyPolicy(
+        probability=0)
+    self.testbed.init_datastore_v3_stub(
+        require_indexes=True, consistency_policy=policy, root_path=self.APP_DIR)
+
+    # Mock out all the authentication, since it doesn't work with the server
+    # being only eventually consistent (but it is ok for the machines to take
+    # a while to appear).
+    self.mock(user_manager, 'IsWhitelistedMachine', lambda *_arg: True)
+
+    # Test when no matching tests.
+    response = self.app.get(
+        '/get_matching_test_cases',
+        {'name': 'tc'},
+        expect_errors=True)
+    self.assertResponse(response, '404 Not Found', '[]')
+
+    # Test with a single matching runner.
+    result_summary, _run_result = CreateRunner('tc')
+    response = self.app.get(
+        '/get_matching_test_cases',
+        {'name': 'tc'})
+    self.assertEqual('200 OK', response.status)
+    self.assertIn(
+        task_common.pack_result_summary_key(result_summary.key),
+        response.body)
+
+    # Test with a multiple matching runners.
+    result_summary_2, _run_result = CreateRunner(
+        machine_id='foo', exit_codes='0', results='Rock on')
+
+    response = self.app.get(
+        '/get_matching_test_cases',
+        {'name': 'tc'})
+    self.assertEqual('200 OK', response.status)
+    self.assertIn(
+        task_common.pack_result_summary_key(result_summary.key),
+        response.body)
+    self.assertIn(
+        task_common.pack_result_summary_key(result_summary_2.key),
+        response.body)
+
+  def testGetResultHandler(self):
+    # Act under admin identity.
+    self._ReplaceCurrentUser(ADMIN_EMAIL)
+
+    # Test when no matching key
+    response = self.app.get('/get_result', {'r': 'fake_key'}, status=400)
+
+    # Create test and runner.
+    result_summary, run_result = CreateRunner(
+        machine_id=MACHINE_ID,
+        exit_codes='0',
+        results='\xe9 Invalid utf-8 string')
+
+    # Valid key.
+    packed = task_common.pack_result_summary_key(result_summary.key)
+    response = self.app.get('/get_result', {'r': packed})
+    self.assertEqual('200 OK', response.status)
+    try:
+      results = json.loads(response.body)
+    except (ValueError, TypeError), e:
+      self.fail(e)
+    # TODO(maruel): Stop using the DB directly in HTTP handlers test.
+    self.assertEqual(
+        ','.join(map(str, run_result.exit_codes)),
+        ''.join(results['exit_codes']))
+    self.assertEqual(result_summary.bot_id, results['machine_id'])
+    expected_result_string = '\n'.join(
+        o.decode('utf-8', 'replace')
+        for o in result_summary.get_outputs())
+    self.assertEqual(expected_result_string, results['output'])
+    self.assertEqual(u'\ufffd Invalid utf-8 string', results['output'])
+
+  def testApiBots(self):
+    # Act under admin identity.
+    self._ReplaceCurrentUser(ADMIN_EMAIL)
+
+    bot = bot_management.tag_bot_seen(
+        'id1', 'localhost', '127.0.0.1', '8.8.4.4', {'foo': 'bar'}, '123456789',
+        False)
+    bot.last_seen = datetime.datetime(2000, 1, 2, 3, 4, 5, 6)
+    bot.put()
+
+    response = self.app.get('/swarming/api/v1/bots')
+    self.assertEqual('200 OK', response.status)
+    expected = {
+        u'machine_death_timeout':
+            int(bot_management.MACHINE_DEATH_TIMEOUT.total_seconds()),
+        u'machines': [
+          {
+            u'dimensions': {u'foo': u'bar'},
+            u'external_ip': u'8.8.4.4',
+            u'hostname': u'localhost',
+            u'id': u'id1',
+            u'internal_ip': u'127.0.0.1',
+            u'last_seen': u'2000-01-02 03:04:05',
+            u'quarantined': False,
+            u'task': None,
+            u'version': u'123456789',
+          },
+       ],
+    }
+    self.assertEqual(expected, response.json)
+
+  def testRetryHandler(self):
+    # Act under admin identity.
+    self._ReplaceCurrentUser(ADMIN_EMAIL)
+
+    # Test when no matching key
+    response = self.app.post(
+        '/restricted/retry', {'r': 'fake_key'}, expect_errors=True)
+    self.assertEqual('400 Bad Request', response.status)
+    self.assertEqual('Unable to retry runner', response.body)
+
+    # Test with matching key.
+    result_summary, _run_result = CreateRunner(exit_codes='0')
+    packed = task_common.pack_result_summary_key(result_summary.key)
+    response = self.app.post('/restricted/retry', {'r': packed})
+    self.assertResponse(response, '200 OK', 'Runner set for retry.')
+
+  def test_convert_test_case(self):
+    data = {
+      'configurations': [
+        {
+          'config_name': 'ignored',
+          'deadline_to_run': 63,
+          'dimensions': {
+            'OS': 'Windows-3.1.1',
+            'hostname': 'localhost',
+          },
+          # Do not block sharded requests, simply ignore the sharding request
+          # and run it as a single shard.
+          'num_instances': 23,
+          'priority': 50,
+        },
+      ],
+      'data': [
+        ('http://localhost/foo', 'foo.zip'),
+        ('http://localhost/bar', 'bar.zip'),
+      ],
+      'env_vars': {
+        'foo': 'bar',
+        'joe': '2',
+      },
+      'requestor': 'Jesus',
+      'test_case_name': 'Request name',
+      'tests': [
+        {
+          'action': ['command1', 'arg1'],
+          'hard_time_out': 66.1,
+          'io_time_out': 68.1,
+          'test_name': 'very ignored',
+        },
+        {
+          'action': ['command2', 'arg2'],
+          'test_name': 'very ignored but must be different',
+          'hard_time_out': 60000000,
+          'io_time_out': 60000000,
+        },
+      ],
+    }
+    actual = handlers_frontend.convert_test_case(json.dumps(data))
+    expected = {
+      'name': u'Request name',
+      'user': u'Jesus',
+      'properties': {
+        'commands': [
+          [u'command1', u'arg1'],
+          [u'command2', u'arg2'],
+        ],
+        'data': [
+          [u'http://localhost/foo', u'foo.zip'],
+          [u'http://localhost/bar', u'bar.zip'],
+        ],
+        'dimensions': {u'OS': u'Windows-3.1.1', u'hostname': u'localhost'},
+        'env': {u'foo': u'bar', u'joe': u'2'},
+        'execution_timeout_secs': 66,
+        'io_timeout_secs': 68,
+      },
+      'priority': 50,
+      'scheduling_expiration_secs': 63,
+    }
+    self.assertEqual(expected, actual)
+
+  def testCancelHandler(self):
+    # Act under admin identity.
+    self._ReplaceCurrentUser(ADMIN_EMAIL)
+
+    response = self.app.post(
+        '/restricted/cancel', {'r': 'invalid_key'}, expect_errors=True)
+    self.assertEqual('400 Bad Request', response.status)
+    self.assertEqual('Unable to cancel runner', response.body)
+
+    result_summary, _run_result = CreateRunner()
+    packed = task_common.pack_result_summary_key(result_summary.key)
+    response = self.app.post('/restricted/cancel', {'r': packed})
+    self.assertResponse(response, '200 OK', 'Runner canceled.')
+
+  def test_dead_machines_count(self):
+    # TODO(maruel): Convert this test case to mock time and use the APIs instead
+    # of editing the DB directly.
+    self.assertEqual('0', self.app.get('/swarming/api/v1/bots/dead/count').body)
+    bot = bot_management.tag_bot_seen(
+        'id1', 'localhost', '127.0.0.1', '8.8.4.4', {}, '123456789', False)
+    self.assertEqual('0', self.app.get('/swarming/api/v1/bots/dead/count').body)
+
+    # Borderline. If this test becomes flaky, increase the 1 second value.
+    bot.last_seen = (
+        utils.utcnow() - bot_management.MACHINE_DEATH_TIMEOUT +
+        datetime.timedelta(seconds=1))
+    bot.put()
+    self.assertEqual('0', self.app.get('/swarming/api/v1/bots/dead/count').body)
+
+    # Make the machine old and ensure it is marked as dead.
+    bot.last_seen = (
+        utils.utcnow() - bot_management.MACHINE_DEATH_TIMEOUT -
+        datetime.timedelta(seconds=1))
+    bot.put()
+    self.assertEqual('1', self.app.get('/swarming/api/v1/bots/dead/count').body)
+
+  def _PostResults(self, run_result, result, expect_errors=False):
+    url_parameters = {
+      'id': run_result.bot_id,
+      'o': result,
+      'r': task_common.pack_run_result_key(run_result.key),
+    }
+    return self.app.post('/result2', url_parameters,
+                         expect_errors=expect_errors)
+
+  def testResultHandler(self):
+    # TODO(maruel): Stop using the DB directly.
+    result_summary, run_result = CreateRunner(machine_id=MACHINE_ID)
+    result = 'result string'
+    response = self._PostResults(run_result, result)
+    self.assertResponse(
+        response, '200 OK', 'Successfully update the runner results.')
+
+    packed = task_common.pack_result_summary_key(result_summary.key)
+    resp = self.app.get('/get_result?r=%s' % packed, status=200)
+    expected = {
+      u'config_instance_index': 0,
+      u'exit_codes': u'',
+      u'machine_id': u'12345678-12345678-12345678-12345678',
+      u'machine_tag': u'12345678-12345678-12345678-12345678',
+      u'num_config_instances': 1,
+      u'output': u'result string',
+    }
+    self.assertEqual(expected, resp.json)
+
+  def testTestRequest(self):
+    # Ensure that a test request fails without a request.
+    response = self.app.post('/test', expect_errors=True)
+    self.assertResponse(response, '400 Bad Request',
+                        '400 Bad Request\n\nThe server could not comply with '
+                        'the request since it is either malformed or otherwise '
+                        'incorrect.\n\n No request parameter found.  ')
+
+    # Ensure invalid requests are rejected.
+    request = {
+        "configurations": [{
+            "config_name": "win",
+            "dimensions": {"os": "win"},
+        }],
+        "test_case_name": "",
+        "tests":[{
+            "action": ["python", "run_test.py"],
+            "test_name": "Run Test",
+        }],
+    }
+    response = self.app.post('/test', {'request': json.dumps(request)},
+                             expect_errors=True)
+    self.assertEquals('400 Bad Request', response.status)
+
+    # Ensure that valid requests are accepted.
+    request['test_case_name'] = 'test_case'
+    response = self.app.post('/test', {'request': json.dumps(request)})
+    self.assertEquals('200 OK', response.status)
 
 
 if __name__ == '__main__':
