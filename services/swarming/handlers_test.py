@@ -24,6 +24,7 @@ from google.appengine.ext import ndb
 import webtest
 
 import handlers_frontend
+from common import test_request_message
 from components import auth
 from components import ereporter2
 from components import stats_framework
@@ -33,7 +34,9 @@ from server import acl
 from server import bot_management
 from server import stats
 from server import task_common
-from server import test_helper
+from server import task_result
+from server import task_scheduler
+from server import task_to_run
 from server import user_manager
 from support import test_case
 
@@ -56,6 +59,100 @@ def clear_ip_whitelist():
   """Removes all IPs from the whitelist."""
   entries = user_manager.MachineWhitelist.query().fetch(keys_only=True)
   ndb.delete_multi(entries)
+
+
+def GetRequestMessage(requestor=None):
+  """Return a properly formatted request message text.
+
+  Returns:
+    A properly formatted request message text.
+  """
+  tests = [
+    test_request_message.TestObject(test_name='t1', action=['ignore-me.exe']),
+  ]
+  configurations = [
+    test_request_message.TestConfiguration(
+        config_name='c1_0',
+        dimensions=dict(os='win-xp', cpu='Unknown', browser='Unknown'),
+        num_instances=1,
+        priority=10)
+  ]
+  request = test_request_message.TestCase(
+      restart_on_failure=False,
+      requestor=requestor,
+      test_case_name='tc',
+      configurations=configurations,
+      data=[('http://b.ina.ry/files2.zip', 'files2.zip')],
+      env_vars=None,
+      tests=tests)
+  return test_request_message.Stringize(request, json_readable=True)
+
+
+def CreateRunner(config_name=None, machine_id=None, ran_successfully=None,
+                 exit_codes=None, created=None, started=None,
+                 ended=None, requestor=None, results=None):
+  """Creates entities to represent a new task request and a bot running it.
+
+  The entities are TaskRequest, TaskToRun, TaskResultSummary, TaskRunResult,
+  ResultChunk and Results.
+
+  The entity may be in a pending, running or completed state.
+
+  Args:
+    config_name: The config name for the runner.
+    machine_id: The machine id for the runner. Also, if this is given the
+      runner is marked as having started.
+    ran_succesfully: True if the runner ran successfully.
+    exit_codes: The exit codes for the runner. Also, if this is given the
+      runner is marked as having finished.
+    created: timedelta from now to mark this request was created in the future.
+    started: timedelta from .created to when the task execution started.
+    ended: timedelta from .started to when the bot completed the task.
+    requestor: string representing the user name that requested the task.
+    results: string that represents stdout the bot sent back.
+
+  Returns:
+    The pending runner created.
+  """
+  config_name = config_name or ('c1_0')
+  request_message = GetRequestMessage(requestor=requestor)
+  data = handlers_frontend.convert_test_case(request_message)
+  request, result_summary = task_scheduler.make_request(data)
+  if created:
+    # For some reason, pylint is being obnoxious here and generates a W0201
+    # warning that cannot be disabled. See http://www.logilab.org/19607
+    setattr(request, 'created_ts', datetime.datetime.utcnow() + created)
+    request.put()
+
+  # The task is reaped by a bot, so it is in a running state. Pending state is
+  # not supported here.
+  task_key = task_to_run.request_to_task_to_run_key(request)
+  task = task_to_run.is_task_reapable(task_key, None)
+  task.put()
+
+  machine_id = machine_id or 'localhost'
+  run_result = task_result.new_run_result(request, 1, machine_id)
+
+  if ran_successfully or exit_codes:
+    exit_codes = map(int, exit_codes.split(',')) if exit_codes else [0]
+    # The entity needs to be saved before it can be updated, since
+    # bot_update_task() accepts the key of the entity.
+    ndb.put_multi(task_result.prepare_put_run_result(run_result))
+    if not task_scheduler.bot_update_task(
+        run_result.key, machine_id, exit_codes, results):
+      assert False, (
+          'Expected to reap the TaskToRun that was created lines above')
+    # Refresh it from the DB.
+
+  if started:
+    run_result.started_ts = run_result.created + started
+  if ended:
+    run_result.completed_ts = run_result.started_ts + ended
+
+  # Mark the job as at least running.
+  ndb.put_multi(task_result.prepare_put_run_result(run_result))
+
+  return result_summary, run_result
 
 
 class AppTest(test_case.TestCase):
@@ -190,27 +287,27 @@ class AppTest(test_case.TestCase):
     # Test when no matching tests.
     response = self.app.get(
         '/get_matching_test_cases',
-        {'name': test_helper.REQUEST_MESSAGE_TEST_CASE_NAME},
+        {'name': 'tc'},
         expect_errors=True)
     self.assertResponse(response, '404 Not Found', '[]')
 
     # Test with a single matching runner.
-    result_summary, _run_result = test_helper.CreateRunner()
+    result_summary, _run_result = CreateRunner('tc')
     response = self.app.get(
         '/get_matching_test_cases',
-        {'name': test_helper.REQUEST_MESSAGE_TEST_CASE_NAME})
+        {'name': 'tc'})
     self.assertEqual('200 OK', response.status)
     self.assertIn(
         task_common.pack_result_summary_key(result_summary.key),
         response.body)
 
     # Test with a multiple matching runners.
-    result_summary_2, _run_result = test_helper.CreateRunner(
+    result_summary_2, _run_result = CreateRunner(
         machine_id='foo', exit_codes='0', results='Rock on')
 
     response = self.app.get(
         '/get_matching_test_cases',
-        {'name': test_helper.REQUEST_MESSAGE_TEST_CASE_NAME})
+        {'name': 'tc'})
     self.assertEqual('200 OK', response.status)
     self.assertIn(
         task_common.pack_result_summary_key(result_summary.key),
@@ -227,7 +324,7 @@ class AppTest(test_case.TestCase):
     response = self.app.get('/get_result', {'r': 'fake_key'}, status=400)
 
     # Create test and runner.
-    result_summary, run_result = test_helper.CreateRunner(
+    result_summary, run_result = CreateRunner(
         machine_id=MACHINE_ID,
         exit_codes='0',
         results='\xe9 Invalid utf-8 string')
@@ -349,7 +446,7 @@ class AppTest(test_case.TestCase):
     self.assertEqual('Unable to retry runner', response.body)
 
     # Test with matching key.
-    result_summary, _run_result = test_helper.CreateRunner(exit_codes='0')
+    result_summary, _run_result = CreateRunner(exit_codes='0')
     packed = task_common.pack_result_summary_key(result_summary.key)
     response = self.app.post('/restricted/retry', {'r': packed})
     self.assertResponse(response, '200 OK', 'Runner set for retry.')
@@ -467,7 +564,7 @@ class AppTest(test_case.TestCase):
 
   def testResultHandler(self):
     # TODO(maruel): Stop using the DB directly.
-    result_summary, run_result = test_helper.CreateRunner(machine_id=MACHINE_ID)
+    result_summary, run_result = CreateRunner(machine_id=MACHINE_ID)
     result = 'result string'
     response = self._PostResults(run_result, result)
     self.assertResponse(
@@ -743,8 +840,7 @@ class AppTest(test_case.TestCase):
 
   def testRunnerPing(self):
     # Start a test and successfully ping it
-    _result_summary, run_result = test_helper.CreateRunner(
-        machine_id=MACHINE_ID)
+    _result_summary, run_result = CreateRunner(machine_id=MACHINE_ID)
     packed = task_common.pack_run_result_key(run_result.key)
     response = self.app.post(
         '/runner_ping', {'r': packed, 'id': run_result.bot_id})
@@ -841,7 +937,7 @@ class AppTest(test_case.TestCase):
     self.assertEqual('400 Bad Request', response.status)
     self.assertEqual('Unable to cancel runner', response.body)
 
-    result_summary, _run_result = test_helper.CreateRunner()
+    result_summary, _run_result = CreateRunner()
     packed = task_common.pack_result_summary_key(result_summary.key)
     response = self.app.post('/restricted/cancel', {'r': packed})
     self.assertResponse(response, '200 OK', 'Runner canceled.')

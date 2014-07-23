@@ -26,7 +26,6 @@ from support import test_case
 
 
 def _gen_request_data(properties=None, **kwargs):
-  # TODO(maruel): Move all the copies of this function in test_helper.
   base_data = {
     'name': 'Request name',
     'user': 'Jesus',
