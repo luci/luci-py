@@ -606,6 +606,26 @@ class ClientHandshakeHandler(auth.ApiHandler):
     self.send_response(data)
 
 
+class ClientTaskResultHandler(auth.ApiHandler):
+  @auth.require(acl.is_bot_or_user)
+  def get(self, key_id):
+    # TODO(maruel): Users can only request their own task. Privileged users can
+    # request any task.
+    key = None
+    try:
+      key = task_scheduler.unpack_result_summary_key(key_id)
+    except ValueError:
+      try:
+        key = task_scheduler.unpack_run_result_key(key_id)
+      except ValueError:
+        self.abort_with_error(400, error='Invalid key')
+
+    result = key.get()
+    if not result:
+      self.abort_with_error(404, error='Task not found')
+    self.send_response(utils.to_json_encodable(result))
+
+
 ### Old Client APIs.
 
 
@@ -1245,6 +1265,8 @@ def create_application(debug):
 
       # New Client API:
       ('/swarming/api/v1/client/handshake', ClientHandshakeHandler),
+      ('/swarming/api/v1/client/task/<key_id:[0-9a-fA-F]+>',
+          ClientTaskResultHandler),
 
       # New Bot API:
       ('/swarming/api/v1/bot/handshake', BotHandshakeHandler),

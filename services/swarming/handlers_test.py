@@ -998,6 +998,61 @@ class NewClientApiTest(AppTestBase):
     ]
     self.assertEqual(expected, errors)
 
+  def test_get_results_unknown(self):
+    response = self.app.get(
+        '/swarming/api/v1/client/task/12300', status=404).json
+    self.assertEqual({u'error': u'Task not found'}, response)
+
+  def test_get_results(self):
+    now = datetime.datetime(2010, 1, 2, 3, 4, 5)
+    self.mock_now(now)
+    str_now = unicode(now.strftime(utils.DATETIME_FORMAT))
+    # Note: this is still the old API.
+    task_id = self.client_create_task('hi')['test_keys'][0]['test_key']
+    response = self.app.get(
+        '/swarming/api/v1/client/task/' + task_id).json
+    expected = {
+      u'abandoned_ts': None,
+      u'bot_id': None,
+      u'completed_ts': None,
+      u'created_ts': str_now,
+      u'exit_codes': [],
+      u'failure': False,
+      u'internal_failure': False,
+      u'modified_ts': str_now,
+      u'name': u'hi',
+      u'outputs': [],
+      u'started_ts': None,
+      u'state': task_result.State.PENDING,
+      u'try_number': None,
+      u'user': u'unknown',
+    }
+    self.assertEqual(expected, response)
+    self.assertEqual('00', task_id[-2:])
+
+    # No bot started yet.
+    run_id = task_id[:-2] + '01'
+    response = self.app.get(
+        '/swarming/api/v1/client/task/' + run_id, status=404).json
+    self.assertEqual({u'error': u'Task not found'}, response)
+    self.bot_poll('bot1')
+    response = self.app.get(
+        '/swarming/api/v1/client/task/' + run_id).json
+    expected = {
+      u'abandoned_ts': None,
+      u'bot_id': u'bot1',
+      u'completed_ts': None,
+      u'exit_codes': [],
+      u'failure': False,
+      u'internal_failure': False,
+      u'modified_ts': str_now,
+      u'outputs': [],
+      u'started_ts': str_now,
+      u'state': task_result.State.RUNNING,
+      u'try_number': 1,
+    }
+    self.assertEqual(expected, response)
+
 
 class OldClientApiTest(AppTestBase):
   def testMatchingTestCasesHandler(self):
