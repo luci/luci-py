@@ -7,6 +7,8 @@
 # Disable 'Method could be a function.'
 # pylint: disable=R0201
 
+import functools
+import json
 import logging
 import webapp2
 
@@ -20,11 +22,13 @@ from . import tokens
 
 # Part of public API of 'auth' component, exposed by this module.
 __all__ = [
+  'ApiHandler',
   'AuthenticatingHandler',
   'configure',
   'cookie_authentication',
   'get_authenticated_routes',
   'oauth_authentication',
+  'require_xsrf_token_request',
   'service_to_service_authentication',
 ]
 
@@ -32,6 +36,16 @@ __all__ = [
 # Global list of authentication functions to use to authenticate all
 # requests. Used by AuthenticatingHandler. Initialized in 'configure'.
 _auth_methods = ()
+
+
+def require_xsrf_token_request(f):
+  """Use for handshaking APIs."""
+  @functools.wraps(f)
+  def hook(self, *args, **kwargs):
+    if not self.request.headers.get('X-XSRF-Token-Request'):
+      raise api.AuthorizationError('Missing required XSRF request header')
+    return f(self, *args, **kwargs)
+  return hook
 
 
 class XSRFToken(tokens.TokenKind):
@@ -180,6 +194,62 @@ class AuthenticatingHandler(webapp2.RequestHandler):
       error: instance of AuthorizationError subclass.
     """
     self.abort(403, detail=str(error))
+
+
+class ApiHandler(AuthenticatingHandler):
+  """Parses JSON request body to a dict, serializes response to JSON."""
+  CONTENT_TYPE = 'application/json; charset=utf-8'
+
+  def authentication_error(self, error):
+    self.abort_with_error(401, text=str(error))
+
+  def authorization_error(self, error):
+    self.abort_with_error(403, text=str(error))
+
+  def send_response(self, response, http_code=200, headers=None):
+    """Sends successful reply and continues execution."""
+    self.response.set_status(http_code)
+    self.response.headers.update(headers or {})
+    self.response.headers['Content-Type'] = self.CONTENT_TYPE
+    self.response.write(json.dumps(response))
+
+  def abort_with_error(self, http_code, **kwargs):
+    """Sends error reply and stops execution."""
+    self.abort(
+        http_code, json=kwargs, headers={'Content-Type': self.CONTENT_TYPE})
+
+  def parse_body(self):
+    """Parse JSON body and verifies it's a dict."""
+    content_type = self.request.headers.get('Content-Type')
+    encoding = 'utf-8'
+    content_type, encoding = _split_charset(content_type)
+    if content_type != 'application/json':
+      msg = 'Expecting JSON body with content type \'%s\'' % self.CONTENT_TYPE
+      self.abort_with_error(400, text=msg)
+    try:
+      body = json.loads(self.request.body, encoding=encoding)
+      if not isinstance(body, dict):
+        raise ValueError()
+    except ValueError:
+      self.abort_with_error(400, text='Not a valid json dict body')
+    return body
+
+
+def _split_charset(content_type):
+  """Splits a content_type charset parameter."""
+  encoding = 'ascii'
+  if ';' in content_type:
+    content_type, encoding = content_type.split(';', 1)
+    encoding = encoding.lower().strip()
+    charset_prefix = 'charset='
+    if not encoding.startswith(charset_prefix):
+      return None, None
+    encoding = encoding[len(charset_prefix):]
+
+    # Whitelist the valid encodings to prevent attacks.
+    if encoding not in ('ascii', 'utf-8'):
+      return None, None
+  return content_type, encoding
 
 
 def configure(auth_methods):

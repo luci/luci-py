@@ -6,7 +6,6 @@
 
 import base64
 import functools
-import json
 import logging
 import urllib
 import webapp2
@@ -62,63 +61,7 @@ def forbid_api_on_replica(method):
   return wrapper
 
 
-def _split_charset(content_type):
-  """Splits a content_type charset parameter."""
-  encoding = 'ascii'
-  if ';' in content_type:
-    content_type, encoding = content_type.split(';', 1)
-    encoding = encoding.lower().strip()
-    charset_prefix = 'charset='
-    if not encoding.startswith(charset_prefix):
-      return None, None
-    encoding = encoding[len(charset_prefix):]
-
-    # Whitelist the valid encodings to prevent attacks.
-    if encoding not in ('ascii', 'utf-8'):
-      return None, None
-  return content_type, encoding
-
-
-class ApiHandler(handler.AuthenticatingHandler):
-  """Parses JSON request body to a dict, serializes response to JSON."""
-  CONTENT_TYPE = 'application/json; charset=utf-8'
-
-  def authentication_error(self, error):
-    self.abort_with_error(401, text=str(error))
-
-  def authorization_error(self, error):
-    self.abort_with_error(403, text=str(error))
-
-  def send_response(self, response, http_code=200, headers=None):
-    """Sends successful reply and continues execution."""
-    self.response.set_status(http_code)
-    self.response.headers.update(headers or {})
-    self.response.headers['Content-Type'] = self.CONTENT_TYPE
-    self.response.write(json.dumps(response))
-
-  def abort_with_error(self, http_code, **kwargs):
-    """Sends error reply and stops execution."""
-    self.abort(
-        http_code, json=kwargs, headers={'Content-Type': self.CONTENT_TYPE})
-
-  def parse_body(self):
-    """Parse JSON body and verifies it's a dict."""
-    content_type = self.request.headers.get('Content-Type')
-    encoding = 'utf-8'
-    content_type, encoding = _split_charset(content_type)
-    if content_type != 'application/json':
-      msg = 'Expecting JSON body with content type \'%s\'' % self.CONTENT_TYPE
-      self.abort_with_error(400, text=msg)
-    try:
-      body = json.loads(self.request.body, encoding=encoding)
-      if not isinstance(body, dict):
-        raise ValueError()
-    except ValueError:
-      self.abort_with_error(400, text='Not a valid json dict body')
-    return body
-
-
-class SelfHandler(ApiHandler):
+class SelfHandler(handler.ApiHandler):
   """Returns identity of a caller.
 
   Available in Standalone, Primary and Replica modes.
@@ -129,7 +72,7 @@ class SelfHandler(ApiHandler):
     self.send_response({'identity': api.get_current_identity().to_bytes()})
 
 
-class XSRFHandler(ApiHandler):
+class XSRFHandler(handler.ApiHandler):
   """Generates XSRF token on demand.
 
   Should be used only by client scripts or Ajax calls. Requires header
@@ -141,14 +84,13 @@ class XSRFHandler(ApiHandler):
   # Don't enforce prior XSRF token, it might not be known yet.
   xsrf_token_enforce_on = ()
 
+  @handler.require_xsrf_token_request
   @api.public
   def post(self):
-    if not self.request.headers.get('X-XSRF-Token-Request'):
-      raise api.AuthorizationError('Missing required XSRF request header')
     self.send_response({'xsrf_token': self.generate_xsrf_token()})
 
 
-class GroupsHandler(ApiHandler):
+class GroupsHandler(handler.ApiHandler):
   """Lists all registered groups.
 
   Returns a list of groups, sorted by name. Each entry in a list is a dict with
@@ -176,7 +118,7 @@ class GroupsHandler(ApiHandler):
     })
 
 
-class GroupHandler(ApiHandler):
+class GroupHandler(handler.ApiHandler):
   """Creating, reading, updating and deleting a single group.
 
   GET is available in Standalone, Primary and Replica modes.
@@ -446,7 +388,7 @@ class ReplicationHandler(handler.AuthenticatingHandler):
     self.send_response(response)
 
 
-class CertificatesHandler(ApiHandler):
+class CertificatesHandler(handler.ApiHandler):
   """Public certificates that service uses to sign blobs.
 
   May be used by other services when validating a signature of this service.
@@ -459,7 +401,7 @@ class CertificatesHandler(ApiHandler):
     self.send_response(signature.get_own_public_certificates())
 
 
-class OAuthConfigHandler(ApiHandler):
+class OAuthConfigHandler(handler.ApiHandler):
   """Returns client_id and client_secret to use for OAuth2 login on a client.
 
   GET is available in Standalone, Primary and Replica modes.
@@ -518,7 +460,7 @@ class OAuthConfigHandler(ApiHandler):
     self.send_response({'ok': True})
 
 
-class ServerStateHandler(ApiHandler):
+class ServerStateHandler(handler.ApiHandler):
   """Reports replication state of a service."""
 
   @api.require(api.is_admin)

@@ -567,7 +567,46 @@ class TaskHandler(auth.AuthenticatingHandler):
     self.response.out.write(template.render('swarming/user_task.html', params))
 
 
-### Client APIs.
+### New Client APIs.
+
+
+class ClientHandshakeHandler(auth.ApiHandler):
+  """First request to be called to get initial data like XSRF token.
+
+  Request body is a JSON dict:
+    {
+      # TODO(maruel): Add useful data.
+    }
+
+  Response body is a JSON dict:
+    {
+      "server_version": "138-193f1f3",
+      "xsrf_token": "......",
+    }
+  """
+
+  # This handler is called to get XSRF token, there's nothing to enforce yet.
+  xsrf_token_enforce_on = ()
+
+  EXPECTED_KEYS = frozenset()
+
+  @auth.require_xsrf_token_request
+  @auth.require(acl.is_bot_or_user)
+  def post(self):
+    request = self.parse_body()
+    # If unexpected values are present, log an error. This is important to catch
+    # typos!
+    if not self.EXPECTED_KEYS.issuperset(request):
+      ereporter2.log_request('Unexpected keys; did you make a typo?')
+    data = {
+      # This access token will be used to validate each subsequent request.
+      'server_version': utils.get_app_version(),
+      'xsrf_token': self.generate_xsrf_token(),
+    }
+    self.send_response(data)
+
+
+### Old Client APIs.
 
 
 class ApiBots(auth.AuthenticatingHandler):
@@ -810,7 +849,7 @@ class RetryHandler(auth.AuthenticatingHandler):
     self.response.out.write('Runner set for retry.')
 
 
-### Bot APIs.
+### Bot download URLs.
 
 
 class BootstrapHandler(auth.AuthenticatingHandler):
@@ -846,6 +885,90 @@ class GetSlaveCodeHandler(auth.AuthenticatingHandler):
         'attachment; filename="swarming_bot.zip"')
     self.response.out.write(
         bot_management.get_swarming_bot_zip(self.request.host_url))
+
+
+### New Bot APIs.
+
+
+class BotHandshakeHandler(auth.ApiHandler):
+  """First request to be called to get initial data like XSRF token.
+
+  The bot is server-controled so the server doesn't have to support multiple API
+  version. Only the current one and the last one, since the bot are finishing
+  their currently running task, they'll be immediately be upgraded after on
+  their next poll.
+
+  Request body is a JSON dict:
+    {
+      "a": {
+        "dimensions": <dict of properties>,
+        "id": <bot id>,
+        "ip": <ip address as a string>,
+        "version": <sha-1 of swarming_bot.zip uncompressed content>,
+
+        # Optional:
+
+        # If an exception occured:
+        "error": <exception as a string>,
+
+        # If the bot decided to quarantine itself.
+        "quarantined": True,
+      }
+      # Differentiate between local_test_runner and slave_machine:
+      #"is_local_test_runner", False,
+    }
+
+  Response body is a JSON dict:
+    {
+      "bot_version": <sha-1 of swarming_bot.zip uncompressed content>,
+      "server_version": "138-193f1f3",
+      "xsrf_token": "......",
+    }
+  """
+
+  # This handler is called to get XSRF token, there's nothing to enforce yet.
+  xsrf_token_enforce_on = ()
+
+  EXPECTED_KEYS = frozenset(['attributes'])
+  EXPECTED_ATTRIBUTES = frozenset(['dimensions', 'id', 'ip', 'version'])
+
+  @auth.require_xsrf_token_request
+  @auth.require(acl.is_bot)
+  def post(self):
+    # In particular, this endpoint does not return commands to the bot, for
+    # example to upgrade itself. It'll be told so when it does its first poll.
+    request = self.parse_body()
+    # If attributes are missing, the bot is severely hosed! We don't refuse it
+    # so the bot has a chance to self-heal. Obviously, it won't be able to reap
+    # any task.
+
+    # If unexpected values are present, log an error. This is important to catch
+    # typos!
+    if not self.EXPECTED_KEYS.issuperset(request):
+      ereporter2.log_request('Unexpected keys; did you make a typo?')
+    attributes = request.get('attributes', {})
+    if not self.EXPECTED_ATTRIBUTES.issuperset(attributes):
+      ereporter2.log_request('Unexpected attributes; did you make a typo?')
+
+    dimensions = attributes.get('dimensions', {})
+    bot_management.tag_bot_seen(
+        attributes['id'],
+        dimensions.get('hostname'),
+        attributes.get('ip'),
+        self.request.remote_addr,
+        dimensions,
+        attributes['version'],
+        attributes.get('quarantined', False))
+    data = {
+      # This access token will be used to validate each subsequent request.
+      'bot_version': bot_management.get_slave_version(self.request.host_url),
+      'server_version': utils.get_app_version(),
+      'xsrf_token': self.generate_xsrf_token(),
+    }
+    self.send_response(data)
+
+
+### Old Bot APIs (To be deleted).
 
 
 class ServerPingHandler(webapp2.RequestHandler):
@@ -1099,6 +1222,7 @@ def create_application(debug):
       ('/bootstrap', BootstrapHandler),
       ('/get_slave_code', GetSlaveCodeHandler),
       ('/get_slave_code/<version:[0-9a-f]{40}>', GetSlaveCodeHandler),
+      # Old bot API to be removed:
       ('/poll_for_test', RegisterHandler),
       ('/remote_error', RemoteErrorHandler),
       ('/result', ResultHandler),
@@ -1106,11 +1230,10 @@ def create_application(debug):
       ('/runner_ping', RunnerPingHandler),
       ('/server_ping', ServerPingHandler),
 
-      # Both Client and Bot API.
+      # Both Client and Bot API. To be split in two and deleted.
       ('/delete_machine_stats', DeleteMachineStatsHandler),
 
       # The new APIs:
-      # TODO(maruel): Move into restricted/
       ('/swarming/api/v1/bots', ApiBots),
       ('/swarming/api/v1/bots/dead/count', DeadBotsCountHandler),
       ('/swarming/api/v1/stats/summary/<resolution:[a-z]+>',
@@ -1119,6 +1242,12 @@ def create_application(debug):
         stats_gviz.StatsGvizDimensionsHandler),
       ('/swarming/api/v1/stats/user/<user:.+>/<resolution:[a-z]+>',
         stats_gviz.StatsGvizUserHandler),
+
+      # New Client API:
+      ('/swarming/api/v1/client/handshake', ClientHandshakeHandler),
+
+      # New Bot API:
+      ('/swarming/api/v1/bot/handshake', BotHandshakeHandler),
 
       ('/_ah/warmup', WarmupHandler),
   ]

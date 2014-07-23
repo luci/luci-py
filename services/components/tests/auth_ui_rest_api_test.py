@@ -94,7 +94,7 @@ class ApiHandlerClassTest(test_case.TestCase):
       raise api.AuthenticationError('Boom!')
     handler.configure([failing_auth])
 
-    class Handler(rest_api.ApiHandler):
+    class Handler(handler.ApiHandler):
       @api.public
       def get(self):
         test.fail('Should not be called')
@@ -107,7 +107,7 @@ class ApiHandlerClassTest(test_case.TestCase):
 
   def test_authorization_error(self):
     """AuthorizationErrors are returned as JSON with status 403."""
-    class Handler(rest_api.ApiHandler):
+    class Handler(handler.ApiHandler):
       @api.public
       def get(self):
         raise api.AuthorizationError('Boom!')
@@ -119,7 +119,7 @@ class ApiHandlerClassTest(test_case.TestCase):
     self.assertEqual({'text': 'Boom!'}, json.loads(response.body))
 
   def test_send_response_simple(self):
-    class Handler(rest_api.ApiHandler):
+    class Handler(handler.ApiHandler):
       @api.public
       def get(self):
         self.send_response({'some': 'response'})
@@ -132,7 +132,7 @@ class ApiHandlerClassTest(test_case.TestCase):
 
   def test_send_response_custom_status_code(self):
     """Non 200 status codes in 'send_response' work."""
-    class Handler(rest_api.ApiHandler):
+    class Handler(handler.ApiHandler):
       @api.public
       def get(self):
         self.send_response({'some': 'response'}, http_code=302)
@@ -145,7 +145,7 @@ class ApiHandlerClassTest(test_case.TestCase):
 
   def test_send_response_custom_header(self):
     """Response headers in 'send_response' work."""
-    class Handler(rest_api.ApiHandler):
+    class Handler(handler.ApiHandler):
       @api.public
       def get(self):
         self.send_response({'some': 'response'}, headers={'Some-Header': '123'})
@@ -162,7 +162,7 @@ class ApiHandlerClassTest(test_case.TestCase):
     """'abort_with_error' aborts execution and returns error as JSON."""
     test = self
 
-    class Handler(rest_api.ApiHandler):
+    class Handler(handler.ApiHandler):
       @api.public
       def get(self):
         self.abort_with_error(http_code=404, text='abc', stuff=123)
@@ -178,7 +178,7 @@ class ApiHandlerClassTest(test_case.TestCase):
     """'parse_body' successfully decodes json-encoded dict in the body."""
     test = self
 
-    class Handler(rest_api.ApiHandler):
+    class Handler(handler.ApiHandler):
       xsrf_token_enforce_on = ()
       @api.public
       def post(self):
@@ -194,7 +194,7 @@ class ApiHandlerClassTest(test_case.TestCase):
     """'parse_body' checks Content-Type header."""
     test = self
 
-    class Handler(rest_api.ApiHandler):
+    class Handler(handler.ApiHandler):
       xsrf_token_enforce_on = ()
       @api.public
       def post(self):
@@ -212,7 +212,7 @@ class ApiHandlerClassTest(test_case.TestCase):
     """'parse_body' returns HTTP 400 if body is not a valid json."""
     test = self
 
-    class Handler(rest_api.ApiHandler):
+    class Handler(handler.ApiHandler):
       xsrf_token_enforce_on = ()
       @api.public
       def post(self):
@@ -230,7 +230,7 @@ class ApiHandlerClassTest(test_case.TestCase):
     """'parse_body' returns HTTP 400 if body is not a json dict."""
     test = self
 
-    class Handler(rest_api.ApiHandler):
+    class Handler(handler.ApiHandler):
       xsrf_token_enforce_on = ()
       @api.public
       def post(self):
@@ -247,7 +247,7 @@ class ApiHandlerClassTest(test_case.TestCase):
   def test_parse_body_bad_encoding(self):
     test = self
 
-    class Handler(rest_api.ApiHandler):
+    class Handler(handler.ApiHandler):
       xsrf_token_enforce_on = ()
       @api.public
       def post(self):

@@ -228,6 +228,7 @@ class AppTestBase(test_case.TestCase):
 
   def bot_poll(self, bot):
     """Simulates a bot that polls for task."""
+    # TODO(maruel): Switch to new API.
     if not self._version:
       attributes = {
         'dimensions': {'cpu': '48', 'os': 'Amiga'},
@@ -247,10 +248,9 @@ class AppTestBase(test_case.TestCase):
     return self.app.post(
         '/poll_for_test', {'attributes': json.dumps(attributes)}).json
 
-
-class FrontendTest(AppTestBase):
   def client_create_task(self, name):
     """Simulate a client that creates a task."""
+    # TODO(maruel): Switch to new API.
     request = {
       'configurations': [
         {
@@ -264,6 +264,9 @@ class FrontendTest(AppTestBase):
     }
     return self.app.post('/test', {'request': json.dumps(request)}).json
 
+
+
+class FrontendTest(AppTestBase):
   def testBots(self):
     # Act under admin identity.
     self._ReplaceCurrentUser(ADMIN_EMAIL)
@@ -733,7 +736,80 @@ class BackendTest(AppTestBase):
       self.assertResponse(response, '200 OK', 'Success.')
 
 
-class BotApiTest(AppTestBase):
+class NewBotApiTest(AppTestBase):
+  def setUp(self):
+    super(NewBotApiTest, self).setUp()
+    self.mock(ereporter2, 'log_request', self.fail)
+
+  def _token(self):
+    headers = {'X-XSRF-Token-Request': '1'}
+    params = {
+      'attributes': {
+        'dimensions': {
+          'os': ['Amiga'],
+        },
+        'id': 'bot1',
+        'version': '123',
+      },
+    }
+    response = self.app.post_json(
+        '/swarming/api/v1/bot/handshake',
+        headers=headers,
+        params=params).json
+    token = response['xsrf_token'].encode('ascii')
+    params['attributes']['version'] = response['bot_version']
+    params['c'] = 0
+    return token, params
+
+  def post_with_token(self, url, params, token):
+    return self.app.post_json(
+        url, params=params, headers={'X-XSRF-Token': token}).json
+
+  def test_handshake(self):
+    # Bare minimum:
+    headers = {'X-XSRF-Token-Request': '1'}
+    params = {
+      'attributes': {
+        'id': 'bot1',
+        'version': '123',
+      },
+    }
+    response = self.app.post_json(
+        '/swarming/api/v1/bot/handshake', headers=headers, params=params).json
+    self.assertEqual(
+        [u'bot_version', u'server_version', u'xsrf_token'], sorted(response))
+    self.assertTrue(response['xsrf_token'])
+    self.assertEqual(40, len(response['bot_version']))
+    self.assertEqual(u'default-version', response['server_version'])
+
+  def test_handshake_extra(self):
+    errors = []
+    self.mock(ereporter2, 'log_request', lambda *args: errors.append(args))
+    headers = {'X-XSRF-Token-Request': '1'}
+    params = {
+      # Works with unknown items but logs an error. This permits catching typos.
+      'foo': 1,
+      'attributes': {
+        'bar': 2,
+        'id': 'bot1',
+        'version': '123',
+      },
+    }
+    response = self.app.post_json(
+        '/swarming/api/v1/bot/handshake', headers=headers, params=params).json
+    self.assertEqual(
+        [u'bot_version', u'server_version', u'xsrf_token'], sorted(response))
+    self.assertTrue(response['xsrf_token'])
+    self.assertEqual(40, len(response['bot_version']))
+    self.assertEqual(u'default-version', response['server_version'])
+    expected = [
+      ('Unexpected keys; did you make a typo?',),
+      ('Unexpected attributes; did you make a typo?',),
+    ]
+    self.assertEqual(expected, errors)
+
+
+class OldBotApiTest(AppTestBase):
   def testGetSlaveCode(self):
     response = self.app.get('/get_slave_code')
     self.assertEqual('200 OK', response.status)
@@ -871,7 +947,59 @@ class BotApiTest(AppTestBase):
         ' Runner failed to ping.  ')
 
 
-class ClientApiTest(AppTestBase):
+class NewClientApiTest(AppTestBase):
+  def setUp(self):
+    super(NewClientApiTest, self).setUp()
+    self.mock(ereporter2, 'log_request', self.fail)
+
+  def _token(self):
+    headers = {'X-XSRF-Token-Request': '1'}
+    params = {}
+    response = self.app.post_json(
+        '/swarming/api/v1/client/handshake',
+        headers=headers,
+        params=params).json
+    token = response['xsrf_token'].encode('ascii')
+    return token
+
+  def post_with_token(self, url, params, token):
+    return self.app.post_json(
+        url, params=params, headers={'X-XSRF-Token': token}).json
+
+  def test_handshake(self):
+    # Bare minimum:
+    headers = {'X-XSRF-Token-Request': '1'}
+    params = {}
+    response = self.app.post_json(
+        '/swarming/api/v1/client/handshake',
+        headers=headers, params=params).json
+    self.assertEqual(
+        [u'server_version', u'xsrf_token'], sorted(response))
+    self.assertTrue(response['xsrf_token'])
+    self.assertEqual(u'default-version', response['server_version'])
+
+  def test_handshake_extra(self):
+    errors = []
+    self.mock(ereporter2, 'log_request', lambda *args: errors.append(args))
+    headers = {'X-XSRF-Token-Request': '1'}
+    params = {
+      # Works with unknown items but logs an error. This permits catching typos.
+      'foo': 1,
+    }
+    response = self.app.post_json(
+        '/swarming/api/v1/client/handshake',
+        headers=headers, params=params).json
+    self.assertEqual(
+        [u'server_version', u'xsrf_token'], sorted(response))
+    self.assertTrue(response['xsrf_token'])
+    self.assertEqual(u'default-version', response['server_version'])
+    expected = [
+      ('Unexpected keys; did you make a typo?',),
+    ]
+    self.assertEqual(expected, errors)
+
+
+class OldClientApiTest(AppTestBase):
   def testMatchingTestCasesHandler(self):
     # Ensure that matching works even when the datastore is not being
     # consistent.

@@ -59,7 +59,7 @@ class LinkTicketToken(auth.TokenKind):
   version = 1
 
 
-class ServiceListingHandler(rest_api.ApiHandler):
+class ServiceListingHandler(auth.ApiHandler):
   """Lists registered replicas with their state."""
 
   @auth.require(auth.is_admin)
@@ -82,7 +82,7 @@ class ServiceListingHandler(rest_api.ApiHandler):
     })
 
 
-class GenerateLinkingURL(rest_api.ApiHandler):
+class GenerateLinkingURL(auth.ApiHandler):
   """Generates an URL that can be used to link a new replica.
 
   See auth/proto/replication.proto for the description of the protocol.

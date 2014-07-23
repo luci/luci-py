@@ -130,9 +130,10 @@ class ReplicationTest(unittest.TestCase):
   def check_oauth_config_replication(self):
     """Verifies changes to OAuth config propagate to replica."""
     oauth_config = {
-      'client_id': 'some-id',
-      'client_not_so_secret': 'secret',
-      'additional_client_ids': ['a', 'b'],
+      u'additional_client_ids': [u'a', u'b'],
+      u'client_id': u'some-id',
+      u'client_not_so_secret': u'secret',
+      u'primary_url': u'http://localhost:9500',
     }
     response = self.auth_service.client.json_request(
         resource='/auth/api/v1/server/oauth_config',
