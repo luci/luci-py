@@ -995,6 +995,19 @@ class OAuthConfigHandlerTest(RestAPITestCase):
       'additional_client_ids': [],
       'client_id': '',
       'client_not_so_secret': '',
+      'primary_url': None,
+    }
+    status, body, _ = self.get('/auth/api/v1/server/oauth_config')
+    self.assertEqual(200, status)
+    self.assertEqual(expected, body)
+
+  def test_primary_url_is_set_on_replica(self):
+    mock_replication_state('https://primary-url')
+    expected = {
+      'additional_client_ids': [],
+      'client_id': '',
+      'client_not_so_secret': '',
+      'primary_url': 'https://primary-url',
     }
     status, body, _ = self.get('/auth/api/v1/server/oauth_config')
     self.assertEqual(200, status)
@@ -1013,6 +1026,7 @@ class OAuthConfigHandlerTest(RestAPITestCase):
       'additional_client_ids': ['a', 'b', 'c'],
       'client_id': 'some-client-id',
       'client_not_so_secret': 'some-secret',
+      'primary_url': None,
     }
     status, body, _ = self.get('/auth/api/v1/server/oauth_config')
     self.assertEqual(200, status)
@@ -1040,6 +1054,7 @@ class OAuthConfigHandlerTest(RestAPITestCase):
       'additional_client_ids': ['c', 'd'],
       'client_id': 'config-from-cache',
       'client_not_so_secret': 'some-secret-cache',
+      'primary_url': None,
     }
     status, body, _ = self.get('/auth/api/v1/server/oauth_config')
     self.assertEqual(200, status)
@@ -1050,6 +1065,7 @@ class OAuthConfigHandlerTest(RestAPITestCase):
       'additional_client_ids': ['a', 'b'],
       'client_id': 'config-from-db',
       'client_not_so_secret': 'some-secret-db',
+      'primary_url': None,
     }
     status, body, _ = self.get(
         path='/auth/api/v1/server/oauth_config',

@@ -468,10 +468,15 @@ class OAuthConfigHandler(ApiHandler):
       auth_db = api.get_request_auth_db()
       client_id, client_secret, additional_ids = auth_db.get_oauth_config()
 
+    # Grab URL of a primary service if running as a replica.
+    replication_state = model.get_replication_state()
+    primary_url = replication_state.primary_url if replication_state else None
+
     self.send_response({
       'additional_client_ids': additional_ids,
       'client_id': client_id,
       'client_not_so_secret': client_secret,
+      'primary_url': primary_url,
     })
 
   @forbid_api_on_replica
