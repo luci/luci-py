@@ -102,7 +102,7 @@ class ApiHandlerClassTest(test_case.TestCase):
     response = call_get(Handler, expect_errors=True)
     self.assertEqual(401, response.status_int)
     self.assertEqual(
-        'application/json; charset=UTF-8', response.headers.get('Content-Type'))
+        'application/json; charset=utf-8', response.headers.get('Content-Type'))
     self.assertEqual({'text': 'Boom!'}, json.loads(response.body))
 
   def test_authorization_error(self):
@@ -115,7 +115,7 @@ class ApiHandlerClassTest(test_case.TestCase):
     response = call_get(Handler, expect_errors=True)
     self.assertEqual(403, response.status_int)
     self.assertEqual(
-        'application/json; charset=UTF-8', response.headers.get('Content-Type'))
+        'application/json; charset=utf-8', response.headers.get('Content-Type'))
     self.assertEqual({'text': 'Boom!'}, json.loads(response.body))
 
   def test_send_response_simple(self):
@@ -127,7 +127,7 @@ class ApiHandlerClassTest(test_case.TestCase):
     response = call_get(Handler)
     self.assertEqual(200, response.status_int)
     self.assertEqual(
-        'application/json; charset=UTF-8', response.headers.get('Content-Type'))
+        'application/json; charset=utf-8', response.headers.get('Content-Type'))
     self.assertEqual({'some': 'response'}, json.loads(response.body))
 
   def test_send_response_custom_status_code(self):
@@ -140,7 +140,7 @@ class ApiHandlerClassTest(test_case.TestCase):
     response = call_get(Handler)
     self.assertEqual(302, response.status_int)
     self.assertEqual(
-        'application/json; charset=UTF-8', response.headers.get('Content-Type'))
+        'application/json; charset=utf-8', response.headers.get('Content-Type'))
     self.assertEqual({'some': 'response'}, json.loads(response.body))
 
   def test_send_response_custom_header(self):
@@ -153,7 +153,7 @@ class ApiHandlerClassTest(test_case.TestCase):
     response = call_get(Handler)
     self.assertEqual(200, response.status_int)
     self.assertEqual(
-        'application/json; charset=UTF-8', response.headers.get('Content-Type'))
+        'application/json; charset=utf-8', response.headers.get('Content-Type'))
     self.assertEqual(
         '123', response.headers.get('Some-Header'))
     self.assertEqual({'some': 'response'}, json.loads(response.body))
@@ -171,7 +171,7 @@ class ApiHandlerClassTest(test_case.TestCase):
     response = call_get(Handler, expect_errors=True)
     self.assertEqual(404, response.status_int)
     self.assertEqual(
-        'application/json; charset=UTF-8', response.headers.get('Content-Type'))
+        'application/json; charset=utf-8', response.headers.get('Content-Type'))
     self.assertEqual({'text': 'abc', 'stuff': 123}, json.loads(response.body))
 
   def test_parse_body_success(self):
@@ -187,7 +187,7 @@ class ApiHandlerClassTest(test_case.TestCase):
     response = call_post(
         Handler,
         json.dumps({'abc': 123}),
-        'application/json; charset=UTF-8')
+        'application/json; charset=utf-8')
     self.assertEqual(200, response.status_int)
 
   def test_parse_body_bad_content_type(self):
@@ -204,7 +204,7 @@ class ApiHandlerClassTest(test_case.TestCase):
     response = call_post(
         Handler,
         json.dumps({'abc': 123}),
-        'application/xml; charset=UTF-8',
+        'application/xml; charset=utf-8',
         expect_errors=True)
     self.assertEqual(400, response.status_int)
 
@@ -222,7 +222,7 @@ class ApiHandlerClassTest(test_case.TestCase):
     response = call_post(
         Handler,
         'not-json',
-        'application/json; charset=UTF-8',
+        'application/json; charset=utf-8',
         expect_errors=True)
     self.assertEqual(400, response.status_int)
 
@@ -240,7 +240,24 @@ class ApiHandlerClassTest(test_case.TestCase):
     response = call_post(
         Handler,
         '[]',
-        'application/json; charset=UTF-8',
+        'application/json; charset=utf-8',
+        expect_errors=True)
+    self.assertEqual(400, response.status_int)
+
+  def test_parse_body_bad_encoding(self):
+    test = self
+
+    class Handler(rest_api.ApiHandler):
+      xsrf_token_enforce_on = ()
+      @api.public
+      def post(self):
+        self.parse_body()
+        test.fail('Request should have been aborted')
+
+    response = call_post(
+        Handler,
+        '[]',
+        'application/json; charset=xmlcharrefreplace',
         expect_errors=True)
     self.assertEqual(400, response.status_int)
 
@@ -349,7 +366,7 @@ class RestAPITestCase(test_case.TestCase):
     # show it in error message (it's usually some sort of error page).
     self.assertEqual(
         response.headers['Content-Type'],
-        'application/json; charset=UTF-8',
+        'application/json; charset=utf-8',
         msg=response.body)
     return response.status_int, json.loads(response.body), response.headers
 
@@ -368,7 +385,7 @@ class RestAPITestCase(test_case.TestCase):
     assert 'params' not in kwargs
     headers = dict(kwargs.pop('headers', None) or {})
     if body:
-      headers['Content-Type'] = 'application/json; charset=UTF-8'
+      headers['Content-Type'] = 'application/json; charset=utf-8'
     kwargs['headers'] = headers
     kwargs['params'] = json.dumps(body) if body is not None else ''
     return self.make_request('POST', path, **kwargs)
@@ -381,7 +398,7 @@ class RestAPITestCase(test_case.TestCase):
     assert 'params' not in kwargs
     headers = dict(kwargs.pop('headers', None) or {})
     if body:
-      headers['Content-Type'] = 'application/json; charset=UTF-8'
+      headers['Content-Type'] = 'application/json; charset=utf-8'
     kwargs['headers'] = headers
     kwargs['params'] = json.dumps(body) if body is not None else ''
     return self.make_request('PUT', path, **kwargs)

@@ -56,17 +56,32 @@ def forbid_api_on_replica(method):
             'text': 'Use Primary service for API requests',
           },
           headers={
-            'Content-Type': 'application/json; charset=UTF-8',
+            'Content-Type': 'application/json; charset=utf-8',
           })
     return method(self, *args, **kwargs)
   return wrapper
 
 
+def _split_charset(content_type):
+  """Splits a content_type charset parameter."""
+  encoding = 'ascii'
+  if ';' in content_type:
+    content_type, encoding = content_type.split(';', 1)
+    encoding = encoding.lower().strip()
+    charset_prefix = 'charset='
+    if not encoding.startswith(charset_prefix):
+      return None, None
+    encoding = encoding[len(charset_prefix):]
+
+    # Whitelist the valid encodings to prevent attacks.
+    if encoding not in ('ascii', 'utf-8'):
+      return None, None
+  return content_type, encoding
+
+
 class ApiHandler(handler.AuthenticatingHandler):
   """Parses JSON request body to a dict, serializes response to JSON."""
-
-  # Content type of requests and responses.
-  content_type = 'application/json; charset=UTF-8'
+  CONTENT_TYPE = 'application/json; charset=utf-8'
 
   def authentication_error(self, error):
     self.abort_with_error(401, text=str(error))
@@ -78,22 +93,24 @@ class ApiHandler(handler.AuthenticatingHandler):
     """Sends successful reply and continues execution."""
     self.response.set_status(http_code)
     self.response.headers.update(headers or {})
-    self.response.headers['Content-Type'] = self.content_type
+    self.response.headers['Content-Type'] = self.CONTENT_TYPE
     self.response.write(json.dumps(response))
 
   def abort_with_error(self, http_code, **kwargs):
     """Sends error reply and stops execution."""
     self.abort(
-        http_code, json=kwargs, headers={'Content-Type': self.content_type})
+        http_code, json=kwargs, headers={'Content-Type': self.CONTENT_TYPE})
 
   def parse_body(self):
     """Parse JSON body and verifies it's a dict."""
     content_type = self.request.headers.get('Content-Type')
-    if content_type != self.content_type:
-      msg = 'Expecting JSON body with content type \'%s\'' % self.content_type
+    encoding = 'utf-8'
+    content_type, encoding = _split_charset(content_type)
+    if content_type != 'application/json':
+      msg = 'Expecting JSON body with content type \'%s\'' % self.CONTENT_TYPE
       self.abort_with_error(400, text=msg)
     try:
-      body = json.loads(self.request.body)
+      body = json.loads(self.request.body, encoding=encoding)
       if not isinstance(body, dict):
         raise ValueError()
     except ValueError:
