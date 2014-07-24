@@ -4,8 +4,9 @@
 
 """Defines access groups."""
 
+import logging
+
 from components import auth
-from components import ereporter2
 from components import utils
 from server import user_manager
 
@@ -108,12 +109,9 @@ def ip_whitelist_authentication(request):
     # IP v6 addresses contain ':' that is not allowed in identity name.
     return auth.Identity(
         auth.IDENTITY_BOT, request.remote_addr.replace(':', '-'))
-
-  ereporter2.log_request(
-      request=request,
-      source='server',
-      category='auth',
-      message='Authentication failure')
+  logging.warning(
+      'No authentication used and caller is not in IP whitelist, params: %s',
+      request.params.mixed())
   return None
 
 
