@@ -7,6 +7,42 @@ var exports = {};
 
 
 ////////////////////////////////////////////////////////////////////////////////
+// Utility functions.
+
+
+// Appends '<prefix>:' to a string if it doesn't have a prefix.
+function addPrefix(prefix, str) {
+  if (str.indexOf(':') == -1) {
+    return prefix + ':' + str;
+  } else {
+    return str;
+  }
+}
+
+
+// Applies 'addPrefix' to each item of a list.
+function addPrefixToItems(prefix, items) {
+  return _.map(items, _.partial(addPrefix, prefix));
+}
+
+
+// Strips '<prefix>:' from a string if it starts with it.
+function stripPrefix(prefix, str) {
+  if (str.slice(0, prefix.length + 1) == prefix + ':') {
+    return str.slice(prefix.length + 1, str.length);
+  } else {
+    return str;
+  }
+}
+
+
+// Applies 'stripPrefix' to each item of a list.
+function stripPrefixFromItems(prefix, items) {
+  return _.map(items, _.partial(stripPrefix, prefix));
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
 // Group chooser UI element: list of groups + 'Create new group' button.
 
 
@@ -269,8 +305,8 @@ GroupForm.prototype.setupSubmitHandler = function(submitCallback) {
         submitCallback({
           name: name.trim(),
           description: description.trim(),
-          members: splitItemList(members),
-          globs: splitItemList(globs),
+          members: addPrefixToItems('user', splitItemList(members)),
+          globs: addPrefixToItems('user', splitItemList(globs)),
           nested: splitItemList(nested)
         });
       } finally {
@@ -337,10 +373,16 @@ EditGroupForm.prototype.load = function() {
 EditGroupForm.prototype.buildForm = function(group, lastModified) {
   // Convert fields to text.
   group = _.clone(group);
+  group.created_by = stripPrefix('user', group.created_by);
   group.created_ts = common.utcTimestampToString(group.created_ts);
+  group.globs = stripPrefixFromItems('user', group.globs || []);
+  group.members = stripPrefixFromItems('user', group.members || []);
+  group.modified_by = stripPrefix('user', group.modified_by);
   group.modified_ts = common.utcTimestampToString(group.modified_ts);
-  group.members = (group.members || []).join('\n') + '\n';
-  group.globs = (group.globs || []).join('\n') + '\n';
+
+  // Convert list of strings to a single text blob.
+  group.globs = group.globs.join('\n') + '\n';
+  group.members = group.members.join('\n') + '\n';
   group.nested = (group.nested || []).join('\n') + '\n';
 
   // Build the actual DOM element.
@@ -428,8 +470,8 @@ var waitForResult = function(defer, groupChooser, form) {
 var registerFormValidators = function() {
   // Regular expressions for form fields.
   var groupRe = /^[0-9a-zA-Z_\-\. ]{3,40}$/;
-  var memberRe = /^(user|bot|service|anonymous)\:[\w\-\+\%\.\@]+$/;
-  var globRe = /^(user|bot|service|anonymous)\:[\w\-\+\%\.\@\*]+$/;
+  var memberRe = /^((user|bot|service|anonymous)\:)?[\w\-\+\%\.\@]+$/;
+  var globRe = /^((user|bot|service|anonymous)\:)?[\w\-\+\%\.\@\*]+$/;
 
   // Splits |value| on lines boundary and checks that each line matches 're'.
   // Helper function use in validators below.
