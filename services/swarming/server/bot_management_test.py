@@ -63,7 +63,8 @@ class BotManagementTest(test_case.TestCase):
         f.write(zipped_code)
       subprocess.check_output(
           [sys.executable, bot_path, 'start_bot', '-h'],
-          cwd=temp_dir)
+          cwd=temp_dir,
+          stderr=subprocess.STDOUT)
     finally:
       shutil.rmtree(temp_dir)
 
@@ -73,18 +74,20 @@ class BotManagementTest(test_case.TestCase):
         str(bot_management.get_bot_key('f-a:1')))
 
   def test_tag_bot_seen(self):
+    now = datetime.datetime(2010, 1, 2, 3, 4, 5, 6)
+    self.mock_now(now)
     bot = bot_management.tag_bot_seen(
         'id1', 'localhost', '127.0.0.1', '8.8.4.4', {'foo': 'bar'},
         hashlib.sha1().hexdigest(), False)
-    self.assertTrue(bot.last_seen)
-    bot.last_seen = datetime.datetime(2010, 1, 2, 3, 4, 5, 6)
+    bot.put()
     expected = {
+      'created_ts': now,
       'dimensions': {u'foo': u'bar'},
       'external_ip': u'8.8.4.4',
       'hostname': u'localhost',
       'id': 'id1',
       'internal_ip': u'127.0.0.1',
-      'last_seen': datetime.datetime(2010, 1, 2, 3, 4, 5, 6),
+      'last_seen_ts': now,
       'quarantined': False,
       'task': None,
       'version': u'da39a3ee5e6b4b0d3255bfef95601890afd80709',

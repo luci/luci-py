@@ -59,13 +59,18 @@
         <td>Internal IP</td>
         <td>{{bot.internal_ip}}</td>
       </tr>
+      <tr>
         <td>External IP</td>
         <td>{{bot.external_ip}}</td>
       </tr>
       <tr>
-        <td>Last seen IP</td>
+        <td>First seen</td>
+        <td>{{bot.created_ts|datetimeformat}}</td>
+      </tr>
+      <tr>
+        <td>Most recent ping</td>
         <td nowrap {% if is_dead %}class="dead_bot"{% endif %}>
-          {{(now-bot.last_seen)|timedeltaformat}}
+          {{(now-bot.last_seen_ts)|timedeltaformat}}
           {% if is_admin and is_dead %}
           &nbsp;&nbsp;
           <form id="delete_{{bot.key.id()}}" method="post"

@@ -39,14 +39,15 @@ class Bot(ndb.Model):
   """This entity declare the knowledge about a bot that successfully connected.
 
   The key id is the id of the bot.
+
+  Multiple bots could run on a single host, for example with multiple
+  phones connected to a host. In this case, the id is specific to each device
+  acting as a bot. So while the id must be unique, the hostname doesn't have
+  to be.
   """
   dimensions = datastore_utils.DeterministicJsonProperty(json_type=dict)
 
-  # Generally, the hostname == id, but it's not always true. For example,
-  # multiple bots could run on a single machine, for example with multiple
-  # phones connected to a host. In this case, hostname is the FQDN of the host
-  # but the id is specific to each device acting as a bot. So while the id
-  # must be unique, the hostname doesn't have to.
+  # FQDN on which this bot is running on.
   hostname = ndb.StringProperty()
 
   # IP address as seen by the bot.
@@ -55,8 +56,11 @@ class Bot(ndb.Model):
   # IP address as seen by the HTTP handler.
   external_ip = ndb.StringProperty()
 
-  # Use auto_now_add instead of auto_now to make unit testing easier.
-  last_seen = ndb.DateTimeProperty(auto_now_add=True)
+  # First time this bot was seen.
+  created_ts = ndb.DateTimeProperty(auto_now_add=True)
+
+  # Last time the bot pinged and this entity was updated
+  last_seen_ts = ndb.DateTimeProperty(auto_now=True, name='last_seen')
 
   # Version the bot is currently at.
   version = ndb.StringProperty(default='')
@@ -75,6 +79,7 @@ class Bot(ndb.Model):
 
   def to_dict(self):
     out = super(Bot, self).to_dict()
+    # Inject the bot id, since it's the entity key.
     out['id'] = self.key.string_id()
     return out
 
@@ -192,7 +197,7 @@ def tag_bot_seen(
   - quarantined: bool to signal if the bot should be exempted from running
         tasks.
   """
-  # The primary reason for the write is to update .last_seen.
+  # The primary reason for the write is to update .last_seen_ts.
   bot = Bot(
       key=get_bot_key(bot_id),
       dimensions=dimensions or {},

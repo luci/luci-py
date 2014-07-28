@@ -271,7 +271,7 @@ class BotsListHandler(auth.AuthenticatingHandler):
   """Presents the list of known bots."""
   ACCEPTABLE_BOTS_SORTS = {
     'dimensions': 'Dimensions',
-    'last_seen': 'Last Seen',
+    'last_seen_ts': 'Last Seen',
     'hostname': 'Hostname',
     'id': 'ID',
   }
@@ -323,7 +323,7 @@ class BotHandler(auth.AuthenticatingHandler):
                 limit, start_cursor=cursor)
     dead_bot_cutoff = utils.utcnow() - bot_management.MACHINE_DEATH_TIMEOUT
     bot = bot_future.get_result()
-    is_dead = bot.last_seen < dead_bot_cutoff if bot else False
+    is_dead = bot.last_seen_ts < dead_bot_cutoff if bot else False
     # Calculate the time this bot was idle.
     idle_time = datetime.timedelta()
     run_time = datetime.timedelta()
@@ -1198,7 +1198,7 @@ class DeadBotsCountHandler(webapp2.RequestHandler):
     self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
     cutoff = utils.utcnow() - bot_management.MACHINE_DEATH_TIMEOUT
     count = bot_management.Bot.query().filter(
-        bot_management.Bot.last_seen < cutoff).count()
+        bot_management.Bot.last_seen_ts < cutoff).count()
     self.response.out.write(str(count))
 
 

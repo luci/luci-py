@@ -314,7 +314,7 @@ def bot_update_task(run_result_key, bot_id, exit_codes, stdout):
 
   to_put = []
   if bot:
-    bot.last_seen = now
+    bot.last_seen_ts = now
     bot.task = run_result_key
     to_put.append(bot)
 
