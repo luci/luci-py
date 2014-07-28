@@ -995,6 +995,121 @@ class BotHandshakeHandler(auth.ApiHandler):
     self.send_response(data)
 
 
+class BotPollHandler(auth.ApiHandler):
+  """The bot polls for a task; returns either a task, update command or sleep.
+
+  The only attributes required are the id. In case of exception on the slave,
+  this is enough to get it just far enough to eventually self-update to a
+  working version. This is to ensure that coding errors in bot code doesn't kill
+  all the fleet at once, they should still be up just enough to be able to
+  self-update again even if they don't get task assigned anymore.
+  """
+  EXPECTED_KEYS = frozenset(['attributes', 'sleep_streak'])
+  EXPECTED_ATTRIBUTES = frozenset(['dimensions', 'id', 'ip', 'version'])
+
+  @auth.require(acl.is_bot)
+  def post(self):
+    request = self.parse_body()
+
+    # If unexpected values are present, log an error. This is important to catch
+    # typos!
+    if not self.EXPECTED_KEYS.issuperset(request):
+      ereporter2.log_request('Unexpected keys; did you make a typo?')
+    # If attributes are missing, the bot is severely hosed!
+    attributes = request.get('attributes', {})
+    if not self.EXPECTED_ATTRIBUTES.issuperset(attributes):
+      ereporter2.log_request('Unexpected attributes; did you make a typo?')
+
+    sleep_streak = request.get('sleep_streak', 0)
+    # Be very permissive on missing values. This can happen because of errors on
+    # the bot, *we don't want to deny them the capacity to update*, so that the
+    # bot code is eventually fixed and the bot self-update to this working code.
+    # It makes fleet management much easier.
+    dimensions = attributes.get('dimensions', {})
+    bot_id = attributes.get('id')
+    # The bot may decide to "self-quarantine" itself.
+    quarantined = attributes.get('quarantine')
+
+    bot_future = None
+    if bot_id:
+      bot_future = bot_management.get_bot_key(bot_id).get_async()
+
+    # The bot version is host-specific, because the host determines the version
+    # being used.
+    expected_version = bot_management.get_slave_version(self.request.host_url)
+    if attributes.get('version') != expected_version:
+      out = {
+        'cmd': 'update',
+        'version': expected_version,
+      }
+      self.send_response(out)
+      if bot_future:
+        bot_future.wait()
+      return
+
+    if not bot_id:
+      self.sleep(sleep_streak)
+      return
+
+    bot = bot_future.get_result()
+    # The server may decide to quarantine the bot.
+    quarantined = quarantined or bot.quarantined
+
+    if not quarantined:
+      # Note its existence at two places, one for stats at 1 minute resolution,
+      # the other for the list of known bots.
+      stats.add_entry(action='bot_active', bot_id=bot_id, dimensions=dimensions)
+
+    bot_management.tag_bot_seen(
+        bot_id,
+        dimensions.get('hostname'),
+        attributes.get('ip'),
+        self.request.remote_addr,
+        dimensions,
+        attributes['version'],
+        quarantined)
+
+    if quarantined:
+      self.sleep(sleep_streak)
+      return
+
+    # The bot is in good shape. Try to grab a task.
+    try:
+      # This is a fairly complex function call, exceptions are expected.
+      request, run_result = task_scheduler.bot_reap_task(dimensions, bot_id)
+      if not request:
+        # No task found, tell it to sleep a bit.
+        self.sleep(sleep_streak)
+        return
+
+      out = {
+        'cmd': 'run',
+        'commands': request.properties.commands,
+        'data': request.properties.data,
+        'env': request.properties.env,
+        'hard_timeout': request.properties.execution_timeout_secs,
+        'io_timeout': request.properties.io_timeout_secs,
+        'task_id': task_common.pack_run_result_key(run_result.key),
+      }
+      self.send_response(out)
+    except runtime.DeadlineExceededError:
+      # If the timeout happened before a task was assigned there is no problems.
+      # If the timeout occurred after a task was assigned, that task will
+      # timeout (BOT_DIED) since the bot didn't get the details required to
+      # run it) and it will automatically get retried (TODO) when the task times
+      # out.
+      # TODO(maruel): Note the task if possible and hand it out on next poll.
+      # https://code.google.com/p/swarming/issues/detail?id=130
+      self.abort(500, 'Deadline')
+
+  def sleep(self, sleep_streak):
+    out = {
+      'cmd': 'sleep',
+      'duration': task_scheduler.exponential_backoff(sleep_streak),
+    }
+    self.send_response(out)
+
+
 ### Old Bot APIs (To be deleted).
 
 
@@ -1277,6 +1392,7 @@ def create_application(debug):
 
       # New Bot API:
       ('/swarming/api/v1/bot/handshake', BotHandshakeHandler),
+      ('/swarming/api/v1/bot/poll', BotPollHandler),
 
       ('/_ah/warmup', WarmupHandler),
   ]

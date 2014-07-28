@@ -758,12 +758,16 @@ class NewBotApiTest(AppTestBase):
         params=params).json
     token = response['xsrf_token'].encode('ascii')
     params['attributes']['version'] = response['bot_version']
-    params['c'] = 0
+    params['sleep_streak'] = 0
     return token, params
 
   def post_with_token(self, url, params, token):
     return self.app.post_json(
         url, params=params, headers={'X-XSRF-Token': token}).json
+
+  def client_get_results(self, task_id):
+    return self.app.get(
+        '/swarming/api/v1/client/task/%s' % task_id).json
 
   def test_handshake(self):
     # Bare minimum:
@@ -807,6 +811,71 @@ class NewBotApiTest(AppTestBase):
       ('Unexpected attributes; did you make a typo?',),
     ]
     self.assertEqual(expected, errors)
+
+  def test_poll_sleep(self):
+    # A bot polls, gets nothing.
+    token, params = self._token()
+    response = self.post_with_token('/swarming/api/v1/bot/poll', params, token)
+    self.assertEqual([u'cmd', u'duration'], sorted(response))
+    self.assertEqual(u'sleep', response['cmd'])
+    self.assertTrue(response['duration'])
+
+    # Sleep again
+    params['sleep_streak'] += 1
+    response = self.post_with_token('/swarming/api/v1/bot/poll', params, token)
+    self.assertEqual([u'cmd', u'duration'], sorted(response))
+    self.assertEqual(u'sleep', response['cmd'])
+    self.assertTrue(response['duration'])
+
+  def test_poll_update(self):
+    token, params = self._token()
+    old_version = params['attributes']['version']
+    params['attributes']['version'] = 'badversion'
+    response = self.post_with_token('/swarming/api/v1/bot/poll', params, token)
+    expected = {
+      u'cmd': u'update',
+      u'version': old_version,
+    }
+    self.assertEqual(expected, response)
+
+  def test_poll_task(self):
+    now = datetime.datetime(2010, 1, 2, 3, 4, 5)
+    self.mock_now(now)
+    str_now = unicode(now.strftime(utils.DATETIME_FORMAT))
+    # A bot polls, gets a task, updates it, completes it.
+    token, params = self._token()
+    # Enqueue a task.
+    task = self.client_create_task('hi')
+    task_id = task['test_keys'][0]['test_key']
+    self.assertEqual('00', task_id[-2:])
+    # Convert TaskResultSummary reference to TaskRunResult.
+    task_id = task_id[:-2] + '01'
+    response = self.post_with_token('/swarming/api/v1/bot/poll', params, token)
+    expected = {
+      u'commands': [[u'python', u'run_test.py']],
+      u'env': {},
+      u'task_id': task_id,
+      u'hard_timeout': 3600,
+      u'cmd': u'run',
+      u'io_timeout': 1200,
+      u'data': [],
+    }
+    self.assertEqual(expected, response)
+    response = self.client_get_results(task_id)
+    expected = {
+      u'abandoned_ts': None,
+      u'bot_id': u'bot1',
+      u'completed_ts': None,
+      u'exit_codes': [],
+      u'failure': False,
+      u'internal_failure': False,
+      u'modified_ts': str_now,
+      u'outputs': [],
+      u'started_ts': str_now,
+      u'state': task_result.State.RUNNING,
+      u'try_number': 1,
+    }
+    self.assertEqual(expected, response)
 
 
 class OldBotApiTest(AppTestBase):
