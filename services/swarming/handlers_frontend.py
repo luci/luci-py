@@ -971,6 +971,13 @@ class BotHandshakeHandler(auth.ApiHandler):
       ereporter2.log_request('Unexpected attributes; did you make a typo?')
 
     dimensions = attributes.get('dimensions', {})
+    quarantined = attributes.get('quarantined', False)
+    # Calculate the powerset of the dimensions. If it's too large, refuse it.
+    if (not quarantined and
+        task_to_run.dimensions_powerset_count(dimensions) > 16384):
+      # It's a big deal, alert the admins.
+      ereporter2.log_request(self.request, message='Too many dimensions on bot')
+      quarantined = True
     bot_management.tag_bot_seen(
         attributes['id'],
         dimensions.get('hostname'),
@@ -978,7 +985,7 @@ class BotHandshakeHandler(auth.ApiHandler):
         self.request.remote_addr,
         dimensions,
         attributes['version'],
-        attributes.get('quarantined', False))
+        quarantined)
     data = {
       # This access token will be used to validate each subsequent request.
       'bot_version': bot_management.get_slave_version(self.request.host_url),

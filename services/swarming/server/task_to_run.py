@@ -210,6 +210,13 @@ def validate_to_run_key(task_key):
   task_request.validate_request_key(request_key)
 
 
+def dimensions_powerset_count(dimensions):
+  """Returns the number of permutations possible with the dimensions."""
+  # TODO(maruel): No need to generate the actual list, just calculate the
+  # length.
+  return len(list(_powerset(dimensions)))
+
+
 def is_task_reapable(task_key, queue_number):
   """Returns TaskToRun if it could be updated.
 

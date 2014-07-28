@@ -7,6 +7,7 @@ import datetime
 import hashlib
 import os
 import sys
+import timeit
 import unittest
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -24,6 +25,7 @@ from server import task_to_run
 from support import test_case
 
 # pylint: disable=W0212
+# Method could be a function - pylint: disable=R0201
 
 
 def _gen_request_data(properties=None, **kwargs):
@@ -149,6 +151,74 @@ class TaskToRunPrivateTest(test_case.TestCase):
       actual = list(task_to_run._powerset(inputs))
       self.assertEquals(expected, actual)
 
+  def test_timeit_generation(self):
+    # The hash table generation is done once per poll request, so it's a cost
+    # latency wise and CPU wise.
+    setup = (
+      "import task_to_run\n"
+      "from components import utils\n"
+      # Test with 1024 permutations.
+      "dimensions = {str(k): '01234567890123456789' for k in xrange(10)}")
+
+    statement = (
+      "items = tuple(sorted("
+      "  task_to_run._hash_dimensions(utils.encode_to_json(i))"
+      "  for i in task_to_run._powerset(dimensions)))\n"
+      "del items")
+    _perf_tuple = timeit.timeit(statement, setup, number=10)
+
+    statement = (
+      "items = frozenset("
+      "  task_to_run._hash_dimensions(utils.encode_to_json(i))"
+      "  for i in task_to_run._powerset(dimensions))\n"
+      "del items")
+    _perf_frozenset = timeit.timeit(statement, setup, number=10)
+
+    # Creating the frozenset is fairly consistently faster by ~5%. Because the
+    # difference is so low, the following assert could fail under load because
+    # timeit is not very accurate.
+    #self.assertGreater(perf_tuple, perf_frozenset)
+    # For reference, numbers locally were: tuple: 0.6295s  frozenset:  0.5753s
+    # Enable to get actual numbers on your workstation:
+    #print('\ntuple: %.4fs  frozenset: %.4fs' % (perf_tuple, perf_frozenset))
+
+  def test_timeit_lookup(self):
+    # Lookups are done much more often than generation under normal utilization.
+    # That's what we want to optimize for.
+    setup = (
+      "import task_to_run\n"
+      "from components import utils\n"
+      # Test with 1024 permutations.
+      "dimensions = {str(k): '01234567890123456789' for k in xrange(10)}\n"
+      "items = tuple(sorted("
+      "  task_to_run._hash_dimensions(utils.encode_to_json(i))"
+      "  for i in task_to_run._powerset(dimensions)))\n")
+
+    statement = (
+      # Simulating 10000 pending tasks. Normally, a single poll will not search
+      # this many items, simply because the DB is not fast enough.
+      "for _ in xrange(10000):"
+      "  1 in items")
+    # TODO(maruel): This is a linear search instead of a binary search, so this
+    # test is a tad unfair. But it's very unlikely that even a binary search can
+    # beat the frozenset.
+    perf_tuple = timeit.timeit(statement, setup, number=10)
+    setup = (
+      "import task_to_run\n"
+      "from components import utils\n"
+      # Test with 1024 permutations.
+      "dimensions = {str(k): '01234567890123456789' for k in xrange(10)}\n"
+      "items = frozenset("
+      "  task_to_run._hash_dimensions(utils.encode_to_json(i))"
+      "  for i in task_to_run._powerset(dimensions))\n")
+    perf_frozenset = timeit.timeit(statement, setup, number=10)
+
+    # Creating the frozenset is fairly consistently faster by 333% (really).
+    self.assertGreater(perf_tuple, perf_frozenset)
+    # For reference, numbers locally were: tuple: 1.4612s  frozenset: 0.0043s
+    # Enable to get actual numbers on your workstation:
+    #print('\ntuple: %.4fs  frozenset: %.4fs' % (perf_tuple, perf_frozenset))
+
   def test_hash_dimensions(self):
     dimensions = 'this is not json'
     as_hex = hashlib.md5(dimensions).digest()[:4].encode('hex')
@@ -157,6 +227,40 @@ class TaskToRunPrivateTest(test_case.TestCase):
     # with bit 31 set because python stores it internally as a int64.
     self.assertEqual('711d0bf1', as_hex)
     self.assertEqual(0xf10b1d71, actual)
+
+  def test_dimensions_search_sizing_10_1(self):
+    dimensions = {str(k): '01234567890123456789' for k in xrange(10)}
+    items = tuple(sorted(
+        task_to_run._hash_dimensions(utils.encode_to_json(i))
+        for i in task_to_run._powerset(dimensions)))
+    self.assertEqual(1024, len(items))
+
+  def test_dimensions_search_sizing_1_20(self):
+    # Multi-value dimensions must *always* be prefered to split variables. They
+    # are much quicker to search.
+    dimensions = {'0': ['01234567890123456789' * i for i in xrange(1, 20)]}
+    items = tuple(sorted(
+        task_to_run._hash_dimensions(utils.encode_to_json(i))
+        for i in task_to_run._powerset(dimensions)))
+    self.assertEqual(20, len(items))
+
+  def test_dimensions_search_sizing_7_4(self):
+    # Likely maximum permitted; 7 keys of 4 items each.
+    dimensions = {
+      str(k): ['01234567890123456789' * i for i in xrange(1, 4)]
+      for k in xrange(7)
+    }
+    items = tuple(sorted(
+        task_to_run._hash_dimensions(utils.encode_to_json(i))
+        for i in task_to_run._powerset(dimensions)))
+    self.assertEqual(16384, len(items))
+
+  def test_dimensions_search_sizing_14_1(self):
+    dimensions = {str(k): '01234567890123456789' for k in xrange(14)}
+    items = tuple(sorted(
+        task_to_run._hash_dimensions(utils.encode_to_json(i))
+        for i in task_to_run._powerset(dimensions)))
+    self.assertEqual(16384, len(items))
 
 
 class TaskToRunApiTest(test_case.TestCase):
@@ -256,6 +360,15 @@ class TaskToRunApiTest(test_case.TestCase):
     q = task_to_run.TaskToRun.query().order(task_to_run.TaskToRun.queue_number)
     self.assertEqual(expected, map(flatten, q.fetch()))
 
+  def test_dimensions_powerset_count(self):
+    dimensions = {
+      'a': ['1', '2'],
+      'b': 'c',
+      'd': ['3', '4'],
+    }
+    self.assertEqual(
+        task_to_run.dimensions_powerset_count(dimensions),
+        len(list(task_to_run._powerset(dimensions))))
   def test_yield_next_available_task_to_dispatch_none(self):
     _gen_new_task_to_run(
         properties=dict(dimensions={u'OS': u'Windows-3.1.1'}))
