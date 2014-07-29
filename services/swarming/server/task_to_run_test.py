@@ -157,7 +157,7 @@ class TaskToRunPrivateTest(test_case.TestCase):
     setup = (
       "import task_to_run\n"
       "from components import utils\n"
-      # Test with 1024 permutations.
+      # Test with 1024 combinations.
       "dimensions = {str(k): '01234567890123456789' for k in xrange(10)}")
 
     statement = (
@@ -188,7 +188,7 @@ class TaskToRunPrivateTest(test_case.TestCase):
     setup = (
       "import task_to_run\n"
       "from components import utils\n"
-      # Test with 1024 permutations.
+      # Test with 1024 combinations.
       "dimensions = {str(k): '01234567890123456789' for k in xrange(10)}\n"
       "items = tuple(sorted("
       "  task_to_run._hash_dimensions(utils.encode_to_json(i))"
@@ -206,7 +206,7 @@ class TaskToRunPrivateTest(test_case.TestCase):
     setup = (
       "import task_to_run\n"
       "from components import utils\n"
-      # Test with 1024 permutations.
+      # Test with 1024 combinations.
       "dimensions = {str(k): '01234567890123456789' for k in xrange(10)}\n"
       "items = frozenset("
       "  task_to_run._hash_dimensions(utils.encode_to_json(i))"
@@ -369,6 +369,7 @@ class TaskToRunApiTest(test_case.TestCase):
     self.assertEqual(
         task_to_run.dimensions_powerset_count(dimensions),
         len(list(task_to_run._powerset(dimensions))))
+
   def test_yield_next_available_task_to_dispatch_none(self):
     _gen_new_task_to_run(
         properties=dict(dimensions={u'OS': u'Windows-3.1.1'}))

@@ -105,7 +105,7 @@ def _gen_queue_number_key(timestamp, priority):
 
 
 def _explode_list(values):
-  """Yields all the permutations in the dict values for items which are list.
+  """Yields all the combinations in the dict values for items which are list.
 
   Examples:
   - values={'a': [1, 2]} yields {'a': 1}, {'a': 2}
@@ -129,7 +129,7 @@ def _explode_list(values):
 
 
 def _powerset(dimensions):
-  """Yields the product of all the possible permutations in dimensions.
+  """Yields the product of all the possible combinations in dimensions.
 
   Starts with the most restrictive set and goes down to the less restrictive
   ones. See unit test TaskToRunPrivateTest.test_powerset for examples.
@@ -211,10 +211,12 @@ def validate_to_run_key(task_key):
 
 
 def dimensions_powerset_count(dimensions):
-  """Returns the number of permutations possible with the dimensions."""
-  # TODO(maruel): No need to generate the actual list, just calculate the
-  # length.
-  return len(list(_powerset(dimensions)))
+  """Returns the number of combinations possible with the dimensions."""
+  out = 1
+  for i in dimensions.itervalues():
+    # Add 1 which is the "Not present" value.
+    out *= len(i) + 1
+  return out
 
 
 def is_task_reapable(task_key, queue_number):
