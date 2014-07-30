@@ -287,6 +287,8 @@ class UINavbarTabHandler(UIHandler):
   navbar_tab_id = None
   # Title of the tab, will be used in tab title and page title.
   navbar_tab_title = None
+  # Relative URL to CSS file with tab's styles.
+  css_file = None
   # Relative URL to javascript file with tab's logic.
   js_file_url = None
   # Path to a Jinja2 template with tab's markup.
@@ -297,6 +299,7 @@ class UINavbarTabHandler(UIHandler):
   def get(self):
     """Renders page HTML to HTTP response stream."""
     env = {
+      'css_file': self.css_file,
       'js_file': self.js_file_url,
       'navbar_tab_id': self.navbar_tab_id,
       'page_title': self.navbar_tab_title,
@@ -313,6 +316,7 @@ class GroupsHandler(UINavbarTabHandler):
   navbar_tab_url = '/auth/groups'
   navbar_tab_id = 'groups'
   navbar_tab_title = 'Groups'
+  css_file = '/auth/static/css/groups.css'
   js_file_url = '/auth/static/js/groups.js'
   template_file = 'auth/groups.html'
 

@@ -29,7 +29,7 @@ javascript library and not jinja2. #}
 <script id="edit-group-form-template" type="text/x-handlebars-template">
   <div class="panel panel-default">
     <div class="panel-heading"><h3 class="panel-title">{{name}}</h3></div>
-    <div class="panel-body">
+    <div class="panel-body" style="padding-bottom: 5px;">
       <div id="alerts"></div>
       <form class="form-horizontal" role="form">
         <input type="hidden" name="name" value="{{name}}">
@@ -75,21 +75,21 @@ javascript library and not jinja2. #}
           <label class="col-sm-2 control-label">Members</label>
           <div class="col-sm-10" style="font-family:monospace;">
             <textarea class="form-control"
-                      rows="6" name="members">{{members}}</textarea>
+                      rows="4" name="members">{{members}}</textarea>
           </div>
         </div>
         <div class="form-group">
           <label class="col-sm-2 control-label">Patterns</label>
           <div class="col-sm-10" style="font-family:monospace;">
             <textarea class="form-control"
-                      rows="3" name="globs">{{globs}}</textarea>
+                      rows="2" name="globs">{{globs}}</textarea>
           </div>
         </div>
         <div class="form-group">
           <label class="col-sm-2 control-label">Nested</label>
           <div class="col-sm-10" style="font-family:monospace;">
             <textarea class="form-control"
-                      rows="3" name="nested">{{nested}}</textarea>
+                      rows="2" name="nested">{{nested}}</textarea>
           </div>
         </div>
         <hr>
@@ -110,7 +110,7 @@ javascript library and not jinja2. #}
 
 <script id="new-group-form-template" type="text/x-handlebars-template">
   <div class="panel panel-default">
-    <div class="panel-body">
+    <div class="panel-body" style="padding-bottom: 5px;">
       <div id="alerts"></div>
       <form class="form-horizontal" role="form">
         <div class="form-group">
@@ -160,8 +160,22 @@ javascript library and not jinja2. #}
 <div class="row">
   <!-- Group chooser + 'Create new group' button. -->
   <div class="col-md-4">
-    <!-- Populated by js. -->
-    <div id="group-chooser">
+    <div class="row">
+      <!-- Group search button. -->
+      <div class="input-group" id="search-box-group">
+          <input id="search-box" type="text"
+                 class="form-control" placeholder="Search" />
+          <span class="input-group-addon">
+            <i class="glyphicon glyphicon-search"></i>
+          </span>
+      </div>
+    </div>
+    <div class="row">
+      <!-- Populated by js. -->
+      <div id="group-chooser-outter">
+        <div id="group-chooser">
+        </div>
+      </div>
     </div>
   </div>
 

@@ -53,8 +53,13 @@ var GroupChooser = function($element) {
   this.groupList = [];
   // Same list, but as a dict: group name -> group object.
   this.groupMap = {};
+  // Mapping group name -> jQuery element.
+  this.groupToItemMap = {};
   // If true, selection won't change on clicks in UI.
   this.interactionDisabled = false;
+
+  // Make group chooser use scroll bar.
+  this.$element.slimScroll({height: '657px'});
 };
 
 
@@ -74,10 +79,21 @@ GroupChooser.prototype.refetchGroups = function() {
 GroupChooser.prototype.setGroupList = function(groups) {
   var self = this;
 
-  // Remember new list (sorted by name).
-  self.groupList = _.sortBy(groups, 'name');
+  // Bring groups without '-' in name to front.
+  var sortKeyFunc = function(group) {
+    var name = group.name;
+    if (name.indexOf('-') == -1) {
+      return 'A-' + name;
+    } else {
+      return 'B-' + name;
+    }
+  };
+
+  // Remember new sorted list.
+  self.groupList = _.sortBy(groups, sortKeyFunc);
   self.groupMap = {};
-  _.each(groups, function(group) {
+  self.groupToItemMap = {};
+  _.each(self.groupList, function(group) {
     self.groupMap[group.name] = group;
   });
 
@@ -87,13 +103,15 @@ GroupChooser.prototype.setGroupList = function(groups) {
     item.addClass('chooser-element');
     item.data('group-name', groupName);
     item.appendTo(self.$element);
+    return item;
   };
 
   // Rebuild DOM: list of groups + 'Create new group' button.
   self.$element.addClass('list-group');
   self.$element.empty();
-  _.each(groups, function(group) {
-    addElement(common.render('group-chooser-item-template', group), group.name);
+  _.each(self.groupList, function(group) {
+    self.groupToItemMap[group.name] = addElement(
+        common.render('group-chooser-item-template', group), group.name);
   });
   addElement(common.render('group-chooser-button-template'), null);
 
@@ -134,6 +152,7 @@ GroupChooser.prototype.setSelection = function(name, state) {
     }
   });
   if (selectionMade) {
+    this.ensureGroupVisible(name);
     this.$element.triggerHandler(
         'selectionChanged', {group: name, state: state});
   }
@@ -160,6 +179,44 @@ GroupChooser.prototype.onSelectionChanged = function(listener) {
 // Disables an ability to change selection.
 GroupChooser.prototype.setInteractionDisabled = function(disabled) {
   this.interactionDisabled = disabled;
+};
+
+
+// Scrolls group list so that given group is visible.
+GroupChooser.prototype.ensureGroupVisible = function(name) {
+  var $item = this.groupToItemMap[name];
+  if (!$item) {
+    return;
+  }
+
+  // |pos| is position of $item relative to scrollable div origin.
+  var scrollTop = this.$element.scrollTop();
+  var pos = $item.position().top + scrollTop;
+
+  // Scroll to the item if it is completely or partially invisible.
+  var itemHeight = $item.outerHeight();
+  var areaHeight = this.$element.height();
+  if (pos < scrollTop || pos + itemHeight > scrollTop + areaHeight) {
+    this.$element.slimScroll({scrollTo: pos});
+  }
+};
+
+
+////////////////////////////////////////////////////////////////////////////////
+// Text field to search for groups.
+
+
+var SearchBox = function($element) {
+  this.$element = $element;
+};
+
+
+// Registers new event listener that is called whenever text changes.
+SearchBox.prototype.onTextChanged = function(listener) {
+  var self = this;
+  this.$element.on('input', function() {
+    listener(self.$element.val());
+  });
 };
 
 
@@ -511,6 +568,7 @@ var registerFormValidators = function() {
 exports.onContentLoaded = function() {
   // Setup global UI elements.
   var groupChooser = new GroupChooser($('#group-chooser'));
+  var searchBox = new SearchBox($('#search-box'));
   var mainFrame = new ContentFrame($('#main-content-pane'));
 
   // Setup form validators used in group forms.
@@ -571,6 +629,23 @@ exports.onContentLoaded = function() {
       startNewGroupFlow();
     } else {
       startEditGroupFlow(selection, state);
+    }
+  });
+
+
+  // Allow to select groups via search box.
+  searchBox.onTextChanged(function(text) {
+    // Search for a group with name that starts with |text|.
+    var found = null;
+    for (var i = 0; i < groupChooser.groupList.length; i++) {
+      var group = groupChooser.groupList[i];
+      if (group.name.slice(0, text.length) == text) {
+        found = group;
+        break;
+      }
+    }
+    if (found) {
+      groupChooser.setSelection(found.name, null);
     }
   });
 
