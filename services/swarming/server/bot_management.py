@@ -29,7 +29,7 @@ START_SLAVE_SCRIPT_KEY = 'start_slave_script'
 
 
 # The amount of time that has to pass before a machine is considered dead.
-MACHINE_DEATH_TIMEOUT = datetime.timedelta(seconds=30*60)
+BOT_DEATH_TIMEOUT = datetime.timedelta(seconds=30*60)
 
 
 ### Models.
@@ -77,10 +77,19 @@ class Bot(ndb.Model):
     # TODO(maruel): This is inefficient in View, fix.
     return self.task.get() if self.task else None
 
+  def is_dead(self, now):
+    """Returns True if the bot is dead based on timestamp now."""
+    return (now - self.last_seen_ts) >= BOT_DEATH_TIMEOUT
+
   def to_dict(self):
     out = super(Bot, self).to_dict()
     # Inject the bot id, since it's the entity key.
     out['id'] = self.key.string_id()
+    return out
+
+  def to_dict_with_now(self, now):
+    out = self.to_dict()
+    out['is_dead'] = self.is_dead(now)
     return out
 
 

@@ -1215,7 +1215,7 @@ class OldClientApiTest(AppTestBase):
     self.assertEqual('200 OK', response.status)
     expected = {
         u'machine_death_timeout':
-            int(bot_management.MACHINE_DEATH_TIMEOUT.total_seconds()),
+            int(bot_management.BOT_DEATH_TIMEOUT.total_seconds()),
         u'machines': [
           {
             u'created_ts': u'2000-01-02 03:04:05',
@@ -1224,12 +1224,14 @@ class OldClientApiTest(AppTestBase):
             u'hostname': u'localhost',
             u'id': u'id1',
             u'internal_ip': u'127.0.0.1',
+            u'is_dead': False,
             u'last_seen_ts': u'2000-01-02 03:04:05',
             u'quarantined': False,
             u'task': None,
             u'version': u'123456789',
           },
        ],
+      u'now': unicode(now.strftime(utils.DATETIME_FORMAT)),
     }
     self.assertEqual(expected, response.json)
 
@@ -1338,13 +1340,13 @@ class OldClientApiTest(AppTestBase):
     self.assertEqual('0', self.app.get('/swarming/api/v1/bots/dead/count').body)
 
     # Borderline. If this test becomes flaky, increase the 1 second value.
-    self.mock_now(now - bot_management.MACHINE_DEATH_TIMEOUT, 1)
+    self.mock_now(now - bot_management.BOT_DEATH_TIMEOUT, 1)
     bot.put()
     self.mock_now(now)
     self.assertEqual('0', self.app.get('/swarming/api/v1/bots/dead/count').body)
 
     # Make the machine old and ensure it is marked as dead.
-    self.mock_now(now - bot_management.MACHINE_DEATH_TIMEOUT, -1)
+    self.mock_now(now - bot_management.BOT_DEATH_TIMEOUT, -1)
     bot.put()
     self.mock_now(now)
     self.assertEqual('1', self.app.get('/swarming/api/v1/bots/dead/count').body)

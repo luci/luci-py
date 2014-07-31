@@ -7,6 +7,24 @@
     margin-top: 10px;
     margin-bottom: 10px;
   }
+
+  table.property_table {
+    font-family: monospace;
+    border-spacing: 0;
+  }
+
+  table.property_table tbody tr:nth-child(even) {
+    background-color: #eeeeee;
+  }
+
+  table.property_table td {
+    padding-left: 1em;
+    padding-right: 1em;
+  }
+
+  table.property_table tbody tr:hover {
+    background-color: #eeffee;
+  }
 </style>
 {% endblock %}
 
@@ -22,8 +40,24 @@
 <h1>Known bots</h1>
 <a href="/">Back to root</a>
 <p>
-
-<p>Sort By:
+<table class=property_table>
+  <tbody>
+    <tr>
+      <td>Current bot version</td>
+      <td>{{current_version[:8]}}</td>
+    </tr>
+    <tr>
+      <td>Number of bots alive</td>
+      <td>{{bots|length - bots_dead}}</td>
+    </tr>
+    <tr>
+      <td>Number of bots dead</td>
+      <td>{{bots_dead}}</td>
+    </tr>
+  </tbody>
+</table>
+<p>
+Sort By:
 <select id="sort" onchange="document.location.href='?sort_by=' + this.value">
   {% for sort_option in sort_options %}
     {% if sort_option.key == selected_sort %}
@@ -34,10 +68,7 @@
     {% endif %}
   {% endfor %}
 </select>
-</p>
 <p>
-Current bot version is: {{current_version[:8]}}
-</p>
 
 {% import 'swarming/bot_view.html' as bot_view %}
 <table id="machine-table" class="alterning_background"
@@ -51,7 +82,7 @@ Current bot version is: {{current_version[:8]}}
   </thead>
   <tbody>
     {% for bot in bots %}
-      <tr class="request {% if bot.last_seen_ts < dead_machine_cutoff %}dead_machine{% endif %}">
+      <tr class="request {% if bot.is_dead(now) %}dead_machine{% endif %}">
         <td>{{bot_view.bot_link(bot.key.id(), is_privileged_user)}}</td>
         <td>
           {% if bot.task %}
@@ -61,7 +92,7 @@ Current bot version is: {{current_version[:8]}}
         </td>
         <td>
           {{(now-bot.last_seen_ts)|timedeltaformat}}
-          {% if is_admin and bot.last_seen_ts < dead_machine_cutoff %}
+          {% if is_admin and bot.is_dead(now) %}
             <form id="delete_{{bot.key.id()}}" method="post"
                 action="/delete_machine_stats">
               <input type="hidden" name="r" value="{{bot.key.id()}}" />

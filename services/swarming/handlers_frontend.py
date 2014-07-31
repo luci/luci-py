@@ -282,8 +282,6 @@ class BotsListHandler(auth.AuthenticatingHandler):
     if sort_by not in self.ACCEPTABLE_BOTS_SORTS:
       self.abort(400, 'Invalid sort_by query parameter')
 
-    dead_machine_cutoff = utils.utcnow() - bot_management.MACHINE_DEATH_TIMEOUT
-
     def sort_bot(bot):
       if sort_by == 'id':
         return bot.key.string_id()
@@ -295,15 +293,16 @@ class BotsListHandler(auth.AuthenticatingHandler):
       SortOptions(k, v)
       for k, v in sorted(self.ACCEPTABLE_BOTS_SORTS.iteritems())
     ]
+    now = utils.utcnow()
     params = {
       'bots': bots,
+      'bots_dead': sum(1 for b in bots if b.is_dead(now)),
       # TODO(maruel): it should be the default AppEngine url version.
       'current_version':
           bot_management.get_slave_version(self.request.host_url),
-      'dead_machine_cutoff': dead_machine_cutoff,
       'is_privileged_user': acl.is_privileged_user(),
       'is_admin': acl.is_admin(),
-      'now': utils.utcnow(),
+      'now': now,
       'selected_sort': sort_by,
       'sort_options': sort_options,
     }
@@ -321,19 +320,17 @@ class BotHandler(auth.AuthenticatingHandler):
         task_result.TaskRunResult.bot_id == bot_id).order(
             -task_result.TaskRunResult.started_ts).fetch_page(
                 limit, start_cursor=cursor)
-    dead_bot_cutoff = utils.utcnow() - bot_management.MACHINE_DEATH_TIMEOUT
+    now = utils.utcnow()
     bot = bot_future.get_result()
-    is_dead = bot.last_seen_ts < dead_bot_cutoff if bot else False
     # Calculate the time this bot was idle.
     idle_time = datetime.timedelta()
     run_time = datetime.timedelta()
-    now = utils.utcnow()
     if run_results:
       run_time = run_results[0].duration_now()
       if not cursor and run_results[0].state != task_result.State.RUNNING:
         # Add idle time since last task completed. Do not do this when a cursor
         # is used since it's not representative.
-        idle_time = utils.utcnow() - run_results[0].ended_ts
+        idle_time = now - run_results[0].ended_ts
       for index in xrange(1, len(run_results)):
         idle_time += (
             run_results[index-1].started_ts - run_results[index].ended_ts)
@@ -348,7 +345,6 @@ class BotHandler(auth.AuthenticatingHandler):
           bot_management.get_slave_version(self.request.host_url),
       'cursor': cursor.urlsafe() if cursor and more else None,
       'idle_time': idle_time,
-      'is_dead': is_dead,
       'is_admin': acl.is_admin(),
       'limit': limit,
       'now': now,
@@ -634,10 +630,13 @@ class ApiBots(auth.AuthenticatingHandler):
 
   @auth.require(acl.is_privileged_user)
   def get(self):
+    now = utils.utcnow()
     params = {
         'machine_death_timeout':
-            int(bot_management.MACHINE_DEATH_TIMEOUT.total_seconds()),
-        'machines': sorted(m.to_dict() for m in bot_management.Bot.query()),
+            int(bot_management.BOT_DEATH_TIMEOUT.total_seconds()),
+        'machines': sorted(
+            m.to_dict_with_now(now) for m in bot_management.Bot.query()),
+        'now': now,
     }
     self.response.headers['Content-Type'] = 'application/json; charset=utf-8'
     self.response.headers['Cache-Control'] = 'no-cache, no-store'
@@ -645,7 +644,7 @@ class ApiBots(auth.AuthenticatingHandler):
 
 
 class DeleteMachineStatsHandler(auth.AuthenticatingHandler):
-  """Handler to delete a machine assignment."""
+  """Handler to delete a bot assignment."""
 
   # TODO(vadimsh): Implement XSRF token support.
   xsrf_token_enforce_on = ()
@@ -1129,7 +1128,7 @@ class ServerPingHandler(webapp2.RequestHandler):
 class RegisterHandler(auth.AuthenticatingHandler):
   """Handler for the register_machine of the Swarm server.
 
-  Attempt to find a matching job for the querying machine.
+  Attempt to find a matching job for the querying bot.
   """
 
   # TODO(vadimsh): Implement XSRF token support.
@@ -1162,9 +1161,8 @@ class RegisterHandler(auth.AuthenticatingHandler):
     except runtime.DeadlineExceededError as e:
       # If the timeout happened before a runner was assigned there are no
       # problems. If the timeout occurred after a runner was assigned, that
-      # runner will timeout (since the machine didn't get the details required
-      # to run it) and it will automatically get retried when the machine
-      # "timeout".
+      # runner will timeout (since the bot didn't get the details required
+      # to run it) and it will automatically get retried when the bot "timeout".
       message = str(e)
       logging.warning(message)
       self.abort(500, message)
@@ -1189,9 +1187,11 @@ class RunnerPingHandler(auth.AuthenticatingHandler):
 
   @auth.require(acl.is_bot)
   def post(self):
-    # TODO(vadimsh): Any machine can send ping on behalf of any other machine.
-    # Ensure 'id' matches credentials used to authenticate the request (i.e.
-    # auth.get_current_identity()).
+    # TODO(vadimsh): Any bot can send ping on behalf of any other bot. Ensure
+    # 'id' matches credentials used to authenticate the request (i.e.
+    # auth.get_current_identity()). In practice this doesn't work since the
+    # Swarming bot id may not have any relationship to the host accessing the
+    # swarming server.
     packed_run_result_key = self.request.get('r', '')
     bot_id = self.request.get('id', '')
     try:
@@ -1222,8 +1222,8 @@ class ResultHandler(auth.AuthenticatingHandler):
     # current request (i.e. auth.get_current_identity()). Or shorter, just use
     # auth.get_current_identity() and have the bot stops passing id=foo at all.
     if bot_id != run_result.bot_id:
-      # Check that machine that posts the result is same as machine that claimed
-      # the task.
+      # Check that bot that posts the result is same as bot that claimed the
+      # task.
       msg = 'Expected bot id %s, got %s' % (run_result.bot_id, bot_id)
       logging.error(msg)
       self.abort(404, msg)
@@ -1258,8 +1258,8 @@ class Result2Handler(auth.AuthenticatingHandler):
     bot_id = urllib.unquote_plus(self.request.get('id'))
     run_result = run_result_key.get()
     if bot_id != run_result.bot_id:
-      # Check that machine that posts the result is same as machine that claimed
-      # the task.
+      # Check that bot that posts the result is same as bot that claimed the
+      # task.
       msg = 'Expected bot id %s, got %s' % (run_result.bot_id, bot_id)
       logging.error(msg)
       self.abort(404, msg)
@@ -1311,7 +1311,7 @@ class RootHandler(auth.AuthenticatingHandler):
 class DeadBotsCountHandler(webapp2.RequestHandler):
   def get(self):
     self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
-    cutoff = utils.utcnow() - bot_management.MACHINE_DEATH_TIMEOUT
+    cutoff = utils.utcnow() - bot_management.BOT_DEATH_TIMEOUT
     count = bot_management.Bot.query().filter(
         bot_management.Bot.last_seen_ts < cutoff).count()
     self.response.out.write(str(count))
