@@ -635,7 +635,8 @@ class ApiBots(auth.AuthenticatingHandler):
         'machine_death_timeout':
             int(bot_management.BOT_DEATH_TIMEOUT.total_seconds()),
         'machines': sorted(
-            m.to_dict_with_now(now) for m in bot_management.Bot.query()),
+            (m.to_dict_with_now(now) for m in bot_management.Bot.query()),
+            key=lambda x: x['id']),
         'now': now,
     }
     self.response.headers['Content-Type'] = 'application/json; charset=utf-8'
