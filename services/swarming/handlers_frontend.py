@@ -29,7 +29,6 @@ from common import test_request_message
 from components import auth
 from components import decorators
 from components import ereporter2
-from components import natsort
 from components import utils
 from server import acl
 from server import bot_management
@@ -270,41 +269,57 @@ class WhitelistIPHandler(auth.AuthenticatingHandler):
 class BotsListHandler(auth.AuthenticatingHandler):
   """Presents the list of known bots."""
   ACCEPTABLE_BOTS_SORTS = {
-    'dimensions': 'Dimensions',
-    'last_seen_ts': 'Last Seen',
+    'last_seen': 'Last Seen',
     'hostname': 'Hostname',
-    'id': 'ID',
+    '__key__': 'ID',
   }
+  SORT_OPTIONS = [
+    SortOptions(k, v) for k, v in sorted(ACCEPTABLE_BOTS_SORTS.iteritems())
+  ]
 
   @auth.require(acl.is_privileged_user)
   def get(self):
-    sort_by = self.request.get('sort_by', 'id')
+    limit = int(self.request.get('limit', 100))
+    cursor = datastore_query.Cursor(urlsafe=self.request.get('cursor'))
+    sort_by = self.request.get('sort_by', '__key__')
     if sort_by not in self.ACCEPTABLE_BOTS_SORTS:
       self.abort(400, 'Invalid sort_by query parameter')
 
-    def sort_bot(bot):
-      if sort_by == 'id':
-        return bot.key.string_id()
-      return getattr(bot, sort_by)
+    order = datastore_query.PropertyOrder(
+        sort_by, datastore_query.PropertyOrder.ASCENDING)
 
-    bots = natsort.natsorted(bot_management.Bot.query().fetch(), key=sort_bot)
-
-    sort_options = [
-      SortOptions(k, v)
-      for k, v in sorted(self.ACCEPTABLE_BOTS_SORTS.iteritems())
-    ]
     now = utils.utcnow()
+    cutoff = now - bot_management.BOT_DEATH_TIMEOUT
+
+    num_total_bots_future = bot_management.Bot.query().count_async()
+    num_dead_bots_future = bot_management.Bot.query(
+        bot_management.Bot.last_seen_ts < cutoff).count_async()
+    fetch_future = bot_management.Bot.query().order(order).fetch_page_async(
+        limit, start_cursor=cursor)
+
+    # TODO(maruel): self.request.host_url should be the default AppEngine url
+    # version and not the current one. It is only an issue when
+    # version-dot-appid.appspot.com urls are used to access this page.
+    version = bot_management.get_slave_version(self.request.host_url)
+    bots, cursor, more = fetch_future.get_result()
+    # Prefetch the tasks. We don't actually use the value here, it'll be
+    # implicitly used by ndb local's cache when refetched by the html template.
+    tasks = filter(None, (b.task for b in bots))
+    ndb.get_multi(tasks)
+    num_total_bots = num_total_bots_future.get_result()
+    num_dead_bots = num_dead_bots_future.get_result()
     params = {
       'bots': bots,
-      'bots_dead': sum(1 for b in bots if b.is_dead(now)),
-      # TODO(maruel): it should be the default AppEngine url version.
-      'current_version':
-          bot_management.get_slave_version(self.request.host_url),
-      'is_privileged_user': acl.is_privileged_user(),
+      'current_version': version,
+      'cursor': cursor.urlsafe() if cursor and more else '',
       'is_admin': acl.is_admin(),
+      'is_privileged_user': acl.is_privileged_user(),
+      'limit': limit,
       'now': now,
-      'selected_sort': sort_by,
-      'sort_options': sort_options,
+      'num_bots_alive': num_total_bots - num_dead_bots,
+      'num_bots_dead': num_dead_bots,
+      'sort_by': sort_by,
+      'sort_options': self.SORT_OPTIONS,
     }
     self.response.out.write(
         template.render('swarming/restricted_botslist.html', params))
@@ -620,6 +635,26 @@ class ClientTaskResultHandler(auth.ApiHandler):
     if not result:
       self.abort_with_error(404, error='Task not found')
     self.send_response(utils.to_json_encodable(result))
+
+
+class ClientApiBots(auth.ApiHandler):
+  """Returns the list of known swarming bots."""
+
+  @auth.require(acl.is_privileged_user)
+  def get(self):
+    now = utils.utcnow()
+    limit = int(self.request.get('limit', 1000))
+    cursor = datastore_query.Cursor(urlsafe=self.request.get('cursor'))
+    q = bot_management.Bot.query().order(bot_management.Bot.key)
+    bots, cursor, more = q.fetch_page(limit, start_cursor=cursor)
+    data = {
+      'bots': [b.to_dict_with_now(now) for b in bots],
+      'death_timeout': bot_management.BOT_DEATH_TIMEOUT.total_seconds(),
+      'cursor': cursor.urlsafe() if cursor and more else None,
+      'limit': limit,
+      'now': now,
+    }
+    self.send_response(utils.to_json_encodable(data))
 
 
 ### Old Client APIs.
@@ -1387,6 +1422,7 @@ def create_application(debug):
         stats_gviz.StatsGvizUserHandler),
 
       # New Client API:
+      ('/swarming/api/v1/client/bots', ClientApiBots),
       ('/swarming/api/v1/client/handshake', ClientHandshakeHandler),
       ('/swarming/api/v1/client/task/<key_id:[0-9a-fA-F]+>',
           ClientTaskResultHandler),

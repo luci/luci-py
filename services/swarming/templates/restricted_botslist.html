@@ -48,11 +48,11 @@
     </tr>
     <tr>
       <td>Number of bots alive</td>
-      <td>{{bots|length - bots_dead}}</td>
+      <td>{{num_bots_alive}}</td>
     </tr>
     <tr>
       <td>Number of bots dead</td>
-      <td>{{bots_dead}}</td>
+      <td>{{num_bots_dead}}</td>
     </tr>
   </tbody>
 </table>
@@ -60,7 +60,7 @@
 Sort By:
 <select id="sort" onchange="document.location.href='?sort_by=' + this.value">
   {% for sort_option in sort_options %}
-    {% if sort_option.key == selected_sort %}
+    {% if sort_option.key == sort_by %}
       <option value="{{sort_option.key}}" selected="">{{sort_option.name}}
       </option>
     {% else %}
@@ -106,5 +106,10 @@ Sort By:
     {% endfor %}
   </tbody>
 </table>
+
+{% if cursor %}
+<p>
+<a href="/restricted/bots?limit={{limit}}&sort_by={{sort_by}}&cursor={{cursor}}">Next page</a>
+{% endif %}
 
 {% endblock %}
