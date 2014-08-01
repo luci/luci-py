@@ -10,6 +10,7 @@ implemented using the webapp2 framework.
 
 import collections
 import datetime
+import itertools
 import json
 import logging
 import os
@@ -428,6 +429,13 @@ class TasksHandler(auth.AuthenticatingHandler):
       # Revisit according to the user requests.
       state = 'all'
 
+    # Start all the counting in parallel.
+    counts_future = {}
+    for state_key, _ in itertools.chain.from_iterable(self.STATE_CHOICES):
+      queries, query = self._get_query(None, state_key)
+      if query:
+        counts_future[state_key] = query.count_async()
+
     if task_name:
       # Word based search.
       sort = 'created_ts'
@@ -457,6 +465,17 @@ class TasksHandler(auth.AuthenticatingHandler):
     # TaskResultSummary.request_key.get().
     futures = ndb.get_multi_async(t.request_key for t in tasks)
 
+    # Appends the number of tasks for each filter. It gives a sense of how much
+    # things are going on.
+    state_choices = []
+    for choice_list in self.STATE_CHOICES:
+      state_choices.append([])
+      for state_key, name in choice_list:
+        if state_key in counts_future:
+          name += ' (%d)' % counts_future[state_key].get_result()
+        state_choices[-1].append((state_key, name))
+
+    ndb.Future.wait_all(futures)
     params = {
       'cursor': cursor_str,
       'is_privileged_user': acl.is_privileged_user(),
@@ -465,20 +484,21 @@ class TasksHandler(auth.AuthenticatingHandler):
       'sort': sort,
       'sort_choices': self.SORT_CHOICES,
       'state': state,
-      'state_choices': self.STATE_CHOICES,
+      'state_choices': state_choices,
       'tasks': tasks,
       'task_name': task_name,
     }
     # TODO(maruel): If admin or if the user is task's .user, show the Cancel
     # button. Do not show otherwise.
     self.response.out.write(template.render('swarming/user_tasks.html', params))
-    ndb.Future.wait_all(futures)
 
   def _get_query(self, sort, state):
     """Returns one or many TaskResultSummary queries."""
-    order = datastore_query.PropertyOrder(
-        sort, datastore_query.PropertyOrder.DESCENDING)
-    query = task_result.TaskResultSummary.query().order(order)
+    query = task_result.TaskResultSummary.query()
+    if sort:
+      order = datastore_query.PropertyOrder(
+          sort, datastore_query.PropertyOrder.DESCENDING)
+      query = query.order(order)
 
     if state == 'pending':
       return None, query.filter(
