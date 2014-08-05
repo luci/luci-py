@@ -379,40 +379,68 @@ class BotHandler(auth.AuthenticatingHandler):
 
 class TasksHandler(auth.AuthenticatingHandler):
   """Lists all requests and allows callers to manage them."""
+  # Each entry is an item in the Sort column.
+  # Each entry is (key, text, hover)
   SORT_CHOICES = [
-    ('created_ts', 'Created'),
-    ('modified_ts', 'Last updated (Recently active)'),
-    ('completed_ts', 'Ended (Completed only)'),
-    ('abandoned_ts', 'Abandoned (We failed you)'),
+    ('created_ts', 'Created', 'Most recently created tasks are shown first.'),
+    ('modified_ts', 'Active', 'Shows the most recently active tasks first.'),
+    ('completed_ts', 'Completed',
+      'Shows the most recently completed tasks first.'),
+    ('abandoned_ts', 'Abandoned',
+      'Shows the most recently abandoned tasks first.'),
   ]
 
+  # Each list is one column in the Task state filtering column.
+  # Each sublist is the checkbox item in this column.
+  # Each entry is (key, text, hover)
   # TODO(maruel): Evaluate what the categories the users would like for
   # diagnosis, then adapt the DB to enable efficient queries.
   STATE_CHOICES = [
     [
-      ('all', 'All states'),
-      ('pending', 'Pending'),
-      ('running', 'Running'),
-      ('pending_running', 'Pending or running'),
+      ('all', 'All', 'All tasks ever requested independent of their state.'),
+      ('pending', 'Pending',
+        'Tasks that are still ready to be assigned to a bot.'),
+      ('running', 'Running', 'Tasks being currently executed by a bot.'),
+      ('pending_running', 'Pending|running',
+        'Tasks either \'pending\' or \'running\'.'),
     ],
     [
-      ('completed', 'Completed'),
-      ('completed_success', 'Completed (success only)'),
-      ('completed_failure', 'Completed (failure only)'),
+      ('completed', 'Completed',
+        'All tasks that are completed, independent if the task itself '
+        'succeeded or failed. This excludes tasks that had an infrastructure '
+        'failure.'),
+      ('completed_success', 'Successes', 'Tasks that completed successfully.'),
+      ('completed_failure', 'Failures',
+        'Tasks that were executed successfully but failed, e.g. exit code is '
+        'non-zero.'),
       # TODO(maruel): This is never set until the new bot API is writen.
       # https://code.google.com/p/swarming/issues/detail?id=117
       #('timed_out', 'Execution timed out'),
     ],
     [
-      ('bot_died', 'Bot died during execution'),
-      ('expired', 'Request expired'),
-      ('canceled', 'Request canceled'),
+      ('bot_died', 'Bot died',
+        'The bot stopped sending updates while running the task, causing the '
+        'task execution to time out. This is considered an infrastructure '
+        'failure and the usual reason is that the bot BSOD\'ed or '
+        'spontaneously rebooted.'),
+      ('expired', 'Expired',
+        'The task was not assigned a bot until its expiration timeout, causing '
+        'the task to never being assigned to a bot. This can happen when the '
+        'dimension filter was not available or overloaded with a low priority. '
+        'Either fix the priority or bring up more bots with these dimensions.'),
+      ('canceled', 'Canceled',
+        'The task was explictly canceled by a user before it started '
+        'executing.'),
     ],
   ]
 
   @auth.require(acl.is_user)
   def get(self):
-    """Handles both ndb.Query searches and search.Index().search() queries."""
+    """Handles both ndb.Query searches and search.Index().search() queries.
+
+    If |task_name| is set or not affects the meaning of |cursor|. When set, the
+    cursor is for search.Index, otherwise the cursor is for a ndb.Query.
+    """
     cursor_str = self.request.get('cursor')
     limit = int(self.request.get('limit', 100))
     sort = self.request.get('sort', self.SORT_CHOICES[0][0])
@@ -429,15 +457,44 @@ class TasksHandler(auth.AuthenticatingHandler):
       # Revisit according to the user requests.
       state = 'all'
 
-    # Start all the counting in parallel.
-    counts_future = {}
-    for state_key, _ in itertools.chain.from_iterable(self.STATE_CHOICES):
-      queries, query = self._get_query(None, state_key)
-      if query:
-        counts_future[state_key] = query.count_async()
+    now = utils.utcnow()
+    counts_future = self._get_counts_future(now)
 
+    # This call is synchronous.
+    tasks, cursor_str, sort, state = self._get_tasks(
+        task_name, cursor_str, limit, sort, state)
+
+    # Prefetch the TaskRequest all at once, so that ndb's in-process cache has
+    # it instead of fetching them one at a time indirectly when using
+    # TaskResultSummary.request_key.get().
+    futures = ndb.get_multi_async(t.request_key for t in tasks)
+
+    # Evaluate the counts to print the filtering columns with the associated
+    # numbers.
+    state_choices = self._get_state_choices(counts_future)
+
+    # Do not let dangling futures linger around.
+    ndb.Future.wait_all(futures)
+    params = {
+      'cursor': cursor_str,
+      'is_privileged_user': acl.is_privileged_user(),
+      'limit': limit,
+      'now': now,
+      'sort': sort,
+      'sort_choices': self.SORT_CHOICES,
+      'state': state,
+      'state_choices': state_choices,
+      'tasks': tasks,
+      'task_name': task_name,
+    }
+    # TODO(maruel): If admin or if the user is task's .user, show the Cancel
+    # button. Do not show otherwise.
+    self.response.out.write(template.render('swarming/user_tasks.html', params))
+
+  def _get_tasks(self, task_name, cursor_str, limit, sort, state):
+    """Returns all tasks for this query. This function is synchronous."""
     if task_name:
-      # Word based search.
+      # Word based search. Override the flags.
       sort = 'created_ts'
       state = 'all'
       tasks, cursor_str = task_scheduler.search_by_name(
@@ -460,37 +517,34 @@ class TasksHandler(auth.AuthenticatingHandler):
         tasks, cursor, more = query.fetch_page(limit, start_cursor=cursor)
         cursor_str = cursor.urlsafe() if cursor and more else None
 
-    # Prefetch the TaskRequest all at once, so that ndb's in-process cache has
-    # it instead of fetching them one at a time indirectly when using
-    # TaskResultSummary.request_key.get().
-    futures = ndb.get_multi_async(t.request_key for t in tasks)
+    return tasks, cursor_str, sort, state
 
+  def _get_counts_future(self, now):
+    """Returns all the counting futures in parallel."""
+    counts_future = {}
+    last_24h = now - datetime.timedelta(days=1)
+    for state_key, _, _ in itertools.chain.from_iterable(self.STATE_CHOICES):
+      _, query = self._get_query(None, state_key)
+      if query:
+        counts_future[state_key] = query.filter(
+            task_result.TaskResultSummary.created_ts >= last_24h).count_async()
+    return counts_future
+
+  def _get_state_choices(self, counts_future):
+    """Converts STATE_CHOICES with _get_counts_future() into nice text."""
     # Appends the number of tasks for each filter. It gives a sense of how much
     # things are going on.
+    counts = {k: v.get_result() for k, v in counts_future.iteritems()}
     state_choices = []
     for choice_list in self.STATE_CHOICES:
       state_choices.append([])
-      for state_key, name in choice_list:
-        if state_key in counts_future:
-          name += ' (%d)' % counts_future[state_key].get_result()
-        state_choices[-1].append((state_key, name))
-
-    ndb.Future.wait_all(futures)
-    params = {
-      'cursor': cursor_str,
-      'is_privileged_user': acl.is_privileged_user(),
-      'limit': limit,
-      'now': utils.utcnow(),
-      'sort': sort,
-      'sort_choices': self.SORT_CHOICES,
-      'state': state,
-      'state_choices': state_choices,
-      'tasks': tasks,
-      'task_name': task_name,
-    }
-    # TODO(maruel): If admin or if the user is task's .user, show the Cancel
-    # button. Do not show otherwise.
-    self.response.out.write(template.render('swarming/user_tasks.html', params))
+      for state_key, name, title in choice_list:
+        if state_key in counts:
+          name += ' (%d)' % counts[state_key]
+        elif state_key == 'pending_running':
+          name += ' (%d)' % (counts['pending'] + counts['running'])
+        state_choices[-1].append((state_key, name, title))
+    return state_choices
 
   def _get_query(self, sort, state):
     """Returns one or many TaskResultSummary queries."""

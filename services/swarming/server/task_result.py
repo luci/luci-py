@@ -79,11 +79,10 @@ class State(object):
   _NAMES = {
     RUNNING: 'Running',
     PENDING: 'Pending',
-    EXPIRED: 'Expired (failed to find a bot before the request\'s expiration)',
-    TIMED_OUT: 'One of the executed command timed out',
-    BOT_DIED: 'Bot died while running the task. Either the task killed the bot '
-      'or the bot suicided',
-    CANCELED: 'User canceled the request',
+    EXPIRED: 'Expired',
+    TIMED_OUT: 'Execution timed out',
+    BOT_DIED: 'Bot died',
+    CANCELED: 'User canceled',
     COMPLETED: 'Completed',
   }
 

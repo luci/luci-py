@@ -87,7 +87,7 @@
     <tr>
       <td align=center>Sort</td>
       <td></td>
-      <td>Task state</td>
+      <td>Task state (total for last 24h)</td>
       <td></td>
       <td>Search by word</td>
     </tr>
@@ -95,23 +95,27 @@
   <tbody>
     <tr>
       <td>
-        {% for key, name in sort_choices %}
-          <input type="radio" name="sort" value="{{key}}"
-              onchange="update_sort()"
-              {% if sort == key %}checked{%endif%}>
-            {{name}}
-          </input>
+        {% for key, name, item_title in sort_choices %}
+          <label title="{{item_title}}">
+            <input type="radio" name="sort" value="{{key}}"
+                onchange="update_sort()"
+                {% if sort == key %}checked{%endif%}>
+              {{name}}
+            </input>
+          </label>
           <br>
         {% endfor %}
       </td>
       {% for state_column in state_choices %}
         <td>
-          {% for key, name in state_column %}
-            <input type="radio" name="state" value="{{key}}"
-                onchange="update_filter()"
-                {% if state == key %}checked{%endif%}>
-              {{name}}
-            </input>
+          {% for key, name, item_title in state_column %}
+            <label title="{{item_title}}">
+              <input type="radio" name="state" value="{{key}}"
+                  onchange="update_filter()"
+                  {% if state == key %}checked{%endif%}>
+                {{name}}
+              </input>
+            </label>
             <br>
           {% endfor %}
         </td>
