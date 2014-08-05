@@ -831,16 +831,22 @@ class NewBotApiTest(AppTestBase):
     # A bot polls, gets nothing.
     token, params = self._token()
     response = self.post_with_token('/swarming/api/v1/bot/poll', params, token)
-    self.assertEqual([u'cmd', u'duration'], sorted(response))
-    self.assertEqual(u'sleep', response['cmd'])
-    self.assertTrue(response['duration'])
+    self.assertTrue(response.pop(u'duration'))
+    expected = {
+      u'cmd': u'sleep',
+      u'quarantined': False,
+    }
+    self.assertEqual(expected, response)
 
     # Sleep again
     params['sleep_streak'] += 1
     response = self.post_with_token('/swarming/api/v1/bot/poll', params, token)
-    self.assertEqual([u'cmd', u'duration'], sorted(response))
-    self.assertEqual(u'sleep', response['cmd'])
-    self.assertTrue(response['duration'])
+    self.assertTrue(response.pop(u'duration'))
+    expected = {
+      u'cmd': u'sleep',
+      u'quarantined': False,
+    }
+    self.assertEqual(expected, response)
 
   def test_poll_update(self):
     token, params = self._token()
@@ -889,6 +895,34 @@ class NewBotApiTest(AppTestBase):
       u'started_ts': str_now,
       u'state': task_result.State.RUNNING,
       u'try_number': 1,
+    }
+    self.assertEqual(expected, response)
+
+  def test_bot_error(self):
+    token, params = self._token()
+    response = self.post_with_token('/swarming/api/v1/bot/poll', params, token)
+    self.assertTrue(response.pop(u'duration'))
+    expected = {
+      u'cmd': u'sleep',
+      u'quarantined': False,
+    }
+    self.assertEqual(expected, response)
+
+    # The bot fails somehow.
+    error_params = {
+      'i': params['attributes']['id'],
+      'm': 'Something happened',
+    }
+    response = self.post_with_token(
+        '/swarming/api/v1/bot/error', error_params, token)
+    self.assertEqual({}, response)
+
+    # Ensure it is now quarantined.
+    response = self.post_with_token('/swarming/api/v1/bot/poll', params, token)
+    self.assertTrue(response.pop(u'duration'))
+    expected = {
+      u'cmd': u'sleep',
+      u'quarantined': True,
     }
     self.assertEqual(expected, response)
 

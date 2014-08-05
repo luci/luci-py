@@ -1093,17 +1093,13 @@ class BotPollHandler(auth.ApiHandler):
     # being used.
     expected_version = bot_management.get_slave_version(self.request.host_url)
     if attributes.get('version') != expected_version:
-      out = {
-        'cmd': 'update',
-        'version': expected_version,
-      }
-      self.send_response(out)
+      self._cmd_update(expected_version)
       if bot_future:
         bot_future.wait()
       return
 
     if not bot_id:
-      self.sleep(sleep_streak)
+      self._cmd_sleep(sleep_streak, True)
       return
 
     bot = bot_future.get_result()
@@ -1125,7 +1121,7 @@ class BotPollHandler(auth.ApiHandler):
         quarantined)
 
     if quarantined:
-      self.sleep(sleep_streak)
+      self._cmd_sleep(sleep_streak, quarantined)
       return
 
     # The bot is in good shape. Try to grab a task.
@@ -1134,19 +1130,10 @@ class BotPollHandler(auth.ApiHandler):
       request, run_result = task_scheduler.bot_reap_task(dimensions, bot_id)
       if not request:
         # No task found, tell it to sleep a bit.
-        self.sleep(sleep_streak)
+        self._cmd_sleep(sleep_streak, False)
         return
 
-      out = {
-        'cmd': 'run',
-        'commands': request.properties.commands,
-        'data': request.properties.data,
-        'env': request.properties.env,
-        'hard_timeout': request.properties.execution_timeout_secs,
-        'io_timeout': request.properties.io_timeout_secs,
-        'task_id': task_common.pack_run_result_key(run_result.key),
-      }
-      self.send_response(out)
+      self._cmd_run(request, run_result.key)
     except runtime.DeadlineExceededError:
       # If the timeout happened before a task was assigned there is no problems.
       # If the timeout occurred after a task was assigned, that task will
@@ -1157,12 +1144,58 @@ class BotPollHandler(auth.ApiHandler):
       # https://code.google.com/p/swarming/issues/detail?id=130
       self.abort(500, 'Deadline')
 
-  def sleep(self, sleep_streak):
+  def _cmd_run(self, request, run_result_key):
+    out = {
+      'cmd': 'run',
+      'commands': request.properties.commands,
+      'data': request.properties.data,
+      'env': request.properties.env,
+      'hard_timeout': request.properties.execution_timeout_secs,
+      'io_timeout': request.properties.io_timeout_secs,
+      'task_id': task_common.pack_run_result_key(run_result_key),
+    }
+    self.send_response(out)
+
+  def _cmd_sleep(self, sleep_streak, quarantined):
     out = {
       'cmd': 'sleep',
       'duration': task_scheduler.exponential_backoff(sleep_streak),
+      'quarantined': quarantined,
     }
     self.send_response(out)
+
+  def _cmd_update(self, expected_version):
+    out = {
+      'cmd': 'update',
+      'version': expected_version,
+    }
+    self.send_response(out)
+
+
+class BotErrorHandler(auth.ApiHandler):
+  """Specialized version of ereporter2's /ereporter2/api/v1/on_error.
+
+  This formally quarantines the bot and sends an alert to the admins. It is
+  meant to be used by slave_machine.py for non-recoverable issues, for example
+  when failing to self update.
+  """
+  EXPECTED_KEYS = frozenset(['i', 'm'])
+
+  @auth.require(acl.is_bot)
+  def post(self):
+    request = self.parse_body()
+    if self.EXPECTED_KEYS != frozenset(request):
+      ereporter2.log_request(
+          'Unexpected keys %s; did you make a typo?' % sorted(request))
+
+    bot_id = request['i']
+    # When a bot reports here, it is borked, quarantine the bot.
+    bot = bot_management.get_bot_key(bot_id).get()
+    bot.quarantined = True
+    bot.put()
+
+    ereporter2.log(source='bot', message=request['m'])
+    self.send_response({})
 
 
 ### Old Bot APIs (To be deleted).
@@ -1448,6 +1481,7 @@ def create_application(debug):
           ClientTaskResultHandler),
 
       # New Bot API:
+      ('/swarming/api/v1/bot/error', BotErrorHandler),
       ('/swarming/api/v1/bot/handshake', BotHandshakeHandler),
       ('/swarming/api/v1/bot/poll', BotPollHandler),
 
