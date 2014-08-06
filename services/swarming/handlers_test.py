@@ -989,6 +989,43 @@ class NewBotApiTest(AppTestBase):
         state=task_result.State.COMPLETED)
     _cycle(params, expected)
 
+  def test_task_error(self):
+    # E.g. local_test_runner blew up.
+    now = datetime.datetime(2010, 1, 2, 3, 4, 5)
+    self.mock_now(now)
+    str_now = unicode(now.strftime(utils.DATETIME_FORMAT))
+    token, params = self._token()
+    self.client_create_task('hi')
+    response = self.post_with_token(
+        '/swarming/api/v1/bot/poll', params, token)
+    task_id = response['task_id']
+
+    # Let's say it failed to start local_test_runner because the new bot code is
+    # broken. The end result is still BOT_DIED. The big change is that it
+    # doesn't need to wait for a cron job to set this status.
+    params = {
+      'i': params['attributes']['id'],
+      't': task_id,
+    }
+    response = self.post_with_token(
+        '/swarming/api/v1/bot/task_error', params, token)
+
+    response = self.client_get_results(task_id)
+    expected = {
+      u'abandoned_ts': str_now,
+      u'bot_id': u'bot1',
+      u'completed_ts': None,
+      u'exit_codes': [],
+      u'failure': False,
+      u'internal_failure': True,
+      u'modified_ts': str_now,
+      u'outputs': [],
+      u'started_ts': str_now,
+      u'state': task_result.State.BOT_DIED,
+      u'try_number': 1,
+    }
+    self.assertEqual(expected, response)
+
 
 class OldBotApiTest(AppTestBase):
   def testGetSlaveCode(self):

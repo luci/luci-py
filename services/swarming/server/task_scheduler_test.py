@@ -472,6 +472,32 @@ class TaskSchedulerApiTest(test_case.TestCase):
     for index in range(number_elements):
       self._bot_update_task_partial_write(index, number_elements, put_multi)
 
+  def test_bot_kill_task(self):
+    data = _gen_request_data(
+        properties=dict(dimensions={u'OS': u'Windows-3.1.1'}))
+    request, result_summary = task_scheduler.make_request(data)
+    reaped_request, run_result = task_scheduler.bot_reap_task(
+        {'OS': 'Windows-3.1.1'}, 'localhost')
+
+    task_scheduler.bot_kill_task(run_result)
+    expected = {
+      'abandoned_ts': self.now,
+      'bot_id': u'localhost',
+      'created_ts': self.now,
+      'completed_ts': None,
+      'exit_codes': [],
+      'failure': False,
+      'internal_failure': True,
+      'modified_ts': self.now,
+      'name': u'Request name',
+      'outputs': [],
+      'started_ts': self.now,
+      'state': State.BOT_DIED,
+      'try_number': 1,
+      'user': u'Jesus',
+    }
+    self.assertEqual(expected, result_summary.to_dict())
+
   def test_cron_abort_expired_task_to_run(self):
     # Create two shards, one is properly reaped, the other is expired.
     data = _gen_request_data(

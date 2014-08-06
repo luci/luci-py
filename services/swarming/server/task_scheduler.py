@@ -108,7 +108,7 @@ def _fetch_for_update(run_result_key, bot_id):
     return None, None, None
   if run_result.bot_id != bot_id:
     logging.error(
-        'Bot %s sent updated for task %s owned by bot %s',
+        'Bot %s sent update for task %s owned by bot %s',
         bot_id, run_result.bot_id, run_result.key)
     return None, None, None
   return run_result, request, bot
@@ -408,6 +408,21 @@ def bot_update_task_old(run_result_key, bot_id, exit_codes, stdout):
   return True
 
 
+def bot_kill_task(run_result):
+  """Terminates a task that is currently running as an internal failure."""
+  request_future = run_result.request_key.get_async()
+  run_result.state = task_result.State.BOT_DIED
+  run_result.internal_failure = True
+  run_result.abandoned_ts = utils.utcnow()
+  ndb.put_multi(task_result.prepare_put_run_result(run_result))
+  request = request_future.get_result()
+  stats.add_run_entry(
+      'run_bot_died', run_result.key,
+      bot_id=run_result.bot_id,
+      dimensions=request.properties.dimensions,
+      user=request.user)
+
+
 def search_by_name(word, cursor_str, limit):
   """Returns TaskResultSummary in -created_ts order containing the word."""
   cursor = search.Cursor(web_safe_string=cursor_str, per_result=True)
@@ -517,17 +532,7 @@ def cron_abort_bot_died():
     for run_result in task_result.yield_run_results_with_dead_bot():
       # Implement automatic retry;
       # https://code.google.com/p/swarming/issues/detail?id=108
-      request_future = run_result.request_key.get_async()
-      run_result.state = task_result.State.BOT_DIED
-      run_result.internal_failure = True
-      run_result.abandoned_ts = utils.utcnow()
-      ndb.put_multi(task_result.prepare_put_run_result(run_result))
-      request = request_future.get_result()
-      stats.add_run_entry(
-          'run_bot_died', run_result.key,
-          bot_id=run_result.bot_id,
-          dimensions=request.properties.dimensions,
-          user=request.user)
+      bot_kill_task(run_result)
       total += 1
   finally:
     # TODO(maruel): Use stats_framework.

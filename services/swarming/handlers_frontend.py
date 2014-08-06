@@ -1295,6 +1295,35 @@ class BotTaskUpdateHandler(auth.ApiHandler):
     self.send_response({})
 
 
+class BotTaskErrorHandler(auth.ApiHandler):
+  """It is a specialized version of ereporter2's /ereporter2/api/v1/on_error
+  that also attaches a task id to it.
+
+  This formally kills the task, marking it as an internal failure. This can be
+  used by slave_machine.py to kill the task when local_test_runner misbehaved.
+  """
+  EXPECTED_KEYS = frozenset(['i', 't'])
+
+  @auth.require(acl.is_bot)
+  def post(self):
+    request = self.parse_body()
+    if self.EXPECTED_KEYS != frozenset(request):
+      ereporter2.log_request(
+          'Unexpected keys %s; did you make a typo?' % sorted(request))
+
+    bot_id = request['i']
+    task_id = request['t']
+    run_result = task_scheduler.unpack_run_result_key(task_id).get()
+    if run_result.bot_id != bot_id:
+      msg = 'Bot %s sent task kill for task %s owned by bot %s' % (
+          bot_id, run_result.bot_id, run_result.key)
+      logging.error(msg)
+      self.abort_with_error(400, error=msg)
+
+    task_scheduler.bot_kill_task(run_result)
+    self.send_response({})
+
+
 ### Old Bot APIs (To be deleted).
 
 
@@ -1582,6 +1611,7 @@ def create_application(debug):
       ('/swarming/api/v1/bot/handshake', BotHandshakeHandler),
       ('/swarming/api/v1/bot/poll', BotPollHandler),
       ('/swarming/api/v1/bot/task_update', BotTaskUpdateHandler),
+      ('/swarming/api/v1/bot/task_error', BotTaskErrorHandler),
 
       ('/_ah/warmup', WarmupHandler),
   ]
