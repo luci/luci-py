@@ -379,6 +379,9 @@ class TaskResultApiTest(test_case.TestCase):
       ndb.put_multi(entities)
     run(1, 0, 'Part1\n')
     with self.assertRaises(ValueError):
+      # It should have been run(1, 1, ...). Duplicate packet #0 is refused.
+      run(1, 0, 'Part1(bis)\n')
+    with self.assertRaises(ValueError):
       # It should have been run(1, 1, ...). Packet #2 will be refused until #1
       # is received.
       run(1, 2, 'Part2\n')

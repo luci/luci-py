@@ -1252,6 +1252,49 @@ class BotErrorHandler(auth.ApiHandler):
     self.send_response({})
 
 
+class BotTaskUpdateHandler(auth.ApiHandler):
+  """Receives updates from a Bot for a task.
+
+  The handler verifies packets are processed in order and will refuse
+  out-of-order packets.
+  """
+  EXPECTED_KEYS = frozenset(['c', 'e', 'i', 'o', 'p', 't'])
+
+  @auth.require(acl.is_bot)
+  def post(self):
+    # Unlike handshake and poll, we do not accept invalid keys here. This code
+    # path is much more strict.
+    request = self.parse_body()
+    if self.EXPECTED_KEYS != frozenset(request):
+      msg = 'Unexpected keys %s; did you make a typo?' % sorted(request)
+      ereporter2.log_request(msg)
+      self.abort_with_error(400, error=msg)
+
+    bot_id = request['i']
+    command_index = request['c']
+    exit_code = request['e']
+    out = request['o']
+    packet_number = request['p']
+    task_id = request['t']
+
+    run_result_key = task_scheduler.unpack_run_result_key(task_id)
+    # Side effect: zaps out any binary content on stdout.
+    if out is not None:
+      out = out.encode('utf-8', 'replace')
+
+    with task_scheduler.bot_update_task_new(
+        run_result_key, bot_id, command_index, packet_number, out,
+        exit_code) as entities:
+      ndb.put_multi(entities)
+
+    # TODO(maruel): When a task is canceled, reply with 'DIE' so that the bot
+    # reboots itself to abort the task abruptly. It is useful when a task hangs
+    # and the timeout was set too long or the task was superseded by a newer
+    # task with more recent executable (e.g. a new Try Server job on a newer
+    # patchset on Rietveld).
+    self.send_response({})
+
+
 ### Old Bot APIs (To be deleted).
 
 
@@ -1340,7 +1383,7 @@ class RunnerPingHandler(auth.AuthenticatingHandler):
     try:
       run_result_key = task_scheduler.unpack_run_result_key(
           packed_run_result_key)
-      task_scheduler.bot_update_task(run_result_key, bot_id, None, None)
+      task_scheduler.bot_update_task_old(run_result_key, bot_id, None, None)
     except ValueError as e:
       logging.error('Failed to accept value %s: %s', packed_run_result_key, e)
       self.abort(400, 'Runner failed to ping.')
@@ -1381,7 +1424,7 @@ class ResultHandler(auth.AuthenticatingHandler):
       # Zap out any binary content on stdout.
       result_string = result_string.encode('utf-8', 'replace')
 
-    task_scheduler.bot_update_task(
+    task_scheduler.bot_update_task_old(
         run_result.key, bot_id, map(int, exit_codes), result_string)
 
     # TODO(maruel): Return JSON.
@@ -1411,7 +1454,7 @@ class Result2Handler(auth.AuthenticatingHandler):
     exit_codes = filter(None, (i.strip() for i in exit_codes.split(',')))
 
     result_string = self.request.get('o').encode('utf-8', 'replace')
-    task_scheduler.bot_update_task(
+    task_scheduler.bot_update_task_old(
         run_result.key, bot_id, map(int, exit_codes), result_string)
     self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
     self.response.out.write('Successfully update the runner results.')
@@ -1538,6 +1581,7 @@ def create_application(debug):
       ('/swarming/api/v1/bot/error', BotErrorHandler),
       ('/swarming/api/v1/bot/handshake', BotHandshakeHandler),
       ('/swarming/api/v1/bot/poll', BotPollHandler),
+      ('/swarming/api/v1/bot/task_update', BotTaskUpdateHandler),
 
       ('/_ah/warmup', WarmupHandler),
   ]

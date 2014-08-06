@@ -137,9 +137,9 @@ def CreateRunner(config_name=None, machine_id=None, ran_successfully=None,
   if ran_successfully or exit_codes:
     exit_codes = map(int, exit_codes.split(',')) if exit_codes else [0]
     # The entity needs to be saved before it can be updated, since
-    # bot_update_task() accepts the key of the entity.
+    # bot_update_task_old() accepts the key of the entity.
     ndb.put_multi(task_result.prepare_put_run_result(run_result))
-    if not task_scheduler.bot_update_task(
+    if not task_scheduler.bot_update_task_old(
         run_result.key, machine_id, exit_codes, results):
       assert False, (
           'Expected to reap the TaskToRun that was created lines above')
@@ -249,7 +249,7 @@ class AppTestBase(test_case.TestCase):
     return self.app.post(
         '/poll_for_test', {'attributes': json.dumps(attributes)}).json
 
-  def client_create_task(self, name):
+  def client_create_task(self, name, extra_command=None):
     """Simulate a client that creates a task."""
     # TODO(maruel): Switch to new API.
     request = {
@@ -261,9 +261,16 @@ class AppTestBase(test_case.TestCase):
         },
       ],
       'test_case_name': name,
-      'tests':[{'action': ['python', 'run_test.py'], 'test_name': 'Y'}],
+      'tests': [
+        {'action': ['python', 'run_test.py'], 'test_name': 'Y'},
+      ],
     }
-    return self.app.post('/test', {'request': json.dumps(request)}).json
+    if extra_command:
+      # Add a second command
+      request['tests'].append({'action': extra_command, 'test_name': 'Z'})
+    raw = self.app.post('/test', {'request': json.dumps(request)}).json
+    task_id = raw['test_keys'][0]['test_key']
+    return raw, task_id
 
 
 
@@ -583,61 +590,27 @@ class FrontendTest(AppTestBase):
     self.app.get('/user/tasks', status=200)
     self.app.get('/user/task/12345', status=404)
 
-  def _check_task(self, task, priority):
-    # The value is using both timestamp and random value, so it is not
-    # deterministic by definition.
-    key = task['test_keys'][0].pop('test_key')
-    self.assertTrue(int(key, 16))
-    self.assertEqual('0', key[-1])
-    expected = {
-      u'priority': priority,
-      u'test_case_name': u'hi',
-      u'test_keys': [
-        {
-          u'config_name': u'hi',
-          u'instance_index': 0,
-          u'num_instances': 1,
-        },
-      ],
-    }
-    self.assertEqual(expected, task)
-    return key
-
-  def test_add_task_admin(self):
-    self._ReplaceCurrentUser(ADMIN_EMAIL)
-    task = self.client_create_task('hi')
-    self._check_task(task, 10)
-
-  def test_add_task_bot(self):
-    task = self.client_create_task('hi')
-    # The bot has access to use high priority. By default on dev server
-    # localhost is whitelisted as a bot.
-    self._check_task(task, 10)
-
   def test_add_task_and_list_user(self):
     # Add a task via the API as a user, then assert it can be viewed.
     self._ReplaceCurrentUser(USER_EMAIL)
-    task = self.client_create_task('hi')
-    # Since the priority 10 was too high for a user (not an admin, neither a
-    # bot), it was reset to 100.
-    key = self._check_task(task, 100)
+    _, task_id = self.client_create_task('hi')
 
     self._ReplaceCurrentUser(ADMIN_EMAIL)
     self.app.get('/user/tasks', status=200)
-    self.app.get('/user/task/%s' % key, status=200)
+    self.app.get('/user/task/%s' % task_id, status=200)
 
     reaped = self.bot_poll('bot1')
     self.assertEqual('RunManifest', reaped['commands'][0]['function'])
     manifest = json.loads(reaped['commands'][0]['args'])
-    run_key = key[:-1] + '1'
-    self.assertEqual({'SWARMING_TASK_ID': run_key}, manifest['env_vars'])
+    run_id = task_id[:-2] + '01'
+    self.assertEqual({'SWARMING_TASK_ID': run_id}, manifest['env_vars'])
     # This can only work once a bot reaped the task.
-    self.app.get('/user/task/%s' % run_key, status=200)
+    self.app.get('/user/task/%s' % run_id, status=200)
 
   def test_task_list_query(self):
     # Try all the combinations of task queries to ensure the index exist.
     self._ReplaceCurrentUser(ADMIN_EMAIL)
-    self._check_task(self.client_create_task('hi'), 10)
+    self.client_create_task('hi')
 
     sort_choices = [i[0] for i in handlers_frontend.TasksHandler.SORT_CHOICES]
     state_choices = sum(
@@ -827,6 +800,17 @@ class NewBotApiTest(AppTestBase):
     ]
     self.assertEqual(expected, errors)
 
+  def test_poll_bad_version(self):
+    token, params = self._token()
+    old_version = params['attributes']['version']
+    params['attributes']['version'] = 'badversion'
+    response = self.post_with_token('/swarming/api/v1/bot/poll', params, token)
+    expected = {
+      u'cmd': u'update',
+      u'version': old_version,
+    }
+    self.assertEqual(expected, response)
+
   def test_poll_sleep(self):
     # A bot polls, gets nothing.
     token, params = self._token()
@@ -860,14 +844,14 @@ class NewBotApiTest(AppTestBase):
     self.assertEqual(expected, response)
 
   def test_poll_task(self):
+    # Successfully poll a task.
     now = datetime.datetime(2010, 1, 2, 3, 4, 5)
     self.mock_now(now)
     str_now = unicode(now.strftime(utils.DATETIME_FORMAT))
     # A bot polls, gets a task, updates it, completes it.
     token, params = self._token()
     # Enqueue a task.
-    task = self.client_create_task('hi')
-    task_id = task['test_keys'][0]['test_key']
+    _, task_id = self.client_create_task('hi')
     self.assertEqual('00', task_id[-2:])
     # Convert TaskResultSummary reference to TaskRunResult.
     task_id = task_id[:-2] + '01'
@@ -925,6 +909,85 @@ class NewBotApiTest(AppTestBase):
       u'quarantined': True,
     }
     self.assertEqual(expected, response)
+
+  def test_update(self):
+    # Runs a task with 2 commands up to completion.
+    now = datetime.datetime(2010, 1, 2, 3, 4, 5)
+    self.mock_now(now)
+    str_now = unicode(now.strftime(utils.DATETIME_FORMAT))
+    token, params = self._token()
+    self.client_create_task('hi', extra_command=['cleanup.py'])
+
+    def _params(**kwargs):
+      out = {
+        'c': 0,
+        'e': None,
+        'i': 'bot1',
+        'o': None,
+        'p': 0,
+        't': task_id,
+      }
+      out.update(**kwargs)
+      return out
+
+    def _expected(**kwargs):
+      out = {
+        u'abandoned_ts': None,
+        u'bot_id': u'bot1',
+        u'completed_ts': None,
+        u'exit_codes': [],
+        u'failure': False,
+        u'internal_failure': False,
+        u'modified_ts': str_now,
+        u'outputs': [],
+        u'started_ts': str_now,
+        u'state': task_result.State.RUNNING,
+        u'try_number': 1,
+      }
+      out.update(**kwargs)
+      return out
+
+    def _cycle(params, expected):
+      response = self.post_with_token(
+          '/swarming/api/v1/bot/task_update', params, token)
+      self.assertEqual({}, response)
+      response = self.client_get_results(task_id)
+      self.assertEqual(expected, response)
+
+    # 1. Initial task update with no data.
+    response = self.post_with_token('/swarming/api/v1/bot/poll', params, token)
+    task_id = response['task_id']
+    params = _params()
+    response = self.post_with_token(
+        '/swarming/api/v1/bot/task_update', params, token)
+    self.assertEqual({}, response)
+    response = self.client_get_results(task_id)
+    self.assertEqual(_expected(), response)
+
+    # 2. Task update with some output.
+    params = _params(o='Oh ')
+    expected = _expected(outputs=[u'Oh '])
+    _cycle(params, expected)
+
+    # 3. Task update with some more output.
+    params = _params(o='hi', p=1)
+    expected = _expected(outputs=[u'Oh hi'])
+    _cycle(params, expected)
+
+    # 4. Task update with completion of first command.
+    params = _params(e=0)
+    expected = _expected(exit_codes=[0], outputs=[u'Oh hi'])
+    _cycle(params, expected)
+
+    # 5. Task update with completion of second command along with full output.
+    params = _params(c=1, e=23, o='Ahaha')
+    expected = _expected(
+        completed_ts=str_now,
+        exit_codes=[0, 23],
+        failure=True,
+        outputs=[u'Oh hi', u'Ahaha'],
+        state=task_result.State.COMPLETED)
+    _cycle(params, expected)
 
 
 class OldBotApiTest(AppTestBase):
@@ -1126,7 +1189,7 @@ class NewClientApiTest(AppTestBase):
     self.mock_now(now)
     str_now = unicode(now.strftime(utils.DATETIME_FORMAT))
     # Note: this is still the old API.
-    task_id = self.client_create_task('hi')['test_keys'][0]['test_key']
+    _, task_id = self.client_create_task('hi')
     response = self.app.get(
         '/swarming/api/v1/client/task/' + task_id).json
     expected = {
@@ -1232,6 +1295,44 @@ class NewClientApiTest(AppTestBase):
 
 
 class OldClientApiTest(AppTestBase):
+  def _check_task(self, task, priority):
+    # The value is using both timestamp and random value, so it is not
+    # deterministic by definition.
+    task_id = task['test_keys'][0].pop('test_key')
+    self.assertTrue(int(task_id, 16))
+    self.assertEqual('00', task_id[-2:])
+    expected = {
+      u'priority': priority,
+      u'test_case_name': u'hi',
+      u'test_keys': [
+        {
+          u'config_name': u'hi',
+          u'instance_index': 0,
+          u'num_instances': 1,
+        },
+      ],
+    }
+    self.assertEqual(expected, task)
+
+  def test_add_task_admin(self):
+    # Admins can trigger high priority tasks.
+    self._ReplaceCurrentUser(ADMIN_EMAIL)
+    task, _ = self.client_create_task('hi')
+    self._check_task(task, 10)
+
+  def test_add_task_bot(self):
+    # The bot has access to use high priority. By default on dev server
+    # localhost is whitelisted as a bot.
+    task, _ = self.client_create_task('hi')
+    self._check_task(task, 10)
+
+  def test_add_task_and_list_user(self):
+    self._ReplaceCurrentUser(USER_EMAIL)
+    task, _ = self.client_create_task('hi')
+    # Since the priority 10 was too high for a user (not an admin, neither a
+    # bot), it was reset to 100.
+    self._check_task(task, 100)
+
   def testMatchingTestCasesHandler(self):
     # Ensure that matching works even when the datastore is not being
     # consistent.

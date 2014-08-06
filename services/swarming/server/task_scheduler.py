@@ -14,6 +14,8 @@ Overview of transactions:
 - cron_abort_stale() uses transactions when aborting tasks.
 """
 
+import contextlib
+import datetime
 import logging
 import math
 import random
@@ -291,7 +293,69 @@ def bot_reap_task(dimensions, bot_id):
   return None, None
 
 
-def bot_update_task(run_result_key, bot_id, exit_codes, stdout):
+@contextlib.contextmanager
+def bot_update_task_new(
+    run_result_key, bot_id, command_index, packet_number, out, exit_code):
+  """Updates a TaskRunResult, returns the packets to save in a context.
+
+  Arguments:
+  - run_result_key: ndb.Key to TaskRunResult.
+  - bot_id: Self advertised bot id to ensure it's the one expected.
+  - command_index: index in TaskRequest.properties.commands.
+  - packet_number: Must be monotonically incrementing id for data represented by
+      'out'. It is to prevent against HTTP handlers processed out of order.
+  - out: Data to append to this command output.
+  - exit_code: Mark that this command, as specified by command_index, is
+      terminated.
+
+  Invalid states, these are flat out refused:
+  - A command is updated after it had an exit code assigned to.
+  - Out of order packet_number of a specific command_index.
+  - Out of order processing of command_index.
+
+  The trickiest part of this function is that partial updates must be
+  specifically handled, in particular:
+  - TaskRunResult was updated but not TaskResultSummary.
+  - TaskChunkOutput was partially writen, with Result entities updated or not.
+  """
+  run_result, request, bot = _fetch_for_update(run_result_key, bot_id)
+  if not run_result:
+    yield None
+    return
+
+  now = utils.utcnow()
+  UPDATE_RATE_DELTA = datetime.timedelta(seconds=30)
+  to_put = []
+  if (bot and
+      (bot.task != run_result_key or now - bot.last_seen > UPDATE_RATE_DELTA)):
+    bot.last_seen = now
+    bot.task = run_result_key
+    to_put.append(bot)
+
+  if len(run_result.exit_codes) not in (command_index, command_index+1):
+    raise ValueError('Unexpected ordering')
+
+  if exit_code is not None:
+    # The command |command_index| completed.
+    run_result.exit_codes.append(exit_code)
+
+  task_completed = (
+      len(run_result.exit_codes) == len(request.properties.commands))
+  if task_completed:
+    run_result.state = task_result.State.COMPLETED
+    run_result.completed_ts = now
+
+  if out:
+    to_put.extend(run_result.append_output(command_index, packet_number, out))
+
+  to_put.extend(task_result.prepare_put_run_result(run_result))
+
+  yield to_put
+
+  _update_stats(run_result, bot_id, request, task_completed)
+
+
+def bot_update_task_old(run_result_key, bot_id, exit_codes, stdout):
   """Updates a TaskRunResult and associated entities with the latest info from
   the bot.
 
