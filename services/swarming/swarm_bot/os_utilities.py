@@ -669,7 +669,10 @@ def get_dimensions():
   if sys.platform in ('cygwin', 'win32'):
     dimensions['cygwin'] = str(int(sys.platform == 'cygwin'))
   if sys.platform == 'win32':
-    dimensions['integrity'] = get_integrity_level_win()
+    # TODO(maruel): Have get_integrity_level_win() work in the first place.
+    integrity = get_integrity_level_win()
+    if integrity is not None:
+      dimensions['integrity'] = integrity
   return dimensions
 
 
