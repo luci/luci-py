@@ -461,10 +461,11 @@ def get_config():
   First try the config.json inside the zip. If not present or not running inside
   swarming_bot.zip, use the one beside the file.
   """
-  with zipfile.ZipFile(THIS_FILE, 'r') as f:
-    return json.load(f.open('config.json'))
+  if THIS_FILE.endswith('.zip'):
+    with zipfile.ZipFile(THIS_FILE, 'r') as f:
+      return json.load(f.open('config.json'))
 
-  with open('config.json', 'r') as f:
+  with open(os.path.join(ROOT_DIR, 'config.json'), 'r') as f:
     return json.load(f)
 
 
@@ -482,15 +483,6 @@ def main(args):
   parser.add_option('-v', '--verbose', action='count', default=0,
                     help='Set logging level to INFO, twice for DEBUG.')
 
-  # TODO(maruel): Remove these once callers are fixed.
-  parser.add_option('-a', '--address', help=optparse.SUPPRESS_HELP)
-  parser.add_option('-p', '--port', help=optparse.SUPPRESS_HELP)
-  parser.add_option(
-      '-r', '--max_url_tries', type='int', help=optparse.SUPPRESS_HELP)
-  parser.add_option(
-      '--keep_alive', action='store_true', help=optparse.SUPPRESS_HELP)
-  parser.add_option('-d', '--directory', help=optparse.SUPPRESS_HELP)
-  parser.add_option('-l', '--log_file', help=optparse.SUPPRESS_HELP)
   (options, args) = parser.parse_args(args)
 
   # Parser handles exiting this script after logging the error.
