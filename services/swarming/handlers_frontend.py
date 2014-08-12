@@ -342,7 +342,7 @@ class BotHandler(auth.AuthenticatingHandler):
     idle_time = datetime.timedelta()
     run_time = datetime.timedelta()
     if run_results:
-      run_time = run_results[0].duration_now()
+      run_time = run_results[0].duration_now() or datetime.timedelta()
       if not cursor and run_results[0].state != task_result.State.RUNNING:
         # Add idle time since last task completed. Do not do this when a cursor
         # is used since it's not representative.
