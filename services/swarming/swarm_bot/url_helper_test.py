@@ -55,8 +55,12 @@ class UrlHelperTest(auto_stub.TestCase):
     reqs = [
       (
         ('http://localhost/auth/api/v1/accounts/self/xsrf_token',),
-        {},
-        'token',
+        {
+          'content_type': 'application/json; charset=utf-8',
+          'data': '{}',
+          'headers': {'X-XSRF-Token-Request': '1'},
+        },
+        '{"xsrf_token":"token"}',
       ),
       (
         ('http://localhost/a',),
@@ -79,8 +83,12 @@ class UrlHelperTest(auto_stub.TestCase):
     reqs = [
       (
         ('http://localhost/auth/api/v1/accounts/self/xsrf_token',),
-        {},
-        'token',
+        {
+          'content_type': 'application/json; charset=utf-8',
+          'data': '{}',
+          'headers': {'X-XSRF-Token-Request': '1'},
+        },
+        '{"xsrf_token":"token"}',
       ),
       (
         ('http://localhost/a',),
@@ -89,8 +97,12 @@ class UrlHelperTest(auto_stub.TestCase):
       ),
       (
         ('http://localhost/auth/api/v1/accounts/self/xsrf_token',),
-        {},
-        'token2',
+        {
+          'content_type': 'application/json; charset=utf-8',
+          'data': '{}',
+          'headers': {'X-XSRF-Token-Request': '1'},
+        },
+        '{"xsrf_token":"token2"}',
       ),
       (
         ('http://localhost/a',),

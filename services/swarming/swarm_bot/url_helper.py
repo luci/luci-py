@@ -36,10 +36,13 @@ class Error(Exception):
 
 class XsrfRemote(object):
   """Transparently adds XSRF token to requests."""
+  TOKEN_RESOURCE = '/auth/api/v1/accounts/self/xsrf_token'
 
-  def __init__(self, url):
+  def __init__(self, url, token_resource=None):
     self.url = url.rstrip('/')
     self.token = None
+    self.token_resource = token_resource or self.TOKEN_RESOURCE
+    self.xsrf_request_params = {}
 
   def url_read(self, resource, **kwargs):
     url = self.url + resource
@@ -64,16 +67,22 @@ class XsrfRemote(object):
     if kwargs.get('data') is not None:
       kwargs['data'] = json.dumps(
           kwargs['data'], sort_keys=True, separators=(',', ':'))
-      kwargs['content_type'] = 'application/json'
+      kwargs['content_type'] = 'application/json; charset=utf-8'
     return self.url_read(resource, **kwargs)
 
   def refresh_token(self):
     """Returns a fresh token. Necessary as the token may expire after an hour.
     """
-    url = self.url + '/auth/api/v1/accounts/self/xsrf_token'
-    self.token = UrlOpen(url)
-    if not self.token:
+    url = self.url + self.token_resource
+    reply = UrlOpen(
+        url,
+        content_type='application/json; charset=utf-8',
+        headers={'X-XSRF-Token-Request': '1'},
+        data=json.dumps(
+            self.xsrf_request_params, sort_keys=True, separators=(',', ':')))
+    if not reply:
       raise Error('Failed to connect to %s' % url)
+    self.token = json.loads(reply)['xsrf_token']
     return self.token
 
 
