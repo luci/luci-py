@@ -170,6 +170,7 @@ class TaskResultApiTest(test_case.TestCase):
       'bot_id': None,
       'completed_ts': None,
       'created_ts': self.now,
+      'durations': [],
       'exit_codes': [],
       'failure': False,
       'internal_failure': False,
@@ -189,8 +190,9 @@ class TaskResultApiTest(test_case.TestCase):
     actual = task_result.new_run_result(request, 1, 'localhost')
     expected = {
       'abandoned_ts': None,
-      'bot_id': u'localhost',
+      'bot_id': 'localhost',
       'completed_ts': None,
+      'durations': [],
       'exit_codes': [],
       'failure': False,
       'internal_failure': False,
@@ -214,6 +216,7 @@ class TaskResultApiTest(test_case.TestCase):
     expected = {
       'abandoned_ts': None,
       'bot_id': None,
+      'durations': [],
       'exit_codes': [],
       'completed_ts': None,
       'created_ts': self.now,
@@ -246,6 +249,7 @@ class TaskResultApiTest(test_case.TestCase):
       'bot_id': u'localhost',
       'completed_ts': None,
       'created_ts': self.now,
+      'durations': [],
       'exit_codes': [],
       'internal_failure': False,
       'modified_ts': reap_ts,
@@ -276,6 +280,7 @@ class TaskResultApiTest(test_case.TestCase):
       'bot_id': u'localhost',
       'completed_ts': complete_ts,
       'created_ts': self.now,
+      'durations': [],
       'exit_codes': [0],
       'failure': False,
       'internal_failure': False,

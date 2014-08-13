@@ -1296,7 +1296,7 @@ class BotTaskUpdateHandler(auth.ApiHandler):
   out-of-order packets.
   """
   ACCEPTED_KEYS = frozenset(
-      [u'command_index', u'exit_code', u'id', u'output',
+      [u'command_index', u'duration', u'exit_code', u'id', u'output',
         u'packet_number', u'task_id'])
   REQUIRED_KEYS = frozenset([u'command_index', u'id', u'task_id'])
 
@@ -1315,6 +1315,7 @@ class BotTaskUpdateHandler(auth.ApiHandler):
     command_index = request['command_index']
     task_id = request['task_id']
 
+    duration = request.get('duration')
     exit_code = request.get('exit_code')
     out = request.get('output')
     packet_number = request.get('packet_number')
@@ -1326,7 +1327,7 @@ class BotTaskUpdateHandler(auth.ApiHandler):
 
     with task_scheduler.bot_update_task_new(
         run_result_key, bot_id, command_index, packet_number, out,
-        exit_code) as entities:
+        exit_code, duration) as entities:
       ndb.put_multi(entities)
 
     # TODO(maruel): When a task is canceled, reply with 'DIE' so that the bot

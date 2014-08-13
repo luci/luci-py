@@ -193,6 +193,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'bot_id': None,
       'created_ts': created_ts,
       'completed_ts': None,
+      'durations': [],
       'exit_codes': [],
       'failure': False,
       'internal_failure': False,
@@ -220,6 +221,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'bot_id': u'localhost',
       'created_ts': created_ts,  # Time the TaskRequest was created.
       'completed_ts': None,
+      'durations': [],
       'exit_codes': [],
       'failure': False,
       'internal_failure': False,
@@ -237,6 +239,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
         'abandoned_ts': None,
         'bot_id': u'localhost',
         'completed_ts': None,
+        'durations': [],
         'exit_codes': [],
         'internal_failure': False,
         'modified_ts': reaped_ts,
@@ -260,6 +263,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'bot_id': u'localhost',
       'created_ts': created_ts,
       'completed_ts': done_ts,
+      'durations': [],
       'exit_codes': [0, 0],
       'failure': False,
       'internal_failure': False,
@@ -277,6 +281,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
         'abandoned_ts': None,
         'bot_id': u'localhost',
         'completed_ts': done_ts,
+        'durations': [],
         'exit_codes': [0, 0],
         'failure': False,
         'internal_failure': False,
@@ -305,6 +310,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'bot_id': u'localhost',
       'created_ts': self.now,
       'completed_ts': self.now,
+      'durations': [],
       'exit_codes': [0, 1],
       'failure': True,
       'internal_failure': False,
@@ -323,6 +329,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
         'abandoned_ts': None,
         'bot_id': u'localhost',
         'completed_ts': self.now,
+        'durations': [],
         'exit_codes': [0, 1],
         'failure': True,
         'internal_failure': False,
@@ -374,11 +381,11 @@ class TaskSchedulerApiTest(test_case.TestCase):
   def test_bot_update_task_new(self):
     run_result = _quick_reap()
     with task_scheduler.bot_update_task_new(
-        run_result.key, 'localhost', 0, 0, 'hi', None) as entities:
+        run_result.key, 'localhost', 0, 0, 'hi', None, None) as entities:
       self.assertEqual(3, len(entities))
       ndb.put_multi(entities)
     with task_scheduler.bot_update_task_new(
-        run_result.key, 'localhost', 0, 1, 'hey', None) as entities:
+        run_result.key, 'localhost', 0, 1, 'hey', None, None) as entities:
       self.assertEqual(3, len(entities))
       ndb.put_multi(entities)
     self.assertEqual(['hihey'], run_result.get_outputs())
@@ -386,24 +393,25 @@ class TaskSchedulerApiTest(test_case.TestCase):
   def test_bot_update_task_new_two_task(self):
     run_result = _quick_reap()
     with task_scheduler.bot_update_task_new(
-        run_result.key, 'localhost', 0, 0, 'hi', 0) as entities:
+        run_result.key, 'localhost', 0, 0, 'hi', 0, 0.1) as entities:
       self.assertEqual(3, len(entities))
       ndb.put_multi(entities)
     with task_scheduler.bot_update_task_new(
-        run_result.key, 'localhost', 1, 0, 'hey', 0) as entities:
+        run_result.key, 'localhost', 1, 0, 'hey', 0, 0.2) as entities:
       self.assertEqual(3, len(entities))
       ndb.put_multi(entities)
     self.assertEqual(['hi', 'hey'], run_result.get_outputs())
+    self.assertEqual([0.1, 0.2], run_result.durations)
 
   def test_bot_update_task_new_cant_append(self):
     run_result = _quick_reap()
     with task_scheduler.bot_update_task_new(
-        run_result.key, 'localhost', 0, 0, 'hi', None) as entities:
+        run_result.key, 'localhost', 0, 0, 'hi', None, None) as entities:
       self.assertEqual(3, len(entities))
       ndb.put_multi(entities)
     with self.assertRaises(ValueError):
       with task_scheduler.bot_update_task_new(
-          run_result.key, 'localhost', 0, 0, 'hey', None) as entities:
+          run_result.key, 'localhost', 0, 0, 'hey', None, None) as entities:
         self.fail()
     self.assertEqual(['hi'], run_result.get_outputs())
 
@@ -485,6 +493,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'bot_id': u'localhost',
       'created_ts': self.now,
       'completed_ts': None,
+      'durations': [],
       'exit_codes': [],
       'failure': False,
       'internal_failure': True,

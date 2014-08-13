@@ -224,6 +224,9 @@ class _TaskResultCommon(ndb.Model):
   # Aggregated exit codes. Ordered by command.
   exit_codes = ndb.IntegerProperty(repeated=True, indexed=False)
 
+  # Aggregated durations in seconds. Ordered by command.
+  durations = ndb.FloatProperty(repeated=True, indexed=False)
+
   # Time when a bot reaped this task.
   started_ts = ndb.DateTimeProperty()
 
@@ -281,6 +284,7 @@ class _TaskResultCommon(ndb.Model):
 
   def to_dict(self):
     out = super(_TaskResultCommon, self).to_dict()
+    out['durations'] = out['durations'] or []
     out['exit_codes'] = out['exit_codes'] or []
     out['outputs'] = self.get_outputs()
     # Make the output consistent independent if using the old format or the new

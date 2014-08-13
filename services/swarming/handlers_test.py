@@ -895,6 +895,7 @@ class NewBotApiTest(AppTestBase):
       u'abandoned_ts': None,
       u'bot_id': u'bot1',
       u'completed_ts': None,
+      u'durations': [],
       u'exit_codes': [],
       u'failure': False,
       u'internal_failure': False,
@@ -945,6 +946,7 @@ class NewBotApiTest(AppTestBase):
     def _params(**kwargs):
       out = {
         'command_index': 0,
+        'duration': None,
         'exit_code': None,
         'id': 'bot1',
         'output': None,
@@ -959,6 +961,7 @@ class NewBotApiTest(AppTestBase):
         u'abandoned_ts': None,
         u'bot_id': u'bot1',
         u'completed_ts': None,
+        u'durations': [],
         u'exit_codes': [],
         u'failure': False,
         u'internal_failure': False,
@@ -999,15 +1002,17 @@ class NewBotApiTest(AppTestBase):
     _cycle(params, expected)
 
     # 4. Task update with completion of first command.
-    params = _params(exit_code=0)
+    params = _params(duration=0.2, exit_code=0)
     expected = _expected(exit_codes=[0], outputs=[u'Oh hi'])
+    expected = _expected(durations=[0.2], exit_codes=[0], outputs=[u'Oh hi'])
     _cycle(params, expected)
 
     # 5. Task update with completion of second command along with full output.
     params = _params(
-        command_index=1, exit_code=23, output='Ahaha')
+        command_index=1, duration=0.1, exit_code=23, output='Ahaha')
     expected = _expected(
         completed_ts=str_now,
+        durations=[0.2, 0.1],
         exit_codes=[0, 23],
         failure=True,
         outputs=[u'Oh hi', u'Ahaha'],
@@ -1041,6 +1046,7 @@ class NewBotApiTest(AppTestBase):
       u'abandoned_ts': str_now,
       u'bot_id': u'bot1',
       u'completed_ts': None,
+      u'durations': [],
       u'exit_codes': [],
       u'failure': False,
       u'internal_failure': True,
@@ -1266,6 +1272,7 @@ class NewClientApiTest(AppTestBase):
       u'bot_id': None,
       u'completed_ts': None,
       u'created_ts': str_now,
+      u'durations': [],
       u'exit_codes': [],
       u'failure': False,
       u'internal_failure': False,
@@ -1292,6 +1299,7 @@ class NewClientApiTest(AppTestBase):
       u'abandoned_ts': None,
       u'bot_id': u'bot1',
       u'completed_ts': None,
+      u'durations': [],
       u'exit_codes': [],
       u'failure': False,
       u'internal_failure': False,

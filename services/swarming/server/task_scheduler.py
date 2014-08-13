@@ -295,7 +295,8 @@ def bot_reap_task(dimensions, bot_id):
 
 @contextlib.contextmanager
 def bot_update_task_new(
-    run_result_key, bot_id, command_index, packet_number, out, exit_code):
+    run_result_key, bot_id, command_index, packet_number, out, exit_code,
+    duration):
   """Updates a TaskRunResult, returns the packets to save in a context.
 
   Arguments:
@@ -307,6 +308,7 @@ def bot_update_task_new(
   - out: Data to append to this command output.
   - exit_code: Mark that this command, as specified by command_index, is
       terminated.
+  - duration: Time spent in seconds for this command.
 
   Invalid states, these are flat out refused:
   - A command is updated after it had an exit code assigned to.
@@ -327,16 +329,21 @@ def bot_update_task_new(
   UPDATE_RATE_DELTA = datetime.timedelta(seconds=30)
   to_put = []
   if (bot and
-      (bot.task != run_result_key or now - bot.last_seen > UPDATE_RATE_DELTA)):
-    bot.last_seen = now
+      (bot.task != run_result_key or
+       now - bot.last_seen_ts > UPDATE_RATE_DELTA)):
+    bot.last_seen_ts = now
     bot.task = run_result_key
     to_put.append(bot)
 
   if len(run_result.exit_codes) not in (command_index, command_index+1):
     raise ValueError('Unexpected ordering')
 
+  if (duration is None) != (exit_code is None):
+    raise ValueError('duration is expected if and only if a command completes')
+
   if exit_code is not None:
     # The command |command_index| completed.
+    run_result.durations.append(duration)
     run_result.exit_codes.append(exit_code)
 
   task_completed = (
