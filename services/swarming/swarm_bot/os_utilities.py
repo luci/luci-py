@@ -657,14 +657,12 @@ def get_dimensions():
       cpu_type,
       cpu_type + '-' + get_cpu_bitness(),
     ],
-    'disk': str(get_free_disk()),
     'gpu': get_gpu(),
     'hostname': get_hostname(),
     'os': [
       os_name,
       os_name + '-' + get_os_version(),
     ],
-    'ram': str(get_physical_ram()),
   }
   if sys.platform in ('cygwin', 'win32'):
     dimensions['cygwin'] = str(int(sys.platform == 'cygwin'))

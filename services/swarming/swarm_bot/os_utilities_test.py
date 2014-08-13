@@ -108,8 +108,7 @@ class TestOsUtilities(auto_stub.TestCase):
     expected = set(['dimensions', 'id', 'ip'])
     self.assertEqual(expected, set(actual))
 
-    expected_dimensions = set(
-        ['cores', 'cpu', 'disk', 'gpu', 'hostname', 'id', 'os', 'ram'])
+    expected_dimensions = set(['cores', 'cpu', 'gpu', 'hostname', 'id', 'os'])
     if sys.platform in ('cygwin', 'win32'):
       expected_dimensions.add('cygwin')
     if sys.platform == 'win32':
