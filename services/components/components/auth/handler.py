@@ -222,7 +222,8 @@ class ApiHandler(AuthenticatingHandler):
     """Parse JSON body and verifies it's a dict."""
     content_type = self.request.headers.get('Content-Type')
     encoding = 'utf-8'
-    content_type, encoding = _split_charset(content_type)
+    if content_type:
+      content_type, encoding = _split_charset(content_type)
     if content_type != 'application/json':
       msg = 'Expecting JSON body with content type \'%s\'' % self.CONTENT_TYPE
       self.abort_with_error(400, text=msg)
