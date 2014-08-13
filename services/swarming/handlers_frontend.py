@@ -174,6 +174,34 @@ def request_work_item(attributes, server_url, remote_addr):
   }
 
 
+def log_unexpected_keys(expected_keys, actual_keys, request, source, name):
+  """Logs an error if unexpected keys are present or expected keys are missing.
+
+  This is important to catch typos.
+  """
+  return log_unexpected_subset_keys(
+      expected_keys, expected_keys, actual_keys, request, source, name)
+
+
+def log_unexpected_subset_keys(
+    expected_keys, minimum_keys, actual_keys, request, source, name):
+  """Logs an error if expected keys are not present."""
+  actual_keys = frozenset(actual_keys)
+  superfluous = actual_keys - expected_keys
+  missing = minimum_keys - actual_keys
+  if superfluous or missing:
+    msg_missing = (' missing: %s' % sorted(missing)) if missing else ''
+    msg_superfluous = (
+        (' superfluous: %s' % sorted(superfluous)) if superfluous else '')
+    message = 'Unexpected %s%s%s; did you make a typo?' % (
+        name, msg_missing, msg_superfluous)
+    ereporter2.log_request(
+        request,
+        source=source,
+        message=message)
+    return message
+
+
 ### is_admin pages.
 
 # TODO(maruel): Sort the handlers once they got their final name.
@@ -679,10 +707,8 @@ class ClientHandshakeHandler(auth.ApiHandler):
   @auth.require(acl.is_bot_or_user)
   def post(self):
     request = self.parse_body()
-    # If unexpected values are present, log an error. This is important to catch
-    # typos!
-    if not self.EXPECTED_KEYS.issuperset(request):
-      ereporter2.log_request('Unexpected keys; did you make a typo?')
+    log_unexpected_keys(
+        self.EXPECTED_KEYS, request, self.request, 'client', 'keys')
     data = {
       # This access token will be used to validate each subsequent request.
       'server_version': utils.get_app_version(),
@@ -1029,7 +1055,7 @@ class BotHandshakeHandler(auth.ApiHandler):
 
   Request body is a JSON dict:
     {
-      "a": {
+      "attributes": {
         "dimensions": <dict of properties>,
         "id": <bot id>,
         "ip": <ip address as a string>,
@@ -1058,8 +1084,10 @@ class BotHandshakeHandler(auth.ApiHandler):
   # This handler is called to get XSRF token, there's nothing to enforce yet.
   xsrf_token_enforce_on = ()
 
-  EXPECTED_KEYS = frozenset(['attributes'])
-  EXPECTED_ATTRIBUTES = frozenset(['dimensions', 'id', 'ip', 'version'])
+  EXPECTED_KEYS = frozenset([u'attributes'])
+  ACCEPTED_ATTRIBUTES = frozenset(
+      [u'dimensions', u'id', u'ip', u'quarantined', u'version'])
+  REQUIRED_ATTRIBUTES = frozenset([u'dimensions', u'id', u'ip', u'version'])
 
   @auth.require_xsrf_token_request
   @auth.require(acl.is_bot)
@@ -1071,30 +1099,27 @@ class BotHandshakeHandler(auth.ApiHandler):
     # so the bot has a chance to self-heal. Obviously, it won't be able to reap
     # any task.
 
-    # If unexpected values are present, log an error. This is important to catch
-    # typos!
-    if not self.EXPECTED_KEYS.issuperset(request):
-      ereporter2.log_request('Unexpected keys; did you make a typo?')
+    log_unexpected_keys(
+        self.EXPECTED_KEYS, request, self.request, 'bot', 'keys')
     attributes = request.get('attributes', {})
-    if not self.EXPECTED_ATTRIBUTES.issuperset(attributes):
-      ereporter2.log_request('Unexpected attributes; did you make a typo?')
+    log_unexpected_subset_keys(
+        self.ACCEPTED_ATTRIBUTES, self.REQUIRED_ATTRIBUTES, attributes,
+        self.request, 'bot', 'attributes')
 
+    bot_id = attributes.get('id')
     dimensions = attributes.get('dimensions', {})
     quarantined = attributes.get('quarantined', False)
-    # Calculate the powerset of the dimensions. If it's too large, refuse it.
-    if (not quarantined and
-        task_to_run.dimensions_powerset_count(dimensions) > 16384):
-      # It's a big deal, alert the admins.
-      ereporter2.log_request(self.request, message='Too many dimensions on bot')
-      quarantined = True
-    bot_management.tag_bot_seen(
-        attributes['id'],
-        dimensions.get('hostname'),
-        attributes.get('ip'),
-        self.request.remote_addr,
-        dimensions,
-        attributes['version'],
-        quarantined)
+    if bot_id:
+      bot_management.tag_bot_seen(
+          bot_id,
+          dimensions.get('hostname'),
+          attributes.get('ip'),
+          self.request.remote_addr,
+          dimensions,
+          attributes['version'],
+          quarantined)
+    # Let it live even if bot_id is not set, so the bot has a chance to
+    # self-update. It won't be assigned any task anyway.
     data = {
       # This access token will be used to validate each subsequent request.
       'bot_version': bot_management.get_slave_version(self.request.host_url),
@@ -1113,21 +1138,21 @@ class BotPollHandler(auth.ApiHandler):
   all the fleet at once, they should still be up just enough to be able to
   self-update again even if they don't get task assigned anymore.
   """
-  EXPECTED_KEYS = frozenset(['attributes', 'sleep_streak'])
-  EXPECTED_ATTRIBUTES = frozenset(['dimensions', 'id', 'ip', 'version'])
+  EXPECTED_KEYS = frozenset([u'attributes', u'sleep_streak'])
+  ACCEPTED_ATTRIBUTES = frozenset(
+      [u'dimensions', u'id', u'ip', u'quarantined', u'version'])
+  REQUIRED_ATTRIBUTES = frozenset([u'dimensions', u'id', u'ip', u'version'])
 
   @auth.require(acl.is_bot)
   def post(self):
     request = self.parse_body()
 
-    # If unexpected values are present, log an error. This is important to catch
-    # typos!
-    if not self.EXPECTED_KEYS.issuperset(request):
-      ereporter2.log_request('Unexpected keys; did you make a typo?')
-    # If attributes are missing, the bot is severely hosed!
+    log_unexpected_keys(
+        self.EXPECTED_KEYS, request, self.request, 'bot', 'keys')
     attributes = request.get('attributes', {})
-    if not self.EXPECTED_ATTRIBUTES.issuperset(attributes):
-      ereporter2.log_request('Unexpected attributes; did you make a typo?')
+    log_unexpected_subset_keys(
+        self.ACCEPTED_ATTRIBUTES, self.REQUIRED_ATTRIBUTES, attributes,
+        self.request, 'bot', 'attributes')
 
     sleep_streak = request.get('sleep_streak', 0)
     # Be very permissive on missing values. This can happen because of errors on
@@ -1137,7 +1162,7 @@ class BotPollHandler(auth.ApiHandler):
     dimensions = attributes.get('dimensions', {})
     bot_id = attributes.get('id')
     # The bot may decide to "self-quarantine" itself.
-    quarantined = attributes.get('quarantine')
+    quarantined = attributes.get('quarantined', False)
 
     bot_future = None
     if bot_id:
@@ -1158,7 +1183,17 @@ class BotPollHandler(auth.ApiHandler):
 
     bot = bot_future.get_result()
     # The server may decide to quarantine the bot.
-    quarantined = quarantined or bot.quarantined
+    quarantined = quarantined or (bot.quarantined if bot else True)
+
+    if (not quarantined and
+        task_to_run.dimensions_powerset_count(dimensions) >
+            task_to_run.MAX_DIMENSIONS):
+      # It's a big deal, alert the admins.
+      ereporter2.log_request(
+          self.request,
+          source='bot',
+          message='Too many dimensions on bot')
+      quarantined = True
 
     if not quarantined:
       # Note its existence at two places, one for stats at 1 minute resolution,
@@ -1187,7 +1222,7 @@ class BotPollHandler(auth.ApiHandler):
         self._cmd_sleep(sleep_streak, False)
         return
 
-      self._cmd_run(request, run_result.key)
+      self._cmd_run(request, run_result.key, bot_id)
     except runtime.DeadlineExceededError:
       # If the timeout happened before a task was assigned there is no problems.
       # If the timeout occurred after a task was assigned, that task will
@@ -1198,15 +1233,18 @@ class BotPollHandler(auth.ApiHandler):
       # https://code.google.com/p/swarming/issues/detail?id=130
       self.abort(500, 'Deadline')
 
-  def _cmd_run(self, request, run_result_key):
+  def _cmd_run(self, request, run_result_key, bot_id):
     out = {
       'cmd': 'run',
-      'commands': request.properties.commands,
-      'data': request.properties.data,
-      'env': request.properties.env,
-      'hard_timeout': request.properties.execution_timeout_secs,
-      'io_timeout': request.properties.io_timeout_secs,
-      'task_id': task_common.pack_run_result_key(run_result_key),
+      'manifest': {
+        'bot_id': bot_id,
+        'commands': request.properties.commands,
+        'data': request.properties.data,
+        'env': request.properties.env,
+        'hard_timeout': request.properties.execution_timeout_secs,
+        'io_timeout': request.properties.io_timeout_secs,
+        'task_id': task_common.pack_run_result_key(run_result_key),
+      },
     }
     self.send_response(out)
 
@@ -1233,22 +1271,21 @@ class BotErrorHandler(auth.ApiHandler):
   meant to be used by slave_machine.py for non-recoverable issues, for example
   when failing to self update.
   """
-  EXPECTED_KEYS = frozenset(['i', 'm'])
+  EXPECTED_KEYS = frozenset([u'id', u'message'])
 
   @auth.require(acl.is_bot)
   def post(self):
     request = self.parse_body()
-    if self.EXPECTED_KEYS != frozenset(request):
-      ereporter2.log_request(
-          'Unexpected keys %s; did you make a typo?' % sorted(request))
+    log_unexpected_keys(
+        self.EXPECTED_KEYS, request, self.request, 'bot', 'keys')
 
-    bot_id = request['i']
+    bot_id = request.get('id', 'unknown')
     # When a bot reports here, it is borked, quarantine the bot.
     bot = bot_management.get_bot_key(bot_id).get()
     bot.quarantined = True
     bot.put()
 
-    ereporter2.log(source='bot', message=request['m'])
+    ereporter2.log(source='bot', message=request.get('message', 'unknown'))
     self.send_response({})
 
 
@@ -1258,24 +1295,29 @@ class BotTaskUpdateHandler(auth.ApiHandler):
   The handler verifies packets are processed in order and will refuse
   out-of-order packets.
   """
-  EXPECTED_KEYS = frozenset(['c', 'e', 'i', 'o', 'p', 't'])
+  ACCEPTED_KEYS = frozenset(
+      [u'command_index', u'exit_code', u'id', u'output',
+        u'packet_number', u'task_id'])
+  REQUIRED_KEYS = frozenset([u'command_index', u'id', u'task_id'])
 
   @auth.require(acl.is_bot)
   def post(self):
     # Unlike handshake and poll, we do not accept invalid keys here. This code
     # path is much more strict.
     request = self.parse_body()
-    if self.EXPECTED_KEYS != frozenset(request):
-      msg = 'Unexpected keys %s; did you make a typo?' % sorted(request)
-      ereporter2.log_request(msg)
+    msg = log_unexpected_subset_keys(
+        self.ACCEPTED_KEYS, self.REQUIRED_KEYS, request, self.request, 'bot',
+        'keys')
+    if msg:
       self.abort_with_error(400, error=msg)
 
-    bot_id = request['i']
-    command_index = request['c']
-    exit_code = request['e']
-    out = request['o']
-    packet_number = request['p']
-    task_id = request['t']
+    bot_id = request['id']
+    command_index = request['command_index']
+    task_id = request['task_id']
+
+    exit_code = request.get('exit_code')
+    out = request.get('output')
+    packet_number = request.get('packet_number')
 
     run_result_key = task_scheduler.unpack_run_result_key(task_id)
     # Side effect: zaps out any binary content on stdout.
@@ -1302,17 +1344,20 @@ class BotTaskErrorHandler(auth.ApiHandler):
   This formally kills the task, marking it as an internal failure. This can be
   used by slave_machine.py to kill the task when local_test_runner misbehaved.
   """
-  EXPECTED_KEYS = frozenset(['i', 't'])
+  EXPECTED_KEYS = frozenset([u'id', u'message', u'task_id'])
 
   @auth.require(acl.is_bot)
   def post(self):
     request = self.parse_body()
-    if self.EXPECTED_KEYS != frozenset(request):
-      ereporter2.log_request(
-          'Unexpected keys %s; did you make a typo?' % sorted(request))
+    msg = log_unexpected_keys(
+        self.EXPECTED_KEYS, request, self.request, 'bot', 'keys')
 
-    bot_id = request['i']
-    task_id = request['t']
+    ereporter2.log(source='bot', message=request.get('message', 'unknown'))
+    if msg:
+      self.abort_with_error(400, error=msg)
+
+    bot_id = request['id']
+    task_id = request['task_id']
     run_result = task_scheduler.unpack_run_result_key(task_id).get()
     if run_result.bot_id != bot_id:
       msg = 'Bot %s sent task kill for task %s owned by bot %s' % (

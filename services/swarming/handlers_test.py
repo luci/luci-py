@@ -727,16 +727,20 @@ class BackendTest(AppTestBase):
 class NewBotApiTest(AppTestBase):
   def setUp(self):
     super(NewBotApiTest, self).setUp()
-    self.mock(ereporter2, 'log_request', self.fail)
+    self.mock(
+        ereporter2, 'log_request',
+        lambda *args, **kwargs: self.fail('%s, %s' % (args, kwargs)))
 
   def _token(self):
     headers = {'X-XSRF-Token-Request': '1'}
     params = {
       'attributes': {
         'dimensions': {
+          'id': 'bot1',
           'os': ['Amiga'],
         },
         'id': 'bot1',
+        'ip': '127.0.0.1',
         'version': '123',
       },
     }
@@ -759,30 +763,15 @@ class NewBotApiTest(AppTestBase):
 
   def test_handshake(self):
     # Bare minimum:
-    headers = {'X-XSRF-Token-Request': '1'}
-    params = {
-      'attributes': {
-        'id': 'bot1',
-        'version': '123',
-      },
-    }
-    response = self.app.post_json(
-        '/swarming/api/v1/bot/handshake', headers=headers, params=params).json
-    self.assertEqual(
-        [u'bot_version', u'server_version', u'xsrf_token'], sorted(response))
-    self.assertTrue(response['xsrf_token'])
-    self.assertEqual(40, len(response['bot_version']))
-    self.assertEqual(u'default-version', response['server_version'])
-
-  def test_handshake_extra(self):
     errors = []
-    self.mock(ereporter2, 'log_request', lambda *args: errors.append(args))
+    def add_error(request, source, message):
+      self.assertTrue(request)
+      self.assertEqual('bot', source)
+      errors.append(message)
+    self.mock(ereporter2, 'log_request', add_error)
     headers = {'X-XSRF-Token-Request': '1'}
     params = {
-      # Works with unknown items but logs an error. This permits catching typos.
-      'foo': 1,
       'attributes': {
-        'bar': 2,
         'id': 'bot1',
         'version': '123',
       },
@@ -795,8 +784,40 @@ class NewBotApiTest(AppTestBase):
     self.assertEqual(40, len(response['bot_version']))
     self.assertEqual(u'default-version', response['server_version'])
     expected = [
-      ('Unexpected keys; did you make a typo?',),
-      ('Unexpected attributes; did you make a typo?',),
+      'Unexpected attributes missing: [u\'dimensions\', u\'ip\']; did you make '
+          'a typo?',
+    ]
+    self.assertEqual(expected, errors)
+
+  def test_handshake_extra(self):
+    errors = []
+    def add_error(request, source, message):
+      self.assertTrue(request)
+      self.assertEqual('bot', source)
+      errors.append(message)
+    self.mock(ereporter2, 'log_request', add_error)
+    headers = {'X-XSRF-Token-Request': '1'}
+    params = {
+      # Works with unknown items but logs an error. This permits catching typos.
+      'foo': 1,
+      'attributes': {
+        'bar': 2,
+        'id': 'bot1',
+        'ip': '127.0.0.1',
+        'version': '123',
+      },
+    }
+    response = self.app.post_json(
+        '/swarming/api/v1/bot/handshake', headers=headers, params=params).json
+    self.assertEqual(
+        [u'bot_version', u'server_version', u'xsrf_token'], sorted(response))
+    self.assertTrue(response['xsrf_token'])
+    self.assertEqual(40, len(response['bot_version']))
+    self.assertEqual(u'default-version', response['server_version'])
+    expected = [
+      'Unexpected keys superfluous: [u\'foo\']; did you make a typo?',
+      'Unexpected attributes missing: [u\'dimensions\'] superfluous: [u\'bar\']'
+          '; did you make a typo?',
     ]
     self.assertEqual(expected, errors)
 
@@ -857,13 +878,16 @@ class NewBotApiTest(AppTestBase):
     task_id = task_id[:-2] + '01'
     response = self.post_with_token('/swarming/api/v1/bot/poll', params, token)
     expected = {
-      u'commands': [[u'python', u'run_test.py']],
-      u'env': {},
-      u'task_id': task_id,
-      u'hard_timeout': 3600,
       u'cmd': u'run',
-      u'io_timeout': 1200,
-      u'data': [],
+      u'manifest': {
+        u'bot_id': u'bot1',
+        u'commands': [[u'python', u'run_test.py']],
+        u'data': [],
+        u'env': {},
+        u'hard_timeout': 3600,
+        u'io_timeout': 1200,
+        u'task_id': task_id,
+      },
     }
     self.assertEqual(expected, response)
     response = self.client_get_results(task_id)
@@ -894,8 +918,8 @@ class NewBotApiTest(AppTestBase):
 
     # The bot fails somehow.
     error_params = {
-      'i': params['attributes']['id'],
-      'm': 'Something happened',
+      'id': params['attributes']['id'],
+      'message': 'Something happened',
     }
     response = self.post_with_token(
         '/swarming/api/v1/bot/error', error_params, token)
@@ -920,12 +944,12 @@ class NewBotApiTest(AppTestBase):
 
     def _params(**kwargs):
       out = {
-        'c': 0,
-        'e': None,
-        'i': 'bot1',
-        'o': None,
-        'p': 0,
-        't': task_id,
+        'command_index': 0,
+        'exit_code': None,
+        'id': 'bot1',
+        'output': None,
+        'packet_number': 0,
+        'task_id': task_id,
       }
       out.update(**kwargs)
       return out
@@ -956,7 +980,7 @@ class NewBotApiTest(AppTestBase):
 
     # 1. Initial task update with no data.
     response = self.post_with_token('/swarming/api/v1/bot/poll', params, token)
-    task_id = response['task_id']
+    task_id = response['manifest']['task_id']
     params = _params()
     response = self.post_with_token(
         '/swarming/api/v1/bot/task_update', params, token)
@@ -965,22 +989,23 @@ class NewBotApiTest(AppTestBase):
     self.assertEqual(_expected(), response)
 
     # 2. Task update with some output.
-    params = _params(o='Oh ')
+    params = _params(output='Oh ')
     expected = _expected(outputs=[u'Oh '])
     _cycle(params, expected)
 
     # 3. Task update with some more output.
-    params = _params(o='hi', p=1)
+    params = _params(output='hi', packet_number=1)
     expected = _expected(outputs=[u'Oh hi'])
     _cycle(params, expected)
 
     # 4. Task update with completion of first command.
-    params = _params(e=0)
+    params = _params(exit_code=0)
     expected = _expected(exit_codes=[0], outputs=[u'Oh hi'])
     _cycle(params, expected)
 
     # 5. Task update with completion of second command along with full output.
-    params = _params(c=1, e=23, o='Ahaha')
+    params = _params(
+        command_index=1, exit_code=23, output='Ahaha')
     expected = _expected(
         completed_ts=str_now,
         exit_codes=[0, 23],
@@ -998,14 +1023,15 @@ class NewBotApiTest(AppTestBase):
     self.client_create_task('hi')
     response = self.post_with_token(
         '/swarming/api/v1/bot/poll', params, token)
-    task_id = response['task_id']
+    task_id = response['manifest']['task_id']
 
     # Let's say it failed to start local_test_runner because the new bot code is
     # broken. The end result is still BOT_DIED. The big change is that it
     # doesn't need to wait for a cron job to set this status.
     params = {
-      'i': params['attributes']['id'],
-      't': task_id,
+      'id': params['attributes']['id'],
+      'message': 'Oh',
+      'task_id': task_id,
     }
     response = self.post_with_token(
         '/swarming/api/v1/bot/task_error', params, token)
@@ -1168,7 +1194,9 @@ class OldBotApiTest(AppTestBase):
 class NewClientApiTest(AppTestBase):
   def setUp(self):
     super(NewClientApiTest, self).setUp()
-    self.mock(ereporter2, 'log_request', self.fail)
+    self.mock(
+        ereporter2, 'log_request',
+        lambda *args, **kwargs: self.fail('%s, %s' % (args, kwargs)))
 
   def _token(self):
     headers = {'X-XSRF-Token-Request': '1'}
@@ -1198,7 +1226,11 @@ class NewClientApiTest(AppTestBase):
 
   def test_handshake_extra(self):
     errors = []
-    self.mock(ereporter2, 'log_request', lambda *args: errors.append(args))
+    def add_error(request, source, message):
+      self.assertTrue(request)
+      self.assertEqual('client', source)
+      errors.append(message)
+    self.mock(ereporter2, 'log_request', add_error)
     headers = {'X-XSRF-Token-Request': '1'}
     params = {
       # Works with unknown items but logs an error. This permits catching typos.
@@ -1212,7 +1244,7 @@ class NewClientApiTest(AppTestBase):
     self.assertTrue(response['xsrf_token'])
     self.assertEqual(u'default-version', response['server_version'])
     expected = [
-      ('Unexpected keys; did you make a typo?',),
+      'Unexpected keys superfluous: [u\'foo\']; did you make a typo?',
     ]
     self.assertEqual(expected, errors)
 

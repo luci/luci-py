@@ -38,6 +38,10 @@ from server import task_common
 from server import task_request
 
 
+# Maximum product search space for dimensions for a bot.
+MAX_DIMENSIONS = 16384
+
+
 class TaskToRun(ndb.Model):
   """Defines a TaskRequest ready to be scheduled on a bot.
 
