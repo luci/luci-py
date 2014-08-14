@@ -49,6 +49,7 @@ def CommonChecks(input_api, output_api):
       join('third_party'),
       join('..', 'components'),
       join('..', 'components', 'third_party'),
+      join('..', '..', 'client', 'tests'),
     ] + sys.path
     black_list = list(input_api.DEFAULT_BLACK_LIST) + [
       r'.*_pb2\.py$',

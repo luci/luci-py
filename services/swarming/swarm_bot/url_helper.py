@@ -4,8 +4,6 @@
 
 """A helper script for wrapping url calls."""
 
-import json
-import logging
 import os
 import sys
 
@@ -15,19 +13,12 @@ sys.path.insert(0, os.path.join(THIS_DIR, 'third_party'))
 
 from utils import net
 
-# The index of the query elements from urlparse.
-QUERY_INDEX = 4
-
-# The timeout to apply whenever opening a url.
-URL_OPEN_TIMEOUT = 5 * 60
-
-# Query parameter key used when doing requests by the bot.
-COUNT_KEY = 'UrlOpenAttempt'
-
 
 # TODO(maruel): Remove it once switch over is complete. Note that it's actually
 # reading, not opening.
 UrlOpen = net.url_read
+# TODO(maruel): Rename callers.
+DownloadFile = net.url_retrieve
 
 
 class Error(Exception):
@@ -48,67 +39,57 @@ class XsrfRemote(object):
     url = self.url + resource
     if kwargs.get('data') == None:
       # No XSRF token for GET.
-      return UrlOpen(url, **kwargs)
+      return net.url_read(url, **kwargs)
 
     if not self.token:
       self.token = self.refresh_token()
-    headers = {'X-XSRF-Token': self.token}
-    resp = UrlOpen(url, headers=headers, **kwargs)
-    if not resp:
+    resp = self._url_read_post(url, **kwargs)
+    if resp is None:
       # This includes 403 because the XSRF token expired. Renew the token.
       # TODO(maruel): It'd be great if it were transparent.
-      headers = {'X-XSRF-Token': self.refresh_token()}
-      resp = UrlOpen(url, headers=headers, **kwargs)
-    if not resp:
+      self.refresh_token()
+      resp = self._url_read_post(url, **kwargs)
+    if resp is None:
       raise Error('Failed to connect to %s' % url)
     return resp
 
   def url_read_json(self, resource, **kwargs):
-    if kwargs.get('data') is not None:
-      kwargs['data'] = json.dumps(
-          kwargs['data'], sort_keys=True, separators=(',', ':'))
-      kwargs['content_type'] = 'application/json; charset=utf-8'
-    return self.url_read(resource, **kwargs)
+    url = self.url + resource
+    if kwargs.get('data') == None:
+      # No XSRF token required for GET.
+      return net.url_read_json(url, **kwargs)
+
+    if not self.token:
+      self.token = self.refresh_token()
+    resp = self._url_read_json_post(url, **kwargs)
+    if resp is None:
+      # This includes 403 because the XSRF token expired. Renew the token.
+      # TODO(maruel): It'd be great if it were transparent.
+      self.refresh_token()
+      resp = self._url_read_json_post(url, **kwargs)
+    if resp is None:
+      raise Error('Failed to connect to %s' % url)
+    return resp
 
   def refresh_token(self):
     """Returns a fresh token. Necessary as the token may expire after an hour.
     """
     url = self.url + self.token_resource
-    reply = UrlOpen(
+    resp = net.url_read_json(
         url,
-        content_type='application/json; charset=utf-8',
         headers={'X-XSRF-Token-Request': '1'},
-        data=json.dumps(
-            self.xsrf_request_params, sort_keys=True, separators=(',', ':')))
-    if not reply:
+        data=self.xsrf_request_params)
+    if resp is None:
       raise Error('Failed to connect to %s' % url)
-    self.token = json.loads(reply)['xsrf_token']
+    self.token = resp['xsrf_token']
     return self.token
 
+  def _url_read_post(self, url, **kwargs):
+    headers = (kwargs.pop('headers', None) or {}).copy()
+    headers['X-XSRF-Token'] = self.token
+    return net.url_read(url, headers=headers, **kwargs)
 
-
-def DownloadFile(local_file, url):
-  """Downloads the data from the given url and saves it in the local_file.
-
-  Args:
-    local_file: Where to save the data downloaded from the url.
-    url: Where to fetch the data from.
-
-  Returns:
-    True if the file is successfully downloaded.
-  """
-  local_file = os.path.abspath(local_file)
-
-  url_data = UrlOpen(url)
-
-  if url_data is None:
-    return False
-
-  try:
-    with open(local_file, 'wb') as f:
-      f.write(url_data)
-  except IOError as e:
-    logging.error('Failed to write to %s\n%s', local_file, e)
-    return False
-
-  return True
+  def _url_read_json_post(self, url, **kwargs):
+    headers = (kwargs.pop('headers', None) or {}).copy()
+    headers['X-XSRF-Token'] = self.token
+    return net.url_read_json(url, headers=headers, **kwargs)

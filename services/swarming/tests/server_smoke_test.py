@@ -140,8 +140,8 @@ class SwarmingTestCase(unittest.TestCase):
     # Obtain admin cookie.
     self._server.client.login_as_admin('smoke-test@example.com')
 
-    # Replace default URL opener with one that has admin cookies, so we can
-    # use url_helper.UrlOpen and still have the cookies present. Add XSRF token
+    # Replace default URL opener with one that has admin cookies, so we can use
+    # url_helper.net.url_read and still have the cookies present. Add XSRF token
     # to every request. It does no harm even if not needed.
     opener = self._server.client.url_opener
     opener.addheaders.append(('X-XSRF-Token', self._server.client.xsrf_token))
@@ -151,7 +151,7 @@ class SwarmingTestCase(unittest.TestCase):
     # tree + a new line. This invalidates the bot's code.
     with open(os.path.join(BOT_DIR, 'start_slave.py'), 'rb') as f:
       start_slave_content = f.read() + '\n'
-    res = url_helper.UrlOpen(
+    res = url_helper.net.url_read(
         urlparse.urljoin(self.server_url, 'restricted/upload_start_slave'),
         data={'script': start_slave_content})
     self.assertTrue(res)
