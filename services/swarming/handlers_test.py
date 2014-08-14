@@ -1637,20 +1637,35 @@ class OldClientApiTest(AppTestBase):
     self.mock_now(now)
     self.assertEqual('1', self.app.get('/swarming/api/v1/bots/dead/count').body)
 
-  def _PostResults(self, run_result, result, expect_errors=False):
+  def _PostResults(self, run_result, exit_code, output):
     url_parameters = {
       'id': run_result.bot_id,
-      'o': result,
+      'x': exit_code,
+      'o': output,
       'r': task_common.pack_run_result_key(run_result.key),
     }
-    return self.app.post('/result2', url_parameters,
-                         expect_errors=expect_errors)
+    return self.app.post('/result2', url_parameters)
+
+  def testResultHandlerNotDone(self):
+    result_summary, _run_result = CreateRunner(machine_id=MACHINE_ID)
+
+    packed = task_common.pack_result_summary_key(result_summary.key)
+    resp = self.app.get('/get_result?r=%s' % packed, status=200)
+    expected = {
+      u'config_instance_index': 0,
+      u'exit_codes': None,
+      u'machine_id': u'12345678-12345678-12345678-12345678',
+      u'machine_tag': u'12345678-12345678-12345678-12345678',
+      u'num_config_instances': 1,
+      u'output': None,
+    }
+    self.assertEqual(expected, resp.json)
 
   def testResultHandler(self):
     # TODO(maruel): Stop using the DB directly.
     result_summary, run_result = CreateRunner(machine_id=MACHINE_ID)
     result = 'result string'
-    response = self._PostResults(run_result, result)
+    response = self._PostResults(run_result, '1', result)
     self.assertResponse(
         response, '200 OK', 'Successfully update the runner results.')
 
@@ -1658,7 +1673,7 @@ class OldClientApiTest(AppTestBase):
     resp = self.app.get('/get_result?r=%s' % packed, status=200)
     expected = {
       u'config_instance_index': 0,
-      u'exit_codes': u'',
+      u'exit_codes': u'1',
       u'machine_id': u'12345678-12345678-12345678-12345678',
       u'machine_tag': u'12345678-12345678-12345678-12345678',
       u'num_config_instances': 1,

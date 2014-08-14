@@ -900,17 +900,22 @@ class GetResultHandler(auth.AuthenticatingHandler):
       logging.info('Unable to provide runner results [key: %s]', key_id)
       return
 
+    # The old API does not support stdout streaming, so do not provide any
+    # details until the task is completed. This whole handler will be deleted
+    # afterward.
+    exit_codes = None
+    output = None
+    if result.state in task_result.State.STATES_NOT_RUNNING:
+      exit_codes = ','.join(map(str, result.exit_codes))
+      output = u'\n'.join(
+          i.decode('utf-8', 'replace') for i in result.get_outputs())
     results = {
-      'exit_codes': ','.join(map(str, result.exit_codes)),
-      # TODO(maruel): Refactor these to make sense.
+      'exit_codes': exit_codes,
       'machine_id': result.bot_id,
       'machine_tag': result.bot_id,
       'config_instance_index': 0,
       'num_config_instances': 1,
-      # TODO(maruel): Return each output independently. Figure out a way to
-      # describe what is important in the steps and what should be ditched.
-      'output': u'\n'.join(
-          i.decode('utf-8', 'replace') for i in result.get_outputs()),
+      'output': output,
     }
 
     self.response.headers['Content-Type'] = 'application/json; charset=utf-8'
