@@ -52,6 +52,26 @@
 <table class="property_table">
   <tbody>
     <tr>
+      <td>Bot's previous task</td>
+      <td>
+        {% if previous_task_id %}
+        <a href="/user/task/{{previous_task_id}}">&#x2190; {{previous_task_name}}</a>
+        {% else %}
+        &#8209;&#8209;
+        {% endif %}
+      </td>
+    </tr>
+    <tr>
+      <td>Bot's following task</td>
+      <td>
+        {% if following_task_id %}
+        <a href="/user/task/{{following_task_id}}">{{following_task_name}} &#x2192;</a>
+        {% else %}
+        &#8209;&#8209;
+        {% endif %}
+      </td>
+    </tr>
+    <tr>
       <td>Name</td>
       <td>{{request.name}}</td>
     </tr>

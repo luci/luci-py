@@ -668,13 +668,50 @@ class TaskHandler(auth.AuthenticatingHandler):
     if not acl.is_privileged_user():
       self.abort(403, 'Implement access control based on the user')
 
-    bot = (
-      bot_management.get_bot_key(result.bot_id).get()
-      if result.bot_id else None)
+    bot_id = result.bot_id
+    following_task_future = None
+    previous_task_future = None
+    if result.started_ts:
+      # Use a shortcut name because it becomes unwieldy otherwise.
+      cls = task_result.TaskRunResult
+
+      # Note that the links will be to the TaskRunResult, not to
+      # TaskResultSummary.
+      following_task_future = cls.query(
+          cls.bot_id == bot_id,
+          cls.started_ts > result.started_ts,
+          ).order(cls.started_ts).get_async()
+      previous_task_future = cls.query(
+          cls.bot_id == bot_id,
+          cls.started_ts < result.started_ts,
+          ).order(-cls.started_ts).get_async()
+
+    bot_future = (
+        bot_management.get_bot_key(bot_id).get_async() if bot_id else None)
+
+    following_task_id = None
+    following_task_name = None
+    previous_task_id = None
+    previous_task_name = None
+    if following_task_future:
+      following_task = following_task_future.get_result()
+      if following_task:
+        following_task_id = task_common.pack_run_result_key(following_task.key)
+        following_task_name = following_task.name
+    if previous_task_future:
+      previous_task = previous_task_future.get_result()
+      if previous_task:
+        previous_task_id = task_common.pack_run_result_key(previous_task.key)
+        previous_task_name = previous_task.name
+
     params = {
-      'bot': bot,
+      'bot': bot_future.get_result() if bot_future else None,
       'is_privileged_user': acl.is_privileged_user(),
+      'following_task_id': following_task_id,
+      'following_task_name': following_task_name,
       'now': utils.utcnow(),
+      'previous_task_id': previous_task_id,
+      'previous_task_name': previous_task_name,
       'request': request,
       'task': result,
     }
