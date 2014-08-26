@@ -51,6 +51,7 @@ def _gen_request_data(name='Request name', properties=None, **kwargs):
     },
     'priority': 50,
     'scheduling_expiration_secs': 60,
+    'tags': [u'tag1'],
   }
   base_data.update(kwargs)
   base_data['properties'].update(properties or {})

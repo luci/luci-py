@@ -97,6 +97,7 @@ def convert_test_case(data):
     },
     'priority': config.priority,
     'scheduling_expiration_secs': config.deadline_to_run,
+    'tags': [],
   }
 
 
@@ -999,6 +1000,7 @@ class RetryHandler(auth.AuthenticatingHandler):
       },
       'priority': request.priority,
       'scheduling_expiration_secs': request.scheduling_expiration_secs,
+      'tags': request.tags,
     }
     # TODO(maruel): The user needs to have a way to get the new task id.
     task_scheduler.make_request(data)

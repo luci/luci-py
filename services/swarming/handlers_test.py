@@ -1598,6 +1598,7 @@ class OldClientApiTest(AppTestBase):
       },
       'priority': 50,
       'scheduling_expiration_secs': 63,
+      'tags': [],
     }
     self.assertEqual(expected, actual)
 

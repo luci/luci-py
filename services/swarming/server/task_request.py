@@ -68,7 +68,8 @@ _MIN_TIMEOUT_SECS = 30
 # The content of the 'data' parameter. This relates to the context of the
 # request, e.g. who wants to run a task.
 _DATA_KEYS = frozenset(
-    ['name', 'priority', 'properties', 'scheduling_expiration_secs', 'user'])
+    ['name', 'priority', 'properties', 'scheduling_expiration_secs', 'tags',
+     'user'])
 # The content of 'properties' inside the 'data' parameter. This relates to the
 # task itself, e.g. what to run.
 _PROPERTIES_KEYS = frozenset(
@@ -175,7 +176,7 @@ class TaskProperties(ndb.Model):
   embedded in a TaskRequest.
 
   TODO(maruel): Determine which of the below that are necessary.
-  Things not caried over from TestCase:
+  Things not carried over from TestCase:
   - TestObject.decorate_output
   - TestCase.verbose, use env var instead.
   - TestObject.hard_time_out, per command execution timeout, only global.
@@ -257,6 +258,9 @@ class TaskRequest(ndb.Model):
   # expired jobs is a simple query.
   expiration_ts = ndb.DateTimeProperty(
       indexed=True, validator=_validate_expiration, required=True)
+
+  # Tags that specify the category of the task.
+  tags = ndb.StringProperty(repeated=True)
 
   @property
   def scheduling_expiration_secs(self):
@@ -359,6 +363,7 @@ def make_request(data):
       - io_timeout_secs
     - priority
     - scheduling_expiration_secs
+    - tags
 
   Returns:
     The newly created TaskRequest.
@@ -397,6 +402,7 @@ def make_request(data):
       user=data['user'],
       properties=properties,
       priority=data['priority'],
-      expiration_ts=expiration_ts)
+      expiration_ts=expiration_ts,
+      tags=data['tags'])
   _put_request(request)
   return request
