@@ -1301,8 +1301,10 @@ class BotTaskUpdateHandler(auth.ApiHandler):
   out-of-order packets.
   """
   ACCEPTED_KEYS = frozenset(
-      [u'command_index', u'duration', u'exit_code', u'id', u'output',
-        u'packet_number', u'task_id'])
+      [
+        u'command_index', u'duration', u'exit_code', u'hard_timeout', u'id',
+        u'io_timeout', u'output', u'packet_number', u'task_id',
+      ])
   REQUIRED_KEYS = frozenset([u'command_index', u'id', u'task_id'])
 
   @auth.require(acl.is_bot)
@@ -1324,6 +1326,8 @@ class BotTaskUpdateHandler(auth.ApiHandler):
     exit_code = request.get('exit_code')
     out = request.get('output')
     packet_number = request.get('packet_number')
+
+    # TODO(maruel): Make use of io_timeout and hard_timeout.
 
     run_result_key = task_scheduler.unpack_run_result_key(task_id)
     # Side effect: zaps out any binary content on stdout.
