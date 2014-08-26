@@ -42,18 +42,8 @@ from server import user_manager
 from support import test_case
 
 
-# A simple machine id constant to use in tests.
-MACHINE_ID = '12345678-12345678-12345678-12345678'
-
-# Sample email of unknown user. It is effectively anonymous.
-UNKNOWN_EMAIL = 'unknown@example.com'
-# Sample email of some known user (but not admin).
-USER_EMAIL = 'user@example.com'
-# Sample email of admin user. It has all permissions.
-ADMIN_EMAIL = 'admin@example.com'
-
 # remote_addr of a fake bot that makes requests in tests.
-FAKE_IP = 'fake-ip'
+FAKE_IP = '192.168.0.0'
 
 
 def clear_ip_whitelist():
@@ -183,28 +173,24 @@ class AppTestBase(test_case.TestCase):
           'SERVER_SOFTWARE': os.environ['SERVER_SOFTWARE'],
         })
 
-    # Whitelist that fake bot.
-    user_manager.AddWhitelist(FAKE_IP)
-
-    # Mock expected groups structure.
-    # TODO(maruel): Mock privileged_user too.
-    def mocked_is_group_member(group, identity=None):
-      identity = identity or auth.get_current_identity()
-      if group == acl.ADMINS_GROUP:
-        return identity.is_user and identity.name == ADMIN_EMAIL
-      if group == acl.USERS_GROUP:
-        return identity.is_user and identity.name == USER_EMAIL
-      if group == acl.BOTS_GROUP:
-        return identity.is_bot
-      return False
-    self.mock(auth, 'is_group_member', mocked_is_group_member)
+    # Note that auth.ADMIN_GROUP != acl.ADMINS_GROUP.
+    auth.bootstrap_group(
+        auth.ADMIN_GROUP,
+        auth.Identity(auth.IDENTITY_USER, 'super-admin@example.com'), '')
+    auth.bootstrap_group(
+        acl.ADMINS_GROUP,
+        auth.Identity(auth.IDENTITY_USER, 'admin@example.com'), '')
+    auth.bootstrap_group(
+        acl.PRIVILEGED_USERS_GROUP,
+        auth.Identity(auth.IDENTITY_USER, 'priv@example.com'), '')
+    auth.bootstrap_group(
+        acl.USERS_GROUP,
+        auth.Identity(auth.IDENTITY_USER, 'user@example.com'), '')
+    auth.bootstrap_group(
+        acl.BOTS_GROUP,
+        auth.Identity(auth.IDENTITY_BOT, FAKE_IP), '')
 
     self.mock(stats_framework, 'add_entry', self._parse_line)
-
-  def _parse_line(self, line):
-    # pylint: disable=W0212
-    actual = stats._parse_line(line, stats._Snapshot(), {}, {})
-    self.assertEqual(True, actual, line)
 
   def tearDown(self):
     try:
@@ -212,11 +198,34 @@ class AppTestBase(test_case.TestCase):
     finally:
       super(AppTestBase, self).tearDown()
 
-  def _ReplaceCurrentUser(self, email, **kwargs):
-    if email:
-      self.testbed.setup_env(USER_EMAIL=email, overwrite=True, **kwargs)
-    else:
-      self.testbed.setup_env(overwrite=True, **kwargs)
+  def _parse_line(self, line):
+    # pylint: disable=W0212
+    actual = stats._parse_line(line, stats._Snapshot(), {}, {})
+    self.assertEqual(True, actual, line)
+
+  def set_as_anonymous(self):
+    clear_ip_whitelist()
+    self.testbed.setup_env(USER_EMAIL='', overwrite=True)
+
+  def set_as_super_admin(self):
+    self.set_as_anonymous()
+    self.testbed.setup_env(USER_EMAIL='super-admin@example.com', overwrite=True)
+
+  def set_as_admin(self):
+    self.set_as_anonymous()
+    self.testbed.setup_env(USER_EMAIL='admin@example.com', overwrite=True)
+
+  def set_as_privileged_user(self):
+    self.set_as_anonymous()
+    self.testbed.setup_env(USER_EMAIL='priv@example.com', overwrite=True)
+
+  def set_as_user(self):
+    self.set_as_anonymous()
+    self.testbed.setup_env(USER_EMAIL='user@example.com', overwrite=True)
+
+  def set_as_bot(self):
+    self.set_as_anonymous()
+    user_manager.AddWhitelist(FAKE_IP)
 
   def assertResponse(self, response, status, body):
     self.assertEqual(status, response.status, response.status)
@@ -276,8 +285,7 @@ class AppTestBase(test_case.TestCase):
 
 class FrontendTest(AppTestBase):
   def testBots(self):
-    # Act under admin identity.
-    self._ReplaceCurrentUser(ADMIN_EMAIL)
+    self.set_as_admin()
 
     # Add bots to display.
     bot_management.tag_bot_seen(
@@ -290,8 +298,7 @@ class FrontendTest(AppTestBase):
     self.assertTrue('200' in response.status)
 
   def testDeleteMachineStats(self):
-    # Act under admin identity.
-    self._ReplaceCurrentUser(ADMIN_EMAIL)
+    self.set_as_admin()
 
     # Add a machine assignment to delete.
     bot_management.tag_bot_seen(
@@ -307,14 +314,11 @@ class FrontendTest(AppTestBase):
     self.assertResponse(response, '204 No Content', '')
 
   def testMainHandler(self):
-    self._ReplaceCurrentUser(ADMIN_EMAIL)
     response = self.app.get('/')
     self.assertEqual('200 OK', response.status)
 
   def testUploadStartSlaveHandler(self):
-    # Act under admin identity.
-    self._ReplaceCurrentUser(ADMIN_EMAIL)
-
+    self.set_as_admin()
     xsrf_token = self.getXsrfToken()
     response = self.app.get('/restricted/upload_start_slave')
     response = self.app.post(
@@ -332,11 +336,7 @@ class FrontendTest(AppTestBase):
     self.assertIn('script_body', response.body)
 
   def testWhitelistIPHandlerParams(self):
-    # Start with clean IP whitelist. It removes FAKE_IP added in setUp.
-    clear_ip_whitelist()
-
-    # Act under admin identity.
-    self._ReplaceCurrentUser(ADMIN_EMAIL)
+    self.set_as_admin()
 
     # Make sure the template renders.
     response = self.app.get('/restricted/whitelist_ip', {})
@@ -372,11 +372,7 @@ class FrontendTest(AppTestBase):
 
   def testWhitelistIPHandler(self):
     ip = ['1.2.3.4', '1:2:3:4:5:6:7:8']
-
-    # Act under admin identity.
-    self._ReplaceCurrentUser(ADMIN_EMAIL)
-
-    clear_ip_whitelist()
+    self.set_as_admin()
     self.assertEqual(0, user_manager.MachineWhitelist.query().count())
     xsrf_token = self.getXsrfToken()
 
@@ -416,16 +412,13 @@ class FrontendTest(AppTestBase):
     ]
 
     # Make sure non-whitelisted requests are rejected.
-    user_manager.DeleteWhitelist(FAKE_IP)
     for handler, method in handlers_to_check:
       response = method(handler, {}, expect_errors=True)
       self.assertEqual(
           '403 Forbidden', response.status, msg='Handler: ' + handler)
 
-    # Whitelist a machine.
-    user_manager.AddWhitelist(FAKE_IP)
-
     # Make sure whitelisted requests are accepted.
+    self.set_as_bot()
     for handler, method in handlers_to_check:
       response = method(handler, {}, expect_errors=True)
       self.assertNotEqual(
@@ -447,18 +440,8 @@ class FrontendTest(AppTestBase):
         ('/result2', self.app.post),
     ]
 
-    # Reset state to non-whitelisted, anonymous machine.
-    user_manager.DeleteWhitelist(FAKE_IP)
-    self._ReplaceCurrentUser(None)
-
     # Make sure all anonymous requests are rejected.
-    for handler, method in allowed + forbidden:
-      response = method(handler, expect_errors=True)
-      self.assertEqual(
-          '403 Forbidden', response.status, msg='Handler: ' + handler)
-
-    # Make sure all requests from unknown account are rejected.
-    self._ReplaceCurrentUser(UNKNOWN_EMAIL)
+    self.set_as_anonymous()
     for handler, method in allowed + forbidden:
       response = method(handler, expect_errors=True)
       self.assertEqual(
@@ -466,7 +449,7 @@ class FrontendTest(AppTestBase):
 
     # Make sure for a known account 'allowed' methods are accessible
     # and 'forbidden' are not.
-    self._ReplaceCurrentUser(USER_EMAIL)
+    self.set_as_user()
     for handler, method in allowed:
       response = method(handler, expect_errors=True)
       self.assertNotEqual(
@@ -530,9 +513,7 @@ class FrontendTest(AppTestBase):
                  'returned %s' % (method, path, response))
       self.assertIn(response.status_int, (403, 405), msg=message)
 
-    # Reset state to non-whitelisted, anonymous machine.
-    user_manager.DeleteWhitelist(FAKE_IP)
-    self._ReplaceCurrentUser(None)
+    self.set_as_anonymous()
     # Try to execute 'get' and 'post' and verify they fail with 403 or 405.
     for route in routes_to_check:
       if '<' in route.template:
@@ -562,6 +543,7 @@ class FrontendTest(AppTestBase):
       self.app.get(url, status=200)
 
   def test_bootstrap_default(self):
+    self.set_as_bot()
     actual = self.app.get('/bootstrap').body
     with open(os.path.join(APP_DIR, 'swarm_bot/bootstrap.py'), 'rb') as f:
       expected = f.read()
@@ -570,8 +552,7 @@ class FrontendTest(AppTestBase):
 
   def test_bootstrap_custom(self):
     # Act under admin identity.
-    self._ReplaceCurrentUser(ADMIN_EMAIL)
-
+    self.set_as_admin()
     self.app.get('/restricted/upload_bootstrap')
     data = {
       'script': 'script_body',
@@ -586,30 +567,43 @@ class FrontendTest(AppTestBase):
 
   def test_task_list_empty(self):
     # Just assert it doesn't throw.
-    self._ReplaceCurrentUser(ADMIN_EMAIL)
+    self.set_as_privileged_user()
     self.app.get('/user/tasks', status=200)
     self.app.get('/user/task/12345', status=404)
 
   def test_add_task_and_list_user(self):
     # Add a task via the API as a user, then assert it can be viewed.
-    self._ReplaceCurrentUser(USER_EMAIL)
+    self.set_as_user()
     _, task_id = self.client_create_task('hi')
 
-    self._ReplaceCurrentUser(ADMIN_EMAIL)
+    self.set_as_privileged_user()
     self.app.get('/user/tasks', status=200)
     self.app.get('/user/task/%s' % task_id, status=200)
 
+    self.set_as_bot()
     reaped = self.bot_poll('bot1')
     self.assertEqual('RunManifest', reaped['commands'][0]['function'])
     manifest = json.loads(reaped['commands'][0]['args'])
     run_id = task_id[:-2] + '01'
     self.assertEqual({'SWARMING_TASK_ID': run_id}, manifest['env_vars'])
+
     # This can only work once a bot reaped the task.
+    self.set_as_privileged_user()
     self.app.get('/user/task/%s' % run_id, status=200)
+
+  def test_task_denied(self):
+    # Add a task via the API as a user, then assert it can't be viewed by
+    # anonymous user.
+    self.set_as_user()
+    _, task_id = self.client_create_task('hi')
+
+    self.set_as_anonymous()
+    self.app.get('/user/tasks', status=403)
+    self.app.get('/user/task/%s' % task_id, status=403)
 
   def test_task_list_query(self):
     # Try all the combinations of task queries to ensure the index exist.
-    self._ReplaceCurrentUser(ADMIN_EMAIL)
+    self.set_as_privileged_user()
     self.client_create_task('hi')
 
     sort_choices = [i[0] for i in handlers_frontend.TasksHandler.SORT_CHOICES]
@@ -633,17 +627,17 @@ class FrontendTest(AppTestBase):
 
   def test_bot_list_empty(self):
     # Just assert it doesn't throw.
-    self._ReplaceCurrentUser(ADMIN_EMAIL)
+    self.set_as_admin()
     self.app.get('/restricted/bots', status=200)
     self.app.get('/restricted/bot/unknown_bot', status=200)
 
   def test_bot_listing(self):
     # Create a task, create 2 bots, one with a task assigned, the other without.
+    self.set_as_admin()
     self.client_create_task('hi')
     self.bot_poll('bot1')
     self.bot_poll('bot2')
 
-    self._ReplaceCurrentUser(ADMIN_EMAIL)
     response = self.app.get('/restricted/bots', status=200)
     reg = re.compile(r'<a\s+href="(.+?)">Next page</a>')
     self.assertFalse(reg.search(response.body))
@@ -693,7 +687,7 @@ class BackendTest(AppTestBase):
     self.execute_tasks()
 
   def testSendEReporter(self):
-    self._ReplaceCurrentUser(ADMIN_EMAIL)
+    self.set_as_admin()
     response = self.app.get('/internal/cron/ereporter2/mail',
                             headers={'X-AppEngine-Cron': 'true'})
     self.assertResponse(response, '200 OK', 'Success.')
@@ -730,6 +724,8 @@ class NewBotApiTest(AppTestBase):
     self.mock(
         ereporter2, 'log_request',
         lambda *args, **kwargs: self.fail('%s, %s' % (args, kwargs)))
+    # Bot API test cases run by default as bot.
+    self.set_as_bot()
 
   def _token(self):
     headers = {'X-XSRF-Token-Request': '1'}
@@ -1060,6 +1056,11 @@ class NewBotApiTest(AppTestBase):
 
 
 class OldBotApiTest(AppTestBase):
+  def setUp(self):
+    # Bot API test cases run by default as bot.
+    super(OldBotApiTest, self).setUp()
+    self.set_as_bot()
+
   def testGetSlaveCode(self):
     response = self.app.get('/get_slave_code')
     self.assertEqual('200 OK', response.status)
@@ -1115,7 +1116,7 @@ class OldBotApiTest(AppTestBase):
         ' Invalid attributes: None: No JSON object could be decoded  ')
 
     # Valid attributes but missing dimensions.
-    attributes = '{"id": "%s"}' % MACHINE_ID
+    attributes = '{"id": "bot1"}'
     response = self.app.post(
         '/poll_for_test', {'attributes': attributes}, expect_errors=True)
     self.assertResponse(
@@ -1129,7 +1130,7 @@ class OldBotApiTest(AppTestBase):
   def testRegisterHandlerNoVersion(self):
     attributes = {
       'dimensions': {'os': ['win-xp']},
-      'id': MACHINE_ID,
+      'id': 'bot1',
     }
     response = self.app.post(
         '/poll_for_test', {'attributes': json.dumps(attributes)})
@@ -1151,7 +1152,7 @@ class OldBotApiTest(AppTestBase):
   def testRegisterHandlerVersion(self):
     attributes = {
       'dimensions': {'os': ['win-xp']},
-      'id': MACHINE_ID,
+      'id': 'bot1',
       'ip': '8.8.4.4',
       'version': bot_management.get_slave_version('http://localhost'),
     }
@@ -1164,7 +1165,7 @@ class OldBotApiTest(AppTestBase):
 
   def testRunnerPing(self):
     # Start a test and successfully ping it
-    _result_summary, run_result = CreateRunner(machine_id=MACHINE_ID)
+    _result_summary, run_result = CreateRunner(machine_id='bot1')
     packed = task_common.pack_run_result_key(run_result.key)
     response = self.app.post(
         '/runner_ping', {'r': packed, 'id': run_result.bot_id})
@@ -1181,9 +1182,7 @@ class OldBotApiTest(AppTestBase):
     error = ereporter2.Error.query().get()
     self.assertEqual(error.message, error_message)
 
-    def is_group_member_mock(group, identity=None):
-      return group == auth.model.ADMIN_GROUP or original(group, identity)
-    original = self.mock(auth.api, 'is_group_member', is_group_member_mock)
+    self.set_as_super_admin()
     self.app.get('/restricted/ereporter2/errors', status=200)
 
   def testRunnerPingFail(self):
@@ -1203,6 +1202,8 @@ class NewClientApiTest(AppTestBase):
     self.mock(
         ereporter2, 'log_request',
         lambda *args, **kwargs: self.fail('%s, %s' % (args, kwargs)))
+    # Client API test cases run by default as user.
+    self.set_as_user()
 
   def _token(self):
     headers = {'X-XSRF-Token-Request': '1'}
@@ -1292,7 +1293,11 @@ class NewClientApiTest(AppTestBase):
     response = self.app.get(
         '/swarming/api/v1/client/task/' + run_id, status=404).json
     self.assertEqual({u'error': u'Task not found'}, response)
+
+    self.set_as_bot()
     self.bot_poll('bot1')
+
+    self.set_as_user()
     response = self.app.get(
         '/swarming/api/v1/client/task/' + run_id).json
     expected = {
@@ -1311,9 +1316,19 @@ class NewClientApiTest(AppTestBase):
     }
     self.assertEqual(expected, response)
 
+  def test_get_results_denied(self):
+    # Asserts that a non-public task can not be seen by an anonymous user.
+    now = datetime.datetime(2010, 1, 2, 3, 4, 5)
+    self.mock_now(now)
+    # Note: this is still the old API.
+    _, task_id = self.client_create_task('hi')
+
+    self.set_as_anonymous()
+    self.app.get('/swarming/api/v1/client/task/' + task_id, status=403)
+    self.assertEqual('00', task_id[-2:])
+
   def test_api_bots(self):
-    # Act under admin identity.
-    self._ReplaceCurrentUser(ADMIN_EMAIL)
+    self.set_as_admin()
     now = datetime.datetime(2000, 1, 2, 3, 4, 5, 6)
     self.mock_now(now)
     bot = bot_management.tag_bot_seen(
@@ -1372,6 +1387,11 @@ class NewClientApiTest(AppTestBase):
 
 
 class OldClientApiTest(AppTestBase):
+  def setUp(self):
+    super(OldClientApiTest, self).setUp()
+    # Client API test cases run by default as user.
+    self.set_as_user()
+
   def _check_task(self, task, priority):
     # The value is using both timestamp and random value, so it is not
     # deterministic by definition.
@@ -1393,18 +1413,18 @@ class OldClientApiTest(AppTestBase):
 
   def test_add_task_admin(self):
     # Admins can trigger high priority tasks.
-    self._ReplaceCurrentUser(ADMIN_EMAIL)
+    self.set_as_admin()
     task, _ = self.client_create_task('hi')
     self._check_task(task, 10)
 
   def test_add_task_bot(self):
     # The bot has access to use high priority. By default on dev server
     # localhost is whitelisted as a bot.
+    self.set_as_bot()
     task, _ = self.client_create_task('hi')
     self._check_task(task, 10)
 
   def test_add_task_and_list_user(self):
-    self._ReplaceCurrentUser(USER_EMAIL)
     task, _ = self.client_create_task('hi')
     # Since the priority 10 was too high for a user (not an admin, neither a
     # bot), it was reset to 100.
@@ -1456,15 +1476,14 @@ class OldClientApiTest(AppTestBase):
         response.body)
 
   def testGetResultHandler(self):
-    # Act under admin identity.
-    self._ReplaceCurrentUser(ADMIN_EMAIL)
+    self.set_as_privileged_user()
 
     # Test when no matching key
     response = self.app.get('/get_result', {'r': 'fake_key'}, status=400)
 
     # Create test and runner.
     result_summary, run_result = CreateRunner(
-        machine_id=MACHINE_ID,
+        machine_id='bot1',
         exit_codes='0',
         results='\xe9 Invalid utf-8 string')
 
@@ -1488,8 +1507,7 @@ class OldClientApiTest(AppTestBase):
     self.assertEqual(u'\ufffd Invalid utf-8 string', results['output'])
 
   def testApiBots(self):
-    # Act under admin identity.
-    self._ReplaceCurrentUser(ADMIN_EMAIL)
+    self.set_as_admin()
     now = datetime.datetime(2000, 1, 2, 3, 4, 5, 6)
     self.mock_now(now)
     bot = bot_management.tag_bot_seen(
@@ -1522,8 +1540,7 @@ class OldClientApiTest(AppTestBase):
     self.assertEqual(expected, response.json)
 
   def testRetryHandler(self):
-    # Act under admin identity.
-    self._ReplaceCurrentUser(ADMIN_EMAIL)
+    self.set_as_admin()
 
     # Test when no matching key
     response = self.app.post(
@@ -1538,6 +1555,7 @@ class OldClientApiTest(AppTestBase):
     self.assertResponse(response, '200 OK', 'Runner set for retry.')
 
   def test_convert_test_case(self):
+    self.set_as_bot()
     data = {
       'configurations': [
         {
@@ -1603,8 +1621,7 @@ class OldClientApiTest(AppTestBase):
     self.assertEqual(expected, actual)
 
   def testCancelHandler(self):
-    # Act under admin identity.
-    self._ReplaceCurrentUser(ADMIN_EMAIL)
+    self.set_as_admin()
 
     response = self.app.post(
         '/restricted/cancel', {'r': 'invalid_key'}, expect_errors=True)
@@ -1648,15 +1665,15 @@ class OldClientApiTest(AppTestBase):
     return self.app.post('/result2', url_parameters)
 
   def testResultHandlerNotDone(self):
-    result_summary, _run_result = CreateRunner(machine_id=MACHINE_ID)
+    result_summary, _run_result = CreateRunner(machine_id='bot1')
 
     packed = task_common.pack_result_summary_key(result_summary.key)
     resp = self.app.get('/get_result?r=%s' % packed, status=200)
     expected = {
       u'config_instance_index': 0,
       u'exit_codes': None,
-      u'machine_id': u'12345678-12345678-12345678-12345678',
-      u'machine_tag': u'12345678-12345678-12345678-12345678',
+      u'machine_id': u'bot1',
+      u'machine_tag': u'bot1',
       u'num_config_instances': 1,
       u'output': None,
     }
@@ -1664,7 +1681,8 @@ class OldClientApiTest(AppTestBase):
 
   def testResultHandler(self):
     # TODO(maruel): Stop using the DB directly.
-    result_summary, run_result = CreateRunner(machine_id=MACHINE_ID)
+    self.set_as_bot()
+    result_summary, run_result = CreateRunner(machine_id='bot1')
     result = 'result string'
     response = self._PostResults(run_result, '1', result)
     self.assertResponse(
@@ -1675,8 +1693,8 @@ class OldClientApiTest(AppTestBase):
     expected = {
       u'config_instance_index': 0,
       u'exit_codes': u'1',
-      u'machine_id': u'12345678-12345678-12345678-12345678',
-      u'machine_tag': u'12345678-12345678-12345678-12345678',
+      u'machine_id': u'bot1',
+      u'machine_tag': u'bot1',
       u'num_config_instances': 1,
       u'output': u'result string',
     }
