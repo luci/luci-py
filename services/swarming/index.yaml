@@ -39,8 +39,3 @@ indexes:
   properties:
   - name: state
   - name: modified_ts
-
-- kind: UserManager
-  properties:
-  - name: ip
-  - name: whitelist
