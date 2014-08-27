@@ -3,23 +3,23 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
-import json
 import logging
 import os
+import shutil
 import subprocess
 import sys
+import tempfile
 import time
 import unittest
 
 # Import them first before manipulating sys.path to ensure they can load fine.
-import os_utilities
+import logging_utils
 import slave_machine
 import url_helper
 import zipped_archive
 
-from common import rpc
-
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+THIS_FILE = os.path.abspath(__file__)
+BASE_DIR = os.path.dirname(THIS_FILE)
 ROOT_DIR = os.path.dirname(BASE_DIR)
 sys.path.insert(0, ROOT_DIR)
 
@@ -27,553 +27,266 @@ import test_env
 
 test_env.setup_test_env()
 
-from depot_tools import auto_stub
-from server import bot_archive
-from mox import mox
+CLIENT_TESTS = os.path.join(ROOT_DIR, '..', '..', 'client', 'tests')
+sys.path.insert(0, CLIENT_TESTS)
 
-# pylint: disable=W0212
-
-
-def _CreateResponse(come_back=None, try_count=1, commands=None, result_url=None,
-                    extra_arg=None):
-  response = {}
-
-  if come_back is not None:
-    response['come_back'] = come_back
-  if try_count is not None:
-    response['try_count'] = try_count
-  if commands is not None:
-    response['commands'] = commands
-  if extra_arg is not None:
-    response['extra_arg'] = extra_arg
-  if result_url is not None:
-    response['result_url'] = result_url
-
-  return json.dumps(response)
+# Creates a server mock for functions in net.py.
+import net_utils
 
 
-def _SetPollJobAndPostFailExpectations(response, result_url, result_string,
-                                       result_code=-1, bad_url=False):
-  """Setup mox expectations for slave behavior under errors.
-
-  A url_helper.UrlOpen to request a job, and one to tell the server something
-  went wrong with the response it received.
-  """
-  # Original register machine request.
-  UrlOpenExpectations(response, mox.IgnoreArg(), mox.IgnoreArg())
-  data = {
-    'o': result_string,
-    's': False,
-    'x': str(result_code),
-  }
-  url_helper.UrlOpen(
-      result_url, data=data).AndReturn(None if bad_url else 'Success')
-
-
-def UrlOpenExpectations(response, url, data):
-  url_helper.UrlOpen(url, data=data).AndReturn(response)
-
-
-class TestSlaveMachine(auto_stub.TestCase):
-  """Test class for the SlaveMachine class."""
-
+class TestSlaveMachine(net_utils.TestCase):
   def setUp(self):
     super(TestSlaveMachine, self).setUp()
-    self._mox = mox.Mox()
-    self._mox.StubOutWithMock(url_helper, 'UrlOpen')
-    self._mox.StubOutWithMock(time, 'sleep')
-    self._mox.StubOutWithMock(subprocess, 'call')
-    self._mox.StubOutWithMock(subprocess, 'check_call')
-    self._mox.StubOutWithMock(os_utilities, 'restart')
-    self.mock(slave_machine, '_store_file', lambda _filepath, _content: None)
-    self.mock(logging, 'warning', lambda *_: None)
-    self.mock(logging, 'error', lambda *_: None)
-    self.mock(logging, 'exception', lambda *_: None)
-
-    with open(os.path.join(BASE_DIR, 'start_slave.py'), 'rb') as f:
-      start_slave_contents = f.read()
-    additionals = {'start_slave.py': start_slave_contents}
-    self.version = bot_archive.get_swarming_bot_version(
-        BASE_DIR, 'http://localhost', additionals)
-    self.attributes = {
-      'dimensions': {'os': ['Linux']},
-      'version': self.version,
-    }
-    # slave_machine.generate_version() is tested via the smoke test.
-    self.mock(zipped_archive, 'generate_version', lambda: self.version)
+    self.root_dir = tempfile.mkdtemp(prefix='slave_machine')
+    self.old_cwd = os.getcwd()
+    os.chdir(self.root_dir)
 
   def tearDown(self):
-    self._mox.UnsetStubs()
+    os.chdir(self.old_cwd)
+    shutil.rmtree(self.root_dir)
     super(TestSlaveMachine, self).tearDown()
 
-  def _CreateValidAttribs(self, try_count=0):
-    attributes = self.attributes.copy()
-    attributes['try_count'] = try_count
-    return {'attributes': json.dumps(attributes)}
+  def test_get_attributes(self):
+    self.assertEqual(
+        ['dimensions', 'id', 'ip'],
+        sorted(slave_machine.get_attributes()))
+
+  def test_get_attributes_failsafe(self):
+    self.assertEqual(
+        ['dimensions', 'id', 'ip'],
+        sorted(slave_machine.get_attributes_failsafe()))
+
+  def test_post_error_task(self):
+    self.mock(logging, 'error', lambda *_: None)
+    self.expected_requests(
+        [
+          (
+            'https://localhost:1/auth/api/v1/accounts/self/xsrf_token',
+            {'data': {}, 'headers': {'X-XSRF-Token-Request': '1'}},
+            {'xsrf_token': 'token'},
+          ),
+          (
+            'https://localhost:1/swarming/api/v1/bot/task_error',
+            {
+              'data': {
+                'id': 'localhost',
+                'message': 'error',
+                'task_id': 23,
+              },
+              'headers': {'X-XSRF-Token': 'token'},
+            },
+            {},
+          ),
+        ])
+    server = url_helper.XsrfRemote('https://localhost:1/')
+    attributes = {'id': 'localhost', 'foo': 'bar'}
+    slave_machine.post_error_task(server, attributes, 'error', 23)
+
+  def test_run_bot(self):
+    # Test the run_bot() loop.
+    self.mock(zipped_archive, 'generate_version', lambda: '123')
 
-  # Mock slave_machine._PostFailedExecuteResults.
-  def _MockPostFailedExecuteResults(self, slave, result_string):
-    self._mox.StubOutWithMock(slave, '_PostFailedExecuteResults')
-    slave._PostFailedExecuteResults(result_string)
-
-  @staticmethod
-  def _MockMakeDirectory(path, exception_message=None):
-    if exception_message:
-      slave_machine._MakeDirectory(path).AndRaise(os.error(exception_message))
-    else:
-      slave_machine._MakeDirectory(path)
-
-  @staticmethod
-  def _MockStoreFile(path, name, contents, exception_message=None):
-    if exception_message:
-      slave_machine._StoreFile(
-          path, name, contents).AndRaise(IOError(exception_message))
-    else:
-      slave_machine._StoreFile(path, name, contents)
-
-  @staticmethod
-  def _MockSubprocessCheckCall(args, exit_code=0):
-    if exit_code:
-      subprocess.check_call(args, cwd=BASE_DIR).AndRaise(
-          subprocess.CalledProcessError(exit_code, args))
-    else:
-      subprocess.check_call(args, cwd=BASE_DIR)
-
-  # Test with an invalid URL and try until it raises an exception.
-  def testInvalidURLWithException(self):
-    # Initial server ping.
-    url_helper.UrlOpen(mox.IgnoreArg()).AndReturn('')
-    url_helper.UrlOpen(mox.IgnoreArg(), data=mox.IgnoreArg(),
-                      ).AndReturn(None)
-
-    self._mox.ReplayAll()
-
-    slave = slave_machine.SlaveMachine('http://localhost', {})
-
-    expected = (
-        'Error when connecting to Swarm server http://localhost/poll_for_test')
-    with self.assertRaisesRegexp(slave_machine.SlaveError, expected):
-      slave.Start(iterations=-1)
-
-    self._mox.VerifyAll()
-
-  def testAttributesFormatBadString(self):
-    # Initial server ping.
-    url_helper.UrlOpen(mox.IgnoreArg()).AndReturn('')
-
-    data = self._CreateValidAttribs()
-
-    UrlOpenExpectations(
-        'blah blah blah', 'http://localhost/poll_for_test', data)
-    self._mox.ReplayAll()
-
-    slave = slave_machine.SlaveMachine('http://localhost', self.attributes)
-    slave.Start(iterations=1)
-
-    self._mox.VerifyAll()
-
-  # Test how values specified in the constructor are reflected in the request.
-  def testConstructor(self):
-    # Initial server ping.
-    url_helper.UrlOpen(mox.IgnoreArg()).AndReturn('')
-
-    data = self._CreateValidAttribs()
-
-    UrlOpenExpectations(
-        'blah blah blah', 'http://localhost/poll_for_test', data)
-    self._mox.ReplayAll()
-
-    slave = slave_machine.SlaveMachine('http://localhost', self.attributes)
-    slave.Start(iterations=1)
-
-    self._mox.VerifyAll()
-
-  # Test with missing mandatory fields in response: come_back.
-  def testMissingAll(self):
-    # Initial server ping.
-    url_helper.UrlOpen(mox.IgnoreArg()).AndReturn('')
-
-    UrlOpenExpectations(_CreateResponse(), mox.IgnoreArg(), mox.IgnoreArg())
-    self._mox.ReplayAll()
-
-    slave = slave_machine.SlaveMachine('http://localhost', {})
-    slave.Start(iterations=1)
-
-    self._mox.VerifyAll()
-
-  # Test with missing mandatory fields in response: try_count.
-  def testMissingTryCount(self):
-    # Initial server ping.
-    url_helper.UrlOpen(mox.IgnoreArg()).AndReturn('')
-
-    UrlOpenExpectations(
-        _CreateResponse(come_back=2, try_count=None), mox.IgnoreArg(),
-        mox.IgnoreArg())
-    self._mox.ReplayAll()
-
-    slave = slave_machine.SlaveMachine('http://localhost', {})
-    slave.Start(iterations=1)
-
-    self._mox.VerifyAll()
-
-  # Test with both commands and come_back missing.
-  def testMissingComeback(self):
-    # Initial server ping.
-    url_helper.UrlOpen(mox.IgnoreArg()).AndReturn('')
-
-    UrlOpenExpectations(_CreateResponse(), mox.IgnoreArg(), mox.IgnoreArg())
-    self._mox.ReplayAll()
-
-    slave = slave_machine.SlaveMachine('http://localhost', {})
-    slave.Start(iterations=1)
-
-    self._mox.VerifyAll()
-
-  # Test with an extra argument in response. It should accept this
-  # without an error.
-  def testExtraResponseArgs(self):
-    # Initial server ping.
-    url_helper.UrlOpen(mox.IgnoreArg()).AndReturn('')
-
-    come_back = 11.0
-    UrlOpenExpectations(
-        _CreateResponse(come_back=come_back, extra_arg='INVALID'),
-        mox.IgnoreArg(), mox.IgnoreArg())
-    time.sleep(come_back)
-    self._mox.ReplayAll()
-
-    slave = slave_machine.SlaveMachine('http://localhost', {})
-    slave.Start(iterations=1)
-
-    self._mox.VerifyAll()
-
-  # Test with missing mandatory fields in response: result_url.
-  def testMissingResultURL(self):
-    # Initial server ping.
-    url_helper.UrlOpen(mox.IgnoreArg()).AndReturn('')
-
-    UrlOpenExpectations(
-        _CreateResponse(commands=[rpc.BuildRPC('a', None)]),
-        mox.IgnoreArg(), mox.IgnoreArg())
-    self._mox.ReplayAll()
-
-    slave = slave_machine.SlaveMachine('http://localhost', {})
-    slave.Start(iterations=1)
-
-    self._mox.VerifyAll()
-
-  # Test with bad type for result_url.
-  def testBadResultURLType(self):
-    # Initial server ping.
-    url_helper.UrlOpen(mox.IgnoreArg()).AndReturn('')
-
-    UrlOpenExpectations(
-        _CreateResponse(commands=[rpc.BuildRPC('a', None)],
-                        result_url=['localhost']),
-        mox.IgnoreArg(), mox.IgnoreArg())
-    self._mox.ReplayAll()
-
-    slave = slave_machine.SlaveMachine('http://localhost', {})
-    slave.Start(iterations=1)
-
-    self._mox.VerifyAll()
-
-  # Test with bad type for commands.
-  def testBadCommands(self):
-    # Initial server ping.
-    url_helper.UrlOpen(mox.IgnoreArg()).AndReturn('')
-
-    _SetPollJobAndPostFailExpectations(
-        _CreateResponse(commands='do this', result_url='localhost'),
-        'localhost',
-        '[u\'Failed to validate commands with value "do this": '
-        "Invalid type: <type \\'unicode\\'> instead of <type \\'list\\'>\']")
-    self._mox.ReplayAll()
-
-    slave = slave_machine.SlaveMachine('http://localhost', {})
-    slave.Start(iterations=1)
-
-    self._mox.VerifyAll()
-
-  # Test with wrong RPC format for commands.
-  def testBadCommandsParseRPCFormat(self):
-    # Initial server ping.
-    url_helper.UrlOpen(mox.IgnoreArg()).AndReturn('')
-
-    _SetPollJobAndPostFailExpectations(
-        _CreateResponse(commands=['do this'], result_url='localhost'),
-        'localhost',
-        '[\'Failed to validate commands with value "[u\\\'do this\\\']": '
-        'Error when parsing RPC: Invalid RPC container\']')
-
-    self._mox.ReplayAll()
-
-    slave = slave_machine.SlaveMachine('http://localhost', {})
-    slave.Start(iterations=1)
-
-    self._mox.VerifyAll()
-
-  # Test with wrong RPC function name.
-  def testBadCommandsParseRPCFunctionName(self):
-    # Initial server ping.
-    url_helper.UrlOpen(mox.IgnoreArg()).AndReturn('')
-
-    commands = [rpc.BuildRPC('WrongFunc', None)]
-    _SetPollJobAndPostFailExpectations(
-        _CreateResponse(commands=commands, result_url='localhost'),
-        'localhost', 'Unsupported RPC function name: WrongFunc')
-    self._mox.ReplayAll()
-
-    slave = slave_machine.SlaveMachine('http://localhost', {})
-    slave.Start(iterations=1)
-
-    self._mox.VerifyAll()
-
-  # Test with both fields in response: come_back and commands.
-  def testInvalidBothCommandsAndComeback(self):
-    # Initial server ping.
-    url_helper.UrlOpen(mox.IgnoreArg()).AndReturn('')
-
-    UrlOpenExpectations(
-        _CreateResponse(come_back=3, commands='do this'),
-        mox.IgnoreArg(), mox.IgnoreArg())
-    self._mox.ReplayAll()
-
-    slave = slave_machine.SlaveMachine('http://localhost', {})
-    slave.Start(iterations=1)
-
-    self._mox.VerifyAll()
-
-  # Test invalid come_back type.
-  def testInvalidComebackType(self):
-    # Initial server ping.
-    url_helper.UrlOpen(mox.IgnoreArg()).AndReturn('')
-
-    UrlOpenExpectations(
-        _CreateResponse(come_back='3'), mox.IgnoreArg(), mox.IgnoreArg())
-    self._mox.ReplayAll()
-
-    slave = slave_machine.SlaveMachine('http://localhost', {})
-    slave.Start(iterations=1)
-
-    self._mox.VerifyAll()
-
-  # Test invalid come_back value.
-  def testInvalidComebackValue(self):
-    # Initial server ping.
-    url_helper.UrlOpen(mox.IgnoreArg()).AndReturn('')
-
-    UrlOpenExpectations(
-        _CreateResponse(come_back=-3.0), mox.IgnoreArg(), mox.IgnoreArg())
-    self._mox.ReplayAll()
-
-    slave = slave_machine.SlaveMachine('http://localhost', {})
-    slave.Start(iterations=1)
-
-    self._mox.VerifyAll()
-
-  # Test invalid try_count type.
-  def testInvalidTryCountType(self):
-    # Initial server ping.
-    url_helper.UrlOpen(mox.IgnoreArg()).AndReturn('')
-
-    UrlOpenExpectations(
-        _CreateResponse(come_back=3.0, try_count='1'),
-        mox.IgnoreArg(), mox.IgnoreArg())
-    self._mox.ReplayAll()
-
-    slave = slave_machine.SlaveMachine('http://localhost', {})
-    slave.Start(iterations=1)
-
-    self._mox.VerifyAll()
-
-  # Test invalid try_count value.
-  def testInvalidTryCountValue(self):
-    # Initial server ping.
-    url_helper.UrlOpen(mox.IgnoreArg()).AndReturn('')
-
-    UrlOpenExpectations(
-        _CreateResponse(come_back=3.0, try_count=-1),
-        mox.IgnoreArg(), mox.IgnoreArg())
-    self._mox.ReplayAll()
-
-    slave = slave_machine.SlaveMachine('http://localhost', {})
-    slave.Start(iterations=1)
-
-    self._mox.VerifyAll()
-
-  # Test 2 iterations of requests with nothing to do + 1 bad response.
-  def testComeBack(self):
-    # Initial server ping.
-    url_helper.UrlOpen(mox.IgnoreArg()).AndReturn('')
-
-    come_back = 1.0
-    try_count = 0
-    message = 'blah blah blah'
-    response = [_CreateResponse(come_back=come_back, try_count=try_count),
-                _CreateResponse(come_back=come_back, try_count=try_count),
-                _CreateResponse(come_back=come_back, try_count=try_count),
-                message]
-
-    for i in range(len(response)):
-      if i < len(response) - 1:
-        url_helper.UrlOpen(
-            mox.IgnoreArg(), data=mox.IgnoreArg()).AndReturn(response[i])
-        time.sleep(come_back)
-      else:
-        UrlOpenExpectations(response[i], mox.IgnoreArg(), mox.IgnoreArg())
-
-    self._mox.ReplayAll()
-
-    slave = slave_machine.SlaveMachine('http://localhost', {})
-    slave.Start(iterations=len(response))
-
-    self._mox.VerifyAll()
-
-  def testRunManifestRPCValidate(self):
-    # Initial server ping.
-    url_helper.UrlOpen(mox.IgnoreArg()).AndReturn('')
-
-    commands = [rpc.BuildRPC('RunManifest', None)]
-    _SetPollJobAndPostFailExpectations(
-        _CreateResponse(commands=commands, result_url='localhost'),
-        'localhost',
-        'Invalid RunManifest arg: None (expected str)')
-    self._mox.ReplayAll()
-
-    slave = slave_machine.SlaveMachine('http://localhost', {})
-    slave.Start(iterations=1)
-
-    self._mox.VerifyAll()
-
-  def testRunManifestRPCExecuteSubprocessException(self):
-    # Initial server ping.
-    url_helper.UrlOpen(mox.IgnoreArg()).AndReturn('')
-
-    function_name = 'RunManifest'
-    args = u'{}'
-
-    slave = slave_machine.SlaveMachine('http://localhost', {})
-    commands = [rpc.BuildRPC(function_name, args)]
-    response = _CreateResponse(commands=commands, result_url='localhost')
-
-    # Mock initial job request.
-    url_helper.UrlOpen(
-        mox.IgnoreArg(), data=mox.IgnoreArg()).AndReturn(response)
-
-    # Mock subprocess to raise exception.
-    full_command = [
-      sys.executable,
-      os.path.abspath(sys.argv[0]),
-      'local_test_runner',
-      '-f', 'work/test_run.json',
-    ]
-    self._MockSubprocessCheckCall(full_command, exit_code=-1)
-
-    os_utilities.restart().AndReturn(None)
-
-    self._mox.ReplayAll()
-
-    slave.Start(iterations=1)
-
-    self._mox.VerifyAll()
-
-  def testRunManifestRPCExecuteNoException(self):
-    # Initial server ping.
-    url_helper.UrlOpen(mox.IgnoreArg()).AndReturn('')
-
-    function_name = 'RunManifest'
-    args = u'{}'
-
-    slave = slave_machine.SlaveMachine('http://localhost', {})
-    commands = [rpc.BuildRPC(function_name, args)]
-    response = _CreateResponse(commands=commands, result_url='localhost')
-
-    # Mock initial job request.
-    url_helper.UrlOpen(
-        mox.IgnoreArg(), data=mox.IgnoreArg()).AndReturn(response)
-
-    # Mock subprocess to raise exception.
-    expected = [
-      sys.executable,
-      os.path.abspath(sys.argv[0]),
-      'local_test_runner',
-      '-f', 'work/test_run.json',
-    ]
-    self._MockSubprocessCheckCall(expected)
-
-    self._mox.ReplayAll()
-
-    slave.Start(iterations=1)
-
-    self._mox.VerifyAll()
-
-  def testRunManifestRPCRestartFails(self):
-    # Initial server ping.
-    url_helper.UrlOpen(mox.IgnoreArg()).AndReturn('')
-
-    function_name = 'RunManifest'
-    args = '{}'
-
-    slave = slave_machine.SlaveMachine('http://localhost', {})
-    commands = [rpc.BuildRPC(function_name, args)]
-    response = _CreateResponse(commands=commands, result_url='localhost')
-
-    # Mock initial job request.
-    url_helper.UrlOpen(
-        mox.IgnoreArg(), data=mox.IgnoreArg()).AndReturn(response)
-
-    # Mock subprocess to raise exception and signal a restart.
-    expected = [
-      sys.executable,
-      os.path.abspath(sys.argv[0]),
-      'local_test_runner',
-      '-f', 'work/test_run.json',
-    ]
-    self._MockSubprocessCheckCall(expected, exit_code='99')
-
-    # Mock out the the restart attempt to raise an exception, otherwise it would
-    # start an infinite loop.
     class Foo(Exception):
       pass
-    os_utilities.restart().AndRaise(Foo)
 
-    self._mox.ReplayAll()
+    called = []
+    expected_attribs = slave_machine.get_attributes()
+    expected_attribs['version'] = '123'
 
+    def poll_server(remote, attributes, sleep_streak):
+      self.assertEqual(remote, server)
+      self.assertEqual(expected_attribs, attributes)
+      called.append(sleep_streak)
+      if sleep_streak == 5:
+        raise Exception('Jumping out of the loop')
+      return sleep_streak + 1
+    self.mock(slave_machine, 'poll_server', poll_server)
+
+    def post_error(remote, attributes, e):
+      self.assertEqual(remote, server)
+      self.assertEqual(expected_attribs, attributes)
+      self.assertEqual('Jumping out of the loop', e)
+      # Necessary to get out of the loop.
+      raise Foo()
+
+    self.mock(slave_machine, 'post_error', post_error)
+
+    self.expected_requests(
+        [
+          ('https://localhost:1/server_ping', {}, None, None),
+          (
+            'https://localhost:1/auth/api/v1/accounts/self/xsrf_token',
+            {
+              'data': {'attributes': expected_attribs},
+              'headers': {'X-XSRF-Token-Request': '1'},
+            },
+            {'xsrf_token': 'token'},
+          ),
+        ])
+    server = url_helper.XsrfRemote('https://localhost:1/')
     with self.assertRaises(Foo):
-      slave.Start(iterations=1)
+      slave_machine.run_bot(server, None)
 
-    self._mox.VerifyAll()
+  def test_poll_server_sleep(self):
+    slept = []
+    self.mock(time, 'sleep', slept.append)
+    self.mock(slave_machine, 'run_manifest', self.fail)
+    self.mock(slave_machine, 'update_bot', self.fail)
+    self.mock(slave_machine, 'post_error', self.fail)
 
-  # Test to make sure the result url of the slave is correctly reset each time a
-  # job is requested.
-  def testResultURLReset(self):
-    # Initial server ping.
-    url_helper.UrlOpen(mox.IgnoreArg()).AndReturn('')
+    self.expected_requests(
+        [
+          (
+            'https://localhost:1/auth/api/v1/accounts/self/xsrf_token',
+            {'data': {}, 'headers': {'X-XSRF-Token-Request': '1'}},
+            {'xsrf_token': 'token'},
+          ),
+          (
+            'https://localhost:1/swarming/api/v1/bot/poll',
+            {
+              'data': {'attributes': {}, 'sleep_streak': '1'},
+              'headers': {'X-XSRF-Token': 'token'},
+            },
+            {
+              'cmd': 'sleep',
+              'duration': 1.24,
+            },
+          ),
+        ])
+    server = url_helper.XsrfRemote('https://localhost:1/')
+    self.assertEqual(2, slave_machine.poll_server(server, {}, 1))
+    self.assertEqual([1.24], slept)
 
-    commands = [rpc.BuildRPC('WrongFunc', None)]
-    response = [_CreateResponse(commands=commands, result_url='here1.com'),
-                _CreateResponse(commands=commands),
-                _CreateResponse(commands=commands, result_url='here2.com')]
+  def test_poll_server_run(self):
+    manifest = []
+    self.mock(time, 'sleep', self.fail)
+    self.mock(
+        slave_machine, 'run_manifest', lambda *args: manifest.append(args))
+    self.mock(slave_machine, 'update_bot', self.fail)
+    self.mock(slave_machine, 'post_error', self.fail)
 
-    _SetPollJobAndPostFailExpectations(
-        response[0], 'here1.com', 'Unsupported RPC function name: WrongFunc')
-    # This response has no result_url. So it shouldn't use the result_url given
-    # in the first response.
-    UrlOpenExpectations(response[1], mox.IgnoreArg(), mox.IgnoreArg())
-    _SetPollJobAndPostFailExpectations(
-        response[2], 'here2.com', 'Unsupported RPC function name: WrongFunc')
+    attribs = {'b': 'c'}
+    self.expected_requests(
+        [
+          (
+            'https://localhost:1/auth/api/v1/accounts/self/xsrf_token',
+            {'data': {}, 'headers': {'X-XSRF-Token-Request': '1'}},
+            {'xsrf_token': 'token'},
+          ),
+          (
+            'https://localhost:1/swarming/api/v1/bot/poll',
+            {
+              'data': {'attributes': attribs, 'sleep_streak': '1'},
+              'headers': {'X-XSRF-Token': 'token'},
+            },
+            {
+              'cmd': 'run',
+              'manifest': {'foo': 'bar'},
+            },
+          ),
+        ])
+    server = url_helper.XsrfRemote('https://localhost:1/')
+    self.assertEqual(0, slave_machine.poll_server(server, attribs, 1))
+    expected = [
+      (server, {'b': 'c'}, {'foo': 'bar'}),
+    ]
+    self.assertEqual(expected, manifest)
 
-    self._mox.ReplayAll()
+  def test_poll_server_update(self):
+    update = []
+    self.mock(time, 'sleep', self.fail)
+    self.mock(slave_machine, 'run_manifest', self.fail)
+    self.mock(slave_machine, 'update_bot', lambda *args: update.append(args))
+    self.mock(slave_machine, 'post_error', self.fail)
 
-    slave = slave_machine.SlaveMachine('http://localhost', {})
-    slave.Start(iterations=3)
+    self.expected_requests(
+        [
+          (
+            'https://localhost:1/auth/api/v1/accounts/self/xsrf_token',
+            {'data': {}, 'headers': {'X-XSRF-Token-Request': '1'}},
+            {'xsrf_token': 'token'},
+          ),
+          (
+            'https://localhost:1/swarming/api/v1/bot/poll',
+            {
+              'data': {'attributes': {}, 'sleep_streak': '1'},
+              'headers': {'X-XSRF-Token': 'token'},
+            },
+            {
+              'cmd': 'update',
+              'version': '123',
+            },
+          ),
+        ])
+    server = url_helper.XsrfRemote('https://localhost:1/')
+    self.assertEqual(0, slave_machine.poll_server(server, {}, 1))
+    self.assertEqual([(server, '123')], update)
 
-    self._mox.VerifyAll()
+  def test_run_manifest(self):
+    self.mock(slave_machine, 'post_error', self.fail)
+
+    # Method should have "self" as first argument - pylint: disable=E0213
+    class Popen(object):
+      def __init__(self2, cmd, cwd, stdout, stderr):
+        self2.returncode = None
+        expected = [
+          sys.executable, THIS_FILE, 'local_test_runner',
+          '-S', 'https://localhost:1', '-f', 'work/test_run.json',
+        ]
+        self.assertEqual(expected, cmd)
+        self.assertEqual(slave_machine.ROOT_DIR, cwd)
+        self.assertEqual(subprocess.PIPE, stdout)
+        self.assertEqual(subprocess.STDOUT, stderr)
+
+      def communicate(self2):
+        self2.returncode = 0
+        return 'foo', None
+    self.mock(subprocess, 'Popen', Popen)
+
+    server = url_helper.XsrfRemote('https://localhost:1/')
+    manifest = {'task_id': 24}
+    slave_machine.run_manifest(server, {}, manifest)
+
+  def test_update_bot(self):
+    self.mock(slave_machine, 'post_error', self.fail)
+    self.mock(slave_machine, 'THIS_FILE', 'swarming_bot.1.zip')
+    self.mock(url_helper, 'DownloadFile', lambda *_: True)
+    calls = []
+    cmd = [sys.executable, 'swarming_bot.2.zip', 'start_slave', '--survive']
+    if sys.platform in ('cygwin', 'win32'):
+      self.mock(subprocess, 'call', lambda *args: calls.append(args))
+      self.mock(os, 'execv', self.fail)
+      expected = [cmd]
+    else:
+      self.mock(subprocess, 'call', self.fail)
+      self.mock(os, 'execv', lambda *args: calls.append(args))
+      expected = [(sys.executable, cmd)]
+
+    server = url_helper.XsrfRemote('https://localhost:1/')
+    slave_machine.update_bot(server, '123')
+    self.assertEqual(expected, calls)
+
+  def test_get_config(self):
+    expected = {u'server': u'http://localhost:8080'}
+    self.assertEqual(expected, slave_machine.get_config())
+
+  def test_main(self):
+    self.mock(slave_machine, 'post_error', self.fail)
+
+    def check(x):
+      self.assertEqual(logging.WARNING, x)
+    self.mock(logging_utils, 'set_console_level', check)
+
+    def run_bot(remote, error):
+      self.assertEqual('http://localhost:8080', remote.url)
+      self.assertEqual(None, error)
+      return 0
+    self.mock(slave_machine, 'run_bot', run_bot)
+
+    self.assertEqual(0, slave_machine.main([]))
 
 
 if __name__ == '__main__':
-  # We don't want the application logs to interfere with our own messages.
-  # You can comment it out for more information when debugging.
-  #logging.disable(logging.FATAL)
+  if '-v' in sys.argv:
+    unittest.TestCase.maxDiff = None
   unittest.main()

@@ -4,6 +4,7 @@
 
 """A helper script for wrapping url calls."""
 
+import logging
 import os
 import sys
 
@@ -63,6 +64,7 @@ class XsrfRemote(object):
       self.token = self.refresh_token()
     resp = self._url_read_json_post(url, **kwargs)
     if resp is None:
+      logging.error('Forcibly refreshing; %s, %s', url, kwargs)
       # This includes 403 because the XSRF token expired. Renew the token.
       # TODO(maruel): It'd be great if it were transparent.
       self.refresh_token()

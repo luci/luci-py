@@ -91,6 +91,8 @@ FILES = (
     'utils/__init__.py',
     'utils/net.py',
     'utils/oauth.py',
+    'utils/on_error.py',
+    'utils/subprocess42.py',
     'utils/tools.py',
     'utils/zip_package.py',
     'zipped_archive.py',

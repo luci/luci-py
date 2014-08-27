@@ -13,7 +13,6 @@ import glob
 import json
 import logging
 import os
-import re
 import shutil
 import signal
 import subprocess
@@ -247,7 +246,6 @@ class SwarmingTestCase(unittest.TestCase):
     # some time before all the tests complete. We will keep polling the results
     # with delays between them. If after TIMEOUT seconds all the tests are still
     # not completed, we report a failure.
-    triggered_retry = False
     started = time.time()
     deadline = started + TIMEOUT
     while running_tests and time.time() < deadline and self.is_bot_alive:
@@ -264,28 +262,9 @@ class SwarmingTestCase(unittest.TestCase):
           continue
 
         logging.info('Test done for %s', running_test_key['config_name'])
-        expected = (
-          re.escape('[==========] Running: dir\n') +
-          re.escape('test_run.json\n') +
-          re.escape('\n') +
-          r'\(Step: \d+ ms\)' + '\n' +
-          re.escape('[==========] Running: dir\n') +
-          re.escape('test_run.json\n') +
-          re.escape('\n') +
-          r'\(Step\: \d+ ms\)' + '\n' +
-          r'\(Total\: \d+ ms\)')
-        self.assertTrue(
-            re.match(expected, results['output']), repr(results['output']))
-
-        # If we haven't retried a runner yet, do that with this runner.
-        if not triggered_retry:
-          logging.info('Retrying test %s', running_test_key['test_key'])
-          url = urlparse.urljoin(self.server_url, 'restricted/retry')
-          data = urllib.urlencode({'r': running_test_key['test_key']})
-          urllib2.urlopen(url, data=data)
-          triggered_retry = True
-        else:
-          running_tests.remove(running_test_key)
+        expected = u'test_run.json\n\ntest_run.json\n'
+        self.assertEqual(expected, results['output'])
+        running_tests.remove(running_test_key)
 
       if running_tests:
         # Throttle query rate in verbose to reduce the noise.

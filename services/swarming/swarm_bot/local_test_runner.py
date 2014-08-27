@@ -5,380 +5,239 @@
 
 """Runs a Swarming task.
 
-It uploads all results back to the Swarming server.
+Downloads all the necessary files to run the task, executes the commands and
+streams results back to the Swarming server.
+
+The process exit code is 0 when the task was executed, even if the task itself
+failed. If there's any failure in the setup or teardown, like invalid packet
+response, failure to contact the server, etc, a non zero exit code is used. It's
+up to the calling process (slave_machine.py) to signal that there was an
+internal failure and to cancel this task run and ask the server to retry it.
 """
 
-__version__ = '0.2'
+__version__ = '0.3'
 
+import StringIO
+import json
 import logging
-import logging.handlers
 import optparse
 import os
-import Queue
 import subprocess
 import sys
-import threading
 import time
 import zipfile
 
 # pylint: disable-msg=W0403
 import logging_utils
 import url_helper
-import zipped_archive
-from common import test_request_message
+from utils import net
+from utils import on_error
+from utils import subprocess42
 
 
-# Path to this file or the zip containing this file.
-THIS_FILE = os.path.abspath(zipped_archive.get_main_script_path())
-
-# Root directory containing this file or the zip containing this file.
-ROOT_DIR = os.path.dirname(THIS_FILE)
+# Sends a maximum of 100kb of stdout per task_update packet.
+MAX_CHUNK_SIZE = 102400
 
 
-# The amount of characters to read in each pass inside _RunCommand,
-# this helps to ensure that the _RunCommand function doesn't ignore
-# its other functions because it is too busy reading input.
-CHARACTERS_TO_READ_PER_PASS = 2000
+# Maximum wait between task_update packet when there's no output.
+MAX_PACKET_INTERVAL = 30
 
 
-def EnqueueOutput(out, queue):
-  """Read all the output from the given handle and insert it into the queue."""
-  while True:
-    # This readline will block until there is either new input or the handle
-    # is closed. Readline will only return None once the handle is close, so
-    # even if the output is being produced slowly, this function won't exit
-    # early.
-    # The potential dealock here is acceptable because this isn't run on the
-    # main thread.
-    data = out.readline()
-    if not data:
-      break
-    queue.put(data, block=True)
-  out.close()
+# Minimum wait between task_update packet when there's output.
+MIN_PACKET_INTERNAL = 10
 
 
-def _TimedOut(time_out, time_out_start):
-  """Returns true if we reached the timeout.
+def download_data(root_dir, files):
+  """Downloads and expands the zip files enumerated in the test run data."""
+  for data_url, _ in files:
+    logging.info('Downloading: %s', data_url)
+    content = net.url_read(data_url)
+    if content is None:
+      raise Exception('Failed to download %s' % data_url)
+    with zipfile.ZipFile(StringIO.StringIO(content)) as zip_file:
+      zip_file.extractall(root_dir)
 
-  This function makes it easy to mock out timeouts in tests.
 
-  Args:
-    time_out: The amount of time required to time out.
-    time_out_start: The start of the time out clock.
+class TaskDetails(object):
+  def __init__(self, data):
+    """Loads the raw data.
 
-  Returns:
-    True if the given values have timed out.
+    It is expected to have at least:
+     - bot_id
+     - commands as a list of lists
+     - data as a list of urls
+     - env as a dict
+     - hard_timeout
+     - io_timeout
+     - task_id
+    """
+    if not isinstance(data, dict):
+      raise ValueError('Expected dict, got %r' % data)
+
+    # Get all the data first so it fails early if the task details is invalid.
+    self.bot_id = data['bot_id']
+    self.commands = data['commands']
+    self.data = data['data']
+    self.env = os.environ.copy()
+    self.env.update(
+        (k.encode('utf-8'), v.encode('utf-8'))
+        for k, v in data['env'].iteritems())
+    self.hard_timeout = data['hard_timeout']
+    self.io_timeout = data['io_timeout']
+    self.task_id = data['task_id']
+
+
+def load_and_run(filename, swarming_server):
+  """Loads the task's metadata and execute it.
+
+  This may throw all sorts of exceptions in case of failure. It's up to the
+  caller to trap them. These shall be considered 'internal_failure' instead of
+  'failure' from a TaskRunResult standpoint.
   """
-  current_time = time.time()
-  if current_time < time_out_start:
-    logging.warning('The current time is earlier than the time out start (%s '
-                    'vs %s). Potential error in setting the time out start '
-                    'values', current_time, time_out_start)
-  return time_out != 0 and time_out_start + time_out < current_time
+  # The work directory is guaranteed to exist since it was created by
+  # slave_machine.py and contains the manifest. Temporary files will be
+  # downloaded there. It's slave_machine.py that will delete the directory
+  # afterward. Tests are not run from there.
+  root_dir = os.path.abspath('work')
+  if not os.path.isdir(root_dir):
+    raise ValueError('%s expected to exist' % root_dir)
+
+  with open(filename, 'rb') as f:
+    task_details = TaskDetails(json.load(f))
+
+  # Download the script to run in the temporary directory.
+  download_data(root_dir, task_details.data)
+
+  for index in xrange(len(task_details.commands)):
+    run_command(swarming_server, index, task_details, root_dir)
+  return 0
 
 
-class Error(Exception):
-  """Simple error exception properly scoped here."""
-  pass
+def post_update(swarming_server, params, exit_code, stdout, packet_number):
+  """Posts task update to task_update.
 
-
-def _ParseRequestFile(request_file_name):
-  """Parses and validates the given request file and store the result test_run.
-
-  Args:
-    request_file_name: The name of the request file to parse and validate.
-
-  Returns:
-    TestRun instance.
+  Arguments:
+    swarming_server: XsrfRemote instance.
+    params: Default JSON parameters for the POST.
+    exit_code: Process exit code, only when a command completed.
+    stdout: Incremental output since last call, if any.
+    packet_number: Monotonically increasing number to keep stdout packets in
+        order.
   """
+  params = params.copy()
+  if exit_code is not None:
+    params['exit_code'] = exit_code
+  if stdout:
+    # The packet_number is used by the server to make sure that the stdout
+    # chunks are processed and saved in the DB in order.
+    params['output'] = stdout
+    params['packet_number'] = packet_number
+    packet_number += 1
+  # TODO(maruel): Support early cancellation.
+  # https://code.google.com/p/swarming/issues/detail?id=62
+  _resp = swarming_server.url_read_json(
+      '/swarming/api/v1/bot/task_update', data=params)
+  return packet_number
+
+
+def should_post_update(stdout, now, last_packet):
+  """Returns True if it's time to send a task_update packet via post_update().
+
+  Sends a packet when one of this condition is met:
+  - more than MAX_CHUNK_SIZE of stdout is buffered.
+  - last packet was sent more than MIN_PACKET_INTERNAL seconds ago and there was
+    stdout.
+  - last packet was sent more than MAX_PACKET_INTERVAL seconds ago.
+  """
+  packet_interval = MIN_PACKET_INTERNAL if stdout else MAX_PACKET_INTERVAL
+  return len(stdout) >= MAX_CHUNK_SIZE or (now - last_packet) > packet_interval
+
+
+def calc_yield_wait(task_details, start, last_io, stdout):
+  """Calculates the maximum number of seconds to wait in yield_any()."""
+  packet_interval = MIN_PACKET_INTERNAL if stdout else MAX_PACKET_INTERVAL
+  now = time.time()
+  hard_timeout = start + task_details.hard_timeout - now
+  io_timeout = last_io + task_details.io_timeout - now
+  return min(min(packet_interval, hard_timeout), io_timeout)
+
+
+def run_command(swarming_server, index, task_details, root_dir):
+  """Runs a command and sends packets to the server to stream results back.
+
+  Implements both I/O and hard timeouts. Sends the packets numbered, so the
+  server can ensure they are processed in order.
+  """
+  # Signal the command is about to be started.
+  params = {
+    'command_index': index,
+    'id': task_details.bot_id,
+    'task_id': task_details.task_id,
+  }
+  last_packet = start = time.time()
+  packet_number = post_update(swarming_server, params, None, '', 0)
+
+  logging.info('Executing: %s', task_details.commands[index])
+  # TODO(maruel): Support both channels independently and display stderr in red.
+  env = None
+  if task_details.env:
+    env = os.environ.copy()
+    env.update(task_details.env)
+  proc = subprocess42.Popen(
+      task_details.commands[index],
+      env=env,
+      cwd=root_dir,
+      stdout=subprocess.PIPE,
+      stderr=subprocess.STDOUT,
+      stdin=subprocess.PIPE)
+
+  stdout = ''
+  exit_code = None
+  had_hard_timeout = False
+  had_io_timeout = False
   try:
-    with open(request_file_name, 'rb') as f:
-      content = f.read()
-  except IOError as e:
-    raise Error('Missing Request File %s: %s' % (request_file_name, e))
+    now = last_io = time.time()
+    for _, new_data in proc.yield_any(
+          maxsize=MAX_CHUNK_SIZE - len(stdout),
+          soft_timeout=calc_yield_wait(task_details, start, last_io, stdout)):
+      now = time.time()
+      if new_data:
+        stdout += new_data
+        last_io = now
+      elif proc.poll() != None:
+        break
 
-  try:
-    return test_request_message.TestRun.FromJSON(content)
-  except test_request_message.Error as e:
-    raise Error(
-        'Invalid Request File %s: %s\n%s' % (request_file_name, e, content))
+      # Post update if necessary.
+      if should_post_update(stdout, now, last_packet):
+        last_packet = time.time()
+        packet_number = post_update(
+            swarming_server, params, None, stdout, packet_number)
+        stdout = ''
 
+      # Kill on timeout if necessary. Both are failures, not internal_failures.
+      # Kill but return 0 so slave_machine.py doesn't cancel the task.
+      if not had_hard_timeout and not had_io_timeout:
+        if now - last_io > task_details.io_timeout:
+          had_io_timeout = True
+          logging.warning('I/O timeout')
+          proc.kill()
+        elif now - start > task_details.hard_timeout:
+          had_hard_timeout = True
+          logging.warning('Hard timeout')
+          proc.kill()
 
-class LocalTestRunner(object):
-  """Dowloads files, runs the commands and uploads results back.
+    exit_code = proc.wait()
+  finally:
+    # Something wrong happened, try to kill the child process.
+    if exit_code is None:
+      had_hard_timeout = True
+      proc.kill()
 
-  Based on the information provided in the request file, the LocalTestRunner
-  can download data from the URL provided in the test request file and unzip
-  it locally. Then, it can execute the set of requested commands.
-  """
-
-  def __init__(self, request_file_name, log=None):
-    """Inits LocalTestRunner with a request file.
-
-    Args:
-      request_file_name: path to the file containing the request.
-      log: CaptureLogs instance that collects logs.
-
-    Raises:
-      Error: When request_file_name is invalid.
-    """
-    self._log = log
-    self.data_dir = os.path.join(ROOT_DIR, 'work')
-    self.last_ping_time = time.time()
-
-    self.test_run = _ParseRequestFile(request_file_name)
-
-    if os.path.exists(self.data_dir) and not os.path.isdir(self.data_dir):
-      raise Error('The specified data folder already exists, but is a regular '
-                  'file rather than a folder.')
-    if not os.path.exists(self.data_dir):
-      os.mkdir(self.data_dir)
-
-  def _RunCommand(self, command, hard_time_out, io_time_out, env):
-    """Runs the given command.
-
-    Args:
-      command: A list containing the command to execute and its arguments.
-          These will be expanded looking for environment variables.
-      hard_time_out: The maximum number of seconds to run this command for. If
-          the command takes longer than this to finish, we kill the process
-          and return an error.
-      io_time_out: The number of seconds to wait for output from this command.
-          If the command doesn't produce any output for |time_out| seconds,
-          then we kill the process and return an error.
-      env: A dictionary containing environment variables to be used when running
-          the command.
-
-    Returns:
-      Tuple containing the exit code and the stdout/stderr of the execution.
-    """
-    assert isinstance(hard_time_out, (int, float))
-    assert isinstance(io_time_out, (int, float))
-
-    logging.info('Executing: %s\ncwd: %s', command, self.data_dir)
-    try:
-      proc = subprocess.Popen(
-          command, stdout=subprocess.PIPE,
-          env=env, bufsize=1, stderr=subprocess.STDOUT,
-          stdin=subprocess.PIPE, universal_newlines=True,
-          cwd=self.data_dir)
-    except OSError as e:
-      logging.exception('Execution of %s raised exception.', command)
-      return (1, e)
-
-    stdout_queue = Queue.Queue()
-    stdout_thread = threading.Thread(target=EnqueueOutput,
-                                     args=(proc.stdout, stdout_queue))
-    stdout_thread.daemon = True  # Ensure this exits if the parent dies
-    stdout_thread.start()
-
-    hard_time_out_start_time = time.time()
-    hit_hard_time_out = False
-    io_time_out_start_time = time.time()
-    hit_io_time_out = False
-    stdout_string = ''
-
-    while not hit_hard_time_out and not hit_io_time_out:
-      try:
-        exit_code = proc.poll()
-      except OSError as e:
-        logging.exception('Polling execution of %s raised exception.', command)
-        return (1, e)
-
-      # TODO(maruel): Add back support to stream content but only to the
-      # Swarming server this time.
-      current_content = ''
-      got_output = False
-      for _ in range(CHARACTERS_TO_READ_PER_PASS):
-        try:
-          current_content += stdout_queue.get_nowait()
-          got_output = True
-        except Queue.Empty:
-          break
-
-      # Some output was produced so reset the timeout counter.
-      if got_output:
-        io_time_out_start_time = time.time()
-
-      # If enough time has passed, let the server know that we are still
-      # alive.
-      if self.last_ping_time + self.test_run.ping_delay < time.time():
-        if url_helper.UrlOpen(self.test_run.ping_url, data='') is not None:
-          self.last_ping_time = time.time()
-
-      # If the process has ended, then read all the output that it generated.
-      if exit_code:
-        while stdout_thread.isAlive() or not stdout_queue.empty():
-          try:
-            current_content += stdout_queue.get(block=True, timeout=1)
-          except Queue.Empty:
-            # Queue could still potentially contain more input later.
-            pass
-
-      if current_content:
-        logging.info(current_content)
-
-      stdout_string += current_content
-
-      if exit_code is not None:
-        return (exit_code, stdout_string)
-
-      # We sleep a little to give the child process a chance to move forward
-      # before we poll it again.
-      time.sleep(0.1)
-
-      if _TimedOut(hard_time_out, hard_time_out_start_time):
-        hit_hard_time_out = True
-
-      if _TimedOut(io_time_out, io_time_out_start_time):
-        hit_io_time_out = True
-
-    # If we get here, it's because we timed out.
-    if hit_hard_time_out:
-      error_string = ('Execution of %s with pid: %d encountered a hard time '
-                      'out after %fs' % (command, proc.pid, hard_time_out))
-    else:
-      error_string = ('Execution of %s with pid: %d timed out after %fs of no '
-                      'output!' % (command, proc.pid, io_time_out))
-
-    logging.error(error_string)
-
-    if not stdout_string:
-      stdout_string = 'No output!'
-
-    stdout_string += '\n' + error_string
-    return (1, stdout_string)
-
-  def DownloadAndExplodeData(self):
-    """Download and explode the zip files enumerated in the test run data.
-
-    Returns:
-      True if we succeeded, False otherwise.
-    """
-    for data in self.test_run.data:
-      assert isinstance(data, (list, tuple))
-      (data_url, file_name) = data
-      local_file = os.path.join(self.data_dir, file_name)
-      logging.info('Downloading: %s from %s', local_file, data_url)
-      if not url_helper.DownloadFile(local_file, data_url):
-        return False
-
-      zip_file = None
-      try:
-        zip_file = zipfile.ZipFile(local_file)
-        zip_file.extractall(self.data_dir)
-      except (zipfile.error, zipfile.BadZipfile, IOError, RuntimeError):
-        logging.exception('Failed to unzip %s.', local_file)
-        return False
-      if zip_file:
-        zip_file.close()
-    return True
-
-  def RunTests(self):
-    """Run the tests specified in the test run tests list and output results.
-
-    Returns:
-      Tuple (result_codes, result_string) to identify the result codes and also
-      provide a detailed result_string.
-    """
-    # Apply the test_run/config environment variables for all tests.
-    env_vars = os.environ.copy()
-    if self.test_run.env_vars:
-      env_vars.update(
-          dict(
-            (k.encode('utf-8'), v.encode('utf-8'))
-            for k, v in self.test_run.env_vars.iteritems()
-          ))
-
-    # Any True will make everything wrapped up.
-    decorate_output = any(t.decorate_output for t in self.test_run.tests)
-
-    result_string = ''
-    result_codes = []
-    test_run_start_time = time.time()
-    for test in self.test_run.tests:
-      test_case_start_time = time.time()
-
-      if decorate_output:
-        if result_string:
-          result_string += '\n'
-        result_string += '[==========] Running: %s' % ' '.join(test.action)
-      (exit_code, stdout_string) = self._RunCommand(test.action,
-                                                    test.hard_time_out,
-                                                    test.io_time_out,
-                                                    env=env_vars)
-      encoding = 'utf-8'
-      try:
-        stdout_string = stdout_string.decode(encoding)
-      except UnicodeDecodeError:
-        stdout_string = (
-            '! Output contains characters not valid in %s encoding !\n%s'
-            % (encoding, stdout_string.decode(encoding, 'replace')))
-
-      # We always accumulate the test output and exit code.
-      if result_string:
-        result_string += '\n'
-      result_string += stdout_string
-      result_codes.append(exit_code)
-
-      if exit_code:
-        logging.warning('Execution error %d: %s', exit_code, stdout_string)
-
-      if decorate_output:
-        test_case_timing = time.time() - test_case_start_time
-        result_string += '\n(Step: %d ms)' % (test_case_timing * 1000)
-
-    # This is for the timing of running ALL tests.
-    if decorate_output:
-      test_run_timing = time.time() - test_run_start_time
-      result_string += '\n(Total: %d ms)' % (test_run_timing * 1000)
-
-    # And append their total number before returning the result string.
-    return result_codes, result_string
-
-  def PublishResults(self, result_codes, result_string):
-    """Publish the given result string to the result_url if any.
-
-    Args:
-      result_codes: The array of exit codes to be published, one per action.
-      result_string: The result to be published.
-
-    Returns:
-      True if we succeeded or had nothing to do, False otherwise.
-    """
-    logging.debug('Publishing Results')
-    data = {
-      'o': result_string,
-      'x': ', '.join(str(i) for i in result_codes),
-    }
-    url_results = url_helper.UrlOpen(
-        self.test_run.result_url,
-        data=data)
-    if url_results is None:
-      logging.error('Failed to publish results to given url, %s',
-                    self.test_run.result_url)
-      return False
-    return True
-
-  def PublishInternalErrors(self):
-    """Get the current log data and publish it."""
-    logging.debug('Publishing internal errors')
-    self.PublishResults([], self._log.read())
-
-  def RetrieveDataAndRunTests(self):
-    """Get the data required to run the tests, then run and publish the results.
-
-    Returns:
-      Process exit code to use.
-    """
-    if not self.DownloadAndExplodeData():
-      return False
-
-    result_codes, result_string = self.RunTests()
-
-    if not self.PublishResults(result_codes, result_string):
-      return 1
-    return max(result_codes)
+  # This is the very last packet for this command.
+  params['duration'] = time.time() - start
+  params['io_timeout'] = had_io_timeout
+  params['hard_timeout'] = had_hard_timeout
+  return post_update(swarming_server, params, exit_code, stdout, packet_number)
 
 
 def main(args):
@@ -389,39 +248,23 @@ def main(args):
       '-f', '--request_file_name',
       help='name of the request file')
   parser.add_option(
-      '-v', '--verbose', action='store_true',
-      help='Set logging level to INFO')
+      '-S', '--swarming-server', help='Swarming server to send data back')
 
-  (options, args) = parser.parse_args(args)
+  options, args = parser.parse_args(args)
   if not options.request_file_name:
     parser.error('You must provide the request file name.')
   if args:
     parser.error('Unknown args: %s' % args)
 
-  # Setup the logger for the console ouput.
-  logging_utils.set_console_level(
-      logging.INFO if options.verbose else logging.ERROR)
+  on_error.report_on_exception_exit(options.swarming_server)
 
-  try:
-    with logging_utils.CaptureLogs('local_test_runner') as log:
-      runner = LocalTestRunner(options.request_file_name, log=log)
-      try:
-        return runner.RetrieveDataAndRunTests()
-      except Exception:
-        # We want to catch all so that we can report all errors, even internal
-        # ones.
-        logging.exception('Failed to run test')
-
-      try:
-        runner.PublishInternalErrors()
-      except Exception:
-        logging.exception('Unable to publish internal errors')
-      return 1
-  except Exception:
-    logging.exception('Internal failure')
-    return 1
+  remote = url_helper.XsrfRemote(options.swarming_server)
+  return load_and_run(options.request_file_name, remote)
 
 
 if __name__ == '__main__':
   logging_utils.prepare_logging('local_test_runner.log')
+  # Setup the logger for the console ouput. This will be used by
+  # slave_machine.py in case of internal_failure.
+  logging_utils.set_console_level(logging.DEBUG)
   sys.exit(main(None))
