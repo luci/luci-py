@@ -194,17 +194,13 @@ class RestrictedWhitelistIPHandler(auth.AuthenticatingHandler):
   def get(self):
     # The user must authenticate with a user credential before being able to
     # whitelist the IP. This is done with login:admin.
-    data = {
+    params = {
       'default_comment': '',
       'default_group': '',
       'default_ip': self.request.remote_addr,
       'note': '',
-      'now': datetime.datetime.utcnow(),
-      'xsrf_token': self.generate_xsrf_token(),
-      'whitelistips': WhitelistedIP.query(),
     }
-    self.response.out.write(template.render('isolate/whitelistip.html', data))
-    self.response.headers['Content-Type'] = 'text/html'
+    self.common(params)
 
   @auth.require(auth.is_admin)
   def post(self):
@@ -238,14 +234,17 @@ class RestrictedWhitelistIPHandler(auth.AuthenticatingHandler):
         WhitelistedIP(id=key, comment=item_comment, group=group, ip=i).put()
         note.append('Success: %s' % i)
 
-    data = {
+    params = {
       'default_comment': self.request.get('comment'),
       'default_group': self.request.get('group'),
       'default_ip': self.request.get('ip'),
       'note': '<br>'.join(note),
-      'now': datetime.datetime.utcnow(),
-      'xsrf_token': self.generate_xsrf_token(),
-      'whitelistips': WhitelistedIP.query(),
     }
-    self.response.out.write(template.render('whitelistip.html', data))
+    self.common(params)
+
+  def common(self, params):
+    params['now'] = datetime.datetime.utcnow()
+    params['xsrf_token'] = self.generate_xsrf_token()
+    params['whitelistips'] = WhitelistedIP.query()
     self.response.headers['Content-Type'] = 'text/html'
+    self.response.out.write(template.render('isolate/whitelistip.html', params))
