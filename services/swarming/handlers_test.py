@@ -922,12 +922,13 @@ class NewBotApiTest(AppTestBase):
         '/swarming/api/v1/bot/error', error_params, token)
     self.assertEqual({}, response)
 
-    # Ensure it is now quarantined.
+    # A bot error currently does not result in permanent quarantine. It will
+    # eventually.
     response = self.post_with_token('/swarming/api/v1/bot/poll', params, token)
     self.assertTrue(response.pop(u'duration'))
     expected = {
       u'cmd': u'sleep',
-      u'quarantined': True,
+      u'quarantined': False,
     }
     self.assertEqual(expected, response)
 

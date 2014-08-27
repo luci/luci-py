@@ -218,8 +218,14 @@ def dimensions_powerset_count(dimensions):
   """Returns the number of combinations possible with the dimensions."""
   out = 1
   for i in dimensions.itervalues():
-    # Add 1 which is the "Not present" value.
-    out *= len(i) + 1
+    if isinstance(i, basestring):
+      # When a dimension value is a string, it can be in two states: "present"
+      # or "not present", so the product is 2.
+      out *= 2
+    else:
+      # When a dimension value is a list, it can be in len(values) + 1 states:
+      # one of each state or "not present".
+      out *= len(i) + 1
   return out
 
 

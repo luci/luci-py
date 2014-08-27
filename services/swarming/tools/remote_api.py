@@ -26,6 +26,7 @@ def setup_context():
   import handlers_backend
   import handlers_frontend
   from components import auth
+  from server import bot_management
   from server import stats
   from server import task_request
   from server import task_result

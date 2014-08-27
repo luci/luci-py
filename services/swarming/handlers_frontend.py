@@ -1209,35 +1209,33 @@ class BotPollHandler(auth.ApiHandler):
     # The bot may decide to "self-quarantine" itself.
     quarantined = attributes.get('quarantined', False)
 
-    bot_future = None
-    if bot_id:
-      bot_future = bot_management.get_bot_key(bot_id).get_async()
+    if quarantined:
+      logging.info('Bot self-quarantined: %s', dimensions)
 
     # The bot version is host-specific, because the host determines the version
     # being used.
     expected_version = bot_management.get_slave_version(self.request.host_url)
     if attributes.get('version') != expected_version:
       self._cmd_update(expected_version)
-      if bot_future:
-        bot_future.wait()
       return
 
     if not bot_id:
       self._cmd_sleep(sleep_streak, True)
       return
 
-    bot = bot_future.get_result()
-    # The server may decide to quarantine the bot.
-    quarantined = quarantined or (bot.quarantined if bot else True)
+    # TODO(maruel): Add support for Admin-enforced quarantine. This will be done
+    # with a separate entity type from bot_management.Bot. It is important to
+    # differentiate between a bot self-quarantining and an admin forcibly
+    # quarantining a bot.
+    # https://code.google.com/p/swarming/issues/detail?id=115
 
-    if (not quarantined and
-        task_to_run.dimensions_powerset_count(dimensions) >
-            task_to_run.MAX_DIMENSIONS):
+    dimensions_count = task_to_run.dimensions_powerset_count(dimensions)
+    if not quarantined and dimensions_count > task_to_run.MAX_DIMENSIONS:
       # It's a big deal, alert the admins.
       ereporter2.log_request(
           self.request,
           source='bot',
-          message='Too many dimensions on bot')
+          message='Too many dimensions (%d) on bot' % dimensions_count)
       quarantined = True
 
     if not quarantined:

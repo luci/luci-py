@@ -68,7 +68,8 @@ class Bot(ndb.Model):
   # The current task being run on this bot.
   task = ndb.KeyProperty(kind='TaskRunResult')
 
-  # If set to True, no task is handed out to this bot.
+  # If set to True, no task is handed out to this bot due to the bot being in a
+  # broken situation.
   quarantined = ndb.BooleanProperty()
 
   @property
@@ -204,7 +205,7 @@ def tag_bot_seen(
   - version: swarming_bot.zip version. Used to spot if a bot failed to update
         promptly.
   - quarantined: bool to signal if the bot should be exempted from running
-        tasks.
+        tasks. That's set when the bot itself signals it should be quarantined.
   """
   # The primary reason for the write is to update .last_seen_ts.
   bot = Bot(

@@ -364,7 +364,7 @@ class TaskToRunApiTest(test_case.TestCase):
   def test_dimensions_powerset_count(self):
     dimensions = {
       'a': ['1', '2'],
-      'b': 'c',
+      'b': 'code',
       'd': ['3', '4'],
     }
     self.assertEqual(
