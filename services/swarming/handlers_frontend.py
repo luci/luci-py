@@ -709,6 +709,7 @@ class TaskHandler(auth.AuthenticatingHandler):
       'is_privileged_user': acl.is_privileged_user(),
       'following_task_id': following_task_id,
       'following_task_name': following_task_name,
+      'is_running': result.state == task_result.State.RUNNING,
       'now': utils.utcnow(),
       'previous_task_id': previous_task_id,
       'previous_task_name': previous_task_name,

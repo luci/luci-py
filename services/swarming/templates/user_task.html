@@ -33,6 +33,17 @@
   .failed_test {
     background-color: #ffdddd;
   }
+
+  .blink {
+    animation: blink 1s steps(5, start) infinite;
+    -webkit-animation: blink 1s steps(5, start) infinite;
+  }
+  @keyframes blink {
+    to { visibility: hidden; }
+  }
+  @-webkit-keyframes blink {
+    to { visibility: hidden; }
+  }
 </style>
 {% endblock %}
 
@@ -169,7 +180,7 @@
 <h3>Outputs:</h3>
 <pre>
 {% for out in task.get_outputs() %}Output:
-{{out}}{% endfor %}
+{{out}}{% endfor %}{% if is_running %}<p class="console"><span class="blink">|</span>{% endif %}
 </pre>
 
 {% endblock %}
