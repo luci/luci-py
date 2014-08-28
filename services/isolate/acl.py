@@ -190,7 +190,7 @@ class RestrictedWhitelistIPHandler(auth.AuthenticatingHandler):
   This handler must have login:admin in app.yaml.
   """
 
-  @auth.require(auth.is_admin)
+  @auth.require(isolate_admin)
   def get(self):
     # The user must authenticate with a user credential before being able to
     # whitelist the IP. This is done with login:admin.
@@ -202,7 +202,7 @@ class RestrictedWhitelistIPHandler(auth.AuthenticatingHandler):
     }
     self.common(params)
 
-  @auth.require(auth.is_admin)
+  @auth.require(isolate_admin)
   def post(self):
     comment = self.request.get('comment')
     group = self.request.get('group')

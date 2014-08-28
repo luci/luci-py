@@ -19,7 +19,7 @@ handlers:
 - url: /restricted.*
   script: main_frontend.app
   secure: always
-  login: admin
+  login: always
 
 - url: /mapreduce/pipeline/images
   static_dir: third_party/mapreduce/lib/pipeline/ui/images
