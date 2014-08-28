@@ -9,7 +9,11 @@ javascript library and not jinja2. #}
 <script id="group-chooser-item-template" type="text/x-handlebars-template">
   <a href="#" class="list-group-item">
     <h5 class="list-group-item-heading">{{name}}</h5>
+    {{#if isExternal}}
+    <small class="list-group-item-text">External</small>
+    {{else}}
     <small class="list-group-item-text">{{description}}</small>
+    {{/if}}
   </a>
 </script>
 
@@ -28,11 +32,18 @@ javascript library and not jinja2. #}
 
 <script id="edit-group-form-template" type="text/x-handlebars-template">
   <div class="panel panel-default">
-    <div class="panel-heading"><h3 class="panel-title">{{name}}</h3></div>
+    <div class="panel-heading">
+      <h3 class="panel-title">{{name}}
+        {{#if isExternal}}
+        <span style="color: gray">(external)</span>
+        {{/if}}
+      </h3>
+    </div>
     <div class="panel-body" style="padding-bottom: 5px;">
       <div id="alerts"></div>
       <form class="form-horizontal" role="form">
         <input type="hidden" name="name" value="{{name}}">
+        {{#unless isExternal}}
         <div class="form-group">
           <label class="col-sm-2 control-label">Description</label>
           <div class="col-sm-10">
@@ -41,6 +52,7 @@ javascript library and not jinja2. #}
           </div>
         </div>
         <hr>
+        {{/unless}}
         <div class="form-group">
           <label class="col-sm-2 control-label">Created on</label>
           <div class="col-sm-10">
@@ -75,9 +87,11 @@ javascript library and not jinja2. #}
           <label class="col-sm-2 control-label">Members</label>
           <div class="col-sm-10" style="font-family:monospace;">
             <textarea class="form-control"
-                      rows="4" name="members">{{members}}</textarea>
+                      rows="{{#if isExternal}}16{{else}}4{{/if}}"
+                      name="members">{{members}}</textarea>
           </div>
         </div>
+        {{#unless isExternal}}
         <div class="form-group">
           <label class="col-sm-2 control-label">Patterns</label>
           <div class="col-sm-10" style="font-family:monospace;">
@@ -103,6 +117,7 @@ javascript library and not jinja2. #}
             </button>
           </div>
         </div>
+        {{/unless}}
       </form>
     </div>
   </div>

@@ -28,6 +28,9 @@ function addPrefixToItems(prefix, items) {
 
 // Strips '<prefix>:' from a string if it starts with it.
 function stripPrefix(prefix, str) {
+  if (!str) {
+    return '';
+  }
   if (str.slice(0, prefix.length + 1) == prefix + ':') {
     return str.slice(prefix.length + 1, str.length);
   } else {
@@ -39,6 +42,12 @@ function stripPrefix(prefix, str) {
 // Applies 'stripPrefix' to each item of a list.
 function stripPrefixFromItems(prefix, items) {
   return _.map(items, _.partial(stripPrefix, prefix));
+}
+
+
+// True if group name starts with '<something>/' prefix.
+function isExternalGroupName(name) {
+  return name.indexOf('/') != -1;
 }
 
 
@@ -79,13 +88,15 @@ GroupChooser.prototype.refetchGroups = function() {
 GroupChooser.prototype.setGroupList = function(groups) {
   var self = this;
 
-  // Bring groups without '-' in name to front.
+  // Groups without '-' or '/' come first, then groups with '-'.
   var sortKeyFunc = function(group) {
     var name = group.name;
-    if (name.indexOf('-') == -1) {
+    if (name.indexOf('-') == -1 && name.indexOf('/') == -1) {
       return 'A-' + name;
-    } else {
+    } else if (name.indexOf('-') == -1) {
       return 'B-' + name;
+    } else {
+      return 'C-' + name;
     }
   };
 
@@ -94,6 +105,7 @@ GroupChooser.prototype.setGroupList = function(groups) {
   self.groupMap = {};
   self.groupToItemMap = {};
   _.each(self.groupList, function(group) {
+    group.isExternal = isExternalGroupName(group.name);
     self.groupMap[group.name] = group;
   });
 
@@ -287,6 +299,7 @@ ContentFrame.prototype.loadContent = function(content) {
 var GroupForm = function($element) {
   this.$element = $element;
   this.visible = false;
+  this.readOnly = false;
 };
 
 
@@ -316,7 +329,16 @@ GroupForm.prototype.load = function() {
 
 // Disables or enables controls on the form.
 GroupForm.prototype.setInteractionDisabled = function(disabled) {
-  $('button', this.$element).attr('disabled', disabled);
+  if (!this.readOnly) {
+    $('button', this.$element).attr('disabled', disabled);
+  }
+};
+
+
+// Disable modification of the form.
+GroupForm.prototype.makeReadonly = function() {
+  this.readOnly = true;
+  $('button, input, textarea', this.$element).attr('disabled', true);
 };
 
 
@@ -441,23 +463,28 @@ EditGroupForm.prototype.buildForm = function(group, lastModified) {
   group.globs = group.globs.join('\n') + '\n';
   group.members = group.members.join('\n') + '\n';
   group.nested = (group.nested || []).join('\n') + '\n';
+  group.isExternal = isExternalGroupName(group.name);
 
-  // Build the actual DOM element.
   this.$element = $(common.render('edit-group-form-template', group));
   this.lastModified = lastModified;
 
-  // 'Delete' button handler. Asks confirmation and calls 'onDeleteGroup'.
-  var self = this;
-  $('#delete-btn', this.$element).click(function() {
-    common.confirm('Delete this group?').done(function() {
-      self.onDeleteGroup(self.groupName, self.lastModified);
+  if (group.isExternal) {
+    // Read-only UI for external groups.
+    this.makeReadonly();
+  } else {
+    // 'Delete' button handler. Asks confirmation and calls 'onDeleteGroup'.
+    var self = this;
+    $('#delete-btn', this.$element).click(function() {
+      common.confirm('Delete this group?').done(function() {
+        self.onDeleteGroup(self.groupName, self.lastModified);
+      });
     });
-  });
 
-  // Add validation and submit handler.
-  this.setupSubmitHandler(function(group) {
-    self.onUpdateGroup(group, self.lastModified)
-  });
+    // Add validation and submit handler.
+    this.setupSubmitHandler(function(group) {
+      self.onUpdateGroup(group, self.lastModified)
+    });
+  }
 };
 
 
@@ -526,7 +553,7 @@ var waitForResult = function(defer, groupChooser, form) {
 // Sets up jQuery.validate validators for group form fields.
 var registerFormValidators = function() {
   // Regular expressions for form fields.
-  var groupRe = /^[0-9a-zA-Z_\-\. ]{3,40}$/;
+  var groupRe = /^[0-9a-zA-Z_\-\.\/]{3,80}$/;
   var memberRe = /^((user|bot|service|anonymous)\:)?[\w\-\+\%\.\@]+$/;
   var globRe = /^((user|bot|service|anonymous)\:)?[\w\-\+\%\.\@\*]+$/;
 

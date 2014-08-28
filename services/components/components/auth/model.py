@@ -59,7 +59,9 @@ __all__ = [
   'configure_as_primary',
   'find_group_dependency_cycle',
   'find_referencing_groups',
+  'get_auth_db_revision',
   'get_missing_groups',
+  'get_service_self_identity',
   'Identity',
   'IDENTITY_ANONYMOUS',
   'IDENTITY_BOT',
@@ -67,9 +69,11 @@ __all__ = [
   'IDENTITY_USER',
   'IdentityProperty',
   'is_empty_group',
+  'is_external_group_name',
   'is_primary',
   'is_replica',
   'is_standalone',
+  'is_valid_group_name',
   'replicate_auth_db',
 ]
 
@@ -93,13 +97,13 @@ ALLOWED_IDENTITY_KINDS = {
   IDENTITY_ANONYMOUS: re.compile(r'^anonymous$'),
   IDENTITY_BOT: re.compile(r'^[0-9a-zA-Z_\-\.@]+$'),
   IDENTITY_SERVICE: re.compile(r'^[0-9a-zA-Z_\-]+$'),
-  IDENTITY_USER: re.compile(r'^[0-9a-zA-Z_\-\.@]+$'),
+  IDENTITY_USER: re.compile(r'^[0-9a-zA-Z_\-\.\+]+@[0-9a-z_\-\.]+$'),
 }
 
 # Regular expression that matches group names. ASCII only, no leading or
 # trailing spaces allowed (spaces inside are fine).
 GROUP_NAME_RE = re.compile(
-    r'^[0-9a-zA-Z_][0-9a-zA-Z_\-\.\ ]{1,80}[0-9a-zA-Z_\-\.]$')
+    r'^([a-z\-]+/)?[0-9a-zA-Z_][0-9a-zA-Z_\-\.\ ]{1,80}[0-9a-zA-Z_\-\.]$')
 # Special group name that means 'All possible users' (including anonymous!).
 GROUP_ALL = '*'
 
@@ -283,6 +287,17 @@ def get_replication_state():
   return REPLICATION_STATE_KEY.get()
 
 
+def get_auth_db_revision():
+  """Returns current revision of AuthDB, it increases with each change."""
+  state = get_replication_state()
+  return state.auth_db_rev if state else 0
+
+
+def get_service_self_identity():
+  """Returns Identity that correspond to the current GAE app itself."""
+  return Identity(IDENTITY_SERVICE, app_identity.get_application_id())
+
+
 class AuthGlobalConfig(ndb.Model):
   """Acts as a root entity for auth models.
 
@@ -464,6 +479,16 @@ def is_empty_group(group):
   """Returns True if group is missing or completely empty."""
   group = group_key(group).get()
   return not group or not(group.members or group.globs or group.nested)
+
+
+def is_valid_group_name(name):
+  """True if string looks like a valid group name."""
+  return bool(GROUP_NAME_RE.match(name))
+
+
+def is_external_group_name(name):
+  """True if group is imported from outside and is not writable."""
+  return is_valid_group_name(name) and '/' in name
 
 
 @ndb.transactional

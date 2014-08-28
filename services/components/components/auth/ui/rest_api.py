@@ -128,6 +128,7 @@ class GroupHandler(handler.ApiHandler):
   @api.require(api.is_admin)
   def get(self, group):
     """Fetches all information about an existing group give its name."""
+    assert model.is_valid_group_name(group), group
     obj = model.group_key(group).get()
     if not obj:
       self.abort_with_error(404, text='No such group')
@@ -140,11 +141,14 @@ class GroupHandler(handler.ApiHandler):
   def put(self, group):
     """Updates an existing group."""
     # Deserialize and validate the body.
+    assert model.is_valid_group_name(group), group
     try:
       body = self.parse_body()
       name = body.pop('name', None)
       if not name or name != group:
         raise ValueError('Missing or mismatching group name in request body')
+      if model.is_external_group_name(name):
+        raise ValueError('External groups are not writable')
       group_params = model.AuthGroup.convert_serializable_dict(body)
     except (TypeError, ValueError) as err:
       self.abort_with_error(400, text=str(err))
@@ -216,11 +220,14 @@ class GroupHandler(handler.ApiHandler):
   def post(self, group):
     """Creates a new group, ensuring it's indeed new (no overwrites)."""
     # Deserialize a body into the entity.
+    assert model.is_valid_group_name(group), group
     try:
       body = self.parse_body()
       name = body.pop('name', None)
       if not name or name != group:
         raise ValueError('Missing or mismatching group name in request body')
+      if model.is_external_group_name(name):
+        raise ValueError('External groups are not writable')
       entity = model.AuthGroup.from_serializable_dict(
           serializable_dict=body,
           key=model.group_key(group),
@@ -275,6 +282,10 @@ class GroupHandler(handler.ApiHandler):
     'HTTP Error 409: Conflict', providing information about what depends on
     this group in the response body.
     """
+    assert model.is_valid_group_name(group), group
+    if model.is_external_group_name(group):
+      self.abort_with_error(400, text='External groups are not writable')
+
     @ndb.transactional
     def delete(expected_ts):
       entity = model.group_key(group).get()

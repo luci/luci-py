@@ -722,6 +722,15 @@ class GroupHandlerTest(RestAPITestCase):
     self.assertEqual(201, status)
     self.assertEqual({'ok': True}, body)
 
+  def test_delete_external_fails(self):
+    status, body, _ = self.delete(
+        path='/auth/api/v1/groups/prefix/name',
+        expect_errors=True,
+        expect_xsrf_token_check=True,
+        expect_admin_check=True)
+    self.assertEqual(400, status)
+    self.assertEqual({'text': 'External groups are not writable'}, body)
+
   def test_post_mismatching_name(self):
     # 'name' key and name in URL should match.
     status, body, _ = self.post(
@@ -790,6 +799,16 @@ class GroupHandlerTest(RestAPITestCase):
         expect_xsrf_token_check=True)
     self.assertEqual(403, status)
     self.assertEqual({'text': 'Access is denied.'}, body)
+
+  def test_post_external_fails(self):
+    status, body, _ = self.post(
+        path='/auth/api/v1/groups/prefix/name',
+        body={'name': 'prefix/name'},
+        expect_errors=True,
+        expect_xsrf_token_check=True,
+        expect_admin_check=True)
+    self.assertEqual(400, status)
+    self.assertEqual({'text': 'External groups are not writable'}, body)
 
   def test_put_success(self):
     frozen_time = utils.timestamp_to_datetime(1300000000000000)
@@ -991,6 +1010,16 @@ class GroupHandlerTest(RestAPITestCase):
         expect_xsrf_token_check=True)
     self.assertEqual(403, status)
     self.assertEqual({'text': 'Access is denied.'}, body)
+
+  def test_put_external_fails(self):
+    status, body, _ = self.post(
+        path='/auth/api/v1/groups/prefix/name',
+        body={'name': 'prefix/name'},
+        expect_errors=True,
+        expect_xsrf_token_check=True,
+        expect_admin_check=True)
+    self.assertEqual(400, status)
+    self.assertEqual({'text': 'External groups are not writable'}, body)
 
 
 class CertificatesHandlerTest(RestAPITestCase):
