@@ -420,11 +420,15 @@ class TasksHandler(auth.AuthenticatingHandler):
   # Each entry is (key, text, hover)
   SORT_CHOICES = [
     ('created_ts', 'Created', 'Most recently created tasks are shown first.'),
-    ('modified_ts', 'Active', 'Shows the most recently active tasks first.'),
+    ('modified_ts', 'Active',
+      'Shows the most recently active tasks first. Using this order resets '
+      'state to \'All\'.'),
     ('completed_ts', 'Completed',
-      'Shows the most recently completed tasks first.'),
+      'Shows the most recently completed tasks first. Using this order resets '
+      'state to \'All\'.'),
     ('abandoned_ts', 'Abandoned',
-      'Shows the most recently abandoned tasks first.'),
+      'Shows the most recently abandoned tasks first. Using this order resets '
+      'state to \'All\'.'),
   ]
 
   # Each list is one column in the Task state filtering column.
@@ -436,20 +440,26 @@ class TasksHandler(auth.AuthenticatingHandler):
     [
       ('all', 'All', 'All tasks ever requested independent of their state.'),
       ('pending', 'Pending',
-        'Tasks that are still ready to be assigned to a bot.'),
-      ('running', 'Running', 'Tasks being currently executed by a bot.'),
+        'Tasks that are still ready to be assigned to a bot. Using this order '
+        'resets order to \'Created\'.'),
+      ('running', 'Running',
+        'Tasks being currently executed by a bot. Using this order resets '
+        'order to \'Created\'.'),
       ('pending_running', 'Pending|running',
-        'Tasks either \'pending\' or \'running\'.'),
+        'Tasks either \'pending\' or \'running\'. Using this order resets '
+        'order to \'Created\'.'),
     ],
     [
       ('completed', 'Completed',
         'All tasks that are completed, independent if the task itself '
         'succeeded or failed. This excludes tasks that had an infrastructure '
-        'failure.'),
-      ('completed_success', 'Successes', 'Tasks that completed successfully.'),
+        'failure. Using this order resets order to \'Created\'.'),
+      ('completed_success', 'Successes',
+        'Tasks that completed successfully. Using this order resets order to '
+        '\'Created\'.'),
       ('completed_failure', 'Failures',
         'Tasks that were executed successfully but failed, e.g. exit code is '
-        'non-zero.'),
+        'non-zero. Using this order resets order to \'Created\'.'),
       # TODO(maruel): This is never set until the new bot API is writen.
       # https://code.google.com/p/swarming/issues/detail?id=117
       #('timed_out', 'Execution timed out'),
@@ -459,15 +469,17 @@ class TasksHandler(auth.AuthenticatingHandler):
         'The bot stopped sending updates while running the task, causing the '
         'task execution to time out. This is considered an infrastructure '
         'failure and the usual reason is that the bot BSOD\'ed or '
-        'spontaneously rebooted.'),
+        'spontaneously rebooted. Using this order resets order to '
+        '\'Created\'.'),
       ('expired', 'Expired',
         'The task was not assigned a bot until its expiration timeout, causing '
         'the task to never being assigned to a bot. This can happen when the '
         'dimension filter was not available or overloaded with a low priority. '
-        'Either fix the priority or bring up more bots with these dimensions.'),
+        'Either fix the priority or bring up more bots with these dimensions. '
+        'Using this order resets order to \'Created\'.'),
       ('canceled', 'Canceled',
         'The task was explictly canceled by a user before it started '
-        'executing.'),
+        'executing. Using this order resets order to \'Created\'.'),
     ],
   ]
 

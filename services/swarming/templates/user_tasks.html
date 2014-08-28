@@ -56,13 +56,14 @@
   function update_sort() {
     // This resets the cursor and filters.
     var sort = radio_value("sort");
-    document.location.href = '/user/tasks?sort=' + sort;
+    var url = '/user/tasks?sort=' + sort + '&limit={{limit}}';
+    document.location.href = url;
   }
 
   function update_filter() {
     // This resets the cursor and sort.
     var state = radio_value("state");
-    var url = '/user/tasks?state=' + state;
+    var url = '/user/tasks?state=' + state + '&limit={{limit}}';
     document.location.href = url;
   }
 </script>
@@ -116,11 +117,14 @@
         </td>
         {% endfor %}
       <td>
-        Task name (whole word only):
-        <br>
-        <input type="text" name="task_name" value="{{task_name}}">
-        <br>
-        <input type="submit" value="Search">
+        <div title="Task name uses whole word search ONLY. Using it resets sort to 'Created' and the task state filter to 'All'.">
+          Task name (whole word only):
+          <br>
+          <input type="text" name="limit" value="{{limit}}" hidden>
+          <input type="text" name="task_name" value="{{task_name}}">
+          <br>
+          <input type="submit" value="Search">
+        </div>
       </td>
     </tr>
   <tbody>
@@ -166,7 +170,11 @@
 
 {% if cursor %}
 <p>
-<a href=/user/tasks?sort={{sort}}&cursor={{cursor}}">Next page</a>
+{% if task_name %}
+  <a href="/user/tasks?task_name={{task_name}}&limit={{limit}}&cursor={{cursor}}">Next page</a>
+{% else %}
+  <a href="/user/tasks?sort={{sort}}&state={{state}}&limit={{limit}}&cursor={{cursor}}">Next page</a>
+{% endif %}
 {% endif %}
 
 {% endblock %}
