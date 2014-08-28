@@ -226,7 +226,7 @@ def run_manifest(remote, attributes, manifest):
 
     if proc.returncode:
       # TODO(maruel): manifest/task number.
-      raise ValueError('Execution failed, internal error:\n%s', out)
+      raise ValueError('Execution failed, internal error:\n%s' % out)
 
     # At this point the script called by subprocess has handled any further
     # communication with the swarming server.
