@@ -377,11 +377,19 @@ class BotHandler(auth.AuthenticatingHandler):
         # is used since it's not representative.
         idle_time = now - run_results[0].ended_ts
       for index in xrange(1, len(run_results)):
-        idle_time += (
-            run_results[index-1].started_ts - run_results[index].ended_ts)
-        duration = run_results[index].duration
-        if duration:
-          run_time += duration
+        # .started_ts will always be set by definition but .ended_ts may be None
+        # if the task was abandoned. We can't count idle time since the bot may
+        # have been busy running *another task*.
+        # TODO(maruel): One option is to add a third value "broken_time".
+        # Looking at timestamps specifically could help too, e.g. comparing
+        # ended_ts of this task vs the next one to see if the bot was assigned
+        # two tasks simultaneously.
+        if run_results[index].ended_ts:
+          idle_time += (
+              run_results[index-1].started_ts - run_results[index].ended_ts)
+          duration = run_results[index].duration
+          if duration:
+            run_time += duration
 
     params = {
       'bot': bot,
