@@ -32,7 +32,7 @@ PATHS_TO_STRIP = (
 ### Private stuff.
 
 
-_RE_STACK_TRACE_FILE = (
+RE_STACK_TRACE_FILE = (
     r'^(?P<prefix>  File \")(?P<file>[^\"]+)(?P<suffix>\"\, line )'
     r'(?P<line_no>\d+)(?:|(?P<rest>\, in )(?P<function>.+))$')
 
@@ -52,7 +52,7 @@ def _reformat_stack(stack):
   """Post processes the stack trace through _relative_path()."""
   out = stack.splitlines(True)
   def replace(l):
-    m = re.match(_RE_STACK_TRACE_FILE, l, re.DOTALL)
+    m = re.match(RE_STACK_TRACE_FILE, l, re.DOTALL)
     if m:
       groups = list(m.groups())
       groups[1] = _relative_path(groups[1])

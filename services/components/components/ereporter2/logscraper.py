@@ -20,9 +20,6 @@ from . import formatter
 from . import models
 
 
-# Access to a protected member XXX of a client class - pylint: disable=W0212
-
-
 # Handle this error message specifically.
 SOFT_MEMORY = 'Exceeded soft private memory limit'
 
@@ -221,10 +218,10 @@ def _signature_from_message(message):
   stacktrace = []
   index = lines.index(_STACK_TRACE_MARKER) + 1
   while index < len(lines):
-    if not re.match(formatter._RE_STACK_TRACE_FILE, lines[index]):
+    if not re.match(formatter.RE_STACK_TRACE_FILE, lines[index]):
       break
     if (len(lines) > index + 1 and
-        re.match(formatter._RE_STACK_TRACE_FILE, lines[index+1])):
+        re.match(formatter.RE_STACK_TRACE_FILE, lines[index+1])):
       # It happens occasionally with jinja2 templates.
       stacktrace.append(lines[index])
       index += 1
@@ -255,7 +252,7 @@ def _signature_from_message(message):
   path = None
   line_no = -1
   for l in reversed(stacktrace):
-    m = re.match(formatter._RE_STACK_TRACE_FILE, l)
+    m = re.match(formatter.RE_STACK_TRACE_FILE, l)
     if m:
       if not path:
         path = os.path.basename(m.group('file'))
@@ -356,7 +353,10 @@ def _log_request_id(request_id):
   return request[0]
 
 
-def _scrape_logs_for_errors(start_time, end_time, module_versions):
+### Public API.
+
+
+def scrape_logs_for_errors(start_time, end_time, module_versions):
   """Returns a list of _ErrorCategory to generate a report.
 
   Arguments:

@@ -14,6 +14,7 @@ test_env.setup_test_env()
 
 from components import auth
 from components import template
+from components.ereporter2 import acl
 from components.ereporter2 import logscraper
 from components.ereporter2 import ui
 from support import test_case
@@ -59,8 +60,8 @@ class Ereporter2Test(test_case.TestCase):
   def setUp(self):
     super(Ereporter2Test, self).setUp()
     self.testbed.init_user_stub()
+    self.mock(acl, 'get_ereporter2_recipients', lambda: ['foo@localhost'])
     self.mock(ui, '_get_end_time_for_email', lambda: 1383000000)
-    self.mock(ui, '_get_recipients', lambda: ['foo@localhost'])
     self._now = datetime.datetime(2014, 6, 24, 20, 19, 42, 653775)
     self.mock_now(self._now, 0)
     ui.configure()
@@ -159,7 +160,7 @@ class Ereporter2Test(test_case.TestCase):
     ]
     self.mock(logscraper, '_extract_exceptions_from_logs', lambda *_: data)
     module_versions = [('foo', 'bar')]
-    report, ignored = logscraper._scrape_logs_for_errors(
+    report, ignored = logscraper.scrape_logs_for_errors(
         10, 20, module_versions)
     out = ui._records_to_params(
         report, len(ignored), 'http://localhost:1/request_id',
@@ -184,7 +185,8 @@ class Ereporter2RecipientsTest(test_case.TestCase):
       auth.Identity(auth.IDENTITY_SERVICE, 'blah-service'),
     ]
     self.mock(auth, 'list_group', lambda _: fake_group)
-    self.assertEqual(['a@example.com', 'b@example.com'], ui._get_recipients())
+    self.assertEqual(
+        ['a@example.com', 'b@example.com'], acl.get_ereporter2_recipients())
 
 
 if __name__ == '__main__':

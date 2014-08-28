@@ -20,6 +20,7 @@ from components import decorators
 from components import template
 from components import utils
 
+from . import acl
 from . import logscraper
 from . import models
 from . import on_error
@@ -35,7 +36,7 @@ from . import ui
 class RestrictedEreporter2Report(auth.AuthenticatingHandler):
   """Returns all the recent errors as a web page."""
 
-  @auth.require(ui._is_recipient_or_admin)
+  @auth.require(acl.is_ereporter2_viewer)
   def get(self):
     """Reports the errors logged and ignored.
 
@@ -57,7 +58,7 @@ class RestrictedEreporter2Report(auth.AuthenticatingHandler):
       modules = modules.split(',')
     tainted = bool(int(self.request.get('tainted', '1')))
     module_versions = utils.get_module_version_list(modules, tainted)
-    errors, ignored = logscraper._scrape_logs_for_errors(
+    errors, ignored = logscraper.scrape_logs_for_errors(
         start, end, module_versions)
 
     params = {
@@ -78,7 +79,7 @@ class RestrictedEreporter2Report(auth.AuthenticatingHandler):
 class RestrictedEreporter2Request(auth.AuthenticatingHandler):
   """Dumps information about single logged request."""
 
-  @auth.require(ui._is_recipient_or_admin)
+  @auth.require(acl.is_ereporter2_viewer)
   def get(self, request_id):
     data = logscraper._log_request_id(request_id)
     if not data:
@@ -90,7 +91,7 @@ class RestrictedEreporter2Request(auth.AuthenticatingHandler):
 class RestrictedEreporter2ErrorsList(auth.AuthenticatingHandler):
   """Dumps information about reported client side errors."""
 
-  @auth.require(auth.is_admin)
+  @auth.require(acl.is_ereporter2_viewer)
   def get(self):
     limit = int(self.request.get('limit', 100))
     cursor = datastore_query.Cursor(urlsafe=self.request.get('cursor'))
@@ -108,7 +109,7 @@ class RestrictedEreporter2ErrorsList(auth.AuthenticatingHandler):
 class RestrictedEreporter2Error(auth.AuthenticatingHandler):
   """Dumps information about reported client side errors."""
 
-  @auth.require(auth.is_admin)
+  @auth.require(acl.is_ereporter2_viewer)
   def get(self, error_id):
     error = models.Error.get_by_id(int(error_id))
     if not error:
@@ -121,7 +122,7 @@ class RestrictedEreporter2Error(auth.AuthenticatingHandler):
 
 
 class RestrictedEreporter2Silence(auth.AuthenticatingHandler):
-  @auth.require(auth.is_admin)
+  @auth.require(acl.is_ereporter2_viewer)
   def get(self):
     items = models.ErrorReportingMonitoring.query().fetch()
     params = {
@@ -130,7 +131,7 @@ class RestrictedEreporter2Silence(auth.AuthenticatingHandler):
     }
     self.response.out.write(template.render('ereporter2/silence.html', params))
 
-  @auth.require(auth.is_admin)
+  @auth.require(acl.is_ereporter2_editor)
   def post(self):
     error = self.request.get('error')
     if not error:
@@ -170,7 +171,7 @@ class CronEreporter2Mail(webapp2.RequestHandler):
     host_url = 'https://%s.appspot.com' % app_identity.get_application_id()
     request_id_url = host_url + '/restricted/ereporter2/request/'
     report_url = host_url + '/restricted/ereporter2/report'
-    recipients = self.request.get('recipients', ui._get_recipients())
+    recipients = self.request.get('recipients', acl.get_ereporter2_recipients())
     result = ui._generate_and_email_report(
         utils.get_module_version_list(None, False),
         recipients,

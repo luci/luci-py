@@ -22,6 +22,7 @@ import webtest
 
 from components import auth
 from components import template
+from components.ereporter2 import acl
 from components.ereporter2 import handlers
 from components.ereporter2 import logscraper
 from components.ereporter2 import models
@@ -259,7 +260,7 @@ class Ereporter2BackendTest(Base):
   def test_cron_ereporter2_mail(self):
     data = [ErrorRecord()]
     self.mock(logscraper, '_extract_exceptions_from_logs', lambda *_: data)
-    self.mock(ui, '_get_recipients', lambda: ['joe@localhost'])
+    self.mock(acl, 'get_ereporter2_recipients', lambda: ['joe@localhost'])
     headers = {'X-AppEngine-Cron': 'true'}
     response = self.app.get(
         '/internal/cron/ereporter2/mail', headers=headers)

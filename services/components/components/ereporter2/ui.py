@@ -15,7 +15,6 @@ from google.appengine.api import app_identity
 from google.appengine.api import mail
 from google.appengine.api import mail_errors
 
-from components import auth
 from components import template
 from components import utils
 
@@ -24,14 +23,7 @@ from . import models
 from . import on_error
 
 
-# Access to a protected member XXX of a client class - pylint: disable=W0212
-
-
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
-
-
-# Name of a group that lists users that receive ereporter2 reports.
-RECIPIENTS_AUTH_GROUP = 'ereporter2-reports'
 
 
 ### Private stuff.
@@ -131,7 +123,7 @@ def _generate_and_email_report(
       start_time, end_time, module_versions, recipients)
   result = False
   try:
-    categories, ignored = logscraper._scrape_logs_for_errors(
+    categories, ignored = logscraper.scrape_logs_for_errors(
         start_time, end_time, module_versions)
     if categories:
       params = _get_template_env(start_time, end_time, module_versions)
@@ -163,19 +155,6 @@ def _generate_and_email_report(
       len(categories),
       recipients)
   return result
-
-
-def _get_recipients():
-  """Returns list of emails to send reports to."""
-  return [x.name for x in auth.list_group(RECIPIENTS_AUTH_GROUP) if x.is_user]
-
-
-def _is_recipient_or_admin():
-  """True if current user is in recipients list or is an admin."""
-  if auth.is_admin():
-    return True
-  ident = auth.get_current_identity()
-  return ident.is_user and ident.name in _get_recipients()
 
 
 ### Public API.

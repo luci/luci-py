@@ -70,7 +70,7 @@ class Ereporter2FormatterTest(test_case.TestCase):
       ),
     ]
     for line, expected in data:
-      match = re.match(formatter._RE_STACK_TRACE_FILE, line)
+      match = re.match(formatter.RE_STACK_TRACE_FILE, line)
       self.assertEqual(expected, match.groups())
 
   def test_relative_path(self):
