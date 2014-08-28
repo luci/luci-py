@@ -58,6 +58,7 @@ def ErrorRecord(**kwargs):
 class Ereporter2Test(test_case.TestCase):
   def setUp(self):
     super(Ereporter2Test, self).setUp()
+    self.testbed.init_user_stub()
     self.mock(ui, '_get_end_time_for_email', lambda: 1383000000)
     self.mock(ui, '_get_recipients', lambda: ['foo@localhost'])
     self._now = datetime.datetime(2014, 6, 24, 20, 19, 42, 653775)

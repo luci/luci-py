@@ -7,11 +7,33 @@ found in the LICENSE file. -->
   <meta http-equiv="Content-type" content="text/html;charset=UTF-8">
   <title>{{title}}</title>
 
+  <style>
+    .top_right_links {
+      display: inline-block;
+      float: right;
+    }
+  </style>
   {% block header %}
     {# Page specific headers goes there. #}
   {% endblock %}
 </head>
 <body>
+  <div class="top_right_links">
+    {% if nickname is defined %}
+      {% if nickname %}
+        {{ nickname }}
+      {% else %}
+        <a href="{{signin_link|safe }}">Sign in</a>
+      {% endif %}
+      <br>
+    {% endif %}
+    {% if now is defined %}
+      {{now|datetimeformat}}<br>
+    {% endif %}
+    {% block floating %}
+    {% endblock %}
+  </div>
+
   {% block body %}
   {% endblock %}
   <hr>

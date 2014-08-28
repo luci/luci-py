@@ -9,6 +9,8 @@ import urllib
 
 import jinja2
 
+from google.appengine.api import users
+
 from components import natsort
 from components import utils
 
@@ -124,8 +126,12 @@ def bootstrap(paths, global_env=None, filters=None):
     assert all(k not in _GLOBAL_FILTERS for k in filters), filters
 
   _TEMPLATE_PATHS.update(paths)
+
   if global_env:
     _GLOBAL_ENV.update(global_env)
+  _GLOBAL_ENV.setdefault('app_version', utils.get_app_version())
+  _GLOBAL_ENV.setdefault('app_revision_url', utils.get_app_revision_url())
+
   if filters:
     _GLOBAL_FILTERS.update(filters)
   utils.clear_cache(get_jinja_env)
@@ -161,6 +167,23 @@ def get_jinja_env():
   return env
 
 
-def render(name, params):
-  """Shorthand to render a template."""
-  return get_jinja_env().get_template(name).render(params)
+def _get_defaults():
+  """Returns parameters used by most templates/base.html."""
+  account = users.get_current_user()
+  return {
+    'nickname': account.email() if account else None,
+    'signin_link': users.create_login_url('/') if not account else None,
+  }
+
+
+def render(name, params=None):
+  """Shorthand to render a template.
+
+  It includes default useful parameters used in most templates/base.html.
+
+  TODO(maruel): Uniformize this.
+  """
+  data = _get_defaults()
+  data.update(params or {})
+  data.setdefault('now', utils.utcnow())
+  return get_jinja_env().get_template(name).render(data)

@@ -14,10 +14,16 @@ found in the LICENSE file. -->
 </head>
 <body>
   <div class="top_right_links">
-    {% if nickname %}
-      {{ nickname }}
-    {% else %}
-      <a href="{{signin_link|safe }}">Sign in</a>
+    {% if nickname is defined %}
+      {% if nickname %}
+        {{ nickname }}
+      {% else %}
+        <a href="{{signin_link|safe }}">Sign in</a>
+      {% endif %}
+      <br>
+    {% endif %}
+    {% if now is defined %}
+      {{now|datetimeformat}}<br>
     {% endif %}
     {% block floating %}
     {% endblock %}

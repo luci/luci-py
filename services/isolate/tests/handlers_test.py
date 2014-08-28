@@ -59,6 +59,7 @@ class MainTest(test_case.TestCase):
   def setUp(self):
     """Creates a new app instance for every test case."""
     super(MainTest, self).setUp()
+    self.testbed.init_user_stub()
 
     # When called during a taskqueue, the call to get_app_version() may fail so
     # pre-fetch it.

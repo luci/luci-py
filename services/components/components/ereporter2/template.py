@@ -10,7 +10,7 @@ ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 def bootstrap():
-  template.bootstrap({'swarming': os.path.join(ROOT_DIR, 'templates')})
+  template.bootstrap({'ereporter2': os.path.join(ROOT_DIR, 'templates')})
 
 
 def render(name, params=None):

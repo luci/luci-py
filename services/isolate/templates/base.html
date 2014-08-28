@@ -8,13 +8,32 @@ found in the LICENSE file. -->
   <title>{{ title or "Isolate Server" }}</title>
   <link rel="stylesheet" type="text/css" href="/default.css"/>
 
+  <style>
+    .top_right_links {
+      display: inline-block;
+      float: right;
+    }
+  </style>
   {% block headers %}
     {# Page specific headers goes there. #}
   {% endblock %}
 </head>
-<body
-  {% if onload is defined %}onload="{{onload}}"{% endif %}
->
+<body {% if onload is defined %}onload="{{onload}}"{% endif %}>
+  <div class="top_right_links">
+    {% if nickname is defined %}
+      {% if nickname %}
+        {{ nickname }}
+      {% else %}
+        <a href="{{signin_link|safe }}">Sign in</a>
+      {% endif %}
+      <br>
+    {% endif %}
+    {% if now is defined %}
+      {{now|datetimeformat}}<br>
+    {% endif %}
+    {% block floating %}
+    {% endblock %}
+  </div>
   {% block body %}
   {% endblock %}
   <hr>

@@ -21,7 +21,6 @@ from google.appengine import runtime
 from google.appengine.api import datastore_errors
 from google.appengine.api import memcache
 from google.appengine.api import taskqueue
-from google.appengine.api import users
 from google.appengine.ext import ndb
 
 import acl
@@ -790,14 +789,10 @@ class RootHandler(auth.AuthenticatingHandler):
 
   @auth.public
   def get(self):
-    account = users.get_current_user()
-
     params = {
       'is_admin': acl.isolate_admin(),
       'is_user': acl.isolate_readable(),
       'map_reduce_jobs': [],
-      'nickname': account.email() if account else None,
-      'signin_link': users.create_login_url('/') if not account else None,
       'user_type': acl.get_user_type(),
     }
     if acl.isolate_admin():

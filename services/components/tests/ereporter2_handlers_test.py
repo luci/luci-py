@@ -92,6 +92,7 @@ def ErrorRecord(**kwargs):
 class Base(test_case.TestCase):
   def setUp(self):
     super(Base, self).setUp()
+    self.testbed.init_user_stub()
     self._now = datetime.datetime(2014, 6, 24, 20, 19, 42, 653775)
     self.mock_now(self._now, 0)
     ui.configure()

@@ -4,21 +4,15 @@
 
 import os
 
-from components import utils
 from components import template
 
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 def bootstrap():
-  global_env = {
-    'app_version': utils.get_app_version(),
-    'app_revision_url': utils.get_app_revision_url(),
-  }
-  template.bootstrap(
-      {'isolate': os.path.join(ROOT_DIR, 'templates')}, global_env)
+  template.bootstrap({'isolate': os.path.join(ROOT_DIR, 'templates')})
 
 
 def render(name, params=None):
   """Shorthand to render a template."""
-  return template.render(name, params or {})
+  return template.render(name, params)
