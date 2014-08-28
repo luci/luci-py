@@ -1,0 +1,29 @@
+{% extends 'auth/base.html' %}
+{% block content %}
+
+<div class="row">
+  <div class="col-md-12">
+    <div class="panel panel-default">
+      <div class="panel-heading">
+        <h3 class="panel-title">Group import configuration</h3>
+      </div>
+      <div class="panel-body">
+        <div id="import-config-alerts"></div>
+        <form class="form" role="form" id="import-config">
+          <div class="form-group">
+            <textarea class="form-control"
+                      style="font-family:monospace;"
+                      rows="10"
+                      name="config"
+                      wrap="off"></textarea>
+          </div>
+          <div class="form-group">
+            <button type="submit" class="btn btn-primary">Save</button>
+          </div>
+         </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock content %}

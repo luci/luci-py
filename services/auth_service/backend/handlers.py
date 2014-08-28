@@ -9,7 +9,15 @@ import webapp2
 from components import decorators
 from components import ereporter2
 
+from common import importer
 from common import replication
+
+
+class InternalImportGroupsCronHandler(webapp2.RequestHandler):
+  @decorators.require_cronjob
+  def get(self):
+    success = importer.import_external_groups()
+    self.response.set_status(200 if success else 500)
 
 
 class InternalReplicationTaskHandler(webapp2.RequestHandler):
@@ -21,6 +29,9 @@ class InternalReplicationTaskHandler(webapp2.RequestHandler):
 
 def get_routes():
   routes = [
+    webapp2.Route(
+        r'/internal/cron/import_groups',
+        InternalImportGroupsCronHandler),
     webapp2.Route(
         r'/internal/taskqueue/replication/<auth_db_rev:\d+>',
         InternalReplicationTaskHandler),

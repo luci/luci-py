@@ -1,4 +1,8 @@
 cron:
+- description: group import from external sources
+  target: backend
+  url: /internal/cron/import_groups
+  schedule: every 15 minutes
 
 ### ereporter2
 

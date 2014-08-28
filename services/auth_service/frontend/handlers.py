@@ -20,6 +20,7 @@ from components.auth.proto import replication_pb2
 from components.auth.ui import rest_api
 from components.auth.ui import ui
 
+from common import importer
 from common import replication
 
 
@@ -37,6 +38,16 @@ class WarmupHandler(webapp2.RequestHandler):
     auth.warmup()
     self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
     self.response.write('ok')
+
+
+class ConfigHandler(ui.UINavbarTabHandler):
+  """Page with simple UI for service-global configuration."""
+  navbar_tab_url = '/auth/config'
+  navbar_tab_id = 'config'
+  navbar_tab_title = 'Config'
+  # config.js here won't work because there's global JS var 'config' already.
+  js_file_url = '/auth_service/static/js/config_page.js'
+  template_file = 'auth_service/config.html'
 
 
 class ServicesHandler(ui.UINavbarTabHandler):
@@ -57,6 +68,22 @@ class LinkTicketToken(auth.TokenKind):
   expiration_sec = 24 * 3600
   secret_key = auth.SecretKey('link_ticket_token', scope='local')
   version = 1
+
+
+class ImporterConfigHandler(auth.ApiHandler):
+  """Reads and sets configuration of the group importer."""
+
+  @auth.require(auth.is_admin)
+  def get(self):
+    self.send_response({'config': importer.read_config()})
+
+  @auth.require(auth.is_admin)
+  def post(self):
+    config = self.parse_body().get('config')
+    if not importer.is_valid_config(config):
+      self.abort_with_error(400, text='Invalid config format.')
+    importer.write_config(config)
+    self.send_response({'ok': True})
 
 
 class ServiceListingHandler(auth.ApiHandler):
@@ -186,6 +213,9 @@ def get_routes():
 
     # API routes.
     webapp2.Route(
+        r'/auth_service/api/v1/importer/config',
+        ImporterConfigHandler),
+    webapp2.Route(
         r'/auth_service/api/v1/internal/link_replica',
         LinkRequestHandler),
     webapp2.Route(
@@ -210,6 +240,7 @@ def create_application(debug=False):
         ui.GroupsHandler,
         ui.OAuthConfigHandler,
         # Additional tabs available only on auth service.
+        ConfigHandler,
         ServicesHandler,
       ])
   template.bootstrap({'auth_service': TEMPLATES_DIR})

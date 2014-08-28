@@ -497,6 +497,17 @@ def get_current_identity():
   get_current_identity()), so it's safe to let this exception to propagate to
   top level and cause HTTP 500.
   """
+  return _get_current_identity()
+
+
+def _get_current_identity():
+  """Actual implementation of get_current_identity().
+
+  Exists to be mocked, since original get_current_identity symbol is copied by
+  value to 'auth' package scope, and mocking the identity would require mocking
+  both 'auth.get_current_identity' and 'auth.api.get_current_identity'. It's
+  simpler to move implementation to a private mockable function.
+  """
   # |current_identity| may be None only if 'RequestCache.set_current_identity'
   # was never called. It happens if request handler isn't inherited from
   # AuthenticatingHandler.
