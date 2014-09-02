@@ -90,14 +90,14 @@ GroupChooser.prototype.setGroupList = function(groups) {
 
   // Groups without '-' or '/' come first, then groups with '-'.
   var sortKeyFunc = function(group) {
-    var name = group.name;
-    if (name.indexOf('-') == -1 && name.indexOf('/') == -1) {
-      return 'A-' + name;
-    } else if (name.indexOf('-') == -1) {
-      return 'B-' + name;
-    } else {
+    var name = group.name
+    if (name.indexOf('/') != -1) {
       return 'C-' + name;
     }
+    if (name.indexOf('-') != -1) {
+      return 'B-' + name;
+    }
+    return 'A-' + name;
   };
 
   // Remember new sorted list.

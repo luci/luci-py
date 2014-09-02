@@ -452,7 +452,7 @@ class AuthGroup(ndb.Model, datastore_utils.SerializableModelMixin):
   nested = ndb.StringProperty(repeated=True)
 
   # Human readable description.
-  description = ndb.StringProperty(indexed=False)
+  description = ndb.StringProperty(indexed=False, default='')
 
   # When the group was created.
   created_ts = ndb.DateTimeProperty(auto_now_add=True)
