@@ -161,7 +161,7 @@ class UIHandler(handler.AuthenticatingHandler):
 
     # Render it.
     self.response.set_status(status)
-    self.response.headers['Content-Type'] = 'text/html; charset=UTF-8'
+    self.response.headers['Content-Type'] = 'text/html; charset=utf-8'
     self.response.write(template.render(path, full_env))
 
   def authentication_error(self, error):

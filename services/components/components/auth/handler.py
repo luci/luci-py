@@ -198,7 +198,9 @@ class AuthenticatingHandler(webapp2.RequestHandler):
 
 class ApiHandler(AuthenticatingHandler):
   """Parses JSON request body to a dict, serializes response to JSON."""
-  CONTENT_TYPE = 'application/json; charset=utf-8'
+  CONTENT_TYPE_BASE = 'application/json'
+  CONTENT_TYPE_FULL = 'application/json; charset=utf-8'
+  _json_body = None
 
   def authentication_error(self, error):
     self.abort_with_error(401, text=str(error))
@@ -210,47 +212,35 @@ class ApiHandler(AuthenticatingHandler):
     """Sends successful reply and continues execution."""
     self.response.set_status(http_code)
     self.response.headers.update(headers or {})
-    self.response.headers['Content-Type'] = self.CONTENT_TYPE
+    self.response.headers['Content-Type'] = self.CONTENT_TYPE_FULL
     self.response.write(json.dumps(response))
 
   def abort_with_error(self, http_code, **kwargs):
     """Sends error reply and stops execution."""
     self.abort(
-        http_code, json=kwargs, headers={'Content-Type': self.CONTENT_TYPE})
+        http_code,
+        json=kwargs,
+        headers={'Content-Type': self.CONTENT_TYPE_FULL})
 
   def parse_body(self):
-    """Parse JSON body and verifies it's a dict."""
-    content_type = self.request.headers.get('Content-Type')
-    encoding = 'utf-8'
-    if content_type:
-      content_type, encoding = _split_charset(content_type)
-    if content_type != 'application/json':
-      msg = 'Expecting JSON body with content type \'%s\'' % self.CONTENT_TYPE
-      self.abort_with_error(400, text=msg)
-    try:
-      body = json.loads(self.request.body, encoding=encoding)
-      if not isinstance(body, dict):
-        raise ValueError()
-    except ValueError:
-      self.abort_with_error(400, text='Not a valid json dict body')
-    return body
+    """Parses JSON body and verifies it's a dict.
 
-
-def _split_charset(content_type):
-  """Splits a content_type charset parameter."""
-  encoding = 'ascii'
-  if ';' in content_type:
-    content_type, encoding = content_type.split(';', 1)
-    encoding = encoding.lower().strip()
-    charset_prefix = 'charset='
-    if not encoding.startswith(charset_prefix):
-      return None, None
-    encoding = encoding[len(charset_prefix):]
-
-    # Whitelist the valid encodings to prevent attacks.
-    if encoding not in ('ascii', 'utf-8'):
-      return None, None
-  return content_type, encoding
+    webob.Request doesn't cache the decoded json body, this function does.
+    """
+    if self._json_body is None:
+      if (self.CONTENT_TYPE_BASE and
+          self.request.content_type != self.CONTENT_TYPE_BASE):
+        msg = (
+            'Expecting JSON body with content type \'%s\'' %
+            self.CONTENT_TYPE_BASE)
+        self.abort_with_error(400, text=msg)
+      try:
+        self._json_body = self.request.json
+        if not isinstance(self._json_body, dict):
+          raise ValueError()
+      except (LookupError, ValueError):
+        self.abort_with_error(400, text='Not a valid json dict body')
+    return self._json_body.copy()
 
 
 def configure(auth_methods):

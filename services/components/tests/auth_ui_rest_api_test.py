@@ -7,6 +7,7 @@
 # pylint: disable=R0201
 
 import json
+import logging
 import sys
 import unittest
 
@@ -27,24 +28,24 @@ from components.auth.ui import rest_api
 from components.auth.ui import ui
 
 
-def call_get(request_handler, expect_errors=False, uri=None):
+def call_get(request_handler, uri=None, **kwargs):
   """Calls request_handler's 'get' in a context of webtest app."""
   uri = uri or '/dummy_path'
   assert uri.startswith('/')
   path = uri.rsplit('?', 1)[0]
-  app = webtest.TestApp(webapp2.WSGIApplication([(path, request_handler)]))
-  return app.get(uri, expect_errors=expect_errors)
+  app = webtest.TestApp(
+      webapp2.WSGIApplication([(path, request_handler)], debug=True))
+  return app.get(uri, **kwargs)
 
 
-def call_post(
-    request_handler, body, content_type, expect_errors=False, uri=None):
+def call_post(request_handler, body, uri=None, **kwargs):
   """Calls request_handler's 'post' in a context of webtest app."""
   uri = uri or '/dummy_path'
   assert uri.startswith('/')
   path = uri.rsplit('?', 1)[0]
-  app = webtest.TestApp(webapp2.WSGIApplication([(path, request_handler)]))
-  return app.post(
-      uri, body, content_type=content_type, expect_errors=expect_errors)
+  app = webtest.TestApp(
+      webapp2.WSGIApplication([(path, request_handler)], debug=True))
+  return app.post(uri, body, **kwargs)
 
 
 def make_xsrf_token(identity=model.Anonymous, xsrf_token_data=None):
@@ -99,8 +100,7 @@ class ApiHandlerClassTest(test_case.TestCase):
       def get(self):
         test.fail('Should not be called')
 
-    response = call_get(Handler, expect_errors=True)
-    self.assertEqual(401, response.status_int)
+    response = call_get(Handler, status=401)
     self.assertEqual(
         'application/json; charset=utf-8', response.headers.get('Content-Type'))
     self.assertEqual({'text': 'Boom!'}, json.loads(response.body))
@@ -112,8 +112,7 @@ class ApiHandlerClassTest(test_case.TestCase):
       def get(self):
         raise api.AuthorizationError('Boom!')
 
-    response = call_get(Handler, expect_errors=True)
-    self.assertEqual(403, response.status_int)
+    response = call_get(Handler, status=403)
     self.assertEqual(
         'application/json; charset=utf-8', response.headers.get('Content-Type'))
     self.assertEqual({'text': 'Boom!'}, json.loads(response.body))
@@ -124,8 +123,7 @@ class ApiHandlerClassTest(test_case.TestCase):
       def get(self):
         self.send_response({'some': 'response'})
 
-    response = call_get(Handler)
-    self.assertEqual(200, response.status_int)
+    response = call_get(Handler, status=200)
     self.assertEqual(
         'application/json; charset=utf-8', response.headers.get('Content-Type'))
     self.assertEqual({'some': 'response'}, json.loads(response.body))
@@ -137,8 +135,7 @@ class ApiHandlerClassTest(test_case.TestCase):
       def get(self):
         self.send_response({'some': 'response'}, http_code=302)
 
-    response = call_get(Handler)
-    self.assertEqual(302, response.status_int)
+    response = call_get(Handler, status=302)
     self.assertEqual(
         'application/json; charset=utf-8', response.headers.get('Content-Type'))
     self.assertEqual({'some': 'response'}, json.loads(response.body))
@@ -150,8 +147,7 @@ class ApiHandlerClassTest(test_case.TestCase):
       def get(self):
         self.send_response({'some': 'response'}, headers={'Some-Header': '123'})
 
-    response = call_get(Handler)
-    self.assertEqual(200, response.status_int)
+    response = call_get(Handler, status=200)
     self.assertEqual(
         'application/json; charset=utf-8', response.headers.get('Content-Type'))
     self.assertEqual(
@@ -168,8 +164,7 @@ class ApiHandlerClassTest(test_case.TestCase):
         self.abort_with_error(http_code=404, text='abc', stuff=123)
         test.fail('Should not be called')
 
-    response = call_get(Handler, expect_errors=True)
-    self.assertEqual(404, response.status_int)
+    response = call_get(Handler, status=404)
     self.assertEqual(
         'application/json; charset=utf-8', response.headers.get('Content-Type'))
     self.assertEqual({'text': 'abc', 'stuff': 123}, json.loads(response.body))
@@ -184,11 +179,11 @@ class ApiHandlerClassTest(test_case.TestCase):
       def post(self):
         test.assertEqual({'abc': 123}, self.parse_body())
 
-    response = call_post(
+    call_post(
         Handler,
         json.dumps({'abc': 123}),
-        'application/json; charset=utf-8')
-    self.assertEqual(200, response.status_int)
+        content_type='application/json; charset=utf-8',
+        status=200)
 
   def test_parse_body_bad_content_type(self):
     """'parse_body' checks Content-Type header."""
@@ -201,12 +196,11 @@ class ApiHandlerClassTest(test_case.TestCase):
         self.parse_body()
         test.fail('Request should have been aborted')
 
-    response = call_post(
+    call_post(
         Handler,
         json.dumps({'abc': 123}),
-        'application/xml; charset=utf-8',
-        expect_errors=True)
-    self.assertEqual(400, response.status_int)
+        content_type='application/xml; charset=utf-8',
+        status=400)
 
   def test_parse_body_bad_json(self):
     """'parse_body' returns HTTP 400 if body is not a valid json."""
@@ -219,12 +213,11 @@ class ApiHandlerClassTest(test_case.TestCase):
         self.parse_body()
         test.fail('Request should have been aborted')
 
-    response = call_post(
+    call_post(
         Handler,
         'not-json',
-        'application/json; charset=utf-8',
-        expect_errors=True)
-    self.assertEqual(400, response.status_int)
+        content_type='application/json; charset=utf-8',
+        status=400)
 
   def test_parse_body_not_dict(self):
     """'parse_body' returns HTTP 400 if body is not a json dict."""
@@ -237,12 +230,11 @@ class ApiHandlerClassTest(test_case.TestCase):
         self.parse_body()
         test.fail('Request should have been aborted')
 
-    response = call_post(
+    call_post(
         Handler,
         '[]',
-        'application/json; charset=utf-8',
-        expect_errors=True)
-    self.assertEqual(400, response.status_int)
+        content_type='application/json; charset=utf-8',
+        status=400)
 
   def test_parse_body_bad_encoding(self):
     test = self
@@ -254,12 +246,11 @@ class ApiHandlerClassTest(test_case.TestCase):
         self.parse_body()
         test.fail('Request should have been aborted')
 
-    response = call_post(
+    call_post(
         Handler,
         '[]',
-        'application/json; charset=xmlcharrefreplace',
-        expect_errors=True)
-    self.assertEqual(400, response.status_int)
+        content_type='application/json; charset=xmlcharrefreplace',
+        status=400)
 
 
 class RestAPITestCase(test_case.TestCase):
@@ -367,7 +358,7 @@ class RestAPITestCase(test_case.TestCase):
     self.assertEqual(
         response.headers['Content-Type'],
         'application/json; charset=utf-8',
-        msg=response.body)
+        response)
     return response.status_int, json.loads(response.body), response.headers
 
   def get(self, path, **kwargs):
@@ -1195,10 +1186,9 @@ class ForbidApiOnReplicaTest(test_case.TestCase):
         calls.append(1)
 
     mock_replication_state('http://locahost:1234')
-    response = call_get(Handler, expect_errors=True)
+    response = call_get(Handler, status=405)
 
     self.assertEqual(0, len(calls))
-    self.assertEqual(405, response.status_code)
     expected = {
       'primary_url': 'http://locahost:1234',
       'text': 'Use Primary service for API requests',
@@ -1227,10 +1217,9 @@ class ForbidUiOnReplicaTest(test_case.TestCase):
         calls.append(1)
 
     mock_replication_state('http://locahost:1234')
-    response = call_get(Handler, expect_errors=True)
+    response = call_get(Handler, status=405)
 
     self.assertEqual(0, len(calls))
-    self.assertEqual(405, response.status_code)
     self.assertEqual(
         '405 Method Not Allowed\n\n'
         'The method GET is not allowed for this resource. \n\n '
@@ -1259,10 +1248,9 @@ class RedirectUiOnReplicaTest(test_case.TestCase):
         calls.append(1)
 
     mock_replication_state('http://locahost:1234')
-    response = call_get(Handler, expect_errors=True, uri='/some/method?arg=1')
+    response = call_get(Handler, status=302, uri='/some/method?arg=1')
 
     self.assertEqual(0, len(calls))
-    self.assertEqual(302, response.status_code)
     self.assertEqual(
         'http://locahost:1234/some/method?arg=1', response.headers['Location'])
 
@@ -1270,4 +1258,6 @@ class RedirectUiOnReplicaTest(test_case.TestCase):
 if __name__ == '__main__':
   if '-v' in sys.argv:
     unittest.TestCase.maxDiff = None
+  logging.basicConfig(
+      level=logging.DEBUG if '-v' in sys.argv else logging.ERROR)
   unittest.main()
