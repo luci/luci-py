@@ -135,7 +135,7 @@ class Ereporter2FrontendTest(Base):
     self.app.get('/restricted/ereporter2/request/123', status=200)
 
   def test_on_error_handler(self):
-    self.mock(logging, 'error', lambda *_: None)
+    self.mock(logging, 'error', lambda *_a, **_k: None)
     data = {
       'foo': 'bar',
     }
@@ -168,7 +168,7 @@ class Ereporter2FrontendTest(Base):
     self.app.get('/ereporter2/api/v1/on_error', status=405)
 
   def test_on_error_handler_bad_type(self):
-    self.mock(logging, 'error', lambda *_: None)
+    self.mock(logging, 'error', lambda *_a, **_k: None)
     params = {
       # 'args' should be a list.
       'r': {'args': 'bar'},
@@ -249,7 +249,7 @@ class Ereporter2BackendTest(Base):
         extra_environ={'REMOTE_ADDR': '127.0.0.1'})
 
   def test_cron_ereporter2_mail_not_cron(self):
-    self.mock(logging, 'error', lambda *_: None)
+    self.mock(logging, 'error', lambda *_a, **_k: None)
     response = self.app.get(
         '/internal/cron/ereporter2/mail', expect_errors=True)
     self.assertEqual(response.status_int, 403)
@@ -285,7 +285,7 @@ class Ereporter2BackendTest(Base):
     self.assertEqual(expected_text, message.body.payload)
 
   def test_cron_old_errors(self):
-    self.mock(logging, 'error', lambda *_: None)
+    self.mock(logging, 'error', lambda *_a, **_k: None)
     kwargs = dict((k, k) for k in on_error.VALID_ERROR_KEYS)
     kwargs['category'] = 'exception'
     kwargs['duration'] = 2.3

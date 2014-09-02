@@ -14,6 +14,7 @@ import logging
 import platform
 import traceback
 
+from google.appengine.api import app_identity
 from google.appengine.api import datastore_errors
 from google.appengine.api.logservice import logsutil
 
@@ -62,7 +63,12 @@ def log(**kwargs):
     error = models.Error(identity=identity, **kwargs)
     error.put()
     key_id = error.key.integer_id()
-    logging.error('Got a %s error\n%s\n%s', error.source, key_id, error.message)
+    logging.error(
+        'Got a %s error\nhttps://%s/restricted/ereporter2/errors/%s\n%s',
+        error.source,
+        app_identity.get_default_version_hostname(),
+        key_id,
+        error.message)
     return key_id
   except (datastore_errors.BadValueError, TypeError) as e:
     stack = formatter._reformat_stack(traceback.format_exc())
@@ -88,4 +94,10 @@ def log_request(request, add_params=True, **kwargs):
   kwargs['source_ip'] = request.remote_addr
   if add_params:
     kwargs['params'] = request.params.mixed()
+    try:
+      as_json = request.json
+      if isinstance(as_json, dict):
+        kwargs['params'].update(as_json)
+    except (LookupError, TypeError, ValueError):
+      pass
   return log(**kwargs)
