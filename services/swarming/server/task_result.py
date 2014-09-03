@@ -217,8 +217,9 @@ class _TaskResultCommon(ndb.Model):
   # Number of chunks for each output for each command when the data is stored as
   # TaskOutput instead of Results. Set to 0 when no output has been collected
   # for a specific index. Ordered by command. This value refers to the number of
-  # TaskOutputChunk entities for each TaskOutput. Use _output_chunk_keys()
-  # generate the ndb.Key to get all the data at once.
+  # TaskOutputChunk entities for each TaskOutput. Use
+  # _get_all_output_chunk_keys() generate the ndb.Key to get all the data at
+  # once.
   stdout_chunks = ndb.IntegerProperty(repeated=True, indexed=False)
 
   # Aggregated exit codes. Ordered by command.
@@ -329,7 +330,8 @@ class _TaskResultCommon(ndb.Model):
       # Fetch everything in parallel.
       futures = [
         ndb.get_multi_async(
-            _output_chunk_keys(run_result_key, command_index, number_chunks))
+            _get_all_output_chunk_keys(
+                run_result_key, command_index, number_chunks))
         for command_index, number_chunks in enumerate(self.stdout_chunks)
       ]
 
@@ -361,7 +363,8 @@ class _TaskResultCommon(ndb.Model):
       if not number_chunks:
         return None
       entities = ndb.get_multi(
-            _output_chunk_keys(run_result_key, command_index, number_chunks))
+          _get_all_output_chunk_keys(
+              run_result_key, command_index, number_chunks))
       return ''.join(c.chunk for c in entities)
 
 
@@ -425,7 +428,8 @@ class TaskRunResult(_TaskResultCommon):
       # order.
       self.stdout_chunks.append(0)
     entities, self.stdout_chunks[command_index] = _output_append(
-        _output_key(self.key, command_index), self.stdout_chunks[command_index],
+        _run_result_key_to_output_key(self.key, command_index),
+        self.stdout_chunks[command_index],
         packet_number, content)
     assert self.stdout_chunks[command_index] <= TaskOutputChunk.MAX_CHUNKS
     return entities
@@ -528,14 +532,14 @@ class TaskResultSummary(_TaskResultCommon):
 ### Private stuff.
 
 
-def _output_key(run_result_key, command_index):
+def _run_result_key_to_output_key(run_result_key, command_index):
   """Returns a ndb.key to a TaskOutput. command_index is zero-indexed."""
   assert run_result_key.kind() == 'TaskRunResult', run_result_key
   assert command_index >= 0, command_index
   return ndb.Key(TaskOutput, command_index+1, parent=run_result_key)
 
 
-def _output_chunk_key(output_key, chunk_number):
+def _output_key_to_output_chunk_key(output_key, chunk_number):
   """Returns a ndb.key to a TaskOutputChunk.
 
   Both command_index and chunk_number are zero-indexed.
@@ -545,10 +549,11 @@ def _output_chunk_key(output_key, chunk_number):
   return ndb.Key(TaskOutputChunk, chunk_number+1, parent=output_key)
 
 
-def _output_chunk_keys(run_result_key, command_index, number_chunks):
+def _get_all_output_chunk_keys(run_result_key, command_index, number_chunks):
   """Returns the ndb.Key's to fetch all the TaskOutputChunk for a TaskOutput."""
   return [
-    _output_chunk_key(_output_key(run_result_key, command_index), i)
+    _output_key_to_output_chunk_key(
+        _run_result_key_to_output_key(run_result_key, command_index), i)
     for i in xrange(number_chunks)
   ]
 
@@ -588,25 +593,30 @@ def _output_append(output_key, number_chunks, packet_number, content):
 
   if bool(number_chunks) != bool(packet_number):
     raise ValueError(
-        'Unexpected packet_number (%d) vs number_chunks (%d)' %
-        (packet_number, number_chunks))
+        '%s\nUnexpected packet_number (%d) vs number_chunks (%d)' %
+        (output_key, packet_number, number_chunks))
 
   if not number_chunks:
     # This content is the first packet.
-    last_chunk = TaskOutputChunk(key=_output_chunk_key(output_key, 0))
+    last_chunk = TaskOutputChunk(
+        key=_output_key_to_output_chunk_key(output_key, 0))
     number_chunks = 1
   else:
-    last_chunk = _output_chunk_key(output_key, number_chunks - 1).get()
+    last_chunk = _output_key_to_output_chunk_key(
+        output_key, number_chunks - 1).get()
     if not last_chunk:
-      raise ValueError('Unexpected missing chunk %d' % (number_chunks-1))
+      raise ValueError(
+          '%s\nUnexpected missing chunk %d' %
+          (output_key, number_chunks-1))
 
-    # |packet_number| is not updated once TaskOutput is full.
+    # |packet_number| is not updated once TaskOutput is full, e.g. more than
+    # MAX_CONTENT has been saved.
     if (not last_chunk.is_output_full and
-        last_chunk.packet_number != packet_number - 1):
+        last_chunk.packet_number+1 != packet_number):
       # Ensures content is written in order.
       raise ValueError(
-          'Unexpected packet_number; %d != %d' %
-          (last_chunk.packet_number, packet_number - 1))
+          '%s\nUnexpected packet_number; expected %s; got: %d' %
+          (output_key, last_chunk.packet_number+1, packet_number))
 
   to_put = []
   while True:
@@ -619,7 +629,7 @@ def _output_append(output_key, number_chunks, packet_number, content):
 
     # More content and not yet full, need to create a new TaskOutputChunk.
     last_chunk = TaskOutputChunk(
-      key=_output_chunk_key(output_key, number_chunks),
+      key=_output_key_to_output_chunk_key(output_key, number_chunks),
       packet_number=packet_number)
     number_chunks += 1
 

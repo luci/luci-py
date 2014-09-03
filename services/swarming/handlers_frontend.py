@@ -1392,17 +1392,29 @@ class BotTaskUpdateHandler(auth.ApiHandler):
     if out is not None:
       out = out.encode('utf-8', 'replace')
 
-    with task_scheduler.bot_update_task_new(
-        run_result_key, bot_id, command_index, packet_number, out,
-        exit_code, duration) as entities:
-      ndb.put_multi(entities)
+    try:
+      with task_scheduler.bot_update_task_new(
+          run_result_key, bot_id, command_index, packet_number, out,
+          exit_code, duration) as entities:
+        # The reason for writing in a transaction is to get rid of partial DB
+        # writes, e.g. a few entities got written but not others. This is a
+        # problem with TaskOutputChunk where some stdout stream chunks would be
+        # written but not other, causing irrecoverable errors.
+        ndb.transaction(lambda: ndb.put_multi(entities), retries=1)
+    except ValueError as e:
+      ereporter2.log_request(
+          request=self.request,
+          source='server',
+          category='task_failure',
+          message='Failed to update task: %s' % e)
+      self.abort_with_error(400, error=str(e))
 
     # TODO(maruel): When a task is canceled, reply with 'DIE' so that the bot
     # reboots itself to abort the task abruptly. It is useful when a task hangs
     # and the timeout was set too long or the task was superseded by a newer
     # task with more recent executable (e.g. a new Try Server job on a newer
     # patchset on Rietveld).
-    self.send_response({})
+    self.send_response({'ok': True})
 
 
 class BotTaskErrorHandler(auth.ApiHandler):

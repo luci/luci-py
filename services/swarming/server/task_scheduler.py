@@ -328,12 +328,16 @@ def bot_update_task_new(
   now = utils.utcnow()
   UPDATE_RATE_DELTA = datetime.timedelta(seconds=30)
   to_put = []
+  futures = []
   if (bot and
       (bot.task != run_result_key or
        now - bot.last_seen_ts > UPDATE_RATE_DELTA)):
     bot.last_seen_ts = now
     bot.task = run_result_key
-    to_put.append(bot)
+    # Because Bot is not in the same root entity, save it independently.
+    # Otherwise it would result in requiring an xg=True transaction. It's not a
+    # big deal even if this entity is not strongly consistent with the others.
+    futures.append(bot.put_async())
 
   if len(run_result.exit_codes) not in (command_index, command_index+1):
     raise ValueError('Unexpected ordering')
@@ -360,6 +364,7 @@ def bot_update_task_new(
   yield to_put
 
   _update_stats(run_result, bot_id, request, task_completed)
+  ndb.Future.wait_all(futures)
 
 
 def bot_update_task_old(run_result_key, bot_id, exit_codes, stdout):

@@ -135,8 +135,11 @@ def post_update(swarming_server, params, exit_code, stdout, packet_number):
     packet_number += 1
   # TODO(maruel): Support early cancellation.
   # https://code.google.com/p/swarming/issues/detail?id=62
-  _resp = swarming_server.url_read_json(
+  resp = swarming_server.url_read_json(
       '/swarming/api/v1/bot/task_update', data=params)
+  if resp.get('error'):
+    # Abandon it. This will force a process exit.
+    raise ValueError(resp.get('error'))
   return packet_number
 
 
@@ -232,12 +235,17 @@ def run_command(swarming_server, index, task_details, root_dir):
     if exit_code is None:
       had_hard_timeout = True
       proc.kill()
+      # TODO(maruel): We'd wait only for X seconds.
+      exit_code = proc.wait()
 
-  # This is the very last packet for this command.
-  params['duration'] = time.time() - start
-  params['io_timeout'] = had_io_timeout
-  params['hard_timeout'] = had_hard_timeout
-  return post_update(swarming_server, params, exit_code, stdout, packet_number)
+    # This is the very last packet for this command.
+    params['duration'] = time.time() - start
+    params['io_timeout'] = had_io_timeout
+    params['hard_timeout'] = had_hard_timeout
+    # At worst, it'll re-throw.
+    result = post_update(
+        swarming_server, params, exit_code, stdout, packet_number)
+  return result
 
 
 def main(args):

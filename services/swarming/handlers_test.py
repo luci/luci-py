@@ -974,7 +974,7 @@ class NewBotApiTest(AppTestBase):
     def _cycle(params, expected):
       response = self.post_with_token(
           '/swarming/api/v1/bot/task_update', params, token)
-      self.assertEqual({}, response)
+      self.assertEqual({u'ok': True}, response)
       response = self.client_get_results(task_id)
       self.assertEqual(expected, response)
 
@@ -984,7 +984,7 @@ class NewBotApiTest(AppTestBase):
     params = _params()
     response = self.post_with_token(
         '/swarming/api/v1/bot/task_update', params, token)
-    self.assertEqual({}, response)
+    self.assertEqual({u'ok': True}, response)
     response = self.client_get_results(task_id)
     self.assertEqual(_expected(), response)
 
