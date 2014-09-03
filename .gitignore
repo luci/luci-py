@@ -1,7 +1,3 @@
 *.pyc
 /services/swarming/swarming_bot.zip
-/services-go/isolateserver/isolateserver
-/services-go/isolateserver/key.pem
-/services-go/isolateserver/privatekey.p12
-/services-go/isolateserver/settings.json
 .coverage

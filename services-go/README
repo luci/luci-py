@@ -1,8 +1,0 @@
-This directory contains the services needed to run a golang Isolate Server.
-
-- isolateserver/ contains the code for the Isolate Server.
-- pkg/ contains the generic packages.
-- third_party/ contains the generic packages that comes from another project.
-- tools/ contains utilities to help run, test and deploy the server.
-
-This code is only tested on Ubuntu.
