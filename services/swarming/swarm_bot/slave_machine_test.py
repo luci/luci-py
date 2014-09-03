@@ -66,7 +66,7 @@ class TestSlaveMachine(net_utils.TestCase):
             {'xsrf_token': 'token'},
           ),
           (
-            'https://localhost:1/swarming/api/v1/bot/task_error',
+            'https://localhost:1/swarming/api/v1/bot/task_error/23',
             {
               'data': {
                 'id': 'localhost',

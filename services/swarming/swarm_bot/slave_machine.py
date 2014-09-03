@@ -108,7 +108,8 @@ def post_error_task(remote, attributes, error, task_id):
     'message': error,
     'task_id': task_id,
   }
-  return remote.url_read_json('/swarming/api/v1/bot/task_error', data=data)
+  return remote.url_read_json(
+      '/swarming/api/v1/bot/task_error/%s' % task_id, data=data)
 
 
 def run_bot(remote, error):

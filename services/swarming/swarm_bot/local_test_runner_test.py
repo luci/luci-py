@@ -151,7 +151,7 @@ class TestLocalTestRunner(net_utils.TestCase):
         {'xsrf_token': 'token'},
       ),
       (
-        'https://localhost:1/swarming/api/v1/bot/task_update',
+        'https://localhost:1/swarming/api/v1/bot/task_update/23',
         {
           'data': {'command_index': 0, 'id': 'localhost', 'task_id': 23},
           'headers': {'X-XSRF-Token': 'token'},
@@ -159,7 +159,7 @@ class TestLocalTestRunner(net_utils.TestCase):
         {},
       ),
       (
-        'https://localhost:1/swarming/api/v1/bot/task_update',
+        'https://localhost:1/swarming/api/v1/bot/task_update/23',
         check_final,
         {},
       ),
@@ -208,7 +208,7 @@ class TestLocalTestRunner(net_utils.TestCase):
         {'xsrf_token': 'token'},
       ),
       (
-        'https://localhost:1/swarming/api/v1/bot/task_update',
+        'https://localhost:1/swarming/api/v1/bot/task_update/23',
         {
           'data': {'command_index': 0, 'id': 'localhost', 'task_id': 23},
           'headers': {'X-XSRF-Token': 'token'},
@@ -216,7 +216,9 @@ class TestLocalTestRunner(net_utils.TestCase):
         {},
       ),
       (
-        'https://localhost:1/swarming/api/v1/bot/task_update', check_final, {},
+        'https://localhost:1/swarming/api/v1/bot/task_update/23',
+        check_final,
+        {},
       ),
     ]
     self.expected_requests(requests)
@@ -267,7 +269,7 @@ class TestLocalTestRunner(net_utils.TestCase):
         {'xsrf_token': 'token'},
       ),
       (
-        'https://localhost:1/swarming/api/v1/bot/task_update',
+        'https://localhost:1/swarming/api/v1/bot/task_update/23',
         {
           'data': {'command_index': 0, 'id': 'localhost', 'task_id': 23},
           'headers': {'X-XSRF-Token': 'token'},
@@ -275,7 +277,9 @@ class TestLocalTestRunner(net_utils.TestCase):
         {},
       ),
       (
-        'https://localhost:1/swarming/api/v1/bot/task_update', check_final, {},
+        'https://localhost:1/swarming/api/v1/bot/task_update/23',
+        check_final,
+        {},
       ),
     ]
     self.expected_requests(requests)
@@ -358,7 +362,7 @@ class TestLocalTestRunner(net_utils.TestCase):
         {'xsrf_token': 'token'},
       ),
       (
-        'https://localhost:1/swarming/api/v1/bot/task_update',
+        'https://localhost:1/swarming/api/v1/bot/task_update/23',
         {
           'data': {'command_index': 0, 'id': 'localhost', 'task_id': 23},
           'headers': {'X-XSRF-Token': 'token'},
@@ -366,7 +370,7 @@ class TestLocalTestRunner(net_utils.TestCase):
         {},
       ),
       (
-        'https://localhost:1/swarming/api/v1/bot/task_update',
+        'https://localhost:1/swarming/api/v1/bot/task_update/23',
         {
           'data': {
             'command_index': 0,
@@ -380,7 +384,7 @@ class TestLocalTestRunner(net_utils.TestCase):
         {},
       ),
       (
-        'https://localhost:1/swarming/api/v1/bot/task_update',
+        'https://localhost:1/swarming/api/v1/bot/task_update/23',
         check_final,
         {},
       ),

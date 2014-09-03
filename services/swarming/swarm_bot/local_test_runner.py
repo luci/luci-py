@@ -136,7 +136,7 @@ def post_update(swarming_server, params, exit_code, stdout, packet_number):
   # TODO(maruel): Support early cancellation.
   # https://code.google.com/p/swarming/issues/detail?id=62
   resp = swarming_server.url_read_json(
-      '/swarming/api/v1/bot/task_update', data=params)
+      '/swarming/api/v1/bot/task_update/%s' % params['task_id'], data=params)
   if resp.get('error'):
     # Abandon it. This will force a process exit.
     raise ValueError(resp.get('error'))

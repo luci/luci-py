@@ -1366,7 +1366,7 @@ class BotTaskUpdateHandler(auth.ApiHandler):
   REQUIRED_KEYS = frozenset([u'command_index', u'id', u'task_id'])
 
   @auth.require(acl.is_bot)
-  def post(self):
+  def post(self, task_id=None):
     # Unlike handshake and poll, we do not accept invalid keys here. This code
     # path is much more strict.
     request = self.parse_body()
@@ -1427,7 +1427,7 @@ class BotTaskErrorHandler(auth.ApiHandler):
   EXPECTED_KEYS = frozenset([u'id', u'message', u'task_id'])
 
   @auth.require(acl.is_bot)
-  def post(self):
+  def post(self, task_id=None):
     request = self.parse_body()
     msg = log_unexpected_keys(
         self.EXPECTED_KEYS, request, self.request, 'bot', 'keys')
@@ -1736,7 +1736,11 @@ def create_application(debug):
       ('/swarming/api/v1/bot/handshake', BotHandshakeHandler),
       ('/swarming/api/v1/bot/poll', BotPollHandler),
       ('/swarming/api/v1/bot/task_update', BotTaskUpdateHandler),
+      ('/swarming/api/v1/bot/task_update/<task_id:[a-f0-9]+>',
+          BotTaskUpdateHandler),
       ('/swarming/api/v1/bot/task_error', BotTaskErrorHandler),
+      ('/swarming/api/v1/bot/task_error/<task_id:[a-f0-9]+>',
+          BotTaskErrorHandler),
 
       ('/_ah/warmup', WarmupHandler),
   ]
