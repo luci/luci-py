@@ -16,14 +16,14 @@ import time
 import unittest
 
 
-# services/auth_service/tests/.
+# /appengine/auth_service/tests/.
 THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 # service/auth_service/
 SERVICE_APP_DIR = os.path.dirname(THIS_DIR)
-# services/auth_service/tests/replica_app/.
+# /appengine/auth_service/tests/replica_app/.
 REPLICA_APP_DIR = os.path.join(THIS_DIR, 'replica_app')
 
-# Add services/components/ directory, to import 'support'.
+# Add /appengine/components/ directory, to import 'support'.
 sys.path.append(os.path.join(os.path.dirname(SERVICE_APP_DIR), 'components'))
 
 from support import gae_sdk_utils
