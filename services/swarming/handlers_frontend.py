@@ -1361,7 +1361,7 @@ class BotTaskUpdateHandler(auth.ApiHandler):
   ACCEPTED_KEYS = frozenset(
       [
         u'command_index', u'duration', u'exit_code', u'hard_timeout', u'id',
-        u'io_timeout', u'output', u'packet_number', u'task_id',
+        u'io_timeout', u'output', u'output_chunk_start', u'task_id',
       ])
   REQUIRED_KEYS = frozenset([u'command_index', u'id', u'task_id'])
 
@@ -1382,19 +1382,19 @@ class BotTaskUpdateHandler(auth.ApiHandler):
 
     duration = request.get('duration')
     exit_code = request.get('exit_code')
-    out = request.get('output')
-    packet_number = request.get('packet_number')
+    output = request.get('output')
+    output_chunk_start = request.get('output_chunk_start')
 
     # TODO(maruel): Make use of io_timeout and hard_timeout.
 
     run_result_key = task_scheduler.unpack_run_result_key(task_id)
     # Side effect: zaps out any binary content on stdout.
-    if out is not None:
-      out = out.encode('utf-8', 'replace')
+    if output is not None:
+      output = output.encode('utf-8', 'replace')
 
     try:
       with task_scheduler.bot_update_task_new(
-          run_result_key, bot_id, command_index, packet_number, out,
+          run_result_key, bot_id, command_index, output, output_chunk_start,
           exit_code, duration) as entities:
         # The reason for writing in a transaction is to get rid of partial DB
         # writes, e.g. a few entities got written but not others. This is a

@@ -947,7 +947,7 @@ class NewBotApiTest(AppTestBase):
         'exit_code': None,
         'id': 'bot1',
         'output': None,
-        'packet_number': 0,
+        'output_chunk_start': 0,
         'task_id': task_id,
       }
       out.update(**kwargs)
@@ -994,7 +994,7 @@ class NewBotApiTest(AppTestBase):
     _cycle(params, expected)
 
     # 3. Task update with some more output.
-    params = _params(output='hi', packet_number=1)
+    params = _params(output='hi', output_chunk_start=3)
     expected = _expected(outputs=[u'Oh hi'])
     _cycle(params, expected)
 

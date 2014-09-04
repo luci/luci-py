@@ -126,25 +126,18 @@ class TaskOutput(ndb.Model):
   This entity doesn't actually exist in the DB. It only exists to make
   categories.
   """
-
-
-class TaskOutputChunk(ndb.Model):
-  """Represents a chunk of a command output.
-
-  Parent is TaskOutput. Key id is monotonically increasing.
-
-  Each entity except the last one must have exactly
-  len(self.chunk) == self.CHUNK_SIZE.
-  """
-  # The maximum size a chunk should be when creating chunk models. The rationale
-  # is that appending data to an entity requires reading it first, so it must
-  # not be too big. On the other hand, having thousands of small entities is
-  # pure overhead.
+  # The maximum size for each TaskOutputChunk.chunk. The rationale is that
+  # appending data to an entity requires reading it first, so it must not be too
+  # big. On the other hand, having thousands of small entities is pure overhead.
   # TODO(maruel): This value was selected from guts feeling. Do proper load
   # testing to find the best value.
+  # TODO(maruel): This value should be stored in the entity for future-proofing.
   CHUNK_SIZE = 102400
 
   # Maximum content saved in a TaskOutput.
+  # TODO(maruel): Add endpoint to do chunked download, so that the GAE limit is
+  # not a problem anymore. There should still be a limit afterward but it can be
+  # much higher.
   MAX_CONTENT = 16000*1024
 
   # Maximum number of chunks.
@@ -153,38 +146,25 @@ class TaskOutputChunk(ndb.Model):
   # It is easier if there is no remainder for efficiency.
   assert (MAX_CONTENT % CHUNK_SIZE) == 0
 
-  chunk = ndb.BlobProperty(default='', compressed=True)
 
-  # Integer sent by the client used to ensure the packets are written in order.
-  # The next packet must be self.packet_number + 1.
-  packet_number = ndb.IntegerProperty(default=0, indexed=False)
+class TaskOutputChunk(ndb.Model):
+  """Represents a chunk of a command output.
+
+  Parent is TaskOutput. Key id is monotonically increasing starting from 1,
+  since 0 is not a valid id.
+
+  Each entity except the last one must have exactly
+  len(self.chunk) == self.CHUNK_SIZE.
+  """
+  chunk = ndb.BlobProperty(default='', compressed=True)
+  # gaps is a series of 2 integer pairs, which specifies the part that are
+  # invalid. Normally it should be empty. All values are relative to the start
+  # of this chunk offset.
+  gaps = ndb.IntegerProperty(repeated=True, indexed=False)
 
   @property
   def chunk_number(self):
     return self.key.integer_id() - 1
-
-  @property
-  def is_output_full(self):
-    """True if the TaskOutput is completely full.
-
-    The return value is only valid on the last TaskOutputChunk of a TaskOutput.
-    """
-    return (
-        self.chunk_number == (self.MAX_CHUNKS-1) and
-        len(self.chunk) == self.CHUNK_SIZE)
-
-  def append(self, content, packet_number):
-    """Appends as much data as possible.
-
-    Returns:
-      tuple(remainder, bool if this instance was modified).
-    """
-    assert content
-    to_append = min(self.CHUNK_SIZE - len(self.chunk), len(content))
-    if to_append:
-      self.chunk += content[:to_append]
-      self.packet_number = packet_number
-    return content[to_append:], bool(to_append)
 
 
 class _TaskResultCommon(ndb.Model):
@@ -362,10 +342,20 @@ class _TaskResultCommon(ndb.Model):
       number_chunks = self.stdout_chunks[command_index]
       if not number_chunks:
         return None
+      # TODO(maruel): Always get one more than necessary, in case number_chunks
+      # is invalid. If there's an unexpected TaskOutputChunk entity present,
+      # continue fetching for more incrementally.
       entities = ndb.get_multi(
           _get_all_output_chunk_keys(
               run_result_key, command_index, number_chunks))
-      return ''.join(c.chunk for c in entities)
+      parts = [c.chunk if c else None for c in entities]
+      for i in xrange(len(parts)):
+        if parts[i] is None:
+          if i == len(parts):
+            parts = parts[:-1]
+          else:
+            parts[i] = '\x00' * TaskOutput.CHUNK_SIZE
+      return ''.join(parts)
 
 
 class TaskRunResult(_TaskResultCommon):
@@ -418,7 +408,7 @@ class TaskRunResult(_TaskResultCommon):
     """Retry number this task. 1 based."""
     return self.key.integer_id()
 
-  def append_output(self, command_index, packet_number, content):
+  def append_output(self, command_index, output, output_chunk_start):
     """Appends output to the stdout of the command.
 
     Returns the entities to save.
@@ -430,8 +420,9 @@ class TaskRunResult(_TaskResultCommon):
     entities, self.stdout_chunks[command_index] = _output_append(
         _run_result_key_to_output_key(self.key, command_index),
         self.stdout_chunks[command_index],
-        packet_number, content)
-    assert self.stdout_chunks[command_index] <= TaskOutputChunk.MAX_CHUNKS
+        output,
+        output_chunk_start)
+    assert self.stdout_chunks[command_index] <= TaskOutput.MAX_CHUNKS
     return entities
 
   def get_outputs(self):
@@ -558,13 +549,13 @@ def _get_all_output_chunk_keys(run_result_key, command_index, number_chunks):
   ]
 
 
-def _output_append(output_key, number_chunks, packet_number, content):
-  """Appends content to a TaskOutput in TaskOutputChunk entities.
+def _output_append(output_key, number_chunks, output, output_chunk_start):
+  """Appends output to a TaskOutput in TaskOutputChunk entities.
 
   Creates new TaskOutputChunk entities as necessary as children of
   TaskRunResult/TaskOutput.
 
-  It silently drops saving the content if it goes over ~16Mb. The hard limit is
+  It silently drops saving the output if it goes over ~16Mb. The hard limit is
   32Mb but HTML escaping can expand the raw data a bit, so just store half of
   the limit to be on the safe side.
 
@@ -579,63 +570,92 @@ def _output_append(output_key, number_chunks, packet_number, content):
     output_key: ndb.Key to TaskOutput that is the parent of TaskOutputChunk.
     number_chunks: Current number of TaskOutputChunk instances. If 0, this means
         there is not data yet.
-    packet_number: 0-based index of the packet used to append to. It must be
-        monotonically incrementing. It is used to assert that data is not lost
-        or added out of order due to DB inconsistency.
-    content: Actual content to append.
+    output: Actual content to append.
+    output_chunk_start: Index of the data to be written to.
 
   Returns:
     A tuple of (list of entities to save, number_chunks). The number_chunks is
-    the number of TaskOutputChunk instances for this content.
+    the number of TaskOutputChunk instances for this output.
   """
-  assert content and isinstance(content, str), content
+  assert output and isinstance(output, str), output
   assert output_key.kind() == 'TaskOutput', output_key
 
-  if bool(number_chunks) != bool(packet_number):
-    raise ValueError(
-        '%s\nUnexpected packet_number (%d) vs number_chunks (%d)' %
-        (output_key, packet_number, number_chunks))
-
-  if not number_chunks:
-    # This content is the first packet.
-    last_chunk = TaskOutputChunk(
-        key=_output_key_to_output_chunk_key(output_key, 0))
-    number_chunks = 1
-  else:
-    last_chunk = _output_key_to_output_chunk_key(
-        output_key, number_chunks - 1).get()
-    if not last_chunk:
-      raise ValueError(
-          '%s\nUnexpected missing chunk %d' %
-          (output_key, number_chunks-1))
-
-    # |packet_number| is not updated once TaskOutput is full, e.g. more than
-    # MAX_CONTENT has been saved.
-    if (not last_chunk.is_output_full and
-        last_chunk.packet_number+1 != packet_number):
-      # Ensures content is written in order.
-      raise ValueError(
-          '%s\nUnexpected packet_number; expected %s; got: %d' %
-          (output_key, last_chunk.packet_number+1, packet_number))
-
-  to_put = []
-  while True:
-    content, modified = last_chunk.append(content, packet_number)
-    if modified:
-      to_put.append(last_chunk)
-
-    if not content or last_chunk.is_output_full:
+  # Split everything in small bits.
+  chunks = []
+  while output:
+    chunk_number = output_chunk_start / TaskOutput.CHUNK_SIZE
+    if chunk_number >= TaskOutput.MAX_CHUNKS:
+      # TODO(maruel): Log into TaskOutput that data was dropped.
+      logging.error('Dropping %d of output', len(output))
       break
+    key = _output_key_to_output_chunk_key(output_key, chunk_number)
+    start = output_chunk_start % TaskOutput.CHUNK_SIZE
+    next_start = TaskOutput.CHUNK_SIZE - start
+    chunks.append((key, start, output[:next_start]))
+    output = output[next_start:]
+    number_chunks = max(number_chunks, chunk_number + 1)
+    output_chunk_start = (chunk_number+1)*TaskOutput.CHUNK_SIZE
 
-    # More content and not yet full, need to create a new TaskOutputChunk.
-    last_chunk = TaskOutputChunk(
-      key=_output_key_to_output_chunk_key(output_key, number_chunks),
-      packet_number=packet_number)
-    number_chunks += 1
+  if not chunks:
+    return [], number_chunks
 
-  if content:
-    logging.error('Dropping %d bytes for %s', len(content), output_key)
-  return to_put, number_chunks
+  # Get the TaskOutputChunk from the DB. Normally it would be only one entity
+  # (the last incomplete one) but this code supports arbitrary overwrite.
+  #
+  # number_chunks should normally be used to skip entities that are assumed to
+  # not be present but we don't assume the number_chunks is valid for safety.
+  #
+  # This means an unneeded get() is done on the missing chunk.
+  entities = ndb.get_multi(i[0] for i in chunks)
+
+  # Update the entities.
+  for i in xrange(len(chunks)):
+    key, start, output = chunks[i]
+    if not entities[i]:
+      # Fill up for missing entities.
+      entities[i] = TaskOutputChunk(key=key)
+    chunk = entities[i]
+    # Magically combine everything.
+    end = start + len(output)
+    if len(chunk.chunk) < start:
+      # Insert blank data automatically.
+      chunk.gaps.extend((len(chunk.chunk), start))
+      chunk.chunk = chunk.chunk + '\x00' * (start-len(chunk.chunk))
+
+    # Strip gaps that are being written to.
+    new_gaps = []
+    for i in xrange(0, len(chunk.gaps), 2):
+      # All values are relative to the starting offset of the chunk itself.
+      gap_start = chunk.gaps[i]
+      gap_end = chunk.gaps[i+1]
+      # If the gap overlaps the chunk being written, strip it. Cases:
+      #   Gap:     |   |
+      #   Chunk: |   |
+      if start <= gap_start <= end and end <= gap_end:
+        gap_start = end
+
+      #   Gap:     |   |
+      #   Chunk:     |   |
+      if gap_start <= start and start <= gap_end <= end:
+        gap_end = start
+
+      #   Gap:       |  |
+      #   Chunk:   |      |
+      if start <= gap_start <= end and start <= gap_end <= end:
+        continue
+
+      #   Gap:     |      |
+      #   Chunk:     |  |
+      if gap_start < start < gap_end and gap_start <= end <= gap_end:
+        # Create a hole.
+        new_gaps.extend((gap_start, start))
+        new_gaps.extend((end, gap_end))
+      else:
+        new_gaps.extend((gap_start, gap_end))
+
+    chunk.gaps = new_gaps
+    chunk.chunk = chunk.chunk[:start] + output + chunk.chunk[end:]
+  return entities, number_chunks
 
 
 ### Public API.

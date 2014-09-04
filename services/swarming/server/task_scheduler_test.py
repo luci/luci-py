@@ -5,6 +5,7 @@
 
 import datetime
 import inspect
+import logging
 import os
 import sys
 import unittest
@@ -382,39 +383,39 @@ class TaskSchedulerApiTest(test_case.TestCase):
   def test_bot_update_task_new(self):
     run_result = _quick_reap()
     with task_scheduler.bot_update_task_new(
-        run_result.key, 'localhost', 0, 0, 'hi', None, None) as entities:
+        run_result.key, 'localhost', 0, 'hi', 0, 0, 0.1) as entities:
       self.assertEqual(3, len(entities))
       ndb.put_multi(entities)
     with task_scheduler.bot_update_task_new(
-        run_result.key, 'localhost', 0, 1, 'hey', None, None) as entities:
+        run_result.key, 'localhost', 0, 'hey', 2, 0, 0.1) as entities:
       self.assertEqual(3, len(entities))
       ndb.put_multi(entities)
     self.assertEqual(['hihey'], run_result.get_outputs())
 
-  def test_bot_update_task_new_two_task(self):
+  def test_bot_update_task_new_two_commands(self):
     run_result = _quick_reap()
     with task_scheduler.bot_update_task_new(
-        run_result.key, 'localhost', 0, 0, 'hi', 0, 0.1) as entities:
+        run_result.key, 'localhost', 0, 'hi', 0, 0, 0.1) as entities:
       self.assertEqual(3, len(entities))
       ndb.put_multi(entities)
     with task_scheduler.bot_update_task_new(
-        run_result.key, 'localhost', 1, 0, 'hey', 0, 0.2) as entities:
+        run_result.key, 'localhost', 1, 'hey', 0, 0, 0.2) as entities:
       self.assertEqual(3, len(entities))
       ndb.put_multi(entities)
     self.assertEqual(['hi', 'hey'], run_result.get_outputs())
     self.assertEqual([0.1, 0.2], run_result.durations)
 
-  def test_bot_update_task_new_cant_append(self):
+  def test_bot_update_task_new_overwrite(self):
     run_result = _quick_reap()
     with task_scheduler.bot_update_task_new(
-        run_result.key, 'localhost', 0, 0, 'hi', None, None) as entities:
+        run_result.key, 'localhost', 0, 'hi', 0, None, None) as entities:
       self.assertEqual(3, len(entities))
       ndb.put_multi(entities)
-    with self.assertRaises(ValueError):
-      with task_scheduler.bot_update_task_new(
-          run_result.key, 'localhost', 0, 0, 'hey', None, None) as entities:
-        self.fail()
-    self.assertEqual(['hi'], run_result.get_outputs())
+    with task_scheduler.bot_update_task_new(
+        run_result.key, 'localhost', 0, 'hey', 1, None, None) as entities:
+      self.assertEqual(3, len(entities))
+      ndb.put_multi(entities)
+    self.assertEqual(['hhey'], run_result.get_outputs())
 
   def test_bot_update_task_old(self):
     data = _gen_request_data(
@@ -455,7 +456,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       raise Foo('Ahah, got ya')
     put_multi = self.mock(ndb, 'put_multi', put_multi_partial)
     # Use a large amount of data to force multiple (3) TaskOutputChunk.
-    stdout = 'f' * (task_result.TaskOutputChunk.CHUNK_SIZE * 2 + 1)
+    stdout = 'f' * (task_result.TaskOutput.CHUNK_SIZE * 2 + 1)
     with self.assertRaises(Foo):
       task_scheduler.bot_update_task_old(
           run_result.key, 'localhost', None, stdout)
@@ -616,4 +617,6 @@ class TaskSchedulerApiTest(test_case.TestCase):
 if __name__ == '__main__':
   if '-v' in sys.argv:
     unittest.TestCase.maxDiff = None
+  logging.basicConfig(
+      level=logging.DEBUG if '-v' in sys.argv else logging.ERROR)
   unittest.main()

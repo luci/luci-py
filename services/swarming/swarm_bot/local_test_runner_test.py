@@ -137,7 +137,7 @@ class TestLocalTestRunner(net_utils.TestCase):
               'id': 'localhost',
               'io_timeout': False,
               'output': 'hi\n',
-              'packet_number': 0,
+              'output_chunk_start': 0,
               'task_id': 23,
             },
             'headers': {'X-XSRF-Token': 'token'},
@@ -179,7 +179,7 @@ class TestLocalTestRunner(net_utils.TestCase):
         })
     # This runs the command for real.
     self.assertEqual(
-        1, local_test_runner.run_command(server, 0, task_details, '.'))
+        3, local_test_runner.run_command(server, 0, task_details, '.'))
 
   def test_run_command_hard_timeout(self):
     # This runs the command for real.
@@ -194,7 +194,7 @@ class TestLocalTestRunner(net_utils.TestCase):
               'id': 'localhost',
               'io_timeout': False,
               'output': 'hi\n',
-              'packet_number': 0,
+              'output_chunk_start': 0,
               'task_id': 23,
             },
             'headers': {'X-XSRF-Token': 'token'},
@@ -240,7 +240,7 @@ class TestLocalTestRunner(net_utils.TestCase):
           'task_id': 23,
         })
     self.assertEqual(
-        1, local_test_runner.run_command(server, 0, task_details, '.'))
+        3, local_test_runner.run_command(server, 0, task_details, '.'))
 
   def test_run_command_io_timeout(self):
     # This runs the command for real.
@@ -255,7 +255,7 @@ class TestLocalTestRunner(net_utils.TestCase):
               'id': 'localhost',
               'io_timeout': True,
               'output': 'hi\n',
-              'packet_number': 0,
+              'output_chunk_start': 0,
               'task_id': 23,
             },
             'headers': {'X-XSRF-Token': 'token'},
@@ -301,7 +301,7 @@ class TestLocalTestRunner(net_utils.TestCase):
           'task_id': 23,
         })
     self.assertEqual(
-        1, local_test_runner.run_command(server, 0, task_details, '.'))
+        3, local_test_runner.run_command(server, 0, task_details, '.'))
 
   def test_run_command_large(self):
     # Method should have "self" as first argument - pylint: disable=E0213
@@ -348,7 +348,7 @@ class TestLocalTestRunner(net_utils.TestCase):
               'id': 'localhost',
               'io_timeout': False,
               'output': 'hi!\n',
-              'packet_number': 1,
+              'output_chunk_start': 100002*4,
               'task_id': 23,
             },
             'headers': {'X-XSRF-Token': 'token'},
@@ -376,7 +376,7 @@ class TestLocalTestRunner(net_utils.TestCase):
             'command_index': 0,
             'id': 'localhost',
             'output': 'hi!\n' * 100002,
-            'packet_number': 0,
+            'output_chunk_start': 0,
             'task_id': 23,
           },
           'headers': {'X-XSRF-Token': 'token'},
@@ -402,7 +402,7 @@ class TestLocalTestRunner(net_utils.TestCase):
           'task_id': 23,
         })
     self.assertEqual(
-        2, local_test_runner.run_command(server, 0, task_details, './'))
+        400012, local_test_runner.run_command(server, 0, task_details, './'))
 
   def test_main(self):
     def load_and_run(manifest, swarming_server):

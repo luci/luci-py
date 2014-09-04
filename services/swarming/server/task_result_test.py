@@ -352,101 +352,144 @@ class TaskResultApiTest(test_case.TestCase):
     self.assertEqual(None, run_result.duration)
     self.assertEqual(None, run_result.duration_now())
 
+
+class TestOutput(test_case.TestCase):
+  APP_DIR = ROOT_DIR
+
+  def setUp(self):
+    super(TestOutput, self).setUp()
+    request = task_request.make_request(_gen_request_data())
+    result_summary = task_result.new_result_summary(request)
+    result_summary.put()
+    self.run_result = task_result.new_run_result(request, 1, 'localhost')
+    ndb.put_multi(task_result.prepare_put_run_result(self.run_result))
+
+  def assertTaskOutputChunk(self, expected):
+    q = task_result.TaskOutputChunk.query().order(
+        task_result.TaskOutputChunk.key)
+    self.assertEqual(expected, [t.to_dict() for t in q.fetch()])
+
   def test_append_output(self):
     # Test that one can stream output and it is returned fine.
-    request = task_request.make_request(_gen_request_data())
-    result_summary = task_result.new_result_summary(request)
-    result_summary.put()
-    run_result = task_result.new_run_result(request, 1, 'localhost')
-    ndb.put_multi(task_result.prepare_put_run_result(run_result))
-
     def run(*args):
-      entities = run_result.append_output(*args)
+      entities = self.run_result.append_output(*args)
       self.assertEqual(1, len(entities))
       ndb.put_multi(entities)
-    run(0, 0, 'Part1\n')
-    run(1, 0, 'Part2\n')
-    run(1, 1, 'Part3\n')
-    self.assertEqual(['Part1\n', 'Part2\nPart3\n'], run_result.get_outputs())
-    self.assertEqual('Part1\n', run_result.get_command_output(0))
-    self.assertEqual('Part2\nPart3\n', run_result.get_command_output(1))
-    self.assertEqual(None, run_result.get_command_output(2))
-
-  def test_append_output_out_of_order(self):
-    request = task_request.make_request(_gen_request_data())
-    result_summary = task_result.new_result_summary(request)
-    result_summary.put()
-    run_result = task_result.new_run_result(request, 1, 'localhost')
-    ndb.put_multi(task_result.prepare_put_run_result(run_result))
-
-    def run(*args):
-      entities = run_result.append_output(*args)
-      self.assertEqual(1, len(entities))
-      ndb.put_multi(entities)
-    run(1, 0, 'Part1\n')
-    with self.assertRaises(ValueError):
-      # It should have been run(1, 1, ...). Duplicate packet #0 is refused.
-      run(1, 0, 'Part1(bis)\n')
-    with self.assertRaises(ValueError):
-      # It should have been run(1, 1, ...). Packet #2 will be refused until #1
-      # is received.
-      run(1, 2, 'Part2\n')
-    run(1, 1, 'Part3\n')
-    with self.assertRaises(ValueError):
-      # It should have been run(1, 2, ...). Packet #0 was already received.
-      run(1, 0, 'Part4\n')
-    run(1, 2, 'Part5\n')
-    self.assertEqual(['', 'Part1\nPart3\nPart5\n'], run_result.get_outputs())
+    run(0, 'Part1\n', 0)
+    run(1, 'Part2\n', 0)
+    run(1, 'Part3\n', len('Part2\n'))
+    self.assertEqual(
+        ['Part1\n', 'Part2\nPart3\n'], self.run_result.get_outputs())
+    self.assertEqual('Part1\n', self.run_result.get_command_output(0))
+    self.assertEqual('Part2\nPart3\n', self.run_result.get_command_output(1))
+    self.assertEqual(None, self.run_result.get_command_output(2))
 
   def test_append_output_large(self):
     self.mock(logging, 'error', lambda *_: None)
-    request = task_request.make_request(_gen_request_data())
-    result_summary = task_result.new_result_summary(request)
-    result_summary.put()
-    run_result = task_result.new_run_result(request, 1, 'localhost')
-    ndb.put_multi(task_result.prepare_put_run_result(run_result))
-
     one_mb = '<3Google' * (1024*1024/8)
 
     def run(*args):
-      entities = run_result.append_output(*args)
+      entities = self.run_result.append_output(*args)
       # Asserts at least one entity was created.
       self.assertTrue(entities)
       ndb.put_multi(entities)
 
     for i in xrange(16):
-      run(0, i, one_mb)
-
-    # It can't take it anymore. It ignores the packet number at that point.
-    self.assertEqual([], run_result.append_output(0, 16, one_mb))
-    self.assertEqual([], run_result.append_output(0, 16, one_mb))
-    self.assertEqual([], run_result.append_output(0, 17, one_mb))
+      run(0, one_mb, i*len(one_mb))
 
     self.assertEqual(
-        task_result.TaskOutputChunk.MAX_CONTENT,
-        len(run_result.get_command_output(0)))
+        task_result.TaskOutput.MAX_CONTENT,
+        len(self.run_result.get_command_output(0)))
 
   def test_append_output_max_chunk(self):
     calls = []
     self.mock(logging, 'error', lambda *args: calls.append(args))
-    request = task_request.make_request(_gen_request_data())
-    result_summary = task_result.new_result_summary(request)
-    result_summary.put()
-    run_result = task_result.new_run_result(request, 1, 'localhost')
-    ndb.put_multi(task_result.prepare_put_run_result(run_result))
-    max_chunk = 'x' * task_result.TaskOutputChunk.MAX_CONTENT
-    entities = run_result.append_output(0, 0, max_chunk)
-    self.assertEqual(task_result.TaskOutputChunk.MAX_CHUNKS, len(entities))
+    max_chunk = 'x' * task_result.TaskOutput.MAX_CONTENT
+    entities = self.run_result.append_output(0, max_chunk, 0)
+    self.assertEqual(task_result.TaskOutput.MAX_CHUNKS, len(entities))
     ndb.put_multi(entities)
     self.assertEqual([], calls)
 
     # Try with MAX_CONTENT + 1 bytes, so the last byte is discarded.
-    entities = run_result.append_output(1, 0, max_chunk + 'x')
-    self.assertEqual(task_result.TaskOutputChunk.MAX_CHUNKS, len(entities))
+    entities = self.run_result.append_output(1, max_chunk + 'x', 0)
+    self.assertEqual(task_result.TaskOutput.MAX_CHUNKS, len(entities))
     ndb.put_multi(entities)
     self.assertEqual(1, len(calls))
     self.assertTrue(calls[0][0].startswith('Dropping '), calls[0][0])
     self.assertEqual(1, calls[0][1])
+
+  def test_append_output_partial(self):
+    ndb.put_multi(self.run_result.append_output(0, 'Foo', 10))
+    expected_output = '\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00Foo'
+    self.assertEqual(expected_output, self.run_result.get_command_output(0))
+    self.assertTaskOutputChunk([{'chunk': expected_output, 'gaps': [0, 10]}])
+
+  def test_append_output_partial_hole(self):
+    ndb.put_multi(self.run_result.append_output(0, 'Foo', 0))
+    ndb.put_multi(self.run_result.append_output(0, 'Bar', 10))
+    expected_output = 'Foo\x00\x00\x00\x00\x00\x00\x00Bar'
+    self.assertEqual(expected_output, self.run_result.get_command_output(0))
+    self.assertTaskOutputChunk([{'chunk': expected_output, 'gaps': [3, 10]}])
+
+  def test_append_output_partial_far(self):
+    ndb.put_multi(self.run_result.append_output(
+        0, 'Foo', 10 + task_result.TaskOutput.CHUNK_SIZE))
+    expected_output = '\x00' * (task_result.TaskOutput.CHUNK_SIZE + 10) + 'Foo'
+    self.assertEqual(expected_output, self.run_result.get_command_output(0))
+    expected = [
+      {'chunk': '\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00Foo', 'gaps': [0, 10]},
+    ]
+    self.assertTaskOutputChunk(expected)
+
+  def test_append_output_partial_far_split(self):
+    # Missing, writing happens on two different TaskOutputChunk entities.
+    ndb.put_multi(self.run_result.append_output(
+        0, 'FooBar', 2 * task_result.TaskOutput.CHUNK_SIZE - 3))
+    expected_output = (
+        '\x00' * (task_result.TaskOutput.CHUNK_SIZE * 2 - 3) + 'FooBar')
+    self.assertEqual(expected_output, self.run_result.get_command_output(0))
+    expected = [
+      {
+        'chunk': '\x00' * (task_result.TaskOutput.CHUNK_SIZE - 3) + 'Foo',
+        'gaps': [0, 102397],
+      },
+      {'chunk': 'Bar', 'gaps': []},
+    ]
+    self.assertTaskOutputChunk(expected)
+
+  def test_append_output_overwrite(self):
+    # Overwrite previously written data.
+    ndb.put_multi(self.run_result.append_output(0, 'FooBar', 0))
+    ndb.put_multi(self.run_result.append_output(0, 'X', 3))
+    self.assertEqual('FooXar', self.run_result.get_command_output(0))
+    self.assertTaskOutputChunk([{'chunk': 'FooXar', 'gaps': []}])
+
+  def test_append_output_reverse_order(self):
+    # Write the data in reverse order in multiple calls.
+    ndb.put_multi(self.run_result.append_output(0, 'Wow', 11))
+    ndb.put_multi(self.run_result.append_output(0, 'Foo', 8))
+    ndb.put_multi(self.run_result.append_output(0, 'Baz', 0))
+    ndb.put_multi(self.run_result.append_output(0, 'Bar', 4))
+    expected_output = 'Baz\x00Bar\x00FooWow'
+    self.assertEqual(expected_output, self.run_result.get_command_output(0))
+    self.assertTaskOutputChunk(
+        [{'chunk': expected_output, 'gaps': [3, 4, 7, 8]}])
+
+  def test_append_output_reverse_order_second_chunk(self):
+    # Write the data in reverse order in multiple calls.
+    ndb.put_multi(self.run_result.append_output(
+        0, 'Wow', task_result.TaskOutput.CHUNK_SIZE + 11))
+    ndb.put_multi(self.run_result.append_output(
+        0, 'Foo', task_result.TaskOutput.CHUNK_SIZE + 8))
+    ndb.put_multi(self.run_result.append_output(
+        0, 'Baz', task_result.TaskOutput.CHUNK_SIZE + 0))
+    ndb.put_multi(self.run_result.append_output(
+        0, 'Bar', task_result.TaskOutput.CHUNK_SIZE + 4))
+    expected_output = (
+        task_result.TaskOutput.CHUNK_SIZE * '\x00' + 'Baz\x00Bar\x00FooWow')
+    self.assertEqual(expected_output, self.run_result.get_command_output(0))
+    self.assertTaskOutputChunk(
+        [{'chunk': 'Baz\x00Bar\x00FooWow', 'gaps': [3, 4, 7, 8]}])
 
 
 if __name__ == '__main__':

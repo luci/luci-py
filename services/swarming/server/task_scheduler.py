@@ -295,24 +295,22 @@ def bot_reap_task(dimensions, bot_id):
 
 @contextlib.contextmanager
 def bot_update_task_new(
-    run_result_key, bot_id, command_index, packet_number, out, exit_code,
-    duration):
+    run_result_key, bot_id, command_index, output, output_chunk_start,
+    exit_code, duration):
   """Updates a TaskRunResult, returns the packets to save in a context.
 
   Arguments:
   - run_result_key: ndb.Key to TaskRunResult.
   - bot_id: Self advertised bot id to ensure it's the one expected.
   - command_index: index in TaskRequest.properties.commands.
-  - packet_number: Must be monotonically incrementing id for data represented by
-      'out'. It is to prevent against HTTP handlers processed out of order.
-  - out: Data to append to this command output.
+  - output: Data to append to this command output.
+  - output_chunk_start: Index of output in the stdout stream.
   - exit_code: Mark that this command, as specified by command_index, is
       terminated.
   - duration: Time spent in seconds for this command.
 
   Invalid states, these are flat out refused:
   - A command is updated after it had an exit code assigned to.
-  - Out of order packet_number of a specific command_index.
   - Out of order processing of command_index.
 
   The trickiest part of this function is that partial updates must be
@@ -320,6 +318,9 @@ def bot_update_task_new(
   - TaskRunResult was updated but not TaskResultSummary.
   - TaskChunkOutput was partially writen, with Result entities updated or not.
   """
+  assert output_chunk_start is None or isinstance(output_chunk_start, int)
+  assert output is None or isinstance(output, str)
+
   run_result, request, bot = _fetch_for_update(run_result_key, bot_id)
   if not run_result:
     yield None
@@ -356,8 +357,10 @@ def bot_update_task_new(
     run_result.state = task_result.State.COMPLETED
     run_result.completed_ts = now
 
-  if out:
-    to_put.extend(run_result.append_output(command_index, packet_number, out))
+  if output:
+    to_put.extend(
+        run_result.append_output(
+            command_index, output, output_chunk_start or 0))
 
   to_put.extend(task_result.prepare_put_run_result(run_result))
 
@@ -409,7 +412,7 @@ def bot_update_task_old(run_result_key, bot_id, exit_codes, stdout):
     # Always overwrite until the new API is in use. This is a bit gross but
     # needed to support partial writes with the old API.
     run_result.stdout_chunks = []
-    to_put.extend(run_result.append_output(0, 0, stdout))
+    to_put.extend(run_result.append_output(0, stdout, 0))
   to_put.extend(task_result.prepare_put_run_result(run_result))
 
   # This will fail occasionally, in particular with partial writes. This is why

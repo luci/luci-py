@@ -113,7 +113,7 @@ def load_and_run(filename, swarming_server):
   return 0
 
 
-def post_update(swarming_server, params, exit_code, stdout, packet_number):
+def post_update(swarming_server, params, exit_code, stdout, output_chunk_start):
   """Posts task update to task_update.
 
   Arguments:
@@ -121,18 +121,17 @@ def post_update(swarming_server, params, exit_code, stdout, packet_number):
     params: Default JSON parameters for the POST.
     exit_code: Process exit code, only when a command completed.
     stdout: Incremental output since last call, if any.
-    packet_number: Monotonically increasing number to keep stdout packets in
-        order.
+    output_chunk_start: Total number of stdout previously sent, for coherency
+        with the server.
   """
   params = params.copy()
   if exit_code is not None:
     params['exit_code'] = exit_code
   if stdout:
-    # The packet_number is used by the server to make sure that the stdout
+    # The output_chunk_start is used by the server to make sure that the stdout
     # chunks are processed and saved in the DB in order.
     params['output'] = stdout
-    params['packet_number'] = packet_number
-    packet_number += 1
+    params['output_chunk_start'] = output_chunk_start
   # TODO(maruel): Support early cancellation.
   # https://code.google.com/p/swarming/issues/detail?id=62
   resp = swarming_server.url_read_json(
@@ -140,7 +139,6 @@ def post_update(swarming_server, params, exit_code, stdout, packet_number):
   if resp.get('error'):
     # Abandon it. This will force a process exit.
     raise ValueError(resp.get('error'))
-  return packet_number
 
 
 def should_post_update(stdout, now, last_packet):
@@ -170,6 +168,9 @@ def run_command(swarming_server, index, task_details, root_dir):
 
   Implements both I/O and hard timeouts. Sends the packets numbered, so the
   server can ensure they are processed in order.
+
+  Returns:
+    Number of stdout bytes streamed to the server.
   """
   # Signal the command is about to be started.
   params = {
@@ -178,7 +179,7 @@ def run_command(swarming_server, index, task_details, root_dir):
     'task_id': task_details.task_id,
   }
   last_packet = start = time.time()
-  packet_number = post_update(swarming_server, params, None, '', 0)
+  post_update(swarming_server, params, None, '', 0)
 
   logging.info('Executing: %s', task_details.commands[index])
   # TODO(maruel): Support both channels independently and display stderr in red.
@@ -194,6 +195,7 @@ def run_command(swarming_server, index, task_details, root_dir):
       stderr=subprocess.STDOUT,
       stdin=subprocess.PIPE)
 
+  output_chunk_start = 0
   stdout = ''
   exit_code = None
   had_hard_timeout = False
@@ -213,8 +215,8 @@ def run_command(swarming_server, index, task_details, root_dir):
       # Post update if necessary.
       if should_post_update(stdout, now, last_packet):
         last_packet = time.time()
-        packet_number = post_update(
-            swarming_server, params, None, stdout, packet_number)
+        post_update(swarming_server, params, None, stdout, output_chunk_start)
+        output_chunk_start += len(stdout)
         stdout = ''
 
       # Kill on timeout if necessary. Both are failures, not internal_failures.
@@ -243,9 +245,11 @@ def run_command(swarming_server, index, task_details, root_dir):
     params['io_timeout'] = had_io_timeout
     params['hard_timeout'] = had_hard_timeout
     # At worst, it'll re-throw.
-    result = post_update(
-        swarming_server, params, exit_code, stdout, packet_number)
-  return result
+    post_update(swarming_server, params, exit_code, stdout, output_chunk_start)
+    output_chunk_start += len(stdout)
+    stdout = ''
+  assert not stdout
+  return output_chunk_start
 
 
 def main(args):
