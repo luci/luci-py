@@ -194,6 +194,13 @@ class _ErrorRecord(object):
     assert isinstance(self.signature, unicode), repr(self.signature)
 
 
+def _shorten(l):
+  assert isinstance(l, unicode), repr(l)
+  if len(l) > 256:
+    return u'hash:%s' % hashlib.sha1(l.encode('utf-8')).hexdigest()
+  return l
+
+
 def _signature_from_message(message):
   """Calculates a signature and extract the exception if any.
 
@@ -203,6 +210,7 @@ def _signature_from_message(message):
   Returns:
     tuple of a signature and the exception type, if any.
   """
+  assert isinstance(message, unicode), repr(message)
   lines = message.splitlines()
   if not lines:
     return '', None
@@ -214,7 +222,7 @@ def _signature_from_message(message):
     if lines[0].startswith(SOFT_MEMORY):
       # Consider SOFT_MEMORY an 'exception'.
       return SOFT_MEMORY, SOFT_MEMORY
-    return lines[0].strip(), None
+    return _shorten(lines[0].strip()), None
 
   # It is a stack trace.
   stacktrace = []
@@ -233,7 +241,7 @@ def _signature_from_message(message):
 
   if index >= len(lines):
     # Failed at grabbing the exception.
-    return lines[0].strip(), None
+    return _shorten(lines[0].strip()), None
 
   # SyntaxError produces this.
   if lines[index].strip() == '^':
@@ -247,7 +255,7 @@ def _signature_from_message(message):
     if not index:
       logging.error('Failed to process message.\n%s', message)
       # Fall back to returning the first line.
-      return lines[0].strip(), None
+      return _shorten(lines[0].strip()), None
     index -= 1
 
   function = None
@@ -267,9 +275,7 @@ def _signature_from_message(message):
     signature = '%s@%s' % (ex_type, function)
   else:
     signature = '%s@%s:%d' % (ex_type, path, line_no)
-  if len(signature) > 256:
-    signature = 'hash:%s' % hashlib.sha1(signature).hexdigest()
-  return signature, ex_type
+  return _shorten(signature), ex_type
 
 
 def _extract_exceptions_from_logs(start_time, end_time, module_versions):

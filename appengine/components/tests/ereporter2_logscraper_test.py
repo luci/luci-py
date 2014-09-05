@@ -41,7 +41,7 @@ class Ereporter2LogscraperTest(test_case.TestCase):
   def test_signatures(self):
     messages = [
       (
-        ('\nTraceback (most recent call last):\n'
+        (u'\nTraceback (most recent call last):\n'
         '  File \"appengine/runtime/wsgi.py\", line 239, in Handle\n'
         '    handler = _config_handle.add_wsgi_middleware(self._LoadHandler())'
             '\n'
@@ -52,7 +52,7 @@ class Ereporter2LogscraperTest(test_case.TestCase):
         'DeadlineExceededError',
       ),
       (
-        ('\nTraceback (most recent call last):\n'
+        (u'\nTraceback (most recent call last):\n'
         '  File \"handlers.py\", line 19, in get\n'
         '    handler = _config_handle.add_wsgi_middleware(self._LoadHandler())'
             '\n'
@@ -66,7 +66,7 @@ class Ereporter2LogscraperTest(test_case.TestCase):
         'DeadlineExceededError',
       ),
       (
-        ('\'error\' is undefined\n'
+        (u'\'error\' is undefined\n'
         'Traceback (most recent call last):\n'
         '  File \"third_party/webapp2-2.5/webapp2.py\", line 1535, in __call__'
             '\n'
@@ -83,13 +83,30 @@ class Ereporter2LogscraperTest(test_case.TestCase):
         'UndefinedError',
       ),
       (
-        ('\nTraceback (most recent call last):\n'
+        (u'\nTraceback (most recent call last):\n'
         '  File \"api.py\", line 74\n'
         '    class ErrorReportingInfo(ndb.Model):\n'
         '        ^\n'
         'SyntaxError: invalid syntax'),
         'SyntaxError@api.py:74',
         'SyntaxError',
+      ),
+      (
+        u'Ovérwhelmingly long message' * 100,
+        u'hash:35961a207a9d344444128405dbdbc00f294263be',
+        None,
+      ),
+      (
+        (u'Ovérwhelmingly long message' * 100 + '\n' +
+        'Traceback (most recent call last):\n'
+        '  File \"appengine/runtime/wsgi.py\", line 239, in Handle\n'
+        '    handler = _config_handle.add_wsgi_middleware(self._LoadHandler())'
+            '\n'
+        '  File \"appengine/ext/ndb/utils.py\", line 28, in wrapping\n'
+        '    def wrapping_wrapper(wrapper):\n'
+        'DeadlineExceededError'),
+        u'DeadlineExceededError@utils.py:28',
+        u'DeadlineExceededError',
       ),
     ]
 
