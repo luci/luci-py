@@ -18,14 +18,16 @@ from google.appengine import runtime
 # Paths that can be stripped from the stack traces by _relative_path().
 PATHS_TO_STRIP = (
   # On AppEngine, cwd is always the application's root directory.
-  os.getcwd() + '/',
-  os.path.dirname(os.path.dirname(os.path.dirname(runtime.__file__))) + '/',
-  os.path.dirname(os.path.dirname(os.path.dirname(webapp2.__file__))) + '/',
+  os.getcwd() + os.path.sep,
+  os.path.dirname(os.path.dirname(os.path.dirname(runtime.__file__))) +
+      os.path.sep,
+  os.path.dirname(os.path.dirname(os.path.dirname(webapp2.__file__))) +
+      os.path.sep,
   # Fallback to stripping at appid.
-  os.path.dirname(os.getcwd()) + '/',
+  os.path.dirname(os.getcwd()) + os.path.sep,
   # stdlib, will contain 'python2.7' as prefix.
-  os.path.dirname(os.path.dirname(os.__file__)),
-  './',
+  os.path.dirname(os.path.dirname(os.__file__)) + os.path.sep,
+  '.' + os.path.sep,
 )
 
 
