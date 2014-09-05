@@ -99,7 +99,7 @@ class _CappedList(object):
 class _ErrorCategory(object):
   """Describes a 'class' of error messages' according to an unique signature."""
   def __init__(self, signature):
-    assert isinstance(signature, basestring), signature
+    assert isinstance(signature, unicode), signature
     # Remove the version embedded in the signature.
     self.signature = signature
     self.events = _CappedList(_ERROR_LIST_HEAD_SIZE, _ERROR_LIST_TAIL_SIZE)
@@ -150,6 +150,7 @@ class _ErrorRecord(object):
       was_loading_request, version, module, handler_module, gae_version,
       instance,
       status, message):
+    assert isinstance(message, unicode), repr(message)
     # Unique identifier.
     self.request_id = request_id
     # Initial time the request was handled.
@@ -190,6 +191,7 @@ class _ErrorRecord(object):
     if not self.signature:
       # Default the signature to the exception type if None.
       self.signature = self.exception_type
+    assert isinstance(self.signature, unicode), repr(self.signature)
 
 
 def _signature_from_message(message):

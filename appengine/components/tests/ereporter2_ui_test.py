@@ -50,7 +50,7 @@ def ErrorRecord(**kwargs):
       'gae_version': '1.9.0',
       'instance': '123',
       'status': 200,
-      'message': 'Failed',
+      'message': u'Failed',
   }
   default_values.update(kwargs)
   return logscraper._ErrorRecord(**default_values)
@@ -152,7 +152,7 @@ class Ereporter2Test(test_case.TestCase):
     self.assertEqual(expected, env)
 
   def test_records_to_params(self):
-    msg = logscraper._STACK_TRACE_MARKER + '\nDeadlineExceededError'
+    msg = logscraper._STACK_TRACE_MARKER + u'\nDeadlineExceededError'
     data = [
       ErrorRecord(),
       ErrorRecord(message=msg),

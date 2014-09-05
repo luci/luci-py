@@ -45,7 +45,8 @@ class ErrorReportingMonitoring(ndb.Model):
 
   @classmethod
   def error_to_key(cls, error):
-    return ndb.Key(cls, hashlib.sha1(error).hexdigest())
+    assert isinstance(error, unicode), repr(error)
+    return ndb.Key(cls, hashlib.sha1(error.encode('utf-8')).hexdigest())
 
 
 class Error(ndb.Model):

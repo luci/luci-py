@@ -58,7 +58,7 @@ def ErrorRecord(**kwargs):
       'instance': '123',
       'status': 200,
       'message': (
-          'Traceback (most recent call last):\n'
+          u'Traceback (most recent call last):\n'
           '  File "handlers_frontend.py", line 461, in post\n'
           '    for entry_info, exists in self.check_entry_infos('
               'entries, namespace):\n'
