@@ -1648,15 +1648,6 @@ class RootHandler(auth.AuthenticatingHandler):
     self.response.out.write(template.render('swarming/root.html', params))
 
 
-class DeadBotsCountHandler(webapp2.RequestHandler):
-  def get(self):
-    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
-    cutoff = utils.utcnow() - bot_management.BOT_DEATH_TIMEOUT
-    count = bot_management.Bot.query().filter(
-        bot_management.Bot.last_seen_ts < cutoff).count()
-    self.response.out.write(str(count))
-
-
 class WarmupHandler(webapp2.RequestHandler):
   def get(self):
     auth.warmup()
@@ -1717,7 +1708,6 @@ def create_application(debug):
 
       # The new APIs:
       ('/swarming/api/v1/bots', ApiBots),
-      ('/swarming/api/v1/bots/dead/count', DeadBotsCountHandler),
       ('/swarming/api/v1/stats/summary/<resolution:[a-z]+>',
         stats_gviz.StatsGvizSummaryHandler),
       ('/swarming/api/v1/stats/dimensions/<dimensions:.+>/<resolution:[a-z]+>',

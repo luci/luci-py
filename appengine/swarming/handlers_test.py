@@ -479,7 +479,6 @@ class FrontendTest(AppTestBase):
       '/stats',
       '/stats/dimensions/<dimensions:.+>',
       '/stats/user/<user:.+>',
-      '/swarming/api/v1/bots/dead/count',
       '/swarming/api/v1/stats/summary/<resolution:[a-z]+>',
       '/swarming/api/v1/stats/dimensions/<dimensions:.+>/<resolution:[a-z]+>',
       '/swarming/api/v1/stats/user/<user:.+>/<resolution:[a-z]+>',
@@ -1633,28 +1632,6 @@ class OldClientApiTest(AppTestBase):
     packed = task_common.pack_result_summary_key(result_summary.key)
     response = self.app.post('/restricted/cancel', {'r': packed})
     self.assertResponse(response, '200 OK', 'Runner canceled.')
-
-  def test_dead_machines_count(self):
-    # TODO(maruel): Convert this test case to use the APIs instead of editing
-    # the DB directly.
-    now = datetime.datetime(2010, 1, 2, 3, 4, 5)
-    self.mock_now(now)
-    self.assertEqual('0', self.app.get('/swarming/api/v1/bots/dead/count').body)
-    bot = bot_management.tag_bot_seen(
-        'id1', 'localhost', '127.0.0.1', '8.8.4.4', {}, '123456789', False)
-    self.assertEqual('0', self.app.get('/swarming/api/v1/bots/dead/count').body)
-
-    # Borderline. If this test becomes flaky, increase the 1 second value.
-    self.mock_now(now - bot_management.BOT_DEATH_TIMEOUT, 1)
-    bot.put()
-    self.mock_now(now)
-    self.assertEqual('0', self.app.get('/swarming/api/v1/bots/dead/count').body)
-
-    # Make the machine old and ensure it is marked as dead.
-    self.mock_now(now - bot_management.BOT_DEATH_TIMEOUT, -1)
-    bot.put()
-    self.mock_now(now)
-    self.assertEqual('1', self.app.get('/swarming/api/v1/bots/dead/count').body)
 
   def _PostResults(self, run_result, exit_code, output):
     url_parameters = {
