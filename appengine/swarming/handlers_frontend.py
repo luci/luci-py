@@ -819,25 +819,6 @@ class ClientApiBots(auth.ApiHandler):
 ### Old Client APIs.
 
 
-class ApiBots(auth.AuthenticatingHandler):
-  """Returns the list of known swarming bots."""
-
-  @auth.require(acl.is_privileged_user)
-  def get(self):
-    now = utils.utcnow()
-    params = {
-        'machine_death_timeout':
-            int(bot_management.BOT_DEATH_TIMEOUT.total_seconds()),
-        'machines': sorted(
-            (m.to_dict_with_now(now) for m in bot_management.Bot.query()),
-            key=lambda x: x['id']),
-        'now': now,
-    }
-    self.response.headers['Content-Type'] = 'application/json; charset=utf-8'
-    self.response.headers['Cache-Control'] = 'no-cache, no-store'
-    self.response.write(utils.encode_to_json(params))
-
-
 class DeleteMachineStatsHandler(auth.AuthenticatingHandler):
   """Handler to delete a bot assignment."""
 
@@ -1686,7 +1667,8 @@ def create_application(debug):
       ('/restricted/cancel', CancelHandler),
       ('/restricted/retry', RetryHandler),
 
-      # Client API, in some cases also indirectly used by the frontend.
+      # Client API, in some cases also indirectly used by the frontend. To be
+      # removed.
       ('/get_matching_test_cases', GetMatchingTestCasesHandler),
       ('/get_result', GetResultHandler),
       ('/test', TestRequestHandler),
@@ -1707,7 +1689,6 @@ def create_application(debug):
       ('/delete_machine_stats', DeleteMachineStatsHandler),
 
       # The new APIs:
-      ('/swarming/api/v1/bots', ApiBots),
       ('/swarming/api/v1/stats/summary/<resolution:[a-z]+>',
         stats_gviz.StatsGvizSummaryHandler),
       ('/swarming/api/v1/stats/dimensions/<dimensions:.+>/<resolution:[a-z]+>',

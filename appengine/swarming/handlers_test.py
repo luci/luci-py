@@ -1506,39 +1506,6 @@ class OldClientApiTest(AppTestBase):
     self.assertEqual(expected_result_string, results['output'])
     self.assertEqual(u'\ufffd Invalid utf-8 string', results['output'])
 
-  def testApiBots(self):
-    self.set_as_admin()
-    now = datetime.datetime(2000, 1, 2, 3, 4, 5, 6)
-    self.mock_now(now)
-    bot = bot_management.tag_bot_seen(
-        'id1', 'localhost', '127.0.0.1', '8.8.4.4', {'foo': 'bar'}, '123456789',
-        False)
-    bot.put()
-
-    response = self.app.get('/swarming/api/v1/bots')
-    self.assertEqual('200 OK', response.status)
-    expected = {
-        u'machine_death_timeout':
-            int(bot_management.BOT_DEATH_TIMEOUT.total_seconds()),
-        u'machines': [
-          {
-            u'created_ts': u'2000-01-02 03:04:05',
-            u'dimensions': {u'foo': u'bar'},
-            u'external_ip': u'8.8.4.4',
-            u'hostname': u'localhost',
-            u'id': u'id1',
-            u'internal_ip': u'127.0.0.1',
-            u'is_dead': False,
-            u'last_seen_ts': u'2000-01-02 03:04:05',
-            u'quarantined': False,
-            u'task': None,
-            u'version': u'123456789',
-          },
-       ],
-      u'now': unicode(now.strftime(utils.DATETIME_FORMAT)),
-    }
-    self.assertEqual(expected, response.json)
-
   def testRetryHandler(self):
     self.set_as_admin()
 
