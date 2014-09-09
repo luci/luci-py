@@ -19,6 +19,7 @@ from common import rpc
 from common import test_request_message
 from server import bot_archive
 from server import file_chunks
+from server import task_common
 
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -66,6 +67,8 @@ class Bot(ndb.Model):
   version = ndb.StringProperty(default='')
 
   # The current task being run on this bot.
+  # TODO(maruel): Save the task_id? It'd be more space efficient, since it fits
+  # a IntegerProperty.
   task = ndb.KeyProperty(kind='TaskRunResult')
 
   # If set to True, no task is handed out to this bot due to the bot being in a
@@ -86,6 +89,9 @@ class Bot(ndb.Model):
     out = super(Bot, self).to_dict()
     # Inject the bot id, since it's the entity key.
     out['id'] = self.key.string_id()
+    # Replace the task key with the task id.
+    if self.task:
+      out['task'] = task_common.pack_run_result_key(self.task)
     return out
 
   def to_dict_with_now(self, now):
