@@ -294,7 +294,7 @@ def bot_reap_task(dimensions, bot_id):
 
 
 @contextlib.contextmanager
-def bot_update_task_new(
+def bot_update_task(
     run_result_key, bot_id, command_index, output, output_chunk_start,
     exit_code, duration):
   """Updates a TaskRunResult, returns the packets to save in a context.
@@ -368,59 +368,6 @@ def bot_update_task_new(
 
   _update_stats(run_result, bot_id, request, task_completed)
   ndb.Future.wait_all(futures)
-
-
-def bot_update_task_old(run_result_key, bot_id, exit_codes, stdout):
-  """Updates a TaskRunResult and associated entities with the latest info from
-  the bot.
-
-  It does two DB RPCs, one get_multi() and one put_multi().
-  """
-  run_result, request, bot = _fetch_for_update(run_result_key, bot_id)
-  if not run_result:
-    return False
-
-  now = utils.utcnow()
-  if run_result.state not in task_result.State.STATES_RUNNING:
-    # It's possible that the ndb.put_multi() below failed in the last call, so
-    # that TaskRunResult was updated but not TaskResultsummary.
-    result_summary = run_result.result_summary_key.get()
-    if not result_summary.need_update_from_run_result(run_result):
-      logging.error(
-          'A zombie bot reappeared after the time out.\n%s; %s',
-          run_result.bot_id, run_result.state)
-      return False
-
-  to_put = []
-  if bot:
-    bot.last_seen_ts = now
-    bot.task = run_result_key
-    to_put.append(bot)
-
-  # TODO(maruel): Wrong but that's the current behavior of the swarming bots.
-  # Eventually change the bot protocol to be able to send more details.
-  completed = bool(exit_codes)
-  if completed:
-    run_result.state = task_result.State.COMPLETED
-    run_result.completed_ts = now
-    assert all(isinstance(i, int) for i in exit_codes), exit_codes
-    # Always overwrite until the new API is in use.
-    run_result.exit_codes = exit_codes
-  if stdout is not None:
-    # https://code.google.com/p/swarming/issues/detail?id=116 requires
-    # https://code.google.com/p/swarming/issues/detail?id=117
-    # Always overwrite until the new API is in use. This is a bit gross but
-    # needed to support partial writes with the old API.
-    run_result.stdout_chunks = []
-    to_put.extend(run_result.append_output(0, stdout, 0))
-  to_put.extend(task_result.prepare_put_run_result(run_result))
-
-  # This will fail occasionally, in particular with partial writes. This is why
-  # the above must not be too aggressive in skipping writes to ensure the data
-  # is forcibly coherent.
-  ndb.put_multi(to_put)
-  _update_stats(run_result, bot_id, request, completed)
-  return True
 
 
 def bot_kill_task(run_result):

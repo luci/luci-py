@@ -14,21 +14,17 @@ import itertools
 import json
 import logging
 import os
-import urllib
 
 import webapp2
 
 from google.appengine import runtime
-from google.appengine.api import datastore_errors
 from google.appengine.datastore import datastore_query
 from google.appengine.ext import ndb
 
 import handlers_backend
 import template
-from common import rpc
 from common import test_request_message
 from components import auth
-from components import decorators
 from components import ereporter2
 from components import utils
 from server import acl
@@ -98,80 +94,6 @@ def convert_test_case(data):
     'priority': config.priority,
     'scheduling_expiration_secs': config.deadline_to_run,
     'tags': [],
-  }
-
-
-def request_work_item(attributes, server_url, remote_addr):
-  # TODO(maruel): Split it out a little.
-  bot_management.validate_and_fix_attributes(attributes)
-  response = bot_management.check_version(attributes, server_url)
-  if response:
-    return response
-
-  dimensions = attributes['dimensions']
-  bot_id = attributes['id'] or dimensions['hostname']
-  # Note its existence at two places, one for stats at 1 minute resolution, the
-  # other for the list of known bots.
-  stats.add_entry(action='bot_active', bot_id=bot_id, dimensions=dimensions)
-
-  # The TaskRunResult will be referenced on the first ping, ensuring that the
-  # task was actually taken.
-  bot_management.tag_bot_seen(
-      bot_id,
-      dimensions.get('hostname', bot_id),
-      attributes['ip'],
-      remote_addr,
-      dimensions,
-      attributes['version'],
-      False)
-
-  request, run_result = task_scheduler.bot_reap_task(dimensions, bot_id)
-  if not request:
-    try_count = attributes['try_count'] + 1
-    return {
-      'come_back': task_scheduler.exponential_backoff(try_count),
-      'try_count': try_count,
-    }
-
-  assert bot_id == run_result.bot_id
-  packed = task_common.pack_run_result_key(run_result.key)
-  test_objects = [
-    test_request_message.TestObject(
-        test_name=str(i),
-        action=command,
-        hard_time_out=request.properties.execution_timeout_secs,
-        io_time_out=request.properties.io_timeout_secs)
-    for i, command in enumerate(request.properties.commands)
-  ]
-  result_url = '%s/result2?r=%s&id=%s' % (server_url, packed, bot_id)
-  ping_url = '%s/runner_ping?r=%s&id=%s' % (server_url, packed, bot_id)
-  # Ask the slave to ping every 55 seconds. The main reason is to make sure that
-  # the majority of the time, the stats of active shards has a ping in every
-  # minute window.
-  # TODO(maruel): Have the slave stream the stdout on the fly, so there won't be
-  # need for ping unless there's no stdout. The slave will decide this instead
-  # of the master.
-  ping_delay = 55
-  env = request.properties.env.copy()
-  env['SWARMING_TASK_ID'] = packed
-  test_run = test_request_message.TestRun(
-      test_run_name=request.name,
-      env_vars=env,
-      configuration=test_request_message.TestConfiguration(
-          config_name=request.name),
-      result_url=result_url,
-      ping_url=ping_url,
-      ping_delay=ping_delay,
-      data=request.properties.data,
-      tests=test_objects)
-
-  content = test_request_message.Stringize(test_run, json_readable=True)
-  # The Swarming bot uses an hand rolled RPC system and 'commands' is actual the
-  # custom RPC commands.
-  return {
-    'commands': [rpc.BuildRPC('RunManifest', content)],
-    'result_url': test_run.result_url,
-    'try_count': 0,
   }
 
 
@@ -1374,7 +1296,7 @@ class BotTaskUpdateHandler(auth.ApiHandler):
       output = output.encode('utf-8', 'replace')
 
     try:
-      with task_scheduler.bot_update_task_new(
+      with task_scheduler.bot_update_task(
           run_result_key, bot_id, command_index, output, output_chunk_start,
           exit_code, duration) as entities:
         # The reason for writing in a transaction is to get rid of partial DB
@@ -1446,172 +1368,6 @@ class ServerPingHandler(webapp2.RequestHandler):
     self.response.out.write('Server up')
 
 
-class RegisterHandler(auth.AuthenticatingHandler):
-  """Handler for the register_machine of the Swarm server.
-
-  Attempt to find a matching job for the querying bot.
-  """
-
-  # TODO(vadimsh): Implement XSRF token support.
-  xsrf_token_enforce_on = ()
-
-  @decorators.silence(
-      datastore_errors.InternalError,
-      datastore_errors.Timeout,
-      datastore_errors.TransactionFailedError)
-  @auth.require(acl.is_bot)
-  def post(self):
-    # Validate the request.
-    if not self.request.body:
-      self.abort(400, 'Request must have a body')
-
-    attributes_str = self.request.get('attributes')
-    try:
-      attributes = json.loads(attributes_str)
-    except (TypeError, ValueError) as e:
-      message = 'Invalid attributes: %s: %s' % (attributes_str, e)
-      logging.error(message)
-      self.abort(400, message)
-
-    # TODO(vadimsh): Ensure attributes['id'] matches credentials used
-    # to authenticate the request (i.e. auth.get_current_identity()).
-    try:
-      out = request_work_item(
-          attributes, self.request.host_url, self.request.remote_addr)
-      response = json.dumps(out)
-    except runtime.DeadlineExceededError as e:
-      # If the timeout happened before a runner was assigned there are no
-      # problems. If the timeout occurred after a runner was assigned, that
-      # runner will timeout (since the bot didn't get the details required
-      # to run it) and it will automatically get retried when the bot "timeout".
-      message = str(e)
-      logging.warning(message)
-      self.abort(500, message)
-    except test_request_message.Error as e:
-      message = str(e)
-      logging.error(message)
-      self.abort(400, message)
-
-    self.response.headers['Content-Type'] = 'application/json; charset=utf-8'
-    self.response.out.write(response)
-
-
-class RunnerPingHandler(auth.AuthenticatingHandler):
-  """Handler for runner pings to the server.
-
-  The runner pings are used to let the server know a runner is still working, so
-  it won't consider it stale.
-  """
-
-  # TODO(vadimsh): Implement XSRF token support.
-  xsrf_token_enforce_on = ()
-
-  @auth.require(acl.is_bot)
-  def post(self):
-    # TODO(vadimsh): Any bot can send ping on behalf of any other bot. Ensure
-    # 'id' matches credentials used to authenticate the request (i.e.
-    # auth.get_current_identity()). In practice this doesn't work since the
-    # Swarming bot id may not have any relationship to the host accessing the
-    # swarming server.
-    packed_run_result_key = self.request.get('r', '')
-    bot_id = self.request.get('id', '')
-    try:
-      run_result_key = task_scheduler.unpack_run_result_key(
-          packed_run_result_key)
-      task_scheduler.bot_update_task_old(run_result_key, bot_id, None, None)
-    except ValueError as e:
-      logging.error('Failed to accept value %s: %s', packed_run_result_key, e)
-      self.abort(400, 'Runner failed to ping.')
-
-    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
-    self.response.out.write('Success.')
-
-
-class ResultHandler(auth.AuthenticatingHandler):
-  """Handles test results from remote test runners."""
-
-  # TODO(vadimsh): Implement XSRF token support.
-  xsrf_token_enforce_on = ()
-
-  @auth.require(acl.is_bot)
-  def post(self):
-    packed = self.request.get('r', '')
-    run_result_key = task_scheduler.unpack_run_result_key(packed)
-    bot_id = urllib.unquote_plus(self.request.get('id'))
-    run_result = run_result_key.get()
-    # TODO(vadimsh): Verify bot_id matches credentials that are used for
-    # current request (i.e. auth.get_current_identity()). Or shorter, just use
-    # auth.get_current_identity() and have the bot stops passing id=foo at all.
-    if bot_id != run_result.bot_id:
-      # Check that bot that posts the result is same as bot that claimed the
-      # task.
-      msg = 'Expected bot id %s, got %s' % (run_result.bot_id, bot_id)
-      logging.error(msg)
-      self.abort(404, msg)
-
-    exit_codes = urllib.unquote_plus(self.request.get('x'))
-    exit_codes = filter(None, (i.strip() for i in exit_codes.split(',')))
-
-    # TODO(maruel): Get rid of this: the result string should probably be in the
-    # body of the request.
-    result_string = urllib.unquote_plus(self.request.get('result_output'))
-    if isinstance(result_string, unicode):
-      # Zap out any binary content on stdout.
-      result_string = result_string.encode('utf-8', 'replace')
-
-    task_scheduler.bot_update_task_old(
-        run_result.key, bot_id, map(int, exit_codes), result_string)
-
-    # TODO(maruel): Return JSON.
-    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
-    self.response.out.write('Successfully update the runner results.')
-
-
-class Result2Handler(auth.AuthenticatingHandler):
-  """Handles test results from remote test runners."""
-
-  xsrf_token_enforce_on = ()
-
-  @auth.require(acl.is_bot)
-  def post(self):
-    packed = self.request.get('r', '')
-    run_result_key = task_scheduler.unpack_run_result_key(packed)
-    bot_id = urllib.unquote_plus(self.request.get('id'))
-    run_result = run_result_key.get()
-    if bot_id != run_result.bot_id:
-      # Check that bot that posts the result is same as bot that claimed the
-      # task.
-      msg = 'Expected bot id %s, got %s' % (run_result.bot_id, bot_id)
-      logging.error(msg)
-      self.abort(404, msg)
-
-    exit_codes = urllib.unquote_plus(self.request.get('x'))
-    exit_codes = filter(None, (i.strip() for i in exit_codes.split(',')))
-
-    result_string = self.request.get('o').encode('utf-8', 'replace')
-    task_scheduler.bot_update_task_old(
-        run_result.key, bot_id, map(int, exit_codes), result_string)
-    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
-    self.response.out.write('Successfully update the runner results.')
-
-
-class RemoteErrorHandler(auth.AuthenticatingHandler):
-  """Handler to log an error reported by a bot."""
-
-  xsrf_token_enforce_on = ()
-
-  @auth.require(acl.is_bot)
-  def post(self):
-    ereporter2.log_request(
-        request=self.request,
-        source='bot',
-        category='task_failure',
-        message=self.request.get('m', ''))
-
-    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
-    self.response.out.write('Success.')
-
-
 ### Public pages.
 
 
@@ -1678,11 +1434,6 @@ def create_application(debug):
       ('/get_slave_code', GetSlaveCodeHandler),
       ('/get_slave_code/<version:[0-9a-f]{40}>', GetSlaveCodeHandler),
       # Old bot API to be removed:
-      ('/poll_for_test', RegisterHandler),
-      ('/remote_error', RemoteErrorHandler),
-      ('/result', ResultHandler),
-      ('/result2', Result2Handler),
-      ('/runner_ping', RunnerPingHandler),
       ('/server_ping', ServerPingHandler),
 
       # Both Client and Bot API. To be split in two and deleted.

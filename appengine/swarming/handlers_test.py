@@ -9,9 +9,11 @@ import json
 import logging
 import os
 import re
+import StringIO
 import sys
 import unittest
 import urllib
+import zipfile
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -32,6 +34,7 @@ from components import stats_framework
 from components import template
 from components import utils
 from server import acl
+from server import bot_archive
 from server import bot_management
 from server import stats
 from server import task_common
@@ -127,12 +130,12 @@ def CreateRunner(config_name=None, machine_id=None, ran_successfully=None,
   if ran_successfully or exit_codes:
     exit_codes = map(int, exit_codes.split(',')) if exit_codes else [0]
     # The entity needs to be saved before it can be updated, since
-    # bot_update_task_old() accepts the key of the entity.
+    # bot_update_task() accepts the key of the entity.
     ndb.put_multi(task_result.prepare_put_run_result(run_result))
-    if not task_scheduler.bot_update_task_old(
-        run_result.key, machine_id, exit_codes, results):
-      assert False, (
-          'Expected to reap the TaskToRun that was created lines above')
+    for index, code in enumerate(exit_codes):
+      with task_scheduler.bot_update_task(
+          run_result.key, machine_id, index, results, 0, code, 0.1) as entities:
+        ndb.put_multi(entities)
     # Refresh it from the DB.
 
   if started:
@@ -236,27 +239,47 @@ class AppTestBase(test_case.TestCase):
         '/auth/api/v1/accounts/self/xsrf_token',
         headers={'X-XSRF-Token-Request': '1'}).json['xsrf_token']
 
-  def bot_poll(self, bot):
-    """Simulates a bot that polls for task."""
-    # TODO(maruel): Switch to new API.
-    if not self._version:
-      attributes = {
-        'dimensions': {'cpu': '48', 'os': 'Amiga'},
-        'id': bot,
-        'ip': FAKE_IP,
-      }
-      result = self.app.post(
-          '/poll_for_test', {'attributes': json.dumps(attributes)}).json
-      self._version = result['commands'][0]['args'][-40:]
+  def _client_token(self):
+    headers = {'X-XSRF-Token-Request': '1'}
+    params = {}
+    response = self.app.post_json(
+        '/swarming/api/v1/client/handshake',
+        headers=headers,
+        params=params).json
+    token = response['xsrf_token'].encode('ascii')
+    return token
 
-    attributes = {
-      'dimensions': {'cpu': '48', 'os': 'Amiga'},
-      'id': bot,
-      'ip': FAKE_IP,
-      'version': self._version,
+  def _bot_token(self, bot='bot1'):
+    headers = {'X-XSRF-Token-Request': '1'}
+    params = {
+      'attributes': {
+        'dimensions': {
+          'id': bot,
+          'os': ['Amiga'],
+        },
+        'id': bot,
+        'ip': '127.0.0.1',
+        'version': '123',
+      },
     }
-    return self.app.post(
-        '/poll_for_test', {'attributes': json.dumps(attributes)}).json
+    response = self.app.post_json(
+        '/swarming/api/v1/bot/handshake',
+        headers=headers,
+        params=params).json
+    token = response['xsrf_token'].encode('ascii')
+    params['attributes']['version'] = response['bot_version']
+    params['sleep_streak'] = 0
+    return token, params
+
+  def post_with_token(self, url, params, token):
+    """Does an HTTP POST with a JSON API and a XSRF token."""
+    return self.app.post_json(
+        url, params=params, headers={'X-XSRF-Token': token}).json
+
+  def bot_poll(self, bot='bot1'):
+    """Simulates a bot that polls for task."""
+    token, params = self._bot_token(bot)
+    return self.post_with_token('/swarming/api/v1/bot/poll', params, token)
 
   def client_create_task(self, name, extra_command=None):
     """Simulate a client that creates a task."""
@@ -280,7 +303,6 @@ class AppTestBase(test_case.TestCase):
     raw = self.app.post('/test', {'request': json.dumps(request)}).json
     task_id = raw['test_keys'][0]['test_key']
     return raw, task_id
-
 
 
 class FrontendTest(AppTestBase):
@@ -397,72 +419,11 @@ class FrontendTest(AppTestBase):
         {'i': ip[0], 'a': 'False', 'xsrf_token': xsrf_token})
     self.assertEqual(1, user_manager.MachineWhitelist.query().count())
 
-  def testUnsecureHandlerMachineAuthentication(self):
-    # Test non-secure handlers to make sure they check the remote machine to be
-    # whitelisted before allowing them to perform the task.
-    # List of non-secure handlers and their method.
-    handlers_to_check = [
-        ('/get_matching_test_cases', self.app.get),
-        ('/get_result', self.app.get),
-        ('/get_slave_code', self.app.get),
-        ('/poll_for_test', self.app.post),
-        ('/remote_error', self.app.post),
-        ('/result2', self.app.post),
-        ('/test', self.app.post),
-    ]
-
-    # Make sure non-whitelisted requests are rejected.
-    for handler, method in handlers_to_check:
-      response = method(handler, {}, expect_errors=True)
-      self.assertEqual(
-          '403 Forbidden', response.status, msg='Handler: ' + handler)
-
-    # Make sure whitelisted requests are accepted.
-    self.set_as_bot()
-    for handler, method in handlers_to_check:
-      response = method(handler, {}, expect_errors=True)
-      self.assertNotEqual(
-          '403 Forbidden', response.status, msg='Handler: ' + handler)
-
-  # Test that some specific non-secure handlers allow access to authenticated
-  # user. Also verify that authenticated user still can't use other handlers.
-  def testUnsecureHandlerUserAuthentication(self):
-    # List of non-secure handlers and their method that can be called by user.
-    allowed = [('/get_matching_test_cases', self.app.get),
-               ('/get_result', self.app.get),
-               ('/test', self.app.post)]
-
-    # List of non-secure handlers that should not be accessible to the user.
-    forbidden = [
-        ('/get_slave_code', self.app.get),
-        ('/poll_for_test', self.app.post),
-        ('/remote_error', self.app.post),
-        ('/result2', self.app.post),
-    ]
-
-    # Make sure all anonymous requests are rejected.
-    self.set_as_anonymous()
-    for handler, method in allowed + forbidden:
-      response = method(handler, expect_errors=True)
-      self.assertEqual(
-          '403 Forbidden', response.status, msg='Handler: ' + handler)
-
-    # Make sure for a known account 'allowed' methods are accessible
-    # and 'forbidden' are not.
-    self.set_as_user()
-    for handler, method in allowed:
-      response = method(handler, expect_errors=True)
-      self.assertNotEqual(
-          '403 Forbidden', response.status, msg='Handler: ' + handler)
-    for handler, method in forbidden:
-      response = method(handler, expect_errors=True)
-      self.assertEqual(
-          '403 Forbidden', response.status, msg='Handler: ' + handler)
-
-  # Test that all handlers are accessible only to authenticated user or machine.
-  # Assumes all routes are defined with plain paths
-  # (i.e. '/some/handler/path' and not regexps).
   def testAllSwarmingHandlersAreSecured(self):
+    # Test that all handlers are accessible only to authenticated user or
+    # bots. Assumes all routes are defined with plain paths (i.e.
+    # '/some/handler/path' and not regexps).
+
     # URL prefixes that correspond to routes that are not protected by swarming
     # app code. It may be routes that do not require login or routes protected
     # by GAE itself via 'login: admin' in app.yaml.
@@ -581,14 +542,10 @@ class FrontendTest(AppTestBase):
 
     self.set_as_bot()
     reaped = self.bot_poll('bot1')
-    self.assertEqual('RunManifest', reaped['commands'][0]['function'])
-    manifest = json.loads(reaped['commands'][0]['args'])
-    run_id = task_id[:-2] + '01'
-    self.assertEqual({'SWARMING_TASK_ID': run_id}, manifest['env_vars'])
 
     # This can only work once a bot reaped the task.
     self.set_as_privileged_user()
-    self.app.get('/user/task/%s' % run_id, status=200)
+    self.app.get('/user/task/%s' % reaped['manifest']['task_id'], status=200)
 
   def test_task_denied(self):
     # Add a task via the API as a user, then assert it can't be viewed by
@@ -726,32 +683,6 @@ class NewBotApiTest(AppTestBase):
     # Bot API test cases run by default as bot.
     self.set_as_bot()
 
-  def _token(self):
-    headers = {'X-XSRF-Token-Request': '1'}
-    params = {
-      'attributes': {
-        'dimensions': {
-          'id': 'bot1',
-          'os': ['Amiga'],
-        },
-        'id': 'bot1',
-        'ip': '127.0.0.1',
-        'version': '123',
-      },
-    }
-    response = self.app.post_json(
-        '/swarming/api/v1/bot/handshake',
-        headers=headers,
-        params=params).json
-    token = response['xsrf_token'].encode('ascii')
-    params['attributes']['version'] = response['bot_version']
-    params['sleep_streak'] = 0
-    return token, params
-
-  def post_with_token(self, url, params, token):
-    return self.app.post_json(
-        url, params=params, headers={'X-XSRF-Token': token}).json
-
   def client_get_results(self, task_id):
     return self.app.get(
         '/swarming/api/v1/client/task/%s' % task_id).json
@@ -817,7 +748,7 @@ class NewBotApiTest(AppTestBase):
     self.assertEqual(expected, errors)
 
   def test_poll_bad_version(self):
-    token, params = self._token()
+    token, params = self._bot_token()
     old_version = params['attributes']['version']
     params['attributes']['version'] = 'badversion'
     response = self.post_with_token('/swarming/api/v1/bot/poll', params, token)
@@ -829,7 +760,7 @@ class NewBotApiTest(AppTestBase):
 
   def test_poll_sleep(self):
     # A bot polls, gets nothing.
-    token, params = self._token()
+    token, params = self._bot_token()
     response = self.post_with_token('/swarming/api/v1/bot/poll', params, token)
     self.assertTrue(response.pop(u'duration'))
     expected = {
@@ -849,7 +780,7 @@ class NewBotApiTest(AppTestBase):
     self.assertEqual(expected, response)
 
   def test_poll_update(self):
-    token, params = self._token()
+    token, params = self._bot_token()
     old_version = params['attributes']['version']
     params['attributes']['version'] = 'badversion'
     response = self.post_with_token('/swarming/api/v1/bot/poll', params, token)
@@ -865,7 +796,7 @@ class NewBotApiTest(AppTestBase):
     self.mock_now(now)
     str_now = unicode(now.strftime(utils.DATETIME_FORMAT))
     # A bot polls, gets a task, updates it, completes it.
-    token, params = self._token()
+    token, params = self._bot_token()
     # Enqueue a task.
     _, task_id = self.client_create_task('hi')
     self.assertEqual('00', task_id[-2:])
@@ -903,7 +834,7 @@ class NewBotApiTest(AppTestBase):
     self.assertEqual(expected, response)
 
   def test_bot_error(self):
-    token, params = self._token()
+    token, params = self._bot_token()
     response = self.post_with_token('/swarming/api/v1/bot/poll', params, token)
     self.assertTrue(response.pop(u'duration'))
     expected = {
@@ -936,7 +867,7 @@ class NewBotApiTest(AppTestBase):
     now = datetime.datetime(2010, 1, 2, 3, 4, 5)
     self.mock_now(now)
     str_now = unicode(now.strftime(utils.DATETIME_FORMAT))
-    token, params = self._token()
+    token, params = self._bot_token()
     self.client_create_task('hi', extra_command=['cleanup.py'])
 
     def _params(**kwargs):
@@ -1020,7 +951,7 @@ class NewBotApiTest(AppTestBase):
     now = datetime.datetime(2010, 1, 2, 3, 4, 5)
     self.mock_now(now)
     str_now = unicode(now.strftime(utils.DATETIME_FORMAT))
-    token, params = self._token()
+    token, params = self._bot_token()
     self.client_create_task('hi')
     response = self.post_with_token(
         '/swarming/api/v1/bot/poll', params, token)
@@ -1054,146 +985,11 @@ class NewBotApiTest(AppTestBase):
     }
     self.assertEqual(expected, response)
 
-
-class OldBotApiTest(AppTestBase):
-  def setUp(self):
-    # Bot API test cases run by default as bot.
-    super(OldBotApiTest, self).setUp()
-    self.set_as_bot()
-
-  def testGetSlaveCode(self):
-    response = self.app.get('/get_slave_code')
-    self.assertEqual('200 OK', response.status)
-    self.assertEqual(
-        len(bot_management.get_swarming_bot_zip('http://localhost')),
-        response.content_length)
-
-  def testGetSlaveCodeHash(self):
-    response = self.app.get(
-        '/get_slave_code/%s' %
-        bot_management.get_slave_version('http://localhost'))
-    self.assertEqual('200 OK', response.status)
-    self.assertEqual(
-        len(bot_management.get_swarming_bot_zip('http://localhost')),
-        response.content_length)
-
-  def testGetSlaveCodeInvalidHash(self):
-    response = self.app.get('/get_slave_code/' + '1' * 40, expect_errors=True)
-    self.assertEqual('404 Not Found', response.status)
-
-  def testRegisterHandler(self):
-    # Missing attributes field.
-    response = self.app.post(
-        '/poll_for_test', {'something': 'nothing'}, expect_errors=True)
-    self.assertResponse(
-        response,
-        '400 Bad Request',
-        '400 Bad Request\n\n'
-        'The server could not comply with the request since it is either '
-        'malformed or otherwise incorrect.\n\n'
-        ' Invalid attributes: : No JSON object could be decoded  ')
-
-    # Invalid attributes field.
-    response = self.app.post(
-        '/poll_for_test', {'attributes': 'nothing'}, expect_errors=True)
-    self.assertResponse(
-        response,
-        '400 Bad Request',
-        '400 Bad Request\n\n'
-        'The server could not comply with the request since it is either '
-        'malformed or otherwise incorrect.\n\n'
-        ' Invalid attributes: nothing: No JSON object could be decoded  ')
-
-    # Invalid empty attributes field.
-    response = self.app.post(
-        '/poll_for_test', {'attributes': None}, expect_errors=True)
-    self.assertResponse(
-        response,
-        '400 Bad Request',
-        '400 Bad Request\n\n'
-        'The server could not comply with the request since it is either '
-        'malformed or otherwise incorrect.\n\n'
-        ' Invalid attributes: None: No JSON object could be decoded  ')
-
-    # Valid attributes but missing dimensions.
-    attributes = '{"id": "bot1"}'
-    response = self.app.post(
-        '/poll_for_test', {'attributes': attributes}, expect_errors=True)
-    self.assertResponse(
-        response,
-        '400 Bad Request',
-        '400 Bad Request\n\n'
-        'The server could not comply with the request since it is '
-        'either malformed or otherwise incorrect.\n\n'
-        ' Missing mandatory attribute: dimensions  ')
-
-  def testRegisterHandlerNoVersion(self):
-    attributes = {
-      'dimensions': {'os': ['win-xp']},
-      'id': 'bot1',
-    }
-    response = self.app.post(
-        '/poll_for_test', {'attributes': json.dumps(attributes)})
-    self.assertEqual('200 OK', response.status)
-    expected = {
-      u'commands': [
-        {
-          u'args':
-              u'http://localhost/get_slave_code/%s' %
-              bot_management.get_slave_version('http://localhost'),
-          u'function': u'UpdateSlave',
-        },
-      ],
-      u'result_url': u'http://localhost/remote_error',
-      u'try_count': 0,
-    }
-    self.assertEqual(expected, response.json)
-
-  def testRegisterHandlerVersion(self):
-    attributes = {
-      'dimensions': {'os': ['win-xp']},
-      'id': 'bot1',
-      'ip': '8.8.4.4',
-      'version': bot_management.get_slave_version('http://localhost'),
-    }
-    response = self.app.post(
-        '/poll_for_test', {'attributes': json.dumps(attributes)})
-    self.assertEqual('200 OK', response.status)
-    expected_1 = {u'come_back': 1.0, u'try_count': 1}
-    expected_2 = {u'come_back': 2.25, u'try_count': 1}
-    self.assertTrue(response.json in (expected_1, expected_2), response.json)
-
-  def testRunnerPing(self):
-    # Start a test and successfully ping it
-    _result_summary, run_result = CreateRunner(machine_id='bot1')
-    packed = task_common.pack_run_result_key(run_result.key)
-    response = self.app.post(
-        '/runner_ping', {'r': packed, 'id': run_result.bot_id})
-    self.assertResponse(response, '200 OK', 'Success.')
-
-  def testRemoteErrorHandler(self):
-    self.app.get('/restricted/ereporter2/errors', status=403)
-
-    error_message = 'error message'
-    response = self.app.post('/remote_error', {'m': error_message})
-    self.assertResponse(response, '200 OK', 'Success.')
-
-    self.assertEqual(1, ereporter2.Error.query().count())
-    error = ereporter2.Error.query().get()
-    self.assertEqual(error.message, error_message)
-
-    self.set_as_super_admin()
-    self.app.get('/restricted/ereporter2/errors', status=200)
-
-  def testRunnerPingFail(self):
-    # Try with an invalid runner key
-    response = self.app.post('/runner_ping', {'r': '1'}, expect_errors=True)
-    self.assertResponse(
-        response, '400 Bad Request',
-        '400 Bad Request\n\n'
-        'The server could not comply with the request since it is either '
-        'malformed or otherwise incorrect.\n\n'
-        ' Runner failed to ping.  ')
+  def test_get_slave_code(self):
+    code = self.app.get('/get_slave_code')
+    expected = set(('config.json', 'start_slave.py')).union(bot_archive.FILES)
+    with zipfile.ZipFile(StringIO.StringIO(code.body), 'r') as z:
+      self.assertEqual(expected, set(z.namelist()))
 
 
 class NewClientApiTest(AppTestBase):
@@ -1204,20 +1000,6 @@ class NewClientApiTest(AppTestBase):
         lambda *args, **kwargs: self.fail('%s, %s' % (args, kwargs)))
     # Client API test cases run by default as user.
     self.set_as_user()
-
-  def _token(self):
-    headers = {'X-XSRF-Token-Request': '1'}
-    params = {}
-    response = self.app.post_json(
-        '/swarming/api/v1/client/handshake',
-        headers=headers,
-        params=params).json
-    token = response['xsrf_token'].encode('ascii')
-    return token
-
-  def post_with_token(self, url, params, token):
-    return self.app.post_json(
-        url, params=params, headers={'X-XSRF-Token': token}).json
 
   def test_handshake(self):
     # Bare minimum:
@@ -1600,14 +1382,6 @@ class OldClientApiTest(AppTestBase):
     response = self.app.post('/restricted/cancel', {'r': packed})
     self.assertResponse(response, '200 OK', 'Runner canceled.')
 
-  def _PostResults(self, run_result, exit_code, output):
-    url_parameters = {
-      'id': run_result.bot_id,
-      'x': exit_code,
-      'o': output,
-      'r': task_common.pack_run_result_key(run_result.key),
-    }
-    return self.app.post('/result2', url_parameters)
 
   def testResultHandlerNotDone(self):
     result_summary, _run_result = CreateRunner(machine_id='bot1')
@@ -1627,14 +1401,25 @@ class OldClientApiTest(AppTestBase):
   def testResultHandler(self):
     # TODO(maruel): Stop using the DB directly.
     self.set_as_bot()
-    result_summary, run_result = CreateRunner(machine_id='bot1')
-    result = 'result string'
-    response = self._PostResults(run_result, '1', result)
-    self.assertResponse(
-        response, '200 OK', 'Successfully update the runner results.')
+    self.client_create_task('hi')
+    token, _ = self._bot_token()
+    res = self.bot_poll()
+    params = {
+      'command_index': 0,
+      'duration': 0.1,
+      'exit_code': 1,
+      'id': 'bot1',
+      'output': 'result string',
+      'output_chunk_start': 0,
+      'task_id': res['manifest']['task_id'],
+    }
+    response = self.post_with_token(
+        '/swarming/api/v1/bot/task_update', params, token)
+    self.assertEqual({u'ok': True}, response)
 
-    packed = task_common.pack_result_summary_key(result_summary.key)
-    resp = self.app.get('/get_result?r=%s' % packed, status=200)
+    self.set_as_privileged_user()
+    resp = self.app.get(
+        '/get_result?r=%s' % res['manifest']['task_id'], status=200)
     expected = {
       u'config_instance_index': 0,
       u'exit_codes': u'1',

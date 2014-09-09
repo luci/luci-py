@@ -8,14 +8,12 @@ Includes management of the swarming_bot.zip code and the list of known bots.
 """
 
 import datetime
-import logging
 import os.path
 
 from google.appengine.api import memcache
 from google.appengine.ext import ndb
 
 from components import datastore_utils
-from common import rpc
 from common import test_request_message
 from server import bot_archive
 from server import file_chunks
@@ -224,24 +222,6 @@ def tag_bot_seen(
       quarantined=quarantined)
   bot.put()
   return bot
-
-
-def check_version(attributes, server_url):
-  """Checks the slave version, forcing it to update if required."""
-  expected_version = get_slave_version(server_url)
-  if attributes.get('version', '') != expected_version:
-    logging.info(
-        '%s != %s, Updating slave %s',
-        expected_version, attributes.get('version', 'N/A'), attributes['id'])
-    url = server_url.rstrip('/') + '/get_slave_code/' + expected_version
-    return {
-      'commands': [rpc.BuildRPC('UpdateSlave', url)],
-      # The only time a bot would have results to send here would be if it
-      # failed to update.
-      'result_url': server_url.rstrip('/') + '/remote_error',
-      'try_count': 0,
-    }
-  return {}
 
 
 def validate_and_fix_attributes(attributes):

@@ -26,7 +26,6 @@ ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FILES = (
     '__main__.py',
     'common/__init__.py',
-    'common/rpc.py',
     'common/test_request_message.py',
     'local_test_runner.py',
     'logging_utils.py',
