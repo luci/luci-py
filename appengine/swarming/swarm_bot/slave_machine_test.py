@@ -144,7 +144,7 @@ class TestSlaveMachine(net_utils.TestCase):
           (
             'https://localhost:1/swarming/api/v1/bot/poll',
             {
-              'data': {'attributes': {}, 'sleep_streak': '1'},
+              'data': {'attributes': {}, 'sleep_streak': 1},
               'headers': {'X-XSRF-Token': 'token'},
             },
             {
@@ -176,7 +176,7 @@ class TestSlaveMachine(net_utils.TestCase):
           (
             'https://localhost:1/swarming/api/v1/bot/poll',
             {
-              'data': {'attributes': attribs, 'sleep_streak': '1'},
+              'data': {'attributes': attribs, 'sleep_streak': 1},
               'headers': {'X-XSRF-Token': 'token'},
             },
             {
@@ -209,7 +209,7 @@ class TestSlaveMachine(net_utils.TestCase):
           (
             'https://localhost:1/swarming/api/v1/bot/poll',
             {
-              'data': {'attributes': {}, 'sleep_streak': '1'},
+              'data': {'attributes': {}, 'sleep_streak': 1},
               'headers': {'X-XSRF-Token': 'token'},
             },
             {

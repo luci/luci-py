@@ -168,7 +168,7 @@ def poll_server(remote, attributes, consecutive_sleeps):
   """Polls the server to run one loop."""
   data = {
     'attributes': attributes,
-    'sleep_streak': str(consecutive_sleeps),
+    'sleep_streak': consecutive_sleeps,
   }
   resp = remote.url_read_json('/swarming/api/v1/bot/poll', data=data)
   logging.debug('Server response:\n%s', resp)
