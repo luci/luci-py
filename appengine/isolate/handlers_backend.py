@@ -409,6 +409,18 @@ class InternalVerifyWorkerHandler(webapp2.RequestHandler):
     future.wait()
 
 
+class InternalStatsUpdateHandler(webapp2.RequestHandler):
+  """Called every few minutes to update statistics."""
+  @decorators.require_cronjob
+  def get(self):
+    self.response.headers['Content-Type'] = 'text/plain'
+    minutes = stats.generate_stats()
+    if minutes is not None:
+      msg = 'Processed %d minutes' % minutes
+      logging.info(msg)
+      self.response.write(msg)
+
+
 ### Mapreduce related handlers
 
 
@@ -459,8 +471,7 @@ def get_routes():
 
     # Stats
     webapp2.Route(
-        r'/internal/cron/stats/update',
-        stats.InternalStatsUpdateHandler),
+        r'/internal/cron/stats/update', InternalStatsUpdateHandler),
 
     # Mapreduce related urls.
     webapp2.Route(

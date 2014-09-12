@@ -101,3 +101,12 @@ class StatsGvizHoursHandler(StatsGvizHandlerBase):
 
 class StatsGvizMinutesHandler(StatsGvizHandlerBase):
   RESOLUTION = 'minutes'
+
+
+def get_routes():
+  return [
+    webapp2.Route(r'/stats', StatsHandler),
+    webapp2.Route(r'/isolate/api/v1/stats/days', StatsGvizDaysHandler),
+    webapp2.Route(r'/isolate/api/v1/stats/hours', StatsGvizHoursHandler),
+    webapp2.Route(r'/isolate/api/v1/stats/minutes', StatsGvizMinutesHandler),
+  ]

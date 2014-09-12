@@ -9,14 +9,13 @@ for general performance concerns. Each http handler should strive to do only one
 log entry at info level per request.
 """
 
-import logging
-
-import webapp2
 from google.appengine.ext import ndb
 
-from components import decorators
 from components import stats_framework
 from components import utils
+
+
+# Class has no __init__ method - pylint: disable=W0232
 
 
 ### Models
@@ -138,16 +137,7 @@ def add_entry(action, number, where):
       '%s; %d; %s' % (_ACTION_NAMES[action], number, where))
 
 
-### Handlers
+def generate_stats():
+  """Returns the number of minutes processed."""
+  return STATS_HANDLER.process_next_chunk(stats_framework.TOO_RECENT)
 
-
-class InternalStatsUpdateHandler(webapp2.RequestHandler):
-  """Called every few minutes to update statistics."""
-  @decorators.require_cronjob
-  def get(self):
-    self.response.headers['Content-Type'] = 'text/plain'
-    i = STATS_HANDLER.process_next_chunk(stats_framework.TOO_RECENT)
-    if i is not None:
-      msg = 'Processed %d minutes' % i
-      logging.info(msg)
-      self.response.write(msg)

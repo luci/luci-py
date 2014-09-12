@@ -2,14 +2,12 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
-import datetime
 import logging
 
 from google.appengine.ext import ndb
 
 from components import auth
 from components import utils
-import template
 
 
 # Names of groups.
@@ -157,9 +155,10 @@ def get_user_type():
   return 'unknown user'
 
 
-def bootstrap_dev_server_acls():
+def bootstrap():
   """Adds 127.0.0.1 as a whitelisted IP when testing."""
-  assert utils.is_local_dev_server()
+  if not utils.is_local_dev_server():
+    return
 
   # Add to IP whitelist.
   access_id = _ip_to_str('v4', 2130706433)
@@ -181,70 +180,32 @@ def bootstrap_dev_server_acls():
         'Users that can manage groups')
 
 
-### Handlers
+def add_whitelist(ip, group, comment):
+  if not comment:
+    raise ValueError('Comment is required.')
+  original_ip = ip
+  mask = 32
+  if '/' in ip:
+    ip, mask = ip.split('/', 1)
+    mask = int(mask)
 
+  if not all(_ip_to_str(*_parse_ip(i)) for i in _expand_subnet(ip, mask)):
+    raise ValueError('IP is invalid')
 
-class RestrictedWhitelistIPHandler(auth.AuthenticatingHandler):
-  """Whitelists the current IP.
-
-  This handler must have login:admin in app.yaml.
-  """
-
-  @auth.require(isolate_admin)
-  def get(self):
-    # The user must authenticate with a user credential before being able to
-    # whitelist the IP. This is done with login:admin.
-    params = {
-      'default_comment': '',
-      'default_group': '',
-      'default_ip': self.request.remote_addr,
-      'note': '',
-    }
-    self.common(params)
-
-  @auth.require(isolate_admin)
-  def post(self):
-    comment = self.request.get('comment')
-    group = self.request.get('group')
-    ip = self.request.get('ip')
-    if not comment:
-      self.abort(403, 'Comment is required.')
-    mask = 32
-    if '/' in ip:
-      ip, mask = ip.split('/', 1)
-      mask = int(mask)
-
-    if not all(_ip_to_str(*_parse_ip(i)) for i in _expand_subnet(ip, mask)):
-      self.abort(403, 'IP is invalid')
-
-    note = []
-    for i in _expand_subnet(ip, mask):
-      key = _ip_to_str(*_parse_ip(i))
-      item = WhitelistedIP.get_by_id(key)
-      item_comment = comment
-      if mask != 32:
-        item_comment += ' ' + self.request.get('ip')
-      if item:
-        item.comment = item_comment
-        item.group = group
-        item.ip = i
-        item.put()
-        note.append('Already present: %s' % i)
-      else:
-        WhitelistedIP(id=key, comment=item_comment, group=group, ip=i).put()
-        note.append('Success: %s' % i)
-
-    params = {
-      'default_comment': self.request.get('comment'),
-      'default_group': self.request.get('group'),
-      'default_ip': self.request.get('ip'),
-      'note': '<br>'.join(note),
-    }
-    self.common(params)
-
-  def common(self, params):
-    params['now'] = datetime.datetime.utcnow()
-    params['xsrf_token'] = self.generate_xsrf_token()
-    params['whitelistips'] = WhitelistedIP.query()
-    self.response.headers['Content-Type'] = 'text/html'
-    self.response.out.write(template.render('isolate/whitelistip.html', params))
+  note = []
+  for i in _expand_subnet(ip, mask):
+    key = _ip_to_str(*_parse_ip(i))
+    item = WhitelistedIP.get_by_id(key)
+    item_comment = comment
+    if mask != 32:
+      item_comment += ' ' + original_ip
+    if item:
+      item.comment = item_comment
+      item.group = group
+      item.ip = i
+      item.put()
+      note.append('Already present: %s' % i)
+    else:
+      WhitelistedIP(id=key, comment=item_comment, group=group, ip=i).put()
+      note.append('Success: %s' % i)
+  return note
