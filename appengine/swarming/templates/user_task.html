@@ -143,7 +143,16 @@
     </tr>
     <tr>
       <td>State</td>
-      <td>{{task.to_string()}} ({{task.state}})</td>
+      <td>
+        {{task.to_string()}} ({{task.state}})
+        {% if task.can_be_canceled and is_admin %}
+          <form id="cancel" method="post" action="/user/tasks/cancel">
+            <input type="hidden" name="xsrf_token" value="{{xsrf_token}}" />
+            <input type="hidden" name="task_id" value="{{task.key_string}}" />
+            <input type="submit" value="Cancel" />
+          </form>
+        {% endif %}
+      </td>
     </tr>
     <tr>
       <td>Bot</td>

@@ -448,6 +448,7 @@ class TasksHandler(auth.AuthenticatingHandler):
     ndb.Future.wait_all(futures)
     params = {
       'cursor': cursor_str,
+      'is_admin': acl.is_admin(),
       'is_privileged_user': acl.is_privileged_user(),
       'limit': limit,
       'now': now,
@@ -457,6 +458,7 @@ class TasksHandler(auth.AuthenticatingHandler):
       'state_choices': state_choices,
       'tasks': tasks,
       'task_name': task_name,
+      'xsrf_token': self.generate_xsrf_token(),
     }
     # TODO(maruel): If admin or if the user is task's .user, show the Cancel
     # button. Do not show otherwise.
@@ -648,6 +650,7 @@ class TaskHandler(auth.AuthenticatingHandler):
 
     params = {
       'bot': bot_future.get_result() if bot_future else None,
+      'is_admin': acl.is_admin(),
       'is_privileged_user': acl.is_privileged_user(),
       'following_task_id': following_task_id,
       'following_task_name': following_task_name,
@@ -657,8 +660,41 @@ class TaskHandler(auth.AuthenticatingHandler):
       'previous_task_name': previous_task_name,
       'request': request,
       'task': result,
+      'xsrf_token': self.generate_xsrf_token(),
     }
     self.response.out.write(template.render('swarming/user_task.html', params))
+
+
+class TaskCancelHandler(auth.AuthenticatingHandler):
+  """Cancel a task."""
+
+  @auth.require(acl.is_admin)
+  def post(self):
+    """Ensures that the associated TaskToRun is canceled and update the
+    TaskResultSummary accordingly.
+
+    TODO(maruel): If a bot is running the task, mark the TaskRunResult as
+    canceled and tell the bot on the next ping to reboot itself.
+    """
+    key_id = self.request.get('task_id', '')
+    try:
+      key = task_scheduler.unpack_result_summary_key(key_id)
+    except ValueError:
+      self.abort_with_error(400, error='Invalid key')
+    redirect_to = self.request.get('redirect_to', '')
+
+    request_key = task_result.result_summary_key_to_request_key(key)
+    task_key = task_to_run.request_to_task_to_run_key(request_key.get())
+    task_to_run.abort_task_to_run(task_key.get())
+    result_summary = key.get()
+    if result_summary.can_be_canceled:
+      result_summary.state = task_result.State.CANCELED
+      result_summary.abandoned_ts = utils.utcnow()
+      result_summary.put()
+    if redirect_to == 'listing':
+      self.redirect('/user/tasks')
+    else:
+      self.redirect('/user/task/%s' % key_id)
 
 
 ### New Client APIs.
@@ -882,94 +918,6 @@ class GetResultHandler(auth.AuthenticatingHandler):
 
     self.response.headers['Content-Type'] = 'application/json; charset=utf-8'
     self.response.out.write(json.dumps(results))
-
-
-class CancelHandler(auth.AuthenticatingHandler):
-  """Cancel a test runner that is not already running."""
-
-  # TODO(vadimsh): Implement XSRF token support.
-  xsrf_token_enforce_on = ()
-
-  @auth.require(acl.is_admin)
-  def post(self):
-    """Ensures that the associated TaskToRun is canceled and update the
-    TaskResultSummary accordingly.
-
-    TODO(maruel): If a bot is running the task, mark the TaskRunResult as
-    canceled and tell the bot on the next ping to reboot itself.
-    """
-    # TODO(maruel): Users can cancel their own task.
-    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
-
-    runner_key = self.request.get('r', '')
-    # Make sure found runner is not yet running.
-    try:
-      result_summary_key = task_scheduler.unpack_result_summary_key(runner_key)
-    except ValueError:
-      self.response.out.write('Unable to cancel runner')
-      self.response.set_status(400)
-      return
-
-    # TODO(maruel): Move this code into task_scheduler.py.
-    request_key = task_result.result_summary_key_to_request_key(
-        result_summary_key)
-    task_key = task_to_run.request_to_task_to_run_key(request_key.get())
-    task_to_run.abort_task_to_run(task_key.get())
-    result_summary = result_summary_key.get()
-    result_summary.state = task_result.State.CANCELED
-    result_summary.abandoned_ts = utils.utcnow()
-    result_summary.put()
-    self.response.out.write('Runner canceled.')
-
-
-class RetryHandler(auth.AuthenticatingHandler):
-  """Retry a test runner again."""
-
-  # TODO(vadimsh): Implement XSRF token support.
-  xsrf_token_enforce_on = ()
-
-  @auth.require(acl.is_admin)
-  def post(self):
-    """Duplicates the original request into a new one.
-
-    Only change the ownership to the user that requested the retry.
-    TaskProperties is unchanged.
-    """
-    # TODO(maruel): Users can cancel their own task.
-    runner_key = self.request.get('r', '')
-    try:
-      result_key = task_scheduler.unpack_result_summary_key(runner_key)
-    except ValueError:
-      self.response.set_status(400)
-      self.response.out.write('Unable to retry runner')
-      return
-
-    request = task_result.result_summary_key_to_request_key(result_key).get()
-    # TODO(maruel): Decide if it will be supported, and if so create a proper
-    # function to 'duplicate' a TaskRequest in task_request.py.
-    # TODO(maruel): Delete.
-    data = {
-      'name': request.name,
-      'user': request.user,
-      'properties': {
-        'commands': request.properties.commands,
-        'data': request.properties.data,
-        'dimensions': request.properties.dimensions,
-        'env': request.properties.env,
-        'execution_timeout_secs': request.properties.execution_timeout_secs,
-        'io_timeout_secs': request.properties.io_timeout_secs,
-      },
-      'priority': request.priority,
-      'scheduling_expiration_secs': request.scheduling_expiration_secs,
-      'tags': request.tags,
-    }
-    # TODO(maruel): The user needs to have a way to get the new task id.
-    task_scheduler.make_request(data)
-
-    # TODO(maruel): Return the new TaskRequest key.
-    # TODO(maruel): Use json encoded return values for the APIs.
-    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
-    self.response.out.write('Runner set for retry.')
 
 
 ### Bot download URLs.
@@ -1409,6 +1357,7 @@ def create_application(debug):
       # User pages.
       ('/user/tasks', TasksHandler),
       ('/user/task/<key_id:[0-9a-fA-F]+>', TaskHandler),
+      ('/user/tasks/cancel', TaskCancelHandler),
 
       # Privileged user pages.
       ('/restricted/bots', BotsListHandler),
@@ -1418,10 +1367,6 @@ def create_application(debug):
       ('/restricted/whitelist_ip', WhitelistIPHandler),
       ('/restricted/upload_start_slave', UploadStartSlaveHandler),
       ('/restricted/upload_bootstrap', UploadBootstrapHandler),
-
-      # Eventually accessible for client.
-      ('/restricted/cancel', CancelHandler),
-      ('/restricted/retry', RetryHandler),
 
       # Client API, in some cases also indirectly used by the frontend. To be
       # removed.

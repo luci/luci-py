@@ -185,6 +185,9 @@ class TaskResultApiTest(test_case.TestCase):
     }
     self.assertEqual(expected, actual.to_dict())
     self.assertEqual(50, actual.priority)
+    self.assertEqual(True, actual.can_be_canceled)
+    actual.state = task_result.State.RUNNING
+    self.assertEqual(False, actual.can_be_canceled)
 
   def test_new_run_result(self):
     request = task_request.make_request(_gen_request_data())
@@ -205,6 +208,7 @@ class TaskResultApiTest(test_case.TestCase):
     }
     self.assertEqual(expected, actual.to_dict())
     self.assertEqual(50, actual.priority)
+    self.assertEqual(False, actual.can_be_canceled)
 
   def test_integration(self):
     # Creates a TaskRequest, along its TaskResultSummary and TaskToRun. Have a

@@ -141,7 +141,6 @@
       <th>Requested</th>
       <th>Pending</th>
       <th>Started</th>
-      <th>Ended</th>
       <th>Duration</th>
       <th>Bot</th>
       <th>Priority</th>
@@ -152,11 +151,22 @@
           <td>
             <a href="/user/task/{{task.key_string}}">{{task.name}}</a>
           </td>
-          <td>{{task.to_string()|safe}}</td>
+          <td>
+            {{task.to_string()|safe}}
+            {% if task.can_be_canceled and is_admin %}
+              <form id="cancel_{{task.key_string}}" method="post"
+                  action="/user/tasks/cancel">
+                <input type="hidden" name="redirect_to" value="listing" />
+                <input type="hidden" name="xsrf_token" value="{{xsrf_token}}" />
+                <input type="hidden" name="task_id"
+                    value="{{task.key_string}}" />
+                <input type="submit" value="Cancel" />
+              </form>
+            {% endif %}
+          </td>
           <td nowrap align=center>{{task.created_ts|succinctdatetimeformat}}</td>
           <td nowrap align=right>{{task.pending_now()|timedeltaformat}}</td>
           <td nowrap align=center>{{task.started_ts|succinctdatetimeformat}}</td>
-          <td nowrap align=center>{{task.ended_ts|succinctdatetimeformat}}</td>
           <td nowrap align=right>{{task.duration_now()|timedeltaformat}}</td>
           <td nowrap>{{bot_view.bot_link(task.bot_id, is_privileged_user)}}</td>
           <td nowrap align=right>{{task.priority}}</td>

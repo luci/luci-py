@@ -581,6 +581,23 @@ class FrontendTest(AppTestBase):
 
     self.app.get('/user/tasks?task_name=hi', status=200)
 
+  def test_task_cancel(self):
+    self.set_as_privileged_user()
+    _, task_id = self.client_create_task('hi')
+
+    self.set_as_admin()
+    # Just ensure it doesn't crash when it shows the 'Cancel' button.
+    self.app.get('/user/tasks')
+
+    xsrf_token = self.getXsrfToken()
+    self.app.post(
+        '/user/tasks/cancel', {'task_id': task_id, 'xsrf_token': xsrf_token})
+
+    # Ensure there's no task available anymore by polling.
+    self.set_as_bot()
+    reaped = self.bot_poll('bot1')
+    self.assertEqual('sleep', reaped['cmd'])
+
   def test_bot_list_empty(self):
     # Just assert it doesn't throw.
     self.set_as_admin()
@@ -1288,21 +1305,6 @@ class OldClientApiTest(AppTestBase):
     self.assertEqual(expected_result_string, results['output'])
     self.assertEqual(u'\ufffd Invalid utf-8 string', results['output'])
 
-  def testRetryHandler(self):
-    self.set_as_admin()
-
-    # Test when no matching key
-    response = self.app.post(
-        '/restricted/retry', {'r': 'fake_key'}, expect_errors=True)
-    self.assertEqual('400 Bad Request', response.status)
-    self.assertEqual('Unable to retry runner', response.body)
-
-    # Test with matching key.
-    result_summary, _run_result = CreateRunner(exit_codes='0')
-    packed = task_common.pack_result_summary_key(result_summary.key)
-    response = self.app.post('/restricted/retry', {'r': packed})
-    self.assertResponse(response, '200 OK', 'Runner set for retry.')
-
   def test_convert_test_case(self):
     self.set_as_bot()
     data = {
@@ -1368,20 +1370,6 @@ class OldClientApiTest(AppTestBase):
       'tags': [],
     }
     self.assertEqual(expected, actual)
-
-  def testCancelHandler(self):
-    self.set_as_admin()
-
-    response = self.app.post(
-        '/restricted/cancel', {'r': 'invalid_key'}, expect_errors=True)
-    self.assertEqual('400 Bad Request', response.status)
-    self.assertEqual('Unable to cancel runner', response.body)
-
-    result_summary, _run_result = CreateRunner()
-    packed = task_common.pack_result_summary_key(result_summary.key)
-    response = self.app.post('/restricted/cancel', {'r': packed})
-    self.assertResponse(response, '200 OK', 'Runner canceled.')
-
 
   def testResultHandlerNotDone(self):
     result_summary, _run_result = CreateRunner(machine_id='bot1')

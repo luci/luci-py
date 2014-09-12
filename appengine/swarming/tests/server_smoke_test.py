@@ -184,7 +184,7 @@ class SwarmingTestCase(unittest.TestCase):
     logging.info('Found: %s', ' '.join(swarm_files))
     return swarm_files
 
-  def trigger_swarm_file(self, swarm_file, running_tests, tests_to_cancel):
+  def trigger_swarm_file(self, swarm_file, running_tests):
     # TODO(maruel): Stop hacking this up and use swarming.py trigger.
     logging.info('trigger_swarm_file(%s)', swarm_file)
     with open(swarm_file, 'rb') as f:
@@ -198,10 +198,7 @@ class SwarmingTestCase(unittest.TestCase):
     current_test_keys = []
     for test_key in test_keys['test_keys']:
       current_test_keys.append(test_key['test_key'])
-      if 'To Cancel' in test_keys['test_case_name']:
-        tests_to_cancel.append(test_key)
-      else:
-        running_tests.append(test_key)
+      running_tests.append(test_key)
       logging.info('Config: %s, index: %s/%s, test key: %s',
                     test_key['config_name'],
                     int(test_key['instance_index']) + 1,
@@ -231,16 +228,8 @@ class SwarmingTestCase(unittest.TestCase):
 
     # Sends a series of .swarm files to the server.
     running_tests = []
-    tests_to_cancel = []
     for swarm_file in self.get_swarm_files():
-      self.trigger_swarm_file(swarm_file, running_tests, tests_to_cancel)
-
-    # Cancel all the tests that are suppose to be cancelled.
-    url = urlparse.urljoin(self.server_url, 'restricted/cancel')
-    for test in tests_to_cancel:
-      data = urllib.urlencode({'r': test['test_key']})
-      resp = urllib2.urlopen(url, data=data).read()
-      self.assertEqual('Runner canceled.', resp)
+      self.trigger_swarm_file(swarm_file, running_tests)
 
     # The slave machine is running along with this test. Thus it may take
     # some time before all the tests complete. We will keep polling the results

@@ -218,6 +218,10 @@ class _TaskResultCommon(ndb.Model):
   abandoned_ts = ndb.DateTimeProperty()
 
   @property
+  def can_be_canceled(self):
+    return self.state == State.PENDING
+
+  @property
   def ended_ts(self):
     return self.completed_ts or self.abandoned_ts
 
