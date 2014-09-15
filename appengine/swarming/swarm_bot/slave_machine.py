@@ -62,7 +62,7 @@ def get_attributes_failsafe():
   }
 
 
-def get_current_state(started_ts):
+def get_current_state(started_ts, sleep_streak):
   """Returns dict with a state of the bot reported to the server with each poll.
 
   Supposed to be use only for dynamic state that changes while bot is running.
@@ -74,12 +74,14 @@ def get_current_state(started_ts):
 
   Args:
     started_ts: when bot started polling.
+    sleep_streak: number of consecutive sleeps up till now.
   """
   # TODO(vadimsh): Send also results of 'uptime' command? Maybe also current
   # amount of RAM, open file descriptors, processes or any other leaky
   # resources. So that the server can decided to reboot the bot to clean up.
   return {
     'running_time': time.time() - started_ts,
+    'sleep_streak': sleep_streak,
   }
 
 
@@ -180,19 +182,25 @@ def run_bot(remote, error):
   consecutive_sleeps = 0
   while True:
     try:
-      consecutive_sleeps = poll_server(
-          remote, attributes, get_current_state(started_ts), consecutive_sleeps)
+      did_something = poll_server(
+          remote, attributes, get_current_state(started_ts, consecutive_sleeps))
+      if did_something:
+        consecutive_sleeps = 0
+      else:
+        consecutive_sleeps += 1
     except Exception as e:
       post_error(remote, attributes, str(e))
       consecutive_sleeps = 0
 
 
-def poll_server(remote, attributes, current_state, consecutive_sleeps):
-  """Polls the server to run one loop."""
+def poll_server(remote, attributes, state):
+  """Polls the server to run one loop.
+
+  Returns True if executed some action, False if server asked the bot to sleep.
+  """
   data = {
     'attributes': attributes,
-    'sleep_streak': consecutive_sleeps,
-    'state': current_state,
+    'state': state,
   }
   resp = remote.url_read_json('/swarming/api/v1/bot/poll', data=data)
   logging.debug('Server response:\n%s', resp)
@@ -200,23 +208,18 @@ def poll_server(remote, attributes, current_state, consecutive_sleeps):
   cmd = resp['cmd']
   if cmd == 'sleep':
     time.sleep(resp['duration'])
-    consecutive_sleeps += 1
+    return False
 
-  elif cmd == 'run':
+  if cmd == 'run':
     run_manifest(remote, attributes, resp['manifest'])
-    consecutive_sleeps = 0
-
   elif cmd == 'update':
     update_bot(remote, attributes, resp['version'])
-    consecutive_sleeps = 0
-
   elif cmd == 'restart':
     restart_bot(remote, attributes, resp['message'])
-    consecutive_sleeps = 0
-
   else:
     raise ValueError('Unexpected command: %s\n%s' % (cmd, resp))
-  return consecutive_sleeps
+
+  return True
 
 
 def run_manifest(remote, attributes, manifest):

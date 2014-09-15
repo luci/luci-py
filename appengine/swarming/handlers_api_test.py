@@ -257,8 +257,7 @@ class AppTestBase(test_case.TestCase):
         params=params).json
     token = response['xsrf_token'].encode('ascii')
     params['attributes']['version'] = response['bot_version']
-    params['state'] = {'running_time': 1234.0}
-    params['sleep_streak'] = 0
+    params['state'] = {'running_time': 1234.0, 'sleep_streak': 0}
     return token, params
 
   def post_with_token(self, url, params, token):
@@ -391,7 +390,7 @@ class BotApiTest(AppTestBase):
     self.assertEqual(expected, response)
 
     # Sleep again
-    params['sleep_streak'] += 1
+    params['state']['sleep_streak'] += 1
     response = self.post_with_token('/swarming/api/v1/bot/poll', params, token)
     self.assertTrue(response.pop(u'duration'))
     expected = {
@@ -414,7 +413,7 @@ class BotApiTest(AppTestBase):
   def test_poll_restart(self):
     def mock_should_restart_bot(bot_id, _attributes, state):
       self.assertEqual('bot1', bot_id)
-      self.assertEqual({'running_time': 1234.0}, state)
+      self.assertEqual({'running_time': 1234.0, 'sleep_streak': 0}, state)
       return True, 'Mocked restart message'
     self.mock(bot_management, 'should_restart_bot', mock_should_restart_bot)
 

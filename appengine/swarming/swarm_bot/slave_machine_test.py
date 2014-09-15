@@ -60,8 +60,10 @@ class TestSlaveMachine(net_utils.TestCase):
     self.mock(time, 'time', lambda: 123.0)
     expected = {
       'running_time': 23.0,
+      'sleep_streak': 123,
     }
-    self.assertEqual(expected, slave_machine.get_current_state(100.0))
+    self.assertEqual(
+        expected, slave_machine.get_current_state(100.0, 123))
 
   def test_post_error_task(self):
     self.mock(logging, 'error', lambda *_: None)
@@ -96,19 +98,16 @@ class TestSlaveMachine(net_utils.TestCase):
     class Foo(Exception):
       pass
 
-    expected_state = {'a': 1, 'b': 2}
-    self.mock(slave_machine, 'get_current_state', lambda _: expected_state)
-
     expected_attribs = slave_machine.get_attributes()
     expected_attribs['version'] = '123'
 
-    def poll_server(remote, attributes, state, sleep_streak):
+    def poll_server(remote, attributes, state):
+      sleep_streak = state['sleep_streak']
       self.assertEqual(remote, server)
       self.assertEqual(expected_attribs, attributes)
-      self.assertEqual(expected_state, state)
       if sleep_streak == 5:
         raise Exception('Jumping out of the loop')
-      return sleep_streak + 1
+      return False
     self.mock(slave_machine, 'poll_server', poll_server)
 
     def post_error(remote, attributes, e):
@@ -154,7 +153,7 @@ class TestSlaveMachine(net_utils.TestCase):
           (
             'https://localhost:1/swarming/api/v1/bot/poll',
             {
-              'data': {'attributes': {}, 'state': {}, 'sleep_streak': 1},
+              'data': {'attributes': {'a': 1}, 'state': {'s': 1}},
               'headers': {'X-XSRF-Token': 'token'},
             },
             {
@@ -164,7 +163,7 @@ class TestSlaveMachine(net_utils.TestCase):
           ),
         ])
     server = url_helper.XsrfRemote('https://localhost:1/')
-    self.assertEqual(2, slave_machine.poll_server(server, {}, {}, 1))
+    self.assertFalse(slave_machine.poll_server(server, {'a': 1}, {'s': 1}))
     self.assertEqual([1.24], slept)
 
   def test_poll_server_run(self):
@@ -187,7 +186,7 @@ class TestSlaveMachine(net_utils.TestCase):
           (
             'https://localhost:1/swarming/api/v1/bot/poll',
             {
-              'data': {'attributes': attribs, 'state': {}, 'sleep_streak': 1},
+              'data': {'attributes': attribs, 'state': {'s': 1}},
               'headers': {'X-XSRF-Token': 'token'},
             },
             {
@@ -197,7 +196,7 @@ class TestSlaveMachine(net_utils.TestCase):
           ),
         ])
     server = url_helper.XsrfRemote('https://localhost:1/')
-    self.assertEqual(0, slave_machine.poll_server(server, attribs, {}, 1))
+    self.assertTrue(slave_machine.poll_server(server, attribs, {'s': 1}))
     expected = [
       (server, {'b': 'c'}, {'foo': 'bar'}),
     ]
@@ -221,7 +220,7 @@ class TestSlaveMachine(net_utils.TestCase):
           (
             'https://localhost:1/swarming/api/v1/bot/poll',
             {
-              'data': {'attributes': {}, 'state': {}, 'sleep_streak': 1},
+              'data': {'attributes': {'a': 1}, 'state': {'s': 1}},
               'headers': {'X-XSRF-Token': 'token'},
             },
             {
@@ -231,8 +230,8 @@ class TestSlaveMachine(net_utils.TestCase):
           ),
         ])
     server = url_helper.XsrfRemote('https://localhost:1/')
-    self.assertEqual(0, slave_machine.poll_server(server, {}, {}, 1))
-    self.assertEqual([(server, {}, '123')], update)
+    self.assertTrue(slave_machine.poll_server(server, {'a': 1}, {'s': 1}))
+    self.assertEqual([(server, {'a': 1}, '123')], update)
 
   def test_poll_server_restart(self):
     restart = []
@@ -252,7 +251,7 @@ class TestSlaveMachine(net_utils.TestCase):
           (
             'https://localhost:1/swarming/api/v1/bot/poll',
             {
-              'data': {'attributes': {}, 'state': {}, 'sleep_streak': 1},
+              'data': {'attributes': {'a': 1}, 'state': {'s': 1}},
               'headers': {'X-XSRF-Token': 'token'},
             },
             {
@@ -262,8 +261,8 @@ class TestSlaveMachine(net_utils.TestCase):
           ),
         ])
     server = url_helper.XsrfRemote('https://localhost:1/')
-    self.assertEqual(0, slave_machine.poll_server(server, {}, {}, 1))
-    self.assertEqual([(server, {}, 'Please die now')], restart)
+    self.assertTrue(slave_machine.poll_server(server, {'a': 1}, {'s': 1}))
+    self.assertEqual([(server, {'a': 1}, 'Please die now')], restart)
 
   def test_run_manifest(self):
     self.mock(slave_machine, 'post_error', self.fail)

@@ -457,20 +457,27 @@ class BotPollHandler(auth.ApiHandler):
   all the fleet at once, they should still be up just enough to be able to
   self-update again even if they don't get task assigned anymore.
   """
-  EXPECTED_KEYS = frozenset([u'attributes', u'sleep_streak', u'state'])
+  EXPECTED_KEYS = frozenset([u'attributes', u'state'])
   ACCEPTED_ATTRIBUTES = frozenset(
       [u'dimensions', u'id', u'ip', u'quarantined', u'version'])
   REQUIRED_ATTRIBUTES = frozenset([u'dimensions', u'id', u'ip', u'version'])
-  ACCEPTED_STATE_KEYS = frozenset([u'running_time'])
-  REQUIRED_STATE_KEYS = frozenset([])
+  ACCEPTED_STATE_KEYS = frozenset([u'running_time', u'sleep_streak'])
+  REQUIRED_STATE_KEYS = frozenset([u'running_time', u'sleep_streak'])
 
   @auth.require(acl.is_bot)
   def post(self):
     request = self.parse_body()
 
     # TODO(vadimsh): Get rid of this line when all bots are updated to the
-    # version that sends 'state'.
+    # version that sends 'state' and 'running_time'.
     request.setdefault('state', {})
+    if 'running_time' not in request['state']:
+      request['state']['running_time'] = 0
+
+    # TODO(vadimsh): Get rid of this line when all bots are updated to the
+    # version that sends 'sleep_streak' in 'state'.
+    if 'sleep_streak' in request:
+      request['state']['sleep_streak'] = request.pop('sleep_streak')
 
     log_unexpected_keys(
         self.EXPECTED_KEYS, request, self.request, 'bot', 'keys')
@@ -485,7 +492,7 @@ class BotPollHandler(auth.ApiHandler):
         self.ACCEPTED_STATE_KEYS, self.REQUIRED_STATE_KEYS, state,
         self.request, 'bot', 'state')
 
-    sleep_streak = request.get('sleep_streak', 0)
+    sleep_streak = state['sleep_streak']
     # Be very permissive on missing values. This can happen because of errors on
     # the bot, *we don't want to deny them the capacity to update*, so that the
     # bot code is eventually fixed and the bot self-update to this working code.
