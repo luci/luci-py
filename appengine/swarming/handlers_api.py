@@ -457,21 +457,33 @@ class BotPollHandler(auth.ApiHandler):
   all the fleet at once, they should still be up just enough to be able to
   self-update again even if they don't get task assigned anymore.
   """
-  EXPECTED_KEYS = frozenset([u'attributes', u'sleep_streak'])
+  EXPECTED_KEYS = frozenset([u'attributes', u'sleep_streak', u'state'])
   ACCEPTED_ATTRIBUTES = frozenset(
       [u'dimensions', u'id', u'ip', u'quarantined', u'version'])
   REQUIRED_ATTRIBUTES = frozenset([u'dimensions', u'id', u'ip', u'version'])
+  ACCEPTED_STATE_KEYS = frozenset([u'running_time'])
+  REQUIRED_STATE_KEYS = frozenset([])
 
   @auth.require(acl.is_bot)
   def post(self):
     request = self.parse_body()
 
+    # TODO(vadimsh): Get rid of this line when all bots are updated to the
+    # version that sends 'state'.
+    request.setdefault('state', {})
+
     log_unexpected_keys(
         self.EXPECTED_KEYS, request, self.request, 'bot', 'keys')
+
     attributes = request.get('attributes', {})
     log_unexpected_subset_keys(
         self.ACCEPTED_ATTRIBUTES, self.REQUIRED_ATTRIBUTES, attributes,
         self.request, 'bot', 'attributes')
+
+    state = request.get('state', {})
+    log_unexpected_subset_keys(
+        self.ACCEPTED_STATE_KEYS, self.REQUIRED_STATE_KEYS, state,
+        self.request, 'bot', 'state')
 
     sleep_streak = request.get('sleep_streak', 0)
     # Be very permissive on missing values. This can happen because of errors on
@@ -530,6 +542,13 @@ class BotPollHandler(auth.ApiHandler):
       self._cmd_sleep(sleep_streak, quarantined)
       return
 
+    # Bot may need a reboot if it is running for too long.
+    needs_restart, restart_message = bot_management.should_restart_bot(
+        bot_id, attributes, state)
+    if needs_restart:
+      self._cmd_restart(restart_message)
+      return
+
     # The bot is in good shape. Try to grab a task.
     try:
       # This is a fairly complex function call, exceptions are expected.
@@ -577,6 +596,14 @@ class BotPollHandler(auth.ApiHandler):
     out = {
       'cmd': 'update',
       'version': expected_version,
+    }
+    self.send_response(out)
+
+  def _cmd_restart(self, message):
+    logging.info('Rebooting bot: %s', message)
+    out = {
+      'cmd': 'restart',
+      'message': message,
     }
     self.send_response(out)
 

@@ -271,3 +271,18 @@ def validate_and_fix_attributes(attributes):
   if 'id' not in attributes:
     raise test_request_message.Error('Missing mandatory attribute: id')
   attributes.setdefault('try_count', 0)
+
+
+def should_restart_bot(_bot_id, _attributes, _state):
+  """Decides whether a bot needs to be restarted.
+
+  Args:
+    bot_id: ID of the bot.
+    attributes: A dictionary representing the machine attributes.
+    state: A dictionary representing current bot state.
+
+  Returns:
+    Tuple (True to restart, text message explaining the reason).
+  """
+  # TODO(vadimsh): Implement.
+  return False, ''

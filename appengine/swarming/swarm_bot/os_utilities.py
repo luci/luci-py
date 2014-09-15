@@ -768,19 +768,27 @@ def setup_auto_startup_osx(command, cwd, plistname):
   return _write(filepath, _generate_launchd_plist(command, cwd, plistname))
 
 
-def restart():
+def restart(message=None, timeout=None):
   """Restarts this machine.
 
-  If it fails to reboot the host, it loops. This function never return.
+  If it fails to reboot the host, it loops until timeout. This function does
+  not return on successful restart, or returns False if machine wasn't
+  restarted within |timeout| seconds.
   """
+  deadline = time.time() + timeout if timeout else None
   while True:
-    restart_and_return()
+    restart_and_return(message)
     # Sleep for 300 seconds to ensure we don't try to do anymore work while the
     # OS is preparing to shutdown.
-    time.sleep(300)
+    if deadline:
+      time.sleep(min(300, deadline - time.time()))
+      if time.time() >= deadline:
+        return False
+    else:
+      time.sleep(300)
 
 
-def restart_and_return():
+def restart_and_return(message=None):
   """Tries to restart this host and immediately return to the caller.
 
   This is mostly useful when done via remote shell, like via ssh, where it is
@@ -802,8 +810,12 @@ def restart_and_return():
     ]
   elif sys.platform == 'linux2' or sys.platform == 'darwin':
     cmds = [['sudo', '/sbin/shutdown', '-r', 'now']]
+    if message:
+      cmds[0].append(message)
   else:
     cmds = [['sudo', 'shutdown', '-r', 'now']]
+    if message:
+      cmds[0].append(message)
 
   success = False
   for cmd in cmds:

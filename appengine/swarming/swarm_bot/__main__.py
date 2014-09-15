@@ -75,7 +75,8 @@ def CMDstart_slave(args):
     if not options.survive:
       # Return immediately to make update via ssh easier.
       import os_utilities
-      os_utilities.restart_and_return()
+      os_utilities.restart_and_return(
+          'Starting new swarming bot: %s' % THIS_FILE)
       return 0
 
   logging.info('Starting the bot: %s', THIS_FILE)

@@ -62,6 +62,27 @@ def get_attributes_failsafe():
   }
 
 
+def get_current_state(started_ts):
+  """Returns dict with a state of the bot reported to the server with each poll.
+
+  Supposed to be use only for dynamic state that changes while bot is running.
+  Use 'attributes' for static state that doesn't change over time.
+
+  The server can not use this state for immediate scheduling purposes (use
+  'dimensions' for that), but it can use it for maintenance and bookkeeping
+  tasks.
+
+  Args:
+    started_ts: when bot started polling.
+  """
+  # TODO(vadimsh): Send also results of 'uptime' command? Maybe also current
+  # amount of RAM, open file descriptors, processes or any other leaky
+  # resources. So that the server can decided to reboot the bot to clean up.
+  return {
+    'running_time': time.time() - started_ts,
+  }
+
+
 def post_error(remote, attributes, error):
   """Posts given string as a failure.
 
@@ -155,20 +176,23 @@ def run_bot(remote, error):
   remote.xsrf_request_params = {'attributes': attributes.copy()}
   remote.refresh_token()
 
+  started_ts = time.time()
   consecutive_sleeps = 0
   while True:
     try:
-      consecutive_sleeps = poll_server(remote, attributes, consecutive_sleeps)
+      consecutive_sleeps = poll_server(
+          remote, attributes, get_current_state(started_ts), consecutive_sleeps)
     except Exception as e:
       post_error(remote, attributes, str(e))
       consecutive_sleeps = 0
 
 
-def poll_server(remote, attributes, consecutive_sleeps):
+def poll_server(remote, attributes, current_state, consecutive_sleeps):
   """Polls the server to run one loop."""
   data = {
     'attributes': attributes,
     'sleep_streak': consecutive_sleeps,
+    'state': current_state,
   }
   resp = remote.url_read_json('/swarming/api/v1/bot/poll', data=data)
   logging.debug('Server response:\n%s', resp)
@@ -183,7 +207,11 @@ def poll_server(remote, attributes, consecutive_sleeps):
     consecutive_sleeps = 0
 
   elif cmd == 'update':
-    update_bot(remote, resp['version'])
+    update_bot(remote, attributes, resp['version'])
+    consecutive_sleeps = 0
+
+  elif cmd == 'restart':
+    restart_bot(remote, attributes, resp['message'])
     consecutive_sleeps = 0
 
   else:
@@ -237,11 +265,13 @@ def run_manifest(remote, attributes, manifest):
     post_error_task(remote, attributes, str(e), task_id)
 
 
-def update_bot(remote, version):
+def update_bot(remote, attributes, version):
   """Downloads the new version of the bot code and then runs it.
 
-  Use alterning files; first load swarming_bot.1.zip, then swarming_bot.2.zip,
+  Use alternating files; first load swarming_bot.1.zip, then swarming_bot.2.zip,
   never touching swarming_bot.zip which was the originally bootstrapped file.
+
+  Does not return.
 
   TODO(maruel): Create LKGBC:
   https://code.google.com/p/swarming/issues/detail?id=112
@@ -266,13 +296,32 @@ def update_bot(remote, version):
     # on Windows than os.exec*(), which has to be emulated since there's no OS
     # provided implementation. This means processes will accumulate as the bot
     # is restarted, which could be a problem long term.
-    subprocess.call(cmd)
+    sys.exit(subprocess.call(cmd))
   else:
     # On OSX, launchd will be unhappy if we quit so the old code bot process
     # has to outlive the new code child process. Launchd really wants the main
-    # process to survive, and it'll restart it if it disapears. os.exec*()
+    # process to survive, and it'll restart it if it disappears. os.exec*()
     # replaces the process so this is fine.
     os.execv(sys.executable, cmd)
+
+  # This code runs only if bot failed to respawn itself.
+  post_error(remote, attributes, 'Bot failed to respawn after update')
+
+
+def restart_bot(remote, attributes, message):
+  """Reboots the machine.
+
+  If the reboot is successful, never returns: the process should just be killed
+  by OS.
+
+  If reboot fails, logs the error to the server and moves the bot to quarantined
+  mode.
+  """
+  # os_utilities.restart should never return, unless restart is not happening.
+  # If restart is taking longer than N minutes, it probably not going to finish
+  # at all. Report this to the server.
+  os_utilities.restart(message, timeout=15*60)
+  post_error(remote, attributes, 'Bot is stuck restarting')
 
 
 def get_config():
@@ -319,8 +368,6 @@ def main(args):
     # Do not reboot here, because it would just cause a reboot loop.
     error = str(e)
   remote = url_helper.XsrfRemote(server, '/swarming/api/v1/bot/handshake')
-  # run_bot() normally doesn't return, except in unit tests, so keep the return
-  # statement here.
   return run_bot(remote, error)
 
 

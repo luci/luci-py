@@ -56,6 +56,13 @@ class TestSlaveMachine(net_utils.TestCase):
         ['dimensions', 'id', 'ip'],
         sorted(slave_machine.get_attributes_failsafe()))
 
+  def test_get_current_state(self):
+    self.mock(time, 'time', lambda: 123.0)
+    expected = {
+      'running_time': 23.0,
+    }
+    self.assertEqual(expected, slave_machine.get_current_state(100.0))
+
   def test_post_error_task(self):
     self.mock(logging, 'error', lambda *_: None)
     self.expected_requests(
@@ -89,14 +96,16 @@ class TestSlaveMachine(net_utils.TestCase):
     class Foo(Exception):
       pass
 
-    called = []
+    expected_state = {'a': 1, 'b': 2}
+    self.mock(slave_machine, 'get_current_state', lambda _: expected_state)
+
     expected_attribs = slave_machine.get_attributes()
     expected_attribs['version'] = '123'
 
-    def poll_server(remote, attributes, sleep_streak):
+    def poll_server(remote, attributes, state, sleep_streak):
       self.assertEqual(remote, server)
       self.assertEqual(expected_attribs, attributes)
-      called.append(sleep_streak)
+      self.assertEqual(expected_state, state)
       if sleep_streak == 5:
         raise Exception('Jumping out of the loop')
       return sleep_streak + 1
@@ -132,6 +141,7 @@ class TestSlaveMachine(net_utils.TestCase):
     self.mock(time, 'sleep', slept.append)
     self.mock(slave_machine, 'run_manifest', self.fail)
     self.mock(slave_machine, 'update_bot', self.fail)
+    self.mock(slave_machine, 'restart_bot', self.fail)
     self.mock(slave_machine, 'post_error', self.fail)
 
     self.expected_requests(
@@ -144,7 +154,7 @@ class TestSlaveMachine(net_utils.TestCase):
           (
             'https://localhost:1/swarming/api/v1/bot/poll',
             {
-              'data': {'attributes': {}, 'sleep_streak': 1},
+              'data': {'attributes': {}, 'state': {}, 'sleep_streak': 1},
               'headers': {'X-XSRF-Token': 'token'},
             },
             {
@@ -154,7 +164,7 @@ class TestSlaveMachine(net_utils.TestCase):
           ),
         ])
     server = url_helper.XsrfRemote('https://localhost:1/')
-    self.assertEqual(2, slave_machine.poll_server(server, {}, 1))
+    self.assertEqual(2, slave_machine.poll_server(server, {}, {}, 1))
     self.assertEqual([1.24], slept)
 
   def test_poll_server_run(self):
@@ -163,6 +173,7 @@ class TestSlaveMachine(net_utils.TestCase):
     self.mock(
         slave_machine, 'run_manifest', lambda *args: manifest.append(args))
     self.mock(slave_machine, 'update_bot', self.fail)
+    self.mock(slave_machine, 'restart_bot', self.fail)
     self.mock(slave_machine, 'post_error', self.fail)
 
     attribs = {'b': 'c'}
@@ -176,7 +187,7 @@ class TestSlaveMachine(net_utils.TestCase):
           (
             'https://localhost:1/swarming/api/v1/bot/poll',
             {
-              'data': {'attributes': attribs, 'sleep_streak': 1},
+              'data': {'attributes': attribs, 'state': {}, 'sleep_streak': 1},
               'headers': {'X-XSRF-Token': 'token'},
             },
             {
@@ -186,7 +197,7 @@ class TestSlaveMachine(net_utils.TestCase):
           ),
         ])
     server = url_helper.XsrfRemote('https://localhost:1/')
-    self.assertEqual(0, slave_machine.poll_server(server, attribs, 1))
+    self.assertEqual(0, slave_machine.poll_server(server, attribs, {}, 1))
     expected = [
       (server, {'b': 'c'}, {'foo': 'bar'}),
     ]
@@ -197,6 +208,7 @@ class TestSlaveMachine(net_utils.TestCase):
     self.mock(time, 'sleep', self.fail)
     self.mock(slave_machine, 'run_manifest', self.fail)
     self.mock(slave_machine, 'update_bot', lambda *args: update.append(args))
+    self.mock(slave_machine, 'restart_bot', self.fail)
     self.mock(slave_machine, 'post_error', self.fail)
 
     self.expected_requests(
@@ -209,7 +221,7 @@ class TestSlaveMachine(net_utils.TestCase):
           (
             'https://localhost:1/swarming/api/v1/bot/poll',
             {
-              'data': {'attributes': {}, 'sleep_streak': 1},
+              'data': {'attributes': {}, 'state': {}, 'sleep_streak': 1},
               'headers': {'X-XSRF-Token': 'token'},
             },
             {
@@ -219,8 +231,39 @@ class TestSlaveMachine(net_utils.TestCase):
           ),
         ])
     server = url_helper.XsrfRemote('https://localhost:1/')
-    self.assertEqual(0, slave_machine.poll_server(server, {}, 1))
-    self.assertEqual([(server, '123')], update)
+    self.assertEqual(0, slave_machine.poll_server(server, {}, {}, 1))
+    self.assertEqual([(server, {}, '123')], update)
+
+  def test_poll_server_restart(self):
+    restart = []
+    self.mock(time, 'sleep', self.fail)
+    self.mock(slave_machine, 'run_manifest', self.fail)
+    self.mock(slave_machine, 'update_bot', self.fail)
+    self.mock(slave_machine, 'restart_bot', lambda *args: restart.append(args))
+    self.mock(slave_machine, 'post_error', self.fail)
+
+    self.expected_requests(
+        [
+          (
+            'https://localhost:1/auth/api/v1/accounts/self/xsrf_token',
+            {'data': {}, 'headers': {'X-XSRF-Token-Request': '1'}},
+            {'xsrf_token': 'token'},
+          ),
+          (
+            'https://localhost:1/swarming/api/v1/bot/poll',
+            {
+              'data': {'attributes': {}, 'state': {}, 'sleep_streak': 1},
+              'headers': {'X-XSRF-Token': 'token'},
+            },
+            {
+              'cmd': 'restart',
+              'message': 'Please die now',
+            },
+          ),
+        ])
+    server = url_helper.XsrfRemote('https://localhost:1/')
+    self.assertEqual(0, slave_machine.poll_server(server, {}, {}, 1))
+    self.assertEqual([(server, {}, 'Please die now')], restart)
 
   def test_run_manifest(self):
     self.mock(slave_machine, 'post_error', self.fail)
@@ -247,24 +290,43 @@ class TestSlaveMachine(net_utils.TestCase):
     manifest = {'task_id': 24}
     slave_machine.run_manifest(server, {}, manifest)
 
-  def test_update_bot(self):
-    self.mock(slave_machine, 'post_error', self.fail)
+  def test_update_bot_linux(self):
+    self.mock(sys, 'platform', 'linux2')
+
+    # In a real case 'update_bot' never exits and doesn't call 'post_error'.
+    # Under the test however forever-blocking calls finish, and post_error is
+    # called.
+    self.mock(slave_machine, 'post_error', lambda *_: None)
     self.mock(slave_machine, 'THIS_FILE', 'swarming_bot.1.zip')
     self.mock(url_helper, 'DownloadFile', lambda *_: True)
+
     calls = []
     cmd = [sys.executable, 'swarming_bot.2.zip', 'start_slave', '--survive']
-    if sys.platform in ('cygwin', 'win32'):
-      self.mock(subprocess, 'call', lambda *args: calls.append(args))
-      self.mock(os, 'execv', self.fail)
-      expected = [cmd]
-    else:
-      self.mock(subprocess, 'call', self.fail)
-      self.mock(os, 'execv', lambda *args: calls.append(args))
-      expected = [(sys.executable, cmd)]
+    self.mock(subprocess, 'call', self.fail)
+    self.mock(os, 'execv', lambda *args: calls.append(args))
 
     server = url_helper.XsrfRemote('https://localhost:1/')
-    slave_machine.update_bot(server, '123')
-    self.assertEqual(expected, calls)
+    slave_machine.update_bot(server, {}, '123')
+    self.assertEqual([(sys.executable, cmd)], calls)
+
+  def test_update_bot_win(self):
+    self.mock(sys, 'platform', 'win32')
+
+    # In a real case 'update_bot' never exists and doesn't call 'post_error'.
+    # Under the test forever blocking calls
+    self.mock(slave_machine, 'post_error', lambda *_: None)
+    self.mock(slave_machine, 'THIS_FILE', 'swarming_bot.1.zip')
+    self.mock(url_helper, 'DownloadFile', lambda *_: True)
+
+    calls = []
+    cmd = [sys.executable, 'swarming_bot.2.zip', 'start_slave', '--survive']
+    self.mock(subprocess, 'call', lambda *args: calls.append(args))
+    self.mock(os, 'execv', self.fail)
+
+    server = url_helper.XsrfRemote('https://localhost:1/')
+    with self.assertRaises(SystemExit):
+      slave_machine.update_bot(server, {}, '123')
+    self.assertEqual([(cmd,)], calls)
 
   def test_get_config(self):
     expected = {u'server': u'http://localhost:8080'}

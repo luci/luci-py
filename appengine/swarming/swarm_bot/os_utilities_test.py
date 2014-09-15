@@ -206,6 +206,23 @@ class TestOsUtilities(auto_stub.TestCase):
     self.mock(subprocess, 'check_call', lambda _: None)
     self.assertIs(True, os_utilities.restart_and_return())
 
+  def test_restart_and_return_with_message(self):
+    self.mock(subprocess, 'check_call', lambda _: None)
+    self.assertIs(True, os_utilities.restart_and_return(message='Boo'))
+
+  def test_restart_with_timeout(self):
+    self.mock(subprocess, 'check_call', lambda _: None)
+    self.mock(logging, 'error', lambda *_: None)
+
+    now = [0]
+    def mock_sleep(dt):
+      now[0] += dt
+    self.mock(time, 'sleep', mock_sleep)
+    self.mock(time, 'time', lambda: now[0])
+
+    self.assertFalse(os_utilities.restart(timeout=60))
+    self.assertEqual(time.time(), 60)
+
 
 if __name__ == '__main__':
   logging.basicConfig(
