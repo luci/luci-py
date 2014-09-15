@@ -167,7 +167,7 @@ def _get_gpu_linux():
     pci_devices = subprocess.check_output(['lspci', '-mm', '-nn']).splitlines()
   except subprocess.CalledProcessError as e:
     logging.error('Failed to run lspci: %s', e)
-    return ['ERROR']
+    return None
 
   out = set()
   re_id = re.compile(r'^(.+?) \[([0-9a-f]{4})\]$')
@@ -215,7 +215,7 @@ def _get_gpu_osx():
         out.add(card['sppci_model'])
     return sorted(out)
   except KeyError:
-    return ['ERROR']
+    return None
 
 
 def _get_gpu_win():
@@ -227,7 +227,7 @@ def _get_gpu_win():
     # installed by Swarming devs. If you find yourself needing it to run without
     # pywin32, for example in cygwin, please send us a CL with the
     # implementation that doesn't use pywin32.
-    return ['ERROR']
+    return None
 
   wmi_service = win32com.client.Dispatch('WbemScripting.SWbemLocator')
   wbem = wmi_service.ConnectServer('.', 'root\\cimv2')
@@ -465,7 +465,7 @@ def get_gpu():
     return _get_gpu_linux()
   if sys.platform == 'win32':
     return _get_gpu_win()
-  return ['IMPLEMENT_ME']
+  return None
 
 
 ### Windows.
@@ -657,13 +657,17 @@ def get_dimensions():
       cpu_type,
       cpu_type + '-' + get_cpu_bitness(),
     ],
-    'gpu': get_gpu(),
     'hostname': get_hostname(),
     'os': [
       os_name,
       os_name + '-' + get_os_version(),
     ],
   }
+
+  gpu = get_gpu()
+  if gpu:
+    dimensions['gpu'] = gpu
+
   if sys.platform in ('cygwin', 'win32'):
     dimensions['cygwin'] = str(int(sys.platform == 'cygwin'))
   if sys.platform == 'win32':
