@@ -468,17 +468,6 @@ class BotPollHandler(auth.ApiHandler):
   def post(self):
     request = self.parse_body()
 
-    # TODO(vadimsh): Get rid of this line when all bots are updated to the
-    # version that sends 'state' and 'running_time'.
-    request.setdefault('state', {})
-    if 'running_time' not in request['state']:
-      request['state']['running_time'] = 0
-
-    # TODO(vadimsh): Get rid of this line when all bots are updated to the
-    # version that sends 'sleep_streak' in 'state'.
-    if 'sleep_streak' in request:
-      request['state']['sleep_streak'] = request.pop('sleep_streak')
-
     log_unexpected_keys(
         self.EXPECTED_KEYS, request, self.request, 'bot', 'keys')
 
@@ -492,7 +481,6 @@ class BotPollHandler(auth.ApiHandler):
         self.ACCEPTED_STATE_KEYS, self.REQUIRED_STATE_KEYS, state,
         self.request, 'bot', 'state')
 
-    sleep_streak = state['sleep_streak']
     # Be very permissive on missing values. This can happen because of errors on
     # the bot, *we don't want to deny them the capacity to update*, so that the
     # bot code is eventually fixed and the bot self-update to this working code.
@@ -512,6 +500,7 @@ class BotPollHandler(auth.ApiHandler):
       self._cmd_update(expected_version)
       return
 
+    sleep_streak = state['sleep_streak']
     if not bot_id:
       self._cmd_sleep(sleep_streak, True)
       return

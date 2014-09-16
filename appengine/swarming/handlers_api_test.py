@@ -367,6 +367,26 @@ class BotApiTest(AppTestBase):
     ]
     self.assertEqual(expected, errors)
 
+  def test_poll_bad_bot(self):
+    # If bot is not sending required keys, assume it is old and update it.
+    token, params = self._bot_token()
+    old_version = params['attributes']['version']
+    params.pop('attributes')
+    params.pop('state')
+    # log_request is expected to be called in that case, multiple times.
+    error_calls = []
+    self.mock(
+        ereporter2,
+        'log_request',
+        lambda *args, **kwargs: error_calls.append((args, kwargs)))
+    response = self.post_with_token('/swarming/api/v1/bot/poll', params, token)
+    expected = {
+      u'cmd': u'update',
+      u'version': old_version,
+    }
+    self.assertEqual(expected, response)
+    self.assertTrue(error_calls)
+
   def test_poll_bad_version(self):
     token, params = self._bot_token()
     old_version = params['attributes']['version']
