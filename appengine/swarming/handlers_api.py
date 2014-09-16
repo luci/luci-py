@@ -622,8 +622,18 @@ class BotErrorHandler(auth.ApiHandler):
     bot_id = request.get('id', 'unknown')
     # When a bot reports here, it is borked, quarantine the bot.
     bot = bot_management.get_bot_key(bot_id).get()
-    bot.quarantined = True
-    bot.put()
+    if not bot:
+      bot_management.tag_bot_seen(
+          bot_id,
+          None,
+          None,
+          self.request.remote_addr,
+          None,
+          None,
+          True)
+    else:
+      bot.quarantined = True
+      bot.put()
 
     ereporter2.log(source='bot', message=request.get('message', 'unknown'))
     self.send_response({})
