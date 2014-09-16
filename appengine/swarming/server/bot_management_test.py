@@ -99,10 +99,16 @@ class BotManagementTest(test_case.TestCase):
     expected['task'] = '12301'
     self.assertEqual(expected, bot.to_dict())
 
-  def test_should_restart_bot(self):
-    # TODO(vadimsh): Implement.
+  def test_should_restart_bot_no(self):
     self.assertEqual(
-        (False, ''), bot_management.should_restart_bot('id', {}, {}))
+        (False, ''),
+        bot_management.should_restart_bot('id', {}, {'running_time': 0}))
+
+  def test_should_restart_bot_yes(self):
+    state = {'running_time': bot_management.BOT_REBOOT_PERIOD_SECS + 1}
+    needs_reboot, message = bot_management.should_restart_bot('id', {}, state)
+    self.assertTrue(needs_reboot)
+    self.assertTrue(message)
 
 
 if __name__ == '__main__':

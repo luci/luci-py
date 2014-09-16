@@ -14,6 +14,7 @@ from google.appengine.api import memcache
 from google.appengine.ext import ndb
 
 from components import datastore_utils
+from components import utils
 from common import test_request_message
 from server import bot_archive
 from server import file_chunks
@@ -29,6 +30,11 @@ START_SLAVE_SCRIPT_KEY = 'start_slave_script'
 
 # The amount of time that has to pass before a machine is considered dead.
 BOT_DEATH_TIMEOUT = datetime.timedelta(seconds=30*60)
+
+
+# How long bot may run before being asked to reboot, sec. Do it often on canary
+# to stress test the reboot mechanism (including bot startup code).
+BOT_REBOOT_PERIOD_SECS = 3600 if utils.is_canary() else 12 * 3600
 
 
 ### Models.
@@ -273,16 +279,21 @@ def validate_and_fix_attributes(attributes):
   attributes.setdefault('try_count', 0)
 
 
-def should_restart_bot(_bot_id, _attributes, _state):
+def should_restart_bot(_bot_id, _attributes, state):
   """Decides whether a bot needs to be restarted.
 
   Args:
     bot_id: ID of the bot.
     attributes: A dictionary representing the machine attributes.
-    state: A dictionary representing current bot state.
+    state: A dictionary representing current bot state, see
+        handlers_api.BotPollHandler for the list of keys.
 
   Returns:
     Tuple (True to restart, text message explaining the reason).
   """
-  # TODO(vadimsh): Implement.
+  # Periodically reboot bots to workaround OS level leaks (especially on Win).
+  running_time = state['running_time']
+  assert isinstance(running_time, (int, float))
+  if running_time > BOT_REBOOT_PERIOD_SECS:
+    return True, 'Periodic reboot, with %ds period' % BOT_REBOOT_PERIOD_SECS
   return False, ''
