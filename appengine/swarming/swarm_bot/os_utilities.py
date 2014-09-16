@@ -166,7 +166,7 @@ def _get_gpu_linux():
   try:
     pci_devices = subprocess.check_output(
         ['lspci', '-mm', '-nn'], stderr=subprocess.PIPE).splitlines()
-  except subprocess.CalledProcessError:
+  except (OSError, subprocess.CalledProcessError):
     # It normally happens on Google Compute Engine as lspci is not installed by
     # default and on ARM since they do not have a PCI bus. In either case, we
     # don't care about the GPU.
