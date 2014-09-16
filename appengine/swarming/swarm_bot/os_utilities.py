@@ -855,16 +855,13 @@ def restart_and_return(message=None):
     ]
   elif sys.platform == 'linux2' or sys.platform == 'darwin':
     cmds = [['sudo', '/sbin/shutdown', '-r', 'now']]
-    if message:
-      cmds[0].append(message)
   else:
     cmds = [['sudo', 'shutdown', '-r', 'now']]
-    if message:
-      cmds[0].append(message)
 
   success = False
   for cmd in cmds:
-    logging.info('Restarting machine with command %s', ' '.join(cmd))
+    logging.info(
+        'Restarting machine with command %s (%s)', ' '.join(cmd), message)
     try:
       subprocess.check_call(cmd)
     except (OSError, subprocess.CalledProcessError) as e:
