@@ -134,7 +134,7 @@
             <td nowrap>{{run_result.started_ts|succinctdatetimeformat}}</td>
             <td nowrap align=right>{{run_result.duration_now()|timedeltaformat}}</td>
             <td nowrap align=right>
-              {% if previous %}
+              {% if previous and previous.started_ts and run_result.ended_ts %}
                 {# Note that tasks are listed in reverse order #}
                 {{(previous.started_ts - run_result.ended_ts)|timedeltaformat}}
               {% elif run_result.ended_ts %}
