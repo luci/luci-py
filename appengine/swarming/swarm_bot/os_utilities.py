@@ -164,9 +164,12 @@ def _generate_launchd_plist(command, cwd, plistname):
 def _get_gpu_linux():
   """Returns video device as listed by 'lspci'. See get_gpu()."""
   try:
-    pci_devices = subprocess.check_output(['lspci', '-mm', '-nn']).splitlines()
-  except subprocess.CalledProcessError as e:
-    logging.error('Failed to run lspci: %s', e)
+    pci_devices = subprocess.check_output(
+        ['lspci', '-mm', '-nn'], stderr=subprocess.PIPE).splitlines()
+  except subprocess.CalledProcessError:
+    # It normally happens on Google Compute Engine as lspci is not installed by
+    # default and on ARM since they do not have a PCI bus. In either case, we
+    # don't care about the GPU.
     return None
 
   out = set()
@@ -254,6 +257,15 @@ def _get_gpu_win():
   return sorted(out)
 
 
+def _safe_read(filepath):
+  """Returns the content of the file if possible, None otherwise."""
+  try:
+    with open(filepath, 'rb') as f:
+      return f.read()
+  except (IOError, OSError):
+    return None
+
+
 ### Public API.
 
 
@@ -284,11 +296,9 @@ def get_os_version():
     return '.'.join(version_parts[:2])
 
   if sys.platform == 'linux2':
-    # Assumes Ubuntu here. Improve if needed. No need to convert the Ubuntu
-    # value since it already returns what we want like '12.04' or '10.04'.
-    distro_details = platform.linux_distribution()
-    assert distro_details[0] == 'Ubuntu', distro_details
-    return distro_details[1]
+    # On Ubuntu it will return a string like '12.04'. On Raspbian, it will look
+    # like '7.6'.
+    return platform.linux_distribution()[1]
 
   logging.error('Unable to determine platform version')
   return None
@@ -301,12 +311,26 @@ def get_os_name():
 
   TODO(maruel): Differentiate between linux distros like Ubuntu or debian.
   """
-  return {
+  value = {
     'cygwin': 'Windows',
     'darwin': 'Mac',
-    'linux2': 'Linux',
     'win32': 'Windows',
-  }.get(sys.platform, sys.platform)
+  }.get(sys.platform)
+  if value:
+    return value
+
+  if sys.platform == 'linux2':
+    # Try to figure out the distro. Supported distros are Debian, Ubuntu,
+    # Raspbian.
+    # Add support for other OSes as relevant.
+    content = _safe_read('/etc/os-release')
+    if content:
+      os_release = dict(l.split('=', 1) for l in content.splitlines() if l)
+      os_id = os_release.get('ID').strip('"')
+      # Uppercase the first letter for consistency with the other platforms.
+      return os_id[0].upper() + os_id[1:]
+
+  return sys.platform
 
 
 def get_cpu_type():
@@ -427,11 +451,14 @@ def get_physical_ram():
 
   if os.path.isfile('/proc/meminfo'):
     # linux.
-    with open('/proc/meminfo') as f:
-      meminfo = f.read()
-    matched = re.search(r'^MemTotal:\s+(\d+) kB', meminfo)
+    meminfo = _safe_read('/proc/meminfo') or ''
+    matched = re.search(r'MemTotal:\s+(\d+) kB', meminfo)
     if matched:
-      return int(round(int(matched.groups()[0]) / 1024. / 1024.))
+      mb = int(matched.groups()[0]) / 1024. / 1024.
+      if 0. < mb < 1.:
+        # TODO(maruel): Mb is too coarse (e.g. raspberry pi), report as kb.
+        return 1
+      return int(round(mb))
 
   logging.error('get_physical_ram() failed to query amount of physical RAM')
   return 0
@@ -650,12 +677,14 @@ def get_attributes_android(device_id, adb_path='adb'):
 def get_dimensions():
   """Returns the default dimensions."""
   os_name = get_os_name()
+  os_version = get_os_version()
   cpu_type = get_cpu_type()
+  cpu_bitness = get_cpu_bitness()
   dimensions = {
     'cores': str(get_num_processors()),
     'cpu': [
       cpu_type,
-      cpu_type + '-' + get_cpu_bitness(),
+      cpu_type + '-' + cpu_bitness,
     ],
     'hostname': get_hostname(),
     'os': [
@@ -663,6 +692,18 @@ def get_dimensions():
       os_name + '-' + get_os_version(),
     ],
   }
+
+  if cpu_type.startswith('arm') and cpu_type != 'arm':
+    dimensions['cpu'].append('arm')
+    dimensions['cpu'].append('arm-' + cpu_bitness)
+    dimensions['cpu'].sort()
+
+  if sys.platform == 'linux2':
+    # Add these for compatibility. 'Linux-12.04' doesn't make any sense but
+    # until this is rolled out and that 'Ubuntu-12.04' can be used everywhere,
+    # we need to keep this for compatibility.
+    dimensions['os'].extend(('Linux', 'Linux-' + os_version))
+    dimensions['os'].sort()
 
   gpu = get_gpu()
   if gpu:

@@ -13,8 +13,8 @@ COMPONENTS_DIR = os.path.join(os.path.dirname(APP_DIR), 'components')
 _INITIALIZED = False
 
 
-def setup_test_env():
-  """Sets up App Engine test environment."""
+def setup_test_env_base():
+  """Sets up a base environment which doesn't require AppEngine."""
   global _INITIALIZED
   if _INITIALIZED:
     raise Exception('Do not call test_env.setup_test_env() twice.')
@@ -24,6 +24,11 @@ def setup_test_env():
   sys.path.insert(0, COMPONENTS_DIR)
   # For dependencies of support code.
   sys.path.insert(0, os.path.join(COMPONENTS_DIR, 'third_party'))
+
+
+def setup_test_env():
+  """Sets up App Engine test environment."""
+  setup_test_env_base()
 
   # For unit tests not importing main.py, which should be ALL unit tests.
   sys.path.insert(0, os.path.join(APP_DIR, 'components', 'third_party'))

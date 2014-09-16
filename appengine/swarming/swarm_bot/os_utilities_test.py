@@ -20,7 +20,7 @@ sys.path.insert(0, ROOT_DIR)
 
 import test_env
 
-test_env.setup_test_env()
+test_env.setup_test_env_base()
 
 from depot_tools import auto_stub
 
@@ -67,12 +67,14 @@ class TestOsUtilities(auto_stub.TestCase):
     self.assertTrue(re.match(r'^\d+\.\d+$', version), version)
 
   def test_get_os_name(self):
-    expected = ('Linux', 'Mac', 'Windows')
+    expected = ('Linux', 'Mac', 'Raspbian', 'Ubuntu', 'Windows')
     self.assertIn(os_utilities.get_os_name(), expected)
 
   def test_get_cpu_type(self):
-    expected = ('arm', 'x86')
-    self.assertIn(os_utilities.get_cpu_type(), expected)
+    actual = os_utilities.get_cpu_type()
+    if actual == 'x86':
+      return
+    self.assertTrue(actual.startswith('arm'), actual)
 
   def test_get_cpu_bitness(self):
     expected = ('32', '64')
@@ -95,7 +97,8 @@ class TestOsUtilities(auto_stub.TestCase):
     self.assertGreater(os_utilities.get_free_disk(), 0)
 
   def test_get_gpu(self):
-    self.assertTrue(os_utilities.get_gpu())
+    actual = os_utilities.get_gpu()
+    self.assertTrue(actual is None or actual)
 
   def test_get_integrity_level_win(self):
     if sys.platform == 'win32':
@@ -108,12 +111,15 @@ class TestOsUtilities(auto_stub.TestCase):
     expected = set(['dimensions', 'id', 'ip'])
     self.assertEqual(expected, set(actual))
 
-    expected_dimensions = set(['cores', 'cpu', 'gpu', 'hostname', 'id', 'os'])
+    expected_dimensions = set(['cores', 'cpu', 'hostname', 'id', 'os'])
     if sys.platform in ('cygwin', 'win32'):
       expected_dimensions.add('cygwin')
     if sys.platform == 'win32':
       expected_dimensions.add('integrity')
-    self.assertEqual(expected_dimensions, set(actual['dimensions']))
+    actual_dimensions = set(actual['dimensions'])
+    # On some bots, 'gpu' is not present.
+    actual_dimensions.discard('gpu')
+    self.assertEqual(expected_dimensions, actual_dimensions)
 
   def test_get_attributes_none(self):
     actual = os_utilities.get_attributes(None)
