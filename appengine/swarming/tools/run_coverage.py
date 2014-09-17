@@ -16,5 +16,5 @@ from tools import run_coverage
 if __name__ == '__main__':
   sys.exit(run_coverage.main(
       APP_DIR,
-      ('tests', 'third_party', 'tools'),
-      'PRESUBMIT.py,tests/*,third_party/*,tools/*'))
+      ('tests', 'tools'),
+      'PRESUBMIT.py,tests/*,tools/*'))

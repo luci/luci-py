@@ -18,7 +18,6 @@ from tools import remote_api
 def setup_context():
   """Symbols to import into interactive console."""
   sys.path.insert(0, APP_DIR)
-  sys.path.insert(0, os.path.join(APP_DIR, 'third_party'))
   sys.path.insert(0, os.path.join(APP_DIR, 'components', 'third_party'))
 
   # Unused variable 'XXX'; they are accessed via locals().

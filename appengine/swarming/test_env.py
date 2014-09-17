@@ -32,8 +32,6 @@ def setup_test_env():
 
   # For unit tests not importing main.py, which should be ALL unit tests.
   sys.path.insert(0, os.path.join(APP_DIR, 'components', 'third_party'))
-  # For dependencies of app itself.
-  sys.path.insert(0, os.path.join(APP_DIR, 'third_party'))
   # For application modules.
   sys.path.insert(0, APP_DIR)
 
