@@ -404,8 +404,8 @@ def yield_next_available_task_to_dispatch(bot_dimensions):
         total,
         expired,
         no_queue,
-        cache_lookup,
         hash_mismatch,
+        cache_lookup,
         real_mismatch,
         ignored,
         broken)
@@ -434,3 +434,23 @@ def abort_task_to_run(task):
   task.put()
   # Add it to the negative cache.
   set_lookup_cache(task.key, False)
+
+
+def retry(request, now):
+  """Retries a task at its original priority.
+
+  If the task expired, it will not be retried.
+
+  Returns the TaskToRun entity to save in the DB on success.
+  """
+  assert ndb.in_transaction()
+  if now > request.expiration_ts:
+    return None
+  to_run = request_to_task_to_run_key(request).get()
+  if to_run.queue_number:
+    return None
+
+  # The original queue_number is used but expiration_ts is unchanged.
+  to_run.queue_number = _gen_queue_number_key(
+      request.created_ts, request.priority)
+  return to_run

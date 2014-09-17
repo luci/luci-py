@@ -11,7 +11,7 @@ TODO(maruel): * is not implemented and gratitious vaporware.
 
 Overview of transactions:
 - bot_reap_task() mutate a TaskToRun in a transaction.
-- cron_abort_stale() uses transactions when aborting tasks.
+- cron_handle_bot_died() uses transactions when aborting and retrying tasks.
 """
 
 import contextlib
@@ -61,6 +61,7 @@ def _update_task(task_key, request, bot_id):
   # transaction. This reduces the likelihood of failing this check inside
   # the transaction, which is an order of magnitude more costly.
   if not task_to_run.is_task_reapable(task_key, None):
+    logging.info('Not reapable anymore')
     result_summary_future.wait()
     return None
 
@@ -72,8 +73,10 @@ def _update_task(task_key, request, bot_id):
       return None, None
     task.queue_number = None
     # TODO(maruel): Use datastore_util.insert() to create the new try_number.
-    run_result = task_result.new_run_result(request, 1, bot_id)
+    run_result = task_result.new_run_result(
+        request, (result_summary.try_number or 0) + 1, bot_id)
     if not bot_id:
+      logging.info('Expired')
       run_result.state = task_result.State.EXPIRED
       run_result.abandoned_ts = utils.utcnow()
       run_result.internal_failure = True
@@ -91,7 +94,8 @@ def _update_task(task_key, request, bot_id):
       datastore_errors.BadRequestError,
       datastore_errors.Timeout,
       datastore_errors.TransactionFailedError,
-      RuntimeError):
+      RuntimeError) as e:
+    logging.warning('Failed: %s', e)
     return None
 
 
@@ -134,6 +138,27 @@ def _update_stats(run_result, bot_id, request, completed):
     stats.add_run_entry(
         'run_updated', run_result.key, bot_id=bot_id,
         dimensions=request.properties.dimensions)
+
+
+@ndb.transactional
+def _retry_task(request, result_summary, run_result, now):
+  """Registers a TaskToRun as to be tried again.
+
+  Transactionally sets the TaskRunResult as BOT_DIED. Set the TaskRunResult as
+  dead but do NOT update TaskResultSummary. This is important so the client is
+  not confused about the state.
+
+  Returns True on success.
+  """
+  to_run = task_to_run.retry(request, now)
+  if not to_run:
+    return False
+  run_result.state = task_result.State.BOT_DIED
+  run_result.internal_failure = True
+  run_result.abandoned_ts = now
+  result_summary.state = task_result.State.PENDING
+  ndb.put_multi((to_run, result_summary, run_result))
+  return True
 
 
 ### Public API.
@@ -376,7 +401,8 @@ def bot_kill_task(run_result):
   run_result.state = task_result.State.BOT_DIED
   run_result.internal_failure = True
   run_result.abandoned_ts = utils.utcnow()
-  ndb.put_multi(task_result.prepare_put_run_result(run_result))
+  entities = task_result.prepare_put_run_result(run_result)
+  ndb.transaction(lambda: ndb.put_multi(entities))
   request = request_future.get_result()
   stats.add_run_entry(
       'run_bot_died', run_result.key,
@@ -484,19 +510,30 @@ def cron_abort_expired_task_to_run():
   return killed
 
 
-def cron_abort_bot_died():
-  """Aborts stale TaskRunResult where the bot stopped sending updates.
+def cron_handle_bot_died():
+  """Aborts or retry stale TaskRunResult where the bot stopped sending updates.
 
-  Basically, sets the task result to State.BOT_DIED in this case.
+  If the task was at its first try, it'll be retried. Otherwise the task will be
+  canceled.
   """
-  total = 0
+  retried = 0
+  killed = 0
   try:
     for run_result in task_result.yield_run_results_with_dead_bot():
-      # Implement automatic retry;
-      # https://code.google.com/p/swarming/issues/detail?id=108
+      if run_result.try_number == 1:
+        packed = task_common.pack_run_result_key(run_result.key)
+        request, result_summary = ndb.get_multi(
+            (run_result.request_key, run_result.result_summary_key))
+        if _retry_task(request, result_summary, run_result, utils.utcnow()):
+          task_to_run.set_lookup_cache(
+              task_to_run.request_to_task_to_run_key(request), True)
+          retried += 1
+          logging.info('Retried task %s', packed)
+          continue
+        logging.info('Failed retrying task %s', packed)
       bot_kill_task(run_result)
-      total += 1
+      killed += 1
   finally:
     # TODO(maruel): Use stats_framework.
-    logging.info('Killed %d task', total)
-  return total
+    logging.info('Killed %d tasks; retried %d tasks', killed, retried)
+  return killed, retried

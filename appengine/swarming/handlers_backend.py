@@ -17,10 +17,10 @@ from server import stats
 from server import task_scheduler
 
 
-class CronAbortBotDiedHandler(webapp2.RequestHandler):
+class CronBotDiedHandler(webapp2.RequestHandler):
   @decorators.require_cronjob
   def get(self):
-    task_scheduler.cron_abort_bot_died()
+    task_scheduler.cron_handle_bot_died()
     self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
     self.response.out.write('Success.')
 
@@ -65,7 +65,10 @@ def get_routes():
   """Returns internal urls that should only be accessible via the backend."""
   routes = [
     # Cron jobs.
-    ('/internal/cron/abort_bot_died', CronAbortBotDiedHandler),
+    # TODO(maruel): Rename cron.yaml job url. Doing so is a bit annoying since
+    # the app version has to be running an already compatible version already.
+    ('/internal/cron/abort_bot_died', CronBotDiedHandler),
+    ('/internal/cron/handle_bot_died', CronBotDiedHandler),
     ('/internal/cron/abort_expired_task_to_run',
         CronAbortExpiredShardToRunHandler),
 

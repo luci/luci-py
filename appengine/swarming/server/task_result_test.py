@@ -147,11 +147,17 @@ class TaskResultApiTest(test_case.TestCase):
         "Key('TaskRequestShard', 'f71849', 'TaskRequest', 256, "
         "'TaskResultSummary', 1, 'TaskRunResult', 1)")
     self.assertEqual(expected, str(run_result_key))
+    run_result_key = task_result.result_summary_key_to_run_result_key(
+        result_summary_key, 2)
+    expected = (
+        "Key('TaskRequestShard', 'f71849', 'TaskRequest', 256, "
+        "'TaskResultSummary', 1, 'TaskRunResult', 2)")
+    self.assertEqual(expected, str(run_result_key))
 
     with self.assertRaises(ValueError):
       task_result.result_summary_key_to_run_result_key(result_summary_key, 0)
     with self.assertRaises(NotImplementedError):
-      task_result.result_summary_key_to_run_result_key(result_summary_key, 2)
+      task_result.result_summary_key_to_run_result_key(result_summary_key, 3)
 
   def test_run_result_key_to_result_summary_key(self):
     request_key = task_request.id_to_request_key(0x100)

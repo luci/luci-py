@@ -373,11 +373,12 @@ class TaskSchedulerApiTest(test_case.TestCase):
       task_scheduler.unpack_result_summary_key('bb80201')
 
   def test_unpack_run_result_key(self):
-    actual = task_scheduler.unpack_run_result_key('bb80201')
-    expected = (
-        "Key('TaskRequestShard', '6f4236', 'TaskRequest', 196608512, "
-        "'TaskResultSummary', 1, 'TaskRunResult', 1)")
-    self.assertEqual(expected, str(actual))
+    for i in ('1', '2'):
+      actual = task_scheduler.unpack_run_result_key('bb8020' + i)
+      expected = (
+          "Key('TaskRequestShard', '6f4236', 'TaskRequest', 196608512, "
+          "'TaskResultSummary', 1, 'TaskRunResult', " + i + ")")
+      self.assertEqual(expected, str(actual))
 
     with self.assertRaises(ValueError):
       task_scheduler.unpack_run_result_key('1')
@@ -386,7 +387,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
     with self.assertRaises(ValueError):
       task_scheduler.unpack_run_result_key('bb80200')
     with self.assertRaises(NotImplementedError):
-      task_scheduler.unpack_run_result_key('bb80202')
+      task_scheduler.unpack_run_result_key('bb80203')
 
   def test_bot_update_task(self):
     run_result = _quick_reap()
@@ -511,19 +512,88 @@ class TaskSchedulerApiTest(test_case.TestCase):
     self.mock_now(self.now, expiration+1)
     self.assertEqual(1, task_scheduler.cron_abort_expired_task_to_run())
 
-  def test_cron_abort_bot_died(self):
+  def test_cron_handle_bot_died(self):
+    # TODO(maruel): Test expired tasks.
     data = _gen_request_data(
-        properties=dict(dimensions={u'OS': u'Windows-3.1.1'}))
+        properties=dict(dimensions={u'OS': u'Windows-3.1.1'}),
+        scheduling_expiration_secs=600)
     task_scheduler.make_request(data)
     bot_dimensions = {
       u'OS': [u'Windows', u'Windows-3.1.1'],
       u'hostname': u'localhost',
       u'foo': u'bar',
     }
-    _request, _run_result = task_scheduler.bot_reap_task(
+    _request, run_result = task_scheduler.bot_reap_task(
         bot_dimensions, 'localhost')
+    self.assertEqual(1, run_result.try_number)
     self.mock_now(self.now + task_scheduler.task_common.BOT_PING_TOLERANCE, 1)
-    self.assertEqual(1, task_scheduler.cron_abort_bot_died())
+    self.assertEqual((0, 1), task_scheduler.cron_handle_bot_died())
+
+    # Refresh and compare:
+    run_result = run_result.key.get()
+    expected = {
+      'abandoned_ts': datetime.datetime(2014, 1, 2, 3, 9, 6, 6),
+      'bot_id': u'localhost',
+      'completed_ts': None,
+      'durations': [],
+      'exit_codes': [],
+      'failure': False,
+      'internal_failure': True,
+      'modified_ts': datetime.datetime(2014, 1, 2, 3, 9, 6, 6),
+      'outputs': [],
+      'started_ts': datetime.datetime(2014, 1, 2, 3, 4, 5, 6),
+      'state': task_result.State.BOT_DIED,
+      'try_number': 1,
+    }
+    self.assertEqual(expected, run_result.to_dict())
+    result_summary = run_result.result_summary_key.get()
+    expected = {
+      'abandoned_ts': None,
+      'bot_id': u'localhost',
+      'completed_ts': None,
+      'created_ts': datetime.datetime(2014, 1, 2, 3, 4, 5, 6),
+      'durations': [],
+      'exit_codes': [],
+      'failure': False,
+      'internal_failure': False,
+      'modified_ts': datetime.datetime(2014, 1, 2, 3, 9, 6, 6),
+      'name': u'Request name',
+      'outputs': [],
+      'started_ts': datetime.datetime(2014, 1, 2, 3, 4, 5, 6),
+      'state': task_result.State.PENDING,
+      'try_number': 1,
+      'user': u'Jesus',
+    }
+    self.assertEqual(expected, result_summary.to_dict())
+
+    # Task was retried.
+    self.mock_now(self.now + task_scheduler.task_common.BOT_PING_TOLERANCE, 2)
+    _request, run_result = task_scheduler.bot_reap_task(
+        bot_dimensions, 'localhost')
+    logging.info('%s', [t.to_dict() for t in task_to_run.TaskToRun.query()])
+    self.assertEqual(2, run_result.try_number)
+    with task_scheduler.bot_update_task(
+        run_result.key, 'localhost', 0, 'Foo1', 0, 0, 0.1) as entities:
+      ndb.put_multi(entities)
+    result_summary = run_result.result_summary_key.get()
+    expected = {
+      'abandoned_ts': None,
+      'bot_id': u'localhost',
+      'completed_ts': datetime.datetime(2014, 1, 2, 3, 9, 7, 6),
+      'created_ts': datetime.datetime(2014, 1, 2, 3, 4, 5, 6),
+      'durations': [0.1],
+      'exit_codes': [0],
+      'failure': False,
+      'internal_failure': False,
+      'modified_ts': datetime.datetime(2014, 1, 2, 3, 9, 7, 6),
+      'name': u'Request name',
+      'outputs': ['Foo1'],
+      'started_ts': datetime.datetime(2014, 1, 2, 3, 9, 7, 6),
+      'state': 112,
+      'try_number': 2,
+      'user': u'Jesus',
+    }
+    self.assertEqual(expected, result_summary.to_dict())
 
   def test_search_by_name(self):
     data = _gen_request_data(
