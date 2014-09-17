@@ -126,6 +126,10 @@
       <td>{{task.started_ts|datetimeformat}}</td>
     </tr>
     <tr>
+      <td>Last updated</td>
+      <td>{{(now-task.modified_ts)|timedeltaformat}} ago</td>
+    </tr>
+    <tr>
       <td>Pending time</td>
       <td>{{task.pending_now()|timedeltaformat}}</td>
     </tr>

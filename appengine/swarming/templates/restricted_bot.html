@@ -65,7 +65,7 @@
       <tr>
         <td>Most recent ping</td>
         <td nowrap {% if bot.is_dead(now) %}class="dead_bot"{% endif %}>
-          {{(now-bot.last_seen_ts)|timedeltaformat}}
+          {{(now-bot.last_seen_ts)|timedeltaformat}} ago
           {% if is_admin and bot.is_dead(now) %}
           &nbsp;&nbsp;
           <form id="delete_{{bot.key.id()}}" method="post"
