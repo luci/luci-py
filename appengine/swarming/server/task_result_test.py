@@ -409,21 +409,33 @@ class TestOutput(test_case.TestCase):
       run(0, one_mb, i*len(one_mb))
 
     self.assertEqual(
-        task_result.TaskOutput.MAX_CONTENT,
+        task_result.TaskOutput.FETCH_MAX_CONTENT,
         len(self.run_result.get_command_output_async(0).get_result()))
 
   def test_append_output_max_chunk(self):
+    # This test case is very slow (1m25s locally) if running with the default
+    # values, so scale it down a bit which results in ~2.5s.
+    self.mock(
+        task_result.TaskOutput, 'PUT_MAX_CONTENT',
+        task_result.TaskOutput.PUT_MAX_CONTENT / 8)
+    self.mock(
+        task_result.TaskOutput, 'PUT_MAX_CHUNKS',
+        task_result.TaskOutput.PUT_MAX_CHUNKS / 8)
+    self.assertFalse(
+        task_result.TaskOutput.PUT_MAX_CONTENT %
+            task_result.TaskOutput.CHUNK_SIZE)
+
     calls = []
     self.mock(logging, 'error', lambda *args: calls.append(args))
-    max_chunk = 'x' * task_result.TaskOutput.MAX_CONTENT
+    max_chunk = 'x' * task_result.TaskOutput.PUT_MAX_CONTENT
     entities = self.run_result.append_output(0, max_chunk, 0)
-    self.assertEqual(task_result.TaskOutput.MAX_CHUNKS, len(entities))
+    self.assertEqual(task_result.TaskOutput.PUT_MAX_CHUNKS, len(entities))
     ndb.put_multi(entities)
     self.assertEqual([], calls)
 
-    # Try with MAX_CONTENT + 1 bytes, so the last byte is discarded.
+    # Try with PUT_MAX_CONTENT + 1 bytes, so the last byte is discarded.
     entities = self.run_result.append_output(1, max_chunk + 'x', 0)
-    self.assertEqual(task_result.TaskOutput.MAX_CHUNKS, len(entities))
+    self.assertEqual(task_result.TaskOutput.PUT_MAX_CHUNKS, len(entities))
     ndb.put_multi(entities)
     self.assertEqual(1, len(calls))
     self.assertTrue(calls[0][0].startswith('Dropping '), calls[0][0])

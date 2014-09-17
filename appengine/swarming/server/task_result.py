@@ -131,19 +131,28 @@ class TaskOutput(ndb.Model):
   # TODO(maruel): This value was selected from guts feeling. Do proper load
   # testing to find the best value.
   # TODO(maruel): This value should be stored in the entity for future-proofing.
-  CHUNK_SIZE = 102400
+  # It can't be changed until then.
+  CHUNK_SIZE = 100*1024
 
   # Maximum content saved in a TaskOutput.
-  # TODO(maruel): Add endpoint to do chunked download, so that the GAE limit is
-  # not a problem anymore. There should still be a limit afterward but it can be
-  # much higher.
-  MAX_CONTENT = 16000*1024
+  # It is a safe-guard for tasks that sends way too much data. 100Mb should be
+  # enough stdout.
+  PUT_MAX_CONTENT = 100*1024*1024
 
   # Maximum number of chunks.
-  MAX_CHUNKS = MAX_CONTENT / CHUNK_SIZE
+  PUT_MAX_CHUNKS = PUT_MAX_CONTENT / CHUNK_SIZE
+
+  # Hard limit on the amount of data returned by get_output_async() at once.
+  # Eventually, we'll want to add support for chunked fetch, if desired. Because
+  # CHUNK_SIZE is hardcoded, it's not exactly 16Mb.
+  FETCH_MAX_CONTENT = 16*1000*1024
+
+  # Maximum number of chunks to fetch at once.
+  FETCH_MAX_CHUNKS = FETCH_MAX_CONTENT / CHUNK_SIZE
 
   # It is easier if there is no remainder for efficiency.
-  assert (MAX_CONTENT % CHUNK_SIZE) == 0
+  assert (PUT_MAX_CONTENT % CHUNK_SIZE) == 0
+  assert (FETCH_MAX_CONTENT % CHUNK_SIZE) == 0
 
   @classmethod
   @ndb.tasklet
@@ -152,6 +161,8 @@ class TaskOutput(ndb.Model):
     # TODO(maruel): Save number_chunks locally in this entity.
     if not number_chunks:
       raise ndb.Return(None)
+
+    number_chunks = min(number_chunks, cls.FETCH_MAX_CHUNKS)
 
     # TODO(maruel): Always get one more than necessary, in case number_chunks
     # is invalid. If there's an unexpected TaskOutputChunk entity present,
@@ -411,7 +422,7 @@ class TaskRunResult(_TaskResultCommon):
         self.stdout_chunks[command_index],
         output,
         output_chunk_start)
-    assert self.stdout_chunks[command_index] <= TaskOutput.MAX_CHUNKS
+    assert self.stdout_chunks[command_index] <= TaskOutput.PUT_MAX_CHUNKS
     return entities
 
   def get_outputs(self):
@@ -564,7 +575,7 @@ def _output_append(output_key, number_chunks, output, output_chunk_start):
   chunks = []
   while output:
     chunk_number = output_chunk_start / TaskOutput.CHUNK_SIZE
-    if chunk_number >= TaskOutput.MAX_CHUNKS:
+    if chunk_number >= TaskOutput.PUT_MAX_CHUNKS:
       # TODO(maruel): Log into TaskOutput that data was dropped.
       logging.error('Dropping %d of output', len(output))
       break
