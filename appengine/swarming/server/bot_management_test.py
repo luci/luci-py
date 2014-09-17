@@ -100,15 +100,38 @@ class BotManagementTest(test_case.TestCase):
     self.assertEqual(expected, bot.to_dict())
 
   def test_should_restart_bot_no(self):
+    state = {
+      'running_time': 0,
+      'started_ts': 1410989556.174,
+    }
     self.assertEqual(
-        (False, ''),
-        bot_management.should_restart_bot('id', {}, {'running_time': 0}))
+        (False, ''), bot_management.should_restart_bot('id', {}, state))
 
   def test_should_restart_bot_yes(self):
-    state = {'running_time': bot_management.BOT_REBOOT_PERIOD_SECS + 1}
+    state = {
+      'running_time': bot_management.BOT_REBOOT_PERIOD_SECS * 5,
+      'started_ts': 1410989556.174,
+    }
     needs_reboot, message = bot_management.should_restart_bot('id', {}, state)
     self.assertTrue(needs_reboot)
     self.assertTrue(message)
+
+  def test_get_bot_reboot_period(self):
+    # Mostly for code coverage.
+    self.mock(bot_management, 'BOT_REBOOT_PERIOD_SECS', 1000)
+    self.mock(bot_management, 'BOT_REBOOT_PERIOD_RANDOMIZATION_MARGIN', 0.1)
+    self.assertEqual(
+        935,
+        bot_management.get_bot_reboot_period('bot', {'started_ts': 1234}))
+    # Make sure the margin is respected.
+    periods = set()
+    for i in xrange(0, 1350):
+      period = bot_management.get_bot_reboot_period('bot', {'started_ts': i})
+      self.assertTrue(900 <= period < 1100)
+      periods.add(period)
+    # Make sure it's really random and covers all expected range. (This check
+    # relies on number of iterations above to be high enough).
+    self.assertEqual(200, len(periods))
 
 
 if __name__ == '__main__':

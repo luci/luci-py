@@ -162,7 +162,11 @@ class AppTestBase(test_case.TestCase):
         params=params).json
     token = response['xsrf_token'].encode('ascii')
     params['attributes']['version'] = response['bot_version']
-    params['state'] = {'running_time': 1234.0, 'sleep_streak': 0}
+    params['state'] = {
+      'running_time': 1234.0,
+      'sleep_streak': 0,
+      'started_ts': 1410990411.111,
+    }
     return token, params
 
   def post_with_token(self, url, params, token):

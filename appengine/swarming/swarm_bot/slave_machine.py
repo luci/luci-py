@@ -73,7 +73,7 @@ def get_current_state(started_ts, sleep_streak):
   tasks.
 
   Args:
-    started_ts: when bot started polling.
+    started_ts: when bot started polling, seconds since epoch by a local clock.
     sleep_streak: number of consecutive sleeps up till now.
   """
   # TODO(vadimsh): Send also results of 'uptime' command? Maybe also current
@@ -82,6 +82,7 @@ def get_current_state(started_ts, sleep_streak):
   return {
     'running_time': time.time() - started_ts,
     'sleep_streak': sleep_streak,
+    'started_ts': started_ts,
   }
 
 

@@ -59,11 +59,12 @@ class TestSlaveMachine(net_utils.TestCase):
   def test_get_current_state(self):
     self.mock(time, 'time', lambda: 123.0)
     expected = {
-      'running_time': 23.0,
+      'running_time': 12.0,
       'sleep_streak': 123,
+      'started_ts': 111.0,
     }
     self.assertEqual(
-        expected, slave_machine.get_current_state(100.0, 123))
+        expected, slave_machine.get_current_state(111.0, 123))
 
   def test_post_error_task(self):
     self.mock(logging, 'error', lambda *_: None)

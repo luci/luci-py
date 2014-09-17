@@ -461,7 +461,8 @@ class BotPollHandler(auth.ApiHandler):
   ACCEPTED_ATTRIBUTES = frozenset(
       [u'dimensions', u'id', u'ip', u'quarantined', u'version'])
   REQUIRED_ATTRIBUTES = frozenset([u'dimensions', u'id', u'ip', u'version'])
-  ACCEPTED_STATE_KEYS = frozenset([u'running_time', u'sleep_streak'])
+  ACCEPTED_STATE_KEYS = frozenset(
+      [u'running_time', u'sleep_streak', u'started_ts'])
   REQUIRED_STATE_KEYS = frozenset([u'running_time', u'sleep_streak'])
 
   @auth.require(acl.is_bot)

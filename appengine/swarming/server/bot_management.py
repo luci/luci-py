@@ -8,6 +8,7 @@ Includes management of the swarming_bot.zip code and the list of known bots.
 """
 
 import datetime
+import hashlib
 import os.path
 
 from google.appengine.api import memcache
@@ -35,6 +36,11 @@ BOT_DEATH_TIMEOUT = datetime.timedelta(seconds=30*60)
 # How long bot may run before being asked to reboot, sec. Do it often on canary
 # to stress test the reboot mechanism (including bot startup code).
 BOT_REBOOT_PERIOD_SECS = 3600 if utils.is_canary() else 12 * 3600
+
+
+# Margin of randomization of BOT_REBOOT_PERIOD_SECS. Per-bot period will be in
+# range [period * (1 - margin), period * (1 + margin)).
+BOT_REBOOT_PERIOD_RANDOMIZATION_MARGIN = 0.2
 
 
 ### Models.
@@ -279,7 +285,24 @@ def validate_and_fix_attributes(attributes):
   attributes.setdefault('try_count', 0)
 
 
-def should_restart_bot(_bot_id, _attributes, state):
+def get_bot_reboot_period(bot_id, state):
+  """Returns how long (in sec) a bot should run before being rebooted.
+
+  Uses BOT_REBOOT_PERIOD_SECS as a baseline, deterministically
+  pseudo-randomizing it it on per-bot basis, to make sure that bots do not
+  reboot all at once.
+  """
+  # Seed stays constant during lifetime of a swarm_bot process, but changes
+  # whenever bot is restarted. That way all bots on average restart every
+  # BOT_REBOOT_PERIOD_SECS.
+  seed_bytes = hashlib.sha1(
+      '%s%s' % (bot_id, state.get('started_ts'))).digest()[:2]
+  seed = ord(seed_bytes[0]) + 256 * ord(seed_bytes[1])
+  factor = 2 * (seed - 32768) / 65536.0 * BOT_REBOOT_PERIOD_RANDOMIZATION_MARGIN
+  return int(BOT_REBOOT_PERIOD_SECS * (1.0 + factor))
+
+
+def should_restart_bot(bot_id, _attributes, state):
   """Decides whether a bot needs to be restarted.
 
   Args:
@@ -294,6 +317,7 @@ def should_restart_bot(_bot_id, _attributes, state):
   # Periodically reboot bots to workaround OS level leaks (especially on Win).
   running_time = state['running_time']
   assert isinstance(running_time, (int, float))
-  if running_time > BOT_REBOOT_PERIOD_SECS:
-    return True, 'Periodic reboot, with %ds period' % BOT_REBOOT_PERIOD_SECS
+  period = get_bot_reboot_period(bot_id, state)
+  if running_time > period:
+    return True, 'Periodic reboot: running longer than %ds' % period
   return False, ''
