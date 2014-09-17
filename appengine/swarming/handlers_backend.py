@@ -7,12 +7,9 @@
 import webapp2
 from google.appengine.api import datastore_errors
 from google.appengine.api import taskqueue
-from google.appengine.ext import ndb
 
-from components import datastore_utils
 from components import decorators
 from components import ereporter2
-from server import result_helper
 from server import stats
 from server import task_scheduler
 
@@ -50,13 +47,7 @@ class TaskCleanupDataHandler(webapp2.RequestHandler):
   @decorators.silence(datastore_errors.Timeout)
   @decorators.require_taskqueue('cleanup')
   def post(self):
-    # All the things that need to be deleted.
-    queries = [
-        result_helper.QueryOldResults(),
-        result_helper.QueryOldResultChunks(),
-    ]
-    datastore_utils.incremental_map(
-        queries, ndb.delete_multi_async, max_inflight=50)
+    # TODO(maruel): Clean up old TaskRequest after a cut-off date.
     self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
     self.response.out.write('Success.')
 

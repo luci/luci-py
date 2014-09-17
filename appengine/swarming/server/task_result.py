@@ -52,7 +52,6 @@ from google.appengine.api import datastore_errors
 from google.appengine.ext import ndb
 
 from components import utils
-from server import result_helper
 from server import task_common
 from server import task_request
 
@@ -146,6 +145,35 @@ class TaskOutput(ndb.Model):
   # It is easier if there is no remainder for efficiency.
   assert (MAX_CONTENT % CHUNK_SIZE) == 0
 
+  @classmethod
+  @ndb.tasklet
+  def get_output_async(cls, output_key, number_chunks):
+    """Returns the stdout for a single command as a ndb.Future."""
+    # TODO(maruel): Save number_chunks locally in this entity.
+    if not number_chunks:
+      raise ndb.Return(None)
+
+    # TODO(maruel): Always get one more than necessary, in case number_chunks
+    # is invalid. If there's an unexpected TaskOutputChunk entity present,
+    # continue fetching for more incrementally.
+    parts = []
+    for f in ndb.get_multi_async(
+        _output_key_to_output_chunk_key(output_key, i)
+        for i in xrange(number_chunks)):
+      chunk = yield f
+      parts.append(chunk.chunk if chunk else None)
+
+    # Trim ending empty chunks.
+    while parts and not parts[-1]:
+      parts.pop()
+
+    # parts is now guaranteed to not end with an empty chunk.
+    # Replace any missing chunk.
+    for i in xrange(len(parts)):
+      if not parts[i]:
+        parts[i] = '\x00' * cls.CHUNK_SIZE
+    raise ndb.Return(''.join(parts))
+
 
 class TaskOutputChunk(ndb.Model):
   """Represents a chunk of a command output.
@@ -188,18 +216,10 @@ class _TaskResultCommon(ndb.Model):
   # automatically if possible.
   internal_failure = ndb.BooleanProperty(default=False)
 
-  # Only one of |outputs| or |stdout_chunks| can be set.
-
-  # Aggregated outputs. Ordered by command.
-  outputs = ndb.KeyProperty(
-      repeated=True, kind=result_helper.Results, indexed=False)
-
-  # Number of chunks for each output for each command when the data is stored as
-  # TaskOutput instead of Results. Set to 0 when no output has been collected
-  # for a specific index. Ordered by command. This value refers to the number of
-  # TaskOutputChunk entities for each TaskOutput. Use
-  # _get_all_output_chunk_keys() generate the ndb.Key to get all the data at
-  # once.
+  # Number of TaskOutputChunk entities for each output for each command. Set to
+  # 0 when no output has been collected for a specific index. Ordered by
+  # command.
+  # TODO(maruel): Move into TaskOutput.
   stdout_chunks = ndb.IntegerProperty(repeated=True, indexed=False)
 
   # Aggregated exit codes. Ordered by command.
@@ -282,10 +302,6 @@ class _TaskResultCommon(ndb.Model):
   def _pre_put_hook(self):
     """Use extra validation that cannot be validated throught 'validator'."""
     super(_TaskResultCommon, self)._pre_put_hook()
-    if self.outputs and self.stdout_chunks:
-      raise datastore_errors.BadValueError(
-          'Only one of .outputs or .stdout_chunks can be set.')
-
     if self.state == State.EXPIRED:
       if self.failure or self.exit_codes:
         raise datastore_errors.BadValueError(
@@ -299,67 +315,36 @@ class _TaskResultCommon(ndb.Model):
 
   def _get_outputs(self, run_result_key):
     """Returns the actual outputs as a list of strings."""
-    if not run_result_key:
-      # The task was not reaped yet.
+    # TODO(maruel): Make this function async.
+    if not run_result_key or not self.stdout_chunks:
+      # The task was not reaped or no output was streamed yet.
       return []
 
-    # TODO(maruel): Once support for self.outputs is removed, make this function
-    # async.
-    # https://code.google.com/p/swarming/issues/detail?id=116
-    if self.outputs:
-      # Old data.
-      return [o.get().GetResults() for o in self.outputs]
+    # Fetch everything in parallel.
+    futures = [
+      self._get_command_output_async(run_result_key, command_index)
+      for command_index in xrange(len(self.stdout_chunks))
+    ]
+    return [future.get_result() for future in futures]
 
-    if self.stdout_chunks:
-      # Fetch everything in parallel.
-      futures = [
-        ndb.get_multi_async(
-            _get_all_output_chunk_keys(
-                run_result_key, command_index, number_chunks))
-        for command_index, number_chunks in enumerate(self.stdout_chunks)
-      ]
+  @ndb.tasklet
+  def _get_command_output_async(self, run_result_key, command_index):
+    """Returns the stdout for a single command as a ndb.Future.
 
-      return [
-        ''.join(chunk.get_result().chunk for chunk in future)
-        for future in futures
-      ]
+    Use out.get_result() to get the data as a str or None if no output is
+    present.
+    """
+    if not run_result_key or command_index >= len(self.stdout_chunks or []):
+      # The task was not reaped or no output was streamed for this index yet.
+      raise ndb.Return(None)
 
-    return []
+    number_chunks = self.stdout_chunks[command_index]
+    if not number_chunks:
+      raise ndb.Return(None)
 
-  def _get_command_output(self, run_result_key, command_index):
-    """Returns the stdout for a single command."""
-    if not run_result_key:
-      # The task was not reaped yet.
-      return []
-
-    # TODO(maruel): Once support for self.outputs is removed, make this function
-    # async.
-    if self.outputs:
-      # Old data.
-      if command_index >= len(self.outputs):
-        return None
-      return self.outputs[command_index].get().GetResults()
-
-    if self.stdout_chunks:
-      if command_index >= len(self.stdout_chunks):
-        return None
-      number_chunks = self.stdout_chunks[command_index]
-      if not number_chunks:
-        return None
-      # TODO(maruel): Always get one more than necessary, in case number_chunks
-      # is invalid. If there's an unexpected TaskOutputChunk entity present,
-      # continue fetching for more incrementally.
-      entities = ndb.get_multi(
-          _get_all_output_chunk_keys(
-              run_result_key, command_index, number_chunks))
-      parts = [c.chunk if c else None for c in entities]
-      for i in xrange(len(parts)):
-        if parts[i] is None:
-          if i == len(parts):
-            parts = parts[:-1]
-          else:
-            parts[i] = '\x00' * TaskOutput.CHUNK_SIZE
-      return ''.join(parts)
+    output_key = _run_result_key_to_output_key(run_result_key, command_index)
+    out = yield TaskOutput.get_output_async(output_key, number_chunks)
+    raise ndb.Return(out)
 
 
 class TaskRunResult(_TaskResultCommon):
@@ -432,8 +417,8 @@ class TaskRunResult(_TaskResultCommon):
   def get_outputs(self):
     return self._get_outputs(self.key)
 
-  def get_command_output(self, command_index):
-    return self._get_command_output(self.key, command_index)
+  def get_command_output_async(self, command_index):
+    return self._get_command_output_async(self.key, command_index)
 
   def to_dict(self):
     out = super(TaskRunResult, self).to_dict()
@@ -482,8 +467,8 @@ class TaskResultSummary(_TaskResultCommon):
   def get_outputs(self):
     return self._get_outputs(self.run_result_key)
 
-  def get_command_output(self, command_index):
-    return self._get_command_output(self.run_result_key, command_index)
+  def get_command_output_async(self, command_index):
+    return self._get_command_output_async(self.run_result_key, command_index)
 
   def set_from_run_result(self, run_result):
     """Copies all the relevant properties from a TaskRunResult into this
@@ -542,15 +527,6 @@ def _output_key_to_output_chunk_key(output_key, chunk_number):
   assert output_key.kind() == 'TaskOutput', output_key
   assert chunk_number >= 0, chunk_number
   return ndb.Key(TaskOutputChunk, chunk_number+1, parent=output_key)
-
-
-def _get_all_output_chunk_keys(run_result_key, command_index, number_chunks):
-  """Returns the ndb.Key's to fetch all the TaskOutputChunk for a TaskOutput."""
-  return [
-    _output_key_to_output_chunk_key(
-        _run_result_key_to_output_key(run_result_key, command_index), i)
-    for i in xrange(number_chunks)
-  ]
 
 
 def _output_append(output_key, number_chunks, output, output_chunk_start):
