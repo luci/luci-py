@@ -505,6 +505,11 @@ class TaskResultSummary(_TaskResultCommon):
     corresponding TaskRunResult.
     """
     assert isinstance(run_result, TaskRunResult), run_result
+    # A previous try is still sending update. Ignore it from a result summary
+    # PoV.
+    if self.try_number and self.try_number > run_result.try_number:
+      return False
+
     for property_name in _TaskResultCommon._properties:
       if isinstance(
           getattr(_TaskResultCommon, property_name), ndb.ComputedProperty):
@@ -743,12 +748,19 @@ def yield_run_results_with_dead_bot():
 def prepare_put_run_result(run_result):
   """Prepares the entity to be saved.
 
-  It returns the updated TaskRunResult and TaskResultSummary to be saved.
+  Return:
+    list(TaskRunResult, TaskResultSummary) to be saved. It's possible that the
+    list only has TaskRunResult when it's updating an try_number that is lower
+    than what TaskResultSummary is at.
   """
-  # TODO(maruel): Test the situation where a shard is retried, but the bot
-  # running the previous try somehow reappears and reports success, the job
-  # should still be marked as success, not as running.
   assert isinstance(run_result, TaskRunResult)
   result_summary = run_result.result_summary_key.get()
+  if (result_summary.try_number and
+      result_summary.try_number > run_result.try_number):
+    # The situation where a shard is retried, but the bot running the previous
+    # try somehow reappears and reports success, the result must still show the
+    # last try's result.
+    return [run_result]
+
   result_summary.set_from_run_result(run_result)
-  return (run_result, result_summary)
+  return [run_result, result_summary]

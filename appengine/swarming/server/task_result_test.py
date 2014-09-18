@@ -345,6 +345,27 @@ class TaskResultApiTest(test_case.TestCase):
 
     self.assertFalse(result_summary.need_update_from_run_result(run_result))
 
+  def test_prepare_put_run_result_two_tries(self):
+    request = task_request.make_request(_gen_request_data())
+    result_summary = task_result.new_result_summary(request)
+    run_result_1 = task_result.new_run_result(request, 1, 'localhost')
+    run_result_2 = task_result.new_run_result(request, 2, 'localhost')
+    self.assertTrue(result_summary.need_update_from_run_result(run_result_1))
+    ndb.put_multi((result_summary, run_result_2))
+
+    self.assertTrue(result_summary.need_update_from_run_result(run_result_1))
+    ndb.put_multi(task_result.prepare_put_run_result(run_result_1))
+
+    self.assertFalse(result_summary.need_update_from_run_result(run_result_1))
+
+    self.assertTrue(result_summary.need_update_from_run_result(run_result_2))
+    ndb.put_multi(task_result.prepare_put_run_result(run_result_2))
+    result_summary = result_summary.key.get()
+
+    self.assertEqual(2, result_summary.try_number)
+    self.assertFalse(result_summary.need_update_from_run_result(run_result_1))
+    self.assertEqual(1, len(task_result.prepare_put_run_result(run_result_1)))
+
   def test_run_result_duration(self):
     run_result = task_result.TaskRunResult(
         started_ts=datetime.datetime(2010, 1, 1, 0, 0, 0),
