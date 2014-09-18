@@ -665,6 +665,20 @@ class NewClientApiTest(AppTestBase):
     # Client API test cases run by default as user.
     self.set_as_user()
 
+  def _complete_task(self, token, task_id, bot_id='bot1'):
+    params = {
+      'command_index': 0,
+      'duration': 0.1,
+      'exit_code': 1,
+      'id': bot_id,
+      'output': 'result string',
+      'output_chunk_start': 0,
+      'task_id': task_id,
+    }
+    response = self.post_with_token(
+        '/swarming/api/v1/bot/task_update', params, token)
+    self.assertEqual({u'ok': True}, response)
+
   def test_handshake(self):
     # Bare minimum:
     headers = {'X-XSRF-Token-Request': '1'}
@@ -774,7 +788,7 @@ class NewClientApiTest(AppTestBase):
     self.assertEqual('00', task_id[-2:])
 
   def test_api_bots(self):
-    self.set_as_admin()
+    self.set_as_privileged_user()
     now = datetime.datetime(2000, 1, 2, 3, 4, 5, 6)
     self.mock_now(now)
     bot = bot_management.tag_bot_seen(
@@ -829,6 +843,121 @@ class NewClientApiTest(AppTestBase):
         status=200).json
     expected['cursor'] = None
     expected['bots'][0]['id'] = u'id2'
+    self.assertEqual(expected, actual)
+
+  def test_api_bot(self):
+    self.set_as_privileged_user()
+    now = datetime.datetime(2000, 1, 2, 3, 4, 5, 6)
+    self.mock_now(now)
+    bot = bot_management.tag_bot_seen(
+        'id1', 'localhost', '127.0.0.1', '8.8.4.4', {'foo': 'bar'}, '123456789',
+        False)
+    bot.put()
+
+    actual = self.app.get('/swarming/api/v1/client/bot/id1', status=200).json
+    expected = {
+      u'created_ts': u'2000-01-02 03:04:05',
+      u'dimensions': {u'foo': u'bar'},
+      u'external_ip': u'8.8.4.4',
+      u'hostname': u'localhost',
+      u'id': u'id1',
+      u'internal_ip': u'127.0.0.1',
+      u'is_dead': False,
+      u'last_seen_ts': u'2000-01-02 03:04:05',
+      u'quarantined': False,
+      u'task': None,
+      u'version': u'123456789',
+    }
+    self.assertEqual(expected, actual)
+
+  def test_api_bot_tasks_empty(self):
+    self.set_as_privileged_user()
+    now = datetime.datetime(2000, 1, 2, 3, 4, 5, 6)
+    self.mock_now(now)
+    actual = self.app.get('/swarming/api/v1/client/bot/id1/tasks').json
+    expected = {
+      u'cursor': None,
+      u'limit': 100,
+      u'now': now.strftime(utils.DATETIME_FORMAT),
+      u'tasks': [],
+    }
+    self.assertEqual(expected, actual)
+
+  def test_api_bot_tasks(self):
+    now = datetime.datetime(2000, 1, 2, 3, 4, 5, 6)
+    self.mock_now(now)
+
+    self.set_as_bot()
+    self.client_create_task('hi')
+    token, _ = self._bot_token()
+    res = self.bot_poll()
+    self._complete_task(token, res['manifest']['task_id'])
+
+    self.client_create_task('ho')
+    token, _ = self._bot_token()
+    res = self.bot_poll()
+    self._complete_task(token, res['manifest']['task_id'])
+
+    self.set_as_privileged_user()
+    actual = self.app.get('/swarming/api/v1/client/bot/bot1/tasks?limit=1').json
+    expected = {
+      u'limit': 1,
+      u'now': now.strftime(utils.DATETIME_FORMAT),
+      u'tasks': [
+        {
+          u'abandoned_ts': None,
+          u'bot_id': u'bot1',
+          u'completed_ts': u'2000-01-02 03:04:05',
+          u'durations': [0.1],
+          u'exit_codes': [1],
+          u'failure': True,
+          u'internal_failure': False,
+          u'modified_ts': u'2000-01-02 03:04:05',
+          u'outputs': [u'result string'],
+          u'started_ts': u'2000-01-02 03:04:05',
+          u'state': task_result.State.COMPLETED,
+          u'try_number': 1,
+        },
+      ],
+    }
+    cursor = actual.pop('cursor')
+    self.assertEqual(expected, actual)
+
+    actual = self.app.get(
+        '/swarming/api/v1/client/bot/bot1/tasks?limit=1&cursor=' + cursor).json
+    expected = {
+      u'cursor': None,
+      u'limit': 1,
+      u'now': now.strftime(utils.DATETIME_FORMAT),
+      u'tasks': [
+        {
+          u'abandoned_ts': None,
+          u'bot_id': u'bot1',
+          u'completed_ts': u'2000-01-02 03:04:05',
+          u'durations': [0.1],
+          u'exit_codes': [1],
+          u'failure': True,
+          u'internal_failure': False,
+          u'modified_ts': u'2000-01-02 03:04:05',
+          u'outputs': [u'result string'],
+          u'started_ts': u'2000-01-02 03:04:05',
+          u'state': task_result.State.COMPLETED,
+          u'try_number': 1,
+        },
+      ],
+    }
+    self.assertEqual(expected, actual)
+
+  def test_api_bot_missing(self):
+    self.set_as_privileged_user()
+    self.app.get('/swarming/api/v1/client/bot/unknown', status=404)
+
+  def test_api_server(self):
+    self.set_as_privileged_user()
+    actual = self.app.get('/swarming/api/v1/client/server').json
+    expected = {
+      'bot_version': bot_management.get_slave_version('http://localhost'),
+    }
     self.assertEqual(expected, actual)
 
 

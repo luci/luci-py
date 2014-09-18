@@ -179,6 +179,53 @@ class ClientApiBots(auth.ApiHandler):
     self.send_response(utils.to_json_encodable(data))
 
 
+class ClientApiBot(auth.ApiHandler):
+  """Returns the info known about a swarming bot."""
+
+  @auth.require(acl.is_privileged_user)
+  def get(self, bot_id):
+    bot = bot_management.get_bot_key(bot_id).get()
+    if not bot:
+      self.abort_with_error(404, error='Bot not found')
+    now = utils.utcnow()
+    self.send_response(utils.to_json_encodable(bot.to_dict_with_now(now)))
+
+
+class ClientApiBotTask(auth.ApiHandler):
+  """Returns the info known about tasks that ran on a specific swarming bot."""
+
+  @auth.require(acl.is_privileged_user)
+  def get(self, bot_id):
+    limit = int(self.request.get('limit', 100))
+    cursor = datastore_query.Cursor(urlsafe=self.request.get('cursor'))
+    run_results, cursor, more = task_result.TaskRunResult.query(
+        task_result.TaskRunResult.bot_id == bot_id).order(
+            -task_result.TaskRunResult.started_ts).fetch_page(
+                limit, start_cursor=cursor)
+    now = utils.utcnow()
+    data = {
+      'cursor': cursor.urlsafe() if cursor and more else None,
+      'limit': limit,
+      'now': now,
+      'tasks': run_results,
+    }
+    self.send_response(utils.to_json_encodable(data))
+
+
+class ClientApiServer(auth.ApiHandler):
+  """Returns info about the server itself.
+
+  For now, it's not much but it'd be the rigth place to return a GlobalConfig if
+  one is ever created.
+  """
+  @auth.require(acl.is_privileged_user)
+  def get(self):
+    data = {
+      'bot_version': bot_management.get_slave_version(self.request.host_url),
+    }
+    self.send_response(utils.to_json_encodable(data))
+
+
 ### Old Client APIs.
 # TODO(maruel): Remove.
 
@@ -761,7 +808,10 @@ def get_routes():
 
       # New Client API:
       ('/swarming/api/v1/client/bots', ClientApiBots),
+      ('/swarming/api/v1/client/bot/<bot_id:[^/]+>', ClientApiBot),
+      ('/swarming/api/v1/client/bot/<bot_id:[^/]+>/tasks', ClientApiBotTask),
       ('/swarming/api/v1/client/handshake', ClientHandshakeHandler),
+      ('/swarming/api/v1/client/server', ClientApiServer),
       ('/swarming/api/v1/client/task/<key_id:[0-9a-fA-F]+>',
           ClientTaskResultHandler),
 
