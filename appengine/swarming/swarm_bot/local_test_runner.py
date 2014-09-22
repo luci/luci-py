@@ -47,6 +47,15 @@ MAX_PACKET_INTERVAL = 30
 MIN_PACKET_INTERNAL = 10
 
 
+# Exit code used to restart the host. Keep in sync with slave_machine.py. The
+# reason for its existance is that if an exception occurs, local_test_runner's
+# exit code will be 1. If the process is killed, it'll likely be -9. In these
+# cases, we want the task to be marked as error. But if local_test_runner wants
+# to reboot without marking the task as an internal failure, a special code must
+# be used.
+RESTART_CODE = 89
+
+
 def download_data(root_dir, files):
   """Downloads and expands the zip files enumerated in the test run data."""
   for data_url, _ in files:
@@ -93,6 +102,9 @@ def load_and_run(filename, swarming_server):
   This may throw all sorts of exceptions in case of failure. It's up to the
   caller to trap them. These shall be considered 'internal_failure' instead of
   'failure' from a TaskRunResult standpoint.
+
+  Return:
+    True on success, False if the task failed.
   """
   # The work directory is guaranteed to exist since it was created by
   # slave_machine.py and contains the manifest. Temporary files will be
@@ -108,9 +120,11 @@ def load_and_run(filename, swarming_server):
   # Download the script to run in the temporary directory.
   download_data(root_dir, task_details.data)
 
+  out = True
   for index in xrange(len(task_details.commands)):
-    run_command(swarming_server, index, task_details, root_dir)
-  return 0
+    out = out and not bool(
+        run_command(swarming_server, index, task_details, root_dir))
+  return out
 
 
 def post_update(swarming_server, params, exit_code, stdout, output_chunk_start):
@@ -170,7 +184,7 @@ def run_command(swarming_server, index, task_details, root_dir):
   server can ensure they are processed in order.
 
   Returns:
-    Number of stdout bytes streamed to the server.
+    Child process exit code.
   """
   # Signal the command is about to be started.
   params = {
@@ -248,8 +262,9 @@ def run_command(swarming_server, index, task_details, root_dir):
     post_update(swarming_server, params, exit_code, stdout, output_chunk_start)
     output_chunk_start += len(stdout)
     stdout = ''
+
   assert not stdout
-  return output_chunk_start
+  return exit_code
 
 
 def main(args):
@@ -271,7 +286,10 @@ def main(args):
   on_error.report_on_exception_exit(options.swarming_server)
 
   remote = url_helper.XsrfRemote(options.swarming_server)
-  return load_and_run(options.request_file_name, remote)
+  if not load_and_run(options.request_file_name, remote):
+    # This means it's time for the bot to reboot but it's not task_error worthy.
+    return RESTART_CODE
+  return 0
 
 
 if __name__ == '__main__':

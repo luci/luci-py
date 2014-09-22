@@ -36,6 +36,10 @@ THIS_FILE = os.path.abspath(zipped_archive.get_main_script_path())
 ROOT_DIR = os.path.dirname(THIS_FILE)
 
 
+# See local_test_runner.py for documentation.
+RESTART_CODE = 89
+
+
 def get_attributes():
   """Returns start_slave.py's get_attributes() dict."""
   # Importing this administrator provided script could have side-effects on
@@ -235,6 +239,7 @@ def run_manifest(remote, attributes, manifest):
   # extracted before any I/O is done, like writting the manifest to disk.
   task_id = manifest['task_id']
 
+  restart_msg = None
   try:
     # We currently do not clean up the 'work' directory now is it compartmented.
     # TODO(maruel): Compartmentation should be done via tag. It is important to
@@ -257,16 +262,25 @@ def run_manifest(remote, attributes, manifest):
         command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, cwd=ROOT_DIR)
     out = proc.communicate()[0]
 
-    if proc.returncode:
+    # TODO(maruel): Ask start_slave.py before rebooting.
+    # https://code.google.com/p/swarming/issues/detail?id=159
+    if proc.returncode == RESTART_CODE:
+      restart_msg = 'Restarting due to task failure'
+    elif proc.returncode:
       # TODO(maruel): manifest/task number.
-      raise ValueError('Execution failed, internal error:\n%s' % out)
-
-    # At this point the script called by subprocess has handled any further
-    # communication with the swarming server.
-    logging.debug('done!')
+      restart_msg = 'Execution failed, internal error:\n%s' % out
+      post_error_task(remote, attributes, restart_msg, task_id)
+    else:
+      # At this point the script called by subprocess has handled any further
+      # communication with the swarming server.
+      logging.debug('done!')
   except Exception as e:
     # Cancel task_id with internal_failure.
-    post_error_task(remote, attributes, str(e), task_id)
+    restart_msg = 'Internal exception occured: %s' % str(e)
+    post_error_task(remote, attributes, restart_msg, task_id)
+  finally:
+    if restart_msg:
+      restart_bot(remote, attributes, restart_msg)
 
 
 def update_bot(remote, attributes, version):

@@ -265,9 +265,7 @@ class TestSlaveMachine(net_utils.TestCase):
     self.assertTrue(slave_machine.poll_server(server, {'a': 1}, {'s': 1}))
     self.assertEqual([(server, {'a': 1}, 'Please die now')], restart)
 
-  def test_run_manifest(self):
-    self.mock(slave_machine, 'post_error', self.fail)
-
+  def _mock_popen(self, returncode):
     # Method should have "self" as first argument - pylint: disable=E0213
     class Popen(object):
       def __init__(self2, cmd, cwd, stdout, stderr):
@@ -282,13 +280,36 @@ class TestSlaveMachine(net_utils.TestCase):
         self.assertEqual(subprocess.STDOUT, stderr)
 
       def communicate(self2):
-        self2.returncode = 0
+        self2.returncode = returncode
         return 'foo', None
     self.mock(subprocess, 'Popen', Popen)
+
+  def test_run_manifest(self):
+    self.mock(slave_machine, 'post_error', self.fail)
+    self.mock(slave_machine, 'post_error_task', self.fail)
+    self.mock(slave_machine, 'restart_bot', self.fail)
+    self._mock_popen(0)
 
     server = url_helper.XsrfRemote('https://localhost:1/')
     manifest = {'task_id': 24}
     slave_machine.run_manifest(server, {}, manifest)
+
+  def test_run_manifest_restart(self):
+    self.mock(slave_machine, 'post_error', self.fail)
+    posted = []
+    self.mock(
+        slave_machine, 'post_error_task', lambda *args: posted.append(args))
+    restarted = []
+    self.mock(slave_machine, 'restart_bot', lambda *_: restarted.append(True))
+
+    self._mock_popen(1)
+    server = url_helper.XsrfRemote('https://localhost:1/')
+    server.token = 'foo'
+    manifest = {'task_id': 24}
+    slave_machine.run_manifest(server, {}, manifest)
+    self.assertEqual(
+        [(server, {}, 'Execution failed, internal error:\nfoo', 24)], posted)
+    self.assertEqual([True], restarted)
 
   def test_update_bot_linux(self):
     self.mock(sys, 'platform', 'linux2')

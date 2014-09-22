@@ -108,6 +108,7 @@ class TestLocalTestRunner(net_utils.TestCase):
       self.assertEqual(self.work_dir, work_dir)
       self.assertTrue(isinstance(task_details, local_test_runner.TaskDetails))
       runs.append(index)
+      return 23
     self.mock(local_test_runner, 'run_command', run_command)
 
     manifest = os.path.join(self.root_dir, 'manifest')
@@ -123,7 +124,8 @@ class TestLocalTestRunner(net_utils.TestCase):
       }
       json.dump(data, f)
 
-    self.assertEqual(0, local_test_runner.load_and_run(manifest, server))
+    # run_command() returned 23 so load_and_run() returns False.
+    self.assertEqual(False, local_test_runner.load_and_run(manifest, server))
 
   def test_run_command(self):
     def check_final(kwargs):
@@ -179,7 +181,65 @@ class TestLocalTestRunner(net_utils.TestCase):
         })
     # This runs the command for real.
     self.assertEqual(
-        3, local_test_runner.run_command(server, 0, task_details, '.'))
+        0, local_test_runner.run_command(server, 0, task_details, '.'))
+
+  def test_run_command_fail(self):
+    def check_final(kwargs):
+      self.assertLess(0, kwargs['data'].pop('duration'))
+      self.assertEqual(
+          {
+            'data': {
+              'command_index': 0,
+              'exit_code': 1,
+              'hard_timeout': False,
+              'id': 'localhost',
+              'io_timeout': False,
+              'output': 'hi\n',
+              'output_chunk_start': 0,
+              'task_id': 23,
+            },
+            'headers': {'X-XSRF-Token': 'token'},
+          },
+          kwargs)
+
+    requests = [
+      (
+        'https://localhost:1/auth/api/v1/accounts/self/xsrf_token',
+        {'data': {}, 'headers': {'X-XSRF-Token-Request': '1'}},
+        {'xsrf_token': 'token'},
+      ),
+      (
+        'https://localhost:1/swarming/api/v1/bot/task_update/23',
+        {
+          'data': {'command_index': 0, 'id': 'localhost', 'task_id': 23},
+          'headers': {'X-XSRF-Token': 'token'},
+        },
+        {},
+      ),
+      (
+        'https://localhost:1/swarming/api/v1/bot/task_update/23',
+        check_final,
+        {},
+      ),
+    ]
+    self.expected_requests(requests)
+    server = url_helper.XsrfRemote('https://localhost:1/')
+
+    task_details = local_test_runner.TaskDetails(
+        {
+          'bot_id': 'localhost',
+          'commands': [
+            [sys.executable, '-c', 'import sys; print(\'hi\'); sys.exit(1)'],
+          ],
+          'data': [],
+          'env': {},
+          'hard_timeout': 6,
+          'io_timeout': 6,
+          'task_id': 23,
+        })
+    # This runs the command for real.
+    self.assertEqual(
+        1, local_test_runner.run_command(server, 0, task_details, '.'))
 
   def test_run_command_hard_timeout(self):
     # This runs the command for real.
@@ -240,7 +300,7 @@ class TestLocalTestRunner(net_utils.TestCase):
           'task_id': 23,
         })
     self.assertEqual(
-        3, local_test_runner.run_command(server, 0, task_details, '.'))
+        -9, local_test_runner.run_command(server, 0, task_details, '.'))
 
   def test_run_command_io_timeout(self):
     # This runs the command for real.
@@ -301,7 +361,7 @@ class TestLocalTestRunner(net_utils.TestCase):
           'task_id': 23,
         })
     self.assertEqual(
-        3, local_test_runner.run_command(server, 0, task_details, '.'))
+        -9, local_test_runner.run_command(server, 0, task_details, '.'))
 
   def test_run_command_large(self):
     # Method should have "self" as first argument - pylint: disable=E0213
@@ -402,7 +462,7 @@ class TestLocalTestRunner(net_utils.TestCase):
           'task_id': 23,
         })
     self.assertEqual(
-        400012, local_test_runner.run_command(server, 0, task_details, './'))
+        0, local_test_runner.run_command(server, 0, task_details, './'))
 
   def test_main(self):
     def load_and_run(manifest, swarming_server):
@@ -412,7 +472,8 @@ class TestLocalTestRunner(net_utils.TestCase):
 
     self.mock(local_test_runner, 'load_and_run', load_and_run)
     self.assertEqual(
-        0, local_test_runner.main(['-S', 'http://localhost', '-f', 'foo']))
+        local_test_runner.RESTART_CODE,
+        local_test_runner.main(['-S', 'http://localhost', '-f', 'foo']))
 
 
 if __name__ == '__main__':
