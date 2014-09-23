@@ -9,6 +9,7 @@ import logging
 
 import webapp2
 
+from google.appengine.api import datastore_errors
 from google.appengine.datastore import datastore_query
 from google.appengine import runtime
 from google.appengine.ext import ndb
@@ -290,6 +291,28 @@ class ClientApiServer(auth.ApiHandler):
   def get(self):
     data = {
       'bot_version': bot_management.get_slave_version(self.request.host_url),
+    }
+    self.send_response(utils.to_json_encodable(data))
+
+
+class ClientRequestHandler(auth.ApiHandler):
+  """Creates a new request, returns all the meta data about the request."""
+  @auth.require(acl.is_bot_or_user)
+  def post(self):
+    request = self.parse_body()
+    # If the priority is below 100, make the the user has right to do so.
+    if request.get('priority', 255) < 100 and not acl.is_bot_or_admin():
+      # Silently drop the priority of normal users.
+      request['priority'] = 100
+
+    try:
+      request, result_summary = task_scheduler.make_request(request)
+    except (datastore_errors.BadValueError, TypeError, ValueError) as e:
+      self.abort_with_error(400, error=str(e))
+
+    data = {
+      'request': request.to_dict(),
+      'task_id': task_common.pack_result_summary_key(result_summary.key),
     }
     self.send_response(utils.to_json_encodable(data))
 
@@ -880,6 +903,7 @@ def get_routes():
       ('/swarming/api/v1/client/bot/<bot_id:[^/]+>/tasks', ClientApiBotTask),
       ('/swarming/api/v1/client/handshake', ClientHandshakeHandler),
       ('/swarming/api/v1/client/list', ClientApiListHandler),
+      ('/swarming/api/v1/client/request', ClientRequestHandler),
       ('/swarming/api/v1/client/server', ClientApiServer),
       ('/swarming/api/v1/client/task/<task_id:[0-9a-f]+>',
           ClientTaskResultHandler),

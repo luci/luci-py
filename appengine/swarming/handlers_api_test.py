@@ -738,6 +738,103 @@ class NewClientApiTest(AppTestBase):
     ]
     self.assertEqual(expected, errors)
 
+  def test_request_invalid(self):
+    headers = {'X-XSRF-Token-Request': '1'}
+    response = self.app.post_json(
+        '/swarming/api/v1/client/handshake', headers=headers, params={}).json
+    params = {
+      'foo': 'bar',
+      'properties': {},
+      'scheduling_expiration_secs': 30,
+      'tags': [],
+    }
+    headers = {'X-XSRF-Token': str(response['xsrf_token'])}
+    response = self.app.post_json(
+        '/swarming/api/v1/client/request',
+        headers=headers, params=params, status=400).json
+    expected = {
+      u'error':
+          u'Unexpected request keys; did you make a typo?\n'
+          u'Missing: name, priority, user\nSuperfluous: foo\n',
+    }
+    self.assertEqual(expected, response)
+
+  def test_request_invalid_lower_level(self):
+    headers = {'X-XSRF-Token-Request': '1'}
+    response = self.app.post_json(
+        '/swarming/api/v1/client/handshake', headers=headers, params={}).json
+    params = {
+      'name': 'job1',
+      'priority': 200,
+      'properties': {
+        'commands': [],
+        'data': [],
+        'dimensions': {},
+        'env': {},
+        'execution_timeout_secs': 10,
+        'io_timeout_secs': 10,
+      },
+      'scheduling_expiration_secs': 30,
+      'tags': ['foo', 'bar'],
+      'user': 'joe@localhost',
+    }
+    headers = {'X-XSRF-Token': str(response['xsrf_token'])}
+    response = self.app.post_json(
+        '/swarming/api/v1/client/request',
+        headers=headers, params=params, status=400).json
+    self.assertEqual({u'error': u'commands is required'}, response)
+
+  def test_request(self):
+    self.mock(random, 'getrandbits', lambda _: 0x88)
+    now = datetime.datetime(2010, 1, 2, 3, 4, 5)
+    self.mock_now(now)
+    str_now = unicode(now.strftime(utils.DATETIME_FORMAT))
+    headers = {'X-XSRF-Token-Request': '1'}
+    response = self.app.post_json(
+        '/swarming/api/v1/client/handshake', headers=headers, params={}).json
+    params = {
+      'name': 'job1',
+      'priority': 200,
+      'properties': {
+        'commands': [['rm', '-rf', '/']],
+        'data': [],
+        'dimensions': {},
+        'env': {},
+        'execution_timeout_secs': 30,
+        'io_timeout_secs': 30,
+      },
+      'scheduling_expiration_secs': 30,
+      'tags': ['foo', 'bar'],
+      'user': 'joe@localhost',
+    }
+    headers = {'X-XSRF-Token': str(response['xsrf_token'])}
+    response = self.app.post_json(
+        '/swarming/api/v1/client/request',
+        headers=headers, params=params).json
+    expected = {
+      u'request': {
+        u'created_ts': str_now,
+        u'expiration_ts': unicode(
+            (now + datetime.timedelta(seconds=30)).strftime(
+                utils.DATETIME_FORMAT)),
+        u'name': u'job1',
+        u'priority': 200,
+        u'properties': {
+          u'commands': [[u'rm', u'-rf', u'/']],
+          u'data': [],
+          u'dimensions': {},
+          u'env': {},
+          u'execution_timeout_secs': 30,
+          u'io_timeout_secs': 30,
+        },
+        u'properties_hash': u'b066ff178d6d987c0ef85d0f765c929f27026719',
+        u'tags': [u'foo', u'bar'],
+        u'user': u'joe@localhost',
+      },
+      u'task_id': u'125ecfd5c888800',
+    }
+    self.assertEqual(expected, response)
+
   def test_get_task_metadata_unknown(self):
     response = self.app.get(
         '/swarming/api/v1/client/task/12300', status=404).json

@@ -307,6 +307,22 @@ def _put_request(request):
   return datastore_utils.insert(request, _new_request_key)
 
 
+def _assert_keys(expected_keys, minimum_keys, actual_keys, name):
+  """Raise an exception if expected keys are not present."""
+  actual_keys = frozenset(actual_keys)
+  superfluous = actual_keys - expected_keys
+  missing = minimum_keys - actual_keys
+  if superfluous or missing:
+    msg_missing = (
+        ('Missing: %s\n' % ', '.join(sorted(missing))) if missing else '')
+    msg_superfluous = (
+        ('Superfluous: %s\n' % ', '.join(sorted(superfluous)))
+        if superfluous else '')
+    message = 'Unexpected %s; did you make a typo?\n%s%s' % (
+        name, msg_missing, msg_superfluous)
+    raise ValueError(message)
+
+
 ### Public API.
 
 
@@ -369,20 +385,11 @@ def make_request(data):
     The newly created TaskRequest.
   """
   # Save ourself headaches with typos and refuses unexpected values.
-  set_data = frozenset(data)
-  if set_data != _DATA_KEYS:
-    raise ValueError(
-        'Unexpected parameters for make_request(): %s\nExpected: %s' % (
-            ', '.join(sorted(_DATA_KEYS.symmetric_difference(set_data))),
-            ', '.join(sorted(_DATA_KEYS))))
+  _assert_keys(_DATA_KEYS, _DATA_KEYS, data, 'request keys')
   data_properties = data['properties']
-  set_data_properties = frozenset(data_properties)
-  if set_data_properties != _PROPERTIES_KEYS:
-    raise ValueError(
-        'Unexpected properties for make_request(): %s\nExpected: %s' % (
-            ', '.join(sorted(
-                _PROPERTIES_KEYS.symmetric_difference(set_data_properties))),
-            ', '.join(sorted(_PROPERTIES_KEYS))))
+  _assert_keys(
+      _PROPERTIES_KEYS, _PROPERTIES_KEYS, data_properties,
+      'request properties keys')
 
   # Class TaskProperties takes care of making everything deterministic.
   properties = TaskProperties(
