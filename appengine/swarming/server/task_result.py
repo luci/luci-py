@@ -230,7 +230,6 @@ class _TaskResultCommon(ndb.Model):
   # Number of TaskOutputChunk entities for each output for each command. Set to
   # 0 when no output has been collected for a specific index. Ordered by
   # command.
-  # TODO(maruel): Move into TaskOutput.
   stdout_chunks = ndb.IntegerProperty(repeated=True, indexed=False)
 
   # Aggregated exit codes. Ordered by command.
@@ -253,30 +252,6 @@ class _TaskResultCommon(ndb.Model):
     return self.state == State.PENDING
 
   @property
-  def ended_ts(self):
-    return self.completed_ts or self.abandoned_ts
-
-  @property
-  def pending(self):
-    """Returns the timedelta the task spent pending to be scheduled or None if
-    not started yet."""
-    if self.started_ts:
-      return self.started_ts - self.created_ts
-
-  def pending_now(self):
-    """Returns the timedelta the task spent pending to be scheduled as of now.
-    """
-    return (self.started_ts or utils.utcnow()) - self.created_ts
-
-  @property
-  def priority(self):
-    # TODO(maruel): This property is not efficient at lookup time so it is
-    # probably better to duplicate the data. The trade off is that TaskRunResult
-    # is saved a lot. Maybe we'll need to rethink this, maybe TaskRunSummary
-    # wasn't a great idea after all.
-    return self.request_key.get().priority
-
-  @property
   def duration(self):
     """Returns the timedelta the task spent executing.
 
@@ -289,26 +264,88 @@ class _TaskResultCommon(ndb.Model):
   def duration_now(self):
     """Returns the timedelta the task spent executing as of now.
 
-    Task abandoned is not applicable and return None.
+    Similar to .duration except that its return value is not deterministic. Task
+    abandoned is not applicable and return None.
     """
     if not self.started_ts or self.abandoned_ts:
       return None
     return (self.completed_ts or utils.utcnow()) - self.started_ts
+
+  @property
+  def ended_ts(self):
+    return self.completed_ts or self.abandoned_ts
+
+  @property
+  def pending(self):
+    """Returns the timedelta the task spent pending to be scheduled or None if
+    not started yet."""
+    if self.started_ts:
+      return self.started_ts - self.created_ts
+
+  def pending_now(self):
+    """Returns the timedelta the task spent pending to be scheduled as of now.
+
+    Similar to .pending except that its return value is not deterministic.
+    """
+    return (self.started_ts or utils.utcnow()) - self.created_ts
+
+  @property
+  def priority(self):
+    # TODO(maruel): This property is not efficient at lookup time so it is
+    # probably better to duplicate the data. The trade off is that TaskRunResult
+    # is saved a lot. Maybe we'll need to rethink this, maybe TaskRunSummary
+    # wasn't a great idea after all.
+    return self.request_key.get().priority
+
+  @property
+  def run_result_key(self):
+    """Returns the active TaskRunResult key."""
+    raise NotImplementedError()
 
   def to_string(self):
     return state_to_string(self)
 
   def to_dict(self):
     out = super(_TaskResultCommon, self).to_dict()
-    out['durations'] = out['durations'] or []
-    out['exit_codes'] = out['exit_codes'] or []
-    out['outputs'] = self.get_outputs()
-    # Make the output consistent independent if using the old format or the new
-    # one.
-    # TODO(maruel): Remove the old format once the DBs have been cleared on the
-    # server.
-    del out['stdout_chunks']
+    # stdout_chunks is an implementation detail.
+    out.pop('stdout_chunks')
     return out
+
+  def get_outputs(self):
+    """Returns the actual outputs as a list of strings."""
+    # TODO(maruel): Make this function async.
+    if not self.run_result_key or not self.stdout_chunks:
+      # The task was not reaped or no output was streamed yet.
+      return []
+
+    # Fetch everything in parallel.
+    futures = [
+      self.get_command_output_async(command_index)
+      for command_index in xrange(len(self.stdout_chunks))
+    ]
+    return [future.get_result() for future in futures]
+
+  @ndb.tasklet
+  def get_command_output_async(self, command_index):
+    """Returns the stdout for a single command as a ndb.Future.
+
+    Use out.get_result() to get the data as a str or None if no output is
+    present.
+    """
+    assert isinstance(command_index, int), command_index
+    if (not self.run_result_key or
+        command_index >= len(self.stdout_chunks or [])):
+      # The task was not reaped or no output was streamed for this index yet.
+      raise ndb.Return(None)
+
+    number_chunks = self.stdout_chunks[command_index]
+    if not number_chunks:
+      raise ndb.Return(None)
+
+    output_key = _run_result_key_to_output_key(
+        self.run_result_key, command_index)
+    out = yield TaskOutput.get_output_async(output_key, number_chunks)
+    raise ndb.Return(out)
 
   def _pre_put_hook(self):
     """Use extra validation that cannot be validated throught 'validator'."""
@@ -323,39 +360,6 @@ class _TaskResultCommon(ndb.Model):
 
     if self.state == State.TIMED_OUT and not self.failure:
       raise datastore_errors.BadValueError('Timeout implies task failure')
-
-  def _get_outputs(self, run_result_key):
-    """Returns the actual outputs as a list of strings."""
-    # TODO(maruel): Make this function async.
-    if not run_result_key or not self.stdout_chunks:
-      # The task was not reaped or no output was streamed yet.
-      return []
-
-    # Fetch everything in parallel.
-    futures = [
-      self._get_command_output_async(run_result_key, command_index)
-      for command_index in xrange(len(self.stdout_chunks))
-    ]
-    return [future.get_result() for future in futures]
-
-  @ndb.tasklet
-  def _get_command_output_async(self, run_result_key, command_index):
-    """Returns the stdout for a single command as a ndb.Future.
-
-    Use out.get_result() to get the data as a str or None if no output is
-    present.
-    """
-    if not run_result_key or command_index >= len(self.stdout_chunks or []):
-      # The task was not reaped or no output was streamed for this index yet.
-      raise ndb.Return(None)
-
-    number_chunks = self.stdout_chunks[command_index]
-    if not number_chunks:
-      raise ndb.Return(None)
-
-    output_key = _run_result_key_to_output_key(run_result_key, command_index)
-    out = yield TaskOutput.get_output_async(output_key, number_chunks)
-    raise ndb.Return(out)
 
 
 class TaskRunResult(_TaskResultCommon):
@@ -404,6 +408,10 @@ class TaskRunResult(_TaskResultCommon):
     return run_result_key_to_result_summary_key(self.key)
 
   @property
+  def run_result_key(self):
+    return self.key
+
+  @property
   def try_number(self):
     """Retry number this task. 1 based."""
     return self.key.integer_id()
@@ -424,12 +432,6 @@ class TaskRunResult(_TaskResultCommon):
         output_chunk_start)
     assert self.stdout_chunks[command_index] <= TaskOutput.PUT_MAX_CHUNKS
     return entities
-
-  def get_outputs(self):
-    return self._get_outputs(self.key)
-
-  def get_command_output_async(self, command_index):
-    return self._get_command_output_async(self.key, command_index)
 
   def to_dict(self):
     out = super(TaskRunResult, self).to_dict()
@@ -474,12 +476,6 @@ class TaskResultSummary(_TaskResultCommon):
     if not self.try_number:
       return None
     return result_summary_key_to_run_result_key(self.key, self.try_number)
-
-  def get_outputs(self):
-    return self._get_outputs(self.run_result_key)
-
-  def get_command_output_async(self, command_index):
-    return self._get_command_output_async(self.run_result_key, command_index)
 
   def set_from_run_result(self, run_result):
     """Copies all the relevant properties from a TaskRunResult into this
@@ -582,7 +578,7 @@ def _output_append(output_key, number_chunks, output, output_chunk_start):
     chunk_number = output_chunk_start / TaskOutput.CHUNK_SIZE
     if chunk_number >= TaskOutput.PUT_MAX_CHUNKS:
       # TODO(maruel): Log into TaskOutput that data was dropped.
-      logging.error('Dropping %d of output', len(output))
+      logging.error('Dropping output\n%d bytes were lost', len(output))
       break
     key = _output_key_to_output_chunk_key(output_key, chunk_number)
     start = output_chunk_start % TaskOutput.CHUNK_SIZE

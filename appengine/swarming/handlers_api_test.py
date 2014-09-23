@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# coding: utf-8
 # Copyright 2014 The Swarming Authors. All rights reserved.
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
@@ -490,7 +491,6 @@ class BotApiTest(AppTestBase):
       u'failure': False,
       u'internal_failure': False,
       u'modified_ts': str_now,
-      u'outputs': [],
       u'started_ts': str_now,
       u'state': task_result.State.RUNNING,
       u'try_number': 1,
@@ -557,7 +557,6 @@ class BotApiTest(AppTestBase):
         u'failure': False,
         u'internal_failure': False,
         u'modified_ts': str_now,
-        u'outputs': [],
         u'started_ts': str_now,
         u'state': task_result.State.RUNNING,
         u'try_number': 1,
@@ -584,29 +583,28 @@ class BotApiTest(AppTestBase):
 
     # 2. Task update with some output.
     params = _params(output='Oh ')
-    expected = _expected(outputs=[u'Oh '])
+    expected = _expected()
     _cycle(params, expected)
 
     # 3. Task update with some more output.
     params = _params(output='hi', output_chunk_start=3)
-    expected = _expected(outputs=[u'Oh hi'])
+    expected = _expected()
     _cycle(params, expected)
 
     # 4. Task update with completion of first command.
     params = _params(duration=0.2, exit_code=0)
-    expected = _expected(exit_codes=[0], outputs=[u'Oh hi'])
-    expected = _expected(durations=[0.2], exit_codes=[0], outputs=[u'Oh hi'])
+    expected = _expected(exit_codes=[0])
+    expected = _expected(durations=[0.2], exit_codes=[0])
     _cycle(params, expected)
 
     # 5. Task update with completion of second command along with full output.
     params = _params(
-        command_index=1, duration=0.1, exit_code=23, output='Ahaha')
+        command_index=1, duration=0.1, exit_code=23, output='Ahahah')
     expected = _expected(
         completed_ts=str_now,
         durations=[0.2, 0.1],
         exit_codes=[0, 23],
         failure=True,
-        outputs=[u'Oh hi', u'Ahaha'],
         state=task_result.State.COMPLETED)
     _cycle(params, expected)
 
@@ -642,7 +640,6 @@ class BotApiTest(AppTestBase):
       u'failure': False,
       u'internal_failure': True,
       u'modified_ts': str_now,
-      u'outputs': [],
       u'started_ts': str_now,
       u'state': task_result.State.BOT_DIED,
       u'try_number': 1,
@@ -715,12 +712,12 @@ class NewClientApiTest(AppTestBase):
     ]
     self.assertEqual(expected, errors)
 
-  def test_get_results_unknown(self):
+  def test_get_task_metadata_unknown(self):
     response = self.app.get(
         '/swarming/api/v1/client/task/12300', status=404).json
     self.assertEqual({u'error': u'Task not found'}, response)
 
-  def test_get_results(self):
+  def test_get_task_metadata(self):
     now = datetime.datetime(2010, 1, 2, 3, 4, 5)
     self.mock_now(now)
     str_now = unicode(now.strftime(utils.DATETIME_FORMAT))
@@ -739,7 +736,6 @@ class NewClientApiTest(AppTestBase):
       u'internal_failure': False,
       u'modified_ts': str_now,
       u'name': u'hi',
-      u'outputs': [],
       u'started_ts': None,
       u'state': task_result.State.PENDING,
       u'try_number': None,
@@ -769,23 +765,166 @@ class NewClientApiTest(AppTestBase):
       u'failure': False,
       u'internal_failure': False,
       u'modified_ts': str_now,
-      u'outputs': [],
       u'started_ts': str_now,
       u'state': task_result.State.RUNNING,
       u'try_number': 1,
     }
     self.assertEqual(expected, response)
 
-  def test_get_results_denied(self):
+  def test_get_task_metadata_denied(self):
     # Asserts that a non-public task can not be seen by an anonymous user.
-    now = datetime.datetime(2010, 1, 2, 3, 4, 5)
-    self.mock_now(now)
     # Note: this is still the old API.
     _, task_id = self.client_create_task('hi')
 
     self.set_as_anonymous()
     self.app.get('/swarming/api/v1/client/task/' + task_id, status=403)
     self.assertEqual('00', task_id[-2:])
+
+  def test_get_task_output(self):
+    # Note: this is still the old API.
+    self.client_create_task('hi')
+
+    self.set_as_bot()
+    token, _ = self._bot_token()
+    res = self.bot_poll()
+    task_id = res['manifest']['task_id']
+    params = {
+      'command_index': 0,
+      'duration': 0.1,
+      'exit_code': 0,
+      'id': 'bot1',
+      'output': u'résult string',
+      'output_chunk_start': 0,
+      'task_id': task_id,
+    }
+    response = self.post_with_token(
+        '/swarming/api/v1/bot/task_update', params, token)
+    self.assertEqual({u'ok': True}, response)
+    params = {
+      'command_index': 1,
+      'duration': 0.1,
+      'exit_code': 0,
+      'id': 'bot1',
+      'output': 'bar',
+      'output_chunk_start': 0,
+      'task_id': task_id,
+    }
+    response = self.post_with_token(
+        '/swarming/api/v1/bot/task_update', params, token)
+    self.assertEqual({u'ok': True}, response)
+
+    self.set_as_privileged_user()
+    run_id = task_id[:-2] + '01'
+    response = self.app.get(
+        '/swarming/api/v1/client/task/%s/output/0' % task_id).json
+    self.assertEqual({'output': u'résult string'}, response)
+    response = self.app.get(
+        '/swarming/api/v1/client/task/%s/output/0' % run_id).json
+    self.assertEqual({'output': u'résult string'}, response)
+
+    response = self.app.get(
+        '/swarming/api/v1/client/task/%s/output/1' % task_id).json
+    self.assertEqual({'output': u'bar'}, response)
+    response = self.app.get(
+        '/swarming/api/v1/client/task/%s/output/1' % run_id).json
+    self.assertEqual({'output': u'bar'}, response)
+
+    response = self.app.get(
+        '/swarming/api/v1/client/task/%s/output/2' % task_id).json
+    self.assertEqual({'output': None}, response)
+    response = self.app.get(
+        '/swarming/api/v1/client/task/%s/output/2' % run_id).json
+    self.assertEqual({'output': None}, response)
+
+  def test_get_task_output_empty(self):
+    _, task_id = self.client_create_task('hi')
+    response = self.app.get(
+        '/swarming/api/v1/client/task/%s/output/0' % task_id).json
+    self.assertEqual({'output': None}, response)
+
+    run_id = task_id[:-2] + '01'
+    response = self.app.get(
+        '/swarming/api/v1/client/task/%s/output/0' % run_id, status=404).json
+    self.assertEqual({u'error': u'Task not found'}, response)
+
+  def test_get_task_output_all(self):
+    # Note: this is still the old API.
+    self.client_create_task('hi')
+
+    self.set_as_bot()
+    token, _ = self._bot_token()
+    res = self.bot_poll()
+    task_id = res['manifest']['task_id']
+    params = {
+      'command_index': 0,
+      'duration': 0.1,
+      'exit_code': 0,
+      'id': 'bot1',
+      'output': 'result string',
+      'output_chunk_start': 0,
+      'task_id': task_id,
+    }
+    response = self.post_with_token(
+        '/swarming/api/v1/bot/task_update', params, token)
+    self.assertEqual({u'ok': True}, response)
+    params = {
+      'command_index': 1,
+      'duration': 0.1,
+      'exit_code': 0,
+      'id': 'bot1',
+      'output': 'bar',
+      'output_chunk_start': 0,
+      'task_id': task_id,
+    }
+    response = self.post_with_token(
+        '/swarming/api/v1/bot/task_update', params, token)
+    self.assertEqual({u'ok': True}, response)
+
+    self.set_as_privileged_user()
+    run_id = task_id[:-2] + '01'
+    response = self.app.get(
+        '/swarming/api/v1/client/task/%s/output/all' % task_id).json
+    self.assertEqual({'outputs': [u'result string', u'bar']}, response)
+    response = self.app.get(
+        '/swarming/api/v1/client/task/%s/output/all' % run_id).json
+    self.assertEqual({'outputs': [u'result string', u'bar']}, response)
+
+  def test_get_task_output_all_empty(self):
+    _, task_id = self.client_create_task('hi')
+    response = self.app.get(
+        '/swarming/api/v1/client/task/%s/output/all' % task_id).json
+    self.assertEqual({'outputs': []}, response)
+
+    run_id = task_id[:-2] + '01'
+    response = self.app.get(
+        '/swarming/api/v1/client/task/%s/output/all' % run_id, status=404).json
+    self.assertEqual({u'error': u'Task not found'}, response)
+
+  def test_get_task_request(self):
+    now = datetime.datetime(2000, 1, 2, 3, 4, 5, 6)
+    self.mock_now(now)
+    _, task_id = self.client_create_task('hi')
+    response = self.app.get(
+        '/swarming/api/v1/client/task/%s/request' % task_id).json
+    expected = {
+      u'created_ts': unicode(now.strftime(utils.DATETIME_FORMAT)),
+      u'expiration_ts': unicode(
+          (now + datetime.timedelta(days=1)).strftime(utils.DATETIME_FORMAT)),
+      u'name': u'hi',
+      u'priority': 100,
+      u'properties': {
+        u'commands': [[u'python', u'run_test.py']],
+        u'data': [],
+        u'dimensions': {u'os': u'Amiga'},
+        u'env': {},
+        u'execution_timeout_secs': 3600,
+        u'io_timeout_secs': 1200,
+      },
+      u'properties_hash': u'f0cc8a33cfaf3172e1c92400c7666ceae094e68f',
+      u'tags': [],
+      u'user': u'unknown',
+    }
+    self.assertEqual(expected, response)
 
   def test_api_bots(self):
     self.set_as_privileged_user()
@@ -902,7 +1041,7 @@ class NewClientApiTest(AppTestBase):
     actual = self.app.get('/swarming/api/v1/client/bot/bot1/tasks?limit=1').json
     expected = {
       u'limit': 1,
-      u'now': now.strftime(utils.DATETIME_FORMAT),
+      u'now': unicode(now.strftime(utils.DATETIME_FORMAT)),
       u'items': [
         {
           u'abandoned_ts': None,
@@ -913,7 +1052,6 @@ class NewClientApiTest(AppTestBase):
           u'failure': True,
           u'internal_failure': False,
           u'modified_ts': u'2000-01-02 03:04:05',
-          u'outputs': [u'result string'],
           u'started_ts': u'2000-01-02 03:04:05',
           u'state': task_result.State.COMPLETED,
           u'try_number': 1,
@@ -928,7 +1066,7 @@ class NewClientApiTest(AppTestBase):
     expected = {
       u'cursor': None,
       u'limit': 1,
-      u'now': now.strftime(utils.DATETIME_FORMAT),
+      u'now': unicode(now.strftime(utils.DATETIME_FORMAT)),
       u'items': [
         {
           u'abandoned_ts': None,
@@ -939,7 +1077,6 @@ class NewClientApiTest(AppTestBase):
           u'failure': True,
           u'internal_failure': False,
           u'modified_ts': u'2000-01-02 03:04:05',
-          u'outputs': [u'result string'],
           u'started_ts': u'2000-01-02 03:04:05',
           u'state': task_result.State.COMPLETED,
           u'try_number': 1,

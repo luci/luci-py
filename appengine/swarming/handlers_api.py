@@ -139,24 +139,81 @@ class ClientHandshakeHandler(auth.ApiHandler):
     self.send_response(data)
 
 
-class ClientTaskResultHandler(auth.ApiHandler):
-  @auth.require(acl.is_bot_or_user)
-  def get(self, key_id):
+class ClientTaskResultBase(auth.ApiHandler):
+  """Implements the common base code for task related query APIs."""
+
+  def get_result_key(self, key_id):
     # TODO(maruel): Users can only request their own task. Privileged users can
     # request any task.
     key = None
+    summary_key = None
     try:
       key = task_scheduler.unpack_result_summary_key(key_id)
+      summary_key = key
     except ValueError:
       try:
         key = task_scheduler.unpack_run_result_key(key_id)
+        summary_key = task_result.run_result_key_to_result_summary_key(key)
       except ValueError:
         self.abort_with_error(400, error='Invalid key')
+    return key, summary_key
 
+  def get_result_entity(self, key_id):
+    key, _ = self.get_result_key(key_id)
     result = key.get()
     if not result:
       self.abort_with_error(404, error='Task not found')
+    return result
+
+
+class ClientTaskResultHandler(ClientTaskResultBase):
+  """Returns meta data about a task."""
+
+  @auth.require(acl.is_bot_or_user)
+  def get(self, key_id):
+    result = self.get_result_entity(key_id)
     self.send_response(utils.to_json_encodable(result))
+
+
+class ClientTaskResultRequestHandler(ClientTaskResultBase):
+  """Returns meta data about a task's request."""
+
+  @auth.require(acl.is_bot_or_user)
+  def get(self, key_id):
+    _, summary_key = self.get_result_key(key_id)
+    request_key = task_result.result_summary_key_to_request_key(summary_key)
+    self.send_response(utils.to_json_encodable(request_key.get()))
+
+
+class ClientTaskResultOutputHandler(ClientTaskResultBase):
+  """Returns output for a single command of a task."""
+
+  @auth.require(acl.is_bot_or_user)
+  def get(self, key_id, command_id):
+    result = self.get_result_entity(key_id)
+    output = result.get_command_output_async(int(command_id)).get_result()
+    if output:
+      output = output.decode('utf-8', 'replace')
+    # JSON then reencodes to ascii compatible encoded strings, which explodes
+    # the size.
+    data = {
+      'output': output,
+    }
+    self.send_response(utils.to_json_encodable(data))
+
+
+class ClientTaskResultOutputAllHandler(ClientTaskResultBase):
+  """Returns all output from all commands of a task."""
+
+  @auth.require(acl.is_bot_or_user)
+  def get(self, key_id):
+    result = self.get_result_entity(key_id)
+    # JSON then reencodes to ascii compatible encoded strings, which explodes
+    # the size.
+    data = {
+      'outputs': [i.decode('utf-8', 'replace') for i in result.get_outputs()],
+    }
+    self.send_response(utils.to_json_encodable(data))
 
 
 class ClientApiBots(auth.ApiHandler):
@@ -814,6 +871,13 @@ def get_routes():
       ('/swarming/api/v1/client/server', ClientApiServer),
       ('/swarming/api/v1/client/task/<key_id:[0-9a-fA-F]+>',
           ClientTaskResultHandler),
+      ('/swarming/api/v1/client/task/<key_id:[0-9a-fA-F]+>/request',
+          ClientTaskResultRequestHandler),
+      ('/swarming/api/v1/client/task/<key_id:[0-9a-fA-F]+>/output/'
+        '<command_id:[0-9]+>',
+          ClientTaskResultOutputHandler),
+      ('/swarming/api/v1/client/task/<key_id:[0-9a-fA-F]+>/output/all',
+          ClientTaskResultOutputAllHandler),
 
       # Bot
       ('/bootstrap', BootstrapHandler),

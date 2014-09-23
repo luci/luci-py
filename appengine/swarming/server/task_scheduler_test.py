@@ -201,7 +201,6 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'internal_failure': False,
       'modified_ts': created_ts,
       'name': u'Request name',
-      'outputs': [],
       'started_ts': None,
       'state': State.PENDING,
       'try_number': None,
@@ -229,7 +228,6 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'internal_failure': False,
       'modified_ts': reaped_ts,
       'name': u'Request name',
-      'outputs': [],
       'started_ts': reaped_ts,
       'state': State.RUNNING,
       'try_number': 1,
@@ -245,7 +243,6 @@ class TaskSchedulerApiTest(test_case.TestCase):
         'exit_codes': [],
         'internal_failure': False,
         'modified_ts': reaped_ts,
-        'outputs': [],
         'started_ts': reaped_ts,
         'failure': False,
         'state': State.RUNNING,
@@ -261,7 +258,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
         run_result.key, 'localhost', 0, 'Foo1', 0, 0, 0.1) as entities:
       ndb.put_multi(entities)
     with task_scheduler.bot_update_task(
-        run_result.key, 'localhost', 1, 'Bar2', 0, 0, 0.2) as entities:
+        run_result.key, 'localhost', 1, 'Bar22', 0, 0, 0.2) as entities:
       ndb.put_multi(entities)
     result_summary, run_results = get_results(request.key)
     expected = {
@@ -275,7 +272,6 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'internal_failure': False,
       'modified_ts': done_ts,
       'name': u'Request name',
-      'outputs': ['Foo1', 'Bar2'],
       'started_ts': reaped_ts,
       'state': State.COMPLETED,
       'try_number': 1,
@@ -292,7 +288,6 @@ class TaskSchedulerApiTest(test_case.TestCase):
         'failure': False,
         'internal_failure': False,
         'modified_ts': done_ts,
-        'outputs': ['Foo1', 'Bar2'],
         'started_ts': reaped_ts,
         'state': State.COMPLETED,
         'try_number': 1,
@@ -311,7 +306,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
         run_result.key, 'localhost', 0, 'Foo1', 0, 0, 0.1) as entities:
       ndb.put_multi(entities)
     with task_scheduler.bot_update_task(
-        run_result.key, 'localhost', 1, 'Bar2', 0, 1, 0.2) as entities:
+        run_result.key, 'localhost', 1, 'Bar22', 0, 1, 0.2) as entities:
       ndb.put_multi(entities)
     result_summary, run_results = get_results(request.key)
 
@@ -326,7 +321,6 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'internal_failure': False,
       'modified_ts': self.now,
       'name': u'Request name',
-      'outputs': ['Foo1', 'Bar2'],
       'started_ts': self.now,
       'state': State.COMPLETED,
       'try_number': 1,
@@ -344,7 +338,6 @@ class TaskSchedulerApiTest(test_case.TestCase):
         'failure': True,
         'internal_failure': False,
         'modified_ts': self.now,
-        'outputs': ['Foo1', 'Bar2'],
         'started_ts': self.now,
         'state': State.COMPLETED,
         'try_number': 1,
@@ -490,7 +483,6 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'internal_failure': True,
       'modified_ts': self.now,
       'name': u'Request name',
-      'outputs': [],
       'started_ts': self.now,
       'state': State.BOT_DIED,
       'try_number': 1,
@@ -540,7 +532,6 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'failure': False,
       'internal_failure': True,
       'modified_ts': datetime.datetime(2014, 1, 2, 3, 9, 6, 6),
-      'outputs': [],
       'started_ts': datetime.datetime(2014, 1, 2, 3, 4, 5, 6),
       'state': task_result.State.BOT_DIED,
       'try_number': 1,
@@ -558,7 +549,6 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'internal_failure': False,
       'modified_ts': datetime.datetime(2014, 1, 2, 3, 9, 6, 6),
       'name': u'Request name',
-      'outputs': [],
       'started_ts': datetime.datetime(2014, 1, 2, 3, 4, 5, 6),
       'state': task_result.State.PENDING,
       'try_number': 1,
@@ -587,7 +577,6 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'internal_failure': False,
       'modified_ts': datetime.datetime(2014, 1, 2, 3, 9, 7, 6),
       'name': u'Request name',
-      'outputs': ['Foo1'],
       'started_ts': datetime.datetime(2014, 1, 2, 3, 9, 7, 6),
       'state': 112,
       'try_number': 2,
