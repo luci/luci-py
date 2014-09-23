@@ -6,6 +6,7 @@
 import datetime
 import hashlib
 import os
+import random
 import sys
 import timeit
 import unittest
@@ -288,7 +289,7 @@ class TaskToRunApiTest(test_case.TestCase):
     self.assertEqual(request.key, actual)
 
   def test_request_to_task_to_run_key(self):
-    self.mock(task_request.random, 'getrandbits', lambda _: 0x88)
+    self.mock(random, 'getrandbits', lambda _: 0x88)
     request = task_request.make_request(_gen_request_data())
     task_key = task_to_run.request_to_task_to_run_key(request)
     expected = (
@@ -304,7 +305,7 @@ class TaskToRunApiTest(test_case.TestCase):
       task_to_run.validate_to_run_key(ndb.Key('TaskRequest', 1, 'TaskToRun', 1))
 
   def test_new_task_to_run(self):
-    self.mock(task_request.random, 'getrandbits', lambda _: 0x12)
+    self.mock(random, 'getrandbits', lambda _: 0x12)
     request_dimensions = {u'OS': u'Windows-3.1.1'}
     data = _gen_request_data(
         properties={
@@ -319,7 +320,7 @@ class TaskToRunApiTest(test_case.TestCase):
     task_to_run.new_task_to_run(task_request.make_request(data)).put()
 
     # Create a second with higher priority.
-    self.mock(task_request.random, 'getrandbits', lambda _: 0x23)
+    self.mock(random, 'getrandbits', lambda _: 0x23)
     data = _gen_request_data(
         properties={
           'commands': [[u'command1', u'arg1']],

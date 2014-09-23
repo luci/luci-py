@@ -6,6 +6,7 @@
 import datetime
 import logging
 import os
+import random
 import sys
 import unittest
 
@@ -70,7 +71,7 @@ class TaskResultApiTest(test_case.TestCase):
     super(TaskResultApiTest, self).setUp()
     self.now = datetime.datetime(2014, 1, 2, 3, 4, 5, 6)
     self.mock_now(self.now)
-    self.mock(task_request.random, 'getrandbits', lambda _: 0x88)
+    self.mock(random, 'getrandbits', lambda _: 0x88)
     self.app = webtest.TestApp(
         deferred.application,
         extra_environ={
@@ -179,6 +180,7 @@ class TaskResultApiTest(test_case.TestCase):
       'durations': [],
       'exit_codes': [],
       'failure': False,
+      'id': '14350e868888800',
       'internal_failure': False,
       'modified_ts': None,
       'name': u'Request name',
@@ -203,6 +205,7 @@ class TaskResultApiTest(test_case.TestCase):
       'durations': [],
       'exit_codes': [],
       'failure': False,
+      'id': '14350e868888801',
       'internal_failure': False,
       'modified_ts': None,
       'started_ts': self.now,
@@ -228,6 +231,7 @@ class TaskResultApiTest(test_case.TestCase):
       'exit_codes': [],
       'completed_ts': None,
       'created_ts': self.now,
+      'id': '14350e868888800',
       'internal_failure': False,
       'modified_ts': self.now,
       'name': u'Request name',
@@ -259,6 +263,7 @@ class TaskResultApiTest(test_case.TestCase):
       'durations': [],
       'exit_codes': [],
       'failure': False,
+      'id': '14350e868888800',
       'internal_failure': False,
       'modified_ts': reap_ts,
       'name': u'Request name',
@@ -286,6 +291,7 @@ class TaskResultApiTest(test_case.TestCase):
       'durations': [],
       'exit_codes': [0],
       'failure': False,
+      'id': '14350e868888800',
       'internal_failure': False,
       'modified_ts': complete_ts,
       'name': u'Request name',

@@ -309,6 +309,7 @@ class _TaskResultCommon(ndb.Model):
     out = super(_TaskResultCommon, self).to_dict()
     # stdout_chunks is an implementation detail.
     out.pop('stdout_chunks')
+    out['id'] = self.key_string
     return out
 
   def get_outputs(self):

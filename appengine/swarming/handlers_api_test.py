@@ -8,6 +8,7 @@ import datetime
 import json
 import logging
 import os
+import random
 import StringIO
 import sys
 import unittest
@@ -457,6 +458,7 @@ class BotApiTest(AppTestBase):
 
   def test_poll_task(self):
     # Successfully poll a task.
+    self.mock(random, 'getrandbits', lambda _: 0x88)
     now = datetime.datetime(2010, 1, 2, 3, 4, 5)
     self.mock_now(now)
     str_now = unicode(now.strftime(utils.DATETIME_FORMAT))
@@ -489,6 +491,7 @@ class BotApiTest(AppTestBase):
       u'durations': [],
       u'exit_codes': [],
       u'failure': False,
+      u'id': u'125ecfd5c888801',
       u'internal_failure': False,
       u'modified_ts': str_now,
       u'started_ts': str_now,
@@ -498,6 +501,7 @@ class BotApiTest(AppTestBase):
     self.assertEqual(expected, response)
 
   def test_bot_error(self):
+    self.mock(random, 'getrandbits', lambda _: 0x88)
     token, params = self._bot_token()
     response = self.post_with_token('/swarming/api/v1/bot/poll', params, token)
     self.assertTrue(response.pop(u'duration'))
@@ -528,6 +532,7 @@ class BotApiTest(AppTestBase):
 
   def test_update(self):
     # Runs a task with 2 commands up to completion.
+    self.mock(random, 'getrandbits', lambda _: 0x88)
     now = datetime.datetime(2010, 1, 2, 3, 4, 5)
     self.mock_now(now)
     str_now = unicode(now.strftime(utils.DATETIME_FORMAT))
@@ -555,6 +560,7 @@ class BotApiTest(AppTestBase):
         u'durations': [],
         u'exit_codes': [],
         u'failure': False,
+        u'id': u'125ecfd5c888801',
         u'internal_failure': False,
         u'modified_ts': str_now,
         u'started_ts': str_now,
@@ -610,6 +616,7 @@ class BotApiTest(AppTestBase):
 
   def test_task_error(self):
     # E.g. local_test_runner blew up.
+    self.mock(random, 'getrandbits', lambda _: 0x88)
     now = datetime.datetime(2010, 1, 2, 3, 4, 5)
     self.mock_now(now)
     str_now = unicode(now.strftime(utils.DATETIME_FORMAT))
@@ -638,6 +645,7 @@ class BotApiTest(AppTestBase):
       u'durations': [],
       u'exit_codes': [],
       u'failure': False,
+      u'id': u'125ecfd5c888801',
       u'internal_failure': True,
       u'modified_ts': str_now,
       u'started_ts': str_now,
@@ -718,6 +726,7 @@ class NewClientApiTest(AppTestBase):
     self.assertEqual({u'error': u'Task not found'}, response)
 
   def test_get_task_metadata(self):
+    self.mock(random, 'getrandbits', lambda _: 0x88)
     now = datetime.datetime(2010, 1, 2, 3, 4, 5)
     self.mock_now(now)
     str_now = unicode(now.strftime(utils.DATETIME_FORMAT))
@@ -733,6 +742,7 @@ class NewClientApiTest(AppTestBase):
       u'durations': [],
       u'exit_codes': [],
       u'failure': False,
+      u'id': u'125ecfd5c888800',
       u'internal_failure': False,
       u'modified_ts': str_now,
       u'name': u'hi',
@@ -763,6 +773,7 @@ class NewClientApiTest(AppTestBase):
       u'durations': [],
       u'exit_codes': [],
       u'failure': False,
+      u'id': u'125ecfd5c888801',
       u'internal_failure': False,
       u'modified_ts': str_now,
       u'started_ts': str_now,
@@ -1023,6 +1034,7 @@ class NewClientApiTest(AppTestBase):
     self.assertEqual(expected, actual)
 
   def test_api_bot_tasks(self):
+    self.mock(random, 'getrandbits', lambda _: 0x88)
     now = datetime.datetime(2000, 1, 2, 3, 4, 5, 6)
     self.mock_now(now)
 
@@ -1032,6 +1044,7 @@ class NewClientApiTest(AppTestBase):
     res = self.bot_poll()
     self._complete_task(token, res['manifest']['task_id'])
 
+    self.mock(random, 'getrandbits', lambda _: 0x55)
     self.client_create_task('ho')
     token, _ = self._bot_token()
     res = self.bot_poll()
@@ -1050,6 +1063,7 @@ class NewClientApiTest(AppTestBase):
           u'durations': [0.1],
           u'exit_codes': [1],
           u'failure': True,
+          u'id': u'dc709e90885501',
           u'internal_failure': False,
           u'modified_ts': u'2000-01-02 03:04:05',
           u'started_ts': u'2000-01-02 03:04:05',
@@ -1075,6 +1089,7 @@ class NewClientApiTest(AppTestBase):
           u'durations': [0.1],
           u'exit_codes': [1],
           u'failure': True,
+          u'id': u'dc709e90888801',
           u'internal_failure': False,
           u'modified_ts': u'2000-01-02 03:04:05',
           u'started_ts': u'2000-01-02 03:04:05',

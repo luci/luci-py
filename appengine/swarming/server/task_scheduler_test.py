@@ -7,6 +7,7 @@ import datetime
 import inspect
 import logging
 import os
+import random
 import sys
 import unittest
 
@@ -181,6 +182,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
 
   def test_get_results(self):
     # TODO(maruel): Split in more focused tests.
+    self.mock(random, 'getrandbits', lambda _: 0x88)
     created_ts = self.now
     self.mock_now(created_ts)
     data = _gen_request_data(
@@ -198,6 +200,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'durations': [],
       'exit_codes': [],
       'failure': False,
+      'id': '14350e868888800',
       'internal_failure': False,
       'modified_ts': created_ts,
       'name': u'Request name',
@@ -225,6 +228,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'durations': [],
       'exit_codes': [],
       'failure': False,
+      'id': '14350e868888800',
       'internal_failure': False,
       'modified_ts': reaped_ts,
       'name': u'Request name',
@@ -241,6 +245,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
         'completed_ts': None,
         'durations': [],
         'exit_codes': [],
+        'id': '14350e868888801',
         'internal_failure': False,
         'modified_ts': reaped_ts,
         'started_ts': reaped_ts,
@@ -269,6 +274,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'durations': [0.1, 0.2],
       'exit_codes': [0, 0],
       'failure': False,
+      'id': '14350e868888800',
       'internal_failure': False,
       'modified_ts': done_ts,
       'name': u'Request name',
@@ -286,6 +292,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
         'durations': [0.1, 0.2],
         'exit_codes': [0, 0],
         'failure': False,
+        'id': '14350e868888801',
         'internal_failure': False,
         'modified_ts': done_ts,
         'started_ts': reaped_ts,
@@ -296,6 +303,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
     self.assertEqual(expected, [t.to_dict() for t in run_results])
 
   def test_exit_code_failure(self):
+    self.mock(random, 'getrandbits', lambda _: 0x88)
     data = _gen_request_data(
         properties=dict(dimensions={u'OS': u'Windows-3.1.1'}))
     request, _result_summary = task_scheduler.make_request(data)
@@ -318,6 +326,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'durations': [0.1, 0.2],
       'exit_codes': [0, 1],
       'failure': True,
+      'id': '14350e868888800',
       'internal_failure': False,
       'modified_ts': self.now,
       'name': u'Request name',
@@ -336,6 +345,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
         'durations': [0.1, 0.2],
         'exit_codes': [0, 1],
         'failure': True,
+        'id': '14350e868888801',
         'internal_failure': False,
         'modified_ts': self.now,
         'started_ts': self.now,
@@ -465,6 +475,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       self._bot_update_task_partial_write(index, number_elements)
 
   def test_bot_kill_task(self):
+    self.mock(random, 'getrandbits', lambda _: 0x88)
     data = _gen_request_data(
         properties=dict(dimensions={u'OS': u'Windows-3.1.1'}))
     request, result_summary = task_scheduler.make_request(data)
@@ -480,6 +491,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'durations': [],
       'exit_codes': [],
       'failure': False,
+      'id': '14350e868888800',
       'internal_failure': True,
       'modified_ts': self.now,
       'name': u'Request name',
@@ -506,6 +518,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
 
   def test_cron_handle_bot_died(self):
     # TODO(maruel): Test expired tasks.
+    self.mock(random, 'getrandbits', lambda _: 0x88)
     data = _gen_request_data(
         properties=dict(dimensions={u'OS': u'Windows-3.1.1'}),
         scheduling_expiration_secs=600)
@@ -530,6 +543,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'durations': [],
       'exit_codes': [],
       'failure': False,
+      'id': '14350e868888801',
       'internal_failure': True,
       'modified_ts': datetime.datetime(2014, 1, 2, 3, 9, 6, 6),
       'started_ts': datetime.datetime(2014, 1, 2, 3, 4, 5, 6),
@@ -546,6 +560,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'durations': [],
       'exit_codes': [],
       'failure': False,
+      'id': '14350e868888800',
       'internal_failure': False,
       'modified_ts': datetime.datetime(2014, 1, 2, 3, 9, 6, 6),
       'name': u'Request name',
@@ -574,6 +589,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'durations': [0.1],
       'exit_codes': [0],
       'failure': False,
+      'id': '14350e868888800',
       'internal_failure': False,
       'modified_ts': datetime.datetime(2014, 1, 2, 3, 9, 7, 6),
       'name': u'Request name',

@@ -6,6 +6,7 @@
 import datetime
 import logging
 import os
+import random
 import sys
 import unittest
 
@@ -73,7 +74,7 @@ class TaskRequestPrivateTest(test_case.TestCase):
     def getrandbits(i):
       self.assertEqual(i, 8)
       return 0x77
-    self.mock(task_request.random, 'getrandbits', getrandbits)
+    self.mock(random, 'getrandbits', getrandbits)
     days_until_end_of_the_world = 2**47 / 24. / 60. / 60. / 1000.
     num_days = int(days_until_end_of_the_world)
     # Remove 1ms to not overflow.
