@@ -105,6 +105,20 @@ def log_unexpected_subset_keys(
 ### New Client APIs.
 
 
+class ClientApiListHandler(auth.ApiHandler):
+  """All query handlers"""
+
+  @auth.public
+  def get(self):
+    # Hard to make it any simpler.
+    prefix = '/swarming/api/v1/client/'
+    data = {
+      r.template[len(prefix):]: r.handler.__doc__ for r in get_routes()
+      if r.template.startswith(prefix) and hasattr(r.handler, 'get')
+    }
+    self.send_response(data)
+
+
 class ClientHandshakeHandler(auth.ApiHandler):
   """First request to be called to get initial data like XSRF token.
 
@@ -142,24 +156,24 @@ class ClientHandshakeHandler(auth.ApiHandler):
 class ClientTaskResultBase(auth.ApiHandler):
   """Implements the common base code for task related query APIs."""
 
-  def get_result_key(self, key_id):
+  def get_result_key(self, task_id):
     # TODO(maruel): Users can only request their own task. Privileged users can
     # request any task.
     key = None
     summary_key = None
     try:
-      key = task_scheduler.unpack_result_summary_key(key_id)
+      key = task_scheduler.unpack_result_summary_key(task_id)
       summary_key = key
     except ValueError:
       try:
-        key = task_scheduler.unpack_run_result_key(key_id)
+        key = task_scheduler.unpack_run_result_key(task_id)
         summary_key = task_result.run_result_key_to_result_summary_key(key)
       except ValueError:
         self.abort_with_error(400, error='Invalid key')
     return key, summary_key
 
-  def get_result_entity(self, key_id):
-    key, _ = self.get_result_key(key_id)
+  def get_result_entity(self, task_id):
+    key, _ = self.get_result_key(task_id)
     result = key.get()
     if not result:
       self.abort_with_error(404, error='Task not found')
@@ -167,31 +181,31 @@ class ClientTaskResultBase(auth.ApiHandler):
 
 
 class ClientTaskResultHandler(ClientTaskResultBase):
-  """Returns meta data about a task."""
+  """Task's result meta data"""
 
   @auth.require(acl.is_bot_or_user)
-  def get(self, key_id):
-    result = self.get_result_entity(key_id)
+  def get(self, task_id):
+    result = self.get_result_entity(task_id)
     self.send_response(utils.to_json_encodable(result))
 
 
 class ClientTaskResultRequestHandler(ClientTaskResultBase):
-  """Returns meta data about a task's request."""
+  """Task's request details"""
 
   @auth.require(acl.is_bot_or_user)
-  def get(self, key_id):
-    _, summary_key = self.get_result_key(key_id)
+  def get(self, task_id):
+    _, summary_key = self.get_result_key(task_id)
     request_key = task_result.result_summary_key_to_request_key(summary_key)
     self.send_response(utils.to_json_encodable(request_key.get()))
 
 
 class ClientTaskResultOutputHandler(ClientTaskResultBase):
-  """Returns output for a single command of a task."""
+  """Task's output for a single command"""
 
   @auth.require(acl.is_bot_or_user)
-  def get(self, key_id, command_id):
-    result = self.get_result_entity(key_id)
-    output = result.get_command_output_async(int(command_id)).get_result()
+  def get(self, task_id, command_index):
+    result = self.get_result_entity(task_id)
+    output = result.get_command_output_async(int(command_index)).get_result()
     if output:
       output = output.decode('utf-8', 'replace')
     # JSON then reencodes to ascii compatible encoded strings, which explodes
@@ -203,11 +217,11 @@ class ClientTaskResultOutputHandler(ClientTaskResultBase):
 
 
 class ClientTaskResultOutputAllHandler(ClientTaskResultBase):
-  """Returns all output from all commands of a task."""
+  """All output from all commands in a task"""
 
   @auth.require(acl.is_bot_or_user)
-  def get(self, key_id):
-    result = self.get_result_entity(key_id)
+  def get(self, task_id):
+    result = self.get_result_entity(task_id)
     # JSON then reencodes to ascii compatible encoded strings, which explodes
     # the size.
     data = {
@@ -217,7 +231,7 @@ class ClientTaskResultOutputAllHandler(ClientTaskResultBase):
 
 
 class ClientApiBots(auth.ApiHandler):
-  """Returns the list of known swarming bots."""
+  """Bots known to the server"""
 
   @auth.require(acl.is_privileged_user)
   def get(self):
@@ -237,7 +251,7 @@ class ClientApiBots(auth.ApiHandler):
 
 
 class ClientApiBot(auth.ApiHandler):
-  """Returns the info known about a swarming bot."""
+  """Bot's meta data"""
 
   @auth.require(acl.is_privileged_user)
   def get(self, bot_id):
@@ -249,7 +263,7 @@ class ClientApiBot(auth.ApiHandler):
 
 
 class ClientApiBotTask(auth.ApiHandler):
-  """Returns the info known about tasks that ran on a specific swarming bot."""
+  """Tasks executed on a specific bot"""
 
   @auth.require(acl.is_privileged_user)
   def get(self, bot_id):
@@ -270,11 +284,8 @@ class ClientApiBotTask(auth.ApiHandler):
 
 
 class ClientApiServer(auth.ApiHandler):
-  """Returns info about the server itself.
+  """Server details"""
 
-  For now, it's not much but it'd be the rigth place to return a GlobalConfig if
-  one is ever created.
-  """
   @auth.require(acl.is_privileged_user)
   def get(self):
     data = {
@@ -868,15 +879,16 @@ def get_routes():
       ('/swarming/api/v1/client/bot/<bot_id:[^/]+>', ClientApiBot),
       ('/swarming/api/v1/client/bot/<bot_id:[^/]+>/tasks', ClientApiBotTask),
       ('/swarming/api/v1/client/handshake', ClientHandshakeHandler),
+      ('/swarming/api/v1/client/list', ClientApiListHandler),
       ('/swarming/api/v1/client/server', ClientApiServer),
-      ('/swarming/api/v1/client/task/<key_id:[0-9a-fA-F]+>',
+      ('/swarming/api/v1/client/task/<task_id:[0-9a-f]+>',
           ClientTaskResultHandler),
-      ('/swarming/api/v1/client/task/<key_id:[0-9a-fA-F]+>/request',
+      ('/swarming/api/v1/client/task/<task_id:[0-9a-f]+>/request',
           ClientTaskResultRequestHandler),
-      ('/swarming/api/v1/client/task/<key_id:[0-9a-fA-F]+>/output/'
-        '<command_id:[0-9]+>',
+      ('/swarming/api/v1/client/task/<task_id:[0-9a-f]+>/output/'
+        '<command_index:[0-9]+>',
           ClientTaskResultOutputHandler),
-      ('/swarming/api/v1/client/task/<key_id:[0-9a-fA-F]+>/output/all',
+      ('/swarming/api/v1/client/task/<task_id:[0-9a-f]+>/output/all',
           ClientTaskResultOutputAllHandler),
 
       # Bot

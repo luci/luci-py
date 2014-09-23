@@ -684,6 +684,24 @@ class NewClientApiTest(AppTestBase):
         '/swarming/api/v1/bot/task_update', params, token)
     self.assertEqual({u'ok': True}, response)
 
+  def test_list(self):
+    self.set_as_anonymous()
+    response = self.app.get('/swarming/api/v1/client/list').json
+    expected = {
+      u'bot/<bot_id:[^/]+>': u'Bot\'s meta data',
+      u'bot/<bot_id:[^/]+>/tasks': u'Tasks executed on a specific bot',
+      u'bots': u'Bots known to the server',
+      u'list': u'All query handlers',
+      u'server': u'Server details',
+      u'task/<task_id:[0-9a-f]+>': u'Task\'s result meta data',
+      u'task/<task_id:[0-9a-f]+>/output/<command_index:[0-9]+>':
+          u'Task\'s output for a single command',
+      u'task/<task_id:[0-9a-f]+>/output/all':
+          u'All output from all commands in a task',
+      u'task/<task_id:[0-9a-f]+>/request': u'Task\'s request details',
+    }
+    self.assertEqual(expected, response)
+
   def test_handshake(self):
     # Bare minimum:
     headers = {'X-XSRF-Token-Request': '1'}

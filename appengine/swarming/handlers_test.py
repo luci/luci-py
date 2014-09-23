@@ -338,6 +338,7 @@ class FrontendTest(AppTestBase):
       '/stats',
       '/stats/dimensions/<dimensions:.+>',
       '/stats/user/<user:.+>',
+      '/swarming/api/v1/client/list',
       '/swarming/api/v1/stats/summary/<resolution:[a-z]+>',
       '/swarming/api/v1/stats/dimensions/<dimensions:.+>/<resolution:[a-z]+>',
       '/swarming/api/v1/stats/user/<user:.+>/<resolution:[a-z]+>',
