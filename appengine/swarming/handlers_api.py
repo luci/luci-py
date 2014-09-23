@@ -170,9 +170,9 @@ class ClientApiBots(auth.ApiHandler):
     q = bot_management.Bot.query().order(bot_management.Bot.key)
     bots, cursor, more = q.fetch_page(limit, start_cursor=cursor)
     data = {
-      'bots': [b.to_dict_with_now(now) for b in bots],
-      'death_timeout': bot_management.BOT_DEATH_TIMEOUT.total_seconds(),
       'cursor': cursor.urlsafe() if cursor and more else None,
+      'death_timeout': bot_management.BOT_DEATH_TIMEOUT.total_seconds(),
+      'items': [b.to_dict_with_now(now) for b in bots],
       'limit': limit,
       'now': now,
     }
@@ -205,9 +205,9 @@ class ClientApiBotTask(auth.ApiHandler):
     now = utils.utcnow()
     data = {
       'cursor': cursor.urlsafe() if cursor and more else None,
+      'items': run_results,
       'limit': limit,
       'now': now,
-      'tasks': run_results,
     }
     self.send_response(utils.to_json_encodable(data))
 

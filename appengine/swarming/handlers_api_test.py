@@ -798,7 +798,7 @@ class NewClientApiTest(AppTestBase):
 
     actual = self.app.get('/swarming/api/v1/client/bots', status=200).json
     expected = {
-      u'bots': [
+      u'items': [
         {
           u'created_ts': u'2000-01-02 03:04:05',
           u'dimensions': {u'foo': u'bar'},
@@ -842,7 +842,7 @@ class NewClientApiTest(AppTestBase):
         '/swarming/api/v1/client/bots?limit=1&cursor=%s' % actual['cursor'],
         status=200).json
     expected['cursor'] = None
-    expected['bots'][0]['id'] = u'id2'
+    expected['items'][0]['id'] = u'id2'
     self.assertEqual(expected, actual)
 
   def test_api_bot(self):
@@ -879,7 +879,7 @@ class NewClientApiTest(AppTestBase):
       u'cursor': None,
       u'limit': 100,
       u'now': now.strftime(utils.DATETIME_FORMAT),
-      u'tasks': [],
+      u'items': [],
     }
     self.assertEqual(expected, actual)
 
@@ -903,7 +903,7 @@ class NewClientApiTest(AppTestBase):
     expected = {
       u'limit': 1,
       u'now': now.strftime(utils.DATETIME_FORMAT),
-      u'tasks': [
+      u'items': [
         {
           u'abandoned_ts': None,
           u'bot_id': u'bot1',
@@ -929,7 +929,7 @@ class NewClientApiTest(AppTestBase):
       u'cursor': None,
       u'limit': 1,
       u'now': now.strftime(utils.DATETIME_FORMAT),
-      u'tasks': [
+      u'items': [
         {
           u'abandoned_ts': None,
           u'bot_id': u'bot1',
