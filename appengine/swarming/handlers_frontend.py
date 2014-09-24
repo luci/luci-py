@@ -31,7 +31,6 @@ from server import stats_gviz
 from server import task_common
 from server import task_result
 from server import task_scheduler
-from server import task_to_run
 from server import user_manager
 
 
@@ -583,16 +582,14 @@ class TaskHandler(auth.AuthenticatingHandler):
 
 
 class TaskCancelHandler(auth.AuthenticatingHandler):
-  """Cancel a task."""
+  """Cancel a task.
+
+  Ensures that the associated TaskToRun is canceled and update the
+  TaskResultSummary accordingly.
+  """
 
   @auth.require(acl.is_admin)
   def post(self):
-    """Ensures that the associated TaskToRun is canceled and update the
-    TaskResultSummary accordingly.
-
-    TODO(maruel): If a bot is running the task, mark the TaskRunResult as
-    canceled and tell the bot on the next ping to reboot itself.
-    """
     key_id = self.request.get('task_id', '')
     try:
       key = task_scheduler.unpack_result_summary_key(key_id)
@@ -600,14 +597,7 @@ class TaskCancelHandler(auth.AuthenticatingHandler):
       self.abort_with_error(400, error='Invalid key')
     redirect_to = self.request.get('redirect_to', '')
 
-    request_key = task_result.result_summary_key_to_request_key(key)
-    task_key = task_to_run.request_to_task_to_run_key(request_key.get())
-    task_to_run.abort_task_to_run(task_key.get())
-    result_summary = key.get()
-    if result_summary.can_be_canceled:
-      result_summary.state = task_result.State.CANCELED
-      result_summary.abandoned_ts = utils.utcnow()
-      result_summary.put()
+    task_scheduler.cancel_task(key)
     if redirect_to == 'listing':
       self.redirect('/user/tasks')
     else:

@@ -317,6 +317,25 @@ class ClientRequestHandler(auth.ApiHandler):
     self.send_response(utils.to_json_encodable(data))
 
 
+class ClientCancelHandler(auth.ApiHandler):
+  """Cancels a task."""
+
+  # TODO(maruel): Allow privileged users to cancel, and users to cancel their
+  # own task.
+  @auth.require(acl.is_admin)
+  def post(self):
+    request = self.parse_body()
+    task_id = request.get('task_id')
+    summary_key = task_scheduler.unpack_result_summary_key(task_id)
+
+    ok, was_running = task_scheduler.cancel_task(summary_key)
+    out = {
+      'ok': ok,
+      'was_running': was_running,
+    }
+    self.send_response(out)
+
+
 ### Old Client APIs.
 # TODO(maruel): Remove.
 
@@ -901,6 +920,7 @@ def get_routes():
       ('/swarming/api/v1/client/bots', ClientApiBots),
       ('/swarming/api/v1/client/bot/<bot_id:[^/]+>', ClientApiBot),
       ('/swarming/api/v1/client/bot/<bot_id:[^/]+>/tasks', ClientApiBotTask),
+      ('/swarming/api/v1/client/cancel', ClientCancelHandler),
       ('/swarming/api/v1/client/handshake', ClientHandshakeHandler),
       ('/swarming/api/v1/client/list', ClientApiListHandler),
       ('/swarming/api/v1/client/request', ClientRequestHandler),

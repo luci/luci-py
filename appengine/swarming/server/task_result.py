@@ -249,6 +249,18 @@ class _TaskResultCommon(ndb.Model):
 
   @property
   def can_be_canceled(self):
+    """Returns True if the task is in a state that can be canceled."""
+    # TOOD(maruel): To be able to add State.RUNNING, the following must be done:
+    # task_scheduler.cancel_task() must be strictly a transaction relative to
+    # task_scheduler.bot_kill_task() and task_scheduler.bot_update_task().
+    #
+    # The tricky part is to keep this code performant. On the other hand, all
+    # the entities under the transaction (TaskToRun, TaskResultSummary and
+    # TaskRunResult) are under the same entity root, so it's definitely
+    # feasible, likely using a transaction is not a problem in practice. The
+    # important part would be to ensure that TaskOuputChunks are not also stored
+    # as part of the transaction, since they do not need to.
+    # https://code.google.com/p/swarming/issues/detail?id=62
     return self.state == State.PENDING
 
   @property

@@ -28,6 +28,7 @@ import webtest
 from components import stats_framework
 from server import bot_management
 from server import stats
+from server import task_common
 from server import task_request
 from server import task_result
 from server import task_scheduler
@@ -502,6 +503,16 @@ class TaskSchedulerApiTest(test_case.TestCase):
     }
     self.assertEqual(expected, result_summary.to_dict())
 
+  def test_cancel_task(self):
+    data = _gen_request_data(
+        properties=dict(dimensions={u'OS': u'Windows-3.1.1'}))
+    _request, result_summary = task_scheduler.make_request(data)
+    ok, was_running = task_scheduler.cancel_task(result_summary.key)
+    self.assertEqual(True, ok)
+    self.assertEqual(False, was_running)
+    result_summary = result_summary.key.get()
+    self.assertEqual(task_result.State.CANCELED, result_summary.state)
+
   def test_cron_abort_expired_task_to_run(self):
     # Create two shards, one is properly reaped, the other is expired.
     data = _gen_request_data(
@@ -531,7 +542,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
     _request, run_result = task_scheduler.bot_reap_task(
         bot_dimensions, 'localhost')
     self.assertEqual(1, run_result.try_number)
-    self.mock_now(self.now + task_scheduler.task_common.BOT_PING_TOLERANCE, 1)
+    self.mock_now(self.now + task_common.BOT_PING_TOLERANCE, 1)
     self.assertEqual((0, 1), task_scheduler.cron_handle_bot_died())
 
     # Refresh and compare:
@@ -572,7 +583,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
     self.assertEqual(expected, result_summary.to_dict())
 
     # Task was retried.
-    self.mock_now(self.now + task_scheduler.task_common.BOT_PING_TOLERANCE, 2)
+    self.mock_now(self.now + task_common.BOT_PING_TOLERANCE, 2)
     _request, run_result = task_scheduler.bot_reap_task(
         bot_dimensions, 'localhost')
     logging.info('%s', [t.to_dict() for t in task_to_run.TaskToRun.query()])

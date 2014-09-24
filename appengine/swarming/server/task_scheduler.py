@@ -470,6 +470,23 @@ def search_by_name(word, cursor_str, limit):
   return tasks, cursor_str
 
 
+def cancel_task(summary_key):
+  """Cancels a task if possible."""
+  request_key = task_result.result_summary_key_to_request_key(summary_key)
+  task_key = task_to_run.request_to_task_to_run_key(request_key.get())
+  task_to_run.abort_task_to_run(task_key.get())
+  result_summary = summary_key.get()
+  ok = False
+  was_running = False
+  if result_summary.can_be_canceled:
+    ok = True
+    was_running = result_summary.state == task_result.State.RUNNING
+    result_summary.state = task_result.State.CANCELED
+    result_summary.abandoned_ts = utils.utcnow()
+    result_summary.put()
+  return ok, was_running
+
+
 ### Cron job.
 
 

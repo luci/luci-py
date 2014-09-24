@@ -835,6 +835,46 @@ class NewClientApiTest(AppTestBase):
     }
     self.assertEqual(expected, response)
 
+  def test_cancel(self):
+    self.mock(random, 'getrandbits', lambda _: 0x88)
+    now = datetime.datetime(2010, 1, 2, 3, 4, 5)
+    self.mock_now(now)
+    str_now = unicode(now.strftime(utils.DATETIME_FORMAT))
+    self.set_as_admin()
+    # Note: this is still the old API.
+    token = self._client_token()
+    _, task_id = self.client_create_task('hi')
+    params = {
+      'task_id': task_id,
+    }
+    response = self.post_with_token(
+        '/swarming/api/v1/client/cancel', params, token)
+    expected = {
+      u'ok': True,
+      u'was_running': False,
+    }
+    self.assertEqual(expected, response)
+    response = self.app.get(
+        '/swarming/api/v1/client/task/' + task_id).json
+    expected = {
+      u'abandoned_ts': str_now,
+      u'bot_id': None,
+      u'completed_ts': None,
+      u'created_ts': str_now,
+      u'durations': [],
+      u'exit_codes': [],
+      u'failure': False,
+      u'id': task_id,
+      u'internal_failure': False,
+      u'modified_ts': str_now,
+      u'name': u'hi',
+      u'started_ts': None,
+      u'state': task_result.State.CANCELED,
+      u'try_number': None,
+      u'user': u'unknown',
+    }
+    self.assertEqual(expected, response)
+
   def test_get_task_metadata_unknown(self):
     response = self.app.get(
         '/swarming/api/v1/client/task/12300', status=404).json
