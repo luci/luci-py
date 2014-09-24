@@ -50,6 +50,20 @@ def get_pseudo_revision(root, remote):
   return git_number.get_num(targets[0]), mergebase
 
 
+def is_pristine(root, mergebase):
+  """Returns True if the tree is pristine relating to mergebase."""
+  head = git(['rev-parse', 'HEAD'], cwd=root).rstrip()
+  logging.info('head: %s, mergebase: %s', head, mergebase)
+
+  if head != mergebase:
+    return False
+
+  # Look for local uncommitted diff.
+  return not (
+      git(['diff', '--ignore-submodules', mergebase], cwd=root) or
+      git(['diff', '--ignore-submodules', '--cached', mergebase], cwd=root))
+
+
 def calculate_version(root, tag):
   """Returns a tag for a git checkout.
 
@@ -58,18 +72,7 @@ def calculate_version(root, tag):
   pristine and optionally adds a tag to further describe it.
   """
   pseudo_revision, mergebase = get_pseudo_revision(root, 'origin/master')
-  head = git(['rev-parse', 'HEAD'], cwd=root).rstrip()
-
-  logging.info('head: %s, mergebase: %s', head, mergebase)
-  if head != mergebase:
-    pristine = False
-  else:
-    # Look for local uncommitted diff.
-    pristine = not (
-        git(['diff', '--ignore-submodules', mergebase], cwd=root) or
-        git(['diff', '--ignore-submodules', '--cached', mergebase], cwd=root))
-    logging.info('was diff clear? %s', pristine)
-
+  pristine = is_pristine(root, mergebase)
   # Trim it to 7 characters like 'git describe' does. 40 characters is
   # overwhelming!
   version = '%s-%s' % (pseudo_revision, mergebase[:7])
