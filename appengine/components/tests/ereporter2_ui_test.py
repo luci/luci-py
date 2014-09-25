@@ -160,8 +160,9 @@ class Ereporter2Test(test_case.TestCase):
     ]
     self.mock(logscraper, '_extract_exceptions_from_logs', lambda *_: data)
     module_versions = [('foo', 'bar')]
-    report, ignored = logscraper.scrape_logs_for_errors(
+    report, ignored, end_time = logscraper.scrape_logs_for_errors(
         10, 20, module_versions)
+    self.assertEqual(20, end_time)
     out = ui._records_to_params(
         report, len(ignored), 'http://localhost:1/request_id',
         'http://localhost:2/report')

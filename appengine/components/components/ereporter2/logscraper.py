@@ -332,13 +332,10 @@ def _extract_exceptions_from_logs(start_time, end_time, module_versions):
         entry.status, '\n'.join(msgs))
 
 
-def _should_ignore_error_category(error_category):
+def _should_ignore_error_category(monitoring, error_category):
   """Returns True if an _ErrorCategory should be ignored."""
-  signature = error_category.signature
-  monitoring = models.ErrorReportingMonitoring.error_to_key(signature).get()
   if not monitoring:
     return False
-
   if monitoring.silenced:
     return True
   if (monitoring.silenced_until and
@@ -373,9 +370,22 @@ def scrape_logs_for_errors(start_time, end_time, module_versions):
     module_versions: list of tuple of module-version to gather info about.
 
   Returns:
-    tuple of two list of _ErrorCategory, the ones that should be reported and
-    the ones that should be ignored.
+    tuple of 3 items:
+      - list of _ErrorCategory that should be reported
+      - list of _ErrorCategory that should be ignored
+      - end_time of the last item processed if not all items were processed or
+        |end_time|
   """
+  # Scan for up to 9 minutes. This function is assumed to be run by a backend
+  # (cron job or task queue) which has a 10 minutes deadline. This leaves ~1
+  # minute to the caller to send an email and update the DB entity.
+  start = utils.time_time()
+
+  # In practice, we don't expect more than ~100 entities.
+  filters = {
+    e.key.string_id(): e for e in models.ErrorReportingMonitoring.query()
+  }
+
   # Gather all the error categories.
   buckets = {}
   for error_record in _extract_exceptions_from_logs(
@@ -383,13 +393,19 @@ def scrape_logs_for_errors(start_time, end_time, module_versions):
     bucket = buckets.setdefault(
         error_record.signature, _ErrorCategory(error_record.signature))
     bucket.append_error(error_record)
+    # Abort, there's too much logs.
+    if (utils.time_time() - start) >= 9*60:
+      end_time = error_record.start_time
+      break
 
   # Filter them.
   categories = []
   ignored = []
   for category in buckets.itervalues():
-    if _should_ignore_error_category(category):
+    key = models.ErrorReportingMonitoring.error_to_key_id(category.signature)
+    if _should_ignore_error_category(filters.get(key), category):
       ignored.append(category)
     else:
       categories.append(category)
-  return categories, ignored
+
+  return categories, ignored, end_time

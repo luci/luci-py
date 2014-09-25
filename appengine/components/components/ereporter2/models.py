@@ -43,10 +43,16 @@ class ErrorReportingMonitoring(ndb.Model):
   # Minimum number of errors that must occurs before the error is reported.
   threshold = ndb.IntegerProperty(default=0, indexed=False)
 
+  @staticmethod
+  def error_to_key_id(error):
+    """Returns the key id for an error signature."""
+    assert isinstance(error, unicode), repr(error)
+    return hashlib.sha1(error.encode('utf-8')).hexdigest()
+
   @classmethod
   def error_to_key(cls, error):
-    assert isinstance(error, unicode), repr(error)
-    return ndb.Key(cls, hashlib.sha1(error.encode('utf-8')).hexdigest())
+    """Returns the ndb.Key for an error signature."""
+    return ndb.Key(cls, cls.error_to_key_id(error))
 
 
 class Error(ndb.Model):

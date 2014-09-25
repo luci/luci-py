@@ -58,7 +58,7 @@ class RestrictedEreporter2Report(auth.AuthenticatingHandler):
       modules = modules.split(',')
     tainted = bool(int(self.request.get('tainted', '1')))
     module_versions = utils.get_module_version_list(modules, tainted)
-    errors, ignored = logscraper.scrape_logs_for_errors(
+    errors, ignored, _end_time = logscraper.scrape_logs_for_errors(
         start, end, module_versions)
 
     params = {

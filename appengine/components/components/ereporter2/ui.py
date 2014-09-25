@@ -10,7 +10,6 @@ import os
 import re
 from xml.sax import saxutils
 
-from google.appengine import runtime
 from google.appengine.api import app_identity
 from google.appengine.api import mail
 from google.appengine.api import mail_errors
@@ -121,40 +120,34 @@ def _generate_and_email_report(
   logging.info(
       '_generate_and_email_report(%s, %s, %s, ..., %s)',
       start_time, end_time, module_versions, recipients)
-  result = False
-  try:
-    categories, ignored = logscraper.scrape_logs_for_errors(
-        start_time, end_time, module_versions)
-    if categories:
-      params = _get_template_env(start_time, end_time, module_versions)
-      params.update(extras or {})
-      params.update(
-          _records_to_params(
-              categories, sum(c.events.total_count for c in ignored),
-              request_id_url, report_url))
-      body = template.render('ereporter2/email_report_content.html', params)
-      subject_line = template.render(
-          'ereporter2/email_report_title.html', params)
-      if not _email_html(recipients, subject_line, body):
-        on_error.log(
-            source='server',
-            category='email',
-            message='Failed to email ereporter2 report')
-    logging.info('New timestamp %s', end_time)
-    models.ErrorReportingInfo(
-        key=models.ErrorReportingInfo.primary_key(),
-        timestamp=end_time).put()
-    result = True
-  except runtime.DeadlineExceededError:
-    # Hitting the deadline here isn't a big deal if it is rare.
-    logging.warning('Got a DeadlineExceededError')
+  categories, ignored, end_time = logscraper.scrape_logs_for_errors(
+      start_time, end_time, module_versions)
+  if categories:
+    params = _get_template_env(start_time, end_time, module_versions)
+    params.update(extras or {})
+    params.update(
+        _records_to_params(
+            categories, sum(c.events.total_count for c in ignored),
+            request_id_url, report_url))
+    body = template.render('ereporter2/email_report_content.html', params)
+    subject_line = template.render(
+        'ereporter2/email_report_title.html', params)
+    if not _email_html(recipients, subject_line, body):
+      on_error.log(
+          source='server',
+          category='email',
+          message='Failed to email ereporter2 report')
+  logging.info('New timestamp %s', end_time)
+  models.ErrorReportingInfo(
+      key=models.ErrorReportingInfo.primary_key(),
+      timestamp=end_time).put()
   logging.info(
       'Processed %d items, ignored %d, reduced to %d categories, sent to %s.',
       sum(c.events.total_count for c in categories),
       sum(c.events.total_count for c in ignored),
       len(categories),
       recipients)
-  return result
+  return True
 
 
 ### Public API.
