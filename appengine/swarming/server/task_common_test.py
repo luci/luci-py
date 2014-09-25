@@ -110,7 +110,7 @@ class TaskCommonApiTest(test_case.TestCase):
     _request, result_summary = task_scheduler.make_request(_gen_request_data())
     bot_dimensions = {'hostname': 'localhost'}
     _request, to_run_result = task_scheduler.bot_reap_task(
-        bot_dimensions, 'localhost')
+        bot_dimensions, 'localhost', 'abc')
 
     actual = task_common.pack_result_summary_key(result_summary.key)
     # 0xbb8 = 3000ms = 3 secs; 0x02 = random;  0x00 = try_number, e.g. it is a
@@ -130,7 +130,7 @@ class TaskCommonApiTest(test_case.TestCase):
     _request, result_summary = task_scheduler.make_request(_gen_request_data())
     bot_dimensions = {'hostname': 'localhost'}
     _request, to_run_result = task_scheduler.bot_reap_task(
-        bot_dimensions, 'localhost')
+        bot_dimensions, 'localhost', 'abc')
 
     actual = task_common.pack_run_result_key(to_run_result.key)
     # 0xbb8 = 3000ms = 3 secs; 0x02 = random;  0x01 = try_number, e.g. it is a

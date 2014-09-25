@@ -119,7 +119,10 @@
     </tr>
     <tr>
       <td>Expiration</td>
-      <td>{{request.expiration_ts|datetimeformat}}</td>
+      <td>
+        {{request.expiration_ts|datetimeformat}}
+        {{(request.expiration_ts-request.created_ts)|timedeltaformat}}
+      </td>
     </tr>
     <tr>
       <td>Started</td>
@@ -165,6 +168,14 @@
     <tr>
       <td>Bot dimensions</td>
       <td>{{bot_view.bot_dimensions(bot)}}</td>
+    </tr>
+    <tr>
+      <td>Bot version</td>
+      <td>{{task.bot_version}}</td>
+    </tr>
+    <tr>
+      <td>Server version</td>
+      <td>{{task.server_versions|join(', ')}}</td>
     </tr>
     <tr class="{% if task.failure %}failed_test{% endif%}">
       <td>Failure</td>

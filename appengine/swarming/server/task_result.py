@@ -215,6 +215,14 @@ class _TaskResultCommon(ndb.Model):
   # Bot that ran this task.
   bot_id = ndb.StringProperty()
 
+  # Bot version (as a hash) of the code running the task.
+  bot_version = ndb.StringProperty()
+
+  # Active server version(s). Note that during execution, the active server
+  # version may have changed, this list will list all versions seen as the task
+  # was updated.
+  server_versions = ndb.StringProperty(repeated=True)
+
   # This entity is updated everytime the bot sends data so it is equivalent to
   # 'last_ping'.
   modified_ts = ndb.DateTimeProperty(auto_now=True)
@@ -730,7 +738,7 @@ def new_result_summary(request):
       user=request.user)
 
 
-def new_run_result(request, try_number, bot_id):
+def new_run_result(request, try_number, bot_id, bot_version):
   """Returns a new TaskRunResult for a TaskRequest.
 
   The caller must save it in the DB.
@@ -740,7 +748,9 @@ def new_run_result(request, try_number, bot_id):
   return TaskRunResult(
       key=result_summary_key_to_run_result_key(summary_key, try_number),
       bot_id=bot_id,
-      started_ts=utils.utcnow())
+      started_ts=utils.utcnow(),
+      bot_version=bot_version,
+      server_versions=[utils.get_app_version()])
 
 
 def yield_run_results_with_dead_bot():
@@ -763,6 +773,12 @@ def prepare_put_run_result(run_result):
     than what TaskResultSummary is at.
   """
   assert isinstance(run_result, TaskRunResult)
+
+  server_version = utils.get_app_version()
+  if (not run_result.server_versions or
+      run_result.server_versions[-1] != server_version):
+    run_result.server_versions.append(server_version)
+
   result_summary = run_result.result_summary_key.get()
   if (result_summary.try_number and
       result_summary.try_number > run_result.try_number):

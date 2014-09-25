@@ -123,7 +123,7 @@ def CreateRunner(config_name=None, machine_id=None, ran_successfully=None,
   task.put()
 
   machine_id = machine_id or 'localhost'
-  run_result = task_result.new_run_result(request, 1, machine_id)
+  run_result = task_result.new_run_result(request, 1, machine_id, 'abc')
 
   if ran_successfully or exit_codes:
     exit_codes = map(int, exit_codes.split(',')) if exit_codes else [0]
@@ -152,7 +152,7 @@ class AppTestBase(test_case.TestCase):
 
   def setUp(self):
     super(AppTestBase, self).setUp()
-    self._version = None
+    self.bot_version = None
     self.testbed.init_user_stub()
     self.testbed.init_search_stub()
 
@@ -258,7 +258,8 @@ class AppTestBase(test_case.TestCase):
         headers=headers,
         params=params).json
     token = response['xsrf_token'].encode('ascii')
-    params['attributes']['version'] = response['bot_version']
+    self.bot_version = response['bot_version']
+    params['attributes']['version'] = self.bot_version
     params['state'] = {
       'running_time': 1234.0,
       'sleep_streak': 0,
@@ -487,6 +488,7 @@ class BotApiTest(AppTestBase):
     expected = {
       u'abandoned_ts': None,
       u'bot_id': u'bot1',
+      u'bot_version': self.bot_version,
       u'completed_ts': None,
       u'durations': [],
       u'exit_codes': [],
@@ -494,6 +496,7 @@ class BotApiTest(AppTestBase):
       u'id': u'125ecfd5c888801',
       u'internal_failure': False,
       u'modified_ts': str_now,
+      u'server_versions': [u'default-version'],
       u'started_ts': str_now,
       u'state': task_result.State.RUNNING,
       u'try_number': 1,
@@ -556,6 +559,7 @@ class BotApiTest(AppTestBase):
       out = {
         u'abandoned_ts': None,
         u'bot_id': u'bot1',
+        u'bot_version': self.bot_version,
         u'completed_ts': None,
         u'durations': [],
         u'exit_codes': [],
@@ -563,6 +567,7 @@ class BotApiTest(AppTestBase):
         u'id': u'125ecfd5c888801',
         u'internal_failure': False,
         u'modified_ts': str_now,
+        u'server_versions': [u'default-version'],
         u'started_ts': str_now,
         u'state': task_result.State.RUNNING,
         u'try_number': 1,
@@ -641,6 +646,7 @@ class BotApiTest(AppTestBase):
     expected = {
       u'abandoned_ts': str_now,
       u'bot_id': u'bot1',
+      u'bot_version': self.bot_version,
       u'completed_ts': None,
       u'durations': [],
       u'exit_codes': [],
@@ -648,6 +654,7 @@ class BotApiTest(AppTestBase):
       u'id': u'125ecfd5c888801',
       u'internal_failure': True,
       u'modified_ts': str_now,
+      u'server_versions': [u'default-version'],
       u'started_ts': str_now,
       u'state': task_result.State.BOT_DIED,
       u'try_number': 1,
@@ -859,6 +866,7 @@ class NewClientApiTest(AppTestBase):
     expected = {
       u'abandoned_ts': str_now,
       u'bot_id': None,
+      u'bot_version': None,
       u'completed_ts': None,
       u'created_ts': str_now,
       u'durations': [],
@@ -868,6 +876,7 @@ class NewClientApiTest(AppTestBase):
       u'internal_failure': False,
       u'modified_ts': str_now,
       u'name': u'hi',
+      u'server_versions': [],
       u'started_ts': None,
       u'state': task_result.State.CANCELED,
       u'try_number': None,
@@ -892,6 +901,7 @@ class NewClientApiTest(AppTestBase):
     expected = {
       u'abandoned_ts': None,
       u'bot_id': None,
+      u'bot_version': None,
       u'completed_ts': None,
       u'created_ts': str_now,
       u'durations': [],
@@ -901,6 +911,7 @@ class NewClientApiTest(AppTestBase):
       u'internal_failure': False,
       u'modified_ts': str_now,
       u'name': u'hi',
+      u'server_versions': [],
       u'started_ts': None,
       u'state': task_result.State.PENDING,
       u'try_number': None,
@@ -924,6 +935,7 @@ class NewClientApiTest(AppTestBase):
     expected = {
       u'abandoned_ts': None,
       u'bot_id': u'bot1',
+      u'bot_version': self.bot_version,
       u'completed_ts': None,
       u'durations': [],
       u'exit_codes': [],
@@ -931,6 +943,7 @@ class NewClientApiTest(AppTestBase):
       u'id': u'125ecfd5c888801',
       u'internal_failure': False,
       u'modified_ts': str_now,
+      u'server_versions': [u'default-version'],
       u'started_ts': str_now,
       u'state': task_result.State.RUNNING,
       u'try_number': 1,
@@ -1214,6 +1227,7 @@ class NewClientApiTest(AppTestBase):
         {
           u'abandoned_ts': None,
           u'bot_id': u'bot1',
+          u'bot_version': self.bot_version,
           u'completed_ts': u'2000-01-02 03:04:05',
           u'durations': [0.1],
           u'exit_codes': [1],
@@ -1221,6 +1235,7 @@ class NewClientApiTest(AppTestBase):
           u'id': u'dc709e90885501',
           u'internal_failure': False,
           u'modified_ts': u'2000-01-02 03:04:05',
+          u'server_versions': [u'default-version'],
           u'started_ts': u'2000-01-02 03:04:05',
           u'state': task_result.State.COMPLETED,
           u'try_number': 1,
@@ -1240,6 +1255,7 @@ class NewClientApiTest(AppTestBase):
         {
           u'abandoned_ts': None,
           u'bot_id': u'bot1',
+          u'bot_version': self.bot_version,
           u'completed_ts': u'2000-01-02 03:04:05',
           u'durations': [0.1],
           u'exit_codes': [1],
@@ -1247,6 +1263,7 @@ class NewClientApiTest(AppTestBase):
           u'id': u'dc709e90888801',
           u'internal_failure': False,
           u'modified_ts': u'2000-01-02 03:04:05',
+          u'server_versions': [u'default-version'],
           u'started_ts': u'2000-01-02 03:04:05',
           u'state': task_result.State.COMPLETED,
           u'try_number': 1,

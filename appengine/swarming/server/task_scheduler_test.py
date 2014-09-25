@@ -85,7 +85,7 @@ def _quick_reap():
       properties=dict(dimensions={u'OS': u'Windows-3.1.1'}))
   request, _result_summary = task_scheduler.make_request(data)
   reaped_request, run_result = task_scheduler.bot_reap_task(
-      {'OS': 'Windows-3.1.1'}, 'localhost')
+      {'OS': 'Windows-3.1.1'}, 'localhost', 'abc')
   return run_result
 
 
@@ -131,7 +131,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       u'foo': u'bar',
     }
     actual_request, run_result  = task_scheduler.bot_reap_task(
-        bot_dimensions, 'localhost')
+        bot_dimensions, 'localhost', 'abc')
     self.assertEqual(request, actual_request)
     self.assertEqual('localhost', run_result.bot_id)
     self.assertEqual(None, task_to_run.TaskToRun.query().get().queue_number)
@@ -149,7 +149,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
         'localhost', 'hostname', 'internal_ip', 'external_ip', bot_dimensions,
         'version', True)
     actual_request, run_result  = task_scheduler.bot_reap_task(
-        bot_dimensions, 'localhost')
+        bot_dimensions, 'localhost', 'abc')
     self.assertEqual(None, actual_request)
     self.assertEqual(None, run_result)
 
@@ -196,6 +196,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
     expected = {
       'abandoned_ts': None,
       'bot_id': None,
+      'bot_version': None,
       'created_ts': created_ts,
       'completed_ts': None,
       'durations': [],
@@ -205,6 +206,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'internal_failure': False,
       'modified_ts': created_ts,
       'name': u'Request name',
+      'server_versions': [],
       'started_ts': None,
       'state': State.PENDING,
       'try_number': None,
@@ -217,13 +219,14 @@ class TaskSchedulerApiTest(test_case.TestCase):
     reaped_ts = self.now + datetime.timedelta(seconds=60)
     self.mock_now(reaped_ts)
     reaped_request, run_result = task_scheduler.bot_reap_task(
-        {'OS': 'Windows-3.1.1'}, 'localhost')
+        {'OS': 'Windows-3.1.1'}, 'localhost', 'abc')
     self.assertEqual(request, reaped_request)
     self.assertTrue(run_result)
     result_summary, run_results = get_results(request.key)
     expected = {
       'abandoned_ts': None,
       'bot_id': u'localhost',
+      'bot_version': u'abc',
       'created_ts': created_ts,  # Time the TaskRequest was created.
       'completed_ts': None,
       'durations': [],
@@ -233,6 +236,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'internal_failure': False,
       'modified_ts': reaped_ts,
       'name': u'Request name',
+      'server_versions': [u'default-version'],
       'started_ts': reaped_ts,
       'state': State.RUNNING,
       'try_number': 1,
@@ -243,14 +247,16 @@ class TaskSchedulerApiTest(test_case.TestCase):
       {
         'abandoned_ts': None,
         'bot_id': u'localhost',
+        'bot_version': u'abc',
         'completed_ts': None,
         'durations': [],
         'exit_codes': [],
+        'failure': False,
         'id': '14350e868888801',
         'internal_failure': False,
         'modified_ts': reaped_ts,
+        'server_versions': [u'default-version'],
         'started_ts': reaped_ts,
-        'failure': False,
         'state': State.RUNNING,
         'try_number': 1,
       },
@@ -270,6 +276,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
     expected = {
       'abandoned_ts': None,
       'bot_id': u'localhost',
+      'bot_version': u'abc',
       'created_ts': created_ts,
       'completed_ts': done_ts,
       'durations': [0.1, 0.2],
@@ -279,6 +286,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'internal_failure': False,
       'modified_ts': done_ts,
       'name': u'Request name',
+      'server_versions': [u'default-version'],
       'started_ts': reaped_ts,
       'state': State.COMPLETED,
       'try_number': 1,
@@ -289,6 +297,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       {
         'abandoned_ts': None,
         'bot_id': u'localhost',
+        'bot_version': u'abc',
         'completed_ts': done_ts,
         'durations': [0.1, 0.2],
         'exit_codes': [0, 0],
@@ -296,6 +305,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
         'id': '14350e868888801',
         'internal_failure': False,
         'modified_ts': done_ts,
+        'server_versions': [u'default-version'],
         'started_ts': reaped_ts,
         'state': State.COMPLETED,
         'try_number': 1,
@@ -309,7 +319,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
         properties=dict(dimensions={u'OS': u'Windows-3.1.1'}))
     request, _result_summary = task_scheduler.make_request(data)
     reaped_request, run_result = task_scheduler.bot_reap_task(
-        {'OS': 'Windows-3.1.1'}, 'localhost')
+        {'OS': 'Windows-3.1.1'}, 'localhost', 'abc')
     self.assertEqual(request, reaped_request)
     with task_scheduler.bot_update_task(
         run_result.key, 'localhost', 0, 'Foo1', 0, 0, 0.1) as entities:
@@ -322,6 +332,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
     expected = {
       'abandoned_ts': None,
       'bot_id': u'localhost',
+      'bot_version': u'abc',
       'created_ts': self.now,
       'completed_ts': self.now,
       'durations': [0.1, 0.2],
@@ -331,6 +342,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'internal_failure': False,
       'modified_ts': self.now,
       'name': u'Request name',
+      'server_versions': [u'default-version'],
       'started_ts': self.now,
       'state': State.COMPLETED,
       'try_number': 1,
@@ -342,6 +354,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       {
         'abandoned_ts': None,
         'bot_id': u'localhost',
+        'bot_version': u'abc',
         'completed_ts': self.now,
         'durations': [0.1, 0.2],
         'exit_codes': [0, 1],
@@ -349,6 +362,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
         'id': '14350e868888801',
         'internal_failure': False,
         'modified_ts': self.now,
+        'server_versions': [u'default-version'],
         'started_ts': self.now,
         'state': State.COMPLETED,
         'try_number': 1,
@@ -439,7 +453,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
         properties=dict(dimensions={u'OS': u'Windows-3.1.1'}))
     request, _result_summary = task_scheduler.make_request(data)
     reaped_request, run_result = task_scheduler.bot_reap_task(
-        {'OS': 'Windows-3.1.1'}, 'localhost')
+        {'OS': 'Windows-3.1.1'}, 'localhost', 'abc')
 
     # Use a large amount of data to force multiple (3) TaskOutputChunk.
     stdout = 'f' * (task_result.TaskOutput.CHUNK_SIZE * 2 + 1)
@@ -481,12 +495,13 @@ class TaskSchedulerApiTest(test_case.TestCase):
         properties=dict(dimensions={u'OS': u'Windows-3.1.1'}))
     request, result_summary = task_scheduler.make_request(data)
     reaped_request, run_result = task_scheduler.bot_reap_task(
-        {'OS': 'Windows-3.1.1'}, 'localhost')
+        {'OS': 'Windows-3.1.1'}, 'localhost', 'abc')
 
     task_scheduler.bot_kill_task(run_result)
     expected = {
       'abandoned_ts': self.now,
       'bot_id': u'localhost',
+      'bot_version': u'abc',
       'created_ts': self.now,
       'completed_ts': None,
       'durations': [],
@@ -496,6 +511,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'internal_failure': True,
       'modified_ts': self.now,
       'name': u'Request name',
+      'server_versions': [u'default-version'],
       'started_ts': self.now,
       'state': State.BOT_DIED,
       'try_number': 1,
@@ -540,7 +556,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       u'foo': u'bar',
     }
     _request, run_result = task_scheduler.bot_reap_task(
-        bot_dimensions, 'localhost')
+        bot_dimensions, 'localhost', 'abc')
     self.assertEqual(1, run_result.try_number)
     self.mock_now(self.now + task_common.BOT_PING_TOLERANCE, 1)
     self.assertEqual((0, 1), task_scheduler.cron_handle_bot_died())
@@ -550,6 +566,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
     expected = {
       'abandoned_ts': datetime.datetime(2014, 1, 2, 3, 9, 6, 6),
       'bot_id': u'localhost',
+      'bot_version': u'abc',
       'completed_ts': None,
       'durations': [],
       'exit_codes': [],
@@ -557,6 +574,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'id': '14350e868888801',
       'internal_failure': True,
       'modified_ts': datetime.datetime(2014, 1, 2, 3, 9, 6, 6),
+      'server_versions': [u'default-version'],
       'started_ts': datetime.datetime(2014, 1, 2, 3, 4, 5, 6),
       'state': task_result.State.BOT_DIED,
       'try_number': 1,
@@ -566,6 +584,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
     expected = {
       'abandoned_ts': None,
       'bot_id': u'localhost',
+      'bot_version': u'abc',
       'completed_ts': None,
       'created_ts': datetime.datetime(2014, 1, 2, 3, 4, 5, 6),
       'durations': [],
@@ -575,6 +594,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'internal_failure': False,
       'modified_ts': datetime.datetime(2014, 1, 2, 3, 9, 6, 6),
       'name': u'Request name',
+      'server_versions': [u'default-version'],
       'started_ts': datetime.datetime(2014, 1, 2, 3, 4, 5, 6),
       'state': task_result.State.PENDING,
       'try_number': 1,
@@ -585,7 +605,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
     # Task was retried.
     self.mock_now(self.now + task_common.BOT_PING_TOLERANCE, 2)
     _request, run_result = task_scheduler.bot_reap_task(
-        bot_dimensions, 'localhost')
+        bot_dimensions, 'localhost', 'abc')
     logging.info('%s', [t.to_dict() for t in task_to_run.TaskToRun.query()])
     self.assertEqual(2, run_result.try_number)
     with task_scheduler.bot_update_task(
@@ -595,6 +615,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
     expected = {
       'abandoned_ts': None,
       'bot_id': u'localhost',
+      'bot_version': u'abc',
       'completed_ts': datetime.datetime(2014, 1, 2, 3, 9, 7, 6),
       'created_ts': datetime.datetime(2014, 1, 2, 3, 4, 5, 6),
       'durations': [0.1],
@@ -604,6 +625,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'internal_failure': False,
       'modified_ts': datetime.datetime(2014, 1, 2, 3, 9, 7, 6),
       'name': u'Request name',
+      'server_versions': [u'default-version'],
       'started_ts': datetime.datetime(2014, 1, 2, 3, 9, 7, 6),
       'state': 112,
       'try_number': 2,

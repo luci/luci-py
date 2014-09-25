@@ -45,7 +45,7 @@ def _secs_to_ms(value):
   return int(round(value * 1000.))
 
 
-def _update_task(task_key, request, bot_id):
+def _update_task(task_key, request, bot_id, bot_version):
   """Reaps a task and insert the results entity.
 
   If bot_id is None, the task is declared EXPIRED.
@@ -74,7 +74,7 @@ def _update_task(task_key, request, bot_id):
     task.queue_number = None
     # TODO(maruel): Use datastore_util.insert() to create the new try_number.
     run_result = task_result.new_run_result(
-        request, (result_summary.try_number or 0) + 1, bot_id)
+        request, (result_summary.try_number or 0) + 1, bot_id, bot_version)
     if not bot_id:
       logging.info('Expired')
       run_result.state = task_result.State.EXPIRED
@@ -253,7 +253,7 @@ def unpack_run_result_key(packed_key):
       result_summary_key, run_id)
 
 
-def bot_reap_task(dimensions, bot_id):
+def bot_reap_task(dimensions, bot_id, bot_version):
   """Reaps a TaskToRun if one is available.
 
   The process is to find a TaskToRun where its .queue_number is set, then
@@ -282,7 +282,7 @@ def bot_reap_task(dimensions, bot_id):
       total_skipped += 1
       continue
 
-    run_result = _update_task(task.key, request, bot_id)
+    run_result = _update_task(task.key, request, bot_id, bot_version)
     if not run_result:
       failures += 1
       #logging.warning('Failed to reap %d', task.key.integer_id())
@@ -510,7 +510,7 @@ def cron_abort_expired_task_to_run():
     for task in task_to_run.yield_expired_task_to_run():
       # Create the TaskRunResult and kill it immediately.
       request = task.request_key.get()
-      if _update_task(task.key, request, None):
+      if _update_task(task.key, request, None, None):
         killed += 1
         stats.add_task_entry(
             'task_request_expired',

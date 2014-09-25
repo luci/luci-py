@@ -706,7 +706,8 @@ class BotPollHandler(auth.ApiHandler):
     # The bot is in good shape. Try to grab a task.
     try:
       # This is a fairly complex function call, exceptions are expected.
-      request, run_result = task_scheduler.bot_reap_task(dimensions, bot_id)
+      request, run_result = task_scheduler.bot_reap_task(
+          dimensions, bot_id, attributes['version'])
       if not request:
         # No task found, tell it to sleep a bit.
         self._cmd_sleep(sleep_streak, False)
