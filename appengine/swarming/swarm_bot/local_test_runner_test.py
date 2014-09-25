@@ -241,6 +241,72 @@ class TestLocalTestRunner(net_utils.TestCase):
     self.assertEqual(
         1, local_test_runner.run_command(server, 0, task_details, '.'))
 
+  def test_run_command_os_error(self):
+    def check_final(kwargs):
+      self.assertLess(0, kwargs['data'].pop('duration'))
+      self.assertEqual(
+          {
+            'data': {
+              'command_index': 0,
+              'exit_code': 1,
+              'hard_timeout': False,
+              'id': 'localhost',
+              'io_timeout': False,
+              'output':
+                  'Command "executable_that_shouldnt_be_on_your_system '
+                    'thus_raising_OSError" failed to start.\n'
+                  # TODO(maruel): OS specific error, fix expectation for other
+                  # OSes.
+                  'Error: [Errno 2] No such file or directory',
+              'output_chunk_start': 0,
+              'task_id': 23,
+            },
+            'headers': {'X-XSRF-Token': 'token'},
+          },
+          kwargs)
+
+    requests = [
+      (
+        'https://localhost:1/auth/api/v1/accounts/self/xsrf_token',
+        {'data': {}, 'headers': {'X-XSRF-Token-Request': '1'}},
+        {'xsrf_token': 'token'},
+      ),
+      (
+        'https://localhost:1/swarming/api/v1/bot/task_update/23',
+        {
+          'data': {'command_index': 0, 'id': 'localhost', 'task_id': 23},
+          'headers': {'X-XSRF-Token': 'token'},
+        },
+        {},
+      ),
+      (
+        'https://localhost:1/swarming/api/v1/bot/task_update/23',
+        check_final,
+        {},
+      ),
+    ]
+    self.expected_requests(requests)
+    server = url_helper.XsrfRemote('https://localhost:1/')
+
+    task_details = local_test_runner.TaskDetails(
+        {
+          'bot_id': 'localhost',
+          'commands': [
+            [
+              'executable_that_shouldnt_be_on_your_system',
+              'thus_raising_OSError',
+            ],
+          ],
+          'data': [],
+          'env': {},
+          'hard_timeout': 6,
+          'io_timeout': 6,
+          'task_id': 23,
+        })
+    # This runs the command for real.
+    self.assertEqual(
+        1, local_test_runner.run_command(server, 0, task_details, '.'))
+
   def test_run_command_hard_timeout(self):
     # This runs the command for real.
     def check_final(kwargs):

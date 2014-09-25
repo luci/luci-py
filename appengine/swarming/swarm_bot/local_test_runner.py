@@ -201,13 +201,22 @@ def run_command(swarming_server, index, task_details, root_dir):
   if task_details.env:
     env = os.environ.copy()
     env.update(task_details.env)
-  proc = subprocess42.Popen(
-      task_details.commands[index],
-      env=env,
-      cwd=root_dir,
-      stdout=subprocess.PIPE,
-      stderr=subprocess.STDOUT,
-      stdin=subprocess.PIPE)
+  try:
+    proc = subprocess42.Popen(
+        task_details.commands[index],
+        env=env,
+        cwd=root_dir,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        stdin=subprocess.PIPE)
+  except OSError as e:
+    stdout = 'Command "%s" failed to start.\nError: %s' % (
+        ' '.join(task_details.commands[index]), e)
+    params['duration'] = time.time() - start
+    params['io_timeout'] = False
+    params['hard_timeout'] = False
+    post_update(swarming_server, params, 1, stdout, 0)
+    return 1
 
   output_chunk_start = 0
   stdout = ''
