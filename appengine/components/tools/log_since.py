@@ -24,6 +24,8 @@ def main():
   parser.add_option(
       '-f', '--force', action='store_true',
       help='Run even if not pristine checkout, e.g. HEAD != origin/master')
+  parser.add_option(
+      '-F', '--files', action='store_true', help='List all modified files')
   options, args = parser.parse_args()
 
   print >> sys.stderr, (
@@ -72,6 +74,17 @@ def main():
         '\nFailed to retrieve the log of last %d commits.' % nb_commits)
     return 1
   sys.stdout.write(log.replace('@chromium.org', ''))
+
+  if options.files:
+    print('')
+    cmd = ['git', 'diff', refspec, '--stat', '-C', '-C']
+    try:
+      subprocess.check_call(cmd, cwd=root)
+    except subprocess.CalledProcessError:
+      print >> sys.stderr, (
+          '\nFailed to list files of last %d commits.' % nb_commits)
+      return 1
+
   return 0
 
 
