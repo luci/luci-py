@@ -15,6 +15,7 @@ import os
 
 import webapp2
 
+from google.appengine.api import users
 from google.appengine.datastore import datastore_query
 from google.appengine.ext import ndb
 
@@ -567,9 +568,11 @@ class TaskHandler(auth.AuthenticatingHandler):
     params = {
       'bot': bot_future.get_result() if bot_future else None,
       'is_admin': acl.is_admin(),
+      'is_gae_admin': users.is_current_user_admin(),
       'is_privileged_user': acl.is_privileged_user(),
       'following_task_id': following_task_id,
       'following_task_name': following_task_name,
+      'full_appid': os.environ['APPLICATION_ID'],
       'is_running': result.state == task_result.State.RUNNING,
       'now': utils.utcnow(),
       'previous_task_id': previous_task_id,

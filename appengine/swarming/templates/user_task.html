@@ -121,7 +121,7 @@
       <td>Expiration</td>
       <td>
         {{request.expiration_ts|datetimeformat}}
-        {{(request.expiration_ts-request.created_ts)|timedeltaformat}}
+        ({{(request.expiration_ts-request.created_ts)|timedeltaformat}})
       </td>
     </tr>
     <tr>
@@ -141,12 +141,23 @@
       <td>{{task.completed_ts|datetimeformat}}</td>
     </tr>
     <tr>
-      <td>Abandoned</td>
-      <td>{{task.abandoned_ts|datetimeformat}}</td>
-    </tr>
-    <tr>
       <td>Duration</td>
       <td>{{task.duration_now()|timedeltaformat}}</td>
+    </tr>
+    <tr>
+      <td>Abandoned</td>
+      <td>
+        {{task.abandoned_ts|datetimeformat}}
+        {% if task.abandoned_ts %}
+          {% if task.started_ts %}
+            ({{(task.abandoned_ts-task.started_ts)|timedeltaformat}} since task
+            started)
+          {% else %}
+            ({{(task.abandoned_ts-request.created_ts)|timedeltaformat}} since
+            task request)
+          {% endif %}
+        {% endif %}
+      </td>
     </tr>
     <tr>
       <td>State</td>
@@ -175,7 +186,17 @@
     </tr>
     <tr>
       <td>Server version</td>
-      <td>{{task.server_versions|join(', ')}}</td>
+      <td>
+        {% for v in task.server_versions %}
+          {% if is_gae_admin %}
+            <a href="https://appengine.google.com/logs?&app_id={{full_appid}}&version_id={{v}}">
+              {{v}}
+            </a>
+          {% else %}
+            {{v}}
+          {% endif %}
+        {% endfor %}
+      </td>
     </tr>
     <tr class="{% if task.failure %}failed_test{% endif%}">
       <td>Failure</td>
