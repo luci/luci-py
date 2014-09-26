@@ -375,9 +375,6 @@ class _TaskResultCommon(ndb.Model):
       if self.failure or self.exit_codes:
         raise datastore_errors.BadValueError(
             'Unexpected State, a task can\'t fail if it hasn\'t started yet')
-      if not self.internal_failure:
-        raise datastore_errors.BadValueError(
-            'Unexpected State, EXPIRED is internal failure')
 
     if self.state == State.TIMED_OUT and not self.failure:
       raise datastore_errors.BadValueError('Timeout implies task failure')

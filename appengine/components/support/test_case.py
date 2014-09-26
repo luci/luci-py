@@ -26,6 +26,7 @@ def mock_now(test, now, seconds):
   test.mock(utils, 'utcnow', lambda: now)
   test.mock(ndb.DateTimeProperty, '_now', lambda _: now)
   test.mock(ndb.DateProperty, '_now', lambda _: now.date())
+  return now
 
 
 class TestCase(auto_stub.TestCase):
@@ -88,7 +89,7 @@ class TestCase(auto_stub.TestCase):
       super(TestCase, self).tearDown()
 
   def mock_now(self, now, seconds=0):
-    mock_now(self, now, seconds)
+    return mock_now(self, now, seconds)
 
   def _SendToAdmins(self, request, *args, **kwargs):
     """Make sure the request is logged.

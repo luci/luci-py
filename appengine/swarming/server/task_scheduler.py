@@ -45,14 +45,63 @@ def _secs_to_ms(value):
   return int(round(value * 1000.))
 
 
+def _expire_task(task_key, request):
+  """Expires a task and insert the results entity.
+
+  Returns:
+    True on success.
+  """
+  assert request.key == task_to_run.task_to_run_key_to_request_key(task_key)
+  result_summary_future = task_result.request_key_to_result_summary_key(
+      request.key).get_async()
+
+  # Look if the TaskToRun is reapable once before doing the check inside the
+  # transaction. This reduces the likelihood of failing this check inside
+  # the transaction, which is an order of magnitude more costly.
+  if not task_to_run.is_task_reapable(task_key, None):
+    logging.info('Not reapable anymore')
+    result_summary_future.wait()
+    return None
+
+  result_summary = result_summary_future.get_result()
+
+  def run():
+    task = task_to_run.is_task_reapable(task_key, None)
+    if not task:
+      return None
+    task.queue_number = None
+    logging.info('Expired')
+    if result_summary.try_number:
+      # It's a retry that is being expired. Keep the old state.
+      result_summary.state = result_summary.run_result_key.get().state
+    else:
+      result_summary.state = task_result.State.EXPIRED
+    result_summary.abandoned_ts = utils.utcnow()
+    ndb.put_multi([task, result_summary])
+    return task
+
+  try:
+    task = ndb.transaction(run)
+    if task:
+      task_to_run.set_lookup_cache(task.key, False)
+    return bool(task)
+  except (
+      apiproxy_errors.CancelledError,
+      datastore_errors.BadRequestError,
+      datastore_errors.Timeout,
+      datastore_errors.TransactionFailedError,
+      RuntimeError) as e:
+    logging.warning('Failed: %s', e)
+    return False
+
+
 def _update_task(task_key, request, bot_id, bot_version):
   """Reaps a task and insert the results entity.
-
-  If bot_id is None, the task is declared EXPIRED.
 
   Returns:
     TaskRunResult if successful, None otherwise.
   """
+  assert bot_id, bot_id
   assert request.key == task_to_run.task_to_run_key_to_request_key(task_key)
   result_summary_future = task_result.request_key_to_result_summary_key(
       request.key).get_async()
@@ -75,11 +124,6 @@ def _update_task(task_key, request, bot_id, bot_version):
     # TODO(maruel): Use datastore_util.insert() to create the new try_number.
     run_result = task_result.new_run_result(
         request, (result_summary.try_number or 0) + 1, bot_id, bot_version)
-    if not bot_id:
-      logging.info('Expired')
-      run_result.state = task_result.State.EXPIRED
-      run_result.abandoned_ts = utils.utcnow()
-      run_result.internal_failure = True
     result_summary.set_from_run_result(run_result)
     ndb.put_multi([task, run_result, result_summary])
     return run_result, task
@@ -510,7 +554,7 @@ def cron_abort_expired_task_to_run():
     for task in task_to_run.yield_expired_task_to_run():
       # Create the TaskRunResult and kill it immediately.
       request = task.request_key.get()
-      if _update_task(task.key, request, None, None):
+      if _expire_task(task.key, request):
         killed += 1
         stats.add_task_entry(
             'task_request_expired',

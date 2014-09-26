@@ -26,6 +26,7 @@ from google.appengine.ext import ndb
 import webtest
 
 from components import stats_framework
+from components import utils
 from server import bot_management
 from server import stats
 from server import task_common
@@ -530,18 +531,79 @@ class TaskSchedulerApiTest(test_case.TestCase):
     self.assertEqual(task_result.State.CANCELED, result_summary.state)
 
   def test_cron_abort_expired_task_to_run(self):
-    # Create two shards, one is properly reaped, the other is expired.
+    self.mock(random, 'getrandbits', lambda _: 0x88)
     data = _gen_request_data(
         properties=dict(dimensions={u'OS': u'Windows-3.1.1'}))
-    task_scheduler.make_request(data)
+    _request, result_summary = task_scheduler.make_request(data)
+    abandoned_ts = self.mock_now(self.now, data['scheduling_expiration_secs']+1)
+    self.assertEqual(1, task_scheduler.cron_abort_expired_task_to_run())
+    self.assertEqual([], task_result.TaskRunResult.query().fetch())
+    expected = {
+      'abandoned_ts': abandoned_ts,
+      'bot_id': None,
+      'bot_version': None,
+      'completed_ts': None,
+      'created_ts': self.now,
+      'durations': [],
+      'exit_codes': [],
+      'failure': False,
+      'id': '14350e868888800',
+      'internal_failure': False,
+      'modified_ts': abandoned_ts,
+      'name': u'Request name',
+      'server_versions': [],
+      'started_ts': None,
+      'state': task_result.State.EXPIRED,
+      'try_number': None,
+      'user': u'Jesus',
+    }
+    self.assertEqual(expected, result_summary.key.get().to_dict())
+
+  def test_cron_abort_expired_task_to_run_retry(self):
+    self.mock(random, 'getrandbits', lambda _: 0x88)
+    data = _gen_request_data(
+        properties=dict(dimensions={u'OS': u'Windows-3.1.1'}))
+    request, result_summary = task_scheduler.make_request(data)
+
+    # Fake first try bot died.
     bot_dimensions = {
       u'OS': [u'Windows', u'Windows-3.1.1'],
       u'hostname': u'localhost',
       u'foo': u'bar',
     }
-    expiration = data['scheduling_expiration_secs']
-    self.mock_now(self.now, expiration+1)
+    _request, run_result = task_scheduler.bot_reap_task(
+        bot_dimensions, 'localhost', 'abc')
+    run_result.state = task_result.State.BOT_DIED
+    run_result.put()
+    self.assertEqual(
+        True,
+        task_scheduler._retry_task(
+            request, result_summary, run_result, utils.utcnow()))
+
+    # BOT_DIED is kept instead of EXPIRED.
+    abandoned_ts = self.mock_now(self.now, data['scheduling_expiration_secs']+1)
     self.assertEqual(1, task_scheduler.cron_abort_expired_task_to_run())
+    self.assertEqual(1, len(task_result.TaskRunResult.query().fetch()))
+    expected = {
+      'abandoned_ts': abandoned_ts,
+      'bot_id': u'localhost',
+      'bot_version': u'abc',
+      'completed_ts': None,
+      'created_ts': self.now,
+      'durations': [],
+      'exit_codes': [],
+      'failure': False,
+      'id': '14350e868888800',
+      'internal_failure': False,
+      'modified_ts': abandoned_ts,
+      'name': u'Request name',
+      'server_versions': [u'default-version'],
+      'started_ts': self.now,
+      'state': task_result.State.BOT_DIED,
+      'try_number': 1,
+      'user': u'Jesus',
+    }
+    self.assertEqual(expected, result_summary.key.get().to_dict())
 
   def test_cron_handle_bot_died(self):
     # TODO(maruel): Test expired tasks.
