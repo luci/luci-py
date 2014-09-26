@@ -296,11 +296,27 @@ class TestSlaveMachine(net_utils.TestCase):
 
   def test_run_manifest_restart(self):
     self.mock(slave_machine, 'post_error', self.fail)
+    self.mock(slave_machine, 'post_error_task', self.fail)
+    restarted = []
+    self.mock(
+        slave_machine, 'restart_bot', lambda *args: restarted.append(args))
+
+    self._mock_popen(slave_machine.RESTART_CODE)
+    server = url_helper.XsrfRemote('https://localhost:1/')
+    server.token = 'foo'
+    manifest = {'task_id': 24}
+    slave_machine.run_manifest(server, {}, manifest)
+    self.assertEqual(
+        [(server, {}, 'Restarting due to task failure')], restarted)
+
+  def test_run_manifest_restart_internal_failure(self):
+    self.mock(slave_machine, 'post_error', self.fail)
     posted = []
     self.mock(
         slave_machine, 'post_error_task', lambda *args: posted.append(args))
     restarted = []
-    self.mock(slave_machine, 'restart_bot', lambda *_: restarted.append(True))
+    self.mock(
+        slave_machine, 'restart_bot', lambda *args: restarted.append(args))
 
     self._mock_popen(1)
     server = url_helper.XsrfRemote('https://localhost:1/')
@@ -309,7 +325,8 @@ class TestSlaveMachine(net_utils.TestCase):
     slave_machine.run_manifest(server, {}, manifest)
     self.assertEqual(
         [(server, {}, 'Execution failed, internal error:\nfoo', 24)], posted)
-    self.assertEqual([True], restarted)
+    self.assertEqual(
+        [(server, {}, 'Execution failed, internal error:\nfoo')], restarted)
 
   def test_update_bot_linux(self):
     self.mock(sys, 'platform', 'linux2')

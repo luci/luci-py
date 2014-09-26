@@ -619,7 +619,48 @@ class BotApiTest(AppTestBase):
         state=task_result.State.COMPLETED)
     _cycle(params, expected)
 
-  def test_task_error(self):
+  def test_task_failure(self):
+    self.mock(random, 'getrandbits', lambda _: 0x88)
+    now = datetime.datetime(2010, 1, 2, 3, 4, 5)
+    self.mock_now(now)
+    str_now = unicode(now.strftime(utils.DATETIME_FORMAT))
+    token, params = self._bot_token()
+    self.client_create_task('hi')
+    response = self.post_with_token(
+        '/swarming/api/v1/bot/poll', params, token)
+    task_id = response['manifest']['task_id']
+
+    params = {
+      'command_index': 0,
+      'duration': 0.1,
+      'exit_code': 1,
+      'id': 'bot1',
+      'output': 'result string',
+      'output_chunk_start': 0,
+      'task_id': task_id,
+    }
+    response = self.post_with_token(
+        '/swarming/api/v1/bot/task_update', params, token)
+    response = self.client_get_results(task_id)
+    expected = {
+      u'abandoned_ts': None,
+      u'bot_id': u'bot1',
+      u'bot_version': self.bot_version,
+      u'completed_ts': str_now,
+      u'durations': [0.1],
+      u'exit_codes': [1],
+      u'failure': True,
+      u'id': u'125ecfd5c888801',
+      u'internal_failure': False,
+      u'modified_ts': str_now,
+      u'server_versions': [u'default-version'],
+      u'started_ts': str_now,
+      u'state': task_result.State.COMPLETED,
+      u'try_number': 1,
+    }
+    self.assertEqual(expected, response)
+
+  def test_task_internal_failure(self):
     # E.g. local_test_runner blew up.
     self.mock(random, 'getrandbits', lambda _: 0x88)
     now = datetime.datetime(2010, 1, 2, 3, 4, 5)

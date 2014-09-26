@@ -534,7 +534,17 @@ class TestLocalTestRunner(net_utils.TestCase):
     def load_and_run(manifest, swarming_server):
       self.assertEqual('foo', manifest)
       self.assertEqual('http://localhost', swarming_server.url)
-      return 0
+      return True
+
+    self.mock(local_test_runner, 'load_and_run', load_and_run)
+    self.assertEqual(
+        0, local_test_runner.main(['-S', 'http://localhost', '-f', 'foo']))
+
+  def test_main_reboot(self):
+    def load_and_run(manifest, swarming_server):
+      self.assertEqual('foo', manifest)
+      self.assertEqual('http://localhost', swarming_server.url)
+      return False
 
     self.mock(local_test_runner, 'load_and_run', load_and_run)
     self.assertEqual(
