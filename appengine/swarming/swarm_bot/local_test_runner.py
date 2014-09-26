@@ -122,8 +122,8 @@ def load_and_run(filename, swarming_server):
 
   out = True
   for index in xrange(len(task_details.commands)):
-    out = out and not bool(
-        run_command(swarming_server, index, task_details, root_dir))
+    exit_code = run_command(swarming_server, index, task_details, root_dir)
+    out = out and not bool(exit_code)
   return out
 
 

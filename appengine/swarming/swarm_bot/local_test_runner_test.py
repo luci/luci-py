@@ -108,7 +108,7 @@ class TestLocalTestRunner(net_utils.TestCase):
       self.assertEqual(self.work_dir, work_dir)
       self.assertTrue(isinstance(task_details, local_test_runner.TaskDetails))
       runs.append(index)
-      return 23
+      return 0
     self.mock(local_test_runner, 'run_command', run_command)
 
     manifest = os.path.join(self.root_dir, 'manifest')
@@ -124,8 +124,46 @@ class TestLocalTestRunner(net_utils.TestCase):
       }
       json.dump(data, f)
 
-    # run_command() returned 23 so load_and_run() returns False.
+    self.assertEqual(True, local_test_runner.load_and_run(manifest, server))
+    self.assertEqual([0, 1], runs)
+
+  def test_load_and_run_fail(self):
+    requests = [
+      (
+        'https://localhost:1/f',
+        {},
+        compress_to_zip({'file3': 'content3'}),
+        None,
+      ),
+    ]
+    self.expected_requests(requests)
+    server = url_helper.XsrfRemote('https://localhost:1/')
+
+    runs = []
+    def run_command(swarming_server, index, task_details, work_dir):
+      self.assertEqual(server, swarming_server)
+      self.assertEqual(self.work_dir, work_dir)
+      self.assertTrue(isinstance(task_details, local_test_runner.TaskDetails))
+      runs.append(index)
+      # Fails the first, pass the second.
+      return 1 if len(runs) == 1 else 0
+    self.mock(local_test_runner, 'run_command', run_command)
+
+    manifest = os.path.join(self.root_dir, 'manifest')
+    with open(manifest, 'wb') as f:
+      data = {
+        'bot_id': 'localhost',
+        'commands': [['a'], ['b', 'c']],
+        'env': {'d': 'e'},
+        'data': [('https://localhost:1/f', 'foo.zip')],
+        'hard_timeout': 10,
+        'io_timeout': 11,
+        'task_id': 23,
+      }
+      json.dump(data, f)
+
     self.assertEqual(False, local_test_runner.load_and_run(manifest, server))
+    self.assertEqual([0, 1], runs)
 
   def test_run_command(self):
     def check_final(kwargs):
