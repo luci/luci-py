@@ -226,7 +226,10 @@ class ClientTaskResultOutputAllHandler(ClientTaskResultBase):
     # JSON then reencodes to ascii compatible encoded strings, which explodes
     # the size.
     data = {
-      'outputs': [i.decode('utf-8', 'replace') for i in result.get_outputs()],
+      'outputs': [
+        i.decode('utf-8', 'replace') if i else i
+        for i in result.get_outputs()
+      ],
     }
     self.send_response(utils.to_json_encodable(data))
 
@@ -469,7 +472,8 @@ class GetResultHandler(auth.AuthenticatingHandler):
     if result.state in task_result.State.STATES_NOT_RUNNING:
       exit_codes = ','.join(map(str, result.exit_codes))
       output = u'\n'.join(
-          i.decode('utf-8', 'replace') for i in result.get_outputs())
+          (i.decode('utf-8', 'replace') if i else '')
+          for i in result.get_outputs())
     results = {
       'exit_codes': exit_codes,
       'machine_id': result.bot_id,
