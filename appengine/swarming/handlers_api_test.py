@@ -724,7 +724,7 @@ class NewClientApiTest(AppTestBase):
       'duration': 0.1,
       'exit_code': 1,
       'id': bot_id,
-      'output': 'result string',
+      'output': u'rÉsult string',
       'output_chunk_start': 0,
       'task_id': task_id,
     }

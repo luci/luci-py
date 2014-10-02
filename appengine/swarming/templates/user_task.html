@@ -220,7 +220,7 @@
 <h3>Outputs:</h3>
 <pre>
 {% for out in task.get_outputs() %}Output:
-{{out}}{% endfor %}{% if is_running %}<p class="console"><span class="blink">|</span>{% endif %}
+{{out.decode('utf-8', 'replace')}}{% endfor %}{% if is_running %}<p class="console"><span class="blink">|</span>{% endif %}
 </pre>
 
 {% endblock %}

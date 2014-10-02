@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# coding: utf-8
 # Copyright 2013 The Swarming Authors. All rights reserved.
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
@@ -178,6 +179,20 @@ class AppTestBase(test_case.TestCase):
     """Simulates a bot that polls for task."""
     token, params = self._bot_token(bot)
     return self.post_with_token('/swarming/api/v1/bot/poll', params, token)
+
+  def bot_complete_task(self, token, task_id, bot_id='bot1'):
+    params = {
+      'command_index': 0,
+      'duration': 0.1,
+      'exit_code': 1,
+      'id': bot_id,
+      'output': u'rÉsult string',
+      'output_chunk_start': 0,
+      'task_id': task_id,
+    }
+    response = self.post_with_token(
+        '/swarming/api/v1/bot/task_update', params, token)
+    self.assertEqual({u'ok': True}, response)
 
   def client_create_task(self, name, extra_command=None):
     """Simulate a client that creates a task."""
@@ -440,7 +455,10 @@ class FrontendTest(AppTestBase):
     self.app.get('/user/task/%s' % task_id, status=200)
 
     self.set_as_bot()
-    reaped = self.bot_poll('bot1')
+    token, _ = self._bot_token()
+    reaped = self.bot_poll()
+    self.bot_complete_task(token, reaped['manifest']['task_id'])
+    # Add unicode chars.
 
     # This can only work once a bot reaped the task.
     self.set_as_privileged_user()
