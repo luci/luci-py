@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # Copyright 2013 The Swarming Authors. All rights reserved.
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
@@ -28,7 +27,6 @@ import time
 import zipfile
 
 # pylint: disable-msg=W0403
-import logging_utils
 import url_helper
 from utils import net
 from utils import on_error
@@ -48,11 +46,10 @@ MIN_PACKET_INTERNAL = 10
 
 
 # Exit code used to restart the host. Keep in sync with bot_main.py. The reason
-# for its existance is that if an exception occurs, local_test_runner's exit
-# code will be 1. If the process is killed, it'll likely be -9. In these cases,
-# we want the task to be marked as error. But if local_test_runner wants to
-# reboot without marking the task as an internal failure, a special code must be
-# used.
+# for its existance is that if an exception occurs, task_runner's exit code will
+# be 1. If the process is killed, it'll likely be -9. In these cases, we want
+# the task to be marked as error. But if task_runner wants to reboot without
+# marking the task as an internal failure, a special code must be used.
 RESTART_CODE = 89
 
 
@@ -297,11 +294,3 @@ def main(args):
     # This means it's time for the bot to reboot but it's not task_error worthy.
     return RESTART_CODE
   return 0
-
-
-if __name__ == '__main__':
-  logging_utils.prepare_logging('local_test_runner.log')
-  # Setup the logger for the console ouput. This will be used by
-  # bot_main.py in case of internal_failure.
-  logging_utils.set_console_level(logging.DEBUG)
-  sys.exit(main(None))

@@ -35,7 +35,7 @@ THIS_FILE = os.path.abspath(zipped_archive.get_main_script_path())
 ROOT_DIR = os.path.dirname(THIS_FILE)
 
 
-# See local_test_runner.py for documentation.
+# See task_runner.py for documentation.
 RESTART_CODE = 89
 
 
@@ -227,15 +227,15 @@ def poll_server(remote, attributes, state):
 
 
 def run_manifest(remote, attributes, manifest):
-  """Defers to local_test_runner.py."""
+  """Defers to task_runner.py."""
   # Ensure the manifest is valid. This can throw a json decoding error. Also
   # raise if it is empty.
   if not manifest:
     raise ValueError('Empty manifest')
 
-  # Necessary to signal an internal_failure. This occurs when local_test_runner
-  # fails to execute the command. It is important to note that this data is
-  # extracted before any I/O is done, like writting the manifest to disk.
+  # Necessary to signal an internal_failure. This occurs when task_runner fails
+  # to execute the command. It is important to note that this data is extracted
+  # before any I/O is done, like writting the manifest to disk.
   task_id = manifest['task_id']
 
   restart_msg = None
@@ -251,6 +251,8 @@ def run_manifest(remote, attributes, manifest):
     path = os.path.join('work', 'test_run.json')
     with open(path, 'wb') as f:
       f.write(json.dumps(manifest))
+    # TODO(maruel): Rename local_test_runner to task_runner or something
+    # relevant.
     command = [
       sys.executable, THIS_FILE, 'local_test_runner',
       '-S', remote.url,

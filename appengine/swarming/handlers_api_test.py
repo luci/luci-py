@@ -661,7 +661,7 @@ class BotApiTest(AppTestBase):
     self.assertEqual(expected, response)
 
   def test_task_internal_failure(self):
-    # E.g. local_test_runner blew up.
+    # E.g. task_runner blew up.
     self.mock(random, 'getrandbits', lambda _: 0x88)
     now = datetime.datetime(2010, 1, 2, 3, 4, 5)
     self.mock_now(now)
@@ -672,7 +672,7 @@ class BotApiTest(AppTestBase):
         '/swarming/api/v1/bot/poll', params, token)
     task_id = response['manifest']['task_id']
 
-    # Let's say it failed to start local_test_runner because the new bot code is
+    # Let's say it failed to start task_runner because the new bot code is
     # broken. The end result is still BOT_DIED. The big change is that it
     # doesn't need to wait for a cron job to set this status.
     params = {

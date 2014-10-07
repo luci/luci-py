@@ -549,7 +549,7 @@ class BotHandshakeHandler(auth.ApiHandler):
         # If the bot decided to quarantine itself.
         "quarantined": True,
       }
-      # Differentiate between local_test_runner and bot_main:
+      # Differentiate between task_runner and bot_main:
       #"is_local_test_runner", False,
     }
 
@@ -872,7 +872,7 @@ class BotTaskErrorHandler(auth.ApiHandler):
   that also attaches a task id to it.
 
   This formally kills the task, marking it as an internal failure. This can be
-  used by bot_main.py to kill the task when local_test_runner misbehaved.
+  used by bot_main.py to kill the task when task_runner misbehaved.
   """
   EXPECTED_KEYS = frozenset([u'id', u'message', u'task_id'])
 

@@ -2,7 +2,7 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
-"""Runs either local_test_runner.py, bot_main.py or start_slave.py.
+"""Runs either task_runner.py, bot_main.py or start_slave.py.
 
 The imports are done late so if an ImportError occurs, it is localized to this
 command only.
@@ -32,9 +32,10 @@ THIS_FILE = os.path.abspath(zipped_archive.get_main_script_path())
 
 def CMDlocal_test_runner(args):
   """Internal command to run a swarming task."""
-  logging_utils.prepare_logging('local_test_runner.log')
-  import local_test_runner
-  return local_test_runner.main(args)
+  # TODO(maruel): rename function.
+  logging_utils.prepare_logging('task_runner.log')
+  import task_runner
+  return task_runner.main(args)
 
 
 def CMDstart_bot(args):

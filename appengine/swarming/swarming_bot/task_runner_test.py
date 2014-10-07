@@ -17,8 +17,8 @@ import unittest
 import zipfile
 
 # Import everything that does not require sys.path hack first.
-import local_test_runner
 import logging_utils
+import task_runner
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(BASE_DIR)
@@ -50,7 +50,7 @@ def compress_to_zip(files):
 class TestLocalTestRunner(net_utils.TestCase):
   def setUp(self):
     super(TestLocalTestRunner, self).setUp()
-    self.root_dir = tempfile.mkdtemp(prefix='local_test_runner')
+    self.root_dir = tempfile.mkdtemp(prefix='task_runner')
     self.work_dir = os.path.join(self.root_dir, 'work')
     os.chdir(self.root_dir)
     os.mkdir(self.work_dir)
@@ -86,7 +86,7 @@ class TestLocalTestRunner(net_utils.TestCase):
     ]
     self.expected_requests(requests)
     items = [(i[0], 'foo.zip') for i in requests]
-    local_test_runner.download_data(self.root_dir, items)
+    task_runner.download_data(self.root_dir, items)
     self.assertEqual(
         ['file1', 'file2', 'file3', 'work'], sorted(os.listdir(self.root_dir)))
 
@@ -106,10 +106,10 @@ class TestLocalTestRunner(net_utils.TestCase):
     def run_command(swarming_server, index, task_details, work_dir):
       self.assertEqual(server, swarming_server)
       self.assertEqual(self.work_dir, work_dir)
-      self.assertTrue(isinstance(task_details, local_test_runner.TaskDetails))
+      self.assertTrue(isinstance(task_details, task_runner.TaskDetails))
       runs.append(index)
       return 0
-    self.mock(local_test_runner, 'run_command', run_command)
+    self.mock(task_runner, 'run_command', run_command)
 
     manifest = os.path.join(self.root_dir, 'manifest')
     with open(manifest, 'wb') as f:
@@ -124,7 +124,7 @@ class TestLocalTestRunner(net_utils.TestCase):
       }
       json.dump(data, f)
 
-    self.assertEqual(True, local_test_runner.load_and_run(manifest, server))
+    self.assertEqual(True, task_runner.load_and_run(manifest, server))
     self.assertEqual([0, 1], runs)
 
   def test_load_and_run_fail(self):
@@ -143,11 +143,11 @@ class TestLocalTestRunner(net_utils.TestCase):
     def run_command(swarming_server, index, task_details, work_dir):
       self.assertEqual(server, swarming_server)
       self.assertEqual(self.work_dir, work_dir)
-      self.assertTrue(isinstance(task_details, local_test_runner.TaskDetails))
+      self.assertTrue(isinstance(task_details, task_runner.TaskDetails))
       runs.append(index)
       # Fails the first, pass the second.
       return 1 if len(runs) == 1 else 0
-    self.mock(local_test_runner, 'run_command', run_command)
+    self.mock(task_runner, 'run_command', run_command)
 
     manifest = os.path.join(self.root_dir, 'manifest')
     with open(manifest, 'wb') as f:
@@ -162,7 +162,7 @@ class TestLocalTestRunner(net_utils.TestCase):
       }
       json.dump(data, f)
 
-    self.assertEqual(False, local_test_runner.load_and_run(manifest, server))
+    self.assertEqual(False, task_runner.load_and_run(manifest, server))
     self.assertEqual([0, 1], runs)
 
   def test_run_command(self):
@@ -207,7 +207,7 @@ class TestLocalTestRunner(net_utils.TestCase):
     self.expected_requests(requests)
     server = url_helper.XsrfRemote('https://localhost:1/')
 
-    task_details = local_test_runner.TaskDetails(
+    task_details = task_runner.TaskDetails(
         {
           'bot_id': 'localhost',
           'commands': [[sys.executable, '-c', 'print(\'hi\')']],
@@ -218,8 +218,7 @@ class TestLocalTestRunner(net_utils.TestCase):
           'task_id': 23,
         })
     # This runs the command for real.
-    self.assertEqual(
-        0, local_test_runner.run_command(server, 0, task_details, '.'))
+    self.assertEqual(0, task_runner.run_command(server, 0, task_details, '.'))
 
   def test_run_command_fail(self):
     def check_final(kwargs):
@@ -263,7 +262,7 @@ class TestLocalTestRunner(net_utils.TestCase):
     self.expected_requests(requests)
     server = url_helper.XsrfRemote('https://localhost:1/')
 
-    task_details = local_test_runner.TaskDetails(
+    task_details = task_runner.TaskDetails(
         {
           'bot_id': 'localhost',
           'commands': [
@@ -276,8 +275,7 @@ class TestLocalTestRunner(net_utils.TestCase):
           'task_id': 23,
         })
     # This runs the command for real.
-    self.assertEqual(
-        1, local_test_runner.run_command(server, 0, task_details, '.'))
+    self.assertEqual(1, task_runner.run_command(server, 0, task_details, '.'))
 
   def test_run_command_os_error(self):
     def check_final(kwargs):
@@ -326,7 +324,7 @@ class TestLocalTestRunner(net_utils.TestCase):
     self.expected_requests(requests)
     server = url_helper.XsrfRemote('https://localhost:1/')
 
-    task_details = local_test_runner.TaskDetails(
+    task_details = task_runner.TaskDetails(
         {
           'bot_id': 'localhost',
           'commands': [
@@ -342,8 +340,7 @@ class TestLocalTestRunner(net_utils.TestCase):
           'task_id': 23,
         })
     # This runs the command for real.
-    self.assertEqual(
-        1, local_test_runner.run_command(server, 0, task_details, '.'))
+    self.assertEqual(1, task_runner.run_command(server, 0, task_details, '.'))
 
   def test_run_command_hard_timeout(self):
     # This runs the command for real.
@@ -388,7 +385,7 @@ class TestLocalTestRunner(net_utils.TestCase):
     self.expected_requests(requests)
     server = url_helper.XsrfRemote('https://localhost:1/')
 
-    task_details = local_test_runner.TaskDetails(
+    task_details = task_runner.TaskDetails(
         {
           'bot_id': 'localhost',
           'commands': [
@@ -403,8 +400,7 @@ class TestLocalTestRunner(net_utils.TestCase):
           'io_timeout': 10,
           'task_id': 23,
         })
-    self.assertEqual(
-        -9, local_test_runner.run_command(server, 0, task_details, '.'))
+    self.assertEqual(-9, task_runner.run_command(server, 0, task_details, '.'))
 
   def test_run_command_io_timeout(self):
     # This runs the command for real.
@@ -449,7 +445,7 @@ class TestLocalTestRunner(net_utils.TestCase):
     self.expected_requests(requests)
     server = url_helper.XsrfRemote('https://localhost:1/')
 
-    task_details = local_test_runner.TaskDetails(
+    task_details = task_runner.TaskDetails(
         {
           'bot_id': 'localhost',
           'commands': [
@@ -464,8 +460,7 @@ class TestLocalTestRunner(net_utils.TestCase):
           'io_timeout': 1,
           'task_id': 23,
         })
-    self.assertEqual(
-        -9, local_test_runner.run_command(server, 0, task_details, '.'))
+    self.assertEqual(-9, task_runner.run_command(server, 0, task_details, '.'))
 
   def test_run_command_large(self):
     # Method should have "self" as first argument - pylint: disable=E0213
@@ -555,7 +550,7 @@ class TestLocalTestRunner(net_utils.TestCase):
     ]
     self.expected_requests(requests)
     server = url_helper.XsrfRemote('https://localhost:1/')
-    task_details = local_test_runner.TaskDetails(
+    task_details = task_runner.TaskDetails(
         {
           'bot_id': 'localhost',
           'commands': [['large', 'executable']],
@@ -565,8 +560,7 @@ class TestLocalTestRunner(net_utils.TestCase):
           'io_timeout': 60,
           'task_id': 23,
         })
-    self.assertEqual(
-        0, local_test_runner.run_command(server, 0, task_details, './'))
+    self.assertEqual(0, task_runner.run_command(server, 0, task_details, './'))
 
   def test_main(self):
     def load_and_run(manifest, swarming_server):
@@ -574,9 +568,9 @@ class TestLocalTestRunner(net_utils.TestCase):
       self.assertEqual('http://localhost', swarming_server.url)
       return True
 
-    self.mock(local_test_runner, 'load_and_run', load_and_run)
+    self.mock(task_runner, 'load_and_run', load_and_run)
     self.assertEqual(
-        0, local_test_runner.main(['-S', 'http://localhost', '-f', 'foo']))
+        0, task_runner.main(['-S', 'http://localhost', '-f', 'foo']))
 
   def test_main_reboot(self):
     def load_and_run(manifest, swarming_server):
@@ -584,10 +578,10 @@ class TestLocalTestRunner(net_utils.TestCase):
       self.assertEqual('http://localhost', swarming_server.url)
       return False
 
-    self.mock(local_test_runner, 'load_and_run', load_and_run)
+    self.mock(task_runner, 'load_and_run', load_and_run)
     self.assertEqual(
-        local_test_runner.RESTART_CODE,
-        local_test_runner.main(['-S', 'http://localhost', '-f', 'foo']))
+        task_runner.RESTART_CODE,
+        task_runner.main(['-S', 'http://localhost', '-f', 'foo']))
 
 
 if __name__ == '__main__':
