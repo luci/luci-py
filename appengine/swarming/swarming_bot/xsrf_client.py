@@ -15,13 +15,6 @@ sys.path.insert(0, os.path.join(THIS_DIR, 'third_party'))
 from utils import net
 
 
-# TODO(maruel): Remove it once switch over is complete. Note that it's actually
-# reading, not opening.
-UrlOpen = net.url_read
-# TODO(maruel): Rename callers.
-DownloadFile = net.url_retrieve
-
-
 class Error(Exception):
   pass
 

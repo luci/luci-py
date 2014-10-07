@@ -15,7 +15,8 @@ import unittest
 # Import them first before manipulating sys.path to ensure they can load fine.
 import bot_main
 import logging_utils
-import url_helper
+import xsrf_client
+from utils import net
 from utils import zip_package
 
 THIS_FILE = os.path.abspath(__file__)
@@ -34,9 +35,9 @@ sys.path.insert(0, CLIENT_TESTS)
 import net_utils
 
 
-class TestSlaveMachine(net_utils.TestCase):
+class TestBotMain(net_utils.TestCase):
   def setUp(self):
-    super(TestSlaveMachine, self).setUp()
+    super(TestBotMain, self).setUp()
     self.root_dir = tempfile.mkdtemp(prefix='bot_main')
     self.old_cwd = os.getcwd()
     os.chdir(self.root_dir)
@@ -44,7 +45,7 @@ class TestSlaveMachine(net_utils.TestCase):
   def tearDown(self):
     os.chdir(self.old_cwd)
     shutil.rmtree(self.root_dir)
-    super(TestSlaveMachine, self).tearDown()
+    super(TestBotMain, self).tearDown()
 
   def test_get_attributes(self):
     self.assertEqual(
@@ -85,7 +86,7 @@ class TestSlaveMachine(net_utils.TestCase):
             {},
           ),
         ])
-    server = url_helper.XsrfRemote('https://localhost:1/')
+    server = xsrf_client.XsrfRemote('https://localhost:1/')
     attributes = {'id': 'localhost', 'foo': 'bar'}
     bot_main.post_error_task(server, attributes, 'error', 23)
 
@@ -129,7 +130,7 @@ class TestSlaveMachine(net_utils.TestCase):
             {'xsrf_token': 'token'},
           ),
         ])
-    server = url_helper.XsrfRemote('https://localhost:1/')
+    server = xsrf_client.XsrfRemote('https://localhost:1/')
     with self.assertRaises(Foo):
       bot_main.run_bot(server, None)
 
@@ -160,7 +161,7 @@ class TestSlaveMachine(net_utils.TestCase):
             },
           ),
         ])
-    server = url_helper.XsrfRemote('https://localhost:1/')
+    server = xsrf_client.XsrfRemote('https://localhost:1/')
     self.assertFalse(bot_main.poll_server(server, {'a': 1}, {'s': 1}))
     self.assertEqual([1.24], slept)
 
@@ -192,7 +193,7 @@ class TestSlaveMachine(net_utils.TestCase):
             },
           ),
         ])
-    server = url_helper.XsrfRemote('https://localhost:1/')
+    server = xsrf_client.XsrfRemote('https://localhost:1/')
     self.assertTrue(bot_main.poll_server(server, attribs, {'s': 1}))
     expected = [
       (server, {'b': 'c'}, {'foo': 'bar'}),
@@ -226,7 +227,7 @@ class TestSlaveMachine(net_utils.TestCase):
             },
           ),
         ])
-    server = url_helper.XsrfRemote('https://localhost:1/')
+    server = xsrf_client.XsrfRemote('https://localhost:1/')
     self.assertTrue(bot_main.poll_server(server, {'a': 1}, {'s': 1}))
     self.assertEqual([(server, {'a': 1}, '123')], update)
 
@@ -257,7 +258,7 @@ class TestSlaveMachine(net_utils.TestCase):
             },
           ),
         ])
-    server = url_helper.XsrfRemote('https://localhost:1/')
+    server = xsrf_client.XsrfRemote('https://localhost:1/')
     self.assertTrue(bot_main.poll_server(server, {'a': 1}, {'s': 1}))
     self.assertEqual([(server, {'a': 1}, 'Please die now')], restart)
 
@@ -286,7 +287,7 @@ class TestSlaveMachine(net_utils.TestCase):
     self.mock(bot_main, 'restart_bot', self.fail)
     self._mock_popen(0)
 
-    server = url_helper.XsrfRemote('https://localhost:1/')
+    server = xsrf_client.XsrfRemote('https://localhost:1/')
     manifest = {'task_id': 24}
     bot_main.run_manifest(server, {}, manifest)
 
@@ -297,7 +298,7 @@ class TestSlaveMachine(net_utils.TestCase):
     self.mock(bot_main, 'restart_bot', lambda *args: restarted.append(args))
 
     self._mock_popen(bot_main.RESTART_CODE)
-    server = url_helper.XsrfRemote('https://localhost:1/')
+    server = xsrf_client.XsrfRemote('https://localhost:1/')
     server.token = 'foo'
     manifest = {'task_id': 24}
     bot_main.run_manifest(server, {}, manifest)
@@ -312,7 +313,7 @@ class TestSlaveMachine(net_utils.TestCase):
     self.mock(bot_main, 'restart_bot', lambda *args: restarted.append(args))
 
     self._mock_popen(1)
-    server = url_helper.XsrfRemote('https://localhost:1/')
+    server = xsrf_client.XsrfRemote('https://localhost:1/')
     server.token = 'foo'
     manifest = {'task_id': 24}
     bot_main.run_manifest(server, {}, manifest)
@@ -329,14 +330,14 @@ class TestSlaveMachine(net_utils.TestCase):
     # called.
     self.mock(bot_main, 'post_error', lambda *_: None)
     self.mock(bot_main, 'THIS_FILE', 'swarming_bot.1.zip')
-    self.mock(url_helper, 'DownloadFile', lambda *_: True)
+    self.mock(net, 'url_retrieve', lambda *_: True)
 
     calls = []
     cmd = [sys.executable, 'swarming_bot.2.zip', 'start_slave', '--survive']
     self.mock(subprocess, 'call', self.fail)
     self.mock(os, 'execv', lambda *args: calls.append(args))
 
-    server = url_helper.XsrfRemote('https://localhost:1/')
+    server = xsrf_client.XsrfRemote('https://localhost:1/')
     bot_main.update_bot(server, {}, '123')
     self.assertEqual([(sys.executable, cmd)], calls)
 
@@ -347,14 +348,14 @@ class TestSlaveMachine(net_utils.TestCase):
     # Under the test forever blocking calls
     self.mock(bot_main, 'post_error', lambda *_: None)
     self.mock(bot_main, 'THIS_FILE', 'swarming_bot.1.zip')
-    self.mock(url_helper, 'DownloadFile', lambda *_: True)
+    self.mock(net, 'url_retrieve', lambda *_: True)
 
     calls = []
     cmd = [sys.executable, 'swarming_bot.2.zip', 'start_slave', '--survive']
     self.mock(subprocess, 'call', lambda *args: calls.append(args))
     self.mock(os, 'execv', self.fail)
 
-    server = url_helper.XsrfRemote('https://localhost:1/')
+    server = xsrf_client.XsrfRemote('https://localhost:1/')
     with self.assertRaises(SystemExit):
       bot_main.update_bot(server, {}, '123')
     self.assertEqual([(cmd,)], calls)

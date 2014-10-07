@@ -27,7 +27,7 @@ import time
 import zipfile
 
 # pylint: disable-msg=W0403
-import url_helper
+import xsrf_client
 from utils import net
 from utils import on_error
 from utils import subprocess42
@@ -289,7 +289,7 @@ def main(args):
 
   on_error.report_on_exception_exit(options.swarming_server)
 
-  remote = url_helper.XsrfRemote(options.swarming_server)
+  remote = xsrf_client.XsrfRemote(options.swarming_server)
   if not load_and_run(options.request_file_name, remote):
     # This means it's time for the bot to reboot but it's not task_error worthy.
     return RESTART_CODE

@@ -3,9 +3,6 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
-"""Unittest to exercise the code in url_helper.py."""
-
-
 import logging
 import os
 import sys
@@ -19,7 +16,7 @@ import test_env
 
 test_env.setup_test_env()
 
-import url_helper  # pylint: disable=W0403
+import xsrf_client # pylint: disable=W0403
 
 CLIENT_TESTS = os.path.join(ROOT_DIR, '..', '..', 'client', 'tests')
 sys.path.insert(0, CLIENT_TESTS)
@@ -40,7 +37,7 @@ class UrlHelperTest(net_utils.TestCase):
   def testXsrfRemoteGET(self):
     self.expected_requests([('http://localhost/a', {}, 'foo', None)])
 
-    remote = url_helper.XsrfRemote('http://localhost/')
+    remote = xsrf_client.XsrfRemote('http://localhost/')
     self.assertEqual('foo', remote.url_read('/a'))
 
   def testXsrfRemoteSimple(self):
@@ -59,7 +56,7 @@ class UrlHelperTest(net_utils.TestCase):
           ),
         ])
 
-    remote = url_helper.XsrfRemote('http://localhost/')
+    remote = xsrf_client.XsrfRemote('http://localhost/')
     self.assertEqual('foo', remote.url_read('/a', data={'foo': 'bar'}))
 
   def testXsrfRemoteRefresh(self):
@@ -91,7 +88,7 @@ class UrlHelperTest(net_utils.TestCase):
           ),
         ])
 
-    remote = url_helper.XsrfRemote('http://localhost/')
+    remote = xsrf_client.XsrfRemote('http://localhost/')
     remote.url_read('/a', data={'foo': 'bar'})
 
   def testXsrfRemoteRefreshForced(self):
@@ -121,7 +118,7 @@ class UrlHelperTest(net_utils.TestCase):
           ),
         ])
 
-    remote = url_helper.XsrfRemote('http://localhost/')
+    remote = xsrf_client.XsrfRemote('http://localhost/')
     remote.token = 'invalid_token'
     remote.url_read('/a', data={'foo': 'bar'})
 
@@ -145,7 +142,7 @@ class UrlHelperTest(net_utils.TestCase):
           ),
         ])
 
-    remote = url_helper.XsrfRemote(
+    remote = xsrf_client.XsrfRemote(
         'http://localhost/',
         '/swarming/api/v1/bot/handshake')
     remote.xsrf_request_params = {'attributes': 'b'}

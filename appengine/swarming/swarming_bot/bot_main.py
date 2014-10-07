@@ -23,7 +23,8 @@ import zipfile
 # pylint: disable-msg=W0403
 import logging_utils
 import os_utilities
-import url_helper
+import xsrf_client
+from utils import net
 from utils import on_error
 from utils import zip_package
 
@@ -119,8 +120,8 @@ def post_error_task(remote, attributes, error, task_id):
     attributes: This bot's attributes.
     error: String representing the problem.
     task_id: Task that had an internal error. When the Swarming server sends
-        commands to a slave machine, even though they could be completely wrong,
-        the server assumes the job as running. Thus this function acts as the
+        commands to a bot, even though they could be completely wrong, the
+        server assumes the job as running. Thus this function acts as the
         exception handler for incoming commands from the Swarming server. If for
         any reason the local test runner script can not be run successfully,
         this function is invoked.
@@ -166,7 +167,7 @@ def run_bot(remote, error):
 
   try:
     # The fully qualified domain name will uniquely identify this machine to the
-    # server, so we can use it to give a deterministic id for this slave. Also
+    # server, so we can use it to give a deterministic id for this bot. Also
     # store as lower case, since it is already case-insensitive.
     attributes.update(get_attributes())
   except Exception as e:
@@ -302,7 +303,7 @@ def update_bot(remote, attributes, version):
 
   # Download as a new file.
   url = remote.url + '/get_slave_code/%s' % version
-  if not url_helper.DownloadFile(new_zip, url):
+  if not net.url_retrieve(new_zip, url):
     raise Exception('Unable to download %s from %s.' % (new_zip, url))
 
   logging.info('Restarting to %s.', new_zip)
@@ -386,5 +387,5 @@ def main(args):
   except Exception as e:
     # Do not reboot here, because it would just cause a reboot loop.
     error = str(e)
-  remote = url_helper.XsrfRemote(server, '/swarming/api/v1/bot/handshake')
+  remote = xsrf_client.XsrfRemote(server, '/swarming/api/v1/bot/handshake')
   return run_bot(remote, error)

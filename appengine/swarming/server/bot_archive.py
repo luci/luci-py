@@ -83,7 +83,6 @@ FILES = (
     'third_party/requests/status_codes.py',
     'third_party/requests/structures.py',
     'third_party/requests/utils.py',
-    'url_helper.py',
     'utils/__init__.py',
     'utils/cacert.pem',
     'utils/net.py',
@@ -92,6 +91,7 @@ FILES = (
     'utils/subprocess42.py',
     'utils/tools.py',
     'utils/zip_package.py',
+    'xsrf_client.py',
 )
 
 

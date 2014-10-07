@@ -28,7 +28,7 @@ import test_env
 
 test_env.setup_test_env()
 
-import url_helper
+import xsrf_client
 from utils import subprocess42
 
 
@@ -100,7 +100,7 @@ class TestLocalTestRunner(net_utils.TestCase):
       ),
     ]
     self.expected_requests(requests)
-    server = url_helper.XsrfRemote('https://localhost:1/')
+    server = xsrf_client.XsrfRemote('https://localhost:1/')
 
     runs = []
     def run_command(swarming_server, index, task_details, work_dir):
@@ -137,7 +137,7 @@ class TestLocalTestRunner(net_utils.TestCase):
       ),
     ]
     self.expected_requests(requests)
-    server = url_helper.XsrfRemote('https://localhost:1/')
+    server = xsrf_client.XsrfRemote('https://localhost:1/')
 
     runs = []
     def run_command(swarming_server, index, task_details, work_dir):
@@ -205,7 +205,7 @@ class TestLocalTestRunner(net_utils.TestCase):
       ),
     ]
     self.expected_requests(requests)
-    server = url_helper.XsrfRemote('https://localhost:1/')
+    server = xsrf_client.XsrfRemote('https://localhost:1/')
 
     task_details = task_runner.TaskDetails(
         {
@@ -260,7 +260,7 @@ class TestLocalTestRunner(net_utils.TestCase):
       ),
     ]
     self.expected_requests(requests)
-    server = url_helper.XsrfRemote('https://localhost:1/')
+    server = xsrf_client.XsrfRemote('https://localhost:1/')
 
     task_details = task_runner.TaskDetails(
         {
@@ -322,7 +322,7 @@ class TestLocalTestRunner(net_utils.TestCase):
       ),
     ]
     self.expected_requests(requests)
-    server = url_helper.XsrfRemote('https://localhost:1/')
+    server = xsrf_client.XsrfRemote('https://localhost:1/')
 
     task_details = task_runner.TaskDetails(
         {
@@ -383,7 +383,7 @@ class TestLocalTestRunner(net_utils.TestCase):
       ),
     ]
     self.expected_requests(requests)
-    server = url_helper.XsrfRemote('https://localhost:1/')
+    server = xsrf_client.XsrfRemote('https://localhost:1/')
 
     task_details = task_runner.TaskDetails(
         {
@@ -443,7 +443,7 @@ class TestLocalTestRunner(net_utils.TestCase):
       ),
     ]
     self.expected_requests(requests)
-    server = url_helper.XsrfRemote('https://localhost:1/')
+    server = xsrf_client.XsrfRemote('https://localhost:1/')
 
     task_details = task_runner.TaskDetails(
         {
@@ -549,7 +549,7 @@ class TestLocalTestRunner(net_utils.TestCase):
       ),
     ]
     self.expected_requests(requests)
-    server = url_helper.XsrfRemote('https://localhost:1/')
+    server = xsrf_client.XsrfRemote('https://localhost:1/')
     task_details = task_runner.TaskDetails(
         {
           'bot_id': 'localhost',
