@@ -45,7 +45,7 @@ def CommonChecks(input_api, output_api):
     # Add project specific paths to sys.path
     sys.path = [
       join('components', 'third_party'),
-      join('swarm_bot'),
+      join('swarming_bot'),
       join('..', 'components'),
       join('..', 'components', 'third_party'),
       join('..', '..', 'client', 'tests'),
@@ -66,7 +66,7 @@ def CommonChecks(input_api, output_api):
     input_api.PresubmitLocalPath(),
     join('common'),
     join('server'),
-    join('swarm_bot'),
+    join('swarming_bot'),
   ]
 
   blacklist = []

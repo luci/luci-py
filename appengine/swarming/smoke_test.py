@@ -22,7 +22,7 @@ import unittest
 import urllib
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
-BOT_DIR = os.path.join(APP_DIR, 'swarm_bot')
+BOT_DIR = os.path.join(APP_DIR, 'swarming_bot')
 sys.path.insert(0, APP_DIR)
 
 import test_env

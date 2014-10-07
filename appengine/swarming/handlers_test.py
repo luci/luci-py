@@ -419,7 +419,7 @@ class FrontendTest(AppTestBase):
   def test_bootstrap_default(self):
     self.set_as_bot()
     actual = self.app.get('/bootstrap').body
-    with open(os.path.join(APP_DIR, 'swarm_bot/bootstrap.py'), 'rb') as f:
+    with open(os.path.join(APP_DIR, 'swarming_bot/bootstrap.py'), 'rb') as f:
       expected = f.read()
     header = 'host_url = \'http://localhost\'\n'
     self.assertEqual(header + expected, actual)

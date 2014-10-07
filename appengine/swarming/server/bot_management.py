@@ -118,7 +118,7 @@ def get_bootstrap(host_url):
   content = file_chunks.RetrieveFile('bootstrap.py')
   if not content:
     # Fallback to the one embedded in the tree.
-    with open(os.path.join(ROOT_DIR, 'swarm_bot/bootstrap.py'), 'rb') as f:
+    with open(os.path.join(ROOT_DIR, 'swarming_bot/bootstrap.py'), 'rb') as f:
       content = f.read()
   header = 'host_url = %r\n' % host_url
   return header + content
@@ -133,7 +133,8 @@ def get_start_slave():
   content = file_chunks.RetrieveFile(START_SLAVE_SCRIPT_KEY)
   if content:
     return content
-  with open(os.path.join(ROOT_DIR, 'swarm_bot', 'start_slave.py'), 'rb') as f:
+  with open(
+      os.path.join(ROOT_DIR, 'swarming_bot', 'start_slave.py'), 'rb') as f:
     return f.read()
 
 
@@ -169,7 +170,7 @@ def get_slave_version(host):
 
   # Need to calculate it.
   additionals = {'start_slave.py': get_start_slave()}
-  bot_dir = os.path.join(ROOT_DIR, 'swarm_bot')
+  bot_dir = os.path.join(ROOT_DIR, 'swarming_bot')
   bot_version = bot_archive.get_swarming_bot_version(bot_dir, host, additionals)
   memcache.set(key, bot_version, namespace=namespace)
   return bot_version
@@ -190,7 +191,7 @@ def get_swarming_bot_zip(host):
   # Get the start slave script from the database, if present. Pass an empty
   # file if the files isn't present.
   additionals = {'start_slave.py': get_start_slave()}
-  bot_dir = os.path.join(ROOT_DIR, 'swarm_bot')
+  bot_dir = os.path.join(ROOT_DIR, 'swarming_bot')
   code = bot_archive.get_swarming_bot_zip(bot_dir, host, additionals)
   memcache.set(key, code, namespace=namespace)
   return code
@@ -292,7 +293,7 @@ def get_bot_reboot_period(bot_id, state):
   pseudo-randomizing it it on per-bot basis, to make sure that bots do not
   reboot all at once.
   """
-  # Seed stays constant during lifetime of a swarm_bot process, but changes
+  # Seed stays constant during lifetime of a swarming_bot process, but changes
   # whenever bot is restarted. That way all bots on average restart every
   # BOT_REBOOT_PERIOD_SECS.
   seed_bytes = hashlib.sha1(
