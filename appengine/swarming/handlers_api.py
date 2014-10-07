@@ -265,6 +265,15 @@ class ClientApiBot(auth.ApiHandler):
     now = utils.utcnow()
     self.send_response(utils.to_json_encodable(bot.to_dict_with_now(now)))
 
+  @auth.require(acl.is_admin)
+  def delete(self, bot_id):
+    bot_key = bot_management.get_bot_key(bot_id)
+    found = False
+    if bot_key.get():
+      bot_key.delete()
+      found = True
+    self.send_response({'deleted': bool(found)})
+
 
 class ClientApiBotTask(auth.ApiHandler):
   """Tasks executed on a specific bot"""

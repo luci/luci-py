@@ -1229,6 +1229,31 @@ class NewClientApiTest(AppTestBase):
     }
     self.assertEqual(expected, actual)
 
+  def test_api_bot_delete(self):
+    self.set_as_admin()
+    now = datetime.datetime(2000, 1, 2, 3, 4, 5, 6)
+    self.mock_now(now)
+    bot = bot_management.tag_bot_seen(
+        'id1', 'localhost', '127.0.0.1', '8.8.4.4', {'foo': 'bar'}, '123456789',
+        False)
+    bot.put()
+
+    token = self.getXsrfToken()
+    actual = self.app.delete(
+        '/swarming/api/v1/client/bot/id1',
+        status=200,
+        headers={'X-XSRF-Token': str(token)}).json
+    expected = {
+      u'deleted': True,
+    }
+    self.assertEqual(expected, actual)
+
+    actual = self.app.get('/swarming/api/v1/client/bot/id1', status=404).json
+    expected = {
+      u'error': u'Bot not found',
+    }
+    self.assertEqual(expected, actual)
+
   def test_api_bot_tasks_empty(self):
     self.set_as_privileged_user()
     now = datetime.datetime(2000, 1, 2, 3, 4, 5, 6)
