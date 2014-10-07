@@ -11,8 +11,8 @@ streams results back to the Swarming server.
 The process exit code is 0 when the task was executed, even if the task itself
 failed. If there's any failure in the setup or teardown, like invalid packet
 response, failure to contact the server, etc, a non zero exit code is used. It's
-up to the calling process (slave_machine.py) to signal that there was an
-internal failure and to cancel this task run and ask the server to retry it.
+up to the calling process (bot_main.py) to signal that there was an internal
+failure and to cancel this task run and ask the server to retry it.
 """
 
 __version__ = '0.3'
@@ -47,12 +47,12 @@ MAX_PACKET_INTERVAL = 30
 MIN_PACKET_INTERNAL = 10
 
 
-# Exit code used to restart the host. Keep in sync with slave_machine.py. The
-# reason for its existance is that if an exception occurs, local_test_runner's
-# exit code will be 1. If the process is killed, it'll likely be -9. In these
-# cases, we want the task to be marked as error. But if local_test_runner wants
-# to reboot without marking the task as an internal failure, a special code must
-# be used.
+# Exit code used to restart the host. Keep in sync with bot_main.py. The reason
+# for its existance is that if an exception occurs, local_test_runner's exit
+# code will be 1. If the process is killed, it'll likely be -9. In these cases,
+# we want the task to be marked as error. But if local_test_runner wants to
+# reboot without marking the task as an internal failure, a special code must be
+# used.
 RESTART_CODE = 89
 
 
@@ -107,9 +107,9 @@ def load_and_run(filename, swarming_server):
     True on success, False if the task failed.
   """
   # The work directory is guaranteed to exist since it was created by
-  # slave_machine.py and contains the manifest. Temporary files will be
-  # downloaded there. It's slave_machine.py that will delete the directory
-  # afterward. Tests are not run from there.
+  # bot_main.py and contains the manifest. Temporary files will be downloaded
+  # there. It's bot_main.py that will delete the directory afterward. Tests are
+  # not run from there.
   root_dir = os.path.abspath('work')
   if not os.path.isdir(root_dir):
     raise ValueError('%s expected to exist' % root_dir)
@@ -243,7 +243,7 @@ def run_command(swarming_server, index, task_details, root_dir):
         stdout = ''
 
       # Kill on timeout if necessary. Both are failures, not internal_failures.
-      # Kill but return 0 so slave_machine.py doesn't cancel the task.
+      # Kill but return 0 so bot_main.py doesn't cancel the task.
       if not had_hard_timeout and not had_io_timeout:
         if now - last_io > task_details.io_timeout:
           had_io_timeout = True
@@ -304,6 +304,6 @@ def main(args):
 if __name__ == '__main__':
   logging_utils.prepare_logging('local_test_runner.log')
   # Setup the logger for the console ouput. This will be used by
-  # slave_machine.py in case of internal_failure.
+  # bot_main.py in case of internal_failure.
   logging_utils.set_console_level(logging.DEBUG)
   sys.exit(main(None))

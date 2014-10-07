@@ -2,7 +2,7 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
-"""Runs either local_test_runner.py, slave_machine.py or start_slave.py.
+"""Runs either local_test_runner.py, bot_main.py or start_slave.py.
 
 The imports are done late so if an ImportError occurs, it is localized to this
 command only.
@@ -42,11 +42,11 @@ def CMDstart_bot(args):
   logging_utils.prepare_logging('swarming_bot.log')
   logging_utils.set_console_level(logging.DEBUG)
   logging.info(
-      'importing slave_machine: %s, %s',
+      'importing bot_main: %s, %s',
       THIS_FILE, zipped_archive.generate_version())
-  import slave_machine
-  result = slave_machine.main(args)
-  logging.info('slave_machine exit code: %d', result)
+  import bot_main
+  result = bot_main.main(args)
+  logging.info('bot_main exit code: %d', result)
   return result
 
 

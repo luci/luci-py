@@ -25,12 +25,12 @@ ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # TODO(maruel): Make the list automatically generated?
 FILES = (
     '__main__.py',
+    'bot_main.py',
     'common/__init__.py',
     'common/test_request_message.py',
     'local_test_runner.py',
     'logging_utils.py',
     'os_utilities.py',
-    'slave_machine.py',
     'third_party/__init__.py',
     'third_party/httplib2/__init__.py',
     'third_party/httplib2/cacerts.txt',

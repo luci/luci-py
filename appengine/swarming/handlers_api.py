@@ -549,7 +549,7 @@ class BotHandshakeHandler(auth.ApiHandler):
         # If the bot decided to quarantine itself.
         "quarantined": True,
       }
-      # Differentiate between local_test_runner and slave_machine:
+      # Differentiate between local_test_runner and bot_main:
       #"is_local_test_runner", False,
     }
 
@@ -771,8 +771,8 @@ class BotErrorHandler(auth.ApiHandler):
   """Specialized version of ereporter2's /ereporter2/api/v1/on_error.
 
   This formally quarantines the bot and sends an alert to the admins. It is
-  meant to be used by slave_machine.py for non-recoverable issues, for example
-  when failing to self update.
+  meant to be used by bot_main.py for non-recoverable issues, for example when
+  failing to self update.
   """
   EXPECTED_KEYS = frozenset([u'id', u'message'])
 
@@ -872,7 +872,7 @@ class BotTaskErrorHandler(auth.ApiHandler):
   that also attaches a task id to it.
 
   This formally kills the task, marking it as an internal failure. This can be
-  used by slave_machine.py to kill the task when local_test_runner misbehaved.
+  used by bot_main.py to kill the task when local_test_runner misbehaved.
   """
   EXPECTED_KEYS = frozenset([u'id', u'message', u'task_id'])
 

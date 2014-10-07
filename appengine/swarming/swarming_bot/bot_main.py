@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # Copyright 2013 The Swarming Authors. All rights reserved.
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
@@ -387,9 +386,3 @@ def main(args):
     error = str(e)
   remote = url_helper.XsrfRemote(server, '/swarming/api/v1/bot/handshake')
   return run_bot(remote, error)
-
-
-if __name__ == '__main__':
-  logging_utils.prepare_logging('swarming_bot.log')
-  os.chdir(ROOT_DIR)
-  sys.exit(main(None))
