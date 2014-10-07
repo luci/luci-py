@@ -585,13 +585,14 @@ def cron_handle_bot_died():
         packed = task_common.pack_run_result_key(run_result.key)
         request, result_summary = ndb.get_multi(
             (run_result.request_key, run_result.result_summary_key))
-        if _retry_task(request, result_summary, run_result, utils.utcnow()):
-          task_to_run.set_lookup_cache(
-              task_to_run.request_to_task_to_run_key(request), True)
-          retried += 1
-          logging.info('Retried task %s', packed)
-          continue
-        logging.info('Failed retrying task %s', packed)
+        if result_summary.try_number == 1:
+          if _retry_task(request, result_summary, run_result, utils.utcnow()):
+            task_to_run.set_lookup_cache(
+                task_to_run.request_to_task_to_run_key(request), True)
+            retried += 1
+            logging.info('Retried task %s', packed)
+            continue
+          logging.info('Failed retrying task %s', packed)
       bot_kill_task(run_result)
       killed += 1
   finally:
