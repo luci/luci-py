@@ -247,9 +247,6 @@ class BotHandler(auth.AuthenticatingHandler):
       'run_time': run_time,
       'xsrf_token': self.generate_xsrf_token(),
     }
-    # TODO(maruel): Make the delete link redirect to /restricted/bots. It would
-    # probably be preferable to not use /delete_machine_stats and create a UI
-    # specialized endpoint instead.
     self.response.out.write(
         template.render('swarming/restricted_bot.html', params))
 

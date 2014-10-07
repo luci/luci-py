@@ -130,9 +130,10 @@ class AppTestBase(test_case.TestCase):
     self.assertEqual(body, response.body, repr(response.body))
 
   def getXsrfToken(self):
-    return self.auth_app.post(
+    resp = self.auth_app.post(
         '/auth/api/v1/accounts/self/xsrf_token',
-        headers={'X-XSRF-Token-Request': '1'}).json['xsrf_token']
+        headers={'X-XSRF-Token-Request': '1'}).json
+    return str(resp['xsrf_token'])
 
   def _client_token(self):
     headers = {'X-XSRF-Token-Request': '1'}
@@ -141,8 +142,7 @@ class AppTestBase(test_case.TestCase):
         '/swarming/api/v1/client/handshake',
         headers=headers,
         params=params).json
-    token = response['xsrf_token'].encode('ascii')
-    return token
+    return str(response['xsrf_token'])
 
   def _bot_token(self, bot='bot1'):
     headers = {'X-XSRF-Token-Request': '1'}
@@ -161,7 +161,7 @@ class AppTestBase(test_case.TestCase):
         '/swarming/api/v1/bot/handshake',
         headers=headers,
         params=params).json
-    token = response['xsrf_token'].encode('ascii')
+    token = str(response['xsrf_token'])
     params['attributes']['version'] = response['bot_version']
     params['state'] = {
       'running_time': 1234.0,
@@ -229,28 +229,30 @@ class FrontendTest(AppTestBase):
         'id2', 'localhost:8080', '127.0.0.2', '8.8.8.8', {'foo': 'bar'},
         '123456789', False)
 
-    response = self.app.get('/restricted/bots')
-    self.assertTrue('200' in response.status)
+    response = self.app.get('/restricted/bots', status=200)
+    self.assertGreater(len(response.body), 1000)
 
-  def testDeleteMachineStats(self):
+  def test_delete_Bot(self):
     self.set_as_admin()
 
-    # Add a machine assignment to delete.
     bot_management.tag_bot_seen(
         'id1', 'localhost', '127.0.0.1', '8.8.4.4', {'foo': 'bar'}, '123456789',
         False)
+    response = self.app.get('/restricted/bots', status=200)
+    self.assertTrue('id1' in response.body)
 
-    # Delete the machine assignment.
-    response = self.app.post('/delete_machine_stats', {'r': 'id1'})
-    self.assertResponse(response, '200 OK', 'Machine Assignment removed.')
+    response = self.app.post(
+        '/restricted/bot/id1/delete',
+        params={},
+        headers={'X-XSRF-Token': self.getXsrfToken()})
+    self.assertFalse('id1' in response.body)
 
-    # Attempt to delete the assignment again and silently pass.
-    response = self.app.post('/delete_machine_stats', {'r': 'id1'})
-    self.assertResponse(response, '204 No Content', '')
+    response = self.app.get('/restricted/bots', status=200)
+    self.assertFalse('id1' in response.body)
 
-  def testMainHandler(self):
-    response = self.app.get('/')
-    self.assertEqual('200 OK', response.status)
+  def test_root(self):
+    response = self.app.get('/', status=200)
+    self.assertGreater(len(response.body), 1000)
 
   def testUploadStartSlaveHandler(self):
     self.set_as_admin()
