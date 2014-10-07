@@ -232,8 +232,6 @@ def run_command(swarming_server, index, task_details, root_dir):
       if new_data:
         stdout += new_data
         last_io = now
-      elif proc.poll() != None:
-        break
 
       # Post update if necessary.
       if should_post_update(stdout, now, last_packet):
