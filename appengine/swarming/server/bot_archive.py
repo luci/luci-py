@@ -92,7 +92,6 @@ FILES = (
     'utils/subprocess42.py',
     'utils/tools.py',
     'utils/zip_package.py',
-    'zipped_archive.py',
 )
 
 
@@ -146,6 +145,7 @@ def get_swarming_bot_version(root_dir, host, additionals):
   """
   result = hashlib.sha1()
   try:
+    # TODO(maruel): Deduplicate from zip_package.genereate_version().
     for item, content in yield_swarming_bot_files(root_dir, host, additionals):
       result.update(item)
       result.update('\x00')

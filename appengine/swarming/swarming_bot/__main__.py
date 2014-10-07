@@ -19,10 +19,10 @@ import sys
 import zipfile
 
 import logging_utils
-import zipped_archive
+from utils import zip_package
 
 # This file can only be run as a zip.
-THIS_FILE = os.path.abspath(zipped_archive.get_main_script_path())
+THIS_FILE = os.path.abspath(zip_package.get_main_script_path())
 
 
 # TODO(maruel): Use depot_tools/subcommand.py. The goal here is to have all the
@@ -43,8 +43,7 @@ def CMDstart_bot(args):
   logging_utils.prepare_logging('swarming_bot.log')
   logging_utils.set_console_level(logging.DEBUG)
   logging.info(
-      'importing bot_main: %s, %s',
-      THIS_FILE, zipped_archive.generate_version())
+      'importing bot_main: %s, %s', THIS_FILE, zip_package.generate_version())
   import bot_main
   result = bot_main.main(args)
   logging.info('bot_main exit code: %d', result)
@@ -65,8 +64,7 @@ def CMDstart_slave(args):
 
   # User provided bot_config.py
   logging.info(
-      'importing bot_config: %s, %s',
-      THIS_FILE, zipped_archive.generate_version())
+      'importing bot_config: %s, %s', THIS_FILE, zip_package.generate_version())
   import bot_config
   if not bot_config.setup_bot():
     # The code asked to not start the bot code right away. In that case, reboot
@@ -101,7 +99,7 @@ def CMDversion(_args):
   """Prints the version of this file and the hash of the code."""
   logging_utils.prepare_logging(None)
   print __version__
-  print zipped_archive.generate_version()
+  print zip_package.generate_version()
   return 0
 
 

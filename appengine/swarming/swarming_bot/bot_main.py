@@ -24,12 +24,12 @@ import zipfile
 import logging_utils
 import os_utilities
 import url_helper
-import zipped_archive
 from utils import on_error
+from utils import zip_package
 
 
 # Path to this file or the zip containing this file.
-THIS_FILE = os.path.abspath(zipped_archive.get_main_script_path())
+THIS_FILE = os.path.abspath(zip_package.get_main_script_path())
 
 # Root directory containing this file or the zip containing this file.
 ROOT_DIR = os.path.dirname(THIS_FILE)
@@ -149,9 +149,9 @@ def run_bot(remote, error):
   # and help the admin fix the swarming_bot code more quickly.
   attributes = {}
   try:
-    # If zipped_archive.generate_version() fails, we still want the server to do
+    # If zip_package.generate_version() fails, we still want the server to do
     # the /server_ping before calculating the attributes.
-    attributes['version'] = zipped_archive.generate_version()
+    attributes['version'] = zip_package.generate_version()
   except Exception as e:
     error = str(e)
 

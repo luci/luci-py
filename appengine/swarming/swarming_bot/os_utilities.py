@@ -26,9 +26,9 @@ import sys
 import time
 
 try:
-  import zipped_archive
+  from utils import zip_package
 
-  THIS_FILE = os.path.abspath(zipped_archive.get_main_script_path() or __file__)
+  THIS_FILE = os.path.abspath(zip_package.get_main_script_path() or __file__)
 except ImportError:
   THIS_FILE = os.path.abspath(__file__)
 

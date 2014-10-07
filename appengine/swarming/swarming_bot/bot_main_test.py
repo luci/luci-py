@@ -16,7 +16,7 @@ import unittest
 import bot_main
 import logging_utils
 import url_helper
-import zipped_archive
+from utils import zip_package
 
 THIS_FILE = os.path.abspath(__file__)
 BASE_DIR = os.path.dirname(THIS_FILE)
@@ -91,7 +91,7 @@ class TestSlaveMachine(net_utils.TestCase):
 
   def test_run_bot(self):
     # Test the run_bot() loop.
-    self.mock(zipped_archive, 'generate_version', lambda: '123')
+    self.mock(zip_package, 'generate_version', lambda: '123')
 
     class Foo(Exception):
       pass
