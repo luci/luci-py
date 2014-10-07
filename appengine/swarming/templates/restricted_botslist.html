@@ -89,8 +89,8 @@ Sort By:
           {{(now-bot.last_seen_ts)|timedeltaformat}}
           {% if is_admin and bot.is_dead(now) %}
             <form id="delete_{{bot.key.id()}}" method="post"
-                action="/delete_machine_stats">
-              <input type="hidden" name="r" value="{{bot.key.id()}}" />
+                action="/restricted/bot/{{bot.key.id()}}/delete">
+              <input type="hidden" name="xsrf_token" value="{{xsrf_token}}" />
               <input type="submit" value="Delete" />
             </form>
           {% endif %}

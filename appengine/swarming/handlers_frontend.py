@@ -189,6 +189,7 @@ class BotsListHandler(auth.AuthenticatingHandler):
       'num_bots_dead': num_dead_bots,
       'sort_by': sort_by,
       'sort_options': self.SORT_OPTIONS,
+      'xsrf_token': self.generate_xsrf_token(),
     }
     self.response.out.write(
         template.render('swarming/restricted_botslist.html', params))
@@ -242,12 +243,24 @@ class BotHandler(auth.AuthenticatingHandler):
       'now': now,
       'run_results': run_results,
       'run_time': run_time,
+      'xsrf_token': self.generate_xsrf_token(),
     }
     # TODO(maruel): Make the delete link redirect to /restricted/bots. It would
     # probably be preferable to not use /delete_machine_stats and create a UI
     # specialized endpoint instead.
     self.response.out.write(
         template.render('swarming/restricted_bot.html', params))
+
+
+class BotDeleteHandler(auth.AuthenticatingHandler):
+  """Deletes a known bot."""
+
+  @auth.require(acl.is_admin)
+  def post(self, bot_id):
+    bot_key = bot_management.get_bot_key(bot_id)
+    if bot_key.get():
+      bot_key.delete()
+    self.redirect('/restricted/bots')
 
 
 ### User accessible pages.
@@ -652,7 +665,8 @@ def create_application(debug):
 
       # Privileged user pages.
       ('/restricted/bots', BotsListHandler),
-      ('/restricted/bot/<bot_id:.+>', BotHandler),
+      ('/restricted/bot/<bot_id:[^/]+>', BotHandler),
+      ('/restricted/bot/<bot_id:[^/]+>/delete', BotDeleteHandler),
 
       # Admin pages.
       ('/restricted/whitelist_ip', WhitelistIPHandler),
