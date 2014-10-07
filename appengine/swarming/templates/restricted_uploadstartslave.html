@@ -2,7 +2,7 @@
 
 {% block body %}
 <form method="post" enctype="multipart/form-data" action="{{path}}">
-  Upload a new start_slave.py file:<br>
+  Upload a new bot_config.py file:<br>
   <input type="file" name="script" /><br>
   <input type="hidden" name="xsrf_token" value="{{xsrf_token}}" />
   <input type="submit" value="Upload" />

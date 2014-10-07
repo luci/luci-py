@@ -40,11 +40,11 @@ RESTART_CODE = 89
 
 
 def get_attributes():
-  """Returns start_slave.py's get_attributes() dict."""
+  """Returns bot_config.py's get_attributes() dict."""
   # Importing this administrator provided script could have side-effects on
   # startup. That is why it is imported late.
-  import start_slave
-  return start_slave.get_attributes()
+  import bot_config
+  return bot_config.get_attributes()
 
 
 def get_attributes_failsafe():
@@ -263,7 +263,7 @@ def run_manifest(remote, attributes, manifest):
         command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, cwd=ROOT_DIR)
     out = proc.communicate()[0]
 
-    # TODO(maruel): Ask start_slave.py before rebooting.
+    # TODO(maruel): Ask bot_config.py before rebooting.
     # https://code.google.com/p/swarming/issues/detail?id=159
     if proc.returncode == RESTART_CODE:
       restart_msg = 'Restarting due to task failure'

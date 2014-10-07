@@ -30,11 +30,11 @@ from support import test_case
 
 
 class BotManagementTest(test_case.TestCase):
-  def test_store_start_slave(self):
+  def test_store_bot_config(self):
     # When a new start slave script is uploaded, we should recalculate the
     # version hash since it will have changed.
     v1 = bot_management.get_slave_version('http://localhost')
-    bot_management.store_start_slave('dummy_script')
+    bot_management.store_bot_config('dummy_script')
     v2 = bot_management.get_slave_version('http://localhost')
     v3 = bot_management.get_slave_version('http://localhost:8080')
     self.assertNotEqual(v1, v2)

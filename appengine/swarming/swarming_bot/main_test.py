@@ -25,10 +25,10 @@ from server import bot_archive
 
 class MainTest(auto_stub.TestCase):
   def setUp(self):
-    with open(os.path.join(BOT_DIR, 'start_slave.py'), 'rb') as f:
-      start_slave_content = f.read()
+    with open(os.path.join(BOT_DIR, 'bot_config.py'), 'rb') as f:
+      bot_config_content = f.read()
     zip_content = bot_archive.get_swarming_bot_zip(
-        BOT_DIR, 'http://localhost', {'start_slave.py': start_slave_content})
+        BOT_DIR, 'http://localhost', {'bot_config.py': bot_config_content})
     self.tmpdir = tempfile.mkdtemp(prefix='main')
     self.zip_file = os.path.join(self.tmpdir, 'swarming_bot.zip')
     with open(self.zip_file, 'wb') as f:

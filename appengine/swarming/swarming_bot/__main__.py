@@ -2,7 +2,7 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
-"""Runs either task_runner.py, bot_main.py or start_slave.py.
+"""Runs either task_runner.py, bot_main.py or bot_config.py.
 
 The imports are done late so if an ImportError occurs, it is localized to this
 command only.
@@ -52,22 +52,23 @@ def CMDstart_bot(args):
 
 
 def CMDstart_slave(args):
-  """Ill named command that actually sets up the bot."""
-  logging_utils.prepare_logging('start_slave.log')
+  """Ill named command that actually sets up the bot then start it."""
+  # TODO(maruel): Rename function.
+  logging_utils.prepare_logging('bot_config.log')
   logging_utils.set_console_level(logging.DEBUG)
 
   parser = optparse.OptionParser()
   parser.add_option(
       '--survive', action='store_true',
-      help='Do not reboot the host even if start_slave.setup_bot() asked to')
+      help='Do not reboot the host even if bot_config.setup_bot() asked to')
   options, args = parser.parse_args(args)
 
-  # User provided start_slave.py
+  # User provided bot_config.py
   logging.info(
-      'importing start_slave: %s, %s',
+      'importing bot_config: %s, %s',
       THIS_FILE, zipped_archive.generate_version())
-  import start_slave
-  if not start_slave.setup_bot():
+  import bot_config
+  if not bot_config.setup_bot():
     # The code asked to not start the bot code right away. In that case, reboot
     # the machine, unless a flag stated to not do it. The flag is provided when
     # the bot code is updated in place. In that case it is unnecessary to

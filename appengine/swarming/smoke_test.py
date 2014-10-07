@@ -38,12 +38,12 @@ VERBOSE = False
 
 def setup_bot(swarming_bot_dir, host):
   """Setups the slave code in a temporary directory so it can be modified."""
-  with open(os.path.join(BOT_DIR, 'start_slave.py'), 'rb') as f:
-    start_slave_content = f.read()
+  with open(os.path.join(BOT_DIR, 'bot_config.py'), 'rb') as f:
+    bot_config_content = f.read()
 
   # Creates a functional but invalid swarming_bot.zip.
   zip_content = bot_archive.get_swarming_bot_zip(
-      BOT_DIR, host, {'start_slave.py': start_slave_content, 'invalid': 'foo'})
+      BOT_DIR, host, {'bot_config.py': bot_config_content, 'invalid': 'foo'})
 
   swarming_bot_zip = os.path.join(swarming_bot_dir, 'swarming_bot.zip')
   with open(swarming_bot_zip, 'wb') as f:
@@ -59,7 +59,7 @@ def start_bot(cwd, log_dir):
     os.path.join(cwd, 'swarming_bot.zip'),
     'start_slave',
   ]
-  with open(os.path.join(log_dir, 'start_slave_stdout.log'), 'wb') as f:
+  with open(os.path.join(log_dir, 'bot_config_stdout.log'), 'wb') as f:
     f.write('Running: %s\n' % cmd)
     f.flush()
     return subprocess.Popen(
@@ -176,7 +176,7 @@ class SwarmingTestCase(unittest.TestCase):
       super(SwarmingTestCase, self).tearDown()
 
   def finish_setup(self):
-    """Uploads start_slave.py and starts a bot.
+    """Uploads bot_config.py and starts a bot.
 
     Should be called from test_* method (not from setUp), since if setUp fails
     tearDown is not getting called (and finish_setup can fail because it uses
@@ -185,14 +185,14 @@ class SwarmingTestCase(unittest.TestCase):
     self.client.login_as_admin('smoke-test@example.com')
     self.client.url_opener.addheaders.append(
         ('X-XSRF-Token', self._server.client.xsrf_token))
-    with open(os.path.join(BOT_DIR, 'start_slave.py'), 'rb') as f:
-      start_slave_content = f.read() + '\n'
+    with open(os.path.join(BOT_DIR, 'bot_config.py'), 'rb') as f:
+      bot_config_content = f.read() + '\n'
     self._bot_proc = start_bot(self.swarming_bot_dir, self.log_dir)
 
     # This will likely restart the bot.
     res = self.client.request(
-        '/restricted/upload_start_slave',
-        body=urllib.urlencode({'script': start_slave_content}))
+        '/restricted/upload/bot_config',
+        body=urllib.urlencode({'script': bot_config_content}))
     self.assertTrue(res)
 
   def has_failed(self):

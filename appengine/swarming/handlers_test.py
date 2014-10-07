@@ -255,9 +255,9 @@ class FrontendTest(AppTestBase):
   def testUploadStartSlaveHandler(self):
     self.set_as_admin()
     xsrf_token = self.getXsrfToken()
-    response = self.app.get('/restricted/upload_start_slave')
+    response = self.app.get('/restricted/upload/bot_config')
     response = self.app.post(
-        '/restricted/upload_start_slave?xsrf_token=%s' % xsrf_token,
+        '/restricted/upload/bot_config?xsrf_token=%s' % xsrf_token,
         expect_errors=True)
     self.assertResponse(
         response, '400 Bad Request',
@@ -266,7 +266,7 @@ class FrontendTest(AppTestBase):
         '  ')
 
     response = self.app.post(
-        '/restricted/upload_start_slave?xsrf_token=%s' % xsrf_token,
+        '/restricted/upload/bot_config?xsrf_token=%s' % xsrf_token,
         upload_files=[('script', 'script', 'script_body')])
     self.assertIn('script_body', response.body)
 
@@ -427,12 +427,12 @@ class FrontendTest(AppTestBase):
   def test_bootstrap_custom(self):
     # Act under admin identity.
     self.set_as_admin()
-    self.app.get('/restricted/upload_bootstrap')
+    self.app.get('/restricted/upload/bootstrap')
     data = {
       'script': 'script_body',
       'xsrf_token': self.getXsrfToken(),
     }
-    r = self.app.post('/restricted/upload_bootstrap', data)
+    r = self.app.post('/restricted/upload/bootstrap', data)
     self.assertIn('script_body', r.body)
 
     actual = self.app.get('/bootstrap').body

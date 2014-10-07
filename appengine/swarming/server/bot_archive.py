@@ -119,7 +119,7 @@ def get_swarming_bot_zip(root_dir, host, additionals):
     root_dir: directory swarming_bot.
     additionals: dict(filepath: content) of additional items to put into the zip
         file, in addition to FILES and MAPPED. In practice, it's going to be a
-        custom start_slave.py.
+        custom bot_config.py.
   Returns:
     A string representing the zipped file's contents.
   """
@@ -175,8 +175,8 @@ def main():
   swarming_bot_dir = os.path.join(ROOT_DIR, 'swarming_bot')
 
   zip_file = os.path.join(ROOT_DIR, 'swarming_bot.zip')
-  with open(os.path.join(swarming_bot_dir, 'start_slave.py'), 'rb') as f:
-    additionals = {'start_slave.py': f.read()}
+  with open(os.path.join(swarming_bot_dir, 'bot_config.py'), 'rb') as f:
+    additionals = {'bot_config.py': f.read()}
   with open(zip_file, 'wb') as f:
     f.write(
         get_swarming_bot_zip(swarming_bot_dir, config['server'], additionals))

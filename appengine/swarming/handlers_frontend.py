@@ -47,13 +47,13 @@ SortOptions = collections.namedtuple('SortOptions', ['key', 'name'])
 # TODO(maruel): Sort the handlers once they got their final name.
 
 
-class UploadStartSlaveHandler(auth.AuthenticatingHandler):
-  """Accept a new start slave script."""
+class UploadBotConfigHandler(auth.AuthenticatingHandler):
+  """Stores a new bot_config.py script."""
 
   @auth.require(acl.is_admin)
   def get(self):
     params = {
-      'content': bot_management.get_start_slave(),
+      'content': bot_management.get_bot_config(),
       'path': self.request.path,
       'xsrf_token': self.generate_xsrf_token(),
     }
@@ -66,11 +66,13 @@ class UploadStartSlaveHandler(auth.AuthenticatingHandler):
     if not script:
       self.abort(400, 'No script uploaded')
 
-    bot_management.store_start_slave(script.encode('utf-8', 'replace'))
+    bot_management.store_bot_config(script.encode('utf-8', 'replace'))
     self.get()
 
 
 class UploadBootstrapHandler(auth.AuthenticatingHandler):
+  """Stores a new bootstrap.py script."""
+
   @auth.require(acl.is_admin)
   def get(self):
     params = {
@@ -670,8 +672,8 @@ def create_application(debug):
 
       # Admin pages.
       ('/restricted/whitelist_ip', WhitelistIPHandler),
-      ('/restricted/upload_start_slave', UploadStartSlaveHandler),
-      ('/restricted/upload_bootstrap', UploadBootstrapHandler),
+      ('/restricted/upload/bot_config', UploadBotConfigHandler),
+      ('/restricted/upload/bootstrap', UploadBootstrapHandler),
 
       # The new APIs:
       ('/swarming/api/v1/stats/summary/<resolution:[a-z]+>',

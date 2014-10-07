@@ -1,10 +1,14 @@
-Swarming Server bot code
-========================
+Swarming bot code
+=================
 
 Contains the code to run on the bots. This code has to be resilient enough to be
-able to self-update in case of partial destruction. The user provided
-start_slave.py should also actively try to self-register itself on startup if
-desired.
+able to self-update in case of partial destruction.
+
+The server optionally has its own bot_config.py that will replace the file in
+this directory. This script provides domain specific dimensions and should
+self-register the bot on startup if desired.
+
+The server replaces config.json with server-specific details.
 
 
 Behavior

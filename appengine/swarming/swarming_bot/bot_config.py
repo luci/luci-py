@@ -2,10 +2,14 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
-"""Returns a swarming bot dimensions and setups automatic startup if needed.
+"""This file is meant to be overriden by the server's specific copy.
 
-This file is uploaded the swarming server so the swarming bots can declare their
-dimensions and startup method easily.
+It implements:
+- get_attributes() to return the bot's attributes. It's useful to create
+  particular dimensions.
+- setup_bot() to be called on startup to ensure the bot is in a known state.
+  It's the perfect time to setup automatic startup if needed.
+- get_state() to return the bot's state at each poll.
 """
 
 import os_utilities
@@ -14,8 +18,8 @@ import os_utilities
 def get_attributes():
   """Returns the attributes for this bot."""
   # The bot id will be automatically selected based on the hostname. If you want
-  # something more special, specify it in your start_slave.py. You can upload a
-  # new version via /restricted/upload_start_slave.
+  # something more special, specify it in your bot_config.py. You can upload a
+  # new version via /restricted/upload/bot_config.
   return os_utilities.get_attributes(None)
 
 
