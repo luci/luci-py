@@ -1,14 +1,16 @@
 {% macro bot_dimensions(bot) %}
-  {% if bot %}{{ render_dimensions(bot.dimensions) }}{% endif %}
+  {% if bot %}{{ render_dict(bot.dimensions) }}{% endif %}
 {% endmacro %}
 
-{% macro render_dimensions(dimensions) %}
-  {% for k, v in dimensions.iteritems()|sort %}
+{% macro render_dict(data) %}
+  {% for k, v in data.iteritems()|sort %}
   <strong>{{k}}</strong>:
   {% if v is string %}
     {{v}}
-  {% else %}
+  {% elif v is sequence %}
     {{v|sort|join(' | ')}}
+  {% else %}
+    {{v}}
   {% endif %}
   <br>
   {% endfor %}

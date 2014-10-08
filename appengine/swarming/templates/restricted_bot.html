@@ -78,7 +78,11 @@
       </tr>
       <tr>
         <td>Dimensions</td>
-        <td>{{bot_view.render_dimensions(bot.dimensions)}}</td>
+        <td>{{bot_view.bot_dimensions(bot)}}</td>
+      </tr>
+      <tr>
+        <td>State</td>
+        <td>{{bot_view.render_dict(bot.state)}}</td>
       </tr>
       <tr>
         <td>Version</td>

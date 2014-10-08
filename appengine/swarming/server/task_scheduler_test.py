@@ -148,7 +148,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
     }
     bot_management.tag_bot_seen(
         'localhost', 'hostname', 'internal_ip', 'external_ip', bot_dimensions,
-        'version', True)
+        'version', True, {})
     actual_request, run_result  = task_scheduler.bot_reap_task(
         bot_dimensions, 'localhost', 'abc')
     self.assertEqual(None, actual_request)
@@ -158,6 +158,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
     self.mock(
         task_scheduler.random, 'random',
         lambda: task_scheduler._PROBABILITY_OF_QUICK_COMEBACK)
+    self.mock(utils, 'is_canary', lambda: False)
     data = [
       (0, 2),
       (1, 2),

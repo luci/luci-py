@@ -77,8 +77,6 @@ def convert_test_case(data):
 
 def log_unexpected_keys(expected_keys, actual_keys, request, source, name):
   """Logs an error if unexpected keys are present or expected keys are missing.
-
-  This is important to catch typos.
   """
   return log_unexpected_subset_keys(
       expected_keys, expected_keys, actual_keys, request, source, name)
@@ -86,7 +84,12 @@ def log_unexpected_keys(expected_keys, actual_keys, request, source, name):
 
 def log_unexpected_subset_keys(
     expected_keys, minimum_keys, actual_keys, request, source, name):
-  """Logs an error if expected keys are not present."""
+  """Logs an error if unexpected keys are present or expected keys are missing.
+
+  Accepts optional keys.
+
+  This is important to catch typos.
+  """
   actual_keys = frozenset(actual_keys)
   superfluous = actual_keys - expected_keys
   missing = minimum_keys - actual_keys
@@ -96,6 +99,23 @@ def log_unexpected_subset_keys(
         (' superfluous: %s' % sorted(superfluous)) if superfluous else '')
     message = 'Unexpected %s%s%s; did you make a typo?' % (
         name, msg_missing, msg_superfluous)
+    ereporter2.log_request(
+        request,
+        source=source,
+        message=message)
+    return message
+
+
+def log_missing_keys(minimum_keys, actual_keys, request, source, name):
+  """Logs an error if expected keys are not present.
+
+  Do not warn about unexpected keys.
+  """
+  actual_keys = frozenset(actual_keys)
+  missing = minimum_keys - actual_keys
+  if missing:
+    msg_missing = (' missing: %s' % sorted(missing)) if missing else ''
+    message = 'Unexpected %s%s; did you make a typo?' % (name, msg_missing)
     ereporter2.log_request(
         request,
         source=source,
@@ -598,6 +618,7 @@ class BotHandshakeHandler(auth.ApiHandler):
     bot_id = attributes.get('id')
     dimensions = attributes.get('dimensions', {})
     quarantined = attributes.get('quarantined', False)
+    state = request.get('state', {})
     if bot_id:
       bot_management.tag_bot_seen(
           bot_id,
@@ -606,7 +627,8 @@ class BotHandshakeHandler(auth.ApiHandler):
           self.request.remote_addr,
           dimensions,
           attributes['version'],
-          quarantined)
+          quarantined,
+          state)
     # Let it live even if bot_id is not set, so the bot has a chance to
     # self-update. It won't be assigned any task anyway.
     data = {
@@ -631,8 +653,6 @@ class BotPollHandler(auth.ApiHandler):
   ACCEPTED_ATTRIBUTES = frozenset(
       [u'dimensions', u'id', u'ip', u'quarantined', u'version'])
   REQUIRED_ATTRIBUTES = frozenset([u'dimensions', u'id', u'ip', u'version'])
-  ACCEPTED_STATE_KEYS = frozenset(
-      [u'running_time', u'sleep_streak', u'started_ts'])
   REQUIRED_STATE_KEYS = frozenset([u'running_time', u'sleep_streak'])
 
   @auth.require(acl.is_bot)
@@ -648,9 +668,8 @@ class BotPollHandler(auth.ApiHandler):
         self.request, 'bot', 'attributes')
 
     state = request.get('state', {})
-    log_unexpected_subset_keys(
-        self.ACCEPTED_STATE_KEYS, self.REQUIRED_STATE_KEYS, state,
-        self.request, 'bot', 'state')
+    log_missing_keys(
+        self.REQUIRED_STATE_KEYS, state, self.request, 'bot', 'state')
 
     # Be very permissive on missing values. This can happen because of errors on
     # the bot, *we don't want to deny them the capacity to update*, so that the
@@ -670,6 +689,9 @@ class BotPollHandler(auth.ApiHandler):
     if attributes.get('version') != expected_version:
       self._cmd_update(expected_version)
       return
+
+    # At that point, the bot should be in relatively good shape since it's
+    # running the right version.
 
     sleep_streak = state['sleep_streak']
     if not bot_id:
@@ -703,7 +725,8 @@ class BotPollHandler(auth.ApiHandler):
         self.request.remote_addr,
         dimensions,
         attributes['version'],
-        quarantined)
+        quarantined,
+        state)
 
     if quarantined:
       self._cmd_sleep(sleep_streak, quarantined)
@@ -802,7 +825,8 @@ class BotErrorHandler(auth.ApiHandler):
           self.request.remote_addr,
           None,
           None,
-          True)
+          True,
+          None)
     else:
       bot.quarantined = True
       bot.put()

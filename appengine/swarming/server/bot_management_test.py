@@ -79,7 +79,7 @@ class BotManagementTest(test_case.TestCase):
     self.mock_now(now)
     bot = bot_management.tag_bot_seen(
         'id1', 'localhost', '127.0.0.1', '8.8.4.4', {'foo': 'bar'},
-        hashlib.sha1().hexdigest(), False)
+        hashlib.sha1().hexdigest(), False, {'ram': 65})
     bot.put()
     expected = {
       'created_ts': now,
@@ -90,6 +90,7 @@ class BotManagementTest(test_case.TestCase):
       'internal_ip': u'127.0.0.1',
       'last_seen_ts': now,
       'quarantined': False,
+      'state': {u'ram': 65},
       'task': None,
       'version': u'da39a3ee5e6b4b0d3255bfef95601890afd80709',
     }

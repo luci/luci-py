@@ -95,7 +95,7 @@ Sort By:
             </form>
           {% endif %}
         </td>
-        <td>{{bot_view.render_dimensions(bot.dimensions)}}</td>
+        <td>{{bot_view.bot_dimensions(bot)}}</td>
         <td>{{bot.version[:8]}}</td>
       </tr>
     {% endfor %}

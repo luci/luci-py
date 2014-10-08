@@ -223,11 +223,18 @@ class FrontendTest(AppTestBase):
     self.set_as_admin()
 
     # Add bots to display.
+    state = {
+      'dict': {'random': 'values'},
+      'float': 0.,
+      'list': ['of', 'things'],
+      'str': u'uni',
+    }
     bot_management.tag_bot_seen(
-        'id1', 'localhost', '127.0.0.1', '8.8.4.4', {}, '123456789', False)
+        'id1', 'localhost', '127.0.0.1', '8.8.4.4', {}, '123456789', False,
+        state)
     bot_management.tag_bot_seen(
         'id2', 'localhost:8080', '127.0.0.2', '8.8.8.8', {'foo': 'bar'},
-        '123456789', False)
+        '123456789', False, {'ram': 65})
 
     response = self.app.get('/restricted/bots', status=200)
     self.assertGreater(len(response.body), 1000)
@@ -237,7 +244,7 @@ class FrontendTest(AppTestBase):
 
     bot_management.tag_bot_seen(
         'id1', 'localhost', '127.0.0.1', '8.8.4.4', {'foo': 'bar'}, '123456789',
-        False)
+        False, {'ram': 65})
     response = self.app.get('/restricted/bots', status=200)
     self.assertTrue('id1' in response.body)
 

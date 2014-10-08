@@ -58,7 +58,11 @@ class Bot(ndb.Model):
   acting as a bot. So while the id must be unique, the hostname doesn't have
   to be.
   """
+  # Dimensions are normally static throughout the lifetime of a bot.
   dimensions = datastore_utils.DeterministicJsonProperty(json_type=dict)
+
+  # State is normally changing during the lifetime of a bot.
+  state = datastore_utils.DeterministicJsonProperty(json_type=dict)
 
   # FQDN on which this bot is running on.
   hostname = ndb.StringProperty()
@@ -211,7 +215,7 @@ def get_bot_key(bot_id):
 
 def tag_bot_seen(
     bot_id, hostname, internal_ip, external_ip, dimensions, version,
-    quarantined):
+    quarantined, state):
   """Records when a bot has queried for work.
 
   Arguments:
@@ -225,6 +229,7 @@ def tag_bot_seen(
         promptly.
   - quarantined: bool to signal if the bot should be exempted from running
         tasks. That's set when the bot itself signals it should be quarantined.
+  - state: ephemeral state of the bot. It is expected to change constantly.
   """
   # The primary reason for the write is to update .last_seen_ts.
   bot = Bot(
@@ -234,7 +239,8 @@ def tag_bot_seen(
       internal_ip=internal_ip,
       external_ip=external_ip,
       version=version,
-      quarantined=quarantined)
+      quarantined=quarantined,
+      state=state)
   bot.put()
   return bot
 

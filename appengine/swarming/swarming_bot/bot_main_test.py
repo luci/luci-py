@@ -15,6 +15,7 @@ import unittest
 # Import them first before manipulating sys.path to ensure they can load fine.
 import bot_main
 import logging_utils
+import os_utilities
 import xsrf_client
 from utils import net
 from utils import zip_package
@@ -58,6 +59,8 @@ class TestBotMain(net_utils.TestCase):
   def test_get_current_state(self):
     self.mock(time, 'time', lambda: 123.0)
     expected = {
+      'disk': os_utilities.get_free_disk(),
+      'ram': os_utilities.get_physical_ram(),
       'running_time': 12.0,
       'sleep_streak': 123,
       'started_ts': 111.0,

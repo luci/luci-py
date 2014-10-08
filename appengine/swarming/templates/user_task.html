@@ -91,7 +91,7 @@
     </tr>
     <tr>
       <td>Request dimensions</td>
-      <td>{{bot_view.render_dimensions(request.properties.dimensions)}}</td>
+      <td>{{bot_view.render_dict(request.properties.dimensions)}}</td>
     </tr>
     <tr>
       <td>Execution timeout (s)</td>
@@ -103,7 +103,7 @@
     </tr>
     <tr>
       <td>Environment variables</td>
-      <td>{{bot_view.render_dimensions(request.properties.env)}}</td>
+      <td>{{bot_view.render_dict(request.properties.env)}}</td>
     </tr>
     <tr>
       <td>Commands</td>

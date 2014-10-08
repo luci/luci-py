@@ -414,7 +414,8 @@ def get_num_processors():
 
 
 def get_physical_ram():
-  """Returns the amount of installed RAM, rounded to the nearest number."""
+  """Returns the amount of installed RAM in Mb, rounded to the nearest number.
+  """
   if sys.platform == 'win32':
     # https://msdn.microsoft.com/library/windows/desktop/aa366589.aspx
     class MemoryStatusEx(ctypes.Structure):
@@ -432,7 +433,7 @@ def get_physical_ram():
     stat = MemoryStatusEx()
     stat.dwLength = ctypes.sizeof(MemoryStatusEx)  # pylint: disable=W0201
     ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(stat))
-    return int(round(stat.dwTotalPhys / 1024. / 1024. / 1024.))
+    return int(round(stat.dwTotalPhys / 1024. / 1024.))
 
   if sys.platform == 'darwin':
     CTL_HW = 6
@@ -447,16 +448,15 @@ def get_physical_ram():
     libc.sysctl(
         arr, 2, ctypes.byref(result), ctypes.byref(size), None,
         ctypes.c_size_t(0))
-    return int(round(result.value / 1024. / 1024. / 1024.))
+    return int(round(result.value / 1024. / 1024.))
 
   if os.path.isfile('/proc/meminfo'):
     # linux.
     meminfo = _safe_read('/proc/meminfo') or ''
     matched = re.search(r'MemTotal:\s+(\d+) kB', meminfo)
     if matched:
-      mb = int(matched.groups()[0]) / 1024. / 1024.
+      mb = int(matched.groups()[0]) / 1024.
       if 0. < mb < 1.:
-        # TODO(maruel): Mb is too coarse (e.g. raspberry pi), report as kb.
         return 1
       return int(round(mb))
 
@@ -465,16 +465,15 @@ def get_physical_ram():
 
 
 def get_free_disk():
-  """Gets free disk space in the partition containing the current file in GB."""
+  """Gets free disk space in the partition containing the current file in Mb."""
   if sys.platform == 'win32':
     free_bytes = ctypes.c_ulonglong(0)
     ctypes.windll.kernel32.GetDiskFreeSpaceExW(
         ctypes.c_wchar_p(ROOT_DIR), None, None, ctypes.pointer(free_bytes))
-    return int(round(free_bytes.value / 1024. / 1024. / 1024.))
+    return int(round(free_bytes.value / 1024. / 1024.))
 
-  # For OSes other than Windows.
   f = os.statvfs(ROOT_DIR)  # pylint: disable=E1101
-  return int(round(f.f_bfree * f.f_frsize / 1024. / 1024. / 1024.))
+  return int(round(f.f_bfree * f.f_frsize / 1024. / 1024.))
 
 
 def get_gpu():

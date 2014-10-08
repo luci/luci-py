@@ -214,7 +214,10 @@ def exponential_backoff(attempt_num):
   if random.random() < _PROBABILITY_OF_QUICK_COMEBACK:
     # Randomly ask the bot to return quickly.
     return 1.0
-  return min(60.0, math.pow(1.5, min(attempt_num, 10) + 1))
+
+  # Enforces more frequent polls on canary.
+  max_wait = 3. if utils.is_canary() else 60.
+  return min(max_wait, math.pow(1.5, min(attempt_num, 10) + 1))
 
 
 def make_request(data):

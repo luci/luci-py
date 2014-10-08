@@ -1152,7 +1152,7 @@ class NewClientApiTest(AppTestBase):
     self.mock_now(now)
     bot = bot_management.tag_bot_seen(
         'id1', 'localhost', '127.0.0.1', '8.8.4.4', {'foo': 'bar'}, '123456789',
-        False)
+        False, {'ram': 65})
     bot.put()
 
     actual = self.app.get('/swarming/api/v1/client/bots', status=200).json
@@ -1168,6 +1168,7 @@ class NewClientApiTest(AppTestBase):
           u'is_dead': False,
           u'last_seen_ts': u'2000-01-02 03:04:05',
           u'quarantined': False,
+          u'state': {u'ram': 65},
           u'task': None,
           u'version': u'123456789',
         },
@@ -1187,7 +1188,7 @@ class NewClientApiTest(AppTestBase):
 
     bot = bot_management.tag_bot_seen(
         'id2', 'localhost', '127.0.0.1', '8.8.4.4', {'foo': 'bar'}, '123456789',
-        False)
+        False,  {u'ram': 65})
     bot.put()
 
     actual = self.app.get(
@@ -1210,7 +1211,7 @@ class NewClientApiTest(AppTestBase):
     self.mock_now(now)
     bot = bot_management.tag_bot_seen(
         'id1', 'localhost', '127.0.0.1', '8.8.4.4', {'foo': 'bar'}, '123456789',
-        False)
+        False, {'ram': 65})
     bot.put()
 
     actual = self.app.get('/swarming/api/v1/client/bot/id1', status=200).json
@@ -1224,6 +1225,7 @@ class NewClientApiTest(AppTestBase):
       u'is_dead': False,
       u'last_seen_ts': u'2000-01-02 03:04:05',
       u'quarantined': False,
+      u'state': {u'ram': 65},
       u'task': None,
       u'version': u'123456789',
     }
@@ -1233,9 +1235,15 @@ class NewClientApiTest(AppTestBase):
     self.set_as_admin()
     now = datetime.datetime(2000, 1, 2, 3, 4, 5, 6)
     self.mock_now(now)
+    state = {
+      'dict': {'random': 'values'},
+      'float': 0.,
+      'list': ['of', 'things'],
+      'str': u'uni',
+    }
     bot = bot_management.tag_bot_seen(
         'id1', 'localhost', '127.0.0.1', '8.8.4.4', {'foo': 'bar'}, '123456789',
-        False)
+        False, state)
     bot.put()
 
     token = self.getXsrfToken()

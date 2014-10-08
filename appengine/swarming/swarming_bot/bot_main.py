@@ -81,9 +81,11 @@ def get_current_state(started_ts, sleep_streak):
     sleep_streak: number of consecutive sleeps up till now.
   """
   # TODO(vadimsh): Send also results of 'uptime' command? Maybe also current
-  # amount of RAM, open file descriptors, processes or any other leaky
-  # resources. So that the server can decided to reboot the bot to clean up.
+  # open file descriptors, processes or any other leaky resources. So that the
+  # server can decided to reboot the bot to clean up.
   return {
+    'disk': os_utilities.get_free_disk(),
+    'ram': os_utilities.get_physical_ram(),
     'running_time': time.time() - started_ts,
     'sleep_streak': sleep_streak,
     'started_ts': started_ts,
