@@ -33,6 +33,7 @@ __all__ = [
   'AuthorizationError',
   'disable_process_cache',
   'Error',
+  'fetch_allowed_client_ids',
   'get_current_identity',
   'get_process_cache_expiration_sec',
   'get_secret',
@@ -254,6 +255,24 @@ class AuthDB(object):
         self.global_config.oauth_additional_client_ids)
 
 
+def fetch_allowed_client_ids():
+  """Fetches a list of OAuth client IDs from the datastore.
+
+  May be used to initialize 'allowed_client_ids' field of @endpoints.api
+  decorator. Changes to this list list would require GAE instance restart
+  to take effect. Still it is better than hardcoding them into the source code.
+  """
+  global_config = model.ROOT_KEY.get()
+  if not global_config:
+    return []
+  allowed = set()
+  if global_config.oauth_client_id:
+    allowed.add(global_config.oauth_client_id)
+  if global_config.oauth_additional_client_ids:
+    allowed.update(global_config.oauth_additional_client_ids)
+  return list(allowed)
+
+
 class RequestCache(object):
   """Holds authentication related information for the current request.
 
@@ -264,8 +283,8 @@ class RequestCache(object):
   """
 
   def __init__(self):
-    self.current_identity = None
     self.auth_db = None
+    self.current_identity = None
 
   def set_current_identity(self, current_identity):
     """Called early during request processing to set identity for a request."""
@@ -274,8 +293,8 @@ class RequestCache(object):
 
   def close(self):
     """Helps GC to collect garbage faster."""
-    self.current_identity = None
     self.auth_db = None
+    self.current_identity = None
 
 
 def disable_process_cache():

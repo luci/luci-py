@@ -39,7 +39,7 @@ def CommonChecks(input_api, output_api):
     # Add GAE SDK modules to sys.path.
     sys.path = [gae_sdk_path] + sys.path
     import appcfg
-    appcfg.fix_sys_path()
+    appcfg.fix_sys_path(appcfg.ENDPOINTSCFG_EXTRA_PATHS)
     # Add project specific paths to sys.path
     sys.path = [
       join('components', 'third_party'),

@@ -69,7 +69,7 @@ class AuthenticatingHandlerMetaclass(type):
 
 
 class AuthenticatingHandler(webapp2.RequestHandler):
-  """Base class for request handlers that use Auth system.
+  """Base class for webapp2 request handlers that use Auth system.
 
   Knows how to extract Identity from request data and how to initialize auth
   request context, so that get_current_identity() and is_group_member() work.
@@ -291,7 +291,7 @@ def get_authenticated_routes(app):
 
 
 ################################################################################
-## Concrete implementations of authentication methods.
+## Concrete implementations of authentication methods for webapp2 handlers.
 
 
 def cookie_authentication(_request):

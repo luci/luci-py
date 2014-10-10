@@ -11,6 +11,11 @@ export a portion of public API by specifying exported symbols in its __all__.
 # Pylint doesn't like relative wildcard imports.
 # pylint: disable=W0401,W0403
 
+try:
+  import endpoints
+except ImportError:
+  endpoints = None
+
 # Auth component is using google.protobuf package, it requires some python
 # package magic hacking.
 from components import utils
@@ -22,6 +27,11 @@ from model import *
 from signature import *
 from tokens import *
 from ui.app import *
+
+# Endpoints support is optional, enabled only when endpoints library is
+# specified in app.yaml.
+if endpoints:
+  from endpoints_support import *
 
 # Import 'config' to register lib_config hook.
 import config
