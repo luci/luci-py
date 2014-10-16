@@ -45,12 +45,11 @@ MAX_PACKET_INTERVAL = 30
 MIN_PACKET_INTERNAL = 10
 
 
-# Exit code used to restart the host. Keep in sync with bot_main.py. The reason
-# for its existance is that if an exception occurs, task_runner's exit code will
-# be 1. If the process is killed, it'll likely be -9. In these cases, we want
-# the task to be marked as error. But if task_runner wants to reboot without
-# marking the task as an internal failure, a special code must be used.
-RESTART_CODE = 89
+# Exit code used to indicate the task failed. Keep in sync with bot_main.py. The
+# reason for its existance is that if an exception occurs, task_runner's exit
+# code will be 1. If the process is killed, it'll likely be -9. In these cases,
+# we want the task to be marked as internal_failure, not as a failure.
+TASK_FAILED = 89
 
 
 def download_data(root_dir, files):
@@ -291,6 +290,5 @@ def main(args):
 
   remote = xsrf_client.XsrfRemote(options.swarming_server)
   if not load_and_run(options.request_file_name, remote):
-    # This means it's time for the bot to reboot but it's not task_error worthy.
-    return RESTART_CODE
+    return TASK_FAILED
   return 0

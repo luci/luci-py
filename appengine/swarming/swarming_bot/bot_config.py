@@ -7,9 +7,11 @@
 It implements:
 - get_attributes() to return the bot's attributes. It's useful to create
   particular dimensions.
+- on_after_task() is a hook called after each task.
 - setup_bot() to be called on startup to ensure the bot is in a known state.
   It's the perfect time to setup automatic startup if needed.
-- get_state() to return the bot's state at each poll.
+
+The (new) functions are provided a bot.Bot instance.
 """
 
 import os_utilities
@@ -33,3 +35,22 @@ def setup_bot():
   os_utilities.set_auto_startup_win() or os_utilities.set_auto_startup_osx().
   """
   return True
+
+
+def on_after_task(bot, failure, internal_failure):
+  """Hook function to be called after running a task.
+
+  It is an excellent place to do post-task cleanup of temporary files.
+
+  The default implementation restarts after a task failure or an internal
+  failure.
+
+  Arguments:
+  - bot: bot.Bot instance.
+  - failure: bool, True if the task failed.
+  - internal_failure: bool, True if an internal failure happened.
+  """
+  if failure:
+    bot.restart('Task failure')
+  elif internal_failure:
+    bot.restart('Internal failure')

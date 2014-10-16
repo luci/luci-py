@@ -2,7 +2,7 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
-"""Swarming bot.
+"""Swarming bot main process.
 
 This is the program that communicates with the Swarming server, ensures the code
 is always up to date and executes a child process to run tasks and upload
@@ -21,6 +21,7 @@ import time
 import zipfile
 
 # pylint: disable-msg=W0403
+import bot
 import logging_utils
 import os_utilities
 import xsrf_client
@@ -37,7 +38,7 @@ ROOT_DIR = os.path.dirname(THIS_FILE)
 
 
 # See task_runner.py for documentation.
-RESTART_CODE = 89
+TASK_FAILED = 89
 
 
 def get_attributes():
@@ -92,23 +93,13 @@ def get_current_state(started_ts, sleep_streak):
   }
 
 
-def post_error(remote, attributes, error):
-  """Posts given string as a failure.
-
-  This is used in case of internal code error, and this causes the bot to become
-  quarantined. https://code.google.com/p/swarming/issues/detail?id=115
-
-  Arguments:
-    remote: An XrsfRemote instance.
-    attributes: This bot's attributes.
-    error: String representing the problem.
-  """
-  logging.error('Error: %s\n%s', attributes, error)
-  data = {
-    'id': attributes['id'],
-    'message': error,
-  }
-  return remote.url_read_json('/swarming/api/v1/bot/error', data=data)
+def on_after_task(botobj, failure, internal_failure):
+  """Hook function called after a task."""
+  try:
+    import bot_config
+    return bot_config.on_after_task(botobj, failure, internal_failure)
+  except Exception as e:
+    logging.exception('Failed to call hook on_after_task(): %s', e)
 
 
 def post_error_task(remote, attributes, error, task_id):
@@ -178,29 +169,30 @@ def run_bot(remote, error):
 
   logging.info('Attributes: %s', attributes)
 
-  if error:
-    post_error(remote, attributes, 'Startup failure: %s' % error)
-
-  # Handshake to get an XSRF token.
+  # Handshake to get an XSRF token even if there were errors.
   remote.xsrf_request_params = {'attributes': attributes.copy()}
   remote.refresh_token()
+
+  botobj = bot.Bot(remote, attributes)
+  if error:
+    botobj.post_error('Startup failure: %s' % error)
 
   started_ts = time.time()
   consecutive_sleeps = 0
   while True:
     try:
-      did_something = poll_server(
-          remote, attributes, get_current_state(started_ts, consecutive_sleeps))
+      state = get_current_state(started_ts, consecutive_sleeps)
+      did_something = poll_server(botobj, remote, attributes, state)
       if did_something:
         consecutive_sleeps = 0
       else:
         consecutive_sleeps += 1
     except Exception as e:
-      post_error(remote, attributes, str(e))
+      botobj.post_error(str(e))
       consecutive_sleeps = 0
 
 
-def poll_server(remote, attributes, state):
+def poll_server(botobj, remote, attributes, state):
   """Polls the server to run one loop.
 
   Returns True if executed some action, False if server asked the bot to sleep.
@@ -218,18 +210,18 @@ def poll_server(remote, attributes, state):
     return False
 
   if cmd == 'run':
-    run_manifest(remote, attributes, resp['manifest'])
+    run_manifest(botobj, remote, attributes, resp['manifest'])
   elif cmd == 'update':
-    update_bot(remote, attributes, resp['version'])
+    update_bot(botobj, remote, resp['version'])
   elif cmd == 'restart':
-    restart_bot(remote, attributes, resp['message'])
+    botobj.restart(resp['message'])
   else:
     raise ValueError('Unexpected command: %s\n%s' % (cmd, resp))
 
   return True
 
 
-def run_manifest(remote, attributes, manifest):
+def run_manifest(botobj, remote, attributes, manifest):
   """Defers to task_runner.py."""
   # Ensure the manifest is valid. This can throw a json decoding error. Also
   # raise if it is empty.
@@ -241,7 +233,9 @@ def run_manifest(remote, attributes, manifest):
   # before any I/O is done, like writting the manifest to disk.
   task_id = manifest['task_id']
 
-  restart_msg = None
+  failure = False
+  internal_failure = False
+  msg = None
   try:
     # We currently do not clean up the 'work' directory now is it compartmented.
     # TODO(maruel): Compartmentation should be done via tag. It is important to
@@ -266,28 +260,22 @@ def run_manifest(remote, attributes, manifest):
         command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, cwd=ROOT_DIR)
     out = proc.communicate()[0]
 
-    # TODO(maruel): Ask bot_config.py before rebooting.
-    # https://code.google.com/p/swarming/issues/detail?id=159
-    if proc.returncode == RESTART_CODE:
-      restart_msg = 'Restarting due to task failure'
-    elif proc.returncode:
-      # TODO(maruel): manifest/task number.
-      restart_msg = 'Execution failed, internal error:\n%s' % out
-      post_error_task(remote, attributes, restart_msg, task_id)
-    else:
-      # At this point the script called by subprocess has handled any further
-      # communication with the swarming server.
-      logging.debug('done!')
+    failure = proc.returncode == TASK_FAILED
+    internal_failure = not failure and bool(proc.returncode)
+    if internal_failure:
+      msg = 'Execution failed, internal error:\n%s' % out
   except Exception as e:
-    # Cancel task_id with internal_failure.
-    restart_msg = 'Internal exception occured: %s' % str(e)
-    post_error_task(remote, attributes, restart_msg, task_id)
+    # Failures include IOError when writing if the disk is full, OSError if
+    # swarming_bot.zip doesn't exist anymore, etc.
+    msg = 'Internal exception occured: %s' % str(e)
+    internal_failure = True
   finally:
-    if restart_msg:
-      restart_bot(remote, attributes, restart_msg)
+    if internal_failure:
+      post_error_task(remote, attributes, msg, task_id)
+    on_after_task(botobj, failure, internal_failure)
 
 
-def update_bot(remote, attributes, version):
+def update_bot(botobj, remote, version):
   """Downloads the new version of the bot code and then runs it.
 
   Use alternating files; first load swarming_bot.1.zip, then swarming_bot.2.zip,
@@ -327,23 +315,9 @@ def update_bot(remote, attributes, version):
     os.execv(sys.executable, cmd)
 
   # This code runs only if bot failed to respawn itself.
-  post_error(remote, attributes, 'Bot failed to respawn after update')
+  botobj.post_error(remote, 'Bot failed to respawn after update')
 
 
-def restart_bot(remote, attributes, message):
-  """Reboots the machine.
-
-  If the reboot is successful, never returns: the process should just be killed
-  by OS.
-
-  If reboot fails, logs the error to the server and moves the bot to quarantined
-  mode.
-  """
-  # os_utilities.restart should never return, unless restart is not happening.
-  # If restart is taking longer than N minutes, it probably not going to finish
-  # at all. Report this to the server.
-  os_utilities.restart(message, timeout=15*60)
-  post_error(remote, attributes, 'Bot is stuck restarting')
 
 
 def get_config():

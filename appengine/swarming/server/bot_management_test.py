@@ -62,10 +62,13 @@ class BotManagementTest(test_case.TestCase):
       bot_path = os.path.join(temp_dir, 'swarming_bot.zip')
       with open(bot_path, 'wb') as f:
         f.write(zipped_code)
-      subprocess.check_output(
+      proc = subprocess.Popen(
           [sys.executable, bot_path, 'start_bot', '-h'],
           cwd=temp_dir,
+          stdout=subprocess.PIPE,
           stderr=subprocess.STDOUT)
+      out = proc.communicate()[0]
+      self.assertEqual(0, proc.returncode, out)
     finally:
       shutil.rmtree(temp_dir)
 

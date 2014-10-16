@@ -580,7 +580,7 @@ class TestLocalTestRunner(net_utils.TestCase):
 
     self.mock(task_runner, 'load_and_run', load_and_run)
     self.assertEqual(
-        task_runner.RESTART_CODE,
+        task_runner.TASK_FAILED,
         task_runner.main(['-S', 'http://localhost', '-f', 'foo']))
 
 

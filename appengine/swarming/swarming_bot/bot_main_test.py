@@ -32,8 +32,12 @@ test_env.setup_test_env()
 CLIENT_TESTS = os.path.join(ROOT_DIR, '..', '..', 'client', 'tests')
 sys.path.insert(0, CLIENT_TESTS)
 
+import bot
 # Creates a server mock for functions in net.py.
 import net_utils
+
+
+# Access to a protected member XX of a client class - pylint: disable=W0212
 
 
 class TestBotMain(net_utils.TestCase):
@@ -42,6 +46,14 @@ class TestBotMain(net_utils.TestCase):
     self.root_dir = tempfile.mkdtemp(prefix='bot_main')
     self.old_cwd = os.getcwd()
     os.chdir(self.root_dir)
+    self.server = xsrf_client.XsrfRemote('https://localhost:1/')
+    self.attributes = {
+      'dimensions': {'foo', 'bar'},
+      'id': 'localhost',
+    }
+    self.bot = bot.Bot(self.server, self.attributes)
+    self.mock(self.bot, 'post_error', self.fail)
+    self.mock(self.bot, 'restart', self.fail)
 
   def tearDown(self):
     os.chdir(self.old_cwd)
@@ -89,9 +101,7 @@ class TestBotMain(net_utils.TestCase):
             {},
           ),
         ])
-    server = xsrf_client.XsrfRemote('https://localhost:1/')
-    attributes = {'id': 'localhost', 'foo': 'bar'}
-    bot_main.post_error_task(server, attributes, 'error', 23)
+    bot_main.post_error_task(self.server, self.attributes, 'error', 23)
 
   def test_run_bot(self):
     # Test the run_bot() loop.
@@ -103,23 +113,24 @@ class TestBotMain(net_utils.TestCase):
     expected_attribs = bot_main.get_attributes()
     expected_attribs['version'] = '123'
 
-    def poll_server(remote, attributes, state):
+    def poll_server(botobj, remote, attributes, state):
+      self.assertEqual(expected_attribs, botobj._attributes)
       sleep_streak = state['sleep_streak']
-      self.assertEqual(remote, server)
+      self.assertEqual(remote, self.server)
       self.assertEqual(expected_attribs, attributes)
       if sleep_streak == 5:
         raise Exception('Jumping out of the loop')
       return False
     self.mock(bot_main, 'poll_server', poll_server)
 
-    def post_error(remote, attributes, e):
-      self.assertEqual(remote, server)
-      self.assertEqual(expected_attribs, attributes)
+    def post_error(botobj, e):
+      self.assertEqual(self.server, botobj._remote)
+      self.assertEqual(expected_attribs, botobj._attributes)
       self.assertEqual('Jumping out of the loop', e)
       # Necessary to get out of the loop.
       raise Foo()
 
-    self.mock(bot_main, 'post_error', post_error)
+    self.mock(bot.Bot, 'post_error', post_error)
 
     self.expected_requests(
         [
@@ -133,17 +144,14 @@ class TestBotMain(net_utils.TestCase):
             {'xsrf_token': 'token'},
           ),
         ])
-    server = xsrf_client.XsrfRemote('https://localhost:1/')
     with self.assertRaises(Foo):
-      bot_main.run_bot(server, None)
+      bot_main.run_bot(self.server, None)
 
   def test_poll_server_sleep(self):
     slept = []
     self.mock(time, 'sleep', slept.append)
     self.mock(bot_main, 'run_manifest', self.fail)
     self.mock(bot_main, 'update_bot', self.fail)
-    self.mock(bot_main, 'restart_bot', self.fail)
-    self.mock(bot_main, 'post_error', self.fail)
 
     self.expected_requests(
         [
@@ -155,7 +163,7 @@ class TestBotMain(net_utils.TestCase):
           (
             'https://localhost:1/swarming/api/v1/bot/poll',
             {
-              'data': {'attributes': {'a': 1}, 'state': {'s': 1}},
+              'data': {'attributes': self.attributes, 'state': {'s': 1}},
               'headers': {'X-XSRF-Token': 'token'},
             },
             {
@@ -164,8 +172,8 @@ class TestBotMain(net_utils.TestCase):
             },
           ),
         ])
-    server = xsrf_client.XsrfRemote('https://localhost:1/')
-    self.assertFalse(bot_main.poll_server(server, {'a': 1}, {'s': 1}))
+    self.assertFalse(
+        bot_main.poll_server(self.bot, self.server, self.attributes, {'s': 1}))
     self.assertEqual([1.24], slept)
 
   def test_poll_server_run(self):
@@ -173,8 +181,6 @@ class TestBotMain(net_utils.TestCase):
     self.mock(time, 'sleep', self.fail)
     self.mock(bot_main, 'run_manifest', lambda *args: manifest.append(args))
     self.mock(bot_main, 'update_bot', self.fail)
-    self.mock(bot_main, 'restart_bot', self.fail)
-    self.mock(bot_main, 'post_error', self.fail)
 
     attribs = {'b': 'c'}
     self.expected_requests(
@@ -196,10 +202,10 @@ class TestBotMain(net_utils.TestCase):
             },
           ),
         ])
-    server = xsrf_client.XsrfRemote('https://localhost:1/')
-    self.assertTrue(bot_main.poll_server(server, attribs, {'s': 1}))
+    self.assertTrue(
+        bot_main.poll_server(self.bot, self.server, attribs, {'s': 1}))
     expected = [
-      (server, {'b': 'c'}, {'foo': 'bar'}),
+      (self.bot, self.server, {'b': 'c'}, {'foo': 'bar'}),
     ]
     self.assertEqual(expected, manifest)
 
@@ -208,8 +214,6 @@ class TestBotMain(net_utils.TestCase):
     self.mock(time, 'sleep', self.fail)
     self.mock(bot_main, 'run_manifest', self.fail)
     self.mock(bot_main, 'update_bot', lambda *args: update.append(args))
-    self.mock(bot_main, 'restart_bot', self.fail)
-    self.mock(bot_main, 'post_error', self.fail)
 
     self.expected_requests(
         [
@@ -221,7 +225,7 @@ class TestBotMain(net_utils.TestCase):
           (
             'https://localhost:1/swarming/api/v1/bot/poll',
             {
-              'data': {'attributes': {'a': 1}, 'state': {'s': 1}},
+              'data': {'attributes': self.attributes, 'state': {'s': 1}},
               'headers': {'X-XSRF-Token': 'token'},
             },
             {
@@ -230,17 +234,16 @@ class TestBotMain(net_utils.TestCase):
             },
           ),
         ])
-    server = xsrf_client.XsrfRemote('https://localhost:1/')
-    self.assertTrue(bot_main.poll_server(server, {'a': 1}, {'s': 1}))
-    self.assertEqual([(server, {'a': 1}, '123')], update)
+    self.assertTrue(
+        bot_main.poll_server(self.bot, self.server, self.attributes, {'s': 1}))
+    self.assertEqual([(self.bot, self.server, '123')], update)
 
   def test_poll_server_restart(self):
     restart = []
     self.mock(time, 'sleep', self.fail)
     self.mock(bot_main, 'run_manifest', self.fail)
     self.mock(bot_main, 'update_bot', self.fail)
-    self.mock(bot_main, 'restart_bot', lambda *args: restart.append(args))
-    self.mock(bot_main, 'post_error', self.fail)
+    self.mock(self.bot, 'restart', lambda *args: restart.append(args))
 
     self.expected_requests(
         [
@@ -252,7 +255,7 @@ class TestBotMain(net_utils.TestCase):
           (
             'https://localhost:1/swarming/api/v1/bot/poll',
             {
-              'data': {'attributes': {'a': 1}, 'state': {'s': 1}},
+              'data': {'attributes': self.attributes, 'state': {'s': 1}},
               'headers': {'X-XSRF-Token': 'token'},
             },
             {
@@ -261,9 +264,9 @@ class TestBotMain(net_utils.TestCase):
             },
           ),
         ])
-    server = xsrf_client.XsrfRemote('https://localhost:1/')
-    self.assertTrue(bot_main.poll_server(server, {'a': 1}, {'s': 1}))
-    self.assertEqual([(server, {'a': 1}, 'Please die now')], restart)
+    self.assertTrue(
+        bot_main.poll_server(self.bot, self.server, self.attributes, {'s': 1}))
+    self.assertEqual([('Please die now',)], restart)
 
   def _mock_popen(self, returncode):
     # Method should have "self" as first argument - pylint: disable=E0213
@@ -285,45 +288,63 @@ class TestBotMain(net_utils.TestCase):
     self.mock(subprocess, 'Popen', Popen)
 
   def test_run_manifest(self):
-    self.mock(bot_main, 'post_error', self.fail)
     self.mock(bot_main, 'post_error_task', self.fail)
-    self.mock(bot_main, 'restart_bot', self.fail)
+    def on_after_task(botobj, failure, internal_failure):
+      self.assertEqual(self.attributes['dimensions'], botobj.dimensions)
+      self.assertEqual(False, failure)
+      self.assertEqual(False, internal_failure)
+    self.mock(bot_main, 'on_after_task', on_after_task)
     self._mock_popen(0)
 
-    server = xsrf_client.XsrfRemote('https://localhost:1/')
-    manifest = {'task_id': 24}
-    bot_main.run_manifest(server, {}, manifest)
+    bot_main.run_manifest(
+        self.bot, self.server, self.attributes, {'task_id': 24})
 
-  def test_run_manifest_restart(self):
-    self.mock(bot_main, 'post_error', self.fail)
+  def test_run_manifest_task_failure(self):
     self.mock(bot_main, 'post_error_task', self.fail)
-    restarted = []
-    self.mock(bot_main, 'restart_bot', lambda *args: restarted.append(args))
+    def on_after_task(_bot, failure, internal_failure):
+      self.assertEqual(True, failure)
+      self.assertEqual(False, internal_failure)
+    self.mock(bot_main, 'on_after_task', on_after_task)
+    self._mock_popen(bot_main.TASK_FAILED)
 
-    self._mock_popen(bot_main.RESTART_CODE)
-    server = xsrf_client.XsrfRemote('https://localhost:1/')
-    server.token = 'foo'
-    manifest = {'task_id': 24}
-    bot_main.run_manifest(server, {}, manifest)
-    self.assertEqual(
-        [(server, {}, 'Restarting due to task failure')], restarted)
+    bot_main.run_manifest(
+        self.bot, self.server, self.attributes, {'task_id': 24})
 
-  def test_run_manifest_restart_internal_failure(self):
-    self.mock(bot_main, 'post_error', self.fail)
+  def test_run_manifest_internal_failure(self):
     posted = []
     self.mock(bot_main, 'post_error_task', lambda *args: posted.append(args))
-    restarted = []
-    self.mock(bot_main, 'restart_bot', lambda *args: restarted.append(args))
-
+    def on_after_task(_bot, failure, internal_failure):
+      self.assertEqual(False, failure)
+      self.assertEqual(True, internal_failure)
+    self.mock(bot_main, 'on_after_task', on_after_task)
     self._mock_popen(1)
-    server = xsrf_client.XsrfRemote('https://localhost:1/')
-    server.token = 'foo'
-    manifest = {'task_id': 24}
-    bot_main.run_manifest(server, {}, manifest)
-    self.assertEqual(
-        [(server, {}, 'Execution failed, internal error:\nfoo', 24)], posted)
-    self.assertEqual(
-        [(server, {}, 'Execution failed, internal error:\nfoo')], restarted)
+
+    bot_main.run_manifest(
+        self.bot, self.server, self.attributes, {'task_id': 24})
+    expected = [
+        (self.server, self.attributes,
+          'Execution failed, internal error:\nfoo', 24)
+    ]
+    self.assertEqual(expected, posted)
+
+  def test_run_manifest_exception(self):
+    posted = []
+    self.mock(bot_main, 'post_error_task', lambda *args: posted.append(args))
+    def on_after_task(_bot, failure, internal_failure):
+      self.assertEqual(False, failure)
+      self.assertEqual(True, internal_failure)
+    self.mock(bot_main, 'on_after_task', on_after_task)
+    def raiseOSError(*_a, **_k):
+      raise OSError('Dang')
+    self.mock(subprocess, 'Popen', raiseOSError)
+
+    bot_main.run_manifest(
+        self.bot, self.server, self.attributes, {'task_id': 24})
+    expected = [
+        (self.server, self.attributes,
+          'Internal exception occured: Dang', 24)
+    ]
+    self.assertEqual(expected, posted)
 
   def test_update_bot_linux(self):
     self.mock(sys, 'platform', 'linux2')
@@ -331,7 +352,7 @@ class TestBotMain(net_utils.TestCase):
     # In a real case 'update_bot' never exits and doesn't call 'post_error'.
     # Under the test however forever-blocking calls finish, and post_error is
     # called.
-    self.mock(bot_main, 'post_error', lambda *_: None)
+    self.mock(self.bot, 'post_error', lambda *_: None)
     self.mock(bot_main, 'THIS_FILE', 'swarming_bot.1.zip')
     self.mock(net, 'url_retrieve', lambda *_: True)
 
@@ -340,8 +361,7 @@ class TestBotMain(net_utils.TestCase):
     self.mock(subprocess, 'call', self.fail)
     self.mock(os, 'execv', lambda *args: calls.append(args))
 
-    server = xsrf_client.XsrfRemote('https://localhost:1/')
-    bot_main.update_bot(server, {}, '123')
+    bot_main.update_bot(self.bot, self.server, '123')
     self.assertEqual([(sys.executable, cmd)], calls)
 
   def test_update_bot_win(self):
@@ -349,7 +369,7 @@ class TestBotMain(net_utils.TestCase):
 
     # In a real case 'update_bot' never exists and doesn't call 'post_error'.
     # Under the test forever blocking calls
-    self.mock(bot_main, 'post_error', lambda *_: None)
+    self.mock(self.bot, 'post_error', lambda *_: None)
     self.mock(bot_main, 'THIS_FILE', 'swarming_bot.1.zip')
     self.mock(net, 'url_retrieve', lambda *_: True)
 
@@ -358,9 +378,8 @@ class TestBotMain(net_utils.TestCase):
     self.mock(subprocess, 'call', lambda *args: calls.append(args))
     self.mock(os, 'execv', self.fail)
 
-    server = xsrf_client.XsrfRemote('https://localhost:1/')
     with self.assertRaises(SystemExit):
-      bot_main.update_bot(server, {}, '123')
+      bot_main.update_bot(self.bot, self.server, '123')
     self.assertEqual([(cmd,)], calls)
 
   def test_get_config(self):
@@ -368,8 +387,6 @@ class TestBotMain(net_utils.TestCase):
     self.assertEqual(expected, bot_main.get_config())
 
   def test_main(self):
-    self.mock(bot_main, 'post_error', self.fail)
-
     def check(x):
       self.assertEqual(logging.WARNING, x)
     self.mock(logging_utils, 'set_console_level', check)
