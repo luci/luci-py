@@ -93,6 +93,7 @@ FILES = (
     'utils/tools.py',
     'utils/zip_package.py',
     'xsrf_client.py',
+    'zipped_archive.py',
 )
 
 

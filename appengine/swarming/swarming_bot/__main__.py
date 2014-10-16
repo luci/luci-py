@@ -65,18 +65,21 @@ def CMDstart_slave(args):
   # User provided bot_config.py
   logging.info(
       'importing bot_config: %s, %s', THIS_FILE, zip_package.generate_version())
-  import bot_config
-  if not bot_config.setup_bot():
-    # The code asked to not start the bot code right away. In that case, reboot
-    # the machine, unless a flag stated to not do it. The flag is provided when
-    # the bot code is updated in place. In that case it is unnecessary to
-    # restart the host.
-    if not options.survive:
-      # Return immediately to make update via ssh easier.
-      import os_utilities
-      os_utilities.restart_and_return(
-          'Starting new swarming bot: %s' % THIS_FILE)
-      return 0
+  try:
+    import bot_config
+    if not bot_config.setup_bot():
+      # The code asked to not start the bot code right away. In that case,
+      # reboot the machine, unless a flag stated to not do it. The flag is
+      # provided when the bot code is updated in place. In that case it is
+      # unnecessary to restart the host.
+      if not options.survive:
+        # Return immediately to make update via ssh easier.
+        import os_utilities
+        os_utilities.restart_and_return(
+            'Starting new swarming bot: %s' % THIS_FILE)
+        return 0
+  except Exception:
+    logging.exception('bot_config.py is invalid.')
 
   logging.info('Starting the bot: %s', THIS_FILE)
   result = subprocess.call([sys.executable, THIS_FILE, 'start_bot'])
