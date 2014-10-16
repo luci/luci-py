@@ -34,7 +34,6 @@ from google.appengine.api import memcache
 from google.appengine.ext import ndb
 
 from components import utils
-from server import task_common
 from server import task_request
 
 
@@ -101,8 +100,8 @@ def _gen_queue_number_key(timestamp, priority):
     - The last 8 bits is currently unused and set to 0.
   """
   assert isinstance(timestamp, datetime.datetime)
-  task_common.validate_priority(priority)
-  now = task_common.milliseconds_since_epoch(timestamp)
+  task_request.validate_priority(priority)
+  now = utils.milliseconds_since_epoch(timestamp)
   assert 0 <= now < 2**47, hex(now)
   # Assumes the system runs a 64 bits version of python.
   return priority << 55 | now << 8
@@ -160,7 +159,7 @@ def _hash_dimensions(dimensions_json):
 
 
 def _memcache_to_run_key(task_key):
-  """Functional equivalent of task_common.pack_result_summary_key()."""
+  """Functional equivalent of task_result.pack_result_summary_key()."""
   request_key = task_to_run_key_to_request_key(task_key)
   return '%x' % request_key.integer_id()
 
@@ -227,6 +226,22 @@ def dimensions_powerset_count(dimensions):
       # one of each state or "not present".
       out *= len(i) + 1
   return out
+
+
+def match_dimensions(request_dimensions, bot_dimensions):
+  """Returns True if the bot dimensions satisfies the request dimensions."""
+  assert isinstance(request_dimensions, dict), request_dimensions
+  assert isinstance(bot_dimensions, dict), bot_dimensions
+  if frozenset(request_dimensions).difference(bot_dimensions):
+    return False
+  for key, required in request_dimensions.iteritems():
+    bot_value = bot_dimensions[key]
+    if isinstance(bot_value, (list, tuple)):
+      if required not in bot_value:
+        return False
+    elif required != bot_value:
+      return False
+  return True
 
 
 def is_task_reapable(task_key, queue_number):
@@ -384,8 +399,7 @@ def yield_next_available_task_to_dispatch(bot_dimensions):
       # which is low enough for our purpose. The reason use_cache=False is
       # otherwise it'll create a buffer bloat.
       request = task.request_key.get(use_cache=False)
-      if not task_common.match_dimensions(
-          request.properties.dimensions, bot_dimensions):
+      if not match_dimensions(request.properties.dimensions, bot_dimensions):
         real_mismatch += 1
         continue
 

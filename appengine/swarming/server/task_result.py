@@ -46,14 +46,19 @@ TaskOutput. It is chunked in TaskOutputChunk to fit the entity size limit.
     +---------------+  +---------------+
 """
 
+import datetime
 import logging
 
 from google.appengine.api import datastore_errors
 from google.appengine.ext import ndb
 
 from components import utils
-from server import task_common
 from server import task_request
+
+
+# Amount of time after which a bot is considered dead. In short, if a bot has
+# not ping in the last 5 minutes while running a task, it is considered dead.
+BOT_PING_TOLERANCE = datetime.timedelta(seconds=5*60)
 
 
 class State(object):
@@ -397,7 +402,7 @@ class TaskRunResult(_TaskResultCommon):
 
   @property
   def key_string(self):
-    return task_common.pack_run_result_key(self.key)
+    return pack_run_result_key(self.key)
 
   @property
   def created_ts(self):
@@ -482,7 +487,7 @@ class TaskResultSummary(_TaskResultCommon):
 
   @property
   def key_string(self):
-    return task_common.pack_result_summary_key(self.key)
+    return pack_result_summary_key(self.key)
 
   @property
   def request_key(self):
@@ -723,6 +728,54 @@ def run_result_key_to_result_summary_key(run_result_key):
   return run_result_key.parent()
 
 
+def pack_result_summary_key(result_summary_key):
+  """Returns TaskResultSummary ndb.Key encoded, safe to use in HTTP requests.
+
+  Defined here because it is needed in stats.py and defining it in
+  task_result.py would cause a circular dependency.
+  """
+  assert result_summary_key.kind() == 'TaskResultSummary'
+  return '%x' % result_summary_key.parent().integer_id()
+
+
+def pack_run_result_key(run_result_key):
+  """Returns TaskRunResult ndb.Key encoded, safe to use in HTTP requests.
+
+  Defined here because it is needed in stats.py and defining it in
+  task_result.py would cause a circular dependency.
+  """
+  assert run_result_key.kind() == 'TaskRunResult'
+  key_id = (
+      run_result_key.parent().parent().integer_id() +
+      run_result_key.integer_id())
+  return '%x' % key_id
+
+
+def unpack_result_summary_key(packed_key):
+  """Returns the TaskResultSummary ndb.Key from a packed key.
+
+  The expected format of |packed_key| is %x.
+  """
+  key_id = int(packed_key, 16)
+  if key_id & 0xff:
+    raise ValueError('Can\'t reference to a specific try result.')
+  request_key = task_request.id_to_request_key(key_id)
+  return request_key_to_result_summary_key(request_key)
+
+
+def unpack_run_result_key(packed_key):
+  """Returns the TaskRunResult ndb.Key from a packed key.
+
+  The expected format of |packed_key| is %x.
+  """
+  key_id = int(packed_key, 16)
+  run_id = key_id & 0xff
+  if not run_id:
+    raise ValueError('Can\'t reference to the overall task result.')
+  result_summary_key = unpack_result_summary_key('%x' % (key_id & ~0xff))
+  return result_summary_key_to_run_result_key(result_summary_key, run_id)
+
+
 def new_result_summary(request):
   """Returns the new and only TaskResultSummary for a TaskRequest.
 
@@ -756,7 +809,7 @@ def yield_run_results_with_dead_bot():
   In practice it is returning a ndb.Query but this is equivalent.
   """
   # If a bot didn't ping recently, it is considered dead.
-  deadline = utils.utcnow() - task_common.BOT_PING_TOLERANCE
+  deadline = utils.utcnow() - BOT_PING_TOLERANCE
   q = TaskRunResult.query().filter(TaskRunResult.modified_ts < deadline)
   return q.filter(TaskRunResult.state == State.RUNNING)
 

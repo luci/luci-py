@@ -21,7 +21,6 @@ from components import utils
 from server import acl
 from server import bot_management
 from server import stats
-from server import task_common
 from server import task_result
 from server import task_scheduler
 from server import task_to_run
@@ -183,11 +182,11 @@ class ClientTaskResultBase(auth.ApiHandler):
     key = None
     summary_key = None
     try:
-      key = task_scheduler.unpack_result_summary_key(task_id)
+      key = task_result.unpack_result_summary_key(task_id)
       summary_key = key
     except ValueError:
       try:
-        key = task_scheduler.unpack_run_result_key(task_id)
+        key = task_result.unpack_run_result_key(task_id)
         summary_key = task_result.run_result_key_to_result_summary_key(key)
       except ValueError:
         self.abort_with_error(400, error='Invalid key')
@@ -344,7 +343,7 @@ class ClientRequestHandler(auth.ApiHandler):
 
     data = {
       'request': request.to_dict(),
-      'task_id': task_common.pack_result_summary_key(result_summary.key),
+      'task_id': task_result.pack_result_summary_key(result_summary.key),
     }
     self.send_response(utils.to_json_encodable(data))
 
@@ -358,7 +357,7 @@ class ClientCancelHandler(auth.ApiHandler):
   def post(self):
     request = self.parse_body()
     task_id = request.get('task_id')
-    summary_key = task_scheduler.unpack_result_summary_key(task_id)
+    summary_key = task_result.unpack_result_summary_key(task_id)
 
     ok, was_running = task_scheduler.cancel_task(summary_key)
     out = {
@@ -430,7 +429,7 @@ class TestRequestHandler(auth.AuthenticatingHandler):
           # TODO(maruel): Remove this.
           'instance_index': 0,
           'num_instances': 1,
-          'test_key': task_common.pack_result_summary_key(result_summary.key),
+          'test_key': task_result.pack_result_summary_key(result_summary.key),
         }
       ],
     }
@@ -451,7 +450,7 @@ class GetMatchingTestCasesHandler(auth.AuthenticatingHandler):
         task_result.TaskResultSummary.name == test_case_name)
     # Returns all the relevant task_ids.
     keys = [
-      task_common.pack_result_summary_key(result_summary)
+      task_result.pack_result_summary_key(result_summary)
       for result_summary in q.iter(keys_only=True)
     ]
     logging.info('Found %d keys', len(keys))
@@ -477,10 +476,10 @@ class GetResultHandler(auth.AuthenticatingHandler):
     # results.
     key = None
     try:
-      key = task_scheduler.unpack_result_summary_key(key_id)
+      key = task_result.unpack_result_summary_key(key_id)
     except ValueError:
       try:
-        key = task_scheduler.unpack_run_result_key(key_id)
+        key = task_result.unpack_run_result_key(key_id)
       except ValueError:
         self.response.set_status(400)
         self.response.out.write('Invalid key')
@@ -770,7 +769,7 @@ class BotPollHandler(auth.ApiHandler):
         'env': request.properties.env,
         'hard_timeout': request.properties.execution_timeout_secs,
         'io_timeout': request.properties.io_timeout_secs,
-        'task_id': task_common.pack_run_result_key(run_result_key),
+        'task_id': task_result.pack_run_result_key(run_result_key),
       },
     }
     self.send_response(out)
@@ -870,7 +869,7 @@ class BotTaskUpdateHandler(auth.ApiHandler):
 
     # TODO(maruel): Make use of io_timeout and hard_timeout.
 
-    run_result_key = task_scheduler.unpack_run_result_key(task_id)
+    run_result_key = task_result.unpack_run_result_key(task_id)
     # Side effect: zaps out any binary content on stdout.
     if output is not None:
       output = output.encode('utf-8', 'replace')
@@ -921,7 +920,7 @@ class BotTaskErrorHandler(auth.ApiHandler):
 
     bot_id = request['id']
     task_id = request['task_id']
-    run_result = task_scheduler.unpack_run_result_key(task_id).get()
+    run_result = task_result.unpack_run_result_key(task_id).get()
     if run_result.bot_id != bot_id:
       msg = 'Bot %s sent task kill for task %s owned by bot %s' % (
           bot_id, run_result.bot_id, run_result.key)

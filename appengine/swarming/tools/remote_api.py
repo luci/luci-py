@@ -27,14 +27,13 @@ def setup_context():
   from components import auth
   from server import bot_management
   from server import stats
-  from server import task_common
   from server import task_request
   from server import task_result
   from server import task_scheduler
   from server import task_to_run
   from server import user_manager
-  from server.task_scheduler import unpack_result_summary_key
-  from server.task_scheduler import unpack_run_result_key
+  from server.task_result import unpack_result_summary_key
+  from server.task_result import unpack_run_result_key
 
   return locals().copy()
 

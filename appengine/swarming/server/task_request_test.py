@@ -21,7 +21,6 @@ from google.appengine.api import datastore_errors
 from google.appengine.ext import ndb
 
 from components import utils
-from server import task_common
 from server import task_request
 from support import test_case
 
@@ -58,7 +57,7 @@ def _gen_request_data(properties=None, **kwargs):
 class TaskRequestPrivateTest(test_case.TestCase):
   def test_new_request_key(self):
     for _ in xrange(3):
-      now = task_common.milliseconds_since_epoch(None)
+      now = utils.milliseconds_since_epoch(None)
       key = task_request._new_request_key()
       key_id = key.integer_id()
       timestamp = key_id >> 16
@@ -221,9 +220,9 @@ class TaskRequestApiTest(test_case.TestCase):
 
     with self.assertRaises(datastore_errors.BadValueError):
       task_request.make_request(
-          _gen_request_data(priority=task_common.MAXIMUM_PRIORITY+1))
+          _gen_request_data(priority=task_request.MAXIMUM_PRIORITY+1))
     task_request.make_request(
-        _gen_request_data(priority=task_common.MAXIMUM_PRIORITY))
+        _gen_request_data(priority=task_request.MAXIMUM_PRIORITY))
 
     with self.assertRaises(datastore_errors.BadValueError):
       task_request.make_request(
@@ -241,6 +240,17 @@ class TaskRequestApiTest(test_case.TestCase):
     task_request.make_request(
         _gen_request_data(
             scheduling_expiration_secs=task_request._MIN_TIMEOUT_SECS))
+
+  def test_validate_priority(self):
+    with self.assertRaises(TypeError):
+      task_request.validate_priority('1')
+    with self.assertRaises(datastore_errors.BadValueError):
+      task_request.validate_priority(-1)
+    with self.assertRaises(datastore_errors.BadValueError):
+      task_request.validate_priority(task_request.MAXIMUM_PRIORITY+1)
+    task_request.validate_priority(0)
+    task_request.validate_priority(1)
+    task_request.validate_priority(task_request.MAXIMUM_PRIORITY)
 
 
 if __name__ == '__main__':

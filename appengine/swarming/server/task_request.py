@@ -53,7 +53,10 @@ from google.appengine.ext import ndb
 
 from components import datastore_utils
 from components import utils
-from server import task_common
+
+
+# Maximum acceptable priority value, which is effectively the lowest priority.
+MAXIMUM_PRIORITY = 255
 
 
 # One day in seconds. Add 10s to account for small jitter.
@@ -141,7 +144,7 @@ def _validate_timeout(prop, value):
 
 def _validate_priority(_prop, value):
   """Validates TaskRequest.priority."""
-  task_common.validate_priority(value)
+  validate_priority(value)
   return value
 
 
@@ -287,7 +290,7 @@ def _new_request_key():
     requests per second without too much transaction conflicts.
   - The last 8 bits are unused and set to 0.
   """
-  now = task_common.milliseconds_since_epoch(None)
+  now = utils.milliseconds_since_epoch(None)
   assert 1 <= now < 2**47, now
   suffix = random.getrandbits(8)
   assert 0 <= suffix <= 0xFF
@@ -413,3 +416,11 @@ def make_request(data):
       tags=data['tags'])
   _put_request(request)
   return request
+
+
+def validate_priority(priority):
+  """Throws ValueError if priority is not a valid value."""
+  if 0 > priority or MAXIMUM_PRIORITY < priority:
+    raise datastore_errors.BadValueError(
+        'priority (%d) must be between 0 and %d (inclusive)' %
+        (priority, MAXIMUM_PRIORITY))

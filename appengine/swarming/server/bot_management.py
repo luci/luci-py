@@ -19,7 +19,7 @@ from components import utils
 from common import test_request_message
 from server import bot_archive
 from server import file_chunks
-from server import task_common
+from server import task_result
 
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -107,7 +107,7 @@ class Bot(ndb.Model):
     out['id'] = self.key.string_id()
     # Replace the task key with the task id.
     if self.task:
-      out['task'] = task_common.pack_run_result_key(self.task)
+      out['task'] = task_result.pack_run_result_key(self.task)
     return out
 
   def to_dict_with_now(self, now):

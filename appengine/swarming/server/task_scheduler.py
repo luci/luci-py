@@ -28,7 +28,6 @@ from google.appengine.runtime import apiproxy_errors
 from components import utils
 from server import bot_management
 from server import stats
-from server import task_common
 from server import task_request
 from server import task_result
 from server import task_to_run
@@ -254,7 +253,7 @@ def make_request(data):
   # (!) and NumberField is signed 32 bits so the best it could do with EPOCH is
   # second resolution up to year 2038.
   index = search.Index(name='requests')
-  packed = task_common.pack_result_summary_key(result_summary.key)
+  packed = task_result.pack_result_summary_key(result_summary.key)
   doc = search.Document(
       fields=[
         search.TextField(name='name', value=request.name),
@@ -272,32 +271,6 @@ def make_request(data):
       dimensions=request.properties.dimensions,
       user=request.user)
   return request, result_summary
-
-
-def unpack_result_summary_key(packed_key):
-  """Returns the TaskResultSummary ndb.Key from a packed key.
-
-  The expected format of |packed_key| is %x.
-  """
-  key_id = int(packed_key, 16)
-  if key_id & 0xff:
-    raise ValueError('Can\'t reference to a specific try result.')
-  request_key = task_request.id_to_request_key(key_id)
-  return task_result.request_key_to_result_summary_key(request_key)
-
-
-def unpack_run_result_key(packed_key):
-  """Returns the TaskRunResult ndb.Key from a packed key.
-
-  The expected format of |packed_key| is %x.
-  """
-  key_id = int(packed_key, 16)
-  run_id = key_id & 0xff
-  if not run_id:
-    raise ValueError('Can\'t reference to the overall task result.')
-  result_summary_key = unpack_result_summary_key('%x' % (key_id & ~0xff))
-  return task_result.result_summary_key_to_run_result_key(
-      result_summary_key, run_id)
 
 
 def bot_reap_task(dimensions, bot_id, bot_version):
@@ -479,7 +452,7 @@ def search_by_name(word, cursor_str, limit):
   for item in results.results:
     value = item_to_id(item)
     if value:
-      result_summary_keys.append(unpack_result_summary_key(value))
+      result_summary_keys.append(task_result.unpack_result_summary_key(value))
       cursors.append(item.cursor)
 
   # Handle None result value. See make_request() for details about how this can
@@ -507,7 +480,7 @@ def search_by_name(word, cursor_str, limit):
           value = item_to_id(item)
           if value:
             cursor = item.cursor
-            task = unpack_result_summary_key(value).get()
+            task = task_result.unpack_result_summary_key(value).get()
             if task:
               tasks.append(task)
               if len(tasks) == limit:
@@ -585,7 +558,7 @@ def cron_handle_bot_died():
   try:
     for run_result in task_result.yield_run_results_with_dead_bot():
       if run_result.try_number == 1:
-        packed = task_common.pack_run_result_key(run_result.key)
+        packed = task_result.pack_run_result_key(run_result.key)
         request, result_summary = ndb.get_multi(
             (run_result.request_key, run_result.result_summary_key))
         if result_summary.try_number == 1:

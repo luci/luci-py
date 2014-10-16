@@ -35,7 +35,6 @@ from server import acl
 from server import bot_archive
 from server import bot_management
 from server import stats
-from server import task_common
 from server import task_result
 from server import task_scheduler
 from server import task_to_run
@@ -1430,7 +1429,7 @@ class OldClientApiTest(AppTestBase):
         {'name': 'tc'})
     self.assertEqual('200 OK', response.status)
     self.assertIn(
-        task_common.pack_result_summary_key(result_summary.key),
+        task_result.pack_result_summary_key(result_summary.key),
         response.body)
 
     # Test with a multiple matching runners.
@@ -1442,10 +1441,10 @@ class OldClientApiTest(AppTestBase):
         {'name': 'tc'})
     self.assertEqual('200 OK', response.status)
     self.assertIn(
-        task_common.pack_result_summary_key(result_summary.key),
+        task_result.pack_result_summary_key(result_summary.key),
         response.body)
     self.assertIn(
-        task_common.pack_result_summary_key(result_summary_2.key),
+        task_result.pack_result_summary_key(result_summary_2.key),
         response.body)
 
   def testGetResultHandler(self):
@@ -1461,7 +1460,7 @@ class OldClientApiTest(AppTestBase):
         results='\xe9 Invalid utf-8 string')
 
     # Valid key.
-    packed = task_common.pack_result_summary_key(result_summary.key)
+    packed = task_result.pack_result_summary_key(result_summary.key)
     response = self.app.get('/get_result', {'r': packed})
     self.assertEqual('200 OK', response.status)
     try:
@@ -1548,7 +1547,7 @@ class OldClientApiTest(AppTestBase):
   def testResultHandlerNotDone(self):
     result_summary, _run_result = CreateRunner(machine_id='bot1')
 
-    packed = task_common.pack_result_summary_key(result_summary.key)
+    packed = task_result.pack_result_summary_key(result_summary.key)
     resp = self.app.get('/get_result?r=%s' % packed, status=200)
     expected = {
       u'config_instance_index': 0,

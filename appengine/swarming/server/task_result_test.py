@@ -24,7 +24,6 @@ from google.appengine.ext import deferred
 from google.appengine.ext import ndb
 
 from components import utils
-from server import task_common
 from server import task_request
 from server import task_result
 from server import task_to_run
@@ -168,6 +167,67 @@ class TaskResultApiTest(test_case.TestCase):
     self.assertEqual(
         result_summary_key,
         task_result.run_result_key_to_result_summary_key(run_result_key))
+
+  def test_pack_result_summary_key(self):
+    request_key = task_request.id_to_request_key(0xbb80200)
+    result_summary_key = task_result.request_key_to_result_summary_key(
+        request_key)
+    run_result_key = task_result.result_summary_key_to_run_result_key(
+        result_summary_key, 1)
+
+    actual = task_result.pack_result_summary_key(result_summary_key)
+    # 0xbb8 = 3000ms = 3 secs; 0x02 = random;  0x00 = try_number, e.g. it is a
+    # TaskResultSummary.
+    self.assertEqual('bb80200', actual)
+
+    with self.assertRaises(AssertionError):
+      task_result.pack_result_summary_key(run_result_key)
+
+  def test_pack_run_result_key(self):
+    request_key = task_request.id_to_request_key(0xbb80200)
+    result_summary_key = task_result.request_key_to_result_summary_key(
+        request_key)
+    run_result_key = task_result.result_summary_key_to_run_result_key(
+        result_summary_key, 1)
+
+    actual = task_result.pack_run_result_key(run_result_key)
+    # 0xbb8 = 3000ms = 3 secs; 0x02 = random;  0x01 = try_number, e.g. it is a
+    # TaskRunResult.
+    self.assertEqual('bb80201', actual)
+
+    with self.assertRaises(AssertionError):
+      task_result.pack_run_result_key(result_summary_key)
+
+  def test_unpack_result_summary_key(self):
+    actual = task_result.unpack_result_summary_key('bb80200')
+    expected = (
+        "Key('TaskRequestShard', '6f4236', 'TaskRequest', 196608512, "
+        "'TaskResultSummary', 1)")
+    self.assertEqual(expected, str(actual))
+
+    with self.assertRaises(ValueError):
+      task_result.unpack_result_summary_key('0')
+    with self.assertRaises(ValueError):
+      task_result.unpack_result_summary_key('g')
+    with self.assertRaises(ValueError):
+      task_result.unpack_result_summary_key('bb80201')
+
+  def test_unpack_run_result_key(self):
+    for i in ('1', '2'):
+      actual = task_result.unpack_run_result_key('bb8020' + i)
+      expected = (
+          "Key('TaskRequestShard', '6f4236', 'TaskRequest', 196608512, "
+          "'TaskResultSummary', 1, 'TaskRunResult', " + i + ")")
+      self.assertEqual(expected, str(actual))
+
+    with self.assertRaises(ValueError):
+      task_result.unpack_run_result_key('1')
+    with self.assertRaises(ValueError):
+      task_result.unpack_run_result_key('g')
+    with self.assertRaises(ValueError):
+      task_result.unpack_run_result_key('bb80200')
+    with self.assertRaises(NotImplementedError):
+      task_result.unpack_run_result_key('bb80203')
 
   def test_new_result_summary(self):
     request = task_request.make_request(_gen_request_data())
@@ -321,11 +381,11 @@ class TaskResultApiTest(test_case.TestCase):
         datetime.timedelta(seconds=4), result_summary.pending_now())
 
     self.assertEqual(
-        task_common.pack_result_summary_key(result_summary.key),
+        task_result.pack_result_summary_key(result_summary.key),
         result_summary.key_string)
     self.assertEqual(complete_ts, result_summary.ended_ts)
     self.assertEqual(
-        task_common.pack_run_result_key(run_result.key),
+        task_result.pack_run_result_key(run_result.key),
         run_result.key_string)
     self.assertEqual(complete_ts, run_result.ended_ts)
 
@@ -337,10 +397,10 @@ class TaskResultApiTest(test_case.TestCase):
     run_result.completed_ts = self.now
     ndb.put_multi(task_result.prepare_put_run_result(run_result))
 
-    self.mock_now(self.now + task_common.BOT_PING_TOLERANCE)
+    self.mock_now(self.now + task_result.BOT_PING_TOLERANCE)
     self.assertEqual([], list(task_result.yield_run_results_with_dead_bot()))
 
-    self.mock_now(self.now + task_common.BOT_PING_TOLERANCE, 1)
+    self.mock_now(self.now + task_result.BOT_PING_TOLERANCE, 1)
     self.assertEqual(
         [run_result], list(task_result.yield_run_results_with_dead_bot()))
 

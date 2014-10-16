@@ -17,7 +17,8 @@ from google.appengine.ext import ndb
 from components import decorators
 from components import stats_framework
 from components import utils
-from server import task_common
+from server import task_result
+from server import task_to_run
 
 
 ### Models
@@ -463,7 +464,7 @@ def _post_process(snapshot, bots_active, tasks_active):
     # Looks at the current buckets, do not create one.
     for bucket in snapshot.buckets:
       # If this bot matches these dimensions, mark it as a member of this group.
-      if task_common.match_dimensions(
+      if task_to_run.match_dimensions(
           json.loads(bucket.dimensions), dimensions):
         # This bot could be used for requests on this dimensions filter.
         if not bot_id in bucket.bot_ids:
@@ -513,14 +514,14 @@ def add_entry(**kwargs):
 def add_run_entry(action, run_result_key, **kwargs):
   """Action about a TaskRunResult."""
   assert action.startswith('run_'), action
-  run_id = task_common.pack_run_result_key(run_result_key)
+  run_id = task_result.pack_run_result_key(run_result_key)
   return add_entry(action=action, run_id=run_id, **kwargs)
 
 
 def add_task_entry(action, result_summary_key, **kwargs):
   """Action about a TaskRequest/TaskResultSummary."""
   assert action.startswith('task_'), action
-  task_id = task_common.pack_result_summary_key(result_summary_key)
+  task_id = task_result.pack_result_summary_key(result_summary_key)
   return add_entry(action=action, task_id=task_id, **kwargs)
 
 

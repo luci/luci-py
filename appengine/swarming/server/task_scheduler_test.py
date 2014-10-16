@@ -29,7 +29,6 @@ from components import stats_framework
 from components import utils
 from server import bot_management
 from server import stats
-from server import task_common
 from server import task_request
 from server import task_result
 from server import task_scheduler
@@ -378,37 +377,6 @@ class TaskSchedulerApiTest(test_case.TestCase):
     # It is tested indirectly in the other functions.
     self.assertTrue(task_scheduler.make_request(data))
 
-  def test_unpack_result_summary_key(self):
-    actual = task_scheduler.unpack_result_summary_key('bb80200')
-    expected = (
-        "Key('TaskRequestShard', '6f4236', 'TaskRequest', 196608512, "
-        "'TaskResultSummary', 1)")
-    self.assertEqual(expected, str(actual))
-
-    with self.assertRaises(ValueError):
-      task_scheduler.unpack_result_summary_key('0')
-    with self.assertRaises(ValueError):
-      task_scheduler.unpack_result_summary_key('g')
-    with self.assertRaises(ValueError):
-      task_scheduler.unpack_result_summary_key('bb80201')
-
-  def test_unpack_run_result_key(self):
-    for i in ('1', '2'):
-      actual = task_scheduler.unpack_run_result_key('bb8020' + i)
-      expected = (
-          "Key('TaskRequestShard', '6f4236', 'TaskRequest', 196608512, "
-          "'TaskResultSummary', 1, 'TaskRunResult', " + i + ")")
-      self.assertEqual(expected, str(actual))
-
-    with self.assertRaises(ValueError):
-      task_scheduler.unpack_run_result_key('1')
-    with self.assertRaises(ValueError):
-      task_scheduler.unpack_run_result_key('g')
-    with self.assertRaises(ValueError):
-      task_scheduler.unpack_run_result_key('bb80200')
-    with self.assertRaises(NotImplementedError):
-      task_scheduler.unpack_run_result_key('bb80203')
-
   def test_bot_update_task(self):
     run_result = _quick_reap()
     with task_scheduler.bot_update_task(
@@ -621,7 +589,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
     _request, run_result = task_scheduler.bot_reap_task(
         bot_dimensions, 'localhost', 'abc')
     self.assertEqual(1, run_result.try_number)
-    self.mock_now(self.now + task_common.BOT_PING_TOLERANCE, 1)
+    self.mock_now(self.now + task_result.BOT_PING_TOLERANCE, 1)
     self.assertEqual((0, 1), task_scheduler.cron_handle_bot_died())
 
     # Refresh and compare:
@@ -666,7 +634,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
     self.assertEqual(expected, result_summary.to_dict())
 
     # Task was retried.
-    self.mock_now(self.now + task_common.BOT_PING_TOLERANCE, 2)
+    self.mock_now(self.now + task_result.BOT_PING_TOLERANCE, 2)
     _request, run_result = task_scheduler.bot_reap_task(
         bot_dimensions, 'localhost', 'abc')
     logging.info('%s', [t.to_dict() for t in task_to_run.TaskToRun.query()])

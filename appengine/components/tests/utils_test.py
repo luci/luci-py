@@ -63,6 +63,11 @@ class UtilsTest(test_case.TestCase):
       'Mon, 02 Jan 2012 03:04:05 -0000',
       utils.datetime_to_rfc2822(datetime.datetime(2012, 1, 2, 3, 4, 5)))
 
+  def test_milliseconds_since_epoch(self):
+    self.mock_now(datetime.datetime(1970, 1, 2, 3, 4, 5, 6789))
+    delta = utils.milliseconds_since_epoch(None)
+    self.assertEqual(97445007, delta)
+
   def test_cache(self):
     calls = []
 

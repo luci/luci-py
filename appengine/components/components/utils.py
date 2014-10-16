@@ -152,6 +152,12 @@ def time_time():
   return (utcnow() - EPOCH).total_seconds()
 
 
+def milliseconds_since_epoch(now):
+  """Returns the number of milliseconds since unix epoch as an int."""
+  now = now or utcnow()
+  return int(round((now - EPOCH).total_seconds() * 1000.))
+
+
 def datetime_to_rfc2822(dt):
   """datetime -> string value for Last-Modified header as defined by RFC2822."""
   if not isinstance(dt, datetime.datetime):

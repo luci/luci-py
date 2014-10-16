@@ -372,6 +372,29 @@ class TaskToRunApiTest(test_case.TestCase):
         task_to_run.dimensions_powerset_count(dimensions),
         len(list(task_to_run._powerset(dimensions))))
 
+  def test_match_dimensions(self):
+    data_true = (
+      ({}, {}),
+      ({}, {'a': 'b'}),
+      ({'a': 'b'}, {'a': 'b'}),
+      ({'os': 'amiga'}, {'os': ['amiga', 'amiga-3.1']}),
+      ( {'os': 'amiga', 'foo': 'bar'},
+        {'os': ['amiga', 'amiga-3.1'], 'a': 'b', 'foo': 'bar'}),
+    )
+
+    for request_dimensions, bot_dimensions in data_true:
+      self.assertEqual(
+          True,
+          task_to_run.match_dimensions(request_dimensions, bot_dimensions))
+
+    data_false = (
+      ({'os': 'amiga'}, {'os': ['Win', 'Win-3.1']}),
+    )
+    for request_dimensions, bot_dimensions in data_false:
+      self.assertEqual(
+          False,
+          task_to_run.match_dimensions(request_dimensions, bot_dimensions))
+
   def test_yield_next_available_task_to_dispatch_none(self):
     _gen_new_task_to_run(
         properties=dict(dimensions={u'OS': u'Windows-3.1.1'}))

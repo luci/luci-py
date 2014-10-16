@@ -25,7 +25,7 @@ test_env.setup_test_env()
 
 from server import bot_archive
 from server import bot_management
-from server import task_scheduler
+from server import task_result
 from support import test_case
 
 
@@ -98,7 +98,7 @@ class BotManagementTest(test_case.TestCase):
       'version': u'da39a3ee5e6b4b0d3255bfef95601890afd80709',
     }
     self.assertEqual(expected, bot.to_dict())
-    bot.task = task_scheduler.unpack_run_result_key('12301')
+    bot.task = task_result.unpack_run_result_key('12301')
     bot.put()
     expected['task'] = '12301'
     self.assertEqual(expected, bot.to_dict())
