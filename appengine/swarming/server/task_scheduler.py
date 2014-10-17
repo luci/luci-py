@@ -123,7 +123,7 @@ def _update_task(task_key, request, bot_id, bot_version):
     # TODO(maruel): Use datastore_util.insert() to create the new try_number.
     run_result = task_result.new_run_result(
         request, (result_summary.try_number or 0) + 1, bot_id, bot_version)
-    result_summary.set_from_run_result(run_result)
+    result_summary.set_from_run_result(run_result, request)
     ndb.put_multi([task, run_result, result_summary])
     return run_result, task
 
@@ -204,6 +204,20 @@ def _retry_task(request, result_summary, run_result, now):
   return True
 
 
+def _copy_entity(src, dst):
+  """Copies the attributes of entity src into dst.
+
+  It doesn't copy the key.
+  """
+  assert type(src) == type(dst), '%s!=%s' % (src.__class__, dst.__class__)
+  # Access to a protected member _XX of a client class - pylint: disable=W0212
+  kwargs = {
+    k: getattr(src, k) for k, v in src.__class__._properties.iteritems()
+    if not isinstance(v, ndb.ComputedProperty)
+  }
+  dst.populate(**kwargs)
+
+
 ### Public API.
 
 
@@ -237,6 +251,15 @@ def make_request(data):
   """
   request = task_request.make_request(data)
 
+  dupe_future = None
+  if request.properties.idempotent:
+    # Find a previously run task that is also idempotent and completed. Start a
+    # query to fetch items that can be used to dedupe the task. See the comment
+    # for this property for more details.
+    dupe_future = task_result.TaskResultSummary.query(
+        task_result.TaskResultSummary.properties_hash==
+            request.properties.properties_hash).get_async()
+
   # At this point, the request is now in the DB but not yet in a mode where it
   # can be triggered or visible. Index it right away so it is searchable. If any
   # of remaining calls in this function fail, the TaskRequest and Search
@@ -261,6 +284,19 @@ def make_request(data):
       ])
   # Even if it fails here, we're still fine, as the task is not "alive" yet.
   index.put([doc])
+
+  if dupe_future:
+    # Reuse the results!
+    dupe_summary = dupe_future.get_result()
+    if dupe_summary:
+      # If there's a bug, commenting out this block is sufficient to disable the
+      # functionality.
+      # Setting task.queue_number to None removes it from the scheduling.
+      task.queue_number = None
+      _copy_entity(dupe_summary, result_summary)
+      result_summary.try_number = 0
+      result_summary.deduped_from = task_result.pack_run_result_key(
+          dupe_summary.run_result_key)
 
   # Storing these entities makes this task live. It is important at this point
   # that the HTTP handler returns as fast as possible, otherwise the task will
@@ -407,7 +443,7 @@ def bot_update_task(
         run_result.append_output(
             command_index, output, output_chunk_start or 0))
 
-  to_put.extend(task_result.prepare_put_run_result(run_result))
+  to_put.extend(task_result.prepare_put_run_result(run_result, request))
 
   yield to_put
 
@@ -421,7 +457,8 @@ def bot_kill_task(run_result):
   run_result.state = task_result.State.BOT_DIED
   run_result.internal_failure = True
   run_result.abandoned_ts = utils.utcnow()
-  entities = task_result.prepare_put_run_result(run_result)
+  # request is not needed in that case.
+  entities = task_result.prepare_put_run_result(run_result, None)
   ndb.transaction(lambda: ndb.put_multi(entities))
   request = request_future.get_result()
   stats.add_run_entry(

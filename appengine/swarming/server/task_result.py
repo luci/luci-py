@@ -400,6 +400,11 @@ class TaskRunResult(_TaskResultCommon):
   # Current state of this task.
   state = StateProperty(default=State.RUNNING, validator=_validate_not_pending)
 
+  # A task run execution can't be definition be deduped from another task.
+  # Still, setting this property always to None simplifies a lot the
+  # presentation layer.
+  deduped_from = None
+
   @property
   def key_string(self):
     return pack_run_result_key(self.key)
@@ -474,16 +479,38 @@ class TaskResultSummary(_TaskResultCommon):
   recently completed tasks.
   """
   # These properties are directly copied from TaskRequest. They are only copied
-  # here to simplify searches with the Web UI. They are immutable.
+  # here to simplify searches with the Web UI and to enable DB queries based on
+  # both user and results properties (e.g. all requests from X which succeeded).
+  # They are immutable.
+  # TODO(maruel): Investigate what is worth copying over.
   created_ts = ndb.DateTimeProperty(required=True)
   name = ndb.StringProperty(required=True)
   user = ndb.StringProperty(required=True)
 
+  # Value of TaskRequest.properties.properties_hash only when these conditions
+  # are met:
+  # - TaskRequest.properties.idempotent is True
+  # - self.state == State.COMPLETED
+  # - self.failure == False
+  # - self.internal_failure == False
+  properties_hash = ndb.BlobProperty(indexed=True)
+
   # State of this task. The value from TaskRunResult will be copied over.
   state = StateProperty(default=State.PENDING)
 
-  # Represent the last try attempt of the task. Starts at 1.
+  # Represent the last try attempt of the task. Starts at 1 EXCEPT when the
+  # results were deduped, in this case it's 0.
   try_number = ndb.IntegerProperty()
+
+  # Set to the task run id when the task result was retrieved from another task.
+  # A task run id is a reference to a TaskRunResult generated via
+  # pack_run_result_key(). The reason so store the packed version instead of
+  # KeyProperty is that it's much shorter and it futureproofing refactoring of
+  # the entity hierarchy.
+  #
+  # Note that when it's set, there's no TaskRunResult child since there was no
+  # run.
+  deduped_from = ndb.StringProperty(indexed=False)
 
   @property
   def key_string(self):
@@ -496,13 +523,20 @@ class TaskResultSummary(_TaskResultCommon):
 
   @property
   def run_result_key(self):
+    if self.deduped_from:
+      # Return the run results for the original task.
+      return unpack_run_result_key(self.deduped_from)
+
     if not self.try_number:
       return None
     return result_summary_key_to_run_result_key(self.key, self.try_number)
 
-  def set_from_run_result(self, run_result):
+  def set_from_run_result(self, run_result, request):
     """Copies all the relevant properties from a TaskRunResult into this
     TaskResultSummary.
+
+    If the task completed, succeeded and is idempotent, self.properties_hash is
+    set.
     """
     assert isinstance(run_result, TaskRunResult), run_result
     for property_name in _TaskResultCommon._properties:
@@ -516,6 +550,12 @@ class TaskResultSummary(_TaskResultCommon):
     # pylint: disable=W0201
     self.state = run_result.state
     self.try_number = run_result.try_number
+
+    if (self.state == State.COMPLETED and not self.failure and
+        not self.internal_failure and request.properties.idempotent):
+      # Signal the results are valid and can be reused.
+      self.properties_hash = request.properties.properties_hash
+      assert self.properties_hash
 
   def need_update_from_run_result(self, run_result):
     """Returns True if set_from_run_result() would modify this instance.
@@ -542,6 +582,12 @@ class TaskResultSummary(_TaskResultCommon):
     return (
         self.state != run_result.state or
         self.try_number != run_result.try_number)
+
+  def to_dict(self):
+    out = super(TaskResultSummary, self).to_dict()
+    if out['properties_hash']:
+      out['properties_hash'] = out['properties_hash'].encode('hex')
+    return out
 
 
 ### Private stuff.
@@ -814,7 +860,7 @@ def yield_run_results_with_dead_bot():
   return q.filter(TaskRunResult.state == State.RUNNING)
 
 
-def prepare_put_run_result(run_result):
+def prepare_put_run_result(run_result, request):
   """Prepares the entity to be saved.
 
   Return:
@@ -837,5 +883,5 @@ def prepare_put_run_result(run_result):
     # last try's result.
     return [run_result]
 
-  result_summary.set_from_run_result(run_result)
+  result_summary.set_from_run_result(run_result, request)
   return [run_result, result_summary]

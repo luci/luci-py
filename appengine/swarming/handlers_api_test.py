@@ -596,9 +596,10 @@ class NewClientApiTest(AppTestBase):
           u'dimensions': {},
           u'env': {},
           u'execution_timeout_secs': 30,
+          u'idempotent': False,
           u'io_timeout_secs': 30,
         },
-        u'properties_hash': u'b066ff178d6d987c0ef85d0f765c929f27026719',
+        u'properties_hash': None,
         u'tags': [u'foo', u'bar'],
         u'user': u'joe@localhost',
       },
@@ -632,6 +633,7 @@ class NewClientApiTest(AppTestBase):
       u'bot_version': None,
       u'completed_ts': None,
       u'created_ts': str_now,
+      u'deduped_from': None,
       u'durations': [],
       u'exit_codes': [],
       u'failure': False,
@@ -639,6 +641,7 @@ class NewClientApiTest(AppTestBase):
       u'internal_failure': False,
       u'modified_ts': str_now,
       u'name': u'hi',
+      u'properties_hash': None,
       u'server_versions': [],
       u'started_ts': None,
       u'state': task_result.State.CANCELED,
@@ -666,6 +669,7 @@ class NewClientApiTest(AppTestBase):
       u'bot_version': None,
       u'completed_ts': None,
       u'created_ts': str_now,
+      u'deduped_from': None,
       u'durations': [],
       u'exit_codes': [],
       u'failure': False,
@@ -673,6 +677,7 @@ class NewClientApiTest(AppTestBase):
       u'internal_failure': False,
       u'modified_ts': str_now,
       u'name': u'hi',
+      u'properties_hash': None,
       u'server_versions': [],
       u'started_ts': None,
       u'state': task_result.State.PENDING,
@@ -724,42 +729,16 @@ class NewClientApiTest(AppTestBase):
     self.client_create_task()
 
     self.set_as_bot()
-    token, _ = self.get_bot_token()
-    res = self.bot_poll()
-    task_id = res['manifest']['task_id']
-    params = {
-      'command_index': 0,
-      'duration': 0.1,
-      'exit_code': 0,
-      'id': 'bot1',
-      'output': u'résult string',
-      'output_chunk_start': 0,
-      'task_id': task_id,
-    }
-    response = self.post_with_token(
-        '/swarming/api/v1/bot/task_update', params, token)
-    self.assertEqual({u'ok': True}, response)
-    params = {
-      'command_index': 1,
-      'duration': 0.1,
-      'exit_code': 0,
-      'id': 'bot1',
-      'output': 'bar',
-      'output_chunk_start': 0,
-      'task_id': task_id,
-    }
-    response = self.post_with_token(
-        '/swarming/api/v1/bot/task_update', params, token)
-    self.assertEqual({u'ok': True}, response)
+    task_id = self.bot_run_task()
 
     self.set_as_privileged_user()
     run_id = task_id[:-2] + '01'
     response = self.app.get(
         '/swarming/api/v1/client/task/%s/output/0' % task_id).json
-    self.assertEqual({'output': u'résult string'}, response)
+    self.assertEqual({'output': u'rÉsult string'}, response)
     response = self.app.get(
         '/swarming/api/v1/client/task/%s/output/0' % run_id).json
-    self.assertEqual({'output': u'résult string'}, response)
+    self.assertEqual({'output': u'rÉsult string'}, response)
 
     response = self.app.get(
         '/swarming/api/v1/client/task/%s/output/1' % task_id).json
@@ -785,6 +764,32 @@ class NewClientApiTest(AppTestBase):
     response = self.app.get(
         '/swarming/api/v1/client/task/%s/output/0' % run_id, status=404).json
     self.assertEqual({u'error': u'Task not found'}, response)
+
+  def test_task_deduped(self):
+    _, task_id_1 = self.client_create_task(properties=dict(idempotent=True))
+
+    self.set_as_bot()
+    task_id_bot = self.bot_run_task()
+    self.assertEqual(task_id_1, task_id_bot[:-1] + '0')
+    self.assertEqual('1', task_id_bot[-1:])
+
+    # Create a second task. Results will be returned immediately without the bot
+    # running anything.
+    self.set_as_user()
+    _, task_id_2 = self.client_create_task(
+        name='ho', properties=dict(idempotent=True))
+
+    self.set_as_bot()
+    resp = self.bot_poll()
+    self.assertEqual('sleep', resp['cmd'])
+
+    self.set_as_user()
+    # Look at the results. It's the same as the previous run, even if task_id_2
+    # was never executed.
+    response = self.app.get(
+        '/swarming/api/v1/client/task/%s/output/all' % task_id_2).json
+    self.assertEqual({'outputs': [u'rÉsult string', u'bar']}, response)
+
 
   def test_get_task_output_all(self):
     self.client_create_task()
@@ -856,9 +861,10 @@ class NewClientApiTest(AppTestBase):
         u'dimensions': {u'os': u'Amiga'},
         u'env': {},
         u'execution_timeout_secs': 3600,
+        u'idempotent': False,
         u'io_timeout_secs': 1200,
       },
-      u'properties_hash': u'f0cc8a33cfaf3172e1c92400c7666ceae094e68f',
+      u'properties_hash': None,
       u'tags': [],
       u'user': u'joe@localhost',
     }
@@ -1002,8 +1008,7 @@ class NewClientApiTest(AppTestBase):
     self.client_create_task()
     token, _ = self.get_bot_token()
     res = self.bot_poll()
-    self.bot_complete_task(
-        token, exit_code=1, task_id=res['manifest']['task_id'])
+    self.bot_complete_task(token, task_id=res['manifest']['task_id'])
 
     self.mock(random, 'getrandbits', lambda _: 0x55)
     self.client_create_task(name='ho')
@@ -1052,8 +1057,8 @@ class NewClientApiTest(AppTestBase):
           u'bot_version': self.bot_version,
           u'completed_ts': u'2000-01-02 03:04:05',
           u'durations': [0.1],
-          u'exit_codes': [1],
-          u'failure': True,
+          u'exit_codes': [0],
+          u'failure': False,
           u'id': u'dc709e90888801',
           u'internal_failure': False,
           u'modified_ts': u'2000-01-02 03:04:05',

@@ -158,6 +158,15 @@ class AppTestBase(test_case.TestCase):
         '/swarming/api/v1/bot/task_update', params, token)
     self.assertEqual({u'ok': True}, response)
 
+  def bot_run_task(self):
+    token, _ = self.get_bot_token()
+    res = self.bot_poll()
+    task_id = res['manifest']['task_id']
+    self.bot_complete_task(token, task_id=task_id)
+    self.bot_complete_task(
+        token, task_id=task_id, command_index=1, output='bar')
+    return task_id
+
   # Client
 
   def get_client_token(self):

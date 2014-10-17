@@ -148,7 +148,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
     bot_management.tag_bot_seen(
         'localhost', 'hostname', 'internal_ip', 'external_ip', bot_dimensions,
         'version', True, {})
-    actual_request, run_result  = task_scheduler.bot_reap_task(
+    actual_request, run_result = task_scheduler.bot_reap_task(
         bot_dimensions, 'localhost', 'abc')
     self.assertEqual(None, actual_request)
     self.assertEqual(None, run_result)
@@ -182,6 +182,66 @@ class TaskSchedulerApiTest(test_case.TestCase):
         lambda: task_scheduler._PROBABILITY_OF_QUICK_COMEBACK - 0.01)
     self.assertEqual(1.0, task_scheduler.exponential_backoff(235))
 
+  def test_task_idempotent(self):
+    self.mock(random, 'getrandbits', lambda _: 0x88)
+    request_1, _result_summary = task_scheduler.make_request(
+        _gen_request_data(
+            properties=dict(
+                dimensions={u'OS': u'Windows-3.1.1'}, idempotent=True)))
+    bot_dimensions = {
+      u'OS': [u'Windows', u'Windows-3.1.1'],
+      u'hostname': u'localhost',
+      u'foo': u'bar',
+    }
+    actual_request_1, run_result_1 = task_scheduler.bot_reap_task(
+        bot_dimensions, 'localhost', 'abc')
+    self.assertEqual(request_1, actual_request_1)
+    self.assertEqual('localhost', run_result_1.bot_id)
+    self.assertEqual(None, task_to_run.TaskToRun.query().get().queue_number)
+    # It's important to terminate the task with success.
+    with task_scheduler.bot_update_task(
+        run_result_1.key, 'localhost', 0, 'Foo1', 0, 0, 0.1) as entities:
+      ndb.put_multi(entities)
+
+    # Create a second task, results are immediately returned.
+    self.mock(random, 'getrandbits', lambda _: 0x77)
+    original_ts = self.now
+    new_ts = self.mock_now(original_ts, 10)
+    request_2, _result_summary = task_scheduler.make_request(
+        _gen_request_data(
+            properties=dict(
+                dimensions={u'OS': u'Windows-3.1.1'}, idempotent=True)))
+    self.assertEqual(None, task_to_run.TaskToRun.query().get().queue_number)
+    actual_request_2, run_result_2 = task_scheduler.bot_reap_task(
+        bot_dimensions, 'localhost', 'abc')
+    self.assertEqual(None, actual_request_2)
+    result_summary_duped, run_results_duped = get_results(request_2.key)
+    expected = {
+      'abandoned_ts': None,
+      'bot_id': u'localhost',
+      'bot_version': u'abc',
+      'created_ts': original_ts,
+      'completed_ts': original_ts,
+      'deduped_from': u'14350e868888801',
+      'durations': [0.1],
+      'exit_codes': [0],
+      'failure': False,
+      'id': '14350e88f987700',
+      'internal_failure': False,
+      # Only this value is updated to 'now', the rest uses the previous run
+      # timestamps.
+      'modified_ts': new_ts,
+      'name': u'Request name',
+      'properties_hash': 'c5c77509f49b191689b056ad7c45c6d5fdcfea20',
+      'server_versions': [u'default-version'],
+      'started_ts': original_ts,
+      'state': State.COMPLETED,
+      'try_number': 0,
+      'user': u'Jesus',
+    }
+    self.assertEqual(expected, result_summary_duped.to_dict())
+    self.assertEqual([], run_results_duped)
+
   def test_get_results(self):
     # TODO(maruel): Split in more focused tests.
     self.mock(random, 'getrandbits', lambda _: 0x88)
@@ -200,6 +260,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'bot_version': None,
       'created_ts': created_ts,
       'completed_ts': None,
+      'deduped_from': None,
       'durations': [],
       'exit_codes': [],
       'failure': False,
@@ -207,6 +268,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'internal_failure': False,
       'modified_ts': created_ts,
       'name': u'Request name',
+      'properties_hash': None,
       'server_versions': [],
       'started_ts': None,
       'state': State.PENDING,
@@ -230,6 +292,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'bot_version': u'abc',
       'created_ts': created_ts,  # Time the TaskRequest was created.
       'completed_ts': None,
+      'deduped_from': None,
       'durations': [],
       'exit_codes': [],
       'failure': False,
@@ -237,6 +300,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'internal_failure': False,
       'modified_ts': reaped_ts,
       'name': u'Request name',
+      'properties_hash': None,
       'server_versions': [u'default-version'],
       'started_ts': reaped_ts,
       'state': State.RUNNING,
@@ -280,6 +344,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'bot_version': u'abc',
       'created_ts': created_ts,
       'completed_ts': done_ts,
+      'deduped_from': None,
       'durations': [0.1, 0.2],
       'exit_codes': [0, 0],
       'failure': False,
@@ -287,6 +352,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'internal_failure': False,
       'modified_ts': done_ts,
       'name': u'Request name',
+      'properties_hash': None,
       'server_versions': [u'default-version'],
       'started_ts': reaped_ts,
       'state': State.COMPLETED,
@@ -336,6 +402,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'bot_version': u'abc',
       'created_ts': self.now,
       'completed_ts': self.now,
+      'deduped_from': None,
       'durations': [0.1, 0.2],
       'exit_codes': [0, 1],
       'failure': True,
@@ -343,6 +410,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'internal_failure': False,
       'modified_ts': self.now,
       'name': u'Request name',
+      'properties_hash': None,
       'server_versions': [u'default-version'],
       'started_ts': self.now,
       'state': State.COMPLETED,
@@ -474,6 +542,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'bot_version': u'abc',
       'created_ts': self.now,
       'completed_ts': None,
+      'deduped_from': None,
       'durations': [],
       'exit_codes': [],
       'failure': False,
@@ -481,6 +550,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'internal_failure': True,
       'modified_ts': self.now,
       'name': u'Request name',
+      'properties_hash': None,
       'server_versions': [u'default-version'],
       'started_ts': self.now,
       'state': State.BOT_DIED,
@@ -513,6 +583,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'bot_version': None,
       'completed_ts': None,
       'created_ts': self.now,
+      'deduped_from': None,
       'durations': [],
       'exit_codes': [],
       'failure': False,
@@ -520,6 +591,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'internal_failure': False,
       'modified_ts': abandoned_ts,
       'name': u'Request name',
+      'properties_hash': None,
       'server_versions': [],
       'started_ts': None,
       'state': task_result.State.EXPIRED,
@@ -559,6 +631,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'bot_version': u'abc',
       'completed_ts': None,
       'created_ts': self.now,
+      'deduped_from': None,
       'durations': [],
       'exit_codes': [],
       'failure': False,
@@ -566,6 +639,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'internal_failure': False,
       'modified_ts': abandoned_ts,
       'name': u'Request name',
+      'properties_hash': None,
       'server_versions': [u'default-version'],
       'started_ts': self.now,
       'state': task_result.State.BOT_DIED,
@@ -618,6 +692,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'bot_version': u'abc',
       'completed_ts': None,
       'created_ts': datetime.datetime(2014, 1, 2, 3, 4, 5, 6),
+      'deduped_from': None,
       'durations': [],
       'exit_codes': [],
       'failure': False,
@@ -625,6 +700,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'internal_failure': False,
       'modified_ts': datetime.datetime(2014, 1, 2, 3, 9, 6, 6),
       'name': u'Request name',
+      'properties_hash': None,
       'server_versions': [u'default-version'],
       'started_ts': datetime.datetime(2014, 1, 2, 3, 4, 5, 6),
       'state': task_result.State.PENDING,
@@ -649,6 +725,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'bot_version': u'abc',
       'completed_ts': datetime.datetime(2014, 1, 2, 3, 9, 7, 6),
       'created_ts': datetime.datetime(2014, 1, 2, 3, 4, 5, 6),
+      'deduped_from': None,
       'durations': [0.1],
       'exit_codes': [0],
       'failure': False,
@@ -656,6 +733,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'internal_failure': False,
       'modified_ts': datetime.datetime(2014, 1, 2, 3, 9, 7, 6),
       'name': u'Request name',
+      'properties_hash': None,
       'server_versions': [u'default-version'],
       'started_ts': datetime.datetime(2014, 1, 2, 3, 9, 7, 6),
       'state': 112,

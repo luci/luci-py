@@ -298,6 +298,32 @@ class FrontendTest(AppTestBase):
     self.set_as_privileged_user()
     self.app.get('/user/task/%s' % reaped['manifest']['task_id'], status=200)
 
+  def test_task_deduped(self):
+    self.set_as_user()
+    _, task_id_1 = self.client_create_task(properties=dict(idempotent=True))
+
+    self.set_as_bot()
+    task_id_bot = self.bot_run_task()
+    self.assertEqual(task_id_1, task_id_bot[:-1] + '0')
+    self.assertEqual('1', task_id_bot[-1:])
+
+    # Create a second task. Results will be returned immediately without the bot
+    # running anything.
+    self.set_as_user()
+    _, task_id_2 = self.client_create_task(
+        name='ho', properties=dict(idempotent=True))
+
+    self.set_as_bot()
+    resp = self.bot_poll()
+    self.assertEqual('sleep', resp['cmd'])
+
+    self.set_as_privileged_user()
+    # Look at the results. It's the same as the previous run, even if task_id_2
+    # was never executed.
+    response = self.app.get('/user/task/%s' % task_id_2, status=200)
+    self.assertTrue('bar' in response.body, response.body)
+    self.assertTrue('Was deduped from' in response.body, response.body)
+
   def test_task_denied(self):
     # Add a task via the API as a user, then assert it can't be viewed by
     # anonymous user.

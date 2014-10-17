@@ -106,6 +106,10 @@
       <td>{{bot_view.render_dict(request.properties.env)}}</td>
     </tr>
     <tr>
+      <td>Idempotent</td>
+      <td>{{request.properties.idempotent}}</td>
+    </tr>
+    <tr>
       <td>Commands</td>
       <td>
         {% for cmd in request.properties.commands %}
@@ -214,6 +218,14 @@
       <td>Try number</td>
       <td>{{task.try_number}}</td>
     </tr>
+    {% if task.deduped_from %}
+      <tr>
+        <td><strong>Was deduped from</strong></td>
+        <td>
+          <a href="/user/task/{{task.deduped_from}}">{{task.deduped_from}}</a>
+        </td>
+      </tr>
+    {% endif %}
   </tbody>
 </table>
 

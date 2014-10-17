@@ -238,6 +238,7 @@ class TaskResultApiTest(test_case.TestCase):
       'bot_version': None,
       'completed_ts': None,
       'created_ts': self.now,
+      'deduped_from': None,
       'durations': [],
       'exit_codes': [],
       'failure': False,
@@ -245,6 +246,7 @@ class TaskResultApiTest(test_case.TestCase):
       'internal_failure': False,
       'modified_ts': None,
       'name': u'Request name',
+      'properties_hash': None,
       'server_versions': [],
       'started_ts': None,
       'state': task_result.State.PENDING,
@@ -294,6 +296,7 @@ class TaskResultApiTest(test_case.TestCase):
       'bot_version': None,
       'completed_ts': None,
       'created_ts': self.now,
+      'deduped_from': None,
       'durations': [],
       'exit_codes': [],
       'failure': False,
@@ -301,6 +304,7 @@ class TaskResultApiTest(test_case.TestCase):
       'internal_failure': False,
       'modified_ts': self.now,
       'name': u'Request name',
+      'properties_hash': None,
       'server_versions': [],
       'started_ts': None,
       'state': task_result.State.PENDING,
@@ -320,13 +324,14 @@ class TaskResultApiTest(test_case.TestCase):
     task.queue_number = None
     task.put()
     run_result = task_result.new_run_result(request, 1, 'localhost', 'abc')
-    ndb.put_multi(task_result.prepare_put_run_result(run_result))
+    ndb.put_multi(task_result.prepare_put_run_result(run_result, request))
     expected = {
       'abandoned_ts': None,
       'bot_id': u'localhost',
-      'bot_version': 'abc',
+      'bot_version': u'abc',
       'completed_ts': None,
       'created_ts': self.now,
+      'deduped_from': None,
       'durations': [],
       'exit_codes': [],
       'failure': False,
@@ -334,6 +339,7 @@ class TaskResultApiTest(test_case.TestCase):
       'internal_failure': False,
       'modified_ts': reap_ts,
       'name': u'Request name',
+      'properties_hash': None,
       'server_versions': [u'default-version'],
       'started_ts': reap_ts,
       'state': task_result.State.RUNNING,
@@ -350,13 +356,14 @@ class TaskResultApiTest(test_case.TestCase):
     run_result.exit_codes.append(0)
     run_result.state = task_result.State.COMPLETED
     ndb.put_multi(run_result.append_output(0, 'foo', 0))
-    ndb.put_multi(task_result.prepare_put_run_result(run_result))
+    ndb.put_multi(task_result.prepare_put_run_result(run_result, request))
     expected = {
       'abandoned_ts': None,
       'bot_id': u'localhost',
       'bot_version': 'abc',
       'completed_ts': complete_ts,
       'created_ts': self.now,
+      'deduped_from': None,
       'durations': [],
       'exit_codes': [0],
       'failure': False,
@@ -364,6 +371,7 @@ class TaskResultApiTest(test_case.TestCase):
       'internal_failure': False,
       'modified_ts': complete_ts,
       'name': u'Request name',
+      'properties_hash': None,
       'server_versions': [u'default-version'],
       'started_ts': reap_ts,
       'state': task_result.State.COMPLETED,
@@ -395,7 +403,7 @@ class TaskResultApiTest(test_case.TestCase):
     result_summary.put()
     run_result = task_result.new_run_result(request, 1, 'localhost', 'abc')
     run_result.completed_ts = self.now
-    ndb.put_multi(task_result.prepare_put_run_result(run_result))
+    ndb.put_multi(task_result.prepare_put_run_result(run_result, request))
 
     self.mock_now(self.now + task_result.BOT_PING_TOLERANCE)
     self.assertEqual([], list(task_result.yield_run_results_with_dead_bot()))
@@ -412,7 +420,7 @@ class TaskResultApiTest(test_case.TestCase):
     ndb.put_multi((result_summary, run_result))
 
     self.assertTrue(result_summary.need_update_from_run_result(run_result))
-    ndb.put_multi(task_result.prepare_put_run_result(run_result))
+    ndb.put_multi(task_result.prepare_put_run_result(run_result, request))
 
     self.assertFalse(result_summary.need_update_from_run_result(run_result))
 
@@ -424,10 +432,10 @@ class TaskResultApiTest(test_case.TestCase):
     ndb.put_multi((result_summary, run_result))
 
     self.assertTrue(result_summary.need_update_from_run_result(run_result))
-    ndb.put_multi(task_result.prepare_put_run_result(run_result))
+    ndb.put_multi(task_result.prepare_put_run_result(run_result, request))
 
     self.mock(utils, 'get_app_version', lambda: 'new-version')
-    ndb.put_multi(task_result.prepare_put_run_result(run_result))
+    ndb.put_multi(task_result.prepare_put_run_result(run_result, request))
     self.assertEqual(
         ['default-version', 'new-version'], run_result.server_versions)
     self.assertEqual(
@@ -443,17 +451,18 @@ class TaskResultApiTest(test_case.TestCase):
     ndb.put_multi((result_summary, run_result_2))
 
     self.assertTrue(result_summary.need_update_from_run_result(run_result_1))
-    ndb.put_multi(task_result.prepare_put_run_result(run_result_1))
+    ndb.put_multi(task_result.prepare_put_run_result(run_result_1, request))
 
     self.assertFalse(result_summary.need_update_from_run_result(run_result_1))
 
     self.assertTrue(result_summary.need_update_from_run_result(run_result_2))
-    ndb.put_multi(task_result.prepare_put_run_result(run_result_2))
+    ndb.put_multi(task_result.prepare_put_run_result(run_result_2, request))
     result_summary = result_summary.key.get()
 
     self.assertEqual(2, result_summary.try_number)
     self.assertFalse(result_summary.need_update_from_run_result(run_result_1))
-    self.assertEqual(1, len(task_result.prepare_put_run_result(run_result_1)))
+    self.assertEqual(
+        1, len(task_result.prepare_put_run_result(run_result_1, request)))
 
   def test_run_result_duration(self):
     run_result = task_result.TaskRunResult(
@@ -478,7 +487,7 @@ class TestOutput(test_case.TestCase):
     result_summary = task_result.new_result_summary(request)
     result_summary.put()
     self.run_result = task_result.new_run_result(request, 1, 'localhost', 'abc')
-    ndb.put_multi(task_result.prepare_put_run_result(self.run_result))
+    ndb.put_multi(task_result.prepare_put_run_result(self.run_result, request))
 
   def assertTaskOutputChunk(self, expected):
     q = task_result.TaskOutputChunk.query().order(

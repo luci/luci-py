@@ -43,6 +43,7 @@ def _gen_request_data(properties=None, **kwargs):
       'dimensions': {u'OS': u'Windows-3.1.1', u'hostname': u'localhost'},
       'env': {u'foo': u'bar', u'joe': u'2'},
       'execution_timeout_secs': 30,
+      'idempotent': False,
       'io_timeout_secs': None,
     },
     'priority': 50,
@@ -137,13 +138,14 @@ class TaskRequestApiTest(test_case.TestCase):
       'dimensions': {u'OS': u'Windows-3.1.1', u'hostname': u'localhost'},
       'env': {u'foo': u'bar', u'joe': u'2'},
       'execution_timeout_secs': 30,
+      'idempotent': False,
       'io_timeout_secs': None,
     }
     expected_request = {
       'name': u'Request name',
       'priority': 50,
       'properties': expected_properties,
-      'properties_hash': '939ee4f5b97c56a003cae8bf52d07725b6eadafd',
+      'properties_hash': None,
       'user': u'Jesus',
       'tags': [u'tag1'],
     }
@@ -156,22 +158,40 @@ class TaskRequestApiTest(test_case.TestCase):
     self.assertEqual(expected_request, actual)
     self.assertEqual(31., request.scheduling_expiration_secs)
 
+  def test_make_request_idempotent(self):
+    request = task_request.make_request(
+        _gen_request_data(properties=dict(idempotent=True)))
+    as_dict = request.to_dict()
+    self.assertEqual(True, as_dict['properties']['idempotent'])
+    # Ensure the algorithm is deterministic.
+    self.assertEqual(
+        '264479359746dd42a6c7154af1bc244061f63170', as_dict['properties_hash'])
+
   def test_duped(self):
     # Two TestRequest with the same properties.
-    request_1 = task_request.make_request(_gen_request_data())
+    request_1 = task_request.make_request(
+        _gen_request_data(properties=dict(idempotent=True)))
     request_2 = task_request.make_request(
         _gen_request_data(
             name='Other', user='Other', priority=201,
-            scheduling_expiration_secs=129, tags=['tag2']))
-    self.assertEqual(request_1.properties_hash, request_2.properties_hash)
+            scheduling_expiration_secs=129, tags=['tag2'],
+            properties=dict(idempotent=True)))
+    self.assertEqual(
+        request_1.properties.properties_hash,
+        request_2.properties.properties_hash)
+    self.assertTrue(request_1.properties.properties_hash)
 
   def test_different(self):
     # Two TestRequest with different properties.
     request_1 = task_request.make_request(
-        _gen_request_data(properties=dict(execution_timeout_secs=30)))
+        _gen_request_data(
+          properties=dict(execution_timeout_secs=30, idempotent=True)))
     request_2 = task_request.make_request(
-        _gen_request_data(properties=dict(execution_timeout_secs=129)))
-    self.assertNotEqual(request_1.properties_hash, request_2.properties_hash)
+        _gen_request_data(
+          properties=dict(execution_timeout_secs=129, idempotent=True)))
+    self.assertNotEqual(
+        request_1.properties.properties_hash,
+        request_2.properties.properties_hash)
 
   def test_bad_values(self):
     with self.assertRaises(ValueError):
