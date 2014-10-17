@@ -767,6 +767,7 @@ class BotPollHandler(auth.ApiHandler):
         'commands': request.properties.commands,
         'data': request.properties.data,
         'env': request.properties.env,
+        'host': utils.get_versioned_hosturl(),
         'hard_timeout': request.properties.execution_timeout_secs,
         'io_timeout': request.properties.io_timeout_secs,
         'task_id': task_result.pack_run_result_key(run_result_key),

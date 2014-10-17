@@ -232,6 +232,7 @@ def run_manifest(botobj, remote, attributes, manifest):
   # to execute the command. It is important to note that this data is extracted
   # before any I/O is done, like writting the manifest to disk.
   task_id = manifest['task_id']
+  url = manifest.get('host', remote.url)
 
   failure = False
   internal_failure = False
@@ -252,7 +253,7 @@ def run_manifest(botobj, remote, attributes, manifest):
     # relevant.
     command = [
       sys.executable, THIS_FILE, 'local_test_runner',
-      '-S', remote.url,
+      '-S', url,
       '-f', path,
     ]
     logging.debug('Running command: %s', command)

@@ -256,6 +256,27 @@ def get_app_version():
 
 
 @cache
+def get_hostname():
+  """Returns the hostname of this instance."""
+  # Sadly, this causes an RPC and when called too frequently, throws quota
+  # errors.
+  # TODO(maruel): Add support for module, version, instance.
+  return modules.get_hostname()
+
+
+@cache
+def get_versioned_hosturl():
+  """Returns the url hostname of this instance locked to the currently running
+  version.
+  """
+  if is_local_dev_server():
+    # TODO(maruel): It'd be nice if it were easier to use a ephemeral SSL
+    # certificate here.
+    return 'http://' + modules.get_hostname()
+  return 'https://%s-dot-%s' % (get_app_version(), get_hostname())
+
+
+@cache
 def get_app_revision_url():
   """Returns URL of a git revision page for currently running app version.
 

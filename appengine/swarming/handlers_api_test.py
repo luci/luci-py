@@ -478,6 +478,7 @@ class BotApiTest(AppTestBase):
         u'data': [],
         u'env': {},
         u'hard_timeout': 3600,
+        u'host': u'http://localhost:8080',
         u'io_timeout': 1200,
         u'task_id': task_id,
       },

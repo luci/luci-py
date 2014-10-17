@@ -268,14 +268,14 @@ class TestBotMain(net_utils.TestCase):
         bot_main.poll_server(self.bot, self.server, self.attributes, {'s': 1}))
     self.assertEqual([('Please die now',)], restart)
 
-  def _mock_popen(self, returncode):
+  def _mock_popen(self, returncode, url='https://localhost:1'):
     # Method should have "self" as first argument - pylint: disable=E0213
     class Popen(object):
       def __init__(self2, cmd, cwd, stdout, stderr):
         self2.returncode = None
         expected = [
           sys.executable, THIS_FILE, 'local_test_runner',
-          '-S', 'https://localhost:1', '-f', 'work/test_run.json',
+          '-S', url, '-f', 'work/test_run.json',
         ]
         self.assertEqual(expected, cmd)
         self.assertEqual(bot_main.ROOT_DIR, cwd)
@@ -294,10 +294,13 @@ class TestBotMain(net_utils.TestCase):
       self.assertEqual(False, failure)
       self.assertEqual(False, internal_failure)
     self.mock(bot_main, 'on_after_task', on_after_task)
-    self._mock_popen(0)
+    self._mock_popen(0, url='https://localhost:3')
 
-    bot_main.run_manifest(
-        self.bot, self.server, self.attributes, {'task_id': 24})
+    params = {
+      'host': 'https://localhost:3',
+      'task_id': 24,
+    }
+    bot_main.run_manifest(self.bot, self.server, self.attributes, params)
 
   def test_run_manifest_task_failure(self):
     self.mock(bot_main, 'post_error_task', self.fail)
