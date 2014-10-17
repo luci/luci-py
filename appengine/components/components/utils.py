@@ -260,13 +260,18 @@ def get_app_version():
 def get_versioned_hosturl():
   """Returns the url hostname of this instance locked to the currently running
   version.
+
+  This function hides the fact that app_identity.get_default_version_hostname()
+  returns None on the dev server and modules.get_hostname() returns incorrectly
+  qualified hostname for HTTPS usage on the prod server. <3
   """
-  hostname = app_identity.get_default_version_hostname()
   if is_local_dev_server():
     # TODO(maruel): It'd be nice if it were easier to use a ephemeral SSL
     # certificate here and not assume unsecured connection.
-    return 'http://' + hostname
-  return 'https://%s-dot-%s' % (get_app_version(), hostname)
+    return 'http://' + modules.get_hostname()
+
+  return 'https://%s-dot-%s' % (
+      get_app_version(), app_identity.get_default_version_hostname())
 
 
 @cache

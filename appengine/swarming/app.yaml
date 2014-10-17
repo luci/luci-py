@@ -53,6 +53,7 @@ skip_files:
 # Test and tools.
 - ^tests/
 - ^tools/
+- test_.+\.py$
 - .+_test\.py$
 # Junk files.
 - ^(.*/)?\..*
