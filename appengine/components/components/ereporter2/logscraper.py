@@ -21,14 +21,14 @@ from . import models
 
 
 # Handle this error message specifically.
-SOFT_MEMORY = 'Exceeded soft private memory limit'
+SOFT_MEMORY = u'Exceeded soft private memory limit'
 
 
 ### Private constants.
 
 
 # Markers to read back a stack trace.
-_STACK_TRACE_MARKER = 'Traceback (most recent call last):'
+_STACK_TRACE_MARKER = u'Traceback (most recent call last):'
 
 
 # Number of first error records to show in the category error list.
