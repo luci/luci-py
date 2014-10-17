@@ -4,7 +4,6 @@
 # found in the LICENSE file.
 
 import datetime
-import hashlib
 import sys
 import unittest
 
@@ -13,220 +12,21 @@ test_env.setup_test_env()
 
 from google.appengine.ext import ndb
 
-from components import datastore_utils
+from components.datastore_utils import serializable
 from support import test_case
 
 
-# Disable 'Access to a protected member ...'. NDB uses '_' for other purposes.
-# pylint: disable=W0212
-
-
-class EntityX(ndb.Model):
-  a = ndb.IntegerProperty()
-
-
-def int_ceil_div(value, divisor):
-  """Returns the ceil() value of a integer based division."""
-  return (value + divisor - 1) / divisor
-
-
-class BP(ndb.Model):
-  bar = datastore_utils.BytesComputedProperty(lambda _: '\x00')
-
-
-class DJP(ndb.Model):
-  bar = datastore_utils.DeterministicJsonProperty(json_type=dict)
-
-
-class BytesComputedPropertyTest(test_case.TestCase):
-  def test_all(self):
-    self.assertEqual('\x00', BP().bar)
-    BP().put()
-    self.assertEqual('\x00', BP.query().get().bar)
-
-
-class DeterministicJsonPropertyTest(test_case.TestCase):
-  def test_all(self):
-    self.assertEqual({'a': 1}, DJP(bar={'a': 1}).bar)
-
-    DJP(bar={'a': 1}).put()
-    self.assertEqual({'a': 1}, DJP.query().get().bar)
-
-    with self.assertRaises(TypeError):
-      DJP(bar=[])
-
-
-class ShardingTest(test_case.TestCase):
-  def test_shard_key(self):
-    actual = datastore_utils.shard_key('1234', 2, 'Root')
-    expected = "Key('Root', '12')"
-    self.assertEqual(expected, str(actual))
-
-  def test_hashed_shard_key(self):
-    actual = datastore_utils.hashed_shard_key('1234', 2, 'Root')
-    expected = "Key('Root', '%s')" % hashlib.md5('1234').hexdigest()[:2]
-    self.assertEqual(expected, str(actual))
-
-  def test_insert(self):
-    data = EntityX(id=1, parent=datastore_utils.shard_key('1', 1, 'Root'))
-    actual = datastore_utils.insert(data, None)
-    expected = ndb.Key('Root', '1', 'EntityX', 1)
-    self.assertEqual(expected, actual)
-
-  def test_insert_already_present(self):
-    EntityX(id=1, parent=datastore_utils.shard_key('1', 1, 'Root')).put()
-    data = EntityX(id=1, parent=datastore_utils.shard_key('1', 1, 'Root'))
-    actual = datastore_utils.insert(data, None)
-    self.assertEqual(None, actual)
-
-  def test_insert_new_key(self):
-    data = EntityX(id=1, parent=datastore_utils.shard_key('1', 1, 'Root'))
-    actual = datastore_utils.insert(data, self.fail)
-    expected = ndb.Key('Root', '1', 'EntityX', 1)
-    self.assertEqual(expected, actual)
-
-  def test_insert_new_key_already_present(self):
-    EntityX(id=1, parent=datastore_utils.shard_key('1', 1, 'Root')).put()
-    data = EntityX(id=1, parent=datastore_utils.shard_key('1', 1, 'Root'))
-    new_key = ndb.Key(
-        'EntityX', 2, parent=datastore_utils.shard_key('2', 1, 'Root'))
-    actual = datastore_utils.insert(data, lambda: new_key)
-    expected = ndb.Key('Root', '2', 'EntityX', 2)
-    self.assertEqual(expected, actual)
-
-  def test_insert_new_key_already_present_twice(self):
-    EntityX(id=1, parent=datastore_utils.shard_key('1', 1, 'Root')).put()
-    EntityX(id=2, parent=datastore_utils.shard_key('2', 1, 'Root')).put()
-    data = EntityX(id=1, parent=datastore_utils.shard_key('1', 1, 'Root'))
-    new_keys = [
-      ndb.Key('EntityX', 2, parent=datastore_utils.shard_key('2', 1, 'Root')),
-      ndb.Key('EntityX', 3, parent=datastore_utils.shard_key('3', 1, 'Root')),
-    ]
-    actual = datastore_utils.insert(data, lambda: new_keys.pop(0))
-    self.assertEqual([], new_keys)
-    expected = ndb.Key('Root', '3', 'EntityX', 3)
-    self.assertEqual(expected, actual)
-
-  def test_insert_new_key_already_present_twice_fail_after(self):
-    EntityX(id=1, parent=datastore_utils.shard_key('1', 1, 'Root')).put()
-    EntityX(id=2, parent=datastore_utils.shard_key('2', 1, 'Root')).put()
-    EntityX(id=3, parent=datastore_utils.shard_key('3', 1, 'Root')).put()
-    data = EntityX(id=1, parent=datastore_utils.shard_key('1', 1, 'Root'))
-    new_keys = [
-      ndb.Key('EntityX', 2, parent=datastore_utils.shard_key('2', 1, 'Root')),
-      ndb.Key('EntityX', 3, parent=datastore_utils.shard_key('3', 1, 'Root')),
-    ]
-    actual = datastore_utils.insert(
-        data, lambda: new_keys.pop(0) if new_keys else None)
-    self.assertEqual([], new_keys)
-    self.assertEqual(None, actual)
-
-  def test_pop_future(self):
-    items = [ndb.Future() for _ in xrange(5)]
-    items[1].set_result(None)
-    items[3].set_result('foo')
-    inputs = items[:]
-    datastore_utils.pop_future_done(inputs)
-    self.assertEqual([items[0], items[2], items[4]], inputs)
-
-  def test_page_queries(self):
-    for i in range(40):
-      EntityX(id=i, a=i%4).put()
-    queries = [
-      EntityX.query(),
-      EntityX.query(EntityX.a == 1),
-      EntityX.query(EntityX.a == 2),
-    ]
-    actual = list(datastore_utils.page_queries(queries))
-
-    # The order won't be deterministic. The only important this is that exactly
-    # all the items are returned as chunks.
-    expected = [
-      [EntityX(id=i, a=1) for i in xrange(1, 40, 4)],
-      [EntityX(id=i, a=2) for i in xrange(2, 42, 4)],
-      [EntityX(id=i, a=i%4) for i in xrange(1, 21)],
-      [EntityX(id=i, a=i%4) for i in xrange(21, 40)],
-    ]
-    self.assertEqual(len(expected), len(actual))
-    for line in actual:
-      # Items may be returned out of order.
-      try:
-        i = expected.index(line)
-      except ValueError:
-        self.fail('%s not found in %s' % (line, actual))
-      self.assertEqual(expected.pop(i), line)
-
-  def test_incremental_map(self):
-    for i in range(40):
-      EntityX(id=i, a=i%4).put()
-    queries = [
-      EntityX.query(),
-      EntityX.query(EntityX.a == 1),
-      EntityX.query(EntityX.a == 2),
-    ]
-    actual = []
-    # Use as much default arguments as possible.
-    datastore_utils.incremental_map(queries, actual.append)
-
-    # The order won't be deterministic. The only important this is that exactly
-    # all the items are returned as chunks and there is 3 chunks.
-    expected = sorted(
-        [EntityX(id=i, a=1) for i in xrange(1, 40, 4)] +
-        [EntityX(id=i, a=2) for i in xrange(2, 42, 4)] +
-        [EntityX(id=i, a=i%4) for i in xrange(1, 21)] +
-        [EntityX(id=i, a=i%4) for i in xrange(21, 40)],
-        key=lambda x: (x.key.id, x.to_dict()))
-    map_page_size = 20
-    self.assertEqual(int_ceil_div(len(expected), map_page_size), len(actual))
-    actual = sorted(sum(actual, []), key=lambda x: (x.key.id, x.to_dict()))
-    self.assertEqual(expected, actual)
-
-  def test_incremental_map_throttling(self):
-    for i in range(40):
-      EntityX(id=i, a=i%4).put()
-    queries = [
-      EntityX.query(),
-      EntityX.query(EntityX.a == 1),
-      EntityX.query(EntityX.a == 2),
-    ]
-    actual = []
-    def map_fn(items):
-      actual.extend(items)
-      # Note that it is returning more Future than what is called. It's fine.
-      for _ in xrange(len(items) * 5):
-        n = ndb.Future('yo dawg')
-        # TODO(maruel): It'd be nice to not set them completed right away to
-        # have better code coverage but I'm not sure how to do this.
-        n.set_result('yo')
-        yield n
-
-    def filter_fn(item):
-      return item.a == 2
-
-    datastore_utils.incremental_map(
-        queries=queries,
-        map_fn=map_fn,
-        filter_fn=filter_fn,
-        max_inflight=1,
-        map_page_size=2,
-        fetch_page_size=3)
-
-    # The order won't be deterministic so sort it.
-    expected = sorted(
-        [EntityX(id=i, a=2) for i in xrange(2, 42, 4)] * 2,
-        key=lambda x: (x.key.id, x.to_dict()))
-    actual.sort(key=lambda x: (x.key.id, x.to_dict()))
-    self.assertEqual(expected, actual)
+# Access to a protected member _XX of a client class - pylint: disable=W0212
 
 
 class SerializableModelTest(test_case.TestCase):
-  """Tests for datastore_utils.SerializableModelMixin and related property
-  converters.
+  """Tests for datastore_utils.serializable.SerializableModelMixin and related
+  property converters.
   """
 
   def test_simple_properties(self):
     """Simple properties are unmodified in to_serializable_dict()."""
-    class Entity(ndb.Model, datastore_utils.SerializableModelMixin):
+    class Entity(ndb.Model, serializable.SerializableModelMixin):
       blob_prop = ndb.BlobProperty()
       bool_prop = ndb.BooleanProperty()
       float_prop = ndb.FloatProperty()
@@ -255,7 +55,7 @@ class SerializableModelTest(test_case.TestCase):
 
     # Ensure all simple properties (from _SIMPLE_PROPERTIES) are covered.
     self.assertEqual(
-        set(datastore_utils._SIMPLE_PROPERTIES),
+        set(serializable._SIMPLE_PROPERTIES),
         set(prop.__class__ for prop in Entity._properties.itervalues()))
 
     # Check entity -> serializable dict conversion.
@@ -270,11 +70,11 @@ class SerializableModelTest(test_case.TestCase):
 
   def test_serializable_properties(self):
     """Check that |serializable_properties| works as expected."""
-    class Entity(ndb.Model, datastore_utils.SerializableModelMixin):
+    class Entity(ndb.Model, serializable.SerializableModelMixin):
       serializable_properties = {
-        'prop_rw': datastore_utils.READABLE | datastore_utils.WRITABLE,
-        'prop_r': datastore_utils.READABLE,
-        'prop_w': datastore_utils.WRITABLE,
+        'prop_rw': serializable.READABLE | serializable.WRITABLE,
+        'prop_r': serializable.READABLE,
+        'prop_w': serializable.WRITABLE,
         'prop_hidden_1': 0,
       }
       prop_r = ndb.IntegerProperty(default=0)
@@ -315,7 +115,7 @@ class SerializableModelTest(test_case.TestCase):
 
   def test_entity_id(self):
     """Test that 'with_id_as' argument in to_serializable_dict is respected."""
-    class Entity(ndb.Model, datastore_utils.SerializableModelMixin):
+    class Entity(ndb.Model, serializable.SerializableModelMixin):
       pass
     self.assertEqual(
         {'my_id': 'abc'},
@@ -323,7 +123,7 @@ class SerializableModelTest(test_case.TestCase):
 
   def test_datetime_properties(self):
     """Test handling of DateTimeProperty."""
-    class Entity(ndb.Model, datastore_utils.SerializableModelMixin):
+    class Entity(ndb.Model, serializable.SerializableModelMixin):
       dt = ndb.DateTimeProperty()
 
     # Same point in time as datetime and as timestamp.
@@ -337,9 +137,9 @@ class SerializableModelTest(test_case.TestCase):
 
   def test_repeated_properties(self):
     """Test that properties with repeated=True are handled."""
-    class IntsEntity(ndb.Model, datastore_utils.SerializableModelMixin):
+    class IntsEntity(ndb.Model, serializable.SerializableModelMixin):
       ints = ndb.IntegerProperty(repeated=True)
-    class DatesEntity(ndb.Model, datastore_utils.SerializableModelMixin):
+    class DatesEntity(ndb.Model, serializable.SerializableModelMixin):
       dates = ndb.DateTimeProperty(repeated=True)
 
     # Same point in time as datetime and as timestamp.
@@ -373,14 +173,14 @@ class SerializableModelTest(test_case.TestCase):
       a = ndb.IntegerProperty()
 
     # With SerializableModelMixin.
-    class InnerSmart(ndb.Model, datastore_utils.SerializableModelMixin):
+    class InnerSmart(ndb.Model, serializable.SerializableModelMixin):
       serializable_properties = {
-        'a': datastore_utils.READABLE | datastore_utils.WRITABLE,
+        'a': serializable.READABLE | serializable.WRITABLE,
       }
       a = ndb.IntegerProperty()
       b = ndb.IntegerProperty()
 
-    class Outter(ndb.Model, datastore_utils.SerializableModelMixin):
+    class Outter(ndb.Model, serializable.SerializableModelMixin):
       simple = structured_cls(InnerSimple)
       smart = structured_cls(InnerSmart)
 
@@ -406,7 +206,7 @@ class SerializableModelTest(test_case.TestCase):
     class Inner(ndb.Model):
       a = ndb.IntegerProperty()
 
-    class Outter(ndb.Model, datastore_utils.SerializableModelMixin):
+    class Outter(ndb.Model, serializable.SerializableModelMixin):
       inner = structured_cls(Inner, repeated=True)
 
     # Repeated structured property -> list of dicts.
@@ -439,7 +239,7 @@ class SerializableModelTest(test_case.TestCase):
 
   def test_exclude_works(self):
     """|exclude| argument of to_serializable_dict() is respected."""
-    class Entity(ndb.Model, datastore_utils.SerializableModelMixin):
+    class Entity(ndb.Model, serializable.SerializableModelMixin):
       prop1 = ndb.IntegerProperty()
       prop2 = ndb.IntegerProperty()
       prop3 = ndb.IntegerProperty()
@@ -451,7 +251,7 @@ class SerializableModelTest(test_case.TestCase):
 
   def test_from_serializable_dict_kwargs_work(self):
     """Keyword arguments in from_serializable_dict are passed to constructor."""
-    class Entity(ndb.Model, datastore_utils.SerializableModelMixin):
+    class Entity(ndb.Model, serializable.SerializableModelMixin):
       prop = ndb.IntegerProperty()
 
     # Pass entity key via keyword parameters.
@@ -462,7 +262,7 @@ class SerializableModelTest(test_case.TestCase):
 
   def test_from_serializable_dict_kwargs_precedence(self):
     """Keyword arguments in from_serializable_dict take precedence."""
-    class Entity(ndb.Model, datastore_utils.SerializableModelMixin):
+    class Entity(ndb.Model, serializable.SerializableModelMixin):
       prop = ndb.IntegerProperty()
 
     # Pass |prop| via serialized dict and as a keyword arg.
@@ -472,7 +272,7 @@ class SerializableModelTest(test_case.TestCase):
 
   def test_bad_type_in_from_serializable_dict(self):
     """from_serializable_dict raises ValueError when seeing unexpected type."""
-    class Entity(ndb.Model, datastore_utils.SerializableModelMixin):
+    class Entity(ndb.Model, serializable.SerializableModelMixin):
       pass
 
     # Pass a list instead of dict.
@@ -481,7 +281,7 @@ class SerializableModelTest(test_case.TestCase):
 
   def test_bad_type_for_repeated_property(self):
     """Trying to deserialize repeated property not from a list -> ValueError."""
-    class Entity(ndb.Model, datastore_utils.SerializableModelMixin):
+    class Entity(ndb.Model, serializable.SerializableModelMixin):
       prop = ndb.IntegerProperty(repeated=True)
 
     # A list, tuple or nothing should work.
@@ -501,7 +301,7 @@ class SerializableModelTest(test_case.TestCase):
 
   def test_bad_type_for_simple_property(self):
     """Trying to deserialize non-number into IntegerProperty -> ValueError."""
-    class Entity(ndb.Model, datastore_utils.SerializableModelMixin):
+    class Entity(ndb.Model, serializable.SerializableModelMixin):
       prop = ndb.IntegerProperty()
 
     # Works.
@@ -512,7 +312,7 @@ class SerializableModelTest(test_case.TestCase):
 
   def test_bad_type_for_datetime_property(self):
     """Trying to deserialize non-number into DateTimeProperty -> ValueError."""
-    class Entity(ndb.Model, datastore_utils.SerializableModelMixin):
+    class Entity(ndb.Model, serializable.SerializableModelMixin):
       prop = ndb.DateTimeProperty()
 
     # Works.
@@ -522,7 +322,7 @@ class SerializableModelTest(test_case.TestCase):
       Entity.from_serializable_dict({'prop': 'abc'})
 
 
-class BytesSerializableObject(datastore_utils.BytesSerializable):
+class BytesSerializableObject(serializable.BytesSerializable):
   def __init__(self, payload):  # pylint: disable=W0231
     self.payload = payload
 
@@ -534,8 +334,7 @@ class BytesSerializableObject(datastore_utils.BytesSerializable):
     return cls(byte_buf[len('prefix:'):])
 
 
-class BytesSerializableObjectProperty(
-    datastore_utils.BytesSerializableProperty):
+class BytesSerializableObjectProperty(serializable.BytesSerializableProperty):
   _value_type = BytesSerializableObject
 
 
@@ -544,7 +343,7 @@ class BytesSerializableTest(test_case.TestCase):
 
   def test_bytes_serializable(self):
     """Test to_serializable_dict and convert_serializable_dict."""
-    class Entity(ndb.Model, datastore_utils.SerializableModelMixin):
+    class Entity(ndb.Model, serializable.SerializableModelMixin):
       bytes_prop = BytesSerializableObjectProperty()
 
     # Ensure to_serializable_dict uses to_bytes.
@@ -557,7 +356,7 @@ class BytesSerializableTest(test_case.TestCase):
     self.assertEqual('hi', entity.bytes_prop.payload)
 
 
-class JsonSerializableObject(datastore_utils.JsonSerializable):
+class JsonSerializableObject(serializable.JsonSerializable):
   def __init__(self, payload):  # pylint: disable=W0231
     self.payload = payload
 
@@ -569,7 +368,7 @@ class JsonSerializableObject(datastore_utils.JsonSerializable):
     return cls(obj['payload'])
 
 
-class JsonSerializableObjectProperty(datastore_utils.JsonSerializableProperty):
+class JsonSerializableObjectProperty(serializable.JsonSerializableProperty):
   _value_type = JsonSerializableObject
 
 
@@ -578,7 +377,7 @@ class JsonSerializableTest(test_case.TestCase):
 
   def test_json_serializable(self):
     """Test to_serializable_dict and convert_serializable_dict."""
-    class Entity(ndb.Model, datastore_utils.SerializableModelMixin):
+    class Entity(ndb.Model, serializable.SerializableModelMixin):
       json_prop = JsonSerializableObjectProperty()
 
     # Ensure to_serializable_dict uses to_jsonish.
