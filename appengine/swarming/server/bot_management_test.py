@@ -23,6 +23,7 @@ import test_env
 
 test_env.setup_test_env()
 
+from components import auth
 from server import bot_archive
 from server import bot_management
 from server import task_result
@@ -30,6 +31,14 @@ from support import test_case
 
 
 class BotManagementTest(test_case.TestCase):
+  def setUp(self):
+    super(BotManagementTest, self).setUp()
+    self.testbed.init_user_stub()
+
+    self.mock(
+        auth, 'get_current_identity',
+        lambda: auth.Identity(auth.IDENTITY_USER, 'joe@localhost'))
+
   def test_store_bot_config(self):
     # When a new start slave script is uploaded, we should recalculate the
     # version hash since it will have changed.

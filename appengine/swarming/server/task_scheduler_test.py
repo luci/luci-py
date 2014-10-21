@@ -776,13 +776,15 @@ class TaskSchedulerApiTest(test_case.TestCase):
     index = [0]
     SKIP = 3
     def put_multi(*args, **kwargs):
-      self.assertEqual('make_request', inspect.stack()[1][3])
+      callers = [i[3] for i in inspect.stack()]
+      self.assertIn('make_request', callers)
       if (index[0] % SKIP) == 1:
         raise RandomFailure()
       return old_put_multi(*args, **kwargs)
 
     def put(*args, **kwargs):
-      self.assertEqual('make_request', inspect.stack()[1][3])
+      callers = [i[3] for i in inspect.stack()]
+      self.assertIn('make_request', callers)
       if (index[0] % SKIP) == 2:
         raise RandomFailure()
       return old_put(*args, **kwargs)
@@ -804,9 +806,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
         pass
 
     self.assertEqual(34, len(saved))
-    # The mocking doesn't affect TaskRequest since it uses
-    # datastore_utils.insert() which uses ndb.Model.put().
-    self.assertEqual(100, task_request.TaskRequest.query().count())
+    self.assertEqual(67, task_request.TaskRequest.query().count())
     self.assertEqual(34, task_result.TaskResultSummary.query().count())
 
     # Now the DB is full of half-corrupted entities.

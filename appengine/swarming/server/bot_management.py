@@ -14,21 +14,15 @@ import os.path
 from google.appengine.api import memcache
 from google.appengine.ext import ndb
 
+from components import auth
 from components import datastore_utils
 from components import utils
 from common import test_request_message
 from server import bot_archive
-from server import file_chunks
 from server import task_result
 
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
-
-# The key to use to access the start slave script file model.
-# TODO(maruel): Create new version of the files instead of overwriting, to keep
-# a log of changes.
-BOT_CONFIG_SCRIPT_KEY = 'start_slave_script'
 
 
 # The amount of time that has to pass before a machine is considered dead.
@@ -116,47 +110,72 @@ class Bot(ndb.Model):
     return out
 
 
+class VersionedFile(ndb.Model):
+  created_ts = ndb.DateTimeProperty(indexed=False, auto_now_add=True)
+  who = auth.IdentityProperty(indexed=False)
+  content = ndb.BlobProperty(compressed=True)
+
+  ROOT_MODEL = datastore_utils.get_versioned_root_model('VersionedFileRoot')
+
+  @classmethod
+  def fetch(cls, name):
+    """Returns the current version of the instance."""
+    return datastore_utils.get_versioned_most_recent_with_root(
+        cls, cls._gen_root_key(name))[1]
+
+  def store(self, name):
+    """Stores a new version of the instance."""
+    # Create an incomplete key.
+    self.key = ndb.Key(self.__class__, None, parent=self._gen_root_key(name))
+    self.who = auth.get_current_identity()
+    return datastore_utils.store_new_version(self, self.ROOT_MODEL)
+
+  @classmethod
+  def _gen_root_key(cls, name):
+    return ndb.Key(cls.ROOT_MODEL, name)
+
+
 ### Public APIs.
 
 
 def get_bootstrap(host_url):
   """Returns the mangled version of the utility script bootstrap.py."""
-  content = file_chunks.RetrieveFile('bootstrap.py')
+  obj = VersionedFile.fetch('bootstrap.py')
+  content = obj.content if obj else None
   if not content:
     # Fallback to the one embedded in the tree.
     with open(os.path.join(ROOT_DIR, 'swarming_bot/bootstrap.py'), 'rb') as f:
       content = f.read()
-  header = 'host_url = %r\n' % host_url
+  header = '# coding=utf-8\nhost_url = %r\n' % host_url
   return header + content
 
 
-def get_bot_config():
-  """Returns the bot_cofnig.py content to be used in the zip.
+def store_bootstrap(content):
+  """Stores a new version of bootstrap.py."""
+  return VersionedFile(content=content).store('bootstrap.py')
 
-  First fetch it from the database, if present. Pass the one in the tree
-  otherwise.
-  """
-  content = file_chunks.RetrieveFile(BOT_CONFIG_SCRIPT_KEY)
-  if content:
-    return content
+
+def get_bot_config():
+  """Returns the current version of bot_config.py."""
+  obj = VersionedFile.fetch('bot_config.py')
+  if obj:
+    return obj.content
+
+  # Fallback to the one embedded in the tree.
   path = os.path.join(ROOT_DIR, 'swarming_bot', 'bot_config.py')
   with open(path, 'rb') as f:
     return f.read()
 
 
-def store_bot_config(script):
-  """Stores the given script as the new start slave script for all slave.
-
-  Args:
-    script: The contents of the new start slave script.
-  """
-  file_chunks.StoreFile(BOT_CONFIG_SCRIPT_KEY, script)
-
+def store_bot_config(content):
+  """Stores a new version of bot_config.py."""
+  out = VersionedFile(content=content).store('bot_config.py')
   # Clear the cached version value since it has now changed. This is *super*
   # aggressive to flush all memcache but that's the only safe way to not send
   # old code by accident.
   while not memcache.flush_all():
     pass
+  return out
 
 
 def get_slave_version(host):

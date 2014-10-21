@@ -27,7 +27,6 @@ from components import ereporter2
 from components import utils
 from server import acl
 from server import bot_management
-from server import file_chunks
 from server import stats_gviz
 from server import task_result
 from server import task_scheduler
@@ -88,7 +87,7 @@ class UploadBootstrapHandler(auth.AuthenticatingHandler):
     if not script:
       self.abort(400, 'No script uploaded')
 
-    file_chunks.StoreFile('bootstrap.py', script.encode('utf-8'))
+    bot_management.store_bootstrap(script.encode('utf-8'))
     self.get()
 
 
