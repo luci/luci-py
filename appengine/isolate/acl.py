@@ -189,23 +189,36 @@ def add_whitelist(ip, group, comment):
     ip, mask = ip.split('/', 1)
     mask = int(mask)
 
-  if not all(_ip_to_str(*_parse_ip(i)) for i in _expand_subnet(ip, mask)):
+  keys = [(ip, _ip_to_str(*_parse_ip(ip))) for ip in _expand_subnet(ip, mask)]
+  if not all(i[1] for i in keys):
     raise ValueError('IP is invalid')
+  keys = [(i[0], ndb.Key(WhitelistedIP, i[1])) for i in keys]
+
+  MAX_CHUNK = 250
 
   note = []
-  for i in _expand_subnet(ip, mask):
-    key = _ip_to_str(*_parse_ip(i))
-    item = WhitelistedIP.get_by_id(key)
-    item_comment = comment
-    if mask != 32:
-      item_comment += ' ' + original_ip
-    if item:
-      item.comment = item_comment
-      item.group = group
-      item.ip = i
-      item.put()
-      note.append('Already present: %s' % i)
-    else:
-      WhitelistedIP(id=key, comment=item_comment, group=group, ip=i).put()
-      note.append('Success: %s' % i)
+  while keys:
+    chunk = keys[:MAX_CHUNK]
+    keys = keys[MAX_CHUNK:]
+
+    to_write = []
+    for item, (ip, key) in zip(ndb.get_multi(i[1] for i in chunk), chunk):
+      item_comment = comment
+      if mask != 32:
+        item_comment += ' ' + original_ip
+
+      if (item and
+          item.comment == item_comment and
+          item.group == group and
+          item.ip == ip):
+        # Skip writing it.
+        note.append('Already present: %s' % ip)
+        continue
+
+      to_write.append(
+          WhitelistedIP(key=key, comment=item_comment, group=group, ip=ip))
+      note.append('Success: %s' % ip)
+    if to_write:
+      ndb.put_multi(to_write)
+
   return note
