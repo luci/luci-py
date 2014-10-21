@@ -17,7 +17,6 @@ from google.appengine.ext import ndb
 from components import auth
 from components import datastore_utils
 from components import utils
-from common import test_request_message
 from server import bot_archive
 from server import task_result
 
@@ -262,55 +261,6 @@ def tag_bot_seen(
       state=state)
   bot.put()
   return bot
-
-
-def validate_and_fix_attributes(attributes):
-  """Validates and fixes the attributes of the requesting machine.
-
-  Args:
-    attributes: A dictionary representing the machine attributes.
-
-  Raises:
-    test_request_message.Error: If the request format/attributes aren't valid.
-
-  Returns:
-    A dictionary containing the fixed attributes of the machine.
-  """
-  # Parse given attributes.
-  for key, value in attributes.iteritems():
-    if key == 'dimensions':
-      if not isinstance(value, dict):
-        raise test_request_message.Error(
-            'Invalid value for %s: %s\n%s' % (key, value, attributes))
-
-    elif key == 'tag':
-      # TODO(maruel): 'tag' is now ignored but do not abort if present so
-      # upgrading can be done seamlessly. Delete this condition once all the
-      # servers and bots are upgraded.
-      pass
-
-    elif key in ('id', 'ip', 'version'):
-      if not isinstance(value, basestring):
-        raise test_request_message.Error(
-            'Invalid value for %s: %s\n%s' % (key, value, attributes))
-
-    elif key == 'try_count':
-      if not isinstance(value, int):
-        raise test_request_message.Error(
-            'Invalid value for %s: %s\n%s' % (key, value, attributes))
-      if value < 0:
-        raise test_request_message.Error(
-            'Invalid value for %s: %s\n%s' % (key, value, attributes))
-
-    else:
-      raise test_request_message.Error(
-          'Invalid key %s\n%s' % (key, attributes))
-
-  if 'dimensions' not in attributes:
-    raise test_request_message.Error('Missing mandatory attribute: dimensions')
-  if 'id' not in attributes:
-    raise test_request_message.Error('Missing mandatory attribute: id')
-  attributes.setdefault('try_count', 0)
 
 
 def get_bot_reboot_period(bot_id, state):

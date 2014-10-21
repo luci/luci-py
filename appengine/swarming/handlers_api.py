@@ -4,7 +4,6 @@
 
 """REST APIs handlers."""
 
-import json
 import logging
 
 import webapp2
@@ -14,7 +13,6 @@ from google.appengine.datastore import datastore_query
 from google.appengine import runtime
 from google.appengine.ext import ndb
 
-from common import test_request_message
 from components import auth
 from components import ereporter2
 from components import utils
@@ -24,54 +22,6 @@ from server import stats
 from server import task_result
 from server import task_scheduler
 from server import task_to_run
-
-
-def convert_test_case(data):
-  """Constructs a TaskProperties out of a test_request_message.TestCase.
-
-  This code is kept for compatibility with the previous API. See make_request()
-  for more details.
-
-  Plan of attack:
-  - Create new bot API.
-  - Convert swarm_bot to use the new versioned API.
-  - Deploy servers.
-  - Delete old bot code.
-  - Create new client API.
-  - Deploy servers.
-  - Switch client code to use new API.
-  - Roll client code into chromium.
-  - Wait 1 month.
-  - Remove old client code API.
-  """
-  test_case = test_request_message.TestCase.FromJSON(data)
-  # TODO(maruel): Add missing mapping and delete obsolete ones.
-  assert len(test_case.configurations) == 1, test_case.configurations
-  config = test_case.configurations[0]
-
-  if test_case.tests:
-    execution_timeout_secs = int(round(test_case.tests[0].hard_time_out))
-    io_timeout_secs = int(round(test_case.tests[0].io_time_out))
-  else:
-    execution_timeout_secs = 2*60*60
-    io_timeout_secs = 60*60
-
-  # Ignore all the settings that are deprecated.
-  return {
-    'name': test_case.test_case_name,
-    'user': test_case.requestor,
-    'properties': {
-      'commands': [c.action for c in test_case.tests],
-      'data': test_case.data,
-      'dimensions': config.dimensions,
-      'env': test_case.env_vars,
-      'execution_timeout_secs': execution_timeout_secs,
-      'io_timeout_secs': io_timeout_secs,
-    },
-    'priority': config.priority,
-    'scheduling_expiration_secs': config.deadline_to_run,
-    'tags': [],
-  }
 
 
 def log_unexpected_keys(expected_keys, actual_keys, request, source, name):
@@ -365,154 +315,6 @@ class ClientCancelHandler(auth.ApiHandler):
       'was_running': was_running,
     }
     self.send_response(out)
-
-
-### Old Client APIs.
-# TODO(maruel): Remove.
-
-
-class DeleteMachineStatsHandler(auth.AuthenticatingHandler):
-  """Handler to delete a bot assignment."""
-
-  # TODO(vadimsh): Implement XSRF token support.
-  xsrf_token_enforce_on = ()
-
-  @auth.require(acl.is_bot_or_admin)
-  def post(self):
-    # TODO(maruel): Implement:
-    # - The bot can only delete itself.
-    # - The admin can delete any bot.
-    bot_key = bot_management.get_bot_key(self.request.get('r', ''))
-    if bot_key.get():
-      bot_key.delete()
-      self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
-      self.response.out.write('Machine Assignment removed.')
-    else:
-      self.response.set_status(204)
-
-
-class TestRequestHandler(auth.AuthenticatingHandler):
-  """Handles task requests from clients."""
-
-  # TODO(vadimsh): Implement XSRF token support.
-  xsrf_token_enforce_on = ()
-
-  @auth.require(acl.is_bot_or_user)
-  def post(self):
-    # Validate the request.
-    if not self.request.get('request'):
-      self.abort(400, 'No request parameter found.')
-
-    # TODO(vadimsh): Store identity of a user that posted the request.
-    test_case = self.request.get('request')
-    try:
-      request_properties = convert_test_case(test_case)
-    except test_request_message.Error as e:
-      message = str(e)
-      logging.error(message)
-      self.abort(400, message)
-
-    # If the priority is below 100, make the the user has right to do so.
-    if request_properties['priority'] < 100 and not acl.is_bot_or_admin():
-      # Silently drop the priority of normal users.
-      request_properties['priority'] = 100
-
-    _, result_summary = task_scheduler.make_request(request_properties)
-    out = {
-      # Return the priority actually used. This enables the client code to print
-      # a warning if the priority was dynamically lowered.
-      'priority': request_properties['priority'],
-      'test_case_name': result_summary.name,
-      'test_keys': [
-        {
-          'config_name': result_summary.name,
-          # TODO(maruel): Remove this.
-          'instance_index': 0,
-          'num_instances': 1,
-          'test_key': task_result.pack_result_summary_key(result_summary.key),
-        }
-      ],
-    }
-    self.response.headers['Content-Type'] = 'application/json; charset=utf-8'
-    self.response.out.write(json.dumps(out))
-
-
-class GetMatchingTestCasesHandler(auth.AuthenticatingHandler):
-  """Get all the keys for any test runners that match a given test case name."""
-
-  @auth.require(acl.is_bot_or_user)
-  def get(self):
-    """Returns a list of TaskResultSummary ndb.Key."""
-    # TODO(maruel): Users can only request their own task. Privileged users can
-    # request any task.
-    test_case_name = self.request.get('name', '')
-    q = task_result.TaskResultSummary.query().filter(
-        task_result.TaskResultSummary.name == test_case_name)
-    # Returns all the relevant task_ids.
-    keys = [
-      task_result.pack_result_summary_key(result_summary)
-      for result_summary in q.iter(keys_only=True)
-    ]
-    logging.info('Found %d keys', len(keys))
-    self.response.headers['Content-Type'] = 'application/json; charset=utf-8'
-    if keys:
-      self.response.write(utils.encode_to_json(keys))
-    else:
-      # TODO(maruel): This is semantically incorrect if you think about this API
-      # as a search API.
-      self.response.set_status(404)
-      self.response.write('[]')
-
-
-class GetResultHandler(auth.AuthenticatingHandler):
-  """Show the full result string from a test runner."""
-
-  @auth.require(acl.is_bot_or_user)
-  def get(self):
-    # TODO(maruel): Users can only request their own task. Privileged users can
-    # request any task.
-    key_id = self.request.get('r', '')
-    # TODO(maruel): Formalize returning data for a specific try or the overall
-    # results.
-    key = None
-    try:
-      key = task_result.unpack_result_summary_key(key_id)
-    except ValueError:
-      try:
-        key = task_result.unpack_run_result_key(key_id)
-      except ValueError:
-        self.response.set_status(400)
-        self.response.out.write('Invalid key')
-        return
-
-    result = key.get()
-    if not result:
-      # TODO(maruel): Use 404 if not present.
-      self.response.set_status(204)
-      logging.info('Unable to provide runner results [key: %s]', key_id)
-      return
-
-    # The old API does not support stdout streaming, so do not provide any
-    # details until the task is completed. This whole handler will be deleted
-    # afterward.
-    exit_codes = None
-    output = None
-    if result.state in task_result.State.STATES_NOT_RUNNING:
-      exit_codes = ','.join(map(str, result.exit_codes))
-      output = u'\n'.join(
-          (i.decode('utf-8', 'replace') if i else '')
-          for i in result.get_outputs())
-    results = {
-      'exit_codes': exit_codes,
-      'machine_id': result.bot_id,
-      'machine_tag': result.bot_id,
-      'config_instance_index': 0,
-      'num_config_instances': 1,
-      'output': output,
-    }
-
-    self.response.headers['Content-Type'] = 'application/json; charset=utf-8'
-    self.response.out.write(json.dumps(results))
 
 
 ### Bot APIs
@@ -947,13 +749,6 @@ class ServerPingHandler(webapp2.RequestHandler):
 
 def get_routes():
   routes = [
-      # Old Client
-      # TODO(maruel): Remove.
-      ('/delete_machine_stats', DeleteMachineStatsHandler),
-      ('/get_matching_test_cases', GetMatchingTestCasesHandler),
-      ('/get_result', GetResultHandler),
-      ('/test', TestRequestHandler),
-
       # New Client API:
       ('/swarming/api/v1/client/bots', ClientApiBots),
       ('/swarming/api/v1/client/bot/<bot_id:[^/]+>', ClientApiBot),

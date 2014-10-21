@@ -64,7 +64,6 @@ def CommonChecks(input_api, output_api):
 
   test_directories = [
     input_api.PresubmitLocalPath(),
-    join('common'),
     join('server'),
     join('swarming_bot'),
   ]

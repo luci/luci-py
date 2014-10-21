@@ -27,8 +27,6 @@ FILES = (
     '__main__.py',
     'bot.py',
     'bot_main.py',
-    'common/__init__.py',
-    'common/test_request_message.py',
     'logging_utils.py',
     'os_utilities.py',
     'task_runner.py',
