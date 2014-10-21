@@ -120,7 +120,7 @@ def bootstrap_dev_server_acls():
   assert utils.is_local_dev_server()
 
   # Add a bot.
-  user_manager.AddWhitelist('127.0.0.1')
+  user_manager.AddWhitelist('127.0.0.1').get_result()
 
   if not auth.is_replica():
     bot = auth.Identity(auth.IDENTITY_BOT, '127.0.0.1')

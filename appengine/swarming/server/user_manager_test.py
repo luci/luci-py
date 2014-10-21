@@ -28,7 +28,7 @@ class UserManagerTest(test_case.TestCase):
     # Make multiple add requests, then a single remove request,
     # then another remove.
     for _ in range(3):
-      user_manager.AddWhitelist(IP[0])
+      user_manager.AddWhitelist(IP[0]).get_result()
     self.assertEqual(1, user_manager.MachineWhitelist.query().count())
     self.assertTrue(user_manager.IsWhitelistedMachine(IP[0]))
 
@@ -39,8 +39,8 @@ class UserManagerTest(test_case.TestCase):
     user_manager.DeleteWhitelist(IP[0])
     self.assertEqual(0, user_manager.MachineWhitelist.query().count())
 
-    user_manager.AddWhitelist(IP[0])
-    user_manager.AddWhitelist(IP[0])
+    user_manager.AddWhitelist(IP[0]).get_result()
+    user_manager.AddWhitelist(IP[0]).get_result()
     self.assertEqual(1, user_manager.MachineWhitelist.query().count())
 
 

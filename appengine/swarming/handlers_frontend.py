@@ -123,8 +123,9 @@ class WhitelistIPHandler(auth.AuthenticatingHandler):
 
     add = self.request.get('a')
     if add == 'True':
-      for ip in ips:
-        user_manager.AddWhitelist(ip)
+      futures = [user_manager.AddWhitelist(ip) for ip in ips]
+      for f in futures:
+        f.get_result()
     elif add == 'False':
       for ip in ips:
         user_manager.DeleteWhitelist(ip)

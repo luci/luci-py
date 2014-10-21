@@ -92,7 +92,7 @@ class AppTestBase(test_case.TestCase):
 
   def set_as_bot(self):
     self.set_as_anonymous()
-    user_manager.AddWhitelist(self.fake_ip)
+    user_manager.AddWhitelist(self.fake_ip).get_result()
 
   # Web or generic
 

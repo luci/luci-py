@@ -20,15 +20,15 @@ class MachineWhitelist(ndb.Model):
   ip = ndb.StringProperty()
 
 
+@ndb.tasklet
 def AddWhitelist(ip):
   """Adds the given IP address to the whitelist."""
-  if MachineWhitelist.query().filter(MachineWhitelist.ip == ip).count(1):
-    # Ignore duplicate requests. Note that the password is silently ignored.
-    logging.info('Ignored duplicate whitelist request for ip: %s', ip)
-    return
-
-  MachineWhitelist(ip=ip).put()
-  logging.debug('Stored ip: %s', ip)
+  res = yield MachineWhitelist.query().filter(
+      MachineWhitelist.ip == ip).count_async(1)
+  if not res:
+    yield MachineWhitelist(ip=ip).put_async()
+    logging.debug('Stored ip: %s', ip)
+  raise ndb.Return(None)
 
 
 def DeleteWhitelist(ip):
