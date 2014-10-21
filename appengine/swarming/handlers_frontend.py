@@ -584,6 +584,7 @@ class TaskHandler(auth.AuthenticatingHandler):
       'following_task_id': following_task_id,
       'following_task_name': following_task_name,
       'full_appid': os.environ['APPLICATION_ID'],
+      'host_url': self.request.host_url,
       'is_running': result.state == task_result.State.RUNNING,
       'now': utils.utcnow(),
       'previous_task_id': previous_task_id,
