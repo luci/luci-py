@@ -425,7 +425,7 @@ def make_request(data):
       properties=properties,
       priority=data['priority'],
       expiration_ts=expiration_ts,
-      tags=data['tags'])
+      tags=sorted(data['tags']))
   _put_request(request)
   return request
 

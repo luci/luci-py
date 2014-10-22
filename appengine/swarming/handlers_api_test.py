@@ -600,7 +600,7 @@ class NewClientApiTest(AppTestBase):
           u'io_timeout_secs': 30,
         },
         u'properties_hash': None,
-        u'tags': [u'foo', u'bar'],
+        u'tags': [u'bar', u'foo'],
         u'user': u'joe@localhost',
       },
       u'task_id': u'125ecfd5c888800',

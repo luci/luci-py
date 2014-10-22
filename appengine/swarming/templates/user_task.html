@@ -8,6 +8,11 @@
     margin-bottom: 10px;
   }
 
+  h2 {
+    margin-top: 10px;
+    margin-bottom: 5px;
+  }
+
   table.property_table {
     font-family: monospace;
     border-spacing: 0;
@@ -55,28 +60,9 @@
 <a href="/user/tasks">Back to tasks list</a>
 <p>
 
+<h2>Request metadata</h2>
 <table class="property_table">
   <tbody>
-    <tr>
-      <td>Bot's previous task</td>
-      <td>
-        {% if previous_task_id %}
-        <a href="/user/task/{{previous_task_id}}">&#x2190; {{previous_task_name}}</a>
-        {% else %}
-        &#8209;&#8209;
-        {% endif %}
-      </td>
-    </tr>
-    <tr>
-      <td>Bot's following task</td>
-      <td>
-        {% if following_task_id %}
-        <a href="/user/task/{{following_task_id}}">{{following_task_name}} &#x2192;</a>
-        {% else %}
-        &#8209;&#8209;
-        {% endif %}
-      </td>
-    </tr>
     <tr>
       <td>Name</td>
       <td>{{request.name}}</td>
@@ -89,6 +75,27 @@
       <td>Priority</td>
       <td>{{request.priority}}</td>
     </tr>
+    <tr>
+      <td>Created</td>
+      <td>{{request.created_ts|datetimeformat}}</td>
+    </tr>
+    <tr>
+      <td>Expiration</td>
+      <td>
+        {{request.expiration_ts|datetimeformat}}
+        ({{(request.expiration_ts-request.created_ts)|timedeltaformat}})
+      </td>
+    </tr>
+    <tr>
+      <td>Tags</td>
+      <td>{{request.tags|join('<br>'|safe)}}</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>Request properties</h2>
+<table class="property_table">
+  <tbody>
     <tr>
       <td>Request dimensions</td>
       <td>{{bot_view.render_dict(request.properties.dimensions)}}</td>
@@ -117,15 +124,34 @@
         {% endfor %}
       </td>
     </tr>
+  </tbody>
+</table>
+
+<h2>Execution</h2>
+<table class="property_table">
+  <tbody>
     <tr>
-      <td>Created</td>
-      <td>{{request.created_ts|datetimeformat}}</td>
+      <td>Bot's previous task</td>
+      <td>
+        {% if previous_task_id %}
+        <a href="/user/task/{{previous_task_id}}">
+          &#x2190; {{previous_task_name}}
+        </a>
+        {% else %}
+        &#8209;&#8209;
+        {% endif %}
+      </td>
     </tr>
     <tr>
-      <td>Expiration</td>
+      <td>Bot's following task</td>
       <td>
-        {{request.expiration_ts|datetimeformat}}
-        ({{(request.expiration_ts-request.created_ts)|timedeltaformat}})
+        {% if following_task_id %}
+        <a href="/user/task/{{following_task_id}}">
+          {{following_task_name}} &#x2192;
+        </a>
+        {% else %}
+        &#8209;&#8209;
+        {% endif %}
       </td>
     </tr>
     <tr>
@@ -229,9 +255,9 @@
   </tbody>
 </table>
 
-<p>
-To run this task locally, execute:
-<pre>  python swarming.py reproduce -S {{host_url}} {{task.key_string}}</pre>
+<br>
+<span style="margin-bottom:0">To run this task locally, execute:</span>
+<pre style="margin-top:0">  python swarming.py reproduce -S {{host_url}} {{task.key_string}}</pre>
 <p>
 
 <h3>Outputs:</h3>
