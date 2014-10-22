@@ -26,6 +26,9 @@ def main(args, app_dir=None):
   parser.add_option(
       '-m', '--module', action='append', help='Module id to update')
   parser.add_option(
+      '-S', '--switch', action='store_true',
+      help='Switch version after uploading new code')
+  parser.add_option(
       '-t', '--tag', help='Tag to attach to a tainted version')
 
   gae_sdk_utils.app_sdk_options(parser, app_dir)
@@ -58,6 +61,16 @@ def main(args, app_dir=None):
   print('Manage at:')
   print('  https://appengine.google.com/deployment?app_id=s~' + app.app_id)
   print('-' * 80)
+
+  if options.switch:
+    if 'tainted' in version:
+      print('')
+      print >> sys.stderr, 'Can\'t use --switch with a tainted version!'
+      return 1
+
+    print('Switching as default version')
+    app.set_default_version(version)
+
   return 0
 
 
