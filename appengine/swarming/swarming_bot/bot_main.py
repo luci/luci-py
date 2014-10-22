@@ -41,6 +41,9 @@ ROOT_DIR = os.path.dirname(THIS_FILE)
 TASK_FAILED = 89
 
 
+### bot_config handler part.
+
+
 def get_attributes():
   """Returns bot_config.py's get_attributes() dict."""
   # Importing this administrator provided script could have side-effects on
@@ -102,6 +105,36 @@ def on_after_task(botobj, failure, internal_failure):
     logging.exception('Failed to call hook on_after_task(): %s', e)
 
 
+def setup_bot():
+  """Calls bot_config.setup_bot() to have the bot self-configure itself.
+
+  See bot_config.py for the return code.
+  """
+  botobj = get_bot(None)
+  try:
+    import bot_config
+  except Exception:
+    logging.exception('bot_config is bad')
+    return True
+
+  try:
+    return bot_config.setup_bot(botobj)
+  except Exception:
+    logging.exception('bot_config.setup_bot() is bad')
+
+  try:
+    # Compatibility code to be removed as soon as all bot_config.py are updated.
+    # TODO(maruel): Delete.
+    # pylint: disable=E1120
+    return bot_config.setup_bot()
+  except Exception:
+    logging.exception('bot_config.setup_bot() is really bad')
+    return True
+
+
+### end of bot_config handler part.
+
+
 def post_error_task(remote, attributes, error, task_id):
   """Posts given error as failure cause for the task.
 
@@ -133,8 +166,8 @@ def post_error_task(remote, attributes, error, task_id):
       '/swarming/api/v1/bot/task_error/%s' % task_id, data=data)
 
 
-def run_bot(remote, error):
-  """Runs the bot until it reboots or self-update."""
+def get_bot(remote):
+  """Returns a valid Bot instance."""
   # TODO(maruel): This should be part of the 'health check' and the bot
   # shouldn't allow itself to upgrade in this condition.
   # https://code.google.com/p/swarming/issues/detail?id=112
@@ -142,20 +175,12 @@ def run_bot(remote, error):
   # annoying to recover. In that case, we set a special property to catch these
   # and help the admin fix the swarming_bot code more quickly.
   attributes = {}
+  error = None
   try:
     # If zip_package.generate_version() fails, we still want the server to do
     # the /server_ping before calculating the attributes.
     attributes['version'] = zip_package.generate_version()
   except Exception as e:
-    error = str(e)
-
-  try:
-    # First thing is to get an arbitrary url. This also ensures the network is
-    # up and running, which is necessary before trying to get the FQDN below.
-    remote.url_read('/server_ping')
-  except Exception as e:
-    # url_read() already traps pretty much every exceptions. This except clause
-    # is kept there "just in case".
     error = str(e)
 
   try:
@@ -170,12 +195,30 @@ def run_bot(remote, error):
   logging.info('Attributes: %s', attributes)
 
   # Handshake to get an XSRF token even if there were errors.
-  remote.xsrf_request_params = {'attributes': attributes.copy()}
-  remote.refresh_token()
+  if remote:
+    remote.xsrf_request_params = {'attributes': attributes.copy()}
+    remote.refresh_token()
 
   botobj = bot.Bot(remote, attributes)
   if error:
     botobj.post_error('Startup failure: %s' % error)
+  return botobj, attributes
+
+
+def run_bot(remote, arg_error):
+  """Runs the bot until it reboots or self-update."""
+  try:
+    # First thing is to get an arbitrary url. This also ensures the network is
+    # up and running, which is necessary before trying to get the FQDN below.
+    remote.url_read('/server_ping')
+  except Exception as e:
+    # url_read() already traps pretty much every exceptions. This except clause
+    # is kept there "just in case".
+    logging.error('Failed to ping')
+
+  botobj, attributes = get_bot(remote)
+  if arg_error:
+    botobj.post_error('Argument error: %s' % arg_error)
 
   started_ts = time.time()
   consecutive_sleeps = 0
@@ -317,8 +360,6 @@ def update_bot(botobj, remote, version):
 
   # This code runs only if bot failed to respawn itself.
   botobj.post_error(remote, 'Bot failed to respawn after update')
-
-
 
 
 def get_config():

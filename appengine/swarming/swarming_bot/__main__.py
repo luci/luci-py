@@ -66,8 +66,8 @@ def CMDstart_slave(args):
   logging.info(
       'importing bot_config: %s, %s', THIS_FILE, zip_package.generate_version())
   try:
-    import bot_config
-    if not bot_config.setup_bot():
+    import bot_main
+    if not bot_main.setup_bot():
       # The code asked to not start the bot code right away. In that case,
       # reboot the machine, unless a flag stated to not do it. The flag is
       # provided when the bot code is updated in place. In that case it is

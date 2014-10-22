@@ -4,18 +4,15 @@
 
 """This file is meant to be overriden by the server's specific copy.
 
-It implements:
-- get_attributes() to return the bot's attributes. It's useful to create
-  particular dimensions.
-- on_after_task() is a hook called after each task.
-- setup_bot() to be called on startup to ensure the bot is in a known state.
-  It's the perfect time to setup automatic startup if needed.
-
-The (new) functions are provided a bot.Bot instance.
+There's 3 types of functions in this file:
+  - get_*() to return properties to describe this bot.
+  - on_*() as hooks based on events happening on the bot.
+  - setup_*() to setup global state on the host.
 """
 
 import os_utilities
 
+# Unused argument 'bot' - pylint: disable=W0613
 
 def get_attributes():
   """Returns the attributes for this bot."""
@@ -25,7 +22,7 @@ def get_attributes():
   return os_utilities.get_attributes(None)
 
 
-def setup_bot():
+def setup_bot(bot):
   """Does one time initialization for this bot.
 
   Returns True if it's fine to start the bot right away. Otherwise, the calling

@@ -5,6 +5,7 @@
 """Bot interface used in bot_config.py."""
 
 import logging
+import sys
 
 import os_utilities
 
@@ -16,10 +17,28 @@ class Bot(object):
     # bot_config.
     self._attributes = attributes
     self._remote = remote
+    self._swarming_bot_zip = sys.modules['__main__'].__file__
+    self._version = getattr(sys.modules['__main__'], '__version__', None)
+
+  @property
+  def bot_main_version(self):
+    """Version of the bot's implementation."""
+    return self._version
 
   @property
   def dimensions(self):
+    """The bot's current dimensions.
+
+    Dimensions are relatively static and not expected to change much. They
+    should change only when it effectively affects the bot's capacity to execute
+    tasks.
+    """
     return self._attributes.get('dimensions', {}).copy()
+
+  @property
+  def swarming_bot_zip(self):
+    """Absolute path to the swarming_bot.zip file."""
+    return self._swarming_bot_zip
 
   def post_error(self, error):
     """Posts given string as a failure.
