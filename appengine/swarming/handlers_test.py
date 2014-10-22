@@ -88,83 +88,6 @@ class FrontendTest(AppTestBase):
     response = self.app.get('/', status=200)
     self.assertGreater(len(response.body), 1000)
 
-  def testUploadStartSlaveHandler(self):
-    self.set_as_admin()
-    xsrf_token = self.get_xsrf_token()
-    response = self.app.get('/restricted/upload/bot_config')
-    response = self.app.post(
-        '/restricted/upload/bot_config?xsrf_token=%s' % xsrf_token,
-        status=400)
-    self.assertEqual(
-        '400 Bad Request\n\nThe server could not comply with the request since '
-        'it is either malformed or otherwise incorrect.\n\n No script uploaded'
-        '  ', response.body)
-
-    response = self.app.post(
-        '/restricted/upload/bot_config?xsrf_token=%s' % xsrf_token,
-        upload_files=[('script', 'script', 'script_body')])
-    self.assertIn('script_body', response.body)
-
-  def testWhitelistIPHandlerParams(self):
-    self.set_as_admin()
-
-    # Make sure the template renders.
-    self.app.get('/restricted/whitelist_ip', {}, status=200)
-    xsrf_token = self.get_xsrf_token()
-
-    # Make sure the link redirects to the right place.
-    self.assertEqual(
-        [],
-        [t.to_dict() for t in user_manager.MachineWhitelist.query().fetch()])
-    self.app.post(
-        '/restricted/whitelist_ip', {'a': 'True', 'xsrf_token': xsrf_token},
-        extra_environ={'REMOTE_ADDR': 'foo'}, status=200)
-    self.assertEqual(
-        [{'ip': u'foo'}],
-        [t.to_dict() for t in user_manager.MachineWhitelist.query().fetch()])
-
-    # All of these requests are invalid so none of them modify entites.
-    self.app.post(
-        '/restricted/whitelist_ip', {'i': '', 'xsrf_token': xsrf_token},
-        expect_errors=True)
-    self.app.post(
-        '/restricted/whitelist_ip', {'i': '123', 'xsrf_token': xsrf_token},
-        expect_errors=True)
-    self.app.post(
-        '/restricted/whitelist_ip',
-        {'i': '123', 'a': 'true', 'xsrf_token': xsrf_token},
-        expect_errors=True)
-    self.assertEqual(
-        [{'ip': u'foo'}],
-        [t.to_dict() for t in user_manager.MachineWhitelist.query().fetch()])
-
-  def testWhitelistIPHandler(self):
-    ip = ['1.2.3.4', '1:2:3:4:5:6:7:8']
-    self.set_as_admin()
-    self.assertEqual(0, user_manager.MachineWhitelist.query().count())
-    xsrf_token = self.get_xsrf_token()
-
-    # Whitelist IPs.
-    self.app.post(
-        '/restricted/whitelist_ip',
-        {'i': ip[0], 'a': 'True', 'xsrf_token': xsrf_token})
-    self.assertEqual(1, user_manager.MachineWhitelist.query().count())
-    self.app.post(
-        '/restricted/whitelist_ip',
-        {'i': ip[1], 'a': 'True', 'xsrf_token': xsrf_token})
-    self.assertEqual(2, user_manager.MachineWhitelist.query().count())
-
-    for i in range(2):
-      whitelist = user_manager.MachineWhitelist.query().filter(
-          user_manager.MachineWhitelist.ip == ip[i])
-      self.assertEqual(1, whitelist.count(), msg='Iteration %d' % i)
-
-    # Remove whitelisted ip.
-    self.app.post(
-        '/restricted/whitelist_ip',
-        {'i': ip[0], 'a': 'False', 'xsrf_token': xsrf_token})
-    self.assertEqual(1, user_manager.MachineWhitelist.query().count())
-
   def testAllSwarmingHandlersAreSecured(self):
     # Test that all handlers are accessible only to authenticated user or
     # bots. Assumes all routes are defined with plain paths (i.e.
@@ -248,30 +171,6 @@ class FrontendTest(AppTestBase):
     )
     for url in urls:
       self.app.get(url, status=200)
-
-  def test_bootstrap_default(self):
-    self.set_as_bot()
-    actual = self.app.get('/bootstrap').body
-    path = os.path.join(self.APP_DIR, 'swarming_bot/bootstrap.py')
-    with open(path, 'rb') as f:
-      expected = f.read()
-    header = '# coding=utf-8\nhost_url = \'http://localhost\'\n'
-    self.assertEqual(header + expected, actual)
-
-  def test_bootstrap_custom(self):
-    # Act under admin identity.
-    self.set_as_admin()
-    self.app.get('/restricted/upload/bootstrap')
-    data = {
-      'script': 'script_body',
-      'xsrf_token': self.get_xsrf_token(),
-    }
-    r = self.app.post('/restricted/upload/bootstrap', data)
-    self.assertIn('script_body', r.body)
-
-    actual = self.app.get('/bootstrap').body
-    expected = '# coding=utf-8\nhost_url = \'http://localhost\'\nscript_body'
-    self.assertEqual(expected, actual)
 
   def test_task_list_empty(self):
     # Just assert it doesn't throw.
@@ -406,6 +305,111 @@ class FrontendTest(AppTestBase):
       response = self.app.get(
           '/restricted/bots?limit=1&sort_by=%s' % sort_by, status=200)
       self.assertTrue(reg.search(response.body), sort_by)
+
+
+class FrontendAdminTest(AppTestBase):
+  # Admin-specific management pages.
+  def test_bootstrap_default(self):
+    self.set_as_bot()
+    actual = self.app.get('/bootstrap').body
+    path = os.path.join(self.APP_DIR, 'swarming_bot/bootstrap.py')
+    with open(path, 'rb') as f:
+      expected = f.read()
+    header = '# coding=utf-8\nhost_url = \'http://localhost\'\n'
+    self.assertEqual(header + expected, actual)
+
+  def test_bootstrap_custom(self):
+    # Act under admin identity.
+    self.set_as_admin()
+    self.app.get('/restricted/upload/bootstrap')
+    data = {
+      'script': 'script_body',
+      'xsrf_token': self.get_xsrf_token(),
+    }
+    r = self.app.post('/restricted/upload/bootstrap', data)
+    self.assertIn('script_body', r.body)
+
+    actual = self.app.get('/bootstrap').body
+    expected = '# coding=utf-8\nhost_url = \'http://localhost\'\nscript_body'
+    self.assertEqual(expected, actual)
+
+  def test_upload_bot_config(self):
+    self.set_as_admin()
+    xsrf_token = self.get_xsrf_token()
+    response = self.app.get('/restricted/upload/bot_config')
+    response = self.app.post(
+        '/restricted/upload/bot_config?xsrf_token=%s' % xsrf_token,
+        status=400)
+    self.assertEqual(
+        '400 Bad Request\n\nThe server could not comply with the request since '
+        'it is either malformed or otherwise incorrect.\n\n No script uploaded'
+        '  ', response.body)
+
+    response = self.app.post(
+        '/restricted/upload/bot_config?xsrf_token=%s' % xsrf_token,
+        upload_files=[('script', 'script', 'script_body')])
+    self.assertIn('script_body', response.body)
+    # TODO(maruel): Assert swarming_bot.zip now contains the new code.
+
+  def testWhitelistIPHandlerParams(self):
+    self.set_as_admin()
+
+    # Make sure the template renders.
+    self.app.get('/restricted/whitelist_ip', {}, status=200)
+    xsrf_token = self.get_xsrf_token()
+
+    # Make sure the link redirects to the right place.
+    self.assertEqual(
+        [],
+        [t.to_dict() for t in user_manager.MachineWhitelist.query().fetch()])
+    self.app.post(
+        '/restricted/whitelist_ip', {'a': 'True', 'xsrf_token': xsrf_token},
+        extra_environ={'REMOTE_ADDR': 'foo'}, status=200)
+    self.assertEqual(
+        [{'ip': u'foo'}],
+        [t.to_dict() for t in user_manager.MachineWhitelist.query().fetch()])
+
+    # All of these requests are invalid so none of them modify entites.
+    self.app.post(
+        '/restricted/whitelist_ip', {'i': '', 'xsrf_token': xsrf_token},
+        expect_errors=True)
+    self.app.post(
+        '/restricted/whitelist_ip', {'i': '123', 'xsrf_token': xsrf_token},
+        expect_errors=True)
+    self.app.post(
+        '/restricted/whitelist_ip',
+        {'i': '123', 'a': 'true', 'xsrf_token': xsrf_token},
+        expect_errors=True)
+    self.assertEqual(
+        [{'ip': u'foo'}],
+        [t.to_dict() for t in user_manager.MachineWhitelist.query().fetch()])
+
+  def testWhitelistIPHandler(self):
+    ip = ['1.2.3.4', '1:2:3:4:5:6:7:8']
+    self.set_as_admin()
+    self.assertEqual(0, user_manager.MachineWhitelist.query().count())
+    xsrf_token = self.get_xsrf_token()
+
+    # Whitelist IPs.
+    self.app.post(
+        '/restricted/whitelist_ip',
+        {'i': ip[0], 'a': 'True', 'xsrf_token': xsrf_token})
+    self.assertEqual(1, user_manager.MachineWhitelist.query().count())
+    self.app.post(
+        '/restricted/whitelist_ip',
+        {'i': ip[1], 'a': 'True', 'xsrf_token': xsrf_token})
+    self.assertEqual(2, user_manager.MachineWhitelist.query().count())
+
+    for i in range(2):
+      whitelist = user_manager.MachineWhitelist.query().filter(
+          user_manager.MachineWhitelist.ip == ip[i])
+      self.assertEqual(1, whitelist.count(), msg='Iteration %d' % i)
+
+    # Remove whitelisted ip.
+    self.app.post(
+        '/restricted/whitelist_ip',
+        {'i': ip[0], 'a': 'False', 'xsrf_token': xsrf_token})
+    self.assertEqual(1, user_manager.MachineWhitelist.query().count())
 
 
 class BackendTest(AppTestBase):
