@@ -5,6 +5,7 @@
 import os
 
 from components import template
+from server import config
 
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -15,4 +16,8 @@ def bootstrap():
 
 def render(name, params=None):
   """Shorthand to render a template."""
-  return template.render(name, params)
+  out = {
+    'google_analytics': config.settings().google_analytics,
+  }
+  out.update(params or {})
+  return template.render(name, out)

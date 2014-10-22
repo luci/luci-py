@@ -22,6 +22,7 @@ from google.appengine.ext import deferred
 import handlers_frontend
 from components import template
 from server import bot_management
+from server import config
 from server import user_manager
 
 
@@ -350,6 +351,17 @@ class FrontendAdminTest(AppTestBase):
         upload_files=[('script', 'script', 'script_body')])
     self.assertIn('script_body', response.body)
     # TODO(maruel): Assert swarming_bot.zip now contains the new code.
+
+  def test_config(self):
+    self.set_as_admin()
+    self.app.get('/restricted/config')
+    params = {
+      'google_analytics': 'foobar',
+      'xsrf_token': self.get_xsrf_token(),
+    }
+    self.app.post('/restricted/config', params)
+    self.assertEqual('foobar', config.settings().google_analytics)
+    self.assertIn('foobar', self.app.get('/').body)
 
   def testWhitelistIPHandlerParams(self):
     self.set_as_admin()

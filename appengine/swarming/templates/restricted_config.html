@@ -1,0 +1,19 @@
+{% extends "swarming/base.html" %}
+
+{% block body %}
+<h1>Global configuration</h1>
+
+{% if note %}
+<span style="color: red; font-style: italic">{{note}}</span><p>
+{% endif %}
+
+<form method="post" action="{{path}}">
+  Google Analytics ID:
+    <input name="google_analytics" value="{{google_analytics}}"/><br>
+
+  <br>
+  <input type="hidden" name="xsrf_token" value="{{xsrf_token}}" />
+  <input type="submit" value="Update" />
+  <br>
+</form>
+{% endblock %}

@@ -27,6 +27,7 @@ from components import ereporter2
 from components import utils
 from server import acl
 from server import bot_management
+from server import config
 from server import stats_gviz
 from server import task_result
 from server import task_scheduler
@@ -43,6 +44,34 @@ SortOptions = collections.namedtuple('SortOptions', ['key', 'name'])
 ### is_admin pages.
 
 # TODO(maruel): Sort the handlers once they got their final name.
+
+
+class ConfigHandler(auth.AuthenticatingHandler):
+  @auth.require(acl.is_admin)
+  def get(self):
+    self.common(None)
+
+  @auth.require(acl.is_admin)
+  def post(self):
+    # Convert MultiDict into a dict.
+    params = {
+      k: self.request.params.getone(k) for k in self.request.params
+      if k != 'xsrf_token'
+    }
+    cfg = config.settings()
+    cfg.populate(**params)
+    cfg.store()
+    self.common('Settings updated')
+
+  def common(self, note):
+    params = {
+      'content': config.settings(),
+      'note': note,
+      'path': self.request.path,
+      'xsrf_token': self.generate_xsrf_token(),
+    }
+    self.response.out.write(
+        template.render('swarming/restricted_config.html', params))
 
 
 class UploadBotConfigHandler(auth.AuthenticatingHandler):
@@ -668,6 +697,7 @@ def create_application(debug):
       ('/restricted/bot/<bot_id:[^/]+>/delete', BotDeleteHandler),
 
       # Admin pages.
+      ('/restricted/config', ConfigHandler),
       ('/restricted/whitelist_ip', WhitelistIPHandler),
       ('/restricted/upload/bot_config', UploadBotConfigHandler),
       ('/restricted/upload/bootstrap', UploadBootstrapHandler),
