@@ -5,9 +5,15 @@
 """Bot interface used in bot_config.py."""
 
 import logging
+import os
 import sys
 
 import os_utilities
+from utils import zip_package
+
+THIS_FILE = os.path.abspath(zip_package.get_main_script_path())
+
+# Method could be a function - pylint: disable=R0201
 
 
 class Bot(object):
@@ -17,7 +23,6 @@ class Bot(object):
     # bot_config.
     self._attributes = attributes
     self._remote = remote
-    self._swarming_bot_zip = sys.modules['__main__'].__file__
     self._version = getattr(sys.modules['__main__'], '__version__', None)
 
   @property
@@ -38,7 +43,7 @@ class Bot(object):
   @property
   def swarming_bot_zip(self):
     """Absolute path to the swarming_bot.zip file."""
-    return self._swarming_bot_zip
+    return THIS_FILE
 
   def post_error(self, error):
     """Posts given string as a failure.
