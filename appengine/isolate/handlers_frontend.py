@@ -82,7 +82,7 @@ class RestrictedGoogleStorageConfig(auth.AuthenticatingHandler):
       self.response.write('Bad private key: %s' % exc)
       return
     # Store the settings.
-    settings.put()
+    settings.store()
     self.response.write('Done!')
 
 

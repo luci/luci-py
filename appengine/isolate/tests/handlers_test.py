@@ -20,6 +20,7 @@ import webtest
 from google.appengine.ext import ndb
 
 from components import auth
+from components import auth_testing
 from components import template
 from components import utils
 from support import test_case
@@ -75,6 +76,8 @@ class MainTest(test_case.TestCase):
         auth.Identity(auth.IDENTITY_USER, 'writer@example.com'), '')
     # TODO(maruel): Create a BOTS_GROUP.
 
+    self.set_as_anonymous()
+
   def tearDown(self):
     template.reset()
     super(MainTest, self).tearDown()
@@ -82,6 +85,7 @@ class MainTest(test_case.TestCase):
   def set_as_anonymous(self):
     ndb.delete_multi(acl.WhitelistedIP.query().fetch(keys_only=True))
     self.testbed.setup_env(USER_EMAIL='', overwrite=True)
+    auth_testing.mock_get_current_identity(self)
 
   def set_as_super_admin(self):
     self.set_as_anonymous()
@@ -94,6 +98,8 @@ class MainTest(test_case.TestCase):
   def set_as_reader(self):
     self.set_as_anonymous()
     self.testbed.setup_env(USER_EMAIL='reader@example.com', overwrite=True)
+    auth_testing.mock_get_current_identity(
+        self, auth.Identity(auth.IDENTITY_USER, 'reader@example.com'))
 
   def set_as_writer(self):
     self.set_as_anonymous()
@@ -147,10 +153,12 @@ class MainTest(test_case.TestCase):
     self.app_frontend.get('/')
 
   def test_browse(self):
+    self.set_as_reader()
     hashhex = self.gen_content()
     self.app_frontend.get('/browse?namespace=default&hash=%s' % hashhex)
 
   def test_browse_missing(self):
+    self.set_as_reader()
     hashhex = '0123456780123456780123456789990123456789'
     self.app_frontend.get('/browse?namespace=default&hash=%s' % hashhex)
 

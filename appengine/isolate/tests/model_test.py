@@ -13,6 +13,8 @@ ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 import test_env
 test_env.setup_test_env()
 
+from components import auth
+from components import auth_testing
 from components import datastore_utils
 from support import test_case
 
@@ -44,6 +46,8 @@ class MainTest(test_case.TestCase):
   def setUp(self):
     """Creates a new app instance for every test case."""
     super(MainTest, self).setUp()
+    auth_testing.mock_get_current_identity(
+        self, auth.Identity(auth.IDENTITY_USER, 'reader@example.com'))
 
   def test_ancestor_assumption(self):
     prefix = '1234'

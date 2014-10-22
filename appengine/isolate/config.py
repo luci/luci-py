@@ -2,22 +2,7 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
-"""Instance specific settings.
-
-Use the datastore editor to change the default values.
-
-Workflow to add a new configuration value to GlobalConfig is:
-  - Add the Property to GlobalConfig with its default value set.
-  - Upload your instance.
-  - Flushing memcache will force a write of the default value for your new
-    property as soon as a setting is looked up.
-
-Workflow to edit a value:
-  - Update the value with AppEngine's Datastore Viewer.
-  - Wait a few seconds for datastore coherency.
-  - Flush Memcache.
-  - Wait 1 min for a local in-memory cache to expire.
-"""
+"""Instance specific settings."""
 
 import os
 
@@ -25,11 +10,16 @@ from google.appengine.api import app_identity
 from google.appengine.api import modules
 from google.appengine.ext import ndb
 
+from components import auth
+from components import datastore_utils
 from components import utils
 
 
 class GlobalConfig(ndb.Model):
   """Application wide settings."""
+  created_ts = ndb.DateTimeProperty(indexed=False, auto_now_add=True)
+  who = auth.IdentityProperty(indexed=False)
+
   # The number of seconds a cache entry must be kept for before it is evicted.
   default_expiration = ndb.IntegerProperty(indexed=False, default=7*24*60*60)
 
@@ -59,6 +49,22 @@ class GlobalConfig(ndb.Model):
   # Secret key used to sign Google Storage URLs: base64 encoded *.der file.
   gs_private_key = ndb.StringProperty(indexed=False, default='')
 
+  ROOT_MODEL = datastore_utils.get_versioned_root_model('GlobalConfigRoot')
+  ROOT_KEY = ndb.Key(ROOT_MODEL, 1)
+
+  @classmethod
+  def fetch(cls):
+    """Returns the current version of the instance."""
+    return datastore_utils.get_versioned_most_recent_with_root(
+        cls, cls.ROOT_KEY)[1]
+
+  def store(self):
+    """Stores a new version of the instance."""
+    # Create an incomplete key.
+    self.key = ndb.Key(self.__class__, None, parent=self.ROOT_KEY)
+    self.who = auth.get_current_identity()
+    return datastore_utils.store_new_version(self, self.ROOT_MODEL)
+
   def _pre_put_hook(self):
     """Generates global_secret only when necessary.
 
@@ -74,28 +80,18 @@ def settings():
 
   Saves any default value that could be missing from the stored entity.
   """
-  # Access to a protected member XXX of a client class.
-  # pylint: disable=W0212
-  context = ndb.ContextOptions(use_cache=False)
-  config = GlobalConfig.get_or_insert('global_config', context_options=context)
+  config = GlobalConfig.fetch()
+  if not config:
+    # TODO(maruel): Remove this code once all instances are migrated.
+    # Access to a protected member XXX of a client class.
+    # pylint: disable=W0212
+    config = ndb.Key(GlobalConfig, 'global_config').get(use_cache=False)
+    if config:
+      config.store()
 
-  # Look in AppEngine internal guts to see if all the values were stored. If
-  # not, store the missing properties in the entity in the datastore.
-  missing = dict(
-      (key, prop._default)
-      for key, prop in GlobalConfig._properties.iteritems()
-      if not prop._has_value(config))
-  if missing:
-    # Not all the properties are set so store the entity with the missing
-    # property set to the default value. In theory it should be done in a
-    # transaction but in practice it's fine.
-    for key, default in missing.iteritems():
-      setattr(config, key, default)
-    config.put()
-
-  if not config.gs_bucket:
-    config.gs_bucket = app_identity.get_application_id()
-    config.put()
+  if not config:
+    config = GlobalConfig(gs_bucket=app_identity.get_application_id())
+    config.store()
 
   return config
 
