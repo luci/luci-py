@@ -234,30 +234,52 @@ class FrontendTest(AppTestBase):
     self.app.get('/user/tasks', status=403)
     self.app.get('/user/task/%s' % task_id, status=403)
 
-  def test_task_list_query(self):
-    # Try all the combinations of task queries to ensure the index exist.
-    self.set_as_privileged_user()
-    self.client_create_task()
-
+  @staticmethod
+  def _sort_state_product():
     sort_choices = [i[0] for i in handlers_frontend.TasksHandler.SORT_CHOICES]
     state_choices = sum(
         ([i[0] for i in j]
           for j in handlers_frontend.TasksHandler.STATE_CHOICES),
         [])
+    return itertools.product(sort_choices, state_choices)
 
-    for sort, state in itertools.product(sort_choices, state_choices):
+  def test_task_list_query(self):
+    # Try all the combinations of task queries to ensure the index exist.
+    self.set_as_privileged_user()
+    self.client_create_task()
+    for sort, state in self._sort_state_product():
       url = '/user/tasks?sort=%s&state=%s' % (sort, state)
       # See require_index in ../components/support/test_case.py in case of
       # NeedIndexError. Do not use status=200 so the output is printed in case
       # of failure.
       resp = self.app.get(url, expect_errors=True)
       self.assertEqual(200, resp.status_code, (resp.body, sort, state))
-      self.app.get(url + '&task_name=hi', status=200)
 
     self.app.get('/user/tasks?sort=foo', status=400)
     self.app.get('/user/tasks?state=foo', status=400)
 
+  def test_task_search_task_name(self):
+    # Try all the combinations of task queries to ensure the index exist.
+    self.set_as_privileged_user()
+    self.client_create_task()
     self.app.get('/user/tasks?task_name=hi', status=200)
+    for sort, state in self._sort_state_product():
+      url = '/user/tasks?sort=%s&state=%s' % (sort, state)
+      self.app.get(url + '&task_name=hi', status=200)
+
+  def test_task_search_task_tag(self):
+    # Try all the combinations of task queries to ensure the index exist.
+    self.set_as_privileged_user()
+    self.client_create_task()
+    self.set_as_bot()
+    token, _ = self.get_bot_token()
+    reaped = self.bot_poll()
+    self.bot_complete_task(token, task_id=reaped['manifest']['task_id'])
+    self.set_as_privileged_user()
+    self.app.get('/user/tasks?task_tag=yo', status=200)
+    for sort, state in self._sort_state_product():
+      url = '/user/tasks?sort=%s&state=%s' % (sort, state)
+      self.app.get(url + '&task_tag=yo', status=200)
 
   def test_task_cancel(self):
     self.set_as_privileged_user()

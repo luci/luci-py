@@ -382,11 +382,13 @@ class TaskResultApiTest(test_case.TestCase):
     self.assertEqual(['foo'], result_summary.get_outputs())
     self.assertEqual(datetime.timedelta(seconds=2), result_summary.duration)
     self.assertEqual(
-        datetime.timedelta(seconds=2), result_summary.duration_now())
+        datetime.timedelta(seconds=2),
+        result_summary.duration_now(utils.utcnow()))
     self.assertEqual(
         datetime.timedelta(seconds=4), result_summary.pending)
     self.assertEqual(
-        datetime.timedelta(seconds=4), result_summary.pending_now())
+        datetime.timedelta(seconds=4),
+        result_summary.pending_now(utils.utcnow()))
 
     self.assertEqual(
         task_result.pack_result_summary_key(result_summary.key),
@@ -469,13 +471,15 @@ class TaskResultApiTest(test_case.TestCase):
         started_ts=datetime.datetime(2010, 1, 1, 0, 0, 0),
         completed_ts=datetime.datetime(2010, 1, 1, 0, 2, 0))
     self.assertEqual(datetime.timedelta(seconds=120), run_result.duration)
-    self.assertEqual(datetime.timedelta(seconds=120), run_result.duration_now())
+    self.assertEqual(
+        datetime.timedelta(seconds=120),
+        run_result.duration_now(utils.utcnow()))
 
     run_result = task_result.TaskRunResult(
         started_ts=datetime.datetime(2010, 1, 1, 0, 0, 0),
         abandoned_ts=datetime.datetime(2010, 1, 1, 0, 1, 0))
     self.assertEqual(None, run_result.duration)
-    self.assertEqual(None, run_result.duration_now())
+    self.assertEqual(None, run_result.duration_now(utils.utcnow()))
 
 
 class TestOutput(test_case.TestCase):

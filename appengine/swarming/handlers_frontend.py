@@ -29,6 +29,7 @@ from server import acl
 from server import bot_management
 from server import config
 from server import stats_gviz
+from server import task_request
 from server import task_result
 from server import task_scheduler
 from server import user_manager
@@ -241,7 +242,7 @@ class BotHandler(auth.AuthenticatingHandler):
     idle_time = datetime.timedelta()
     run_time = datetime.timedelta()
     if run_results:
-      run_time = run_results[0].duration_now() or datetime.timedelta()
+      run_time = run_results[0].duration_now(now) or datetime.timedelta()
       if not cursor and run_results[0].state != task_result.State.RUNNING:
         # Add idle time since last task completed. Do not do this when a cursor
         # is used since it's not representative.
@@ -374,6 +375,7 @@ class TasksHandler(auth.AuthenticatingHandler):
     sort = self.request.get('sort', self.SORT_CHOICES[0][0])
     state = self.request.get('state', self.STATE_CHOICES[0][0][0])
     task_name = self.request.get('task_name', '').strip()
+    task_tag = self.request.get('task_tag', '').strip()
 
     if not any(sort == i[0] for i in self.SORT_CHOICES):
       self.abort(400, 'Invalid sort')
@@ -390,7 +392,7 @@ class TasksHandler(auth.AuthenticatingHandler):
 
     # This call is synchronous.
     tasks, cursor_str, sort, state = self._get_tasks(
-        task_name, cursor_str, limit, sort, state)
+        task_name, task_tag, cursor_str, limit, sort, state)
 
     # Prefetch the TaskRequest all at once, so that ndb's in-process cache has
     # it instead of fetching them one at a time indirectly when using
@@ -403,28 +405,80 @@ class TasksHandler(auth.AuthenticatingHandler):
 
     # Do not let dangling futures linger around.
     ndb.Future.wait_all(futures)
+    gen = (t.duration_now(now) for t in tasks)
+    durations = sorted(i for i in gen if i is not None)
+    gen = (t.pending_now(now) for t in tasks)
+    pendings = sorted(i for i in gen if i is not None)
+
+    def safe_sum(items):
+      return sum(items, datetime.timedelta())
+
+    def avg(items):
+      if not items:
+        return 0.
+      return safe_sum(items) / len(items)
+
+    def median(items):
+      if not items:
+        return 0.
+      middle = len(items) / 2
+      if len(items) % 2:
+        return items[middle]
+      return (items[middle-1]+items[middle]) / 2
+
     params = {
       'cursor': cursor_str,
+      'duration_average': avg(durations),
+      'duration_median': median(durations),
+      'duration_sum': safe_sum(durations),
       'is_admin': acl.is_admin(),
       'is_privileged_user': acl.is_privileged_user(),
       'limit': limit,
       'now': now,
+      'pending_average': avg(pendings),
+      'pending_median': median(pendings),
+      'pending_sum': safe_sum(pendings),
+      'show_footer': bool(pendings or durations),
       'sort': sort,
       'sort_choices': self.SORT_CHOICES,
       'state': state,
       'state_choices': state_choices,
       'tasks': tasks,
       'task_name': task_name,
+      'task_tag': task_tag,
       'xsrf_token': self.generate_xsrf_token(),
     }
     # TODO(maruel): If admin or if the user is task's .user, show the Cancel
     # button. Do not show otherwise.
     self.response.out.write(template.render('swarming/user_tasks.html', params))
 
-  def _get_tasks(self, task_name, cursor_str, limit, sort, state):
+  def _get_tasks(self, task_name, task_tag, cursor_str, limit, sort, state):
     """Returns all tasks for this query. This function is synchronous."""
-    if task_name:
-      # Word based search. Override the flags.
+    tags = [t for t in task_tag.splitlines() if t]
+    if tags:
+      # Tag based search. Override the flags.
+      sort = 'created_ts'
+      state = 'all'
+      # Only the TaskRequest has the tags. So first query all the keys to
+      # requests; then fetch the TaskResultSummary.
+      order = datastore_query.PropertyOrder(
+          sort, datastore_query.PropertyOrder.DESCENDING)
+      query = task_request.TaskRequest.query().order(order)
+      tags_filter = task_request.TaskRequest.tags == tags.pop(0)
+      while tags:
+        tags_filter = ndb.AND(
+            tags_filter, task_request.TaskRequest.tags == tags.pop(0))
+      query = query.filter(tags_filter)
+      cursor = datastore_query.Cursor(urlsafe=cursor_str)
+      requests, cursor, more = query.fetch_page(
+          limit, start_cursor=cursor, keys_only=True)
+      keys = [
+        task_result.request_key_to_result_summary_key(k) for k in requests
+      ]
+      tasks = ndb.get_multi(keys)
+      cursor_str = cursor.urlsafe() if cursor and more else None
+    elif task_name:
+      # Task name based word based search. Override the flags.
       sort = 'created_ts'
       state = 'all'
       tasks, cursor_str = task_scheduler.search_by_name(

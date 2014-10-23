@@ -286,7 +286,7 @@ class _TaskResultCommon(ndb.Model):
       return None
     return self.completed_ts - self.started_ts
 
-  def duration_now(self):
+  def duration_now(self, now):
     """Returns the timedelta the task spent executing as of now.
 
     Similar to .duration except that its return value is not deterministic. Task
@@ -294,7 +294,7 @@ class _TaskResultCommon(ndb.Model):
     """
     if not self.started_ts or self.abandoned_ts:
       return None
-    return (self.completed_ts or utils.utcnow()) - self.started_ts
+    return (self.completed_ts or now) - self.started_ts
 
   @property
   def ended_ts(self):
@@ -307,12 +307,12 @@ class _TaskResultCommon(ndb.Model):
     if self.started_ts:
       return self.started_ts - self.created_ts
 
-  def pending_now(self):
+  def pending_now(self, now):
     """Returns the timedelta the task spent pending to be scheduled as of now.
 
     Similar to .pending except that its return value is not deterministic.
     """
-    return (self.started_ts or utils.utcnow()) - self.created_ts
+    return (self.started_ts or now) - self.created_ts
 
   @property
   def priority(self):

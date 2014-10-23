@@ -25,21 +25,29 @@
   table.layout_table td:first-child {
     border-color: black;
     border-right: thin solid;
-    padding-right: 1.5em;
+    padding-right: 1em;
   }
 
   table.layout_table td:nth-child(2) {
-    padding-left: 1.5em;
+    padding-left: 1em;
   }
 
   table.layout_table td:nth-child(4) {
     border-color: black;
     border-right: thin solid;
-    padding-right: 1.5em;
+    padding-right: 1em;
   }
 
   table.layout_table td:nth-child(5) {
-    padding-left: 1.5em;
+    border-color: black;
+    border-right: thin solid;
+    padding-left: 1em;
+    padding-right: 1em;
+  }
+
+  table.layout_table td:nth-child(6) {
+    padding-left: 1em;
+    padding-right: 0.5em;
   }
 
 </style>
@@ -53,17 +61,29 @@
     }
   }
 
+  function get_limit() {
+    return document.getElementById('limitText').value;
+  }
+
+  function update_limit_text(val) {
+    document.getElementById('limitText').value = val;
+  }
+
+  function update_limit_range(val) {
+    document.getElementById('limitRange').value = val;
+  }
+
   function update_sort() {
     // This resets the cursor and filters.
     var sort = radio_value("sort");
-    var url = '/user/tasks?sort=' + sort + '&limit={{limit}}';
+    var url = '/user/tasks?sort=' + sort + '&limit=' + get_limit();
     document.location.href = url;
   }
 
   function update_filter() {
     // This resets the cursor and sort.
     var state = radio_value("state");
-    var url = '/user/tasks?state=' + state + '&limit={{limit}}';
+    var url = '/user/tasks?state=' + state + '&limit=' + get_limit();
     document.location.href = url;
   }
 </script>
@@ -76,16 +96,23 @@
 <h1>Tasks</h1>
 <a href="/">Back to root</a>
 <p>
-
 <form id="filter" name="filter" method="GET">
+<input type="range" id="limitRange" name="limit" value="{{limit}}" min=10
+    max=500 step=5 onchange="update_limit_text(this.value);"
+    onmousemove="update_limit_text(this.value);" >
+<input type="text" id="limitText" value="{{limit}}" maxlength="3"
+    onchange="update_limit_range(this.value);">
+<input type="submit" value="Set limit">
+<p>
 <table class=layout_table>
   <thead>
     <tr>
       <td align=center>Sort</td>
       <td></td>
-      <td>Task state (total for last 24h)</td>
+      <td>State (total last 24h)</td>
       <td></td>
-      <td>Search by word</td>
+      <td>Search by tag</td>
+      <td>Search by task name</td>
     </tr>
   </thead>
   <tbody>
@@ -117,10 +144,20 @@
         </td>
         {% endfor %}
       <td>
-        <div title="Task name uses whole word search ONLY. Using it resets sort to 'Created' and the task state filter to 'All'.">
-          Task name (whole word only):
+        <div title="Task tags uses whole tag search ONLY. Using it resets sort to 'Created' and the task state filter to 'All'.">
+          Task tags<br>
+          (whole tag only, 1 per line)
           <br>
-          <input type="text" name="limit" value="{{limit}}" hidden>
+          <textarea name="task_tag" rows="3" cols="30">{{task_tag}}</textarea>
+          <br>
+          <input type="submit" value="Search">
+        </div>
+      </td>
+      <td>
+        <div title="Task name uses whole word search ONLY. Using it resets sort to 'Created' and the task state filter to 'All'.">
+          Task name<br>
+          (whole word only)
+          <br>
           <input type="text" name="task_name" value="{{task_name}}">
           <br>
           <input type="submit" value="Search">
@@ -140,7 +177,6 @@
       <th>Status</th>
       <th>Requested</th>
       <th>Pending</th>
-      <th>Started</th>
       <th>Duration</th>
       <th>Bot</th>
       <th>Priority</th>
@@ -165,14 +201,55 @@
             {% endif %}
           </td>
           <td nowrap align=center>{{task.created_ts|succinctdatetimeformat}}</td>
-          <td nowrap align=right>{{task.pending_now()|timedeltaformat}}</td>
-          <td nowrap align=center>{{task.started_ts|succinctdatetimeformat}}</td>
-          <td nowrap align=right>{{task.duration_now()|timedeltaformat}}</td>
+          <td nowrap align=right>{{task.pending_now(now)|timedeltaformat}}</td>
+          <td nowrap align=right>{{task.duration_now(now)|timedeltaformat}}</td>
           <td nowrap>{{bot_view.bot_link(task.bot_id, is_privileged_user)}}</td>
           <td nowrap align=right>{{task.priority}}</td>
         </tr>
       {% endfor %}
+      {% if show_footer %}
+        <tr>
+          <td>&nbsp;</td>
+          <td></td>
+          <td></td>
+          <td></td>
+          <td></td>
+          <td></td>
+          <td></td>
+        </tr>
+      {% endif %}
     </tbody>
+    {% if show_footer %}
+      <tfoot>
+        <tr>
+          <td></td>
+          <td></td>
+          <td><strong>Median</strong></td>
+          <td align=right>{{pending_median|timedeltaformat}}</td>
+          <td align=right>{{duration_median|timedeltaformat}}</td>
+          <td></td>
+          <td></td>
+        </tr>
+        <tr>
+          <td></td>
+          <td><strong>Total: </strong>{{tasks|length}}</td>
+          <td><strong>Average</strong></td>
+          <td align=right>{{pending_average|timedeltaformat}}</td>
+          <td align=right>{{duration_average|timedeltaformat}}</td>
+          <td></td>
+          <td></td>
+        </tr>
+        <tr>
+          <td></td>
+          <td></td>
+          <td><strong>Sum</strong></td>
+          <td align=right>{{pending_sum|timedeltaformat}}</td>
+          <td align=right>{{duration_sum|timedeltaformat}}</td>
+          <td></td>
+          <td></td>
+        </tr>
+      </tfoot>
+    {% endif %}
   </table>
 {% else %}
   No data to show for this selection.
