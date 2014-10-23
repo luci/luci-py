@@ -58,11 +58,11 @@ class GlobalConfig(ndb.Model):
     return datastore_utils.get_versioned_most_recent_with_root(
         cls, cls.ROOT_KEY)[1]
 
-  def store(self):
+  def store(self, who=None):
     """Stores a new version of the instance."""
     # Create an incomplete key.
     self.key = ndb.Key(self.__class__, None, parent=self.ROOT_KEY)
-    self.who = auth.get_current_identity()
+    self.who = who or auth.get_current_identity()
     return datastore_utils.store_new_version(self, self.ROOT_MODEL)
 
   def _pre_put_hook(self):
@@ -87,11 +87,11 @@ def settings():
     # pylint: disable=W0212
     config = ndb.Key(GlobalConfig, 'global_config').get(use_cache=False)
     if config:
-      config.store()
+      config.store(who=auth.get_service_self_identity())
 
   if not config:
     config = GlobalConfig(gs_bucket=app_identity.get_application_id())
-    config.store()
+    config.store(who=auth.get_service_self_identity())
 
   return config
 

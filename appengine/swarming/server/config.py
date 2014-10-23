@@ -28,11 +28,11 @@ class GlobalConfig(ndb.Model):
     return datastore_utils.get_versioned_most_recent_with_root(
         cls, cls.ROOT_KEY)[1]
 
-  def store(self):
+  def store(self, who=None):
     """Stores a new version of the instance."""
     # Create an incomplete key.
     self.key = ndb.Key(self.__class__, None, parent=self.ROOT_KEY)
-    self.who = auth.get_current_identity()
+    self.who = who or auth.get_current_identity()
     return datastore_utils.store_new_version(self, self.ROOT_MODEL)
 
 
@@ -45,5 +45,5 @@ def settings():
   config = GlobalConfig.fetch()
   if not config:
     config = GlobalConfig()
-    config.store()
+    config.store(who=auth.get_service_self_identity())
   return config
