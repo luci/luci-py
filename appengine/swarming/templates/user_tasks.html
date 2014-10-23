@@ -257,7 +257,9 @@
 
 {% if cursor %}
 <p>
-{% if task_name %}
+{% if task_tag %}
+  <a href="/user/tasks?task_tag={{task_tag}}&limit={{limit}}&cursor={{cursor}}">Next page</a>
+{% elif task_name %}
   <a href="/user/tasks?task_name={{task_name}}&limit={{limit}}&cursor={{cursor}}">Next page</a>
 {% else %}
   <a href="/user/tasks?sort={{sort}}&state={{state}}&limit={{limit}}&cursor={{cursor}}">Next page</a>
