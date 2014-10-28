@@ -145,7 +145,7 @@ def get_bootstrap(host_url):
     # Fallback to the one embedded in the tree.
     with open(os.path.join(ROOT_DIR, 'swarming_bot/bootstrap.py'), 'rb') as f:
       content = f.read()
-  header = '# coding=utf-8\nhost_url = %r\n' % host_url
+  header = 'host_url = %r\n' % host_url
   return header + content
 
 

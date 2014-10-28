@@ -338,7 +338,7 @@ class FrontendAdminTest(AppTestBase):
     path = os.path.join(self.APP_DIR, 'swarming_bot/bootstrap.py')
     with open(path, 'rb') as f:
       expected = f.read()
-    header = '# coding=utf-8\nhost_url = \'http://localhost\'\n'
+    header = 'host_url = \'http://localhost\'\n'
     self.assertEqual(header + expected, actual)
 
   def test_bootstrap_custom(self):
@@ -353,7 +353,7 @@ class FrontendAdminTest(AppTestBase):
     self.assertIn('script_body', r.body)
 
     actual = self.app.get('/bootstrap').body
-    expected = '# coding=utf-8\nhost_url = \'http://localhost\'\nscript_body'
+    expected = 'host_url = \'http://localhost\'\nscript_body'
     self.assertEqual(expected, actual)
 
   def test_upload_bot_config(self):
