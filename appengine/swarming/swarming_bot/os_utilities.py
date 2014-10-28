@@ -485,13 +485,15 @@ def get_gpu():
   TODO(maruel): Add custom processing to normalize the string as much as
   possible but differences will occur between OSes.
   """
+  result = None
   if sys.platform == 'darwin':
-    return _get_gpu_osx()
-  if sys.platform == 'linux2':
-    return _get_gpu_linux()
-  if sys.platform == 'win32':
-    return _get_gpu_win()
-  return None
+    result = _get_gpu_osx()
+  elif sys.platform == 'linux2':
+    result = _get_gpu_linux()
+  elif sys.platform == 'win32':
+    result =  _get_gpu_win()
+
+  return result if result else ['none']
 
 
 ### Windows.
@@ -685,6 +687,7 @@ def get_dimensions():
       cpu_type,
       cpu_type + '-' + cpu_bitness,
     ],
+    'gpu': get_gpu(),
     'hostname': get_hostname(),
     'os': [
       os_name,
@@ -703,10 +706,6 @@ def get_dimensions():
     # we need to keep this for compatibility.
     dimensions['os'].extend(('Linux', 'Linux-' + os_version))
     dimensions['os'].sort()
-
-  gpu = get_gpu()
-  if gpu:
-    dimensions['gpu'] = gpu
 
   if sys.platform in ('cygwin', 'win32'):
     dimensions['cygwin'] = str(int(sys.platform == 'cygwin'))
