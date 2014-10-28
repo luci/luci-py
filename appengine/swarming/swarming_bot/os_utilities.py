@@ -493,7 +493,11 @@ def get_gpu():
   elif sys.platform == 'win32':
     result =  _get_gpu_win()
 
-  return result if result else ['none']
+  # 15ad is VMWare. It's akin not having a GPU card.
+  result = result or ['none']
+  if '15ad' in result:
+    result.append('none')
+  return result
 
 
 ### Windows.
