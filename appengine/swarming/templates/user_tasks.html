@@ -13,7 +13,7 @@
     font-family: monospace;
   }
 
-  .layout_table thead {
+  table.layout_table thead {
     background-color: #C0C0C0;
     font-weight:bold;
   }
@@ -50,6 +50,29 @@
     padding-right: 0.5em;
   }
 
+  table.alterning_background td:nth-child(3) {
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  table.alterning_background td:nth-child(4) {
+    text-align: right;
+    white-space: nowrap;
+  }
+
+  table.alterning_background td:nth-child(5) {
+    text-align: right;
+    white-space: nowrap;
+  }
+
+  table.alterning_background td:nth-child(6) {
+    white-space: nowrap;
+  }
+
+  table.alterning_background td:nth-child(7) {
+    text-align: right;
+    white-space: nowrap;
+  }
 </style>
 <script>
   function radio_value(field) {
@@ -169,6 +192,14 @@
 </form>
 <br>
 
+{% macro total_pending_star() %}
+  {% if has_pending %}*{% endif %}
+  {% endmacro %}
+
+{% macro total_running_star() %}
+  {% if has_running %}*{% endif %}
+{% endmacro %}
+
 {% if tasks %}
   <table id="request-table" class="alterning_background"
       summary="This table lists all test requests">
@@ -200,11 +231,15 @@
               </form>
             {% endif %}
           </td>
-          <td nowrap align=center>{{task.created_ts|succinctdatetimeformat}}</td>
-          <td nowrap align=right>{{task.pending_now(now)|timedeltaformat}}</td>
-          <td nowrap align=right>{{task.duration_now(now)|timedeltaformat}}</td>
-          <td nowrap>{{bot_view.bot_link(task.bot_id, is_privileged_user)}}</td>
-          <td nowrap align=right>{{task.priority}}</td>
+          <td>{{task.created_ts|succinctdatetimeformat}}</td>
+          <td>
+            {{bot_view.pending_star(task)}}{{task.pending_now(now)|timedeltaformat}}
+          </td>
+          <td>
+            {{bot_view.running_star(task)}}{{task.duration_now(now)|timedeltaformat}}
+          </td>
+          <td>{{bot_view.bot_link(task.bot_id, is_privileged_user)}}</td>
+          <td>{{task.priority}}</td>
         </tr>
       {% endfor %}
       {% if show_footer %}
@@ -225,8 +260,12 @@
           <td></td>
           <td></td>
           <td><strong>Median</strong></td>
-          <td align=right>{{pending_median|timedeltaformat}}</td>
-          <td align=right>{{duration_median|timedeltaformat}}</td>
+          <td>
+            {{total_pending_star()}}{{pending_median|timedeltaformat}}
+          </td>
+          <td>
+            {{total_running_star()}}{{duration_median|timedeltaformat}}
+          </td>
           <td></td>
           <td></td>
         </tr>
@@ -234,8 +273,12 @@
           <td></td>
           <td><strong>Total: </strong>{{tasks|length}}</td>
           <td><strong>Average</strong></td>
-          <td align=right>{{pending_average|timedeltaformat}}</td>
-          <td align=right>{{duration_average|timedeltaformat}}</td>
+          <td>
+            {{total_pending_star()}}{{pending_average|timedeltaformat}}
+          </td>
+          <td>
+            {{total_running_star()}}{{duration_average|timedeltaformat}}
+          </td>
           <td></td>
           <td></td>
         </tr>
@@ -243,8 +286,12 @@
           <td></td>
           <td></td>
           <td><strong>Sum</strong></td>
-          <td align=right>{{pending_sum|timedeltaformat}}</td>
-          <td align=right>{{duration_sum|timedeltaformat}}</td>
+          <td>
+            {{total_pending_star()}}{{pending_sum|timedeltaformat}}
+          </td>
+          <td>
+            {{total_running_star()}}{{duration_sum|timedeltaformat}}
+          </td>
           <td></td>
           <td></td>
         </tr>

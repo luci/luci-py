@@ -27,3 +27,11 @@
     &#8209;&#8209;
   {% endif %}
 {% endmacro %}
+
+{% macro pending_star(task) %}
+  {% if task.is_pending %}*{% endif %}
+{% endmacro %}
+
+{% macro running_star(task) %}
+  {% if task.is_running %}*{% endif %}
+{% endmacro %}

@@ -431,6 +431,8 @@ class TasksHandler(auth.AuthenticatingHandler):
       'duration_average': avg(durations),
       'duration_median': median(durations),
       'duration_sum': safe_sum(durations),
+      'has_pending': any(t.is_pending for t in tasks),
+      'has_running': any(t.is_running for t in tasks),
       'is_admin': acl.is_admin(),
       'is_privileged_user': acl.is_privileged_user(),
       'limit': limit,
@@ -443,9 +445,9 @@ class TasksHandler(auth.AuthenticatingHandler):
       'sort_choices': self.SORT_CHOICES,
       'state': state,
       'state_choices': state_choices,
-      'tasks': tasks,
       'task_name': task_name,
       'task_tag': task_tag,
+      'tasks': tasks,
       'xsrf_token': self.generate_xsrf_token(),
     }
     # TODO(maruel): If admin or if the user is task's .user, show the Cancel

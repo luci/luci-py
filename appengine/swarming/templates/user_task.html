@@ -164,7 +164,9 @@
     </tr>
     <tr>
       <td>Pending time</td>
-      <td>{{task.pending_now(now)|timedeltaformat}}</td>
+      <td>
+        {{bot_view.pending_star(task)}}{{task.pending_now(now)|timedeltaformat}}
+      </td>
     </tr>
     <tr>
       <td>Completed</td>
@@ -172,7 +174,9 @@
     </tr>
     <tr>
       <td>Duration</td>
-      <td>{{task.duration_now(now)|timedeltaformat}}</td>
+      <td>
+        {{bot_view.running_star(task)}}{{task.duration_now(now)|timedeltaformat}}
+      </td>
     </tr>
     <tr>
       <td>Abandoned</td>

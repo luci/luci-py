@@ -301,6 +301,16 @@ class _TaskResultCommon(ndb.Model):
     return self.completed_ts or self.abandoned_ts
 
   @property
+  def is_pending(self):
+    """Returns True if the task is still pending. Mostly for html view."""
+    return self.state == State.PENDING
+
+  @property
+  def is_running(self):
+    """Returns True if the task is still pending. Mostly for html view."""
+    return self.state == State.RUNNING
+
+  @property
   def pending(self):
     """Returns the timedelta the task spent pending to be scheduled or None if
     not started yet."""
