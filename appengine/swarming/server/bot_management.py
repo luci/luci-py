@@ -25,7 +25,7 @@ ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 # The amount of time that has to pass before a machine is considered dead.
-BOT_DEATH_TIMEOUT = datetime.timedelta(seconds=30*60)
+BOT_DEATH_TIMEOUT = datetime.timedelta(seconds=10*60)
 
 
 # How long bot may run before being asked to reboot, sec. Do it often on canary
