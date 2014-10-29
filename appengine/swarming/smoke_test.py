@@ -14,6 +14,7 @@ import logging
 import os
 import shutil
 import signal
+import socket
 import subprocess
 import sys
 import tempfile
@@ -82,12 +83,14 @@ def kill_bot(bot_proc):
     assert not bot_proc.returncode
 
 
-def trigger(client, name):
-  request = {
-    'name': name,
+def gen_data(exit_code=0, properties=None, **kwargs):
+  out = {
+    'name': None,
     'priority': 10,
     'properties': {
-      'commands': [['python', '-c', 'print(\'hi\')']],
+      'commands': [
+        ['python', '-c', 'import sys; print(\'hi\'); sys.exit(%d)' % exit_code],
+      ],
       'data': [],
       'dimensions': {'cpu': 'x86'},
       'env': {},
@@ -98,11 +101,21 @@ def trigger(client, name):
     'tags': [],
     'user': 'joe@localhost',
   }
+  out.update(kwargs)
+  if properties:
+    out['properties'].update(properties)
+  return out
+
+
+def trigger(client, **kwargs):
+  """Triggers a task, returns kwargs and task_id."""
   response = client.json_request(
-      '/swarming/api/v1/client/request', request).body
+      '/swarming/api/v1/client/request', gen_data(**kwargs)).body
+  if not 'task_id' in response:
+    raise ValueError(response)
   task_id = response['task_id']
   logging.info('Triggered %s', task_id)
-  return task_id
+  return kwargs, task_id
 
 
 def get_result(client, task_id):
@@ -112,9 +125,12 @@ def get_result(client, task_id):
         '/swarming/api/v1/client/task/%s' % task_id).body
     if response['state'] not in (0x10, 0x20):
       logging.info('Task %s completed:\n%s', task_id, response)
-      return response['state'] == 0x70
+      outputs = client.json_request(
+          '/swarming/api/v1/client/task/%s/output/all' % task_id).body
+      response['outputs'] = outputs
+      return response
     time.sleep(2 if VERBOSE else 0.01)
-  return False
+  return {}
 
 
 def dump_logs(log_dir, swarming_bot_dir):
@@ -203,12 +219,52 @@ class SwarmingTestCase(unittest.TestCase):
     self.finish_setup()
 
     running_tasks = [
-      trigger(self.client, 'foo'),
-      trigger(self.client, 'bar'),
+      trigger(self.client, name='foo'),
+      trigger(self.client, name='bar'),
+      trigger(self.client, name='failed', exit_code=1),
+      trigger(
+          self.client, name='invalid', exit_code=1,
+          properties={'commands': [['unknown_invalid_command']]}),
     ]
 
-    for task_id in running_tasks:
-      self.assertTrue(get_result(self.client, task_id))
+    for kwargs, task_id in running_tasks:
+      self.assertResults(kwargs, get_result(self.client, task_id))
+
+  def assertResults(self, kwargs, result):
+    result = result.copy()
+    # These are not deterministic (or I'm too lazy to calculate the value).
+    self.assertTrue(result.pop('bot_version'))
+    self.assertTrue(result.pop('created_ts'))
+    self.assertTrue(result.pop('completed_ts'))
+    self.assertTrue(result.pop('durations'))
+    self.assertTrue(result.pop('id'))
+    self.assertTrue(result.pop('modified_ts'))
+    self.assertTrue(result.pop('started_ts'))
+
+    exit_code = kwargs.get('exit_code', 0)
+    name = kwargs['name']
+    outputs = [u'hi\n']
+    if name == 'invalid':
+      outputs = [
+        u'Command "unknown_invalid_command" failed to start.\n'
+        u'Error: [Errno 2] No such file or directory',
+      ]
+    expected = {
+      u'abandoned_ts': None,
+      u'bot_id': unicode(socket.getfqdn().split('.', 1)[0]),
+      u'deduped_from': None,
+      u'exit_codes': [exit_code],
+      u'failure': exit_code != 0,
+      u'internal_failure': False,
+      u'name': unicode(name),
+      u'properties_hash': None,
+      'outputs': {u'outputs': outputs},
+      u'server_versions': [u'1'],
+      u'state': 0x70,  # task_result.State.COMPLETED.
+      u'try_number': 1,
+      u'user': u'joe@localhost',
+    }
+    self.assertEqual(expected, result)
 
 
 if __name__ == '__main__':

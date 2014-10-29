@@ -51,7 +51,8 @@ def on_after_task(bot, failure, internal_failure):
   - failure: bool, True if the task failed.
   - internal_failure: bool, True if an internal failure happened.
   """
-  if failure:
-    bot.restart('Task failure')
-  elif internal_failure:
-    bot.restart('Internal failure')
+  # Example code:
+  #if failure:
+  #  bot.restart('Task failure')
+  #elif internal_failure:
+  #  bot.restart('Internal failure')
