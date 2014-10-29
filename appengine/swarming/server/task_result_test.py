@@ -111,6 +111,7 @@ class TaskResultApiTest(test_case.TestCase):
     # Same code as State.to_string() except that it works for
     # TaskResultSummary too.
     class Foo(ndb.Model):
+      deduped_from = None
       state = task_result.StateProperty()
       failure = ndb.BooleanProperty(default=False)
       internal_failure = ndb.BooleanProperty(default=False)
@@ -119,6 +120,9 @@ class TaskResultApiTest(test_case.TestCase):
       self.assertTrue(task_result.State.to_string(i))
     for i in task_result.State.STATES:
       self.assertTrue(task_result.state_to_string(Foo(state=i)))
+    f = Foo(state=task_result.State.COMPLETED)
+    f.deduped_from = '123'
+    self.assertEqual('Completed (deduped)', task_result.state_to_string(f))
 
   def test_request_key_to_result_summary_key(self):
     request_key = task_request.id_to_request_key(256)

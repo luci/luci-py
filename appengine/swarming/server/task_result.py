@@ -314,16 +314,21 @@ class _TaskResultCommon(ndb.Model):
 
   @property
   def pending(self):
-    """Returns the timedelta the task spent pending to be scheduled or None if
-    not started yet."""
-    if self.started_ts:
+    """Returns the timedelta the task spent pending to be scheduled.
+
+    Returns None if not started yet or if the task was deduped from another one.
+    """
+    if not self.deduped_from and self.started_ts:
       return self.started_ts - self.created_ts
+    return None
 
   def pending_now(self, now):
     """Returns the timedelta the task spent pending to be scheduled as of now.
 
     Similar to .pending except that its return value is not deterministic.
     """
+    if self.deduped_from:
+      return None
     return (self.started_ts or now) - self.created_ts
 
   @property
@@ -738,9 +743,11 @@ def state_to_string(state_obj):
   """Returns a user-readable string representing a State."""
   out = State.to_string(state_obj.state)
   if state_obj.failure:
-    out += ' (Task failed)'
+    out += ' (failed)'
   if state_obj.internal_failure:
-    out += ' (Internal failure)'
+    out += ' (internal failure)'
+  if state_obj.deduped_from:
+    out += ' (deduped)'
   return out
 
 
