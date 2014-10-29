@@ -29,7 +29,6 @@ from server import acl
 from server import bot_management
 from server import config
 from server import stats_gviz
-from server import task_request
 from server import task_result
 from server import task_scheduler
 from server import user_manager
@@ -375,7 +374,9 @@ class TasksHandler(auth.AuthenticatingHandler):
     sort = self.request.get('sort', self.SORT_CHOICES[0][0])
     state = self.request.get('state', self.STATE_CHOICES[0][0][0])
     task_name = self.request.get('task_name', '').strip()
-    task_tag = self.request.get('task_tag', '').strip()
+    task_tags = [
+      line for line in self.request.get('task_tag', '').splitlines() if line
+    ]
 
     if not any(sort == i[0] for i in self.SORT_CHOICES):
       self.abort(400, 'Invalid sort')
@@ -391,17 +392,20 @@ class TasksHandler(auth.AuthenticatingHandler):
     counts_future = self._get_counts_future(now)
 
     # This call is synchronous.
-    tasks, cursor_str, sort, state = self._get_tasks(
-        task_name, task_tag, cursor_str, limit, sort, state)
+    try:
+      tasks, cursor_str, sort, state = task_result.get_tasks(
+          task_name, task_tags, cursor_str, limit, sort, state)
 
-    # Prefetch the TaskRequest all at once, so that ndb's in-process cache has
-    # it instead of fetching them one at a time indirectly when using
-    # TaskResultSummary.request_key.get().
-    futures = ndb.get_multi_async(t.request_key for t in tasks)
+      # Prefetch the TaskRequest all at once, so that ndb's in-process cache has
+      # it instead of fetching them one at a time indirectly when using
+      # TaskResultSummary.request_key.get().
+      futures = ndb.get_multi_async(t.request_key for t in tasks)
 
-    # Evaluate the counts to print the filtering columns with the associated
-    # numbers.
-    state_choices = self._get_state_choices(counts_future)
+      # Evaluate the counts to print the filtering columns with the associated
+      # numbers.
+      state_choices = self._get_state_choices(counts_future)
+    except ValueError as e:
+      self.abort(400, str(e))
 
     # Do not let dangling futures linger around.
     ndb.Future.wait_all(futures)
@@ -446,7 +450,7 @@ class TasksHandler(auth.AuthenticatingHandler):
       'state': state,
       'state_choices': state_choices,
       'task_name': task_name,
-      'task_tag': task_tag,
+      'task_tag': '\n'.join(task_tags),
       'tasks': tasks,
       'xsrf_token': self.generate_xsrf_token(),
     }
@@ -454,63 +458,12 @@ class TasksHandler(auth.AuthenticatingHandler):
     # button. Do not show otherwise.
     self.response.out.write(template.render('swarming/user_tasks.html', params))
 
-  def _get_tasks(self, task_name, task_tag, cursor_str, limit, sort, state):
-    """Returns all tasks for this query. This function is synchronous."""
-    tags = [t for t in task_tag.splitlines() if t]
-    if tags:
-      # Tag based search. Override the flags.
-      sort = 'created_ts'
-      state = 'all'
-      # Only the TaskRequest has the tags. So first query all the keys to
-      # requests; then fetch the TaskResultSummary.
-      order = datastore_query.PropertyOrder(
-          sort, datastore_query.PropertyOrder.DESCENDING)
-      query = task_request.TaskRequest.query().order(order)
-      tags_filter = task_request.TaskRequest.tags == tags.pop(0)
-      while tags:
-        tags_filter = ndb.AND(
-            tags_filter, task_request.TaskRequest.tags == tags.pop(0))
-      query = query.filter(tags_filter)
-      cursor = datastore_query.Cursor(urlsafe=cursor_str)
-      requests, cursor, more = query.fetch_page(
-          limit, start_cursor=cursor, keys_only=True)
-      keys = [
-        task_result.request_key_to_result_summary_key(k) for k in requests
-      ]
-      tasks = ndb.get_multi(keys)
-      cursor_str = cursor.urlsafe() if cursor and more else None
-    elif task_name:
-      # Task name based word based search. Override the flags.
-      sort = 'created_ts'
-      state = 'all'
-      tasks, cursor_str = task_scheduler.search_by_name(
-          task_name, cursor_str, limit)
-    else:
-      # Normal listing.
-      queries, query = self._get_query(sort, state)
-      if queries:
-        # When multiple queries are used, we can't use a cursor.
-        cursor_str = None
-
-        # Take the first |limit| items for each query. This is not efficient,
-        # worst case is fetching N * limit entities.
-        futures = [q.fetch_async(limit) for q in queries]
-        lists = sum((f.get_result() for f in futures), [])
-        tasks = sorted(lists, key=lambda i: i.created_ts, reverse=True)[:limit]
-      else:
-        # Normal efficient behavior.
-        cursor = datastore_query.Cursor(urlsafe=cursor_str)
-        tasks, cursor, more = query.fetch_page(limit, start_cursor=cursor)
-        cursor_str = cursor.urlsafe() if cursor and more else None
-
-    return tasks, cursor_str, sort, state
-
   def _get_counts_future(self, now):
     """Returns all the counting futures in parallel."""
     counts_future = {}
     last_24h = now - datetime.timedelta(days=1)
     for state_key, _, _ in itertools.chain.from_iterable(self.STATE_CHOICES):
-      _, query = self._get_query(None, state_key)
+      _, query = task_result.get_result_summary_query(None, state_key)
       if query:
         counts_future[state_key] = query.filter(
             task_result.TaskResultSummary.created_ts >= last_24h).count_async()
@@ -531,72 +484,6 @@ class TasksHandler(auth.AuthenticatingHandler):
           name += ' (%d)' % (counts['pending'] + counts['running'])
         state_choices[-1].append((state_key, name, title))
     return state_choices
-
-  def _get_query(self, sort, state):
-    """Returns one or many TaskResultSummary queries."""
-    query = task_result.TaskResultSummary.query()
-    if sort:
-      order = datastore_query.PropertyOrder(
-          sort, datastore_query.PropertyOrder.DESCENDING)
-      query = query.order(order)
-
-    if state == 'pending':
-      return None, query.filter(
-          task_result.TaskResultSummary.state == task_result.State.PENDING)
-
-    if state == 'running':
-      return None, query.filter(
-          task_result.TaskResultSummary.state == task_result.State.RUNNING)
-
-    if state == 'pending_running':
-      # This is a special case that sends two concurrent queries under the hood.
-      # ndb.OR() doesn't work when order() is used, it requires __key__ sorting.
-      # This is not efficient, so the DB should be updated accordingly to be
-      # able to support pagination.
-      queries = [
-        query.filter(
-            task_result.TaskResultSummary.state == task_result.State.PENDING),
-        query.filter(
-            task_result.TaskResultSummary.state == task_result.State.RUNNING),
-      ]
-      return queries, None
-
-    if state == 'completed':
-      return None, query.filter(
-          task_result.TaskResultSummary.state == task_result.State.COMPLETED)
-
-    if state == 'completed_success':
-      query = query.filter(
-          task_result.TaskResultSummary.state == task_result.State.COMPLETED)
-      return None, query.filter(task_result.TaskResultSummary.failure == False)
-
-    if state == 'completed_failure':
-      query = query.filter(
-          task_result.TaskResultSummary.state == task_result.State.COMPLETED)
-      return None, query.filter(task_result.TaskResultSummary.failure == True)
-
-    if state == 'expired':
-      return None, query.filter(
-          task_result.TaskResultSummary.state == task_result.State.EXPIRED)
-
-    # TODO(maruel): This is never set until the new bot API is writen.
-    # https://code.google.com/p/swarming/issues/detail?id=117
-    if state == 'timed_out':
-      return None, query.filter(
-          task_result.TaskResultSummary.state == task_result.State.TIMED_OUT)
-
-    if state == 'bot_died':
-      return None, query.filter(
-          task_result.TaskResultSummary.state == task_result.State.BOT_DIED)
-
-    if state == 'canceled':
-      return None, query.filter(
-          task_result.TaskResultSummary.state == task_result.State.CANCELED)
-
-    if state == 'all':
-      return None, query
-
-    self.abort(400, 'invalid state')
 
 
 class TaskHandler(auth.AuthenticatingHandler):

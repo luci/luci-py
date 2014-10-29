@@ -209,6 +209,8 @@ class TaskSchedulerApiTest(test_case.TestCase):
     new_ts = self.mock_now(original_ts, 10)
     request_2, _result_summary = task_scheduler.make_request(
         _gen_request_data(
+            name='yay',
+            user='Raoul',
             properties=dict(
                 dimensions={u'OS': u'Windows-3.1.1'}, idempotent=True)))
     self.assertEqual(None, task_to_run.TaskToRun.query().get().queue_number)
@@ -220,7 +222,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'abandoned_ts': None,
       'bot_id': u'localhost',
       'bot_version': u'abc',
-      'created_ts': original_ts,
+      'created_ts': new_ts,
       'completed_ts': original_ts,
       'deduped_from': u'14350e868888801',
       'durations': [0.1],
@@ -231,13 +233,13 @@ class TaskSchedulerApiTest(test_case.TestCase):
       # Only this value is updated to 'now', the rest uses the previous run
       # timestamps.
       'modified_ts': new_ts,
-      'name': u'Request name',
+      'name': u'yay',
       'properties_hash': 'c5c77509f49b191689b056ad7c45c6d5fdcfea20',
       'server_versions': [u'default-version'],
       'started_ts': original_ts,
       'state': State.COMPLETED,
       'try_number': 0,
-      'user': u'Jesus',
+      'user': u'Raoul',
     }
     self.assertEqual(expected, result_summary_duped.to_dict())
     self.assertEqual([], run_results_duped)
@@ -748,9 +750,9 @@ class TaskSchedulerApiTest(test_case.TestCase):
     _, result_summary = task_scheduler.make_request(data)
 
     # Assert that search is not case-sensitive by using unexpected casing.
-    actual, _cursor = task_scheduler.search_by_name('requEST', None, 10)
+    actual, _cursor = task_result.search_by_name('requEST', None, 10)
     self.assertEqual([result_summary], actual)
-    actual, _cursor = task_scheduler.search_by_name('name', None, 10)
+    actual, _cursor = task_result.search_by_name('name', None, 10)
     self.assertEqual([result_summary], actual)
 
   def test_search_by_name_failures(self):
@@ -758,10 +760,10 @@ class TaskSchedulerApiTest(test_case.TestCase):
         properties=dict(dimensions={u'OS': u'Windows-3.1.1'}))
     _, result_summary = task_scheduler.make_request(data)
 
-    actual, _cursor = task_scheduler.search_by_name('foo', None, 10)
+    actual, _cursor = task_result.search_by_name('foo', None, 10)
     self.assertEqual([], actual)
     # Partial match doesn't work.
-    actual, _cursor = task_scheduler.search_by_name('nam', None, 10)
+    actual, _cursor = task_result.search_by_name('nam', None, 10)
     self.assertEqual([], actual)
 
   def test_search_by_name_broken_tasks(self):
@@ -811,11 +813,11 @@ class TaskSchedulerApiTest(test_case.TestCase):
 
     # Now the DB is full of half-corrupted entities.
     cursor = None
-    actual, cursor = task_scheduler.search_by_name('Request', cursor, 31)
+    actual, cursor = task_result.search_by_name('Request', cursor, 31)
     self.assertEqual(31, len(actual))
-    actual, cursor = task_scheduler.search_by_name('Request', cursor, 31)
+    actual, cursor = task_result.search_by_name('Request', cursor, 31)
     self.assertEqual(3, len(actual))
-    actual, cursor = task_scheduler.search_by_name('Request', cursor, 31)
+    actual, cursor = task_result.search_by_name('Request', cursor, 31)
     self.assertEqual(0, len(actual))
 
 

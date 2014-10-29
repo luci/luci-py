@@ -204,16 +204,16 @@ def _retry_task(request, result_summary, run_result, now):
   return True
 
 
-def _copy_entity(src, dst):
+def _copy_entity(src, dst, skip_list):
   """Copies the attributes of entity src into dst.
 
-  It doesn't copy the key.
+  It doesn't copy the key nor any member in skip_list.
   """
   assert type(src) == type(dst), '%s!=%s' % (src.__class__, dst.__class__)
   # Access to a protected member _XX of a client class - pylint: disable=W0212
   kwargs = {
     k: getattr(src, k) for k, v in src.__class__._properties.iteritems()
-    if not isinstance(v, ndb.ComputedProperty)
+    if not isinstance(v, ndb.ComputedProperty) and k not in skip_list
   }
   dst.populate(**kwargs)
 
@@ -293,7 +293,7 @@ def make_request(data):
       # functionality.
       # Setting task.queue_number to None removes it from the scheduling.
       task.queue_number = None
-      _copy_entity(dupe_summary, result_summary)
+      _copy_entity(dupe_summary, result_summary, ('created_ts', 'name', 'user'))
       result_summary.try_number = 0
       result_summary.deduped_from = task_result.pack_run_result_key(
           dupe_summary.run_result_key)
@@ -466,65 +466,6 @@ def bot_kill_task(run_result):
       bot_id=run_result.bot_id,
       dimensions=request.properties.dimensions,
       user=request.user)
-
-
-def search_by_name(word, cursor_str, limit):
-  """Returns TaskResultSummary in -created_ts order containing the word."""
-  cursor = search.Cursor(web_safe_string=cursor_str, per_result=True)
-  index = search.Index(name='requests')
-
-  def item_to_id(item):
-    for field in item.fields:
-      if field.name == 'id':
-        return field.value
-
-  # The code is structured to handle incomplete entities but still return
-  # 'limit' items. This is done by fetching a few more entities than necessary,
-  # then keeping track of the cursor per item so the right cursor can be
-  # returned.
-  opts = search.QueryOptions(limit=limit + 5, cursor=cursor)
-  results = index.search(search.Query('name:%s' % word, options=opts))
-  result_summary_keys = []
-  cursors = []
-  for item in results.results:
-    value = item_to_id(item)
-    if value:
-      result_summary_keys.append(task_result.unpack_result_summary_key(value))
-      cursors.append(item.cursor)
-
-  # Handle None result value. See make_request() for details about how this can
-  # happen.
-  tasks = []
-  cursor = None
-  for task, c in zip(ndb.get_multi(result_summary_keys), cursors):
-    if task:
-      cursor = c
-      tasks.append(task)
-      if len(tasks) == limit:
-        # Drop the rest.
-        break
-  else:
-    if len(cursors) == limit + 5:
-      while len(tasks) < limit:
-        # Go into the slow path, seems like we got a lot of corrupted items.
-        opts = search.QueryOptions(limit=limit-len(tasks) + 5, cursor=cursor)
-        results = index.search(search.Query('name:%s' % word, options=opts))
-        if not results.results:
-          # Nothing else.
-          cursor = None
-          break
-        for item in results.results:
-          value = item_to_id(item)
-          if value:
-            cursor = item.cursor
-            task = task_result.unpack_result_summary_key(value).get()
-            if task:
-              tasks.append(task)
-              if len(tasks) == limit:
-                break
-
-  cursor_str = cursor.web_safe_string if cursor else None
-  return tasks, cursor_str
 
 
 def cancel_task(summary_key):

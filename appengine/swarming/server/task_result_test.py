@@ -481,6 +481,18 @@ class TaskResultApiTest(test_case.TestCase):
     self.assertEqual(None, run_result.duration)
     self.assertEqual(None, run_result.duration_now(utils.utcnow()))
 
+  def test_get_result_summary_query(self):
+    # Indirectly tested by both frontend and API.
+    pass
+
+  def test_get_tasks(self):
+    # Indirectly tested by both frontend and API.
+    pass
+
+  def test_search_by_name(self):
+    # Tested in task_scheduler_test.
+    pass
+
 
 class TestOutput(test_case.TestCase):
   APP_DIR = ROOT_DIR

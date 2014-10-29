@@ -50,6 +50,8 @@ import datetime
 import logging
 
 from google.appengine.api import datastore_errors
+from google.appengine.api import search
+from google.appengine.datastore import datastore_query
 from google.appengine.ext import ndb
 
 from components import utils
@@ -786,9 +788,6 @@ def run_result_key_to_result_summary_key(run_result_key):
 
 def pack_result_summary_key(result_summary_key):
   """Returns TaskResultSummary ndb.Key encoded, safe to use in HTTP requests.
-
-  Defined here because it is needed in stats.py and defining it in
-  task_result.py would cause a circular dependency.
   """
   assert result_summary_key.kind() == 'TaskResultSummary'
   return '%x' % result_summary_key.parent().integer_id()
@@ -796,9 +795,6 @@ def pack_result_summary_key(result_summary_key):
 
 def pack_run_result_key(run_result_key):
   """Returns TaskRunResult ndb.Key encoded, safe to use in HTTP requests.
-
-  Defined here because it is needed in stats.py and defining it in
-  task_result.py would cause a circular dependency.
   """
   assert run_result_key.kind() == 'TaskRunResult'
   key_id = (
@@ -895,3 +891,198 @@ def prepare_put_run_result(run_result, request):
 
   result_summary.set_from_run_result(run_result, request)
   return [run_result, result_summary]
+
+
+def get_tasks(task_name, task_tags, cursor_str, limit, sort, state):
+  """Returns TaskResultSummary entities for this query.
+
+  This function is synchronous.
+
+  Arguments:
+    task_name: search for task name whole word.
+    task_tags: list of search for one or multiple task tags.
+    cursor_str: query-dependent string encoded cursor to continue a previous
+        search.
+    limit: Maximum number of items to return.
+    sort: get_result_summary_query() argument. Only used is both task_name and
+        task_tags are empty.
+    state: get_result_summary_query() argument. Only used is both task_name and
+        task_tags are empty.
+
+  Returns:
+    tuple(list of tasks, str encoded cursor, updated sort, updated state)
+  """
+  if task_tags:
+    # Tag based search. Override the flags.
+    sort = 'created_ts'
+    state = 'all'
+    # Only the TaskRequest has the tags. So first query all the keys to
+    # requests; then fetch the TaskResultSummary.
+    order = datastore_query.PropertyOrder(
+        sort, datastore_query.PropertyOrder.DESCENDING)
+    query = task_request.TaskRequest.query().order(order)
+    task_tags = task_tags[:]
+    tags_filter = task_request.TaskRequest.tags == task_tags.pop(0)
+    while task_tags:
+      tags_filter = ndb.AND(
+          tags_filter, task_request.TaskRequest.tags == task_tags.pop(0))
+    query = query.filter(tags_filter)
+    cursor = datastore_query.Cursor(urlsafe=cursor_str)
+    requests, cursor, more = query.fetch_page(
+        limit, start_cursor=cursor, keys_only=True)
+    keys = [request_key_to_result_summary_key(k) for k in requests]
+    tasks = ndb.get_multi(keys)
+    cursor_str = cursor.urlsafe() if cursor and more else None
+  elif task_name:
+    # Task name based word based search. Override the flags.
+    sort = 'created_ts'
+    state = 'all'
+    tasks, cursor_str = search_by_name(task_name, cursor_str, limit)
+  else:
+    # Normal listing.
+    queries, query = get_result_summary_query(sort, state)
+    if queries:
+      # When multiple queries are used, we can't use a cursor.
+      cursor_str = None
+
+      # Take the first |limit| items for each query. This is not efficient,
+      # worst case is fetching N * limit entities.
+      futures = [q.fetch_async(limit) for q in queries]
+      lists = sum((f.get_result() for f in futures), [])
+      tasks = sorted(lists, key=lambda i: i.created_ts, reverse=True)[:limit]
+    else:
+      # Normal efficient behavior.
+      cursor = datastore_query.Cursor(urlsafe=cursor_str)
+      tasks, cursor, more = query.fetch_page(limit, start_cursor=cursor)
+      cursor_str = cursor.urlsafe() if cursor and more else None
+
+  return tasks, cursor_str, sort, state
+
+
+def get_result_summary_query(sort, state):
+  """Generates one or many ndb.Query to return TaskResultSummary in the order
+  and state specified.
+
+  There can be multiple queries when a single query may not be able to return
+  all results.
+  TODO(maruel): Update entities so multiple queries code path is not necessary
+  anymore.
+
+  Arguments:
+    sort: One valid TaskResultSummary property that can be used for sorting.
+    state: One of the known state to filter on.
+
+  Returns:
+    tuple(queries, query); one is valid and the other is None.
+  """
+  query = TaskResultSummary.query()
+  if sort:
+    order = datastore_query.PropertyOrder(
+        sort, datastore_query.PropertyOrder.DESCENDING)
+    query = query.order(order)
+
+  if state == 'pending':
+    return None, query.filter(TaskResultSummary.state == State.PENDING)
+
+  if state == 'running':
+    return None, query.filter(TaskResultSummary.state == State.RUNNING)
+
+  if state == 'pending_running':
+    # This is a special case that sends two concurrent queries under the hood.
+    # ndb.OR() doesn't work when order() is used, it requires __key__ sorting.
+    # This is not efficient, so the DB should be updated accordingly to be
+    # able to support pagination.
+    queries = [
+      query.filter(TaskResultSummary.state == State.PENDING),
+      query.filter(TaskResultSummary.state == State.RUNNING),
+    ]
+    return queries, None
+
+  if state == 'completed':
+    return None, query.filter(TaskResultSummary.state == State.COMPLETED)
+
+  if state == 'completed_success':
+    query = query.filter(TaskResultSummary.state == State.COMPLETED)
+    return None, query.filter(TaskResultSummary.failure == False)
+
+  if state == 'completed_failure':
+    query = query.filter(TaskResultSummary.state == State.COMPLETED)
+    return None, query.filter(TaskResultSummary.failure == True)
+
+  if state == 'expired':
+    return None, query.filter(TaskResultSummary.state == State.EXPIRED)
+
+  # TODO(maruel): This is never set until the new bot API is writen.
+  # https://code.google.com/p/swarming/issues/detail?id=117
+  if state == 'timed_out':
+    return None, query.filter(TaskResultSummary.state == State.TIMED_OUT)
+
+  if state == 'bot_died':
+    return None, query.filter(TaskResultSummary.state == State.BOT_DIED)
+
+  if state == 'canceled':
+    return None, query.filter(TaskResultSummary.state == State.CANCELED)
+
+  if state == 'all':
+    return None, query
+
+  raise ValueError('Invalid state')
+
+
+def search_by_name(word, cursor_str, limit):
+  """Returns TaskResultSummary in -created_ts order containing the word."""
+  cursor = search.Cursor(web_safe_string=cursor_str, per_result=True)
+  index = search.Index(name='requests')
+
+  def item_to_id(item):
+    for field in item.fields:
+      if field.name == 'id':
+        return field.value
+
+  # The code is structured to handle incomplete entities but still return
+  # 'limit' items. This is done by fetching a few more entities than necessary,
+  # then keeping track of the cursor per item so the right cursor can be
+  # returned.
+  opts = search.QueryOptions(limit=limit + 5, cursor=cursor)
+  results = index.search(search.Query('name:%s' % word, options=opts))
+  result_summary_keys = []
+  cursors = []
+  for item in results.results:
+    value = item_to_id(item)
+    if value:
+      result_summary_keys.append(unpack_result_summary_key(value))
+      cursors.append(item.cursor)
+
+  # Handle None result value. See make_request() for details about how this can
+  # happen.
+  tasks = []
+  cursor = None
+  for task, c in zip(ndb.get_multi(result_summary_keys), cursors):
+    if task:
+      cursor = c
+      tasks.append(task)
+      if len(tasks) == limit:
+        # Drop the rest.
+        break
+  else:
+    if len(cursors) == limit + 5:
+      while len(tasks) < limit:
+        # Go into the slow path, seems like we got a lot of corrupted items.
+        opts = search.QueryOptions(limit=limit-len(tasks) + 5, cursor=cursor)
+        results = index.search(search.Query('name:%s' % word, options=opts))
+        if not results.results:
+          # Nothing else.
+          cursor = None
+          break
+        for item in results.results:
+          value = item_to_id(item)
+          if value:
+            cursor = item.cursor
+            task = unpack_result_summary_key(value).get()
+            if task:
+              tasks.append(task)
+              if len(tasks) == limit:
+                break
+
+  cursor_str = cursor.web_safe_string if cursor else None
+  return tasks, cursor_str

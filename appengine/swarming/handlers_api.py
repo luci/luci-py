@@ -5,6 +5,7 @@
 """REST APIs handlers."""
 
 import logging
+import textwrap
 
 import webapp2
 
@@ -72,6 +73,12 @@ def log_missing_keys(minimum_keys, actual_keys, request, source, name):
     return message
 
 
+def process_doc(handler):
+  lines = handler.__doc__.rstrip().splitlines()
+  rest = textwrap.dedent('\n'.join(lines[1:]))
+  return '\n'.join((lines[0], rest)).rstrip()
+
+
 ### New Client APIs.
 
 
@@ -83,7 +90,7 @@ class ClientApiListHandler(auth.ApiHandler):
     # Hard to make it any simpler.
     prefix = '/swarming/api/v1/client/'
     data = {
-      r.template[len(prefix):]: r.handler.__doc__ for r in get_routes()
+      r.template[len(prefix):]: process_doc(r.handler) for r in get_routes()
       if r.template.startswith(prefix) and hasattr(r.handler, 'get')
     }
     self.send_response(data)
@@ -199,6 +206,62 @@ class ClientTaskResultOutputAllHandler(ClientTaskResultBase):
         i.decode('utf-8', 'replace') if i else i
         for i in result.get_outputs()
       ],
+    }
+    self.send_response(utils.to_json_encodable(data))
+
+
+class ClientApiTasksHandler(auth.ApiHandler):
+  """Requests all TaskResultSummary with filters.
+
+  It is specifically a GET with query parameters for simplicity instead of a
+  JSON POST.
+
+  Arguments:
+    name: Search by task name; str or None.
+    tag: Search by task tag, can be used mulitple times; list(str) or None.
+    cursor: Continue a previous query; str or None.
+    limit: Maximum number of items to return.
+    sort: Ordering: 'created_ts', 'modified_ts', 'completed_ts', 'abandoned_ts'.
+        Defaults to 'created_ts'.
+    state: Filtering: 'all', 'pending', 'running', 'pending_running',
+        'completed', 'completed_success', 'completed_failure', 'bot_died',
+        'expired', 'canceled'. Defaults to 'all'.
+
+  In particular, one of `name`, `tag` or `state` can be used
+  exclusively.
+  """
+  EXPECTED = {'cursor', 'limit', 'name', 'sort', 'state', 'tag'}
+
+  @auth.require(acl.is_privileged_user)
+  def get(self):
+    extra = frozenset(self.request.GET) - self.EXPECTED
+    if extra:
+      self.abort_with_error(
+          400,
+          error='Extraneous query parameters. Did you make a typo? %s' %
+          ','.join(sorted(extra)))
+
+    # Use a similar query to /user/tasks.
+    name = self.request.get('name')
+    tags = self.request.get_all('tag')
+    cursor_str = self.request.get('cursor')
+    limit = int(self.request.get('limit', 100))
+    sort = self.request.get('sort', 'created_ts')
+    state = self.request.get('state', 'all')
+
+    uses = bool(name) + bool(tags) + bool(state!='all')
+    if uses > 1:
+      self.abort_with_error(
+          400, error='Only one of name, tag (1 or many) or state can be used')
+
+    items, cursor_str, sort, state = task_result.get_tasks(
+        name, tags, cursor_str, limit, sort, state)
+    data = {
+      'cursor': cursor_str,
+      'items': items,
+      'limit': limit,
+      'sort': sort,
+      'state': state,
     }
     self.send_response(utils.to_json_encodable(data))
 
@@ -394,10 +457,10 @@ class BotHandshakeHandler(auth.ApiHandler):
   # This handler is called to get XSRF token, there's nothing to enforce yet.
   xsrf_token_enforce_on = ()
 
-  EXPECTED_KEYS = frozenset([u'attributes'])
-  ACCEPTED_ATTRIBUTES = frozenset(
-      [u'dimensions', u'id', u'ip', u'quarantined', u'version'])
-  REQUIRED_ATTRIBUTES = frozenset([u'dimensions', u'id', u'ip', u'version'])
+  EXPECTED_KEYS = {u'attributes'}
+  ACCEPTED_ATTRIBUTES = {
+      u'dimensions', u'id', u'ip', u'quarantined', u'version'}
+  REQUIRED_ATTRIBUTES = {u'dimensions', u'id', u'ip', u'version'}
 
   @auth.require_xsrf_token_request
   @auth.require(acl.is_bot)
@@ -450,11 +513,11 @@ class BotPollHandler(auth.ApiHandler):
   all the fleet at once, they should still be up just enough to be able to
   self-update again even if they don't get task assigned anymore.
   """
-  EXPECTED_KEYS = frozenset([u'attributes', u'state'])
-  ACCEPTED_ATTRIBUTES = frozenset(
-      [u'dimensions', u'id', u'ip', u'quarantined', u'version'])
-  REQUIRED_ATTRIBUTES = frozenset([u'dimensions', u'id', u'ip', u'version'])
-  REQUIRED_STATE_KEYS = frozenset([u'running_time', u'sleep_streak'])
+  EXPECTED_KEYS = {u'attributes', u'state'}
+  ACCEPTED_ATTRIBUTES = {
+      u'dimensions', u'id', u'ip', u'quarantined', u'version'}
+  REQUIRED_ATTRIBUTES = {u'dimensions', u'id', u'ip', u'version'}
+  REQUIRED_STATE_KEYS = {u'running_time', u'sleep_streak'}
 
   @auth.require(acl.is_bot)
   def post(self):
@@ -608,7 +671,7 @@ class BotErrorHandler(auth.ApiHandler):
   meant to be used by bot_main.py for non-recoverable issues, for example when
   failing to self update.
   """
-  EXPECTED_KEYS = frozenset([u'id', u'message'])
+  EXPECTED_KEYS = {u'id', u'message'}
 
   @auth.require(acl.is_bot)
   def post(self):
@@ -643,12 +706,11 @@ class BotTaskUpdateHandler(auth.ApiHandler):
   The handler verifies packets are processed in order and will refuse
   out-of-order packets.
   """
-  ACCEPTED_KEYS = frozenset(
-      [
-        u'command_index', u'duration', u'exit_code', u'hard_timeout', u'id',
-        u'io_timeout', u'output', u'output_chunk_start', u'task_id',
-      ])
-  REQUIRED_KEYS = frozenset([u'command_index', u'id', u'task_id'])
+  ACCEPTED_KEYS = {
+    u'command_index', u'duration', u'exit_code', u'hard_timeout', u'id',
+    u'io_timeout', u'output', u'output_chunk_start', u'task_id',
+  }
+  REQUIRED_KEYS = {u'command_index', u'id', u'task_id'}
 
   @auth.require(acl.is_bot)
   def post(self, task_id=None):
@@ -709,7 +771,7 @@ class BotTaskErrorHandler(auth.ApiHandler):
   This formally kills the task, marking it as an internal failure. This can be
   used by bot_main.py to kill the task when task_runner misbehaved.
   """
-  EXPECTED_KEYS = frozenset([u'id', u'message', u'task_id'])
+  EXPECTED_KEYS = {u'id', u'message', u'task_id'}
 
   @auth.require(acl.is_bot)
   def post(self, task_id=None):
@@ -767,6 +829,7 @@ def get_routes():
           ClientTaskResultOutputHandler),
       ('/swarming/api/v1/client/task/<task_id:[0-9a-f]+>/output/all',
           ClientTaskResultOutputAllHandler),
+      ('/swarming/api/v1/client/tasks', ClientApiTasksHandler),
 
       # Bot
       ('/bootstrap', BootstrapHandler),

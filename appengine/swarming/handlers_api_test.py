@@ -446,9 +446,9 @@ class BotApiTest(AppTestBase):
       self.assertEqual(expected, set(z.namelist()))
 
 
-class NewClientApiTest(AppTestBase):
+class ClientApiTest(AppTestBase):
   def setUp(self):
-    super(NewClientApiTest, self).setUp()
+    super(ClientApiTest, self).setUp()
     self.mock(
         ereporter2, 'log_request',
         lambda *args, **kwargs: self.fail('%s, %s' % (args, kwargs)))
@@ -470,6 +470,7 @@ class NewClientApiTest(AppTestBase):
       u'task/<task_id:[0-9a-f]+>/output/all':
           u'All output from all commands in a task',
       u'task/<task_id:[0-9a-f]+>/request': u'Task\'s request details',
+      u'tasks': handlers_api.process_doc(handlers_api.ClientApiTasksHandler),
     }
     self.assertEqual(expected, response)
 
@@ -777,7 +778,7 @@ class NewClientApiTest(AppTestBase):
     # running anything.
     self.set_as_user()
     _, task_id_2 = self.client_create_task(
-        name='ho', properties=dict(idempotent=True))
+         name='second', user='jack@localhost', properties=dict(idempotent=True))
 
     self.set_as_bot()
     resp = self.bot_poll()
@@ -789,7 +790,6 @@ class NewClientApiTest(AppTestBase):
     response = self.app.get(
         '/swarming/api/v1/client/task/%s/output/all' % task_id_2).json
     self.assertEqual({'outputs': [u'rÉsult string', u'bar']}, response)
-
 
   def test_get_task_output_all(self):
     self.client_create_task()
@@ -869,6 +869,115 @@ class NewClientApiTest(AppTestBase):
       u'user': u'joe@localhost',
     }
     self.assertEqual(expected, response)
+
+  def test_tasks(self):
+    # Create two tasks, one deduped.
+    self.mock(random, 'getrandbits', lambda _: 0x66)
+    now = datetime.datetime(2000, 1, 2, 3, 4, 5, 6)
+    self.mock_now(now)
+    self.client_create_task(
+        name='first', tags=['project:yay', 'commit:post', 'os:Win'],
+        properties=dict(idempotent=True))
+    self.set_as_bot()
+    self.bot_run_task()
+
+    self.set_as_user()
+    self.mock(random, 'getrandbits', lambda _: 0x88)
+    self.mock_now(now, 60)
+    self.client_create_task(
+        name='second', user='jack@localhost',
+        tags=['project:yay', 'commit:pre', 'os:Win'],
+        properties=dict(idempotent=True))
+
+    self.set_as_privileged_user()
+    expected_first = {
+      u'abandoned_ts': None,
+      u'bot_id': u'bot1',
+      u'bot_version': self.bot_version,
+      u'completed_ts': u'2000-01-02 03:04:05',
+      u'created_ts': u'2000-01-02 03:04:05',
+      u'deduped_from': None,
+      u'durations': [0.1, 0.2],
+      u'exit_codes': [0, 0],
+      u'failure': False,
+      u'id': u'dc709e90886600',
+      u'internal_failure': False,
+      u'modified_ts': u'2000-01-02 03:04:05',
+      u'name': u'first',
+      u'properties_hash': u'd181190fea9de5dfa28ebcd155548e3f6db6ab93',
+      u'server_versions': [u'default-version'],
+      u'started_ts': u'2000-01-02 03:04:05',
+      u'state': task_result.State.COMPLETED,
+      u'try_number': 1,
+      u'user': u'joe@localhost',
+    }
+    expected_second = {
+      u'abandoned_ts': None,
+      u'bot_id': u'bot1',
+      u'bot_version': self.bot_version,
+      u'completed_ts': u'2000-01-02 03:04:05',
+      u'created_ts': u'2000-01-02 03:05:05',
+      u'deduped_from': u'dc709e90886601',
+      u'durations': [0.1, 0.2],
+      u'exit_codes': [0, 0],
+      u'failure': False,
+      u'id': u'dc709f7ae88800',
+      u'internal_failure': False,
+      u'modified_ts': u'2000-01-02 03:05:05',
+      u'name': u'second',
+      u'properties_hash': u'd181190fea9de5dfa28ebcd155548e3f6db6ab93',
+      u'server_versions': [u'default-version'],
+      u'started_ts': u'2000-01-02 03:04:05',
+      u'state': task_result.State.COMPLETED,
+      u'try_number': 0,
+      u'user': u'jack@localhost',
+    }
+
+    expected = {
+      u'cursor': None,
+      u'items': [expected_second, expected_first],
+      u'limit': 100,
+      u'sort': u'created_ts',
+      u'state': u'all',
+    }
+    resource = '/swarming/api/v1/client/tasks'
+    self.assertEqual(expected, self.app.get(resource).json)
+
+    # It has a cursor even if there's only one element because of Search API.
+    expected = {
+      u'items': [expected_second],
+      u'limit': 100,
+      u'sort': u'created_ts',
+      u'state': u'all',
+    }
+    actual = self.app.get(resource + '?name=second').json
+    self.assertTrue(actual.pop('cursor'))
+    self.assertEqual(expected, actual)
+
+    expected = {
+      u'cursor': None,
+      u'items': [],
+      u'limit': 100,
+      u'sort': u'created_ts',
+      u'state': u'all',
+    }
+    self.assertEqual(expected, self.app.get(resource + '?&tag=foo:bar').json)
+
+    expected = {
+      u'cursor': None,
+      u'items': [expected_second],
+      u'limit': 100,
+      u'sort': u'created_ts',
+      u'state': u'all',
+    }
+    actual = self.app.get(resource + '?tag=project:yay&tag=commit:pre').json
+    self.assertEqual(expected, actual)
+
+  def test_tasks_fail(self):
+    self.app.get('/swarming/api/v1/client/tasks?tags=a:b', status=403)
+    self.set_as_privileged_user()
+    # It's 'tag', not 'tags'.
+    self.app.get('/swarming/api/v1/client/tasks?tags=a:b', status=400)
 
   def test_api_bots(self):
     self.set_as_privileged_user()
