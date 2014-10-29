@@ -11,6 +11,7 @@ results back.
 It manages self-update and rebooting the host in case of problems.
 """
 
+import contextlib
 import json
 import logging
 import optparse
@@ -369,7 +370,9 @@ def get_config():
   swarming_bot.zip, use the one beside the file.
   """
   if THIS_FILE.endswith('.zip'):
-    with zipfile.ZipFile(THIS_FILE, 'r') as f:
+    # Can't use with statement here as it has to work with python 2.6 due to
+    # obscure reasons relating to old cygwin installs.
+    with contextlib.closing(zipfile.ZipFile(THIS_FILE, 'r')) as f:
       return json.load(f.open('config.json'))
 
   with open(os.path.join(ROOT_DIR, 'config.json'), 'r') as f:
