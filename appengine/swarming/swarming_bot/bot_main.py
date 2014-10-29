@@ -110,7 +110,7 @@ def setup_bot():
 
   See bot_config.py for the return code.
   """
-  botobj = get_bot(None)
+  botobj = get_bot(get_remote())
   try:
     import bot_config
   except Exception:
@@ -121,18 +121,18 @@ def setup_bot():
     return bot_config.setup_bot(botobj)
   except Exception:
     logging.exception('bot_config.setup_bot() is bad')
-
-  try:
-    # Compatibility code to be removed as soon as all bot_config.py are updated.
-    # TODO(maruel): Delete.
-    # pylint: disable=E1120
-    return bot_config.setup_bot()
-  except Exception:
-    logging.exception('bot_config.setup_bot() is really bad')
-    return True
+  return True
 
 
 ### end of bot_config handler part.
+
+
+def get_remote():
+  """Return a XsrfRemote instance to the preconfigured server."""
+  config = get_config()
+  server = config['server']
+  on_error.report_on_exception_exit(server)
+  return xsrf_client.XsrfRemote(server, '/swarming/api/v1/bot/handshake')
 
 
 def post_error_task(remote, attributes, error, task_id):
@@ -390,9 +390,6 @@ def main(args):
   parser.add_option('-v', '--verbose', action='count', default=0,
                     help='Set logging level to INFO, twice for DEBUG.')
 
-  config = get_config()
-  server = config['server']
-  on_error.report_on_exception_exit(server)
   error = None
   try:
     # Do this late so an error is reported. It could happen when a flag is
@@ -405,5 +402,5 @@ def main(args):
   except Exception as e:
     # Do not reboot here, because it would just cause a reboot loop.
     error = str(e)
-  remote = xsrf_client.XsrfRemote(server, '/swarming/api/v1/bot/handshake')
+  remote = get_remote()
   return run_bot(remote, error)

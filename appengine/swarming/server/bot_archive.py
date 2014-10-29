@@ -91,7 +91,6 @@ FILES = (
     'utils/tools.py',
     'utils/zip_package.py',
     'xsrf_client.py',
-    'zipped_archive.py',
 )
 
 
@@ -123,7 +122,6 @@ def get_swarming_bot_zip(root_dir, host, additionals):
     A string representing the zipped file's contents.
   """
   zip_memory_file = StringIO.StringIO()
-  # TODO(maruel): Use client/utils/zipped_archive.py.
   with zipfile.ZipFile(zip_memory_file, 'w', zipfile.ZIP_DEFLATED) as zip_file:
     for item, content in yield_swarming_bot_files(root_dir, host, additionals):
       zip_file.writestr(item, content)
