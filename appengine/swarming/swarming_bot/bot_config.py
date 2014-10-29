@@ -8,6 +8,10 @@ There's 3 types of functions in this file:
   - get_*() to return properties to describe this bot.
   - on_*() as hooks based on events happening on the bot.
   - setup_*() to setup global state on the host.
+
+This file shouldn't import from other scripts in this directory except
+os_utilities which is guaranteed to be usable as an API. It's fine to import
+from stdlib.
 """
 
 import os_utilities

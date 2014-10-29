@@ -9,6 +9,9 @@ Includes code:
 - to declare the current system this code is running under.
 - to run a command on user login.
 - to restart the host.
+
+This file serves as an API to bot_config.py. bot_config.py can be replaced on
+the server to allow additional server-specific functionality.
 """
 
 import cgi
@@ -26,6 +29,9 @@ import sys
 import time
 
 try:
+  # The reason for this try/except is so someone can copy this single file on a
+  # new machine and execute it as-is to get the dimensions that would be set.
+  from utils import file_path
   from utils import zip_package
 
   THIS_FILE = os.path.abspath(zip_package.get_main_script_path() or __file__)
@@ -752,6 +758,11 @@ def get_attributes(id_tag):
     if device_id:
       return get_attributes_android(device_id)
   return get_attributes_host(id_tag)
+
+
+def rmtree(path):
+  """Removes a directory the bold way."""
+  file_path.rmtree(path)
 
 
 def setup_auto_startup_win(command, cwd, batch_name):
