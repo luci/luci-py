@@ -110,7 +110,7 @@ def setup_bot():
 
   See bot_config.py for the return code.
   """
-  botobj = get_bot(get_remote())
+  botobj, _ = get_bot(get_remote())
   try:
     import bot_config
   except Exception:
