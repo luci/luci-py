@@ -152,6 +152,7 @@ def _validate_priority(_prop, value):
 
 
 def _validate_expiration(prop, value):
+  """Validates TaskRequest.expiration_ts."""
   now = utils.utcnow()
   offset = int(round((value - now).total_seconds()))
   if _MIN_TIMEOUT_SECS > offset or _ONE_DAY_SECS < offset:
@@ -160,6 +161,13 @@ def _validate_expiration(prop, value):
         '%s (%s, %ds from now) must effectively be between %ds and one day '
         'from now (%s)' %
         (prop._name, value, offset, _MIN_TIMEOUT_SECS, now))
+
+
+def _validate_tags(prop, value):
+  """Validates and sort TaskRequest.tags."""
+  if not ':' in value:
+    # pylint: disable=W0212
+    raise ValueError('%s must be key:value form, not %s' % (prop._name, value))
 
 
 ### Models.
@@ -269,7 +277,7 @@ class TaskRequest(ndb.Model):
       indexed=True, validator=_validate_expiration, required=True)
 
   # Tags that specify the category of the task.
-  tags = ndb.StringProperty(repeated=True)
+  tags = ndb.StringProperty(repeated=True, validator=_validate_tags)
 
   @property
   def scheduling_expiration_secs(self):
@@ -283,6 +291,15 @@ class TaskRequest(ndb.Model):
     out['properties_hash'] = (
         properties_hash.encode('hex') if properties_hash else None)
     return out
+
+  def _pre_put_hook(self):
+    """Adds automatic tags."""
+    super(TaskRequest, self)._pre_put_hook()
+    self.tags.append('priority:%s' % self.priority)
+    self.tags.append('user:%s' % self.user)
+    for key, value in self.properties.dimensions.iteritems():
+      self.tags.append('%s:%s' % (key, value))
+    self.tags = sorted(set(self.tags))
 
 
 def _new_request_key():
@@ -425,7 +442,7 @@ def make_request(data):
       properties=properties,
       priority=data['priority'],
       expiration_ts=expiration_ts,
-      tags=sorted(data['tags']))
+      tags=data['tags'])
   _put_request(request)
   return request
 

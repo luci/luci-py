@@ -547,7 +547,7 @@ class ClientApiTest(AppTestBase):
         'io_timeout_secs': 10,
       },
       'scheduling_expiration_secs': 30,
-      'tags': ['foo', 'bar'],
+      'tags': ['foo:bar'],
       'user': 'joe@localhost',
     }
     headers = {'X-XSRF-Token': str(response['xsrf_token'])}
@@ -576,7 +576,7 @@ class ClientApiTest(AppTestBase):
         'io_timeout_secs': 30,
       },
       'scheduling_expiration_secs': 30,
-      'tags': ['foo', 'bar'],
+      'tags': ['foo:bar'],
       'user': 'joe@localhost',
     }
     headers = {'X-XSRF-Token': str(response['xsrf_token'])}
@@ -601,7 +601,11 @@ class ClientApiTest(AppTestBase):
           u'io_timeout_secs': 30,
         },
         u'properties_hash': None,
-        u'tags': [u'bar', u'foo'],
+        u'tags': [
+          u'foo:bar',
+          u'priority:200',
+          u'user:joe@localhost',
+        ],
         u'user': u'joe@localhost',
       },
       u'task_id': u'125ecfd5c888800',
@@ -865,7 +869,7 @@ class ClientApiTest(AppTestBase):
         u'io_timeout_secs': 1200,
       },
       u'properties_hash': None,
-      u'tags': [],
+      u'tags': [u'os:Amiga', u'priority:100', u'user:joe@localhost'],
       u'user': u'joe@localhost',
     }
     self.assertEqual(expected, response)

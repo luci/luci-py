@@ -276,10 +276,10 @@ class FrontendTest(AppTestBase):
     reaped = self.bot_poll()
     self.bot_complete_task(token, task_id=reaped['manifest']['task_id'])
     self.set_as_privileged_user()
-    self.app.get('/user/tasks?task_tag=yo', status=200)
+    self.app.get('/user/tasks?task_tag=yo:dawg', status=200)
     for sort, state in self._sort_state_product():
       url = '/user/tasks?sort=%s&state=%s' % (sort, state)
-      self.app.get(url + '&task_tag=yo', status=200)
+      self.app.get(url + '&task_tag=yo:dawg', status=200)
 
   def test_task_cancel(self):
     self.set_as_privileged_user()

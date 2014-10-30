@@ -46,7 +46,7 @@ def _gen_request_data(properties=None, **kwargs):
     },
     'priority': 50,
     'scheduling_expiration_secs': 60,
-    'tags': [u'tag1'],
+    'tags': [u'tag:1'],
   }
   base_data.update(kwargs)
   base_data['properties'].update(properties or {})
@@ -122,7 +122,7 @@ class TaskResultApiTest(test_case.TestCase):
       self.assertTrue(task_result.state_to_string(Foo(state=i)))
     f = Foo(state=task_result.State.COMPLETED)
     f.deduped_from = '123'
-    self.assertEqual('Completed (deduped)', task_result.state_to_string(f))
+    self.assertEqual('Deduped', task_result.state_to_string(f))
 
   def test_request_key_to_result_summary_key(self):
     request_key = task_request.id_to_request_key(256)

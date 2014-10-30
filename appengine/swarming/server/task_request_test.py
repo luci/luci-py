@@ -48,7 +48,7 @@ def _gen_request_data(properties=None, **kwargs):
     },
     'priority': 50,
     'scheduling_expiration_secs': 30,
-    'tags': [u'tag1'],
+    'tags': [u'tag:1'],
   }
   base_data.update(kwargs)
   base_data['properties'].update(properties or {})
@@ -147,7 +147,13 @@ class TaskRequestApiTest(test_case.TestCase):
       'properties': expected_properties,
       'properties_hash': None,
       'user': u'Jesus',
-      'tags': [u'tag1'],
+      'tags': [
+        u'OS:Windows-3.1.1',
+        u'hostname:localhost',
+        u'priority:50',
+        u'tag:1',
+        u'user:Jesus',
+      ],
     }
     actual = request.to_dict()
     # expiration_ts - created_ts == deadline_to_run.
@@ -174,7 +180,7 @@ class TaskRequestApiTest(test_case.TestCase):
     request_2 = task_request.make_request(
         _gen_request_data(
             name='Other', user='Other', priority=201,
-            scheduling_expiration_secs=129, tags=['tag2'],
+            scheduling_expiration_secs=129, tags=['tag:2'],
             properties=dict(idempotent=True)))
     self.assertEqual(
         request_1.properties.properties_hash,

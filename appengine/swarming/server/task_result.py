@@ -741,13 +741,13 @@ def _output_append(output_key, number_chunks, output, output_chunk_start):
 
 def state_to_string(state_obj):
   """Returns a user-readable string representing a State."""
+  if state_obj.deduped_from:
+    return 'Deduped'
   out = State.to_string(state_obj.state)
   if state_obj.failure:
     out += ' (failed)'
   if state_obj.internal_failure:
     out += ' (internal failure)'
-  if state_obj.deduped_from:
-    out += ' (deduped)'
   return out
 
 
