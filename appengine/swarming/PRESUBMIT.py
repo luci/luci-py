@@ -68,10 +68,14 @@ def CommonChecks(input_api, output_api):
     join('swarming_bot'),
   ]
 
-  blacklist = []
+  blacklist = [
+    # Never run the remote_smoke_test automatically. Should instead be run after
+    # uploading a server instance.
+    r'^remote_smoke_test\.py$'
+  ]
   if not input_api.is_committing:
     # Skip smoke tests on upload.
-    blacklist.append(r'smoke_test\.py$')
+    blacklist.append(r'.+_smoke_test\.py$')
 
   tests = []
   for directory in test_directories:
