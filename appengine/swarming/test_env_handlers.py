@@ -116,7 +116,7 @@ class AppTestBase(test_case.TestCase):
     params = {
       'attributes': {
         'dimensions': {
-          'id': bot,
+          'id': [bot],
           'os': ['Amiga'],
         },
         'id': bot,

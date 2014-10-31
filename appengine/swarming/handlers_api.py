@@ -481,12 +481,18 @@ class BotHandshakeHandler(auth.ApiHandler):
 
     bot_id = attributes.get('id')
     dimensions = attributes.get('dimensions', {})
+    # TODO(maruel): Remove and move to 'state'.
+    hostnames = dimensions.get('hostname')
+    if isinstance(hostnames, list) and len(hostnames) == 1:
+      hostname = hostnames[0]
+    else:
+      hostname = hostnames
     quarantined = attributes.get('quarantined', False)
     state = request.get('state', {})
     if bot_id:
       bot_management.tag_bot_seen(
           bot_id,
-          dimensions.get('hostname'),
+          hostname,
           attributes.get('ip'),
           self.request.remote_addr,
           dimensions,
@@ -568,23 +574,42 @@ class BotPollHandler(auth.ApiHandler):
     # quarantining a bot.
     # https://code.google.com/p/swarming/issues/detail?id=115
 
-    dimensions_count = task_to_run.dimensions_powerset_count(dimensions)
-    if not quarantined and dimensions_count > task_to_run.MAX_DIMENSIONS:
-      # It's a big deal, alert the admins.
-      ereporter2.log_request(
-          self.request,
-          source='bot',
-          message='Too many dimensions (%d) on bot' % dimensions_count)
-      quarantined = True
+    if not quarantined:
+      if not all(
+          isinstance(key, unicode) and
+          isinstance(values, list) and
+          all(isinstance(value, unicode) for value in values)
+          for key, values in dimensions.iteritems()):
+        # It's a big deal, alert the admins.
+        ereporter2.log_request(
+            self.request,
+            source='bot',
+            message='Invalid dimensions on bot')
+        quarantined = True
+      else:
+        dimensions_count = task_to_run.dimensions_powerset_count(dimensions)
+        if dimensions_count > task_to_run.MAX_DIMENSIONS:
+          # It's a big deal, alert the admins.
+          ereporter2.log_request(
+              self.request,
+              source='bot',
+              message='Too many dimensions (%d) on bot' % dimensions_count)
+          quarantined = True
 
     if not quarantined:
       # Note its existence at two places, one for stats at 1 minute resolution,
       # the other for the list of known bots.
       stats.add_entry(action='bot_active', bot_id=bot_id, dimensions=dimensions)
 
+    # TODO(maruel): Remove and move to 'state'.
+    hostnames = dimensions.get('hostname')
+    if isinstance(hostnames, list) and len(hostnames) == 1:
+      hostname = hostnames[0]
+    else:
+      hostname = hostnames
     bot_management.tag_bot_seen(
         bot_id,
-        dimensions.get('hostname'),
+        hostname,
         attributes.get('ip'),
         self.request.remote_addr,
         dimensions,

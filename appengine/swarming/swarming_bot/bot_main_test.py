@@ -97,7 +97,7 @@ class TestBotMain(net_utils.TestCase):
             'https://localhost:1/swarming/api/v1/bot/task_error/23',
             {
               'data': {
-                'id': expected_attribs['dimensions']['id'],
+                'id': expected_attribs['id'],
                 'message': 'error',
                 'task_id': 23,
               },

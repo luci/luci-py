@@ -178,7 +178,7 @@ class TestOsUtilities(auto_stub.TestCase):
     props['bar'] = 'foo'
     self.mock(os_utilities, 'get_adb_device_properties_raw', lambda *_: props)
 
-    expected_dimensions['id'] = '123'
+    expected_dimensions['id'] = ['123']
     actual = os_utilities.get_attributes_android('123')
     expected = {
       'dimensions': expected_dimensions,

@@ -988,8 +988,8 @@ class ClientApiTest(AppTestBase):
     now = datetime.datetime(2000, 1, 2, 3, 4, 5, 6)
     self.mock_now(now)
     bot = bot_management.tag_bot_seen(
-        'id1', 'localhost', '127.0.0.1', '8.8.4.4', {'foo': 'bar'}, '123456789',
-        False, {'ram': 65})
+        'id1', 'localhost', '127.0.0.1', '8.8.4.4', {'foo': ['bar']},
+        '123456789', False, {'ram': 65})
     bot.put()
 
     actual = self.app.get('/swarming/api/v1/client/bots', status=200).json
@@ -997,7 +997,7 @@ class ClientApiTest(AppTestBase):
       u'items': [
         {
           u'created_ts': u'2000-01-02 03:04:05',
-          u'dimensions': {u'foo': u'bar'},
+          u'dimensions': {u'foo': [u'bar']},
           u'external_ip': u'8.8.4.4',
           u'hostname': u'localhost',
           u'id': u'id1',
@@ -1024,8 +1024,8 @@ class ClientApiTest(AppTestBase):
     self.assertEqual(expected, actual)
 
     bot = bot_management.tag_bot_seen(
-        'id2', 'localhost', '127.0.0.1', '8.8.4.4', {'foo': 'bar'}, '123456789',
-        False,  {u'ram': 65})
+        'id2', 'localhost', '127.0.0.1', '8.8.4.4', {'foo': ['bar']},
+        '123456789', False,  {u'ram': 65})
     bot.put()
 
     actual = self.app.get(
@@ -1047,14 +1047,14 @@ class ClientApiTest(AppTestBase):
     now = datetime.datetime(2000, 1, 2, 3, 4, 5, 6)
     self.mock_now(now)
     bot = bot_management.tag_bot_seen(
-        'id1', 'localhost', '127.0.0.1', '8.8.4.4', {'foo': 'bar'}, '123456789',
-        False, {'ram': 65})
+        'id1', 'localhost', '127.0.0.1', '8.8.4.4', {'foo': ['bar']},
+        '123456789', False, {'ram': 65})
     bot.put()
 
     actual = self.app.get('/swarming/api/v1/client/bot/id1', status=200).json
     expected = {
       u'created_ts': u'2000-01-02 03:04:05',
-      u'dimensions': {u'foo': u'bar'},
+      u'dimensions': {u'foo': [u'bar']},
       u'external_ip': u'8.8.4.4',
       u'hostname': u'localhost',
       u'id': u'id1',
@@ -1079,8 +1079,8 @@ class ClientApiTest(AppTestBase):
       'str': u'uni',
     }
     bot = bot_management.tag_bot_seen(
-        'id1', 'localhost', '127.0.0.1', '8.8.4.4', {'foo': 'bar'}, '123456789',
-        False, state)
+        'id1', 'localhost', '127.0.0.1', '8.8.4.4', {'foo': ['bar']},
+        '123456789', False, state)
     bot.put()
 
     token = self.get_client_token()

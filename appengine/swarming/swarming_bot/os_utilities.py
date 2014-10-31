@@ -673,7 +673,7 @@ def get_attributes_android(device_id, adb_path='adb'):
   # by device id, independent of things like hostname, especially in the case
   # where a single host runs multiple Swarming bots for multiple android
   # devices.
-  dimensions['id'] = device_id
+  dimensions['id'] = [device_id]
   return {
     'dimensions': dimensions,
     'id': device_id,
@@ -692,13 +692,13 @@ def get_dimensions():
   cpu_type = get_cpu_type()
   cpu_bitness = get_cpu_bitness()
   dimensions = {
-    'cores': str(get_num_processors()),
+    'cores': [str(get_num_processors())],
     'cpu': [
       cpu_type,
       cpu_type + '-' + cpu_bitness,
     ],
     'gpu': get_gpu(),
-    'hostname': get_hostname(),
+    'hostname': [get_hostname()],
     'os': [
       os_name,
       os_name + '-' + get_os_version(),
@@ -718,12 +718,12 @@ def get_dimensions():
     dimensions['os'].sort()
 
   if sys.platform in ('cygwin', 'win32'):
-    dimensions['cygwin'] = str(int(sys.platform == 'cygwin'))
+    dimensions['cygwin'] = [str(int(sys.platform == 'cygwin'))]
   if sys.platform == 'win32':
     # TODO(maruel): Have get_integrity_level_win() work in the first place.
     integrity = get_integrity_level_win()
     if integrity is not None:
-      dimensions['integrity'] = integrity
+      dimensions['integrity'] = [integrity]
   return dimensions
 
 
@@ -738,7 +738,7 @@ def get_attributes_host(id_tag):
   # Also add the id as a dimension, so it's possible to trigger a task precisely
   # by id, independent of things like hostname, especially in the case where a
   # single host runs multiple Swarming bot.
-  dimensions['id'] = id_tag
+  dimensions['id'] = [id_tag]
   return {
     'dimensions': dimensions,
     'id': id_tag,
