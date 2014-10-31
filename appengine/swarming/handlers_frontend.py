@@ -407,13 +407,6 @@ class TasksHandler(auth.AuthenticatingHandler):
     except ValueError as e:
       self.abort(400, str(e))
 
-    # Do not let dangling futures linger around.
-    ndb.Future.wait_all(futures)
-    gen = (t.duration_now(now) for t in tasks)
-    durations = sorted(i for i in gen if i is not None)
-    gen = (t.pending_now(now) for t in tasks)
-    pendings = sorted(i for i in gen if i is not None)
-
     def safe_sum(items):
       return sum(items, datetime.timedelta())
 
@@ -430,11 +423,20 @@ class TasksHandler(auth.AuthenticatingHandler):
         return items[middle]
       return (items[middle-1]+items[middle]) / 2
 
+    gen = (t.duration_now(now) for t in tasks)
+    durations = sorted(t for t in gen if t is not None)
+    gen = (t.pending_now(now) for t in tasks)
+    pendings = sorted(t for t in gen if t is not None)
+    total_saved = safe_sum(t.duration for t in tasks if t.deduped_from)
+    duration_sum = safe_sum(durations)
+    total_saved_percent = (
+        (100. * total_saved.total_seconds() / duration_sum.total_seconds())
+        if duration_sum else 0.)
     params = {
       'cursor': cursor_str,
       'duration_average': avg(durations),
       'duration_median': median(durations),
-      'duration_sum': safe_sum(durations),
+      'duration_sum': duration_sum,
       'has_pending': any(t.is_pending for t in tasks),
       'has_running': any(t.is_running for t in tasks),
       'is_admin': acl.is_admin(),
@@ -452,11 +454,16 @@ class TasksHandler(auth.AuthenticatingHandler):
       'task_name': task_name,
       'task_tag': '\n'.join(task_tags),
       'tasks': tasks,
+      'total_saved': total_saved,
+      'total_saved_percent': total_saved_percent,
       'xsrf_token': self.generate_xsrf_token(),
     }
     # TODO(maruel): If admin or if the user is task's .user, show the Cancel
     # button. Do not show otherwise.
     self.response.out.write(template.render('swarming/user_tasks.html', params))
+
+    # Do not let dangling futures linger around.
+    ndb.Future.wait_all(futures)
 
   def _get_counts_future(self, now):
     """Returns all the counting futures in parallel."""
