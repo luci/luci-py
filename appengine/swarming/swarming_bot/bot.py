@@ -45,6 +45,11 @@ class Bot(object):
     return self._attributes.get('dimensions', {}).copy()
 
   @property
+  def id(self):
+    """Returns the bot's ID."""
+    return self._attributes.get('id', 'unknown')
+
+  @property
   def remote(self):
     """XsrfClient instance to talk to the server.
 

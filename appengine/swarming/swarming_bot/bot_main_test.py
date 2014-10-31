@@ -50,7 +50,9 @@ class TestBotMain(net_utils.TestCase):
     self.attributes = {
       'dimensions': {'foo', 'bar'},
       'id': 'localhost',
+      'version': '123',
     }
+    self.mock(zip_package, 'generate_version', lambda: '123')
     self.bot = bot.Bot(self.server, self.attributes, 'version1', self.root_dir)
     self.mock(self.bot, 'post_error', self.fail)
     self.mock(self.bot, 'restart', self.fail)
@@ -83,6 +85,7 @@ class TestBotMain(net_utils.TestCase):
     self.mock(logging, 'error', lambda *_: None)
     self.mock(bot_main, 'get_remote', lambda: self.server)
     expected_attribs = bot_main.get_attributes()
+    expected_attribs['version'] = '123'
     self.expected_requests(
         [
           (
@@ -399,5 +402,6 @@ class TestBotMain(net_utils.TestCase):
 if __name__ == '__main__':
   if '-v' in sys.argv:
     unittest.TestCase.maxDiff = None
-  logging.basicConfig(level=logging.ERROR)
+  logging.basicConfig(
+      level=logging.DEBUG if '-v' in sys.argv else logging.ERROR)
   unittest.main()

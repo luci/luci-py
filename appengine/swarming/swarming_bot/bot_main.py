@@ -19,6 +19,7 @@ import os
 import subprocess
 import sys
 import time
+import traceback
 import zipfile
 
 # pylint: disable-msg=W0403
@@ -40,6 +41,9 @@ ROOT_DIR = os.path.dirname(THIS_FILE)
 
 # See task_runner.py for documentation.
 TASK_FAILED = 89
+
+
+_ERROR_HANDLER_WAS_REGISTERED = False
 
 
 ### bot_config handler part.
@@ -130,9 +134,12 @@ def setup_bot():
 
 def get_remote():
   """Return a XsrfRemote instance to the preconfigured server."""
+  global _ERROR_HANDLER_WAS_REGISTERED
   config = get_config()
   server = config['server']
-  on_error.report_on_exception_exit(server)
+  if not _ERROR_HANDLER_WAS_REGISTERED:
+    on_error.report_on_exception_exit(server)
+    _ERROR_HANDLER_WAS_REGISTERED = True
   return xsrf_client.XsrfRemote(server, '/swarming/api/v1/bot/handshake')
 
 
@@ -179,13 +186,13 @@ def get_bot():
   # annoying to recover. In that case, we set a special property to catch these
   # and help the admin fix the swarming_bot code more quickly.
   attributes = {}
-  error = None
+  error = ''
   try:
     # If zip_package.generate_version() fails, we still want the server to do
     # the /server_ping before calculating the attributes.
     attributes['version'] = zip_package.generate_version()
   except Exception as e:
-    error = str(e)
+    error += 'generate_version(): %s\n%s\n' % (e, traceback.format_exc())
 
   try:
     # The fully qualified domain name will uniquely identify this machine to the
@@ -194,7 +201,7 @@ def get_bot():
     attributes.update(get_attributes())
   except Exception as e:
     attributes.update(get_attributes_failsafe())
-    error = str(e)
+    error += 'get_attributes(): %s\n%s\n' % (e, traceback.format_exc())
 
   logging.info('Attributes: %s', attributes)
 
