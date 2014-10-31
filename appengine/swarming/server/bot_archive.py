@@ -17,6 +17,8 @@ import StringIO
 import sys
 import zipfile
 
+from components import utils
+
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -101,7 +103,11 @@ def yield_swarming_bot_files(root_dir, host, additionals):
   """
   items = {i: None for i in FILES}
   items.update(additionals)
-  items['config.json'] = json.dumps({'server': host.rstrip('/')})
+  config = {
+    'server': host.rstrip('/'),
+    'server_version': utils.get_app_version(),
+  }
+  items['config.json'] = json.dumps(config)
   for item, content in sorted(items.iteritems()):
     if content is not None:
       yield item, content

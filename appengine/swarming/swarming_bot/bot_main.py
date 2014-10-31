@@ -111,7 +111,7 @@ def setup_bot():
 
   See bot_config.py for the return code.
   """
-  botobj, _ = get_bot(get_remote())
+  botobj = get_bot()
   try:
     import bot_config
   except Exception:
@@ -136,15 +136,14 @@ def get_remote():
   return xsrf_client.XsrfRemote(server, '/swarming/api/v1/bot/handshake')
 
 
-def post_error_task(remote, attributes, error, task_id):
+def post_error_task(botobj, error, task_id):
   """Posts given error as failure cause for the task.
 
   This is used in case of internal code error, and this causes the task to
   become BOT_DIED.
 
   Arguments:
-    remote: An XrsfRemote instance.
-    attributes: This bot's attributes.
+    botobj: A bot.Bot instance.
     error: String representing the problem.
     task_id: Task that had an internal error. When the Swarming server sends
         commands to a bot, even though they could be completely wrong, the
@@ -157,18 +156,22 @@ def post_error_task(remote, attributes, error, task_id):
   # at all. In this case the server could retry the task even if it doesn't have
   # 'idempotent' set. See
   # https://code.google.com/p/swarming/issues/detail?id=108.
-  logging.error('Error: %s\n%s', attributes, error)
+  # Access to a protected member _XXX of a client class - pylint: disable=W0212
+  logging.error('Error: %s\n%s', botobj._attributes, error)
   data = {
-    'id': attributes.get('id'),
+    'id': botobj._attributes.get('id'),
     'message': error,
     'task_id': task_id,
   }
-  return remote.url_read_json(
+  return botobj.remote.url_read_json(
       '/swarming/api/v1/bot/task_error/%s' % task_id, data=data)
 
 
-def get_bot(remote):
-  """Returns a valid Bot instance."""
+def get_bot():
+  """Returns a valid Bot instance.
+
+  Should only be called once in the process lifetime.
+  """
   # TODO(maruel): This should be part of the 'health check' and the bot
   # shouldn't allow itself to upgrade in this condition.
   # https://code.google.com/p/swarming/issues/detail?id=112
@@ -196,28 +199,29 @@ def get_bot(remote):
   logging.info('Attributes: %s', attributes)
 
   # Handshake to get an XSRF token even if there were errors.
-  if remote:
-    remote.xsrf_request_params = {'attributes': attributes.copy()}
-    remote.refresh_token()
+  remote = get_remote()
+  remote.xsrf_request_params = {'attributes': attributes.copy()}
+  remote.refresh_token()
 
-  botobj = bot.Bot(remote, attributes)
+  config = get_config()
+  botobj = bot.Bot(remote, attributes, config['server_version'], ROOT_DIR)
   if error:
     botobj.post_error('Startup failure: %s' % error)
-  return botobj, attributes
+  return botobj
 
 
-def run_bot(remote, arg_error):
+def run_bot(arg_error):
   """Runs the bot until it reboots or self-update."""
   try:
     # First thing is to get an arbitrary url. This also ensures the network is
     # up and running, which is necessary before trying to get the FQDN below.
-    remote.url_read('/server_ping')
+    get_remote().url_read('/server_ping')
   except Exception as e:
     # url_read() already traps pretty much every exceptions. This except clause
     # is kept there "just in case".
     logging.error('Failed to ping')
 
-  botobj, attributes = get_bot(remote)
+  botobj = get_bot()
   if arg_error:
     botobj.post_error('Argument error: %s' % arg_error)
 
@@ -226,7 +230,7 @@ def run_bot(remote, arg_error):
   while True:
     try:
       state = get_current_state(started_ts, consecutive_sleeps)
-      did_something = poll_server(botobj, remote, attributes, state)
+      did_something = poll_server(botobj, state)
       if did_something:
         consecutive_sleeps = 0
       else:
@@ -236,16 +240,17 @@ def run_bot(remote, arg_error):
       consecutive_sleeps = 0
 
 
-def poll_server(botobj, remote, attributes, state):
+def poll_server(botobj, state):
   """Polls the server to run one loop.
 
   Returns True if executed some action, False if server asked the bot to sleep.
   """
+  # Access to a protected member _XXX of a client class - pylint: disable=W0212
   data = {
-    'attributes': attributes,
+    'attributes': botobj._attributes,
     'state': state,
   }
-  resp = remote.url_read_json('/swarming/api/v1/bot/poll', data=data)
+  resp = botobj.remote.url_read_json('/swarming/api/v1/bot/poll', data=data)
   logging.debug('Server response:\n%s', resp)
 
   cmd = resp['cmd']
@@ -254,9 +259,9 @@ def poll_server(botobj, remote, attributes, state):
     return False
 
   if cmd == 'run':
-    run_manifest(botobj, remote, attributes, resp['manifest'])
+    run_manifest(botobj, resp['manifest'])
   elif cmd == 'update':
-    update_bot(botobj, remote, resp['version'])
+    update_bot(botobj, resp['version'])
   elif cmd == 'restart':
     botobj.restart(resp['message'])
   else:
@@ -265,7 +270,7 @@ def poll_server(botobj, remote, attributes, state):
   return True
 
 
-def run_manifest(botobj, remote, attributes, manifest):
+def run_manifest(botobj, manifest):
   """Defers to task_runner.py."""
   # Ensure the manifest is valid. This can throw a json decoding error. Also
   # raise if it is empty.
@@ -276,7 +281,7 @@ def run_manifest(botobj, remote, attributes, manifest):
   # to execute the command. It is important to note that this data is extracted
   # before any I/O is done, like writting the manifest to disk.
   task_id = manifest['task_id']
-  url = manifest.get('host', remote.url)
+  url = manifest.get('host', botobj.remote.url)
 
   failure = False
   internal_failure = False
@@ -287,10 +292,11 @@ def run_manifest(botobj, remote, attributes, manifest):
     # not be too aggressive about deletion because running a task with a warm
     # cache has important performance benefit.
     # https://code.google.com/p/swarming/issues/detail?id=149
-    if not os.path.isdir('work'):
-      os.makedirs('work')
+    work_dir = os.path.join(botobj.base_dir, 'work')
+    if not os.path.isdir(work_dir):
+      os.makedirs(work_dir)
 
-    path = os.path.join('work', 'test_run.json')
+    path = os.path.join(work_dir, 'test_run.json')
     with open(path, 'wb') as f:
       f.write(json.dumps(manifest))
     # TODO(maruel): Rename local_test_runner to task_runner or something
@@ -316,11 +322,11 @@ def run_manifest(botobj, remote, attributes, manifest):
     internal_failure = True
   finally:
     if internal_failure:
-      post_error_task(remote, attributes, msg, task_id)
+      post_error_task(botobj, msg, task_id)
     on_after_task(botobj, failure, internal_failure)
 
 
-def update_bot(botobj, remote, version):
+def update_bot(botobj, version):
   """Downloads the new version of the bot code and then runs it.
 
   Use alternating files; first load swarming_bot.1.zip, then swarming_bot.2.zip,
@@ -337,7 +343,7 @@ def update_bot(botobj, remote, version):
     new_zip = 'swarming_bot.2.zip'
 
   # Download as a new file.
-  url = remote.url + '/get_slave_code/%s' % version
+  url = botobj.remote.url + '/get_slave_code/%s' % version
   if not net.url_retrieve(new_zip, url):
     raise Exception('Unable to download %s from %s.' % (new_zip, url))
 
@@ -360,7 +366,7 @@ def update_bot(botobj, remote, version):
     os.execv(sys.executable, cmd)
 
   # This code runs only if bot failed to respawn itself.
-  botobj.post_error(remote, 'Bot failed to respawn after update')
+  botobj.post_error('Bot failed to respawn after update')
 
 
 def get_config():
@@ -405,5 +411,4 @@ def main(args):
   except Exception as e:
     # Do not reboot here, because it would just cause a reboot loop.
     error = str(e)
-  remote = get_remote()
-  return run_bot(remote, error)
+  return run_bot(error)

@@ -16,10 +16,15 @@ THIS_FILE = os.path.abspath(__file__)
 
 class TestBot(unittest.TestCase):
   def test_bot(self):
-    obj = bot.Bot(None, {'dimensions': {'foo': 'bar'}})
-    self.assertEqual(__version__, obj.bot_main_version)
+    obj = bot.Bot(
+        None,
+        {'dimensions': {'foo': 'bar'}},
+        '1234-1a2b3c4-tainted-joe',
+        'base_dir')
     self.assertEqual({'foo': 'bar'}, obj.dimensions)
     self.assertEqual(THIS_FILE, obj.swarming_bot_zip)
+    self.assertEqual('1234-1a2b3c4-tainted-joe', obj.server_version)
+    self.assertEqual('base_dir', obj.base_dir)
 
 
 if __name__ == '__main__':

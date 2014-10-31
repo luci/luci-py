@@ -6,7 +6,6 @@
 
 import logging
 import os
-import sys
 
 import os_utilities
 from utils import zip_package
@@ -17,18 +16,23 @@ THIS_FILE = os.path.abspath(zip_package.get_main_script_path())
 
 
 class Bot(object):
-  def __init__(self, remote, attributes):
+  def __init__(self, remote, attributes, server_version, base_dir):
     # Do not expose attributes nor remote for now, as attributes will be
     # refactored soon and remote would have a lot of side effects if used by
     # bot_config.
     self._attributes = attributes
     self._remote = remote
-    self._version = getattr(sys.modules['__main__'], '__version__', None)
+    self._server_version = server_version
+    self._base_dir = base_dir
 
   @property
-  def bot_main_version(self):
-    """Version of the bot's implementation."""
-    return self._version
+  def base_dir(self):
+    """Returns the working directory.
+
+    It is normally the current workind directory, e.g. os.getcwd() but it is
+    preferable to not assume that.
+    """
+    return self._base_dir
 
   @property
   def dimensions(self):
@@ -39,6 +43,26 @@ class Bot(object):
     tasks.
     """
     return self._attributes.get('dimensions', {}).copy()
+
+  @property
+  def remote(self):
+    """XsrfClient instance to talk to the server.
+
+    Should not be normally used by bot_config.py for now.
+    """
+    return self._remote
+
+  @property
+  def server_version(self):
+    """Version of the server's implementation.
+
+    The form is nnn-hhhhhhh for pristine version and nnn-hhhhhhh-tainted-uuuu
+    for non-upstreamed code base:
+      nnn: revision pseudo number
+      hhhhhhh: git commit hash
+      uuuu: username
+    """
+    return self._server_version
 
   @property
   def swarming_bot_zip(self):

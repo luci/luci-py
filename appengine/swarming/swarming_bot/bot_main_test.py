@@ -51,7 +51,7 @@ class TestBotMain(net_utils.TestCase):
       'dimensions': {'foo', 'bar'},
       'id': 'localhost',
     }
-    self.bot = bot.Bot(self.server, self.attributes)
+    self.bot = bot.Bot(self.server, self.attributes, 'version1', self.root_dir)
     self.mock(self.bot, 'post_error', self.fail)
     self.mock(self.bot, 'restart', self.fail)
 
@@ -81,18 +81,23 @@ class TestBotMain(net_utils.TestCase):
 
   def test_post_error_task(self):
     self.mock(logging, 'error', lambda *_: None)
+    self.mock(bot_main, 'get_remote', lambda: self.server)
+    expected_attribs = bot_main.get_attributes()
     self.expected_requests(
         [
           (
             'https://localhost:1/auth/api/v1/accounts/self/xsrf_token',
-            {'data': {}, 'headers': {'X-XSRF-Token-Request': '1'}},
+            {
+              'data': {'attributes': expected_attribs},
+              'headers': {'X-XSRF-Token-Request': '1'},
+            },
             {'xsrf_token': 'token'},
           ),
           (
             'https://localhost:1/swarming/api/v1/bot/task_error/23',
             {
               'data': {
-                'id': 'localhost',
+                'id': expected_attribs['dimensions']['id'],
                 'message': 'error',
                 'task_id': 23,
               },
@@ -101,7 +106,8 @@ class TestBotMain(net_utils.TestCase):
             {},
           ),
         ])
-    bot_main.post_error_task(self.server, self.attributes, 'error', 23)
+    botobj = bot_main.get_bot()
+    bot_main.post_error_task(botobj, 'error', 23)
 
   def test_run_bot(self):
     # Test the run_bot() loop.
@@ -113,11 +119,10 @@ class TestBotMain(net_utils.TestCase):
     expected_attribs = bot_main.get_attributes()
     expected_attribs['version'] = '123'
 
-    def poll_server(botobj, remote, attributes, state):
+    def poll_server(botobj, state):
       self.assertEqual(expected_attribs, botobj._attributes)
       sleep_streak = state['sleep_streak']
-      self.assertEqual(remote, self.server)
-      self.assertEqual(expected_attribs, attributes)
+      self.assertEqual(botobj.remote, self.server)
       if sleep_streak == 5:
         raise Exception('Jumping out of the loop')
       return False
@@ -129,8 +134,9 @@ class TestBotMain(net_utils.TestCase):
       self.assertEqual('Jumping out of the loop', e)
       # Necessary to get out of the loop.
       raise Foo()
-
     self.mock(bot.Bot, 'post_error', post_error)
+
+    self.mock(bot_main, 'get_remote', lambda: self.server)
 
     self.expected_requests(
         [
@@ -144,8 +150,9 @@ class TestBotMain(net_utils.TestCase):
             {'xsrf_token': 'token'},
           ),
         ])
+
     with self.assertRaises(Foo):
-      bot_main.run_bot(self.server, None)
+      bot_main.run_bot(None)
 
   def test_poll_server_sleep(self):
     slept = []
@@ -172,8 +179,7 @@ class TestBotMain(net_utils.TestCase):
             },
           ),
         ])
-    self.assertFalse(
-        bot_main.poll_server(self.bot, self.server, self.attributes, {'s': 1}))
+    self.assertFalse(bot_main.poll_server(self.bot, {'s': 1}))
     self.assertEqual([1.24], slept)
 
   def test_poll_server_run(self):
@@ -182,7 +188,6 @@ class TestBotMain(net_utils.TestCase):
     self.mock(bot_main, 'run_manifest', lambda *args: manifest.append(args))
     self.mock(bot_main, 'update_bot', self.fail)
 
-    attribs = {'b': 'c'}
     self.expected_requests(
         [
           (
@@ -193,7 +198,7 @@ class TestBotMain(net_utils.TestCase):
           (
             'https://localhost:1/swarming/api/v1/bot/poll',
             {
-              'data': {'attributes': attribs, 'state': {'s': 1}},
+              'data': {'attributes': self.bot._attributes, 'state': {'s': 1}},
               'headers': {'X-XSRF-Token': 'token'},
             },
             {
@@ -202,11 +207,8 @@ class TestBotMain(net_utils.TestCase):
             },
           ),
         ])
-    self.assertTrue(
-        bot_main.poll_server(self.bot, self.server, attribs, {'s': 1}))
-    expected = [
-      (self.bot, self.server, {'b': 'c'}, {'foo': 'bar'}),
-    ]
+    self.assertTrue(bot_main.poll_server(self.bot, {'s': 1}))
+    expected = [(self.bot, {'foo': 'bar'})]
     self.assertEqual(expected, manifest)
 
   def test_poll_server_update(self):
@@ -234,9 +236,8 @@ class TestBotMain(net_utils.TestCase):
             },
           ),
         ])
-    self.assertTrue(
-        bot_main.poll_server(self.bot, self.server, self.attributes, {'s': 1}))
-    self.assertEqual([(self.bot, self.server, '123')], update)
+    self.assertTrue(bot_main.poll_server(self.bot, {'s': 1}))
+    self.assertEqual([(self.bot, '123')], update)
 
   def test_poll_server_restart(self):
     restart = []
@@ -264,8 +265,7 @@ class TestBotMain(net_utils.TestCase):
             },
           ),
         ])
-    self.assertTrue(
-        bot_main.poll_server(self.bot, self.server, self.attributes, {'s': 1}))
+    self.assertTrue(bot_main.poll_server(self.bot, {'s': 1}))
     self.assertEqual([('Please die now',)], restart)
 
   def _mock_popen(self, returncode, url='https://localhost:1'):
@@ -275,7 +275,7 @@ class TestBotMain(net_utils.TestCase):
         self2.returncode = None
         expected = [
           sys.executable, THIS_FILE, 'local_test_runner',
-          '-S', url, '-f', 'work/test_run.json',
+          '-S', url, '-f', os.path.join(self.root_dir, 'work', 'test_run.json'),
         ]
         self.assertEqual(expected, cmd)
         self.assertEqual(bot_main.ROOT_DIR, cwd)
@@ -288,7 +288,7 @@ class TestBotMain(net_utils.TestCase):
     self.mock(subprocess, 'Popen', Popen)
 
   def test_run_manifest(self):
-    self.mock(bot_main, 'post_error_task', self.fail)
+    self.mock(bot_main, 'post_error_task', lambda *args: self.fail(args))
     def on_after_task(botobj, failure, internal_failure):
       self.assertEqual(self.attributes['dimensions'], botobj.dimensions)
       self.assertEqual(False, failure)
@@ -300,7 +300,7 @@ class TestBotMain(net_utils.TestCase):
       'host': 'https://localhost:3',
       'task_id': 24,
     }
-    bot_main.run_manifest(self.bot, self.server, self.attributes, params)
+    bot_main.run_manifest(self.bot, params)
 
   def test_run_manifest_task_failure(self):
     self.mock(bot_main, 'post_error_task', self.fail)
@@ -310,8 +310,7 @@ class TestBotMain(net_utils.TestCase):
     self.mock(bot_main, 'on_after_task', on_after_task)
     self._mock_popen(bot_main.TASK_FAILED)
 
-    bot_main.run_manifest(
-        self.bot, self.server, self.attributes, {'task_id': 24})
+    bot_main.run_manifest(self.bot, {'task_id': 24})
 
   def test_run_manifest_internal_failure(self):
     posted = []
@@ -322,12 +321,8 @@ class TestBotMain(net_utils.TestCase):
     self.mock(bot_main, 'on_after_task', on_after_task)
     self._mock_popen(1)
 
-    bot_main.run_manifest(
-        self.bot, self.server, self.attributes, {'task_id': 24})
-    expected = [
-        (self.server, self.attributes,
-          'Execution failed, internal error:\nfoo', 24)
-    ]
+    bot_main.run_manifest(self.bot, {'task_id': 24})
+    expected = [(self.bot, 'Execution failed, internal error:\nfoo', 24)]
     self.assertEqual(expected, posted)
 
   def test_run_manifest_exception(self):
@@ -341,12 +336,8 @@ class TestBotMain(net_utils.TestCase):
       raise OSError('Dang')
     self.mock(subprocess, 'Popen', raiseOSError)
 
-    bot_main.run_manifest(
-        self.bot, self.server, self.attributes, {'task_id': 24})
-    expected = [
-        (self.server, self.attributes,
-          'Internal exception occured: Dang', 24)
-    ]
+    bot_main.run_manifest(self.bot, {'task_id': 24})
+    expected = [(self.bot, 'Internal exception occured: Dang', 24)]
     self.assertEqual(expected, posted)
 
   def test_update_bot_linux(self):
@@ -364,7 +355,7 @@ class TestBotMain(net_utils.TestCase):
     self.mock(subprocess, 'call', self.fail)
     self.mock(os, 'execv', lambda *args: calls.append(args))
 
-    bot_main.update_bot(self.bot, self.server, '123')
+    bot_main.update_bot(self.bot, '123')
     self.assertEqual([(sys.executable, cmd)], calls)
 
   def test_update_bot_win(self):
@@ -382,11 +373,14 @@ class TestBotMain(net_utils.TestCase):
     self.mock(os, 'execv', self.fail)
 
     with self.assertRaises(SystemExit):
-      bot_main.update_bot(self.bot, self.server, '123')
+      bot_main.update_bot(self.bot, '123')
     self.assertEqual([(cmd,)], calls)
 
   def test_get_config(self):
-    expected = {u'server': u'http://localhost:8080'}
+    expected = {
+      u'server': u'http://localhost:8080',
+      u'server_version': u'version1',
+    }
     self.assertEqual(expected, bot_main.get_config())
 
   def test_main(self):
@@ -394,8 +388,7 @@ class TestBotMain(net_utils.TestCase):
       self.assertEqual(logging.WARNING, x)
     self.mock(logging_utils, 'set_console_level', check)
 
-    def run_bot(remote, error):
-      self.assertEqual('http://localhost:8080', remote.url)
+    def run_bot(error):
       self.assertEqual(None, error)
       return 0
     self.mock(bot_main, 'run_bot', run_bot)
@@ -406,4 +399,5 @@ class TestBotMain(net_utils.TestCase):
 if __name__ == '__main__':
   if '-v' in sys.argv:
     unittest.TestCase.maxDiff = None
+  logging.basicConfig(level=logging.ERROR)
   unittest.main()
