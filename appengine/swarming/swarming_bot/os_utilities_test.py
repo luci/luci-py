@@ -107,7 +107,7 @@ class TestOsUtilities(auto_stub.TestCase):
       self.assertIs(os_utilities.get_integrity_level_win(), None)
 
   def test_get_attributes(self):
-    actual = os_utilities.get_attributes('id')
+    actual = os_utilities.get_attributes()
     expected = set(['dimensions', 'id', 'ip'])
     self.assertEqual(expected, set(actual))
 
@@ -161,24 +161,26 @@ class TestOsUtilities(auto_stub.TestCase):
     self.mock(os_utilities, 'get_adb_device_properties_raw', lambda *_: props)
     actual = os_utilities.get_dimensions_android('123')
     expected = {
-      'ro.board.platform': 'ro.board.platform',
-      'ro.build.id': 'ro.build.id',
-      'ro.build.tags': 'ro.build.tags',
-      'ro.build.type': 'ro.build.type',
-      'ro.build.version.sdk': 'ro.build.version.sdk',
-      'ro.product.board': 'ro.product.board',
-      'ro.product.cpu.abi': 'ro.product.cpu.abi',
-      'ro.product.cpu.abi2': 'ro.product.cpu.abi2',
+      'id': ['123'],
+      'ro.board.platform': ['ro.board.platform'],
+      'ro.build.id': ['ro.build.id'],
+      'ro.build.tags': ['ro.build.tags'],
+      'ro.build.type': ['ro.build.type'],
+      'ro.build.version.sdk': ['ro.build.version.sdk'],
+      'ro.product.board': ['ro.product.board'],
+      'ro.product.cpu.abi': ['ro.product.cpu.abi'],
+      'ro.product.cpu.abi2': ['ro.product.cpu.abi2'],
     }
     self.assertEqual(expected, actual)
 
   def test_get_attributes_android(self):
-    expected_dimensions = dict((k, k) for k in os_utilities.ANDROID_DETAILS)
-    props = expected_dimensions.copy()
+    expected_dimensions = {k: [k] for k in os_utilities.ANDROID_DETAILS}
+    expected_dimensions['id'] = ['123']
+
+    props = {k: k for k in os_utilities.ANDROID_DETAILS}
     props['bar'] = 'foo'
     self.mock(os_utilities, 'get_adb_device_properties_raw', lambda *_: props)
 
-    expected_dimensions['id'] = ['123']
     actual = os_utilities.get_attributes_android('123')
     expected = {
       'dimensions': expected_dimensions,
@@ -231,6 +233,8 @@ class TestOsUtilities(auto_stub.TestCase):
 
 
 if __name__ == '__main__':
+  if '-v' in sys.argv:
+    unittest.TestCase.maxDiff = None
   logging.basicConfig(
       level=logging.DEBUG if '-v' in sys.argv else logging.ERROR)
   unittest.main()

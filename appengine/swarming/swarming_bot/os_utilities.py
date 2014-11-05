@@ -61,6 +61,9 @@ ANDROID_DETAILS = frozenset(
 ### Private stuff.
 
 
+_STARTED_TS = time.time()
+
+
 def _write(filepath, content):
   """Writes out a file and returns True on success."""
   logging.info('Writing in %s:\n%s', filepath, content)
@@ -661,13 +664,31 @@ def get_dimensions_android(device_id, adb_path='adb'):
   In this case, details are about the device, not about the host.
   """
   properties = get_adb_device_properties_raw(device_id, adb_path)
-  return dict((k, v) for k, v in properties.iteritems() if k in ANDROID_DETAILS)
+  out = {k: [v] for k, v in properties.iteritems() if k in ANDROID_DETAILS}
+  out['id'] = [device_id]
+  return out
+
+
+def get_state_android(device_id, adb_path='adb'):
+  """Returns state information about the device.
+
+  It's a big speculating TODO. Would be temperature, device uptime, partition
+  space, etc.
+  """
+  # Unused argument - pylint: disable=W0613
+  return {
+    'device': {
+      # TODO(maruel): Fill me.
+    },
+    'host': get_state(),
+  }
 
 
 def get_attributes_android(device_id, adb_path='adb'):
   """Returns the default Swarming dictionary of attributes for this android
   device.
   """
+  # TODO(maruel): Delete this function.
   dimensions = get_dimensions_android(device_id, adb_path)
   # Also add the id as a dimension, so it's possible to trigger a task precisely
   # by device id, independent of things like hostname, especially in the case
@@ -699,9 +720,10 @@ def get_dimensions():
     ],
     'gpu': get_gpu(),
     'hostname': [get_hostname()],
+    'id': [get_hostname_short()],
     'os': [
       os_name,
-      os_name + '-' + get_os_version(),
+      os_name + '-' + os_version,
     ],
   }
 
@@ -711,10 +733,7 @@ def get_dimensions():
     dimensions['cpu'].sort()
 
   if sys.platform == 'linux2':
-    # Add these for compatibility. 'Linux-12.04' doesn't make any sense but
-    # until this is rolled out and that 'Ubuntu-12.04' can be used everywhere,
-    # we need to keep this for compatibility.
-    dimensions['os'].extend(('Linux', 'Linux-' + os_version))
+    dimensions['os'].append('Linux')
     dimensions['os'].sort()
 
   if sys.platform in ('cygwin', 'win32'):
@@ -727,32 +746,52 @@ def get_dimensions():
   return dimensions
 
 
-def get_attributes_host(id_tag):
+def get_state():
+  """Returns dict with a state of the bot reported to the server with each poll.
+
+  Supposed to be use only for dynamic state that changes while bot is running.
+
+  The server can not use this state for immediate scheduling purposes (use
+  'dimensions' for that), but it can use it for maintenance and bookkeeping
+  tasks.
+  """
+  # TODO(vadimsh): Send 'uptime', number of open file descriptors, processes or
+  # any other leaky resources. So that the server can decided to reboot the bot
+  # to clean up.
+  # TODO(maruel): Change 'disk' to report every mounted partition.
+  return {
+    'disk': get_free_disk(),
+    'ip': get_ip(),
+    'ram': get_physical_ram(),
+    'running_time': time.time() - _STARTED_TS,
+    'started_ts': _STARTED_TS,
+  }
+
+
+def get_attributes_host(id_tag=None):
   """Returns the default Swarming dictionary of attributes for this host.
 
   'id' is used to uniquely identify the bot.
   'dimensions' is used for task selection.
   """
+  # TODO(maruel): Delete this function.
+  assert not id_tag, id_tag
   dimensions = get_dimensions()
-  id_tag = id_tag if id_tag else get_hostname_short()
-  # Also add the id as a dimension, so it's possible to trigger a task precisely
-  # by id, independent of things like hostname, especially in the case where a
-  # single host runs multiple Swarming bot.
-  dimensions['id'] = [id_tag]
   return {
     'dimensions': dimensions,
-    'id': id_tag,
+    'id': dimensions['id'][0],
     'ip': get_ip(),
   }
 
 
-def get_attributes(id_tag):
+def get_attributes(id_tag=None):
   """Returns the default Swarming dictionary of attributes for this bot.
 
   Automatically detects if an android device is being used depending on
   environment variables, as driven by
   ../tools/android/udev_start_bot_deferred.sh.
   """
+  # TODO(maruel): Delete this function.
   if id_tag is None:
     device_id = os.environ.get('SWARMING_BOT_ANDROID')
     if device_id:
