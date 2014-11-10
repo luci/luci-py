@@ -293,7 +293,7 @@ def should_restart_bot(bot_id, _attributes, state):
     Tuple (True to restart, text message explaining the reason).
   """
   # Periodically reboot bots to workaround OS level leaks (especially on Win).
-  running_time = state['running_time']
+  running_time = state.get('running_time', 0)
   assert isinstance(running_time, (int, float))
   period = get_bot_reboot_period(bot_id, state)
   if running_time > period:

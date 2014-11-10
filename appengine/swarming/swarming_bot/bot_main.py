@@ -19,7 +19,6 @@ import os
 import subprocess
 import sys
 import time
-import traceback
 import zipfile
 
 # pylint: disable-msg=W0403
@@ -49,56 +48,41 @@ _ERROR_HANDLER_WAS_REGISTERED = False
 ### bot_config handler part.
 
 
-def get_attributes():
+def get_dimensions():
   """Returns bot_config.py's get_attributes() dict."""
   # Importing this administrator provided script could have side-effects on
   # startup. That is why it is imported late.
-  import bot_config
-  return bot_config.get_attributes()
-
-
-def get_attributes_failsafe():
-  """Returns fail-safe default attributes."""
   try:
-    hostname = os_utilities.get_hostname_short()
+    import bot_config
+    return bot_config.get_dimensions()
   except Exception as e:
-    hostname = str(e)
-  try:
-    ip = os_utilities.get_ip()
-  except Exception as e:
-    ip = str(e)
+    try:
+      out = os_utilities.get_dimensions()
+      out['error'] = [str(e)]
+      return out
+    except Exception as e:
+      try:
+        botid = os_utilities.get_hostname_short()
+      except Exception as e2:
+        botid = 'error_%s' % str(e2)
+      return {'id': [botid], 'error': [str(e)]}
 
-  return {
-    'dimensions': {},
-    'id': hostname,
-    'ip': ip,
-  }
 
-
-def get_current_state(started_ts, sleep_streak):
+def get_state(sleep_streak):
   """Returns dict with a state of the bot reported to the server with each poll.
-
-  Supposed to be use only for dynamic state that changes while bot is running.
-  Use 'attributes' for static state that doesn't change over time.
-
-  The server can not use this state for immediate scheduling purposes (use
-  'dimensions' for that), but it can use it for maintenance and bookkeeping
-  tasks.
-
-  Args:
-    started_ts: when bot started polling, seconds since epoch by a local clock.
-    sleep_streak: number of consecutive sleeps up till now.
   """
-  # TODO(vadimsh): Send also results of 'uptime' command? Maybe also current
-  # open file descriptors, processes or any other leaky resources. So that the
-  # server can decided to reboot the bot to clean up.
-  return {
-    'disk': os_utilities.get_free_disk(),
-    'ram': os_utilities.get_physical_ram(),
-    'running_time': time.time() - started_ts,
-    'sleep_streak': sleep_streak,
-    'started_ts': started_ts,
-  }
+  try:
+    import bot_config
+    out = bot_config.get_state()
+    if not isinstance(out, dict):
+      out = {'error': out}
+  except Exception as e:
+    out = {
+      'error': str(e),
+    }
+
+  out['sleep_streak'] = sleep_streak
+  return out
 
 
 def on_after_task(botobj, failure, internal_failure):
@@ -132,6 +116,28 @@ def setup_bot():
 ### end of bot_config handler part.
 
 
+def generate_version():
+  """Returns the bot's code version."""
+  try:
+    return zip_package.generate_version()
+  except Exception as e:
+    return 'Error: %s' % e
+
+
+def get_attributes():
+  """Returns the attributes sent to the server.
+
+  Each called function catches all exceptions so the bot doesn't die on startup,
+  which is annoying to recover. In that case, we set a special property to catch
+  these and help the admin fix the swarming_bot code more quickly.
+  """
+  return {
+    'dimensions': get_dimensions(),
+    'state': get_state(0),
+    'version': generate_version(),
+  }
+
+
 def get_remote():
   """Return a XsrfRemote instance to the preconfigured server."""
   global _ERROR_HANDLER_WAS_REGISTERED
@@ -163,10 +169,9 @@ def post_error_task(botobj, error, task_id):
   # at all. In this case the server could retry the task even if it doesn't have
   # 'idempotent' set. See
   # https://code.google.com/p/swarming/issues/detail?id=108.
-  # Access to a protected member _XXX of a client class - pylint: disable=W0212
-  logging.error('Error: %s\n%s', botobj._attributes, error)
+  logging.error('Error: %s', error)
   data = {
-    'id': botobj._attributes.get('id'),
+    'id': botobj.id,
     'message': error,
     'task_id': task_id,
   }
@@ -179,42 +184,17 @@ def get_bot():
 
   Should only be called once in the process lifetime.
   """
-  # TODO(maruel): This should be part of the 'health check' and the bot
-  # shouldn't allow itself to upgrade in this condition.
+  # TODO(maruel): Run 'health check' on startup.
   # https://code.google.com/p/swarming/issues/detail?id=112
-  # Catch all exceptions here so the bot doesn't die on startup, which is
-  # annoying to recover. In that case, we set a special property to catch these
-  # and help the admin fix the swarming_bot code more quickly.
-  attributes = {}
-  error = ''
-  try:
-    # If zip_package.generate_version() fails, we still want the server to do
-    # the /server_ping before calculating the attributes.
-    attributes['version'] = zip_package.generate_version()
-  except Exception as e:
-    error += 'generate_version(): %s\n%s\n' % (e, traceback.format_exc())
-
-  try:
-    # The fully qualified domain name will uniquely identify this machine to the
-    # server, so we can use it to give a deterministic id for this bot. Also
-    # store as lower case, since it is already case-insensitive.
-    attributes.update(get_attributes())
-  except Exception as e:
-    attributes.update(get_attributes_failsafe())
-    error += 'get_attributes(): %s\n%s\n' % (e, traceback.format_exc())
-
-  logging.info('Attributes: %s', attributes)
+  attributes = get_attributes()
 
   # Handshake to get an XSRF token even if there were errors.
   remote = get_remote()
-  remote.xsrf_request_params = {'attributes': attributes.copy()}
+  remote.xsrf_request_params = attributes.copy()
   remote.refresh_token()
 
   config = get_config()
-  botobj = bot.Bot(remote, attributes, config['server_version'], ROOT_DIR)
-  if error:
-    botobj.post_error('Startup failure: %s' % error)
-  return botobj
+  return bot.Bot(remote, attributes, config['server_version'], ROOT_DIR)
 
 
 def run_bot(arg_error):
@@ -232,32 +212,29 @@ def run_bot(arg_error):
   if arg_error:
     botobj.post_error('Argument error: %s' % arg_error)
 
-  started_ts = time.time()
   consecutive_sleeps = 0
   while True:
     try:
-      state = get_current_state(started_ts, consecutive_sleeps)
-      did_something = poll_server(botobj, state)
+      botobj.update_state(get_state(consecutive_sleeps))
+      did_something = poll_server(botobj)
       if did_something:
         consecutive_sleeps = 0
       else:
         consecutive_sleeps += 1
     except Exception as e:
+      logging.exception('poll_server failed')
       botobj.post_error(str(e))
       consecutive_sleeps = 0
 
 
-def poll_server(botobj, state):
+def poll_server(botobj):
   """Polls the server to run one loop.
 
   Returns True if executed some action, False if server asked the bot to sleep.
   """
   # Access to a protected member _XXX of a client class - pylint: disable=W0212
-  data = {
-    'attributes': botobj._attributes,
-    'state': state,
-  }
-  resp = botobj.remote.url_read_json('/swarming/api/v1/bot/poll', data=data)
+  resp = botobj.remote.url_read_json(
+      '/swarming/api/v1/bot/poll', data=botobj._attributes)
   logging.debug('Server response:\n%s', resp)
 
   cmd = resp['cmd']
@@ -325,6 +302,7 @@ def run_manifest(botobj, manifest):
   except Exception as e:
     # Failures include IOError when writing if the disk is full, OSError if
     # swarming_bot.zip doesn't exist anymore, etc.
+    logging.exception('run_manifest failed')
     msg = 'Internal exception occured: %s' % str(e)
     internal_failure = True
   finally:

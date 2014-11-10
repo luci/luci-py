@@ -58,24 +58,14 @@ class BotApiTest(AppTestBase):
       errors.append(message)
     self.mock(ereporter2, 'log_request', add_error)
     headers = {'X-XSRF-Token-Request': '1'}
-    params = {
-      'attributes': {
-        'id': 'bot1',
-        'version': '123',
-      },
-    }
     response = self.app.post_json(
-        '/swarming/api/v1/bot/handshake', headers=headers, params=params).json
+        '/swarming/api/v1/bot/handshake', headers=headers, params={}).json
     self.assertEqual(
         [u'bot_version', u'server_version', u'xsrf_token'], sorted(response))
     self.assertTrue(response['xsrf_token'])
     self.assertEqual(40, len(response['bot_version']))
     self.assertEqual(u'default-version', response['server_version'])
-    expected = [
-      'Unexpected attributes missing: [u\'dimensions\', u\'ip\']; did you make '
-          'a typo?',
-    ]
-    self.assertEqual(expected, errors)
+    self.assertEqual([], errors)
 
   def test_handshake_extra(self):
     errors = []
@@ -88,12 +78,14 @@ class BotApiTest(AppTestBase):
     params = {
       # Works with unknown items but logs an error. This permits catching typos.
       'foo': 1,
-      'attributes': {
-        'bar': 2,
-        'id': 'bot1',
-        'ip': '127.0.0.1',
-        'version': '123',
+      'dimensions': {
+        'id': ['bot1'],
       },
+      'state': {
+        'bar': 2,
+        'ip': '127.0.0.1',
+      },
+      'version': '123',
     }
     response = self.app.post_json(
         '/swarming/api/v1/bot/handshake', headers=headers, params=params).json
@@ -104,16 +96,14 @@ class BotApiTest(AppTestBase):
     self.assertEqual(u'default-version', response['server_version'])
     expected = [
       'Unexpected keys superfluous: [u\'foo\']; did you make a typo?',
-      'Unexpected attributes missing: [u\'dimensions\'] superfluous: [u\'bar\']'
-          '; did you make a typo?',
     ]
     self.assertEqual(expected, errors)
 
   def test_poll_bad_bot(self):
     # If bot is not sending required keys, assume it is old and update it.
     token, params = self.get_bot_token()
-    old_version = params['attributes']['version']
-    params.pop('attributes')
+    old_version = params['version']
+    params.pop('dimensions')
     params.pop('state')
     # log_request is expected to be called in that case, multiple times.
     error_calls = []
@@ -131,8 +121,8 @@ class BotApiTest(AppTestBase):
 
   def test_poll_bad_version(self):
     token, params = self.get_bot_token()
-    old_version = params['attributes']['version']
-    params['attributes']['version'] = 'badversion'
+    old_version = params['version']
+    params['version'] = 'badversion'
     response = self.post_with_token('/swarming/api/v1/bot/poll', params, token)
     expected = {
       u'cmd': u'update',
@@ -163,8 +153,8 @@ class BotApiTest(AppTestBase):
 
   def test_poll_update(self):
     token, params = self.get_bot_token()
-    old_version = params['attributes']['version']
-    params['attributes']['version'] = 'badversion'
+    old_version = params['version']
+    params['version'] = 'badversion'
     response = self.post_with_token('/swarming/api/v1/bot/poll', params, token)
     expected = {
       u'cmd': u'update',
@@ -252,7 +242,7 @@ class BotApiTest(AppTestBase):
 
     # The bot fails somehow.
     error_params = {
-      'id': params['attributes']['id'],
+      'id': params['dimensions']['id'][0],
       'message': 'Something happened',
     }
     response = self.post_with_token(
@@ -413,7 +403,7 @@ class BotApiTest(AppTestBase):
     # broken. The end result is still BOT_DIED. The big change is that it
     # doesn't need to wait for a cron job to set this status.
     params = {
-      'id': params['attributes']['id'],
+      'id': params['dimensions']['id'][0],
       'message': 'Oh',
       'task_id': task_id,
     }

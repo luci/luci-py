@@ -16,11 +16,11 @@ the server to allow additional server-specific functionality.
 
 import cgi
 import ctypes
+import json
 import logging
 import multiprocessing
 import os
 import platform
-import pprint
 import re
 import shlex
 import socket
@@ -685,25 +685,6 @@ def get_state_android(device_id, adb_path='adb'):
   }
 
 
-def get_attributes_android(device_id, adb_path='adb'):
-  """Returns the default Swarming dictionary of attributes for this android
-  device.
-  """
-  # TODO(maruel): Delete this function.
-  dimensions = get_dimensions_android(device_id, adb_path)
-  # Also add the id as a dimension, so it's possible to trigger a task precisely
-  # by device id, independent of things like hostname, especially in the case
-  # where a single host runs multiple Swarming bots for multiple android
-  # devices.
-  dimensions['id'] = [device_id]
-  return {
-    'dimensions': dimensions,
-    'id': device_id,
-    # This is the IP of the host, not the device.
-    'ip': get_ip(),
-  }
-
-
 ###
 
 
@@ -764,40 +745,11 @@ def get_state():
     'disk': get_free_disk(),
     'ip': get_ip(),
     'ram': get_physical_ram(),
-    'running_time': time.time() - _STARTED_TS,
-    'started_ts': _STARTED_TS,
+    'running_time': int(round(time.time() - _STARTED_TS)),
+    'started_ts': int(round(_STARTED_TS)),
   }
 
 
-def get_attributes_host(id_tag=None):
-  """Returns the default Swarming dictionary of attributes for this host.
-
-  'id' is used to uniquely identify the bot.
-  'dimensions' is used for task selection.
-  """
-  # TODO(maruel): Delete this function.
-  assert not id_tag, id_tag
-  dimensions = get_dimensions()
-  return {
-    'dimensions': dimensions,
-    'id': dimensions['id'][0],
-    'ip': get_ip(),
-  }
-
-
-def get_attributes(id_tag=None):
-  """Returns the default Swarming dictionary of attributes for this bot.
-
-  Automatically detects if an android device is being used depending on
-  environment variables, as driven by
-  ../tools/android/udev_start_bot_deferred.sh.
-  """
-  # TODO(maruel): Delete this function.
-  if id_tag is None:
-    device_id = os.environ.get('SWARMING_BOT_ANDROID')
-    if device_id:
-      return get_attributes_android(device_id)
-  return get_attributes_host(id_tag)
 
 
 def rmtree(path):
@@ -925,10 +877,14 @@ def restart_and_return(message=None):
 
 
 def main():
-  """Prints out the output of get_attributes()."""
+  """Prints out the output of get_dimensions() and get_state()."""
   # Pass an empty tag, so pop it up since it has no significance.
-  attribs = get_attributes(None)
-  pprint.pprint(attribs)
+  data = {
+    'dimensions': get_dimensions(),
+    'state': get_state(),
+  }
+  json.dump(data, sys.stdout, indent=2, sort_keys=True)
+  print('')
   return 0
 
 

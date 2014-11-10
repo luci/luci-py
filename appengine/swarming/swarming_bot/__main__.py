@@ -8,8 +8,9 @@ The imports are done late so if an ImportError occurs, it is localized to this
 command only.
 """
 
-__version__ = '0.2'
+__version__ = '0.3'
 
+import json
 import logging
 import os
 import optparse
@@ -28,6 +29,14 @@ THIS_FILE = os.path.abspath(zip_package.get_main_script_path())
 # TODO(maruel): Use depot_tools/subcommand.py. The goal here is to have all the
 # sub commands packed into the single .zip file as a swiss army knife (think
 # busybox but worse).
+
+
+def CMDattributes(_args):
+  """Prints out the bot's attributes."""
+  import bot_main
+  json.dump(bot_main.get_attributes(), sys.stdout, indent=2, sort_keys=True)
+  print('')
+  return 0
 
 
 def CMDlocal_test_runner(args):

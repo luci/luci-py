@@ -4,6 +4,8 @@
 
 """This file is meant to be overriden by the server's specific copy.
 
+You can upload a new version via /restricted/upload/bot_config.
+
 There's 3 types of functions in this file:
   - get_*() to return properties to describe this bot.
   - on_*() as hooks based on events happening on the bot.
@@ -18,24 +20,33 @@ import os_utilities
 
 # Unused argument 'bot' - pylint: disable=W0613
 
-def get_attributes():
-  """Returns the attributes for this bot."""
-  # The bot id will be automatically selected based on the hostname. If you want
-  # something more special, specify it in your bot_config.py. You can upload a
-  # new version via /restricted/upload/bot_config.
-  return os_utilities.get_attributes(None)
 
+def get_dimensions():
+  """Returns dict with the bot's dimensions.
 
-def setup_bot(bot):
-  """Does one time initialization for this bot.
+  The dimensions are what are used to select the bot that can run each task.
 
-  Returns True if it's fine to start the bot right away. Otherwise, the calling
-  script should exit.
-
-  Example: making this script starts automatically on user login via
-  os_utilities.set_auto_startup_win() or os_utilities.set_auto_startup_osx().
+  The bot id will be automatically selected based on the hostname with
+  os_utilities.get_dimensions(). If you want something more special, specify it
+  in your bot_config.py and override the item 'id'.
   """
-  return True
+  return os_utilities.get_dimensions()
+
+
+def get_state():
+  """Returns dict with a state of the bot reported to the server with each poll.
+
+  It is only for dynamic state that changes while bot is running for information
+  for the sysadmins.
+
+  The server can not use this state for immediate scheduling purposes (use
+  'dimensions' for that), but it can use it for maintenance and bookkeeping
+  tasks.
+  """
+  return os_utilities.get_state()
+
+
+### Hooks
 
 
 def on_after_task(bot, failure, internal_failure):
@@ -56,3 +67,18 @@ def on_after_task(bot, failure, internal_failure):
   #  bot.restart('Task failure')
   #elif internal_failure:
   #  bot.restart('Internal failure')
+
+
+### Setup
+
+
+def setup_bot(bot):
+  """Does one time initialization for this bot.
+
+  Returns True if it's fine to start the bot right away. Otherwise, the calling
+  script should exit.
+
+  Example: making this script starts automatically on user login via
+  os_utilities.set_auto_startup_win() or os_utilities.set_auto_startup_osx().
+  """
+  return True

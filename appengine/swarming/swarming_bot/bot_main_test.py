@@ -62,36 +62,31 @@ class TestBotMain(net_utils.TestCase):
     shutil.rmtree(self.root_dir)
     super(TestBotMain, self).tearDown()
 
-  def test_get_attributes(self):
+  def test_get_dimensions(self):
     self.assertEqual(
-        ['dimensions', 'id', 'ip'], sorted(bot_main.get_attributes()))
+        ['cores', 'cpu', 'gpu', 'hostname', 'id', 'os'],
+        sorted(bot_main.get_dimensions()))
 
-  def test_get_attributes_failsafe(self):
-    self.assertEqual(
-        ['dimensions', 'id', 'ip'], sorted(bot_main.get_attributes_failsafe()))
+  def test_generate_version(self):
+    self.assertEqual('123', bot_main.generate_version())
 
-  def test_get_current_state(self):
-    self.mock(time, 'time', lambda: 123.0)
-    expected = {
-      'disk': os_utilities.get_free_disk(),
-      'ram': os_utilities.get_physical_ram(),
-      'running_time': 12.0,
-      'sleep_streak': 123,
-      'started_ts': 111.0,
-    }
-    self.assertEqual(expected, bot_main.get_current_state(111.0, 123))
+  def test_get_state(self):
+    self.mock(time, 'time', lambda: 126.0)
+    expected = os_utilities.get_state()
+    expected['sleep_streak'] = 12
+    self.assertEqual(expected, bot_main.get_state(12))
 
   def test_post_error_task(self):
+    self.mock(time, 'time', lambda: 126.0)
     self.mock(logging, 'error', lambda *_: None)
     self.mock(bot_main, 'get_remote', lambda: self.server)
     expected_attribs = bot_main.get_attributes()
-    expected_attribs['version'] = '123'
     self.expected_requests(
         [
           (
             'https://localhost:1/auth/api/v1/accounts/self/xsrf_token',
             {
-              'data': {'attributes': expected_attribs},
+              'data': expected_attribs,
               'headers': {'X-XSRF-Token-Request': '1'},
             },
             {'xsrf_token': 'token'},
@@ -100,7 +95,7 @@ class TestBotMain(net_utils.TestCase):
             'https://localhost:1/swarming/api/v1/bot/task_error/23',
             {
               'data': {
-                'id': expected_attribs['id'],
+                'id': expected_attribs['dimensions']['id'][0],
                 'message': 'error',
                 'task_id': 23,
               },
@@ -114,17 +109,14 @@ class TestBotMain(net_utils.TestCase):
 
   def test_run_bot(self):
     # Test the run_bot() loop.
-    self.mock(zip_package, 'generate_version', lambda: '123')
-
+    self.mock(time, 'time', lambda: 126.0)
     class Foo(Exception):
       pass
 
     expected_attribs = bot_main.get_attributes()
-    expected_attribs['version'] = '123'
 
-    def poll_server(botobj, state):
-      self.assertEqual(expected_attribs, botobj._attributes)
-      sleep_streak = state['sleep_streak']
+    def poll_server(botobj):
+      sleep_streak = botobj.state['sleep_streak']
       self.assertEqual(botobj.remote, self.server)
       if sleep_streak == 5:
         raise Exception('Jumping out of the loop')
@@ -133,7 +125,6 @@ class TestBotMain(net_utils.TestCase):
 
     def post_error(botobj, e):
       self.assertEqual(self.server, botobj._remote)
-      self.assertEqual(expected_attribs, botobj._attributes)
       self.assertEqual('Jumping out of the loop', e)
       # Necessary to get out of the loop.
       raise Foo()
@@ -147,7 +138,7 @@ class TestBotMain(net_utils.TestCase):
           (
             'https://localhost:1/auth/api/v1/accounts/self/xsrf_token',
             {
-              'data': {'attributes': expected_attribs},
+              'data': expected_attribs,
               'headers': {'X-XSRF-Token-Request': '1'},
             },
             {'xsrf_token': 'token'},
@@ -173,7 +164,7 @@ class TestBotMain(net_utils.TestCase):
           (
             'https://localhost:1/swarming/api/v1/bot/poll',
             {
-              'data': {'attributes': self.attributes, 'state': {'s': 1}},
+              'data': self.attributes,
               'headers': {'X-XSRF-Token': 'token'},
             },
             {
@@ -182,7 +173,7 @@ class TestBotMain(net_utils.TestCase):
             },
           ),
         ])
-    self.assertFalse(bot_main.poll_server(self.bot, {'s': 1}))
+    self.assertFalse(bot_main.poll_server(self.bot))
     self.assertEqual([1.24], slept)
 
   def test_poll_server_run(self):
@@ -201,7 +192,7 @@ class TestBotMain(net_utils.TestCase):
           (
             'https://localhost:1/swarming/api/v1/bot/poll',
             {
-              'data': {'attributes': self.bot._attributes, 'state': {'s': 1}},
+              'data': self.bot._attributes,
               'headers': {'X-XSRF-Token': 'token'},
             },
             {
@@ -210,7 +201,7 @@ class TestBotMain(net_utils.TestCase):
             },
           ),
         ])
-    self.assertTrue(bot_main.poll_server(self.bot, {'s': 1}))
+    self.assertTrue(bot_main.poll_server(self.bot))
     expected = [(self.bot, {'foo': 'bar'})]
     self.assertEqual(expected, manifest)
 
@@ -230,7 +221,7 @@ class TestBotMain(net_utils.TestCase):
           (
             'https://localhost:1/swarming/api/v1/bot/poll',
             {
-              'data': {'attributes': self.attributes, 'state': {'s': 1}},
+              'data': self.attributes,
               'headers': {'X-XSRF-Token': 'token'},
             },
             {
@@ -239,7 +230,7 @@ class TestBotMain(net_utils.TestCase):
             },
           ),
         ])
-    self.assertTrue(bot_main.poll_server(self.bot, {'s': 1}))
+    self.assertTrue(bot_main.poll_server(self.bot))
     self.assertEqual([(self.bot, '123')], update)
 
   def test_poll_server_restart(self):
@@ -259,7 +250,7 @@ class TestBotMain(net_utils.TestCase):
           (
             'https://localhost:1/swarming/api/v1/bot/poll',
             {
-              'data': {'attributes': self.attributes, 'state': {'s': 1}},
+              'data': self.attributes,
               'headers': {'X-XSRF-Token': 'token'},
             },
             {
@@ -268,7 +259,7 @@ class TestBotMain(net_utils.TestCase):
             },
           ),
         ])
-    self.assertTrue(bot_main.poll_server(self.bot, {'s': 1}))
+    self.assertTrue(bot_main.poll_server(self.bot))
     self.assertEqual([('Please die now',)], restart)
 
   def _mock_popen(self, returncode, url='https://localhost:1'):
@@ -403,5 +394,5 @@ if __name__ == '__main__':
   if '-v' in sys.argv:
     unittest.TestCase.maxDiff = None
   logging.basicConfig(
-      level=logging.DEBUG if '-v' in sys.argv else logging.ERROR)
+      level=logging.DEBUG if '-v' in sys.argv else logging.CRITICAL)
   unittest.main()

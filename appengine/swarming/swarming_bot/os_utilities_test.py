@@ -106,24 +106,21 @@ class TestOsUtilities(auto_stub.TestCase):
     else:
       self.assertIs(os_utilities.get_integrity_level_win(), None)
 
-  def test_get_attributes(self):
-    actual = os_utilities.get_attributes()
-    expected = set(['dimensions', 'id', 'ip'])
+  def test_get_dimensions(self):
+    actual = os_utilities.get_dimensions()
+
+    expected = set(['cores', 'cpu', 'hostname', 'id', 'os'])
+    if sys.platform in ('cygwin', 'win32'):
+      expected.add('cygwin')
+    if sys.platform == 'win32':
+      expected.add('integrity')
+    # On some bots, 'gpu' is not present.
+    actual.pop('gpu', None)
     self.assertEqual(expected, set(actual))
 
-    expected_dimensions = set(['cores', 'cpu', 'hostname', 'id', 'os'])
-    if sys.platform in ('cygwin', 'win32'):
-      expected_dimensions.add('cygwin')
-    if sys.platform == 'win32':
-      expected_dimensions.add('integrity')
-    actual_dimensions = set(actual['dimensions'])
-    # On some bots, 'gpu' is not present.
-    actual_dimensions.discard('gpu')
-    self.assertEqual(expected_dimensions, actual_dimensions)
-
-  def test_get_attributes_none(self):
-    actual = os_utilities.get_attributes(None)
-    expected = set(['dimensions', 'id', 'ip'])
+  def test_get_state(self):
+    actual = os_utilities.get_state()
+    expected = set(['disk', 'ip', 'ram', 'running_time', 'started_ts'])
     self.assertEqual(expected, set(actual))
 
   def test_get_adb_list_devices(self):
@@ -173,19 +170,18 @@ class TestOsUtilities(auto_stub.TestCase):
     }
     self.assertEqual(expected, actual)
 
-  def test_get_attributes_android(self):
-    expected_dimensions = {k: [k] for k in os_utilities.ANDROID_DETAILS}
-    expected_dimensions['id'] = ['123']
-
-    props = {k: k for k in os_utilities.ANDROID_DETAILS}
+  def test_get_state_android(self):
+    self.mock(time, 'time', lambda: os_utilities._STARTED_TS + 1)
+    expected_dimensions = dict((k, k) for k in os_utilities.ANDROID_DETAILS)
+    props = expected_dimensions.copy()
     props['bar'] = 'foo'
     self.mock(os_utilities, 'get_adb_device_properties_raw', lambda *_: props)
 
-    actual = os_utilities.get_attributes_android('123')
+    expected_dimensions['id'] = ['123']
+    actual = os_utilities.get_state_android('123')
     expected = {
-      'dimensions': expected_dimensions,
-      'id': '123',
-      'ip': os_utilities.get_ip(),
+      'device': {},
+      'host': os_utilities.get_state(),
     }
     self.assertEqual(expected, actual)
 

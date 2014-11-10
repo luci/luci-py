@@ -3,6 +3,7 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
+import json
 import os
 import re
 import shutil
@@ -21,6 +22,7 @@ test_env.setup_test_env()
 
 from depot_tools import auto_stub
 from server import bot_archive
+import bot_main
 
 
 class MainTest(auto_stub.TestCase):
@@ -37,14 +39,27 @@ class MainTest(auto_stub.TestCase):
   def tearDown(self):
     shutil.rmtree(self.tmpdir)
 
+  def test_attributes(self):
+    actual = json.loads(subprocess.check_output(
+        [sys.executable, self.zip_file, 'attributes']))
+    expected = bot_main.get_attributes()
+    for key in ('disk', 'running_time', 'started_ts'):
+      del actual['state'][key]
+      del expected['state'][key]
+    del actual['version']
+    del expected['version']
+    self.assertEqual(expected, actual)
+
   def test_version(self):
     version = subprocess.check_output(
         [sys.executable, self.zip_file, 'version'])
     lines = version.strip().split()
     self.assertEqual(2, len(lines), lines)
-    self.assertEqual('0.2', lines[0])
+    self.assertEqual('0.3', lines[0])
     self.assertTrue(re.match(r'^[0-9a-f]{40}$', lines[1]), lines[1])
 
 
 if __name__ == '__main__':
+  if '-v' in sys.argv:
+    unittest.TestCase.maxDiff = None
   unittest.main()

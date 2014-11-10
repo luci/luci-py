@@ -114,15 +114,16 @@ class AppTestBase(test_case.TestCase):
     """Gets the XSRF token for bot after handshake."""
     headers = {'X-XSRF-Token-Request': '1'}
     params = {
-      'attributes': {
-        'dimensions': {
-          'id': [bot],
-          'os': ['Amiga'],
-        },
-        'id': bot,
-        'ip': '127.0.0.1',
-        'version': '123',
+      'dimensions': {
+        'id': [bot],
+        'os': ['Amiga'],
       },
+      'state': {
+        'running_time': 1234.0,
+        'sleep_streak': 0,
+        'started_ts': 1410990411.111,
+      },
+      'version': '123',
     }
     response = self.app.post_json(
         '/swarming/api/v1/bot/handshake',
@@ -130,12 +131,7 @@ class AppTestBase(test_case.TestCase):
         params=params).json
     token = response['xsrf_token'].encode('ascii')
     self.bot_version = response['bot_version']
-    params['attributes']['version'] = self.bot_version
-    params['state'] = {
-      'running_time': 1234.0,
-      'sleep_streak': 0,
-      'started_ts': 1410990411.111,
-    }
+    params['version'] = self.bot_version
     return token, params
 
   def bot_poll(self, bot='bot1'):

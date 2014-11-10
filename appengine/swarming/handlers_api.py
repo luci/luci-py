@@ -428,22 +428,9 @@ class BotHandshakeHandler(auth.ApiHandler):
 
   Request body is a JSON dict:
     {
-      "attributes": {
-        "dimensions": <dict of properties>,
-        "id": <bot id>,
-        "ip": <ip address as a string>,
-        "version": <sha-1 of swarming_bot.zip uncompressed content>,
-
-        # Optional:
-
-        # If an exception occured:
-        "error": <exception as a string>,
-
-        # If the bot decided to quarantine itself.
-        "quarantined": True,
-      }
-      # Differentiate between task_runner and bot_main:
-      #"is_local_test_runner", False,
+      "dimensions": <dict of properties>,
+      "state": <dict of properties>,
+      "version": <sha-1 of swarming_bot.zip uncompressed content>,
     }
 
   Response body is a JSON dict:
@@ -457,10 +444,9 @@ class BotHandshakeHandler(auth.ApiHandler):
   # This handler is called to get XSRF token, there's nothing to enforce yet.
   xsrf_token_enforce_on = ()
 
-  EXPECTED_KEYS = {u'attributes'}
-  ACCEPTED_ATTRIBUTES = {
-      u'dimensions', u'id', u'ip', u'quarantined', u'version'}
-  REQUIRED_ATTRIBUTES = {u'dimensions', u'id', u'ip', u'version'}
+  # TODO(maruel): Enforce the correct keys once all rolled out.
+  ACCEPTED_KEYS = {u'attributes', u'dimensions', u'state', u'version'}
+  EXPECTED_KEYS = frozenset()
 
   @auth.require_xsrf_token_request
   @auth.require(acl.is_bot)
@@ -468,35 +454,28 @@ class BotHandshakeHandler(auth.ApiHandler):
     # In particular, this endpoint does not return commands to the bot, for
     # example to upgrade itself. It'll be told so when it does its first poll.
     request = self.parse_body()
-    # If attributes are missing, the bot is severely hosed! We don't refuse it
-    # so the bot has a chance to self-heal. Obviously, it won't be able to reap
-    # any task.
-
-    log_unexpected_keys(
-        self.EXPECTED_KEYS, request, self.request, 'bot', 'keys')
-    attributes = request.get('attributes', {})
     log_unexpected_subset_keys(
-        self.ACCEPTED_ATTRIBUTES, self.REQUIRED_ATTRIBUTES, attributes,
-        self.request, 'bot', 'attributes')
+        self.ACCEPTED_KEYS, self.EXPECTED_KEYS, request, self.request, 'bot',
+        'keys')
 
-    bot_id = attributes.get('id')
-    dimensions = attributes.get('dimensions', {})
+    dimensions = request.get('dimensions', {})
     # TODO(maruel): Remove and move to 'state'.
-    hostnames = dimensions.get('hostname')
+    state = request.get('state', {})
+    hostnames = state.get('hostname')
     if isinstance(hostnames, list) and len(hostnames) == 1:
       hostname = hostnames[0]
     else:
       hostname = hostnames
-    quarantined = attributes.get('quarantined', False)
-    state = request.get('state', {})
+    bot_id = (dimensions.get('id') or ['unknown'])[0]
+    quarantined = dimensions.get('quarantined', False)
     if bot_id:
       bot_management.tag_bot_seen(
           bot_id,
           hostname,
-          attributes.get('ip'),
+          state.get('ip'),
           self.request.remote_addr,
           dimensions,
-          attributes['version'],
+          request.get('version', ''),
           quarantined,
           state)
     # Let it live even if bot_id is not set, so the bot has a chance to
@@ -513,29 +492,23 @@ class BotHandshakeHandler(auth.ApiHandler):
 class BotPollHandler(auth.ApiHandler):
   """The bot polls for a task; returns either a task, update command or sleep.
 
-  The only attributes required are the id. In case of exception on the slave,
-  this is enough to get it just far enough to eventually self-update to a
-  working version. This is to ensure that coding errors in bot code doesn't kill
-  all the fleet at once, they should still be up just enough to be able to
-  self-update again even if they don't get task assigned anymore.
+  In case of exception on the bot, this is enough to get it just far enough to
+  eventually self-update to a working version. This is to ensure that coding
+  errors in bot code doesn't kill all the fleet at once, they should still be up
+  just enough to be able to self-update again even if they don't get task
+  assigned anymore.
   """
-  EXPECTED_KEYS = {u'attributes', u'state'}
-  ACCEPTED_ATTRIBUTES = {
-      u'dimensions', u'id', u'ip', u'quarantined', u'version'}
-  REQUIRED_ATTRIBUTES = {u'dimensions', u'id', u'ip', u'version'}
+  ACCEPTED_KEYS = {u'attributes', u'dimensions', u'state', u'version'}
+  EXPECTED_KEYS = {u'dimensions', u'state', u'version'}
   REQUIRED_STATE_KEYS = {u'running_time', u'sleep_streak'}
 
   @auth.require(acl.is_bot)
   def post(self):
     request = self.parse_body()
 
-    log_unexpected_keys(
-        self.EXPECTED_KEYS, request, self.request, 'bot', 'keys')
-
-    attributes = request.get('attributes', {})
-    log_unexpected_subset_keys(
-        self.ACCEPTED_ATTRIBUTES, self.REQUIRED_ATTRIBUTES, attributes,
-        self.request, 'bot', 'attributes')
+    msg = log_unexpected_subset_keys(
+        self.ACCEPTED_KEYS, self.EXPECTED_KEYS, request, self.request, 'bot',
+        'keys')
 
     state = request.get('state', {})
     log_missing_keys(
@@ -545,10 +518,10 @@ class BotPollHandler(auth.ApiHandler):
     # the bot, *we don't want to deny them the capacity to update*, so that the
     # bot code is eventually fixed and the bot self-update to this working code.
     # It makes fleet management much easier.
-    dimensions = attributes.get('dimensions', {})
-    bot_id = attributes.get('id')
+    dimensions = request.get('dimensions', {})
+    bot_id = (dimensions.get('id') or ['unknown'])[0]
     # The bot may decide to "self-quarantine" itself.
-    quarantined = attributes.get('quarantined', False)
+    quarantined = dimensions.get('quarantined', False)
 
     if quarantined:
       logging.info('Bot self-quarantined: %s', dimensions)
@@ -556,14 +529,14 @@ class BotPollHandler(auth.ApiHandler):
     # The bot version is host-specific, because the host determines the version
     # being used.
     expected_version = bot_management.get_slave_version(self.request.host_url)
-    if attributes.get('version') != expected_version:
+    if msg or request.get('version') != expected_version:
       self._cmd_update(expected_version)
       return
 
     # At that point, the bot should be in relatively good shape since it's
     # running the right version.
 
-    sleep_streak = state['sleep_streak']
+    sleep_streak = state.get('sleep_streak', 0)
     if not bot_id:
       self._cmd_sleep(sleep_streak, True)
       return
@@ -610,10 +583,10 @@ class BotPollHandler(auth.ApiHandler):
     bot_management.tag_bot_seen(
         bot_id,
         hostname,
-        attributes.get('ip'),
+        state.get('ip'),
         self.request.remote_addr,
         dimensions,
-        attributes['version'],
+        request.get('version', ''),
         quarantined,
         state)
 
@@ -623,7 +596,7 @@ class BotPollHandler(auth.ApiHandler):
 
     # Bot may need a reboot if it is running for too long.
     needs_restart, restart_message = bot_management.should_restart_bot(
-        bot_id, attributes, state)
+        bot_id, request, state)
     if needs_restart:
       self._cmd_restart(restart_message)
       return
@@ -632,7 +605,7 @@ class BotPollHandler(auth.ApiHandler):
     try:
       # This is a fairly complex function call, exceptions are expected.
       request, run_result = task_scheduler.bot_reap_task(
-          dimensions, bot_id, attributes['version'])
+          dimensions, bot_id, request.get('version', ''))
       if not request:
         # No task found, tell it to sleep a bit.
         self._cmd_sleep(sleep_streak, False)

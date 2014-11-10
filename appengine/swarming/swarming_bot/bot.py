@@ -47,7 +47,7 @@ class Bot(object):
   @property
   def id(self):
     """Returns the bot's ID."""
-    return self._attributes.get('id', 'unknown')
+    return self.dimensions.get('id', ['unknown'])[0]
 
   @property
   def remote(self):
@@ -68,6 +68,10 @@ class Bot(object):
       uuuu: username
     """
     return self._server_version
+
+  @property
+  def state(self):
+    return self._attributes['state']
 
   @property
   def swarming_bot_zip(self):
@@ -101,3 +105,7 @@ class Bot(object):
     # finish at all. Report this to the server.
     os_utilities.restart(message, timeout=15*60)
     self.post_error('Bot is stuck restarting for: %s' % message)
+
+  def update_state(self, new_state):
+    """Called internally to update Bot.state."""
+    self._attributes['state'] = new_state
