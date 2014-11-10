@@ -664,7 +664,8 @@ def get_dimensions_android(device_id, adb_path='adb'):
   In this case, details are about the device, not about the host.
   """
   properties = get_adb_device_properties_raw(device_id, adb_path)
-  out = {k: [v] for k, v in properties.iteritems() if k in ANDROID_DETAILS}
+  out = dict(
+      (k, [v]) for k, v in properties.iteritems() if k in ANDROID_DETAILS)
   out['id'] = [device_id]
   return out
 
