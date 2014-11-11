@@ -10,6 +10,7 @@ from google.appengine.runtime import apiproxy_errors
 
 __all__ = [
   'HIGH_KEY_ID',
+  'get_versioned_most_recent',
   'get_versioned_most_recent_with_root',
   'get_versioned_root_model',
   'insert',
@@ -59,7 +60,9 @@ def insert(entity, new_key_callback=None, extra=None):
         If this parameter is None, insertion is only tried once.
     extra: additional entities to store simultaneously. For example a bookeeping
         entity that must be updated simultaneously along |entity|. All the
-        entities must be inside the same entity group.
+        entities must be inside the same entity group. This function is not safe
+        w.r.t. `extra`, entities in this list will overwrite entities already in
+        the DB.
 
   Returns:
     ndb.Key of the newly saved entity or None if the entity was already present
@@ -101,13 +104,15 @@ def insert(entity, new_key_callback=None, extra=None):
 def get_versioned_root_model(model_name):
   """Returns a root model that can be used for versioned entities.
 
-  Using this entity for get_versioned_most_recent_with_root() and
-  store_new_version() is optional. Any entity with .current as an
-  ndb.IntegerProperty will do.
+  Using this entity for get_versioned_most_recent(),
+  get_versioned_most_recent_with_root() and store_new_version() is optional. Any
+  entity with cls.current as an ndb.IntegerProperty will do.
   """
   assert isinstance(model_name, str), model_name
 
   class Root(ndb.Model):
+    # Key id of the most recent child entity in the DB. It is monotonically
+    # decreasing starting at HIGH_KEY_ID. It is None if no child is present.
     current = ndb.IntegerProperty(indexed=False)
 
     @classmethod
@@ -117,55 +122,66 @@ def get_versioned_root_model(model_name):
   return Root
 
 
+def get_versioned_most_recent(cls, root_key):
+  """Returns the most recent entity of cls child of root_key."""
+  return get_versioned_most_recent_with_root(cls, root_key)[1]
+
+
 def get_versioned_most_recent_with_root(cls, root_key):
-  """Returns the most recent instance of a versioned entity."""
+  """Returns the most recent instance of a versioned entity and the root entity.
+
+  Getting the root entity is needed to get the current index.
+  """
+  # Using a cls.query(ancestor=root_key).get() would work too but is less
+  # efficient since it can't be cached by ndb's cache.
   assert issubclass(cls, ndb.Model), cls
   assert root_key is None or isinstance(root_key, ndb.Key), root_key
 
   root = root_key.get()
-  if not root:
+  if not root or not root.current:
     return None, None
-  index = root.current or HIGH_KEY_ID
-  return root, ndb.Key(cls, index, parent=root_key).get()
+  return root, ndb.Key(cls, root.current, parent=root_key).get()
 
 
-def store_new_version(entity, root_factory):
+def store_new_version(entity, root_cls, extra=None):
   """Stores a new version of the instance.
 
   entity.key is updated to the key used to store the entity. Only the parent key
-  needs to be set.
+  needs to be set. E.g. Entity(parent=ndb.Key(ParentCls, ParentId), ...) or
+  entity.key = ndb.Key(Entry, None, ParentCls, ParentId).
 
-  If there was no root entity, one is created by calling root_factory().
+  If there was no root entity in the DB, one is created by calling root_cls().
+
+  Fetch for root entity is not done in a transaction, so this function is unsafe
+  w.r.t. root content.
+
+  Arguments:
+    entity: ndb.Model entity to append in the DB.
+    root_cls: class returned by get_versioned_root_model().
+    extra: extraneous entities to put in the transaction. They must all be in
+        the same entity group.
 
   Returns:
     tuple(root, entity) with the two entities that were PUT in the db.
   """
   assert isinstance(entity, ndb.Model), entity
   assert entity.key and entity.key.parent(), 'entity.key.parent() must be set.'
-
-  root, previous = get_versioned_most_recent_with_root(
-      entity.__class__, entity.key.parent())
-  if not root:
-    root = root_factory(key=entity.key.parent(), current=HIGH_KEY_ID)
-  assert root.current, root
-
-  if previous:
-    entity.key = previous.key
-  else:
-    # Starts with an invalid key, it'll be updated automatically.
-    entity.key = ndb.Key(entity.__class__, None, parent=root.key)
-
-  # Very similar to append_decreasing() except that it also updated
-  # root.current inside the transaction.
-
+  # Access to a protected member _XX of a client class - pylint: disable=W0212
+  assert root_cls._properties.keys() == ['current'], (
+      'This function is unsafe for root entity, use store_new_version_safe '
+      'which is not yet implemented')
+  root_key = entity.key.parent()
+  root = root_key.get() or root_cls(key=root_key)
+  root.current = root.current or HIGH_KEY_ID
   flat = list(entity.key.flat())
-  if not flat[-1]:
-    flat[-1] = root.current
-    entity.key = ndb.Key(flat=flat)
+  flat[-1] = root.current
+  entity.key = ndb.Key(flat=flat)
 
   def _new_key_minus_one_current():
     flat[-1] -= 1
     root.current = flat[-1]
     return ndb.Key(flat=flat)
 
-  return insert(entity, _new_key_minus_one_current, extra=[root])
+  extra = (extra or [])[:]
+  extra.append(root)
+  return insert(entity, _new_key_minus_one_current, extra=extra)

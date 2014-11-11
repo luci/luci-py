@@ -86,29 +86,86 @@ class MonotonicTest(test_case.TestCase):
     self.assertTrue(issubclass(cls, ndb.Model))
     self.assertEqual(53, cls(current=53).current)
 
-  def test_get_versioned_most_recent_with_root(self):
+  def test_get_versioned_most_recent(self):
+    # First entity id is HIGH_KEY_ID, second is HIGH_KEY_ID-1.
     cls = monotonic.get_versioned_root_model('fidoula')
     parent_key = ndb.Key(cls, 'foo')
-    monotonic.store_new_version(EntityX(a=1, parent=parent_key), cls)
+    for i in (monotonic.HIGH_KEY_ID, monotonic.HIGH_KEY_ID-1):
+      monotonic.store_new_version(EntityX(parent=parent_key), cls)
+      actual = monotonic.get_versioned_most_recent(EntityX, parent_key)
+      expected = EntityX(key=ndb.Key('EntityX', i, parent=parent_key))
+      self.assertEqual(expected, actual)
+
+  def test_get_versioned_most_recent_with_root(self):
+    # First entity id is HIGH_KEY_ID, second is HIGH_KEY_ID-1.
+    cls = monotonic.get_versioned_root_model('fidoula')
+    parent_key = ndb.Key(cls, 'foo')
+    for i in (monotonic.HIGH_KEY_ID, monotonic.HIGH_KEY_ID-1):
+      monotonic.store_new_version(EntityX(parent=parent_key), cls)
+      actual = monotonic.get_versioned_most_recent_with_root(
+          EntityX, parent_key)
+      expected = (
+        cls(key=parent_key, current=i),
+        EntityX(key=ndb.Key('EntityX', i, parent=parent_key)),
+      )
+      self.assertEqual(expected, actual)
+
+  def test_get_versioned_most_recent_with_root_already_saved(self):
+    # Stores the root entity with .current == None.
+    cls = monotonic.get_versioned_root_model('fidoula')
+    parent_key = ndb.Key(cls, 'foo')
+    cls(key=parent_key).put()
+    monotonic.store_new_version(EntityX(parent=parent_key), cls)
+
     actual = monotonic.get_versioned_most_recent_with_root(EntityX, parent_key)
     expected = (
       cls(key=parent_key, current=monotonic.HIGH_KEY_ID),
-      EntityX(
-          key=ndb.Key('EntityX', monotonic.HIGH_KEY_ID, parent=parent_key),
-          a=1),
-    )
-    self.assertEqual(expected, actual)
-    monotonic.store_new_version(EntityX(a=1, parent=parent_key), cls)
-    actual = monotonic.get_versioned_most_recent_with_root(EntityX, parent_key)
-    expected = (
-      cls(key=parent_key, current=monotonic.HIGH_KEY_ID - 1),
-      EntityX(
-          key=ndb.Key('EntityX', monotonic.HIGH_KEY_ID - 1, parent=parent_key),
-          a=1),
+      EntityX(key=ndb.Key('EntityX', monotonic.HIGH_KEY_ID, parent=parent_key)),
     )
     self.assertEqual(expected, actual)
 
-  def test_store_new_version(self):
+  def test_get_versioned_most_recent_with_root_already_saved_invalid(self):
+    # Stores the root entity with an invalid .current value.
+    cls = monotonic.get_versioned_root_model('fidoula')
+    parent_key = ndb.Key(cls, 'foo')
+    cls(key=parent_key, current=23).put()
+    monotonic.store_new_version(EntityX(parent=parent_key), cls)
+
+    actual = monotonic.get_versioned_most_recent_with_root(EntityX, parent_key)
+    expected = (
+      cls(key=parent_key, current=23),
+      EntityX(key=ndb.Key('EntityX', 23, parent=parent_key)),
+    )
+    self.assertEqual(expected, actual)
+
+  def test_get_versioned_most_recent_with_root_unexpected_extra(self):
+    cls = monotonic.get_versioned_root_model('fidoula')
+    parent_key = ndb.Key(cls, 'foo')
+    monotonic.store_new_version(EntityX(parent=parent_key), cls)
+    monotonic.store_new_version(EntityX(parent=parent_key), cls)
+    EntityX(id=monotonic.HIGH_KEY_ID-2, parent=parent_key).put()
+
+    # The unexpected entity is not registered.
+    actual = monotonic.get_versioned_most_recent_with_root(EntityX, parent_key)
+    expected = (
+      cls(key=parent_key, current=monotonic.HIGH_KEY_ID-1),
+      EntityX(
+          key=ndb.Key('EntityX', monotonic.HIGH_KEY_ID-1, parent=parent_key)),
+    )
+    self.assertEqual(expected, actual)
+
+    # The unexpected entity is safely skipped. In particular, root.current was
+    # updated properly.
+    monotonic.store_new_version(EntityX(parent=parent_key), cls)
+    actual = monotonic.get_versioned_most_recent_with_root(EntityX, parent_key)
+    expected = (
+      cls(key=parent_key, current=monotonic.HIGH_KEY_ID-3),
+      EntityX(
+          key=ndb.Key('EntityX', monotonic.HIGH_KEY_ID-3, parent=parent_key)),
+    )
+    self.assertEqual(expected, actual)
+
+  def test_store_new_version_fast(self):
     cls = monotonic.get_versioned_root_model('fidoula')
     parent = ndb.Key(cls, 'foo')
     actual = monotonic.store_new_version(EntityX(a=1, parent=parent), cls)
@@ -117,6 +174,23 @@ class MonotonicTest(test_case.TestCase):
     actual = monotonic.store_new_version(EntityX(a=2, parent=parent), cls)
     self.assertEqual(
         ndb.Key('fidoula', 'foo', 'EntityX', monotonic.HIGH_KEY_ID - 1), actual)
+
+  def test_store_new_version_fast_extra(self):
+    # Includes an unrelated entity in the PUT. It must be in the same entity
+    # group.
+    cls = monotonic.get_versioned_root_model('fidoula')
+    parent = ndb.Key(cls, 'foo')
+    class Unrelated(ndb.Model):
+      b = ndb.IntegerProperty()
+    unrelated = Unrelated(id='bar', parent=parent, b=42)
+    actual = monotonic.store_new_version(
+        EntityX(a=1, parent=parent), cls, extra=[unrelated])
+    self.assertEqual(
+        ndb.Key('fidoula', 'foo', 'EntityX', monotonic.HIGH_KEY_ID), actual)
+    actual = monotonic.store_new_version(EntityX(a=2, parent=parent), cls)
+    self.assertEqual(
+        ndb.Key('fidoula', 'foo', 'EntityX', monotonic.HIGH_KEY_ID - 1), actual)
+    self.assertEqual({'b': 42}, unrelated.key.get().to_dict())
 
 
 if __name__ == '__main__':

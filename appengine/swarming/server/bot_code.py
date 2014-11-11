@@ -34,8 +34,8 @@ class VersionedFile(ndb.Model):
   @classmethod
   def fetch(cls, name):
     """Returns the current version of the instance."""
-    return datastore_utils.get_versioned_most_recent_with_root(
-        cls, cls._gen_root_key(name))[1]
+    return datastore_utils.get_versioned_most_recent(
+        cls, cls._gen_root_key(name))
 
   def store(self, name):
     """Stores a new version of the instance."""

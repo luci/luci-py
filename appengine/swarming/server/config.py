@@ -25,8 +25,7 @@ class GlobalConfig(ndb.Model):
   @classmethod
   def fetch(cls):
     """Returns the current version of the instance."""
-    return datastore_utils.get_versioned_most_recent_with_root(
-        cls, cls.ROOT_KEY)[1]
+    return datastore_utils.get_versioned_most_recent(cls, cls.ROOT_KEY)
 
   def store(self, who=None):
     """Stores a new version of the instance."""
