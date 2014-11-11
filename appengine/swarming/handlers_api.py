@@ -18,6 +18,7 @@ from components import auth
 from components import ereporter2
 from components import utils
 from server import acl
+from server import bot_code
 from server import bot_management
 from server import stats
 from server import task_result
@@ -334,7 +335,7 @@ class ClientApiServer(auth.ApiHandler):
   @auth.require(acl.is_privileged_user)
   def get(self):
     data = {
-      'bot_version': bot_management.get_slave_version(self.request.host_url),
+      'bot_version': bot_code.get_bot_version(self.request.host_url),
     }
     self.send_response(utils.to_json_encodable(data))
 
@@ -391,11 +392,11 @@ class BootstrapHandler(auth.AuthenticatingHandler):
     self.response.headers['Content-Type'] = 'text/x-python'
     self.response.headers['Content-Disposition'] = (
         'attachment; filename="swarming_bot_bootstrap.py"')
-    self.response.out.write(bot_management.get_bootstrap(self.request.host_url))
+    self.response.out.write(bot_code.get_bootstrap(self.request.host_url))
 
 
 class GetSlaveCodeHandler(auth.AuthenticatingHandler):
-  """Returns a zip file with all the files required by a slave.
+  """Returns a zip file with all the files required by a bot.
 
   Optionally specify the hash version to download. If so, the returned data is
   cacheable.
@@ -404,7 +405,7 @@ class GetSlaveCodeHandler(auth.AuthenticatingHandler):
   @auth.require(acl.is_bot)
   def get(self, version=None):
     if version:
-      expected = bot_management.get_slave_version(self.request.host_url)
+      expected = bot_code.get_bot_version(self.request.host_url)
       if version != expected:
         logging.error('Requested Swarming bot %s, have %s', version, expected)
         self.abort(404)
@@ -415,7 +416,7 @@ class GetSlaveCodeHandler(auth.AuthenticatingHandler):
     self.response.headers['Content-Disposition'] = (
         'attachment; filename="swarming_bot.zip"')
     self.response.out.write(
-        bot_management.get_swarming_bot_zip(self.request.host_url))
+        bot_code.get_swarming_bot_zip(self.request.host_url))
 
 
 class BotHandshakeHandler(auth.ApiHandler):
@@ -482,7 +483,7 @@ class BotHandshakeHandler(auth.ApiHandler):
     # self-update. It won't be assigned any task anyway.
     data = {
       # This access token will be used to validate each subsequent request.
-      'bot_version': bot_management.get_slave_version(self.request.host_url),
+      'bot_version': bot_code.get_bot_version(self.request.host_url),
       'server_version': utils.get_app_version(),
       'xsrf_token': self.generate_xsrf_token(),
     }
@@ -528,7 +529,7 @@ class BotPollHandler(auth.ApiHandler):
 
     # The bot version is host-specific, because the host determines the version
     # being used.
-    expected_version = bot_management.get_slave_version(self.request.host_url)
+    expected_version = bot_code.get_bot_version(self.request.host_url)
     if msg or request.get('version') != expected_version:
       self._cmd_update(expected_version)
       return

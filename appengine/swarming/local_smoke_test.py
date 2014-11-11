@@ -38,7 +38,7 @@ VERBOSE = False
 
 
 def setup_bot(swarming_bot_dir, host):
-  """Setups the slave code in a temporary directory so it can be modified."""
+  """Setups the bot code in a temporary directory so it can be modified."""
   with open(os.path.join(BOT_DIR, 'bot_config.py'), 'rb') as f:
     bot_config_content = f.read()
 

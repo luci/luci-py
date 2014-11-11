@@ -3,10 +3,13 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
-"""Generates the archive for the bot.
+"""Generates the swarming_bot.zip archive for the bot.
 
-The hash of the archive is used to define the current version of the swarm bot
-code.
+Unlike the other scripts, this file can be run stand-alone to generate a
+swarming_bot.zip so it doesn't import anything from the AppEngine SDK.
+
+The hash of the content of the files in the archive is used to define the
+current version of the swarming bot code.
 """
 
 import hashlib
@@ -117,7 +120,7 @@ def yield_swarming_bot_files(root_dir, host, additionals):
 
 
 def get_swarming_bot_zip(root_dir, host, additionals):
-  """Returns a zipped file of all the files a slave needs to run.
+  """Returns a zipped file of all the files a bot needs to run.
 
   Arguments:
     root_dir: directory swarming_bot.
@@ -138,14 +141,14 @@ def get_swarming_bot_zip(root_dir, host, additionals):
 
 
 def get_swarming_bot_version(root_dir, host, additionals):
-  """Returns the SHA1 hash of the slave code, representing the version.
+  """Returns the SHA1 hash of the bot code, representing the version.
 
   Arguments:
     root_dir: directory swarming_bot.
     additionals: See get_swarming_bot_zip's doc.
 
   Returns:
-    The SHA1 hash of the slave code.
+    The SHA1 hash of the bot code.
   """
   result = hashlib.sha1()
   try:

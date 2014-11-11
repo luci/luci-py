@@ -115,7 +115,7 @@ def _get_startup_dir_win():
     startup = (
         'AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs\\Startup')
 
-  # On cygwin 1.5, which is still used on some slaves, '~' points inside
+  # On cygwin 1.5, which is still used on some bots, '~' points inside
   # c:\\cygwin\\home so use USERPROFILE.
   return '%s\\%s\\' % (
     os.environ.get('USERPROFILE', 'DUMMY, ONLY USED IN TESTS'), startup)

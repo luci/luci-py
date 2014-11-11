@@ -26,6 +26,7 @@ from components import auth
 from components import ereporter2
 from components import utils
 from server import acl
+from server import bot_code
 from server import bot_management
 from server import config
 from server import stats_gviz
@@ -80,7 +81,7 @@ class UploadBotConfigHandler(auth.AuthenticatingHandler):
   @auth.require(acl.is_admin)
   def get(self):
     params = {
-      'content': bot_management.get_bot_config(),
+      'content': bot_code.get_bot_config(),
       'path': self.request.path,
       'xsrf_token': self.generate_xsrf_token(),
     }
@@ -93,7 +94,7 @@ class UploadBotConfigHandler(auth.AuthenticatingHandler):
     if not script:
       self.abort(400, 'No script uploaded')
 
-    bot_management.store_bot_config(script.encode('utf-8', 'replace'))
+    bot_code.store_bot_config(script.encode('utf-8', 'replace'))
     self.get()
 
 
@@ -103,7 +104,7 @@ class UploadBootstrapHandler(auth.AuthenticatingHandler):
   @auth.require(acl.is_admin)
   def get(self):
     params = {
-      'content': bot_management.get_bootstrap(self.request.host_url),
+      'content': bot_code.get_bootstrap(self.request.host_url),
       'path': self.request.path,
       'xsrf_token': self.generate_xsrf_token(),
     }
@@ -116,7 +117,7 @@ class UploadBootstrapHandler(auth.AuthenticatingHandler):
     if not script:
       self.abort(400, 'No script uploaded')
 
-    bot_management.store_bootstrap(script.encode('utf-8'))
+    bot_code.store_bootstrap(script.encode('utf-8'))
     self.get()
 
 
@@ -199,7 +200,7 @@ class BotsListHandler(auth.AuthenticatingHandler):
     # TODO(maruel): self.request.host_url should be the default AppEngine url
     # version and not the current one. It is only an issue when
     # version-dot-appid.appspot.com urls are used to access this page.
-    version = bot_management.get_slave_version(self.request.host_url)
+    version = bot_code.get_bot_version(self.request.host_url)
     bots, cursor, more = fetch_future.get_result()
     # Prefetch the tasks. We don't actually use the value here, it'll be
     # implicitly used by ndb local's cache when refetched by the html template.
@@ -264,8 +265,7 @@ class BotHandler(auth.AuthenticatingHandler):
     params = {
       'bot': bot,
       'bot_id': bot_id,
-      'current_version':
-          bot_management.get_slave_version(self.request.host_url),
+      'current_version': bot_code.get_bot_version(self.request.host_url),
       'cursor': cursor.urlsafe() if cursor and more else None,
       'idle_time': idle_time,
       'is_admin': acl.is_admin(),
@@ -618,7 +618,7 @@ class RootHandler(auth.AuthenticatingHandler):
 class WarmupHandler(webapp2.RequestHandler):
   def get(self):
     auth.warmup()
-    bot_management.get_swarming_bot_zip(self.request.host_url)
+    bot_code.get_swarming_bot_zip(self.request.host_url)
     utils.get_module_version_list(None, None)
     self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
     self.response.write('ok')

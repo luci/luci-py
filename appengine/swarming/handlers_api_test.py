@@ -23,6 +23,7 @@ import handlers_api
 from components import ereporter2
 from components import utils
 from server import bot_archive
+from server import bot_code
 from server import bot_management
 from server import task_result
 
@@ -1182,7 +1183,7 @@ class ClientApiTest(AppTestBase):
     self.set_as_privileged_user()
     actual = self.app.get('/swarming/api/v1/client/server').json
     expected = {
-      'bot_version': bot_management.get_slave_version('http://localhost'),
+      'bot_version': bot_code.get_bot_version('http://localhost'),
     }
     self.assertEqual(expected, actual)
 
