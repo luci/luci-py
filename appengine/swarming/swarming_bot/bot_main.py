@@ -59,13 +59,18 @@ def get_dimensions():
     try:
       out = os_utilities.get_dimensions()
       out['error'] = [str(e)]
+      out['quarantined'] = ['1']
       return out
     except Exception as e:
       try:
         botid = os_utilities.get_hostname_short()
       except Exception as e2:
         botid = 'error_%s' % str(e2)
-      return {'id': [botid], 'error': [str(e)]}
+      return {
+          'id': [botid],
+          'error': [str(e)],
+          'quarantined': ['1'],
+        }
 
 
 def get_state(sleep_streak):
@@ -79,6 +84,7 @@ def get_state(sleep_streak):
   except Exception as e:
     out = {
       'error': str(e),
+      'quarantined': True,
     }
 
   out['sleep_streak'] = sleep_streak

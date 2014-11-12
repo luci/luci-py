@@ -51,7 +51,28 @@ class BotApiTest(AppTestBase):
     self.set_as_bot()
 
   def test_handshake(self):
-    # Bare minimum:
+    errors = []
+    def add_error(request, source, message):
+      self.assertTrue(request)
+      self.assertEqual('bot', source)
+      errors.append(message)
+    self.mock(ereporter2, 'log_request', add_error)
+    headers = {'X-XSRF-Token-Request': '1'}
+    params = {
+      'dimensions': {'id': ['id1']},
+      'state': {u'running_time': 0, u'sleep_streak': 0},
+      'version': '1',
+    }
+    response = self.app.post_json(
+        '/swarming/api/v1/bot/handshake', headers=headers, params=params).json
+    self.assertEqual(
+        [u'bot_version', u'server_version', u'xsrf_token'], sorted(response))
+    self.assertTrue(response['xsrf_token'])
+    self.assertEqual(40, len(response['bot_version']))
+    self.assertEqual(u'default-version', response['server_version'])
+    self.assertEqual([], errors)
+
+  def test_handshake_minimum(self):
     errors = []
     def add_error(request, source, message):
       self.assertTrue(request)
@@ -66,7 +87,11 @@ class BotApiTest(AppTestBase):
     self.assertTrue(response['xsrf_token'])
     self.assertEqual(40, len(response['bot_version']))
     self.assertEqual(u'default-version', response['server_version'])
-    self.assertEqual([], errors)
+    expected = [
+      'Unexpected keys missing: [u\'dimensions\', u\'state\', u\'version\']; '
+      'did you make a typo?',
+    ]
+    self.assertEqual(expected, errors)
 
   def test_handshake_extra(self):
     errors = []
@@ -101,24 +126,29 @@ class BotApiTest(AppTestBase):
     self.assertEqual(expected, errors)
 
   def test_poll_bad_bot(self):
-    # If bot is not sending required keys, assume it is old and update it.
+    # If bot is not sending required keys but report right version, enforce
+    # sleeping.
+    errors = []
+    def add_error(request, source, message):
+      self.assertTrue(request)
+      self.assertEqual('bot', source)
+      errors.append(message)
+    self.mock(ereporter2, 'log_request', add_error)
     token, params = self.get_bot_token()
-    old_version = params['version']
     params.pop('dimensions')
     params.pop('state')
-    # log_request is expected to be called in that case, multiple times.
-    error_calls = []
-    self.mock(
-        ereporter2,
-        'log_request',
-        lambda *args, **kwargs: error_calls.append((args, kwargs)))
     response = self.post_with_token('/swarming/api/v1/bot/poll', params, token)
     expected = {
-      u'cmd': u'update',
-      u'version': old_version,
+      u'cmd': u'sleep',
+      u'quarantined': True,
     }
+    self.assertTrue(response.pop(u'duration'))
     self.assertEqual(expected, response)
-    self.assertTrue(error_calls)
+    expected = [
+      'Unexpected keys missing: [u\'dimensions\', u\'state\']; '
+      'did you make a typo?',
+    ]
+    self.assertEqual(expected, errors)
 
   def test_poll_bad_version(self):
     token, params = self.get_bot_token()
@@ -164,7 +194,7 @@ class BotApiTest(AppTestBase):
     self.assertEqual(expected, response)
 
   def test_poll_restart(self):
-    def mock_should_restart_bot(bot_id, _attributes, state):
+    def mock_should_restart_bot(bot_id, state):
       self.assertEqual('bot1', bot_id)
       expected_state = {
         'running_time': 1234.0,
@@ -978,26 +1008,25 @@ class ClientApiTest(AppTestBase):
     self.set_as_privileged_user()
     now = datetime.datetime(2000, 1, 2, 3, 4, 5, 6)
     self.mock_now(now)
-    bot = bot_management.tag_bot_seen(
-        'id1', 'localhost', '127.0.0.1', '8.8.4.4', {'foo': ['bar']},
-        '123456789', False, {'ram': 65})
-    bot.put()
+    bot_management.bot_event(
+        event_type='connected', bot_id='id1', external_ip='8.8.4.4',
+        dimensions={'foo': ['bar'], 'id': ['id1']}, state={'ram': 65},
+        version='123456789', quarantined=False, task_id=None, task_name=None)
 
     actual = self.app.get('/swarming/api/v1/client/bots', status=200).json
     expected = {
       u'items': [
         {
-          u'created_ts': u'2000-01-02 03:04:05',
-          u'dimensions': {u'foo': [u'bar']},
+          u'dimensions': {u'foo': [u'bar'], u'id': [u'id1']},
           u'external_ip': u'8.8.4.4',
-          u'hostname': u'localhost',
+          u'first_seen_ts': u'2000-01-02 03:04:05',
           u'id': u'id1',
-          u'internal_ip': u'127.0.0.1',
           u'is_dead': False,
           u'last_seen_ts': u'2000-01-02 03:04:05',
           u'quarantined': False,
           u'state': {u'ram': 65},
-          u'task': None,
+          u'task_id': None,
+          u'task_name': None,
           u'version': u'123456789',
         },
       ],
@@ -1014,10 +1043,10 @@ class ClientApiTest(AppTestBase):
     expected['limit'] = 1
     self.assertEqual(expected, actual)
 
-    bot = bot_management.tag_bot_seen(
-        'id2', 'localhost', '127.0.0.1', '8.8.4.4', {'foo': ['bar']},
-        '123456789', False,  {u'ram': 65})
-    bot.put()
+    bot_management.bot_event(
+        event_type='connected', bot_id='id2', external_ip='8.8.4.4',
+        dimensions={'foo': ['bar'], 'id': ['id2']}, state={'ram': 65},
+        version='123456789', quarantined=False, task_id=None, task_name=None)
 
     actual = self.app.get(
         '/swarming/api/v1/client/bots?limit=1', status=200).json
@@ -1030,6 +1059,7 @@ class ClientApiTest(AppTestBase):
         '/swarming/api/v1/client/bots?limit=1&cursor=%s' % actual['cursor'],
         status=200).json
     expected['cursor'] = None
+    expected['items'][0]['dimensions']['id'] = [u'id2']
     expected['items'][0]['id'] = u'id2'
     self.assertEqual(expected, actual)
 
@@ -1037,24 +1067,23 @@ class ClientApiTest(AppTestBase):
     self.set_as_privileged_user()
     now = datetime.datetime(2000, 1, 2, 3, 4, 5, 6)
     self.mock_now(now)
-    bot = bot_management.tag_bot_seen(
-        'id1', 'localhost', '127.0.0.1', '8.8.4.4', {'foo': ['bar']},
-        '123456789', False, {'ram': 65})
-    bot.put()
+    bot_management.bot_event(
+        event_type='connected', bot_id='id1', external_ip='8.8.4.4',
+        dimensions={'foo': ['bar'], 'id': ['id1']}, state={'ram': 65},
+        version='123456789', quarantined=False, task_id=None, task_name=None)
 
     actual = self.app.get('/swarming/api/v1/client/bot/id1', status=200).json
     expected = {
-      u'created_ts': u'2000-01-02 03:04:05',
-      u'dimensions': {u'foo': [u'bar']},
+      u'dimensions': {u'foo': [u'bar'], u'id': [u'id1']},
       u'external_ip': u'8.8.4.4',
-      u'hostname': u'localhost',
+      u'first_seen_ts': u'2000-01-02 03:04:05',
       u'id': u'id1',
-      u'internal_ip': u'127.0.0.1',
       u'is_dead': False,
       u'last_seen_ts': u'2000-01-02 03:04:05',
       u'quarantined': False,
       u'state': {u'ram': 65},
-      u'task': None,
+      u'task_id': None,
+      u'task_name': None,
       u'version': u'123456789',
     }
     self.assertEqual(expected, actual)
@@ -1069,10 +1098,10 @@ class ClientApiTest(AppTestBase):
       'list': ['of', 'things'],
       'str': u'uni',
     }
-    bot = bot_management.tag_bot_seen(
-        'id1', 'localhost', '127.0.0.1', '8.8.4.4', {'foo': ['bar']},
-        '123456789', False, state)
-    bot.put()
+    bot_management.bot_event(
+        event_type='connected', bot_id='id1', external_ip='8.8.4.4',
+        dimensions={'foo': ['bar'], 'id': ['id1']}, state=state,
+        version='123456789', quarantined=False, task_id=None, task_name=None)
 
     token = self.get_client_token()
     actual = self.app.delete(

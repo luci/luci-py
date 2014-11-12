@@ -169,8 +169,7 @@ class WhitelistIPHandler(auth.AuthenticatingHandler):
 class BotsListHandler(auth.AuthenticatingHandler):
   """Presents the list of known bots."""
   ACCEPTABLE_BOTS_SORTS = {
-    'last_seen': 'Last Seen',
-    'hostname': 'Hostname',
+    'last_seen_ts': 'Last Seen',
     '__key__': 'ID',
   }
   SORT_OPTIONS = [
@@ -191,10 +190,10 @@ class BotsListHandler(auth.AuthenticatingHandler):
     now = utils.utcnow()
     cutoff = now - bot_management.BOT_DEATH_TIMEOUT
 
-    num_total_bots_future = bot_management.Bot.query().count_async()
-    num_dead_bots_future = bot_management.Bot.query(
-        bot_management.Bot.last_seen_ts < cutoff).count_async()
-    fetch_future = bot_management.Bot.query().order(order).fetch_page_async(
+    num_total_bots_future = bot_management.BotInfo.query().count_async()
+    num_dead_bots_future = bot_management.BotInfo.query(
+        bot_management.BotInfo.last_seen_ts < cutoff).count_async()
+    fetch_future = bot_management.BotInfo.query().order(order).fetch_page_async(
         limit, start_cursor=cursor)
 
     # TODO(maruel): self.request.host_url should be the default AppEngine url
@@ -227,15 +226,21 @@ class BotsListHandler(auth.AuthenticatingHandler):
 
 
 class BotHandler(auth.AuthenticatingHandler):
+  """Returns data about the bot, including last tasks and events."""
+
   @auth.require(acl.is_privileged_user)
   def get(self, bot_id):
+    # pagination is currently for tasks, not events.
     limit = int(self.request.get('limit', 100))
     cursor = datastore_query.Cursor(urlsafe=self.request.get('cursor'))
-    bot_future = bot_management.get_bot_key(bot_id).get_async()
+    bot_future = bot_management.get_info_key(bot_id).get_async()
     run_results, cursor, more = task_result.TaskRunResult.query(
         task_result.TaskRunResult.bot_id == bot_id).order(
             -task_result.TaskRunResult.started_ts).fetch_page(
                 limit, start_cursor=cursor)
+
+    events_future = bot_management.get_events_query(bot_id).fetch_async(100)
+
     now = utils.utcnow()
     bot = bot_future.get_result()
     # Calculate the time this bot was idle.
@@ -267,6 +272,7 @@ class BotHandler(auth.AuthenticatingHandler):
       'bot_id': bot_id,
       'current_version': bot_code.get_bot_version(self.request.host_url),
       'cursor': cursor.urlsafe() if cursor and more else None,
+      'events': events_future.get_result(),
       'idle_time': idle_time,
       'is_admin': acl.is_admin(),
       'limit': limit,
@@ -280,11 +286,17 @@ class BotHandler(auth.AuthenticatingHandler):
 
 
 class BotDeleteHandler(auth.AuthenticatingHandler):
-  """Deletes a known bot."""
+  """Deletes a known bot.
+
+  This only deletes the BotInfo, not BotRoot, BotEvent's nor BotSettings.
+
+  This is sufficient so the bot doesn't show up on the Bots page while keeping
+  historical data.
+  """
 
   @auth.require(acl.is_admin)
   def post(self, bot_id):
-    bot_key = bot_management.get_bot_key(bot_id)
+    bot_key = bot_management.get_info_key(bot_id)
     if bot_key.get():
       bot_key.delete()
     self.redirect('/restricted/bots')
@@ -538,7 +550,7 @@ class TaskHandler(auth.AuthenticatingHandler):
           ).order(-cls.started_ts).get_async()
 
     bot_future = (
-        bot_management.get_bot_key(bot_id).get_async() if bot_id else None)
+        bot_management.get_info_key(bot_id).get_async() if bot_id else None)
 
     following_task_id = None
     following_task_name = None

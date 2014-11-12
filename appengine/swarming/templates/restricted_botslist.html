@@ -25,6 +25,10 @@
   table.property_table tbody tr:hover {
     background-color: #eeffee;
   }
+
+  .bad_version {
+    background-color: #ffffee;
+  }
 </style>
 {% endblock %}
 
@@ -73,30 +77,33 @@ Sort By:
     <th>Task</th>
     <th>Last Seen</th>
     <th>Dimensions</th>
+    <th>State</th>
     <th>Version</th>
   </thead>
   <tbody>
     {% for bot in bots %}
       <tr class="request {% if bot.is_dead(now) %}dead_machine{% endif %}">
-        <td>{{bot_view.bot_link(bot.key.id(), is_privileged_user)}}</td>
+        <td>{{bot_view.bot_link(bot.id, is_privileged_user)}}</td>
         <td>
           {% if bot.task %}
-          <a href="/user/task/{{bot.task_entity.key_string}}">
-            {{bot.task_entity.name}}</a>
+          <a href="/user/task/{{bot.task_id}}">{{bot.task_name}}</a>
           {% else %}&#8209;&#8209;{% endif%}
         </td>
         <td>
           {{(now-bot.last_seen_ts)|timedeltaformat}}
           {% if is_admin and bot.is_dead(now) %}
-            <form id="delete_{{bot.key.id()}}" method="post"
-                action="/restricted/bot/{{bot.key.id()}}/delete">
+            <form id="delete_{{bot.id}}" method="post"
+                action="/restricted/bot/{{bot.id}}/delete">
               <input type="hidden" name="xsrf_token" value="{{xsrf_token}}" />
               <input type="submit" value="Delete" />
             </form>
           {% endif %}
         </td>
-        <td>{{bot_view.bot_dimensions(bot)}}</td>
-        <td>{{bot.version[:8]}}</td>
+        <td>{{bot_view.render_dict(bot.dimensions)}}</td>
+        <td>{{bot_view.render_dict(bot.state)}}</td>
+        <td {%if bot.version != current_version%}class="bad_version"{%endif%}>
+          {{bot.version[:8]}}
+        </td>
       </tr>
     {% endfor %}
   </tbody>

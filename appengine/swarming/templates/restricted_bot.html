@@ -30,6 +30,10 @@
     background-color: #eeffee;
   }
 
+  .bad_version {
+    background-color: #ffffee;
+  }
+
   .dead_bot {
     background-color: #ffdddd;
   }
@@ -48,11 +52,7 @@
     <tbody>
       <tr>
         <td>ID</td>
-        <td>{{bot.key.id()}}</td>
-      </tr>
-      <tr>
-        <td>Internal IP</td>
-        <td>{{bot.internal_ip}}</td>
+        <td>{{bot.id}}</td>
       </tr>
       <tr>
         <td>External IP</td>
@@ -60,7 +60,7 @@
       </tr>
       <tr>
         <td>First seen</td>
-        <td>{{bot.created_ts|datetimeformat}}</td>
+        <td>{{bot.first_seen_ts|datetimeformat}}</td>
       </tr>
       <tr>
         <td>Most recent ping</td>
@@ -68,8 +68,8 @@
           {{(now-bot.last_seen_ts)|timedeltaformat}} ago
           {% if is_admin and bot.is_dead(now) %}
           &nbsp;&nbsp;
-          <form id="delete_{{bot.key.id()}}" method="post"
-              action="/restricted/bot/{{bot.key.id()}}/delete">
+          <form id="delete_{{bot.id}}" method="post"
+              action="/restricted/bot/{{bot.id}}/delete">
             <input type="hidden" name="xsrf_token" value="{{xsrf_token}}" />
             <input type="submit" value="Delete" />
           </form>
@@ -86,18 +86,17 @@
       </tr>
       <tr>
         <td>Version</td>
-        <td>{{bot.version}}</td>
+        <td>{{bot.version[:8]}}</td>
       </tr>
       <tr>
         <td>Expected version</td>
-        <td>{{current_version}}</td>
+        <td>{{current_version[:8]}}</td>
       </tr>
       <tr>
         <td>Current task</td>
         <td>
           {% if bot.task %}
-            <a href="/user/task/{{bot.task_entity.key_string}}">
-              {{bot.task_entity.name}}</a>
+            <a href="/user/task/{{bot.task_id}}">{{bot.task_name}}</a>
           {% else %}
             &#8209;&#8209;
           {% endif %}
@@ -114,6 +113,53 @@
     </tbody>
   </table>
   <p>
+
+  {% if events %}
+    {# TODO(maruel): Merge events and tasks together. #}
+    <h3>Recent events</h3>
+    <table class="property_table">
+      <thead>
+        <tr>
+          <th>Timestamp</th>
+          <th>Type</th>
+          <th>Quarantined</th>
+          <th>Task</th>
+          <th>Extra</th>
+          <th>Version</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for event in events %}
+        {# TODO(maruel): Create hover text that includes all the data (including
+        dimensions and state about the event #}
+        <tr>
+          <td>{{event.ts|succinctdatetimeformat}}</td>
+          <td>{{event.event_type}}</td>
+          <td>
+            {% if event.quarantined %}{{event.quarantined}}{% endif %}
+          </td>
+          <td>
+            {% if event.task_id %}
+              <a href="/user/task/{{event.task_id}}">{{event.task_id}}</a>
+            {% else %}
+              &#8209;&#8209;
+            {% endif %}
+          </td>
+          <td>
+            {% if event.extra %}
+              {{event.extra}}
+            {% else %}
+              &#8209;&#8209;
+            {% endif %}
+          </td>
+          <td {%if event.version != current_version%}class="bad_version"{%endif%}>
+            {{event.version[:8]}}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
 
   {% if run_results %}
     <h3>Previous tasks</h3>
@@ -145,7 +191,7 @@
                 {% if not cursor %}
                   {{(now - run_result.ended_ts)|timedeltaformat}}
                 {% else %}
-                  --
+                  &#8209;&#8209;
                 {% endif %}
               {% else %}
                 (Still running)
@@ -161,7 +207,7 @@
 
   {% if cursor %}
   <br>
-  <a href="/restricted/bot/{{bot.key.id()}}?limit={{limit}}&cursor={{cursor}}"}>
+  <a href="/restricted/bot/{{bot.id}}?limit={{limit}}&cursor={{cursor}}"}>
     Next page</a>
   {% endif %}
 

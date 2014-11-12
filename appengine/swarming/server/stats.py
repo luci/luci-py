@@ -40,6 +40,10 @@ class _SnapshotBucketBase(ndb.Model):
   tasks_pending_secs = ndb.FloatProperty(default=0)
 
   tasks_active = ndb.IntegerProperty(default=0)
+  # TODO(maruel): Add:
+  # Number of tasks pending at the start of this moment. It only makes sense for
+  # minute resolution.
+  # tasks_pending = ndb.IntegerProperty(default=0)
 
   tasks_completed = ndb.IntegerProperty(default=0)
   tasks_completed = ndb.IntegerProperty(default=0)
@@ -92,19 +96,29 @@ class _SnapshotForDimensions(_SnapshotBucketBase):
   # and determine if it becomes a problem.
   bot_ids = ndb.StringProperty(repeated=True)
 
+  bot_ids_bad = ndb.StringProperty(repeated=True)
+
   @property
   def bots_active(self):
     return len(self.bot_ids)
 
+  @property
+  def bots_inactive(self):
+    return len(self.bot_ids_bad)
+
   def accumulate(self, rhs):
     assert self.dimensions == rhs.dimensions
-    stats_framework.accumulate(self, rhs, ['bot_ids', 'dimensions'])
+    stats_framework.accumulate(
+        self, rhs, ['bot_ids', 'bot_ids_bad', 'dimensions'])
     self.bot_ids = sorted(set(self.bot_ids) | set(rhs.bot_ids))
+    self.bot_ids_bad = sorted(set(self.bot_ids_bad) | set(rhs.bot_ids_bad))
 
   def to_dict(self):
     out = super(_SnapshotForDimensions, self).to_dict()
     out['bots_active'] = self.bots_active
+    out['bots_inactive'] = self.bots_inactive
     del out['bot_ids']
+    del out['bot_ids_bad']
     return out
 
 
@@ -126,6 +140,11 @@ class _Snapshot(ndb.Model):
   # and determine if it becomes a problem.
   bot_ids = ndb.StringProperty(repeated=True)
 
+  # Bots that are quarantined.
+  # TODO(maruel): Also add bots that are considered dead at that moment. That
+  # wil be a useful metric.
+  bot_ids_bad = ndb.StringProperty(repeated=True)
+
   # Buckets the statistics per dimensions.
   buckets = ndb.LocalStructuredProperty(_SnapshotForDimensions, repeated=True)
   # Per user statistics.
@@ -134,6 +153,10 @@ class _Snapshot(ndb.Model):
   @property
   def bots_active(self):
     return len(self.bot_ids)
+
+  @property
+  def bots_inactive(self):
+    return len(self.bot_ids_bad)
 
   # Sums.
 
@@ -228,8 +251,10 @@ class _Snapshot(ndb.Model):
 
   def accumulate(self, rhs):
     """Accumulates data from rhs into self."""
-    stats_framework.accumulate(self, rhs, ['bot_ids', 'buckets', 'users'])
+    stats_framework.accumulate(
+        self, rhs, ['bot_ids', 'bot_ids_bad', 'buckets', 'users'])
     self.bot_ids = sorted(set(self.bot_ids) | set(rhs.bot_ids))
+    self.bot_ids_bad = sorted(set(self.bot_ids_bad) | set(rhs.bot_ids_bad))
     lhs_dimensions = dict((i.dimensions, i) for i in self.buckets)
     rhs_dimensions = dict((i.dimensions, i) for i in rhs.buckets)
     for key in set(rhs_dimensions):
@@ -259,6 +284,7 @@ class _Snapshot(ndb.Model):
     """Returns the summary only, not the buckets."""
     return {
       'bots_active': self.bots_active,
+      'bots_inactive': self.bots_inactive,
       'http_failures': self.http_failures,
       'http_requests': self.http_requests,
       'tasks_active': self.tasks_active,
@@ -281,6 +307,7 @@ class _Snapshot(ndb.Model):
 _VALID_ACTIONS = frozenset(
   [
     'bot_active',
+    'bot_inactive',
     # run_* relates to a TaskRunResult. It can happen multiple time for a single
     # task, when the task is retried automatically.
     'run_bot_died',
@@ -358,7 +385,7 @@ def _unpack_entry(line):
   return {_REVERSE_KEY_MAPPING[k]: v for k, v in json.loads(line).iteritems()}
 
 
-def _parse_line(line, values, bots_active, tasks_active):
+def _parse_line(line, values, bots_active, bots_inactive, tasks_active):
   """Updates a Snapshot instance with a processed statistics line if relevant.
 
   This function is a big switch case, so while it is long and will get longer,
@@ -375,7 +402,7 @@ def _parse_line(line, values, bots_active, tasks_active):
 
     # Preemptively reduce copy-paste.
     d = None
-    if 'dimensions' in extras and action != 'bot_active':
+    if 'dimensions' in extras and action not in ('bot_active', 'bot_inactive'):
       # Skip bot_active because we don't want complex dimensions to be created
       # implicitly.
       dimensions_json = utils.encode_to_json(extras['dimensions'])
@@ -390,6 +417,13 @@ def _parse_line(line, values, bots_active, tasks_active):
         raise ValueError(','.join(sorted(extras)))
 
       bots_active[extras['bot_id']] = extras['dimensions']
+      return True
+
+    if action == 'bot_inactive':
+      if sorted(extras) != ['bot_id', 'dimensions']:
+        raise ValueError(','.join(sorted(extras)))
+
+      bots_inactive[extras.get('bot_id') or 'unknown'] = extras['dimensions']
       return True
 
     if action == 'run_bot_died':
@@ -454,12 +488,13 @@ def _parse_line(line, values, bots_active, tasks_active):
     return False
 
 
-def _post_process(snapshot, bots_active, tasks_active):
+def _post_process(snapshot, bots_active, bots_inactive, tasks_active):
   """Completes the _Snapshot instance with additional data."""
   for dimensions_json, tasks in tasks_active.iteritems():
     snapshot.get_dimensions(dimensions_json).tasks_active = len(tasks)
 
   snapshot.bot_ids = sorted(bots_active)
+  snapshot.bot_ids_bad = sorted(bots_inactive)
   for bot_id, dimensions in bots_active.iteritems():
     # Looks at the current buckets, do not create one.
     for bucket in snapshot.buckets:
@@ -471,6 +506,17 @@ def _post_process(snapshot, bots_active, tasks_active):
           bucket.bot_ids.append(bot_id)
           bucket.bot_ids.sort()
 
+  for bot_id, dimensions in bots_inactive.iteritems():
+    # Looks at the current buckets, do not create one.
+    for bucket in snapshot.buckets:
+      # If this bot matches these dimensions, mark it as a member of this group.
+      if task_to_run.match_dimensions(
+          json.loads(bucket.dimensions), dimensions):
+        # This bot could be used for requests on this dimensions filter.
+        if not bot_id in bucket.bot_ids_bad:
+          bucket.bot_ids_bad.append(bot_id)
+          bucket.bot_ids_bad.sort()
+
 
 def _extract_snapshot_from_logs(start_time, end_time):
   """Returns a _Snapshot from the processed logs for the specified interval.
@@ -481,6 +527,7 @@ def _extract_snapshot_from_logs(start_time, end_time):
   total_lines = 0
   parse_errors = 0
   bots_active = {}
+  bots_inactive = {}
   tasks_active = {}
 
   for entry in stats_framework.yield_entries(start_time, end_time):
@@ -489,12 +536,12 @@ def _extract_snapshot_from_logs(start_time, end_time):
       snapshot.http_failures += 1
 
     for l in entry.entries:
-      if _parse_line(l, snapshot, bots_active, tasks_active):
+      if _parse_line(l, snapshot, bots_active, bots_inactive, tasks_active):
         total_lines += 1
       else:
         parse_errors += 1
 
-  _post_process(snapshot, bots_active, tasks_active)
+  _post_process(snapshot, bots_active, bots_inactive, tasks_active)
   logging.debug('Parsed %d lines, %d errors', total_lines, parse_errors)
   return snapshot
 

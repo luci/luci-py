@@ -57,12 +57,14 @@ class FrontendTest(AppTestBase):
       'list': ['of', 'things'],
       'str': u'uni',
     }
-    bot_management.tag_bot_seen(
-        'id1', 'localhost', '127.0.0.1', '8.8.4.4', {}, '123456789', False,
-        state)
-    bot_management.tag_bot_seen(
-        'id2', 'localhost:8080', '127.0.0.2', '8.8.8.8', {'foo': 'bar'},
-        '123456789', False, {'ram': 65})
+    bot_management.bot_event(
+        event_type='connected', bot_id='id1', external_ip='8.8.4.4',
+        dimensions={'id': ['id1']}, state=state, version='123456789',
+        quarantined=False, task_id=None, task_name=None)
+    bot_management.bot_event(
+        event_type='connected', bot_id='id2', external_ip='8.8.8.8',
+        dimensions={'id': ['id2']}, state={'ram': 65}, version='123456789',
+        quarantined=False, task_id=None, task_name=None)
 
     response = self.app.get('/restricted/bots', status=200)
     self.assertGreater(len(response.body), 1000)
@@ -70,9 +72,10 @@ class FrontendTest(AppTestBase):
   def test_delete_bot(self):
     self.set_as_admin()
 
-    bot_management.tag_bot_seen(
-        'id1', 'localhost', '127.0.0.1', '8.8.4.4', {'foo': 'bar'}, '123456789',
-        False, {'ram': 65})
+    bot_management.bot_event(
+        event_type='connected', bot_id='id1', external_ip='8.8.4.4',
+        dimensions={'id': ['id1']}, state={'foo': 'bar'}, version='123456789',
+        quarantined=False, task_id=None, task_name=None)
     response = self.app.get('/restricted/bots', status=200)
     self.assertTrue('id1' in response.body)
 

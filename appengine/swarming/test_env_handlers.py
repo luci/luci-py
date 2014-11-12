@@ -65,7 +65,7 @@ class AppTestBase(test_case.TestCase):
 
   def _parse_line(self, line):
     # pylint: disable=W0212
-    actual = stats._parse_line(line, stats._Snapshot(), {}, {})
+    actual = stats._parse_line(line, stats._Snapshot(), {}, {}, {})
     self.assertEqual(True, actual, line)
 
   def set_as_anonymous(self):

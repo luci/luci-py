@@ -15,7 +15,6 @@ Overview of transactions:
 """
 
 import contextlib
-import datetime
 import logging
 import math
 import random
@@ -26,7 +25,6 @@ from google.appengine.ext import ndb
 from google.appengine.runtime import apiproxy_errors
 
 from components import utils
-from server import bot_management
 from server import stats
 from server import task_request
 from server import task_result
@@ -144,21 +142,18 @@ def _update_task(task_key, request, bot_id, bot_version):
 
 def _fetch_for_update(run_result_key, bot_id):
   """Fetches all the data for a bot task update."""
-  bot_key = bot_management.get_bot_key(bot_id)
   request_key = task_result.result_summary_key_to_request_key(
       task_result.run_result_key_to_result_summary_key(run_result_key))
-
-  run_result, request, bot = ndb.get_multi(
-      [run_result_key, request_key, bot_key])
+  run_result, request = ndb.get_multi([run_result_key, request_key])
   if not run_result:
     logging.error('No result found for %s', run_result_key)
-    return None, None, None
+    return None, None
   if run_result.bot_id != bot_id:
     logging.error(
         'Bot %s sent update for task %s owned by bot %s',
         bot_id, run_result.bot_id, run_result.key)
-    return None, None, None
-  return run_result, request, bot
+    return None, None
+  return run_result, request
 
 
 def _update_stats(run_result, bot_id, request, completed):
@@ -320,10 +315,6 @@ def bot_reap_task(dimensions, bot_id, bot_version):
     The TaskToRun involved is not returned.
   """
   assert bot_id
-  bot = bot_management.get_bot_key(bot_id).get()
-  if bot and bot.quarantined:
-    return None, None
-
   q = task_to_run.yield_next_available_task_to_dispatch(dimensions)
   # When a large number of bots try to reap hundreds of tasks simultaneously,
   # they'll constantly fail to call reap_task_to_run() as they'll get preempted
@@ -398,28 +389,19 @@ def bot_update_task(
   specifically handled, in particular:
   - TaskRunResult was updated but not TaskResultSummary.
   - TaskChunkOutput was partially writen, with Result entities updated or not.
+
+  Yields:
+  - tuple(list(entities), bool(completed).
   """
   assert output_chunk_start is None or isinstance(output_chunk_start, int)
   assert output is None or isinstance(output, str)
 
-  run_result, request, bot = _fetch_for_update(run_result_key, bot_id)
+  run_result, request = _fetch_for_update(run_result_key, bot_id)
   if not run_result:
-    yield None
+    yield None, False
     return
 
   now = utils.utcnow()
-  UPDATE_RATE_DELTA = datetime.timedelta(seconds=30)
-  to_put = []
-  futures = []
-  if (bot and
-      (bot.task != run_result_key or
-       now - bot.last_seen_ts > UPDATE_RATE_DELTA)):
-    bot.last_seen_ts = now
-    bot.task = run_result_key
-    # Because Bot is not in the same root entity, save it independently.
-    # Otherwise it would result in requiring an xg=True transaction. It's not a
-    # big deal even if this entity is not strongly consistent with the others.
-    futures.append(bot.put_async())
 
   if len(run_result.exit_codes) not in (command_index, command_index+1):
     raise ValueError('Unexpected ordering')
@@ -438,6 +420,7 @@ def bot_update_task(
     run_result.state = task_result.State.COMPLETED
     run_result.completed_ts = now
 
+  to_put = []
   if output:
     to_put.extend(
         run_result.append_output(
@@ -445,10 +428,9 @@ def bot_update_task(
 
   to_put.extend(task_result.prepare_put_run_result(run_result, request))
 
-  yield to_put
+  yield to_put, task_completed
 
   _update_stats(run_result, bot_id, request, task_completed)
-  ndb.Future.wait_all(futures)
 
 
 def bot_kill_task(run_result):

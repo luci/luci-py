@@ -35,6 +35,7 @@ class StatsPrivateTest(test_case.TestCase):
     # - 402 is running on host4
     data = (
       stats._pack_entry(action='bot_active', bot_id='host3', dimensions={}),
+      stats._pack_entry(action='bot_inactive', bot_id='failed1', dimensions={}),
 
       stats._pack_entry(
           action='task_enqueued', task_id='100', dimensions={}, user='me'),
@@ -65,19 +66,21 @@ class StatsPrivateTest(test_case.TestCase):
 
     snapshot = stats._Snapshot()
     bots_active = {}
+    bots_inactive = {}
     tasks_active = {}
     for line in data:
       actual = stats._parse_line(
-          line, snapshot, bots_active, tasks_active)
+          line, snapshot, bots_active, bots_inactive, tasks_active)
       self.assertIs(True, actual, line)
 
-    stats._post_process(snapshot, bots_active, tasks_active)
+    stats._post_process(snapshot, bots_active, bots_inactive, tasks_active)
     return snapshot
 
   def test_parse_summary(self):
     snapshot = self._gen_data()
     expected = {
       'bots_active': 3,
+      'bots_inactive': 1,
       'http_failures': 0,
       'http_requests': 0,
       'tasks_active': 2,
@@ -99,6 +102,7 @@ class StatsPrivateTest(test_case.TestCase):
     expected = [
       {
         'bots_active': 0,
+        'bots_inactive': 0,
         'dimensions': '{"os":"Amiga"}',
         'tasks_active': 0,
         'tasks_avg_pending_secs': 0.0,
@@ -113,6 +117,7 @@ class StatsPrivateTest(test_case.TestCase):
       },
       {
         'bots_active': 3,
+        'bots_inactive': 1,
         'dimensions': '{}',
         'tasks_active': 2,
         'tasks_avg_pending_secs': 1.5,
@@ -201,11 +206,13 @@ class StatsPrivateTest(test_case.TestCase):
 
     snapshot = stats._Snapshot()
     bots_active = {}
+    bots_inactive = {}
     tasks_active = {}
     for line in data:
-      actual = stats._parse_line(line, snapshot, bots_active, tasks_active)
+      actual = stats._parse_line(
+          line, snapshot, bots_active, bots_inactive, tasks_active)
       self.assertEqual(True, actual)
-    stats._post_process(snapshot, bots_active, tasks_active)
+    stats._post_process(snapshot, bots_active, bots_inactive, tasks_active)
 
     expected = [
       '{"os":"Linux"}',

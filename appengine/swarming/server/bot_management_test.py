@@ -18,41 +18,80 @@ import test_env
 test_env.setup_test_env()
 
 from server import bot_management
-from server import task_result
 from support import test_case
 
 
 class BotManagementTest(test_case.TestCase):
-  def test_get_bot_key(self):
-    self.assertEqual(
-        "Key('BotRoot', 'f-a:1', 'Bot', 'f-a:1')",
-        str(bot_management.get_bot_key('f-a:1')))
-
-  def test_tag_bot_seen(self):
+  def test_bot_event_connected(self):
     now = datetime.datetime(2010, 1, 2, 3, 4, 5, 6)
     self.mock_now(now)
-    bot = bot_management.tag_bot_seen(
-        'id1', 'localhost', '127.0.0.1', '8.8.4.4', {'foo': 'bar'},
-        hashlib.sha1().hexdigest(), False, {'ram': 65})
-    bot.put()
+    bot_management.bot_event(
+        event_type='connected', bot_id='id1', external_ip='8.8.4.4',
+        dimensions={'id': ['id1'], 'foo': ['bar']}, state={'ram': 65},
+        version=hashlib.sha1().hexdigest(), quarantined=False, task_id=None,
+        task_name=None)
+
+    # Assert that BotInfo was updated too.
     expected = {
-      'created_ts': now,
-      'dimensions': {u'foo': u'bar'},
+      'dimensions': {u'foo': [u'bar'], u'id': [u'id1']},
       'external_ip': u'8.8.4.4',
-      'hostname': u'localhost',
+      'first_seen_ts': now,
       'id': 'id1',
-      'internal_ip': u'127.0.0.1',
       'last_seen_ts': now,
       'quarantined': False,
       'state': {u'ram': 65},
-      'task': None,
+      'task_id': None,
+      'task_name': None,
       'version': u'da39a3ee5e6b4b0d3255bfef95601890afd80709',
     }
-    self.assertEqual(expected, bot.to_dict())
-    bot.task = task_result.unpack_run_result_key('12301')
-    bot.put()
-    expected['task'] = '12301'
-    self.assertEqual(expected, bot.to_dict())
+    self.assertEqual(expected,
+        bot_management.get_info_key('id1').get().to_dict())
+
+    expected = [
+      {
+      'dimensions': {u'foo': [u'bar'], u'id': [u'id1']},
+      'error': None,
+      'event_type': u'connected',
+      'external_ip': u'8.8.4.4',
+      'reboot_reason': None,
+      'quarantined': False,
+      'state': {u'ram': 65},
+      'task_id': None,
+      'ts': now,
+      'version': u'da39a3ee5e6b4b0d3255bfef95601890afd80709',
+      },
+    ]
+    self.assertEqual(
+        expected,
+        [i.to_dict() for i in bot_management.get_events_query('id1').fetch()])
+
+  def test_bot_event_poll(self):
+    now = datetime.datetime(2010, 1, 2, 3, 4, 5, 6)
+    self.mock_now(now)
+    bot_management.bot_event(
+        event_type='request_sleep', bot_id='id1', external_ip='8.8.4.4',
+        dimensions={'id': ['id1'], 'foo': ['bar']}, state={'ram': 65},
+        version=hashlib.sha1().hexdigest(), quarantined=True, task_id=None,
+        task_name=None)
+
+    # Assert that BotInfo was updated too.
+    expected = {
+      'dimensions': {u'foo': [u'bar'], u'id': [u'id1']},
+      'external_ip': u'8.8.4.4',
+      'first_seen_ts': now,
+      'id': 'id1',
+      'last_seen_ts': now,
+      'quarantined': True,
+      'state': {u'ram': 65},
+      'task_id': None,
+      'task_name': None,
+      'version': u'da39a3ee5e6b4b0d3255bfef95601890afd80709',
+    }
+    self.assertEqual(expected,
+        bot_management.get_info_key('id1').get().to_dict())
+
+    # No BotEvent is registered for 'poll'.
+    self.assertEqual([], bot_management.get_events_query('id1').fetch())
 
   def test_should_restart_bot_no(self):
     state = {
@@ -60,14 +99,14 @@ class BotManagementTest(test_case.TestCase):
       'started_ts': 1410989556.174,
     }
     self.assertEqual(
-        (False, ''), bot_management.should_restart_bot('id', {}, state))
+        (False, ''), bot_management.should_restart_bot('id', state))
 
   def test_should_restart_bot_yes(self):
     state = {
       'running_time': bot_management.BOT_REBOOT_PERIOD_SECS * 5,
       'started_ts': 1410989556.174,
     }
-    needs_reboot, message = bot_management.should_restart_bot('id', {}, state)
+    needs_reboot, message = bot_management.should_restart_bot('id', state)
     self.assertTrue(needs_reboot)
     self.assertTrue(message)
 

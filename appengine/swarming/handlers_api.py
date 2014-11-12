@@ -275,7 +275,7 @@ class ClientApiBots(auth.ApiHandler):
     now = utils.utcnow()
     limit = int(self.request.get('limit', 1000))
     cursor = datastore_query.Cursor(urlsafe=self.request.get('cursor'))
-    q = bot_management.Bot.query().order(bot_management.Bot.key)
+    q = bot_management.BotInfo.query().order(bot_management.BotInfo.key)
     bots, cursor, more = q.fetch_page(limit, start_cursor=cursor)
     data = {
       'cursor': cursor.urlsafe() if cursor and more else None,
@@ -292,7 +292,7 @@ class ClientApiBot(auth.ApiHandler):
 
   @auth.require(acl.is_privileged_user)
   def get(self, bot_id):
-    bot = bot_management.get_bot_key(bot_id).get()
+    bot = bot_management.get_info_key(bot_id).get()
     if not bot:
       self.abort_with_error(404, error='Bot not found')
     now = utils.utcnow()
@@ -300,7 +300,8 @@ class ClientApiBot(auth.ApiHandler):
 
   @auth.require(acl.is_admin)
   def delete(self, bot_id):
-    bot_key = bot_management.get_bot_key(bot_id)
+    # Only delete BotInfo, not BotRoot, BotEvent nor BotSettings.
+    bot_key = bot_management.get_info_key(bot_id)
     found = False
     if bot_key.get():
       bot_key.delete()
@@ -419,20 +420,96 @@ class GetSlaveCodeHandler(auth.AuthenticatingHandler):
         bot_code.get_swarming_bot_zip(self.request.host_url))
 
 
-class BotHandshakeHandler(auth.ApiHandler):
-  """First request to be called to get initial data like XSRF token.
-
-  The bot is server-controled so the server doesn't have to support multiple API
-  version. Only the current one and the last one, since the bot are finishing
-  their currently running task, they'll be immediately be upgraded after on
-  their next poll.
-
+class _BotBaseHandler(auth.ApiHandler):
+  """
   Request body is a JSON dict:
     {
       "dimensions": <dict of properties>,
       "state": <dict of properties>,
       "version": <sha-1 of swarming_bot.zip uncompressed content>,
     }
+  """
+
+  EXPECTED_KEYS = {u'dimensions', u'state', u'version'}
+  REQUIRED_STATE_KEYS = {u'running_time', u'sleep_streak'}
+
+  def _process(self):
+    """Returns True if the bot has invalid parameter and should be automatically
+    quarantined.
+
+    Does one DB synchronous GET.
+
+    Returns:
+      tuple(bot_id, version, state, dimensions, quarantined)
+    """
+    request = self.parse_body()
+    version = request.get('version', None)
+
+    dimensions = request.get('dimensions', {})
+    state = request.get('state', {})
+    bot_id = None
+    if dimensions.get('id'):
+      dimension_id = dimensions['id']
+      if (isinstance(dimension_id, list) and len(dimension_id) == 1
+          and isinstance(dimension_id[0], unicode)):
+        bot_id = dimensions['id'][0]
+
+    # The bot may decide to "self-quarantine" itself. Accept both via dimensions
+    # or via state. See bot_management._BotCommon.quarantined for more details.
+    if (bool(dimensions.get('quarantined')) or
+        bool(state.get('quarantined'))):
+      # Not worth checking the properties if the bot self-quarantined. It's just
+      # noise.
+      return bot_id, version, state, dimensions, True
+
+    if log_unexpected_keys(
+        self.EXPECTED_KEYS, request, self.request, 'bot', 'keys'):
+      return bot_id, version, state, dimensions, True
+
+    if log_missing_keys(
+        self.REQUIRED_STATE_KEYS, state, self.request, 'bot', 'state'):
+      return bot_id, version, state, dimensions, True
+
+    if not bot_id:
+      return bot_id, version, state, dimensions, True
+
+    if not all(
+        isinstance(key, unicode) and
+        isinstance(values, list) and
+        all(isinstance(value, unicode) for value in values)
+        for key, values in dimensions.iteritems()):
+      # It's a big deal, alert the admins.
+      ereporter2.log_request(
+          self.request,
+          source='bot',
+          message='Invalid dimensions on bot')
+      return bot_id, version, state, dimensions, True
+
+    dimensions_count = task_to_run.dimensions_powerset_count(dimensions)
+    if dimensions_count > task_to_run.MAX_DIMENSIONS:
+      # It's a big deal, alert the admins.
+      ereporter2.log_request(
+          self.request,
+          source='bot',
+          message='Too many dimensions (%d) on bot' % dimensions_count)
+      return bot_id, version, state, dimensions, True
+
+    # Look for admin enforced quarantine.
+    bot_settings = bot_management.get_settings_key(bot_id).get()
+    quarantined = bool(bot_settings and bot_settings.quarantined)
+    return bot_id, version, state, dimensions, quarantined
+
+
+class BotHandshakeHandler(_BotBaseHandler):
+  """First request to be called to get initial data like XSRF token.
+
+  The bot is server-controled so the server doesn't have to support multiple API
+  version. When running a task, the bot sync the the version specific URL. Once
+  abot finished its currently running task, it'll be immediately be upgraded
+  after on its next poll.
+
+  This endpoint does not return commands to the bot, for example to upgrade
+  itself. It'll be told so when it does its first poll.
 
   Response body is a JSON dict:
     {
@@ -445,42 +522,15 @@ class BotHandshakeHandler(auth.ApiHandler):
   # This handler is called to get XSRF token, there's nothing to enforce yet.
   xsrf_token_enforce_on = ()
 
-  # TODO(maruel): Enforce the correct keys once all rolled out.
-  ACCEPTED_KEYS = {u'attributes', u'dimensions', u'state', u'version'}
-  EXPECTED_KEYS = frozenset()
-
   @auth.require_xsrf_token_request
   @auth.require(acl.is_bot)
   def post(self):
-    # In particular, this endpoint does not return commands to the bot, for
-    # example to upgrade itself. It'll be told so when it does its first poll.
-    request = self.parse_body()
-    log_unexpected_subset_keys(
-        self.ACCEPTED_KEYS, self.EXPECTED_KEYS, request, self.request, 'bot',
-        'keys')
-
-    dimensions = request.get('dimensions', {})
-    # TODO(maruel): Remove and move to 'state'.
-    state = request.get('state', {})
-    hostnames = state.get('hostname')
-    if isinstance(hostnames, list) and len(hostnames) == 1:
-      hostname = hostnames[0]
-    else:
-      hostname = hostnames
-    bot_id = (dimensions.get('id') or ['unknown'])[0]
-    quarantined = dimensions.get('quarantined', False)
-    if bot_id:
-      bot_management.tag_bot_seen(
-          bot_id,
-          hostname,
-          state.get('ip'),
-          self.request.remote_addr,
-          dimensions,
-          request.get('version', ''),
-          quarantined,
-          state)
-    # Let it live even if bot_id is not set, so the bot has a chance to
-    # self-update. It won't be assigned any task anyway.
+    bot_id, version, state, dimensions, quarantined = self._process()
+    bot_management.bot_event(
+        event_type='connected', bot_id=bot_id,
+        external_ip=self.request.remote_addr, dimensions=dimensions,
+        state=state, version=version, quarantined=quarantined, task_id='',
+        task_name=None)
     data = {
       # This access token will be used to validate each subsequent request.
       'bot_version': bot_code.get_bot_version(self.request.host_url),
@@ -490,7 +540,7 @@ class BotHandshakeHandler(auth.ApiHandler):
     self.send_response(data)
 
 
-class BotPollHandler(auth.ApiHandler):
+class BotPollHandler(_BotBaseHandler):
   """The bot polls for a task; returns either a task, update command or sleep.
 
   In case of exception on the bot, this is enough to get it just far enough to
@@ -499,106 +549,56 @@ class BotPollHandler(auth.ApiHandler):
   just enough to be able to self-update again even if they don't get task
   assigned anymore.
   """
-  ACCEPTED_KEYS = {u'attributes', u'dimensions', u'state', u'version'}
-  EXPECTED_KEYS = {u'dimensions', u'state', u'version'}
-  REQUIRED_STATE_KEYS = {u'running_time', u'sleep_streak'}
 
   @auth.require(acl.is_bot)
   def post(self):
-    request = self.parse_body()
+    """Handles a polling request.
 
-    msg = log_unexpected_subset_keys(
-        self.ACCEPTED_KEYS, self.EXPECTED_KEYS, request, self.request, 'bot',
-        'keys')
+    Be very permissive on missing values. This can happen because of errors
+    on the bot, *we don't want to deny them the capacity to update*, so that the
+    bot code is eventually fixed and the bot self-update to this working code.
 
-    state = request.get('state', {})
-    log_missing_keys(
-        self.REQUIRED_STATE_KEYS, state, self.request, 'bot', 'state')
+    It makes recovery of the fleet in case of catastrophic failure much easier.
+    """
+    bot_id, version, state, dimensions, quarantined = self._process()
+    sleep_streak = state.get('sleep_streak', 0)
 
-    # Be very permissive on missing values. This can happen because of errors on
-    # the bot, *we don't want to deny them the capacity to update*, so that the
-    # bot code is eventually fixed and the bot self-update to this working code.
-    # It makes fleet management much easier.
-    dimensions = request.get('dimensions', {})
-    bot_id = (dimensions.get('id') or ['unknown'])[0]
-    # The bot may decide to "self-quarantine" itself.
-    quarantined = dimensions.get('quarantined', False)
+    # Note bot existence at two places, one for stats at 1 minute resolution,
+    # the other for the list of known bots.
+    action = 'bot_inactive' if quarantined else 'bot_active'
+    stats.add_entry(action=action, bot_id=bot_id, dimensions=dimensions)
 
-    if quarantined:
-      logging.info('Bot self-quarantined: %s', dimensions)
+    def bot_event(event_type, task_id=None, task_name=None):
+      bot_management.bot_event(
+          event_type=event_type, bot_id=bot_id,
+          external_ip=self.request.remote_addr, dimensions=dimensions,
+          state=state, version=version, quarantined=quarantined,
+          task_id=task_id, task_name=task_name)
 
-    # The bot version is host-specific, because the host determines the version
-    # being used.
+    # Bot version is host-specific because the host URL is embedded in
+    # swarming_bot.zip
     expected_version = bot_code.get_bot_version(self.request.host_url)
-    if msg or request.get('version') != expected_version:
+    if version != expected_version:
+      bot_event('request_update')
       self._cmd_update(expected_version)
       return
-
-    # At that point, the bot should be in relatively good shape since it's
-    # running the right version.
-
-    sleep_streak = state.get('sleep_streak', 0)
-    if not bot_id:
-      self._cmd_sleep(sleep_streak, True)
-      return
-
-    # TODO(maruel): Add support for Admin-enforced quarantine. This will be done
-    # with a separate entity type from bot_management.Bot. It is important to
-    # differentiate between a bot self-quarantining and an admin forcibly
-    # quarantining a bot.
-    # https://code.google.com/p/swarming/issues/detail?id=115
-
-    if not quarantined:
-      if not all(
-          isinstance(key, unicode) and
-          isinstance(values, list) and
-          all(isinstance(value, unicode) for value in values)
-          for key, values in dimensions.iteritems()):
-        # It's a big deal, alert the admins.
-        ereporter2.log_request(
-            self.request,
-            source='bot',
-            message='Invalid dimensions on bot')
-        quarantined = True
-      else:
-        dimensions_count = task_to_run.dimensions_powerset_count(dimensions)
-        if dimensions_count > task_to_run.MAX_DIMENSIONS:
-          # It's a big deal, alert the admins.
-          ereporter2.log_request(
-              self.request,
-              source='bot',
-              message='Too many dimensions (%d) on bot' % dimensions_count)
-          quarantined = True
-
-    if not quarantined:
-      # Note its existence at two places, one for stats at 1 minute resolution,
-      # the other for the list of known bots.
-      stats.add_entry(action='bot_active', bot_id=bot_id, dimensions=dimensions)
-
-    # TODO(maruel): Remove and move to 'state'.
-    hostnames = dimensions.get('hostname')
-    if isinstance(hostnames, list) and len(hostnames) == 1:
-      hostname = hostnames[0]
-    else:
-      hostname = hostnames
-    bot_management.tag_bot_seen(
-        bot_id,
-        hostname,
-        state.get('ip'),
-        self.request.remote_addr,
-        dimensions,
-        request.get('version', ''),
-        quarantined,
-        state)
-
     if quarantined:
+      bot_event('request_sleep')
       self._cmd_sleep(sleep_streak, quarantined)
       return
 
-    # Bot may need a reboot if it is running for too long.
+    #
+    # At that point, the bot should be in relatively good shape since it's
+    # running the right version. It is still possible that invalid code was
+    # pushed to the server, so be diligent about it.
+    #
+
+    # Bot may need a reboot if it is running for too long. We do not reboot
+    # quarantined bots.
     needs_restart, restart_message = bot_management.should_restart_bot(
-        bot_id, request, state)
+        bot_id, state)
     if needs_restart:
+      bot_event('request_restart')
       self._cmd_restart(restart_message)
       return
 
@@ -606,12 +606,18 @@ class BotPollHandler(auth.ApiHandler):
     try:
       # This is a fairly complex function call, exceptions are expected.
       request, run_result = task_scheduler.bot_reap_task(
-          dimensions, bot_id, request.get('version', ''))
+          dimensions, bot_id, version)
       if not request:
         # No task found, tell it to sleep a bit.
-        self._cmd_sleep(sleep_streak, False)
+        bot_event('request_sleep')
+        self._cmd_sleep(sleep_streak, quarantined)
         return
 
+      # This one is tricky since it intentionally runs a transaction after
+      # another one.
+      bot_event(
+          'request_task', task_id=run_result.key_string,
+          task_name=request.name)
       self._cmd_run(request, run_result.key, bot_id)
     except runtime.DeadlineExceededError:
       # If the timeout happened before a task was assigned there is no problems.
@@ -670,6 +676,8 @@ class BotErrorHandler(auth.ApiHandler):
   meant to be used by bot_main.py for non-recoverable issues, for example when
   failing to self update.
   """
+
+  # TODO(maruel): Use _BotBaseHandler
   EXPECTED_KEYS = {u'id', u'message'}
 
   @auth.require(acl.is_bot)
@@ -677,25 +685,17 @@ class BotErrorHandler(auth.ApiHandler):
     request = self.parse_body()
     log_unexpected_keys(
         self.EXPECTED_KEYS, request, self.request, 'bot', 'keys')
+    message = request.get('message', 'unknown')
+    bot_id = request.get('id')
+    if bot_id:
+      bot_management.bot_event(
+          event_type='error', bot_id=bot_id,
+          external_ip=self.request.remote_addr, dimensions=None, state=None,
+          version=None, quarantined=None, task_id=None, task_name=None,
+          error=message)
 
-    bot_id = request.get('id', 'unknown')
-    # When a bot reports here, it is borked, quarantine the bot.
-    bot = bot_management.get_bot_key(bot_id).get()
-    if not bot:
-      bot_management.tag_bot_seen(
-          bot_id,
-          None,
-          None,
-          self.request.remote_addr,
-          None,
-          None,
-          True,
-          None)
-    else:
-      bot.quarantined = True
-      bot.put()
-
-    ereporter2.log(source='bot', message=request.get('message', 'unknown'))
+    # Also log inconditionally an ereporter2 event.
+    ereporter2.log(source='bot', message=message)
     self.send_response({})
 
 
@@ -741,12 +741,17 @@ class BotTaskUpdateHandler(auth.ApiHandler):
     try:
       with task_scheduler.bot_update_task(
           run_result_key, bot_id, command_index, output, output_chunk_start,
-          exit_code, duration) as entities:
+          exit_code, duration) as (entities, completed):
         # The reason for writing in a transaction is to get rid of partial DB
         # writes, e.g. a few entities got written but not others. This is a
         # problem with TaskOutputChunk where some stdout stream chunks would be
         # written but not other, causing irrecoverable errors.
         ndb.transaction(lambda: ndb.put_multi(entities), retries=1)
+      action = 'task_completed' if completed else 'task_update'
+      bot_management.bot_event(
+          event_type=action, bot_id=bot_id,
+          external_ip=self.request.remote_addr, dimensions=None, state=None,
+          version=None, quarantined=None, task_id=task_id, task_name=None)
     except ValueError as e:
       ereporter2.log_request(
           request=self.request,
@@ -770,20 +775,28 @@ class BotTaskErrorHandler(auth.ApiHandler):
   This formally kills the task, marking it as an internal failure. This can be
   used by bot_main.py to kill the task when task_runner misbehaved.
   """
+
   EXPECTED_KEYS = {u'id', u'message', u'task_id'}
 
   @auth.require(acl.is_bot)
   def post(self, task_id=None):
     request = self.parse_body()
+    bot_id = request.get('id')
+    task_id = request.get('task_id', '')
+    message = request.get('message', 'unknown')
+
+    bot_management.bot_event(
+        event_type='task_error', bot_id=bot_id,
+        external_ip=self.request.remote_addr, dimensions=None, state=None,
+        version=None, quarantined=None, task_id=task_id, task_name=None,
+        error=message)
+
     msg = log_unexpected_keys(
         self.EXPECTED_KEYS, request, self.request, 'bot', 'keys')
-
-    ereporter2.log(source='bot', message=request.get('message', 'unknown'))
+    ereporter2.log(source='bot', message=message)
     if msg:
       self.abort_with_error(400, error=msg)
 
-    bot_id = request['id']
-    task_id = request['task_id']
     run_result = task_result.unpack_run_result_key(task_id).get()
     if run_result.bot_id != bot_id:
       msg = 'Bot %s sent task kill for task %s owned by bot %s' % (
