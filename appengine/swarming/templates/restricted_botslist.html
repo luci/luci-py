@@ -74,21 +74,16 @@ Sort By:
     summary="This table lists all machines that have polled this server">
   <thead>
     <th>ID</th>
-    <th>Task</th>
     <th>Last Seen</th>
     <th>Dimensions</th>
     <th>State</th>
     <th>Version</th>
+    <th>Task</th>
   </thead>
   <tbody>
     {% for bot in bots %}
       <tr class="request {% if bot.is_dead(now) %}dead_machine{% endif %}">
-        <td>{{bot_view.bot_link(bot.id, is_privileged_user)}}</td>
-        <td>
-          {% if bot.task %}
-          <a href="/user/task/{{bot.task_id}}">{{bot.task_name}}</a>
-          {% else %}&#8209;&#8209;{% endif%}
-        </td>
+        <td nowrap>{{bot_view.bot_link(bot.id, is_privileged_user)}}</td>
         <td>
           {{(now-bot.last_seen_ts)|timedeltaformat}}
           {% if is_admin and bot.is_dead(now) %}
@@ -99,10 +94,15 @@ Sort By:
             </form>
           {% endif %}
         </td>
-        <td>{{bot_view.render_dict(bot.dimensions)}}</td>
-        <td>{{bot_view.render_dict(bot.state)}}</td>
+        <td nowrap>{{bot_view.render_dict(bot.dimensions)}}</td>
+        <td nowrap>{{bot_view.render_dict(bot.state)}}</td>
         <td {%if bot.version != current_version%}class="bad_version"{%endif%}>
           {{bot.version[:8]}}
+        </td>
+        <td>
+          {% if bot.task %}
+          <a href="/user/task/{{bot.task_id}}">{{bot.task_name}}</a>
+          {% else %}&#8209;&#8209;{% endif%}
         </td>
       </tr>
     {% endfor %}

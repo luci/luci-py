@@ -120,7 +120,7 @@ class TestOsUtilities(auto_stub.TestCase):
 
   def test_get_state(self):
     actual = os_utilities.get_state()
-    expected = set(['disk', 'ip', 'ram', 'running_time', 'started_ts'])
+    expected = set(['disk', 'gpu', 'ip', 'ram', 'running_time', 'started_ts'])
     self.assertEqual(expected, set(actual))
 
   def test_get_adb_list_devices(self):

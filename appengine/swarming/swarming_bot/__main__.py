@@ -34,7 +34,9 @@ THIS_FILE = os.path.abspath(zip_package.get_main_script_path())
 def CMDattributes(_args):
   """Prints out the bot's attributes."""
   import bot_main
-  json.dump(bot_main.get_attributes(), sys.stdout, indent=2, sort_keys=True)
+  json.dump(
+      bot_main.get_attributes(), sys.stdout, indent=2, sort_keys=True,
+      separators=(',', ': '))
   print('')
   return 0
 

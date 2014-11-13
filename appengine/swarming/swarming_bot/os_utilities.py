@@ -24,6 +24,7 @@ import platform
 import re
 import shlex
 import socket
+import string
 import subprocess
 import sys
 import time
@@ -32,13 +33,13 @@ try:
   # The reason for this try/except is so someone can copy this single file on a
   # new machine and execute it as-is to get the dimensions that would be set.
   from utils import file_path
+  from utils import tools
   from utils import zip_package
 
   THIS_FILE = os.path.abspath(zip_package.get_main_script_path() or __file__)
 except ImportError:
   THIS_FILE = os.path.abspath(__file__)
-
-ROOT_DIR = os.path.dirname(THIS_FILE)
+  tools = None
 
 
 # Properties from an android device that should be kept as dimension.
@@ -62,6 +63,14 @@ ANDROID_DETAILS = frozenset(
 
 
 _STARTED_TS = time.time()
+
+
+# Make cached a no-op when client/utils/tools.py is unavailable.
+if not tools:
+  def cached(func):
+    return func
+else:
+  cached = tools.cached
 
 
 def _write(filepath, content):
@@ -171,7 +180,8 @@ def _generate_launchd_plist(command, cwd, plistname):
 
 
 def _get_gpu_linux():
-  """Returns video device as listed by 'lspci'. See get_gpu()."""
+  """Returns video device as listed by 'lspci'. See get_gpu().
+  """
   try:
     pci_devices = subprocess.check_output(
         ['lspci', '-mm', '-nn'], stderr=subprocess.PIPE).splitlines()
@@ -179,9 +189,10 @@ def _get_gpu_linux():
     # It normally happens on Google Compute Engine as lspci is not installed by
     # default and on ARM since they do not have a PCI bus. In either case, we
     # don't care about the GPU.
-    return None
+    return None, None
 
-  out = set()
+  dimensions = set()
+  state = set()
   re_id = re.compile(r'^(.+?) \[([0-9a-f]{4})\]$')
   for pci_device in pci_devices:
     # Bus, Type, Vendor [ID], Device [ID], extra...
@@ -192,42 +203,54 @@ def _get_gpu_linux():
       vendor = re_id.match(line[2])
       device = re_id.match(line[3])
       ven_id = vendor.group(2)
-      out.add(ven_id)
-      out.add('%s:%s' % (ven_id, device.group(2)))
-      out.add('%s %s' % (vendor.group(1), device.group(1)))
-  return sorted(out)
+      dimensions.add(ven_id)
+      dimensions.add('%s:%s' % (ven_id, device.group(2)))
+      state.add('%s %s' % (vendor.group(1), device.group(1)))
+  return sorted(dimensions), sorted(state)
+
+
+@cached
+def _get_SPDisplaysDataType_osx():
+  """Returns an XML about the system display properties."""
+  import plistlib
+  sp = subprocess.check_output(
+      ['system_profiler', 'SPDisplaysDataType', '-xml'])
+  return plistlib.readPlistFromString(sp)[0]['_items']
 
 
 def _get_gpu_osx():
   """Returns video device as listed by 'system_profiler'. See get_gpu()."""
-  import plistlib
-  sp = subprocess.check_output(
-      ['system_profiler', 'SPDisplaysDataType', '-xml'])
-  pl = plistlib.readPlistFromString(sp)
-  try:
-    out = set()
-    for card in pl[0]['_items']:
-      # Warning: the value provided depends on the driver manufacturer.
-      # Other interesting values: spdisplays_vram, spdisplays_revision-id
-      ven_id = 'UNKNOWN'
-      if 'spdisplays_vendor-id' in card:
-        # NVidia
-        ven_id = card['spdisplays_vendor-id'][2:]
-      elif 'spdisplays_vendor' in card:
-        # Intel and ATI
-        match = re.search(r'\(0x([0-9a-f]{4})\)', card['spdisplays_vendor'])
-        if match:
-          ven_id = match.group(1)
-      dev_id = card['spdisplays_device-id'][2:]
-      out.add(ven_id)
-      out.add('%s:%s' % (ven_id, dev_id))
+  dimensions = set()
+  state = set()
+  for card in _get_SPDisplaysDataType_osx():
+    # Warning: the value provided depends on the driver manufacturer.
+    # Other interesting values: spdisplays_vram, spdisplays_revision-id
+    ven_id = 'UNKNOWN'
+    if 'spdisplays_vendor-id' in card:
+      # NVidia
+      ven_id = card['spdisplays_vendor-id'][2:]
+    elif 'spdisplays_vendor' in card:
+      # Intel and ATI
+      match = re.search(r'\(0x([0-9a-f]{4})\)', card['spdisplays_vendor'])
+      if match:
+        ven_id = match.group(1)
+    dev_id = card['spdisplays_device-id'][2:]
+    dimensions.add(ven_id)
+    dimensions.add('%s:%s' % (ven_id, dev_id))
 
-      # VMWare doesn't set it.
-      if 'sppci_model' in card:
-        out.add(card['sppci_model'])
-    return sorted(out)
-  except KeyError:
-    return None
+    # VMWare doesn't set it.
+    if 'sppci_model' in card:
+      state.add(card['sppci_model'])
+  return sorted(dimensions), sorted(state)
+
+
+def _get_monitor_hidpi_osx():
+  """Returns True if the monitor is hidpi."""
+  return any(
+    any(m['spdisplays_retina'] == 'spdisplays_yes'
+        for m in card['spdisplays_ndrvs'])
+    for card in _get_SPDisplaysDataType_osx()
+    if 'spdisplays_ndrvs' in card)
 
 
 def _get_gpu_win():
@@ -239,16 +262,17 @@ def _get_gpu_win():
     # installed by Swarming devs. If you find yourself needing it to run without
     # pywin32, for example in cygwin, please send us a CL with the
     # implementation that doesn't use pywin32.
-    return None
+    return None, None
 
   wmi_service = win32com.client.Dispatch('WbemScripting.SWbemLocator')
   wbem = wmi_service.ConnectServer('.', 'root\\cimv2')
-  out = set()
+  dimensions = set()
+  state = set()
   # https://msdn.microsoft.com/library/aa394512.aspx
   for device in wbem.ExecQuery('SELECT * FROM Win32_VideoController'):
     vp = device.VideoProcessor
     if vp:
-      out.add(vp)
+      state.add(vp)
 
     # The string looks like:
     #  PCI\VEN_15AD&DEV_0405&SUBSYS_040515AD&REV_00\3&2B8E0B4B&0&78
@@ -261,9 +285,51 @@ def _get_gpu_win():
     match = re.search(r'DEV_([0-9A-F]{4})', pnp_string)
     if match:
       dev_id = match.group(1).lower()
-    out.add(ven_id)
-    out.add('%s:%s' % (ven_id, dev_id))
-  return sorted(out)
+    dimensions.add(ven_id)
+    dimensions.add('%s:%s' % (ven_id, dev_id))
+  return sorted(dimensions), sorted(state)
+
+
+@cached
+def _get_mount_points_win():
+  """Returns the list of 'fixed' drives in format 'X:\\'."""
+  ctypes.windll.kernel32.GetDriveTypeW.argtypes = (ctypes.c_wchar_p,)
+  ctypes.windll.kernel32.GetDriveTypeW.restype = ctypes.c_ulong
+  DRIVE_FIXED = 3
+  # https://msdn.microsoft.com/library/windows/desktop/aa364939.aspx
+  return [
+    letter + ':\\'
+    for letter in string.lowercase
+    if ctypes.windll.kernel32.GetDriveTypeW(letter + ':\\') == DRIVE_FIXED
+  ]
+
+
+def _get_free_space_on_drive_win(mount_point):
+  """Returns free space on a mount point in Mb."""
+  free_bytes = ctypes.c_ulonglong(0)
+  ctypes.windll.kernel32.GetDiskFreeSpaceExW(
+      ctypes.c_wchar_p(mount_point), None, None, ctypes.pointer(free_bytes))
+  return int(round(free_bytes.value / 1024. / 1024.))
+
+
+def _get_free_space_on_disks_win():
+  """Returns free space on all mount point in Mb."""
+  return dict(
+      (p, _get_free_space_on_drive_win(p)) for p in _get_mount_points_win())
+
+
+def _get_free_space_on_disks_posix():
+  """Returns free space on all mount point in Mb."""
+  # A bit cheezy but works well.
+  proc = subprocess.Popen(
+      ['/bin/df', '-k', '-P'], env={'LANG': 'C'},
+      stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+  out = {}
+  for l in proc.communicate()[0].splitlines():
+    if l.startswith('/dev/'):
+      items = l.split()
+      out[items[5]] = int(round(int(items[3]) / 1024.))
+  return out
 
 
 def _safe_read(filepath):
@@ -278,6 +344,7 @@ def _safe_read(filepath):
 ### Public API.
 
 
+@cached
 def get_os_version():
   """Returns the normalized OS version as a string.
 
@@ -313,6 +380,7 @@ def get_os_version():
   return None
 
 
+@cached
 def get_os_name():
   """Returns standardized OS name.
 
@@ -342,6 +410,7 @@ def get_os_name():
   return sys.platform
 
 
+@cached
 def get_cpu_type():
   """Returns the type of processor: arm or x86."""
   machine = platform.machine().lower()
@@ -350,6 +419,7 @@ def get_cpu_type():
   return machine
 
 
+@cached
 def get_cpu_bitness():
   """Returns the number of bits in the CPU architecture as a str: 32 or 64.
 
@@ -422,6 +492,7 @@ def get_num_processors():
       return 0
 
 
+@cached
 def get_physical_ram():
   """Returns the amount of installed RAM in Mb, rounded to the nearest number.
   """
@@ -474,44 +545,52 @@ def get_physical_ram():
 
 
 def get_free_disk():
-  """Gets free disk space in the partition containing the current file in Mb."""
+  """Gets free disk space in all partitions in Mb."""
   if sys.platform == 'win32':
-    free_bytes = ctypes.c_ulonglong(0)
-    ctypes.windll.kernel32.GetDiskFreeSpaceExW(
-        ctypes.c_wchar_p(ROOT_DIR), None, None, ctypes.pointer(free_bytes))
-    return int(round(free_bytes.value / 1024. / 1024.))
-
-  f = os.statvfs(ROOT_DIR)  # pylint: disable=E1101
-  return int(round(f.f_bfree * f.f_frsize / 1024. / 1024.))
+    return _get_free_space_on_disks_win()
+  return _get_free_space_on_disks_posix()
 
 
+@cached
 def get_gpu():
   """Returns the installed video card(s) name.
 
   Returns:
     All the video cards detected.
+    tuple(list(dimensions), list(state)).
 
   TODO(maruel): Add custom processing to normalize the string as much as
   possible but differences will occur between OSes.
   """
-  result = None
   if sys.platform == 'darwin':
-    result = _get_gpu_osx()
+    dimensions, state = _get_gpu_osx()
   elif sys.platform == 'linux2':
-    result = _get_gpu_linux()
+    dimensions, state = _get_gpu_linux()
   elif sys.platform == 'win32':
-    result =  _get_gpu_win()
+    dimensions, state = _get_gpu_win()
+  else:
+    dimensions, state = None
 
   # 15ad is VMWare. It's akin not having a GPU card.
-  result = result or ['none']
-  if '15ad' in result:
-    result.append('none')
-  return result
+  dimensions = dimensions or ['none']
+  if '15ad' in dimensions:
+    dimensions.append('none')
+    dimensions.sort()
+  return dimensions, state
+
+
+@cached
+def get_monitor_hidpi():
+  """Returns True if there is an hidpi monitor detected."""
+  if sys.platform == 'darwin':
+    return [_get_monitor_hidpi_osx()]
+  return None
 
 
 ### Windows.
 
 
+@cached
 def get_integrity_level_win():
   """Returns the integrity level of the current process as a string.
 
@@ -700,7 +779,7 @@ def get_dimensions():
       cpu_type,
       cpu_type + '-' + cpu_bitness,
     ],
-    'gpu': get_gpu(),
+    'gpu': get_gpu()[0],
     'hostname': [get_hostname()],
     'id': [get_hostname_short()],
     'os': [
@@ -708,6 +787,10 @@ def get_dimensions():
       os_name + '-' + os_version,
     ],
   }
+  if 'none' not in dimensions['gpu']:
+    hidpi = get_monitor_hidpi()
+    if hidpi:
+      dimensions['hidpi'] = hidpi
 
   if cpu_type.startswith('arm') and cpu_type != 'arm':
     dimensions['cpu'].append('arm')
@@ -740,16 +823,14 @@ def get_state():
   # TODO(vadimsh): Send 'uptime', number of open file descriptors, processes or
   # any other leaky resources. So that the server can decided to reboot the bot
   # to clean up.
-  # TODO(maruel): Change 'disk' to report every mounted partition.
   return {
     'disk': get_free_disk(),
+    'gpu': get_gpu()[1],
     'ip': get_ip(),
     'ram': get_physical_ram(),
     'running_time': int(round(time.time() - _STARTED_TS)),
     'started_ts': int(round(_STARTED_TS)),
   }
-
-
 
 
 def rmtree(path):
@@ -883,7 +964,7 @@ def main():
     'dimensions': get_dimensions(),
     'state': get_state(),
   }
-  json.dump(data, sys.stdout, indent=2, sort_keys=True)
+  json.dump(data, sys.stdout, indent=2, sort_keys=True, separators=(',', ': '))
   print('')
   return 0
 
