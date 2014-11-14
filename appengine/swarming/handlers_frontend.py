@@ -170,7 +170,7 @@ class BotsListHandler(auth.AuthenticatingHandler):
   """Presents the list of known bots."""
   ACCEPTABLE_BOTS_SORTS = {
     'last_seen_ts': 'Last Seen',
-    'quarantined': 'Quarantined',
+    '-quarantined': 'Quarantined',
     '__key__': 'ID',
   }
   SORT_OPTIONS = [
@@ -185,8 +185,12 @@ class BotsListHandler(auth.AuthenticatingHandler):
     if sort_by not in self.ACCEPTABLE_BOTS_SORTS:
       self.abort(400, 'Invalid sort_by query parameter')
 
-    order = datastore_query.PropertyOrder(
-        sort_by, datastore_query.PropertyOrder.ASCENDING)
+    if sort_by[0] == '-':
+      order = datastore_query.PropertyOrder(
+          sort_by[1:], datastore_query.PropertyOrder.DESCENDING)
+    else:
+      order = datastore_query.PropertyOrder(
+          sort_by, datastore_query.PropertyOrder.ASCENDING)
 
     now = utils.utcnow()
     cutoff = now - bot_management.BOT_DEATH_TIMEOUT
@@ -194,6 +198,8 @@ class BotsListHandler(auth.AuthenticatingHandler):
     num_total_bots_future = bot_management.BotInfo.query().count_async()
     num_dead_bots_future = bot_management.BotInfo.query(
         bot_management.BotInfo.last_seen_ts < cutoff).count_async()
+    num_quarantined_bots_future = bot_management.BotInfo.query(
+        bot_management.BotInfo.quarantined == True).count_async()
     fetch_future = bot_management.BotInfo.query().order(order).fetch_page_async(
         limit, start_cursor=cursor)
 
@@ -208,6 +214,7 @@ class BotsListHandler(auth.AuthenticatingHandler):
     ndb.get_multi(tasks)
     num_total_bots = num_total_bots_future.get_result()
     num_dead_bots = num_dead_bots_future.get_result()
+    num_quarantined_bots = num_quarantined_bots_future.get_result()
     params = {
       'bots': bots,
       'current_version': version,
@@ -218,6 +225,7 @@ class BotsListHandler(auth.AuthenticatingHandler):
       'now': now,
       'num_bots_alive': num_total_bots - num_dead_bots,
       'num_bots_dead': num_dead_bots,
+      'num_bots_quarantined': num_quarantined_bots,
       'sort_by': sort_by,
       'sort_options': self.SORT_OPTIONS,
       'xsrf_token': self.generate_xsrf_token(),

@@ -830,6 +830,7 @@ def get_state(threshold_mb=2*1024, skip=None):
   # any other leaky resources. So that the server can decided to reboot the bot
   # to clean up.
   state = {
+    'cwd': os.getcwd(),
     'disk': get_free_disk(),
     'gpu': get_gpu()[1],
     'ip': get_ip(),
