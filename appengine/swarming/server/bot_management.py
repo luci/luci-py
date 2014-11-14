@@ -144,23 +144,16 @@ class BotEvent(_BotCommon):
   This entity is created on each bot state transition.
   """
   ALLOWED_EVENTS = {
-    'connected', 'error', 'rebooting', 'request_restart', 'request_update',
-    'request_sleep', 'request_task', 'task_completed', 'task_error',
-    'task_update',
+    'bot_connected', 'bot_error', 'bot_rebooting',
+    'request_restart', 'request_update', 'request_sleep', 'request_task',
+    'task_completed', 'task_error', 'task_update',
   }
   # Common properties for all events (which includes everything in _BotCommon).
   ts = ndb.DateTimeProperty(auto_now=True)
   event_type = ndb.StringProperty(choices=ALLOWED_EVENTS)
 
-  # event_type == 'error'. This replaces ereporter2 error reporting.
-  error = ndb.StringProperty(indexed=False)
-
-  # event_type == 'request_restart' or 'rebooting'.
-  reboot_reason = ndb.StringProperty(indexed=False)
-
-  @property
-  def extra(self):
-    return self.error or self.reboot_reason
+  # event_type == 'bot_error', 'request_restart' or 'bot_rebooting'
+  message = ndb.TextProperty()
 
   @property
   def previous_key(self):

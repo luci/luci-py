@@ -78,17 +78,20 @@ class Bot(object):
     """Absolute path to the swarming_bot.zip file."""
     return THIS_FILE
 
-  def post_error(self, error):
+  def post_event(self, event_type, message):
+    """Posts an event to the server."""
+    data = self._attributes.copy()
+    data['event'] = event_type
+    data['message'] = message
+    self._remote.url_read_json('/swarming/api/v1/bot/event', data=data)
+
+  def post_error(self, message):
     """Posts given string as a failure.
 
     This is used in case of internal code error.
     """
-    logging.error('Error: %s\n%s', self._attributes, error)
-    data = {
-      'id': self._attributes['id'],
-      'message': error,
-    }
-    return self._remote.url_read_json('/swarming/api/v1/bot/error', data=data)
+    logging.error('Error: %s\n%s', self._attributes, message)
+    self.post_event('bot_error', message)
 
   def restart(self, message):
     """Reboots the machine.
@@ -99,7 +102,7 @@ class Bot(object):
     If reboot fails, logs the error to the server and moves the bot to
     quarantined mode.
     """
-    # TODO(maruel): Notify the server that the bot is rebooting.
+    self.post_event('bot_rebooting', message)
     # os_utilities.restart should never return, unless restart is not happening.
     # If restart is taking longer than N minutes, it probably not going to
     # finish at all. Report this to the server.

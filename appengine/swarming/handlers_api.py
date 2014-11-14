@@ -440,7 +440,7 @@ class _BotBaseHandler(auth.ApiHandler):
     Does one DB synchronous GET.
 
     Returns:
-      tuple(bot_id, version, state, dimensions, quarantined)
+      tuple(request, bot_id, version, state, dimensions, quarantined)
     """
     request = self.parse_body()
     version = request.get('version', None)
@@ -460,18 +460,18 @@ class _BotBaseHandler(auth.ApiHandler):
         bool(state.get('quarantined'))):
       # Not worth checking the properties if the bot self-quarantined. It's just
       # noise.
-      return bot_id, version, state, dimensions, True
+      return request, bot_id, version, state, dimensions, True
 
     if log_unexpected_keys(
         self.EXPECTED_KEYS, request, self.request, 'bot', 'keys'):
-      return bot_id, version, state, dimensions, True
+      return request, bot_id, version, state, dimensions, True
 
     if log_missing_keys(
         self.REQUIRED_STATE_KEYS, state, self.request, 'bot', 'state'):
-      return bot_id, version, state, dimensions, True
+      return request, bot_id, version, state, dimensions, True
 
     if not bot_id:
-      return bot_id, version, state, dimensions, True
+      return request, bot_id, version, state, dimensions, True
 
     if not all(
         isinstance(key, unicode) and
@@ -483,7 +483,7 @@ class _BotBaseHandler(auth.ApiHandler):
           self.request,
           source='bot',
           message='Invalid dimensions on bot')
-      return bot_id, version, state, dimensions, True
+      return request, bot_id, version, state, dimensions, True
 
     dimensions_count = task_to_run.dimensions_powerset_count(dimensions)
     if dimensions_count > task_to_run.MAX_DIMENSIONS:
@@ -492,12 +492,12 @@ class _BotBaseHandler(auth.ApiHandler):
           self.request,
           source='bot',
           message='Too many dimensions (%d) on bot' % dimensions_count)
-      return bot_id, version, state, dimensions, True
+      return request, bot_id, version, state, dimensions, True
 
     # Look for admin enforced quarantine.
     bot_settings = bot_management.get_settings_key(bot_id).get()
     quarantined = bool(bot_settings and bot_settings.quarantined)
-    return bot_id, version, state, dimensions, quarantined
+    return request, bot_id, version, state, dimensions, quarantined
 
 
 class BotHandshakeHandler(_BotBaseHandler):
@@ -525,9 +525,9 @@ class BotHandshakeHandler(_BotBaseHandler):
   @auth.require_xsrf_token_request
   @auth.require(acl.is_bot)
   def post(self):
-    bot_id, version, state, dimensions, quarantined = self._process()
+    _request, bot_id, version, state, dimensions, quarantined = self._process()
     bot_management.bot_event(
-        event_type='connected', bot_id=bot_id,
+        event_type='bot_connected', bot_id=bot_id,
         external_ip=self.request.remote_addr, dimensions=dimensions,
         state=state, version=version, quarantined=quarantined, task_id='',
         task_name=None)
@@ -560,7 +560,7 @@ class BotPollHandler(_BotBaseHandler):
 
     It makes recovery of the fleet in case of catastrophic failure much easier.
     """
-    bot_id, version, state, dimensions, quarantined = self._process()
+    _request, bot_id, version, state, dimensions, quarantined = self._process()
     sleep_streak = state.get('sleep_streak', 0)
 
     # Note bot existence at two places, one for stats at 1 minute resolution,
@@ -672,12 +672,9 @@ class BotPollHandler(_BotBaseHandler):
 class BotErrorHandler(auth.ApiHandler):
   """Specialized version of ereporter2's /ereporter2/api/v1/on_error.
 
-  This formally quarantines the bot and sends an alert to the admins. It is
-  meant to be used by bot_main.py for non-recoverable issues, for example when
-  failing to self update.
+  TODO(maruel): To be deleted.
   """
 
-  # TODO(maruel): Use _BotBaseHandler
   EXPECTED_KEYS = {u'id', u'message'}
 
   @auth.require(acl.is_bot)
@@ -689,12 +686,34 @@ class BotErrorHandler(auth.ApiHandler):
     bot_id = request.get('id')
     if bot_id:
       bot_management.bot_event(
-          event_type='error', bot_id=bot_id,
+          event_type='bot_error', bot_id=bot_id,
           external_ip=self.request.remote_addr, dimensions=None, state=None,
           version=None, quarantined=None, task_id=None, task_name=None,
-          error=message)
+          message=message)
 
     # Also log inconditionally an ereporter2 event.
+    ereporter2.log(source='bot', message=message)
+    self.send_response({})
+
+
+class BotEventHandler(_BotBaseHandler):
+  """On signal that a bot had an event worth logging."""
+
+  EXPECTED_KEYS = _BotBaseHandler.EXPECTED_KEYS | {u'event', u'message'}
+
+  @auth.require(acl.is_bot)
+  def post(self):
+    request, bot_id, version, state, dimensions, quarantined = self._process()
+    event = request.get('event')
+    if event not in ('bot_error', 'bot_rebooting'):
+      self.abort_with_error(400, error='Unsupported event type')
+    message = request.get('message')
+    bot_management.bot_event(
+        event_type=event, bot_id=bot_id, external_ip=self.request.remote_addr,
+        dimensions=dimensions, state=state, version=version,
+        quarantined=quarantined, task_id=None, task_name=None, message=message)
+
+    # Also log unconditionally an ereporter2 event.
     ereporter2.log(source='bot', message=message)
     self.send_response({})
 
@@ -789,7 +808,7 @@ class BotTaskErrorHandler(auth.ApiHandler):
         event_type='task_error', bot_id=bot_id,
         external_ip=self.request.remote_addr, dimensions=None, state=None,
         version=None, quarantined=None, task_id=task_id, task_name=None,
-        error=message)
+        message=message)
 
     msg = log_unexpected_keys(
         self.EXPECTED_KEYS, request, self.request, 'bot', 'keys')
@@ -849,6 +868,7 @@ def get_routes():
       ('/get_slave_code/<version:[0-9a-f]{40}>', GetSlaveCodeHandler),
       ('/server_ping', ServerPingHandler),
       ('/swarming/api/v1/bot/error', BotErrorHandler),
+      ('/swarming/api/v1/bot/event', BotEventHandler),
       ('/swarming/api/v1/bot/handshake', BotHandshakeHandler),
       ('/swarming/api/v1/bot/poll', BotPollHandler),
       ('/swarming/api/v1/bot/task_update', BotTaskUpdateHandler),

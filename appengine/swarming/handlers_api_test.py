@@ -290,6 +290,52 @@ class BotApiTest(AppTestBase):
     }
     self.assertEqual(expected, response)
 
+  def test_bot_event(self):
+    self.mock(random, 'getrandbits', lambda _: 0x88)
+    now = datetime.datetime(2010, 1, 2, 3, 4, 5)
+    self.mock_now(now)
+    token, params = self.get_bot_token()
+    params['event'] = 'bot_rebooting'
+    params['message'] = 'for the best'
+    response = self.post_with_token('/swarming/api/v1/bot/event', params, token)
+    self.assertEqual({}, response)
+
+    # TODO(maruel): Replace with client api to query last BotEvent.
+    actual = [e.to_dict() for e in bot_management.get_events_query('bot1')]
+    expected = [
+      {
+        'dimensions': {u'id': [u'bot1'], u'os': [u'Amiga']},
+        'event_type': u'bot_rebooting',
+        'external_ip': u'192.168.2.2',
+        'message': u'for the best',
+        'quarantined': False,
+        'state': {
+          u'running_time': 1234.0,
+          u'sleep_streak': 0,
+          u'started_ts': 1410990411.111,
+        },
+        'task_id': u'',
+        'ts': now,
+        'version': self.bot_version,
+      },
+      {
+        'dimensions': {u'id': [u'bot1'], u'os': [u'Amiga']},
+        'event_type': u'bot_connected',
+        'external_ip': u'192.168.2.2',
+        'message': None,
+        'quarantined': False,
+        'state': {
+          u'running_time': 1234.0,
+          u'sleep_streak': 0,
+          u'started_ts': 1410990411.111,
+        },
+        'task_id': u'',
+        'ts': now,
+        'version': u'123',
+      },
+    ]
+    self.assertEqual(expected, actual)
+
   def test_update(self):
     # Runs a task with 2 commands up to completion.
     self.mock(random, 'getrandbits', lambda _: 0x88)
@@ -1009,7 +1055,7 @@ class ClientApiTest(AppTestBase):
     now = datetime.datetime(2000, 1, 2, 3, 4, 5, 6)
     self.mock_now(now)
     bot_management.bot_event(
-        event_type='connected', bot_id='id1', external_ip='8.8.4.4',
+        event_type='bot_connected', bot_id='id1', external_ip='8.8.4.4',
         dimensions={'foo': ['bar'], 'id': ['id1']}, state={'ram': 65},
         version='123456789', quarantined=False, task_id=None, task_name=None)
 
@@ -1044,7 +1090,7 @@ class ClientApiTest(AppTestBase):
     self.assertEqual(expected, actual)
 
     bot_management.bot_event(
-        event_type='connected', bot_id='id2', external_ip='8.8.4.4',
+        event_type='bot_connected', bot_id='id2', external_ip='8.8.4.4',
         dimensions={'foo': ['bar'], 'id': ['id2']}, state={'ram': 65},
         version='123456789', quarantined=False, task_id=None, task_name=None)
 
@@ -1068,7 +1114,7 @@ class ClientApiTest(AppTestBase):
     now = datetime.datetime(2000, 1, 2, 3, 4, 5, 6)
     self.mock_now(now)
     bot_management.bot_event(
-        event_type='connected', bot_id='id1', external_ip='8.8.4.4',
+        event_type='bot_connected', bot_id='id1', external_ip='8.8.4.4',
         dimensions={'foo': ['bar'], 'id': ['id1']}, state={'ram': 65},
         version='123456789', quarantined=False, task_id=None, task_name=None)
 
@@ -1099,7 +1145,7 @@ class ClientApiTest(AppTestBase):
       'str': u'uni',
     }
     bot_management.bot_event(
-        event_type='connected', bot_id='id1', external_ip='8.8.4.4',
+        event_type='bot_connected', bot_id='id1', external_ip='8.8.4.4',
         dimensions={'foo': ['bar'], 'id': ['id1']}, state=state,
         version='123456789', quarantined=False, task_id=None, task_name=None)
 

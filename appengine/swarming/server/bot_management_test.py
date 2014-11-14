@@ -26,7 +26,7 @@ class BotManagementTest(test_case.TestCase):
     now = datetime.datetime(2010, 1, 2, 3, 4, 5, 6)
     self.mock_now(now)
     bot_management.bot_event(
-        event_type='connected', bot_id='id1', external_ip='8.8.4.4',
+        event_type='bot_connected', bot_id='id1', external_ip='8.8.4.4',
         dimensions={'id': ['id1'], 'foo': ['bar']}, state={'ram': 65},
         version=hashlib.sha1().hexdigest(), quarantined=False, task_id=None,
         task_name=None)
@@ -50,10 +50,9 @@ class BotManagementTest(test_case.TestCase):
     expected = [
       {
       'dimensions': {u'foo': [u'bar'], u'id': [u'id1']},
-      'error': None,
-      'event_type': u'connected',
+      'event_type': u'bot_connected',
       'external_ip': u'8.8.4.4',
-      'reboot_reason': None,
+      'message': None,
       'quarantined': False,
       'state': {u'ram': 65},
       'task_id': None,

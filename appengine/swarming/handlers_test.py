@@ -58,11 +58,11 @@ class FrontendTest(AppTestBase):
       'str': u'uni',
     }
     bot_management.bot_event(
-        event_type='connected', bot_id='id1', external_ip='8.8.4.4',
+        event_type='bot_connected', bot_id='id1', external_ip='8.8.4.4',
         dimensions={'id': ['id1']}, state=state, version='123456789',
         quarantined=False, task_id=None, task_name=None)
     bot_management.bot_event(
-        event_type='connected', bot_id='id2', external_ip='8.8.8.8',
+        event_type='bot_connected', bot_id='id2', external_ip='8.8.8.8',
         dimensions={'id': ['id2']}, state={'ram': 65}, version='123456789',
         quarantined=False, task_id=None, task_name=None)
 
@@ -73,7 +73,7 @@ class FrontendTest(AppTestBase):
     self.set_as_admin()
 
     bot_management.bot_event(
-        event_type='connected', bot_id='id1', external_ip='8.8.4.4',
+        event_type='bot_connected', bot_id='id1', external_ip='8.8.4.4',
         dimensions={'id': ['id1']}, state={'foo': 'bar'}, version='123456789',
         quarantined=False, task_id=None, task_name=None)
     response = self.app.get('/restricted/bots', status=200)

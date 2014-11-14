@@ -124,7 +124,7 @@
           <th>Type</th>
           <th>Quarantined</th>
           <th>Task</th>
-          <th>Extra</th>
+          <th>Msg</th>
           <th>Version</th>
         </tr>
       </thead>
@@ -146,8 +146,8 @@
             {% endif %}
           </td>
           <td>
-            {% if event.extra %}
-              {{event.extra}}
+            {% if event.message %}
+              {{event.message}}
             {% else %}
               &#8209;&#8209;
             {% endif %}
