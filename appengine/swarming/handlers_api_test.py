@@ -262,6 +262,10 @@ class BotApiTest(AppTestBase):
 
   def test_bot_error(self):
     self.mock(random, 'getrandbits', lambda _: 0x88)
+    errors = []
+    self.mock(
+        ereporter2, 'log_request',
+        lambda *args, **kwargs: errors.append((args, kwargs)))
     token, params = self.get_bot_token()
     response = self.post_with_token('/swarming/api/v1/bot/poll', params, token)
     self.assertTrue(response.pop(u'duration'))
@@ -289,6 +293,7 @@ class BotApiTest(AppTestBase):
       u'quarantined': False,
     }
     self.assertEqual(expected, response)
+    self.assertEqual(1, len(errors))
 
   def test_bot_event(self):
     self.mock(random, 'getrandbits', lambda _: 0x88)
@@ -470,6 +475,10 @@ class BotApiTest(AppTestBase):
     now = datetime.datetime(2010, 1, 2, 3, 4, 5)
     self.mock_now(now)
     str_now = unicode(now.strftime(utils.DATETIME_FORMAT))
+    errors = []
+    self.mock(
+        ereporter2, 'log_request',
+        lambda *args, **kwargs: errors.append((args, kwargs)))
     token, params = self.get_bot_token()
     self.client_create_task()
     response = self.post_with_token(
@@ -505,6 +514,7 @@ class BotApiTest(AppTestBase):
       u'try_number': 1,
     }
     self.assertEqual(expected, response)
+    self.assertEqual(1, len(errors))
 
   def test_get_slave_code(self):
     code = self.app.get('/get_slave_code')

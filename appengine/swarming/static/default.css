@@ -33,10 +33,6 @@ table.alterning_background tbody .request {
   border-bottom-width: 1px;
 }
 
-.dead_machine {
-  background-color: #ffdddd !important;
-}
-
 .failed_test {
   background-color: #ffdddd !important;
 }

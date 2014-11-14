@@ -9,6 +9,7 @@ import textwrap
 
 import webapp2
 
+from google.appengine.api import app_identity
 from google.appengine.api import datastore_errors
 from google.appengine.datastore import datastore_query
 from google.appengine import runtime
@@ -479,19 +480,24 @@ class _BotBaseHandler(auth.ApiHandler):
         all(isinstance(value, unicode) for value in values)
         for key, values in dimensions.iteritems()):
       # It's a big deal, alert the admins.
-      ereporter2.log_request(
-          self.request,
-          source='bot',
-          message='Invalid dimensions on bot')
+      line = (
+          'Bot: https://%s/restricted/bot/%s\n'
+          'Invalid dimensions for bot:\n'
+          '%r') % (
+          app_identity.get_default_version_hostname(), bot_id, dimensions)
+      ereporter2.log_request(self.request, source='bot', message=line)
       return request, bot_id, version, state, dimensions, True
 
     dimensions_count = task_to_run.dimensions_powerset_count(dimensions)
     if dimensions_count > task_to_run.MAX_DIMENSIONS:
       # It's a big deal, alert the admins.
-      ereporter2.log_request(
-          self.request,
-          source='bot',
-          message='Too many dimensions (%d) on bot' % dimensions_count)
+      line = (
+          'Bot: https://%s/restricted/bot/%s\n'
+          'Too high dimensions product (%d) for bot:\n'
+          '%r') % (
+          app_identity.get_default_version_hostname(), bot_id, dimensions_count,
+          dimensions)
+      ereporter2.log_request(self.request, source='bot', message=line)
       return request, bot_id, version, state, dimensions, True
 
     # Look for admin enforced quarantine.
@@ -692,7 +698,12 @@ class BotErrorHandler(auth.ApiHandler):
           message=message)
 
     # Also log inconditionally an ereporter2 event.
-    ereporter2.log(source='bot', message=message)
+    line = (
+        'Bot: https://%s/restricted/bot/%s\n'
+        'Old API error:\n'
+        '%s') % (
+        app_identity.get_default_version_hostname(), bot_id, message)
+    ereporter2.log_request(self.request, source='bot', message=line)
     self.send_response({})
 
 
@@ -713,8 +724,13 @@ class BotEventHandler(_BotBaseHandler):
         dimensions=dimensions, state=state, version=version,
         quarantined=quarantined, task_id=None, task_name=None, message=message)
 
-    # Also log unconditionally an ereporter2 event.
-    ereporter2.log(source='bot', message=message)
+    if event == 'bot_error':
+      line = (
+          'Bot: https://%s/restricted/bot/%s\n'
+          'Bot error:\n'
+          '%s') % (
+          app_identity.get_default_version_hostname(), bot_id, message)
+      ereporter2.log_request(self.request, source='bot', message=line)
     self.send_response({})
 
 
@@ -809,10 +825,17 @@ class BotTaskErrorHandler(auth.ApiHandler):
         external_ip=self.request.remote_addr, dimensions=None, state=None,
         version=None, quarantined=None, task_id=task_id, task_name=None,
         message=message)
+    line = (
+        'Bot: https://%s/restricted/bot/%s\n'
+        'Task failed: https://%s/user/task/%s\n'
+        '%s') % (
+        app_identity.get_default_version_hostname(), bot_id,
+        app_identity.get_default_version_hostname(), task_id,
+        message)
+    ereporter2.log_request(self.request, source='bot', message=line)
 
     msg = log_unexpected_keys(
         self.EXPECTED_KEYS, request, self.request, 'bot', 'keys')
-    ereporter2.log(source='bot', message=message)
     if msg:
       self.abort_with_error(400, error=msg)
 

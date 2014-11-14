@@ -26,8 +26,16 @@
     background-color: #eeffee;
   }
 
-  .bad_version {
+  .bot_bad_version {
     background-color: #ffffee;
+  }
+
+  .bot_dead {
+    background-color: #ffdddd !important;
+  }
+
+  .bot_quarantined {
+    background-color: #ff0303 !important;
   }
 </style>
 
@@ -93,7 +101,7 @@
   </thead>
   <tbody>
     {% for bot in bots %}
-      <tr class="request {% if bot.is_dead(now) %}dead_machine{% endif %}">
+    <tr class="request {% if bot.is_dead(now) %}bot_dead{% elif bot.quarantined %}bot_quarantined{% endif %}">
         <td nowrap>{{bot_view.bot_link(bot.id, is_privileged_user)}}</td>
         <td>
           {{(now-bot.last_seen_ts)|timedeltaformat}}
@@ -107,7 +115,7 @@
         </td>
         <td nowrap>{{bot_view.render_dict(bot.dimensions)}}</td>
         <td nowrap>{{bot_view.render_dict(bot.state)}}</td>
-        <td {%if bot.version != current_version%}class="bad_version"{%endif%}>
+        <td {%if bot.version != current_version%}class="bot_bad_version"{%endif%}>
           {{bot.version[:8]}}
         </td>
         <td>
