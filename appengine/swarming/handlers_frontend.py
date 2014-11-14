@@ -170,6 +170,7 @@ class BotsListHandler(auth.AuthenticatingHandler):
   """Presents the list of known bots."""
   ACCEPTABLE_BOTS_SORTS = {
     'last_seen_ts': 'Last Seen',
+    'quarantined': 'Quarantined',
     '__key__': 'ID',
   }
   SORT_OPTIONS = [

@@ -30,6 +30,12 @@
     background-color: #ffffee;
   }
 </style>
+
+<script>
+  function submit_form() {
+    document.getElementById("order").submit();
+  }
+</script>
 {% endblock %}
 
 
@@ -56,17 +62,18 @@
   </tbody>
 </table>
 <p>
-Sort By:
-<select id="sort" onchange="document.location.href='?sort_by=' + this.value">
+
+<form id="order" name="order" method="GET">
   {% for sort_option in sort_options %}
-    {% if sort_option.key == sort_by %}
-      <option value="{{sort_option.key}}" selected="">{{sort_option.name}}
-      </option>
-    {% else %}
-      <option value="{{sort_option.key}}">{{sort_option.name}}</option>
-    {% endif %}
+    <label>
+      <input type="radio" name="sort_by" value="{{sort_option.key}}"
+          onchange="submit_form()"
+          {% if sort_by == sort_option.key %}checked{%endif%}>
+        {{sort_option.name}}
+      </input>
+    </label>
   {% endfor %}
-</select>
+</form>
 <p>
 
 {% import 'swarming/bot_view.html' as bot_view %}
