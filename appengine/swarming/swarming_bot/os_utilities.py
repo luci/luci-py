@@ -811,7 +811,7 @@ def get_dimensions():
   return dimensions
 
 
-def get_state():
+def get_state(threshold_mb=2*1024, skip=None):
   """Returns dict with a state of the bot reported to the server with each poll.
 
   Supposed to be use only for dynamic state that changes while bot is running.
@@ -819,11 +819,17 @@ def get_state():
   The server can not use this state for immediate scheduling purposes (use
   'dimensions' for that), but it can use it for maintenance and bookkeeping
   tasks.
+
+  Arguments:
+  - threshold_mb: number of mb below which the bot will quarantine itself
+        automatically. Set to 0 or None to disable.
+  - skip: list of partitions to skip for automatic quarantining on low free
+        space.
   """
   # TODO(vadimsh): Send 'uptime', number of open file descriptors, processes or
   # any other leaky resources. So that the server can decided to reboot the bot
   # to clean up.
-  return {
+  state = {
     'disk': get_free_disk(),
     'gpu': get_gpu()[1],
     'ip': get_ip(),
@@ -831,6 +837,27 @@ def get_state():
     'running_time': int(round(time.time() - _STARTED_TS)),
     'started_ts': int(round(_STARTED_TS)),
   }
+  auto_quarantine_on_low_space(state, threshold_mb, skip)
+  return state
+
+
+def auto_quarantine_on_low_space(state, threshold_mb=2*1024, skip=None):
+  """Quarantines when less than threshold_mb on any partition.
+
+  Modifies state in-place. Assumes state['disk'] is valid.
+  """
+  if not threshold_mb or state.get('quarantined'):
+    return
+  if skip is None:
+    # Do not check these mount points for low disk space.
+    skip = ['/boot', '/boot/efi']
+
+  s = []
+  for mount, space_mb in state['disk'].iteritems():
+    if mount not in skip and space_mb < threshold_mb:
+      s.append('Not enough free disk space on %s.' % mount)
+  if s:
+    state['quarantined'] = '\n'.join(s)
 
 
 def rmtree(path):
