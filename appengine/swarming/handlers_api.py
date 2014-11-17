@@ -619,12 +619,16 @@ class BotPollHandler(_BotBaseHandler):
         self._cmd_sleep(sleep_streak, quarantined)
         return
 
-      # This one is tricky since it intentionally runs a transaction after
-      # another one.
-      bot_event(
-          'request_task', task_id=run_result.key_string,
-          task_name=request.name)
-      self._cmd_run(request, run_result.key, bot_id)
+      try:
+        # This one is tricky since it intentionally runs a transaction after
+        # another one.
+        bot_event(
+            'request_task', task_id=run_result.key_string,
+            task_name=request.name)
+        self._cmd_run(request, run_result.key, bot_id)
+      except:
+        logging.exception('Dang, exception after reaping')
+        raise
     except runtime.DeadlineExceededError:
       # If the timeout happened before a task was assigned there is no problems.
       # If the timeout occurred after a task was assigned, that task will
