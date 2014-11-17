@@ -42,46 +42,52 @@ def _secs_to_ms(value):
   return int(round(value * 1000.))
 
 
-def _expire_task(task_key, request):
-  """Expires a task and insert the results entity.
+def _expire_task(to_run_key):
+  """Expires a TaskResultSummary and unschedules the TaskToRun.
 
   Returns:
     True on success.
   """
-  assert request.key == task_to_run.task_to_run_key_to_request_key(task_key)
-  result_summary_future = task_result.request_key_to_result_summary_key(
-      request.key).get_async()
-
   # Look if the TaskToRun is reapable once before doing the check inside the
-  # transaction. This reduces the likelihood of failing this check inside
-  # the transaction, which is an order of magnitude more costly.
-  if not task_to_run.is_task_reapable(task_key, None):
+  # transaction. This reduces the likelihood of failing this check inside the
+  # transaction, which is an order of magnitude more costly.
+  if not to_run_key.get().is_reapable:
     logging.info('Not reapable anymore')
-    result_summary_future.wait()
     return None
 
-  result_summary = result_summary_future.get_result()
+  request_key = task_to_run.task_to_run_key_to_request_key(to_run_key)
+  result_summary_key = task_result.request_key_to_result_summary_key(
+      request_key)
 
   def run():
-    task = task_to_run.is_task_reapable(task_key, None)
-    if not task:
-      return None
-    task.queue_number = None
-    logging.info('Expired')
+    # Fetch the two entities concurrently.
+    to_run_future = to_run_key.get_async()
+    result_summary_future = result_summary_key.get_async()
+    to_run = to_run_future.get_result()
+    if not to_run or not to_run.is_reapable:
+      result_summary_future.wait()
+      return False
+
+    to_run.queue_number = None
+    result_summary = result_summary_future.get_result()
     if result_summary.try_number:
-      # It's a retry that is being expired. Keep the old state.
+      # It's a retry that is being expired. Keep the old state. That requires an
+      # additional pipelined GET but that shouldn't be the common case.
       result_summary.state = result_summary.run_result_key.get().state
     else:
       result_summary.state = task_result.State.EXPIRED
     result_summary.abandoned_ts = utils.utcnow()
-    ndb.put_multi([task, result_summary])
-    return task
+    ndb.put_multi([to_run, result_summary])
+    return True
 
   try:
-    task = ndb.transaction(run)
-    if task:
-      task_to_run.set_lookup_cache(task.key, False)
-    return bool(task)
+    success = ndb.transaction(run)
+    if success:
+      task_to_run.set_lookup_cache(to_run_key, False)
+      logging.info(
+          'Expired %s',
+          task_result.pack_result_summary_key(result_summary_key))
+    return success
   except (
       apiproxy_errors.CancelledError,
       datastore_errors.BadRequestError,
@@ -487,11 +493,11 @@ def cron_abort_expired_task_to_run():
   killed = 0
   skipped = 0
   try:
-    for task in task_to_run.yield_expired_task_to_run():
-      # Create the TaskRunResult and kill it immediately.
-      request = task.request_key.get()
-      if _expire_task(task.key, request):
+    for to_run in task_to_run.yield_expired_task_to_run():
+      request_future = to_run.request_key.get_async()
+      if _expire_task(to_run.key):
         killed += 1
+        request = request_future.get_result()
         stats.add_task_entry(
             'task_request_expired',
             task_result.request_key_to_result_summary_key(
@@ -501,6 +507,7 @@ def cron_abort_expired_task_to_run():
       else:
         # It's not a big deal, the bot will continue running.
         skipped += 1
+        request_future.wait()
   finally:
     # TODO(maruel): Use stats_framework.
     logging.info('Killed %d task, skipped %d', killed, skipped)

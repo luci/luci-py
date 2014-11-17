@@ -72,6 +72,11 @@ class TaskToRun(ndb.Model):
   queue_number = ndb.IntegerProperty()
 
   @property
+  def is_reapable(self):
+    """Returns True if the task is ready to be scheduled."""
+    return bool(self.queue_number)
+
+  @property
   def request_key(self):
     """Returns the TaskRequest ndb.Key that is parent to the task to run."""
     return task_to_run_key_to_request_key(self.key)
