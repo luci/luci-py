@@ -7,42 +7,50 @@
 This module doesn't do the scheduling itself. It only describes the entities to
 store tasks results.
 
-Graph of the schema for TaskResultSummary and TaskRunResult. TaskResultSummary
-represents the overall result for the TaskRequest taking in account retries.
-TaskRunResult represents the result for one 'try'. There can be multiple tries
-for one job, for example if a bot dies.
+- TaskResultSummary represents the overall result for the TaskRequest taking in
+  account retries.
+- TaskRunResult represents the result for one 'try'. There can
+  be multiple tries for one job, for example if a bot dies.
+- The stdout of each command in TaskResult.properties.commands is saved inside
+  TaskOutput.
+- It is chunked in TaskOutputChunk to fit the entity size limit.
 
-The stdout of each command in TaskResult.properties.commands is saved inside
-TaskOutput. It is chunked in TaskOutputChunk to fit the entity size limit.
-
-        <See task_request.py>
-                  ^
-                  |
-        +---------------------+
-        |TaskRequest          |
-        |    +--------------+ |
-        |    |TaskProperties| |
-        |    +--------------+ |
-        +---------------------+
-                   ^
-                   |
-          +-----------------+
-          |TaskResultSummary|
-          +-----------------+
-                ^      ^
-                |      |
-    +-------------+  +-------------+
-    |TaskRunResult|  |TaskRunResult|
-    +-------------+  +-------------+
-                ^
-                |
-              +----------+
-              |TaskOutput|
-              +----------+
-                ^       ^
-                |       |
+Graph of schema:
+               <See task_request.py>
+                         ^
+                         |
+               +---------------------+
+               |TaskRequest          |
+               |    +--------------+ |   (task_request.py)
+               |    |TaskProperties| |
+               |    +--------------+ |
+               |id=<based on epoch>  |
+               +---------------------+
+                          ^
+                          |
+                          |
+                  +-----------------+
+                  |TaskResultSummary|
+                  |id=1             |
+                  +-----------------+
+                       ^          ^
+                       |          |
+                       |          |
+               +-------------+  +-------------+
+               |TaskRunResult|  |TaskRunResult|
+               |id=1 <try #> |  |id=2         |
+               +-------------+  +-------------+
+                ^           ^           ...
+                |           |
+        +----------------+  +----------+
+        |TaskOutput      |  |TaskOutput| ...
+        |id=1 <cmd index>|  |id=2      |
+        +----------------+  +----------+
+                 ^      ^        ...
+                 |      |
     +---------------+  +---------------+
-    |TaskOutputChunk|  |TaskOutputChunk|
+    |TaskOutputChunk|  |TaskOutputChunk| ...
+    |id=1           |  |id=2           |
     +---------------+  +---------------+
 """
 

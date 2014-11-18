@@ -16,12 +16,14 @@ Graph of the schema:
     |    +--------------+ |
     |    |TaskProperties| |
     |    +--------------+ |
+    |id=<based on epoch>  |
     +---------------------+
                ^
                |
-          +---------+
-          |TaskToRun|
-          +---------+
+    +-----------------------+
+    |TaskToRun              |
+    |id=<hash of dimensions>|
+    +-----------------------+
 """
 
 import datetime

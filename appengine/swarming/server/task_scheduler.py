@@ -5,13 +5,6 @@
 """High level tasks execution scheduling API.
 
 This is the interface closest to the HTTP handlers.
-
-It supports retries* and deduping*.
-TODO(maruel): * is not implemented and gratitious vaporware.
-
-Overview of transactions:
-- bot_reap_task() mutate a TaskToRun in a transaction.
-- cron_handle_bot_died() uses transactions when aborting and retrying tasks.
 """
 
 import contextlib

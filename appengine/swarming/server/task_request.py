@@ -24,16 +24,18 @@ Overview of transactions:
 
 
 Graph of the schema:
-      +------Root------+
-      |TaskRequestShard|
-      +----------------+
-              ^
-              |
+       +------Root------+
+       |TaskRequestShard|
+       |id="<hash>"     |
+       +----------------+
+               ^
+               |
     +---------------------+
     |TaskRequest          |
     |    +--------------+ |
     |    |TaskProperties| |
     |    +--------------+ |
+    |id=<based on epoch>  |
     +---------------------+
                ^
                |

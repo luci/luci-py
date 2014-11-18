@@ -31,42 +31,48 @@ block depends on the previous ones:
 
 ## Overall schema graph of a task request with 2 tries
 
-       +------Root------+
-       |TaskRequestShard|                                        task_request.py
-       +----------------+
-               ^
-               |
-    +---------------------+
-    |TaskRequest          |
-    |    +--------------+ |                                      task_request.py
-    |    |TaskProperties| |
-    |    +--------------+ |
-    +---------------------+
-         ^           ^
-         |           |
-    +---------+      |
-    |TaskToRun|      |                                            task_to_run.py
-    +---------+      |
-                     |
-                     |
-            +-----------------+
-            |TaskResultSummary|                                   task_result.py
-            +-----------------+
-               ^          ^
-               |          |
-               |          |
-      +-------------+  +-------------+
-      |TaskRunResult|  |TaskRunResult|                            task_result.py
-      +-------------+  +-------------+
-                 ^
-                 |
-               +----------+
-               |TaskOutput|                                       task_result.py
-               +----------+
-                 ^      ^
+               +------Root------+
+               |TaskRequestShard|                                task_request.py
+               |id="<hash>"     |
+               +----------------+
+                       ^
+                       |
+               +---------------------+
+               |TaskRequest          |
+               |    +--------------+ |                           task_request.py
+               |    |TaskProperties| |
+               |    +--------------+ |
+               |id=<based on epoch>  |
+               +---------------------+
+                    ^           ^
+                    |           |
+    +-----------------------+   |
+    |TaskToRun              |   |                                 task_to_run.py
+    |id=<hash of dimensions>|   |
+    +-----------------------+   |
+                                |
+                  +-----------------+
+                  |TaskResultSummary|                             task_result.py
+                  |id=1             |
+                  +-----------------+
+                       ^          ^
+                       |          |
+                       |          |
+               +-------------+  +-------------+
+               |TaskRunResult|  |TaskRunResult|                   task_result.py
+               |id=1 <try #> |  |id=2         |
+               +-------------+  +-------------+
+                ^           ^           ...
+                |           |
+        +----------------+  +----------+
+        |TaskOutput      |  |TaskOutput| ...                      task_result.py
+        |id=1 <cmd index>|  |id=2      |
+        +----------------+  +----------+
+                 ^      ^        ...
                  |      |
     +---------------+  +---------------+
-    |TaskOutputChunk|  |TaskOutputChunk|                          task_result.py
+    |TaskOutputChunk|  |TaskOutputChunk| ...                      task_result.py
+    |id=1           |  |id=2           |
     +---------------+  +---------------+
 
 
