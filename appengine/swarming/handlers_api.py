@@ -469,16 +469,16 @@ class _BotBaseHandler(auth.ApiHandler):
           and isinstance(dimension_id[0], unicode)):
         bot_id = dimensions['id'][0]
 
+    # The bot may decide to "self-quarantine" itself. Accept both via
+    # dimensions or via state. See bot_management._BotCommon.quarantined for
+    # more details.
+    if (bool(dimensions.get('quarantined')) or
+        bool(state.get('quarantined'))):
+      return request, bot_id, version, state, dimensions, 'Bot self-quarantined'
+
     quarantined_msg = None
     # Use a dummy 'for' to be able to break early from the block.
     for _ in [0]:
-      # The bot may decide to "self-quarantine" itself. Accept both via
-      # dimensions or via state. See bot_management._BotCommon.quarantined for
-      # more details.
-      if (bool(dimensions.get('quarantined')) or
-          bool(state.get('quarantined'))):
-        quarantined_msg = 'Bot self-quarantined'
-        break
 
       quarantined_msg = has_unexpected_keys(
           self.EXPECTED_KEYS, request, 'keys')
