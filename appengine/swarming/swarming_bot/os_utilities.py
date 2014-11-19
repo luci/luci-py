@@ -247,7 +247,7 @@ def _get_gpu_osx():
 def _get_monitor_hidpi_osx():
   """Returns True if the monitor is hidpi."""
   return any(
-    any(m['spdisplays_retina'] == 'spdisplays_yes'
+    any(m.get('spdisplays_retina') == 'spdisplays_yes'
         for m in card['spdisplays_ndrvs'])
     for card in _get_SPDisplaysDataType_osx()
     if 'spdisplays_ndrvs' in card)
