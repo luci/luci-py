@@ -292,8 +292,8 @@ class TaskResultApiTest(test_case.TestCase):
     # TaskResultSummary and TaskRunResult are properly updated.
     request = task_request.make_request(_gen_request_data())
     result_summary = task_result.new_result_summary(request)
-    task = task_to_run.new_task_to_run(request)
-    ndb.put_multi([result_summary, task])
+    to_run = task_to_run.new_task_to_run(request)
+    ndb.put_multi([result_summary, to_run])
     expected = {
       'abandoned_ts': None,
       'bot_id': None,
@@ -324,9 +324,8 @@ class TaskResultApiTest(test_case.TestCase):
     # Task is reaped after 2 seconds (4 secs total).
     reap_ts = self.now + datetime.timedelta(seconds=4)
     self.mock_now(reap_ts)
-    task = task_to_run.is_task_reapable(task.key, None)
-    task.queue_number = None
-    task.put()
+    to_run.queue_number = None
+    to_run.put()
     run_result = task_result.new_run_result(request, 1, 'localhost', 'abc')
     ndb.put_multi(task_result.prepare_put_run_result(run_result, request))
     expected = {

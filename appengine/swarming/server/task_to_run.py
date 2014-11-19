@@ -256,30 +256,6 @@ def match_dimensions(request_dimensions, bot_dimensions):
   return True
 
 
-def is_task_reapable(task_key, queue_number):
-  """Returns TaskToRun if it could be updated.
-
-  This function enforces that TaskToRun.queue_number member is not in the value
-  specified.
-
-  Arguments:
-  - task_key: ndb.Key to TaskToRun entity to update.
-  - queue_number: new queue_number value that it would be set to.
-
-  Returns:
-    TaskToRun entity if bool(.queue_number) is not equivalent to the
-    bool(|queue_number)| passed as an argument, None if the entity had
-    .queue_number already set to the same True/False state.
-  """
-  assert task_key.kind() == 'TaskToRun', task_key
-  # Refresh the item.
-  task = task_key.get(use_cache=False)
-  if bool(queue_number) == bool(task.queue_number):
-    # Too bad, someone else reaped it in the meantime.
-    return None
-  return task
-
-
 def set_lookup_cache(task_key, is_available_to_schedule):
   """Updates the quick lookup cache to mark an item as available or not.
 

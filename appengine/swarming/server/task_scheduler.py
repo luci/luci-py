@@ -52,7 +52,7 @@ def _expire_task(to_run_key, request):
       request.key)
 
   def run():
-    # Fetch the two entities concurrently.
+    # 2 concurrent GET, one PUT. Optionally with an additional serialized GET.
     to_run_future = to_run_key.get_async()
     result_summary_future = result_summary_key.get_async()
     to_run = to_run_future.get_result()
@@ -87,47 +87,42 @@ def _expire_task(to_run_key, request):
       datastore_errors.Timeout,
       datastore_errors.TransactionFailedError,
       RuntimeError) as e:
-    logging.warning('Failed: %s', e)
+    packed = task_result.pack_result_summary_key(result_summary_key)
+    logging.info('Failed to reap %s: %s', packed, e)
     return False
 
 
-def _update_task(task_key, request, bot_id, bot_version):
+def _reap_task(to_run_key, request, bot_id, bot_version):
   """Reaps a task and insert the results entity.
 
   Returns:
     TaskRunResult if successful, None otherwise.
   """
   assert bot_id, bot_id
-  assert request.key == task_to_run.task_to_run_key_to_request_key(task_key)
-  result_summary_future = task_result.request_key_to_result_summary_key(
-      request.key).get_async()
-
-  # Look if the TaskToRun is reapable once before doing the check inside the
-  # transaction. This reduces the likelihood of failing this check inside
-  # the transaction, which is an order of magnitude more costly.
-  if not task_to_run.is_task_reapable(task_key, None):
-    logging.info('Not reapable anymore')
-    result_summary_future.wait()
-    return None
-
-  result_summary = result_summary_future.get_result()
+  assert request.key == task_to_run.task_to_run_key_to_request_key(to_run_key)
+  result_summary_key = task_result.request_key_to_result_summary_key(
+      request.key)
 
   def run():
-    task = task_to_run.is_task_reapable(task_key, None)
-    if not task:
-      return None, None
-    task.queue_number = None
-    # TODO(maruel): Use datastore_util.insert() to create the new try_number.
+    # 2 GET, 1 PUT at the end.
+    to_run_future = to_run_key.get_async()
+    result_summary_future = result_summary_key.get_async()
+    to_run = to_run_future.get_result()
+    if not to_run or not to_run.is_reapable:
+      result_summary_future.wait()
+      return None
+    to_run.queue_number = None
+    result_summary = result_summary_future.get_result()
     run_result = task_result.new_run_result(
         request, (result_summary.try_number or 0) + 1, bot_id, bot_version)
     result_summary.set_from_run_result(run_result, request)
-    ndb.put_multi([task, run_result, result_summary])
-    return run_result, task
+    ndb.put_multi([to_run, run_result, result_summary])
+    return run_result
 
   try:
-    run_result, task = ndb.transaction(run, retries=0)
-    if task:
-      task_to_run.set_lookup_cache(task.key, False)
+    run_result = ndb.transaction(run, retries=0)
+    if run_result:
+      task_to_run.set_lookup_cache(to_run_key, False)
     return run_result
   except (
       apiproxy_errors.CancelledError,
@@ -135,7 +130,7 @@ def _update_task(task_key, request, bot_id, bot_version):
       datastore_errors.Timeout,
       datastore_errors.TransactionFailedError,
       RuntimeError) as e:
-    logging.warning('Failed: %s', e)
+    logging.warning('Failed to reap: %s', e)
     return None
 
 
@@ -391,17 +386,15 @@ def bot_reap_task(dimensions, bot_id, bot_version):
   failures = 0
   to_skip = 0
   total_skipped = 0
-  for request, task in q:
+  for request, to_run in q:
     if to_skip:
       to_skip -= 1
       total_skipped += 1
       continue
 
-    run_result = _update_task(task.key, request, bot_id, bot_version)
+    run_result = _reap_task(to_run.key, request, bot_id, bot_version)
     if not run_result:
       failures += 1
-      #logging.warning('Failed to reap %d', task.key.integer_id())
-      # TODO(maruel): Add unit test!
       # Every 3 failures starting on the very first one, jump randomly ahead of
       # the pack. This reduces the contention where hundreds of bots fight for
       # exactly the same task while there's many ready to be run waiting in the
@@ -501,21 +494,59 @@ def bot_update_task(
   _update_stats(run_result, bot_id, request, task_completed)
 
 
-def bot_kill_task(run_result):
-  """Terminates a task that is currently running as an internal failure."""
-  request_future = run_result.request_key.get_async()
-  run_result.state = task_result.State.BOT_DIED
-  run_result.internal_failure = True
-  run_result.abandoned_ts = utils.utcnow()
-  # request is not needed in that case.
-  entities = task_result.prepare_put_run_result(run_result, None)
-  ndb.transaction(lambda: ndb.put_multi(entities))
-  request = request_future.get_result()
-  stats.add_run_entry(
-      'run_bot_died', run_result.key,
-      bot_id=run_result.bot_id,
-      dimensions=request.properties.dimensions,
-      user=request.user)
+def bot_kill_task(run_result_key, bot_id):
+  """Terminates a task that is currently running as an internal failure.
+
+  Returns:
+    str if an error message.
+  """
+  result_summary_key = task_result.run_result_key_to_result_summary_key(
+      run_result_key)
+  request_key = task_result.result_summary_key_to_request_key(
+      result_summary_key)
+  request_future = request_key.get_async()
+  server_version = utils.get_app_version()
+  now = utils.utcnow()
+  packed = task_result.pack_run_result_key(run_result_key)
+
+  def run():
+    run_result, result_summary = ndb.get_multi(
+        (run_result_key, result_summary_key))
+    if (not run_result.server_versions or
+        run_result.server_versions[-1] != server_version):
+      run_result.server_versions.append(server_version)
+
+    if bot_id and run_result.bot_id != bot_id:
+      return None, 'Bot %s sent task kill for task %s owned by bot %s' % (
+          bot_id, packed, run_result.bot_id)
+
+    if run_result.state == task_result.State.BOT_DIED:
+      return None, 'Task %s was already killed' % packed
+
+    run_result.state = task_result.State.BOT_DIED
+    run_result.internal_failure = True
+    run_result.abandoned_ts = now
+    result_summary.set_from_run_result(run_result, None)
+    ndb.put_multi((run_result, result_summary))
+    return run_result, None
+
+  try:
+    run_result, msg = ndb.transaction(run)
+    request = request_future.get_result()
+    if run_result:
+      stats.add_run_entry(
+          'run_bot_died', run_result.key,
+          bot_id=run_result.bot_id,
+          dimensions=request.properties.dimensions,
+          user=request.user)
+    return msg
+  except (
+      apiproxy_errors.CancelledError,
+      datastore_errors.BadRequestError,
+      datastore_errors.Timeout,
+      datastore_errors.TransactionFailedError,
+      RuntimeError) as e:
+    return 'Failed killing task %s: %s' % (packed, e)
 
 
 def cancel_task(summary_key):

@@ -520,7 +520,8 @@ class TaskSchedulerApiTest(test_case.TestCase):
     reaped_request, run_result = task_scheduler.bot_reap_task(
         {'OS': 'Windows-3.1.1'}, 'localhost', 'abc')
 
-    task_scheduler.bot_kill_task(run_result)
+    self.assertEqual(
+        None, task_scheduler.bot_kill_task(run_result.key, 'localhost'))
     expected = {
       'abandoned_ts': self.now,
       'bot_id': u'localhost',
@@ -542,7 +543,36 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'try_number': 1,
       'user': u'Jesus',
     }
-    self.assertEqual(expected, result_summary.to_dict())
+    self.assertEqual(expected, result_summary.key.get().to_dict())
+    expected = {
+      'abandoned_ts': self.now,
+      'bot_id': u'localhost',
+      'bot_version': u'abc',
+      'completed_ts': None,
+      'durations': [],
+      'exit_codes': [],
+      'failure': False,
+      'id': '14350e868888801',
+      'internal_failure': True,
+      'modified_ts': self.now,
+      'server_versions': [u'default-version'],
+      'started_ts': self.now,
+      'state': State.BOT_DIED,
+      'try_number': 1,
+    }
+    self.assertEqual(expected, run_result.key.get().to_dict())
+
+  def test_bot_kill_task_wrong_bot(self):
+    self.mock(random, 'getrandbits', lambda _: 0x88)
+    data = _gen_request_data(
+        properties=dict(dimensions={u'OS': u'Windows-3.1.1'}))
+    request, result_summary = task_scheduler.make_request(data)
+    reaped_request, run_result = task_scheduler.bot_reap_task(
+        {'OS': 'Windows-3.1.1'}, 'localhost', 'abc')
+    expected = (
+      'Bot bot1 sent task kill for task 14350e868888801 owned by bot localhost')
+    self.assertEqual(
+        expected, task_scheduler.bot_kill_task(run_result.key, 'bot1'))
 
   def test_cancel_task(self):
     data = _gen_request_data(

@@ -60,8 +60,8 @@ def _task_to_run_to_dict(i):
 
 def _yield_next_available_task_to_dispatch(bot_dimensions):
   return [
-    _task_to_run_to_dict(task)
-    for _request, task in
+    _task_to_run_to_dict(to_run)
+    for _request, to_run in
         task_to_run.yield_next_available_task_to_dispatch(bot_dimensions)
   ]
 
@@ -69,9 +69,9 @@ def _yield_next_available_task_to_dispatch(bot_dimensions):
 def _gen_new_task_to_run(**kwargs):
   """Returns a TaskToRun saved in the DB."""
   data = _gen_request_data(**kwargs)
-  task = task_to_run.new_task_to_run(task_request.make_request(data))
-  task.put()
-  return task
+  to_run = task_to_run.new_task_to_run(task_request.make_request(data))
+  to_run.put()
+  return to_run
 
 
 def _hash_dimensions(dimensions):
@@ -584,95 +584,80 @@ class TaskToRunApiTest(test_case.TestCase):
     self.assertEqual(
         1, len(list(task_to_run.yield_expired_task_to_run())))
 
-  def test_is_task_reapable(self):
+  def test_is_reapable(self):
     req_dimensions = {u'OS': u'Windows-3.1.1'}
-    task_1 = _gen_new_task_to_run(properties=dict(dimensions=req_dimensions))
-    task_2 = _gen_new_task_to_run(properties=dict(dimensions=req_dimensions))
+    to_run = _gen_new_task_to_run(properties=dict(dimensions=req_dimensions))
     bot_dimensions = {u'OS': u'Windows-3.1.1', u'hostname': u'localhost'}
     self.assertEqual(
-        2, len(_yield_next_available_task_to_dispatch(bot_dimensions)))
-
-    # A bot is assigned a task shard.
-    task = task_to_run.is_task_reapable(task_1.key, None)
-    task.queue_number = None
-    task.put()
-    self.assertEqual(
         1, len(_yield_next_available_task_to_dispatch(bot_dimensions)))
 
-    # This task shard cannot be assigned anymore.
-    self.assertEqual(None, task_to_run.is_task_reapable(task_1.key, None))
-    self.assertEqual(
-        1, len(_yield_next_available_task_to_dispatch(bot_dimensions)))
-    task = task_to_run.is_task_reapable(task_2.key, None)
-    task.queue_number = None
-    task.put()
-    self.assertEqual(
-        0, len(_yield_next_available_task_to_dispatch(bot_dimensions)))
+    self.assertEqual(True, to_run.is_reapable)
+    to_run.queue_number = None
+    to_run.put()
+    self.assertEqual(False, to_run.is_reapable)
 
   def test_set_lookup_cache(self):
-    task = _gen_new_task_to_run(
+    to_run = _gen_new_task_to_run(
         properties=dict(dimensions={u'OS': u'Windows-3.1.1'}))
-    self.assertEqual(False, task_to_run._lookup_cache_is_taken(task.key))
-    task_to_run.set_lookup_cache(task.key, True)
-    self.assertEqual(False, task_to_run._lookup_cache_is_taken(task.key))
-    task_to_run.set_lookup_cache(task.key, False)
-    self.assertEqual(True, task_to_run._lookup_cache_is_taken(task.key))
-    task_to_run.set_lookup_cache(task.key, True)
-    self.assertEqual(False, task_to_run._lookup_cache_is_taken(task.key))
+    self.assertEqual(False, task_to_run._lookup_cache_is_taken(to_run.key))
+    task_to_run.set_lookup_cache(to_run.key, True)
+    self.assertEqual(False, task_to_run._lookup_cache_is_taken(to_run.key))
+    task_to_run.set_lookup_cache(to_run.key, False)
+    self.assertEqual(True, task_to_run._lookup_cache_is_taken(to_run.key))
+    task_to_run.set_lookup_cache(to_run.key, True)
+    self.assertEqual(False, task_to_run._lookup_cache_is_taken(to_run.key))
 
   def test_abort_task_to_run(self):
-    task = _gen_new_task_to_run(
+    to_run = _gen_new_task_to_run(
         properties=dict(dimensions={u'OS': u'Windows-3.1.1'}))
     _gen_new_task_to_run(
         properties=dict(dimensions={u'OS': u'Windows-3.1.1'}))
     bot_dimensions = {u'OS': u'Windows-3.1.1', u'hostname': u'localhost'}
     self.assertEqual(
         2, len(_yield_next_available_task_to_dispatch(bot_dimensions)))
-    task_to_run.abort_task_to_run(task)
+    task_to_run.abort_task_to_run(to_run)
     self.assertEqual(
         1, len(_yield_next_available_task_to_dispatch(bot_dimensions)))
 
     # Aborting an aborted task shard is just fine.
-    task_to_run.abort_task_to_run(task)
+    task_to_run.abort_task_to_run(to_run)
     self.assertEqual(
         1, len(_yield_next_available_task_to_dispatch(bot_dimensions)))
 
   def test_retry(self):
-    task = _gen_new_task_to_run(
+    to_run = _gen_new_task_to_run(
         properties=dict(dimensions={u'OS': u'Windows-3.1.1'}))
     bot_dimensions = {u'OS': u'Windows-3.1.1', u'hostname': u'localhost'}
     self.assertEqual(
         1, len(_yield_next_available_task_to_dispatch(bot_dimensions)))
-    task = task_to_run.is_task_reapable(task.key, None)
-    task.queue_number = None
-    task.put()
+    to_run.queue_number = None
+    to_run.put()
     self.assertEqual(
         0, len(_yield_next_available_task_to_dispatch(bot_dimensions)))
 
+    request = to_run.request_key.get()
     self.mock_now(self.now, 60)
     def tx():
-      to_run = task_to_run.retry(task.request_key.get(), utils.utcnow())
-      to_run.put()
+      task_to_run.retry(request, utils.utcnow()).put()
     ndb.transaction(tx)
     self.assertEqual(
         1, len(_yield_next_available_task_to_dispatch(bot_dimensions)))
 
   def test_retry_expired(self):
-    task = _gen_new_task_to_run(
+    to_run = _gen_new_task_to_run(
         properties=dict(dimensions={u'OS': u'Windows-3.1.1'}))
     bot_dimensions = {u'OS': u'Windows-3.1.1', u'hostname': u'localhost'}
     self.assertEqual(
         1, len(_yield_next_available_task_to_dispatch(bot_dimensions)))
-    task = task_to_run.is_task_reapable(task.key, None)
-    task.queue_number = None
-    task.put()
+    to_run.queue_number = None
+    to_run.put()
     self.assertEqual(
         0, len(_yield_next_available_task_to_dispatch(bot_dimensions)))
 
     self.mock_now(self.now, 61)
     def tx():
       self.assertEqual(
-          None, task_to_run.retry(task.request_key.get(), utils.utcnow()))
+          None, task_to_run.retry(to_run.request_key.get(), utils.utcnow()))
     ndb.transaction(tx)
     self.assertEqual(
         0, len(_yield_next_available_task_to_dispatch(bot_dimensions)))

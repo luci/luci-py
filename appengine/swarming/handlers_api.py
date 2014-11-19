@@ -843,14 +843,11 @@ class BotTaskErrorHandler(auth.ApiHandler):
     if msg:
       self.abort_with_error(400, error=msg)
 
-    run_result = task_result.unpack_run_result_key(task_id).get()
-    if run_result.bot_id != bot_id:
-      msg = 'Bot %s sent task kill for task %s owned by bot %s' % (
-          bot_id, run_result.bot_id, run_result.key)
+    msg = task_scheduler.bot_kill_task(
+        task_result.unpack_run_result_key(task_id), bot_id)
+    if msg:
       logging.error(msg)
       self.abort_with_error(400, error=msg)
-
-    task_scheduler.bot_kill_task(run_result)
     self.send_response({})
 
 
