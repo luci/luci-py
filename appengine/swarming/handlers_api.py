@@ -4,6 +4,7 @@
 
 """REST APIs handlers."""
 
+import json
 import logging
 import textwrap
 
@@ -27,16 +28,9 @@ from server import task_scheduler
 from server import task_to_run
 
 
-def log_unexpected_keys(expected_keys, actual_keys, request, source, name):
-  """Logs an error if unexpected keys are present or expected keys are missing.
-  """
-  return log_unexpected_subset_keys(
-      expected_keys, expected_keys, actual_keys, request, source, name)
-
-
-def log_unexpected_subset_keys(
-    expected_keys, minimum_keys, actual_keys, request, source, name):
-  """Logs an error if unexpected keys are present or expected keys are missing.
+def has_unexpected_subset_keys(expected_keys, minimum_keys, actual_keys, name):
+  """Returns an error if unexpected keys are present or expected keys are
+  missing.
 
   Accepts optional keys.
 
@@ -49,17 +43,42 @@ def log_unexpected_subset_keys(
     msg_missing = (' missing: %s' % sorted(missing)) if missing else ''
     msg_superfluous = (
         (' superfluous: %s' % sorted(superfluous)) if superfluous else '')
-    message = 'Unexpected %s%s%s; did you make a typo?' % (
+    return 'Unexpected %s%s%s; did you make a typo?' % (
         name, msg_missing, msg_superfluous)
-    ereporter2.log_request(
-        request,
-        source=source,
-        message=message)
-    return message
 
 
-def log_missing_keys(minimum_keys, actual_keys, request, source, name):
-  """Logs an error if expected keys are not present.
+def has_unexpected_keys(expected_keys, actual_keys, name):
+  """Return an error if unexpected keys are present or expected keys are
+  missing.
+  """
+  return has_unexpected_subset_keys(
+      expected_keys, expected_keys, actual_keys, name)
+
+
+def log_unexpected_subset_keys(
+    expected_keys, minimum_keys, actual_keys, request, source, name):
+  """Logs an error if unexpected keys are present or expected keys are missing.
+
+  Accepts optional keys.
+
+  This is important to catch typos.
+  """
+  message = has_unexpected_subset_keys(
+    expected_keys, minimum_keys, actual_keys, name)
+  if message:
+    ereporter2.log_request(request, source=source, message=message)
+  return message
+
+
+def log_unexpected_keys(expected_keys, actual_keys, request, source, name):
+  """Logs an error if unexpected keys are present or expected keys are missing.
+  """
+  return log_unexpected_subset_keys(
+      expected_keys, expected_keys, actual_keys, request, source, name)
+
+
+def has_missing_keys(minimum_keys, actual_keys, name):
+  """Returns an error if expected keys are not present.
 
   Do not warn about unexpected keys.
   """
@@ -67,12 +86,7 @@ def log_missing_keys(minimum_keys, actual_keys, request, source, name):
   missing = minimum_keys - actual_keys
   if missing:
     msg_missing = (' missing: %s' % sorted(missing)) if missing else ''
-    message = 'Unexpected %s%s; did you make a typo?' % (name, msg_missing)
-    ereporter2.log_request(
-        request,
-        source=source,
-        message=message)
-    return message
+    return 'Unexpected %s%s; did you make a typo?' % (name, msg_missing)
 
 
 def process_doc(handler):
@@ -441,7 +455,7 @@ class _BotBaseHandler(auth.ApiHandler):
     Does one DB synchronous GET.
 
     Returns:
-      tuple(request, bot_id, version, state, dimensions, quarantined)
+      tuple(request, bot_id, version, state, dimensions, quarantined_msg)
     """
     request = self.parse_body()
     version = request.get('version', None)
@@ -455,55 +469,59 @@ class _BotBaseHandler(auth.ApiHandler):
           and isinstance(dimension_id[0], unicode)):
         bot_id = dimensions['id'][0]
 
-    # The bot may decide to "self-quarantine" itself. Accept both via dimensions
-    # or via state. See bot_management._BotCommon.quarantined for more details.
-    if (bool(dimensions.get('quarantined')) or
-        bool(state.get('quarantined'))):
-      # Not worth checking the properties if the bot self-quarantined. It's just
-      # noise.
-      return request, bot_id, version, state, dimensions, True
+    quarantined_msg = None
+    # Use a dummy 'for' to be able to break early from the block.
+    for _ in [0]:
+      # The bot may decide to "self-quarantine" itself. Accept both via
+      # dimensions or via state. See bot_management._BotCommon.quarantined for
+      # more details.
+      if (bool(dimensions.get('quarantined')) or
+          bool(state.get('quarantined'))):
+        quarantined_msg = 'Bot self-quarantined'
+        break
 
-    if log_unexpected_keys(
-        self.EXPECTED_KEYS, request, self.request, 'bot', 'keys'):
-      return request, bot_id, version, state, dimensions, True
+      quarantined_msg = has_unexpected_keys(
+          self.EXPECTED_KEYS, request, 'keys')
+      if quarantined_msg:
+        break
 
-    if log_missing_keys(
-        self.REQUIRED_STATE_KEYS, state, self.request, 'bot', 'state'):
-      return request, bot_id, version, state, dimensions, True
+      quarantined_msg = has_missing_keys(
+          self.REQUIRED_STATE_KEYS, state, 'state')
+      if quarantined_msg:
+        break
 
-    if not bot_id:
-      return request, bot_id, version, state, dimensions, True
+      if not bot_id:
+        quarantined_msg = 'Missing bot id'
+        break
 
-    if not all(
-        isinstance(key, unicode) and
-        isinstance(values, list) and
-        all(isinstance(value, unicode) for value in values)
-        for key, values in dimensions.iteritems()):
-      # It's a big deal, alert the admins.
-      line = (
-          'Bot: https://%s/restricted/bot/%s\n'
-          'Invalid dimensions for bot:\n'
-          '%r') % (
-          app_identity.get_default_version_hostname(), bot_id, dimensions)
+      if not all(
+          isinstance(key, unicode) and
+          isinstance(values, list) and
+          all(isinstance(value, unicode) for value in values)
+          for key, values in dimensions.iteritems()):
+        quarantined_msg = (
+            'Invalid dimensions type:\n%s' % json.dumps(dimensions,
+              sort_keys=True, indent=2, separators=(',', ': ')))
+        break
+
+      dimensions_count = task_to_run.dimensions_powerset_count(dimensions)
+      if dimensions_count > task_to_run.MAX_DIMENSIONS:
+        quarantined_msg = 'Dimensions product %d is too high' % dimensions_count
+        break
+
+    if quarantined_msg:
+      line = 'Quarantined Bot\nhttps://%s/restricted/bot/%s\n%s' % (
+          app_identity.get_default_version_hostname(), bot_id,
+          quarantined_msg)
       ereporter2.log_request(self.request, source='bot', message=line)
-      return request, bot_id, version, state, dimensions, True
-
-    dimensions_count = task_to_run.dimensions_powerset_count(dimensions)
-    if dimensions_count > task_to_run.MAX_DIMENSIONS:
-      # It's a big deal, alert the admins.
-      line = (
-          'Bot: https://%s/restricted/bot/%s\n'
-          'Too high dimensions product (%d) for bot:\n'
-          '%r') % (
-          app_identity.get_default_version_hostname(), bot_id, dimensions_count,
-          dimensions)
-      ereporter2.log_request(self.request, source='bot', message=line)
-      return request, bot_id, version, state, dimensions, True
+      return request, bot_id, version, state, dimensions, quarantined_msg
 
     # Look for admin enforced quarantine.
     bot_settings = bot_management.get_settings_key(bot_id).get()
-    quarantined = bool(bot_settings and bot_settings.quarantined)
-    return request, bot_id, version, state, dimensions, quarantined
+    if bool(bot_settings and bot_settings.quarantined):
+      return request, bot_id, version, state, dimensions, 'Quarantined by admin'
+
+    return request, bot_id, version, state, dimensions, None
 
 
 class BotHandshakeHandler(_BotBaseHandler):
@@ -531,12 +549,14 @@ class BotHandshakeHandler(_BotBaseHandler):
   @auth.require_xsrf_token_request
   @auth.require(acl.is_bot)
   def post(self):
-    _request, bot_id, version, state, dimensions, quarantined = self._process()
+    (_request, bot_id, version, state,
+        dimensions, quarantined_msg) = self._process()
     bot_management.bot_event(
         event_type='bot_connected', bot_id=bot_id,
         external_ip=self.request.remote_addr, dimensions=dimensions,
-        state=state, version=version, quarantined=quarantined, task_id='',
-        task_name=None)
+        state=state, version=version, quarantined=bool(quarantined_msg),
+        task_id='', task_name=None, message=quarantined_msg)
+
     data = {
       # This access token will be used to validate each subsequent request.
       'bot_version': bot_code.get_bot_version(self.request.host_url),
@@ -566,8 +586,10 @@ class BotPollHandler(_BotBaseHandler):
 
     It makes recovery of the fleet in case of catastrophic failure much easier.
     """
-    _request, bot_id, version, state, dimensions, quarantined = self._process()
+    (_request, bot_id, version, state,
+        dimensions, quarantined_msg) = self._process()
     sleep_streak = state.get('sleep_streak', 0)
+    quarantined = bool(quarantined_msg)
 
     # Note bot existence at two places, one for stats at 1 minute resolution,
     # the other for the list of known bots.
@@ -579,7 +601,7 @@ class BotPollHandler(_BotBaseHandler):
           event_type=event_type, bot_id=bot_id,
           external_ip=self.request.remote_addr, dimensions=dimensions,
           state=state, version=version, quarantined=quarantined,
-          task_id=task_id, task_name=task_name)
+          task_id=task_id, task_name=task_name, message=quarantined_msg)
 
     # Bot version is host-specific because the host URL is embedded in
     # swarming_bot.zip
@@ -718,7 +740,8 @@ class BotEventHandler(_BotBaseHandler):
 
   @auth.require(acl.is_bot)
   def post(self):
-    request, bot_id, version, state, dimensions, quarantined = self._process()
+    (request, bot_id, version, state,
+        dimensions, quarantined_msg) = self._process()
     event = request.get('event')
     if event not in ('bot_error', 'bot_rebooting'):
       self.abort_with_error(400, error='Unsupported event type')
@@ -726,7 +749,8 @@ class BotEventHandler(_BotBaseHandler):
     bot_management.bot_event(
         event_type=event, bot_id=bot_id, external_ip=self.request.remote_addr,
         dimensions=dimensions, state=state, version=version,
-        quarantined=quarantined, task_id=None, task_name=None, message=message)
+        quarantined=bool(quarantined_msg), task_id=None, task_name=None,
+        message=message)
 
     if event == 'bot_error':
       line = (

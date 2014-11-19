@@ -88,8 +88,9 @@ class BotApiTest(AppTestBase):
     self.assertEqual(40, len(response['bot_version']))
     self.assertEqual(u'default-version', response['server_version'])
     expected = [
-      'Unexpected keys missing: [u\'dimensions\', u\'state\', u\'version\']; '
-      'did you make a typo?',
+      'Quarantined Bot\nhttps://None/restricted/bot/None\n'
+        'Unexpected keys missing: [u\'dimensions\', u\'state\', u\'version\']; '
+        'did you make a typo?',
     ]
     self.assertEqual(expected, errors)
 
@@ -121,7 +122,8 @@ class BotApiTest(AppTestBase):
     self.assertEqual(40, len(response['bot_version']))
     self.assertEqual(u'default-version', response['server_version'])
     expected = [
-      'Unexpected keys superfluous: [u\'foo\']; did you make a typo?',
+      u'Quarantined Bot\nhttps://None/restricted/bot/bot1\n'
+        u'Unexpected keys superfluous: [u\'foo\']; did you make a typo?',
     ]
     self.assertEqual(expected, errors)
 
@@ -145,8 +147,9 @@ class BotApiTest(AppTestBase):
     self.assertTrue(response.pop(u'duration'))
     self.assertEqual(expected, response)
     expected = [
-      'Unexpected keys missing: [u\'dimensions\', u\'state\']; '
-      'did you make a typo?',
+      'Quarantined Bot\nhttps://None/restricted/bot/None\n'
+        'Unexpected keys missing: [u\'dimensions\', u\'state\']; '
+        'did you make a typo?',
     ]
     self.assertEqual(expected, errors)
 
@@ -604,7 +607,7 @@ class ClientApiTest(AppTestBase):
     expected = {
       u'error':
           u'Unexpected request keys; did you make a typo?\n'
-          u'Missing: name, priority, user\nSuperfluous: foo\n',
+            u'Missing: name, priority, user\nSuperfluous: foo\n',
     }
     self.assertEqual(expected, response)
 
