@@ -33,6 +33,13 @@ def CommonChecks(input_api, output_api):
   gae_sdk_path = FindAppEngineSDK(input_api)
   if not gae_sdk_path:
     output.append(output_api.PresubmitError('Couldn\'t find AppEngine SDK.'))
+  if not input_api.os_path.isfile(join('..', '..', 'client', 'swarming.py')):
+    output.append(
+        output_api.PresubmitError(
+            'Couldn\'t find ../../client. Please run:\n'
+            '  git submodule init\n'
+            '  git submodule update'))
+  if output:
     return output
 
   import sys
