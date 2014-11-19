@@ -134,22 +134,6 @@ def _reap_task(to_run_key, request, bot_id, bot_version):
     return None
 
 
-def _fetch_for_update(run_result_key, bot_id):
-  """Fetches all the data for a bot task update."""
-  request_key = task_result.result_summary_key_to_request_key(
-      task_result.run_result_key_to_result_summary_key(run_result_key))
-  run_result, request = ndb.get_multi([run_result_key, request_key])
-  if not run_result:
-    logging.error('No result found for %s', run_result_key)
-    return None, None
-  if run_result.bot_id != bot_id:
-    logging.error(
-        'Bot %s sent update for task %s owned by bot %s',
-        bot_id, run_result.bot_id, run_result.key)
-    return None, None
-  return run_result, request
-
-
 def _update_stats(run_result, bot_id, request, completed):
   """Updates stats after a bot task update notification."""
   if completed:
@@ -203,10 +187,7 @@ def _handle_dead_bot(run_result_key):
       # It was updated already or not updating last. Likely DB index was stale.
       return None, run_result.bot_id
 
-    if (not run_result.server_versions or
-        run_result.server_versions[-1] != server_version):
-      run_result.server_versions.append(server_version)
-
+    run_result.signal_server_version(server_version)
     if result_summary.try_number != run_result.try_number:
       # Not updating correct run_result, cancel it without touching
       # result_summary.
@@ -426,11 +407,10 @@ def bot_reap_task(dimensions, bot_id, bot_version):
   return None, None
 
 
-@contextlib.contextmanager
 def bot_update_task(
     run_result_key, bot_id, command_index, output, output_chunk_start,
     exit_code, duration):
-  """Updates a TaskRunResult, returns the packets to save in a context.
+  """Updates a TaskRunResult and TaskResultSummary, along TaskOutput.
 
   Arguments:
   - run_result_key: ndb.Key to TaskRunResult.
@@ -446,52 +426,95 @@ def bot_update_task(
   - A command is updated after it had an exit code assigned to.
   - Out of order processing of command_index.
 
-  The trickiest part of this function is that partial updates must be
-  specifically handled, in particular:
-  - TaskRunResult was updated but not TaskResultSummary.
-  - TaskChunkOutput was partially writen, with Result entities updated or not.
-
-  Yields:
-  - tuple(list(entities), bool(completed).
+  Returns:
+    True if the task completed.
   """
   assert output_chunk_start is None or isinstance(output_chunk_start, int)
   assert output is None or isinstance(output, str)
 
-  run_result, request = _fetch_for_update(run_result_key, bot_id)
-  if not run_result:
-    yield None, False
-    return
-
+  result_summary_key = task_result.run_result_key_to_result_summary_key(
+      run_result_key)
+  request_key = task_result.result_summary_key_to_request_key(
+      result_summary_key)
+  request_future = request_key.get_async()
+  server_version = utils.get_app_version()
+  packed = task_result.pack_run_result_key(run_result_key)
+  request = request_future.get_result()
   now = utils.utcnow()
 
-  if len(run_result.exit_codes) not in (command_index, command_index+1):
-    raise ValueError('Unexpected ordering')
+  def run():
+    # 2 consecutive GETs, one PUT.
+    run_result_future = run_result_key.get_async()
+    result_summary_future = result_summary_key.get_async()
+    run_result = run_result_future.get_result()
+    if not run_result:
+      result_summary_future.wait()
+      return None, False, 'is missing'
 
-  if (duration is None) != (exit_code is None):
-    raise ValueError('duration is expected if and only if a command completes')
+    if run_result.bot_id != bot_id:
+      result_summary_future.wait()
+      return None, False, 'expected bot (%s) but had update from bot %s' % (
+          run_result.bot_id, bot_id)
 
-  if exit_code is not None:
-    # The command |command_index| completed.
-    run_result.durations.append(duration)
-    run_result.exit_codes.append(exit_code)
+    if len(run_result.exit_codes) not in (command_index, command_index+1):
+      result_summary_future.wait()
+      return None, False, 'has unexpected ordering, expected %d, got %d' % (
+          len(run_result.exit_codes), command_index)
 
-  task_completed = (
-      len(run_result.exit_codes) == len(request.properties.commands))
-  if task_completed:
-    run_result.state = task_result.State.COMPLETED
-    run_result.completed_ts = now
+    if (duration is None) != (exit_code is None):
+      result_summary_future.wait()
+      return None, False, (
+          'had unexpected duration; expected iff a command completes; index %d'
+          % len(run_result.exit_codes))
 
-  to_put = []
-  if output:
-    to_put.extend(
-        run_result.append_output(
-            command_index, output, output_chunk_start or 0))
+    if exit_code is not None:
+      # The command |command_index| completed.
+      run_result.durations.append(duration)
+      run_result.exit_codes.append(exit_code)
 
-  to_put.extend(task_result.prepare_put_run_result(run_result, request))
+    task_completed = (
+        len(run_result.exit_codes) == len(request.properties.commands))
+    if task_completed:
+      run_result.state = task_result.State.COMPLETED
+      run_result.completed_ts = now
 
-  yield to_put, task_completed
+    run_result.signal_server_version(server_version)
+    to_put = []
+    if output:
+      # This does 1 multi GETs. This also modifies run_result in place.
+      to_put.extend(
+          run_result.append_output(
+              command_index, output, output_chunk_start or 0))
 
-  _update_stats(run_result, bot_id, request, task_completed)
+    result_summary = result_summary_future.get_result()
+    if (result_summary.try_number and
+        result_summary.try_number > run_result.try_number):
+      # The situation where a shard is retried but the bot running the previous
+      # try somehow reappears and reports success, the result must still show
+      # the last try's result.
+      to_put.append(run_result)
+    else:
+      result_summary.set_from_run_result(run_result, request)
+      to_put.extend((run_result, result_summary))
+
+    ndb.put_multi(to_put)
+    return run_result, task_completed, None
+
+  try:
+    run_result, task_completed, error = ndb.transaction(run, retries=1)
+    if run_result:
+      _update_stats(run_result, bot_id, request, task_completed)
+    if error:
+       logging.error('Task %s %s', packed, error)
+    return task_completed
+  except (
+      apiproxy_errors.CancelledError,
+      datastore_errors.BadRequestError,
+      datastore_errors.Timeout,
+      datastore_errors.TransactionFailedError,
+      RuntimeError) as e:
+    logging.info('Failed updating task\n%s\n%s', packed, e)
+    return False
 
 
 def bot_kill_task(run_result_key, bot_id):
@@ -512,10 +535,6 @@ def bot_kill_task(run_result_key, bot_id):
   def run():
     run_result, result_summary = ndb.get_multi(
         (run_result_key, result_summary_key))
-    if (not run_result.server_versions or
-        run_result.server_versions[-1] != server_version):
-      run_result.server_versions.append(server_version)
-
     if bot_id and run_result.bot_id != bot_id:
       return None, 'Bot %s sent task kill for task %s owned by bot %s' % (
           bot_id, packed, run_result.bot_id)
@@ -523,6 +542,7 @@ def bot_kill_task(run_result_key, bot_id):
     if run_result.state == task_result.State.BOT_DIED:
       return None, 'Task %s was already killed' % packed
 
+    run_result.signal_server_version(server_version)
     run_result.state = task_result.State.BOT_DIED
     run_result.internal_failure = True
     run_result.abandoned_ts = now

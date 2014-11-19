@@ -21,7 +21,6 @@ import sys
 import time
 import zipfile
 
-# pylint: disable-msg=W0403
 import bot
 import logging_utils
 import os_utilities

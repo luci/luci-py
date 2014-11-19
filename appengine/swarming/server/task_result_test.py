@@ -327,7 +327,8 @@ class TaskResultApiTest(test_case.TestCase):
     to_run.queue_number = None
     to_run.put()
     run_result = task_result.new_run_result(request, 1, 'localhost', 'abc')
-    ndb.put_multi(task_result.prepare_put_run_result(run_result, request))
+    result_summary.set_from_run_result(run_result, request)
+    ndb.put_multi((result_summary, run_result))
     expected = {
       'abandoned_ts': None,
       'bot_id': u'localhost',
@@ -349,7 +350,7 @@ class TaskResultApiTest(test_case.TestCase):
       'try_number': 1,
       'user': u'Jesus',
     }
-    self.assertEqual(expected, result_summary.to_dict())
+    self.assertEqual(expected, result_summary.key.get().to_dict())
 
     # Task completed after 2 seconds (6 secs total), the task has been running
     # for 2 seconds.
@@ -359,7 +360,8 @@ class TaskResultApiTest(test_case.TestCase):
     run_result.exit_codes.append(0)
     run_result.state = task_result.State.COMPLETED
     ndb.put_multi(run_result.append_output(0, 'foo', 0))
-    ndb.put_multi(task_result.prepare_put_run_result(run_result, request))
+    result_summary.set_from_run_result(run_result, request)
+    ndb.put_multi((result_summary, run_result))
     expected = {
       'abandoned_ts': None,
       'bot_id': u'localhost',
@@ -381,8 +383,8 @@ class TaskResultApiTest(test_case.TestCase):
       'try_number': 1,
       'user': u'Jesus',
     }
-    self.assertEqual(expected, result_summary.to_dict())
-    self.assertEqual(['foo'], result_summary.get_outputs())
+    self.assertEqual(expected, result_summary.key.get().to_dict())
+    self.assertEqual(['foo'], list(result_summary.get_outputs()))
     self.assertEqual(datetime.timedelta(seconds=2), result_summary.duration)
     self.assertEqual(
         datetime.timedelta(seconds=2),
@@ -408,7 +410,8 @@ class TaskResultApiTest(test_case.TestCase):
     result_summary.put()
     run_result = task_result.new_run_result(request, 1, 'localhost', 'abc')
     run_result.completed_ts = self.now
-    ndb.put_multi(task_result.prepare_put_run_result(run_result, request))
+    result_summary.set_from_run_result(run_result, request)
+    ndb.put_multi((run_result, result_summary))
 
     self.mock_now(self.now + task_result.BOT_PING_TOLERANCE)
     self.assertEqual(
@@ -419,7 +422,7 @@ class TaskResultApiTest(test_case.TestCase):
         [run_result.key],
         list(task_result.yield_run_result_keys_with_dead_bot()))
 
-  def test_prepare_put_run_result(self):
+  def test_set_from_run_result(self):
     request = task_request.make_request(_gen_request_data())
     result_summary = task_result.new_result_summary(request)
     run_result = task_result.new_run_result(request, 1, 'localhost', 'abc')
@@ -427,11 +430,12 @@ class TaskResultApiTest(test_case.TestCase):
     ndb.put_multi((result_summary, run_result))
 
     self.assertTrue(result_summary.need_update_from_run_result(run_result))
-    ndb.put_multi(task_result.prepare_put_run_result(run_result, request))
+    result_summary.set_from_run_result(run_result, request)
+    ndb.put_multi([result_summary])
 
     self.assertFalse(result_summary.need_update_from_run_result(run_result))
 
-  def test_prepare_put_run_result_two_server_versions(self):
+  def test_set_from_run_result_two_server_versions(self):
     request = task_request.make_request(_gen_request_data())
     result_summary = task_result.new_result_summary(request)
     run_result = task_result.new_run_result(request, 1, 'localhost', 'abc')
@@ -439,17 +443,20 @@ class TaskResultApiTest(test_case.TestCase):
     ndb.put_multi((result_summary, run_result))
 
     self.assertTrue(result_summary.need_update_from_run_result(run_result))
-    ndb.put_multi(task_result.prepare_put_run_result(run_result, request))
+    result_summary.set_from_run_result(run_result, request)
+    ndb.put_multi([result_summary])
 
-    self.mock(utils, 'get_app_version', lambda: 'new-version')
-    ndb.put_multi(task_result.prepare_put_run_result(run_result, request))
+    run_result.signal_server_version('new-version')
+    result_summary.set_from_run_result(run_result, request)
+    ndb.put_multi((result_summary, run_result))
     self.assertEqual(
-        ['default-version', 'new-version'], run_result.server_versions)
+        ['default-version', 'new-version'],
+        run_result.key.get().server_versions)
     self.assertEqual(
         ['default-version', 'new-version'],
         result_summary.key.get().server_versions)
 
-  def test_prepare_put_run_result_two_tries(self):
+  def test_set_from_run_result_two_tries(self):
     request = task_request.make_request(_gen_request_data())
     result_summary = task_result.new_result_summary(request)
     run_result_1 = task_result.new_run_result(request, 1, 'localhost', 'abc')
@@ -458,18 +465,19 @@ class TaskResultApiTest(test_case.TestCase):
     ndb.put_multi((result_summary, run_result_2))
 
     self.assertTrue(result_summary.need_update_from_run_result(run_result_1))
-    ndb.put_multi(task_result.prepare_put_run_result(run_result_1, request))
+    result_summary.set_from_run_result(run_result_1, request)
+    ndb.put_multi((result_summary, run_result_1))
 
+    result_summary = result_summary.key.get()
     self.assertFalse(result_summary.need_update_from_run_result(run_result_1))
 
     self.assertTrue(result_summary.need_update_from_run_result(run_result_2))
-    ndb.put_multi(task_result.prepare_put_run_result(run_result_2, request))
+    result_summary.set_from_run_result(run_result_2, request)
+    ndb.put_multi((result_summary, run_result_2))
     result_summary = result_summary.key.get()
 
     self.assertEqual(2, result_summary.try_number)
     self.assertFalse(result_summary.need_update_from_run_result(run_result_1))
-    self.assertEqual(
-        1, len(task_result.prepare_put_run_result(run_result_1, request)))
 
   def test_run_result_duration(self):
     run_result = task_result.TaskRunResult(
@@ -508,7 +516,9 @@ class TestOutput(test_case.TestCase):
     result_summary = task_result.new_result_summary(request)
     result_summary.put()
     self.run_result = task_result.new_run_result(request, 1, 'localhost', 'abc')
-    ndb.put_multi(task_result.prepare_put_run_result(self.run_result, request))
+    result_summary.set_from_run_result(self.run_result, request)
+    ndb.put_multi((result_summary, self.run_result))
+    self.run_result = self.run_result.key.get()
 
   def assertTaskOutputChunk(self, expected):
     q = task_result.TaskOutputChunk.query().order(
@@ -525,7 +535,7 @@ class TestOutput(test_case.TestCase):
     run(1, 'Part2\n', 0)
     run(1, 'Part3\n', len('Part2\n'))
     self.assertEqual(
-        ['Part1\n', 'Part2\nPart3\n'], self.run_result.get_outputs())
+        ['Part1\n', 'Part2\nPart3\n'], list(self.run_result.get_outputs()))
     self.assertEqual(
         'Part1\n',
         self.run_result.get_command_output_async(0).get_result())

@@ -362,8 +362,13 @@ class _TaskResultCommon(ndb.Model):
     out['id'] = self.key_string
     return out
 
+  def signal_server_version(self, server_version):
+    """Adds `server_version` to self.server_versions if relevant."""
+    if not self.server_versions or self.server_versions[-1] != server_version:
+      self.server_versions.append(server_version)
+
   def get_outputs(self):
-    """Returns the actual outputs as a list of strings."""
+    """Yields the actual outputs as a generator of strings."""
     # TODO(maruel): Make this function async.
     if not self.run_result_key or not self.stdout_chunks:
       # The task was not reaped or no output was streamed yet.
@@ -374,7 +379,7 @@ class _TaskResultCommon(ndb.Model):
       self.get_command_output_async(command_index)
       for command_index in xrange(len(self.stdout_chunks))
     ]
-    return [future.get_result() for future in futures]
+    return (future.get_result() for future in futures)
 
   @ndb.tasklet
   def get_command_output_async(self, command_index):
@@ -887,33 +892,6 @@ def yield_run_result_keys_with_dead_bot():
   deadline = utils.utcnow() - BOT_PING_TOLERANCE
   q = TaskRunResult.query().filter(TaskRunResult.modified_ts < deadline)
   return q.filter(TaskRunResult.state == State.RUNNING).iter(keys_only=True)
-
-
-def prepare_put_run_result(run_result, request):
-  """Prepares the entity to be saved.
-
-  Return:
-    list(TaskRunResult, TaskResultSummary) to be saved. It's possible that the
-    list only has TaskRunResult when it's updating an try_number that is lower
-    than what TaskResultSummary is at.
-  """
-  assert isinstance(run_result, TaskRunResult)
-
-  server_version = utils.get_app_version()
-  if (not run_result.server_versions or
-      run_result.server_versions[-1] != server_version):
-    run_result.server_versions.append(server_version)
-
-  result_summary = run_result.result_summary_key.get()
-  if (result_summary.try_number and
-      result_summary.try_number > run_result.try_number):
-    # The situation where a shard is retried, but the bot running the previous
-    # try somehow reappears and reports success, the result must still show the
-    # last try's result.
-    return [run_result]
-
-  result_summary.set_from_run_result(run_result, request)
-  return [run_result, result_summary]
 
 
 def get_tasks(task_name, task_tags, cursor_str, limit, sort, state):

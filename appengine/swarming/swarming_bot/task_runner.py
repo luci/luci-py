@@ -26,7 +26,6 @@ import sys
 import time
 import zipfile
 
-# pylint: disable-msg=W0403
 import xsrf_client
 from utils import net
 from utils import on_error

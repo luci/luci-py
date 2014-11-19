@@ -181,9 +181,10 @@ class TaskSchedulerApiTest(test_case.TestCase):
     self.assertEqual('localhost', run_result_1.bot_id)
     self.assertEqual(None, task_to_run.TaskToRun.query().get().queue_number)
     # It's important to terminate the task with success.
-    with task_scheduler.bot_update_task(
-        run_result_1.key, 'localhost', 0, 'Foo1', 0, 0, 0.1) as (entities, _):
-      ndb.put_multi(entities)
+    self.assertEqual(
+        True,
+        task_scheduler.bot_update_task(
+            run_result_1.key, 'localhost', 0, 'Foo1', 0, 0, 0.1))
 
     # Create a second task, results are immediately returned.
     self.mock(random, 'getrandbits', lambda _: 0x77)
@@ -315,12 +316,14 @@ class TaskSchedulerApiTest(test_case.TestCase):
     # The bot completes the task.
     done_ts = self.now + datetime.timedelta(seconds=120)
     self.mock_now(done_ts)
-    with task_scheduler.bot_update_task(
-        run_result.key, 'localhost', 0, 'Foo1', 0, 0, 0.1) as (entities, _):
-      ndb.put_multi(entities)
-    with task_scheduler.bot_update_task(
-        run_result.key, 'localhost', 1, 'Bar22', 0, 0, 0.2) as (entities, _):
-      ndb.put_multi(entities)
+    self.assertEqual(
+        True,
+        task_scheduler.bot_update_task(
+            run_result.key, 'localhost', 0, 'Foo1', 0, 0, 0.1))
+    self.assertEqual(
+        False,
+        task_scheduler.bot_update_task(
+        run_result.key, 'localhost', 1, 'Bar22', 0, 0, 0.2))
     result_summary, run_results = get_results(request.key)
     expected = {
       'abandoned_ts': None,
@@ -372,12 +375,14 @@ class TaskSchedulerApiTest(test_case.TestCase):
     reaped_request, run_result = task_scheduler.bot_reap_task(
         {'OS': 'Windows-3.1.1'}, 'localhost', 'abc')
     self.assertEqual(request, reaped_request)
-    with task_scheduler.bot_update_task(
-        run_result.key, 'localhost', 0, 'Foo1', 0, 0, 0.1) as (entities, _):
-      ndb.put_multi(entities)
-    with task_scheduler.bot_update_task(
-        run_result.key, 'localhost', 1, 'Bar22', 0, 1, 0.2) as (entities, _):
-      ndb.put_multi(entities)
+    self.assertEqual(
+        True,
+        task_scheduler.bot_update_task(
+        run_result.key, 'localhost', 0, 'Foo1', 0, 0, 0.1))
+    self.assertEqual(
+        False,
+        task_scheduler.bot_update_task(
+        run_result.key, 'localhost', 1, 'Bar22', 0, 1, 0.2))
     result_summary, run_results = get_results(request.key)
 
     expected = {
@@ -431,86 +436,41 @@ class TaskSchedulerApiTest(test_case.TestCase):
 
   def test_bot_update_task(self):
     run_result = _quick_reap()
-    with task_scheduler.bot_update_task(
-        run_result.key, 'localhost', 0, 'hi', 0, 0, 0.1) as (entities, _):
-      self.assertEqual(3, len(entities))
-      ndb.put_multi(entities)
-    with task_scheduler.bot_update_task(
-        run_result.key, 'localhost', 0, 'hey', 2, 0, 0.1) as (entities, _):
-      self.assertEqual(3, len(entities))
-      ndb.put_multi(entities)
-    self.assertEqual(['hihey'], run_result.get_outputs())
+    self.assertEqual(
+        True,
+        task_scheduler.bot_update_task(
+            run_result.key, 'localhost', 0, 'hi', 0, 0, 0.1))
+    self.assertEqual(
+        False,
+        task_scheduler.bot_update_task(
+            run_result.key, 'localhost', 0, 'hey', 2, 0, 0.1))
+    self.assertEqual(['hihey'], list(run_result.key.get().get_outputs()))
 
   def test_bot_update_task_new_two_commands(self):
     run_result = _quick_reap()
-    with task_scheduler.bot_update_task(
-        run_result.key, 'localhost', 0, 'hi', 0, 0, 0.1) as (entities, _):
-      self.assertEqual(3, len(entities))
-      ndb.put_multi(entities)
-    with task_scheduler.bot_update_task(
-        run_result.key, 'localhost', 1, 'hey', 0, 0, 0.2) as (entities, _):
-      self.assertEqual(3, len(entities))
-      ndb.put_multi(entities)
-    self.assertEqual(['hi', 'hey'], run_result.get_outputs())
+    self.assertEqual(
+        True,
+        task_scheduler.bot_update_task(
+            run_result.key, 'localhost', 0, 'hi', 0, 0, 0.1))
+    self.assertEqual(
+        False,
+        task_scheduler.bot_update_task(
+            run_result.key, 'localhost', 1, 'hey', 0, 0, 0.2))
+    run_result = run_result.key.get()
+    self.assertEqual(['hi', 'hey'], list(run_result.get_outputs()))
     self.assertEqual([0.1, 0.2], run_result.durations)
 
   def test_bot_update_task_new_overwrite(self):
     run_result = _quick_reap()
-    with task_scheduler.bot_update_task(
-        run_result.key, 'localhost', 0, 'hi', 0, None, None) as (entities, _):
-      self.assertEqual(3, len(entities))
-      ndb.put_multi(entities)
-    with task_scheduler.bot_update_task(
-        run_result.key, 'localhost', 0, 'hey', 1, None, None) as (entities, _):
-      self.assertEqual(3, len(entities))
-      ndb.put_multi(entities)
-    self.assertEqual(['hhey'], run_result.get_outputs())
-
-  def _bot_update_task_partial_write(self, index, expected_length):
-    """Tests that a partial write fails."""
-    class Foo(Exception):
-      pass
-
-    data = _gen_request_data(
-        properties=dict(dimensions={u'OS': u'Windows-3.1.1'}))
-    request, _result_summary = task_scheduler.make_request(data)
-    reaped_request, run_result = task_scheduler.bot_reap_task(
-        {'OS': 'Windows-3.1.1'}, 'localhost', 'abc')
-
-    # Use a large amount of data to force multiple (3) TaskOutputChunk.
-    stdout = 'f' * (task_result.TaskOutput.CHUNK_SIZE * 2 + 1)
-    with self.assertRaises(Foo):
-      with task_scheduler.bot_update_task(
-          run_result.key, 'localhost', 0, stdout, 0, None, None) as (
-              entities, _):
-        self.assertEqual(expected_length, len(entities))
-        entities[index].put()
-        raise Foo('Ahah, got ya')
-
-    # The client retries, this time it works.
-    with task_scheduler.bot_update_task(
-        run_result.key, 'localhost', 0, stdout, 0, None, None) as (entities, _):
-      self.assertEqual(expected_length, len(entities))
-      ndb.put_multi(entities)
-
-    self.assertEqual([stdout], run_result.get_outputs())
-
-    # The client retried even if it shouldn't have. No difference.
-    with task_scheduler.bot_update_task(
-        run_result.key, 'localhost', 0, stdout, 0, 0, 0.1) as (entities, _):
-      self.assertEqual(expected_length, len(entities))
-      ndb.put_multi(entities)
-
-    self.assertEqual([stdout], run_result.get_outputs())
-
-  def test_bot_update_task_partial_write(self):
-    # The ndb.put_multi() mocks in _bot_update_task_partial_write receives:
-    #  1 * TaskRunResult, 1 * TaskResultSummary, 3 * TaskOutputChunk.
-    # This test case ensures that the code is behaving correctly, independent of
-    # which element was written to the DB.
-    number_elements = 5
-    for index in range(number_elements):
-      self._bot_update_task_partial_write(index, number_elements)
+    self.assertEqual(
+        False,
+        task_scheduler.bot_update_task(
+            run_result.key, 'localhost', 0, 'hi', 0, None, None))
+    self.assertEqual(
+        False,
+        task_scheduler.bot_update_task(
+            run_result.key, 'localhost', 0, 'hey', 1, None, None))
+    self.assertEqual(['hhey'], list(run_result.key.get().get_outputs()))
 
   def test_bot_kill_task(self):
     self.mock(random, 'getrandbits', lambda _: 0x88)
@@ -728,9 +688,10 @@ class TaskSchedulerApiTest(test_case.TestCase):
         bot_dimensions, 'localhost', 'abc')
     logging.info('%s', [t.to_dict() for t in task_to_run.TaskToRun.query()])
     self.assertEqual(2, run_result.try_number)
-    with task_scheduler.bot_update_task(
-        run_result.key, 'localhost', 0, 'Foo1', 0, 0, 0.1) as (entities, _):
-      ndb.put_multi(entities)
+    self.assertEqual(
+        True,
+        task_scheduler.bot_update_task(
+            run_result.key, 'localhost', 0, 'Foo1', 0, 0, 0.1))
     expected = {
       'abandoned_ts': None,
       'bot_id': u'localhost',

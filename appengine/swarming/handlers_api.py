@@ -802,14 +802,9 @@ class BotTaskUpdateHandler(auth.ApiHandler):
       output = output.encode('utf-8', 'replace')
 
     try:
-      with task_scheduler.bot_update_task(
+      completed = task_scheduler.bot_update_task(
           run_result_key, bot_id, command_index, output, output_chunk_start,
-          exit_code, duration) as (entities, completed):
-        # The reason for writing in a transaction is to get rid of partial DB
-        # writes, e.g. a few entities got written but not others. This is a
-        # problem with TaskOutputChunk where some stdout stream chunks would be
-        # written but not other, causing irrecoverable errors.
-        ndb.transaction(lambda: ndb.put_multi(entities), retries=1)
+          exit_code, duration)
       action = 'task_completed' if completed else 'task_update'
       bot_management.bot_event(
           event_type=action, bot_id=bot_id,
