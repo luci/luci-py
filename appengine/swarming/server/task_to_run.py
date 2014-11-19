@@ -196,6 +196,11 @@ def task_to_run_key_to_request_key(task_key):
   return task_key.parent()
 
 
+def gen_queue_number_key(request):
+  """Returns the value to use for TaskToRun.queue_number based on request."""
+  return _gen_queue_number_key(request.created_ts, request.priority)
+
+
 def new_task_to_run(request):
   """Returns a fresh new TaskToRun for the task ready to be scheduled.
 
@@ -204,7 +209,7 @@ def new_task_to_run(request):
   """
   return TaskToRun(
       key=request_to_task_to_run_key(request),
-      queue_number=_gen_queue_number_key(request.created_ts, request.priority),
+      queue_number=gen_queue_number_key(request),
       expiration_ts=request.expiration_ts)
 
 
@@ -472,6 +477,5 @@ def retry(request, now):
     return None
 
   # The original queue_number is used but expiration_ts is unchanged.
-  to_run.queue_number = _gen_queue_number_key(
-      request.created_ts, request.priority)
+  to_run.queue_number = gen_queue_number_key(request)
   return to_run

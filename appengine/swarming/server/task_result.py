@@ -556,6 +556,14 @@ class TaskResultSummary(_TaskResultCommon):
       return None
     return result_summary_key_to_run_result_key(self.key, self.try_number)
 
+  def reset_to_pending(self):
+    """Resets this entity to pending state."""
+    self.durations = []
+    self.exit_codes = []
+    self.internal_failure = False
+    self.state = State.PENDING
+    self.started_ts = None
+
   def set_from_run_result(self, run_result, request):
     """Copies all the relevant properties from a TaskRunResult into this
     TaskResultSummary.
@@ -870,15 +878,15 @@ def new_run_result(request, try_number, bot_id, bot_version):
       server_versions=[utils.get_app_version()])
 
 
-def yield_run_results_with_dead_bot():
-  """Yields all the TaskRunResult where the bot died recently.
+def yield_run_result_keys_with_dead_bot():
+  """Yields all the TaskRunResult ndb.Key where the bot died recently.
 
-  In practice it is returning a ndb.Query but this is equivalent.
+  In practice it is returning a ndb.QueryIterator but this is equivalent.
   """
   # If a bot didn't ping recently, it is considered dead.
   deadline = utils.utcnow() - BOT_PING_TOLERANCE
   q = TaskRunResult.query().filter(TaskRunResult.modified_ts < deadline)
-  return q.filter(TaskRunResult.state == State.RUNNING)
+  return q.filter(TaskRunResult.state == State.RUNNING).iter(keys_only=True)
 
 
 def prepare_put_run_result(run_result, request):

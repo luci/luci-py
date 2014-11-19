@@ -403,7 +403,7 @@ class TaskResultApiTest(test_case.TestCase):
         run_result.key_string)
     self.assertEqual(complete_ts, run_result.ended_ts)
 
-  def test_yield_run_results_with_dead_bot(self):
+  def test_yield_run_result_keys_with_dead_bot(self):
     request = task_request.make_request(_gen_request_data())
     result_summary = task_result.new_result_summary(request)
     result_summary.put()
@@ -412,11 +412,13 @@ class TaskResultApiTest(test_case.TestCase):
     ndb.put_multi(task_result.prepare_put_run_result(run_result, request))
 
     self.mock_now(self.now + task_result.BOT_PING_TOLERANCE)
-    self.assertEqual([], list(task_result.yield_run_results_with_dead_bot()))
+    self.assertEqual(
+        [], list(task_result.yield_run_result_keys_with_dead_bot()))
 
     self.mock_now(self.now + task_result.BOT_PING_TOLERANCE, 1)
     self.assertEqual(
-        [run_result], list(task_result.yield_run_results_with_dead_bot()))
+        [run_result.key],
+        list(task_result.yield_run_result_keys_with_dead_bot()))
 
   def test_prepare_put_run_result(self):
     request = task_request.make_request(_gen_request_data())

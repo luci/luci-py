@@ -35,7 +35,7 @@ def _secs_to_ms(value):
   return int(round(value * 1000.))
 
 
-def _expire_task(to_run_key):
+def _expire_task(to_run_key, request):
   """Expires a TaskResultSummary and unschedules the TaskToRun.
 
   Returns:
@@ -48,9 +48,8 @@ def _expire_task(to_run_key):
     logging.info('Not reapable anymore')
     return None
 
-  request_key = task_to_run.task_to_run_key_to_request_key(to_run_key)
   result_summary_key = task_result.request_key_to_result_summary_key(
-      request_key)
+      request.key)
 
   def run():
     # Fetch the two entities concurrently.
@@ -66,7 +65,8 @@ def _expire_task(to_run_key):
     if result_summary.try_number:
       # It's a retry that is being expired. Keep the old state. That requires an
       # additional pipelined GET but that shouldn't be the common case.
-      result_summary.state = result_summary.run_result_key.get().state
+      run_result = result_summary.run_result_key.get()
+      result_summary.set_from_run_result(run_result, request)
     else:
       result_summary.state = task_result.State.EXPIRED
     result_summary.abandoned_ts = utils.utcnow()
@@ -177,25 +177,94 @@ def _update_stats(run_result, bot_id, request, completed):
         dimensions=request.properties.dimensions)
 
 
-@ndb.transactional
-def _retry_task(request, result_summary, run_result, now):
-  """Registers a TaskToRun as to be tried again.
+def _handle_dead_bot(run_result_key):
+  """Handles TaskRunResult where its bot has stopped showing sign of life.
 
-  Transactionally sets the TaskRunResult as BOT_DIED. Set the TaskRunResult as
-  dead but do NOT update TaskResultSummary. This is important so the client is
-  not confused about the state.
+  Transactionally updates the entities depending on the state of this task. The
+  task may be retried automatically, canceled or left alone.
 
-  Returns True on success.
+  Returns:
+    True if the task was retried, False if the task was killed, None if no
+    action was done.
   """
-  to_run = task_to_run.retry(request, now)
-  if not to_run:
-    return False
-  run_result.state = task_result.State.BOT_DIED
-  run_result.internal_failure = True
-  run_result.abandoned_ts = now
-  result_summary.state = task_result.State.PENDING
-  ndb.put_multi((to_run, result_summary, run_result))
-  return True
+  result_summary_key = task_result.run_result_key_to_result_summary_key(
+      run_result_key)
+  request_key = task_result.result_summary_key_to_request_key(
+      result_summary_key)
+  request_future = request_key.get_async()
+  now = utils.utcnow()
+  server_version = utils.get_app_version()
+  packed = task_result.pack_run_result_key(run_result_key)
+  logging.info('Handling dead bot task %s', packed)
+  request = request_future.get_result()
+  to_run_key = task_to_run.request_to_task_to_run_key(request)
+
+  def run():
+    """Returns tuple(Result, bot_id)."""
+    # Do one GET, one PUT at the end.
+    run_result, result_summary, to_run = ndb.get_multi(
+        (run_result_key, result_summary_key, to_run_key))
+    if run_result.state != task_result.State.RUNNING:
+      # It was updated already or not updating last. Likely DB index was stale.
+      return None, run_result.bot_id
+
+    if (not run_result.server_versions or
+        run_result.server_versions[-1] != server_version):
+      run_result.server_versions.append(server_version)
+
+    if result_summary.try_number != run_result.try_number:
+      # Not updating correct run_result, cancel it without touching
+      # result_summary.
+      to_put = (run_result,)
+      run_result.state = task_result.State.BOT_DIED
+      run_result.internal_failure = True
+      run_result.abandoned_ts = now
+      result = False
+    elif result_summary.try_number == 1:
+      # Retry it.
+      to_put = (run_result, result_summary, to_run)
+      to_run.queue_number = task_to_run.gen_queue_number_key(request)
+      run_result.state = task_result.State.BOT_DIED
+      run_result.internal_failure = True
+      run_result.abandoned_ts = now
+      # Do not sync data from run_result to result_summary, since the task is
+      # being retried.
+      result_summary.reset_to_pending()
+      result = True
+    else:
+      # Cancel it, there was more than one try.
+      to_put = (run_result, result_summary)
+      run_result.state = task_result.State.BOT_DIED
+      run_result.internal_failure = True
+      run_result.abandoned_ts = now
+      result_summary.set_from_run_result(run_result, request)
+      result = False
+    ndb.put_multi(to_put)
+    return result, run_result.bot_id
+
+  try:
+    success, bot_id = ndb.transaction(run)
+    if success is not None:
+      task_to_run.set_lookup_cache(to_run_key, success)
+      if not success:
+        stats.add_run_entry(
+            'run_bot_died', run_result_key,
+            bot_id=bot_id[0],
+            dimensions=request.properties.dimensions,
+            user=request.user)
+      else:
+        logging.info('Retried')
+    else:
+      logging.info('Ignored')
+    return success
+  except (
+      apiproxy_errors.CancelledError,
+      datastore_errors.BadRequestError,
+      datastore_errors.Timeout,
+      datastore_errors.TransactionFailedError,
+      RuntimeError) as e:
+    logging.info('Failed retrying task\n%s\n%s', packed, e)
+    return None
 
 
 def _copy_entity(src, dst, skip_list):
@@ -487,10 +556,9 @@ def cron_abort_expired_task_to_run():
   skipped = 0
   try:
     for to_run in task_to_run.yield_expired_task_to_run():
-      request_future = to_run.request_key.get_async()
-      if _expire_task(to_run.key):
+      request = to_run.request_key.get()
+      if _expire_task(to_run.key, request):
         killed += 1
-        request = request_future.get_result()
         stats.add_task_entry(
             'task_request_expired',
             task_result.request_key_to_result_summary_key(
@@ -500,7 +568,6 @@ def cron_abort_expired_task_to_run():
       else:
         # It's not a big deal, the bot will continue running.
         skipped += 1
-        request_future.wait()
   finally:
     # TODO(maruel): Use stats_framework.
     logging.info('Killed %d task, skipped %d', killed, skipped)
@@ -513,25 +580,19 @@ def cron_handle_bot_died():
   If the task was at its first try, it'll be retried. Otherwise the task will be
   canceled.
   """
-  retried = 0
+  ignored = 0
   killed = 0
+  retried = 0
   try:
-    for run_result in task_result.yield_run_results_with_dead_bot():
-      if run_result.try_number == 1:
-        packed = task_result.pack_run_result_key(run_result.key)
-        request, result_summary = ndb.get_multi(
-            (run_result.request_key, run_result.result_summary_key))
-        if result_summary.try_number == 1:
-          if _retry_task(request, result_summary, run_result, utils.utcnow()):
-            task_to_run.set_lookup_cache(
-                task_to_run.request_to_task_to_run_key(request), True)
-            retried += 1
-            logging.info('Retried task %s', packed)
-            continue
-          logging.info('Failed retrying task %s', packed)
-      bot_kill_task(run_result)
-      killed += 1
+    for run_result_key in task_result.yield_run_result_keys_with_dead_bot():
+      result = _handle_dead_bot(run_result_key)
+      if result is True:
+        retried += 1
+      elif result is False:
+        killed += 1
+      else:
+        ignored += 1
   finally:
     # TODO(maruel): Use stats_framework.
-    logging.info('Killed %d tasks; retried %d tasks', killed, retried)
-  return killed, retried
+    logging.info('Killed %d; retried %d; ignored: %d', killed, retried, ignored)
+  return killed, retried, ignored
