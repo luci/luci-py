@@ -312,24 +312,46 @@ def _get_free_space_on_drive_win(mount_point):
   return int(round(free_bytes.value / 1024. / 1024.))
 
 
+def _get_total_size_on_drive_win(mount_point):
+  """Returns total size of a mount point in Mb."""
+  total_bytes = ctypes.c_ulonglong(0)
+  ctypes.windll.kernel32.GetDiskFreeSpaceExW(
+      ctypes.c_wchar_p(mount_point), None, ctypes.pointer(total_bytes), None)
+  return int(round(total_bytes.value / 1024. / 1024.))
+
+
 def _get_free_space_on_disks_win():
   """Returns free space on all mount point in Mb."""
   return dict(
       (p, _get_free_space_on_drive_win(p)) for p in _get_mount_points_win())
 
 
-def _get_free_space_on_disks_posix():
-  """Returns free space on all mount point in Mb."""
-  # A bit cheezy but works well.
+def _get_largest_disk_size_win():
+  """Returns the disk size of the largest mount point in Mb."""
+  return max(_get_total_size_on_drive_win(p) for p in _get_mount_points_win())
+
+
+def _run_df():
+  """Runs df and returns the output."""
   proc = subprocess.Popen(
       ['/bin/df', '-k', '-P'], env={'LANG': 'C'},
       stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-  out = {}
   for l in proc.communicate()[0].splitlines():
     if l.startswith('/dev/'):
-      items = l.split()
-      out[items[5]] = int(round(int(items[3]) / 1024.))
-  return out
+      yield l.split()
+
+
+def _get_free_space_on_disks_posix():
+  """Returns free space on all mount point in Mb."""
+  # A bit cheezy but works well.
+  return dict(
+      (items[5], int(round(int(items[3]) / 1024.))) for items in _run_df())
+
+
+def _get_largest_disk_size_posix():
+  """Returns the disk size of the largest mount point in Mb."""
+  # A bit cheezy but works well.
+  return max(int(round(int(items[1]) / 1024.)) for items in _run_df())
 
 
 def _safe_read(filepath):
@@ -544,11 +566,18 @@ def get_physical_ram():
   return 0
 
 
-def get_free_disk():
+def get_free_disks():
   """Gets free disk space in all partitions in Mb."""
   if sys.platform == 'win32':
     return _get_free_space_on_disks_win()
   return _get_free_space_on_disks_posix()
+
+
+def get_largest_disk_size():
+  """Returns disk size of the largest partition in Mb."""
+  if sys.platform == 'win32':
+    return _get_largest_disk_size_win()
+  return _get_largest_disk_size_posix()
 
 
 @cached
@@ -779,6 +808,7 @@ def get_dimensions():
       cpu_type,
       cpu_type + '-' + cpu_bitness,
     ],
+    'disk': [str(get_largest_disk_size())],
     'gpu': get_gpu()[0],
     'hostname': [get_hostname()],
     'id': [get_hostname_short()],
@@ -786,6 +816,7 @@ def get_dimensions():
       os_name,
       os_name + '-' + os_version,
     ],
+    'ram': [str(get_physical_ram())],
   }
   if 'none' not in dimensions['gpu']:
     hidpi = get_monitor_hidpi()
@@ -831,10 +862,9 @@ def get_state(threshold_mb=2*1024, skip=None):
   # to clean up.
   state = {
     'cwd': os.getcwd(),
-    'disk': get_free_disk(),
+    'free_disks': get_free_disks(),
     'gpu': get_gpu()[1],
     'ip': get_ip(),
-    'ram': get_physical_ram(),
     'running_time': int(round(time.time() - _STARTED_TS)),
     'started_ts': int(round(_STARTED_TS)),
   }
@@ -845,7 +875,7 @@ def get_state(threshold_mb=2*1024, skip=None):
 def auto_quarantine_on_low_space(state, threshold_mb=2*1024, skip=None):
   """Quarantines when less than threshold_mb on any partition.
 
-  Modifies state in-place. Assumes state['disk'] is valid.
+  Modifies state in-place. Assumes state['free_disks'] is valid.
   """
   if not threshold_mb or state.get('quarantined'):
     return
@@ -854,7 +884,7 @@ def auto_quarantine_on_low_space(state, threshold_mb=2*1024, skip=None):
     skip = ['/boot', '/boot/efi']
 
   s = []
-  for mount, space_mb in state['disk'].iteritems():
+  for mount, space_mb in state['free_disks'].iteritems():
     if mount not in skip and space_mb < threshold_mb:
       s.append('Not enough free disk space on %s.' % mount)
   if s:

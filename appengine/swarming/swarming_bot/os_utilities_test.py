@@ -93,8 +93,8 @@ class TestOsUtilities(auto_stub.TestCase):
   def test_get_physical_ram(self):
     self.assertGreater(os_utilities.get_physical_ram(), 0)
 
-  def test_get_free_disk(self):
-    self.assertGreater(os_utilities.get_free_disk(), 0)
+  def test_get_free_disks(self):
+    self.assertGreater(os_utilities.get_free_disks(), 0)
 
   def test_get_gpu(self):
     actual = os_utilities.get_gpu()
@@ -109,7 +109,7 @@ class TestOsUtilities(auto_stub.TestCase):
   def test_get_dimensions(self):
     actual = os_utilities.get_dimensions()
 
-    expected = set(['cores', 'cpu', 'hostname', 'id', 'os'])
+    expected = set(['cores', 'cpu', 'disk', 'hostname', 'id', 'os', 'ram'])
     if sys.platform in ('cygwin', 'win32'):
       expected.add('cygwin')
     if sys.platform == 'win32':
@@ -120,7 +120,7 @@ class TestOsUtilities(auto_stub.TestCase):
 
   def test_get_state(self):
     actual = os_utilities.get_state()
-    expected = {'cwd', 'disk', 'gpu', 'ip', 'ram', 'running_time', 'started_ts'}
+    expected = {'cwd', 'free_disks', 'gpu', 'ip', 'running_time', 'started_ts'}
     self.assertEqual(expected, set(actual))
 
   def test_get_adb_list_devices(self):

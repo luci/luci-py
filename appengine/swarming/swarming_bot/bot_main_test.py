@@ -64,7 +64,7 @@ class TestBotMain(net_utils.TestCase):
 
   def test_get_dimensions(self):
     self.assertEqual(
-        ['cores', 'cpu', 'gpu', 'hostname', 'id', 'os'],
+        ['cores', 'cpu', 'disk', 'gpu', 'hostname', 'id', 'os', 'ram'],
         sorted(bot_main.get_dimensions()))
 
   def test_generate_version(self):
