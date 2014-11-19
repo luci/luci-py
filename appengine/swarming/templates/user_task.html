@@ -60,204 +60,210 @@
 <a href="/user/tasks">Back to tasks list</a>
 <p>
 
-<h2>Request metadata</h2>
-<table class="property_table">
-  <tbody>
-    <tr>
-      <td>Name</td>
-      <td>{{request.name}}</td>
-    </tr>
-    <tr>
-      <td>User</td>
-      <td>{{request.user}}</td>
-    </tr>
-    <tr>
-      <td>Priority</td>
-      <td>{{request.priority}}</td>
-    </tr>
-    <tr>
-      <td>Created</td>
-      <td>{{request.created_ts|datetimeformat}}</td>
-    </tr>
-    <tr>
-      <td>Expiration</td>
-      <td>
-        {{request.expiration_ts|datetimeformat}}
-        ({{(request.expiration_ts-request.created_ts)|timedeltaformat}})
-      </td>
-    </tr>
-    <tr>
-      <td>Tags</td>
-      <td>{{request.tags|join('<br>'|safe)}}</td>
-    </tr>
-  </tbody>
-</table>
-
-<h2>Request properties</h2>
-<table class="property_table">
-  <tbody>
-    <tr>
-      <td>Request dimensions</td>
-      <td>{{bot_view.render_dict(request.properties.dimensions)}}</td>
-    </tr>
-    <tr>
-      <td>Execution timeout (s)</td>
-      <td>{{request.properties.execution_timeout_secs}}</td>
-    </tr>
-    <tr>
-      <td>I/O timeout (s)</td>
-      <td>{{request.properties.io_timeout_secs}}</td>
-    </tr>
-    <tr>
-      <td>Environment variables</td>
-      <td>{{bot_view.render_dict(request.properties.env)}}</td>
-    </tr>
-    <tr>
-      <td>Idempotent</td>
-      <td>{{request.properties.idempotent}}</td>
-    </tr>
-    <tr>
-      <td>Commands</td>
-      <td>
-        {% for cmd in request.properties.commands %}
-        {{cmd|join(' ')}}<br>
-        {% endfor %}
-      </td>
-    </tr>
-  </tbody>
-</table>
-
-<h2>Execution</h2>
-<table class="property_table">
-  <tbody>
-    <tr>
-      <td>Bot's previous task</td>
-      <td>
-        {% if previous_task_id %}
-        <a href="/user/task/{{previous_task_id}}">
-          &#x2190; {{previous_task_name}}
-        </a>
-        {% else %}
-        &#8209;&#8209;
-        {% endif %}
-      </td>
-    </tr>
-    <tr>
-      <td>Bot's following task</td>
-      <td>
-        {% if following_task_id %}
-        <a href="/user/task/{{following_task_id}}">
-          {{following_task_name}} &#x2192;
-        </a>
-        {% else %}
-        &#8209;&#8209;
-        {% endif %}
-      </td>
-    </tr>
-    <tr>
-      <td>Started</td>
-      <td>{{task.started_ts|datetimeformat}}</td>
-    </tr>
-    <tr>
-      <td>Last updated</td>
-      <td>{{(now-task.modified_ts)|timedeltaformat}} ago</td>
-    </tr>
-    <tr>
-      <td>Pending time</td>
-      <td>
-        {{bot_view.pending_star(task)}}{{task.pending_now(now)|timedeltaformat}}
-      </td>
-    </tr>
-    <tr>
-      <td>Completed</td>
-      <td>{{task.completed_ts|datetimeformat}}</td>
-    </tr>
-    <tr>
-      <td>Duration</td>
-      <td>
-        {{bot_view.running_star(task)}}{{task.duration_now(now)|timedeltaformat}}
-      </td>
-    </tr>
-    <tr>
-      <td>Abandoned</td>
-      <td>
-        {{task.abandoned_ts|datetimeformat}}
-        {% if task.abandoned_ts %}
-          {% if task.started_ts %}
-            ({{(task.abandoned_ts-task.started_ts)|timedeltaformat}} since task
-            started)
-          {% else %}
-            ({{(task.abandoned_ts-request.created_ts)|timedeltaformat}} since
-            task request)
-          {% endif %}
-        {% endif %}
-      </td>
-    </tr>
-    <tr>
-      <td>State</td>
-      <td>
-        {{task.to_string()}} ({{task.state}})
-        {% if task.can_be_canceled and is_admin %}
-          <form id="cancel" method="post" action="/user/tasks/cancel">
-            <input type="hidden" name="xsrf_token" value="{{xsrf_token}}" />
-            <input type="hidden" name="task_id" value="{{task.key_string}}" />
-            <input type="submit" value="Cancel" />
-          </form>
-        {% endif %}
-      </td>
-    </tr>
-    <tr>
-      <td>Bot</td>
-      <td>{{bot_view.bot_link(task.bot_id, is_privileged_user)}}</td>
-    </tr>
-    <tr>
-      <td>Bot dimensions</td>
-      <td>{{bot_view.bot_dimensions(bot)}}</td>
-    </tr>
-    <tr>
-      <td>Bot version</td>
-      <td>{{task.bot_version}}</td>
-    </tr>
-    <tr>
-      <td>Server version</td>
-      <td>
-        {% for v in task.server_versions %}
-          {% if is_gae_admin %}
-            <a href="https://appengine.google.com/logs?&app_id={{full_appid}}&version_id={{v}}">
-              {{v}}
-            </a>
-          {% else %}
-            {{v}}
-          {% endif %}
-        {% endfor %}
-      </td>
-    </tr>
-    <tr class="{% if task.failure %}failed_test{% endif%}">
-      <td>Failure</td>
-      <td>{{task.failure}}</td>
-    </tr>
-    <tr class="{% if task.internal_failure %}failed_test{% endif%}">
-      <td>Internal failure</td>
-      <td>{{task.internal_failure}}</td>
-    </tr>
-    <tr>
-      <td>Exit codes</td>
-      <td>{{task.exit_codes}}</td>
-    </tr>
-    <tr>
-      <td>Try number</td>
-      <td>{{task.try_number}}</td>
-    </tr>
-    {% if task.deduped_from %}
+<div title="Information about the request itself that doesn't include what is being run; it's about the context and description.">
+  <h2>Request metadata</h2>
+  <table class="property_table">
+    <tbody>
       <tr>
-        <td><strong>Was deduped from</strong></td>
+        <td>Name</td>
+        <td>{{request.name}}</td>
+      </tr>
+      <tr>
+        <td>User</td>
+        <td>{{request.user}}</td>
+      </tr>
+      <tr>
+        <td>Priority</td>
+        <td>{{request.priority}}</td>
+      </tr>
+      <tr>
+        <td>Created</td>
+        <td>{{request.created_ts|datetimeformat}}</td>
+      </tr>
+      <tr>
+        <td>Expiration</td>
         <td>
-          <a href="/user/task/{{task.deduped_from}}">{{task.deduped_from}}</a>
+          {{request.expiration_ts|datetimeformat}}
+          ({{(request.expiration_ts-request.created_ts)|timedeltaformat}})
         </td>
       </tr>
-    {% endif %}
-  </tbody>
-</table>
+      <tr>
+        <td>Tags</td>
+        <td>{{request.tags|join('<br>'|safe)}}</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<div title="Information about what was asked to be run. This is what is used for task deduplication.">
+  <h2>Request properties</h2>
+  <table class="property_table">
+    <tbody>
+      <tr>
+        <td>Request dimensions</td>
+        <td>{{bot_view.render_dict(request.properties.dimensions)}}</td>
+      </tr>
+      <tr>
+        <td>Execution timeout (s)</td>
+        <td>{{request.properties.execution_timeout_secs}}</td>
+      </tr>
+      <tr>
+        <td>I/O timeout (s)</td>
+        <td>{{request.properties.io_timeout_secs}}</td>
+      </tr>
+      <tr>
+        <td>Environment variables</td>
+        <td>{{bot_view.render_dict(request.properties.env)}}</td>
+      </tr>
+      <tr>
+        <td>Idempotent</td>
+        <td>{{request.properties.idempotent}}</td>
+      </tr>
+      <tr>
+        <td>Commands</td>
+        <td>
+          {% for cmd in request.properties.commands %}
+          {{cmd|join(' ')}}<br>
+          {% endfor %}
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<div title="Information about the result: the task was run where (which bot), when and what is the result.">
+  <h2>Execution</h2>
+  <table class="property_table">
+    <tbody>
+      <tr>
+        <td>Bot's previous task</td>
+        <td>
+          {% if previous_task_id %}
+          <a href="/user/task/{{previous_task_id}}">
+            &#x2190; {{previous_task_name}}
+          </a>
+          {% else %}
+          &#8209;&#8209;
+          {% endif %}
+        </td>
+      </tr>
+      <tr>
+        <td>Bot's following task</td>
+        <td>
+          {% if following_task_id %}
+          <a href="/user/task/{{following_task_id}}">
+            {{following_task_name}} &#x2192;
+          </a>
+          {% else %}
+          &#8209;&#8209;
+          {% endif %}
+        </td>
+      </tr>
+      <tr>
+        <td>Started</td>
+        <td>{{task.started_ts|datetimeformat}}</td>
+      </tr>
+      <tr>
+        <td>Last updated</td>
+        <td>{{(now-task.modified_ts)|timedeltaformat}} ago</td>
+      </tr>
+      <tr>
+        <td>Pending time</td>
+        <td>
+          {{bot_view.pending_star(task)}}{{task.pending_now(now)|timedeltaformat}}
+        </td>
+      </tr>
+      <tr>
+        <td>Completed</td>
+        <td>{{task.completed_ts|datetimeformat}}</td>
+      </tr>
+      <tr>
+        <td>Duration</td>
+        <td>
+          {{bot_view.running_star(task)}}{{task.duration_now(now)|timedeltaformat}}
+        </td>
+      </tr>
+      <tr>
+        <td>Abandoned</td>
+        <td>
+          {{task.abandoned_ts|datetimeformat}}
+          {% if task.abandoned_ts %}
+            {% if task.started_ts %}
+              ({{(task.abandoned_ts-task.started_ts)|timedeltaformat}} since task
+              started)
+            {% else %}
+              ({{(task.abandoned_ts-request.created_ts)|timedeltaformat}} since
+              task request)
+            {% endif %}
+          {% endif %}
+        </td>
+      </tr>
+      <tr>
+        <td>State</td>
+        <td>
+          {{task.to_string()}} ({{task.state}})
+          {% if task.can_be_canceled and is_admin %}
+            <form id="cancel" method="post" action="/user/tasks/cancel">
+              <input type="hidden" name="xsrf_token" value="{{xsrf_token}}" />
+              <input type="hidden" name="task_id" value="{{task.key_string}}" />
+              <input type="submit" value="Cancel" />
+            </form>
+          {% endif %}
+        </td>
+      </tr>
+      <tr>
+        <td>Bot</td>
+        <td>{{bot_view.bot_link(task.bot_id, is_privileged_user)}}</td>
+      </tr>
+      <tr>
+        <td>Bot dimensions</td>
+        <td>{{bot_view.bot_dimensions(bot)}}</td>
+      </tr>
+      <tr>
+        <td>Bot version</td>
+        <td>{{task.bot_version}}</td>
+      </tr>
+      <tr>
+        <td>Server version</td>
+        <td>
+          {% for v in task.server_versions %}
+            {% if is_gae_admin %}
+              <a href="https://appengine.google.com/logs?&app_id={{full_appid}}&version_id={{v}}">
+                {{v}}
+              </a>
+            {% else %}
+              {{v}}
+            {% endif %}
+          {% endfor %}
+        </td>
+      </tr>
+      <tr class="{% if task.failure %}failed_test{% endif%}">
+        <td>Failure</td>
+        <td>{{task.failure}}</td>
+      </tr>
+      <tr class="{% if task.internal_failure %}failed_test{% endif%}">
+        <td>Internal failure</td>
+        <td>{{task.internal_failure}}</td>
+      </tr>
+      <tr>
+        <td>Exit codes</td>
+        <td>{{task.exit_codes}}</td>
+      </tr>
+      <tr>
+        <td>Try number</td>
+        <td>{{task.try_number}}</td>
+      </tr>
+      {% if task.deduped_from %}
+        <tr>
+          <td><strong>Was deduped from</strong></td>
+          <td>
+            <a href="/user/task/{{task.deduped_from}}">{{task.deduped_from}}</a>
+          </td>
+        </tr>
+      {% endif %}
+    </tbody>
+  </table>
+</div>
 
 <br>
 <span style="margin-bottom:0">To run this task locally, execute:</span>
