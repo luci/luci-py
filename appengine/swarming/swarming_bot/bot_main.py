@@ -213,6 +213,8 @@ def run_bot(arg_error):
     # is kept there "just in case".
     logging.error('Failed to ping')
 
+  # If this fails, there's hardly anything that can be done, the bot can't even
+  # get to the point to be able to self-update.
   botobj = get_bot()
   if arg_error:
     botobj.post_error('Argument error: %s' % arg_error)

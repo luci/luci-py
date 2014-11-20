@@ -88,10 +88,13 @@ class Bot(object):
   def post_error(self, message):
     """Posts given string as a failure.
 
-    This is used in case of internal code error.
+    This is used in case of internal code error. It traps exception.
     """
     logging.error('Error: %s\n%s', self._attributes, message)
-    self.post_event('bot_error', message)
+    try:
+      self.post_event('bot_error', message)
+    except Exception:
+      logging.exception('post_error(%s) failed.', message)
 
   def restart(self, message):
     """Reboots the machine.
