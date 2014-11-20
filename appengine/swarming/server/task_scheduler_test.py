@@ -590,7 +590,8 @@ class TaskSchedulerApiTest(test_case.TestCase):
   def test_cron_abort_expired_task_to_run_retry(self):
     self.mock(random, 'getrandbits', lambda _: 0x88)
     data = _gen_request_data(
-        properties=dict(dimensions={u'OS': u'Windows-3.1.1'}))
+        properties=dict(dimensions={u'OS': u'Windows-3.1.1'}),
+        scheduling_expiration_secs=600)
     request, result_summary = task_scheduler.make_request(data)
 
     # Fake first try bot died.
@@ -728,7 +729,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
     self.assertEqual(expected, run_result.result_summary_key.get().to_dict())
 
   def test_cron_handle_bot_died_second(self):
-    # Test two retries leading to a BOT_DIED status.
+    # Test two tries internal_failure's leading to a BOT_DIED status.
     self.mock(random, 'getrandbits', lambda _: 0x88)
     data = _gen_request_data(
         properties=dict(dimensions={u'OS': u'Windows-3.1.1'}),
@@ -774,8 +775,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
     }
     self.assertEqual(expected, run_result.result_summary_key.get().to_dict())
 
-  def test_cron_handle_bot_died_ignored(self):
-    # Test two retries.
+  def test_cron_handle_bot_died_ignored_expired(self):
     self.mock(random, 'getrandbits', lambda _: 0x88)
     data = _gen_request_data(
         properties=dict(dimensions={u'OS': u'Windows-3.1.1'}),
@@ -790,14 +790,8 @@ class TaskSchedulerApiTest(test_case.TestCase):
         bot_dimensions, 'localhost', 'abc')
     self.assertEqual(1, run_result.try_number)
     self.assertEqual(task_result.State.RUNNING, run_result.state)
-    self.mock_now(self.now + task_result.BOT_PING_TOLERANCE, 1)
-    self.assertEqual((0, 1, 0), task_scheduler.cron_handle_bot_died())
-    self.mock_now(self.now + task_result.BOT_PING_TOLERANCE, 2)
-    _request, run_result = task_scheduler.bot_reap_task(
-        bot_dimensions, 'localhost', 'abc')
-    self.mock_now(self.now + 2 * task_result.BOT_PING_TOLERANCE, 3)
+    self.mock_now(self.now + task_result.BOT_PING_TOLERANCE, 601)
     self.assertEqual((1, 0, 0), task_scheduler.cron_handle_bot_died())
-    self.assertEqual((0, 0, 0), task_scheduler.cron_handle_bot_died())
 
   def test_search_by_name(self):
     data = _gen_request_data(

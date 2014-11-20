@@ -624,44 +624,6 @@ class TaskToRunApiTest(test_case.TestCase):
     self.assertEqual(
         1, len(_yield_next_available_task_to_dispatch(bot_dimensions)))
 
-  def test_retry(self):
-    to_run = _gen_new_task_to_run(
-        properties=dict(dimensions={u'OS': u'Windows-3.1.1'}))
-    bot_dimensions = {u'OS': u'Windows-3.1.1', u'hostname': u'localhost'}
-    self.assertEqual(
-        1, len(_yield_next_available_task_to_dispatch(bot_dimensions)))
-    to_run.queue_number = None
-    to_run.put()
-    self.assertEqual(
-        0, len(_yield_next_available_task_to_dispatch(bot_dimensions)))
-
-    request = to_run.request_key.get()
-    self.mock_now(self.now, 60)
-    def tx():
-      task_to_run.retry(request, utils.utcnow()).put()
-    ndb.transaction(tx)
-    self.assertEqual(
-        1, len(_yield_next_available_task_to_dispatch(bot_dimensions)))
-
-  def test_retry_expired(self):
-    to_run = _gen_new_task_to_run(
-        properties=dict(dimensions={u'OS': u'Windows-3.1.1'}))
-    bot_dimensions = {u'OS': u'Windows-3.1.1', u'hostname': u'localhost'}
-    self.assertEqual(
-        1, len(_yield_next_available_task_to_dispatch(bot_dimensions)))
-    to_run.queue_number = None
-    to_run.put()
-    self.assertEqual(
-        0, len(_yield_next_available_task_to_dispatch(bot_dimensions)))
-
-    self.mock_now(self.now, 61)
-    def tx():
-      self.assertEqual(
-          None, task_to_run.retry(to_run.request_key.get(), utils.utcnow()))
-    ndb.transaction(tx)
-    self.assertEqual(
-        0, len(_yield_next_available_task_to_dispatch(bot_dimensions)))
-
 
 if __name__ == '__main__':
   if '-v' in sys.argv:
