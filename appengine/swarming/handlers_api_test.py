@@ -16,6 +16,9 @@ import zipfile
 # Setups environment.
 import test_env_handlers
 
+from google.appengine.api import datastore_errors
+from google.appengine.ext import ndb
+
 import webapp2
 import webtest
 
@@ -344,7 +347,7 @@ class BotApiTest(AppTestBase):
     ]
     self.assertEqual(expected, actual)
 
-  def test_update(self):
+  def test_task_complete(self):
     # Runs a task with 2 commands up to completion.
     self.mock(random, 'getrandbits', lambda _: 0x88)
     now = datetime.datetime(2010, 1, 2, 3, 4, 5)
@@ -430,6 +433,66 @@ class BotApiTest(AppTestBase):
         failure=True,
         state=task_result.State.COMPLETED)
     _cycle(params, expected)
+
+  def test_task_update_db_failure(self):
+    # The error is caught in task_scheduler.bot_update_task().
+    self.client_create_task(
+        properties=dict(commands=[['python', 'runtest.py'], ['cleanup.py']]))
+
+    token, params = self.get_bot_token()
+    response = self.post_with_token(
+        '/swarming/api/v1/bot/poll', params, token)
+    task_id = response['manifest']['task_id']
+
+    def r(*_):
+      raise datastore_errors.Timeout('Sorry!')
+    self.mock(ndb, 'put_multi', r)
+    params = {
+      'command_index': 0,
+      'duration': 0.1,
+      'exit_code': 0,
+      'id': 'bot1',
+      'output': 'result string',
+      'output_chunk_start': 0,
+      'task_id': task_id,
+    }
+    response = self.post_with_token(
+        '/swarming/api/v1/bot/task_update', params, token, status=500)
+    expected = {
+      u'error':
+          u'The server has either erred or is incapable of performing the '
+          u'requested operation.',
+    }
+    self.assertEqual(expected, response)
+
+  def test_task_update_failure(self):
+    # The error is caught in handlers_api.BotTaskUpdateHandler.post().
+    self.client_create_task(
+        properties=dict(commands=[['python', 'runtest.py'], ['cleanup.py']]))
+
+    token, params = self.get_bot_token()
+    response = self.post_with_token(
+        '/swarming/api/v1/bot/poll', params, token)
+    task_id = response['manifest']['task_id']
+
+    class NewError(Exception):
+      pass
+
+    def r(*_):
+      raise NewError('Sorry!')
+    self.mock(ndb, 'put_multi', r)
+    params = {
+      'command_index': 0,
+      'duration': 0.1,
+      'exit_code': 0,
+      'id': 'bot1',
+      'output': 'result string',
+      'output_chunk_start': 0,
+      'task_id': task_id,
+    }
+    response = self.post_with_token(
+        '/swarming/api/v1/bot/task_update', params, token, status=500)
+    self.assertEqual({u'error': u'Sorry!'}, response)
 
   def test_task_failure(self):
     self.mock(random, 'getrandbits', lambda _: 0x88)

@@ -75,21 +75,24 @@ def _expire_task(to_run_key, request):
 
   try:
     success = ndb.transaction(run)
-    if success:
-      task_to_run.set_lookup_cache(to_run_key, False)
-      logging.info(
-          'Expired %s',
-          task_result.pack_result_summary_key(result_summary_key))
-    return success
   except (
       apiproxy_errors.CancelledError,
       datastore_errors.BadRequestError,
+      datastore_errors.InternalError,
       datastore_errors.Timeout,
       datastore_errors.TransactionFailedError,
       RuntimeError) as e:
     packed = task_result.pack_result_summary_key(result_summary_key)
+    # It'll be caught by next cron job execution.
     logging.info('Failed to reap %s: %s', packed, e)
     return False
+
+  if success:
+    task_to_run.set_lookup_cache(to_run_key, False)
+    logging.info(
+        'Expired %s',
+        task_result.pack_result_summary_key(result_summary_key))
+  return success
 
 
 def _reap_task(to_run_key, request, bot_id, bot_version):
@@ -121,17 +124,20 @@ def _reap_task(to_run_key, request, bot_id, bot_version):
 
   try:
     run_result = ndb.transaction(run, retries=0)
-    if run_result:
-      task_to_run.set_lookup_cache(to_run_key, False)
-    return run_result
   except (
       apiproxy_errors.CancelledError,
       datastore_errors.BadRequestError,
+      datastore_errors.InternalError,
       datastore_errors.Timeout,
       datastore_errors.TransactionFailedError,
       RuntimeError) as e:
+    # The bot will reap the next available task, no big deal.
     logging.warning('Failed to reap: %s', e)
     return None
+
+  if run_result:
+    task_to_run.set_lookup_cache(to_run_key, False)
+  return run_result
 
 
 def _update_stats(run_result, bot_id, request, completed):
@@ -219,28 +225,31 @@ def _handle_dead_bot(run_result_key):
     return result, run_result.bot_id
 
   try:
-    success, bot_id = ndb.transaction(run)
-    if success is not None:
-      task_to_run.set_lookup_cache(to_run_key, success)
-      if not success:
-        stats.add_run_entry(
-            'run_bot_died', run_result_key,
-            bot_id=bot_id[0],
-            dimensions=request.properties.dimensions,
-            user=request.user)
-      else:
-        logging.info('Retried')
-    else:
-      logging.info('Ignored')
-    return success
+    success, bot_id = ndb.transaction(run, retries=1)
   except (
       apiproxy_errors.CancelledError,
       datastore_errors.BadRequestError,
+      datastore_errors.InternalError,
       datastore_errors.Timeout,
       datastore_errors.TransactionFailedError,
       RuntimeError) as e:
+    # It'll be caught by next cron job execution.
     logging.info('Failed retrying task\n%s\n%s', packed, e)
     return None
+
+  if success is not None:
+    task_to_run.set_lookup_cache(to_run_key, success)
+    if not success:
+      stats.add_run_entry(
+          'run_bot_died', run_result_key,
+          bot_id=bot_id[0],
+          dimensions=request.properties.dimensions,
+          user=request.user)
+    else:
+      logging.info('Retried')
+  else:
+    logging.info('Ignored')
+  return success
 
 
 def _copy_entity(src, dst, skip_list):
@@ -427,7 +436,8 @@ def bot_update_task(
   - Out of order processing of command_index.
 
   Returns:
-    True if the task completed.
+    tuple(bool, bool); first is if the update succeeded, second is if the task
+    completed.
   """
   assert output_chunk_start is None or isinstance(output_chunk_start, int)
   assert output is None or isinstance(output, str)
@@ -502,19 +512,22 @@ def bot_update_task(
 
   try:
     run_result, task_completed, error = ndb.transaction(run, retries=1)
-    if run_result:
-      _update_stats(run_result, bot_id, request, task_completed)
-    if error:
-       logging.error('Task %s %s', packed, error)
-    return task_completed
   except (
       apiproxy_errors.CancelledError,
       datastore_errors.BadRequestError,
+      datastore_errors.InternalError,
       datastore_errors.Timeout,
       datastore_errors.TransactionFailedError,
       RuntimeError) as e:
+    # It is important that the caller correctly surface this error.
     logging.info('Failed updating task\n%s\n%s', packed, e)
-    return False
+    return False, False
+
+  if run_result:
+    _update_stats(run_result, bot_id, request, task_completed)
+  if error:
+      logging.error('Task %s %s', packed, error)
+  return True, task_completed
 
 
 def bot_kill_task(run_result_key, bot_id):
@@ -551,22 +564,26 @@ def bot_kill_task(run_result_key, bot_id):
     return run_result, None
 
   try:
-    run_result, msg = ndb.transaction(run)
-    request = request_future.get_result()
-    if run_result:
-      stats.add_run_entry(
-          'run_bot_died', run_result.key,
-          bot_id=run_result.bot_id,
-          dimensions=request.properties.dimensions,
-          user=request.user)
-    return msg
+    run_result, msg = ndb.transaction(run, retries=1)
   except (
       apiproxy_errors.CancelledError,
       datastore_errors.BadRequestError,
+      datastore_errors.InternalError,
       datastore_errors.Timeout,
       datastore_errors.TransactionFailedError,
       RuntimeError) as e:
+    # At worst, the task will be tagged as BOT_DIED after BOT_PING_TOLERANCE
+    # seconds passed on the next cron_handle_bot_died cron job.
     return 'Failed killing task %s: %s' % (packed, e)
+
+  request = request_future.get_result()
+  if run_result:
+    stats.add_run_entry(
+        'run_bot_died', run_result.key,
+        bot_id=run_result.bot_id,
+        dimensions=request.properties.dimensions,
+        user=request.user)
+  return msg
 
 
 def cancel_task(summary_key):

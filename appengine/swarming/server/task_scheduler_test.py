@@ -18,6 +18,7 @@ import test_env
 
 test_env.setup_test_env()
 
+from google.appengine.api import datastore_errors
 from google.appengine.api import search
 from google.appengine.ext import deferred
 from google.appengine.ext import ndb
@@ -182,7 +183,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
     self.assertEqual(None, task_to_run.TaskToRun.query().get().queue_number)
     # It's important to terminate the task with success.
     self.assertEqual(
-        True,
+        (True, True),
         task_scheduler.bot_update_task(
             run_result_1.key, 'localhost', 0, 'Foo1', 0, 0, 0.1))
 
@@ -317,11 +318,11 @@ class TaskSchedulerApiTest(test_case.TestCase):
     done_ts = self.now + datetime.timedelta(seconds=120)
     self.mock_now(done_ts)
     self.assertEqual(
-        True,
+        (True, True),
         task_scheduler.bot_update_task(
             run_result.key, 'localhost', 0, 'Foo1', 0, 0, 0.1))
     self.assertEqual(
-        False,
+        (True, False),
         task_scheduler.bot_update_task(
         run_result.key, 'localhost', 1, 'Bar22', 0, 0, 0.2))
     result_summary, run_results = get_results(request.key)
@@ -376,11 +377,11 @@ class TaskSchedulerApiTest(test_case.TestCase):
         {'OS': 'Windows-3.1.1'}, 'localhost', 'abc')
     self.assertEqual(request, reaped_request)
     self.assertEqual(
-        True,
+        (True, True),
         task_scheduler.bot_update_task(
         run_result.key, 'localhost', 0, 'Foo1', 0, 0, 0.1))
     self.assertEqual(
-        False,
+        (True, False),
         task_scheduler.bot_update_task(
         run_result.key, 'localhost', 1, 'Bar22', 0, 1, 0.2))
     result_summary, run_results = get_results(request.key)
@@ -437,11 +438,11 @@ class TaskSchedulerApiTest(test_case.TestCase):
   def test_bot_update_task(self):
     run_result = _quick_reap()
     self.assertEqual(
-        True,
+        (True, True),
         task_scheduler.bot_update_task(
             run_result.key, 'localhost', 0, 'hi', 0, 0, 0.1))
     self.assertEqual(
-        False,
+        (True, False),
         task_scheduler.bot_update_task(
             run_result.key, 'localhost', 0, 'hey', 2, 0, 0.1))
     self.assertEqual(['hihey'], list(run_result.key.get().get_outputs()))
@@ -449,11 +450,11 @@ class TaskSchedulerApiTest(test_case.TestCase):
   def test_bot_update_task_new_two_commands(self):
     run_result = _quick_reap()
     self.assertEqual(
-        True,
+        (True, True),
         task_scheduler.bot_update_task(
             run_result.key, 'localhost', 0, 'hi', 0, 0, 0.1))
     self.assertEqual(
-        False,
+        (True, False),
         task_scheduler.bot_update_task(
             run_result.key, 'localhost', 1, 'hey', 0, 0, 0.2))
     run_result = run_result.key.get()
@@ -463,14 +464,25 @@ class TaskSchedulerApiTest(test_case.TestCase):
   def test_bot_update_task_new_overwrite(self):
     run_result = _quick_reap()
     self.assertEqual(
-        False,
+        (True, False),
         task_scheduler.bot_update_task(
             run_result.key, 'localhost', 0, 'hi', 0, None, None))
     self.assertEqual(
-        False,
+        (True, False),
         task_scheduler.bot_update_task(
             run_result.key, 'localhost', 0, 'hey', 1, None, None))
     self.assertEqual(['hhey'], list(run_result.key.get().get_outputs()))
+
+  def test_bot_update_exception(self):
+    run_result = _quick_reap()
+    def r(*_):
+      raise datastore_errors.TransactionFailedError('Sorry!')
+
+    self.mock(ndb, 'put_multi', r)
+    self.assertEqual(
+        (False, False),
+        task_scheduler.bot_update_task(
+            run_result.key, 'localhost', 0, 'hi', 0, 0, 0.1))
 
   def test_bot_kill_task(self):
     self.mock(random, 'getrandbits', lambda _: 0x88)
@@ -689,7 +701,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
     logging.info('%s', [t.to_dict() for t in task_to_run.TaskToRun.query()])
     self.assertEqual(2, run_result.try_number)
     self.assertEqual(
-        True,
+        (True, True),
         task_scheduler.bot_update_task(
             run_result.key, 'localhost', 0, 'Foo1', 0, 0, 0.1))
     expected = {

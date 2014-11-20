@@ -103,10 +103,10 @@ class AppTestBase(test_case.TestCase):
         headers={'X-XSRF-Token-Request': '1'}).json
     return resp['xsrf_token'].encode('ascii')
 
-  def post_with_token(self, url, params, token):
+  def post_with_token(self, url, params, token, **kwargs):
     """Does an HTTP POST with a JSON API and a XSRF token."""
     return self.app.post_json(
-        url, params=params, headers={'X-XSRF-Token': token}).json
+        url, params=params, headers={'X-XSRF-Token': token}, **kwargs).json
 
   # Bot
 

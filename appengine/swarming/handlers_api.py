@@ -802,9 +802,12 @@ class BotTaskUpdateHandler(auth.ApiHandler):
       output = output.encode('utf-8', 'replace')
 
     try:
-      completed = task_scheduler.bot_update_task(
+      success, completed = task_scheduler.bot_update_task(
           run_result_key, bot_id, command_index, output, output_chunk_start,
           exit_code, duration)
+      if not success:
+        self.abort_with_error(500, error='Failed to update, please retry')
+
       action = 'task_completed' if completed else 'task_update'
       bot_management.bot_event(
           event_type=action, bot_id=bot_id,
@@ -817,6 +820,8 @@ class BotTaskUpdateHandler(auth.ApiHandler):
           category='task_failure',
           message='Failed to update task: %s' % e)
       self.abort_with_error(400, error=str(e))
+    except Exception as e:
+      self.abort_with_error(500, error=str(e))
 
     # TODO(maruel): When a task is canceled, reply with 'DIE' so that the bot
     # reboots itself to abort the task abruptly. It is useful when a task hangs
