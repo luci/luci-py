@@ -10,6 +10,7 @@ from google.appengine.runtime import apiproxy_errors
 
 __all__ = [
   'HIGH_KEY_ID',
+  'Root',
   'get_versioned_most_recent',
   'get_versioned_most_recent_with_root',
   'get_versioned_root_model',
@@ -40,6 +41,16 @@ def _insert(entities):
 
 
 ### Public API.
+
+
+class Root(ndb.Model):
+  """Root entity used for store_new_version() and get_versioned_most_recent().
+
+  Either inherit from this class or use get_versioned_root_model().
+  """
+  # Key id of the most recent child entity in the DB. It is monotonically
+  # decreasing starting at HIGH_KEY_ID. It is None if no child is present.
+  current = ndb.IntegerProperty(indexed=False)
 
 
 def insert(entity, new_key_callback=None, extra=None):
@@ -109,17 +120,12 @@ def get_versioned_root_model(model_name):
   entity with cls.current as an ndb.IntegerProperty will do.
   """
   assert isinstance(model_name, str), model_name
-
-  class Root(ndb.Model):
-    # Key id of the most recent child entity in the DB. It is monotonically
-    # decreasing starting at HIGH_KEY_ID. It is None if no child is present.
-    current = ndb.IntegerProperty(indexed=False)
-
+  class _Root(Root):
     @classmethod
     def _get_kind(cls):
       return model_name
 
-  return Root
+  return _Root
 
 
 def get_versioned_most_recent(cls, root_key):
