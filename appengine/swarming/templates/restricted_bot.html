@@ -50,25 +50,25 @@
 {% if bot %}
   <table class="property_table">
     <tbody>
-      <tr>
+      <tr title="The bot id is what uniquely identify the bot.">
         <td>ID</td>
         <td>{{bot.id}}</td>
       </tr>
-      <tr>
+      <tr title="IP address that the server saw the connection from.">
         <td>External IP</td>
         <td>{{bot.external_ip}}</td>
       </tr>
-      <tr>
+      <tr title="First time ever the bot contacted the server.">
         <td>First seen</td>
         <td>{{bot.first_seen_ts|datetimeformat}}</td>
       </tr>
-      <tr>
+      <tr title="Last time the bot contacted the server.">
         <td>Most recent ping</td>
         <td nowrap {% if bot.is_dead(now) %}class="dead_bot"{% endif %}>
           {{(now-bot.last_seen_ts)|timedeltaformat}} ago
           {% if is_admin and bot.is_dead(now) %}
           &nbsp;&nbsp;
-          <form id="delete_{{bot.id}}" method="post"
+          <form id="form_delete" method="post"
               action="/restricted/bot/{{bot.id}}/delete">
             <input type="hidden" name="xsrf_token" value="{{xsrf_token}}" />
             <input type="submit" value="Delete" />
@@ -76,23 +76,23 @@
           {% endif %}
         </td>
       </tr>
-      <tr>
+      <tr title="Bot's dimension is the list of properties that the requests dimensions are matched against. If all the requests dimensions are in the bot dimensions, the bot is allowed to execute the task.">
         <td>Dimensions</td>
         <td>{{bot_view.bot_dimensions(bot)}}</td>
       </tr>
-      <tr>
+      <tr title="Bot's state is informative only.">
         <td>State</td>
         <td>{{bot_view.render_dict(bot.state)}}</td>
       </tr>
-      <tr>
+      <tr title="Version is based on the content of swarming_bot.zip which is the swarming bot code.">
         <td>Version</td>
         <td>{{bot.version[:8]}}</td>
       </tr>
-      <tr>
+      <tr title="The version the server expects the bot to be using.">
         <td>Expected version</td>
         <td>{{current_version[:8]}}</td>
       </tr>
-      <tr>
+      <tr title="Current task handled by the bot, if any.">
         <td>Current task</td>
         <td>
           {% if bot.task %}
@@ -102,11 +102,11 @@
           {% endif %}
         </td>
       </tr>
-      <tr>
+      <tr title="Sum of duration of all the tasks listed below.">
         <td>Total running time<br>for past {{ run_results|length }} tasks</td>
         <td>{{run_time|timedeltaformat}}</td>
       </tr>
-      <tr>
+      <tr title="Gaps between all the tasks listed below where the bot didn't execute a task. The bot could be rebooting during this time." >
         <td>Total idle time</td>
         <td>{{idle_time|timedeltaformat}}</td>
       </tr>

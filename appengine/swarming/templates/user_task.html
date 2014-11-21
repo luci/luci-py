@@ -64,30 +64,30 @@
   <h2>Request metadata</h2>
   <table class="property_table">
     <tbody>
-      <tr>
+      <tr title="Name of the task, used for display purpose only.">
         <td>Name</td>
         <td>{{request.name}}</td>
       </tr>
-      <tr>
+      <tr title="Who triggered this task, as reported by the client.">
         <td>User</td>
         <td>{{request.user}}</td>
       </tr>
-      <tr>
+      <tr title="Task priority is between 1 and 255, lower value is higher priority. Higher priority requests are executed first.">
         <td>Priority</td>
         <td>{{request.priority}}</td>
       </tr>
-      <tr>
+      <tr title="When the request was done by the client.">
         <td>Created</td>
         <td>{{request.created_ts|datetimeformat}}</td>
       </tr>
-      <tr>
+      <tr title="When this request becomes so old it's not even worth handing to a bot. It may happen to low priority on a busy fleet.">
         <td>Expiration</td>
         <td>
           {{request.expiration_ts|datetimeformat}}
           ({{(request.expiration_ts-request.created_ts)|timedeltaformat}})
         </td>
       </tr>
-      <tr>
+      <tr title="Tags used for searching and/or analyzing groups of tasks.">
         <td>Tags</td>
         <td>{{request.tags|join('<br>'|safe)}}</td>
       </tr>
@@ -99,27 +99,27 @@
   <h2>Request properties</h2>
   <table class="property_table">
     <tbody>
-      <tr>
-        <td>Request dimensions</td>
+      <tr title="The request dimensions is the minimum set of properties a bot must advertise to be able to execute this task.">
+        <td>Request dims</td>
         <td>{{bot_view.render_dict(request.properties.dimensions)}}</td>
       </tr>
-      <tr>
-        <td>Execution timeout (s)</td>
+      <tr title="The maximum number of seconds that the command may use, otherwise it is forcibly killed.">
+        <td>Exec timeout</td>
         <td>{{request.properties.execution_timeout_secs}}</td>
       </tr>
-      <tr>
-        <td>I/O timeout (s)</td>
+      <tr title="The maximum number of seconds that the command may not output any stdout in a single shot.">
+        <td>I/O timeout</td>
         <td>{{request.properties.io_timeout_secs}}</td>
       </tr>
-      <tr>
-        <td>Environment variables</td>
+      <tr title="Additional environment variables to the one provided by the bot.">
+        <td>Env vars</td>
         <td>{{bot_view.render_dict(request.properties.env)}}</td>
       </tr>
-      <tr>
+      <tr title="If True, successful task results may be reused for subsequent requests, so the task can be deduped.">
         <td>Idempotent</td>
         <td>{{request.properties.idempotent}}</td>
       </tr>
-      <tr>
+      <tr title="Actual command executed by the bot.">
         <td>Commands</td>
         <td>
           {% for cmd in request.properties.commands %}
@@ -135,8 +135,8 @@
   <h2>Execution</h2>
   <table class="property_table">
     <tbody>
-      <tr>
-        <td>Bot's previous task</td>
+      <tr title="The previous task executed by this bot before this task, if any.">
+        <td>Previous task</td>
         <td>
           {% if previous_task_id %}
           <a href="/user/task/{{previous_task_id}}">
@@ -147,8 +147,8 @@
           {% endif %}
         </td>
       </tr>
-      <tr>
-        <td>Bot's following task</td>
+      <tr title="The next task executed by this bot, if any.">
+        <td>Following task</td>
         <td>
           {% if following_task_id %}
           <a href="/user/task/{{following_task_id}}">
@@ -159,31 +159,31 @@
           {% endif %}
         </td>
       </tr>
-      <tr>
+      <tr title="When the bot was handed this task.">
         <td>Started</td>
         <td>{{task.started_ts|datetimeformat}}</td>
       </tr>
-      <tr>
+      <tr title="Last time this bot sent an update about this task.">
         <td>Last updated</td>
         <td>{{(now-task.modified_ts)|timedeltaformat}} ago</td>
       </tr>
-      <tr>
+      <tr title="Time between when the request was done and the bot started the task.">
         <td>Pending time</td>
         <td>
           {{bot_view.pending_star(task)}}{{task.pending_now(now)|timedeltaformat}}
         </td>
       </tr>
-      <tr>
+      <tr title="When the task was completed, if done.">
         <td>Completed</td>
         <td>{{task.completed_ts|datetimeformat}}</td>
       </tr>
-      <tr>
+      <tr title="Duration of the task, up to now if the task is still on-going.">
         <td>Duration</td>
         <td>
           {{bot_view.running_star(task)}}{{task.duration_now(now)|timedeltaformat}}
         </td>
       </tr>
-      <tr>
+      <tr title="Moment where the task was declared a failure by the server due to internal error or expiration.">
         <td>Abandoned</td>
         <td>
           {{task.abandoned_ts|datetimeformat}}
@@ -198,7 +198,7 @@
           {% endif %}
         </td>
       </tr>
-      <tr>
+      <tr title="Current state of the task, may be pending, running, completed, bot_died, expired, canceled.">
         <td>State</td>
         <td>
           {{task.to_string()}} ({{task.state}})
@@ -211,19 +211,19 @@
           {% endif %}
         </td>
       </tr>
-      <tr>
+      <tr title="Link to the bot that executed this task, if any.">
         <td>Bot</td>
         <td>{{bot_view.bot_link(task.bot_id, is_privileged_user)}}</td>
       </tr>
-      <tr>
+      <tr title="Current bot dimensions. TODO(maruel): List dimensions at time of task reaping.">
         <td>Bot dimensions</td>
         <td>{{bot_view.bot_dimensions(bot)}}</td>
       </tr>
-      <tr>
+      <tr title="Current bot version. TODO(maruel): List bot version at time of task reaping.">
         <td>Bot version</td>
         <td>{{task.bot_version}}</td>
       </tr>
-      <tr>
+      <tr title="List of server versions that touched this task.">
         <td>Server version</td>
         <td>
           {% for v in task.server_versions %}
@@ -237,24 +237,24 @@
           {% endfor %}
         </td>
       </tr>
-      <tr class="{% if task.failure %}failed_test{% endif%}">
+      <tr class="{% if task.failure %}failed_test{% endif%}" title="True if the task failed normally.">
         <td>Failure</td>
         <td>{{task.failure}}</td>
       </tr>
-      <tr class="{% if task.internal_failure %}failed_test{% endif%}">
+      <tr class="{% if task.internal_failure %}failed_test{% endif%}" title="True if an internal Swarming error occured for this task. A BSOD is considered an internal failure.">
         <td>Internal failure</td>
         <td>{{task.internal_failure}}</td>
       </tr>
-      <tr>
+      <tr title="Process exit code for each commands executed on the bot.">
         <td>Exit codes</td>
         <td>{{task.exit_codes}}</td>
       </tr>
-      <tr>
+      <tr title="A task may be tried 2 times. This list the try number starting at 1.">
         <td>Try number</td>
         <td>{{task.try_number}}</td>
       </tr>
       {% if task.deduped_from %}
-        <tr>
+        <tr title="This task was not executed, results from the task listed here were reused as-is.">
           <td><strong>Was deduped from</strong></td>
           <td>
             <a href="/user/task/{{task.deduped_from}}">{{task.deduped_from}}</a>
