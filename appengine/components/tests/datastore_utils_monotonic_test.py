@@ -12,6 +12,7 @@ test_env.setup_test_env()
 from google.appengine.ext import ndb
 
 from components.datastore_utils import monotonic
+from components.datastore_utils import txn
 from support import test_case
 
 
@@ -79,6 +80,22 @@ class MonotonicTest(test_case.TestCase):
         data, lambda: new_keys.pop(0) if new_keys else None)
     self.assertEqual([], new_keys)
     self.assertEqual(None, actual)
+
+  def test_insert_transaction_failure(self):
+    EntityX(id=1, parent=self.parent).put()
+    calls = []
+    def transaction(*args, **kwargs):
+      calls.append(1)
+      if len(calls) < 2:
+        raise txn.CommitError()
+      return old_transaction(*args, **kwargs)
+
+    old_transaction = self.mock(txn, 'transaction', transaction)
+
+    actual = monotonic.insert(EntityX(id=2, parent=self.parent))
+    expected = ndb.Key('EntityX', 2, parent=self.parent)
+    self.assertEqual(expected, actual)
+    self.assertEqual([1, 1], calls)
 
   def test_get_versioned_root_model(self):
     cls = monotonic.get_versioned_root_model('fidoula')
@@ -165,7 +182,7 @@ class MonotonicTest(test_case.TestCase):
     )
     self.assertEqual(expected, actual)
 
-  def test_store_new_version_fast(self):
+  def test_store_new_version(self):
     cls = monotonic.get_versioned_root_model('fidoula')
     parent = ndb.Key(cls, 'foo')
     actual = monotonic.store_new_version(EntityX(a=1, parent=parent), cls)
@@ -175,7 +192,7 @@ class MonotonicTest(test_case.TestCase):
     self.assertEqual(
         ndb.Key('fidoula', 'foo', 'EntityX', monotonic.HIGH_KEY_ID - 1), actual)
 
-  def test_store_new_version_fast_extra(self):
+  def test_store_new_version_extra(self):
     # Includes an unrelated entity in the PUT. It must be in the same entity
     # group.
     cls = monotonic.get_versioned_root_model('fidoula')
@@ -191,6 +208,26 @@ class MonotonicTest(test_case.TestCase):
     self.assertEqual(
         ndb.Key('fidoula', 'foo', 'EntityX', monotonic.HIGH_KEY_ID - 1), actual)
     self.assertEqual({'b': 42}, unrelated.key.get().to_dict())
+
+  def test_store_new_version_transaction_failure(self):
+    # Ensures that when a transaction fails, the key id is not modified and the
+    # retry is on the same key id.
+    cls = monotonic.get_versioned_root_model('fidoula')
+    parent = ndb.Key(cls, 'foo')
+    actual = monotonic.store_new_version(EntityX(a=1, parent=parent), cls)
+
+    calls = []
+    def transaction(*args, **kwargs):
+      calls.append(1)
+      if len(calls) < 2:
+        raise txn.CommitError()
+      return old_transaction(*args, **kwargs)
+    old_transaction = self.mock(txn, 'transaction', transaction)
+
+    actual = monotonic.store_new_version(EntityX(a=2, parent=parent), cls)
+    self.assertEqual(
+        ndb.Key('fidoula', 'foo', 'EntityX', monotonic.HIGH_KEY_ID - 1), actual)
+    self.assertEqual([1, 1], calls)
 
 
 if __name__ == '__main__':

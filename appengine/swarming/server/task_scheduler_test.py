@@ -26,6 +26,7 @@ from google.appengine.ext import ndb
 # From tools/third_party/
 import webtest
 
+from components import datastore_utils
 from components import stats_framework
 from components import utils
 from server import stats
@@ -476,7 +477,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
   def test_bot_update_exception(self):
     run_result = _quick_reap()
     def r(*_):
-      raise datastore_errors.TransactionFailedError('Sorry!')
+      raise datastore_utils.CommitError('Sorry!')
 
     self.mock(ndb, 'put_multi', r)
     self.assertEqual(

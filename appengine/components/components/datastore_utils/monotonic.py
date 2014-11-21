@@ -8,6 +8,9 @@ from google.appengine.api import datastore_errors
 from google.appengine.ext import ndb
 from google.appengine.runtime import apiproxy_errors
 
+from . import txn
+
+
 __all__ = [
   'HIGH_KEY_ID',
   'Root',
@@ -25,19 +28,6 @@ HIGH_KEY_ID = (1 << 47) - 1
 
 
 ### Private stuff.
-
-
-@ndb.transactional(retries=0)  # pylint: disable=E1120
-def _insert(entities):
-  """Guarantees insertion of the first entity and return True on success.
-
-  Other entities can be saved simultaneously.
-  """
-  if entities[0].key.get():
-    # The entity exists, abort.
-    return False
-  ndb.put_multi(entities)
-  return True
 
 
 ### Public API.
@@ -88,6 +78,13 @@ def insert(entity, new_key_callback=None, extra=None):
   if not new_key_callback:
     new_key_callback = lambda: None
 
+  def run():
+    if entities[0].key.get():
+      # The entity exists, abort.
+      return False
+    ndb.put_multi(entities)
+    return True
+
   # TODO(maruel): Run a severe load test and count the number of retries.
   while True:
     # First iterate outside the transaction in case the first entity key number
@@ -97,18 +94,16 @@ def insert(entity, new_key_callback=None, extra=None):
 
     if not entity.key or not entity.key.id():
       break
+
     try:
-      if _insert(entities):
+      if txn.transaction(run, retries=0):
         break
-    except (
-        apiproxy_errors.CancelledError,
-        datastore_errors.BadRequestError,
-        datastore_errors.Timeout,
-        datastore_errors.TransactionFailedError,
-        RuntimeError):
+    except txn.CommitError:
+      # Retry with the same key.
       pass
-    # Entity existed. Get the next key.
-    entity.key = new_key_callback()
+    else:
+      # Entity existed. Get the next key.
+      entity.key = new_key_callback()
   return entity.key
 
 
