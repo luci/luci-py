@@ -21,6 +21,7 @@ import os
 import threading
 import time
 
+from google.appengine.api import oauth
 from google.appengine.ext import ndb
 from google.appengine.ext.ndb import metadata
 
@@ -33,7 +34,6 @@ __all__ = [
   'AuthorizationError',
   'disable_process_cache',
   'Error',
-  'fetch_allowed_client_ids',
   'get_current_identity',
   'get_process_cache_expiration_sec',
   'get_secret',
@@ -255,22 +255,67 @@ class AuthDB(object):
         self.global_config.oauth_additional_client_ids)
 
 
-def fetch_allowed_client_ids():
-  """Fetches a list of OAuth client IDs from the datastore.
+def extract_oauth_caller_identity(extra_client_ids=None):
+  """Extracts and validates Identity of a caller for current request.
 
-  May be used to initialize 'allowed_client_ids' field of @endpoints.api
-  decorator. Changes to this list list would require GAE instance restart
-  to take effect. Still it is better than hardcoding them into the source code.
+  Uses client_id whitelist fetched from the datastore to validate OAuth client
+  used to build access_token. Also recognizes various types of service accounts
+  and verifies that their client_id is what it should be. Service account's
+  client_id doesn't have to be in client_id whitelist.
+
+  Used by webapp2 request handlers and Cloud Endpoints API methods.
+
+  Args:
+    extra_client_ids: optional list of allowed client_ids, in addition to
+      the whitelist in the datastore.
+
+  Returns:
+    Identity of the caller in case the request was successfully validated.
+
+  Raises:
+    AuthenticationError in case access_token is missing or invalid.
+    AuthorizationError in case client_id is forbidden.
   """
-  global_config = model.ROOT_KEY.get()
-  if not global_config:
-    return []
-  allowed = set()
-  if global_config.oauth_client_id:
-    allowed.add(global_config.oauth_client_id)
-  if global_config.oauth_additional_client_ids:
-    allowed.update(global_config.oauth_additional_client_ids)
-  return list(allowed)
+  # OAuth2 scope a token should have.
+  oauth_scope = 'https://www.googleapis.com/auth/userinfo.email'
+
+  # Extract client_id and email from access token. That also validates the token
+  # and raises OAuthRequestError if token is revoked or otherwise not valid.
+  try:
+    client_id = oauth.get_client_id(oauth_scope)
+  except oauth.OAuthRequestError:
+    raise AuthenticationError('Invalid OAuth token')
+
+  # This call just reads data cached by oauth.get_client_id, and thus should
+  # never fail.
+  email = oauth.get_current_user(oauth_scope).email()
+
+  # Is client_id in the explicit whitelist? Used with three legged OAuth.
+  good = (
+      get_request_auth_db().is_allowed_oauth_client_id(client_id) or
+      client_id in (extra_client_ids or []))
+
+  # Detect various sorts of service accounts. They have a property: client_id
+  # and email are related in some way. No need to whitelist client_ids for each
+  # of them, since email address uniquely identifies credentials used.
+
+  # GAE service account. Token via app_identity.get_access_token().
+  if not good and email.endswith('@appspot.gserviceaccount.com'):
+    good = (client_id == 'anonymous')
+
+  # GCE service account. Token via GCE metadata server.
+  if not good and email.endswith('@project.gserviceaccount.com'):
+    project_id = email[:-len('@project.gserviceaccount.com')]
+    good = (client_id == '%s.project.googleusercontent.com' % project_id)
+
+  # Service account with *.p12 key. Token via SignedJwtAssertionCredentials.
+  if not good and email.endswith('@developer.gserviceaccount.com'):
+    prefix = email[:-len('@developer.gserviceaccount.com')]
+    good = (client_id == '%s.apps.googleusercontent.com' % prefix)
+
+  if not good:
+    raise AuthorizationError('Invalid OAuth client_id: %s' % client_id)
+  return model.Identity(model.IDENTITY_USER, email)
 
 
 class RequestCache(object):

@@ -16,27 +16,27 @@ from support import test_case
 
 
 class BP(ndb.Model):
-  bar = properties.BytesComputedProperty(lambda _: '\x00')
+  prop = properties.BytesComputedProperty(lambda _: '\x00')
 
 
 class DJP(ndb.Model):
-  bar = properties.DeterministicJsonProperty(json_type=dict)
+  prop = properties.DeterministicJsonProperty(json_type=dict)
 
 
 class PropertiesTest(test_case.TestCase):
   def test_DeterministicJsonProperty(self):
-    self.assertEqual({'a': 1}, DJP(bar={'a': 1}).bar)
+    self.assertEqual({'a': 1}, DJP(prop={'a': 1}).prop)
 
-    DJP(bar={'a': 1}).put()
-    self.assertEqual({'a': 1}, DJP.query().get().bar)
+    DJP(prop={'a': 1}).put()
+    self.assertEqual({'a': 1}, DJP.query().get().prop)
 
     with self.assertRaises(TypeError):
-      DJP(bar=[])
+      DJP(prop=[])
 
   def test_BytesComputedProperty(self):
-    self.assertEqual('\x00', BP().bar)
+    self.assertEqual('\x00', BP().prop)
     BP().put()
-    self.assertEqual('\x00', BP.query().get().bar)
+    self.assertEqual('\x00', BP.query().get().prop)
 
 
 if __name__ == '__main__':

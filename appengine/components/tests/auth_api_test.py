@@ -613,6 +613,60 @@ class ApiTest(test_case.TestCase):
         api.is_decorated(api.require(lambda: True)(lambda: None)))
 
 
+class OAuthAccountsTest(test_case.TestCase):
+  """Test for extract_oauth_caller_identity function."""
+
+  def mock_all(self, user_email, client_id, allowed_client_ids=()):
+    class FakeUser(object):
+      email = lambda _: user_email
+    class FakeAuthDB(object):
+      is_allowed_oauth_client_id = lambda _, cid: cid in allowed_client_ids
+    self.mock(api.oauth, 'get_current_user', lambda _: FakeUser())
+    self.mock(api.oauth, 'get_client_id', lambda _: client_id)
+    self.mock(api, 'get_request_auth_db', FakeAuthDB)
+
+  @staticmethod
+  def user(email):
+    return model.Identity(model.IDENTITY_USER, email)
+
+  def test_is_allowed_oauth_client_id_ok(self):
+    self.mock_all('email@email.com', 'some-client-id', ['some-client-id'])
+    self.assertEqual(
+        self.user('email@email.com'), api.extract_oauth_caller_identity())
+
+  def test_is_allowed_oauth_client_id_not_ok(self):
+    self.mock_all('email@email.com', 'some-client-id', ['another-client-id'])
+    with self.assertRaises(api.AuthorizationError):
+      api.extract_oauth_caller_identity()
+
+  def test_is_allowed_oauth_client_id_not_ok_empty(self):
+    self.mock_all('email@email.com', 'some-client-id')
+    with self.assertRaises(api.AuthorizationError):
+      api.extract_oauth_caller_identity()
+
+  def test_gae_service_account(self):
+    self.mock_all('app-id@appspot.gserviceaccount.com', 'anonymous')
+    self.assertEqual(
+        self.user('app-id@appspot.gserviceaccount.com'),
+        api.extract_oauth_caller_identity())
+
+  def test_gce_service_account(self):
+    self.mock_all(
+        '123456789123@project.gserviceaccount.com',
+        '123456789123.project.googleusercontent.com')
+    self.assertEqual(
+        self.user('123456789123@project.gserviceaccount.com'),
+        api.extract_oauth_caller_identity())
+
+  def test_private_key_service_account(self):
+    self.mock_all(
+        '111111111111-abcdefghq20gfl1@developer.gserviceaccount.com',
+        '111111111111-abcdefghq20gfl1.apps.googleusercontent.com')
+    self.assertEqual(
+        self.user('111111111111-abcdefghq20gfl1@developer.gserviceaccount.com'),
+        api.extract_oauth_caller_identity())
+
+
 if __name__ == '__main__':
   if '-v' in sys.argv:
     unittest.TestCase.maxDiff = None

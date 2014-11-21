@@ -142,6 +142,7 @@ class AuthenticatingHandlerTest(test_case.TestCase):
       def authentication_error(self, err):
         test.assertEqual('Too bad', err.message)
         calls.append('authentication_error')
+        # pylint: disable=bad-super-call
         super(Handler, self).authentication_error(err)
 
     handler.configure([failing, skipped])
@@ -167,6 +168,7 @@ class AuthenticatingHandlerTest(test_case.TestCase):
 
       def authorization_error(self, err):
         calls.append('authorization_error')
+        # pylint: disable=bad-super-call
         super(Handler, self).authorization_error(err)
 
     app = self.make_test_app('/request', Handler)
@@ -336,8 +338,8 @@ class OAuthAuthenticationTest(test_case.TestCase):
 
   def test_applicable(self):
     self.mock_allowed_client_id('allowed-client-id')
-    self.mock(handler.oauth, 'get_client_id', lambda _arg: 'allowed-client-id')
-    self.mock(handler.oauth, 'get_current_user',
+    self.mock(oauth, 'get_client_id', lambda _arg: 'allowed-client-id')
+    self.mock(oauth, 'get_current_user',
         lambda _arg: users.User(email='joe@example.com'))
     self.assertEqual(
         model.Identity(model.IDENTITY_USER, 'joe@example.com'),
@@ -346,15 +348,17 @@ class OAuthAuthenticationTest(test_case.TestCase):
   def test_bad_token(self):
     def mocked_get_client_id(_arg):
       raise oauth.NotAllowedError()
-    self.mock(handler.oauth, 'get_client_id', mocked_get_client_id)
+    self.mock(oauth, 'get_client_id', mocked_get_client_id)
 
     with self.assertRaises(api.AuthenticationError):
       handler.oauth_authentication(self.make_request())
 
   def test_not_allowed_client_id(self):
     self.mock_allowed_client_id('good-client-id')
-    self.mock(handler.oauth, 'get_client_id', lambda _arg: 'bad-client-id')
-    with self.assertRaises(api.AuthenticationError):
+    self.mock(oauth, 'get_client_id', lambda _arg: 'bad-client-id')
+    self.mock(oauth, 'get_current_user',
+        lambda _arg: users.User(email='joe@example.com'))
+    with self.assertRaises(api.AuthorizationError):
       handler.oauth_authentication(self.make_request())
 
 

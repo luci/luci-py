@@ -52,6 +52,10 @@ def CommonChecks(input_api, output_api):
     disabled_warnings = [
       'E1101', # Instance X has no member Y
       'W0232', # Class has no __init__ method
+
+      # Pylint fails to recognize lazy module loading in components.auth.config,
+      # no local disables work, so had to kill it globally.
+      'cyclic-import',
     ]
     output.extend(input_api.canned_checks.RunPylint(
         input_api, output_api,

@@ -12,7 +12,6 @@ import json
 import logging
 import webapp2
 
-from google.appengine.api import oauth
 from google.appengine.api import users
 
 from . import api
@@ -302,33 +301,9 @@ def cookie_authentication(_request):
 
 def oauth_authentication(request):
   """OAuth2 based authentication via oauth.get_current_user()."""
-  # Skip if 'Authorization' header is not set.
   if not request.headers.get('Authorization'):
     return None
-
-  # OAuth2 scope token should have.
-  oauth_scope = 'https://www.googleapis.com/auth/userinfo.email'
-
-  # Extract client_id from access token. That also validates the token and
-  # raises OAuthRequestError if token is revoked or otherwise not valid. It's
-  # important to abort request with invalid token rather than fall back to
-  # default Anonymous identity.
-  try:
-    client_id = oauth.get_client_id(oauth_scope)
-  # Note: we intentionally do not handle OAuthServiceFailureError here.
-  # If it happens client receives HTTP 500 error retries with existing token,
-  # as it should.
-  except oauth.OAuthRequestError:
-    raise api.AuthenticationError('Invalid OAuth token')
-
-  # Ensure given client_id is known.
-  auth_db = api.get_request_auth_db()
-  if not auth_db.is_allowed_oauth_client_id(client_id):
-    raise api.AuthenticationError('Invalid OAuth client_id: %s' % client_id)
-
-  # Extract email associated with the token.
-  return model.Identity(
-      model.IDENTITY_USER, oauth.get_current_user(oauth_scope).email())
+  return api.extract_oauth_caller_identity()
 
 
 def service_to_service_authentication(request):
