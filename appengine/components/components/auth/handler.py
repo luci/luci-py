@@ -105,6 +105,10 @@ class AuthenticatingHandler(webapp2.RequestHandler):
         logging.error('Authentication error.\n%s', err)
         self.authentication_error(err)
         return
+      except api.AuthorizationError as err:
+        logging.error('Authorization error.\n%s', err)
+        self.authorization_error(err)
+        return
 
     # If no authentication method is applicable, default to anonymous identity.
     identity = identity or model.Anonymous
