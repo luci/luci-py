@@ -36,11 +36,7 @@ def main(args, app_dir=None):
 
   gae_sdk_utils.app_sdk_options(parser, app_dir)
   options, args = parser.parse_args(args)
-
-  # 'appcfg.py delete_version' is buggy when used with OAuth2 authentication, so
-  # use cookie-based auth.
-  app = gae_sdk_utils.process_sdk_options(
-      parser, options, app_dir, use_oauth=False)
+  app = gae_sdk_utils.process_sdk_options(parser, options, app_dir)
 
   # List all deployed versions, dump them to a temp file to be edited.
   versions = app.get_uploaded_versions()
