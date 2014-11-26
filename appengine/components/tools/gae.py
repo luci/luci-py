@@ -8,19 +8,28 @@
 __version__ = '1.0'
 
 import atexit
+import code
 import optparse
 import os
+import signal
 import sys
 import tempfile
+import urllib2
+
+try:
+  import readline
+except ImportError:
+  readline = None
 
 # In case gae.py was run via symlink, find the original file since it's where
-# third_party libs are.
+# third_party libs are. Handle a chain of symlinks too.
 SCRIPT_PATH = os.path.abspath(__file__)
-try:
-  SCRIPT_PATH = os.path.abspath(
-      os.path.join(os.path.dirname(SCRIPT_PATH), os.readlink(SCRIPT_PATH)))
-except OSError:
-  pass
+while True:
+  try:
+    SCRIPT_PATH = os.path.abspath(
+        os.path.join(os.path.dirname(SCRIPT_PATH), os.readlink(SCRIPT_PATH)))
+  except OSError:
+    break
 
 ROOT_DIR = os.path.dirname(os.path.dirname(SCRIPT_PATH))
 sys.path.insert(0, ROOT_DIR)
@@ -99,10 +108,113 @@ def CMDcleanup(parser, args):
   return 0
 
 
+@subcommand.usage('[extra arguments for dev_appserver.py]')
+def CMDdevserver(parser, args):
+  """Runs the app locally via dev_appserver.py."""
+  parser.allow_positional_args = True
+  parser.disable_interspersed_args()
+  parser.add_option(
+      '-o', '--open', action='store_true',
+      help='Listen to all interfaces (less secure)')
+  app, options, args = parser.parse_args(args)
+  # Let dev_appserver.py handle Ctrl+C interrupts.
+  signal.signal(signal.SIGINT, signal.SIG_IGN)
+  return app.run_dev_appserver(args, options.open)
+
+
 def CMDlogin(parser, args):
   """Initiates OAuth2 login flow if cached OAuth2 token is missing."""
   app, _, _ = parser.parse_args(args)
   return int(not gae_sdk_utils.is_oauth_token_cached() and not app.login())
+
+
+@subcommand.usage('[module_id version_id]')
+def CMDshell(parser, args):
+  """Opens interactive remote shell with app's GAE environment.
+
+  Connects to a specific version of a specific module (an active version of
+  'default' module by default). The app must have 'remote_api: on' builtin
+  enabled in app.yaml.
+
+  Always uses password based authentication.
+  """
+  parser.allow_positional_args = True
+  parser.add_option(
+      '-H', '--host', help='Only necessary if not hosted on .appspot.com')
+  app, options, args = parser.parse_args(args)
+
+  module = 'default'
+  version = None
+  if len(args) == 2:
+    module, version = args
+  elif len(args) == 1:
+    module = args[0]
+  elif args:
+    parser.error('Unknown args: %s' % args)
+
+  if not options.host:
+    prefixes = filter(None, (version, module, app.app_id))
+    options.host = '%s.appspot.com' % '-dot-'.join(prefixes)
+
+  # Ensure remote_api is initialized and GAE sys.path is set.
+  gae_sdk_utils.setup_env(
+      app.app_dir, app.app_id, version, module, remote_api=True)
+
+  # Open the connection.
+  from google.appengine.ext.remote_api import remote_api_stub
+  try:
+    print('Connecting...')
+    remote_api_stub.ConfigureRemoteApi(
+        None,
+        '/_ah/remote_api',
+        gae_sdk_utils.get_authentication_function(),
+        options.host,
+        save_cookies=True,
+        secure=True)
+  except urllib2.URLError:
+    print >> sys.stderr, 'Failed to access %s' % options.host
+    return 1
+  remote_api_stub.MaybeInvokeAuthentication()
+
+  def register_sys_path(*path):
+    abs_path = os.path.abspath(os.path.join(*path))
+    if os.path.isdir(abs_path) and not abs_path in sys.path:
+      sys.path.insert(0, abs_path)
+
+  # Simplify imports of app modules (with dependencies). This code is optimized
+  # for layout of apps that use 'components'.
+  register_sys_path(app.app_dir)
+  register_sys_path(app.app_dir, 'third_party')
+  register_sys_path(app.app_dir, 'components', 'third_party')
+
+  # Import some common modules into interactive console namespace.
+  def setup_context():
+    # pylint: disable=unused-variable
+    from google.appengine.api import app_identity
+    from google.appengine.api import memcache
+    from google.appengine.api import urlfetch
+    from google.appengine.ext import ndb
+    return locals().copy()
+  context = setup_context()
+
+  # Fancy readline support.
+  if readline is not None:
+    readline.parse_and_bind('tab: complete')
+    history_file = os.path.expanduser(
+        '~/.config/gae_tool/remote_api_%s' % app.app_id)
+    if not os.path.exists(os.path.dirname(history_file)):
+      os.makedirs(os.path.dirname(history_file))
+    atexit.register(lambda: readline.write_history_file(history_file))
+    if os.path.exists(history_file):
+      readline.read_history_file(history_file)
+
+  prompt = [
+    'App Engine interactive console for "%s".' % app.app_id,
+    'Available symbols:',
+  ]
+  prompt.extend(sorted('  %s' % symbol for symbol in context))
+  code.interact('\n'.join(prompt), None, context)
+  return 0
 
 
 @subcommand.usage('[version_id]')
