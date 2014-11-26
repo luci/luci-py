@@ -152,6 +152,9 @@ def CMDshell(parser, args):
   elif args:
     parser.error('Unknown args: %s' % args)
 
+  if module not in app.modules:
+    parser.error('No such module: %s' % module)
+
   if not options.host:
     prefixes = filter(None, (version, module, app.app_id))
     options.host = '%s.appspot.com' % '-dot-'.join(prefixes)
@@ -277,6 +280,10 @@ def CMDupload(parser, args):
   parser.add_force_option()
   parser.allow_positional_args = True
   app, options, modules = parser.parse_args(args)
+
+  for module in modules:
+    if module not in app.modules:
+      parser.error('No such module: %s' % module)
 
   version = calculate_version.calculate_version(app.app_dir, options.tag)
 
