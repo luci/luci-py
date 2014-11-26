@@ -69,6 +69,7 @@ def insert(entity, new_key_callback=None, extra=None):
     ndb.Key of the newly saved entity or None if the entity was already present
     in the db.
   """
+  assert not ndb.in_transaction()
   assert entity.key.id(), entity.key
   entities = [entity]
   if extra:
@@ -135,6 +136,7 @@ def get_versioned_most_recent_with_root(cls, root_key):
   """
   # Using a cls.query(ancestor=root_key).get() would work too but is less
   # efficient since it can't be cached by ndb's cache.
+  assert not ndb.in_transaction()
   assert issubclass(cls, ndb.Model), cls
   assert root_key is None or isinstance(root_key, ndb.Key), root_key
 
@@ -165,6 +167,7 @@ def store_new_version(entity, root_cls, extra=None):
   Returns:
     tuple(root, entity) with the two entities that were PUT in the db.
   """
+  assert not ndb.in_transaction()
   assert isinstance(entity, ndb.Model), entity
   assert entity.key and entity.key.parent(), 'entity.key.parent() must be set.'
   # Access to a protected member _XX of a client class - pylint: disable=W0212
