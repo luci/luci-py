@@ -117,7 +117,7 @@ def _get_startup_dir_win():
   # CSIDL_STARTUP = 7
   # https://msdn.microsoft.com/library/windows/desktop/bb762180.aspx
   # shell.SHGetFolderLocation(NULL, CSIDL_STARTUP, NULL, NULL, string)
-  if get_os_version() == '5.1':
+  if get_os_version_number() == '5.1':
     startup = 'Start Menu\\Programs\\Startup'
   else:
     # Vista+
@@ -177,6 +177,13 @@ def _generate_launchd_plist(command, cwd, plistname):
     '  </dict>\n'
     '</plist>\n')
   return header
+
+
+def _get_os_version_name_win():
+  """Returns the marketing name of the OS including the service pack."""
+  marketing_name = platform.uname()[2]
+  service_pack = platform.win32_ver()[2] or 'SP0'
+  return '%s-%s' % (marketing_name, service_pack)
 
 
 def _get_gpu_linux():
@@ -305,31 +312,22 @@ def _get_mount_points_win():
   ]
 
 
-def _get_free_space_on_drive_win(mount_point):
-  """Returns free space on a mount point in Mb."""
+def _get_disk_info_win(mount_point):
+  """Returns total and free space on a mount point in Mb."""
+  total_bytes = ctypes.c_ulonglong(0)
   free_bytes = ctypes.c_ulonglong(0)
   ctypes.windll.kernel32.GetDiskFreeSpaceExW(
-      ctypes.c_wchar_p(mount_point), None, None, ctypes.pointer(free_bytes))
-  return int(round(free_bytes.value / 1024. / 1024.))
+      ctypes.c_wchar_p(mount_point), None, ctypes.pointer(total_bytes),
+      ctypes.pointer(free_bytes))
+  return {
+    'free_mb': int(round(free_bytes.value / 1024. / 1024.)),
+    'size_mb': int(round(total_bytes.value / 1024. / 1024.)),
+  }
 
 
-def _get_total_size_on_drive_win(mount_point):
-  """Returns total size of a mount point in Mb."""
-  total_bytes = ctypes.c_ulonglong(0)
-  ctypes.windll.kernel32.GetDiskFreeSpaceExW(
-      ctypes.c_wchar_p(mount_point), None, ctypes.pointer(total_bytes), None)
-  return int(round(total_bytes.value / 1024. / 1024.))
-
-
-def _get_free_space_on_disks_win():
-  """Returns free space on all mount point in Mb."""
-  return dict(
-      (p, _get_free_space_on_drive_win(p)) for p in _get_mount_points_win())
-
-
-def _get_largest_disk_size_win():
-  """Returns the disk size of the largest mount point in Mb."""
-  return max(_get_total_size_on_drive_win(p) for p in _get_mount_points_win())
+def _get_disks_info_win():
+  """Returns disk infos on all mount point in Mb."""
+  return dict((p, _get_disk_info_win(p)) for p in _get_mount_points_win())
 
 
 def _run_df():
@@ -342,17 +340,16 @@ def _run_df():
       yield l.split()
 
 
-def _get_free_space_on_disks_posix():
-  """Returns free space on all mount point in Mb."""
-  # A bit cheezy but works well.
+def _get_disks_info_posix():
+  """Returns disks info on all mount point in Mb."""
   return dict(
-      (items[5], int(round(int(items[3]) / 1024.))) for items in _run_df())
-
-
-def _get_largest_disk_size_posix():
-  """Returns the disk size of the largest mount point in Mb."""
-  # A bit cheezy but works well.
-  return max(int(round(int(items[1]) / 1024.)) for items in _run_df())
+      (
+        items[5],
+        {
+          'free_mb': int(round(int(items[3]) / 1024.)),
+          'size_mb': int(round(int(items[1]) / 1024.)),
+        }
+      ) for items in _run_df())
 
 
 def _safe_read(filepath):
@@ -368,22 +365,20 @@ def _safe_read(filepath):
 
 
 @cached
-def get_os_version():
-  """Returns the normalized OS version as a string.
+def get_os_version_number():
+  """Returns the normalized OS version number as a string.
 
   Returns:
     The format depends on the OS:
-    - Windows: 5.1, 6.1, etc.
+    - Windows: 5.1, 6.1, etc. There is no way to distinguish between Windows 7
+          and Windows Server 2008R2 since they both report 6.1.
     - OSX: 10.7, 10.8, etc.
     - Ubuntu: 12.04, 10.04, etc.
     Others will return None.
   """
   if sys.platform in ('cygwin', 'win32'):
-    version = (
-        platform.system() if sys.platform == 'cygwin' else platform.version())
-    if '-' in version:
-      version = version.split('-')[1]
-    version_parts = version.split('.')
+    version_parts = (platform.system() if sys.platform == 'cygwin'
+        else platform.version()).split('-')[-1].split('.')
     assert len(version_parts) >= 2,  'Unable to determine Windows version'
     if version_parts[0] < 5 or (version_parts[0] == 5 and version_parts[1] < 1):
       assert False, 'Version before XP are unsupported: %s' % version_parts
@@ -404,12 +399,25 @@ def get_os_version():
 
 
 @cached
+def get_os_version_name():
+  """Returns the marketing name on Windows.
+
+  Returns None on other OSes, since it's not problematic there. Having
+  dimensions like Trusty or Snow Leopard is not useful.
+  """
+  if sys.platform == 'win32':
+    return _get_os_version_name_win()
+  return None
+
+
+@cached
 def get_os_name():
   """Returns standardized OS name.
 
   Defaults to sys.platform for OS not normalized.
 
-  TODO(maruel): Differentiate between linux distros like Ubuntu or debian.
+  Returns:
+    Windows, Mac, Ubuntu, Raspbian, etc.
   """
   value = {
     'cygwin': 'Windows',
@@ -567,18 +575,11 @@ def get_physical_ram():
   return 0
 
 
-def get_free_disks():
-  """Gets free disk space in all partitions in Mb."""
+def get_disks_info():
+  """Returns a dict of dict of free and total disk space."""
   if sys.platform == 'win32':
-    return _get_free_space_on_disks_win()
-  return _get_free_space_on_disks_posix()
-
-
-def get_largest_disk_size():
-  """Returns disk size of the largest partition in Mb."""
-  if sys.platform == 'win32':
-    return _get_largest_disk_size_win()
-  return _get_largest_disk_size_posix()
+    return _get_disks_info_win()
+  return _get_disks_info_posix()
 
 
 @cached
@@ -800,7 +801,6 @@ def get_state_android(device_id, adb_path='adb'):
 def get_dimensions():
   """Returns the default dimensions."""
   os_name = get_os_name()
-  os_version = get_os_version()
   cpu_type = get_cpu_type()
   cpu_bitness = get_cpu_bitness()
   dimensions = {
@@ -809,16 +809,19 @@ def get_dimensions():
       cpu_type,
       cpu_type + '-' + cpu_bitness,
     ],
-    'disk': [str(get_largest_disk_size())],
     'gpu': get_gpu()[0],
-    'hostname': [get_hostname()],
     'id': [get_hostname_short()],
     'os': [
       os_name,
-      os_name + '-' + os_version,
+      os_name + '-' + get_os_version_number(),
     ],
-    'ram': [str(get_physical_ram())],
   }
+  os_version_name = get_os_version_name()
+  if os_version_name:
+    # Windows-XP, Windows-7, Windows-2008ServerR2-SP1, etc.
+    # TODO(maruel): Use get_os_version_name() when available, fallback to
+    # get_os_version_number() otherwise.
+    dimensions['os'].append('%s-%s' % (os_name, os_version_name))
   if 'none' not in dimensions['gpu']:
     hidpi = get_monitor_hidpi()
     if hidpi:
@@ -833,13 +836,6 @@ def get_dimensions():
     dimensions['os'].append('Linux')
     dimensions['os'].sort()
 
-  if sys.platform in ('cygwin', 'win32'):
-    dimensions['cygwin'] = [str(int(sys.platform == 'cygwin'))]
-  if sys.platform == 'win32':
-    # TODO(maruel): Have get_integrity_level_win() work in the first place.
-    integrity = get_integrity_level_win()
-    if integrity is not None:
-      dimensions['integrity'] = [integrity]
   return dimensions
 
 
@@ -863,12 +859,21 @@ def get_state(threshold_mb=2*1024, skip=None):
   # to clean up.
   state = {
     'cwd': os.getcwd(),
-    'free_disks': get_free_disks(),
+    'disks': get_disks_info(),
     'gpu': get_gpu()[1],
     'ip': get_ip(),
+    'hostname': get_hostname(),
+    'ram': get_physical_ram(),
     'running_time': int(round(time.time() - _STARTED_TS)),
     'started_ts': int(round(_STARTED_TS)),
   }
+  if sys.platform in ('cygwin', 'win32'):
+    state['cygwin'] = [str(int(sys.platform == 'cygwin'))]
+  if sys.platform == 'win32':
+    # TODO(maruel): Have get_integrity_level_win() work in the first place.
+    integrity = get_integrity_level_win()
+    if integrity is not None:
+      state['integrity'] = [integrity]
   auto_quarantine_on_low_space(state, threshold_mb, skip)
   return state
 
@@ -885,7 +890,8 @@ def auto_quarantine_on_low_space(state, threshold_mb=2*1024, skip=None):
     skip = ['/boot', '/boot/efi']
 
   s = []
-  for mount, space_mb in state['free_disks'].iteritems():
+  for mount, infos in state['disks'].iteritems():
+    space_mb = infos['free_mb']
     if mount not in skip and space_mb < threshold_mb:
       s.append('Not enough free disk space on %s.' % mount)
   if s:

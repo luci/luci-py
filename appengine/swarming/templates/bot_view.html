@@ -24,15 +24,14 @@
   {% for k, v in data.iteritems()|sort %}
     {{indent|safe}}<strong>{{k}}</strong>:
     {% if v is string %}
-      {{v}}
+      {{v}}<br>
     {% elif v is mapping %}
-      {{render_dict_idented(v, indent + '&nbsp;&nbsp;')}}
+    <br>{{render_dict_idented(v, indent + '&nbsp;&nbsp;')}}
     {% elif v is sequence %}
-      {{v|sort|join(' | ')}}
+      {{v|sort|join(' | ')}}<br>
     {% else %}
-      {{v}}
+      {{v}}<br>
     {% endif %}
-    <br>
   {% endfor %}
 {% endmacro %}
 

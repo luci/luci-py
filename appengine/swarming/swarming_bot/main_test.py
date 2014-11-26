@@ -43,7 +43,7 @@ class MainTest(auto_stub.TestCase):
     actual = json.loads(subprocess.check_output(
         [sys.executable, self.zip_file, 'attributes']))
     expected = bot_main.get_attributes()
-    for key in ('cwd', 'free_disks', 'running_time', 'started_ts'):
+    for key in ('cwd', 'disks', 'running_time', 'started_ts'):
       del actual['state'][key]
       del expected['state'][key]
     del actual['version']

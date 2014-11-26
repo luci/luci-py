@@ -62,9 +62,16 @@ class TestOsUtilitiesPrivate(auto_stub.TestCase):
 
 class TestOsUtilities(auto_stub.TestCase):
   def test_get_os_version(self):
-    version = os_utilities.get_os_version()
+    version = os_utilities.get_os_version_number()
     self.assertTrue(version)
     self.assertTrue(re.match(r'^\d+\.\d+$', version), version)
+
+  def test_get_os_version_names(self):
+    name = os_utilities.get_os_version_name()
+    if sys.platform == 'win32':
+      self.assertTrue(isinstance(name, str), name)
+    else:
+      self.assertEqual(None, name)
 
   def test_get_os_name(self):
     expected = ('Linux', 'Mac', 'Raspbian', 'Ubuntu', 'Windows')
@@ -93,8 +100,8 @@ class TestOsUtilities(auto_stub.TestCase):
   def test_get_physical_ram(self):
     self.assertGreater(os_utilities.get_physical_ram(), 0)
 
-  def test_get_free_disks(self):
-    self.assertGreater(os_utilities.get_free_disks(), 0)
+  def test_get_disks_info(self):
+    self.assertGreater(len(os_utilities.get_disks_info()), 0)
 
   def test_get_gpu(self):
     actual = os_utilities.get_gpu()
@@ -109,18 +116,19 @@ class TestOsUtilities(auto_stub.TestCase):
   def test_get_dimensions(self):
     actual = os_utilities.get_dimensions()
 
-    expected = set(['cores', 'cpu', 'disk', 'hostname', 'id', 'os', 'ram'])
-    if sys.platform in ('cygwin', 'win32'):
-      expected.add('cygwin')
-    if sys.platform == 'win32':
-      expected.add('integrity')
-    # On some bots, 'gpu' is not present.
-    actual.pop('gpu', None)
+    expected = set(['cores', 'cpu', 'gpu', 'id', 'os'])
     self.assertEqual(expected, set(actual))
 
   def test_get_state(self):
     actual = os_utilities.get_state()
-    expected = {'cwd', 'free_disks', 'gpu', 'ip', 'running_time', 'started_ts'}
+    expected = {
+      'cwd', 'disks', 'gpu', 'ip', 'hostname', 'ram', 'running_time',
+      'started_ts',
+    }
+    if sys.platform in ('cygwin', 'win32'):
+      expected.add('cygwin')
+    if sys.platform == 'win32':
+      expected.add('integrity')
     self.assertEqual(expected, set(actual))
 
   def test_get_adb_list_devices(self):
