@@ -8,5 +8,5 @@ Description:
 Tools for Chromium developpers.
 
 Local Modifications:
-Kept git_common.py, git_number.py and subprocess2.py.
+Kept git_common.py, git_number.py, subprocess2.py and subcommand.py.
 Copied testing_support/auto_stub.py as auto_stub.py.

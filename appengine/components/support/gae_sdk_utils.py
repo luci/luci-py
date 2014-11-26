@@ -58,6 +58,18 @@ def find_gae_sdk(search_dir=TOOLS_DIR):
       return item
 
 
+def find_app_yaml(search_dir):
+  """Locates app.yaml file in |search_dir| or any of its parent directories."""
+  while True:
+    attempt = os.path.join(search_dir, 'app.yaml')
+    if os.path.isfile(attempt):
+      return attempt
+    prev_dir = search_dir
+    search_dir = os.path.dirname(search_dir)
+    if search_dir == prev_dir:
+      return None
+
+
 def setup_gae_sdk(sdk_path):
   """Modifies sys.path and other global process state to be able to use GAE SDK.
 
@@ -91,6 +103,10 @@ def gae_sdk_path():
   return _GAE_SDK_PATH
 
 
+class LoginRequiredError(Exception):
+  """Raised by Application methods if use has to go through login flow."""
+
+
 class Application(object):
   """Configurable GAE application.
 
@@ -98,13 +114,11 @@ class Application(object):
   serving version, uploaded versions, etc.). Built on top of appcfg.py calls.
   """
 
-  def __init__(self, app_dir, app_id=None, verbose=False, use_oauth=True):
+  def __init__(self, app_dir, app_id=None, verbose=False):
     """Args:
       app_dir: application directory (should contain app.yaml).
       app_id: application ID to use, or None to use one from app.yaml.
       verbose: if True will run all appcfg.py operations in verbose mode.
-      use_oauth: if True, use --oauth2 authentication when invoking appcfg.py,
-        otherwise use cookie-based one. OAuth2 is not supported by some tools.
     """
     if not _GAE_SDK_PATH:
       raise ValueError('Call setup_gae_sdk first')
@@ -114,7 +128,7 @@ class Application(object):
     self._app_dir = os.path.abspath(app_dir)
     self._app_id = app_id
     self._verbose = verbose
-    self._use_oauth = use_oauth
+    self._use_oauth = True
     self._login = None
     self._password = None
 
@@ -138,6 +152,13 @@ class Application(object):
     if 'default' not in self._modules:
       raise ValueError('Default module is missing')
 
+  def use_cookie_auth(self):
+    """Switches to Application Specific Password for authentication.
+
+    Required for some buggy combinations of commands and apps.
+    """
+    self._use_oauth = False
+
   @property
   def app_dir(self):
     """Absolute path to application directory."""
@@ -160,8 +181,24 @@ class Application(object):
     yamls = self._modules.copy()
     return [yamls.pop('default').path] + [m.path for m in yamls.itervalues()]
 
+  def login(self):
+    """Runs OAuth2 login flow and returns true on success."""
+    # HACK: Call a command with no side effect to launch the flow.
+    cmd = [
+      sys.executable,
+      os.path.join(gae_sdk_path(), 'appcfg.py'),
+      '--application', self.app_id,
+      '--oauth2',
+      '--noauth_local_webserver',
+      'list_versions',
+    ]
+    return subprocess.call(cmd, cwd=self._app_dir) == 0
+
   def run_appcfg(self, args):
     """Runs appcfg.py <args>, deserializes its output and returns it."""
+    if self._use_oauth and not is_oauth_token_cached():
+      raise LoginRequiredError()
+
     # Common options.
     cmd = [
       sys.executable,
@@ -228,7 +265,6 @@ class Application(object):
 
   def delete_version(self, version, modules=None):
     """Deletes the specified version of the given module names."""
-    assert not self._use_oauth, 'Currently works only with cookie-based auth'
     # For some reason 'delete_version' call processes only one module at a time,
     # unlike all other related appcfg.py calls.
     for module in sorted(modules or self.modules):
@@ -362,7 +398,7 @@ def app_sdk_options(parser, app_dir=None):
   parser.add_option('-v', '--verbose', action='store_true')
 
 
-def process_sdk_options(parser, options, app_dir, use_oauth=True):
+def process_sdk_options(parser, options, app_dir):
   """Handles values of options added by 'add_sdk_options'.
 
   Modifies global process state by configuring logging and path to GAE SDK.
@@ -371,8 +407,6 @@ def process_sdk_options(parser, options, app_dir, use_oauth=True):
     parser: OptionParser instance to use to report errors.
     options: parsed options, as returned by parser.parse_args.
     app_dir: path to application directory to use by default.
-    use_oauth: if True, use --oauth2 authentication when invoking appcfg.py,
-        otherwise use cookie-based one. OAuth2 is not supported by some tools.
 
   Returns:
     New instance of Application configured based on passed options.
@@ -390,7 +424,7 @@ def process_sdk_options(parser, options, app_dir, use_oauth=True):
   app_dir = os.path.abspath(app_dir or options.app_dir)
 
   try:
-    return Application(app_dir, options.app_id, options.verbose, use_oauth)
+    return Application(app_dir, options.app_id, options.verbose)
   except ValueError as e:
     parser.error(str(e))
 
@@ -413,6 +447,12 @@ def confirm(text, app, version, modules=None):
   print('  Version:   %s' % version)
   print('  Modules:   %s' % ', '.join(modules or app.modules))
   return raw_input('Continue? [y/N] ') in ('y', 'Y')
+
+
+def is_oauth_token_cached():
+  """True if appcfg.py should be able to use OAuth2 without user interaction."""
+  return os.path.exists(
+      os.path.join(os.path.expanduser('~'), '.appcfg_oauth2_tokens'))
 
 
 def get_authentication_function(bucket='gae_sdk_utils'):
