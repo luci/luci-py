@@ -419,20 +419,3 @@ def yield_expired_task_to_run():
   for task in TaskToRun.query().filter(TaskToRun.queue_number > 0):
     if task.expiration_ts < now:
       yield task
-
-
-def abort_task_to_run(task):
-  """Updates a TaskToRun to note it should not be scheduled for work.
-
-  Arguments:
-  - task: TaskToRun entity to update.
-  """
-  # TODO(maruel): Add support to kill an on-going task and update the
-  # corresponding TaskRunResult.
-  # TODO(maruel): Add stats.
-  assert not ndb.in_transaction()
-  assert isinstance(task, TaskToRun), task
-  task.queue_number = None
-  task.put()
-  # Add it to the negative cache.
-  set_lookup_cache(task.key, False)

@@ -607,23 +607,6 @@ class TaskToRunApiTest(test_case.TestCase):
     task_to_run.set_lookup_cache(to_run.key, True)
     self.assertEqual(False, task_to_run._lookup_cache_is_taken(to_run.key))
 
-  def test_abort_task_to_run(self):
-    to_run = _gen_new_task_to_run(
-        properties=dict(dimensions={u'OS': u'Windows-3.1.1'}))
-    _gen_new_task_to_run(
-        properties=dict(dimensions={u'OS': u'Windows-3.1.1'}))
-    bot_dimensions = {u'OS': u'Windows-3.1.1', u'hostname': u'localhost'}
-    self.assertEqual(
-        2, len(_yield_next_available_task_to_dispatch(bot_dimensions)))
-    task_to_run.abort_task_to_run(to_run)
-    self.assertEqual(
-        1, len(_yield_next_available_task_to_dispatch(bot_dimensions)))
-
-    # Aborting an aborted task shard is just fine.
-    task_to_run.abort_task_to_run(to_run)
-    self.assertEqual(
-        1, len(_yield_next_available_task_to_dispatch(bot_dimensions)))
-
 
 if __name__ == '__main__':
   if '-v' in sys.argv:

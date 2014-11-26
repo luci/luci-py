@@ -548,21 +548,34 @@ def bot_kill_task(run_result_key, bot_id):
   return msg
 
 
-def cancel_task(summary_key):
+def cancel_task(result_summary_key):
   """Cancels a task if possible."""
-  request_key = task_result.result_summary_key_to_request_key(summary_key)
-  task_key = task_to_run.request_to_task_to_run_key(request_key.get())
-  task_to_run.abort_task_to_run(task_key.get())
-  result_summary = summary_key.get()
-  ok = False
-  was_running = False
-  if result_summary.can_be_canceled:
-    ok = True
+  request_key = task_result.result_summary_key_to_request_key(
+      result_summary_key)
+  to_run_key = task_to_run.request_to_task_to_run_key(request_key.get())
+  now = utils.utcnow()
+
+  def run():
+    to_run, result_summary = ndb.get_multi((to_run_key, result_summary_key))
     was_running = result_summary.state == task_result.State.RUNNING
+    if not result_summary.can_be_canceled:
+      return False, was_running
+    to_run.queue_number = None
     result_summary.state = task_result.State.CANCELED
-    result_summary.abandoned_ts = utils.utcnow()
-    result_summary.put()
+    result_summary.abandoned_ts = now
+    ndb.put_multi((to_run, result_summary))
+    return True, was_running
+
+  try:
+    ok, was_running = datastore_utils.transaction(run)
+  except datastore_utils.CommitError as e:
+    packed = task_result.pack_result_summary_key(result_summary_key)
+    return 'Failed killing task %s: %s' % (packed, e)
+  # Add it to the negative cache.
+  task_to_run.set_lookup_cache(to_run_key, False)
+  # TODO(maruel): Add stats.
   return ok, was_running
+
 
 
 ### Cron job.
