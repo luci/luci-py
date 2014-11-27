@@ -266,11 +266,9 @@ class TaskToRunApiTest(test_case.TestCase):
   def test_request_to_task_to_run_key(self):
     self.mock(random, 'getrandbits', lambda _: 0x88)
     request = task_request.make_request(_gen_request_data())
-    task_key = task_to_run.request_to_task_to_run_key(request)
-    expected = (
-        "Key('TaskRequestShard', '0c152f', 'TaskRequest', 91005376593954816, "
-        "'TaskToRun', 2471203225)")
-    self.assertEqual(expected, str(task_key))
+    self.assertEqual(
+        ndb.Key('TaskRequest', 0x7e296460f77ff77e, 'TaskToRun', 2471203225),
+        task_to_run.request_to_task_to_run_key(request))
 
   def test_validate_to_run_key(self):
     request = task_request.make_request(_gen_request_data())
@@ -337,16 +335,14 @@ class TaskToRunApiTest(test_case.TestCase):
       {
         'dimensions_hash': _hash_dimensions(request_dimensions),
         'expiration_ts': self.now + datetime.timedelta(seconds=31),
-        # random 8-15 bits = 23 as mocked above.
-        'request_key': '0x014350e868882300',
+        'request_key': '0x7e296460f77ffdce',
         # Lower priority value means higher priority.
         'queue_number': '0x05014350e8688800',
       },
       {
         'dimensions_hash': _hash_dimensions(request_dimensions),
         'expiration_ts': self.now + datetime.timedelta(seconds=31),
-        # random 8-15 bits = 12 as mocked above.
-        'request_key': '0x014350e868881200',
+        'request_key': '0x7e296460f77ffede',
         'queue_number': '0x0a014350e8688800',
       },
     ]

@@ -229,9 +229,9 @@ class BotApiTest(AppTestBase):
     token, params = self.get_bot_token()
     # Enqueue a task.
     _, task_id = self.client_create_task()
-    self.assertEqual('00', task_id[-2:])
+    self.assertEqual('0', task_id[-1])
     # Convert TaskResultSummary reference to TaskRunResult.
-    task_id = task_id[:-2] + '01'
+    task_id = task_id[:-1] + '1'
     response = self.post_with_token('/swarming/api/v1/bot/poll', params, token)
     expected = {
       u'cmd': u'run',
@@ -256,7 +256,7 @@ class BotApiTest(AppTestBase):
       u'durations': [],
       u'exit_codes': [],
       u'failure': False,
-      u'id': u'125ecfd5c888801',
+      u'id': u'5cee488008811',
       u'internal_failure': False,
       u'modified_ts': str_now,
       u'server_versions': [u'default-version'],
@@ -379,7 +379,7 @@ class BotApiTest(AppTestBase):
         u'durations': [],
         u'exit_codes': [],
         u'failure': False,
-        u'id': u'125ecfd5c888801',
+        u'id': u'5cee488008811',
         u'internal_failure': False,
         u'modified_ts': str_now,
         u'server_versions': [u'default-version'],
@@ -525,7 +525,7 @@ class BotApiTest(AppTestBase):
       u'durations': [0.1],
       u'exit_codes': [1],
       u'failure': True,
-      u'id': u'125ecfd5c888801',
+      u'id': u'5cee488008811',
       u'internal_failure': False,
       u'modified_ts': str_now,
       u'server_versions': [u'default-version'],
@@ -571,7 +571,7 @@ class BotApiTest(AppTestBase):
       u'durations': [],
       u'exit_codes': [],
       u'failure': False,
-      u'id': u'125ecfd5c888801',
+      u'id': u'5cee488008811',
       u'internal_failure': True,
       u'modified_ts': str_now,
       u'server_versions': [u'default-version'],
@@ -751,7 +751,7 @@ class ClientApiTest(AppTestBase):
         ],
         u'user': u'joe@localhost',
       },
-      u'task_id': u'125ecfd5c888800',
+      u'task_id': u'5cee488008810',
     }
     self.assertEqual(expected, response)
 
@@ -821,7 +821,7 @@ class ClientApiTest(AppTestBase):
       u'durations': [],
       u'exit_codes': [],
       u'failure': False,
-      u'id': u'125ecfd5c888800',
+      u'id': u'5cee488008810',
       u'internal_failure': False,
       u'modified_ts': str_now,
       u'name': u'hi',
@@ -833,10 +833,10 @@ class ClientApiTest(AppTestBase):
       u'user': u'joe@localhost',
     }
     self.assertEqual(expected, response)
-    self.assertEqual('00', task_id[-2:])
+    self.assertEqual('0', task_id[-1])
 
     # No bot started yet.
-    run_id = task_id[:-2] + '01'
+    run_id = task_id[:-1] + '1'
     response = self.app.get(
         '/swarming/api/v1/client/task/' + run_id, status=404).json
     self.assertEqual({u'error': u'Task not found'}, response)
@@ -855,7 +855,7 @@ class ClientApiTest(AppTestBase):
       u'durations': [],
       u'exit_codes': [],
       u'failure': False,
-      u'id': u'125ecfd5c888801',
+      u'id': u'5cee488008811',
       u'internal_failure': False,
       u'modified_ts': str_now,
       u'server_versions': [u'default-version'],
@@ -871,7 +871,7 @@ class ClientApiTest(AppTestBase):
 
     self.set_as_anonymous()
     self.app.get('/swarming/api/v1/client/task/' + task_id, status=403)
-    self.assertEqual('00', task_id[-2:])
+    self.assertEqual('0', task_id[-1])
 
   def test_get_task_output(self):
     self.client_create_task()
@@ -880,7 +880,7 @@ class ClientApiTest(AppTestBase):
     task_id = self.bot_run_task()
 
     self.set_as_privileged_user()
-    run_id = task_id[:-2] + '01'
+    run_id = task_id[:-1] + '1'
     response = self.app.get(
         '/swarming/api/v1/client/task/%s/output/0' % task_id).json
     self.assertEqual({'output': u'rÉsult string'}, response)
@@ -908,7 +908,7 @@ class ClientApiTest(AppTestBase):
         '/swarming/api/v1/client/task/%s/output/0' % task_id).json
     self.assertEqual({'output': None}, response)
 
-    run_id = task_id[:-2] + '01'
+    run_id = task_id[:-1] + '1'
     response = self.app.get(
         '/swarming/api/v1/client/task/%s/output/0' % run_id, status=404).json
     self.assertEqual({u'error': u'Task not found'}, response)
@@ -971,7 +971,7 @@ class ClientApiTest(AppTestBase):
     self.assertEqual({u'ok': True}, response)
 
     self.set_as_privileged_user()
-    run_id = task_id[:-2] + '01'
+    run_id = task_id[:-1] + '1'
     response = self.app.get(
         '/swarming/api/v1/client/task/%s/output/all' % task_id).json
     self.assertEqual({'outputs': [u'result string', u'bar']}, response)
@@ -985,13 +985,13 @@ class ClientApiTest(AppTestBase):
         '/swarming/api/v1/client/task/%s/output/all' % task_id).json
     self.assertEqual({'outputs': []}, response)
 
-    run_id = task_id[:-2] + '01'
+    run_id = task_id[:-1] + '1'
     response = self.app.get(
         '/swarming/api/v1/client/task/%s/output/all' % run_id, status=404).json
     self.assertEqual({u'error': u'Task not found'}, response)
 
   def test_get_task_request(self):
-    now = datetime.datetime(2000, 1, 2, 3, 4, 5, 6)
+    now = datetime.datetime(2010, 1, 2, 3, 4, 5, 6)
     self.mock_now(now)
     _, task_id = self.client_create_task()
     response = self.app.get(
@@ -1020,7 +1020,8 @@ class ClientApiTest(AppTestBase):
   def test_tasks(self):
     # Create two tasks, one deduped.
     self.mock(random, 'getrandbits', lambda _: 0x66)
-    now = datetime.datetime(2000, 1, 2, 3, 4, 5, 6)
+    now = datetime.datetime(2010, 1, 2, 3, 4, 5, 6)
+    now_str = unicode(now.strftime(utils.DATETIME_FORMAT))
     self.mock_now(now)
     self.client_create_task(
         name='first', tags=['project:yay', 'commit:post', 'os:Win'],
@@ -1030,7 +1031,8 @@ class ClientApiTest(AppTestBase):
 
     self.set_as_user()
     self.mock(random, 'getrandbits', lambda _: 0x88)
-    self.mock_now(now, 60)
+    now_60 = self.mock_now(now, 60)
+    now_60_str = unicode(now_60.strftime(utils.DATETIME_FORMAT))
     self.client_create_task(
         name='second', user='jack@localhost',
         tags=['project:yay', 'commit:pre', 'os:Win'],
@@ -1041,19 +1043,19 @@ class ClientApiTest(AppTestBase):
       u'abandoned_ts': None,
       u'bot_id': u'bot1',
       u'bot_version': self.bot_version,
-      u'completed_ts': u'2000-01-02 03:04:05',
-      u'created_ts': u'2000-01-02 03:04:05',
+      u'completed_ts': now_str,
+      u'created_ts': now_str,
       u'deduped_from': None,
       u'durations': [0.1, 0.2],
       u'exit_codes': [0, 0],
       u'failure': False,
-      u'id': u'dc709e90886600',
+      u'id': u'5cee488006610',
       u'internal_failure': False,
-      u'modified_ts': u'2000-01-02 03:04:05',
+      u'modified_ts': now_str,
       u'name': u'first',
       u'properties_hash': u'd181190fea9de5dfa28ebcd155548e3f6db6ab93',
       u'server_versions': [u'default-version'],
-      u'started_ts': u'2000-01-02 03:04:05',
+      u'started_ts': now_str,
       u'state': task_result.State.COMPLETED,
       u'try_number': 1,
       u'user': u'joe@localhost',
@@ -1062,19 +1064,19 @@ class ClientApiTest(AppTestBase):
       u'abandoned_ts': None,
       u'bot_id': u'bot1',
       u'bot_version': self.bot_version,
-      u'completed_ts': u'2000-01-02 03:04:05',
-      u'created_ts': u'2000-01-02 03:05:05',
-      u'deduped_from': u'dc709e90886601',
+      u'completed_ts': now_str,
+      u'created_ts': now_60_str,
+      u'deduped_from': u'5cee488006611',
       u'durations': [0.1, 0.2],
       u'exit_codes': [0, 0],
       u'failure': False,
-      u'id': u'dc709f7ae88800',
+      u'id': u'5cfcee8008810',
       u'internal_failure': False,
-      u'modified_ts': u'2000-01-02 03:05:05',
+      u'modified_ts': now_60_str,
       u'name': u'second',
       u'properties_hash': u'd181190fea9de5dfa28ebcd155548e3f6db6ab93',
       u'server_versions': [u'default-version'],
-      u'started_ts': u'2000-01-02 03:04:05',
+      u'started_ts': now_str,
       u'state': task_result.State.COMPLETED,
       u'try_number': 0,
       u'user': u'jack@localhost',
@@ -1128,7 +1130,8 @@ class ClientApiTest(AppTestBase):
 
   def test_api_bots(self):
     self.set_as_privileged_user()
-    now = datetime.datetime(2000, 1, 2, 3, 4, 5, 6)
+    now = datetime.datetime(2010, 1, 2, 3, 4, 5, 6)
+    now_str = unicode(now.strftime(utils.DATETIME_FORMAT))
     self.mock_now(now)
     bot_management.bot_event(
         event_type='bot_connected', bot_id='id1', external_ip='8.8.4.4',
@@ -1141,10 +1144,10 @@ class ClientApiTest(AppTestBase):
         {
           u'dimensions': {u'foo': [u'bar'], u'id': [u'id1']},
           u'external_ip': u'8.8.4.4',
-          u'first_seen_ts': u'2000-01-02 03:04:05',
+          u'first_seen_ts': now_str,
           u'id': u'id1',
           u'is_dead': False,
-          u'last_seen_ts': u'2000-01-02 03:04:05',
+          u'last_seen_ts': now_str,
           u'quarantined': False,
           u'state': {u'ram': 65},
           u'task_id': None,
@@ -1187,7 +1190,8 @@ class ClientApiTest(AppTestBase):
 
   def test_api_bot(self):
     self.set_as_privileged_user()
-    now = datetime.datetime(2000, 1, 2, 3, 4, 5, 6)
+    now = datetime.datetime(2010, 1, 2, 3, 4, 5, 6)
+    now_str = unicode(now.strftime(utils.DATETIME_FORMAT))
     self.mock_now(now)
     bot_management.bot_event(
         event_type='bot_connected', bot_id='id1', external_ip='8.8.4.4',
@@ -1198,10 +1202,10 @@ class ClientApiTest(AppTestBase):
     expected = {
       u'dimensions': {u'foo': [u'bar'], u'id': [u'id1']},
       u'external_ip': u'8.8.4.4',
-      u'first_seen_ts': u'2000-01-02 03:04:05',
+      u'first_seen_ts': now_str,
       u'id': u'id1',
       u'is_dead': False,
-      u'last_seen_ts': u'2000-01-02 03:04:05',
+      u'last_seen_ts': now_str,
       u'quarantined': False,
       u'state': {u'ram': 65},
       u'task_id': None,
@@ -1212,7 +1216,7 @@ class ClientApiTest(AppTestBase):
 
   def test_api_bot_delete(self):
     self.set_as_admin()
-    now = datetime.datetime(2000, 1, 2, 3, 4, 5, 6)
+    now = datetime.datetime(2010, 1, 2, 3, 4, 5, 6)
     self.mock_now(now)
     state = {
       'dict': {'random': 'values'},
@@ -1243,7 +1247,7 @@ class ClientApiTest(AppTestBase):
 
   def test_api_bot_tasks_empty(self):
     self.set_as_privileged_user()
-    now = datetime.datetime(2000, 1, 2, 3, 4, 5, 6)
+    now = datetime.datetime(2010, 1, 2, 3, 4, 5, 6)
     self.mock_now(now)
     actual = self.app.get('/swarming/api/v1/client/bot/id1/tasks').json
     expected = {
@@ -1256,7 +1260,8 @@ class ClientApiTest(AppTestBase):
 
   def test_api_bot_tasks(self):
     self.mock(random, 'getrandbits', lambda _: 0x88)
-    now = datetime.datetime(2000, 1, 2, 3, 4, 5, 6)
+    now = datetime.datetime(2010, 1, 2, 3, 4, 5, 6)
+    now_str = unicode(now.strftime(utils.DATETIME_FORMAT))
     self.mock_now(now)
 
     self.set_as_bot()
@@ -1265,6 +1270,8 @@ class ClientApiTest(AppTestBase):
     res = self.bot_poll()
     self.bot_complete_task(token, task_id=res['manifest']['task_id'])
 
+    now_1 = self.mock_now(now, 1)
+    now_1_str = unicode(now_1.strftime(utils.DATETIME_FORMAT))
     self.mock(random, 'getrandbits', lambda _: 0x55)
     self.client_create_task(name='ho')
     token, _ = self.get_bot_token()
@@ -1276,21 +1283,21 @@ class ClientApiTest(AppTestBase):
     actual = self.app.get('/swarming/api/v1/client/bot/bot1/tasks?limit=1').json
     expected = {
       u'limit': 1,
-      u'now': unicode(now.strftime(utils.DATETIME_FORMAT)),
+      u'now': now_1_str,
       u'items': [
         {
           u'abandoned_ts': None,
           u'bot_id': u'bot1',
           u'bot_version': self.bot_version,
-          u'completed_ts': u'2000-01-02 03:04:05',
+          u'completed_ts': now_1_str,
           u'durations': [0.1],
           u'exit_codes': [1],
           u'failure': True,
-          u'id': u'dc709e90885501',
+          u'id': u'5cee870005511',
           u'internal_failure': False,
-          u'modified_ts': u'2000-01-02 03:04:05',
+          u'modified_ts': now_1_str,
           u'server_versions': [u'default-version'],
-          u'started_ts': u'2000-01-02 03:04:05',
+          u'started_ts': now_1_str,
           u'state': task_result.State.COMPLETED,
           u'try_number': 1,
         },
@@ -1304,21 +1311,21 @@ class ClientApiTest(AppTestBase):
     expected = {
       u'cursor': None,
       u'limit': 1,
-      u'now': unicode(now.strftime(utils.DATETIME_FORMAT)),
+      u'now': now_1_str,
       u'items': [
         {
           u'abandoned_ts': None,
           u'bot_id': u'bot1',
           u'bot_version': self.bot_version,
-          u'completed_ts': u'2000-01-02 03:04:05',
+          u'completed_ts': now_str,
           u'durations': [0.1],
           u'exit_codes': [0],
           u'failure': False,
-          u'id': u'dc709e90888801',
+          u'id': u'5cee488008811',
           u'internal_failure': False,
-          u'modified_ts': u'2000-01-02 03:04:05',
+          u'modified_ts': now_str,
           u'server_versions': [u'default-version'],
-          u'started_ts': u'2000-01-02 03:04:05',
+          u'started_ts': now_str,
           u'state': task_result.State.COMPLETED,
           u'try_number': 1,
         },

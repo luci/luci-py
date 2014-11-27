@@ -58,35 +58,63 @@ def _gen_request_data(properties=None, **kwargs):
 class TaskRequestPrivateTest(test_case.TestCase):
   def test_new_request_key(self):
     for _ in xrange(3):
-      now = utils.milliseconds_since_epoch(None)
+      delta = utils.utcnow() - task_request._BEGINING_OF_THE_WORLD
+      now = int(round(delta.total_seconds() * 1000.))
       key = task_request._new_request_key()
-      key_id = key.integer_id()
-      timestamp = key_id >> 16
-      randomness = key_id & 0xFFFF
-      diff = abs(timestamp - now)
-      self.assertTrue(diff < 1000, diff)
+      # Remove the XOR.
+      key_id = key.integer_id() ^ (2**63-1)
+      timestamp = key_id >> 20
+      randomness = (key_id >> 4) & 0xFFFF
+      version = key_id & 0xF
+      self.assertLess(abs(timestamp - now), 1000)
+      self.assertEqual(1, version)
       if randomness:
         break
     else:
       self.fail('Failed to find randomness')
 
-  def test_new_request_key_no_random(self):
+  def test_new_request_key_zero(self):
     def getrandbits(i):
-      self.assertEqual(i, 8)
-      return 0x77
+      self.assertEqual(i, 16)
+      return 0x7766
     self.mock(random, 'getrandbits', getrandbits)
-    days_until_end_of_the_world = 2**47 / 24. / 60. / 60. / 1000.
+    self.mock_now(task_request._BEGINING_OF_THE_WORLD)
+    key = task_request._new_request_key()
+    # Remove the XOR.
+    key_id = key.integer_id() ^ (2**63-1)
+    #   00000000000 7766 1
+    #     ^          ^   ^
+    #     |          |   |
+    #  since 2010    | schema version
+    #                |
+    #               rand
+    self.assertEqual('0x0000000000077661', '0x%016x' % key_id)
+
+  def test_new_request_key_end(self):
+    def getrandbits(i):
+      self.assertEqual(i, 16)
+      return 0x7766
+    self.mock(random, 'getrandbits', getrandbits)
+    days_until_end_of_the_world = 2**43 / 24. / 60. / 60. / 1000.
     num_days = int(days_until_end_of_the_world)
     # Remove 1ms to not overflow.
     num_seconds = (
         (days_until_end_of_the_world - num_days) * 24. * 60. * 60. - 0.001)
-    self.assertEqual(1628906, num_days)
-    now = utils.EPOCH + datetime.timedelta(days=num_days, seconds=num_seconds)
+    self.assertEqual(101806, num_days)
+    self.assertEqual(278, int(num_days / 365.3))
+    now = (task_request._BEGINING_OF_THE_WORLD +
+        datetime.timedelta(days=num_days, seconds=num_seconds))
     self.mock_now(now)
     key = task_request._new_request_key()
-    # Last 0x00 is reserved for shard numbers.
-    # Next to last 0x77 is the random bits.
-    self.assertEqual('0x7fffffffffff7700', '0x%016x' % key.integer_id())
+    # Remove the XOR.
+    key_id = key.integer_id() ^ (2**63-1)
+    #   7ffffffffff 7766 1
+    #     ^          ^   ^
+    #     |          |   |
+    #  since 2010    | schema version
+    #                |
+    #               rand
+    self.assertEqual('0x7ffffffffff77661', '0x%016x' % key_id)
 
 
 class TaskRequestApiTest(test_case.TestCase):
@@ -100,15 +128,32 @@ class TaskRequestApiTest(test_case.TestCase):
         i[5:] for i in dir(self) if i.startswith('test_'))
     self.assertFalse(missing)
 
-  def test_id_to_request_key(self):
+  def test_request_id_to_key(self):
+    # Old style keys.
     self.assertEqual(
-        "Key('TaskRequestShard', 'f71849', 'TaskRequest', 256)",
-        str(task_request.id_to_request_key(0x100)))
+        ndb.Key('TaskRequestShard', 'f71849', 'TaskRequest', 256),
+        task_request.request_id_to_key('10'))
+    # New style key.
+    self.assertEqual(
+        ndb.Key('TaskRequest', 0x7fffffffffffffee),
+        task_request.request_id_to_key('11'))
     with self.assertRaises(ValueError):
-      task_request.id_to_request_key(1)
+      task_request.request_id_to_key('2')
+
+  def test_request_key_to_id(self):
+    # Old style keys.
+    self.assertEqual(
+        '100',
+       task_request.request_key_to_id(
+           ndb.Key('TaskRequestShard', 'f71849', 'TaskRequest', 256)))
+    # New style key.
+    self.assertEqual(
+        '11',
+       task_request.request_key_to_id(
+           ndb.Key('TaskRequest', 0x7fffffffffffffee)))
 
   def test_validate_request_key(self):
-    task_request.validate_request_key(task_request.id_to_request_key(0x100))
+    task_request.validate_request_key(task_request.request_id_to_key('10'))
     task_request.validate_request_key(
         ndb.Key(
             'TaskRequestShard', 'a' * task_request._SHARDING_LEVEL,

@@ -8,10 +8,8 @@ This module doesn't do the scheduling itself. It only describes the tasks ready
 to be scheduled.
 
 Graph of the schema:
-     <See task_request.py>
-               ^
-               |
-    +---------------------+
+
+    +--------Root---------+
     |TaskRequest          |  (task_request.py)
     |    +--------------+ |
     |    |TaskProperties| |

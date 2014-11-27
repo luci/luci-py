@@ -125,37 +125,45 @@ class TaskResultApiTest(test_case.TestCase):
     self.assertEqual('Deduped', task_result.state_to_string(f))
 
   def test_request_key_to_result_summary_key(self):
-    request_key = task_request.id_to_request_key(256)
+    # New style key.
+    request_key = task_request.request_id_to_key('11')
     result_key = task_result.request_key_to_result_summary_key(
         request_key)
-    expected = (
-        "Key('TaskRequestShard', 'f71849', 'TaskRequest', 256, "
-        "'TaskResultSummary', 1)")
-    self.assertEqual(expected, str(result_key))
+    expected = ndb.Key(
+        'TaskRequest', 0x7fffffffffffffee, 'TaskResultSummary', 1)
+    self.assertEqual(expected, result_key)
+    # Old style key.
+    request_key = task_request.request_id_to_key('10')
+    result_key = task_result.request_key_to_result_summary_key(
+        request_key)
+    expected = ndb.Key(
+        'TaskRequestShard', 'f71849', 'TaskRequest', 256,
+        'TaskResultSummary', 1)
+    self.assertEqual(expected, result_key)
 
   def test_result_summary_key_to_request_key(self):
-    request_key = task_request.id_to_request_key(0x100)
+    request_key = task_request.request_id_to_key('11')
     result_summary_key = task_result.request_key_to_result_summary_key(
         request_key)
     actual = task_result.result_summary_key_to_request_key(result_summary_key)
     self.assertEqual(request_key, actual)
 
   def test_result_summary_key_to_run_result_key(self):
-    request_key = task_request.id_to_request_key(0x100)
+    request_key = task_request.request_id_to_key('11')
     result_summary_key = task_result.request_key_to_result_summary_key(
         request_key)
     run_result_key = task_result.result_summary_key_to_run_result_key(
         result_summary_key, 1)
-    expected = (
-        "Key('TaskRequestShard', 'f71849', 'TaskRequest', 256, "
-        "'TaskResultSummary', 1, 'TaskRunResult', 1)")
-    self.assertEqual(expected, str(run_result_key))
+    expected = ndb.Key(
+        'TaskRequest', 0x7fffffffffffffee, 'TaskResultSummary', 1,
+        'TaskRunResult', 1)
+    self.assertEqual(expected, run_result_key)
     run_result_key = task_result.result_summary_key_to_run_result_key(
         result_summary_key, 2)
-    expected = (
-        "Key('TaskRequestShard', 'f71849', 'TaskRequest', 256, "
-        "'TaskResultSummary', 1, 'TaskRunResult', 2)")
-    self.assertEqual(expected, str(run_result_key))
+    expected = ndb.Key(
+        'TaskRequest', 0x7fffffffffffffee, 'TaskResultSummary', 1,
+        'TaskRunResult', 2)
+    self.assertEqual(expected, run_result_key)
 
     with self.assertRaises(ValueError):
       task_result.result_summary_key_to_run_result_key(result_summary_key, 0)
@@ -163,7 +171,7 @@ class TaskResultApiTest(test_case.TestCase):
       task_result.result_summary_key_to_run_result_key(result_summary_key, 3)
 
   def test_run_result_key_to_result_summary_key(self):
-    request_key = task_request.id_to_request_key(0x100)
+    request_key = task_request.request_id_to_key('11')
     result_summary_key = task_result.request_key_to_result_summary_key(
         request_key)
     run_result_key = task_result.result_summary_key_to_run_result_key(
@@ -173,41 +181,41 @@ class TaskResultApiTest(test_case.TestCase):
         task_result.run_result_key_to_result_summary_key(run_result_key))
 
   def test_pack_result_summary_key(self):
-    request_key = task_request.id_to_request_key(0xbb80200)
+    request_key = task_request.request_id_to_key('11')
     result_summary_key = task_result.request_key_to_result_summary_key(
         request_key)
     run_result_key = task_result.result_summary_key_to_run_result_key(
         result_summary_key, 1)
 
     actual = task_result.pack_result_summary_key(result_summary_key)
-    # 0xbb8 = 3000ms = 3 secs; 0x02 = random;  0x00 = try_number, e.g. it is a
-    # TaskResultSummary.
-    self.assertEqual('bb80200', actual)
+    self.assertEqual('110', actual)
 
     with self.assertRaises(AssertionError):
       task_result.pack_result_summary_key(run_result_key)
 
   def test_pack_run_result_key(self):
-    request_key = task_request.id_to_request_key(0xbb80200)
+    request_key = task_request.request_id_to_key('11')
     result_summary_key = task_result.request_key_to_result_summary_key(
         request_key)
     run_result_key = task_result.result_summary_key_to_run_result_key(
         result_summary_key, 1)
-
-    actual = task_result.pack_run_result_key(run_result_key)
-    # 0xbb8 = 3000ms = 3 secs; 0x02 = random;  0x01 = try_number, e.g. it is a
-    # TaskRunResult.
-    self.assertEqual('bb80201', actual)
+    self.assertEqual('111', task_result.pack_run_result_key(run_result_key))
 
     with self.assertRaises(AssertionError):
       task_result.pack_run_result_key(result_summary_key)
 
   def test_unpack_result_summary_key(self):
+    # New style key.
+    actual = task_result.unpack_result_summary_key('bb80210')
+    expected = ndb.Key(
+        'TaskRequest', 0x7fffffffff447fde, 'TaskResultSummary', 1)
+    self.assertEqual(expected, actual)
+    # Old style key.
     actual = task_result.unpack_result_summary_key('bb80200')
-    expected = (
-        "Key('TaskRequestShard', '6f4236', 'TaskRequest', 196608512, "
-        "'TaskResultSummary', 1)")
-    self.assertEqual(expected, str(actual))
+    expected = ndb.Key(
+        'TaskRequestShard', '6f4236', 'TaskRequest', 196608512,
+        'TaskResultSummary', 1)
+    self.assertEqual(expected, actual)
 
     with self.assertRaises(ValueError):
       task_result.unpack_result_summary_key('0')
@@ -217,12 +225,20 @@ class TaskResultApiTest(test_case.TestCase):
       task_result.unpack_result_summary_key('bb80201')
 
   def test_unpack_run_result_key(self):
+    # New style key.
+    for i in ('1', '2'):
+      actual = task_result.unpack_run_result_key('bb8021' + i)
+      expected = ndb.Key(
+          'TaskRequest', 0x7fffffffff447fde,
+          'TaskResultSummary', 1, 'TaskRunResult', int(i))
+      self.assertEqual(expected, actual)
+    # Old style key.
     for i in ('1', '2'):
       actual = task_result.unpack_run_result_key('bb8020' + i)
-      expected = (
-          "Key('TaskRequestShard', '6f4236', 'TaskRequest', 196608512, "
-          "'TaskResultSummary', 1, 'TaskRunResult', " + i + ")")
-      self.assertEqual(expected, str(actual))
+      expected = ndb.Key(
+          'TaskRequestShard', '6f4236', 'TaskRequest', 196608512,
+          'TaskResultSummary', 1, 'TaskRunResult', int(i))
+      self.assertEqual(expected, actual)
 
     with self.assertRaises(ValueError):
       task_result.unpack_run_result_key('1')
@@ -246,7 +262,7 @@ class TaskResultApiTest(test_case.TestCase):
       'durations': [],
       'exit_codes': [],
       'failure': False,
-      'id': '14350e868888800',
+      'id': '1d69b9f088008810',
       'internal_failure': False,
       'modified_ts': None,
       'name': u'Request name',
@@ -274,7 +290,7 @@ class TaskResultApiTest(test_case.TestCase):
       'durations': [],
       'exit_codes': [],
       'failure': False,
-      'id': '14350e868888801',
+      'id': '1d69b9f088008811',
       'internal_failure': False,
       'modified_ts': None,
       'server_versions': ['default-version'],
@@ -304,7 +320,7 @@ class TaskResultApiTest(test_case.TestCase):
       'durations': [],
       'exit_codes': [],
       'failure': False,
-      'id': '14350e868888800',
+      'id': '1d69b9f088008810',
       'internal_failure': False,
       'modified_ts': self.now,
       'name': u'Request name',
@@ -339,7 +355,7 @@ class TaskResultApiTest(test_case.TestCase):
       'durations': [],
       'exit_codes': [],
       'failure': False,
-      'id': '14350e868888800',
+      'id': '1d69b9f088008810',
       'internal_failure': False,
       'modified_ts': reap_ts,
       'name': u'Request name',
@@ -365,14 +381,14 @@ class TaskResultApiTest(test_case.TestCase):
     expected = {
       'abandoned_ts': None,
       'bot_id': u'localhost',
-      'bot_version': 'abc',
+      'bot_version': u'abc',
       'completed_ts': complete_ts,
       'created_ts': self.now,
       'deduped_from': None,
       'durations': [],
       'exit_codes': [0],
       'failure': False,
-      'id': '14350e868888800',
+      'id': '1d69b9f088008810',
       'internal_failure': False,
       'modified_ts': complete_ts,
       'name': u'Request name',

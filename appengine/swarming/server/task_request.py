@@ -24,13 +24,8 @@ Overview of transactions:
 
 
 Graph of the schema:
-       +------Root------+
-       |TaskRequestShard|
-       |id="<hash>"     |
-       +----------------+
-               ^
-               |
-    +---------------------+
+
+    +--------Root---------+
     |TaskRequest          |
     |    +--------------+ |
     |    |TaskProperties| |
@@ -69,6 +64,14 @@ _ONE_DAY_SECS = 24*60*60 + 10
 _MIN_TIMEOUT_SECS = 30
 
 
+# The world started on 2010-01-01 at 00:00:00 UTC. The rationale is that using
+# EPOCH (1970) means that 40 years worth of keys are wasted.
+#
+# Note: This creates a 'naive' object instead of a formal UTC object. Note that
+# datetime.datetime.utcnow() also return naive objects. That's python.
+_BEGINING_OF_THE_WORLD = datetime.datetime(2010, 1, 1, 0, 0, 0, 0)
+
+
 # Parameters for make_request().
 # The content of the 'data' parameter. This relates to the context of the
 # request, e.g. who wants to run a task.
@@ -96,6 +99,7 @@ _EXPECTED_PROPERTIES_KEYS = frozenset(
 # This will cause mild transaction conflicts during load tests. On the
 # production server, use 16**6 (~16 million) root entities to reduce the number
 # of transaction conflict.
+# TODO(maruel): Remove support 2015-02-01.
 _SHARDING_LEVEL = 3 if utils.is_canary() else 6
 
 
@@ -182,14 +186,6 @@ class TaskProperties(ndb.Model):
   This entity is not saved in the DB as a standalone entity, instead it is
   embedded in a TaskRequest.
 
-  TODO(maruel): Determine which of the below that are necessary.
-  Things not carried over from TestCase:
-  - TestObject.decorate_output
-  - TestCase.verbose, use env var instead.
-  - TestObject.hard_time_out, per command execution timeout, only global.
-  - TestObject.io_time_out, I/O timeout, per command execution timeout, only
-    global.
-
   This model is immutable.
   """
   # Hashing algorithm used to hash TaskProperties to create its key.
@@ -246,9 +242,14 @@ class TaskProperties(ndb.Model):
 class TaskRequest(ndb.Model):
   """Contains a user request.
 
-  The key is a increasing integer based on time since utils.EPOCH plus some
-  randomness on 8 low order bits then lower 8 bits set to 0. See
-  _new_request_key() for the complete gory details.
+  Key id is a decreasing integer based on time since utils.EPOCH plus some
+  randomness on lower order bits. See _new_request_key() for the complete gory
+  details.
+
+  There is also "old style keys" which inherit from a fake root entity
+  TaskRequestShard.
+
+  TODO(maruel): Remove support 2015-02-01.
 
   This model is immutable.
   """
@@ -307,22 +308,38 @@ class TaskRequest(ndb.Model):
 def _new_request_key():
   """Returns a valid ndb.Key for this entity.
 
-  Key id is a 64 bit integer:
-  - 1 bit highest order bit to detect overflow.
-  - 47 bits is time since epoch at 1ms resolution is
-    2**47 / 365 / 24 / 60 / 60 / 1000 = 4462 years.
-  - 8 bits of randomness reduces to 2**-7 the probability of collision on exact
-    same timestamp at 1ms resolution, so a maximum theoretical rate of 256000
-    requests per second but an effective rate likely in the range of ~2560
-    requests per second without too much transaction conflicts.
-  - The last 8 bits are unused and set to 0.
+  Task id is a 64 bits integer represented as a string to the user:
+  - 1 highest order bits set to 0 to keep value positive.
+  - 43 bits is time since _BEGINING_OF_THE_WORLD at 1ms resolution.
+    It is good for 2**43 / 365.3 / 24 / 60 / 60 / 1000 = 278 years or 2010+278 =
+    2288. The author will be dead at that time.
+  - 16 bits set to a random value or a server instance specific value. Assuming
+    an instance is internally consistent with itself, it can ensure to not reuse
+    the same 16 bits in two consecutive requests and/or throttle itself to one
+    request per millisecond.
+    Using random value reduces to 2**-15 the probability of collision on exact
+    same timestamp at 1ms resolution, so a maximum theoretical rate of 65536000
+    requests/sec but an effective rate in the range of ~64k requests/sec without
+    much transaction conflicts. We should be fine.
+  - 4 bits set to 0x1. This is to represent the 'version' of the entity schema.
+    Previous version had 0. Note that this value is XOR'ed in the DB so it's
+    stored as 0xE. When the TaskRequest entity tree is modified in a breaking
+    way that affects the packing and unpacking of task ids, this value should be
+    bumped.
+
+  The key id is this value XORed with 2**63-1. The reason is that increasing key
+  id values are in decreasing timestamp order.
   """
-  now = utils.milliseconds_since_epoch(None)
-  assert 1 <= now < 2**47, now
-  suffix = random.getrandbits(8)
-  assert 0 <= suffix <= 0xFF
-  value = (now << 16) | (suffix << 8)
-  return id_to_request_key(value)
+  utcnow = utils.utcnow()
+  if utcnow < _BEGINING_OF_THE_WORLD:
+    raise ValueError(
+        'Time %s is set to before %s' % (utcnow, _BEGINING_OF_THE_WORLD))
+  delta = utcnow - _BEGINING_OF_THE_WORLD
+  now = int(round(delta.total_seconds() * 1000.))
+  # TODO(maruel): Use real randomness.
+  suffix = random.getrandbits(16)
+  task_id = (now << 20) | (suffix << 4) | 0x1
+  return ndb.Key(TaskRequest, task_id ^ (2**63-1))
 
 
 def _put_request(request):
@@ -356,15 +373,48 @@ def _assert_keys(expected_keys, minimum_keys, actual_keys, name):
 ### Public API.
 
 
-def id_to_request_key(task_id):
-  """Returns the ndb.Key for a TaskRequest id."""
-  if task_id & 0xFF:
-    raise ValueError('Unexpected low order byte is set')
+def request_id_to_key(task_id):
+  """Returns the ndb.Key for a TaskRequest id with the try number stripped.
+
+  There's two style of keys. Old ones ends with '0', new ones ends with '1'.
+
+  TODO(maruel): Remove support 2015-02-01.
+  """
+  assert isinstance(task_id, basestring)
   if not task_id:
     raise ValueError('Invalid null key')
-  parent = datastore_utils.hashed_shard_key(
-      str(task_id), _SHARDING_LEVEL, 'TaskRequestShard')
-  return ndb.Key(TaskRequest, task_id, parent=parent)
+  c = task_id[-1]
+  if c == '1':
+    # New style key. The key id is the reverse of the value.
+    task_id_int = int(task_id, 16)
+    if task_id_int < 0:
+      raise ValueError('Invalid task id (overflowed)')
+    return ndb.Key(TaskRequest, task_id_int ^ (2**63-1))
+  elif c == '0':
+    # TODO(maruel): Remove support 2015-02-01.
+    # Old style key.
+    task_id += '0'
+    task_id_int = int(task_id, 16)
+    # The sharding was done on the decimal representation of the number, not
+    # hex. Oops.
+    parent = datastore_utils.hashed_shard_key(
+        str(task_id_int), _SHARDING_LEVEL, 'TaskRequestShard')
+    return ndb.Key(TaskRequest, task_id_int, parent=parent)
+  else:
+    raise ValueError('Invalid key')
+
+
+def request_key_to_id(request_key):
+  """Returns a task_id from a TaskRequest ndb.Key."""
+  key_id = request_key.integer_id()
+  # It's 0xE instead of 0x1 in the DB because of the XOR.
+  if (key_id & 0xF) == 0xE:
+    # New style key.
+    return '%x' % (key_id ^(2**63-1))
+  else:
+    # Old style key.
+    # TODO(maruel): Remove support 2015-02-01.
+    return '%x' % key_id
 
 
 def validate_request_key(request_key):
@@ -373,10 +423,12 @@ def validate_request_key(request_key):
   task_id = request_key.integer_id()
   if not task_id:
     raise ValueError('Invalid null TaskRequest key')
-  if task_id & 0xFF:
-    raise ValueError('Unexpected low order byte is set')
+  if (task_id & 0xF) == 0xE:
+    # New style key.
+    return
 
   # Check the shard.
+  # TODO(maruel): Remove support 2015-02-01.
   request_shard_key = request_key.parent()
   if not request_shard_key:
     raise ValueError('Expected parent key for TaskRequest, got nothing')

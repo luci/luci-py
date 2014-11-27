@@ -16,10 +16,8 @@ store tasks results.
 - It is chunked in TaskOutputChunk to fit the entity size limit.
 
 Graph of schema:
-               <See task_request.py>
-                         ^
-                         |
-               +---------------------+
+
+               +--------Root---------+
                |TaskRequest          |
                |    +--------------+ |   (task_request.py)
                |    |TaskProperties| |
@@ -776,7 +774,6 @@ def request_key_to_result_summary_key(request_key):
   """Returns the TaskResultSummary ndb.Key for this TaskRequest.key."""
   assert request_key.kind() == 'TaskRequest', request_key
   assert request_key.integer_id(), request_key
-  assert not (request_key.integer_id() & 0xFF), request_key
   return ndb.Key(TaskResultSummary, 1, parent=request_key)
 
 
@@ -818,17 +815,18 @@ def pack_result_summary_key(result_summary_key):
   """Returns TaskResultSummary ndb.Key encoded, safe to use in HTTP requests.
   """
   assert result_summary_key.kind() == 'TaskResultSummary'
-  return '%x' % result_summary_key.parent().integer_id()
+  request_key = result_summary_key_to_request_key(result_summary_key)
+  return task_request.request_key_to_id(request_key) + '0'
 
 
 def pack_run_result_key(run_result_key):
   """Returns TaskRunResult ndb.Key encoded, safe to use in HTTP requests.
   """
   assert run_result_key.kind() == 'TaskRunResult'
-  key_id = (
-      run_result_key.parent().parent().integer_id() +
-      run_result_key.integer_id())
-  return '%x' % key_id
+  request_key = result_summary_key_to_request_key(
+      run_result_key_to_result_summary_key(run_result_key))
+  key_id = task_request.request_key_to_id(request_key)
+  return key_id + '%x' % run_result_key.integer_id()
 
 
 def unpack_result_summary_key(packed_key):
@@ -836,10 +834,10 @@ def unpack_result_summary_key(packed_key):
 
   The expected format of |packed_key| is %x.
   """
-  key_id = int(packed_key, 16)
-  if key_id & 0xff:
+  request_key = task_request.request_id_to_key(packed_key[:-1])
+  run_id = int(packed_key[-1], 16)
+  if run_id & 0xff:
     raise ValueError('Can\'t reference to a specific try result.')
-  request_key = task_request.id_to_request_key(key_id)
   return request_key_to_result_summary_key(request_key)
 
 
@@ -848,11 +846,11 @@ def unpack_run_result_key(packed_key):
 
   The expected format of |packed_key| is %x.
   """
-  key_id = int(packed_key, 16)
-  run_id = key_id & 0xff
+  request_key = task_request.request_id_to_key(packed_key[:-1])
+  run_id = int(packed_key[-1], 16)
   if not run_id:
     raise ValueError('Can\'t reference to the overall task result.')
-  result_summary_key = unpack_result_summary_key('%x' % (key_id & ~0xff))
+  result_summary_key = request_key_to_result_summary_key(request_key)
   return result_summary_key_to_run_result_key(result_summary_key, run_id)
 
 

@@ -31,13 +31,7 @@ block depends on the previous ones:
 
 ## Overall schema graph of a task request with 2 tries
 
-               +------Root------+
-               |TaskRequestShard|                                task_request.py
-               |id="<hash>"     |
-               +----------------+
-                       ^
-                       |
-               +---------------------+
+               +--------Root---------+
                |TaskRequest          |
                |    +--------------+ |                           task_request.py
                |    |TaskProperties| |
@@ -82,16 +76,17 @@ AppEngine's automatic key numbering is never used. The entities are directly
 created with predefined keys so entity sharding can be tightly controlled to
 reduce DB contention.
 
-* TaskRequest has almost monotonically increasing key ids. The key is based on
-  time but the multiple servers may not have a fully synchronized clock. 8 bits
-  of randomness is injected to help reduce key id contention. The low 8 bits is
-  set to 0.
+* TaskRequest has almost monotonically decreasing key ids. The key is based on
+  time but the multiple servers may not have a fully synchronized clock. 16 bits
+  of randomness is injected to help reduce key id contention. The low 4 bits is
+  set to 0x8 to version the schema. See task_request.py for more detail.
 * TaskResultSummary has key id = 1.
 * TaskRunResult has monotonically increasing key id starting at 1.
-* TaskToRun has the same key id as the corresponding TaskRequest.
+* TaskToRun has the key id as the first 32 bits of the SHA-1 of the
+  TaskRequest.properties.dimensions.
 
 ### Notes
 
 * Each root entity is tagged as Root.
-* Each line is annoted with the file that define the entities on this line.
+* Each line is annotated with the file that define the entities on this line.
 * Dotted line means a similar key relationship without actual entity hierarchy.
