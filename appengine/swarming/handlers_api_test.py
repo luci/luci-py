@@ -1122,6 +1122,12 @@ class ClientApiTest(AppTestBase):
     actual = self.app.get(resource + '?tag=project:yay&tag=commit:pre').json
     self.assertEqual(expected, actual)
 
+    # Test output from deduped task.
+    for task in expected['items']:
+      response = self.app.get(
+          '/swarming/api/v1/client/task/%s/output/all' % task['id']).json
+      self.assertEqual({u'outputs': [u'r\xc9sult string', u'bar']}, response)
+
   def test_tasks_fail(self):
     self.app.get('/swarming/api/v1/client/tasks?tags=a:b', status=403)
     self.set_as_privileged_user()

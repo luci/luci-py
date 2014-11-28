@@ -825,8 +825,9 @@ def pack_run_result_key(run_result_key):
   assert run_result_key.kind() == 'TaskRunResult'
   request_key = result_summary_key_to_request_key(
       run_result_key_to_result_summary_key(run_result_key))
-  key_id = task_request.request_key_to_id(request_key)
-  return key_id + '%x' % run_result_key.integer_id()
+  try_id = run_result_key.integer_id()
+  assert 1 <= try_id <= 15, try_id
+  return task_request.request_key_to_id(request_key) + '%x' % try_id
 
 
 def unpack_result_summary_key(packed_key):

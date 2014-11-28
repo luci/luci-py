@@ -62,7 +62,7 @@ class TaskRequestPrivateTest(test_case.TestCase):
       now = int(round(delta.total_seconds() * 1000.))
       key = task_request._new_request_key()
       # Remove the XOR.
-      key_id = key.integer_id() ^ (2**63-1)
+      key_id = key.integer_id() ^ task_request._TASK_REQUEST_KEY_ID_MASK
       timestamp = key_id >> 20
       randomness = (key_id >> 4) & 0xFFFF
       version = key_id & 0xF
@@ -81,7 +81,7 @@ class TaskRequestPrivateTest(test_case.TestCase):
     self.mock_now(task_request._BEGINING_OF_THE_WORLD)
     key = task_request._new_request_key()
     # Remove the XOR.
-    key_id = key.integer_id() ^ (2**63-1)
+    key_id = key.integer_id() ^ task_request._TASK_REQUEST_KEY_ID_MASK
     #   00000000000 7766 1
     #     ^          ^   ^
     #     |          |   |
@@ -107,7 +107,7 @@ class TaskRequestPrivateTest(test_case.TestCase):
     self.mock_now(now)
     key = task_request._new_request_key()
     # Remove the XOR.
-    key_id = key.integer_id() ^ (2**63-1)
+    key_id = key.integer_id() ^ task_request._TASK_REQUEST_KEY_ID_MASK
     #   7ffffffffff 7766 1
     #     ^          ^   ^
     #     |          |   |
@@ -143,7 +143,7 @@ class TaskRequestApiTest(test_case.TestCase):
   def test_request_key_to_id(self):
     # Old style keys.
     self.assertEqual(
-        '100',
+        '10',
        task_request.request_key_to_id(
            ndb.Key('TaskRequestShard', 'f71849', 'TaskRequest', 256)))
     # New style key.

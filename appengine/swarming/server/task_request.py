@@ -43,6 +43,7 @@ separate entity to clearly declare the boundary for task request deduplication.
 
 import datetime
 import hashlib
+import logging
 import random
 
 from google.appengine.api import datastore_errors
@@ -70,6 +71,10 @@ _MIN_TIMEOUT_SECS = 30
 # Note: This creates a 'naive' object instead of a formal UTC object. Note that
 # datetime.datetime.utcnow() also return naive objects. That's python.
 _BEGINING_OF_THE_WORLD = datetime.datetime(2010, 1, 1, 0, 0, 0, 0)
+
+
+# Mask to TaskRequest key ids so they become decreasing numbers.
+_TASK_REQUEST_KEY_ID_MASK = int(2L**63-1)
 
 
 # Parameters for make_request().
@@ -327,8 +332,8 @@ def _new_request_key():
     way that affects the packing and unpacking of task ids, this value should be
     bumped.
 
-  The key id is this value XORed with 2**63-1. The reason is that increasing key
-  id values are in decreasing timestamp order.
+  The key id is this value XORed with _TASK_REQUEST_KEY_ID_MASK. The reason is
+  that increasing key id values are in decreasing timestamp order.
   """
   utcnow = utils.utcnow()
   if utcnow < _BEGINING_OF_THE_WORLD:
@@ -338,8 +343,8 @@ def _new_request_key():
   now = int(round(delta.total_seconds() * 1000.))
   # TODO(maruel): Use real randomness.
   suffix = random.getrandbits(16)
-  task_id = (now << 20) | (suffix << 4) | 0x1
-  return ndb.Key(TaskRequest, task_id ^ (2**63-1))
+  task_id = int((now << 20) | (suffix << 4) | 0x1)
+  return ndb.Key(TaskRequest, task_id ^ _TASK_REQUEST_KEY_ID_MASK)
 
 
 def _put_request(request):
@@ -389,7 +394,7 @@ def request_id_to_key(task_id):
     task_id_int = int(task_id, 16)
     if task_id_int < 0:
       raise ValueError('Invalid task id (overflowed)')
-    return ndb.Key(TaskRequest, task_id_int ^ (2**63-1))
+    return ndb.Key(TaskRequest, task_id_int ^ _TASK_REQUEST_KEY_ID_MASK)
   elif c == '0':
     # TODO(maruel): Remove support 2015-02-01.
     # Old style key.
@@ -405,16 +410,16 @@ def request_id_to_key(task_id):
 
 
 def request_key_to_id(request_key):
-  """Returns a task_id from a TaskRequest ndb.Key."""
+  """Returns a task_id as a string from a TaskRequest ndb.Key."""
   key_id = request_key.integer_id()
   # It's 0xE instead of 0x1 in the DB because of the XOR.
   if (key_id & 0xF) == 0xE:
     # New style key.
-    return '%x' % (key_id ^(2**63-1))
+    return '%x' % (key_id ^ _TASK_REQUEST_KEY_ID_MASK)
   else:
     # Old style key.
     # TODO(maruel): Remove support 2015-02-01.
-    return '%x' % key_id
+    return ('%x' % key_id)[:-1]
 
 
 def validate_request_key(request_key):
