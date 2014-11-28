@@ -26,7 +26,7 @@ def create_application():
   # Sadly, this function does an RPC call and may contribute to cause time out
   # on the initial load.
   # Doing it here instead of appengine_config.py reduce the scope of appstats
-  # recording. To clarify, this means mapreduces started with map_reduce_jobs.py
+  # recording. To clarify, this means mapreduces started with mapreduce_jobs.py
   # won't be instrumented, which is actually what we want in practice.
   if utils.is_canary():
     a = recording.appstats_wsgi_middleware(a)

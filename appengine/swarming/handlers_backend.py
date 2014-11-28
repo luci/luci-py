@@ -8,6 +8,7 @@ import webapp2
 from google.appengine.api import datastore_errors
 from google.appengine.api import taskqueue
 
+import mapreduce_jobs
 from components import decorators
 from components import ereporter2
 from server import stats
@@ -52,6 +53,19 @@ class TaskCleanupDataHandler(webapp2.RequestHandler):
     self.response.out.write('Success.')
 
 
+### Mapreduce related handlers
+
+
+class InternalLaunchMapReduceJobWorkerHandler(webapp2.RequestHandler):
+  """Called via task queue or cron to start a map reduce job."""
+  @decorators.require_taskqueue(mapreduce_jobs.MAPREDUCE_TASK_QUEUE)
+  def post(self, job_id):  # pylint: disable=R0201
+    mapreduce_jobs.launch_job(job_id)
+
+
+###
+
+
 def get_routes():
   """Returns internal urls that should only be accessible via the backend."""
   routes = [
@@ -68,6 +82,10 @@ def get_routes():
 
     # Task queues.
     ('/internal/taskqueue/cleanup_data', TaskCleanupDataHandler),
+
+    # Mapreduce related urls.
+    (r'/internal/taskqueue/mapreduce/launch/<job_id:[^\/]+>',
+      InternalLaunchMapReduceJobWorkerHandler),
   ]
   routes = [webapp2.Route(*a) for a in routes]
   routes.extend(ereporter2.get_backend_routes())

@@ -12,7 +12,7 @@ import acl
 import config
 import gcs
 import handlers_api
-import map_reduce_jobs
+import mapreduce_jobs
 import stats
 import template
 from components import auth
@@ -139,13 +139,13 @@ class RestrictedLaunchMapReduceJob(auth.AuthenticatingHandler):
   @auth.require(acl.isolate_admin)
   def post(self):
     job_id = self.request.get('job_id')
-    assert job_id in map_reduce_jobs.MAP_REDUCE_JOBS
+    assert job_id in mapreduce_jobs.MAPREDUCE_JOBS
     # Do not use 'backend' module when running from dev appserver. Mapreduce
     # generates URLs that are incompatible with dev appserver URL routing when
     # using custom modules.
     success = utils.enqueue_task(
         url='/internal/taskqueue/mapreduce/launch/%s' % job_id,
-        queue_name=map_reduce_jobs.MAP_REDUCE_TASK_QUEUE,
+        queue_name=mapreduce_jobs.MAPREDUCE_TASK_QUEUE,
         use_dedicated_module=not utils.is_local_dev_server())
     # New tasks should show up on the status page.
     if success:
@@ -237,13 +237,13 @@ class RootHandler(auth.AuthenticatingHandler):
     params = {
       'is_admin': acl.isolate_admin(),
       'is_user': acl.isolate_readable(),
-      'map_reduce_jobs': [],
+      'mapreduce_jobs': [],
       'user_type': acl.get_user_type(),
     }
     if acl.isolate_admin():
-      params['map_reduce_jobs'] = [
+      params['mapreduce_jobs'] = [
         {'id': job_id, 'name': job_def['name']}
-        for job_id, job_def in map_reduce_jobs.MAP_REDUCE_JOBS.iteritems()
+        for job_id, job_def in mapreduce_jobs.MAPREDUCE_JOBS.iteritems()
       ]
       params['xsrf_token'] = self.generate_xsrf_token()
     self.response.write(template.render('isolate/root.html', params))
@@ -267,7 +267,7 @@ def get_routes():
 
       # Mapreduce related urls.
       webapp2.Route(
-          r'/restricted/launch_map_reduce',
+          r'/restricted/launch_mapreduce',
           RestrictedLaunchMapReduceJob),
 
       # User web pages.

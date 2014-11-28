@@ -89,4 +89,18 @@ python -c "import urllib; exec urllib.urlopen('{{host_url}}/bootstrap').read()"
   </li>
 </ul>
 
+<h3>Map reduce jobs</h3>
+<ul class="admin">
+  <li><a href="/restricted/mapreduce/status">Map reduce jobs status</a></li>
+  {% for job in mapreduce_jobs %}
+    <li>
+      <form action="/restricted/launch_mapreduce" method="post">
+        <input type="hidden" name="xsrf_token" value="{{xsrf_token}}" />
+        <input type="hidden" name="job_id" value="{{job.id}}" />
+        <button type="submit">Launch '{{job.name}}'</button>
+      </form>
+    </li>
+  {% endfor %}
+</ul>
+
 {% endblock %}

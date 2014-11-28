@@ -2,6 +2,8 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
+"""Map reduce jobs to update the DB schemas or any other maintenance task."""
+
 import logging
 import os
 import sys
@@ -18,41 +20,35 @@ import gcs
 
 
 # Task queue name to run all map reduce jobs on.
-MAP_REDUCE_TASK_QUEUE = 'map-reduce-jobs'
+MAPREDUCE_TASK_QUEUE = 'mapreduce-jobs'
 
 
-# All registered mapreduce jobs, will be displayed on admin page.
-# All parameters are passed as is to mapreduce.control.start_map.
-MAP_REDUCE_JOBS = {
+# Registered mapreduce jobs, displayed on admin page.
+MAPREDUCE_JOBS = {
   'find_missing_gs_files': {
     'name': 'Report missing GS files',
-    'handler_spec': 'map_reduce_jobs.detect_missing_gs_file_mapper',
-    'reader_spec': 'mapreduce.input_readers.DatastoreInputReader',
     'mapper_parameters': {
       'entity_kind': 'handlers.ContentEntry',
-      'batch_size': 20,
     },
-    'shard_count': 64,
-    'queue_name': MAP_REDUCE_TASK_QUEUE,
   },
   'delete_broken_entries': {
     'name': 'Delete entries that do not have corresponding GS files',
-    'handler_spec': 'map_reduce_jobs.delete_broken_entries_mapper',
-    'reader_spec': 'mapreduce.input_readers.DatastoreInputReader',
     'mapper_parameters': {
       'entity_kind': 'handlers.ContentEntry',
-      'batch_size': 20,
     },
-    'shard_count': 64,
-    'queue_name': MAP_REDUCE_TASK_QUEUE,
   },
 }
 
 
 def launch_job(job_id):
-  """Launches a job given its key from MAP_REDUCE_JOBS dict."""
-  assert job_id in MAP_REDUCE_JOBS, 'Unknown mapreduce job id %s' % job_id
-  job_def = MAP_REDUCE_JOBS[job_id]
+  """Launches a job given its key from MAPREDUCE_JOBS dict."""
+  assert job_id in MAPREDUCE_JOBS, 'Unknown mapreduce job id %s' % job_id
+  job_def = MAPREDUCE_JOBS[job_id].copy()
+  job_def.setdefault('shard_count', 64)
+  job_def.setdefault('queue_name', MAPREDUCE_TASK_QUEUE)
+  job_def.setdefault(
+      'reader_spec', 'mapreduce.input_readers.DatastoreInputReader')
+  job_def.setdefault('handler_spec', 'mapreduce_jobs.' + job_id)
   return control.start_map(base_path='/internal/mapreduce', **job_def)
 
 
@@ -76,13 +72,13 @@ def is_good_content_entry(entry):
 ### Actual mappers
 
 
-def detect_missing_gs_file_mapper(entry):
+def find_missing_gs_files(entry):
   """Mapper that takes ContentEntry and logs to output if GS file is missing."""
   if not is_good_content_entry(entry):
     logging.error('MR: found bad entry\n%s', entry.key.id())
 
 
-def delete_broken_entries_mapper(entry):
+def delete_broken_entries(entry):
   """Mapper that deletes ContentEntry entities that are broken."""
   if not is_good_content_entry(entry):
     # MR framework disables memcache on a context level. Explicitly request
@@ -92,6 +88,5 @@ def delete_broken_entries_mapper(entry):
     logging.error('MR: deleted bad entry\n%s', entry.key.id())
 
 
-# Export mapreduce WSGI application as 'app'.
-# Used in app.yaml and module-backend.yaml for mapreduce/* routes.
+# Export mapreduce WSGI application as 'app' for *.yaml routes.
 app = main.APP

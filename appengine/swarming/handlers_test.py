@@ -496,8 +496,10 @@ class BackendTest(AppTestBase):
 
   def testTaskQueueUrls(self):
     # Tests all the cron tasks are securely handled.
+    # TODO(maruel): Test mapreduce.
     task_queue_urls = sorted(
       r for r in self._GetRoutes() if r.startswith('/internal/taskqueue/')
+      if r != '/internal/taskqueue/mapreduce/launch/<job_id:[^\\/]+>'
     )
     task_queues = [
       ('cleanup', '/internal/taskqueue/cleanup_data'),

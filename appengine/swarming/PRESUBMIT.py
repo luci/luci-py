@@ -53,6 +53,7 @@ def CommonChecks(input_api, output_api):
     sys.path = [
       join('components', 'third_party'),
       join('swarming_bot'),
+      join('third_party'),
       join('..', 'components'),
       join('..', 'components', 'third_party'),
       join('..', '..', 'client', 'tests'),

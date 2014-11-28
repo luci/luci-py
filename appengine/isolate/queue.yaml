@@ -16,7 +16,7 @@ queue:
   retry_parameters:
     task_age_limit: 1d
 
-- name: map-reduce-jobs
+- name: mapreduce-jobs
   bucket_size: 100
   rate: 200/s
   retry_parameters:

@@ -21,6 +21,7 @@ from google.appengine.ext import ndb
 
 import handlers_api
 import handlers_backend
+import mapreduce_jobs
 import template
 from components import auth
 from components import ereporter2
@@ -161,6 +162,33 @@ class WhitelistIPHandler(auth.AuthenticatingHandler):
     else:
       self.abort(400, 'Invalid \'a\' parameter.')
     self.get()
+
+
+### Mapreduce related handlers
+
+
+class RestrictedLaunchMapReduceJob(auth.AuthenticatingHandler):
+  """Enqueues a task to start a map reduce job on the backend module.
+
+  A tree of map reduce jobs inherits module and version of a handler that
+  launched it. All UI handlers are executes by 'default' module. So to run a
+  map reduce on a backend module one needs to pass a request to a task running
+  on backend module.
+  """
+
+  @auth.require(acl.is_admin)
+  def post(self):
+    job_id = self.request.get('job_id')
+    assert job_id in mapreduce_jobs.MAPREDUCE_JOBS
+    success = utils.enqueue_task(
+        url='/internal/taskqueue/mapreduce/launch/%s' % job_id,
+        queue_name=mapreduce_jobs.MAPREDUCE_TASK_QUEUE,
+        use_dedicated_module=False)
+    # New tasks should show up on the status page.
+    if success:
+      self.redirect('/restricted/mapreduce/status')
+    else:
+      self.abort(500, 'Failed to launch the job')
 
 
 ### acl.is_privileged_user pages.
@@ -631,8 +659,15 @@ class RootHandler(auth.AuthenticatingHandler):
       'is_bot': acl.is_bot(),
       'is_privileged_user': acl.is_privileged_user(),
       'is_user': acl.is_user(),
+      'mapreduce_jobs': [],
       'user_type': acl.get_user_type(),
     }
+    if acl.is_admin():
+      params['mapreduce_jobs'] = [
+        {'id': job_id, 'name': job_def['name']}
+        for job_id, job_def in mapreduce_jobs.MAPREDUCE_JOBS.iteritems()
+      ]
+      params['xsrf_token'] = self.generate_xsrf_token()
     self.response.out.write(template.render('swarming/root.html', params))
 
 
@@ -672,6 +707,9 @@ def create_application(debug):
       ('/restricted/whitelist_ip', WhitelistIPHandler),
       ('/restricted/upload/bot_config', UploadBotConfigHandler),
       ('/restricted/upload/bootstrap', UploadBootstrapHandler),
+
+      # Mapreduce related urls.
+      (r'/restricted/launch_mapreduce', RestrictedLaunchMapReduceJob),
 
       # The new APIs:
       ('/swarming/api/v1/stats/summary/<resolution:[a-z]+>',

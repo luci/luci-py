@@ -17,7 +17,7 @@ from google.appengine.ext import ndb
 
 import config
 import gcs
-import map_reduce_jobs
+import mapreduce_jobs
 import model
 import stats
 import template
@@ -426,9 +426,9 @@ class InternalStatsUpdateHandler(webapp2.RequestHandler):
 
 class InternalLaunchMapReduceJobWorkerHandler(webapp2.RequestHandler):
   """Called via task queue or cron to start a map reduce job."""
-  @decorators.require_taskqueue(map_reduce_jobs.MAP_REDUCE_TASK_QUEUE)
+  @decorators.require_taskqueue(mapreduce_jobs.MAPREDUCE_TASK_QUEUE)
   def post(self, job_id):  # pylint: disable=R0201
-    map_reduce_jobs.launch_job(job_id)
+    mapreduce_jobs.launch_job(job_id)
 
 
 ###

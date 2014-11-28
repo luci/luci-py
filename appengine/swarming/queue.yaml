@@ -2,3 +2,11 @@ queue:
 - name: cleanup
   max_concurrent_requests: 1
   rate: 1/m
+
+- name: mapreduce-jobs
+  bucket_size: 100
+  rate: 200/s
+  retry_parameters:
+    task_age_limit: 2h
+    min_backoff_seconds: 1
+    max_backoff_seconds: 600

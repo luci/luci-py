@@ -13,7 +13,7 @@ automatic_scaling:
 
 handlers:
 - url: /restricted/mapreduce(/.*)?
-  script: map_reduce_jobs.app
+  script: mapreduce_jobs.app
   secure: always
   login: admin
 
