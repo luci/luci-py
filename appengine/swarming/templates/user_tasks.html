@@ -209,6 +209,7 @@
       <th>Requested</th>
       <th>Pending</th>
       <th>Duration</th>
+      <th>User</th>
       <th>Bot</th>
       <th>Priority</th>
     </thead>
@@ -238,6 +239,8 @@
           <td>
             {{bot_view.running_star(task)}}{{task.duration_now(now)|timedeltaformat}}
           </td>
+          {# TODO(maruel): Make it a link to all tasks from user #}
+          <td>{{task.user}}</td>
           <td>{{bot_view.bot_link(task.bot_id, is_privileged_user)}}</td>
           <td>{{task.priority}}</td>
         </tr>
