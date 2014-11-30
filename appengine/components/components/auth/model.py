@@ -51,11 +51,14 @@ from google.appengine.ext import ndb
 from components import datastore_utils
 from components import utils
 
+from . import ipaddr
+
 # Part of public API of 'auth' component, exposed by this module.
 __all__ = [
   'ADMIN_GROUP',
   'Anonymous',
   'bootstrap_group',
+  'bootstrap_ip_whitelist',
   'configure_as_primary',
   'find_group_dependency_cycle',
   'find_referencing_groups',
@@ -313,6 +316,7 @@ class AuthGlobalConfig(ndb.Model):
 
   Entities that belong to this entity group are:
    * AuthGroup
+   * AuthIPWhitelist
    * AuthReplicationState
    * AuthSecret
   """
@@ -686,3 +690,100 @@ class AuthSecret(ndb.Model):
         replicate_auth_db()
       return entity
     return create()
+
+
+################################################################################
+## IP whitelist.
+
+
+class AuthIPWhitelist(ndb.Model, datastore_utils.SerializableModelMixin):
+  """A named set of whitelisted IPv4 and IPv6 subnets.
+
+  Can be assigned to individual user accounts to forcibly limit them only to
+  particular IP addresses, e.g. it can be used to enforce that specific service
+  account is used only from some known IP range.
+
+  Entity id is a name of the whitelist. Parent entity is ROOT_KEY.
+
+  There's a special "bots" IP whitelist that can be used to list IP addresses
+  of machines the service trusts unconditionally. Requests from such machines
+  doesn't have to have any additional credentials attached.
+
+  TODO(vadimsh): Implement "account name -> IP whitelist" mapping.
+  TODO(vadimsh): Make bots use service accounts and remove "bots" whitelist.
+  """
+  # How to convert this entity to or from serializable dict.
+  serializable_properties = {
+    'subnets': datastore_utils.READABLE | datastore_utils.WRITABLE,
+    'description': datastore_utils.READABLE | datastore_utils.WRITABLE,
+    'created_ts': datastore_utils.READABLE,
+    'created_by': datastore_utils.READABLE,
+    'modified_ts': datastore_utils.READABLE,
+    'modified_by': datastore_utils.READABLE,
+  }
+
+  # The list of subnets. The validator is used only as a last measure. JSON API
+  # handler should do validation too.
+  subnets = ndb.StringProperty(
+      repeated=True, validator=lambda _, val: ipaddr.normalize_subnet(val))
+
+  # Human readable description.
+  description = ndb.StringProperty(indexed=False, default='')
+
+  # When the list was created.
+  created_ts = ndb.DateTimeProperty(auto_now_add=True)
+  # Who created the list.
+  created_by = IdentityProperty()
+
+  # When the list was modified.
+  modified_ts = ndb.DateTimeProperty(auto_now_add=True)
+  # Who modified the list the last time.
+  modified_by = IdentityProperty()
+
+  def is_ip_whitelisted(self, ip):
+    """Returns True if ipaddr.IP is in the whitelist."""
+    # TODO(vadimsh): If number of subnets to check grows it makes sense to add
+    # an internal cache to 'subnet_from_string' (sort of like in re.compile).
+    return any(
+        ipaddr.is_in_subnet(ip, ipaddr.subnet_from_string(net))
+        for net in self.subnets)
+
+
+def ip_whitelist_key(name):
+  """Returns ndb.Key for AuthIPWhitelist entity given its name."""
+  return ndb.Key(AuthIPWhitelist, name, parent=ROOT_KEY)
+
+
+@ndb.transactional
+def bootstrap_ip_whitelist(name, subnet, description):
+  """Adds a subnet to an IP whitelist if it's not there yet.
+
+  Can be used on local dev appserver to add 127.0.0.1 to IP whitelist during
+  startup. Should not be used from request handlers.
+
+  Args:
+    name: IP whitelist name to add a subnet to.
+    subnet: IP subnet to add (as a string).
+    description: description of IP whitelist (if new entity is created).
+
+  Returns:
+    True if entry was added, False if it is already there or subnet is invalid.
+  """
+  try:
+    subnet = ipaddr.normalize_subnet(subnet)
+  except ValueError:
+    return False
+  key = ip_whitelist_key(name)
+  entity = key.get()
+  if entity and subnet in entity.subnets:
+    return False
+  if not entity:
+    entity = AuthIPWhitelist(
+        key=key,
+        description=description,
+        created_by=get_service_self_identity(),
+        modified_by=get_service_self_identity())
+  entity.subnets.append(subnet)
+  entity.put()
+  replicate_auth_db()
+  return True

@@ -20,6 +20,7 @@ from google.appengine.ext import ndb
 from support import test_case
 
 from components.auth import api
+from components.auth import ipaddr
 from components.auth import model
 
 
@@ -172,6 +173,12 @@ class AuthDBTest(test_case.TestCase):
         model.AuthSecret.bootstrap('global%d' % i, 'global') for i in (0, 1, 2)
     ]
 
+    # And IP whitelist.
+    bots_ip_whitelist = model.AuthIPWhitelist(
+        key=model.ip_whitelist_key('bots'),
+        subnets=['127.0.0.1/32'])
+    bots_ip_whitelist.put()
+
     # This all stuff should be fetched into AuthDB.
     auth_db = api.fetch_auth_db()
     self.assertEqual(global_config, auth_db.global_config)
@@ -184,6 +191,7 @@ class AuthDBTest(test_case.TestCase):
     self.assertEqual(
         set(s.key.id() for s in global_secrets),
         set(auth_db.secrets['global']))
+    self.assertEqual({'bots': bots_ip_whitelist}, auth_db.ip_whitelists)
 
   def test_get_secret(self):
     # Make AuthDB with two secrets.

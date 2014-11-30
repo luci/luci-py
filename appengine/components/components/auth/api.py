@@ -35,6 +35,7 @@ __all__ = [
   'disable_process_cache',
   'Error',
   'get_current_identity',
+  'get_ip_whitelist',
   'get_process_cache_expiration_sec',
   'get_secret',
   'is_admin',
@@ -112,18 +113,21 @@ class AuthDB(object):
       global_config=None,
       groups=None,
       secrets=None,
+      ip_whitelists=None,
       entity_group_version=None):
     """
     Args:
       global_config: instance of AuthGlobalConfig entity.
       groups: list of AuthGroup entities.
       secrets: list of AuthSecret entities ('local' and 'global' in same list).
+      ip_whitelists: list of AuthIPWhitelist entities.
       entity_group_version: version of AuthGlobalConfig entity group at the
           moment when entities were fetched from it.
     """
     self.global_config = global_config or model.AuthGlobalConfig()
     self.groups = {g.key.string_id(): g for g in (groups or [])}
     self.secrets = {'local': {}, 'global': {}}
+    self.ip_whitelists = {e.key.string_id(): e for e in (ip_whitelists or [])}
     self.entity_group_version = entity_group_version
 
     # Split |secrets| into local and global ones based on parent key id.
@@ -230,6 +234,13 @@ class AuthDB(object):
           model.AuthSecret.bootstrap(secret_key.name, secret_key.scope))
     entity = self.secrets[secret_key.scope][secret_key.name]
     return list(entity.values)
+
+  def get_ip_whitelist(self, name):
+    """Returns AuthIPWhitelist given its name (or None)."""
+    # TODO(vadimsh): Implement "account name -> IP whitelist" mapping and
+    # replace 'name' with 'identity', so that get_ip_whitelist(identity) returns
+    # a list of IPs that 'identity' is expected to use.
+    return self.ip_whitelists.get(name)
 
   def is_allowed_oauth_client_id(self, client_id):
     """True if given OAuth2 client_id can be used to authenticate the user."""
@@ -422,17 +433,27 @@ def fetch_auth_db(known_version=None):
     # memcache 'get'.
 
     # Fetch all stuff in parallel. Fetch ALL groups and ALL secrets.
-    global_config = root_key.get_async()
-    groups = model.AuthGroup.query(ancestor=root_key).fetch_async()
-    secrets = model.AuthSecret.query(ancestor=root_key).fetch_async()
+    global_config_future = root_key.get_async()
+    groups_future = model.AuthGroup.query(ancestor=root_key).fetch_async()
+    secrets_future = model.AuthSecret.query(ancestor=root_key).fetch_async()
+
+    # TODO(vadimsh): Fetch "account name -> IP whitelist name" mapping first,
+    # and then make multiget of needed IP whitelists only. No need for .query()
+    # here, all needed entities are known in advance.
+    ip_whitelist_ids = ["bots"]
+    ip_whitelists_future = ndb.get_multi_async(
+        model.ip_whitelist_key(n) for n in ip_whitelist_ids)
 
     # Note that get_entity_group_version() uses same entity group (root_key)
     # internally and respects transactions. So all data fetched here does indeed
     # correspond to |current_version|.
     return AuthDB(
-        global_config=global_config.get_result(),
-        groups=groups.get_result(),
-        secrets=secrets.get_result(),
+        global_config=global_config_future.get_result(),
+        groups=groups_future.get_result(),
+        secrets=secrets_future.get_result(),
+        ip_whitelists=[
+          f.get_result() for f in ip_whitelists_future if f.get_result()
+        ],
         entity_group_version=current_version)
 
   bootstrap()
@@ -610,6 +631,11 @@ def get_secret(secret_key):
   Creates a new secret if necessary.
   """
   return get_request_auth_db().get_secret(secret_key)
+
+
+def get_ip_whitelist(name):
+  """Returns AuthIPWhitelist given its name (or None)."""
+  return get_request_auth_db().get_ip_whitelist(name)
 
 
 def public(func):

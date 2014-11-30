@@ -23,6 +23,7 @@ utils.fix_protobuf_package()
 
 from api import *
 from handler import *
+from ipaddr import *
 from model import *
 from signature import *
 from tokens import *

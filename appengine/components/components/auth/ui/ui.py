@@ -174,8 +174,10 @@ class UIHandler(handler.AuthenticatingHandler):
 
   def authorization_error(self, error):
     """Redirects to login or shows 'Access Denied' page."""
-    # Not authenticated -> redirect to login.
-    if api.get_current_identity().is_anonymous:
+    # Not authenticated or used IP whitelist for auth -> redirect to login.
+    # Bots doesn't use UI, and users should always use real accounts.
+    ident = api.get_current_identity()
+    if ident.is_anonymous or ident.is_bot:
       self.redirect(users.create_login_url(self.request.path))
       return
 

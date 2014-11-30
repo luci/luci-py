@@ -62,6 +62,7 @@ class AuthenticatingHandlerTest(test_case.TestCase):
     super(AuthenticatingHandlerTest, self).setUp()
     # Reset global config of auth library before each test.
     handler.configure([])
+    api.reset_local_state()
     # Capture error and warning log messages.
     self.logged_errors = []
     self.mock(handler.logging, 'error',
@@ -89,6 +90,23 @@ class AuthenticatingHandlerTest(test_case.TestCase):
 
     app = self.make_test_app('/request', Handler)
     self.assertEqual('OK', app.get('/request').body)
+
+  def test_ip_whitelist_bot(self):
+    """Requests from client in "bots" IP whitelist are authenticated as bot."""
+    handler.configure([])
+    model.bootstrap_ip_whitelist('bots', '192.168.1.100/32', 'testing')
+
+    class Handler(handler.AuthenticatingHandler):
+      @api.public
+      def get(self):
+        self.response.write(api.get_current_identity().to_bytes())
+
+    app = self.make_test_app('/request', Handler)
+    call = lambda ip: (
+        app.get('/request', extra_environ={'REMOTE_ADDR': ip}).body)
+
+    self.assertEqual('bot:192.168.1.100', call('192.168.1.100'))
+    self.assertEqual('anonymous:anonymous', call('127.0.0.1'))
 
   def test_auth_method_order(self):
     """Registered auth methods are tested in order."""

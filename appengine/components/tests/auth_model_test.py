@@ -10,7 +10,10 @@ import unittest
 import test_env
 test_env.setup_test_env()
 
+from components import utils
+from components.auth import ipaddr
 from components.auth import model
+
 from support import test_case
 
 
@@ -306,6 +309,43 @@ class FindDependencyCycleTest(test_case.TestCase):
     make_group('B2', nested=('A',))
     group = make_group('C', nested=('B1', 'B2'), store=False)
     self.assertEqual(['C', 'B1', 'A'], model.find_group_dependency_cycle(group))
+
+
+class IpWhitelistTest(test_case.TestCase):
+  """Tests for AuthIPWhitelist related functions."""
+
+  def test_bootstrap_ip_whitelist(self):
+    self.assertIsNone(model.ip_whitelist_key('list').get())
+
+    mocked_now = datetime.datetime(2014, 01, 01)
+    self.mock_now(mocked_now)
+
+    ret = model.bootstrap_ip_whitelist('list', '192.168.0.0/24', 'comment')
+    self.assertTrue(ret)
+
+    ent = model.ip_whitelist_key('list').get()
+    self.assertTrue(ent)
+    self.assertEqual({
+      'created_by': model.get_service_self_identity(),
+      'created_ts': mocked_now,
+      'description': u'comment',
+      'modified_by': model.get_service_self_identity(),
+      'modified_ts': mocked_now,
+      'subnets': [u'192.168.0.0/24'],
+    }, ent.to_dict())
+
+  def test_bootstrap_ip_whitelist_bad_subnet(self):
+    self.assertFalse(model.bootstrap_ip_whitelist('list', 'not a subnet', ''))
+
+  def test_is_ip_whitelisted(self):
+    ent = model.AuthIPWhitelist(subnets=['127.0.0.1', '192.168.0.0/24'])
+    test = lambda ip: ent.is_ip_whitelisted(ipaddr.ip_from_string(ip))
+    self.assertTrue(test('127.0.0.1'))
+    self.assertTrue(test('192.168.0.0'))
+    self.assertTrue(test('192.168.0.9'))
+    self.assertTrue(test('192.168.0.255'))
+    self.assertFalse(test('192.168.1.0'))
+    self.assertFalse(test('192.1.0.0'))
 
 
 if __name__ == '__main__':
