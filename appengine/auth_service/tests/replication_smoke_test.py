@@ -62,6 +62,7 @@ class ReplicationTest(unittest.TestCase):
     self.link_replica_to_primary()
     self.check_oauth_config_replication()
     self.check_group_replication()
+    self.check_ip_whitelist_replication()
 
   def link_replica_to_primary(self):
     """Links replica to primary."""
@@ -217,6 +218,10 @@ class ReplicationTest(unittest.TestCase):
     response = self.replica.client.json_request(
         '/auth/api/v1/groups/some-group')
     self.assertEqual(404, response.http_code)
+
+  def check_ip_whitelist_replication(self):
+    """Verifies changes to IP whitelist propagate to replica."""
+    # TODO(vadimsh): Implement once IP whitelist is accessible via API.
 
 
 if __name__ == '__main__':

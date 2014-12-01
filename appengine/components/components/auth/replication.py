@@ -31,7 +31,7 @@ LINKING_ERRORS = {
 
 # Returned by new_auth_db_snapshot.
 AuthDBSnapshot = collections.namedtuple(
-    'AuthDBSnapshot', 'global_config, groups, secrets')
+    'AuthDBSnapshot', 'global_config, groups, secrets, ip_whitelists')
 
 
 class ProtocolError(Exception):
@@ -125,10 +125,16 @@ def new_auth_db_snapshot():
   groups = model.AuthGroup.query(ancestor=model.ROOT_KEY).fetch_async()
   secrets = model.AuthSecret.query(
       ancestor=model.secret_scope_key('global')).fetch_async()
+  # TODO(vadimsh): Fetch "account name -> IP whitelist name" mapping first,
+  # and then make multiget of needed IP whitelists only. No need for .query()
+  # here, all needed entities are known in advance.
+  ip_whitelists = ndb.get_multi_async(
+      model.ip_whitelist_key(n) for n in ['bots'])
   snapshot = AuthDBSnapshot(
       global_config.get_result() or model.AuthGlobalConfig(key=model.ROOT_KEY),
       groups.get_result(),
-      secrets.get_result())
+      secrets.get_result(),
+      [f.get_result() for f in ip_whitelists if f.get_result()])
   return state.get_result(), snapshot
 
 
@@ -170,6 +176,16 @@ def auth_db_snapshot_to_proto(snapshot, auth_db_proto=None):
     msg.modified_ts = utils.datetime_to_timestamp(ent.modified_ts)
     msg.modified_by = ent.modified_by.to_bytes()
 
+  for ent in snapshot.ip_whitelists:
+    msg = auth_db_proto.ip_whitelists.add()
+    msg.name = ent.key.id()
+    msg.subnets.extend(ent.subnets)
+    msg.description = ent.description
+    msg.created_ts = utils.datetime_to_timestamp(ent.created_ts)
+    msg.created_by = ent.created_by.to_bytes()
+    msg.modified_ts = utils.datetime_to_timestamp(ent.modified_ts)
+    msg.modified_by = ent.modified_by.to_bytes()
+
   return auth_db_proto
 
 
@@ -208,7 +224,19 @@ def proto_to_auth_db_snapshot(auth_db_proto):
     for msg in auth_db_proto.secrets
   ]
 
-  return AuthDBSnapshot(global_config, groups, secrets)
+  ip_whitelists = [
+    model.AuthIPWhitelist(
+        key=model.ip_whitelist_key(msg.name),
+        subnets=list(msg.subnets),
+        description=msg.description,
+        created_ts=utils.timestamp_to_datetime(msg.created_ts),
+        created_by=model.Identity.from_bytes(msg.created_by),
+        modified_ts=utils.timestamp_to_datetime(msg.modified_ts),
+        modified_by=model.Identity.from_bytes(msg.modified_by))
+    for msg in auth_db_proto.ip_whitelists
+  ]
+
+  return AuthDBSnapshot(global_config, groups, secrets, ip_whitelists)
 
 
 def get_changed_entities(new_entity_list, old_entity_list):
@@ -265,11 +293,15 @@ def replace_auth_db(auth_db_rev, modified_ts, snapshot):
     entites_to_put.append(snapshot.global_config)
   entites_to_put.extend(get_changed_entities(snapshot.groups, current.groups))
   entites_to_put.extend(get_changed_entities(snapshot.secrets, current.secrets))
+  entites_to_put.extend(
+      get_changed_entities(snapshot.ip_whitelists, current.ip_whitelists))
 
   # Keys of entities that needs to be removed.
   keys_to_delete = []
   keys_to_delete.extend(get_deleted_keys(snapshot.groups, current.groups))
   keys_to_delete.extend(get_deleted_keys(snapshot.secrets, current.secrets))
+  keys_to_delete.extend(
+      get_deleted_keys(snapshot.ip_whitelists, current.ip_whitelists))
 
   @ndb.transactional
   def update_auth_db():

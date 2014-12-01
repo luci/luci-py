@@ -117,6 +117,30 @@ message AuthSecret {
 }
 
 
+// A named set of whitelisted IP addresses. Corresponds to AuthIPWhitelist
+// entity in model.py.
+message AuthIPWhitelist {
+  // Name of the IP whitelist.
+  required string name = 1;
+
+  // The list of IP subnets.
+  repeated string subnets = 2;
+
+  // Human readable description.
+  required string description = 3;
+
+  // When the list was created. Microseconds since epoch.
+  required int64 created_ts = 4;
+  // Who created the list.
+  required string created_by = 5;
+
+  // When the list was modified. Microseconds since epoch.
+  required int64 modified_ts = 6;
+  // Who modified the list the last time.
+  required string modified_by = 7;
+}
+
+
 // An entire database of auth configuration that is being replicated.
 // Corresponds to AuthGlobalConfig entity in model.py, plus a list of all groups
 // and a list of global secrets.
@@ -131,6 +155,8 @@ message AuthDB {
   repeated AuthGroup groups = 4;
   // Global secrets shared between services.
   repeated AuthSecret secrets = 5;
+  // All IP whitelists.
+  repeated AuthIPWhitelist ip_whitelists = 6;
 }
 
 
