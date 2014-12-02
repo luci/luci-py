@@ -50,17 +50,20 @@ def ensure_configured():
   global _config_called
 
   # Import lazily to avoid module reference cycle.
+  from components import utils
   from . import handler
   from .ui import ui
 
   with _config_lock:
     if not _config_called:
-      # Supported authentication mechanisms.
-      authenticators = [
-        handler.oauth_authentication,
+      authenticators = []
+      # OAuth mocks on dev server always return useless values, don't use it.
+      if not utils.is_local_dev_server():
+        authenticators.append(handler.oauth_authentication)
+      authenticators.extend([
         handler.cookie_authentication,
         handler.service_to_service_authentication,
-      ]
+      ])
       if _config.CUSTOM_AUTHENTICATORS_HOOK:
         authenticators.extend(_config.CUSTOM_AUTHENTICATORS_HOOK())
       handler.configure(authenticators)

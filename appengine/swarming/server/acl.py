@@ -119,13 +119,17 @@ def bootstrap_dev_server_acls():
   """Adds localhost to IP whitelist and Swarming groups."""
   assert utils.is_local_dev_server()
 
-  # Add a bot.
-  user_manager.AddWhitelist('127.0.0.1').get_result()
+  loopback_ips = ('127.0.0.1', '::1')
+
+  # Whitelist localhost.
+  for ip in loopback_ips:
+    user_manager.AddWhitelist(ip).get_result()
 
   if not auth.is_replica():
-    bot = auth.Identity(auth.IDENTITY_BOT, '127.0.0.1')
-    auth.bootstrap_group(BOTS_GROUP, bot, 'Swarming bots')
-    auth.bootstrap_group(USERS_GROUP, bot, 'Swarming users')
+    for ip in loopback_ips:
+      bot = auth.Identity(auth.IDENTITY_BOT, ip.replace(':', '-'))
+      auth.bootstrap_group(BOTS_GROUP, bot, 'Swarming bots')
+      auth.bootstrap_group(USERS_GROUP, bot, 'Swarming users')
 
     # Add a swarming admin. smoke-test@example.com is used in
     # server_smoke_test.py
