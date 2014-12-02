@@ -17,6 +17,7 @@ from protorpc import util
 
 from . import api
 from . import config
+from . import ipaddr
 from . import model
 
 from components import utils
@@ -100,7 +101,7 @@ def endpoints_method(
     @functools.wraps(func)
     def wrapper(service, *args, **kwargs):
       try:
-        initialize_request_auth()
+        initialize_request_auth(service.request_state.remote_address)
         return func(service, *args, **kwargs)
       except api.AuthenticationError:
         raise endpoints.UnauthorizedException()
@@ -110,13 +111,12 @@ def endpoints_method(
   return new_decorator
 
 
-def initialize_request_auth():
+def initialize_request_auth(remote_address):
   """Grabs caller identity and initializes request local authentication context.
 
   Called before executing a cloud endpoints method. May raise AuthorizationError
   or AuthenticationError exceptions.
   """
-  # TODO(vadimsh): Add IP whitelist support in addition to OAuth.
   config.ensure_configured()
 
   # Endpoints library always does authentication before invoking a method. Just
@@ -128,12 +128,12 @@ def initialize_request_auth():
   # API is mocked. It makes API Explorer work with local apps. Always use Cloud
   # Endpoints auth on the dev server. It has a side effect: client_id whitelist
   # is ignored, there's no way to get client_id on dev server via endpoints API.
-  ident = None
+  identity = None
   if utils.is_local_dev_server():
     if current_user:
-      ident = model.Identity(model.IDENTITY_USER, current_user.email())
+      identity = model.Identity(model.IDENTITY_USER, current_user.email())
     else:
-      ident = model.Anonymous
+      identity = model.Anonymous
   else:
     # Use OAuth API directly to grab both client_id and email and validate them.
     # endpoints.get_current_user() itself is implemented in terms of OAuth API,
@@ -142,20 +142,35 @@ def initialize_request_auth():
     # cached values without making any additional RPCs.
     if os.environ.get('HTTP_AUTHORIZATION'):
       # Raises error for forbidden client_id, never returns None or Anonymous.
-      ident = api.extract_oauth_caller_identity(
+      identity = api.extract_oauth_caller_identity(
           extra_client_ids=[endpoints.API_EXPLORER_CLIENT_ID])
       # Double check that we used same cached values as endpoints did.
-      assert ident and not ident.is_anonymous, ident
+      assert identity and not identity.is_anonymous, identity
       assert current_user is not None
-      assert ident.name == current_user.email(), (
-          ident.name, current_user.email())
+      assert identity.name == current_user.email(), (
+          identity.name, current_user.email())
     else:
       # 'Authorization' header is missing. Endpoints still could have found
       # id_token in GET request parameters. Ignore it for now, the code is
       # complicated without it already.
       if current_user is not None:
         raise api.AuthenticationError('Unsupported authentication method')
-      ident = model.Anonymous
+      identity = model.Anonymous
 
-  assert ident is not None
-  api.get_request_cache().set_current_identity(ident)
+  # Verify IP is whitelisted. Do it for anonymous identities too. Anonymous
+  # access can be allowed only from specific set of IPs. verify_ip_whitelisted
+  # raises AuthorizationError if IP is not allowed.
+  assert identity is not None
+  assert remote_address
+  ip = ipaddr.ip_from_string(remote_address)
+  api.verify_ip_whitelisted(identity, ip)
+
+  # TODO(vadimsh): Remove this branch once bots use service accounts. For now
+  # any anonymous request coming from IP whitelist named "bots" is assumed
+  # to be a request from a bot.
+  if identity.is_anonymous:
+    whitelist = api.get_ip_whitelist('bots')
+    if whitelist and whitelist.is_ip_whitelisted(ip):
+      identity = model.Identity(model.IDENTITY_BOT, ipaddr.ip_to_string(ip))
+
+  api.get_request_cache().set_current_identity(identity)
