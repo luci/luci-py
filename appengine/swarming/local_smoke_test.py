@@ -83,7 +83,7 @@ def kill_bot(bot_proc):
     assert not bot_proc.returncode
 
 
-def gen_data(exit_code=0, properties=None, **kwargs):
+def gen_request(exit_code=0, properties=None, **kwargs):
   out = {
     'name': None,
     'priority': 10,
@@ -101,21 +101,44 @@ def gen_data(exit_code=0, properties=None, **kwargs):
     'tags': [],
     'user': 'joe@localhost',
   }
+  assert set(out).issuperset(kwargs)
   out.update(kwargs)
   if properties:
+    assert set(out['properties']).issuperset(properties)
     out['properties'].update(properties)
   return out
 
 
-def trigger(client, **kwargs):
+def gen_expected(**kwargs):
+  expected = {
+    u'abandoned_ts': None,
+    u'bot_id': unicode(socket.getfqdn().split('.', 1)[0]),
+    u'deduped_from': None,
+    u'exit_codes': [0],
+    u'failure': False,
+    u'internal_failure': False,
+    u'name': u'',
+    u'properties_hash': None,
+    u'outputs': [u'hi\n'],
+    u'server_versions': [u'1'],
+    u'state': 0x70,  # task_result.State.COMPLETED.
+    u'try_number': 1,
+    u'user': u'joe@localhost',
+  }
+  assert set(expected).issuperset(kwargs)
+  expected.update(kwargs)
+  return expected
+
+
+def trigger(client, request):
   """Triggers a task, returns kwargs and task_id."""
   response = client.json_request(
-      '/swarming/api/v1/client/request', gen_data(**kwargs)).body
+      '/swarming/api/v1/client/request', request).body
   if not 'task_id' in response:
     raise ValueError(response)
   task_id = response['task_id']
   logging.info('Triggered %s', task_id)
-  return kwargs, task_id
+  return task_id
 
 
 def get_result(client, task_id):
@@ -125,9 +148,11 @@ def get_result(client, task_id):
         '/swarming/api/v1/client/task/%s' % task_id).body
     if response['state'] not in (0x10, 0x20):
       logging.info('Task %s completed:\n%s', task_id, response)
+      # Manually append outputs to the result.
       outputs = client.json_request(
           '/swarming/api/v1/client/task/%s/output/all' % task_id).body
-      response['outputs'] = outputs
+      assert set(outputs) == {u'outputs'}
+      response[u'outputs'] = outputs[u'outputs']
       return response
     time.sleep(2 if VERBOSE else 0.01)
   return {}
@@ -216,21 +241,82 @@ class SwarmingTestCase(unittest.TestCase):
     return not self._resultForDoCleanups.wasSuccessful()
 
   def test_integration(self):
+    """Runs a few task requests and wait for results."""
     self.finish_setup()
 
-    running_tasks = [
-      trigger(self.client, name='foo'),
-      trigger(self.client, name='bar'),
-      trigger(self.client, name='failed', exit_code=1),
-      trigger(
-          self.client, name='invalid', exit_code=1,
-          properties={'commands': [['unknown_invalid_command']]}),
+    # tuple(task_request, expectation)
+    tasks = [
+      (gen_request(name='foo'), gen_expected(name=u'foo')),
+      (
+        gen_request(name='failed', exit_code=1),
+        gen_expected(
+          name=u'failed', exit_codes=[1], failure=True),
+      ),
+      (
+        gen_request(
+            name='invalid',
+            properties={'commands': [['unknown_invalid_command']]}),
+        gen_expected(
+            name=u'invalid',
+            exit_codes=[1],
+            failure=True,
+            outputs=[
+              u'Command "unknown_invalid_command" failed to start.\n'
+              u'Error: [Errno 2] No such file or directory',
+            ]),
+      ),
+      (
+        gen_request(
+            name='hard_timeout',
+            properties={
+              'commands': [
+                [
+                  'python', '-c',
+                  # Need to flush to ensure it will be sent to the server.
+                  'import time,sys; sys.stdout.write(\'hi\\n\'); '
+                    'sys.stdout.flush(); time.sleep(120)',
+                ],
+              ],
+              'execution_timeout_secs': 1,
+            }),
+        gen_expected(
+            name=u'hard_timeout',
+            exit_codes=[-9],
+            failure=True,
+            state=0x40),  # task_result.State.TIMED_OUT
+      ),
+      (
+        gen_request(
+            name='io_timeout',
+            properties={
+              'commands': [
+                [
+                  'python', '-c',
+                  # Need to flush to ensure it will be sent to the server.
+                  'import time,sys; sys.stdout.write(\'hi\\n\'); '
+                    'sys.stdout.flush(); time.sleep(120)',
+                ],
+              ],
+              'io_timeout_secs': 1,
+            }),
+        gen_expected(
+            name=u'io_timeout',
+            exit_codes=[-9],
+            failure=True,
+            state=0x40),  # task_result.State.TIMED_OUT
+      ),
+      (gen_request(name='bar'), gen_expected(name=u'bar')),
     ]
 
-    for kwargs, task_id in running_tasks:
-      self.assertResults(kwargs, get_result(self.client, task_id))
+    # tuple(task_id, expectation)
+    running_tasks = [
+      (trigger(self.client, request), expected) for request, expected in tasks
+    ]
 
-  def assertResults(self, kwargs, result):
+    for task_id, expectation in running_tasks:
+      self.assertResults(expectation, get_result(self.client, task_id))
+
+  def assertResults(self, expected, result):
     result = result.copy()
     # These are not deterministic (or I'm too lazy to calculate the value).
     self.assertTrue(result.pop('bot_version'))
@@ -240,30 +326,6 @@ class SwarmingTestCase(unittest.TestCase):
     self.assertTrue(result.pop('id'))
     self.assertTrue(result.pop('modified_ts'))
     self.assertTrue(result.pop('started_ts'))
-
-    exit_code = kwargs.get('exit_code', 0)
-    name = kwargs['name']
-    outputs = [u'hi\n']
-    if name == 'invalid':
-      outputs = [
-        u'Command "unknown_invalid_command" failed to start.\n'
-        u'Error: [Errno 2] No such file or directory',
-      ]
-    expected = {
-      u'abandoned_ts': None,
-      u'bot_id': unicode(socket.getfqdn().split('.', 1)[0]),
-      u'deduped_from': None,
-      u'exit_codes': [exit_code],
-      u'failure': exit_code != 0,
-      u'internal_failure': False,
-      u'name': unicode(name),
-      u'properties_hash': None,
-      'outputs': {u'outputs': outputs},
-      u'server_versions': [u'1'],
-      u'state': 0x70,  # task_result.State.COMPLETED.
-      u'try_number': 1,
-      u'user': u'joe@localhost',
-    }
     self.assertEqual(expected, result)
 
 

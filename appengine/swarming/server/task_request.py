@@ -62,7 +62,7 @@ _ONE_DAY_SECS = 24*60*60 + 10
 
 
 # Minimum value for timeouts.
-_MIN_TIMEOUT_SECS = 30
+_MIN_TIMEOUT_SECS = 1 if utils.is_local_dev_server() else 30
 
 
 # The world started on 2010-01-01 at 00:00:00 UTC. The rationale is that using

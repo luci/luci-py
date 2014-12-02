@@ -791,10 +791,10 @@ class BotTaskUpdateHandler(auth.ApiHandler):
 
     duration = request.get('duration')
     exit_code = request.get('exit_code')
+    hard_timeout = request.get('hard_timeout')
+    io_timeout = request.get('io_timeout')
     output = request.get('output')
     output_chunk_start = request.get('output_chunk_start')
-
-    # TODO(maruel): Make use of io_timeout and hard_timeout.
 
     run_result_key = task_result.unpack_run_result_key(task_id)
     # Side effect: zaps out any binary content on stdout.
@@ -804,7 +804,7 @@ class BotTaskUpdateHandler(auth.ApiHandler):
     try:
       success, completed = task_scheduler.bot_update_task(
           run_result_key, bot_id, command_index, output, output_chunk_start,
-          exit_code, duration)
+          exit_code, duration, hard_timeout, io_timeout)
       if not success:
         self.abort_with_error(500, error='Failed to update, please retry')
 

@@ -74,13 +74,13 @@ class State(object):
 
   It's in fact an enum. Values should be in decreasing order of importance.
   """
-  RUNNING = 0x10
-  PENDING = 0x20
-  EXPIRED = 0x30
-  TIMED_OUT = 0x40
-  BOT_DIED = 0x50
-  CANCELED = 0x60
-  COMPLETED = 0x70
+  RUNNING = 0x10    # 16
+  PENDING = 0x20    # 32
+  EXPIRED = 0x30    # 48
+  TIMED_OUT = 0x40  # 64
+  BOT_DIED = 0x50   # 80
+  CANCELED = 0x60   # 96
+  COMPLETED = 0x70  # 112
 
   STATES = (RUNNING, PENDING, EXPIRED, TIMED_OUT, BOT_DIED, CANCELED, COMPLETED)
   STATES_RUNNING = (RUNNING, PENDING)

@@ -510,6 +510,20 @@ class TaskResultApiTest(test_case.TestCase):
     self.assertEqual(None, run_result.duration)
     self.assertEqual(None, run_result.duration_now(utils.utcnow()))
 
+  def test_run_result_timeout(self):
+    request = task_request.make_request(_gen_request_data())
+    result_summary = task_result.new_result_summary(request)
+    result_summary.put()
+    run_result = task_result.new_run_result(request, 1, 'localhost', 'abc')
+    run_result.state = task_result.State.TIMED_OUT
+    run_result.completed_ts = self.now
+    result_summary.set_from_run_result(run_result, request)
+    ndb.put_multi((run_result, result_summary))
+    run_result = run_result.key.get()
+    result_summary = result_summary.key.get()
+    self.assertEqual(True, run_result.failure)
+    self.assertEqual(True, result_summary.failure)
+
   def test_get_result_summary_query(self):
     # Indirectly tested by both frontend and API.
     pass

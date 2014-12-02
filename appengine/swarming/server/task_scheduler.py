@@ -393,7 +393,7 @@ def bot_reap_task(dimensions, bot_id, bot_version):
 
 def bot_update_task(
     run_result_key, bot_id, command_index, output, output_chunk_start,
-    exit_code, duration):
+    exit_code, duration, hard_timeout, io_timeout):
   """Updates a TaskRunResult and TaskResultSummary, along TaskOutput.
 
   Arguments:
@@ -405,6 +405,8 @@ def bot_update_task(
   - exit_code: Mark that this command, as specified by command_index, is
       terminated.
   - duration: Time spent in seconds for this command.
+  - hard_timeout: Bool set if an hard timeout occured.
+  - io_timeout: Bool set if an I/O timeout occured.
 
   Invalid states, these are flat out refused:
   - A command is updated after it had an exit code assigned to.
@@ -459,9 +461,13 @@ def bot_update_task(
 
     task_completed = (
         len(run_result.exit_codes) == len(request.properties.commands))
-    if task_completed:
-      run_result.state = task_result.State.COMPLETED
-      run_result.completed_ts = now
+    if run_result.state in task_result.State.STATES_RUNNING:
+      if hard_timeout or io_timeout:
+        run_result.state = task_result.State.TIMED_OUT
+        run_result.completed_ts = now
+      elif task_completed:
+        run_result.state = task_result.State.COMPLETED
+        run_result.completed_ts = now
 
     run_result.signal_server_version(server_version)
     to_put = []
