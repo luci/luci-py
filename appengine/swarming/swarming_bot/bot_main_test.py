@@ -58,6 +58,7 @@ class TestBotMain(net_utils.TestCase):
     self.mock(self.bot, 'restart', self.fail)
 
   def tearDown(self):
+    os.environ.pop('SWARMING_BOT_ID', None)
     os.chdir(self.old_cwd)
     shutil.rmtree(self.root_dir)
     super(TestBotMain, self).tearDown()
@@ -147,6 +148,8 @@ class TestBotMain(net_utils.TestCase):
 
     with self.assertRaises(Foo):
       bot_main.run_bot(None)
+    self.assertEqual(
+        os_utilities.get_hostname_short(), os.environ['SWARMING_BOT_ID'])
 
   def test_poll_server_sleep(self):
     slept = []

@@ -53,7 +53,10 @@ def get_dimensions():
   # startup. That is why it is imported late.
   try:
     import bot_config
-    return bot_config.get_dimensions()
+    out = bot_config.get_dimensions()
+    if not isinstance(out, dict):
+      raise ValueError('Unexpected type %s' % out.__class__)
+    return out
   except Exception as e:
     try:
       out = os_utilities.get_dimensions()
@@ -189,8 +192,6 @@ def get_bot():
 
   Should only be called once in the process lifetime.
   """
-  # TODO(maruel): Run 'health check' on startup.
-  # https://code.google.com/p/swarming/issues/detail?id=112
   attributes = get_attributes()
 
   # Handshake to get an XSRF token even if there were errors.
@@ -219,6 +220,11 @@ def run_bot(arg_error):
   if arg_error:
     botobj.post_error('Argument error: %s' % arg_error)
 
+  # This environment variable is accessible to the tasks executed by this bot.
+  os.environ['SWARMING_BOT_ID'] = botobj.id
+
+  # TODO(maruel): Run 'health check' on startup.
+  # https://code.google.com/p/swarming/issues/detail?id=112
   consecutive_sleeps = 0
   while True:
     try:
