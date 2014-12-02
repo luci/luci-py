@@ -115,6 +115,9 @@ GROUP_ALL = '*'
 ROOT_KEY = ndb.Key('AuthGlobalConfig', 'root')
 # Key of AuthReplicationState entity.
 REPLICATION_STATE_KEY = ndb.Key('AuthReplicationState', 'self', parent=ROOT_KEY)
+# Key of AuthIPWhitelistAssignments entity.
+IP_WHITELIST_ASSIGNMENTS_KEY = ndb.Key(
+    'AuthIPWhitelistAssignments', 'default', parent=ROOT_KEY)
 
 
 # Configuration of Primary service, set by 'configure_as_primary'.
@@ -696,12 +699,36 @@ class AuthSecret(ndb.Model):
 ## IP whitelist.
 
 
+class AuthIPWhitelistAssignments(ndb.Model):
+  """A singleton entity with "identity -> AuthIPWhitelist to use" mapping.
+
+  Entity key is IP_WHITELIST_ASSIGNMENTS_KEY. Parent entity is ROOT_KEY.
+
+  See AuthIPWhitelist for more info about IP whitelists.
+  """
+  class Assignment(ndb.Model):
+    # Identity name to limit by IP whitelist. Unique key in 'assignments' list.
+    identity = IdentityProperty()
+    # Name of IP whitelist to use (see AuthIPWhitelist).
+    ip_whitelist = ndb.StringProperty()
+    # Why the assignment was created.
+    comment = ndb.StringProperty()
+    # When the assignment was created.
+    created_ts = ndb.DateTimeProperty(auto_now_add=True)
+    # Who created the assignment.
+    created_by = IdentityProperty()
+
+  # Holds all the assignments.
+  assignments = ndb.LocalStructuredProperty(Assignment, repeated=True)
+
+
 class AuthIPWhitelist(ndb.Model, datastore_utils.SerializableModelMixin):
   """A named set of whitelisted IPv4 and IPv6 subnets.
 
   Can be assigned to individual user accounts to forcibly limit them only to
   particular IP addresses, e.g. it can be used to enforce that specific service
-  account is used only from some known IP range.
+  account is used only from some known IP range. The mapping between accounts
+  and IP whitelists is stored in AuthIPWhitelistAssignments.
 
   Entity id is a name of the whitelist. Parent entity is ROOT_KEY.
 
@@ -709,7 +736,6 @@ class AuthIPWhitelist(ndb.Model, datastore_utils.SerializableModelMixin):
   of machines the service trusts unconditionally. Requests from such machines
   doesn't have to have any additional credentials attached.
 
-  TODO(vadimsh): Implement "account name -> IP whitelist" mapping.
   TODO(vadimsh): Make bots use service accounts and remove "bots" whitelist.
   """
   # How to convert this entity to or from serializable dict.
@@ -787,3 +813,65 @@ def bootstrap_ip_whitelist(name, subnet, description):
   entity.put()
   replicate_auth_db()
   return True
+
+
+@ndb.transactional
+def bootstrap_ip_whitelist_assignment(identity, ip_whitelist, comment=''):
+  """Sets a mapping "identity -> IP whitelist to use" for some account.
+
+  Replaces existing assignment. Can be used on local dev appserver to configure
+  IP whitelist assignments during startup or in tests. Should not be used from
+  request handlers.
+
+  Args:
+    identity: Identity to modify.
+    ip_whitelist: name of AuthIPWhitelist to assign.
+    comment: comment to set.
+
+  Returns:
+    True if IP whitelist assignment was modified, False if it was already set.
+  """
+  entity = (
+      IP_WHITELIST_ASSIGNMENTS_KEY.get() or
+      AuthIPWhitelistAssignments(key=IP_WHITELIST_ASSIGNMENTS_KEY))
+
+  found = False
+  for assignment in entity.assignments:
+    if assignment.identity == identity:
+      if assignment.ip_whitelist == ip_whitelist:
+        return False
+      assignment.ip_whitelist = ip_whitelist
+      assignment.comment = comment
+      found = True
+      break
+
+  if not found:
+    entity.assignments.append(
+        AuthIPWhitelistAssignments.Assignment(
+            identity=identity,
+            ip_whitelist=ip_whitelist,
+            comment=comment,
+            created_by=get_service_self_identity()))
+
+  entity.put()
+  replicate_auth_db()
+  return True
+
+
+def fetch_ip_whitelists():
+  """Fetches AuthIPWhitelistAssignments and relevant AuthIPWhitelist entities.
+
+  Returns:
+    (AuthIPWhitelistAssignments, list of AuthIPWhitelist).
+  """
+  assignments = (
+      IP_WHITELIST_ASSIGNMENTS_KEY.get() or
+      AuthIPWhitelistAssignments(key=IP_WHITELIST_ASSIGNMENTS_KEY))
+
+  # TODO(vadimsh): Remove 'bots' once bots use service accounts.
+  names = set(a.ip_whitelist for a in assignments.assignments)
+  names.add('bots')
+
+  whitelists = ndb.get_multi(ip_whitelist_key(n) for n in names)
+  whitelists = sorted(filter(None, whitelists), key=lambda x: x.key.id())
+  return assignments, whitelists

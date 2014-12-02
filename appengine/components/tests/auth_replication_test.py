@@ -34,10 +34,28 @@ def snapshot_to_dict(snapshot):
     'groups': [entity_to_dict(g) for g in snapshot.groups],
     'secrets': [entity_to_dict(s) for s in snapshot.secrets],
     'ip_whitelists': [entity_to_dict(l) for l in snapshot.ip_whitelists],
+    'ip_whitelist_assignments':
+        entity_to_dict(snapshot.ip_whitelist_assignments),
   }
   # Ensure no new keys are forgotten.
   assert len(snapshot) == len(result)
   return result
+
+
+def make_snapshot_obj(
+    global_config=None, groups=None, secrets=None,
+    ip_whitelists=None, ip_whitelist_assignments=None):
+  """Returns AuthDBSnapshot with omitted fields set to default values."""
+  return replication.AuthDBSnapshot(
+      global_config=global_config or model.AuthGlobalConfig(key=model.ROOT_KEY),
+      groups=groups or [],
+      secrets=secrets or [],
+      ip_whitelists=ip_whitelists or [],
+      ip_whitelist_assignments=(
+          ip_whitelist_assignments or
+          model.AuthIPWhitelistAssignments(
+              key=model.IP_WHITELIST_ASSIGNMENTS_KEY)),
+  )
 
 
 class NewAuthDBSnapshotTest(test_case.TestCase):
@@ -57,6 +75,11 @@ class NewAuthDBSnapshotTest(test_case.TestCase):
       'groups': [],
       'secrets': [],
       'ip_whitelists': [],
+      'ip_whitelist_assignments': {
+        '__id__': 'default',
+        '__parent__': ndb.Key('AuthGlobalConfig', 'root'),
+        'assignments': [],
+      },
     }
     self.assertEqual(expected_snapshot, snapshot_to_dict(snapshot))
 
@@ -114,6 +137,17 @@ class NewAuthDBSnapshotTest(test_case.TestCase):
         created_by=model.Identity.from_bytes('user:creator@example.com'),
         modified_by=model.Identity.from_bytes('user:modifier@example.com'))
     ip_whitelist.put()
+
+    ip_whitelist_assignments = model.AuthIPWhitelistAssignments(
+        key=model.IP_WHITELIST_ASSIGNMENTS_KEY,
+        assignments=[
+          model.AuthIPWhitelistAssignments.Assignment(
+            identity=model.Identity.from_bytes('user:bot_account@example.com'),
+            ip_whitelist='bots',
+            comment='some comment',
+            created_by=model.Identity.from_bytes('user:creator@example.com')),
+        ])
+    ip_whitelist_assignments.put()
 
     captured_state, snapshot = replication.new_auth_db_snapshot()
 
@@ -183,7 +217,22 @@ class NewAuthDBSnapshotTest(test_case.TestCase):
           'modified_ts': datetime.datetime(2014, 1, 1, 1, 1, 1),
           'subnets': ['127.0.0.1/32'],
         },
-      ]
+      ],
+      'ip_whitelist_assignments': {
+        '__id__': 'default',
+        '__parent__': ndb.Key('AuthGlobalConfig', 'root'),
+        'assignments': [
+          {
+            'comment': 'some comment',
+            'created_by': model.Identity(
+                kind='user', name='creator@example.com'),
+            'created_ts': datetime.datetime(2014, 1, 1, 1, 1, 1),
+            'identity': model.Identity(
+                kind='user', name='bot_account@example.com'),
+            'ip_whitelist': 'bots',
+          },
+        ],
+      },
     }
     self.assertEqual(expected_snapshot, snapshot_to_dict(snapshot))
 
@@ -199,19 +248,17 @@ class SnapshotToProtoConversionTest(test_case.TestCase):
 
   def test_empty(self):
     """Serializing empty snapshot."""
-    snapshot = replication.AuthDBSnapshot(
-        model.AuthGlobalConfig(key=model.ROOT_KEY), [], [], [])
+    snapshot = make_snapshot_obj()
     self.assert_serialization_works(snapshot)
 
   def test_global_config_serialization(self):
     """Serializing snapshot with non-trivial AuthGlobalConfig."""
-    snapshot = replication.AuthDBSnapshot(
-        model.AuthGlobalConfig(
+    snapshot = make_snapshot_obj(
+        global_config=model.AuthGlobalConfig(
             key=model.ROOT_KEY,
             oauth_client_id='some-client-id',
             oauth_client_secret='some-client-secret',
-            oauth_additional_client_ids=['id1', 'id2']),
-        [], [], [])
+            oauth_additional_client_ids=['id1', 'id2']))
     self.assert_serialization_works(snapshot)
 
   def test_group_serialization(self):
@@ -230,8 +277,7 @@ class SnapshotToProtoConversionTest(test_case.TestCase):
         modified_ts=utils.utcnow(),
         modified_by=model.Identity.from_bytes('user:modifier@example.com'),
     )
-    snapshot = replication.AuthDBSnapshot(
-        model.AuthGlobalConfig(key=model.ROOT_KEY), [group], [], [])
+    snapshot = make_snapshot_obj(groups=[group])
     self.assert_serialization_works(snapshot)
 
   def test_secret_serialization(self):
@@ -242,11 +288,10 @@ class SnapshotToProtoConversionTest(test_case.TestCase):
         values=['\x00' * 100, ''],
         modified_ts=utils.utcnow(),
         modified_by=model.Identity.from_bytes('user:modifier@example.com'))
-    snapshot = replication.AuthDBSnapshot(
-        model.AuthGlobalConfig(key=model.ROOT_KEY), [], [secret], [])
+    snapshot = make_snapshot_obj(secrets=[secret])
     self.assert_serialization_works(snapshot)
 
-  def test_ip_whitelist_serialization(self):
+  def test_ip_whitelists_serialization(self):
     """Serializing snapshot with non-trivial IP whitelist."""
     ip_whitelist = model.AuthIPWhitelist(
         key=model.ip_whitelist_key('bots'),
@@ -257,8 +302,24 @@ class SnapshotToProtoConversionTest(test_case.TestCase):
         modified_ts=utils.utcnow(),
         modified_by=model.Identity.from_bytes('user:modifier@example.com'),
     )
-    snapshot = replication.AuthDBSnapshot(
-        model.AuthGlobalConfig(key=model.ROOT_KEY), [], [], [ip_whitelist])
+    snapshot = make_snapshot_obj(ip_whitelists=[ip_whitelist])
+    self.assert_serialization_works(snapshot)
+
+  def test_ip_whitelist_assignments_serialization(self):
+    """Serializing snapshot with non-trivial AuthIPWhitelistAssignments."""
+    entity = model.AuthIPWhitelistAssignments(
+        key=model.IP_WHITELIST_ASSIGNMENTS_KEY,
+        assignments=[
+          model.AuthIPWhitelistAssignments.Assignment(
+            identity=model.Identity.from_bytes('user:a@example.com'),
+            ip_whitelist='some whitelist',
+            comment='some comment',
+            created_ts=utils.utcnow(),
+            created_by=model.Identity.from_bytes('user:creator@example.com'),
+          ),
+        ],
+    )
+    snapshot = make_snapshot_obj(ip_whitelist_assignments=entity)
     self.assert_serialization_works(snapshot)
 
 
@@ -300,11 +361,24 @@ class ReplaceAuthDbTest(test_case.TestCase):
     secret('keep', 'global').put()
     secret('local', 'local').put()
 
-    # TODO(vadimsh): Add more cases when 'new_auth_db_snapshot' doesn't hardcode
-    # 'bots' anymore.
     def ip_whitelist(name, **kwargs):
       return model.AuthIPWhitelist(key=model.ip_whitelist_key(name), **kwargs)
-    ip_whitelist('bots').put()
+    ip_whitelist('modify').put()
+    ip_whitelist('delete').put()
+    ip_whitelist('keep').put()
+
+    def assignment(ident, ip_whitelist):
+      return model.AuthIPWhitelistAssignments.Assignment(
+          identity=model.Identity.from_bytes(ident),
+          ip_whitelist=ip_whitelist,
+          comment='comment')
+    model.AuthIPWhitelistAssignments(
+        key=model.IP_WHITELIST_ASSIGNMENTS_KEY,
+        assignments=[
+          assignment('user:1@example.com', 'modify'),
+          assignment('user:2@example.com', 'delete'),
+          assignment('user:3@example.com', 'keep'),
+        ]).put()
 
     # Prepare snapshot.
     snapshot = replication.AuthDBSnapshot(
@@ -324,8 +398,19 @@ class ReplaceAuthDbTest(test_case.TestCase):
           secret('keep', 'global'),
         ],
         ip_whitelists=[
-          ip_whitelist('bots', subnets=['127.0.0.1/32']),
-        ])
+          ip_whitelist('new', subnets=['1.1.1.1/32']),
+          ip_whitelist('modify', subnets=['127.0.0.1/32', '192.168.0.1/32']),
+          ip_whitelist('keep'),
+        ],
+        ip_whitelist_assignments=model.AuthIPWhitelistAssignments(
+            key=model.IP_WHITELIST_ASSIGNMENTS_KEY,
+            assignments=[
+              assignment('user:a@example.com', 'new'),
+              assignment('user:b@example.com', 'modify'),
+              assignment('user:c@example.com', 'keep'),
+            ],
+        ),
+    )
 
     # Push it.
     updated, state = replication.replace_auth_db(
@@ -418,16 +503,63 @@ class ReplaceAuthDbTest(test_case.TestCase):
       ],
       'ip_whitelists': [
         {
-          '__id__': 'bots',
+          '__id__': 'keep',
           '__parent__': ndb.Key('AuthGlobalConfig', 'root'),
           'created_by': None,
           'created_ts': datetime.datetime(2014, 1, 1, 1, 1, 1),
           'description': '',
           'modified_by': None,
           'modified_ts': datetime.datetime(2014, 1, 1, 1, 1, 1),
-          'subnets': ['127.0.0.1/32'],
+          'subnets': [],
+        },
+        {
+          '__id__': 'modify',
+          '__parent__': ndb.Key('AuthGlobalConfig', 'root'),
+          'created_by': None,
+          'created_ts': datetime.datetime(2014, 1, 1, 1, 1, 1),
+          'description': '',
+          'modified_by': None,
+          'modified_ts': datetime.datetime(2014, 1, 1, 1, 1, 1),
+          'subnets': ['127.0.0.1/32', '192.168.0.1/32'],
+        },
+        {
+          '__id__': 'new',
+          '__parent__': ndb.Key('AuthGlobalConfig', 'root'),
+          'created_by': None,
+          'created_ts': datetime.datetime(2014, 1, 1, 1, 1, 1),
+          'description': '',
+          'modified_by': None,
+          'modified_ts': datetime.datetime(2014, 1, 1, 1, 1, 1),
+          'subnets': ['1.1.1.1/32'],
         },
       ],
+      'ip_whitelist_assignments': {
+        '__id__': 'default',
+        '__parent__': ndb.Key('AuthGlobalConfig', 'root'),
+        'assignments': [
+          {
+            'comment': 'comment',
+            'created_by': None,
+            'created_ts': datetime.datetime(2014, 1, 1, 1, 1, 1),
+            'identity': model.Identity(kind='user', name='a@example.com'),
+            'ip_whitelist': 'new',
+          },
+          {
+            'comment': 'comment',
+            'created_by': None,
+            'created_ts': datetime.datetime(2014, 1, 1, 1, 1, 1),
+            'identity': model.Identity(kind='user', name='b@example.com'),
+            'ip_whitelist': 'modify',
+          },
+          {
+            'comment': 'comment',
+            'created_by': None,
+            'created_ts': datetime.datetime(2014, 1, 1, 1, 1, 1),
+            'identity': model.Identity(kind='user', name='c@example.com'),
+            'ip_whitelist': 'keep',
+          },
+        ],
+      },
     }
     self.assertEqual(expected_auth_db, snapshot_to_dict(current_snapshot))
 
@@ -453,8 +585,7 @@ class ReplaceAuthDbTest(test_case.TestCase):
     updated, state = replication.replace_auth_db(
         auth_db_rev=123,
         modified_ts=datetime.datetime(2014, 1, 1, 1, 1, 1),
-        snapshot=replication.AuthDBSnapshot(
-            model.AuthGlobalConfig(key=model.ROOT_KEY), [], [], []))
+        snapshot=make_snapshot_obj())
     self.assertFalse(updated)
     # Old modified_ts, update is not applied.
     expected_state = {

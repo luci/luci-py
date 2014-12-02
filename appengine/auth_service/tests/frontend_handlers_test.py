@@ -50,7 +50,9 @@ class FrontendHandlersTest(test_case.TestCase):
   def setUp(self):
     super(FrontendHandlersTest, self).setUp()
     self.mock(replication, 'trigger_replication', lambda *_args, **_kws: None)
-    self.app = webtest.TestApp(handlers.create_application(debug=True))
+    self.app = webtest.TestApp(
+        handlers.create_application(debug=True),
+        extra_environ={'REMOTE_ADDR': '127.0.0.1'})
     auth_testing.mock_is_admin(self, True)
     auth_testing.mock_get_current_identity(self)
 

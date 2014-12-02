@@ -73,7 +73,9 @@ class AuthenticatingHandlerTest(test_case.TestCase):
 
   def make_test_app(self, path, request_handler):
     """Returns webtest.TestApp with single route."""
-    return webtest.TestApp(webapp2.WSGIApplication([(path, request_handler)]))
+    return webtest.TestApp(
+        webapp2.WSGIApplication([(path, request_handler)]),
+        extra_environ={'REMOTE_ADDR': '127.0.0.1'})
 
   def test_anonymous(self):
     """If all auth methods are not applicable, identity is set to Anonymous."""
@@ -107,6 +109,33 @@ class AuthenticatingHandlerTest(test_case.TestCase):
 
     self.assertEqual('bot:192.168.1.100', call('192.168.1.100'))
     self.assertEqual('anonymous:anonymous', call('127.0.0.1'))
+
+  def test_ip_whitelist(self):
+    """Per-account IP whitelist works."""
+    ident1 = model.Identity(model.IDENTITY_USER, 'a@example.com')
+    ident2 = model.Identity(model.IDENTITY_USER, 'b@example.com')
+
+    model.bootstrap_ip_whitelist('whitelist', '192.168.1.100/32', '')
+    model.bootstrap_ip_whitelist_assignment(ident1, 'whitelist')
+
+    class Handler(handler.AuthenticatingHandler):
+      @api.public
+      def get(self):
+        self.response.write('OK')
+
+    app = self.make_test_app('/request', Handler)
+    def call(ident, ip):
+      handler.configure([lambda _request: ident])
+      response = app.get(
+          '/request', extra_environ={'REMOTE_ADDR': ip}, expect_errors=True)
+      return response.status_int
+
+    # IP is whitelisted.
+    self.assertEqual(200, call(ident1, '192.168.1.100'))
+    # IP is NOT whitelisted.
+    self.assertEqual(403, call(ident1, '127.0.0.1'))
+    # Whitelist is not used.
+    self.assertEqual(200, call(ident2, '127.0.0.1'))
 
   def test_auth_method_order(self):
     """Registered auth methods are tested in order."""

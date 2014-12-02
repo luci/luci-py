@@ -337,6 +337,53 @@ class IpWhitelistTest(test_case.TestCase):
   def test_bootstrap_ip_whitelist_bad_subnet(self):
     self.assertFalse(model.bootstrap_ip_whitelist('list', 'not a subnet', ''))
 
+  def test_bootstrap_ip_whitelist_assignment_new(self):
+    self.mock_now(datetime.datetime(2014, 01, 01))
+
+    ret = model.bootstrap_ip_whitelist_assignment(
+        model.Identity(model.IDENTITY_USER, 'a@example.com'),
+        'some ip whitelist', 'some comment')
+    self.assertTrue(ret)
+
+    self.assertEqual(
+      {
+        'assignments': [
+          {
+            'comment': 'some comment',
+            'created_by': model.get_service_self_identity(),
+            'created_ts': datetime.datetime(2014, 01, 01),
+            'identity': model.Identity(model.IDENTITY_USER, 'a@example.com'),
+            'ip_whitelist': 'some ip whitelist',
+          },
+        ],
+      }, model.IP_WHITELIST_ASSIGNMENTS_KEY.get().to_dict())
+
+  def test_bootstrap_ip_whitelist_assignment_modify(self):
+    self.mock_now(datetime.datetime(2014, 01, 01))
+
+    ret = model.bootstrap_ip_whitelist_assignment(
+        model.Identity(model.IDENTITY_USER, 'a@example.com'),
+        'some ip whitelist', 'some comment')
+    self.assertTrue(ret)
+
+    ret = model.bootstrap_ip_whitelist_assignment(
+        model.Identity(model.IDENTITY_USER, 'a@example.com'),
+        'another ip whitelist', 'another comment')
+    self.assertTrue(ret)
+
+    self.assertEqual(
+      {
+        'assignments': [
+          {
+            'comment': 'another comment',
+            'created_by': model.get_service_self_identity(),
+            'created_ts': datetime.datetime(2014, 01, 01),
+            'identity': model.Identity(model.IDENTITY_USER, 'a@example.com'),
+            'ip_whitelist': 'another ip whitelist',
+          },
+        ],
+      }, model.IP_WHITELIST_ASSIGNMENTS_KEY.get().to_dict())
+
   def test_is_ip_whitelisted(self):
     ent = model.AuthIPWhitelist(subnets=['127.0.0.1', '192.168.0.0/24'])
     test = lambda ip: ent.is_ip_whitelisted(ipaddr.ip_from_string(ip))
@@ -346,6 +393,36 @@ class IpWhitelistTest(test_case.TestCase):
     self.assertTrue(test('192.168.0.255'))
     self.assertFalse(test('192.168.1.0'))
     self.assertFalse(test('192.1.0.0'))
+
+  def test_fetch_ip_whitelists_empty(self):
+    assignments, whitelists = model.fetch_ip_whitelists()
+    self.assertEqual(model.IP_WHITELIST_ASSIGNMENTS_KEY, assignments.key)
+    self.assertEqual(0, len(assignments.assignments))
+    self.assertEqual([], whitelists)
+
+  def test_fetch_ip_whitelists_non_empty(self):
+    ent = model.AuthIPWhitelistAssignments(
+        key=model.IP_WHITELIST_ASSIGNMENTS_KEY)
+
+    def add(identity, **kwargs):
+      kwargs['identity'] = model.Identity.from_bytes(identity)
+      ent.assignments.append(
+          model.AuthIPWhitelistAssignments.Assignment(**kwargs))
+    add('user:a1@example.com', ip_whitelist='A')
+    add('user:a2@example.com', ip_whitelist='A')
+    add('user:b@example.com', ip_whitelist='B')
+    add('user:c@example.com', ip_whitelist='missing')
+    ent.put()
+
+    def store_whitelist(name):
+      model.AuthIPWhitelist(key=model.ip_whitelist_key(name)).put()
+    store_whitelist('A')
+    store_whitelist('B')
+    store_whitelist('bots')
+
+    assignments, whitelists = model.fetch_ip_whitelists()
+    self.assertEqual(ent.to_dict(), assignments.to_dict())
+    self.assertEqual(['A', 'B', 'bots'], [e.key.id() for e in whitelists])
 
 
 if __name__ == '__main__':

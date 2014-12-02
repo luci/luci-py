@@ -34,7 +34,8 @@ def call_get(request_handler, uri=None, **kwargs):
   assert uri.startswith('/')
   path = uri.rsplit('?', 1)[0]
   app = webtest.TestApp(
-      webapp2.WSGIApplication([(path, request_handler)], debug=True))
+      webapp2.WSGIApplication([(path, request_handler)], debug=True),
+      extra_environ={'REMOTE_ADDR': '127.0.0.1'})
   return app.get(uri, **kwargs)
 
 
@@ -44,7 +45,8 @@ def call_post(request_handler, body, uri=None, **kwargs):
   assert uri.startswith('/')
   path = uri.rsplit('?', 1)[0]
   app = webtest.TestApp(
-      webapp2.WSGIApplication([(path, request_handler)], debug=True))
+      webapp2.WSGIApplication([(path, request_handler)], debug=True),
+      extra_environ={'REMOTE_ADDR': '127.0.0.1'})
   return app.post(uri, body, **kwargs)
 
 
@@ -263,7 +265,8 @@ class RestAPITestCase(test_case.TestCase):
     super(RestAPITestCase, self).setUp()
     # Make webtest app that can execute REST API requests.
     self.app = webtest.TestApp(
-        webapp2.WSGIApplication(rest_api.get_rest_api_routes(), debug=True))
+        webapp2.WSGIApplication(rest_api.get_rest_api_routes(), debug=True),
+        extra_environ={'REMOTE_ADDR': '127.0.0.1'})
     # Reset global config and cached state.
     handler.configure([])
     api.reset_local_state()

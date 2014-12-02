@@ -30,6 +30,7 @@ class AuthDBTest(test_case.TestCase):
   def setUp(self):
     super(AuthDBTest, self).setUp()
     self.mock(api.logging, 'warning', lambda *_args: None)
+    self.mock(api.logging, 'error', lambda *_args: None)
 
   def test_is_group_member(self):
     # Test identity.
@@ -174,6 +175,21 @@ class AuthDBTest(test_case.TestCase):
     ]
 
     # And IP whitelist.
+    ip_whitelist_assignments = model.AuthIPWhitelistAssignments(
+        key=model.IP_WHITELIST_ASSIGNMENTS_KEY,
+        assignments=[
+          model.AuthIPWhitelistAssignments.Assignment(
+            identity=model.Anonymous,
+            ip_whitelist='some ip whitelist',
+          ),
+        ])
+    ip_whitelist_assignments.put()
+    some_ip_whitelist = model.AuthIPWhitelist(
+        key=model.ip_whitelist_key('some ip whitelist'),
+        subnets=['127.0.0.1/32'])
+    some_ip_whitelist.put()
+
+    # TODO(vadimsh): Remove 'bots' once bots use service accounts.
     bots_ip_whitelist = model.AuthIPWhitelist(
         key=model.ip_whitelist_key('bots'),
         subnets=['127.0.0.1/32'])
@@ -191,7 +207,12 @@ class AuthDBTest(test_case.TestCase):
     self.assertEqual(
         set(s.key.id() for s in global_secrets),
         set(auth_db.secrets['global']))
-    self.assertEqual({'bots': bots_ip_whitelist}, auth_db.ip_whitelists)
+    self.assertEqual(
+        ip_whitelist_assignments,
+        auth_db.ip_whitelist_assignments)
+    self.assertEqual(
+        {'bots': bots_ip_whitelist, 'some ip whitelist': some_ip_whitelist},
+        auth_db.ip_whitelists)
 
   def test_get_secret(self):
     # Make AuthDB with two secrets.
@@ -227,6 +248,58 @@ class AuthDBTest(test_case.TestCase):
   def test_get_secret_bad_scope(self):
     with self.assertRaises(ValueError):
       api.AuthDB().get_secret(api.SecretKey('some', 'bad-scope'))
+
+  @staticmethod
+  def make_auth_db_with_ip_whitelist():
+    """AuthDB with a@example.com assigned IP whitelist '127.0.0.1/32'."""
+    return api.AuthDB(
+      ip_whitelists=[
+        model.AuthIPWhitelist(
+          key=model.ip_whitelist_key('some ip whitelist'),
+          subnets=['127.0.0.1/32'],
+        ),
+      ],
+      ip_whitelist_assignments=model.AuthIPWhitelistAssignments(
+        assignments=[
+          model.AuthIPWhitelistAssignments.Assignment(
+            identity=model.Identity(model.IDENTITY_USER, 'a@example.com'),
+            ip_whitelist='some ip whitelist',)
+        ],
+      ),
+    )
+
+  def test_verify_ip_whitelisted_ok(self):
+    # Should not raise: IP is whitelisted.
+    self.make_auth_db_with_ip_whitelist().verify_ip_whitelisted(
+        model.Identity(model.IDENTITY_USER, 'a@example.com'),
+        ipaddr.ip_from_string('127.0.0.1'))
+
+  def test_verify_ip_whitelisted_not_whitelisted(self):
+    with self.assertRaises(api.AuthorizationError):
+      self.make_auth_db_with_ip_whitelist().verify_ip_whitelisted(
+          model.Identity(model.IDENTITY_USER, 'a@example.com'),
+          ipaddr.ip_from_string('192.168.0.100'))
+
+  def test_verify_ip_whitelisted_not_assigned(self):
+    # Should not raise: whitelist is not required for another_user@example.com.
+    self.make_auth_db_with_ip_whitelist().verify_ip_whitelisted(
+        model.Identity(model.IDENTITY_USER, 'another_user@example.com'),
+        ipaddr.ip_from_string('192.168.0.100'))
+
+  def test_verify_ip_whitelisted_missing_whitelist(self):
+    auth_db = api.AuthDB(
+      ip_whitelist_assignments=model.AuthIPWhitelistAssignments(
+        assignments=[
+          model.AuthIPWhitelistAssignments.Assignment(
+            identity=model.Identity(model.IDENTITY_USER, 'a@example.com'),
+            ip_whitelist='missing ip whitelist',)
+        ],
+      ),
+    )
+    with self.assertRaises(api.AuthorizationError):
+      auth_db.verify_ip_whitelisted(
+          model.Identity(model.IDENTITY_USER, 'a@example.com'),
+          ipaddr.ip_from_string('127.0.0.1'))
 
 
 class TestAuthDBCache(test_case.TestCase):

@@ -141,6 +141,22 @@ message AuthIPWhitelist {
 }
 
 
+// A pair (identity, IP whitelist name) plus some metadata. Corresponds to
+// AuthIPWhitelistAssignments.Assignment model in model.py.
+message AuthIPWhitelistAssignment {
+  // Identity name to limit by IP whitelist.
+  required string identity = 1;
+  // Name of IP whitelist to use (see AuthIPWhitelist).
+  required string ip_whitelist = 2;
+  // Why the assignment was created.
+  required string comment = 3;
+  // When the assignment was created. Microseconds since epoch.
+  required int64 created_ts = 4;
+  // Who created the assignment.
+  required string created_by = 5;
+}
+
+
 // An entire database of auth configuration that is being replicated.
 // Corresponds to AuthGlobalConfig entity in model.py, plus a list of all groups
 // and a list of global secrets.
@@ -157,6 +173,8 @@ message AuthDB {
   repeated AuthSecret secrets = 5;
   // All IP whitelists.
   repeated AuthIPWhitelist ip_whitelists = 6;
+  // Mapping 'account -> IP whitlist to use for that account'.
+  repeated AuthIPWhitelistAssignment ip_whitelist_assignments = 7;
 }
 
 

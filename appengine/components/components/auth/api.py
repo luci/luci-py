@@ -26,6 +26,7 @@ from google.appengine.ext import ndb
 from google.appengine.ext.ndb import metadata
 
 from . import config
+from . import ipaddr
 from . import model
 
 # Part of public API of 'auth' component, exposed by this module.
@@ -45,6 +46,7 @@ __all__ = [
   'require',
   'SecretKey',
   'UninitializedError',
+  'verify_ip_whitelisted',
   'warmup',
 ]
 
@@ -113,6 +115,7 @@ class AuthDB(object):
       global_config=None,
       groups=None,
       secrets=None,
+      ip_whitelist_assignments=None,
       ip_whitelists=None,
       entity_group_version=None):
     """
@@ -121,6 +124,7 @@ class AuthDB(object):
       groups: list of AuthGroup entities.
       secrets: list of AuthSecret entities ('local' and 'global' in same list).
       ip_whitelists: list of AuthIPWhitelist entities.
+      ip_whitelist_assignments: AuthIPWhitelistAssignments entity.
       entity_group_version: version of AuthGlobalConfig entity group at the
           moment when entities were fetched from it.
     """
@@ -128,6 +132,8 @@ class AuthDB(object):
     self.groups = {g.key.string_id(): g for g in (groups or [])}
     self.secrets = {'local': {}, 'global': {}}
     self.ip_whitelists = {e.key.string_id(): e for e in (ip_whitelists or [])}
+    self.ip_whitelist_assignments = (
+        ip_whitelist_assignments or model.AuthIPWhitelistAssignments())
     self.entity_group_version = entity_group_version
 
     # Split |secrets| into local and global ones based on parent key id.
@@ -235,12 +241,39 @@ class AuthDB(object):
     entity = self.secrets[secret_key.scope][secret_key.name]
     return list(entity.values)
 
+  # TODO(vadimsh): Remove this method once bots switch to service accounts.
   def get_ip_whitelist(self, name):
     """Returns AuthIPWhitelist given its name (or None)."""
-    # TODO(vadimsh): Implement "account name -> IP whitelist" mapping and
-    # replace 'name' with 'identity', so that get_ip_whitelist(identity) returns
-    # a list of IPs that 'identity' is expected to use.
     return self.ip_whitelists.get(name)
+
+  def verify_ip_whitelisted(self, identity, ip):
+    """Verifies IP is in a whitelist assigned to Identity (if any).
+
+    Raises AuthorizationError if identity has an IP whitelist assigned and given
+    IP address doesn't belong to it.
+    """
+    assert isinstance(identity, model.Identity), identity
+
+    # Find IP whitelist name in the assignment entity (if any).
+    for assignment in self.ip_whitelist_assignments.assignments:
+      if assignment.identity == identity:
+        whitelist_id = assignment.ip_whitelist
+        break
+    else:
+      return
+
+    # IP whitelist MUST be there. But if it's missing, choose a safer
+    # alternative: reject the request.
+    whitelist = self.ip_whitelists.get(whitelist_id)
+    if not whitelist:
+      logging.error('Unknown IP whitelist: %s', whitelist_id)
+      raise AuthorizationError('IP is not whitelisted')
+
+    if not whitelist.is_ip_whitelisted(ip):
+      logging.error(
+          'IP is not whitelisted.\nIdentity: %s\nIP: %s\nWhitelist: %s',
+          identity.to_bytes(), ipaddr.ip_to_string(ip), whitelist_id)
+      raise AuthorizationError('IP is not whitelisted')
 
   def is_allowed_oauth_client_id(self, client_id):
     """True if given OAuth2 client_id can be used to authenticate the user."""
@@ -437,12 +470,8 @@ def fetch_auth_db(known_version=None):
     groups_future = model.AuthGroup.query(ancestor=root_key).fetch_async()
     secrets_future = model.AuthSecret.query(ancestor=root_key).fetch_async()
 
-    # TODO(vadimsh): Fetch "account name -> IP whitelist name" mapping first,
-    # and then make multiget of needed IP whitelists only. No need for .query()
-    # here, all needed entities are known in advance.
-    ip_whitelist_ids = ["bots"]
-    ip_whitelists_future = ndb.get_multi_async(
-        model.ip_whitelist_key(n) for n in ip_whitelist_ids)
+    # It's fine to block here as long as it's the last fetch.
+    ip_whitelist_assignments, ip_whitelists = model.fetch_ip_whitelists()
 
     # Note that get_entity_group_version() uses same entity group (root_key)
     # internally and respects transactions. So all data fetched here does indeed
@@ -451,9 +480,8 @@ def fetch_auth_db(known_version=None):
         global_config=global_config_future.get_result(),
         groups=groups_future.get_result(),
         secrets=secrets_future.get_result(),
-        ip_whitelists=[
-          f.get_result() for f in ip_whitelists_future if f.get_result()
-        ],
+        ip_whitelists=ip_whitelists,
+        ip_whitelist_assignments=ip_whitelist_assignments,
         entity_group_version=current_version)
 
   bootstrap()
@@ -633,9 +661,19 @@ def get_secret(secret_key):
   return get_request_auth_db().get_secret(secret_key)
 
 
+# TODO(vadimsh): Remove this function once bots switch to service accounts.
 def get_ip_whitelist(name):
   """Returns AuthIPWhitelist given its name (or None)."""
   return get_request_auth_db().get_ip_whitelist(name)
+
+
+def verify_ip_whitelisted(identity, ip):
+  """Verifies IP is in a whitelist assigned to Identity (if any).
+
+  Raises AuthorizationError if identity has an IP whitelist assigned and given
+  IP address doesn't belong to it.
+  """
+  get_request_auth_db().verify_ip_whitelisted(identity, ip)
 
 
 def public(func):
