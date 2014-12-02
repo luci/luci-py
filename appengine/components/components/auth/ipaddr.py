@@ -37,27 +37,26 @@ def ip_from_string(ipstr):
 
   Raises ValueError if |ipstr| is not recognized as IPv4 or IPv6 address.
   """
-  if '.' in ipstr:
-    # IPv4. Mixed v4-v6 addresses (e.g ::ffff:192.0.2.128) are not supported.
-    try:
+  values = None
+  try:
+    if '.' in ipstr:
+      # IPv4. Mixed v4-v6 addresses (e.g ::ffff:192.0.2.128) are not supported.
       values = [int(i) for i in ipstr.split('.')]
-    except ValueError:
-      raise ValueError('Not an IP address')
-    if len(values) != 4 or not all(0 <= i <= 255 for i in values):
-      raise ValueError('Not an IP address')
-    factor = 256
-    bits = 32
-  elif ':' in ipstr:
-    # IPv6. The code currently doesn't support '::' syntax for groups of zeros.
-    try:
+      if len(values) != 4 or not all(0 <= i <= 255 for i in values):
+        values = None
+      factor = 256
+      bits = 32
+    elif ':' in ipstr:
+      # IPv6. The code currently doesn't support '::' syntax for groups of
+      # zeros.
       values = [int(i, 16) for i in ipstr.split(':')]
-    except ValueError:
-      raise ValueError('Not an IP address')
-    if len(values) != 8 or not all(0 <= i <= 65535 for i in values):
-      raise ValueError('Not an IP address')
-    factor = 65536
-    bits = 128
-  else:
+      if len(values) != 8 or not all(0 <= i <= 65535 for i in values):
+        values = None
+      factor = 65536
+      bits = 128
+  except ValueError:
+    values = None
+  if not values:
     raise ValueError('%r is not an IP address' % ipstr)
   value = 0L
   for i in values:

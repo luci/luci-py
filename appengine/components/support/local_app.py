@@ -249,8 +249,11 @@ class HttpClient(object):
       headers = (headers or {}).copy()
       headers['Content-Type'] = 'application/json; charset=UTF-8'
     resp = self.request(resource, body, headers=headers, method=method)
-    return self.HttpResponse(
-        resp.http_code, json.loads(resp.body), resp.headers)
+    try:
+      value = json.loads(resp.body)
+    except ValueError:
+      raise ValueError('Invalid JSON: %r' % resp.body)
+    return self.HttpResponse(resp.http_code, value, resp.headers)
 
   @property
   def url_opener(self):
