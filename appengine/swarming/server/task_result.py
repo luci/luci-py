@@ -1012,8 +1012,6 @@ def get_result_summary_query(sort, state):
   if state == 'expired':
     return None, query.filter(TaskResultSummary.state == State.EXPIRED)
 
-  # TODO(maruel): This is never set until the new bot API is writen.
-  # https://code.google.com/p/swarming/issues/detail?id=117
   if state == 'timed_out':
     return None, query.filter(TaskResultSummary.state == State.TIMED_OUT)
 

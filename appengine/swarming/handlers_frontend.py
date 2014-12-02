@@ -388,9 +388,8 @@ class TasksHandler(auth.AuthenticatingHandler):
       ('completed_failure', 'Failures',
         'Tasks that were executed successfully but failed, e.g. exit code is '
         'non-zero. Using this order resets order to \'Created\'.'),
-      # TODO(maruel): This is never set until the new bot API is writen.
-      # https://code.google.com/p/swarming/issues/detail?id=117
-      #('timed_out', 'Execution timed out'),
+      ('timed_out', 'Timed out',
+        'The execution timed out, so it was forcibly killed.'),
     ],
     [
       ('bot_died', 'Bot died',
