@@ -45,6 +45,7 @@ class IpAddrTest(test_case.TestCase):
     self.assertEqual(
         ipaddr.IP(128, 0xffff0000000000000000000000000000L),
         ipaddr.ip_from_string('ffff:0:0:0:0:0:0:0'))
+    self.assertEqual(ipaddr.IP(128, 1), ipaddr.ip_from_string('::1'))
 
   def test_ip_from_string_v6_bad(self):
     # '::' syntax is not supported.

@@ -48,7 +48,9 @@ def ip_from_string(ipstr):
       bits = 32
     elif ':' in ipstr:
       # IPv6. The code currently doesn't support '::' syntax for groups of
-      # zeros.
+      # zeros except for loopback '::1', since it shows up in local smoke tests.
+      if ipstr == '::1':
+        return IP(128, 1)
       values = [int(i, 16) for i in ipstr.split(':')]
       if len(values) != 8 or not all(0 <= i <= 65535 for i in values):
         values = None
