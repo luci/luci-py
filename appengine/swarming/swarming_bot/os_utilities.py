@@ -631,6 +631,9 @@ def get_integrity_level_win():
   """
   if sys.platform != 'win32':
     return None
+  if get_os_version_number() == '5.1':
+    # Integrity level is Vista+.
+    return None
 
   mapping = {
     0x0000: 'untrusted',
