@@ -401,9 +401,9 @@ class FrontendAdminTest(AppTestBase):
         [t.to_dict() for t in user_manager.MachineWhitelist.query().fetch()])
     self.app.post(
         '/restricted/whitelist_ip', {'a': 'True', 'xsrf_token': xsrf_token},
-        extra_environ={'REMOTE_ADDR': 'foo'}, status=200)
+        extra_environ={'REMOTE_ADDR': '192.168.2.0'}, status=200)
     self.assertEqual(
-        [{'ip': u'foo'}],
+        [{'ip': u'192.168.2.0'}],
         [t.to_dict() for t in user_manager.MachineWhitelist.query().fetch()])
 
     # All of these requests are invalid so none of them modify entites.
@@ -418,7 +418,7 @@ class FrontendAdminTest(AppTestBase):
         {'i': '123', 'a': 'true', 'xsrf_token': xsrf_token},
         expect_errors=True)
     self.assertEqual(
-        [{'ip': u'foo'}],
+        [{'ip': u'192.168.2.0'}],
         [t.to_dict() for t in user_manager.MachineWhitelist.query().fetch()])
 
   def testWhitelistIPHandler(self):

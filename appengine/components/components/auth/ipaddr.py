@@ -58,7 +58,7 @@ def ip_from_string(ipstr):
     factor = 65536
     bits = 128
   else:
-    raise ValueError('Not an IP address')
+    raise ValueError('%r is not an IP address' % ipstr)
   value = 0L
   for i in values:
     value = value * factor + i
