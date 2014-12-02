@@ -59,6 +59,7 @@ __all__ = [
   'Anonymous',
   'bootstrap_group',
   'bootstrap_ip_whitelist',
+  'BOTS_IP_WHITELIST',
   'configure_as_primary',
   'find_group_dependency_cycle',
   'find_referencing_groups',
@@ -85,6 +86,8 @@ __all__ = [
 # only group needed to bootstrap everything else.
 ADMIN_GROUP = 'administrators'
 
+# Name of AuthIPWhitelist with bots IP ranges. See AuthIPWhitelist.
+BOTS_IP_WHITELIST = 'bots'
 
 # No identity information is provided. Identity name is always 'anonymous'.
 IDENTITY_ANONYMOUS = 'anonymous'
@@ -732,11 +735,10 @@ class AuthIPWhitelist(ndb.Model, datastore_utils.SerializableModelMixin):
 
   Entity id is a name of the whitelist. Parent entity is ROOT_KEY.
 
-  There's a special "bots" IP whitelist that can be used to list IP addresses
-  of machines the service trusts unconditionally. Requests from such machines
-  doesn't have to have any additional credentials attached.
-
-  TODO(vadimsh): Make bots use service accounts and remove "bots" whitelist.
+  There's a special IP whitelist named 'bots' that can be used to list
+  IP addresses of machines the service trusts unconditionally. Requests from
+  such machines doesn't have to have any additional credentials attached.
+  Requests will be authenticated as coming from identity 'bot:<IP address>'.
   """
   # How to convert this entity to or from serializable dict.
   serializable_properties = {
@@ -868,9 +870,8 @@ def fetch_ip_whitelists():
       IP_WHITELIST_ASSIGNMENTS_KEY.get() or
       AuthIPWhitelistAssignments(key=IP_WHITELIST_ASSIGNMENTS_KEY))
 
-  # TODO(vadimsh): Remove 'bots' once bots use service accounts.
   names = set(a.ip_whitelist for a in assignments.assignments)
-  names.add('bots')
+  names.add(BOTS_IP_WHITELIST)
 
   whitelists = ndb.get_multi(ip_whitelist_key(n) for n in names)
   whitelists = sorted(filter(None, whitelists), key=lambda x: x.key.id())

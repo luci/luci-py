@@ -36,7 +36,6 @@ __all__ = [
   'disable_process_cache',
   'Error',
   'get_current_identity',
-  'get_ip_whitelist',
   'get_process_cache_expiration_sec',
   'get_secret',
   'is_admin',
@@ -241,18 +240,23 @@ class AuthDB(object):
     entity = self.secrets[secret_key.scope][secret_key.name]
     return list(entity.values)
 
-  # TODO(vadimsh): Remove this method once bots switch to service accounts.
-  def get_ip_whitelist(self, name):
-    """Returns AuthIPWhitelist given its name (or None)."""
-    return self.ip_whitelists.get(name)
-
   def verify_ip_whitelisted(self, identity, ip):
-    """Verifies IP is in a whitelist assigned to Identity (if any).
+    """Verifies IP is in a whitelist assigned to Identity or in bots whitelist.
+
+    Returns new bot Identity if request was authenticated as coming from
+    IP whitelisted bot, or |identity| otherwise.
 
     Raises AuthorizationError if identity has an IP whitelist assigned and given
     IP address doesn't belong to it.
     """
     assert isinstance(identity, model.Identity), identity
+
+    # Check bots whitelist to authenticate anonymous request as coming from bot.
+    if identity.is_anonymous:
+      whitelist = self.ip_whitelists.get(model.BOTS_IP_WHITELIST)
+      if whitelist and whitelist.is_ip_whitelisted(ip):
+        addr_str = ipaddr.ip_to_string(ip)
+        return model.Identity(model.IDENTITY_BOT, addr_str.replace(':', '-'))
 
     # Find IP whitelist name in the assignment entity (if any).
     for assignment in self.ip_whitelist_assignments.assignments:
@@ -260,7 +264,7 @@ class AuthDB(object):
         whitelist_id = assignment.ip_whitelist
         break
     else:
-      return
+      return identity
 
     # IP whitelist MUST be there. But if it's missing, choose a safer
     # alternative: reject the request.
@@ -274,6 +278,8 @@ class AuthDB(object):
           'IP is not whitelisted.\nIdentity: %s\nIP: %s\nWhitelist: %s',
           identity.to_bytes(), ipaddr.ip_to_string(ip), whitelist_id)
       raise AuthorizationError('IP is not whitelisted')
+
+    return identity
 
   def is_allowed_oauth_client_id(self, client_id):
     """True if given OAuth2 client_id can be used to authenticate the user."""
@@ -661,19 +667,16 @@ def get_secret(secret_key):
   return get_request_auth_db().get_secret(secret_key)
 
 
-# TODO(vadimsh): Remove this function once bots switch to service accounts.
-def get_ip_whitelist(name):
-  """Returns AuthIPWhitelist given its name (or None)."""
-  return get_request_auth_db().get_ip_whitelist(name)
-
-
 def verify_ip_whitelisted(identity, ip):
-  """Verifies IP is in a whitelist assigned to Identity (if any).
+  """Verifies IP is in a whitelist assigned to Identity or in bots whitelist.
+
+  Returns new bot Identity if request was authenticated as coming from
+  IP whitelisted bot, or |identity| otherwise.
 
   Raises AuthorizationError if identity has an IP whitelist assigned and given
   IP address doesn't belong to it.
   """
-  get_request_auth_db().verify_ip_whitelisted(identity, ip)
+  return get_request_auth_db().verify_ip_whitelisted(identity, ip)
 
 
 def public(func):

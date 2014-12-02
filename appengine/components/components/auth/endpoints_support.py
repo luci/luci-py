@@ -157,20 +157,11 @@ def initialize_request_auth(remote_address):
         raise api.AuthenticationError('Unsupported authentication method')
       identity = model.Anonymous
 
-  # Verify IP is whitelisted. Do it for anonymous identities too. Anonymous
-  # access can be allowed only from specific set of IPs. verify_ip_whitelisted
-  # raises AuthorizationError if IP is not allowed.
+  # Verify IP is whitelisted and authenticate requests from bots. It raises
+  # AuthorizationError if IP is not allowed.
   assert identity is not None
   assert remote_address
   ip = ipaddr.ip_from_string(remote_address)
-  api.verify_ip_whitelisted(identity, ip)
-
-  # TODO(vadimsh): Remove this branch once bots use service accounts. For now
-  # any anonymous request coming from IP whitelist named "bots" is assumed
-  # to be a request from a bot.
-  if identity.is_anonymous:
-    whitelist = api.get_ip_whitelist('bots')
-    if whitelist and whitelist.is_ip_whitelisted(ip):
-      identity = model.Identity(model.IDENTITY_BOT, ipaddr.ip_to_string(ip))
+  identity = api.verify_ip_whitelisted(identity, ip)
 
   api.get_request_cache().set_current_identity(identity)

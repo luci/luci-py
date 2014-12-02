@@ -114,23 +114,14 @@ class AuthenticatingHandler(webapp2.RequestHandler):
     # If no authentication method is applicable, default to anonymous identity.
     identity = identity or model.Anonymous
 
-    # Verify IP is whitelisted. Do it for anonymous identities too. Anonymous
-    # access can be allowed only from specific set of IPs.
+    # Verify IP is whitelisted and authenticate requests from bots.
     assert self.request.remote_addr
     ip = ipaddr.ip_from_string(self.request.remote_addr)
     try:
-      api.verify_ip_whitelisted(identity, ip)
+      identity = api.verify_ip_whitelisted(identity, ip)
     except api.AuthorizationError as err:
       self.authorization_error(err)
       return
-
-    # TODO(vadimsh): Remove this branch once bots use service accounts. For now
-    # any anonymous request coming from IP whitelist named "bots" is assumed
-    # to be a request from a bot.
-    if identity.is_anonymous:
-      whitelist = api.get_ip_whitelist('bots')
-      if whitelist and whitelist.is_ip_whitelisted(ip):
-        identity = model.Identity(model.IDENTITY_BOT, ipaddr.ip_to_string(ip))
 
     # Successfully extracted and validated an identity. Put it into request
     # cache. It's later used by 'get_current_identity()' and other calls.
