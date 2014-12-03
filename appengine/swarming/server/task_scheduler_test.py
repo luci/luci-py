@@ -905,15 +905,18 @@ class TaskSchedulerApiTest(test_case.TestCase):
         raise RandomFailure()
       return old_put_multi(*args, **kwargs)
 
-    def put(*args, **kwargs):
+    def put_async(*args, **kwargs):
       callers = [i[3] for i in inspect.stack()]
       self.assertIn('make_request', callers)
+      out = ndb.Future()
       if (index[0] % SKIP) == 2:
-        raise RandomFailure()
-      return old_put(*args, **kwargs)
+        out.set_exception(search.Error())
+      else:
+        out.set_result(old_put_async(*args, **kwargs).get_result())
+      return out
 
     old_put_multi = self.mock(ndb, 'put_multi', put_multi)
-    old_put = self.mock(search.Index, 'put', put)
+    old_put_async = self.mock(search.Index, 'put_async', put_async)
 
     saved = []
 
@@ -928,9 +931,9 @@ class TaskSchedulerApiTest(test_case.TestCase):
       except RandomFailure:
         pass
 
-    self.assertEqual(34, len(saved))
+    self.assertEqual(67, len(saved))
     self.assertEqual(67, task_request.TaskRequest.query().count())
-    self.assertEqual(34, task_result.TaskResultSummary.query().count())
+    self.assertEqual(67, task_result.TaskResultSummary.query().count())
 
     # Now the DB is full of half-corrupted entities.
     cursor = None
@@ -946,5 +949,5 @@ if __name__ == '__main__':
   if '-v' in sys.argv:
     unittest.TestCase.maxDiff = None
   logging.basicConfig(
-      level=logging.DEBUG if '-v' in sys.argv else logging.ERROR)
+      level=logging.DEBUG if '-v' in sys.argv else logging.CRITICAL)
   unittest.main()

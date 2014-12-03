@@ -306,7 +306,7 @@ def make_request(data):
         search.AtomField(name='id', value=packed),
       ])
   # Even if it fails here, we're still fine, as the task is not "alive" yet.
-  index.put([doc])
+  search_future = index.put_async([doc])
 
   if dupe_future:
     # Reuse the results!
@@ -324,7 +324,18 @@ def make_request(data):
   # Storing these entities makes this task live. It is important at this point
   # that the HTTP handler returns as fast as possible, otherwise the task will
   # be run but the client will not know about it.
-  ndb.put_multi([result_summary, task])
+  def run():
+    ndb.put_multi([result_summary, task])
+
+  # Raising will abort to the caller.
+  datastore_utils.transaction(run)
+
+  try:
+    search_future.get_result()
+  except search.Error:
+    # Do not abort the task, for now search is best effort.
+    logging.exception('Put failed')
+
   stats.add_task_entry(
       'task_enqueued', result_summary.key,
       dimensions=request.properties.dimensions,
