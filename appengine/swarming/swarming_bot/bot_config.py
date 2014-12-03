@@ -29,6 +29,8 @@ def get_dimensions():
   The bot id will be automatically selected based on the hostname with
   os_utilities.get_dimensions(). If you want something more special, specify it
   in your bot_config.py and override the item 'id'.
+
+  See https://code.google.com/p/swarming/wiki/SwarmingMagicValues.
   """
   return os_utilities.get_dimensions()
 
@@ -42,6 +44,8 @@ def get_state():
   The server can not use this state for immediate scheduling purposes (use
   'dimensions' for that), but it can use it for maintenance and bookkeeping
   tasks.
+
+  See https://code.google.com/p/swarming/wiki/SwarmingMagicValues.
   """
   return os_utilities.get_state()
 

@@ -92,8 +92,26 @@ class BotManagementTest(test_case.TestCase):
     # No BotEvent is registered for 'poll'.
     self.assertEqual([], bot_management.get_events_query('id1').fetch())
 
+  def test_should_restart_bot_not_set(self):
+    state = {
+      'running_time': 0,
+      'started_ts': 1410989556.174,
+    }
+    self.assertEqual(
+        (False, ''), bot_management.should_restart_bot('id', state))
+
+  def test_should_restart_bot_bad_type(self):
+    state = {
+      'periodic_reboot_secs': '100',
+      'running_time': 105,
+      'started_ts': 1410989556.174,
+    }
+    self.assertEqual(
+        (False, ''), bot_management.should_restart_bot('id', state))
+
   def test_should_restart_bot_no(self):
     state = {
+      'periodic_reboot_secs': 100,
       'running_time': 0,
       'started_ts': 1410989556.174,
     }
@@ -102,7 +120,8 @@ class BotManagementTest(test_case.TestCase):
 
   def test_should_restart_bot_yes(self):
     state = {
-      'running_time': bot_management.BOT_REBOOT_PERIOD_SECS * 5,
+      'periodic_reboot_secs': 100,
+      'running_time': 105,
       'started_ts': 1410989556.174,
     }
     needs_reboot, message = bot_management.should_restart_bot('id', state)
@@ -111,15 +130,14 @@ class BotManagementTest(test_case.TestCase):
 
   def test_get_bot_reboot_period(self):
     # Mostly for code coverage.
-    self.mock(bot_management, 'BOT_REBOOT_PERIOD_SECS', 1000)
     self.mock(bot_management, 'BOT_REBOOT_PERIOD_RANDOMIZATION_MARGIN', 0.1)
-    self.assertEqual(
-        935,
-        bot_management.get_bot_reboot_period('bot', {'started_ts': 1234}))
+    state = {'periodic_reboot_secs': 1000, 'started_ts': 1234}
+    self.assertEqual(935, bot_management.get_bot_reboot_period('bot', state))
     # Make sure the margin is respected.
     periods = set()
     for i in xrange(0, 1350):
-      period = bot_management.get_bot_reboot_period('bot', {'started_ts': i})
+      state = {'periodic_reboot_secs': 1000, 'started_ts': i}
+      period = bot_management.get_bot_reboot_period('bot', state)
       self.assertTrue(900 <= period < 1100)
       periods.add(period)
     # Make sure it's really random and covers all expected range. (This check
