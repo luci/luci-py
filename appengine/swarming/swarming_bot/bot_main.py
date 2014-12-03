@@ -296,10 +296,8 @@ def run_manifest(botobj, manifest):
     path = os.path.join(work_dir, 'test_run.json')
     with open(path, 'wb') as f:
       f.write(json.dumps(manifest))
-    # TODO(maruel): Rename local_test_runner to task_runner or something
-    # relevant.
     command = [
-      sys.executable, THIS_FILE, 'local_test_runner',
+      sys.executable, THIS_FILE, 'task_runner',
       '-S', url,
       '-f', path,
     ]

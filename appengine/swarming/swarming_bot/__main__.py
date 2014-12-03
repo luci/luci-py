@@ -41,7 +41,7 @@ def CMDattributes(_args):
   return 0
 
 
-def CMDlocal_test_runner(args):
+def CMDtask_runner(args):
   """Internal command to run a swarming task."""
   # TODO(maruel): rename function.
   logging_utils.prepare_logging('task_runner.log')

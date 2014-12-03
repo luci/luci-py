@@ -271,7 +271,7 @@ class TestBotMain(net_utils.TestCase):
       def __init__(self2, cmd, cwd, stdout, stderr):
         self2.returncode = None
         expected = [
-          sys.executable, THIS_FILE, 'local_test_runner',
+          sys.executable, THIS_FILE, 'task_runner',
           '-S', url, '-f', os.path.join(self.root_dir, 'work', 'test_run.json'),
         ]
         self.assertEqual(expected, cmd)

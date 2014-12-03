@@ -247,6 +247,7 @@ def run_command(swarming_server, index, task_details, root_dir):
           logging.warning('Hard timeout')
           proc.kill()
 
+    logging.info('Waiting for proces exit')
     exit_code = proc.wait()
   finally:
     # Something wrong happened, try to kill the child process.
@@ -254,6 +255,7 @@ def run_command(swarming_server, index, task_details, root_dir):
       had_hard_timeout = True
       proc.kill()
       # TODO(maruel): We'd wait only for X seconds.
+      logging.info('Waiting for proces exit')
       exit_code = proc.wait()
 
     # This is the very last packet for this command.
