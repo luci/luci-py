@@ -814,17 +814,14 @@ def get_dimensions():
     ],
     'gpu': get_gpu()[0],
     'id': [get_hostname_short()],
-    'os': [
-      os_name,
-      os_name + '-' + get_os_version_number(),
-    ],
+    'os': [os_name],
   }
   os_version_name = get_os_version_name()
   if os_version_name:
-    # Windows-XP, Windows-7, Windows-2008ServerR2-SP1, etc.
-    # TODO(maruel): Use get_os_version_name() when available, fallback to
-    # get_os_version_number() otherwise.
+    # This only happens on Windows.
     dimensions['os'].append('%s-%s' % (os_name, os_version_name))
+  else:
+    dimensions['os'].append('%s-%s' % (os_name, get_os_version_number()))
   if 'none' not in dimensions['gpu']:
     hidpi = get_monitor_hidpi()
     if hidpi:
