@@ -114,10 +114,12 @@ class TestOsUtilities(auto_stub.TestCase):
       self.assertIs(os_utilities.get_integrity_level_win(), None)
 
   def test_get_dimensions(self):
-    actual = os_utilities.get_dimensions()
-
+    actual = set(os_utilities.get_dimensions())
+    # Only set on GCE.
+    actual.discard('machine_type')
+    actual.discard('zone')
     expected = set(['cores', 'cpu', 'gpu', 'id', 'os'])
-    self.assertEqual(expected, set(actual))
+    self.assertEqual(expected, actual)
 
   def test_get_state(self):
     actual = os_utilities.get_state()

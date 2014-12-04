@@ -28,6 +28,7 @@ import string
 import subprocess
 import sys
 import time
+import urllib2
 
 try:
   # The reason for this try/except is so someone can copy this single file on a
@@ -352,6 +353,25 @@ def _get_disks_info_posix():
       ) for items in _run_df())
 
 
+@cached
+def _get_metadata_gce():
+  """Returns the GCE metadata as a dict.
+
+  Refs:
+    https://cloud.google.com/compute/docs/metadata
+    https://cloud.google.com/compute/docs/machine-types
+  """
+  url = (
+    'http://metadata.google.internal/computeMetadata/v1/instance/'
+    '?recursive=true')
+  headers = {'Metadata-Flavor': 'Google'}
+  try:
+    resp = urllib2.urlopen(urllib2.Request(url, headers=headers), timeout=5)
+  except urllib2.URLError:
+    return None
+  return json.load(resp)
+
+
 def _safe_read(filepath):
   """Returns the content of the file if possible, None otherwise."""
   try:
@@ -506,6 +526,7 @@ def get_hostname_short():
   return get_hostname().split('.', 1)[0]
 
 
+@cached
 def get_num_processors():
   """Returns the number of processors.
 
@@ -616,6 +637,29 @@ def get_monitor_hidpi():
   if sys.platform == 'darwin':
     return [_get_monitor_hidpi_osx()]
   return None
+
+
+### Google Cloud Compute Engine.
+
+
+@cached
+def get_zone_gce():
+  """Returns the zone containing the GCE VM."""
+  metadata = _get_metadata_gce()
+  if not metadata:
+    return None
+  # Format is projects/<id>/zones/<zone>
+  return metadata['zone'].rsplit('/', 1)[-1]
+
+
+@cached
+def get_machine_type_gce():
+  """Returns the GCE machine type."""
+  metadata = _get_metadata_gce()
+  if not metadata:
+    return None
+  # Format is projects/<id>/machineTypes/<machine_type>
+  return metadata['machineType'].rsplit('/', 1)[-1]
 
 
 ### Windows.
@@ -826,6 +870,13 @@ def get_dimensions():
     hidpi = get_monitor_hidpi()
     if hidpi:
       dimensions['hidpi'] = hidpi
+
+  machine_type = get_machine_type_gce()
+  if machine_type:
+    dimensions['machine_type'] = [machine_type]
+  zone = get_zone_gce()
+  if zone:
+    dimensions['zone'] = [zone]
 
   if cpu_type.startswith('arm') and cpu_type != 'arm':
     dimensions['cpu'].append('arm')
