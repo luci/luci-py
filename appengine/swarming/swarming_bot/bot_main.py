@@ -9,6 +9,9 @@ is always up to date and executes a child process to run tasks and upload
 results back.
 
 It manages self-update and rebooting the host in case of problems.
+
+Set the environment variable SWARMING_LOAD_TEST=1 to disable the use of
+server-provided bot_config.py. This permits safe load testing.
 """
 
 import contextlib
@@ -47,11 +50,28 @@ _ERROR_HANDLER_WAS_REGISTERED = False
 ### bot_config handler part.
 
 
+def _in_load_test_mode():
+  """Returns True if the default values should be used instead of the server
+  provided bot_config.py.
+
+  This also disables server telling the bot to restart.
+  """
+  return os.environ.get('SWARMING_LOAD_TEST') == '1'
+
+
 def get_dimensions():
   """Returns bot_config.py's get_attributes() dict."""
   # Importing this administrator provided script could have side-effects on
   # startup. That is why it is imported late.
   try:
+    if _in_load_test_mode():
+      # Returns a minimal set of dimensions so it doesn't run tasks by error.
+      dimensions = os_utilities.get_dimensions()
+      return {
+        'id': dimensions['id'],
+        'load_test': ['1'],
+      }
+
     import bot_config
     out = bot_config.get_dimensions()
     if not isinstance(out, dict):
@@ -79,23 +99,30 @@ def get_state(sleep_streak):
   """Returns dict with a state of the bot reported to the server with each poll.
   """
   try:
-    import bot_config
-    out = bot_config.get_state()
-    if not isinstance(out, dict):
-      out = {'error': out}
+    if _in_load_test_mode():
+      state = os_utilities.get_state()
+      state['dimensions'] = os_utilities.get_dimensions()
+    else:
+      import bot_config
+      state = bot_config.get_state()
+      if not isinstance(state, dict):
+        state = {'error': state}
   except Exception as e:
-    out = {
+    state = {
       'error': str(e),
       'quarantined': True,
     }
 
-  out['sleep_streak'] = sleep_streak
-  return out
+  state['sleep_streak'] = sleep_streak
+  return state
 
 
 def on_after_task(botobj, failure, internal_failure):
   """Hook function called after a task."""
   try:
+    if _in_load_test_mode():
+      return
+
     import bot_config
     return bot_config.on_after_task(botobj, failure, internal_failure)
   except Exception as e:
@@ -107,6 +134,9 @@ def setup_bot():
 
   See bot_config.py for the return code.
   """
+  if _in_load_test_mode():
+    return True
+
   botobj = get_bot()
   try:
     import bot_config
@@ -260,7 +290,10 @@ def poll_server(botobj):
   elif cmd == 'update':
     update_bot(botobj, resp['version'])
   elif cmd == 'restart':
-    botobj.restart(resp['message'])
+    if _in_load_test_mode():
+      logging.warning('Would have restarted: %s' % resp['message'])
+    else:
+      botobj.restart(resp['message'])
   else:
     raise ValueError('Unexpected command: %s\n%s' % (cmd, resp))
 

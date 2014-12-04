@@ -14,6 +14,9 @@ There's 3 types of functions in this file:
 This file shouldn't import from other scripts in this directory except
 os_utilities which is guaranteed to be usable as an API. It's fine to import
 from stdlib.
+
+Set the environment variable SWARMING_LOAD_TEST=1 to disable the use of
+server-provided bot_config.py. This permits safe load testing.
 """
 
 import os_utilities

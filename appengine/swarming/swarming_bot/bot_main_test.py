@@ -43,6 +43,7 @@ import net_utils
 class TestBotMain(net_utils.TestCase):
   def setUp(self):
     super(TestBotMain, self).setUp()
+    os.environ.pop('SWARMING_LOAD_TEST', None)
     self.root_dir = tempfile.mkdtemp(prefix='bot_main')
     self.old_cwd = os.getcwd()
     os.chdir(self.root_dir)
@@ -67,6 +68,10 @@ class TestBotMain(net_utils.TestCase):
     self.assertEqual(
         ['cores', 'cpu', 'gpu', 'id', 'os'],
         sorted(bot_main.get_dimensions()))
+
+  def test_get_dimensions_load_test(self):
+    os.environ['SWARMING_LOAD_TEST'] = '1'
+    self.assertEqual(['id', 'load_test'], sorted(bot_main.get_dimensions()))
 
   def test_generate_version(self):
     self.assertEqual('123', bot_main.generate_version())
@@ -264,6 +269,34 @@ class TestBotMain(net_utils.TestCase):
         ])
     self.assertTrue(bot_main.poll_server(self.bot))
     self.assertEqual([('Please die now',)], restart)
+
+  def test_poll_server_restart_load_test(self):
+    os.environ['SWARMING_LOAD_TEST'] = '1'
+    self.mock(time, 'sleep', self.fail)
+    self.mock(bot_main, 'run_manifest', self.fail)
+    self.mock(bot_main, 'update_bot', self.fail)
+    self.mock(self.bot, 'restart', self.fail)
+
+    self.expected_requests(
+        [
+          (
+            'https://localhost:1/auth/api/v1/accounts/self/xsrf_token',
+            {'data': {}, 'headers': {'X-XSRF-Token-Request': '1'}},
+            {'xsrf_token': 'token'},
+          ),
+          (
+            'https://localhost:1/swarming/api/v1/bot/poll',
+            {
+              'data': self.attributes,
+              'headers': {'X-XSRF-Token': 'token'},
+            },
+            {
+              'cmd': 'restart',
+              'message': 'Please die now',
+            },
+          ),
+        ])
+    self.assertTrue(bot_main.poll_server(self.bot))
 
   def _mock_popen(self, returncode, url='https://localhost:1'):
     # Method should have "self" as first argument - pylint: disable=E0213
