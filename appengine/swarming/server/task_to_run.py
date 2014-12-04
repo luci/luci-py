@@ -110,9 +110,9 @@ def _gen_queue_number(
     queue_number is a 63 bit integer with timestamp at µs resolution plus
     priority scaled with scale_factor_us as a delay factor.
   """
-  assert isinstance(timestamp, datetime.datetime)
-  assert isinstance(priority, int)
-  assert isinstance(scale_factor_us, int)
+  assert isinstance(timestamp, datetime.datetime), '%r' % timestamp
+  assert isinstance(priority, int), '%r' % priority
+  assert isinstance(scale_factor_us, (int, long)), '%r' % scale_factor_us
   task_request.validate_priority(priority)
   assert 0 <= priority <= 255, 'Just for clarity, validate_priority() checks it'
   if not 0 <= scale_factor_us <= 2**54:
