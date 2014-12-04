@@ -1,3 +1,4 @@
+# coding=utf-8
 # Copyright 2014 The Swarming Authors. All rights reserved.
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
@@ -65,8 +66,8 @@ class TaskToRun(ndb.Model):
 
   # priority and request creation timestamp are mixed together to allow queries
   # to order the results by this field to allow sorting by priority first, and
-  # then timestamp. See _gen_queue_number_key() for details. This value is only
-  # set when the task is available to run, i.e.
+  # then timestamp. See _gen_queue_number() for details. This value is only set
+  # when the task is available to run, i.e.
   # ndb.TaskResult.query(ancestor=self.key).get().state==AVAILABLE.
   # If this task it not ready to be scheduled, it must be None.
   queue_number = ndb.IntegerProperty()
@@ -87,29 +88,39 @@ class TaskToRun(ndb.Model):
     return out
 
 
-def _gen_queue_number_key(timestamp, priority):
+def _gen_queue_number(
+    timestamp, priority, scale_factor_us=365*24*60*60*1000*1000):
   """Generates a 64 bit packed value used for TaskToRun.queue_number.
 
   The lower value the higher importance.
 
   Arguments:
-  - timestamp: datetime.datetime when the TaskRequest was filed in.
-  - priority: priority of the TaskRequest.
+  - timestamp: datetime.datetime when the TaskRequest was filed in. This value
+        at 1µs is used for the FIFO ordering.
+  - priority: priority of the TaskRequest. It's a 8 bit integer. Lower is higher
+        priority.
+  - scale_factor_us: multiplicative factor of the priority versus time. Higher
+        values means that priority will become a strict stack of FIFO queues.
+        Lower values means a blend between priority and time, where lower
+        priority tasks (higher `priority` value) will slowly preempt higher
+        priority tasks (lower `priority` value) when they waited long enough.
+        Default is each priority increment is worth one year.
 
   Returns:
-    queue_number is a 64 bit integer:
-    - 1 bit highest order bit set to 0 to detect overflow.
-    - 8 bits of priority.
-    - 47 bits at 1ms resolution is 2**47 / 365 / 24 / 60 / 60 / 1000 = 4462
-      years.
-    - The last 8 bits is currently unused and set to 0.
+    queue_number is a 63 bit integer with timestamp at µs resolution plus
+    priority scaled with scale_factor_us as a delay factor.
   """
   assert isinstance(timestamp, datetime.datetime)
+  assert isinstance(priority, int)
+  assert isinstance(scale_factor_us, int)
   task_request.validate_priority(priority)
-  now = utils.milliseconds_since_epoch(timestamp)
-  assert 0 <= now < 2**47, hex(now)
-  # Assumes the system runs a 64 bits version of python.
-  return priority << 55 | now << 8
+  assert 0 <= priority <= 255, 'Just for clarity, validate_priority() checks it'
+  if not 0 <= scale_factor_us <= 2**54:
+    raise ValueError('Invalid scale_factor_us (%s)' % scale_factor_us)
+
+  value = int(round((timestamp - utils.EPOCH).total_seconds() * 1000. * 1000.))
+  assert 0 <= value < 2**58, hex(value)
+  return value + priority * scale_factor_us
 
 
 def _explode_list(values):
@@ -194,9 +205,9 @@ def task_to_run_key_to_request_key(task_key):
   return task_key.parent()
 
 
-def gen_queue_number_key(request):
+def gen_queue_number(request):
   """Returns the value to use for TaskToRun.queue_number based on request."""
-  return _gen_queue_number_key(request.created_ts, request.priority)
+  return _gen_queue_number(request.created_ts, request.priority)
 
 
 def new_task_to_run(request):
@@ -207,7 +218,7 @@ def new_task_to_run(request):
   """
   return TaskToRun(
       key=request_to_task_to_run_key(request),
-      queue_number=gen_queue_number_key(request),
+      queue_number=gen_queue_number(request),
       expiration_ts=request.expiration_ts)
 
 

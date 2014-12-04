@@ -277,30 +277,30 @@ class TaskToRunApiTest(test_case.TestCase):
     with self.assertRaises(ValueError):
       task_to_run.validate_to_run_key(ndb.Key('TaskRequest', 1, 'TaskToRun', 1))
 
-  def test_gen_queue_number_key(self):
+  def test_gen_queue_number(self):
     # tuples of (input, expected).
     # 2**47 / 365 / 24 / 60 / 60 / 1000. = 4462.756
     data = [
       (('1970-01-01 00:00:00.000',   0), '0x0000000000000000'),
-      (('1970-01-01 00:00:00.000', 255), '0x7f80000000000000'),
-      (('1970-01-01 00:00:00.040',   0), '0x0000000000002800'),
-      (('1970-01-01 00:00:00.050',   0), '0x0000000000003200'),
-      (('1970-01-01 00:00:00.100',   0), '0x0000000000006400'),
-      (('1970-01-01 00:00:00.900',   0), '0x0000000000038400'),
-      (('1970-01-01 00:00:01.000',   0), '0x000000000003e800'),
-      (('1970-01-01 00:00:00.000',   1), '0x0080000000000000'),
-      (('1970-01-01 00:00:00.000',   2), '0x0100000000000000'),
-      (('2010-01-02 03:04:05.060',   0), '0x000125ecfd5cc400'),
-      (('2010-01-02 03:04:05.060',   1), '0x008125ecfd5cc400'),
+      (('1970-01-01 00:00:00.000', 255), '0x001c91dd87cc2000'),
+      (('1970-01-01 00:00:00.040',   0), '0x0000000000009c40'),
+      (('1970-01-01 00:00:00.050',   0), '0x000000000000c350'),
+      (('1970-01-01 00:00:00.100',   0), '0x00000000000186a0'),
+      (('1970-01-01 00:00:00.900',   0), '0x00000000000dbba0'),
+      (('1970-01-01 00:00:01.000',   0), '0x00000000000f4240'),
+      (('1970-01-01 00:00:00.000',   1), '0x00001cae8c13e000'),
+      (('1970-01-01 00:00:00.000',   2), '0x0000395d1827c000'),
+      (('2010-01-02 03:04:05.060',   0), '0x00047c25bdb25da0'),
+      (('2010-01-02 03:04:05.060',   1), '0x000498d449c63da0'),
       # It's the end of the world as we know it...
-      (('6429-10-17 02:45:55.327',   0), '0x007fffffffffff00'),
-      (('6429-10-17 02:45:55.327', 255), '0x7fffffffffffff00'),
-      (('6429-10-17 02:45:55.327', 255), '0x7fffffffffffff00'),
+      (('9999-12-31 23:59:59.999',   0), '0x0384440ccc735c20'),
+      (('9999-12-31 23:59:59.999', 255), '0x03a0d5ea543f7c20'),
+      (('9999-12-31 23:59:59.999', 255), '0x03a0d5ea543f7c20'),
     ]
-    for (timestamp, priority), expected in data:
+    for i, ((timestamp, priority), expected) in enumerate(data):
       d = datetime.datetime.strptime(timestamp, '%Y-%m-%d %H:%M:%S.%f')
-      actual = '0x%016x' % task_to_run._gen_queue_number_key(d, priority)
-      self.assertEquals(expected, actual)
+      actual = '0x%016x' % task_to_run._gen_queue_number(d, priority)
+      self.assertEquals((i, expected), (i, actual))
 
   def test_new_task_to_run(self):
     self.mock(random, 'getrandbits', lambda _: 0x12)
@@ -337,13 +337,13 @@ class TaskToRunApiTest(test_case.TestCase):
         'expiration_ts': self.now + datetime.timedelta(seconds=31),
         'request_key': '0x7e296460f77ffdce',
         # Lower priority value means higher priority.
-        'queue_number': '0x05014350e8688800',
+        'queue_number': '0x00060dc5849f1346',
       },
       {
         'dimensions_hash': _hash_dimensions(request_dimensions),
         'expiration_ts': self.now + datetime.timedelta(seconds=31),
         'request_key': '0x7e296460f77ffede',
-        'queue_number': '0x0a014350e8688800',
+        'queue_number': '0x00072c96fd65d346',
       },
     ]
 
@@ -420,7 +420,7 @@ class TaskToRunApiTest(test_case.TestCase):
       {
         'dimensions_hash': _hash_dimensions(request_dimensions),
         'expiration_ts': self.expiration_ts,
-        'queue_number': '0x19014350e8688800',
+        'queue_number': '0x000a890b67ba1346',
       },
     ]
     self.assertEqual(expected, actual)
@@ -438,7 +438,7 @@ class TaskToRunApiTest(test_case.TestCase):
       {
         'dimensions_hash': _hash_dimensions(request_dimensions),
         'expiration_ts': self.expiration_ts,
-        'queue_number': '0x19014350e8688800',
+        'queue_number': '0x000a890b67ba1346',
       },
     ]
     self.assertEqual(expected, actual)
@@ -452,7 +452,7 @@ class TaskToRunApiTest(test_case.TestCase):
       {
         'dimensions_hash': _hash_dimensions(request_dimensions),
         'expiration_ts': self.expiration_ts,
-        'queue_number': '0x19014350e8688800',
+        'queue_number': '0x000a890b67ba1346',
       },
     ]
     self.assertEqual(expected, actual)
@@ -472,7 +472,7 @@ class TaskToRunApiTest(test_case.TestCase):
       {
         'dimensions_hash': _hash_dimensions(request_dimensions),
         'expiration_ts': self.expiration_ts,
-        'queue_number': '0x19014350e8688800',
+        'queue_number': '0x000a890b67ba1346',
       },
     ]
     self.assertEqual(expected, actual)
@@ -495,12 +495,12 @@ class TaskToRunApiTest(test_case.TestCase):
       {
         'dimensions_hash': _hash_dimensions(request_dimensions_1),
         'expiration_ts': self.expiration_ts,
-        'queue_number': '0x19014350e8688800',
+        'queue_number': '0x000a890b67ba1346',
       },
       {
         'dimensions_hash': _hash_dimensions(request_dimensions_2),
         'expiration_ts': self.expiration_ts + datetime.timedelta(seconds=1),
-        'queue_number': '0x19014350e86c7000',
+        'queue_number': '0x000a890b67c95586',
       },
     ]
     self.assertEqual(expected, actual)
@@ -528,12 +528,12 @@ class TaskToRunApiTest(test_case.TestCase):
         'dimensions_hash': _hash_dimensions(request_dimensions_2),
         # Due to time being late on the second requester frontend.
         'expiration_ts': self.expiration_ts - datetime.timedelta(seconds=1),
-        'queue_number': '0x19014350e864a000',
+        'queue_number': '0x000a890b67aad106',
       },
       {
         'dimensions_hash': _hash_dimensions(request_dimensions_1),
         'expiration_ts': self.expiration_ts,
-        'queue_number': '0x19014350e8688800',
+        'queue_number': '0x000a890b67ba1346',
       },
     ]
     self.assertEqual(expected, actual)
@@ -554,12 +554,12 @@ class TaskToRunApiTest(test_case.TestCase):
       {
         'dimensions_hash': _hash_dimensions(request_dimensions_1),
         'expiration_ts': datetime.datetime(2014, 1, 2, 3, 6, 5, 6),
-        'queue_number': '0x05014350e952e800',
+        'queue_number': '0x00060dc588329a46',
       },
       {
         'dimensions_hash': _hash_dimensions(request_dimensions_2),
         'expiration_ts': datetime.datetime(2014, 1, 2, 3, 5, 5, 6),
-        'queue_number': '0x19014350e8688800',
+        'queue_number': '0x000a890b67ba1346',
       },
     ]
     bot_dimensions = {u'OS': u'Windows-3.1.1', u'hostname': u'localhost'}

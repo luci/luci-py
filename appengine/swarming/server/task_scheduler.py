@@ -188,7 +188,7 @@ def _handle_dead_bot(run_result_key):
     elif result_summary.try_number == 1 and now < request.expiration_ts:
       # Retry it.
       to_put = (run_result, result_summary, to_run)
-      to_run.queue_number = task_to_run.gen_queue_number_key(request)
+      to_run.queue_number = task_to_run.gen_queue_number(request)
       run_result.state = task_result.State.BOT_DIED
       run_result.internal_failure = True
       run_result.abandoned_ts = now
