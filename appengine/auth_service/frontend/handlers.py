@@ -239,6 +239,7 @@ def create_application(debug=False):
         # Standard tabs provided by auth component.
         ui.GroupsHandler,
         ui.OAuthConfigHandler,
+        ui.IPWhitelistsHandler,
         # Additional tabs available only on auth service.
         ConfigHandler,
         ServicesHandler,

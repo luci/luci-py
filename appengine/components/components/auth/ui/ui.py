@@ -332,5 +332,14 @@ class OAuthConfigHandler(UINavbarTabHandler):
   template_file = 'auth/oauth_config.html'
 
 
+class IPWhitelistsHandler(UINavbarTabHandler):
+  """Page with IP whitelists configuration."""
+  navbar_tab_url = '/auth/ip_whitelists'
+  navbar_tab_id = 'ip_whitelists'
+  navbar_tab_title = 'IP Whitelists'
+  js_file_url = '/auth/static/js/ip_whitelists.js'
+  template_file = 'auth/ip_whitelists.html'
+
+
 # Register them as default tabs.
-_ui_navbar_tabs = (GroupsHandler, OAuthConfigHandler)
+_ui_navbar_tabs = (GroupsHandler, OAuthConfigHandler, IPWhitelistsHandler)

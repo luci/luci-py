@@ -120,6 +120,16 @@ var normalizeGroupObj = function(group) {
 };
 
 
+// IP whitelist object -> IP whitelist object with all necessary fields present.
+var normalizeIpWhitelistObj = function(ipWhitelist) {
+  return {
+    name: ipWhitelist.name,
+    description: ipWhitelist.description,
+    subnets: ipWhitelist.subnets || []
+  };
+};
+
+
 // Sets XSRF token.
 exports.setXSRFToken = function(token) {
   xsrf_token = token;
@@ -216,6 +226,51 @@ exports.groupUpdate = function(group, lastModified) {
       'PUT',
       '/auth/api/v1/groups/' + group.name,
       normalizeGroupObj(group),
+      headers);
+};
+
+
+// Lists all known IP whitelists.
+exports.ipWhitelists = function() {
+  return call('GET', '/auth/api/v1/ip_whitelists');
+};
+
+
+// Fetches single IP whitelist given its name.
+exports.ipWhitelistRead = function(name) {
+  return call('GET', '/auth/api/v1/ip_whitelists/' + name);
+};
+
+
+// Deletes an IP whitelist.
+exports.ipWhitelistDelete = function(name, lastModified) {
+  var headers = {};
+  if (lastModified) {
+    headers['If-Unmodified-Since'] = lastModified;
+  }
+  return call('DELETE', '/auth/api/v1/ip_whitelists/' + name, null, headers);
+};
+
+
+// Creates a new IP whitelist.
+exports.ipWhitelistCreate = function(ipWhitelist) {
+  return call(
+      'POST',
+      '/auth/api/v1/ip_whitelists/' + ipWhitelist.name,
+      normalizeIpWhitelistObj(ipWhitelist));
+};
+
+
+// Updates an existing IP whitelist.
+exports.ipWhitelistUpdate = function(ipWhitelist, lastModified) {
+  var headers = {};
+  if (lastModified) {
+    headers['If-Unmodified-Since'] = lastModified;
+  }
+  return call(
+      'PUT',
+      '/auth/api/v1/ip_whitelists/' + ipWhitelist.name,
+      normalizeIpWhitelistObj(ipWhitelist),
       headers);
 };
 
