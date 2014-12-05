@@ -17,12 +17,24 @@ import test_env
 
 test_env.setup_test_env()
 
+from google.appengine.ext import ndb
+
 from server import bot_management
 from support import test_case
 
 
 class BotManagementTest(test_case.TestCase):
-  def test_bot_event_connected(self):
+  def test_all_apis_are_tested(self):
+    actual = frozenset(i[5:] for i in dir(self) if i.startswith('test_'))
+    # Contains the list of all public APIs.
+    expected = frozenset(
+        i for i in dir(bot_management)
+        if i[0] != '_' and hasattr(getattr(bot_management, i), 'func_name'))
+    missing = expected - actual
+    self.assertFalse(missing)
+
+  def test_bot_event(self):
+    # connected.
     now = datetime.datetime(2010, 1, 2, 3, 4, 5, 6)
     self.mock_now(now)
     bot_management.bot_event(
@@ -31,7 +43,6 @@ class BotManagementTest(test_case.TestCase):
         version=hashlib.sha1().hexdigest(), quarantined=False, task_id=None,
         task_name=None)
 
-    # Assert that BotInfo was updated too.
     expected = {
       'dimensions': {u'foo': [u'bar'], u'id': [u'id1']},
       'external_ip': u'8.8.4.4',
@@ -44,9 +55,17 @@ class BotManagementTest(test_case.TestCase):
       'task_name': None,
       'version': u'da39a3ee5e6b4b0d3255bfef95601890afd80709',
     }
-    self.assertEqual(expected,
-        bot_management.get_info_key('id1').get().to_dict())
+    self.assertEqual(
+        expected, bot_management.get_info_key('id1').get().to_dict())
 
+  def test_get_events_query(self):
+    now = datetime.datetime(2010, 1, 2, 3, 4, 5, 6)
+    self.mock_now(now)
+    bot_management.bot_event(
+        event_type='bot_connected', bot_id='id1', external_ip='8.8.4.4',
+        dimensions={'id': ['id1'], 'foo': ['bar']}, state={'ram': 65},
+        version=hashlib.sha1().hexdigest(), quarantined=False, task_id=None,
+        task_name=None)
     expected = [
       {
       'dimensions': {u'foo': [u'bar'], u'id': [u'id1']},
@@ -61,10 +80,9 @@ class BotManagementTest(test_case.TestCase):
       },
     ]
     self.assertEqual(
-        expected,
-        [i.to_dict() for i in bot_management.get_events_query('id1').fetch()])
+        expected, [i.to_dict() for i in bot_management.get_events_query('id1')])
 
-  def test_bot_event_poll(self):
+  def test_bot_event_poll_sleep(self):
     now = datetime.datetime(2010, 1, 2, 3, 4, 5, 6)
     self.mock_now(now)
     bot_management.bot_event(
@@ -93,7 +111,7 @@ class BotManagementTest(test_case.TestCase):
     # No BotEvent is registered for 'poll'.
     self.assertEqual([], bot_management.get_events_query('id1').fetch())
 
-  def test_bot_busy(self):
+  def test_bot_event_busy(self):
     now = datetime.datetime(2010, 1, 2, 3, 4, 5, 6)
     self.mock_now(now)
     bot_management.bot_event(
@@ -161,7 +179,7 @@ class BotManagementTest(test_case.TestCase):
     self.assertEqual(
         (False, ''), bot_management.should_restart_bot('id', state))
 
-  def test_should_restart_bot_yes(self):
+  def test_should_restart_bot(self):
     state = {
       'periodic_reboot_secs': 100,
       'running_time': 105,
@@ -187,6 +205,20 @@ class BotManagementTest(test_case.TestCase):
     # relies on number of iterations above to be high enough).
     self.assertEqual(200, len(periods))
 
+  def test_get_info_key(self):
+    self.assertEqual(
+        ndb.Key(bot_management.BotRoot, 'foo', bot_management.BotInfo, 'info'),
+        bot_management.get_info_key('foo'))
+
+  def test_get_root_key(self):
+    self.assertEqual(
+        ndb.Key(bot_management.BotRoot, 'foo'),
+        bot_management.get_root_key('foo'))
+
+  def test_get_settings_key(self):
+    expected = ndb.Key(
+        bot_management.BotRoot, 'foo', bot_management.BotSettings, 'settings')
+    self.assertEqual(expected, bot_management.get_settings_key('foo'))
 
 if __name__ == '__main__':
   logging.basicConfig(
