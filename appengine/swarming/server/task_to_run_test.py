@@ -20,6 +20,7 @@ test_env.setup_test_env()
 
 from google.appengine.ext import ndb
 
+from components import auth_testing
 from components import utils
 from server import task_request
 from server import task_to_run
@@ -78,7 +79,13 @@ def _hash_dimensions(dimensions):
   return task_to_run._hash_dimensions(utils.encode_to_json(dimensions))
 
 
-class TaskToRunPrivateTest(test_case.TestCase):
+class TestCase(test_case.TestCase):
+  def setUp(self):
+    super(TestCase, self).setUp()
+    auth_testing.mock_get_current_identity(self)
+
+
+class TaskToRunPrivateTest(TestCase):
   def test_powerset(self):
     # tuples of (input, expected).
     # TODO(maruel): We'd want the code to deterministically try 'Windows-6.1'
@@ -240,7 +247,7 @@ class TaskToRunPrivateTest(test_case.TestCase):
     self.assertEqual(16384, len(items))
 
 
-class TaskToRunApiTest(test_case.TestCase):
+class TaskToRunApiTest(TestCase):
   def setUp(self):
     super(TaskToRunApiTest, self).setUp()
     self.now = datetime.datetime(2014, 01, 02, 03, 04, 05, 06)

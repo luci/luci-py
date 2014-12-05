@@ -20,6 +20,7 @@ test_env.setup_test_env()
 from google.appengine.api import datastore_errors
 from google.appengine.ext import ndb
 
+from components import auth_testing
 from components import utils
 from server import task_request
 from support import test_case
@@ -55,7 +56,13 @@ def _gen_request_data(properties=None, **kwargs):
   return base_data
 
 
-class TaskRequestPrivateTest(test_case.TestCase):
+class TestCase(test_case.TestCase):
+  def setUp(self):
+    super(TestCase, self).setUp()
+    auth_testing.mock_get_current_identity(self)
+
+
+class TaskRequestPrivateTest(TestCase):
   def test_new_request_key(self):
     for _ in xrange(3):
       delta = utils.utcnow() - task_request._BEGINING_OF_THE_WORLD
@@ -117,7 +124,7 @@ class TaskRequestPrivateTest(test_case.TestCase):
     self.assertEqual('0x7ffffffffff77661', '0x%016x' % key_id)
 
 
-class TaskRequestApiTest(test_case.TestCase):
+class TaskRequestApiTest(TestCase):
   def test_all_apis_are_tested(self):
     # Ensures there's a test for each public API.
     module = task_request
@@ -187,6 +194,7 @@ class TaskRequestApiTest(test_case.TestCase):
       'io_timeout_secs': None,
     }
     expected_request = {
+      'authenticated': auth_testing.DEFAULT_MOCKED_IDENTITY,
       'name': u'Request name',
       'priority': 50,
       'properties': expected_properties,

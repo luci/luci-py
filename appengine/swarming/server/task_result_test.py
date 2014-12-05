@@ -23,6 +23,7 @@ import webtest
 from google.appengine.ext import deferred
 from google.appengine.ext import ndb
 
+from components import auth_testing
 from components import utils
 from server import task_request
 from server import task_result
@@ -63,7 +64,13 @@ def get_entities(entity_model):
       (i.to_dict() for i in entity_model.query().fetch()), cmp=_safe_cmp)
 
 
-class TaskResultApiTest(test_case.TestCase):
+class TestCase(test_case.TestCase):
+  def setUp(self):
+    super(TestCase, self).setUp()
+    auth_testing.mock_get_current_identity(self)
+
+
+class TaskResultApiTest(TestCase):
   APP_DIR = ROOT_DIR
 
   def setUp(self):
@@ -537,7 +544,7 @@ class TaskResultApiTest(test_case.TestCase):
     pass
 
 
-class TestOutput(test_case.TestCase):
+class TestOutput(TestCase):
   APP_DIR = ROOT_DIR
 
   def setUp(self):

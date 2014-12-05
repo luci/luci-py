@@ -49,6 +49,7 @@ import random
 from google.appengine.api import datastore_errors
 from google.appengine.ext import ndb
 
+from components import auth
 from components import datastore_utils
 from components import utils
 
@@ -263,11 +264,14 @@ class TaskRequest(ndb.Model):
   # to this property.
   created_ts = ndb.DateTimeProperty(required=True)
 
-  # The name for this test request.
+  # The name for this task request. It's only for description.
   name = ndb.StringProperty(required=True)
 
-  # User who requested this task.
-  user = ndb.StringProperty(required=True)
+  # Authenticated client that triggered this task.
+  authenticated = auth.IdentityProperty()
+
+  # Which user to blame for this task.
+  user = ndb.StringProperty(default='')
 
   # The actual properties are embedded in this model.
   properties = ndb.LocalStructuredProperty(
@@ -496,8 +500,9 @@ def make_request(data):
       seconds=data['scheduling_expiration_secs'])
   request = TaskRequest(
       created_ts=now,
+      authenticated=auth.get_current_identity(),
       name=data['name'],
-      user=data['user'],
+      user=data['user'] or '',
       properties=properties,
       priority=data['priority'],
       expiration_ts=expiration_ts,

@@ -23,6 +23,7 @@ import webapp2
 import webtest
 
 import handlers_api
+from components import auth_testing
 from components import ereporter2
 from components import utils
 from server import bot_archive
@@ -728,6 +729,7 @@ class ClientApiTest(AppTestBase):
         headers=headers, params=params).json
     expected = {
       u'request': {
+        u'authenticated': [u'user', u'user@example.com'],
         u'created_ts': str_now,
         u'expiration_ts': unicode(
             (now + datetime.timedelta(seconds=30)).strftime(
@@ -997,6 +999,7 @@ class ClientApiTest(AppTestBase):
     response = self.app.get(
         '/swarming/api/v1/client/task/%s/request' % task_id).json
     expected = {
+      u'authenticated': [u'user', u'user@example.com'],
       u'created_ts': unicode(now.strftime(utils.DATETIME_FORMAT)),
       u'expiration_ts': unicode(
           (now + datetime.timedelta(days=1)).strftime(utils.DATETIME_FORMAT)),

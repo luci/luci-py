@@ -512,8 +512,8 @@ class TaskResultSummary(_TaskResultCommon):
   # They are immutable.
   # TODO(maruel): Investigate what is worth copying over.
   created_ts = ndb.DateTimeProperty(required=True)
-  name = ndb.StringProperty(required=True)
-  user = ndb.StringProperty(required=True)
+  name = ndb.StringProperty()
+  user = ndb.StringProperty()
 
   # Value of TaskRequest.properties.properties_hash only when these conditions
   # are met:

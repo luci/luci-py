@@ -70,7 +70,25 @@
       </tr>
       <tr title="Who triggered this task, as reported by the client.">
         <td>User</td>
-        <td>{{request.user}}</td>
+        <td>
+          {% if request.user %}
+            {{request.user}}
+          {% else %}
+            &#8209;&#8209;
+          {% endif %}
+        </td>
+      </tr>
+      <tr title="Authenticated credential used by the client to trigger this task.">
+        <td>Authenticated</td>
+        <td>
+          {# The only reason for this condition is to not crash on older
+          entities. #}
+          {% if request.authenticated %}
+            {{request.authenticated.to_bytes()}}
+          {% else %}
+            &#8209;&#8209;
+          {% endif %}
+        </td>
       </tr>
       <tr title="Task priority is between 1 and 255, lower value is higher priority. Higher priority requests are executed first.">
         <td>Priority</td>
