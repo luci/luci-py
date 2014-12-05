@@ -109,9 +109,6 @@ def ip_whitelist_authentication(request):
     # IP v6 addresses contain ':' that is not allowed in identity name.
     return auth.Identity(
         auth.IDENTITY_BOT, request.remote_addr.replace(':', '-'))
-  logging.warning(
-      'No authentication used and caller is not in IP whitelist, params: %s',
-      request.params.mixed())
   return None
 
 

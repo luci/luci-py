@@ -118,7 +118,6 @@ def whitelisted_ip_authentication(request):
   iptype, ipvalue = _parse_ip(request.remote_addr)
   whitelisted = WhitelistedIP.get_by_id(_ip_to_str(iptype, ipvalue))
   if not whitelisted:
-    logging.warning('Access from unknown IP: %s', request.remote_addr)
     return None
   if whitelisted.group:
     # Any member of of the group can impersonate others. This is to enable
