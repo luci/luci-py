@@ -223,11 +223,13 @@ class BotsListHandler(auth.AuthenticatingHandler):
     now = utils.utcnow()
     cutoff = now - bot_management.BOT_DEATH_TIMEOUT
 
-    num_total_bots_future = bot_management.BotInfo.query().count_async()
-    num_dead_bots_future = bot_management.BotInfo.query(
+    num_bots_busy_future = bot_management.BotInfo.query(
+        bot_management.BotInfo.is_busy == True).count_async()
+    num_bots_dead_future = bot_management.BotInfo.query(
         bot_management.BotInfo.last_seen_ts < cutoff).count_async()
-    num_quarantined_bots_future = bot_management.BotInfo.query(
+    num_bots_quarantined_future = bot_management.BotInfo.query(
         bot_management.BotInfo.quarantined == True).count_async()
+    num_bots_total_future = bot_management.BotInfo.query().count_async()
     fetch_future = bot_management.BotInfo.query().order(order).fetch_page_async(
         limit, start_cursor=cursor)
 
@@ -240,9 +242,10 @@ class BotsListHandler(auth.AuthenticatingHandler):
     # implicitly used by ndb local's cache when refetched by the html template.
     tasks = filter(None, (b.task for b in bots))
     ndb.get_multi(tasks)
-    num_total_bots = num_total_bots_future.get_result()
-    num_dead_bots = num_dead_bots_future.get_result()
-    num_quarantined_bots = num_quarantined_bots_future.get_result()
+    num_bots_busy = num_bots_busy_future.get_result()
+    num_bots_dead = num_bots_dead_future.get_result()
+    num_bots_quarantined = num_bots_quarantined_future.get_result()
+    num_bots_total = num_bots_total_future.get_result()
     params = {
       'bots': bots,
       'current_version': version,
@@ -251,9 +254,10 @@ class BotsListHandler(auth.AuthenticatingHandler):
       'is_privileged_user': acl.is_privileged_user(),
       'limit': limit,
       'now': now,
-      'num_bots_alive': num_total_bots - num_dead_bots,
-      'num_bots_dead': num_dead_bots,
-      'num_bots_quarantined': num_quarantined_bots,
+      'num_bots_alive': num_bots_total - num_bots_dead,
+      'num_bots_busy': num_bots_busy,
+      'num_bots_dead': num_bots_dead,
+      'num_bots_quarantined': num_bots_quarantined,
       'sort_by': sort_by,
       'sort_options': self.SORT_OPTIONS,
       'xsrf_token': self.generate_xsrf_token(),

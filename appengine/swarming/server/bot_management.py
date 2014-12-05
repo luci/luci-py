@@ -105,6 +105,9 @@ class BotInfo(_BotCommon):
   # Must only be set when self.task_id is set.
   task_name = ndb.StringProperty(indexed=False)
 
+  # Used to count the instantaneous number of busy bots.
+  is_busy = ndb.ComputedProperty(lambda self: bool(self.task_id))
+
   @property
   def id(self):
     return self.key.parent().string_id()
@@ -117,6 +120,7 @@ class BotInfo(_BotCommon):
     out = super(BotInfo, self).to_dict()
     # Inject the bot id, since it's the entity key.
     out['id'] = self.id
+    out.pop('is_busy')
     return out
 
   def to_dict_with_now(self, now):

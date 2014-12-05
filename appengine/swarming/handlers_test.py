@@ -47,7 +47,7 @@ class AppTestBase(test_env_handlers.AppTestBase):
 
 
 class FrontendTest(AppTestBase):
-  def testBots(self):
+  def test_bots(self):
     self.set_as_admin()
 
     # Add bots to display.

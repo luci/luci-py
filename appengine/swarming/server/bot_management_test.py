@@ -86,11 +86,54 @@ class BotManagementTest(test_case.TestCase):
       'task_name': None,
       'version': u'da39a3ee5e6b4b0d3255bfef95601890afd80709',
     }
-    self.assertEqual(expected,
-        bot_management.get_info_key('id1').get().to_dict())
+    bot_info = bot_management.get_info_key('id1').get()
+    self.assertEqual(expected, bot_info.to_dict())
+    self.assertEqual(False, bot_info.is_busy)
 
     # No BotEvent is registered for 'poll'.
     self.assertEqual([], bot_management.get_events_query('id1').fetch())
+
+  def test_bot_busy(self):
+    now = datetime.datetime(2010, 1, 2, 3, 4, 5, 6)
+    self.mock_now(now)
+    bot_management.bot_event(
+        event_type='request_task', bot_id='id1', external_ip='8.8.4.4',
+        dimensions={'id': ['id1'], 'foo': ['bar']}, state={'ram': 65},
+        version=hashlib.sha1().hexdigest(), quarantined=False, task_id='12311',
+        task_name='yo')
+
+    expected = {
+      'dimensions': {u'foo': [u'bar'], u'id': [u'id1']},
+      'external_ip': u'8.8.4.4',
+      'first_seen_ts': now,
+      'id': 'id1',
+      'last_seen_ts': now,
+      'quarantined': False,
+      'state': {u'ram': 65},
+      'task_id': u'12311',
+      'task_name': u'yo',
+      'version': u'da39a3ee5e6b4b0d3255bfef95601890afd80709',
+    }
+    bot_info = bot_management.get_info_key('id1').get()
+    self.assertEqual(expected, bot_info.to_dict())
+    self.assertEqual(True, bot_info.is_busy)
+
+    expected = [
+      {
+        'dimensions': {u'foo': [u'bar'], u'id': [u'id1']},
+       'event_type': u'request_task',
+       'external_ip': u'8.8.4.4',
+       'message': None,
+       'quarantined': False,
+       'state': {u'ram': 65},
+       'task_id': u'12311',
+       'ts': now,
+       'version': u'da39a3ee5e6b4b0d3255bfef95601890afd80709',
+      },
+    ]
+    self.assertEqual(
+        expected,
+        [e.to_dict() for e in bot_management.get_events_query('id1')])
 
   def test_should_restart_bot_not_set(self):
     state = {
