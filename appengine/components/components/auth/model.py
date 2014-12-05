@@ -78,6 +78,7 @@ __all__ = [
   'is_replica',
   'is_standalone',
   'is_valid_group_name',
+  'is_valid_ip_whitelist_name',
   'replicate_auth_db',
 ]
 
@@ -113,6 +114,8 @@ GROUP_NAME_RE = re.compile(
 # Special group name that means 'All possible users' (including anonymous!).
 GROUP_ALL = '*'
 
+# Regular expression for IP whitelist name.
+IP_WHITELIST_NAME_RE = re.compile(r'^[0-9a-zA-Z_\-\+\.\ ]{2,200}$')
 
 # Global root key of auth models entity group.
 ROOT_KEY = ndb.Key('AuthGlobalConfig', 'root')
@@ -780,6 +783,11 @@ class AuthIPWhitelist(ndb.Model, datastore_utils.SerializableModelMixin):
 def ip_whitelist_key(name):
   """Returns ndb.Key for AuthIPWhitelist entity given its name."""
   return ndb.Key(AuthIPWhitelist, name, parent=ROOT_KEY)
+
+
+def is_valid_ip_whitelist_name(name):
+  """True if string looks like a valid IP whitelist name."""
+  return bool(IP_WHITELIST_NAME_RE.match(name))
 
 
 @ndb.transactional

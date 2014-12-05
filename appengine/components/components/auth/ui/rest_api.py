@@ -26,12 +26,18 @@ def get_rest_api_routes():
   """Return a list of webapp2 routes with auth REST API handlers."""
   assert model.GROUP_NAME_RE.pattern[0] == '^'
   group_re = model.GROUP_NAME_RE.pattern[1:]
+  assert model.IP_WHITELIST_NAME_RE.pattern[0] == '^'
+  ip_whitelist_re = model.IP_WHITELIST_NAME_RE.pattern[1:]
   return [
     webapp2.Route('/auth/api/v1/accounts/self', SelfHandler),
     webapp2.Route('/auth/api/v1/accounts/self/xsrf_token', XSRFHandler),
     webapp2.Route('/auth/api/v1/groups', GroupsHandler),
-    webapp2.Route('/auth/api/v1/groups/<group:%s>' % group_re, GroupHandler),
+    webapp2.Route('/auth/api/v1/groups/<name:%s>' % group_re, GroupHandler),
     webapp2.Route('/auth/api/v1/internal/replication', ReplicationHandler),
+    webapp2.Route('/auth/api/v1/ip_whitelists', IPWhitelistsHandler),
+    webapp2.Route(
+        '/auth/api/v1/ip_whitelists/<name:%s>' % ip_whitelist_re,
+        IPWhitelistHandler),
     webapp2.Route('/auth/api/v1/server/certificates', CertificatesHandler),
     webapp2.Route('/auth/api/v1/server/oauth_config', OAuthConfigHandler),
     webapp2.Route('/auth/api/v1/server/state', ServerStateHandler),
@@ -59,6 +65,253 @@ def forbid_api_on_replica(method):
           })
     return method(self, *args, **kwargs)
   return wrapper
+
+
+class EntityOperationError(Exception):
+  """Raised by do_* methods in EntityHandlerBase to indicate a conflict."""
+  def __init__(self, message, details):
+    super(EntityOperationError, self).__init__(message)
+    self.message = message
+    self.details = details
+
+
+class EntityHandlerBase(handler.ApiHandler):
+  """Handler for creating, reading, updating and deleting an entity in AuthDB.
+
+  Implements optimistic concurrency control based on Last-Modified header.
+
+  Subclasses must override class methods (see below). Entities being manipulated
+  should implement datastore_utils.SerializableModelMixin and have following
+  properties:
+    created_by
+    created_ts
+    modified_by
+    modified_ts
+
+  GET handler is available in Standalone, Primary and Replica modes.
+
+  Everything else is available only in Standalone and Primary modes.
+  """
+
+  # Root URL of this handler, e.g. '/auth/api/v1/groups/'.
+  entity_url_prefix = None
+  # Entity class being operated on, e.g. model.AuthGroup.
+  entity_kind = None
+  # Will show up as a key in response dicts, e.g. {<name>: ...}.
+  entity_kind_name = None
+  # Will show up in error messages, e.g. 'Failed to delete <title>'.
+  entity_kind_title = None
+
+  @classmethod
+  def get_entity_key(cls, name):
+    """Returns ndb.Key corresponding to entity with given name."""
+    raise NotImplementedError()
+
+  @classmethod
+  def is_entity_writable(cls, _name):
+    """Returns True to allow POST\PUT\DELETE."""
+    return True
+
+  @classmethod
+  def do_create(cls, entity):
+    """Called in transaction to validate and put a new entity.
+
+    Raises:
+      EntityOperationError in case of a conflict.
+    """
+    raise NotImplementedError()
+
+  @classmethod
+  def do_update(cls, entity, params, modified_by):
+    """Called in transaction to update existing entity.
+
+    Raises:
+      EntityOperationError in case of a conflict.
+    """
+    raise NotImplementedError()
+
+  @classmethod
+  def do_delete(cls, entity):
+    """Called in transaction to delete existing entity.
+
+    Raises:
+      EntityOperationError in case of a conflict.
+    """
+    raise NotImplementedError()
+
+  # Actual handlers implemented in terms of do_* calls.
+
+  @api.require(api.is_admin)
+  def get(self, name):
+    """Fetches entity give its name."""
+    obj = self.get_entity_key(name).get()
+    if not obj:
+      self.abort_with_error(404, text='No such %s' % self.entity_kind_title)
+    self.send_response(
+        response={
+          self.entity_kind_name: obj.to_serializable_dict(with_id_as='name'),
+        },
+        headers={'Last-Modified': utils.datetime_to_rfc2822(obj.modified_ts)})
+
+  @forbid_api_on_replica
+  @api.require(api.is_admin)
+  def post(self, name):
+    """Creates a new entity, ensuring it's indeed new (no overwrites)."""
+    try:
+      body = self.parse_body()
+      name_in_body = body.pop('name', None)
+      if not name_in_body or name_in_body != name:
+        raise ValueError('Missing or mismatching name in request body')
+      if not self.is_entity_writable(name):
+        raise ValueError('This %s is not writable' % self.entity_kind_title)
+      entity = self.entity_kind.from_serializable_dict(
+          serializable_dict=body,
+          key=self.get_entity_key(name),
+          created_by=api.get_current_identity(),
+          modified_by=api.get_current_identity())
+    except (TypeError, ValueError) as e:
+      self.abort_with_error(400, text=str(e))
+
+    @ndb.transactional
+    def create(entity):
+      if entity.key.get():
+        return False, {
+          'http_code': 409,
+          'text': 'Such %s already exists' % self.entity_kind_title,
+        }
+      try:
+        self.do_create(entity)
+      except EntityOperationError as exc:
+        return False, {
+          'http_code': 409,
+          'text': exc.message,
+          'details': exc.details,
+        }
+      except ValueError as exc:
+        return False, {
+          'http_code': 400,
+          'text': str(exc),
+        }
+      return True, None
+
+    success, error_details = create(entity)
+    if not success:
+      self.abort_with_error(**error_details)
+    self.send_response(
+        response={'ok': True},
+        http_code=201,
+        headers={
+          'Last-Modified': utils.datetime_to_rfc2822(entity.modified_ts),
+          'Location':
+              '%s%s' % (self.entity_url_prefix, urllib.quote(entity.key.id())),
+        }
+    )
+
+  @forbid_api_on_replica
+  @api.require(api.is_admin)
+  def put(self, name):
+    """Updates an existing entity."""
+    try:
+      body = self.parse_body()
+      name_in_body = body.pop('name', None)
+      if not name_in_body or name_in_body != name:
+        raise ValueError('Missing or mismatching name in request body')
+      if not self.is_entity_writable(name):
+        raise ValueError('This %s is not writable' % self.entity_kind_title)
+      entity_params = self.entity_kind.convert_serializable_dict(body)
+    except (TypeError, ValueError) as e:
+      self.abort_with_error(400, text=str(e))
+
+    @ndb.transactional
+    def update(params, modified_by, expected_ts):
+      entity = self.get_entity_key(name).get()
+      if not entity:
+        return None, {
+          'http_code': 404,
+          'text': 'No such %s' % self.entity_kind_title,
+        }
+      if (expected_ts and
+          utils.datetime_to_rfc2822(entity.modified_ts) != expected_ts):
+        return None, {
+          'http_code': 412,
+          'text':
+              '%s was modified by someone else' %
+              self.entity_kind_title.capitalize(),
+        }
+      try:
+        self.do_update(entity, params, modified_by)
+      except EntityOperationError as exc:
+        return None, {
+          'http_code': 409,
+          'text': exc.message,
+          'details': exc.details,
+        }
+      except ValueError as exc:
+        return False, {
+          'http_code': 400,
+          'text': str(exc),
+        }
+      return entity, None
+
+    entity, error_details = update(
+        entity_params,
+        api.get_current_identity(),
+        self.request.headers.get('If-Unmodified-Since'))
+    if not entity:
+      self.abort_with_error(**error_details)
+    self.send_response(
+        response={'ok': True},
+        http_code=200,
+        headers={
+          'Last-Modified': utils.datetime_to_rfc2822(entity.modified_ts),
+        }
+    )
+
+  @forbid_api_on_replica
+  @api.require(api.is_admin)
+  def delete(self, name):
+    """Deletes an entity."""
+    if not self.is_entity_writable(name):
+      self.abort_with_error(
+          400, text='This %s is not writable' % self.entity_kind_title)
+
+    @ndb.transactional
+    def delete(expected_ts):
+      entity = self.get_entity_key(name).get()
+      if not entity:
+        if expected_ts:
+          return False, {
+            'http_code': 412,
+            'text':
+                '%s was deleted by someone else' %
+                self.entity_kind_title.capitalize(),
+          }
+        else:
+          # Unconditionally deleting it, and it's already gone -> success.
+          return True, None
+      if (expected_ts and
+          utils.datetime_to_rfc2822(entity.modified_ts) != expected_ts):
+        return False, {
+          'http_code': 412,
+          'text':
+              '%s was modified by someone else' %
+              self.entity_kind_title.capitalize(),
+        }
+      try:
+        self.do_delete(entity)
+      except EntityOperationError as exc:
+        return False, {
+          'http_code': 409,
+          'text': exc.message,
+          'details': exc.details,
+        }
+      return True, None
+
+    success, error_details = delete(
+        self.request.headers.get('If-Unmodified-Since'))
+    if not success:
+      self.abort_with_error(**error_details)
+    self.send_response({'ok': True})
 
 
 class SelfHandler(handler.ApiHandler):
@@ -107,222 +360,80 @@ class GroupsHandler(handler.ApiHandler):
     # Generally speaking, fetching a list of group members can be an expensive
     # operation, and group listing call shouldn't do it all the time. So throw
     # away all fields that enumerate group members.
-    group_list = model.AuthGroup.query(ancestor=model.ROOT_KEY).fetch()
+    group_list = model.AuthGroup.query(ancestor=model.ROOT_KEY)
     self.send_response({
       'groups': [
         g.to_serializable_dict(
             with_id_as='name',
-            exclude=('members', 'globs', 'nested'))
+            exclude=('globs', 'members', 'nested'))
         for g in sorted(group_list, key=lambda x: x.key.string_id())
       ],
     })
 
 
-class GroupHandler(handler.ApiHandler):
+class GroupHandler(EntityHandlerBase):
   """Creating, reading, updating and deleting a single group.
 
   GET is available in Standalone, Primary and Replica modes.
   Everything else is available only in Standalone and Primary modes.
   """
+  entity_url_prefix = '/auth/api/v1/groups/'
+  entity_kind = model.AuthGroup
+  entity_kind_name = 'group'
+  entity_kind_title = 'group'
 
-  @api.require(api.is_admin)
-  def get(self, group):
-    """Fetches all information about an existing group give its name."""
-    assert model.is_valid_group_name(group), group
-    obj = model.group_key(group).get()
-    if not obj:
-      self.abort_with_error(404, text='No such group')
-    self.send_response(
-        response={'group': obj.to_serializable_dict(with_id_as='name')},
-        headers={'Last-Modified': utils.datetime_to_rfc2822(obj.modified_ts)})
+  @classmethod
+  def get_entity_key(cls, name):
+    assert model.is_valid_group_name(name), name
+    return model.group_key(name)
 
-  @forbid_api_on_replica
-  @api.require(api.is_admin)
-  def put(self, group):
-    """Updates an existing group."""
-    # Deserialize and validate the body.
-    assert model.is_valid_group_name(group), group
-    try:
-      body = self.parse_body()
-      name = body.pop('name', None)
-      if not name or name != group:
-        raise ValueError('Missing or mismatching group name in request body')
-      if model.is_external_group_name(name):
-        raise ValueError('External groups are not writable')
-      group_params = model.AuthGroup.convert_serializable_dict(body)
-    except (TypeError, ValueError) as err:
-      self.abort_with_error(400, text=str(err))
+  @classmethod
+  def is_entity_writable(cls, name):
+    return not model.is_external_group_name(name)
 
-    @ndb.transactional
-    def update(params, modified_by, expected_ts):
-      # Missing?
-      entity = model.group_key(group).get()
-      if not entity:
-        return None, {'http_code': 404, 'text': 'No such group'}
+  @classmethod
+  def do_create(cls, entity):
+    missing = model.get_missing_groups(entity.nested)
+    if missing:
+      raise EntityOperationError(
+          message='Referencing a nested group that doesn\'t exist',
+          details={'missing': missing})
+    entity.put()
+    model.replicate_auth_db()
 
-      # Check the precondition if required.
-      if (expected_ts and
-          utils.datetime_to_rfc2822(entity.modified_ts) != expected_ts):
-        return None, {
-          'http_code': 412,
-          'text': 'Group was modified by someone else',
-        }
-
-      # If adding new nested groups, need to ensure they exist.
-      added_nested_groups = set(params['nested']) - set(entity.nested)
-      if added_nested_groups:
-        missing = model.get_missing_groups(added_nested_groups)
-        if missing:
-          return None, {
-            'http_code': 409,
-            'text': 'Referencing a nested group that doesn\'t exist',
-            'details': {'missing': missing},
-          }
-
-      # Update in place.
-      entity.populate(**params)
-      entity.modified_ts = utils.utcnow()
-      entity.modified_by = modified_by
-
-      # Now make sure updated group is not a part of new group dependency cycle.
-      if added_nested_groups:
-        cycle = model.find_group_dependency_cycle(entity)
-        if cycle:
-          return None, {
-            'http_code': 409,
-            'text': 'Groups can not have cyclic dependencies',
-            'details': {'cycle': cycle},
-          }
-
-      # Looks good.
-      entity.put()
-      model.replicate_auth_db()
-      return entity, None
-
-    # Run the transaction.
-    entity, error_details = update(
-        group_params,
-        api.get_current_identity(),
-        self.request.headers.get('If-Unmodified-Since'))
-    if not entity:
-      self.abort_with_error(**error_details)
-
-    self.send_response(
-        response={'ok': True},
-        http_code=200,
-        headers={
-          'Last-Modified': utils.datetime_to_rfc2822(entity.modified_ts),
-        }
-    )
-
-  @forbid_api_on_replica
-  @api.require(api.is_admin)
-  def post(self, group):
-    """Creates a new group, ensuring it's indeed new (no overwrites)."""
-    # Deserialize a body into the entity.
-    assert model.is_valid_group_name(group), group
-    try:
-      body = self.parse_body()
-      name = body.pop('name', None)
-      if not name or name != group:
-        raise ValueError('Missing or mismatching group name in request body')
-      if model.is_external_group_name(name):
-        raise ValueError('External groups are not writable')
-      entity = model.AuthGroup.from_serializable_dict(
-          serializable_dict=body,
-          key=model.group_key(group),
-          created_by=api.get_current_identity(),
-          modified_by=api.get_current_identity())
-    except (TypeError, ValueError) as err:
-      self.abort_with_error(400, text=str(err))
-
-    @ndb.transactional
-    def put_new(entity):
-      # The group should be new.
-      if entity.key.get():
-        return False, {'text': 'Such group already exists'}
-
-      # All nested groups should exist.
-      missing = model.get_missing_groups(entity.nested)
+  @classmethod
+  def do_update(cls, entity, params, modified_by):
+    # If adding new nested groups, need to ensure they exist.
+    added_nested_groups = set(params['nested']) - set(entity.nested)
+    if added_nested_groups:
+      missing = model.get_missing_groups(added_nested_groups)
       if missing:
-        return False, {
-          'text': 'Referencing a nested group that doesn\'t exist',
-          'details': {'missing': missing},
-        }
+        raise EntityOperationError(
+            message='Referencing a nested group that doesn\'t exist',
+            details={'missing': missing})
+    # Now make sure updated group is not a part of new group dependency cycle.
+    entity.populate(**params)
+    if added_nested_groups:
+      cycle = model.find_group_dependency_cycle(entity)
+      if cycle:
+        raise EntityOperationError(
+            message='Groups can not have cyclic dependencies',
+            details={'cycle': cycle})
+    # Good enough.
+    entity.modified_ts = utils.utcnow()
+    entity.modified_by = modified_by
+    entity.put()
+    model.replicate_auth_db()
 
-      # Ok, good enough.
-      entity.put()
-      model.replicate_auth_db()
-      return True, None
-
-    success, error_details = put_new(entity)
-    if not success:
-      self.abort_with_error(409, **error_details)
-
-    self.send_response(
-        response={'ok': True},
-        http_code=201,
-        headers={
-          'Last-Modified': utils.datetime_to_rfc2822(entity.modified_ts),
-          'Location': '/auth/api/v1/groups/%s' % urllib.quote(entity.key.id()),
-        }
-    )
-
-  @forbid_api_on_replica
-  @api.require(api.is_admin)
-  def delete(self, group):
-    """Deletes a group.
-
-    Respects 'If-Unmodified-Since' header. If it is set, verifies the group
-    has exact same modification timestamp as specified in the header before
-    deleting it. Returns 'HTTP Error 412: Precondition failed' otherwise.
-
-    Will also check that the group is not referenced in any ACL rules or other
-    groups (as a nested group). If it does, request returns
-    'HTTP Error 409: Conflict', providing information about what depends on
-    this group in the response body.
-    """
-    assert model.is_valid_group_name(group), group
-    if model.is_external_group_name(group):
-      self.abort_with_error(400, text='External groups are not writable')
-
-    @ndb.transactional
-    def delete(expected_ts):
-      entity = model.group_key(group).get()
-      if not entity:
-        if expected_ts:
-          # Precondition was used? Group was expected to exist.
-          return False, {
-            'http_code': 412, 'text': 'Group was deleted by someone else'}
-        else:
-          # Unconditionally deleting it, and it's already gone -> success.
-          return True, None
-
-      # Check the precondition if required.
-      if (expected_ts and
-          utils.datetime_to_rfc2822(entity.modified_ts) != expected_ts):
-        return False, {
-            'http_code': 412, 'text': 'Group was modified by someone else'}
-
-      # Check the group is not used by other groups.
-      referencing_groups = model.find_referencing_groups(group)
-      if referencing_groups:
-        return False, {
-          'http_code': 409,
-          'text': 'Group is being referenced in other groups',
-          'details': {'groups': list(referencing_groups)},
-        }
-
-      # Ok, good to delete.
-      entity.key.delete()
-      model.replicate_auth_db()
-      return True, None
-
-    success, error_details = delete(
-        self.request.headers.get('If-Unmodified-Since'))
-    if not success:
-      self.abort_with_error(**error_details)
-    self.send_response({'ok': True})
+  @classmethod
+  def do_delete(cls, entity):
+    referencing_groups = model.find_referencing_groups(entity.key.id())
+    if referencing_groups:
+      raise EntityOperationError(
+          message='Group is being referenced in other groups',
+          details={'groups': list(referencing_groups)})
+    entity.key.delete()
+    model.replicate_auth_db()
 
 
 class ReplicationHandler(handler.AuthenticatingHandler):
@@ -397,6 +508,60 @@ class ReplicationHandler(handler.AuthenticatingHandler):
     response.current_revision.modified_ts = utils.datetime_to_timestamp(
         state.modified_ts)
     self.send_response(response)
+
+
+class IPWhitelistsHandler(handler.ApiHandler):
+  """Lists all IP whitelists.
+
+  Available in Standalone, Primary and Replica modes. Replicas only have IP
+  whitelists referenced in "account -> IP whitelist" mapping.
+  """
+
+  @api.require(api.is_admin)
+  def get(self):
+    entities = model.AuthIPWhitelist.query(ancestor=model.ROOT_KEY)
+    self.send_response({
+      'ip_whitelists': [
+        e.to_serializable_dict(with_id_as='name')
+        for e in sorted(entities, key=lambda x: x.key.id())
+      ],
+    })
+
+
+class IPWhitelistHandler(EntityHandlerBase):
+  """Creating, reading, updating and deleting a single IP whitelist.
+
+  GET is available in Standalone, Primary and Replica modes.
+  Everything else is available only in Standalone and Primary modes.
+  """
+  entity_url_prefix = '/auth/api/v1/ip_whitelists/'
+  entity_kind = model.AuthIPWhitelist
+  entity_kind_name = 'ip_whitelist'
+  entity_kind_title = 'ip whitelist'
+
+  @classmethod
+  def get_entity_key(cls, name):
+    assert model.is_valid_ip_whitelist_name(name), name
+    return model.ip_whitelist_key(name)
+
+  @classmethod
+  def do_create(cls, entity):
+    entity.put()
+    model.replicate_auth_db()
+
+  @classmethod
+  def do_update(cls, entity, params, modified_by):
+    entity.populate(**params)
+    entity.modified_ts = utils.utcnow()
+    entity.modified_by = modified_by
+    entity.put()
+    model.replicate_auth_db()
+
+  @classmethod
+  def do_delete(cls, entity):
+    # TODO(vadimsh): Verify it isn't being referenced by whitelist assigments.
+    entity.key.delete()
+    model.replicate_auth_db()
 
 
 class CertificatesHandler(handler.ApiHandler):
