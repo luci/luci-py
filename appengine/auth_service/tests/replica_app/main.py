@@ -27,7 +27,7 @@ auth.disable_process_cache()
 if not auth.is_replica():
   auth.bootstrap_group(
       auth.ADMIN_GROUP,
-      auth.Identity(auth.IDENTITY_USER, 'test@example.com'),
+      [auth.Identity(auth.IDENTITY_USER, 'test@example.com')],
       'Users that can manage groups')
 
 # /_ah/warmup is used by the smoke test to detect that app is alive.

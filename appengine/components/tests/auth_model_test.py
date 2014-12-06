@@ -206,24 +206,47 @@ def make_group(group_id, nested=(), store=True):
 class GroupBootstrapTest(test_case.TestCase):
   """Test for bootstrap_group function."""
 
-  def test_group_bootstrap(self):
-    ident = model.Identity(model.IDENTITY_USER, 'joe@example.com')
-
+  def test_group_bootstrap_empty(self):
     mocked_now = datetime.datetime(2014, 01, 01)
     self.mock_now(mocked_now)
 
-    added = model.bootstrap_group('some-group', ident, 'Blah description')
+    added = model.bootstrap_group('some-group', [], 'Blah description')
     self.assertTrue(added)
 
     ent = model.group_key('some-group').get()
     self.assertEqual(
         {
-          'created_by': ident,
+          'created_by': model.get_service_self_identity(),
           'created_ts': mocked_now,
           'description': 'Blah description',
           'globs': [],
-          'members': [ident],
-          'modified_by': ident,
+          'members': [],
+          'modified_by': model.get_service_self_identity(),
+          'modified_ts': mocked_now,
+          'nested': []
+        },
+        ent.to_dict())
+
+  def test_group_bootstrap_non_empty(self):
+    ident1 = model.Identity(model.IDENTITY_USER, 'joe@example.com')
+    ident2 = model.Identity(model.IDENTITY_USER, 'sam@example.com')
+
+    mocked_now = datetime.datetime(2014, 01, 01)
+    self.mock_now(mocked_now)
+
+    added = model.bootstrap_group(
+        'some-group', [ident1, ident2], 'Blah description')
+    self.assertTrue(added)
+
+    ent = model.group_key('some-group').get()
+    self.assertEqual(
+        {
+          'created_by': model.get_service_self_identity(),
+          'created_ts': mocked_now,
+          'description': 'Blah description',
+          'globs': [],
+          'members': [ident1, ident2],
+          'modified_by': model.get_service_self_identity(),
           'modified_ts': mocked_now,
           'nested': []
         },
@@ -314,13 +337,13 @@ class FindDependencyCycleTest(test_case.TestCase):
 class IpWhitelistTest(test_case.TestCase):
   """Tests for AuthIPWhitelist related functions."""
 
-  def test_bootstrap_ip_whitelist(self):
+  def test_bootstrap_ip_whitelist_empty(self):
     self.assertIsNone(model.ip_whitelist_key('list').get())
 
     mocked_now = datetime.datetime(2014, 01, 01)
     self.mock_now(mocked_now)
 
-    ret = model.bootstrap_ip_whitelist('list', '192.168.0.0/24', 'comment')
+    ret = model.bootstrap_ip_whitelist('list', [], 'comment')
     self.assertTrue(ret)
 
     ent = model.ip_whitelist_key('list').get()
@@ -331,11 +354,32 @@ class IpWhitelistTest(test_case.TestCase):
       'description': u'comment',
       'modified_by': model.get_service_self_identity(),
       'modified_ts': mocked_now,
-      'subnets': [u'192.168.0.0/24'],
+      'subnets': [],
+    }, ent.to_dict())
+
+  def test_bootstrap_ip_whitelist(self):
+    self.assertIsNone(model.ip_whitelist_key('list').get())
+
+    mocked_now = datetime.datetime(2014, 01, 01)
+    self.mock_now(mocked_now)
+
+    ret = model.bootstrap_ip_whitelist(
+        'list', ['192.168.0.0/24', '127.0.0.1/32'], 'comment')
+    self.assertTrue(ret)
+
+    ent = model.ip_whitelist_key('list').get()
+    self.assertTrue(ent)
+    self.assertEqual({
+      'created_by': model.get_service_self_identity(),
+      'created_ts': mocked_now,
+      'description': u'comment',
+      'modified_by': model.get_service_self_identity(),
+      'modified_ts': mocked_now,
+      'subnets': [u'192.168.0.0/24', u'127.0.0.1/32'],
     }, ent.to_dict())
 
   def test_bootstrap_ip_whitelist_bad_subnet(self):
-    self.assertFalse(model.bootstrap_ip_whitelist('list', 'not a subnet', ''))
+    self.assertFalse(model.bootstrap_ip_whitelist('list', ['not a subnet']))
 
   def test_bootstrap_ip_whitelist_assignment_new(self):
     self.mock_now(datetime.datetime(2014, 01, 01))

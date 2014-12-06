@@ -39,13 +39,13 @@ class EndpointsAuthTest(test_case.TestCase):
 
   def test_ip_whitelist_bot(self):
     """Requests from client in "bots" IP whitelist are authenticated as bot."""
-    model.bootstrap_ip_whitelist('bots', '192.168.1.100/32', 'testing')
+    model.bootstrap_ip_whitelist('bots', ['192.168.1.100/32'])
     self.assertEqual('bot:192.168.1.100', self.call('192.168.1.100', None))
     self.assertEqual('anonymous:anonymous', self.call('127.0.0.1', None))
 
   def test_ip_whitelist_whitelisted(self):
     """Per-account IP whitelist works."""
-    model.bootstrap_ip_whitelist('whitelist', '192.168.1.100/32', '')
+    model.bootstrap_ip_whitelist('whitelist', ['192.168.1.100/32'])
     model.bootstrap_ip_whitelist_assignment(
         model.Identity(model.IDENTITY_USER, 'a@example.com'), 'whitelist')
     self.assertEqual(
@@ -54,7 +54,7 @@ class EndpointsAuthTest(test_case.TestCase):
 
   def test_ip_whitelist_not_whitelisted(self):
     """Per-account IP whitelist works."""
-    model.bootstrap_ip_whitelist('whitelist', '192.168.1.100/32', '')
+    model.bootstrap_ip_whitelist('whitelist', ['192.168.1.100/32'])
     model.bootstrap_ip_whitelist_assignment(
         model.Identity(model.IDENTITY_USER, 'a@example.com'), 'whitelist')
     with self.assertRaises(api.AuthorizationError):
@@ -62,7 +62,7 @@ class EndpointsAuthTest(test_case.TestCase):
 
   def test_ip_whitelist_not_used(self):
     """Per-account IP whitelist works."""
-    model.bootstrap_ip_whitelist('whitelist', '192.168.1.100/32', '')
+    model.bootstrap_ip_whitelist('whitelist', ['192.168.1.100/32'])
     model.bootstrap_ip_whitelist_assignment(
         model.Identity(model.IDENTITY_USER, 'a@example.com'), 'whitelist')
     self.assertEqual(

@@ -250,6 +250,6 @@ def create_application(debug=False):
   if utils.is_local_dev_server():
     auth.bootstrap_group(
         auth.ADMIN_GROUP,
-        auth.Identity(auth.IDENTITY_USER, 'test@example.com'),
+        [auth.Identity(auth.IDENTITY_USER, 'test@example.com')],
         'Users that can manage groups')
   return webapp2.WSGIApplication(get_routes(), debug=debug)

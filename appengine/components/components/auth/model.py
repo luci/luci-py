@@ -59,6 +59,7 @@ __all__ = [
   'Anonymous',
   'bootstrap_group',
   'bootstrap_ip_whitelist',
+  'bootstrap_loopback_ips',
   'BOTS_IP_WHITELIST',
   'configure_as_primary',
   'find_group_dependency_cycle',
@@ -66,12 +67,14 @@ __all__ = [
   'get_auth_db_revision',
   'get_missing_groups',
   'get_service_self_identity',
+  'group_key',
   'Identity',
   'IDENTITY_ANONYMOUS',
   'IDENTITY_BOT',
   'IDENTITY_SERVICE',
   'IDENTITY_USER',
   'IdentityProperty',
+  'ip_whitelist_key',
   'is_empty_group',
   'is_external_group_name',
   'is_primary',
@@ -505,22 +508,25 @@ def is_external_group_name(name):
 
 
 @ndb.transactional
-def bootstrap_group(group, identity, description):
-  """Makes a group (if not yet exists) and adds an |identity| to it as a member.
+def bootstrap_group(group, identities, description=''):
+  """Makes a group (if not yet exists) and adds |identities| to it as members.
 
-  Returns True if added |identity| to |group|, False if it is already there.
+  Returns True if modified the group, False if identities are already there.
   """
   key = group_key(group)
   entity = key.get()
-  if entity and identity in entity.members:
+  if entity and all(i in entity.members for i in identities):
     return False
   if not entity:
     entity = AuthGroup(
         key=key,
         description=description,
-        created_by=identity,
-        modified_by=identity)
-  entity.members.append(identity)
+        created_by=get_service_self_identity(),
+        modified_by=get_service_self_identity())
+  for i in identities:
+    if i not in entity.members:
+      entity.members.append(i)
+  entity.modified_by = get_service_self_identity()
   entity.put()
   replicate_auth_db()
   return True
@@ -791,27 +797,28 @@ def is_valid_ip_whitelist_name(name):
 
 
 @ndb.transactional
-def bootstrap_ip_whitelist(name, subnet, description):
-  """Adds a subnet to an IP whitelist if it's not there yet.
+def bootstrap_ip_whitelist(name, subnets, description=''):
+  """Adds subnets to an IP whitelist if not there yet.
 
   Can be used on local dev appserver to add 127.0.0.1 to IP whitelist during
   startup. Should not be used from request handlers.
 
   Args:
     name: IP whitelist name to add a subnet to.
-    subnet: IP subnet to add (as a string).
+    subnets: IP subnet to add (as a list of strings).
     description: description of IP whitelist (if new entity is created).
 
   Returns:
     True if entry was added, False if it is already there or subnet is invalid.
   """
+  assert isinstance(subnets, (list, tuple))
   try:
-    subnet = ipaddr.normalize_subnet(subnet)
+    subnets = [ipaddr.normalize_subnet(s) for s in subnets]
   except ValueError:
     return False
   key = ip_whitelist_key(name)
   entity = key.get()
-  if entity and subnet in entity.subnets:
+  if entity and all(s in entity.subnets for s in subnets):
     return False
   if not entity:
     entity = AuthIPWhitelist(
@@ -819,10 +826,29 @@ def bootstrap_ip_whitelist(name, subnet, description):
         description=description,
         created_by=get_service_self_identity(),
         modified_by=get_service_self_identity())
-  entity.subnets.append(subnet)
+  for s in subnets:
+    if s not in entity.subnets:
+      entity.subnets.append(s)
+  entity.modified_by = get_service_self_identity()
   entity.put()
   replicate_auth_db()
   return True
+
+
+def bootstrap_loopback_ips():
+  """Adds 127.0.0.1 and ::1 to 'bots' IP whitelist.
+
+  Useful on local dev server and in tests. Must not be used in production.
+
+  Returns list of corresponding bot Identities.
+  """
+  # See api.py, AuthDB.verify_ip_whitelisted for IP -> Identity conversion.
+  assert utils.is_local_dev_server()
+  bootstrap_ip_whitelist(BOTS_IP_WHITELIST, ['127.0.0.1', '::1'], 'Local bots')
+  return [
+    Identity(IDENTITY_BOT, '127.0.0.1'),
+    Identity(IDENTITY_BOT, '0-0-0-0-0-0-0-1'),
+  ]
 
 
 @ndb.transactional

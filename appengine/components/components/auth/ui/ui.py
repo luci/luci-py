@@ -223,7 +223,7 @@ class BootstrapHandler(UIHandler):
   @api.require(users.is_current_user_admin)
   def post(self):
     added = model.bootstrap_group(
-        model.ADMIN_GROUP, api.get_current_identity(),
+        model.ADMIN_GROUP, [api.get_current_identity()],
         'Users that can manage groups')
     env = {
       'page_title': 'Bootstrap',

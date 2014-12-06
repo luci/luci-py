@@ -65,7 +65,7 @@ class MainTest(test_case.TestCase):
     # pre-fetch it.
     version = utils.get_app_version()
     self.mock(utils, 'get_task_queue_host', lambda: version)
-    self.source_ip = '127.0.0.1'
+    self.source_ip = '192.168.0.1'
     self.app_api = webtest.TestApp(
         webapp2.WSGIApplication(handlers_api.get_routes(), debug=True),
         extra_environ={'REMOTE_ADDR': self.source_ip})
@@ -78,19 +78,19 @@ class MainTest(test_case.TestCase):
     # Tasks are enqueued on the backend.
     self.app = self.app_backend
 
-    acl.bootstrap()
-
   def whitelist_self(self):
-    acl.WhitelistedIP(
-        id=acl._ip_to_str(*acl._parse_ip(self.source_ip)),
-        ip=self.source_ip).put()
+    auth.bootstrap_ip_whitelist(auth.BOTS_IP_WHITELIST, [self.source_ip])
 
   def mock_acl_checks(self):
     known_groups = (
       acl.READERS_GROUP,
       acl.WRITERS_GROUP,
     )
-    self.mock(auth, 'is_group_member', lambda group: group in known_groups)
+    def is_group_member_mock(group):
+      if auth.get_current_identity().is_anonymous:
+        return False
+      return group in known_groups
+    self.mock(auth, 'is_group_member', is_group_member_mock)
 
   def handshake(self):
     self.whitelist_self()

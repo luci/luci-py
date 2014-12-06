@@ -115,26 +115,20 @@ def ip_whitelist_authentication(request):
 def bootstrap_dev_server_acls():
   """Adds localhost to IP whitelist and Swarming groups."""
   assert utils.is_local_dev_server()
+  if auth.is_replica():
+    return
 
-  loopback_ips = ('127.0.0.1', '::1')
+  bots = auth.bootstrap_loopback_ips()
+  auth.bootstrap_group(BOTS_GROUP, bots, 'Swarming bots')
+  auth.bootstrap_group(USERS_GROUP, bots, 'Swarming users')
 
-  # Whitelist localhost.
-  for ip in loopback_ips:
-    user_manager.AddWhitelist(ip).get_result()
+  # Add a swarming admin. smoke-test@example.com is used in
+  # server_smoke_test.py
+  admin = auth.Identity(auth.IDENTITY_USER, 'smoke-test@example.com')
+  auth.bootstrap_group(ADMINS_GROUP, [admin], 'Swarming administrators')
 
-  if not auth.is_replica():
-    for ip in loopback_ips:
-      bot = auth.Identity(auth.IDENTITY_BOT, ip.replace(':', '-'))
-      auth.bootstrap_group(BOTS_GROUP, bot, 'Swarming bots')
-      auth.bootstrap_group(USERS_GROUP, bot, 'Swarming users')
-
-    # Add a swarming admin. smoke-test@example.com is used in
-    # server_smoke_test.py
-    admin = auth.Identity(auth.IDENTITY_USER, 'smoke-test@example.com')
-    auth.bootstrap_group(ADMINS_GROUP, admin, 'Swarming administrators')
-
-    # Add an instance admin (for easier manual testing when running dev server).
-    auth.bootstrap_group(
-        auth.ADMIN_GROUP,
-        auth.Identity(auth.IDENTITY_USER, 'test@example.com'),
-        'Users that can manage groups')
+  # Add an instance admin (for easier manual testing when running dev server).
+  auth.bootstrap_group(
+      auth.ADMIN_GROUP,
+      [auth.Identity(auth.IDENTITY_USER, 'test@example.com')],
+      'Users that can manage groups')

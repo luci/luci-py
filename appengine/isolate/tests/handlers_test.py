@@ -48,7 +48,7 @@ class MainTest(test_case.TestCase):
     # pre-fetch it.
     version = utils.get_app_version()
     self.mock(utils, 'get_task_queue_host', lambda: version)
-    self.source_ip = '127.0.0.1'
+    self.source_ip = '192.168.0.1'
     self.app_frontend = webtest.TestApp(
         handlers_frontend.create_application(debug=True),
         extra_environ={'REMOTE_ADDR': self.source_ip})
@@ -64,16 +64,16 @@ class MainTest(test_case.TestCase):
     # Note that auth.ADMIN_GROUP != acl.ADMINS_GROUP.
     auth.bootstrap_group(
         auth.ADMIN_GROUP,
-        auth.Identity(auth.IDENTITY_USER, 'super-admin@example.com'), '')
+        [auth.Identity(auth.IDENTITY_USER, 'super-admin@example.com')])
     auth.bootstrap_group(
         acl.ADMINS_GROUP,
-        auth.Identity(auth.IDENTITY_USER, 'admin@example.com'), '')
+        [auth.Identity(auth.IDENTITY_USER, 'admin@example.com')])
     auth.bootstrap_group(
         acl.READERS_GROUP,
-        auth.Identity(auth.IDENTITY_USER, 'reader@example.com'), '')
+        [auth.Identity(auth.IDENTITY_USER, 'reader@example.com')])
     auth.bootstrap_group(
         acl.WRITERS_GROUP,
-        auth.Identity(auth.IDENTITY_USER, 'writer@example.com'), '')
+        [auth.Identity(auth.IDENTITY_USER, 'writer@example.com')])
     # TODO(maruel): Create a BOTS_GROUP.
 
     self.set_as_anonymous()
@@ -83,31 +83,13 @@ class MainTest(test_case.TestCase):
     super(MainTest, self).tearDown()
 
   def set_as_anonymous(self):
-    ndb.delete_multi(acl.WhitelistedIP.query().fetch(keys_only=True))
     self.testbed.setup_env(USER_EMAIL='', overwrite=True)
-    auth_testing.mock_get_current_identity(self)
-
-  def set_as_super_admin(self):
-    self.set_as_anonymous()
-    self.testbed.setup_env(USER_EMAIL='super-admin@example.com', overwrite=True)
-
-  def set_as_admin(self):
-    self.set_as_anonymous()
-    self.testbed.setup_env(USER_EMAIL='admin@example.com', overwrite=True)
+    auth.ip_whitelist_key(auth.BOTS_IP_WHITELIST).delete()
+    auth_testing.reset_local_state()
 
   def set_as_reader(self):
     self.set_as_anonymous()
     self.testbed.setup_env(USER_EMAIL='reader@example.com', overwrite=True)
-    auth_testing.mock_get_current_identity(
-        self, auth.Identity(auth.IDENTITY_USER, 'reader@example.com'))
-
-  def set_as_writer(self):
-    self.set_as_anonymous()
-    self.testbed.setup_env(USER_EMAIL='writer@example.com', overwrite=True)
-
-  def set_as_bot(self):
-    self.set_as_anonymous()
-    acl.add_whitelist(self.source_ip, 'foo', 'comment')
 
   def _gen_stats(self):
     # Generates data for the last 10 days, last 10 hours and last 10 minutes.

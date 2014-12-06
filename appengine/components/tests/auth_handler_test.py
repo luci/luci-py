@@ -96,7 +96,7 @@ class AuthenticatingHandlerTest(test_case.TestCase):
   def test_ip_whitelist_bot(self):
     """Requests from client in "bots" IP whitelist are authenticated as bot."""
     handler.configure([])
-    model.bootstrap_ip_whitelist('bots', '192.168.1.100/32', 'testing')
+    model.bootstrap_ip_whitelist('bots', ['192.168.1.100/32'])
 
     class Handler(handler.AuthenticatingHandler):
       @api.public
@@ -115,7 +115,7 @@ class AuthenticatingHandlerTest(test_case.TestCase):
     ident1 = model.Identity(model.IDENTITY_USER, 'a@example.com')
     ident2 = model.Identity(model.IDENTITY_USER, 'b@example.com')
 
-    model.bootstrap_ip_whitelist('whitelist', '192.168.1.100/32', '')
+    model.bootstrap_ip_whitelist('whitelist', ['192.168.1.100/32'])
     model.bootstrap_ip_whitelist_assignment(ident1, 'whitelist')
 
     class Handler(handler.AuthenticatingHandler):
@@ -201,7 +201,7 @@ class AuthenticatingHandlerTest(test_case.TestCase):
     self.assertEqual(401, response.status_int)
 
     # Authentication error is logged.
-    self.assertEqual(1, len(self.logged_errors))
+    self.assertEqual(1, len(self.logged_warnings))
 
   def test_authorization_error(self):
     """AuthorizationError in auth method is handled."""

@@ -96,6 +96,13 @@ class AuthenticatingHandler(webapp2.RequestHandler):
     # Configuration may modify _auth_methods used below.
     config.ensure_configured()
 
+    # Thread local (and request local) auth state.
+    auth_context = api.get_request_cache()
+
+    # Make get_current_identity() return Anonymous until authentication is
+    # complete. It is used in authentication_error/authorization_error calls.
+    auth_context.set_current_identity(model.Anonymous)
+
     identity = None
     for method_func in _auth_methods:
       try:
@@ -103,16 +110,18 @@ class AuthenticatingHandler(webapp2.RequestHandler):
         if identity:
           break
       except api.AuthenticationError as err:
-        logging.error('Authentication error.\n%s', err)
         self.authentication_error(err)
         return
       except api.AuthorizationError as err:
-        logging.error('Authorization error.\n%s', err)
         self.authorization_error(err)
         return
 
     # If no authentication method is applicable, default to anonymous identity.
     identity = identity or model.Anonymous
+
+    # Successfully extracted an identity. Put it in the request state now so
+    # that authorization_error() below can report it, if needed.
+    auth_context.set_current_identity(identity)
 
     # Verify IP is whitelisted and authenticate requests from bots.
     assert self.request.remote_addr
@@ -123,9 +132,8 @@ class AuthenticatingHandler(webapp2.RequestHandler):
       self.authorization_error(err)
       return
 
-    # Successfully extracted and validated an identity. Put it into request
-    # cache. It's later used by 'get_current_identity()' and other calls.
-    api.get_request_cache().set_current_identity(identity)
+    # verify_ip_whitelisted may change identity for bots, store new one.
+    auth_context.set_current_identity(identity)
 
     try:
       # Verify XSRF token if required.
@@ -138,8 +146,6 @@ class AuthenticatingHandler(webapp2.RequestHandler):
       # AuthorizationError.
       return super(AuthenticatingHandler, self).dispatch()
     except api.AuthorizationError as err:
-      if not identity.is_anonymous:
-        logging.warning('Authorization error.\n%s\nIdentity: %s', err, identity)
       self.authorization_error(err)
 
   def generate_xsrf_token(self, xsrf_token_data=None):
@@ -190,6 +196,7 @@ class AuthenticatingHandler(webapp2.RequestHandler):
     Args:
       error: instance of AuthenticationError subclass.
     """
+    logging.warning('Authentication error.\n%s', error)
     self.abort(401, detail=str(error))
 
   def authorization_error(self, error):
@@ -205,6 +212,9 @@ class AuthenticatingHandler(webapp2.RequestHandler):
     Args:
       error: instance of AuthorizationError subclass.
     """
+    logging.warning(
+        'Authorization error.\n%s\nIdentity: %s\nIP: %s',
+        error, api.get_current_identity().to_bytes(), self.request.remote_addr)
     self.abort(403, detail=str(error))
 
 
@@ -215,9 +225,13 @@ class ApiHandler(AuthenticatingHandler):
   _json_body = None
 
   def authentication_error(self, error):
+    logging.warning('Authentication error.\n%s', error)
     self.abort_with_error(401, text=str(error))
 
   def authorization_error(self, error):
+    logging.warning(
+        'Authorization error.\n%s\nIdentity: %s\nIP: %s',
+        error, api.get_current_identity().to_bytes(), self.request.remote_addr)
     self.abort_with_error(403, text=str(error))
 
   def send_response(self, response, http_code=200, headers=None):

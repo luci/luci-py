@@ -156,27 +156,18 @@ def get_user_type():
 
 def bootstrap():
   """Adds 127.0.0.1 as a whitelisted IP when testing."""
-  if not utils.is_local_dev_server():
+  if not utils.is_local_dev_server() or auth.is_replica():
     return
 
-  # Add to IP whitelist.
-  access_id = _ip_to_str('v4', 2130706433)
-  WhitelistedIP.get_or_insert(
-      access_id,
-      ip='127.0.0.1',
-      comment='automatic because of running on dev server')
+  bots = auth.bootstrap_loopback_ips()
+  auth.bootstrap_group(READERS_GROUP, bots, 'Can read from Isolate')
+  auth.bootstrap_group(WRITERS_GROUP, bots, 'Can write to Isolate')
 
-  # Add to Isolate groups.
-  if not auth.is_replica():
-    ident = auth.Identity(auth.IDENTITY_BOT, access_id)
-    auth.bootstrap_group(READERS_GROUP, ident, 'Can read from Isolate')
-    auth.bootstrap_group(WRITERS_GROUP, ident, 'Can write to Isolate')
-
-    # Add a fake admin for local dev server.
-    auth.bootstrap_group(
-        auth.ADMIN_GROUP,
-        auth.Identity(auth.IDENTITY_USER, 'test@example.com'),
-        'Users that can manage groups')
+  # Add a fake admin for local dev server.
+  auth.bootstrap_group(
+      auth.ADMIN_GROUP,
+      [auth.Identity(auth.IDENTITY_USER, 'test@example.com')],
+      'Users that can manage groups')
 
 
 def add_whitelist(ip, group, comment):

@@ -504,6 +504,8 @@ def reset_local_state():
   _auth_db_expiration = None
   _auth_db_fetching_thread = None
   _lazy_bootstrap_ran = False
+  _thread_local.request_cache = None
+  os.environ.pop('__AUTH_CACHE__', None)
 
 
 def get_process_auth_db():

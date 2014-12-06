@@ -43,3 +43,7 @@ def mock_is_admin(test_case, value=True):
       return value
     return orig(group, ident)
   test_case.mock(api, 'is_group_member', mocked_is_group_member)
+
+
+# reset_local_state must be called only in tests, so expose it here.
+reset_local_state = api.reset_local_state

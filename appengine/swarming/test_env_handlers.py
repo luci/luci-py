@@ -19,10 +19,10 @@ import webtest
 from support import test_case
 
 from components import auth
+from components import auth_testing
 from components import stats_framework
 from server import acl
 from server import stats
-from server import user_manager
 
 
 class AppTestBase(test_case.TestCase):
@@ -47,19 +47,19 @@ class AppTestBase(test_case.TestCase):
     # Note that auth.ADMIN_GROUP != acl.ADMINS_GROUP.
     auth.bootstrap_group(
         auth.ADMIN_GROUP,
-        auth.Identity(auth.IDENTITY_USER, 'super-admin@example.com'), '')
+        [auth.Identity(auth.IDENTITY_USER, 'super-admin@example.com')])
     auth.bootstrap_group(
         acl.ADMINS_GROUP,
-        auth.Identity(auth.IDENTITY_USER, 'admin@example.com'), '')
+        [auth.Identity(auth.IDENTITY_USER, 'admin@example.com')])
     auth.bootstrap_group(
         acl.PRIVILEGED_USERS_GROUP,
-        auth.Identity(auth.IDENTITY_USER, 'priv@example.com'), '')
+        [auth.Identity(auth.IDENTITY_USER, 'priv@example.com')])
     auth.bootstrap_group(
         acl.USERS_GROUP,
-        auth.Identity(auth.IDENTITY_USER, 'user@example.com'), '')
+        [auth.Identity(auth.IDENTITY_USER, 'user@example.com')])
     auth.bootstrap_group(
         acl.BOTS_GROUP,
-        auth.Identity(auth.IDENTITY_BOT, self.fake_ip), '')
+        [auth.Identity(auth.IDENTITY_BOT, self.fake_ip)])
 
     self.mock(stats_framework, 'add_entry', self._parse_line)
 
@@ -70,9 +70,9 @@ class AppTestBase(test_case.TestCase):
 
   def set_as_anonymous(self):
     """Removes all IPs from the whitelist."""
-    entries = user_manager.MachineWhitelist.query().fetch(keys_only=True)
-    ndb.delete_multi(entries)
     self.testbed.setup_env(USER_EMAIL='', overwrite=True)
+    auth.ip_whitelist_key(auth.BOTS_IP_WHITELIST).delete()
+    auth_testing.reset_local_state()
 
   def set_as_super_admin(self):
     self.set_as_anonymous()
@@ -92,7 +92,7 @@ class AppTestBase(test_case.TestCase):
 
   def set_as_bot(self):
     self.set_as_anonymous()
-    user_manager.AddWhitelist(self.fake_ip).get_result()
+    auth.bootstrap_ip_whitelist(auth.BOTS_IP_WHITELIST, [self.fake_ip])
 
   # Web or generic
 
