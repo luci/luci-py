@@ -86,44 +86,6 @@ class RestrictedGoogleStorageConfig(auth.AuthenticatingHandler):
     self.response.write('Done!')
 
 
-class RestrictedWhitelistIPHandler(auth.AuthenticatingHandler):
-  """Whitelists the current IP."""
-
-  @auth.require(acl.isolate_admin)
-  def get(self):
-    params = {
-      'default_comment': '',
-      'default_group': '',
-      'default_ip': self.request.remote_addr,
-      'note': '',
-    }
-    self.common(params)
-
-  @auth.require(acl.isolate_admin)
-  def post(self):
-    comment = self.request.get('comment')
-    group = self.request.get('group')
-    ip = self.request.get('ip')
-    try:
-      note = acl.add_whitelist(ip, group, comment)
-    except ValueError as e:
-      self.abort(404, e.args[0])
-    params = {
-      'default_comment': self.request.get('comment'),
-      'default_group': self.request.get('group'),
-      'default_ip': self.request.get('ip'),
-      'note': '<br>'.join(note),
-    }
-    self.common(params)
-
-  def common(self, params):
-    params['now'] = datetime.datetime.utcnow()
-    params['xsrf_token'] = self.generate_xsrf_token()
-    params['whitelistips'] = acl.WhitelistedIP.query()
-    self.response.headers['Content-Type'] = 'text/html'
-    self.response.out.write(template.render('isolate/whitelistip.html', params))
-
-
 ### Mapreduce related handlers
 
 
@@ -260,8 +222,6 @@ class WarmupHandler(webapp2.RequestHandler):
 def get_routes():
   return [
       # Administrative urls.
-      webapp2.Route(
-          r'/restricted/whitelistip', RestrictedWhitelistIPHandler),
       webapp2.Route(
           r'/restricted/gs_config', RestrictedGoogleStorageConfig),
 

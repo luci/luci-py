@@ -309,7 +309,7 @@ class AppTestSignedOut(TestCase):
     if self.token:
       print('Testing with whitelisted IP')
     else:
-      print('Testing unauthencated')
+      print('Testing unauthenticated')
 
   @staticmethod
   def fetch(url, payload):
