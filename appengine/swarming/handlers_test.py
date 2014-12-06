@@ -23,7 +23,6 @@ import handlers_frontend
 from components import template
 from server import bot_management
 from server import config
-from server import user_manager
 
 
 class AppTestBase(test_env_handlers.AppTestBase):
@@ -387,66 +386,6 @@ class FrontendAdminTest(AppTestBase):
     self.app.post('/restricted/config', params)
     self.assertEqual('foobar', config.settings().google_analytics)
     self.assertIn('foobar', self.app.get('/').body)
-
-  def testWhitelistIPHandlerParams(self):
-    self.set_as_admin()
-
-    # Make sure the template renders.
-    self.app.get('/restricted/whitelist_ip', {}, status=200)
-    xsrf_token = self.get_xsrf_token()
-
-    # Make sure the link redirects to the right place.
-    self.assertEqual(
-        [],
-        [t.to_dict() for t in user_manager.MachineWhitelist.query().fetch()])
-    self.app.post(
-        '/restricted/whitelist_ip', {'a': 'True', 'xsrf_token': xsrf_token},
-        extra_environ={'REMOTE_ADDR': '192.168.2.0'}, status=200)
-    self.assertEqual(
-        [{'ip': u'192.168.2.0'}],
-        [t.to_dict() for t in user_manager.MachineWhitelist.query().fetch()])
-
-    # All of these requests are invalid so none of them modify entites.
-    self.app.post(
-        '/restricted/whitelist_ip', {'i': '', 'xsrf_token': xsrf_token},
-        expect_errors=True)
-    self.app.post(
-        '/restricted/whitelist_ip', {'i': '123', 'xsrf_token': xsrf_token},
-        expect_errors=True)
-    self.app.post(
-        '/restricted/whitelist_ip',
-        {'i': '123', 'a': 'true', 'xsrf_token': xsrf_token},
-        expect_errors=True)
-    self.assertEqual(
-        [{'ip': u'192.168.2.0'}],
-        [t.to_dict() for t in user_manager.MachineWhitelist.query().fetch()])
-
-  def testWhitelistIPHandler(self):
-    ip = ['1.2.3.4', '1:2:3:4:5:6:7:8']
-    self.set_as_admin()
-    self.assertEqual(0, user_manager.MachineWhitelist.query().count())
-    xsrf_token = self.get_xsrf_token()
-
-    # Whitelist IPs.
-    self.app.post(
-        '/restricted/whitelist_ip',
-        {'i': ip[0], 'a': 'True', 'xsrf_token': xsrf_token})
-    self.assertEqual(1, user_manager.MachineWhitelist.query().count())
-    self.app.post(
-        '/restricted/whitelist_ip',
-        {'i': ip[1], 'a': 'True', 'xsrf_token': xsrf_token})
-    self.assertEqual(2, user_manager.MachineWhitelist.query().count())
-
-    for i in range(2):
-      whitelist = user_manager.MachineWhitelist.query().filter(
-          user_manager.MachineWhitelist.ip == ip[i])
-      self.assertEqual(1, whitelist.count(), msg='Iteration %d' % i)
-
-    # Remove whitelisted ip.
-    self.app.post(
-        '/restricted/whitelist_ip',
-        {'i': ip[0], 'a': 'False', 'xsrf_token': xsrf_token})
-    self.assertEqual(1, user_manager.MachineWhitelist.query().count())
 
 
 class BackendTest(AppTestBase):

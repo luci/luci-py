@@ -33,7 +33,6 @@ from server import config
 from server import stats_gviz
 from server import task_result
 from server import task_scheduler
-from server import user_manager
 
 
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -119,48 +118,6 @@ class UploadBootstrapHandler(auth.AuthenticatingHandler):
       self.abort(400, 'No script uploaded')
 
     bot_code.store_bootstrap(script.encode('utf-8'))
-    self.get()
-
-
-class WhitelistIPHandler(auth.AuthenticatingHandler):
-  @auth.require(acl.is_admin)
-  def get(self):
-    display_whitelists = sorted(
-        (
-          {
-            'ip': w.ip,
-            'key': w.key.id,
-            'url': self.request.path_url,
-          } for w in user_manager.MachineWhitelist().query()),
-        key=lambda x: x['ip'])
-
-    params = {
-      'post_url': self.request.path_url,
-      'whitelists': display_whitelists,
-      'xsrf_token': self.generate_xsrf_token(),
-    }
-    self.response.out.write(
-        template.render('swarming/restricted_whitelistip.html', params))
-
-  @auth.require(acl.is_admin)
-  def post(self):
-    ip = self.request.get('i', self.request.remote_addr)
-    mask = 32
-    if '/' in ip:
-      ip, mask = ip.split('/', 1)
-      mask = int(mask)
-    ips = acl.expand_subnet(ip, mask)
-
-    add = self.request.get('a')
-    if add == 'True':
-      futures = [user_manager.AddWhitelist(ip) for ip in ips]
-      for f in futures:
-        f.get_result()
-    elif add == 'False':
-      for ip in ips:
-        user_manager.DeleteWhitelist(ip)
-    else:
-      self.abort(400, 'Invalid \'a\' parameter.')
     self.get()
 
 
@@ -707,7 +664,6 @@ def create_application(debug):
 
       # Admin pages.
       ('/restricted/config', ConfigHandler),
-      ('/restricted/whitelist_ip', WhitelistIPHandler),
       ('/restricted/upload/bot_config', UploadBotConfigHandler),
       ('/restricted/upload/bootstrap', UploadBootstrapHandler),
 

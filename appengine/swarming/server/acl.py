@@ -4,11 +4,8 @@
 
 """Defines access groups."""
 
-import logging
-
 from components import auth
 from components import utils
-from server import user_manager
 
 
 # Names of groups.
@@ -18,30 +15,6 @@ ADMINS_GROUP = 'swarming-admins'
 BOTS_GROUP = 'swarming-bots'
 PRIVILEGED_USERS_GROUP = 'swarming-privileged-users'
 USERS_GROUP = 'swarming-users'
-
-
-### Private stuff.
-
-
-def _ipv4_to_int(ip):
-  values = [int(i) for i in ip.split('.')]
-  factor = 256
-  value = 0L
-  for i in values:
-    value = value * factor + i
-  return value
-
-
-def _int_to_ipv4(integer):
-  values = []
-  factor = 256
-  for _ in range(4):
-    values.append(integer % factor)
-    integer = integer / factor
-  return '.'.join(str(i) for i in reversed(values))
-
-
-### Public API.
 
 
 def is_admin():
@@ -84,32 +57,6 @@ def get_user_type():
   if is_bot():
     return 'bot'
   return 'unknown user'
-
-
-def expand_subnet(ip, mask):
-  """Returns all the IP addressed comprised in a range."""
-  if mask == 32:
-    return [ip]
-  bit = 1 << (32 - mask)
-  return [_int_to_ipv4(_ipv4_to_int(ip) + r) for r in range(bit)]
-
-
-def ip_whitelist_authentication(request):
-  """Check to see if the request is from a whitelisted machine.
-
-  Will use the remote machine's IP.
-
-  Args:
-    request: WebAPP request sent by remote machine.
-
-  Returns:
-    auth.Identity of a machine if IP is whitelisted, None otherwise.
-  """
-  if user_manager.IsWhitelistedMachine(request.remote_addr):
-    # IP v6 addresses contain ':' that is not allowed in identity name.
-    return auth.Identity(
-        auth.IDENTITY_BOT, request.remote_addr.replace(':', '-'))
-  return None
 
 
 def bootstrap_dev_server_acls():
