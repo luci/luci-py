@@ -360,7 +360,7 @@ class GroupsHandler(handler.ApiHandler):
     # Generally speaking, fetching a list of group members can be an expensive
     # operation, and group listing call shouldn't do it all the time. So throw
     # away all fields that enumerate group members.
-    group_list = model.AuthGroup.query(ancestor=model.ROOT_KEY)
+    group_list = model.AuthGroup.query(ancestor=model.root_key())
     self.send_response({
       'groups': [
         g.to_serializable_dict(
@@ -519,7 +519,7 @@ class IPWhitelistsHandler(handler.ApiHandler):
 
   @api.require(api.is_admin)
   def get(self):
-    entities = model.AuthIPWhitelist.query(ancestor=model.ROOT_KEY)
+    entities = model.AuthIPWhitelist.query(ancestor=model.root_key())
     self.send_response({
       'ip_whitelists': [
         e.to_serializable_dict(with_id_as='name')
@@ -593,7 +593,7 @@ class OAuthConfigHandler(handler.ApiHandler):
 
     # Use most up-to-date data in datastore if requested. Used by management UI.
     if cache_control in ('no-cache', 'max-age=0'):
-      global_config = model.ROOT_KEY.get()
+      global_config = model.root_key().get()
       client_id = global_config.oauth_client_id
       client_secret = global_config.oauth_client_secret
       additional_ids = global_config.oauth_additional_client_ids
@@ -624,7 +624,7 @@ class OAuthConfigHandler(handler.ApiHandler):
 
     @ndb.transactional
     def update():
-      config = model.ROOT_KEY.get()
+      config = model.root_key().get()
       config.populate(
           oauth_client_id=client_id,
           oauth_client_secret=client_secret,

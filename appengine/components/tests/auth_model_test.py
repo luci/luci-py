@@ -400,7 +400,7 @@ class IpWhitelistTest(test_case.TestCase):
             'ip_whitelist': 'some ip whitelist',
           },
         ],
-      }, model.IP_WHITELIST_ASSIGNMENTS_KEY.get().to_dict())
+      }, model.ip_whitelist_assignments_key().get().to_dict())
 
   def test_bootstrap_ip_whitelist_assignment_modify(self):
     self.mock_now(datetime.datetime(2014, 01, 01))
@@ -426,7 +426,7 @@ class IpWhitelistTest(test_case.TestCase):
             'ip_whitelist': 'another ip whitelist',
           },
         ],
-      }, model.IP_WHITELIST_ASSIGNMENTS_KEY.get().to_dict())
+      }, model.ip_whitelist_assignments_key().get().to_dict())
 
   def test_is_ip_whitelisted(self):
     ent = model.AuthIPWhitelist(subnets=['127.0.0.1', '192.168.0.0/24'])
@@ -440,13 +440,13 @@ class IpWhitelistTest(test_case.TestCase):
 
   def test_fetch_ip_whitelists_empty(self):
     assignments, whitelists = model.fetch_ip_whitelists()
-    self.assertEqual(model.IP_WHITELIST_ASSIGNMENTS_KEY, assignments.key)
+    self.assertEqual(model.ip_whitelist_assignments_key(), assignments.key)
     self.assertEqual(0, len(assignments.assignments))
     self.assertEqual([], whitelists)
 
   def test_fetch_ip_whitelists_non_empty(self):
     ent = model.AuthIPWhitelistAssignments(
-        key=model.IP_WHITELIST_ASSIGNMENTS_KEY)
+        key=model.ip_whitelist_assignments_key())
 
     def add(identity, **kwargs):
       kwargs['identity'] = model.Identity.from_bytes(identity)

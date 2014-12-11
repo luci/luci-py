@@ -120,17 +120,31 @@ GROUP_ALL = '*'
 # Regular expression for IP whitelist name.
 IP_WHITELIST_NAME_RE = re.compile(r'^[0-9a-zA-Z_\-\+\.\ ]{2,200}$')
 
-# Global root key of auth models entity group.
-ROOT_KEY = ndb.Key('AuthGlobalConfig', 'root')
-# Key of AuthReplicationState entity.
-REPLICATION_STATE_KEY = ndb.Key('AuthReplicationState', 'self', parent=ROOT_KEY)
-# Key of AuthIPWhitelistAssignments entity.
-IP_WHITELIST_ASSIGNMENTS_KEY = ndb.Key(
-    'AuthIPWhitelistAssignments', 'default', parent=ROOT_KEY)
-
 
 # Configuration of Primary service, set by 'configure_as_primary'.
 _replication_callback = None
+
+
+# Root ndb keys of various models. They can't be defined as a module level
+# constants because ndb.Key implicitly includes current APPLICATION_ID. And in
+# testing environment it is '_' during module loading time. Trying to use such
+# key from within a testbed test case results in the following error:
+# BadRequestError: app "testbed-test" cannot access app "_"'s data
+
+
+def root_key():
+  """Global root key of auth models entity group."""
+  return ndb.Key('AuthGlobalConfig', 'root')
+
+
+def replication_state_key():
+  """Key of AuthReplicationState entity."""
+  return ndb.Key('AuthReplicationState', 'self', parent=root_key())
+
+
+def ip_whitelist_assignments_key():
+  """Key of AuthIPWhitelistAssignments entity."""
+  return ndb.Key('AuthIPWhitelistAssignments', 'default', parent=root_key())
 
 
 ################################################################################
@@ -274,8 +288,8 @@ def configure_as_primary(replication_callback):
 
   Should be called during Primary application startup. The callback will be
   called as 'replication_callback(AuthReplicationState)' from inside transaction
-  on ROOT_KEY entity group whenever replicate_auth_db() is called (i.e. on every
-  change to auth db that should be replication to replicas).
+  on root_key() entity group whenever replicate_auth_db() is called (i.e. on
+  every change to auth db that should be replication to replicas).
   """
   global _replication_callback
   _replication_callback = replication_callback
@@ -299,7 +313,7 @@ def is_standalone():
 
 def get_replication_state():
   """Returns AuthReplicationState singleton entity if it exists."""
-  return REPLICATION_STATE_KEY.get()
+  return replication_state_key().get()
 
 
 def get_auth_db_revision():
@@ -317,7 +331,7 @@ class AuthGlobalConfig(ndb.Model):
   """Acts as a root entity for auth models.
 
   There should be only one instance of this model in Datastore, with a key set
-  to ROOT_KEY. A change to an entity group rooted at this key is a signal that
+  to root_key(). A change to an entity group rooted at this key is a signal that
   AuthDB has to be refetched (see 'fetch_auth_db' in api.py).
 
   Entities that change often or associated with particular bot or user
@@ -343,9 +357,9 @@ class AuthGlobalConfig(ndb.Model):
 class AuthReplicationState(ndb.Model, datastore_utils.SerializableModelMixin):
   """Contains state used to control Primary -> Replica replication.
 
-  It's a singleton entity with key REPLICATION_STATE_KEY (in same entity groups
-  as ROOT_KEY). This entity should be small since it is updated (auth_db_rev is
-  incremented) whenever AuthDB changes.
+  It's a singleton entity with key replication_state_key() (in same entity
+  groups as root_key()). This entity should be small since it is updated
+  (auth_db_rev is incremented) whenever AuthDB changes.
 
   Exists in any AuthDB (on Primary and Replicas). Primary updates it whenever
   changes to AuthDB are made, Replica updates it whenever it receives a push
@@ -400,16 +414,17 @@ def replicate_auth_db():
   sync and async modes of an NDB operation from inside a hook. And without a
   strict assert it's very easy to forget about "Do not use put_async" warning.
   For that reason _post_put_hook is NOT used and replicate_auth_db() should be
-  called explicitly whenever relevant part of ROOT_KEY entity group is updated.
+  called explicitly whenever relevant part of root_key() entity group is
+  updated.
   """
   def increment_revision_and_update_replicas():
     """Does the actual job, called inside a transaction."""
-    # Update auth_db_rev. REPLICATION_STATE_KEY is in same group as ROOT_KEY.
-    state = REPLICATION_STATE_KEY.get()
+    # Update auth_db_rev. replication_state_key() is in same group as root_key.
+    state = replication_state_key().get()
     if not state:
       primary_id = app_identity.get_application_id() if is_primary() else None
       state = AuthReplicationState(
-          key=REPLICATION_STATE_KEY,
+          key=replication_state_key(),
           primary_id=primary_id,
           auth_db_rev=0)
     # Assert Primary or Standalone. Replicas can't increment auth db revision.
@@ -443,7 +458,7 @@ def replicate_auth_db():
 class AuthGroup(ndb.Model, datastore_utils.SerializableModelMixin):
   """A group of identities, entity id is a group name.
 
-  Parent is AuthGlobalConfig entity keyed at ROOT_KEY.
+  Parent is AuthGlobalConfig entity keyed at root_key().
 
   Primary service holds authoritative list of Groups, that gets replicated to
   all Replicas.
@@ -488,7 +503,7 @@ class AuthGroup(ndb.Model, datastore_utils.SerializableModelMixin):
 
 def group_key(group):
   """Returns ndb.Key for AuthGroup entity."""
-  return ndb.Key(AuthGroup, group, parent=ROOT_KEY)
+  return ndb.Key(AuthGroup, group, parent=root_key())
 
 
 def is_empty_group(group):
@@ -542,7 +557,7 @@ def find_referencing_groups(group):
     Set of names of referencing groups.
   """
   referencing_groups = AuthGroup.query(
-      AuthGroup.nested == group, ancestor=ROOT_KEY).fetch(keys_only=True)
+      AuthGroup.nested == group, ancestor=root_key()).fetch(keys_only=True)
   return set(key.id() for key in referencing_groups)
 
 
@@ -622,7 +637,7 @@ def find_group_dependency_cycle(group):
 class AuthSecretScope(ndb.Model):
   """Entity to act as parent entity for AuthSecret.
 
-  Parent is AuthGlobalConfig entity keyed at ROOT_KEY.
+  Parent is AuthGlobalConfig entity keyed at root_key().
 
   Id of this entity defines scope of secret keys that have this entity as
   a parent. Possible scopes are 'local' and 'global'.
@@ -639,16 +654,16 @@ class AuthSecretScope(ndb.Model):
 
 def secret_scope_key(scope):
   """Key of AuthSecretScope entity for a given scope ('global' or 'local')."""
-  return ndb.Key(AuthSecretScope, scope, parent=ROOT_KEY)
+  return ndb.Key(AuthSecretScope, scope, parent=root_key())
 
 
 class AuthSecret(ndb.Model):
   """Some service-wide named secret blob.
 
   Entity can be a child of:
-    * Key(AuthSecretScope, 'global', parent=ROOT_KEY):
+    * Key(AuthSecretScope, 'global', parent=root_key()):
         Global secrets replicated across all services.
-    * Key(AuthSecretScope, 'local', parent=ROOT_KEY):
+    * Key(AuthSecretScope, 'local', parent=root_key()):
         Secrets local to the current service.
 
   There should be only very limited number of AuthSecret entities around. AuthDB
@@ -714,7 +729,7 @@ class AuthSecret(ndb.Model):
 class AuthIPWhitelistAssignments(ndb.Model):
   """A singleton entity with "identity -> AuthIPWhitelist to use" mapping.
 
-  Entity key is IP_WHITELIST_ASSIGNMENTS_KEY. Parent entity is ROOT_KEY.
+  Entity key is ip_whitelist_assignments_key(). Parent entity is root_key().
 
   See AuthIPWhitelist for more info about IP whitelists.
   """
@@ -742,7 +757,7 @@ class AuthIPWhitelist(ndb.Model, datastore_utils.SerializableModelMixin):
   account is used only from some known IP range. The mapping between accounts
   and IP whitelists is stored in AuthIPWhitelistAssignments.
 
-  Entity id is a name of the whitelist. Parent entity is ROOT_KEY.
+  Entity id is a name of the whitelist. Parent entity is root_key().
 
   There's a special IP whitelist named 'bots' that can be used to list
   IP addresses of machines the service trusts unconditionally. Requests from
@@ -788,7 +803,7 @@ class AuthIPWhitelist(ndb.Model, datastore_utils.SerializableModelMixin):
 
 def ip_whitelist_key(name):
   """Returns ndb.Key for AuthIPWhitelist entity given its name."""
-  return ndb.Key(AuthIPWhitelist, name, parent=ROOT_KEY)
+  return ndb.Key(AuthIPWhitelist, name, parent=root_key())
 
 
 def is_valid_ip_whitelist_name(name):
@@ -868,8 +883,8 @@ def bootstrap_ip_whitelist_assignment(identity, ip_whitelist, comment=''):
     True if IP whitelist assignment was modified, False if it was already set.
   """
   entity = (
-      IP_WHITELIST_ASSIGNMENTS_KEY.get() or
-      AuthIPWhitelistAssignments(key=IP_WHITELIST_ASSIGNMENTS_KEY))
+      ip_whitelist_assignments_key().get() or
+      AuthIPWhitelistAssignments(key=ip_whitelist_assignments_key()))
 
   found = False
   for assignment in entity.assignments:
@@ -901,8 +916,8 @@ def fetch_ip_whitelists():
     (AuthIPWhitelistAssignments, list of AuthIPWhitelist).
   """
   assignments = (
-      IP_WHITELIST_ASSIGNMENTS_KEY.get() or
-      AuthIPWhitelistAssignments(key=IP_WHITELIST_ASSIGNMENTS_KEY))
+      ip_whitelist_assignments_key().get() or
+      AuthIPWhitelistAssignments(key=ip_whitelist_assignments_key()))
 
   names = set(a.ip_whitelist for a in assignments.assignments)
   names.add(BOTS_IP_WHITELIST)

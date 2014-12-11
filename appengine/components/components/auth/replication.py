@@ -108,7 +108,7 @@ def become_replica(ticket, initiated_by):
 
   # Become replica. Auth DB will be overwritten on a first push from Primary.
   state = model.AuthReplicationState(
-      key=model.REPLICATION_STATE_KEY,
+      key=model.replication_state_key(),
       primary_id=ticket.primary_id,
       primary_url=ticket.primary_url)
   state.put()
@@ -122,9 +122,9 @@ def new_auth_db_snapshot():
     Tuple (AuthReplicationState, AuthDBSnapshot).
   """
   # Start fetching stuff in parallel.
-  state_future = model.REPLICATION_STATE_KEY.get_async()
-  config_future = model.ROOT_KEY.get_async()
-  groups_future = model.AuthGroup.query(ancestor=model.ROOT_KEY).fetch_async()
+  state_future = model.replication_state_key().get_async()
+  config_future = model.root_key().get_async()
+  groups_future = model.AuthGroup.query(ancestor=model.root_key()).fetch_async()
   secrets_future = model.AuthSecret.query(
       ancestor=model.secret_scope_key('global')).fetch_async()
 
@@ -132,7 +132,8 @@ def new_auth_db_snapshot():
   ip_whitelist_assignments, ip_whitelists = model.fetch_ip_whitelists()
 
   snapshot = AuthDBSnapshot(
-      config_future.get_result() or model.AuthGlobalConfig(key=model.ROOT_KEY),
+      config_future.get_result() or model.AuthGlobalConfig(
+          key=model.root_key()),
       groups_future.get_result(),
       secrets_future.get_result(),
       ip_whitelists,
@@ -204,7 +205,7 @@ def proto_to_auth_db_snapshot(auth_db_proto):
   # Explicit conversion to 'list' is needed here since protobuf magic doesn't
   # stack with NDB magic.
   global_config = model.AuthGlobalConfig(
-      key=model.ROOT_KEY,
+      key=model.root_key(),
       oauth_client_id=auth_db_proto.oauth_client_id,
       oauth_client_secret=auth_db_proto.oauth_client_secret,
       oauth_additional_client_ids=list(
@@ -247,7 +248,7 @@ def proto_to_auth_db_snapshot(auth_db_proto):
   ]
 
   ip_whitelist_assignments = model.AuthIPWhitelistAssignments(
-      key=model.IP_WHITELIST_ASSIGNMENTS_KEY,
+      key=model.ip_whitelist_assignments_key(),
       assignments=[
         model.AuthIPWhitelistAssignments.Assignment(
             identity=model.Identity.from_bytes(msg.identity),

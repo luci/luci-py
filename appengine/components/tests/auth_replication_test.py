@@ -47,14 +47,15 @@ def make_snapshot_obj(
     ip_whitelists=None, ip_whitelist_assignments=None):
   """Returns AuthDBSnapshot with omitted fields set to default values."""
   return replication.AuthDBSnapshot(
-      global_config=global_config or model.AuthGlobalConfig(key=model.ROOT_KEY),
+      global_config=global_config or model.AuthGlobalConfig(
+          key=model.root_key()),
       groups=groups or [],
       secrets=secrets or [],
       ip_whitelists=ip_whitelists or [],
       ip_whitelist_assignments=(
           ip_whitelist_assignments or
           model.AuthIPWhitelistAssignments(
-              key=model.IP_WHITELIST_ASSIGNMENTS_KEY)),
+              key=model.ip_whitelist_assignments_key())),
   )
 
 
@@ -87,14 +88,14 @@ class NewAuthDBSnapshotTest(test_case.TestCase):
     self.mock_now(datetime.datetime(2014, 1, 1, 1, 1, 1))
 
     state = model.AuthReplicationState(
-        key=model.REPLICATION_STATE_KEY,
+        key=model.replication_state_key(),
         primary_id='blah',
         primary_url='https://blah',
         auth_db_rev=123)
     state.put()
 
     global_config = model.AuthGlobalConfig(
-        key=model.ROOT_KEY,
+        key=model.root_key(),
         oauth_client_id='oauth_client_id',
         oauth_client_secret='oauth_client_secret',
         oauth_additional_client_ids=['a', 'b'])
@@ -139,7 +140,7 @@ class NewAuthDBSnapshotTest(test_case.TestCase):
     ip_whitelist.put()
 
     ip_whitelist_assignments = model.AuthIPWhitelistAssignments(
-        key=model.IP_WHITELIST_ASSIGNMENTS_KEY,
+        key=model.ip_whitelist_assignments_key(),
         assignments=[
           model.AuthIPWhitelistAssignments.Assignment(
             identity=model.Identity.from_bytes('user:bot_account@example.com'),
@@ -255,7 +256,7 @@ class SnapshotToProtoConversionTest(test_case.TestCase):
     """Serializing snapshot with non-trivial AuthGlobalConfig."""
     snapshot = make_snapshot_obj(
         global_config=model.AuthGlobalConfig(
-            key=model.ROOT_KEY,
+            key=model.root_key(),
             oauth_client_id='some-client-id',
             oauth_client_secret='some-client-secret',
             oauth_additional_client_ids=['id1', 'id2']))
@@ -308,7 +309,7 @@ class SnapshotToProtoConversionTest(test_case.TestCase):
   def test_ip_whitelist_assignments_serialization(self):
     """Serializing snapshot with non-trivial AuthIPWhitelistAssignments."""
     entity = model.AuthIPWhitelistAssignments(
-        key=model.IP_WHITELIST_ASSIGNMENTS_KEY,
+        key=model.ip_whitelist_assignments_key(),
         assignments=[
           model.AuthIPWhitelistAssignments.Assignment(
             identity=model.Identity.from_bytes('user:a@example.com'),
@@ -329,7 +330,7 @@ class ReplaceAuthDbTest(test_case.TestCase):
   @staticmethod
   def configure_as_replica(auth_db_rev=0, modified_ts=None):
     state = model.AuthReplicationState(
-         key=model.REPLICATION_STATE_KEY,
+         key=model.replication_state_key(),
          primary_id='primary',
          primary_url='https://primary',
          auth_db_rev=auth_db_rev,
@@ -342,7 +343,7 @@ class ReplaceAuthDbTest(test_case.TestCase):
 
     # Prepare auth db state.
     model.AuthGlobalConfig(
-        key=model.ROOT_KEY,
+        key=model.root_key(),
         oauth_client_id='oauth_client_id',
         oauth_client_secret='oauth_client_secret',
         oauth_additional_client_ids=['a', 'b']).put()
@@ -373,7 +374,7 @@ class ReplaceAuthDbTest(test_case.TestCase):
           ip_whitelist=ip_whitelist,
           comment='comment')
     model.AuthIPWhitelistAssignments(
-        key=model.IP_WHITELIST_ASSIGNMENTS_KEY,
+        key=model.ip_whitelist_assignments_key(),
         assignments=[
           assignment('user:1@example.com', 'modify'),
           assignment('user:2@example.com', 'delete'),
@@ -383,7 +384,7 @@ class ReplaceAuthDbTest(test_case.TestCase):
     # Prepare snapshot.
     snapshot = replication.AuthDBSnapshot(
         global_config=model.AuthGlobalConfig(
-            key=model.ROOT_KEY,
+            key=model.root_key(),
             oauth_client_id='another_oauth_client_id',
             oauth_client_secret='another_oauth_client_secret',
             oauth_additional_client_ids=[]),
@@ -403,7 +404,7 @@ class ReplaceAuthDbTest(test_case.TestCase):
           ip_whitelist('keep'),
         ],
         ip_whitelist_assignments=model.AuthIPWhitelistAssignments(
-            key=model.IP_WHITELIST_ASSIGNMENTS_KEY,
+            key=model.ip_whitelist_assignments_key(),
             assignments=[
               assignment('user:a@example.com', 'new'),
               assignment('user:b@example.com', 'modify'),

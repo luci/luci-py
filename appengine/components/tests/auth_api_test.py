@@ -141,18 +141,18 @@ class AuthDBTest(test_case.TestCase):
 
   def test_fetch_auth_db_lazy_bootstrap(self):
     # Don't exist before the call.
-    self.assertFalse(model.ROOT_KEY.get())
+    self.assertFalse(model.root_key().get())
 
     # Run bootstrap.
     api._lazy_bootstrap_ran = False
     api.fetch_auth_db()
 
     # Exist now.
-    self.assertTrue(model.ROOT_KEY.get())
+    self.assertTrue(model.root_key().get())
 
   def test_fetch_auth_db(self):
     # Create AuthGlobalConfig.
-    global_config = model.AuthGlobalConfig(key=model.ROOT_KEY)
+    global_config = model.AuthGlobalConfig(key=model.root_key())
     global_config.oauth_client_id = '1'
     global_config.oauth_client_secret = 'secret'
     global_config.oauth_additional_client_ids = ['2', '3']
@@ -176,7 +176,7 @@ class AuthDBTest(test_case.TestCase):
 
     # And IP whitelist.
     ip_whitelist_assignments = model.AuthIPWhitelistAssignments(
-        key=model.IP_WHITELIST_ASSIGNMENTS_KEY,
+        key=model.ip_whitelist_assignments_key(),
         assignments=[
           model.AuthIPWhitelistAssignments.Assignment(
             identity=model.Anonymous,

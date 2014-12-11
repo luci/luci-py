@@ -20,9 +20,6 @@ from components.auth import signature
 from components.auth.proto import replication_pb2
 
 
-# Root key for AuthReplicaState entities. Entity itself doesn't exist.
-REPLICAS_ROOT_KEY = ndb.Key('AuthReplicaStateRoot', 'root')
-
 # Possible values of push_status field of AuthReplicaState.
 PUSH_STATUS_SUCCESS = 0
 PUSH_STATUS_TRANSIENT_ERROR = 1
@@ -48,7 +45,7 @@ class FatalReplicaUpdateError(ReplicaUpdateError):
 class AuthReplicaState(ndb.Model, datastore_utils.SerializableModelMixin):
   """Last known state of a Replica as known by Primary.
 
-  Parent key is REPLICAS_ROOT_KEY. Key id is GAE application ID of a replica.
+  Parent key is replicas_root_key(). Key id is GAE application ID of a replica.
   """
   # How to convert this entity to serializable dict.
   serializable_properties = {
@@ -78,6 +75,13 @@ class AuthReplicaState(ndb.Model, datastore_utils.SerializableModelMixin):
   push_error = ndb.StringProperty(indexed=False)
 
 
+def replicas_root_key():
+  """Root key for AuthReplicaState entities. Entity itself doesn't exist."""
+  # It' intentionally not under model.root_key(). It has nothing to do with core
+  # auth model.
+  return ndb.Key('AuthReplicaStateRoot', 'root')
+
+
 def configure_as_primary():
   """Switches current service to Primary mode.
 
@@ -93,7 +97,7 @@ def register_replica(app_id, replica_url):
   """Creates a new AuthReplicaState or resets the state of existing one."""
   ent = AuthReplicaState(
       id=app_id,
-      parent=REPLICAS_ROOT_KEY,
+      parent=replicas_root_key(),
       replica_url=replica_url)
   ent.put()
   trigger_replication()
@@ -148,7 +152,7 @@ def update_replicas_task(auth_db_rev):
 
   # Grab last known replicas state and push only to replicas that are behind.
   stale_replicas = [
-    entity for entity in AuthReplicaState.query(ancestor=REPLICAS_ROOT_KEY)
+    entity for entity in AuthReplicaState.query(ancestor=replicas_root_key())
     if entity.auth_db_rev is None or entity.auth_db_rev < auth_db_rev
   ]
   if not stale_replicas:
@@ -188,7 +192,7 @@ def update_replicas_task(auth_db_rev):
     # Eagerly update known replica state in local DB as soon as response is
     # received. That way if 'update_replicas_task' is killed midway, at least
     # the state of some replicas will be updated. Note that this transaction is
-    # modifying a single entity group (REPLICAS_ROOT_KEY) and thus can't be
+    # modifying a single entity group (replicas_root_key()) and thus can't be
     # called very often (due to 1 QPS limit on entity group updates).
     # If contention here becomes an issue, adding simple time.sleep(X) before
     # the transaction is totally fine (since 'update_replicas_task' is executed

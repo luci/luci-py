@@ -42,10 +42,6 @@ from components import utils
 from components.auth import model
 
 
-# Key of GroupImporterConfig singleton entity.
-CONFIG_KEY = ndb.Key('GroupImporterConfig', 'config')
-
-
 class BundleImportError(Exception):
   """Base class for errors while fetching external bundle."""
 
@@ -84,6 +80,11 @@ class BundleBadFormatError(BundleImportError):
 
   def __str__(self):
     return 'Bundle contains invalid group file: %s' % self.inner_exc
+
+
+def config_key():
+  """Key of GroupImporterConfig singleton entity."""
+  return ndb.Key('GroupImporterConfig', 'config')
 
 
 class GroupImporterConfig(ndb.Model):
@@ -145,7 +146,7 @@ def is_valid_config(config):
 
 def read_config():
   """Returns currently stored config or [] if not set."""
-  e = CONFIG_KEY.get()
+  e = config_key().get()
   return (e.config if e else []) or []
 
 
@@ -154,7 +155,7 @@ def write_config(config):
   if not is_valid_config(config):
     raise ValueError('Invalid config')
   e = GroupImporterConfig(
-      key=CONFIG_KEY,
+      key=config_key(),
       config=config,
       modified_by=auth.get_current_identity())
   e.put()
@@ -208,7 +209,7 @@ def import_external_groups():
   @ndb.transactional
   def snapshot_groups():
     """Fetches all existing groups and AuthDB revision number."""
-    groups = model.AuthGroup.query(ancestor=model.ROOT_KEY).fetch_async()
+    groups = model.AuthGroup.query(ancestor=model.root_key()).fetch_async()
     return auth.get_auth_db_revision(), groups.get_result()
 
   @ndb.transactional

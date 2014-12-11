@@ -58,7 +58,7 @@ def make_xsrf_token(identity=model.Anonymous, xsrf_token_data=None):
 
 def get_auth_db_rev():
   """Returns current version of AuthReplicationState.auth_db_rev."""
-  ent = model.REPLICATION_STATE_KEY.get()
+  ent = model.replication_state_key().get()
   return 0 if not ent else ent.auth_db_rev
 
 
@@ -66,12 +66,12 @@ def mock_replication_state(primary_url):
   """Modifies AuthReplicationState to represent Replica or Standalone modes."""
   if not primary_url:
     # Convert to standalone by nuking AuthReplicationState.
-    model.REPLICATION_STATE_KEY.delete()
+    model.replication_state_key().delete()
     assert model.is_standalone()
   else:
     # Convert to replica by writing AuthReplicationState with primary_id set.
     model.AuthReplicationState(
-        key=model.REPLICATION_STATE_KEY,
+        key=model.replication_state_key(),
         primary_id='mocked-primary',
         primary_url=primary_url).put()
     assert model.is_replica()
@@ -1446,7 +1446,7 @@ class OAuthConfigHandlerTest(RestAPITestCase):
   def test_no_cache_works(self):
     # Put something into DB.
     config_in_db = model.AuthGlobalConfig(
-        key=model.ROOT_KEY,
+        key=model.root_key(),
         oauth_client_id='config-from-db',
         oauth_client_secret='some-secret-db',
         oauth_additional_client_ids=['a', 'b'])
@@ -1501,7 +1501,7 @@ class OAuthConfigHandlerTest(RestAPITestCase):
     self.assertEqual({'ok': True}, response)
 
     # Ensure it modified the state in DB.
-    config = model.ROOT_KEY.get()
+    config = model.root_key().get()
     self.assertEqual('some-client-id', config.oauth_client_id)
     self.assertEqual('some-secret', config.oauth_client_secret)
     self.assertEqual(['1', '2', '3'], config.oauth_additional_client_ids)
@@ -1521,7 +1521,7 @@ class ServerStateHandlerTest(RestAPITestCase):
     self.mock_now(utils.timestamp_to_datetime(1300000000000000))
 
     # Configure as standalone.
-    state = model.AuthReplicationState(key=model.REPLICATION_STATE_KEY)
+    state = model.AuthReplicationState(key=model.replication_state_key())
     state.put()
 
     expected = {

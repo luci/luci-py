@@ -433,16 +433,16 @@ def fetch_auth_db(known_version=None):
   If |known_version| is None, this function always returns a new instance.
 
   If |known_version| is not None, this function will compare |known_version| to
-  current version of ROOT_KEY entity group, fetched by calling
+  current version of root_key() entity group, fetched by calling
   get_entity_group_version(). It they match, function will return None
   (meaning that there's no need to refetch AuthDB), otherwise it will fetch
   a fresh copy of AuthDB and return it.
 
   Runs in transaction to guarantee consistency of fetched data. Effectively it
-  fetches momentary snapshot of subset of ROOT_KEY entity group.
+  fetches momentary snapshot of subset of root_key() entity group.
   """
   # Entity group root. To reduce amount of typing.
-  root_key = model.ROOT_KEY
+  root_key = model.root_key()
 
   @ndb.non_transactional
   def bootstrap():

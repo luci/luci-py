@@ -93,7 +93,7 @@ class ServiceListingHandler(auth.ApiHandler):
   def get(self):
     services = sorted(
         replication.AuthReplicaState.query(
-            ancestor=replication.REPLICAS_ROOT_KEY),
+            ancestor=replication.replicas_root_key()),
         key=lambda x: x.key.id())
     last_auth_state = model.get_replication_state()
     self.send_response({
