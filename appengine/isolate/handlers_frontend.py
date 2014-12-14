@@ -57,7 +57,7 @@ _GVIZ_COLUMNS_ORDER = (
 class RestrictedGoogleStorageConfig(auth.AuthenticatingHandler):
   """View and modify Google Storage config entries."""
 
-  @auth.require(acl.isolate_admin)
+  @auth.require(auth.is_admin)
   def get(self):
     settings = config.settings()
     self.response.write(template.render('isolate/gs_config.html', {
@@ -67,7 +67,7 @@ class RestrictedGoogleStorageConfig(auth.AuthenticatingHandler):
         'xsrf_token': self.generate_xsrf_token(),
     }))
 
-  @auth.require(acl.isolate_admin)
+  @auth.require(auth.is_admin)
   def post(self):
     settings = config.settings()
     settings.gs_bucket = self.request.get('gs_bucket')
@@ -98,7 +98,7 @@ class RestrictedLaunchMapReduceJob(auth.AuthenticatingHandler):
   on backend module.
   """
 
-  @auth.require(acl.isolate_admin)
+  @auth.require(auth.is_admin)
   def post(self):
     job_id = self.request.get('job_id')
     assert job_id in mapreduce_jobs.MAPREDUCE_JOBS
@@ -197,12 +197,12 @@ class RootHandler(auth.AuthenticatingHandler):
   @auth.public
   def get(self):
     params = {
-      'is_admin': acl.isolate_admin(),
+      'is_admin': auth.is_admin(),
       'is_user': acl.isolate_readable(),
       'mapreduce_jobs': [],
       'user_type': acl.get_user_type(),
     }
-    if acl.isolate_admin():
+    if auth.is_admin():
       params['mapreduce_jobs'] = [
         {'id': job_id, 'name': job_def['name']}
         for job_id, job_def in mapreduce_jobs.MAPREDUCE_JOBS.iteritems()

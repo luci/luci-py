@@ -61,18 +61,14 @@ class MainTest(test_case.TestCase):
     # Tasks are enqueued on the backend.
     self.app = self.app_backend
 
-    # Note that auth.ADMIN_GROUP != acl.ADMINS_GROUP.
     auth.bootstrap_group(
         auth.ADMIN_GROUP,
-        [auth.Identity(auth.IDENTITY_USER, 'super-admin@example.com')])
-    auth.bootstrap_group(
-        acl.ADMINS_GROUP,
         [auth.Identity(auth.IDENTITY_USER, 'admin@example.com')])
     auth.bootstrap_group(
-        acl.READERS_GROUP,
+        acl.READONLY_ACCESS_GROUP,
         [auth.Identity(auth.IDENTITY_USER, 'reader@example.com')])
     auth.bootstrap_group(
-        acl.WRITERS_GROUP,
+        acl.FULL_ACCESS_GROUP,
         [auth.Identity(auth.IDENTITY_USER, 'writer@example.com')])
     # TODO(maruel): Create a BOTS_GROUP.
 

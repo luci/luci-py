@@ -83,8 +83,8 @@ class MainTest(test_case.TestCase):
 
   def mock_acl_checks(self):
     known_groups = (
-      acl.READERS_GROUP,
-      acl.WRITERS_GROUP,
+      acl.FULL_ACCESS_GROUP,
+      acl.READONLY_ACCESS_GROUP,
     )
     def is_group_member_mock(group):
       if auth.get_current_identity().is_anonymous:
