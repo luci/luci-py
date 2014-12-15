@@ -89,6 +89,7 @@ FILES = (
     'third_party/requests/utils.py',
     'utils/__init__.py',
     'utils/cacert.pem',
+    'utils/file_path.py',
     'utils/net.py',
     'utils/oauth.py',
     'utils/on_error.py',
