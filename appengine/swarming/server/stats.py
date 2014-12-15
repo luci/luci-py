@@ -542,7 +542,9 @@ def _extract_snapshot_from_logs(start_time, end_time):
         parse_errors += 1
 
   _post_process(snapshot, bots_active, bots_inactive, tasks_active)
-  logging.debug('Parsed %d lines, %d errors', total_lines, parse_errors)
+  logging.debug(
+      '_extract_snapshot_from_logs(%s, %s): %d lines, %d errors',
+      start_time, end_time, total_lines, parse_errors)
   return snapshot
 
 

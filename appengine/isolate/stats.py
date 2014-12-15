@@ -9,6 +9,8 @@ for general performance concerns. Each http handler should strive to do only one
 log entry at info level per request.
 """
 
+import logging
+
 from google.appengine.ext import ndb
 
 from components import stats_framework
@@ -81,7 +83,7 @@ def _parse_line(line, values):
   """Updates a _Snapshot instance with a processed statistics line if relevant.
   """
   if line.count(';') < 2:
-    return
+    return False
   action_id, measurement, _rest = line.split('; ', 2)
   action = _ACTION_NAMES.index(action_id)
   measurement = int(measurement)
@@ -89,16 +91,19 @@ def _parse_line(line, values):
   if action == STORE:
     values.uploads += 1
     values.uploads_bytes += measurement
+    return True
   elif action == RETURN:
     values.downloads += 1
     values.downloads_bytes += measurement
+    return True
   elif action == LOOKUP:
     values.contains_requests += 1
     values.contains_lookups += measurement
+    return True
   elif action == DUPE:
-    pass
+    return True
   else:
-    assert False
+    return False
 
 
 def _extract_snapshot_from_logs(start_time, end_time):
@@ -107,12 +112,20 @@ def _extract_snapshot_from_logs(start_time, end_time):
   The data is retrieved from logservice via stats_framework.
   """
   values = _Snapshot()
+  total_lines = 0
+  parse_errors = 0
   for entry in stats_framework.yield_entries(start_time, end_time):
     values.requests += 1
     if entry.request.status >= 400:
       values.failures += 1
     for l in entry.entries:
-      _parse_line(l, values)
+      if _parse_line(l, values):
+        total_lines += 1
+      else:
+        parse_errors += 1
+  logging.debug(
+      '_extract_snapshot_from_logs(%s, %s): %d lines, %d errors',
+      start_time, end_time, total_lines, parse_errors)
   return values
 
 
