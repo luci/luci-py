@@ -3,9 +3,13 @@
 # found in the LICENSE file.
 
 import base64
+import contextlib
 import datetime
 import logging
 import time
+
+import endpoints
+import webtest
 
 from google.appengine.ext import ndb
 from google.appengine.ext import testbed
@@ -138,3 +142,52 @@ class TestCase(auto_stub.TestCase):
       if not ran:
         return ran_total
       ran_total += ran
+
+
+class EndpointsTestCase(TestCase):
+  """Base class for a test case that tests Cloud Endpoint Service.
+
+  Usage:
+    class MyTestCase(test_case.EndpointsTestCase):
+      api_service_cls = MyEndpointsService
+
+      def test_stuff(self):
+        response = self.call_api('my_method')
+        self.assertEqual(...)
+
+      def test_expected_fail(self):
+        with self.call_should_fail(403):
+          self.call_api('protected_method')
+  """
+  # Should be set in subclasses to a subclass of remote.Service.
+  api_service_cls = None
+
+  _api_app = None
+
+  @property
+  def api_app(self):
+    """Returns instance of webtest.TestApp that wraps Endpoints API service."""
+    if self._api_app is None:
+      self._api_app = webtest.TestApp(
+          endpoints.api_server([self.api_service_cls], restricted=False),
+          extra_environ={'REMOTE_ADDR': '127.0.0.1'})
+    return self._api_app
+
+  def call_api(self, method, body=None, status=None):
+    """Calls endpoints API method identified by its name."""
+    self.assertTrue(hasattr(self.api_service_cls, method))
+    return self.api_app.post_json(
+        '/_ah/spi/%s.%s' % (self.api_service_cls.__name__, method),
+        body or {},
+        status=status)
+
+  @contextlib.contextmanager
+  def call_should_fail(self, _status):
+    """Asserts that Endpoints call inside the guarded region of code fails."""
+    # This should be a call_api(..., status=<something>). Unfortunately,
+    # Cloud Endpoints doesn't interact with webtest properly. See
+    # https://code.google.com/p/googleappengine/issues/detail?id=10544 and
+    # http://stackoverflow.com/questions/24219654/content-length-error-in-
+    #   google-cloud-endpoints-testing
+    with self.assertRaises(AssertionError):
+      yield

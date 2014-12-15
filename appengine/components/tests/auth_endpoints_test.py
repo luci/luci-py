@@ -9,6 +9,10 @@ import unittest
 import test_env
 test_env.setup_test_env()
 
+import endpoints
+from protorpc import messages
+from protorpc import remote
+
 from support import test_case
 
 from components.auth import api
@@ -68,6 +72,46 @@ class EndpointsAuthTest(test_case.TestCase):
     self.assertEqual(
         'user:another_user@example.com',
         self.call('127.0.0.1', 'another_user@example.com'))
+
+
+@endpoints.api(name='testing', version='v1')
+class TestingServiceApi(remote.Service):
+  """Used as an example Endpoints service below."""
+
+  class Requests(messages.Message):
+    param1 = messages.StringField(1)
+    param2 = messages.StringField(2)
+    raise_error = messages.BooleanField(3)
+
+  class Response(messages.Message):
+    param1 = messages.StringField(1)
+    param2 = messages.StringField(2)
+
+  @endpoints.method(
+      Requests,
+      Response,
+      name='public_method_name',
+      http_method='GET')
+  def real_method_name(self, request):
+    if request.raise_error:
+      raise endpoints.BadRequestException()
+    return self.Response(param1=request.param1, param2=request.param2)
+
+
+class EndpointsTestCaseTest(test_case.EndpointsTestCase):
+  api_service_cls = TestingServiceApi
+
+  def test_ok(self):
+    response = self.call_api(
+        method='real_method_name',
+        body={'param1': 'a', 'param2': 'b', 'raise_error': False})
+    self.assertEqual({'param1': 'a', 'param2': 'b'}, response.json_body)
+
+  def test_fail(self):
+    with self.call_should_fail(400):
+      self.call_api(
+          method='real_method_name',
+          body={'param1': 'a', 'param2': 'b', 'raise_error': True})
 
 
 if __name__ == '__main__':
