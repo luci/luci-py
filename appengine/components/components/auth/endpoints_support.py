@@ -43,6 +43,21 @@ users_id_token.logging = logging.getLogger('endpoints.users_id_token')
 users_id_token.logging.setLevel(logging.INFO)
 
 
+# Reduce the verbosity of messages dumped by _ah/spi/BackendService.logMessages.
+# Otherwise ereporter2 catches them one by one, generating email for each
+# individual error. See endpoints.api_backend_service.BackendServiceImpl.
+def monkey_patch_endpoints_logger():
+  logger = logging.getLogger('endpoints.api_backend_service')
+  original = logger.handle
+  def patched_handle(record):
+    if record.levelno >= logging.ERROR:
+      record.levelno = logging.WARNING
+      record.levelname = logging.getLevelName(record.levelno)
+    return original(record)
+  logger.handle = patched_handle
+monkey_patch_endpoints_logger()
+
+
 @util.positional(2)
 def endpoints_api(
     name, version,
