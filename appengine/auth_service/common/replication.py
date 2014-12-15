@@ -282,6 +282,7 @@ def push_to_replica(replica_url, auth_db_blob, key_name, sig):
   # Pass signature via the headers.
   headers = {
     'Content-Type': 'application/octet-stream',
+    'X-URLFetch-Service-Id': utils.get_urlfetch_service_id(),
     'X-AuthDB-SigKey-v1': key_name,
     'X-AuthDB-SigVal-v1': sig,
   }

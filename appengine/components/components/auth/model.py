@@ -106,7 +106,7 @@ IDENTITY_USER = 'user'
 ALLOWED_IDENTITY_KINDS = {
   IDENTITY_ANONYMOUS: re.compile(r'^anonymous$'),
   IDENTITY_BOT: re.compile(r'^[0-9a-zA-Z_\-\.@]+$'),
-  IDENTITY_SERVICE: re.compile(r'^[0-9a-zA-Z_\-]+$'),
+  IDENTITY_SERVICE: re.compile(r'^[0-9a-zA-Z_\-\:\.]+$'),
   IDENTITY_USER: re.compile(r'^[0-9a-zA-Z_\-\.\+]+@[0-9a-z_\-\.]+$'),
 }
 
@@ -178,7 +178,7 @@ class Identity(
         raise ValueError('Identity has invalid format: only ASCII is allowed')
     if (kind not in ALLOWED_IDENTITY_KINDS or
         not ALLOWED_IDENTITY_KINDS[kind].match(name)):
-      raise ValueError('Identity has invalid format')
+      raise ValueError('Identity has invalid format: %s' % name)
     return super(Identity, cls).__new__(cls, str(kind), name)
 
   def to_bytes(self):

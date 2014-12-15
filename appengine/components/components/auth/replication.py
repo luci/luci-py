@@ -66,6 +66,7 @@ def become_replica(ticket, initiated_by):
   if utils.is_local_dev_server():
     headers['X-Appengine-Inbound-Appid'] = app_identity.get_application_id()
     protocol = 'http'
+  headers['X-URLFetch-Service-Id'] = utils.get_urlfetch_service_id()
 
   # Pass back the ticket for primary to verify it, tell the primary to use
   # default version hostname to talk to us.

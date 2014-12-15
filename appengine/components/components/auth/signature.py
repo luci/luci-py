@@ -64,6 +64,7 @@ def get_service_public_certificates(service_url):
     result = urlfetch.fetch(
         url='%s/auth/api/v1/server/certificates' % service_url,
         method='GET',
+        headers={'X-URLFetch-Service-Id': utils.get_urlfetch_service_id()},
         follow_redirects=False,
         deadline=10,
         validate_certificate=True)

@@ -141,7 +141,13 @@ class GenerateLinkingURL(auth.ApiHandler):
       assert utils.is_local_dev_server()
       host = 'http://%s' % custom_host
     else:
-      host = 'https://%s.appspot.com' % app_id
+      # Use same domain as auth_service. Usually it's just appspot.com.
+      current_hostname = app_identity.get_default_version_hostname()
+      domain = current_hostname.partition('.')[2]
+      naked_app_id = app_id
+      if ':' in app_id:
+        naked_app_id = app_id[app_id.find(':')+1:]
+      host = 'https://%s.%s' % (naked_app_id, domain)
 
     # URL to a handler on Replica that initiates Replica <-> Primary handshake.
     url = '%s/auth/link?t=%s' % (
@@ -196,7 +202,7 @@ class LinkRequestHandler(auth.AuthenticatingHandler):
 
 def get_routes():
   # Use special syntax on dev server to specify where app is running.
-  app_id_re = r'[0-9a-zA-Z_\-]*'
+  app_id_re = r'[0-9a-zA-Z_\-\:\.]*'
   if utils.is_local_dev_server():
     app_id_re += r'(@localhost:[0-9]+)?'
 

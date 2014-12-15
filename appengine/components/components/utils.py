@@ -275,6 +275,18 @@ def get_versioned_hosturl():
 
 
 @cache
+def get_urlfetch_service_id():
+  """Returns a value for X-URLFetch-Service-Id header for GAE <-> GAE calls.
+
+  Usually it can be omitted. It is required in certain environments.
+  """
+  if is_local_dev_server():
+    return 'LOCAL'
+  hostname = app_identity.get_default_version_hostname().split('.')
+  return hostname[-2].upper() if len(hostname) >= 3 else 'APPSPOT'
+
+
+@cache
 def get_app_revision_url():
   """Returns URL of a git revision page for currently running app version.
 
