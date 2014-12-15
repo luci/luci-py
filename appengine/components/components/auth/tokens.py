@@ -8,7 +8,8 @@ import base64
 import hashlib
 import hmac
 import json
-import time
+
+from components import utils
 
 from . import api
 
@@ -54,6 +55,7 @@ class TokenKind(object):
   # What algo to use for MAC tag, one of MAC_ALGOS.
   algo = 'hmac-sha256'
   # Defines how long token can live, in seconds. Should be set in subclasses.
+  # May be overridden on per-token basis, see |expiration_sec| in 'generate'.
   expiration_sec = None
   # Name of the secret key to use when generating and validating the token.
   # Must be an instance of SecretKey. Should be set in subclasses.
@@ -62,7 +64,7 @@ class TokenKind(object):
   version = 1
 
   @classmethod
-  def generate(cls, message=None, embedded=None):
+  def generate(cls, message=None, embedded=None, expiration_sec=None):
     """Generates a token that contains MAC tag for |message|.
 
     Args:
@@ -74,6 +76,8 @@ class TokenKind(object):
           who has the token. Should be used only for publicly visible data.
           It is tagged by token's MAC, so 'validate' function can detect
           any modifications (and reject tokens tampered with).
+      expiration_sec: how long token lives before considered expired, overrides
+          default TokenKind.expiration_sec if present.
 
     Returns:
       URL safe base64 encoded token.
@@ -89,8 +93,11 @@ class TokenKind(object):
     secret = api.get_secret(cls.secret_key)
     assert secret
 
-    # Append 'issued' timestamp (in milliseconds).
-    embedded['_i'] = str(int(time.time() * 1000))
+    # Append 'issued' timestamp (in milliseconds) and expiration time.
+    embedded['_i'] = str(int(utils.time_time() * 1000))
+    if expiration_sec is not None:
+      assert expiration_sec > 0, expiration_sec
+      embedded['_x'] = str(int(expiration_sec * 1000))
 
     # Encode token using most recent secret key value.
     return encode_token(cls.algo, cls.version, secret[0], message, embedded)
@@ -145,12 +152,20 @@ class TokenKind(object):
     issued_ts = int(issued_ts)
 
     # Discard tokens from the future. Someone is messing with the clock.
-    now = time.time() * 1000
+    now = utils.time_time() * 1000
     if issued_ts > now + ALLOWED_CLOCK_DRIFT_SEC * 1000:
       raise InvalidTokenError('Bad token: issued timestamp is in the future')
 
+    # Grab expiration time embedded into the token, if any.
+    expiration_msec = embedded.pop('_x', None)
+    if expiration_msec is None:
+      expiration_msec = cls.expiration_sec * 1000
+    else:
+      expiration_msec = int(expiration_msec)
+      assert expiration_msec > 0, expiration_msec
+
     # Check token expiration.
-    if now > issued_ts + cls.expiration_sec * 1000:
+    if now > issued_ts + expiration_msec:
       raise InvalidTokenError('Bad token: expired')
 
     return embedded

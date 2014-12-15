@@ -3,6 +3,7 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
+import datetime
 import string
 import sys
 import unittest
@@ -257,10 +258,6 @@ class TestToken(test_case.TestCase):
     self.mock(tokens.api, 'get_secret', mocked_get_secret)
     return calls
 
-  def set_time(self, now):
-    """Mocks time.time() to return |now|."""
-    self.mock(tokens.time, 'time', lambda: now)
-
   def test_works(self):
     tok = SimpleToken.generate('message', {'embedded': 'some'})
     self.assertEqual({'embedded': 'some'}, SimpleToken.validate(tok, 'message'))
@@ -297,36 +294,56 @@ class TestToken(test_case.TestCase):
       TokenV2.validate(tok)
 
   def test_checks_issued_time(self):
-    # Make token issued at TS 3600.
-    self.set_time(3600)
+    origin = datetime.datetime(2014, 1, 1, 1, 1, 1)
+
+    # Make token issued at TS 'origin'.
+    self.mock_now(origin, 0)
     tok = SimpleToken.generate()
 
     # If clocks moves forward (as it should), token is valid.
-    self.set_time(5400)
+    self.mock_now(origin, 1800)
     SimpleToken.validate(tok)
 
     # If clocks moves slightly backward, it's still OK. Happens if token is
     # generated on one machine, but validated on another one with slightly late
     # clock.
-    self.set_time(3600 - tokens.ALLOWED_CLOCK_DRIFT_SEC + 5)
+    self.mock_now(origin, -tokens.ALLOWED_CLOCK_DRIFT_SEC+5)
     SimpleToken.validate(tok)
 
     # If token is from far future, then something is fishy...
-    self.set_time(0)
+    self.mock_now(origin, -3600)
     with self.assertRaises(tokens.InvalidTokenError):
       SimpleToken.validate(tok)
 
   def test_checks_expiration_time(self):
-    # Make token issues at TS 0.
-    self.set_time(0)
+    origin = datetime.datetime(2014, 1, 1, 1, 1, 1)
+
+    # Make token issued at TS 'origin'.
+    self.mock_now(origin, 0)
     tok = SimpleToken.generate()
 
     # Valid before expiration.
-    self.set_time(SimpleToken.expiration_sec - 10)
+    self.mock_now(origin, SimpleToken.expiration_sec - 10)
     SimpleToken.validate(tok)
 
     # Invalid after expiration.
-    self.set_time(SimpleToken.expiration_sec + 10)
+    self.mock_now(origin, SimpleToken.expiration_sec + 10)
+    with self.assertRaises(tokens.InvalidTokenError):
+      SimpleToken.validate(tok)
+
+  def test_checks_embedded_expiration(self):
+    origin = datetime.datetime(2014, 1, 1, 1, 1, 1)
+
+    # Make token issues at TS 'origin' that expires in 30 sec (instead of 1h).
+    self.mock_now(origin, 0)
+    tok = SimpleToken.generate(expiration_sec=30)
+
+    # Valid before expiration.
+    self.mock_now(origin, 29)
+    SimpleToken.validate(tok)
+
+    # Invalid after expiration.
+    self.mock_now(origin, 31)
     with self.assertRaises(tokens.InvalidTokenError):
       SimpleToken.validate(tok)
 
