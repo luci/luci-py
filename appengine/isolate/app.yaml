@@ -12,7 +12,7 @@ automatic_scaling:
   max_pending_latency: 250ms
 
 handlers:
-- url: /_ah/.*
+- url: /_ah/spi/.*
   script: endpoint_handlers_api.app
 
 - url: /restricted/mapreduce(/.*)?
