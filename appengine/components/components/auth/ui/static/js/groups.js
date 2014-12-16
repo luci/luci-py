@@ -51,6 +51,23 @@ function isExternalGroupName(name) {
 }
 
 
+// True if string looks like a glob pattern (and not as group member name).
+function isGlob(item) {
+  // Glob patterns contain '*' and '[]' not allowed in member names.
+  return item.search(/[\*\[\]]/) != -1;
+}
+
+
+// Trims group description to fit single line.
+function trimGroupDescription(desc) {
+  var firstLine = desc.split('\n')[0];
+  if (firstLine.length > 55) {
+    firstLine = firstLine.slice(0, 55) + '...';
+  }
+  return firstLine;
+}
+
+
 ////////////////////////////////////////////////////////////////////////////////
 // Group chooser UI element: list of groups + 'Create new group' button.
 
@@ -106,6 +123,7 @@ GroupChooser.prototype.setGroupList = function(groups) {
   self.groupToItemMap = {};
   _.each(self.groupList, function(group) {
     group.isExternal = isExternalGroupName(group.name);
+    group.descriptionTrimmed = trimGroupDescription(group.description);
     self.groupMap[group.name] = group;
   });
 
@@ -362,9 +380,8 @@ GroupForm.prototype.setupSubmitHandler = function(submitCallback) {
     submitHandler: function($form) {
       // Extract data from the form.
       var name = $('input[name=name]', $form).val();
-      var description = $('input[name=description]', $form).val();
-      var members = $('textarea[name=members]', $form).val();
-      var globs = $('textarea[name=globs]', $form).val();
+      var description = $('textarea[name=description]', $form).val();
+      var membersAndGlobs = $('textarea[name=membersAndGlobs]', $form).val();
       var nested = $('textarea[name=nested]', $form).val();
 
       // Splits 'value' on lines boundaries, trims spaces and returns lines
@@ -378,14 +395,26 @@ GroupForm.prototype.setupSubmitHandler = function(submitCallback) {
         });
       };
 
+      // Split joined membersAndGlobs into separately 'members' and 'globs'.
+      // Globs are defined by '*' or '[]' chars not allowed in member entries.
+      var members = [];
+      var globs = [];
+      _.each(splitItemList(membersAndGlobs), function(item) {
+        if (isGlob(item)) {
+          globs.push(item);
+        } else {
+          members.push(item);
+        }
+      });
+
       // Pass data to callback. Never allow actual POST by always returning
       // false. POST is done via asynchronous request in the submit handler.
       try {
         submitCallback({
           name: name.trim(),
           description: description.trim(),
-          members: addPrefixToItems('user', splitItemList(members)),
-          globs: addPrefixToItems('user', splitItemList(globs)),
+          members: addPrefixToItems('user', members),
+          globs: addPrefixToItems('user', globs),
           nested: splitItemList(nested)
         });
       } finally {
@@ -401,11 +430,8 @@ GroupForm.prototype.setupSubmitHandler = function(submitCallback) {
       'description': {
         required: true
       },
-      'members': {
-        memberList: true
-      },
-      'globs': {
-        globList: true
+      'membersAndGlobs': {
+        membersAndGlobsList: true
       },
       'nested': {
         groupList: true
@@ -454,14 +480,26 @@ EditGroupForm.prototype.buildForm = function(group, lastModified) {
   group = _.clone(group);
   group.created_by = stripPrefix('user', group.created_by);
   group.created_ts = common.utcTimestampToString(group.created_ts);
-  group.globs = stripPrefixFromItems('user', group.globs || []);
-  group.members = stripPrefixFromItems('user', group.members || []);
   group.modified_by = stripPrefix('user', group.modified_by);
   group.modified_ts = common.utcTimestampToString(group.modified_ts);
 
+  // Join members and globs list into single UI list.
+  var members = stripPrefixFromItems('user', group.members || []);
+  var globs = stripPrefixFromItems('user', group.globs || []);
+  var membersAndGlobs = [].concat(members, globs);
+
+  // Assert that they can be split apart later.
+  if (!_.all(members, function(item) { return !isGlob(item)})) {
+    console.log(members);
+    throw 'Invalid members list';
+  }
+  if (!_.all(globs, isGlob)) {
+    console.log(globs);
+    throw 'Invalid glob list';
+  }
+
   // Convert list of strings to a single text blob.
-  group.globs = group.globs.join('\n') + '\n';
-  group.members = group.members.join('\n') + '\n';
+  group.membersAndGlobs = membersAndGlobs.join('\n') + '\n';
   group.nested = (group.nested || []).join('\n') + '\n';
   group.isExternal = isExternalGroupName(group.name);
 
@@ -554,8 +592,7 @@ var waitForResult = function(defer, groupChooser, form) {
 var registerFormValidators = function() {
   // Regular expressions for form fields.
   var groupRe = /^[0-9a-zA-Z_\-\.\/]{3,80}$/;
-  var memberRe = /^((user|bot|service|anonymous)\:)?[\w\-\+\%\.\@]+$/;
-  var globRe = /^((user|bot|service|anonymous)\:)?[\w\-\+\%\.\@\*]+$/;
+  var membersRe = /^((user|bot|service|anonymous)\:)?[\w\-\+\%\.\@\*\[\]]+$/;
 
   // Splits |value| on lines boundary and checks that each line matches 're'.
   // Helper function use in validators below.
@@ -571,13 +608,9 @@ var registerFormValidators = function() {
       function(value, element) { return groupRe.test(value); },
       'Invalid group name'
     ],
-    'memberList': [
-      _.partial(validateItemList, memberRe),
-      'Invalid member entry, expected format is <b>type</b>:<b>id</b>'
-    ],
-    'globList': [
-      _.partial(validateItemList, globRe),
-      'Invalid pattern entry, expected format is <b>type</b>:<b>glob</b>'
+    'membersAndGlobsList': [
+      _.partial(validateItemList, membersRe),
+      'Invalid member entry'
     ],
     'groupList': [
       _.partial(validateItemList, groupRe),

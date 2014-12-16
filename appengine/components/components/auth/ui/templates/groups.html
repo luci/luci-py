@@ -12,7 +12,7 @@ javascript library and not jinja2. #}
     {{#if isExternal}}
     <small class="list-group-item-text">External</small>
     {{else}}
-    <small class="list-group-item-text">{{description}}</small>
+    <small class="list-group-item-text">{{descriptionTrimmed}}</small>
     {{/if}}
   </a>
 </script>
@@ -47,39 +47,23 @@ javascript library and not jinja2. #}
         <div class="form-group">
           <label class="col-sm-2 control-label">Description</label>
           <div class="col-sm-10">
-            <input type="text" class="form-control"
-                   name="description" value="{{description}}">
+            <textarea class="form-control" rows="3" name="description">{{description}}</textarea>
           </div>
         </div>
         <hr>
         {{/unless}}
         <div class="form-group">
-          <label class="col-sm-2 control-label">Created on</label>
+          <label class="col-sm-2 control-label">Created</label>
           <div class="col-sm-10">
             <input type="text" class="form-control"
-                   value="{{created_ts}}" disabled>
+                   value="{{created_ts}} by {{created_by}}" disabled>
           </div>
         </div>
         <div class="form-group">
-          <label class="col-sm-2 control-label">Created by</label>
+          <label class="col-sm-2 control-label">Modified</label>
           <div class="col-sm-10">
             <input type="text" class="form-control"
-                   value="{{created_by}}" disabled>
-          </div>
-        </div>
-        <hr>
-        <div class="form-group">
-          <label class="col-sm-2 control-label">Modified on</label>
-          <div class="col-sm-10">
-            <input type="text" class="form-control"
-                   value="{{modified_ts}}" disabled>
-          </div>
-        </div>
-        <div class="form-group">
-          <label class="col-sm-2 control-label">Modified by</label>
-          <div class="col-sm-10">
-            <input type="text" class="form-control"
-                   value="{{modified_by}}" disabled>
+                   value="{{modified_ts}} by {{modified_by}}" disabled>
           </div>
         </div>
         <hr>
@@ -87,23 +71,16 @@ javascript library and not jinja2. #}
           <label class="col-sm-2 control-label">Members</label>
           <div class="col-sm-10" style="font-family:monospace;">
             <textarea class="form-control"
-                      rows="{{#if isExternal}}16{{else}}4{{/if}}"
-                      name="members">{{members}}</textarea>
+                      rows="{{#if isExternal}}24{{else}}9{{/if}}"
+                      name="membersAndGlobs">{{membersAndGlobs}}</textarea>
           </div>
         </div>
         {{#unless isExternal}}
         <div class="form-group">
-          <label class="col-sm-2 control-label">Patterns</label>
+          <label class="col-sm-2 control-label">Subgroups</label>
           <div class="col-sm-10" style="font-family:monospace;">
             <textarea class="form-control"
-                      rows="2" name="globs">{{globs}}</textarea>
-          </div>
-        </div>
-        <div class="form-group">
-          <label class="col-sm-2 control-label">Nested</label>
-          <div class="col-sm-10" style="font-family:monospace;">
-            <textarea class="form-control"
-                      rows="2" name="nested">{{nested}}</textarea>
+                      rows="4" name="nested">{{nested}}</textarea>
           </div>
         </div>
         <hr>
@@ -137,24 +114,18 @@ javascript library and not jinja2. #}
         <div class="form-group">
           <label class="col-sm-2">Description</label>
           <div class="col-sm-10">
-            <input type="text" class="form-control" name="description">
+            <textarea class="form-control" rows="3" name="description"></textarea>
           </div>
         </div>
         <hr>
         <div class="form-group">
           <label class="col-sm-2 control-label">Members</label>
           <div class="col-sm-10" style="font-family:monospace;">
-            <textarea class="form-control" rows="6" name="members"></textarea>
+            <textarea class="form-control" rows="10" name="membersAndGlobs"></textarea>
           </div>
         </div>
         <div class="form-group">
-          <label class="col-sm-2 control-label">Patterns</label>
-          <div class="col-sm-10" style="font-family:monospace;">
-            <textarea class="form-control" rows="3" name="globs"></textarea>
-          </div>
-        </div>
-        <div class="form-group">
-          <label class="col-sm-2 control-label">Nested</label>
+          <label class="col-sm-2 control-label">Subgroups</label>
           <div class="col-sm-10" style="font-family:monospace;">
             <textarea class="form-control" rows="3" name="nested"></textarea>
           </div>

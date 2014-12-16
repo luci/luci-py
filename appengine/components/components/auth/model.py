@@ -483,7 +483,7 @@ class AuthGroup(ndb.Model, datastore_utils.SerializableModelMixin):
   nested = ndb.StringProperty(repeated=True)
 
   # Human readable description.
-  description = ndb.StringProperty(indexed=False, default='')
+  description = ndb.TextProperty(default='')
 
   # When the group was created.
   created_ts = ndb.DateTimeProperty(auto_now_add=True)
@@ -780,7 +780,7 @@ class AuthIPWhitelist(ndb.Model, datastore_utils.SerializableModelMixin):
       repeated=True, validator=lambda _, val: ipaddr.normalize_subnet(val))
 
   # Human readable description.
-  description = ndb.StringProperty(indexed=False, default='')
+  description = ndb.TextProperty(default='')
 
   # When the list was created.
   created_ts = ndb.DateTimeProperty(auto_now_add=True)
