@@ -4,7 +4,13 @@
 
 """This module defines Isolate Server frontend url handlers."""
 
+import os
 import re
+import sys
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(BASE_DIR, 'third_party'))
+sys.path.insert(0, os.path.join(BASE_DIR, 'components', 'third_party'))
 
 import endpoints
 from protorpc import message_types
@@ -12,6 +18,7 @@ from protorpc import messages
 from protorpc import remote
 
 from components import auth
+from components import ereporter2
 from handlers_api import MIN_SIZE_FOR_DIRECT_GS
 from handlers_api import MIN_SIZE_FOR_GS
 from handlers_api import PreUploadContentHandler
@@ -135,4 +142,9 @@ class IsolateService(remote.Service):
     return response
 
 
-app = endpoints.api_server([IsolateService])
+def create_application():
+  ereporter2.register_formatter()
+  return endpoints.api_server([IsolateService])
+
+
+app = create_application()
