@@ -4,6 +4,8 @@
 
 """This module defines Isolate Server frontend url handlers."""
 
+import re
+
 import endpoints
 from protorpc import message_types
 from protorpc import messages
@@ -12,21 +14,27 @@ from protorpc import remote
 from components import auth
 from handlers_api import MIN_SIZE_FOR_DIRECT_GS
 from handlers_api import MIN_SIZE_FOR_GS
+from handlers_api import PreUploadContentHandler
+import model
+import stats
 
 
 ### Request Types
 
 
 class Digest(messages.Message):
-  """Abstraction for a single element of the JSON post body list."""
+  """ProtoRPC message containing digest information."""
   digest = messages.StringField(1)
-  is_isolated = messages.BoolField(2)
-  size = messages.IntField(3)
+  is_isolated = messages.BooleanField(2, default=False)
+  size = messages.IntegerField(3)
 
 
 class DigestCollection(messages.Message):
   """Endpoints request type analogous to the existing JSON post body."""
   items = messages.MessageField(Digest, 1, repeated=True)
+  namespace = messages.StringField(4, default='default')
+  digest_hash = messages.StringField(5, default='SHA-1')
+  compression = messages.StringField(6, default='flate')
 
 
 ### Response Types
@@ -43,20 +51,44 @@ class UrlCollection(messages.Message):
   items = messages.MessageField(UrlMessage, 1, repeated=True)
 
 
-### Utility
+### API
 
 
 @auth.endpoints_api(name='isolateservice', version='v1')
 class IsolateService(remote.Service):
-  """Base class for handlers; implements authentication functionality.
+  """Implement API methods corresponding to handlers in handlers_api."""
 
-  TODO(cmassaro): this should eventually be equipollent to the similarly-named
-  handler in handlers_api.py.
-  """
+  @classmethod
+  def check_entries_exist(cls, entries):
+    """For now, just monkey patch into the existing handler.
+
+    Arguments:
+      entries: a DigestCollection to be posted
+
+    Yields:
+      entry_info, Boolean pairs, where Boolean indicates existence of the entry
+    """
+    for yielded_tuple in PreUploadContentHandler.check_entry_infos(
+        entries, entries.namespace):
+      yield yielded_tuple
+
+  @classmethod
+  def generate_urls(cls, _digest_element):
+    """Generate upload and finalize URLs for a digest.
+
+    Arguments:
+      _digest_element: a single Digest from the request message
+
+    Returns:
+      a two-tuple of URL strings
+
+    TODO(cmassaro): for real implement this
+    """
+    return (None, None)
 
   @auth.endpoints_method(DigestCollection, UrlCollection,
                          path='preupload', http_method='POST',
-                         name='digests.preupload')
+                         name='preuploader.preupload')
   def preupload(self, request):
     """Checks for entry's existence and generates upload URLs.
 
@@ -81,6 +113,26 @@ class IsolateService(remote.Service):
         ...
         ])
     """
+    response = UrlCollection(items=[])
 
-    pass
+    # check for namespace error
+    if not re.match(r'^%s$' % model.NAMESPACE_RE, request.namespace):
+      raise endpoints.BadRequestException(
+          'Invalid namespace; allowed keys must pass regexp "%s"' %
+          model.NAMESPACE_RE)
+    for digest_element in request.items:
+      # check for error conditions
+      if not model.is_valid_hex(digest_element.digest):
+        raise endpoints.BadRequestException('Invalid hex code: %s' %
+                                            (digest_element.digest))
 
+      # generate and append new URLs
+      upload_url, finalize_url = self.generate_urls(digest_element)
+      response.items.append(UrlMessage(upload_url=upload_url,
+                                       finalize_url=finalize_url))
+
+    # all is well; return the UrlCollection
+    return response
+
+
+app = endpoints.api_server([IsolateService])

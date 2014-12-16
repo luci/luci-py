@@ -12,6 +12,9 @@ automatic_scaling:
   max_pending_latency: 250ms
 
 handlers:
+- url: /_ah/.*
+  script: endpoint_handlers_api.app
+
 - url: /restricted/mapreduce(/.*)?
   script: mapreduce_jobs.app
   secure: always

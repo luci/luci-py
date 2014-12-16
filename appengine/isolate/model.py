@@ -101,13 +101,18 @@ _HASH_LETTERS = frozenset('0123456789abcdef')
 ### Public API.
 
 
+def is_valid_hex(hex_string):
+  """Returns True if the string consists of hexadecimal characters."""
+  return _HASH_LETTERS.issuperset(hex_string)
+
+
 def check_hash(hash_key, length):
   """Checks the validity of an hash_key. Doesn't use a regexp for speed.
 
   Raises in case of non-validity.
   """
   # It is faster than running a regexp.
-  if len(hash_key) != length or not _HASH_LETTERS.issuperset(hash_key):
+  if len(hash_key) != length or not is_valid_hex(hash_key):
     raise ValueError('Invalid \'%s\' as ContentEntry key' % hash_key)
 
 

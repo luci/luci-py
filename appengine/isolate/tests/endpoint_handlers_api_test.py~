@@ -23,8 +23,21 @@ import webtest
 from components import auth_testing
 from contextlib import contextmanager
 import endpoint_handlers_api
+import model
 from endpoint_handlers_api import Digest
 from endpoint_handlers_api import DigestCollection
+
+
+def hash_content(content, namespace):
+  """Create and return the hash of some content in a given namespace."""
+  hash_algo = model.get_hash_algo(namespace)
+  hash_algo.update(content)
+  return hash_algo.hexdigest()
+
+
+def generate_digest(content, namespace):
+  """Create a Digest from content (in a given namespace) for preupload."""
+  return Digest(digest=hash_content(content, namespace), size=len(content))
 
 
 class IsolateServiceTest(test_case.EndpointsTestCase):
@@ -49,10 +62,19 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
 
   def test_pre_upload_ok(self):
     """Assert that preupload correctly posts the DigestCollection."""
-    good_digests = DigestCollection(items=[Digest(digest='abcd', size=4)])
-    bad_1 = DigestCollection(items=[Digest(digest='g', size=4)])
-    bad_2 = DigestCollection(items=[Digest(digest='abcd', size=400)],
-                             namespace='~whatever')
+    good_digests = DigestCollection()
+    good_digests.items.append(generate_digest('some stuff',
+                                              good_digests.namespace))
+
+    # fail because of bad hash
+    bad_digest = hash_content('some stuff', 'default')
+    bad_digest = 'g' + bad_digest[1:]  # that's not hexadecimal!
+    bad_1 = DigestCollection()
+    bad_1.items.append(Digest(digest=bad_digest, size=10))
+
+    # fail because of bad namespace
+    bad_2 = DigestCollection(namespace='~tildewhatevs')
+    bad_2.items.append(generate_digest('other stuff', 'default'))
 
     url = '/_ah/spi/IsolateService.preupload'
     response = self.app_api.post_json(url,
@@ -72,3 +94,4 @@ if __name__ == '__main__':
   else:
     logging.basicConfig(level=logging.FATAL)
   unittest.main()
+
