@@ -14,7 +14,8 @@ javascript library and not jinja2. #}
         <th>GAE admin</th>
         <th>Ereporter2</th>
         <th>Exceptions</th>
-        <th style="width:100px;">Lag</th>
+        <th style="width:100px;" class="text-center">Auth API</th>
+        <th style="width:100px;" class="text-center">Lag</th>
         <th style="width:100px;" class="text-center">Status</th>
       </tr>
     </thead>
@@ -39,7 +40,12 @@ javascript library and not jinja2. #}
             view <span class="glyphicon glyphicon-share-alt"></span>
           </a>
         </td>
-        <td style="width:100px;">{{this.lag_ms}}</td>
+        <td style="width:100px;" class="text-center">
+          {{this.auth_code_version}}
+        </td>
+        <td style="width:100px;" class="text-center">
+          {{this.lag_ms}}
+        </td>
         <td style="width:100px;" class="text-center">
           <span
             class="label label-{{this.status.label}} status-label"

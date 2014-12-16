@@ -15,6 +15,7 @@ from components import utils
 
 from components.auth import model
 from components.auth import tokens
+from components.auth import version
 from components.auth.proto import replication_pb2
 from components.auth.ui import rest_api
 from components.auth.ui import ui
@@ -99,6 +100,7 @@ class ServiceListingHandler(auth.ApiHandler):
       'services': [
         x.to_serializable_dict(with_id_as='app_id') for x in services
       ],
+      'auth_code_version': version.__version__,
       'auth_db_rev': {
         'primary_id': last_auth_state.primary_id,
         'rev': last_auth_state.auth_db_rev,

@@ -23,6 +23,7 @@ from components import utils
 from components.auth import api
 from components.auth import handler
 from components.auth import model
+from components.auth import version
 
 from components.auth.ui import rest_api
 from components.auth.ui import ui
@@ -1525,6 +1526,7 @@ class ServerStateHandlerTest(RestAPITestCase):
     state.put()
 
     expected = {
+      'auth_code_version': version.__version__,
       'mode': 'standalone',
       'replication_state': {
         'auth_db_rev': 0,

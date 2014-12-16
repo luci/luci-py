@@ -17,6 +17,7 @@ from components import utils
 from components.auth import model
 from components.auth import replication
 from components.auth import signature
+from components.auth import version
 from components.auth.proto import replication_pb2
 
 
@@ -52,6 +53,7 @@ class AuthReplicaState(ndb.Model, datastore_utils.SerializableModelMixin):
     'replica_url': datastore_utils.READABLE,
     'auth_db_rev': datastore_utils.READABLE,
     'rev_modified_ts': datastore_utils.READABLE,
+    'auth_code_version': datastore_utils.READABLE,
     'push_started_ts': datastore_utils.READABLE,
     'push_finished_ts': datastore_utils.READABLE,
     'push_status': datastore_utils.READABLE,
@@ -64,6 +66,8 @@ class AuthReplicaState(ndb.Model, datastore_utils.SerializableModelMixin):
   auth_db_rev = ndb.IntegerProperty(default=0, indexed=False)
   # Time when auth_db_rev was created (by primary clock).
   rev_modified_ts = ndb.DateTimeProperty(indexed=False)
+  # Value of components.auth.version.__version__ used by replica.
+  auth_code_version = ndb.StringProperty(indexed=False)
 
   # Timestamp of when last push attempt started.
   push_started_ts = ndb.DateTimeProperty(indexed=False)
@@ -176,11 +180,14 @@ def update_replicas_task(auth_db_rev):
     completed = ndb.Future.wait_any(futures)
     replica = futures.pop(completed)
 
-    # Only one of these will be non None.
     exception = completed.get_exception()
-    current_revision = None if exception else completed.get_result()
-
     success = exception is None
+
+    current_revision = None
+    auth_code_version = None
+    if success:
+      current_revision, auth_code_version = completed.get_result()
+
     if not success:
       logging.error(
           'Error when pushing update to replica: %s (%s).\nReplica id is %s.',
@@ -203,7 +210,8 @@ def update_replicas_task(auth_db_rev):
             key=replica.key,
             started_ts=push_started_ts,
             finished_ts=utils.utcnow(),
-            current_revision=current_revision)
+            current_revision=current_revision,
+            auth_code_version=auth_code_version)
         logging.info(
             'Replica %s is updated to rev %d', replica.key.id(), stored_rev)
       else:
@@ -247,6 +255,7 @@ def pack_auth_db():
   req.revision.auth_db_rev = state.auth_db_rev
   req.revision.modified_ts = utils.datetime_to_timestamp(state.modified_ts)
   replication.auth_db_snapshot_to_proto(snapshot, req.auth_db)
+  req.auth_code_version = version.__version__
   auth_db_blob = req.SerializeToString()
 
   # Sign it using primary's private keys.
@@ -268,7 +277,9 @@ def push_to_replica(replica_url, auth_db_blob, key_name, sig):
     sig: base64 encoded signature of |auth_db_blob|.
 
   Returns:
-    AuthDB revision reporter by a replica (as replication_pb2.AuthDBRevision).
+    Tuple:
+      AuthDB revision reporter by a replica (as replication_pb2.AuthDBRevision).
+      Auth component version used by replica (see components.auth.version).
 
   Raises:
     FatalReplicaUpdateError if replica rejected the push.
@@ -330,11 +341,18 @@ def push_to_replica(replica_url, auth_db_blob, key_name, sig):
   if not response.HasField('current_revision'):
     raise FatalReplicaUpdateError(
         'Incomplete response, current_revision is missing')
-  raise ndb.Return(response.current_revision)
+
+  # Extract auth component version used by replica if proto is recent enough.
+  auth_code_version = None
+  if response.HasField('auth_code_version'):
+    auth_code_version = response.auth_code_version
+
+  raise ndb.Return((response.current_revision, auth_code_version))
 
 
 @ndb.transactional
-def _update_state_on_success(key, started_ts, finished_ts, current_revision):
+def _update_state_on_success(
+    key, started_ts, finished_ts, current_revision, auth_code_version):
   """Updates AuthReplicaState after a successful push.
 
   Args:
@@ -342,6 +360,7 @@ def _update_state_on_success(key, started_ts, finished_ts, current_revision):
     started_ts: datetime timestamp of when push was initiated.
     finished_ts: datetime timestamp of when push was completed.
     current_revision: an instance of AuthDBRevision as reported by Replica.
+    auth_code_version: components.auth.version.__version__ on replica.
 
   Returns:
     Auth DB revision of replica as it is stored in DB after the update. May be
@@ -363,6 +382,7 @@ def _update_state_on_success(key, started_ts, finished_ts, current_revision):
   state.auth_db_rev = current_revision.auth_db_rev
   state.rev_modified_ts = utils.timestamp_to_datetime(
       current_revision.modified_ts)
+  state.auth_code_version = auth_code_version
   state.push_started_ts = started_ts
   state.push_finished_ts = finished_ts
   state.push_status = PUSH_STATUS_SUCCESS

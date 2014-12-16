@@ -199,6 +199,8 @@ message ReplicationPushRequest {
   optional AuthDBRevision revision = 1;
   // An entire database of auth configuration for specific revision.
   optional AuthDB auth_db = 2;
+  // Version of 'auth' component on Primary, see components/auth/version.py.
+  optional string auth_code_version = 3;
 }
 
 
@@ -236,4 +238,6 @@ message ReplicationPushResponse {
   optional AuthDBRevision current_revision = 2;
   // Present for TRANSIENT_ERROR and FATAL_ERROR statuses.
   optional ErrorCode error_code = 3;
+  // Version of 'auth' component on Replica, see components/auth/version.py.
+  optional string auth_code_version = 4;
 }

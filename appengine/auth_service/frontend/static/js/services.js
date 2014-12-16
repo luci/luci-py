@@ -35,6 +35,7 @@ var updateServiceListing = function() {
     var services = [];
     var now = result.data['now'];
     var auth_db_rev = result.data['auth_db_rev'];
+    var auth_code_version = result.data['auth_code_version'];
 
     var getUpToDateStatus = function(updated_ts) {
       var dt = Math.round((now - updated_ts) / 1000000);
@@ -47,8 +48,8 @@ var updateServiceListing = function() {
         };
       }
       return {
-        text: 'up to date',
-        tooltip: '',
+        text: 'ok',
+        tooltip: 'Has latest ACLs',
         label: 'success'
       };
     };
@@ -82,6 +83,7 @@ var updateServiceListing = function() {
     // Add auth service itself to the list.
     services.push({
       app_id: auth_db_rev['primary_id'],
+      auth_code_version: auth_code_version,
       lag_ms: '0 ms',
       service_url: '/',
       status: getUpToDateStatus(auth_db_rev.ts)
@@ -91,6 +93,7 @@ var updateServiceListing = function() {
     _.each(result.data['services'], function(service) {
       services.push({
         app_id: service.app_id,
+        auth_code_version: service.auth_code_version || '--',
         lag_ms: getReplicationLag(service),
         service_url: service.replica_url + '/',
         status: getReplicaStatus(service)

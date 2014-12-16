@@ -19,6 +19,7 @@ from .. import handler
 from .. import model
 from .. import replication
 from .. import signature
+from .. import version
 from ..proto import replication_pb2
 
 
@@ -453,6 +454,7 @@ class ReplicationHandler(handler.AuthenticatingHandler):
     response = replication_pb2.ReplicationPushResponse()
     response.status = replication_pb2.ReplicationPushResponse.FATAL_ERROR
     response.error_code = error_code
+    response.auth_code_version = version.__version__
     self.send_response(response)
 
   # Check that request came from some GAE app. More thorough check is inside.
@@ -492,6 +494,9 @@ class ReplicationHandler(handler.AuthenticatingHandler):
 
     # Handle it.
     logging.info('Received AuthDB push: rev %d', request.revision.auth_db_rev)
+    if request.HasField('auth_code_version'):
+      logging.info(
+          'Primary\'s auth component version: %s', request.auth_code_version)
     applied, state = replication.push_auth_db(request.revision, request.auth_db)
     logging.info(
         'AuthDB push %s: rev is %d',
@@ -507,6 +512,7 @@ class ReplicationHandler(handler.AuthenticatingHandler):
     response.current_revision.auth_db_rev = state.auth_db_rev
     response.current_revision.modified_ts = utils.datetime_to_timestamp(
         state.modified_ts)
+    response.auth_code_version = version.__version__
     self.send_response(response)
 
 
@@ -650,6 +656,7 @@ class ServerStateHandler(handler.ApiHandler):
       mode = 'standalone'
     state = model.get_replication_state() or model.AuthReplicationState()
     self.send_response({
+      'auth_code_version': version.__version__,
       'mode': mode,
       'replication_state': state.to_serializable_dict(),
     })
