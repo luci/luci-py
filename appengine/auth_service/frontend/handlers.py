@@ -10,7 +10,6 @@ import webapp2
 from google.appengine.api import app_identity
 
 from components import auth
-from components import ereporter2
 from components import template
 from components import utils
 
@@ -208,7 +207,6 @@ def get_routes():
 
   # Auth service extends the basic UI and API provided by Auth component.
   routes = []
-  routes.extend(ereporter2.get_frontend_routes())
   routes.extend(rest_api.get_rest_api_routes())
   routes.extend(ui.get_ui_routes())
   routes.extend([
@@ -235,7 +233,6 @@ def get_routes():
 
 
 def create_application(debug=False):
-  ereporter2.configure()
   replication.configure_as_primary()
 
   # Configure UI appearance, add all custom tabs.

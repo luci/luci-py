@@ -24,7 +24,6 @@ import handlers_backend
 import mapreduce_jobs
 import template
 from components import auth
-from components import ereporter2
 from components import utils
 from server import acl
 from server import bot_code
@@ -642,7 +641,6 @@ class WarmupHandler(webapp2.RequestHandler):
 
 def create_application(debug):
   template.bootstrap()
-  ereporter2.configure()
 
   routes = [
       # Frontend pages. They return HTML.
@@ -690,6 +688,5 @@ def create_application(debug):
   # TODO(maruel): Split backend into a separate module. For now add routes here.
   routes.extend(handlers_backend.get_routes())
   routes.extend(handlers_api.get_routes())
-  routes.extend(ereporter2.get_frontend_routes())
 
   return webapp2.WSGIApplication(routes, debug=debug)

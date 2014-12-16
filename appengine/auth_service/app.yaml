@@ -28,6 +28,7 @@ builtins:
 - remote_api: on
 
 includes:
+- components/ereporter2
 - components/static_third_party.yaml
 
 inbound_services:

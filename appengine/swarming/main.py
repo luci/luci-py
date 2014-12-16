@@ -16,6 +16,7 @@ sys.path.insert(0, os.path.join(APP_DIR, 'components', 'third_party'))
 
 from components import ereporter2
 from components import utils
+
 import handlers_frontend
 
 
@@ -26,7 +27,7 @@ import handlers_frontend
 logservice.AUTOFLUSH_EVERY_LINES = 1
 
 
-def CreateApplication():
+def create_application():
   ereporter2.register_formatter()
   a = handlers_frontend.create_application(False)
   # In theory we'd want to take the output of app_identity.get_application_id().
@@ -37,4 +38,4 @@ def CreateApplication():
   return a
 
 
-app = CreateApplication()
+app = create_application()

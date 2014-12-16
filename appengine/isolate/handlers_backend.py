@@ -22,7 +22,6 @@ import model
 import stats
 import template
 from components import decorators
-from components import ereporter2
 from components import utils
 
 
@@ -487,8 +486,4 @@ def create_application(debug=False):
   """
   # Necessary due to email sent by cron job.
   template.bootstrap()
-  ereporter2.configure()
-
-  routes = get_routes()
-  routes.extend(ereporter2.get_backend_routes())
-  return webapp2.WSGIApplication(routes, debug=debug)
+  return webapp2.WSGIApplication(get_routes(), debug=debug)

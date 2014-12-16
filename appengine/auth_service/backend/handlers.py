@@ -7,7 +7,6 @@
 import webapp2
 
 from components import decorators
-from components import ereporter2
 
 from common import importer
 from common import replication
@@ -28,7 +27,7 @@ class InternalReplicationTaskHandler(webapp2.RequestHandler):
 
 
 def get_routes():
-  routes = [
+  return [
     webapp2.Route(
         r'/internal/cron/import_groups',
         InternalImportGroupsCronHandler),
@@ -36,11 +35,8 @@ def get_routes():
         r'/internal/taskqueue/replication/<auth_db_rev:\d+>',
         InternalReplicationTaskHandler),
   ]
-  routes.extend(ereporter2.get_backend_routes())
-  return routes
 
 
 def create_application(debug=False):
-  ereporter2.configure()
   replication.configure_as_primary()
   return webapp2.WSGIApplication(get_routes(), debug=debug)

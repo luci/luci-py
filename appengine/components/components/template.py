@@ -98,8 +98,8 @@ _GLOBAL_FILTERS = _DEFAULT_GLOBAL_FILTERS.copy()
 def bootstrap(paths, global_env=None, filters=None):
   """Resets cached Jinja2 env to pick up new template paths.
 
-  This is purely additive. So consecutive calls to this functions with different
-  arguments is fine.
+  This is purely additive and idempotent. So consecutive calls to this functions
+  with different arguments is fine.
 
   Args:
     paths: dict {prefix -> template_dir}, templates under template_dir would be
@@ -108,22 +108,26 @@ def bootstrap(paths, global_env=None, filters=None):
     filters: dict with filters to add to global filter list.
   """
   assert isinstance(paths, dict), paths
-  assert all(k not in _TEMPLATE_PATHS for k in paths), paths
+  assert all(
+      _TEMPLATE_PATHS.get(k, v) == v for k, v in paths.iteritems()), paths
   assert all(os.path.isabs(p) for p in paths.itervalues()), paths
   assert all(os.path.isdir(p) for p in paths.itervalues()), paths
 
   if global_env is not None:
     assert isinstance(global_env, dict), global_env
+    assert all(isinstance(k, str) for k in global_env), global_env
     assert all(
-        isinstance(k, str) for k, v in global_env.iteritems()), global_env
-    assert all(k not in _GLOBAL_ENV for k in global_env), global_env
+        _GLOBAL_ENV.get(k, v) == v
+        for k, v in global_env.iteritems()), global_env
 
   if filters is not None:
     assert isinstance(filters, dict), filters
     assert all(
         isinstance(k, str) and callable(v)
         for k, v in filters.iteritems()), filters
-    assert all(k not in _GLOBAL_FILTERS for k in filters), filters
+    assert all(
+        _GLOBAL_FILTERS.get(k, v) == v
+        for k, v in filters.iteritems()), filters
 
   _TEMPLATE_PATHS.update(paths)
 

@@ -10,7 +10,6 @@ from google.appengine.api import taskqueue
 
 import mapreduce_jobs
 from components import decorators
-from components import ereporter2
 from server import stats
 from server import task_scheduler
 
@@ -87,6 +86,4 @@ def get_routes():
     (r'/internal/taskqueue/mapreduce/launch/<job_id:[^\/]+>',
       InternalLaunchMapReduceJobWorkerHandler),
   ]
-  routes = [webapp2.Route(*a) for a in routes]
-  routes.extend(ereporter2.get_backend_routes())
-  return routes
+  return [webapp2.Route(*a) for a in routes]

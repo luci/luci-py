@@ -416,12 +416,6 @@ class BackendTest(AppTestBase):
     # The actual number doesn't matter, just make sure they are unqueued.
     self.execute_tasks()
 
-  def testSendEReporter(self):
-    self.set_as_admin()
-    response = self.app.get(
-        '/internal/cron/ereporter2/mail', headers={'X-AppEngine-Cron': 'true'})
-    self.assertEqual('Success.', response.body)
-
   def testCronTriggerTask(self):
     triggers = (
       '/internal/cron/trigger_cleanup_data',

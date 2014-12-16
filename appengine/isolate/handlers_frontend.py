@@ -16,7 +16,6 @@ import mapreduce_jobs
 import stats
 import template
 from components import auth
-from components import ereporter2
 from components import stats_framework
 from components import stats_framework_gviz
 from components import utils
@@ -252,11 +251,9 @@ def create_application(debug=False):
   - /stats/.* has statistics.
   """
   acl.bootstrap()
-  ereporter2.configure()
   template.bootstrap()
 
   routes = get_routes()
-  routes.extend(ereporter2.get_frontend_routes())
   routes.extend(handlers_api.get_routes())
 
   return webapp2.WSGIApplication(routes, debug=debug)

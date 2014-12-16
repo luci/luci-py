@@ -44,6 +44,7 @@ inbound_services:
 
 includes:
 - components/auth
+- components/ereporter2
 - components/static_third_party.yaml
 
 # https://developers.google.com/appengine/docs/python/tools/libraries27
