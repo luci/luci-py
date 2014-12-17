@@ -24,6 +24,16 @@ package = 'testing_api'
 
 class WhoResponse(messages.Message):
   identity = messages.StringField(1)
+  ip = messages.StringField(2)
+  host = messages.StringField(3)
+
+
+class HostTokenRequest(messages.Message):
+  host = messages.StringField(1)
+
+
+class HostTokenRespones(messages.Message):
+  host_token = messages.StringField(1)
 
 
 @auth.endpoints_api(name='testing_service', version='v1')
@@ -34,7 +44,10 @@ class TestingServiceApi(remote.Service):
       name='who',
       http_method='GET')
   def who(self, _request):
-    return WhoResponse(identity=auth.get_current_identity().to_bytes())
+    return WhoResponse(
+        host=auth.get_current_identity_host(),
+        identity=auth.get_current_identity().to_bytes(),
+        ip=auth.ip_to_string(auth.get_current_identity_ip()))
 
   @auth.endpoints_method(
       message_types.VoidMessage,
@@ -44,6 +57,14 @@ class TestingServiceApi(remote.Service):
   @auth.require(lambda: False)
   def forbidden(self, _request):
     pass
+
+  @auth.endpoints_method(
+      HostTokenRequest,
+      HostTokenRespones,
+      name='create_host_token',
+      http_method='POST')
+  def create_host_token(self, request):
+    return HostTokenRespones(host_token=auth.create_host_token(request.host))
 
 
 app = endpoints.api_server([TestingServiceApi])

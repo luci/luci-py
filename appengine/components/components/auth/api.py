@@ -36,6 +36,8 @@ __all__ = [
   'disable_process_cache',
   'Error',
   'get_current_identity',
+  'get_current_identity_host',
+  'get_current_identity_ip',
   'get_process_cache_expiration_sec',
   'get_secret',
   'is_admin',
@@ -380,16 +382,30 @@ class RequestCache(object):
   def __init__(self):
     self.auth_db = None
     self.current_identity = None
+    self.current_identity_host = None
+    self.current_identity_ip = None
 
   def set_current_identity(self, current_identity):
     """Called early during request processing to set identity for a request."""
     assert current_identity is not None
     self.current_identity = current_identity
 
+  def set_current_identity_host(self, hostname):
+    """Called for requests that provide valid X-Host-Token header."""
+    assert hostname is not None
+    self.current_identity_host = hostname
+
+  def set_current_identity_ip(self, ip):
+    """Remembers callers ipaddr.IP address."""
+    assert isinstance(ip, ipaddr.IP)
+    self.current_identity_ip = ip
+
   def close(self):
     """Helps GC to collect garbage faster."""
     self.auth_db = None
     self.current_identity = None
+    self.current_identity_host = None
+    self.current_identity_ip = None
 
 
 def disable_process_cache():
@@ -636,6 +652,34 @@ def _get_current_identity():
   if ident is None:
     raise UninitializedError()
   return ident
+
+
+def get_current_identity_host():
+  """Returns hostname extracted from X-Host-Token header or None if missing.
+
+  To be used to authenticate machines that reuse same single service account.
+
+  Raises UninitializedError if request context is not initialized, for more info
+  see get_current_identity().
+  """
+  cache = get_request_cache()
+  # cache.current_identity is None iff request context is uninitialized.
+  if cache.current_identity is None:
+    return UninitializedError()
+  return cache.current_identity_host
+
+
+def get_current_identity_ip():
+  """Returns ipaddr.IP address of a client that sent current request.
+
+  Raises UninitializedError if request context is not initialized, for more info
+  see get_current_identity().
+  """
+  cache = get_request_cache()
+  # cache.current_identity is None iff request context is uninitialized.
+  if cache.current_identity is None:
+    return UninitializedError()
+  return cache.current_identity_ip
 
 
 def is_group_member(group_name, identity=None):

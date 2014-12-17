@@ -6,6 +6,7 @@
 # Disable 'Unused variable', 'Unused argument' and 'Method could be a function'.
 # pylint: disable=W0612,W0613,R0201
 
+import datetime
 import os
 import sys
 import unittest
@@ -23,6 +24,8 @@ from support import test_case
 
 from components.auth import api
 from components.auth import handler
+from components.auth import host_token
+from components.auth import ipaddr
 from components.auth import model
 
 
@@ -74,7 +77,7 @@ class AuthenticatingHandlerTest(test_case.TestCase):
   def make_test_app(self, path, request_handler):
     """Returns webtest.TestApp with single route."""
     return webtest.TestApp(
-        webapp2.WSGIApplication([(path, request_handler)]),
+        webapp2.WSGIApplication([(path, request_handler)], debug=True),
         extra_environ={'REMOTE_ADDR': '127.0.0.1'})
 
   def test_anonymous(self):
@@ -104,8 +107,9 @@ class AuthenticatingHandlerTest(test_case.TestCase):
         self.response.write(api.get_current_identity().to_bytes())
 
     app = self.make_test_app('/request', Handler)
-    call = lambda ip: (
-        app.get('/request', extra_environ={'REMOTE_ADDR': ip}).body)
+    def call(ip):
+      api.reset_local_state()
+      return app.get('/request', extra_environ={'REMOTE_ADDR': ip}).body
 
     self.assertEqual('bot:192.168.1.100', call('192.168.1.100'))
     self.assertEqual('anonymous:anonymous', call('127.0.0.1'))
@@ -125,6 +129,7 @@ class AuthenticatingHandlerTest(test_case.TestCase):
 
     app = self.make_test_app('/request', Handler)
     def call(ident, ip):
+      api.reset_local_state()
       handler.configure([lambda _request: ident])
       response = app.get(
           '/request', extra_environ={'REMOTE_ADDR': ip}, expect_errors=True)
@@ -348,6 +353,46 @@ class AuthenticatingHandlerTest(test_case.TestCase):
     routes = handler.get_authenticated_routes(app)
     self.assertEqual(1, len(routes))
     self.assertEqual(Authenticated, routes[0].handler)
+
+  def test_get_current_identity_ip(self):
+    handler.configure([])
+
+    class Handler(handler.AuthenticatingHandler):
+      @api.public
+      def get(self):
+        self.response.write(ipaddr.ip_to_string(api.get_current_identity_ip()))
+
+    app = self.make_test_app('/request', Handler)
+    response = app.get('/request', extra_environ={'REMOTE_ADDR': '192.1.2.3'})
+    self.assertEqual('192.1.2.3', response.body)
+
+  def test_get_current_identity_host(self):
+    handler.configure([])
+
+    class Handler(handler.AuthenticatingHandler):
+      @api.public
+      def get(self):
+        self.response.write(api.get_current_identity_host() or '<none>')
+
+    app = self.make_test_app('/request', Handler)
+    def call(headers):
+      api.reset_local_state()
+      return app.get('/request', headers=headers).body
+
+    # Good token.
+    token = host_token.create_host_token('HOST.domain.com')
+    self.assertEqual('host.domain.com', call({'X-Host-Token-V1': token}))
+
+    # Missing or invalid tokens.
+    self.assertEqual('<none>', call({}))
+    self.assertEqual('<none>', call({'X-Host-Token-V1': 'broken'}))
+
+    # Expired token.
+    origin = datetime.datetime(2014, 1, 1, 1, 1, 1)
+    self.mock_now(origin)
+    token = host_token.create_host_token('HOST.domain.com', expiration_sec=60)
+    self.mock_now(origin, 61)
+    self.assertEqual('<none>', call({'X-Host-Token-V1': token}))
 
 
 class CookieAuthenticationTest(test_case.TestCase):

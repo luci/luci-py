@@ -63,6 +63,7 @@ class ReplicationTest(unittest.TestCase):
     self.check_oauth_config_replication()
     self.check_group_replication()
     self.check_ip_whitelist_replication()
+    self.check_host_token_usage()
 
   def link_replica_to_primary(self):
     """Links replica to primary."""
@@ -222,6 +223,26 @@ class ReplicationTest(unittest.TestCase):
   def check_ip_whitelist_replication(self):
     """Verifies changes to IP whitelist propagate to replica."""
     # TODO(vadimsh): Implement once IP whitelist is accessible via API.
+
+  def check_host_token_usage(self):
+    logging.info('Generating host token in primary')
+    response = self.auth_service.client.json_request(
+        resource='/auth/api/v1/host_token',
+        body={'host': 'some-host-name.domain.com', 'expiration_sec': 3600},
+        headers={'X-XSRF-Token': self.auth_service.client.xsrf_token})
+    self.assertEqual(201, response.http_code)
+    host_token = response.body['host_token']
+
+    # Wait for replica to get bootstrapped secret key used to create host token.
+    self.wait_for_sync()
+
+    # Ensure replica understands X-Host-Token-V1 header.
+    logging.info('Sending host token to replica')
+    response = self.replica.client.json_request(
+        resource='/auth/api/v1/accounts/self',
+        headers={'X-Host-Token-V1': host_token})
+    self.assertEqual(200, response.http_code)
+    self.assertEqual('some-host-name.domain.com', response.body.get('host'))
 
 
 if __name__ == '__main__':

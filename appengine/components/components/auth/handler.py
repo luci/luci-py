@@ -16,6 +16,7 @@ from google.appengine.api import users
 
 from . import api
 from . import config
+from . import host_token
 from . import ipaddr
 from . import model
 from . import tokens
@@ -123,9 +124,17 @@ class AuthenticatingHandler(webapp2.RequestHandler):
     # that authorization_error() below can report it, if needed.
     auth_context.set_current_identity(identity)
 
+    # Extract caller host name from host token header, if present and valid.
+    tok = self.request.headers.get(host_token.HTTP_HEADER)
+    if tok:
+      validated_host = host_token.validate_host_token(tok)
+      if validated_host:
+        auth_context.set_current_identity_host(validated_host)
+
     # Verify IP is whitelisted and authenticate requests from bots.
     assert self.request.remote_addr
     ip = ipaddr.ip_from_string(self.request.remote_addr)
+    auth_context.set_current_identity_ip(ip)
     try:
       identity = api.verify_ip_whitelisted(identity, ip)
     except api.AuthorizationError as err:

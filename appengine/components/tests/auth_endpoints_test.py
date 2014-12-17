@@ -17,6 +17,8 @@ from support import test_case
 
 from components.auth import api
 from components.auth import endpoints_support
+from components.auth import host_token
+from components.auth import ipaddr
 from components.auth import model
 
 
@@ -27,7 +29,7 @@ class EndpointsAuthTest(test_case.TestCase):
     super(EndpointsAuthTest, self).setUp()
     self.mock(endpoints_support.logging, 'error', lambda *_args: None)
 
-  def call(self, remote_address, email):
+  def call(self, remote_address, email, headers=None):
     """Mocks current user calls initialize_request_auth."""
 
     class User(object):
@@ -38,7 +40,7 @@ class EndpointsAuthTest(test_case.TestCase):
         lambda: User() if email else None)
 
     api.reset_local_state()
-    endpoints_support.initialize_request_auth(remote_address)
+    endpoints_support.initialize_request_auth(remote_address, headers or {})
     return api.get_current_identity().to_bytes()
 
   def test_ip_whitelist_bot(self):
@@ -72,6 +74,18 @@ class EndpointsAuthTest(test_case.TestCase):
     self.assertEqual(
         'user:another_user@example.com',
         self.call('127.0.0.1', 'another_user@example.com'))
+
+  def test_get_current_identity_ip(self):
+    """IP address is stored in auth context."""
+    self.call('1.2.3.4', 'user@example.com')
+    self.assertEqual(
+        ipaddr.ip_from_string('1.2.3.4'), api.get_current_identity_ip())
+
+  def test_get_current_identity_host(self):
+    """Validates caller host (from X-Host-Token) is stored in auth context."""
+    tok = host_token.create_host_token('host-name.domain')
+    self.call('127.0.0.1', 'user@example.com', headers={'X-Host-Token-V1': tok})
+    self.assertEqual('host-name.domain', api.get_current_identity_host())
 
 
 @endpoints.api(name='testing', version='v1')

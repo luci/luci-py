@@ -9,14 +9,16 @@ This module is used only when 'endpoints' is importable (see auth/__init__.py).
 
 import functools
 import logging
-import os
 
 import endpoints
+
 from protorpc import message_types
+from protorpc import remote
 from protorpc import util
 
 from . import api
 from . import config
+from . import host_token
 from . import ipaddr
 from . import model
 
@@ -116,7 +118,8 @@ def endpoints_method(
     @functools.wraps(func)
     def wrapper(service, *args, **kwargs):
       try:
-        initialize_request_auth(service.request_state.remote_address)
+        initialize_request_auth(
+            service.request_state.remote_address, service.request_state.headers)
         return func(service, *args, **kwargs)
       except api.AuthenticationError:
         raise endpoints.UnauthorizedException()
@@ -126,7 +129,7 @@ def endpoints_method(
   return new_decorator
 
 
-def initialize_request_auth(remote_address):
+def initialize_request_auth(remote_address, headers):
   """Grabs caller identity and initializes request local authentication context.
 
   Called before executing a cloud endpoints method. May raise AuthorizationError
@@ -155,7 +158,7 @@ def initialize_request_auth(remote_address):
     # with some additional code to handle id_token that we currently skip (see
     # TODO at the top of this file). OAuth API calls below will just reuse
     # cached values without making any additional RPCs.
-    if os.environ.get('HTTP_AUTHORIZATION'):
+    if headers.get('Authorization'):
       # Raises error for forbidden client_id, never returns None or Anonymous.
       identity = api.extract_oauth_caller_identity(
           extra_client_ids=[endpoints.API_EXPLORER_CLIENT_ID])
@@ -172,11 +175,20 @@ def initialize_request_auth(remote_address):
         raise api.AuthenticationError('Unsupported authentication method')
       identity = model.Anonymous
 
+  # Thread local (and request local) auth state.
+  auth_context = api.get_request_cache()
+
+  # Extract caller host name from host token header, if present and valid.
+  tok = headers.get(host_token.HTTP_HEADER)
+  if tok:
+    validated_host = host_token.validate_host_token(tok)
+    if validated_host:
+      auth_context.set_current_identity_host(validated_host)
+
   # Verify IP is whitelisted and authenticate requests from bots. It raises
   # AuthorizationError if IP is not allowed.
   assert identity is not None
   assert remote_address
   ip = ipaddr.ip_from_string(remote_address)
-  identity = api.verify_ip_whitelisted(identity, ip)
-
-  api.get_request_cache().set_current_identity(identity)
+  auth_context.set_current_identity_ip(ip)
+  auth_context.set_current_identity(api.verify_ip_whitelisted(identity, ip))

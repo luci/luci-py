@@ -713,7 +713,10 @@ class AuthSecret(ndb.Model):
       # Global keys can only be created on Primary or Standalone service.
       if scope == 'global' and is_replica():
         raise ValueError('Can\'t bootstrap global key on Replica')
-      entity = cls(key=key, values=[os.urandom(length)])
+      entity = cls(
+          key=key,
+          values=[os.urandom(length)],
+          modified_by=get_service_self_identity())
       entity.put()
       # Only global keys are part of replicated state.
       if scope == 'global':
