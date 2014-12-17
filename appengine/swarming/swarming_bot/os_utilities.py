@@ -621,7 +621,7 @@ def get_gpu():
   elif sys.platform == 'win32':
     dimensions, state = _get_gpu_win()
   else:
-    dimensions, state = None
+    dimensions, state = None, None
 
   # 15ad is VMWare. It's akin not having a GPU card.
   dimensions = dimensions or ['none']
