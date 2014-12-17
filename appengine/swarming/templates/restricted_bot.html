@@ -63,7 +63,7 @@
         <td>{{bot.first_seen_ts|datetimeformat}}</td>
       </tr>
       <tr title="Last time the bot contacted the server.">
-        <td>Most recent ping</td>
+        <td>Last contact</td>
         <td nowrap {% if bot.is_dead(now) %}class="dead_bot"{% endif %}>
           {{(now-bot.last_seen_ts)|timedeltaformat}} ago
           {% if is_admin and bot.is_dead(now) %}
