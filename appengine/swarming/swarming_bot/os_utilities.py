@@ -397,9 +397,15 @@ def get_os_version_number():
     Others will return None.
   """
   if sys.platform in ('cygwin', 'win32'):
-    version_parts = (platform.system() if sys.platform == 'cygwin'
-        else platform.version()).split('-')[-1].split('.')
-    assert len(version_parts) >= 2,  'Unable to determine Windows version'
+    if sys.platform == 'win32':
+      version_raw = platform.version()
+      version_parts = version_raw.split('.')
+    else:
+      # This handles 'CYGWIN_NT-5.1' and 'CYGWIN_NT-6.1-WOW64'.
+      version_raw = platform.system()
+      version_parts = version_raw.split('-')[1].split('.')
+    assert len(version_parts) >= 2,  (
+        'Unable to determine Windows version: %s' % version_raw)
     if version_parts[0] < 5 or (version_parts[0] == 5 and version_parts[1] < 1):
       assert False, 'Version before XP are unsupported: %s' % version_parts
     return '.'.join(version_parts[:2])
@@ -994,7 +1000,11 @@ def setup_auto_startup_win(command, cwd, batch_name):
       ':: This file was generated automatically by os_utilities.py.\r\n'
       'cd /d %s\r\n'
       '%s 1>> swarming_bot_out.log 2>&1\r\n') % (cwd, ' '.join(command))
-  return _write(batch_path, content)
+  success = _write(batch_path, content)
+  if success and sys.platform == 'cygwin':
+    # For some reason, cygwin tends to create the file with 0644.
+    os.chmod(batch_path, 0755)
+  return success
 
 
 def setup_auto_startup_osx(command, cwd, plistname):
