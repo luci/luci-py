@@ -60,7 +60,7 @@ def is_pristine(root, mergebase):
 
   # Look for local uncommitted diff.
   return not (
-      git(['diff', '--ignore-submodules', mergebase], cwd=root) or
+      git(['diff', '--ignore-submodules=none', mergebase], cwd=root) or
       git(['diff', '--ignore-submodules', '--cached', mergebase], cwd=root))
 
 
