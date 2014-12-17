@@ -169,7 +169,7 @@ def calc_yield_wait(task_details, start, last_io, stdout):
   now = time.time()
   hard_timeout = start + task_details.hard_timeout - now
   io_timeout = last_io + task_details.io_timeout - now
-  return min(min(packet_interval, hard_timeout), io_timeout)
+  return max(min(min(packet_interval, hard_timeout), io_timeout), 0)
 
 
 def run_command(swarming_server, index, task_details, root_dir):
