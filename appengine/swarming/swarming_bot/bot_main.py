@@ -129,26 +129,30 @@ def on_after_task(botobj, failure, internal_failure):
     logging.exception('Failed to call hook on_after_task(): %s', e)
 
 
-def setup_bot():
+def setup_bot(skip_reboot):
   """Calls bot_config.setup_bot() to have the bot self-configure itself.
 
-  See bot_config.py for the return code.
+  Reboot the host if bot_config.setup_bot() returns False, unless skip_reboot is
+  also true.
   """
   if _in_load_test_mode():
-    return True
+    return
 
   botobj = get_bot()
   try:
     import bot_config
-  except Exception:
-    logging.exception('bot_config is bad')
-    return True
+  except Exception as e:
+    botobj.post_error('bot_config.py is bad: %s' % e)
+    return
 
   try:
-    return bot_config.setup_bot(botobj)
-  except Exception:
-    logging.exception('bot_config.setup_bot() is bad')
-  return True
+    should_continue = bot_config.setup_bot(botobj)
+  except Exception as e:
+    botobj.post_error('bot_config.setup_bot() threw: %s' % e)
+    return
+
+  if not should_continue and not skip_reboot:
+    botobj.restart('Starting new swarming bot: %s' % THIS_FILE)
 
 
 ### end of bot_config handler part.

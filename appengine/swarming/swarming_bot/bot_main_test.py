@@ -33,6 +33,7 @@ CLIENT_TESTS = os.path.join(ROOT_DIR, '..', '..', 'client', 'tests')
 sys.path.insert(0, CLIENT_TESTS)
 
 import bot
+import bot_config
 # Creates a server mock for functions in net.py.
 import net_utils
 
@@ -81,6 +82,31 @@ class TestBotMain(net_utils.TestCase):
     expected = os_utilities.get_state()
     expected['sleep_streak'] = 12
     self.assertEqual(expected, bot_main.get_state(12))
+
+  def test_setup_bot(self):
+    self.mock(bot_main, 'get_remote', lambda: self.server)
+    self.mock(bot.Bot, 'post_error', self.fail)
+    setup_bots = []
+    def setup_bot(_bot):
+      setup_bots.append(1)
+      return False
+    self.mock(bot_config, 'setup_bot', setup_bot)
+    restarts = []
+    self.mock(bot.Bot, 'restart', restarts.append)
+    self.expected_requests(
+        [
+          (
+            'https://localhost:1/auth/api/v1/accounts/self/xsrf_token',
+            {
+              'data': bot_main.get_attributes(),
+              'headers': {'X-XSRF-Token-Request': '1'},
+            },
+            {'xsrf_token': 'token'},
+          ),
+        ])
+    bot_main.setup_bot(False)
+    self.assertEqual(['Starting new swarming bot: %s' % THIS_FILE], restarts)
+    self.assertEqual([1], setup_bots)
 
   def test_post_error_task(self):
     self.mock(time, 'time', lambda: 126.0)
