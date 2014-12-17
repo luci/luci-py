@@ -137,7 +137,8 @@ def get_swarming_bot_zip(root_dir, host, additionals):
       zip_file.writestr(item, content)
 
   data = zip_memory_file.getvalue()
-  logging.info('get_swarming_bot_zip(%s) is %d bytes', additionals, len(data))
+  logging.info(
+      'get_swarming_bot_zip(%s) is %d bytes', additionals.keys(), len(data))
   return data
 
 
