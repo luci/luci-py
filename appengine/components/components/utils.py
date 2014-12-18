@@ -204,11 +204,11 @@ class _Cache(object):
   def get_value(self):
     """Returns a cached value refreshing it if it has expired."""
     with self.lock:
-      if not self.value_is_set or (self.expires and time.time() > self.expires):
+      if not self.value_is_set or (self.expires and time_time() > self.expires):
         self.value = self.func()
         self.value_is_set = True
         if self.expiration_sec:
-          self.expires = time.time() + self.expiration_sec
+          self.expires = time_time() + self.expiration_sec
       return self.value
 
   def clear(self):
