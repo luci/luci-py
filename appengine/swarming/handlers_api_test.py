@@ -4,6 +4,7 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
+import base64
 import datetime
 import logging
 import os
@@ -409,12 +410,12 @@ class BotApiTest(AppTestBase):
     self.assertEqual(_expected(), response)
 
     # 2. Task update with some output.
-    params = _params(output='Oh ')
+    params = _params(output=base64.b64encode('Oh '))
     expected = _expected()
     _cycle(params, expected)
 
     # 3. Task update with some more output.
-    params = _params(output='hi', output_chunk_start=3)
+    params = _params(output=base64.b64encode('hi'), output_chunk_start=3)
     expected = _expected()
     _cycle(params, expected)
 
@@ -426,7 +427,8 @@ class BotApiTest(AppTestBase):
 
     # 5. Task update with completion of second command along with full output.
     params = _params(
-        command_index=1, duration=0.1, exit_code=23, output='Ahahah')
+        command_index=1, duration=0.1, exit_code=23,
+        output=base64.b64encode('Ahahah'))
     expected = _expected(
         completed_ts=str_now,
         durations=[0.2, 0.1],
@@ -453,7 +455,7 @@ class BotApiTest(AppTestBase):
       'duration': 0.1,
       'exit_code': 0,
       'id': 'bot1',
-      'output': 'result string',
+      'output': base64.b64encode('result string'),
       'output_chunk_start': 0,
       'task_id': task_id,
     }
@@ -487,7 +489,7 @@ class BotApiTest(AppTestBase):
       'duration': 0.1,
       'exit_code': 0,
       'id': 'bot1',
-      'output': 'result string',
+      'output': base64.b64encode('result string'),
       'output_chunk_start': 0,
       'task_id': task_id,
     }
@@ -511,7 +513,7 @@ class BotApiTest(AppTestBase):
       'duration': 0.1,
       'exit_code': 1,
       'id': 'bot1',
-      'output': 'result string',
+      'output': base64.b64encode('result string'),
       'output_chunk_start': 0,
       'task_id': task_id,
     }
@@ -952,7 +954,7 @@ class ClientApiTest(AppTestBase):
       'duration': 0.1,
       'exit_code': 0,
       'id': 'bot1',
-      'output': 'result string',
+      'output': base64.b64encode('result string'),
       'output_chunk_start': 0,
       'task_id': task_id,
     }
@@ -964,7 +966,7 @@ class ClientApiTest(AppTestBase):
       'duration': 0.1,
       'exit_code': 0,
       'id': 'bot1',
-      'output': 'bar',
+      'output': base64.b64encode('bar'),
       'output_chunk_start': 0,
       'task_id': task_id,
     }

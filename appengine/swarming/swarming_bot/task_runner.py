@@ -14,9 +14,10 @@ up to the calling process (bot_main.py) to signal that there was an internal
 failure and to cancel this task run and ask the server to retry it.
 """
 
-__version__ = '0.3'
+__version__ = '0.4'
 
 import StringIO
+import base64
 import json
 import logging
 import optparse
@@ -139,7 +140,7 @@ def post_update(swarming_server, params, exit_code, stdout, output_chunk_start):
   if stdout:
     # The output_chunk_start is used by the server to make sure that the stdout
     # chunks are processed and saved in the DB in order.
-    params['output'] = stdout
+    params['output'] = base64.b64encode(stdout)
     params['output_chunk_start'] = output_chunk_start
   # TODO(maruel): Support early cancellation.
   # https://code.google.com/p/swarming/issues/detail?id=62

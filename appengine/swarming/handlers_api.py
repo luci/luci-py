@@ -4,6 +4,7 @@
 
 """REST APIs handlers."""
 
+import base64
 import json
 import logging
 import textwrap
@@ -797,9 +798,17 @@ class BotTaskUpdateHandler(auth.ApiHandler):
     output_chunk_start = request.get('output_chunk_start')
 
     run_result_key = task_result.unpack_run_result_key(task_id)
-    # Side effect: zaps out any binary content on stdout.
     if output is not None:
-      output = output.encode('utf-8', 'replace')
+      try:
+        output = base64.b64decode(output)
+      except UnicodeEncodeError as e:
+        logging.error('Failed to decode output\n%s\n%r', e, output)
+        output = output.encode('ascii', 'replace')
+      except TypeError as e:
+        # Save the output as-is instead. The error will be logged in ereporter2
+        # and returning a HTTP 500 would only force the bot to stay in a retry
+        # loop.
+        logging.error('Failed to decode output\n%s\n%r', e, output)
 
     try:
       success, completed = task_scheduler.bot_update_task(

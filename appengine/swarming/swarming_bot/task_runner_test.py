@@ -5,6 +5,7 @@
 # found in the LICENSE file.
 
 import StringIO
+import base64
 import json
 import logging
 import os
@@ -176,7 +177,7 @@ class TestLocalTestRunner(net_utils.TestCase):
               'hard_timeout': False,
               'id': 'localhost',
               'io_timeout': False,
-              'output': 'hi\n',
+              'output': base64.b64encode('hi\n'),
               'output_chunk_start': 0,
               'task_id': 23,
             },
@@ -231,7 +232,7 @@ class TestLocalTestRunner(net_utils.TestCase):
               'hard_timeout': False,
               'id': 'localhost',
               'io_timeout': False,
-              'output': 'hi\n',
+              'output': base64.b64encode('hi\n'),
               'output_chunk_start': 0,
               'task_id': 23,
             },
@@ -288,12 +289,12 @@ class TestLocalTestRunner(net_utils.TestCase):
               'hard_timeout': False,
               'id': 'localhost',
               'io_timeout': False,
-              'output':
+              'output': base64.b64encode(
                   'Command "executable_that_shouldnt_be_on_your_system '
                     'thus_raising_OSError" failed to start.\n'
                   # TODO(maruel): OS specific error, fix expectation for other
                   # OSes.
-                  'Error: [Errno 2] No such file or directory',
+                  'Error: [Errno 2] No such file or directory'),
               'output_chunk_start': 0,
               'task_id': 23,
             },
@@ -354,7 +355,7 @@ class TestLocalTestRunner(net_utils.TestCase):
               'hard_timeout': True,
               'id': 'localhost',
               'io_timeout': False,
-              'output': 'hi\n',
+              'output': base64.b64encode('hi\n'),
               'output_chunk_start': 0,
               'task_id': 23,
             },
@@ -414,7 +415,7 @@ class TestLocalTestRunner(net_utils.TestCase):
               'hard_timeout': False,
               'id': 'localhost',
               'io_timeout': True,
-              'output': 'hi\n',
+              'output': base64.b64encode('hi\n'),
               'output_chunk_start': 0,
               'task_id': 23,
             },
@@ -506,7 +507,7 @@ class TestLocalTestRunner(net_utils.TestCase):
               'hard_timeout': False,
               'id': 'localhost',
               'io_timeout': False,
-              'output': 'hi!\n',
+              'output': base64.b64encode('hi!\n'),
               'output_chunk_start': 100002*4,
               'task_id': 23,
             },
@@ -534,7 +535,7 @@ class TestLocalTestRunner(net_utils.TestCase):
           'data': {
             'command_index': 0,
             'id': 'localhost',
-            'output': 'hi!\n' * 100002,
+            'output': base64.b64encode('hi!\n' * 100002),
             'output_chunk_start': 0,
             'task_id': 23,
           },

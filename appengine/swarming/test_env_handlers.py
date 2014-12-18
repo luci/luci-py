@@ -5,6 +5,7 @@
 
 """Base class for handlers_*_test.py"""
 
+import base64
 import os
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -145,7 +146,7 @@ class AppTestBase(test_case.TestCase):
       'duration': 0.1 * (kwargs.get('command_index', 0)+1),
       'exit_code': 0,
       'id': 'bot1',
-      'output': u'rÉsult string',
+      'output': base64.b64encode(u'rÉsult string'.encode('utf-8')),
       'output_chunk_start': 0,
       'task_id': None,
     }
@@ -160,7 +161,7 @@ class AppTestBase(test_case.TestCase):
     task_id = res['manifest']['task_id']
     self.bot_complete_task(token, task_id=task_id)
     self.bot_complete_task(
-        token, task_id=task_id, command_index=1, output='bar')
+        token, task_id=task_id, command_index=1, output=base64.b64encode('bar'))
     return task_id
 
   # Client
