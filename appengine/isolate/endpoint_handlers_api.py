@@ -97,8 +97,7 @@ class IsolateService(remote.Service):
     for digest in entries.items:
       # check for error conditions
       try:
-        key = model.entry_key(entries.namespace.encode('utf-8'),
-                              digest.digest.encode('utf-8'))
+        key = model.entry_key(entries.namespace, digest.digest)
       except (AssertionError, ValueError) as error:
         raise endpoints.BadRequestException(error.message)
       else:
@@ -125,7 +124,7 @@ class IsolateService(remote.Service):
   def should_push_to_gs(cls, digest):
     """True to direct client to upload given EntryInfo directly to GS."""
     # Relatively small *.isolated files go through app engine to cache them.
-    if digest.isolated and digest.size <= model.MAX_MEMCACHE_ISOLATED:
+    if digest.is_isolated and digest.size <= model.MAX_MEMCACHE_ISOLATED:
       return False
     # All other large enough files go through GS.
     return digest.size >= MIN_SIZE_FOR_DIRECT_GS
@@ -141,9 +140,19 @@ class IsolateService(remote.Service):
           settings.gs_private_key)
     return self._gs_url_signer
 
-  def uri_for(self, *args, **kwargs):
-    """Fake version for now."""
-    return auth.AuthenticatingHandler.uri_for(*args, **kwargs)
+  def uri_for(self, *_args, **kwargs):
+    """Builds an URI for the provided data.
+
+    Currently looks like
+    <hostname>/<api_method>/<namespace>/<hash_key>, e.g.
+    localhost:80/store-gs/default/234987234987239487139847abcd1234e1fefeb1
+    """
+    name = 'content-gs/store'
+    namespace = kwargs.pop('namespace')
+    hex_digest = kwargs.pop('hash_key')
+    url_list = [dict(self.request_state.headers)['host']]
+    url_list.extend([name, namespace, hex_digest])
+    return '/'.join(url_list)
 
   def generate_store_url(self, digest, namespace, http_verb,
                          uploaded_to_gs, expiration):
@@ -162,7 +171,7 @@ class IsolateService(remote.Service):
     # Data that goes into request parameters and signature.
     expiration_ts = str(int(time.time() + expiration.total_seconds()))
     item_size = str(digest.size)
-    is_isolated = str(int(digest.isolated))
+    is_isolated = str(int(digest.is_isolated))
     uploaded_to_gs = str(int(uploaded_to_gs))
 
     # Generate signature.
@@ -180,9 +189,10 @@ class IsolateService(remote.Service):
         'i': is_isolated,
         's': item_size,
         'sig': sig,
-        'token': self.request.get('token'),
+        # 'token': digest.get('token'),
         'x': expiration_ts,
     }
+    # TODO(cmassaro): where can we get the auth token?
     return '%s?%s' % (url_base, urllib.urlencode(params))
 
   def generate_push_urls(self, digest, namespace):
@@ -205,8 +215,7 @@ class IsolateService(remote.Service):
     """
     if self.should_push_to_gs(digest):
       # Store larger stuff in Google Storage.
-      key = model.entry_key(namespace.encode('utf-8'),
-                            digest.digest.encode('utf-8'))
+      key = model.entry_key(namespace, digest.digest)
       upload_url = self.gs_url_signer.get_upload_url(
           filename=key.id(),
           content_type='application/octet-stream',

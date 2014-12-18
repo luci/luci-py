@@ -118,6 +118,10 @@ def check_hash(hash_key, length):
 
 def entry_key(namespace, hash_key):
   """Returns a valid ndb.Key for a ContentEntry."""
+  if isinstance(namespace, unicode):
+    namespace = namespace.encode('utf-8')
+  if isinstance(hash_key, unicode):
+    hash_key = hash_key.encode('utf-8')
   check_hash(hash_key, get_hash_algo(namespace).digest_size * 2)
   return entry_key_from_id('%s/%s' % (namespace, hash_key))
 

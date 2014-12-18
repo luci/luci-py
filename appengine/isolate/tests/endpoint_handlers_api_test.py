@@ -88,16 +88,18 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
     bad_collection = DigestCollection(items=[
         Digest(digest=bad_digest, size=10)])
     with self.call_should_fail('400'):
-      unused_resp = self.app_api.post_json(IsolateServiceTest.preupload_url,
-                                           self.message_to_dict(bad_collection))
+      _response = self.app_api.post_json(
+          IsolateServiceTest.preupload_url, self.message_to_dict(
+              bad_collection))
 
   def test_pre_upload_invalid_namespace(self):
     """Assert that status 400 is returned when the namespace is invalid."""
     bad_collection = DigestCollection(namespace='~tildewhatevs', items=[
         generate_digest('pangolin', 'default')])
     with self.call_should_fail('400'):
-      unused_resp = self.app_api.post_json(IsolateServiceTest.preupload_url,
-                                           self.message_to_dict(bad_collection))
+      _response = self.app_api.post_json(
+          IsolateServiceTest.preupload_url, self.message_to_dict(
+              bad_collection))
 
 
 if __name__ == '__main__':
