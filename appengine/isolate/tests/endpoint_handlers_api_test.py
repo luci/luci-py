@@ -3,11 +3,14 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
+import base64
 import json
 import logging
 import os
+import re
 import sys
 import unittest
+from Crypto.PublicKey import RSA
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -26,6 +29,7 @@ import webtest
 
 from components import auth_testing
 from components import utils
+import config
 import endpoint_handlers_api
 from endpoint_handlers_api import Digest
 from endpoint_handlers_api import DigestCollection
@@ -61,6 +65,8 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
   # TODO(cmassaro): this should eventually inherit from endpointstestcase
 
   preupload_url = '/_ah/spi/IsolateService.preupload'
+  gs_prefix = 'localhost:80/content-gs/store/'
+  store_prefix = 'https://isolateserver-dev.storage.googleapis.com/'
 
   APP_DIR = ROOT_DIR
 
@@ -79,19 +85,41 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
         webapp2.WSGIApplication(handlers_backend.get_routes(), debug=True),
         extra_environ={'REMOTE_ADDR': self.source_ip})
 
-  @classmethod
-  def message_to_dict(cls, message):
+  @staticmethod
+  def message_to_dict(message):
     """Returns a JSON-ish dictionary corresponding to the RPC message."""
     return json.loads(protojson.encode_message(message))
+
+  @staticmethod
+  def make_private_key():
+    """Add a private key to config.settings() to create finalize URLs."""
+    new_key = RSA.generate(2048)
+    pem_key = base64.b64encode(new_key.exportKey('PEM'))
+    config.settings().gs_private_key = pem_key
 
   def test_pre_upload_ok(self):
     """Assert that preupload correctly posts a valid DigestCollection."""
     good_digests = DigestCollection()
-    good_digests.items.append(generate_digest('a pony',
-                                              good_digests.namespace))
+    good_digests.items.append(
+        generate_digest('a pony', good_digests.namespace))
     response = self.app_api.post_json(
         IsolateServiceTest.preupload_url, self.message_to_dict(good_digests))
-    self.assertNotEqual(response, None)  # TODO(cmassaro): better check
+    message = json.loads(response.body).get(u'items', [{}])[0]
+    self.assertTrue(message.get(u'upload_url', '').startswith(self.gs_prefix))
+
+  def test_finalize_url_ok(self):
+    """Assert that a finalize_url is generated when should_push_to_gs."""
+    digests = DigestCollection()
+
+    # add a private key; the URLSigner is initialized from config.settings()
+    self.make_private_key()
+    digests.items.append(generate_digest('duckling.' * 70, digests.namespace))
+    response = self.app_api.post_json(
+        IsolateServiceTest.preupload_url, self.message_to_dict(digests))
+    message = json.loads(response.body).get(u'items', [{}])[0]
+    self.assertTrue(message.get(u'upload_url', '').startswith(
+        self.store_prefix))
+    self.assertTrue(message.get(u'finalize_url', '').startswith(self.gs_prefix))
 
   def test_pre_upload_invalid_hash(self):
     """Assert that status 400 is returned when the digest is invalid."""
@@ -148,10 +176,6 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
     # find enqueued tasks
     enqueued_tasks = self.execute_tasks()
     self.assertEqual(1, enqueued_tasks)
-
-  def test_existent_entities_update_timestamps(self):
-    """Assert that existent entities' timestamps be updated."""
-    pass
 
 
 if __name__ == '__main__':
