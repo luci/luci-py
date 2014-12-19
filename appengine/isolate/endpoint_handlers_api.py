@@ -113,9 +113,10 @@ class IsolateService(remote.Service):
   @classmethod
   def partition_collection(cls, entries):
     """Create DigestCollections for existent and new digests."""
-    seen_unseen = [DigestCollection(
-        items=[], namespace=entries.namespace, digest_hash=entries.digest_hash,
-        compression=entries.compression) for _ in range(2)]
+    seen_unseen = [DigestCollection(items=[], namespace=entries.namespace,
+                                    digest_hash=entries.digest_hash,
+                                    compression=entries.compression)
+                   for _ in range(2)]
     for digest, exists in cls.check_entries_exist(entries):
       seen_unseen[exists].items.append(digest)
     return seen_unseen
@@ -253,8 +254,6 @@ class IsolateService(remote.Service):
   def tag_existing(cls, collection):
     """Tag existing digests with new timestamp.
 
-    TODO(cmassaro): make sure that taskqueue will interact properly
-
     Arguments:
       collection: a DigestCollection containing existing digests
 
@@ -264,8 +263,8 @@ class IsolateService(remote.Service):
     if collection.items:
       url = '/internal/taskqueue/tag/%s/%s' % (
           collection.namespace, utils.datetime_to_timestamp(utils.utcnow()))
-      payload = ''.join(binascii.unhexlify(digest.digest)
-                        for digest in collection.items)
+      payload = ''.join(
+          binascii.unhexlify(digest.digest) for digest in collection.items)
       return utils.enqueue_task(url, 'tag', payload=payload)
 
   @auth.endpoints_method(DigestCollection, UrlCollection,
@@ -310,14 +309,14 @@ class IsolateService(remote.Service):
     for digest_element in new_digests.items:
       # check for error conditions
       if not model.is_valid_hex(digest_element.digest):
-        raise endpoints.BadRequestException('Invalid hex code: %s' %
-                                            (digest_element.digest))
+        raise endpoints.BadRequestException(
+            'Invalid hex code: %s' % (digest_element.digest))
 
       # generate and append new URLs
       upload_url, finalize_url = self.generate_push_urls(digest_element,
                                                          request.namespace)
-      response.items.append(UrlMessage(upload_url=upload_url,
-                                       finalize_url=finalize_url))
+      response.items.append(
+          UrlMessage(upload_url=upload_url, finalize_url=finalize_url))
 
     # tag existing entities and return new ones
     self.tag_existing(existing_digests)
