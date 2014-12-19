@@ -302,15 +302,23 @@ class AuthenticatingHandlerTest(test_case.TestCase):
     self.assertFalse(calls)
 
   def test_xsrf_token_uses_enforce_on(self):
-    """Only methods set in |xsrf_token_enforce_on| trigger token validation."""
+    """Only methods set in |xsrf_token_enforce_on| require token validation."""
     # Validate tokens only on PUT (not on POST).
-    app, calls = self.make_xsrf_handling_app(
-        xsrf_token_enforce_on=('PUT',))
+    app, calls = self.make_xsrf_handling_app(xsrf_token_enforce_on=('PUT',))
     token = app.get('/request').body
-    # POST check is False, because it ignores the token. PUT is fine.
+    # Both POST and PUT work when token provided, verifying it.
     app.post('/request', {'xsrf_token': token})
     app.put('/request', {'xsrf_token': token})
-    self.assertEqual([('POST', False), ('PUT', True)], calls)
+    self.assertEqual([('POST', True), ('PUT', True)], calls)
+    # POST works without a token, put PUT doesn't.
+    self.assertEqual(200, app.post('/request').status_int)
+    self.assertEqual(403, app.put('/request', expect_errors=True).status_int)
+    # Both fail if wrong token is provided.
+    bad_token = {'xsrf_token': 'boo'}
+    self.assertEqual(
+        403, app.post('/request', bad_token, expect_errors=True).status_int)
+    self.assertEqual(
+        403, app.put('/request', bad_token, expect_errors=True).status_int)
 
   def test_xsrf_token_uses_xsrf_token_header(self):
     """Name of the header used for XSRF can be changed."""

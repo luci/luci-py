@@ -253,7 +253,7 @@ class ApiHandlerClassTest(test_case.TestCase):
     call_post(
         Handler,
         '[]',
-        content_type='application/json; charset=xmlcharrefreplace',
+        content_type='application/json; charset=ascii',
         status=400)
 
 

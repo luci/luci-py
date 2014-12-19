@@ -116,6 +116,15 @@ class AuthenticatingHandler(webapp2.RequestHandler):
       except api.AuthorizationError as err:
         self.authorization_error(err)
         return
+    else:
+      method_func = None
+
+    # XSRF token is required only if using Cookie based or IP whitelist auth.
+    # A browser doesn't send Authorization: 'Bearer ...' or any other headers
+    # by itself. So XSRF check is not required if header based authentication
+    # is used.
+    using_headers_auth = method_func in (
+        oauth_authentication, service_to_service_authentication)
 
     # If no authentication method is applicable, default to anonymous identity.
     identity = identity or model.Anonymous
@@ -145,9 +154,19 @@ class AuthenticatingHandler(webapp2.RequestHandler):
     auth_context.set_current_identity(identity)
 
     try:
-      # Verify XSRF token if required.
+      # Fail if XSRF token is required, but not provided.
+      need_xsrf_token = (
+          not using_headers_auth and
+          self.request.method in self.xsrf_token_enforce_on)
+      if need_xsrf_token and self.xsrf_token is None:
+        raise api.AuthorizationError('XSRF token is missing')
+
+      # If XSRF token is present, verify it is valid and extract its payload.
+      # Do it even if XSRF token is not strictly required, since some handlers
+      # use it to store session state (it is similar to a signed cookie).
       self.xsrf_token_data = {}
-      if self.request.method in self.xsrf_token_enforce_on:
+      if self.xsrf_token is not None:
+        # This raises AuthorizationError if token is invalid.
         self.xsrf_token_data = self.verify_xsrf_token()
 
       # All other ACL checks will be performed by corresponding handlers
@@ -166,6 +185,20 @@ class AuthenticatingHandler(webapp2.RequestHandler):
     return XSRFToken.generate(
         [api.get_current_identity().to_bytes()], xsrf_token_data)
 
+  @property
+  def xsrf_token(self):
+    """Returns XSRF token passed with the request or None if missing.
+
+    Doesn't do any validation. Use verify_xsrf_token() instead.
+    """
+    token = None
+    if self.xsrf_token_header:
+      token = self.request.headers.get(self.xsrf_token_header)
+    if not token and self.xsrf_token_request_param:
+      param = self.request.get_all(self.xsrf_token_request_param)
+      token = param[0] if param else None
+    return token
+
   def verify_xsrf_token(self):
     """Grabs a token from the request, validates it and extracts embedded data.
 
@@ -178,15 +211,10 @@ class AuthenticatingHandler(webapp2.RequestHandler):
     Raises:
       AuthorizationError if token is missing, invalid or expired.
     """
-    # Get token from header or request parameter.
-    token = None
-    if self.xsrf_token_header:
-      token = self.request.headers.get(self.xsrf_token_header)
-    if not token and self.xsrf_token_request_param:
-      token = self.request.get(self.xsrf_token_request_param)
+    token = self.xsrf_token
     if not token:
       raise api.AuthorizationError('XSRF token is missing')
-    # And check that it was generated for same identity.
+    # Check that it was generated for the same identity.
     try:
       return XSRFToken.validate(token, [api.get_current_identity().to_bytes()])
     except tokens.InvalidTokenError as err:

@@ -8,7 +8,6 @@ Application that use 'auth' component can override settings defined here by
 adding the following lines to appengine_config.py:
 
   components_auth_UI_APP_NAME = 'My service name'
-  components_auth_CUSTOM_AUTHENTICATORS_HOOK = lambda: [acl.check_ip_whitlist]
 
 Code flow when this is used:
   * GAE app starts and loads a module with main WSGI app.
@@ -33,8 +32,6 @@ _config_called = False
 _config = lib_config.register(
     'components_auth',
     {
-      # Callback that returns a list of functions.
-      'CUSTOM_AUTHENTICATORS_HOOK': None,
       # Title of the service to show in UI.
       'UI_APP_NAME': 'Auth',
       # True if application is calling 'configure_ui' manually.
@@ -64,8 +61,6 @@ def ensure_configured():
         handler.cookie_authentication,
         handler.service_to_service_authentication,
       ])
-      if _config.CUSTOM_AUTHENTICATORS_HOOK:
-        authenticators.extend(_config.CUSTOM_AUTHENTICATORS_HOOK())
       handler.configure(authenticators)
       # Customize auth UI to show where it's running.
       if not _config.UI_CUSTOM_CONFIG:
