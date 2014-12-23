@@ -6,6 +6,8 @@
 
 import binascii
 import datetime
+import hashlib
+import hmac
 import os
 import re
 import sys
@@ -28,7 +30,6 @@ import config
 import gcs
 from handlers_api import MIN_SIZE_FOR_DIRECT_GS
 from handlers_api import MIN_SIZE_FOR_GS
-from handlers_api import StoreContentHandler
 import model
 import stats
 
@@ -45,26 +46,59 @@ class Digest(messages.Message):
   size = messages.IntegerField(3)
 
 
+class Namespace(messages.Message):
+  """Encapsulates namespace, compression, and hash algorithm."""
+  namespace = messages.StringField(1, default='default')
+  digest_hash = messages.StringField(2, default='SHA-1')
+  compression = messages.StringField(3, default='flate')
+
+
 class DigestCollection(messages.Message):
   """Endpoints request type analogous to the existing JSON post body."""
   items = messages.MessageField(Digest, 1, repeated=True)
-  namespace = messages.StringField(4, default='default')
-  digest_hash = messages.StringField(5, default='SHA-1')
-  compression = messages.StringField(6, default='flate')
+  namespace = messages.MessageField(Namespace, 2, repeated=False)
 
 
-### Response Types
+class StorageRequest(messages.Message):
+  """ProtoRPC message representing an entity to be added to the data store.
+
+  TODO(cmassaro): worthwhile to make expiration_ts a DateTimeField?
+  TODO(cmassaro): any required fields?
+  TODO(cmassaro): how is data distinct from item.digest?
+  """
+  item = messages.MessageField(Digest, 1, repeated=False)
+  data = messages.BytesField(2)
+  upload_ticket = messages.StringField(3)
+  namespace = messages.MessageField(Namespace, 4)
 
 
-class UrlMessage(messages.Message):
+class FinalizeRequest(messages.Message):
+  """Content storage request for large Google storage entities."""
+  item = messages.MessageField(Digest, 1, repeated=False)
+  upload_ticket = messages.StringField(2)
+  namespace = messages.MessageField(Namespace, 3)
+
+
+## Response Types
+
+
+class PreuploadStatus(messages.Message):
   """Endpoints response type for a single URL or pair of URLs."""
-  upload_url = messages.StringField(1, required=False)
-  finalize_url = messages.StringField(2, required=False)
+  gs_upload_url = messages.StringField(1, required=False)
+  upload_ticket = messages.StringField(2, required=False)
 
 
 class UrlCollection(messages.Message):
   """Endpoints response type analogous to existing JSON response."""
-  items = messages.MessageField(UrlMessage, 1, repeated=True)
+  items = messages.MessageField(PreuploadStatus, 1, repeated=True)
+
+
+class StorageResponse(messages.Message):
+  """Endpoints response to report content storage status.
+
+  TODO(cmassaro): determine what "entry" should contain; maybe a repeated field?
+  """
+  entry = messages.StringField(1)
 
 
 ### API
@@ -79,9 +113,99 @@ class IsolateService(remote.Service):
 
   _gs_url_signer = None
 
+  ### Endpoints Methods
+
+  @auth.endpoints_method(DigestCollection, UrlCollection,
+                         path='preuploader', http_method='POST',
+                         name='preupload')
+  def preupload(self, request):
+    """Checks for entry's existence and generates upload URLs.
+
+    Arguments:
+      request: the DigestCollection to be posted
+
+    Returns:
+      the UrlCollection corresponding to the uploaded digests
+
+    The response list is commensurate to the request's; each UrlMessage has
+      * if an entry is missing: two URLs: the URL to upload a file
+        to and the URL to call when the upload is done (can be null).
+      * if the entry is already present: null URLs ('').
+
+    UrlCollection([
+        UrlMessage(
+          upload_url = "<upload url>"
+          finalize_url = "<finalize url>"
+          )
+        UrlMessage(
+          upload_url = '')
+        ...
+        ])
+    """
+    response = UrlCollection(items=[])
+
+    # check for namespace error
+    if not re.match(r'^%s$' % model.NAMESPACE_RE, request.namespace.namespace):
+      raise endpoints.BadRequestException(
+          'Invalid namespace; allowed keys must pass regexp "%s"' %
+          model.NAMESPACE_RE)
+
+    # check for existing elements
+    new_digests, existing_digests = self.partition_collection(request)
+
+    # process unseen elements
+    for digest_element in new_digests.items:
+      # check for error conditions
+      if not model.is_valid_hex(digest_element.digest):
+        raise endpoints.BadRequestException(
+            'Invalid hex code: %s' % (digest_element.digest))
+
+      status = PreuploadStatus()
+      if self.should_push_to_gs(digest_element):
+        # Store larger stuff in Google Storage.
+        key = model.entry_key(
+            request.namespace.namespace, digest_element.digest)
+        status.gs_upload_url = self.gs_url_signer.get_upload_url(
+            filename=key.id(),
+            content_type='application/octet-stream',
+            expiration=self.DEFAULT_LINK_EXPIRATION)
+      response.items.append(status)
+
+    # tag existing entities and return new ones
+    self.tag_existing(existing_digests)
+    return response
+
+  @auth.endpoints_method(StorageRequest, StorageResponse)
+  def store_inline(self, request):
+    """Replaces the StoreContentHandler's PUT method.
+
+    TODO(cmassaro): message types, implementation
+
+    Args:
+      request: a StoreRequest
+
+    Response:
+      the StorageResponse containing information about the upload
+    """
+    pass
+
+  @auth.endpoints_method(FinalizeRequest, StorageResponse)
+  def finalize_gs_upload(self, request):
+    """Replaces the StoreContentHandler's POST method.
+
+    Args:
+      request: a StoreRequest
+
+    Response:
+      the StorageResponse containing information about the upload
+    """
+    pass
+
+  ### Utility
+
   @classmethod
   def check_entries_exist(cls, entries):
-    """For now, just monkey patch into the existing handler.
+    """Assess which entities already exist in the datastore.
 
     Arguments:
       entries: a DigestCollection to be posted
@@ -97,7 +221,7 @@ class IsolateService(remote.Service):
     for digest in entries.items:
       # check for error conditions
       try:
-        key = model.entry_key(entries.namespace, digest.digest)
+        key = model.entry_key(entries.namespace.namespace, digest.digest)
       except (AssertionError, ValueError) as error:
         raise endpoints.BadRequestException(error.message)
       else:
@@ -113,10 +237,8 @@ class IsolateService(remote.Service):
   @classmethod
   def partition_collection(cls, entries):
     """Create DigestCollections for existent and new digests."""
-    seen_unseen = [DigestCollection(items=[], namespace=entries.namespace,
-                                    digest_hash=entries.digest_hash,
-                                    compression=entries.compression)
-                   for _ in range(2)]
+    seen_unseen = [DigestCollection(
+        items=[], namespace=entries.namespace) for _ in range(2)]
     for digest, exists in cls.check_entries_exist(entries):
       seen_unseen[exists].items.append(digest)
     return seen_unseen
@@ -155,6 +277,28 @@ class IsolateService(remote.Service):
     url_list.extend([name, namespace, hex_digest])
     return '/'.join(url_list)
 
+  @classmethod
+  def generate_signature(cls, secret_key, http_verb, expiration_ts, namespace,
+                         hash_key, item_size, is_isolated, uploaded_to_gs):
+    """Generates an HMAC-SHA1 signature for a given set of parameters.
+
+    Used by preupload to sign store URLs and by store_content to validate them.
+
+    All arguments should be in the form of strings.
+    """
+    data_to_sign = '\n'.join([
+        http_verb,
+        expiration_ts,
+        namespace,
+        hash_key,
+        item_size,
+        is_isolated,
+        uploaded_to_gs,
+    ])
+    mac = hmac.new(secret_key, digestmod=hashlib.sha1)
+    mac.update(data_to_sign)
+    return mac.hexdigest()
+
   def generate_store_url(self, digest, namespace, http_verb,
                          uploaded_to_gs, expiration):
     """Generates a signed URL to /content-gs/store method.
@@ -176,7 +320,7 @@ class IsolateService(remote.Service):
     uploaded_to_gs = str(int(uploaded_to_gs))
 
     # Generate signature.
-    sig = StoreContentHandler.generate_signature(
+    sig = self.generate_signature(
         config.settings().global_secret, http_verb, expiration_ts, namespace,
         digest.digest, item_size, is_isolated, uploaded_to_gs)
 
@@ -213,6 +357,8 @@ class IsolateService(remote.Service):
 
     Returns:
       a pair of store URLs (may be None)
+
+    TODO(cmassaro): cannibalize this logic for client
     """
     if self.should_push_to_gs(digest):
       # Store larger stuff in Google Storage.
@@ -237,20 +383,6 @@ class IsolateService(remote.Service):
     return upload_url, finalize_url
 
   @classmethod
-  def generate_urls(cls, _digest_element):
-    """Generate upload and finalize URLs for a digest.
-
-    Arguments:
-      _digest_element: a single Digest from the request message
-
-    Returns:
-      a two-tuple of URL strings
-
-    TODO(cmassaro): phase this out once generate_push_urls is working
-    """
-    return (None, None)
-
-  @classmethod
   def tag_existing(cls, collection):
     """Tag existing digests with new timestamp.
 
@@ -262,65 +394,11 @@ class IsolateService(remote.Service):
     """
     if collection.items:
       url = '/internal/taskqueue/tag/%s/%s' % (
-          collection.namespace, utils.datetime_to_timestamp(utils.utcnow()))
+          collection.namespace.namespace,
+          utils.datetime_to_timestamp(utils.utcnow()))
       payload = ''.join(
           binascii.unhexlify(digest.digest) for digest in collection.items)
       return utils.enqueue_task(url, 'tag', payload=payload)
-
-  @auth.endpoints_method(DigestCollection, UrlCollection,
-                         path='preupload', http_method='POST',
-                         name='preuploader.preupload')
-  def preupload(self, request):
-    """Checks for entry's existence and generates upload URLs.
-
-    Arguments:
-      request: the DigestCollection to be posted
-
-    Returns:
-      the UrlCollection corresponding to the uploaded digests
-
-    The response list is commensurate to the request's; each UrlMessage has
-      * if an entry is missing: two URLs: the URL to upload a file
-        to and the URL to call when the upload is done (can be null).
-      * if the entry is already present: null URLs ('').
-
-    UrlCollection([
-        UrlMessage(
-          upload_url = "<upload url>"
-          finalize_url = "<finalize url>"
-          )
-        UrlMessage(
-          upload_url = '')
-        ...
-        ])
-    """
-    response = UrlCollection(items=[])
-
-    # check for namespace error
-    if not re.match(r'^%s$' % model.NAMESPACE_RE, request.namespace):
-      raise endpoints.BadRequestException(
-          'Invalid namespace; allowed keys must pass regexp "%s"' %
-          model.NAMESPACE_RE)
-
-    # check for existing elements
-    new_digests, existing_digests = self.partition_collection(request)
-
-    # process unseen elements
-    for digest_element in new_digests.items:
-      # check for error conditions
-      if not model.is_valid_hex(digest_element.digest):
-        raise endpoints.BadRequestException(
-            'Invalid hex code: %s' % (digest_element.digest))
-
-      # generate and append new URLs
-      upload_url, finalize_url = self.generate_push_urls(digest_element,
-                                                         request.namespace)
-      response.items.append(
-          UrlMessage(upload_url=upload_url, finalize_url=finalize_url))
-
-    # tag existing entities and return new ones
-    self.tag_existing(existing_digests)
-    return response
 
 
 def create_application():

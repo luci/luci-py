@@ -31,7 +31,6 @@ from components import auth_testing
 from components import utils
 import config
 import endpoint_handlers_api
-from endpoint_handlers_api import Digest
 from endpoint_handlers_api import DigestCollection
 import handlers_backend
 import model
@@ -54,7 +53,20 @@ def generate_digest(content, namespace):
   Returns:
     a Digest corresponding to the content/ namespace pair
   """
-  return Digest(digest=hash_content(content, namespace), size=len(content))
+  return endpoint_handlers_api.Digest(
+      digest=hash_content(content, namespace), size=len(content))
+
+
+def generate_store_request(content, verb):
+  namespace = endpoint_handlers_api.Namespace()
+  digest = generate_digest(content, namespace.namespace)
+  request = endpoint_handlers_api.StorageRequest(
+      item=digest, namespace=namespace)
+  signature = endpoint_handlers_api.IsolateService.generate_signature(*map(
+      str, [config.settings().global_secret, verb, 60, namespace,
+            digest.digest, digest.size, digest.is_isolated, '1']))
+  request.upload_ticket = signature
+  return request
 
 
 ### Isolate Service Test
@@ -64,7 +76,7 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
   """Test the IsolateService's API methods."""
   # TODO(cmassaro): this should eventually inherit from endpointstestcase
 
-  preupload_url = '/_ah/spi/IsolateService.preupload'
+  api_service_cls = endpoint_handlers_api.IsolateService
   gs_prefix = 'localhost:80/content-gs/store/'
   store_prefix = 'https://isolateserver-dev.storage.googleapis.com/'
 
@@ -77,10 +89,6 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
     self.mock(utils, 'get_task_queue_host', lambda: version)
     self.testbed.setup_env(current_version_id='testbed.version')
     self.source_ip = '127.0.0.1'
-    self.app_api = webtest.TestApp(
-        endpoints.api_server([endpoint_handlers_api.IsolateService],
-                             restricted=False),
-        extra_environ={'REMOTE_ADDR': self.source_ip})
     self.app = webtest.TestApp(
         webapp2.WSGIApplication(handlers_backend.get_routes(), debug=True),
         extra_environ={'REMOTE_ADDR': self.source_ip})
@@ -98,62 +106,69 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
     config.settings().gs_private_key = pem_key
 
   def test_pre_upload_ok(self):
-    """Assert that preupload correctly posts a valid DigestCollection."""
-    good_digests = DigestCollection()
-    good_digests.items.append(
-        generate_digest('a pony', good_digests.namespace))
-    response = self.app_api.post_json(
-        IsolateServiceTest.preupload_url, self.message_to_dict(good_digests))
+    """Assert that preupload correctly posts a valid DigestCollection.
+
+    TODO(cmassaro): verify the upload_ticket is correct
+    """
+    good_digests = DigestCollection(
+        namespace=endpoint_handlers_api.Namespace())
+    good_digests.items.append(generate_digest('a pony', good_digests.namespace))
+    response = self.call_api(
+        'preupload', self.message_to_dict(good_digests), 200)
     message = json.loads(response.body).get(u'items', [{}])[0]
-    self.assertTrue(message.get(u'upload_url', '').startswith(self.gs_prefix))
+    self.assertEqual('', message.get(u'gs_upload_url', ''))
 
   def test_finalize_url_ok(self):
-    """Assert that a finalize_url is generated when should_push_to_gs."""
-    digests = DigestCollection()
+    """Assert that a finalize_url is generated when should_push_to_gs.
+
+    TODO(cmassaro): verify upload_ticket
+    """
+    digests = DigestCollection(namespace=endpoint_handlers_api.Namespace())
 
     # add a private key; the URLSigner is initialized from config.settings()
     self.make_private_key()
     digests.items.append(generate_digest('duckling.' * 70, digests.namespace))
-    response = self.app_api.post_json(
-        IsolateServiceTest.preupload_url, self.message_to_dict(digests))
+    response = self.call_api(
+        'preupload', self.message_to_dict(digests), 200)
     message = json.loads(response.body).get(u'items', [{}])[0]
-    self.assertTrue(message.get(u'upload_url', '').startswith(
+    self.assertTrue(message.get(u'gs_upload_url', '').startswith(
         self.store_prefix))
-    self.assertTrue(message.get(u'finalize_url', '').startswith(self.gs_prefix))
 
   def test_pre_upload_invalid_hash(self):
     """Assert that status 400 is returned when the digest is invalid."""
-    bad_digest = hash_content('some stuff', 'default')
+    bad_collection = DigestCollection(
+        namespace=endpoint_handlers_api.Namespace())
+    bad_digest = hash_content('some stuff', bad_collection.namespace.namespace)
     bad_digest = 'g' + bad_digest[1:]  # that's not hexadecimal!
-    bad_collection = DigestCollection(items=[
-        Digest(digest=bad_digest, size=10)])
+    bad_collection.items.append(
+        endpoint_handlers_api.Digest(digest=bad_digest, size=10))
     with self.call_should_fail('400'):
-      _response = self.app_api.post_json(
-          IsolateServiceTest.preupload_url, self.message_to_dict(
-              bad_collection))
+      _response = self.call_api(
+          'preupload', self.message_to_dict(bad_collection), 200)
 
   def test_pre_upload_invalid_namespace(self):
     """Assert that status 400 is returned when the namespace is invalid."""
-    bad_collection = DigestCollection(namespace='~tildewhatevs', items=[
-        generate_digest('pangolin', 'default')])
+    bad_collection = DigestCollection(
+        namespace=endpoint_handlers_api.Namespace(namespace='~tildewhatevs'),
+        items=[generate_digest('pangolin', endpoint_handlers_api.Namespace())])
     with self.call_should_fail('400'):
-      _response = self.app_api.post_json(
-          IsolateServiceTest.preupload_url, self.message_to_dict(
-              bad_collection))
+      _response = self.call_api(
+          'preupload', self.message_to_dict(bad_collection), 200)
 
   def test_check_existing_finds_existing_entities(self):
     """Assert that existence check is working."""
-    collection = DigestCollection()
+    collection = DigestCollection(namespace=endpoint_handlers_api.Namespace())
     collection.items.extend([
         generate_digest('small content', collection.namespace),
         generate_digest('larger content', collection.namespace),
         generate_digest('biggest content', collection.namespace)])
-    key = model.entry_key(collection.namespace, collection.items[0].digest)
+    key = model.entry_key(
+        collection.namespace.namespace, collection.items[0].digest)
 
     # guarantee that one digest already exists in the datastore
     model.new_content_entry(key, content=collection.items[0].digest).put()
-    response = self.app_api.post_json(
-        IsolateServiceTest.preupload_url, self.message_to_dict(collection))
+    response = self.call_api(
+        'preupload', self.message_to_dict(collection), 200)
 
     # we should see one enqueued task and two new URLs in the response
     self.assertEqual(2, len(json.loads(response.body)['items']))
@@ -163,19 +178,27 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
 
   def test_check_existing_enqueues_tasks(self):
     """Assert that existent entities are enqueued."""
-    collection = DigestCollection()
-    collection.items.extend([
-        generate_digest('some content', collection.namespace)])
-    key = model.entry_key(collection.namespace, collection.items[0].digest)
+    collection = DigestCollection(namespace=endpoint_handlers_api.Namespace())
+    collection.items.append(
+        generate_digest('some content', collection.namespace))
+    key = model.entry_key(
+        collection.namespace.namespace, collection.items[0].digest)
 
     # guarantee that one digest already exists in the datastore
     model.new_content_entry(key, content=collection.items[0].digest).put()
-    _response = self.app_api.post_json(
-        IsolateServiceTest.preupload_url, self.message_to_dict(collection))
+    _response = self.call_api(
+        'preupload', self.message_to_dict(collection), 200)
 
     # find enqueued tasks
     enqueued_tasks = self.execute_tasks()
     self.assertEqual(1, enqueued_tasks)
+
+  def test_store_inline_ok(self):
+    """Assert that content storage completes successfully."""
+    request = generate_store_request('sibilance', 'POST')
+    response = self.call_api(
+        'store_inline', body=self.message_to_dict(request), status=200)
+    self.assertEquals(json.loads(response.body).get('content', None), '')
 
 
 if __name__ == '__main__':
