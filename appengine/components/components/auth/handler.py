@@ -172,9 +172,7 @@ class AuthenticatingHandler(webapp2.RequestHandler):
       # All other ACL checks will be performed by corresponding handlers
       # manually or via '@required' decorator. Failed ACL check raises
       # AuthorizationError.
-      super(AuthenticatingHandler, self).dispatch()
-      # Disable frame support wholesale.
-      self.response.headers['X-Frame-Options'] = 'DENY'
+      return super(AuthenticatingHandler, self).dispatch()
     except api.AuthorizationError as err:
       self.authorization_error(err)
 
