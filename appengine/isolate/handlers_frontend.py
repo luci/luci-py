@@ -53,22 +53,26 @@ _GVIZ_COLUMNS_ORDER = (
 ### Restricted handlers
 
 
-class RestrictedGoogleStorageConfig(auth.AuthenticatingHandler):
+class RestrictedConfig(auth.AuthenticatingHandler):
   """View and modify Google Storage config entries."""
 
   @auth.require(auth.is_admin)
   def get(self):
     settings = config.settings()
-    self.response.write(template.render('isolate/gs_config.html', {
+    self.response.write(template.render('isolate/config.html', {
+        'default_expiration': settings.default_expiration,
         'gs_bucket': settings.gs_bucket,
         'gs_client_id_email': settings.gs_client_id_email,
         'gs_private_key': settings.gs_private_key,
+        'updated_by': settings.updated_by.to_bytes(),
+        'updated_ts': settings.updated_ts,
         'xsrf_token': self.generate_xsrf_token(),
     }))
 
   @auth.require(auth.is_admin)
   def post(self):
     settings = config.settings()
+    settings.default_expiration = int(self.request.get('default_expiration'))
     settings.gs_bucket = self.request.get('gs_bucket')
     settings.gs_client_id_email = self.request.get('gs_client_id_email')
     settings.gs_private_key = self.request.get('gs_private_key')
@@ -221,8 +225,7 @@ class WarmupHandler(webapp2.RequestHandler):
 def get_routes():
   return [
       # Administrative urls.
-      webapp2.Route(
-          r'/restricted/gs_config', RestrictedGoogleStorageConfig),
+      webapp2.Route(r'/restricted/config', RestrictedConfig),
 
       # Mapreduce related urls.
       webapp2.Route(

@@ -17,7 +17,7 @@ from components import utils
 class GlobalConfig(config.GlobalConfig):
   """Application wide settings."""
   # The number of seconds a cache entry must be kept for before it is evicted.
-  default_expiration = ndb.IntegerProperty(indexed=False, default=7*24*60*60)
+  default_expiration = ndb.IntegerProperty(indexed=False, default=30*24*60*60)
 
   # This determines the number of initial letters from the ContentEntry hash
   # value to use as buckets in ContentShard. This is to even out writes across

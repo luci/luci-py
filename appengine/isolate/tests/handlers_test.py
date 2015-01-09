@@ -26,6 +26,7 @@ from components import utils
 from support import test_case
 
 import acl
+import config
 import handlers_backend
 import handlers_frontend
 import model
@@ -83,6 +84,10 @@ class MainTest(test_case.TestCase):
     auth.ip_whitelist_key(auth.BOTS_IP_WHITELIST).delete()
     auth_testing.reset_local_state()
 
+  def set_as_admin(self):
+    self.set_as_anonymous()
+    self.testbed.setup_env(USER_EMAIL='admin@example.com', overwrite=True)
+
   def set_as_reader(self):
     self.set_as_anonymous()
     self.testbed.setup_env(USER_EMAIL='reader@example.com', overwrite=True)
@@ -139,6 +144,16 @@ class MainTest(test_case.TestCase):
     self.set_as_reader()
     hashhex = '0123456780123456780123456789990123456789'
     self.app_frontend.get('/browse?namespace=default&hash=%s' % hashhex)
+
+  def test_config(self):
+    self.set_as_admin()
+    resp = self.app_frontend.get('/restricted/config')
+    self.assertNotIn('123456', resp.body)
+    settings = config.settings()
+    settings.default_expiration = 123456
+    settings.store()
+    resp = self.app_frontend.get('/restricted/config')
+    self.assertIn('123456', resp.body)
 
   def test_stats(self):
     self._gen_stats()

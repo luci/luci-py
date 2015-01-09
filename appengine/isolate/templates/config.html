@@ -3,27 +3,40 @@
 
 {% block body %}
 
-<h1>Google Storage config</h1>
-<p>See this <a href="https://developers.google.com/storage/docs/accesscontrol#About-the-Client-ID">
-page</a> for instructions on how to setup Service account for API Access to Google Storage.
-</p>
+<h1>Server global config</h1>
+
+Last updated by: <strong>{{ updated_by }}</strong>.<br>
+Last updated on: <strong>{{ updated_ts|datetimeformat }}</strong>.<br>
 
 <form method="post">
+  <h2>Cache</h2>
+  <div>
+    Default expiration (secs):<br />
+    <input type="text" name="default_expiration" value="{{ default_expiration }}" size="60" />
+  </div>
+  <h2>Google storage</h2>
+  See this <a href="https://developers.google.com/storage/docs/accesscontrol#About-the-Client-ID">
+  page</a> for instructions on how to setup Service account for API Access to Google Storage.
+  <p>
   <div>
     Google Storage Bucket:<br />
     <input type="text" name="gs_bucket" value="{{ gs_bucket }}" size="60" />
   </div>
+  <br>
   <div>
     API access client email address:<br />
     <input type="text" name="gs_client_id_email" value="{{ gs_client_id_email }}" size="60" />
   </div>
+  <br>
   <div>
     API access base64 encoded *.der private key:<br />
     <textarea rows="14" cols="80" name="gs_private_key">{{ gs_private_key }}</textarea>
   </div>
+  <br>
   <input type="hidden" name="xsrf_token" value="{{ xsrf_token }}" />
   <input type="submit" value="Submit" />
 </form>
+<br>
 
 <hr>
 

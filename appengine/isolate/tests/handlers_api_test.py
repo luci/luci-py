@@ -28,6 +28,7 @@ from components import utils
 from support import test_case
 
 import acl
+import config
 import gcs
 import handlers_api
 import handlers_backend
@@ -164,13 +165,11 @@ class MainTest(test_case.TestCase):
       self.assertEqual(None, urls[1])
       self.put_content(urls[0], content)
     self.assertEqual(2, len(list(model.ContentEntry.query())))
-    expiration = 7*24*60*60
+    expiration = config.settings().default_expiration
     self.assertEqual(0, self.execute_tasks())
 
     # Advance time, tag the first item.
     now += datetime.timedelta(seconds=2*expiration)
-    self.assertEqual(
-        datetime.datetime(2012, 01, 16, 03, 04, 05, 06), utils.utcnow())
     r = self.app_api.post_json(
         '/content-gs/pre-upload/default?token=%s' % self.handshake(),
         [gen_item(items[0])])
