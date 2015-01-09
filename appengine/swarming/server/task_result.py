@@ -428,6 +428,9 @@ class TaskRunResult(_TaskResultCommon):
   # Current state of this task.
   state = StateProperty(default=State.RUNNING, validator=_validate_not_pending)
 
+  # Effective cost of this task.
+  cost_usd = ndb.FloatProperty(indexed=False, default=0.)
+
   # A task run execution can't be definition be deduped from another task.
   # Still, setting this property always to None simplifies a lot the
   # presentation layer.
@@ -530,6 +533,9 @@ class TaskResultSummary(_TaskResultCommon):
   # results were deduped, in this case it's 0.
   try_number = ndb.IntegerProperty()
 
+  # Effective cost of this task for each try. Use self.cost_usd for the sum.
+  costs_usd = ndb.FloatProperty(repeated=True, indexed=False)
+
   # Set to the task run id when the task result was retrieved from another task.
   # A task run id is a reference to a TaskRunResult generated via
   # pack_run_result_key(). The reason so store the packed version instead of
@@ -539,6 +545,11 @@ class TaskResultSummary(_TaskResultCommon):
   # Note that when it's set, there's no TaskRunResult child since there was no
   # run.
   deduped_from = ndb.StringProperty(indexed=False)
+
+  @property
+  def cost_usd(self):
+    """Returns the sum of the cost of each try."""
+    return sum(self.costs_usd) if self.costs_usd else 0.
 
   @property
   def key_string(self):
@@ -586,6 +597,10 @@ class TaskResultSummary(_TaskResultCommon):
     # pylint: disable=W0201
     self.state = run_result.state
     self.try_number = run_result.try_number
+
+    while len(self.costs_usd) < run_result.try_number:
+      self.costs_usd.append(0.)
+    self.costs_usd[run_result.try_number-1] = run_result.cost_usd
 
     if (self.state == State.COMPLETED and not self.failure and
         not self.internal_failure and request.properties.idempotent):

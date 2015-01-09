@@ -47,10 +47,9 @@ def compress_to_zip(files):
       zip_file.writestr(item, content)
   return out.getvalue()
 
-
-class TestLocalTestRunner(net_utils.TestCase):
+class TestLocalTestRunnerBase(net_utils.TestCase):
   def setUp(self):
-    super(TestLocalTestRunner, self).setUp()
+    super(TestLocalTestRunnerBase, self).setUp()
     self.root_dir = tempfile.mkdtemp(prefix='task_runner')
     self.work_dir = os.path.join(self.root_dir, 'work')
     os.chdir(self.root_dir)
@@ -59,16 +58,13 @@ class TestLocalTestRunner(net_utils.TestCase):
   def tearDown(self):
     os.chdir(BASE_DIR)
     shutil.rmtree(self.root_dir)
-    super(TestLocalTestRunner, self).tearDown()
+    super(TestLocalTestRunnerBase, self).tearDown()
 
-  def _incrementing_time(self):
-    """Makes 'duration' deterministic."""
-    # Use a list so 'times' can be mutated.
-    times = [0.]
-    def get_time():
-      times[0] += 1.
-      return times[0]
-    self.mock(time, 'time', get_time)
+
+class TestLocalTestRunner(TestLocalTestRunnerBase):
+  def setUp(self):
+    super(TestLocalTestRunner, self).setUp()
+    self.mock(time, 'time', lambda: 1000000000.)
 
   def test_download_data(self):
     requests = [
@@ -104,10 +100,13 @@ class TestLocalTestRunner(net_utils.TestCase):
     server = xsrf_client.XsrfRemote('https://localhost:1/')
 
     runs = []
-    def run_command(swarming_server, index, task_details, work_dir):
+    def run_command(
+        swarming_server, index, task_details, work_dir, cost_usd_hour, start):
       self.assertEqual(server, swarming_server)
       self.assertEqual(self.work_dir, work_dir)
       self.assertTrue(isinstance(task_details, task_runner.TaskDetails))
+      self.assertEqual(3600., cost_usd_hour)
+      self.assertEqual(time.time(), start)
       runs.append(index)
       return 0
     self.mock(task_runner, 'run_command', run_command)
@@ -125,7 +124,8 @@ class TestLocalTestRunner(net_utils.TestCase):
       }
       json.dump(data, f)
 
-    self.assertEqual(True, task_runner.load_and_run(manifest, server))
+    self.assertEqual(
+        True, task_runner.load_and_run(manifest, server, 3600., time.time()))
     self.assertEqual([0, 1], runs)
 
   def test_load_and_run_fail(self):
@@ -141,10 +141,13 @@ class TestLocalTestRunner(net_utils.TestCase):
     server = xsrf_client.XsrfRemote('https://localhost:1/')
 
     runs = []
-    def run_command(swarming_server, index, task_details, work_dir):
+    def run_command(
+        swarming_server, index, task_details, work_dir, cost_usd_hour, start):
       self.assertEqual(server, swarming_server)
       self.assertEqual(self.work_dir, work_dir)
       self.assertTrue(isinstance(task_details, task_runner.TaskDetails))
+      self.assertEqual(3600., cost_usd_hour)
+      self.assertEqual(time.time(), start)
       runs.append(index)
       # Fails the first, pass the second.
       return 1 if len(runs) == 1 else 0
@@ -163,16 +166,18 @@ class TestLocalTestRunner(net_utils.TestCase):
       }
       json.dump(data, f)
 
-    self.assertEqual(False, task_runner.load_and_run(manifest, server))
+    self.assertEqual(
+        False, task_runner.load_and_run(manifest, server, 3600., time.time()))
     self.assertEqual([0, 1], runs)
 
   def test_run_command(self):
     def check_final(kwargs):
-      self.assertLess(0, kwargs['data'].pop('duration'))
       self.assertEqual(
           {
             'data': {
               'command_index': 0,
+              'cost_usd': 1.,
+              'duration': 0.,
               'exit_code': 0,
               'hard_timeout': False,
               'id': 'localhost',
@@ -194,7 +199,12 @@ class TestLocalTestRunner(net_utils.TestCase):
       (
         'https://localhost:1/swarming/api/v1/bot/task_update/23',
         {
-          'data': {'command_index': 0, 'id': 'localhost', 'task_id': 23},
+          'data': {
+            'command_index': 0,
+            'cost_usd': 1.,
+            'id': 'localhost',
+            'task_id': 23,
+          },
           'headers': {'X-XSRF-Token': 'token'},
         },
         {},
@@ -219,15 +229,19 @@ class TestLocalTestRunner(net_utils.TestCase):
           'task_id': 23,
         })
     # This runs the command for real.
-    self.assertEqual(0, task_runner.run_command(server, 0, task_details, '.'))
+    r = task_runner.run_command(
+        server, 0, task_details, '.', 3600., time.time() - 1)
+    self.assertEqual(0, r)
 
   def test_run_command_fail(self):
     def check_final(kwargs):
-      self.assertLess(0, kwargs['data'].pop('duration'))
       self.assertEqual(
           {
             'data': {
               'command_index': 0,
+              'cost_usd': 10.,
+              # Due to time.time() mock.
+              'duration': 0.,
               'exit_code': 1,
               'hard_timeout': False,
               'id': 'localhost',
@@ -249,7 +263,12 @@ class TestLocalTestRunner(net_utils.TestCase):
       (
         'https://localhost:1/swarming/api/v1/bot/task_update/23',
         {
-          'data': {'command_index': 0, 'id': 'localhost', 'task_id': 23},
+          'data': {
+            'command_index': 0,
+            'cost_usd': 10.,
+            'id': 'localhost',
+            'task_id': 23,
+          },
           'headers': {'X-XSRF-Token': 'token'},
         },
         {},
@@ -276,15 +295,20 @@ class TestLocalTestRunner(net_utils.TestCase):
           'task_id': 23,
         })
     # This runs the command for real.
-    self.assertEqual(1, task_runner.run_command(server, 0, task_details, '.'))
+    start = time.time()
+    self.mock(time, 'time', lambda: start + 10)
+    r = task_runner.run_command(server, 0, task_details, '.', 3600., start)
+    self.assertEqual(1, r)
 
   def test_run_command_os_error(self):
     def check_final(kwargs):
-      self.assertLess(0, kwargs['data'].pop('duration'))
       self.assertEqual(
           {
             'data': {
               'command_index': 0,
+              'cost_usd': 10.,
+              # Due to time.time() mock.
+              'duration': 0.,
               'exit_code': 1,
               'hard_timeout': False,
               'id': 'localhost',
@@ -311,7 +335,12 @@ class TestLocalTestRunner(net_utils.TestCase):
       (
         'https://localhost:1/swarming/api/v1/bot/task_update/23',
         {
-          'data': {'command_index': 0, 'id': 'localhost', 'task_id': 23},
+          'data': {
+            'command_index': 0,
+            'cost_usd': 10.,
+            'id': 'localhost',
+            'task_id': 23,
+          },
           'headers': {'X-XSRF-Token': 'token'},
         },
         {},
@@ -341,127 +370,10 @@ class TestLocalTestRunner(net_utils.TestCase):
           'task_id': 23,
         })
     # This runs the command for real.
-    self.assertEqual(1, task_runner.run_command(server, 0, task_details, '.'))
-
-  def test_run_command_hard_timeout(self):
-    # This runs the command for real.
-    def check_final(kwargs):
-      self.assertLess(0, kwargs['data'].pop('duration'))
-      self.assertEqual(
-          {
-            'data': {
-              'command_index': 0,
-              'exit_code': -9,
-              'hard_timeout': True,
-              'id': 'localhost',
-              'io_timeout': False,
-              'output': base64.b64encode('hi\n'),
-              'output_chunk_start': 0,
-              'task_id': 23,
-            },
-            'headers': {'X-XSRF-Token': 'token'},
-          },
-          kwargs)
-
-    requests = [
-      (
-        'https://localhost:1/auth/api/v1/accounts/self/xsrf_token',
-        {'data': {}, 'headers': {'X-XSRF-Token-Request': '1'}},
-        {'xsrf_token': 'token'},
-      ),
-      (
-        'https://localhost:1/swarming/api/v1/bot/task_update/23',
-        {
-          'data': {'command_index': 0, 'id': 'localhost', 'task_id': 23},
-          'headers': {'X-XSRF-Token': 'token'},
-        },
-        {},
-      ),
-      (
-        'https://localhost:1/swarming/api/v1/bot/task_update/23',
-        check_final,
-        {},
-      ),
-    ]
-    self.expected_requests(requests)
-    server = xsrf_client.XsrfRemote('https://localhost:1/')
-
-    task_details = task_runner.TaskDetails(
-        {
-          'bot_id': 'localhost',
-          'commands': [
-            [
-              sys.executable, '-u', '-c',
-              'import time; print(\'hi\'); time.sleep(10)',
-            ],
-          ],
-          'data': [],
-          'env': {},
-          'hard_timeout': 1,
-          'io_timeout': 10,
-          'task_id': 23,
-        })
-    self.assertEqual(-9, task_runner.run_command(server, 0, task_details, '.'))
-
-  def test_run_command_io_timeout(self):
-    # This runs the command for real.
-    def check_final(kwargs):
-      self.assertLess(0, kwargs['data'].pop('duration'))
-      self.assertEqual(
-          {
-            'data': {
-              'command_index': 0,
-              'exit_code': -9,
-              'hard_timeout': False,
-              'id': 'localhost',
-              'io_timeout': True,
-              'output': base64.b64encode('hi\n'),
-              'output_chunk_start': 0,
-              'task_id': 23,
-            },
-            'headers': {'X-XSRF-Token': 'token'},
-          },
-          kwargs)
-
-    requests = [
-      (
-        'https://localhost:1/auth/api/v1/accounts/self/xsrf_token',
-        {'data': {}, 'headers': {'X-XSRF-Token-Request': '1'}},
-        {'xsrf_token': 'token'},
-      ),
-      (
-        'https://localhost:1/swarming/api/v1/bot/task_update/23',
-        {
-          'data': {'command_index': 0, 'id': 'localhost', 'task_id': 23},
-          'headers': {'X-XSRF-Token': 'token'},
-        },
-        {},
-      ),
-      (
-        'https://localhost:1/swarming/api/v1/bot/task_update/23',
-        check_final,
-        {},
-      ),
-    ]
-    self.expected_requests(requests)
-    server = xsrf_client.XsrfRemote('https://localhost:1/')
-
-    task_details = task_runner.TaskDetails(
-        {
-          'bot_id': 'localhost',
-          'commands': [
-            [
-              sys.executable, '-u', '-c',
-              'import time; print(\'hi\'); time.sleep(10)',
-            ],
-          ],
-          'data': [],
-          'env': {},
-          'hard_timeout': 10,
-          'io_timeout': 1,
-          'task_id': 23,
-        })
-    self.assertEqual(-9, task_runner.run_command(server, 0, task_details, '.'))
+    start = time.time()
+    self.mock(time, 'time', lambda: start + 10)
+    r = task_runner.run_command(server, 0, task_details, '.', 3600., start)
+    self.assertEqual(1, r)
 
   def test_run_command_large(self):
     # Method should have "self" as first argument - pylint: disable=E0213
@@ -498,11 +410,13 @@ class TestLocalTestRunner(net_utils.TestCase):
     self.mock(subprocess42, 'Popen', Popen)
 
     def check_final(kwargs):
-      self.assertLess(0, kwargs['data'].pop('duration'))
       self.assertEqual(
           {
             'data': {
               'command_index': 0,
+              'cost_usd': 0.,
+              # Due to time.time() mock.
+              'duration': 0.,
               'exit_code': 0,
               'hard_timeout': False,
               'id': 'localhost',
@@ -524,7 +438,12 @@ class TestLocalTestRunner(net_utils.TestCase):
       (
         'https://localhost:1/swarming/api/v1/bot/task_update/23',
         {
-          'data': {'command_index': 0, 'id': 'localhost', 'task_id': 23},
+          'data': {
+            'command_index': 0,
+            'cost_usd': 0.,
+            'id': 'localhost',
+            'task_id': 23,
+          },
           'headers': {'X-XSRF-Token': 'token'},
         },
         {},
@@ -534,6 +453,7 @@ class TestLocalTestRunner(net_utils.TestCase):
         {
           'data': {
             'command_index': 0,
+            'cost_usd': 0.,
             'id': 'localhost',
             'output': base64.b64encode('hi!\n' * 100002),
             'output_chunk_start': 0,
@@ -561,28 +481,176 @@ class TestLocalTestRunner(net_utils.TestCase):
           'io_timeout': 60,
           'task_id': 23,
         })
-    self.assertEqual(0, task_runner.run_command(server, 0, task_details, './'))
+    r = task_runner.run_command(
+        server, 0, task_details, './', 3600., time.time())
+    self.assertEqual(0, r)
 
   def test_main(self):
-    def load_and_run(manifest, swarming_server):
+    def load_and_run(manifest, swarming_server, cost_usd_hour, start):
       self.assertEqual('foo', manifest)
       self.assertEqual('http://localhost', swarming_server.url)
+      self.assertEqual(3600., cost_usd_hour)
+      self.assertEqual(time.time(), start)
       return True
 
     self.mock(task_runner, 'load_and_run', load_and_run)
-    self.assertEqual(
-        0, task_runner.main(['-S', 'http://localhost', '-f', 'foo']))
+    cmd = [
+      '--swarming-server', 'http://localhost', '--file', 'foo',
+      '--cost-usd-hour', '3600', '--start', str(time.time()),
+    ]
+    self.assertEqual(0, task_runner.main(cmd))
 
   def test_main_reboot(self):
-    def load_and_run(manifest, swarming_server):
+    def load_and_run(manifest, swarming_server, cost_usd_hour, start):
       self.assertEqual('foo', manifest)
       self.assertEqual('http://localhost', swarming_server.url)
+      self.assertEqual(3600., cost_usd_hour)
+      self.assertEqual(time.time(), start)
       return False
 
     self.mock(task_runner, 'load_and_run', load_and_run)
+    cmd = [
+      '--swarming-server', 'http://localhost', '--file', 'foo',
+      '--cost-usd-hour', '3600', '--start', str(time.time()),
+    ]
+    self.assertEqual(task_runner.TASK_FAILED, task_runner.main(cmd))
+
+
+class TestLocalTestRunnerNoTimeMock(TestLocalTestRunnerBase):
+  # Do not mock time.time() for these tests otherwise it becomes a tricky
+  # implementation detail check.
+  def check_first(self, kwargs):
+    self.assertLessEqual(0., kwargs['data'].pop('cost_usd'))
     self.assertEqual(
-        task_runner.TASK_FAILED,
-        task_runner.main(['-S', 'http://localhost', '-f', 'foo']))
+      {
+        'data': {
+          'command_index': 0,
+          'id': 'localhost',
+          'task_id': 23,
+        },
+        'headers': {'X-XSRF-Token': 'token'},
+      },
+      kwargs)
+
+  def test_run_command_hard_timeout(self):
+    # This runs the command for real.
+    def check_final(kwargs):
+      self.assertLess(0.5, kwargs['data'].pop('cost_usd'))
+      self.assertLess(0.5, kwargs['data'].pop('duration'))
+      self.assertEqual(
+          {
+            'data': {
+              'command_index': 0,
+              'exit_code': -9,
+              'hard_timeout': True,
+              'id': 'localhost',
+              'io_timeout': False,
+              'output': base64.b64encode('hi\n'),
+              'output_chunk_start': 0,
+              'task_id': 23,
+            },
+            'headers': {'X-XSRF-Token': 'token'},
+          },
+          kwargs)
+
+    requests = [
+      (
+        'https://localhost:1/auth/api/v1/accounts/self/xsrf_token',
+        {'data': {}, 'headers': {'X-XSRF-Token-Request': '1'}},
+        {'xsrf_token': 'token'},
+      ),
+      (
+        'https://localhost:1/swarming/api/v1/bot/task_update/23',
+        self.check_first,
+        {},
+      ),
+      (
+        'https://localhost:1/swarming/api/v1/bot/task_update/23',
+        check_final,
+        {},
+      ),
+    ]
+    self.expected_requests(requests)
+    server = xsrf_client.XsrfRemote('https://localhost:1/')
+
+    task_details = task_runner.TaskDetails(
+        {
+          'bot_id': 'localhost',
+          'commands': [
+            [
+              sys.executable, '-u', '-c',
+              'import time; print(\'hi\'); time.sleep(10)',
+            ],
+          ],
+          'data': [],
+          'env': {},
+          'hard_timeout': 0.5,
+          'io_timeout': 10,
+          'task_id': 23,
+        })
+    r = task_runner.run_command(
+        server, 0, task_details, '.', 3600., time.time())
+    self.assertEqual(-9, r)
+
+  def test_run_command_io_timeout(self):
+    # This runs the command for real.
+    def check_final(kwargs):
+      self.assertLess(0.5, kwargs['data'].pop('cost_usd'))
+      self.assertLess(0.5, kwargs['data'].pop('duration'))
+      self.assertEqual(
+          {
+            'data': {
+              'command_index': 0,
+              'exit_code': -9,
+              'hard_timeout': False,
+              'id': 'localhost',
+              'io_timeout': True,
+              'output': base64.b64encode('hi\n'),
+              'output_chunk_start': 0,
+              'task_id': 23,
+            },
+            'headers': {'X-XSRF-Token': 'token'},
+          },
+          kwargs)
+
+    requests = [
+      (
+        'https://localhost:1/auth/api/v1/accounts/self/xsrf_token',
+        {'data': {}, 'headers': {'X-XSRF-Token-Request': '1'}},
+        {'xsrf_token': 'token'},
+      ),
+      (
+        'https://localhost:1/swarming/api/v1/bot/task_update/23',
+        self.check_first,
+        {},
+      ),
+      (
+        'https://localhost:1/swarming/api/v1/bot/task_update/23',
+        check_final,
+        {},
+      ),
+    ]
+    self.expected_requests(requests)
+    server = xsrf_client.XsrfRemote('https://localhost:1/')
+
+    task_details = task_runner.TaskDetails(
+        {
+          'bot_id': 'localhost',
+          'commands': [
+            [
+              sys.executable, '-u', '-c',
+              'import time; print(\'hi\'); time.sleep(10)',
+            ],
+          ],
+          'data': [],
+          'env': {},
+          'hard_timeout': 10,
+          'io_timeout': 0.5,
+          'task_id': 23,
+        })
+    r = task_runner.run_command(
+        server, 0, task_details, '.', 3600., time.time())
+    self.assertEqual(-9, r)
 
 
 if __name__ == '__main__':

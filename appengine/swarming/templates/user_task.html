@@ -267,6 +267,17 @@
         <td>Exit codes</td>
         <td>{{task.exit_codes}}</td>
       </tr>
+      <tr title="Cost of running this task, as reported by the bot, if
+      applicable.">
+        <td>$ USD</td>
+        <td>
+          {% if task.cost_usd %}
+            {{task.cost_usd|round(5) }} $
+          {% else %}
+            &#8209;&#8209;
+          {% endif %}
+        </td>
+      </tr>
       <tr title="A task may be tried 2 times. This list the try number starting at 1.">
         <td>Try number</td>
         <td>{{task.try_number}}</td>

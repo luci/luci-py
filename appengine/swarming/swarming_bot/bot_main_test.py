@@ -52,12 +52,16 @@ class TestBotMain(net_utils.TestCase):
     self.attributes = {
       'dimensions': {'foo', 'bar'},
       'id': 'localhost',
+      'state': {
+        'cost_usd_hour': 3600.,
+      },
       'version': '123',
     }
     self.mock(zip_package, 'generate_version', lambda: '123')
     self.bot = bot.Bot(self.server, self.attributes, 'version1', self.root_dir)
     self.mock(self.bot, 'post_error', self.fail)
     self.mock(self.bot, 'restart', self.fail)
+    self.mock(time, 'time', lambda: 100.)
 
   def tearDown(self):
     os.environ.pop('SWARMING_BOT_ID', None)
@@ -236,7 +240,7 @@ class TestBotMain(net_utils.TestCase):
           ),
         ])
     self.assertTrue(bot_main.poll_server(self.bot))
-    expected = [(self.bot, {'foo': 'bar'})]
+    expected = [(self.bot, {'foo': 'bar'}, time.time())]
     self.assertEqual(expected, manifest)
 
   def test_poll_server_update(self):
@@ -331,7 +335,9 @@ class TestBotMain(net_utils.TestCase):
         self2.returncode = None
         expected = [
           sys.executable, THIS_FILE, 'task_runner',
-          '-S', url, '-f', os.path.join(self.root_dir, 'work', 'test_run.json'),
+          '--swarming-server', url,
+          '--file', os.path.join(self.root_dir, 'work', 'test_run.json'),
+          '--cost-usd-hour', '3600.0', '--start', '100.0',
         ]
         self.assertEqual(expected, cmd)
         self.assertEqual(bot_main.ROOT_DIR, cwd)
@@ -356,7 +362,7 @@ class TestBotMain(net_utils.TestCase):
       'host': 'https://localhost:3',
       'task_id': 24,
     }
-    bot_main.run_manifest(self.bot, params)
+    bot_main.run_manifest(self.bot, params, time.time())
 
   def test_run_manifest_task_failure(self):
     self.mock(bot_main, 'post_error_task', self.fail)
@@ -366,7 +372,7 @@ class TestBotMain(net_utils.TestCase):
     self.mock(bot_main, 'on_after_task', on_after_task)
     self._mock_popen(bot_main.TASK_FAILED)
 
-    bot_main.run_manifest(self.bot, {'task_id': 24})
+    bot_main.run_manifest(self.bot, {'task_id': 24}, time.time())
 
   def test_run_manifest_internal_failure(self):
     posted = []
@@ -377,7 +383,7 @@ class TestBotMain(net_utils.TestCase):
     self.mock(bot_main, 'on_after_task', on_after_task)
     self._mock_popen(1)
 
-    bot_main.run_manifest(self.bot, {'task_id': 24})
+    bot_main.run_manifest(self.bot, {'task_id': 24}, time.time())
     expected = [(self.bot, 'Execution failed, internal error:\nfoo', 24)]
     self.assertEqual(expected, posted)
 
@@ -392,7 +398,7 @@ class TestBotMain(net_utils.TestCase):
       raise OSError('Dang')
     self.mock(subprocess, 'Popen', raiseOSError)
 
-    bot_main.run_manifest(self.bot, {'task_id': 24})
+    bot_main.run_manifest(self.bot, {'task_id': 24}, time.time())
     expected = [(self.bot, 'Internal exception occured: Dang', 24)]
     self.assertEqual(expected, posted)
 

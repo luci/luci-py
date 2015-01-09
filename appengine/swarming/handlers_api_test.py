@@ -255,6 +255,7 @@ class BotApiTest(AppTestBase):
       u'bot_id': u'bot1',
       u'bot_version': self.bot_version,
       u'completed_ts': None,
+      u'cost_usd': 0.,
       u'durations': [],
       u'exit_codes': [],
       u'failure': False,
@@ -362,6 +363,7 @@ class BotApiTest(AppTestBase):
     def _params(**kwargs):
       out = {
         'command_index': 0,
+        'cost_usd': 0.1,
         'duration': None,
         'exit_code': None,
         'id': 'bot1',
@@ -378,6 +380,7 @@ class BotApiTest(AppTestBase):
         u'bot_id': u'bot1',
         u'bot_version': self.bot_version,
         u'completed_ts': None,
+        u'cost_usd': 0.1,
         u'durations': [],
         u'exit_codes': [],
         u'failure': False,
@@ -452,6 +455,7 @@ class BotApiTest(AppTestBase):
     self.mock(ndb, 'put_multi', r)
     params = {
       'command_index': 0,
+      'cost_usd': 0.1,
       'duration': 0.1,
       'exit_code': 0,
       'id': 'bot1',
@@ -486,6 +490,7 @@ class BotApiTest(AppTestBase):
     self.mock(ndb, 'put_multi', r)
     params = {
       'command_index': 0,
+      'cost_usd': 0.1,
       'duration': 0.1,
       'exit_code': 0,
       'id': 'bot1',
@@ -510,6 +515,7 @@ class BotApiTest(AppTestBase):
 
     params = {
       'command_index': 0,
+      'cost_usd': 0.1,
       'duration': 0.1,
       'exit_code': 1,
       'id': 'bot1',
@@ -525,6 +531,7 @@ class BotApiTest(AppTestBase):
       u'bot_id': u'bot1',
       u'bot_version': self.bot_version,
       u'completed_ts': str_now,
+      u'cost_usd': 0.1,
       u'durations': [0.1],
       u'exit_codes': [1],
       u'failure': True,
@@ -571,6 +578,7 @@ class BotApiTest(AppTestBase):
       u'bot_id': u'bot1',
       u'bot_version': self.bot_version,
       u'completed_ts': None,
+      u'cost_usd': 0.,
       u'durations': [],
       u'exit_codes': [],
       u'failure': False,
@@ -784,6 +792,7 @@ class ClientApiTest(AppTestBase):
       u'bot_id': None,
       u'bot_version': None,
       u'completed_ts': None,
+      u'costs_usd': [],
       u'created_ts': str_now,
       u'deduped_from': None,
       u'durations': [],
@@ -820,6 +829,7 @@ class ClientApiTest(AppTestBase):
       u'bot_id': None,
       u'bot_version': None,
       u'completed_ts': None,
+      u'costs_usd': [],
       u'created_ts': str_now,
       u'deduped_from': None,
       u'durations': [],
@@ -856,6 +866,7 @@ class ClientApiTest(AppTestBase):
       u'bot_id': u'bot1',
       u'bot_version': self.bot_version,
       u'completed_ts': None,
+      u'cost_usd': 0.,
       u'durations': [],
       u'exit_codes': [],
       u'failure': False,
@@ -951,6 +962,7 @@ class ClientApiTest(AppTestBase):
     task_id = res['manifest']['task_id']
     params = {
       'command_index': 0,
+      'cost_usd': 0.1,
       'duration': 0.1,
       'exit_code': 0,
       'id': 'bot1',
@@ -963,6 +975,7 @@ class ClientApiTest(AppTestBase):
     self.assertEqual({u'ok': True}, response)
     params = {
       'command_index': 1,
+      'cost_usd': 0.1,
       'duration': 0.1,
       'exit_code': 0,
       'id': 'bot1',
@@ -1049,6 +1062,7 @@ class ClientApiTest(AppTestBase):
       u'bot_id': u'bot1',
       u'bot_version': self.bot_version,
       u'completed_ts': now_str,
+      u'costs_usd': [0.1],
       u'created_ts': now_str,
       u'deduped_from': None,
       u'durations': [0.1, 0.2],
@@ -1070,6 +1084,7 @@ class ClientApiTest(AppTestBase):
       u'bot_id': u'bot1',
       u'bot_version': self.bot_version,
       u'completed_ts': now_str,
+      u'costs_usd': [],
       u'created_ts': now_60_str,
       u'deduped_from': u'5cee488006611',
       u'durations': [0.1, 0.2],
@@ -1301,6 +1316,7 @@ class ClientApiTest(AppTestBase):
           u'bot_id': u'bot1',
           u'bot_version': self.bot_version,
           u'completed_ts': now_1_str,
+          u'cost_usd': 0.1,
           u'durations': [0.1],
           u'exit_codes': [1],
           u'failure': True,
@@ -1329,6 +1345,7 @@ class ClientApiTest(AppTestBase):
           u'bot_id': u'bot1',
           u'bot_version': self.bot_version,
           u'completed_ts': now_str,
+          u'cost_usd': 0.1,
           u'durations': [0.1],
           u'exit_codes': [0],
           u'failure': False,

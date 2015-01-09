@@ -361,6 +361,12 @@ def _get_metadata_gce():
     https://cloud.google.com/compute/docs/metadata
     https://cloud.google.com/compute/docs/machine-types
   """
+  # To get it at the command line, use:
+  _ = """
+  curl --silent \
+   http://metadata.google.internal/computeMetadata/v1/instance/?recursive=true \
+   -H "Metadata-Flavor: Google" | python -m json.tool | less
+  """
   url = (
     'http://metadata.google.internal/computeMetadata/v1/instance/'
     '?recursive=true')
@@ -645,6 +651,15 @@ def get_monitor_hidpi():
   return None
 
 
+@cached
+def get_cost_hour():
+  """Returns the cost in $USD/h as a floating point value if applicable."""
+  metadata = _get_metadata_gce()
+  if not metadata:
+    return None
+  return _get_cost_hour_gce()
+
+
 ### Google Cloud Compute Engine.
 
 
@@ -666,6 +681,69 @@ def get_machine_type_gce():
     return None
   # Format is projects/<id>/machineTypes/<machine_type>
   return metadata['machineType'].rsplit('/', 1)[-1]
+
+
+def _get_cost_hour_gce():
+  """Returns the $USD/hour of using this bot if applicable."""
+  # Machine. https://cloud.google.com/compute/pricing#machinetype
+  MACHINE_TABLE_US = {
+    'n1-standard-1': 0.063,
+    'n1-standard-2': 0.126,
+    'n1-standard-4': 0.252,
+    'n1-standard-8': 0.504,
+    'n1-standard-16': 1.008,
+    'f1-micro': 0.012,
+    'g1-small': 0.032,
+    'n1-highmem-2': 0.148,
+    'n1-highmem-4': 0.296,
+    'n1-highmem-8': 0.592,
+    'n1-highmem-16': 1.184,
+    'n1-highcpu-2': 0.080,
+    'n1-highcpu-4': 0.160,
+    'n1-highcpu-8': 0.320,
+    'n1-highcpu-16': 0.640,
+  }
+  MACHINE_TABLE_EUROPE_ASIA = {
+    'n1-standard-1': 0.069,
+    'n1-standard-2': 0.138,
+    'n1-standard-4': 0.276,
+    'n1-standard-8': 0.552,
+    'n1-standard-16': 1.104,
+    'f1-micro': 0.013,
+    'g1-small': 0.0347,
+    'n1-highmem-2': 0.162,
+    'n1-highmem-4': 0.324,
+    'n1-highmem-8': 0.648,
+    'n1-highmem-16': 1.296,
+    'n1-highcpu-2': 0.086,
+    'n1-highcpu-4': 0.172,
+    'n1-highcpu-8': 0.344,
+    'n1-highcpu-16': 0.688,
+  }
+  machine_type = get_machine_type_gce()
+  if get_zone_gce().startswith('us-'):
+    machine_cost = MACHINE_TABLE_US[machine_type]
+  else:
+    machine_cost = MACHINE_TABLE_EUROPE_ASIA[machine_type]
+
+  # OS. https://cloud.google.com/compute/pricing#premiumoperatingsystems
+  os_cost = 0.
+  if sys.platform == 'win32':
+    # Assume Windows Server.
+    if machine_type in ('f1-micro', 'g1-small'):
+      os_cost = 0.02
+    else:
+      os_cost = 0.04 * get_num_processors()
+
+  # Disk. https://cloud.google.com/compute/pricing#disk
+  # TODO(maruel): Figure out the disk type. The metadata is not useful AFAIK.
+  DISK_GB_MONTH = 0.04
+  disk_gb_cost = 0.
+  for disk in get_disks_info().itervalues():
+    disk_gb_cost += disk['free_mb'] / 1024. * (DISK_GB_MONTH / 30. / 24.)
+
+  # TODO(maruel): Network. It's not a constant cost, it's per task.
+  return machine_cost + os_cost + disk_gb_cost
 
 
 ### Windows.
@@ -915,6 +993,7 @@ def get_state(threshold_mb=2*1024, skip=None):
   # any other leaky resources. So that the server can decided to reboot the bot
   # to clean up.
   state = {
+    'cost_usd_hour': get_cost_hour(),
     'cwd': os.getcwd(),
     'disks': get_disks_info(),
     'gpu': get_gpu()[1],

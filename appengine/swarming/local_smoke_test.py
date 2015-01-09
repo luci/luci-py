@@ -131,6 +131,8 @@ def gen_expected(**kwargs):
   expected = {
     u'abandoned_ts': None,
     u'bot_id': unicode(socket.getfqdn().split('.', 1)[0]),
+    # TODO(maruel): This won't be zero when this test is run on a GCE VM.
+    u'costs_usd': [0.],
     u'deduped_from': None,
     u'exit_codes': [0],
     u'failure': False,

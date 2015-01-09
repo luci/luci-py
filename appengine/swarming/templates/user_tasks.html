@@ -209,6 +209,7 @@
       <th>Requested</th>
       <th>Pending</th>
       <th>Duration</th>
+      <th>$USD</th>
       <th>User</th>
       <th>Bot</th>
       <th>Priority</th>
@@ -239,10 +240,16 @@
           <td>
             {{bot_view.running_star(task)}}{{task.duration_now(now)|timedeltaformat}}
           </td>
-          {# TODO(maruel): Make it a link to all tasks from user #}
+          <td>
+            {% if task.cost_usd %}
+              {{task.cost_usd|round(4) }} $
+            {% else %}
+              &#8209;&#8209;
+            {% endif %}
+          </td>
           <td>
             {% if task.user %}
-              {{task.user}}
+              <a href="/user/tasks?task_tag=user:{{task.user}}&limit={{limit}}">{{task.user}}</a>
             {% else %}
               &#8209;&#8209;
             {% endif %}
@@ -254,6 +261,7 @@
       {% if show_footer %}
         <tr>
           <td>&nbsp;</td>
+          <td></td>
           <td></td>
           <td></td>
           <td></td>
@@ -290,6 +298,7 @@
           </td>
           <td></td>
           <td></td>
+          <td></td>
         </tr>
         <tr>
           <td></td>
@@ -301,21 +310,30 @@
           <td>
             {{total_running_star()}}{{duration_sum|timedeltaformat}}
           </td>
+          <td>
+            {% if total_cost_usd %}
+              {{total_cost_usd|round(4) }} $
+            {% else %}
+              &#8209;&#8209;
+            {% endif %}
+          </td>
           <td></td>
           <td></td>
+        </tr>
         <tr>
           <td></td>
           <td></td>
           <td><strong>Saved by deduping</strong></td>
-          <td></td>
+          <td>
+            ({{'%1.1f' % total_saved_percent}}%)
+          </td>
           <td>
             {{total_saved|timedeltaformat}}
           </td>
-          <td>
-            {{'%1.1f' % total_saved_percent}}%
-          </td>
           <td></td>
-        </tr>
+          <td></td>
+          <td></td>
+          <td></td>
         </tr>
       </tfoot>
     {% endif %}

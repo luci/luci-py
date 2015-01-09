@@ -280,6 +280,7 @@ def poll_server(botobj):
   Returns True if executed some action, False if server asked the bot to sleep.
   """
   # Access to a protected member _XXX of a client class - pylint: disable=W0212
+  start = time.time()
   resp = botobj.remote.url_read_json(
       '/swarming/api/v1/bot/poll', data=botobj._attributes)
   logging.debug('Server response:\n%s', resp)
@@ -290,7 +291,7 @@ def poll_server(botobj):
     return False
 
   if cmd == 'run':
-    run_manifest(botobj, resp['manifest'])
+    run_manifest(botobj, resp['manifest'], start)
   elif cmd == 'update':
     update_bot(botobj, resp['version'])
   elif cmd == 'restart':
@@ -304,7 +305,7 @@ def poll_server(botobj):
   return True
 
 
-def run_manifest(botobj, manifest):
+def run_manifest(botobj, manifest, start):
   """Defers to task_runner.py."""
   # Ensure the manifest is valid. This can throw a json decoding error. Also
   # raise if it is empty.
@@ -335,8 +336,11 @@ def run_manifest(botobj, manifest):
       f.write(json.dumps(manifest))
     command = [
       sys.executable, THIS_FILE, 'task_runner',
-      '-S', url,
-      '-f', path,
+      '--swarming-server', url,
+      '--file', path,
+      '--cost-usd-hour', str(botobj.state.get('cost_usd_hour') or 0.),
+      # Include the time taken to poll the task in the cost.
+      '--start', str(start),
     ]
     logging.debug('Running command: %s', command)
     proc = subprocess.Popen(

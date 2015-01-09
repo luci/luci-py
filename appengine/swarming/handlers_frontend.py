@@ -435,6 +435,7 @@ class TasksHandler(auth.AuthenticatingHandler):
     durations = sorted(t for t in gen if t is not None)
     gen = (t.pending_now(now) for t in tasks)
     pendings = sorted(t for t in gen if t is not None)
+    total_cost_usd = sum(t.cost_usd for t in tasks)
     total_saved = safe_sum(t.duration for t in tasks if t.deduped_from)
     duration_sum = safe_sum(durations)
     total_saved_percent = (
@@ -462,6 +463,7 @@ class TasksHandler(auth.AuthenticatingHandler):
       'task_name': task_name,
       'task_tag': '\n'.join(task_tags),
       'tasks': tasks,
+      'total_cost_usd': total_cost_usd,
       'total_saved': total_saved,
       'total_saved_percent': total_saved_percent,
       'xsrf_token': self.generate_xsrf_token(),

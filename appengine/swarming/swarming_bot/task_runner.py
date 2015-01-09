@@ -92,7 +92,7 @@ class TaskDetails(object):
     self.task_id = data['task_id']
 
 
-def load_and_run(filename, swarming_server):
+def load_and_run(filename, swarming_server, cost_usd_hour, start):
   """Loads the task's metadata and execute it.
 
   This may throw all sorts of exceptions in case of failure. It's up to the
@@ -118,7 +118,8 @@ def load_and_run(filename, swarming_server):
 
   out = True
   for index in xrange(len(task_details.commands)):
-    exit_code = run_command(swarming_server, index, task_details, root_dir)
+    exit_code = run_command(
+        swarming_server, index, task_details, root_dir, cost_usd_hour, start)
     out = out and not bool(exit_code)
   return out
 
@@ -173,7 +174,8 @@ def calc_yield_wait(task_details, start, last_io, stdout):
   return max(min(min(packet_interval, hard_timeout), io_timeout), 0)
 
 
-def run_command(swarming_server, index, task_details, root_dir):
+def run_command(
+    swarming_server, index, task_details, root_dir, cost_usd_hour, task_start):
   """Runs a command and sends packets to the server to stream results back.
 
   Implements both I/O and hard timeouts. Sends the packets numbered, so the
@@ -183,12 +185,13 @@ def run_command(swarming_server, index, task_details, root_dir):
     Child process exit code.
   """
   # Signal the command is about to be started.
+  last_packet = start = now = time.time()
   params = {
     'command_index': index,
+    'cost_usd': cost_usd_hour * (now - task_start) / 60. / 60.,
     'id': task_details.bot_id,
     'task_id': task_details.task_id,
   }
-  last_packet = start = time.time()
   post_update(swarming_server, params, None, '', 0)
 
   logging.info('Executing: %s', task_details.commands[index])
@@ -208,7 +211,9 @@ def run_command(swarming_server, index, task_details, root_dir):
   except OSError as e:
     stdout = 'Command "%s" failed to start.\nError: %s' % (
         ' '.join(task_details.commands[index]), e)
-    params['duration'] = time.time() - start
+    now = time.time()
+    params['cost_usd'] = cost_usd_hour * (now - task_start) / 60. / 60.
+    params['duration'] = now - start
     params['io_timeout'] = False
     params['hard_timeout'] = False
     post_update(swarming_server, params, 1, stdout, 0)
@@ -220,7 +225,7 @@ def run_command(swarming_server, index, task_details, root_dir):
   had_hard_timeout = False
   had_io_timeout = False
   try:
-    now = last_io = time.time()
+    last_io = time.time()
     for _, new_data in proc.yield_any(
           maxsize=MAX_CHUNK_SIZE - len(stdout),
           soft_timeout=calc_yield_wait(task_details, start, last_io, stdout)):
@@ -232,6 +237,8 @@ def run_command(swarming_server, index, task_details, root_dir):
       # Post update if necessary.
       if should_post_update(stdout, now, last_packet):
         last_packet = time.time()
+        params['cost_usd'] = (
+            cost_usd_hour * (last_packet - task_start) / 60. / 60.)
         post_update(swarming_server, params, None, stdout, output_chunk_start)
         output_chunk_start += len(stdout)
         stdout = ''
@@ -254,13 +261,20 @@ def run_command(swarming_server, index, task_details, root_dir):
     # Something wrong happened, try to kill the child process.
     if exit_code is None:
       had_hard_timeout = True
-      proc.kill()
+      try:
+        proc.kill()
+      except OSError:
+        # The process has already exited.
+        pass
+
       # TODO(maruel): We'd wait only for X seconds.
       logging.info('Waiting for proces exit')
       exit_code = proc.wait()
 
     # This is the very last packet for this command.
-    params['duration'] = time.time() - start
+    now = time.time()
+    params['cost_usd'] = cost_usd_hour * (now - task_start) / 60. / 60.
+    params['duration'] = now - start
     params['io_timeout'] = had_io_timeout
     params['hard_timeout'] = had_hard_timeout
     # At worst, it'll re-throw.
@@ -276,14 +290,15 @@ def main(args):
   parser = optparse.OptionParser(
       description=sys.modules[__name__].__doc__,
       version=__version__)
+  parser.add_option('--file', help='Name of the request file')
   parser.add_option(
-      '-f', '--request_file_name',
-      help='name of the request file')
+      '--swarming-server', help='Swarming server to send data back')
   parser.add_option(
-      '-S', '--swarming-server', help='Swarming server to send data back')
+      '--cost-usd-hour', type='float', help='Cost of this VM in $/h')
+  parser.add_option('--start', type='float', help='Time this task was started')
 
   options, args = parser.parse_args(args)
-  if not options.request_file_name:
+  if not options.file:
     parser.error('You must provide the request file name.')
   if args:
     parser.error('Unknown args: %s' % args)
@@ -291,6 +306,7 @@ def main(args):
   on_error.report_on_exception_exit(options.swarming_server)
 
   remote = xsrf_client.XsrfRemote(options.swarming_server)
-  if not load_and_run(options.request_file_name, remote):
+  if not load_and_run(
+      options.file, remote, options.cost_usd_hour, options.start):
     return TASK_FAILED
   return 0

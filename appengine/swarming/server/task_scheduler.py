@@ -318,6 +318,7 @@ def make_request(data):
       task.queue_number = None
       _copy_entity(dupe_summary, result_summary, ('created_ts', 'name', 'user'))
       result_summary.try_number = 0
+      result_summary.costs_usd = []
       result_summary.deduped_from = task_result.pack_run_result_key(
           dupe_summary.run_result_key)
 
@@ -404,7 +405,7 @@ def bot_reap_task(dimensions, bot_id, bot_version):
 
 def bot_update_task(
     run_result_key, bot_id, command_index, output, output_chunk_start,
-    exit_code, duration, hard_timeout, io_timeout):
+    exit_code, duration, hard_timeout, io_timeout, cost_usd):
   """Updates a TaskRunResult and TaskResultSummary, along TaskOutput.
 
   Arguments:
@@ -418,6 +419,7 @@ def bot_update_task(
   - duration: Time spent in seconds for this command.
   - hard_timeout: Bool set if an hard timeout occured.
   - io_timeout: Bool set if an I/O timeout occured.
+  - cost_usd: Cost in $USD of this task up to now.
 
   Invalid states, these are flat out refused:
   - A command is updated after it had an exit code assigned to.
@@ -429,6 +431,8 @@ def bot_update_task(
   """
   assert output_chunk_start is None or isinstance(output_chunk_start, int)
   assert output is None or isinstance(output, str)
+  if cost_usd is not None and cost_usd < 0.:
+    raise ValueError('cost_usd must be None or greater or equal than 0')
 
   result_summary_key = task_result.run_result_key_to_result_summary_key(
       run_result_key)
@@ -481,24 +485,26 @@ def bot_update_task(
         run_result.completed_ts = now
 
     run_result.signal_server_version(server_version)
-    to_put = []
+    to_put = [run_result]
     if output:
       # This does 1 multi GETs. This also modifies run_result in place.
       to_put.extend(
           run_result.append_output(
               command_index, output, output_chunk_start or 0))
 
+    run_result.cost_usd = max(cost_usd, run_result.cost_usd or 0.)
+
     result_summary = result_summary_future.get_result()
     if (result_summary.try_number and
         result_summary.try_number > run_result.try_number):
       # The situation where a shard is retried but the bot running the previous
       # try somehow reappears and reports success, the result must still show
-      # the last try's result.
-      to_put.append(run_result)
+      # the last try's result. We still need to update cost_usd manually.
+      result_summary.costs_usd[run_result.try_number-1] = run_result.cost_usd
     else:
       result_summary.set_from_run_result(run_result, request)
-      to_put.extend((run_result, result_summary))
 
+    to_put.append(result_summary)
     ndb.put_multi(to_put)
     return run_result, task_completed, None
 

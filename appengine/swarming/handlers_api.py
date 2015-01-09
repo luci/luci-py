@@ -770,8 +770,8 @@ class BotTaskUpdateHandler(auth.ApiHandler):
   out-of-order packets.
   """
   ACCEPTED_KEYS = {
-    u'command_index', u'duration', u'exit_code', u'hard_timeout', u'id',
-    u'io_timeout', u'output', u'output_chunk_start', u'task_id',
+    u'cost_usd', u'command_index', u'duration', u'exit_code', u'hard_timeout',
+    u'id', u'io_timeout', u'output', u'output_chunk_start', u'task_id',
   }
   REQUIRED_KEYS = {u'command_index', u'id', u'task_id'}
 
@@ -788,6 +788,7 @@ class BotTaskUpdateHandler(auth.ApiHandler):
 
     bot_id = request['id']
     command_index = request['command_index']
+    cost_usd = request['cost_usd']
     task_id = request['task_id']
 
     duration = request.get('duration')
@@ -813,7 +814,7 @@ class BotTaskUpdateHandler(auth.ApiHandler):
     try:
       success, completed = task_scheduler.bot_update_task(
           run_result_key, bot_id, command_index, output, output_chunk_start,
-          exit_code, duration, hard_timeout, io_timeout)
+          exit_code, duration, hard_timeout, io_timeout, cost_usd)
       if not success:
         self.abort_with_error(500, error='Failed to update, please retry')
 

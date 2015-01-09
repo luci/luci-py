@@ -143,6 +143,7 @@ class AppTestBase(test_case.TestCase):
   def bot_complete_task(self, token, **kwargs):
     params = {
       'command_index': 0,
+      'cost_usd': 0.1,
       'duration': 0.1 * (kwargs.get('command_index', 0)+1),
       'exit_code': 0,
       'id': 'bot1',
