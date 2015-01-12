@@ -30,17 +30,10 @@ import webtest
 from components import auth_testing
 from components import utils
 import config
-
 import endpoint_handlers_api
 from endpoint_handlers_api import DigestCollection
 import handlers_backend
 import model
-
-
-def make_private_key():
-  new_key = RSA.generate(2048)
-  pem_key = base64.b64encode(new_key.exportKey('PEM'))
-  config.settings().gs_private_key = pem_key
 
 
 def hash_content(content, namespace):
@@ -50,8 +43,7 @@ def hash_content(content, namespace):
   return hash_algo.hexdigest()
 
 
-def generate_digest(
-    content, namespace=endpoint_handlers_api.Namespace().namespace):
+def generate_digest(content, namespace):
   """Create a Digest from content (in a given namespace) for preupload.
 
   Arguments:
@@ -65,26 +57,16 @@ def generate_digest(
       digest=hash_content(content, namespace), size=len(content))
 
 
-def generate_embedded(namespace, digest):
-  return {
-      'c': namespace.compression,
-      'd': digest.digest,
-      'h': namespace.digest_hash,
-      'i': str(int(digest.is_isolated)),
-      'n': namespace.namespace,
-      's': str(digest.size),
-  }
-
-
-validate = endpoint_handlers_api.TokenSigner.validate
-
-
-def generate_store_request(content):
+def generate_store_request(content, verb):
   namespace = endpoint_handlers_api.Namespace()
   digest = generate_digest(content, namespace.namespace)
-  return endpoint_handlers_api.StorageRequest(
-      upload_ticket=endpoint_handlers_api.IsolateService.generate_ticket(
-          digest, namespace))
+  request = endpoint_handlers_api.StorageRequest(
+      item=digest, namespace=namespace)
+  signature = endpoint_handlers_api.IsolateService.generate_signature(*map(
+      str, [config.settings().global_secret, verb, 60, namespace,
+            digest.digest, digest.size, digest.is_isolated, '1']))
+  request.upload_ticket = signature
+  return request
 
 
 ### Isolate Service Test
@@ -110,13 +92,18 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
     self.app = webtest.TestApp(
         webapp2.WSGIApplication(handlers_backend.get_routes(), debug=True),
         extra_environ={'REMOTE_ADDR': self.source_ip})
-    # add a private key; signing depends on config.settings()
-    make_private_key()
 
   @staticmethod
   def message_to_dict(message):
     """Returns a JSON-ish dictionary corresponding to the RPC message."""
     return json.loads(protojson.encode_message(message))
+
+  @staticmethod
+  def make_private_key():
+    """Add a private key to config.settings() to create finalize URLs."""
+    new_key = RSA.generate(2048)
+    pem_key = base64.b64encode(new_key.exportKey('PEM'))
+    config.settings().gs_private_key = pem_key
 
   def test_pre_upload_ok(self):
     """Assert that preupload correctly posts a valid DigestCollection.
@@ -130,10 +117,6 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
         'preupload', self.message_to_dict(good_digests), 200)
     message = json.loads(response.body).get(u'items', [{}])[0]
     self.assertEqual('', message.get(u'gs_upload_url', ''))
-    self.assertEqual(
-        validate(message.get(u'upload_ticket', ''), 'datastore'),
-        generate_embedded(good_digests.namespace, good_digests.items[0]))
-    self.assertEqual(good_digests.items[0].digest, message.get('digest', ''))
 
   def test_finalize_url_ok(self):
     """Assert that a finalize_url is generated when should_push_to_gs.
@@ -141,6 +124,9 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
     TODO(cmassaro): verify upload_ticket
     """
     digests = DigestCollection(namespace=endpoint_handlers_api.Namespace())
+
+    # add a private key; the URLSigner is initialized from config.settings()
+    self.make_private_key()
     digests.items.append(generate_digest('duckling.' * 70, digests.namespace))
     response = self.call_api(
         'preupload', self.message_to_dict(digests), 200)
@@ -209,13 +195,10 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
 
   def test_store_inline_ok(self):
     """Assert that content storage completes successfully."""
-    request = generate_store_request('sibilance')
-    embedded = validate(request.upload_ticket, 'datastore')
-    expected = model.entry_key(embedded['n'], embedded['d'])
-    self.assertIsNone(expected.get())
-    _response = self.call_api(
+    request = generate_store_request('sibilance', 'POST')
+    response = self.call_api(
         'store_inline', body=self.message_to_dict(request), status=200)
-    self.assertIsNotNone(expected.get())
+    self.assertEquals(json.loads(response.body).get('content', None), '')
 
 
 if __name__ == '__main__':

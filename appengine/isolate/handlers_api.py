@@ -50,7 +50,7 @@ MIN_SIZE_FOR_DIRECT_GS = MIN_SIZE_FOR_GS
 ### Utility
 
 
-def _hash_content(content, namespace):
+def hash_content(content, namespace):
   """Decompresses and hashes given |content|.
 
   Returns tuple (hex digest, expanded size).
@@ -583,7 +583,7 @@ class StoreContentHandler(ProtocolHandler):
     if content is not None:
       # Verify advertised hash matches the data.
       try:
-        hex_digest, expanded_size = _hash_content(content, namespace)
+        hex_digest, expanded_size = hash_content(content, namespace)
         if hex_digest != hash_key:
           raise ValueError(
               'Hash and data do not match, '
