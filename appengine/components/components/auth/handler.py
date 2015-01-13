@@ -90,6 +90,8 @@ class AuthenticatingHandler(webapp2.RequestHandler):
   xsrf_token_request_param = 'xsrf_token'
   # Embedded data extracted from XSRF token of current request.
   xsrf_token_data = None
+  # If not None, sets X_Frame-Options on all replies.
+  frame_options = 'DENY'
 
   def dispatch(self):
     """Extracts and verifies Identity, sets up request auth context."""
@@ -103,6 +105,10 @@ class AuthenticatingHandler(webapp2.RequestHandler):
     # Make get_current_identity() return Anonymous until authentication is
     # complete. It is used in authentication_error/authorization_error calls.
     auth_context.set_current_identity(model.Anonymous)
+
+    # Disable frame support wholesale.
+    if self.frame_options:
+      self.response.headers['X-Frame-Options'] = self.frame_options
 
     identity = None
     for method_func in _auth_methods:
@@ -172,7 +178,7 @@ class AuthenticatingHandler(webapp2.RequestHandler):
       # All other ACL checks will be performed by corresponding handlers
       # manually or via '@required' decorator. Failed ACL check raises
       # AuthorizationError.
-      return super(AuthenticatingHandler, self).dispatch()
+      super(AuthenticatingHandler, self).dispatch()
     except api.AuthorizationError as err:
       self.authorization_error(err)
 
@@ -260,6 +266,8 @@ class ApiHandler(AuthenticatingHandler):
   CONTENT_TYPE_BASE = 'application/json'
   CONTENT_TYPE_FULL = 'application/json; charset=utf-8'
   _json_body = None
+  # Clickjacking not applicable to APIs.
+  frame_options = None
 
   def authentication_error(self, error):
     logging.warning('Authentication error.\n%s', error)
