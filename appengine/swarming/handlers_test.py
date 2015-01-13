@@ -34,7 +34,7 @@ class AppTestBase(test_env_handlers.AppTestBase):
     self.app = webtest.TestApp(
         app,
         extra_environ={
-          'REMOTE_ADDR': self.fake_ip,
+          'REMOTE_ADDR': self.source_ip,
           'SERVER_SOFTWARE': os.environ['SERVER_SOFTWARE'],
         })
 
@@ -378,14 +378,34 @@ class FrontendAdminTest(AppTestBase):
 
   def test_config(self):
     self.set_as_admin()
-    self.app.get('/restricted/config')
+    resp = self.app.get('/restricted/config')
+    # TODO(maruel): Use beautifulsoup?
     params = {
       'google_analytics': 'foobar',
+      'keyid': str(config.settings().key.integer_id()),
+      'reusable_task_age_secs': 30,
       'xsrf_token': self.get_xsrf_token(),
     }
-    self.app.post('/restricted/config', params)
+    self.assertEqual('', config.settings().google_analytics)
+    resp = self.app.post('/restricted/config', params)
+    self.assertNotIn('Update conflict', resp)
     self.assertEqual('foobar', config.settings().google_analytics)
     self.assertIn('foobar', self.app.get('/').body)
+
+  def test_config_conflict(self):
+    self.set_as_admin()
+    resp = self.app.get('/restricted/config')
+    # TODO(maruel): Use beautifulsoup?
+    params = {
+      'google_analytics': 'foobar',
+      'keyid': str(config.settings().key.integer_id() - 1),
+      'reusable_task_age_secs': 30,
+      'xsrf_token': self.get_xsrf_token(),
+    }
+    self.assertEqual('', config.settings().google_analytics)
+    resp = self.app.post('/restricted/config', params)
+    self.assertIn('Update conflict', resp)
+    self.assertEqual('', config.settings().google_analytics)
 
 
 class BackendTest(AppTestBase):

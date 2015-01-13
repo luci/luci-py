@@ -1,17 +1,31 @@
+{% set title = 'Swarming global config' %}
 {% extends "swarming/base.html" %}
 
 {% block body %}
-<h1>Global configuration</h1>
+<h1>Server global config</h1>
+
+Last updated by:
+<strong>{% if cfg.updated_by %}{{cfg.updated_by.to_bytes()}}{% else%}N/A{%endif%}
+  </strong>.<br>
+Last updated on:
+<strong>{{cfg.updated_ts|datetimeformat}}</strong>.<br>
 
 {% if note %}
 <span style="color: red; font-style: italic">{{note}}</span><p>
 {% endif %}
 
 <form method="post" action="{{path}}">
+  <h2>General</h2>
   Google Analytics ID:
-    <input name="google_analytics" value="{{google_analytics}}"/><br>
+  <input name="google_analytics" value="{{cfg.google_analytics}}"/><br>
+
+  <h2>Tasks</h2>
+  Max age in seconds for task reuse:
+  <input name="reusable_task_age_secs" value="{{cfg.reusable_task_age_secs}}"/>
+  <br>
 
   <br>
+  <input type="hidden" name="keyid" value="{{cfg.key.integer_id()}}" />
   <input type="hidden" name="xsrf_token" value="{{xsrf_token}}" />
   <input type="submit" value="Update" />
   <br>

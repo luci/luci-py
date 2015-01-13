@@ -62,6 +62,13 @@ class MainTest(test_case.TestCase):
     # Tasks are enqueued on the backend.
     self.app = self.app_backend
 
+    self.auth_app = webtest.TestApp(
+        auth.create_wsgi_application(debug=True),
+        extra_environ={
+          'REMOTE_ADDR': self.source_ip,
+          'SERVER_SOFTWARE': os.environ['SERVER_SOFTWARE'],
+        })
+
     auth.bootstrap_group(
         auth.ADMIN_GROUP,
         [auth.Identity(auth.IDENTITY_USER, 'admin@example.com')])
@@ -131,6 +138,13 @@ class MainTest(test_case.TestCase):
         is_verified=True).put()
     return hashhex
 
+  def get_xsrf_token(self):
+    """Gets the generic XSRF token for web clients."""
+    resp = self.auth_app.post(
+        '/auth/api/v1/accounts/self/xsrf_token',
+        headers={'X-XSRF-Token-Request': '1'}).json
+    return resp['xsrf_token'].encode('ascii')
+
   def test_root(self):
     # Just asserts it doesn't crash.
     self.app_frontend.get('/')
@@ -148,12 +162,33 @@ class MainTest(test_case.TestCase):
   def test_config(self):
     self.set_as_admin()
     resp = self.app_frontend.get('/restricted/config')
-    self.assertNotIn('123456', resp.body)
-    settings = config.settings()
-    settings.default_expiration = 123456
-    settings.store()
+    # TODO(maruel): Use beautifulsoup?
+    params = {
+      'default_expiration': 123456,
+      'google_analytics': 'foobar',
+      'keyid': str(config.settings().key.integer_id()),
+      'xsrf_token': self.get_xsrf_token(),
+    }
+    self.assertEqual('', config.settings().google_analytics)
+    resp = self.app_frontend.post('/restricted/config', params)
+    self.assertNotIn('Update conflict', resp)
+    self.assertEqual('foobar', config.settings().google_analytics)
+    self.assertIn('foobar', self.app_frontend.get('/').body)
+
+  def test_config_conflict(self):
+    self.set_as_admin()
     resp = self.app_frontend.get('/restricted/config')
-    self.assertIn('123456', resp.body)
+    # TODO(maruel): Use beautifulsoup?
+    params = {
+      'google_analytics': 'foobar',
+      'keyid': str(config.settings().key.integer_id() - 1),
+      'reusable_task_age_secs': 30,
+      'xsrf_token': self.get_xsrf_token(),
+    }
+    self.assertEqual('', config.settings().google_analytics)
+    resp = self.app_frontend.post('/restricted/config', params)
+    self.assertIn('Update conflict', resp)
+    self.assertEqual('', config.settings().google_analytics)
 
   def test_stats(self):
     self._gen_stats()

@@ -46,7 +46,7 @@ SortOptions = collections.namedtuple('SortOptions', ['key', 'name'])
 # TODO(maruel): Sort the handlers once they got their final name.
 
 
-class ConfigHandler(auth.AuthenticatingHandler):
+class RestrictedConfigHandler(auth.AuthenticatingHandler):
   @auth.require(acl.is_admin)
   def get(self):
     self.common(None)
@@ -56,16 +56,21 @@ class ConfigHandler(auth.AuthenticatingHandler):
     # Convert MultiDict into a dict.
     params = {
       k: self.request.params.getone(k) for k in self.request.params
-      if k != 'xsrf_token'
+      if k not in ('keyid', 'xsrf_token')
     }
-    cfg = config.settings()
+    params['reusable_task_age_secs'] = int(params['reusable_task_age_secs'])
+    cfg = config.settings(fresh=True)
+    keyid = int(self.request.get('keyid', '0'))
+    if cfg.key.integer_id() != keyid:
+      self.common('Update conflict %s != %s' % (cfg.key.integer_id(), keyid))
+      return
     cfg.populate(**params)
     cfg.store()
     self.common('Settings updated')
 
   def common(self, note):
     params = {
-      'content': config.settings(),
+      'cfg': config.settings(fresh=True),
       'note': note,
       'path': self.request.path,
       'xsrf_token': self.generate_xsrf_token(),
@@ -663,7 +668,7 @@ def create_application(debug):
       ('/restricted/bot/<bot_id:[^/]+>/delete', BotDeleteHandler),
 
       # Admin pages.
-      ('/restricted/config', ConfigHandler),
+      ('/restricted/config', RestrictedConfigHandler),
       ('/restricted/upload/bot_config', UploadBotConfigHandler),
       ('/restricted/upload/bootstrap', UploadBootstrapHandler),
 

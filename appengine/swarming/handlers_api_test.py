@@ -41,7 +41,7 @@ class AppTestBase(test_env_handlers.AppTestBase):
     self.app = webtest.TestApp(
         app,
         extra_environ={
-          'REMOTE_ADDR': self.fake_ip,
+          'REMOTE_ADDR': self.source_ip,
           'SERVER_SOFTWARE': os.environ['SERVER_SOFTWARE'],
         })
 

@@ -73,6 +73,15 @@ class GlobalConfig(ndb.Model):
     return cls._config_fetcher()
 
   @classmethod
+  def clear_cache(cls):
+    """Clears the cache of .cached().
+
+    So the next call to .cached() returns the fresh instance from ndb.
+    """
+    if cls._config_fetcher:
+      utils.clear_cache(cls._config_fetcher)
+
+  @classmethod
   def fetch(cls):
     """Returns the current up-to-date version of the config entity.
 
@@ -85,6 +94,7 @@ class GlobalConfig(ndb.Model):
     # Create an incomplete key, to be completed by 'store_new_version'.
     self.key = ndb.Key(self.__class__, None, parent=self._get_root_key())
     self.updated_by = updated_by or auth.get_current_identity()
+    self.updated_ts = utils.utcnow()
     return datastore_utils.store_new_version(self, self._get_root_model())
 
   def modify(self, updated_by=None, **kwargs):

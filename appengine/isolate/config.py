@@ -45,12 +45,21 @@ class GlobalConfig(config.GlobalConfig):
   # Secret key used to sign Google Storage URLs: base64 encoded *.der file.
   gs_private_key = ndb.StringProperty(indexed=False, default='')
 
+  # id to inject into pages if applicable.
+  google_analytics = ndb.StringProperty(indexed=False, default='')
+
   def set_defaults(self):
     self.global_secret = os.urandom(16)
     self.gs_bucket = app_identity.get_application_id()
 
 
-def settings():
+def settings(fresh=False):
+  """Loads GlobalConfig or a default one if not present.
+
+  If fresh=True, a full fetch from NDB is done.
+  """
+  if fresh:
+    GlobalConfig.clear_cache()
   return GlobalConfig.cached()
 
 

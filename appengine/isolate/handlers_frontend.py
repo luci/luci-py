@@ -53,40 +53,44 @@ _GVIZ_COLUMNS_ORDER = (
 ### Restricted handlers
 
 
-class RestrictedConfig(auth.AuthenticatingHandler):
-  """View and modify Google Storage config entries."""
-
+class RestrictedConfigHandler(auth.AuthenticatingHandler):
   @auth.require(auth.is_admin)
   def get(self):
-    settings = config.settings()
-    self.response.write(template.render('isolate/config.html', {
-        'default_expiration': settings.default_expiration,
-        'gs_bucket': settings.gs_bucket,
-        'gs_client_id_email': settings.gs_client_id_email,
-        'gs_private_key': settings.gs_private_key,
-        'updated_by': settings.updated_by.to_bytes(),
-        'updated_ts': settings.updated_ts,
-        'xsrf_token': self.generate_xsrf_token(),
-    }))
+    self.common(None)
 
   @auth.require(auth.is_admin)
   def post(self):
-    settings = config.settings()
-    settings.default_expiration = int(self.request.get('default_expiration'))
-    settings.gs_bucket = self.request.get('gs_bucket')
-    settings.gs_client_id_email = self.request.get('gs_client_id_email')
-    settings.gs_private_key = self.request.get('gs_private_key')
-    self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
+    # Convert MultiDict into a dict.
+    params = {
+      k: self.request.params.getone(k) for k in self.request.params
+      if k not in ('keyid', 'xsrf_token')
+    }
+    cfg = config.settings(fresh=True)
+    keyid = int(self.request.get('keyid', '0'))
+    if cfg.key.integer_id() != keyid:
+      self.common('Update conflict %s != %s' % (cfg.key.integer_id(), keyid))
+      return
+    params['default_expiration'] = int(params['default_expiration'])
+    cfg.populate(**params)
     try:
       # Ensure key is correct, it's easy to make a mistake when creating it.
-      gcs.URLSigner.load_private_key(settings.gs_private_key)
+      gcs.URLSigner.load_private_key(cfg.gs_private_key)
     except Exception as exc:
       # TODO(maruel): Handling Exception is too generic. And add self.abort(400)
       self.response.write('Bad private key: %s' % exc)
       return
-    # Store the settings.
-    settings.store()
-    self.response.write('Done!')
+    cfg.store()
+    self.common('Settings updated')
+
+  def common(self, note):
+    params = {
+      'cfg': config.settings(fresh=True),
+      'note': note,
+      'path': self.request.path,
+      'xsrf_token': self.generate_xsrf_token(),
+    }
+    self.response.write(
+        template.render('isolate/restricted_config.html', params))
 
 
 ### Mapreduce related handlers
@@ -225,7 +229,7 @@ class WarmupHandler(webapp2.RequestHandler):
 def get_routes():
   return [
       # Administrative urls.
-      webapp2.Route(r'/restricted/config', RestrictedConfig),
+      webapp2.Route(r'/restricted/config', RestrictedConfigHandler),
 
       # Mapreduce related urls.
       webapp2.Route(

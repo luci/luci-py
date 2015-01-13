@@ -32,7 +32,7 @@ class AppTestBase(test_case.TestCase):
   def setUp(self):
     super(AppTestBase, self).setUp()
     self.bot_version = None
-    self.fake_ip = '192.168.2.2'
+    self.source_ip = '192.168.2.2'
     self.testbed.init_user_stub()
     self.testbed.init_search_stub()
 
@@ -41,7 +41,7 @@ class AppTestBase(test_case.TestCase):
     self.auth_app = webtest.TestApp(
         auth.create_wsgi_application(debug=True),
         extra_environ={
-          'REMOTE_ADDR': self.fake_ip,
+          'REMOTE_ADDR': self.source_ip,
           'SERVER_SOFTWARE': os.environ['SERVER_SOFTWARE'],
         })
 
@@ -60,7 +60,7 @@ class AppTestBase(test_case.TestCase):
         [auth.Identity(auth.IDENTITY_USER, 'user@example.com')])
     auth.bootstrap_group(
         acl.BOTS_GROUP,
-        [auth.Identity(auth.IDENTITY_BOT, self.fake_ip)])
+        [auth.Identity(auth.IDENTITY_BOT, self.source_ip)])
 
     self.mock(stats_framework, 'add_entry', self._parse_line)
 
@@ -93,7 +93,7 @@ class AppTestBase(test_case.TestCase):
 
   def set_as_bot(self):
     self.set_as_anonymous()
-    auth.bootstrap_ip_whitelist(auth.BOTS_IP_WHITELIST, [self.fake_ip])
+    auth.bootstrap_ip_whitelist(auth.BOTS_IP_WHITELIST, [self.source_ip])
 
   # Web or generic
 

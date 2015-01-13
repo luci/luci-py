@@ -41,9 +41,12 @@ class ConfigTest(test_case.TestCase):
     conf = Config.cached()
     self.assertIsNotNone(conf)
     conf.param = '1234'
+    now = self.mock_now(datetime.datetime(2010, 1, 1))
     conf.store(updated_by=auth.Anonymous)
+    self.mock_now(datetime.datetime(2010, 1, 1), 100)
     conf = Config.fetch()
     self.assertEqual('1234', conf.param)
+    self.assertEqual(now, conf.updated_ts)
 
   def test_expiration(self):
     self.mock_now(datetime.datetime(2014, 1, 2, 3, 4, 5, 6))
