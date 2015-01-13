@@ -16,10 +16,12 @@ the server to allow additional server-specific functionality.
 
 import cgi
 import ctypes
+import getpass
 import json
 import logging
 import multiprocessing
 import os
+import pipes
 import platform
 import re
 import shlex
@@ -27,6 +29,7 @@ import socket
 import string
 import subprocess
 import sys
+import tempfile
 import time
 import urllib2
 
@@ -178,6 +181,119 @@ def _generate_launchd_plist(command, cwd, plistname):
     '  </dict>\n'
     '</plist>\n')
   return header
+
+
+def _generate_initd(command, cwd, user):
+  """Returns a valid init.d script for use for Swarming.
+
+  Author is lazy so he copy-pasted.
+  Source: https://github.com/fhd/init-script-template
+
+  Copyright (C) 2012-2014 Felix H. Dahlke
+  This is open source software, licensed under the MIT License. See the file
+  LICENSE for details.
+
+  LICENSE is at https://github.com/fhd/init-script-template/blob/master/LICENSE
+  """
+  return """#!/bin/sh
+### BEGIN INIT INFO
+# Provides:
+# Required-Start:    $remote_fs $syslog
+# Required-Stop:     $remote_fs $syslog
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Start daemon at boot time
+# Description:       Enable service provided by daemon.
+### END INIT INFO
+
+dir='%(cwd)s'
+user='%(user)s'
+cmd='%(cmd)s'
+
+name=`basename $0`
+pid_file="/var/run/$name.pid"
+stdout_log="/var/log/$name.log"
+stderr_log="/var/log/$name.err"
+
+get_pid() {
+  cat "$pid_file"
+}
+
+is_running() {
+  [ -f "$pid_file" ] && ps `get_pid` > /dev/null 2>&1
+}
+
+case "$1" in
+  start)
+  if is_running; then
+    echo "Already started"
+  else
+    echo "Starting $name"
+    cd "$dir"
+    sudo -u "$user" $cmd >> "$stdout_log" 2>> "$stderr_log" &
+    echo $! > "$pid_file"
+    if ! is_running; then
+      echo "Unable to start, see $stdout_log and $stderr_log"
+      exit 1
+    fi
+  fi
+  ;;
+  stop)
+  if is_running; then
+    echo -n "Stopping $name.."
+    kill `get_pid`
+    for i in {1..10}
+    do
+      if ! is_running; then
+        break
+      fi
+
+      echo -n "."
+      sleep 1
+    done
+    echo
+
+    if is_running; then
+      echo "Not stopped; may still be shutting down or shutdown may have failed"
+      exit 1
+    else
+      echo "Stopped"
+      if [ -f "$pid_file" ]; then
+        rm "$pid_file"
+      fi
+    fi
+  else
+    echo "Not running"
+  fi
+  ;;
+  restart)
+  $0 stop
+  if is_running; then
+    echo "Unable to stop, will not attempt to start"
+    exit 1
+  fi
+  $0 start
+  ;;
+  status)
+  if is_running; then
+    echo "Running"
+  else
+    echo "Stopped"
+    exit 1
+  fi
+  ;;
+  *)
+  echo "Usage: $0 {start|stop|restart|status}"
+  exit 1
+  ;;
+esac
+
+exit 0
+""" % {
+      'cmd': ' '.join(pipes.quote(c) for c in command),
+      'cwd': pipes.quote(cwd),
+      'user': pipes.quote(user),
+    }
 
 
 def _get_os_version_name_win():
@@ -1054,6 +1170,8 @@ def setup_auto_startup_win(command, cwd, batch_name):
   TODO(maruel): This function assumes |command| is python script to be run.
   """
   logging.info('setup_auto_startup_win(%s, %s, %s)', command, cwd, batch_name)
+  if not os.path.isabs(cwd):
+    raise ValueError('Refusing relative path')
   assert batch_name.endswith('.bat'), batch_name
   batch_path = _get_startup_dir_win() + batch_name
 
@@ -1095,6 +1213,8 @@ def setup_auto_startup_osx(command, cwd, plistname):
   ~/Library/LaunchAgents/.
   """
   logging.info('setup_auto_startup_osx(%s, %s, %s)', command, cwd, plistname)
+  if not os.path.isabs(cwd):
+    raise ValueError('Refusing relative path')
   assert plistname.endswith('.plist'), plistname
   launchd_dir = os.path.expanduser('~/Library/LaunchAgents')
   if not os.path.isdir(launchd_dir):
@@ -1102,6 +1222,36 @@ def setup_auto_startup_osx(command, cwd, plistname):
     os.mkdir(launchd_dir)
   filepath = os.path.join(launchd_dir, plistname)
   return _write(filepath, _generate_launchd_plist(command, cwd, plistname))
+
+
+def setup_auto_startup_initd_linux(command, cwd, user=None, name='swarming'):
+  """Uses init.d to start the bot automatically."""
+  if not user:
+    user = getpass.getuser()
+  logging.info(
+      'setup_auto_startup_initd_linux(%s, %s, %s, %s)',
+      command, cwd, user, name)
+  if not os.path.isabs(cwd):
+    raise ValueError('Refusing relative path')
+  script = _generate_initd(command, cwd, user)
+  filepath = pipes.quote(os.path.join('/etc/init.d', name))
+  with tempfile.NamedTemporaryFile() as f:
+    if not _write(f.name, script):
+      return False
+
+    # Need to do 3 things as sudo. Do it all at once to enable a single sudo
+    # request.
+    # TODO(maruel): Likely not the sanest thing, reevaluate.
+    cmd = [
+      'sudo', '/bin/sh', '-c',
+      "cp %s %s && chmod 0755 %s && update-rc.d %s defaults" % (
+        pipes.quote(f.name), filepath, filepath, name)
+    ]
+    subprocess.check_call(cmd)
+    print('To remove, use:')
+    print('  sudo update-rc.d -f %s remove' % name)
+    print('  sudo rm %s' % filepath)
+  return True
 
 
 def restart(message=None, timeout=None):

@@ -83,9 +83,13 @@ def CMDstart_slave(args):
     logging.exception('bot_config.py is invalid.')
 
   logging.info('Starting the bot: %s', THIS_FILE)
-  result = subprocess.call([sys.executable, THIS_FILE, 'start_bot'])
-  logging.info('Bot exit code: %d', result)
-  return result
+  cmd = [sys.executable, THIS_FILE, 'start_bot']
+  if sys.platform == 'win32':
+    result = subprocess.call(cmd)
+    logging.info('Bot exit code: %d', result)
+    return result
+  else:
+    os.execv(cmd[0], cmd)
 
 
 def CMDrestart(_args):
@@ -119,7 +123,10 @@ def main():
       os.remove('swarming_bot.1.zip')
     shutil.copyfile('swarming_bot.zip', 'swarming_bot.1.zip')
     cmd = [sys.executable, 'swarming_bot.1.zip'] + sys.argv[1:]
-    return subprocess.call(cmd)
+    if sys.platform == 'win32':
+      return subprocess.call(cmd)
+    else:
+      os.execv(cmd[0], cmd)
 
   # sys.argv[0] is the zip file itself.
   cmd = 'start_slave'
