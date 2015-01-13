@@ -28,6 +28,7 @@ from components import ereporter2
 from components import utils
 import config
 import gcs
+from handlers_api import hash_content
 from handlers_api import MIN_SIZE_FOR_DIRECT_GS
 from handlers_api import MIN_SIZE_FOR_GS
 import model
@@ -60,32 +61,24 @@ class DigestCollection(messages.Message):
 
 
 class StorageRequest(messages.Message):
-  """ProtoRPC message representing an entity to be added to the data store.
-
-  TODO(cmassaro): worthwhile to make expiration_ts a DateTimeField?
-  TODO(cmassaro): any required fields?
-  TODO(cmassaro): how is data distinct from item.digest?
-  """
-  item = messages.MessageField(Digest, 1, repeated=False)
-  data = messages.BytesField(2)
-  upload_ticket = messages.StringField(3)
-  namespace = messages.MessageField(Namespace, 4)
+  """ProtoRPC message representing an entity to be added to the data store."""
+  upload_ticket = messages.StringField(1)
+  content = messages.BytesField(2)
 
 
 class FinalizeRequest(messages.Message):
-  """Content storage request for large Google storage entities."""
-  item = messages.MessageField(Digest, 1, repeated=False)
-  upload_ticket = messages.StringField(2)
-  namespace = messages.MessageField(Namespace, 3)
+  """Request to validate upload of large Google storage entities."""
+  upload_ticket = messages.StringField(1)
 
 
-## Response Types
+### Response Types
 
 
 class PreuploadStatus(messages.Message):
   """Endpoints response type for a single URL or pair of URLs."""
-  gs_upload_url = messages.StringField(1, required=False)
-  upload_ticket = messages.StringField(2, required=False)
+  digest = messages.StringField(1, required=True)
+  gs_upload_url = messages.StringField(2)
+  upload_ticket = messages.StringField(3, required=True)
 
 
 class UrlCollection(messages.Message):
@@ -93,12 +86,21 @@ class UrlCollection(messages.Message):
   items = messages.MessageField(PreuploadStatus, 1, repeated=True)
 
 
-class StorageResponse(messages.Message):
-  """Endpoints response to report content storage status.
+### Upload Ticket Utility
 
-  TODO(cmassaro): determine what "entry" should contain; maybe a repeated field?
-  """
-  entry = messages.StringField(1)
+
+# default expiration time for signed links
+DEFAULT_LINK_EXPIRATION = datetime.timedelta(hours=4)
+
+
+# messages for generating and validating upload tickets
+UPLOAD_MESSAGES = ['datastore', 'gs']
+
+
+class TokenSigner(auth.TokenKind):
+  """Used to create upload tickets."""
+  expiration_sec = DEFAULT_LINK_EXPIRATION.total_seconds()
+  secret_key = auth.SecretKey('isolate_upload_token', scope='local')
 
 
 ### API
@@ -107,9 +109,6 @@ class StorageResponse(messages.Message):
 @auth.endpoints_api(name='isolateservice', version='v1')
 class IsolateService(remote.Service):
   """Implement API methods corresponding to handlers in handlers_api."""
-
-  # Default expiration time for signed links.
-  DEFAULT_LINK_EXPIRATION = datetime.timedelta(hours=4)
 
   _gs_url_signer = None
 
@@ -160,7 +159,12 @@ class IsolateService(remote.Service):
         raise endpoints.BadRequestException(
             'Invalid hex code: %s' % (digest_element.digest))
 
-      status = PreuploadStatus()
+      # generate upload ticket
+      status = PreuploadStatus(
+          digest=digest_element.digest,
+          upload_ticket=self.generate_ticket(digest_element, request.namespace))
+
+      # generate GS upload URL if necessary
       if self.should_push_to_gs(digest_element):
         # Store larger stuff in Google Storage.
         key = model.entry_key(
@@ -168,28 +172,48 @@ class IsolateService(remote.Service):
         status.gs_upload_url = self.gs_url_signer.get_upload_url(
             filename=key.id(),
             content_type='application/octet-stream',
-            expiration=self.DEFAULT_LINK_EXPIRATION)
+            expiration=DEFAULT_LINK_EXPIRATION)
       response.items.append(status)
 
     # tag existing entities and return new ones
     self.tag_existing(existing_digests)
     return response
 
-  @auth.endpoints_method(StorageRequest, StorageResponse)
+  @auth.endpoints_method(StorageRequest, message_types.VoidMessage)
   def store_inline(self, request):
-    """Replaces the StoreContentHandler's PUT method.
+    """Stores relatively small entities in the datastore."""
+    # validate token or error out
+    try:
+      embedded = TokenSigner.validate(request.upload_ticket, UPLOAD_MESSAGES[0])
+    except auth.InvalidTokenError as error:
+      raise endpoints.BadRequestException(
+          'Ticket validation failed: %s' % error.message)
 
-    TODO(cmassaro): message types, implementation
+    # read data and convert types
+    digest = embedded['d'].encode('utf-8')
+    is_isolated = bool(int(embedded['i']))
+    namespace = embedded['n']
+    size = int(embedded['s'])
+    content = request.content
 
-    Args:
-      request: a StoreRequest
+    # assert that embedded content is the data sent by the request
+    if (digest, size) != hash_content(content, namespace):
+      raise endpoints.BadRequestException(
+          'Embedded digest does not match provided data.')
 
-    Response:
-      the StorageResponse containing information about the upload
-    """
-    pass
+    # all is well; create key and put new content entry into datastore
+    key = model.entry_key(namespace, digest)
+    entry = model.new_content_entry(
+        key=key,
+        is_isolated=is_isolated,
+        compressed_size=len(content),
+        expanded_size=size,
+        is_verified=True,
+        content=content)
+    entry.put()
+    return message_types.VoidMessage()
 
-  @auth.endpoints_method(FinalizeRequest, StorageResponse)
+  @auth.endpoints_method(FinalizeRequest, message_types.VoidMessage)
   def finalize_gs_upload(self, request):
     """Replaces the StoreContentHandler's POST method.
 
@@ -202,6 +226,33 @@ class IsolateService(remote.Service):
     pass
 
   ### Utility
+
+  @classmethod
+  def generate_ticket(cls, digest, namespace):
+    """Generates an HMAC-SHA1 signature for a given set of parameters.
+
+    Used by preupload to sign store URLs and by store_content to validate them.
+
+    Args:
+      digest: the Digest being uploaded
+      namespace: the namespace associated with the original DigestCollection
+
+    Returns:
+      base64-encoded upload ticket
+    """
+    uploaded_to_gs = cls.should_push_to_gs(digest)
+
+    # get a single dictionary containing important information
+    embedded = {
+        'c': namespace.compression,
+        'd': digest.digest,
+        'h': namespace.digest_hash,
+        'i': str(int(digest.is_isolated)),
+        'n': namespace.namespace,
+        's': str(digest.size),
+    }
+    message = UPLOAD_MESSAGES[uploaded_to_gs]
+    return TokenSigner.generate(message, embedded)
 
   @classmethod
   def check_entries_exist(cls, entries):
@@ -262,125 +313,6 @@ class IsolateService(remote.Service):
           settings.gs_client_id_email,
           settings.gs_private_key)
     return self._gs_url_signer
-
-  def uri_for(self, *_args, **kwargs):
-    """Builds an URI for the provided data.
-
-    Currently looks like
-    <hostname>/<api_method>/<namespace>/<hash_key>, e.g.
-    localhost:80/store-gs/default/234987234987239487139847abcd1234e1fefeb1
-    """
-    name = 'content-gs/store'
-    namespace = kwargs.pop('namespace')
-    hex_digest = kwargs.pop('hash_key')
-    url_list = [dict(self.request_state.headers)['host']]
-    url_list.extend([name, namespace, hex_digest])
-    return '/'.join(url_list)
-
-  @classmethod
-  def generate_signature(cls, secret_key, http_verb, expiration_ts, namespace,
-                         hash_key, item_size, is_isolated, uploaded_to_gs):
-    """Generates an HMAC-SHA1 signature for a given set of parameters.
-
-    Used by preupload to sign store URLs and by store_content to validate them.
-
-    All arguments should be in the form of strings.
-    """
-    data_to_sign = '\n'.join([
-        http_verb,
-        expiration_ts,
-        namespace,
-        hash_key,
-        item_size,
-        is_isolated,
-        uploaded_to_gs,
-    ])
-    mac = hmac.new(secret_key, digestmod=hashlib.sha1)
-    mac.update(data_to_sign)
-    return mac.hexdigest()
-
-  def generate_store_url(self, digest, namespace, http_verb,
-                         uploaded_to_gs, expiration):
-    """Generates a signed URL to /content-gs/store method.
-
-    Arguments:
-      digest: a Digest instance
-      namespace: the original request's namespace
-      http_verb: the HTTP API method to be called (GET, POST, ...)
-      uploaded_to_gs: whether the digest is already uploaded
-      expiration: absolute specification of timeout
-
-    Returns:
-      the URL base with parameters as a string
-    """
-    # Data that goes into request parameters and signature.
-    expiration_ts = str(int(time.time() + expiration.total_seconds()))
-    item_size = str(digest.size)
-    is_isolated = str(int(digest.is_isolated))
-    uploaded_to_gs = str(int(uploaded_to_gs))
-
-    # Generate signature.
-    sig = self.generate_signature(
-        config.settings().global_secret, http_verb, expiration_ts, namespace,
-        digest.digest, item_size, is_isolated, uploaded_to_gs)
-
-    # Bare full URL to /content-gs/store endpoint.
-    url_base = self.uri_for(
-        'store-gs', namespace=namespace, hash_key=digest.digest, _full=True)
-
-    # Construct url with query parameters, reuse auth token.
-    params = {
-        'g': uploaded_to_gs,
-        'i': is_isolated,
-        's': item_size,
-        'sig': sig,
-        # 'token': digest.get('token'),
-        'x': expiration_ts,
-    }
-    # TODO(cmassaro): where can we get the auth token?
-    return '%s?%s' % (url_base, urllib.urlencode(params))
-
-  def generate_push_urls(self, digest, namespace):
-    """Generates a pair of URLs to be used by clients to upload an item.
-
-    The GS filename is exactly ContentEntry.key.id().
-
-    URL's being generated are 'upload URL' and 'finalize URL'. Client uploads
-    an item to upload URL (via PUT request) and then POST status of the upload
-    to a finalize URL.
-
-    Finalize URL may be optional (it's None in that case).
-
-    Arguments:
-      digest: a Digest instance
-      namespace: the original request's namespace
-
-    Returns:
-      a pair of store URLs (may be None)
-
-    TODO(cmassaro): cannibalize this logic for client
-    """
-    if self.should_push_to_gs(digest):
-      # Store larger stuff in Google Storage.
-      key = model.entry_key(namespace, digest.digest)
-      upload_url = self.gs_url_signer.get_upload_url(
-          filename=key.id(),
-          content_type='application/octet-stream',
-          expiration=self.DEFAULT_LINK_EXPIRATION)
-      finalize_url = self.generate_store_url(
-          digest, namespace,
-          http_verb='POST',
-          uploaded_to_gs=True,
-          expiration=self.DEFAULT_LINK_EXPIRATION)
-    else:
-      # Store smallish entries and *.isolated in Datastore directly.
-      upload_url = self.generate_store_url(
-          digest, namespace,
-          http_verb='PUT',
-          uploaded_to_gs=False,
-          expiration=self.DEFAULT_LINK_EXPIRATION)
-      finalize_url = None
-    return upload_url, finalize_url
 
   @classmethod
   def tag_existing(cls, collection):
