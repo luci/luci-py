@@ -33,12 +33,13 @@ import config
 
 import endpoint_handlers_api
 from endpoint_handlers_api import DigestCollection
+from endpoint_handlers_api import UPLOAD_MESSAGES
 import handlers_backend
 import model
 
 
 def make_private_key():
-  new_key = RSA.generate(2048)
+  new_key = RSA.generate(1024)
   pem_key = base64.b64encode(new_key.exportKey('PEM'))
   config.settings().gs_private_key = pem_key
 
@@ -86,6 +87,21 @@ def generate_store_request(content):
       upload_ticket=endpoint_handlers_api.IsolateService.generate_ticket(
           digest, namespace),
       content=content)
+
+
+def pad_string(string, size=endpoint_handlers_api.MIN_SIZE_FOR_DIRECT_GS):
+  pad = ''.join('0' for unused_i in xrange(size + 1 - len(string)))
+  return string + pad
+
+
+def generate_finalize_request(content):
+  content = pad_string(content)
+  namespace = endpoint_handlers_api.Namespace()
+  digest = generate_digest(content, namespace.namespace)
+  digest.is_isolated = False
+  return endpoint_handlers_api.FinalizeRequest(
+      upload_ticket=endpoint_handlers_api.IsolateService.generate_ticket(
+          digest, namespace))
 
 
 ### Isolate Service Test
@@ -211,7 +227,7 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
   def test_store_inline_ok(self):
     """Assert that inline content storage completes successfully."""
     request = generate_store_request('sibilance')
-    embedded = validate(request.upload_ticket, 'datastore')
+    embedded = validate(request.upload_ticket, UPLOAD_MESSAGES[0])
     key = model.entry_key(embedded['n'], embedded['d'])
 
     # assert that store_inline puts the correct entity into the datastore
@@ -243,6 +259,32 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
     with self.call_should_fail('400'):
       _response = self.call_api(
           'store_inline', self.message_to_dict(request), 200)
+
+  def test_finalized_data_in_gs(self):
+    """Assert that data are actually in GS when finalized.
+
+    TODO(cmassaro): does this even make sense to do?
+    """
+    pass
+
+  def test_finalize_gs_creates_content_entry(self):
+    """Assert that finalize_gs_upload creates a content entry.
+
+    TODO(cmassaro): what else should be tested here?
+    """
+    request = generate_finalize_request('empathy')
+    embedded = validate(request.upload_ticket, UPLOAD_MESSAGES[1])
+    key = model.entry_key(embedded['n'], embedded['d'])
+
+    # finalize_gs_upload should put a new ContentEntry into the database
+    _response = self.call_api(
+        'finalize_gs_upload', self.message_to_dict(request), 200)
+    stored = key.get()
+    self.assertEqual(key, stored.key)
+
+    # assert that expected attributes are present
+    self.assertEqual('', stored.content)
+    self.assertEqual(int(embedded['s']), stored.expanded_size)
 
 
 if __name__ == '__main__':
