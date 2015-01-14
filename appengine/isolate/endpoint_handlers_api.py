@@ -34,9 +34,6 @@ from handlers_api import MIN_SIZE_FOR_GS
 import model
 import stats
 
-from google.appengine import runtime
-from google.appengine.api import datastore_errors
-from google.appengine.api import taskqueue
 from google.appengine.ext import ndb
 
 
@@ -89,7 +86,7 @@ class UrlCollection(messages.Message):
   items = messages.MessageField(PreuploadStatus, 1, repeated=True)
 
 
-### Utility
+### Upload Ticket Utility
 
 
 # default expiration time for signed links
@@ -104,17 +101,6 @@ class TokenSigner(auth.TokenKind):
   """Used to create upload tickets."""
   expiration_sec = DEFAULT_LINK_EXPIRATION.total_seconds()
   secret_key = auth.SecretKey('isolate_upload_token', scope='local')
-
-
-@ndb.transactional
-def store_and_enqueue_verify_task(entry, task_queue_host):
-  entry.put()
-  taskqueue.add(
-      url='/internal/taskqueue/verify/%s' % entry.key.id(),
-      queue_name='verify',
-      headers={'Host': task_queue_host},
-      transactional=True,
-  )
 
 
 ### API
@@ -196,21 +182,9 @@ class IsolateService(remote.Service):
   @auth.endpoints_method(StorageRequest, message_types.VoidMessage)
   def store_inline(self, request):
     """Stores relatively small entities in the datastore."""
-    return self.storage_helper(request, False)
-
-  @auth.endpoints_method(FinalizeRequest, message_types.VoidMessage)
-  def finalize_gs_upload(self, request):
-    """Informs client that large entities have been uploaded to GCS."""
-    return self.storage_helper(request, True)
-
-  ### Utility
-
-  def storage_helper(self, request, uploaded_to_gs):
-    """Implement shared logic between store_inline and finalize_gs."""
     # validate token or error out
     try:
-      embedded = TokenSigner.validate(
-          request.upload_ticket, UPLOAD_MESSAGES[uploaded_to_gs])
+      embedded = TokenSigner.validate(request.upload_ticket, UPLOAD_MESSAGES[0])
     except auth.InvalidTokenError as error:
       raise endpoints.BadRequestException(
           'Ticket validation failed: %s' % error.message)
@@ -220,58 +194,38 @@ class IsolateService(remote.Service):
     is_isolated = bool(int(embedded['i']))
     namespace = embedded['n']
     size = int(embedded['s'])
+    content = request.content
 
-    # create a key
+    # assert that embedded content is the data sent by the request
+    if (digest, size) != hash_content(content, namespace):
+      raise endpoints.BadRequestException(
+          'Embedded digest does not match provided data.')
+
+    # all is well; create key and put new content entry into datastore
     key = model.entry_key(namespace, digest)
-
-    # get content and compressed size
-    if uploaded_to_gs:
-      # ensure that file info is uploaded to GS first
-      # TODO(cmassaro): address analogous TODO from handlers_api
-      file_info = gcs.get_file_info(config.settings().gs_bucket, key.id())
-      if not file_info:
-        raise endpoints.BadRequestException(
-            'File should be in Google Storage.\nFile: \'%s\' Size: %d.' % (
-                key.id(), size))
-      content = ''
-      compressed_size = file_info.size
-    else:
-      content = request.content
-      compressed_size = len(content)
-
-    # all is well; create an entry
     entry = model.new_content_entry(
         key=key,
         is_isolated=is_isolated,
-        compressed_size=compressed_size,
+        compressed_size=len(content),
         expanded_size=size,
         is_verified=True,
-        content=content,
-    )
-
-    # DB: assert that embedded content is the data sent by the request
-    if not uploaded_to_gs:
-      if (digest, size) != hash_content(content, namespace):
-        raise endpoints.BadRequestException(
-            'Embedded digest does not match provided data.')
-      else:
-        entry.put()
-
-    # GCS: enqueue verification task
-    else:
-      try:
-        store_and_enqueue_verify_task(entry, utils.get_task_queue_host())
-      except (
-          datastore_errors.Error,
-          runtime.apiproxy_errors.CancelledError,
-          runtime.apiproxy_errors.DeadlineExceededError,
-          runtime.apiproxy_errors.OverQuotaError,
-          runtime.DeadlineExceededError,
-          taskqueue.Error) as e:
-        raise endpoints.InternalServerException(
-            'Unable to store the entity: %s.' % e.__class__.__name__)
-
+        content=content)
+    entry.put()
     return message_types.VoidMessage()
+
+  @auth.endpoints_method(FinalizeRequest, message_types.VoidMessage)
+  def finalize_gs_upload(self, request):
+    """Replaces the StoreContentHandler's POST method.
+
+    Args:
+      request: a StoreRequest
+
+    Response:
+      the StorageResponse containing information about the upload
+    """
+    pass
+
+  ### Utility
 
   @classmethod
   def generate_ticket(cls, digest, namespace):
