@@ -84,13 +84,16 @@ class UploadBotConfigHandler(auth.AuthenticatingHandler):
 
   @auth.require(acl.is_admin)
   def get(self):
+    bot_config = bot_code.get_bot_config()
     params = {
-      'content': bot_code.get_bot_config(),
+      'content': bot_config.content,
       'path': self.request.path,
+      'when': bot_config.when,
+      'who': bot_config.who,
       'xsrf_token': self.generate_xsrf_token(),
     }
     self.response.out.write(
-        template.render('swarming/restricted_uploadstartslave.html', params))
+        template.render('swarming/restricted_upload_bot_config.html', params))
 
   @auth.require(acl.is_admin)
   def post(self):
@@ -107,13 +110,16 @@ class UploadBootstrapHandler(auth.AuthenticatingHandler):
 
   @auth.require(acl.is_admin)
   def get(self):
+    bootstrap = bot_code.get_bootstrap(self.request.host_url)
     params = {
-      'content': bot_code.get_bootstrap(self.request.host_url),
+      'content': bootstrap.content,
       'path': self.request.path,
+      'when': bootstrap.when,
+      'who': bootstrap.who,
       'xsrf_token': self.generate_xsrf_token(),
     }
     self.response.out.write(
-        template.render('swarming/restricted_uploadbootstrap.html', params))
+        template.render('swarming/restricted_upload_bootstrap.html', params))
 
   @auth.require(acl.is_admin)
   def post(self):

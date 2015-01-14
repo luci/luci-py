@@ -8,6 +8,7 @@ It includes everything that is AppEngine specific. The non-GAE code is in
 bot_archive.py.
 """
 
+import collections
 import os.path
 
 from google.appengine.api import memcache
@@ -22,6 +23,9 @@ ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 ### Models.
+
+
+File = collections.namedtuple('File', ('content', 'who', 'when'))
 
 
 class VersionedFile(ndb.Model):
@@ -53,15 +57,18 @@ class VersionedFile(ndb.Model):
 
 
 def get_bootstrap(host_url):
-  """Returns the mangled version of the utility script bootstrap.py."""
-  obj = VersionedFile.fetch('bootstrap.py')
-  content = obj.content if obj else None
-  if not content:
-    # Fallback to the one embedded in the tree.
-    with open(os.path.join(ROOT_DIR, 'swarming_bot/bootstrap.py'), 'rb') as f:
-      content = f.read()
+  """Returns the mangled version of the utility script bootstrap.py.
+
+  Returns:
+    File instance.
+  """
   header = 'host_url = %r\n' % host_url
-  return header + content
+  obj = VersionedFile.fetch('bootstrap.py')
+  if obj and obj.content:
+    return File(header + obj.content, obj.who, obj.created_ts)
+  # Fallback to the one embedded in the tree.
+  with open(os.path.join(ROOT_DIR, 'swarming_bot/bootstrap.py'), 'rb') as f:
+    return File(header + f.read(), None, None)
 
 
 def store_bootstrap(content):
@@ -70,15 +77,19 @@ def store_bootstrap(content):
 
 
 def get_bot_config():
-  """Returns the current version of bot_config.py."""
+  """Returns the current version of bot_config.py and extra metadata.
+
+  Returns:
+    File instance.
+  """
   obj = VersionedFile.fetch('bot_config.py')
   if obj:
-    return obj.content
+    return File(obj.content, obj.who, obj.created_ts)
 
   # Fallback to the one embedded in the tree.
   path = os.path.join(ROOT_DIR, 'swarming_bot', 'bot_config.py')
   with open(path, 'rb') as f:
-    return f.read()
+    return File(f.read(), None, None)
 
 
 def store_bot_config(content):
@@ -108,7 +119,7 @@ def get_bot_version(host):
     return bot_version
 
   # Need to calculate it.
-  additionals = {'bot_config.py': get_bot_config()}
+  additionals = {'bot_config.py': get_bot_config().content}
   bot_dir = os.path.join(ROOT_DIR, 'swarming_bot')
   bot_version = bot_archive.get_swarming_bot_version(bot_dir, host, additionals)
   memcache.set(key, bot_version, namespace=namespace)
@@ -129,7 +140,7 @@ def get_swarming_bot_zip(host):
 
   # Get the start bot script from the database, if present. Pass an empty
   # file if the files isn't present.
-  additionals = {'bot_config.py': get_bot_config()}
+  additionals = {'bot_config.py': get_bot_config().content}
   bot_dir = os.path.join(ROOT_DIR, 'swarming_bot')
   code = bot_archive.get_swarming_bot_zip(bot_dir, host, additionals)
   memcache.set(key, code, namespace=namespace)

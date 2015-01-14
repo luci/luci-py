@@ -1,8 +1,12 @@
 {% extends "swarming/base.html" %}
 
 {% block body %}
+Last updated by:
+<strong>{% if who %}{{who.to_bytes()}}{% else%}N/A{%endif%}</strong>.<br>
+Last updated on: <strong>{{when|datetimeformat}}</strong>.
+<p>
 <form method="post" enctype="multipart/form-data" action="{{path}}">
-  Upload a new bot_config.py file:<br>
+  Upload a new bootstrap.py file:<br>
   <input type="file" name="script" /><br>
   <input type="hidden" name="xsrf_token" value="{{xsrf_token}}" />
   <input type="submit" value="Upload" />
