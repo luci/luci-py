@@ -30,6 +30,7 @@ from components import auth_testing
 from components import datastore_utils
 from components import stats_framework
 from components import utils
+from server import config
 from server import stats
 from server import task_request
 from server import task_result
@@ -169,9 +170,9 @@ class TaskSchedulerApiTest(test_case.TestCase):
         lambda: task_scheduler._PROBABILITY_OF_QUICK_COMEBACK - 0.01)
     self.assertEqual(1.0, task_scheduler.exponential_backoff(235))
 
-  def test_task_idempotent(self):
-    self.mock(random, 'getrandbits', lambda _: 0x88)
-    request_1, _result_summary = task_scheduler.make_request(
+  def _task_ran_successly(self):
+    """Runs a task successfully and returns the task_id."""
+    request, _result_summary = task_scheduler.make_request(
         _gen_request_data(
             properties=dict(
                 dimensions={u'OS': u'Windows-3.1.1'}, idempotent=True)))
@@ -180,28 +181,32 @@ class TaskSchedulerApiTest(test_case.TestCase):
       u'hostname': u'localhost',
       u'foo': u'bar',
     }
-    actual_request_1, run_result_1 = task_scheduler.bot_reap_task(
+    actual_request, run_result = task_scheduler.bot_reap_task(
         bot_dimensions, 'localhost', 'abc')
-    self.assertEqual(request_1, actual_request_1)
-    self.assertEqual('localhost', run_result_1.bot_id)
+    self.assertEqual(request, actual_request)
+    self.assertEqual('localhost', run_result.bot_id)
     self.assertEqual(None, task_to_run.TaskToRun.query().get().queue_number)
     # It's important to terminate the task with success.
     self.assertEqual(
         (True, True),
         task_scheduler.bot_update_task(
-            run_result_1.key, 'localhost', 0, 'Foo1', 0, 0, 0.1, False, False,
+            run_result.key, 'localhost', 0, 'Foo1', 0, 0, 0.1, False, False,
             0.1))
+    return unicode(run_result.key_string)
 
-    # Create a second task, results are immediately returned.
-    self.mock(random, 'getrandbits', lambda _: 0x77)
-    original_ts = self.now
-    new_ts = self.mock_now(original_ts, 10)
+  def _task_deduped(
+      self, new_ts, deduped_from, task_id='1d8dc670a0008810', now=None):
     request_2, _result_summary = task_scheduler.make_request(
         _gen_request_data(
             name='yay',
             user='Raoul',
             properties=dict(
                 dimensions={u'OS': u'Windows-3.1.1'}, idempotent=True)))
+    bot_dimensions = {
+      u'OS': [u'Windows', u'Windows-3.1.1'],
+      u'hostname': u'localhost',
+      u'foo': u'bar',
+    }
     self.assertEqual(None, task_to_run.TaskToRun.query().get().queue_number)
     actual_request_2, run_result_2 = task_scheduler.bot_reap_task(
         bot_dimensions, 'localhost', 'abc')
@@ -211,28 +216,101 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'abandoned_ts': None,
       'bot_id': u'localhost',
       'bot_version': u'abc',
-      'completed_ts': original_ts,
+      'completed_ts': now or self.now,
       'costs_usd': [],
       'created_ts': new_ts,
-      'deduped_from': u'1d69b9f088008811',
+      'deduped_from': deduped_from,
       'durations': [0.1],
       'exit_codes': [0],
       'failure': False,
-      'id': '1d69ba1798007710',
+      'id': task_id,
       'internal_failure': False,
       # Only this value is updated to 'now', the rest uses the previous run
       # timestamps.
       'modified_ts': new_ts,
       'name': u'yay',
-      'properties_hash': '53e296e901d534a0c07bfa4abe3ba0109492fef1',
+      # A deduped task cannot be deduped against.
+      'properties_hash': None,
       'server_versions': [u'default-version'],
-      'started_ts': original_ts,
+      'started_ts': now or self.now,
       'state': State.COMPLETED,
       'try_number': 0,
       'user': u'Raoul',
     }
     self.assertEqual(expected, result_summary_duped.to_dict())
     self.assertEqual([], run_results_duped)
+
+  def test_task_idempotent(self):
+    self.mock(random, 'getrandbits', lambda _: 0x88)
+    # First task is idempotent.
+    task_id = self._task_ran_successly()
+
+    # Second task is deduped against first task.
+    new_ts = self.mock_now(self.now, config.settings().reusable_task_age_secs-1)
+    self._task_deduped(new_ts, task_id)
+
+  def test_task_idempotent_old(self):
+    self.mock(random, 'getrandbits', lambda _: 0x88)
+    # First task is idempotent.
+    self._task_ran_successly()
+
+    # Second task is scheduled, first task is too old to be reused.
+    new_ts = self.mock_now(self.now, config.settings().reusable_task_age_secs)
+    request_2, _result_summary = task_scheduler.make_request(
+        _gen_request_data(
+            name='yay',
+            user='Raoul',
+            properties=dict(
+                dimensions={u'OS': u'Windows-3.1.1'}, idempotent=True)))
+    # The task was enqueued for execution.
+    self.assertNotEqual(None, task_to_run.TaskToRun.query().get().queue_number)
+
+  def test_task_idempotent_three(self):
+    self.mock(random, 'getrandbits', lambda _: 0x88)
+    # First task is idempotent.
+    task_id = self._task_ran_successly()
+
+    # Second task is deduped against first task.
+    new_ts = self.mock_now(self.now, config.settings().reusable_task_age_secs-1)
+    self._task_deduped(new_ts, task_id)
+
+    # Third task is scheduled, second task is not dedupable, first task is too
+    # old.
+    new_ts = self.mock_now(self.now, config.settings().reusable_task_age_secs)
+    request_3, _result_summary = task_scheduler.make_request(
+        _gen_request_data(
+            name='yay',
+            user='Jesus',
+            properties=dict(
+                dimensions={u'OS': u'Windows-3.1.1'}, idempotent=True)))
+    # The task was enqueued for execution.
+    self.assertNotEqual(None, task_to_run.TaskToRun.query().get().queue_number)
+
+  def test_task_idempotent_variable(self):
+    # Test the edge case where GlobalConfig.reusable_task_age_secs is being
+    # modified. This ensure TaskResultSummary.order(TRS.key) works.
+    self.mock(random, 'getrandbits', lambda _: 0x88)
+    cfg = config.settings()
+    cfg.reusable_task_age_secs = 10
+    cfg.store()
+
+    # First task is idempotent.
+    self._task_ran_successly()
+
+    # Second task is scheduled, first task is too old to be reused.
+    second_ts = self.mock_now(self.now, 10)
+    task_id = self._task_ran_successly()
+
+    # Now any of the 2 tasks could be reused. Assert the right one (the most
+    # recent) is reused.
+    cfg = config.settings()
+    cfg.reusable_task_age_secs = 100
+    cfg.store()
+
+    # Third task is deduped against second task. That ensures ordering works
+    # correctly.
+    third_ts = self.mock_now(self.now, 20)
+    self._task_deduped(third_ts, task_id, '1d69ba3ea8008810', second_ts)
 
   def test_get_results(self):
     # TODO(maruel): Split in more focused tests.

@@ -1097,7 +1097,7 @@ class ClientApiTest(AppTestBase):
       u'internal_failure': False,
       u'modified_ts': now_60_str,
       u'name': u'second',
-      u'properties_hash': u'b59e9e3dc6bfd585ea3b2adb084b0ed811ba002b',
+      u'properties_hash': None,
       u'server_versions': [u'default-version'],
       u'started_ts': now_str,
       u'state': task_result.State.COMPLETED,

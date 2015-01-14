@@ -8,6 +8,7 @@ This is the interface closest to the HTTP handlers.
 """
 
 import contextlib
+import datetime
 import logging
 import math
 import random
@@ -19,6 +20,7 @@ from google.appengine.runtime import apiproxy_errors
 
 from components import datastore_utils
 from components import utils
+from server import config
 from server import stats
 from server import task_request
 from server import task_result
@@ -279,9 +281,14 @@ def make_request(data):
     # Find a previously run task that is also idempotent and completed. Start a
     # query to fetch items that can be used to dedupe the task. See the comment
     # for this property for more details.
-    dupe_future = task_result.TaskResultSummary.query(
-        task_result.TaskResultSummary.properties_hash==
-            request.properties.properties_hash).get_async()
+    #
+    # Do not use "cls.created_ts > oldest" here because this would require a
+    # composite index. It's unnecessary because TaskRequest.key is mostly
+    # equivalent to decreasing TaskRequest.created_ts, ordering by key works as
+    # well and doesn't require a composite index.
+    cls = task_result.TaskResultSummary
+    h = request.properties.properties_hash
+    dupe_future = cls.query(cls.properties_hash==h).order(cls.key).get_async()
 
   # At this point, the request is now in the DB but not yet in a mode where it
   # can be triggered or visible. Index it right away so it is searchable. If any
@@ -311,12 +318,17 @@ def make_request(data):
   if dupe_future:
     # Reuse the results!
     dupe_summary = dupe_future.get_result()
-    if dupe_summary:
+    # Refuse tasks older than X days. This is due to the isolate server dropping
+    # files. https://code.google.com/p/swarming/issues/detail?id=197
+    oldest = utils.utcnow() - datetime.timedelta(
+        seconds=config.settings().reusable_task_age_secs)
+    if dupe_summary and dupe_summary.created_ts > oldest:
       # If there's a bug, commenting out this block is sufficient to disable the
       # functionality.
       # Setting task.queue_number to None removes it from the scheduling.
       task.queue_number = None
       _copy_entity(dupe_summary, result_summary, ('created_ts', 'name', 'user'))
+      result_summary.properties_hash = None
       result_summary.try_number = 0
       result_summary.costs_usd = []
       result_summary.deduped_from = task_result.pack_run_result_key(

@@ -602,8 +602,11 @@ class TaskResultSummary(_TaskResultCommon):
       self.costs_usd.append(0.)
     self.costs_usd[run_result.try_number-1] = run_result.cost_usd
 
-    if (self.state == State.COMPLETED and not self.failure and
-        not self.internal_failure and request.properties.idempotent):
+    if (self.state == State.COMPLETED and
+        not self.failure and
+        not self.internal_failure and
+        request.properties.idempotent and
+        not self.deduped_from):
       # Signal the results are valid and can be reused.
       self.properties_hash = request.properties.properties_hash
       assert self.properties_hash
