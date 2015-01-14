@@ -269,14 +269,21 @@
       </tr>
       <tr title="Cost of running this task, as reported by the bot, if
       applicable.">
-        <td>$ USD</td>
-        <td>
-          {% if task.cost_usd %}
-            {{task.cost_usd|round(5) }} $
-          {% else %}
-            &#8209;&#8209;
-          {% endif %}
-        </td>
+        {% if task.cost_saved_usd %}
+          <td>$ USD saved</td>
+          <td>
+            <span style="color:green">{{task.cost_saved_usd|round(4) }} $</span>
+          </td>
+        {% else %}
+          <td>$ USD</td>
+          <td>
+            {% if task.cost_usd %}
+              {{task.cost_usd|round(5) }} $
+            {% else %}
+              &#8209;&#8209;
+            {% endif %}
+          </td>
+        {% endif %}
       </tr>
       <tr title="A task may be tried 2 times. This list the try number starting at 1.">
         <td>Try number</td>

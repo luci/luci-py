@@ -431,7 +431,10 @@ class TaskRunResult(_TaskResultCommon):
   # Effective cost of this task.
   cost_usd = ndb.FloatProperty(indexed=False, default=0.)
 
-  # A task run execution can't be definition be deduped from another task.
+  # A task run execution can't by definition save any cost.
+  cost_saved_usd = None
+
+  # A task run execution can't by definition be deduped from another task.
   # Still, setting this property always to None simplifies a lot the
   # presentation layer.
   deduped_from = None
@@ -534,7 +537,12 @@ class TaskResultSummary(_TaskResultCommon):
   try_number = ndb.IntegerProperty()
 
   # Effective cost of this task for each try. Use self.cost_usd for the sum.
+  # It's empty on deduped task, since nothing was executed.
   costs_usd = ndb.FloatProperty(repeated=True, indexed=False)
+
+  # Cost saved for deduped task. This is the value of TaskResultSummary.cost_usd
+  # from self.deduped_from.
+  cost_saved_usd = ndb.FloatProperty(indexed=False)
 
   # Set to the task run id when the task result was retrieved from another task.
   # A task run id is a reference to a TaskRunResult generated via

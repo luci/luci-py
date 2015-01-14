@@ -330,6 +330,8 @@ def make_request(data):
       _copy_entity(dupe_summary, result_summary, ('created_ts', 'name', 'user'))
       result_summary.properties_hash = None
       result_summary.try_number = 0
+      result_summary.cost_saved_usd = result_summary.cost_usd
+      # Only zap after.
       result_summary.costs_usd = []
       result_summary.deduped_from = task_result.pack_run_result_key(
           dupe_summary.run_result_key)

@@ -243,6 +243,8 @@
           <td>
             {% if task.cost_usd %}
               {{task.cost_usd|round(4) }} $
+            {% elif task.cost_saved_usd %}
+              <span style="color:green">-{{task.cost_saved_usd|round(4) }} $</span>
             {% else %}
               &#8209;&#8209;
             {% endif %}
@@ -330,7 +332,13 @@
           <td>
             {{total_saved|timedeltaformat}}
           </td>
-          <td></td>
+          <td>
+            {% if total_cost_saved_usd %}
+              <span style="color:green">{{total_cost_saved_usd|round(4) }} $</span>
+            {% else %}
+              &#8209;&#8209;
+            {% endif %}
+          </td>
           <td></td>
           <td></td>
           <td></td>
