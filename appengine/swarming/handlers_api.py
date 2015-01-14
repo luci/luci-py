@@ -670,6 +670,7 @@ class BotPollHandler(_BotBaseHandler):
         'commands': request.properties.commands,
         'data': request.properties.data,
         'env': request.properties.env,
+        'grace_period': request.properties.grace_period_secs,
         'host': utils.get_versioned_hosturl(),
         'hard_timeout': request.properties.execution_timeout_secs,
         'io_timeout': request.properties.io_timeout_secs,

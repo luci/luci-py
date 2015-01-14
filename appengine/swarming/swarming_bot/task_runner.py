@@ -87,6 +87,7 @@ class TaskDetails(object):
     self.env.update(
         (k.encode('utf-8'), v.encode('utf-8'))
         for k, v in data['env'].iteritems())
+    self.grace_period = data['grace_period']
     self.hard_timeout = data['hard_timeout']
     self.io_timeout = data['io_timeout']
     self.task_id = data['task_id']
@@ -165,10 +166,14 @@ def should_post_update(stdout, now, last_packet):
   return len(stdout) >= MAX_CHUNK_SIZE or (now - last_packet) > packet_interval
 
 
-def calc_yield_wait(task_details, start, last_io, stdout):
+def calc_yield_wait(task_details, start, last_io, timed_out, stdout):
   """Calculates the maximum number of seconds to wait in yield_any()."""
-  packet_interval = MIN_PACKET_INTERNAL if stdout else MAX_PACKET_INTERVAL
   now = time.time()
+  if timed_out:
+    # Give a |grace_period| seconds delay.
+    return max(now - timed_out - task_details.grace_period, 0.)
+
+  packet_interval = MIN_PACKET_INTERNAL if stdout else MAX_PACKET_INTERVAL
   hard_timeout = start + task_details.hard_timeout - now
   io_timeout = last_io + task_details.io_timeout - now
   return max(min(min(packet_interval, hard_timeout), io_timeout), 0)
@@ -205,6 +210,7 @@ def run_command(
         task_details.commands[index],
         env=env,
         cwd=root_dir,
+        detached=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         stdin=subprocess.PIPE)
@@ -224,11 +230,13 @@ def run_command(
   exit_code = None
   had_hard_timeout = False
   had_io_timeout = False
+  timed_out = None
   try:
     last_io = time.time()
     for _, new_data in proc.yield_any(
           maxsize=MAX_CHUNK_SIZE - len(stdout),
-          soft_timeout=calc_yield_wait(task_details, start, last_io, stdout)):
+          soft_timeout=calc_yield_wait(
+              task_details, start, last_io, timed_out, stdout)):
       now = time.time()
       if new_data:
         stdout += new_data
@@ -243,18 +251,33 @@ def run_command(
         output_chunk_start += len(stdout)
         stdout = ''
 
-      # Kill on timeout if necessary. Both are failures, not internal_failures.
-      # Kill but return 0 so bot_main.py doesn't cancel the task.
-      if not had_hard_timeout and not had_io_timeout:
+      # Send signal on timeout if necessary. Both are failures, not
+      # internal_failures.
+      # Eventually kill but return 0 so bot_main.py doesn't cancel the task.
+      if not timed_out:
         if now - last_io > task_details.io_timeout:
           had_io_timeout = True
           logging.warning('I/O timeout')
-          proc.kill()
+          proc.terminate()
+          timed_out = time.time()
         elif now - start > task_details.hard_timeout:
           had_hard_timeout = True
           logging.warning('Hard timeout')
-          proc.kill()
-
+          proc.terminate()
+          timed_out = time.time()
+      else:
+        # During grace period.
+        if now >= timed_out + task_details.grace_period:
+          # Now kill for real. The user can distinguish between the following
+          # states:
+          # - signal but process exited within grace period,
+          #   (hard_|io_)_timed_out will be set but the process exit code will
+          #   be script provided.
+          # - processed exited late, exit code will be -9 on posix.
+          try:
+            proc.kill()
+          except OSError:
+            pass
     logging.info('Waiting for proces exit')
     exit_code = proc.wait()
   finally:
@@ -277,7 +300,7 @@ def run_command(
     params['duration'] = now - start
     params['io_timeout'] = had_io_timeout
     params['hard_timeout'] = had_hard_timeout
-    # At worst, it'll re-throw.
+    # At worst, it'll re-throw, which will be caught by bot_main.py.
     post_update(swarming_server, params, exit_code, stdout, output_chunk_start)
     output_chunk_start += len(stdout)
     stdout = ''

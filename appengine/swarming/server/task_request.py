@@ -91,7 +91,7 @@ _REQUIRED_PROPERTIES_KEYS = frozenset(
      'io_timeout_secs'])
 _EXPECTED_PROPERTIES_KEYS = frozenset(
     ['commands', 'data', 'dimensions', 'env', 'execution_timeout_secs',
-     'idempotent', 'io_timeout_secs'])
+    'grace_period_secs', 'idempotent', 'io_timeout_secs'])
 
 
 # The production server must handle up to 1000 task requests per second. The
@@ -148,9 +148,17 @@ def _validate_dict_of_strings(prop, value):
     raise TypeError('%s must be a dict of strings' % prop._name)
 
 
+def _validate_grace(prop, value):
+  """Validates grace_period_secs in TaskProperties."""
+  if not (0 <= value <= _ONE_DAY_SECS):
+    # pylint: disable=W0212
+    raise datastore_errors.BadValueError(
+        '%s (%ds) must be between %ds and one day' % (prop._name, value, 0))
+
+
 def _validate_timeout(prop, value):
   """Validates timeouts in seconds in TaskProperties."""
-  if _MIN_TIMEOUT_SECS > value or _ONE_DAY_SECS < value:
+  if not (_MIN_TIMEOUT_SECS <= value <= _ONE_DAY_SECS):
     # pylint: disable=W0212
     raise datastore_errors.BadValueError(
         '%s (%ds) must be between %ds and one day' %
@@ -167,7 +175,7 @@ def _validate_expiration(prop, value):
   """Validates TaskRequest.expiration_ts."""
   now = utils.utcnow()
   offset = int(round((value - now).total_seconds()))
-  if _MIN_TIMEOUT_SECS > offset or _ONE_DAY_SECS < offset:
+  if not (_MIN_TIMEOUT_SECS <= offset <= _ONE_DAY_SECS):
     # pylint: disable=W0212
     raise datastore_errors.BadValueError(
         '%s (%s, %ds from now) must effectively be between %ds and one day '
@@ -217,9 +225,15 @@ class TaskProperties(ndb.Model):
   env = datastore_utils.DeterministicJsonProperty(
       validator=_validate_dict_of_strings, json_type=dict)
 
-  # Maximum duration the bot can take to run this task.
+  # Maximum duration the bot can take to run this task. It's named hard_timeout
+  # in the bot.
   execution_timeout_secs = ndb.IntegerProperty(
       validator=_validate_timeout, required=True)
+
+  # Grace period is the time between signaling the task it timed out and killing
+  # the process. During this time the process should clean up itself as quickly
+  # as possible, potentially uploading partial results back.
+  grace_period_secs = ndb.IntegerProperty(validator=_validate_grace, default=30)
 
   # Bot controlled timeout for new bytes from the subprocess. If a subprocess
   # doesn't output new data to stdout for .io_timeout_secs, consider the command
@@ -467,6 +481,7 @@ def make_request(data):
       - dimensions
       - env
       - execution_timeout_secs
+      - grace_period_secs*
       - idempotent*
       - io_timeout_secs
     - priority
@@ -492,6 +507,7 @@ def make_request(data):
       dimensions=data_properties['dimensions'],
       env=data_properties['env'],
       execution_timeout_secs=data_properties['execution_timeout_secs'],
+      grace_period_secs=data_properties.get('grace_period_secs', 30),
       idempotent=data_properties.get('idempotent', False),
       io_timeout_secs=data_properties['io_timeout_secs'])
 

@@ -43,6 +43,7 @@ from server.task_result import State
 
 
 def _gen_request_data(name='Request name', properties=None, **kwargs):
+  # Do not include optional arguments.
   base_data = {
     'name': name,
     'user': 'Jesus',
@@ -223,7 +224,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       # timestamps.
       'modified_ts': new_ts,
       'name': u'yay',
-      'properties_hash': 'c5c77509f49b191689b056ad7c45c6d5fdcfea20',
+      'properties_hash': '53e296e901d534a0c07bfa4abe3ba0109492fef1',
       'server_versions': [u'default-version'],
       'started_ts': original_ts,
       'state': State.COMPLETED,

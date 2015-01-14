@@ -268,7 +268,7 @@ class SwarmingTestCase(unittest.TestCase):
         ],
         gen_expected(
             name=u'hard_timeout',
-            exit_codes=[-9],
+            exit_codes=[-signal.SIGTERM],
             failure=True,
             state=0x40),  # task_result.State.TIMED_OUT
       ),
@@ -282,7 +282,7 @@ class SwarmingTestCase(unittest.TestCase):
         ],
         gen_expected(
             name=u'io_timeout',
-            exit_codes=[-9],
+            exit_codes=[-signal.SIGTERM],
             failure=True,
             state=0x40),  # task_result.State.TIMED_OUT
       ),

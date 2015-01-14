@@ -44,6 +44,7 @@ def _gen_request_data(properties=None, **kwargs):
       'dimensions': {u'OS': u'Windows-3.1.1', u'hostname': u'localhost'},
       'env': {u'foo': u'bar', u'joe': u'2'},
       'execution_timeout_secs': 30,
+      'grace_period_secs': 30,
       'idempotent': False,
       'io_timeout_secs': None,
     },
@@ -190,6 +191,7 @@ class TaskRequestApiTest(TestCase):
       'dimensions': {u'OS': u'Windows-3.1.1', u'hostname': u'localhost'},
       'env': {u'foo': u'bar', u'joe': u'2'},
       'execution_timeout_secs': 30,
+      'grace_period_secs': 30,
       'idempotent': False,
       'io_timeout_secs': None,
     }
@@ -224,7 +226,7 @@ class TaskRequestApiTest(TestCase):
     self.assertEqual(True, as_dict['properties']['idempotent'])
     # Ensure the algorithm is deterministic.
     self.assertEqual(
-        '264479359746dd42a6c7154af1bc244061f63170', as_dict['properties_hash'])
+        'f10d3159e26b2126f5dc3b9b3e824a584be442f2', as_dict['properties_hash'])
 
   def test_duped(self):
     # Two TestRequest with the same properties.

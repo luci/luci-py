@@ -12,6 +12,12 @@ import tempfile
 import time
 import unittest
 
+THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# Small hack to make it work on Windows even without symlink support.
+if os.path.isfile(os.path.join(THIS_DIR, 'utils')):
+  sys.path.insert(0, os.path.join(THIS_DIR, '..', '..', '..', 'client'))
+
 # Import them first before manipulating sys.path to ensure they can load fine.
 import bot_main
 import logging_utils
@@ -70,9 +76,9 @@ class TestBotMain(net_utils.TestCase):
     super(TestBotMain, self).tearDown()
 
   def test_get_dimensions(self):
-    self.assertEqual(
-        ['cores', 'cpu', 'gpu', 'id', 'os'],
-        sorted(bot_main.get_dimensions()))
+    dimensions = set(bot_main.get_dimensions())
+    dimensions.discard('hidpi')
+    self.assertEqual({'cores', 'cpu', 'gpu', 'id', 'os'}, dimensions)
 
   def test_get_dimensions_load_test(self):
     os.environ['SWARMING_LOAD_TEST'] = '1'
