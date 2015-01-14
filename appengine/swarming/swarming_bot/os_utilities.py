@@ -295,6 +295,24 @@ exit 0
       'user': pipes.quote(user),
     }
 
+def _generate_autostart_destkop(command, name):
+  """Returns a valid .desktop for use with Swarming bot.
+
+  http://standards.freedesktop.org/desktop-entry-spec/desktop-entry-spec-latest.html
+  """
+  return (
+    '[Desktop Entry]\n'
+    'Type=Application\n'
+    'Name=%(name)s\n'
+    'Exec=%(cmd)s\n'
+    'Hidden=false\n'
+    'NoDisplay=false\n'
+    'Comment=Created by os_utilties.py\n'
+    'X-GNOME-Autostart-enabled=true\n') % {
+      'cmd': ' '.join(pipes.quote(c) for c in command),
+      'name': name,
+    }
+
 
 def _get_os_version_name_win():
   """Returns the marketing name of the OS including the service pack."""
@@ -1252,6 +1270,18 @@ def setup_auto_startup_initd_linux(command, cwd, user=None, name='swarming'):
     print('  sudo update-rc.d -f %s remove' % name)
     print('  sudo rm %s' % filepath)
   return True
+
+
+def setup_auto_startup_autostart_desktop_linux(command, name='swarming'):
+  """Uses ~/.config/autostart to start automatically the bot on user login.
+
+  http://standards.freedesktop.org/autostart-spec/autostart-spec-latest.html
+  """
+  basedir = os.path.expanduser('~/.config/autostart')
+  if not os.path.isdir(basedir):
+    os.makedirs(basedir)
+  filepath = os.path.join(basedir, '%s.desktop' % name)
+  return _write(filepath, _generate_autostart_destkop(command, name))
 
 
 def restart(message=None, timeout=None):
