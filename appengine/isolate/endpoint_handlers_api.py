@@ -254,8 +254,7 @@ class IsolateService(remote.Service):
       if (digest, size) != hash_content(content, namespace):
         raise endpoints.BadRequestException(
             'Embedded digest does not match provided data.')
-      else:
-        entry.put()
+      entry.put()
 
     # GCS: enqueue verification task
     else:

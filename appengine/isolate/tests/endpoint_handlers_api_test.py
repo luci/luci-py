@@ -34,6 +34,7 @@ import config
 import endpoint_handlers_api
 from endpoint_handlers_api import DigestCollection
 from endpoint_handlers_api import UPLOAD_MESSAGES
+import gcs
 import handlers_backend
 import model
 
@@ -51,8 +52,7 @@ def hash_content(content, namespace):
   return hash_algo.hexdigest()
 
 
-def generate_digest(
-    content, namespace=endpoint_handlers_api.Namespace().namespace):
+def generate_digest(content, namespace):
   """Create a Digest from content (in a given namespace) for preupload.
 
   Arguments:
@@ -66,6 +66,15 @@ def generate_digest(
       digest=hash_content(content, namespace), size=len(content))
 
 
+def generate_collection(contents, namespace=None):
+  if namespace is None:
+    namespace = endpoint_handlers_api.Namespace()
+  return DigestCollection(
+      namespace=namespace,
+      items=[generate_digest(content, namespace.namespace)
+             for content in contents])
+
+
 def generate_embedded(namespace, digest):
   return {
       'c': namespace.compression,
@@ -77,16 +86,17 @@ def generate_embedded(namespace, digest):
   }
 
 
-validate = endpoint_handlers_api.TokenSigner.validate
-
-
-def generate_store_request(content):
-  namespace = endpoint_handlers_api.Namespace()
-  digest = generate_digest(content, namespace.namespace)
+def preupload_status_to_request(preupload_status, content):
+  """Create a Storage/FinalizeRequest corresponding to a PreuploadStatus."""
+  ticket = preupload_status.get('upload_ticket')
+  url = preupload_status.get('gs_upload_url', None)
+  if url is not None:
+    return endpoint_handlers_api.FinalizeRequest(upload_ticket=ticket)
   return endpoint_handlers_api.StorageRequest(
-      upload_ticket=endpoint_handlers_api.IsolateService.generate_ticket(
-          digest, namespace),
-      content=content)
+      upload_ticket=ticket, content=content)
+
+
+validate = endpoint_handlers_api.TokenSigner.validate
 
 
 def pad_string(string, size=endpoint_handlers_api.MIN_SIZE_FOR_DIRECT_GS):
@@ -94,14 +104,17 @@ def pad_string(string, size=endpoint_handlers_api.MIN_SIZE_FOR_DIRECT_GS):
   return string + pad
 
 
-def generate_finalize_request(content):
-  content = pad_string(content)
-  namespace = endpoint_handlers_api.Namespace()
-  digest = generate_digest(content, namespace.namespace)
-  digest.is_isolated = False
-  return endpoint_handlers_api.FinalizeRequest(
-      upload_ticket=endpoint_handlers_api.IsolateService.generate_ticket(
-          digest, namespace))
+class FileInfaux(object):
+  """Fake file info to mock GCS retrieval."""
+
+  def __init__(self, content):
+    self.size = len(content)
+
+
+def get_file_info_factory(content=None):
+  """Return a function to mock gcs.get_file_info."""
+  result = None if content is None else FileInfaux(content)
+  return lambda unused_bucket, unused_id: result
 
 
 ### Isolate Service Test
@@ -135,14 +148,20 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
     """Returns a JSON-ish dictionary corresponding to the RPC message."""
     return json.loads(protojson.encode_message(message))
 
+  def store_request(self, content):
+    """Generate a Storage/FinalizeRequest via preupload status."""
+    collection = generate_collection([content])
+    response = self.call_api(
+        'preupload', self.message_to_dict(collection), 200)
+    message = json.loads(response.body).get(u'items', [{}])[0]
+    return preupload_status_to_request(message, content)
+
   def test_pre_upload_ok(self):
     """Assert that preupload correctly posts a valid DigestCollection.
 
     TODO(cmassaro): verify the upload_ticket is correct
     """
-    good_digests = DigestCollection(
-        namespace=endpoint_handlers_api.Namespace())
-    good_digests.items.append(generate_digest('a pony', good_digests.namespace))
+    good_digests = generate_collection(['a pony'])
     response = self.call_api(
         'preupload', self.message_to_dict(good_digests), 200)
     message = json.loads(response.body).get(u'items', [{}])[0]
@@ -157,8 +176,7 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
 
     TODO(cmassaro): verify upload_ticket
     """
-    digests = DigestCollection(namespace=endpoint_handlers_api.Namespace())
-    digests.items.append(generate_digest('duckling.' * 70, digests.namespace))
+    digests = generate_collection([pad_string('duckling')])
     response = self.call_api(
         'preupload', self.message_to_dict(digests), 200)
     message = json.loads(response.body).get(u'items', [{}])[0]
@@ -180,19 +198,17 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
   def test_pre_upload_invalid_namespace(self):
     """Assert that status 400 is returned when the namespace is invalid."""
     bad_collection = DigestCollection(
-        namespace=endpoint_handlers_api.Namespace(namespace='~tildewhatevs'),
-        items=[generate_digest('pangolin', endpoint_handlers_api.Namespace())])
+        namespace=endpoint_handlers_api.Namespace(namespace='~tildewhatevs'))
+    bad_collection.items.append(
+        generate_digest('pangolin', bad_collection.namespace.namespace))
     with self.call_should_fail('400'):
       _response = self.call_api(
           'preupload', self.message_to_dict(bad_collection), 200)
 
   def test_check_existing_finds_existing_entities(self):
     """Assert that existence check is working."""
-    collection = DigestCollection(namespace=endpoint_handlers_api.Namespace())
-    collection.items.extend([
-        generate_digest('small content', collection.namespace),
-        generate_digest('larger content', collection.namespace),
-        generate_digest('biggest content', collection.namespace)])
+    collection = generate_collection(
+        ['small content', 'larger content', 'biggest content'])
     key = model.entry_key(
         collection.namespace.namespace, collection.items[0].digest)
 
@@ -226,7 +242,7 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
 
   def test_store_inline_ok(self):
     """Assert that inline content storage completes successfully."""
-    request = generate_store_request('sibilance')
+    request = self.store_request('sibilance')
     embedded = validate(request.upload_ticket, UPLOAD_MESSAGES[0])
     key = model.entry_key(embedded['n'], embedded['d'])
 
@@ -246,7 +262,7 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
 
     TODO(cmassaro): more comprehensive tests (expired tokens, etc.)?
     """
-    request = generate_store_request('sonority')
+    request = self.store_request(pad_string('sonority'))
     request.upload_ticket += '7'
     with self.call_should_fail('400'):
       _response = self.call_api(
@@ -254,29 +270,39 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
 
   def test_store_inline_bad_digest(self):
     """Assert that inline content storage fails when data do not match."""
-    request = generate_store_request('anseres sacri')
+    request = self.store_request('anseres sacri')
     request.content = ':)' + request.content[2:]
     with self.call_should_fail('400'):
       _response = self.call_api(
           'store_inline', self.message_to_dict(request), 200)
 
   def test_finalized_data_in_gs(self):
-    """Assert that data are actually in GS when finalized.
+    """Assert that data are actually in GS when finalized."""
+    # create content
+    content = pad_string('huge, important data')
+    request = self.store_request(content)
 
-    TODO(cmassaro): does this even make sense to do?
-    """
-    pass
+    # this should succeed
+    self.mock(gcs, 'get_file_info', get_file_info_factory(content))
+    _response = self.call_api(
+        'finalize_gs_upload', self.message_to_dict(request), 200)
+
+    # this should fail
+    self.mock(gcs, 'get_file_info', get_file_info_factory())
+    with self.call_should_fail('400'):
+      _response = self.call_api(
+          'finalize_gs_upload', self.message_to_dict(request), 200)
+    self.assertEqual(1, self.execute_tasks())
 
   def test_finalize_gs_creates_content_entry(self):
-    """Assert that finalize_gs_upload creates a content entry.
-
-    TODO(cmassaro): what else should be tested here?
-    """
-    request = generate_finalize_request('empathy')
+    """Assert that finalize_gs_upload creates a content entry."""
+    content = pad_string('empathy')
+    request = self.store_request(content)
     embedded = validate(request.upload_ticket, UPLOAD_MESSAGES[1])
     key = model.entry_key(embedded['n'], embedded['d'])
 
     # finalize_gs_upload should put a new ContentEntry into the database
+    self.mock(gcs, 'get_file_info', get_file_info_factory(content))
     _response = self.call_api(
         'finalize_gs_upload', self.message_to_dict(request), 200)
     stored = key.get()
@@ -285,6 +311,12 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
     # assert that expected attributes are present
     self.assertEqual('', stored.content)
     self.assertEqual(int(embedded['s']), stored.expanded_size)
+
+    # ensure that verification occurs
+    self.mock(gcs, 'read_file', lambda _bucket, _key: content)
+    self.assertFalse(stored.key.get().is_verified)
+    self.assertEqual(1, self.execute_tasks())
+    self.assertTrue(stored.key.get().is_verified)
 
 
 if __name__ == '__main__':
