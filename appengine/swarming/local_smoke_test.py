@@ -132,8 +132,6 @@ def gen_expected(**kwargs):
     u'abandoned_ts': None,
     u'bot_id': unicode(socket.getfqdn().split('.', 1)[0]),
     u'cost_saved_usd': None,
-    # TODO(maruel): This won't be zero when this test is run on a GCE VM.
-    u'costs_usd': [0.],
     u'deduped_from': None,
     u'exit_codes': [0],
     u'failure': False,
@@ -308,6 +306,7 @@ class SwarmingTestCase(unittest.TestCase):
     result = result['shards'][0].copy()
     # These are not deterministic (or I'm too lazy to calculate the value).
     self.assertTrue(result.pop('bot_version'))
+    self.assertTrue(result.pop('costs_usd'))
     self.assertTrue(result.pop('created_ts'))
     self.assertTrue(result.pop('completed_ts'))
     self.assertTrue(result.pop('durations'))

@@ -78,7 +78,8 @@ class TestBotMain(net_utils.TestCase):
   def test_get_dimensions(self):
     dimensions = set(bot_main.get_dimensions())
     dimensions.discard('hidpi')
-    self.assertEqual({'cores', 'cpu', 'gpu', 'id', 'os'}, dimensions)
+    expected = {'cores', 'cpu', 'gpu', 'id', 'machine_type', 'os'}
+    self.assertEqual(expected, dimensions)
 
   def test_get_dimensions_load_test(self):
     os.environ['SWARMING_LOAD_TEST'] = '1'

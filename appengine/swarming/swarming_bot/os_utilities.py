@@ -63,6 +63,63 @@ ANDROID_DETAILS = frozenset(
     ])
 
 
+# https://cloud.google.com/compute/pricing#machinetype
+GCE_MACHINE_COST_HOUR_US = {
+  'n1-standard-1': 0.063,
+  'n1-standard-2': 0.126,
+  'n1-standard-4': 0.252,
+  'n1-standard-8': 0.504,
+  'n1-standard-16': 1.008,
+  'f1-micro': 0.012,
+  'g1-small': 0.032,
+  'n1-highmem-2': 0.148,
+  'n1-highmem-4': 0.296,
+  'n1-highmem-8': 0.592,
+  'n1-highmem-16': 1.184,
+  'n1-highcpu-2': 0.080,
+  'n1-highcpu-4': 0.160,
+  'n1-highcpu-8': 0.320,
+  'n1-highcpu-16': 0.640,
+}
+
+
+# https://cloud.google.com/compute/pricing#machinetype
+GCE_MACHINE_COST_HOUR_EUROPE_ASIA = {
+  'n1-standard-1': 0.069,
+  'n1-standard-2': 0.138,
+  'n1-standard-4': 0.276,
+  'n1-standard-8': 0.552,
+  'n1-standard-16': 1.104,
+  'f1-micro': 0.013,
+  'g1-small': 0.0347,
+  'n1-highmem-2': 0.162,
+  'n1-highmem-4': 0.324,
+  'n1-highmem-8': 0.648,
+  'n1-highmem-16': 1.296,
+  'n1-highcpu-2': 0.086,
+  'n1-highcpu-4': 0.172,
+  'n1-highcpu-8': 0.344,
+  'n1-highcpu-16': 0.688,
+}
+
+
+GCE_RAM_GB_PER_CORE_RATIOS = {
+  0.9: 'n1-highcpu-',
+  3.75: 'n1-standard-',
+  6.5: 'n1-highmem-',
+}
+
+
+# https://cloud.google.com/compute/pricing#disk
+GCE_HDD_GB_COST_MONTH = 0.04
+GCE_SSD_GB_COST_MONTH = 0.17
+
+
+# https://cloud.google.com/compute/pricing#premiumoperatingsystems
+GCE_WINDOWS_COST_CORE_HOUR = 0.04
+
+
+
 ### Private stuff.
 
 
@@ -790,8 +847,73 @@ def get_cost_hour():
   """Returns the cost in $USD/h as a floating point value if applicable."""
   metadata = _get_metadata_gce()
   if not metadata:
-    return None
+    # Get an approximate cost trying to emulate GCE equivalent cost.
+    cores = get_num_processors()
+    os_cost = 0.
+    if sys.platform == 'darwin':
+      # Apple tax. It's 50% better, right?
+      os_cost = GCE_WINDOWS_COST_CORE_HOUR * 1.5 * cores
+    elif sys.platform == 'win32':
+      # MS tax.
+      os_cost = GCE_WINDOWS_COST_CORE_HOUR * cores
+
+    # Guess an equivalent machine_type.
+    machine_cost = GCE_MACHINE_COST_HOUR_US.get(get_machine_type(), 0.)
+
+    # Assume HDD for now, it's the cheapest. That's not true, we do have SSDs.
+    disk_gb_cost = 0.
+    for disk in get_disks_info().itervalues():
+      disk_gb_cost += disk['free_mb'] / 1024. * (
+          GCE_HDD_GB_COST_MONTH / 30. / 24.)
+    return machine_cost + os_cost + disk_gb_cost
+
   return _get_cost_hour_gce()
+
+
+@cached
+def get_machine_type():
+  """Returns a GCE-equivalent machine type.
+
+  If running on GCE, returns the right machine type. Otherwise tries to find the
+  'closest' one.
+  """
+  metadata = _get_metadata_gce()
+  if metadata:
+    return get_machine_type_gce()
+
+  ram_gb = get_physical_ram() / 1024.
+  cores = get_num_processors()
+  ram_gb_per_core = ram_gb / cores
+  logging.info('RAM GB/core = %s', ram_gb_per_core)
+  best_fit = None
+  for ratio, prefix in GCE_RAM_GB_PER_CORE_RATIOS.iteritems():
+    delta = (ram_gb_per_core-ratio)**2
+    if best_fit is None or delta < best_fit[0]:
+      best_fit = (delta, prefix)
+  prefix = best_fit[1]
+  machine_type = prefix + str(cores)
+  if machine_type not in GCE_MACHINE_COST_HOUR_US:
+    # Try a best fit.
+    logging.info('Failed to find a good machine_type match: %s', machine_type)
+    for i in (16, 8, 4, 2):
+      if cores > i:
+        machine_type = prefix + str(i)
+        break
+    else:
+      if cores == 1:
+        # There's no n1-highcpu-1 nor n1-highmem-1.
+        if ram_gb < 1.7:
+          machine_type = 'f1-micro'
+        elif ram_gb < 3.75:
+          machine_type = 'g1-small'
+        else:
+          machine_type = 'n1-standard-1'
+      else:
+        logging.info('Failed to find a fit: %s', machine_type)
+
+  if machine_type not in GCE_MACHINE_COST_HOUR_US:
+    return None
+  return machine_type
 
 
 ### Google Cloud Compute Engine.
@@ -819,64 +941,32 @@ def get_machine_type_gce():
 
 def _get_cost_hour_gce():
   """Returns the $USD/hour of using this bot if applicable."""
-  # Machine. https://cloud.google.com/compute/pricing#machinetype
-  MACHINE_TABLE_US = {
-    'n1-standard-1': 0.063,
-    'n1-standard-2': 0.126,
-    'n1-standard-4': 0.252,
-    'n1-standard-8': 0.504,
-    'n1-standard-16': 1.008,
-    'f1-micro': 0.012,
-    'g1-small': 0.032,
-    'n1-highmem-2': 0.148,
-    'n1-highmem-4': 0.296,
-    'n1-highmem-8': 0.592,
-    'n1-highmem-16': 1.184,
-    'n1-highcpu-2': 0.080,
-    'n1-highcpu-4': 0.160,
-    'n1-highcpu-8': 0.320,
-    'n1-highcpu-16': 0.640,
-  }
-  MACHINE_TABLE_EUROPE_ASIA = {
-    'n1-standard-1': 0.069,
-    'n1-standard-2': 0.138,
-    'n1-standard-4': 0.276,
-    'n1-standard-8': 0.552,
-    'n1-standard-16': 1.104,
-    'f1-micro': 0.013,
-    'g1-small': 0.0347,
-    'n1-highmem-2': 0.162,
-    'n1-highmem-4': 0.324,
-    'n1-highmem-8': 0.648,
-    'n1-highmem-16': 1.296,
-    'n1-highcpu-2': 0.086,
-    'n1-highcpu-4': 0.172,
-    'n1-highcpu-8': 0.344,
-    'n1-highcpu-16': 0.688,
-  }
+  # Machine.
   machine_type = get_machine_type_gce()
   if get_zone_gce().startswith('us-'):
-    machine_cost = MACHINE_TABLE_US[machine_type]
+    machine_cost = GCE_MACHINE_COST_HOUR_US[machine_type]
   else:
-    machine_cost = MACHINE_TABLE_EUROPE_ASIA[machine_type]
+    machine_cost = GCE_MACHINE_COST_HOUR_EUROPE_ASIA[machine_type]
 
-  # OS. https://cloud.google.com/compute/pricing#premiumoperatingsystems
+  # OS.
   os_cost = 0.
   if sys.platform == 'win32':
     # Assume Windows Server.
     if machine_type in ('f1-micro', 'g1-small'):
       os_cost = 0.02
     else:
-      os_cost = 0.04 * get_num_processors()
+      os_cost = GCE_WINDOWS_COST_CORE_HOUR * get_num_processors()
 
-  # Disk. https://cloud.google.com/compute/pricing#disk
+  # Disk.
   # TODO(maruel): Figure out the disk type. The metadata is not useful AFAIK.
-  DISK_GB_MONTH = 0.04
   disk_gb_cost = 0.
   for disk in get_disks_info().itervalues():
-    disk_gb_cost += disk['free_mb'] / 1024. * (DISK_GB_MONTH / 30. / 24.)
+    disk_gb_cost += disk['free_mb'] / 1024. * (
+        GCE_HDD_GB_COST_MONTH / 30. / 24.)
 
   # TODO(maruel): Network. It's not a constant cost, it's per task.
+  # See https://cloud.google.com/monitoring/api/metrics
+  # compute.googleapis.com/instance/network/sent_bytes_count
   return machine_cost + os_cost + disk_gb_cost
 
 
@@ -1089,7 +1179,7 @@ def get_dimensions():
     if hidpi:
       dimensions['hidpi'] = hidpi
 
-  machine_type = get_machine_type_gce()
+  machine_type = get_machine_type()
   if machine_type:
     dimensions['machine_type'] = [machine_type]
   zone = get_zone_gce()
