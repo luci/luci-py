@@ -49,6 +49,10 @@
   @-webkit-keyframes blink {
     to { visibility: hidden; }
   }
+
+  .help_text {
+    background-color: #ffffee;
+  }
 </style>
 {% endblock %}
 
@@ -302,9 +306,15 @@
 </div>
 
 <br>
+<div class=help_text>
+<h2>Help</h2>
 <span style="margin-bottom:0">To run this task locally, execute:</span>
 <pre style="margin-top:0">  python swarming.py reproduce -S {{host_url}} {{task.key_string}}</pre>
-<p>
+<span style="margin-bottom:0">Download task output results from ISOLATED_OUTDIR into directory "foo":</span>
+<pre style="margin-top:0">  python swarming.py collect -S {{host_url}} --task-output-dir=foo {{task.key_string}}</pre>
+<span style="margin-bottom:0">Looking for swarming.py?</span>
+<pre style="margin-top:0">  git clone https://code.google.com/p/swarming.client.git</pre>
+</div>
 
 <h3>Outputs:</h3>
 <pre>
