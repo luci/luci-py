@@ -20,6 +20,7 @@ from google.appengine.datastore import datastore_query
 from google.appengine.ext import ndb
 
 import handlers_api
+import handlers_bot
 import handlers_backend
 import mapreduce_jobs
 import template
@@ -704,5 +705,6 @@ def create_application(debug):
   # TODO(maruel): Split backend into a separate module. For now add routes here.
   routes.extend(handlers_backend.get_routes())
   routes.extend(handlers_api.get_routes())
+  routes.extend(handlers_bot.get_routes())
 
   return webapp2.WSGIApplication(routes, debug=debug)
