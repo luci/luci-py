@@ -124,7 +124,6 @@ def get_file_info_factory(content=None):
 
 class IsolateServiceTest(test_case.EndpointsTestCase):
   """Test the IsolateService's API methods."""
-  # TODO(cmassaro): this should eventually inherit from endpointstestcase
 
   api_service_cls = endpoint_handlers_api.IsolateService
   gs_prefix = 'localhost:80/content-gs/store/'
@@ -167,31 +166,29 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
     self.mock(original_object, attribute_name, original_with_side_effect)
 
   def test_pre_upload_ok(self):
-    """Assert that preupload correctly posts a valid DigestCollection.
-
-    TODO(cmassaro): verify the upload_ticket is correct
-    """
+    """Assert that preupload correctly posts a valid DigestCollection."""
     good_digests = generate_collection(['a pony'])
     response = self.call_api(
         'preupload', self.message_to_dict(good_digests), 200)
     message = response.json.get(u'items', [{}])[0]
     self.assertEqual('', message.get(u'gs_upload_url', ''))
     self.assertEqual(
-        validate(message.get(u'upload_ticket', ''), 'datastore'),
+        validate(message.get(u'upload_ticket', ''), UPLOAD_MESSAGES[0]),
         generate_embedded(good_digests.namespace, good_digests.items[0]))
-    self.assertEqual(good_digests.items[0].digest, message.get('digest', ''))
+    self.assertEqual(good_digests.items[0].digest, message['digest'])
 
   def test_finalize_url_ok(self):
-    """Assert that a finalize_url is generated when should_push_to_gs.
-
-    TODO(cmassaro): verify upload_ticket
-    """
+    """Assert that a finalize_url is generated when should_push_to_gs."""
     digests = generate_collection([pad_string('duckling')])
     response = self.call_api(
         'preupload', self.message_to_dict(digests), 200)
     message = response.json.get(u'items', [{}])[0]
     self.assertTrue(message.get(u'gs_upload_url', '').startswith(
         self.store_prefix))
+    self.assertEqual(
+        validate(message.get(u'upload_ticket', ''), UPLOAD_MESSAGES[1]),
+        generate_embedded(digests.namespace, digests.items[0]))
+    self.assertEqual(digests.items[0].digest, message['digest'])
 
   def test_pre_upload_invalid_hash(self):
     """Assert that status 400 is returned when the digest is invalid."""
@@ -268,10 +265,7 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
         endpoint_handlers_api.hash_content(stored.content, embedded['n']))
 
   def test_store_inline_bad_mac(self):
-    """Assert that inline content storage fails when token is altered.
-
-    TODO(cmassaro): more comprehensive tests (expired tokens, etc.)?
-    """
+    """Assert that inline content storage fails when token is altered."""
     request = self.store_request(pad_string('sonority'))
     request.upload_ticket += '7'
     with self.call_should_fail('400'):
@@ -339,10 +333,7 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
     self.assertTrue(stored.key.get().is_verified)
 
   def test_retrieve_content_memcache_ok(self):
-    """Assert that content retrieval goes off swimmingly in the normal case.
-
-    TODO(cmassaro): test for non-memcache case
-    """
+    """Assert that content retrieval goes off swimmingly in the normal case."""
     content = 'Grecian Urn'
     request = self.store_request(content)
     embedded = validate(request.upload_ticket, UPLOAD_MESSAGES[0])
@@ -430,9 +421,7 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
         namespace=endpoint_handlers_api.Namespace(),
         offset=offset) for offset in [-1, len(content) + 1]]
     for request in requests:
-      # TODO(cmassaro): There's no way to send 416 in Endpoints. What code
-      #   should we use?
-      with self.call_should_fail('416'):
+      with self.call_should_fail('400'):
         self.call_api('retrieve_content', self.message_to_dict(request), 200)
 
   def test_retrieve_content_not_found(self):
