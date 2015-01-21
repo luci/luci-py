@@ -8,6 +8,7 @@ import binascii
 import datetime
 import hashlib
 import hmac
+import httplib
 import os
 import re
 import sys
@@ -36,6 +37,7 @@ import stats
 
 from google.appengine import runtime
 from google.appengine.api import datastore_errors
+from google.appengine.api import memcache
 from google.appengine.api import taskqueue
 from google.appengine.ext import ndb
 
@@ -74,6 +76,13 @@ class FinalizeRequest(messages.Message):
   upload_ticket = messages.StringField(1)
 
 
+class RetrieveRequest(messages.Message):
+  """Request to retrieve content from memcache, datastore, or GS."""
+  digest = messages.StringField(1, required=True)
+  namespace = messages.MessageField(Namespace, 2)
+  offset = messages.IntegerField(3, default=0)
+
+
 ### Response Types
 
 
@@ -87,6 +96,12 @@ class PreuploadStatus(messages.Message):
 class UrlCollection(messages.Message):
   """Endpoints response type analogous to existing JSON response."""
   items = messages.MessageField(PreuploadStatus, 1, repeated=True)
+
+
+class RetrievedContent(messages.Message):
+  """Content retrieved from DB, or GS URL."""
+  content = messages.StringField(1)
+  url = messages.StringField(2)
 
 
 ### Utility
@@ -203,6 +218,44 @@ class IsolateService(remote.Service):
     """Informs client that large entities have been uploaded to GCS."""
     return self.storage_helper(request, True)
 
+  @auth.endpoints_method(RetrieveRequest, RetrievedContent)
+  def retrieve_content(self, request):
+    """Retrieves content from a storage location."""
+    content = None
+    key = None
+
+    # try the memcache
+    memcache_entry = memcache.get(
+        request.digest, namespace='table_%s' % request.namespace.namespace)
+    if memcache_entry is not None:
+      content = memcache_entry
+
+    # try ndb
+    else:
+      key = model.entry_key(request.namespace.namespace, request.digest)
+      stored = key.get()
+      if stored is None:
+        raise endpoints.NotFoundException('Unable to retrieve the entry.')
+      if stored.content:
+        content = stored.content
+
+    # return here if something has been found
+    if content is not None:
+      # make sure that request.offset is acceptable
+      if request.offset < 0 or request.offset > len(content):
+        raise endpoints.BadRequestException(
+            'Invalid offset %d. Offset must be between 0 and content length.' %
+            request.offset)
+      return RetrievedContent(content=content[request.offset:])
+
+    # TODO(cmassaro): this was originally a 302 redirect; should that happen
+    #   here, or are we okay with just returning the URL?
+    # TODO(cmassaro): what do we do about weird offsets in this case?
+    return RetrievedContent(url=self.gs_url_signer.get_upload_url(
+        filename=key.id(),
+        content_type='application/octet-stream',
+        expiration=DEFAULT_LINK_EXPIRATION))
+
   ### Utility
 
   def storage_helper(self, request, uploaded_to_gs):
@@ -245,7 +298,7 @@ class IsolateService(remote.Service):
         is_isolated=is_isolated,
         compressed_size=compressed_size,
         expanded_size=size,
-        is_verified=True,
+        is_verified=not uploaded_to_gs,
         content=content,
     )
 

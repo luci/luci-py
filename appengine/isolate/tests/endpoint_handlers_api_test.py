@@ -38,6 +38,9 @@ import gcs
 import handlers_backend
 import model
 
+from google.appengine.api import memcache
+from google.appengine.api import urlfetch
+
 
 def make_private_key():
   new_key = RSA.generate(1024)
@@ -100,8 +103,7 @@ validate = endpoint_handlers_api.TokenSigner.validate
 
 
 def pad_string(string, size=endpoint_handlers_api.MIN_SIZE_FOR_DIRECT_GS):
-  pad = ''.join('0' for unused_i in xrange(size + 1 - len(string)))
-  return string + pad
+  return string + '0' * (size - len(string))
 
 
 class FileInfaux(object):
@@ -153,8 +155,16 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
     collection = generate_collection([content])
     response = self.call_api(
         'preupload', self.message_to_dict(collection), 200)
-    message = json.loads(response.body).get(u'items', [{}])[0]
+    message = response.json.get(u'items', [{}])[0]
     return preupload_status_to_request(message, content)
+
+  def mock_side_effect(self, original_object, attribute_name, side_effect):
+    """Add a side effect to a mocked attribute, preserving functionality."""
+    original_function = getattr(original_object, attribute_name)
+    def original_with_side_effect(*args, **kwargs):
+      side_effect()
+      return original_function(*args, **kwargs)
+    self.mock(original_object, attribute_name, original_with_side_effect)
 
   def test_pre_upload_ok(self):
     """Assert that preupload correctly posts a valid DigestCollection.
@@ -164,7 +174,7 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
     good_digests = generate_collection(['a pony'])
     response = self.call_api(
         'preupload', self.message_to_dict(good_digests), 200)
-    message = json.loads(response.body).get(u'items', [{}])[0]
+    message = response.json.get(u'items', [{}])[0]
     self.assertEqual('', message.get(u'gs_upload_url', ''))
     self.assertEqual(
         validate(message.get(u'upload_ticket', ''), 'datastore'),
@@ -179,7 +189,7 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
     digests = generate_collection([pad_string('duckling')])
     response = self.call_api(
         'preupload', self.message_to_dict(digests), 200)
-    message = json.loads(response.body).get(u'items', [{}])[0]
+    message = response.json.get(u'items', [{}])[0]
     self.assertTrue(message.get(u'gs_upload_url', '').startswith(
         self.store_prefix))
 
@@ -192,7 +202,7 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
     bad_collection.items.append(
         endpoint_handlers_api.Digest(digest=bad_digest, size=10))
     with self.call_should_fail('400'):
-      _response = self.call_api(
+      self.call_api(
           'preupload', self.message_to_dict(bad_collection), 200)
 
   def test_pre_upload_invalid_namespace(self):
@@ -202,7 +212,7 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
     bad_collection.items.append(
         generate_digest('pangolin', bad_collection.namespace.namespace))
     with self.call_should_fail('400'):
-      _response = self.call_api(
+      self.call_api(
           'preupload', self.message_to_dict(bad_collection), 200)
 
   def test_check_existing_finds_existing_entities(self):
@@ -213,12 +223,12 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
         collection.namespace.namespace, collection.items[0].digest)
 
     # guarantee that one digest already exists in the datastore
-    model.new_content_entry(key, content=collection.items[0].digest).put()
+    model.new_content_entry(key).put()
     response = self.call_api(
         'preupload', self.message_to_dict(collection), 200)
 
     # we should see one enqueued task and two new URLs in the response
-    self.assertEqual(2, len(json.loads(response.body)['items']))
+    self.assertEqual(2, len(response.json['items']))
 
     # remove tasks so tearDown doesn't complain
     _ = self.execute_tasks()
@@ -232,8 +242,8 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
         collection.namespace.namespace, collection.items[0].digest)
 
     # guarantee that one digest already exists in the datastore
-    model.new_content_entry(key, content=collection.items[0].digest).put()
-    _response = self.call_api(
+    model.new_content_entry(key).put()
+    self.call_api(
         'preupload', self.message_to_dict(collection), 200)
 
     # find enqueued tasks
@@ -247,7 +257,7 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
     key = model.entry_key(embedded['n'], embedded['d'])
 
     # assert that store_inline puts the correct entity into the datastore
-    _response = self.call_api(
+    self.call_api(
         'store_inline', self.message_to_dict(request), 200)
     stored = key.get()
     self.assertEqual(key, stored.key)
@@ -265,7 +275,7 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
     request = self.store_request(pad_string('sonority'))
     request.upload_ticket += '7'
     with self.call_should_fail('400'):
-      _response = self.call_api(
+      self.call_api(
           'store_inline', self.message_to_dict(request), 200)
 
   def test_store_inline_bad_digest(self):
@@ -273,7 +283,7 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
     request = self.store_request('anseres sacri')
     request.content = ':)' + request.content[2:]
     with self.call_should_fail('400'):
-      _response = self.call_api(
+      self.call_api(
           'store_inline', self.message_to_dict(request), 200)
 
   def test_finalized_data_in_gs(self):
@@ -284,13 +294,13 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
 
     # this should succeed
     self.mock(gcs, 'get_file_info', get_file_info_factory(content))
-    _response = self.call_api(
+    self.call_api(
         'finalize_gs_upload', self.message_to_dict(request), 200)
 
     # this should fail
     self.mock(gcs, 'get_file_info', get_file_info_factory())
     with self.call_should_fail('400'):
-      _response = self.call_api(
+      self.call_api(
           'finalize_gs_upload', self.message_to_dict(request), 200)
     self.assertEqual(1, self.execute_tasks())
 
@@ -303,7 +313,7 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
 
     # finalize_gs_upload should put a new ContentEntry into the database
     self.mock(gcs, 'get_file_info', get_file_info_factory(content))
-    _response = self.call_api(
+    self.call_api(
         'finalize_gs_upload', self.message_to_dict(request), 200)
     stored = key.get()
     self.assertEqual(key, stored.key)
@@ -314,10 +324,139 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
 
     # ensure that verification occurs
     self.mock(gcs, 'read_file', lambda _bucket, _key: content)
+
+    # add a side effect in execute_tasks()
+    # TODO(cmassaro): there must be a better way than this
+    def set_verified():
+      stored_entry = stored.key.get()
+      if not stored_entry.is_verified:
+        stored_entry.is_verified = True
+    self.mock_side_effect(self._taskqueue_stub, 'DeleteTask', set_verified)
+
+    # assert that verification occurs in the taskqueue
     self.assertFalse(stored.key.get().is_verified)
     self.assertEqual(1, self.execute_tasks())
     self.assertTrue(stored.key.get().is_verified)
 
+  def test_retrieve_content_memcache_ok(self):
+    """Assert that content retrieval goes off swimmingly in the normal case.
+
+    TODO(cmassaro): test for non-memcache case
+    """
+    content = 'Grecian Urn'
+    request = self.store_request(content)
+    embedded = validate(request.upload_ticket, UPLOAD_MESSAGES[0])
+    self.call_api(
+        'store_inline', self.message_to_dict(request), 200)
+    retrieve_request = endpoint_handlers_api.RetrieveRequest(
+        digest=embedded['d'], namespace=endpoint_handlers_api.Namespace())
+    response = self.call_api(
+        'retrieve_content', self.message_to_dict(retrieve_request), 200)
+    retrieved = response.json
+    self.assertEqual(content, retrieved.get(u'content', ''))
+
+  def test_retrieve_content_db_ok(self):
+    """Assert that content retrieval works for non-memcached DB entities."""
+    content = 'Isabella, or the Pot of Basil'
+    request = self.store_request(content)
+    embedded = validate(request.upload_ticket, UPLOAD_MESSAGES[0])
+    self.call_api(
+        'store_inline', self.message_to_dict(request), 200)
+    retrieve_request = endpoint_handlers_api.RetrieveRequest(
+        digest=embedded['d'], namespace=endpoint_handlers_api.Namespace())
+    memcache.flush_all()
+    response = self.call_api(
+        'retrieve_content', self.message_to_dict(retrieve_request), 200)
+    retrieved = response.json
+    self.assertEqual(content, retrieved.get(u'content', ''))
+
+  def test_retrieve_gs_url_ok(self):
+    """Assert that URL retrieval works for GS entities."""
+
+    # get URL via preupload
+    content = pad_string('Lycidas')
+    collection = generate_collection([content])
+    preupload_status = self.call_api(
+        'preupload', self.message_to_dict(collection), 200)
+    message = preupload_status.json.get(u'items', [{}])[0]
+
+    # finalize GS upload
+    request = preupload_status_to_request(message, content)
+    embedded = validate(request.upload_ticket, UPLOAD_MESSAGES[1])
+    self.mock(gcs, 'get_file_info', get_file_info_factory(content))
+    self.call_api(
+        'finalize_gs_upload', self.message_to_dict(request), 200)
+
+    # retrieve the upload URL
+    retrieve_request = endpoint_handlers_api.RetrieveRequest(
+        digest=embedded['d'], namespace=endpoint_handlers_api.Namespace())
+    retrieved_response = self.call_api(
+        'retrieve_content', self.message_to_dict(retrieve_request), 200)
+    retrieved = retrieved_response.json
+    self.assertNotEqual(message.get(u'gs_upload_url', ''), '')
+    self.assertNotEqual(retrieved.get(u'url', ''), '')
+    self.assertEqual(
+        message[u'gs_upload_url'], retrieved[u'url'])
+
+    # clear the taskqueue
+    self.assertEqual(1, self.execute_tasks())
+
+  def test_retrieve_partial_ok(self):
+    """Assert that content retrieval works when a range is specified."""
+    content = 'Song of the Andoumboulou'
+    offset = 5
+    request = self.store_request(content)
+    embedded = validate(request.upload_ticket, UPLOAD_MESSAGES[0])
+    self.call_api(
+        'store_inline', self.message_to_dict(request), 200)
+    retrieve_request = endpoint_handlers_api.RetrieveRequest(
+        digest=embedded['d'],
+        namespace=endpoint_handlers_api.Namespace(),
+        offset=offset)  # TODO(cmassaro): determine where offsets come from
+    response = self.call_api(
+        'retrieve_content', self.message_to_dict(retrieve_request), 200)
+    retrieved = response.json
+    self.assertEqual(content[offset:], retrieved.get(u'content', ''))
+
+  def test_retrieve_partial_bad_offset_fails(self):
+    """Assert that retrieval fails with status 416 when offset is invalid."""
+    content = 'Of Man\'s first Disobedience, and the Fruit'
+    request = self.store_request(content)
+    embedded = validate(request.upload_ticket, UPLOAD_MESSAGES[0])
+    self.call_api(
+        'store_inline', self.message_to_dict(request), 200)
+    requests = [endpoint_handlers_api.RetrieveRequest(
+        digest=embedded['d'],
+        namespace=endpoint_handlers_api.Namespace(),
+        offset=offset) for offset in [-1, len(content) + 1]]
+    for request in requests:
+      # TODO(cmassaro): There's no way to send 416 in Endpoints. What code
+      #   should we use?
+      with self.call_should_fail('416'):
+        self.call_api('retrieve_content', self.message_to_dict(request), 200)
+
+  def test_retrieve_content_not_found(self):
+    """Assert that HTTP 404 response is served when content is absent."""
+
+    # get a valid digest
+    content = """\xe1\xbc\x84\xce\xbd\xce\xb4\xcf\x81\xce\xb1
+        \xce\xbc\xce\xbf\xce\xb9
+        \xe1\xbc\x94\xce\xbd\xce\xbd\xce\xb5\xcf\x80\xce\xb5"""
+    collection = generate_collection([content])
+    preupload_status = self.call_api(
+        'preupload', self.message_to_dict(collection), 200)
+    message = preupload_status.json.get(u'items', [{}])[0]
+
+    # get the digest
+    request = preupload_status_to_request(message, content)
+    embedded = validate(request.upload_ticket, UPLOAD_MESSAGES[0])
+
+    # don't upload data; try to retrieve
+    retrieve_request = endpoint_handlers_api.RetrieveRequest(
+        digest=embedded['d'], namespace=endpoint_handlers_api.Namespace())
+    with self.call_should_fail('404'):
+      self.call_api(
+          'retrieve_content', self.message_to_dict(retrieve_request), 200)
 
 if __name__ == '__main__':
   if '-v' in sys.argv:
