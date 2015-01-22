@@ -31,6 +31,10 @@ handlers:
   upload: static/(.+)\.(css|ico|txt)
   secure: always
 
+- url: /elements
+  static_dir: elements
+  secure: always
+
 - url: /(user|restricted)(|/.*)
   script: main.app
   secure: always

@@ -172,7 +172,14 @@ function sendQuery(url, redrawCharts) {
 // TODO(maruel): Better refactor this so this code is also shared with isolate
 // server front end.
 
-function get_key_formatter() {
+function get_key_formatter(resolution) {
+  if (resolution) {
+    if (resolution == 'days') {
+      return new google.visualization.DateFormat({pattern: 'yyyy/MM/dd'});
+    } else {
+      return new google.visualization.DateFormat({pattern: 'MM/dd HH:mm'});
+    }
+  }
   if (current_resolution == 'days') {
     return new google.visualization.DateFormat({pattern: 'yyyy/MM/dd'});
   } else {

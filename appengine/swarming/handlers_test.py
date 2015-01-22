@@ -110,6 +110,7 @@ class FrontendTest(AppTestBase):
       '/ereporter2/api/v1/on_error',
       '/server_ping',
       '/stats',
+      '/stats_app',
       '/stats/dimensions/<dimensions:.+>',
       '/stats/user/<user:.+>',
       '/swarming/api/v1/client/list',
@@ -160,6 +161,7 @@ class FrontendTest(AppTestBase):
     quoted = urllib.quote('{"os":"amiga"}')
     urls = (
       '/stats',
+      '/stats_app',
       '/stats/dimensions/' + quoted,
       '/stats/user/joe',
       '/swarming/api/v1/stats/summary/days',

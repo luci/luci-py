@@ -1,0 +1,61 @@
+<!--
+# Copyright 2015 The Swarming Authors. All rights reserved.
+# Use of this source code is governed by the Apache v2.0 license that can be
+# found in the LICENSE file.
+
+-->
+
+<!--
+@group Swarming Elements
+
+`stats-time-chart' encapsulates a 'google-chart' element and data formating
+logic specific for Time chart of the Swarming statistics app.
+This element exposes a 'dataTable' attribute `google.visualization.DataTable`,
+and a `resolution` attribute that is 'minutes', 'hours', or 'days'.
+
+Example:
+  <stats-time-chart dataTable="{{data_table}}"></stats-time-chart>
+
+@element stats-time-chart
+-->
+
+<link rel="import" href="/third_party/bower_components/polymer/polymer.html">
+<link rel="import" href="stats-chart-base.html">
+
+<polymer-element name="stats-time-chart" extends="stats-chart-base" attributes="dataTable resolution isDimension">
+  <script>
+  Polymer('stats-time-chart', {
+    isDimension: false,
+    titleText: 'Times (s)',
+
+    populate: function() {
+      this.resetFormattedData();
+
+      // These indexes are relative to stats_gviz._Summary.ORDER.
+      this.getKeyFormatter().format(this.dataTable, 0);
+
+      var round3 = new google.visualization.NumberFormat(
+          {decimalSymbol:'.', fractionDigits:3});
+      // These indexes are relative to stats_gviz._GVIZ_COLUMNS_ORDER.
+      if (this.isDimension) {
+        round3.format(this.dataTable, 6);
+        round3.format(this.dataTable, 7);
+        round3.format(this.dataTable, 8);
+      } else {
+        round3.format(this.dataTable, 8);
+        round3.format(this.dataTable, 9);
+        round3.format(this.dataTable, 10);
+      }
+
+      var view = new google.visualization.DataView(this.dataTable);
+      if (this.dimension) {
+        view.setColumns([0, 6, 7, 8]);
+      } else {
+        view.setColumns([0, 8, 9, 10]);
+      }
+
+      this.attachView(view);
+    }
+  });
+  </script>
+</polymer-element>

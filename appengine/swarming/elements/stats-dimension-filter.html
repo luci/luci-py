@@ -1,0 +1,268 @@
+<!--
+# Copyright 2015 The Swarming Authors. All rights reserved.
+# Use of this source code is governed by the Apache v2.0 license that can be
+# found in the LICENSE file.
+
+-->
+
+<!--
+@group Swarming Elements
+
+`stats-dimension-filter' is a control that filters dimension list. It takes a
+list of available dimension objects as its `dimensions` attribute.
+dimensions = [
+  {"cpu":"x86-64","gpu":"none","os":"Mac","pool":"Chrome"},
+  {"cpu":"x86-64","gpu":"none","os":"Windows","pool":"Chrome"},
+  {"os":"Linux"},
+  {"os":"Mac"},
+  {"os":"Windows"}
+]
+A dimension object may have a number of properties such as `cpu` and `gpu`. For
+each unique property this control will create a dropdown menu for user to filter
+by that property.
+
+When more than one dimensions are available after applying a filter, one is
+picked to shown while other field menus are shrinked.
+
+This control exposes a `value` attribute denotes the current dimension selected.
+A null `value` indicates no dimension is selected.
+
+Example:
+  <stats-dimension-filter
+      dimensions='[{"cpu":"x86-64", "os":"Mac"}, {"os":"Linux"}]'>
+  </stats-dimension-filter>
+
+@element stats-dimension-filter
+-->
+
+<link rel="import" href="/third_party/bower_components/polymer/polymer.html">
+<link rel="import" href="/third_party/bower_components/core-label/core-label.html">
+<link rel="import" href="/third_party/bower_components/core-menu/core-menu.html">
+<link rel="import" href="/third_party/bower_components/paper-button/paper-button.html">
+<link rel="import" href="/third_party/bower_components/core-dropdown/core-dropdown.html">
+<link rel="import" href="/third_party/bower_components/core-dropdown-menu/core-dropdown-menu.html">
+<link rel="import" href="/third_party/bower_components/core-item/core-item.html">
+<link rel="import" href="/third_party/bower_components/core-selector/core-selector.html">
+
+<polymer-element name="stats-dimension-filter" attributes="dimensions value" layout vertical>
+  <template>
+    <style>
+    core-dropdown {
+      background-color: #fff;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      box-shadow: 0 6px 12px rgba(0,0,0,.175);
+      margin: 2px 0 0;
+      min-width: 160px;
+      padding: 5px 0;
+      top: 100%;
+    }
+
+    core-dropdown-menu {
+      background-color: #fff;
+      border: 1px solid transparent;
+      border-color: #ccc;
+      border-radius: 4px;
+      color: #333;
+      cursor: pointer;
+      padding: 6px 12px;
+    }
+
+    core-dropdown-menu:hover {
+      background-color: #eee;
+    }
+
+    core-item {
+      color: #333;
+      padding: 3px 20px;
+      white-space: nowrap;
+    }
+
+    h4 {
+      margin: 5px 0px;
+    }
+
+    paper-button {
+      text-transform: none;
+      font-size: 14px;
+    }
+
+    .dimension-selector a {
+      color: blue;
+      cursor: pointer;
+    }
+
+    .dimension-selector li {
+      list-style-type: none;
+    }
+    </style>
+    <div layout horizontal center>
+      <h4>Filters:</h4>
+      <template repeat="{{f in filters | filtersArray(filters, count)}}">
+        <paper-button class="custom" on-tap="{{onFilterUnchecked}}" prop="{{f.prop}}">
+          <core-icon icon="clear"></core-icon>
+          {{f.prop}}: {{f.value}}
+        </paper-button>
+      </template>
+    </div>
+    <div>
+      <template repeat="{{prop in props | propPickerFilter(filters, count)}}">
+        <core-dropdown-menu label="{{prop}}" on-core-select="{{propSelected}}">
+          <core-dropdown class="dropdown">
+            <core-selector class="menu">
+              <template repeat="{{v in values[prop] | propValueFilter(dimensions, filters, prop, count)}}">
+                <core-item name="{{v}}">{{v}}</core-item>
+              </template>
+            </core-selector>
+          </core-dropdown>
+        </core-dropdown-menu>
+      </template>
+    </div>
+    <h4>Resolved Dimension:</h4>
+    <div>
+      <template if="{{value}}">
+        <paper-button class="custom" on-tap="{{onClearDimension}}">
+          <core-icon icon="clear"></core-icon>
+          {{stringify(value)}}
+        </paper-button>
+      </template>
+      <template if="{{!value}}">
+        No dimension selected
+      </template>
+    <h4>Dimensions:</h4>
+    <ul class="dimension-selector">
+      <template repeat="{{d in dimensions | dimensionFilter(filters, count)}}">
+        <li><a on-tap="{{selectDimension}}">{{stringify(d)}}</a></li>
+      </template>
+    </ul>
+  </template>
+  <script>
+  Polymer('stats-dimension-filter', {
+    count: 0,
+    dimensions: [],
+    filters: {},
+    props: [],
+    value: null,
+    values: {},
+
+    stringify: function(d) {
+      return JSON.stringify(d);
+    },
+
+    // Update this.props and this.values
+    dimensionsChanged: function() {
+      var ds = this.dimensions;
+      var attrs = {}, values = {};
+      var props = [];
+      for (var i = 0; i < ds.length; ++i) {
+        var d = ds[i];
+        if (typeof d === "object") {
+          for (var attr in d) {
+            if (!attrs[attr]) {
+              attrs[attr] = {};
+            }
+            attrs[attr][d[attr]] = true;
+          }
+        } else {
+          console.error('dimension should be an object');
+        }
+      }
+      for (var attr in attrs) {
+        props.push(attr);
+        if (!values[attr]) {
+          values[attr] = [];
+        }
+        for (var i in attrs[attr]) {
+          values[attr].push(i);
+        }
+      }
+      this.props = props;
+      this.values = values;
+    },
+
+    dimensionFilter: function(dimensions, filters, count) {
+      var hasFilter = false;
+      var arr = dimensions.filter(function(d) {
+        for (var prop in filters) {
+          hasFilter = true;
+          if (d[prop] !== filters[prop]) {
+            return false;
+          }
+        }
+        return true;
+      });
+      if (hasFilter) {
+        this.value = JSON.stringify(arr[0]);
+      }
+      return arr;
+    },
+
+    propPickerFilter: function(props, filters, count) {
+      return props.filter(function(prop) {
+        for (var p in filters) {
+          if (prop === p) {
+            return false;
+          }
+        }
+        return true;
+      });
+    },
+
+    filtersArray: function(filters, count) {
+      var arr = [];
+      for (var prop in filters) {
+        arr.push({
+          prop: prop,
+          value: filters[prop]
+        });
+      }
+      return arr;
+    },
+
+    // HACK: this is to trigger the dimensionFilter due to a bug in Polymer
+    // https://github.com/Polymer/polymer/issues/1082
+    filtersChanged: function() {
+      this.count++;
+    },
+
+    propSelected: function(event, detail, sender) {
+      var prop = sender.label;
+      var v = sender.selectedItemLabel;
+      if (v) {
+        this.filters[prop] = v;
+      }
+      // TODO: use observer pattern
+      this.filtersChanged();
+    },
+
+    propValueFilter: function(values, dimensions, filters, prop) {
+      var ds = this.dimensionFilter(dimensions, filters);
+      var selection = {};
+      for (var i = 0; i < ds.length; ++i) {
+        if (ds[i].hasOwnProperty(prop)) {
+          selection[ds[i][prop]] = true;
+        }
+      }
+      var ret = [];
+      for (var i in selection) {
+        ret.push(i);
+      }
+      return ret;
+    },
+
+    onFilterUnchecked: function(event, detail, sender) {
+      delete this.filters[sender.getAttribute('prop')];
+      // TODO: use observer pattern
+      this.filtersChanged();
+    },
+
+    selectDimension: function(event, detail, sender) {
+      this.value = sender.innerHTML;
+    },
+
+    onClearDimension: function(event, detail, sender) {
+      this.value = null;
+    }
+  });
+  </script>
+</polymer-element>

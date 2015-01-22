@@ -1,0 +1,124 @@
+<!--
+# Copyright 2015 The Swarming Authors. All rights reserved.
+# Use of this source code is governed by the Apache v2.0 license that can be
+# found in the LICENSE file.
+
+-->
+
+<!--
+@group Swarming Elements
+
+`stats-chart-base' encapsulates a 'google-chart' element and data formating
+utility functions.
+
+@element stats-chart-base
+-->
+
+
+<link rel="import" href="/third_party/bower_components/polymer/polymer.html">
+<link rel="import" href="/third_party/bower_components/google-apis/google-jsapi.html">
+<link rel="import" href="/third_party/bower_components/google-chart/google-chart.html">
+
+<polymer-element name="stats-chart-base">
+  <template>
+    <style>
+      google-chart {
+        width: 100%;
+        height: 250px;
+      }
+    </style>
+    <google-chart
+      id="chart"
+      type="line"
+      options='{"title": "", "animation": {"duration": 500, "easing": "out"}, "legend": {"position": "bottom"} }'>
+    </google-chart>
+    <google-jsapi on-api-load="{{readyForAction}}"></google-jsapi>
+  </template>
+  <script>
+
+  (function() {
+    function formatToIsoUnit(val) {
+      for (var n = 0; val >= 1000; n++) {
+        val /= 1000;
+      }
+      // Enforce 2 decimals.
+      if (n > 0) {
+        val = val.toFixed(2);
+      }
+      return val + ISO_SUFFIXES[n];
+    }
+
+    var p = {
+      dataTable: null,
+      isReady: false,
+      resolution: 'hours',
+      titleText: '',
+
+      observe: {
+        'dataTable': 'loadData'
+      },
+
+      ready: function() {
+        // FIXME: I tried option='{"title": "{{titleText}}"" }''
+        this.$.chart.options.title = this.titleText;
+      },
+
+      attachView: function(view) {
+        this.$.chart.setAttribute('data', view.toDataTable().toJSON());
+      },
+
+      getKeyFormatter: function() {
+        if (this.resolution == 'days') {
+          return new google.visualization.DateFormat({pattern: 'yyyy/MM/dd'});
+        } else {
+          return new google.visualization.DateFormat({pattern: 'MM/dd HH:mm'});
+        }
+      },
+
+      formatDataColumnToIsoUnit: function(column) {
+        for (var i = 0; i < this.dataTable.getNumberOfRows(); i++) {
+          this.dataTable.setFormattedValue(
+              i, column, formatToIsoUnit(this.dataTable.getValue(i, column)));
+        }
+      },
+
+      populate: function() {
+        // override by subclass
+      },
+
+      readyForAction: function(e, detail, sender) {
+        google.load("visualization", "1", {
+          packages: ['corechart'],
+          callback: function() {
+            this.isReady = true;
+            this.loadData();
+          }.bind(this)
+        });
+      },
+
+      // Makes sure ALL custom formatting is removed.
+      resetFormattedData: function() {
+        for (var i = 0; i < this.dataTable.getNumberOfColumns(); i++) {
+          this.resetFormattedDataColumn(i);
+        }
+      },
+
+      // Makes sure custom formatting is removed for a specific column.
+      resetFormattedDataColumn: function(column) {
+        for (var i = 0; i < this.dataTable.getNumberOfRows(); i++) {
+          this.dataTable.setFormattedValue(i, column, null);
+        }
+      },
+
+      loadData: function() {
+        if (this.isReady && this.dataTable) {
+          this.populate();
+        }
+      }
+    };
+
+    Polymer('stats-chart-base', p);
+  })();
+
+  </script>
+</polymer-element>

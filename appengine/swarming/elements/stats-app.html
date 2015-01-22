@@ -1,0 +1,182 @@
+<!--
+# Copyright 2015 The Swarming Authors. All rights reserved.
+# Use of this source code is governed by the Apache v2.0 license that can be
+# found in the LICENSE file.
+
+-->
+
+<!--
+@group Swarming Elements
+
+`stats-app' encapsulates the statistic front end.
+
+@element stats-app
+-->
+
+<link rel="import" href="/third_party/bower_components/polymer/polymer.html">
+<link rel="import" href="/third_party/bower_components/core-ajax/core-ajax.html">
+<link rel="import" href="/third_party/bower_components/core-label/core-label.html">
+<link rel="import" href="/third_party/bower_components/paper-checkbox/paper-checkbox.html">
+<link rel="import" href="/third_party/bower_components/paper-dialog/paper-dialog.html">
+<link rel="import" href="/third_party/bower_components/paper-radio-button/paper-radio-button.html">
+<link rel="import" href="/third_party/bower_components/paper-radio-group/paper-radio-group.html">
+<link rel="import" href="/third_party/bower_components/paper-spinner/paper-spinner.html">
+
+<link rel="import" href="stats-dimension-filter.html">
+<link rel="import" href="stats-request-chart.html">
+<link rel="import" href="stats-work-chart.html">
+<link rel="import" href="stats-time-chart.html">
+
+<polymer-element name="stats-app" attributes="dimensions">
+  <template>
+    <style>
+      #loading {
+        position: fixed;
+        top: 0px;
+        right: 0px;
+      }
+      #radioGroup > paper-radio-button {
+        padding: 0px 0px 0px 12px;
+      }
+      #filterPanel {
+        width: 480px;
+      }
+      core-label {
+        margin-left: 12px;
+        display: inline;
+      }
+    </style>
+
+    <core-ajax id="get_stats_summary"
+      headers='{"x-datasource-auth": "a"}'
+      url="/swarming/api/v1/stats/summary/{{resolution}}"
+      params='{"duration": "{{duration}}"}'
+      handleAs="json"
+      on-core-response="{{onGetStatsSummarySuccess}}"
+      loading="{{ajaxLoading}}">
+    </core-ajax>
+
+    <core-ajax id="get_stats_dimension"
+      headers='{"x-datasource-auth": "a"}'
+      url="/swarming/api/v1/stats/dimensions/{{dimension}}/{{resolution}}"
+      params='{"duration": "{{duration}}"}'
+      handleAs="json"
+      on-core-response="{{onGetStatsSummarySuccess}}"
+      loading="{{ajaxLoading}}">
+    </core-ajax>
+
+    <div layout horizontal>
+      <div layout vertical id="filterPanel">
+        <div layout horizontal center>
+          <paper-radio-group id="radioGroup" selected="{{resolution}}">
+            <paper-radio-button name="days" label="Days"></paper-radio-button>
+            <paper-radio-button name="hours" label="Hours"></paper-radio-button>
+            <paper-radio-button name="minutes" label="Minutes"></paper-radio-button>
+          </paper-radio-group>
+        </div>
+
+        <stats-dimension-filter dimensions="{{dimensions}}" value="{{dimension}}">
+        </stats-dimension-filter>
+      </div>
+      <div layout vertical flex>
+        <stats-request-chart
+          hidden?="{{dimension}}"
+          dataTable="{{dataTable}}"
+          resolution="{{resolution}}">
+        </stats-request-chart>
+
+        <stats-work-chart
+          isDimension="{{dimension ? true : false}}"
+          dataTable="{{dataTable}}"
+          resolution="{{resolution}}">
+        </stats-work-chart>
+
+        <stats-time-chart
+          isDimension="{{dimension ? true : false}}"
+          dataTable="{{dataTable}}"
+          resolution="{{resolution}}">
+        </stats-time-chart>
+      </div>
+    </div>
+
+    <paper-spinner id="loading"></paper-spinner>
+  </template>
+
+  <script>
+  Polymer('stats-app', {
+    observe: {
+      'dimension': 'paramsChanged',
+      'duration': 'paramsChanged',
+      'resolution': 'paramsChanged'
+    },
+
+    ready: function() {
+      var self = this;
+      window.onpopstate = function(event) {
+        self.restoringState = true;
+        self.dimension = event.state.dimension;
+        self.duration = event.state.duration;
+        self.resolution = event.state.resolution;
+      };
+      this.restoreState();
+    },
+
+    restoreState: function() {
+      try {
+        var stateObj = JSON.parse(
+            decodeURIComponent(window.location.search.substr(1)));
+        this.dimension = stateObj.dimension;
+        this.duration = stateObj.duration || 120;
+        this.resolution = stateObj.resolution || 'hours';
+        this.restoringState = true;
+        var stateObj = this.getState();
+        var url = '/stats_app?' + JSON.stringify(stateObj);
+        window.history.replaceState(stateObj, '', url);
+      } catch (e) {
+        this.restoringState = false;
+        this.resolution = 'hours';
+        this.duration = 120;
+      }
+    },
+
+    getState: function() {
+      return {
+        dimension: this.dimension,
+        duration: this.duration,
+        resolution: this.resolution,
+      };
+    },
+
+    pushState: function() {
+      var stateObj = this.getState();
+      var url = '/stats_app?' + JSON.stringify(stateObj);
+      window.history.pushState(stateObj, '', url);
+    },
+
+    paramsChanged: function(oldValue, newValue) {
+      if (this.dimension) {
+        this.$.get_stats_dimension.go();
+      } else {
+        this.$.get_stats_summary.go();
+      }
+      if (!this.restoringState) {
+        this.pushState();
+      } else {
+        this.restoringState = false;
+      }
+    },
+
+    onGetStatsSummarySuccess: function(event, detail, sender) {
+      this.dataTable = new google.visualization.DataTable(detail.response.table);
+    },
+
+    ajaxLoadingChanged: function(oldValue, newValue) {
+      if (newValue) {
+        this.$.loading.active = true;
+      } else {
+        this.$.loading.active = false;
+      }
+    }
+  });
+  </script>
+</polymer-element>

@@ -17,7 +17,7 @@ from components import utils
 from gviz import gviz_api
 from server import acl
 from server import stats
-
+from mapreduce.lib import simplejson
 
 ### Private Stuff.
 
@@ -60,6 +60,50 @@ class _Dimensions(object):
     'tasks_request_expired',  # 10th element.
   )
 
+
+class _StatsApp(object):
+  TEMPLATE = 'swarming/stats_app.html'
+
+  DESCRIPTION = {
+    'http_failures': ('number', 'HTTP Failures'),
+    'http_requests': ('number', 'Total HTTP requests'),
+
+    'bots_active': ('number', 'Bots active'),
+    'tasks_active': ('number', 'Tasks active'),
+
+    'tasks_enqueued': ('number', 'Tasks enqueued'),
+
+    'tasks_started': ('number', 'Tasks started'),
+    'tasks_avg_pending_secs': ('number', 'Average shard pending time (s)'),
+
+    'tasks_completed': ('number', 'Tasks completed'),
+    'tasks_total_runtime_secs': ('number', 'Tasks total runtime (s)'),
+    'tasks_avg_runtime_secs': ('number', 'Average shard runtime (s)'),
+
+    'tasks_bot_died': ('number', 'Tasks where the bot died'),
+    'tasks_request_expired': ('number', 'Tasks requests expired'),
+  }
+
+  # Warning: modifying the order here requires updating cls.TEMPLATE.
+  ORDER = (
+    'key',
+    'http_requests',
+    'http_failures',
+
+    'bots_active',
+    'tasks_active',
+
+    'tasks_enqueued',  # 5th element.
+    'tasks_started',
+    'tasks_completed',
+
+    'tasks_avg_pending_secs',
+    'tasks_total_runtime_secs',
+    'tasks_avg_runtime_secs',  # 10th element.
+
+    'tasks_bot_died',
+    'tasks_request_expired',
+  )
 
 class _Summary(object):
   TEMPLATE = 'swarming/stats.html'
@@ -255,6 +299,42 @@ class StatsSummaryHandler(StatsHandlerBase):
       'users': users,
     }
 
+
+class StatsAppHandler(StatsHandlerBase):
+  @auth.public
+  def get(self):
+    self.send_response(_StatsApp)
+
+  @staticmethod
+  def process_data(description, stats_data):
+    def sorted_unique_list_from_itr(i):
+      return natsort.natsorted(set(itertools.chain.from_iterable(i)))
+
+    dimensions = sorted_unique_list_from_itr(
+        (i.dimensions for i in line.values.buckets) for line in stats_data)
+
+    if acl.is_privileged_user():
+      bots = sorted_unique_list_from_itr(
+          line.values.bot_ids for line in stats_data)
+    else:
+      bots = []
+
+    if acl.is_privileged_user():
+      users = sorted_unique_list_from_itr(
+          (i.user for i in line.values.users) for line in stats_data)
+    else:
+      users = []
+
+    table = _stats_data_to_summary(stats_data)
+    # TODO(maruel): 'bots', 'dimensions' and 'users' should be updated when the
+    # user changes the resolution at which the data is displayed.
+    return {
+      'bots': bots,
+      'dimensions': simplejson.dumps(dimensions),
+      'initial_data': gviz_api.DataTable(description, table).ToJSon(
+          columns_order=_Summary.ORDER),
+      'users': users,
+    }
 
 class StatsDimensionsHandler(StatsHandlerBase):
   dimensions = None
