@@ -261,10 +261,13 @@ class IsolateService(remote.Service):
   def storage_helper(self, request, uploaded_to_gs):
     """Implement shared logic between store_inline and finalize_gs."""
     # validate token or error out
+    if not request.upload_ticket:
+      raise endpoints.BadRequestException(
+          'Upload ticket was empty or not provided.')
     try:
       embedded = TokenSigner.validate(
           request.upload_ticket, UPLOAD_MESSAGES[uploaded_to_gs])
-    except auth.InvalidTokenError as error:
+    except (auth.InvalidTokenError, ValueError) as error:
       raise endpoints.BadRequestException(
           'Ticket validation failed: %s' % error.message)
 
@@ -350,7 +353,12 @@ class IsolateService(remote.Service):
         's': str(digest.size),
     }
     message = UPLOAD_MESSAGES[uploaded_to_gs]
-    return TokenSigner.generate(message, embedded)
+    try:
+      result = TokenSigner.generate(message, embedded)
+    except  ValueError as error:
+      raise endpoints.BadRequestException(
+          'Ticket generation failed: %s' % error.message)
+    return result
 
   @classmethod
   def check_entries_exist(cls, entries):

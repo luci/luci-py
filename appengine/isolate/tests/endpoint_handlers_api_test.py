@@ -272,6 +272,14 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
       self.call_api(
           'store_inline', self.message_to_dict(request), 200)
 
+  def test_store_inline_no_upload_ticket(self):
+    """Assert that inline content storage fails when there is no ticket."""
+    request = self.store_request('silence')
+    request.upload_ticket = None
+    with self.call_should_fail('400'):
+      self.call_api(
+          'store_inline', self.message_to_dict(request), 200)
+
   def test_store_inline_bad_digest(self):
     """Assert that inline content storage fails when data do not match."""
     request = self.store_request('anseres sacri')
@@ -297,6 +305,14 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
       self.call_api(
           'finalize_gs_upload', self.message_to_dict(request), 200)
     self.assertEqual(1, self.execute_tasks())
+
+  def test_finalized_no_upload_ticket(self):
+    """Assert that GS finalization fails when there is no ticket."""
+    request = self.store_request(pad_string('silence'))
+    request.upload_ticket = None
+    with self.call_should_fail('400'):
+      self.call_api(
+          'finalize_gs_upload', self.message_to_dict(request), 200)
 
   def test_finalize_gs_creates_content_entry(self):
     """Assert that finalize_gs_upload creates a content entry."""
