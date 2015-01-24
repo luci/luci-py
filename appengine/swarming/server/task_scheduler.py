@@ -333,20 +333,43 @@ def make_request(data):
       result_summary.deduped_from = task_pack.pack_run_result_key(
           dupe_summary.run_result_key)
 
+  # Get parent task details if applicable.
+  parent_task_keys = None
+  if request.parent_task_id:
+    parent_run_key = task_pack.unpack_run_result_key(request.parent_task_id)
+    parent_task_keys = [
+      parent_run_key,
+      task_pack.run_result_key_to_result_summary_key(parent_run_key),
+    ]
+
   # Storing these entities makes this task live. It is important at this point
   # that the HTTP handler returns as fast as possible, otherwise the task will
   # be run but the client will not know about it.
   def run():
     ndb.put_multi([result_summary, task])
 
+  def run_parent():
+    # This one is slower.
+    items = ndb.get_multi(parent_task_keys)
+    k = result_summary.key_string
+    for item in items:
+      item.children_task_ids.append(k)
+    ndb.put_multi(items)
+
   # Raising will abort to the caller.
-  datastore_utils.transaction(run)
+  futures = [datastore_utils.transaction_async(run)]
+  if parent_task_keys:
+    futures.append(datastore_utils.transaction_async(run_parent))
 
   try:
     search_future.get_result()
   except search.Error:
     # Do not abort the task, for now search is best effort.
     logging.exception('Put failed')
+
+  for future in futures:
+    # Check for failures, it would raise in this case, aborting the call.
+    future.get_result()
 
   stats.add_task_entry(
       'task_enqueued', result_summary.key,

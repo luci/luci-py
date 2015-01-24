@@ -338,7 +338,7 @@ class TestBotMain(net_utils.TestCase):
   def _mock_popen(self, returncode, url='https://localhost:1'):
     # Method should have "self" as first argument - pylint: disable=E0213
     class Popen(object):
-      def __init__(self2, cmd, cwd, stdout, stderr):
+      def __init__(self2, cmd, cwd, stdout, stderr, env):
         self2.returncode = None
         expected = [
           sys.executable, THIS_FILE, 'task_runner',
@@ -350,6 +350,7 @@ class TestBotMain(net_utils.TestCase):
         self.assertEqual(bot_main.ROOT_DIR, cwd)
         self.assertEqual(subprocess.PIPE, stdout)
         self.assertEqual(subprocess.STDOUT, stderr)
+        self.assertEqual('24', env['SWARMING_TASK_ID'])
 
       def communicate(self2):
         self2.returncode = returncode
@@ -367,7 +368,7 @@ class TestBotMain(net_utils.TestCase):
 
     params = {
       'host': 'https://localhost:3',
-      'task_id': 24,
+      'task_id': '24',
     }
     bot_main.run_manifest(self.bot, params, time.time())
 
@@ -379,7 +380,7 @@ class TestBotMain(net_utils.TestCase):
     self.mock(bot_main, 'on_after_task', on_after_task)
     self._mock_popen(bot_main.TASK_FAILED)
 
-    bot_main.run_manifest(self.bot, {'task_id': 24}, time.time())
+    bot_main.run_manifest(self.bot, {'task_id': '24'}, time.time())
 
   def test_run_manifest_internal_failure(self):
     posted = []
@@ -390,8 +391,8 @@ class TestBotMain(net_utils.TestCase):
     self.mock(bot_main, 'on_after_task', on_after_task)
     self._mock_popen(1)
 
-    bot_main.run_manifest(self.bot, {'task_id': 24}, time.time())
-    expected = [(self.bot, 'Execution failed, internal error:\nfoo', 24)]
+    bot_main.run_manifest(self.bot, {'task_id': '24'}, time.time())
+    expected = [(self.bot, 'Execution failed, internal error:\nfoo', '24')]
     self.assertEqual(expected, posted)
 
   def test_run_manifest_exception(self):
@@ -405,8 +406,8 @@ class TestBotMain(net_utils.TestCase):
       raise OSError('Dang')
     self.mock(subprocess, 'Popen', raiseOSError)
 
-    bot_main.run_manifest(self.bot, {'task_id': 24}, time.time())
-    expected = [(self.bot, 'Internal exception occured: Dang', 24)]
+    bot_main.run_manifest(self.bot, {'task_id': '24'}, time.time())
+    expected = [(self.bot, 'Internal exception occured: Dang', '24')]
     self.assertEqual(expected, posted)
 
   def test_update_bot_linux(self):

@@ -75,16 +75,15 @@ _MIN_TIMEOUT_SECS = 1 if utils.is_local_dev_server() else 30
 _BEGINING_OF_THE_WORLD = datetime.datetime(2010, 1, 1, 0, 0, 0, 0)
 
 
-# Mask to TaskRequest key ids so they become decreasing numbers.
-_TASK_REQUEST_KEY_ID_MASK = int(2L**63-1)
-
-
 # Parameters for make_request().
 # The content of the 'data' parameter. This relates to the context of the
 # request, e.g. who wants to run a task.
-_DATA_KEYS = frozenset(
+_REQUIRED_DATA_KEYS = frozenset(
     ['name', 'priority', 'properties', 'scheduling_expiration_secs', 'tags',
      'user'])
+_EXPECTED_DATA_KEYS = frozenset(
+    ['name', 'parent_task_id', 'priority', 'properties',
+      'scheduling_expiration_secs', 'tags', 'user'])
 # The content of 'properties' inside the 'data' parameter. This relates to the
 # task itself, e.g. what to run.
 _REQUIRED_PROPERTIES_KEYS = frozenset(
@@ -134,29 +133,6 @@ def _validate_dict_of_strings(prop, value):
     raise TypeError('%s must be a dict of strings' % prop._name)
 
 
-def _validate_grace(prop, value):
-  """Validates grace_period_secs in TaskProperties."""
-  if not (0 <= value <= _ONE_DAY_SECS):
-    # pylint: disable=W0212
-    raise datastore_errors.BadValueError(
-        '%s (%ds) must be between %ds and one day' % (prop._name, value, 0))
-
-
-def _validate_timeout(prop, value):
-  """Validates timeouts in seconds in TaskProperties."""
-  if not (_MIN_TIMEOUT_SECS <= value <= _ONE_DAY_SECS):
-    # pylint: disable=W0212
-    raise datastore_errors.BadValueError(
-        '%s (%ds) must be between %ds and one day' %
-            (prop._name, value, _MIN_TIMEOUT_SECS))
-
-
-def _validate_priority(_prop, value):
-  """Validates TaskRequest.priority."""
-  validate_priority(value)
-  return value
-
-
 def _validate_expiration(prop, value):
   """Validates TaskRequest.expiration_ts."""
   now = utils.utcnow()
@@ -169,8 +145,39 @@ def _validate_expiration(prop, value):
         (prop._name, value, offset, _MIN_TIMEOUT_SECS, now))
 
 
+def _validate_grace(prop, value):
+  """Validates grace_period_secs in TaskProperties."""
+  if not (0 <= value <= _ONE_DAY_SECS):
+    # pylint: disable=W0212
+    raise datastore_errors.BadValueError(
+        '%s (%ds) must be between %ds and one day' % (prop._name, value, 0))
+
+
+def _validate_priority(_prop, value):
+  """Validates TaskRequest.priority."""
+  validate_priority(value)
+  return value
+
+
+def _validate_task_run_id(_prop, value):
+  """Validates a task_id looks valid without fetching the entity."""
+  if not value:
+    return None
+  task_pack.unpack_run_result_key(value)
+  return value
+
+
+def _validate_timeout(prop, value):
+  """Validates timeouts in seconds in TaskProperties."""
+  if not (_MIN_TIMEOUT_SECS <= value <= _ONE_DAY_SECS):
+    # pylint: disable=W0212
+    raise datastore_errors.BadValueError(
+        '%s (%ds) must be between %ds and one day' %
+            (prop._name, value, _MIN_TIMEOUT_SECS))
+
+
 def _validate_tags(prop, value):
-  """Validates and sort TaskRequest.tags."""
+  """Validates and sorts TaskRequest.tags."""
   if not ':' in value:
     # pylint: disable=W0212
     raise ValueError('%s must be key:value form, not %s' % (prop._name, value))
@@ -291,6 +298,10 @@ class TaskRequest(ndb.Model):
   # Tags that specify the category of the task.
   tags = ndb.StringProperty(repeated=True, validator=_validate_tags)
 
+  # Set when a task (the parent) reentrantly create swarming tasks. Must be set
+  # to a valid task_id pointing to a TaskRunResult or be None.
+  parent_task_id = ndb.StringProperty(validator=_validate_task_run_id)
+
   @property
   def scheduling_expiration_secs(self):
     """Reconstructs this value from expiration_ts and created_ts."""
@@ -336,8 +347,8 @@ def _new_request_key():
     way that affects the packing and unpacking of task ids, this value should be
     bumped.
 
-  The key id is this value XORed with _TASK_REQUEST_KEY_ID_MASK. The reason is
-  that increasing key id values are in decreasing timestamp order.
+  The key id is this value XORed with task_pack.TASK_REQUEST_KEY_ID_MASK. The
+  reason is that increasing key id values are in decreasing timestamp order.
   """
   utcnow = utils.utcnow()
   if utcnow < _BEGINING_OF_THE_WORLD:
@@ -348,7 +359,7 @@ def _new_request_key():
   # TODO(maruel): Use real randomness.
   suffix = random.getrandbits(16)
   task_id = int((now << 20) | (suffix << 4) | 0x1)
-  return ndb.Key(TaskRequest, task_id ^ _TASK_REQUEST_KEY_ID_MASK)
+  return ndb.Key(TaskRequest, task_id ^ task_pack.TASK_REQUEST_KEY_ID_MASK)
 
 
 def _put_request(request):
@@ -417,7 +428,7 @@ def make_request(data):
   Argument:
   - data: dict with:
     - name
-    - user
+    - parent_task_id*
     - properties
       - commands
       - data
@@ -430,18 +441,38 @@ def make_request(data):
     - priority
     - scheduling_expiration_secs
     - tags
+    - user
 
   * are optional.
+
+  If parent_task_id is set, properties for the parent are used:
+  - priority: defaults to parent.priority - 1
+  - user: overriden by parent.user
 
   Returns:
     The newly created TaskRequest.
   """
   # Save ourself headaches with typos and refuses unexpected values.
-  _assert_keys(_DATA_KEYS, _DATA_KEYS, data, 'request keys')
+  _assert_keys(_EXPECTED_DATA_KEYS, _REQUIRED_DATA_KEYS, data, 'request keys')
   data_properties = data['properties']
   _assert_keys(
       _EXPECTED_PROPERTIES_KEYS, _REQUIRED_PROPERTIES_KEYS, data_properties,
       'request properties keys')
+
+  parent_task_id = data.get('parent_task_id') or None
+  if parent_task_id:
+    data = data.copy()
+    run_result_key = task_pack.unpack_run_result_key(parent_task_id)
+    result_summary_key = task_pack.run_result_key_to_result_summary_key(
+        run_result_key)
+    request_key = task_pack.result_summary_key_to_request_key(
+        result_summary_key)
+    parent = request_key.get()
+    if not parent:
+      raise ValueError('parent_task_id is invalid')
+    data['priority'] = max(min(data['priority'], parent.priority - 1), 0)
+    # Drop the previous user.
+    data['user'] = parent.user
 
   # Class TaskProperties takes care of making everything deterministic.
   properties = TaskProperties(
@@ -457,15 +488,17 @@ def make_request(data):
   now = utils.utcnow()
   expiration_ts = now + datetime.timedelta(
       seconds=data['scheduling_expiration_secs'])
+
   request = TaskRequest(
-      created_ts=now,
       authenticated=auth.get_current_identity(),
-      name=data['name'],
-      user=data['user'] or '',
-      properties=properties,
-      priority=data['priority'],
+      created_ts=now,
       expiration_ts=expiration_ts,
-      tags=data['tags'])
+      name=data['name'],
+      parent_task_id=parent_task_id,
+      priority=data['priority'],
+      properties=properties,
+      tags=data['tags'],
+      user=data['user'] or '')
   _put_request(request)
   return request
 

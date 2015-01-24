@@ -538,12 +538,24 @@ class TaskHandler(auth.AuthenticatingHandler):
         self.abort(404, 'Invalid key format.')
 
     # 'result' can be either a TaskRunResult or TaskResultSummary.
-    result, request = ndb.get_multi([key, request_key])
+    result_future = key.get_async()
+    request_future = request_key.get_async()
+    result = result_future.get_result()
     if not result:
       self.abort(404, 'Invalid key.')
 
     if not acl.is_privileged_user():
       self.abort(403, 'Implement access control based on the user')
+
+    request = request_future.get_result()
+    parent_task_future = None
+    if request.parent_task_id:
+      parent_key = task_result.unpack_run_result_key(request.parent_task_id)
+      parent_task_future = parent_key.get_async()
+    children_tasks_futures = [
+      task_result.unpack_result_summary_key(c).get_async()
+      for c in result.children_task_ids
+    ]
 
     bot_id = result.bot_id
     following_task_future = None
@@ -566,34 +578,32 @@ class TaskHandler(auth.AuthenticatingHandler):
     bot_future = (
         bot_management.get_info_key(bot_id).get_async() if bot_id else None)
 
-    following_task_id = None
-    following_task_name = None
-    previous_task_id = None
-    previous_task_name = None
+    following_task = None
     if following_task_future:
       following_task = following_task_future.get_result()
-      if following_task:
-        following_task_id = task_pack.pack_run_result_key(following_task.key)
-        following_task_name = following_task.name
+
+    previous_task = None
     if previous_task_future:
       previous_task = previous_task_future.get_result()
-      if previous_task:
-        previous_task_id = task_pack.pack_run_result_key(previous_task.key)
-        previous_task_name = previous_task.name
+
+    parent_task = None
+    if parent_task_future:
+      parent_task = parent_task_future.get_result()
+    children_tasks = [c.get_result() for c in children_tasks_futures]
 
     params = {
       'bot': bot_future.get_result() if bot_future else None,
+      'children_tasks': children_tasks,
       'is_admin': acl.is_admin(),
       'is_gae_admin': users.is_current_user_admin(),
       'is_privileged_user': acl.is_privileged_user(),
-      'following_task_id': following_task_id,
-      'following_task_name': following_task_name,
+      'following_task': following_task,
       'full_appid': os.environ['APPLICATION_ID'],
       'host_url': self.request.host_url,
       'is_running': result.state == task_result.State.RUNNING,
       'now': utils.utcnow(),
-      'previous_task_id': previous_task_id,
-      'previous_task_name': previous_task_name,
+      'parent_task': parent_task,
+      'previous_task': previous_task,
       'request': request,
       'task': result,
       'xsrf_token': self.generate_xsrf_token(),

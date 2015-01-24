@@ -119,6 +119,14 @@ def _validate_not_pending(prop, value):
     raise datastore_errors.BadValueError('%s cannot be PENDING' % prop._name)
 
 
+def _validate_task_summary_id(_prop, value):
+  """Validates a task_id looks valid without fetching the entity."""
+  if not value:
+    return None
+  task_pack.unpack_result_summary_key(value)
+  return value
+
+
 def _calculate_failure(result_common):
   # When a command times out, there may not be any exit code, it is still a user
   # process failure mode, not an infrastructure failure mode.
@@ -268,6 +276,12 @@ class _TaskResultCommon(ndb.Model):
   completed_ts = ndb.DateTimeProperty()
   abandoned_ts = ndb.DateTimeProperty()
 
+  # Children tasks that were triggered by this task. This is set when the task
+  # reentrantly creates other Swarming tasks. Note that the task_id is to a
+  # TaskResultSummary.
+  children_task_ids = ndb.StringProperty(
+      validator=_validate_task_summary_id, repeated=True)
+
   @property
   def can_be_canceled(self):
     """Returns True if the task is in a state that can be canceled."""
@@ -411,6 +425,9 @@ class _TaskResultCommon(ndb.Model):
 
     if self.state == State.TIMED_OUT and not self.failure:
       raise datastore_errors.BadValueError('Timeout implies task failure')
+
+    self.children_task_ids = sorted(
+        set(self.children_task_ids), key=lambda x: int(x, 16))
 
 
 class TaskRunResult(_TaskResultCommon):

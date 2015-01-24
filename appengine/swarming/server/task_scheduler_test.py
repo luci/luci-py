@@ -170,7 +170,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
         lambda: task_scheduler._PROBABILITY_OF_QUICK_COMEBACK - 0.01)
     self.assertEqual(1.0, task_scheduler.exponential_backoff(235))
 
-  def _task_ran_successly(self):
+  def _task_ran_successfully(self):
     """Runs a task successfully and returns the task_id."""
     request, _result_summary = task_scheduler.make_request(
         _gen_request_data(
@@ -216,6 +216,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'abandoned_ts': None,
       'bot_id': u'localhost',
       'bot_version': u'abc',
+      'children_task_ids': [],
       'completed_ts': now or self.now,
       'costs_usd': [],
       'cost_saved_usd': 0.1,
@@ -244,7 +245,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
   def test_task_idempotent(self):
     self.mock(random, 'getrandbits', lambda _: 0x88)
     # First task is idempotent.
-    task_id = self._task_ran_successly()
+    task_id = self._task_ran_successfully()
 
     # Second task is deduped against first task.
     new_ts = self.mock_now(self.now, config.settings().reusable_task_age_secs-1)
@@ -253,7 +254,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
   def test_task_idempotent_old(self):
     self.mock(random, 'getrandbits', lambda _: 0x88)
     # First task is idempotent.
-    self._task_ran_successly()
+    self._task_ran_successfully()
 
     # Second task is scheduled, first task is too old to be reused.
     new_ts = self.mock_now(self.now, config.settings().reusable_task_age_secs)
@@ -269,7 +270,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
   def test_task_idempotent_three(self):
     self.mock(random, 'getrandbits', lambda _: 0x88)
     # First task is idempotent.
-    task_id = self._task_ran_successly()
+    task_id = self._task_ran_successfully()
 
     # Second task is deduped against first task.
     new_ts = self.mock_now(self.now, config.settings().reusable_task_age_secs-1)
@@ -296,11 +297,11 @@ class TaskSchedulerApiTest(test_case.TestCase):
     cfg.store()
 
     # First task is idempotent.
-    self._task_ran_successly()
+    self._task_ran_successfully()
 
     # Second task is scheduled, first task is too old to be reused.
     second_ts = self.mock_now(self.now, 10)
-    task_id = self._task_ran_successly()
+    task_id = self._task_ran_successfully()
 
     # Now any of the 2 tasks could be reused. Assert the right one (the most
     # recent) is reused.
@@ -312,6 +313,23 @@ class TaskSchedulerApiTest(test_case.TestCase):
     # correctly.
     third_ts = self.mock_now(self.now, 20)
     self._task_deduped(third_ts, task_id, '1d69ba3ea8008810', second_ts)
+
+  def test_task_parent_children(self):
+    # Parent task creates a child task.
+    parent_id = self._task_ran_successfully()
+    data = _gen_request_data(
+        parent_task_id=parent_id,
+        properties=dict(dimensions={u'OS': u'Windows-3.1.1'}))
+    request, result_summary = task_scheduler.make_request(data)
+    self.assertEqual([], result_summary.children_task_ids)
+    self.assertEqual(parent_id, request.parent_task_id)
+
+    parent_run_result_key = task_pack.unpack_run_result_key(parent_id)
+    parent_res_summary_key = task_pack.run_result_key_to_result_summary_key(
+        parent_run_result_key)
+    expected = [result_summary.key_string]
+    self.assertEqual(expected, parent_run_result_key.get().children_task_ids)
+    self.assertEqual(expected, parent_res_summary_key.get().children_task_ids)
 
   def test_get_results(self):
     # TODO(maruel): Split in more focused tests.
@@ -329,6 +347,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'abandoned_ts': None,
       'bot_id': None,
       'bot_version': None,
+      'children_task_ids': [],
       'completed_ts': None,
       'costs_usd': [],
       'cost_saved_usd': None,
@@ -363,6 +382,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'abandoned_ts': None,
       'bot_id': u'localhost',
       'bot_version': u'abc',
+      'children_task_ids': [],
       'completed_ts': None,
       'costs_usd': [0.],
       'cost_saved_usd': None,
@@ -388,6 +408,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
         'abandoned_ts': None,
         'bot_id': u'localhost',
         'bot_version': u'abc',
+        'children_task_ids': [],
         'completed_ts': None,
         'cost_usd': 0.,
         'durations': [],
@@ -421,6 +442,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'abandoned_ts': None,
       'bot_id': u'localhost',
       'bot_version': u'abc',
+      'children_task_ids': [],
       'completed_ts': done_ts,
       'costs_usd': [0.1],
       'cost_saved_usd': None,
@@ -446,6 +468,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
         'abandoned_ts': None,
         'bot_id': u'localhost',
         'bot_version': u'abc',
+        'children_task_ids': [],
         'completed_ts': done_ts,
         'cost_usd': 0.1,
         'durations': [0.1, 0.2],
@@ -484,6 +507,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'abandoned_ts': None,
       'bot_id': u'localhost',
       'bot_version': u'abc',
+      'children_task_ids': [],
       'completed_ts': self.now,
       'costs_usd': [0.1],
       'cost_saved_usd': None,
@@ -510,6 +534,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
         'abandoned_ts': None,
         'bot_id': u'localhost',
         'bot_version': u'abc',
+        'children_task_ids': [],
         'completed_ts': self.now,
         'cost_usd': 0.1,
         'durations': [0.1, 0.2],
@@ -600,6 +625,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'abandoned_ts': None,
       'bot_id': u'localhost',
       'bot_version': u'abc',
+      'children_task_ids': [],
       'completed_ts': self.now,
       'costs_usd': [0.1],
       'cost_saved_usd': None,
@@ -625,6 +651,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'abandoned_ts': None,
       'bot_id': u'localhost',
       'bot_version': u'abc',
+      'children_task_ids': [],
       'completed_ts': self.now,
       'cost_usd': 0.1,
       'durations': [0.1],
@@ -660,6 +687,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'abandoned_ts': self.now,
       'bot_id': u'localhost',
       'bot_version': u'abc',
+      'children_task_ids': [],
       'completed_ts': None,
       'costs_usd': [0.],
       'cost_saved_usd': None,
@@ -684,6 +712,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'abandoned_ts': self.now,
       'bot_id': u'localhost',
       'bot_version': u'abc',
+      'children_task_ids': [],
       'completed_ts': None,
       'cost_usd': 0.,
       'durations': [],
@@ -746,6 +775,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'abandoned_ts': abandoned_ts,
       'bot_id': None,
       'bot_version': None,
+      'children_task_ids': [],
       'completed_ts': None,
       'costs_usd': [],
       'cost_saved_usd': None,
@@ -796,6 +826,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'abandoned_ts': abandoned_ts,
       'bot_id': u'localhost',
       'bot_version': u'abc',
+      'children_task_ids': [],
       'completed_ts': None,
       'costs_usd': [0.],
       'cost_saved_usd': None,
@@ -841,6 +872,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'abandoned_ts': now_1,
       'bot_id': u'localhost',
       'bot_version': u'abc',
+      'children_task_ids': [],
       'completed_ts': None,
       'cost_usd': 0.,
       'durations': [],
@@ -859,6 +891,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'abandoned_ts': None,
       'bot_id': u'localhost',
       'bot_version': u'abc',
+      'children_task_ids': [],
       'completed_ts': None,
       'costs_usd': [0.],
       'cost_saved_usd': None,
@@ -895,6 +928,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'abandoned_ts': None,
       'bot_id': u'localhost',
       'bot_version': u'abc',
+      'children_task_ids': [],
       'completed_ts': now_2,
       'costs_usd': [0., 0.1],
       'cost_saved_usd': None,
@@ -945,6 +979,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'abandoned_ts': now_2,
       'bot_id': u'localhost',
       'bot_version': u'abc',
+      'children_task_ids': [],
       'completed_ts': None,
       'costs_usd': [0., 0.],
       'cost_saved_usd': None,

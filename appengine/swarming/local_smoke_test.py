@@ -131,6 +131,7 @@ def gen_expected(**kwargs):
   expected = {
     u'abandoned_ts': None,
     u'bot_id': unicode(socket.getfqdn().split('.', 1)[0]),
+    u'children_task_ids': [],
     u'cost_saved_usd': None,
     u'deduped_from': None,
     u'exit_codes': [0],

@@ -71,7 +71,7 @@ class TaskRequestPrivateTest(TestCase):
       now = int(round(delta.total_seconds() * 1000.))
       key = task_request._new_request_key()
       # Remove the XOR.
-      key_id = key.integer_id() ^ task_request._TASK_REQUEST_KEY_ID_MASK
+      key_id = key.integer_id() ^ task_pack.TASK_REQUEST_KEY_ID_MASK
       timestamp = key_id >> 20
       randomness = (key_id >> 4) & 0xFFFF
       version = key_id & 0xF
@@ -90,7 +90,7 @@ class TaskRequestPrivateTest(TestCase):
     self.mock_now(task_request._BEGINING_OF_THE_WORLD)
     key = task_request._new_request_key()
     # Remove the XOR.
-    key_id = key.integer_id() ^ task_request._TASK_REQUEST_KEY_ID_MASK
+    key_id = key.integer_id() ^ task_pack.TASK_REQUEST_KEY_ID_MASK
     #   00000000000 7766 1
     #     ^          ^   ^
     #     |          |   |
@@ -116,7 +116,7 @@ class TaskRequestPrivateTest(TestCase):
     self.mock_now(now)
     key = task_request._new_request_key()
     # Remove the XOR.
-    key_id = key.integer_id() ^ task_request._TASK_REQUEST_KEY_ID_MASK
+    key_id = key.integer_id() ^ task_pack.TASK_REQUEST_KEY_ID_MASK
     #   7ffffffffff 7766 1
     #     ^          ^   ^
     #     |          |   |
@@ -124,6 +124,16 @@ class TaskRequestPrivateTest(TestCase):
     #                |
     #               rand
     self.assertEqual('0x7ffffffffff77661', '0x%016x' % key_id)
+
+  def test_validate_task_run_id(self):
+    class P(object):
+      _name = 'foo'
+    self.assertEqual(
+        '1d69b9f088008811',
+        task_request._validate_task_run_id(P(), '1d69b9f088008811'))
+    self.assertEqual(None, task_request._validate_task_run_id(P(), ''))
+    with self.assertRaises(ValueError):
+      task_request._validate_task_run_id(P(), '1')
 
 
 class TaskRequestApiTest(TestCase):
@@ -175,6 +185,7 @@ class TaskRequestApiTest(TestCase):
     expected_request = {
       'authenticated': auth_testing.DEFAULT_MOCKED_IDENTITY,
       'name': u'Request name',
+      'parent_task_id': None,
       'priority': 50,
       'properties': expected_properties,
       'properties_hash': None,
@@ -195,6 +206,20 @@ class TaskRequestApiTest(TestCase):
         int(round((expiration - created).total_seconds())), deadline_to_run)
     self.assertEqual(expected_request, actual)
     self.assertEqual(31., request.scheduling_expiration_secs)
+
+  def test_make_request_parent(self):
+    parent = task_request.make_request(_gen_request_data())
+    # Hack: Would need to know about TaskResultSummary.
+    parent_id = task_pack.pack_request_key(parent.key) + '1'
+    child = task_request.make_request(
+        _gen_request_data(parent_task_id=parent_id))
+    self.assertEqual(parent_id, child.parent_task_id)
+
+  def test_make_request_invalid_parent_id(self):
+    # Must ends with '1' or '2', not '0'
+    data = _gen_request_data(parent_task_id='1d69b9f088008810')
+    with self.assertRaises(ValueError):
+      task_request.make_request(data)
 
   def test_make_request_idempotent(self):
     request = task_request.make_request(

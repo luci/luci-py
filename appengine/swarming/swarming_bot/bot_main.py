@@ -331,6 +331,11 @@ def run_manifest(botobj, manifest, start):
     if not os.path.isdir(work_dir):
       os.makedirs(work_dir)
 
+    env = os.environ.copy()
+    # Windows in particular does not tolerate unicode strings in environment
+    # variables.
+    env['SWARMING_TASK_ID'] = task_id.encode('ascii')
+
     path = os.path.join(work_dir, 'test_run.json')
     with open(path, 'wb') as f:
       f.write(json.dumps(manifest))
@@ -344,7 +349,8 @@ def run_manifest(botobj, manifest, start):
     ]
     logging.debug('Running command: %s', command)
     proc = subprocess.Popen(
-        command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, cwd=ROOT_DIR)
+        command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, cwd=ROOT_DIR,
+        env=env)
     out = proc.communicate()[0]
 
     failure = proc.returncode == TASK_FAILED

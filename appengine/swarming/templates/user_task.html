@@ -113,6 +113,16 @@
         <td>Tags</td>
         <td>{{request.tags|join('<br>'|safe)}}</td>
       </tr>
+      <tr title="Parent task that created this task.">
+        <td>Parent task</td>
+        <td>
+          {% if parent_task %}
+            <a href="/user/task/{{parent_task.key_string}}">{{parent_task.name}}</a>
+          {% else %}
+            &#8209;&#8209;
+          {% endif %}
+        </td>
+      </tr>
     </tbody>
   </table>
 </div>
@@ -160,9 +170,9 @@
       <tr title="The previous task executed by this bot before this task, if any.">
         <td>Previous task</td>
         <td>
-          {% if previous_task_id %}
-          <a href="/user/task/{{previous_task_id}}">
-            &#x2190; {{previous_task_name}}
+          {% if previous_task %}
+          <a href="/user/task/{{previous_task.key_string}}">
+            &#x2190; {{previous_task.name}}
           </a>
           {% else %}
           &#8209;&#8209;
@@ -172,9 +182,9 @@
       <tr title="The next task executed by this bot, if any.">
         <td>Following task</td>
         <td>
-          {% if following_task_id %}
-          <a href="/user/task/{{following_task_id}}">
-            {{following_task_name}} &#x2192;
+          {% if following_task %}
+          <a href="/user/task/{{following_task.key_string}}">
+            {{following_task.name}} &#x2192;
           </a>
           {% else %}
           &#8209;&#8209;
@@ -270,6 +280,19 @@
       <tr title="Process exit code for each commands executed on the bot.">
         <td>Exit codes</td>
         <td>{{task.exit_codes}}</td>
+      </tr>
+      <tr title="Children tasks that were created by this task.">
+        <td>Children tasks</td>
+        <td>
+          {% if children_tasks %}
+            {% for children in children_tasks %}
+              <a href="/user/task/{{children.key_string}}">{{children.name}}</a>
+              <br>
+            {% endfor %}
+          {% else %}
+            &#8209;&#8209;
+          {% endif %}
+        </td>
       </tr>
       <tr title="Cost of running this task, as reported by the bot, if
       applicable.">

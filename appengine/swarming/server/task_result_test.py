@@ -139,6 +139,7 @@ class TaskResultApiTest(TestCase):
       'abandoned_ts': None,
       'bot_id': None,
       'bot_version': None,
+      'children_task_ids': [],
       'completed_ts': None,
       'costs_usd': [],
       'cost_saved_usd': None,
@@ -164,6 +165,13 @@ class TaskResultApiTest(TestCase):
     actual.state = task_result.State.RUNNING
     self.assertEqual(False, actual.can_be_canceled)
 
+    actual.children_task_ids = [
+      '1d69ba3ea8008810', '3d69ba3ea8008810', '2d69ba3ea8008810',
+    ]
+    actual.put()
+    expected = [u'1d69ba3ea8008810', u'2d69ba3ea8008810', u'3d69ba3ea8008810']
+    self.assertEqual(expected, actual.key.get().children_task_ids)
+
   def test_new_run_result(self):
     request = task_request.make_request(_gen_request_data())
     actual = task_result.new_run_result(request, 1, 'localhost', 'abc')
@@ -171,6 +179,7 @@ class TaskResultApiTest(TestCase):
       'abandoned_ts': None,
       'bot_id': 'localhost',
       'bot_version': 'abc',
+      'children_task_ids': [],
       'completed_ts': None,
       'cost_usd': 0.,
       'durations': [],
@@ -200,6 +209,7 @@ class TaskResultApiTest(TestCase):
       'abandoned_ts': None,
       'bot_id': None,
       'bot_version': None,
+      'children_task_ids': [],
       'completed_ts': None,
       'costs_usd': [],
       'cost_saved_usd': None,
@@ -237,6 +247,7 @@ class TaskResultApiTest(TestCase):
       'abandoned_ts': None,
       'bot_id': u'localhost',
       'bot_version': u'abc',
+      'children_task_ids': [],
       'completed_ts': None,
       'costs_usd': [0.],
       'cost_saved_usd': None,
@@ -272,6 +283,7 @@ class TaskResultApiTest(TestCase):
       'abandoned_ts': None,
       'bot_id': u'localhost',
       'bot_version': u'abc',
+      'children_task_ids': [],
       'completed_ts': complete_ts,
       'costs_usd': [0.],
       'cost_saved_usd': None,
