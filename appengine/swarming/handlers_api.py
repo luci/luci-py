@@ -24,6 +24,7 @@ from server import acl
 from server import bot_code
 from server import bot_management
 from server import stats
+from server import task_pack
 from server import task_result
 from server import task_scheduler
 from server import task_to_run
@@ -136,12 +137,12 @@ class ClientTaskResultBase(auth.ApiHandler):
     key = None
     summary_key = None
     try:
-      key = task_result.unpack_result_summary_key(task_id)
+      key = task_pack.unpack_result_summary_key(task_id)
       summary_key = key
     except ValueError:
       try:
-        key = task_result.unpack_run_result_key(task_id)
-        summary_key = task_result.run_result_key_to_result_summary_key(key)
+        key = task_pack.unpack_run_result_key(task_id)
+        summary_key = task_pack.run_result_key_to_result_summary_key(key)
       except ValueError:
         self.abort_with_error(400, error='Invalid key')
     return key, summary_key
@@ -169,7 +170,7 @@ class ClientTaskResultRequestHandler(ClientTaskResultBase):
   @auth.require(acl.is_bot_or_user)
   def get(self, task_id):
     _, summary_key = self.get_result_key(task_id)
-    request_key = task_result.result_summary_key_to_request_key(summary_key)
+    request_key = task_pack.result_summary_key_to_request_key(summary_key)
     self.send_response(utils.to_json_encodable(request_key.get()))
 
 
@@ -354,7 +355,7 @@ class ClientRequestHandler(auth.ApiHandler):
 
     data = {
       'request': request.to_dict(),
-      'task_id': task_result.pack_result_summary_key(result_summary.key),
+      'task_id': task_pack.pack_result_summary_key(result_summary.key),
     }
     self.send_response(utils.to_json_encodable(data))
 
@@ -368,7 +369,7 @@ class ClientCancelHandler(auth.ApiHandler):
   def post(self):
     request = self.parse_body()
     task_id = request.get('task_id')
-    summary_key = task_result.unpack_result_summary_key(task_id)
+    summary_key = task_pack.unpack_result_summary_key(task_id)
 
     ok, was_running = task_scheduler.cancel_task(summary_key)
     out = {

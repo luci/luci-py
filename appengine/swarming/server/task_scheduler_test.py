@@ -32,6 +32,7 @@ from components import stats_framework
 from components import utils
 from server import config
 from server import stats
+from server import task_pack
 from server import task_request
 from server import task_result
 from server import task_scheduler
@@ -71,8 +72,7 @@ def get_results(request_key):
   Returns:
     tuple(TaskResultSummary, list of TaskRunResult that exist).
   """
-  result_summary_key = task_result.request_key_to_result_summary_key(
-      request_key)
+  result_summary_key = task_pack.request_key_to_result_summary_key(request_key)
   result_summary = result_summary_key.get()
   # There's two way to look at it, either use a DB query or fetch all the
   # entities that could exist, at most 255. In general, there will be <3

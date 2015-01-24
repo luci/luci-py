@@ -24,7 +24,7 @@ from server import acl
 from server import bot_code
 from server import bot_management
 from server import stats
-from server import task_result
+from server import task_pack
 from server import task_scheduler
 from server import task_to_run
 
@@ -364,7 +364,7 @@ class BotPollHandler(_BotBaseHandler):
         'host': utils.get_versioned_hosturl(),
         'hard_timeout': request.properties.execution_timeout_secs,
         'io_timeout': request.properties.io_timeout_secs,
-        'task_id': task_result.pack_run_result_key(run_result_key),
+        'task_id': task_pack.pack_run_result_key(run_result_key),
       },
     }
     self.send_response(out)
@@ -489,7 +489,7 @@ class BotTaskUpdateHandler(auth.ApiHandler):
     output = request.get('output')
     output_chunk_start = request.get('output_chunk_start')
 
-    run_result_key = task_result.unpack_run_result_key(task_id)
+    run_result_key = task_pack.unpack_run_result_key(task_id)
     if output is not None:
       try:
         output = base64.b64decode(output)
@@ -569,7 +569,7 @@ class BotTaskErrorHandler(auth.ApiHandler):
       self.abort_with_error(400, error=msg)
 
     msg = task_scheduler.bot_kill_task(
-        task_result.unpack_run_result_key(task_id), bot_id)
+        task_pack.unpack_run_result_key(task_id), bot_id)
     if msg:
       logging.error(msg)
       self.abort_with_error(400, error=msg)

@@ -31,6 +31,7 @@ from server import bot_code
 from server import bot_management
 from server import config
 from server import stats_gviz
+from server import task_pack
 from server import task_result
 from server import task_scheduler
 
@@ -526,13 +527,13 @@ class TaskHandler(auth.AuthenticatingHandler):
     key = None
     request_key = None
     try:
-      key = task_result.unpack_result_summary_key(key_id)
-      request_key = task_result.result_summary_key_to_request_key(key)
+      key = task_pack.unpack_result_summary_key(key_id)
+      request_key = task_pack.result_summary_key_to_request_key(key)
     except ValueError:
       try:
-        key = task_result.unpack_run_result_key(key_id)
-        request_key = task_result.result_summary_key_to_request_key(
-            task_result.run_result_key_to_result_summary_key(key))
+        key = task_pack.unpack_run_result_key(key_id)
+        request_key = task_pack.result_summary_key_to_request_key(
+            task_pack.run_result_key_to_result_summary_key(key))
       except (NotImplementedError, ValueError):
         self.abort(404, 'Invalid key format.')
 
@@ -572,12 +573,12 @@ class TaskHandler(auth.AuthenticatingHandler):
     if following_task_future:
       following_task = following_task_future.get_result()
       if following_task:
-        following_task_id = task_result.pack_run_result_key(following_task.key)
+        following_task_id = task_pack.pack_run_result_key(following_task.key)
         following_task_name = following_task.name
     if previous_task_future:
       previous_task = previous_task_future.get_result()
       if previous_task:
-        previous_task_id = task_result.pack_run_result_key(previous_task.key)
+        previous_task_id = task_pack.pack_run_result_key(previous_task.key)
         previous_task_name = previous_task.name
 
     params = {
@@ -611,7 +612,7 @@ class TaskCancelHandler(auth.AuthenticatingHandler):
   def post(self):
     key_id = self.request.get('task_id', '')
     try:
-      key = task_result.unpack_result_summary_key(key_id)
+      key = task_pack.unpack_result_summary_key(key_id)
     except ValueError:
       self.abort_with_error(400, error='Invalid key')
     redirect_to = self.request.get('redirect_to', '')

@@ -52,6 +52,7 @@ from google.appengine.ext import ndb
 from components import auth
 from components import datastore_utils
 from components import utils
+from server import task_pack
 
 
 # Maximum acceptable priority value, which is effectively the lowest priority.
@@ -92,21 +93,6 @@ _REQUIRED_PROPERTIES_KEYS = frozenset(
 _EXPECTED_PROPERTIES_KEYS = frozenset(
     ['commands', 'data', 'dimensions', 'env', 'execution_timeout_secs',
     'grace_period_secs', 'idempotent', 'io_timeout_secs'])
-
-
-# The production server must handle up to 1000 task requests per second. The
-# number of root entities must be a few orders of magnitude higher. The goal is
-# to almost completely get rid of transactions conflicts. This means that the
-# probability of two transactions happening on the same shard must be very low.
-# This relates to number of transactions per second * seconds per transaction /
-# number of shard.
-#
-# Intentionally starve the canary server by using only 16³=4096 root entities.
-# This will cause mild transaction conflicts during load tests. On the
-# production server, use 16**6 (~16 million) root entities to reduce the number
-# of transaction conflict.
-# TODO(maruel): Remove support 2015-02-01.
-_SHARDING_LEVEL = 3 if utils.is_canary() else 6
 
 
 ### Properties validators must come before the models.
@@ -396,50 +382,6 @@ def _assert_keys(expected_keys, minimum_keys, actual_keys, name):
 ### Public API.
 
 
-def request_id_to_key(task_id):
-  """Returns the ndb.Key for a TaskRequest id with the try number stripped.
-
-  There's two style of keys. Old ones ends with '0', new ones ends with '1'.
-
-  TODO(maruel): Remove support 2015-02-01.
-  """
-  assert isinstance(task_id, basestring)
-  if not task_id:
-    raise ValueError('Invalid null key')
-  c = task_id[-1]
-  if c == '1':
-    # New style key. The key id is the reverse of the value.
-    task_id_int = int(task_id, 16)
-    if task_id_int < 0:
-      raise ValueError('Invalid task id (overflowed)')
-    return ndb.Key(TaskRequest, task_id_int ^ _TASK_REQUEST_KEY_ID_MASK)
-  elif c == '0':
-    # TODO(maruel): Remove support 2015-02-01.
-    # Old style key.
-    task_id += '0'
-    task_id_int = int(task_id, 16)
-    # The sharding was done on the decimal representation of the number, not
-    # hex. Oops.
-    parent = datastore_utils.hashed_shard_key(
-        str(task_id_int), _SHARDING_LEVEL, 'TaskRequestShard')
-    return ndb.Key(TaskRequest, task_id_int, parent=parent)
-  else:
-    raise ValueError('Invalid key')
-
-
-def request_key_to_id(request_key):
-  """Returns a task_id as a string from a TaskRequest ndb.Key."""
-  key_id = request_key.integer_id()
-  # It's 0xE instead of 0x1 in the DB because of the XOR.
-  if (key_id & 0xF) == 0xE:
-    # New style key.
-    return '%x' % (key_id ^ _TASK_REQUEST_KEY_ID_MASK)
-  else:
-    # Old style key.
-    # TODO(maruel): Remove support 2015-02-01.
-    return ('%x' % key_id)[:-1]
-
-
 def validate_request_key(request_key):
   if request_key.kind() != 'TaskRequest':
     raise ValueError('Expected key to TaskRequest, got %s' % request_key.kind())
@@ -459,11 +401,12 @@ def validate_request_key(request_key):
     raise ValueError(
         'Expected key to TaskRequestShard, got %s' % request_shard_key.kind())
   root_entity_shard_id = request_shard_key.string_id()
-  if not root_entity_shard_id or len(root_entity_shard_id) != _SHARDING_LEVEL:
+  if (not root_entity_shard_id or
+      len(root_entity_shard_id) != task_pack.DEPRECATED_SHARDING_LEVEL):
     raise ValueError(
         'Expected root entity key (used for sharding) to be of length %d but '
         'length was only %d (key value %r)' % (
-            _SHARDING_LEVEL,
+            task_pack.DEPRECATED_SHARDING_LEVEL,
             len(root_entity_shard_id or ''),
             root_entity_shard_id))
 

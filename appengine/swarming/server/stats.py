@@ -17,7 +17,7 @@ from google.appengine.ext import ndb
 from components import decorators
 from components import stats_framework
 from components import utils
-from server import task_result
+from server import task_pack
 from server import task_to_run
 
 
@@ -563,14 +563,14 @@ def add_entry(**kwargs):
 def add_run_entry(action, run_result_key, **kwargs):
   """Action about a TaskRunResult."""
   assert action.startswith('run_'), action
-  run_id = task_result.pack_run_result_key(run_result_key)
+  run_id = task_pack.pack_run_result_key(run_result_key)
   return add_entry(action=action, run_id=run_id, **kwargs)
 
 
 def add_task_entry(action, result_summary_key, **kwargs):
   """Action about a TaskRequest/TaskResultSummary."""
   assert action.startswith('task_'), action
-  task_id = task_result.pack_result_summary_key(result_summary_key)
+  task_id = task_pack.pack_result_summary_key(result_summary_key)
   return add_entry(action=action, task_id=task_id, **kwargs)
 
 

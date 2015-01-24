@@ -61,8 +61,8 @@ from google.appengine.datastore import datastore_query
 from google.appengine.ext import ndb
 
 from components import utils
+from server import task_pack
 from server import task_request
-
 
 # Amount of time after which a bot is considered dead. In short, if a bot has
 # not ping in the last 5 minutes while running a task, it is considered dead.
@@ -441,7 +441,7 @@ class TaskRunResult(_TaskResultCommon):
 
   @property
   def key_string(self):
-    return pack_run_result_key(self.key)
+    return task_pack.pack_run_result_key(self.key)
 
   @property
   def created_ts(self):
@@ -462,12 +462,12 @@ class TaskRunResult(_TaskResultCommon):
   @property
   def request_key(self):
     """Returns the TaskRequest ndb.Key that is related to this entity."""
-    return result_summary_key_to_request_key(self.result_summary_key)
+    return task_pack.result_summary_key_to_request_key(self.result_summary_key)
 
   @property
   def result_summary_key(self):
     """Returns the TaskToRun ndb.Key that is parent of this entity."""
-    return run_result_key_to_result_summary_key(self.key)
+    return task_pack.run_result_key_to_result_summary_key(self.key)
 
   @property
   def run_result_key(self):
@@ -561,22 +561,23 @@ class TaskResultSummary(_TaskResultCommon):
 
   @property
   def key_string(self):
-    return pack_result_summary_key(self.key)
+    return task_pack.pack_result_summary_key(self.key)
 
   @property
   def request_key(self):
     """Returns the TaskRequest ndb.Key that is related to this entity."""
-    return result_summary_key_to_request_key(self.key)
+    return task_pack.result_summary_key_to_request_key(self.key)
 
   @property
   def run_result_key(self):
     if self.deduped_from:
       # Return the run results for the original task.
-      return unpack_run_result_key(self.deduped_from)
+      return task_pack.unpack_run_result_key(self.deduped_from)
 
     if not self.try_number:
       return None
-    return result_summary_key_to_run_result_key(self.key, self.try_number)
+    return task_pack.result_summary_key_to_run_result_key(
+        self.key, self.try_number)
 
   def reset_to_pending(self):
     """Resets this entity to pending state."""
@@ -796,98 +797,13 @@ def state_to_string(state_obj):
   return out
 
 
-def request_key_to_result_summary_key(request_key):
-  """Returns the TaskResultSummary ndb.Key for this TaskRequest.key."""
-  assert request_key.kind() == 'TaskRequest', request_key
-  assert request_key.integer_id(), request_key
-  return ndb.Key(TaskResultSummary, 1, parent=request_key)
-
-
-def result_summary_key_to_request_key(result_summary_key):
-  """Returns the TaskRequest ndb.Key for this TaskResultSummmary key."""
-  assert result_summary_key.kind() == 'TaskResultSummary', result_summary_key
-  return result_summary_key.parent()
-
-
-def result_summary_key_to_run_result_key(result_summary_key, try_number):
-  """Returns the TaskRunResult ndb.Key for this TaskResultSummary.key.
-
-  Arguments:
-    result_summary_key: ndb.Key for a TaskResultSummary entity.
-    try_number: the try on which TaskRunResult was created for. The first try
-        is 1, the second is 2, etc.
-
-  Returns:
-    ndb.Key for the corresponding TaskRunResult entity.
-  """
-  assert result_summary_key.kind() == 'TaskResultSummary', result_summary_key
-  if try_number < 1:
-    raise ValueError('Try number(%d) must be above 0' % try_number)
-  if try_number > 2:
-    # https://code.google.com/p/swarming/issues/detail?id=108
-    raise NotImplementedError(
-        'Try number(%d) > 2 is not yet implemented' % try_number)
-  return ndb.Key(TaskRunResult, try_number, parent=result_summary_key)
-
-
-def run_result_key_to_result_summary_key(run_result_key):
-  """Returns the TaskResultSummary ndb.Key for this TaskRunResult.key.
-  """
-  assert run_result_key.kind() == 'TaskRunResult', run_result_key
-  return run_result_key.parent()
-
-
-def pack_result_summary_key(result_summary_key):
-  """Returns TaskResultSummary ndb.Key encoded, safe to use in HTTP requests.
-  """
-  assert result_summary_key.kind() == 'TaskResultSummary'
-  request_key = result_summary_key_to_request_key(result_summary_key)
-  return task_request.request_key_to_id(request_key) + '0'
-
-
-def pack_run_result_key(run_result_key):
-  """Returns TaskRunResult ndb.Key encoded, safe to use in HTTP requests.
-  """
-  assert run_result_key.kind() == 'TaskRunResult'
-  request_key = result_summary_key_to_request_key(
-      run_result_key_to_result_summary_key(run_result_key))
-  try_id = run_result_key.integer_id()
-  assert 1 <= try_id <= 15, try_id
-  return task_request.request_key_to_id(request_key) + '%x' % try_id
-
-
-def unpack_result_summary_key(packed_key):
-  """Returns the TaskResultSummary ndb.Key from a packed key.
-
-  The expected format of |packed_key| is %x.
-  """
-  request_key = task_request.request_id_to_key(packed_key[:-1])
-  run_id = int(packed_key[-1], 16)
-  if run_id & 0xff:
-    raise ValueError('Can\'t reference to a specific try result.')
-  return request_key_to_result_summary_key(request_key)
-
-
-def unpack_run_result_key(packed_key):
-  """Returns the TaskRunResult ndb.Key from a packed key.
-
-  The expected format of |packed_key| is %x.
-  """
-  request_key = task_request.request_id_to_key(packed_key[:-1])
-  run_id = int(packed_key[-1], 16)
-  if not run_id:
-    raise ValueError('Can\'t reference to the overall task result.')
-  result_summary_key = request_key_to_result_summary_key(request_key)
-  return result_summary_key_to_run_result_key(result_summary_key, run_id)
-
-
 def new_result_summary(request):
   """Returns the new and only TaskResultSummary for a TaskRequest.
 
   The caller must save it in the DB.
   """
   return TaskResultSummary(
-      key=request_key_to_result_summary_key(request.key),
+      key=task_pack.request_key_to_result_summary_key(request.key),
       created_ts=request.created_ts,
       name=request.name,
       user=request.user)
@@ -899,9 +815,10 @@ def new_run_result(request, try_number, bot_id, bot_version):
   The caller must save it in the DB.
   """
   assert isinstance(request, task_request.TaskRequest)
-  summary_key = request_key_to_result_summary_key(request.key)
+  summary_key = task_pack.request_key_to_result_summary_key(request.key)
   return TaskRunResult(
-      key=result_summary_key_to_run_result_key(summary_key, try_number),
+      key=task_pack.result_summary_key_to_run_result_key(
+          summary_key, try_number),
       bot_id=bot_id,
       started_ts=utils.utcnow(),
       bot_version=bot_version,
@@ -956,7 +873,7 @@ def get_tasks(task_name, task_tags, cursor_str, limit, sort, state):
     cursor = datastore_query.Cursor(urlsafe=cursor_str)
     requests, cursor, more = query.fetch_page(
         limit, start_cursor=cursor, keys_only=True)
-    keys = [request_key_to_result_summary_key(k) for k in requests]
+    keys = [task_pack.request_key_to_result_summary_key(k) for k in requests]
     tasks = ndb.get_multi(keys)
     cursor_str = cursor.urlsafe() if cursor and more else None
   elif task_name:
@@ -1074,7 +991,7 @@ def search_by_name(word, cursor_str, limit):
   for item in results.results:
     value = item_to_id(item)
     if value:
-      result_summary_keys.append(unpack_result_summary_key(value))
+      result_summary_keys.append(task_pack.unpack_result_summary_key(value))
       cursors.append(item.cursor)
 
   # Handle None result value. See make_request() for details about how this can
@@ -1102,7 +1019,7 @@ def search_by_name(word, cursor_str, limit):
           value = item_to_id(item)
           if value:
             cursor = item.cursor
-            task = unpack_result_summary_key(value).get()
+            task = task_pack.unpack_result_summary_key(value).get()
             if task:
               tasks.append(task)
               if len(tasks) == limit:

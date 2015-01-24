@@ -35,7 +35,7 @@ from google.appengine.ext import ndb
 
 from components import datastore_utils
 from components import utils
-from server import task_result
+from server import task_pack
 
 
 # The amount of time that has to pass before a machine is considered dead.
@@ -85,7 +85,7 @@ class _BotCommon(ndb.Model):
   def task(self):
     if not self.task_id:
       return None
-    return task_result.unpack_run_result_key(self.task_id)
+    return task_pack.unpack_run_result_key(self.task_id)
 
 
 class BotInfo(_BotCommon):

@@ -22,6 +22,7 @@ from google.appengine.ext import ndb
 
 from components import auth_testing
 from components import utils
+from server import task_pack
 from server import task_request
 from support import test_case
 
@@ -136,43 +137,19 @@ class TaskRequestApiTest(TestCase):
         i[5:] for i in dir(self) if i.startswith('test_'))
     self.assertFalse(missing)
 
-  def test_request_id_to_key(self):
-    # Old style keys.
-    self.assertEqual(
-        ndb.Key('TaskRequestShard', 'f71849', 'TaskRequest', 256),
-        task_request.request_id_to_key('10'))
-    # New style key.
-    self.assertEqual(
-        ndb.Key('TaskRequest', 0x7fffffffffffffee),
-        task_request.request_id_to_key('11'))
-    with self.assertRaises(ValueError):
-      task_request.request_id_to_key('2')
-
-  def test_request_key_to_id(self):
-    # Old style keys.
-    self.assertEqual(
-        '10',
-       task_request.request_key_to_id(
-           ndb.Key('TaskRequestShard', 'f71849', 'TaskRequest', 256)))
-    # New style key.
-    self.assertEqual(
-        '11',
-       task_request.request_key_to_id(
-           ndb.Key('TaskRequest', 0x7fffffffffffffee)))
-
   def test_validate_request_key(self):
-    task_request.validate_request_key(task_request.request_id_to_key('10'))
+    task_request.validate_request_key(task_pack.unpack_request_key('10'))
     task_request.validate_request_key(
         ndb.Key(
-            'TaskRequestShard', 'a' * task_request._SHARDING_LEVEL,
+            'TaskRequestShard', 'a' * task_pack.DEPRECATED_SHARDING_LEVEL,
             'TaskRequest', 0x100))
     with self.assertRaises(ValueError):
       task_request.validate_request_key(ndb.Key('TaskRequest', 1))
     with self.assertRaises(ValueError):
-      task_request.validate_request_key(
-          ndb.Key(
-              'TaskRequestShard', 'a' * (task_request._SHARDING_LEVEL + 1),
-              'TaskRequest', 0x100))
+      key = ndb.Key(
+          'TaskRequestShard', 'a' * (task_pack.DEPRECATED_SHARDING_LEVEL + 1),
+          'TaskRequest', 0x100)
+      task_request.validate_request_key(key)
 
   def test_make_request(self):
     deadline_to_run = 31

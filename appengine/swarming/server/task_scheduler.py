@@ -22,6 +22,7 @@ from components import datastore_utils
 from components import utils
 from server import config
 from server import stats
+from server import task_pack
 from server import task_request
 from server import task_result
 from server import task_to_run
@@ -51,8 +52,7 @@ def _expire_task(to_run_key, request):
     logging.info('Not reapable anymore')
     return None
 
-  result_summary_key = task_result.request_key_to_result_summary_key(
-      request.key)
+  result_summary_key = task_pack.request_key_to_result_summary_key(request.key)
 
   def run():
     # 2 concurrent GET, one PUT. Optionally with an additional serialized GET.
@@ -84,8 +84,7 @@ def _expire_task(to_run_key, request):
   if success:
     task_to_run.set_lookup_cache(to_run_key, False)
     logging.info(
-        'Expired %s',
-        task_result.pack_result_summary_key(result_summary_key))
+        'Expired %s', task_pack.pack_result_summary_key(result_summary_key))
   return success
 
 
@@ -97,8 +96,7 @@ def _reap_task(to_run_key, request, bot_id, bot_version):
   """
   assert bot_id, bot_id
   assert request.key == task_to_run.task_to_run_key_to_request_key(to_run_key)
-  result_summary_key = task_result.request_key_to_result_summary_key(
-      request.key)
+  result_summary_key = task_pack.request_key_to_result_summary_key(request.key)
 
   def run():
     # 2 GET, 1 PUT at the end.
@@ -137,7 +135,7 @@ def _update_stats(run_result, bot_id, request, completed):
         user=request.user)
     stats.add_task_entry(
         'task_completed',
-        task_result.request_key_to_result_summary_key(request.key),
+        task_pack.request_key_to_result_summary_key(request.key),
         dimensions=request.properties.dimensions,
         pending_ms=_secs_to_ms(
             (run_result.completed_ts - request.created_ts).total_seconds()),
@@ -158,14 +156,13 @@ def _handle_dead_bot(run_result_key):
     True if the task was retried, False if the task was killed, None if no
     action was done.
   """
-  result_summary_key = task_result.run_result_key_to_result_summary_key(
+  result_summary_key = task_pack.run_result_key_to_result_summary_key(
       run_result_key)
-  request_key = task_result.result_summary_key_to_request_key(
-      result_summary_key)
+  request_key = task_pack.result_summary_key_to_request_key(result_summary_key)
   request_future = request_key.get_async()
   now = utils.utcnow()
   server_version = utils.get_app_version()
-  packed = task_result.pack_run_result_key(run_result_key)
+  packed = task_pack.pack_run_result_key(run_result_key)
   request = request_future.get_result()
   to_run_key = task_to_run.request_to_task_to_run_key(request)
 
@@ -306,7 +303,7 @@ def make_request(data):
   # (!) and NumberField is signed 32 bits so the best it could do with EPOCH is
   # second resolution up to year 2038.
   index = search.Index(name='requests')
-  packed = task_result.pack_result_summary_key(result_summary.key)
+  packed = task_pack.pack_result_summary_key(result_summary.key)
   doc = search.Document(
       fields=[
         search.TextField(name='name', value=request.name),
@@ -333,7 +330,7 @@ def make_request(data):
       result_summary.cost_saved_usd = result_summary.cost_usd
       # Only zap after.
       result_summary.costs_usd = []
-      result_summary.deduped_from = task_result.pack_run_result_key(
+      result_summary.deduped_from = task_pack.pack_run_result_key(
           dupe_summary.run_result_key)
 
   # Storing these entities makes this task live. It is important at this point
@@ -448,13 +445,12 @@ def bot_update_task(
   if cost_usd is not None and cost_usd < 0.:
     raise ValueError('cost_usd must be None or greater or equal than 0')
 
-  result_summary_key = task_result.run_result_key_to_result_summary_key(
+  result_summary_key = task_pack.run_result_key_to_result_summary_key(
       run_result_key)
-  request_key = task_result.result_summary_key_to_request_key(
-      result_summary_key)
+  request_key = task_pack.result_summary_key_to_request_key(result_summary_key)
   request_future = request_key.get_async()
   server_version = utils.get_app_version()
-  packed = task_result.pack_run_result_key(run_result_key)
+  packed = task_pack.pack_run_result_key(run_result_key)
   request = request_future.get_result()
   now = utils.utcnow()
 
@@ -541,14 +537,13 @@ def bot_kill_task(run_result_key, bot_id):
   Returns:
     str if an error message.
   """
-  result_summary_key = task_result.run_result_key_to_result_summary_key(
+  result_summary_key = task_pack.run_result_key_to_result_summary_key(
       run_result_key)
-  request_key = task_result.result_summary_key_to_request_key(
-      result_summary_key)
+  request_key = task_pack.result_summary_key_to_request_key(result_summary_key)
   request_future = request_key.get_async()
   server_version = utils.get_app_version()
   now = utils.utcnow()
-  packed = task_result.pack_run_result_key(run_result_key)
+  packed = task_pack.pack_run_result_key(run_result_key)
 
   def run():
     run_result, result_summary = ndb.get_multi(
@@ -587,8 +582,7 @@ def bot_kill_task(run_result_key, bot_id):
 
 def cancel_task(result_summary_key):
   """Cancels a task if possible."""
-  request_key = task_result.result_summary_key_to_request_key(
-      result_summary_key)
+  request_key = task_pack.result_summary_key_to_request_key(result_summary_key)
   to_run_key = task_to_run.request_to_task_to_run_key(request_key.get())
   now = utils.utcnow()
 
@@ -606,7 +600,7 @@ def cancel_task(result_summary_key):
   try:
     ok, was_running = datastore_utils.transaction(run)
   except datastore_utils.CommitError as e:
-    packed = task_result.pack_result_summary_key(result_summary_key)
+    packed = task_pack.pack_result_summary_key(result_summary_key)
     return 'Failed killing task %s: %s' % (packed, e)
   # Add it to the negative cache.
   task_to_run.set_lookup_cache(to_run_key, False)
@@ -641,8 +635,7 @@ def cron_abort_expired_task_to_run():
         killed += 1
         stats.add_task_entry(
             'task_request_expired',
-            task_result.request_key_to_result_summary_key(
-                request.key),
+            task_pack.request_key_to_result_summary_key(request.key),
             dimensions=request.properties.dimensions,
             user=request.user)
       else:
