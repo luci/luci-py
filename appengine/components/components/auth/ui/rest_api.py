@@ -71,6 +71,22 @@ def forbid_api_on_replica(method):
   return wrapper
 
 
+def has_read_access():
+  """Returns True if current caller can read groups and other auth data.
+
+  Used in @require(...) decorators of API handlers.
+  """
+  return api.is_admin() or api.is_group_member('groups-readonly-access')
+
+
+def has_write_access():
+  """Returns True if current caller can modify groups and other auth data.
+
+  Used in @require(...) decorators of API handlers.
+  """
+  return api.is_admin()
+
+
 class EntityOperationError(Exception):
   """Raised by do_* methods in EntityHandlerBase to indicate a conflict."""
   def __init__(self, message, details):
@@ -145,7 +161,7 @@ class EntityHandlerBase(handler.ApiHandler):
 
   # Actual handlers implemented in terms of do_* calls.
 
-  @api.require(api.is_admin)
+  @api.require(has_read_access)
   def get(self, name):
     """Fetches entity give its name."""
     obj = self.get_entity_key(name).get()
@@ -158,7 +174,7 @@ class EntityHandlerBase(handler.ApiHandler):
         headers={'Last-Modified': utils.datetime_to_rfc2822(obj.modified_ts)})
 
   @forbid_api_on_replica
-  @api.require(api.is_admin)
+  @api.require(has_write_access)
   def post(self, name):
     """Creates a new entity, ensuring it's indeed new (no overwrites)."""
     try:
@@ -212,7 +228,7 @@ class EntityHandlerBase(handler.ApiHandler):
     )
 
   @forbid_api_on_replica
-  @api.require(api.is_admin)
+  @api.require(has_write_access)
   def put(self, name):
     """Updates an existing entity."""
     try:
@@ -272,7 +288,7 @@ class EntityHandlerBase(handler.ApiHandler):
     )
 
   @forbid_api_on_replica
-  @api.require(api.is_admin)
+  @api.require(has_write_access)
   def delete(self, name):
     """Deletes an entity."""
     if not self.is_entity_writable(name):
@@ -361,7 +377,7 @@ class GroupsHandler(handler.ApiHandler):
   Available in Standalone, Primary and Replica modes.
   """
 
-  @api.require(api.is_admin)
+  @api.require(has_read_access)
   def get(self):
     # Currently AuthGroup entity contains a list of group members in the entity
     # body. It's an implementation detail that should not be relied upon.
@@ -573,7 +589,7 @@ class IPWhitelistsHandler(handler.ApiHandler):
   whitelists referenced in "account -> IP whitelist" mapping.
   """
 
-  @api.require(api.is_admin)
+  @api.require(has_read_access)
   def get(self):
     entities = model.AuthIPWhitelist.query(ancestor=model.root_key())
     self.send_response({
@@ -671,7 +687,7 @@ class OAuthConfigHandler(handler.ApiHandler):
     })
 
   @forbid_api_on_replica
-  @api.require(api.is_admin)
+  @api.require(has_write_access)
   def post(self):
     body = self.parse_body()
     client_id = body['client_id']
@@ -695,7 +711,7 @@ class OAuthConfigHandler(handler.ApiHandler):
 class ServerStateHandler(handler.ApiHandler):
   """Reports replication state of a service."""
 
-  @api.require(api.is_admin)
+  @api.require(has_read_access)
   def get(self):
     if model.is_primary():
       mode = 'primary'

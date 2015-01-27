@@ -13,6 +13,14 @@ from support import test_case
 from components.auth import signature
 
 
+# Skip check_signature tests if PyCrypto is not available.
+try:
+  import Crypto
+  has_pycrypto = True
+except ImportError:
+  has_pycrypto = False
+
+
 class SignatureTest(test_case.TestCase):
   def test_get_x509_certificate_by_name_ok(self):
     certs = signature.get_own_public_certificates()
@@ -26,20 +34,21 @@ class SignatureTest(test_case.TestCase):
     with self.assertRaises(signature.CertificateError):
       signature.get_x509_certificate_by_name(certs, 'not-a-certname')
 
-  def test_signature_correct(self):
-    blob = '123456789'
-    key_name, sig = signature.sign_blob(blob)
-    cert = signature.get_x509_certificate_by_name(
-        signature.get_own_public_certificates(), key_name)
-    self.assertTrue(signature.check_signature(blob, cert, sig))
+  if has_pycrypto:
+    def test_signature_correct(self):
+      blob = '123456789'
+      key_name, sig = signature.sign_blob(blob)
+      cert = signature.get_x509_certificate_by_name(
+          signature.get_own_public_certificates(), key_name)
+      self.assertTrue(signature.check_signature(blob, cert, sig))
 
-  def test_signature_wrong(self):
-    blob = '123456789'
-    key_name, sig = signature.sign_blob(blob)
-    sig = chr(ord(sig[0]) + 1) + sig[1:]
-    cert = signature.get_x509_certificate_by_name(
-        signature.get_own_public_certificates(), key_name)
-    self.assertFalse(signature.check_signature(blob, cert, sig))
+    def test_signature_wrong(self):
+      blob = '123456789'
+      key_name, sig = signature.sign_blob(blob)
+      sig = chr(ord(sig[0]) + 1) + sig[1:]
+      cert = signature.get_x509_certificate_by_name(
+          signature.get_own_public_certificates(), key_name)
+      self.assertFalse(signature.check_signature(blob, cert, sig))
 
 
 if __name__ == '__main__':
