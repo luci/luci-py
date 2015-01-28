@@ -48,6 +48,9 @@ def CMDcleanup(parser, args):
 
   Removes the specified versions from all app modules. If no versions are
   provided via command line, will ask interactively.
+
+  When asking interactively, uses EDITOR environment variable to edit the list
+  of versions. Otherwise uses notepad.exe on Windows, or vi otherwise.
   """
   parser.add_force_option()
   parser.allow_positional_args = True
