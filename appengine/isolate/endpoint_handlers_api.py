@@ -236,8 +236,7 @@ class IsolateService(remote.Service):
       stored = key.get()
       if stored is None:
         raise endpoints.NotFoundException('Unable to retrieve the entry.')
-      if stored.content:
-        content = stored.content
+      content = stored.content  # will be None if entity is in GCS
 
     # return here if something has been found
     if content is not None:
@@ -289,7 +288,7 @@ class IsolateService(remote.Service):
         raise endpoints.BadRequestException(
             'File should be in Google Storage.\nFile: \'%s\' Size: %d.' % (
                 key.id(), size))
-      content = ''
+      content = None
       compressed_size = file_info.size
     else:
       content = request.content
