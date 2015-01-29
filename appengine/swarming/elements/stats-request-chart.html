@@ -10,19 +10,20 @@
 
 `stats-request-chart' encapsulates a 'google-chart' element and data formating
 logic specific for Http Request chart of the Swarming statistics app.
-This element exposes a 'dataTable' attribute `google.visualization.DataTable`
-and a `resolution` attribute that is 'minutes', 'hours', or 'days'.
+This element exposes a 'data' attribute which is a JSON serialized
+`google.visualization.DataTable` object, and a `resolution` attribute that is
+'minutes', 'hours', or 'days'.
 
 Example:
-  <stats-request-chart dataTable="{{data_table}}"></stats-request-chart>
+  <stats-request-chart data="{{data_table}}"></stats-request-chart>
 
 @element stats-request-chart
 -->
 
-<link rel="import" href="/third_party/bower_components/polymer/polymer.html">
+<link rel="import" href="bower_components/polymer/polymer.html">
 <link rel="import" href="stats-chart-base.html">
 
-<polymer-element name="stats-request-chart" extends="stats-chart-base" attributes="dataTable resolution">
+<polymer-element name="stats-request-chart" extends="stats-chart-base" attributes="data resolution">
   <script>
   Polymer('stats-request-chart', {
     titleText: 'Requests',

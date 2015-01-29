@@ -675,7 +675,6 @@ def create_application(debug):
       # Public pages.
       ('/', RootHandler),
       ('/stats', stats_gviz.StatsSummaryHandler),
-      ('/stats_app', stats_gviz.StatsAppHandler),
       ('/stats/dimensions/<dimensions:.+>', stats_gviz.StatsDimensionsHandler),
       ('/stats/user/<user:.+>', stats_gviz.StatsUserHandler),
 

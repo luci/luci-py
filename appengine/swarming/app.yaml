@@ -31,8 +31,9 @@ handlers:
   upload: static/(.+)\.(css|ico|txt)
   secure: always
 
-- url: /elements
-  static_dir: elements
+- url: /elements/([^/]+\-build)\.(html|js)
+  static_files: elements/\1.\2
+  upload: elements/([^/]+\-build)\.(html|js)
   secure: always
 
 - url: /(user|restricted)(|/.*)

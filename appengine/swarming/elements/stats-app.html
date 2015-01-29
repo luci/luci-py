@@ -13,19 +13,21 @@
 @element stats-app
 -->
 
-<link rel="import" href="/third_party/bower_components/polymer/polymer.html">
-<link rel="import" href="/third_party/bower_components/core-ajax/core-ajax.html">
-<link rel="import" href="/third_party/bower_components/core-label/core-label.html">
-<link rel="import" href="/third_party/bower_components/paper-checkbox/paper-checkbox.html">
-<link rel="import" href="/third_party/bower_components/paper-dialog/paper-dialog.html">
-<link rel="import" href="/third_party/bower_components/paper-radio-button/paper-radio-button.html">
-<link rel="import" href="/third_party/bower_components/paper-radio-group/paper-radio-group.html">
-<link rel="import" href="/third_party/bower_components/paper-spinner/paper-spinner.html">
+<link rel="import" href="bower_components/polymer/polymer.html">
+<link rel="import" href="bower_components/core-ajax/core-ajax.html">
+<link rel="import" href="bower_components/core-label/core-label.html">
+<link rel="import" href="bower_components/paper-checkbox/paper-checkbox.html">
+<link rel="import" href="bower_components/paper-dialog/paper-dialog.html">
+<link rel="import" href="bower_components/paper-radio-button/paper-radio-button.html">
+<link rel="import" href="bower_components/paper-radio-group/paper-radio-group.html">
+<link rel="import" href="bower_components/paper-spinner/paper-spinner.html">
 
 <link rel="import" href="stats-dimension-filter.html">
 <link rel="import" href="stats-request-chart.html">
 <link rel="import" href="stats-work-chart.html">
+<link rel="import" href="stats-table-chart.html">
 <link rel="import" href="stats-time-chart.html">
+
 
 <polymer-element name="stats-app" attributes="dimensions">
   <template>
@@ -81,23 +83,24 @@
       <div layout vertical flex>
         <stats-request-chart
           hidden?="{{dimension}}"
-          dataTable="{{dataTable}}"
+          data="{{dataTable}}"
           resolution="{{resolution}}">
         </stats-request-chart>
 
         <stats-work-chart
           isDimension="{{dimension ? true : false}}"
-          dataTable="{{dataTable}}"
+          data="{{dataTable}}"
           resolution="{{resolution}}">
         </stats-work-chart>
 
         <stats-time-chart
           isDimension="{{dimension ? true : false}}"
-          dataTable="{{dataTable}}"
+          data="{{dataTable}}"
           resolution="{{resolution}}">
         </stats-time-chart>
       </div>
     </div>
+    <stats-table-chart data="{{dataTable}}"></stats-table-chart>
 
     <paper-spinner id="loading"></paper-spinner>
   </template>
@@ -130,7 +133,7 @@
         this.resolution = stateObj.resolution || 'hours';
         this.restoringState = true;
         var stateObj = this.getState();
-        var url = '/stats_app?' + JSON.stringify(stateObj);
+        var url = '/stats?' + JSON.stringify(stateObj);
         window.history.replaceState(stateObj, '', url);
       } catch (e) {
         this.restoringState = false;
@@ -149,7 +152,7 @@
 
     pushState: function() {
       var stateObj = this.getState();
-      var url = '/stats_app?' + JSON.stringify(stateObj);
+      var url = '/stats?' + JSON.stringify(stateObj);
       window.history.pushState(stateObj, '', url);
     },
 
@@ -167,7 +170,7 @@
     },
 
     onGetStatsSummarySuccess: function(event, detail, sender) {
-      this.dataTable = new google.visualization.DataTable(detail.response.table);
+      this.dataTable = detail.response.table;
     },
 
     ajaxLoadingChanged: function(oldValue, newValue) {

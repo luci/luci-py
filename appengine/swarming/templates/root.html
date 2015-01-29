@@ -2,6 +2,8 @@
 
 
 {% block headers %}
+<script src="/third_party/webcomponentsjs/webcomponents.min.js"></script>
+<link rel="import" href="/elements/stats-overview-build.html">
 <style>
   .admin a {
     {% if not is_admin %}
@@ -21,6 +23,9 @@
       text-decoration: line-through;
     {% endif %}
   }
+  stats-overview {
+    min-width: 600px;
+  }
 </style>
 {% endblock %}
 
@@ -28,78 +33,83 @@
 {% block body %}
 
 <h1>Swarming Server</h1>
-Swarming Server is an open source task distribution service written in python
-running on AppEngine.
-<p>
+<div layout horizontal>
+  <div>
+    <div>Swarming Server is an open source task distribution service written in python
+    running on AppEngine.</div>
+    <p>
 
-{% if not nickname %}
-Please <a href="{{signin_link|safe}}">sign in</a> for more access.
-{% else %}
-As a {{user_type}}, you are entitled to see these pages:
-{% endif %}
+    {% if not nickname %}
+    Please <a href="{{signin_link|safe}}">sign in</a> for more access.
+    {% else %}
+    As a {{user_type}}, you are entitled to see these pages:
+    {% endif %}
 
-<h3>Service Status</h3>
-<ul>
-  <li><a href="/stats">Usage statistics</a></li>
-  <li class="user"><a href="/user/tasks">Tasks list and search</a></li>
-  <li class="privileged_user"><a href="/restricted/bots">Known bots</a></li>
-  <li class="admin"><a href="/restricted/ereporter2/errors">Recent ereporter2 errors</a></li>
-  <li class="admin"><a href="/restricted/ereporter2/report">Recent exceptions in server log</a></li>
-</ul>
+    <h3>Service Status</h3>
+    <ul>
+      <li><a href="/stats">Usage statistics</a></li>
+      <li class="user"><a href="/user/tasks">Tasks list and search</a></li>
+      <li class="privileged_user"><a href="/restricted/bots">Known bots</a></li>
+      <li class="admin"><a href="/restricted/ereporter2/errors">Recent ereporter2 errors</a></li>
+      <li class="admin"><a href="/restricted/ereporter2/report">Recent exceptions in server log</a></li>
+    </ul>
 
-<h3>Configuration</h3>
-<ul class="admin">
-  <li><a href="/restricted/config">Global server config</a></li>
-  <li><a href="/restricted/upload/bootstrap">Upload new bootstrap.py</a></li>
-  <li><a href="/restricted/upload/bot_config">Upload new bot_config.py</a></li>
-  <li><a href="/auth/groups">Manage user groups</a></li>
-</ul>
+    <h3>Configuration</h3>
+    <ul class="admin">
+      <li><a href="/restricted/config">Global server config</a></li>
+      <li><a href="/restricted/upload/bootstrap">Upload new bootstrap.py</a></li>
+      <li><a href="/restricted/upload/bot_config">Upload new bot_config.py</a></li>
+      <li><a href="/auth/groups">Manage user groups</a></li>
+    </ul>
 
-<h3>Running a bot</h3>
-<ul class="spaced">
-  <li>
-    To start a bot, run one of these:
-    <ol>
+    <h3>Running a bot</h3>
+    <ul class="spaced">
       <li>
-        Don't forget if swarming_bot.zip was already present, curl won't
-        overwrite it so "rm swarming_bot.zip" first if necessary.
-        <pre style="margin-bottom:0">
-mkdir bot; cd bot
-curl -sSLOJ {{host_url}}/get_slave_code
-python swarming_bot.zip
-</pre>
+        To start a bot, run one of these:
+        <ol>
+          <li>
+            Don't forget if swarming_bot.zip was already present, curl won't
+            overwrite it so "rm swarming_bot.zip" first if necessary.
+            <pre style="margin-bottom:0">
+    mkdir bot; cd bot
+    curl -sSLOJ {{host_url}}/get_slave_code
+    python swarming_bot.zip
+    </pre>
+          </li>
+          <li>
+            Here's an even shorter command when you like to live dangerously:
+            <pre style="margin-bottom:0">
+    python -c "import urllib; exec urllib.urlopen('{{host_url}}/bootstrap').read()"
+    </pre>
+          </li>
+          <li>
+            The escaped version to pass as a ssh argument:
+            <pre>
+    'python -c "import urllib; exec urllib.urlopen('"'{{host_url}}/bootstrap'"').read()"'</pre>
+          </li>
+        </ol>
       </li>
-      <li>
-        Here's an even shorter command when you like to live dangerously:
-        <pre style="margin-bottom:0">
-python -c "import urllib; exec urllib.urlopen('{{host_url}}/bootstrap').read()"
-</pre>
+      <li>See the project's page for code and help pages:
+        <a href="https://code.google.com/p/swarming/">
+          https://code.google.com/p/swarming/</a>
       </li>
-      <li>
-        The escaped version to pass as a ssh argument:
-        <pre>
-'python -c "import urllib; exec urllib.urlopen('"'{{host_url}}/bootstrap'"').read()"'</pre>
-      </li>
-    </ol>
-  </li>
-  <li>See the project's page for code and help pages:
-    <a href="https://code.google.com/p/swarming/">
-      https://code.google.com/p/swarming/</a>
-  </li>
-</ul>
+    </ul>
 
-<h3>Map reduce jobs</h3>
-<ul class="admin">
-  <li><a href="/restricted/mapreduce/status">Map reduce jobs status</a></li>
-  {% for job in mapreduce_jobs %}
-    <li>
-      <form action="/restricted/launch_mapreduce" method="post">
-        <input type="hidden" name="xsrf_token" value="{{xsrf_token}}" />
-        <input type="hidden" name="job_id" value="{{job.id}}" />
-        <button type="submit">Launch '{{job.name}}'</button>
-      </form>
-    </li>
-  {% endfor %}
-</ul>
+    <h3>Map reduce jobs</h3>
+    <ul class="admin">
+      <li><a href="/restricted/mapreduce/status">Map reduce jobs status</a></li>
+      {% for job in mapreduce_jobs %}
+        <li>
+          <form action="/restricted/launch_mapreduce" method="post">
+            <input type="hidden" name="xsrf_token" value="{{xsrf_token}}" />
+            <input type="hidden" name="job_id" value="{{job.id}}" />
+            <button type="submit">Launch '{{job.name}}'</button>
+          </form>
+        </li>
+      {% endfor %}
+    </ul>
+  </div>
+  <stats-overview flex></stats-overview>
+</div>
 
 {% endblock %}

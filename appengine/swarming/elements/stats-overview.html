@@ -1,0 +1,62 @@
+<!--
+# Copyright 2015 The Swarming Authors. All rights reserved.
+# Use of this source code is governed by the Apache v2.0 license that can be
+# found in the LICENSE file.
+
+-->
+
+<!--
+@group Swarming Elements
+
+`stats-overview' displays an overview of the last 20 minutes stats.
+
+@element stats-overview
+-->
+
+<link rel="import" href="bower_components/polymer/polymer.html">
+<link rel="import" href="bower_components/core-ajax/core-ajax.html">
+
+<link rel="import" href="stats-request-chart.html">
+<link rel="import" href="stats-work-chart.html">
+<link rel="import" href="stats-time-chart.html">
+
+<polymer-element name="stats-overview" attributes="dimensions" layout vertical>
+  <template>
+    <core-ajax id="get_stats_summary"
+      headers='{"x-datasource-auth": "a"}'
+      url="/swarming/api/v1/stats/summary/minutes"
+      params='{"duration": "20"}'
+      handleAs="json"
+      on-core-response="{{onGetStatsSummarySuccess}}">
+    </core-ajax>
+
+    <div layout vertical>
+      <stats-request-chart
+        data="{{dataTable}}"
+        resolution="minutes">
+      </stats-request-chart>
+
+      <stats-work-chart
+        data="{{dataTable}}"
+        resolution="minutes">
+      </stats-work-chart>
+
+      <stats-time-chart
+        data="{{dataTable}}"
+        resolution="minutes">
+      </stats-time-chart>
+    </div>
+  </template>
+
+  <script>
+  Polymer('stats-overview', {
+    ready: function() {
+      this.$.get_stats_summary.go();
+    },
+
+    onGetStatsSummarySuccess: function(event, detail, sender) {
+      this.dataTable = detail.response.table;
+    }
+  });
+  </script>
+</polymer-element>

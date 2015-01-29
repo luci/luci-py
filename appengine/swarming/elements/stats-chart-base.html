@@ -15,9 +15,9 @@ utility functions.
 -->
 
 
-<link rel="import" href="/third_party/bower_components/polymer/polymer.html">
-<link rel="import" href="/third_party/bower_components/google-apis/google-jsapi.html">
-<link rel="import" href="/third_party/bower_components/google-chart/google-chart.html">
+<link rel="import" href="bower_components/polymer/polymer.html">
+<link rel="import" href="bower_components/google-apis/google-jsapi.html">
+<link rel="import" href="bower_components/google-chart/google-chart.html">
 
 <polymer-element name="stats-chart-base">
   <template>
@@ -55,7 +55,7 @@ utility functions.
       titleText: '',
 
       observe: {
-        'dataTable': 'loadData'
+        'data': 'loadData'
       },
 
       ready: function() {
@@ -111,7 +111,8 @@ utility functions.
       },
 
       loadData: function() {
-        if (this.isReady && this.dataTable) {
+        if (this.isReady && this.data) {
+          this.dataTable = new google.visualization.DataTable(this.data);
           this.populate();
         }
       }
