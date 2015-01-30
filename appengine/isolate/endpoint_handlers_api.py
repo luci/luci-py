@@ -88,9 +88,8 @@ class RetrieveRequest(messages.Message):
 
 class PreuploadStatus(messages.Message):
   """Endpoints response type for a single URL or pair of URLs."""
-  digest = messages.StringField(1, required=True)
-  gs_upload_url = messages.StringField(2)
-  upload_ticket = messages.StringField(3, required=True)
+  gs_upload_url = messages.StringField(1)
+  upload_ticket = messages.StringField(2)
 
 
 class UrlCollection(messages.Message):
@@ -181,31 +180,33 @@ class IsolateService(remote.Service):
     # check for existing elements
     new_digests, existing_digests = self.partition_collection(request)
 
-    # process unseen elements
-    for digest_element in new_digests.items:
+    # process all elements; add an upload ticket for cache misses
+    for digest_element in request.items:
       # check for error conditions
       if not model.is_valid_hex(digest_element.digest):
         raise endpoints.BadRequestException(
             'Invalid hex code: %s' % (digest_element.digest))
+      status = PreuploadStatus()
 
-      # generate upload ticket
-      status = PreuploadStatus(
-          digest=digest_element.digest,
-          upload_ticket=self.generate_ticket(digest_element, request.namespace))
+      if digest_element in new_digests:
+        # generate preupload ticket
+        status.upload_ticket = self.generate_ticket(
+            digest_element, request.namespace)
 
-      # generate GS upload URL if necessary
-      if self.should_push_to_gs(digest_element):
-        # Store larger stuff in Google Storage.
-        key = model.entry_key(
-            request.namespace.namespace, digest_element.digest)
-        status.gs_upload_url = self.gs_url_signer.get_upload_url(
-            filename=key.id(),
-            content_type='application/octet-stream',
-            expiration=DEFAULT_LINK_EXPIRATION)
+        # generate GS upload URL if necessary
+        if self.should_push_to_gs(digest_element):
+          key = model.entry_key(
+              request.namespace.namespace, digest_element.digest)
+          status.gs_upload_url = self.gs_url_signer.get_upload_url(
+              filename=key.id(),
+              content_type='application/octet-stream',
+              expiration=DEFAULT_LINK_EXPIRATION)
+
       response.items.append(status)
 
     # tag existing entities and return new ones
-    self.tag_existing(existing_digests)
+    self.tag_existing(DigestCollection(
+        items=list(existing_digests), namespace=request.namespace))
     return response
 
   @auth.endpoints_method(StorageRequest, message_types.VoidMessage)
@@ -392,11 +393,10 @@ class IsolateService(remote.Service):
 
   @classmethod
   def partition_collection(cls, entries):
-    """Create DigestCollections for existent and new digests."""
-    seen_unseen = [DigestCollection(
-        items=[], namespace=entries.namespace) for _ in range(2)]
+    """Create sets of existent and new digests."""
+    seen_unseen = [set(), set()]
     for digest, exists in cls.check_entries_exist(entries):
-      seen_unseen[exists].items.append(digest)
+      seen_unseen[exists].add(digest)
     return seen_unseen
 
   @classmethod
