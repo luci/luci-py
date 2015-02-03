@@ -31,11 +31,6 @@
     </core-ajax>
 
     <div layout vertical>
-      <stats-request-chart
-        data="{{dataTable}}"
-        resolution="minutes">
-      </stats-request-chart>
-
       <stats-work-chart
         data="{{dataTable}}"
         resolution="minutes">
@@ -45,6 +40,11 @@
         data="{{dataTable}}"
         resolution="minutes">
       </stats-time-chart>
+
+      <stats-request-chart
+        data="{{dataTable}}"
+        resolution="minutes">
+      </stats-request-chart>
     </div>
   </template>
 

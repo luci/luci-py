@@ -2345,14 +2345,14 @@ polyfill-next-selector { content: ':host > a'; }
         </stats-dimension-filter>
       </div>
       <div layout="" vertical="" flex="">
-        <stats-request-chart hidden?="{{dimension}}" data="{{dataTable}}" resolution="{{resolution}}">
-        </stats-request-chart>
-
         <stats-work-chart isdimension="{{dimension ? true : false}}" data="{{dataTable}}" resolution="{{resolution}}">
         </stats-work-chart>
 
         <stats-time-chart isdimension="{{dimension ? true : false}}" data="{{dataTable}}" resolution="{{resolution}}">
         </stats-time-chart>
+
+        <stats-request-chart hidden?="{{dimension}}" data="{{dataTable}}" resolution="{{resolution}}">
+        </stats-request-chart>
       </div>
     </div>
     <stats-table-chart data="{{dataTable}}"></stats-table-chart>
@@ -2361,4 +2361,5 @@ polyfill-next-selector { content: ':host > a'; }
   </template>
 
   
-</polymer-element><script charset="utf-8" src="stats-app-build.js"></script></body></html>
+</polymer-element>
+<script charset="utf-8" src="stats-app-build.js"></script></body></html>

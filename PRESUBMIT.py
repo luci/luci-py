@@ -27,9 +27,13 @@ def header(input_api):
 
 
 def CommonChecks(input_api, output_api):
+  excluded = [
+    r'.*_pb2\.py$',
+    r'.*-build\.(js|html)$',
+  ]
   return input_api.canned_checks.PanProjectChecks(
       input_api, output_api,
-      excluded_paths=[r'.*_pb2\.py$'],
+      excluded_paths=excluded,
       owners_check=False,
       license_header=header(input_api))
 

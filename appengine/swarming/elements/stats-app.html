@@ -81,12 +81,6 @@
         </stats-dimension-filter>
       </div>
       <div layout vertical flex>
-        <stats-request-chart
-          hidden?="{{dimension}}"
-          data="{{dataTable}}"
-          resolution="{{resolution}}">
-        </stats-request-chart>
-
         <stats-work-chart
           isDimension="{{dimension ? true : false}}"
           data="{{dataTable}}"
@@ -98,6 +92,12 @@
           data="{{dataTable}}"
           resolution="{{resolution}}">
         </stats-time-chart>
+
+        <stats-request-chart
+          hidden?="{{dimension}}"
+          data="{{dataTable}}"
+          resolution="{{resolution}}">
+        </stats-request-chart>
       </div>
     </div>
     <stats-table-chart data="{{dataTable}}"></stats-table-chart>
