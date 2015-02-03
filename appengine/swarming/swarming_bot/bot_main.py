@@ -117,6 +117,18 @@ def get_state(sleep_streak):
   return state
 
 
+def on_before_task(botobj):
+  """Hook function called just before a task is going to be scheduled."""
+  try:
+    if _in_load_test_mode():
+      return
+
+    import bot_config
+    return bot_config.on_before_task(botobj)
+  except Exception as e:
+    botobj.post_error('Failed to call hook on_after_task()' % e)
+
+
 def on_after_task(botobj, failure, internal_failure):
   """Hook function called after a task."""
   try:
@@ -126,7 +138,7 @@ def on_after_task(botobj, failure, internal_failure):
     import bot_config
     return bot_config.on_after_task(botobj, failure, internal_failure)
   except Exception as e:
-    logging.exception('Failed to call hook on_after_task(): %s', e)
+    botobj.post_error('Failed to call hook on_after_task()' % e)
 
 
 def setup_bot(skip_reboot):
@@ -339,6 +351,7 @@ def run_manifest(botobj, manifest, start):
     path = os.path.join(work_dir, 'test_run.json')
     with open(path, 'wb') as f:
       f.write(json.dumps(manifest))
+    on_before_task(botobj)
     command = [
       sys.executable, THIS_FILE, 'task_runner',
       '--swarming-server', url,

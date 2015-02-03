@@ -56,6 +56,18 @@ def get_state():
 ### Hooks
 
 
+def on_before_task(bot):
+  """Hook function to be called before running a task.
+
+  It shouldn't do much, since it can't cancel the task so it shouldn't do
+  anything too fancy.
+
+  Arguments:
+  - bot: bot.Bot instance.
+  """
+  pass
+
+
 def on_after_task(bot, failure, internal_failure):
   """Hook function to be called after running a task.
 
