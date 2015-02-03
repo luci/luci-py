@@ -551,16 +551,13 @@ def _get_metadata_gce():
   Refs:
     https://cloud.google.com/compute/docs/metadata
     https://cloud.google.com/compute/docs/machine-types
+
+  To get the at the command line from a GCE VM, use:
+    curl --silent \
+      http://metadata.google.internal/computeMetadata/v1/?recursive=true \
+      -H "Metadata-Flavor: Google" | python -m json.tool | less
   """
-  # To get it at the command line, use:
-  _ = """
-  curl --silent \
-   http://metadata.google.internal/computeMetadata/v1/instance/?recursive=true \
-   -H "Metadata-Flavor: Google" | python -m json.tool | less
-  """
-  url = (
-    'http://metadata.google.internal/computeMetadata/v1/instance/'
-    '?recursive=true')
+  url = 'http://metadata.google.internal/computeMetadata/v1/?recursive=true'
   headers = {'Metadata-Flavor': 'Google'}
   try:
     resp = urllib2.urlopen(urllib2.Request(url, headers=headers), timeout=5)
@@ -845,29 +842,29 @@ def get_monitor_hidpi():
 @cached
 def get_cost_hour():
   """Returns the cost in $USD/h as a floating point value if applicable."""
-  metadata = _get_metadata_gce()
-  if not metadata:
-    # Get an approximate cost trying to emulate GCE equivalent cost.
-    cores = get_num_processors()
-    os_cost = 0.
-    if sys.platform == 'darwin':
+  if _get_metadata_gce():
+    return _get_cost_hour_gce()
+
+  # Get an approximate cost trying to emulate GCE equivalent cost.
+  cores = get_num_processors()
+  os_cost = 0.
+  if sys.platform == 'darwin':
       # Apple tax. It's 50% better, right?
       os_cost = GCE_WINDOWS_COST_CORE_HOUR * 1.5 * cores
-    elif sys.platform == 'win32':
+  elif sys.platform == 'win32':
       # MS tax.
       os_cost = GCE_WINDOWS_COST_CORE_HOUR * cores
 
-    # Guess an equivalent machine_type.
-    machine_cost = GCE_MACHINE_COST_HOUR_US.get(get_machine_type(), 0.)
+  # Guess an equivalent machine_type.
+  machine_cost = GCE_MACHINE_COST_HOUR_US.get(get_machine_type(), 0.)
 
-    # Assume HDD for now, it's the cheapest. That's not true, we do have SSDs.
-    disk_gb_cost = 0.
-    for disk in get_disks_info().itervalues():
+  # Assume HDD for now, it's the cheapest. That's not true, we do have SSDs.
+  disk_gb_cost = 0.
+  for disk in get_disks_info().itervalues():
       disk_gb_cost += disk['free_mb'] / 1024. * (
           GCE_HDD_GB_COST_MONTH / 30. / 24.)
-    return machine_cost + os_cost + disk_gb_cost
+  return machine_cost + os_cost + disk_gb_cost
 
-  return _get_cost_hour_gce()
 
 
 @cached
@@ -877,8 +874,7 @@ def get_machine_type():
   If running on GCE, returns the right machine type. Otherwise tries to find the
   'closest' one.
   """
-  metadata = _get_metadata_gce()
-  if metadata:
+  if _get_metadata_gce():
     return get_machine_type_gce()
 
   ram_gb = get_physical_ram() / 1024.
@@ -926,7 +922,7 @@ def get_zone_gce():
   if not metadata:
     return None
   # Format is projects/<id>/zones/<zone>
-  return metadata['zone'].rsplit('/', 1)[-1]
+  return metadata['instance']['zone'].rsplit('/', 1)[-1]
 
 
 @cached
@@ -936,7 +932,7 @@ def get_machine_type_gce():
   if not metadata:
     return None
   # Format is projects/<id>/machineTypes/<machine_type>
-  return metadata['machineType'].rsplit('/', 1)[-1]
+  return metadata['instance']['machineType'].rsplit('/', 1)[-1]
 
 
 def _get_cost_hour_gce():
