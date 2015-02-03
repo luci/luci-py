@@ -177,7 +177,10 @@ class TestBotMain(net_utils.TestCase):
 
     self.expected_requests(
         [
-          ('https://localhost:1/server_ping', {}, None, None),
+          (
+            'https://localhost:1/swarming/api/v1/bot/server_ping',
+            {}, None, None,
+          ),
           (
             'https://localhost:1/auth/api/v1/accounts/self/xsrf_token',
             {

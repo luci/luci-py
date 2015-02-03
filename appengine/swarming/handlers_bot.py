@@ -102,7 +102,7 @@ class BootstrapHandler(auth.AuthenticatingHandler):
         bot_code.get_bootstrap(self.request.host_url).content)
 
 
-class GetSlaveCodeHandler(auth.AuthenticatingHandler):
+class BotCodeHandler(auth.AuthenticatingHandler):
   """Returns a zip file with all the files required by a bot.
 
   Optionally specify the hash version to download. If so, the returned data is
@@ -592,18 +592,23 @@ class ServerPingHandler(webapp2.RequestHandler):
 def get_routes():
   routes = [
       ('/bootstrap', BootstrapHandler),
-      ('/get_slave_code', GetSlaveCodeHandler),
-      ('/get_slave_code/<version:[0-9a-f]{40}>', GetSlaveCodeHandler),
-      ('/server_ping', ServerPingHandler),
+      ('/bot_code', BotCodeHandler),
+      ('/swarming/api/v1/bot/bot_code/<version:[0-9a-f]{40}>', BotCodeHandler),
       ('/swarming/api/v1/bot/error', BotErrorHandler),
       ('/swarming/api/v1/bot/event', BotEventHandler),
       ('/swarming/api/v1/bot/handshake', BotHandshakeHandler),
       ('/swarming/api/v1/bot/poll', BotPollHandler),
+      ('/swarming/api/v1/bot/server_ping', ServerPingHandler),
       ('/swarming/api/v1/bot/task_update', BotTaskUpdateHandler),
       ('/swarming/api/v1/bot/task_update/<task_id:[a-f0-9]+>',
           BotTaskUpdateHandler),
       ('/swarming/api/v1/bot/task_error', BotTaskErrorHandler),
       ('/swarming/api/v1/bot/task_error/<task_id:[a-f0-9]+>',
           BotTaskErrorHandler),
+
+      # TODO(maruel): Remove once all bots are updated.
+      ('/get_slave_code', BotCodeHandler),
+      ('/get_slave_code/<version:[0-9a-f]{40}>', BotCodeHandler),
+      ('/server_ping', ServerPingHandler),
   ]
   return [webapp2.Route(*i) for i in routes]

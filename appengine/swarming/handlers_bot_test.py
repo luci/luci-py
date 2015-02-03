@@ -593,8 +593,8 @@ class BotApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(expected, response)
     self.assertEqual(1, len(errors))
 
-  def test_get_slave_code(self):
-    code = self.app.get('/get_slave_code')
+  def test_bot_code(self):
+    code = self.app.get('/bot_code')
     expected = set(('bot_config.py', 'config.json')).union(bot_archive.FILES)
     with zipfile.ZipFile(StringIO.StringIO(code.body), 'r') as z:
       self.assertEqual(expected, set(z.namelist()))

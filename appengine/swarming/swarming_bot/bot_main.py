@@ -254,7 +254,7 @@ def run_bot(arg_error):
   try:
     # First thing is to get an arbitrary url. This also ensures the network is
     # up and running, which is necessary before trying to get the FQDN below.
-    get_remote().url_read('/server_ping')
+    get_remote().url_read('/swarming/api/v1/bot/server_ping')
   except Exception as e:
     # url_read() already traps pretty much every exceptions. This except clause
     # is kept there "just in case".
@@ -399,7 +399,7 @@ def update_bot(botobj, version):
     new_zip = 'swarming_bot.2.zip'
 
   # Download as a new file.
-  url = botobj.remote.url + '/get_slave_code/%s' % version
+  url = botobj.remote.url + '/swarming/api/v1/bot/bot_code/%s' % version
   if not net.url_retrieve(new_zip, url):
     raise Exception('Unable to download %s from %s.' % (new_zip, url))
 

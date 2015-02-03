@@ -7,5 +7,5 @@
 # must be concise since it is executed directly at the CLI.
 # pylint: disable=E0602
 import os, urllib, sys
-urllib.urlretrieve('%s/get_slave_code' % host_url, 'swarming_bot.zip')
+urllib.urlretrieve('%s/bot_code' % host_url, 'swarming_bot.zip')
 os.execv(sys.executable, [sys.executable, 'swarming_bot.zip'])

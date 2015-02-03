@@ -43,7 +43,7 @@ class LocalBot(object):
     self._log_dir = log_dir
     self._bot_zip = os.path.join(self.tmpdir, 'swarming_bot.zip')
     self._proc = None
-    urllib.urlretrieve(swarming_server + '/get_slave_code', self._bot_zip)
+    urllib.urlretrieve(swarming_server + '/bot_code', self._bot_zip)
 
   def start(self):
     """Starts the local Swarming bot."""
