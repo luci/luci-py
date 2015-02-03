@@ -126,7 +126,7 @@ def on_before_task(botobj):
     import bot_config
     return bot_config.on_before_task(botobj)
   except Exception as e:
-    botobj.post_error('Failed to call hook on_after_task()' % e)
+    botobj.post_error('Failed to call hook on_before_task(): %s' % e)
 
 
 def on_after_task(botobj, failure, internal_failure):
@@ -138,7 +138,7 @@ def on_after_task(botobj, failure, internal_failure):
     import bot_config
     return bot_config.on_after_task(botobj, failure, internal_failure)
   except Exception as e:
-    botobj.post_error('Failed to call hook on_after_task()' % e)
+    botobj.post_error('Failed to call hook on_after_task(): %s' % e)
 
 
 def setup_bot(skip_reboot):
