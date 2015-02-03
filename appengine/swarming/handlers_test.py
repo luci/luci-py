@@ -381,6 +381,7 @@ class FrontendAdminTest(AppTestBase):
     resp = self.app.get('/restricted/config')
     # TODO(maruel): Use beautifulsoup?
     params = {
+      'bot_death_timeout_secs': 10*60,
       'google_analytics': 'foobar',
       'keyid': str(config.settings().key.integer_id()),
       'reusable_task_age_secs': 30,
@@ -397,6 +398,7 @@ class FrontendAdminTest(AppTestBase):
     resp = self.app.get('/restricted/config')
     # TODO(maruel): Use beautifulsoup?
     params = {
+      'bot_death_timeout_secs': 10*60,
       'google_analytics': 'foobar',
       'keyid': str(config.settings().key.integer_id() - 1),
       'reusable_task_age_secs': 30,

@@ -60,6 +60,7 @@ class RestrictedConfigHandler(auth.AuthenticatingHandler):
       k: self.request.params.getone(k) for k in self.request.params
       if k not in ('keyid', 'xsrf_token')
     }
+    params['bot_death_timeout_secs'] = int(params['bot_death_timeout_secs'])
     params['reusable_task_age_secs'] = int(params['reusable_task_age_secs'])
     cfg = config.settings(fresh=True)
     keyid = int(self.request.get('keyid', '0'))
@@ -190,7 +191,8 @@ class BotsListHandler(auth.AuthenticatingHandler):
           sort_by, datastore_query.PropertyOrder.ASCENDING)
 
     now = utils.utcnow()
-    cutoff = now - bot_management.BOT_DEATH_TIMEOUT
+    cutoff = now - datetime.timedelta(
+        seconds=config.settings().bot_death_timeout_secs)
 
     num_bots_busy_future = bot_management.BotInfo.query(
         bot_management.BotInfo.is_busy == True).count_async()

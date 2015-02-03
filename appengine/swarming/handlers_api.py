@@ -21,6 +21,7 @@ from components import auth
 from components import ereporter2
 from components import utils
 from server import acl
+from server import config
 from server import bot_code
 from server import bot_management
 from server import stats
@@ -276,7 +277,7 @@ class ClientApiBots(auth.ApiHandler):
     bots, cursor, more = q.fetch_page(limit, start_cursor=cursor)
     data = {
       'cursor': cursor.urlsafe() if cursor and more else None,
-      'death_timeout': bot_management.BOT_DEATH_TIMEOUT.total_seconds(),
+      'death_timeout': config.settings().bot_death_timeout_secs,
       'items': [b.to_dict_with_now(now) for b in bots],
       'limit': limit,
       'now': now,

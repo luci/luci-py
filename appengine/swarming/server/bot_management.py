@@ -35,11 +35,8 @@ from google.appengine.ext import ndb
 
 from components import datastore_utils
 from components import utils
+from server import config
 from server import task_pack
-
-
-# The amount of time that has to pass before a machine is considered dead.
-BOT_DEATH_TIMEOUT = datetime.timedelta(seconds=10*60)
 
 
 # Margin of randomization of BOT_REBOOT_PERIOD_SECS. Per-bot period will be in
@@ -114,7 +111,8 @@ class BotInfo(_BotCommon):
 
   def is_dead(self, now):
     """Returns True if the bot is dead based on timestamp now."""
-    return (now - self.last_seen_ts) >= BOT_DEATH_TIMEOUT
+    timeout = config.settings().bot_death_timeout_secs
+    return (now - self.last_seen_ts).total_seconds() >= timeout
 
   def to_dict(self):
     out = super(BotInfo, self).to_dict()

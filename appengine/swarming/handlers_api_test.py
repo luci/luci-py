@@ -22,6 +22,7 @@ import handlers_api
 import handlers_bot
 from components import ereporter2
 from components import utils
+from server import config
 from server import bot_code
 from server import bot_management
 from server import task_result
@@ -631,7 +632,7 @@ class ClientApiTest(test_env_handlers.AppTestBase):
         },
       ],
       u'cursor': None,
-      u'death_timeout': bot_management.BOT_DEATH_TIMEOUT.total_seconds(),
+      u'death_timeout': config.settings().bot_death_timeout_secs,
       u'limit': 1000,
       u'now': unicode(now.strftime(utils.DATETIME_FORMAT)),
     }

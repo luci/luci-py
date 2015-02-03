@@ -18,6 +18,9 @@ class GlobalConfig(config.GlobalConfig):
   reusable_task_age_secs = ndb.IntegerProperty(
       indexed=False, default=7*24*60*60)
 
+  # The amount of time that has to pass before a machine is considered dead.
+  bot_death_timeout_secs = ndb.IntegerProperty(default=10*60)
+
 
 def settings(fresh=False):
   """Loads GlobalConfig or a default one if not present.
