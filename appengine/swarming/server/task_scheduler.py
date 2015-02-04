@@ -106,8 +106,13 @@ def _reap_task(to_run_key, request, bot_id, bot_version):
     if not to_run or not to_run.is_reapable:
       result_summary_future.wait()
       return None
-    to_run.queue_number = None
     result_summary = result_summary_future.get_result()
+    if result_summary.bot_id == bot_id:
+      # This means two things, first it's a retry, second it's that the first
+      # try failed and the retry is being reaped by the same bot. Deny that, as
+      # the bot may be deeply broken and could be in a killing spree.
+      return None
+    to_run.queue_number = None
     run_result = task_result.new_run_result(
         request, (result_summary.try_number or 0) + 1, bot_id, bot_version)
     result_summary.set_from_run_result(run_result, request)

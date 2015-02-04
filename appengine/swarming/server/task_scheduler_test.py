@@ -916,17 +916,17 @@ class TaskSchedulerApiTest(test_case.TestCase):
     # Task was retried.
     now_2 = self.mock_now(self.now + task_result.BOT_PING_TOLERANCE, 2)
     _request, run_result = task_scheduler.bot_reap_task(
-        bot_dimensions, 'localhost', 'abc')
+        bot_dimensions, 'localhost-second', 'abc')
     logging.info('%s', [t.to_dict() for t in task_to_run.TaskToRun.query()])
     self.assertEqual(2, run_result.try_number)
     self.assertEqual(
         (True, True),
         task_scheduler.bot_update_task(
-            run_result.key, 'localhost', 0, 'Foo1', 0, 0, 0.1, False, False,
-            0.1))
+            run_result.key, 'localhost-second', 0, 'Foo1', 0, 0, 0.1, False,
+            False, 0.1))
     expected = {
       'abandoned_ts': None,
-      'bot_id': u'localhost',
+      'bot_id': u'localhost-second',
       'bot_version': u'abc',
       'children_task_ids': [],
       'completed_ts': now_2,
@@ -951,6 +951,79 @@ class TaskSchedulerApiTest(test_case.TestCase):
     self.assertEqual(expected, run_result.result_summary_key.get().to_dict())
     self.assertEqual(0.1, run_result.key.get().cost_usd)
 
+  def test_cron_handle_bot_died_same_bot_denied(self):
+    # Test first retry, then success.
+    self.mock(random, 'getrandbits', lambda _: 0x88)
+    data = _gen_request_data(
+        properties=dict(dimensions={u'OS': u'Windows-3.1.1'}),
+        scheduling_expiration_secs=600)
+    task_scheduler.make_request(data)
+    bot_dimensions = {
+      u'OS': [u'Windows', u'Windows-3.1.1'],
+      u'hostname': u'localhost',
+      u'foo': u'bar',
+    }
+    _request, run_result = task_scheduler.bot_reap_task(
+        bot_dimensions, 'localhost', 'abc')
+    self.assertEqual(1, run_result.try_number)
+    self.assertEqual(task_result.State.RUNNING, run_result.state)
+    now_1 = self.mock_now(self.now + task_result.BOT_PING_TOLERANCE, 1)
+    self.assertEqual((0, 1, 0), task_scheduler.cron_handle_bot_died())
+
+    # Refresh and compare:
+    expected = {
+      'abandoned_ts': now_1,
+      'bot_id': u'localhost',
+      'bot_version': u'abc',
+      'children_task_ids': [],
+      'completed_ts': None,
+      'cost_usd': 0.,
+      'durations': [],
+      'exit_codes': [],
+      'failure': False,
+      'id': '1d69b9f088008811',
+      'internal_failure': True,
+      'modified_ts': now_1,
+      'server_versions': [u'default-version'],
+      'started_ts': self.now,
+      'state': task_result.State.BOT_DIED,
+      'try_number': 1,
+    }
+    self.assertEqual(expected, run_result.key.get().to_dict())
+    expected = {
+      'abandoned_ts': None,
+      'bot_id': u'localhost',
+      'bot_version': u'abc',
+      'children_task_ids': [],
+      'completed_ts': None,
+      'costs_usd': [0.],
+      'cost_saved_usd': None,
+      'created_ts': self.now,
+      'deduped_from': None,
+      'durations': [],
+      'exit_codes': [],
+      'failure': False,
+      'id': '1d69b9f088008810',
+      'internal_failure': False,
+      'modified_ts': now_1,
+      'name': u'Request name',
+      'properties_hash': None,
+      'server_versions': [u'default-version'],
+      'started_ts': None,
+      'state': task_result.State.PENDING,
+      'try_number': 1,
+      'user': u'Jesus',
+    }
+    self.assertEqual(expected, run_result.result_summary_key.get().to_dict())
+
+    # Task was retried but the same bot polls again, it's denied the task.
+    now_2 = self.mock_now(self.now + task_result.BOT_PING_TOLERANCE, 2)
+    request, run_result = task_scheduler.bot_reap_task(
+        bot_dimensions, 'localhost', 'abc')
+    self.assertEqual(None, request)
+    self.assertEqual(None, run_result)
+    logging.info('%s', [t.to_dict() for t in task_to_run.TaskToRun.query()])
+
   def test_cron_handle_bot_died_second(self):
     # Test two tries internal_failure's leading to a BOT_DIED status.
     self.mock(random, 'getrandbits', lambda _: 0x88)
@@ -970,14 +1043,15 @@ class TaskSchedulerApiTest(test_case.TestCase):
     self.mock_now(self.now + task_result.BOT_PING_TOLERANCE, 1)
     self.assertEqual((0, 1, 0), task_scheduler.cron_handle_bot_died())
     now_1 = self.mock_now(self.now + task_result.BOT_PING_TOLERANCE, 2)
+    # It must be a different bot.
     _request, run_result = task_scheduler.bot_reap_task(
-        bot_dimensions, 'localhost', 'abc')
+        bot_dimensions, 'localhost-second', 'abc')
     now_2 = self.mock_now(self.now + 2 * task_result.BOT_PING_TOLERANCE, 3)
     self.assertEqual((1, 0, 0), task_scheduler.cron_handle_bot_died())
     self.assertEqual((0, 0, 0), task_scheduler.cron_handle_bot_died())
     expected = {
       'abandoned_ts': now_2,
-      'bot_id': u'localhost',
+      'bot_id': u'localhost-second',
       'bot_version': u'abc',
       'children_task_ids': [],
       'completed_ts': None,
