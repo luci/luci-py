@@ -133,6 +133,8 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
 
   def setUp(self):
     super(IsolateServiceTest, self).setUp()
+    self.testbed.init_blobstore_stub()
+    self.testbed.init_urlfetch_stub()
     auth_testing.mock_get_current_identity(self)
     version = utils.get_app_version()
     self.mock(utils, 'get_task_queue_host', lambda: version)
