@@ -29,6 +29,7 @@ import gcs
 import model
 import stats
 from components import auth
+from components import datastore_utils
 from components import utils
 
 
@@ -664,26 +665,15 @@ class StoreContentHandler(ProtocolHandler):
             logging.info('Entity exists, but not yet verified')
         else:
           # New entity. Store it and enqueue verification task, transactionally.
-          try:
-            @ndb.transactional
-            def store_and_enqueue_verify_task(entry, task_queue_host):
-              entry.put()
-              taskqueue.add(
-                  url='/internal/taskqueue/verify/%s' % entry.key.id(),
-                  queue_name='verify',
-                  headers={'Host': task_queue_host},
-                  transactional=True)
-            store_and_enqueue_verify_task(entry, utils.get_task_queue_host())
-          except (
-              datastore_errors.Error,
-              runtime.apiproxy_errors.CancelledError,
-              runtime.apiproxy_errors.DeadlineExceededError,
-              runtime.apiproxy_errors.OverQuotaError,
-              runtime.DeadlineExceededError,
-              taskqueue.Error) as e:
-            return self.send_error(
-                'Unable to store the entity: %s.' % e.__class__.__name__,
-                http_code=503)
+          task_queue_host = utils.get_task_queue_host()
+          def run():
+            entry.put()
+            taskqueue.add(
+                url='/internal/taskqueue/verify/%s' % entry.key.id(),
+                queue_name='verify',
+                headers={'Host': task_queue_host},
+                transactional=True)
+          datastore_utils.transaction(run)
 
       # TODO(vadimsh): Fill in details about the entry, such as expiration time.
       self.send_json({'entry': {}})

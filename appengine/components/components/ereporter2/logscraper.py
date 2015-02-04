@@ -402,8 +402,13 @@ def scrape_logs_for_errors(start_time, end_time, module_versions):
   categories = []
   ignored = []
   for category in buckets.itervalues():
-    key = models.ErrorReportingMonitoring.error_to_key_id(category.signature)
-    if _should_ignore_error_category(filters.get(key), category):
+    # Ignore either the exception or the signature. Signature takes precedence.
+    f = filters.get(models.ErrorReportingMonitoring.error_to_key_id(
+        category.signature))
+    if not f and category.exception_type:
+      f = filters.get(models.ErrorReportingMonitoring.error_to_key_id(
+          category.exception_type))
+    if _should_ignore_error_category(f, category):
       ignored.append(category)
     else:
       categories.append(category)

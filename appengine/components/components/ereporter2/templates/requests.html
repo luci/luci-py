@@ -35,11 +35,26 @@ Modules-Versions:
   <p>
   <form method="POST" action="/restricted/ereporter2/silence">
     <strong>Silencing</strong><br>
-    When under threshold: <input name="threshold" type="number"></input><br>
+    {% if category.exception_type %}
+      <label title="Signature">
+        <input type="radio" name="mute_type" value="signature" checked>Signature
+        </input>
+      </label>
+      <label title="Exception">
+        <input type="radio" name="mute_type" value="exception_type" checked>
+          Exception</input>
+      </label><br>
+      <input type="hidden" name="exception_type" value="{{category.exception_type}}"></input>
+    {% else %}
+      <input type="hidden" name="mute_type" value="signature"></input>
+      <input type="hidden" name="exception_type" value=""></input>
+    {% endif %}
+    When under threshold: <input name="threshold" type="number" value="10">
+      </input><br>
     <input type="checkbox" name="silenced">Silence forever</input><br>
     Silence up to (UTC): <input type="datetime-local" name="silenced_until">
     </input><br>
-    <input type="hidden" name="error" value="{{category.signature}}"></input>
+    <input type="hidden" name="signature" value="{{category.signature}}"></input>
     <input type="hidden" name="xsrf_token" value="{{xsrf_token}}"></input>
     <input type="submit" value="Mute it!"></input>
   </form>

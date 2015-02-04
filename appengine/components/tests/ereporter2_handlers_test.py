@@ -199,10 +199,12 @@ class Ereporter2FrontendTest(Base):
     self.assertEqual('/restricted/ereporter2/silence', silence_url)
 
     expected_inputs = {
-      'error': 'DeadlineExceededError@check_entry_infos',
+      'exception_type': 'DeadlineExceededError',
+      'signature': 'DeadlineExceededError@check_entry_infos',
+      'mute_type': 'exception_type',
       'silenced': None,
       'silenced_until': None,
-      'threshold': None,
+      'threshold': '10',
     }
     actual_inputs = {}
     for i in re.findall(r'(\<input .+?\<\/input\>)', form, re.DOTALL):

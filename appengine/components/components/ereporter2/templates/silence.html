@@ -63,7 +63,7 @@
         <td>
           <form method="POST">
             <input type=submit value="Delete"></input>
-            <input type="hidden" name="error" value="{{item.error}}" />
+            <input type="hidden" name="to_delete" value="{{item.key.id()}}" />
             <input type="hidden" name="xsrf_token" value="{{xsrf_token}}" />
           </form>
         </td>

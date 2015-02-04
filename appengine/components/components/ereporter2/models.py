@@ -26,10 +26,9 @@ class ErrorReportingMonitoring(ndb.Model):
 
   Key name is the hash of the error name.
   """
-  created_ts = ndb.DateTimeProperty(auto_now_add=True, indexed=False)
+  created_ts = ndb.DateTimeProperty(auto_now_add=True)
 
-  # The error string. Limited to 500 bytes. It can be either the exception type
-  # or a single line.
+  # The error string. It can be either the exception type or a single line.
   error = ndb.StringProperty(indexed=False)
 
   # If True, this error is silenced and never reported.
