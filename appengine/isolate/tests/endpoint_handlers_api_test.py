@@ -440,8 +440,7 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
     retrieved = retrieved_response.json
     self.assertNotEqual(message.get(u'gs_upload_url', ''), '')
     self.assertNotEqual(retrieved.get(u'url', ''), '')
-    self.assertEqual(
-        message[u'gs_upload_url'], retrieved[u'url'])
+    self.assertTrue(retrieved.get(u'url', '').startswith(self.store_prefix))
 
     # clear the taskqueue
     self.assertEqual(1, self.execute_tasks())

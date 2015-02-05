@@ -248,12 +248,9 @@ class IsolateService(remote.Service):
             request.offset)
       return RetrievedContent(content=content[request.offset:])
 
-    # TODO(cmassaro): this was originally a 302 redirect; should that happen
-    #   here, or are we okay with just returning the URL?
     # TODO(cmassaro): what do we do about weird offsets in this case?
-    return RetrievedContent(url=self.gs_url_signer.get_upload_url(
+    return RetrievedContent(url=self.gs_url_signer.get_download_url(
         filename=key.id(),
-        content_type='application/octet-stream',
         expiration=DEFAULT_LINK_EXPIRATION))
 
   ### Utility
