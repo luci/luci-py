@@ -5,14 +5,11 @@
 """Access control groups for ereporter2."""
 
 from components import auth
+from . import config
 
 
-# Name of a group that lists users that receive ereporter2 reports.
-RECIPIENTS_AUTH_GROUP = 'ereporter2-reports'
-
-# Group that can view all ereporter2 reports without being a general auth admin.
-# It can also silence reports.
-VIEWERS_AUTH_GROUP = 'ereporter2-viewers'
+RECIPIENTS_AUTH_GROUP = config.config.RECIPIENTS_AUTH_GROUP
+VIEWERS_AUTH_GROUP = config.config.VIEWERS_AUTH_GROUP
 
 
 def get_ereporter2_recipients():
