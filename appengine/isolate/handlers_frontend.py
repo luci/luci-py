@@ -127,6 +127,7 @@ class RestrictedLaunchMapReduceJob(auth.AuthenticatingHandler):
 
 
 class BrowseHandler(auth.AuthenticatingHandler):
+  @auth.autologin
   @auth.require(acl.isolate_readable)
   def get(self):
     namespace = self.request.get('namespace', 'default')

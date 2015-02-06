@@ -16,6 +16,7 @@ test_env.setup_test_env()
 import webapp2
 
 from google.appengine.api import logservice
+from google.appengine.api import users
 
 # From components/third_party/
 import webtest
@@ -114,6 +115,10 @@ class Ereporter2FrontendTest(Base):
     def is_group_member_mock(group, identity=None):
       return group == auth.model.ADMIN_GROUP or original(group, identity)
     original = self.mock(auth.api, 'is_group_member', is_group_member_mock)
+    class admin(object):
+      def email(self):
+        return 'admin@example.com'
+    self.mock(users, 'get_current_user', admin)
 
   def test_frontend_general(self):
     self.mock_as_admin()
@@ -203,7 +208,7 @@ class Ereporter2FrontendTest(Base):
       'signature': 'DeadlineExceededError@check_entry_infos',
       'mute_type': 'exception_type',
       'silenced': None,
-      'silenced_until': None,
+      'silenced_until': 'T',
       'threshold': '10',
     }
     actual_inputs = {}
@@ -215,6 +220,7 @@ class Ereporter2FrontendTest(Base):
         continue
       self.assertTrue(name_match, i)
       name = name_match.group(1)
+      # That's cheezy, as silenced used 'checked', not value.
       value_match = re.search(r'value\=\"(.+)\"', i)
       if name == 'xsrf_token':
         expected_inputs[name] = value_match.group(1)
@@ -241,6 +247,10 @@ class Ereporter2FrontendTest(Base):
     resp = self.app.get('/restricted/ereporter2/report')
     self.assertIn('Found 0 occurrences of 0 errors across', resp.body)
     self.assertIn('Ignored 1 occurrences of 1 errors across', resp.body)
+
+  def test_report_silence_autologin(self):
+    resp = self.app.get('/restricted/ereporter2/report')
+    self.assertEqual(302, resp.status_code)
 
 
 class Ereporter2BackendTest(Base):

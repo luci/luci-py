@@ -22,6 +22,7 @@ import threading
 import time
 
 from google.appengine.api import oauth
+from google.appengine.api import users
 from google.appengine.ext import ndb
 from google.appengine.ext.ndb import metadata
 
@@ -31,6 +32,7 @@ from . import model
 
 # Part of public API of 'auth' component, exposed by this module.
 __all__ = [
+  'autologin',
   'AuthenticationError',
   'AuthorizationError',
   'disable_process_cache',
@@ -790,6 +792,46 @@ def require(callback):
     return wrapper
 
   return decorator
+
+
+def autologin(func):
+  """Decorator that autologin anonymous users via the web UI.
+
+  This is meant to to used on handlers that require a non-anonymous user via
+  @require(), so that the user is not served a 403 simply because he didn't have
+  the cookie set yet. Do not use this decorator on APIs using anything else than
+  AppEngine's user authentication mechanism.
+
+  Usage example:
+
+  class MyHandler(auth.AuthenticatingHandler):
+    @auth.autologin
+    @auth.require(auth.is_admin)
+    def get(self):
+      ....
+  """
+  # @public decorator sets __auth_public attribute.
+  if hasattr(func, '__auth_public'):
+    raise TypeError('Can\'t use @public and @autolgin on same function')
+  # When nesting multiple decorators the information (argspec, name) about
+  # original function gets lost. __wrapped__ is used by NDB decorators
+  # to preserve reference to original function. Use it too.
+  original = getattr(func, '__wrapped__', func)
+  if original.__name__ != 'get':
+    raise TypeError('Only get() can be set as autologin')
+
+  @functools.wraps(func)
+  def wrapper(self, *args, **kwargs):
+    if not users.get_current_user():
+      self.redirect(users.create_login_url(self.request.url))
+      return
+    return func(self, *args, **kwargs)
+
+  # Propagate reference to original function, mark function as decorated.
+  wrapper.__wrapped__ = original
+  wrapper.__auth_require = True
+
+  return wrapper
 
 
 def is_decorated(func):

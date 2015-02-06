@@ -36,6 +36,7 @@ from . import ui
 class RestrictedEreporter2Report(auth.AuthenticatingHandler):
   """Returns all the recent errors as a web page."""
 
+  @auth.autologin
   @auth.require(acl.is_ereporter2_viewer)
   def get(self):
     """Reports the errors logged and ignored.
@@ -79,6 +80,7 @@ class RestrictedEreporter2Report(auth.AuthenticatingHandler):
 class RestrictedEreporter2Request(auth.AuthenticatingHandler):
   """Dumps information about single logged request."""
 
+  @auth.autologin
   @auth.require(acl.is_ereporter2_viewer)
   def get(self, request_id):
     data = logscraper._log_request_id(request_id)
@@ -91,6 +93,7 @@ class RestrictedEreporter2Request(auth.AuthenticatingHandler):
 class RestrictedEreporter2ErrorsList(auth.AuthenticatingHandler):
   """Dumps information about reported client side errors."""
 
+  @auth.autologin
   @auth.require(acl.is_ereporter2_viewer)
   def get(self):
     limit = int(self.request.get('limit', 100))
@@ -109,6 +112,7 @@ class RestrictedEreporter2ErrorsList(auth.AuthenticatingHandler):
 class RestrictedEreporter2Error(auth.AuthenticatingHandler):
   """Dumps information about reported client side errors."""
 
+  @auth.autologin
   @auth.require(acl.is_ereporter2_viewer)
   def get(self, error_id):
     error = models.Error.get_by_id(int(error_id))
@@ -122,6 +126,7 @@ class RestrictedEreporter2Error(auth.AuthenticatingHandler):
 
 
 class RestrictedEreporter2Silence(auth.AuthenticatingHandler):
+  @auth.autologin
   @auth.require(acl.is_ereporter2_viewer)
   def get(self):
     # Due to historical reasons where created_ts had indexed=False,, do not use
@@ -149,6 +154,8 @@ class RestrictedEreporter2Silence(auth.AuthenticatingHandler):
         self.abort(400)
       silenced = self.request.get('silenced')
       silenced_until = self.request.get('silenced_until')
+      if silenced_until == 'T':
+        silenced_until = ''
       threshold = self.request.get('threshold')
       key = models.ErrorReportingMonitoring.error_to_key(error)
       if not silenced and not silenced_until and not threshold:

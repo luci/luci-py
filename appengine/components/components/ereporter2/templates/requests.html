@@ -1,6 +1,21 @@
 {% set title = 'Error Report' %}
 {% extends "ereporter2/base.html" %}
 
+{% block header %}
+<script>
+  function on_silenced(self) {
+    if (self.checked) {
+      self.parentElement.getElementsByClassName('silenced_until')[0].value = "T";
+    }
+  }
+  function on_silenced_until(self) {
+    if (self.value) {
+      self.parentElement.getElementsByClassName('silenced')[0].checked = null;
+    }
+  }
+</script>
+{% endblock %}
+
 {% block body %}
 <h2>Report for {{start|epochformat}} ({{start}}) to {{end|epochformat}} ({{end}})</h2>
 <a href="/restricted/ereporter2/report?start={{start-3600}}&end={{start}}">
@@ -36,7 +51,7 @@ Modules-Versions:
   <form method="POST" action="/restricted/ereporter2/silence">
     <strong>Silencing</strong><br>
     {% if category.exception_type %}
-      <label title="Signature">
+      Filter for: <label title="Signature">
         <input type="radio" name="mute_type" value="signature" checked>Signature
         </input>
       </label>
@@ -51,8 +66,10 @@ Modules-Versions:
     {% endif %}
     When under threshold: <input name="threshold" type="number" value="10">
       </input><br>
-    <input type="checkbox" name="silenced">Silence forever</input><br>
-    Silence up to (UTC): <input type="datetime-local" name="silenced_until">
+    <input type="checkbox" class="silenced" name="silenced" checked onclick="on_silenced(this)">
+    Silence forever</input>
+    <strong>or</strong>
+    Silence up to (UTC): <input type="datetime-local" class="silenced_until" name="silenced_until" oninput="on_silenced_until(this)" value="T">
     </input><br>
     <input type="hidden" name="signature" value="{{category.signature}}"></input>
     <input type="hidden" name="xsrf_token" value="{{xsrf_token}}"></input>
