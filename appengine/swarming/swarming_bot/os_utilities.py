@@ -529,7 +529,15 @@ def _run_df():
       stdout=subprocess.PIPE, stderr=subprocess.PIPE)
   for l in proc.communicate()[0].splitlines():
     if l.startswith('/dev/'):
-      yield l.split()
+      items = l.split()
+      if (sys.platform == 'darwin' and
+          items[5].startswith('/Volumes/firmwaresyncd.')):
+        # There's an issue on OSX where sometimes a small volume is mounted
+        # during boot time and may be caught here by accident. Just ignore it as
+        # it could trigger the low free disk space check and cause an unexpected
+        # bot self-quarantine.
+        continue
+      yield items
 
 
 def _get_disks_info_posix():
