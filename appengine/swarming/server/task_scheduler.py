@@ -260,8 +260,8 @@ def exponential_backoff(attempt_num):
   return min(max_wait, math.pow(1.5, min(attempt_num, 10) + 1))
 
 
-def make_request(data):
-  """Creates and stores all the entities for a new task request.
+def schedule_request(request):
+  """Creates and stores all the entities to schedule a new task request.
 
   The number of entities created is 3: TaskRequest, TaskResultSummary and
   TaskToRun.
@@ -271,13 +271,11 @@ def make_request(data):
   in-between.
 
   Arguments:
-  - data: is in the format expected by task_request.make_request().
+  - request: is in the TaskRequest entity saved in the DB.
 
   Returns:
-    tuple(TaskRequest, TaskResultSummary). TaskToRun is not returned.
+    TaskResultSummary. TaskToRun is not returned.
   """
-  request = task_request.make_request(data)
-
   dupe_future = None
   if request.properties.idempotent:
     # Find a previously run task that is also idempotent and completed. Start a
@@ -380,7 +378,7 @@ def make_request(data):
       'task_enqueued', result_summary.key,
       dimensions=request.properties.dimensions,
       user=request.user)
-  return request, result_summary
+  return result_summary
 
 
 def bot_reap_task(dimensions, bot_id, bot_version):

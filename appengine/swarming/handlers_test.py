@@ -301,6 +301,27 @@ class FrontendTest(AppTestBase):
     reaped = self.bot_poll('bot1')
     self.assertEqual('sleep', reaped['cmd'])
 
+  def test_task_retry(self):
+    self.set_as_privileged_user()
+    _, task_id = self.client_create_task()
+    xsrf_token = self.get_xsrf_token()
+    resp = self.app.post(
+        '/user/task/%s/retry' % task_id, {'xsrf_token': xsrf_token})
+    self.assertEqual(302, resp.status_code)
+    prefix = 'http://localhost/user/task/'
+    self.assertTrue(resp.location.startswith(prefix))
+    new_task_id = resp.location[len(prefix):]
+    self.assertNotEqual(new_task_id, task_id)
+
+    # Both tasks are scheduled.
+    self.set_as_bot()
+    reaped = self.bot_poll('bot1')
+    self.assertEqual('run', reaped['cmd'])
+    self.assertEqual(task_id[:-1] + '1', reaped['manifest']['task_id'])
+    reaped = self.bot_poll('bot2')
+    self.assertEqual('run', reaped['cmd'])
+    self.assertEqual(new_task_id[:-1] + '1', reaped['manifest']['task_id'])
+
   def test_bot_list_empty(self):
     # Just assert it doesn't throw.
     self.set_as_admin()

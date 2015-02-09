@@ -32,7 +32,6 @@ from support import test_case
 def _gen_request_data(properties=None, **kwargs):
   base_data = {
     'name': 'Request name',
-    'user': 'Jesus',
     'properties': {
       'commands': [
         [u'command1', u'arg1'],
@@ -52,6 +51,7 @@ def _gen_request_data(properties=None, **kwargs):
     'priority': 50,
     'scheduling_expiration_secs': 30,
     'tags': [u'tag:1'],
+    'user': 'Jesus',
   }
   base_data.update(kwargs)
   base_data['properties'].update(properties or {})
@@ -162,8 +162,12 @@ class TaskRequestApiTest(TestCase):
       task_request.validate_request_key(key)
 
   def test_make_request(self):
-    deadline_to_run = 31
-    data = _gen_request_data(scheduling_expiration_secs=deadline_to_run)
+    # Compare with test_make_request_clone().
+    parent = task_request.make_request(_gen_request_data())
+    # Hack: Would need to know about TaskResultSummary.
+    parent_id = task_pack.pack_request_key(parent.key) + '1'
+    data = _gen_request_data(
+        properties=dict(idempotent=True), parent_task_id=parent_id)
     request = task_request.make_request(data)
     expected_properties = {
       'commands': [
@@ -179,33 +183,35 @@ class TaskRequestApiTest(TestCase):
       'env': {u'foo': u'bar', u'joe': u'2'},
       'execution_timeout_secs': 30,
       'grace_period_secs': 30,
-      'idempotent': False,
+      'idempotent': True,
       'io_timeout_secs': None,
     }
     expected_request = {
       'authenticated': auth_testing.DEFAULT_MOCKED_IDENTITY,
       'name': u'Request name',
-      'parent_task_id': None,
-      'priority': 50,
+      'parent_task_id': unicode(parent_id),
+      'priority': 49,
       'properties': expected_properties,
-      'properties_hash': None,
-      'user': u'Jesus',
+      'properties_hash': 'f10d3159e26b2126f5dc3b9b3e824a584be442f2',
       'tags': [
         u'OS:Windows-3.1.1',
         u'hostname:localhost',
-        u'priority:50',
+        u'priority:49',
         u'tag:1',
         u'user:Jesus',
       ],
+      'user': u'Jesus',
     }
     actual = request.to_dict()
-    # expiration_ts - created_ts == deadline_to_run.
+    # expiration_ts - created_ts == scheduling_expiration_secs.
     created = actual.pop('created_ts')
     expiration = actual.pop('expiration_ts')
     self.assertEqual(
-        int(round((expiration - created).total_seconds())), deadline_to_run)
+        int(round((expiration - created).total_seconds())),
+        data['scheduling_expiration_secs'])
     self.assertEqual(expected_request, actual)
-    self.assertEqual(31., request.scheduling_expiration_secs)
+    self.assertEqual(
+        data['scheduling_expiration_secs'], request.scheduling_expiration_secs)
 
   def test_make_request_parent(self):
     parent = task_request.make_request(_gen_request_data())
@@ -323,6 +329,65 @@ class TaskRequestApiTest(TestCase):
     task_request.make_request(
         _gen_request_data(
             scheduling_expiration_secs=task_request._MIN_TIMEOUT_SECS))
+
+  def test_make_request_clone(self):
+    # Compare with test_make_request().
+    parent = task_request.make_request(_gen_request_data())
+    # Hack: Would need to know about TaskResultSummary.
+    parent_id = task_pack.pack_request_key(parent.key) + '1'
+    data = _gen_request_data(
+        properties=dict(idempotent=True), parent_task_id=parent_id)
+    request = task_request.make_request_clone(task_request.make_request(data))
+    # Differences from make_request() are:
+    # - idempotent was reset to False.
+    # - parent_task_id was reset to None.
+    expected_properties = {
+      'commands': [
+        [u'command1', u'arg1'],
+        [u'command2', u'arg2'],
+      ],
+      'data': [
+        # Items were sorted.
+        [u'http://localhost/bar', u'bar.zip'],
+        [u'http://localhost/foo', u'foo.zip'],
+      ],
+      'dimensions': {u'OS': u'Windows-3.1.1', u'hostname': u'localhost'},
+      'env': {u'foo': u'bar', u'joe': u'2'},
+      'execution_timeout_secs': 30,
+      'grace_period_secs': 30,
+      'idempotent': False,
+      'io_timeout_secs': None,
+    }
+    # Differences from make_request() are:
+    # - parent_task_id was reset to None.
+    # - tag 'user:' was replaced
+    # - user was replaced.
+    expected_request = {
+      'authenticated': auth_testing.DEFAULT_MOCKED_IDENTITY,
+      'name': u'Request name (Retry #1)',
+      'parent_task_id': None,
+      'priority': 49,
+      'properties': expected_properties,
+      'properties_hash': None,
+      'tags': [
+        u'OS:Windows-3.1.1',
+        u'hostname:localhost',
+        u'priority:49',
+        u'tag:1',
+        u'user:mocked@example.com',
+      ],
+      'user': u'mocked@example.com',
+    }
+    actual = request.to_dict()
+    # expiration_ts - created_ts == deadline_to_run.
+    created = actual.pop('created_ts')
+    expiration = actual.pop('expiration_ts')
+    self.assertEqual(
+        int(round((expiration - created).total_seconds())),
+        data['scheduling_expiration_secs'])
+    self.assertEqual(expected_request, actual)
+    self.assertEqual(
+        data['scheduling_expiration_secs'], request.scheduling_expiration_secs)
 
   def test_validate_priority(self):
     with self.assertRaises(TypeError):

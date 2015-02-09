@@ -13,6 +13,10 @@
     margin-bottom: 5px;
   }
 
+  h2.inline {
+    display: inline;
+  }
+
   table.property_table {
     font-family: monospace;
     border-spacing: 0;
@@ -52,6 +56,11 @@
 
   .help_text {
     background-color: #ffffee;
+  }
+
+  .spaced {
+    margin-top: 10px;
+    margin-bottom: 5px;
   }
 </style>
 {% endblock %}
@@ -128,7 +137,15 @@
 </div>
 
 <div title="Information about what was asked to be run. This is what is used for task deduplication.">
-  <h2>Request properties</h2>
+  <div class="spaced">
+    <h2 class="inline">Request properties</h2>
+    {% if is_privileged_user %}
+      <form method="POST" action="/user/task/{{task.key_string}}/retry" style="display:inline">
+        <input type="submit" value="Retry" style="display:inline"></input>
+        <input type="hidden" name="xsrf_token" value="{{xsrf_token}}" />
+      </form>
+    {% endif %}
+  </div>
   <table class="property_table">
     <tbody>
       <tr title="The request dimensions is the minimum set of properties a bot must advertise to be able to execute this task.">

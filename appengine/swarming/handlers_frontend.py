@@ -12,6 +12,7 @@ import collections
 import datetime
 import itertools
 import os
+import re
 
 import webapp2
 
@@ -32,6 +33,7 @@ from server import bot_management
 from server import config
 from server import stats_gviz
 from server import task_pack
+from server import task_request
 from server import task_result
 from server import task_scheduler
 
@@ -522,18 +524,20 @@ class TasksHandler(auth.AuthenticatingHandler):
 
 
 class TaskHandler(auth.AuthenticatingHandler):
-  """Show the full text of a test request."""
+  """Show the full text of a task request.
+
+  This handler supports both TaskResultSummary (ends with 0) or TaskRunResult
+  (ends with 1 or 2).
+  """
 
   @auth.require(acl.is_user)
-  def get(self, key_id):
-    key = None
-    request_key = None
+  def get(self, task_id):
     try:
-      key = task_pack.unpack_result_summary_key(key_id)
+      key = task_pack.unpack_result_summary_key(task_id)
       request_key = task_pack.result_summary_key_to_request_key(key)
     except ValueError:
       try:
-        key = task_pack.unpack_run_result_key(key_id)
+        key = task_pack.unpack_run_result_key(task_id)
         request_key = task_pack.result_summary_key_to_request_key(
             task_pack.run_result_key_to_result_summary_key(key))
       except (NotImplementedError, ValueError):
@@ -636,6 +640,39 @@ class TaskCancelHandler(auth.AuthenticatingHandler):
       self.redirect('/user/task/%s' % key_id)
 
 
+class TaskRetryHandler(auth.AuthenticatingHandler):
+  """Retries the same task but with new metadata.
+
+  Retrying a task forcibly make it not idempotent so the task is inconditionally
+  scheduled.
+
+  This handler supports both TaskResultSummary (ends with 0) or TaskRunResult
+  (ends with 1 or 2).
+  """
+
+  @auth.require(acl.is_privileged_user)
+  def post(self, task_id):
+    try:
+      key = task_pack.unpack_result_summary_key(task_id)
+      request_key = task_pack.result_summary_key_to_request_key(key)
+    except ValueError:
+      try:
+        key = task_pack.unpack_run_result_key(task_id)
+        request_key = task_pack.result_summary_key_to_request_key(
+            task_pack.run_result_key_to_result_summary_key(key))
+      except (NotImplementedError, ValueError):
+        self.abort(404, 'Invalid key format.')
+
+    # Retrying a task is essentially reusing the same task request as the
+    # original one, but with new parameters.
+    original_request = request_key.get()
+    if not original_request:
+      self.abort(404, 'Invalid request key.')
+    new_request = task_request.make_request_clone(original_request)
+    result_summary = task_scheduler.schedule_request(new_request)
+    self.redirect('/user/task/%s' % result_summary.key_string)
+
+
 ### Public pages.
 
 
@@ -682,7 +719,8 @@ def create_application(debug):
 
       # User pages.
       ('/user/tasks', TasksHandler),
-      ('/user/task/<key_id:[0-9a-fA-F]+>', TaskHandler),
+      ('/user/task/<task_id:[0-9a-fA-F]+>', TaskHandler),
+      ('/user/task/<task_id:[0-9a-fA-F]+>/retry', TaskRetryHandler),
       ('/user/tasks/cancel', TaskCancelHandler),
 
       # Privileged user pages.

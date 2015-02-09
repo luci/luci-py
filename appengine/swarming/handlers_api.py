@@ -26,6 +26,7 @@ from server import bot_code
 from server import bot_management
 from server import stats
 from server import task_pack
+from server import task_request
 from server import task_result
 from server import task_scheduler
 from server import task_to_run
@@ -343,17 +344,18 @@ class ClientRequestHandler(auth.ApiHandler):
   """Creates a new request, returns all the meta data about the request."""
   @auth.require(acl.is_bot_or_user)
   def post(self):
-    request = self.parse_body()
+    request_data = self.parse_body()
     # If the priority is below 100, make the the user has right to do so.
-    if request.get('priority', 255) < 100 and not acl.is_bot_or_admin():
+    if request_data.get('priority', 255) < 100 and not acl.is_bot_or_admin():
       # Silently drop the priority of normal users.
-      request['priority'] = 100
+      request_data['priority'] = 100
 
     try:
-      request, result_summary = task_scheduler.make_request(request)
+      request = task_request.make_request(request_data)
     except (datastore_errors.BadValueError, TypeError, ValueError) as e:
       self.abort_with_error(400, error=str(e))
 
+    result_summary = task_scheduler.schedule_request(request)
     data = {
       'request': request.to_dict(),
       'task_id': task_pack.pack_result_summary_key(result_summary.key),

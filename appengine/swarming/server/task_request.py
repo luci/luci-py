@@ -45,6 +45,7 @@ import datetime
 import hashlib
 import logging
 import random
+import re
 
 from google.appengine.api import datastore_errors
 from google.appengine.ext import ndb
@@ -469,7 +470,7 @@ def make_request(data):
         result_summary_key)
     parent = request_key.get()
     if not parent:
-      raise ValueError('parent_task_id is invalid')
+      raise ValueError('parent_task_id is not a valid task')
     data['priority'] = max(min(data['priority'], parent.priority - 1), 0)
     # Drop the previous user.
     data['user'] = parent.user
@@ -499,6 +500,53 @@ def make_request(data):
       properties=properties,
       tags=data['tags'],
       user=data['user'] or '')
+  _put_request(request)
+  return request
+
+
+def make_request_clone(original_request):
+  """Makes a new TaskRequest from a previous one.
+
+  Modifications:
+  - Enforces idempotent=False.
+  - Removes the parent_task_id if any.
+  - Append suffix '(Retry #1)' to the task name, incrementing the number of
+    followup retries.
+  - Strip any tag starting with 'user:'.
+  - Override request's user with the credentials of the currently logged in
+    user.
+
+  Returns:
+    The newly created TaskRequest.
+  """
+  now = utils.utcnow()
+  properties = TaskProperties(**original_request.properties.to_dict())
+  properties.idempotent = False
+  expiration_ts = (
+      now + (original_request.expiration_ts - original_request.created_ts))
+  name = original_request.name
+  match = re.match(r'^(.*) \(Retry #(\d+)\)$', name)
+  if match:
+    name = '%s (Retry #%d)' % (match.group(1), int(match.group(2)) + 1)
+  else:
+    name += ' (Retry #1)'
+  user = auth.get_current_identity()
+  username = user.to_bytes()
+  prefix = 'user:'
+  if not username.startswith(prefix):
+    raise ValueError('a request can only be cloned by a user, not a bot')
+  username = username[len(prefix):]
+  tags = set(t for t in original_request.tags if not t.startswith('user:'))
+  request = TaskRequest(
+      authenticated=user,
+      created_ts=now,
+      expiration_ts=expiration_ts,
+      name=name,
+      parent_task_id=None,
+      priority=original_request.priority,
+      properties=properties,
+      tags=tags,
+      user=username)
   _put_request(request)
   return request
 
