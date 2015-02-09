@@ -355,7 +355,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
     str_now = unicode(now.strftime(utils.DATETIME_FORMAT))
     token, params = self.get_bot_token()
     self.client_create_task(
-        properties=dict(commands=[['python', 'runtest.py'], ['cleanup.py']]))
+        properties=dict(commands=[['python', 'runtest.py']]))
 
     def _params(**kwargs):
       out = {
@@ -420,20 +420,13 @@ class BotApiTest(test_env_handlers.AppTestBase):
     expected = _expected()
     _cycle(params, expected)
 
-    # 4. Task update with completion of first command.
-    params = _params(duration=0.2, exit_code=0)
-    expected = _expected(exit_codes=[0])
-    expected = _expected(durations=[0.2], exit_codes=[0])
-    _cycle(params, expected)
-
-    # 5. Task update with completion of second command along with full output.
+    # 4. Task update with completion of the command.
     params = _params(
-        command_index=1, duration=0.1, exit_code=23,
-        output=base64.b64encode('Ahahah'))
+        duration=0.1, exit_code=23, output=base64.b64encode('Ahahah'))
     expected = _expected(
         completed_ts=str_now,
-        durations=[0.2, 0.1],
-        exit_codes=[0, 23],
+        durations=[0.1],
+        exit_codes=[23],
         failure=True,
         state=task_result.State.COMPLETED)
     _cycle(params, expected)
@@ -441,7 +434,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
   def test_task_update_db_failure(self):
     # The error is caught in task_scheduler.bot_update_task().
     self.client_create_task(
-        properties=dict(commands=[['python', 'runtest.py'], ['cleanup.py']]))
+        properties=dict(commands=[['python', 'runtest.py']]))
 
     token, params = self.get_bot_token()
     response = self.post_with_token(
@@ -473,7 +466,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
   def test_task_update_failure(self):
     # The error is caught in handlers_api.BotTaskUpdateHandler.post().
     self.client_create_task(
-        properties=dict(commands=[['python', 'runtest.py'], ['cleanup.py']]))
+        properties=dict(commands=[['python', 'runtest.py']]))
 
     token, params = self.get_bot_token()
     response = self.post_with_token(

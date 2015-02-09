@@ -33,10 +33,7 @@ def _gen_request_data(properties=None, **kwargs):
   base_data = {
     'name': 'Request name',
     'properties': {
-      'commands': [
-        [u'command1', u'arg1'],
-        [u'command2', u'arg2'],
-      ],
+      'commands': [[u'command1', u'arg1']],
       'data': [
         [u'http://localhost/foo', u'foo.zip'],
         [u'http://localhost/bar', u'bar.zip'],
@@ -170,10 +167,7 @@ class TaskRequestApiTest(TestCase):
         properties=dict(idempotent=True), parent_task_id=parent_id)
     request = task_request.make_request(data)
     expected_properties = {
-      'commands': [
-        [u'command1', u'arg1'],
-        [u'command2', u'arg2'],
-      ],
+      'commands': [[u'command1', u'arg1']],
       'data': [
         # Items were sorted.
         [u'http://localhost/bar', u'bar.zip'],
@@ -192,7 +186,7 @@ class TaskRequestApiTest(TestCase):
       'parent_task_id': unicode(parent_id),
       'priority': 49,
       'properties': expected_properties,
-      'properties_hash': 'f10d3159e26b2126f5dc3b9b3e824a584be442f2',
+      'properties_hash': '6ec96bdc40fad2bdaec3cbbe43594961ad72f02e',
       'tags': [
         u'OS:Windows-3.1.1',
         u'hostname:localhost',
@@ -234,7 +228,7 @@ class TaskRequestApiTest(TestCase):
     self.assertEqual(True, as_dict['properties']['idempotent'])
     # Ensure the algorithm is deterministic.
     self.assertEqual(
-        'f10d3159e26b2126f5dc3b9b3e824a584be442f2', as_dict['properties_hash'])
+        '6ec96bdc40fad2bdaec3cbbe43594961ad72f02e', as_dict['properties_hash'])
 
   def test_duped(self):
     # Two TestRequest with the same properties.
@@ -277,7 +271,7 @@ class TaskRequestApiTest(TestCase):
           _gen_request_data(properties=dict(commands=[])))
     with self.assertRaises(TypeError):
       task_request.make_request(
-          _gen_request_data(properties=dict(commands={})))
+          _gen_request_data(properties=dict(commands={'a': 'b'})))
     with self.assertRaises(TypeError):
       task_request.make_request(
           _gen_request_data(properties=dict(commands=['python'])))
@@ -342,10 +336,7 @@ class TaskRequestApiTest(TestCase):
     # - idempotent was reset to False.
     # - parent_task_id was reset to None.
     expected_properties = {
-      'commands': [
-        [u'command1', u'arg1'],
-        [u'command2', u'arg2'],
-      ],
+      'commands': [[u'command1', u'arg1']],
       'data': [
         # Items were sorted.
         [u'http://localhost/bar', u'bar.zip'],

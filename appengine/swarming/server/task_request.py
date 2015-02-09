@@ -475,6 +475,11 @@ def make_request(data):
     # Drop the previous user.
     data['user'] = parent.user
 
+  # Can't be a validator yet as we wouldn't be able to load previous task
+  # requests.
+  if len(data_properties.get('commands') or []) > 1:
+    raise datastore_errors.BadValueError('Only one command is supported')
+
   # Class TaskProperties takes care of making everything deterministic.
   properties = TaskProperties(
       commands=data_properties['commands'],
