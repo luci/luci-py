@@ -552,10 +552,10 @@ class TaskHandler(auth.AuthenticatingHandler):
     request = request_future.get_result()
     parent_task_future = None
     if request.parent_task_id:
-      parent_key = task_result.unpack_run_result_key(request.parent_task_id)
+      parent_key = task_pack.unpack_run_result_key(request.parent_task_id)
       parent_task_future = parent_key.get_async()
     children_tasks_futures = [
-      task_result.unpack_result_summary_key(c).get_async()
+      task_pack.unpack_result_summary_key(c).get_async()
       for c in result.children_task_ids
     ]
 
