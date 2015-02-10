@@ -398,7 +398,7 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
     response = self.call_api(
         'retrieve_content', self.message_to_dict(retrieve_request), 200)
     retrieved = response.json
-    self.assertEqual(content, retrieved.get(u'content', ''))
+    self.assertEqual(content, base64.b64decode(retrieved.get(u'content', '')))
 
   def test_retrieve_content_db_ok(self):
     """Assert that content retrieval works for non-memcached DB entities."""
@@ -413,7 +413,7 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
     response = self.call_api(
         'retrieve_content', self.message_to_dict(retrieve_request), 200)
     retrieved = response.json
-    self.assertEqual(content, retrieved.get(u'content', ''))
+    self.assertEqual(content, base64.b64decode(retrieved.get(u'content', '')))
 
   def test_retrieve_gs_url_ok(self):
     """Assert that URL retrieval works for GS entities."""
@@ -460,7 +460,8 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
     response = self.call_api(
         'retrieve_content', self.message_to_dict(retrieve_request), 200)
     retrieved = response.json
-    self.assertEqual(content[offset:], retrieved.get(u'content', ''))
+    self.assertEqual(content[offset:], base64.b64decode(retrieved.get(
+        u'content', '')))
 
   def test_retrieve_partial_bad_offset_fails(self):
     """Assert that retrieval fails with status 416 when offset is invalid."""

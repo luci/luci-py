@@ -99,7 +99,7 @@ class UrlCollection(messages.Message):
 
 class RetrievedContent(messages.Message):
   """Content retrieved from DB, or GS URL."""
-  content = messages.StringField(1)
+  content = messages.BytesField(1)
   url = messages.StringField(2)
 
 
