@@ -238,12 +238,20 @@ def get_bot():
 
   Should only be called once in the process lifetime.
   """
-  attributes = get_attributes()
+  while True:
+    try:
+      attributes = get_attributes()
 
-  # Handshake to get an XSRF token even if there were errors.
-  remote = get_remote()
-  remote.xsrf_request_params = attributes.copy()
-  remote.refresh_token()
+      # Handshake to get an XSRF token even if there were errors.
+      remote = get_remote()
+      remote.xsrf_request_params = attributes.copy()
+      remote.refresh_token()
+      break
+    except Exception:
+      # Continue looping. The main reason to get into this situation is when the
+      # network is down for > 20 minutes. It's worth continuing to loop until
+      # the server is reachable again.
+      logging.exception('Catastrophic failure')
 
   config = get_config()
   return bot.Bot(remote, attributes, config['server_version'], ROOT_DIR)
@@ -254,11 +262,13 @@ def run_bot(arg_error):
   try:
     # First thing is to get an arbitrary url. This also ensures the network is
     # up and running, which is necessary before trying to get the FQDN below.
-    get_remote().url_read('/swarming/api/v1/bot/server_ping')
+    resp = get_remote().url_read('/swarming/api/v1/bot/server_ping')
+    if resp is None:
+      logging.error('No response from server_ping')
   except Exception as e:
     # url_read() already traps pretty much every exceptions. This except clause
     # is kept there "just in case".
-    logging.error('Failed to ping')
+    logging.exception('server_ping threw')
 
   # If this fails, there's hardly anything that can be done, the bot can't even
   # get to the point to be able to self-update.

@@ -56,8 +56,10 @@ class TestBotMain(net_utils.TestCase):
     os.chdir(self.root_dir)
     self.server = xsrf_client.XsrfRemote('https://localhost:1/')
     self.attributes = {
-      'dimensions': {'foo', 'bar'},
-      'id': 'localhost',
+      'dimensions': {
+        'foo': ['bar'],
+        'id': ['localhost'],
+      },
       'state': {
         'cost_usd_hour': 3600.,
       },
@@ -96,7 +98,6 @@ class TestBotMain(net_utils.TestCase):
 
   def test_setup_bot(self):
     self.mock(bot_main, 'get_remote', lambda: self.server)
-    self.mock(bot.Bot, 'post_error', self.fail)
     setup_bots = []
     def setup_bot(_bot):
       setup_bots.append(1)
@@ -151,7 +152,7 @@ class TestBotMain(net_utils.TestCase):
     bot_main.post_error_task(botobj, 'error', 23)
 
   def test_run_bot(self):
-    # Test the run_bot() loop.
+    # Test the run_bot() loop. Does not use self.bot.
     self.mock(time, 'time', lambda: 126.0)
     class Foo(Exception):
       pass
@@ -169,8 +170,7 @@ class TestBotMain(net_utils.TestCase):
     def post_error(botobj, e):
       self.assertEqual(self.server, botobj._remote)
       self.assertEqual('Jumping out of the loop', e)
-      # Necessary to get out of the loop.
-      raise Foo()
+      raise Foo('Necessary to get out of the loop')
     self.mock(bot.Bot, 'post_error', post_error)
 
     self.mock(bot_main, 'get_remote', lambda: self.server)
@@ -178,16 +178,16 @@ class TestBotMain(net_utils.TestCase):
     self.expected_requests(
         [
           (
-            'https://localhost:1/swarming/api/v1/bot/server_ping',
-            {}, None, None,
-          ),
-          (
             'https://localhost:1/auth/api/v1/accounts/self/xsrf_token',
             {
               'data': expected_attribs,
               'headers': {'X-XSRF-Token-Request': '1'},
             },
             {'xsrf_token': 'token'},
+          ),
+          (
+            'https://localhost:1/swarming/api/v1/bot/server_ping',
+            {}, 'foo', None,
           ),
         ])
 
