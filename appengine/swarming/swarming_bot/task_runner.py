@@ -52,6 +52,20 @@ MIN_PACKET_INTERNAL = 10
 TASK_FAILED = 89
 
 
+# Used to implement monotonic_time for a clock that never goes backward.
+_last_now = 0
+
+
+def monotonic_time():
+  """Returns monotonically increasing time."""
+  global _last_now
+  now = time.time()
+  if now > _last_now:
+    # TODO(maruel): If delta is large, probably worth alerting via ereporter2.
+    _last_now = now
+  return _last_now
+
+
 def download_data(root_dir, files):
   """Downloads and expands the zip files enumerated in the test run data."""
   for data_url, _ in files:
@@ -168,7 +182,7 @@ def should_post_update(stdout, now, last_packet):
 
 def calc_yield_wait(task_details, start, last_io, timed_out, stdout):
   """Calculates the maximum number of seconds to wait in yield_any()."""
-  now = time.time()
+  now = monotonic_time()
   if timed_out:
     # Give a |grace_period| seconds delay.
     return max(now - timed_out - task_details.grace_period, 0.)
@@ -190,7 +204,7 @@ def run_command(
     Child process exit code.
   """
   # Signal the command is about to be started.
-  last_packet = start = now = time.time()
+  last_packet = start = now = monotonic_time()
   params = {
     'command_index': index,
     'cost_usd': cost_usd_hour * (now - task_start) / 60. / 60.,
@@ -217,7 +231,7 @@ def run_command(
   except OSError as e:
     stdout = 'Command "%s" failed to start.\nError: %s' % (
         ' '.join(task_details.commands[index]), e)
-    now = time.time()
+    now = monotonic_time()
     params['cost_usd'] = cost_usd_hour * (now - task_start) / 60. / 60.
     params['duration'] = now - start
     params['io_timeout'] = False
@@ -232,19 +246,19 @@ def run_command(
   had_io_timeout = False
   timed_out = None
   try:
-    last_io = time.time()
+    last_io = monotonic_time()
     for _, new_data in proc.yield_any(
           maxsize=MAX_CHUNK_SIZE - len(stdout),
           soft_timeout=calc_yield_wait(
               task_details, start, last_io, timed_out, stdout)):
-      now = time.time()
+      now = monotonic_time()
       if new_data:
         stdout += new_data
         last_io = now
 
       # Post update if necessary.
       if should_post_update(stdout, now, last_packet):
-        last_packet = time.time()
+        last_packet = monotonic_time()
         params['cost_usd'] = (
             cost_usd_hour * (last_packet - task_start) / 60. / 60.)
         post_update(swarming_server, params, None, stdout, output_chunk_start)
@@ -259,12 +273,12 @@ def run_command(
           had_io_timeout = True
           logging.warning('I/O timeout')
           proc.terminate()
-          timed_out = time.time()
+          timed_out = monotonic_time()
         elif now - start > task_details.hard_timeout:
           had_hard_timeout = True
           logging.warning('Hard timeout')
           proc.terminate()
-          timed_out = time.time()
+          timed_out = monotonic_time()
       else:
         # During grace period.
         if now >= timed_out + task_details.grace_period:
@@ -295,7 +309,7 @@ def run_command(
       exit_code = proc.wait()
 
     # This is the very last packet for this command.
-    now = time.time()
+    now = monotonic_time()
     params['cost_usd'] = cost_usd_hour * (now - task_start) / 60. / 60.
     params['duration'] = now - start
     params['io_timeout'] = had_io_timeout
@@ -329,6 +343,11 @@ def main(args):
   on_error.report_on_exception_exit(options.swarming_server)
 
   remote = xsrf_client.XsrfRemote(options.swarming_server)
+
+  now = monotonic_time()
+  if options.start > now:
+    options.start = now
+
   if not load_and_run(
       options.file, remote, options.cost_usd_hour, options.start):
     return TASK_FAILED

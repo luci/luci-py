@@ -56,9 +56,9 @@ def compress_to_zip(files):
   return out.getvalue()
 
 
-class TestLocalTaskRunnerBase(net_utils.TestCase):
+class TestTaskRunnerBase(net_utils.TestCase):
   def setUp(self):
-    super(TestLocalTaskRunnerBase, self).setUp()
+    super(TestTaskRunnerBase, self).setUp()
     self.root_dir = tempfile.mkdtemp(prefix='task_runner')
     self.work_dir = os.path.join(self.root_dir, 'work')
     os.chdir(self.root_dir)
@@ -67,7 +67,7 @@ class TestLocalTaskRunnerBase(net_utils.TestCase):
   def tearDown(self):
     os.chdir(BASE_DIR)
     shutil.rmtree(self.root_dir)
-    super(TestLocalTaskRunnerBase, self).tearDown()
+    super(TestTaskRunnerBase, self).tearDown()
 
   @staticmethod
   def get_task_details(
@@ -120,9 +120,9 @@ class TestLocalTaskRunnerBase(net_utils.TestCase):
     return check_first
 
 
-class TestLocalTaskRunner(TestLocalTaskRunnerBase):
+class TestTaskRunner(TestTaskRunnerBase):
   def setUp(self):
-    super(TestLocalTaskRunner, self).setUp()
+    super(TestTaskRunner, self).setUp()
     self.mock(time, 'time', lambda: 1000000000.)
 
   def get_check_final(self, exit_code=0, output='hi\n'):
@@ -346,8 +346,9 @@ class TestLocalTaskRunner(TestLocalTaskRunnerBase):
           {
             'data': {
               'command_index': 0,
-              'cost_usd': 0.,
-              # Due to time.time() mock.
+              # That's because the cost includes the duration starting at start,
+              # not when the process was started.
+              'cost_usd': 10.,
               'duration': 0.,
               'exit_code': 0,
               'hard_timeout': False,
@@ -372,7 +373,7 @@ class TestLocalTaskRunner(TestLocalTaskRunnerBase):
         {
           'data': {
             'command_index': 0,
-            'cost_usd': 0.,
+            'cost_usd': 10.,
             'id': 'localhost',
             'task_id': 23,
           },
@@ -385,7 +386,7 @@ class TestLocalTaskRunner(TestLocalTaskRunnerBase):
         {
           'data': {
             'command_index': 0,
-            'cost_usd': 0.,
+            'cost_usd': 10.,
             'id': 'localhost',
             'output': base64.b64encode('hi!\n' * 100002),
             'output_chunk_start': 0,
@@ -414,8 +415,10 @@ class TestLocalTaskRunner(TestLocalTaskRunnerBase):
           'io_timeout': 60,
           'task_id': 23,
         })
+    start = time.time()
+    self.mock(time, 'time', lambda: start + 10)
     r = task_runner.run_command(
-        server, 0, task_details, './', 3600., time.time())
+        server, 0, task_details, './', 3600., start)
     self.assertEqual(0, r)
 
   def test_main(self):
@@ -449,7 +452,7 @@ class TestLocalTaskRunner(TestLocalTaskRunnerBase):
     self.assertEqual(task_runner.TASK_FAILED, task_runner.main(cmd))
 
 
-class TestLocalTaskRunnerNoTimeMock(TestLocalTaskRunnerBase):
+class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
   # Do not mock time.time() for these tests otherwise it becomes a tricky
   # implementation detail check.
   # These test cases run the command for real.
