@@ -90,6 +90,7 @@ class PreuploadStatus(messages.Message):
   """Endpoints response type for a single URL or pair of URLs."""
   gs_upload_url = messages.StringField(1)
   upload_ticket = messages.StringField(2)
+  index = messages.IntegerField(3)
 
 
 class UrlCollection(messages.Message):
@@ -101,6 +102,11 @@ class RetrievedContent(messages.Message):
   """Content retrieved from DB, or GS URL."""
   content = messages.BytesField(1)
   url = messages.StringField(2)
+
+
+class PushPing(messages.Message):
+  """Indicates whether data storage executed successfully."""
+  ok = messages.BooleanField(1)
 
 
 ### Utility
@@ -142,9 +148,7 @@ class IsolateService(remote.Service):
 
   ### Endpoints Methods
 
-  @auth.endpoints_method(DigestCollection, UrlCollection,
-                         path='preuploader', http_method='POST',
-                         name='preupload')
+  @auth.endpoints_method(DigestCollection, UrlCollection, http_method='POST')
   def preupload(self, request):
     """Checks for entry's existence and generates upload URLs.
 
@@ -181,12 +185,12 @@ class IsolateService(remote.Service):
     new_digests, existing_digests = self.partition_collection(request)
 
     # process all elements; add an upload ticket for cache misses
-    for digest_element in request.items:
+    for index, digest_element in enumerate(request.items):
       # check for error conditions
       if not model.is_valid_hex(digest_element.digest):
         raise endpoints.BadRequestException(
             'Invalid hex code: %s' % (digest_element.digest))
-      status = PreuploadStatus()
+      status = PreuploadStatus(index=index)
 
       if digest_element in new_digests:
         # generate preupload ticket
@@ -209,12 +213,12 @@ class IsolateService(remote.Service):
         items=list(existing_digests), namespace=request.namespace))
     return response
 
-  @auth.endpoints_method(StorageRequest, message_types.VoidMessage)
+  @auth.endpoints_method(StorageRequest, PushPing)
   def store_inline(self, request):
     """Stores relatively small entities in the datastore."""
     return self.storage_helper(request, False)
 
-  @auth.endpoints_method(FinalizeRequest, message_types.VoidMessage)
+  @auth.endpoints_method(FinalizeRequest, PushPing)
   def finalize_gs_upload(self, request):
     """Informs client that large entities have been uploaded to GCS."""
     return self.storage_helper(request, True)
@@ -323,7 +327,7 @@ class IsolateService(remote.Service):
         raise endpoints.InternalServerException(
             'Unable to store the entity: %s.' % e.__class__.__name__)
 
-    return message_types.VoidMessage()
+    return PushPing(ok=True)
 
   @classmethod
   def generate_ticket(cls, digest, namespace):

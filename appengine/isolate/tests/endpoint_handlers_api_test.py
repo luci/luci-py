@@ -228,10 +228,12 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
     items = response.json['items']
     self.assertEqual(3, len(items))
     for i, item in enumerate(items):
+      self.assertEqual(i, int(item['index']))
       if i == 0:
-        self.assertEqual({}, item)
+        self.assertIsNone(item.get('upload_ticket'))
       else:
-        self.assertIn('upload_ticket', item)
+        self.assertIsNotNone(item.get('upload_ticket'))
+        self.assertFalse(item.get('d', False))
 
     # remove tasks so tearDown doesn't complain
     _ = self.execute_tasks()
