@@ -144,7 +144,7 @@ class AppTestBase(test_case.TestCase):
     params = {
       'command_index': 0,
       'cost_usd': 0.1,
-      'duration': 0.1 * (kwargs.get('command_index', 0)+1),
+      'duration': 0.1,
       'exit_code': 0,
       'id': 'bot1',
       'output': base64.b64encode(u'rÉsult string'.encode('utf-8')),
@@ -161,8 +161,6 @@ class AppTestBase(test_case.TestCase):
     res = self.bot_poll()
     task_id = res['manifest']['task_id']
     self.bot_complete_task(token, task_id=task_id)
-    self.bot_complete_task(
-        token, task_id=task_id, command_index=1, output=base64.b64encode('bar'))
     return task_id
 
   # Client

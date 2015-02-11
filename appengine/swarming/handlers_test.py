@@ -224,7 +224,8 @@ class FrontendTest(AppTestBase):
     # Look at the results. It's the same as the previous run, even if task_id_2
     # was never executed.
     response = self.app.get('/user/task/%s' % task_id_2, status=200)
-    self.assertTrue('bar' in response.body, response.body)
+    self.assertTrue(
+        u'rÉsult string'.encode('utf-8') in response.body, response.body)
     self.assertTrue('Was deduped from' in response.body, response.body)
 
   def test_task_denied(self):

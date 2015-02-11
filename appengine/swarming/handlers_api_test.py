@@ -349,16 +349,9 @@ class ClientApiTest(test_env_handlers.AppTestBase):
 
     response = self.app.get(
         '/swarming/api/v1/client/task/%s/output/1' % task_id).json
-    self.assertEqual({'output': u'bar'}, response)
-    response = self.app.get(
-        '/swarming/api/v1/client/task/%s/output/1' % run_id).json
-    self.assertEqual({'output': u'bar'}, response)
-
-    response = self.app.get(
-        '/swarming/api/v1/client/task/%s/output/2' % task_id).json
     self.assertEqual({'output': None}, response)
     response = self.app.get(
-        '/swarming/api/v1/client/task/%s/output/2' % run_id).json
+        '/swarming/api/v1/client/task/%s/output/1' % run_id).json
     self.assertEqual({'output': None}, response)
 
   def test_get_task_output_empty(self):
@@ -395,7 +388,7 @@ class ClientApiTest(test_env_handlers.AppTestBase):
     # was never executed.
     response = self.app.get(
         '/swarming/api/v1/client/task/%s/output/all' % task_id_2).json
-    self.assertEqual({'outputs': [u'rÉsult string', u'bar']}, response)
+    self.assertEqual({'outputs': [u'rÉsult string']}, response)
 
   def test_get_task_output_all(self):
     self.client_create_task()
@@ -417,28 +410,15 @@ class ClientApiTest(test_env_handlers.AppTestBase):
     response = self.post_with_token(
         '/swarming/api/v1/bot/task_update', params, token)
     self.assertEqual({u'ok': True}, response)
-    params = {
-      'command_index': 1,
-      'cost_usd': 0.1,
-      'duration': 0.1,
-      'exit_code': 0,
-      'id': 'bot1',
-      'output': base64.b64encode('bar'),
-      'output_chunk_start': 0,
-      'task_id': task_id,
-    }
-    response = self.post_with_token(
-        '/swarming/api/v1/bot/task_update', params, token)
-    self.assertEqual({u'ok': True}, response)
 
     self.set_as_privileged_user()
     run_id = task_id[:-1] + '1'
     response = self.app.get(
         '/swarming/api/v1/client/task/%s/output/all' % task_id).json
-    self.assertEqual({'outputs': [u'result string', u'bar']}, response)
+    self.assertEqual({'outputs': [u'result string']}, response)
     response = self.app.get(
         '/swarming/api/v1/client/task/%s/output/all' % run_id).json
-    self.assertEqual({'outputs': [u'result string', u'bar']}, response)
+    self.assertEqual({'outputs': [u'result string']}, response)
 
   def test_get_task_output_all_empty(self):
     _, task_id = self.client_create_task()
@@ -513,8 +493,8 @@ class ClientApiTest(test_env_handlers.AppTestBase):
       u'cost_saved_usd': None,
       u'created_ts': now_str,
       u'deduped_from': None,
-      u'durations': [0.1, 0.2],
-      u'exit_codes': [0, 0],
+      u'durations': [0.1],
+      u'exit_codes': [0],
       u'failure': False,
       u'id': u'5cee488006610',
       u'internal_failure': False,
@@ -537,8 +517,8 @@ class ClientApiTest(test_env_handlers.AppTestBase):
       u'cost_saved_usd': 0.1,
       u'created_ts': now_60_str,
       u'deduped_from': u'5cee488006611',
-      u'durations': [0.1, 0.2],
-      u'exit_codes': [0, 0],
+      u'durations': [0.1],
+      u'exit_codes': [0],
       u'failure': False,
       u'id': u'5cfcee8008810',
       u'internal_failure': False,
@@ -596,7 +576,7 @@ class ClientApiTest(test_env_handlers.AppTestBase):
     for task in expected['items']:
       response = self.app.get(
           '/swarming/api/v1/client/task/%s/output/all' % task['id']).json
-      self.assertEqual({u'outputs': [u'r\xc9sult string', u'bar']}, response)
+      self.assertEqual({u'outputs': [u'r\xc9sult string']}, response)
 
   def test_tasks_fail(self):
     self.app.get('/swarming/api/v1/client/tasks?tags=a:b', status=403)
