@@ -190,12 +190,13 @@ class IsolateService(remote.Service):
       if not model.is_valid_hex(digest_element.digest):
         raise endpoints.BadRequestException(
             'Invalid hex code: %s' % (digest_element.digest))
-      status = PreuploadStatus(index=index)
 
       if digest_element in new_digests:
         # generate preupload ticket
-        status.upload_ticket = self.generate_ticket(
-            digest_element, request.namespace)
+        status = PreuploadStatus(
+            index=index,
+            upload_ticket = self.generate_ticket(
+                digest_element, request.namespace))
 
         # generate GS upload URL if necessary
         if self.should_push_to_gs(digest_element):
@@ -206,7 +207,7 @@ class IsolateService(remote.Service):
               content_type='application/octet-stream',
               expiration=DEFAULT_LINK_EXPIRATION)
 
-      response.items.append(status)
+        response.items.append(status)
 
     # tag existing entities and return new ones
     self.tag_existing(DigestCollection(
@@ -224,7 +225,7 @@ class IsolateService(remote.Service):
     return self.storage_helper(request, True)
 
   @auth.endpoints_method(RetrieveRequest, RetrievedContent)
-  def retrieve_content(self, request):
+  def retrieve(self, request):
     """Retrieves content from a storage location."""
     content = None
     key = None
@@ -356,7 +357,7 @@ class IsolateService(remote.Service):
     message = UPLOAD_MESSAGES[uploaded_to_gs]
     try:
       result = TokenSigner.generate(message, embedded)
-    except  ValueError as error:
+    except ValueError as error:
       raise endpoints.BadRequestException(
           'Ticket generation failed: %s' % error.message)
     return result

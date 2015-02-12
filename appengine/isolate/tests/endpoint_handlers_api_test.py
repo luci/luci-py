@@ -226,14 +226,10 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
 
     # we should see one enqueued task and two new URLs in the response
     items = response.json['items']
-    self.assertEqual(3, len(items))
-    for i, item in enumerate(items):
-      self.assertEqual(i, int(item['index']))
-      if i == 0:
-        self.assertIsNone(item.get('upload_ticket'))
-      else:
-        self.assertIsNotNone(item.get('upload_ticket'))
-        self.assertFalse(item.get('d', False))
+    self.assertEqual(2, len(items))
+    self.assertEqual([1, 2], [int(item['index']) for item in items])
+    for item in items:
+      self.assertIsNotNone(item.get('upload_ticket'))
 
     # remove tasks so tearDown doesn't complain
     _ = self.execute_tasks()
@@ -388,7 +384,7 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
       self.call_api(
           'store_inline', self.message_to_dict(large_request), 200)
 
-  def test_retrieve_content_memcache_ok(self):
+  def test_retrieve_memcache_ok(self):
     """Assert that content retrieval goes off swimmingly in the normal case."""
     content = 'Grecian Urn'
     request = self.store_request(content)
@@ -398,11 +394,11 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
     retrieve_request = endpoint_handlers_api.RetrieveRequest(
         digest=embedded['d'], namespace=endpoint_handlers_api.Namespace())
     response = self.call_api(
-        'retrieve_content', self.message_to_dict(retrieve_request), 200)
+        'retrieve', self.message_to_dict(retrieve_request), 200)
     retrieved = response.json
     self.assertEqual(content, base64.b64decode(retrieved.get(u'content', '')))
 
-  def test_retrieve_content_db_ok(self):
+  def test_retrieve_db_ok(self):
     """Assert that content retrieval works for non-memcached DB entities."""
     content = 'Isabella, or the Pot of Basil'
     request = self.store_request(content)
@@ -413,7 +409,7 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
         digest=embedded['d'], namespace=endpoint_handlers_api.Namespace())
     memcache.flush_all()
     response = self.call_api(
-        'retrieve_content', self.message_to_dict(retrieve_request), 200)
+        'retrieve', self.message_to_dict(retrieve_request), 200)
     retrieved = response.json
     self.assertEqual(content, base64.b64decode(retrieved.get(u'content', '')))
 
@@ -438,7 +434,7 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
     retrieve_request = endpoint_handlers_api.RetrieveRequest(
         digest=embedded['d'], namespace=endpoint_handlers_api.Namespace())
     retrieved_response = self.call_api(
-        'retrieve_content', self.message_to_dict(retrieve_request), 200)
+        'retrieve', self.message_to_dict(retrieve_request), 200)
     retrieved = retrieved_response.json
     self.assertNotEqual(message.get(u'gs_upload_url', ''), '')
     self.assertNotEqual(retrieved.get(u'url', ''), '')
@@ -460,7 +456,7 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
         namespace=endpoint_handlers_api.Namespace(),
         offset=offset)  # TODO(cmassaro): determine where offsets come from
     response = self.call_api(
-        'retrieve_content', self.message_to_dict(retrieve_request), 200)
+        'retrieve', self.message_to_dict(retrieve_request), 200)
     retrieved = response.json
     self.assertEqual(content[offset:], base64.b64decode(retrieved.get(
         u'content', '')))
@@ -478,9 +474,9 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
         offset=offset) for offset in [-1, len(content) + 1]]
     for request in requests:
       with self.call_should_fail('400'):
-        self.call_api('retrieve_content', self.message_to_dict(request), 200)
+        self.call_api('retrieve', self.message_to_dict(request), 200)
 
-  def test_retrieve_content_not_found(self):
+  def test_retrieve_not_found(self):
     """Assert that HTTP 404 response is served when content is absent."""
 
     # get a valid digest
@@ -501,7 +497,7 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
         digest=embedded['d'], namespace=endpoint_handlers_api.Namespace())
     with self.call_should_fail('404'):
       self.call_api(
-          'retrieve_content', self.message_to_dict(retrieve_request), 200)
+          'retrieve', self.message_to_dict(retrieve_request), 200)
 
 if __name__ == '__main__':
   if '-v' in sys.argv:
