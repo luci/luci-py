@@ -84,7 +84,7 @@ def CMDstart_slave(args):
 
   logging.info('Starting the bot: %s', THIS_FILE)
   cmd = [sys.executable, THIS_FILE, 'start_bot']
-  if sys.platform == 'win32':
+  if sys.platform in ('cygwin', 'win32'):
     result = subprocess.call(cmd)
     logging.info('Bot exit code: %d', result)
     return result
@@ -118,12 +118,13 @@ def main():
 
   if os.path.basename(THIS_FILE) == 'swarming_bot.zip':
     # Self-replicate itself right away as swarming_bot.1.zip and restart as it.
-    print >> sys.stderr, 'Self replicating.'
+    print >> sys.stderr, 'Self replicating pid:%d.' % os.getpid()
     if os.path.isfile('swarming_bot.1.zip'):
       os.remove('swarming_bot.1.zip')
     shutil.copyfile('swarming_bot.zip', 'swarming_bot.1.zip')
     cmd = [sys.executable, 'swarming_bot.1.zip'] + sys.argv[1:]
-    if sys.platform == 'win32':
+    print >> sys.stderr, 'cmd: %s' % cmd
+    if sys.platform in ('cygwin', 'win32'):
       return subprocess.call(cmd)
     else:
       os.execv(cmd[0], cmd)

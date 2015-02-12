@@ -23,7 +23,7 @@ test_env.setup_test_env()
 
 from depot_tools import auto_stub
 
-_LOG_HEADER = r'^\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d\.\d\d\d: '
+_LOG_HEADER = r'^%s \d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d\.\d\d\d: ' % os.getpid()
 
 
 class TestLoggingUtils(auto_stub.TestCase):

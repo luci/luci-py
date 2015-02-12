@@ -65,7 +65,8 @@ class CaptureLogs(object):
     os.close(handle)
     self._handler = logging.FileHandler(self._path, 'w')
     self._handler.setLevel(logging.DEBUG)
-    formatter = UTCFormatter('%(asctime)s: %(levelname)-5s %(message)s')
+    formatter = UTCFormatter(
+        '%(process)d %(asctime)s: %(levelname)-5s %(message)s')
     self._handler.setFormatter(formatter)
     self._root = root or logging.getLogger()
     self._root.addHandler(self._handler)
@@ -133,7 +134,8 @@ def prepare_logging(filename, root=None):
   Makes it log in UTC all the time. Prepare a rotating file based log.
   """
   assert not find_stderr(root)
-  formatter = UTCFormatter('%(asctime)s: %(levelname)-5s %(message)s')
+  formatter = UTCFormatter(
+      '%(process)d %(asctime)s: %(levelname)-5s %(message)s')
 
   # It is a requirement that the root logger is set to DEBUG, so the messages
   # are not lost. It defaults to WARNING otherwise.
@@ -149,11 +151,15 @@ def prepare_logging(filename, root=None):
   # Setup up logging to a constant file so we can debug issues where
   # the results aren't properly sent to the result URL.
   if filename:
-    rotating_file = NoInheritRotatingFileHandler(
-        filename, maxBytes=10 * 1024 * 1024, backupCount=5)
-    rotating_file.setLevel(logging.DEBUG)
-    rotating_file.setFormatter(formatter)
-    logger.addHandler(rotating_file)
+    try:
+      rotating_file = NoInheritRotatingFileHandler(
+          filename, maxBytes=10 * 1024 * 1024, backupCount=5)
+      rotating_file.setLevel(logging.DEBUG)
+      rotating_file.setFormatter(formatter)
+      logger.addHandler(rotating_file)
+    except Exception:
+      # May happen on cygwin. Do not crash.
+      logging.exception('Failed to open %s', filename)
 
 
 def set_console_level(level, root=None):
