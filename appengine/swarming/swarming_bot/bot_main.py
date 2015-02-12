@@ -245,7 +245,6 @@ def get_bot():
       # Handshake to get an XSRF token even if there were errors.
       remote = get_remote()
       remote.xsrf_request_params = attributes.copy()
-      remote.refresh_token()
       break
     except Exception:
       # Continue looping. The main reason to get into this situation is when the

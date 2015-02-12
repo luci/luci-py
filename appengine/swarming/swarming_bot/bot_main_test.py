@@ -105,17 +105,7 @@ class TestBotMain(net_utils.TestCase):
     self.mock(bot_config, 'setup_bot', setup_bot)
     restarts = []
     self.mock(bot.Bot, 'restart', restarts.append)
-    self.expected_requests(
-        [
-          (
-            'https://localhost:1/auth/api/v1/accounts/self/xsrf_token',
-            {
-              'data': bot_main.get_attributes(),
-              'headers': {'X-XSRF-Token-Request': '1'},
-            },
-            {'xsrf_token': 'token'},
-          ),
-        ])
+    self.expected_requests([])
     bot_main.setup_bot(False)
     self.assertEqual(['Starting new swarming bot: %s' % THIS_FILE], restarts)
     self.assertEqual([1], setup_bots)
@@ -157,8 +147,6 @@ class TestBotMain(net_utils.TestCase):
     class Foo(Exception):
       pass
 
-    expected_attribs = bot_main.get_attributes()
-
     def poll_server(botobj):
       sleep_streak = botobj.state['sleep_streak']
       self.assertEqual(botobj.remote, self.server)
@@ -177,14 +165,6 @@ class TestBotMain(net_utils.TestCase):
 
     self.expected_requests(
         [
-          (
-            'https://localhost:1/auth/api/v1/accounts/self/xsrf_token',
-            {
-              'data': expected_attribs,
-              'headers': {'X-XSRF-Token-Request': '1'},
-            },
-            {'xsrf_token': 'token'},
-          ),
           (
             'https://localhost:1/swarming/api/v1/bot/server_ping',
             {}, 'foo', None,
