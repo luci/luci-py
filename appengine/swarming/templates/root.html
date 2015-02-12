@@ -63,37 +63,28 @@
     </ul>
 
     <h3>Running a bot</h3>
-    <ul class="spaced">
-      <li>
-        To start a bot, run one of these:
-        <ol>
-          <li>
-            Don't forget if swarming_bot.zip was already present, curl won't
-            overwrite it so "rm swarming_bot.zip" first if necessary.
-            <pre style="margin-bottom:0">
-    mkdir bot; cd bot
-    curl -sSLOJ {{host_url}}/bot_code
-    python swarming_bot.zip
-    </pre>
-          </li>
-          <li>
-            Here's an even shorter command when you like to live dangerously:
-            <pre style="margin-bottom:0">
-    python -c "import urllib; exec urllib.urlopen('{{host_url}}/bootstrap').read()"
-    </pre>
-          </li>
-          <li>
-            The escaped version to pass as a ssh argument:
-            <pre>
-    'python -c "import urllib; exec urllib.urlopen('"'{{host_url}}/bootstrap'"').read()"'</pre>
-          </li>
-        </ol>
-      </li>
-      <li>See the project's page for code and help pages:
-        <a href="https://code.google.com/p/swarming/">
-          https://code.google.com/p/swarming/</a>
-      </li>
-    </ul>
+      To bootstrap a bot, run one of these:
+      <ol>
+        <li>
+          TL;DR;
+<pre>python -c "import urllib; exec urllib.urlopen('{{host_url}}/bootstrap').read()"</pre>
+        </li>
+        <li>
+          Escaped version to pass as a ssh argument:
+<pre>'python -c "import urllib; exec urllib.urlopen('"'{{host_url}}/bootstrap'"').read()"'</pre>
+        </li>
+        <li>
+          Manually. Don't forget if swarming_bot.zip was already present, curl
+          won't overwrite it so "rm swarming_bot.zip" first if necessary.
+<pre style="margin-bottom:0">mkdir bot; cd bot
+curl -sSLOJ {{host_url}}/bot_code
+python swarming_bot.zip</pre>
+        </li>
+      </ol>
+    </li>
+    See the project's page for code and help pages:
+      <a href="https://code.google.com/p/swarming/">
+        https://code.google.com/p/swarming/</a>
 
     <h3>Map reduce jobs</h3>
     <ul class="admin">
