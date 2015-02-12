@@ -748,8 +748,12 @@ def get_num_processors():
       # Mac OS 10.6
       return int(os.sysconf('SC_NPROCESSORS_ONLN'))  # pylint: disable=E1101
     except:
+      # Returns non-zero, otherwise it could generate a divide by zero later
+      # when doing calculations, leading to a crash. Saw it happens on Win2K8R2
+      # on python 2.7.5 on cygwin 1.7.28.
       logging.error('get_num_processors() failed to query number of cores')
-      return 0
+      # Return an improbable number to make it easier to catch.
+      return 5
 
 
 @cached
