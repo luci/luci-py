@@ -109,6 +109,11 @@ class PushPing(messages.Message):
   ok = messages.BooleanField(1)
 
 
+class ServerDetails(messages.Message):
+  """Reports the current API version."""
+  server_version = messages.StringField(1)
+
+
 ### Utility
 
 
@@ -195,7 +200,7 @@ class IsolateService(remote.Service):
         # generate preupload ticket
         status = PreuploadStatus(
             index=index,
-            upload_ticket = self.generate_ticket(
+            upload_ticket=self.generate_ticket(
                 digest_element, request.namespace))
 
         # generate GS upload URL if necessary
@@ -257,6 +262,10 @@ class IsolateService(remote.Service):
     return RetrievedContent(url=self.gs_url_signer.get_download_url(
         filename=key.id(),
         expiration=DEFAULT_LINK_EXPIRATION))
+
+  @auth.endpoints_method(message_types.VoidMessage, ServerDetails)
+  def server_details(self, _request):
+    return ServerDetails(server_version=utils.get_app_version())
 
   ### Utility
 

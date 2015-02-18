@@ -499,6 +499,12 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
       self.call_api(
           'retrieve', self.message_to_dict(retrieve_request), 200)
 
+  def test_server_details_ok(self):
+    """Assert that server_details returns the correct version."""
+    response = self.call_api('server_details', {}, 200).json
+    self.assertEqual(utils.get_app_version(), response['server_version'])
+
+
 if __name__ == '__main__':
   if '-v' in sys.argv:
     unittest.TestCase.maxDiff = None
