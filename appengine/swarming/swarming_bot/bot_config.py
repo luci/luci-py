@@ -56,8 +56,19 @@ def get_state():
 ### Hooks
 
 
+def on_bot_startup(bot):
+  """Hook function called when the bot starts.
+
+  It's a good time to do some cleanup before starting to poll for tasks.
+
+  Arguments:
+  - bot: bot.Bot instance.
+  """
+  pass
+
+
 def on_before_task(bot):
-  """Hook function to be called before running a task.
+  """Hook function called before running a task.
 
   It shouldn't do much, since it can't cancel the task so it shouldn't do
   anything too fancy.
@@ -69,7 +80,7 @@ def on_before_task(bot):
 
 
 def on_after_task(bot, failure, internal_failure):
-  """Hook function to be called after running a task.
+  """Hook function called after running a task.
 
   It is an excellent place to do post-task cleanup of temporary files.
 

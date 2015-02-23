@@ -22,6 +22,7 @@ import os
 import subprocess
 import sys
 import time
+import traceback
 import zipfile
 
 import bot
@@ -90,7 +91,7 @@ def get_dimensions():
         botid = 'error_%s' % str(e2)
       return {
           'id': [botid],
-          'error': [str(e)],
+          'error': ['%s\n%s' % (e, traceback.format_exc()[-2048])],
           'quarantined': ['1'],
         }
 
@@ -109,7 +110,7 @@ def get_state(sleep_streak):
         state = {'error': state}
   except Exception as e:
     state = {
-      'error': str(e),
+      'error': '%s\n%s' % (e, traceback.format_exc()[-2048]),
       'quarantined': True,
     }
 
@@ -117,28 +118,19 @@ def get_state(sleep_streak):
   return state
 
 
-def on_before_task(botobj):
-  """Hook function called just before a task is going to be scheduled."""
+def call_hook(botobj, name, *args):
+  """Calls a hook funciton in bot_config.py."""
   try:
     if _in_load_test_mode():
       return
 
     import bot_config
-    return bot_config.on_before_task(botobj)
+    hook = getattr(bot_config, name, None)
+    if hook:
+      return hook(botobj, *args)
   except Exception as e:
-    botobj.post_error('Failed to call hook on_before_task(): %s' % e)
-
-
-def on_after_task(botobj, failure, internal_failure):
-  """Hook function called after a task."""
-  try:
-    if _in_load_test_mode():
-      return
-
-    import bot_config
-    return bot_config.on_after_task(botobj, failure, internal_failure)
-  except Exception as e:
-    botobj.post_error('Failed to call hook on_after_task(): %s' % e)
+    msg = '%s\n%s' % (e, traceback.format_exc()[-2048:])
+    botobj.post_error('Failed to call hook %s(): %s' % (name, msg))
 
 
 def setup_bot(skip_reboot):
@@ -154,13 +146,15 @@ def setup_bot(skip_reboot):
   try:
     import bot_config
   except Exception as e:
-    botobj.post_error('bot_config.py is bad: %s' % e)
+    msg = '%s\n%s' % (e, traceback.format_exc()[-2048:])
+    botobj.post_error('bot_config.py is bad: %s' % msg)
     return
 
   try:
     should_continue = bot_config.setup_bot(botobj)
   except Exception as e:
-    botobj.post_error('bot_config.setup_bot() threw: %s' % e)
+    msg = '%s\n%s' % (e, traceback.format_exc()[-2048:])
+    botobj.post_error('bot_config.setup_bot() threw: %s' % msg)
     return
 
   if not should_continue and not skip_reboot:
@@ -275,6 +269,8 @@ def run_bot(arg_error):
   if arg_error:
     botobj.post_error('Argument error: %s' % arg_error)
 
+  call_hook(botobj, 'on_bot_startup')
+
   # This environment variable is accessible to the tasks executed by this bot.
   os.environ['SWARMING_BOT_ID'] = botobj.id
 
@@ -291,7 +287,8 @@ def run_bot(arg_error):
         consecutive_sleeps += 1
     except Exception as e:
       logging.exception('poll_server failed')
-      botobj.post_error(str(e))
+      msg = '%s\n%s' % (e, traceback.format_exc()[-2048:])
+      botobj.post_error(msg)
       consecutive_sleeps = 0
 
 
@@ -360,7 +357,7 @@ def run_manifest(botobj, manifest, start):
     path = os.path.join(work_dir, 'test_run.json')
     with open(path, 'wb') as f:
       f.write(json.dumps(manifest))
-    on_before_task(botobj)
+    call_hook(botobj, 'on_before_task')
     command = [
       sys.executable, THIS_FILE, 'task_runner',
       '--swarming-server', url,
@@ -383,12 +380,13 @@ def run_manifest(botobj, manifest, start):
     # Failures include IOError when writing if the disk is full, OSError if
     # swarming_bot.zip doesn't exist anymore, etc.
     logging.exception('run_manifest failed')
-    msg = 'Internal exception occured: %s' % str(e)
+    msg = 'Internal exception occured: %s\n%s' % (
+        e, traceback.format_exc()[-2048:])
     internal_failure = True
   finally:
     if internal_failure:
       post_error_task(botobj, msg, task_id)
-    on_after_task(botobj, failure, internal_failure)
+    call_hook(botobj, 'on_after_task', failure, internal_failure)
 
 
 def update_bot(botobj, version):

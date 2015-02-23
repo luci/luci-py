@@ -157,7 +157,9 @@ class TestBotMain(net_utils.TestCase):
 
     def post_error(botobj, e):
       self.assertEqual(self.server, botobj._remote)
-      self.assertEqual('Jumping out of the loop', e)
+      lines = e.splitlines()
+      self.assertEqual('Jumping out of the loop', lines[0])
+      self.assertEqual('Traceback (most recent call last):', lines[1])
       raise Foo('Necessary to get out of the loop')
     self.mock(bot.Bot, 'post_error', post_error)
 
@@ -342,11 +344,13 @@ class TestBotMain(net_utils.TestCase):
 
   def test_run_manifest(self):
     self.mock(bot_main, 'post_error_task', lambda *args: self.fail(args))
-    def on_after_task(botobj, failure, internal_failure):
-      self.assertEqual(self.attributes['dimensions'], botobj.dimensions)
-      self.assertEqual(False, failure)
-      self.assertEqual(False, internal_failure)
-    self.mock(bot_main, 'on_after_task', on_after_task)
+    def call_hook(botobj, name, *args):
+      if name == 'on_after_task':
+        failure, internal_failure = args
+        self.assertEqual(self.attributes['dimensions'], botobj.dimensions)
+        self.assertEqual(False, failure)
+        self.assertEqual(False, internal_failure)
+    self.mock(bot_main, 'call_hook', call_hook)
     self._mock_popen(0, url='https://localhost:3')
 
     params = {
@@ -357,10 +361,12 @@ class TestBotMain(net_utils.TestCase):
 
   def test_run_manifest_task_failure(self):
     self.mock(bot_main, 'post_error_task', self.fail)
-    def on_after_task(_bot, failure, internal_failure):
-      self.assertEqual(True, failure)
-      self.assertEqual(False, internal_failure)
-    self.mock(bot_main, 'on_after_task', on_after_task)
+    def call_hook(_botobj, name, *args):
+      if name == 'on_after_task':
+        failure, internal_failure = args
+        self.assertEqual(True, failure)
+        self.assertEqual(False, internal_failure)
+    self.mock(bot_main, 'call_hook', call_hook)
     self._mock_popen(bot_main.TASK_FAILED)
 
     bot_main.run_manifest(self.bot, {'task_id': '24'}, time.time())
@@ -368,10 +374,12 @@ class TestBotMain(net_utils.TestCase):
   def test_run_manifest_internal_failure(self):
     posted = []
     self.mock(bot_main, 'post_error_task', lambda *args: posted.append(args))
-    def on_after_task(_bot, failure, internal_failure):
-      self.assertEqual(False, failure)
-      self.assertEqual(True, internal_failure)
-    self.mock(bot_main, 'on_after_task', on_after_task)
+    def call_hook(_botobj, name, *args):
+      if name == 'on_after_task':
+        failure, internal_failure = args
+        self.assertEqual(False, failure)
+        self.assertEqual(True, internal_failure)
+    self.mock(bot_main, 'call_hook', call_hook)
     self._mock_popen(1)
 
     bot_main.run_manifest(self.bot, {'task_id': '24'}, time.time())
@@ -380,11 +388,15 @@ class TestBotMain(net_utils.TestCase):
 
   def test_run_manifest_exception(self):
     posted = []
-    self.mock(bot_main, 'post_error_task', lambda *args: posted.append(args))
-    def on_after_task(_bot, failure, internal_failure):
-      self.assertEqual(False, failure)
-      self.assertEqual(True, internal_failure)
-    self.mock(bot_main, 'on_after_task', on_after_task)
+    def post_error_task(botobj, msg, task_id):
+      posted.append((botobj, msg.splitlines()[0], task_id))
+    self.mock(bot_main, 'post_error_task', post_error_task)
+    def call_hook(_botobj, name, *args):
+      if name == 'on_after_task':
+        failure, internal_failure = args
+        self.assertEqual(False, failure)
+        self.assertEqual(True, internal_failure)
+    self.mock(bot_main, 'call_hook', call_hook)
     def raiseOSError(*_a, **_k):
       raise OSError('Dang')
     self.mock(subprocess, 'Popen', raiseOSError)

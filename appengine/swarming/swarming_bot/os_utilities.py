@@ -31,6 +31,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import urllib
 import urllib2
 
 try:
@@ -124,6 +125,8 @@ GCE_WINDOWS_COST_CORE_HOUR = 0.04
 
 
 _STARTED_TS = time.time()
+
+_CACHED_OAUTH2_ACCESS_TOKEN_GCE = {}
 
 
 # Make cached a no-op when client/utils/tools.py is unavailable.
@@ -574,6 +577,51 @@ def _get_metadata_gce():
   return json.load(resp)
 
 
+def _get_cost_hour_gce():
+  """Returns the $USD/hour of using this bot if applicable."""
+  # Machine.
+  machine_type = get_machine_type_gce()
+  if get_zone_gce().startswith('us-'):
+    machine_cost = GCE_MACHINE_COST_HOUR_US[machine_type]
+  else:
+    machine_cost = GCE_MACHINE_COST_HOUR_EUROPE_ASIA[machine_type]
+
+  # OS.
+  os_cost = 0.
+  if sys.platform == 'win32':
+    # Assume Windows Server.
+    if machine_type in ('f1-micro', 'g1-small'):
+      os_cost = 0.02
+    else:
+      os_cost = GCE_WINDOWS_COST_CORE_HOUR * get_num_processors()
+
+  # Disk.
+  # TODO(maruel): Figure out the disk type. The metadata is not useful AFAIK.
+  disk_gb_cost = 0.
+  for disk in get_disks_info().itervalues():
+    disk_gb_cost += disk['free_mb'] / 1024. * (
+        GCE_HDD_GB_COST_MONTH / 30. / 24.)
+
+  # TODO(maruel): Network. It's not a constant cost, it's per task.
+  # See https://cloud.google.com/monitoring/api/metrics
+  # compute.googleapis.com/instance/network/sent_bytes_count
+  return machine_cost + os_cost + disk_gb_cost
+
+
+def _oauth2_access_token_gce(scope):
+  """Returns a value oauth2 access token."""
+  cached_scope = _CACHED_OAUTH2_ACCESS_TOKEN_GCE.get(scope)
+  # If not cached or expires in less than 5m.
+  if not cached_scope or cached_scope['expiresAt'] - 5*60 >= time.time():
+    # TODO(maruel): Move GCE VM authentication logic into client/utils/net.py.
+    # As seen in google-api-python-client/oauth2client/gce.py
+    url = (
+      'http://metadata.google.internal/0.1/meta-data/service-accounts/'
+      'default/acquire?%s') % urllib.quote(scope)
+    _CACHED_OAUTH2_ACCESS_TOKEN_GCE[scope] = json.load(urllib2.urlopen(url))
+  return _CACHED_OAUTH2_ACCESS_TOKEN_GCE[scope]['accessToken']
+
+
 def _safe_read(filepath):
   """Returns the content of the file if possible, None otherwise."""
   try:
@@ -924,6 +972,12 @@ def get_machine_type():
   return machine_type
 
 
+def send_metric(name, value):
+  if _get_metadata_gce():
+    return send_metric_gce(name, value)
+  # Ignore on other platforms for now.
+
+
 ### Google Cloud Compute Engine.
 
 
@@ -947,35 +1001,68 @@ def get_machine_type_gce():
   return metadata['instance']['machineType'].rsplit('/', 1)[-1]
 
 
-def _get_cost_hour_gce():
-  """Returns the $USD/hour of using this bot if applicable."""
-  # Machine.
-  machine_type = get_machine_type_gce()
-  if get_zone_gce().startswith('us-'):
-    machine_cost = GCE_MACHINE_COST_HOUR_US[machine_type]
-  else:
-    machine_cost = GCE_MACHINE_COST_HOUR_EUROPE_ASIA[machine_type]
+def send_metric_gce(name, value):
+  """Sets a lightweight custom metric.
 
-  # OS.
-  os_cost = 0.
-  if sys.platform == 'win32':
-    # Assume Windows Server.
-    if machine_type in ('f1-micro', 'g1-small'):
-      os_cost = 0.02
-    else:
-      os_cost = GCE_WINDOWS_COST_CORE_HOUR * get_num_processors()
+  In particular, the metric has no description and it is double. To make this
+  work, use "--scopes https://www.googleapis.com/auth/monitoring" when running
+  "gcloud compute instances create". You can verify if the scope is enabled from
+  within a GCE VM with:
+    curl "http://metadata.google.internal/computeMetadata/v1/instance/\
+service-accounts/default/scopes" -H "Metadata-Flavor: Google"
 
-  # Disk.
-  # TODO(maruel): Figure out the disk type. The metadata is not useful AFAIK.
-  disk_gb_cost = 0.
-  for disk in get_disks_info().itervalues():
-    disk_gb_cost += disk['free_mb'] / 1024. * (
-        GCE_HDD_GB_COST_MONTH / 30. / 24.)
+  Ref: https://cloud.google.com/monitoring/custom-metrics/lightweight
 
-  # TODO(maruel): Network. It's not a constant cost, it's per task.
-  # See https://cloud.google.com/monitoring/api/metrics
-  # compute.googleapis.com/instance/network/sent_bytes_count
-  return machine_cost + os_cost + disk_gb_cost
+  To create a metric, use:
+  https://developers.google.com/apis-explorer/#p/cloudmonitoring/v2beta2/cloudmonitoring.metricDescriptors.create
+  It is important to set the commonLabels.
+  """
+  logging.info('send_metric_gce(%s, %s)', name, value)
+  assert isinstance(name, str), repr(name)
+  assert isinstance(value, float), repr(value)
+
+  access_token = _oauth2_access_token_gce(
+      'https://www.googleapis.com/auth/monitoring')
+  metadata = _get_metadata_gce()
+  project_id = metadata['project']['numericProjectId']
+
+  url = (
+    'https://www.googleapis.com/cloudmonitoring/v2beta2/projects/%s/'
+    'timeseries:write') % project_id
+  now = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
+  body = {
+    'commonLabels': {
+      'cloud.googleapis.com/service': 'compute.googleapis.com',
+      'cloud.googleapis.com/location': get_zone_gce(),
+      'compute.googleapis.com/resource_type': 'instance',
+      'compute.googleapis.com/resource_id': metadata['instance']['id'],
+    },
+    'timeseries': [
+      {
+        'timeseriesDesc': {
+          'metric': 'custom.cloudmonitoring.googleapis.com/' + name,
+          'project': project_id,
+        },
+        'point': {
+          'start': now,
+          'end': now,
+          'doubleValue': value,
+        },
+      },
+    ],
+  }
+  headers = {
+    'Authorization': 'Bearer ' + access_token,
+    'Content-Type': 'application/json',
+  }
+  logging.info('%s', json.dumps(body, indent=2, sort_keys=True))
+  try:
+    resp = urllib2.urlopen(urllib2.Request(url, json.dumps(body), headers))
+    # Result must be valid JSON. A sample response:
+    #   {"kind": "cloudmonitoring#writeTimeseriesResponse"}
+    logging.debug(json.load(resp))
+  except urllib2.HTTPError as e:
+    logging.error('%s: %s' % (e, e.read()))
 
 
 ### Windows.
