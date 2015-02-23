@@ -43,6 +43,7 @@ builtins:
 - remote_api: on
 
 inbound_services:
+- mail
 - warmup
 
 includes:

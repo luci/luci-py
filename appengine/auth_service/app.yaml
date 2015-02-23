@@ -32,6 +32,7 @@ includes:
 - components/static_third_party.yaml
 
 inbound_services:
+- mail
 - warmup
 
 # https://developers.google.com/appengine/docs/python/tools/libraries27

@@ -8,6 +8,8 @@ import datetime
 
 import webapp2
 
+from google.appengine.api import users
+
 import acl
 import config
 import gcs
@@ -227,6 +229,13 @@ class WarmupHandler(webapp2.RequestHandler):
     self.response.write('ok')
 
 
+class EmailHandler(auth.AuthenticatingHandler):
+  """Blackhole any email sent."""
+  @auth.require(users.is_current_user_admin)
+  def post(self):
+    pass
+
+
 def get_routes():
   return [
       # Administrative urls.
@@ -245,7 +254,8 @@ def get_routes():
       webapp2.Route(r'/isolate/api/v1/stats/minutes', StatsGvizMinutesHandler),
       webapp2.Route(r'/', RootHandler),
 
-      # AppEngine-specific url:
+      # AppEngine-specific urls:
+      webapp2.Route(r'/_ah/mail/.+', EmailHandler),
       webapp2.Route(r'/_ah/warmup', WarmupHandler),
   ]
 

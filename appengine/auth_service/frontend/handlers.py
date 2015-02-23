@@ -5,9 +5,11 @@
 """This module defines Auth Server frontend url handlers."""
 
 import os
+
 import webapp2
 
 from google.appengine.api import app_identity
+from google.appengine.api import users
 
 from components import auth
 from components import template
@@ -38,6 +40,13 @@ class WarmupHandler(webapp2.RequestHandler):
     auth.warmup()
     self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
     self.response.write('ok')
+
+
+class EmailHandler(auth.AuthenticatingHandler):
+  """Blackhole any email sent."""
+  @auth.require(users.is_current_user_admin)
+  def post(self):
+    pass
 
 
 class ConfigHandler(ui.UINavbarTabHandler):
@@ -215,6 +224,7 @@ def get_routes():
     # UI routes.
     webapp2.Route(
         r'/', webapp2.RedirectHandler, defaults={'_uri': '/auth/groups'}),
+    webapp2.Route(r'/_ah/mail/.+', EmailHandler),
     webapp2.Route(r'/_ah/warmup', WarmupHandler),
 
     # API routes.

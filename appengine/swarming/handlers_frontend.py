@@ -706,6 +706,13 @@ class WarmupHandler(webapp2.RequestHandler):
     self.response.write('ok')
 
 
+class EmailHandler(auth.AuthenticatingHandler):
+  """Blackhole any email sent."""
+  @auth.require(users.is_current_user_admin)
+  def post(self):
+    pass
+
+
 def create_application(debug):
   template.bootstrap()
 
@@ -744,6 +751,7 @@ def create_application(debug):
       ('/swarming/api/v1/stats/user/<user:.+>/<resolution:[a-z]+>',
         stats_gviz.StatsGvizUserHandler),
 
+      ('/_ah/mail/.+', EmailHandler),
       ('/_ah/warmup', WarmupHandler),
   ]
   routes = [webapp2.Route(*i) for i in routes]
