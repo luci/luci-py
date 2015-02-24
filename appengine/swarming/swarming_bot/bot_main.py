@@ -19,6 +19,7 @@ import json
 import logging
 import optparse
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -311,7 +312,9 @@ def poll_server(botobj):
     return False
 
   if cmd == 'run':
-    run_manifest(botobj, resp['manifest'], start)
+    if run_manifest(botobj, resp['manifest'], start):
+      # Completed a task successfully so update swarming_bot.zip if necessary.
+      update_lkgbc()
   elif cmd == 'update':
     update_bot(botobj, resp['version'])
   elif cmd == 'restart':
@@ -326,7 +329,10 @@ def poll_server(botobj):
 
 
 def run_manifest(botobj, manifest, start):
-  """Defers to task_runner.py."""
+  """Defers to task_runner.py.
+
+  Return True if the task succeeded.
+  """
   # Ensure the manifest is valid. This can throw a json decoding error. Also
   # raise if it is empty.
   if not manifest:
@@ -378,6 +384,7 @@ def run_manifest(botobj, manifest, start):
     internal_failure = not failure and bool(proc.returncode)
     if internal_failure:
       msg = 'Execution failed, internal error:\n%s' % out
+    return not bool(proc.returncode)
   except Exception as e:
     # Failures include IOError when writing if the disk is full, OSError if
     # swarming_bot.zip doesn't exist anymore, etc.
@@ -438,6 +445,17 @@ def update_bot(botobj, version):
 
   # This code runs only if bot failed to respawn itself.
   botobj.post_error('Bot failed to respawn after update')
+
+
+def update_lkgbc():
+  """Updates the Last Known Good Bot Code if necessary."""
+  try:
+    org = os.stat('swarming_bot.zip')
+    cur = os.stat(THIS_FILE)
+    if org.st_size != org.st_size or org.st_mtime < cur.st_mtime:
+      shutil.copy(THIS_FILE, 'swarming_bot.zip')
+  except Exception as e:
+    logging.exception('failed to update lkgbc: %s', e)
 
 
 def get_config():
