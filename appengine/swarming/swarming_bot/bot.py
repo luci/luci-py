@@ -16,14 +16,16 @@ THIS_FILE = os.path.abspath(zip_package.get_main_script_path())
 
 
 class Bot(object):
-  def __init__(self, remote, attributes, server_version, base_dir):
+  def __init__(
+      self, remote, attributes, server_version, base_dir, shutdown_hook):
     # Do not expose attributes nor remote for now, as attributes will be
     # refactored soon and remote would have a lot of side effects if used by
     # bot_config.
     self._attributes = attributes
+    self._base_dir = base_dir
     self._remote = remote
     self._server_version = server_version
-    self._base_dir = base_dir
+    self._shutdown_hook = shutdown_hook
 
   @property
   def base_dir(self):
@@ -106,6 +108,11 @@ class Bot(object):
     quarantined mode.
     """
     self.post_event('bot_rebooting', message)
+    if self._shutdown_hook:
+      try:
+        self._shutdown_hook(self)
+      except Exception as e:
+        logging.exception('shutdown hook failed: %s', e)
     # os_utilities.restart should never return, unless restart is not happening.
     # If restart is taking longer than N minutes, it probably not going to
     # finish at all. Report this to the server.

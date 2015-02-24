@@ -66,9 +66,11 @@ class TestBotMain(net_utils.TestCase):
       'version': '123',
     }
     self.mock(zip_package, 'generate_version', lambda: '123')
-    self.bot = bot.Bot(self.server, self.attributes, 'version1', self.root_dir)
+    self.bot = bot.Bot(
+        self.server, self.attributes, 'version1', self.root_dir, self.fail)
     self.mock(self.bot, 'post_error', self.fail)
     self.mock(self.bot, 'restart', self.fail)
+    self.mock(subprocess, 'call', self.fail)
     self.mock(time, 'time', lambda: 100.)
 
   def tearDown(self):
@@ -104,11 +106,22 @@ class TestBotMain(net_utils.TestCase):
       return False
     self.mock(bot_config, 'setup_bot', setup_bot)
     restarts = []
-    self.mock(bot.Bot, 'restart', restarts.append)
+    post_event = []
+    self.mock(
+        os_utilities, 'restart', lambda *a, **kw: restarts.append((a, kw)))
+    self.mock(
+        bot.Bot, 'post_event', lambda *a, **kw: post_event.append((a, kw)))
     self.expected_requests([])
     bot_main.setup_bot(False)
-    self.assertEqual(['Starting new swarming bot: %s' % THIS_FILE], restarts)
+    self.assertEqual(
+        [(('Starting new swarming bot: %s' % THIS_FILE,), {'timeout': 900})],
+        restarts)
     self.assertEqual([1], setup_bots)
+    expected = [
+      'Starting new swarming bot: %s' % THIS_FILE,
+      'Bot is stuck restarting for: Starting new swarming bot: %s' % THIS_FILE,
+    ]
+    self.assertEqual(expected, [i[0][2] for i in post_event])
 
   def test_post_error_task(self):
     self.mock(time, 'time', lambda: 126.0)
@@ -417,7 +430,7 @@ class TestBotMain(net_utils.TestCase):
 
     calls = []
     cmd = [sys.executable, 'swarming_bot.2.zip', 'start_slave', '--survive']
-    self.mock(subprocess, 'call', self.fail)
+    self.mock(subprocess, 'Popen', self.fail)
     self.mock(os, 'execv', lambda *args: calls.append(args))
 
     bot_main.update_bot(self.bot, '123')
@@ -434,7 +447,7 @@ class TestBotMain(net_utils.TestCase):
 
     calls = []
     cmd = [sys.executable, 'swarming_bot.2.zip', 'start_slave', '--survive']
-    self.mock(subprocess, 'call', lambda *args: calls.append(args))
+    self.mock(subprocess, 'Popen', lambda *args: calls.append(args))
     self.mock(os, 'execv', self.fail)
 
     with self.assertRaises(SystemExit):

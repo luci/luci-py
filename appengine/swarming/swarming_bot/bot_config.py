@@ -56,6 +56,17 @@ def get_state():
 ### Hooks
 
 
+def on_bot_shutdown(bot):
+  """Hook function called when the bot shuts down, usually rebooting.
+
+  It's a good time to do other kinds of cleanup.
+
+  Arguments:
+  - bot: bot.Bot instance.
+  """
+  pass
+
+
 def on_bot_startup(bot):
   """Hook function called when the bot starts.
 

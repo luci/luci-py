@@ -247,7 +247,9 @@ def get_bot():
       logging.exception('Catastrophic failure')
 
   config = get_config()
-  return bot.Bot(remote, attributes, config['server_version'], ROOT_DIR)
+  return bot.Bot(
+      remote, attributes, config['server_version'], ROOT_DIR,
+      lambda b: call_hook(b, 'on_bot_shutdown'))
 
 
 def run_bot(arg_error):
@@ -415,12 +417,18 @@ def update_bot(botobj, version):
   sys.stderr.flush()
 
   cmd = [sys.executable, new_zip, 'start_slave', '--survive']
+  # Do not call on_bot_shutdown.
   if sys.platform in ('cygwin', 'win32'):
     # (Tentative) It is expected that subprocess.Popen() behaves a tad better
     # on Windows than os.exec*(), which has to be emulated since there's no OS
     # provided implementation. This means processes will accumulate as the bot
     # is restarted, which could be a problem long term.
-    sys.exit(subprocess.call(cmd))
+    try:
+      subprocess.Popen(cmd)
+    except Exception as e:
+      logging.exception('failed to respawn: %s', e)
+    else:
+      sys.exit(0)
   else:
     # On OSX, launchd will be unhappy if we quit so the old code bot process
     # has to outlive the new code child process. Launchd really wants the main
@@ -474,4 +482,7 @@ def main(args):
   except Exception as e:
     # Do not reboot here, because it would just cause a reboot loop.
     error = str(e)
-  return run_bot(error)
+  try:
+    return run_bot(error)
+  finally:
+    call_hook(bot.Bot(None, None, None, ROOT_DIR, None), 'on_bot_shutdown')

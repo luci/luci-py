@@ -85,9 +85,12 @@ def CMDstart_slave(args):
   logging.info('Starting the bot: %s', THIS_FILE)
   cmd = [sys.executable, THIS_FILE, 'start_bot']
   if sys.platform in ('cygwin', 'win32'):
-    result = subprocess.call(cmd)
-    logging.info('Bot exit code: %d', result)
-    return result
+    try:
+      subprocess.Popen(cmd)
+      return 0
+    except Exception as e:
+      logging.exception('failed to start: %s', e)
+      return 1
   else:
     os.execv(cmd[0], cmd)
 
@@ -125,7 +128,12 @@ def main():
     cmd = [sys.executable, 'swarming_bot.1.zip'] + sys.argv[1:]
     print >> sys.stderr, 'cmd: %s' % cmd
     if sys.platform in ('cygwin', 'win32'):
-      return subprocess.call(cmd)
+      try:
+        subprocess.Popen(cmd)
+        return 0
+      except Exception as e:
+        logging.exception('failed to start: %s', e)
+        return 1
     else:
       os.execv(cmd[0], cmd)
 

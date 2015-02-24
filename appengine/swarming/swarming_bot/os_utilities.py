@@ -17,6 +17,7 @@ the server to allow additional server-specific functionality.
 import cgi
 import ctypes
 import getpass
+import glob
 import json
 import logging
 import multiprocessing
@@ -1525,6 +1526,33 @@ def restart_and_return(message=None):
     else:
       success = True
   return success
+
+
+def roll_log(name):
+  """Rolls a log in 5Mb chunks and keep the last 10 files."""
+  try:
+    if not os.isfile(name) or os.stat(name).st_size < 5*1024*1024:
+      return
+    if os.isfile('%s.9' % name):
+      os.remove('%s.9' % name)
+    for i in xrange(8, 0, -1):
+      item = '%s.%d' % (name, i)
+      if os.isfile(item):
+        os.rename(item, '%s.%d' % (name, i+1))
+    if os.isfile(name):
+      os.rename(name, '%s.1' % name)
+  except Exception as e:
+    logging.exception('roll_log(%s) failed: %s', name, e)
+
+
+def trim_rolled_log(name):
+  try:
+    for item in glob.iglob('%s.??' % name):
+      os.remove(item)
+    for item in glob.iglob('%s.???' % name):
+      os.remove(item)
+  except Exception as e:
+    logging.exception('trim_rolled_log(%s) failed: %s', name, e)
 
 
 def main():

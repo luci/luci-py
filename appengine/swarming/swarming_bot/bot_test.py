@@ -20,7 +20,8 @@ class TestBot(unittest.TestCase):
         None,
         {'dimensions': {'foo': 'bar'}},
         '1234-1a2b3c4-tainted-joe',
-        'base_dir')
+        'base_dir',
+        None)
     self.assertEqual({'foo': 'bar'}, obj.dimensions)
     self.assertEqual(THIS_FILE, obj.swarming_bot_zip)
     self.assertEqual('1234-1a2b3c4-tainted-joe', obj.server_version)
