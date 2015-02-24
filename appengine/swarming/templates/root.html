@@ -11,6 +11,12 @@
       text-decoration: line-through;
     {% endif %}
   }
+  .command {
+    font-family: monospace;
+    margin-bottom: 10px;
+    margin-top: 10px;
+    white-space: pre-wrap;
+  }
   .privileged_user a {
     {% if not is_privileged_user %}
       color: gray;
@@ -67,18 +73,18 @@
       <ol>
         <li>
           TL;DR;
-<pre>python -c "import urllib; exec urllib.urlopen('{{host_url}}/bootstrap').read()"</pre>
+<div class="command">python -c "import urllib; exec urllib.urlopen('{{host_url}}/bootstrap').read()"</div>
         </li>
         <li>
           Escaped version to pass as a ssh argument:
-<pre>'python -c "import urllib; exec urllib.urlopen('"'{{host_url}}/bootstrap'"').read()"'</pre>
+<div class="command">'python -c "import urllib; exec urllib.urlopen('"'{{host_url}}/bootstrap'"').read()"'</div>
         </li>
         <li>
           Manually. Don't forget if swarming_bot.zip was already present, curl
           won't overwrite it so "rm swarming_bot.zip" first if necessary.
-<pre style="margin-bottom:0">mkdir bot; cd bot
+<div class="command" style="margin-bottom:0">mkdir bot; cd bot
 curl -sSLOJ {{host_url}}/bot_code
-python swarming_bot.zip</pre>
+python swarming_bot.zip</div>
         </li>
       </ol>
     </li>
