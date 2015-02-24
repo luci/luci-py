@@ -229,10 +229,9 @@ class WarmupHandler(webapp2.RequestHandler):
     self.response.write('ok')
 
 
-class EmailHandler(auth.AuthenticatingHandler):
+class EmailHandler(webapp2.RequestHandler):
   """Blackhole any email sent."""
-  @auth.require(users.is_current_user_admin)
-  def post(self):
+  def post(self, to):
     pass
 
 
@@ -255,7 +254,7 @@ def get_routes():
       webapp2.Route(r'/', RootHandler),
 
       # AppEngine-specific urls:
-      webapp2.Route(r'/_ah/mail/.+', EmailHandler),
+      webapp2.Route(r'/_ah/mail/<to:.+>', EmailHandler),
       webapp2.Route(r'/_ah/warmup', WarmupHandler),
   ]
 
