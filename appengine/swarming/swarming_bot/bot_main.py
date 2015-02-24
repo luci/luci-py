@@ -91,7 +91,7 @@ def get_dimensions():
         botid = 'error_%s' % str(e2)
       return {
           'id': [botid],
-          'error': ['%s\n%s' % (e, traceback.format_exc()[-2048])],
+          'error': ['%s\n%s' % (e, traceback.format_exc()[-2048:])],
           'quarantined': ['1'],
         }
 
@@ -110,7 +110,7 @@ def get_state(sleep_streak):
         state = {'error': state}
   except Exception as e:
     state = {
-      'error': '%s\n%s' % (e, traceback.format_exc()[-2048]),
+      'error': '%s\n%s' % (e, traceback.format_exc()[-2048:]),
       'quarantined': True,
     }
 
