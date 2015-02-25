@@ -1531,15 +1531,15 @@ def restart_and_return(message=None):
 def roll_log(name):
   """Rolls a log in 5Mb chunks and keep the last 10 files."""
   try:
-    if not os.isfile(name) or os.stat(name).st_size < 5*1024*1024:
+    if not os.path.isfile(name) or os.stat(name).st_size < 5*1024*1024:
       return
-    if os.isfile('%s.9' % name):
+    if os.path.isfile('%s.9' % name):
       os.remove('%s.9' % name)
     for i in xrange(8, 0, -1):
       item = '%s.%d' % (name, i)
-      if os.isfile(item):
+      if os.path.isfile(item):
         os.rename(item, '%s.%d' % (name, i+1))
-    if os.isfile(name):
+    if os.path.isfile(name):
       os.rename(name, '%s.1' % name)
   except Exception as e:
     logging.exception('roll_log(%s) failed: %s', name, e)
