@@ -56,7 +56,7 @@ class BundleFetchError(BundleImportError):
     self.content = content
 
   def __str__(self):
-    return 'Request to %s failed with code %d:\n%s' % (
+    return 'Request to %s failed with code %d:\n%r' % (
         self.url, self.status_code, self.content)
 
 
