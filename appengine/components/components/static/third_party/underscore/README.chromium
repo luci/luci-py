@@ -11,3 +11,6 @@ extending any core JavaScript objects.
 
 Local Modifications:
 Only minified version kept.
+
+sourceMappingURL line is remove:
+- //# sourceMappingURL=underscore-min.map
