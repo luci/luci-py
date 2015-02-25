@@ -25,16 +25,31 @@ handlers:
 - url: /mapreduce/pipeline/images
   static_dir: third_party/mapreduce/lib/pipeline/ui/images
   secure: always
+  http_headers:
+    Content-Security-Policy: "default-src https: 'self'"
+    Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
+    X-Frame-Options: deny
 
 - url: /([^/]+)\.(css|ico|txt)
   static_files: static/\1.\2
   upload: static/(.+)\.(css|ico|txt)
   secure: always
+  http_headers:
+    Content-Security-Policy: "default-src https: 'self'"
+    Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
+    X-Frame-Options: deny
 
 - url: /elements/([^/]+\-build)\.(html|js)
   static_files: elements/\1.\2
   upload: elements/([^/]+\-build)\.(html|js)
   secure: always
+  http_headers:
+    # TODO(maruel): Unsure about polymer if it is inline-style free.
+    # TODO(maruel): Polymer abuses eval() and http://crbug.com/277857 gets in
+    # the way.
+    Content-Security-Policy: "default-src https: 'self' 'unsafe-inline' 'unsafe-eval'"
+    Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
+    X-Frame-Options: deny
 
 - url: /(user|restricted)(|/.*)
   script: main.app

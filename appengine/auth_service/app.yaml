@@ -13,11 +13,19 @@ handlers:
   static_files: components/auth/ui/static/\1.\2
   upload: components/auth/ui/static/(.+)\.(css|gif|ico|js|ttf|svg)
   secure: always
+  http_headers:
+    Content-Security-Policy: "default-src https: 'self'"
+    Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
+    X-Frame-Options: deny
 
 - url: /auth_service/static/(.+)\.(css|gif|ico|js|ttf|svg)
   static_files: frontend/static/\1.\2
   upload: frontend/static/(.+)\.(css|gif|ico|js|ttf|svg)
   secure: always
+  http_headers:
+    Content-Security-Policy: "default-src https: 'self'"
+    Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
+    X-Frame-Options: deny
 
 - url: /.*
   script: frontend.main.app

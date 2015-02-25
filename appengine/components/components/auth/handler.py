@@ -106,7 +106,23 @@ class AuthenticatingHandler(webapp2.RequestHandler):
     # complete. It is used in authentication_error/authorization_error calls.
     auth_context.set_current_identity(model.Anonymous)
 
+    # http://www.html5rocks.com/en/tutorials/security/content-security-policy/
+    # https://www.owasp.org/index.php/Content_Security_Policy
+    # TODO(maruel): Remove 'unsafe-inline' once all inline style="foo:bar" in
+    # all HTML tags were removed. Warning if seeing this post 2016, it could
+    # take a while.
+    # - https://www.google.com is due to Google Viz library.
+    # - https://www.google-analytics.com due to Analytics.
+    # - 'unsafe-eval' due to polymer.
+    self.response.headers['Content-Security-Policy'] = (
+        'default-src https: \'self\' \'unsafe-inline\' https://www.google.com '
+        'https://www.google-analytics.com \'unsafe-eval\'')
+    # Enforce HTTPS by adding the HSTS header; 365*24*60*60s.
+    # https://www.owasp.org/index.php/HTTP_Strict_Transport_Security
+    self.response.headers['Strict-Transport-Security'] = (
+        'max-age=31536000; includeSubDomains; preload')
     # Disable frame support wholesale.
+    # https://www.owasp.org/index.php/Clickjacking_Defense_Cheat_Sheet
     if self.frame_options:
       self.response.headers['X-Frame-Options'] = self.frame_options
 

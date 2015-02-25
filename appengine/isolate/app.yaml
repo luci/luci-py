@@ -14,6 +14,7 @@ automatic_scaling:
 handlers:
 - url: /_ah/spi/.*
   script: endpoint_handlers_api.app
+  secure: always
 
 - url: /restricted/mapreduce(/.*)?
   script: mapreduce_jobs.app
@@ -28,11 +29,19 @@ handlers:
 - url: /mapreduce/pipeline/images
   static_dir: third_party/mapreduce/lib/pipeline/ui/images
   secure: always
+  http_headers:
+    Content-Security-Policy: "default-src https: 'self'"
+    Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
+    X-Frame-Options: deny
 
 - url: /(.+)\.(css|gif|ico|js|txt)
   static_files: static/\1.\2
   upload: static/(.+)\.(css|gif|ico|js|txt)
   secure: always
+  http_headers:
+    Content-Security-Policy: "default-src https: 'self'"
+    Strict-Transport-Security: "max-age=31536000; includeSubDomains; preload"
+    X-Frame-Options: deny
 
 - url: /.*
   script: main_frontend.app
