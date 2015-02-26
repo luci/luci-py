@@ -33,6 +33,12 @@ GOOD_IMPORTER_CONFIG = [
     'systems': ['ldap'],
     'url': 'http://example.com/stuff.tar.gz',
   },
+  {
+    'systems': ['chromium-committers'],
+    'groups': ['chromium-committers'],
+    'url': 'http://chromium-committers.appspot.com/chromium',
+    'format': 'plainlist',
+  },
 ]
 
 BAD_IMPORTER_CONFIG = [

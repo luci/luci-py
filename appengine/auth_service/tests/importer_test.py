@@ -3,6 +3,7 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
+import collections
 import datetime
 import logging
 import os
@@ -194,7 +195,8 @@ class ImporterTest(test_case.TestCase):
         systems=['ldap'],
         groups=['ldap/group-a', 'ldap/group-b'],
         oauth_scopes=['scope'],
-        domain='example.com').get_result()
+        domain='example.com',
+        fmt='tarball').get_result()
 
     expected = {
       'ldap': {
@@ -222,10 +224,32 @@ class ImporterTest(test_case.TestCase):
         systems=['ldap'],
         groups=['ldap/group-a', 'ldap/group-b'],
         oauth_scopes=['scope'],
-        domain='example.com')
+        domain='example.com',
+        fmt='tarball')
 
     with self.assertRaises(importer.BundleBadFormatError):
       future.get_result()
+
+  def test_load_plaintext(self):
+    test_plaintext_content = 'a\nb'
+
+    bundles = collections.defaultdict(dict)
+    importer.load_plaintext(
+        bundles,
+        test_plaintext_content,
+        systems=['chromium-committers'],
+        groups=['chromium-committers'],
+        domain='example.com')
+
+    expected = {
+      'chromium-committers': {
+        'chromium-committers': [
+          auth.Identity.from_bytes('user:a@example.com'),
+          auth.Identity.from_bytes('user:b@example.com')
+        ],
+      }
+    }
+    self.assertEqual(expected, bundles)
 
   def test_import_external_groups(self):
     self.mock_now(datetime.datetime(2010, 1, 2, 3, 4, 5, 6))

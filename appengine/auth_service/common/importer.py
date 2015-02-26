@@ -2,7 +2,7 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
-"""Imports groups from some external tar.gz bundle.
+"""Imports groups from some external tar.gz bundle or plain text list.
 
 External URL should serve *.tar.gz file with the following file structure:
   <external group system name>/<group name>:
@@ -26,6 +26,9 @@ sees <external group system name>/* in a tarball, it modifies group list from
 that system on the server to match group list in the tarball _exactly_,
 including removal of groups that are on the server, but no longer present in
 the tarball.
+
+Plain list format should have one userid per line and can only describe a single
+group in a single system.
 """
 
 import collections
@@ -141,6 +144,14 @@ def is_valid_config(config):
     if domain and not isinstance(domain, basestring):
       return False
 
+    # 'format' is an optional string describing the format of the imported
+    # source. The default format is 'tarball'.
+    fmt = item.get('format', 'tarball')
+    if fmt not in ['tarball', 'plainlist']:
+      return False
+    if fmt == 'plainlist' and not (len(systems) == 1 and len(groups) == 1):
+      return False
+
   return True
 
 
@@ -184,7 +195,8 @@ def import_external_groups():
         p['systems'],
         p.get('groups'),
         p.get('oauth_scopes'),
-        p.get('domain'))
+        p.get('domain'),
+        p.get('format', 'tarball'))
     for p in config
   ]
 
@@ -251,9 +263,42 @@ def import_external_groups():
   return not errors
 
 
+def load_tarball(bundles, content, systems, groups, domain):
+  try:
+    # Expected filenames are <external system name>/<group name>, skip
+    # everything else.
+    for filename, fileobj in extract_tar_archive(content):
+      chunks = filename.split('/')
+      if len(chunks) != 2 or not auth.is_valid_group_name(filename):
+        logging.warning('Skipping file %s, not a valid name', filename)
+        continue
+      if groups is not None and filename not in groups:
+        continue
+      system = chunks[0]
+      if system not in systems:
+        logging.warning('Skipping file %s, not allowed', filename)
+        continue
+      # Reject the whole bundle if at least one group file is broken. That way
+      # all existing groups will stay intact. Simply ignoring broken group
+      # here will cause the importer to remove it completely.
+      try:
+        bundles[system][filename] = parse_group_file(fileobj.read(), domain)
+      except ValueError as err:
+        raise BundleBadFormatError(err)
+  except tarfile.TarError as exc:
+    raise BundleUnpackError('Not a valid tar archive: %s' % exc)
+
+
+def load_plaintext(bundles, content, systems, groups, domain):
+  try:
+    bundles[systems[0]][groups[0]] = parse_group_file(content, domain)
+  except ValueError as err:
+    raise BundleBadFormatError(err)
+
+
 @ndb.tasklet
-def fetch_bundle_async(url, systems, groups, oauth_scopes, domain):
-  """Fetches and extracts group files from  *.tar.gz bundle.
+def fetch_bundle_async(url, systems, groups, oauth_scopes, domain, fmt):
+  """Fetches and extracts group files from  *.tar.gz bundle or plain text list.
 
   Args:
     url: url to *.tar.gz file.
@@ -262,6 +307,7 @@ def fetch_bundle_async(url, systems, groups, oauth_scopes, domain):
     oauth_scopes: list of OAuth scopes to use when generating access_token for
         accessing |url|, if not set or empty - do not use OAuth.
     domain: email domain to append to naked user ids.
+    fmt: format of the source data.
 
   Returns:
     Dict {system name -> {group name -> list of identities}}.
@@ -293,29 +339,10 @@ def fetch_bundle_async(url, systems, groups, oauth_scopes, domain):
 
   # System name (e.g. 'ldap') -> full group name -> list of identities.
   bundles = collections.defaultdict(dict)
-  try:
-    # Expected filenames are <external system name>/<group name>, skip
-    # everything else.
-    for filename, fileobj in extract_tar_archive(result.content):
-      chunks = filename.split('/')
-      if len(chunks) != 2 or not auth.is_valid_group_name(filename):
-        logging.warning('Skipping file %s, not a valid name', filename)
-        continue
-      if groups is not None and filename not in groups:
-        continue
-      system = chunks[0]
-      if system not in systems:
-        logging.warning('Skipping file %s, not allowed', filename)
-        continue
-      # Reject the whole bundle if at least one group file is broken. That way
-      # all existing groups will stay intact. Simply ignoring broken group here
-      # will cause the importer to remove it completely.
-      try:
-        bundles[system][filename] = parse_group_file(fileobj.read(), domain)
-      except ValueError as err:
-        raise BundleBadFormatError(err)
-  except tarfile.TarError as exc:
-    raise BundleUnpackError('Not a valid tar archive: %s' % exc)
+  if fmt == 'tarball':
+    load_tarball(bundles, result.content, systems, groups, domain)
+  elif fmt == 'plainlist':
+    load_plaintext(bundles, result.content, systems, groups, domain)
   raise ndb.Return(dict(bundles.iteritems()))
 
 
