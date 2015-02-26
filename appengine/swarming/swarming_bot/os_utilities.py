@@ -1063,7 +1063,9 @@ service-accounts/default/scopes" -H "Metadata-Flavor: Google"
     #   {"kind": "cloudmonitoring#writeTimeseriesResponse"}
     logging.debug(json.load(resp))
   except urllib2.HTTPError as e:
-    logging.error('%s: %s' % (e, e.read()))
+    logging.error('send_metric failed: %s: %s' % (e, e.read()))
+  except IOError as e:
+    logging.error('send_metric failed: %s' % e)
 
 
 ### Windows.
