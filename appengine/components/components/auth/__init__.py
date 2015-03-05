@@ -36,6 +36,7 @@ from ui.app import *
 # specified in app.yaml.
 if endpoints:
   from endpoints_support import *
+  from ui.endpoints_api import AuthService
 
 # Import 'config' to register lib_config hook.
 import config
