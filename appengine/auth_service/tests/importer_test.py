@@ -49,7 +49,10 @@ def build_tar_gz(content):
 
 
 def ident(name):
-  return auth.Identity(auth.IDENTITY_USER, '%s@example.com' % name)
+  if '@' not in name:
+    return auth.Identity(auth.IDENTITY_USER, '%s@example.com' % name)
+  else:
+    return auth.Identity(auth.IDENTITY_USER, name)
 
 
 def group(name, members, nested=None):
@@ -73,18 +76,18 @@ class ImporterTest(test_case.TestCase):
     auth_testing.mock_is_admin(self, True)
     auth_testing.mock_get_current_identity(self)
 
-  def mock_urlfetch(self, url, bundle):
+  def mock_urlfetch(self, urls):
     def mock_get_access_token(_scope):
       return 'token', 0
     self.mock(importer.app_identity, 'get_access_token', mock_get_access_token)
 
     @ndb.tasklet
     def mock_fetch(**kwargs):
-      self.assertEqual(url, kwargs['url'])
+      self.assertIn(kwargs['url'], urls)
       self.assertEqual({'Authorization': 'OAuth token'}, kwargs['headers'])
       class ReturnValue(object):
         status_code = 200
-        content = build_tar_gz(bundle)
+        content = urls[kwargs['url']]
       raise ndb.Return(ReturnValue())
     self.mock(ndb.get_context(), 'urlfetch', mock_fetch)
 
@@ -102,23 +105,18 @@ class ImporterTest(test_case.TestCase):
     }
     self.assertEqual(expected, out)
 
-  def test_parse_group_file_ok(self):
-    body = '\n'.join(['b', 'a'])
+  def test_load_group_file_ok(self):
+    body = '\n'.join(['', 'b', 'a', ''])
     expected = [
       auth.Identity.from_bytes('user:a@example.com'),
       auth.Identity.from_bytes('user:b@example.com'),
     ]
-    self.assertEqual(expected, importer.parse_group_file(body, 'example.com'))
+    self.assertEqual(expected, importer.load_group_file(body, 'example.com'))
 
-  def test_parse_group_file_bad_id(self):
+  def test_load_group_file_bad_id(self):
     body = 'bad id'
-    with self.assertRaises(ValueError):
-      importer.parse_group_file(body, 'example.com')
-
-  def test_parse_group_file_empty_lines(self):
-    body = 'a\n\n'
-    with self.assertRaises(ValueError):
-      importer.parse_group_file(body, 'example.com')
+    with self.assertRaises(importer.BundleBadFormatError):
+      importer.load_group_file(body, 'example.com')
 
   def test_prepare_import(self):
     service_id = auth.Identity.from_bytes('service:some-service')
@@ -178,8 +176,8 @@ class ImporterTest(test_case.TestCase):
     self.assertEqual(expected_to_put, {x.key.id(): x.to_dict() for x in to_put})
     self.assertEqual([model.group_key('ldap/deleted')], to_delete)
 
-  def test_fetch_bundle_async(self):
-    bundle = {
+  def test_load_tarball(self):
+    bundle = build_tar_gz({
       'at_root': 'a\nb',
       'ldap/ bad name': 'a\nb',
       'ldap/group-a': 'a\nb',
@@ -187,16 +185,12 @@ class ImporterTest(test_case.TestCase):
       'ldap/group-c': 'a\nb',
       'ldap/deeper/group-a': 'a\nb',
       'not-ldap/group-a': 'a\nb',
-    }
-    self.mock_urlfetch('https://fake_url', bundle)
-
-    result = importer.fetch_bundle_async(
-        url='https://fake_url',
+    })
+    result = importer.load_tarball(
+        content=bundle,
         systems=['ldap'],
         groups=['ldap/group-a', 'ldap/group-b'],
-        oauth_scopes=['scope'],
-        domain='example.com',
-        fmt='tarball').get_result()
+        domain='example.com')
 
     expected = {
       'ldap': {
@@ -212,44 +206,17 @@ class ImporterTest(test_case.TestCase):
     }
     self.assertEqual(expected, result)
 
-  def test_fetch_bundle_async_bad_group(self):
-    bundle = {
+  def test_load_tarball_bad_group(self):
+    bundle = build_tar_gz({
       'at_root': 'a\nb',
-      'ldap/group-a': 'a\n\n\n',
-    }
-    self.mock_urlfetch('https://fake_url', bundle)
-
-    future = importer.fetch_bundle_async(
-        url='https://fake_url',
+      'ldap/group-a': 'a\n!!!!!',
+    })
+    with self.assertRaises(importer.BundleBadFormatError):
+      importer.load_tarball(
+        content=bundle,
         systems=['ldap'],
         groups=['ldap/group-a', 'ldap/group-b'],
-        oauth_scopes=['scope'],
-        domain='example.com',
-        fmt='tarball')
-
-    with self.assertRaises(importer.BundleBadFormatError):
-      future.get_result()
-
-  def test_load_plaintext(self):
-    test_plaintext_content = 'a\nb'
-
-    bundles = collections.defaultdict(dict)
-    importer.load_plaintext(
-        bundles,
-        test_plaintext_content,
-        systems=['chromium-committers'],
-        groups=['chromium-committers'],
         domain='example.com')
-
-    expected = {
-      'chromium-committers': {
-        'chromium-committers': [
-          auth.Identity.from_bytes('user:a@example.com'),
-          auth.Identity.from_bytes('user:b@example.com')
-        ],
-      }
-    }
-    self.assertEqual(expected, bundles)
 
   def test_import_external_groups(self):
     self.mock_now(datetime.datetime(2010, 1, 2, 3, 4, 5, 6))
@@ -260,31 +227,47 @@ class ImporterTest(test_case.TestCase):
     importer.write_config([
       {
         'domain': 'example.com',
+        'format': 'tarball',
         'groups': ['ldap/new'],
+        'oauth_scopes': ['scope'],
         'systems': ['ldap'],
-        'url': 'https://fake_url',
-      }
+        'url': 'https://fake_tarball',
+      },
+      {
+        'format': 'plainlist',
+        'group': 'external_1',
+        'oauth_scopes': ['scope'],
+        'url': 'https://fake_external_1',
+      },
+      {
+        'description': 'Some external group',
+        'domain': 'example.com',
+        'format': 'plainlist',
+        'group': 'external_2',
+        'oauth_scopes': ['scope'],
+        'url': 'https://fake_external_2',
+      },
     ])
 
-    @ndb.tasklet
-    def mock_fetch_bundle_async(*_args, **_kwargs):
-      raise ndb.Return({
-        'ldap': {
-          'ldap/new': [ident('a'), ident('b')],
-        },
-      })
-    self.mock(importer, 'fetch_bundle_async', mock_fetch_bundle_async)
+    self.mock_urlfetch({
+      'https://fake_tarball': build_tar_gz({
+        'ldap/new': 'a\nb',
+      }),
+      'https://fake_external_1': 'abc@test.com\ndef@test.com\n',
+      'https://fake_external_2': '123\n456',
+    })
 
     # Should be deleted during import, since not in a imported bundle.
     group('ldap/deleted', []).put()
-    initial_auth_db_rev = model.get_auth_db_revision()
-
-    # Verify initial state.
-    self.assertEqual(['ldap/deleted'], fetch_groups().keys())
+    # Should be updated.
+    group('external/external_1', ['x', 'y']).put()
+    # Should be removed, since not in list of external groups.
+    group('external/deleted', []).put()
 
     # Run the import.
-    ret = importer.import_external_groups()
-    self.assertTrue(ret)
+    initial_auth_db_rev = model.get_auth_db_revision()
+    importer.import_external_groups()
+    self.assertEqual(initial_auth_db_rev + 1, model.get_auth_db_revision())
 
     # Verify final state.
     expected_groups = {
@@ -298,9 +281,28 @@ class ImporterTest(test_case.TestCase):
         'modified_ts': datetime.datetime(2010, 1, 2, 3, 4, 5, 6),
         'nested': [],
       },
+      'external/external_1': {
+        'created_by': ident('admin'),
+        'created_ts': datetime.datetime(1999, 1, 2, 3, 4, 5, 6),
+        'description': u'',
+        'globs': [],
+        'members': [ident('abc@test.com'), ident('def@test.com')],
+        'modified_by': service_id,
+        'modified_ts': datetime.datetime(2010, 1, 2, 3, 4, 5, 6),
+        'nested': [],
+      },
+      'external/external_2': {
+        'created_by': service_id,
+        'created_ts': datetime.datetime(2010, 1, 2, 3, 4, 5, 6),
+        'description': u'',
+        'globs': [],
+        'members': [ident('123'), ident('456')],
+        'modified_by': service_id,
+        'modified_ts': datetime.datetime(2010, 1, 2, 3, 4, 5, 6),
+        'nested': [],
+      },
     }
     self.assertEqual(expected_groups, fetch_groups())
-    self.assertEqual(initial_auth_db_rev + 1, model.get_auth_db_revision())
 
 
 if __name__ == '__main__':

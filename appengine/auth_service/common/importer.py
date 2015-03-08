@@ -28,7 +28,9 @@ including removal of groups that are on the server, but no longer present in
 the tarball.
 
 Plain list format should have one userid per line and can only describe a single
-group in a single system.
+group in a single system. Such groups will be added to 'external/*' groups
+namespace. Removing such group from importer config will remove it from
+service too.
 """
 
 import collections
@@ -102,33 +104,21 @@ def is_valid_config(config):
   if not isinstance(config, list):
     return False
 
-  seen_systems = set()
+  seen_systems = set(['external'])
+  seen_groups = set()
   for item in config:
     if not isinstance(item, dict):
       return False
 
-    # 'url' is a required string: where to fetch tar.gz from.
+    # 'format' is an optional string describing the format of the imported
+    # source. The default format is 'tarball'.
+    fmt = item.get('format', 'tarball')
+    if fmt not in ['tarball', 'plainlist']:
+      return False
+
+    # 'url' is a required string: where to fetch groups from.
     url = item.get('url')
     if not url or not isinstance(url, basestring):
-      return False
-
-    # 'systems' is a required list of strings: group systems expected to be
-    # found in the archive (they act as prefixes to group names, e.g 'ldap').
-    systems = item.get('systems')
-    if not systems or not isinstance(systems, list):
-      return False
-    if not all(isinstance(x, basestring) for x in systems):
-      return False
-
-    # There should be no overlap in systems between different bundles.
-    if set(systems) & seen_systems:
-      return False
-    seen_systems.update(systems)
-
-    # 'groups' is an optional list of strings: if given, filters imported groups
-    # only to this list.
-    groups = item.get('groups')
-    if groups and not all(isinstance(x, basestring) for x in groups):
       return False
 
     # 'oauth_scopes' is an optional list of strings: used when generating OAuth
@@ -144,13 +134,35 @@ def is_valid_config(config):
     if domain and not isinstance(domain, basestring):
       return False
 
-    # 'format' is an optional string describing the format of the imported
-    # source. The default format is 'tarball'.
-    fmt = item.get('format', 'tarball')
-    if fmt not in ['tarball', 'plainlist']:
-      return False
-    if fmt == 'plainlist' and not (len(systems) == 1 and len(groups) == 1):
-      return False
+    # 'tarball' format uses 'systems' and 'groups' fields.
+    if fmt == 'tarball':
+      # 'systems' is a required list of strings: group systems expected to be
+      # found in the archive (they act as prefixes to group names, e.g 'ldap').
+      systems = item.get('systems')
+      if not systems or not isinstance(systems, list):
+        return False
+      if not all(isinstance(x, basestring) for x in systems):
+        return False
+
+      # There should be no overlap in systems between different bundles.
+      if set(systems) & seen_systems:
+        return False
+      seen_systems.update(systems)
+
+      # 'groups' is an optional list of strings: if given, filters imported
+      # groups only to this list.
+      groups = item.get('groups')
+      if groups and not all(isinstance(x, basestring) for x in groups):
+        return False
+    elif fmt == 'plainlist':
+      # 'group' is a required name of imported group. The full group name will
+      # be 'external/<group>'.
+      group = item.get('group')
+      if not group or not isinstance(group, basestring) or group in seen_groups:
+        return False
+      seen_groups.add(group)
+    else:
+      assert False, 'Unreachable'
 
   return True
 
@@ -175,48 +187,48 @@ def write_config(config):
 def import_external_groups():
   """Refetches all external groups.
 
-  Runs as a cron task.
-
-  Returns:
-    True on success, False if at least one import failed.
+  Runs as a cron task. Raises BundleImportError in case of import errors.
   """
+  # Missing config is not a error.
   config = read_config()
   if not config:
     logging.info('Not configured')
-    return True
+    return
   if not is_valid_config(config):
-    logging.warning('Bad config')
-    return False
+    raise BundleImportError('Bad config')
 
-  # Fetch all bundles specified in config in parallel.
-  futures = [
-    fetch_bundle_async(
-        p['url'],
-        p['systems'],
-        p.get('groups'),
-        p.get('oauth_scopes'),
-        p.get('domain'),
-        p.get('format', 'tarball'))
-    for p in config
-  ]
+  # Fetch all files specified in config in parallel.
+  futures = [fetch_file_async(p['url'], p.get('oauth_scopes')) for p in config]
 
   # {system name -> group name -> list of identities}
   bundles = {}
-  errors = False
-  for params, future in zip(config, futures):
-    if future.get_exception():
-      errors = True
-      logging.error(
-          'Failed to process %s: %s', params['url'], future.get_exception())
-    else:
-      fetched = future.get_result()
-      # There should be no intersection between archives.
-      assert not (set(fetched) & set(bundles)), (fetched.keys(), bundles.keys())
+  for p, future in zip(config, futures):
+    fmt = p.get('format', 'tarball')
+
+    # Unpack tarball into {system name -> group name -> list of identities}.
+    if fmt == 'tarball':
+      fetched = load_tarball(
+          future.get_result(), p['systems'], p.get('groups'), p.get('domain'))
+      assert not (
+          set(fetched) & set(bundles)), (fetched.keys(), bundles.keys())
       bundles.update(fetched)
+      continue
+
+    # Add plainlist group to 'external/*' bundle.
+    if fmt == 'plainlist':
+      group = load_group_file(future.get_result(), p.get('domain'))
+      name = 'external/%s' % p['group']
+      if 'external' not in bundles:
+        bundles['external'] = {}
+      assert name not in bundles['external'], name
+      bundles['external'][name] = group
+      continue
+
+    assert False, 'Unreachable'
 
   # Nothing to process?
   if not bundles:
-    return not errors
+    return
 
   @ndb.transactional
   def snapshot_groups():
@@ -260,10 +272,24 @@ def import_external_groups():
     if apply_import(revision, entities_to_put, keys_to_delete):
       break
   logging.info('Groups updated: %d', len(entities_to_put) + len(keys_to_delete))
-  return not errors
 
 
-def load_tarball(bundles, content, systems, groups, domain):
+def load_tarball(content, systems, groups, domain):
+  """Unzips tarball with groups and deserializes them.
+
+  Args:
+    content: byte buffer with *.tar.gz data.
+    systems: names of external group systems expected to be in the bundle.
+    groups: list of group name to extract, or None to extract all.
+    domain: email domain to append to naked user ids.
+
+  Returns:
+    Dict {system name -> {group name -> list of identities}}.
+
+  Raises:
+    BundleImportError on errors.
+  """
+  bundles = collections.defaultdict(dict)
   try:
     # Expected filenames are <external system name>/<group name>, skip
     # everything else.
@@ -278,42 +304,47 @@ def load_tarball(bundles, content, systems, groups, domain):
       if system not in systems:
         logging.warning('Skipping file %s, not allowed', filename)
         continue
-      # Reject the whole bundle if at least one group file is broken. That way
-      # all existing groups will stay intact. Simply ignoring broken group
-      # here will cause the importer to remove it completely.
-      try:
-        bundles[system][filename] = parse_group_file(fileobj.read(), domain)
-      except ValueError as err:
-        raise BundleBadFormatError(err)
+      # Do not catch BundleBadFormatError here and in effect reject the whole
+      # bundle if at least one group file is broken. That way all existing
+      # groups will stay intact. Simply ignoring broken group here will cause
+      # the importer to remove it completely.
+      bundles[system][filename] = load_group_file(fileobj.read(), domain)
   except tarfile.TarError as exc:
     raise BundleUnpackError('Not a valid tar archive: %s' % exc)
+  return dict(bundles.iteritems())
 
 
-def load_plaintext(bundles, content, systems, groups, domain):
-  try:
-    bundles[systems[0]][groups[0]] = parse_group_file(content, domain)
-  except ValueError as err:
-    raise BundleBadFormatError(err)
+def load_group_file(body, domain):
+  """Given body of imported group file returns list of Identities.
+
+  Raises BundleBadFormatError if group file is malformed.
+  """
+  members = []
+  for uid in body.strip().splitlines():
+    try:
+      ident = auth.Identity(
+          auth.IDENTITY_USER,
+          '%s@%s' % (uid, domain) if domain else uid)
+      members.append(ident)
+    except ValueError as exc:
+      raise BundleBadFormatError(exc)
+  return sorted(members, key=lambda x: x.to_bytes())
 
 
 @ndb.tasklet
-def fetch_bundle_async(url, systems, groups, oauth_scopes, domain, fmt):
-  """Fetches and extracts group files from  *.tar.gz bundle or plain text list.
+def fetch_file_async(url, oauth_scopes):
+  """Fetches a file optionally using OAuth2 for authentication.
 
   Args:
-    url: url to *.tar.gz file.
-    systems: names of external group systems expected to be in the bundle.
-    groups: list of group name to extract, or None to extract all.
+    url: url to a file to fetch.
     oauth_scopes: list of OAuth scopes to use when generating access_token for
         accessing |url|, if not set or empty - do not use OAuth.
-    domain: email domain to append to naked user ids.
-    fmt: format of the source data.
 
   Returns:
-    Dict {system name -> {group name -> list of identities}}.
+    Byte buffer with file's body.
 
   Raises:
-    BundleImportError on fetch or extraction errors.
+    BundleImportError on fetch errors.
   """
   if utils.is_local_dev_server():
     protocols = ('http://', 'https://')
@@ -336,14 +367,7 @@ def fetch_bundle_async(url, systems, groups, oauth_scopes, domain, fmt):
       validate_certificate=True)
   if result.status_code != 200:
     raise BundleFetchError(url, result.status_code, result.content)
-
-  # System name (e.g. 'ldap') -> full group name -> list of identities.
-  bundles = collections.defaultdict(dict)
-  if fmt == 'tarball':
-    load_tarball(bundles, result.content, systems, groups, domain)
-  elif fmt == 'plainlist':
-    load_plaintext(bundles, result.content, systems, groups, domain)
-  raise ndb.Return(dict(bundles.iteritems()))
+  raise ndb.Return(result.content)
 
 
 def extract_tar_archive(content):
@@ -354,21 +378,6 @@ def extract_tar_archive(content):
       if item.isreg():
         with contextlib.closing(tar.extractfile(item)) as extracted:
           yield item.name, extracted
-
-
-def parse_group_file(body, domain):
-  """Given body of imported group file returns list of Identities.
-
-  Raises ValueError if group file is malformed.
-  """
-  members = []
-  for uid in body.splitlines():
-    # This raises ValueError if uid is not correct.
-    ident = auth.Identity(
-        auth.IDENTITY_USER,
-        '%s@%s' % (uid, domain) if domain else uid)
-    members.append(ident)
-  return sorted(members, key=lambda x: x.to_bytes())
 
 
 def prepare_import(system_name, existing_groups, imported_groups, timestamp):

@@ -34,10 +34,9 @@ GOOD_IMPORTER_CONFIG = [
     'url': 'http://example.com/stuff.tar.gz',
   },
   {
-    'systems': ['chromium-committers'],
-    'groups': ['chromium-committers'],
-    'url': 'http://chromium-committers.appspot.com/chromium',
     'format': 'plainlist',
+    'group': 'chromium-committers',
+    'url': 'http://chromium-committers.appspot.com/chromium',
   },
 ]
 

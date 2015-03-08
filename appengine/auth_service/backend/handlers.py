@@ -15,8 +15,8 @@ from common import replication
 class InternalImportGroupsCronHandler(webapp2.RequestHandler):
   @decorators.require_cronjob
   def get(self):
-    success = importer.import_external_groups()
-    self.response.set_status(200 if success else 500)
+    # Let exceptions to fall through and cause HTTP 500 and nice stack trace.
+    importer.import_external_groups()
 
 
 class InternalReplicationTaskHandler(webapp2.RequestHandler):
