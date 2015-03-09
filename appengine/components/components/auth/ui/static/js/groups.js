@@ -68,6 +68,38 @@ function trimGroupDescription(desc) {
 }
 
 
+// Given an array of strings returns a one with longest substring of 'text'.
+function longestMatch(items, text) {
+  if (text.length == 0 || items.length == 0) {
+    return null;
+  }
+  // Invariant: curSet is non empty subsequence of 'items', each item in curSet
+  // has 'curPrefix' as a substring.
+  var curPrefix = '';
+  var curSet = items;
+  for (var i = 0; i < text.length; i++) {
+    // Attempt to increase curPrefix.
+    var newPrefix = curPrefix + text[i];
+    var newSet = _.filter(curSet, function(item) {
+      return item.indexOf(newPrefix) != -1;
+    });
+    // No matches at all -> curSet contains longest matches.
+    if (newSet.length == 0) {
+      // Could not find the first letter -> no match at all.
+      if (i == 0) {
+        return null;
+      }
+      return curSet[0];
+    }
+    // Carry on.
+    curPrefix = newPrefix;
+    curSet = newSet;
+  }
+  // curSet is a subset of 'items' that have 'text' as substring, pick first.
+  return curSet[0];
+}
+
+
 ////////////////////////////////////////////////////////////////////////////////
 // Group chooser UI element: list of groups + 'Create new group' button.
 
@@ -77,6 +109,8 @@ var GroupChooser = function($element) {
   this.$element = $element;
   // Currently known list of groups as shown in UI.
   this.groupList = [];
+  // Just names. To avoid building this list for use in search all the time.
+  this.groupNames = [];
   // Same list, but as a dict: group name -> group object.
   this.groupMap = {};
   // Mapping group name -> jQuery element, plus null -> "new group" element.
@@ -121,10 +155,12 @@ GroupChooser.prototype.setGroupList = function(groups) {
   self.groupList = _.sortBy(groups, sortKeyFunc);
   self.groupMap = {};
   self.groupToItemMap = {};
+  self.groupNames = [];
   _.each(self.groupList, function(group) {
     group.isExternal = isExternalGroupName(group.name);
     group.descriptionTrimmed = trimGroupDescription(group.description);
     self.groupMap[group.name] = group;
+    self.groupNames.push(group.name);
   });
 
   // Helper function to add children to DOM.
@@ -265,6 +301,17 @@ SearchBox.prototype.onTextChanged = function(listener) {
 };
 
 
+// Registers new event listener that is called when Enter is hit.
+SearchBox.prototype.onEnterKey = function(listener) {
+  var self = this;
+  this.$element.on('keyup', function(e) {
+    if (e.keyCode == 13) {
+      listener(self.$element.val());
+    }
+  });
+};
+
+
 ////////////////////////////////////////////////////////////////////////////////
 // Main content frame: a parent for forms to create a group or edit an existing.
 
@@ -351,6 +398,12 @@ GroupForm.prototype.show = function($parent) {
 GroupForm.prototype.hide = function() {
   this.visible = false;
   this.$element.detach();
+};
+
+
+// Switches focus to members box on the form.
+GroupForm.prototype.focus = function() {
+  $('textarea[name=membersAndGlobs]', this.$element).focus();
 };
 
 
@@ -719,17 +772,16 @@ exports.onContentLoaded = function() {
 
   // Allow to select groups via search box.
   searchBox.onTextChanged(function(text) {
-    // Search for a group with name that starts with |text|.
-    var found = null;
-    for (var i = 0; i < groupChooser.groupList.length; i++) {
-      var group = groupChooser.groupList[i];
-      if (group.name.slice(0, text.length) == text) {
-        found = group;
-        break;
-      }
-    }
+    var found = longestMatch(groupChooser.groupNames, text);
     if (found) {
-      groupChooser.setSelection(found.name, null);
+      groupChooser.setSelection(found, null);
+    }
+  });
+
+  // Focus on group members box if "Enter" is hit.
+  searchBox.onEnterKey(function(text) {
+    if (mainFrame.content) {
+      mainFrame.content.focus();
     }
   });
 
