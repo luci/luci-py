@@ -91,6 +91,36 @@ exports.confirm = function(message) {
 };
 
 
+// Used in setAnchor and onAnchorChange to filter out unneeded event.
+var knownAnchor;
+
+
+// Returns #anchor part of the current location.
+exports.getAnchor = function() {
+  return window.location.hash.substring(1);
+};
+
+
+// Changes #anchor part of the current location. Calling this method does not
+// trigger 'onAnchorChange' event.
+exports.setAnchor = function(a) {
+  knownAnchor = a;
+  window.location.hash = '#' + a;
+};
+
+
+// Sets a callback to watch for changes to #anchor part of the location.
+exports.onAnchorChange = function(cb) {
+  window.onhashchange = function() {
+    var a = exports.getAnchor();
+    if (a != knownAnchor) {
+      knownAnchor = a;
+      cb();
+    }
+  };
+};
+
+
 // Wrapper around 'Im busy' UI indicator.
 var ProgressSpinner = function() {
   this.$element = $('#progress-spinner');

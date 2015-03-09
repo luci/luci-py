@@ -79,7 +79,7 @@ var GroupChooser = function($element) {
   this.groupList = [];
   // Same list, but as a dict: group name -> group object.
   this.groupMap = {};
-  // Mapping group name -> jQuery element.
+  // Mapping group name -> jQuery element, plus null -> "new group" element.
   this.groupToItemMap = {};
   // If true, selection won't change on clicks in UI.
   this.interactionDisabled = false;
@@ -143,7 +143,8 @@ GroupChooser.prototype.setGroupList = function(groups) {
     self.groupToItemMap[group.name] = addElement(
         common.render('group-chooser-item-template', group), group.name);
   });
-  addElement(common.render('group-chooser-button-template'), null);
+  self.groupToItemMap[null] = addElement(
+      common.render('group-chooser-button-template'), null);
 
   // Setup click event handlers. Clicks change selection.
   $('.chooser-element', self.$element).click(function() {
@@ -152,6 +153,12 @@ GroupChooser.prototype.setGroupList = function(groups) {
     }
     return false;
   });
+};
+
+
+// Returns true if given group is in the list.
+GroupChooser.prototype.isKnownGroup = function(name) {
+  return this.groupMap.hasOwnProperty(name);
 };
 
 
@@ -212,7 +219,7 @@ GroupChooser.prototype.setInteractionDisabled = function(disabled) {
 };
 
 
-// Scrolls group list so that given group is visible.
+// Scrolls group list so that given group (or "new group button") is visible.
 GroupChooser.prototype.ensureGroupVisible = function(name) {
   var $item = this.groupToItemMap[name];
   if (!$item) {
@@ -229,6 +236,14 @@ GroupChooser.prototype.ensureGroupVisible = function(name) {
   if (pos < scrollTop || pos + itemHeight > scrollTop + areaHeight) {
     this.$element.slimScroll({scrollTo: pos});
   }
+};
+
+
+// Called when GroupChooser becomes visible in DOM (with all parent elements).
+GroupChooser.prototype.madeVisible = function() {
+  // ensureGroupVisible works only when groupChooser is visible in DOM, so
+  // call it once more after displaying everything.
+  this.ensureGroupVisible(this.getSelection());
 };
 
 
@@ -314,8 +329,9 @@ ContentFrame.prototype.loadContent = function(content) {
 // Common code for 'New group' and 'Edit group' forms.
 
 
-var GroupForm = function($element) {
+var GroupForm = function($element, anchor) {
   this.$element = $element;
+  this.anchor = anchor;
   this.visible = false;
   this.readOnly = false;
 };
@@ -325,6 +341,9 @@ var GroupForm = function($element) {
 GroupForm.prototype.show = function($parent) {
   this.visible = true;
   this.$element.appendTo($parent);
+  if (this.anchor) {
+    common.setAnchor(this.anchor);
+  }
 };
 
 
@@ -447,7 +466,7 @@ GroupForm.prototype.setupSubmitHandler = function(submitCallback) {
 
 EditGroupForm = function(groupName) {
   // Call parent constructor.
-  GroupForm.call(this, null);
+  GroupForm.call(this, null, groupName);
   // Name of the group this form operates on.
   this.groupName = groupName;
   // Last-Modified header of content (once loaded).
@@ -530,9 +549,14 @@ EditGroupForm.prototype.buildForm = function(group, lastModified) {
 // 'Create new group' form.
 
 
+// It must be an invalid group name (to avoid collisions).
+var NEW_GROUP_ANCHOR = 'new!';
+
+
 var NewGroupForm = function(onSubmitGroup) {
   // Call parent constructor.
-  GroupForm.call(this, $(common.render('new-group-form-template')));
+  GroupForm.call(
+      this, $(common.render('new-group-form-template')), NEW_GROUP_ANCHOR);
 
   // Add validation and submit handler.
   this.setupSubmitHandler(function(group) {
@@ -709,14 +733,32 @@ exports.onContentLoaded = function() {
     }
   });
 
-  // Present the page only when main content pane is loaded.
-  mainFrame.onContentShown(common.presentContent);
+  // Helper function that selects a group specified in location anchor.
+  var jumpToAnchor = function(selectDefault) {
+    var anchor = common.getAnchor();
+    if (anchor == NEW_GROUP_ANCHOR) {
+      groupChooser.setSelection(null, null);
+    } else if (groupChooser.isKnownGroup(anchor)) {
+      groupChooser.setSelection(anchor, null);
+    } else if (selectDefault) {
+      groupChooser.selectDefault();
+    }
+  };
 
   // Load and show data.
   groupChooser.refetchGroups().then(function() {
-    groupChooser.selectDefault();
+    // Show a group specified in anchor (or a default one).
+    jumpToAnchor(true);
+    // Only start paying attention to anchor changes when the state is loaded.
+    common.onAnchorChange(function() { jumpToAnchor(false); });
   }, function(error) {
     common.presentError(error.text);
+  });
+
+  // Present the page only when main content pane is loaded.
+  mainFrame.onContentShown(function() {
+    common.presentContent();
+    groupChooser.madeVisible();
   });
 
   // Enable XSRF token auto-updater.
