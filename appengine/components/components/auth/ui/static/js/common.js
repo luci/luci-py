@@ -25,6 +25,41 @@ exports.utcTimestampToString = function(utc) {
 };
 
 
+// Appends '<prefix>:' to a string if it doesn't have a prefix.
+exports.addPrefix = function(prefix, str) {
+  if (str.indexOf(':') == -1) {
+    return prefix + ':' + str;
+  } else {
+    return str;
+  }
+};
+
+
+// Applies 'addPrefix' to each item of a list.
+exports.addPrefixToItems = function(prefix, items) {
+  return _.map(items, _.partial(exports.addPrefix, prefix));
+};
+
+
+// Strips '<prefix>:' from a string if it starts with it.
+exports.stripPrefix = function(prefix, str) {
+  if (!str) {
+    return '';
+  }
+  if (str.slice(0, prefix.length + 1) == prefix + ':') {
+    return str.slice(prefix.length + 1, str.length);
+  } else {
+    return str;
+  }
+};
+
+
+// Applies 'stripPrefix' to each item of a list.
+exports.stripPrefixFromItems = function(prefix, items) {
+  return _.map(items, _.partial(exports.stripPrefix, prefix));
+};
+
+
 // Fetches handlebars template code from #<templateId> element and renders it.
 // Returns rendered string.
 exports.render = function(templateId, context) {
@@ -118,6 +153,14 @@ exports.onAnchorChange = function(cb) {
       cb();
     }
   };
+};
+
+
+// Returns value of URL query parameter given its name.
+exports.getQueryParameter = function(name) {
+  // See http://stackoverflow.com/a/5158301.
+  var match = RegExp('[?&]' + name + '=([^&]*)').exec(window.location.search);
+  return match && decodeURIComponent(match[1].replace(/\+/g, ' '));
 };
 
 

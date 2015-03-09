@@ -10,41 +10,6 @@ var exports = {};
 // Utility functions.
 
 
-// Appends '<prefix>:' to a string if it doesn't have a prefix.
-function addPrefix(prefix, str) {
-  if (str.indexOf(':') == -1) {
-    return prefix + ':' + str;
-  } else {
-    return str;
-  }
-}
-
-
-// Applies 'addPrefix' to each item of a list.
-function addPrefixToItems(prefix, items) {
-  return _.map(items, _.partial(addPrefix, prefix));
-}
-
-
-// Strips '<prefix>:' from a string if it starts with it.
-function stripPrefix(prefix, str) {
-  if (!str) {
-    return '';
-  }
-  if (str.slice(0, prefix.length + 1) == prefix + ':') {
-    return str.slice(prefix.length + 1, str.length);
-  } else {
-    return str;
-  }
-}
-
-
-// Applies 'stripPrefix' to each item of a list.
-function stripPrefixFromItems(prefix, items) {
-  return _.map(items, _.partial(stripPrefix, prefix));
-}
-
-
 // True if group name starts with '<something>/' prefix.
 function isExternalGroupName(name) {
   return name.indexOf('/') != -1;
@@ -485,8 +450,8 @@ GroupForm.prototype.setupSubmitHandler = function(submitCallback) {
         submitCallback({
           name: name.trim(),
           description: description.trim(),
-          members: addPrefixToItems('user', members),
-          globs: addPrefixToItems('user', globs),
+          members: common.addPrefixToItems('user', members),
+          globs: common.addPrefixToItems('user', globs),
           nested: splitItemList(nested)
         });
       } finally {
@@ -548,16 +513,13 @@ EditGroupForm.prototype.load = function() {
 
 // Builds DOM element with this form given group object.
 EditGroupForm.prototype.buildForm = function(group, lastModified) {
-  // Convert fields to text.
+  // Prepare environment for template.
   group = _.clone(group);
-  group.created_by = stripPrefix('user', group.created_by);
-  group.created_ts = common.utcTimestampToString(group.created_ts);
-  group.modified_by = stripPrefix('user', group.modified_by);
-  group.modified_ts = common.utcTimestampToString(group.modified_ts);
+  group.nameUrlEncoding = encodeURIComponent(group.name);
 
   // Join members and globs list into single UI list.
-  var members = stripPrefixFromItems('user', group.members || []);
-  var globs = stripPrefixFromItems('user', group.globs || []);
+  var members = common.stripPrefixFromItems('user', group.members || []);
+  var globs = common.stripPrefixFromItems('user', group.globs || []);
   var membersAndGlobs = [].concat(members, globs);
 
   // Assert that they can be split apart later.
@@ -595,6 +557,9 @@ EditGroupForm.prototype.buildForm = function(group, lastModified) {
       self.onUpdateGroup(group, self.lastModified)
     });
   }
+
+  // Activate tooltip on "View change log" button.
+  $('#change-log-button', this.$element).tooltip();
 };
 
 

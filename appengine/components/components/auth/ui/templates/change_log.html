@@ -1,0 +1,32 @@
+{% extends 'auth/base.html' %}
+{% block content %}
+
+{# BEWARE: The following templates in 'raw' section are handled by handlebars
+javascript library and not jinja2. #}
+
+{% raw %}
+
+<script id="group-info-template" type="text/x-handlebars-template">
+  <h3>Group {{name}}.</h3>
+  <hr>
+  <p>Created by <strong>{{created_by}}</strong> on {{created_ts}}.</p>
+  <p>Modified by <strong>{{modified_by}}</strong> on {{modified_ts}}.</p>
+  <hr>
+  <p>
+    <a href="https://code.google.com/p/swarming/issues/detail?id=216">
+      <em>TODO: implement me.</em>
+    </a>
+  </p>
+</script>
+
+{% endraw %}
+
+<div class="row">
+  <div class="col-md-12">
+    <!-- Populated by js. -->
+    <div id="group-info">
+    </div>
+  </div>
+</div>
+
+{% endblock %}

@@ -37,6 +37,14 @@ javascript library and not jinja2. #}
         {{#if isExternal}}
         <span style="color: gray">(external)</span>
         {{/if}}
+        <a href="/auth/groups/log?group={{nameUrlEncoding}}"
+           id="change-log-button"
+           style="float: right"
+           title="View change log"
+           data-toggle="tooltip"
+           data-placement="left">
+          <span class="glyphicon glyphicon-list-alt"></span>
+        </a>
       </h3>
     </div>
     <div class="panel-body" style="padding-bottom: 5px;">
@@ -53,25 +61,10 @@ javascript library and not jinja2. #}
         <hr>
         {{/unless}}
         <div class="form-group">
-          <label class="col-sm-2 control-label">Created</label>
-          <div class="col-sm-10">
-            <input type="text" class="form-control"
-                   value="{{created_ts}} by {{created_by}}" disabled>
-          </div>
-        </div>
-        <div class="form-group">
-          <label class="col-sm-2 control-label">Modified</label>
-          <div class="col-sm-10">
-            <input type="text" class="form-control"
-                   value="{{modified_ts}} by {{modified_by}}" disabled>
-          </div>
-        </div>
-        <hr>
-        <div class="form-group">
           <label class="col-sm-2 control-label">Members</label>
           <div class="col-sm-10" style="font-family:monospace;">
             <textarea class="form-control"
-                      rows="{{#if isExternal}}24{{else}}9{{/if}}"
+                      rows="{{#if isExternal}}30{{else}}15{{/if}}"
                       name="membersAndGlobs">{{membersAndGlobs}}</textarea>
           </div>
         </div>
@@ -80,7 +73,7 @@ javascript library and not jinja2. #}
           <label class="col-sm-2 control-label">Subgroups</label>
           <div class="col-sm-10" style="font-family:monospace;">
             <textarea class="form-control"
-                      rows="4" name="nested">{{nested}}</textarea>
+                      rows="5" name="nested">{{nested}}</textarea>
           </div>
         </div>
         <hr>
@@ -127,7 +120,7 @@ javascript library and not jinja2. #}
         <div class="form-group">
           <label class="col-sm-2 control-label">Subgroups</label>
           <div class="col-sm-10" style="font-family:monospace;">
-            <textarea class="form-control" rows="3" name="nested"></textarea>
+            <textarea class="form-control" rows="5" name="nested"></textarea>
           </div>
         </div>
         <hr>

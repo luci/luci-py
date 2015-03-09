@@ -56,6 +56,7 @@ def get_ui_routes():
     webapp2.Route(r'/auth', MainHandler),
     webapp2.Route(r'/auth/bootstrap', BootstrapHandler, name='bootstrap'),
     webapp2.Route(r'/auth/link', LinkToPrimaryHandler),
+    webapp2.Route(r'/auth/groups/log', ChangeLogHandler),
   ])
   return routes
 
@@ -279,6 +280,19 @@ class LinkToPrimaryHandler(UIHandler):
       'success': success,
     }
     self.reply('auth/linking_done.html', env)
+
+
+class ChangeLogHandler(UIHandler):
+  """Page with a log of changes to some groups."""
+  @redirect_ui_on_replica
+  @api.require(api.is_admin)
+  def get(self):
+    env = {
+      'js_file': '/auth/static/js/change_log.js',
+      'navbar_tab_id': 'groups',
+      'page_title': 'Chanage Log',
+    }
+    self.reply('auth/change_log.html', env)
 
 
 class UINavbarTabHandler(UIHandler):
