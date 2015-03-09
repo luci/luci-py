@@ -1485,7 +1485,9 @@ def restart(message=None, timeout=None):
     # Sleep for 300 seconds to ensure we don't try to do anymore work while the
     # OS is preparing to shutdown.
     if deadline:
-      time.sleep(min(300, deadline - time.time()))
+      delay = deadline - time.time()
+      if delay > 0.:
+        time.sleep(min(300, delay))
       if time.time() >= deadline:
         return False
     else:
