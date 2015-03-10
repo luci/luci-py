@@ -75,7 +75,7 @@ class TestTaskRunnerBase(net_utils.TestCase):
     return task_runner.TaskDetails(
         {
           'bot_id': 'localhost',
-          'commands': [[sys.executable, '-u', '-c', script]],
+          'command': [sys.executable, '-u', '-c', script],
           'data': [],
           'env': {},
           'grace_period': grace_period,
@@ -110,7 +110,6 @@ class TestTaskRunnerBase(net_utils.TestCase):
       self.assertEqual(
         {
           'data': {
-            'command_index': 0,
             'id': 'localhost',
             'task_id': 23,
           },
@@ -132,7 +131,6 @@ class TestTaskRunner(TestTaskRunnerBase):
       self.assertEqual(
           {
             'data': {
-              'command_index': 0,
               'cost_usd': 10.,
               'duration': 0.,
               'exit_code': exit_code,
@@ -153,7 +151,7 @@ class TestTaskRunner(TestTaskRunnerBase):
     self.mock(time, 'time', lambda: start + 10)
     server = xsrf_client.XsrfRemote('https://localhost:1/')
     return task_runner.run_command(
-        server, 0, task_details, '.', 3600., start)
+        server, task_details, '.', 3600., start)
 
   def test_download_data(self):
     requests = [
@@ -190,14 +188,14 @@ class TestTaskRunner(TestTaskRunnerBase):
 
     runs = []
     def run_command(
-        swarming_server, index, task_details, work_dir, cost_usd_hour, start):
+        swarming_server, task_details, work_dir, cost_usd_hour, start):
       self.assertEqual(server, swarming_server)
       # Necessary for OSX.
       self.assertEqual(os.path.realpath(self.work_dir), work_dir)
       self.assertTrue(isinstance(task_details, task_runner.TaskDetails))
       self.assertEqual(3600., cost_usd_hour)
       self.assertEqual(time.time(), start)
-      runs.append(index)
+      runs.append(0)
       return 0
     self.mock(task_runner, 'run_command', run_command)
 
@@ -205,7 +203,7 @@ class TestTaskRunner(TestTaskRunnerBase):
     with open(manifest, 'wb') as f:
       data = {
         'bot_id': 'localhost',
-        'commands': [['a'], ['b', 'c']],
+        'command': ['a'],
         'data': [('https://localhost:1/f', 'foo.zip')],
         'env': {'d': 'e'},
         'grace_period': 30.,
@@ -217,7 +215,7 @@ class TestTaskRunner(TestTaskRunnerBase):
 
     self.assertEqual(
         True, task_runner.load_and_run(manifest, server, 3600., time.time()))
-    self.assertEqual([0, 1], runs)
+    self.assertEqual([0], runs)
 
   def test_load_and_run_fail(self):
     requests = [
@@ -233,14 +231,14 @@ class TestTaskRunner(TestTaskRunnerBase):
 
     runs = []
     def run_command(
-        swarming_server, index, task_details, work_dir, cost_usd_hour, start):
+        swarming_server, task_details, work_dir, cost_usd_hour, start):
       self.assertEqual(server, swarming_server)
       # Necessary for OSX.
       self.assertEqual(os.path.realpath(self.work_dir), work_dir)
       self.assertTrue(isinstance(task_details, task_runner.TaskDetails))
       self.assertEqual(3600., cost_usd_hour)
       self.assertEqual(time.time(), start)
-      runs.append(index)
+      runs.append(0)
       # Fails the first, pass the second.
       return 1 if len(runs) == 1 else 0
     self.mock(task_runner, 'run_command', run_command)
@@ -249,7 +247,7 @@ class TestTaskRunner(TestTaskRunnerBase):
     with open(manifest, 'wb') as f:
       data = {
         'bot_id': 'localhost',
-        'commands': [['a'], ['b', 'c']],
+        'command': ['a'],
         'data': [('https://localhost:1/f', 'foo.zip')],
         'env': {'d': 'e'},
         'grace_period': 30.,
@@ -261,7 +259,7 @@ class TestTaskRunner(TestTaskRunnerBase):
 
     self.assertEqual(
         False, task_runner.load_and_run(manifest, server, 3600., time.time()))
-    self.assertEqual([0, 1], runs)
+    self.assertEqual([0], runs)
 
   def test_run_command(self):
     # This runs the command for real.
@@ -291,11 +289,9 @@ class TestTaskRunner(TestTaskRunnerBase):
     task_details = task_runner.TaskDetails(
         {
           'bot_id': 'localhost',
-          'commands': [
-            [
-              'executable_that_shouldnt_be_on_your_system',
-              'thus_raising_OSError',
-            ],
+          'command': [
+            'executable_that_shouldnt_be_on_your_system',
+            'thus_raising_OSError',
           ],
           'data': [],
           'env': {},
@@ -311,7 +307,7 @@ class TestTaskRunner(TestTaskRunnerBase):
     class Popen(object):
       """Mocks the process so we can control how data is returned."""
       def __init__(self2, cmd, cwd, env, stdout, stderr, stdin, detached):
-        self.assertEqual(task_details.commands[0], cmd)
+        self.assertEqual(task_details.command, cmd)
         self.assertEqual('./', cwd)
         self.assertEqual(os.environ, env)
         self.assertEqual(subprocess.PIPE, stdout)
@@ -345,7 +341,6 @@ class TestTaskRunner(TestTaskRunnerBase):
       self.assertEqual(
           {
             'data': {
-              'command_index': 0,
               # That's because the cost includes the duration starting at start,
               # not when the process was started.
               'cost_usd': 10.,
@@ -372,7 +367,6 @@ class TestTaskRunner(TestTaskRunnerBase):
         'https://localhost:1/swarming/api/v1/bot/task_update/23',
         {
           'data': {
-            'command_index': 0,
             'cost_usd': 10.,
             'id': 'localhost',
             'task_id': 23,
@@ -385,7 +379,6 @@ class TestTaskRunner(TestTaskRunnerBase):
         'https://localhost:1/swarming/api/v1/bot/task_update/23',
         {
           'data': {
-            'command_index': 0,
             'cost_usd': 10.,
             'id': 'localhost',
             'output': base64.b64encode('hi!\n' * 100002),
@@ -407,7 +400,7 @@ class TestTaskRunner(TestTaskRunnerBase):
     task_details = task_runner.TaskDetails(
         {
           'bot_id': 'localhost',
-          'commands': [['large', 'executable']],
+          'command': ['large', 'executable'],
           'data': [],
           'env': {},
           'grace_period': 30.,
@@ -418,7 +411,7 @@ class TestTaskRunner(TestTaskRunnerBase):
     start = time.time()
     self.mock(time, 'time', lambda: start + 10)
     r = task_runner.run_command(
-        server, 0, task_details, './', 3600., start)
+        server, task_details, './', 3600., start)
     self.assertEqual(0, r)
 
   def test_main(self):
@@ -512,7 +505,6 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
       self.assertEqual(
           {
             'data': {
-              'command_index': 0,
               'exit_code': exit_code,
               'hard_timeout': hard_timeout,
               'id': 'localhost',
@@ -529,7 +521,7 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
   def _run(self, task_details):
     server = xsrf_client.XsrfRemote('https://localhost:1/')
     return task_runner.run_command(
-        server, 0, task_details, '.', 3600., time.time())
+        server, task_details, '.', 3600., time.time())
 
   def test_hard(self):
     # Actually 0xc000013a

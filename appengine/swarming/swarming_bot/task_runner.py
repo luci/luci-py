@@ -4,7 +4,7 @@
 
 """Runs a Swarming task.
 
-Downloads all the necessary files to run the task, executes the commands and
+Downloads all the necessary files to run the task, executes the command and
 streams results back to the Swarming server.
 
 The process exit code is 0 when the task was executed, even if the task itself
@@ -83,7 +83,7 @@ class TaskDetails(object):
 
     It is expected to have at least:
      - bot_id
-     - commands as a list of lists
+     - command as a list of str
      - data as a list of urls
      - env as a dict
      - hard_timeout
@@ -95,7 +95,7 @@ class TaskDetails(object):
 
     # Get all the data first so it fails early if the task details is invalid.
     self.bot_id = data['bot_id']
-    self.commands = data['commands']
+    self.command = data['command']
     self.data = data['data']
     self.env = os.environ.copy()
     self.env.update(
@@ -131,12 +131,9 @@ def load_and_run(filename, swarming_server, cost_usd_hour, start):
   # Download the script to run in the temporary directory.
   download_data(root_dir, task_details.data)
 
-  out = True
-  for index in xrange(len(task_details.commands)):
-    exit_code = run_command(
-        swarming_server, index, task_details, root_dir, cost_usd_hour, start)
-    out = out and not bool(exit_code)
-  return out
+  exit_code = run_command(
+      swarming_server, task_details, root_dir, cost_usd_hour, start)
+  return not bool(exit_code)
 
 
 def post_update(swarming_server, params, exit_code, stdout, output_chunk_start):
@@ -194,7 +191,7 @@ def calc_yield_wait(task_details, start, last_io, timed_out, stdout):
 
 
 def run_command(
-    swarming_server, index, task_details, root_dir, cost_usd_hour, task_start):
+    swarming_server, task_details, root_dir, cost_usd_hour, task_start):
   """Runs a command and sends packets to the server to stream results back.
 
   Implements both I/O and hard timeouts. Sends the packets numbered, so the
@@ -206,14 +203,13 @@ def run_command(
   # Signal the command is about to be started.
   last_packet = start = now = monotonic_time()
   params = {
-    'command_index': index,
     'cost_usd': cost_usd_hour * (now - task_start) / 60. / 60.,
     'id': task_details.bot_id,
     'task_id': task_details.task_id,
   }
   post_update(swarming_server, params, None, '', 0)
 
-  logging.info('Executing: %s', task_details.commands[index])
+  logging.info('Executing: %s', task_details.command)
   # TODO(maruel): Support both channels independently and display stderr in red.
   env = None
   if task_details.env:
@@ -221,7 +217,7 @@ def run_command(
     env.update(task_details.env)
   try:
     proc = subprocess42.Popen(
-        task_details.commands[index],
+        task_details.command,
         env=env,
         cwd=root_dir,
         detached=True,
@@ -230,7 +226,7 @@ def run_command(
         stdin=subprocess.PIPE)
   except OSError as e:
     stdout = 'Command "%s" failed to start.\nError: %s' % (
-        ' '.join(task_details.commands[index]), e)
+        ' '.join(task_details.command), e)
     now = monotonic_time()
     params['cost_usd'] = cost_usd_hour * (now - task_start) / 60. / 60.
     params['duration'] = now - start

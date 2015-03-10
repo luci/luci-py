@@ -234,7 +234,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
       u'cmd': u'run',
       u'manifest': {
         u'bot_id': u'bot1',
-        u'commands': [[u'python', u'run_test.py']],
+        u'command': [u'python', u'run_test.py'],
         u'data': [],
         u'env': {},
         u'hard_timeout': 3600,
@@ -359,7 +359,6 @@ class BotApiTest(test_env_handlers.AppTestBase):
 
     def _params(**kwargs):
       out = {
-        'command_index': 0,
         'cost_usd': 0.1,
         'duration': None,
         'exit_code': None,
@@ -445,7 +444,6 @@ class BotApiTest(test_env_handlers.AppTestBase):
       raise datastore_errors.Timeout('Sorry!')
     self.mock(ndb, 'put_multi', r)
     params = {
-      'command_index': 0,
       'cost_usd': 0.1,
       'duration': 0.1,
       'exit_code': 0,
@@ -480,7 +478,6 @@ class BotApiTest(test_env_handlers.AppTestBase):
       raise NewError('Sorry!')
     self.mock(ndb, 'put_multi', r)
     params = {
-      'command_index': 0,
       'cost_usd': 0.1,
       'duration': 0.1,
       'exit_code': 0,
@@ -505,7 +502,6 @@ class BotApiTest(test_env_handlers.AppTestBase):
     task_id = response['manifest']['task_id']
 
     params = {
-      'command_index': 0,
       'cost_usd': 0.1,
       'duration': 0.1,
       'exit_code': 1,

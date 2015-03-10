@@ -398,7 +398,6 @@ class ClientApiTest(test_env_handlers.AppTestBase):
     res = self.bot_poll()
     task_id = res['manifest']['task_id']
     params = {
-      'command_index': 0,
       'cost_usd': 0.1,
       'duration': 0.1,
       'exit_code': 0,

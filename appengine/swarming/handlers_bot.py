@@ -357,7 +357,7 @@ class BotPollHandler(_BotBaseHandler):
       'cmd': 'run',
       'manifest': {
         'bot_id': bot_id,
-        'commands': request.properties.commands,
+        'command': request.properties.commands[0],
         'data': request.properties.data,
         'env': request.properties.env,
         'grace_period': request.properties.grace_period_secs,
@@ -461,10 +461,10 @@ class BotTaskUpdateHandler(auth.ApiHandler):
   out-of-order packets.
   """
   ACCEPTED_KEYS = {
-    u'cost_usd', u'command_index', u'duration', u'exit_code', u'hard_timeout',
+    u'cost_usd', u'duration', u'exit_code', u'hard_timeout',
     u'id', u'io_timeout', u'output', u'output_chunk_start', u'task_id',
   }
-  REQUIRED_KEYS = {u'command_index', u'id', u'task_id'}
+  REQUIRED_KEYS = {u'id', u'task_id'}
 
   @auth.require(acl.is_bot)
   def post(self, task_id=None):
@@ -478,7 +478,6 @@ class BotTaskUpdateHandler(auth.ApiHandler):
       self.abort_with_error(400, error=msg)
 
     bot_id = request['id']
-    command_index = request['command_index']
     cost_usd = request['cost_usd']
     task_id = request['task_id']
 
@@ -504,7 +503,7 @@ class BotTaskUpdateHandler(auth.ApiHandler):
 
     try:
       success, completed = task_scheduler.bot_update_task(
-          run_result_key, bot_id, command_index, output, output_chunk_start,
+          run_result_key, bot_id, output, output_chunk_start,
           exit_code, duration, hard_timeout, io_timeout, cost_usd)
       if not success:
         self.abort_with_error(500, error='Failed to update, please retry')

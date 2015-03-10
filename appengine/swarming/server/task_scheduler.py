@@ -441,18 +441,16 @@ def bot_reap_task(dimensions, bot_id, bot_version):
 
 
 def bot_update_task(
-    run_result_key, bot_id, command_index, output, output_chunk_start,
+    run_result_key, bot_id, output, output_chunk_start,
     exit_code, duration, hard_timeout, io_timeout, cost_usd):
   """Updates a TaskRunResult and TaskResultSummary, along TaskOutput.
 
   Arguments:
   - run_result_key: ndb.Key to TaskRunResult.
   - bot_id: Self advertised bot id to ensure it's the one expected.
-  - command_index: index in TaskRequest.properties.commands.
   - output: Data to append to this command output.
   - output_chunk_start: Index of output in the stdout stream.
-  - exit_code: Mark that this command, as specified by command_index, is
-      terminated.
+  - exit_code: Mark that this command is terminated.
   - duration: Time spent in seconds for this command.
   - hard_timeout: Bool set if an hard timeout occured.
   - io_timeout: Bool set if an I/O timeout occured.
@@ -460,7 +458,6 @@ def bot_update_task(
 
   Invalid states, these are flat out refused:
   - A command is updated after it had an exit code assigned to.
-  - Out of order processing of command_index.
 
   Returns:
     tuple(bool, bool); first is if the update succeeded, second is if the task
@@ -494,10 +491,13 @@ def bot_update_task(
       return None, False, 'expected bot (%s) but had update from bot %s' % (
           run_result.bot_id, bot_id)
 
-    if len(run_result.exit_codes) not in (command_index, command_index+1):
-      result_summary_future.wait()
-      return None, False, 'has unexpected ordering, expected %d, got %d' % (
-          len(run_result.exit_codes), command_index)
+    # This happens as an HTTP request is retried when the DB write succeeded but
+    # it still returned HTTP 500.
+    if len(run_result.exit_codes) and exit_code is not None:
+      if run_result.exit_codes[0] != exit_code:
+        result_summary_future.wait()
+        return None, False, 'got 2 different exit_codes; %d then %d' % (
+            run_result.exit_codes[0], exit_code)
 
     if (duration is None) != (exit_code is None):
       result_summary_future.wait()
@@ -506,7 +506,7 @@ def bot_update_task(
           % len(run_result.exit_codes))
 
     if exit_code is not None:
-      # The command |command_index| completed.
+      # The command completed.
       run_result.durations.append(duration)
       run_result.exit_codes.append(exit_code)
 
@@ -525,8 +525,7 @@ def bot_update_task(
     if output:
       # This does 1 multi GETs. This also modifies run_result in place.
       to_put.extend(
-          run_result.append_output(
-              command_index, output, output_chunk_start or 0))
+          run_result.append_output(0, output, output_chunk_start or 0))
 
     run_result.cost_usd = max(cost_usd, run_result.cost_usd or 0.)
 

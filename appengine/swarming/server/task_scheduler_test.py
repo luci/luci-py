@@ -192,7 +192,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
     self.assertEqual(
         (True, True),
         task_scheduler.bot_update_task(
-            run_result.key, 'localhost', 0, 'Foo1', 0, 0, 0.1, False, False,
+            run_result.key, 'localhost', 'Foo1', 0, 0, 0.1, False, False,
             0.1))
     return unicode(run_result.key_string)
 
@@ -435,12 +435,12 @@ class TaskSchedulerApiTest(test_case.TestCase):
     self.assertEqual(
         (True, True),
         task_scheduler.bot_update_task(
-            run_result.key, 'localhost', 0, 'Foo1', 0, 0, 0.1, False, False,
+            run_result.key, 'localhost', 'Foo1', 0, 0, 0.1, False, False,
             0.1))
     self.assertEqual(
         (True, False),
         task_scheduler.bot_update_task(
-        run_result.key, 'localhost', 1, 'Bar22', 0, 0, 0.2, False, False, 0.1))
+        run_result.key, 'localhost', 'Bar22', 0, 0, 0.2, False, False, 0.1))
     result_summary, run_results = get_results(request.key)
     expected = {
       'abandoned_ts': None,
@@ -501,11 +501,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
     self.assertEqual(
         (True, True),
         task_scheduler.bot_update_task(
-        run_result.key, 'localhost', 0, 'Foo1', 0, 0, 0.1, False, False, 0.1))
-    self.assertEqual(
-        (True, False),
-        task_scheduler.bot_update_task(
-        run_result.key, 'localhost', 1, 'Bar22', 0, 1, 0.2, False, False, 0.1))
+        run_result.key, 'localhost', 'Foo1', 0, 1, 0.1, False, False, 0.1))
     result_summary, run_results = get_results(request.key)
 
     expected = {
@@ -518,8 +514,8 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'cost_saved_usd': None,
       'created_ts': self.now,
       'deduped_from': None,
-      'durations': [0.1, 0.2],
-      'exit_codes': [0, 1],
+      'durations': [0.1],
+      'exit_codes': [1],
       'failure': True,
       'id': '1d69b9f088008810',
       'internal_failure': False,
@@ -542,8 +538,8 @@ class TaskSchedulerApiTest(test_case.TestCase):
         'children_task_ids': [],
         'completed_ts': self.now,
         'cost_usd': 0.1,
-        'durations': [0.1, 0.2],
-        'exit_codes': [0, 1],
+        'durations': [0.1],
+        'exit_codes': [1],
         'failure': True,
         'id': '1d69b9f088008811',
         'internal_failure': False,
@@ -568,40 +564,25 @@ class TaskSchedulerApiTest(test_case.TestCase):
     self.assertEqual(
         (True, True),
         task_scheduler.bot_update_task(
-            run_result.key, 'localhost', 0, 'hi', 0, 0, 0.1, False, False, 0.1))
+            run_result.key, 'localhost', 'hi', 0, 0, 0.1, False, False, 0.1))
     self.assertEqual(
         (True, False),
         task_scheduler.bot_update_task(
-            run_result.key, 'localhost', 0, 'hey', 2, 0, 0.1, False, False,
+            run_result.key, 'localhost', 'hey', 2, 0, 0.1, False, False,
             0.1))
     self.assertEqual(['hihey'], list(run_result.key.get().get_outputs()))
-
-  def test_bot_update_task_new_two_commands(self):
-    run_result = _quick_reap()
-    self.assertEqual(
-        (True, True),
-        task_scheduler.bot_update_task(
-            run_result.key, 'localhost', 0, 'hi', 0, 0, 0.1, False, False, 0.1))
-    self.assertEqual(
-        (True, False),
-        task_scheduler.bot_update_task(
-            run_result.key, 'localhost', 1, 'hey', 0, 0, 0.2, False, False,
-            0.1))
-    run_result = run_result.key.get()
-    self.assertEqual(['hi', 'hey'], list(run_result.get_outputs()))
-    self.assertEqual([0.1, 0.2], run_result.durations)
 
   def test_bot_update_task_new_overwrite(self):
     run_result = _quick_reap()
     self.assertEqual(
         (True, False),
         task_scheduler.bot_update_task(
-            run_result.key, 'localhost', 0, 'hi', 0, None, None, False, False,
+            run_result.key, 'localhost', 'hi', 0, None, None, False, False,
             0.1))
     self.assertEqual(
         (True, False),
         task_scheduler.bot_update_task(
-            run_result.key, 'localhost', 0, 'hey', 1, None, None, False, False,
+            run_result.key, 'localhost', 'hey', 1, None, None, False, False,
             0.1))
     self.assertEqual(['hhey'], list(run_result.key.get().get_outputs()))
 
@@ -614,7 +595,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
     self.assertEqual(
         (False, False),
         task_scheduler.bot_update_task(
-            run_result.key, 'localhost', 0, 'hi', 0, 0, 0.1, False, False, 0.1))
+            run_result.key, 'localhost', 'hi', 0, 0, 0.1, False, False, 0.1))
 
   def _bot_update_timeouts(self, hard, io):
     self.mock(random, 'getrandbits', lambda _: 0x88)
@@ -627,7 +608,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
     self.assertEqual(
         (True, True),
         task_scheduler.bot_update_task(
-            run_result.key, 'localhost', 0, 'hi', 0, 0, 0.1, hard, io, 0.1))
+            run_result.key, 'localhost', 'hi', 0, 0, 0.1, hard, io, 0.1))
     expected = {
       'abandoned_ts': None,
       'bot_id': u'localhost',
@@ -936,8 +917,8 @@ class TaskSchedulerApiTest(test_case.TestCase):
     self.assertEqual(
         (True, True),
         task_scheduler.bot_update_task(
-            run_result.key, 'localhost-second', 0, 'Foo1', 0, 0, 0.1, False,
-            False, 0.1))
+            run_result.key, 'localhost-second', 'Foo1', 0, 0, 0.1, False, False,
+            0.1))
     expected = {
       'abandoned_ts': None,
       'bot_id': u'localhost-second',
