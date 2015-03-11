@@ -720,8 +720,6 @@ def create_application(debug):
       # Public pages.
       ('/', RootHandler),
       ('/stats', stats_gviz.StatsSummaryHandler),
-      ('/stats/dimensions/<dimensions:.+>', stats_gviz.StatsDimensionsHandler),
-      ('/stats/user/<user:.+>', stats_gviz.StatsUserHandler),
 
       # User pages.
       ('/user/tasks', TasksHandler),
@@ -747,8 +745,6 @@ def create_application(debug):
         stats_gviz.StatsGvizSummaryHandler),
       ('/swarming/api/v1/stats/dimensions/<dimensions:.+>/<resolution:[a-z]+>',
         stats_gviz.StatsGvizDimensionsHandler),
-      ('/swarming/api/v1/stats/user/<user:.+>/<resolution:[a-z]+>',
-        stats_gviz.StatsGvizUserHandler),
 
       ('/_ah/mail/<to:.+>', EmailHandler),
       ('/_ah/warmup', WarmupHandler),

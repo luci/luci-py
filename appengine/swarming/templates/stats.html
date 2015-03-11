@@ -20,15 +20,5 @@
   </head>
   <body>
     <div id="container"></div>
-    {% import 'swarming/bot_view.html' as bot_view %}
-    {% if bots %}
-    Bots:<br>
-    <ul>
-      {% for bot in bots %}
-        {# Get dimensions of each bot aka a mini bots list #}
-        <li>{{bot_view.bot_link(bot, true)}}</li>
-      {% endfor %}
-    </ul>
-    {% endif %}
   </body>
 </html>

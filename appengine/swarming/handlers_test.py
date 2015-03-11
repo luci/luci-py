@@ -110,8 +110,6 @@ class FrontendTest(AppTestBase):
       '/ereporter2/api/v1/on_error',
       '/server_ping',
       '/stats',
-      '/stats/dimensions/<dimensions:.+>',
-      '/stats/user/<user:.+>',
       '/swarming/api/v1/client/list',
       '/swarming/api/v1/bot/server_ping',
       '/swarming/api/v1/stats/summary/<resolution:[a-z]+>',
@@ -161,17 +159,12 @@ class FrontendTest(AppTestBase):
     quoted = urllib.quote('{"os":"amiga"}')
     urls = (
       '/stats',
-      '/stats/dimensions/' + quoted,
-      '/stats/user/joe',
       '/swarming/api/v1/stats/summary/days',
       '/swarming/api/v1/stats/summary/hours',
       '/swarming/api/v1/stats/summary/minutes',
       '/swarming/api/v1/stats/dimensions/%s/days' % quoted,
       '/swarming/api/v1/stats/dimensions/%s/hours' % quoted,
       '/swarming/api/v1/stats/dimensions/%s/minutes' % quoted,
-      '/swarming/api/v1/stats/user/joe/days',
-      '/swarming/api/v1/stats/user/joe/hours',
-      '/swarming/api/v1/stats/user/joe/minutes',
     )
     for url in urls:
       self.app.get(url, status=200)
