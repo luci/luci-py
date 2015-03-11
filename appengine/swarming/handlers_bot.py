@@ -114,6 +114,7 @@ class BotCodeHandler(auth.AuthenticatingHandler):
     if version:
       expected = bot_code.get_bot_version(self.request.host_url)
       if version != expected:
+        # This can happen when the server is rapidly updated.
         logging.error('Requested Swarming bot %s, have %s', version, expected)
         self.abort(404)
       self.response.headers['Cache-Control'] = 'public, max-age=3600'

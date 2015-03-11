@@ -417,7 +417,14 @@ def update_bot(botobj, version):
   # Download as a new file.
   url = botobj.remote.url + '/swarming/api/v1/bot/bot_code/%s' % version
   if not net.url_retrieve(new_zip, url):
-    raise Exception('Unable to download %s from %s.' % (new_zip, url))
+    # Try without a specific version. It can happen when a server is rapidly
+    # updated multiple times in a row.
+    botobj.post_error(
+        'Unable to download %s from %s; first tried version %s' %
+        (new_zip, url, version))
+    # Poll again, this may work next time. To prevent busy-loop, sleep a little.
+    time.sleep(2)
+    return
 
   logging.info('Restarting to %s.', new_zip)
   sys.stdout.flush()
