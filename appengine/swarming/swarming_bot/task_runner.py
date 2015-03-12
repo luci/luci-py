@@ -285,24 +285,28 @@ def run_command(
           #   be script provided.
           # - processed exited late, exit code will be -9 on posix.
           try:
+            logging.warning('proc.kill() after grace')
             proc.kill()
           except OSError:
             pass
     logging.info('Waiting for proces exit')
     exit_code = proc.wait()
+    logging.info('Waiting for proces exit - done')
   finally:
     # Something wrong happened, try to kill the child process.
     if exit_code is None:
       had_hard_timeout = True
       try:
+        logging.warning('proc.kill() in finally')
         proc.kill()
       except OSError:
         # The process has already exited.
         pass
 
       # TODO(maruel): We'd wait only for X seconds.
-      logging.info('Waiting for proces exit')
+      logging.info('Waiting for proces exit in finally')
       exit_code = proc.wait()
+      logging.info('Waiting for proces exit in finally - done')
 
     # This is the very last packet for this command.
     now = monotonic_time()
@@ -315,6 +319,7 @@ def run_command(
     output_chunk_start += len(stdout)
     stdout = ''
 
+  logging.info('run_command() = %s', exit_code)
   assert not stdout
   return exit_code
 
