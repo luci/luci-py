@@ -188,7 +188,9 @@ def calc_yield_wait(task_details, start, last_io, timed_out, stdout):
   packet_interval = MIN_PACKET_INTERNAL if stdout else MAX_PACKET_INTERVAL
   hard_timeout = start + task_details.hard_timeout - now
   io_timeout = last_io + task_details.io_timeout - now
-  return max(min(min(packet_interval, hard_timeout), io_timeout), 0)
+  out = max(min(min(packet_interval, hard_timeout), io_timeout), 0)
+  logging.debug('calc_yield_wait() = %d', out)
+  return out
 
 
 def run_command(
@@ -344,13 +346,17 @@ def main(args):
 
   on_error.report_on_exception_exit(options.swarming_server)
 
+  logging.info('starting')
   remote = xsrf_client.XsrfRemote(options.swarming_server)
 
   now = monotonic_time()
   if options.start > now:
     options.start = now
 
-  if not load_and_run(
-      options.file, remote, options.cost_usd_hour, options.start):
-    return TASK_FAILED
-  return 0
+  try:
+    if not load_and_run(
+        options.file, remote, options.cost_usd_hour, options.start):
+      return TASK_FAILED
+    return 0
+  finally:
+    logging.info('quitting')

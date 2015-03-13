@@ -342,6 +342,8 @@ def run_manifest(botobj, manifest, start):
   # to execute the command. It is important to note that this data is extracted
   # before any I/O is done, like writting the manifest to disk.
   task_id = manifest['task_id']
+  # Sets an hard timeout of task's hard_time + 5 minutes to notify the server.
+  hard_timeout = manifest['hard_timeout'] + 5*60.
   url = manifest.get('host', botobj.remote.url)
 
   failure = False
@@ -375,15 +377,21 @@ def run_manifest(botobj, manifest, start):
       '--start', str(start),
     ]
     logging.debug('Running command: %s', command)
-    proc = subprocess.Popen(
-        command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, cwd=ROOT_DIR,
-        env=env)
-    out = proc.communicate()[0]
+    proc = subprocess.Popen(command, cwd=ROOT_DIR, env=env)
+    while proc.poll() is None:
+      if time.time() - start >= hard_timeout:
+        proc.kill()
+        failure = False
+        internal_failure = True
+        msg = 'task_runner hung'
+        return False
+      # Busy loop.
+      time.sleep(0.5)
 
     failure = proc.returncode == TASK_FAILED
     internal_failure = not failure and bool(proc.returncode)
     if internal_failure:
-      msg = 'Execution failed, internal error:\n%s' % out
+      msg = 'Execution failed, internal error.'
     return not bool(proc.returncode)
   except Exception as e:
     # Failures include IOError when writing if the disk is full, OSError if
