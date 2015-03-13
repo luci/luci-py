@@ -245,11 +245,11 @@ def run_command(
   had_io_timeout = False
   timed_out = None
   try:
+    calc = lambda: calc_yield_wait(
+        task_details, start, last_io, timed_out, stdout)
+    maxsize = lambda: MAX_CHUNK_SIZE - len(stdout)
     last_io = monotonic_time()
-    for _, new_data in proc.yield_any(
-          maxsize=MAX_CHUNK_SIZE - len(stdout),
-          soft_timeout=calc_yield_wait(
-              task_details, start, last_io, timed_out, stdout)):
+    for _, new_data in proc.yield_any(maxsize=maxsize, soft_timeout=calc):
       now = monotonic_time()
       if new_data:
         stdout += new_data
