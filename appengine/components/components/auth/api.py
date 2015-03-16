@@ -369,7 +369,10 @@ def extract_oauth_caller_identity(extra_client_ids=None):
 
   if not good:
     raise AuthorizationError('Invalid OAuth client_id: %s' % client_id)
-  return model.Identity(model.IDENTITY_USER, email)
+  try:
+    return model.Identity(model.IDENTITY_USER, email)
+  except ValueError:
+    raise AuthenticationError('Unsupported user email: %s' % email)
 
 
 class RequestCache(object):

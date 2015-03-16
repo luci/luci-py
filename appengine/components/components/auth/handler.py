@@ -384,7 +384,10 @@ def get_authenticated_routes(app):
 def cookie_authentication(_request):
   """AppEngine cookie based authentication via users.get_current_user()."""
   user = users.get_current_user()
-  return model.Identity(model.IDENTITY_USER, user.email()) if user else None
+  try:
+    return model.Identity(model.IDENTITY_USER, user.email()) if user else None
+  except ValueError:
+    raise api.AuthenticationError('Unsupported user email: %s' % user.email())
 
 
 def oauth_authentication(request):
@@ -401,4 +404,7 @@ def service_to_service_authentication(request):
   be set by external users (with exception of admins).
   """
   app_id = request.headers.get('X-Appengine-Inbound-Appid')
-  return model.Identity(model.IDENTITY_SERVICE, app_id) if app_id else None
+  try:
+    return model.Identity(model.IDENTITY_SERVICE, app_id) if app_id else None
+  except ValueError:
+    raise api.AuthenticationError('Unsupported application ID: %s' % app_id)
