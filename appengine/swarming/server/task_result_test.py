@@ -318,11 +318,11 @@ class TaskResultApiTest(TestCase):
 
     self.assertEqual(
         task_pack.pack_result_summary_key(result_summary.key),
-        result_summary.key_string)
+        result_summary.key_packed)
     self.assertEqual(complete_ts, result_summary.ended_ts)
     self.assertEqual(
         task_pack.pack_run_result_key(run_result.key),
-        run_result.key_string)
+        run_result.key_packed)
     self.assertEqual(complete_ts, run_result.ended_ts)
 
   def test_yield_run_result_keys_with_dead_bot(self):

@@ -16,6 +16,7 @@ import re
 
 import webapp2
 
+from google.appengine import runtime
 from google.appengine.api import users
 from google.appengine.datastore import datastore_query
 from google.appengine.ext import ndb
@@ -80,7 +81,7 @@ class RestrictedConfigHandler(auth.AuthenticatingHandler):
       'path': self.request.path,
       'xsrf_token': self.generate_xsrf_token(),
     }
-    self.response.out.write(
+    self.response.write(
         template.render('swarming/restricted_config.html', params))
 
 
@@ -97,7 +98,7 @@ class UploadBotConfigHandler(auth.AuthenticatingHandler):
       'who': bot_config.who,
       'xsrf_token': self.generate_xsrf_token(),
     }
-    self.response.out.write(
+    self.response.write(
         template.render('swarming/restricted_upload_bot_config.html', params))
 
   @auth.require(acl.is_admin)
@@ -123,7 +124,7 @@ class UploadBootstrapHandler(auth.AuthenticatingHandler):
       'who': bootstrap.who,
       'xsrf_token': self.generate_xsrf_token(),
     }
-    self.response.out.write(
+    self.response.write(
         template.render('swarming/restricted_upload_bootstrap.html', params))
 
   @auth.require(acl.is_admin)
@@ -235,7 +236,7 @@ class BotsListHandler(auth.AuthenticatingHandler):
       'sort_options': self.SORT_OPTIONS,
       'xsrf_token': self.generate_xsrf_token(),
     }
-    self.response.out.write(
+    self.response.write(
         template.render('swarming/restricted_botslist.html', params))
 
 
@@ -295,7 +296,7 @@ class BotHandler(auth.AuthenticatingHandler):
       'run_time': run_time,
       'xsrf_token': self.generate_xsrf_token(),
     }
-    self.response.out.write(
+    self.response.write(
         template.render('swarming/restricted_bot.html', params))
 
 
@@ -490,7 +491,7 @@ class TasksHandler(auth.AuthenticatingHandler):
     }
     # TODO(maruel): If admin or if the user is task's .user, show the Cancel
     # button. Do not show otherwise.
-    self.response.out.write(template.render('swarming/user_tasks.html', params))
+    self.response.write(template.render('swarming/user_tasks.html', params))
 
     # Do not let dangling futures linger around.
     ndb.Future.wait_all(futures)
@@ -499,11 +500,14 @@ class TasksHandler(auth.AuthenticatingHandler):
     """Returns all the counting futures in parallel."""
     counts_future = {}
     last_24h = now - datetime.timedelta(days=1)
+    request_id = task_request.datetime_to_request_base_id(last_24h)
+    request_key = task_request.request_id_to_key(request_id)
     for state_key, _, _ in itertools.chain.from_iterable(self.STATE_CHOICES):
-      _, query = task_result.get_result_summary_query(None, state_key)
-      if query:
-        counts_future[state_key] = query.filter(
-            task_result.TaskResultSummary.created_ts >= last_24h).count_async()
+      query = task_result.get_result_summary_query(None, state_key)
+      # It is counter intuitive but the equality has to be reversed, since the
+      # value in the db is binary negated.
+      counts_future[state_key] = query.filter(
+          task_result.TaskResultSummary.key <= request_key).count_async()
     return counts_future
 
   def _get_state_choices(self, counts_future):
@@ -515,10 +519,7 @@ class TasksHandler(auth.AuthenticatingHandler):
     for choice_list in self.STATE_CHOICES:
       state_choices.append([])
       for state_key, name, title in choice_list:
-        if state_key in counts:
-          name += ' (%d)' % counts[state_key]
-        elif state_key == 'pending_running':
-          name += ' (%d)' % (counts['pending'] + counts['running'])
+        name += ' (%d)' % counts[state_key]
         state_choices[-1].append((state_key, name, title))
     return state_choices
 
@@ -614,7 +615,7 @@ class TaskHandler(auth.AuthenticatingHandler):
       'task': result,
       'xsrf_token': self.generate_xsrf_token(),
     }
-    self.response.out.write(template.render('swarming/user_task.html', params))
+    self.response.write(template.render('swarming/user_task.html', params))
 
 
 class TaskCancelHandler(auth.AuthenticatingHandler):
@@ -670,7 +671,7 @@ class TaskRetryHandler(auth.AuthenticatingHandler):
       self.abort(404, 'Invalid request key.')
     new_request = task_request.make_request_clone(original_request)
     result_summary = task_scheduler.schedule_request(new_request)
-    self.redirect('/user/task/%s' % result_summary.key_string)
+    self.redirect('/user/task/%s' % result_summary.key_packed)
 
 
 ### Public pages.
@@ -694,7 +695,7 @@ class RootHandler(auth.AuthenticatingHandler):
         for job_id, job_def in mapreduce_jobs.MAPREDUCE_JOBS.iteritems()
       ]
       params['xsrf_token'] = self.generate_xsrf_token()
-    self.response.out.write(template.render('swarming/root.html', params))
+    self.response.write(template.render('swarming/root.html', params))
 
 
 class WarmupHandler(webapp2.RequestHandler):

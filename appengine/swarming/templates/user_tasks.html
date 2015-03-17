@@ -218,17 +218,17 @@
       {% for task in tasks %}
         <tr class="request {% if task.failure or task.internal_failure %}failed_test{% endif%}">
           <td>
-            <a href="/user/task/{{task.key_string}}">{{task.name}}</a>
+            <a href="/user/task/{{task.key_packed}}">{{task.name}}</a>
           </td>
           <td>
             {{task.to_string()|safe}}
             {% if task.can_be_canceled and is_admin %}
-              <form id="cancel_{{task.key_string}}" method="post"
+              <form id="cancel_{{task.key_packed}}" method="post"
                   action="/user/tasks/cancel">
                 <input type="hidden" name="redirect_to" value="listing" />
                 <input type="hidden" name="xsrf_token" value="{{xsrf_token}}" />
                 <input type="hidden" name="task_id"
-                    value="{{task.key_string}}" />
+                    value="{{task.key_packed}}" />
                 <input type="submit" value="Cancel" />
               </form>
             {% endif %}

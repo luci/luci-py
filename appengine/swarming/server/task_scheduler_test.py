@@ -194,7 +194,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
         task_scheduler.bot_update_task(
             run_result.key, 'localhost', 'Foo1', 0, 0, 0.1, False, False,
             0.1))
-    return unicode(run_result.key_string)
+    return unicode(run_result.key_packed)
 
   def _task_deduped(
       self, new_ts, deduped_from, task_id='1d8dc670a0008810', now=None):
@@ -330,7 +330,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
     parent_run_result_key = task_pack.unpack_run_result_key(parent_id)
     parent_res_summary_key = task_pack.run_result_key_to_result_summary_key(
         parent_run_result_key)
-    expected = [result_summary.key_string]
+    expected = [result_summary.key_packed]
     self.assertEqual(expected, parent_run_result_key.get().children_task_ids)
     self.assertEqual(expected, parent_res_summary_key.get().children_task_ids)
 

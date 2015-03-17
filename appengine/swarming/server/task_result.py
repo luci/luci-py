@@ -371,7 +371,7 @@ class _TaskResultCommon(ndb.Model):
     out = super(_TaskResultCommon, self).to_dict()
     # stdout_chunks is an implementation detail.
     out.pop('stdout_chunks')
-    out['id'] = self.key_string
+    out['id'] = self.key_packed
     return out
 
   def signal_server_version(self, server_version):
@@ -459,7 +459,7 @@ class TaskRunResult(_TaskResultCommon):
   deduped_from = None
 
   @property
-  def key_string(self):
+  def key_packed(self):
     return task_pack.pack_run_result_key(self.key)
 
   @property
@@ -579,7 +579,7 @@ class TaskResultSummary(_TaskResultCommon):
     return sum(self.costs_usd) if self.costs_usd else 0.
 
   @property
-  def key_string(self):
+  def key_packed(self):
     return task_pack.pack_result_summary_key(self.key)
 
   @property
@@ -801,6 +801,15 @@ def _output_append(output_key, number_chunks, output, output_chunk_start):
   return entities, number_chunks
 
 
+def _sort_property(sort):
+  """Returns a datastore_query.PropertyOrder based on 'sort'."""
+  if sort == 'created_ts':
+    return datastore_query.PropertyOrder(
+        '__key__', datastore_query.PropertyOrder.ASCENDING)
+  return datastore_query.PropertyOrder(
+      sort, datastore_query.PropertyOrder.DESCENDING)
+
+
 ### Public API.
 
 
@@ -866,9 +875,9 @@ def get_tasks(task_name, task_tags, cursor_str, limit, sort, state):
     cursor_str: query-dependent string encoded cursor to continue a previous
         search.
     limit: Maximum number of items to return.
-    sort: get_result_summary_query() argument. Only used is both task_name and
+    sort: get_result_summary_query() argument. Only used if both task_name and
         task_tags are empty.
-    state: get_result_summary_query() argument. Only used is both task_name and
+    state: get_result_summary_query() argument. Only used if both task_name and
         task_tags are empty.
 
   Returns:
@@ -880,8 +889,7 @@ def get_tasks(task_name, task_tags, cursor_str, limit, sort, state):
     state = 'all'
     # Only the TaskRequest has the tags. So first query all the keys to
     # requests; then fetch the TaskResultSummary.
-    order = datastore_query.PropertyOrder(
-        sort, datastore_query.PropertyOrder.DESCENDING)
+    order = _sort_property(sort)
     query = task_request.TaskRequest.query().order(order)
     task_tags = task_tags[:]
     tags_filter = task_request.TaskRequest.tags == task_tags.pop(0)
@@ -902,21 +910,10 @@ def get_tasks(task_name, task_tags, cursor_str, limit, sort, state):
     tasks, cursor_str = search_by_name(task_name, cursor_str, limit)
   else:
     # Normal listing.
-    queries, query = get_result_summary_query(sort, state)
-    if queries:
-      # When multiple queries are used, we can't use a cursor.
-      cursor_str = None
-
-      # Take the first |limit| items for each query. This is not efficient,
-      # worst case is fetching N * limit entities.
-      futures = [q.fetch_async(limit) for q in queries]
-      lists = sum((f.get_result() for f in futures), [])
-      tasks = sorted(lists, key=lambda i: i.created_ts, reverse=True)[:limit]
-    else:
-      # Normal efficient behavior.
-      cursor = datastore_query.Cursor(urlsafe=cursor_str)
-      tasks, cursor, more = query.fetch_page(limit, start_cursor=cursor)
-      cursor_str = cursor.urlsafe() if cursor and more else None
+    query = get_result_summary_query(sort, state)
+    cursor = datastore_query.Cursor(urlsafe=cursor_str)
+    tasks, cursor, more = query.fetch_page(limit, start_cursor=cursor)
+    cursor_str = cursor.urlsafe() if cursor and more else None
 
   return tasks, cursor_str, sort, state
 
@@ -925,66 +922,55 @@ def get_result_summary_query(sort, state):
   """Generates one or many ndb.Query to return TaskResultSummary in the order
   and state specified.
 
-  There can be multiple queries when a single query may not be able to return
-  all results.
-  TODO(maruel): Update entities so multiple queries code path is not necessary
-  anymore.
-
   Arguments:
     sort: One valid TaskResultSummary property that can be used for sorting.
     state: One of the known state to filter on.
 
   Returns:
-    tuple(queries, query); one is valid and the other is None.
+    A ndb.Query instance.
   """
   query = TaskResultSummary.query()
   if sort:
-    order = datastore_query.PropertyOrder(
-        sort, datastore_query.PropertyOrder.DESCENDING)
-    query = query.order(order)
+    query = query.order(_sort_property(sort))
 
   if state == 'pending':
-    return None, query.filter(TaskResultSummary.state == State.PENDING)
+    return query.filter(TaskResultSummary.state == State.PENDING)
 
   if state == 'running':
-    return None, query.filter(TaskResultSummary.state == State.RUNNING)
+    return query.filter(TaskResultSummary.state == State.RUNNING)
 
   if state == 'pending_running':
-    # This is a special case that sends two concurrent queries under the hood.
-    # ndb.OR() doesn't work when order() is used, it requires __key__ sorting.
-    # This is not efficient, so the DB should be updated accordingly to be
-    # able to support pagination.
-    queries = [
-      query.filter(TaskResultSummary.state == State.PENDING),
-      query.filter(TaskResultSummary.state == State.RUNNING),
-    ]
-    return queries, None
+    # TaskResultSummary.state <= State.PENDING would work.
+    return query.filter(
+        ndb.OR(
+            TaskResultSummary.state == State.PENDING,
+            TaskResultSummary.state == State.RUNNING))
 
   if state == 'completed':
-    return None, query.filter(TaskResultSummary.state == State.COMPLETED)
+    return query.filter(TaskResultSummary.state == State.COMPLETED)
 
   if state == 'completed_success':
     query = query.filter(TaskResultSummary.state == State.COMPLETED)
-    return None, query.filter(TaskResultSummary.failure == False)
+    return query.filter(TaskResultSummary.failure == False)
 
   if state == 'completed_failure':
     query = query.filter(TaskResultSummary.state == State.COMPLETED)
-    return None, query.filter(TaskResultSummary.failure == True)
+    return query.filter(TaskResultSummary.failure == True)
 
   if state == 'expired':
-    return None, query.filter(TaskResultSummary.state == State.EXPIRED)
+    return query.filter(TaskResultSummary.state == State.EXPIRED)
 
   if state == 'timed_out':
-    return None, query.filter(TaskResultSummary.state == State.TIMED_OUT)
+    return query.filter(TaskResultSummary.state == State.TIMED_OUT)
 
   if state == 'bot_died':
-    return None, query.filter(TaskResultSummary.state == State.BOT_DIED)
+    return query.filter(TaskResultSummary.state == State.BOT_DIED)
 
   if state == 'canceled':
-    return None, query.filter(TaskResultSummary.state == State.CANCELED)
+    return query.filter(TaskResultSummary.state == State.CANCELED)
 
   if state == 'all':
-    return None, query
+    return query
 
   raise ValueError('Invalid state')
 

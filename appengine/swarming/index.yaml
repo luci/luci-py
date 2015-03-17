@@ -10,35 +10,15 @@ indexes:
 # automatically uploaded to the admin console when you next deploy
 # your application using appcfg.py.
 
-- kind: TaskRequest
+- kind: TaskResultSummary
   properties:
-  - name: tags
-  - name: created_ts
-    direction: desc
+  - name: failure
+  - name: state
 
 - kind: TaskResultSummary
   properties:
   - name: failure
   - name: state
-  - name: created_ts
-
-- kind: TaskResultSummary
-  properties:
-  - name: failure
-  - name: state
-  - name: created_ts
-    direction: desc
-
-- kind: TaskResultSummary
-  properties:
-  - name: state
-  - name: created_ts
-
-- kind: TaskResultSummary
-  properties:
-  - name: state
-  - name: created_ts
-    direction: desc
 
 - kind: TaskRunResult
   properties:

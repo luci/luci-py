@@ -391,6 +391,25 @@ class TaskRequestApiTest(TestCase):
     task_request.validate_priority(1)
     task_request.validate_priority(task_request.MAXIMUM_PRIORITY)
 
+  def test_datetime_to_request_base_id(self):
+    now = datetime.datetime(2012, 1, 2, 3, 4, 5, 123456)
+    self.assertEqual(
+        0xeb5313d0300000, task_request.datetime_to_request_base_id(now))
+
+  def test_request_key_to_datetime(self):
+    key = ndb.Key(task_request.TaskRequest, 0x7f14acec2fcfffff)
+    # Resolution is only kept at millisecond level compared to
+    # datetime_to_request_base_id() by design.
+    self.assertEqual(
+        datetime.datetime(2012, 1, 2, 3, 4, 5, 123000),
+        task_request.request_key_to_datetime(key))
+
+  def test_request_id_to_key(self):
+    # Simple XOR.
+    self.assertEqual(
+        ndb.Key(task_request.TaskRequest, 0x7f14acec2fcfffff),
+        task_request.request_id_to_key(0xeb5313d0300000))
+
 
 if __name__ == '__main__':
   if '-v' in sys.argv:

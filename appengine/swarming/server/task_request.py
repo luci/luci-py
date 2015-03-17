@@ -351,16 +351,10 @@ def _new_request_key():
   The key id is this value XORed with task_pack.TASK_REQUEST_KEY_ID_MASK. The
   reason is that increasing key id values are in decreasing timestamp order.
   """
-  utcnow = utils.utcnow()
-  if utcnow < _BEGINING_OF_THE_WORLD:
-    raise ValueError(
-        'Time %s is set to before %s' % (utcnow, _BEGINING_OF_THE_WORLD))
-  delta = utcnow - _BEGINING_OF_THE_WORLD
-  now = int(round(delta.total_seconds() * 1000.))
+  request_id_base = datetime_to_request_base_id(utils.utcnow())
   # TODO(maruel): Use real randomness.
   suffix = random.getrandbits(16)
-  task_id = int((now << 20) | (suffix << 4) | 0x1)
-  return ndb.Key(TaskRequest, task_id ^ task_pack.TASK_REQUEST_KEY_ID_MASK)
+  return request_id_to_key(int(request_id_base | (suffix << 4) | 0x1))
 
 
 def _put_request(request):
@@ -392,6 +386,40 @@ def _assert_keys(expected_keys, minimum_keys, actual_keys, name):
 
 
 ### Public API.
+
+
+def request_key_to_datetime(request_key):
+  """Converts a TaskRequest.key to datetime.
+
+  See _new_request_key() for more details.
+  """
+  if request_key.kind() != 'TaskRequest':
+    raise ValueError('Expected key to TaskRequest, got %s' % request_key.kind())
+  # Ignore lowest 20 bits.
+  xored = request_key.integer_id() ^ task_pack.TASK_REQUEST_KEY_ID_MASK
+  offset_ms = (xored >> 20) / 1000.
+  return _BEGINING_OF_THE_WORLD + datetime.timedelta(seconds=offset_ms)
+
+
+def datetime_to_request_base_id(now):
+  """Converts a datetime into a TaskRequest key base value.
+
+  Used for query order().
+  """
+  if now < _BEGINING_OF_THE_WORLD:
+    raise ValueError(
+        'Time %s is set to before %s' % (now, _BEGINING_OF_THE_WORLD))
+  delta = now - _BEGINING_OF_THE_WORLD
+  return int(round(delta.total_seconds() * 1000.)) << 20
+
+
+def request_id_to_key(request_id):
+  """Converts a request id into a TaskRequest key.
+
+  Note that this function does NOT accept a task id. This functions is primarily
+  meant for limiting queries to a task creation range.
+  """
+  return ndb.Key(TaskRequest, request_id ^ task_pack.TASK_REQUEST_KEY_ID_MASK)
 
 
 def validate_request_key(request_key):

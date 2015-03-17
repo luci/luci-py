@@ -354,7 +354,7 @@ def schedule_request(request):
   def run_parent():
     # This one is slower.
     items = ndb.get_multi(parent_task_keys)
-    k = result_summary.key_string
+    k = result_summary.key_packed
     for item in items:
       item.children_task_ids.append(k)
     ndb.put_multi(items)
