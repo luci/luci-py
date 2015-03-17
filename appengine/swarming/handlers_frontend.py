@@ -17,6 +17,7 @@ import re
 import webapp2
 
 from google.appengine import runtime
+from google.appengine.api import search
 from google.appengine.api import users
 from google.appengine.datastore import datastore_query
 from google.appengine.ext import ndb
@@ -430,7 +431,7 @@ class TasksHandler(auth.AuthenticatingHandler):
       # Evaluate the counts to print the filtering columns with the associated
       # numbers.
       state_choices = self._get_state_choices(counts_future)
-    except ValueError as e:
+    except (search.QueryError, ValueError) as e:
       self.abort(400, str(e))
 
     def safe_sum(items):
