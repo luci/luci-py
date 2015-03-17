@@ -168,6 +168,7 @@ class TaskResultApiTest(TestCase):
     actual.children_task_ids = [
       '1d69ba3ea8008810', '3d69ba3ea8008810', '2d69ba3ea8008810',
     ]
+    actual.modified_ts = utils.utcnow()
     ndb.transaction(actual.put)
     expected = [u'1d69ba3ea8008810', u'2d69ba3ea8008810', u'3d69ba3ea8008810']
     self.assertEqual(expected, actual.key.get().children_task_ids)
@@ -204,6 +205,7 @@ class TaskResultApiTest(TestCase):
     request = task_request.make_request(_gen_request_data())
     result_summary = task_result.new_result_summary(request)
     to_run = task_to_run.new_task_to_run(request)
+    result_summary.modified_ts = utils.utcnow()
     ndb.transaction(lambda: ndb.put_multi([result_summary, to_run]))
     expected = {
       'abandoned_ts': None,
@@ -241,6 +243,7 @@ class TaskResultApiTest(TestCase):
     to_run.queue_number = None
     to_run.put()
     run_result = task_result.new_run_result(request, 1, 'localhost', 'abc')
+    run_result.modified_ts = utils.utcnow()
     result_summary.set_from_run_result(run_result, request)
     ndb.transaction(lambda: ndb.put_multi((result_summary, run_result)))
     expected = {
@@ -276,6 +279,7 @@ class TaskResultApiTest(TestCase):
     run_result.completed_ts = complete_ts
     run_result.exit_codes.append(0)
     run_result.state = task_result.State.COMPLETED
+    run_result.modified_ts = utils.utcnow()
     ndb.transaction(
         lambda: ndb.put_multi(run_result.append_output(0, 'foo', 0)))
     result_summary.set_from_run_result(run_result, request)
@@ -328,9 +332,11 @@ class TaskResultApiTest(TestCase):
   def test_yield_run_result_keys_with_dead_bot(self):
     request = task_request.make_request(_gen_request_data())
     result_summary = task_result.new_result_summary(request)
+    result_summary.modified_ts = utils.utcnow()
     ndb.transaction(result_summary.put)
     run_result = task_result.new_run_result(request, 1, 'localhost', 'abc')
-    run_result.completed_ts = self.now
+    run_result.completed_ts = utils.utcnow()
+    run_result.modified_ts = utils.utcnow()
     result_summary.set_from_run_result(run_result, request)
     ndb.transaction(lambda: ndb.put_multi((run_result, result_summary)))
 
@@ -348,6 +354,8 @@ class TaskResultApiTest(TestCase):
     result_summary = task_result.new_result_summary(request)
     run_result = task_result.new_run_result(request, 1, 'localhost', 'abc')
     self.assertTrue(result_summary.need_update_from_run_result(run_result))
+    result_summary.modified_ts = utils.utcnow()
+    run_result.modified_ts = utils.utcnow()
     ndb.transaction(lambda: ndb.put_multi((result_summary, run_result)))
 
     self.assertTrue(result_summary.need_update_from_run_result(run_result))
@@ -361,6 +369,8 @@ class TaskResultApiTest(TestCase):
     result_summary = task_result.new_result_summary(request)
     run_result = task_result.new_run_result(request, 1, 'localhost', 'abc')
     self.assertTrue(result_summary.need_update_from_run_result(run_result))
+    result_summary.modified_ts = utils.utcnow()
+    run_result.modified_ts = utils.utcnow()
     ndb.transaction(lambda: ndb.put_multi((result_summary, run_result)))
 
     self.assertTrue(result_summary.need_update_from_run_result(run_result))
@@ -368,6 +378,7 @@ class TaskResultApiTest(TestCase):
     ndb.transaction(lambda: ndb.put_multi([result_summary]))
 
     run_result.signal_server_version('new-version')
+    run_result.modified_ts = utils.utcnow()
     result_summary.set_from_run_result(run_result, request)
     ndb.transaction(lambda: ndb.put_multi((result_summary, run_result)))
     self.assertEqual(
@@ -383,9 +394,12 @@ class TaskResultApiTest(TestCase):
     run_result_1 = task_result.new_run_result(request, 1, 'localhost', 'abc')
     run_result_2 = task_result.new_run_result(request, 2, 'localhost', 'abc')
     self.assertTrue(result_summary.need_update_from_run_result(run_result_1))
+    run_result_2.modified_ts = utils.utcnow()
+    result_summary.modified_ts = utils.utcnow()
     ndb.transaction(lambda: ndb.put_multi((result_summary, run_result_2)))
 
     self.assertTrue(result_summary.need_update_from_run_result(run_result_1))
+    run_result_1.modified_ts = utils.utcnow()
     result_summary.set_from_run_result(run_result_1, request)
     ndb.transaction(lambda: ndb.put_multi((result_summary, run_result_1)))
 
@@ -393,6 +407,7 @@ class TaskResultApiTest(TestCase):
     self.assertFalse(result_summary.need_update_from_run_result(run_result_1))
 
     self.assertTrue(result_summary.need_update_from_run_result(run_result_2))
+    run_result_2.modified_ts = utils.utcnow()
     result_summary.set_from_run_result(run_result_2, request)
     ndb.transaction(lambda: ndb.put_multi((result_summary, run_result_2)))
     result_summary = result_summary.key.get()
@@ -418,10 +433,12 @@ class TaskResultApiTest(TestCase):
   def test_run_result_timeout(self):
     request = task_request.make_request(_gen_request_data())
     result_summary = task_result.new_result_summary(request)
+    result_summary.modified_ts = utils.utcnow()
     ndb.transaction(result_summary.put)
     run_result = task_result.new_run_result(request, 1, 'localhost', 'abc')
     run_result.state = task_result.State.TIMED_OUT
-    run_result.completed_ts = self.now
+    run_result.completed_ts = utils.utcnow()
+    run_result.modified_ts = utils.utcnow()
     result_summary.set_from_run_result(run_result, request)
     ndb.transaction(lambda: ndb.put_multi((run_result, result_summary)))
     run_result = run_result.key.get()
@@ -449,8 +466,10 @@ class TestOutput(TestCase):
     super(TestOutput, self).setUp()
     request = task_request.make_request(_gen_request_data())
     result_summary = task_result.new_result_summary(request)
+    result_summary.modified_ts = utils.utcnow()
     ndb.transaction(result_summary.put)
     self.run_result = task_result.new_run_result(request, 1, 'localhost', 'abc')
+    self.run_result.modified_ts = utils.utcnow()
     result_summary.set_from_run_result(self.run_result, request)
     ndb.transaction(lambda: ndb.put_multi((result_summary, self.run_result)))
     self.run_result = self.run_result.key.get()

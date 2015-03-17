@@ -97,7 +97,7 @@ class BotInfo(_BotCommon):
   first_seen_ts = ndb.DateTimeProperty(auto_now_add=True, indexed=False)
 
   # Last time the bot pinged and this entity was updated
-  last_seen_ts = ndb.DateTimeProperty(auto_now=True)
+  last_seen_ts = ndb.DateTimeProperty()
 
   # Must only be set when self.task_id is set.
   task_name = ndb.StringProperty(indexed=False)
@@ -146,7 +146,7 @@ class BotEvent(_BotCommon):
     'task_completed', 'task_error', 'task_update',
   }
   # Common properties for all events (which includes everything in _BotCommon).
-  ts = ndb.DateTimeProperty(auto_now=True)
+  ts = ndb.DateTimeProperty(auto_now_add=True)
   event_type = ndb.StringProperty(choices=ALLOWED_EVENTS)
 
   # event_type == 'bot_error', 'request_restart' or 'bot_rebooting'

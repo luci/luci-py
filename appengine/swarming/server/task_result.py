@@ -246,7 +246,7 @@ class _TaskResultCommon(ndb.Model):
 
   # This entity is updated everytime the bot sends data so it is equivalent to
   # 'last_ping'.
-  modified_ts = ndb.DateTimeProperty(auto_now=True)
+  modified_ts = ndb.DateTimeProperty()
 
   # Records that the task failed, e.g. one process had a non-zero exit code. The
   # task may be retried if desired to weed out flakiness.
@@ -427,6 +427,9 @@ class _TaskResultCommon(ndb.Model):
 
     if self.state == State.TIMED_OUT and not self.failure:
       raise datastore_errors.BadValueError('Timeout implies task failure')
+
+    if not self.modified_ts:
+      raise datastore_errors.BadValueError('Must update .modified_ts')
 
     self.children_task_ids = sorted(
         set(self.children_task_ids), key=lambda x: int(x, 16))

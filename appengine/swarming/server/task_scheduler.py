@@ -53,6 +53,7 @@ def _expire_task(to_run_key, request):
     return None
 
   result_summary_key = task_pack.request_key_to_result_summary_key(request.key)
+  now = utils.utcnow()
 
   def run():
     # 2 concurrent GET, one PUT. Optionally with an additional serialized GET.
@@ -72,7 +73,8 @@ def _expire_task(to_run_key, request):
       result_summary.set_from_run_result(run_result, request)
     else:
       result_summary.state = task_result.State.EXPIRED
-    result_summary.abandoned_ts = utils.utcnow()
+    result_summary.abandoned_ts = now
+    result_summary.modified_ts = now
     ndb.put_multi([to_run, result_summary])
     return True
 
@@ -98,6 +100,8 @@ def _reap_task(to_run_key, request, bot_id, bot_version):
   assert request.key == task_to_run.task_to_run_key_to_request_key(to_run_key)
   result_summary_key = task_pack.request_key_to_result_summary_key(request.key)
 
+  now = utils.utcnow()
+
   def run():
     # 2 GET, 1 PUT at the end.
     to_run_future = to_run_key.get_async()
@@ -115,6 +119,7 @@ def _reap_task(to_run_key, request, bot_id, bot_version):
     to_run.queue_number = None
     run_result = task_result.new_run_result(
         request, (result_summary.try_number or 0) + 1, bot_id, bot_version)
+    run_result.modified_ts = now
     result_summary.set_from_run_result(run_result, request)
     ndb.put_multi([to_run, run_result, result_summary])
     return run_result
@@ -181,6 +186,7 @@ def _handle_dead_bot(run_result_key):
       return None, run_result.bot_id
 
     run_result.signal_server_version(server_version)
+    run_result.modified_ts = now
     if result_summary.try_number != run_result.try_number:
       # Not updating correct run_result, cancel it without touching
       # result_summary.
@@ -199,6 +205,7 @@ def _handle_dead_bot(run_result_key):
       # Do not sync data from run_result to result_summary, since the task is
       # being retried.
       result_summary.reset_to_pending()
+      result_summary.modified_ts = now
       result = True
     else:
       # Cancel it, there was more than one try or the task expired in the
@@ -315,12 +322,14 @@ def schedule_request(request):
   # Even if it fails here, we're still fine, as the task is not "alive" yet.
   search_future = index.put_async([doc])
 
+  now = utils.utcnow()
+
   if dupe_future:
     # Reuse the results!
     dupe_summary = dupe_future.get_result()
     # Refuse tasks older than X days. This is due to the isolate server dropping
     # files. https://code.google.com/p/swarming/issues/detail?id=197
-    oldest = utils.utcnow() - datetime.timedelta(
+    oldest = now - datetime.timedelta(
         seconds=config.settings().reusable_task_age_secs)
     if dupe_summary and dupe_summary.created_ts > oldest:
       # If there's a bug, commenting out this block is sufficient to disable the
@@ -345,6 +354,8 @@ def schedule_request(request):
       task_pack.run_result_key_to_result_summary_key(parent_run_key),
     ]
 
+  result_summary.modified_ts = now
+
   # Storing these entities makes this task live. It is important at this point
   # that the HTTP handler returns as fast as possible, otherwise the task will
   # be run but the client will not know about it.
@@ -357,6 +368,7 @@ def schedule_request(request):
     k = result_summary.key_packed
     for item in items:
       item.children_task_ids.append(k)
+      item.modified_ts = now
     ndb.put_multi(items)
 
   # Raising will abort to the caller.
@@ -528,6 +540,7 @@ def bot_update_task(
           run_result.append_output(0, output, output_chunk_start or 0))
 
     run_result.cost_usd = max(cost_usd, run_result.cost_usd or 0.)
+    run_result.modified_ts = now
 
     result_summary = result_summary_future.get_result()
     if (result_summary.try_number and
@@ -536,6 +549,7 @@ def bot_update_task(
       # try somehow reappears and reports success, the result must still show
       # the last try's result. We still need to update cost_usd manually.
       result_summary.costs_usd[run_result.try_number-1] = run_result.cost_usd
+      result_summary.modified_ts = now
     else:
       result_summary.set_from_run_result(run_result, request)
 
@@ -584,6 +598,7 @@ def bot_kill_task(run_result_key, bot_id):
     run_result.state = task_result.State.BOT_DIED
     run_result.internal_failure = True
     run_result.abandoned_ts = now
+    run_result.modified_ts = now
     result_summary.set_from_run_result(run_result, None)
     ndb.put_multi((run_result, result_summary))
     return run_result, None
@@ -619,6 +634,7 @@ def cancel_task(result_summary_key):
     to_run.queue_number = None
     result_summary.state = task_result.State.CANCELED
     result_summary.abandoned_ts = now
+    result_summary.modified_ts = now
     ndb.put_multi((to_run, result_summary))
     return True, was_running
 
