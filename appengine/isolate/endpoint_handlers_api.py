@@ -334,7 +334,7 @@ class IsolateService(remote.Service):
           runtime.apiproxy_errors.OverQuotaError,
           runtime.DeadlineExceededError,
           taskqueue.Error) as e:
-        raise endpoints.InternalServerException(
+        raise endpoints.InternalServerErrorException(
             'Unable to store the entity: %s.' % e.__class__.__name__)
 
     return PushPing(ok=True)

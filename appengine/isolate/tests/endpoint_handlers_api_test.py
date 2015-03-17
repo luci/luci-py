@@ -39,6 +39,7 @@ import handlers_backend
 import model
 
 from google.appengine.api import memcache
+from google.appengine.api import taskqueue
 from google.appengine.api import urlfetch
 
 
@@ -377,12 +378,32 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
     small_request = self.store_request(small)
     large_request = self.store_request(large)
 
+    # try the large entity
+    self.mock(gcs, 'get_file_info', get_file_info_factory(large))
     with self.call_should_fail('400'):
       self.call_api(
           'finalize_gs_upload', self.message_to_dict(small_request), 200)
+
+    # try the inline stored entity
     with self.call_should_fail('400'):
       self.call_api(
           'store_inline', self.message_to_dict(large_request), 200)
+
+  def test_storage_server_error(self):
+    """Assert that GS storage raises appropriate error when storage fails."""
+    # pretend that taskqueue addition fails
+    def _taskqueue_add_mock(*_args, **_kwargs):
+      raise taskqueue.Error()
+    self.mock(taskqueue, 'add', _taskqueue_add_mock)
+
+    # make a GCS-sized request
+    big_datum = pad_string('gigas')
+    request = self.store_request(big_datum)
+    self.mock(gcs, 'get_file_info', get_file_info_factory(big_datum))
+
+    # should raise InternalServerErrorException
+    with self.call_should_fail('500'):
+      self.call_api('finalize_gs_upload', self.message_to_dict(request), 200)
 
   def test_retrieve_memcache_ok(self):
     """Assert that content retrieval goes off swimmingly in the normal case."""
