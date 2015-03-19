@@ -65,9 +65,10 @@ libraries:
 
 skip_files:
 # Test and tools.
+- support/
 - ^tests/
 - ^tools/
-- test_.+\.py$
+- test_.+
 - .+_test\.py$
 # Junk files.
 - ^(.*/)?\..*
