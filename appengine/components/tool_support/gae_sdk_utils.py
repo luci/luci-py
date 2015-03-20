@@ -573,3 +573,11 @@ class KeyringAuth(DefaultAuth):
     except Exception as e:
       print >> sys.stderr, 'Failed to unlock keyring: %s' % e
       return False
+
+
+def setup_gae_env():
+  """Sets up App Engine/Django test environment."""
+  sdk_path = find_gae_sdk()
+  if not sdk_path:
+    raise RuntimeError('Couldn\'t find GAE SDK.')
+  setup_gae_sdk(sdk_path)

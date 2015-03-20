@@ -12,9 +12,7 @@ methods.
 import unittest
 import os
 
-import test_env
-test_env.setup_test_env()
-
+from tool_support import gae_sdk_utils
 from tool_support import local_app
 
 
@@ -96,4 +94,5 @@ class CloudEndpointsSmokeTest(unittest.TestCase):
 
 
 if __name__ == '__main__':
+  gae_sdk_utils.setup_gae_env()
   unittest.main()
