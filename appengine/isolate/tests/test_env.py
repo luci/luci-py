@@ -20,7 +20,7 @@ def setup_test_env():
     raise Exception('Do not call test_env.setup_test_env() twice.')
   _INITIALIZED = True
 
-  # For 'from support import ...'
+  # For 'from test_support import ...'
   sys.path.insert(0, COMPONENTS_DIR)
   # For dependencies of support code.
   sys.path.insert(0, os.path.join(COMPONENTS_DIR, 'third_party'))

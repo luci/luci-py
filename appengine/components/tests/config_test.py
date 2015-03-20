@@ -15,7 +15,7 @@ from google.appengine.ext import ndb
 from components import auth
 from components import config
 
-from support import test_case
+from test_support import test_case
 
 
 class ConfigTest(test_case.TestCase):

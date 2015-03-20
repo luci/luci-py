@@ -16,7 +16,7 @@ test_env.setup_test_env()
 from components import auth
 from components import auth_testing
 from components import datastore_utils
-from support import test_case
+from test_support import test_case
 
 import model
 

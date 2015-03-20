@@ -18,7 +18,7 @@ from protorpc.remote import protojson
 import webapp2
 import webtest
 
-from support import test_case
+from test_support import test_case
 from components import utils
 
 from components.auth import api

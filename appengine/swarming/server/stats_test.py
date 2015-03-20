@@ -16,7 +16,7 @@ import test_env
 test_env.setup_test_env()
 
 from server import stats
-from support import test_case
+from test_support import test_case
 
 
 # pylint: disable=W0212

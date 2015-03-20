@@ -11,7 +11,7 @@ import unittest
 import test_env
 test_env.setup_test_env()
 
-from support import test_case
+from test_support import test_case
 
 from components.auth import tokens
 from components.auth import api

@@ -19,7 +19,7 @@ import webtest
 from components import auth_testing
 from components import template
 
-from support import test_case
+from test_support import test_case
 
 from common import importer
 from common import replication

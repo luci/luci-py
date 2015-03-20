@@ -24,7 +24,7 @@ test_env.setup_test_env()
 from components import auth
 from server import bot_archive
 from server import bot_code
-from support import test_case
+from test_support import test_case
 
 
 class BotManagementTest(test_case.TestCase):

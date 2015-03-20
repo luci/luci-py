@@ -25,7 +25,7 @@ from google.appengine.ext import ndb
 
 from components import auth
 from components import utils
-from support import test_case
+from test_support import test_case
 
 import acl
 import config

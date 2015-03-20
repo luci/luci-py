@@ -14,7 +14,7 @@ from components import utils
 from components.auth import ipaddr
 from components.auth import model
 
-from support import test_case
+from test_support import test_case
 
 
 class IdentityTest(test_case.TestCase):

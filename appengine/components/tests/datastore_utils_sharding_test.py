@@ -13,7 +13,7 @@ test_env.setup_test_env()
 from google.appengine.ext import ndb
 
 from components.datastore_utils import sharding
-from support import test_case
+from test_support import test_case
 
 
 class EntityX(ndb.Model):

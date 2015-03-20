@@ -22,7 +22,7 @@ dev_appserver.fix_sys_path()
 
 import endpoints
 from protorpc.remote import protojson
-from support import test_case
+from test_support import test_case
 
 import webapp2
 import webtest

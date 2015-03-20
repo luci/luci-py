@@ -17,7 +17,7 @@ from google.appengine.ext import ndb
 
 import webtest
 
-from support import test_case
+from test_support import test_case
 
 from components import auth
 from components import auth_testing

@@ -23,7 +23,7 @@ from components import auth
 from components import auth_testing
 from components import template
 from components import utils
-from support import test_case
+from test_support import test_case
 
 import acl
 import config

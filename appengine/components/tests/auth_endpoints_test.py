@@ -13,7 +13,7 @@ import endpoints
 from protorpc import messages
 from protorpc import remote
 
-from support import test_case
+from test_support import test_case
 
 from components.auth import api
 from components.auth import endpoints_support

@@ -24,7 +24,7 @@ from components import auth_testing
 from components import utils
 from server import task_pack
 from server import task_request
-from support import test_case
+from test_support import test_case
 
 # pylint: disable=W0212
 

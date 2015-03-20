@@ -20,7 +20,7 @@ test_env.setup_test_env()
 from google.appengine.ext import ndb
 
 from server import bot_management
-from support import test_case
+from test_support import test_case
 
 
 class BotManagementTest(test_case.TestCase):

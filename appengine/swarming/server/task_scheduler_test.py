@@ -37,7 +37,7 @@ from server import task_request
 from server import task_result
 from server import task_scheduler
 from server import task_to_run
-from support import test_case
+from test_support import test_case
 
 from server.task_result import State
 

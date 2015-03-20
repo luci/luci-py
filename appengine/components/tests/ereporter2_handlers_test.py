@@ -29,7 +29,7 @@ from components.ereporter2 import logscraper
 from components.ereporter2 import models
 from components.ereporter2 import on_error
 from components.ereporter2 import ui
-from support import test_case
+from test_support import test_case
 
 
 # Access to a protected member XXX of a client class - pylint: disable=W0212

@@ -17,8 +17,8 @@ import webapp2
 
 import stats
 from components import stats_framework
-from support import stats_framework_mock
-from support import test_case
+from test_support import stats_framework_mock
+from test_support import test_case
 
 # pylint: disable=R0201
 

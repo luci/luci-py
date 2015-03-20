@@ -13,7 +13,7 @@ from google.appengine.ext import ndb
 
 from components.datastore_utils import monotonic
 from components.datastore_utils import txn
-from support import test_case
+from test_support import test_case
 
 
 # Access to a protected member _XX of a client class - pylint: disable=W0212

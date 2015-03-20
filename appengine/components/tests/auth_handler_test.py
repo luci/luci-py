@@ -20,7 +20,7 @@ import webtest
 from google.appengine.api import oauth
 from google.appengine.api import users
 
-from support import test_case
+from test_support import test_case
 
 from components.auth import api
 from components.auth import handler

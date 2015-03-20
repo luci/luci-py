@@ -19,8 +19,8 @@ from google.appengine.ext import ndb
 
 from components import stats_framework
 from components import utils
-from support import stats_framework_mock
-from support import test_case
+from test_support import stats_framework_mock
+from test_support import test_case
 
 # pylint: disable=W0212
 

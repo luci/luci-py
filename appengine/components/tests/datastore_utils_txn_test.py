@@ -14,7 +14,7 @@ from google.appengine.api import datastore_errors
 from google.appengine.ext import ndb
 
 from components.datastore_utils import txn
-from support import test_case
+from test_support import test_case
 
 
 class EntityX(ndb.Model):
