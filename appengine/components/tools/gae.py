@@ -38,7 +38,7 @@ sys.path.insert(0, os.path.join(ROOT_DIR, 'third_party'))
 import colorama
 from depot_tools import subcommand
 
-from support import gae_sdk_utils
+from tool_support import gae_sdk_utils
 from tools import calculate_version
 
 

@@ -32,7 +32,7 @@ import test_env
 test_env.setup_test_env()
 
 from server import bot_archive
-from support import local_app
+from tool_support import local_app
 
 
 class LocalBot(object):

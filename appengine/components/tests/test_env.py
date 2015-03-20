@@ -7,13 +7,13 @@ import sys
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-# For 'from components import ...' and 'from support import ...'.
+# For 'from components import ...' and 'from tool_support import ...'.
 sys.path.insert(0, ROOT_DIR)
 sys.path.insert(0, os.path.join(ROOT_DIR, 'components', 'third_party'))
 # For depot_tools/auto_stub.py.
 sys.path.insert(0, os.path.join(ROOT_DIR, 'third_party'))
 
-from support import gae_sdk_utils
+from tool_support import gae_sdk_utils
 
 
 def setup_test_env():

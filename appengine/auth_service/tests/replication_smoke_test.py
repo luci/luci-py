@@ -26,8 +26,8 @@ REPLICA_APP_DIR = os.path.join(THIS_DIR, 'replica_app')
 # Add /appengine/components/ directory, to import 'support'.
 sys.path.append(os.path.join(os.path.dirname(SERVICE_APP_DIR), 'components'))
 
-from support import gae_sdk_utils
-from support import local_app
+from tool_support import gae_sdk_utils
+from tool_support import local_app
 
 
 class ReplicationTest(unittest.TestCase):

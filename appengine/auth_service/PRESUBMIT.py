@@ -14,12 +14,9 @@ def FindAppEngineSDK(input_api):
   import sys
   old_sys_path = sys.path
   try:
-    # Add 'components' to sys.path to be able to import gae_sdk_utils.
-    components_dir = input_api.os_path.join(
-        input_api.PresubmitLocalPath(), '..', 'components')
-    sys.path = [components_dir] + sys.path
-    # pylint: disable=F0401
-    from support import gae_sdk_utils
+    sys.path = [input_api.PresubmitLocalPath()] + sys.path
+    # pylint: disable=relative-import
+    from tool_support import gae_sdk_utils
     return gae_sdk_utils.find_gae_sdk()
   finally:
     sys.path = old_sys_path

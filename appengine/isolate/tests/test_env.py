@@ -32,7 +32,7 @@ def setup_test_env():
   # For application modules.
   sys.path.insert(0, APP_DIR)
 
-  from support import gae_sdk_utils
+  from tool_support import gae_sdk_utils
   gae_sdk_dir = gae_sdk_utils.find_gae_sdk()
   if not gae_sdk_dir:
     raise Exception('Unable to find gae sdk path, aborting test.')

@@ -20,7 +20,7 @@ def setup_test_env():
     raise Exception('Do not call test_env.setup_test_env() twice.')
   _INITIALIZED = True
 
-  # For 'from support import ...'
+  # For 'from tool_support import ...'
   sys.path.insert(0, COMPONENTS_DIR)
   # For dependencies of support code.
   sys.path.insert(0, os.path.join(COMPONENTS_DIR, 'third_party'))
@@ -32,7 +32,7 @@ def setup_test_env():
   # For application modules.
   sys.path.insert(0, APP_DIR)
 
-  from support import gae_sdk_utils
+  from tool_support import gae_sdk_utils
   gae_sdk_dir = gae_sdk_utils.find_gae_sdk()
   if not gae_sdk_dir:
     raise Exception('Unable to find gae sdk path, aborting test.')
