@@ -27,6 +27,7 @@ if os.path.isfile(os.path.join(THIS_DIR, 'utils')):
 
 # Import everything that does not require sys.path hack first.
 import logging_utils
+from utils import file_path
 from utils import subprocess42
 import task_runner
 import xsrf_client
@@ -65,26 +66,29 @@ class TestTaskRunnerBase(net_utils.TestCase):
 
   def tearDown(self):
     os.chdir(BASE_DIR)
-    shutil.rmtree(self.root_dir)
+    file_path.rmtree(self.root_dir)
     super(TestTaskRunnerBase, self).tearDown()
 
   @staticmethod
-  def get_task_details(
-      script, hard_timeout=10., io_timeout=10., grace_period=30.):
-    return task_runner.TaskDetails(
-        {
-          'bot_id': 'localhost',
-          'command': [sys.executable, '-u', '-c', script],
-          'data': [],
-          'env': {},
-          'grace_period': grace_period,
-          'hard_timeout': hard_timeout,
-          'io_timeout': io_timeout,
-          'task_id': 23,
-        })
+  def get_manifest(
+      script, hard_timeout=10., io_timeout=10., grace_period=30., data=None):
+    return {
+      'bot_id': 'localhost',
+      'command': [sys.executable, '-u', '-c', script],
+      'data': data or [],
+      'env': {},
+      'grace_period': grace_period,
+      'hard_timeout': hard_timeout,
+      'io_timeout': io_timeout,
+      'task_id': 23,
+    }
 
-  def requests(self, cost_usd=0., **kwargs):
-    requests = [
+  @classmethod
+  def get_task_details(cls, *args, **kwargs):
+    return task_runner.TaskDetails(cls.get_manifest(*args, **kwargs))
+
+  def gen_requests(self, cost_usd=0., **kwargs):
+    return [
       (
         'https://localhost:1/auth/api/v1/accounts/self/xsrf_token',
         {'data': {}, 'headers': {'X-XSRF-Token-Request': '1'}},
@@ -101,7 +105,10 @@ class TestTaskRunnerBase(net_utils.TestCase):
         {},
       ),
     ]
-    self.expected_requests(requests)
+
+  def requests(self, **kwargs):
+    """Generates the expected HTTP requests for a task run."""
+    self.expected_requests(self.gen_requests(**kwargs))
 
   def get_check_first(self, cost_usd):
     def check_first(kwargs):
@@ -145,7 +152,7 @@ class TestTaskRunner(TestTaskRunnerBase):
           kwargs)
     return check_final
 
-  def _run(self, task_details):
+  def _run_command(self, task_details):
     start = time.time()
     self.mock(time, 'time', lambda: start + 10)
     server = xsrf_client.XsrfRemote('https://localhost:1/')
@@ -264,14 +271,14 @@ class TestTaskRunner(TestTaskRunnerBase):
     # This runs the command for real.
     self.requests(cost_usd=1, exit_code=0)
     task_details = self.get_task_details('print(\'hi\')')
-    self.assertEqual(0, self._run(task_details))
+    self.assertEqual(0, self._run_command(task_details))
 
   def test_run_command_fail(self):
     # This runs the command for real.
     self.requests(cost_usd=10., exit_code=1)
     task_details = self.get_task_details(
         'import sys; print(\'hi\'); sys.exit(1)')
-    self.assertEqual(1, self._run(task_details))
+    self.assertEqual(1, self._run_command(task_details))
 
   def test_run_command_os_error(self):
     # This runs the command for real.
@@ -299,7 +306,7 @@ class TestTaskRunner(TestTaskRunnerBase):
           'io_timeout': 6,
           'task_id': 23,
         })
-    self.assertEqual(1, self._run(task_details))
+    self.assertEqual(1, self._run_command(task_details))
 
   def test_run_command_large(self):
     # Method should have "self" as first argument - pylint: disable=E0213
@@ -497,8 +504,12 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
       self, hard_timeout=False, io_timeout=False, exit_code=None,
       output='hi\n'):
     def check_final(kwargs):
-      self.assertLess(self.SHORT_TIME_OUT, kwargs['data'].pop('cost_usd'))
-      self.assertLess(self.SHORT_TIME_OUT, kwargs['data'].pop('duration'))
+      if hard_timeout or io_timeout:
+        self.assertLess(self.SHORT_TIME_OUT, kwargs['data'].pop('cost_usd'))
+        self.assertLess(self.SHORT_TIME_OUT, kwargs['data'].pop('duration'))
+      else:
+        self.assertLess(0., kwargs['data'].pop('cost_usd'))
+        self.assertLess(0., kwargs['data'].pop('duration'))
       # It makes the diffing easier.
       kwargs['data']['output'] = base64.b64decode(kwargs['data']['output'])
       self.assertEqual(
@@ -506,7 +517,7 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
             'data': {
               'exit_code': exit_code,
               'hard_timeout': hard_timeout,
-              'id': 'localhost',
+              'id': u'localhost',
               'io_timeout': io_timeout,
               'output': output,
               'output_chunk_start': 0,
@@ -517,7 +528,15 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
           kwargs)
     return check_final
 
-  def _run(self, task_details):
+  def _load_and_run(self, manifest):
+    # Dot not mock time since this test class is testing timeouts.
+    server = xsrf_client.XsrfRemote('https://localhost:1/')
+    with open('manifest.json', 'w') as f:
+      json.dump(manifest, f)
+    return task_runner.load_and_run('manifest.json', server, 3600., time.time())
+
+  def _run_command(self, task_details):
+    # Dot not mock time since this test class is testing timeouts.
     server = xsrf_client.XsrfRemote('https://localhost:1/')
     return task_runner.run_command(
         server, task_details, '.', 3600., time.time())
@@ -528,7 +547,7 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
     self.requests(hard_timeout=True, exit_code=sig)
     details = self.get_task_details(
         self.SCRIPT_HANG, hard_timeout=self.SHORT_TIME_OUT)
-    self.assertEqual(sig, self._run(details))
+    self.assertEqual(sig, self._run_command(details))
 
   def test_io(self):
     # Actually 0xc000013a
@@ -536,7 +555,7 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
     self.requests(io_timeout=True, exit_code=sig)
     details = self.get_task_details(
         self.SCRIPT_HANG, io_timeout=self.SHORT_TIME_OUT)
-    self.assertEqual(sig, self._run(details))
+    self.assertEqual(sig, self._run_command(details))
 
   def test_hard_signal(self):
     sig = signal.SIGBREAK if sys.platform == 'win32' else signal.SIGTERM
@@ -545,7 +564,7 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
     details = self.get_task_details(
         self.SCRIPT_SIGNAL, hard_timeout=self.SHORT_TIME_OUT)
     # Returns 0 because the process cleaned up itself.
-    self.assertEqual(0, self._run(details))
+    self.assertEqual(0, self._run_command(details))
 
   def test_io_signal(self):
     sig = signal.SIGBREAK if sys.platform == 'win32' else signal.SIGTERM
@@ -554,7 +573,7 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
     details = self.get_task_details(
         self.SCRIPT_SIGNAL, io_timeout=self.SHORT_TIME_OUT)
     # Returns 0 because the process cleaned up itself.
-    self.assertEqual(0, self._run(details))
+    self.assertEqual(0, self._run_command(details))
 
   def test_hard_no_grace(self):
     # Actually 0xc000013a
@@ -563,7 +582,7 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
     details = self.get_task_details(
         self.SCRIPT_HANG, hard_timeout=self.SHORT_TIME_OUT,
         grace_period=self.SHORT_TIME_OUT)
-    self.assertEqual(sig, self._run(details))
+    self.assertEqual(sig, self._run_command(details))
 
   def test_io_no_grace(self):
     # Actually 0xc000013a
@@ -572,7 +591,7 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
     details = self.get_task_details(
         self.SCRIPT_HANG, io_timeout=self.SHORT_TIME_OUT,
         grace_period=self.SHORT_TIME_OUT)
-    self.assertEqual(sig, self._run(details))
+    self.assertEqual(sig, self._run_command(details))
 
   def test_hard_signal_no_grace(self):
     exit_code = 1 if sys.platform == 'win32' else -signal.SIGKILL
@@ -584,7 +603,7 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
         self.SCRIPT_SIGNAL_HANG, hard_timeout=self.SHORT_TIME_OUT,
         grace_period=self.SHORT_TIME_OUT)
     # Returns 0 because the process cleaned up itself.
-    self.assertEqual(exit_code, self._run(details))
+    self.assertEqual(exit_code, self._run_command(details))
 
   def test_io_signal_no_grace(self):
     exit_code = 1 if sys.platform == 'win32' else -signal.SIGKILL
@@ -596,7 +615,69 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
         self.SCRIPT_SIGNAL_HANG, io_timeout=self.SHORT_TIME_OUT,
         grace_period=self.SHORT_TIME_OUT)
     # Returns 0 because the process cleaned up itself.
-    self.assertEqual(exit_code, self._run(details))
+    self.assertEqual(exit_code, self._run_command(details))
+
+  def test_grand_children(self):
+    # Uses load_and_run()
+    data = [
+      ('http://localhost:1/foo.zip', 'ignored'),
+    ]
+    parent = (
+      'import subprocess, sys\n'
+      'sys.exit(subprocess.call([sys.executable, \'-u\', \'children.py\']))\n')
+    children = (
+      'import subprocess, sys\n'
+      'sys.exit(subprocess.call('
+          '[sys.executable, \'-u\', \'grand_children.py\']))\n')
+    grand_children = 'print \'hi\''
+
+    requests = self.gen_requests(exit_code=0, output='hi\n')
+    requests.append(
+      (
+        'http://localhost:1/foo.zip',
+        {},
+        compress_to_zip(
+            {'children.py': children, 'grand_children.py': grand_children}),
+        None,
+      ))
+    self.expected_requests(requests)
+
+    manifest = self.get_manifest(parent, data=data)
+    self.assertEqual(True, self._load_and_run(manifest))
+
+  def test_hard_signal_no_grace_grand_children(self):
+    # Uses load_and_run()
+    # Actually 0xc000013a
+    exit_code = -1073741510 if sys.platform == 'win32' else -signal.SIGTERM
+
+    data = [
+      ('http://localhost:1/foo.zip', 'ignored'),
+    ]
+    parent = (
+      'import subprocess, sys\n'
+      'sys.exit(subprocess.call([sys.executable, \'-u\', \'children.py\']))\n')
+    children = (
+      'import subprocess, sys\n'
+      'sys.exit(subprocess.call('
+          '[sys.executable, \'-u\', \'grand_children.py\']))\n')
+    grand_children = self.SCRIPT_SIGNAL_HANG
+
+    requests = self.gen_requests(
+        hard_timeout=True, exit_code=exit_code, output='hi\n')
+    requests.append(
+      (
+        'http://localhost:1/foo.zip',
+        {},
+        compress_to_zip(
+            {'children.py': children, 'grand_children.py': grand_children}),
+        None,
+      ))
+    self.expected_requests(requests)
+
+    manifest = self.get_manifest(
+        parent, hard_timeout=self.SHORT_TIME_OUT,
+        grace_period=self.SHORT_TIME_OUT, data=data)
+    self.assertEqual(False, self._load_and_run(manifest))
 
 
 if __name__ == '__main__':
