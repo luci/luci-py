@@ -69,7 +69,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
         [u'bot_version', u'server_version', u'xsrf_token'], sorted(response))
     self.assertTrue(response['xsrf_token'])
     self.assertEqual(40, len(response['bot_version']))
-    self.assertEqual(u'default-version', response['server_version'])
+    self.assertEqual(u'v1a', response['server_version'])
     self.assertEqual([], errors)
 
   def test_handshake_minimum(self):
@@ -86,7 +86,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
         [u'bot_version', u'server_version', u'xsrf_token'], sorted(response))
     self.assertTrue(response['xsrf_token'])
     self.assertEqual(40, len(response['bot_version']))
-    self.assertEqual(u'default-version', response['server_version'])
+    self.assertEqual(u'v1a', response['server_version'])
     expected = [
       'Quarantined Bot\nhttps://None/restricted/bot/None\n'
         'Unexpected keys missing: [u\'dimensions\', u\'state\', u\'version\']; '
@@ -120,7 +120,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
         [u'bot_version', u'server_version', u'xsrf_token'], sorted(response))
     self.assertTrue(response['xsrf_token'])
     self.assertEqual(40, len(response['bot_version']))
-    self.assertEqual(u'default-version', response['server_version'])
+    self.assertEqual(u'v1a', response['server_version'])
     expected = [
       u'Quarantined Bot\nhttps://None/restricted/bot/bot1\n'
         u'Unexpected keys superfluous: [u\'foo\']; did you make a typo?',
@@ -259,7 +259,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
       u'id': u'5cee488008811',
       u'internal_failure': False,
       u'modified_ts': str_now,
-      u'server_versions': [u'default-version'],
+      u'server_versions': [u'v1a'],
       u'started_ts': str_now,
       u'state': task_result.State.RUNNING,
       u'try_number': 1,
@@ -384,7 +384,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
         u'id': u'5cee488008811',
         u'internal_failure': False,
         u'modified_ts': str_now,
-        u'server_versions': [u'default-version'],
+        u'server_versions': [u'v1a'],
         u'started_ts': str_now,
         u'state': task_result.State.RUNNING,
         u'try_number': 1,
@@ -526,7 +526,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
       u'id': u'5cee488008811',
       u'internal_failure': False,
       u'modified_ts': str_now,
-      u'server_versions': [u'default-version'],
+      u'server_versions': [u'v1a'],
       u'started_ts': str_now,
       u'state': task_result.State.COMPLETED,
       u'try_number': 1,
@@ -574,7 +574,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
       u'id': u'5cee488008811',
       u'internal_failure': True,
       u'modified_ts': str_now,
-      u'server_versions': [u'default-version'],
+      u'server_versions': [u'v1a'],
       u'started_ts': str_now,
       u'state': task_result.State.BOT_DIED,
       u'try_number': 1,

@@ -11,17 +11,12 @@ import sys
 import time
 import unittest
 
-# Import os_utilities first before manipulating sys.path to ensure it can load
-# fine.
-import os_utilities
-
-ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, ROOT_DIR)
-
 import test_env
-test_env.setup_test_env_base()
+test_env.setup_test_env()
 
 from depot_tools import auto_stub
+
+import os_utilities
 
 VERBOSE = '-v' in sys.argv
 

@@ -18,34 +18,17 @@ import time
 import unittest
 import zipfile
 
-THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+import test_env
+test_env.setup_test_env()
 
-# Small hack to make it work on Windows even without symlink support.
-if os.path.isfile(os.path.join(THIS_DIR, 'utils')):
-  sys.path.insert(0, os.path.join(THIS_DIR, '..', '..', '..', 'client'))
+# Creates a server mock for functions in net.py.
+import net_utils
 
-
-# Import everything that does not require sys.path hack first.
 import logging_utils
 from utils import file_path
 from utils import subprocess42
 import task_runner
 import xsrf_client
-
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-ROOT_DIR = os.path.dirname(BASE_DIR)
-sys.path.insert(0, ROOT_DIR)
-
-import test_env
-test_env.setup_test_env()
-
-
-
-CLIENT_TESTS = os.path.join(ROOT_DIR, '..', '..', 'client', 'tests')
-sys.path.insert(0, CLIENT_TESTS)
-
-# Creates a server mock for functions in net.py.
-import net_utils
 
 
 def compress_to_zip(files):
@@ -65,7 +48,7 @@ class TestTaskRunnerBase(net_utils.TestCase):
     os.mkdir(self.work_dir)
 
   def tearDown(self):
-    os.chdir(BASE_DIR)
+    os.chdir(test_env.BOT_DIR)
     file_path.rmtree(self.root_dir)
     super(TestTaskRunnerBase, self).tearDown()
 

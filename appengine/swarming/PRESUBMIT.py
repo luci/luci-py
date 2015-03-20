@@ -58,6 +58,7 @@ def CommonChecks(input_api, output_api):
       r'.*_pb2\.py$',
     ]
     disabled_warnings = [
+      'relative-import',
     ]
     output.extend(input_api.canned_checks.RunPylint(
         input_api, output_api,

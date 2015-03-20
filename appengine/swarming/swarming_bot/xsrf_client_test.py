@@ -9,19 +9,13 @@ import sys
 import time
 import unittest
 
-ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, ROOT_DIR)
-
 import test_env
 test_env.setup_test_env()
 
-import xsrf_client # pylint: disable=W0403
-
-CLIENT_TESTS = os.path.join(ROOT_DIR, '..', '..', 'client', 'tests')
-sys.path.insert(0, CLIENT_TESTS)
-
 # Creates a server mock for functions in net.py.
 import net_utils
+
+import xsrf_client
 
 
 class UrlHelperTest(net_utils.TestCase):

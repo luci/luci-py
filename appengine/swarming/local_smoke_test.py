@@ -28,11 +28,12 @@ BOT_DIR = os.path.join(APP_DIR, 'swarming_bot')
 CLIENT_DIR = os.path.join(APP_DIR, '..', '..', 'client')
 sys.path.insert(0, APP_DIR)
 
-import test_env
-test_env.setup_test_env()
+from tool_support import gae_sdk_utils
+gae_sdk_utils.setup_gae_env()
+
+from tool_support import local_app
 
 from server import bot_archive
-from tool_support import local_app
 
 
 class LocalBot(object):

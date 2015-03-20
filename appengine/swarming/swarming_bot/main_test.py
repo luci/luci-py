@@ -13,8 +13,10 @@ import tempfile
 import unittest
 
 BOT_DIR = os.path.dirname(os.path.abspath(__file__))
-ROOT_DIR = os.path.dirname(BOT_DIR)
-sys.path.insert(0, ROOT_DIR)
+# swarming/ for bot_archive and to import GAE SDK. This is important to note
+# that this is the only test that needs the GAE SDK, due to the use of
+# bot_archive to ensure the .zip generated is valid.
+sys.path.insert(0, os.path.dirname(BOT_DIR))
 
 import test_env
 test_env.setup_test_env()
@@ -22,6 +24,7 @@ test_env.setup_test_env()
 from depot_tools import auto_stub
 
 from server import bot_archive
+
 import bot_main
 
 

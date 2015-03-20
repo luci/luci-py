@@ -75,7 +75,7 @@ class ClientApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(
         [u'server_version', u'xsrf_token'], sorted(response))
     self.assertTrue(response['xsrf_token'])
-    self.assertEqual(u'default-version', response['server_version'])
+    self.assertEqual(u'v1a', response['server_version'])
 
   def test_handshake_extra(self):
     errors = []
@@ -95,7 +95,7 @@ class ClientApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(
         [u'server_version', u'xsrf_token'], sorted(response))
     self.assertTrue(response['xsrf_token'])
-    self.assertEqual(u'default-version', response['server_version'])
+    self.assertEqual(u'v1a', response['server_version'])
     expected = [
       'Unexpected keys superfluous: [u\'foo\']; did you make a typo?',
     ]
@@ -317,7 +317,7 @@ class ClientApiTest(test_env_handlers.AppTestBase):
       u'id': u'5cee488008811',
       u'internal_failure': False,
       u'modified_ts': str_now,
-      u'server_versions': [u'default-version'],
+      u'server_versions': [u'v1a'],
       u'started_ts': str_now,
       u'state': task_result.State.RUNNING,
       u'try_number': 1,
@@ -500,7 +500,7 @@ class ClientApiTest(test_env_handlers.AppTestBase):
       u'modified_ts': now_str,
       u'name': u'first',
       u'properties_hash': u'b59e9e3dc6bfd585ea3b2adb084b0ed811ba002b',
-      u'server_versions': [u'default-version'],
+      u'server_versions': [u'v1a'],
       u'started_ts': now_str,
       u'state': task_result.State.COMPLETED,
       u'try_number': 1,
@@ -524,7 +524,7 @@ class ClientApiTest(test_env_handlers.AppTestBase):
       u'modified_ts': now_60_str,
       u'name': u'second',
       u'properties_hash': None,
-      u'server_versions': [u'default-version'],
+      u'server_versions': [u'v1a'],
       u'started_ts': now_str,
       u'state': task_result.State.COMPLETED,
       u'try_number': 0,
@@ -753,7 +753,7 @@ class ClientApiTest(test_env_handlers.AppTestBase):
           u'id': u'5cee870005511',
           u'internal_failure': False,
           u'modified_ts': now_1_str,
-          u'server_versions': [u'default-version'],
+          u'server_versions': [u'v1a'],
           u'started_ts': now_1_str,
           u'state': task_result.State.COMPLETED,
           u'try_number': 1,
@@ -783,7 +783,7 @@ class ClientApiTest(test_env_handlers.AppTestBase):
           u'id': u'5cee488008811',
           u'internal_failure': False,
           u'modified_ts': now_str,
-          u'server_versions': [u'default-version'],
+          u'server_versions': [u'v1a'],
           u'started_ts': now_str,
           u'state': task_result.State.COMPLETED,
           u'try_number': 1,

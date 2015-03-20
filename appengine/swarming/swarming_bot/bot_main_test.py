@@ -12,36 +12,22 @@ import tempfile
 import time
 import unittest
 
-THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+THIS_FILE = os.path.abspath(__file__)
 
-# Small hack to make it work on Windows even without symlink support.
-if os.path.isfile(os.path.join(THIS_DIR, 'utils')):
-  sys.path.insert(0, os.path.join(THIS_DIR, '..', '..', '..', 'client'))
+import test_env
+test_env.setup_test_env()
 
-# Import them first before manipulating sys.path to ensure they can load fine.
+# Creates a server mock for functions in net.py.
+import net_utils
+
+from utils import net
+from utils import zip_package
+import bot
+import bot_config
 import bot_main
 import logging_utils
 import os_utilities
 import xsrf_client
-from utils import net
-from utils import zip_package
-
-THIS_FILE = os.path.abspath(__file__)
-BASE_DIR = os.path.dirname(THIS_FILE)
-ROOT_DIR = os.path.dirname(BASE_DIR)
-sys.path.insert(0, ROOT_DIR)
-
-import test_env
-
-test_env.setup_test_env()
-
-CLIENT_TESTS = os.path.join(ROOT_DIR, '..', '..', 'client', 'tests')
-sys.path.insert(0, CLIENT_TESTS)
-
-import bot
-import bot_config
-# Creates a server mock for functions in net.py.
-import net_utils
 
 
 # Access to a protected member XX of a client class - pylint: disable=W0212

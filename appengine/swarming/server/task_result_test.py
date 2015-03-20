@@ -10,9 +10,6 @@ import random
 import sys
 import unittest
 
-ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, ROOT_DIR)
-
 import test_env
 test_env.setup_test_env()
 
@@ -72,7 +69,7 @@ class TestCase(test_case.TestCase):
 
 
 class TaskResultApiTest(TestCase):
-  APP_DIR = ROOT_DIR
+  APP_DIR = test_env.APP_DIR
 
   def setUp(self):
     super(TaskResultApiTest, self).setUp()
@@ -189,7 +186,7 @@ class TaskResultApiTest(TestCase):
       'id': '1d69b9f088008811',
       'internal_failure': False,
       'modified_ts': None,
-      'server_versions': ['default-version'],
+      'server_versions': ['v1a'],
       'started_ts': self.now,
       'state': task_result.State.RUNNING,
       'try_number': 1,
@@ -264,7 +261,7 @@ class TaskResultApiTest(TestCase):
       'modified_ts': reap_ts,
       'name': u'Request name',
       'properties_hash': None,
-      'server_versions': [u'default-version'],
+      'server_versions': [u'v1a'],
       'started_ts': reap_ts,
       'state': task_result.State.RUNNING,
       'try_number': 1,
@@ -302,7 +299,7 @@ class TaskResultApiTest(TestCase):
       'modified_ts': complete_ts,
       'name': u'Request name',
       'properties_hash': None,
-      'server_versions': [u'default-version'],
+      'server_versions': [u'v1a'],
       'started_ts': reap_ts,
       'state': task_result.State.COMPLETED,
       'try_number': 1,
@@ -382,11 +379,9 @@ class TaskResultApiTest(TestCase):
     result_summary.set_from_run_result(run_result, request)
     ndb.transaction(lambda: ndb.put_multi((result_summary, run_result)))
     self.assertEqual(
-        ['default-version', 'new-version'],
-        run_result.key.get().server_versions)
+        ['v1a', 'new-version'], run_result.key.get().server_versions)
     self.assertEqual(
-        ['default-version', 'new-version'],
-        result_summary.key.get().server_versions)
+        ['v1a', 'new-version'], result_summary.key.get().server_versions)
 
   def test_set_from_run_result_two_tries(self):
     request = task_request.make_request(_gen_request_data())
@@ -460,7 +455,7 @@ class TaskResultApiTest(TestCase):
 
 
 class TestOutput(TestCase):
-  APP_DIR = ROOT_DIR
+  APP_DIR = test_env.APP_DIR
 
   def setUp(self):
     super(TestOutput, self).setUp()

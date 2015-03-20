@@ -11,9 +11,6 @@ import random
 import sys
 import unittest
 
-ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, ROOT_DIR)
-
 import test_env
 test_env.setup_test_env()
 
@@ -38,6 +35,7 @@ from server import task_result
 from server import task_scheduler
 from server import task_to_run
 from server.task_result import State
+
 
 # pylint: disable=W0212,W0612
 
@@ -93,7 +91,7 @@ def _quick_reap():
 
 
 class TaskSchedulerApiTest(test_case.TestCase):
-  APP_DIR = ROOT_DIR
+  APP_DIR = test_env.APP_DIR
 
   def setUp(self):
     super(TaskSchedulerApiTest, self).setUp()
@@ -233,7 +231,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'name': u'yay',
       # A deduped task cannot be deduped against.
       'properties_hash': None,
-      'server_versions': [u'default-version'],
+      'server_versions': [u'v1a'],
       'started_ts': now or self.now,
       'state': State.COMPLETED,
       'try_number': 0,
@@ -398,7 +396,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'modified_ts': reaped_ts,
       'name': u'Request name',
       'properties_hash': None,
-      'server_versions': [u'default-version'],
+      'server_versions': [u'v1a'],
       'started_ts': reaped_ts,
       'state': State.RUNNING,
       'try_number': 1,
@@ -419,7 +417,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
         'id': '1d69b9f088008811',
         'internal_failure': False,
         'modified_ts': reaped_ts,
-        'server_versions': [u'default-version'],
+        'server_versions': [u'v1a'],
         'started_ts': reaped_ts,
         'state': State.RUNNING,
         'try_number': 1,
@@ -458,7 +456,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'modified_ts': done_ts,
       'name': u'Request name',
       'properties_hash': None,
-      'server_versions': [u'default-version'],
+      'server_versions': [u'v1a'],
       'started_ts': reaped_ts,
       'state': State.COMPLETED,
       'try_number': 1,
@@ -479,7 +477,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
         'id': '1d69b9f088008811',
         'internal_failure': False,
         'modified_ts': done_ts,
-        'server_versions': [u'default-version'],
+        'server_versions': [u'v1a'],
         'started_ts': reaped_ts,
         'state': State.COMPLETED,
         'try_number': 1,
@@ -520,7 +518,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'modified_ts': self.now,
       'name': u'Request name',
       'properties_hash': None,
-      'server_versions': [u'default-version'],
+      'server_versions': [u'v1a'],
       'started_ts': self.now,
       'state': State.COMPLETED,
       'try_number': 1,
@@ -542,7 +540,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
         'id': '1d69b9f088008811',
         'internal_failure': False,
         'modified_ts': self.now,
-        'server_versions': [u'default-version'],
+        'server_versions': [u'v1a'],
         'started_ts': self.now,
         'state': State.COMPLETED,
         'try_number': 1,
@@ -625,7 +623,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'modified_ts': self.now,
       'name': u'Request name',
       'properties_hash': None,
-      'server_versions': [u'default-version'],
+      'server_versions': [u'v1a'],
       'started_ts': self.now,
       'state': State.TIMED_OUT,
       'try_number': 1,
@@ -646,7 +644,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'id': '1d69b9f088008811',
       'internal_failure': False,
       'modified_ts': self.now,
-      'server_versions': [u'default-version'],
+      'server_versions': [u'v1a'],
       'started_ts': self.now,
       'state': State.TIMED_OUT,
       'try_number': 1,
@@ -688,7 +686,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'modified_ts': self.now,
       'name': u'Request name',
       'properties_hash': None,
-      'server_versions': [u'default-version'],
+      'server_versions': [u'v1a'],
       'started_ts': self.now,
       'state': State.BOT_DIED,
       'try_number': 1,
@@ -708,7 +706,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'id': '1d69b9f088008811',
       'internal_failure': True,
       'modified_ts': self.now,
-      'server_versions': [u'default-version'],
+      'server_versions': [u'v1a'],
       'started_ts': self.now,
       'state': State.BOT_DIED,
       'try_number': 1,
@@ -832,7 +830,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'modified_ts': abandoned_ts,
       'name': u'Request name',
       'properties_hash': None,
-      'server_versions': [u'default-version'],
+      'server_versions': [u'v1a'],
       'started_ts': self.now,
       'state': task_result.State.BOT_DIED,
       'try_number': 1,
@@ -874,7 +872,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'id': '1d69b9f088008811',
       'internal_failure': True,
       'modified_ts': now_1,
-      'server_versions': [u'default-version'],
+      'server_versions': [u'v1a'],
       'started_ts': self.now,
       'state': task_result.State.BOT_DIED,
       'try_number': 1,
@@ -898,7 +896,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'modified_ts': now_1,
       'name': u'Request name',
       'properties_hash': None,
-      'server_versions': [u'default-version'],
+      'server_versions': [u'v1a'],
       'started_ts': None,
       'state': task_result.State.PENDING,
       'try_number': 1,
@@ -935,7 +933,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'modified_ts': now_2,
       'name': u'Request name',
       'properties_hash': None,
-      'server_versions': [u'default-version'],
+      'server_versions': [u'v1a'],
       'started_ts': now_2,
       'state': task_result.State.COMPLETED,
       'try_number': 2,
@@ -978,7 +976,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'id': '1d69b9f088008811',
       'internal_failure': True,
       'modified_ts': now_1,
-      'server_versions': [u'default-version'],
+      'server_versions': [u'v1a'],
       'started_ts': self.now,
       'state': task_result.State.BOT_DIED,
       'try_number': 1,
@@ -1002,7 +1000,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'modified_ts': now_1,
       'name': u'Request name',
       'properties_hash': None,
-      'server_versions': [u'default-version'],
+      'server_versions': [u'v1a'],
       'started_ts': None,
       'state': task_result.State.PENDING,
       'try_number': 1,
@@ -1062,7 +1060,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'modified_ts': now_2,
       'name': u'Request name',
       'properties_hash': None,
-      'server_versions': [u'default-version'],
+      'server_versions': [u'v1a'],
       'started_ts': now_1,
       'state': task_result.State.BOT_DIED,
       'try_number': 2,

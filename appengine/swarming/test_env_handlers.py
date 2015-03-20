@@ -8,8 +8,6 @@
 import base64
 import os
 
-APP_DIR = os.path.dirname(os.path.abspath(__file__))
-
 import test_env
 test_env.setup_test_env()
 
@@ -27,7 +25,7 @@ from server import stats
 
 
 class AppTestBase(test_case.TestCase):
-  APP_DIR = APP_DIR
+  APP_DIR = test_env.APP_DIR
 
   def setUp(self):
     super(AppTestBase, self).setUp()
