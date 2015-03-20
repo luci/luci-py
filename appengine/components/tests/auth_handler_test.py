@@ -421,47 +421,6 @@ class CookieAuthenticationTest(test_case.TestCase):
         handler.cookie_authentication(webapp2.Request({})))
 
 
-class OAuthAuthenticationTest(test_case.TestCase):
-  """Tests for oauth_authentication."""
-
-  @staticmethod
-  def make_request():
-    return webapp2.Request({'HTTP_AUTHORIZATION': 'Bearer 123'})
-
-  def mock_allowed_client_id(self, client_id):
-    auth_db = api.AuthDB(
-        global_config=model.AuthGlobalConfig(oauth_client_id=client_id))
-    self.mock(handler.api, 'get_request_auth_db', lambda: auth_db)
-
-  def test_non_applicable(self):
-    self.assertIsNone(handler.oauth_authentication(webapp2.Request({})))
-
-  def test_applicable(self):
-    self.mock_allowed_client_id('allowed-client-id')
-    self.mock(oauth, 'get_client_id', lambda _arg: 'allowed-client-id')
-    self.mock(oauth, 'get_current_user',
-        lambda _arg: users.User(email='joe@example.com'))
-    self.assertEqual(
-        model.Identity(model.IDENTITY_USER, 'joe@example.com'),
-        handler.oauth_authentication(self.make_request()))
-
-  def test_bad_token(self):
-    def mocked_get_client_id(_arg):
-      raise oauth.NotAllowedError()
-    self.mock(oauth, 'get_client_id', mocked_get_client_id)
-
-    with self.assertRaises(api.AuthenticationError):
-      handler.oauth_authentication(self.make_request())
-
-  def test_not_allowed_client_id(self):
-    self.mock_allowed_client_id('good-client-id')
-    self.mock(oauth, 'get_client_id', lambda _arg: 'bad-client-id')
-    self.mock(oauth, 'get_current_user',
-        lambda _arg: users.User(email='joe@example.com'))
-    with self.assertRaises(api.AuthorizationError):
-      handler.oauth_authentication(self.make_request())
-
-
 class ServiceToServiceAuthenticationTest(test_case.TestCase):
   """Tests for service_to_service_authentication."""
 
