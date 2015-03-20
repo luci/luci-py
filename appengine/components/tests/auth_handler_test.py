@@ -14,19 +14,18 @@ import unittest
 import test_env
 test_env.setup_test_env()
 
-import webapp2
-import webtest
-
 from google.appengine.api import oauth
 from google.appengine.api import users
 
-from test_support import test_case
+import webapp2
+import webtest
 
 from components.auth import api
 from components.auth import handler
 from components.auth import host_token
 from components.auth import ipaddr
 from components.auth import model
+from test_support import test_case
 
 
 class AuthenticatingHandlerMetaclassTest(test_case.TestCase):

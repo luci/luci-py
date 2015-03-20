@@ -17,7 +17,7 @@ def FindAppEngineSDK(input_api):
     # Add '.' to sys.path to be able to
     # 'from tool_support import gae_sdk_utils'.
     sys.path = [input_api.PresubmitLocalPath()] + sys.path
-    # pylint: disable=F0401
+    # pylint: disable=relative-import
     from tool_support import gae_sdk_utils
     return gae_sdk_utils.find_gae_sdk()
   finally:

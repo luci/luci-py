@@ -20,11 +20,10 @@ test_env.setup_test_env()
 
 from google.appengine.ext import ndb
 
-from test_support import test_case
-
 from components import auth
 from components import auth_testing
 from components.auth import model
+from test_support import test_case
 
 from common import importer
 

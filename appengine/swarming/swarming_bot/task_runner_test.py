@@ -27,18 +27,17 @@ if os.path.isfile(os.path.join(THIS_DIR, 'utils')):
 
 # Import everything that does not require sys.path hack first.
 import logging_utils
+from utils import subprocess42
 import task_runner
+import xsrf_client
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT_DIR = os.path.dirname(BASE_DIR)
 sys.path.insert(0, ROOT_DIR)
 
 import test_env
-
 test_env.setup_test_env()
 
-import xsrf_client
-from utils import subprocess42
 
 
 CLIENT_TESTS = os.path.join(ROOT_DIR, '..', '..', 'client', 'tests')

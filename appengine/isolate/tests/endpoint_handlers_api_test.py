@@ -17,30 +17,26 @@ ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 import test_env
 test_env.setup_test_env()
 
-import dev_appserver
-dev_appserver.fix_sys_path()
+from google.appengine.api import memcache
+from google.appengine.api import taskqueue
+from google.appengine.api import urlfetch
 
 import endpoints
 from protorpc.remote import protojson
-from test_support import test_case
-
 import webapp2
 import webtest
 
 from components import auth_testing
 from components import utils
-import config
+from test_support import test_case
 
+import config
 import endpoint_handlers_api
 from endpoint_handlers_api import DigestCollection
 from endpoint_handlers_api import UPLOAD_MESSAGES
 import gcs
 import handlers_backend
 import model
-
-from google.appengine.api import memcache
-from google.appengine.api import taskqueue
-from google.appengine.api import urlfetch
 
 
 def make_private_key():

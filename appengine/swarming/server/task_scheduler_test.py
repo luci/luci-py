@@ -15,7 +15,6 @@ ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT_DIR)
 
 import test_env
-
 test_env.setup_test_env()
 
 from google.appengine.api import datastore_errors
@@ -23,13 +22,14 @@ from google.appengine.api import search
 from google.appengine.ext import deferred
 from google.appengine.ext import ndb
 
-# From tools/third_party/
 import webtest
 
 from components import auth_testing
 from components import datastore_utils
 from components import stats_framework
 from components import utils
+from test_support import test_case
+
 from server import config
 from server import stats
 from server import task_pack
@@ -37,8 +37,6 @@ from server import task_request
 from server import task_result
 from server import task_scheduler
 from server import task_to_run
-from test_support import test_case
-
 from server.task_result import State
 
 # pylint: disable=W0212,W0612

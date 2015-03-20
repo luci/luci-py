@@ -10,8 +10,8 @@ import unittest
 import test_env
 test_env.setup_test_env()
 
-from test_support import test_case
 from components.auth import host_token
+from test_support import test_case
 
 
 class HostTokenTest(test_case.TestCase):

@@ -9,8 +9,8 @@ import unittest
 import test_env
 test_env.setup_test_env()
 
-from test_support import test_case
 from components.auth import ipaddr
+from test_support import test_case
 
 
 class IpAddrTest(test_case.TestCase):

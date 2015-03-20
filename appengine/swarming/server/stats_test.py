@@ -12,11 +12,11 @@ ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT_DIR)
 
 import test_env
-
 test_env.setup_test_env()
 
-from server import stats
 from test_support import test_case
+
+from server import stats
 
 
 # pylint: disable=W0212

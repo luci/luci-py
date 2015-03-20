@@ -17,17 +17,15 @@ test_env.setup_test_env()
 import webapp2
 import webtest
 
-from test_support import test_case
 from components import utils
-
 from components.auth import api
 from components.auth import handler
 from components.auth import host_token
 from components.auth import model
 from components.auth import version
-
 from components.auth.ui import rest_api
 from components.auth.ui import ui
+from test_support import test_case
 
 
 def call_get(request_handler, uri=None, **kwargs):

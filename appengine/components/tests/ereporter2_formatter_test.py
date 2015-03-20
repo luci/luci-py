@@ -12,9 +12,8 @@ import unittest
 import test_env
 test_env.setup_test_env()
 
-from test_support import test_case
-
 from components.ereporter2 import formatter
+from test_support import test_case
 
 
 # Access to a protected member XXX of a client class - pylint: disable=W0212

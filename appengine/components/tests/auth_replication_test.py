@@ -12,11 +12,10 @@ test_env.setup_test_env()
 
 from google.appengine.ext import ndb
 
-from test_support import test_case
 from components import utils
-
 from components.auth import model
 from components.auth import replication
+from test_support import test_case
 
 
 def entity_to_dict(e):

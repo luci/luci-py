@@ -9,10 +9,10 @@ Implicitly depends on auto_stub.
 
 import datetime
 
+import webtest
+
 from components import stats_framework
 from components import utils
-
-import webtest
 
 
 class RequestLog(object):

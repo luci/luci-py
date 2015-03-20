@@ -14,13 +14,13 @@ ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT_DIR)
 
 import test_env
-
 test_env.setup_test_env()
 
 from google.appengine.ext import ndb
 
-from server import bot_management
 from test_support import test_case
+
+from server import bot_management
 
 
 class BotManagementTest(test_case.TestCase):

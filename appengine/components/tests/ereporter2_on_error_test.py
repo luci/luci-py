@@ -15,8 +15,6 @@ import test_env
 test_env.setup_test_env()
 
 import webapp2
-
-# From components/third_party/
 import webtest
 
 from components import auth

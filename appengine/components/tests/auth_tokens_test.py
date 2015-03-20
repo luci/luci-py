@@ -11,10 +11,9 @@ import unittest
 import test_env
 test_env.setup_test_env()
 
-from test_support import test_case
-
-from components.auth import tokens
 from components.auth import api
+from components.auth import tokens
+from test_support import test_case
 
 
 URL_SAFE_ALPHABET = set(string.letters + string.digits + '-_')

@@ -17,11 +17,10 @@ test_env.setup_test_env()
 
 from google.appengine.ext import ndb
 
-from test_support import test_case
-
 from components.auth import api
 from components.auth import ipaddr
 from components.auth import model
+from test_support import test_case
 
 
 class AuthDBTest(test_case.TestCase):

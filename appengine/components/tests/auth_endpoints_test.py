@@ -13,13 +13,12 @@ import endpoints
 from protorpc import messages
 from protorpc import remote
 
-from test_support import test_case
-
 from components.auth import api
 from components.auth import endpoints_support
 from components.auth import host_token
 from components.auth import ipaddr
 from components.auth import model
+from test_support import test_case
 
 
 class EndpointsAuthTest(test_case.TestCase):

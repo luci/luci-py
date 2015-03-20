@@ -13,17 +13,14 @@ APP_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 import test_env
 test_env.setup_test_env()
 
-# From components/third_party/
 import webtest
 
 from components import auth_testing
 from components import template
-
 from test_support import test_case
 
 from common import importer
 from common import replication
-
 from frontend import handlers
 
 

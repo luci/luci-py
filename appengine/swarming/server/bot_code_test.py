@@ -18,13 +18,13 @@ ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT_DIR)
 
 import test_env
-
 test_env.setup_test_env()
 
 from components import auth
+from test_support import test_case
+
 from server import bot_archive
 from server import bot_code
-from test_support import test_case
 
 
 class BotManagementTest(test_case.TestCase):

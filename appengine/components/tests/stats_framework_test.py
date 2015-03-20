@@ -12,10 +12,10 @@ import unittest
 import test_env
 test_env.setup_test_env()
 
+from google.appengine.ext import ndb
+
 import webapp2
 import webtest
-
-from google.appengine.ext import ndb
 
 from components import stats_framework
 from components import utils

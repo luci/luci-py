@@ -14,7 +14,6 @@ ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT_DIR)
 
 import test_env
-
 test_env.setup_test_env()
 
 from google.appengine.api import datastore_errors
@@ -22,9 +21,11 @@ from google.appengine.ext import ndb
 
 from components import auth_testing
 from components import utils
+from test_support import test_case
+
 from server import task_pack
 from server import task_request
-from test_support import test_case
+
 
 # pylint: disable=W0212
 

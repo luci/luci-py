@@ -14,10 +14,9 @@ ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 import test_env
 test_env.setup_test_env()
 
-# From components/third_party/
-import webtest
-
 from google.appengine.ext import ndb
+
+import webtest
 
 from components import auth
 from components import auth_testing

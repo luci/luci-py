@@ -15,7 +15,6 @@ def FindAppEngineSDK(input_api):
   old_sys_path = sys.path
   try:
     sys.path = [input_api.PresubmitLocalPath()] + sys.path
-    # pylint: disable=F0401
     from tool_support import gae_sdk_utils
     return gae_sdk_utils.find_gae_sdk()
   finally:

@@ -17,11 +17,11 @@ from google.appengine.ext import ndb
 
 import webtest
 
-from test_support import test_case
-
 from components import auth
 from components import auth_testing
 from components import stats_framework
+from test_support import test_case
+
 from server import acl
 from server import stats
 

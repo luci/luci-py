@@ -13,12 +13,10 @@ import unittest
 import test_env
 test_env.setup_test_env()
 
-import webapp2
-
 from google.appengine.api import logservice
 from google.appengine.api import users
 
-# From components/third_party/
+import webapp2
 import webtest
 
 from components import auth

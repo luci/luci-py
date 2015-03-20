@@ -10,15 +10,15 @@ import unittest
 import test_env
 test_env.setup_test_env()
 
-# From components/third_party/
+import webapp2
 import webtest
 
-import webapp2
-
-import stats
 from components import stats_framework
 from test_support import stats_framework_mock
 from test_support import test_case
+
+import stats
+
 
 # pylint: disable=R0201
 
