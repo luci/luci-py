@@ -22,7 +22,7 @@ import urllib
 import urllib2
 import zlib
 
-import test_env  # pylint: disable=W0611
+from test_support import test_env  # pylint: disable=W0611
 test_env.setup_test_env()
 
 from rietveld import upload

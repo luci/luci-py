@@ -12,8 +12,6 @@ import sys
 import unittest
 from Crypto.PublicKey import RSA
 
-ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
 import test_env
 test_env.setup_test_env()
 
@@ -124,9 +122,9 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
 
   api_service_cls = endpoint_handlers_api.IsolateService
   gs_prefix = 'localhost:80/content-gs/store/'
-  store_prefix = 'https://isolateserver-dev.storage.googleapis.com/'
+  store_prefix = 'https://sample-app.storage.googleapis.com/'
 
-  APP_DIR = ROOT_DIR
+  APP_DIR = test_env.APP_DIR
 
   def setUp(self):
     super(IsolateServiceTest, self).setUp()

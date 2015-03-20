@@ -11,8 +11,6 @@ import time
 import unittest
 import urllib
 
-ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
 import test_env
 test_env.setup_test_env()
 
@@ -53,7 +51,7 @@ def gen_item(content):
 
 class MainTest(test_case.TestCase):
   """Tests the handlers."""
-  APP_DIR = ROOT_DIR
+  APP_DIR = test_env.APP_DIR
 
   def setUp(self):
     """Creates a new app instance for every test case."""
@@ -107,7 +105,7 @@ class MainTest(test_case.TestCase):
     deleted = []
     def delete_files(bucket, files, ignore_missing=False):
       # pylint: disable=W0613
-      self.assertEquals('isolateserver-dev', bucket)
+      self.assertEquals('sample-app', bucket)
       deleted.extend(files)
       return []
     self.mock(gcs, 'delete_files', delete_files)

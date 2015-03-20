@@ -9,8 +9,6 @@ import os
 import sys
 import unittest
 
-ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
 import test_env
 test_env.setup_test_env()
 
@@ -37,7 +35,7 @@ import stats
 
 class MainTest(test_case.TestCase):
   """Tests the handlers."""
-  APP_DIR = ROOT_DIR
+  APP_DIR = test_env.APP_DIR
 
   def setUp(self):
     """Creates a new app instance for every test case."""

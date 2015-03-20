@@ -60,12 +60,27 @@ def CommonChecks(input_api, output_api):
   finally:
     sys.path = old_sys_path
 
-  # TODO(maruel): Create a smoke test that use local servers.
-  tests = input_api.canned_checks.GetUnitTestsInDirectory(
-      input_api, output_api,
-      join('tests'),
-      whitelist=[r'.+_test\.py$'],
-      blacklist=[r'.+_smoke_test\.py$'])
+  test_directories = [
+    input_api.PresubmitLocalPath(),
+  ]
+
+  blacklist = [
+    # Never run the remote_smoke_test automatically. Should instead be run after
+    # uploading a server instance.
+    r'^remote_smoke_test\.py$'
+  ]
+  if not input_api.is_committing:
+    # Skip smoke tests on upload.
+    blacklist.append(r'.+_smoke_test\.py$')
+
+  tests = []
+  for directory in test_directories:
+    tests.extend(
+        input_api.canned_checks.GetUnitTestsInDirectory(
+            input_api, output_api,
+            directory,
+            whitelist=[r'.+_test\.py$'],
+            blacklist=blacklist))
   output.extend(input_api.RunTests(tests, parallel=True))
   return output
 
