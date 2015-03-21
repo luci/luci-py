@@ -15,25 +15,21 @@ import sys
 import time
 import unittest
 
-
-# /appengine/auth_service/tests/.
-THIS_DIR = os.path.dirname(os.path.abspath(__file__))
-# service/auth_service/
-SERVICE_APP_DIR = os.path.dirname(THIS_DIR)
-# /appengine/auth_service/tests/replica_app/.
-REPLICA_APP_DIR = os.path.join(THIS_DIR, 'replica_app')
-
-# Add /appengine/components/ directory, to import 'support'.
-sys.path.append(os.path.join(os.path.dirname(SERVICE_APP_DIR), 'components'))
-
 from tool_support import gae_sdk_utils
 from tool_support import local_app
+
+# /appengine/auth_service/common/.
+THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+# /appengine/auth_service/.
+APP_DIR = os.path.dirname(THIS_DIR)
+# /appengine/auth_service/common/test_replica_app/.
+REPLICA_APP_DIR = os.path.join(THIS_DIR, 'test_replica_app')
 
 
 class ReplicationTest(unittest.TestCase):
   def setUp(self):
     super(ReplicationTest, self).setUp()
-    self.auth_service = local_app.LocalApplication(SERVICE_APP_DIR, 9500)
+    self.auth_service = local_app.LocalApplication(APP_DIR, 9500)
     self.replica = local_app.LocalApplication(REPLICA_APP_DIR, 9600)
     # Launch both first, only then wait for them to come online.
     apps = [self.auth_service, self.replica]
@@ -246,12 +242,7 @@ class ReplicationTest(unittest.TestCase):
 
 
 if __name__ == '__main__':
-  sdk_path = gae_sdk_utils.find_gae_sdk()
-  if not sdk_path:
-    print >> sys.stderr, 'Couldn\'t find GAE SDK.'
-    sys.exit(1)
-  gae_sdk_utils.setup_gae_sdk(sdk_path)
-
+  gae_sdk_utils.setup_gae_env()
   if '-v' in sys.argv:
     unittest.TestCase.maxDiff = None
     logging.basicConfig(level=logging.DEBUG)
