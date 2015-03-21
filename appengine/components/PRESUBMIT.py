@@ -14,10 +14,7 @@ def FindAppEngineSDK(input_api):
   import sys
   old_sys_path = sys.path
   try:
-    # Add '.' to sys.path to be able to
-    # 'from tool_support import gae_sdk_utils'.
     sys.path = [input_api.PresubmitLocalPath()] + sys.path
-    # pylint: disable=relative-import
     from tool_support import gae_sdk_utils
     return gae_sdk_utils.find_gae_sdk()
   finally:
@@ -51,12 +48,10 @@ def CommonChecks(input_api, output_api):
       r'.*_pb2\.py$',
     ]
     disabled_warnings = [
-      'E1101', # Instance X has no member Y
-      'W0232', # Class has no __init__ method
-
       # Pylint fails to recognize lazy module loading in components.auth.config,
       # no local disables work, so had to kill it globally.
       'cyclic-import',
+      'relative-import',
     ]
     output.extend(input_api.canned_checks.RunPylint(
         input_api, output_api,
@@ -65,14 +60,27 @@ def CommonChecks(input_api, output_api):
   finally:
     sys.path = old_sys_path
 
+  # Add the commented out directories when adding tests.
+  test_directories = [
+    join('components'),
+    join('components', 'auth'),
+    join('components', 'auth', 'ui'),
+    join('components', 'datastore_utils'),
+    join('components', 'ereporter2'),
+  ]
   blacklist = []
   if not input_api.is_committing:
+    # Skip smoke tests on upload.
     blacklist.append(r'.+_smoke_test\.py$')
-  tests = input_api.canned_checks.GetUnitTestsInDirectory(
-      input_api, output_api,
-      join('tests'),
-      whitelist=[r'.+_test\.py$'],
-      blacklist=blacklist)
+
+  tests = []
+  for directory in test_directories:
+    tests.extend(
+        input_api.canned_checks.GetUnitTestsInDirectory(
+            input_api, output_api,
+            directory,
+            whitelist=[r'.+_test\.py$'],
+            blacklist=blacklist))
   output.extend(input_api.RunTests(tests, parallel=True))
   return output
 

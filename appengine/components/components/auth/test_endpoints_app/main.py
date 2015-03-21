@@ -5,10 +5,10 @@
 # Pylint doesn't like endpoints.
 # pylint: disable=C0322,R0201
 
-import endpoints
 import os
 import sys
 
+import endpoints
 from protorpc import message_types
 from protorpc import messages
 from protorpc import remote

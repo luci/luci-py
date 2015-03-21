@@ -16,10 +16,8 @@ from tool_support import gae_sdk_utils
 from tool_support import local_app
 
 
-# /components/tests/.
 THIS_DIR = os.path.dirname(os.path.abspath(__file__))
-# /components/tests/endpoints_app/.
-TEST_APP_DIR = os.path.join(THIS_DIR, 'endpoints_app')
+TEST_APP_DIR = os.path.join(THIS_DIR, 'test_endpoints_app')
 
 
 class CloudEndpointsSmokeTest(unittest.TestCase):
