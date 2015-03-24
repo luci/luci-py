@@ -72,6 +72,10 @@ def CommonChecks(input_api, output_api):
   if not input_api.is_committing:
     # Skip smoke tests on upload.
     blacklist.append(r'.+_smoke_test\.py$')
+  else:
+    # 'tests' contains only smoke tests. Add it only when committing (otherwise
+    # depot_tools emits warning "Out of 4 files, found none that matched ...").
+    test_directories.append(join('tests'))
 
   tests = []
   for directory in test_directories:
