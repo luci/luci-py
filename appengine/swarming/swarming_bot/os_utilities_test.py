@@ -112,6 +112,8 @@ class TestOsUtilities(auto_stub.TestCase):
     # Only set on GCE.
     actual.discard('machine_type')
     actual.discard('zone')
+    # Only set on Mac.
+    actual.discard('hidpi')
     expected = set(['cores', 'cpu', 'gpu', 'id', 'os'])
     self.assertEqual(expected, actual)
 
