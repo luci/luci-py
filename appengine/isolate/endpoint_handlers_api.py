@@ -213,9 +213,10 @@ class IsolateService(remote.Service):
 
         response.items.append(status)
 
-    # tag existing entities and return new ones
+    # Tag existing entities and collect stats.
     self.tag_existing(DigestCollection(
         items=list(existing_digests), namespace=request.namespace))
+    stats.add_entry(stats.LOOKUP, len(request.items), len(existing_digests))
     return response
 
   @auth.endpoints_method(StorageRequest, PushPing)
@@ -233,12 +234,14 @@ class IsolateService(remote.Service):
     """Retrieves content from a storage location."""
     content = None
     key = None
+    offset = request.offset
 
     # try the memcache
     memcache_entry = memcache.get(
         request.digest, namespace='table_%s' % request.namespace.namespace)
     if memcache_entry is not None:
       content = memcache_entry
+      found = 'memcache'
 
     # try ndb
     else:
@@ -247,17 +250,27 @@ class IsolateService(remote.Service):
       if stored is None:
         raise endpoints.NotFoundException('Unable to retrieve the entry.')
       content = stored.content  # will be None if entity is in GCS
+      found = 'inline'
 
-    # return here if something has been found
+    # Return and log stats here if something has been found.
     if content is not None:
-      # make sure that request.offset is acceptable
-      if request.offset < 0 or request.offset > len(content):
+      # make sure that offset is acceptable
+      if offset < 0 or offset > len(content):
         raise endpoints.BadRequestException(
             'Invalid offset %d. Offset must be between 0 and content length.' %
-            request.offset)
-      return RetrievedContent(content=content[request.offset:])
+            offset)
+      stats.add_entry(stats.RETURN, len(content) - offset, found)
+      return RetrievedContent(content=content[offset:])
 
-    # TODO(cmassaro): what do we do about weird offsets in this case?
+    # The data is in GS; log stats and return the URL.
+    if offset < 0 or offset > stored.compressed_size:
+      raise endpoints.BadRequestException(
+          'Invalid offset %d. Offset must be between 0 and content length.' %
+          offset)
+    stats.add_entry(
+        stats.RETURN,
+        stored.compressed_size - offset,
+        'GS; %s' % stored.key.id())
     return RetrievedContent(url=self.gs_url_signer.get_download_url(
         filename=key.id(),
         expiration=DEFAULT_LINK_EXPIRATION))
