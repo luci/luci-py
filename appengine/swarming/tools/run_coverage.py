@@ -8,7 +8,6 @@ import sys
 
 APP_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(APP_DIR, '..', 'components'))
-sys.path.insert(0, os.path.join(APP_DIR, '..', 'third_party_local'))
 
 from tools import run_coverage
 

@@ -22,8 +22,6 @@ def setup_test_env():
   # For 'from components import ...' and 'from test_support import ...'.
   sys.path.insert(0, ROOT_DIR)
   sys.path.insert(0, os.path.join(ROOT_DIR, '..', 'third_party_local'))
-  # For depot_tools/auto_stub.py.
-  sys.path.insert(0, os.path.join(ROOT_DIR, 'third_party'))
 
   from tool_support import gae_sdk_utils
   gae_sdk_utils.setup_gae_env()
