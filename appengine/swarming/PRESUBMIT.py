@@ -47,11 +47,9 @@ def CommonChecks(input_api, output_api):
     appcfg.fix_sys_path()
     # Add project specific paths to sys.path
     sys.path = [
-      join('components', 'third_party'),
-      join('swarming_bot'),
       join('third_party'),
       join('..', 'components'),
-      join('..', 'components', 'third_party'),
+      join('..', 'third_party_local'),
       join('..', '..', 'client', 'tests'),
     ] + sys.path
     black_list = list(input_api.DEFAULT_BLACK_LIST) + [

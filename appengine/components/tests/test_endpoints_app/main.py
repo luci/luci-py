@@ -5,16 +5,10 @@
 # Pylint doesn't like endpoints.
 # pylint: disable=C0322,R0201
 
-import os
-import sys
-
 import endpoints
 from protorpc import message_types
 from protorpc import messages
 from protorpc import remote
-
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.join(BASE_DIR, 'components', 'third_party'))
 
 from components import auth
 

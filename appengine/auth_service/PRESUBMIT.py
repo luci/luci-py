@@ -41,11 +41,9 @@ def CommonChecks(input_api, output_api):
     appcfg.fix_sys_path()
     # Add project specific paths to sys.path
     sys.path = [
-      join('components', 'third_party'),
-      join('tests'),
       # See tests/test_env.py for more information.
       join('..', 'components'),
-      join('..', 'components', 'third_party'),
+      join('..', 'third_party_local'),
     ] + sys.path
     black_list = list(input_api.DEFAULT_BLACK_LIST) + [
       r'.*_pb2\.py$',

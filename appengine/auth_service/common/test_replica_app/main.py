@@ -2,12 +2,7 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
-import os
-import sys
 import webapp2
-
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.join(BASE_DIR, 'components', 'third_party'))
 
 from components import auth
 from components import utils

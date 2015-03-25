@@ -1,6 +1,0 @@
-This directory contains the services needed for a Swarming infrastructure.
-
-- auth_service/ contains the code for Authentication Server.
-- components/ contains the code shared by all servers.
-- isolate/ contains the code for the Isolate Server.
-- swarming/ contains the code for the Swarming Server.

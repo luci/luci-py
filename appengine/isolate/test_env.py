@@ -14,6 +14,8 @@ def setup_test_env():
   # For application modules.
   sys.path.insert(0, APP_DIR)
   sys.path.insert(0, os.path.join(APP_DIR, 'third_party'))
+  # TODO(maruel): Remove.
+  sys.path.insert(0, os.path.join(APP_DIR, 'components', 'third_party'))
 
   from test_support import test_env
   test_env.setup_test_env()

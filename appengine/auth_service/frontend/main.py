@@ -4,15 +4,9 @@
 
 """This module is the entry point to load the AppEngine instance."""
 
-import os
-import sys
-
 import endpoints
 
 from google.appengine.ext.appstats import recording
-
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, os.path.join(BASE_DIR, 'components', 'third_party'))
 
 from components import auth
 from components import ereporter2

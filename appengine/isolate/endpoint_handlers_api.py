@@ -17,7 +17,6 @@ import urllib
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(BASE_DIR, 'third_party'))
-sys.path.insert(0, os.path.join(BASE_DIR, 'components', 'third_party'))
 
 import endpoints
 from protorpc import message_types

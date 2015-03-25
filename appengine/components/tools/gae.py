@@ -33,7 +33,7 @@ while True:
 
 ROOT_DIR = os.path.dirname(os.path.dirname(SCRIPT_PATH))
 sys.path.insert(0, ROOT_DIR)
-sys.path.insert(0, os.path.join(ROOT_DIR, 'third_party'))
+sys.path.insert(0, os.path.join(ROOT_DIR, '..', 'third_party_local'))
 
 import colorama
 from depot_tools import subcommand
