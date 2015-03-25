@@ -141,6 +141,13 @@ def store_and_enqueue_verify_task(entry, task_queue_host):
   )
 
 
+def entry_key_or_error(namespace, digest):
+  try:
+    return model.entry_key(namespace, digest)
+  except ValueError as error:
+    raise endpoints.BadRequestException(error.message)
+
+
 ### API
 
 
@@ -204,7 +211,7 @@ class IsolateService(remote.Service):
 
         # generate GS upload URL if necessary
         if self.should_push_to_gs(digest_element):
-          key = model.entry_key(
+          key = entry_key_or_error(
               request.namespace.namespace, digest_element.digest)
           status.gs_upload_url = self.gs_url_signer.get_upload_url(
               filename=key.id(),
@@ -245,7 +252,7 @@ class IsolateService(remote.Service):
 
     # try ndb
     else:
-      key = model.entry_key(request.namespace.namespace, request.digest)
+      key = entry_key_or_error(request.namespace.namespace, request.digest)
       stored = key.get()
       if stored is None:
         raise endpoints.NotFoundException('Unable to retrieve the entry.')
@@ -301,7 +308,7 @@ class IsolateService(remote.Service):
     size = int(embedded['s'])
 
     # create a key
-    key = model.entry_key(namespace, digest)
+    key = entry_key_or_error(namespace, digest)
 
     # get content and compressed size
     if uploaded_to_gs:
@@ -400,12 +407,8 @@ class IsolateService(remote.Service):
     futures = {}
     for digest in entries.items:
       # check for error conditions
-      try:
-        key = model.entry_key(entries.namespace.namespace, digest.digest)
-      except (AssertionError, ValueError) as error:
-        raise endpoints.BadRequestException(error.message)
-      else:
-        futures[key.get_async(use_cache=False)] = digest
+      key = entry_key_or_error(entries.namespace.namespace, digest.digest)
+      futures[key.get_async(use_cache=False)] = digest
 
     # Pick first one that finishes and yield it, rinse, repeat.
     while futures:
