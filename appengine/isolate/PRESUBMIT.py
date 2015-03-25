@@ -42,7 +42,6 @@ def CommonChecks(input_api, output_api):
     # Add project specific paths to sys.path
     sys.path = [
       # See tests/test_env.py for more information.
-      join('third_party'),
       join('..', 'components'),
       join('..', 'third_party_local'),
     ] + sys.path

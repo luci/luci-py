@@ -5,12 +5,6 @@
 """Map reduce jobs to update the DB schemas or any other maintenance task."""
 
 import logging
-import os
-import sys
-
-# Map-reduce library expects 'mapreduce' package to be in sys.path.
-ROOT_DIR = os.path.abspath(os.path.dirname(__file__))
-sys.path.append(os.path.join(ROOT_DIR, 'third_party'))
 
 from mapreduce import control
 from mapreduce import main

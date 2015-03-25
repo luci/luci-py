@@ -17,4 +17,4 @@ if __name__ == '__main__':
   sys.exit(run_coverage.main(
       APP_DIR,
       ('tools',),
-      'PRESUBMIT.py,tools/*'))
+      'PRESUBMIT.py,components,*test*,tool*'))

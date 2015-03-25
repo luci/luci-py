@@ -13,7 +13,6 @@ def setup_test_env():
   """Sets up App Engine test environment."""
   # For application modules.
   sys.path.insert(0, APP_DIR)
-  sys.path.insert(0, os.path.join(APP_DIR, 'third_party'))
   # TODO(maruel): Remove.
   sys.path.insert(0, os.path.join(APP_DIR, 'components', 'third_party'))
 
