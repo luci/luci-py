@@ -14,26 +14,18 @@ import re
 import sys
 import unittest
 
-ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
 import test_env_handlers
 from test_support import test_case
 
-import dev_appserver
-dev_appserver.fix_sys_path()
-
-import endpoints
 from protorpc.remote import protojson
 import webapp2
 import webtest
 
 from components import auth
-from components import auth_testing
 from components import ereporter2
 from components import utils
 
 import handlers_api
-import handlers_backend
 import handlers_bot
 import handlers_endpoints
 import swarming_rpcs
@@ -41,7 +33,6 @@ import swarming_rpcs
 from server import acl
 from server import bot_management
 from server import config
-from server import task_result
 
 
 def message_to_dict(rpc_message):
@@ -57,10 +48,12 @@ class BaseTest(test_env_handlers.AppTestBase, test_case.EndpointsTestCase):
     test_case.EndpointsTestCase.setUp(self)
     super(BaseTest, self).setUp()
     self.mock(auth, 'is_group_member', lambda *_args, **_kwargs: True)
+    # handlers_bot is necessary to create fake tasks.
+    # TODO(maruel): Get rid of handlers_api.get_routes() here. The API should be
+    # self-sufficient.
     routes = handlers_bot.get_routes() + handlers_api.get_routes()
-    app = webapp2.WSGIApplication(routes, debug=True)
     self.app = webtest.TestApp(
-        app,
+        webapp2.WSGIApplication(routes, debug=True),
         extra_environ={
           'REMOTE_ADDR': self.source_ip,
           'SERVER_SOFTWARE': os.environ['SERVER_SOFTWARE'],

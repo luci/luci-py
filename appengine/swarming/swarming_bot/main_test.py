@@ -43,6 +43,7 @@ class MainTest(auto_stub.TestCase):
     shutil.rmtree(self.tmpdir)
 
   def test_attributes(self):
+    self.maxDiff = None
     actual = json.loads(subprocess.check_output(
         [sys.executable, self.zip_file, 'attributes']))
     expected = bot_main.get_attributes()

@@ -12,13 +12,17 @@ automatic_scaling:
   max_pending_latency: 250ms
 
 handlers:
+- url: /_ah/spi/.*
+  script: main.endpoint_app
+  secure: always
+
 - url: /internal/mapreduce(/.*)?
-  script: mapreduce_jobs.app
+  script: mapreduce.main.APP
   secure: always
   login: admin
 
 - url: /restricted/mapreduce(/.*)?
-  script: mapreduce_jobs.app
+  script: mapreduce.main.APP
   secure: always
   login: admin
 
@@ -67,7 +71,6 @@ handlers:
   secure: always
 
 builtins:
-- appstats: on
 - deferred: on
 - remote_api: on
 

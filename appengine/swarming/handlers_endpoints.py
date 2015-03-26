@@ -5,7 +5,6 @@
 """This module defines Swarming Server endpoints handlers."""
 
 import json
-import logging
 
 from google.appengine.api import datastore_errors
 from google.appengine.datastore import datastore_query
@@ -14,7 +13,6 @@ from protorpc import message_types
 from protorpc import remote
 
 from components import auth
-from components import ereporter2
 from components import utils
 
 import message_conversion
@@ -246,11 +244,3 @@ class SwarmingBotService(remote.Service):
             now)) for bot in bots],
         limit=request.limit,
         now=now)
-
-
-def create_application():
-  ereporter2.register_formatter()
-  return endpoints.api_server([swarming_api])
-
-
-app = create_application()

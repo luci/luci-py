@@ -2,12 +2,16 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
-"""Map reduce jobs to update the DB schemas or any other maintenance task."""
+"""Defines the mapreduces, which are used to do one-off mass updates on entities
+and other manually triggered maintenance tasks.
+
+Automatically triggered maintenance tasks should use a task queue on the backend
+instead.
+"""
 
 import logging
 
 from mapreduce import control
-from mapreduce import main
 
 
 # Task queue name to run all map reduce jobs on.
@@ -45,7 +49,3 @@ def dummy(_entry):
   #   from mapreduce import operation
   #   yield operation.db.Put(entity)
   pass
-
-
-# Export mapreduce WSGI application as 'app' for *.yaml routes.
-app = main.APP
