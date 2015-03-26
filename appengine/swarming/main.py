@@ -18,7 +18,6 @@ APP_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(APP_DIR, 'components', 'third_party'))
 
 from components import ereporter2
-from components import utils
 
 import handlers_endpoints
 import handlers_frontend
