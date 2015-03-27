@@ -2,16 +2,18 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
-"""This module is the entry point to load the AppEngine instance."""
+"""This modules is imported by AppEngine and defines the 'app' object.
+
+It is a separate file so that application bootstrapping code like ereporter2,
+that shouldn't be done in unit tests, can be done safely. This file must be
+tested via a smoke test.
+"""
 
 import os
 import sys
 
-from google.appengine.ext.appstats import recording
-
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.join(BASE_DIR, 'third_party'))
-sys.path.insert(0, os.path.join(BASE_DIR, 'components', 'third_party'))
+APP_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(APP_DIR, 'components', 'third_party'))
 
 from components import ereporter2
 from components import utils
@@ -20,18 +22,8 @@ import handlers_backend
 
 
 def create_application():
-  """Bootstraps the app and creates the url router."""
   ereporter2.register_formatter()
-  a = handlers_backend.create_application()
-  # In theory we'd want to take the output of app_identity.get_application_id().
-  # Sadly, this function does an RPC call and may contribute to cause time out
-  # on the initial load.
-  # Doing it here instead of appengine_config.py reduce the scope of appstats
-  # recording. To clarify, this means mapreduces started with mapreduce_jobs.py
-  # won't be instrumented, which is actually what we want in practice.
-  if utils.is_canary():
-    a = recording.appstats_wsgi_middleware(a)
-  return a
+  return handlers_backend.create_application(False)
 
 
 app = create_application()

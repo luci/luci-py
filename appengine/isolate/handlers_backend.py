@@ -479,7 +479,7 @@ def get_routes():
   ]
 
 
-def create_application(debug=False):
+def create_application(debug):
   """Creates the url router for the backend.
 
   The backend only implements urls under /internal/.

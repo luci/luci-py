@@ -13,16 +13,16 @@ automatic_scaling:
 
 handlers:
 - url: /_ah/spi/.*
-  script: endpoint_handlers_api.app
+  script: main_frontend.endpoint_app
   secure: always
 
 - url: /restricted/mapreduce(/.*)?
-  script: mapreduce_jobs.app
+  script: mapreduce.main.APP
   secure: always
   login: admin
 
 - url: /restricted.*
-  script: main_frontend.app
+  script: main_frontend.frontend_app
   secure: always
   login: required
 
@@ -44,11 +44,10 @@ handlers:
     X-Frame-Options: deny
 
 - url: /.*
-  script: main_frontend.app
+  script: main_frontend.frontend_app
   secure: always
 
 builtins:
-- appstats: on
 - remote_api: on
 
 inbound_services:

@@ -6,17 +6,14 @@
 
 import binascii
 import datetime
-import hashlib
-import hmac
-import httplib
-import os
 import re
-import sys
 import time
-import urllib
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.join(BASE_DIR, 'third_party'))
+from google.appengine import runtime
+from google.appengine.api import datastore_errors
+from google.appengine.api import memcache
+from google.appengine.api import taskqueue
+from google.appengine.ext import ndb
 
 import endpoints
 from protorpc import message_types
@@ -24,21 +21,14 @@ from protorpc import messages
 from protorpc import remote
 
 from components import auth
-from components import ereporter2
 from components import utils
+
 import config
 import gcs
 from handlers_api import hash_content
 from handlers_api import MIN_SIZE_FOR_DIRECT_GS
-from handlers_api import MIN_SIZE_FOR_GS
 import model
 import stats
-
-from google.appengine import runtime
-from google.appengine.api import datastore_errors
-from google.appengine.api import memcache
-from google.appengine.api import taskqueue
-from google.appengine.ext import ndb
 
 
 ### Request Types
@@ -462,11 +452,3 @@ class IsolateService(remote.Service):
       payload = ''.join(
           binascii.unhexlify(digest.digest) for digest in collection.items)
       return utils.enqueue_task(url, 'tag', payload=payload)
-
-
-def create_application():
-  ereporter2.register_formatter()
-  return endpoints.api_server([IsolateService])
-
-
-app = create_application()

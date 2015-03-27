@@ -2,12 +2,16 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
-"""Map reduce jobs to update the DB schemas or any other maintenance task."""
+"""Defines the mapreduces, which are used to do one-off mass updates on entities
+and other manually triggered maintenance tasks.
+
+Automatically triggered maintenance tasks should use a task queue on the backend
+instead.
+"""
 
 import logging
 
 from mapreduce import control
-from mapreduce import main
 
 import config
 import gcs
@@ -80,7 +84,3 @@ def delete_broken_entries(entry):
     # think that entity exists.
     entry.key.delete(use_memcache=True)
     logging.error('MR: deleted bad entry\n%s', entry.key.id())
-
-
-# Export mapreduce WSGI application as 'app' for *.yaml routes.
-app = main.APP

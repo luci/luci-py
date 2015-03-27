@@ -259,7 +259,7 @@ def get_routes():
   ]
 
 
-def create_application(debug=False):
+def create_application(debug):
   """Creates the url router.
 
   The basic layouts is as follow:
