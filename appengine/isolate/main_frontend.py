@@ -30,7 +30,7 @@ def create_application():
   # App that serves HTML pages and old API.
   frontend = handlers_frontend.create_application(False)
   # App that serves new endpoints API.
-  api = endpoints.api_server([handlers_endpoints.IsolateServer])
+  api = endpoints.api_server([handlers_endpoints.IsolateService])
   return frontend, api
 
 
