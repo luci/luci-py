@@ -13,7 +13,7 @@ automatic_scaling:
 
 handlers:
 - url: /_ah/spi/.*
-  script: main_frontend.endpoint_app
+  script: main_frontend.endpoints_app
   secure: always
 
 - url: /restricted/mapreduce(/.*)?
