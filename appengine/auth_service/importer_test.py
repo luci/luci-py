@@ -25,7 +25,7 @@ from components import auth_testing
 from components.auth import model
 from test_support import test_case
 
-from common import importer
+import importer
 
 
 def build_tar_gz(content):

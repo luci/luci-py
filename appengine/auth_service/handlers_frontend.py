@@ -22,8 +22,8 @@ from components.auth.proto import replication_pb2
 from components.auth.ui import rest_api
 from components.auth.ui import ui
 
-from common import importer
-from common import replication
+import importer
+import replication
 
 
 # Path to search for jinja templates.
@@ -243,7 +243,7 @@ def get_routes():
   return routes
 
 
-def create_application(debug=False):
+def create_application(debug):
   replication.configure_as_primary()
 
   # Configure UI appearance, add all custom tabs.

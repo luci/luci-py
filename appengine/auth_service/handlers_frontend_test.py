@@ -4,11 +4,8 @@
 # found in the LICENSE file.
 
 import logging
-import os
 import sys
 import unittest
-
-APP_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 import test_env
 test_env.setup_test_env()
@@ -19,9 +16,9 @@ from components import auth_testing
 from components import template
 from test_support import test_case
 
-from common import importer
-from common import replication
-from frontend import handlers
+import handlers_frontend
+import importer
+import replication
 
 
 GOOD_IMPORTER_CONFIG = [
@@ -53,7 +50,7 @@ class FrontendHandlersTest(test_case.TestCase):
     super(FrontendHandlersTest, self).setUp()
     self.mock(replication, 'trigger_replication', lambda *_args, **_kws: None)
     self.app = webtest.TestApp(
-        handlers.create_application(debug=True),
+        handlers_frontend.create_application(debug=True),
         extra_environ={'REMOTE_ADDR': '127.0.0.1'})
     auth_testing.mock_is_admin(self, True)
     auth_testing.mock_get_current_identity(self)

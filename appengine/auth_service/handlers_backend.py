@@ -8,8 +8,8 @@ import webapp2
 
 from components import decorators
 
-from common import importer
-from common import replication
+import importer
+import replication
 
 
 class InternalImportGroupsCronHandler(webapp2.RequestHandler):
@@ -37,6 +37,6 @@ def get_routes():
   ]
 
 
-def create_application(debug=False):
+def create_application(debug):
   replication.configure_as_primary()
   return webapp2.WSGIApplication(get_routes(), debug=debug)

@@ -60,10 +60,7 @@ def CommonChecks(input_api, output_api):
 
   # Add the commented out directories when adding tests.
   test_directories = [
-    #input_api.PresubmitLocalPath(),
-    #join('backend'),
-    join('common'),
-    join('frontend'),
+    input_api.PresubmitLocalPath(),
   ]
 
   blacklist = [

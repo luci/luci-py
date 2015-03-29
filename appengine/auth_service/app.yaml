@@ -7,7 +7,7 @@ threadsafe: true
 
 handlers:
 - url: /_ah/spi/.*
-  script: frontend.main.endpoints_app
+  script: main_frontend.endpoints_app
   secure: always
 
 # Auth service is extending components/auth in non-trivial way.
@@ -32,11 +32,10 @@ handlers:
     X-Frame-Options: deny
 
 - url: /.*
-  script: frontend.main.frontend_app
+  script: main_frontend.frontend_app
   secure: always
 
 builtins:
-- appstats: on
 - remote_api: on
 
 includes:

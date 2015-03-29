@@ -18,12 +18,10 @@ import unittest
 from tool_support import gae_sdk_utils
 from tool_support import local_app
 
-# /appengine/auth_service/common/.
-THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 # /appengine/auth_service/.
-APP_DIR = os.path.dirname(THIS_DIR)
-# /appengine/auth_service/common/test_replica_app/.
-REPLICA_APP_DIR = os.path.join(THIS_DIR, 'test_replica_app')
+APP_DIR = os.path.dirname(os.path.abspath(__file__))
+# /appengine/auth_service/test_replica_app/.
+REPLICA_APP_DIR = os.path.join(APP_DIR, 'test_replica_app')
 
 
 class ReplicationTest(unittest.TestCase):
