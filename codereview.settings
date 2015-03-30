@@ -1,4 +1,4 @@
 # This file is used by git-cl to get repository specific information.
-CODE_REVIEW_SERVER: codereview.appspot.com
-CC_LIST: swarming-eng@googlegroups.com
-VIEW_VC: https://code.google.com/p/swarming/source/detail?repo=default&r=
+CODE_REVIEW_SERVER: codereview.chromium.org
+CC_LIST: chromium-reviews@chromium.org
+VIEW_VC: https://github.com/luci/luci-py/commit/

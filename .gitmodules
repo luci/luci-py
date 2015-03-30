@@ -1,3 +1,0 @@
-[submodule "client"]
-	path = client
-	url = https://code.google.com/p/swarming.client
