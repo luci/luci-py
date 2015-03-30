@@ -23,8 +23,8 @@ handlers:
     X-Frame-Options: deny
 
 - url: /auth_service/static/(.+)\.(css|gif|ico|js|ttf|svg)
-  static_files: frontend/static/\1.\2
-  upload: frontend/static/(.+)\.(css|gif|ico|js|ttf|svg)
+  static_files: static/\1.\2
+  upload: static/(.+)\.(css|gif|ico|js|ttf|svg)
   secure: always
   http_headers:
     Content-Security-Policy: "default-src https: 'self'"
