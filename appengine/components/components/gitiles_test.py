@@ -215,12 +215,53 @@ class GitilesTestCase(test_case.TestCase):
     self.assertEqual(content, 'content')
 
   def test_get_archive(self):
+    req_path = 'project/+archive/master.tar.gz'
+    gerrit.fetch.return_value.content = 'tar gz bytes'
+
+    content = gitiles.get_archive(HOSTNAME, 'project', 'master')
+    gerrit.fetch.assert_called_once_with(HOSTNAME, req_path)
+    self.assertEqual('tar gz bytes', content)
+
+  def test_get_archive_with_dirpath(self):
     req_path = 'project/+archive/master/./dir.tar.gz'
     gerrit.fetch.return_value.content = 'tar gz bytes'
 
     content = gitiles.get_archive(HOSTNAME, 'project', 'master', '/dir')
     gerrit.fetch.assert_called_once_with(HOSTNAME, req_path)
     self.assertEqual('tar gz bytes', content)
+
+  def test_parse_url(self):
+    url = 'http://localhost/project/+/treeish/path'
+    parsed = gitiles.parse_gitiles_url(url)
+    self.assertEqual(parsed.hostname, 'localhost')
+    self.assertEqual(parsed.project, 'project')
+    self.assertEqual(parsed.treeish, 'treeish')
+    self.assertEqual(parsed.path, '/path')
+
+  def test_parse_authenticated_url(self):
+    url = 'http://localhost/a/project/+/treeish/path'
+    parsed = gitiles.parse_gitiles_url(url)
+    self.assertEqual(parsed.hostname, 'localhost')
+    self.assertEqual(parsed.project, 'project')
+
+  def test_parse_url_with_dot(self):
+    url = 'http://localhost/project/+/treeish/./path'
+    parsed = gitiles.parse_gitiles_url(url)
+    self.assertEqual(parsed.treeish, 'treeish')
+    self.assertEqual(parsed.path, '/path')
+
+  def test_unparse_url(self):
+    parsed = gitiles.GitilesUrl(
+        hostname='localhost', project='project',
+        treeish='treeish', path='/path')
+    url = gitiles.unparse_gitiles_url(parsed)
+    self.assertEqual(url, 'https://localhost/project/+/treeish/./path')
+
+  def test_unparse_url_defaults_to_master(self):
+    parsed = gitiles.GitilesUrl(
+        hostname='localhost', project='project', treeish=None, path='/path')
+    url = gitiles.unparse_gitiles_url(parsed)
+    self.assertEqual(url, 'https://localhost/project/+/master/./path')
 
 
 if __name__ == '__main__':

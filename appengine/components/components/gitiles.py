@@ -44,13 +44,19 @@ RGX_URL_PATH = re.compile('/([^\+]+)(\+/(.*))?')
 
 
 def parse_gitiles_url(url):
-  """Parses a Gitiles-formatted url."""
+  """Parses a Gitiles-formatted url.
+
+  If /a authentication prefix is present in |url|, it is omitted.
+  """
   parsed = urlparse.urlparse(url)
   path_match = RGX_URL_PATH.match(parsed.path)
   if not path_match:
     raise ValueError('Invalid Gitiles repo url: %s' % url)
 
-  project = path_match.group(1).strip('/')
+  project = path_match.group(1)
+  if project.startswith('a/'):
+    project = project[len('a/'):]
+  project = project.strip('/')
 
   treeish_and_path = path_match.group(3) or '/'
   if not treeish_and_path.endswith('/'):
@@ -58,13 +64,28 @@ def parse_gitiles_url(url):
   sep = '/./' if '/./' in treeish_and_path else '/'
   treeish, path = treeish_and_path.split(sep, 1)
   assert not treeish.startswith('/')
-  path = '/' + path
+  path = '/' + path.strip('/')
 
   return GitilesUrl(
       hostname=parsed.netloc,
       project=project,
       treeish=treeish,
       path=path)
+
+
+def unparse_gitiles_url(gitiles_url):
+  """Converts GitilesUrl to str."""
+  assert gitiles_url
+  assert gitiles_url.hostname
+  assert gitiles_url.project
+
+  result = 'https://{hostname}/{project}'.format(**gitiles_url._asdict())
+
+  if gitiles_url.treeish or gitiles_url.path:
+    result += '/+/%s' % (gitiles_url.treeish or 'master').strip('/')
+  if gitiles_url.path:
+    result += '/./%s' % gitiles_url.path.strip('/')
+  return result
 
 
 def parse_time(tm):
@@ -188,14 +209,13 @@ def get_file_content(hostname, project, treeish, path):
   return base64.b64decode(data)
 
 
-def get_archive(hostname, project, treeish, dir_path):
+def get_archive(hostname, project, treeish, dir_path=None):
   """Gets a directory as a tar.gz archive."""
   assert project
   assert treeish
-  assert dir_path
-  if dir_path.endswith('/'):
-    dir_path = dir_path[:-1]
-  dir_path = '%s.tar.gz' % dir_path
+  dir_path = (dir_path or '').strip('/')
+  if dir_path:
+    dir_path = '/./%s' % dir_path
   res = gerrit.fetch(
-      hostname, '%s/+archive/%s/.%s' % (project, treeish, dir_path))
-  return res.content
+      hostname, '%s/+archive/%s%s.tar.gz' % (project, treeish, dir_path))
+  return res.content if res else None
