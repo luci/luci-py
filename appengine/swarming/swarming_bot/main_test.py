@@ -47,11 +47,15 @@ class MainTest(auto_stub.TestCase):
     actual = json.loads(subprocess.check_output(
         [sys.executable, self.zip_file, 'attributes']))
     expected = bot_main.get_attributes()
-    for key in ('cwd', 'disks', 'running_time', 'started_ts'):
-      del actual['state'][key]
-      del expected['state'][key]
-    del actual['version']
-    del expected['version']
+    for key in (u'cwd', u'disks', u'running_time', u'started_ts'):
+      del actual[u'state'][key]
+      del expected[u'state'][key]
+    del actual[u'version']
+    del expected[u'version']
+    self.assertAlmostEqual(
+        actual[u'state'].pop(u'cost_usd_hour'),
+        expected[u'state'].pop(u'cost_usd_hour'),
+        places=6)
     self.assertEqual(expected, actual)
 
   def test_version(self):

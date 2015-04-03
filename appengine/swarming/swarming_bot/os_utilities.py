@@ -52,63 +52,63 @@ except ImportError:
 ANDROID_DETAILS = frozenset(
     [
       # Hardware details.
-      'ro.board.platform',
-      'ro.product.board',  # or ro.product.device?
-      'ro.product.cpu.abi',
-      'ro.product.cpu.abi2',
+      u'ro.board.platform',
+      u'ro.product.board',  # or ro.product.device?
+      u'ro.product.cpu.abi',
+      u'ro.product.cpu.abi2',
 
       # OS details.
-      'ro.build.id',
-      'ro.build.tags',
-      'ro.build.type',
-      'ro.build.version.sdk',
+      u'ro.build.id',
+      u'ro.build.tags',
+      u'ro.build.type',
+      u'ro.build.version.sdk',
     ])
 
 
 # https://cloud.google.com/compute/pricing#machinetype
 GCE_MACHINE_COST_HOUR_US = {
-  'n1-standard-1': 0.063,
-  'n1-standard-2': 0.126,
-  'n1-standard-4': 0.252,
-  'n1-standard-8': 0.504,
-  'n1-standard-16': 1.008,
-  'f1-micro': 0.012,
-  'g1-small': 0.032,
-  'n1-highmem-2': 0.148,
-  'n1-highmem-4': 0.296,
-  'n1-highmem-8': 0.592,
-  'n1-highmem-16': 1.184,
-  'n1-highcpu-2': 0.080,
-  'n1-highcpu-4': 0.160,
-  'n1-highcpu-8': 0.320,
-  'n1-highcpu-16': 0.640,
+  u'n1-standard-1': 0.063,
+  u'n1-standard-2': 0.126,
+  u'n1-standard-4': 0.252,
+  u'n1-standard-8': 0.504,
+  u'n1-standard-16': 1.008,
+  u'f1-micro': 0.012,
+  u'g1-small': 0.032,
+  u'n1-highmem-2': 0.148,
+  u'n1-highmem-4': 0.296,
+  u'n1-highmem-8': 0.592,
+  u'n1-highmem-16': 1.184,
+  u'n1-highcpu-2': 0.080,
+  u'n1-highcpu-4': 0.160,
+  u'n1-highcpu-8': 0.320,
+  u'n1-highcpu-16': 0.640,
 }
 
 
 # https://cloud.google.com/compute/pricing#machinetype
 GCE_MACHINE_COST_HOUR_EUROPE_ASIA = {
-  'n1-standard-1': 0.069,
-  'n1-standard-2': 0.138,
-  'n1-standard-4': 0.276,
-  'n1-standard-8': 0.552,
-  'n1-standard-16': 1.104,
-  'f1-micro': 0.013,
-  'g1-small': 0.0347,
-  'n1-highmem-2': 0.162,
-  'n1-highmem-4': 0.324,
-  'n1-highmem-8': 0.648,
-  'n1-highmem-16': 1.296,
-  'n1-highcpu-2': 0.086,
-  'n1-highcpu-4': 0.172,
-  'n1-highcpu-8': 0.344,
-  'n1-highcpu-16': 0.688,
+  u'n1-standard-1': 0.069,
+  u'n1-standard-2': 0.138,
+  u'n1-standard-4': 0.276,
+  u'n1-standard-8': 0.552,
+  u'n1-standard-16': 1.104,
+  u'f1-micro': 0.013,
+  u'g1-small': 0.0347,
+  u'n1-highmem-2': 0.162,
+  u'n1-highmem-4': 0.324,
+  u'n1-highmem-8': 0.648,
+  u'n1-highmem-16': 1.296,
+  u'n1-highcpu-2': 0.086,
+  u'n1-highcpu-4': 0.172,
+  u'n1-highcpu-8': 0.344,
+  u'n1-highcpu-16': 0.688,
 }
 
 
 GCE_RAM_GB_PER_CORE_RATIOS = {
-  0.9: 'n1-highcpu-',
-  3.75: 'n1-standard-',
-  6.5: 'n1-highmem-',
+  0.9: u'n1-highcpu-',
+  3.75: u'n1-standard-',
+  6.5: u'n1-highmem-',
 }
 
 
@@ -119,7 +119,6 @@ GCE_SSD_GB_COST_MONTH = 0.17
 
 # https://cloud.google.com/compute/pricing#premiumoperatingsystems
 GCE_WINDOWS_COST_CORE_HOUR = 0.04
-
 
 
 ### Private stuff.
@@ -182,7 +181,7 @@ def _get_startup_dir_win():
   # CSIDL_STARTUP = 7
   # https://msdn.microsoft.com/library/windows/desktop/bb762180.aspx
   # shell.SHGetFolderLocation(NULL, CSIDL_STARTUP, NULL, NULL, string)
-  if get_os_version_number() == '5.1':
+  if get_os_version_number() == u'5.1':
     startup = 'Start Menu\\Programs\\Startup'
   else:
     # Vista+
@@ -659,17 +658,17 @@ def get_os_version_number():
         'Unable to determine Windows version: %s' % version_raw)
     if version_parts[0] < 5 or (version_parts[0] == 5 and version_parts[1] < 1):
       assert False, 'Version before XP are unsupported: %s' % version_parts
-    return '.'.join(version_parts[:2])
+    return u'.'.join(version_parts[:2])
 
   if sys.platform == 'darwin':
     version_parts = platform.mac_ver()[0].split('.')
     assert len(version_parts) >= 2, 'Unable to determine Mac version'
-    return '.'.join(version_parts[:2])
+    return u'.'.join(version_parts[:2])
 
   if sys.platform == 'linux2':
     # On Ubuntu it will return a string like '12.04'. On Raspbian, it will look
     # like '7.6'.
-    return platform.linux_distribution()[1]
+    return unicode(platform.linux_distribution()[1])
 
   logging.error('Unable to determine platform version')
   return None
@@ -697,9 +696,9 @@ def get_os_name():
     Windows, Mac, Ubuntu, Raspbian, etc.
   """
   value = {
-    'cygwin': 'Windows',
-    'darwin': 'Mac',
-    'win32': 'Windows',
+    'cygwin': u'Windows',
+    'darwin': u'Mac',
+    'win32': u'Windows',
   }.get(sys.platform)
   if value:
     return value
@@ -713,9 +712,9 @@ def get_os_name():
       os_release = dict(l.split('=', 1) for l in content.splitlines() if l)
       os_id = os_release.get('ID').strip('"')
       # Uppercase the first letter for consistency with the other platforms.
-      return os_id[0].upper() + os_id[1:]
+      return unicode(os_id[0].upper() + os_id[1:])
 
-  return sys.platform
+  return unicode(sys.platform)
 
 
 @cached
@@ -723,8 +722,8 @@ def get_cpu_type():
   """Returns the type of processor: arm or x86."""
   machine = platform.machine().lower()
   if machine in ('amd64', 'x86_64', 'i386'):
-    return 'x86'
-  return machine
+    return u'x86'
+  return unicode(machine)
 
 
 @cached
@@ -737,9 +736,9 @@ def get_cpu_bitness():
   python process.
   """
   if platform.machine().endswith('64'):
-    return '64'
+    return u'64'
   # TODO(maruel): Work harder to figure out if OS is 64 bits.
-  return '64' if sys.maxsize > 2**32 else '32'
+  return u'64' if sys.maxsize > 2**32 else u'32'
 
 
 def get_ip():
@@ -775,12 +774,12 @@ def get_hostname():
     # The base name will be the IPv4 address reversed, which is not useful. This
     # happens on OSX.
     hostname = socket.gethostname()
-  return hostname
+  return unicode(hostname)
 
 
 def get_hostname_short():
   """Returns the base host name."""
-  return get_hostname().split('.', 1)[0]
+  return get_hostname().split(u'.', 1)[0]
 
 
 @cached
@@ -871,9 +870,6 @@ def get_gpu():
   Returns:
     All the video cards detected.
     tuple(list(dimensions), list(state)).
-
-  TODO(maruel): Add custom processing to normalize the string as much as
-  possible but differences will occur between OSes.
   """
   if sys.platform == 'darwin':
     dimensions, state = _get_gpu_osx()
@@ -885,9 +881,9 @@ def get_gpu():
     dimensions, state = None, None
 
   # 15ad is VMWare. It's akin not having a GPU card.
-  dimensions = dimensions or ['none']
+  dimensions = dimensions or [u'none']
   if '15ad' in dimensions:
-    dimensions.append('none')
+    dimensions.append(u'none')
     dimensions.sort()
   return dimensions, state
 
@@ -927,7 +923,6 @@ def get_cost_hour():
   return machine_cost + os_cost + disk_gb_cost
 
 
-
 @cached
 def get_machine_type():
   """Returns a GCE-equivalent machine type.
@@ -948,23 +943,23 @@ def get_machine_type():
     if best_fit is None or delta < best_fit[0]:
       best_fit = (delta, prefix)
   prefix = best_fit[1]
-  machine_type = prefix + str(cores)
+  machine_type = prefix + unicode(cores)
   if machine_type not in GCE_MACHINE_COST_HOUR_US:
     # Try a best fit.
     logging.info('Failed to find a good machine_type match: %s', machine_type)
     for i in (16, 8, 4, 2):
       if cores > i:
-        machine_type = prefix + str(i)
+        machine_type = prefix + unicode(i)
         break
     else:
       if cores == 1:
         # There's no n1-highcpu-1 nor n1-highmem-1.
         if ram_gb < 1.7:
-          machine_type = 'f1-micro'
+          machine_type = u'f1-micro'
         elif ram_gb < 3.75:
-          machine_type = 'g1-small'
+          machine_type = u'g1-small'
         else:
-          machine_type = 'n1-standard-1'
+          machine_type = u'n1-standard-1'
       else:
         logging.info('Failed to find a fit: %s', machine_type)
 
@@ -989,7 +984,7 @@ def get_zone_gce():
   if not metadata:
     return None
   # Format is projects/<id>/zones/<zone>
-  return metadata['instance']['zone'].rsplit('/', 1)[-1]
+  return unicode(metadata['instance']['zone'].rsplit('/', 1)[-1])
 
 
 @cached
@@ -999,7 +994,7 @@ def get_machine_type_gce():
   if not metadata:
     return None
   # Format is projects/<id>/machineTypes/<machine_type>
-  return metadata['instance']['machineType'].rsplit('/', 1)[-1]
+  return unicode(metadata['instance']['machineType'].rsplit('/', 1)[-1])
 
 
 def send_metric_gce(name, value):
@@ -1081,18 +1076,18 @@ def get_integrity_level_win():
   """
   if sys.platform != 'win32':
     return None
-  if get_os_version_number() == '5.1':
+  if get_os_version_number() == u'5.1':
     # Integrity level is Vista+.
     return None
 
   mapping = {
-    0x0000: 'untrusted',
-    0x1000: 'low',
-    0x2000: 'medium',
-    0x2100: 'medium high',
-    0x3000: 'high',
-    0x4000: 'system',
-    0x5000: 'protected process',
+    0x0000: u'untrusted',
+    0x1000: u'low',
+    0x2000: u'medium',
+    0x2100: u'medium high',
+    0x3000: u'high',
+    0x4000: u'system',
+    0x5000: u'protected process',
   }
 
   # This was specifically written this way to work on cygwin except for the
@@ -1187,7 +1182,7 @@ def get_integrity_level_win():
     res = ctypes.windll.advapi32.GetSidSubAuthority(
         token_info.Label.Sid, p_sid_size.contents.value - 1)
     value = res.contents.value
-    return mapping.get(value) or '0x%04x' % value
+    return mapping.get(value) or u'0x%04x' % value
   finally:
     ctypes.windll.kernel32.CloseHandle(token)
 
@@ -1229,7 +1224,7 @@ def get_dimensions_android(device_id, adb_path='adb'):
   properties = get_adb_device_properties_raw(device_id, adb_path)
   out = dict(
       (k, [v]) for k, v in properties.iteritems() if k in ANDROID_DETAILS)
-  out['id'] = [device_id]
+  out[u'id'] = [device_id]
   return out
 
 
@@ -1241,10 +1236,10 @@ def get_state_android(device_id, adb_path='adb'):
   """
   # Unused argument - pylint: disable=W0613
   return {
-    'device': {
+    u'device': {
       # TODO(maruel): Fill me.
     },
-    'host': get_state(),
+    u'host': get_state(),
   }
 
 
@@ -1257,41 +1252,41 @@ def get_dimensions():
   cpu_type = get_cpu_type()
   cpu_bitness = get_cpu_bitness()
   dimensions = {
-    'cores': [str(get_num_processors())],
-    'cpu': [
+    u'cores': [unicode(get_num_processors())],
+    u'cpu': [
       cpu_type,
-      cpu_type + '-' + cpu_bitness,
+      cpu_type + u'-' + cpu_bitness,
     ],
-    'gpu': get_gpu()[0],
-    'id': [get_hostname_short()],
-    'os': [os_name],
+    u'gpu': get_gpu()[0],
+    u'id': [get_hostname_short()],
+    u'os': [os_name],
   }
   os_version_name = get_os_version_name()
   if os_version_name:
     # This only happens on Windows.
-    dimensions['os'].append('%s-%s' % (os_name, os_version_name))
+    dimensions[u'os'].append(u'%s-%s' % (os_name, os_version_name))
   else:
-    dimensions['os'].append('%s-%s' % (os_name, get_os_version_number()))
-  if 'none' not in dimensions['gpu']:
+    dimensions[u'os'].append(u'%s-%s' % (os_name, get_os_version_number()))
+  if u'none' not in dimensions[u'gpu']:
     hidpi = get_monitor_hidpi()
     if hidpi:
-      dimensions['hidpi'] = hidpi
+      dimensions[u'hidpi'] = hidpi
 
   machine_type = get_machine_type()
   if machine_type:
-    dimensions['machine_type'] = [machine_type]
+    dimensions[u'machine_type'] = [machine_type]
   zone = get_zone_gce()
   if zone:
-    dimensions['zone'] = [zone]
+    dimensions[u'zone'] = [zone]
 
-  if cpu_type.startswith('arm') and cpu_type != 'arm':
-    dimensions['cpu'].append('arm')
-    dimensions['cpu'].append('arm-' + cpu_bitness)
-    dimensions['cpu'].sort()
+  if cpu_type.startswith(u'arm') and cpu_type != u'arm':
+    dimensions[u'cpu'].append(u'arm')
+    dimensions[u'cpu'].append(u'arm-' + cpu_bitness)
+    dimensions[u'cpu'].sort()
 
   if sys.platform == 'linux2':
-    dimensions['os'].append('Linux')
-    dimensions['os'].sort()
+    dimensions[u'os'].append(u'Linux')
+    dimensions[u'os'].sort()
 
   return dimensions
 
@@ -1315,23 +1310,23 @@ def get_state(threshold_mb=2*1024, skip=None):
   # any other leaky resources. So that the server can decided to reboot the bot
   # to clean up.
   state = {
-    'cost_usd_hour': get_cost_hour(),
-    'cwd': os.getcwd(),
-    'disks': get_disks_info(),
-    'gpu': get_gpu()[1],
-    'ip': get_ip(),
-    'hostname': get_hostname(),
-    'ram': get_physical_ram(),
-    'running_time': int(round(time.time() - _STARTED_TS)),
-    'started_ts': int(round(_STARTED_TS)),
+    u'cost_usd_hour': get_cost_hour(),
+    u'cwd': os.getcwd(),
+    u'disks': get_disks_info(),
+    u'gpu': get_gpu()[1],
+    u'ip': get_ip(),
+    u'hostname': get_hostname(),
+    u'ram': get_physical_ram(),
+    u'running_time': int(round(time.time() - _STARTED_TS)),
+    u'started_ts': int(round(_STARTED_TS)),
   }
   if sys.platform in ('cygwin', 'win32'):
-    state['cygwin'] = [str(int(sys.platform == 'cygwin'))]
+    state[u'cygwin'] = [sys.platform == 'cygwin']
   if sys.platform == 'win32':
     # TODO(maruel): Have get_integrity_level_win() work in the first place.
     integrity = get_integrity_level_win()
     if integrity is not None:
-      state['integrity'] = [integrity]
+      state[u'integrity'] = [integrity]
   auto_quarantine_on_low_space(state, threshold_mb, skip)
   return state
 
@@ -1341,19 +1336,19 @@ def auto_quarantine_on_low_space(state, threshold_mb=2*1024, skip=None):
 
   Modifies state in-place. Assumes state['free_disks'] is valid.
   """
-  if not threshold_mb or state.get('quarantined'):
+  if not threshold_mb or state.get(u'quarantined'):
     return
   if skip is None:
     # Do not check these mount points for low disk space.
     skip = ['/boot', '/boot/efi']
 
   s = []
-  for mount, infos in state['disks'].iteritems():
+  for mount, infos in state[u'disks'].iteritems():
     space_mb = infos['free_mb']
     if mount not in skip and space_mb < threshold_mb:
       s.append('Not enough free disk space on %s.' % mount)
   if s:
-    state['quarantined'] = '\n'.join(s)
+    state[u'quarantined'] = '\n'.join(s)
 
 
 def rmtree(path):
@@ -1563,8 +1558,8 @@ def main():
   """Prints out the output of get_dimensions() and get_state()."""
   # Pass an empty tag, so pop it up since it has no significance.
   data = {
-    'dimensions': get_dimensions(),
-    'state': get_state(),
+    u'dimensions': get_dimensions(),
+    u'state': get_state(),
   }
   json.dump(data, sys.stdout, indent=2, sort_keys=True, separators=(',', ': '))
   print('')

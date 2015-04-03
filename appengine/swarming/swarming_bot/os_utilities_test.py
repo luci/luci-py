@@ -68,17 +68,17 @@ class TestOsUtilities(auto_stub.TestCase):
       self.assertEqual(None, name)
 
   def test_get_os_name(self):
-    expected = ('Linux', 'Mac', 'Raspbian', 'Ubuntu', 'Windows')
+    expected = (u'Linux', u'Mac', u'Raspbian', u'Ubuntu', u'Windows')
     self.assertIn(os_utilities.get_os_name(), expected)
 
   def test_get_cpu_type(self):
     actual = os_utilities.get_cpu_type()
-    if actual == 'x86':
+    if actual == u'x86':
       return
-    self.assertTrue(actual.startswith('arm'), actual)
+    self.assertTrue(actual.startswith(u'arm'), actual)
 
   def test_get_cpu_bitness(self):
-    expected = ('32', '64')
+    expected = (u'32', u'64')
     self.assertIn(os_utilities.get_cpu_bitness(), expected)
 
   def test_get_ip(self):
@@ -110,23 +110,23 @@ class TestOsUtilities(auto_stub.TestCase):
   def test_get_dimensions(self):
     actual = set(os_utilities.get_dimensions())
     # Only set on GCE.
-    actual.discard('machine_type')
-    actual.discard('zone')
+    actual.discard(u'machine_type')
+    actual.discard(u'zone')
     # Only set on Mac.
-    actual.discard('hidpi')
-    expected = set(['cores', 'cpu', 'gpu', 'id', 'os'])
+    actual.discard(u'hidpi')
+    expected = set([u'cores', u'cpu', u'gpu', u'id', u'os'])
     self.assertEqual(expected, actual)
 
   def test_get_state(self):
     actual = os_utilities.get_state()
     expected = {
-      'cost_usd_hour', 'cwd', 'disks', 'gpu', 'ip', 'hostname', 'ram',
-      'running_time', 'started_ts',
+      u'cost_usd_hour', u'cwd', u'disks', u'gpu', u'ip', u'hostname', u'ram',
+      u'running_time', u'started_ts',
     }
     if sys.platform in ('cygwin', 'win32'):
-      expected.add('cygwin')
+      expected.add(u'cygwin')
     if sys.platform == 'win32':
-      expected.add('integrity')
+      expected.add(u'integrity')
     self.assertEqual(expected, set(actual))
 
   def test_get_adb_list_devices(self):
@@ -152,27 +152,27 @@ class TestOsUtilities(auto_stub.TestCase):
     self.mock(subprocess, 'check_output', lambda *_: stdout)
     actual = os_utilities.get_adb_device_properties_raw('123')
     expected = {
-      'ro.build.display.id': 'KRT16S',
-      'ro.build.id': 'KRT16S',
-      'ro.build.version.incremental': '920375',
+      u'ro.build.display.id': u'KRT16S',
+      u'ro.build.id': u'KRT16S',
+      u'ro.build.version.incremental': u'920375',
     }
     self.assertEqual(expected, actual)
 
   def test_get_dimensions_android(self):
     props = dict((k, k) for k in os_utilities.ANDROID_DETAILS)
-    props['bar'] = 'foo'
+    props[u'bar'] = u'foo'
     self.mock(os_utilities, 'get_adb_device_properties_raw', lambda *_: props)
     actual = os_utilities.get_dimensions_android('123')
     expected = {
-      'id': ['123'],
-      'ro.board.platform': ['ro.board.platform'],
-      'ro.build.id': ['ro.build.id'],
-      'ro.build.tags': ['ro.build.tags'],
-      'ro.build.type': ['ro.build.type'],
-      'ro.build.version.sdk': ['ro.build.version.sdk'],
-      'ro.product.board': ['ro.product.board'],
-      'ro.product.cpu.abi': ['ro.product.cpu.abi'],
-      'ro.product.cpu.abi2': ['ro.product.cpu.abi2'],
+      u'id': [u'123'],
+      u'ro.board.platform': [u'ro.board.platform'],
+      u'ro.build.id': [u'ro.build.id'],
+      u'ro.build.tags': [u'ro.build.tags'],
+      u'ro.build.type': [u'ro.build.type'],
+      u'ro.build.version.sdk': [u'ro.build.version.sdk'],
+      u'ro.product.board': [u'ro.product.board'],
+      u'ro.product.cpu.abi': [u'ro.product.cpu.abi'],
+      u'ro.product.cpu.abi2': [u'ro.product.cpu.abi2'],
     }
     self.assertEqual(expected, actual)
 
@@ -180,14 +180,14 @@ class TestOsUtilities(auto_stub.TestCase):
     self.mock(time, 'time', lambda: os_utilities._STARTED_TS + 1)
     expected_dimensions = dict((k, k) for k in os_utilities.ANDROID_DETAILS)
     props = expected_dimensions.copy()
-    props['bar'] = 'foo'
+    props[u'bar'] = u'foo'
     self.mock(os_utilities, 'get_adb_device_properties_raw', lambda *_: props)
 
-    expected_dimensions['id'] = ['123']
+    expected_dimensions[u'id'] = [u'123']
     actual = os_utilities.get_state_android('123')
     expected = {
-      'device': {},
-      'host': os_utilities.get_state(),
+      u'device': {},
+      u'host': os_utilities.get_state(),
     }
     self.assertEqual(expected, actual)
 
