@@ -592,7 +592,8 @@ def bot_kill_task(run_result_key, bot_id):
           bot_id, packed, run_result.bot_id)
 
     if run_result.state == task_result.State.BOT_DIED:
-      return None, 'Task %s was already killed' % packed
+      # Ignore this failure.
+      return None, None
 
     run_result.signal_server_version(server_version)
     run_result.state = task_result.State.BOT_DIED
