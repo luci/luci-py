@@ -37,6 +37,8 @@ CHUNK_FMT = '!20sL'
 CHUNK_SIZE = struct.calcsize(CHUNK_FMT)
 DIRTY_TREES = collections.defaultdict(int)
 REF = 'refs/number/commits'
+AUTHOR_NAME = 'git-number'
+AUTHOR_EMAIL = 'chrome-infrastructure-team@google.com'
 
 # Number of bytes to use for the prefix on our internal number structure.
 # 0 is slow to deserialize. 2 creates way too much bookeeping overhead (would
@@ -153,7 +155,14 @@ def finalize(targets):
     assert updater.returncode == 0
 
     tree_id = git.run('write-tree', env=env)
-    commit_cmd = ['commit-tree', '-m', msg, '-p'] + git.hashes(REF)
+    commit_cmd = [
+        # Git user.name and/or user.email may not be configured, so specifying
+        # them explicitly. They are not used, but requried by Git.
+        '-c', 'user.name=%s' % AUTHOR_NAME,
+        '-c', 'user.email=%s' % AUTHOR_EMAIL,
+        'commit-tree',
+        '-m', msg,
+        '-p'] + git.hash_multi(REF)
     for t in targets:
       commit_cmd.extend(['-p', binascii.hexlify(t)])
     commit_cmd.append(tree_id)
@@ -243,25 +252,33 @@ def main():  # pragma: no cover
   levels = [logging.ERROR, logging.INFO, logging.DEBUG]
   logging.basicConfig(level=levels[min(opts.verbose, len(levels) - 1)])
 
-  try:
-    if opts.reset:
-      clear_caches(on_disk=True)
-      return
-
-    try:
-      targets = git.parse_commitrefs(*(args or ['HEAD']))
-    except git.BadCommitRefException as e:
-      parser.error(e)
-
-    load_generation_numbers(targets)
-    if not opts.no_cache:
-      finalize(targets)
-
-    print '\n'.join(map(str, map(get_num, targets)))
-    return 0
-  except KeyboardInterrupt:
+  # 'git number' should only be used on bots.
+  if os.getenv('CHROME_HEADLESS') != '1':
+    logging.error("'git-number' is an infrastructure tool that is only "
+                  "intended to be used internally by bots. Developers should "
+                  "use the 'Cr-Commit-Position' value in the commit's message.")
     return 1
+
+  if opts.reset:
+    clear_caches(on_disk=True)
+    return
+
+  try:
+    targets = git.parse_commitrefs(*(args or ['HEAD']))
+  except git.BadCommitRefException as e:
+    parser.error(e)
+
+  load_generation_numbers(targets)
+  if not opts.no_cache:
+    finalize(targets)
+
+  print '\n'.join(map(str, map(get_num, targets)))
+  return 0
 
 
 if __name__ == '__main__':  # pragma: no cover
-  sys.exit(main())
+  try:
+    sys.exit(main())
+  except KeyboardInterrupt:
+    sys.stderr.write('interrupted\n')
+    sys.exit(1)

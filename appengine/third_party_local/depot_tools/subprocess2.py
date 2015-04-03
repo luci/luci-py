@@ -34,8 +34,8 @@ SUBPROCESS_CLEANUP_HACKED = False
 class CalledProcessError(subprocess.CalledProcessError):
   """Augment the standard exception with more data."""
   def __init__(self, returncode, cmd, cwd, stdout, stderr):
-    super(CalledProcessError, self).__init__(returncode, cmd)
-    self.stdout = stdout
+    super(CalledProcessError, self).__init__(returncode, cmd, output=stdout)
+    self.stdout = self.output  # for backward compatibility.
     self.stderr = stderr
     self.cwd = cwd
 
@@ -247,9 +247,10 @@ class Popen(subprocess.Popen):
             'http://code.google.com/p/chromium/wiki/CygwinDllRemappingFailure '
             'to learn how to fix this error; you need to rebase your cygwin '
             'dlls')
-      # Popen() can throw OSError when cwd or args[0] doesn't exist. Let it go
-      # through
-      raise
+      # Popen() can throw OSError when cwd or args[0] doesn't exist.
+      raise OSError('Execution failed with error: %s.\n'
+                    'Check that %s or %s exist and have execution permission.'
+                    % (str(e), kwargs.get('cwd'), args[0]))
 
   def _tee_threads(self, input):  # pylint: disable=W0622
     """Does I/O for a process's pipes using threads.
@@ -510,5 +511,5 @@ def check_output(args, **kwargs):
   """
   kwargs.setdefault('stdin', VOID)
   if 'stdout' in kwargs:
-    raise ValueError('stdout argument not allowed, it will be overridden.')
+    raise ValueError('stdout argument not allowed, it would be overridden.')
   return check_call_out(args, stdout=PIPE, **kwargs)[0]
