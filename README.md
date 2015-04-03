@@ -1,7 +1,7 @@
 # LUCI
 
-LUCI is an ensemble of services that work together to run large CI (continuous
-integration) scale infrastructure.
+LUCI is an ensemble of services that work together to run large scale CI
+(continuous integration) infrastructure.
 
 See the wiki at https://github.com/luci/luci-py/wiki for more details.
 
