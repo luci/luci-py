@@ -24,7 +24,7 @@ from email import utils as email_utils
 
 from google.appengine import runtime
 from google.appengine.api import app_identity
-from google.appengine.api import memcache
+from google.appengine.api import memcache as gae_memcache
 from google.appengine.api import modules
 from google.appengine.api import taskqueue
 
@@ -73,20 +73,20 @@ def get_module_version_list(module_list, tainted):
   if not module_list:
     # If the function it called too often, it'll raise a OverQuotaError. So
     # cache it for 10 minutes.
-    module_list = memcache.get('modules_list')
+    module_list = gae_memcache.get('modules_list')
     if not module_list:
       module_list = modules.get_modules()
-      memcache.set('modules_list', module_list, time=10*60)
+      gae_memcache.set('modules_list', module_list, time=10*60)
 
   for module in module_list:
     # If the function it called too often, it'll raise a OverQuotaError.
     # Versions is a bit more tricky since we'll loose data, since versions are
     # changed much more often than modules. So cache it for 1 minute.
     key = 'modules_list-' + module
-    version_list = memcache.get(key)
+    version_list = gae_memcache.get(key)
     if not version_list:
       version_list = modules.get_versions(module)
-      memcache.set(key, version_list, time=60)
+      gae_memcache.set(key, version_list, time=60)
     result.extend(
         (module, v) for v in version_list if tainted or '-tainted' not in v)
   return result
@@ -248,6 +248,76 @@ def clear_cache(func):
   func.__parent_cache__.clear()
 
 
+def memcache(key, timeout=None):
+  """Decorator that implements memcache-based cache for a function.
+
+  The generated cache key contains current application version and values of all
+  function arguments converted to string using `repr`.
+
+  Args:
+    key (str): unique string that will be used as a part of cache key.
+    timeout (int): cache timeout in seconds.
+
+  Example:
+    @memcache('f')
+    def f(a, b=2):
+      # Heavy computation
+      return 42
+
+  Decorator raises:
+    NotImplementedError if function uses varargs or kwargs.
+  """
+  memcache_set_kwargs = {}
+  if timeout is not None:
+    memcache_set_kwargs['timeout'] = timeout
+
+  def decorator(func):
+    argspec = inspect.getargspec(func)
+    if argspec.varargs:
+      raise NotImplementedError(
+          'varargs in memcached functions are not supported')
+    if argspec.keywords:
+      raise NotImplementedError(
+          'kwargs in memcached functions are not supported')
+
+    @functools.wraps(func)
+    def decorated(*args, **kwargs):
+      key_args = []
+      for i, name in enumerate(argspec.args):
+        if name in ('self', 'cls') and i == 0:
+          # Assume nobody will use self/cls argument for something different
+          # that current instance/class.
+          continue
+        if i < len(args):
+          arg_value = args[i]
+        elif name in kwargs:
+          arg_value = kwargs[name]
+        else:
+          # argspec.defaults contains _last_ default values, so we need to shift
+          # |i| left.
+          default_value_index = i - (len(argspec.args) - len(argspec.defaults))
+          if default_value_index < 0:
+            # Parameter not provided. Call function to cause TypeError
+            func(*args, **kwargs)
+            assert False, 'Function call did not fail'
+          arg_value = argspec.defaults[default_value_index]
+        key_args.append(arg_value)
+
+      cache_key = 'utils.memcache/%s/%s%s' % (
+          get_app_version(), key, repr(key_args))
+
+      result = gae_memcache.get(cache_key)
+      if isinstance(result, tuple):
+        return result[0]
+
+      result = func(*args, **kwargs)
+      gae_memcache.set(cache_key, (result,), **memcache_set_kwargs)
+      return result
+
+    return decorated
+  return decorator
+
+
 @cache
 def get_app_version():
   """Returns currently running version (not necessary a default one)."""
@@ -322,10 +392,10 @@ def get_task_queue_host():
   # modules.get_hostname sometimes fails with unknown internal error.
   # Cache its result in a memcache to avoid calling it too often.
   cache_key = 'task_queue_host:%s:%s' % (_task_queue_module, get_app_version())
-  value = memcache.get(cache_key)
+  value = gae_memcache.get(cache_key)
   if not value:
     value = modules.get_hostname(module=_task_queue_module)
-    memcache.set(cache_key, value)
+    gae_memcache.set(cache_key, value)
   return value
 
 
