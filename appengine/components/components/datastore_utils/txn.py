@@ -8,6 +8,7 @@ import logging
 
 from google.appengine.api import datastore_errors
 from google.appengine.ext import ndb
+from google.appengine.ext.ndb import tasklets
 from google.appengine.runtime import apiproxy_errors
 
 
@@ -61,3 +62,25 @@ def transaction(callback, **ctx_options):
   """Synchronous version of transaction_async()."""
   future = transaction_async(callback, **ctx_options)
   return future.get_result()
+
+
+@ndb.utils.decorator
+def transactional_async(func, args, kwds, **ctx_options):
+  """The async version of @txn.transactional."""
+  if args or kwds:
+    return transaction_async(lambda: func(*args, **kwds), **ctx_options)
+  return transaction_async(func, **ctx_options)
+
+
+@ndb.utils.decorator
+def transactional(func, args, kwds, **ctx_options):
+  """Decorator that wraps a function with txn.transaction."""
+  return transactional_async.wrapped_decorator(
+      func, args, kwds, **ctx_options).get_result()
+
+
+@ndb.utils.decorator
+def transactional_tasklet(func, args, kwds, **options):
+  """The tasklet version of @txn.transactional_async."""
+  func = tasklets.tasklet(func)
+  return transactional_async.wrapped_decorator(func, args, kwds, **options)

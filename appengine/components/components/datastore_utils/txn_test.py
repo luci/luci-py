@@ -75,6 +75,32 @@ class TransactionTest(test_case.TestCase):
       future.get_result()
     self.assertEqual(0, EntityX.query().count())
 
+  def test_transactional(self):
+    @txn.transactional
+    def run():
+      EntityX(a=1).put()
+      return 2
+    self.assertEqual(2, run())
+    self.assertEqual(1, EntityX.query().count())
+
+  def test_transactional_async(self):
+    @txn.transactional_async
+    def run():
+      EntityX(a=1).put()
+      return 2
+    future = run()
+    self.assertEqual(2, future.get_result())
+    self.assertEqual(1, EntityX.query().count())
+
+  def test_transactional_task(self):
+    @txn.transactional_tasklet
+    def run():
+      yield EntityX(a=1).put_async()
+      raise ndb.Return(2)
+    future = run()
+    self.assertEqual(2, future.get_result())
+    self.assertEqual(1, EntityX.query().count())
+
 
 if __name__ == '__main__':
   if '-v' in sys.argv:
