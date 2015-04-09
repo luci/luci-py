@@ -248,7 +248,8 @@ def clear_cache(func):
   func.__parent_cache__.clear()
 
 
-def memcache(key, key_args=None, timeout=None):
+# ignore time parameter warning | pylint: disable=redefined-outer-name
+def memcache(key, key_args=None, time=None):
   """Decorator that implements memcache-based cache for a function.
 
   The generated cache key contains current application version and values of
@@ -258,7 +259,7 @@ def memcache(key, key_args=None, timeout=None):
     key (str): unique string that will be used as a part of cache key.
     key_args (list of str): list of function argument names to include
       in the generated cache key.
-    timeout (int): cache timeout in seconds.
+    time (int): optional expiration time.
 
   Example:
     @memcache('f', ['a', 'b'])
@@ -276,8 +277,8 @@ def memcache(key, key_args=None, timeout=None):
   assert all(key_args), key_args
 
   memcache_set_kwargs = {}
-  if timeout is not None:
-    memcache_set_kwargs['timeout'] = timeout
+  if time is not None:
+    memcache_set_kwargs['time'] = time
 
   def decorator(func):
     argspec = inspect.getargspec(func)

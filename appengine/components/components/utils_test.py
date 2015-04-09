@@ -109,14 +109,14 @@ class MemcacheTest(test_case.TestCase):
     self.mock(memcache, 'get', memcache_get)
 
     self.set_calls = []
-    def memcache_set(key, value, timeout=None):
+    def memcache_set(key, value, time=None):
       self.cached_value = value
-      self.set_calls.append((key, value, timeout))
+      self.set_calls.append((key, value, time))
     self.mock(memcache, 'set', memcache_set)
 
     self.f_calls = []
 
-  @utils.memcache('f', ['a', 'b', 'c', 'd'], timeout=54)
+  @utils.memcache('f', ['a', 'b', 'c', 'd'], time=54)
   def f(self, a, b, c=3, d=4, e=5):
     self.f_calls.append((a, b, c, d, e))
     return self.f_value
