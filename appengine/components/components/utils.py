@@ -248,25 +248,33 @@ def clear_cache(func):
   func.__parent_cache__.clear()
 
 
-def memcache(key, timeout=None):
+def memcache(key, key_args=None, timeout=None):
   """Decorator that implements memcache-based cache for a function.
 
-  The generated cache key contains current application version and values of all
-  function arguments converted to string using `repr`.
+  The generated cache key contains current application version and values of
+  |key_args| arguments converted to string using `repr`.
 
   Args:
     key (str): unique string that will be used as a part of cache key.
+    key_args (list of str): list of function argument names to include
+      in the generated cache key.
     timeout (int): cache timeout in seconds.
 
   Example:
-    @memcache('f')
-    def f(a, b=2):
+    @memcache('f', ['a', 'b'])
+    def f(a, b=2, not_used_in_cache_key=6):
       # Heavy computation
       return 42
 
   Decorator raises:
     NotImplementedError if function uses varargs or kwargs.
   """
+  assert isinstance(key, basestring), key
+  key_args = key_args or []
+  assert isinstance(key_args, list), key_args
+  assert all(isinstance(a, basestring) for a in key_args), key_args
+  assert all(key_args), key_args
+
   memcache_set_kwargs = {}
   if timeout is not None:
     memcache_set_kwargs['timeout'] = timeout
@@ -280,14 +288,21 @@ def memcache(key, timeout=None):
       raise NotImplementedError(
           'kwargs in memcached functions are not supported')
 
+    # List of arg names and indexes. Has same order as |key_args|.
+    arg_indexes = []
+    for name in key_args:
+      try:
+        i = argspec.args.index(name)
+      except ValueError:
+        raise KeyError(
+            'key_format expects "%s" parameter, but it was not found among '
+            'function parameters' % name)
+      arg_indexes.append((name, i))
+
     @functools.wraps(func)
     def decorated(*args, **kwargs):
-      key_args = []
-      for i, name in enumerate(argspec.args):
-        if name in ('self', 'cls') and i == 0:
-          # Assume nobody will use self/cls argument for something different
-          # that current instance/class.
-          continue
+      arg_values = []
+      for name, i in arg_indexes:
         if i < len(args):
           arg_value = args[i]
         elif name in kwargs:
@@ -301,13 +316,16 @@ def memcache(key, timeout=None):
             func(*args, **kwargs)
             assert False, 'Function call did not fail'
           arg_value = argspec.defaults[default_value_index]
-        key_args.append(arg_value)
+        arg_values.append(arg_value)
+
+      # Instead of putting a raw value to memcache, put tuple (value,)
+      # so we can distinguish a cached None value and absence of the value.
 
       cache_key = 'utils.memcache/%s/%s%s' % (
-          get_app_version(), key, repr(key_args))
+          get_app_version(), key, repr(arg_values))
 
       result = gae_memcache.get(cache_key)
-      if isinstance(result, tuple):
+      if isinstance(result, tuple) and len(result) == 1:
         return result[0]
 
       result = func(*args, **kwargs)

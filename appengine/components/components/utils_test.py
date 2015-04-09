@@ -116,15 +116,15 @@ class MemcacheTest(test_case.TestCase):
 
     self.f_calls = []
 
-  @utils.memcache('f', timeout=54)
-  def f(self, a, b, c=3, d=4):
-    self.f_calls.append((a, b, c, d))
+  @utils.memcache('f', ['a', 'b', 'c', 'd'], timeout=54)
+  def f(self, a, b, c=3, d=4, e=5):
+    self.f_calls.append((a, b, c, d, e))
     return self.f_value
 
   def test_call(self):
-    self.f(1, 2, 3, 4)
+    self.f(1, 2, 3, 4, 5)
     self.assertEqual(self.get_calls, ['utils.memcache/v1a/f[1, 2, 3, 4]'])
-    self.assertEqual(self.f_calls, [(1, 2, 3, 4)])
+    self.assertEqual(self.f_calls, [(1, 2, 3, 4, 5)])
     self.assertEqual(
         self.set_calls, [('utils.memcache/v1a/f[1, 2, 3, 4]', ('value',), 54)])
 
@@ -140,7 +140,7 @@ class MemcacheTest(test_case.TestCase):
     self.f_value = None
     self.assertEqual(self.f(1, 2, 3, 4), None)
     self.assertEqual(self.get_calls, ['utils.memcache/v1a/f[1, 2, 3, 4]'])
-    self.assertEqual(self.f_calls, [(1, 2, 3, 4)])
+    self.assertEqual(self.f_calls, [(1, 2, 3, 4, 5)])
     self.assertEqual(
         self.set_calls,
         [('utils.memcache/v1a/f[1, 2, 3, 4]', (None,), 54)])
@@ -157,14 +157,14 @@ class MemcacheTest(test_case.TestCase):
   def test_call_without_optional_arg(self):
     self.f(1, 2)
     self.assertEqual(self.get_calls, ['utils.memcache/v1a/f[1, 2, 3, 4]'])
-    self.assertEqual(self.f_calls, [(1, 2, 3, 4)])
+    self.assertEqual(self.f_calls, [(1, 2, 3, 4, 5)])
     self.assertEqual(
         self.set_calls, [('utils.memcache/v1a/f[1, 2, 3, 4]', ('value',), 54)])
 
   def test_call_kwargs(self):
     self.f(1, 2, c=30, d=40)
     self.assertEqual(self.get_calls, ['utils.memcache/v1a/f[1, 2, 30, 40]'])
-    self.assertEqual(self.f_calls, [(1, 2, 30, 40)])
+    self.assertEqual(self.f_calls, [(1, 2, 30, 40, 5)])
     self.assertEqual(
         self.set_calls,
         [('utils.memcache/v1a/f[1, 2, 30, 40]', ('value',), 54)])
@@ -172,7 +172,7 @@ class MemcacheTest(test_case.TestCase):
   def test_call_all_kwargs(self):
     self.f(a=1, b=2, c=30, d=40)
     self.assertEqual(self.get_calls, ['utils.memcache/v1a/f[1, 2, 30, 40]'])
-    self.assertEqual(self.f_calls, [(1, 2, 30, 40)])
+    self.assertEqual(self.f_calls, [(1, 2, 30, 40, 5)])
     self.assertEqual(
         self.set_calls,
         [('utils.memcache/v1a/f[1, 2, 30, 40]', ('value',), 54)])
@@ -180,14 +180,14 @@ class MemcacheTest(test_case.TestCase):
   def test_call_packed_args(self):
     self.f(*[1, 2])
     self.assertEqual(self.get_calls, ['utils.memcache/v1a/f[1, 2, 3, 4]'])
-    self.assertEqual(self.f_calls, [(1, 2, 3, 4)])
+    self.assertEqual(self.f_calls, [(1, 2, 3, 4, 5)])
     self.assertEqual(
         self.set_calls, [('utils.memcache/v1a/f[1, 2, 3, 4]', ('value',), 54)])
 
   def test_call_packed_kwargs(self):
     self.f(1, 2, **{'c':30, 'd': 40})
     self.assertEqual(self.get_calls, ['utils.memcache/v1a/f[1, 2, 30, 40]'])
-    self.assertEqual(self.f_calls, [(1, 2, 30, 40)])
+    self.assertEqual(self.f_calls, [(1, 2, 30, 40, 5)])
     self.assertEqual(
         self.set_calls,
         [('utils.memcache/v1a/f[1, 2, 30, 40]', ('value',), 54)])
@@ -195,12 +195,32 @@ class MemcacheTest(test_case.TestCase):
   def test_call_packed_both(self):
     self.f(*[1, 2], **{'c':30, 'd': 40})
     self.assertEqual(self.get_calls, ['utils.memcache/v1a/f[1, 2, 30, 40]'])
-    self.assertEqual(self.f_calls, [(1, 2, 30, 40)])
+    self.assertEqual(self.f_calls, [(1, 2, 30, 40, 5)])
     self.assertEqual(
         self.set_calls,
         [('utils.memcache/v1a/f[1, 2, 30, 40]', ('value',), 54)])
 
-  def self_invalid_args(self):
+  def test_empty_key_arg(self):
+    @utils.memcache('f')
+    def f(a):
+      # pylint: disable=unused-argument
+      return 1
+
+    f(1)
+    self.assertEqual(self.get_calls, ['utils.memcache/v1a/f[]'])
+    self.assertEqual(
+        self.set_calls,
+        [('utils.memcache/v1a/f[]', (1,), None)])
+
+  def test_nonexisting_arg(self):
+    with self.assertRaises(KeyError):
+      # pylint: disable=unused-variable
+      @utils.memcache('f', ['b'])
+      def f(a):
+        # pylint: disable=unused-argument
+        pass
+
+  def test_invalid_args(self):
     with self.assertRaises(TypeError):
       # pylint: disable=no-value-for-parameter
       self.f()
@@ -216,15 +236,15 @@ class MemcacheTest(test_case.TestCase):
   def test_args_prohibited(self):
     with self.assertRaises(NotImplementedError):
       # pylint: disable=unused-variable
-      @utils.memcache('f')
-      def f(*args):
+      @utils.memcache('f', [])
+      def f(a, *args):
         # pylint: disable=unused-argument
         pass
 
   def test_kwargs_prohibited(self):
     with self.assertRaises(NotImplementedError):
       # pylint: disable=unused-variable
-      @utils.memcache('f')
+      @utils.memcache('f', [])
       def f(**kwargs):
         # pylint: disable=unused-argument
         pass
