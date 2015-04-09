@@ -1,0 +1,15 @@
+// Copyright 2015 The Swarming Authors. All rights reserved.
+// Use of this source code is governed by the Apache v2.0 license that can be
+// found in the LICENSE file.
+
+// Schema for config files in services/luci-config config set.
+
+syntax = "proto2";
+
+package luci.config;
+
+// Schema of acl.cfg file.
+message AclCfg {
+  // Name of the group that has access to all services/* config sets.
+  optional string service_access_group = 1;
+}
