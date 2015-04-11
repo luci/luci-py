@@ -282,6 +282,7 @@ def run_bot(arg_error):
   consecutive_sleeps = 0
   while True:
     try:
+      botobj.update_dimensions(get_dimensions())
       botobj.update_state(get_state(consecutive_sleeps))
       did_something = poll_server(botobj)
       if did_something:

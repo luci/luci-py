@@ -119,6 +119,10 @@ class Bot(object):
     os_utilities.restart(message, timeout=15*60)
     self.post_error('Bot is stuck restarting for: %s' % message)
 
+  def update_dimensions(self, new_dimensions):
+    """Called internally to update Bot.dimensions."""
+    self._attributes['dimensions'] = new_dimensions
+
   def update_state(self, new_state):
     """Called internally to update Bot.state."""
     self._attributes['state'] = new_state
