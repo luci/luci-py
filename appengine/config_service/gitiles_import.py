@@ -6,6 +6,10 @@
 
 If services_config_location is set in admin.GlobalConfig root entity,
 each directory in the location is imported as services/<directory_name>.
+
+For each project defined in the project registry with
+config_storage_type == Gitiles, projects/<project_id> config set is imported
+from project.config_location.
 """
 
 import contextlib
@@ -25,6 +29,7 @@ from components.datastore_utils import txn
 
 from proto import service_config_pb2
 import admin
+import projects
 import storage
 import validation
 
@@ -32,6 +37,9 @@ import validation
 DEFAULT_GITILES_IMPORT_CONFIG = service_config_pb2.ImportCfg.Gitiles(
     fetch_log_deadline=15,
     fetch_archive_deadline=15,
+    project_config_default_branch='luci',
+    project_config_default_path='/',
+    branch_config_default_path='luci',
 )
 
 
@@ -57,6 +65,7 @@ def import_revision(config_set, location, create_config_set=False):
   assert re.match('[0-9a-f]{40}', location.treeish), (
       '"%s" is not a valid sha' % location.treeish
   )
+  logging.debug('Importing revision %s:%s', config_set, location.treeish)
   rev_key = ndb.Key(
       storage.ConfigSet, config_set,
       storage.Revision, location.treeish)
@@ -137,6 +146,7 @@ def import_config_set(config_set, location):
     config_set_key = ndb.Key(storage.ConfigSet, config_set)
     config_set_entity = config_set_key.get()
     if config_set_entity and config_set_entity.latest_revision == commit.sha:
+      logging.debug('Config set %s is up to date', config_set)
       return
 
     commit_location = location._replace(treeish=commit.sha)
@@ -170,6 +180,52 @@ def import_services(location_root):
     import_config_set('services/%s' % service_id, service_location)
 
 
+def import_project(project_id, location):
+  cfg = get_gitiles_config()
+
+  # Adjust location
+  treeish = location.treeish
+  if not treeish or treeish == 'HEAD':
+    treeish = cfg.project_config_default_branch
+  location = location._replace(
+      treeish=treeish,
+      path=location.path.strip('/') or cfg.project_config_default_path,
+  )
+
+  # Update project repo info.
+  repo_url = str(location._replace(treeish=None, path=None))
+  projects.update_import_info(
+      project_id, projects.RepositoryType.GITILES, repo_url)
+
+  import_config_set('projects/%s' % project_id, location)
+
+  # Import branches
+  for branch in projects.get_branches(project_id):
+    branch_location = location._replace(
+        treeish=branch.name,
+        path=branch.config_path or cfg.branch_config_default_path,
+    )
+    import_config_set(
+        'projects/%s/branches/%s' % (project_id, branch.name), branch_location)
+
+
+def import_projects():
+  """Imports project configs that are stored in Gitiles."""
+  for project in projects.get_projects():
+    if project.config_storage_type != service_config_pb2.Project.GITILES:
+      continue
+    try:
+      location = gitiles.Location.parse_resolve(project.config_location)
+    except ValueError:
+      logging.exception('Invalid project location: %s', project.config_location)
+      continue
+
+    try:
+      import_project(project.id, location)
+    except Exception as ex:
+      logging.exception('Could not import project %s', project.id)
+
+
 def cron_run_import():  # pragma: no cover
   conf = admin.GlobalConfig.fetch()
   gitiles_type = admin.ServiceConfigStorageType.GITILES
@@ -177,3 +233,4 @@ def cron_run_import():  # pragma: no cover
       conf.services_config_location):
     loc = gitiles.Location.parse_resolve(conf.services_config_location)
     import_services(loc)
+  import_projects()

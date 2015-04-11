@@ -17,8 +17,10 @@ from components import auth
 from components import gitiles
 from test_support import test_case
 
+from proto import project_config_pb2
 from proto import service_config_pb2
 import gitiles_import
+import projects
 import storage
 import validation
 
@@ -210,6 +212,64 @@ class GitilesImportTestCase(test_case.TestCase):
     gitiles_import.import_config_set.assert_called_once_with(
         'services/luci-config',
         'https://localhost/config/+/HEAD/luci-config')
+
+  def test_import_projects_and_branches(self):
+    self.mock(gitiles_import, 'import_config_set', mock.Mock())
+    self.mock(projects, 'get_projects', mock.Mock())
+    self.mock(projects, 'get_branches', mock.Mock())
+    projects.get_projects.return_value = [
+      service_config_pb2.Project(
+          id='chromium',
+          config_location='https://localhost/chromium/src/',
+          config_storage_type=service_config_pb2.Project.GITILES,
+      ),
+      service_config_pb2.Project(
+          id='bad_location',
+          config_location='https://localhost/',
+          config_storage_type=service_config_pb2.Project.GITILES,
+      ),
+      service_config_pb2.Project(
+          id='non-gitiles',
+      ),
+    ]
+    BranchType = project_config_pb2.BranchesCfg.Branch
+    projects.get_branches.return_value = [
+      BranchType(name='master'),
+      BranchType(name='release42', config_path='/my-configs'),
+    ]
+
+    gitiles_import.import_projects()
+
+    self.assertEqual(gitiles_import.import_config_set.call_count, 3)
+    gitiles_import.import_config_set.assert_any_call(
+        'projects/chromium', 'https://localhost/chromium/src/+/luci')
+    gitiles_import.import_config_set.assert_any_call(
+        'projects/chromium/branches/master',
+        'https://localhost/chromium/src/+/master/luci')
+    gitiles_import.import_config_set.assert_any_call(
+        'projects/chromium/branches/release42',
+        'https://localhost/chromium/src/+/release42/my-configs')
+
+  def test_import_projects_exception(self):
+    self.mock(gitiles_import, 'import_project', mock.Mock())
+    gitiles_import.import_project.side_effect = Exception
+
+    self.mock(projects, 'get_projects', mock.Mock())
+    projects.get_projects.return_value = [
+      service_config_pb2.Project(
+          id='chromium',
+          config_location='https://localhost/chromium/src/',
+          config_storage_type=service_config_pb2.Project.GITILES,
+      ),
+      service_config_pb2.Project(
+          id='will-fail',
+          config_location='https://localhost/chromium/src/',
+          config_storage_type=service_config_pb2.Project.GITILES,
+      )
+    ]
+
+    gitiles_import.import_projects()
+    self.assertEqual(gitiles_import.import_project.call_count, 2)
 
 
 if __name__ == '__main__':

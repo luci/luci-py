@@ -17,7 +17,7 @@ RGX_CONFIG_SET_SERVICE = re.compile('services/([a-z\-]+)')
 
 @utils.memcache('acl.cfg', time=60)
 def read_acl_cfg():
-  return storage.get_self_config('acl.cfg', service_config_pb2.AclCfg)
+  return storage.get_self_config(common.ACL_FILENAME, service_config_pb2.AclCfg)
 
 
 def can_read_config_set(config_set, headers=None):
@@ -31,6 +31,17 @@ def can_read_config_set(config_set, headers=None):
     if service_match:
       service_name = service_match.group(1)
       return can_read_service_config(service_name, headers=headers)
+
+    project_match = common.PROJECT_CONFIG_SET_RGX.match(config_set)
+    if project_match:
+      project_id = project_match.group(1)
+      return can_read_project_config(project_id)
+
+    branch_match = common.BRANCH_CONFIG_SET_RGX.match(config_set)
+    if branch_match:
+      project_id = branch_match.group(1)
+      return can_read_project_config(project_id)
+
   except ValueError:  # pragma: no cover
     # Make sure we don't let ValueError raise for a reason different than
     # malformed config_set.
@@ -54,3 +65,17 @@ def can_read_service_config(service_id, headers=None):
       group and auth.is_group_member(group) or
       (headers or {}).get('X-Appengine-Inbound-Appid') == service_id
   )
+
+
+# pylint: disable=W0613
+def can_read_project_config(project_id):  # pragma: no cover
+  return has_project_access()
+
+
+def can_read_project_list():  # pragma: no cover
+  return has_project_access()
+
+
+def has_project_access():
+  group = read_acl_cfg().project_access_group
+  return auth.is_admin() or (group and auth.is_group_member(group))

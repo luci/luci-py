@@ -16,4 +16,6 @@ def validate_config(config_set, path, content, log_errors=False):
   # TODO(nodir): implement custom validation.
   # TODO(nodir): validate service/luci-config:projects.cfg.
   # TODO(nodir): validate service/luci-config:import.cfg.
+  # TODO(nodir): validate service/<project_id>:project.cfg.
+  # TODO(nodir): validate service/<project_id>:branches.cfg.
   return True

@@ -2,16 +2,42 @@
 // Use of this source code is governed by the Apache v2.0 license that can be
 // found in the LICENSE file.
 
-// Schema for config files in services/luci-config config set.
+// Schemas for config files in services/luci-config config set.
 
 syntax = "proto2";
 
 package luci.config;
 
+// A tenant of a service. Defined in projects.cfg.
+message Project {
+  // Depending on repository type, luci-config imports configuration files
+  // differently.
+  enum ConfigStorageType {
+    // Will be used if config_storage_type is not set.
+    UNKNOWN = 0;
+    // Gitiles REST API is used to fetch config files.
+    GITILES = 1;
+  }
+  // Globally unique id of the project.
+  required string id = 1;
+  // URL of the repository where project-wide configurations are stored.
+  optional string config_location = 2;
+  // Type of the configuration repository, see ConfigStorageType.
+  optional ConfigStorageType config_storage_type = 3;
+}
+
+// Schema of projects.cfg file. Represents luci tenants registry.
+message ProjectsCfg {
+  // All projects served by this instance of Luci.
+  repeated Project projects = 1;
+}
+
 // Schema of acl.cfg file.
 message AclCfg {
   // Name of the group that has access to all services/* config sets.
   optional string service_access_group = 1;
+  // Name of the group that has access to all projects/* config sets.
+  optional string project_access_group = 2;
 }
 
 // Schema for import.cfg. It specified how to import configuration files from
@@ -23,6 +49,12 @@ message ImportCfg {
     optional int32 fetch_log_deadline = 1;
     // Request timeout in seconds when requesting directory archive.
     optional int32 fetch_archive_deadline = 2;
+    // Default branch for project configs.
+    optional string project_config_default_branch = 3;
+    // Default directory for project configs.
+    optional string project_config_default_path = 4;
+    // Default directory for branch configs.
+    optional string branch_config_default_path = 5;
   }
 
   // Configuration of import from Gitiles repositories.

@@ -13,9 +13,101 @@ from google.protobuf import descriptor_pb2
 DESCRIPTOR = _descriptor.FileDescriptor(
   name='service_config.proto',
   package='luci.config',
-  serialized_pb='\n\x14service_config.proto\x12\x0bluci.config\"&\n\x06\x41\x63lCfg\x12\x1c\n\x14service_access_group\x18\x01 \x01(\t\"\x83\x01\n\tImportCfg\x12/\n\x07gitiles\x18\x01 \x01(\x0b\x32\x1e.luci.config.ImportCfg.Gitiles\x1a\x45\n\x07Gitiles\x12\x1a\n\x12\x66\x65tch_log_deadline\x18\x01 \x01(\x05\x12\x1e\n\x16\x66\x65tch_archive_deadline\x18\x02 \x01(\x05')
+  serialized_pb='\n\x14service_config.proto\x12\x0bluci.config\"\xa2\x01\n\x07Project\x12\n\n\x02id\x18\x01 \x02(\t\x12\x17\n\x0f\x63onfig_location\x18\x02 \x01(\t\x12\x43\n\x13\x63onfig_storage_type\x18\x03 \x01(\x0e\x32&.luci.config.Project.ConfigStorageType\"-\n\x11\x43onfigStorageType\x12\x0b\n\x07UNKNOWN\x10\x00\x12\x0b\n\x07GITILES\x10\x01\"5\n\x0bProjectsCfg\x12&\n\x08projects\x18\x01 \x03(\x0b\x32\x14.luci.config.Project\"D\n\x06\x41\x63lCfg\x12\x1c\n\x14service_access_group\x18\x01 \x01(\t\x12\x1c\n\x14project_access_group\x18\x02 \x01(\t\"\xf4\x01\n\tImportCfg\x12/\n\x07gitiles\x18\x01 \x01(\x0b\x32\x1e.luci.config.ImportCfg.Gitiles\x1a\xb5\x01\n\x07Gitiles\x12\x1a\n\x12\x66\x65tch_log_deadline\x18\x01 \x01(\x05\x12\x1e\n\x16\x66\x65tch_archive_deadline\x18\x02 \x01(\x05\x12%\n\x1dproject_config_default_branch\x18\x03 \x01(\t\x12#\n\x1bproject_config_default_path\x18\x04 \x01(\t\x12\"\n\x1a\x62ranch_config_default_path\x18\x05 \x01(\t')
 
 
+
+_PROJECT_CONFIGSTORAGETYPE = _descriptor.EnumDescriptor(
+  name='ConfigStorageType',
+  full_name='luci.config.Project.ConfigStorageType',
+  filename=None,
+  file=DESCRIPTOR,
+  values=[
+    _descriptor.EnumValueDescriptor(
+      name='UNKNOWN', index=0, number=0,
+      options=None,
+      type=None),
+    _descriptor.EnumValueDescriptor(
+      name='GITILES', index=1, number=1,
+      options=None,
+      type=None),
+  ],
+  containing_type=None,
+  options=None,
+  serialized_start=155,
+  serialized_end=200,
+)
+
+
+_PROJECT = _descriptor.Descriptor(
+  name='Project',
+  full_name='luci.config.Project',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='id', full_name='luci.config.Project.id', index=0,
+      number=1, type=9, cpp_type=9, label=2,
+      has_default_value=False, default_value=unicode("", "utf-8"),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='config_location', full_name='luci.config.Project.config_location', index=1,
+      number=2, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=unicode("", "utf-8"),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='config_storage_type', full_name='luci.config.Project.config_storage_type', index=2,
+      number=3, type=14, cpp_type=8, label=1,
+      has_default_value=False, default_value=0,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+    _PROJECT_CONFIGSTORAGETYPE,
+  ],
+  options=None,
+  is_extendable=False,
+  extension_ranges=[],
+  serialized_start=38,
+  serialized_end=200,
+)
+
+
+_PROJECTSCFG = _descriptor.Descriptor(
+  name='ProjectsCfg',
+  full_name='luci.config.ProjectsCfg',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='projects', full_name='luci.config.ProjectsCfg.projects', index=0,
+      number=1, type=11, cpp_type=10, label=3,
+      has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  options=None,
+  is_extendable=False,
+  extension_ranges=[],
+  serialized_start=202,
+  serialized_end=255,
+)
 
 
 _ACLCFG = _descriptor.Descriptor(
@@ -32,6 +124,13 @@ _ACLCFG = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
+    _descriptor.FieldDescriptor(
+      name='project_access_group', full_name='luci.config.AclCfg.project_access_group', index=1,
+      number=2, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=unicode("", "utf-8"),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
   ],
   extensions=[
   ],
@@ -41,8 +140,8 @@ _ACLCFG = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=37,
-  serialized_end=75,
+  serialized_start=257,
+  serialized_end=325,
 )
 
 
@@ -67,6 +166,27 @@ _IMPORTCFG_GITILES = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
+    _descriptor.FieldDescriptor(
+      name='project_config_default_branch', full_name='luci.config.ImportCfg.Gitiles.project_config_default_branch', index=2,
+      number=3, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=unicode("", "utf-8"),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='project_config_default_path', full_name='luci.config.ImportCfg.Gitiles.project_config_default_path', index=3,
+      number=4, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=unicode("", "utf-8"),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='branch_config_default_path', full_name='luci.config.ImportCfg.Gitiles.branch_config_default_path', index=4,
+      number=5, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=unicode("", "utf-8"),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
   ],
   extensions=[
   ],
@@ -76,8 +196,8 @@ _IMPORTCFG_GITILES = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=140,
-  serialized_end=209,
+  serialized_start=391,
+  serialized_end=572,
 )
 
 _IMPORTCFG = _descriptor.Descriptor(
@@ -103,14 +223,31 @@ _IMPORTCFG = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=78,
-  serialized_end=209,
+  serialized_start=328,
+  serialized_end=572,
 )
 
+_PROJECT.fields_by_name['config_storage_type'].enum_type = _PROJECT_CONFIGSTORAGETYPE
+_PROJECT_CONFIGSTORAGETYPE.containing_type = _PROJECT;
+_PROJECTSCFG.fields_by_name['projects'].message_type = _PROJECT
 _IMPORTCFG_GITILES.containing_type = _IMPORTCFG;
 _IMPORTCFG.fields_by_name['gitiles'].message_type = _IMPORTCFG_GITILES
+DESCRIPTOR.message_types_by_name['Project'] = _PROJECT
+DESCRIPTOR.message_types_by_name['ProjectsCfg'] = _PROJECTSCFG
 DESCRIPTOR.message_types_by_name['AclCfg'] = _ACLCFG
 DESCRIPTOR.message_types_by_name['ImportCfg'] = _IMPORTCFG
+
+class Project(_message.Message):
+  __metaclass__ = _reflection.GeneratedProtocolMessageType
+  DESCRIPTOR = _PROJECT
+
+  # @@protoc_insertion_point(class_scope:luci.config.Project)
+
+class ProjectsCfg(_message.Message):
+  __metaclass__ = _reflection.GeneratedProtocolMessageType
+  DESCRIPTOR = _PROJECTSCFG
+
+  # @@protoc_insertion_point(class_scope:luci.config.ProjectsCfg)
 
 class AclCfg(_message.Message):
   __metaclass__ = _reflection.GeneratedProtocolMessageType

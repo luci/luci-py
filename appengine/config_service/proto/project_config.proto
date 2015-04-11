@@ -1,0 +1,31 @@
+// Copyright 2014 The Swarming Authors. All rights reserved.
+// Use of this source code is governed by the Apache v2.0 license that can be
+// found in the LICENSE file.
+
+// Schemas for some of config files in projects/<project_id> config sets.
+
+syntax = "proto2";
+
+package config_service;
+
+// Schema for project.cfg
+message ProjectCfg {
+  // Full name of the project.
+  optional string name = 1;
+}
+
+// Schema of branches.cfg.
+message BranchesCfg {
+  message Branch {
+    // Name of the branch.
+    optional string name = 1;
+    // Branch name glob.
+    // optional string name_glob = 2; TODO(nodirt): implement.
+    // Path to config directory for the branch. Defaults to "infra/config".
+    optional string config_path = 3;
+  }
+  // List of branches that have configuration files and need to be fetched into
+  // luci-config. Branches are accessible through get_branches() API endpoint.
+  // A CI servie can read all branches of all projects and build them.
+  repeated Branch branches = 1;
+}

@@ -44,6 +44,48 @@ class StorageTestCase(test_case.TestCase):
     self.assertEqual(
         content_hash, 'v1:6b584e8ece562ebffc15d38808cd6b98fc3d97ea')
 
+  def test_get_latest_multi(self):
+    self.put_file('foo', 'deadbeef', 'a.cfg', 'fooo')
+    self.put_file('bar', 'beefdead', 'a.cfg', 'barr')
+
+    expected = [
+      {
+        'config_set': 'foo',
+        'revision': 'deadbeef',
+        'content_hash': 'v1:551f4d3376caed56a600e02dfaa733b68898dc2b',
+        'content': 'fooo',
+      },
+      {
+        'config_set': 'bar',
+        'revision': 'beefdead',
+        'content_hash': 'v1:f89094690273aed90f20da47629315b54e494eb8',
+        'content': 'barr',
+      },
+    ]
+    actual = storage.get_latest_multi(['foo', 'bar'], 'a.cfg')
+    self.assertEqual(expected, actual)
+
+  def test_get_latest_multi_hashes_only(self):
+    self.put_file('foo', 'deadbeef', 'a.cfg', 'fooo')
+    self.put_file('bar', 'beefdead', 'a.cfg', 'barr')
+
+    expected = [
+      {
+        'config_set': 'foo',
+        'revision': 'deadbeef',
+        'content_hash': 'v1:551f4d3376caed56a600e02dfaa733b68898dc2b',
+        'content': None,
+      },
+      {
+        'config_set': 'bar',
+        'revision': 'beefdead',
+        'content_hash': 'v1:f89094690273aed90f20da47629315b54e494eb8',
+        'content': None,
+      },
+    ]
+    actual = storage.get_latest_multi(['foo', 'bar'], 'a.cfg', hashes_only=True)
+    self.assertEqual(expected, actual)
+
   def test_get_latest_non_existing_config_set(self):
     revision, content_hash = storage.get_config_hash('foo', 'config.yaml')
     self.assertEqual(revision, None)

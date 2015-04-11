@@ -8,14 +8,11 @@ import hashlib
 import logging
 
 from google.appengine.api import app_identity
-from google.appengine.api import memcache
 from google.appengine.ext import ndb
 from google.protobuf import text_format
 
+from components import utils
 from components.datastore_utils import txn
-
-
-CACHE_TIMEOUT_SECONDS = 50
 
 
 class Blob(ndb.Model):
@@ -119,6 +116,45 @@ def get_latest(config_set, path):
   return get_config_by_hash(content_hash)
 
 
+def get_latest_multi(config_sets, path, hashes_only=False):
+  """Returns latest contents of all <config_set>:<path> config files.
+
+  Returns:
+    A a list of dicts with keys 'config_set', 'revision', 'content_hash' and
+    'content'. Content is not available if |hashes_only| is True.
+  """
+  assert path
+  assert not path.startswith('/')
+
+  config_set_keys = [ndb.Key(ConfigSet, cs) for cs in config_sets]
+  config_set_entities = filter(None, ndb.get_multi(config_set_keys))
+
+  file_keys = [
+    ndb.Key(ConfigSet, cs.key.id(), Revision, cs.latest_revision, File, path)
+    for cs in config_set_entities
+  ]
+  file_entities = filter(None, ndb.get_multi(file_keys))
+
+  results = [
+    {
+      'config_set': f.key.parent().parent().id(),
+      'revision': f.key.parent().id(),
+      'content_hash': f.content_hash,
+      'content': (
+          None if hashes_only else ndb.Key(Blob, f.content_hash).get_async()),
+    }
+    for f in file_entities
+  ]
+
+  if not hashes_only:
+    for r in results:
+      blob = r['content'].get_result()
+      r['content'] = blob.content if blob else None
+
+  return results
+
+
+@utils.memcache('latest_message', ['config_set', 'path'])
 def get_latest_as_message(config_set, path, message_factory):
   """Reads latest config file as a text-formatted protobuf message.
 
@@ -128,22 +164,21 @@ def get_latest_as_message(config_set, path, message_factory):
 
   Memcaches results.
   """
-  cache_key = 'latest_message/%s:%s' % (config_set, path)
-  msg = memcache.get(cache_key)
-  if msg is not None:
-    return msg
   msg = message_factory()
   text = get_latest(config_set, path)
   if text:
     text_format.Merge(text, msg)
-  memcache.add(cache_key, msg, CACHE_TIMEOUT_SECONDS)
   return msg
+
+
+@utils.cache
+def get_self_config_set():
+  return 'services/%s' % app_identity.get_application_id()
 
 
 def get_self_config(path, message_factory):
   """Parses a config file in the app's config set into a protobuf message."""
-  config_set = 'services/%s' % app_identity.get_application_id()
-  return get_latest_as_message(config_set, path, message_factory)
+  return get_latest_as_message(get_self_config_set(), path, message_factory)
 
 
 def compute_hash(content):
