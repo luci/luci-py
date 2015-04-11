@@ -69,12 +69,12 @@ class StorageTestCase(test_case.TestCase):
     self.assertEqual(blob.content, content)
 
   def test_message_field_merge(self):
-    default_msg = service_config_pb2.AclCfg(service_access_group='def-group')
+    default_msg = service_config_pb2.ImportCfg(
+        gitiles=service_config_pb2.ImportCfg.Gitiles(fetch_log_deadline=42))
     self.mock(storage, 'get_latest', mock.Mock())
-    storage.get_latest.return_value = ''
-
-    msg = storage.get_self_config('acl.cfg', lambda: default_msg)
-    self.assertEqual(msg.service_access_group, 'def-group')
+    storage.get_latest.return_value = 'gitiles { fetch_archive_deadline: 10 }'
+    msg = storage.get_self_config('import.cfg', lambda: default_msg)
+    self.assertEqual(msg.gitiles.fetch_log_deadline, 42)
 
   def test_get_self_config(self):
     expected = service_config_pb2.AclCfg(service_access_group='group')

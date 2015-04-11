@@ -13,14 +13,6 @@ import urlparse
 from components import gerrit
 
 
-GitilesUrl = collections.namedtuple(
-    'GitilesUrl',
-    [
-      'hostname',
-      'project',
-      'treeish',
-      'path',
-    ])
 Contribution = collections.namedtuple(
     'Contribution', ['name', 'email', 'time'])
 Commit = collections.namedtuple(
@@ -43,49 +35,143 @@ Log = collections.namedtuple('Log', ['commits'])
 RGX_URL_PATH = re.compile('/([^\+]+)(\+/(.*))?')
 
 
-def parse_gitiles_url(url):
-  """Parses a Gitiles-formatted url.
+LocationTuple = collections.namedtuple(
+    'LocationTuple', ['hostname', 'project', 'treeish', 'path'])
 
-  If /a authentication prefix is present in |url|, it is omitted.
+
+class Location(LocationTuple):
+  """Gitiles URL. Immutable.
+
+  Contains gitiles methods, such as get_log, for convenience.
   """
-  parsed = urlparse.urlparse(url)
-  path_match = RGX_URL_PATH.match(parsed.path)
-  if not path_match:
-    raise ValueError('Invalid Gitiles repo url: %s' % url)
 
-  project = path_match.group(1)
-  if project.startswith('a/'):
-    project = project[len('a/'):]
-  project = project.strip('/')
+  def __eq__(self, other):
+    return str(self) == str(other)
 
-  treeish_and_path = path_match.group(3) or '/'
-  if not treeish_and_path.endswith('/'):
-    treeish_and_path += '/'
-  sep = '/./' if '/./' in treeish_and_path else '/'
-  treeish, path = treeish_and_path.split(sep, 1)
-  assert not treeish.startswith('/')
-  path = '/' + path.strip('/')
+  def __ne__(self, other):
+    return not self.__eq__(other)
 
-  return GitilesUrl(
-      hostname=parsed.netloc,
-      project=project,
-      treeish=treeish,
-      path=path)
+  @classmethod
+  def parse(cls, url, treeishes=None):
+    """Parses a Gitiles-formatted url.
 
+    If /a authentication prefix is present in |url|, it is omitted.
 
-def unparse_gitiles_url(gitiles_url):
-  """Converts GitilesUrl to str."""
-  assert gitiles_url
-  assert gitiles_url.hostname
-  assert gitiles_url.project
+    Args:
+      url (str): url to parse.
+      treeishes (list of str): if None (default), treats first directory after
+        /+/ as treeish. Otherwise, finds longest prefix present in |treeishes|.
 
-  result = 'https://{hostname}/{project}'.format(**gitiles_url._asdict())
+    Returns:
+      gitiles.Location.
+        treeish: if not present in the |url|, defaults to 'HEAD'.
+        path: always starts with '/'. If not present in |url|, it is just '/'.
+    """
+    parsed = urlparse.urlparse(url)
+    path_match = RGX_URL_PATH.match(parsed.path)
+    if not path_match:
+      raise ValueError('Invalid Gitiles repo url: %s' % url)
 
-  if gitiles_url.treeish or gitiles_url.path:
-    result += '/+/%s' % (gitiles_url.treeish or 'master').strip('/')
-  if gitiles_url.path:
-    result += '/./%s' % gitiles_url.path.strip('/')
-  return result
+    hostname = parsed.netloc
+    project = path_match.group(1)
+    if project.startswith('a/'):
+      project = project[len('a/'):]
+    project = project.strip('/')
+
+    treeish_and_path = (path_match.group(3) or '').strip('/')
+    first_slash = treeish_and_path.find('/')
+    if first_slash == -1:
+      treeish = treeish_and_path
+      path = '/'
+    elif not treeishes:
+      treeish = treeish_and_path[:first_slash]
+      path = treeish_and_path[first_slash:]
+    else:
+      treeish = treeish_and_path
+      treeishes = set(treeishes)
+      while True:
+        if treeish in treeishes:
+          break
+        i = treeish.rfind('/')
+        assert i != 0
+        if i == -1:
+          break
+        treeish = treeish[:i]
+      path = treeish_and_path[len(treeish):]
+
+    treeish = treeish or 'HEAD'
+
+    path = path or ''
+    if not path.startswith('/'):
+      path = '/' + path
+
+    # Check yourself.
+    _validate_args(hostname, project, treeish, path, path_required=True)
+
+    return cls(hostname, project, treeish, path)
+
+  @classmethod
+  def parse_resolve(cls, url):
+    """Like parse, but supports refs with slashes.
+
+    May send a get_refs() request.
+    """
+    loc = cls.parse(url)
+    if loc.path and loc.path != '/':
+      # If true ref name contains slash, a prefix of path might be suffix of
+      # ref. Try to resolve it.
+      refs = get_refs(loc.hostname, loc.project)
+      if refs:
+        treeishes = set(refs.keys())
+        for ref in refs.iterkeys():
+          for prefix in ('refs/tags/', 'refs/heads/'):
+            if ref.startswith(prefix):
+              treeishes.add(ref[len(prefix):])
+              break
+        loc = cls.parse(url, treeishes=treeishes)
+    return loc
+
+  def __str__(self):
+    result = 'https://{hostname}/{project}'.format(
+        hostname=self.hostname, project=self.project)
+    path = (self.path or '').strip('/')
+
+    if self.treeish or path:
+      result += '/+/%s' % self.treeish_safe
+    if path:
+      result += '/%s' % path
+    return result
+
+  @property
+  def treeish_safe(self):
+    return (self.treeish or 'HEAD').strip('/')
+
+  @property
+  def path_safe(self):
+    path = self.path or '/'
+    if not path.startswith('/'):
+      path = '/' + path
+    return path
+
+  def get_log(self, **kwargs):
+    return get_log(
+        self.hostname, self.project, self.treeish_safe, self.path_safe,
+        **kwargs)
+
+  def get_tree(self, **kwargs):
+    return get_tree(
+        self.hostname, self.project, self.treeish_safe, self.path_safe,
+        **kwargs)
+
+  def get_archive(self, **kwargs):
+    return get_archive(
+        self.hostname, self.project, self.treeish_safe, self.path_safe,
+        **kwargs)
+
+  def get_file_content(self, **kwargs):
+    return get_file_content(
+        self.hostname, self.project, self.treeish_safe, self.path_safe,
+        **kwargs)
 
 
 def parse_time(tm):
@@ -136,22 +222,21 @@ def get_commit(hostname, project, treeish):
   Returns:
     Commit object, or None if the commit was not found.
   """
+  _validate_args(hostname, project, treeish)
   data = gerrit.fetch_json(hostname, '%s/+/%s' % (project, treeish))
   if data is None:
     return None
   return _parse_commit(data)
 
 
-def get_tree(hostname, project, treeish, path):
+def get_tree(hostname, project, treeish, path=None):
   """Gets a tree object.
 
   Returns:
     Tree object, or None if the tree was not found.
   """
-  assert project
-  assert treeish
-  assert path
-  data = gerrit.fetch_json(hostname, '%s/+/%s/.%s' % (project, treeish, path))
+  _validate_args(hostname, project, treeish, path)
+  data = gerrit.fetch_json(hostname, '%s/+/%s%s' % (project, treeish, path))
   if data is None:
     return None
 
@@ -168,7 +253,7 @@ def get_tree(hostname, project, treeish, path):
       ])
 
 
-def get_log(hostname, project, treeish, path=None, limit=None):
+def get_log(hostname, project, treeish, path=None, limit=None, **fetch_kwargs):
   """Gets a commit log.
 
   Does not support paging.
@@ -176,46 +261,77 @@ def get_log(hostname, project, treeish, path=None, limit=None):
   Returns:
     Log object, or None if no log available.
   """
+  _validate_args(hostname, project, treeish, path)
   query_params = {}
   if limit:
     query_params['n'] = limit
+  path = (path or '').strip('/')
   data = gerrit.fetch_json(
       hostname,
-      '%s/+log/%s/.%s' % (project, treeish, path or '/'),
-      query_params=query_params)
+      '%s/+log/%s/%s' % (project, treeish, path),
+      query_params=query_params,
+      **fetch_kwargs)
   if data is None:
     return None
   return Log(
       commits=[_parse_commit(c) for c in data.get('log', [])])
 
 
-def get_file_content(hostname, project, treeish, path):
+def get_file_content(hostname, project, treeish, path, **fetch_kwargs):
   """Gets file contents.
 
   Returns:
     Raw contents of the file.
   """
-  assert hostname
-  assert project
-  assert treeish
-  assert path
-  assert path.startswith('/')
+  _validate_args(hostname, project, treeish, path, path_required=True)
   data = gerrit.fetch(
       hostname,
-      '%s/+/%s/.%s' % (project, treeish, path),
-      accept_header='text/plain').content
+      '%s/+/%s%s' % (project, treeish, path),
+      accept_header='text/plain', **fetch_kwargs).content
   if data is None:
     return None
   return base64.b64decode(data)
 
 
-def get_archive(hostname, project, treeish, dir_path=None):
+def get_archive(hostname, project, treeish, dir_path=None, **fetch_kwargs):
   """Gets a directory as a tar.gz archive."""
-  assert project
-  assert treeish
+  _validate_args(hostname, project, treeish, dir_path)
   dir_path = (dir_path or '').strip('/')
   if dir_path:
-    dir_path = '/./%s' % dir_path
+    dir_path = '/%s' % dir_path
   res = gerrit.fetch(
-      hostname, '%s/+archive/%s%s.tar.gz' % (project, treeish, dir_path))
+      hostname, '%s/+archive/%s%s.tar.gz' % (project, treeish, dir_path),
+      **fetch_kwargs)
   return res.content if res else None
+
+
+def get_refs(hostname, project, **fetch_kwargs):
+  """Gets refs from the server.
+
+  Returns:
+    Dict (ref_name -> last_commit_sha), or None if repository was not found.
+  """
+  _validate_args(hostname, project)
+  res = gerrit.fetch_json(hostname, '%s/+refs' % project, **fetch_kwargs)
+  if res is None:
+    return None
+  return {k: v['value'] for k, v in res.iteritems()}
+
+
+def assert_non_empty_string(value):
+  assert isinstance(value, basestring)
+  assert value
+
+
+def _validate_args(
+    hostname, project, treeish='HEAD', path=None, path_required=False):
+  assert_non_empty_string(hostname)
+  assert_non_empty_string(project)
+  assert_non_empty_string(treeish)
+  assert not treeish.startswith('/'), treeish
+  assert not treeish.endswith('/'), treeish
+  if path_required:
+    assert path is not None
+  if path is not None:
+    assert_non_empty_string(path)
+    assert path.startswith(path), path

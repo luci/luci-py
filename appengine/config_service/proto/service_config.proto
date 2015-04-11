@@ -13,3 +13,18 @@ message AclCfg {
   // Name of the group that has access to all services/* config sets.
   optional string service_access_group = 1;
 }
+
+// Schema for import.cfg. It specified how to import configuration files from
+// external sources.
+message ImportCfg {
+
+  message Gitiles {
+    // Request timeout in seconds when requesting commit log.
+    optional int32 fetch_log_deadline = 1;
+    // Request timeout in seconds when requesting directory archive.
+    optional int32 fetch_archive_deadline = 2;
+  }
+
+  // Configuration of import from Gitiles repositories.
+  optional Gitiles gitiles = 1;
+}

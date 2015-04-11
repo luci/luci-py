@@ -14,6 +14,7 @@ import webapp2
 from components import utils
 from components import ereporter2
 
+import admin
 import api
 import handlers
 
@@ -26,7 +27,7 @@ def create_html_app():  # pragma: no cover
 
 def create_endpoints_app():  # pragma: no cover
   """Returns WSGI app that serves cloud endpoints requests."""
-  return endpoints.api_server([api.ConfigApi])
+  return endpoints.api_server([api.ConfigApi, admin.AdminApi])
 
 
 def create_backend_app():  # pragma: no cover

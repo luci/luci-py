@@ -100,7 +100,7 @@ class GitilesTestCase(test_case.TestCase):
     self.assertEqual(commit.author.email, 'john.doe@chromium.org')
 
   def test_get_tree(self):
-    req_path = 'project/+/deadbeef/./dir'
+    req_path = 'project/+/deadbeef/dir'
     gerrit.fetch_json.return_value = {
         'id': 'c244aa92a18cd719c55205f99e04333840330012',
         'entries': [
@@ -128,7 +128,7 @@ class GitilesTestCase(test_case.TestCase):
     self.assertEqual(tree.entries[0].name, 'a')
 
   def test_get_log(self):
-    req_path = 'project/+log/master/./'
+    req_path = 'project/+log/master/'
     gerrit.fetch_json.return_value = {
       'log': [
         {
@@ -205,8 +205,24 @@ class GitilesTestCase(test_case.TestCase):
         )
     )
 
+  def test_get_log_with_slash(self):
+    req_path = 'project/+log/master/'
+    gerrit.fetch_json.return_value = None
+
+    gitiles.get_log(HOSTNAME, 'project', 'master', path='/', limit=2)
+    gerrit.fetch_json.assert_called_once_with(
+        HOSTNAME, req_path, query_params={'n': 2})
+
+  def test_get_log_with_path(self):
+    req_path = 'project/+log/master/x'
+    gerrit.fetch_json.return_value = None
+
+    gitiles.get_log(HOSTNAME, 'project', 'master', path='x', limit=2)
+    gerrit.fetch_json.assert_called_once_with(
+        HOSTNAME, req_path, query_params={'n': 2})
+
   def test_get_file_content(self):
-    req_path = 'project/+/master/./a.txt'
+    req_path = 'project/+/master/a.txt'
     gerrit.fetch.return_value.content = base64.b64encode('content')
 
     content = gitiles.get_file_content(HOSTNAME, 'project', 'master', '/a.txt')
@@ -223,45 +239,77 @@ class GitilesTestCase(test_case.TestCase):
     self.assertEqual('tar gz bytes', content)
 
   def test_get_archive_with_dirpath(self):
-    req_path = 'project/+archive/master/./dir.tar.gz'
+    req_path = 'project/+archive/master/dir.tar.gz'
     gerrit.fetch.return_value.content = 'tar gz bytes'
 
     content = gitiles.get_archive(HOSTNAME, 'project', 'master', '/dir')
     gerrit.fetch.assert_called_once_with(HOSTNAME, req_path)
     self.assertEqual('tar gz bytes', content)
 
-  def test_parse_url(self):
-    url = 'http://localhost/project/+/treeish/path'
-    parsed = gitiles.parse_gitiles_url(url)
-    self.assertEqual(parsed.hostname, 'localhost')
-    self.assertEqual(parsed.project, 'project')
-    self.assertEqual(parsed.treeish, 'treeish')
-    self.assertEqual(parsed.path, '/path')
+  def test_parse_location(self):
+    url = 'http://localhost/project/+/treeish/path/to/something'
+    loc = gitiles.Location.parse(url)
+    self.assertEqual(loc.hostname, 'localhost')
+    self.assertEqual(loc.project, 'project')
+    self.assertEqual(loc.treeish, 'treeish')
+    self.assertEqual(loc.path, '/path/to/something')
 
   def test_parse_authenticated_url(self):
     url = 'http://localhost/a/project/+/treeish/path'
-    parsed = gitiles.parse_gitiles_url(url)
-    self.assertEqual(parsed.hostname, 'localhost')
-    self.assertEqual(parsed.project, 'project')
+    loc = gitiles.Location.parse(url)
+    self.assertEqual(loc.hostname, 'localhost')
+    self.assertEqual(loc.project, 'project')
 
-  def test_parse_url_with_dot(self):
-    url = 'http://localhost/project/+/treeish/./path'
-    parsed = gitiles.parse_gitiles_url(url)
-    self.assertEqual(parsed.treeish, 'treeish')
-    self.assertEqual(parsed.path, '/path')
+  def test_parse_location_with_dot(self):
+    url = 'http://localhost/project/+/treeish/path'
+    loc = gitiles.Location.parse(url)
+    self.assertEqual(loc.treeish, 'treeish')
+    self.assertEqual(loc.path, '/path')
 
-  def test_unparse_url(self):
-    parsed = gitiles.GitilesUrl(
+  def test_parse_resolve(self):
+    self.mock(gitiles, 'get_refs', mock.Mock())
+    gitiles.get_refs.return_value = {
+      'refs/heads/master': {},
+      'refs/heads/a/b': {},
+      'refs/tags/c/d': {},
+    }
+    loc = gitiles.Location.parse_resolve('http://h/p/+/a/b/c')
+    self.assertEqual(loc.treeish, 'a/b')
+    self.assertEqual(loc.path, '/c')
+
+    loc = gitiles.Location.parse_resolve('http://h/p/+/c/d/e')
+    self.assertEqual(loc.treeish, 'c/d')
+    self.assertEqual(loc.path, '/e')
+
+    loc = gitiles.Location.parse_resolve('http://h/p/+/a/c/b')
+    self.assertEqual(loc.treeish, 'a')
+    self.assertEqual(loc.path, '/c/b')
+
+  def test_location_neq(self):
+    loc1 = gitiles.Location(
         hostname='localhost', project='project',
         treeish='treeish', path='/path')
-    url = gitiles.unparse_gitiles_url(parsed)
-    self.assertEqual(url, 'https://localhost/project/+/treeish/./path')
+    loc2 = gitiles.Location(
+        hostname='localhost', project='project',
+        treeish='treeish', path='/path')
+    self.assertFalse(loc1.__ne__(loc2))
 
-  def test_unparse_url_defaults_to_master(self):
-    parsed = gitiles.GitilesUrl(
+  def test_location_str(self):
+    loc = gitiles.Location(
+        hostname='localhost', project='project',
+        treeish='treeish', path='/path')
+    self.assertEqual(loc, 'https://localhost/project/+/treeish/path')
+
+  def test_location_str_with_slash_path(self):
+    loc = gitiles.Location(
+        hostname='localhost', project='project',
+        treeish='treeish', path='/')
+    self.assertEqual(loc, 'https://localhost/project/+/treeish')
+
+  def test_location_str_defaults_to_head(self):
+    loc = gitiles.Location(
         hostname='localhost', project='project', treeish=None, path='/path')
-    url = gitiles.unparse_gitiles_url(parsed)
-    self.assertEqual(url, 'https://localhost/project/+/master/./path')
+    self.assertEqual(loc, 'https://localhost/project/+/HEAD/path')
 
 
 if __name__ == '__main__':

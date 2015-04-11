@@ -12,6 +12,8 @@ from google.appengine.api import memcache
 from google.appengine.ext import ndb
 from google.protobuf import text_format
 
+from components.datastore_utils import txn
+
 
 CACHE_TIMEOUT_SECONDS = 50
 
@@ -34,6 +36,8 @@ class ConfigSet(ndb.Model):
 
   Entity key:
     Id is a config set name. Examples: services/luci-config, projects/chromium.
+
+  gitiles_import.py relies on the fact that this class has only one attribute.
   """
   # last imported revision of the config set. See also Revision and File.
   latest_revision = ndb.StringProperty(required=True)
@@ -153,19 +157,20 @@ def compute_hash(content):
   return 'v1:%s' % sha.hexdigest()
 
 
-@ndb.non_transactional
-def import_blob(content):
+@ndb.tasklet
+def import_blob_async(content, content_hash=None):
   """Saves |content| to a Blob entity.
 
   Returns:
     Content hash.
   """
-  content_hash = compute_hash(content)
+  content_hash = content_hash or compute_hash(content)
 
   # pylint: disable=E1120
-  @ndb.transactional(propagation=ndb.TransactionOptions.INDEPENDENT)
-  def do_import():
-    Blob(id=content_hash, content=content).put()
   if not Blob.get_by_id(content_hash):
-    do_import()
-  return content_hash
+    yield Blob(id=content_hash, content=content).put_async()
+  raise ndb.Return(content_hash)
+
+
+def import_blob(content, content_hash=None):
+  return import_blob_async(content, content_hash=content_hash).get_result()

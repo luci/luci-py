@@ -4,6 +4,11 @@
 
 cron:
 
+- description: import configs from Gitiles
+  target: backend
+  url: /internal/cron/luci-config/gitiles_import
+  schedule: every 2 minutes
+
 ### ereporter2
 
 - description: ereporter2 cleanup

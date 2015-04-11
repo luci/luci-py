@@ -143,7 +143,8 @@ def set_review(
 
 def fetch(
     hostname, path, query_params=None, method='GET', payload=None,
-    expect_status=(httplib.OK, httplib.NOT_FOUND), accept_header=None):
+    expect_status=(httplib.OK, httplib.NOT_FOUND), accept_header=None,
+    deadline=None):
   """Makes a single authenticated blocking request using urlfetch.
 
   Raises
@@ -168,9 +169,13 @@ def fetch(
 
   try:
     logging.debug('%s %s' % (method, url))
+    fetch_kwargs = {}
+    if deadline is not None:
+      fetch_kwargs['deadline'] = deadline
     response = urlfetch.fetch(
         url, payload=payload, method=method, headers=request_headers,
-        follow_redirects=False, validate_certificate=True)
+        follow_redirects=False, validate_certificate=True,
+        **fetch_kwargs)
   except urlfetch.Error as err:  # pragma: no cover
     raise Error(None, err.message)
 
@@ -193,11 +198,12 @@ def fetch(
 
 def fetch_json(
     hostname, path, query_params=None, method='GET', body=None,
-    expect_status=(httplib.OK, httplib.NOT_FOUND)):
+    expect_status=(httplib.OK, httplib.NOT_FOUND),
+    deadline=None):
   payload = json.dumps(body) if body else None
   res = fetch(
       hostname, path, query_params, method, payload, expect_status,
-      accept_header='application/json')
+      accept_header='application/json', deadline=deadline)
   if not res or not res.content:
     return None
   if not res.content.startswith(RESPONSE_PREFIX):
