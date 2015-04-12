@@ -15,6 +15,7 @@ test_env.setup_test_env()
 from test_support import test_case
 import mock
 
+from components import auth
 from components import gerrit
 from components import gitiles
 
@@ -30,6 +31,7 @@ class GitilesTestCase(test_case.TestCase):
     super(GitilesTestCase, self).setUp()
     self.mock(gerrit, 'fetch_json', mock.Mock())
     self.mock(gerrit, 'fetch', mock.Mock())
+    self.mock(auth, 'get_access_token', mock.Mock(return_value=('token', 0.0)))
 
   def test_parse_time(self):
     time_str = 'Fri Nov 07 17:09:03 2014'

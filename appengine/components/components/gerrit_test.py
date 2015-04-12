@@ -34,6 +34,7 @@ class GerritFetchTestCase(test_case.TestCase):
         content='',
     )
     self.mock(urlfetch, 'fetch', mock.Mock(return_value=self.response))
+    self.mock(auth, 'get_access_token', mock.Mock(return_value=('token', 0.0)))
 
   def test_fetch(self):
     req_body = {'b': 2}

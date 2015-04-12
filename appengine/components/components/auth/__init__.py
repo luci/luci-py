@@ -28,6 +28,7 @@ from handler import *
 from host_token import *
 from ipaddr import *
 from model import *
+from service_account import *
 from signature import *
 from tokens import *
 from ui.app import *

@@ -11,11 +11,9 @@ import logging
 import urllib
 import urlparse
 
-from google.appengine.api import app_identity
 from google.appengine.api import urlfetch
 
 from components import auth
-from components import utils
 
 
 AUTH_SCOPE = 'https://www.googleapis.com/auth/gerritcodereview'
@@ -162,7 +160,7 @@ def fetch(
     url = '%s?%s' % (url, urllib.urlencode(query_params))
   request_headers = {
     'Content-Type': 'application/json',
-    'Authorization': 'OAuth %s' % get_access_token(),
+    'Authorization': 'Bearer %s' % auth.get_access_token([AUTH_SCOPE])[0],
   }
   if accept_header:
     request_headers['Accept'] = accept_header
@@ -212,22 +210,3 @@ def fetch_json(
     raise Error(res.status_code, msg)
   content = res.content[len(RESPONSE_PREFIX):]
   return json.loads(content)
-
-
-def get_access_token():  # pragma: no cover
-  """Returns OAuth token to use when talking to Gitiles servers."""
-  # On real GAE use app service account.
-  if not utils.is_local_dev_server():
-    return app_identity.get_access_token(
-        ['https://www.googleapis.com/auth/gerritcodereview'])[0]
-  # On dev server allow custom tokens loaded from local_dev_config. Use 'imp'
-  # because dev_appserver tries to emulate app sandbox and hacks 'import' to
-  # respect 'skip_files:' section in app.yaml.
-  try:
-    import imp
-    local_dev_config = imp.load_source(
-        'local_dev_config', 'local_dev_config.py')
-    # Copy your chrome-internal .netrc token there.
-    return local_dev_config.GITILES_OAUTH_TOKEN
-  except (ImportError, IOError):
-    return 'fake_token'

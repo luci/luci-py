@@ -39,7 +39,6 @@ import logging
 import StringIO
 import tarfile
 
-from google.appengine.api import app_identity
 from google.appengine.ext import ndb
 
 from components import auth
@@ -354,8 +353,8 @@ def fetch_file_async(url, oauth_scopes):
 
   headers = {}
   if oauth_scopes:
-    headers['Authorization'] = 'OAuth %s' % (
-        app_identity.get_access_token(oauth_scopes)[0])
+    headers['Authorization'] = 'Bearer %s' % (
+        auth.get_access_token(oauth_scopes)[0])
 
   ctx = ndb.get_context()
   result = yield ctx.urlfetch(

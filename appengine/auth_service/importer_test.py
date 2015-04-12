@@ -78,12 +78,12 @@ class ImporterTest(test_case.TestCase):
   def mock_urlfetch(self, urls):
     def mock_get_access_token(_scope):
       return 'token', 0
-    self.mock(importer.app_identity, 'get_access_token', mock_get_access_token)
+    self.mock(auth, 'get_access_token', mock_get_access_token)
 
     @ndb.tasklet
     def mock_fetch(**kwargs):
       self.assertIn(kwargs['url'], urls)
-      self.assertEqual({'Authorization': 'OAuth token'}, kwargs['headers'])
+      self.assertEqual({'Authorization': 'Bearer token'}, kwargs['headers'])
       class ReturnValue(object):
         status_code = 200
         content = urls[kwargs['url']]
