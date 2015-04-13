@@ -97,10 +97,9 @@ class TaskDetails(object):
     self.bot_id = data['bot_id']
     self.command = data['command']
     self.data = data['data']
-    self.env = os.environ.copy()
-    self.env.update(
-        (k.encode('utf-8'), v.encode('utf-8'))
-        for k, v in data['env'].iteritems())
+    self.env = {
+      k.encode('utf-8'): v.encode('utf-8') for k, v in data['env'].iteritems()
+    }
     self.grace_period = data['grace_period']
     self.hard_timeout = data['hard_timeout']
     self.io_timeout = data['io_timeout']

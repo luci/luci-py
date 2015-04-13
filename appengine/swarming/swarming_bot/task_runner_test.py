@@ -298,7 +298,9 @@ class TestTaskRunner(TestTaskRunnerBase):
       def __init__(self2, cmd, cwd, env, stdout, stderr, stdin, detached):
         self.assertEqual(task_details.command, cmd)
         self.assertEqual('./', cwd)
-        self.assertEqual(os.environ, env)
+        expected_env = os.environ.copy()
+        expected_env['foo'] = 'bar'
+        self.assertEqual(expected_env, env)
         self.assertEqual(subprocess.PIPE, stdout)
         self.assertEqual(subprocess.STDOUT, stderr)
         self.assertEqual(subprocess.PIPE, stdin)
@@ -391,7 +393,7 @@ class TestTaskRunner(TestTaskRunnerBase):
           'bot_id': 'localhost',
           'command': ['large', 'executable'],
           'data': [],
-          'env': {},
+          'env': {'foo': 'bar'},
           'grace_period': 30.,
           'hard_timeout': 60,
           'io_timeout': 60,

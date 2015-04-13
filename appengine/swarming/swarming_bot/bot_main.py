@@ -275,7 +275,7 @@ def run_bot(arg_error):
   call_hook(botobj, 'on_bot_startup')
 
   # This environment variable is accessible to the tasks executed by this bot.
-  os.environ['SWARMING_BOT_ID'] = botobj.id
+  os.environ['SWARMING_BOT_ID'] = botobj.id.encode('utf-8')
 
   # TODO(maruel): Run 'health check' on startup.
   # https://code.google.com/p/swarming/issues/detail?id=112
