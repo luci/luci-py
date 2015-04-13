@@ -42,6 +42,7 @@ import tarfile
 from google.appengine.ext import ndb
 
 from components import auth
+from components import net
 from components import utils
 from components.auth import model
 
@@ -345,28 +346,11 @@ def fetch_file_async(url, oauth_scopes):
   Raises:
     BundleImportError on fetch errors.
   """
-  if utils.is_local_dev_server():
-    protocols = ('http://', 'https://')
-  else:
-    protocols = ('https://',)
-  assert url.startswith(protocols), url
-
-  headers = {}
-  if oauth_scopes:
-    headers['Authorization'] = 'Bearer %s' % (
-        auth.get_access_token(oauth_scopes)[0])
-
-  ctx = ndb.get_context()
-  result = yield ctx.urlfetch(
-      url=url,
-      method='GET',
-      headers=headers,
-      follow_redirects=False,
-      deadline=5*60,
-      validate_certificate=True)
-  if result.status_code != 200:
-    raise BundleFetchError(url, result.status_code, result.content)
-  raise ndb.Return(result.content)
+  try:
+    data = yield net.request_async(url, scopes=oauth_scopes, deadline=60)
+    raise ndb.Return(data)
+  except net.Error as e:
+    raise BundleFetchError(url, e.status_code, e.content)
 
 
 def extract_tar_archive(content):

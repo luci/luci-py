@@ -76,7 +76,7 @@ class ImporterTest(test_case.TestCase):
     auth_testing.mock_get_current_identity(self)
 
   def mock_urlfetch(self, urls):
-    def mock_get_access_token(_scope):
+    def mock_get_access_token(*_args):
       return 'token', 0
     self.mock(auth, 'get_access_token', mock_get_access_token)
 

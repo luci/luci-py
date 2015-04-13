@@ -174,7 +174,7 @@ class GitilesTestCase(test_case.TestCase):
 
     log = gitiles.get_log(HOSTNAME, 'project', 'master', limit=2)
     gerrit.fetch_json.assert_called_once_with(
-        HOSTNAME, req_path, query_params={'n': 2})
+        HOSTNAME, req_path, params={'n': 2})
 
     john = gitiles.Contribution(
         name='John Doe', email='john.doe@chromium.org',
@@ -213,7 +213,7 @@ class GitilesTestCase(test_case.TestCase):
 
     gitiles.get_log(HOSTNAME, 'project', 'master', path='/', limit=2)
     gerrit.fetch_json.assert_called_once_with(
-        HOSTNAME, req_path, query_params={'n': 2})
+        HOSTNAME, req_path, params={'n': 2})
 
   def test_get_log_with_path(self):
     req_path = 'project/+log/master/x'
@@ -221,20 +221,20 @@ class GitilesTestCase(test_case.TestCase):
 
     gitiles.get_log(HOSTNAME, 'project', 'master', path='x', limit=2)
     gerrit.fetch_json.assert_called_once_with(
-        HOSTNAME, req_path, query_params={'n': 2})
+        HOSTNAME, req_path, params={'n': 2})
 
   def test_get_file_content(self):
     req_path = 'project/+/master/a.txt'
-    gerrit.fetch.return_value.content = base64.b64encode('content')
+    gerrit.fetch.return_value = base64.b64encode('content')
 
     content = gitiles.get_file_content(HOSTNAME, 'project', 'master', '/a.txt')
     gerrit.fetch.assert_called_once_with(
-        HOSTNAME, req_path, accept_header='text/plain')
+        HOSTNAME, req_path, headers={'Accept': 'text/plain'})
     self.assertEqual(content, 'content')
 
   def test_get_archive(self):
     req_path = 'project/+archive/master.tar.gz'
-    gerrit.fetch.return_value.content = 'tar gz bytes'
+    gerrit.fetch.return_value = 'tar gz bytes'
 
     content = gitiles.get_archive(HOSTNAME, 'project', 'master')
     gerrit.fetch.assert_called_once_with(HOSTNAME, req_path)
@@ -242,7 +242,7 @@ class GitilesTestCase(test_case.TestCase):
 
   def test_get_archive_with_dirpath(self):
     req_path = 'project/+archive/master/dir.tar.gz'
-    gerrit.fetch.return_value.content = 'tar gz bytes'
+    gerrit.fetch.return_value = 'tar gz bytes'
 
     content = gitiles.get_archive(HOSTNAME, 'project', 'master', '/dir')
     gerrit.fetch.assert_called_once_with(HOSTNAME, req_path)

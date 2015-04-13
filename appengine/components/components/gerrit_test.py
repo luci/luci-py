@@ -5,6 +5,7 @@
 
 import httplib
 import json
+import logging
 import sys
 import unittest
 
@@ -12,10 +13,12 @@ from test_support import test_env
 test_env.setup_test_env()
 
 import mock
-from google.appengine.api import urlfetch
+
+from google.appengine.ext import ndb
 
 from components import auth
 from components import gerrit
+from components import net
 from test_support import test_case
 
 
@@ -33,17 +36,22 @@ class GerritFetchTestCase(test_case.TestCase):
         headers={},
         content='',
     )
-    self.mock(urlfetch, 'fetch', mock.Mock(return_value=self.response))
+    self.urlfetch_mock = mock.Mock(return_value=self.response)
+    @ndb.tasklet
+    def mocked_urlfetch(**kwargs):
+      raise ndb.Return(self.urlfetch_mock(**kwargs))
+    self.mock(net, 'urlfetch_async', mocked_urlfetch)
     self.mock(auth, 'get_access_token', mock.Mock(return_value=('token', 0.0)))
+    self.mock(logging, 'warning', mock.Mock())
 
-  def test_fetch(self):
+  def test_post(self):
     req_body = {'b': 2}
     self.response.content = ')]}\'{"a":1}'
     actual = gerrit.fetch_json(
-        'localhost', 'p', body=req_body, query_params={'p': 1})
+        'localhost', 'p', method='POST', payload=req_body, params={'p': 1})
     self.assertEqual(actual, {'a': 1})
-    fetch_args, fetch_kwargs = urlfetch.fetch.call_args
-    self.assertEqual(fetch_args[0], 'https://localhost/a/p?p=1')
+    _, fetch_kwargs = self.urlfetch_mock.call_args
+    self.assertEqual(fetch_kwargs['url'], 'https://localhost/a/p?p=1')
     self.assertEqual(json.loads(fetch_kwargs.get('payload')), req_body)
 
   def test_not_found(self):
@@ -53,12 +61,12 @@ class GerritFetchTestCase(test_case.TestCase):
 
   def test_auth_failure(self):
     self.response.status_code = httplib.FORBIDDEN
-    with self.assertRaises(auth.AuthorizationError):
+    with self.assertRaises(net.AuthError):
       gerrit.fetch_json('localhost', 'a')
 
   def test_bad_prefix(self):
     self.response.content = 'abc'
-    with self.assertRaises(gerrit.Error):
+    with self.assertRaises(net.Error):
       gerrit.fetch_json('localhost', 'a')
 
 
@@ -131,7 +139,7 @@ class GerritTestCase(test_case.TestCase):
         'labels': labels,
     }
     gerrit.fetch_json.assert_called_with(
-        HOSTNAME, req_path, method='POST', body=expected_body)
+        HOSTNAME, req_path, method='POST', payload=expected_body)
 
     # Test with "notify" parameter.
     gerrit.set_review(
@@ -141,7 +149,7 @@ class GerritTestCase(test_case.TestCase):
         HOSTNAME,
         req_path,
         method='POST',
-        body={
+        payload={
           'message': 'Hi!',
           'labels': labels,
           'notify': 'ALL',

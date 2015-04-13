@@ -269,7 +269,7 @@ def get_log(hostname, project, treeish, path=None, limit=None, **fetch_kwargs):
   data = gerrit.fetch_json(
       hostname,
       '%s/+log/%s/%s' % (project, treeish, path),
-      query_params=query_params,
+      params=query_params,
       **fetch_kwargs)
   if data is None:
     return None
@@ -281,28 +281,26 @@ def get_file_content(hostname, project, treeish, path, **fetch_kwargs):
   """Gets file contents.
 
   Returns:
-    Raw contents of the file.
+    Raw contents of the file or None if not found.
   """
   _validate_args(hostname, project, treeish, path, path_required=True)
   data = gerrit.fetch(
       hostname,
       '%s/+/%s%s' % (project, treeish, path),
-      accept_header='text/plain', **fetch_kwargs).content
-  if data is None:
-    return None
-  return base64.b64decode(data)
+      headers={'Accept': 'text/plain'},
+      **fetch_kwargs)
+  return base64.b64decode(data) if data is not None else None
 
 
 def get_archive(hostname, project, treeish, dir_path=None, **fetch_kwargs):
-  """Gets a directory as a tar.gz archive."""
+  """Gets a directory as a tar.gz archive or None if not found."""
   _validate_args(hostname, project, treeish, dir_path)
   dir_path = (dir_path or '').strip('/')
   if dir_path:
     dir_path = '/%s' % dir_path
-  res = gerrit.fetch(
+  return gerrit.fetch(
       hostname, '%s/+archive/%s%s.tar.gz' % (project, treeish, dir_path),
       **fetch_kwargs)
-  return res.content if res else None
 
 
 def get_refs(hostname, project, **fetch_kwargs):

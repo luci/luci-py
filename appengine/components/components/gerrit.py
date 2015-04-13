@@ -5,29 +5,18 @@
 """Gerrit functions for GAE environment."""
 
 import collections
-import httplib
 import json
 import logging
 import urllib
 import urlparse
 
-from google.appengine.api import urlfetch
-
 from components import auth
+from components import net
+from components import utils
 
 
 AUTH_SCOPE = 'https://www.googleapis.com/auth/gerritcodereview'
 RESPONSE_PREFIX = ")]}'"
-
-
-class Error(Exception):
-  """Exception class for errors commuicating with a Gerrit/Gitiles service."""
-
-  def __init__(self, http_status, *args, **kwargs):
-    super(Error, self).__init__(*args, **kwargs)
-    self.http_status = http_status
-    if self.http_status:  # pragma: no branch
-      self.message = '(%s) %s' % (self.http_status, self.message)
 
 
 Owner = collections.namedtuple('Owner', ['name', 'email', 'username'])
@@ -136,77 +125,57 @@ def set_review(
   body = {k:v for k, v in body.iteritems() if v is not None}
 
   path = 'changes/%s/revisions/%s/review' % (change_id, revision)
-  fetch_json(hostname, path, method='POST', body=body)
+  fetch_json(hostname, path, method='POST', payload=body)
 
 
-def fetch(
-    hostname, path, query_params=None, method='GET', payload=None,
-    expect_status=(httplib.OK, httplib.NOT_FOUND), accept_header=None,
-    deadline=None):
-  """Makes a single authenticated blocking request using urlfetch.
+def fetch(hostname, path, **kwargs):
+  """Sends request to Gerrit, returns raw response.
 
-  Raises
-    auth.AuthorizationError if authentication fails.
-    Error if response status is not in expect_status tuple.
+  See 'net.request' for list of accepted kwargs.
 
-  Returns parsed json contents.
+  Returns:
+    Response body on success.
+    None on 404 response.
+
+  Raises:
+    net.Error on communication errors.
   """
-  if not hasattr(expect_status, '__contains__'):  # pragma: no cover
-    expect_status = (expect_status,)
-
-  assert not path.startswith('/')
-  url = urlparse.urljoin('https://' + hostname, 'a/' + path)
-  if query_params:
-    url = '%s?%s' % (url, urllib.urlencode(query_params))
-  request_headers = {
-    'Content-Type': 'application/json',
-    'Authorization': 'Bearer %s' % auth.get_access_token([AUTH_SCOPE])[0],
-  }
-  if accept_header:
-    request_headers['Accept'] = accept_header
-
+  assert not path.startswith('/'), path
+  assert 'scopes' not in kwargs, kwargs['scopes']
   try:
-    logging.debug('%s %s' % (method, url))
-    fetch_kwargs = {}
-    if deadline is not None:
-      fetch_kwargs['deadline'] = deadline
-    response = urlfetch.fetch(
-        url, payload=payload, method=method, headers=request_headers,
-        follow_redirects=False, validate_certificate=True,
-        **fetch_kwargs)
-  except urlfetch.Error as err:  # pragma: no cover
-    raise Error(None, err.message)
-
-  # Check if this is an authentication issue.
-  auth_failed = response.status_code in (
-      httplib.UNAUTHORIZED, httplib.FORBIDDEN)
-  if auth_failed:
-    reason = (
-        'Authorization failed for %s. Status code: %s' %
-        (hostname, response.status_code))
-    raise auth.AuthorizationError(reason)
-
-  if response.status_code not in expect_status:  # pragma: no cover
-    raise Error(response.status_code, response.content)
-
-  if response.status_code == httplib.NOT_FOUND:
+    url = urlparse.urljoin('https://' + hostname, 'a/' + path)
+    return net.request(url, scopes=[AUTH_SCOPE], **kwargs)
+  except net.NotFoundError:
     return None
-  return response
 
 
-def fetch_json(
-    hostname, path, query_params=None, method='GET', body=None,
-    expect_status=(httplib.OK, httplib.NOT_FOUND),
-    deadline=None):
-  payload = json.dumps(body) if body else None
-  res = fetch(
-      hostname, path, query_params, method, payload, expect_status,
-      accept_header='application/json', deadline=deadline)
-  if not res or not res.content:
+def fetch_json(hostname, path, payload=None, headers=None, **kwargs):
+  """Sends JSON request to Gerrit, parses prefixed JSON response.
+
+  See 'fetch' for the list of arguments.
+
+  Returns:
+    Deserialized response body on success.
+    None on 404 response.
+
+  Raises:
+    net.Error on communication errors.
+  """
+  headers = (headers or {}).copy()
+  headers['Accept'] = 'application/json'
+  if payload is not None:
+    headers['Content-Type'] = 'application/json; charset=utf-8'
+  content = fetch(
+      hostname=hostname,
+      path=path,
+      payload=utils.encode_to_json(payload) if payload is not None else None,
+      headers=headers,
+      **kwargs)
+  if content is None:
     return None
-  if not res.content.startswith(RESPONSE_PREFIX):
-    msg = ('Unexpected response format. Expected prefix %s. Received: %s' %
-           (RESPONSE_PREFIX, res.content))
-    raise Error(res.status_code, msg)
-  content = res.content[len(RESPONSE_PREFIX):]
-  return json.loads(content)
+  if not content.startswith(RESPONSE_PREFIX):
+    msg = (
+        'Unexpected response format. Expected prefix %s. Received: %s' %
+        (RESPONSE_PREFIX, content))
+    raise net.Error(msg, status_code=200, response=content)
+  return json.loads(content[len(RESPONSE_PREFIX):])
