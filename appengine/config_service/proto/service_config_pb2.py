@@ -13,7 +13,7 @@ from google.protobuf import descriptor_pb2
 DESCRIPTOR = _descriptor.FileDescriptor(
   name='service_config.proto',
   package='luci.config',
-  serialized_pb='\n\x14service_config.proto\x12\x0bluci.config\"\xa2\x01\n\x07Project\x12\n\n\x02id\x18\x01 \x02(\t\x12\x17\n\x0f\x63onfig_location\x18\x02 \x01(\t\x12\x43\n\x13\x63onfig_storage_type\x18\x03 \x01(\x0e\x32&.luci.config.Project.ConfigStorageType\"-\n\x11\x43onfigStorageType\x12\x0b\n\x07UNKNOWN\x10\x00\x12\x0b\n\x07GITILES\x10\x01\"5\n\x0bProjectsCfg\x12&\n\x08projects\x18\x01 \x03(\x0b\x32\x14.luci.config.Project\"D\n\x06\x41\x63lCfg\x12\x1c\n\x14service_access_group\x18\x01 \x01(\t\x12\x1c\n\x14project_access_group\x18\x02 \x01(\t\"\xf4\x01\n\tImportCfg\x12/\n\x07gitiles\x18\x01 \x01(\x0b\x32\x1e.luci.config.ImportCfg.Gitiles\x1a\xb5\x01\n\x07Gitiles\x12\x1a\n\x12\x66\x65tch_log_deadline\x18\x01 \x01(\x05\x12\x1e\n\x16\x66\x65tch_archive_deadline\x18\x02 \x01(\x05\x12%\n\x1dproject_config_default_branch\x18\x03 \x01(\t\x12#\n\x1bproject_config_default_path\x18\x04 \x01(\t\x12\"\n\x1a\x62ranch_config_default_path\x18\x05 \x01(\t')
+  serialized_pb='\n\x14service_config.proto\x12\x0bluci.config\"\xa2\x01\n\x07Project\x12\n\n\x02id\x18\x01 \x02(\t\x12\x17\n\x0f\x63onfig_location\x18\x02 \x01(\t\x12\x43\n\x13\x63onfig_storage_type\x18\x03 \x01(\x0e\x32&.luci.config.Project.ConfigStorageType\"-\n\x11\x43onfigStorageType\x12\x0b\n\x07UNKNOWN\x10\x00\x12\x0b\n\x07GITILES\x10\x01\"5\n\x0bProjectsCfg\x12&\n\x08projects\x18\x01 \x03(\x0b\x32\x14.luci.config.Project\"D\n\x06\x41\x63lCfg\x12\x1c\n\x14service_access_group\x18\x01 \x01(\t\x12\x1c\n\x14project_access_group\x18\x02 \x01(\t\"\xf4\x01\n\tImportCfg\x12/\n\x07gitiles\x18\x01 \x01(\x0b\x32\x1e.luci.config.ImportCfg.Gitiles\x1a\xb5\x01\n\x07Gitiles\x12\x1a\n\x12\x66\x65tch_log_deadline\x18\x01 \x01(\x05\x12\x1e\n\x16\x66\x65tch_archive_deadline\x18\x02 \x01(\x05\x12%\n\x1dproject_config_default_branch\x18\x03 \x01(\t\x12#\n\x1bproject_config_default_path\x18\x04 \x01(\t\x12\"\n\x1a\x62ranch_config_default_path\x18\x05 \x01(\t\"b\n\nSchemasCfg\x12/\n\x07schemas\x18\x01 \x03(\x0b\x32\x1e.luci.config.SchemasCfg.Schema\x1a#\n\x06Schema\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x0b\n\x03url\x18\x02 \x01(\t')
 
 
 
@@ -227,15 +227,80 @@ _IMPORTCFG = _descriptor.Descriptor(
   serialized_end=572,
 )
 
+
+_SCHEMASCFG_SCHEMA = _descriptor.Descriptor(
+  name='Schema',
+  full_name='luci.config.SchemasCfg.Schema',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='name', full_name='luci.config.SchemasCfg.Schema.name', index=0,
+      number=1, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=unicode("", "utf-8"),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='url', full_name='luci.config.SchemasCfg.Schema.url', index=1,
+      number=2, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=unicode("", "utf-8"),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  options=None,
+  is_extendable=False,
+  extension_ranges=[],
+  serialized_start=637,
+  serialized_end=672,
+)
+
+_SCHEMASCFG = _descriptor.Descriptor(
+  name='SchemasCfg',
+  full_name='luci.config.SchemasCfg',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='schemas', full_name='luci.config.SchemasCfg.schemas', index=0,
+      number=1, type=11, cpp_type=10, label=3,
+      has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+  ],
+  extensions=[
+  ],
+  nested_types=[_SCHEMASCFG_SCHEMA, ],
+  enum_types=[
+  ],
+  options=None,
+  is_extendable=False,
+  extension_ranges=[],
+  serialized_start=574,
+  serialized_end=672,
+)
+
 _PROJECT.fields_by_name['config_storage_type'].enum_type = _PROJECT_CONFIGSTORAGETYPE
 _PROJECT_CONFIGSTORAGETYPE.containing_type = _PROJECT;
 _PROJECTSCFG.fields_by_name['projects'].message_type = _PROJECT
 _IMPORTCFG_GITILES.containing_type = _IMPORTCFG;
 _IMPORTCFG.fields_by_name['gitiles'].message_type = _IMPORTCFG_GITILES
+_SCHEMASCFG_SCHEMA.containing_type = _SCHEMASCFG;
+_SCHEMASCFG.fields_by_name['schemas'].message_type = _SCHEMASCFG_SCHEMA
 DESCRIPTOR.message_types_by_name['Project'] = _PROJECT
 DESCRIPTOR.message_types_by_name['ProjectsCfg'] = _PROJECTSCFG
 DESCRIPTOR.message_types_by_name['AclCfg'] = _ACLCFG
 DESCRIPTOR.message_types_by_name['ImportCfg'] = _IMPORTCFG
+DESCRIPTOR.message_types_by_name['SchemasCfg'] = _SCHEMASCFG
 
 class Project(_message.Message):
   __metaclass__ = _reflection.GeneratedProtocolMessageType
@@ -266,6 +331,18 @@ class ImportCfg(_message.Message):
   DESCRIPTOR = _IMPORTCFG
 
   # @@protoc_insertion_point(class_scope:luci.config.ImportCfg)
+
+class SchemasCfg(_message.Message):
+  __metaclass__ = _reflection.GeneratedProtocolMessageType
+
+  class Schema(_message.Message):
+    __metaclass__ = _reflection.GeneratedProtocolMessageType
+    DESCRIPTOR = _SCHEMASCFG_SCHEMA
+
+    # @@protoc_insertion_point(class_scope:luci.config.SchemasCfg.Schema)
+  DESCRIPTOR = _SCHEMASCFG
+
+  # @@protoc_insertion_point(class_scope:luci.config.SchemasCfg)
 
 
 # @@protoc_insertion_point(module_scope)

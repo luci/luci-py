@@ -60,3 +60,19 @@ message ImportCfg {
   // Configuration of import from Gitiles repositories.
   optional Gitiles gitiles = 1;
 }
+
+// Schema of schemas.cfg
+message SchemasCfg {
+  message Schema {
+    // Name of schema.
+    // For service configs, "<config_set>:<path>"
+    // For project configs, "projects:<path>"
+    // For branch configs, "projects/branches:<path>"
+    optional string name = 1;
+    // URL to the schema definition, e.g. to a .proto file in a repository.
+    optional string url = 2;
+  }
+  // List of known schemas. They are available at /schemas/<name> as a short
+  // mutable link.
+  repeated Schema schemas = 1;
+}
