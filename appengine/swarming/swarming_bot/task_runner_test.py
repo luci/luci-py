@@ -640,29 +640,79 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
     ]
     parent = (
       'import subprocess, sys\n'
-      'sys.exit(subprocess.call([sys.executable, \'-u\', \'children.py\']))\n')
+      'p = subprocess.Popen([sys.executable, \'-u\', \'children.py\'])\n'
+      'print(p.pid)\n'
+      'p.wait()\n'
+      'sys.exit(p.returncode)\n')
     children = (
       'import subprocess, sys\n'
-      'sys.exit(subprocess.call('
-          '[sys.executable, \'-u\', \'grand_children.py\']))\n')
+      'p = subprocess.Popen([sys.executable, \'-u\', \'grand_children.py\'])\n'
+      'print(p.pid)\n'
+      'p.wait()\n'
+      'sys.exit(p.returncode)\n')
     grand_children = self.SCRIPT_SIGNAL_HANG
 
-    requests = self.gen_requests(
-        hard_timeout=True, exit_code=exit_code, output='hi\n')
-    requests.append(
+    # We need to catch the pid of the grand children to be able to kill it, so
+    # create our own check_final() instead of using self._gen_requests().
+    to_kill = []
+    def check_final(kwargs):
+      self.assertLess(self.SHORT_TIME_OUT, kwargs['data'].pop('cost_usd'))
+      self.assertLess(self.SHORT_TIME_OUT, kwargs['data'].pop('duration'))
+      # It makes the diffing easier.
+      output = base64.b64decode(kwargs['data'].pop('output'))
+      # The command print the pid of this child and grand-child processes, each
+      # on its line.
+      to_kill.extend(int(i) for i in output.splitlines()[:2])
+      self.assertEqual(
+          {
+            'data': {
+              'exit_code': exit_code,
+              'hard_timeout': True,
+              'id': u'localhost',
+              'io_timeout': False,
+              'output_chunk_start': 0,
+              'task_id': 23,
+            },
+            'headers': {'X-XSRF-Token': 'token'},
+          },
+          kwargs)
+    requests = [
+      (
+        'https://localhost:1/auth/api/v1/accounts/self/xsrf_token',
+        {'data': {}, 'headers': {'X-XSRF-Token-Request': '1'}},
+        {'xsrf_token': 'token'},
+      ),
+      (
+        'https://localhost:1/swarming/api/v1/bot/task_update/23',
+        self.get_check_first(0.),
+        {},
+      ),
+      (
+        'https://localhost:1/swarming/api/v1/bot/task_update/23',
+        check_final,
+        {},
+      ),
       (
         'http://localhost:1/foo.zip',
         {},
         compress_to_zip(
             {'children.py': children, 'grand_children.py': grand_children}),
         None,
-      ))
+      ),
+    ]
     self.expected_requests(requests)
 
-    manifest = self.get_manifest(
-        parent, hard_timeout=self.SHORT_TIME_OUT,
-        grace_period=self.SHORT_TIME_OUT, data=data)
-    self.assertEqual(False, self._load_and_run(manifest))
+    try:
+      manifest = self.get_manifest(
+          parent, hard_timeout=self.SHORT_TIME_OUT,
+          grace_period=self.SHORT_TIME_OUT, data=data)
+      self.assertEqual(False, self._load_and_run(manifest))
+    finally:
+      for k in to_kill:
+        try:
+          os.kill(k, signal.SIGKILL)
+        except OSError:
+          pass
 
 
 if __name__ == '__main__':
