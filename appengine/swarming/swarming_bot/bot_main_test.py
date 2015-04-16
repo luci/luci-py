@@ -347,14 +347,16 @@ class TestBotMain(net_utils.TestCase):
     self.mock(bot_main, 'post_error_task', lambda *args: self.fail(args))
     def call_hook(botobj, name, *args):
       if name == 'on_after_task':
-        failure, internal_failure = args
+        failure, internal_failure, dimensions = args
         self.assertEqual(self.attributes['dimensions'], botobj.dimensions)
         self.assertEqual(False, failure)
         self.assertEqual(False, internal_failure)
+        self.assertEqual({'os': 'Amiga'}, dimensions)
     self.mock(bot_main, 'call_hook', call_hook)
     self._mock_popen(0, url='https://localhost:3')
 
     manifest = {
+      'dimensions': {'os': 'Amiga'},
       'hard_timeout': 60,
       'host': 'https://localhost:3',
       'task_id': '24',
@@ -365,13 +367,14 @@ class TestBotMain(net_utils.TestCase):
     self.mock(bot_main, 'post_error_task', self.fail)
     def call_hook(_botobj, name, *args):
       if name == 'on_after_task':
-        failure, internal_failure = args
+        failure, internal_failure, dimensions = args
         self.assertEqual(True, failure)
         self.assertEqual(False, internal_failure)
+        self.assertEqual({}, dimensions)
     self.mock(bot_main, 'call_hook', call_hook)
     self._mock_popen(bot_main.TASK_FAILED)
 
-    manifest = {'hard_timeout': 60, 'task_id': '24'}
+    manifest = {'dimensions': {}, 'hard_timeout': 60, 'task_id': '24'}
     bot_main.run_manifest(self.bot, manifest, time.time())
 
   def test_run_manifest_internal_failure(self):
@@ -379,13 +382,14 @@ class TestBotMain(net_utils.TestCase):
     self.mock(bot_main, 'post_error_task', lambda *args: posted.append(args))
     def call_hook(_botobj, name, *args):
       if name == 'on_after_task':
-        failure, internal_failure = args
+        failure, internal_failure, dimensions = args
         self.assertEqual(False, failure)
         self.assertEqual(True, internal_failure)
+        self.assertEqual({}, dimensions)
     self.mock(bot_main, 'call_hook', call_hook)
     self._mock_popen(1)
 
-    manifest = {'hard_timeout': 60, 'task_id': '24'}
+    manifest = {'dimensions': {}, 'hard_timeout': 60, 'task_id': '24'}
     bot_main.run_manifest(self.bot, manifest, time.time())
     expected = [(self.bot, 'Execution failed, internal error.', '24')]
     self.assertEqual(expected, posted)
@@ -397,15 +401,16 @@ class TestBotMain(net_utils.TestCase):
     self.mock(bot_main, 'post_error_task', post_error_task)
     def call_hook(_botobj, name, *args):
       if name == 'on_after_task':
-        failure, internal_failure = args
+        failure, internal_failure, dimensions = args
         self.assertEqual(False, failure)
         self.assertEqual(True, internal_failure)
+        self.assertEqual({}, dimensions)
     self.mock(bot_main, 'call_hook', call_hook)
     def raiseOSError(*_a, **_k):
       raise OSError('Dang')
     self.mock(subprocess, 'Popen', raiseOSError)
 
-    manifest = {'hard_timeout': 60, 'task_id': '24'}
+    manifest = {'dimensions': {}, 'hard_timeout': 60, 'task_id': '24'}
     bot_main.run_manifest(self.bot, manifest, time.time())
     expected = [(self.bot, 'Internal exception occured: Dang', '24')]
     self.assertEqual(expected, posted)

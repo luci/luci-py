@@ -120,7 +120,7 @@ def get_state(sleep_streak):
 
 
 def call_hook(botobj, name, *args):
-  """Calls a hook funciton in bot_config.py."""
+  """Calls a hook function in bot_config.py."""
   try:
     if _in_load_test_mode():
       return
@@ -346,6 +346,7 @@ def run_manifest(botobj, manifest, start):
   # Sets an hard timeout of task's hard_time + 5 minutes to notify the server.
   hard_timeout = manifest['hard_timeout'] + 5*60.
   url = manifest.get('host', botobj.remote.url)
+  task_dimensions = manifest['dimensions']
 
   failure = False
   internal_failure = False
@@ -404,7 +405,8 @@ def run_manifest(botobj, manifest, start):
   finally:
     if internal_failure:
       post_error_task(botobj, msg, task_id)
-    call_hook(botobj, 'on_after_task', failure, internal_failure)
+    call_hook(
+      botobj, 'on_after_task', failure, internal_failure, task_dimensions)
 
 
 def update_bot(botobj, version):

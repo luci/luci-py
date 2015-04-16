@@ -360,6 +360,7 @@ class BotPollHandler(_BotBaseHandler):
         'bot_id': bot_id,
         'command': request.properties.commands[0],
         'data': request.properties.data,
+        'dimensions': request.properties.dimensions,
         'env': request.properties.env,
         'grace_period': request.properties.grace_period_secs,
         'host': utils.get_versioned_hosturl(),

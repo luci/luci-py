@@ -236,6 +236,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
         u'bot_id': u'bot1',
         u'command': [u'python', u'run_test.py'],
         u'data': [],
+        u'dimensions': {u'os': u'Amiga'},
         u'env': {},
         u'hard_timeout': 3600,
         u'grace_period': 30,
