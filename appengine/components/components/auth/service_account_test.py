@@ -134,24 +134,24 @@ class GetAccessTokenTest(test_case.TestCase):
     self.mock_now(now, 0)
     self.assertEqual(
         ('token@1420167600', 1420171200.0),
-        service_account._get_jwt_based_token('scope', FAKE_SECRET_KEY))
-    self.assertEqual([(['scope'], FAKE_SECRET_KEY)], calls)
-    self.assertEqual(['access_token:scope:pkey_id'], memcache.keys())
+        service_account._get_jwt_based_token('http://scope', FAKE_SECRET_KEY))
+    self.assertEqual([(['http://scope'], FAKE_SECRET_KEY)], calls)
+    self.assertEqual(['access_token@http://scope@pkey_id'], memcache.keys())
     del calls[:]
 
     # Uses cached copy while it is valid.
     self.mock_now(now, 3000)
     self.assertEqual(
         ('token@1420167600', 1420171200.0),
-        service_account._get_jwt_based_token('scope', FAKE_SECRET_KEY))
+        service_account._get_jwt_based_token('http://scope', FAKE_SECRET_KEY))
     self.assertFalse(calls)
 
     # 5 min before expiration it is considered unusable, and new one is minted.
     self.mock_now(now, 3600 - 5 * 60 + 1)
     self.assertEqual(
         ('token@1420170901', 1420174501.0),
-        service_account._get_jwt_based_token('scope', FAKE_SECRET_KEY))
-    self.assertEqual([(['scope'], FAKE_SECRET_KEY)], calls)
+        service_account._get_jwt_based_token('http://scope', FAKE_SECRET_KEY))
+    self.assertEqual([(['http://scope'], FAKE_SECRET_KEY)], calls)
 
   def test_mint_jwt_based_token(self):
     self.mock_now(datetime.datetime(2015, 1, 2, 3))

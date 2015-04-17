@@ -133,9 +133,9 @@ def _get_jwt_based_token(scopes, service_account_key):
   # Derive memcache key from scopes and private_key_id.
   if isinstance(scopes, basestring):
     scopes = [scopes]
-  assert all(':' not in scope for scope in scopes), scopes
-  assert ':' not in service_account_key.private_key_id, service_account_key
-  cache_key = 'access_token:%s:%s' % (
+  assert all('@' not in scope for scope in scopes), scopes
+  assert '@' not in service_account_key.private_key_id, service_account_key
+  cache_key = 'access_token@%s@%s' % (
       ' '.join(scopes), service_account_key.private_key_id)
 
   # Randomize refresh time to avoid thundering herd effect when token expires.
