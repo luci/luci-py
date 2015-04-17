@@ -140,7 +140,8 @@ class TestTaskRunner(TestTaskRunnerBase):
     self.mock(time, 'time', lambda: start + 10)
     server = xsrf_client.XsrfRemote('https://localhost:1/')
     return task_runner.run_command(
-        server, task_details, '.', 3600., start)
+        server, task_details, '.', 3600., start,
+        os.path.join(self.work_dir, 'task_summary.json'))
 
   def test_download_data(self):
     requests = [
@@ -177,13 +178,15 @@ class TestTaskRunner(TestTaskRunnerBase):
 
     runs = []
     def run_command(
-        swarming_server, task_details, work_dir, cost_usd_hour, start):
+        swarming_server, task_details, work_dir, cost_usd_hour, start,
+        json_file):
       self.assertEqual(server, swarming_server)
       # Necessary for OSX.
       self.assertEqual(os.path.realpath(self.work_dir), work_dir)
       self.assertTrue(isinstance(task_details, task_runner.TaskDetails))
       self.assertEqual(3600., cost_usd_hour)
       self.assertEqual(time.time(), start)
+      self.assertEqual('task_summary.json', json_file)
       runs.append(0)
       return 0
     self.mock(task_runner, 'run_command', run_command)
@@ -203,7 +206,8 @@ class TestTaskRunner(TestTaskRunnerBase):
       json.dump(data, f)
 
     self.assertEqual(
-        True, task_runner.load_and_run(manifest, server, 3600., time.time()))
+        True, task_runner.load_and_run(
+            manifest, server, 3600., time.time(), 'task_summary.json'))
     self.assertEqual([0], runs)
 
   def test_load_and_run_fail(self):
@@ -220,13 +224,15 @@ class TestTaskRunner(TestTaskRunnerBase):
 
     runs = []
     def run_command(
-        swarming_server, task_details, work_dir, cost_usd_hour, start):
+        swarming_server, task_details, work_dir, cost_usd_hour, start,
+        json_file):
       self.assertEqual(server, swarming_server)
       # Necessary for OSX.
       self.assertEqual(os.path.realpath(self.work_dir), work_dir)
       self.assertTrue(isinstance(task_details, task_runner.TaskDetails))
       self.assertEqual(3600., cost_usd_hour)
       self.assertEqual(time.time(), start)
+      self.assertEqual('task_summary.json', json_file)
       runs.append(0)
       # Fails the first, pass the second.
       return 1 if len(runs) == 1 else 0
@@ -247,7 +253,8 @@ class TestTaskRunner(TestTaskRunnerBase):
       json.dump(data, f)
 
     self.assertEqual(
-        False, task_runner.load_and_run(manifest, server, 3600., time.time()))
+        False, task_runner.load_and_run(
+            manifest, server, 3600., time.time(), 'task_summary.json'))
     self.assertEqual([0], runs)
 
   def test_run_command(self):
@@ -402,36 +409,43 @@ class TestTaskRunner(TestTaskRunnerBase):
     start = time.time()
     self.mock(time, 'time', lambda: start + 10)
     r = task_runner.run_command(
-        server, task_details, './', 3600., start)
+        server, task_details, './', 3600., start,
+        os.path.join(self.work_dir, 'task_summary.json'))
     self.assertEqual(0, r)
 
   def test_main(self):
-    def load_and_run(manifest, swarming_server, cost_usd_hour, start):
+    def load_and_run(
+        manifest, swarming_server, cost_usd_hour, start, json_file):
       self.assertEqual('foo', manifest)
       self.assertEqual('http://localhost', swarming_server.url)
       self.assertEqual(3600., cost_usd_hour)
       self.assertEqual(time.time(), start)
+      self.assertEqual('task_summary.json', json_file)
       return True
 
     self.mock(task_runner, 'load_and_run', load_and_run)
     cmd = [
       '--swarming-server', 'http://localhost', '--file', 'foo',
       '--cost-usd-hour', '3600', '--start', str(time.time()),
+      '--json-file', 'task_summary.json',
     ]
     self.assertEqual(0, task_runner.main(cmd))
 
   def test_main_reboot(self):
-    def load_and_run(manifest, swarming_server, cost_usd_hour, start):
+    def load_and_run(
+        manifest, swarming_server, cost_usd_hour, start, json_file):
       self.assertEqual('foo', manifest)
       self.assertEqual('http://localhost', swarming_server.url)
       self.assertEqual(3600., cost_usd_hour)
       self.assertEqual(time.time(), start)
+      self.assertEqual('task_summary.json', json_file)
       return False
 
     self.mock(task_runner, 'load_and_run', load_and_run)
     cmd = [
       '--swarming-server', 'http://localhost', '--file', 'foo',
       '--cost-usd-hour', '3600', '--start', str(time.time()),
+      '--json-file', 'task_summary.json',
     ]
     self.assertEqual(task_runner.TASK_FAILED, task_runner.main(cmd))
 
@@ -518,13 +532,16 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
     server = xsrf_client.XsrfRemote('https://localhost:1/')
     with open('manifest.json', 'w') as f:
       json.dump(manifest, f)
-    return task_runner.load_and_run('manifest.json', server, 3600., time.time())
+    return task_runner.load_and_run(
+      'manifest.json', server, 3600., time.time(),
+      os.path.join(self.work_dir, 'task_summary.json'))
 
   def _run_command(self, task_details):
     # Dot not mock time since this test class is testing timeouts.
     server = xsrf_client.XsrfRemote('https://localhost:1/')
     return task_runner.run_command(
-        server, task_details, '.', 3600., time.time())
+        server, task_details, '.', 3600., time.time(),
+        os.path.join(self.work_dir, 'task_summary.json'))
 
   def test_hard(self):
     # Actually 0xc000013a

@@ -106,7 +106,7 @@ class TaskDetails(object):
     self.task_id = data['task_id']
 
 
-def load_and_run(filename, swarming_server, cost_usd_hour, start):
+def load_and_run(filename, swarming_server, cost_usd_hour, start, json_file):
   """Loads the task's metadata and execute it.
 
   This may throw all sorts of exceptions in case of failure. It's up to the
@@ -131,7 +131,7 @@ def load_and_run(filename, swarming_server, cost_usd_hour, start):
   download_data(root_dir, task_details.data)
 
   exit_code = run_command(
-      swarming_server, task_details, root_dir, cost_usd_hour, start)
+      swarming_server, task_details, root_dir, cost_usd_hour, start, json_file)
   return not bool(exit_code)
 
 
@@ -193,7 +193,8 @@ def calc_yield_wait(task_details, start, last_io, timed_out, stdout):
 
 
 def run_command(
-    swarming_server, task_details, root_dir, cost_usd_hour, task_start):
+    swarming_server, task_details, root_dir, cost_usd_hour, task_start,
+    json_file):
   """Runs a command and sends packets to the server to stream results back.
 
   Implements both I/O and hard timeouts. Sends the packets numbered, so the
@@ -321,6 +322,9 @@ def run_command(
     output_chunk_start += len(stdout)
     stdout = ''
 
+    with open(json_file, 'w') as fd:
+      json.dump({'exit_code': exit_code, 'version': 1}, fd)
+
   logging.info('run_command() = %s', exit_code)
   assert not stdout
   return exit_code
@@ -336,6 +340,8 @@ def main(args):
   parser.add_option(
       '--cost-usd-hour', type='float', help='Cost of this VM in $/h')
   parser.add_option('--start', type='float', help='Time this task was started')
+  parser.add_option(
+      '--json-file', help='Name of the JSON file to write a task summary to')
 
   options, args = parser.parse_args(args)
   if not options.file:
@@ -354,7 +360,8 @@ def main(args):
 
   try:
     if not load_and_run(
-        options.file, remote, options.cost_usd_hour, options.start):
+        options.file, remote, options.cost_usd_hour, options.start,
+        options.json_file):
       return TASK_FAILED
     return 0
   finally:

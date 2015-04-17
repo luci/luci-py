@@ -22,6 +22,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 import traceback
 import zipfile
@@ -347,6 +348,7 @@ def run_manifest(botobj, manifest, start):
   hard_timeout = manifest['hard_timeout'] + 5*60.
   url = manifest.get('host', botobj.remote.url)
   task_dimensions = manifest['dimensions']
+  task_summary = {}
 
   failure = False
   internal_failure = False
@@ -366,10 +368,13 @@ def run_manifest(botobj, manifest, start):
     # variables.
     env['SWARMING_TASK_ID'] = task_id.encode('ascii')
 
-    path = os.path.join(work_dir, 'test_run.json')
+    path = os.path.join(work_dir, 'task_run.json')
     with open(path, 'wb') as f:
       f.write(json.dumps(manifest))
     call_hook(botobj, 'on_before_task')
+    task_summary_file = os.path.join(work_dir, 'task_summary.json')
+    if os.path.exists(task_summary_file):
+      os.remove(task_summary_file)
     command = [
       sys.executable, THIS_FILE, 'task_runner',
       '--swarming-server', url,
@@ -377,6 +382,7 @@ def run_manifest(botobj, manifest, start):
       '--cost-usd-hour', str(botobj.state.get('cost_usd_hour') or 0.),
       # Include the time taken to poll the task in the cost.
       '--start', str(start),
+      '--json-file', task_summary_file,
     ]
     logging.debug('Running command: %s', command)
     proc = subprocess.Popen(command, cwd=ROOT_DIR, env=env)
@@ -394,6 +400,9 @@ def run_manifest(botobj, manifest, start):
     internal_failure = not failure and bool(proc.returncode)
     if internal_failure:
       msg = 'Execution failed, internal error.'
+    if os.path.exists(task_summary_file):
+      with open(task_summary_file) as fd:
+        task_summary = json.load(fd)
     return not bool(proc.returncode)
   except Exception as e:
     # Failures include IOError when writing if the disk is full, OSError if
@@ -406,7 +415,8 @@ def run_manifest(botobj, manifest, start):
     if internal_failure:
       post_error_task(botobj, msg, task_id)
     call_hook(
-      botobj, 'on_after_task', failure, internal_failure, task_dimensions)
+      botobj, 'on_after_task', failure, internal_failure, task_dimensions,
+      task_summary)
 
 
 def update_bot(botobj, version):

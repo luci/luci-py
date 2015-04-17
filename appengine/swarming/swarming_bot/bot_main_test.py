@@ -327,8 +327,10 @@ class TestBotMain(net_utils.TestCase):
         expected = [
           sys.executable, THIS_FILE, 'task_runner',
           '--swarming-server', url,
-          '--file', os.path.join(self.root_dir, 'work', 'test_run.json'),
+          '--file', os.path.join(self.root_dir, 'work', 'task_run.json'),
           '--cost-usd-hour', '3600.0', '--start', '100.0',
+          '--json-file',
+          os.path.join(self.root_dir, 'work', 'task_summary.json'),
         ]
         self.assertEqual(expected, cmd)
         self.assertEqual(bot_main.ROOT_DIR, cwd)
@@ -347,11 +349,12 @@ class TestBotMain(net_utils.TestCase):
     self.mock(bot_main, 'post_error_task', lambda *args: self.fail(args))
     def call_hook(botobj, name, *args):
       if name == 'on_after_task':
-        failure, internal_failure, dimensions = args
+        failure, internal_failure, dimensions, summary = args
         self.assertEqual(self.attributes['dimensions'], botobj.dimensions)
         self.assertEqual(False, failure)
         self.assertEqual(False, internal_failure)
         self.assertEqual({'os': 'Amiga'}, dimensions)
+        self.assertEqual({}, summary)
     self.mock(bot_main, 'call_hook', call_hook)
     self._mock_popen(0, url='https://localhost:3')
 
@@ -367,10 +370,11 @@ class TestBotMain(net_utils.TestCase):
     self.mock(bot_main, 'post_error_task', self.fail)
     def call_hook(_botobj, name, *args):
       if name == 'on_after_task':
-        failure, internal_failure, dimensions = args
+        failure, internal_failure, dimensions, summary = args
         self.assertEqual(True, failure)
         self.assertEqual(False, internal_failure)
         self.assertEqual({}, dimensions)
+        self.assertEqual({}, summary)
     self.mock(bot_main, 'call_hook', call_hook)
     self._mock_popen(bot_main.TASK_FAILED)
 
@@ -382,10 +386,11 @@ class TestBotMain(net_utils.TestCase):
     self.mock(bot_main, 'post_error_task', lambda *args: posted.append(args))
     def call_hook(_botobj, name, *args):
       if name == 'on_after_task':
-        failure, internal_failure, dimensions = args
+        failure, internal_failure, dimensions, summary = args
         self.assertEqual(False, failure)
         self.assertEqual(True, internal_failure)
         self.assertEqual({}, dimensions)
+        self.assertEqual({}, summary)
     self.mock(bot_main, 'call_hook', call_hook)
     self._mock_popen(1)
 
@@ -401,10 +406,11 @@ class TestBotMain(net_utils.TestCase):
     self.mock(bot_main, 'post_error_task', post_error_task)
     def call_hook(_botobj, name, *args):
       if name == 'on_after_task':
-        failure, internal_failure, dimensions = args
+        failure, internal_failure, dimensions, summary = args
         self.assertEqual(False, failure)
         self.assertEqual(True, internal_failure)
         self.assertEqual({}, dimensions)
+        self.assertEqual({}, summary)
     self.mock(bot_main, 'call_hook', call_hook)
     def raiseOSError(*_a, **_k):
       raise OSError('Dang')
