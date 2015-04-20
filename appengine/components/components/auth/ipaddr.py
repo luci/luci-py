@@ -42,24 +42,37 @@ def ip_from_string(ipstr):
     if '.' in ipstr:
       # IPv4. Mixed v4-v6 addresses (e.g ::ffff:192.0.2.128) are not supported.
       values = [int(i) for i in ipstr.split('.')]
-      if len(values) != 4 or not all(0 <= i <= 255 for i in values):
-        values = None
+      if len(values) != 4:
+        raise ValueError('expecting 4 bytes, got %d' % len(values))
+      if not all(0 <= i <= 255 for i in values):
+        raise ValueError('byte value is out of range')
       factor = 256
       bits = 32
     elif ':' in ipstr:
-      # IPv6. The code currently doesn't support '::' syntax for groups of
-      # zeros except for loopback '::1', since it shows up in local smoke tests.
-      if ipstr == '::1':
-        return IP(128, 1)
-      values = [int(i, 16) for i in ipstr.split(':')]
-      if len(values) != 8 or not all(0 <= i <= 65535 for i in values):
-        values = None
+      # IPv6. '::' will be replaced with appropriate number of zeros.
+      gaps = ipstr.count('::')
+      if gaps > 1:
+        raise ValueError('\'::\' can be used at most once')
+      if not gaps:
+        blocks = ipstr.split(':')
+      else:
+        idx = ipstr.index('::')
+        before = ipstr[:idx].split(':') if ipstr[:idx] else []
+        after = ipstr[idx+2:].split(':') if ipstr[idx+2:] else []
+        if len(before) + len(after) >= 8:
+          raise ValueError('too many sections')
+        blocks = before + ['0'] * (8 - len(before) - len(after)) + after
+      if len(blocks) != 8:
+        raise ValueError('expecting 8 sections, got %d' % len(blocks))
+      values = [int(i, 16) for i in blocks]
+      if not all(0 <= i <= 65535 for i in values):
+        raise ValueError('int16 value is out of range')
       factor = 65536
       bits = 128
-  except ValueError:
-    values = None
-  if not values:
-    raise ValueError('%r is not an IP address' % ipstr)
+    else:
+      raise ValueError('not IPv4 or IPv6 address')
+  except ValueError as e:
+    raise ValueError('%r is not an IP address (%s)' % (ipstr, e))
   value = 0L
   for i in values:
     value = value * factor + i

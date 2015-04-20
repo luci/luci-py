@@ -45,16 +45,33 @@ class IpAddrTest(test_case.TestCase):
     self.assertEqual(
         ipaddr.IP(128, 0xffff0000000000000000000000000000L),
         ipaddr.ip_from_string('ffff:0:0:0:0:0:0:0'))
-    self.assertEqual(ipaddr.IP(128, 1), ipaddr.ip_from_string('::1'))
 
   def test_ip_from_string_v6_bad(self):
-    # '::' syntax is not supported.
-    with self.assertRaises(ValueError):
-      ipaddr.ip_from_string('::0')
     with self.assertRaises(ValueError):
       ipaddr.ip_from_string('0:0:0:0:0:0:0')
     with self.assertRaises(ValueError):
       ipaddr.ip_from_string('0:0:0:0:0:0:0:00gg')
+
+  def test_ip_from_string_v6_omitting_zeros_ok(self):
+    self.assertEqual(ipaddr.IP(128, 1), ipaddr.ip_from_string('::1'))
+    self.assertEqual(ipaddr.IP(128, 0), ipaddr.ip_from_string('::0'))
+    self.assertEqual(ipaddr.IP(128, 0), ipaddr.ip_from_string('::'))
+    self.assertEqual(
+        ipaddr.ip_from_string('ffff:ffff:ffff:0:ffff:ffff:ffff:ffff'),
+        ipaddr.ip_from_string('ffff:ffff:ffff::ffff:ffff:ffff:ffff'))
+    self.assertEqual(
+        ipaddr.ip_from_string('ffff:ffff:0:0:0:0:0:ffff'),
+        ipaddr.ip_from_string('ffff:ffff::ffff'))
+    self.assertEqual(
+        ipaddr.ip_from_string('ffff:0:0:0:0:0:0:0'),
+        ipaddr.ip_from_string('ffff::'))
+
+
+  def test_ip_from_string_v6_omitting_zeros_bad(self):
+    with self.assertRaises(ValueError):
+      ipaddr.ip_from_string('::1::')
+    with self.assertRaises(ValueError):
+      ipaddr.ip_from_string('0:0:0:0:0:0:0::0')
 
   def test_ip_to_string_v4_ok(self):
     call = lambda val: ipaddr.ip_to_string(ipaddr.IP(32, val))

@@ -1358,7 +1358,10 @@ class IPWhitelistHandlerTest(RestAPITestCase):
         expect_xsrf_token_check=True,
         expect_admin_check=True)
     self.assertEqual(400, status)
-    self.assertEqual({'text': 'u\'not a subnet\' is not an IP address'}, body)
+    self.assertEqual({
+        'text':
+          'u\'not a subnet\' is not an IP address (not IPv4 or IPv6 address)',
+        }, body)
 
   def test_post_already_exists(self):
     model.AuthIPWhitelist(key=model.ip_whitelist_key('A whitelist')).put()
@@ -1442,7 +1445,10 @@ class IPWhitelistHandlerTest(RestAPITestCase):
         expect_xsrf_token_check=True,
         expect_admin_check=True)
     self.assertEqual(400, status)
-    self.assertEqual({'text': 'u\'not a subnet\' is not an IP address'}, body)
+    self.assertEqual({
+        'text':
+          'u\'not a subnet\' is not an IP address (not IPv4 or IPv6 address)'
+        }, body)
 
   def test_put_missing(self):
     status, body, _ = self.put(
