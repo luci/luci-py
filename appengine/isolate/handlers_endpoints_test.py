@@ -4,6 +4,7 @@
 # found in the LICENSE file.
 
 import base64
+import hashlib
 import json
 import logging
 import sys
@@ -37,14 +38,14 @@ def make_private_key():
   config.settings().gs_private_key = pem_key
 
 
-def hash_content(content, namespace):
+def hash_content(content):
   """Create and return the hash of some content in a given namespace."""
-  hash_algo = model.get_hash_algo(namespace)
+  hash_algo = hashlib.sha1()
   hash_algo.update(content)
   return hash_algo.hexdigest()
 
 
-def generate_digest(content, namespace):
+def generate_digest(content):
   """Create a Digest from content (in a given namespace) for preupload.
 
   Arguments:
@@ -55,7 +56,7 @@ def generate_digest(content, namespace):
     a Digest corresponding to the content/ namespace pair
   """
   return handlers_endpoints.Digest(
-      digest=hash_content(content, namespace), size=len(content))
+      digest=hash_content(content), size=len(content))
 
 
 def generate_collection(contents, namespace=None):
@@ -63,15 +64,12 @@ def generate_collection(contents, namespace=None):
     namespace = handlers_endpoints.Namespace()
   return handlers_endpoints.DigestCollection(
       namespace=namespace,
-      items=[generate_digest(content, namespace.namespace)
-             for content in contents])
+      items=[generate_digest(content) for content in contents])
 
 
 def generate_embedded(namespace, digest):
   return {
-      'c': namespace.compression,
       'd': digest.digest,
-      'h': namespace.digest_hash,
       'i': str(int(digest.is_isolated)),
       'n': namespace.namespace,
       's': str(digest.size),
@@ -191,7 +189,7 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
     """Assert that status 400 is returned when the digest is invalid."""
     bad_collection = handlers_endpoints.DigestCollection(
         namespace=handlers_endpoints.Namespace())
-    bad_digest = hash_content('some stuff', bad_collection.namespace.namespace)
+    bad_digest = hash_content('some stuff')
     bad_digest = 'g' + bad_digest[1:]  # that's not hexadecimal!
     bad_collection.items.append(
         handlers_endpoints.Digest(digest=bad_digest, size=10))
@@ -203,8 +201,7 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
     """Assert that status 400 is returned when the namespace is invalid."""
     bad_collection = handlers_endpoints.DigestCollection(
         namespace=handlers_endpoints.Namespace(namespace='~tildewhatevs'))
-    bad_collection.items.append(
-        generate_digest('pangolin', bad_collection.namespace.namespace))
+    bad_collection.items.append(generate_digest('pangolin'))
     with self.call_should_fail('400'):
       self.call_api(
           'preupload', self.message_to_dict(bad_collection), 200)
@@ -213,7 +210,7 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
     """Assert that existence check is working."""
     collection = generate_collection(
         ['small content', 'larger content', 'biggest content'])
-    key = model.entry_key(
+    key = model.get_entry_key(
         collection.namespace.namespace, collection.items[0].digest)
 
     # guarantee that one digest already exists in the datastore
@@ -235,9 +232,8 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
     """Assert that existent entities are enqueued."""
     collection = handlers_endpoints.DigestCollection(
         namespace=handlers_endpoints.Namespace())
-    collection.items.append(
-        generate_digest('some content', collection.namespace))
-    key = model.entry_key(
+    collection.items.append(generate_digest('some content'))
+    key = model.get_entry_key(
         collection.namespace.namespace, collection.items[0].digest)
 
     # guarantee that one digest already exists in the datastore
@@ -254,7 +250,7 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
     request = self.store_request('sibilance')
     embedded = validate(
         request.upload_ticket, handlers_endpoints.UPLOAD_MESSAGES[0])
-    key = model.entry_key(embedded['n'], embedded['d'])
+    key = model.get_entry_key(embedded['n'], embedded['d'])
 
     # assert that store_inline puts the correct entity into the datastore
     self.call_api(
@@ -272,7 +268,7 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
     request = self.store_request('')
     embedded = validate(
         request.upload_ticket, handlers_endpoints.UPLOAD_MESSAGES[0])
-    key = model.entry_key(embedded['n'], embedded['d'])
+    key = model.get_entry_key(embedded['n'], embedded['d'])
 
     # assert that store_inline puts the correct entity into the datastore
     self.call_api(
@@ -341,7 +337,7 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
     request = self.store_request(content)
     embedded = validate(
         request.upload_ticket, handlers_endpoints.UPLOAD_MESSAGES[1])
-    key = model.entry_key(embedded['n'], embedded['d'])
+    key = model.get_entry_key(embedded['n'], embedded['d'])
 
     # finalize_gs_upload should put a new ContentEntry into the database
     self.mock(gcs, 'get_file_info', get_file_info_factory(content))

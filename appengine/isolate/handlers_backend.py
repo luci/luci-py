@@ -5,6 +5,7 @@
 """This module defines Isolate Server backend url handlers."""
 
 import binascii
+import hashlib
 import logging
 import time
 import zlib
@@ -72,11 +73,11 @@ def split_payload(request, chunk_size, max_chunks):
   return [content[i * chunk_size: (i + 1) * chunk_size] for i in xrange(count)]
 
 
-def payload_to_hashes(request, namespace):
+def payload_to_hashes(request):
   """Converts a raw payload into SHA-1 hashes as bytes."""
   return split_payload(
       request,
-      model.get_hash_algo(namespace).digest_size,
+      hashlib.sha1().digest_size,
       model.MAX_KEYS_PER_DB_OPS)
 
 
@@ -207,7 +208,7 @@ class InternalCleanupTrimLostWorkerHandler(webapp2.RequestHandler):
         if filestats.st_ctime >= cutoff:
           continue
 
-        # This must match the logic in model.entry_key(). Since this request
+        # This must match the logic in model.get_entry_key(). Since this request
         # will in practice touch every item, do not use memcache since it'll
         # mess it up by loading every items in it.
         # TODO(maruel): Batch requests to use get_multi_async() similar to
@@ -277,10 +278,10 @@ class InternalTagWorkerHandler(webapp2.RequestHandler):
     now = utils.timestamp_to_datetime(long(timestamp))
     expiration = config.settings().default_expiration
     try:
-      digests = payload_to_hashes(self, namespace)
+      digests = payload_to_hashes(self)
       # Requests all the entities at once.
       futures = ndb.get_multi_async(
-          model.entry_key(namespace, binascii.hexlify(d)) for d in digests)
+          model.get_entry_key(namespace, binascii.hexlify(d)) for d in digests)
 
       to_save = []
       while futures:
@@ -320,7 +321,7 @@ class InternalVerifyWorkerHandler(webapp2.RequestHandler):
       runtime.DeadlineExceededError)
   @decorators.require_taskqueue('verify')
   def post(self, namespace, hash_key):
-    entry = model.entry_key(namespace, hash_key).get()
+    entry = model.get_entry_key(namespace, hash_key).get()
     if not entry:
       logging.error('Failed to find entity')
       return
@@ -354,7 +355,7 @@ class InternalVerifyWorkerHandler(webapp2.RequestHandler):
         entry.compressed_size <= model.MAX_MEMCACHE_ISOLATED and
         entry.is_isolated)
     expanded_size = 0
-    digest = model.get_hash_algo(namespace)
+    digest = hashlib.sha1()
     data = None
 
     try:

@@ -3,6 +3,7 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
+import hashlib
 import logging
 import os
 import sys
@@ -23,7 +24,7 @@ import model
 
 
 def hash_item(content):
-  h = model.get_hash_algo('default')
+  h = hashlib.sha1()
   h.update(content)
   return h.hexdigest()
 
@@ -50,12 +51,12 @@ class MainTest(test_case.TestCase):
   def test_ancestor_assumption(self):
     prefix = '1234'
     suffix = 40 - len(prefix)
-    c = model.new_content_entry(model.entry_key('n', prefix + '0' * suffix))
+    c = model.new_content_entry(model.get_entry_key('n', prefix + '0' * suffix))
     self.assertEqual(0, len(list(model.ContentEntry.query())))
     c.put()
     self.assertEqual(1, len(list(model.ContentEntry.query())))
 
-    c = model.new_content_entry(model.entry_key('n', prefix + '1' * suffix))
+    c = model.new_content_entry(model.get_entry_key('n', prefix + '1' * suffix))
     self.assertEqual(1, len(list(model.ContentEntry.query())))
     c.put()
     self.assertEqual(2, len(list(model.ContentEntry.query())))

@@ -59,7 +59,7 @@ def hash_content(content, namespace):
   Raises ValueError in case of errors.
   """
   expanded_size = 0
-  digest = model.get_hash_algo(namespace)
+  digest = hashlib.sha1()
   try:
     for data in model.expand_content(namespace, [content]):
       expanded_size += len(data)
@@ -242,9 +242,9 @@ class PreUploadContentHandler(ProtocolHandler):
   _gs_url_signer = None
 
   @staticmethod
-  def parse_request(body, namespace):
+  def parse_request(body):
     """Parses a request body into a list of EntryInfo objects."""
-    hex_digest_size = model.get_hash_algo(namespace).digest_size * 2
+    hex_digest_size = hashlib.sha1().digest_size * 2
     try:
       out = [
         PreUploadContentHandler.EntryInfo(
@@ -266,7 +266,7 @@ class PreUploadContentHandler(ProtocolHandler):
     # Kick off all queries in parallel. Build mapping Future -> digest.
     futures = {}
     for entry_info in entries:
-      key = model.entry_key(namespace, entry_info.digest)
+      key = model.get_entry_key(namespace, entry_info.digest)
       futures[key.get_async(use_cache=False)] = entry_info
 
     # Pick first one that finishes and yield it, rinse, repeat.
@@ -351,7 +351,7 @@ class PreUploadContentHandler(ProtocolHandler):
     """
     if self.should_push_to_gs(entry_info):
       # Store larger stuff in Google Storage.
-      key = model.entry_key(namespace, entry_info.digest)
+      key = model.get_entry_key(namespace, entry_info.digest)
       upload_url = self.gs_url_signer.get_upload_url(
           filename=key.id(),
           content_type='application/octet-stream',
@@ -381,7 +381,7 @@ class PreUploadContentHandler(ProtocolHandler):
 
     # Parse a body into list of EntryInfo objects.
     try:
-      entries = self.parse_request(self.request.body, namespace)
+      entries = self.parse_request(self.request.body)
     except ValueError as err:
       return self.send_error(
           'Bad /pre-upload request.\n(%s)\n%s' % (err, self.request.body[:200]))
@@ -440,7 +440,7 @@ class RetrieveContentHandler(ProtocolHandler):
       stats.add_entry(stats.RETURN, len(memcache_entry) - offset, 'memcache')
       return
 
-    entry = model.entry_key(namespace, hash_key).get()
+    entry = model.get_entry_key(namespace, hash_key).get()
     if not entry:
       return self.send_error('Unable to retrieve the entry.', http_code=404)
 
@@ -577,7 +577,7 @@ class StoreContentHandler(ProtocolHandler):
 
     # Info about corresponding GS entry (if it exists).
     gs_bucket = config.settings().gs_bucket
-    key = model.entry_key(namespace, hash_key)
+    key = model.get_entry_key(namespace, hash_key)
 
     # Verify the data while at it since it's already in memory but before
     # storing it in memcache and datastore.

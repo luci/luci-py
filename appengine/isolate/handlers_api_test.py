@@ -4,6 +4,7 @@
 # found in the LICENSE file.
 
 import datetime
+import hashlib
 import logging
 import os
 import sys
@@ -35,7 +36,7 @@ import model
 
 
 def hash_item(content):
-  h = model.get_hash_algo('default')
+  h = hashlib.sha1()
   h.update(content)
   return h.hexdigest()
 
@@ -224,7 +225,7 @@ class MainTest(test_case.TestCase):
     ]
     self.mock(gcs, 'list_files', lambda _: mock_files)
 
-    model.ContentEntry(key=model.entry_key('d', '0' * 40)).put()
+    model.ContentEntry(key=model.get_entry_key('d', '0' * 40)).put()
     headers = {'X-AppEngine-Cron': 'true'}
     resp = self.app_backend.get(
         '/internal/cron/cleanup/trigger/trim_lost', headers=headers)

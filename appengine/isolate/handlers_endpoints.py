@@ -6,8 +6,10 @@
 
 import binascii
 import datetime
+import hashlib
 import re
 import time
+import zlib
 
 from google.appengine import runtime
 from google.appengine.api import datastore_errors
@@ -133,7 +135,7 @@ def store_and_enqueue_verify_task(entry, task_queue_host):
 
 def entry_key_or_error(namespace, digest):
   try:
-    return model.entry_key(namespace, digest)
+    return model.get_entry_key(namespace, digest)
   except ValueError as error:
     raise endpoints.BadRequestException(error.message)
 
@@ -329,7 +331,9 @@ class IsolateService(remote.Service):
     if not uploaded_to_gs:
       if (digest, size) != hash_content(content, namespace):
         raise endpoints.BadRequestException(
-            'Embedded digest does not match provided data.')
+            'Embedded digest does not match provided data: '
+            '(digest, size): (%r, %r); expected: %r' % (
+                digest, size, hash_content(content, namespace)))
       entry.put()
 
     # GCS: enqueue verification task
@@ -365,9 +369,7 @@ class IsolateService(remote.Service):
 
     # get a single dictionary containing important information
     embedded = {
-        'c': namespace.compression,
         'd': digest.digest,
-        'h': namespace.digest_hash,
         'i': str(int(digest.is_isolated)),
         'n': namespace.namespace,
         's': str(digest.size),

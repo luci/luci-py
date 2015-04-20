@@ -4,6 +4,7 @@
 # found in the LICENSE file.
 
 import datetime
+import hashlib
 import logging
 import os
 import sys
@@ -122,10 +123,10 @@ class MainTest(test_case.TestCase):
 
   @staticmethod
   def gen_content(namespace='default', content='Foo'):
-    h = model.get_hash_algo(namespace)
+    h = hashlib.sha1()
     h.update(content)
     hashhex = h.hexdigest()
-    key = model.entry_key(namespace, hashhex)
+    key = model.get_entry_key(namespace, hashhex)
     model.new_content_entry(
         key,
         is_isolated=False,
