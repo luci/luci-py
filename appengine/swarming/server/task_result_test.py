@@ -453,6 +453,14 @@ class TaskResultApiTest(TestCase):
     # Tested in task_scheduler_test.
     pass
 
+  def test_get_result_summaries(self):
+    # Indirectly tested by API.
+    pass
+
+  def test_get_run_results(self):
+    # Indirectly tested by API.
+    pass
+
 
 class TestOutput(TestCase):
   APP_DIR = test_env.APP_DIR

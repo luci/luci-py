@@ -54,6 +54,7 @@ Graph of schema:
 
 import datetime
 import logging
+import random
 
 from google.appengine.api import datastore_errors
 from google.appengine.api import search
@@ -813,6 +814,11 @@ def _sort_property(sort):
       sort, datastore_query.PropertyOrder.DESCENDING)
 
 
+def _datetime_to_key(date):
+  assert isinstance(date, datetime.datetime), date
+  return task_request.convert_to_request_key(date)
+
+
 ### Public API.
 
 
@@ -919,6 +925,65 @@ def get_tasks(task_name, task_tags, cursor_str, limit, sort, state):
     cursor_str = cursor.urlsafe() if cursor and more else None
 
   return tasks, cursor_str, sort, state
+
+
+def get_run_results(cursor_str, bot_id, start, end, batch_size):
+  """Executes a TaskRunResult query over the appropriate date range."""
+  if not 0 < batch_size <= 1000:
+    raise ValueError('batch_size must be between 1 and 1000')
+  start_key, end_key = map(_datetime_to_key, (start, end))
+
+  query = TaskRunResult.query(
+      TaskRunResult.bot_id == bot_id,
+      TaskRunResult.key <= start_key,
+      TaskRunResult.key >= end_key)
+  query = query.order(TaskRunResult.key)
+  cursor = datastore_query.Cursor(urlsafe=cursor_str)
+  return query.fetch_page(batch_size, start_cursor=cursor)
+
+
+def get_result_summaries(
+    task_tags, cursor_str, start, end, state, batch_size):
+  """Returns TaskResultSummary entities for this query.
+
+  Arguments:
+    task_tags: list of search for one or multiple task tags.
+    cursor_str: query-dependent string encoded cursor to continue a previous
+        search.
+    start: earliest creation date of retrieved tasks
+    end: most recent creation date of retrieved tasks
+    state: get_result_summary_query() argument. Only used if both task_name and
+        task_tags are empty.
+    batch_size: Maximum number of items to return.
+
+  Returns:
+    tuple(list of tasks, str encoded cursor, updated state)
+
+  This is a slight modification of get_tasks above; it removes support for
+  "limit," "name," and "sort" and adds support for date ranges.
+  """
+  if not 0 < batch_size <= 1000:
+    raise ValueError('Inappropriate value for batch_size.')
+  start_key, end_key = map(_datetime_to_key, (start, end))
+
+  # Inequalities are <= and >= because keys are in reverse chronological order.
+  query = task_request.TaskRequest.query(
+      task_request.TaskRequest.key <= start_key,
+      task_request.TaskRequest.key >= end_key)
+  query = query.order(task_request.TaskRequest.key)
+
+  # Filter by one or more tags.
+  for tag in task_tags:
+    query = query.filter(task_request.TaskRequest.tags == tag)
+
+  # Fetch and return.
+  cursor = datastore_query.Cursor(urlsafe=cursor_str)
+  requests, cursor, more = query.fetch_page(
+      batch_size, start_cursor=cursor, keys_only=True)
+  keys = [task_pack.request_key_to_result_summary_key(k) for k in requests]
+  tasks = ndb.get_multi(keys)
+  cursor_str = cursor.urlsafe() if cursor and more else None
+  return tasks, cursor_str, state
 
 
 def get_result_summary_query(sort, state):

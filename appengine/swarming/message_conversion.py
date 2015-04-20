@@ -126,6 +126,7 @@ def task_request_from_dict(entity_dict):
           'TaskRequest is missing required field %s.' % field)
   entity_dict['expiration_secs'] = _timestamp_to_secs(
       entity_dict['created_ts'], entity_dict['expiration_ts'])
+  entity_dict['tag'] = entity_dict.pop('tags', [])
   field_map = {
     'authenticated': (
       lambda x: '='.join(x) if isinstance(x, (list, tuple)) else x, False),
@@ -135,7 +136,7 @@ def task_request_from_dict(entity_dict):
     'parent_task_id': (None, False),
     'properties': (properties_from_dict, True),
     'priority': (None, False),
-    'tags': (None, False),
+    'tag': (None, False),
     'user': (None, False)}
   return _populate_rpc(swarming_rpcs.TaskRequest, entity_dict, field_map)
 

@@ -394,6 +394,12 @@ class TaskRequestApiTest(TestCase):
     self.assertEqual(
         0xeb5313d0300000, task_request.datetime_to_request_base_id(now))
 
+  def test_convert_to_request_key(self):
+    """Indirectly tested by API."""
+    now = datetime.datetime(2012, 1, 2, 3, 4, 5, 123456)
+    key = task_request.convert_to_request_key(now)
+    self.assertEqual(9157134072765480958, key.id())
+
   def test_request_key_to_datetime(self):
     key = ndb.Key(task_request.TaskRequest, 0x7f14acec2fcfffff)
     # Resolution is only kept at millisecond level compared to

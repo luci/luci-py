@@ -140,22 +140,6 @@ def to_units(number):
 ### Time
 
 
-class UTC(datetime.tzinfo):
-  _offset = datetime.timedelta(0)
-
-  def utcoffset(self, _dt):
-    return self._offset
-
-  def tzname(self, _dt):
-    return 'Z'
-
-  def dst(self, _dt):
-    return self._offset
-
-
-utc = UTC()
-
-
 def utcnow():
   """Returns datetime.utcnow(), used for testing.
 

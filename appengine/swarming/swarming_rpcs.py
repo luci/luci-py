@@ -71,16 +71,16 @@ class TaskRequest(messages.Message):
   parent_task_id = messages.StringField(5)
   priority = messages.IntegerField(6)
   properties = messages.MessageField(TaskProperty, 7, required=True)
-  tags = messages.StringField(8, repeated=True)
-  user = messages.StringField(9)
+  tag = messages.StringField(9, repeated=True)
+  user = messages.StringField(10)
 
 
 class TasksRequest(messages.Message):
   """Request to get some subset of available tasks."""
-  cursor = messages.StringField(1)  # ?
-  limit = messages.IntegerField(2, default=100)
-  name = messages.StringField(3)
-  sort = messages.StringField(4, default='created_ts')
+  batch_size = messages.IntegerField(1, default=200)
+  cursor = messages.StringField(2)
+  end = message_types.DateTimeField(3)
+  start = message_types.DateTimeField(4)
   state = messages.EnumField(TaskState, 5, default='ALL')
   tag = messages.StringField(6, repeated=True)
 
@@ -131,9 +131,6 @@ class TaskList(messages.Message):
   """Wraps a list of TaskResultSummary, along with request information."""
   cursor = messages.StringField(1)
   items = messages.MessageField(TaskResultSummary, 2, repeated=True)
-  limit = messages.IntegerField(3)
-  sort = messages.StringField(4)
-  state = messages.StringField(5)
 
 
 class TaskRequestMetadata(messages.Message):
@@ -150,20 +147,22 @@ class TaskRequestMetadata(messages.Message):
 
 class BotId(messages.Message):
   """Provides the bot ID for Bot* requests."""
-  bot_id = messages.StringField(1)
+  bot_id = messages.StringField(1, required=True)
 
 
 class BotsRequest(messages.Message):
   """Information needed to request bot data."""
-  cursor = messages.StringField(1)
-  limit = messages.IntegerField(2, default=1000)
+  batch_size = messages.IntegerField(1, default=200)
+  cursor = messages.StringField(2)
 
 
 class BotTasksRequest(messages.Message):
   """Request to get data about a bot's tasks."""
-  bot_id = messages.StringField(1)
-  cursor = messages.StringField(2)
-  limit = messages.IntegerField(3)
+  batch_size = messages.IntegerField(1, default=200)
+  cursor = messages.StringField(3)
+  end = message_types.DateTimeField(2)
+  start = message_types.DateTimeField(4)
+  bot_id = messages.StringField(5, required=True)
 
 
 ### Bot-Related Responses
@@ -186,10 +185,9 @@ class BotInfo(messages.Message):
 class BotList(messages.Message):
   """Wraps a list of BotInfo, along with information about the request."""
   cursor = messages.StringField(1)
-  death_timeout = messages.IntegerField(2)
   items = messages.MessageField(BotInfo, 3, repeated=True)
-  limit = messages.IntegerField(4)
-  now = message_types.DateTimeField(5)
+  now = message_types.DateTimeField(4)
+  death_timeout = messages.IntegerField(2)
 
 
 class DeletedResponse(messages.Message):
@@ -218,8 +216,7 @@ class TaskRunResult(messages.Message):
   try_number = messages.IntegerField(17)
 
 
-class BotTask(messages.Message):
+class BotTasks(messages.Message):
   cursor = messages.StringField(1)
   items = messages.MessageField(TaskRunResult, 2, repeated=True)
-  limit = messages.IntegerField(3)
-  now = message_types.DateTimeField(4)
+  now = message_types.DateTimeField(3)

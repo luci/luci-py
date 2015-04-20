@@ -4,13 +4,11 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
-import base64
 import datetime
 import json
 import logging
 import os
 import random
-import re
 import sys
 import unittest
 
@@ -91,7 +89,7 @@ class TaskApiTest(BaseTest):
             env=[],
             execution_timeout_secs=30,
             io_timeout_secs=30),
-        tags=['foo:bar'],
+        tag=['foo:bar'],
         user='joe@localhost')
     expected = {
       u'request': {
@@ -108,7 +106,7 @@ class TaskApiTest(BaseTest):
           u'idempotent': False,
           u'io_timeout_secs': u'30',
         },
-        u'tags': [
+        u'tag': [
           u'foo:bar',
           u'priority:200',
           u'user:joe@localhost',
@@ -307,7 +305,7 @@ class TaskApiTest(BaseTest):
     response = self.call_api('request', message_to_dict(request), 200)
     expected = {
       u'authenticated': u'user=user@example.com',
-      u'created_ts': unicode(now.strftime(self.DATETIME_FORMAT)),
+      u'created_ts': unicode(now.strftime(self.DATETIME_NO_MICRO)),
       u'expiration_secs': unicode(24 * 60 * 60),
       u'name': u'hi',
       u'priority': u'10',
@@ -319,13 +317,14 @@ class TaskApiTest(BaseTest):
         u'idempotent': False,
         u'io_timeout_secs': u'1200',
       },
-      u'tags': [u'os:Amiga', u'priority:10', u'user:joe@localhost'],
+      u'tag': [u'os:Amiga', u'priority:10', u'user:joe@localhost'],
       u'user': u'joe@localhost',
     }
     self.assertEqual(expected, response.json)
 
   def test_list_ok(self):
     """Asserts that list requests all TaskResultSummaries."""
+
     # first request
     now = datetime.datetime(2010, 1, 2, 3, 4, 5)
     str_now = unicode(now.strftime(self.DATETIME_NO_MICRO))
@@ -347,8 +346,10 @@ class TaskApiTest(BaseTest):
         tags=['project:yay', 'commit:pre', 'os:Win'],
         properties=dict(idempotent=True))
 
+    start = now - datetime.timedelta(days=1)
+    end = now + datetime.timedelta(days=1)
     self.set_as_privileged_user()
-    request = swarming_rpcs.TasksRequest()
+    request = swarming_rpcs.TasksRequest(end=end, start=start)
     response = self.call_api('list', message_to_dict(request), 200)
 
     # we expect [second, first]
@@ -386,38 +387,28 @@ class TaskApiTest(BaseTest):
         u'state': u'COMPLETED',
         u'try_number': u'1',
         u'user': u'joe@localhost'}]
-    second, _first = task_results
+    second, _ = task_results
     expected = {
-      u'items': task_results,
-      u'limit': u'100',
-      u'sort': u'created_ts',
-      u'state': u'all'}
+      u'items': task_results}
 
     self.assertEqual(expected, response.json)
-
-    # try with a name: should only contain second
-    request = swarming_rpcs.TasksRequest(name='second')
-    expected[u'items'] = [second]
-    response = self.call_api('list', message_to_dict(request), 200)
-    json_version = response.json
-    self.assertTrue(json_version.pop('cursor'))
-    self.assertEqual(expected, json_version)
 
     # try with a tag: should still only contain second
     request = swarming_rpcs.TasksRequest(
-        tag=['project:yay', 'commit:pre'])
+        end=end, start=start, tag=['project:yay', 'commit:pre'])
     response = self.call_api('list', message_to_dict(request), 200)
-    self.assertEqual(expected, response.json)
+    self.assertEqual({u'items': [second]}, response.json)
 
     # try with a spurious tag: items should be empty
-    request = swarming_rpcs.TasksRequest(tag=['foo:bar'])
+    request = swarming_rpcs.TasksRequest(end=end, start=start, tag=['foo:bar'])
     expected.pop('items')
     response = self.call_api('list', message_to_dict(request), 200)
     self.assertEqual(expected, response.json)
 
     # try with multiple sort/filter options
     request = swarming_rpcs.TasksRequest(
-        tag=['foo:bar'], state=swarming_rpcs.TaskState.PENDING)
+        end=end, start=start, tag=['foo:bar'],
+        state=swarming_rpcs.TaskState.PENDING)
     with self.call_should_fail('400'):
       self.call_api('list', message_to_dict(request), 200)
 
@@ -451,7 +442,6 @@ class BotApiTest(BaseTest):
         },
       ],
       u'death_timeout': unicode(config.settings().bot_death_timeout_secs),
-      u'limit': u'1000',
       u'now': unicode(now.strftime(self.DATETIME_FORMAT)),
     }
     request = swarming_rpcs.BotsRequest()
@@ -535,11 +525,13 @@ class BotApiTest(BaseTest):
     self.bot_complete_task(
         token, exit_code=1, task_id=res['manifest']['task_id'])
 
+    start = now + datetime.timedelta(seconds=0.5)
+    end = now_1 + datetime.timedelta(seconds=0.5)
+    request = swarming_rpcs.BotTasksRequest(bot_id='bot1', end=end, start=start)
+
     self.set_as_privileged_user()
-    response = self.call_api(
-        'tasks', {'bot_id': 'bot1', 'limit': 1}, 200)
+    response = self.call_api('tasks', message_to_dict(request), 200)
     expected = {
-      u'limit': u'1',
       u'items': [{
         u'bot_id': u'bot1',
         u'completed_ts': now_1_str,
@@ -556,7 +548,6 @@ class BotApiTest(BaseTest):
       u'now': unicode(now_1.strftime(self.DATETIME_FORMAT)),
     }
     json_version = response.json
-    json_version.pop('cursor')
     self.assertEqual(expected, json_version)
 
 

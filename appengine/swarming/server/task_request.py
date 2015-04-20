@@ -351,10 +351,9 @@ def _new_request_key():
   The key id is this value XORed with task_pack.TASK_REQUEST_KEY_ID_MASK. The
   reason is that increasing key id values are in decreasing timestamp order.
   """
-  request_id_base = datetime_to_request_base_id(utils.utcnow())
   # TODO(maruel): Use real randomness.
   suffix = random.getrandbits(16)
-  return request_id_to_key(int(request_id_base | (suffix << 4) | 0x1))
+  return convert_to_request_key(utils.utcnow(), suffix)
 
 
 def _put_request(request):
@@ -411,6 +410,12 @@ def datetime_to_request_base_id(now):
         'Time %s is set to before %s' % (now, _BEGINING_OF_THE_WORLD))
   delta = now - _BEGINING_OF_THE_WORLD
   return int(round(delta.total_seconds() * 1000.)) << 20
+
+
+def convert_to_request_key(date, suffix=0):
+  assert 0 <= suffix <= 0xffff
+  request_id_base = datetime_to_request_base_id(date)
+  return request_id_to_key(int(request_id_base | suffix << 4 | 0x1))
 
 
 def request_id_to_key(request_id):
