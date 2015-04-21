@@ -10,6 +10,7 @@ import urllib
 
 from google.appengine.api import urlfetch
 from google.appengine.ext import ndb
+from google.appengine.runtime import apiproxy_errors
 
 from components import auth
 from components import utils
@@ -109,22 +110,22 @@ def request_async(
           follow_redirects=False,
           deadline=deadline,
           validate_certificate=True)
-    except urlfetch.Error as e:
-      # Transient network error.
+    except (apiproxy_errors.DeadlineExceededError, urlfetch.Error) as e:
+      # Transient network error or URL fetch service RPC deadline.
       logging.warning('%s %s failed: %s', method, url, e)
       continue
 
     # Transient error on the other side.
     if response.status_code >= 500 or response.status_code == 408:
       logging.warning(
-          '%s %s failed with HTTP %s: %s',
+          '%s %s failed with HTTP %d: %r',
           method, url, response.status_code, response.content)
       continue
 
     # Non-transient error.
     if 300 <= response.status_code < 500:
       logging.warning(
-          '%s %s failed with HTTP %s: %s',
+          '%s %s failed with HTTP %d: %r',
           method, url, response.status_code, response.content)
       cls = Error
       if response.status_code == 404:
