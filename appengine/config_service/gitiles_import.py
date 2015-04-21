@@ -25,6 +25,7 @@ from google.protobuf import text_format
 
 from components import auth
 from components import gitiles
+from components import net
 from components.datastore_utils import txn
 
 from proto import service_config_pb2
@@ -37,9 +38,9 @@ import validation
 DEFAULT_GITILES_IMPORT_CONFIG = service_config_pb2.ImportCfg.Gitiles(
     fetch_log_deadline=15,
     fetch_archive_deadline=15,
-    project_config_default_branch='luci',
+    project_config_default_ref='refs/heads/luci',
     project_config_default_path='/',
-    branch_config_default_path='luci',
+    ref_config_default_path='luci',
 )
 
 
@@ -158,7 +159,7 @@ def import_config_set(config_set, location):
     logging.error(
         'Could not import config set %s from %s: urlfetch deadline exceeded',
         config_set, location)
-  except auth.AuthorizationError:
+  except net.AuthError:
     # TODO(nodir): change to error when luci-config has access to internal
     # repos.
     logging.warning(
@@ -186,7 +187,7 @@ def import_project(project_id, location):
   # Adjust location
   treeish = location.treeish
   if not treeish or treeish == 'HEAD':
-    treeish = cfg.project_config_default_branch
+    treeish = cfg.project_config_default_ref
   location = location._replace(
       treeish=treeish,
       path=location.path.strip('/') or cfg.project_config_default_path,
@@ -199,14 +200,16 @@ def import_project(project_id, location):
 
   import_config_set('projects/%s' % project_id, location)
 
-  # Import branches
-  for branch in projects.get_branches(project_id):
-    branch_location = location._replace(
-        treeish=branch.name,
-        path=branch.config_path or cfg.branch_config_default_path,
+  # Import refs
+  for ref in projects.get_refs(project_id):
+    assert ref.name
+    assert ref.name.startswith('refs/'), ref.name
+    ref_location = location._replace(
+        treeish=ref.name,
+        path=ref.config_path or cfg.ref_config_default_path,
     )
     import_config_set(
-        'projects/%s/branches/%s' % (project_id, branch.name), branch_location)
+        'projects/%s/%s' % (project_id, ref.name), ref_location)
 
 
 def import_projects():

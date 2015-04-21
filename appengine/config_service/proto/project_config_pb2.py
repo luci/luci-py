@@ -13,7 +13,7 @@ from google.protobuf import descriptor_pb2
 DESCRIPTOR = _descriptor.FileDescriptor(
   name='project_config.proto',
   package='config_service',
-  serialized_pb='\n\x14project_config.proto\x12\x0e\x63onfig_service\"\x1a\n\nProjectCfg\x12\x0c\n\x04name\x18\x01 \x01(\t\"p\n\x0b\x42ranchesCfg\x12\x34\n\x08\x62ranches\x18\x01 \x03(\x0b\x32\".config_service.BranchesCfg.Branch\x1a+\n\x06\x42ranch\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x13\n\x0b\x63onfig_path\x18\x03 \x01(\t')
+  serialized_pb='\n\x14project_config.proto\x12\x0e\x63onfig_service\"\x1a\n\nProjectCfg\x12\x0c\n\x04name\x18\x01 \x01(\t\"^\n\x07RefsCfg\x12)\n\x04refs\x18\x01 \x03(\x0b\x32\x1b.config_service.RefsCfg.Ref\x1a(\n\x03Ref\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x13\n\x0b\x63onfig_path\x18\x03 \x01(\t')
 
 
 
@@ -46,22 +46,22 @@ _PROJECTCFG = _descriptor.Descriptor(
 )
 
 
-_BRANCHESCFG_BRANCH = _descriptor.Descriptor(
-  name='Branch',
-  full_name='config_service.BranchesCfg.Branch',
+_REFSCFG_REF = _descriptor.Descriptor(
+  name='Ref',
+  full_name='config_service.RefsCfg.Ref',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   fields=[
     _descriptor.FieldDescriptor(
-      name='name', full_name='config_service.BranchesCfg.Branch.name', index=0,
+      name='name', full_name='config_service.RefsCfg.Ref.name', index=0,
       number=1, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=unicode("", "utf-8"),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
-      name='config_path', full_name='config_service.BranchesCfg.Branch.config_path', index=1,
+      name='config_path', full_name='config_service.RefsCfg.Ref.config_path', index=1,
       number=3, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=unicode("", "utf-8"),
       message_type=None, enum_type=None, containing_type=None,
@@ -76,19 +76,19 @@ _BRANCHESCFG_BRANCH = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=137,
-  serialized_end=180,
+  serialized_start=122,
+  serialized_end=162,
 )
 
-_BRANCHESCFG = _descriptor.Descriptor(
-  name='BranchesCfg',
-  full_name='config_service.BranchesCfg',
+_REFSCFG = _descriptor.Descriptor(
+  name='RefsCfg',
+  full_name='config_service.RefsCfg',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   fields=[
     _descriptor.FieldDescriptor(
-      name='branches', full_name='config_service.BranchesCfg.branches', index=0,
+      name='refs', full_name='config_service.RefsCfg.refs', index=0,
       number=1, type=11, cpp_type=10, label=3,
       has_default_value=False, default_value=[],
       message_type=None, enum_type=None, containing_type=None,
@@ -97,20 +97,20 @@ _BRANCHESCFG = _descriptor.Descriptor(
   ],
   extensions=[
   ],
-  nested_types=[_BRANCHESCFG_BRANCH, ],
+  nested_types=[_REFSCFG_REF, ],
   enum_types=[
   ],
   options=None,
   is_extendable=False,
   extension_ranges=[],
   serialized_start=68,
-  serialized_end=180,
+  serialized_end=162,
 )
 
-_BRANCHESCFG_BRANCH.containing_type = _BRANCHESCFG;
-_BRANCHESCFG.fields_by_name['branches'].message_type = _BRANCHESCFG_BRANCH
+_REFSCFG_REF.containing_type = _REFSCFG;
+_REFSCFG.fields_by_name['refs'].message_type = _REFSCFG_REF
 DESCRIPTOR.message_types_by_name['ProjectCfg'] = _PROJECTCFG
-DESCRIPTOR.message_types_by_name['BranchesCfg'] = _BRANCHESCFG
+DESCRIPTOR.message_types_by_name['RefsCfg'] = _REFSCFG
 
 class ProjectCfg(_message.Message):
   __metaclass__ = _reflection.GeneratedProtocolMessageType
@@ -118,17 +118,17 @@ class ProjectCfg(_message.Message):
 
   # @@protoc_insertion_point(class_scope:config_service.ProjectCfg)
 
-class BranchesCfg(_message.Message):
+class RefsCfg(_message.Message):
   __metaclass__ = _reflection.GeneratedProtocolMessageType
 
-  class Branch(_message.Message):
+  class Ref(_message.Message):
     __metaclass__ = _reflection.GeneratedProtocolMessageType
-    DESCRIPTOR = _BRANCHESCFG_BRANCH
+    DESCRIPTOR = _REFSCFG_REF
 
-    # @@protoc_insertion_point(class_scope:config_service.BranchesCfg.Branch)
-  DESCRIPTOR = _BRANCHESCFG
+    # @@protoc_insertion_point(class_scope:config_service.RefsCfg.Ref)
+  DESCRIPTOR = _REFSCFG
 
-  # @@protoc_insertion_point(class_scope:config_service.BranchesCfg)
+  # @@protoc_insertion_point(class_scope:config_service.RefsCfg)
 
 
 # @@protoc_insertion_point(module_scope)

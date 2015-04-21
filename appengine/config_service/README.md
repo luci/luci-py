@@ -37,12 +37,11 @@ component to read `swarming.cfg` from `projects/<project id>` config set.
 * **service**: project-independent (in particular, chromium-independent)
   multi-tenant reusable software. Examples: swarming, isolate, auth.
 - **project**: a tenant of a service. Examples: chromium, v8, skia.
-- **branch**: a tree of project files. In Git case, a tree is mapped to a tuple
-  (repository_url, branch_name).
+- **ref**: a git ref in a project repo.
 - **config set**: a versioned collection of config files. Config sets have
   names, for example: `services/chrome-infra-auth`, `projects/chromium`,
-  `projects/chromium/trees/master`. Config sets encapsulate location of files.
-  Config service API accepts config sets instead of repository URLs.
+  `projects/chromium/refs/heads/master`. Config sets encapsulate location of
+  files. Config service API accepts config sets instead of repository URLs.
  `services/luci-config:projects.cfg` means `projects.cfg` file in
  `services/luci-config` config set.
 
@@ -71,8 +70,7 @@ There are three types of configs:
 
   * project metadata: project name, project description, mailing list,
     owner email, team auth group, wiki link, etc.
-  * list of project trees. Example: `master` tree is mapped to `master` branch
-    of the same repository.
+  * list of project refs.
   * cron jobs: when and what project tasks to run.
 
   Project configs live in `projects/<project_id>` config set. Services discover
@@ -80,7 +78,7 @@ There are three types of configs:
   `projects/<project_id>` config set. For instance, cron service reads
   `projects/<project_id>:cron.cfg` for each project in the registry.
 
-3. Tree configs. These are repository/branch-specific configs in a project.
+3. Ref configs. These are repository/branch-specific configs in a project.
    Examples:
 
   * list of builds that have to pass for a CL to be committed.
@@ -88,7 +86,8 @@ There are three types of configs:
   * Code review info: type (rietveld, gerrit, etc), URL and codereview-specific
     details.
 
-  Tree configs live in `projects/<project_id>/tree/<tree_name>` config set.
+  Ref configs live in `projects/<project_id>/<ref_name> config set, where
+  <ref_name> always starts with "refs/".
 
 
 ## GAE component

@@ -49,12 +49,12 @@ message ImportCfg {
     optional int32 fetch_log_deadline = 1;
     // Request timeout in seconds when requesting directory archive.
     optional int32 fetch_archive_deadline = 2;
-    // Default branch for project configs.
-    optional string project_config_default_branch = 3;
+    // Default ref for project configs.
+    optional string project_config_default_ref = 3;
     // Default directory for project configs.
     optional string project_config_default_path = 4;
-    // Default directory for branch configs.
-    optional string branch_config_default_path = 5;
+    // Default directory for ref configs.
+    optional string ref_config_default_path = 5;
   }
 
   // Configuration of import from Gitiles repositories.
@@ -67,7 +67,7 @@ message SchemasCfg {
     // Name of schema.
     // For service configs, "<config_set>:<path>"
     // For project configs, "projects:<path>"
-    // For branch configs, "projects/branches:<path>"
+    // For ref configs, "projects/refs:<path>"
     optional string name = 1;
     // URL to the schema definition, e.g. to a .proto file in a repository.
     optional string url = 2;

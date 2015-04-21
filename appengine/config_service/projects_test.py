@@ -39,29 +39,29 @@ class ProjectsTestCase(test_case.TestCase):
     )
     self.assertEqual(projects.get_projects(), expected.projects)
 
-  def test_get_branches(self):
+  def test_get_refs(self):
     storage.get_latest.return_value = '''
-      branches {
-        name: "master"
+      refs {
+        name: "refs/heads/master"
       }
-      branches {
-        name: "release42"
+      refs {
+        name: "refs/heads/release42"
         config_path: "other"
       }
     '''
-    expected = project_config_pb2.BranchesCfg(
-        branches=[
-          project_config_pb2.BranchesCfg.Branch(
-              name='master'),
-          project_config_pb2.BranchesCfg.Branch(
-              name='release42', config_path='other'),
+    expected = project_config_pb2.RefsCfg(
+        refs=[
+          project_config_pb2.RefsCfg.Ref(
+              name='refs/heads/master'),
+          project_config_pb2.RefsCfg.Ref(
+              name='refs/heads/release42', config_path='other'),
         ],
     )
-    self.assertEqual(projects.get_branches('chromium'), expected.branches)
+    self.assertEqual(projects.get_refs('chromium'), expected.refs)
 
-  def test_get_branches_of_non_existent_project(self):
+  def test_get_refs_of_non_existent_project(self):
     storage.get_latest.return_value = None
-    self.assertEqual(projects.get_branches('chromium'), None)
+    self.assertEqual(projects.get_refs('chromium'), None)
 
   def test_repo_info(self):
     self.assertEqual(projects.get_repo('x'), (None, None))

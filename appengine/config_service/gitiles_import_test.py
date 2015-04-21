@@ -15,6 +15,7 @@ import mock
 
 from components import auth
 from components import gitiles
+from components import net
 from test_support import test_case
 
 from proto import project_config_pb2
@@ -161,9 +162,8 @@ class GitilesImportTestCase(test_case.TestCase):
         gitiles.Location.parse('https://localhost/project'))
 
   def test_import_config_set_with_auth_error(self):
-    def raise_auth_error(*_, **__):
-      raise auth.AuthorizationError()
-    self.mock(gitiles, 'get_log', mock.Mock(side_effect=raise_auth_error))
+    self.mock(gitiles, 'get_log', mock.Mock())
+    gitiles.get_log.side_effect = net.AuthError('Denied', 500, 'Denied')
 
     # Should not raise an exception.
     gitiles_import.import_config_set(
@@ -172,11 +172,8 @@ class GitilesImportTestCase(test_case.TestCase):
 
   def test_deadline_exceeded(self):
     self.mock_get_log()
-
-    def raise_deadline_exceeded(*args, **kwrags):
-      raise urlfetch_errors.DeadlineExceededError()
     self.mock(gitiles, 'get_archive', mock.Mock())
-    gitiles.get_archive.side_effect = raise_deadline_exceeded
+    gitiles.get_archive.side_effect = urlfetch_errors.DeadlineExceededError
 
     # Should not raise an exception.
     gitiles_import.import_config_set(
@@ -213,10 +210,10 @@ class GitilesImportTestCase(test_case.TestCase):
         'services/luci-config',
         'https://localhost/config/+/HEAD/luci-config')
 
-  def test_import_projects_and_branches(self):
+  def test_import_projects_and_refs(self):
     self.mock(gitiles_import, 'import_config_set', mock.Mock())
     self.mock(projects, 'get_projects', mock.Mock())
-    self.mock(projects, 'get_branches', mock.Mock())
+    self.mock(projects, 'get_refs', mock.Mock())
     projects.get_projects.return_value = [
       service_config_pb2.Project(
           id='chromium',
@@ -232,23 +229,23 @@ class GitilesImportTestCase(test_case.TestCase):
           id='non-gitiles',
       ),
     ]
-    BranchType = project_config_pb2.BranchesCfg.Branch
-    projects.get_branches.return_value = [
-      BranchType(name='master'),
-      BranchType(name='release42', config_path='/my-configs'),
+    RefType = project_config_pb2.RefsCfg.Ref
+    projects.get_refs.return_value = [
+      RefType(name='refs/heads/master'),
+      RefType(name='refs/heads/release42', config_path='/my-configs'),
     ]
 
     gitiles_import.import_projects()
 
     self.assertEqual(gitiles_import.import_config_set.call_count, 3)
     gitiles_import.import_config_set.assert_any_call(
-        'projects/chromium', 'https://localhost/chromium/src/+/luci')
+        'projects/chromium', 'https://localhost/chromium/src/+/refs/heads/luci')
     gitiles_import.import_config_set.assert_any_call(
-        'projects/chromium/branches/master',
-        'https://localhost/chromium/src/+/master/luci')
+        'projects/chromium/refs/heads/master',
+        'https://localhost/chromium/src/+/refs/heads/master/luci')
     gitiles_import.import_config_set.assert_any_call(
-        'projects/chromium/branches/release42',
-        'https://localhost/chromium/src/+/release42/my-configs')
+        'projects/chromium/refs/heads/release42',
+        'https://localhost/chromium/src/+/refs/heads/release42/my-configs')
 
   def test_import_projects_exception(self):
     self.mock(gitiles_import, 'import_project', mock.Mock())

@@ -18,5 +18,6 @@ def validate_config(config_set, path, content, log_errors=False):
   # TODO(nodir): validate service/luci-config:import.cfg.
   # TODO(nodir): validate service/luci-config:schemas.cfg.
   # TODO(nodir): validate service/<project_id>:project.cfg.
-  # TODO(nodir): validate service/<project_id>:branches.cfg.
+  # TODO(nodir): validate service/<project_id>:refs.cfg. Ref names must start
+  # with 'refs/'.
   return True

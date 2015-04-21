@@ -13,7 +13,7 @@ from google.protobuf import descriptor_pb2
 DESCRIPTOR = _descriptor.FileDescriptor(
   name='service_config.proto',
   package='luci.config',
-  serialized_pb='\n\x14service_config.proto\x12\x0bluci.config\"\xa2\x01\n\x07Project\x12\n\n\x02id\x18\x01 \x02(\t\x12\x17\n\x0f\x63onfig_location\x18\x02 \x01(\t\x12\x43\n\x13\x63onfig_storage_type\x18\x03 \x01(\x0e\x32&.luci.config.Project.ConfigStorageType\"-\n\x11\x43onfigStorageType\x12\x0b\n\x07UNKNOWN\x10\x00\x12\x0b\n\x07GITILES\x10\x01\"5\n\x0bProjectsCfg\x12&\n\x08projects\x18\x01 \x03(\x0b\x32\x14.luci.config.Project\"D\n\x06\x41\x63lCfg\x12\x1c\n\x14service_access_group\x18\x01 \x01(\t\x12\x1c\n\x14project_access_group\x18\x02 \x01(\t\"\xf4\x01\n\tImportCfg\x12/\n\x07gitiles\x18\x01 \x01(\x0b\x32\x1e.luci.config.ImportCfg.Gitiles\x1a\xb5\x01\n\x07Gitiles\x12\x1a\n\x12\x66\x65tch_log_deadline\x18\x01 \x01(\x05\x12\x1e\n\x16\x66\x65tch_archive_deadline\x18\x02 \x01(\x05\x12%\n\x1dproject_config_default_branch\x18\x03 \x01(\t\x12#\n\x1bproject_config_default_path\x18\x04 \x01(\t\x12\"\n\x1a\x62ranch_config_default_path\x18\x05 \x01(\t\"b\n\nSchemasCfg\x12/\n\x07schemas\x18\x01 \x03(\x0b\x32\x1e.luci.config.SchemasCfg.Schema\x1a#\n\x06Schema\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x0b\n\x03url\x18\x02 \x01(\t')
+  serialized_pb='\n\x14service_config.proto\x12\x0bluci.config\"\xa2\x01\n\x07Project\x12\n\n\x02id\x18\x01 \x02(\t\x12\x17\n\x0f\x63onfig_location\x18\x02 \x01(\t\x12\x43\n\x13\x63onfig_storage_type\x18\x03 \x01(\x0e\x32&.luci.config.Project.ConfigStorageType\"-\n\x11\x43onfigStorageType\x12\x0b\n\x07UNKNOWN\x10\x00\x12\x0b\n\x07GITILES\x10\x01\"5\n\x0bProjectsCfg\x12&\n\x08projects\x18\x01 \x03(\x0b\x32\x14.luci.config.Project\"D\n\x06\x41\x63lCfg\x12\x1c\n\x14service_access_group\x18\x01 \x01(\t\x12\x1c\n\x14project_access_group\x18\x02 \x01(\t\"\xee\x01\n\tImportCfg\x12/\n\x07gitiles\x18\x01 \x01(\x0b\x32\x1e.luci.config.ImportCfg.Gitiles\x1a\xaf\x01\n\x07Gitiles\x12\x1a\n\x12\x66\x65tch_log_deadline\x18\x01 \x01(\x05\x12\x1e\n\x16\x66\x65tch_archive_deadline\x18\x02 \x01(\x05\x12\"\n\x1aproject_config_default_ref\x18\x03 \x01(\t\x12#\n\x1bproject_config_default_path\x18\x04 \x01(\t\x12\x1f\n\x17ref_config_default_path\x18\x05 \x01(\t\"b\n\nSchemasCfg\x12/\n\x07schemas\x18\x01 \x03(\x0b\x32\x1e.luci.config.SchemasCfg.Schema\x1a#\n\x06Schema\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x0b\n\x03url\x18\x02 \x01(\t')
 
 
 
@@ -167,7 +167,7 @@ _IMPORTCFG_GITILES = _descriptor.Descriptor(
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
-      name='project_config_default_branch', full_name='luci.config.ImportCfg.Gitiles.project_config_default_branch', index=2,
+      name='project_config_default_ref', full_name='luci.config.ImportCfg.Gitiles.project_config_default_ref', index=2,
       number=3, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=unicode("", "utf-8"),
       message_type=None, enum_type=None, containing_type=None,
@@ -181,7 +181,7 @@ _IMPORTCFG_GITILES = _descriptor.Descriptor(
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
-      name='branch_config_default_path', full_name='luci.config.ImportCfg.Gitiles.branch_config_default_path', index=4,
+      name='ref_config_default_path', full_name='luci.config.ImportCfg.Gitiles.ref_config_default_path', index=4,
       number=5, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=unicode("", "utf-8"),
       message_type=None, enum_type=None, containing_type=None,
@@ -197,7 +197,7 @@ _IMPORTCFG_GITILES = _descriptor.Descriptor(
   is_extendable=False,
   extension_ranges=[],
   serialized_start=391,
-  serialized_end=572,
+  serialized_end=566,
 )
 
 _IMPORTCFG = _descriptor.Descriptor(
@@ -224,7 +224,7 @@ _IMPORTCFG = _descriptor.Descriptor(
   is_extendable=False,
   extension_ranges=[],
   serialized_start=328,
-  serialized_end=572,
+  serialized_end=566,
 )
 
 
@@ -258,8 +258,8 @@ _SCHEMASCFG_SCHEMA = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=637,
-  serialized_end=672,
+  serialized_start=631,
+  serialized_end=666,
 )
 
 _SCHEMASCFG = _descriptor.Descriptor(
@@ -285,8 +285,8 @@ _SCHEMASCFG = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=574,
-  serialized_end=672,
+  serialized_start=568,
+  serialized_end=666,
 )
 
 _PROJECT.fields_by_name['config_storage_type'].enum_type = _PROJECT_CONFIGSTORAGETYPE

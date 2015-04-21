@@ -49,11 +49,11 @@ class ApiTest(test_case.EndpointsTestCase):
     storage.get_config_hash.return_value = 'deadbeef', 'abc0123'
     storage.get_config_by_hash.return_value = 'config text'
 
-  def mock_branches(self):
-    self.mock(projects, 'get_branches', mock.Mock())
-    projects.get_branches.return_value = [
-      project_config_pb2.BranchesCfg.Branch(name='master'),
-      project_config_pb2.BranchesCfg.Branch(name='release42'),
+  def mock_refs(self):
+    self.mock(projects, 'get_refs', mock.Mock())
+    projects.get_refs.return_value = [
+      project_config_pb2.RefsCfg.Ref(name='refs/heads/master'),
+      project_config_pb2.RefsCfg.Ref(name='refs/heads/release42'),
     ]
 
   ##############################################################################
@@ -201,43 +201,43 @@ class ApiTest(test_case.EndpointsTestCase):
       self.call_api('get_projects', {})
 
   ##############################################################################
-  # get_branches
+  # get_refs
 
-  def test_get_branches(self):
-    self.mock_branches()
+  def test_get_refs(self):
+    self.mock_refs()
 
     req = {'project_id': 'chromium'}
-    resp = self.call_api('get_branches', req).json_body
+    resp = self.call_api('get_refs', req).json_body
 
     self.assertEqual(resp, {
-      'branches': [
-        {'name': 'master'},
-        {'name': 'release42'},
+      'refs': [
+        {'name': 'refs/heads/master'},
+        {'name': 'refs/heads/release42'},
       ],
     })
 
-  def test_get_branches_without_permissions(self):
-    self.mock_branches()
+  def test_get_refs_without_permissions(self):
+    self.mock_refs()
     acl.can_read_project_config.return_value = False
 
     req = {'project_id': 'chromium'}
     with self.call_should_fail(httplib.NOT_FOUND):
-      self.call_api('get_branches', req)
-    self.assertFalse(projects.get_branches.called)
+      self.call_api('get_refs', req)
+    self.assertFalse(projects.get_refs.called)
 
 
-  def test_get_branches_of_non_existent_project(self):
-    self.mock(projects, 'get_branches', mock.Mock())
-    projects.get_branches.return_value = None
+  def test_get_refs_of_non_existent_project(self):
+    self.mock(projects, 'get_refs', mock.Mock())
+    projects.get_refs.return_value = None
     req = {'project_id': 'nonexistent'}
     with self.call_should_fail(httplib.NOT_FOUND):
-      self.call_api('get_branches', req)
+      self.call_api('get_refs', req)
 
   ##############################################################################
   # get_project_configs
 
   def test_get_config_multi(self):
-    self.mock_branches()
+    self.mock_refs()
 
     self.mock(storage, 'get_latest_multi', mock.Mock())
     storage.get_latest_multi.return_value = [
@@ -280,35 +280,35 @@ class ApiTest(test_case.EndpointsTestCase):
     self.assertFalse(api.get_projects.called)
 
   ##############################################################################
-  # get_branch_configs
+  # get_ref_configs
 
-  def test_get_branch_configs(self):
-    self.mock_branches()
+  def test_get_ref_configs(self):
+    self.mock_refs()
 
     self.mock(api, 'get_config_multi', mock.Mock())
     res = api.GetConfigMultiResponseMessage()
     api.get_config_multi.return_value = res
 
     req = {'path': 'cq.cfg'}
-    resp = self.call_api('get_branch_configs', req).json_body
+    resp = self.call_api('get_ref_configs', req).json_body
 
     config_sets = api.get_config_multi.call_args[0][0]
     self.assertEqual(
         list(config_sets),
         [
-          'projects/chromium/branches/master',
-          'projects/chromium/branches/release42',
-          'projects/v8/branches/master',
-          'projects/v8/branches/release42',
+          'projects/chromium/refs/heads/master',
+          'projects/chromium/refs/heads/release42',
+          'projects/v8/refs/heads/master',
+          'projects/v8/refs/heads/release42',
         ])
 
-  def test_get_branch_configs_without_permission(self):
+  def test_get_ref_configs_without_permission(self):
     self.mock(api, 'get_projects', mock.Mock())
     acl.has_project_access.return_value = False
 
     req = {'path': 'cq.cfg'}
     with self.call_should_fail(httplib.NOT_FOUND):
-      self.call_api('get_branch_configs', req)
+      self.call_api('get_ref_configs', req)
     self.assertFalse(api.get_projects.called)
 
 

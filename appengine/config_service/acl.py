@@ -37,9 +37,9 @@ def can_read_config_set(config_set, headers=None):
       project_id = project_match.group(1)
       return can_read_project_config(project_id)
 
-    branch_match = common.BRANCH_CONFIG_SET_RGX.match(config_set)
-    if branch_match:
-      project_id = branch_match.group(1)
+    ref_match = common.REF_CONFIG_SET_RGX.match(config_set)
+    if ref_match:
+      project_id = ref_match.group(1)
       return can_read_project_config(project_id)
 
   except ValueError:  # pragma: no cover

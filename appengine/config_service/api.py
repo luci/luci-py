@@ -150,32 +150,32 @@ class ConfigApi(remote.Service):
     return self.GetProjectsResponseMessage(projects=get_projects())
 
   ##############################################################################
-  # endpoint: get_branches
+  # endpoint: get_refs
 
-  GET_BRANCHES_REQUEST_RESOURCE_CONTAINER = endpoints.ResourceContainer(
+  GET_REFS_REQUEST_RESOURCE_CONTAINER = endpoints.ResourceContainer(
       message_types.VoidMessage,
       project_id=messages.StringField(1, required=True),
   )
 
-  class GetBranchesResponseMessage(messages.Message):
-    class Branch(messages.Message):
+  class GetRefsResponseMessage(messages.Message):
+    class Ref(messages.Message):
       name = messages.StringField(1)
-    branches = messages.MessageField(Branch, 1, repeated=True)
+    refs = messages.MessageField(Ref, 1, repeated=True)
 
   @auth.endpoints_method(
-      GET_BRANCHES_REQUEST_RESOURCE_CONTAINER,
-      GetBranchesResponseMessage,
-      path='projects/{project_id}/branches')
-  def get_branches(self, request):
-    """Gets list of branches of a project."""
+      GET_REFS_REQUEST_RESOURCE_CONTAINER,
+      GetRefsResponseMessage,
+      path='projects/{project_id}/refs')
+  def get_refs(self, request):
+    """Gets list of refs of a project."""
     if not acl.can_read_project_config(request.project_id):
       raise endpoints.NotFoundException()
-    branch_names = get_branch_names(request.project_id)
-    if branch_names is None:
+    ref_names = get_ref_names(request.project_id)
+    if ref_names is None:
       # Project not found
       raise endpoints.NotFoundException()
-    res = self.GetBranchesResponseMessage()
-    res.branches = [res.Branch(name=b) for b in branch_names]
+    res = self.GetRefsResponseMessage()
+    res.refs = [res.Ref(name=ref) for ref in ref_names]
     return res
 
   ##############################################################################
@@ -196,22 +196,22 @@ class ConfigApi(remote.Service):
         iter_project_config_sets(), request.path, request.hashes_only)
 
   ##############################################################################
-  # endpoint: get_branch_configs
+  # endpoint: get_ref_configs
 
   @auth.endpoints_method(
       GET_CONFIG_MULTI_REQUEST_RESOURCE_CONTAINER,
       GetConfigMultiResponseMessage,
-      path='configs/branches/{path}')
-  def get_branch_configs(self, request):
-    """Gets configs in all branch config sets."""
+      path='configs/refs/{path}')
+  def get_ref_configs(self, request):
+    """Gets configs in all ref config sets."""
 
-    def iter_branch_config_sets():
+    def iter_ref_config_sets():
       for project in get_projects():
-        for branch_name in get_branch_names(project.id):
-          yield 'projects/%s/branches/%s' % (project.id, branch_name)
+        for ref_name in get_ref_names(project.id):
+          yield 'projects/%s/%s' % (project.id, ref_name)
 
     return get_config_multi(
-        iter_branch_config_sets(), request.path, request.hashes_only)
+        iter_ref_config_sets(), request.path, request.hashes_only)
 
 
 @utils.memcache('projects_with_details', time=60)  # 1 min.
@@ -239,15 +239,15 @@ def get_projects():
   return result
 
 
-@utils.memcache('branch_names', ['project_id'], time=5*60)  # 5 min.
-def get_branch_names(project_id):
-  """Returns list of branch names for a project. Caches results."""
+@utils.memcache('ref_names', ['project_id'], time=5*60)  # 5 min.
+def get_ref_names(project_id):
+  """Returns list of ref names for a project. Caches results."""
   assert project_id
-  branches = projects.get_branches(project_id)
-  if branches is None:
+  refs = projects.get_refs(project_id)
+  if refs is None:
     # Project does not exist
     return None
-  return [b.name for b in branches]
+  return [ref.name for ref in refs]
 
 
 def get_config_multi(config_sets, path, hashes_only):

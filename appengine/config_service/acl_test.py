@@ -58,7 +58,7 @@ class AclTestCase(test_case.TestCase):
 
   def test_can_read_project_config_no_access(self):
     self.assertFalse(acl.can_read_config_set('projects/swarming'))
-    self.assertFalse(acl.can_read_config_set('projects/swarming/branches/x'))
+    self.assertFalse(acl.can_read_config_set('projects/swarming/refs/heads/x'))
 
   def test_malformed_config_set(self):
     with self.assertRaises(ValueError):

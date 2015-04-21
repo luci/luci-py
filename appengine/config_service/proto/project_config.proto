@@ -14,18 +14,18 @@ message ProjectCfg {
   optional string name = 1;
 }
 
-// Schema of branches.cfg.
-message BranchesCfg {
-  message Branch {
-    // Name of the branch.
+// Schema of refs.cfg.
+message RefsCfg {
+  message Ref {
+    // Name of the ref. Must start with "refs/".
     optional string name = 1;
-    // Branch name glob.
+    // Ref name glob.
     // optional string name_glob = 2; TODO(nodirt): implement.
-    // Path to config directory for the branch. Defaults to "infra/config".
+    // Path to config directory for the ref. Defaults to "infra/config".
     optional string config_path = 3;
   }
-  // List of branches that have configuration files and need to be fetched into
-  // luci-config. Branches are accessible through get_branches() API endpoint.
-  // A CI servie can read all branches of all projects and build them.
-  repeated Branch branches = 1;
+  // List of refs that have configuration files and need to be fetched into
+  // luci-config. Refs are accessible through get_refs() API endpoint.
+  // A CI service can read all refs of all projects and build them.
+  repeated Ref refs = 1;
 }

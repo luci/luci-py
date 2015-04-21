@@ -27,14 +27,14 @@ class HandlersTest(test_case.TestCase):
     storage.get_self_config.return_value = service_config_pb2.SchemasCfg(
         schemas=[
           service_config_pb2.SchemasCfg.Schema(
-              name='projects/branches.cfg',
-              url='http://somehost/branches.proto',
+              name='projects/refs.cfg',
+              url='http://somehost/refs.proto',
           )],
     )
 
-    response = self.app.get('/schemas/projects/branches.cfg', status=302)
+    response = self.app.get('/schemas/projects/refs.cfg', status=302)
     self.assertEqual(
-        'http://somehost/branches.proto', response.headers.get('Location'))
+        'http://somehost/refs.proto', response.headers.get('Location'))
 
     self.app.get('/schemas/non-existent', status=404)
 

@@ -18,8 +18,8 @@ import common
 import storage
 
 
-DEFAULT_BRANCH_CFG = project_config_pb2.BranchesCfg(
-    branches=[project_config_pb2.BranchesCfg.Branch(name='master')])
+DEFAULT_REF_CFG = project_config_pb2.RefsCfg(
+    refs=[project_config_pb2.RefsCfg.Ref(name='refs/heads/master')])
 
 
 class RepositoryType(messages.Enum):
@@ -91,17 +91,17 @@ def get_metadata(project_id):
       project_config_pb2.ProjectCfg)
 
 
-def get_branches(project_id):
-  """Returns list of project branches stored in branches.cfg.
+def get_refs(project_id):
+  """Returns list of project refs stored in refs.cfg.
 
   Never returns None.
   """
   cfg = _get_project_config(
-      project_id, common.BRANCHES_FILENAME, project_config_pb2.BranchesCfg)
+      project_id, common.REFS_FILENAME, project_config_pb2.RefsCfg)
   # TODO(nodirt): implement globs.
-  if not cfg.branches and not project_exists(project_id):
+  if not cfg.refs and not project_exists(project_id):
     return None
-  return cfg.branches or DEFAULT_BRANCH_CFG.branches
+  return cfg.refs or DEFAULT_REF_CFG.refs
 
 
 def _get_project_config(project_id, path, message_factory):
