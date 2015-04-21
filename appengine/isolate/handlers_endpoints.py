@@ -350,6 +350,9 @@ class IsolateService(remote.Service):
         raise endpoints.InternalServerErrorException(
             'Unable to store the entity: %s.' % e.__class__.__name__)
 
+    stats.add_entry(
+        stats.STORE, entry.compressed_size,
+        'GS; %s' % entry.key.id() if uploaded_to_gs else 'inline')
     return PushPing(ok=True)
 
   @classmethod
