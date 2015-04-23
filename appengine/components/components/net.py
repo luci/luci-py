@@ -106,7 +106,7 @@ def request_async(
           url=url,
           payload=payload,
           method=method,
-          headers=headers,
+          headers=headers or {},
           follow_redirects=False,
           deadline=deadline,
           validate_certificate=True)

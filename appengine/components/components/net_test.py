@@ -38,7 +38,7 @@ class NetTest(test_case.TestCase):
       defaults = {
         'deadline': 10,
         'follow_redirects': False,
-        'headers': None,
+        'headers': {},
         'method': 'GET',
         'payload': None,
         'validate_certificate': True,
