@@ -96,6 +96,7 @@ def request_async(
     assert method in ('CREATE', 'POST', 'PUT'), method
 
   attempt = 0
+  response = None
   while attempt < max_attempts:
     if attempt:
       logging.info('Retrying...')
@@ -143,7 +144,8 @@ def request_async(
 
   raise Error(
       'Failed to call %s after %d attempts' % (url, max_attempts),
-      response.status_code, response.content)
+      response.status_code if response else None,
+      response.content if response else None)
 
 
 def request(*args, **kwargs):
