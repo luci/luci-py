@@ -173,10 +173,14 @@ class TaskRequestApiTest(TestCase):
       ],
       'dimensions': {u'OS': u'Windows-3.1.1', u'hostname': u'localhost'},
       'env': {u'foo': u'bar', u'joe': u'2'},
+      'extra_args': None,
       'execution_timeout_secs': 30,
       'grace_period_secs': 30,
       'idempotent': True,
       'io_timeout_secs': None,
+      'isolated': None,
+      'isolatedserver': None,
+      'namespace': None,
     }
     expected_request = {
       'authenticated': auth_testing.DEFAULT_MOCKED_IDENTITY,
@@ -184,7 +188,7 @@ class TaskRequestApiTest(TestCase):
       'parent_task_id': unicode(parent_id),
       'priority': 49,
       'properties': expected_properties,
-      'properties_hash': '6ec96bdc40fad2bdaec3cbbe43594961ad72f02e',
+      'properties_hash': 'e7276ca9999756de386d26d39ae648e641ae1eac',
       'tags': [
         u'OS:Windows-3.1.1',
         u'hostname:localhost',
@@ -226,7 +230,7 @@ class TaskRequestApiTest(TestCase):
     self.assertEqual(True, as_dict['properties']['idempotent'])
     # Ensure the algorithm is deterministic.
     self.assertEqual(
-        '6ec96bdc40fad2bdaec3cbbe43594961ad72f02e', as_dict['properties_hash'])
+        'e7276ca9999756de386d26d39ae648e641ae1eac', as_dict['properties_hash'])
 
   def test_duped(self):
     # Two TestRequest with the same properties.
@@ -261,9 +265,6 @@ class TaskRequestApiTest(TestCase):
       task_request.make_request(_gen_request_data(properties={'foo': 'bar'}))
     task_request.make_request(_gen_request_data())
 
-    with self.assertRaises(datastore_errors.BadValueError):
-      task_request.make_request(
-          _gen_request_data(properties=dict(commands=None)))
     with self.assertRaises(datastore_errors.BadValueError):
       task_request.make_request(
           _gen_request_data(properties=dict(commands=[])))
@@ -322,6 +323,12 @@ class TaskRequestApiTest(TestCase):
         _gen_request_data(
             scheduling_expiration_secs=task_request._MIN_TIMEOUT_SECS))
 
+    # Try with isolated/isolatedserver/namespace.
+    with self.assertRaises(ValueError):
+      task_request.make_request(
+          _gen_request_data(properties=dict(
+              commands=['see', 'spot', 'run'], isolated='something.isolated')))
+
   def test_make_request_clone(self):
     # Compare with test_make_request().
     parent = task_request.make_request(_gen_request_data())
@@ -343,9 +350,13 @@ class TaskRequestApiTest(TestCase):
       'dimensions': {u'OS': u'Windows-3.1.1', u'hostname': u'localhost'},
       'env': {u'foo': u'bar', u'joe': u'2'},
       'execution_timeout_secs': 30,
+      'extra_args': None,
       'grace_period_secs': 30,
       'idempotent': False,
       'io_timeout_secs': None,
+      'isolated': None,
+      'isolatedserver': None,
+      'namespace': None,
     }
     # Differences from make_request() are:
     # - parent_task_id was reset to None.

@@ -57,9 +57,13 @@ class TaskProperty(messages.Message):
   dimensions = messages.MessageField(StringPair, 3, repeated=True)
   env = messages.MessageField(StringPair, 4, repeated=True)
   execution_timeout_secs = messages.IntegerField(5)
-  grace_period_secs = messages.IntegerField(6)
-  idempotent = messages.BooleanField(7, default=False)
-  io_timeout_secs = messages.IntegerField(8)
+  extra_args = messages.StringField(6, repeated=True)
+  grace_period_secs = messages.IntegerField(7)
+  idempotent = messages.BooleanField(8, default=False)
+  io_timeout_secs = messages.IntegerField(9)
+  isolated = messages.StringField(10)
+  isolatedserver = messages.StringField(11)
+  namespace = messages.StringField(12)
 
 
 class TaskRequest(messages.Message):

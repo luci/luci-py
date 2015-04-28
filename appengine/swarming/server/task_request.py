@@ -87,12 +87,12 @@ _EXPECTED_DATA_KEYS = frozenset(
       'scheduling_expiration_secs', 'tags', 'user'])
 # The content of 'properties' inside the 'data' parameter. This relates to the
 # task itself, e.g. what to run.
-_REQUIRED_PROPERTIES_KEYS = frozenset(
+_REQUIRED_PROPERTIES_KEYS= frozenset(
     ['commands', 'data', 'dimensions', 'env', 'execution_timeout_secs',
      'io_timeout_secs'])
 _EXPECTED_PROPERTIES_KEYS = frozenset(
     ['commands', 'data', 'dimensions', 'env', 'execution_timeout_secs',
-    'grace_period_secs', 'idempotent', 'io_timeout_secs'])
+     'grace_period_secs', 'idempotent', 'io_timeout_secs'])
 
 
 ### Properties validators must come before the models.
@@ -181,7 +181,30 @@ def _validate_tags(prop, value):
   """Validates and sorts TaskRequest.tags."""
   if not ':' in value:
     # pylint: disable=W0212
-    raise ValueError('%s must be key:value form, not %s' % (prop._name, value))
+    raise datastore_errors.BadValueError(
+        '%s must be key:value form, not %s' % (prop._name, value))
+
+
+def _validate_args(prop, value):
+  if not (isinstance(value, list) and all(
+      isinstance(arg, unicode) for arg in value)):
+    raise datastore_errors.BadValueError(
+        '%s must be a list of unicode strings, not %r' % (prop._name, value))
+
+
+def _validate_isolated(prop, value):
+  if value and not frozenset(value).issubset('0123456789abcdef'):
+    raise datastore_errors.BadValueError(
+        '%s must be lowercase hex, not %s' % (prop._name, value))
+
+
+def _validate_hostname(prop, value):
+  labels = value.split('.')
+  if not (
+      all(re.match(r'[a-zA-Z\d\-]{1,63}$', label) for label in labels)
+      and 0 < len(value) < 254):
+    raise datastore_errors.BadValueError(
+        '%s must be valid hostname, not %s' % (prop._name, value))
 
 
 ### Models.
@@ -195,6 +218,11 @@ class TaskProperties(ndb.Model):
   embedded in a TaskRequest.
 
   This model is immutable.
+
+  New-style TaskProperties supports invocation of run_isolated. When this
+  behavior is desired, .commands and .data must be omitted; instead, the members
+  .isolated, .isolatedserver, .namespace, and (optionally) .extra_args should
+  be supplied instead.
   """
   # Hashing algorithm used to hash TaskProperties to create its key.
   HASHING_ALGO = hashlib.sha1
@@ -202,7 +230,7 @@ class TaskProperties(ndb.Model):
   # Commands to run. It is a list of lists. Each command is run one after the
   # other. Encoded json.
   commands = datastore_utils.DeterministicJsonProperty(
-      validator=_validate_command, json_type=list, required=True)
+      validator=_validate_command, json_type=list)
 
   # List of (URLs, local file) for the bot to download. Encoded as json. Must be
   # sorted by URLs. Optional.
@@ -224,6 +252,10 @@ class TaskProperties(ndb.Model):
   execution_timeout_secs = ndb.IntegerProperty(
       validator=_validate_timeout, required=True)
 
+  # Extra arguments to supply to the command `python run_isolated ... .`
+  extra_args = datastore_utils.DeterministicJsonProperty(
+      validator=_validate_args, json_type=list)
+
   # Grace period is the time between signaling the task it timed out and killing
   # the process. During this time the process should clean up itself as quickly
   # as possible, potentially uploading partial results back.
@@ -237,6 +269,15 @@ class TaskProperties(ndb.Model):
   # If True, the task can safely be served results from a previously succeeded
   # task.
   idempotent = ndb.BooleanProperty(default=False)
+
+  # The hash of an isolated archive.
+  isolated = ndb.StringProperty(validator=_validate_isolated)
+
+  # The hostname of the isolated server to use.
+  isolatedserver = ndb.StringProperty(validator=_validate_hostname)
+
+  # Namespace on the isolate server.
+  namespace = ndb.StringProperty()
 
   @property
   def properties_hash(self):
@@ -489,9 +530,8 @@ def make_request(data):
   # Save ourself headaches with typos and refuses unexpected values.
   _assert_keys(_EXPECTED_DATA_KEYS, _REQUIRED_DATA_KEYS, data, 'request keys')
   data_properties = data['properties']
-  _assert_keys(
-      _EXPECTED_PROPERTIES_KEYS, _REQUIRED_PROPERTIES_KEYS, data_properties,
-      'request properties keys')
+  _assert_keys(_EXPECTED_PROPERTIES_KEYS, _REQUIRED_PROPERTIES_KEYS,
+               data_properties, 'request properties keys')
 
   parent_task_id = data.get('parent_task_id') or None
   if parent_task_id:
@@ -514,6 +554,7 @@ def make_request(data):
     raise datastore_errors.BadValueError('Only one command is supported')
 
   # Class TaskProperties takes care of making everything deterministic.
+  # TODO(cmassaro): New API must add support for run_isolate information.
   properties = TaskProperties(
       commands=data_properties['commands'],
       data=data_properties['data'],

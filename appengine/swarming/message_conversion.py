@@ -97,9 +97,14 @@ def properties_from_dict(entity_dict):
     'dimensions': (_string_pairs_from_dict, False),
     'env': (_string_pairs_from_dict, False),
     'execution_timeout_secs': (None, False),
+    'extra_args': (None, False),
     'grace_period_secs': (None, False),
     'idempotent': (None, False),
-    'io_timeout_secs': (None, False)}
+    'io_timeout_secs': (None, False),
+    'isolated': (None, False),
+    'isolatedserver': (None, False),
+    'namespace': (None, False),
+  }
   return _populate_rpc(swarming_rpcs.TaskProperty, entity_dict, field_map)
 
 
