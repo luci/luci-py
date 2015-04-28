@@ -31,6 +31,7 @@ import string
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import urllib
 import urllib2
@@ -126,7 +127,10 @@ GCE_WINDOWS_COST_CORE_HOUR = 0.04
 
 _STARTED_TS = time.time()
 
-_CACHED_OAUTH2_ACCESS_TOKEN_GCE = {}
+_CACHED_OAUTH2_TOKEN_GCE = {}
+_CACHED_OAUTH2_TOKEN_GCE_LOCK = threading.Lock()
+
+_MONITORING_SCOPE = 'https://www.googleapis.com/auth/monitoring'
 
 
 # Make cached a no-op when client/utils/tools.py is unavailable.
@@ -571,10 +575,11 @@ def _get_metadata_gce():
   url = 'http://metadata.google.internal/computeMetadata/v1/?recursive=true'
   headers = {'Metadata-Flavor': 'Google'}
   try:
-    resp = urllib2.urlopen(urllib2.Request(url, headers=headers), timeout=5)
-  except urllib2.URLError:
+    return json.load(
+        urllib2.urlopen(urllib2.Request(url, headers=headers), timeout=5))
+  except IOError as e:
+    logging.error('GCE metadata not available: %s', e)
     return None
-  return json.load(resp)
 
 
 def _get_cost_hour_gce():
@@ -608,18 +613,41 @@ def _get_cost_hour_gce():
   return machine_cost + os_cost + disk_gb_cost
 
 
-def _oauth2_access_token_gce(scope):
-  """Returns a value oauth2 access token."""
-  cached_scope = _CACHED_OAUTH2_ACCESS_TOKEN_GCE.get(scope)
-  # If not cached or expires in less than 5m.
-  if not cached_scope or cached_scope['expiresAt'] - 5*60 >= time.time():
-    # TODO(maruel): Move GCE VM authentication logic into client/utils/net.py.
-    # As seen in google-api-python-client/oauth2client/gce.py
+def _oauth2_access_token_gce(account='default'):
+  """Returns a value of oauth2 access token."""
+  # TODO(maruel): Move GCE VM authentication logic into client/utils/net.py.
+  # As seen in google-api-python-client/oauth2client/gce.py
+  with _CACHED_OAUTH2_TOKEN_GCE_LOCK:
+    cached_tok = _CACHED_OAUTH2_TOKEN_GCE.get(account)
+    # Cached and expires in more than 5 min from now.
+    if cached_tok and cached_tok['expiresAt'] >= time.time() + 5*60:
+      return cached_tok['accessToken']
+    # Grab the token.
     url = (
-      'http://metadata.google.internal/0.1/meta-data/service-accounts/'
-      'default/acquire?%s') % urllib.quote(scope)
-    _CACHED_OAUTH2_ACCESS_TOKEN_GCE[scope] = json.load(urllib2.urlopen(url))
-  return _CACHED_OAUTH2_ACCESS_TOKEN_GCE[scope]['accessToken']
+        'http://metadata.google.internal/computeMetadata/v1/instance'
+        '/service-accounts/%s/token' % account)
+    headers = {'Metadata-Flavor': 'Google'}
+    try:
+      resp = json.load(
+          urllib2.urlopen(urllib2.Request(url, headers=headers), timeout=20))
+    except IOError as e:
+      logging.error('Failed to grab GCE access token: %s', e)
+      raise
+    tok = {
+      'accessToken': resp['access_token'],
+      'expiresAt': time.time() + resp['expires_in'],
+    }
+    _CACHED_OAUTH2_TOKEN_GCE[account] = tok
+    return tok['accessToken']
+
+
+def _oauth2_available_scopes_gce(account='default'):
+  """Returns a list of OAuth2 scopes granted to GCE service account."""
+  metadata = _get_metadata_gce()
+  if not metadata:
+    return []
+  accounts = metadata['instance']['serviceAccounts']
+  return accounts.get(account, {}).get('scopes') or []
 
 
 def _safe_read(filepath):
@@ -968,6 +996,14 @@ def get_machine_type():
   return machine_type
 
 
+@cached
+def can_send_metric():
+  """True if 'send_metric' really does something."""
+  if _get_metadata_gce():
+    return _MONITORING_SCOPE in _oauth2_available_scopes_gce()
+  return False
+
+
 def send_metric(name, value):
   if _get_metadata_gce():
     return send_metric_gce(name, value)
@@ -997,6 +1033,15 @@ def get_machine_type_gce():
   return unicode(metadata['instance']['machineType'].rsplit('/', 1)[-1])
 
 
+@cached
+def get_tags_gce():
+  """Returns a list of instance tags or empty list if not GCE VM."""
+  metadata = _get_metadata_gce()
+  if not metadata:
+    return []
+  return metadata['instance']['tags']
+
+
 def send_metric_gce(name, value):
   """Sets a lightweight custom metric.
 
@@ -1017,8 +1062,6 @@ service-accounts/default/scopes" -H "Metadata-Flavor: Google"
   assert isinstance(name, str), repr(name)
   assert isinstance(value, float), repr(value)
 
-  access_token = _oauth2_access_token_gce(
-      'https://www.googleapis.com/auth/monitoring')
   metadata = _get_metadata_gce()
   project_id = metadata['project']['numericProjectId']
 
@@ -1048,7 +1091,7 @@ service-accounts/default/scopes" -H "Metadata-Flavor: Google"
     ],
   }
   headers = {
-    'Authorization': 'Bearer ' + access_token,
+    'Authorization': 'Bearer ' + _oauth2_access_token_gce(),
     'Content-Type': 'application/json',
   }
   logging.info('%s', json.dumps(body, indent=2, sort_keys=True))

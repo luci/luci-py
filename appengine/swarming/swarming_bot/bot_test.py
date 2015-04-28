@@ -8,6 +8,7 @@ __version__ = '23'
 import os
 import sys
 import unittest
+import threading
 
 import bot
 
@@ -26,6 +27,19 @@ class TestBot(unittest.TestCase):
     self.assertEqual(THIS_FILE, obj.swarming_bot_zip)
     self.assertEqual('1234-1a2b3c4-tainted-joe', obj.server_version)
     self.assertEqual('base_dir', obj.base_dir)
+
+  def test_bot_call_later(self):
+    obj = bot.Bot(None, {}, '1234-1a2b3c4-tainted-joe', 'base_dir', None)
+    ev = threading.Event()
+    obj.call_later(0.001, ev.set)
+    self.assertTrue(ev.wait(1))
+
+  def test_bot_call_later_cancel(self):
+    obj = bot.Bot(None, {}, '1234-1a2b3c4-tainted-joe', 'base_dir', None)
+    ev = threading.Event()
+    obj.call_later(0.1, ev.set)
+    obj.cancel_all_timers()
+    self.assertFalse(ev.wait(0.3))
 
 
 if __name__ == '__main__':
