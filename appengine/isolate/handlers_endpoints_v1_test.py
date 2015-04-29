@@ -21,6 +21,7 @@ from protorpc.remote import protojson
 import webapp2
 import webtest
 
+from components import auth
 from components import auth_testing
 from components import utils
 from test_support import test_case
@@ -28,7 +29,7 @@ from test_support import test_case
 import config
 import gcs
 import handlers_backend
-import handlers_endpoints
+import handlers_endpoints_v1
 import model
 
 
@@ -50,19 +51,18 @@ def generate_digest(content):
 
   Arguments:
     content: the content to be hashed
-    namespace: the namespace in which the content will be hashed
 
   Returns:
     a Digest corresponding to the content/ namespace pair
   """
-  return handlers_endpoints.Digest(
+  return handlers_endpoints_v1.Digest(
       digest=hash_content(content), size=len(content))
 
 
 def generate_collection(contents, namespace=None):
   if namespace is None:
-    namespace = handlers_endpoints.Namespace()
-  return handlers_endpoints.DigestCollection(
+    namespace = handlers_endpoints_v1.Namespace()
+  return handlers_endpoints_v1.DigestCollection(
       namespace=namespace,
       items=[generate_digest(content) for content in contents])
 
@@ -81,15 +81,15 @@ def preupload_status_to_request(preupload_status, content):
   ticket = preupload_status.get('upload_ticket')
   url = preupload_status.get('gs_upload_url', None)
   if url is not None:
-    return handlers_endpoints.FinalizeRequest(upload_ticket=ticket)
-  return handlers_endpoints.StorageRequest(
+    return handlers_endpoints_v1.FinalizeRequest(upload_ticket=ticket)
+  return handlers_endpoints_v1.StorageRequest(
       upload_ticket=ticket, content=content)
 
 
-validate = handlers_endpoints.TokenSigner.validate
+validate = handlers_endpoints_v1.TokenSigner.validate
 
 
-def pad_string(string, size=handlers_endpoints.MIN_SIZE_FOR_DIRECT_GS):
+def pad_string(string, size=handlers_endpoints_v1.MIN_SIZE_FOR_DIRECT_GS):
   return string + '0' * (size - len(string))
 
 
@@ -112,7 +112,7 @@ def get_file_info_factory(content=None):
 class IsolateServiceTest(test_case.EndpointsTestCase):
   """Test the IsolateService's API methods."""
 
-  api_service_cls = handlers_endpoints.IsolateService
+  api_service_cls = handlers_endpoints_v1.IsolateService
   gs_prefix = 'localhost:80/content-gs/store/'
   store_prefix = 'https://sample-app.storage.googleapis.com/'
 
@@ -165,7 +165,7 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
     self.assertEqual('', message.get(u'gs_upload_url', ''))
     expected = validate(
         message.get(u'upload_ticket', ''),
-        handlers_endpoints.UPLOAD_MESSAGES[0])
+        handlers_endpoints_v1.UPLOAD_MESSAGES[0])
     self.assertEqual(
         expected,
         generate_embedded(good_digests.namespace, good_digests.items[0]))
@@ -180,27 +180,27 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
         self.store_prefix))
     expected = validate(
         message.get(u'upload_ticket', ''),
-        handlers_endpoints.UPLOAD_MESSAGES[1])
+        handlers_endpoints_v1.UPLOAD_MESSAGES[1])
     self.assertEqual(
         expected,
         generate_embedded(digests.namespace, digests.items[0]))
 
   def test_pre_upload_invalid_hash(self):
     """Assert that status 400 is returned when the digest is invalid."""
-    bad_collection = handlers_endpoints.DigestCollection(
-        namespace=handlers_endpoints.Namespace())
+    bad_collection = handlers_endpoints_v1.DigestCollection(
+        namespace=handlers_endpoints_v1.Namespace())
     bad_digest = hash_content('some stuff')
     bad_digest = 'g' + bad_digest[1:]  # that's not hexadecimal!
     bad_collection.items.append(
-        handlers_endpoints.Digest(digest=bad_digest, size=10))
+        handlers_endpoints_v1.Digest(digest=bad_digest, size=10))
     with self.call_should_fail('400'):
       self.call_api(
           'preupload', self.message_to_dict(bad_collection), 200)
 
   def test_pre_upload_invalid_namespace(self):
     """Assert that status 400 is returned when the namespace is invalid."""
-    bad_collection = handlers_endpoints.DigestCollection(
-        namespace=handlers_endpoints.Namespace(namespace='~tildewhatevs'))
+    bad_collection = handlers_endpoints_v1.DigestCollection(
+        namespace=handlers_endpoints_v1.Namespace(namespace='~tildewhatevs'))
     bad_collection.items.append(generate_digest('pangolin'))
     with self.call_should_fail('400'):
       self.call_api(
@@ -230,8 +230,8 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
 
   def test_check_existing_enqueues_tasks(self):
     """Assert that existent entities are enqueued."""
-    collection = handlers_endpoints.DigestCollection(
-        namespace=handlers_endpoints.Namespace())
+    collection = handlers_endpoints_v1.DigestCollection(
+        namespace=handlers_endpoints_v1.Namespace())
     collection.items.append(generate_digest('some content'))
     key = model.get_entry_key(
         collection.namespace.namespace, collection.items[0].digest)
@@ -249,7 +249,7 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
     """Assert that inline content storage completes successfully."""
     request = self.store_request('sibilance')
     embedded = validate(
-        request.upload_ticket, handlers_endpoints.UPLOAD_MESSAGES[0])
+        request.upload_ticket, handlers_endpoints_v1.UPLOAD_MESSAGES[0])
     key = model.get_entry_key(embedded['n'], embedded['d'])
 
     # assert that store_inline puts the correct entity into the datastore
@@ -261,13 +261,13 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
     # assert that expected (digest, size) pair is generated by stored content
     self.assertEqual(
         (embedded['d'].encode('utf-8'), int(embedded['s'])),
-        handlers_endpoints.hash_content(stored.content, embedded['n']))
+        handlers_endpoints_v1.hash_content(stored.content, embedded['n']))
 
   def test_store_inline_empty_content(self):
     """Assert that inline content storage works when content is empty."""
     request = self.store_request('')
     embedded = validate(
-        request.upload_ticket, handlers_endpoints.UPLOAD_MESSAGES[0])
+        request.upload_ticket, handlers_endpoints_v1.UPLOAD_MESSAGES[0])
     key = model.get_entry_key(embedded['n'], embedded['d'])
 
     # assert that store_inline puts the correct entity into the datastore
@@ -279,7 +279,7 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
     # assert that expected (digest, size) pair is generated by stored content
     self.assertEqual(
         (embedded['d'].encode('utf-8'), int(embedded['s'])),
-        handlers_endpoints.hash_content(stored.content, embedded['n']))
+        handlers_endpoints_v1.hash_content(stored.content, embedded['n']))
 
   def test_store_inline_bad_mac(self):
     """Assert that inline content storage fails when token is altered."""
@@ -336,7 +336,7 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
     content = pad_string('empathy')
     request = self.store_request(content)
     embedded = validate(
-        request.upload_ticket, handlers_endpoints.UPLOAD_MESSAGES[1])
+        request.upload_ticket, handlers_endpoints_v1.UPLOAD_MESSAGES[1])
     key = model.get_entry_key(embedded['n'], embedded['d'])
 
     # finalize_gs_upload should put a new ContentEntry into the database
@@ -406,11 +406,11 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
     content = 'Grecian Urn'
     request = self.store_request(content)
     embedded = validate(
-        request.upload_ticket, handlers_endpoints.UPLOAD_MESSAGES[0])
+        request.upload_ticket, handlers_endpoints_v1.UPLOAD_MESSAGES[0])
     self.call_api(
         'store_inline', self.message_to_dict(request), 200)
-    retrieve_request = handlers_endpoints.RetrieveRequest(
-        digest=embedded['d'], namespace=handlers_endpoints.Namespace())
+    retrieve_request = handlers_endpoints_v1.RetrieveRequest(
+        digest=embedded['d'], namespace=handlers_endpoints_v1.Namespace())
     response = self.call_api(
         'retrieve', self.message_to_dict(retrieve_request), 200)
     retrieved = response.json
@@ -421,11 +421,11 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
     content = 'Isabella, or the Pot of Basil'
     request = self.store_request(content)
     embedded = validate(
-        request.upload_ticket, handlers_endpoints.UPLOAD_MESSAGES[0])
+        request.upload_ticket, handlers_endpoints_v1.UPLOAD_MESSAGES[0])
     self.call_api(
         'store_inline', self.message_to_dict(request), 200)
-    retrieve_request = handlers_endpoints.RetrieveRequest(
-        digest=embedded['d'], namespace=handlers_endpoints.Namespace())
+    retrieve_request = handlers_endpoints_v1.RetrieveRequest(
+        digest=embedded['d'], namespace=handlers_endpoints_v1.Namespace())
     memcache.flush_all()
     response = self.call_api(
         'retrieve', self.message_to_dict(retrieve_request), 200)
@@ -445,14 +445,14 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
     # finalize GS upload
     request = preupload_status_to_request(message, content)
     embedded = validate(
-        request.upload_ticket, handlers_endpoints.UPLOAD_MESSAGES[1])
+        request.upload_ticket, handlers_endpoints_v1.UPLOAD_MESSAGES[1])
     self.mock(gcs, 'get_file_info', get_file_info_factory(content))
     self.call_api(
         'finalize_gs_upload', self.message_to_dict(request), 200)
 
     # retrieve the upload URL
-    retrieve_request = handlers_endpoints.RetrieveRequest(
-        digest=embedded['d'], namespace=handlers_endpoints.Namespace())
+    retrieve_request = handlers_endpoints_v1.RetrieveRequest(
+        digest=embedded['d'], namespace=handlers_endpoints_v1.Namespace())
     retrieved_response = self.call_api(
         'retrieve', self.message_to_dict(retrieve_request), 200)
     retrieved = retrieved_response.json
@@ -469,12 +469,12 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
     offset = 5
     request = self.store_request(content)
     embedded = validate(
-        request.upload_ticket, handlers_endpoints.UPLOAD_MESSAGES[0])
+        request.upload_ticket, handlers_endpoints_v1.UPLOAD_MESSAGES[0])
     self.call_api(
         'store_inline', self.message_to_dict(request), 200)
-    retrieve_request = handlers_endpoints.RetrieveRequest(
+    retrieve_request = handlers_endpoints_v1.RetrieveRequest(
         digest=embedded['d'],
-        namespace=handlers_endpoints.Namespace(),
+        namespace=handlers_endpoints_v1.Namespace(),
         offset=offset)  # TODO(cmassaro): determine where offsets come from
     response = self.call_api(
         'retrieve', self.message_to_dict(retrieve_request), 200)
@@ -487,12 +487,12 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
     content = 'Of Man\'s first Disobedience, and the Fruit'
     request = self.store_request(content)
     embedded = validate(
-        request.upload_ticket, handlers_endpoints.UPLOAD_MESSAGES[0])
+        request.upload_ticket, handlers_endpoints_v1.UPLOAD_MESSAGES[0])
     self.call_api(
         'store_inline', self.message_to_dict(request), 200)
-    requests = [handlers_endpoints.RetrieveRequest(
+    requests = [handlers_endpoints_v1.RetrieveRequest(
         digest=embedded['d'],
-        namespace=handlers_endpoints.Namespace(),
+        namespace=handlers_endpoints_v1.Namespace(),
         offset=offset) for offset in [-1, len(content) + 1]]
     for request in requests:
       with self.call_should_fail('400'):
@@ -513,11 +513,11 @@ class IsolateServiceTest(test_case.EndpointsTestCase):
     # get the digest
     request = preupload_status_to_request(message, content)
     embedded = validate(
-        request.upload_ticket, handlers_endpoints.UPLOAD_MESSAGES[0])
+        request.upload_ticket, handlers_endpoints_v1.UPLOAD_MESSAGES[0])
 
     # don't upload data; try to retrieve
-    retrieve_request = handlers_endpoints.RetrieveRequest(
-        digest=embedded['d'], namespace=handlers_endpoints.Namespace())
+    retrieve_request = handlers_endpoints_v1.RetrieveRequest(
+        digest=embedded['d'], namespace=handlers_endpoints_v1.Namespace())
     with self.call_should_fail('404'):
       self.call_api(
           'retrieve', self.message_to_dict(retrieve_request), 200)

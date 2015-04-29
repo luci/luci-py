@@ -143,9 +143,11 @@ def entry_key_or_error(namespace, digest):
 ### API
 
 
-@auth.endpoints_api(name='isolateservice', version='v1')
+@auth.endpoints_api(
+    name='isolateservice', version='v1',
+    description='Version 1 of Isolate Service')
 class IsolateService(remote.Service):
-  """Implement API methods corresponding to handlers in handlers_api."""
+  """Implements Isolate's API methods."""
 
   _gs_url_signer = None
 
