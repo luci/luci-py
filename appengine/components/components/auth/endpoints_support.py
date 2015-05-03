@@ -113,8 +113,19 @@ def endpoints_method(
   assert 'audiences' not in kwargs, 'Not supported'
   assert 'allowed_client_ids' not in kwargs, 'Not supported'
 
-  orig_decorator = endpoints.method(request_message, response_message, **kwargs)
+  # @endpoints.method wraps a method with a call that sets up state for
+  # endpoints.get_current_user(). It does a bunch of checks and eventually calls
+  # oauth.get_client_id(). oauth.get_client_id() times out a lot and we want to
+  # retry RPC on deadline exceptions a bunch of times. To do so we rely on the
+  # fact that oauth.get_client_id() (and other functions in oauth module)
+  # essentially caches a result of RPC call to OAuth service in os.environ. So
+  # we call it ourselves (with retries) to cache the state in os.environ before
+  # giving up control to @endpoints.method. That's what @initialize_oauth
+  # decorator does.
+
   def new_decorator(func):
+    @initialize_oauth
+    @endpoints.method(request_message, response_message, **kwargs)
     @functools.wraps(func)
     def wrapper(service, *args, **kwargs):
       try:
@@ -125,8 +136,30 @@ def endpoints_method(
         raise endpoints.UnauthorizedException()
       except api.AuthorizationError:
         raise endpoints.ForbiddenException()
-    return orig_decorator(wrapper)
+    return wrapper
   return new_decorator
+
+
+def initialize_oauth(method):
+  """Initializes OAuth2 state before calling wrapped @endpoints.method.
+
+  Used to retry deadlines in GetOAuthUser RPCs before diving into Endpoints code
+  that doesn't care about retries.
+
+  TODO(vadimsh): This call is unneccessary if id_token is used instead of
+  access_token. We do not use id_tokens currently.
+  """
+  @functools.wraps(method)
+  def wrapper(service, *args, **kwargs):
+    if service.request_state.headers.get('Authorization'):
+      # See _maybe_set_current_user_vars in endpoints/users_id_token.py.
+      scopes = (
+          method.method_info.scopes
+          if method.method_info.scopes is not None
+          else service.api_info.scopes)
+      api.attempt_oauth_initialization(scopes)
+    return method(service, *args, **kwargs)
+  return wrapper
 
 
 def initialize_request_auth(remote_address, headers):

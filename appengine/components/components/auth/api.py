@@ -25,6 +25,7 @@ from google.appengine.api import oauth
 from google.appengine.api import users
 from google.appengine.ext import ndb
 from google.appengine.ext.ndb import metadata
+from google.appengine.runtime import apiproxy_errors
 
 from . import config
 from . import ipaddr
@@ -309,6 +310,29 @@ class AuthDB(object):
         self.global_config.oauth_additional_client_ids)
 
 
+def attempt_oauth_initialization(scope):
+  """Attempts to perform GetOAuthUser RPC retrying deadlines.
+
+  The result it cached in appengine.api.oauth guts. Never raises exceptions,
+  just gives up letting subsequent oauth.* calls fail in a proper way.
+  """
+  # 4 attempts: ~20 sec (default RPC deadline is 5 sec).
+  attempt = 0
+  while attempt < 4:
+    attempt += 1
+    try:
+      oauth.get_client_id(scope)
+      return
+    except apiproxy_errors.DeadlineExceededError as e:
+      logging.warning('DeadlineExceededError: %s', e)
+      continue
+    except oauth.Error as e:
+      # Next call to oauth.get_client_id() will trigger same error and it will
+      # be handled for real.
+      logging.warning('oauth.Error: %s', e)
+      return
+
+
 def extract_oauth_caller_identity(extra_client_ids=None):
   """Extracts and validates Identity of a caller for current request.
 
@@ -332,6 +356,9 @@ def extract_oauth_caller_identity(extra_client_ids=None):
   """
   # OAuth2 scope a token should have.
   oauth_scope = 'https://www.googleapis.com/auth/userinfo.email'
+
+  # Fetch OAuth request state with retries. oauth.* calls use it internally.
+  attempt_oauth_initialization(oauth_scope)
 
   # Extract client_id and email from access token. That also validates the token
   # and raises OAuthRequestError if token is revoked or otherwise not valid.
