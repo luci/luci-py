@@ -186,6 +186,10 @@ class IsolateService(remote.Service):
           'Invalid namespace; allowed keys must pass regexp "%s"' %
           model.NAMESPACE_RE)
 
+    if len(request.items) > 1000:
+      raise endpoints.BadRequestException(
+          'Only up to 1000 items can be looked up at once')
+
     # check for existing elements
     new_digests, existing_digests = self.partition_collection(request)
 
