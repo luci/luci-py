@@ -73,6 +73,7 @@ class ConfigApi(remote.Service):
   @auth.endpoints_method(
       GET_CONFIG_REQUEST_RESOURCE_CONTAINER,
       GetConfigResponseMessage,
+      http_method='GET',
       path='config_sets/{config_set}/config/{path}')
   def get_config(self, request):
     """Gets a config file."""
@@ -121,6 +122,7 @@ class ConfigApi(remote.Service):
   @auth.endpoints_method(
       GET_CONFIG_BY_HASH_REQUEST_RESOURCE_CONTAINER,
       GetConfigByHashResponseMessage,
+      http_method='GET',
       path='config/{content_hash}')
   def get_config_by_hash(self, request):
     """Gets a config file by its hash."""
@@ -139,6 +141,7 @@ class ConfigApi(remote.Service):
   @auth.endpoints_method(
       message_types.VoidMessage,
       GetProjectsResponseMessage,
+      http_method='GET',
       path='projects')
   def get_projects(self, request):  # pylint: disable=W0613
     """Gets list of registered projects.
@@ -165,6 +168,7 @@ class ConfigApi(remote.Service):
   @auth.endpoints_method(
       GET_REFS_REQUEST_RESOURCE_CONTAINER,
       GetRefsResponseMessage,
+      http_method='GET',
       path='projects/{project_id}/refs')
   def get_refs(self, request):
     """Gets list of refs of a project."""
@@ -184,6 +188,7 @@ class ConfigApi(remote.Service):
   @auth.endpoints_method(
       GET_CONFIG_MULTI_REQUEST_RESOURCE_CONTAINER,
       GetConfigMultiResponseMessage,
+      http_method='GET',
       path='configs/projects/{path}')
   def get_project_configs(self, request):
     """Gets configs in all project config sets."""
@@ -201,6 +206,7 @@ class ConfigApi(remote.Service):
   @auth.endpoints_method(
       GET_CONFIG_MULTI_REQUEST_RESOURCE_CONTAINER,
       GetConfigMultiResponseMessage,
+      http_method='GET',
       path='configs/refs/{path}')
   def get_ref_configs(self, request):
     """Gets configs in all ref config sets."""
