@@ -384,6 +384,10 @@ def extract_oauth_caller_identity(extra_client_ids=None):
   if not good and email.endswith('@appspot.gserviceaccount.com'):
     good = (client_id == 'anonymous')
 
+  # Internal service account.
+  if not good and email.endswith('@system.gserviceaccount.com'):
+    good = (client_id == 'anonymous')
+
   # GCE service account. Token via GCE metadata server.
   if not good and email.endswith('@project.gserviceaccount.com'):
     project_id = email[:-len('@project.gserviceaccount.com')]
@@ -395,7 +399,10 @@ def extract_oauth_caller_identity(extra_client_ids=None):
     good = (client_id == '%s.apps.googleusercontent.com' % prefix)
 
   if not good:
-    raise AuthorizationError('Invalid OAuth client_id: %s' % client_id)
+    raise AuthorizationError(
+        'Unrecognized combination of email (%s) and client_id (%s). '
+        'Is client_id whitelisted? Is it unrecognized service account?' %
+        (email, client_id))
   try:
     return model.Identity(model.IDENTITY_USER, email)
   except ValueError:
