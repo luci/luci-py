@@ -41,9 +41,16 @@ def CMDattributes(_args):
   return 0
 
 
+def CMDrun_isolated(args):
+  """Internal command to run an isolated command."""
+  logging_utils.prepare_logging('run_isolated_bot.log')
+  sys.path.insert(0, os.path.join(THIS_FILE, 'client'))
+  import run_isolated
+  return run_isolated.main(args)
+
+
 def CMDtask_runner(args):
   """Internal command to run a swarming task."""
-  # TODO(maruel): rename function.
   logging_utils.prepare_logging('task_runner.log')
   import task_runner
   return task_runner.main(args)
