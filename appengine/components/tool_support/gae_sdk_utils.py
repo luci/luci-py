@@ -128,9 +128,6 @@ class Application(object):
     self._app_dir = os.path.abspath(app_dir)
     self._app_id = app_id
     self._verbose = verbose
-    self._use_oauth = True
-    self._login = None
-    self._password = None
 
     # Module ID -> (path to YAML, deserialized content of module YAML).
     self._modules = {}
@@ -151,13 +148,6 @@ class Application(object):
 
     if 'default' not in self._modules:
       raise ValueError('Default module is missing')
-
-  def use_cookie_auth(self):
-    """Switches to Application Specific Password for authentication.
-
-    Required for some buggy combinations of commands and apps.
-    """
-    self._use_oauth = False
 
   @property
   def app_dir(self):
@@ -188,7 +178,6 @@ class Application(object):
       sys.executable,
       os.path.join(gae_sdk_path(), 'appcfg.py'),
       '--application', self.app_id,
-      '--oauth2',
       '--noauth_local_webserver',
       'list_versions',
     ]
@@ -196,10 +185,9 @@ class Application(object):
 
   def run_appcfg(self, args):
     """Runs appcfg.py <args>, deserializes its output and returns it."""
-    if self._use_oauth and not is_oauth_token_cached():
+    if not is_oauth_token_cached():
       raise LoginRequiredError()
 
-    # Common options.
     cmd = [
       sys.executable,
       os.path.join(gae_sdk_path(), 'appcfg.py'),
@@ -207,44 +195,17 @@ class Application(object):
     ]
     if self._verbose:
       cmd.append('--verbose')
-
-    # Authentication related options.
-    stdin = None
-    if self._use_oauth:
-      cmd.extend(['--oauth2', '--noauth_local_webserver'])
-    else:
-      # Ask for login and password right now, before calling appcfg.py. That
-      # allows to cache this information, otherwise appcfg.py would ask it all
-      # the time.
-      if self._login is None:
-        auth_func = get_authentication_function()
-        self._login, self._password = auth_func()
-        assert self._login is not None
-        assert self._password is not None
-      # Pass email via cmd line, ask appcfg.py to read password from stdin.
-      cmd.extend(['--email', self._login, '--passin'])
-      stdin = self._password
-
-    # Additional options.
     cmd.extend(args)
 
     # Run it.
     logging.debug('Running %s', cmd)
     proc = subprocess.Popen(
         cmd, cwd=self._app_dir, stdout=subprocess.PIPE, stdin=subprocess.PIPE)
-    output, _ = proc.communicate(stdin)
+    output, _ = proc.communicate(None)
     if proc.returncode:
       raise RuntimeError(
           '\'appcfg.py %s\' failed with exit code %d' % (
           args[0], proc.returncode))
-
-    # appcfg.py prints password prompt to stdout :( It doesn't even put
-    # a new line after it. It breaks YAML parsing below.
-    if not self._use_oauth:
-      prompt = 'Password for %s: ' % self._login
-      assert output.startswith(prompt), output
-      output = output[len(prompt):]
-
     return yaml.safe_load(output)
 
   def list_versions(self):

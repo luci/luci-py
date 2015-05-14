@@ -102,8 +102,6 @@ def CMDcleanup(parser, args):
       print('Aborted.')
       return 1
 
-  # 'delete_version' is buggy, it may require cookie based authentication for
-  # some (old) applications.
   for version in versions_to_remove:
     print('Deleting %s...' % version)
     app.delete_version(version)
@@ -371,15 +369,10 @@ class OptionParser(optparse.OptionParser):
 
   def parse_args(self, *args, **kwargs):
     gae_sdk_utils.app_sdk_options(self, self.app_dir)
-    self.add_option(
-        '--no-oauth', action='store_true',
-        help='Use password authentication instead of OAuth2')
     options, args = optparse.OptionParser.parse_args(self, *args, **kwargs)
     if not self.allow_positional_args and args:
       self.error('Unknown arguments: %s' % args)
     app = gae_sdk_utils.process_sdk_options(self, options, self.app_dir)
-    if options.no_oauth:
-      app.use_cookie_auth()
     return app, options, args
 
 
