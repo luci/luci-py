@@ -7,6 +7,7 @@
 import functools
 import json
 import os
+import urlparse
 import webapp2
 
 from google.appengine.api import users
@@ -144,6 +145,12 @@ class UIHandler(handler.AuthenticatingHandler):
     }
     js_config.update(common)
 
+    # Prepare URL to explore app API.
+    schema, netloc, _, _, _, _ = urlparse.urlparse(self.request.url)
+    api_url = (
+        'https://apis-explorer.appspot.com/apis-explorer/?'
+        'base=%s://%s/_ah/api' % (schema, netloc))
+
     # Jinja2 environment to use to render a template.
     full_env = {
       'app_name': _ui_app_name,
@@ -152,6 +159,7 @@ class UIHandler(handler.AuthenticatingHandler):
       'config': json.dumps(js_config),
       'identity': api.get_current_identity(),
       'js_module_name': js_module_name,
+      'api_url': api_url,
       'navbar': [
         (cls.navbar_tab_id, cls.navbar_tab_title, cls.navbar_tab_url)
         for cls in _ui_navbar_tabs
