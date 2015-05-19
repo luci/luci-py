@@ -154,7 +154,7 @@ def get_latest_multi(config_sets, path, hashes_only=False):
   return results
 
 
-@utils.memcache('latest_message', ['config_set', 'path'])
+@utils.memcache('latest_message', ['config_set', 'path'], time=60)
 def get_latest_as_message(config_set, path, message_factory):
   """Reads latest config file as a text-formatted protobuf message.
 
