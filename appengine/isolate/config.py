@@ -10,8 +10,8 @@ from google.appengine.api import app_identity
 from google.appengine.api import modules
 from google.appengine.ext import ndb
 
-from components import config
 from components import utils
+from components.datastore_utils import config
 
 
 class GlobalConfig(config.GlobalConfig):

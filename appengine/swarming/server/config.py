@@ -6,7 +6,7 @@
 
 from google.appengine.ext import ndb
 
-from components import config
+from components.datastore_utils import config
 
 
 class GlobalConfig(config.GlobalConfig):

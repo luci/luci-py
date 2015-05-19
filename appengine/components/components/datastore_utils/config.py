@@ -5,7 +5,7 @@
 """Versioned singleton entity with global application configuration.
 
 Example usage:
-  from components import config
+  from components.datastore_utils import config
 
   class MyConfig(config.GlobalConfig):
     param1 = ndb.StringProperty()

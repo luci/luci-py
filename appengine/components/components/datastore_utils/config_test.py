@@ -13,7 +13,7 @@ test_env.setup_test_env()
 from google.appengine.ext import ndb
 
 from components import auth
-from components import config
+from components.datastore_utils import config
 from test_support import test_case
 
 

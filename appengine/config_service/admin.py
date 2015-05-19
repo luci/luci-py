@@ -20,7 +20,7 @@ from protorpc import message_types
 from protorpc import remote
 
 from components import auth
-from components import config
+from components.datastore_utils import config
 
 
 # This is used by endpoints indirectly.
