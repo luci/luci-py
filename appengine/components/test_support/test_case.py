@@ -11,6 +11,7 @@ import time
 import endpoints
 import webtest
 
+from google.appengine.datastore import datastore_stub_util
 from google.appengine.ext import ndb
 from google.appengine.ext import testbed
 
@@ -69,7 +70,9 @@ class TestCase(auto_stub.TestCase):
 
     self.testbed.init_app_identity_stub()
     self.testbed.init_datastore_v3_stub(
-        require_indexes=not train_index_yaml, root_path=self.APP_DIR)
+        require_indexes=not train_index_yaml, root_path=self.APP_DIR,
+        consistency_policy=datastore_stub_util.PseudoRandomHRConsistencyPolicy(
+            probability=1))
     self.testbed.init_logservice_stub()
     self.testbed.init_memcache_stub()
     self.testbed.init_modules_stub()
