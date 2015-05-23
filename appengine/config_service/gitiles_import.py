@@ -173,6 +173,8 @@ def import_services(location_root):
 
   for service_entry in tree.entries:
     service_id = service_entry.name
+    if service_entry.type != 'tree':
+      continue
     if not validation.is_valid_service_id(service_id):
       logging.warning('Invalid service id: %s', service_id)
       continue

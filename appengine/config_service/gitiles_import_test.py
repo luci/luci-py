@@ -198,6 +198,12 @@ class GitilesImportTestCase(test_case.TestCase):
               type='tree',
               mode=0,
           ),
+          gitiles.TreeEntry(
+              id='deadbeef1',
+              name='a-file',
+              type='blob',
+              mode=0,
+          ),
         ],
     )
 
