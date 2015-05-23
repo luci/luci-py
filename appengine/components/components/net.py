@@ -171,7 +171,7 @@ def json_request_async(
   Args:
     url: url to send the request to.
     method: HTTP method to use, e.g. GET, POST, PUT.
-    payload: object to serialized to JSON and put in the request body.
+    payload: object to be serialized to JSON and put in the request body.
     params: dict with query GET parameters (i.e. ?key=value&key=value).
     headers: additional request headers.
     scopes: OAuth2 scopes for the access token (ok skip auth if None).
