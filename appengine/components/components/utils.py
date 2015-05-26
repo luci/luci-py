@@ -429,17 +429,26 @@ def set_task_queue_module(module):
   clear_cache(get_task_queue_host)
 
 
-def enqueue_task(url, queue_name, payload=None, name=None,
-                 use_dedicated_module=True, transactional=False):
+def enqueue_task(
+    url,
+    queue_name,
+    payload=None,
+    name=None,
+    countdown=None,
+    use_dedicated_module=True,
+    transactional=False):
   """Adds a task to a task queue.
 
-  If |use_dedicated_module| is True (default) a task will be executed by
+  If |use_dedicated_module| is True (default) the task will be executed by
   a separate backend module instance that runs same version as currently
   executing instance. Otherwise it will run on a current version of default
   module.
 
-  Returns True if a task was successfully added, logs error and returns False
-  if task queue is acting up.
+  Returns True if the task was successfully added or a task with such name
+  existed before (i.e. on TombstonedTaskError exception): deduplicated task is
+  not a error.
+
+  Logs an error and returns False if task queue is acting up.
   """
   try:
     headers = None
@@ -452,8 +461,14 @@ def enqueue_task(url, queue_name, payload=None, name=None,
         queue_name=queue_name,
         payload=payload,
         name=name,
+        countdown=countdown,
         headers=headers,
         transactional=transactional)
+    return True
+  except taskqueue.TombstonedTaskError:
+    logging.info(
+        'Task %r deduplicated (already exists in queue %r)',
+        name, queue_name)
     return True
   except (
       taskqueue.Error,
@@ -462,7 +477,7 @@ def enqueue_task(url, queue_name, payload=None, name=None,
       runtime.apiproxy_errors.DeadlineExceededError,
       runtime.apiproxy_errors.OverQuotaError) as e:
     logging.warning(
-        'Problem adding task \'%s\' to task queue \'%s\' (%s): %s',
+        'Problem adding task %r to task queue %r (%s): %s',
         url, queue_name, e.__class__.__name__, e)
     return False
 
