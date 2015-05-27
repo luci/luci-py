@@ -57,6 +57,80 @@ class ApiTest(test_case.EndpointsTestCase):
     ]
 
   ##############################################################################
+  # get_mapping
+
+  def test_get_config_one(self):
+    self.mock(storage, 'get_mapping', mock.Mock())
+    storage.get_mapping.return_value = {
+      'services/x': 'http://x',
+    }
+
+    req = {
+      'config_set': 'services/x',
+    }
+    resp = self.call_api('get_mapping', req).json_body
+
+    storage.get_mapping.assert_called_once_with(config_set='services/x')
+
+    self.assertEqual(resp, {
+      'mappings': [
+        {
+          'config_set': 'services/x',
+          'location': 'http://x',
+        },
+      ],
+    })
+
+  def test_get_config_one_forbidden(self):
+    acl.can_read_config_set.return_value = False
+    with self.call_should_fail(httplib.FORBIDDEN):
+      req = {
+        'config_set': 'services/x',
+      }
+      self.call_api('get_mapping', req)
+
+  def test_get_config_all(self):
+    self.mock(storage, 'get_mapping', mock.Mock())
+    storage.get_mapping.return_value = {
+      'services/x': 'http://x',
+      'services/y': 'http://y',
+    }
+
+    resp = self.call_api('get_mapping', {}).json_body
+
+    self.assertEqual(resp, {
+      'mappings': [
+        {
+          'config_set': 'services/x',
+          'location': 'http://x',
+        },
+        {
+          'config_set': 'services/y',
+          'location': 'http://y',
+        },
+      ],
+    })
+
+  def test_get_config_all_partially_forbidden(self):
+    self.mock(storage, 'get_mapping', mock.Mock())
+    storage.get_mapping.return_value = {
+      'services/x': 'http://x',
+      'services/y': 'http://y',
+    }
+    acl.can_read_config_set.side_effect = [True, False]
+
+    resp = self.call_api('get_mapping', {}).json_body
+
+    self.assertEqual(resp, {
+      'mappings': [
+        {
+          'config_set': 'services/x',
+          'location': 'http://x',
+        },
+      ],
+    })
+
+  ##############################################################################
   # get_config
 
   def test_get_config(self):

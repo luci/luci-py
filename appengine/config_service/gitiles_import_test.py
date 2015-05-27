@@ -49,9 +49,10 @@ class GitilesImportTestCase(test_case.TestCase):
         gitiles.Location(
             hostname='localhost',
             project='project',
-            treeish='a1841f40264376d170269ee9473ce924b7c2c4e9',
+            treeish='luci/config',
             path='/',
         ),
+        'a1841f40264376d170269ee9473ce924b7c2c4e9',
         create_config_set=True)
 
     gitiles.get_archive.assert_called_once_with(
@@ -62,6 +63,9 @@ class GitilesImportTestCase(test_case.TestCase):
     self.assertEqual(
         saved_config_set.latest_revision,
         'a1841f40264376d170269ee9473ce924b7c2c4e9')
+    self.assertEqual(
+        saved_config_set.location,
+        'https://localhost/project/+/luci/config')
 
     saved_revision = storage.Revision.get_by_id(
         'a1841f40264376d170269ee9473ce924b7c2c4e9', parent=saved_config_set.key)
@@ -85,8 +89,9 @@ class GitilesImportTestCase(test_case.TestCase):
         gitiles.Location(
             hostname='localhost',
             project='project',
-            treeish='a1841f40264376d170269ee9473ce924b7c2c4e9',
+            treeish='master',
             path='/'),
+        'a1841f40264376d170269ee9473ce924b7c2c4e9',
         create_config_set=True)
     self.assertFalse(gitiles.get_archive.called)
 
@@ -98,8 +103,9 @@ class GitilesImportTestCase(test_case.TestCase):
         gitiles.Location(
           hostname='localhost',
           project='project',
-          treeish='a1841f40264376d170269ee9473ce924b7c2c4e9',
-          path='/'))
+          treeish='master',
+          path='/'),
+        'a1841f40264376d170269ee9473ce924b7c2c4e9')
 
   def test_import_invalid_revision(self):
     self.mock_get_archive()
@@ -110,8 +116,9 @@ class GitilesImportTestCase(test_case.TestCase):
         gitiles.Location(
           hostname='localhost',
           project='project',
-          treeish='a1841f40264376d170269ee9473ce924b7c2c4e9',
-          path='/'))
+          treeish='master',
+          path='/'),
+        'a1841f40264376d170269ee9473ce924b7c2c4e9')
     # Assert not saved.
     self.assertIsNone(storage.ConfigSet.get_by_id('config_set'))
 

@@ -52,16 +52,45 @@ class GetConfigMultiResponseMessage(messages.Message):
 class ConfigApi(remote.Service):
   """API to access configurations."""
 
+  def can_read_config_set(self, config_set):
+    try:
+      return acl.can_read_config_set(
+          config_set, headers=self.request_state.headers)
+    except ValueError:
+      raise endpoints.BadRequestException('Invalid config set: %s' % config_set)
+
+  ##############################################################################
+  # endpoint: get_mapping
+
+  class GetMappingResponseMessage(messages.Message):
+    class Mapping(messages.Message):
+      config_set = messages.StringField(1, required=True)
+      location = messages.StringField(2)
+    mappings = messages.MessageField(Mapping, 1, repeated=True)
+
+  @auth.endpoints_method(
+      endpoints.ResourceContainer(
+          message_types.VoidMessage,
+          config_set=messages.StringField(1),
+      ),
+      GetMappingResponseMessage,
+      http_method='GET',
+      path='mapping')
+  def get_mapping(self, request):
+    """Returns config-set mapping, one or all."""
+    if request.config_set and not self.can_read_config_set(request.config_set):
+      raise endpoints.ForbiddenException()
+
+    res = self.GetMappingResponseMessage()
+    mapping = storage.get_mapping(config_set=request.config_set)
+    for config_set, location in sorted(mapping.iteritems()):
+      if self.can_read_config_set(config_set):
+        res.mappings.append(
+            res.Mapping(config_set=config_set, location=location))
+    return res
+
   ##############################################################################
   # endpoint: get_config
-
-  GET_CONFIG_REQUEST_RESOURCE_CONTAINER = endpoints.ResourceContainer(
-      message_types.VoidMessage,
-      config_set=messages.StringField(1, required=True),
-      path=messages.StringField(2, required=True),
-      revision=messages.StringField(3),
-      hash_only=messages.BooleanField(4),
-  )
 
   class GetConfigResponseMessage(messages.Message):
     revision = messages.StringField(1, required=True)
@@ -71,7 +100,13 @@ class ConfigApi(remote.Service):
     content = messages.BytesField(3)
 
   @auth.endpoints_method(
-      GET_CONFIG_REQUEST_RESOURCE_CONTAINER,
+      endpoints.ResourceContainer(
+          message_types.VoidMessage,
+          config_set=messages.StringField(1, required=True),
+          path=messages.StringField(2, required=True),
+          revision=messages.StringField(3),
+          hash_only=messages.BooleanField(4),
+      ),
       GetConfigResponseMessage,
       http_method='GET',
       path='config_sets/{config_set}/config/{path}')
@@ -79,14 +114,7 @@ class ConfigApi(remote.Service):
     """Gets a config file."""
     res = self.GetConfigResponseMessage()
 
-    try:
-      has_access = acl.can_read_config_set(
-          request.config_set, headers=self.request_state.headers)
-    except ValueError:
-      raise endpoints.BadRequestException(
-          'Invalid config set: %s' % request.config_set)
-
-    if not has_access:
+    if not self.can_read_config_set(request.config_set):
       logging.warning(
           '%s does not have access to %s',
           auth.get_current_identity().to_bytes(),
@@ -111,16 +139,14 @@ class ConfigApi(remote.Service):
   ##############################################################################
   # endpoint: get_config_by_hash
 
-  GET_CONFIG_BY_HASH_REQUEST_RESOURCE_CONTAINER = endpoints.ResourceContainer(
-      message_types.VoidMessage,
-      content_hash=messages.StringField(1, required=True),
-  )
-
   class GetConfigByHashResponseMessage(messages.Message):
     content = messages.BytesField(1, required=True)
 
   @auth.endpoints_method(
-      GET_CONFIG_BY_HASH_REQUEST_RESOURCE_CONTAINER,
+      endpoints.ResourceContainer(
+          message_types.VoidMessage,
+          content_hash=messages.StringField(1, required=True),
+      ),
       GetConfigByHashResponseMessage,
       http_method='GET',
       path='config/{content_hash}')
@@ -155,18 +181,16 @@ class ConfigApi(remote.Service):
   ##############################################################################
   # endpoint: get_refs
 
-  GET_REFS_REQUEST_RESOURCE_CONTAINER = endpoints.ResourceContainer(
-      message_types.VoidMessage,
-      project_id=messages.StringField(1, required=True),
-  )
-
   class GetRefsResponseMessage(messages.Message):
     class Ref(messages.Message):
       name = messages.StringField(1)
     refs = messages.MessageField(Ref, 1, repeated=True)
 
   @auth.endpoints_method(
-      GET_REFS_REQUEST_RESOURCE_CONTAINER,
+      endpoints.ResourceContainer(
+          message_types.VoidMessage,
+          project_id=messages.StringField(1, required=True),
+      ),
       GetRefsResponseMessage,
       http_method='GET',
       path='projects/{project_id}/refs')

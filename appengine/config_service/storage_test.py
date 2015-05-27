@@ -23,6 +23,25 @@ class StorageTestCase(test_case.TestCase):
     storage.File(id=path, parent=rev_key, content_hash=content_hash).put()
     storage.Blob(id=content_hash, content=content).put()
 
+  def test_get_mapping(self):
+    storage.ConfigSet(
+        id='services/x', latest_revision='deadbeef', location='http://x').put()
+    storage.ConfigSet(
+        id='services/y', latest_revision='deadbeef', location='http://y').put()
+
+    self.assertEqual(
+        storage.get_mapping(),
+        {'services/x':'http://x', 'services/y':'http://y'}
+    )
+    self.assertEqual(
+        storage.get_mapping('services/x'),
+        {'services/x':'http://x'}
+    )
+    self.assertEqual(
+        storage.get_mapping('services/z'),
+        {'services/z':None}
+    )
+
   def test_get_config(self):
     self.put_file('foo', 'deadbeef', 'config.cfg', 'content')
     revision, content_hash = storage.get_config_hash(

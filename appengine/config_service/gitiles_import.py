@@ -57,26 +57,36 @@ def get_gitiles_config():
   return cfg.gitiles
 
 
-def import_revision(config_set, location, create_config_set=False):
+def import_revision(
+    config_set, base_location, revision, create_config_set=False):
   """Imports a referenced Gitiles revision into a config set.
+
+  |base_location| will be used to set storage.ConfigSet.location.
 
   If |create_config_set| is True and Revision entity does not exist,
   then creates ConfigSet with latest_revision set to |location.treeish|.
   """
-  assert re.match('[0-9a-f]{40}', location.treeish), (
-      '"%s" is not a valid sha' % location.treeish
+  assert re.match('[0-9a-f]{40}', revision), (
+      '"%s" is not a valid sha' % revision
   )
-  logging.debug('Importing revision %s:%s', config_set, location.treeish)
+  logging.debug('Importing revision %s @ %s', config_set, revision)
   rev_key = ndb.Key(
       storage.ConfigSet, config_set,
-      storage.Revision, location.treeish)
+      storage.Revision, revision)
+
+  updated_config_set = storage.ConfigSet(
+      id=config_set,
+      latest_revision=revision,
+      location=str(base_location))
+
   if rev_key.get():
     if create_config_set:
-      storage.ConfigSet(id=config_set, latest_revision=location.treeish).put()
+      updated_config_set.put()
     return
 
   # Fetch archive, extract files and save them to Blobs outside ConfigSet
   # transaction.
+  location = base_location._replace(treeish=revision)
   archive = location.get_archive(
       deadline=get_gitiles_config().fetch_archive_deadline)
   if not archive:
@@ -88,8 +98,7 @@ def import_revision(config_set, location, create_config_set=False):
 
   entites_to_put = [storage.Revision(key=rev_key)]
   if create_config_set:
-    entites_to_put.append(
-        storage.ConfigSet(id=config_set, latest_revision=location.treeish))
+    entites_to_put.append(updated_config_set)
 
   stream = StringIO.StringIO(archive)
   blob_futures = []
@@ -101,7 +110,7 @@ def import_revision(config_set, location, create_config_set=False):
         content = extracted.read()
         if not validation.validate_config(
             config_set, item.name, content, log_errors=True):
-          logging.error('Invalid revision: %s/%s', config_set, location.treeish)
+          logging.error('Invalid revision: %s@%s', config_set, revision)
           return
         content_hash = storage.compute_hash(content)
         blob_futures.append(storage.import_blob_async(
@@ -150,11 +159,10 @@ def import_config_set(config_set, location):
       logging.debug('Config set %s is up to date', config_set)
       return
 
-    commit_location = location._replace(treeish=commit.sha)
     # ConfigSet.latest_revision needs to be updated in the same transaction as
     # Revision. Assume ConfigSet.latest_revision is the only attribute and
     # use import_revision's create_config_set parameter to set latest_revision.
-    import_revision(config_set, commit_location, create_config_set=True)
+    import_revision(config_set, location, commit.sha, create_config_set=True)
   except urlfetch_errors.DeadlineExceededError:
     logging.error(
         'Could not import config set %s from %s: urlfetch deadline exceeded',

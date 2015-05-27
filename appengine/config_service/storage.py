@@ -38,6 +38,7 @@ class ConfigSet(ndb.Model):
   """
   # last imported revision of the config set. See also Revision and File.
   latest_revision = ndb.StringProperty(required=True)
+  location = ndb.StringProperty(required=True)
 
 
 class Revision(ndb.Model):
@@ -65,6 +66,14 @@ class File(ndb.Model):
   def _pre_put_hook(self):
     assert isinstance(self.key.id(), str)
     assert not self.key.id().startswith('/')
+
+
+def get_mapping(config_set=None):
+  if config_set:
+    config_sets = [ConfigSet.get_by_id(config_set) or ConfigSet(id=config_set)]
+  else:
+    config_sets = ConfigSet.query().fetch()
+  return {cs.key.id(): cs.location for cs in config_sets}
 
 
 def get_latest_revision(config_set):
