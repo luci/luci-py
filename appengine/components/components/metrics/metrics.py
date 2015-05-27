@@ -40,19 +40,25 @@ import webapp2
 from components import auth
 from components import net
 from components import utils
+from components.datastore_utils import config
 
 
 # Public API.
 __all__ = [
   'Buffer',
   'Descriptor',
+  'MonitoringConfig',
   'METRIC_TYPES',
   'VALUE_TYPES',
 ]
 
 
 # Monitoring API supports only gauge custom metrics currently.
-METRIC_TYPES = ['gauge']
+METRIC_TYPES = [
+  # A sample is a value of some property at an instant in time, e.g. CPU load.
+  # Sent to Cloud Monitoring as is.
+  'gauge',
+]
 
 
 # Name of the value type -> python type(s). Only int64 and double are supported.
@@ -110,6 +116,12 @@ class Descriptor(object):
         metric_type=data['metric_type'],
         value_type=data['value_type'])
 
+  def make_metric(self):
+    """Returns _Metric instance to use for metrics with this description."""
+    assert self.metric_type in METRIC_TYPES
+    if self.metric_type == 'gauge':
+      return _GaugeMetric(self)
+
   def validate_value(self, value):
     """Checks that metric value match the descriptor."""
     expected = VALUE_TYPES[self.value_type][0]
@@ -134,12 +146,7 @@ class Descriptor(object):
 class Buffer(object):
   """Holds collected metrics before they are sent to the Cloud."""
 
-  def __init__(self, project_id=None, service_account_key=None):
-    project_id = project_id or app_identity.get_application_id()
-    if not isinstance(project_id, basestring) or '/' in project_id:
-      raise ValueError('Invalid project ID: %r' % (project_id,))
-    self._project_id = project_id
-    self._service_account_key = service_account_key
+  def __init__(self):
     self._descriptors = {}
     self._metrics = collections.defaultdict(collections.OrderedDict)
 
@@ -151,6 +158,7 @@ class Buffer(object):
       value: new value of the gauge.
       labels: dict with metric labels (must match descriptor schema).
     """
+    assert descriptor
     if descriptor.metric_type != 'gauge':
       raise TypeError('Expecting gauge metric descriptor')
     self._metric(descriptor, labels).set_gauge(value)
@@ -170,7 +178,7 @@ class Buffer(object):
         points.append({
           'desc': desc_name,
           'labels': labels,
-          'point': metric.to_point(),
+          'point': metric.to_dict(),
         })
     self._descriptors.clear()
     self._metrics.clear()
@@ -179,12 +187,6 @@ class Buffer(object):
     flush_task = {
       'descriptors': descriptors,
       'points': points,
-      'project_id': self._project_id,
-      'service_account_key': {
-        'client_email': self._service_account_key.client_email,
-        'private_key': self._service_account_key.private_key,
-        'private_key_id': self._service_account_key.private_key_id,
-      } if self._service_account_key else None,
     }
     if task_queue_name:
       _enqueue_flush(flush_task, task_queue_name)
@@ -213,14 +215,42 @@ class Buffer(object):
     key = tuple(labels[k] for k, _ in descriptor.labels)
     metric = self._metrics[descriptor.name].get(key)
     if metric is None:
-      if descriptor.metric_type == 'gauge':
-        metric = _GaugeMetric(descriptor)
-      else:
-        # Cloud Monitoring API only implements gauge custom metrics now.
-        raise NotImplementedError(
-            'Metric type %r is not implemented' % descriptor.metric_type)
+      metric = descriptor.make_metric()
       self._metrics[descriptor.name][key] = metric
     return metric
+
+
+class MonitoringConfig(config.GlobalConfig):
+  """Application-wide monitoring-related settings."""
+  # Cloud Project ID to send metrics to (current GAE project by default).
+  project_id = ndb.StringProperty(indexed=False)
+  # Service account to use to authenticate (GAE service account by default).
+  client_email = ndb.StringProperty(indexed=False)
+  # Private key of the corresponding service account.
+  private_key = ndb.StringProperty(indexed=False)
+  # Private key ID of the corresponding service account.
+  private_key_id = ndb.StringProperty(indexed=False)
+
+  @property
+  def service_account_key(self):
+    if not self.client_email:
+      return None
+    return auth.ServiceAccountKey(
+        client_email=self.client_email,
+        private_key=self.private_key,
+        private_key_id=self.private_key_id)
+
+  @service_account_key.setter
+  def service_account_key(self, value):
+    if not value:
+      self.client_email = None
+      self.private_key = None
+      self.private_key_id = None
+    else:
+      assert isinstance(value, auth.ServiceAccountKey)
+      self.client_email = value.client_email
+      self.private_key = value.private_key
+      self.private_key_id = value.private_key_id
 
 
 ## Internal guts, do not use directly.
@@ -240,6 +270,9 @@ _WRITE_URL = (
     'https://www.googleapis.com/cloudmonitoring/v2beta2'
     '/projects/{project_id}/timeseries:write')
 
+# Format string for UTC datetime as expected by Monitoring API.
+_TS_FORMAT = '%Y-%m-%dT%H:%M:%SZ'
+
 
 # Number of metrics to push at once (API limit is 200).
 _MAX_BATCH_SIZE = 100
@@ -248,26 +281,34 @@ _MAX_BATCH_SIZE = 100
 _MAX_TASK_SIZE = 90 * 1024
 
 
-class _GaugeMetric(object):
+class _Metric(object):
+  """Carries single sample of a metric.
+
+  Used as a base class for concrete metric types.
+  """
+
   def __init__(self, descriptor):
     self.descriptor = descriptor
     self.value = None
-    self.ts = None
+    self.min_ts = None
+    self.max_ts = None
 
+  def to_dict(self):
+    assert self.min_ts is not None
+    assert self.max_ts is not None
+    return {
+      'start': self.min_ts,
+      'end': self.max_ts,
+      'value': self.value,
+    }
+
+
+class _GaugeMetric(_Metric):
   def set_gauge(self, value):
     self.descriptor.validate_value(value)
     self.value = value
-    self.ts = utils.utcnow()
-
-  def to_point(self):
-    assert self.ts is not None
-    ts = self.ts.strftime('%Y-%m-%dT%H:%M:%SZ')
-    value_key = '%sValue' % self.descriptor.value_type
-    return {
-      'start': ts,
-      'end': ts,
-      value_key: self.value,
-    }
+    self.min_ts = utils.datetime_to_timestamp(utils.utcnow())
+    self.max_ts = self.min_ts
 
 
 def _split_in_batches(enumerable, batch_size):
@@ -302,18 +343,27 @@ def _execute_flush(flush_task):
 
   See Buffer.flush() for the format of flush_task dict.
   """
-  # Unwrap flush_task a little.
   descriptors = {
     k: Descriptor.from_dict(v)
     for k, v in flush_task['descriptors'].iteritems()
   }
-  points = flush_task['points']
-  project_id = flush_task['project_id']
-  if flush_task['service_account_key']:
-    service_account_key = auth.ServiceAccountKey(
-        **flush_task['service_account_key'])
-  else:
-    service_account_key = None
+  _send_metrics(descriptors, flush_task['points'])
+
+
+def _send_metrics(descriptors, points):
+  """Calls 'timeseries:write' API to push metrics to Cloud Monitoring.
+
+  Args:
+    descriptors: dict {name -> Descriptor object}.
+    points: list of dicts {'desc': <name>, 'labels': <list>, 'point': <dict>}
+        where point dict is in a format of _Metric.to_dict().
+  """
+  if not points:
+    return
+
+  conf = MonitoringConfig.cached()
+  project_id = conf.project_id or app_identity.get_application_id()
+  service_account_key = conf.service_account_key
 
   # Register all metrics (in parallel).
   futures = []
@@ -328,6 +378,9 @@ def _execute_flush(flush_task):
     # See https://cloud.google.com/monitoring/v2beta2/timeseries/write.
     desc = descriptors[p['desc']]
     labels = {l[0]: v for l, v in zip(desc.labels, p['labels'])}
+    point = p['point']
+    desc.validate_value(point['value'])
+    value_key = '%sValue' % desc.value_type
     return {
       'timeseriesDesc': {
         'metric': 'custom.cloudmonitoring.googleapis.com/%s' % desc.name,
@@ -336,7 +389,13 @@ def _execute_flush(flush_task):
           for k, v in labels.iteritems()
         },
       },
-      'point': p['point'],
+      'point': {
+        'start': utils.timestamp_to_datetime(
+            point['start']).strftime(_TS_FORMAT),
+        'end': utils.timestamp_to_datetime(
+            point['end']).strftime(_TS_FORMAT),
+        value_key: point['value'],
+      },
     }
 
   # Split points in batches and send each batch in parallel.

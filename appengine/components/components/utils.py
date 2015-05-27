@@ -465,7 +465,7 @@ def enqueue_task(
         headers=headers,
         transactional=transactional)
     return True
-  except taskqueue.TombstonedTaskError:
+  except (taskqueue.TombstonedTaskError, taskqueue.TaskAlreadyExistsError):
     logging.info(
         'Task %r deduplicated (already exists in queue %r)',
         name, queue_name)

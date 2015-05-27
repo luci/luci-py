@@ -27,6 +27,10 @@ Example usage:
 Advantages over regular ndb.Entity with predefined key:
   1. All changes are logged (see datastore_utils.store_new_version).
   2. In-memory process-wide cache.
+
+TODO: Get rid of components.auth dependency. It creates circular import between
+components.auth and components.datastore_utils. components.datastore_utils is on
+"lower" level than components.auth and must not depend on it.
 """
 
 from google.appengine.ext import ndb

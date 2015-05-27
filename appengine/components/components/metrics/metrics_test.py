@@ -4,6 +4,7 @@
 # found in the LICENSE file.
 
 import datetime
+import json
 import logging
 import sys
 import unittest
@@ -105,48 +106,52 @@ class BufferTest(test_case.TestCase):
     'points': [
       {
         'point': {
-          'start': '2015-01-02T03:04:05Z',
-          'end': '2015-01-02T03:04:05Z',
-          'int64Value': 456,
+          'start': 1420167845000000,
+          'end': 1420167845000000,
+          'value': 456,
         },
         'labels': ('1', '2'),
         'desc': 'name1',
       },
       {
         'point': {
-          'start': '2015-01-02T03:04:05Z',
-          'end': '2015-01-02T03:04:05Z',
-          'int64Value': 789,
+          'start': 1420167845000000,
+          'end': 1420167845000000,
+          'value': 789,
         },
         'labels': ('3', '4'),
         'desc': 'name1',
       },
       {
         'point': {
-          'start': '2015-01-02T03:04:05Z',
-          'end': '2015-01-02T03:04:05Z',
-          'int64Value': 555,
+          'start': 1420167845000000,
+          'end': 1420167845000000,
+          'value': 555,
         },
         'labels': ('x', 'z'),
         'desc': 'name2',
       },
       {
         'point': {
-          'start': '2015-01-02T03:04:05Z',
-          'end': '2015-01-02T03:04:05Z',
-          'doubleValue': 3.0,
+          'start': 1420167845000000,
+          'end': 1420167845000000,
+          'value': 3.0,
         },
         'labels': (),
         'desc': 'name3',
       },
     ],
-    'project_id': '123',
-    'service_account_key': {
-      'client_email': 'client_email',
-      'private_key': 'private_key',
-      'private_key_id': 'private_key_id',
-    },
   }
+
+  def setUp(self):
+    super(BufferTest, self).setUp()
+    conf = metrics.MonitoringConfig()
+    conf.project_id = '123'
+    conf.service_account_key = auth.ServiceAccountKey(
+        client_email='client_email',
+        private_key='private_key',
+        private_key_id='private_key_id')
+    conf.store(updated_by=auth.Anonymous)
 
   def test_conflicting_descriptors(self):
     d1 = metrics.Descriptor('name', 'Description', labels={'A': 'a', 'B': 'b'})
@@ -171,10 +176,7 @@ class BufferTest(test_case.TestCase):
     d2 = metrics.Descriptor('name2', 'Desc 2', labels={'C': 'c', 'D': 'd'})
     d3 = metrics.Descriptor('name3', 'Desc 3', value_type='double')
 
-    buf = metrics.Buffer(
-        project_id='123',
-        service_account_key=auth.ServiceAccountKey(
-            'client_email', 'private_key', 'private_key_id'))
+    buf = metrics.Buffer()
     # Overwrite.
     buf.set_gauge(d1, 123, labels={'A': '1', 'B': '2'})
     buf.set_gauge(d1, 456, labels={'A': '1', 'B': '2'})
