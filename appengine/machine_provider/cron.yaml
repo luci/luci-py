@@ -1,0 +1,3 @@
+cron:
+- url: /internal/cron/process-lease-requests
+  schedule: every 1 minutes
