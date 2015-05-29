@@ -48,7 +48,7 @@ def update_import_info(project_id, repo_type, repo_url):
       ('repo_url', repo_url, info.repo_url),
       ('repo_type', repo_type, info.repo_type),
     )
-    logging.warning('Changing project %s repo info:\n',
+    logging.warning('Changing project %s repo info:\n%s',
         project_id,
         '\n'.join([
           '%s: %s -> %s' % (attr, old_value, new_value)
