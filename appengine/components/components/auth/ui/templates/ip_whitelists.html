@@ -19,16 +19,21 @@
             <div id="alerts-box"></div>
             <div class="form-group">
               <label class="control-label">Description</label>
-              <input type="text" class="form-control" name="description">
+              <input type="text"
+                     class="form-control"
+                     {% if auth_service_config_locked %}readonly{% endif %}
+                     name="description">
             </div>
             <div class="form-group">
               <label class="control-label">IP subnets</label>
               <div style="font-family:monospace;">
                 <textarea class="form-control"
                           rows="5" name="subnets"
+                          {% if auth_service_config_locked %}readonly{% endif %}
                           wrap="off"></textarea>
               </div>
             </div>
+            {% if not auth_service_config_locked %}
             <div class="form-group">
               <button id="update-btn" type="button" class="btn btn-primary">
                 Update whitelist
@@ -37,7 +42,13 @@
                 Delete whitelist
               </button>
             </div>
+            {% endif %}
           </div>
+          {% if auth_service_config_locked %}
+          <div class="form-group">
+            {{ render_config_locked() }}
+          </div>
+          {% endif %}
         </form>
       </div>
     </div>

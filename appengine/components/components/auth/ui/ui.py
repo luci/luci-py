@@ -28,20 +28,26 @@ TEMPLATES_DIR = os.path.join(
 
 # Global static configuration set in 'configure_ui'.
 _ui_app_name = 'Unknown'
+_ui_env_callback = None
 _ui_navbar_tabs = ()
 
 
-def configure_ui(app_name, ui_tabs=None):
+def configure_ui(app_name, ui_tabs=None, env_callback=None):
   """Modifies global configuration of Auth UI.
 
   Args:
     app_name: name of the service (visible in page headers, titles, etc.)
     ui_tabs: list of UINavbarTabHandler subclasses that define tabs to show, or
         None to show the standard set of tabs.
+    env_callback: callable that returns a dict with additional environment for
+        templates. Will be called each time a template is rendered. Used by
+        auth_service.
   """
   global _ui_app_name
+  global _ui_env_callback
   global _ui_navbar_tabs
   _ui_app_name = app_name
+  _ui_env_callback = env_callback
   if ui_tabs is not None:
     assert all(issubclass(cls, UINavbarTabHandler) for cls in ui_tabs)
     _ui_navbar_tabs = tuple(ui_tabs)
@@ -128,10 +134,13 @@ class UIHandler(handler.AuthenticatingHandler):
 
     # This goes to both Jinja2 env and Javascript config object.
     common = {
+      'auth_service_config_locked': False, # overridden in auth_service
       'login_url': users.create_login_url(self.request.path),
       'logout_url': users.create_logout_url('/'),
       'xsrf_token': self.generate_xsrf_token(),
     }
+    if _ui_env_callback:
+      common.update(_ui_env_callback())
 
     # Name of Javascript module with page code.
     js_module_name = None

@@ -8,14 +8,20 @@ import webapp2
 
 from components import decorators
 
+import config
 import importer
 import replication
+
+
+class InternalUpdateConfigCronHandler(webapp2.RequestHandler):
+  @decorators.require_cronjob
+  def get(self):
+    config.refetch_config()
 
 
 class InternalImportGroupsCronHandler(webapp2.RequestHandler):
   @decorators.require_cronjob
   def get(self):
-    # Let exceptions to fall through and cause HTTP 500 and nice stack trace.
     importer.import_external_groups()
 
 
@@ -28,6 +34,9 @@ class InternalReplicationTaskHandler(webapp2.RequestHandler):
 
 def get_routes():
   return [
+    webapp2.Route(
+        r'/internal/cron/update_config',
+        InternalUpdateConfigCronHandler),
     webapp2.Route(
         r'/internal/cron/import_groups',
         InternalImportGroupsCronHandler),

@@ -15,10 +15,15 @@
                       style="font-family:monospace;"
                       rows="10"
                       name="config"
+                      {% if auth_service_config_locked %}readonly{% endif %}
                       wrap="off"></textarea>
           </div>
           <div class="form-group">
-            <button type="submit" class="btn btn-primary">Save</button>
+            {% if auth_service_config_locked %}
+              {{ render_config_locked() }}
+            {% else %}
+              <button type="submit" class="btn btn-primary">Save</button>
+            {% endif %}
           </div>
          </form>
       </div>

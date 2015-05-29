@@ -12,6 +12,7 @@
             <label class="control-label">Primary client_id</label>
             <div style="font-family:monospace;">
               <input type="text" class="form-control"
+                     {% if auth_service_config_locked %}readonly{% endif %}
                      name="client_id" placeholder="Not set">
             </div>
           </div>
@@ -19,6 +20,7 @@
             <label class="control-label">Client not-so-secret</label>
             <div style="font-family:monospace;">
               <input type="text" class="form-control"
+                     {% if auth_service_config_locked %}readonly{% endif %}
                      name="client_secret" placeholder="Not set">
             </div>
           </div>
@@ -27,11 +29,16 @@
             <div style="font-family:monospace;">
               <textarea class="form-control"
                         rows="5" name="more_ids"
+                        {% if auth_service_config_locked %}readonly{% endif %}
                         wrap="off"></textarea>
             </div>
           </div>
           <div class="form-group">
-            <button type="submit" class="btn btn-primary">Submit</button>
+            {% if auth_service_config_locked %}
+              {{ render_config_locked() }}
+            {% else %}
+              <button type="submit" class="btn btn-primary">Submit</button>
+            {% endif %}
           </div>
         </form>
       </div>

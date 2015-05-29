@@ -25,6 +25,10 @@ from .. import version
 from ..proto import replication_pb2
 
 
+# Set by set_config_locked.
+_is_config_locked_cb = None
+
+
 def get_rest_api_routes():
   """Return a list of webapp2 routes with auth REST API handlers."""
   assert model.GROUP_NAME_RE.pattern[0] == '^'
@@ -87,6 +91,27 @@ def has_write_access():
   return api.is_admin()
 
 
+def is_config_locked():
+  """Returns True to forbid configuration changing API calls.
+
+  If is_config_locked returns True API requests that change configuration will
+  return HTTP 409 error.
+
+  A configuration is subset of AuthDB that changes infrequently:
+  * OAuth client_id whitelist
+  * IP whitelist
+
+  Used by auth_service that utilizes luci-config for config management.
+  """
+  return _is_config_locked_cb() if _is_config_locked_cb else False
+
+
+def set_config_locked(locked_callback):
+  """Sets a function that returns True if configuration is locked."""
+  global _is_config_locked_cb
+  _is_config_locked_cb = locked_callback
+
+
 class EntityOperationError(Exception):
   """Raised by do_* methods in EntityHandlerBase to indicate a conflict."""
   def __init__(self, message, details):
@@ -121,6 +146,13 @@ class EntityHandlerBase(handler.ApiHandler):
   entity_kind_name = None
   # Will show up in error messages, e.g. 'Failed to delete <title>'.
   entity_kind_title = None
+
+  def check_preconditions(self):
+    """Called after ACL checks, but before actual handling.
+
+    Raises:
+      webapp2.HTTPException (via self.abort) to abort the request.
+    """
 
   @classmethod
   def get_entity_key(cls, name):
@@ -164,6 +196,7 @@ class EntityHandlerBase(handler.ApiHandler):
   @api.require(has_read_access)
   def get(self, name):
     """Fetches entity give its name."""
+    self.check_preconditions()
     obj = self.get_entity_key(name).get()
     if not obj:
       self.abort_with_error(404, text='No such %s' % self.entity_kind_title)
@@ -177,6 +210,7 @@ class EntityHandlerBase(handler.ApiHandler):
   @api.require(has_write_access)
   def post(self, name):
     """Creates a new entity, ensuring it's indeed new (no overwrites)."""
+    self.check_preconditions()
     try:
       body = self.parse_body()
       name_in_body = body.pop('name', None)
@@ -231,6 +265,7 @@ class EntityHandlerBase(handler.ApiHandler):
   @api.require(has_write_access)
   def put(self, name):
     """Updates an existing entity."""
+    self.check_preconditions()
     try:
       body = self.parse_body()
       name_in_body = body.pop('name', None)
@@ -291,6 +326,7 @@ class EntityHandlerBase(handler.ApiHandler):
   @api.require(has_write_access)
   def delete(self, name):
     """Deletes an entity."""
+    self.check_preconditions()
     if not self.is_entity_writable(name):
       self.abort_with_error(
           400, text='This %s is not writable' % self.entity_kind_title)
@@ -611,6 +647,10 @@ class IPWhitelistHandler(EntityHandlerBase):
   entity_kind_name = 'ip_whitelist'
   entity_kind_title = 'ip whitelist'
 
+  def check_preconditions(self):
+    if self.request.method != 'GET' and is_config_locked():
+      self.abort_with_error(409, text='The configuration is managed elsewhere')
+
   @classmethod
   def get_entity_key(cls, name):
     assert model.is_valid_ip_whitelist_name(name), name
@@ -689,6 +729,9 @@ class OAuthConfigHandler(handler.ApiHandler):
   @forbid_api_on_replica
   @api.require(has_write_access)
   def post(self):
+    if is_config_locked():
+      self.abort_with_error(409, text='The configuration is managed elsewhere')
+
     body = self.parse_body()
     client_id = body['client_id']
     client_secret = body['client_not_so_secret']

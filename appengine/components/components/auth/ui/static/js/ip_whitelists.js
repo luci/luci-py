@@ -18,8 +18,9 @@ var splitSubnetsList = function(subnets) {
 // Selector is a combo box with IP whitelist names and "Create new" item.
 
 
-var Selector = function($element) {
+var Selector = function($element, readonly) {
   this.$element = $element;
+  this.readonly = readonly;
   this.onCreateWhitelist = null;
   this.onWhitelistSelected = null;
 
@@ -52,8 +53,15 @@ Selector.prototype.populate = function(whitelists, selection) {
   });
 
   // Separator and "New list" option.
-  addToSelector('----------------------------', 'SEPARATOR');
-  addToSelector('Create new IP whitelist', 'CREATE');
+  if (!this.readonly) {
+    addToSelector('----------------------------', 'SEPARATOR');
+    addToSelector('Create new IP whitelist', 'CREATE');
+  } else {
+    // Empty list looks ugly, put something in there.
+    if (selected == null) {
+      addToSelector('No IP whitelists', 'SEPARATOR');
+    }
+  }
 
   // Make the selection.
   selected.attr('selected', 'selected');
@@ -244,7 +252,8 @@ var reloadWhitelists = function(selector, selection) {
 
 // Called when HTML body of a page is loaded.
 exports.onContentLoaded = function() {
-  var selector = new Selector($('#ip-whitelists-selector'));
+  var readonly = config.auth_service_config_locked;
+  var selector = new Selector($('#ip-whitelists-selector'), readonly);
   var newListDialog = new NewWhitelistDialog($('#create-ip-whitelist'));
   var whitelistPane = new WhitelistPane($('#selected-ip-whitelist'));
 

@@ -22,6 +22,7 @@ from components.auth.proto import replication_pb2
 from components.auth.ui import rest_api
 from components.auth.ui import ui
 
+import config
 import importer
 import replication
 
@@ -67,6 +68,16 @@ class ServicesHandler(ui.UINavbarTabHandler):
   template_file = 'auth_service/services.html'
 
 
+def get_additional_ui_environment():
+  """Gets injected into Jinja and Javascript environment."""
+  return {
+    'auth_service_config_backend': config.get_remote_url(),
+    'auth_service_config_locked': config.is_remote_configured(),
+    'auth_service_config_rev': 'not-implemented',
+    'auth_service_config_url': 'http://example.com/not-implemented',
+  }
+
+
 ################################################################################
 ## API handlers.
 
@@ -87,10 +98,12 @@ class ImporterConfigHandler(auth.ApiHandler):
 
   @auth.require(auth.is_admin)
   def post(self):
-    config = self.parse_body().get('config')
-    if not importer.is_valid_config(config):
+    if config.is_remote_configured():
+      self.abort_with_error(409, text='The configuration is managed elsewhere')
+    conf = self.parse_body().get('config')
+    if not importer.is_valid_config(conf):
       self.abort_with_error(400, text='Invalid config format.')
-    importer.write_config(config)
+    importer.write_config(conf)
     self.send_response({'ok': True})
 
 
@@ -245,6 +258,7 @@ def get_routes():
 
 def create_application(debug):
   replication.configure_as_primary()
+  rest_api.set_config_locked(config.is_remote_configured)
 
   # Configure UI appearance, add all custom tabs.
   ui.configure_ui(
@@ -257,7 +271,8 @@ def create_application(debug):
         # Additional tabs available only on auth service.
         ConfigHandler,
         ServicesHandler,
-      ])
+      ],
+      env_callback=get_additional_ui_environment)
   template.bootstrap({'auth_service': TEMPLATES_DIR})
 
   # Add a fake admin for local dev server.

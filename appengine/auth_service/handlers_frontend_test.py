@@ -93,6 +93,16 @@ class FrontendHandlersTest(test_case.TestCase):
     self.assertEqual({'text': 'Invalid config format.'}, response.json)
     self.assertEqual([], importer.read_config())
 
+  def test_importer_config_post_locked(self):
+    self.mock(handlers_frontend.config, 'is_remote_configured', lambda: True)
+    response = self.app.post_json(
+        '/auth_service/api/v1/importer/config',
+        {'config': GOOD_IMPORTER_CONFIG},
+        headers={'X-XSRF-Token': auth_testing.generate_xsrf_token_for_test()},
+        status=409)
+    self.assertEqual(
+        {'text': 'The configuration is managed elsewhere'}, response.json)
+
 
 if __name__ == '__main__':
   if '-v' in sys.argv:

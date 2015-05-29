@@ -1181,6 +1181,8 @@ class IPWhitelistHandlerTest(RestAPITestCase):
     self.assertEqual({'text': 'No such ip whitelist'}, body)
 
   def test_get_existing(self):
+    # Works even if config modifications are forbidden.
+    self.mock(rest_api, 'is_config_locked', lambda: True)
     self.mock_now(utils.timestamp_to_datetime(1300000000000000))
 
     ent = model.AuthIPWhitelist(
@@ -1292,6 +1294,17 @@ class IPWhitelistHandlerTest(RestAPITestCase):
     # IPWhitelistHandler.do_delete.
     pass
 
+  def test_delete_when_config_locked(self):
+    self.mock(rest_api, 'is_config_locked', lambda: True)
+    status, body, _ = self.delete(
+        path='/auth/api/v1/ip_whitelists/A%20whitelist',
+        expect_errors=True,
+        expect_xsrf_token_check=True,
+        expect_admin_check=True)
+    self.assertEqual(409, status)
+    self.assertEqual(
+        {'text': 'The configuration is managed elsewhere'}, body)
+
   def test_post_success(self):
     frozen_time = utils.timestamp_to_datetime(1300000000000000)
     self.mock_now(frozen_time)
@@ -1382,6 +1395,18 @@ class IPWhitelistHandlerTest(RestAPITestCase):
         expect_xsrf_token_check=True)
     self.assertEqual(403, status)
     self.assertEqual({'text': 'Access is denied.'}, body)
+
+  def test_post_when_config_locked(self):
+    self.mock(rest_api, 'is_config_locked', lambda: True)
+    status, body, _ = self.post(
+        path='/auth/api/v1/ip_whitelists/A%20whitelist',
+        body={'name': 'A whitelist'},
+        expect_errors=True,
+        expect_xsrf_token_check=True,
+        expect_admin_check=True)
+    self.assertEqual(409, status)
+    self.assertEqual(
+        {'text': 'The configuration is managed elsewhere'}, body)
 
   def test_put_success(self):
     frozen_time = utils.timestamp_to_datetime(1300000000000000)
@@ -1482,6 +1507,22 @@ class IPWhitelistHandlerTest(RestAPITestCase):
     self.assertEqual(412, status)
     self.assertEqual(
         {'text': 'Ip whitelist was modified by someone else'}, body)
+
+  def test_put_when_config_locked(self):
+    self.mock(rest_api, 'is_config_locked', lambda: True)
+    status, body, _ = self.put(
+        path='/auth/api/v1/ip_whitelists/A%20whitelist',
+        body={
+          'description': 'Test whitelist',
+          'name': 'A whitelist',
+        },
+        expect_errors=True,
+        expect_xsrf_token_check=True,
+        expect_admin_check=True)
+    self.assertEqual(409, status)
+    self.assertEqual(
+        {'text': 'The configuration is managed elsewhere'}, body)
+
 
 
 class CertificatesHandlerTest(RestAPITestCase):
@@ -1611,6 +1652,23 @@ class OAuthConfigHandlerTest(RestAPITestCase):
         expect_errors=True)
     self.assertEqual(403, status)
     self.assertEqual({'text': 'Access is denied.'}, response)
+
+  def test_post_when_config_locked(self):
+    self.mock(rest_api, 'is_config_locked', lambda: True)
+    request_body = {
+      'additional_client_ids': ['1', '2', '3'],
+      'client_id': 'some-client-id',
+      'client_not_so_secret': 'some-secret',
+    }
+    status, response, _ = self.post(
+        path='/auth/api/v1/server/oauth_config',
+        body=request_body,
+        headers={'X-XSRF-Token': make_xsrf_token()},
+        expect_admin_check=True,
+        expect_errors=True)
+    self.assertEqual(409, status)
+    self.assertEqual(
+        {'text': 'The configuration is managed elsewhere'}, response)
 
 
 class ServerStateHandlerTest(RestAPITestCase):

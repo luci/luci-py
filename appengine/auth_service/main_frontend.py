@@ -18,6 +18,7 @@ sys.path.insert(0, os.path.join(APP_DIR, 'components', 'third_party'))
 import endpoints
 
 from components import auth
+from components import config
 from components import ereporter2
 from components import utils
 
@@ -29,8 +30,8 @@ def create_applications():
 
   # App that serves HTML pages and old API.
   frontend = handlers_frontend.create_application(False)
-  # App that serves new endpoints API.
-  api = endpoints.api_server([auth.AuthService])
+  # App that serves endpoints APIs.
+  api = endpoints.api_server([auth.AuthService, config.ConfigApi])
   return frontend, api
 
 
