@@ -26,7 +26,7 @@ Example usage:
 
   def get_param1():
     # Read latest version of my.cfg in services/my_service config set.
-    cfg = config.get_self_config('my.cfg', my_config_pb2.MyCfg)
+    rev, cfg = config.get_self_config('my.cfg', my_config_pb2.MyCfg)
     return cfg.param1
 
 For more info, read docstrings in api.py.

@@ -102,6 +102,15 @@ class Provider(object):
           result[config_set] = (rev, content)
     raise ndb.Return(result)
 
+  @ndb.tasklet
+  def get_config_set_location_async(self, _config_set):
+    """Returns URL of where configs for given config set are stored.
+
+    Returns:
+      Always None for file system.
+    """
+    raise ndb.Return(None)
+
 
 def get_provider():  # pragma: no cover
   return Provider(common.CONSTANTS.CONFIG_DIR)

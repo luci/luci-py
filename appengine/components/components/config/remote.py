@@ -177,6 +177,23 @@ class Provider(object):
     return self._get_configs_multi(format_url('configs/refs/%s', path))
 
   @ndb.tasklet
+  def get_config_set_location_async(self, config_set):
+    """Returns URL of where configs for given config set are stored.
+
+    Returns:
+      URL or None if no such config set.
+    """
+    assert config_set
+    res = yield self._api_call_async(
+        'mapping', params={'config_set': config_set})
+    if not res:
+      raise ndb.Return(None)
+    for entry in res.get('mappings', []):
+      if entry.get('config_set') == config_set:
+        raise ndb.Return(entry.get('location'))
+    raise ndb.Return(None)
+
+  @ndb.tasklet
   def _update_last_good_config_async(self, config_key):
     now = utils.utcnow()
     current = yield config_key.get_async()

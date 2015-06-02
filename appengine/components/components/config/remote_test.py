@@ -122,6 +122,24 @@ class RemoteTestCase(test_case.TestCase):
 
     self.assertEqual(configs, {'projects/chromium': ('aaaaaaaa', 'a config')})
 
+  def test_get_config_set_location_async(self):
+    self.mock(net, 'json_request_async', mock.Mock())
+    net.json_request_async.return_value = ndb.Future()
+    net.json_request_async.return_value.set_result({
+      'mappings': [
+        {
+          'config_set': 'services/abc',
+          'location': 'http://example.com',
+        },
+      ],
+    })
+    r = self.provider.get_config_set_location_async('services/abc').get_result()
+    self.assertEqual(r, 'http://example.com')
+    net.json_request_async.assert_called_once_with(
+        'https://luci-config.appspot.com/_ah/api/config/v1/mapping',
+        scopes='https://www.googleapis.com/auth/userinfo.email',
+        params={'config_set': 'services/abc'})
+
   def test_cron_update_last_good_configs(self):
     self.provider.get_async(
         'services/foo', 'bar.cfg', store_last_good=True).get_result()
