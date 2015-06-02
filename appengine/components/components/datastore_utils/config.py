@@ -33,6 +33,9 @@ components.auth and components.datastore_utils. components.datastore_utils is on
 "lower" level than components.auth and must not depend on it.
 """
 
+# Pylint fails to recognize that ndb.Model.key is defined in ndb.Model.
+# pylint: disable=attribute-defined-outside-init
+
 from google.appengine.ext import ndb
 
 from components import auth

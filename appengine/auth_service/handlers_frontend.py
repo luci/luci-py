@@ -94,16 +94,16 @@ class ImporterConfigHandler(auth.ApiHandler):
 
   @auth.require(auth.is_admin)
   def get(self):
-    self.send_response({'config': importer.read_config()})
+    self.send_response({'config': importer.read_config_text()})
 
   @auth.require(auth.is_admin)
   def post(self):
     if config.is_remote_configured():
       self.abort_with_error(409, text='The configuration is managed elsewhere')
-    conf = self.parse_body().get('config')
-    if not importer.is_valid_config(conf):
-      self.abort_with_error(400, text='Invalid config format.')
-    importer.write_config(conf)
+    try:
+      importer.write_config_text(self.parse_body().get('config'))
+    except ValueError as ex:
+      self.abort_with_error(400, text=str(ex))
     self.send_response({'ok': True})
 
 

@@ -11,6 +11,7 @@ import StringIO
 import sys
 import tarfile
 import tempfile
+import textwrap
 import unittest
 
 APP_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -25,6 +26,10 @@ from components import auth_testing
 from components.auth import model
 from test_support import test_case
 
+# Must be after 'components' import, since they add it to sys.path.
+from google import protobuf
+
+from proto import config_pb2
 import importer
 
 
@@ -67,6 +72,13 @@ def group(name, members, nested=None):
 
 def fetch_groups():
   return {x.key.id(): x.to_dict() for x in model.AuthGroup.query()}
+
+
+def put_config(config_proto, config):
+  importer.GroupImporterConfig(
+      key=importer.config_key(),
+      config_proto=config_proto,
+      config=config).put()
 
 
 class ImporterTest(test_case.TestCase):
@@ -223,30 +235,26 @@ class ImporterTest(test_case.TestCase):
     service_id = auth.Identity.from_bytes('service:some-service')
     self.mock(auth, 'get_service_self_identity', lambda: service_id)
 
-    importer.write_config([
-      {
-        'domain': 'example.com',
-        'format': 'tarball',
-        'groups': ['ldap/new'],
-        'oauth_scopes': ['scope'],
-        'systems': ['ldap'],
-        'url': 'https://fake_tarball',
-      },
-      {
-        'format': 'plainlist',
-        'group': 'external_1',
-        'oauth_scopes': ['scope'],
-        'url': 'https://fake_external_1',
-      },
-      {
-        'description': 'Some external group',
-        'domain': 'example.com',
-        'format': 'plainlist',
-        'group': 'external_2',
-        'oauth_scopes': ['scope'],
-        'url': 'https://fake_external_2',
-      },
-    ])
+    importer.write_config_text("""
+      tarball {
+        domain: "example.com"
+        groups: "ldap/new"
+        oauth_scopes: "scope"
+        systems: "ldap"
+        url: "https://fake_tarball"
+      }
+      plainlist {
+        group: "external_1"
+        oauth_scopes: "scope"
+        url: "https://fake_external_1"
+      }
+      plainlist {
+        domain: "example.com"
+        group: "external_2"
+        oauth_scopes: "scope"
+        url: "https://fake_external_2"
+      }
+    """)
 
     self.mock_urlfetch({
       'https://fake_tarball': build_tar_gz({
@@ -302,6 +310,64 @@ class ImporterTest(test_case.TestCase):
       },
     }
     self.assertEqual(expected_groups, fetch_groups())
+
+  def test_read_config_text(self):
+    # Empty.
+    put_config('', '')
+    self.assertEqual('', importer.read_config_text())
+    # Good.
+    put_config('tarball{}', '')
+    self.assertEqual('tarball{}', importer.read_config_text())
+    # Legacy.
+    put_config('', '[{"url":"12"}]')
+    self.assertEqual('tarball {\n  url: "12"\n}\n', importer.read_config_text())
+
+  def test_write_config_text(self):
+    put_config('', 'legacy')
+    importer.write_config_text('tarball{url:"12"\nsystems:"12"}')
+    e = importer.config_key().get()
+    self.assertEqual('legacy', e.config)
+    self.assertEqual('tarball{url:"12"\nsystems:"12"}', e.config_proto)
+
+  def test_legacy_json_config_to_proto(self):
+    msg = importer.legacy_json_config_to_proto("""
+    [
+      {
+        "url": "https://example.com/all_users",
+        "group": "plain-list",
+        "format": "plainlist"
+      },
+      {
+        "url": "https://example.com/tarball.tar.gz",
+        "domain": "example.com",
+        "oauth_scopes": [
+          "oauth-scope"
+        ],
+        "systems": [
+          "ldap"
+        ],
+        "groups": [
+          "ldap/a",
+          "ldap/b"
+        ]
+      }
+    ]
+    """)
+    expected = textwrap.dedent("""
+    tarball {
+      url: "https://example.com/tarball.tar.gz"
+      oauth_scopes: "oauth-scope"
+      domain: "example.com"
+      systems: "ldap"
+      groups: "ldap/a"
+      groups: "ldap/b"
+    }
+    plainlist {
+      url: "https://example.com/all_users"
+      group: "plain-list"
+    }
+    """.lstrip('\n'))
+    self.assertEqual(expected, protobuf.text_format.MessageToString(msg))
 
 
 if __name__ == '__main__':

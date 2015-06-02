@@ -1,0 +1,50 @@
+// Copyright 2015 The Swarming Authors. All rights reserved.
+// Use of this source code is governed by the Apache v2.0 license that can be
+// found in the LICENSE file.
+
+// Configuration schema for configs fetched via a config service.
+
+package auth_service;
+
+
+// Configuration of cron job that imports groups from external sources.
+message GroupImporterConfig {
+  // Import groups stored as files in a tarball.
+  message TarballEntry {
+    // Where to import data from.
+    optional string url = 1;
+    // List of OAuth scopes to use for authentication (or empty to skip auth).
+    repeated string oauth_scopes = 2;
+    // Email domain to append to imported identities.
+    optional string domain = 3;
+    // List of group systems expected to be found in the archive. They act as
+    // prefixes to group names, e.g 'ldap'. Each system corresponds to
+    // a subdirectory in the tarball. Each tarball may have groups from multiple
+    // external systems, but groups from some external system must not be split
+    // between multiple tarballs. When importer sees <group system name>/* in
+    // a tarball, it modifies group list from that system on the auth_service to
+    // match group list in the tarball _exactly_. For example it removes groups
+    // that are on the server, but no longer present in the tarball.
+    repeated string systems = 4;
+    // List of groups to import from the tarball (as filenames relative to
+    // tarball root, e.g. 'ldap/some-group'). If empty, imports all groups in
+    // the tarball.
+    repeated string groups = 5;
+  }
+
+  // Import a single group stored as a plain list of identities.
+  message PlainlistEntry {
+    // Where to import data from.
+    optional string url = 1;
+    // List of OAuth scopes to use for authentication (or empty to skip auth).
+    repeated string oauth_scopes = 2;
+    // Email domain to append to imported identities.
+    optional string domain = 3;
+    // For PLAINLIST imports, a name of imported group. The full group name will
+    // be 'external/<group>'.
+    optional string group = 4;
+  }
+
+  repeated TarballEntry tarball = 1;
+  repeated PlainlistEntry plainlist = 2;
+}

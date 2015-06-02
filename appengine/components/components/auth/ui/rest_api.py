@@ -101,7 +101,7 @@ def is_config_locked():
   * OAuth client_id whitelist
   * IP whitelist
 
-  Used by auth_service that utilizes luci-config for config management.
+  Used by auth_service that utilizes config_service for config management.
   """
   return _is_config_locked_cb() if _is_config_locked_cb else False
 

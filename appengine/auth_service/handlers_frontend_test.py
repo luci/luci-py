@@ -21,26 +21,26 @@ import importer
 import replication
 
 
-GOOD_IMPORTER_CONFIG = [
-  {
-    'domain': 'example.com',
-    'systems': ['ldap'],
-    'url': 'http://example.com/stuff.tar.gz',
-  },
-  {
-    'format': 'plainlist',
-    'group': 'chromium-committers',
-    'url': 'http://chromium-committers.appspot.com/chromium',
-  },
-]
+GOOD_IMPORTER_CONFIG = """
+# Comment.
+tarball {
+  domain: "example.com"
+  systems: "ldap"
+  url: "http://example.com/stuff.tar.gz"
+}
+plainlist {
+  group: "chromium-committers"
+  url: "http://chromium-committers.appspot.com/chromium"
+}
+"""
 
-BAD_IMPORTER_CONFIG = [
-  # Missing 'url'.
-  {
-    'domain': 'example.com',
-    'systems': ['ldap'],
-  },
-]
+BAD_IMPORTER_CONFIG = """
+# Missing 'url'.
+tarball {
+  domain: "example.com"
+  systems: "ldap"
+}
+"""
 
 
 class FrontendHandlersTest(test_case.TestCase):
@@ -68,10 +68,10 @@ class FrontendHandlersTest(test_case.TestCase):
 
   def test_importer_config_get_default(self):
     response = self.app.get('/auth_service/api/v1/importer/config', status=200)
-    self.assertEqual({'config': []}, response.json)
+    self.assertEqual({'config': ''}, response.json)
 
   def test_importer_config_get(self):
-    importer.write_config(GOOD_IMPORTER_CONFIG)
+    importer.write_config_text(GOOD_IMPORTER_CONFIG)
     response = self.app.get('/auth_service/api/v1/importer/config', status=200)
     self.assertEqual({'config': GOOD_IMPORTER_CONFIG}, response.json)
 
@@ -82,7 +82,7 @@ class FrontendHandlersTest(test_case.TestCase):
         headers={'X-XSRF-Token': auth_testing.generate_xsrf_token_for_test()},
         status=200)
     self.assertEqual({'ok': True}, response.json)
-    self.assertEqual(GOOD_IMPORTER_CONFIG, importer.read_config())
+    self.assertEqual(GOOD_IMPORTER_CONFIG, importer.read_config_text())
 
   def test_importer_config_post_bad(self):
     response = self.app.post_json(
@@ -90,8 +90,9 @@ class FrontendHandlersTest(test_case.TestCase):
         {'config': BAD_IMPORTER_CONFIG},
         headers={'X-XSRF-Token': auth_testing.generate_xsrf_token_for_test()},
         status=400)
-    self.assertEqual({'text': 'Invalid config format.'}, response.json)
-    self.assertEqual([], importer.read_config())
+    self.assertEqual(
+        {'text': '"url" field is required in TarballEntry'}, response.json)
+    self.assertEqual('', importer.read_config_text())
 
   def test_importer_config_post_locked(self):
     self.mock(handlers_frontend.config, 'is_remote_configured', lambda: True)

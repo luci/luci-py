@@ -15,17 +15,18 @@ import sys
 import tempfile
 
 
+# Directory with this file.
+THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+
+
 # Printed if protoc is missing or too old.
 PROTOC_INSTALL_HELP = r"""Could not find working protocol buffers compiler.
 
-To install it on Linux run install_protoc.py.
+To install it on Linux and Mac run %s.
 
-On Windows and Mac you are on your own.
-"""
+On Windows you are on your own.
+""" % (os.path.join(THIS_DIR, 'install_protoc.py'))
 
-
-# Directory with this file.
-THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # Where to look for 'protoc' first (before hitting PATH). install_protoc.py
 # installs protoc there.
@@ -33,6 +34,8 @@ DEFAULT_PROTOC_DIR = os.path.join(THIS_DIR, 'protoc')
 
 # Minimally required protoc version.
 MIN_SUPPORTED_PROTOC_VERSION = (2, 5, 0)
+# Maximally supported protoc version.
+MAX_SUPPORTED_PROTOC_VERSION = (2, 5, 9)
 
 # Paths that should not be searched for *.proto.
 BLACKLISTED_PATHS = [
@@ -181,6 +184,15 @@ def main(args, app_dir=None, import_paths=None, blacklisted_paths=None):
       print >> sys.stderr, (
           'protoc version is too old (%s), expecting at least %s.\n' %
           (existing, expected))
+    sys.stderr.write(PROTOC_INSTALL_HELP)
+    return 1
+  # Make sure protoc produces code compatible with vendored libprotobuf.
+  if protoc_version > MAX_SUPPORTED_PROTOC_VERSION:
+    existing = '.'.join(map(str, protoc_version))
+    expected = '.'.join(map(str, MAX_SUPPORTED_PROTOC_VERSION))
+    print >> sys.stderr, (
+        'protoc version is too new (%s), expecting at most %s.\n' %
+        (existing, expected))
     sys.stderr.write(PROTOC_INSTALL_HELP)
     return 1
 

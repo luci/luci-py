@@ -31,13 +31,7 @@ exports.onContentLoaded = function() {
   // Handle 'Save' button.
   $('#import-config').submit(function(event) {
     event.preventDefault();
-    var config = null;
-    try {
-      config = JSON.parse($('#import-config textarea[name="config"]').val())
-    } catch(err) {
-      showResult('error', 'Bad JSON.', err.message);
-      return;
-    }
+    var config = $('#import-config textarea[name="config"]').val();
     common.setInteractionDisabled($('#import-config'), true);
     writeImporterConfig({'config': config}).then(function(response) {
       showResult('success', 'Config updated.');
@@ -49,8 +43,7 @@ exports.onContentLoaded = function() {
 
   // Read the config, show the page only when it's available.
   readImporterConfig().then(function(response) {
-    var str = JSON.stringify(response.data['config'], undefined, 2);
-    $('#import-config textarea[name="config"]').val(str);
+    $('#import-config textarea[name="config"]').val(response.data['config']);
     common.presentContent();
   }, function(error) {
     common.presentError(error.text);
