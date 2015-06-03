@@ -55,6 +55,8 @@ class Provider(object):
   def get_project_ids(self):
     # A project_id cannot contain a slash, so recursion is not needed.
     projects_dir = os.path.join(self.root, 'projects')
+    if not os.path.isdir(projects_dir):
+      return
     for pid in os.listdir(projects_dir):
       if os.path.isdir(os.path.join(projects_dir, pid)):
         yield pid
@@ -63,7 +65,10 @@ class Provider(object):
     assert project_id
     assert os.path.sep not in project_id, project_id
     project_path = os.path.join(self.root, 'projects', project_id) + os.path.sep
-    for dirpath, dirs, _ in os.walk(project_path + 'refs'):
+    refs_dir = project_path + 'refs'
+    if not os.path.isdir(refs_dir):
+      return
+    for dirpath, dirs, _ in os.walk(refs_dir):
       if SEPARATOR in dirs:
         # This is a leaf of the ref tree.
         dirs.remove(SEPARATOR)  # Do not go deeper.

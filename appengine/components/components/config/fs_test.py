@@ -23,6 +23,7 @@ class FsTestCase(test_case.TestCase):
   def setUp(self):
     super(FsTestCase, self).setUp()
     self.provider = fs.Provider(CONFIG_ROOT)
+    self.empty_provider = fs.Provider('nonexistent')
 
   def test_get(self):
     rev, content = self.provider.get_async(
@@ -38,6 +39,10 @@ class FsTestCase(test_case.TestCase):
     actual = self.provider.get_project_configs_async('foo.cfg').get_result()
     self.assertEqual(expected, actual)
 
+    actual = self.empty_provider.get_project_configs_async(
+        'foo.cfg').get_result()
+    self.assertEqual({}, actual)
+
   def test_get_ref_configs(self):
     expected = {
       'projects/chromium/refs/heads/master': (
@@ -49,6 +54,9 @@ class FsTestCase(test_case.TestCase):
     }
     actual = self.provider.get_ref_configs_async('foo.cfg').get_result()
     self.assertEqual(expected, actual)
+
+    actual = self.empty_provider.get_ref_configs_async('foo.cfg').get_result()
+    self.assertEqual({}, actual)
 
 
 if __name__ == '__main__':
