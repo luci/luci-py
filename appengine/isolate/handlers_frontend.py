@@ -151,6 +151,8 @@ class StatsHandler(webapp2.RequestHandler):
     """
     # Preloads the data to save a complete request.
     resolution = self.request.params.get('resolution', 'hours')
+    if resolution not in ('days', 'hours', 'minutes'):
+      resolution = 'hours'
     duration = utils.get_request_as_int(self.request, 'duration', 120, 1, 1000)
 
     description = _GVIZ_DESCRIPTION.copy()
