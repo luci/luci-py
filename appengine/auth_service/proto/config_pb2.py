@@ -13,7 +13,7 @@ from google.protobuf import descriptor_pb2
 DESCRIPTOR = _descriptor.FileDescriptor(
   name='config.proto',
   package='auth_service',
-  serialized_pb='\n\x0c\x63onfig.proto\x12\x0c\x61uth_service\"\xd3\x02\n\x13GroupImporterConfig\x12?\n\x07tarball\x18\x01 \x03(\x0b\x32..auth_service.GroupImporterConfig.TarballEntry\x12\x43\n\tplainlist\x18\x02 \x03(\x0b\x32\x30.auth_service.GroupImporterConfig.PlainlistEntry\x1a\x62\n\x0cTarballEntry\x12\x0b\n\x03url\x18\x01 \x01(\t\x12\x14\n\x0coauth_scopes\x18\x02 \x03(\t\x12\x0e\n\x06\x64omain\x18\x03 \x01(\t\x12\x0f\n\x07systems\x18\x04 \x03(\t\x12\x0e\n\x06groups\x18\x05 \x03(\t\x1aR\n\x0ePlainlistEntry\x12\x0b\n\x03url\x18\x01 \x01(\t\x12\x14\n\x0coauth_scopes\x18\x02 \x03(\t\x12\x0e\n\x06\x64omain\x18\x03 \x01(\t\x12\r\n\x05group\x18\x04 \x01(\t')
+  serialized_pb='\n\x0c\x63onfig.proto\x12\x0c\x61uth_service\"\xd3\x02\n\x13GroupImporterConfig\x12?\n\x07tarball\x18\x01 \x03(\x0b\x32..auth_service.GroupImporterConfig.TarballEntry\x12\x43\n\tplainlist\x18\x02 \x03(\x0b\x32\x30.auth_service.GroupImporterConfig.PlainlistEntry\x1a\x62\n\x0cTarballEntry\x12\x0b\n\x03url\x18\x01 \x01(\t\x12\x14\n\x0coauth_scopes\x18\x02 \x03(\t\x12\x0e\n\x06\x64omain\x18\x03 \x01(\t\x12\x0f\n\x07systems\x18\x04 \x03(\t\x12\x0e\n\x06groups\x18\x05 \x03(\t\x1aR\n\x0ePlainlistEntry\x12\x0b\n\x03url\x18\x01 \x01(\t\x12\x14\n\x0coauth_scopes\x18\x02 \x03(\t\x12\x0e\n\x06\x64omain\x18\x03 \x01(\t\x12\r\n\x05group\x18\x04 \x01(\t\"[\n\x0bOAuthConfig\x12\x19\n\x11primary_client_id\x18\x01 \x01(\t\x12\x1d\n\x15primary_client_secret\x18\x02 \x01(\t\x12\x12\n\nclient_ids\x18\x03 \x03(\t')
 
 
 
@@ -155,11 +155,54 @@ _GROUPIMPORTERCONFIG = _descriptor.Descriptor(
   serialized_end=370,
 )
 
+
+_OAUTHCONFIG = _descriptor.Descriptor(
+  name='OAuthConfig',
+  full_name='auth_service.OAuthConfig',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='primary_client_id', full_name='auth_service.OAuthConfig.primary_client_id', index=0,
+      number=1, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=unicode("", "utf-8"),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='primary_client_secret', full_name='auth_service.OAuthConfig.primary_client_secret', index=1,
+      number=2, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=unicode("", "utf-8"),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='client_ids', full_name='auth_service.OAuthConfig.client_ids', index=2,
+      number=3, type=9, cpp_type=9, label=3,
+      has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  options=None,
+  is_extendable=False,
+  extension_ranges=[],
+  serialized_start=372,
+  serialized_end=463,
+)
+
 _GROUPIMPORTERCONFIG_TARBALLENTRY.containing_type = _GROUPIMPORTERCONFIG;
 _GROUPIMPORTERCONFIG_PLAINLISTENTRY.containing_type = _GROUPIMPORTERCONFIG;
 _GROUPIMPORTERCONFIG.fields_by_name['tarball'].message_type = _GROUPIMPORTERCONFIG_TARBALLENTRY
 _GROUPIMPORTERCONFIG.fields_by_name['plainlist'].message_type = _GROUPIMPORTERCONFIG_PLAINLISTENTRY
 DESCRIPTOR.message_types_by_name['GroupImporterConfig'] = _GROUPIMPORTERCONFIG
+DESCRIPTOR.message_types_by_name['OAuthConfig'] = _OAUTHCONFIG
 
 class GroupImporterConfig(_message.Message):
   __metaclass__ = _reflection.GeneratedProtocolMessageType
@@ -178,6 +221,12 @@ class GroupImporterConfig(_message.Message):
   DESCRIPTOR = _GROUPIMPORTERCONFIG
 
   # @@protoc_insertion_point(class_scope:auth_service.GroupImporterConfig)
+
+class OAuthConfig(_message.Message):
+  __metaclass__ = _reflection.GeneratedProtocolMessageType
+  DESCRIPTOR = _OAUTHCONFIG
+
+  # @@protoc_insertion_point(class_scope:auth_service.OAuthConfig)
 
 
 # @@protoc_insertion_point(module_scope)

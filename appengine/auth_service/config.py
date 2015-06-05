@@ -33,6 +33,7 @@ from components import gitiles
 from components import utils
 from components.auth import model
 
+from proto import config_pb2
 import importer
 
 
@@ -198,14 +199,30 @@ def _update_ip_whitelist_config(_rev, _conf):
   return False
 
 
-def _validate_oauth_config(_conf):
-  # TODO(vadimsh): Implement.
-  pass
+def _validate_oauth_config(conf):
+  # Any correctly structured config is acceptable for now.
+  if not isinstance(conf, config_pb2.OAuthConfig):
+    raise ValueError('Wrong message type')
 
 
-def _update_oauth_config(_rev, _conf):
-  # TODO(vadimsh): Implement.
-  return False
+def _update_oauth_config(_rev, conf):
+  assert ndb.in_transaction(), 'Must be called in AuthDB transaction'
+  existing = model.root_key().get()
+  existing_as_dict = {
+    'oauth_client_id': existing.oauth_client_id,
+    'oauth_client_secret': existing.oauth_client_secret,
+    'oauth_additional_client_ids': list(existing.oauth_additional_client_ids),
+  }
+  new_as_dict = {
+    'oauth_client_id': conf.primary_client_id,
+    'oauth_client_secret': conf.primary_client_secret,
+    'oauth_additional_client_ids': list(conf.client_ids),
+  }
+  if new_as_dict == existing_as_dict:
+    return False
+  existing.populate(**new_as_dict)
+  existing.put()
+  return True
 
 
 ### Description of all known config files: how to validate and import them.
@@ -233,7 +250,7 @@ _CONFIG_SCHEMAS = {
     'use_authdb_transaction': True,
   },
   'oauth.cfg': {
-    'proto_class': None,
+    'proto_class': config_pb2.OAuthConfig,
     'revision_getter': lambda: _get_authdb_config_rev('oauth.cfg'),
     'validator': _validate_oauth_config,
     'updater': _update_oauth_config,

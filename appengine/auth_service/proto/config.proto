@@ -48,3 +48,16 @@ message GroupImporterConfig {
   repeated TarballEntry tarball = 1;
   repeated PlainlistEntry plainlist = 2;
 }
+
+
+// OAuth client_id whitelist config.
+message OAuthConfig {
+  // ClientID returned by /auth/api/v1/server/oauth_config endpoint to clients.
+  optional string primary_client_id = 1;
+  // Client secret (that's not really a secret, since it is visible) returned
+  // by /auth/api/v1/server/oauth_config endpoint to clients. Corresponding
+  // callback URL must be localhost or urn:ietf:wg:oauth:2.0:oob.
+  optional string primary_client_secret = 2;
+  // Whitelist of all accepted client_ids (in addition to the primary one).
+  repeated string client_ids = 3;
+}

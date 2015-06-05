@@ -12,9 +12,11 @@ test_env.setup_test_env()
 
 from google.appengine.ext import ndb
 
-from test_support import test_case
 from components import config as config_component
+from components.auth import model
+from test_support import test_case
 
+from proto import config_pb2
 import config
 
 
@@ -84,11 +86,35 @@ class ConfigTest(test_case.TestCase):
     self.assertTrue(config._update_imports_config(new_rev, body))
     self.assertEqual(new_rev, config._get_imports_config_revision())
 
+  def test_update_oauth_config(self):
+    @ndb.transactional
+    def run(conf):
+      return config._update_oauth_config(None, conf)
+    model.AuthGlobalConfig(key=model.root_key()).put()
+    # Pushing empty config to empty state -> no changes.
+    self.assertFalse(run(config_pb2.OAuthConfig()))
+    # Updating config.
+    self.assertTrue(run(config_pb2.OAuthConfig(
+        primary_client_id='a',
+        primary_client_secret='b',
+        client_ids=['c', 'd'])))
+    self.assertEqual({
+      'oauth_additional_client_ids': ['c', 'd'],
+      'oauth_client_id': 'a',
+      'oauth_client_secret': 'b',
+    }, model.root_key().get().to_dict())
+    # Same config again -> no changes.
+    self.assertFalse(run(config_pb2.OAuthConfig(
+        primary_client_id='a',
+        primary_client_secret='b',
+        client_ids=['c', 'd'])))
+
   def test_fetch_configs_ok(self):
     fetches = {
       'imports.cfg': ('imports_cfg_rev', 'tarball{url:"a" systems:"b"}'),
       'ip_whitelist.cfg': ('ip_whitelist_cfg_rev', 'TODO'),
-      'oauth.cfg': ('oauth_cfg_rev', 'TODO'),
+      'oauth.cfg': (
+          'oauth_cfg_rev', config_pb2.OAuthConfig(primary_client_id='a')),
     }
     @ndb.tasklet
     def get_self_config_mock(path, *_args, **_kwargs):
@@ -107,7 +133,7 @@ class ConfigTest(test_case.TestCase):
           'TODO'),
       'oauth.cfg': (
           config.Revision('oauth_cfg_rev', 'http://url'),
-          'TODO'),
+          config_pb2.OAuthConfig(primary_client_id='a')),
     }, result)
 
   def test_fetch_configs_not_valid(self):
