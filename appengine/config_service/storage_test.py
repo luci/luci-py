@@ -16,7 +16,7 @@ import storage
 class StorageTestCase(test_case.TestCase):
   def put_file(self, config_set, revision, path, content):
     confg_set_key = storage.ConfigSet(
-        id=config_set, latest_revision=revision).put()
+        id=config_set, latest_revision=revision, location='http://x.com').put()
     rev_key = storage.Revision(id=revision, parent=confg_set_key).put()
 
     content_hash = storage.compute_hash(content)

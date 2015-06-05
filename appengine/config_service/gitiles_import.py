@@ -232,6 +232,11 @@ def import_projects():
     except ValueError:
       logging.exception('Invalid project location: %s', project.config_location)
       continue
+    except net.AuthError as ex:
+      logging.error(
+          'Could not resolve %s due to permissions: %s',
+          project.config_location, ex.message)
+      continue
 
     try:
       import_project(project.id, location)
