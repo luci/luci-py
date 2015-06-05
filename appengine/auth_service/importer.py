@@ -101,6 +101,7 @@ class GroupImporterConfig(ndb.Model):
   """Singleton entity with group importer configuration JSON."""
   config = ndb.TextProperty() # legacy field with JSON config
   config_proto = ndb.TextProperty()
+  config_revision = ndb.JsonProperty() # see config.py, _update_imports_config
   modified_by = auth.IdentityProperty(indexed=False)
   modified_ts = ndb.DateTimeProperty(auto_now=True, indexed=False)
 
@@ -139,7 +140,21 @@ def legacy_json_config_to_proto(config_json):
   return msg
 
 
-def validate_config(config):
+def validate_config(text):
+  """Deserializes text to config_pb2.GroupImporterConfig and validates it.
+
+  Raise:
+    ValueError if config is not valid.
+  """
+  msg = config_pb2.GroupImporterConfig()
+  try:
+    protobuf.text_format.Merge(text, msg)
+  except protobuf.text_format.ParseError as ex:
+    raise ValueError('Config is badly formated: %s' % ex)
+  validate_config_proto(msg)
+
+
+def validate_config_proto(config):
   """Checks config_pb2.GroupImporterConfig for correctness.
 
   Raises:
@@ -183,7 +198,7 @@ def validate_config(config):
     seen_groups.add(plainlist.group)
 
 
-def read_config_text():
+def read_config():
   """Returns importer config as a text blob (or '' if not set)."""
   e = config_key().get()
   if not e:
@@ -208,23 +223,19 @@ def read_legacy_config():
   return e.config if e else None
 
 
-def write_config_text(text):
+def write_config(text, config_revision=None, modified_by=None):
   """Validates config text blobs and puts it into the datastore.
 
   Raises:
     ValueError on invalid format.
   """
-  msg = config_pb2.GroupImporterConfig()
-  try:
-    protobuf.text_format.Merge(text, msg)
-  except protobuf.text_format.ParseError as ex:
-    raise ValueError('Config is badly formated: %s' % ex)
-  validate_config(msg)
+  validate_config(text)
   e = GroupImporterConfig(
       key=config_key(),
       config=read_legacy_config(),
       config_proto=text,
-      modified_by=auth.get_current_identity())
+      config_revision=config_revision,
+      modified_by=modified_by or auth.get_service_self_identity())
   e.put()
 
 
@@ -234,7 +245,7 @@ def import_external_groups():
   Runs as a cron task. Raises BundleImportError in case of import errors.
   """
   # Missing config is not a error.
-  config_text = read_config_text()
+  config_text = read_config()
   if not config_text:
     logging.info('Not configured')
     return
@@ -244,7 +255,7 @@ def import_external_groups():
   except protobuf.text_format.ParseError as ex:
     raise BundleImportError('Bad config format: %s' % ex)
   try:
-    validate_config(config)
+    validate_config_proto(config)
   except ValueError as ex:
     raise BundleImportError('Bad config structure: %s' % ex)
 

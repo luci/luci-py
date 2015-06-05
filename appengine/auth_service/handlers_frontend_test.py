@@ -71,7 +71,7 @@ class FrontendHandlersTest(test_case.TestCase):
     self.assertEqual({'config': ''}, response.json)
 
   def test_importer_config_get(self):
-    importer.write_config_text(GOOD_IMPORTER_CONFIG)
+    importer.write_config(GOOD_IMPORTER_CONFIG)
     response = self.app.get('/auth_service/api/v1/importer/config', status=200)
     self.assertEqual({'config': GOOD_IMPORTER_CONFIG}, response.json)
 
@@ -82,7 +82,7 @@ class FrontendHandlersTest(test_case.TestCase):
         headers={'X-XSRF-Token': auth_testing.generate_xsrf_token_for_test()},
         status=200)
     self.assertEqual({'ok': True}, response.json)
-    self.assertEqual(GOOD_IMPORTER_CONFIG, importer.read_config_text())
+    self.assertEqual(GOOD_IMPORTER_CONFIG, importer.read_config())
 
   def test_importer_config_post_bad(self):
     response = self.app.post_json(
@@ -92,7 +92,7 @@ class FrontendHandlersTest(test_case.TestCase):
         status=400)
     self.assertEqual(
         {'text': '"url" field is required in TarballEntry'}, response.json)
-    self.assertEqual('', importer.read_config_text())
+    self.assertEqual('', importer.read_config())
 
   def test_importer_config_post_locked(self):
     self.mock(handlers_frontend.config, 'is_remote_configured', lambda: True)

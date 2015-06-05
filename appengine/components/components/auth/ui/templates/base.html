@@ -49,11 +49,10 @@ found in the LICENSE file. -->
 {% macro render_config_locked() -%}
 <hr>
 <p>
-This configuration is distributed by
-<a target="_blank" href="{{auth_service_config_backend}}">luci-config</a>
-from <a target="_blank" href="{{auth_service_config_url}}">these files</a>.
-Latest known revision is
-<span style="font-family:monospace;">{{auth_service_config_rev}}</span>.
+The configuration is distributed by
+<a target="_blank" href="{{auth_service_config_remote_url}}">luci-config</a>.
+Using revision <a target="_blank" href="{{auth_service_config_url}}"
+style="font-family:monospace;">{{auth_service_config_rev}}</a>.
 </p>
 {%- endmacro %}
 

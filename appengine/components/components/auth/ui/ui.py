@@ -40,8 +40,8 @@ def configure_ui(app_name, ui_tabs=None, env_callback=None):
     ui_tabs: list of UINavbarTabHandler subclasses that define tabs to show, or
         None to show the standard set of tabs.
     env_callback: callable that returns a dict with additional environment for
-        templates. Will be called each time a template is rendered. Used by
-        auth_service.
+        templates. Will be called each time a template is rendered with single
+        argument: UIHandler instance. Used by auth_service.
   """
   global _ui_app_name
   global _ui_env_callback
@@ -140,7 +140,7 @@ class UIHandler(handler.AuthenticatingHandler):
       'xsrf_token': self.generate_xsrf_token(),
     }
     if _ui_env_callback:
-      common.update(_ui_env_callback())
+      common.update(_ui_env_callback(self))
 
     # Name of Javascript module with page code.
     js_module_name = None

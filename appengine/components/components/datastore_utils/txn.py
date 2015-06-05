@@ -16,6 +16,9 @@ __all__ = [
   'CommitError',
   'transaction',
   'transaction_async',
+  'transactional_async',
+  'transactional',
+  'transactional_tasklet',
 ]
 
 

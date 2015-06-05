@@ -235,7 +235,7 @@ class ImporterTest(test_case.TestCase):
     service_id = auth.Identity.from_bytes('service:some-service')
     self.mock(auth, 'get_service_self_identity', lambda: service_id)
 
-    importer.write_config_text("""
+    importer.write_config("""
       tarball {
         domain: "example.com"
         groups: "ldap/new"
@@ -311,20 +311,20 @@ class ImporterTest(test_case.TestCase):
     }
     self.assertEqual(expected_groups, fetch_groups())
 
-  def test_read_config_text(self):
+  def test_read_config(self):
     # Empty.
     put_config('', '')
-    self.assertEqual('', importer.read_config_text())
+    self.assertEqual('', importer.read_config())
     # Good.
     put_config('tarball{}', '')
-    self.assertEqual('tarball{}', importer.read_config_text())
+    self.assertEqual('tarball{}', importer.read_config())
     # Legacy.
     put_config('', '[{"url":"12"}]')
-    self.assertEqual('tarball {\n  url: "12"\n}\n', importer.read_config_text())
+    self.assertEqual('tarball {\n  url: "12"\n}\n', importer.read_config())
 
-  def test_write_config_text(self):
+  def test_write_config(self):
     put_config('', 'legacy')
-    importer.write_config_text('tarball{url:"12"\nsystems:"12"}')
+    importer.write_config('tarball{url:"12"\nsystems:"12"}')
     e = importer.config_key().get()
     self.assertEqual('legacy', e.config)
     self.assertEqual('tarball{url:"12"\nsystems:"12"}', e.config_proto)

@@ -68,13 +68,23 @@ class ServicesHandler(ui.UINavbarTabHandler):
   template_file = 'auth_service/services.html'
 
 
-def get_additional_ui_environment():
+def get_additional_ui_environment(handler):
   """Gets injected into Jinja and Javascript environment."""
+  # See config._CONFIG_SCHEMAS for where these paths are defined.
+  if isinstance(handler, ConfigHandler):
+    path = 'imports.cfg'
+  elif isinstance(handler, ui.IPWhitelistsHandler):
+    path = 'ip_whitelist.cfg'
+  elif isinstance(handler, ui.OAuthConfigHandler):
+    path = 'oauth.cfg'
+  else:
+    return {'auth_service_config_locked': config.is_remote_configured()}
+  rev = config.get_config_revision(path)
   return {
-    'auth_service_config_backend': config.get_remote_url(),
     'auth_service_config_locked': config.is_remote_configured(),
-    'auth_service_config_rev': 'not-implemented',
-    'auth_service_config_url': 'http://example.com/not-implemented',
+    'auth_service_config_remote_url': config.get_remote_url(),
+    'auth_service_config_rev': rev.revision if rev else 'none',
+    'auth_service_config_url': rev.url if rev else 'about:blank',
   }
 
 
@@ -94,14 +104,16 @@ class ImporterConfigHandler(auth.ApiHandler):
 
   @auth.require(auth.is_admin)
   def get(self):
-    self.send_response({'config': importer.read_config_text()})
+    self.send_response({'config': importer.read_config()})
 
   @auth.require(auth.is_admin)
   def post(self):
     if config.is_remote_configured():
       self.abort_with_error(409, text='The configuration is managed elsewhere')
     try:
-      importer.write_config_text(self.parse_body().get('config'))
+      importer.write_config(
+          text=self.parse_body().get('config'),
+          modified_by=auth.get_current_identity())
     except ValueError as ex:
       self.abort_with_error(400, text=str(ex))
     self.send_response({'ok': True})
@@ -264,13 +276,11 @@ def create_application(debug):
   ui.configure_ui(
       app_name='Auth Service',
       ui_tabs=[
-        # Standard tabs provided by auth component.
         ui.GroupsHandler,
+        ServicesHandler,
         ui.OAuthConfigHandler,
         ui.IPWhitelistsHandler,
-        # Additional tabs available only on auth service.
         ConfigHandler,
-        ServicesHandler,
       ],
       env_callback=get_additional_ui_environment)
   template.bootstrap({'auth_service': TEMPLATES_DIR})
