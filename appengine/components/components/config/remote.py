@@ -20,7 +20,7 @@ from . import common
 from . import validation
 
 
-MEMCACHE_PREFIX = 'components.config/'
+MEMCACHE_PREFIX = 'components.config/v1/'
 # Delete LastGoodConfig if it was not accessed for more than a week.
 CONFIG_MAX_TIME_SINCE_LAST_ACCESS = datetime.timedelta(days=7)
 # Update LastGoodConfig.last_access_ts if it will be deleted next day.
@@ -89,6 +89,8 @@ class Provider(object):
     assert config_set
     assert path
 
+    get_latest = not revision
+
     content_hash = None
     if use_memcache:
       cache_key = (
@@ -109,7 +111,7 @@ class Provider(object):
         content_hash = res['content_hash']
         if content_hash and use_memcache:
           yield ctx.memcache_set(
-              cache_key, (revision, content_hash), time=0 if revision else 60)
+              cache_key, (revision, content_hash), time=60 if get_latest else 0)
     raise ndb.Return((revision, content_hash))
 
   @ndb.tasklet
