@@ -7,7 +7,7 @@ import re
 ################################################################################
 ## Config set patterns.
 
-SERVICE_ID_PATTERN = '[a-z0-9\-]+'
+SERVICE_ID_PATTERN = '[a-z0-9\-_]+'
 SERVICE_ID_RGX = re.compile('^%s$' % SERVICE_ID_PATTERN)
 SERVICE_CONFIG_SET_RGX = re.compile('^services/(%s)$' % SERVICE_ID_PATTERN)
 
