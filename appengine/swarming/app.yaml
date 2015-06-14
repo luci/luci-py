@@ -111,5 +111,7 @@ skip_files:
 - ^(.*/)?#.*#
 - .+~
 - .+\.py[co]
+# Doc, readme and license.
+- ^doc/
 - ^[A-Z]+$
 - ^[A-Z]+\.[a-z]+$
