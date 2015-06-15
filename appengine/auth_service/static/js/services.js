@@ -3,6 +3,8 @@
 // found in the LICENSE file.
 
 var services = (function() {
+'use strict';
+
 var exports = {};
 
 
@@ -33,9 +35,9 @@ var updateServiceListing = function() {
 
   defer.then(function(result) {
     var services = [];
-    var now = result.data['now'];
-    var auth_db_rev = result.data['auth_db_rev'];
-    var auth_code_version = result.data['auth_code_version'];
+    var now = result.data.now;
+    var auth_db_rev = result.data.auth_db_rev;
+    var auth_code_version = result.data.auth_code_version;
 
     var getUpToDateStatus = function(updated_ts) {
       var dt = Math.round((now - updated_ts) / 1000000);
@@ -58,7 +60,7 @@ var updateServiceListing = function() {
       if (service.auth_db_rev == auth_db_rev.rev) {
         return getUpToDateStatus(service.push_finished_ts);
       }
-      if (service.push_status == 0) {
+      if (service.push_status === 0) {
         return {
           text: 'syncing',
           tooltip: String.format(
@@ -82,7 +84,7 @@ var updateServiceListing = function() {
 
     // Add auth service itself to the list.
     services.push({
-      app_id: auth_db_rev['primary_id'],
+      app_id: auth_db_rev.primary_id,
       auth_code_version: auth_code_version,
       lag_ms: '0 ms',
       service_url: '/',
@@ -90,7 +92,7 @@ var updateServiceListing = function() {
     });
 
     // Add all replicas.
-    _.each(result.data['services'], function(service) {
+    _.each(result.data.services, function(service) {
       services.push({
         app_id: service.app_id,
         auth_code_version: service.auth_code_version || '--',
@@ -124,7 +126,7 @@ var initAddServiceForm = function() {
       });
       defer.then(function(result) {
         // On success, show the URL.
-        var url = result.data['url'];
+        var url = result.data.url;
         $('#add-service-form-alerts').html(
             common.render('present-link-template', {url: url, app_id: app_id}));
       }, function(error) {

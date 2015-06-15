@@ -3,6 +3,8 @@
 // found in the LICENSE file.
 
 var change_log = (function() {
+'use strict';
+
 var exports = {};
 
 
@@ -19,7 +21,7 @@ exports.onContentLoaded = function() {
     common.presentContent();
   }, function(error) {
     common.presentError(error.text);
-  })
+  });
 };
 
 

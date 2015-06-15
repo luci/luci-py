@@ -3,6 +3,8 @@
 // found in the LICENSE file.
 
 var common = (function() {
+'use strict';
+
 var exports = {};
 var templatesCache = {};
 
@@ -159,7 +161,8 @@ exports.onAnchorChange = function(cb) {
 // Returns value of URL query parameter given its name.
 exports.getQueryParameter = function(name) {
   // See http://stackoverflow.com/a/5158301.
-  var match = RegExp('[?&]' + name + '=([^&]*)').exec(window.location.search);
+  var match = new RegExp(
+      '[?&]' + name + '=([^&]*)').exec(window.location.search);
   return match && decodeURIComponent(match[1].replace(/\+/g, ' '));
 };
 
@@ -182,9 +185,9 @@ ProgressSpinner.prototype.show = function() {
 
 // Hides progress indicator.
 ProgressSpinner.prototype.hide = function() {
-  if (this.counter != 0) {
+  if (this.counter !== 0) {
     this.counter -= 1;
-    if (this.counter == 0) {
+    if (this.counter === 0) {
       this.$element.removeClass('spinning').addClass('not-spinning');
     }
   }

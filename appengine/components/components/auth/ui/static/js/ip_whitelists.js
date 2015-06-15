@@ -3,13 +3,15 @@
 // found in the LICENSE file.
 
 var ip_whitelists = (function() {
+'use strict';
+
 var exports = {};
 
 
 // Multiline string with subnets -> list of subnet strings.
 var splitSubnetsList = function(subnets) {
   var mapper = function(str) { return str.trim(); };
-  var filter = function(str) { return str != ''; };
+  var filter = function(str) { return str !== ''; };
   return _.filter(_.map(subnets.split('\n'), mapper), filter);
 };
 
@@ -49,7 +51,7 @@ Selector.prototype.populate = function(whitelists, selection) {
 
   // All whitelists.
   _.each(whitelists, function(whitelist) {
-    addToSelector(whitelist['name'], whitelist);
+    addToSelector(whitelist.name, whitelist);
   });
 
   // Separator and "New list" option.
@@ -58,7 +60,7 @@ Selector.prototype.populate = function(whitelists, selection) {
     addToSelector('Create new IP whitelist', 'CREATE');
   } else {
     // Empty list looks ugly, put something in there.
-    if (selected == null) {
+    if (selected === null) {
       addToSelector('No IP whitelists', 'SEPARATOR');
     }
   }
@@ -74,18 +76,18 @@ Selector.prototype.onSelectionChanged = function() {
   var selectedOption = $('option:selected', this.$element);
   var selectedData = selectedOption.data('selector-data');
   if (selectedData === 'SEPARATOR') {
-    if (this.onWhitelistSelected != null) {
+    if (this.onWhitelistSelected !== null) {
       this.onWhitelistSelected(null);
     }
   } else if (selectedData === 'CREATE') {
-    if (this.onWhitelistSelected != null) {
+    if (this.onWhitelistSelected !== null) {
       this.onWhitelistSelected(null);
     }
-    if (this.onCreateWhitelist != null) {
+    if (this.onCreateWhitelist !== null) {
       this.onCreateWhitelist();
     }
   } else {
-    if (this.onWhitelistSelected != null) {
+    if (this.onWhitelistSelected !== null) {
       this.onWhitelistSelected(selectedData);
     }
   }
@@ -134,7 +136,7 @@ NewWhitelistDialog.prototype.showError = function(text) {
 
 // Called when "Create" button is clicked. Invokes onCreateWhitelist callback.
 NewWhitelistDialog.prototype.onCreateClicked = function() {
-  if (this.onCreateWhitelist == null) {
+  if (this.onCreateWhitelist === null) {
     return;
   }
 
@@ -209,7 +211,7 @@ WhitelistPane.prototype.populate = function(ipWhitelist) {
 // Called whenever 'Update' button is clicked.
 WhitelistPane.prototype.onUpdateClick = function() {
   if (!this.onUpdateWhitelist) {
-    return
+    return;
   }
 
   var desc = $('input[name="description"]', this.$element).val();
@@ -239,7 +241,7 @@ WhitelistPane.prototype.onDeleteClick = function() {
 var reloadWhitelists = function(selector, selection) {
   var done = $.Deferred();
   api.ipWhitelists().then(function(response) {
-    selector.populate(response.data['ip_whitelists'], selection);
+    selector.populate(response.data.ip_whitelists, selection);
     common.presentContent();
     done.resolve(response);
   }, function(error) {
@@ -305,7 +307,7 @@ exports.onContentLoaded = function() {
     var defer = wrapDefer(api.ipWhitelistCreate(ipWhitelist), ipWhitelist.name);
     defer.then(function(response) {
       newListDialog.hide();
-      whitelistPane.showSuccess('Created.')
+      whitelistPane.showSuccess('Created.');
     }, function(error) {
       newListDialog.showError(error.text || 'Unknown error');
     });
@@ -324,7 +326,7 @@ exports.onContentLoaded = function() {
     var defer = wrapDefer(
         api.ipWhitelistUpdate(ipWhitelist, lastModified), ipWhitelist.name);
     defer.then(function(response) {
-      whitelistPane.showSuccess('Updated.')
+      whitelistPane.showSuccess('Updated.');
     }, function(error) {
       whitelistPane.showError(error.text || 'Unknown error');
     });

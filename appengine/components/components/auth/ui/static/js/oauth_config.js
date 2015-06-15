@@ -3,6 +3,8 @@
 // found in the LICENSE file.
 
 var oauth_config = (function() {
+'use strict';
+
 var exports = {};
 var form = null;
 

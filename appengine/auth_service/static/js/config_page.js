@@ -3,6 +3,8 @@
 // found in the LICENSE file.
 
 var config_page = (function() {
+'use strict';
+
 var exports = {};
 
 
@@ -43,7 +45,7 @@ exports.onContentLoaded = function() {
 
   // Read the config, show the page only when it's available.
   readImporterConfig().then(function(response) {
-    $('#import-config textarea[name="config"]').val(response.data['config']);
+    $('#import-config textarea[name="config"]').val(response.data.config);
     common.presentContent();
   }, function(error) {
     common.presentError(error.text);

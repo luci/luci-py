@@ -3,6 +3,8 @@
 // found in the LICENSE file.
 
 var api = (function() {
+'use strict';
+
 var exports = {};
 
 // Current known value of XSRF token.
@@ -40,7 +42,7 @@ var call = function(type, url, data, headers) {
   var request = $.ajax({
     type: type,
     url: url,
-    data: (data != null) ? JSON.stringify(data) : null,
+    data: (data !== null) ? JSON.stringify(data) : null,
     cache: false,
     contentType: 'application/json; charset=UTF-8',
     dataType: 'json',

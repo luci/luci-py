@@ -3,6 +3,8 @@
 // found in the LICENSE file.
 
 var groups = (function() {
+'use strict';
+
 var exports = {};
 
 
@@ -35,9 +37,17 @@ function trimGroupDescription(desc) {
 
 // Given an array of strings returns a one with longest substring of 'text'.
 function longestMatch(items, text) {
-  if (text.length == 0 || items.length == 0) {
+  if (text.length === 0 || items.length === 0) {
     return null;
   }
+
+  // Make jshint happy by moving local function declaration outside of the loop.
+  var makePrefixFilter = function(prefix) {
+    return function(item) {
+      return item.indexOf(prefix) != -1;
+    };
+  };
+
   // Invariant: curSet is non empty subsequence of 'items', each item in curSet
   // has 'curPrefix' as a substring.
   var curPrefix = '';
@@ -45,13 +55,11 @@ function longestMatch(items, text) {
   for (var i = 0; i < text.length; i++) {
     // Attempt to increase curPrefix.
     var newPrefix = curPrefix + text[i];
-    var newSet = _.filter(curSet, function(item) {
-      return item.indexOf(newPrefix) != -1;
-    });
+    var newSet = _.filter(curSet, makePrefixFilter(newPrefix));
     // No matches at all -> curSet contains longest matches.
-    if (newSet.length == 0) {
+    if (newSet.length === 0) {
       // Could not find the first letter -> no match at all.
-      if (i == 0) {
+      if (i === 0) {
         return null;
       }
       return curSet[0];
@@ -106,7 +114,7 @@ GroupChooser.prototype.setGroupList = function(groups) {
 
   // Groups without '-' or '/' come first, then groups with '-'.
   var sortKeyFunc = function(group) {
-    var name = group.name
+    var name = group.name;
     if (name.indexOf('/') != -1) {
       return 'C-' + name;
     }
@@ -377,7 +385,7 @@ GroupForm.prototype.focus = function() {
 GroupForm.prototype.load = function() {
   // Subclasses implement this. Base class just returns resolved deferred.
   var defer = $.Deferred();
-  defer.resolve()
+  defer.resolve();
   return defer;
 };
 
@@ -482,7 +490,7 @@ GroupForm.prototype.setupSubmitHandler = function(submitCallback) {
 // Form to view\edit existing group.
 
 
-EditGroupForm = function(groupName) {
+var EditGroupForm = function(groupName) {
   // Call parent constructor.
   GroupForm.call(this, null, groupName);
   // Name of the group this form operates on.
@@ -523,7 +531,7 @@ EditGroupForm.prototype.buildForm = function(group, lastModified) {
   var membersAndGlobs = [].concat(members, globs);
 
   // Assert that they can be split apart later.
-  if (!_.all(members, function(item) { return !isGlob(item)})) {
+  if (!_.all(members, function(item) { return !isGlob(item); })) {
     console.log(members);
     throw 'Invalid members list';
   }
@@ -554,7 +562,7 @@ EditGroupForm.prototype.buildForm = function(group, lastModified) {
 
     // Add validation and submit handler.
     this.setupSubmitHandler(function(group) {
-      self.onUpdateGroup(group, self.lastModified)
+      self.onUpdateGroup(group, self.lastModified);
     });
   }
 
