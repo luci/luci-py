@@ -36,7 +36,7 @@ For more info, read docstrings in api.py.
 # pylint: disable=W0401,W0403
 
 from .api import *
-from .common import ConfigSettings
+from .common import *
 from .endpoint import ConfigApi
 
 

@@ -13,15 +13,7 @@ Provider do not do type conversion, api.py does.
 
 import logging
 
-from google.appengine.api import app_identity
 from google.appengine.ext import ndb
-
-# Config component is using google.protobuf package, it requires some python
-# package magic hacking.
-from components import utils
-utils.fix_protobuf_package()
-
-from google import protobuf
 
 from . import common
 from . import fs
@@ -36,10 +28,6 @@ class CannotLoadConfigError(Error):
   """A config could not be loaded."""
 
 
-class ConfigFormatError(Error):
-  """A config could not be converted to the destination type."""
-
-
 def _get_config_provider():  # pragma: no cover
   """Returns a config provider to load configs.
 
@@ -52,16 +40,18 @@ def _get_config_provider():  # pragma: no cover
 
 @ndb.tasklet
 def get_async(
-    config_set, path, dest_type=None, revision=None, store_last_good=None):
-  """Reads a revision and config.
+    config_set, path, dest_type=None, revision=None, store_last_good=False):
+  """Reads a revision and contents of a config.
 
-  If |store_last_good| is True (default if latest config-set for this service is
-  requested), does not make remote calls, but consults datastore only, so the
-  call is faster and less likely to fail. A request for a certain config with
+  If |store_last_good| is True (default is False), does not make remote calls,
+  but consults datastore only, so the call is faster, less likely to fail and
+  resilient to config service outages. A request for a certain config with
   store_last_good==True, instructs Cron job to start checking it periodically.
   If a config was not requested for a week, it is deleted from the datastore and
   not updated anymore. If the Cron job receives an invalid config, it is
-  ignored.
+  ignored, so get_async with store_last_good=True is guaranteed to always return
+  valid configs as long as validation code is not changed in a non-backward
+  compatible way.
 
   Args:
     config_set (str): config set to read a config from.
@@ -85,15 +75,13 @@ def get_async(
   """
   assert config_set
   assert path
-  _validate_dest_type(dest_type)
+  common._validate_dest_type(dest_type)
 
   if store_last_good:
     if revision:  # pragma: no cover
       raise ValueError(
           'store_last_good parameter cannot be set to True if revision is '
           'specified')
-  elif store_last_good is None:
-    store_last_good = config_set == self_config_set() and not revision
 
   try:
     revision, config = yield _get_config_provider().get_async(
@@ -107,7 +95,7 @@ def get_async(
             ex,
         ))
 
-  raise ndb.Return((revision, _convert_config(config, dest_type)))
+  raise ndb.Return((revision, common._convert_config(config, dest_type)))
 
 
 def get(*args, **kwargs):
@@ -117,7 +105,7 @@ def get(*args, **kwargs):
 
 def get_self_config_async(*args, **kwargs):
   """A shorthand for get_async with config set for the current appid."""
-  return get_async(self_config_set(), *args, **kwargs)
+  return get_async(common.self_config_set(), *args, **kwargs)
 
 
 def get_self_config(*args, **kwargs):
@@ -162,7 +150,7 @@ def get_project_configs_async(path, dest_type=None):
     None.
   """
   assert path
-  _validate_dest_type(dest_type)
+  common._validate_dest_type(dest_type)
 
   configs = yield _get_config_provider().get_project_configs_async(path)
   result = {}
@@ -171,8 +159,8 @@ def get_project_configs_async(path, dest_type=None):
     project_id = config_set[len('projects/'):]
     assert project_id
     try:
-      config = _convert_config(content, dest_type)
-    except ConfigFormatError:
+      config = common._convert_config(content, dest_type)
+    except common.ConfigFormatError:
       logging.exception(
           'Could not parse config at %s in config set %s: %r',
           path, config_set, content)
@@ -202,7 +190,7 @@ def get_ref_configs_async(path, dest_type=None):
     always starts with 'ref/'. In file system mode, revision is None.
   """
   assert path
-  _validate_dest_type(dest_type)
+  common._validate_dest_type(dest_type)
   configs = yield _get_config_provider().get_ref_configs_async(path)
   result = {}
   for config_set, (revision, content) in configs.iteritems():
@@ -211,8 +199,8 @@ def get_ref_configs_async(path, dest_type=None):
     assert project_id
     assert ref
     try:
-      config = _convert_config(content, dest_type)
-    except ConfigFormatError:
+      config = common._convert_config(content, dest_type)
+    except common.ConfigFormatError:
       logging.exception(
           'Could not parse config at %s in config set %s: %r',
           path, config_set, content)
@@ -245,27 +233,3 @@ def get_config_set_location(config_set):  # pragma: no cover
   """Blocking version of get_config_set_location_async."""
   return get_config_set_location_async(config_set).get_result()
 
-
-def _validate_dest_type(dest_type):
-  if dest_type is None:
-    return
-  if not issubclass(dest_type, protobuf.message.Message):
-    raise NotImplementedError('%s type is not supported' % dest_type.__name__)
-
-
-def _convert_config(config, dest_type):
-  _validate_dest_type(dest_type)
-  if dest_type is None:
-    return config
-  msg = dest_type()
-  if config:
-    try:
-      protobuf.text_format.Merge(config, msg)
-    except protobuf.text_format.ParseError as ex:
-      raise ConfigFormatError(ex.message)
-  return msg
-
-
-@utils.cache
-def self_config_set():
-  return 'services/%s' % app_identity.get_application_id()
