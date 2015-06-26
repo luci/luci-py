@@ -337,12 +337,16 @@ def process_main_thread_task(botobj, resp):
 
 
 def task_worker():
+  thread_name = threading.current_thread().name
+  logging.info(thread_name + ' has started')
   while True:
     botobj, resp = task_queue.get(block=True)
+    logging.info(thread_name + ' has picked up %s', str(resp))
     # Access to a protected member _XXX of a client class - pylint: disable=W0212
     start = time.time()
     run_manifest(botobj, resp['manifest'], start)
-    q.task_done()
+    logging.info(threading.current_thread().name + ' done')
+    task_queue.task_done()
 
 
 def run_manifest(botobj, manifest, start):
