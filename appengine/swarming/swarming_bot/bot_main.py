@@ -19,10 +19,12 @@ import json
 import logging
 import optparse
 import os
+import Queue
 import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import traceback
 import zipfile
@@ -253,6 +255,7 @@ def get_bot():
       remote, attributes, config['server_version'], ROOT_DIR,
       lambda b: call_hook(b, 'on_bot_shutdown'))
 
+task_queue = Queue.Queue()
 
 def run_bot(arg_error):
   """Runs the bot until it reboots or self-update."""
@@ -281,12 +284,32 @@ def run_bot(arg_error):
   # TODO(maruel): Run 'health check' on startup.
   # https://code.google.com/p/swarming/issues/detail?id=112
   consecutive_sleeps = 0
+
+  thread_pool = []
+  pool_size = 10
+
+  for i in range(pool_size):
+    t = threading.Thread(target=task_worker)
+    t.setDaemon(True)
+    thread_pool.append(t)
+    t.start()
+
   while True:
     try:
       botobj.update_dimensions(get_dimensions())
       botobj.update_state(get_state(consecutive_sleeps))
-      did_something = poll_server(botobj)
-      if did_something:
+      # Pull a task
+      resp = botobj.remote.url_read_json(
+          '/swarming/api/v1/bot/poll', data=botobj._attributes)
+      logging.debug('Server response:\n%s', resp)
+      if resp['cmd'] == 'run':
+        # Put response to process in the task queue
+        task_queue.put((botobj, resp), block=True)
+      else:
+        process_main_thread_task(botobj, resp)
+
+      has_todo_tasks = task_queue.empty()
+      if has_todo_tasks:
         consecutive_sleeps = 0
       else:
         consecutive_sleeps += 1
@@ -296,38 +319,30 @@ def run_bot(arg_error):
       botobj.post_error(msg)
       consecutive_sleeps = 0
 
-
-def poll_server(botobj):
-  """Polls the server to run one loop.
-
-  Returns True if executed some action, False if server asked the bot to sleep.
-  """
-  # Access to a protected member _XXX of a client class - pylint: disable=W0212
-  start = time.time()
-  resp = botobj.remote.url_read_json(
-      '/swarming/api/v1/bot/poll', data=botobj._attributes)
-  logging.debug('Server response:\n%s', resp)
-
-  cmd = resp['cmd']
-  if cmd == 'sleep':
-    time.sleep(resp['duration'])
-    return False
-
-  if cmd == 'run':
-    if run_manifest(botobj, resp['manifest'], start):
-      # Completed a task successfully so update swarming_bot.zip if necessary.
-      update_lkgbc()
-  elif cmd == 'update':
-    update_bot(botobj, resp['version'])
-  elif cmd == 'restart':
-    if _in_load_test_mode():
-      logging.warning('Would have restarted: %s' % resp['message'])
+def process_main_thread_task(botobj, resp):
+    cmd = resp['cmd']
+    if cmd == 'sleep':
+      time.sleep(resp['duration'])
+    elif cmd == 'update':
+      update_bot(botobj, resp['version'])
+    elif cmd == 'restart':
+      if _in_load_test_mode():
+        logging.warning('Would have restarted: %s' % resp['message'])
+      else:
+        botobj.restart(resp['message'])
     else:
-      botobj.restart(resp['message'])
-  else:
-    raise ValueError('Unexpected command: %s\n%s' % (cmd, resp))
+      raise ValueError('Unexpected command: %s\n%s' % (cmd, resp))
+    # Handle auto-update of swarming_bot.zip
+    # update_lkgbc()
 
-  return True
+
+def task_worker():
+  while True:
+    botobj, resp = task_queue.get(block=True)
+    # Access to a protected member _XXX of a client class - pylint: disable=W0212
+    start = time.time()
+    run_manifest(botobj, resp['manifest'], start)
+    q.task_done()
 
 
 def run_manifest(botobj, manifest, start):
@@ -359,7 +374,8 @@ def run_manifest(botobj, manifest, start):
     # not be too aggressive about deletion because running a task with a warm
     # cache has important performance benefit.
     # https://code.google.com/p/swarming/issues/detail?id=149
-    work_dir = os.path.join(botobj.base_dir, 'work')
+    thread_name = threading.current_thread().name
+    work_dir = os.path.join(botobj.base_dir, 'work', thread_name)
     if not os.path.isdir(work_dir):
       os.makedirs(work_dir)
 
