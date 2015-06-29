@@ -24,6 +24,7 @@ from google.appengine.ext import ndb
 from google.protobuf import text_format
 
 from components import auth
+from components import config
 from components import gitiles
 from components import net
 from components.datastore_utils import txn
@@ -183,7 +184,7 @@ def import_services(location_root):
     service_id = service_entry.name
     if service_entry.type != 'tree':
       continue
-    if not validation.is_valid_service_id(service_id):
+    if not config.validation.is_valid_service_id(service_id):
       logging.warning('Invalid service id: %s', service_id)
       continue
     service_location = location_root._replace(

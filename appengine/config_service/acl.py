@@ -5,6 +5,7 @@
 import re
 
 from components import auth
+from components import config
 from components import utils
 
 from proto import service_config_pb2
@@ -27,17 +28,17 @@ def can_read_config_set(config_set, headers=None):
     ValueError if config_set is malformed.
   """
   try:
-    service_match = common.SERVICE_CONFIG_SET_RGX.match(config_set)
+    service_match = config.SERVICE_CONFIG_SET_RGX.match(config_set)
     if service_match:
       service_name = service_match.group(1)
       return can_read_service_config(service_name, headers=headers)
 
-    project_match = common.PROJECT_CONFIG_SET_RGX.match(config_set)
+    project_match = config.PROJECT_CONFIG_SET_RGX.match(config_set)
     if project_match:
       project_id = project_match.group(1)
       return can_read_project_config(project_id)
 
-    ref_match = common.REF_CONFIG_SET_RGX.match(config_set)
+    ref_match = config.REF_CONFIG_SET_RGX.match(config_set)
     if ref_match:
       project_id = ref_match.group(1)
       return can_read_project_config(project_id)

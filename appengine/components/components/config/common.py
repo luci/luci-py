@@ -2,6 +2,8 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
+import re
+
 from google.appengine.api import app_identity
 from google.appengine.api import lib_config
 from google.appengine.ext import ndb
@@ -17,13 +19,29 @@ from components import utils
 from components.datastore_utils import config
 
 
+################################################################################
+# Patterns
+
+
+SERVICE_ID_PATTERN = r'[a-z0-9\-_]+'
+SERVICE_ID_RGX = re.compile(r'^%s$' % SERVICE_ID_PATTERN)
+SERVICE_CONFIG_SET_RGX = re.compile(r'^services/(%s)$' % SERVICE_ID_PATTERN)
+
+PROJECT_ID_PATTERN = SERVICE_ID_PATTERN
+PROJECT_ID_RGX = re.compile(r'^%s$' % PROJECT_ID_PATTERN)
+PROJECT_CONFIG_SET_RGX = re.compile(r'^projects/(%s)$' % PROJECT_ID_PATTERN)
+
+REF_CONFIG_SET_RGX = re.compile(
+    r'^projects/(%s)/refs/.+$' % PROJECT_ID_PATTERN)
+
+
+################################################################################
+# Settings
+
+
 class ConstantConfig(object):
   # In filesystem mode, the directory where configs are read from.
   CONFIG_DIR = 'configs'
-
-
-class ConfigFormatError(Exception):
-  """A config file is malformed."""
 
 
 CONSTANTS = lib_config.register('components_config', ConstantConfig.__dict__)
@@ -34,9 +52,12 @@ class ConfigSettings(config.GlobalConfig):
   service_hostname = ndb.StringProperty(indexed=False)
 
 
-@utils.cache
-def self_config_set():
-  return 'services/%s' % app_identity.get_application_id()
+################################################################################
+# Config parsing
+
+
+class ConfigFormatError(Exception):
+  """A config file is malformed."""
 
 
 def _validate_dest_type(dest_type):
@@ -57,3 +78,12 @@ def _convert_config(content, dest_type):
     except protobuf.text_format.ParseError as ex:
       raise ConfigFormatError(ex.message)
   return msg
+
+
+################################################################################
+# Rest
+
+
+@utils.cache
+def self_config_set():
+  return 'services/%s' % app_identity.get_application_id()

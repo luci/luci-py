@@ -232,4 +232,3 @@ def get_config_set_location_async(config_set):  # pragma: no cover
 def get_config_set_location(config_set):  # pragma: no cover
   """Blocking version of get_config_set_location_async."""
   return get_config_set_location_async(config_set).get_result()
-

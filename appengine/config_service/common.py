@@ -4,24 +4,6 @@
 
 import re
 
-################################################################################
-## Config set patterns.
-
-SERVICE_ID_PATTERN = '[a-z0-9\-_]+'
-SERVICE_ID_RGX = re.compile('^%s$' % SERVICE_ID_PATTERN)
-SERVICE_CONFIG_SET_RGX = re.compile('^services/(%s)$' % SERVICE_ID_PATTERN)
-
-PROJECT_ID_PATTERN = SERVICE_ID_PATTERN
-PROJECT_ID_RGX = re.compile('^%s$' % PROJECT_ID_PATTERN)
-PROJECT_CONFIG_SET_RGX = re.compile('^projects/(%s)$' % PROJECT_ID_PATTERN)
-
-REF_CONFIG_SET_RGX = re.compile(
-    '^projects/(%s)/refs/.+$' % PROJECT_ID_PATTERN)
-
-
-################################################################################
-## Known config file names.
-
 # luci-config configs.
 PROJECT_REGISTRY_FILENAME = 'projects.cfg'
 ACL_FILENAME = 'acl.cfg'

@@ -224,11 +224,12 @@ class Provider(object):
             'Could not fetch config content %s by hash %s',
             config_key.id(), content_hash)
         return
-      try:
-        validation.validate(config_set, path, content, log_errors=True)
-      except ValueError:
-        logging.error(
-            'Invalid config %s:%s@%s was ignored', config_set, path, revision)
+      logging.debug('Validating %s:%s@%s', config_set, path, revision)
+      ctx = validation.Context.logging()
+      validation.validate(config_set, path, content, ctx=ctx)
+      if ctx.result().has_errors:
+        logging.exception(
+            'Invalid config %s:%s@%s is ignored', config_set, path, revision)
         return
 
     @ndb.transactional_tasklet

@@ -38,16 +38,3 @@ For more info, read docstrings in api.py.
 from .api import *
 from .common import *
 from .endpoint import ConfigApi
-
-
-__all__ = [
-    'CannotLoadConfigError',
-    'ConfigApi',
-    'ConfigFormatError',
-    'ConfigSettings',
-    'get',
-    'get_async',
-    'get_self_config',
-    'get_self_config_async',
-    'self_config_set',
-]

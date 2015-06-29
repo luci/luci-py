@@ -7,10 +7,6 @@ import re
 import common
 
 
-def is_valid_service_id(service_id):
-  return bool(common.SERVICE_ID_RGX.match(service_id))
-
-
 def validate_config(config_set, path, content, log_errors=False):
   """Validate config content."""
   # TODO(nodir): implement custom validation.
