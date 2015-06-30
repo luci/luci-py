@@ -44,6 +44,24 @@ class ValidationTestCase(test_case.TestCase):
     self.rule_set.validate('projects/foo', 'baz.cfg', 'wrong')
     self.rule_set.validate('projects/baz', 'bar.cfg', 'wrong')
 
+  def test_context_metadata(self):
+    ctx = validation.Context()
+
+    ctx.config_set = 'services/foo'
+    self.assertEqual(ctx.service_id, 'foo')
+    self.assertEqual(ctx.project_id, None)
+    self.assertEqual(ctx.ref, None)
+
+    ctx.config_set = 'projects/foo'
+    self.assertEqual(ctx.service_id, None)
+    self.assertEqual(ctx.project_id, 'foo')
+    self.assertEqual(ctx.ref, None)
+
+    ctx.config_set = 'projects/foo/refs/a'
+    self.assertEqual(ctx.service_id, None)
+    self.assertEqual(ctx.project_id, 'foo')
+    self.assertEqual(ctx.ref, 'refs/a')
+
   def test_regex_pattern_and_no_dest_type(self):
     rule = validation.rule(
         config_set=re.compile('^projects/f[^/]+$').match,

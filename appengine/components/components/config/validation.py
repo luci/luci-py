@@ -50,10 +50,37 @@ __all__ = [
 
 
 class Context(validation_context.Context):
-  """A validation context with config_set and path information."""
+  """A validation context with config metadata information."""
 
   config_set = None
   path = None
+
+  @property
+  def service_id(self):
+    if self.config_set:
+      m = common.SERVICE_CONFIG_SET_RGX.match(self.config_set)
+      if m:
+        return m.group(1)
+    return None
+
+  @property
+  def project_id(self):
+    if self.config_set:
+      m = common.PROJECT_CONFIG_SET_RGX.match(self.config_set)
+      if m:
+        return m.group(1)
+      m = common.REF_CONFIG_SET_RGX.match(self.config_set)
+      if m:
+        return m.group(1)
+    return None
+
+  @property
+  def ref(self):
+    if self.config_set:
+      m = common.REF_CONFIG_SET_RGX.match(self.config_set)
+      if m:
+        return m.group(2)
+    return None
 
 
 def is_valid_service_id(service_id):

@@ -32,7 +32,7 @@ PROJECT_ID_RGX = re.compile(r'^%s$' % PROJECT_ID_PATTERN)
 PROJECT_CONFIG_SET_RGX = re.compile(r'^projects/(%s)$' % PROJECT_ID_PATTERN)
 
 REF_CONFIG_SET_RGX = re.compile(
-    r'^projects/(%s)/refs/.+$' % PROJECT_ID_PATTERN)
+    r'^projects/(%s)/(refs/.+$)' % PROJECT_ID_PATTERN)
 
 ALL_CONFIG_SET_RGX = [
   SERVICE_CONFIG_SET_RGX,
