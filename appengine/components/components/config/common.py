@@ -34,6 +34,12 @@ PROJECT_CONFIG_SET_RGX = re.compile(r'^projects/(%s)$' % PROJECT_ID_PATTERN)
 REF_CONFIG_SET_RGX = re.compile(
     r'^projects/(%s)/refs/.+$' % PROJECT_ID_PATTERN)
 
+ALL_CONFIG_SET_RGX = [
+  SERVICE_CONFIG_SET_RGX,
+  PROJECT_CONFIG_SET_RGX,
+  REF_CONFIG_SET_RGX,
+]
+
 
 ################################################################################
 # Settings

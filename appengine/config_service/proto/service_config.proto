@@ -3,6 +3,11 @@
 // found in the LICENSE file.
 
 // Schemas for config files in services/luci-config config set.
+//
+// In this file, "string pattern" is an exact string (can't have a colon) or a
+// string that starts with "regex:", followed by a regular expression. In case
+// of regex, the pattern must match an entire string, as if it was sorrounded by
+// ^ and $.
 
 syntax = "proto2";
 
@@ -14,12 +19,12 @@ message Project {
   // differently.
   enum ConfigStorageType {
     // Will be used if config_storage_type is not set.
-    UNKNOWN = 0;
+    UNSET = 0;
     // Gitiles REST API is used to fetch config files.
     GITILES = 1;
   }
   // Globally unique id of the project.
-  required string id = 1;
+  optional string id = 1;
   // URL of the repository where project-wide configurations are stored.
   optional string config_location = 2;
   // Type of the configuration repository, see ConfigStorageType.
@@ -75,4 +80,65 @@ message SchemasCfg {
   // List of known schemas. They are available at /schemas/<name> as a short
   // mutable link.
   repeated Schema schemas = 1;
+}
+
+/******************************************************************************/
+/* Validation                                                                 */
+/******************************************************************************/
+
+// Schema of validation.cfg
+message ValidationCfg {
+  // Defines one validation rule. It can match configs in different config-sets
+  // and paths.
+  message Rule {
+    // A string pattern (see above) for config_set.
+    optional string config_set = 1;
+    // A string pattern (see above) for config file path.
+    optional string path = 2;
+    // URL of a validation endpoint. The config service will send an HTTP POST
+    // request to the endpoint, where body is JSON-encoded
+    // ValidationRequestMessage. The endpoint is expected to respond with
+    // HTTP status 200 and JSON-encoded ValidationResponseMessage.
+    optional string url = 3;
+  }
+
+  // Defines validation rules for externally-validated configs.
+  // All rules that match a config by config_set and path must pass in order
+  // for a config to be considered valid.
+  repeated Rule rules = 1;
+}
+
+
+// This message is used only in JSON form. It is sent as request body to an
+// external validation endpoint in order to validate a config.
+message ValidationRequestMessage {
+  // Config set of the config file to validate.
+  optional string config_set = 1;
+  // Path of the config file to validate.
+  optional string path = 2;
+  // Base64-encoded contents of the file.
+  optional string content = 3;
+}
+
+// This message is used only in JSON form. It is expected from an external
+// validation endpoint that validates a config.
+message ValidationResponseMessage {
+  // Severity of a validation response message. In JSON encoded as a string.
+  enum Severity {
+    DEBUG = 10;
+    INFO = 20;
+    WARNING = 30;
+    ERROR = 40;
+    CRITICAL = 50;
+  }
+  // A message that explains why a config is valid or not.
+  message Message {
+    // Textual representation of the message.
+    optional string text = 1;
+    // If an error, a config is considered invalid. Defaults to INFO.
+    optional Severity severity = 2;
+  }
+  // Errors, warnings and other information found during validation.
+  // If at least one error is found, the config is considered invalid.
+  repeated Message messages = 1;
 }

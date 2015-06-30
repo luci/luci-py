@@ -31,6 +31,7 @@ from components.datastore_utils import txn
 
 from proto import service_config_pb2
 import admin
+import common
 import projects
 import storage
 import validation
@@ -48,7 +49,7 @@ DEFAULT_GITILES_IMPORT_CONFIG = service_config_pb2.ImportCfg.Gitiles(
 def get_gitiles_config():
   cfg = service_config_pb2.ImportCfg(gitiles=DEFAULT_GITILES_IMPORT_CONFIG)
   try:
-    cfg = storage.get_self_config('import.cfg', lambda: cfg)
+    cfg = storage.get_self_config(common.IMPORT_FILENAME, lambda: cfg)
   except text_format.ParseError as ex:
     # It is critical that get_gitiles_config() returns a valid config.
     # If import.cfg is broken, it should not break importing mechanism,
@@ -109,9 +110,10 @@ def import_revision(
         continue
       with contextlib.closing(tar.extractfile(item)) as extracted:
         content = extracted.read()
-        if not validation.validate_config(
-            config_set, item.name, content, log_errors=True):
-          logging.error('Invalid revision: %s@%s', config_set, revision)
+        ctx = config.validation.Context.logging()
+        validation.validate_config(config_set, item.name, content, ctx=ctx)
+        if ctx.result().has_errors:
+          logging.error('Invalid revision %s@%s', config_set, revision)
           return
         content_hash = storage.compute_hash(content)
         blob_futures.append(storage.import_blob_async(
@@ -169,9 +171,7 @@ def import_config_set(config_set, location):
         'Could not import config set %s from %s: urlfetch deadline exceeded',
         config_set, location)
   except net.AuthError:
-    # TODO(nodir): change to error when luci-config has access to internal
-    # repos.
-    logging.warning(
+    logging.error(
         'Could not import config set %s from %s: permission denied',
         config_set, location)
 
@@ -185,7 +185,7 @@ def import_services(location_root):
     if service_entry.type != 'tree':
       continue
     if not config.validation.is_valid_service_id(service_id):
-      logging.warning('Invalid service id: %s', service_id)
+      logging.error('Invalid service id: %s', service_id)
       continue
     service_location = location_root._replace(
         path=os.path.join(location_root.path, service_entry.name))

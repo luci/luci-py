@@ -19,8 +19,7 @@ message RefsCfg {
   message Ref {
     // Name of the ref. Must start with "refs/".
     optional string name = 1;
-    // Ref name glob.
-    // optional string name_glob = 2; TODO(nodirt): implement.
+
     // Path to config directory for the ref. Defaults to "infra/config".
     optional string config_path = 3;
   }

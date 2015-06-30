@@ -32,7 +32,7 @@ TreeEntry = collections.namedtuple(
 Tree = collections.namedtuple('Tree', ['id', 'entries'])
 Log = collections.namedtuple('Log', ['commits'])
 
-RGX_URL_PATH = re.compile('/([^\+]+)(\+/(.*))?')
+RGX_URL_PATH = re.compile(r'^/([^\+]+)(\+/(.*))?$')
 
 
 LocationTuple = collections.namedtuple(

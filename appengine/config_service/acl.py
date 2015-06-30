@@ -13,12 +13,10 @@ import common
 import storage
 
 
-RGX_CONFIG_SET_SERVICE = re.compile('services/([a-z\-]+)')
-
-
 @utils.memcache('acl.cfg', time=60)
 def read_acl_cfg():
-  return storage.get_self_config(common.ACL_FILENAME, service_config_pb2.AclCfg)
+  return storage.get_self_config(
+      common.ACL_FILENAME, service_config_pb2.AclCfg)
 
 
 def can_read_config_set(config_set, headers=None):

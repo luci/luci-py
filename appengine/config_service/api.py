@@ -15,6 +15,7 @@ from components import utils
 import acl
 import projects
 import storage
+import validation
 
 
 # This is used by endpoints indirectly.
@@ -112,6 +113,11 @@ class ConfigApi(remote.Service):
       path='config_sets/{config_set}/config/{path}')
   def get_config(self, request):
     """Gets a config file."""
+    try:
+      validation.validate_config_set(request.config_set)
+      validation.validate_path(request.path)
+    except ValueError as ex:
+      raise endpoints.BadRequestException(ex.message)
     res = self.GetConfigResponseMessage()
 
     if not self.can_read_config_set(request.config_set):
@@ -216,6 +222,10 @@ class ConfigApi(remote.Service):
       path='configs/projects/{path}')
   def get_project_configs(self, request):
     """Gets configs in all project config sets."""
+    try:
+      validation.validate_path(request.path)
+    except ValueError as ex:
+      raise endpoints.BadRequestException(ex.message)
 
     def iter_project_config_sets():
       for project in get_projects():
@@ -234,6 +244,10 @@ class ConfigApi(remote.Service):
       path='configs/refs/{path}')
   def get_ref_configs(self, request):
     """Gets configs in all ref config sets."""
+    try:
+      validation.validate_path(request.path)
+    except ValueError as ex:
+      raise endpoints.BadRequestException(ex.message)
 
     def iter_ref_config_sets():
       for project in get_projects():

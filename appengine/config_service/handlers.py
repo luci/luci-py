@@ -9,6 +9,7 @@ import webapp2
 from components import decorators
 
 from proto import service_config_pb2
+import common
 import gitiles_import
 import storage
 
@@ -31,7 +32,8 @@ class SchemasHandler(webapp2.RequestHandler):
   """Redirects to a known schema definition."""
 
   def get(self, name):
-    cfg = storage.get_self_config('schemas.cfg', service_config_pb2.SchemasCfg)
+    cfg = storage.get_self_config(
+        common.SCHEMAS_FILENAME, service_config_pb2.SchemasCfg)
     # Assume cfg was validated by validation.py
     if cfg:
       for schema in cfg.schemas:
