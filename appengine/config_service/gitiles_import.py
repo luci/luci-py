@@ -227,10 +227,11 @@ def import_project(project_id, location):
 def import_projects():
   """Imports project configs that are stored in Gitiles."""
   for project in projects.get_projects():
-    if project.config_storage_type != service_config_pb2.Project.GITILES:
+    loc = project.config_location
+    if loc.storage_type != service_config_pb2.ConfigSetLocation.GITILES:
       continue
     try:
-      location = gitiles.Location.parse_resolve(project.config_location)
+      location = gitiles.Location.parse_resolve(loc.url)
     except ValueError:
       logging.exception('Invalid project location: %s', project.config_location)
       continue

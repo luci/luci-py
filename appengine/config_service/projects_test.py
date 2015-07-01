@@ -28,16 +28,20 @@ class ProjectsTestCase(test_case.TestCase):
     storage.get_latest_async.return_value.set_result('''
       projects {
         id: "chromium"
-        config_storage_type: GITILES
-        config_location: "http://localhost"
+        config_location {
+          storage_type: GITILES
+          url: "http://localhost"
+        }
       }
     ''')
     expected = service_config_pb2.ProjectsCfg(
         projects=[
           service_config_pb2.Project(
               id='chromium',
-              config_storage_type=service_config_pb2.Project.GITILES,
-              config_location='http://localhost'),
+              config_location=service_config_pb2.ConfigSetLocation(
+                storage_type=service_config_pb2.ConfigSetLocation.GITILES,
+                url='http://localhost')
+              ),
         ],
     )
     self.assertEqual(projects.get_projects(), expected.projects)

@@ -84,20 +84,26 @@ class ValidationTestCase(test_case.TestCase):
     cfg = '''
       projects {
         id: "a"
-        config_storage_type: GITILES
-        config_location: "https://a.googlesource.com/project"
+        config_location {
+          storage_type: GITILES
+          url: "https://a.googlesource.com/project"
+        }
       }
       projects {
         id: "b"
       }
       projects {
         id: "a"
-        config_storage_type: GITILES
-        config_location: "https://no-project.googlesource.com"
+        config_location {
+          storage_type: GITILES
+          url: "https://no-project.googlesource.com"
+        }
       }
       projects {
-        config_storage_type: GITILES
-        config_location: "https://no-project.googlesource.com/bad_plus/+"
+        config_location {
+          storage_type: GITILES
+          url: "https://no-project.googlesource.com/bad_plus/+"
+        }
       }
     '''
     result = validation.validate_config(
@@ -106,7 +112,7 @@ class ValidationTestCase(test_case.TestCase):
     self.assertEqual(
         [m.text for m in result.messages],
         [
-          'Project b: config_storage_type is not set',
+          'Project b: config_location: storage_type is not set',
           'Project a: id is not unique',
           ('Project a: config_location: Invalid Gitiles repo url: '
            'https://no-project.googlesource.com'),

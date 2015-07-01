@@ -231,13 +231,17 @@ class GitilesImportTestCase(test_case.TestCase):
     projects.get_projects.return_value = [
       service_config_pb2.Project(
           id='chromium',
-          config_location='https://localhost/chromium/src/',
-          config_storage_type=service_config_pb2.Project.GITILES,
+          config_location=service_config_pb2.ConfigSetLocation(
+            url='https://localhost/chromium/src/',
+            storage_type=service_config_pb2.ConfigSetLocation.GITILES,
+          )
       ),
       service_config_pb2.Project(
           id='bad_location',
-          config_location='https://localhost/',
-          config_storage_type=service_config_pb2.Project.GITILES,
+          config_location=service_config_pb2.ConfigSetLocation(
+            url='https://localhost/',
+            storage_type=service_config_pb2.ConfigSetLocation.GITILES,
+          ),
       ),
       service_config_pb2.Project(
           id='non-gitiles',
@@ -269,13 +273,17 @@ class GitilesImportTestCase(test_case.TestCase):
     projects.get_projects.return_value = [
       service_config_pb2.Project(
           id='chromium',
-          config_location='https://localhost/chromium/src/',
-          config_storage_type=service_config_pb2.Project.GITILES,
+          config_location=service_config_pb2.ConfigSetLocation(
+            url='https://localhost/chromium/src/',
+            storage_type=service_config_pb2.ConfigSetLocation.GITILES,
+          ),
       ),
       service_config_pb2.Project(
           id='will-fail',
-          config_location='https://localhost/chromium/src/',
-          config_storage_type=service_config_pb2.Project.GITILES,
+          config_location=service_config_pb2.ConfigSetLocation(
+            url='https://localhost/chromium/src/',
+            storage_type=service_config_pb2.ConfigSetLocation.GITILES,
+          ),
       )
     ]
 

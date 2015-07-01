@@ -13,22 +13,32 @@ syntax = "proto2";
 
 package luci.config;
 
-// A tenant of a service. Defined in projects.cfg.
-message Project {
-  // Depending on repository type, luci-config imports configuration files
+// Used to specify project/service configuration location.
+message ConfigSetLocation {
+  // Depending on repository type, config service imports configuration files
   // differently.
-  enum ConfigStorageType {
-    // Will be used if config_storage_type is not set.
+  enum StorageType {
+    // Will be used if storage_type is not set.
     UNSET = 0;
     // Gitiles REST API is used to fetch config files.
     GITILES = 1;
   }
+  // URL of the repository where project-wide configurations are stored.
+  optional string url = 1;
+  // Type of the configuration repository, e.g. GITILES.
+  optional StorageType storage_type = 2;
+}
+
+/******************************************************************************/
+/* Projects                                                                   */
+/******************************************************************************/
+
+// A tenant of a service. Defined in projects.cfg.
+message Project {
   // Globally unique id of the project.
   optional string id = 1;
-  // URL of the repository where project-wide configurations are stored.
-  optional string config_location = 2;
-  // Type of the configuration repository, see ConfigStorageType.
-  optional ConfigStorageType config_storage_type = 3;
+  // Where to import "projects/<id>" config set from.
+  optional ConfigSetLocation config_location = 2;
 }
 
 // Schema of projects.cfg file. Represents luci tenants registry.

@@ -77,6 +77,23 @@ def validate_validation_cfg(cfg, ctx):
         validate_url(rule.url, ctx)
 
 
+def validate_config_set_location(loc, ctx, allow_relative_url=False):
+  if not loc:
+    ctx.error('not specified')
+    return
+  if loc.storage_type == service_config_pb2.ConfigSetLocation.UNSET:
+    ctx.error('storage_type is not set')
+  else:
+    assert loc.storage_type == service_config_pb2.ConfigSetLocation.GITILES
+    if allow_relative_url and is_url_relative(loc.url):
+      # It is relative. Avoid calling gitiles.Location.parse.
+      return
+    try:
+      gitiles.Location.parse(loc.url)
+    except ValueError as ex:
+      ctx.error(ex.message)
+
+
 @validation.self_rule(
     common.PROJECT_REGISTRY_FILENAME, service_config_pb2.ProjectsCfg)
 def validate_project_registry(cfg, ctx):
@@ -94,15 +111,9 @@ def validate_project_registry(cfg, ctx):
         if not unsorted_id and i > 0:
           if cfg.projects[i - 1].id and project.id < cfg.projects[i - 1].id:
             unsorted_id = project.id
+      with ctx.prefix('config_location: '):
+        validate_config_set_location(project.config_location, ctx)
 
-      if project.config_storage_type == service_config_pb2.Project.UNSET:
-        ctx.error('config_storage_type is not set')
-      else:
-        assert project.config_storage_type == service_config_pb2.Project.GITILES
-        try:
-          gitiles.Location.parse(project.config_location)
-        except ValueError as ex:
-          ctx.error('config_location: %s', ex)
 
   if unsorted_id:
     ctx.warning(
@@ -262,3 +273,8 @@ def _pattern_match(pattern, value):
     kind, pattern = pattern.split(':', 2)
     assert kind == 'regex'
     return bool(re.match('^%s$' % pattern, value))
+
+
+def is_url_relative(url):
+  parsed = urlparse.urlparse(url)
+  return bool(not parsed.scheme and not parsed.netloc and parsed.path)
