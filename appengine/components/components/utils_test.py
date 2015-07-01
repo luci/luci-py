@@ -94,110 +94,133 @@ class UtilsTest(test_case.TestCase):
     self.assertEqual(2, get_me())
     self.assertEqual(2, len(calls))
 
+
+class FakeNdbContext(object):
+  def __init__(self):
+    self.get_calls = []
+    self.set_calls = []
+    self.cached_value = None
+
+  @ndb.tasklet
+  def memcache_get(self, key):
+    self.get_calls.append(key)
+    raise ndb.Return(self.cached_value)
+
+  @ndb.tasklet
+  def memcache_set(self, key, value, time=None):
+    self.cached_value = value
+    self.set_calls.append((key, value, time))
+
+
 class MemcacheTest(test_case.TestCase):
 
   def setUp(self):
     super(MemcacheTest, self).setUp()
 
-    self.f_value = 'value'
-
-    self.get_calls = []
-    self.cached_value = None
-    def memcache_get(key):
-      self.get_calls.append(key)
-      return self.cached_value
-    self.mock(memcache, 'get', memcache_get)
-
-    self.set_calls = []
-    def memcache_set(key, value, time=None):
-      self.cached_value = value
-      self.set_calls.append((key, value, time))
-    self.mock(memcache, 'set', memcache_set)
-
     self.f_calls = []
+    self.f_value = 'value'
+    self.ctx = FakeNdbContext()
+    self.mock(ndb, 'get_context', lambda: self.ctx)
 
   @utils.memcache('f', ['a', 'b', 'c', 'd'], time=54)
   def f(self, a, b, c=3, d=4, e=5):
     self.f_calls.append((a, b, c, d, e))
     return self.f_value
 
-  def test_call(self):
-    self.f(1, 2, 3, 4, 5)
-    self.assertEqual(self.get_calls, ['utils.memcache/v1a/f[1, 2, 3, 4]'])
+  @utils.memcache_async('f', ['a', 'b', 'c', 'd'], time=54)
+  @ndb.tasklet
+  def f_async(self, a, b, c=3, d=4, e=5):
+    self.f_calls.append((a, b, c, d, e))
+    raise ndb.Return(self.f_value)
+
+  def test_async(self):
+    self.f_async(1, 2, 3, 4, 5).get_result()
+    self.assertEqual(self.ctx.get_calls, ['utils.memcache/v1a/f[1, 2, 3, 4]'])
     self.assertEqual(self.f_calls, [(1, 2, 3, 4, 5)])
     self.assertEqual(
-        self.set_calls, [('utils.memcache/v1a/f[1, 2, 3, 4]', ('value',), 54)])
+        self.ctx.set_calls,
+        [('utils.memcache/v1a/f[1, 2, 3, 4]', ('value',), 54)])
 
-    self.get_calls = []
+  def test_call(self):
+    self.f(1, 2, 3, 4, 5)
+    self.assertEqual(self.ctx.get_calls, ['utils.memcache/v1a/f[1, 2, 3, 4]'])
+    self.assertEqual(self.f_calls, [(1, 2, 3, 4, 5)])
+    self.assertEqual(
+        self.ctx.set_calls,
+        [('utils.memcache/v1a/f[1, 2, 3, 4]', ('value',), 54)])
+
+    self.ctx.get_calls = []
     self.f_calls = []
-    self.set_calls = []
+    self.ctx.set_calls = []
     self.f(1, 2, 3, 4)
-    self.assertEqual(self.get_calls, ['utils.memcache/v1a/f[1, 2, 3, 4]'])
+    self.assertEqual(self.ctx.get_calls, ['utils.memcache/v1a/f[1, 2, 3, 4]'])
     self.assertEqual(self.f_calls, [])
-    self.assertEqual(self.set_calls, [])
+    self.assertEqual(self.ctx.set_calls, [])
 
   def test_none(self):
     self.f_value = None
     self.assertEqual(self.f(1, 2, 3, 4), None)
-    self.assertEqual(self.get_calls, ['utils.memcache/v1a/f[1, 2, 3, 4]'])
+    self.assertEqual(self.ctx.get_calls, ['utils.memcache/v1a/f[1, 2, 3, 4]'])
     self.assertEqual(self.f_calls, [(1, 2, 3, 4, 5)])
     self.assertEqual(
-        self.set_calls,
+        self.ctx.set_calls,
         [('utils.memcache/v1a/f[1, 2, 3, 4]', (None,), 54)])
 
-    self.get_calls = []
+    self.ctx.get_calls = []
     self.f_calls = []
-    self.set_calls = []
+    self.ctx.set_calls = []
     self.assertEqual(self.f(1, 2, 3, 4), None)
-    self.assertEqual(self.get_calls, ['utils.memcache/v1a/f[1, 2, 3, 4]'])
+    self.assertEqual(self.ctx.get_calls, ['utils.memcache/v1a/f[1, 2, 3, 4]'])
     self.assertEqual(self.f_calls, [])
-    self.assertEqual(self.set_calls, [])
+    self.assertEqual(self.ctx.set_calls, [])
 
 
   def test_call_without_optional_arg(self):
     self.f(1, 2)
-    self.assertEqual(self.get_calls, ['utils.memcache/v1a/f[1, 2, 3, 4]'])
+    self.assertEqual(self.ctx.get_calls, ['utils.memcache/v1a/f[1, 2, 3, 4]'])
     self.assertEqual(self.f_calls, [(1, 2, 3, 4, 5)])
     self.assertEqual(
-        self.set_calls, [('utils.memcache/v1a/f[1, 2, 3, 4]', ('value',), 54)])
+        self.ctx.set_calls,
+        [('utils.memcache/v1a/f[1, 2, 3, 4]', ('value',), 54)])
 
   def test_call_kwargs(self):
     self.f(1, 2, c=30, d=40)
-    self.assertEqual(self.get_calls, ['utils.memcache/v1a/f[1, 2, 30, 40]'])
+    self.assertEqual(self.ctx.get_calls, ['utils.memcache/v1a/f[1, 2, 30, 40]'])
     self.assertEqual(self.f_calls, [(1, 2, 30, 40, 5)])
     self.assertEqual(
-        self.set_calls,
+        self.ctx.set_calls,
         [('utils.memcache/v1a/f[1, 2, 30, 40]', ('value',), 54)])
 
   def test_call_all_kwargs(self):
     self.f(a=1, b=2, c=30, d=40)
-    self.assertEqual(self.get_calls, ['utils.memcache/v1a/f[1, 2, 30, 40]'])
+    self.assertEqual(self.ctx.get_calls, ['utils.memcache/v1a/f[1, 2, 30, 40]'])
     self.assertEqual(self.f_calls, [(1, 2, 30, 40, 5)])
     self.assertEqual(
-        self.set_calls,
+        self.ctx.set_calls,
         [('utils.memcache/v1a/f[1, 2, 30, 40]', ('value',), 54)])
 
   def test_call_packed_args(self):
     self.f(*[1, 2])
-    self.assertEqual(self.get_calls, ['utils.memcache/v1a/f[1, 2, 3, 4]'])
+    self.assertEqual(self.ctx.get_calls, ['utils.memcache/v1a/f[1, 2, 3, 4]'])
     self.assertEqual(self.f_calls, [(1, 2, 3, 4, 5)])
     self.assertEqual(
-        self.set_calls, [('utils.memcache/v1a/f[1, 2, 3, 4]', ('value',), 54)])
+        self.ctx.set_calls,
+        [('utils.memcache/v1a/f[1, 2, 3, 4]', ('value',), 54)])
 
   def test_call_packed_kwargs(self):
     self.f(1, 2, **{'c':30, 'd': 40})
-    self.assertEqual(self.get_calls, ['utils.memcache/v1a/f[1, 2, 30, 40]'])
+    self.assertEqual(self.ctx.get_calls, ['utils.memcache/v1a/f[1, 2, 30, 40]'])
     self.assertEqual(self.f_calls, [(1, 2, 30, 40, 5)])
     self.assertEqual(
-        self.set_calls,
+        self.ctx.set_calls,
         [('utils.memcache/v1a/f[1, 2, 30, 40]', ('value',), 54)])
 
   def test_call_packed_both(self):
     self.f(*[1, 2], **{'c':30, 'd': 40})
-    self.assertEqual(self.get_calls, ['utils.memcache/v1a/f[1, 2, 30, 40]'])
+    self.assertEqual(self.ctx.get_calls, ['utils.memcache/v1a/f[1, 2, 30, 40]'])
     self.assertEqual(self.f_calls, [(1, 2, 30, 40, 5)])
     self.assertEqual(
-        self.set_calls,
+        self.ctx.set_calls,
         [('utils.memcache/v1a/f[1, 2, 30, 40]', ('value',), 54)])
 
   def test_empty_key_arg(self):
@@ -207,9 +230,9 @@ class MemcacheTest(test_case.TestCase):
       return 1
 
     f(1)
-    self.assertEqual(self.get_calls, ['utils.memcache/v1a/f[]'])
+    self.assertEqual(self.ctx.get_calls, ['utils.memcache/v1a/f[]'])
     self.assertEqual(
-        self.set_calls,
+        self.ctx.set_calls,
         [('utils.memcache/v1a/f[]', (1,), None)])
 
   def test_nonexisting_arg(self):

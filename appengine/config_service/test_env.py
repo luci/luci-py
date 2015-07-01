@@ -34,3 +34,11 @@ def main():
   else:
     logging.basicConfig(level=logging.FATAL)
   unittest.main()
+
+
+def future(result):
+  # Assume setup_test_env was called.
+  from google.appengine.ext import ndb
+  f = ndb.Future()
+  f.set_result(result)
+  return f

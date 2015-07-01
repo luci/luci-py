@@ -27,6 +27,7 @@ from google.appengine.api import app_identity
 from google.appengine.api import memcache as gae_memcache
 from google.appengine.api import modules
 from google.appengine.api import taskqueue
+from google.appengine.ext import ndb
 
 THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -249,7 +250,7 @@ def clear_cache(func):
 
 
 # ignore time parameter warning | pylint: disable=redefined-outer-name
-def memcache(key, key_args=None, time=None):
+def memcache_async(key, key_args=None, time=None):
   """Decorator that implements memcache-based cache for a function.
 
   The generated cache key contains current application version and values of
@@ -281,7 +282,14 @@ def memcache(key, key_args=None, time=None):
     memcache_set_kwargs['time'] = time
 
   def decorator(func):
-    argspec = inspect.getargspec(func)
+    unwrapped = func
+    while True:
+      deeper = getattr(unwrapped, '__wrapped__', None)
+      if not deeper:
+        break
+      unwrapped = deeper
+
+    argspec = inspect.getargspec(unwrapped)
     if argspec.varargs:
       raise NotImplementedError(
           'varargs in memcached functions are not supported')
@@ -301,6 +309,7 @@ def memcache(key, key_args=None, time=None):
       arg_indexes.append((name, i))
 
     @functools.wraps(func)
+    @ndb.tasklet
     def decorated(*args, **kwargs):
       arg_values = []
       for name, i in arg_indexes:
@@ -325,14 +334,29 @@ def memcache(key, key_args=None, time=None):
       cache_key = 'utils.memcache/%s/%s%s' % (
           get_app_version(), key, repr(arg_values))
 
-      result = gae_memcache.get(cache_key)
+      ctx = ndb.get_context()
+      result = yield ctx.memcache_get(cache_key)
       if isinstance(result, tuple) and len(result) == 1:
-        return result[0]
+        raise ndb.Return(result[0])
 
       result = func(*args, **kwargs)
-      gae_memcache.set(cache_key, (result,), **memcache_set_kwargs)
-      return result
+      if isinstance(result, ndb.Future):
+        result = yield result
+      yield ctx.memcache_set(cache_key, (result,), **memcache_set_kwargs)
+      raise ndb.Return(result)
 
+    return decorated
+  return decorator
+
+
+def memcache(*args, **kwargs):
+  """Blocking version of memcache_async."""
+  decorator_async = memcache_async(*args, **kwargs)
+  def decorator(func):
+    decorated_async = decorator_async(func)
+    @functools.wraps(func)
+    def decorated(*args, **kwargs):
+      return decorated_async(*args, **kwargs).get_result()
     return decorated
   return decorator
 

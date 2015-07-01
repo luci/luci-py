@@ -5,6 +5,7 @@
 
 import os
 
+from test_env import future
 import test_env
 test_env.setup_test_env()
 
@@ -32,8 +33,8 @@ TEST_ARCHIVE_PATH = os.path.join(
 
 class GitilesImportTestCase(test_case.TestCase):
   def test_get_gitiles_config_corrupted(self):
-    self.mock(storage, 'get_latest', mock.Mock())
-    storage.get_latest.return_value = 'garbage'
+    self.mock(storage, 'get_latest_async', mock.Mock())
+    storage.get_latest_async.return_value = future('garbage')
     gitiles_import.get_gitiles_config()
 
   def mock_get_archive(self):

@@ -15,8 +15,8 @@ import storage
 
 @utils.memcache('acl.cfg', time=60)
 def read_acl_cfg():
-  return storage.get_self_config(
-      common.ACL_FILENAME, service_config_pb2.AclCfg)
+  return storage.get_self_config_async(
+      common.ACL_FILENAME, service_config_pb2.AclCfg).get_result()
 
 
 def can_read_config_set(config_set, headers=None):

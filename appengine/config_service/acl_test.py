@@ -5,6 +5,7 @@
 
 import wsgiref.headers
 
+from test_env import future
 import test_env
 test_env.setup_test_env()
 
@@ -28,7 +29,7 @@ class AclTestCase(test_case.TestCase):
         service_access_group='service-admins',
         project_access_group='project-admins',
     )
-    self.mock(storage, 'get_self_config', lambda *_: acl_cfg)
+    self.mock(storage, 'get_self_config_async', lambda *_: future(acl_cfg))
 
   def test_admin_can_read_all(self):
     self.mock(auth, 'is_admin', mock.Mock(return_value=True))

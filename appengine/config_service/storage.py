@@ -68,21 +68,30 @@ class File(ndb.Model):
     assert not self.key.id().startswith('/')
 
 
-def get_mapping(config_set=None):
+@ndb.tasklet
+def get_mapping_async(config_set=None):
   if config_set:
-    config_sets = [ConfigSet.get_by_id(config_set) or ConfigSet(id=config_set)]
+    existing = yield ConfigSet.get_by_id_async(config_set)
+    config_sets = [existing or ConfigSet(id=config_set)]
   else:
-    config_sets = ConfigSet.query().fetch()
-  return {cs.key.id(): cs.location for cs in config_sets}
+    config_sets = yield ConfigSet.query().fetch_async()
+  raise ndb.Return({
+      cs.key.id(): cs.location
+      for cs in config_sets
+      if cs
+    })
 
 
-def get_latest_revision(config_set):
+@ndb.tasklet
+def get_latest_revision_async(config_set):
   """Returns latest known revision of the |config_set|. May return None."""
-  config_set_entity = ConfigSet.get_by_id(config_set)
-  return config_set_entity.latest_revision if config_set_entity else None
+  config_set_entity = yield ConfigSet.get_by_id_async(config_set)
+  raise ndb.Return(
+      config_set_entity.latest_revision if config_set_entity else None)
 
 
-def get_config_hash(config_set, path, revision=None):
+@ndb.tasklet
+def get_config_hash_async(config_set, path, revision=None):
   """Returns tuple (revision, content_hash).
 
   |revision| detaults to the latest revision.
@@ -94,38 +103,42 @@ def get_config_hash(config_set, path, revision=None):
   assert not path.startswith('/')
 
   if not revision:
-    revision = get_latest_revision(config_set)
+    revision = yield get_latest_revision_async(config_set)
     if revision is None:
       logging.warning('Config set not found: %s' % config_set)
-      return None, None
+      raise ndb.Return(None, None)
 
   assert revision
   file_key = ndb.Key(
       ConfigSet, config_set,
       Revision, revision,
       File, path)
-  file_entity = file_key.get()
+  file_entity = yield file_key.get_async()
   content_hash = file_entity.content_hash if file_entity else None
   if not content_hash:
     revision = None
-  return revision, content_hash
+  raise ndb.Return(revision, content_hash)
 
 
-def get_config_by_hash(content_hash):
+@ndb.tasklet
+def get_config_by_hash_async(content_hash):
   """Returns config content by its hash."""
-  blob = Blob.get_by_id(content_hash)
-  return blob.content if blob else None
+  blob = yield Blob.get_by_id_async(content_hash)
+  raise ndb.Return(blob.content if blob else None)
 
 
-def get_latest(config_set, path):
+@ndb.tasklet
+def get_latest_async(config_set, path):
   """Returns latest content of a config file."""
-  _, content_hash = get_config_hash(config_set, path)
+  _, content_hash = yield get_config_hash_async(config_set, path)
   if not content_hash:  # pragma: no cover
-    return None
-  return get_config_by_hash(content_hash)
+    raise ndb.Return(None)
+  content = yield get_config_by_hash_async(content_hash)
+  raise ndb.Return(content)
 
 
-def get_latest_multi(config_sets, path, hashes_only=False):
+@ndb.tasklet
+def get_latest_multi_async(config_sets, path, hashes_only=False):
   """Returns latest contents of all <config_set>:<path> config files.
 
   Returns:
@@ -136,13 +149,15 @@ def get_latest_multi(config_sets, path, hashes_only=False):
   assert not path.startswith('/')
 
   config_set_keys = [ndb.Key(ConfigSet, cs) for cs in config_sets]
-  config_set_entities = filter(None, ndb.get_multi(config_set_keys))
+  config_set_entities = yield ndb.get_multi_async(config_set_keys)
+  config_set_entities = filter(None, config_set_entities)
 
   file_keys = [
     ndb.Key(ConfigSet, cs.key.id(), Revision, cs.latest_revision, File, path)
     for cs in config_set_entities
   ]
-  file_entities = filter(None, ndb.get_multi(file_keys))
+  file_entities = yield ndb.get_multi_async(file_keys)
+  file_entities = filter(None, file_entities)
 
   results = [
     {
@@ -157,14 +172,15 @@ def get_latest_multi(config_sets, path, hashes_only=False):
 
   if not hashes_only:
     for r in results:
-      blob = r['content'].get_result()
+      blob = yield r['content']
       r['content'] = blob.content if blob else None
 
-  return results
+  raise ndb.Return(results)
 
 
-@utils.memcache('latest_message', ['config_set', 'path'], time=60)
-def get_latest_as_message(config_set, path, message_factory):
+@utils.memcache_async('latest_message', ['config_set', 'path'], time=60)
+@ndb.tasklet
+def get_latest_as_message_async(config_set, path, message_factory):
   """Reads latest config file as a text-formatted protobuf message.
 
   |message_factory| is a function that creates a message. Typically the message
@@ -174,10 +190,10 @@ def get_latest_as_message(config_set, path, message_factory):
   Memcaches results.
   """
   msg = message_factory()
-  text = get_latest(config_set, path)
+  text = yield get_latest_async(config_set, path)
   if text:
     text_format.Merge(text, msg)
-  return msg
+  raise ndb.Return(msg)
 
 
 @utils.cache
@@ -185,9 +201,10 @@ def get_self_config_set():
   return 'services/%s' % app_identity.get_application_id()
 
 
-def get_self_config(path, message_factory):
+def get_self_config_async(path, message_factory):
   """Parses a config file in the app's config set into a protobuf message."""
-  return get_latest_as_message(get_self_config_set(), path, message_factory)
+  return get_latest_as_message_async(
+      get_self_config_set(), path, message_factory)
 
 
 def compute_hash(content):

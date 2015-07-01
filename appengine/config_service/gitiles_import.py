@@ -49,7 +49,8 @@ DEFAULT_GITILES_IMPORT_CONFIG = service_config_pb2.ImportCfg.Gitiles(
 def get_gitiles_config():
   cfg = service_config_pb2.ImportCfg(gitiles=DEFAULT_GITILES_IMPORT_CONFIG)
   try:
-    cfg = storage.get_self_config(common.IMPORT_FILENAME, lambda: cfg)
+    cfg = storage.get_self_config_async(
+        common.IMPORT_FILENAME, lambda: cfg).get_result()
   except text_format.ParseError as ex:
     # It is critical that get_gitiles_config() returns a valid config.
     # If import.cfg is broken, it should not break importing mechanism,

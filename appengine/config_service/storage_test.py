@@ -3,6 +3,7 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
+from test_env import future
 import test_env
 test_env.setup_test_env()
 
@@ -14,6 +15,7 @@ import storage
 
 
 class StorageTestCase(test_case.TestCase):
+
   def put_file(self, config_set, revision, path, content):
     confg_set_key = storage.ConfigSet(
         id=config_set, latest_revision=revision, location='http://x.com').put()
@@ -30,35 +32,36 @@ class StorageTestCase(test_case.TestCase):
         id='services/y', latest_revision='deadbeef', location='http://y').put()
 
     self.assertEqual(
-        storage.get_mapping(),
+        storage.get_mapping_async().get_result(),
         {'services/x':'http://x', 'services/y':'http://y'}
     )
     self.assertEqual(
-        storage.get_mapping('services/x'),
+        storage.get_mapping_async('services/x').get_result(),
         {'services/x':'http://x'}
     )
     self.assertEqual(
-        storage.get_mapping('services/z'),
+        storage.get_mapping_async('services/z').get_result(),
         {'services/z':None}
     )
 
   def test_get_config(self):
     self.put_file('foo', 'deadbeef', 'config.cfg', 'content')
-    revision, content_hash = storage.get_config_hash(
-        'foo', 'config.cfg', revision='deadbeef')
+    revision, content_hash = storage.get_config_hash_async(
+        'foo', 'config.cfg', revision='deadbeef').get_result()
     self.assertEqual(revision, 'deadbeef')
     self.assertEqual(
         content_hash, 'v1:6b584e8ece562ebffc15d38808cd6b98fc3d97ea')
 
   def test_get_non_existing_config(self):
-    revision, content_hash = storage.get_config_hash(
-        'foo', 'config.cfg', revision='deadbeef')
+    revision, content_hash = storage.get_config_hash_async(
+        'foo', 'config.cfg', revision='deadbeef').get_result()
     self.assertEqual(revision, None)
     self.assertEqual(content_hash, None)
 
   def test_get_latest_config(self):
     self.put_file('foo', 'deadbeef', 'config.cfg', 'content')
-    revision, content_hash = storage.get_config_hash('foo', 'config.cfg')
+    revision, content_hash = storage.get_config_hash_async(
+        'foo', 'config.cfg').get_result()
     self.assertEqual(revision, 'deadbeef')
     self.assertEqual(
         content_hash, 'v1:6b584e8ece562ebffc15d38808cd6b98fc3d97ea')
@@ -81,7 +84,8 @@ class StorageTestCase(test_case.TestCase):
         'content': 'barr',
       },
     ]
-    actual = storage.get_latest_multi(['foo', 'bar'], 'a.cfg')
+    actual = storage.get_latest_multi_async(
+        ['foo', 'bar'], 'a.cfg').get_result()
     self.assertEqual(expected, actual)
 
   def test_get_latest_multi_hashes_only(self):
@@ -102,18 +106,21 @@ class StorageTestCase(test_case.TestCase):
         'content': None,
       },
     ]
-    actual = storage.get_latest_multi(['foo', 'bar'], 'a.cfg', hashes_only=True)
+    actual = storage.get_latest_multi_async(
+        ['foo', 'bar'], 'a.cfg', hashes_only=True).get_result()
     self.assertEqual(expected, actual)
 
   def test_get_latest_non_existing_config_set(self):
-    revision, content_hash = storage.get_config_hash('foo', 'config.yaml')
+    revision, content_hash = storage.get_config_hash_async(
+        'foo', 'config.yaml').get_result()
     self.assertEqual(revision, None)
     self.assertEqual(content_hash, None)
 
   def test_get_config_by_hash(self):
-    self.assertIsNone(storage.get_config_by_hash('deadbeef'))
+    self.assertIsNone(storage.get_config_by_hash_async('deadbeef').get_result())
     storage.Blob(id='deadbeef', content='content').put()
-    self.assertEqual(storage.get_config_by_hash('deadbeef'), 'content')
+    self.assertEqual(
+        storage.get_config_by_hash_async('deadbeef').get_result(), 'content')
 
   def test_compute_hash(self):
     content = 'some content\n'
@@ -125,43 +132,48 @@ class StorageTestCase(test_case.TestCase):
     content = 'some content'
     storage.import_blob(content)
     storage.import_blob(content)  # Coverage.
-    blob = storage.Blob.get_by_id(storage.compute_hash(content))
+    blob = storage.Blob.get_by_id_async(
+        storage.compute_hash(content)).get_result()
     self.assertIsNotNone(blob)
     self.assertEqual(blob.content, content)
 
   def test_message_field_merge(self):
     default_msg = service_config_pb2.ImportCfg(
         gitiles=service_config_pb2.ImportCfg.Gitiles(fetch_log_deadline=42))
-    self.mock(storage, 'get_latest', mock.Mock())
-    storage.get_latest.return_value = 'gitiles { fetch_archive_deadline: 10 }'
-    msg = storage.get_self_config('import.cfg', lambda: default_msg)
+    self.mock(storage, 'get_latest_async', mock.Mock())
+    storage.get_latest_async.return_value = future(
+        'gitiles { fetch_archive_deadline: 10 }')
+    msg = storage.get_self_config_async(
+        'import.cfg', lambda: default_msg).get_result()
     self.assertEqual(msg.gitiles.fetch_log_deadline, 42)
 
   def test_get_self_config(self):
     expected = service_config_pb2.AclCfg(service_access_group='group')
 
-    self.mock(storage, 'get_config_hash', mock.Mock())
-    self.mock(storage, 'get_config_by_hash', mock.Mock())
+    self.mock(storage, 'get_config_hash_async', mock.Mock())
+    self.mock(storage, 'get_config_by_hash_async', mock.Mock())
+    storage.get_config_hash_async.return_value = future(
+        ('deadbeef', 'beefdead'))
+    storage.get_config_by_hash_async.return_value = future(
+        'service_access_group: "group"')
 
-    storage.get_config_hash.return_value = 'deadbeef', 'beefdead'
-    storage.get_config_by_hash.return_value = 'service_access_group: "group"'
-
-    actual = storage.get_self_config('acl.cfg', service_config_pb2.AclCfg)
+    actual = storage.get_self_config_async(
+        'acl.cfg', service_config_pb2.AclCfg).get_result()
     self.assertEqual(expected, actual)
 
-    storage.get_config_hash.assert_called_once_with(
+    storage.get_config_hash_async.assert_called_once_with(
         'services/sample-app', 'acl.cfg')
-    storage.get_config_by_hash.assert_called_once_with('beefdead')
+    storage.get_config_by_hash_async.assert_called_once_with('beefdead')
 
     # memcached:
-    storage.get_config_hash.reset_mock()
-    storage.get_config_by_hash.reset_mock()
-    actual = storage.get_latest_as_message(
+    storage.get_config_hash_async.reset_mock()
+    storage.get_config_by_hash_async.reset_mock()
+    actual = storage.get_latest_as_message_async(
         'services/sample-app', 'acl.cfg',
-        service_config_pb2.AclCfg)
+        service_config_pb2.AclCfg).get_result()
     self.assertEqual(expected, actual)
-    self.assertFalse(storage.get_config_hash.called)
-    self.assertFalse(storage.get_config_by_hash.called)
+    self.assertFalse(storage.get_config_hash_async.called)
+    self.assertFalse(storage.get_config_by_hash_async.called)
 
 
 if __name__ == '__main__':

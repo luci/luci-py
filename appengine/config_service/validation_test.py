@@ -6,6 +6,7 @@
 import base64
 import logging
 
+from test_env import future
 import test_env
 test_env.setup_test_env()
 
@@ -204,26 +205,27 @@ class ValidationTestCase(test_case.TestCase):
     cfg = '# a config'
     cfg_b64 = base64.b64encode(cfg)
 
-    self.mock(storage, 'get_self_config', mock.Mock())
-    storage.get_self_config.return_value = service_config_pb2.ValidationCfg(
-      rules=[
-        service_config_pb2.ValidationCfg.Rule(
-          config_set='services/foo',
-          path='bar.cfg',
-          url='https://bar.verifier',
-        ),
-        service_config_pb2.ValidationCfg.Rule(
-          config_set='regex:projects/[^/]+',
-          path='regex:.+.\cfg',
-          url='https://bar2.verifier',
-        ),
-        service_config_pb2.ValidationCfg.Rule(
-          config_set='regex:.+',
-          path='regex:.+',
-          url='https://ultimate.verifier',
-        ),
-      ]
-    )
+    self.mock(storage, 'get_self_config_async', mock.Mock())
+    storage.get_self_config_async.return_value = future(
+        service_config_pb2.ValidationCfg(
+            rules=[
+              service_config_pb2.ValidationCfg.Rule(
+                config_set='services/foo',
+                path='bar.cfg',
+                url='https://bar.verifier',
+              ),
+              service_config_pb2.ValidationCfg.Rule(
+                config_set='regex:projects/[^/]+',
+                path='regex:.+.\cfg',
+                url='https://bar2.verifier',
+              ),
+              service_config_pb2.ValidationCfg.Rule(
+                config_set='regex:.+',
+                path='regex:.+',
+                url='https://ultimate.verifier',
+              ),
+            ]
+          ))
 
     @ndb.tasklet
     def json_request_async(url, **kwargs):

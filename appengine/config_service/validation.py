@@ -234,7 +234,7 @@ def validate_config_async(config_set, path, content, ctx=None):
   # defined using validation.self_rule.
   validation.validate(config_set, path, content, ctx=ctx)
 
-  validation_cfg = storage.get_self_config(
+  validation_cfg = yield storage.get_self_config_async(
       common.VALIDATION_FILENAME, service_config_pb2.ValidationCfg)
   # Be paranoid, check yourself.
   validate_validation_cfg(validation_cfg, validation.Context.raise_on_error())

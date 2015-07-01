@@ -83,7 +83,8 @@ class ConfigApi(remote.Service):
       raise endpoints.ForbiddenException()
 
     res = self.GetMappingResponseMessage()
-    mapping = storage.get_mapping(config_set=request.config_set)
+    mapping = storage.get_mapping_async(
+        config_set=request.config_set).get_result()
     for config_set, location in sorted(mapping.iteritems()):
       if self.can_read_config_set(config_set):
         res.mappings.append(
@@ -127,13 +128,16 @@ class ConfigApi(remote.Service):
           request.config_set)
       raise_config_not_found()
 
-    res.revision, res.content_hash = storage.get_config_hash(
-        request.config_set, request.path, revision=request.revision)
+    res.revision, res.content_hash = (
+        storage.get_config_hash_async(
+            request.config_set, request.path, revision=request.revision)
+        .get_result())
     if not res.content_hash:
       raise_config_not_found()
 
     if not request.hash_only:
-      res.content = storage.get_config_by_hash(res.content_hash)
+      res.content = (
+          storage.get_config_by_hash_async(res.content_hash).get_result())
       if not res.content:
         logging.warning(
             'Config hash is found, but the blob is not.\n'
@@ -159,7 +163,8 @@ class ConfigApi(remote.Service):
   def get_config_by_hash(self, request):
     """Gets a config file by its hash."""
     res = self.GetConfigByHashResponseMessage(
-        content=storage.get_config_by_hash(request.content_hash))
+        content=storage.get_config_by_hash_async(
+            request.content_hash).get_result())
     if not res.content:
       raise_config_not_found()
     return res
@@ -303,7 +308,8 @@ def get_config_multi(config_sets, path, hashes_only):
     raise endpoints.ForbiddenException()
 
   res = GetConfigMultiResponseMessage()
-  configs = storage.get_latest_multi(config_sets, path, hashes_only)
+  configs = storage.get_latest_multi_async(
+      config_sets, path, hashes_only).get_result()
   for config in configs:
     if not hashes_only and config.get('content') is None:
       logging.error(

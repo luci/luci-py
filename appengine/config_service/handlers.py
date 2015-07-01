@@ -32,8 +32,8 @@ class SchemasHandler(webapp2.RequestHandler):
   """Redirects to a known schema definition."""
 
   def get(self, name):
-    cfg = storage.get_self_config(
-        common.SCHEMAS_FILENAME, service_config_pb2.SchemasCfg)
+    cfg = storage.get_self_config_async(
+        common.SCHEMAS_FILENAME, service_config_pb2.SchemasCfg).get_result()
     # Assume cfg was validated by validation.py
     if cfg:
       for schema in cfg.schemas:

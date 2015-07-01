@@ -63,8 +63,9 @@ def get_projects():
 
   Never returns None. Cached.
   """
-  cfg = storage.get_self_config(
-      common.PROJECT_REGISTRY_FILENAME, service_config_pb2.ProjectsCfg)
+  cfg = storage.get_self_config_async(
+      common.PROJECT_REGISTRY_FILENAME,
+      service_config_pb2.ProjectsCfg).get_result()
   return cfg.projects or []
 
 
@@ -106,5 +107,5 @@ def get_refs(project_id):
 
 def _get_project_config(project_id, path, message_factory):
   assert project_id
-  return storage.get_latest_as_message(
-      'projects/%s' % project_id, path, message_factory)
+  return storage.get_latest_as_message_async(
+      'projects/%s' % project_id, path, message_factory).get_result()

@@ -3,11 +3,13 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
+from test_env import future
 import test_env
 test_env.setup_test_env()
 
-import mock
+from google.appengine.ext import ndb
 
+import mock
 from test_support import test_case
 
 from proto import service_config_pb2
@@ -19,16 +21,17 @@ import storage
 class ProjectsTestCase(test_case.TestCase):
   def setUp(self):
     super(ProjectsTestCase, self).setUp()
-    self.mock(storage, 'get_latest', mock.Mock())
+    self.mock(storage, 'get_latest_async', mock.Mock())
+    storage.get_latest_async.return_value = ndb.Future()
 
   def test_get_projects(self):
-    storage.get_latest.return_value = '''
+    storage.get_latest_async.return_value.set_result('''
       projects {
         id: "chromium"
         config_storage_type: GITILES
         config_location: "http://localhost"
       }
-    '''
+    ''')
     expected = service_config_pb2.ProjectsCfg(
         projects=[
           service_config_pb2.Project(
@@ -40,7 +43,7 @@ class ProjectsTestCase(test_case.TestCase):
     self.assertEqual(projects.get_projects(), expected.projects)
 
   def test_get_refs(self):
-    storage.get_latest.return_value = '''
+    storage.get_latest_async.return_value.set_result('''
       refs {
         name: "refs/heads/master"
       }
@@ -48,7 +51,7 @@ class ProjectsTestCase(test_case.TestCase):
         name: "refs/heads/release42"
         config_path: "other"
       }
-    '''
+    ''')
     expected = project_config_pb2.RefsCfg(
         refs=[
           project_config_pb2.RefsCfg.Ref(
@@ -60,7 +63,7 @@ class ProjectsTestCase(test_case.TestCase):
     self.assertEqual(projects.get_refs('chromium'), expected.refs)
 
   def test_get_refs_of_non_existent_project(self):
-    storage.get_latest.return_value = None
+    storage.get_latest_async.return_value.set_result(None)
     self.assertEqual(projects.get_refs('chromium'), None)
 
   def test_repo_info(self):
