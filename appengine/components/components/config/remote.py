@@ -53,7 +53,7 @@ class Provider(object):
     self.service_hostname = service_hostname
 
   @ndb.tasklet
-  def _api_call_async(self, path, **kwargs):
+  def _api_call_async(self, path, allow_not_found=True, **kwargs):
     assert path
     url = 'https://%s/_ah/api/config/v1/%s' % (self.service_hostname, path)
     kwargs.setdefault('scopes', EMAIL_SCOPE)
@@ -61,7 +61,9 @@ class Provider(object):
       response = yield net.json_request_async(url, **kwargs)
       raise ndb.Return(response)
     except net.NotFoundError:
-      raise ndb.Return(None)
+      if allow_not_found:
+        raise ndb.Return(None)
+      raise
 
   @ndb.tasklet
   def get_config_by_hash_async(self, content_hash):
@@ -141,7 +143,8 @@ class Provider(object):
 
     # Response must return a dict with 'configs' key which is a list of configs.
     # Each config has keys 'config_set', 'revision' and 'content_hash'.
-    res = yield self._api_call_async(url_path, params={'hashes_only': True})
+    res = yield self._api_call_async(
+        url_path, params={'hashes_only': True}, allow_not_found=False)
 
     # Load config contents. Most of them will come from memcache.
     for cfg in res['configs']:

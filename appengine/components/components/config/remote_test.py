@@ -101,6 +101,12 @@ class RemoteTestCase(test_case.TestCase):
 
     self.assertFalse(net.json_request_async.called)
 
+  def test_get_project_configs_async_receives_404(self):
+    net.json_request_async.side_effect = net.NotFoundError(
+        'Not found', 404, None)
+    with self.assertRaises(net.NotFoundError):
+      self.provider.get_project_configs_async('cfg').get_result()
+
   def test_get_project_configs_async(self):
     self.mock(net, 'json_request_async', mock.Mock())
     net.json_request_async.return_value = ndb.Future()
