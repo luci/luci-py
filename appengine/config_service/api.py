@@ -305,6 +305,8 @@ def get_config_multi(config_sets, path, hashes_only):
   Returns empty config list if requester does not have project access.
   """
   if not acl.has_project_access():
+    logging.warning(
+        '%s does not have project access', auth.get_current_identity())
     raise endpoints.ForbiddenException()
 
   res = GetConfigMultiResponseMessage()

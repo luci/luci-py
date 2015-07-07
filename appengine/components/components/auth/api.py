@@ -382,7 +382,7 @@ def extract_oauth_caller_identity(extra_client_ids=None):
 
   # GAE service account. Token via app_identity.get_access_token().
   if not good and email.endswith('@appspot.gserviceaccount.com'):
-    good = (client_id == 'anonymous')
+    good = True
 
   # Internal service account.
   if not good and email.endswith('@system.gserviceaccount.com'):
