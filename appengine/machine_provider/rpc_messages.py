@@ -7,6 +7,12 @@
 from protorpc import messages
 
 
+class Backend(messages.Enum):
+  """Lists valid backends."""
+  DUMMY = 0
+  GCE = 1
+
+
 class OSFamily(messages.Enum):
   """Lists valid OS families."""
   LINUX = 1
@@ -15,12 +21,49 @@ class OSFamily(messages.Enum):
 
 
 class Dimensions(messages.Message):
-  """Represents the dimensions of a machine.
-
-  Args:
-    os_family: The operating system family of this machine.
-  """
+  """Represents the dimensions of a machine."""
+  # The operating system family of this machine.
   os_family = messages.EnumField(OSFamily, 1)
+  # The backend which should be used to spin up this machine. This should
+  # generally be left unspecified so the Machine Provider selects the backend
+  # on its own.
+  backend = messages.EnumField(Backend, 2)
+  # The hostname of this machine.
+  hostname = messages.StringField(3)
+
+
+class CatalogAdditionRequest(messages.Message):
+  """Represents a request to add a machine to the catalog.
+
+  dimensions.hostname must be unique per backend if specified.
+  """
+  # Dimensions instance specifying what sort of machine this is.
+  dimensions = messages.MessageField(Dimensions, 1, required=True)
+
+
+class CatalogDeletionRequest(messages.Message):
+  """Represents a request to delete a machine in the catalog."""
+  # Dimensions instance specifying what sort of machine this is.
+  dimensions = messages.MessageField(Dimensions, 1, required=True)
+
+
+class CatalogManipulationRequestError(messages.Enum):
+  """Represents an error in a catalog manipulation request."""
+  # Per backend, hostnames must be unique in the catalog.
+  HOSTNAME_REUSE = 1
+  # Tried to lookup an entry that didn't exist.
+  ENTRY_NOT_FOUND = 2
+  # Didn't specify a backend.
+  UNSPECIFIED_BACKEND = 3
+  # Specified backend didn't match the backend originating the request.
+  MISMATCHED_BACKEND = 4
+
+
+class CatalogManipulationResponse(messages.Message):
+  """Represents a response to a catalog manipulation response."""
+  # CatalogManipulationRequestError instance indicating an error with the
+  # request, or None if there is no error.
+  error = messages.EnumField(CatalogManipulationRequestError, 1)
 
 
 class LeaseRequest(messages.Message):

@@ -63,12 +63,169 @@ class MockUser(object):
     return self._email
 
 
-class LeaseTest(test_case.EndpointsTestCase):
+class CatalogTest(test_case.EndpointsTestCase):
+  """Tests for handlers_endpoints.CatalogEndpoints."""
+  api_service_cls = handlers_endpoints.CatalogEndpoints
+
+  def setUp(self):
+    super(CatalogTest, self).setUp()
+    app = handlers_endpoints.create_endpoints_app()
+    self.app = webtest.TestApp(app)
+
+  def test_add(self):
+    request = rpc_to_json(rpc_messages.CatalogAdditionRequest(
+        dimensions=rpc_messages.Dimensions(
+            hostname='fake-host',
+            os_family=rpc_messages.OSFamily.LINUX,
+        ),
+    ))
+    auth_testing.mock_get_current_identity(self)
+
+    response = jsonish_dict_to_rpc(
+        self.call_api('add', request).json,
+        rpc_messages.CatalogManipulationResponse,
+    )
+    self.failIf(response.error)
+
+  def test_add_duplicate(self):
+    request_1 = rpc_to_json(rpc_messages.CatalogAdditionRequest(
+        dimensions=rpc_messages.Dimensions(
+            hostname='fake-host',
+            os_family=rpc_messages.OSFamily.LINUX,
+        ),
+    ))
+    request_2 = rpc_to_json(rpc_messages.CatalogAdditionRequest(
+        dimensions=rpc_messages.Dimensions(
+            hostname='fake-host',
+            os_family=rpc_messages.OSFamily.LINUX,
+        ),
+    ))
+    auth_testing.mock_get_current_identity(self)
+
+    response_1 = jsonish_dict_to_rpc(
+        self.call_api('add', request_1).json,
+        rpc_messages.CatalogManipulationResponse,
+    )
+    response_2 = jsonish_dict_to_rpc(
+        self.call_api('add', request_2).json,
+        rpc_messages.CatalogManipulationResponse,
+    )
+    self.failIf(response_1.error)
+    self.assertEqual(
+        response_2.error,
+        rpc_messages.CatalogManipulationRequestError.HOSTNAME_REUSE,
+    )
+
+  def test_add_duplicate_no_hostname(self):
+    request_1 = rpc_to_json(rpc_messages.CatalogAdditionRequest(
+        dimensions=rpc_messages.Dimensions(
+            os_family=rpc_messages.OSFamily.LINUX,
+        ),
+    ))
+    request_2 = rpc_to_json(rpc_messages.CatalogAdditionRequest(
+        dimensions=rpc_messages.Dimensions(
+            os_family=rpc_messages.OSFamily.LINUX,
+        ),
+    ))
+    auth_testing.mock_get_current_identity(self)
+
+    response_1 = jsonish_dict_to_rpc(
+        self.call_api('add', request_1).json,
+        rpc_messages.CatalogManipulationResponse,
+    )
+    response_2 = jsonish_dict_to_rpc(
+        self.call_api('add', request_2).json,
+        rpc_messages.CatalogManipulationResponse,
+    )
+    self.failIf(response_1.error)
+    self.failIf(response_2.error)
+
+  def test_delete(self):
+    request_1 = rpc_to_json(rpc_messages.CatalogAdditionRequest(
+        dimensions=rpc_messages.Dimensions(
+            hostname='fake-host',
+            os_family=rpc_messages.OSFamily.LINUX,
+        ),
+    ))
+    request_2 = rpc_to_json(rpc_messages.CatalogAdditionRequest(
+        dimensions=rpc_messages.Dimensions(
+            hostname='fake-host',
+            os_family=rpc_messages.OSFamily.LINUX,
+        ),
+    ))
+    request_3 = rpc_to_json(rpc_messages.CatalogAdditionRequest(
+        dimensions=rpc_messages.Dimensions(
+            hostname='fake-host',
+            os_family=rpc_messages.OSFamily.WINDOWS,
+        ),
+    ))
+    auth_testing.mock_get_current_identity(self)
+
+    response_1 = jsonish_dict_to_rpc(
+        self.call_api('add', request_1).json,
+        rpc_messages.CatalogManipulationResponse,
+    )
+    response_2 = jsonish_dict_to_rpc(
+        self.call_api('delete', request_2).json,
+        rpc_messages.CatalogManipulationResponse,
+    )
+    response_3 = jsonish_dict_to_rpc(
+        self.call_api('add', request_3).json,
+        rpc_messages.CatalogManipulationResponse,
+    )
+    self.failIf(response_1.error)
+    self.failIf(response_2.error)
+    self.failIf(response_3.error)
+
+  def test_delete_invalid(self):
+    request_1 = rpc_to_json(rpc_messages.CatalogAdditionRequest(
+        dimensions=rpc_messages.Dimensions(
+            hostname='fake-host',
+            os_family=rpc_messages.OSFamily.LINUX,
+        ),
+    ))
+    request_2 = rpc_to_json(rpc_messages.CatalogDeletionRequest(
+        dimensions=rpc_messages.Dimensions(
+            os_family=rpc_messages.OSFamily.LINUX,
+        ),
+    ))
+    request_3 = rpc_to_json(rpc_messages.CatalogAdditionRequest(
+        dimensions=rpc_messages.Dimensions(
+            hostname='fake-host',
+            os_family=rpc_messages.OSFamily.WINDOWS,
+        ),
+    ))
+    auth_testing.mock_get_current_identity(self)
+
+    response_1 = jsonish_dict_to_rpc(
+        self.call_api('add', request_1).json,
+        rpc_messages.CatalogManipulationResponse,
+    )
+    response_2 = jsonish_dict_to_rpc(
+        self.call_api('delete', request_2).json,
+        rpc_messages.CatalogManipulationResponse,
+    )
+    response_3 = jsonish_dict_to_rpc(
+        self.call_api('add', request_3).json,
+        rpc_messages.CatalogManipulationResponse,
+    )
+    self.failIf(response_1.error)
+    self.assertEqual(
+        response_2.error,
+        rpc_messages.CatalogManipulationRequestError.ENTRY_NOT_FOUND,
+    )
+    self.assertEqual(
+        response_3.error,
+        rpc_messages.CatalogManipulationRequestError.HOSTNAME_REUSE,
+    )
+
+
+class MachineProviderLeaseTest(test_case.EndpointsTestCase):
   """Tests for handlers_endpoints.MachineProviderEndpoints.lease."""
   api_service_cls = handlers_endpoints.MachineProviderEndpoints
 
   def setUp(self):
-    super(LeaseTest, self).setUp()
+    super(MachineProviderLeaseTest, self).setUp()
     app = handlers_endpoints.create_endpoints_app()
     self.app = webtest.TestApp(app)
 

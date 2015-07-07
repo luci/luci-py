@@ -21,6 +21,116 @@ import models
 import rpc_messages
 
 
+@auth.endpoints.api(name='catalog', version='v1')
+class CatalogEndpoints(remote.Service):
+  """Implements cloud endpoints for the Machine Provider Catalog."""
+
+  @staticmethod
+  def check_backend(request):
+    """Checks that the given catalog manipulation request specifies a backend.
+
+    Returns:
+      rpc_messages.CatalogManipulationRequestError.UNSPECIFIED_BACKEND if the
+      backend is unspecified and can't be inferred, otherwise None.
+    """
+    if acl.is_catalog_admin():
+      # Catalog administrators may update any CatalogEntry, but the backend must
+      # be specified because hostname uniqueness is enforced per-backend.
+      if not request.dimensions.backend:
+        logging.warning('Backend unspecified by administrator')
+        return rpc_messages.CatalogManipulationRequestError.UNSPECIFIED_BACKEND
+    elif acl.is_backend_service():
+      # Backends may only update their own machines.
+      current_backend = acl.get_current_backend()
+      if request.dimensions.backend is None:
+        request.dimensions.backend = current_backend
+      if request.dimensions.backend != current_backend:
+        logging.warning('Mismatched backend')
+        return rpc_messages.CatalogManipulationRequestError.MISMATCHED_BACKEND
+
+  @auth.endpoints_method(
+      rpc_messages.CatalogAdditionRequest,
+      rpc_messages.CatalogManipulationResponse,
+  )
+  @auth.require(acl.is_backend_service_or_catalog_admin)
+  @ndb.transactional
+  def add(self, request):
+    """Handles an incoming CatalogAdditionRequest."""
+    user = auth.get_current_identity().to_bytes()
+    logging.info(
+        'Received CatalogAdditionRequest:\nUser: %s\n%s',
+        user,
+        request,
+    )
+    error = self.check_backend(request)
+    if error:
+      return rpc_messages.CatalogManipulationResponse(error=error)
+
+    if request.dimensions.hostname:
+      entry = models.CatalogEntry.get_by_id(
+          models.CatalogEntry.compute_id(request.dimensions),
+      )
+      if entry:
+        # Hostname, if specified, must be unique.
+        logging.info('Hostname reuse:\nOriginally used for: \n%s', entry)
+        return rpc_messages.CatalogManipulationResponse(
+            error=rpc_messages.CatalogManipulationRequestError.HOSTNAME_REUSE
+        )
+    models.CatalogEntry.create_and_put(request.dimensions)
+    return rpc_messages.CatalogManipulationResponse()
+
+  @auth.endpoints_method(
+      rpc_messages.CatalogDeletionRequest,
+      rpc_messages.CatalogManipulationResponse,
+  )
+  @auth.require(acl.is_backend_service_or_catalog_admin)
+  def delete(self, request):
+    """Handles an incoming CatalogDeletionRequest."""
+    user = auth.get_current_identity().to_bytes()
+    logging.info(
+        'Received CatalogDeletionRequest:\nUser: %s\n%s',
+        user,
+        request,
+    )
+    error = self.check_backend(request)
+    if error:
+      return rpc_messages.CatalogManipulationResponse(error=error)
+
+    if request.dimensions.hostname:
+      error = self.delete_transactionally(request)
+      if error:
+        return rpc_messages.CatalogManipulationResponse(error=error)
+    else:
+      entries = models.CatalogEntry.query_by_exact_dimensions(
+          request.dimensions
+      )
+      if not entries:
+        logging.info('Catalog entry not found')
+        return rpc_messages.CatalogManipulationResponse(
+            error=rpc_messages.CatalogManipulationRequestError.ENTRY_NOT_FOUND
+        )
+      entries[0].key.delete()
+    return rpc_messages.CatalogManipulationResponse()
+
+  @ndb.transactional
+  def delete_transactionally(self, request):
+    """Transactionally deletes a CatalogEntry by backend and hostname.
+
+    Returns:
+      rpc_messages.CatalogManipulationRequestError.ENTRY_NOT_FOUND if a matching
+      CatalogEntry doesn't exist, otherwise None.
+    """
+    assert request.dimensions.backend is not None
+    assert request.dimensions.hostname is not None
+    entry = models.CatalogEntry.get_by_id(
+        models.CatalogEntry.compute_id(request.dimensions)
+    )
+    if not entry or not entry.has_exact_dimensions(request.dimensions):
+      logging.info('Catalog entry not found')
+      return rpc_messages.CatalogManipulationRequestError.ENTRY_NOT_FOUND
+    entry.key.delete()
+
+
 @auth.endpoints.api(name='machine_provider', version='v1')
 class MachineProviderEndpoints(remote.Service):
   """Implements cloud endpoints for the Machine Provider."""
@@ -59,9 +169,9 @@ class MachineProviderEndpoints(remote.Service):
             'Request ID reuse:\nOriginally used for:\n%s',
             duplicate.request
         )
-        response = rpc_messages.LeaseResponse()
-        response.error = rpc_messages.LeaseRequestError.REQUEST_ID_REUSE
-        return response
+        return rpc_messages.LeaseResponse(
+            error=rpc_messages.LeaseRequestError.REQUEST_ID_REUSE
+        )
     else:
       logging.info('Storing LeaseRequest')
       response = rpc_messages.LeaseResponse()
@@ -79,4 +189,4 @@ class MachineProviderEndpoints(remote.Service):
 
 
 def create_endpoints_app():
-  return endpoints.api_server([MachineProviderEndpoints])
+  return endpoints.api_server([CatalogEndpoints, MachineProviderEndpoints])
