@@ -74,8 +74,6 @@ class LeaseRequest(messages.Message):
   dimensions = messages.MessageField(Dimensions, 2, required=True)
   # Desired length of the lease in seconds.
   duration = messages.IntegerField(3, required=True)
-  # Desired start time of the lease in seconds from now. Default to 0, or ASAP.
-  start_time = messages.IntegerField(4, default=0)
   # URL to post a LeaseResponse message to when a response is ready. If
   # unspecified, the caller is responsible for polling for the result.
   callback = messages.StringField(5)
