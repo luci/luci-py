@@ -119,11 +119,44 @@ def validate_project_registry(cfg, ctx):
   check_id_sorted(cfg.projects, 'Projects', ctx)
 
 
+
+def validate_identity(identity, ctx):
+  try:
+    auth.Identity.from_bytes(identity)
+  except ValueError as ex:
+    ctx.error(ex.message)
+
+
 def validate_email(email, ctx):
   try:
     auth.Identity('user', email)
   except ValueError as ex:
     ctx.error('invalid email: "%s"', email)
+
+
+def validate_group(group, ctx):
+  if not auth.is_valid_group_name(group):
+    ctx.error('invalid group: %s', group)
+
+
+def validate_identity_predicate(access, ctx):
+  """Ensures |access| is "group:<group>", an identity or an email."""
+  if not access:
+    ctx.error('not specified')
+    return
+  elif access.startswith('group:'):
+    group = access.split(':', 2)[1]
+    validate_group(group, ctx)
+  elif ':' in access:
+    validate_identity(access, ctx)
+  else:
+    validate_email(access, ctx)
+
+
+def validate_access_list(access_list, ctx):
+  for i, ac in enumerate(access_list):
+    with ctx.prefix('access #%d: ', i + 1):
+      validate_identity_predicate(ac, ctx)
 
 
 @validation.self_rule(
@@ -139,10 +172,10 @@ def validate_services_cfg(cfg, ctx):
               service.config_location, ctx, allow_relative_url=True)
       for owner in service.owners:
         validate_email(owner, ctx)
-
       if service.metadata_url:
         with ctx.prefix('metadata_url: '):
           validate_url(service.metadata_url, ctx)
+      validate_access_list(service.access, ctx)
 
   check_id_sorted(cfg.services, 'Services', ctx)
 
@@ -183,9 +216,10 @@ def validate_service_dynamic_metadata_blob(metadata, ctx):
 
 
 @validation.self_rule(common.ACL_FILENAME, service_config_pb2.AclCfg)
-def validate_acl_cfg(_cfg, _ctx):
-  # A valid protobuf message is enough.
-  pass
+def validate_acl_cfg(cfg, ctx):
+  if cfg.project_config_access:
+    validate_group(cfg.project_config_access, ctx)
+
 
 @validation.self_rule(common.IMPORT_FILENAME, service_config_pb2.ImportCfg)
 def validate_import_cfg(_cfg, _ctx):
@@ -224,6 +258,7 @@ def validate_schemas(cfg, ctx):
 def validate_project_metadata(cfg, ctx):
   if not cfg.name:
     ctx.error('name is not specified')
+  validate_access_list(service.access, ctx)
 
 
 @validation.project_config_rule(

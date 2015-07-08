@@ -12,6 +12,15 @@ package config_service;
 message ProjectCfg {
   // Full name of the project.
   optional string name = 1;
+  // A list of identities that have read-only access to the. An element is one
+  // of:
+  // * "group:<group>", where group is defined on auth server.
+  // * "<email>"
+  // * "<identity>"
+  //
+  // If not specified, only admins and trusted services have access.
+  // Talk to admins to determine the group name appropriate for your project.
+  repeated string access = 2;
 }
 
 // Schema of refs.cfg.

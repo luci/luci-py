@@ -55,8 +55,7 @@ class ConfigApi(remote.Service):
 
   def can_read_config_set(self, config_set):
     try:
-      return acl.can_read_config_set(
-          config_set, headers=self.request_state.headers)
+      return acl.can_read_config_set(config_set)
     except ValueError:
       raise endpoints.BadRequestException('Invalid config set: %s' % config_set)
 
@@ -185,9 +184,9 @@ class ConfigApi(remote.Service):
 
     The project list is stored in services/luci-config:projects.cfg.
     """
-    if not acl.can_read_project_list():
-      raise endpoints.ForbiddenException()
-    return self.GetProjectsResponseMessage(projects=get_projects())
+    return self.GetProjectsResponseMessage(
+        projects=[p for p in get_projects() if acl.has_project_access(p.id)],
+    )
 
   ##############################################################################
   # endpoint: get_refs
@@ -207,7 +206,7 @@ class ConfigApi(remote.Service):
       path='projects/{project_id}/refs')
   def get_refs(self, request):
     """Gets list of refs of a project."""
-    if not acl.can_read_project_config(request.project_id):
+    if not acl.has_project_access(request.project_id):
       raise endpoints.NotFoundException()
     ref_names = get_ref_names(request.project_id)
     if ref_names is None:
@@ -304,12 +303,8 @@ def get_config_multi(config_sets, path, hashes_only):
 
   Returns empty config list if requester does not have project access.
   """
-  if not acl.has_project_access():
-    logging.warning(
-        '%s does not have project access', auth.get_current_identity())
-    raise endpoints.ForbiddenException()
-
   res = GetConfigMultiResponseMessage()
+  config_sets = filter(acl.can_read_config_set, config_sets)
   configs = storage.get_latest_multi_async(
       config_sets, path, hashes_only).get_result()
   for config in configs:

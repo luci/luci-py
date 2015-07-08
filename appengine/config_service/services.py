@@ -30,6 +30,9 @@ def get_services_async():
 
   The list is stored in services/luci-config:services.cfg. Never returns None.
   Cached.
+
+  Returns:
+    A list of service_config_pb2.Service.
   """
   cfg = yield storage.get_self_config_async(
       common.SERVICES_REGISTRY_FILENAME, service_config_pb2.ServicesCfg)
@@ -37,7 +40,12 @@ def get_services_async():
 
 
 @ndb.tasklet
-def _get_service_async(service_id):
+def get_service_async(service_id):
+  """Returns a service config by id.
+
+  Returns:
+    service_config_pb2.Service, or None if not found.
+  """
   services = yield get_services_async()
   for service in services:
     if service.id == service_id:
@@ -71,7 +79,7 @@ def get_metadata_async(service_id):
     ServiceNotFoundError if service |service_id| is not found.
     DynamicMetadataError if metadata endpoint response is bad.
   """
-  service = yield _get_service_async(service_id)
+  service = yield get_service_async(service_id)
   if service is None:
     raise ServiceNotFoundError('Service "%s" not found', service_id)
 

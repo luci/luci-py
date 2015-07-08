@@ -13,7 +13,7 @@ from google.protobuf import descriptor_pb2
 DESCRIPTOR = _descriptor.FileDescriptor(
   name='project_config.proto',
   package='config_service',
-  serialized_pb='\n\x14project_config.proto\x12\x0e\x63onfig_service\"\x1a\n\nProjectCfg\x12\x0c\n\x04name\x18\x01 \x01(\t\"^\n\x07RefsCfg\x12)\n\x04refs\x18\x01 \x03(\x0b\x32\x1b.config_service.RefsCfg.Ref\x1a(\n\x03Ref\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x13\n\x0b\x63onfig_path\x18\x03 \x01(\t')
+  serialized_pb='\n\x14project_config.proto\x12\x0e\x63onfig_service\"*\n\nProjectCfg\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x0e\n\x06\x61\x63\x63\x65ss\x18\x02 \x03(\t\"^\n\x07RefsCfg\x12)\n\x04refs\x18\x01 \x03(\x0b\x32\x1b.config_service.RefsCfg.Ref\x1a(\n\x03Ref\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x13\n\x0b\x63onfig_path\x18\x03 \x01(\t')
 
 
 
@@ -32,6 +32,13 @@ _PROJECTCFG = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
+    _descriptor.FieldDescriptor(
+      name='access', full_name='config_service.ProjectCfg.access', index=1,
+      number=2, type=9, cpp_type=9, label=3,
+      has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
   ],
   extensions=[
   ],
@@ -42,7 +49,7 @@ _PROJECTCFG = _descriptor.Descriptor(
   is_extendable=False,
   extension_ranges=[],
   serialized_start=40,
-  serialized_end=66,
+  serialized_end=82,
 )
 
 
@@ -76,8 +83,8 @@ _REFSCFG_REF = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=122,
-  serialized_end=162,
+  serialized_start=138,
+  serialized_end=178,
 )
 
 _REFSCFG = _descriptor.Descriptor(
@@ -103,8 +110,8 @@ _REFSCFG = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=68,
-  serialized_end=162,
+  serialized_start=84,
+  serialized_end=178,
 )
 
 _REFSCFG_REF.containing_type = _REFSCFG;

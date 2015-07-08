@@ -64,6 +64,14 @@ message Service {
   optional ConfigSetLocation config_location = 3;
   // An HTTPS endpoint that returns JSON-encoded ServiceDynamicMetadata in body.
   optional string metadata_url = 4;
+  // A list of identities that have access to this service's configs.
+  // of:
+  // * "group:<group>", where group is defined on auth server.
+  // * "<email>"
+  // * "<identity>"
+  //
+  // If not specified, only admins and trusted services have access.
+  repeated string access = 5;
 }
 
 // Machine-generated service metadata, exposed by a service endpoint.
@@ -91,9 +99,8 @@ message ServicesCfg {
 
 // Schema of acl.cfg file.
 message AclCfg {
-  // Name of the group that has access to all services/* config sets.
-  optional string service_access_group = 1;
   // Name of the group that has access to all projects/* config sets.
+  // Only trusted services should be in this group.
   optional string project_access_group = 2;
 }
 

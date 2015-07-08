@@ -79,6 +79,9 @@ class ValidationTestCase(test_case.TestCase):
     cfg = '''
       services {
         id: "a"
+        access: "a@a.com"
+        access: "user:a@a.com"
+        access: "group:abc"
       }
       services {
         owners: "not an email"
@@ -87,6 +90,9 @@ class ValidationTestCase(test_case.TestCase):
           url: "../some"
         }
         metadata_url: "not an url"
+        access: "**&"
+        access: "group:**&"
+        access: "a:b"
       }
       services {
         id: "b"
@@ -111,6 +117,9 @@ class ValidationTestCase(test_case.TestCase):
           'Service #2: invalid email: "not an email"',
           'Service #2: metadata_url: hostname not specified',
           'Service #2: metadata_url: scheme must be "https"',
+          'Service #2: access #1: invalid email: "**&"',
+          'Service #2: access #2: invalid group: **&',
+          'Service #2: access #3: Identity has invalid format: b',
           'Services are not sorted by id. First offending id: a-unsorted',
         ]
     )

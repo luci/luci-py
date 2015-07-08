@@ -102,6 +102,14 @@ default and metadata url.
 
 See [ServicesCfg message](proto/service_config.proto) for more info.
 
+## Access control
+
+Service configs are accessible to a group defined in service/luci-config:acl.cfg
+and a GAE app with the same id, e.g. x.appspot.com has access to `services/x`.
+
+Projects define access to their configs in projects/foo:project.cfg. See
+[access field in ProjectCfg message](proto/project_config.proto).
+
 ## Configuration validation
 
 Config files are validated and config set revisions containing invalid configs

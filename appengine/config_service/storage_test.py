@@ -148,14 +148,14 @@ class StorageTestCase(test_case.TestCase):
     self.assertEqual(msg.gitiles.fetch_log_deadline, 42)
 
   def test_get_self_config(self):
-    expected = service_config_pb2.AclCfg(service_access_group='group')
+    expected = service_config_pb2.AclCfg(project_access_group='group')
 
     self.mock(storage, 'get_config_hash_async', mock.Mock())
     self.mock(storage, 'get_config_by_hash_async', mock.Mock())
     storage.get_config_hash_async.return_value = future(
         ('deadbeef', 'beefdead'))
     storage.get_config_by_hash_async.return_value = future(
-        'service_access_group: "group"')
+        'project_access_group: "group"')
 
     actual = storage.get_self_config_async(
         'acl.cfg', service_config_pb2.AclCfg).get_result()

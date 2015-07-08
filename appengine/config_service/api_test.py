@@ -31,9 +31,11 @@ class ApiTest(test_case.EndpointsTestCase):
 
   def setUp(self):
     super(ApiTest, self).setUp()
-    self.mock(acl, 'has_project_access', mock.Mock(return_value=True))
-    self.mock(acl, 'can_read_config_set', mock.Mock(return_value=True))
-    self.mock(acl, 'can_read_project_config', mock.Mock(return_value=True))
+    self.mock(acl, 'has_project_access', mock.Mock())
+    acl.has_project_access.side_effect = (
+        lambda pid: pid != 'secret'
+    )
+    self.mock(acl, 'has_service_access', mock.Mock(return_value=True))
     self.mock(projects, 'get_projects', mock.Mock())
     projects.get_projects.return_value = [
       service_config_pb2.Project(id='chromium'),
@@ -84,7 +86,7 @@ class ApiTest(test_case.EndpointsTestCase):
     })
 
   def test_get_config_one_forbidden(self):
-    acl.can_read_config_set.return_value = False
+    self.mock(acl, 'can_read_config_set', mock.Mock(return_value=False))
     with self.call_should_fail(httplib.FORBIDDEN):
       req = {
         'config_set': 'services/x',
@@ -119,7 +121,7 @@ class ApiTest(test_case.EndpointsTestCase):
       'services/x': 'http://x',
       'services/y': 'http://y',
     })
-    acl.can_read_config_set.side_effect = [True, False]
+    self.mock(acl, 'can_read_config_set', mock.Mock(side_effect=[True, False]))
 
     resp = self.call_api('get_mapping', {}).json_body
 
@@ -194,7 +196,7 @@ class ApiTest(test_case.EndpointsTestCase):
       self.call_api('get_config', req)
 
   def test_get_wrong_config_set(self):
-    acl.can_read_config_set.side_effect = ValueError
+    self.mock(acl, 'can_read_config_set', mock.Mock(side_effect=ValueError))
 
     req = {
       'config_set': 'xxx',
@@ -205,14 +207,14 @@ class ApiTest(test_case.EndpointsTestCase):
       self.call_api('get_config', req).json_body
 
   def test_get_config_without_permissions(self):
-    acl.can_read_config_set.return_value = False
+    self.mock(acl, 'can_read_config_set', mock.Mock(return_value=False))
     self.mock(storage, 'get_config_hash_async', mock.Mock())
 
     req = {
       'config_set': 'services/luci-config',
       'path': 'projects.cfg',
     }
-    with self.call_should_fail(httplib.NOT_FOUND):
+    with self.call_should_fail(404):
       self.call_api('get_config', req)
     self.assertFalse(storage.get_config_hash_async.called)
 
@@ -242,16 +244,20 @@ class ApiTest(test_case.EndpointsTestCase):
       service_config_pb2.Project(id='chromium'),
       service_config_pb2.Project(id='v8'),
       service_config_pb2.Project(id='inconsistent'),
+      service_config_pb2.Project(id='secret'),
     ]
     projects.get_metadata.side_effect = [
-      project_config_pb2.ProjectCfg(name='Chromium, the best browser'),
-      project_config_pb2.ProjectCfg(),
-      project_config_pb2.ProjectCfg(),
+      project_config_pb2.ProjectCfg(
+          name='Chromium, the best browser', access='all'),
+      project_config_pb2.ProjectCfg(access='all'),
+      project_config_pb2.ProjectCfg(access='all'),
+      project_config_pb2.ProjectCfg(access='administrators'),
     ]
     projects.get_repo.side_effect = [
       (projects.RepositoryType.GITILES, 'http://localhost/chromium'),
       (projects.RepositoryType.GITILES, 'http://localhost/v8'),
-      (None, None)
+      (None, None),
+      (projects.RepositoryType.GITILES, 'http://localhost/secret'),
     ]
 
     resp = self.call_api('get_projects', {}).json_body
@@ -274,8 +280,7 @@ class ApiTest(test_case.EndpointsTestCase):
 
   def test_get_projects_without_permissions(self):
     acl.has_project_access.return_value = False
-    with self.call_should_fail(httplib.FORBIDDEN):
-      self.call_api('get_projects', {})
+    self.call_api('get_projects', {})
 
   ##############################################################################
   # get_refs
@@ -295,18 +300,18 @@ class ApiTest(test_case.EndpointsTestCase):
 
   def test_get_refs_without_permissions(self):
     self.mock_refs()
-    acl.can_read_project_config.return_value = False
+    acl.has_project_access.side_effect = None
+    acl.has_project_access.return_value = False
 
     req = {'project_id': 'chromium'}
     with self.call_should_fail(httplib.NOT_FOUND):
       self.call_api('get_refs', req)
     self.assertFalse(projects.get_refs.called)
 
-
   def test_get_refs_of_non_existent_project(self):
     self.mock(projects, 'get_refs', mock.Mock())
     projects.get_refs.return_value = None
-    req = {'project_id': 'nonexistent'}
+    req = {'project_id': 'non-existent'}
     with self.call_should_fail(httplib.NOT_FOUND):
       self.call_api('get_refs', req)
 
@@ -315,6 +320,10 @@ class ApiTest(test_case.EndpointsTestCase):
 
   def test_get_config_multi(self):
     self.mock_refs()
+    projects.get_projects.return_value.extend([
+      service_config_pb2.Project(id='inconsistent'),
+      service_config_pb2.Project(id='secret'),
+    ])
 
     self.mock(storage, 'get_latest_multi_async', mock.Mock())
     storage.get_latest_multi_async.return_value = future([
@@ -345,16 +354,8 @@ class ApiTest(test_case.EndpointsTestCase):
     })
     config_sets_arg = storage.get_latest_multi_async.call_args[0][0]
     self.assertEqual(
-        list(config_sets_arg), ['projects/chromium', 'projects/v8'])
-
-  def test_get_project_configs_without_permission(self):
-    self.mock(api, 'get_projects', mock.Mock())
-    acl.has_project_access.return_value = False
-
-    req = {'path': 'cq.cfg'}
-    with self.call_should_fail(httplib.FORBIDDEN):
-      self.call_api('get_project_configs', req)
-    self.assertFalse(api.get_projects.called)
+        list(config_sets_arg),
+        ['projects/chromium', 'projects/v8', 'projects/inconsistent'])
 
   ##############################################################################
   # get_ref_configs
@@ -380,13 +381,11 @@ class ApiTest(test_case.EndpointsTestCase):
         ])
 
   def test_get_ref_configs_without_permission(self):
-    self.mock(api, 'get_projects', mock.Mock())
     acl.has_project_access.return_value = False
 
     req = {'path': 'cq.cfg'}
-    with self.call_should_fail(httplib.NOT_FOUND):
-      self.call_api('get_ref_configs', req)
-    self.assertFalse(api.get_projects.called)
+    resp = self.call_api('get_ref_configs', req).json_body
+    self.assertEqual(resp, {})
 
 
 if __name__ == '__main__':

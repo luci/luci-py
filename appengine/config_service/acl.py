@@ -10,6 +10,8 @@ from components import utils
 
 from proto import service_config_pb2
 import common
+import projects
+import services
 import storage
 
 
@@ -18,8 +20,22 @@ def read_acl_cfg():
   return storage.get_self_config_async(
       common.ACL_FILENAME, service_config_pb2.AclCfg).get_result()
 
+def _has_access(access_list):
+  cur_ident = auth.get_current_identity().to_bytes()
+  for ac in access_list:
+    if ac.startswith('group:'):
+      if auth.is_group_member(ac.split(':', 2)[1]):
+        return True
+    else:
+      identity_str = ac
+      if ':' not in identity_str:
+        identity_str = 'user:%s' % identity_str
+      if cur_ident == identity_str:
+        return True
+  return False
 
-def can_read_config_set(config_set, headers=None):
+
+def can_read_config_set(config_set):
   """Returns True if current requester has access to the |config_set|.
 
   Raise:
@@ -29,17 +45,17 @@ def can_read_config_set(config_set, headers=None):
     service_match = config.SERVICE_CONFIG_SET_RGX.match(config_set)
     if service_match:
       service_name = service_match.group(1)
-      return can_read_service_config(service_name, headers=headers)
+      return has_service_access(service_name)
 
     project_match = config.PROJECT_CONFIG_SET_RGX.match(config_set)
     if project_match:
       project_id = project_match.group(1)
-      return can_read_project_config(project_id)
+      return has_project_access(project_id)
 
     ref_match = config.REF_CONFIG_SET_RGX.match(config_set)
     if ref_match:
       project_id = ref_match.group(1)
-      return can_read_project_config(project_id)
+      return has_project_access(project_id)
 
   except ValueError:  # pragma: no cover
     # Make sure we don't let ValueError raise for a reason different than
@@ -49,32 +65,26 @@ def can_read_config_set(config_set, headers=None):
   raise ValueError()
 
 
-def can_read_service_config(service_id, headers=None):
+def has_service_access(service_id):
   """Returns True if current requester can read service configs.
 
-  If X-Appengine-Inbound-Appid header matches service_id, the permission is
-  granted.
+  An app <app-id> has access to configs of service with id <app-id>.
   """
   assert isinstance(service_id, basestring)
   assert service_id
 
-  group = read_acl_cfg().service_access_group
+  if auth.is_admin():
+    return True
+
+  service_cfg = services.get_service_async(service_id).get_result()
+  return service_cfg and _has_access(service_cfg.access)
+
+
+def has_project_access(project_id):
+  metadata = projects.get_metadata(project_id)
+  super_group = read_acl_cfg().project_access_group
   return (
       auth.is_admin() or
-      group and auth.is_group_member(group) or
-      (headers or {}).get('X-Appengine-Inbound-Appid') == service_id
+      super_group and auth.is_group_member(super_group) or
+      metadata and _has_access(metadata.access)
   )
-
-
-# pylint: disable=W0613
-def can_read_project_config(project_id):  # pragma: no cover
-  return has_project_access()
-
-
-def can_read_project_list():  # pragma: no cover
-  return has_project_access()
-
-
-def has_project_access():
-  group = read_acl_cfg().project_access_group
-  return auth.is_admin() or (group and auth.is_group_member(group))
