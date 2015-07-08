@@ -75,6 +75,24 @@ class ValidationTestCase(test_case.TestCase):
         ]
     )
 
+  def test_validate_acl_cfg(self):
+    cfg = '''
+      invalid_field: "admins"
+    '''
+    result = validation.validate_config(
+        config.self_config_set(), 'acl.cfg', cfg)
+    self.assertEqual(len(result.messages), 1)
+    self.assertEqual(result.messages[0].severity, logging.ERROR)
+    self.assertTrue(
+        result.messages[0].text.startswith('Could not parse config'))
+
+    cfg = '''
+      project_access_group: "admins"
+    '''
+    result = validation.validate_config(
+        config.self_config_set(), 'acl.cfg', cfg)
+    self.assertEqual(len(result.messages), 0)
+
   def test_validate_services_registry(self):
     cfg = '''
       services {

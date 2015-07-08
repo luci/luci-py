@@ -217,8 +217,8 @@ def validate_service_dynamic_metadata_blob(metadata, ctx):
 
 @validation.self_rule(common.ACL_FILENAME, service_config_pb2.AclCfg)
 def validate_acl_cfg(cfg, ctx):
-  if cfg.project_config_access:
-    validate_group(cfg.project_config_access, ctx)
+  if cfg.project_access_group:
+    validate_group(cfg.project_access_group, ctx)
 
 
 @validation.self_rule(common.IMPORT_FILENAME, service_config_pb2.ImportCfg)
