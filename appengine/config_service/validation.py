@@ -186,7 +186,7 @@ def validate_service_dynamic_metadata_blob(metadata, ctx):
     ctx.error('Service dynamic metadata must be an object')
     return
 
-  if not metadata.get('version') != '1.0':
+  if metadata.get('version') != '1.0':
     ctx.error(
         'Expected format version 1.0, but found "%s"', metadata.get('version'))
 

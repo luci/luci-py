@@ -151,10 +151,13 @@ class ValidationTestCase(test_case.TestCase):
           [m.text for m in ctx.result().messages], expected_messages)
 
     expect_errors([], ['Service dynamic metadata must be an object'])
-    expect_errors({}, [])
-    expect_errors({'validation': 'bad'}, ['validation: must be an object'])
+    expect_errors({}, ['Expected format version 1.0, but found "None"'])
+    expect_errors(
+        {'version': '1.0', 'validation': 'bad'},
+        ['validation: must be an object'])
     expect_errors(
         {
+          'version': '1.0',
           'validation': {
             'patterns': 'bad',
           }
@@ -165,6 +168,7 @@ class ValidationTestCase(test_case.TestCase):
         ])
     expect_errors(
       {
+        'version': '1.0',
         'validation': {
           'url': 'bad url',
           'patterns': [
