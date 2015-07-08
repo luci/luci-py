@@ -156,7 +156,8 @@ class ConfigApi(remote.Service):
     return res
 
   @auth.endpoints_method(
-      message_types.VoidMessage, ServiceDynamicMetadata, path='metadata')
+      message_types.VoidMessage, ServiceDynamicMetadata,
+      http_method='GET', path='metadata')
   @auth.require(is_trusted_requester)
   def get_metadata(self, _request):
     """Describes a service. Used by config service to discover other services.
