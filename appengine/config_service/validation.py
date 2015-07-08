@@ -10,6 +10,7 @@ import urlparse
 
 from google.appengine.ext import ndb
 
+from components import auth
 from components import config
 from components import gitiles
 from components import net
@@ -18,6 +19,7 @@ from components.config import validation
 from proto import project_config_pb2
 from proto import service_config_pb2
 import common
+import services
 import storage
 
 
@@ -50,44 +52,55 @@ def validate_url(url, ctx):
 
 
 def validate_pattern(pattern, literal_validator, ctx):
+  try:
+    config.validation.compile_pattern(pattern)
+  except ValueError as ex:
+    ctx.error(ex.message)
+    return
+
   if ':' not in pattern:
     literal_validator(pattern, ctx)
+  elif pattern.startswith('text:'):
+    literal_validator(pattern.split(':', 2)[1], ctx)
+
+
+def check_id_sorted(iterable, list_name, ctx):
+  """Emits a warning if the iterable is not sorted by id."""
+  prev = None
+  for item in iterable:
+    if not item.id:
+      continue
+    if prev is not None and item.id < prev:
+      ctx.warning(
+          '%s are not sorted by id. First offending id: %s', list_name, item.id)
+      return
+    prev = item.id
+
+
+def validate_id(id, rgx, known_ids, ctx):
+  if not id:
+    ctx.error('id is not specified')
     return
-
-  pattern_type, pattern_text = pattern.split(':', 2)
-  if pattern_type != 'regex':
-    ctx.error('unknown pattern type: %s', pattern_type)
+  if not rgx.match(id):
+    ctx.error('id "%s" does not match %s regex', id, rgx.pattern)
     return
-  try:
-    re.compile(pattern_text)
-  except re.error as ex:
-    ctx.error('invalid regular expression "%s": %s', pattern_text, ex)
-
-
-@validation.self_rule(
-    common.VALIDATION_FILENAME, service_config_pb2.ValidationCfg)
-def validate_validation_cfg(cfg, ctx):
-  for i, rule in enumerate(cfg.rules):
-    with ctx.prefix('Rule #%d: ', i + 1):
-      with ctx.prefix('config_set: '):
-        validate_pattern(rule.config_set, validate_config_set, ctx)
-      with ctx.prefix('path: '):
-        validate_pattern(rule.path, validate_path, ctx)
-      with ctx.prefix('url: '):
-        validate_url(rule.url, ctx)
+  if id in known_ids:
+    ctx.error('id is not unique')
+  else:
+    known_ids.add(id)
 
 
 def validate_config_set_location(loc, ctx, allow_relative_url=False):
   if not loc:
     ctx.error('not specified')
     return
-  if loc.storage_type == service_config_pb2.ConfigSetLocation.UNSET:
+  if allow_relative_url and is_url_relative(loc.url):
+    if loc.storage_type != service_config_pb2.ConfigSetLocation.UNSET:
+      ctx.error('storage_type must not be set if relative url is used')
+  elif loc.storage_type == service_config_pb2.ConfigSetLocation.UNSET:
     ctx.error('storage_type is not set')
   else:
     assert loc.storage_type == service_config_pb2.ConfigSetLocation.GITILES
-    if allow_relative_url and is_url_relative(loc.url):
-      # It is relative. Avoid calling gitiles.Location.parse.
-      return
     try:
       gitiles.Location.parse(loc.url)
     except ValueError as ex:
@@ -98,27 +111,75 @@ def validate_config_set_location(loc, ctx, allow_relative_url=False):
     common.PROJECT_REGISTRY_FILENAME, service_config_pb2.ProjectsCfg)
 def validate_project_registry(cfg, ctx):
   project_ids = set()
-  unsorted_id = None
   for i, project in enumerate(cfg.projects):
     with ctx.prefix('Project %s: ', project.id or ('#%d' % (i + 1))):
-      if not project.id:
-        ctx.error('id is not specified')
-      else:
-        if project.id in project_ids:
-          ctx.error('id is not unique')
-        else:
-          project_ids.add(project.id)
-        if not unsorted_id and i > 0:
-          if cfg.projects[i - 1].id and project.id < cfg.projects[i - 1].id:
-            unsorted_id = project.id
+      validate_id(project.id, config.common.PROJECT_ID_RGX, project_ids, ctx)
       with ctx.prefix('config_location: '):
         validate_config_set_location(project.config_location, ctx)
+  check_id_sorted(cfg.projects, 'Projects', ctx)
 
 
-  if unsorted_id:
-    ctx.warning(
-        'Project list is not sorted by id. First offending id: %s',
-        unsorted_id)
+def validate_email(email, ctx):
+  try:
+    auth.Identity('user', email)
+  except ValueError as ex:
+    ctx.error('invalid email: "%s"', email)
+
+
+@validation.self_rule(
+    common.SERVICES_REGISTRY_FILENAME, service_config_pb2.ServicesCfg)
+def validate_services_cfg(cfg, ctx):
+  service_ids = set()
+  for i, service in enumerate(cfg.services):
+    with ctx.prefix('Service %s: ', service.id or ('#%d' % (i + 1))):
+      validate_id(service.id, config.common.SERVICE_ID_RGX, service_ids, ctx)
+      if service.config_location and service.config_location.url:
+        with ctx.prefix('config_location: '):
+          validate_config_set_location(
+              service.config_location, ctx, allow_relative_url=True)
+      for owner in service.owners:
+        validate_email(owner, ctx)
+
+      if service.metadata_url:
+        with ctx.prefix('metadata_url: '):
+          validate_url(service.metadata_url, ctx)
+
+  check_id_sorted(cfg.services, 'Services', ctx)
+
+
+def validate_service_dynamic_metadata_blob(metadata, ctx):
+  """Validates JSON-encoded ServiceDynamicMetadata"""
+  if not isinstance(metadata, dict):
+    ctx.error('Service dynamic metadata must be an object')
+    return
+
+  if not metadata.get('version') != '1.0':
+    ctx.error(
+        'Expected format version 1.0, but found "%s"', metadata.get('version'))
+
+  validation = metadata.get('validation')
+  if validation is None:
+    return
+
+  with ctx.prefix('validation: '):
+    if not isinstance(validation, dict):
+      ctx.error('must be an object')
+      return
+    with ctx.prefix('url: '):
+      validate_url(validation.get('url'), ctx)
+    patterns = validation.get('patterns')
+    if not isinstance(patterns, list):
+      ctx.error('patterns must be a list')
+      return
+    for i, p in enumerate(patterns):
+      with ctx.prefix('pattern #%d: ', i + 1):
+        if not isinstance(p, dict):
+          ctx.error('must be an object')
+          continue
+        with ctx.prefix('config_set: '):
+          validate_pattern(p.get('config_set'), validate_config_set, ctx)
+        with ctx.prefix('path: '):
+          validate_pattern(p.get('path'), validate_path, ctx)
 
 
 @validation.self_rule(common.ACL_FILENAME, service_config_pb2.AclCfg)
@@ -184,8 +245,29 @@ def validate_refs_cfg(cfg, ctx):
 
 
 @ndb.tasklet
-def _endpoint_validate_async(url, config_set, path, content, ctx):
+def _validate_by_service_async(service, config_set, path, content, ctx):
   """Validates a config with an external service."""
+  try:
+    metadata = yield services.get_metadata_async(service.id)
+  except services.DynamicMetadataError as ex:
+    logging.error('Could not load dynamic metadata for %s: %s', service.id, ex)
+    return
+
+  assert metadata and metadata.validation
+  url = metadata.validation.url
+  if not url:
+    return
+
+  match = False
+  for p in metadata.validation.patterns:
+    # TODO(nodir): optimize if necessary.
+    if (validation.compile_pattern(p.config_set)(config_set) and
+        validation.compile_pattern(p.path)(path)):
+      match = True
+      break
+  if not match:
+    return
+
   res = None
 
   def report_error(text):
@@ -205,8 +287,7 @@ def _endpoint_validate_async(url, config_set, path, content, ctx):
       'content': base64.b64encode(content),
     }
     res = yield net.json_request_async(
-        url, method='POST', payload=req,
-        scope='https://www.googleapis.com/auth/userinfo.email')
+        url, method='POST', payload=req, scope=net.EMAIL_SCOPE)
   except net.Error as ex:
     report_error('Net error: %s' % ex)
     return
@@ -245,17 +326,11 @@ def validate_config_async(config_set, path, content, ctx=None):
   # defined using validation.self_rule.
   validation.validate(config_set, path, content, ctx=ctx)
 
-  validation_cfg = yield storage.get_self_config_async(
-      common.VALIDATION_FILENAME, service_config_pb2.ValidationCfg)
-  # Be paranoid, check yourself.
-  validate_validation_cfg(validation_cfg, validation.Context.raise_on_error())
-
+  all_services = yield services.get_services_async()
   futures = []
-  for rule in validation_cfg.rules:
-    if (_pattern_match(rule.config_set, config_set) and
-        _pattern_match(rule.path, path)):
-      futures.append(
-          _endpoint_validate_async(rule.url, config_set, path, content, ctx))
+  for service in all_services:
+    futures.append(
+        _validate_by_service_async(service, config_set, path, content, ctx))
   yield futures
   raise ndb.Return(ctx.result())
 
@@ -263,16 +338,6 @@ def validate_config_async(config_set, path, content, ctx=None):
 def validate_config(*args, **kwargs):
   """Blocking version of validate_async."""
   return validate_config_async(*args, **kwargs).get_result()
-
-
-def _pattern_match(pattern, value):
-  # Assume pattern is valid.
-  if ':' not in pattern:
-    return pattern == value
-  else:
-    kind, pattern = pattern.split(':', 2)
-    assert kind == 'regex'
-    return bool(re.match('^%s$' % pattern, value))
 
 
 def is_url_relative(url):

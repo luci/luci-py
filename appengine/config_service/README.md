@@ -2,17 +2,17 @@
 
   - Stores and imports config files from repositories, such as Gitiles.
   - Provides read-only access to config files and encapsulates their location.
+  - Stores a registry of LUCI services.
   - Stores a registry of projects that use LUCI services.
-
 
 ## Quick examples
 
 ### Service config example
 Auth service admins keep client id whitelist and configuration of group import
-from externa sources. They can store these configs as files in Gitiles.
-Config service can be configured to import them from Gitiles to
-to `services/auth` config set. Auth service can use config component to
-access its own configs.
+from external sources. These configs are stored as files in Gitiles.
+Config service imports them from Gitiles to `services/<auth-service-app-id>`
+config set. Auth service can use
+[config component](../components/components/config) to access its the configs.
 
 As a result, Auth services has the following for free
 
@@ -61,11 +61,6 @@ There are three types of configs:
     `services/<service_id>` is always accessible to
     &lt;service-id&gt;.appspot.com.
 
-    `services/luci-config:projects.cfg` is a project registry. It contains
-    unique project ids (chromium, v8, skia) and location of project configs.
-    This list is available through get_projects() API. This is how projects are
-    discovered by services.
-
   2. Project configs. Project-wide branch-independent configs for services.
     This is what a project as a tenant tells a service about itself. Examples:
 
@@ -90,14 +85,42 @@ There are three types of configs:
     Ref configs live in `projects/<project_id>/<ref_name>` config
     set, where `<ref_name>` always starts with `refs/`.
 
+## Project registry
+
+`services/luci-config:projects.cfg` is a project registry. It contains unique
+project ids (chromium, v8, skia) and location of project configs. This list is
+available through get_projects() API. This is how projects are discovered by
+services.
+
+See [ProjectsCfg message](proto/service_config.proto) for more info.
+
+## Service registry
+
+`services/luci-config:services.cfg` is a service registry. It contains unique
+service ids (chrome-infra-auth, swarming), location of configs if different from
+default and metadata url.
+
+See [ServicesCfg message](proto/service_config.proto) for more info.
+
+## Configuration validation
+
+Config files are validated and config set revisions containing invalid configs
+are not imported. Configs of the config service (services/luci-config config
+set) are validated by the config service. Other configs can be validated by
+registered services. A service may expose a list of config patterns that it is
+able to validate and the config service will call service's endpoint to
+validate.
+
+See [ServicesCfg and Validator messages](proto/service_config.proto) for more
+info.
 
 ## GAE component
 
-config component can be used by a GAE app to read configs.
-
+[config component](../components/components/config) can be used by a GAE app to
+read configs.
 
 ## Config import
 
 Configs are continuously imported from external sources to the datastore by
-config service backend.
+config service backend, with 10 min latency.
 [Read more](https://github.com/luci/luci-py/wiki/Config-service:-config-import)

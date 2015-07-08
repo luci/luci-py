@@ -143,7 +143,7 @@ class RemoteTestCase(test_case.TestCase):
     self.assertEqual(r, 'http://example.com')
     net.json_request_async.assert_called_once_with(
         'https://luci-config.appspot.com/_ah/api/config/v1/mapping',
-        scopes='https://www.googleapis.com/auth/userinfo.email',
+        scopes=net.EMAIL_SCOPE,
         params={'config_set': 'services/abc'})
 
   def test_cron_update_last_good_configs(self):

@@ -13,7 +13,7 @@ from google.protobuf import descriptor_pb2
 DESCRIPTOR = _descriptor.FileDescriptor(
   name='service_config.proto',
   package='luci.config',
-  serialized_pb='\n\x14service_config.proto\x12\x0bluci.config\"\x89\x01\n\x11\x43onfigSetLocation\x12\x0b\n\x03url\x18\x01 \x01(\t\x12@\n\x0cstorage_type\x18\x02 \x01(\x0e\x32*.luci.config.ConfigSetLocation.StorageType\"%\n\x0bStorageType\x12\t\n\x05UNSET\x10\x00\x12\x0b\n\x07GITILES\x10\x01\"N\n\x07Project\x12\n\n\x02id\x18\x01 \x01(\t\x12\x37\n\x0f\x63onfig_location\x18\x02 \x01(\x0b\x32\x1e.luci.config.ConfigSetLocation\"5\n\x0bProjectsCfg\x12&\n\x08projects\x18\x01 \x03(\x0b\x32\x14.luci.config.Project\"D\n\x06\x41\x63lCfg\x12\x1c\n\x14service_access_group\x18\x01 \x01(\t\x12\x1c\n\x14project_access_group\x18\x02 \x01(\t\"\xee\x01\n\tImportCfg\x12/\n\x07gitiles\x18\x01 \x01(\x0b\x32\x1e.luci.config.ImportCfg.Gitiles\x1a\xaf\x01\n\x07Gitiles\x12\x1a\n\x12\x66\x65tch_log_deadline\x18\x01 \x01(\x05\x12\x1e\n\x16\x66\x65tch_archive_deadline\x18\x02 \x01(\x05\x12\"\n\x1aproject_config_default_ref\x18\x03 \x01(\t\x12#\n\x1bproject_config_default_path\x18\x04 \x01(\t\x12\x1f\n\x17ref_config_default_path\x18\x05 \x01(\t\"b\n\nSchemasCfg\x12/\n\x07schemas\x18\x01 \x03(\x0b\x32\x1e.luci.config.SchemasCfg.Schema\x1a#\n\x06Schema\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x0b\n\x03url\x18\x02 \x01(\t\"v\n\rValidationCfg\x12.\n\x05rules\x18\x01 \x03(\x0b\x32\x1f.luci.config.ValidationCfg.Rule\x1a\x35\n\x04Rule\x12\x12\n\nconfig_set\x18\x01 \x01(\t\x12\x0c\n\x04path\x18\x02 \x01(\t\x12\x0b\n\x03url\x18\x03 \x01(\t\"M\n\x18ValidationRequestMessage\x12\x12\n\nconfig_set\x18\x01 \x01(\t\x12\x0c\n\x04path\x18\x02 \x01(\t\x12\x0f\n\x07\x63ontent\x18\x03 \x01(\t\"\x80\x02\n\x19ValidationResponseMessage\x12@\n\x08messages\x18\x01 \x03(\x0b\x32..luci.config.ValidationResponseMessage.Message\x1aZ\n\x07Message\x12\x0c\n\x04text\x18\x01 \x01(\t\x12\x41\n\x08severity\x18\x02 \x01(\x0e\x32/.luci.config.ValidationResponseMessage.Severity\"E\n\x08Severity\x12\t\n\x05\x44\x45\x42UG\x10\n\x12\x08\n\x04INFO\x10\x14\x12\x0b\n\x07WARNING\x10\x1e\x12\t\n\x05\x45RROR\x10(\x12\x0c\n\x08\x43RITICAL\x10\x32')
+  serialized_pb='\n\x14service_config.proto\x12\x0bluci.config\"\x89\x01\n\x11\x43onfigSetLocation\x12\x0b\n\x03url\x18\x01 \x01(\t\x12@\n\x0cstorage_type\x18\x02 \x01(\x0e\x32*.luci.config.ConfigSetLocation.StorageType\"%\n\x0bStorageType\x12\t\n\x05UNSET\x10\x00\x12\x0b\n\x07GITILES\x10\x01\"N\n\x07Project\x12\n\n\x02id\x18\x01 \x01(\t\x12\x37\n\x0f\x63onfig_location\x18\x02 \x01(\x0b\x32\x1e.luci.config.ConfigSetLocation\"5\n\x0bProjectsCfg\x12&\n\x08projects\x18\x01 \x03(\x0b\x32\x14.luci.config.Project\"t\n\x07Service\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0e\n\x06owners\x18\x02 \x03(\t\x12\x37\n\x0f\x63onfig_location\x18\x03 \x01(\x0b\x32\x1e.luci.config.ConfigSetLocation\x12\x14\n\x0cmetadata_url\x18\x04 \x01(\t\"U\n\x16ServiceDynamicMetadata\x12\x0f\n\x07version\x18\x01 \x01(\t\x12*\n\nvalidation\x18\x02 \x01(\x0b\x32\x16.luci.config.Validator\"5\n\x0bServicesCfg\x12&\n\x08services\x18\x01 \x03(\x0b\x32\x14.luci.config.Service\"D\n\x06\x41\x63lCfg\x12\x1c\n\x14service_access_group\x18\x01 \x01(\t\x12\x1c\n\x14project_access_group\x18\x02 \x01(\t\"\xee\x01\n\tImportCfg\x12/\n\x07gitiles\x18\x01 \x01(\x0b\x32\x1e.luci.config.ImportCfg.Gitiles\x1a\xaf\x01\n\x07Gitiles\x12\x1a\n\x12\x66\x65tch_log_deadline\x18\x01 \x01(\x05\x12\x1e\n\x16\x66\x65tch_archive_deadline\x18\x02 \x01(\x05\x12\"\n\x1aproject_config_default_ref\x18\x03 \x01(\t\x12#\n\x1bproject_config_default_path\x18\x04 \x01(\t\x12\x1f\n\x17ref_config_default_path\x18\x05 \x01(\t\"b\n\nSchemasCfg\x12/\n\x07schemas\x18\x01 \x03(\x0b\x32\x1e.luci.config.SchemasCfg.Schema\x1a#\n\x06Schema\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x0b\n\x03url\x18\x02 \x01(\t\"1\n\rConfigPattern\x12\x12\n\nconfig_set\x18\x01 \x01(\t\x12\x0c\n\x04path\x18\x02 \x01(\t\"F\n\tValidator\x12,\n\x08patterns\x18\x01 \x03(\x0b\x32\x1a.luci.config.ConfigPattern\x12\x0b\n\x03url\x18\x02 \x01(\t\"M\n\x18ValidationRequestMessage\x12\x12\n\nconfig_set\x18\x01 \x01(\t\x12\x0c\n\x04path\x18\x02 \x01(\t\x12\x0f\n\x07\x63ontent\x18\x03 \x01(\t\"\x80\x02\n\x19ValidationResponseMessage\x12@\n\x08messages\x18\x01 \x03(\x0b\x32..luci.config.ValidationResponseMessage.Message\x1aZ\n\x07Message\x12\x0c\n\x04text\x18\x01 \x01(\t\x12\x41\n\x08severity\x18\x02 \x01(\x0e\x32/.luci.config.ValidationResponseMessage.Severity\"E\n\x08Severity\x12\t\n\x05\x44\x45\x42UG\x10\n\x12\x08\n\x04INFO\x10\x14\x12\x0b\n\x07WARNING\x10\x1e\x12\t\n\x05\x45RROR\x10(\x12\x0c\n\x08\x43RITICAL\x10\x32')
 
 
 
@@ -67,8 +67,8 @@ _VALIDATIONRESPONSEMESSAGE_SEVERITY = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   options=None,
-  serialized_start=1110,
-  serialized_end=1179,
+  serialized_start=1373,
+  serialized_end=1442,
 )
 
 
@@ -171,6 +171,118 @@ _PROJECTSCFG = _descriptor.Descriptor(
 )
 
 
+_SERVICE = _descriptor.Descriptor(
+  name='Service',
+  full_name='luci.config.Service',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='id', full_name='luci.config.Service.id', index=0,
+      number=1, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=unicode("", "utf-8"),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='owners', full_name='luci.config.Service.owners', index=1,
+      number=2, type=9, cpp_type=9, label=3,
+      has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='config_location', full_name='luci.config.Service.config_location', index=2,
+      number=3, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='metadata_url', full_name='luci.config.Service.metadata_url', index=3,
+      number=4, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=unicode("", "utf-8"),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  options=None,
+  is_extendable=False,
+  extension_ranges=[],
+  serialized_start=312,
+  serialized_end=428,
+)
+
+
+_SERVICEDYNAMICMETADATA = _descriptor.Descriptor(
+  name='ServiceDynamicMetadata',
+  full_name='luci.config.ServiceDynamicMetadata',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='version', full_name='luci.config.ServiceDynamicMetadata.version', index=0,
+      number=1, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=unicode("", "utf-8"),
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='validation', full_name='luci.config.ServiceDynamicMetadata.validation', index=1,
+      number=2, type=11, cpp_type=10, label=1,
+      has_default_value=False, default_value=None,
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  options=None,
+  is_extendable=False,
+  extension_ranges=[],
+  serialized_start=430,
+  serialized_end=515,
+)
+
+
+_SERVICESCFG = _descriptor.Descriptor(
+  name='ServicesCfg',
+  full_name='luci.config.ServicesCfg',
+  filename=None,
+  file=DESCRIPTOR,
+  containing_type=None,
+  fields=[
+    _descriptor.FieldDescriptor(
+      name='services', full_name='luci.config.ServicesCfg.services', index=0,
+      number=1, type=11, cpp_type=10, label=3,
+      has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+  ],
+  extensions=[
+  ],
+  nested_types=[],
+  enum_types=[
+  ],
+  options=None,
+  is_extendable=False,
+  extension_ranges=[],
+  serialized_start=517,
+  serialized_end=570,
+)
+
+
 _ACLCFG = _descriptor.Descriptor(
   name='AclCfg',
   full_name='luci.config.AclCfg',
@@ -201,8 +313,8 @@ _ACLCFG = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=312,
-  serialized_end=380,
+  serialized_start=572,
+  serialized_end=640,
 )
 
 
@@ -257,8 +369,8 @@ _IMPORTCFG_GITILES = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=446,
-  serialized_end=621,
+  serialized_start=706,
+  serialized_end=881,
 )
 
 _IMPORTCFG = _descriptor.Descriptor(
@@ -284,8 +396,8 @@ _IMPORTCFG = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=383,
-  serialized_end=621,
+  serialized_start=643,
+  serialized_end=881,
 )
 
 
@@ -319,8 +431,8 @@ _SCHEMASCFG_SCHEMA = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=686,
-  serialized_end=721,
+  serialized_start=946,
+  serialized_end=981,
 )
 
 _SCHEMASCFG = _descriptor.Descriptor(
@@ -346,35 +458,28 @@ _SCHEMASCFG = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=623,
-  serialized_end=721,
+  serialized_start=883,
+  serialized_end=981,
 )
 
 
-_VALIDATIONCFG_RULE = _descriptor.Descriptor(
-  name='Rule',
-  full_name='luci.config.ValidationCfg.Rule',
+_CONFIGPATTERN = _descriptor.Descriptor(
+  name='ConfigPattern',
+  full_name='luci.config.ConfigPattern',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   fields=[
     _descriptor.FieldDescriptor(
-      name='config_set', full_name='luci.config.ValidationCfg.Rule.config_set', index=0,
+      name='config_set', full_name='luci.config.ConfigPattern.config_set', index=0,
       number=1, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=unicode("", "utf-8"),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
     _descriptor.FieldDescriptor(
-      name='path', full_name='luci.config.ValidationCfg.Rule.path', index=1,
+      name='path', full_name='luci.config.ConfigPattern.path', index=1,
       number=2, type=9, cpp_type=9, label=1,
-      has_default_value=False, default_value=unicode("", "utf-8"),
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      options=None),
-    _descriptor.FieldDescriptor(
-      name='url', full_name='luci.config.ValidationCfg.Rule.url', index=2,
-      number=3, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=unicode("", "utf-8"),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
@@ -388,35 +493,43 @@ _VALIDATIONCFG_RULE = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=788,
-  serialized_end=841,
+  serialized_start=983,
+  serialized_end=1032,
 )
 
-_VALIDATIONCFG = _descriptor.Descriptor(
-  name='ValidationCfg',
-  full_name='luci.config.ValidationCfg',
+
+_VALIDATOR = _descriptor.Descriptor(
+  name='Validator',
+  full_name='luci.config.Validator',
   filename=None,
   file=DESCRIPTOR,
   containing_type=None,
   fields=[
     _descriptor.FieldDescriptor(
-      name='rules', full_name='luci.config.ValidationCfg.rules', index=0,
+      name='patterns', full_name='luci.config.Validator.patterns', index=0,
       number=1, type=11, cpp_type=10, label=3,
       has_default_value=False, default_value=[],
+      message_type=None, enum_type=None, containing_type=None,
+      is_extension=False, extension_scope=None,
+      options=None),
+    _descriptor.FieldDescriptor(
+      name='url', full_name='luci.config.Validator.url', index=1,
+      number=2, type=9, cpp_type=9, label=1,
+      has_default_value=False, default_value=unicode("", "utf-8"),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       options=None),
   ],
   extensions=[
   ],
-  nested_types=[_VALIDATIONCFG_RULE, ],
+  nested_types=[],
   enum_types=[
   ],
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=723,
-  serialized_end=841,
+  serialized_start=1034,
+  serialized_end=1104,
 )
 
 
@@ -457,8 +570,8 @@ _VALIDATIONREQUESTMESSAGE = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=843,
-  serialized_end=920,
+  serialized_start=1106,
+  serialized_end=1183,
 )
 
 
@@ -492,8 +605,8 @@ _VALIDATIONRESPONSEMESSAGE_MESSAGE = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=1018,
-  serialized_end=1108,
+  serialized_start=1281,
+  serialized_end=1371,
 )
 
 _VALIDATIONRESPONSEMESSAGE = _descriptor.Descriptor(
@@ -520,20 +633,22 @@ _VALIDATIONRESPONSEMESSAGE = _descriptor.Descriptor(
   options=None,
   is_extendable=False,
   extension_ranges=[],
-  serialized_start=923,
-  serialized_end=1179,
+  serialized_start=1186,
+  serialized_end=1442,
 )
 
 _CONFIGSETLOCATION.fields_by_name['storage_type'].enum_type = _CONFIGSETLOCATION_STORAGETYPE
 _CONFIGSETLOCATION_STORAGETYPE.containing_type = _CONFIGSETLOCATION;
 _PROJECT.fields_by_name['config_location'].message_type = _CONFIGSETLOCATION
 _PROJECTSCFG.fields_by_name['projects'].message_type = _PROJECT
+_SERVICE.fields_by_name['config_location'].message_type = _CONFIGSETLOCATION
+_SERVICEDYNAMICMETADATA.fields_by_name['validation'].message_type = _VALIDATOR
+_SERVICESCFG.fields_by_name['services'].message_type = _SERVICE
 _IMPORTCFG_GITILES.containing_type = _IMPORTCFG;
 _IMPORTCFG.fields_by_name['gitiles'].message_type = _IMPORTCFG_GITILES
 _SCHEMASCFG_SCHEMA.containing_type = _SCHEMASCFG;
 _SCHEMASCFG.fields_by_name['schemas'].message_type = _SCHEMASCFG_SCHEMA
-_VALIDATIONCFG_RULE.containing_type = _VALIDATIONCFG;
-_VALIDATIONCFG.fields_by_name['rules'].message_type = _VALIDATIONCFG_RULE
+_VALIDATOR.fields_by_name['patterns'].message_type = _CONFIGPATTERN
 _VALIDATIONRESPONSEMESSAGE_MESSAGE.fields_by_name['severity'].enum_type = _VALIDATIONRESPONSEMESSAGE_SEVERITY
 _VALIDATIONRESPONSEMESSAGE_MESSAGE.containing_type = _VALIDATIONRESPONSEMESSAGE;
 _VALIDATIONRESPONSEMESSAGE.fields_by_name['messages'].message_type = _VALIDATIONRESPONSEMESSAGE_MESSAGE
@@ -541,10 +656,14 @@ _VALIDATIONRESPONSEMESSAGE_SEVERITY.containing_type = _VALIDATIONRESPONSEMESSAGE
 DESCRIPTOR.message_types_by_name['ConfigSetLocation'] = _CONFIGSETLOCATION
 DESCRIPTOR.message_types_by_name['Project'] = _PROJECT
 DESCRIPTOR.message_types_by_name['ProjectsCfg'] = _PROJECTSCFG
+DESCRIPTOR.message_types_by_name['Service'] = _SERVICE
+DESCRIPTOR.message_types_by_name['ServiceDynamicMetadata'] = _SERVICEDYNAMICMETADATA
+DESCRIPTOR.message_types_by_name['ServicesCfg'] = _SERVICESCFG
 DESCRIPTOR.message_types_by_name['AclCfg'] = _ACLCFG
 DESCRIPTOR.message_types_by_name['ImportCfg'] = _IMPORTCFG
 DESCRIPTOR.message_types_by_name['SchemasCfg'] = _SCHEMASCFG
-DESCRIPTOR.message_types_by_name['ValidationCfg'] = _VALIDATIONCFG
+DESCRIPTOR.message_types_by_name['ConfigPattern'] = _CONFIGPATTERN
+DESCRIPTOR.message_types_by_name['Validator'] = _VALIDATOR
 DESCRIPTOR.message_types_by_name['ValidationRequestMessage'] = _VALIDATIONREQUESTMESSAGE
 DESCRIPTOR.message_types_by_name['ValidationResponseMessage'] = _VALIDATIONRESPONSEMESSAGE
 
@@ -565,6 +684,24 @@ class ProjectsCfg(_message.Message):
   DESCRIPTOR = _PROJECTSCFG
 
   # @@protoc_insertion_point(class_scope:luci.config.ProjectsCfg)
+
+class Service(_message.Message):
+  __metaclass__ = _reflection.GeneratedProtocolMessageType
+  DESCRIPTOR = _SERVICE
+
+  # @@protoc_insertion_point(class_scope:luci.config.Service)
+
+class ServiceDynamicMetadata(_message.Message):
+  __metaclass__ = _reflection.GeneratedProtocolMessageType
+  DESCRIPTOR = _SERVICEDYNAMICMETADATA
+
+  # @@protoc_insertion_point(class_scope:luci.config.ServiceDynamicMetadata)
+
+class ServicesCfg(_message.Message):
+  __metaclass__ = _reflection.GeneratedProtocolMessageType
+  DESCRIPTOR = _SERVICESCFG
+
+  # @@protoc_insertion_point(class_scope:luci.config.ServicesCfg)
 
 class AclCfg(_message.Message):
   __metaclass__ = _reflection.GeneratedProtocolMessageType
@@ -596,17 +733,17 @@ class SchemasCfg(_message.Message):
 
   # @@protoc_insertion_point(class_scope:luci.config.SchemasCfg)
 
-class ValidationCfg(_message.Message):
+class ConfigPattern(_message.Message):
   __metaclass__ = _reflection.GeneratedProtocolMessageType
+  DESCRIPTOR = _CONFIGPATTERN
 
-  class Rule(_message.Message):
-    __metaclass__ = _reflection.GeneratedProtocolMessageType
-    DESCRIPTOR = _VALIDATIONCFG_RULE
+  # @@protoc_insertion_point(class_scope:luci.config.ConfigPattern)
 
-    # @@protoc_insertion_point(class_scope:luci.config.ValidationCfg.Rule)
-  DESCRIPTOR = _VALIDATIONCFG
+class Validator(_message.Message):
+  __metaclass__ = _reflection.GeneratedProtocolMessageType
+  DESCRIPTOR = _VALIDATOR
 
-  # @@protoc_insertion_point(class_scope:luci.config.ValidationCfg)
+  # @@protoc_insertion_point(class_scope:luci.config.Validator)
 
 class ValidationRequestMessage(_message.Message):
   __metaclass__ = _reflection.GeneratedProtocolMessageType

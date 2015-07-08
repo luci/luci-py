@@ -178,6 +178,7 @@ def import_config_set(config_set, location):
 
 
 def import_services(location_root):
+  # TODO(nodir): import services from location specified in services.cfg
   assert location_root
   tree = location_root.get_tree()
 

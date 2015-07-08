@@ -15,6 +15,7 @@ utils.fix_protobuf_package()
 
 from google import protobuf
 
+from components import auth
 from components import utils
 from components.datastore_utils import config
 
@@ -32,7 +33,7 @@ PROJECT_ID_RGX = re.compile(r'^%s$' % PROJECT_ID_PATTERN)
 PROJECT_CONFIG_SET_RGX = re.compile(r'^projects/(%s)$' % PROJECT_ID_PATTERN)
 
 REF_CONFIG_SET_RGX = re.compile(
-    r'^projects/(%s)/(refs/.+$)' % PROJECT_ID_PATTERN)
+    r'^projects/(%s)/(refs/.+)$' % PROJECT_ID_PATTERN)
 
 ALL_CONFIG_SET_RGX = [
   SERVICE_CONFIG_SET_RGX,
@@ -56,6 +57,8 @@ CONSTANTS = lib_config.register('components_config', ConstantConfig.__dict__)
 class ConfigSettings(config.GlobalConfig):
   # Hostname of the config service.
   service_hostname = ndb.StringProperty(indexed=False)
+  # Identity account used by config service.
+  trusted_config_account = auth.IdentityProperty(indexed=False)
 
 
 ################################################################################

@@ -7,7 +7,7 @@ cron:
 - description: import configs from Gitiles
   target: backend
   url: /internal/cron/luci-config/gitiles_import
-  schedule: every 2 minutes
+  schedule: every 10 minutes
 
 ### ereporter2
 

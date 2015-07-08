@@ -47,6 +47,48 @@ message ProjectsCfg {
   repeated Project projects = 1;
 }
 
+/******************************************************************************/
+/* Services                                                                   */
+/******************************************************************************/
+
+// Describes one luci service.
+message Service {
+  // Globally unique id of the service. Required.
+  // Used in "services/<service_id>" config set name.
+  optional string id = 1;
+  // Email addresses of responsible and point-of-contacts for the service.
+  repeated string owners = 2;
+  // Where to import "services/<id>" config set from. If config_location.url is
+  // relative, it is relative to the current configuration file.
+  // If not specified, defaults to "../<id>/".
+  optional ConfigSetLocation config_location = 3;
+  // An HTTPS endpoint that returns JSON-encoded ServiceDynamicMetadata in body.
+  optional string metadata_url = 4;
+}
+
+// Machine-generated service metadata, exposed by a service endpoint.
+// Typically implemented by config component, embedded in an app:
+// see appengine/components/components/config/endpoint.py
+//
+// If you add a field here, also add it to ServiceDynamicMetadata in endpoint.py
+message ServiceDynamicMetadata {
+  // Format version. Supported versions: 1.0.
+  optional string version = 1;
+  // What configs this service can validate and how to validate them.
+  optional Validator validation = 2;
+}
+
+// Schema of services.cfg
+message ServicesCfg {
+  // A list of all luci services. Should be sorted by id.
+  repeated Service services = 1;
+}
+
+/******************************************************************************/
+/* Misc                                                                       */
+/******************************************************************************/
+
+
 // Schema of acl.cfg file.
 message AclCfg {
   // Name of the group that has access to all services/* config sets.
@@ -96,28 +138,25 @@ message SchemasCfg {
 /* Validation                                                                 */
 /******************************************************************************/
 
-// Schema of validation.cfg
-message ValidationCfg {
-  // Defines one validation rule. It can match configs in different config-sets
-  // and paths.
-  message Rule {
-    // A string pattern (see above) for config_set.
-    optional string config_set = 1;
-    // A string pattern (see above) for config file path.
-    optional string path = 2;
-    // URL of a validation endpoint. The config service will send an HTTP POST
-    // request to the endpoint, where body is JSON-encoded
-    // ValidationRequestMessage. The endpoint is expected to respond with
-    // HTTP status 200 and JSON-encoded ValidationResponseMessage.
-    optional string url = 3;
-  }
-
-  // Defines validation rules for externally-validated configs.
-  // All rules that match a config by config_set and path must pass in order
-  // for a config to be considered valid.
-  repeated Rule rules = 1;
+// Defines a pattern of a config identity. Both config_set and path must
+// match.
+message ConfigPattern {
+  // A string pattern for config_set.
+  optional string config_set = 1;
+  // A string pattern for config file path.
+  optional string path = 2;
 }
 
+// Describes what configuration can be validated and how to validate them.
+message Validator {
+  // A list of configuration patterns that this validator can validate.
+  repeated ConfigPattern patterns = 1;
+  // URL of a validation endpoint. The config service will send an HTTP POST
+  // request to the endpoint, where body is JSON-encoded
+  // ValidationRequestMessage. The endpoint is expected to respond with
+  // HTTP status 200 and JSON-encoded ValidationResponseMessage.
+  optional string url = 2;
+}
 
 // This message is used only in JSON form. It is sent as request body to an
 // external validation endpoint in order to validate a config.

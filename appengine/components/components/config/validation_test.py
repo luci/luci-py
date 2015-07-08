@@ -44,6 +44,25 @@ class ValidationTestCase(test_case.TestCase):
     self.rule_set.validate('projects/foo', 'baz.cfg', 'wrong')
     self.rule_set.validate('projects/baz', 'bar.cfg', 'wrong')
 
+  def test_patterns(self):
+    validation.rule(
+        'projects/foo', 'bar.cfg', test_config_pb2.Config,
+        rule_set=self.rule_set)
+    validation.rule(
+        'services/foo', 'foo.cfg', test_config_pb2.Config,
+        rule_set=self.rule_set)
+    validation.rule(
+        'services/foo', 'foo.cfg', test_config_pb2.Config,
+        rule_set=self.rule_set)
+    self.assertEqual(
+      self.rule_set.patterns(),
+      {
+        validation.ConfigPattern('projects/foo', 'bar.cfg'),
+        validation.ConfigPattern('services/foo', 'foo.cfg'),
+        validation.ConfigPattern('services/foo', 'foo.cfg'),
+      }
+    )
+
   def test_context_metadata(self):
     ctx = validation.Context()
 
@@ -64,8 +83,8 @@ class ValidationTestCase(test_case.TestCase):
 
   def test_regex_pattern_and_no_dest_type(self):
     rule = validation.rule(
-        config_set=re.compile('^projects/f[^/]+$').match,
-        path=lambda p: p.endswith('.yaml'),
+        config_set='regex:projects/f[^/]+',
+        path='regex:.+.yaml',
         rule_set=self.rule_set)
     def validate_yaml(cfg, ctx):
       try:
@@ -118,6 +137,16 @@ class ValidationTestCase(test_case.TestCase):
 
     rule.remove()
     self.rule_set.validate('projects/foo', 'bar.cfg', 'invalid config')
+
+  def test_compile_pattern(self):
+    self.assertTrue(validation.compile_pattern('abc')('abc'))
+    self.assertTrue(validation.compile_pattern('text:abc')('abc'))
+    self.assertFalse(validation.compile_pattern('text:abc')('abcd'))
+
+    self.assertTrue(validation.compile_pattern('regex:abc')('abc'))
+    self.assertTrue(validation.compile_pattern('regex:\w+')('abc'))
+    self.assertTrue(validation.compile_pattern('regex:^(\w+)c$')('abc'))
+    self.assertFalse(validation.compile_pattern('regex:\d+')('a123b'))
 
 
 if __name__ == '__main__':

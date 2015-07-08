@@ -25,7 +25,6 @@ MEMCACHE_PREFIX = 'components.config/v1/'
 CONFIG_MAX_TIME_SINCE_LAST_ACCESS = datetime.timedelta(days=7)
 # Update LastGoodConfig.last_access_ts if it will be deleted next day.
 UPDATE_LAST_ACCESS_TIME_FREQUENCY = datetime.timedelta(days=1)
-EMAIL_SCOPE = 'https://www.googleapis.com/auth/userinfo.email'
 
 
 class LastGoodConfig(ndb.Model):
@@ -56,7 +55,7 @@ class Provider(object):
   def _api_call_async(self, path, allow_not_found=True, **kwargs):
     assert path
     url = 'https://%s/_ah/api/config/v1/%s' % (self.service_hostname, path)
-    kwargs.setdefault('scopes', EMAIL_SCOPE)
+    kwargs.setdefault('scopes', net.EMAIL_SCOPE)
     try:
       response = yield net.json_request_async(url, **kwargs)
       raise ndb.Return(response)

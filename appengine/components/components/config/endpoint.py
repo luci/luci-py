@@ -5,24 +5,36 @@
 """Cloud Endpoints API for configs.
 
 * Reads/writes config service location.
-* Validates configs. TODO(nodir): implement.
+* Validates configs.
+* Provides service metadata.
 """
 
 import logging
 
-from components import auth
 from protorpc import messages
 from protorpc import message_types
 from protorpc import remote
+import endpoints
+
+from components import auth
 
 from . import common
 from . import validation
 
 
+METADATA_FORMAT_VERSION = "1.0"
+
+
+def get_default_rule_set():
+  return validation.DEFAULT_RULE_SET
+
+
 class ConfigSettingsMessage(messages.Message):
-  """Configuration service location."""
+  """Configuration service location. Resembles common.ConfigSettings"""
   # Example: 'luci-config.appspot.com'
   service_hostname = messages.StringField(1)
+  # Example: 'user:luci-config@appspot.gserviceaccount.com'
+  trusted_config_account = messages.StringField(2)
 
 
 class ValidateRequestMessage(messages.Message):
@@ -46,6 +58,50 @@ class ValidateResponseMessage(messages.Message):
   messages = messages.MessageField(ValidationMessage, 1, repeated=True)
 
 
+def is_trusted_requester():
+  """Returns True if the requester can see the service metadata.
+
+  Used in metadata endpoint.
+
+  Returns:
+    True if the current identity is an admin or the config service.
+  """
+  if auth.is_admin():
+    return True
+
+  settings = common.ConfigSettings.cached()
+  if settings and settings.trusted_config_account:
+    identity = auth.get_current_identity()
+    if identity == settings.trusted_config_account:
+      return True
+
+  return False
+
+
+class ConfigPattern(messages.Message):
+  """A pattern for one config file. See ServiceDynamicMetadata."""
+  config_set = messages.StringField(1, required=True)
+  path = messages.StringField(2, required=True)
+
+
+class ServiceDynamicMetadata(messages.Message):
+  """Equivalent of config_service's ServiceDynamicMetadata proto message.
+
+  Keep this class in sync with:
+    * ServiceDynamicMetadata message in
+      appengine/config_service/proto/service_config.proto
+    * validation.validate_service_dynamic_metadata_blob()
+    * services._dict_to_dynamic_metadata()
+  """
+
+  class Validator(messages.Message):
+    patterns = messages.MessageField(ConfigPattern, 1, repeated=True)
+    url = messages.StringField(2, required=True)
+
+  version = messages.StringField(1, required=True)
+  validation = messages.MessageField(Validator, 2)
+
+
 @auth.endpoints_api(name='config', version='v1', title='Configuration service')
 class ConfigApi(remote.Service):
   """Configuration service."""
@@ -57,14 +113,27 @@ class ConfigApi(remote.Service):
   def settings(self, request):
     """Reads/writes config service location. Accessible only by admins."""
     settings = common.ConfigSettings.fetch() or common.ConfigSettings()
+    delta = {}
     if request.service_hostname is not None:
-      # Change only if service_hostname was specified.
-      changed = settings.modify(service_hostname=request.service_hostname)
-      if changed:
-        logging.warning('Updated config settings')
+      delta['service_hostname'] = request.service_hostname
+    if request.trusted_config_account is not None:
+      try:
+        delta['trusted_config_account'] = auth.Identity.from_bytes(
+            request.trusted_config_account)
+      except ValueError as ex:
+        raise endpoints.BadRequestException(
+            'Invalid trusted_config_account %s: %s' % (
+              request.trusted_config_account,
+              ex.message))
+    changed = settings.modify(**delta)
+    if changed:
+      logging.warning('Updated config settings')
     settings = common.ConfigSettings.fetch() or settings
     return ConfigSettingsMessage(
         service_hostname=settings.service_hostname,
+        trusted_config_account=(
+            settings.trusted_config_account.to_bytes()
+            if settings.trusted_config_account else None)
     )
 
   @auth.endpoints_method(
@@ -85,3 +154,24 @@ class ConfigApi(remote.Service):
           text=m.text,
       ))
     return res
+
+  @auth.endpoints_method(
+      message_types.VoidMessage, ServiceDynamicMetadata, path='metadata')
+  @auth.require(is_trusted_requester)
+  def get_metadata(self, _request):
+    """Describes a service. Used by config service to discover other services.
+    """
+    meta = ServiceDynamicMetadata(version=METADATA_FORMAT_VERSION)
+    http_headers = dict(self.request_state.headers)
+    assert 'host' in http_headers, http_headers
+    meta.validation = meta.Validator(
+        url='https://{hostname}/_ah/api/{name}/{version}/{path}validate'.format(
+            hostname=http_headers['host'],
+            name=self.api_info.name,
+            version=self.api_info.version,
+            path=self.api_info.path or '',
+        )
+    )
+    for p in sorted(get_default_rule_set().patterns()):
+      meta.validation.patterns.append(ConfigPattern(**p._asdict()))
+    return meta

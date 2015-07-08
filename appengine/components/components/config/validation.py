@@ -26,6 +26,7 @@ Example with custom validation:
   # Will raise ValueError
 """
 
+import collections
 import fnmatch
 import functools
 import re
@@ -87,6 +88,14 @@ def is_valid_service_id(service_id):
   return bool(common.SERVICE_ID_RGX.match(service_id))
 
 
+ConfigPattern = collections.namedtuple(
+    'ConfigPattern',
+    [
+      'config_set',  # config_set pattern, see compile_pattern().
+      'path',  # path pattern, see compile_pattern().
+    ])
+
+
 def rule(config_set, path, dest_type=None, rule_set=None):
   """Creates a validation rule, that can act as a decorator.
 
@@ -109,8 +118,8 @@ def rule(config_set, path, dest_type=None, rule_set=None):
           ctx.error('bar cannot be negative: %d', cfg.bar)
 
   |config_set| and |path| are patterns that determine if a rule is applicable
-  to a config. A pattern is an exact string or a function. Both
-  config-set and path patterns must match.
+  to a config. Both |config_set| and |path| patterns must match. See
+  compile_pattern's docstring for the definition of "pattern".
 
   Args:
     config_set (str or function): pattern for config set.
@@ -133,12 +142,16 @@ def rule(config_set, path, dest_type=None, rule_set=None):
 
 def project_config_rule(*args, **kwargs):
   """Shortcut for rule() for project configs."""
-  return rule(common.PROJECT_CONFIG_SET_RGX.match, *args, **kwargs)
+  return rule(
+      'regex:%s' % common.PROJECT_CONFIG_SET_RGX.pattern,
+      *args, **kwargs)
 
 
 def ref_config_rule(*args, **kwargs):
   """Shortcut for rule() for ref configs."""
-  return rule(common.REF_CONFIG_SET_RGX.match, *args, **kwargs)
+  return rule(
+      'regex:%s' % common.REF_CONFIG_SET_RGX.pattern,
+      *args, **kwargs)
 
 
 def self_rule(*args, **kwargs):
@@ -177,8 +190,10 @@ class Rule(object):
   rule_set = None
 
   def __init__(self, config_set, path, dest_type=None):
-    self.config_set_fn = _match_fn(config_set)
-    self.path_fn = _match_fn(path)
+    self.config_set = config_set
+    self.path = path
+    self.config_set_fn = compile_pattern(config_set)
+    self.path_fn = compile_pattern(path)
     common._validate_dest_type(dest_type)
     self.dest_type = dest_type
     self.validator_funcs = []
@@ -236,12 +251,57 @@ class RuleSet(object):
   def is_defined_for(self, config_set, path):
     return any(r.match(config_set, path) for r in self.rules)
 
+  def patterns(self):
+    """Returns a set of all config patterns that this rule_set can validate.
 
-def _match_fn(pattern):
-  if isinstance(pattern, basestring):
-    return lambda s: s == pattern
-  assert hasattr(pattern, '__call__'), '%s is not a function' % pattern
-  return pattern
+    Returns:
+      A set of ConfigPattern objects.
+    """
+    return set(
+      ConfigPattern(config_set=r.config_set, path=r.path)
+      for r in self.rules
+    )
+
+
+def compile_pattern(pattern):
+  """Compiles a pattern to a predicate function.
+
+  A pattern is a "<kind>:<value>" pair, where kind can be "text" (default) or
+  "regex" and value interpretation depends on the kind:
+    regex: value must be a regular expression. If it does not start/end with
+      ^/$, they are added automatically.
+    text: exact string.
+  If colon is not present in the pattern, it is treated as "text:<pattern>".
+
+  Returns:
+    func (s: string): bool
+
+  Raises:
+    ValueError if |pattern| is malformed.
+  """
+  if not isinstance(pattern, basestring):
+    raise ValueError('Pattern must be a string')
+  if ':' in pattern:
+    kind, value = pattern.split(':', 2)
+  else:
+    kind = 'text'
+    value = pattern
+
+  if kind == 'text':
+    return lambda s: s == value
+
+  if kind == 'regex':
+    if not value.startswith('^'):
+      value = '^' + value
+    if not value.endswith('$'):
+      value = value + '$'
+    try:
+      regex = re.compile(value)
+    except re.error as ex:
+      raise ValueError(ex.message)
+    return regex.match
+
+  raise ValueError('Invalid pattern kind: %s' % kind)
 
 
 DEFAULT_RULE_SET = RuleSet()

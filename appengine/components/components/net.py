@@ -16,6 +16,9 @@ from components import auth
 from components import utils
 
 
+EMAIL_SCOPE = 'https://www.googleapis.com/auth/userinfo.email'
+
+
 class Error(Exception):
   """Raised on non-transient errors."""
   def __init__(self, msg, status_code, response):

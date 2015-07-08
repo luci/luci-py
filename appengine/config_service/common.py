@@ -4,9 +4,9 @@
 
 # luci-config configs.
 PROJECT_REGISTRY_FILENAME = 'projects.cfg'
+SERVICES_REGISTRY_FILENAME = 'services.cfg'
 ACL_FILENAME = 'acl.cfg'
 IMPORT_FILENAME = 'import.cfg'
-VALIDATION_FILENAME = 'validation.cfg'
 SCHEMAS_FILENAME = 'schemas.cfg'
 
 # Project configs.

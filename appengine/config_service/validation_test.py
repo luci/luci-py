@@ -21,64 +21,16 @@ from components.config import validation_context
 
 from proto import project_config_pb2
 from proto import service_config_pb2
+import services
 import storage
 import validation
 
 
 class ValidationTestCase(test_case.TestCase):
-  def test_validate_validation_cfg(self):
-    cfg = '''
-      rules {
-        config_set: "projects/foo"
-        path: "bar.cfg"
-        url: "https://foo.com/validate_config"
-      }
-      rules {
-        config_set: "regex:projects\/foo"
-        path: "regex:.+"
-        url: "https://foo.com/validate_config"
-      }
-      rules {
-        config_set: "bad config set name"
-        path: "regex:))bad regex"
-        # no url
-      }
-      rules {
-        config_set: "regex:)("
-        path: "/bar.cfg"
-        url: "http://not-https.com"
-      }
-      rules {
-        config_set: "projects/foo"
-        path: "a/../b.cfg"
-        url: "https://foo.com/validate_config"
-      }
-      rules {
-        config_set: "projects/foo"
-        path: "a/./b.cfg"
-        url: "/no/hostname"
-      }
-    '''
-    result = validation.validate_config(
-        config.self_config_set(), 'validation.cfg', cfg)
-
-    self.assertEqual(
-        [m.text for m in result.messages],
-        [
-          'Rule #3: config_set: invalid config set: bad config set name',
-          ('Rule #3: path: invalid regular expression "))bad regex": '
-           'unbalanced parenthesis'),
-          'Rule #3: url: not specified',
-          ('Rule #4: config_set: invalid regular expression ")(": '
-            'unbalanced parenthesis'),
-          'Rule #4: path: must not be absolute: /bar.cfg',
-          'Rule #4: url: scheme must be "https"',
-          'Rule #5: path: must not contain ".." or "." components: a/../b.cfg',
-          'Rule #6: path: must not contain ".." or "." components: a/./b.cfg',
-          'Rule #6: url: hostname not specified',
-          'Rule #6: url: scheme must be "https"',
-        ]
-    )
+  def setUp(self):
+    super(ValidationTestCase, self).setUp()
+    self.services = []
+    self.mock(services, 'get_services_async', lambda: future(self.services))
 
   def test_validate_project_registry(self):
     cfg = '''
@@ -119,8 +71,106 @@ class ValidationTestCase(test_case.TestCase):
           'Project #4: id is not specified',
           ('Project #4: config_location: Invalid Gitiles repo url: '
            'https://no-project.googlesource.com/bad_plus/+'),
-          'Project list is not sorted by id. First offending id: a',
+          'Projects are not sorted by id. First offending id: a',
         ]
+    )
+
+  def test_validate_services_registry(self):
+    cfg = '''
+      services {
+        id: "a"
+      }
+      services {
+        owners: "not an email"
+        config_location {
+          storage_type: GITILES
+          url: "../some"
+        }
+        metadata_url: "not an url"
+      }
+      services {
+        id: "b"
+        config_location {
+          storage_type: GITILES
+          url: "https://gitiles.host.com/project"
+        }
+      }
+      services {
+        id: "a-unsorted"
+      }
+    '''
+    result = validation.validate_config(
+        config.self_config_set(), 'services.cfg', cfg)
+
+    self.assertEqual(
+        [m.text for m in result.messages],
+        [
+          'Service #2: id is not specified',
+          ('Service #2: config_location: '
+           'storage_type must not be set if relative url is used'),
+          'Service #2: invalid email: "not an email"',
+          'Service #2: metadata_url: hostname not specified',
+          'Service #2: metadata_url: scheme must be "https"',
+          'Services are not sorted by id. First offending id: a-unsorted',
+        ]
+    )
+
+
+  def test_validate_service_dynamic_metadata_blob(self):
+    def expect_errors(blob, expected_messages):
+      ctx = config.validation.Context()
+      validation.validate_service_dynamic_metadata_blob(blob, ctx)
+      self.assertEqual(
+          [m.text for m in ctx.result().messages], expected_messages)
+
+    expect_errors([], ['Service dynamic metadata must be an object'])
+    expect_errors({}, [])
+    expect_errors({'validation': 'bad'}, ['validation: must be an object'])
+    expect_errors(
+        {
+          'validation': {
+            'patterns': 'bad',
+          }
+        },
+        [
+          'validation: url: not specified',
+          'validation: patterns must be a list',
+        ])
+    expect_errors(
+      {
+        'validation': {
+          'url': 'bad url',
+          'patterns': [
+            'bad',
+            {
+            },
+            {
+              'config_set': 'a:b',
+              'path': '/foo',
+            },
+            {
+              'config_set': 'regex:)(',
+              'path': '../b',
+            },
+            {
+              'config_set': 'projects/foo',
+              'path': 'bar.cfg',
+            },
+          ]
+        }
+      },
+      [
+        'validation: url: hostname not specified',
+        'validation: url: scheme must be "https"',
+        'validation: pattern #1: must be an object',
+        'validation: pattern #2: config_set: Pattern must be a string',
+        'validation: pattern #2: path: Pattern must be a string',
+        'validation: pattern #3: config_set: Invalid pattern kind: a',
+        'validation: pattern #3: path: must not be absolute: /foo',
+        'validation: pattern #4: config_set: unbalanced parenthesis',
+        ('validation: pattern #4: path: '
+         'must not contain ".." or "." components: ../b'),
+      ]
     )
 
   def test_validate_schemas(self):
@@ -207,31 +257,49 @@ class ValidationTestCase(test_case.TestCase):
         ],
     )
 
-  def test_endpoint_validate_async(self):
+  def test_validation_by_service_async(self):
     cfg = '# a config'
     cfg_b64 = base64.b64encode(cfg)
 
-    self.mock(storage, 'get_self_config_async', mock.Mock())
-    storage.get_self_config_async.return_value = future(
-        service_config_pb2.ValidationCfg(
-            rules=[
-              service_config_pb2.ValidationCfg.Rule(
-                config_set='services/foo',
-                path='bar.cfg',
+    self.services = [
+      service_config_pb2.Service(id='a'),
+      service_config_pb2.Service(id='b'),
+      service_config_pb2.Service(id='c'),
+    ]
+
+    @ndb.tasklet
+    def get_metadata_async(service_id):
+      if service_id == 'a':
+        raise ndb.Return(service_config_pb2.ServiceDynamicMetadata(
+            validation=service_config_pb2.Validator(
+                patterns=[service_config_pb2.ConfigPattern(
+                    config_set='services/foo',
+                    path='bar.cfg',
+                )],
                 url='https://bar.verifier',
-              ),
-              service_config_pb2.ValidationCfg.Rule(
-                config_set='regex:projects/[^/]+',
-                path='regex:.+.\cfg',
+            )
+        ))
+      if service_id == 'b':
+        raise ndb.Return(service_config_pb2.ServiceDynamicMetadata(
+            validation=service_config_pb2.Validator(
+                patterns=[service_config_pb2.ConfigPattern(
+                    config_set=r'regex:projects/[^/]+',
+                    path=r'regex:.+\.cfg',
+                )],
                 url='https://bar2.verifier',
-              ),
-              service_config_pb2.ValidationCfg.Rule(
-                config_set='regex:.+',
-                path='regex:.+',
+              )))
+      if service_id == 'c':
+        raise ndb.Return(service_config_pb2.ServiceDynamicMetadata(
+            validation=service_config_pb2.Validator(
+                patterns=[service_config_pb2.ConfigPattern(
+                    config_set=r'regex:.+',
+                    path=r'regex:.+',
+                )],
                 url='https://ultimate.verifier',
-              ),
-            ]
-          ))
+              )))
+      return None
+    self.mock(services, 'get_metadata_async', mock.Mock())
+    services.get_metadata_async.side_effect = get_metadata_async
 
     @ndb.tasklet
     def json_request_async(url, **kwargs):
@@ -264,7 +332,7 @@ class ValidationTestCase(test_case.TestCase):
         'path': 'bar.cfg',
         'content': cfg_b64,
       },
-      scope='https://www.googleapis.com/auth/userinfo.email',
+      scope=net.EMAIL_SCOPE,
     )
     net.json_request_async.assert_any_call(
       'https://ultimate.verifier',
@@ -274,7 +342,7 @@ class ValidationTestCase(test_case.TestCase):
         'path': 'bar.cfg',
         'content': cfg_b64,
       },
-      scope='https://www.googleapis.com/auth/userinfo.email',
+      scope=net.EMAIL_SCOPE,
     )
 
     ############################################################################
@@ -296,7 +364,7 @@ class ValidationTestCase(test_case.TestCase):
         'path': 'bar.cfg',
         'content': cfg_b64,
       },
-      scope='https://www.googleapis.com/auth/userinfo.email',
+      scope=net.EMAIL_SCOPE,
     )
     net.json_request_async.assert_any_call(
       'https://ultimate.verifier',
@@ -306,7 +374,7 @@ class ValidationTestCase(test_case.TestCase):
         'path': 'bar.cfg',
         'content': cfg_b64,
       },
-      scope='https://www.googleapis.com/auth/userinfo.email',
+      scope=net.EMAIL_SCOPE,
     )
 
     ############################################################################
