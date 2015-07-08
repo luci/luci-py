@@ -135,7 +135,7 @@ def endpoints_method(
       except api.AuthenticationError:
         raise endpoints.UnauthorizedException()
       except api.AuthorizationError as ex:
-        logging.error('Forbidden: %s', ex.message)
+        logging.warning('Forbidden: %s', ex.message)
         raise endpoints.ForbiddenException()
     return wrapper
   return new_decorator
