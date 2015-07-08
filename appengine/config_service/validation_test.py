@@ -254,6 +254,16 @@ class ValidationTestCase(test_case.TestCase):
         ]
     )
 
+  def test_validate_project_metadata(self):
+    cfg = '''
+      name: "Chromium"
+      access: "group:all"
+      access: "a@a.com"
+    '''
+    result = validation.validate_config('projects/x', 'project.cfg', cfg)
+
+    self.assertEqual(len(result.messages), 0)
+
   def test_validate_refs(self):
     cfg = '''
       refs {

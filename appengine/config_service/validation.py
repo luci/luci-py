@@ -258,7 +258,7 @@ def validate_schemas(cfg, ctx):
 def validate_project_metadata(cfg, ctx):
   if not cfg.name:
     ctx.error('name is not specified')
-  validate_access_list(service.access, ctx)
+  validate_access_list(cfg.access, ctx)
 
 
 @validation.project_config_rule(
