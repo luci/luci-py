@@ -373,7 +373,7 @@ class ValidationTestCase(test_case.TestCase):
         'path': 'bar.cfg',
         'content': cfg_b64,
       },
-      scope=net.EMAIL_SCOPE,
+      scopes=net.EMAIL_SCOPE,
     )
     net.json_request_async.assert_any_call(
       'https://ultimate.verifier',
@@ -383,7 +383,7 @@ class ValidationTestCase(test_case.TestCase):
         'path': 'bar.cfg',
         'content': cfg_b64,
       },
-      scope=net.EMAIL_SCOPE,
+      scopes=net.EMAIL_SCOPE,
     )
 
     ############################################################################
@@ -405,7 +405,7 @@ class ValidationTestCase(test_case.TestCase):
         'path': 'bar.cfg',
         'content': cfg_b64,
       },
-      scope=net.EMAIL_SCOPE,
+      scopes=net.EMAIL_SCOPE,
     )
     net.json_request_async.assert_any_call(
       'https://ultimate.verifier',
@@ -415,7 +415,7 @@ class ValidationTestCase(test_case.TestCase):
         'path': 'bar.cfg',
         'content': cfg_b64,
       },
-      scope=net.EMAIL_SCOPE,
+      scopes=net.EMAIL_SCOPE,
     )
 
     ############################################################################
