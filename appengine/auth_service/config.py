@@ -31,6 +31,7 @@ from components import config
 from components import datastore_utils
 from components import gitiles
 from components import utils
+from components.auth import ipaddr
 from components.auth import model
 
 from proto import config_pb2
@@ -189,14 +190,111 @@ def _update_authdb_configs(configs):
     model.replicate_auth_db()
 
 
-def _validate_ip_whitelist_config(_conf):
-  # TODO(vadimsh): Implement.
-  pass
+def _validate_ip_whitelist_config(conf):
+  if not isinstance(conf, config_pb2.IPWhitelistConfig):
+    raise ValueError('Wrong message type: %s' % conf.__class__.__name__)
+  whitelists = set()
+  for ip_whitelist in conf.ip_whitelists:
+    if not model.IP_WHITELIST_NAME_RE.match(ip_whitelist.name):
+      raise ValueError('Invalid IP whitelist name: %s' % ip_whitelist.name)
+    if ip_whitelist.name in whitelists:
+      raise ValueError('IP whitelist %s is defined twice' % ip_whitelist.name)
+    whitelists.add(ip_whitelist.name)
+    for net in ip_whitelist.subnets:
+      # Raises ValueError if subnet is not valid.
+      ipaddr.subnet_from_string(net)
+  idents = []
+  for assignment in conf.assignments:
+    # Raises ValueError if identity is not valid.
+    ident = model.Identity.from_bytes(assignment.identity)
+    if assignment.ip_whitelist_name not in whitelists:
+      raise ValueError(
+          'Unknown IP whitelist: %s' % assignment.ip_whitelist_name)
+    if ident in idents:
+      raise ValueError('Identity %s is specified twice' % assignment.identity)
+    idents.append(ident)
 
 
-def _update_ip_whitelist_config(_rev, _conf):
-  # TODO(vadimsh): Implement.
-  return False
+def _update_ip_whitelist_config(_rev, conf):
+  assert ndb.in_transaction(), 'Must be called in AuthDB transaction'
+  now = utils.utcnow()
+
+  # Existing whitelist entities.
+  existing_ip_whitelists = {
+    e.key.id(): e
+    for e in model.AuthIPWhitelist.query(ancestor=model.root_key())
+  }
+
+  # Entities being imported.
+  imported_ip_whitelists = {
+    msg.name: model.AuthIPWhitelist(
+        key=model.ip_whitelist_key(msg.name),
+        subnets=list(msg.subnets),
+        description='Imported from ip_whitelist.cfg',
+        created_ts=now,
+        created_by=model.get_service_self_identity(),
+        modified_ts=now,
+        modified_by=model.get_service_self_identity())
+    for msg in conf.ip_whitelists
+  }
+
+  to_put = []
+  to_delete = []
+
+  # New or modified IP whitelists.
+  for wl in imported_ip_whitelists.itervalues():
+    existing_wl = existing_ip_whitelists.get(wl.key.id())
+    if not existing_wl or existing_wl.subnets != wl.subnets:
+      if existing_wl:
+        wl.created_ts = existing_wl.created_ts
+        wl.created_by = existing_wl.created_by
+      to_put.append(wl)
+
+  # Removed IP whitelists.
+  for wl in existing_ip_whitelists.itervalues():
+    if wl.key.id() not in imported_ip_whitelists:
+      to_delete.append(wl.key)
+
+  # Update assignments. Don't touch created_ts and created_by for existing ones.
+  ip_whitelist_assignments = (
+      model.ip_whitelist_assignments_key().get() or
+      model.AuthIPWhitelistAssignments(
+          key=model.ip_whitelist_assignments_key()))
+  existing = {
+    (a.identity.to_bytes(), a.ip_whitelist): a
+    for a in ip_whitelist_assignments.assignments
+  }
+  updated = []
+  for a in conf.assignments:
+    key = (a.identity, a.ip_whitelist_name)
+    if key in existing:
+      updated.append(existing[key])
+    else:
+      new_one = model.AuthIPWhitelistAssignments.Assignment(
+          identity=model.Identity.from_bytes(a.identity),
+          ip_whitelist=a.ip_whitelist_name,
+          comment='Imported from ip_whitelist.cfg',
+          created_ts=now,
+          created_by=model.get_service_self_identity())
+      updated.append(new_one)
+
+  # Something has changed?
+  updated_keys = [
+    (a.identity.to_bytes(), a.ip_whitelist)
+    for a in updated
+  ]
+  if set(updated_keys) != set(existing):
+    ip_whitelist_assignments.assignments = updated
+    to_put.append(ip_whitelist_assignments)
+
+  if not to_put and not to_delete:
+    return False
+  futures = []
+  futures.extend(ndb.put_multi_async(to_put))
+  futures.extend(ndb.delete_multi_async(to_delete))
+  for f in futures:
+    f.check_success()
+  return True
 
 
 def _validate_oauth_config(conf):
@@ -243,7 +341,7 @@ _CONFIG_SCHEMAS = {
     'use_authdb_transaction': False,
   },
   'ip_whitelist.cfg': {
-    'proto_class': None,
+    'proto_class': config_pb2.IPWhitelistConfig,
     'revision_getter': lambda: _get_authdb_config_rev('ip_whitelist.cfg'),
     'validator': _validate_ip_whitelist_config,
     'updater': _update_ip_whitelist_config,

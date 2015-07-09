@@ -61,3 +61,27 @@ message OAuthConfig {
   // Whitelist of all accepted client_ids (in addition to the primary one).
   repeated string client_ids = 3;
 }
+
+
+// IP whitelists config: a set of named IP whitelists and a mapping between
+// identity name -> IP whitelist to restrict it to.
+message IPWhitelistConfig {
+  message IPWhitelist {
+    // Name of the IP whitelist.
+    optional string name = 1;
+    // List of subnets.
+    repeated string subnets = 2;
+  }
+
+  message Assignment {
+    // Identity to restrict IPs to.
+    optional string identity = 1;
+    // Name of the corresponding IPWhitelist with a set of subnets.
+    optional string ip_whitelist_name = 2;
+  }
+
+  // A set of named subnets.
+  repeated IPWhitelist ip_whitelists = 1;
+  // A mapping "identity name -> IP whitelist name".
+  repeated Assignment assignments = 2;
+}
