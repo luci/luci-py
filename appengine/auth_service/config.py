@@ -33,6 +33,7 @@ from components import gitiles
 from components import utils
 from components.auth import ipaddr
 from components.auth import model
+from components.config import validation
 
 from proto import config_pb2
 import importer
@@ -66,13 +67,6 @@ def get_config_revision(path):
   """Returns tuple with info about last imported config revision."""
   schema = _CONFIG_SCHEMAS.get(path)
   return schema['revision_getter']() if schema else None
-
-
-def validate_config(path, conf):
-  """Raises ValueError if given config file is invalid."""
-  schema = _CONFIG_SCHEMAS.get(path)
-  if schema and schema['validator']:
-    schema['validator'](conf)
 
 
 def refetch_config(force=False):
@@ -116,6 +110,36 @@ def refetch_config(force=False):
   # update generates single AuthDB replication task instead of a bunch of them.
   if dirty_in_authdb:
     _update_authdb_configs(dirty_in_authdb)
+
+
+### Integration with config validation framework.
+
+# TODO(vadimsh): Use validation context for real (e.g. emit multiple errors at
+# once instead of aborting on the first one).
+
+
+@validation.self_rule('imports.cfg')
+def validate_imports_config(conf, ctx):
+  try:
+    importer.validate_config(conf)
+  except ValueError as exc:
+    ctx.error(str(exc))
+
+
+@validation.self_rule('ip_whitelist.cfg', config_pb2.IPWhitelistConfig)
+def validate_ip_whitelist_config(conf, ctx):
+  try:
+    _validate_ip_whitelist_config(conf)
+  except ValueError as exc:
+    ctx.error(str(exc))
+
+
+@validation.self_rule('oauth.cfg', config_pb2.OAuthConfig)
+def validate_oauth_config(conf, ctx):
+  try:
+    _validate_oauth_config(conf)
+  except ValueError as exc:
+    ctx.error(str(exc))
 
 
 ### Group importer config implementation details.
@@ -336,21 +360,18 @@ _CONFIG_SCHEMAS = {
   'imports.cfg': {
     'proto_class': None, # importer configs as stored as text
     'revision_getter': _get_imports_config_revision,
-    'validator': importer.validate_config,
     'updater': _update_imports_config,
     'use_authdb_transaction': False,
   },
   'ip_whitelist.cfg': {
     'proto_class': config_pb2.IPWhitelistConfig,
     'revision_getter': lambda: _get_authdb_config_rev('ip_whitelist.cfg'),
-    'validator': _validate_ip_whitelist_config,
     'updater': _update_ip_whitelist_config,
     'use_authdb_transaction': True,
   },
   'oauth.cfg': {
     'proto_class': config_pb2.OAuthConfig,
     'revision_getter': lambda: _get_authdb_config_rev('oauth.cfg'),
-    'validator': _validate_oauth_config,
     'updater': _update_oauth_config,
     'use_authdb_transaction': True,
   },
@@ -384,7 +405,7 @@ def _fetch_configs(paths):
   for path, future in zip(paths, futures):
     rev, conf = future.get_result()
     try:
-      validate_config(path, conf)
+      validation.validate(config.self_config_set(), path, conf)
     except ValueError as exc:
       raise config.CannotLoadConfigError(
           'Config %s at rev %s failed to pass validation: %s' %

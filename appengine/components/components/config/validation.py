@@ -122,8 +122,8 @@ def rule(config_set, path, dest_type=None, rule_set=None):
   compile_pattern's docstring for the definition of "pattern".
 
   Args:
-    config_set (str or function): pattern for config set.
-    path (str or function): pattern for path.
+    config_set (str): pattern for config set, see compile_pattern.
+    path (str): pattern for path, see compile_pattern.
     dest_type (type): if specified, config contents will be converted to
       |dest_type| before calling the decorated function.
       Currently only protobuf messages are supported. If a config cannot be
