@@ -71,7 +71,7 @@ class RemoteTestCase(test_case.TestCase):
         'https://luci-config.appspot.com/_ah/api/config/v1/'
         'config_sets/services%2Ffoo/config/bar.cfg',
         params={'hash_only': True, 'revision': 'aaaabbbb'},
-        scopes=remote.EMAIL_SCOPE)
+        scopes=net.EMAIL_SCOPE)
 
     # Memcache coverage
     net.json_request_async.reset_mock()

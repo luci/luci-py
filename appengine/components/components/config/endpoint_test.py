@@ -37,6 +37,7 @@ class EndpointTestCase(test_case.EndpointsTestCase):
     self.assertEqual(
         resp,
         {
+          'version': '1.0',
           'validation': {
             'url': 'https://localhost:80/_ah/api/config/v1/validate',
             'patterns': [

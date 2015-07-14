@@ -59,9 +59,10 @@ class Provider(object):
     try:
       response = yield net.json_request_async(url, **kwargs)
       raise ndb.Return(response)
-    except net.NotFoundError:
+    except net.NotFoundError as ex:
       if allow_not_found:
         raise ndb.Return(None)
+      logging.warning('404 response: %s', ex.response)
       raise
 
   @ndb.tasklet
