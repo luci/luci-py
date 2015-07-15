@@ -48,87 +48,102 @@ class CatalogEndpoints(remote.Service):
         logging.warning('Mismatched backend')
         return rpc_messages.CatalogManipulationRequestError.MISMATCHED_BACKEND
 
-  @auth.endpoints_method(
-      rpc_messages.CatalogAdditionRequest,
-      rpc_messages.CatalogManipulationResponse,
-  )
-  @auth.require(acl.is_backend_service_or_catalog_admin)
-  @ndb.transactional
-  def add(self, request):
-    """Handles an incoming CatalogAdditionRequest."""
-    user = auth.get_current_identity().to_bytes()
-    logging.info(
-        'Received CatalogAdditionRequest:\nUser: %s\n%s',
-        user,
-        request,
-    )
-    error = self.check_backend(request)
-    if error:
-      return rpc_messages.CatalogManipulationResponse(error=error)
-
-    if request.dimensions.hostname:
-      entry = models.CatalogEntry.get_by_id(
-          models.CatalogEntry.compute_id(request.dimensions),
-      )
-      if entry:
-        # Hostname, if specified, must be unique.
-        logging.info('Hostname reuse:\nOriginally used for: \n%s', entry)
-        return rpc_messages.CatalogManipulationResponse(
-            error=rpc_messages.CatalogManipulationRequestError.HOSTNAME_REUSE
-        )
-    models.CatalogEntry.create_and_put(request.dimensions)
-    return rpc_messages.CatalogManipulationResponse()
-
-  @auth.endpoints_method(
-      rpc_messages.CatalogDeletionRequest,
-      rpc_messages.CatalogManipulationResponse,
-  )
-  @auth.require(acl.is_backend_service_or_catalog_admin)
-  def delete(self, request):
-    """Handles an incoming CatalogDeletionRequest."""
-    user = auth.get_current_identity().to_bytes()
-    logging.info(
-        'Received CatalogDeletionRequest:\nUser: %s\n%s',
-        user,
-        request,
-    )
-    error = self.check_backend(request)
-    if error:
-      return rpc_messages.CatalogManipulationResponse(error=error)
-
-    if request.dimensions.hostname:
-      error = self.delete_transactionally(request)
-      if error:
-        return rpc_messages.CatalogManipulationResponse(error=error)
-    else:
-      entries = models.CatalogEntry.query_by_exact_dimensions(
-          request.dimensions
-      )
-      if not entries:
-        logging.info('Catalog entry not found')
-        return rpc_messages.CatalogManipulationResponse(
-            error=rpc_messages.CatalogManipulationRequestError.ENTRY_NOT_FOUND
-        )
-      entries[0].key.delete()
-    return rpc_messages.CatalogManipulationResponse()
-
-  @ndb.transactional
-  def delete_transactionally(self, request):
-    """Transactionally deletes a CatalogEntry by backend and hostname.
+  @staticmethod
+  def check_hostname(request):
+    """Checks that the given catalog manipulation request specifies a hostname.
 
     Returns:
-      rpc_messages.CatalogManipulationRequestError.ENTRY_NOT_FOUND if a matching
-      CatalogEntry doesn't exist, otherwise None.
+      rpc_messages.CatalogManipulationRequestError.UNSPECIFIED_HOSTNAME if the
+      hostname is unspecified, otherwise None.
     """
-    assert request.dimensions.backend is not None
-    assert request.dimensions.hostname is not None
-    entry = models.CatalogEntry.get_by_id(
-        models.CatalogEntry.compute_id(request.dimensions)
+    if not request.dimensions.hostname:
+      logging.warning('Hostname unspecified')
+      return rpc_messages.CatalogManipulationRequestError.UNSPECIFIED_HOSTNAME
+
+  @auth.endpoints_method(
+      rpc_messages.CatalogMachineAdditionRequest,
+      rpc_messages.CatalogManipulationResponse,
+  )
+  @auth.require(acl.is_backend_service_or_catalog_admin)
+  def add_machine(self, request):
+    """Handles an incoming CatalogMachineAdditionRequest."""
+    user = auth.get_current_identity().to_bytes()
+    logging.info(
+        'Received CatalogMachineAdditionRequest:\nUser: %s\n%s',
+        user,
+        request,
     )
-    if not entry or not entry.has_exact_dimensions(request.dimensions):
+    error = self.check_backend(request) or self.check_hostname(request)
+    if error:
+      return rpc_messages.CatalogManipulationResponse(error=error)
+    return self._add_machine(request)
+
+  @ndb.transactional
+  def _add_machine(self, request):
+    """Handles datastore operations for CatalogMachineAdditionRequests."""
+    entry = models.CatalogMachineEntry.generate_key(request.dimensions).get()
+    if entry:
+      # Enforces per-backend hostname uniqueness.
+      logging.info('Hostname reuse:\nOriginally used for: \n%s', entry)
+      return rpc_messages.CatalogManipulationResponse(
+          error=rpc_messages.CatalogManipulationRequestError.HOSTNAME_REUSE
+      )
+    models.CatalogMachineEntry.create_and_put(request.dimensions)
+    return rpc_messages.CatalogManipulationResponse()
+
+  @auth.endpoints_method(
+      rpc_messages.CatalogMachineDeletionRequest,
+      rpc_messages.CatalogManipulationResponse,
+  )
+  @auth.require(acl.is_backend_service_or_catalog_admin)
+  def delete_machine(self, request):
+    """Handles an incoming CatalogMachineDeletionRequest."""
+    user = auth.get_current_identity().to_bytes()
+    logging.info(
+        'Received CatalogMachineDeletionRequest:\nUser: %s\n%s',
+        user,
+        request,
+    )
+    error = self.check_backend(request) or self.check_hostname(request)
+    if error:
+      return rpc_messages.CatalogManipulationResponse(error=error)
+    return self._delete_machine(request)
+
+  @ndb.transactional
+  def _delete_machine(self, request):
+    """Handles datastore operations for CatalogMachineDeletionRequests."""
+    entry = models.CatalogMachineEntry.generate_key(request.dimensions).get()
+    if not entry:
       logging.info('Catalog entry not found')
-      return rpc_messages.CatalogManipulationRequestError.ENTRY_NOT_FOUND
+      return rpc_messages.CatalogManipulationResponse(
+        error=rpc_messages.CatalogManipulationRequestError.ENTRY_NOT_FOUND,
+      )
     entry.key.delete()
+    return rpc_messages.CatalogManipulationResponse()
+
+  @auth.endpoints_method(
+      rpc_messages.CatalogCapacityModificationRequest,
+      rpc_messages.CatalogManipulationResponse,
+  )
+  @auth.require(acl.is_backend_service_or_catalog_admin)
+  def modify_capacity(self, request):
+    """Handles an incoming CatalogCapacityModificationRequest."""
+    user = auth.get_current_identity().to_bytes()
+    logging.info(
+        'Received CatalogCapacityModificationRequest:\nUser: %s\n%s',
+        user,
+        request,
+    )
+    error = self.check_backend(request)
+    if error:
+      return rpc_messages.CatalogManipulationResponse(error=error)
+    return self._modify_capacity(request)
+
+  @ndb.transactional
+  def _modify_capacity(self, request):
+    """Handles datastore operations for CatalogCapacityModificationRequests."""
+    models.CatalogCapacityEntry.create_and_put(request.dimensions)
+    return rpc_messages.CatalogManipulationResponse()
 
 
 @auth.endpoints.api(name='machine_provider', version='v1')

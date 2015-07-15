@@ -73,7 +73,7 @@ class CatalogTest(test_case.EndpointsTestCase):
     self.app = webtest.TestApp(app)
 
   def test_add(self):
-    request = rpc_to_json(rpc_messages.CatalogAdditionRequest(
+    request = rpc_to_json(rpc_messages.CatalogMachineAdditionRequest(
         dimensions=rpc_messages.Dimensions(
             hostname='fake-host',
             os_family=rpc_messages.OSFamily.LINUX,
@@ -82,19 +82,36 @@ class CatalogTest(test_case.EndpointsTestCase):
     auth_testing.mock_get_current_identity(self)
 
     response = jsonish_dict_to_rpc(
-        self.call_api('add', request).json,
+        self.call_api('add_machine', request).json,
         rpc_messages.CatalogManipulationResponse,
     )
     self.failIf(response.error)
 
+  def test_add_no_hostname(self):
+    request = rpc_to_json(rpc_messages.CatalogMachineAdditionRequest(
+        dimensions=rpc_messages.Dimensions(
+            os_family=rpc_messages.OSFamily.LINUX,
+        ),
+    ))
+    auth_testing.mock_get_current_identity(self)
+
+    response = jsonish_dict_to_rpc(
+        self.call_api('add_machine', request).json,
+        rpc_messages.CatalogManipulationResponse,
+    )
+    self.assertEqual(
+      response.error,
+      rpc_messages.CatalogManipulationRequestError.UNSPECIFIED_HOSTNAME,
+    )
+
   def test_add_duplicate(self):
-    request_1 = rpc_to_json(rpc_messages.CatalogAdditionRequest(
+    request_1 = rpc_to_json(rpc_messages.CatalogMachineAdditionRequest(
         dimensions=rpc_messages.Dimensions(
             hostname='fake-host',
             os_family=rpc_messages.OSFamily.LINUX,
         ),
     ))
-    request_2 = rpc_to_json(rpc_messages.CatalogAdditionRequest(
+    request_2 = rpc_to_json(rpc_messages.CatalogMachineAdditionRequest(
         dimensions=rpc_messages.Dimensions(
             hostname='fake-host',
             os_family=rpc_messages.OSFamily.LINUX,
@@ -103,11 +120,11 @@ class CatalogTest(test_case.EndpointsTestCase):
     auth_testing.mock_get_current_identity(self)
 
     response_1 = jsonish_dict_to_rpc(
-        self.call_api('add', request_1).json,
+        self.call_api('add_machine', request_1).json,
         rpc_messages.CatalogManipulationResponse,
     )
     response_2 = jsonish_dict_to_rpc(
-        self.call_api('add', request_2).json,
+        self.call_api('add_machine', request_2).json,
         rpc_messages.CatalogManipulationResponse,
     )
     self.failIf(response_1.error)
@@ -116,44 +133,20 @@ class CatalogTest(test_case.EndpointsTestCase):
         rpc_messages.CatalogManipulationRequestError.HOSTNAME_REUSE,
     )
 
-  def test_add_duplicate_no_hostname(self):
-    request_1 = rpc_to_json(rpc_messages.CatalogAdditionRequest(
-        dimensions=rpc_messages.Dimensions(
-            os_family=rpc_messages.OSFamily.LINUX,
-        ),
-    ))
-    request_2 = rpc_to_json(rpc_messages.CatalogAdditionRequest(
-        dimensions=rpc_messages.Dimensions(
-            os_family=rpc_messages.OSFamily.LINUX,
-        ),
-    ))
-    auth_testing.mock_get_current_identity(self)
-
-    response_1 = jsonish_dict_to_rpc(
-        self.call_api('add', request_1).json,
-        rpc_messages.CatalogManipulationResponse,
-    )
-    response_2 = jsonish_dict_to_rpc(
-        self.call_api('add', request_2).json,
-        rpc_messages.CatalogManipulationResponse,
-    )
-    self.failIf(response_1.error)
-    self.failIf(response_2.error)
-
   def test_delete(self):
-    request_1 = rpc_to_json(rpc_messages.CatalogAdditionRequest(
+    request_1 = rpc_to_json(rpc_messages.CatalogMachineAdditionRequest(
         dimensions=rpc_messages.Dimensions(
             hostname='fake-host',
             os_family=rpc_messages.OSFamily.LINUX,
         ),
     ))
-    request_2 = rpc_to_json(rpc_messages.CatalogAdditionRequest(
+    request_2 = rpc_to_json(rpc_messages.CatalogMachineAdditionRequest(
         dimensions=rpc_messages.Dimensions(
             hostname='fake-host',
             os_family=rpc_messages.OSFamily.LINUX,
         ),
     ))
-    request_3 = rpc_to_json(rpc_messages.CatalogAdditionRequest(
+    request_3 = rpc_to_json(rpc_messages.CatalogMachineAdditionRequest(
         dimensions=rpc_messages.Dimensions(
             hostname='fake-host',
             os_family=rpc_messages.OSFamily.WINDOWS,
@@ -162,15 +155,15 @@ class CatalogTest(test_case.EndpointsTestCase):
     auth_testing.mock_get_current_identity(self)
 
     response_1 = jsonish_dict_to_rpc(
-        self.call_api('add', request_1).json,
+        self.call_api('add_machine', request_1).json,
         rpc_messages.CatalogManipulationResponse,
     )
     response_2 = jsonish_dict_to_rpc(
-        self.call_api('delete', request_2).json,
+        self.call_api('delete_machine', request_2).json,
         rpc_messages.CatalogManipulationResponse,
     )
     response_3 = jsonish_dict_to_rpc(
-        self.call_api('add', request_3).json,
+        self.call_api('add_machine', request_3).json,
         rpc_messages.CatalogManipulationResponse,
     )
     self.failIf(response_1.error)
@@ -178,35 +171,36 @@ class CatalogTest(test_case.EndpointsTestCase):
     self.failIf(response_3.error)
 
   def test_delete_invalid(self):
-    request_1 = rpc_to_json(rpc_messages.CatalogAdditionRequest(
+    request_1 = rpc_to_json(rpc_messages.CatalogMachineAdditionRequest(
         dimensions=rpc_messages.Dimensions(
-            hostname='fake-host',
+            hostname='fake-host-1',
             os_family=rpc_messages.OSFamily.LINUX,
         ),
     ))
-    request_2 = rpc_to_json(rpc_messages.CatalogDeletionRequest(
+    request_2 = rpc_to_json(rpc_messages.CatalogMachineDeletionRequest(
         dimensions=rpc_messages.Dimensions(
+            hostname='fake-host-2',
             os_family=rpc_messages.OSFamily.LINUX,
         ),
     ))
-    request_3 = rpc_to_json(rpc_messages.CatalogAdditionRequest(
+    request_3 = rpc_to_json(rpc_messages.CatalogMachineDeletionRequest(
         dimensions=rpc_messages.Dimensions(
-            hostname='fake-host',
-            os_family=rpc_messages.OSFamily.WINDOWS,
+            hostname='fake-host-1',
+            os_family=rpc_messages.OSFamily.LINUX,
         ),
     ))
     auth_testing.mock_get_current_identity(self)
 
     response_1 = jsonish_dict_to_rpc(
-        self.call_api('add', request_1).json,
+        self.call_api('add_machine', request_1).json,
         rpc_messages.CatalogManipulationResponse,
     )
     response_2 = jsonish_dict_to_rpc(
-        self.call_api('delete', request_2).json,
+        self.call_api('delete_machine', request_2).json,
         rpc_messages.CatalogManipulationResponse,
     )
     response_3 = jsonish_dict_to_rpc(
-        self.call_api('add', request_3).json,
+        self.call_api('add_machine', request_3).json,
         rpc_messages.CatalogManipulationResponse,
     )
     self.failIf(response_1.error)
@@ -218,6 +212,21 @@ class CatalogTest(test_case.EndpointsTestCase):
         response_3.error,
         rpc_messages.CatalogManipulationRequestError.HOSTNAME_REUSE,
     )
+
+  def test_modify(self):
+    request = rpc_to_json(rpc_messages.CatalogCapacityModificationRequest(
+        count=1,
+        dimensions=rpc_messages.Dimensions(
+            os_family=rpc_messages.OSFamily.OSX,
+        ),
+    ))
+    auth_testing.mock_get_current_identity(self)
+
+    response = jsonish_dict_to_rpc(
+        self.call_api('modify_capacity', request).json,
+        rpc_messages.CatalogManipulationResponse,
+    )
+    self.failIf(response.error)
 
 
 class MachineProviderLeaseTest(test_case.EndpointsTestCase):

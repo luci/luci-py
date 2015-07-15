@@ -10,10 +10,13 @@ from google.appengine.ext import ndb
 from google.appengine.ext.ndb import msgprop
 
 from protorpc import messages
+from protorpc import protobuf
+from protorpc.remote import protojson
 
 from components import auth
 
 import rpc_messages
+import utils
 
 
 class Enum(frozenset):
@@ -51,7 +54,7 @@ class LeaseRequest(ndb.Model):
 
 
 class CatalogEntry(ndb.Model):
-  """Datastore representation of a machine in the catalog."""
+  """Datastore representation of an entry in the catalog."""
   # rpc_messages.Dimensions describing this machine.
   dimensions = msgprop.MessageProperty(
       rpc_messages.Dimensions,
@@ -61,34 +64,13 @@ class CatalogEntry(ndb.Model):
   )
 
   @classmethod
-  def compute_id(cls, dimensions):
-    """Computes the ID of a CatalogEntry with the given dimensions.
-
-    Args:
-      dimensions: rpc_messages.Dimensions describing this machine.
-    """
-    assert dimensions.backend is not None
-    if dimensions.hostname:
-      return hashlib.sha1(
-          '%s\0%s' % (dimensions.backend, dimensions.hostname)
-      ).hexdigest()
-    return None
-
-  @classmethod
   def create_and_put(cls, dimensions):
     """Creates a new CatalogEntry entity and puts it in the datastore.
 
     Args:
       dimensions: rpc_messages.Dimensions describing this machine.
     """
-    # CatalogEntries require the backend dimension to be specified, but leave
-    # the hostname dimension optional. However, CatalogEntries must enforce
-    # per-backend hostname uniqueness when hostname is defined.
-    assert dimensions.backend is not None
-    if dimensions.hostname:
-      cls(dimensions=dimensions, id=cls.compute_id(dimensions)).put()
-    else:
-      cls(dimensions=dimensions).put()
+    cls(dimensions=dimensions, key=cls.generate_key(dimensions)).put()
 
   def has_exact_dimensions(self, dimensions):
     """Returns whether this CatalogEntry has exactly the given dimensions.
@@ -125,3 +107,60 @@ class CatalogEntry(ndb.Model):
     return [
         e for e in cls.query(*filters) if e.has_exact_dimensions(dimensions)
     ]
+
+
+class CatalogCapacityEntry(CatalogEntry):
+  """Datastore representation of machine capacity in the catalog.
+
+  Key:
+    id: Hash of the non-None dimensions, where backend is the only required
+      dimension. Used to enforce per-backend dimension uniqueness.
+    kind: CatalogCapacityEntry. This root entity does not reference any parents.
+  """
+
+  @classmethod
+  def generate_key(cls, dimensions):
+    """Generates the key for a CatalogEntry with the given dimensions.
+
+    Args:
+      dimensions: rpc_messages.Dimensions describing this machine.
+
+    Returns:
+      An ndb.Key instance.
+    """
+    # Enforces per-backend dimension uniqueness.
+    assert dimensions.backend is not None
+    return ndb.Key(
+        cls,
+        hashlib.sha1(utils.fingerprint(dimensions)).hexdigest()
+    )
+
+
+class CatalogMachineEntry(CatalogEntry):
+  """Datastore representation of a machine in the catalog.
+
+  Key:
+    id: Hash of the backend + hostname dimensions. Used to enforce per-backend
+      hostname uniqueness.
+    kind: CatalogMachineEntry. This root entity does not reference any parents.
+  """
+
+  @classmethod
+  def generate_key(cls, dimensions):
+    """Generates the key for a CatalogEntry with the given dimensions.
+
+    Args:
+      dimensions: rpc_messages.Dimensions describing this machine.
+
+    Returns:
+      An ndb.Key instance.
+    """
+    # Enforces per-backend hostname uniqueness.
+    assert dimensions.backend is not None
+    assert dimensions.hostname is not None
+    return ndb.Key(
+        cls,
+        hashlib.sha1(
+            '%s\0%s' % (dimensions.backend, dimensions.hostname)
+        ).hexdigest(),
+    )

@@ -32,19 +32,28 @@ class Dimensions(messages.Message):
   hostname = messages.StringField(3)
 
 
-class CatalogAdditionRequest(messages.Message):
+class CatalogMachineAdditionRequest(messages.Message):
   """Represents a request to add a machine to the catalog.
 
-  dimensions.hostname must be unique per backend if specified.
+  dimensions.backend must be specified.
+  dimensions.hostname must be unique per backend.
   """
   # Dimensions instance specifying what sort of machine this is.
   dimensions = messages.MessageField(Dimensions, 1, required=True)
 
 
-class CatalogDeletionRequest(messages.Message):
+class CatalogMachineDeletionRequest(messages.Message):
   """Represents a request to delete a machine in the catalog."""
   # Dimensions instance specifying what sort of machine this is.
   dimensions = messages.MessageField(Dimensions, 1, required=True)
+
+
+class CatalogCapacityModificationRequest(messages.Message):
+  """Represents a request to modify machine capacity in the catalog."""
+  # Dimensions instance specifying what sort of machine this is.
+  dimensions = messages.MessageField(Dimensions, 1, required=True)
+  # Amount of available capacity matching the specified dimensions.
+  count = messages.IntegerField(2, required=True)
 
 
 class CatalogManipulationRequestError(messages.Enum):
@@ -57,6 +66,8 @@ class CatalogManipulationRequestError(messages.Enum):
   UNSPECIFIED_BACKEND = 3
   # Specified backend didn't match the backend originating the request.
   MISMATCHED_BACKEND = 4
+  # Didn't specify a hostname.
+  UNSPECIFIED_HOSTNAME = 5
 
 
 class CatalogManipulationResponse(messages.Message):
