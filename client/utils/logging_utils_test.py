@@ -1,7 +1,7 @@
 #!/usr/bin/env python
-# Copyright 2014 The Swarming Authors. All rights reserved.
-# Use of this source code is governed by the Apache v2.0 license that can be
-# found in the LICENSE file.
+# Copyright 2015 The Swarming Authors. All rights reserved.
+# Use of this source code is governed under the Apache License, Version 2.0 that
+# can be found in the LICENSE file.
 
 import logging
 import os
@@ -11,11 +11,10 @@ import shutil
 import unittest
 import re
 
-# Import this first before manipulating sys.path to ensure it can load fine.
-import logging_utils
-
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT_DIR)
+
+from utils import logging_utils
 
 import test_env
 test_env.setup_test_env()

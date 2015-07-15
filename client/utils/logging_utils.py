@@ -1,16 +1,14 @@
-# Copyright 2014 The Swarming Authors. All rights reserved.
-# Use of this source code is governed by the Apache v2.0 license that can be
-# found in the LICENSE file.
+# Copyright 2015 The Swarming Authors. All rights reserved.
+# Use of this source code is governed under the Apache License, Version 2.0 that
+# can be found in the LICENSE file.
 
-"""Utility relating to logging.
+"""Utility relating to logging."""
 
-TODO(maruel): Merge buffering and output related code from client/utils/tools.py
-in a single file.
-"""
-
+import argparse
 import codecs
 import logging
 import logging.handlers
+import optparse
 import os
 import sys
 import tempfile
@@ -56,6 +54,10 @@ else:  # Not Windows.
 
 
   NoInheritRotatingFileHandler = logging.handlers.RotatingFileHandler
+
+
+# Levels used for logging.
+LEVELS = [logging.ERROR, logging.INFO, logging.DEBUG]
 
 
 class CaptureLogs(object):
@@ -121,6 +123,18 @@ class UTCFormatter(logging.Formatter):
       return "%s.%03d" % (t, record.msecs)
 
 
+class Filter(logging.Filter):
+  """Adds fields used by the infra-specific formatter.
+
+  Fields added:
+  - 'severity': one-letter indicator of log level (first letter of levelname).
+  """
+
+  def filter(self, record):
+    record.severity = record.levelname[0]
+    return True
+
+
 def find_stderr(root=None):
   """Returns the logging.handler streaming to stderr, if any."""
   for log in (root or logging.getLogger()).handlers:
@@ -134,8 +148,7 @@ def prepare_logging(filename, root=None):
   Makes it log in UTC all the time. Prepare a rotating file based log.
   """
   assert not find_stderr(root)
-  formatter = UTCFormatter(
-      '%(process)d %(asctime)s: %(levelname)-5s %(message)s')
+  formatter = UTCFormatter('%(process)d %(asctime)s %(severity)s: %(message)s')
 
   # It is a requirement that the root logger is set to DEBUG, so the messages
   # are not lost. It defaults to WARNING otherwise.
@@ -144,6 +157,7 @@ def prepare_logging(filename, root=None):
 
   stderr = logging.StreamHandler()
   stderr.setFormatter(formatter)
+  stderr.addFilter(Filter())
   # Default to ERROR.
   stderr.setLevel(logging.ERROR)
   logger.addHandler(stderr)
@@ -153,9 +167,11 @@ def prepare_logging(filename, root=None):
   if filename:
     try:
       rotating_file = NoInheritRotatingFileHandler(
-          filename, maxBytes=10 * 1024 * 1024, backupCount=5)
+          filename, maxBytes=10 * 1024 * 1024, backupCount=5,
+          encoding='utf-8')
       rotating_file.setLevel(logging.DEBUG)
       rotating_file.setFormatter(formatter)
+      rotating_file.addFilter(Filter())
       logger.addHandler(rotating_file)
     except Exception:
       # May happen on cygwin. Do not crash.
@@ -166,3 +182,81 @@ def set_console_level(level, root=None):
   """Reset the console (stderr) logging level."""
   handler = find_stderr(root)
   handler.setLevel(level)
+
+
+class OptionParserWithLogging(optparse.OptionParser):
+  """Adds --verbose option."""
+
+  # Set to True to enable --log-file options.
+  enable_log_file = True
+
+  # Set in unit tests.
+  logger_root = None
+
+  def __init__(self, verbose=0, log_file=None, **kwargs):
+    kwargs.setdefault('description', sys.modules['__main__'].__doc__)
+    optparse.OptionParser.__init__(self, **kwargs)
+    self.group_logging = optparse.OptionGroup(self, 'Logging')
+    self.group_logging.add_option(
+        '-v', '--verbose',
+        action='count',
+        default=verbose,
+        help='Use multiple times to increase verbosity')
+    if self.enable_log_file:
+      self.group_logging.add_option(
+          '-l', '--log-file',
+          default=log_file,
+          help='The name of the file to store rotating log details')
+      self.group_logging.add_option(
+          '--no-log', action='store_const', const='', dest='log_file',
+          help='Disable log file')
+
+  def parse_args(self, *args, **kwargs):
+    # Make sure this group is always the last one.
+    self.add_option_group(self.group_logging)
+
+    options, args = optparse.OptionParser.parse_args(self, *args, **kwargs)
+    prepare_logging(self.enable_log_file and options.log_file, self.logger_root)
+    set_console_level(
+        LEVELS[min(len(LEVELS) - 1, options.verbose)], self.logger_root)
+    return options, args
+
+
+class ArgumentParserWithLogging(argparse.ArgumentParser):
+  """Adds --verbose option."""
+
+  # Set to True to enable --log-file options.
+  enable_log_file = True
+
+  def __init__(self, verbose=0, log_file=None, **kwargs):
+    kwargs.setdefault('description', sys.modules['__main__'].__doc__)
+    kwargs.setdefault('conflict_handler', 'resolve')
+    self.__verbose = verbose
+    self.__log_file = log_file
+    super(ArgumentParserWithLogging, self).__init__(**kwargs)
+
+  def _add_logging_group(self):
+    group = self.add_argument_group('Logging')
+    group.add_argument(
+        '-v', '--verbose',
+        action='count',
+        default=self.__verbose,
+        help='Use multiple times to increase verbosity')
+    if self.enable_log_file:
+      group.add_argument(
+          '-l', '--log-file',
+          default=self.__log_file,
+          help='The name of the file to store rotating log details')
+      group.add_argument(
+          '--no-log', action='store_const', const='', dest='log_file',
+          help='Disable log file')
+
+  def parse_args(self, *args, **kwargs):
+    # Make sure this group is always the last one.
+    self._add_logging_group()
+
+    args = super(ArgumentParserWithLogging, self).parse_args(*args, **kwargs)
+    prepare_logging(self.enable_log_file and args.log_file, self.logger_root)
+    set_console_level(
+        LEVELS[min(len(LEVELS) - 1, args.verbose)], self.logger_root)
+    return args

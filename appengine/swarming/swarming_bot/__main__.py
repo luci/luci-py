@@ -19,7 +19,7 @@ import subprocess
 import sys
 import zipfile
 
-import logging_utils
+from utils import logging_utils
 from utils import zip_package
 
 # This file can only be run as a zip.

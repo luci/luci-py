@@ -28,9 +28,9 @@ import traceback
 import zipfile
 
 import bot
-import logging_utils
 import os_utilities
 import xsrf_client
+from utils import logging_utils
 from utils import net
 from utils import on_error
 from utils import zip_package

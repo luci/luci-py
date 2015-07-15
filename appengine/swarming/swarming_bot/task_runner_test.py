@@ -24,8 +24,8 @@ test_env.setup_test_env()
 # Creates a server mock for functions in net.py.
 import net_utils
 
-import logging_utils
 from utils import file_path
+from utils import logging_utils
 from utils import subprocess42
 import task_runner
 import xsrf_client
