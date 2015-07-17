@@ -1,6 +1,5 @@
 #!/usr/bin/env python
-#
-# Copyright 2010 Google Inc.
+# Copyright 2010 Google Inc. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -32,11 +31,15 @@ __all__ = [
     "try_serialize_handler",
     "try_deserialize_handler",
     "CALLBACK_MR_ID_TASK_HEADER",
+    "strip_prefix_from_items"
     ]
 
 import inspect
 import os
 import pickle
+import random
+import sys
+import time
 import types
 
 from google.appengine.ext import ndb
@@ -50,6 +53,30 @@ _MR_SHARD_ID_TASK_HEADER = "AE-MR-SHARD-ID"
 
 # Callback task MR ID task header
 CALLBACK_MR_ID_TASK_HEADER = "Mapreduce-Id"
+
+
+# Ridiculous future UNIX epoch time, 500 years from now.
+_FUTURE_TIME = 2**34
+
+
+def _get_descending_key(gettime=time.time):
+  """Returns a key name lexically ordered by time descending.
+
+  This lets us have a key name for use with Datastore entities which returns
+  rows in time descending order when it is scanned in lexically ascending order,
+  allowing us to bypass index building for descending indexes.
+
+  Args:
+    gettime: Used for testing.
+
+  Returns:
+    A string with a time descending key.
+  """
+  now_descending = int((_FUTURE_TIME - gettime()) * 100)
+  request_id_hash = os.environ.get("REQUEST_ID_HASH")
+  if not request_id_hash:
+    request_id_hash = str(random.getrandbits(32))
+  return "%d%s" % (now_descending, request_id_hash)
 
 
 def _get_task_host():
@@ -77,17 +104,18 @@ def _get_task_host():
   return "%s.%s.%s" % (version, module, default_host)
 
 
-def _get_task_headers(mr_spec, mr_id_header_key=_MR_ID_TASK_HEADER):
+def _get_task_headers(map_job_id,
+                      mr_id_header_key=_MR_ID_TASK_HEADER):
   """Get headers for all mr tasks.
 
   Args:
-    mr_spec: an instance of model.MapreduceSpec.
+    map_job_id: map job id.
     mr_id_header_key: the key to set mr id with.
 
   Returns:
     A dictionary of all headers.
   """
-  return {mr_id_header_key: mr_spec.mapreduce_id,
+  return {mr_id_header_key: map_job_id,
           "Host": _get_task_host()}
 
 
@@ -118,10 +146,10 @@ def get_queue_name(queue_name):
   if queue_name:
     return queue_name
   queue_name = os.environ.get("HTTP_X_APPENGINE_QUEUENAME",
-                              parameters.DEFAULT_QUEUE_NAME)
+                              parameters.config.QUEUE_NAME)
   if len(queue_name) > 1 and queue_name[0:2] == "__":
     # We are currently in some special queue. E.g. __cron.
-    return parameters.DEFAULT_QUEUE_NAME
+    return parameters.config.QUEUE_NAME
   else:
     return queue_name
 
@@ -158,10 +186,11 @@ def for_name(fq_name, recursive=False):
   name doesn't contain '.', the current module will be used.
 
   Args:
-    fq_name: fully qualified name of something to find
+    fq_name: fully qualified name of something to find.
+    recursive: run recursively or not.
 
   Returns:
-    class object.
+    class object or None if fq_name is None.
 
   Raises:
     ImportError: when specified module could not be loaded or the class
@@ -169,6 +198,9 @@ def for_name(fq_name, recursive=False):
   """
 #  if "." not in fq_name:
 #    raise ImportError("'%s' is not a full-qualified name" % fq_name)
+
+  if fq_name is None:
+    return
 
   fq_name = str(fq_name)
   module_name = __name__
@@ -191,7 +223,7 @@ def for_name(fq_name, recursive=False):
       raise
     else:
       raise ImportError("Could not find '%s' on path '%s'" % (
-                        short_name, module_name))
+          short_name, module_name))
   except ImportError:
     # module_name is not actually a module. Try for_name for it to figure
     # out what's this.
@@ -204,7 +236,7 @@ def for_name(fq_name, recursive=False):
         raise KeyError()
     except KeyError:
       raise ImportError("Could not find '%s' on path '%s'" % (
-                        short_name, module_name))
+          short_name, module_name))
     except ImportError:
       # This means recursive import attempts failed, thus we will raise the
       # first ImportError we encountered, since it's likely the most accurate.
@@ -349,3 +381,51 @@ def _set_ndb_cache_policy():
   ndb_ctx = ndb.get_context()
   ndb_ctx.set_cache_policy(lambda key: False)
   ndb_ctx.set_memcache_policy(lambda key: False)
+
+
+def _obj_to_path(obj):
+  """Returns the fully qualified path to the object.
+
+  Args:
+    obj: obj must be a new style top level class, or a top level function.
+      No inner function or static method.
+
+  Returns:
+    Fully qualified path to the object.
+
+  Raises:
+    TypeError: when argument obj has unsupported type.
+    ValueError: when obj can't be discovered on the top level.
+  """
+  if obj is None:
+    return obj
+
+  if inspect.isclass(obj) or inspect.isfunction(obj):
+    fetched = getattr(sys.modules[obj.__module__], obj.__name__, None)
+    if fetched is None:
+      raise ValueError(
+          "Object %r must be defined on the top level of a module." % obj)
+    return "%s.%s" % (obj.__module__, obj.__name__)
+  raise TypeError("Unexpected type %s." % type(obj))
+
+
+def strip_prefix_from_items(prefix, items):
+  """Strips out the prefix from each of the items if it is present.
+
+  Args:
+    prefix: the string for that you wish to strip from the beginning of each
+      of the items.
+    items: a list of strings that may or may not contain the prefix you want
+      to strip out.
+
+  Returns:
+    items_no_prefix: a copy of the list of items (same order) without the
+      prefix (if present).
+  """
+  items_no_prefix = []
+  for item in items:
+    if item.startswith(prefix):
+      items_no_prefix.append(item[len(prefix):])
+    else:
+      items_no_prefix.append(item)
+  return items_no_prefix

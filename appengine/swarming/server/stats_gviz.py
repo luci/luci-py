@@ -6,6 +6,7 @@
 
 import datetime
 import itertools
+import json
 import webapp2
 
 import template
@@ -17,7 +18,6 @@ from components import utils
 from gviz import gviz_api
 from server import acl
 from server import stats
-from mapreduce.lib import simplejson
 
 ### Private Stuff.
 
@@ -179,7 +179,7 @@ class StatsSummaryHandler(StatsHandlerBase):
     # TODO(maruel): 'dimensions' should be updated when the user changes the
     # resolution at which the data is displayed.
     return {
-      'dimensions': simplejson.dumps(dimensions),
+      'dimensions': json.dumps(dimensions),
       'initial_data': gviz_api.DataTable(description, table).ToJSon(
           columns_order=_Summary.ORDER),
     }

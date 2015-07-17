@@ -2,7 +2,7 @@
 """Base pipelines."""
 
 
-from mapreduce.lib import pipeline
+import pipeline
 
 from mapreduce import parameters
 

@@ -1,6 +1,5 @@
 #!/usr/bin/env python
-#
-# Copyright 2010 Google Inc.
+# Copyright 2010 Google Inc. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -25,6 +24,7 @@ __all__ = [
     'MAX_NAMESPACE_LENGTH',
     'MAX_NAMESPACE',
     'MIN_NAMESPACE',
+    'NAMESPACE_BATCH_SIZE',
     'NamespaceRange',
     'get_namespace_keys',
 ]
@@ -42,20 +42,25 @@ NAMESPACE_CHARACTERS = ''.join(sorted(string.digits +
                                       '._-'))
 MAX_NAMESPACE_LENGTH = 100
 MIN_NAMESPACE = ''
+NAMESPACE_BATCH_SIZE = 50
 
 
 def _setup_constants(alphabet=NAMESPACE_CHARACTERS,
-                     max_length=MAX_NAMESPACE_LENGTH):
+                     max_length=MAX_NAMESPACE_LENGTH,
+                     batch_size=NAMESPACE_BATCH_SIZE):
   """Calculate derived constant values. Only useful for testing."""
 
   global NAMESPACE_CHARACTERS
   global MAX_NAMESPACE_LENGTH
+  # pylint: disable=global-variable-undefined
   global MAX_NAMESPACE
   global _LEX_DISTANCE
+  global NAMESPACE_BATCH_SIZE
 
   NAMESPACE_CHARACTERS = alphabet
   MAX_NAMESPACE_LENGTH = max_length
   MAX_NAMESPACE = NAMESPACE_CHARACTERS[-1] * MAX_NAMESPACE_LENGTH
+  NAMESPACE_BATCH_SIZE = batch_size
 
   # _LEX_DISTANCE will contain the lexical distance between two adjacent
   # characters in NAMESPACE_CHARACTERS at each character index. This is used
@@ -81,6 +86,7 @@ def _setup_constants(alphabet=NAMESPACE_CHARACTERS,
   for i in range(1, MAX_NAMESPACE_LENGTH):
     _LEX_DISTANCE.append(
         _LEX_DISTANCE[i-1] * len(NAMESPACE_CHARACTERS) + 1)
+  # pylint: disable=undefined-loop-variable
   del i
 _setup_constants()
 
@@ -102,7 +108,7 @@ def _ord_to_namespace(n, _max_length=None):
 
   Args:
     n: A number representing the lexographical ordering of a namespace.
-
+    _max_length: The maximum namespace length.
   Returns:
     A string representing the nth namespace in lexographical order.
   """
@@ -171,6 +177,7 @@ class NamespaceRange(object):
                namespace_start=None,
                namespace_end=None,
                _app=None):
+    # pylint: disable=g-doc-args
     """Initializes a NamespaceRange instance.
 
     Args:
@@ -273,8 +280,11 @@ class NamespaceRange(object):
     namespace_start = _ord_to_namespace(_namespace_to_ord(after_namespace) + 1)
     return NamespaceRange(namespace_start, self.namespace_end, _app=self.app)
 
-  def make_datastore_query(self):
+  def make_datastore_query(self, cursor=None):
     """Returns a datastore.Query that generates all namespaces in the range.
+
+    Args:
+      cursor: start cursor for the query.
 
     Returns:
       A datastore.Query instance that generates db.Keys for each namespace in
@@ -289,18 +299,19 @@ class NamespaceRange(object):
     return datastore.Query('__namespace__',
                            filters=filters,
                            keys_only=True,
+                           cursor=cursor,
                            _app=self.app)
 
   def normalized_start(self):
     """Returns a NamespaceRange with leading non-existant namespaces removed.
 
     Returns:
-      A copy of this NamespaceRange whose namespace_start is adjusted to exlcude
+      A copy of this NamespaceRange whose namespace_start is adjusted to exclude
       the portion of the range that contains no actual namespaces in the
       datastore. None is returned if the NamespaceRange contains no actual
       namespaces in the datastore.
     """
-    namespaces_after_key = self.make_datastore_query().Get(1)
+    namespaces_after_key = list(self.make_datastore_query().Run(limit=1))
 
     if not namespaces_after_key:
       return None
@@ -335,6 +346,7 @@ class NamespaceRange(object):
             can_query=itertools.chain(itertools.repeat(True, 50),
                                       itertools.repeat(False)).next,
             _app=None):
+    # pylint: disable=g-doc-args
     """Splits the complete NamespaceRange into n equally-sized NamespaceRanges.
 
     Args:
@@ -360,15 +372,32 @@ class NamespaceRange(object):
     if n < 1:
       raise ValueError('n must be >= 1')
 
-    ns_range = NamespaceRange(_app=_app)
+    ranges = None
     if can_query():
-      ns_range = ns_range.normalized_start()
-      if ns_range is None:
-        if contiguous:
-          return [NamespaceRange(_app=_app)]
-        else:
+      if not contiguous:
+        ns_keys = get_namespace_keys(_app, n + 1)
+        if not ns_keys:
           return []
-    ranges = [ns_range]
+        else:
+          if len(ns_keys) <= n:
+            # If you have less actual namespaces than number of NamespaceRanges
+            # to return, then just return the list of those namespaces.
+            ns_range = []
+            for ns_key in ns_keys:
+              ns_range.append(NamespaceRange(ns_key.name() or '',
+                                             ns_key.name() or '',
+                                             _app=_app))
+            return sorted(ns_range,
+                          key=lambda ns_range: ns_range.namespace_start)
+          # Use the first key and save the initial normalized_start() call.
+          ranges = [NamespaceRange(ns_keys[0].name() or '', _app=_app)]
+      else:
+        ns_range = NamespaceRange(_app=_app).normalized_start()
+        if ns_range is None:
+          return [NamespaceRange(_app=_app)]
+        ranges = [ns_range]
+    else:
+      ranges = [NamespaceRange(_app=_app)]
 
     singles = []
     while ranges and (len(ranges) + len(singles)) < n:
@@ -413,12 +442,19 @@ class NamespaceRange(object):
 
   def __iter__(self):
     """Iterate over all the namespaces within this range."""
-    query = self.make_datastore_query()
-    for ns_key in query.Run():
-      yield ns_key.name() or ''
+    cursor = None
+    while True:
+      query = self.make_datastore_query(cursor=cursor)
+      count = 0
+      for ns_key in query.Run(limit=NAMESPACE_BATCH_SIZE):
+        count += 1
+        yield ns_key.name() or ''
+      if count < NAMESPACE_BATCH_SIZE:
+        break
+      cursor = query.GetCursor()
 
 
 def get_namespace_keys(app, limit):
   """Get namespace keys."""
   ns_query = datastore.Query('__namespace__', keys_only=True, _app=app)
-  return ns_query.Get(limit=limit)
+  return list(ns_query.Run(limit=limit, batch_size=limit))

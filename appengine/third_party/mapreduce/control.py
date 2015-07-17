@@ -21,6 +21,8 @@
 __all__ = ["start_map"]
 
 # pylint: disable=g-bad-name
+# pylint: disable=protected-access
+
 
 import logging
 
@@ -29,6 +31,7 @@ from mapreduce import handlers
 from mapreduce import model
 from mapreduce import parameters
 from mapreduce import util
+from mapreduce.api import map_job
 
 
 def start_map(name,
@@ -47,12 +50,19 @@ def start_map(name,
               in_xg_transaction=False):
   """Start a new, mapper-only mapreduce.
 
+  Deprecated! Use map_job.start instead.
+
+  If a value can be specified both from an explicit argument and from
+  a dictionary, the value from the explicit argument wins.
+
   Args:
     name: mapreduce name. Used only for display purposes.
     handler_spec: fully qualified name of mapper handler function/class to call.
     reader_spec: fully qualified name of mapper reader to use
     mapper_parameters: dictionary of parameters to pass to mapper. These are
-      mapper-specific and also used for reader initialization.
+      mapper-specific and also used for reader/writer initialization.
+      Should have format {"input_reader": {}, "output_writer":{}}. Old
+      deprecated style does not have sub dictionaries.
     shard_count: number of shards to create.
     mapreduce_parameters: dictionary of mapreduce parameters relevant to the
       whole job.
@@ -76,15 +86,20 @@ def start_map(name,
     mapreduce id as string.
   """
   if shard_count is None:
-    shard_count = parameters.DEFAULT_SHARD_COUNT
-  if base_path is None:
-    # pylint: disable=protected-access
-    base_path = parameters._DEFAULT_BASE_PATH
+    shard_count = parameters.config.SHARD_COUNT
 
   if mapper_parameters:
     mapper_parameters = dict(mapper_parameters)
+
+  # Make sure this old API fill all parameters with default values.
+  mr_params = map_job.JobConfig._get_default_mr_params()
   if mapreduce_parameters:
-    mapreduce_parameters = dict(mapreduce_parameters)
+    mr_params.update(mapreduce_parameters)
+
+  # Override default values if user specified them as arguments.
+  if base_path:
+    mr_params["base_path"] = base_path
+  mr_params["queue_name"] = util.get_queue_name(queue_name)
 
   mapper_spec = model.MapperSpec(handler_spec,
                                  reader_spec,
@@ -99,9 +114,10 @@ def start_map(name,
   return handlers.StartJobHandler._start_map(
       name,
       mapper_spec,
-      mapreduce_parameters or {},
-      base_path=base_path,
-      queue_name=util.get_queue_name(queue_name),
+      mr_params,
+      # TODO(user): Now that "queue_name" is part of mr_params.
+      # Remove all the other ways to get queue_name after one release.
+      queue_name=mr_params["queue_name"],
       eta=eta,
       countdown=countdown,
       hooks_class_name=hooks_class_name,

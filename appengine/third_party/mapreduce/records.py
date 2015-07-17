@@ -4,6 +4,10 @@
 This format implements log file format from leveldb:
 http://leveldb.googlecode.com/svn/trunk/doc/log_format.txt
 
+The main advantages of this format are
+1. to detect corruption. Every record has a crc32c checksum.
+2. to quickly skip corrupted record to the next valid record.
+
 Full specification of format follows in case leveldb decides to change it.
 
 
@@ -69,7 +73,7 @@ import struct
 
 # Note: this will be scrubbed to google.appengine.api.files import crc32c
 # when mapreduce is pushed to runtime.
-from mapreduce.lib import crc32c
+from mapreduce.third_party import crc32c
 from mapreduce import errors
 
 
@@ -270,7 +274,11 @@ class RecordsReader(object):
                        (len(data), pad_length))
 
   def read(self):
-    """Reads record from current position in reader."""
+    """Reads record from current position in reader.
+
+    Returns:
+      original bytes stored in a single record.
+    """
     data = None
     while True:
       last_offset = self.tell()
