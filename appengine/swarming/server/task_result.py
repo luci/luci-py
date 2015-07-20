@@ -530,7 +530,7 @@ class TaskResultSummary(_TaskResultCommon):
   Parent is a TaskRequest. Key id is always 1.
 
   This includes the relevant result taking in account all tries. This entity is
-  basically a cache.
+  basically a cache plus a bunch of indexes to speed up common queries.
 
   It's primary purpose is for status pages listing all the active tasks or
   recently completed tasks.
@@ -543,6 +543,7 @@ class TaskResultSummary(_TaskResultCommon):
   created_ts = ndb.DateTimeProperty(required=True)
   name = ndb.StringProperty()
   user = ndb.StringProperty()
+  tags = ndb.StringProperty(repeated=True)
 
   # Value of TaskRequest.properties.properties_hash only when these conditions
   # are met:
@@ -843,7 +844,8 @@ def new_result_summary(request):
       key=task_pack.request_key_to_result_summary_key(request.key),
       created_ts=request.created_ts,
       name=request.name,
-      user=request.user)
+      user=request.user,
+      tags=request.tags)
 
 
 def new_run_result(request, try_number, bot_id, bot_version):
@@ -892,6 +894,9 @@ def get_tasks(task_name, task_tags, cursor_str, limit, sort, state):
   Returns:
     tuple(list of tasks, str encoded cursor, updated sort, updated state)
   """
+  # TODO(vadimsh): Use tags with get_result_summary_query. Will require existing
+  # entities to be updated first to include 'tags' fields (otherwise they'll
+  # disappear from the search).
   if task_tags:
     # Tag based search. Override the flags.
     sort = 'created_ts'
@@ -919,7 +924,7 @@ def get_tasks(task_name, task_tags, cursor_str, limit, sort, state):
     tasks, cursor_str = search_by_name(task_name, cursor_str, limit)
   else:
     # Normal listing.
-    query = get_result_summary_query(sort, state)
+    query = get_result_summary_query(sort, state, None)
     cursor = datastore_query.Cursor(urlsafe=cursor_str)
     tasks, cursor, more = query.fetch_page(limit, start_cursor=cursor)
     cursor_str = cursor.urlsafe() if cursor and more else None
@@ -986,13 +991,14 @@ def get_result_summaries(
   return tasks, cursor_str, state
 
 
-def get_result_summary_query(sort, state):
+def get_result_summary_query(sort, state, tags):
   """Generates one or many ndb.Query to return TaskResultSummary in the order
-  and state specified.
+  and state specified (filtering by tags if specified).
 
   Arguments:
     sort: One valid TaskResultSummary property that can be used for sorting.
     state: One of the known state to filter on.
+    tags: List of tags to filter on (multiple tags will be ANDed together).
 
   Returns:
     A ndb.Query instance.
@@ -1000,6 +1006,11 @@ def get_result_summary_query(sort, state):
   query = TaskResultSummary.query()
   if sort:
     query = query.order(_sort_property(sort))
+  if tags:
+    tags_filter = TaskResultSummary.tags == tags[0]
+    for tag in tags[1:]:
+      tags_filter = ndb.AND(tags_filter, TaskResultSummary.tags == tag)
+    query = query.filter(tags_filter)
 
   if state == 'pending':
     return query.filter(TaskResultSummary.state == State.PENDING)

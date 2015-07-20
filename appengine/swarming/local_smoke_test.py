@@ -144,6 +144,7 @@ def gen_expected(**kwargs):
     u'outputs': [u'hi\n'],
     u'server_versions': [u'1'],
     u'state': 0x70,  # task_result.State.COMPLETED.
+    u'tags': [u'cpu:x86', u'priority:100', u'user:joe@localhost'],
     u'try_number': 1,
     u'user': u'joe@localhost',
   }

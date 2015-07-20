@@ -234,6 +234,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'server_versions': [u'v1a'],
       'started_ts': now or self.now,
       'state': State.COMPLETED,
+      'tags': [u'OS:Windows-3.1.1', u'priority:50', u'tag:1', u'user:Jesus'],
       'try_number': 0,
       'user': u'Raoul',
     }
@@ -364,6 +365,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'server_versions': [],
       'started_ts': None,
       'state': State.PENDING,
+      'tags': [u'OS:Windows-3.1.1', u'priority:50', u'tag:1', u'user:Jesus'],
       'try_number': None,
       'user': u'Jesus',
     }
@@ -399,6 +401,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'server_versions': [u'v1a'],
       'started_ts': reaped_ts,
       'state': State.RUNNING,
+      'tags': [u'OS:Windows-3.1.1', u'priority:50', u'tag:1', u'user:Jesus'],
       'try_number': 1,
       'user': u'Jesus',
     }
@@ -459,6 +462,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'server_versions': [u'v1a'],
       'started_ts': reaped_ts,
       'state': State.COMPLETED,
+      'tags': [u'OS:Windows-3.1.1', u'priority:50', u'tag:1', u'user:Jesus'],
       'try_number': 1,
       'user': u'Jesus',
     }
@@ -522,6 +526,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'started_ts': self.now,
       'state': State.COMPLETED,
       'try_number': 1,
+      'tags': [u'OS:Windows-3.1.1', u'priority:50', u'tag:1', u'user:Jesus'],
       'user': u'Jesus',
     }
     self.assertEqual(expected, result_summary.to_dict())
@@ -626,6 +631,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'server_versions': [u'v1a'],
       'started_ts': self.now,
       'state': State.TIMED_OUT,
+      'tags': [u'OS:Windows-3.1.1', u'priority:50', u'tag:1', u'user:Jesus'],
       'try_number': 1,
       'user': u'Jesus',
     }
@@ -689,6 +695,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'server_versions': [u'v1a'],
       'started_ts': self.now,
       'state': State.BOT_DIED,
+      'tags': [u'OS:Windows-3.1.1', u'priority:50', u'tag:1', u'user:Jesus'],
       'try_number': 1,
       'user': u'Jesus',
     }
@@ -781,6 +788,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'server_versions': [],
       'started_ts': None,
       'state': task_result.State.EXPIRED,
+      'tags': [u'OS:Windows-3.1.1', u'priority:50', u'tag:1', u'user:Jesus'],
       'try_number': None,
       'user': u'Jesus',
     }
@@ -833,6 +841,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'server_versions': [u'v1a'],
       'started_ts': self.now,
       'state': task_result.State.BOT_DIED,
+      'tags': [u'OS:Windows-3.1.1', u'priority:50', u'tag:1', u'user:Jesus'],
       'try_number': 1,
       'user': u'Jesus',
     }
@@ -899,6 +908,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'server_versions': [u'v1a'],
       'started_ts': None,
       'state': task_result.State.PENDING,
+      'tags': [u'OS:Windows-3.1.1', u'priority:50', u'tag:1', u'user:Jesus'],
       'try_number': 1,
       'user': u'Jesus',
     }
@@ -936,6 +946,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'server_versions': [u'v1a'],
       'started_ts': now_2,
       'state': task_result.State.COMPLETED,
+      'tags': [u'OS:Windows-3.1.1', u'priority:50', u'tag:1', u'user:Jesus'],
       'try_number': 2,
       'user': u'Jesus',
     }
@@ -1003,6 +1014,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'server_versions': [u'v1a'],
       'started_ts': None,
       'state': task_result.State.PENDING,
+      'tags': [u'OS:Windows-3.1.1', u'priority:50', u'tag:1', u'user:Jesus'],
       'try_number': 1,
       'user': u'Jesus',
     }
@@ -1063,6 +1075,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
       'server_versions': [u'v1a'],
       'started_ts': now_1,
       'state': task_result.State.BOT_DIED,
+      'tags': [u'OS:Windows-3.1.1', u'priority:50', u'tag:1', u'user:Jesus'],
       'try_number': 2,
       'user': u'Jesus',
     }

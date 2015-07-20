@@ -267,7 +267,7 @@ class ClientApiTasksHandler(auth.ApiHandler):
     self.send_response(utils.to_json_encodable(data))
 
 
-class ClientApiCountHandler(auth.ApiHandler):
+class ClientApiTasksCountHandler(auth.ApiHandler):
   """Counts number of tasks in a given state.
 
   Can be used to estimate pending queue size.
@@ -278,7 +278,7 @@ class ClientApiCountHandler(auth.ApiHandler):
         'completed', 'completed_success', 'completed_failure', 'bot_died',
         'expired', 'canceled'. Defaults to 'all'.
   """
-  EXPECTED = {'interval', 'state'}
+  EXPECTED = {'interval', 'state', 'tag'}
 
   # See task_result.get_result_summary_query().
   VALID_STATES = {
@@ -304,11 +304,9 @@ class ClientApiCountHandler(auth.ApiHandler):
           error='Extraneous query parameters. Did you make a typo? %s' %
           ','.join(sorted(extra)))
 
-    # TODO(vadimsh): Add filtering by tags (to support queries like "number of
-    # Windows tasks in pending state"). There's no corresponding index in
-    # the datastore (to filter by state and tags at once), so it's not trivial.
     interval = self.request.get('interval', 24 * 3600)
     state = self.request.get('state', 'all')
+    tags = self.request.get_all('tag')
 
     try:
       interval = int(interval)
@@ -329,7 +327,7 @@ class ClientApiCountHandler(auth.ApiHandler):
     request_id = task_request.datetime_to_request_base_id(cutoff)
     request_key = task_request.request_id_to_key(request_id)
 
-    query = task_result.get_result_summary_query(None, state)
+    query = task_result.get_result_summary_query(None, state, tags)
     query = query.filter(task_result.TaskResultSummary.key <= request_key)
     self.send_response(utils.to_json_encodable({'count': query.count()}))
 
@@ -498,6 +496,6 @@ def get_routes():
       ('/swarming/api/v1/client/task/<task_id:[0-9a-f]+>/output/all',
           ClientTaskResultOutputAllHandler),
       ('/swarming/api/v1/client/tasks', ClientApiTasksHandler),
-      ('/swarming/api/v1/client/count', ClientApiCountHandler),
+      ('/swarming/api/v1/client/tasks/count', ClientApiTasksCountHandler),
   ]
   return [webapp2.Route(*i) for i in routes]

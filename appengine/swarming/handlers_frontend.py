@@ -504,7 +504,7 @@ class TasksHandler(auth.AuthenticatingHandler):
     request_id = task_request.datetime_to_request_base_id(last_24h)
     request_key = task_request.request_id_to_key(request_id)
     for state_key, _, _ in itertools.chain.from_iterable(self.STATE_CHOICES):
-      query = task_result.get_result_summary_query(None, state_key)
+      query = task_result.get_result_summary_query(None, state_key, None)
       # It is counter intuitive but the equality has to be reversed, since the
       # value in the db is binary negated.
       counts_future[state_key] = query.filter(

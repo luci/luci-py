@@ -53,7 +53,6 @@ class ClientApiTest(test_env_handlers.AppTestBase):
       u'bot/<bot_id:[^/]+>': u'Bot\'s meta data',
       u'bot/<bot_id:[^/]+>/tasks': u'Tasks executed on a specific bot',
       u'bots': u'Bots known to the server',
-      u'count': handlers_api.process_doc(handlers_api.ClientApiCountHandler),
       u'list': u'All query handlers',
       u'server': u'Server details',
       u'task/<task_id:[0-9a-f]+>': u'Task\'s result meta data',
@@ -63,6 +62,8 @@ class ClientApiTest(test_env_handlers.AppTestBase):
           u'All output from all commands in a task',
       u'task/<task_id:[0-9a-f]+>/request': u'Task\'s request details',
       u'tasks': handlers_api.process_doc(handlers_api.ClientApiTasksHandler),
+      u'tasks/count': handlers_api.process_doc(
+          handlers_api.ClientApiTasksCountHandler),
     }
     self.assertEqual(expected, response)
 
@@ -252,6 +253,7 @@ class ClientApiTest(test_env_handlers.AppTestBase):
       u'server_versions': [],
       u'started_ts': None,
       u'state': task_result.State.CANCELED,
+      u'tags': [u'os:Amiga', u'priority:10', u'user:joe@localhost'],
       u'try_number': None,
       u'user': u'joe@localhost',
     }
@@ -291,6 +293,7 @@ class ClientApiTest(test_env_handlers.AppTestBase):
       u'server_versions': [],
       u'started_ts': None,
       u'state': task_result.State.PENDING,
+      u'tags': [u'os:Amiga', u'priority:100', u'user:joe@localhost'],
       u'try_number': None,
       u'user': u'joe@localhost',
     }
@@ -512,6 +515,14 @@ class ClientApiTest(test_env_handlers.AppTestBase):
       u'server_versions': [u'v1a'],
       u'started_ts': now_str,
       u'state': task_result.State.COMPLETED,
+      u'tags': [
+        u'commit:post',
+        u'os:Amiga',
+        u'os:Win',
+        u'priority:100',
+        u'project:yay',
+        u'user:joe@localhost',
+      ],
       u'try_number': 1,
       u'user': u'joe@localhost',
     }
@@ -536,6 +547,14 @@ class ClientApiTest(test_env_handlers.AppTestBase):
       u'server_versions': [u'v1a'],
       u'started_ts': now_str,
       u'state': task_result.State.COMPLETED,
+      u'tags': [
+        u'commit:post',
+        u'os:Amiga',
+        u'os:Win',
+        u'priority:100',
+        u'project:yay',
+        u'user:joe@localhost',
+      ],
       u'try_number': 0,
       u'user': u'jack@localhost',
     }
@@ -615,15 +634,23 @@ class ClientApiTest(test_env_handlers.AppTestBase):
     self.set_as_privileged_user()
 
     # Default 24h cutoff interval.
-    result = self.app.get('/swarming/api/v1/client/count').json
+    result = self.app.get('/swarming/api/v1/client/tasks/count').json
     self.assertEqual({'count': 2}, result)
 
     # Test cutoff.
-    result = self.app.get('/swarming/api/v1/client/count?interval=30').json
+    result = self.app.get(
+        '/swarming/api/v1/client/tasks/count?interval=30').json
     self.assertEqual({'count': 1}, result)
 
     # Test filter by state.
-    result = self.app.get('/swarming/api/v1/client/count?state=pending').json
+    result = self.app.get(
+        '/swarming/api/v1/client/tasks/count?state=pending').json
+    self.assertEqual({'count': 1}, result)
+
+    # Test filter by tag.
+    result = self.app.get(
+        '/swarming/api/v1/client/tasks/count?'
+        'tag=project:yay&tag=commit:pre').json
     self.assertEqual({'count': 1}, result)
 
   def test_api_bots(self):
