@@ -53,6 +53,7 @@ class ClientApiTest(test_env_handlers.AppTestBase):
       u'bot/<bot_id:[^/]+>': u'Bot\'s meta data',
       u'bot/<bot_id:[^/]+>/tasks': u'Tasks executed on a specific bot',
       u'bots': u'Bots known to the server',
+      u'count': handlers_api.process_doc(handlers_api.ClientApiCountHandler),
       u'list': u'All query handlers',
       u'server': u'Server details',
       u'task/<task_id:[0-9a-f]+>': u'Task\'s result meta data',
@@ -590,6 +591,40 @@ class ClientApiTest(test_env_handlers.AppTestBase):
     self.set_as_privileged_user()
     # It's 'tag', not 'tags'.
     self.app.get('/swarming/api/v1/client/tasks?tags=a:b', status=400)
+
+  def test_count(self):
+    now = datetime.datetime(2010, 1, 2, 3, 4, 5, 6)
+
+    # Task in completed state.
+    self.set_as_user()
+    self.mock_now(now)
+    self.client_create_task(
+        name='first', tags=['project:yay', 'commit:post', 'os:Win'],
+        properties=dict(idempotent=False))
+    self.set_as_bot()
+    self.bot_run_task()
+
+    # Task in pending state.
+    self.set_as_user()
+    self.mock_now(now, 60)
+    self.client_create_task(
+        name='second', user='jack@localhost',
+        tags=['project:yay', 'commit:pre', 'os:Win'],
+        properties=dict(idempotent=False))
+
+    self.set_as_privileged_user()
+
+    # Default 24h cutoff interval.
+    result = self.app.get('/swarming/api/v1/client/count').json
+    self.assertEqual({'count': 2}, result)
+
+    # Test cutoff.
+    result = self.app.get('/swarming/api/v1/client/count?interval=30').json
+    self.assertEqual({'count': 1}, result)
+
+    # Test filter by state.
+    result = self.app.get('/swarming/api/v1/client/count?state=pending').json
+    self.assertEqual({'count': 1}, result)
 
   def test_api_bots(self):
     self.set_as_privileged_user()

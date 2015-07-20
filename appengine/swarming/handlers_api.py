@@ -267,6 +267,73 @@ class ClientApiTasksHandler(auth.ApiHandler):
     self.send_response(utils.to_json_encodable(data))
 
 
+class ClientApiCountHandler(auth.ApiHandler):
+  """Counts number of tasks in a given state.
+
+  Can be used to estimate pending queue size.
+
+  Args:
+    interval: How far back into the past to search for tasks (seconds).
+    state: Filtering: 'all', 'pending', 'running', 'pending_running',
+        'completed', 'completed_success', 'completed_failure', 'bot_died',
+        'expired', 'canceled'. Defaults to 'all'.
+  """
+  EXPECTED = {'interval', 'state'}
+
+  # See task_result.get_result_summary_query().
+  VALID_STATES = {
+    'all',
+    'bot_died',
+    'canceled',
+    'completed',
+    'completed_failure',
+    'completed_success',
+    'expired',
+    'pending',
+    'pending_running',
+    'running',
+    'timed_out',
+  }
+
+  @auth.require(acl.is_privileged_user)
+  def get(self):
+    extra = frozenset(self.request.GET) - self.EXPECTED
+    if extra:
+      self.abort_with_error(
+          400,
+          error='Extraneous query parameters. Did you make a typo? %s' %
+          ','.join(sorted(extra)))
+
+    # TODO(vadimsh): Add filtering by tags (to support queries like "number of
+    # Windows tasks in pending state"). There's no corresponding index in
+    # the datastore (to filter by state and tags at once), so it's not trivial.
+    interval = self.request.get('interval', 24 * 3600)
+    state = self.request.get('state', 'all')
+
+    try:
+      interval = int(interval)
+      if interval <= 0:
+        raise ValueError()
+    except ValueError:
+      self.abort_with_error(
+          400, error='"interval" must be a positive integer number of seconds')
+
+    if state not in self.VALID_STATES:
+      self.abort_with_error(
+          400,
+          error='Invalid state "%s", expecting on of %s' %
+          (state, ', '.join(sorted(self.VALID_STATES))))
+
+    # Cutoff deadline => request key for filtering (it embeds timestamp).
+    cutoff = utils.utcnow() - datetime.timedelta(seconds=interval)
+    request_id = task_request.datetime_to_request_base_id(cutoff)
+    request_key = task_request.request_id_to_key(request_id)
+
+    query = task_result.get_result_summary_query(None, state)
+    query = query.filter(task_result.TaskResultSummary.key <= request_key)
+    self.send_response(utils.to_json_encodable({'count': query.count()}))
+
+
 class ClientApiBots(auth.ApiHandler):
   """Bots known to the server"""
 
@@ -431,5 +498,6 @@ def get_routes():
       ('/swarming/api/v1/client/task/<task_id:[0-9a-f]+>/output/all',
           ClientTaskResultOutputAllHandler),
       ('/swarming/api/v1/client/tasks', ClientApiTasksHandler),
+      ('/swarming/api/v1/client/count', ClientApiCountHandler),
   ]
   return [webapp2.Route(*i) for i in routes]
