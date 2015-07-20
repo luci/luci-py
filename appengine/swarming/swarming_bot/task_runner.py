@@ -322,8 +322,14 @@ def run_command(
     output_chunk_start += len(stdout)
     stdout = ''
 
+    summary = {
+        'exit_code': exit_code,
+        'hard_timeout': had_hard_timeout,
+        'io_timeout': had_io_timeout,
+        'version': 2,
+    }
     with open(json_file, 'w') as fd:
-      json.dump({'exit_code': exit_code, 'version': 1}, fd)
+      json.dump(summary, fd)
 
   logging.info('run_command() = %s', exit_code)
   assert not stdout
