@@ -593,35 +593,33 @@ class ClientApiTest(test_env_handlers.AppTestBase):
 
   def test_api_bots(self):
     self.set_as_privileged_user()
-    now = datetime.datetime(2010, 1, 2, 3, 4, 5, 6)
-    now_str = unicode(now.strftime(utils.DATETIME_FORMAT))
-    self.mock_now(now)
+    self.mock_now(datetime.datetime(2010, 1, 2, 3, 4, 5, 6))
+    now_str = lambda: unicode(utils.utcnow().strftime(utils.DATETIME_FORMAT))
     bot_management.bot_event(
         event_type='bot_connected', bot_id='id1', external_ip='8.8.4.4',
         dimensions={'foo': ['bar'], 'id': ['id1']}, state={'ram': 65},
         version='123456789', quarantined=False, task_id=None, task_name=None)
+    bot1_dict = {
+      u'dimensions': {u'foo': [u'bar'], u'id': [u'id1']},
+      u'external_ip': u'8.8.4.4',
+      u'first_seen_ts': now_str(),
+      u'id': u'id1',
+      u'is_dead': False,
+      u'last_seen_ts': now_str(),
+      u'quarantined': False,
+      u'state': {u'ram': 65},
+      u'task_id': None,
+      u'task_name': None,
+      u'version': u'123456789',
+    }
 
     actual = self.app.get('/swarming/api/v1/client/bots', status=200).json
     expected = {
-      u'items': [
-        {
-          u'dimensions': {u'foo': [u'bar'], u'id': [u'id1']},
-          u'external_ip': u'8.8.4.4',
-          u'first_seen_ts': now_str,
-          u'id': u'id1',
-          u'is_dead': False,
-          u'last_seen_ts': now_str,
-          u'quarantined': False,
-          u'state': {u'ram': 65},
-          u'task_id': None,
-          u'task_name': None,
-          u'version': u'123456789',
-        },
-      ],
+      u'items': [bot1_dict],
       u'cursor': None,
       u'death_timeout': config.settings().bot_death_timeout_secs,
       u'limit': 1000,
-      u'now': unicode(now.strftime(utils.DATETIME_FORMAT)),
+      u'now': now_str(),
     }
     self.assertEqual(expected, actual)
 
@@ -631,24 +629,62 @@ class ClientApiTest(test_env_handlers.AppTestBase):
     expected['limit'] = 1
     self.assertEqual(expected, actual)
 
+    # Advance time to make bot1 dead to test filtering for dead bots.
+    self.mock_now(datetime.datetime(2011, 1, 2, 3, 4, 5, 6))
+    bot1_dict['is_dead'] = True
+    expected['now'] = now_str()
+
+    # Use quarantined bot to check filtering by 'quarantined' flag.
     bot_management.bot_event(
         event_type='bot_connected', bot_id='id2', external_ip='8.8.4.4',
         dimensions={'foo': ['bar'], 'id': ['id2']}, state={'ram': 65},
-        version='123456789', quarantined=False, task_id=None, task_name=None)
+        version='123456789', quarantined=True, task_id=None, task_name=None)
+    bot2_dict = {
+      u'dimensions': {u'foo': [u'bar'], u'id': [u'id2']},
+      u'external_ip': u'8.8.4.4',
+      u'first_seen_ts': now_str(),
+      u'id': u'id2',
+      u'is_dead': False,
+      u'last_seen_ts': now_str(),
+      u'quarantined': True,
+      u'state': {u'ram': 65},
+      u'task_id': None,
+      u'task_name': None,
+      u'version': u'123456789',
+    }
 
+    # Test limit + cursor: start the query.
     actual = self.app.get(
         '/swarming/api/v1/client/bots?limit=1', status=200).json
     expected['cursor'] = actual['cursor']
+    expected['items'] = [bot1_dict]
     self.assertTrue(actual['cursor'])
     self.assertEqual(expected, actual)
 
-    # Test with cursor.
+    # Test limit + cursor: continue the query.
     actual = self.app.get(
         '/swarming/api/v1/client/bots?limit=1&cursor=%s' % actual['cursor'],
         status=200).json
     expected['cursor'] = None
-    expected['items'][0]['dimensions']['id'] = [u'id2']
-    expected['items'][0]['id'] = u'id2'
+    expected['items'] = [bot2_dict]
+    self.assertEqual(expected, actual)
+
+    # Filtering by 'quarantined'.
+    actual = self.app.get(
+        '/swarming/api/v1/client/bots?filter=quarantined',
+        status=200).json
+    expected['limit'] = 1000
+    expected['cursor'] = None
+    expected['items'] = [bot2_dict]
+    self.assertEqual(expected, actual)
+
+    # Filtering by 'is_dead'.
+    actual = self.app.get(
+        '/swarming/api/v1/client/bots?filter=is_dead',
+        status=200).json
+    expected['limit'] = 1000
+    expected['cursor'] = None
+    expected['items'] = [bot1_dict]
     self.assertEqual(expected, actual)
 
   def test_api_bot(self):

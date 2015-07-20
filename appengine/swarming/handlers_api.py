@@ -5,6 +5,7 @@
 """Swarming client REST APIs handlers."""
 
 import base64
+import datetime
 import json
 import logging
 import textwrap
@@ -269,17 +270,45 @@ class ClientApiTasksHandler(auth.ApiHandler):
 class ClientApiBots(auth.ApiHandler):
   """Bots known to the server"""
 
+  ACCEPTABLE_FILTERS = (
+    'quarantined',
+    'is_dead',
+  )
+
   @auth.require(acl.is_privileged_user)
   def get(self):
     now = utils.utcnow()
     limit = int(self.request.get('limit', 1000))
+    filter_by = self.request.get('filter')
+    if filter_by and filter_by not in self.ACCEPTABLE_FILTERS:
+      self.abort_with_error(400, error='Invalid filter query parameter')
+
+    q = bot_management.BotInfo.query()
+
+    if not filter_by:
+      q = q.order(bot_management.BotInfo.key)
+      recheck = lambda _: True
+    elif filter_by == 'quarantined':
+      q = q.order(bot_management.BotInfo.key)
+      q = q.filter(bot_management.BotInfo.quarantined == True)
+      recheck = lambda b: b.quarantined
+    elif filter_by == 'is_dead':
+      # The first sort key must be the same as used in the filter, otherwise
+      # datastore raises BadRequestError.
+      deadline = now - datetime.timedelta(
+          seconds=config.settings().bot_death_timeout_secs)
+      q = q.order(bot_management.BotInfo.last_seen_ts)
+      q = q.filter(bot_management.BotInfo.last_seen_ts < deadline)
+      recheck = lambda b: b.last_seen_ts < deadline
+    else:
+      raise AssertionError('Impossible')
+
     cursor = datastore_query.Cursor(urlsafe=self.request.get('cursor'))
-    q = bot_management.BotInfo.query().order(bot_management.BotInfo.key)
     bots, cursor, more = q.fetch_page(limit, start_cursor=cursor)
     data = {
       'cursor': cursor.urlsafe() if cursor and more else None,
       'death_timeout': config.settings().bot_death_timeout_secs,
-      'items': [b.to_dict_with_now(now) for b in bots],
+      'items': [b.to_dict_with_now(now) for b in bots if recheck(b)],
       'limit': limit,
       'now': now,
     }
