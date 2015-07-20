@@ -88,7 +88,10 @@ class CatalogEndpoints(remote.Service):
       return rpc_messages.CatalogManipulationResponse(
           error=rpc_messages.CatalogManipulationRequestError.HOSTNAME_REUSE
       )
-    models.CatalogMachineEntry.create_and_put(request.dimensions)
+    models.CatalogMachineEntry.create_and_put(
+        request.dimensions,
+        models.CatalogMachineEntryStates.AVAILABLE,
+    )
     return rpc_messages.CatalogManipulationResponse()
 
   @auth.endpoints_method(
@@ -142,7 +145,10 @@ class CatalogEndpoints(remote.Service):
   @ndb.transactional
   def _modify_capacity(self, request):
     """Handles datastore operations for CatalogCapacityModificationRequests."""
-    models.CatalogCapacityEntry.create_and_put(request.dimensions)
+    models.CatalogCapacityEntry.create_and_put(
+        request.dimensions,
+        request.count,
+    )
     return rpc_messages.CatalogManipulationResponse()
 
 
@@ -157,9 +163,7 @@ class MachineProviderEndpoints(remote.Service):
     # Hash the combination of client + client-generated request ID in order to
     # deduplicate responses on a per-client basis.
     user = auth.get_current_identity().to_bytes()
-    request_hash = hashlib.sha1(
-        '%s\0%s' % (user, request.request_id)
-    ).hexdigest()
+    request_hash = models.LeaseRequest.generate_key(user, request).id()
     logging.info(
         'Received LeaseRequest:\nUser: %s\nRequest hash: %s\n%s',
         user,
@@ -167,9 +171,9 @@ class MachineProviderEndpoints(remote.Service):
         request,
     )
     duplicate = models.LeaseRequest.get_by_id(request_hash)
-    deduplication_checksum = hashlib.sha1(
-        protobuf.encode_message(request)
-    ).hexdigest()
+    deduplication_checksum = models.LeaseRequest.compute_deduplication_checksum(
+        request,
+    )
     if duplicate:
       # Found a duplicate request ID from the same user. Attempt deduplication.
       if deduplication_checksum == duplicate.deduplication_checksum:

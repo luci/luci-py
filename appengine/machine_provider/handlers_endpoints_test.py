@@ -47,22 +47,6 @@ def jsonish_dict_to_rpc(dictionary, rpc_message_type):
   return protojson.decode_message(rpc_message_type, json.dumps(dictionary))
 
 
-class MockUser(object):
-  """Mocked user for endpoints.get_current_user."""
-
-  def __init__(self, email):
-    """Initializes a new instance of the MockUser class.
-
-    Args:
-      email: The email address of this user.
-    """
-    self._email = email
-
-  def email(self):
-    """Returns the email address of this user."""
-    return self._email
-
-
 class CatalogTest(test_case.EndpointsTestCase):
   """Tests for handlers_endpoints.CatalogEndpoints."""
   api_service_cls = handlers_endpoints.CatalogEndpoints

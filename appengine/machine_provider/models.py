@@ -52,6 +52,45 @@ class LeaseRequest(ndb.Model):
   # DateTime indicating original datastore write time.
   created_ts = ndb.DateTimeProperty(auto_now_add=True)
 
+  @classmethod
+  def compute_deduplication_checksum(cls, request):
+    """Computes the deduplication checksum for the given request.
+
+    Args:
+      request: The rpc_messages.LeaseRequest instance to deduplicate.
+
+    Returns:
+      The deduplication checksum.
+    """
+    return hashlib.sha1(protobuf.encode_message(request)).hexdigest()
+
+  @classmethod
+  def generate_key(cls, user, request):
+    """Generates the key for the given request initiated by the given user.
+
+    Args:
+      user: An auth.model.Identity instance representing the requester.
+      request: The rpc_messages.LeaseRequest sent by the user.
+
+    Returns:
+      An ndb.Key instance.
+    """
+    # Enforces per-user request ID uniqueness
+    return ndb.Key(
+        cls,
+        hashlib.sha1('%s\0%s' % (user, request.request_id)).hexdigest(),
+    )
+
+  @classmethod
+  def query_untriaged(cls):
+    """Queries for untriaged LeaseRequests.
+
+    Yields:
+      Untriaged LeaseRequests in no guaranteed order.
+    """
+    for request in cls.query(cls.state == LeaseRequestStates.UNTRIAGED):
+      yield request
+
 
 class CatalogEntry(ndb.Model):
   """Datastore representation of an entry in the catalog."""
@@ -63,51 +102,6 @@ class CatalogEntry(ndb.Model):
       ],
   )
 
-  @classmethod
-  def create_and_put(cls, dimensions):
-    """Creates a new CatalogEntry entity and puts it in the datastore.
-
-    Args:
-      dimensions: rpc_messages.Dimensions describing this machine.
-    """
-    cls(dimensions=dimensions, key=cls.generate_key(dimensions)).put()
-
-  def has_exact_dimensions(self, dimensions):
-    """Returns whether this CatalogEntry has exactly the given dimensions.
-
-    This will match unspecified/None-valued dimensions.
-
-    Args:
-      dimensions: rpc_messages.Dimensions to check for.
-
-    Returns:
-      True if this CatalogEntry has exactly the given dimensions, else False.
-    """
-    for field in dimensions.all_fields():
-      if getattr(self.dimensions, field.name) != getattr(dimensions, field.name):
-        return False
-    return True
-
-  @classmethod
-  def query_by_exact_dimensions(cls, dimensions):
-    """Queries for CatalogEntries exactly matching the given dimensions.
-
-    This will match unspecifed/None-valued dimensions.
-
-    Args:
-      dimensions: rpc_messages.Dimensions to query for.
-
-    Returns:
-      A list of matching CatalogEntry instances.
-    """
-    filters = [
-        getattr(cls.dimensions, field.name) == getattr(dimensions, field.name)
-        for field in dimensions.all_fields()
-    ]
-    return [
-        e for e in cls.query(*filters) if e.has_exact_dimensions(dimensions)
-    ]
-
 
 class CatalogCapacityEntry(CatalogEntry):
   """Datastore representation of machine capacity in the catalog.
@@ -117,6 +111,24 @@ class CatalogCapacityEntry(CatalogEntry):
       dimension. Used to enforce per-backend dimension uniqueness.
     kind: CatalogCapacityEntry. This root entity does not reference any parents.
   """
+  # The amount of capacity with these dimensions that can be provided.
+  count = ndb.IntegerProperty(indexed=True, required=True)
+  # Whether there is available capacity or not.
+  has_capacity = ndb.ComputedProperty(lambda self: self.count > 0)
+
+  @classmethod
+  def create_and_put(cls, dimensions, count):
+    """Creates a new CatalogEntry entity and puts it in the datastore.
+
+    Args:
+      dimensions: rpc_messages.Dimensions describing this capacity.
+      count: Amount of capacity with the given dimensions.
+    """
+    cls(
+        count=count,
+        dimensions=dimensions,
+        key=cls.generate_key(dimensions),
+    ).put()
 
   @classmethod
   def generate_key(cls, dimensions):
@@ -135,6 +147,24 @@ class CatalogCapacityEntry(CatalogEntry):
         hashlib.sha1(utils.fingerprint(dimensions)).hexdigest()
     )
 
+  @classmethod
+  def query_available(cls, *filters):
+    """Queries for available capacity.
+
+    Args:
+      *filters: Any additional filters to include in the query.
+
+    Yields:
+      CatalogCapacityEntry keys in no guaranteed order.
+    """
+    for capacity in cls.query(cls.has_capacity == True, *filters).fetch(
+        keys_only=True,
+    ):
+      yield capacity
+
+
+CatalogMachineEntryStates = Enum(['AVAILABLE', 'LEASED'])
+
 
 class CatalogMachineEntry(CatalogEntry):
   """Datastore representation of a machine in the catalog.
@@ -144,6 +174,27 @@ class CatalogMachineEntry(CatalogEntry):
       hostname uniqueness.
     kind: CatalogMachineEntry. This root entity does not reference any parents.
   """
+  # Element of CatalogMachineEntryStates giving the state of this entry.
+  state = ndb.StringProperty(
+      choices=CatalogMachineEntryStates,
+      default=CatalogMachineEntryStates.AVAILABLE,
+      indexed=True,
+      required=True,
+  )
+
+  @classmethod
+  def create_and_put(cls, dimensions, state):
+    """Creates a new CatalogEntry entity and puts it in the datastore.
+
+    Args:
+      dimensions: rpc_messages.Dimensions describing this machine.
+      state: Element of CatalogMachineEntryState describing this machine.
+    """
+    cls(
+        dimensions=dimensions,
+        state=state,
+        key=cls.generate_key(dimensions),
+    ).put()
 
   @classmethod
   def generate_key(cls, dimensions):
@@ -164,3 +215,17 @@ class CatalogMachineEntry(CatalogEntry):
             '%s\0%s' % (dimensions.backend, dimensions.hostname)
         ).hexdigest(),
     )
+
+  @classmethod
+  def query_available(cls, *filters):
+    """Queries for available machines.
+
+    Args:
+      *filters: Any additional filters to include in the query.
+
+    Yields:
+      CatalogMachineEntry keys in no guaranteed order.
+    """
+    available = cls.state == CatalogMachineEntryStates.AVAILABLE
+    for machine in cls.query(available, *filters).fetch(keys_only=True):
+      yield machine

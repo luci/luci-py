@@ -2,7 +2,7 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
-"""Miscellaneous elper functions."""
+"""Miscellaneous helper functions."""
 
 import collections
 
