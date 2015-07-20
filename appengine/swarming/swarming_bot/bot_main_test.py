@@ -53,7 +53,8 @@ class TestBotMain(net_utils.TestCase):
     }
     self.mock(zip_package, 'generate_version', lambda: '123')
     self.bot = bot.Bot(
-        self.server, self.attributes, 'version1', self.root_dir, self.fail)
+        self.server, self.attributes, 'https://localhost:1/', 'version1',
+        self.root_dir, self.fail)
     self.mock(self.bot, 'post_error', self.fail)
     self.mock(self.bot, 'restart', self.fail)
     self.mock(subprocess, 'call', self.fail)

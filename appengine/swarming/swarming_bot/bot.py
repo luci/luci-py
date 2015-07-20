@@ -18,13 +18,15 @@ THIS_FILE = os.path.abspath(zip_package.get_main_script_path())
 
 class Bot(object):
   def __init__(
-      self, remote, attributes, server_version, base_dir, shutdown_hook):
+      self, remote, attributes, server, server_version, base_dir,
+      shutdown_hook):
     # Do not expose attributes nor remote for now, as attributes will be
     # refactored soon and remote would have a lot of side effects if used by
     # bot_config.
     self._attributes = attributes
     self._base_dir = base_dir
     self._remote = remote
+    self._server = server
     self._server_version = server_version
     self._shutdown_hook = shutdown_hook
     self._timers = []
@@ -62,6 +64,11 @@ class Bot(object):
     Should not be normally used by bot_config.py for now.
     """
     return self._remote
+
+  @property
+  def server(self):
+    """URL of the swarming server this bot is connected to."""
+    return self._server
 
   @property
   def server_version(self):

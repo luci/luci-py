@@ -250,7 +250,7 @@ def get_bot():
 
   config = get_config()
   return bot.Bot(
-      remote, attributes, config['server_version'], ROOT_DIR,
+      remote, attributes, config['server'], config['server_version'], ROOT_DIR,
       lambda b: call_hook(b, 'on_bot_shutdown'))
 
 
@@ -531,4 +531,5 @@ def main(args):
   try:
     return run_bot(error)
   finally:
-    call_hook(bot.Bot(None, None, None, ROOT_DIR, None), 'on_bot_shutdown')
+    call_hook(bot.Bot(None, None, None, None, ROOT_DIR, None),
+              'on_bot_shutdown')
