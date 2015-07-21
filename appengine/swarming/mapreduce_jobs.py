@@ -9,9 +9,15 @@ Automatically triggered maintenance tasks should use a task queue on the backend
 instead.
 """
 
+import datetime
 import logging
 
+from google.appengine.ext import ndb
+
 from mapreduce import control
+from mapreduce import operation
+
+from components import utils
 
 
 # Task queue name to run all map reduce jobs on.
@@ -20,8 +26,8 @@ MAPREDUCE_TASK_QUEUE = 'mapreduce-jobs'
 
 # Registered mapreduce jobs, displayed on admin page.
 MAPREDUCE_JOBS = {
-  'dummy': {
-    'name': 'Dummy task',
+  'backfill_tags': {
+    'name': 'Backfill tags',
     'mapper_parameters': {
       'entity_kind': 'server.task_result.TaskResultSummary',
     },
@@ -33,7 +39,7 @@ def launch_job(job_id):
   """Launches a job given its key from MAPREDUCE_JOBS dict."""
   assert job_id in MAPREDUCE_JOBS, 'Unknown mapreduce job id %s' % job_id
   job_def = MAPREDUCE_JOBS[job_id].copy()
-  job_def.setdefault('shard_count', 64)
+  job_def.setdefault('shard_count', 256)
   job_def.setdefault('queue_name', MAPREDUCE_TASK_QUEUE)
   job_def.setdefault(
       'reader_spec', 'mapreduce.input_readers.DatastoreInputReader')
@@ -44,8 +50,31 @@ def launch_job(job_id):
 ### Actual mappers
 
 
-def dummy(_entry):
-  # TODO(maruel): Do something, use:
-  #   from mapreduce import operation
-  #   yield operation.db.Put(entity)
-  pass
+OLD_TASKS_CUTOFF = utils.utcnow() - datetime.timedelta(hours=12)
+
+
+def backfill_tags(entity):
+  # Already handled?
+  if entity.tags:
+    return
+
+  # TaskRequest is immutable, can be fetched outside the transaction.
+  task_request = entity.request_key.get(use_cache=False, use_memcache=False)
+  if not task_request or not task_request.tags:
+    return
+
+  # Fast path for old entries: do not use transaction, assumes old entities are
+  # not being concurrently modified outside of this job.
+  if entity.created_ts and entity.created_ts < OLD_TASKS_CUTOFF:
+    entity.tags = task_request.tags
+    yield operation.db.Put(entity)
+    return
+
+  # For recent entries be careful and use transaction.
+  def fix_task_result_summary():
+    task_result_summary = entity.key.get()
+    if task_result_summary and not task_result_summary.tags:
+      task_result_summary.tags = task_request.tags
+      task_result_summary.put()
+
+  ndb.transaction(fix_task_result_summary, use_cache=False, use_memcache=False)

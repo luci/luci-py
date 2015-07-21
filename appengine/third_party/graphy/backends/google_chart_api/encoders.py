@@ -43,7 +43,7 @@ class BaseChartEncoder(object):
 
   def __init__(self, chart):
     self.extra_params = {}  # You can add specific params here.
-    self.url_base = 'https://chart.apis.google.com/chart'
+    self.url_base = 'http://chart.apis.google.com/chart'
     self.formatters = self._GetFormatters()
     self.chart = chart
     self.enhanced_encoding = False

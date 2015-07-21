@@ -419,8 +419,10 @@ class _TaskResultCommon(ndb.Model):
   def _pre_put_hook(self):
     """Use extra validation that cannot be validated throught 'validator'."""
     super(_TaskResultCommon, self)._pre_put_hook()
-    assert ndb.in_transaction(), (
-        'Saving %s outside of transaction' % self.__class__.__name__)
+    # TODO(vadimsh): Map reduce jobs use non-transactional put for old entities
+    # for performance reasons.
+    # assert ndb.in_transaction(), (
+    #     'Saving %s outside of transaction' % self.__class__.__name__)
     if self.state == State.EXPIRED:
       if self.failure or self.exit_codes:
         raise datastore_errors.BadValueError(
