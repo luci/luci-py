@@ -7,6 +7,7 @@
 import binascii
 import datetime
 import hashlib
+import os
 import re
 import time
 import zlib
@@ -127,6 +128,7 @@ def store_and_enqueue_verify_task(entry, task_queue_host):
   entry.put()
   taskqueue.add(
       url='/internal/taskqueue/verify/%s' % entry.key.id(),
+      params={'req': os.environ['REQUEST_LOG_ID']},
       queue_name='verify',
       headers={'Host': task_queue_host},
       transactional=True,

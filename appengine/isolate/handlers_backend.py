@@ -321,15 +321,17 @@ class InternalVerifyWorkerHandler(webapp2.RequestHandler):
       runtime.DeadlineExceededError)
   @decorators.require_taskqueue('verify')
   def post(self, namespace, hash_key):
+    original_request = self.request.get('req')
     entry = model.get_entry_key(namespace, hash_key).get()
     if not entry:
-      logging.error('Failed to find entity')
+      logging.error('Failed to find entity\n%s', original_request)
       return
     if entry.is_verified:
-      logging.warning('Was already verified')
+      logging.warning('Was already verified\n%s', original_request)
       return
     if entry.content is not None:
-      logging.error('Should not be called with inline content')
+      logging.error(
+          'Should not be called with inline content\n%s', original_request)
       return
 
     # Get GS file size.
@@ -341,14 +343,15 @@ class InternalVerifyWorkerHandler(webapp2.RequestHandler):
       # According to the docs, GS is read-after-write consistent, so a file is
       # missing only if it wasn't stored at all or it was deleted, in any case
       # it's not a valid ContentEntry.
-      self.purge_entry(entry, 'No such GS file')
+      self.purge_entry(entry, 'No such GS file\n%s', original_request)
       return
 
     # Expected stored length and actual length should match.
     if gs_file_info.size != entry.compressed_size:
       self.purge_entry(entry,
-          'Bad GS file: expected size is %d, actual size is %d',
-          entry.compressed_size, gs_file_info.size)
+          'Bad GS file: expected size is %d, actual size is %d\n%s',
+          entry.compressed_size, gs_file_info.size,
+          original_request)
       return
 
     save_to_memcache = (
@@ -374,13 +377,16 @@ class InternalVerifyWorkerHandler(webapp2.RequestHandler):
       # Hashes should match.
       if digest.hexdigest() != hash_key:
         self.purge_entry(entry,
-            'SHA-1 do not match data (%d bytes, %d bytes expanded)',
-            entry.compressed_size, expanded_size)
+            'SHA-1 do not match data\n'
+            '%d bytes, %d bytes expanded, expected %d bytes\n%s',
+            entry.compressed_size, expanded_size,
+            entry.expanded_size, original_request)
         return
 
     except gcs.NotFoundError as e:
       # Somebody deleted a file between get_file_info and read_file calls.
-      self.purge_entry(entry, 'File was unexpectedly deleted')
+      self.purge_entry(
+          entry, 'File was unexpectedly deleted\n%s', original_request)
       return
     except (gcs.ForbiddenError, gcs.AuthorizationError) as e:
       # Misconfiguration in Google Storage ACLs. Don't delete an entry, it may
@@ -394,7 +400,8 @@ class InternalVerifyWorkerHandler(webapp2.RequestHandler):
       # block should be last.
       # It's broken or unreadable.
       self.purge_entry(entry,
-          'Failed to read the file (%s): %s', e.__class__.__name__, e)
+          'Failed to read the file (%s): %s\n%s',
+          e.__class__.__name__, e, original_request)
       return
 
     # Verified. Data matches the hash.
@@ -402,8 +409,8 @@ class InternalVerifyWorkerHandler(webapp2.RequestHandler):
     entry.is_verified = True
     future = entry.put_async()
     logging.info(
-        '%d bytes (%d bytes expanded) verified',
-        entry.compressed_size, expanded_size)
+        '%d bytes (%d bytes expanded) verified\n%s',
+        entry.compressed_size, expanded_size, original_request)
     if save_to_memcache:
       model.save_in_memcache(namespace, hash_key, ''.join(stream.accumulated))
     future.wait()
