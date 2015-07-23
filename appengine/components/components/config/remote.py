@@ -182,6 +182,11 @@ class Provider(object):
     return self._get_configs_multi(format_url('configs/refs/%s', path))
 
   @ndb.tasklet
+  def get_projects_async(self):
+    res = yield self._api_call_async('projects', allow_not_found=False)
+    raise ndb.Return(res.get('projects', []))
+
+  @ndb.tasklet
   def get_config_set_location_async(self, config_set):
     """Returns URL of where configs for given config set are stored.
 

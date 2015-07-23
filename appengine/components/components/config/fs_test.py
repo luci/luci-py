@@ -31,6 +31,14 @@ class FsTestCase(test_case.TestCase):
     self.assertIsNone(rev)
     self.assertEqual(content, 'projects/chromium:foo.cfg\n')
 
+  def test_get_projects_async(self):
+    projects = self.provider.get_projects_async().get_result()
+    self.assertEqual(projects, [
+      {'id': 'chromium'},
+      {'id': 'empty_project'},
+      {'id': 'v8'},
+    ])
+
   def test_get_project_configs(self):
     expected = {
       'projects/chromium': (None, 'projects/chromium:foo.cfg\n'),

@@ -45,6 +45,23 @@ class RemoteTestCase(test_case.TestCase):
       raise ndb.Return({
         'content':  base64.b64encode('a config'),
       })
+
+    if url == URL_PREFIX + 'projects':
+      raise ndb.Return({
+        'projects':[
+          {
+           'id': 'chromium',
+           'repo_type': 'GITILES',
+           'repo_url': 'https://chromium.googlesource.com/chromium/src',
+           'name': 'Chromium browser'
+          },
+          {
+           'id': 'infra',
+           'repo_type': 'GITILES',
+           'repo_url': 'https://chromium.googlesource.com/infra/infra',
+          },
+        ]
+      })
     self.fail('Unexpected url: %s' % url)
 
   def test_get_async(self):
@@ -100,6 +117,22 @@ class RemoteTestCase(test_case.TestCase):
     self.assertEqual(content, 'a config')
 
     self.assertFalse(net.json_request_async.called)
+
+  def test_get_projects(self):
+    projects = self.provider.get_projects_async().get_result()
+    self.assertEqual(projects, [
+      {
+       'id': 'chromium',
+       'repo_type': 'GITILES',
+       'repo_url': 'https://chromium.googlesource.com/chromium/src',
+       'name': 'Chromium browser'
+      },
+      {
+       'id': 'infra',
+       'repo_type': 'GITILES',
+       'repo_url': 'https://chromium.googlesource.com/infra/infra',
+      },
+    ])
 
   def test_get_project_configs_async_receives_404(self):
     net.json_request_async.side_effect = net.NotFoundError(

@@ -61,6 +61,12 @@ class Provider(object):
       if os.path.isdir(os.path.join(projects_dir, pid)):
         yield pid
 
+  @ndb.tasklet
+  def get_projects_async(self):
+    projects = [{'id': pid} for pid in sorted(self.get_project_ids())]
+    # TODO(nodir): read project names from projects/<pid>:project.cfg
+    raise ndb.Return(projects)
+
   def get_project_refs(self, project_id):
     assert project_id
     assert os.path.sep not in project_id, project_id

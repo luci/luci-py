@@ -11,6 +11,7 @@ See _get_config_provider().
 Provider do not do type conversion, api.py does.
 """
 
+import collections
 import logging
 
 from google.appengine.ext import ndb
@@ -18,6 +19,14 @@ from google.appengine.ext import ndb
 from . import common
 from . import fs
 from . import remote
+
+
+Project = collections.namedtuple('Project', [
+  'id',  # Unique project id, defined in projects.cfg
+  'repo_type',   # e.g. 'GITILES'
+  'repo_url',   # e.g. 'https://chromium.googlesource.com/chromium/src'
+  'name',  # e.g. 'Chromium browser'
+])
 
 
 class Error(Exception):
@@ -132,6 +141,19 @@ def get_ref_config_async(project_id, ref, *args, **kwargs):
 def get_ref_config(*args, **kwargs):
   """Blocking version of get_ref_config_async."""
   return get_ref_config_async(*args, **kwargs).get_result()
+
+
+@ndb.tasklet
+def get_projects_async():
+  """Returns a list of registered projects (type Project)."""
+  project_dicts = yield _get_config_provider().get_projects_async()
+  empty = Project('', '', '', '')
+  raise ndb.Return([empty._replace(**p) for p in project_dicts])
+
+
+def get_projects():
+  """Blocking version of get_projects_async."""
+  return get_projects_async().get_result()
 
 
 @ndb.tasklet

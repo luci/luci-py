@@ -58,6 +58,35 @@ class ApiTestCase(test_case.TestCase):
     with self.assertRaises(config.CannotLoadConfigError):
       config.get('services/foo', 'bar.cfg')
 
+  def test_get_projects(self):
+    self.provider.get_projects_async.return_value = ndb.Future()
+    self.provider.get_projects_async.return_value.set_result([
+      {
+       'id': 'chromium',
+       'repo_type': 'GITILES',
+       'repo_url': 'https://chromium.googlesource.com/chromium/src',
+       'name': 'Chromium browser'
+      },
+      {
+       'id': 'infra',
+       'repo_type': 'GITILES',
+       'repo_url': 'https://chromium.googlesource.com/infra/infra',
+      },
+    ])
+    projects = config.get_projects()
+    self.assertEqual(projects, [
+      config.Project(
+          id='chromium',
+          repo_type='GITILES',
+          repo_url='https://chromium.googlesource.com/chromium/src',
+          name='Chromium browser'),
+      config.Project(
+          id='infra',
+          repo_type='GITILES',
+          repo_url='https://chromium.googlesource.com/infra/infra',
+          name=''),
+    ])
+
   def test_get_project_configs(self):
     self.provider.get_project_configs_async.return_value = ndb.Future()
     self.provider.get_project_configs_async.return_value.set_result({
