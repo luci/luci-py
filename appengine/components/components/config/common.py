@@ -80,12 +80,13 @@ def _convert_config(content, dest_type):
   _validate_dest_type(dest_type)
   if dest_type is None or isinstance(content, dest_type):
     return content
+  if content is None:
+    return None
   msg = dest_type()
-  if content:
-    try:
-      protobuf.text_format.Merge(content, msg)
-    except protobuf.text_format.ParseError as ex:
-      raise ConfigFormatError(ex.message)
+  try:
+    protobuf.text_format.Merge(content, msg)
+  except protobuf.text_format.ParseError as ex:
+    raise ConfigFormatError(ex.message)
   return msg
 
 
