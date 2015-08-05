@@ -4,6 +4,9 @@
 
 """NDB model classes used to model AuthDB relations.
 
+Overview
+--------
+
 Models defined here are used by central authentication service (that stores all
 groups and secrets) and by services that implement some concrete functionality
 protected with ACLs (like isolate and swarming services).
@@ -37,6 +40,29 @@ an AppEngine application or special 'anonymous' identity).
 In addition to that, AuthDB stores small amount of authentication related
 configuration data, such as OAuth2 client_id and client_secret and various
 secret keys.
+
+Audit trail
+-----------
+
+Each change to AuthDB has an associated revision number (that monotonically
+increases with each change). All entities modified by a change are copied to
+append-only log under an entity key associated with the revision (see
+historical_revision_key below). Removals are marked by special auth_db_deleted
+flag in entites in the log. This is enough to recover a snapshot of all groups
+at some specific moment in time, or to produce a diff between two revisions.
+
+Note that entities in the historical log are not used by online queries. At any
+moment in time most recent version of an AuthDB entity exists in two copies:
+  1) Main copy used for online queries. It is mutated in-place with each change.
+  2) Most recent record in the historical log. Read only.
+
+To reduce a possibility of misuse of historical copies in online transactions,
+history log entity classes are suffixied with 'History' suffix. They also have
+all indexes stripped.
+
+This mechanism is enabled only on services in Standalone or Primary mode.
+Replicas do not keep track of AuthDB revisions and do not keep any historical
+log.
 """
 
 import collections
@@ -145,6 +171,11 @@ def replication_state_key():
 def ip_whitelist_assignments_key():
   """Key of AuthIPWhitelistAssignments entity."""
   return ndb.Key('AuthIPWhitelistAssignments', 'default', parent=root_key())
+
+
+def historical_revision_key(auth_db_rev):
+  """Key for entity subgroup that holds changes done in a concrete revision."""
+  return ndb.Key('Rev', auth_db_rev, parent=root_key())
 
 
 ################################################################################
@@ -327,7 +358,150 @@ def get_service_self_identity():
   return Identity(IDENTITY_SERVICE, app_identity.get_application_id())
 
 
-class AuthGlobalConfig(ndb.Model):
+class AuthVersionedEntityMixin(object):
+  """Mixin class for entities that keep track of when they change.
+
+  Entities that have this mixin are supposed to be updated in get()\put() or
+  get()\delete() transactions. Caller must call record_revision(...) sometime
+  during the transaction (but before put()). Similarly a call to
+  record_deletion(...) is expected sometime before delete().
+
+  replicate_auth_db will store a copy of the entity in the revision log when
+  committing a transaction.
+
+  A pair of properties auth_db_rev and auth_db_prev_rev are used to implement
+  a linked list of versions of this entity (e.g. one can take most recent entity
+  version and go back in time by following auth_db_prev_rev links).
+  """
+  # When the entity was modified last time. Do not use 'auto_now' property since
+  # such property overrides any explicitly set value with now() during put. It's
+  # undesired when storing a copy of entity received from Primary (Replica
+  # should have modified_ts to be same as on Primary).
+  modified_ts = ndb.DateTimeProperty()
+  # Who modified the entity last time.
+  modified_by = IdentityProperty()
+
+  # Revision of Auth DB at which this entity was updated last time.
+  auth_db_rev = ndb.IntegerProperty()
+  # Revision of Auth DB of previous version of this entity or None.
+  auth_db_prev_rev = ndb.IntegerProperty()
+
+  def record_revision(self, modified_by, modified_ts=None, comment=None):
+    """Updates the entity to record Auth DB revision of the current transaction.
+
+    Stages the entity to be copied to historical log.
+
+    Must be called sometime before 'put' (not necessary right before it). Note
+    that NDB hooks are not used because they are buggy. See docstring for
+    replicate_auth_db for more info.
+
+    Args:
+      modified_by: Identity that made the change.
+      modified_ts: datetime when the change was made (or None for current time).
+      comment: optional comment to put in the revision log.
+    """
+    _get_pending_auth_db_transaction().record_change(
+        entity=self,
+        deletion=False,
+        modified_by=modified_by,
+        modified_ts=modified_ts or utils.utcnow(),
+        comment=comment)
+
+  def record_deletion(self, modified_by, modified_ts=None, comment=None):
+    """Marks entity as being deleted in the current transaction.
+
+    Stages the entity to be copied to historical log (with 'auth_db_deleted'
+    flag set).
+
+    Must be called sometime before 'delete' (not necessary right before it).
+    Note that NDB hooks are not used because they are buggy. See docstring for
+    replicate_auth_db for more info.
+
+    Args:
+      modified_by: Identity that made the change.
+      modified_ts: datetime when the change was made (or None for current time).
+      comment: optional comment to put in the revision log.
+    """
+    _get_pending_auth_db_transaction().record_change(
+        entity=self,
+        deletion=True,
+        modified_by=modified_by,
+        modified_ts=modified_ts or utils.utcnow(),
+        comment=comment)
+
+  ## Internal interface. Do not use directly unless you know what you are doing.
+
+  @classmethod
+  def get_historical_copy_class(cls):
+    """Returns entity class for historical copies of original entity.
+
+    Has all the same properties, but unindexed (not needed), unvalidated
+    (original entity is already validated) and not cached.
+
+    The name of the new entity class is "<original name>History" (to make sure
+    it doesn't show up in indexes for original entity class).
+    """
+    existing = getattr(cls, '_auth_db_historical_copy_cls', None)
+    if existing:
+      return existing
+    props = {}
+    for name, prop in cls._properties.iteritems():
+      # Whitelist supported property classes. Better to fail loudly when
+      # encountering something new, rather than silently produce (possibly)
+      # incorrect result. Note that all AuthDB classes are instantiated in
+      # unit tests, so there should be no unexpected asserts in production.
+      assert prop.__class__ in (
+        IdentityGlobProperty,
+        IdentityProperty,
+        ndb.BlobProperty,
+        ndb.BooleanProperty,
+        ndb.DateTimeProperty,
+        ndb.IntegerProperty,
+        ndb.LocalStructuredProperty,
+        ndb.StringProperty,
+        ndb.TextProperty,
+      ), prop.__class__
+      kwargs = {
+        'name': prop._name,
+        'indexed': False,
+        'required': False,
+        'repeated': prop._repeated,
+      }
+      if prop.__class__ == ndb.LocalStructuredProperty:
+        kwargs['modelclass'] = prop._modelclass
+      props[name] = prop.__class__(**kwargs)
+    new_cls = type(
+        '%sHistory' % cls.__name__, (_AuthDBHistoricalEntity,), props)
+    cls._auth_db_historical_copy_cls = new_cls
+    return new_cls
+
+  def make_historical_copy(self, deleted, comment):
+    """Returns an entity to put in the historical log.
+
+    It's a copy of the original entity, but stored under another key and with
+    indexes removed. It also has a bunch of additional properties (defined
+    in _AuthDBHistoricalEntity). See 'get_historical_copy_class'.
+
+    The key is derived from auth_db_rev and class and ID of the original entity.
+    For example, AuthGroup "admins" modified at rev 123 will be copied to
+    the history as ('AuthGlobalConfig', 'root', 'Rev', 123, 'AuthGroupHistory',
+    'admins'), where the key prefix (first two pairs) is obtained with
+    historical_revision_key(...).
+    """
+    assert self.key.parent() == root_key() or self.key == root_key(), self.key
+    cls = self.get_historical_copy_class()
+    entity = cls(
+        id=self.key.id(),
+        parent=historical_revision_key(self.auth_db_rev))
+    for prop in self._properties:
+      setattr(entity, prop, getattr(self, prop))
+    entity.auth_db_deleted = deleted
+    entity.auth_db_change_comment = comment
+    entity.auth_db_app_version = utils.get_app_version()
+    return entity
+
+
+class AuthGlobalConfig(ndb.Model, AuthVersionedEntityMixin):
   """Acts as a root entity for auth models.
 
   There should be only one instance of this model in Datastore, with a key set
@@ -343,6 +517,7 @@ class AuthGlobalConfig(ndb.Model):
   Entities that belong to this entity group are:
    * AuthGroup
    * AuthIPWhitelist
+   * AuthIPWhitelistAssignments
    * AuthReplicationState
    * AuthSecret
   """
@@ -393,17 +568,16 @@ class AuthReplicationState(ndb.Model, datastore_utils.SerializableModelMixin):
 
 
 def replicate_auth_db():
-  """Increments auth_db_rev by one.
+  """Increments auth_db_rev, updates historical log, triggers replication.
 
-  It is a signal that Auth DB should be replicated to Replicas. If called from
-  inside a transaction, it inherits it and updates auth_db_rev only once (even
-  if called multiple times during that transaction).
+  Must be called once from inside a transaction (right before exiting it).
 
   Should only be called for services in Standalone or Primary modes. Will raise
   ValueError if called on Replica. When called for service in Standalone mode,
   will update auth_db_rev but won't kick any replication. For services in
   Primary mode will also initiate replication by calling callback set in
-  'configure_as_primary'.
+  'configure_as_primary'. The callback usually transactionally enqueues a task
+  (to gracefully handle transaction rollbacks).
 
   WARNING: This function relies on a valid transaction context. NDB hooks and
   asynchronous operations are known to be buggy in this regard: NDB hook for
@@ -417,45 +591,126 @@ def replicate_auth_db():
   called explicitly whenever relevant part of root_key() entity group is
   updated.
   """
-  def increment_revision_and_update_replicas():
-    """Does the actual job, called inside a transaction."""
-    # Update auth_db_rev. replication_state_key() is in same group as root_key.
-    state = replication_state_key().get()
-    if not state:
-      primary_id = app_identity.get_application_id() if is_primary() else None
-      state = AuthReplicationState(
-          key=replication_state_key(),
-          primary_id=primary_id,
-          auth_db_rev=0)
-    # Assert Primary or Standalone. Replicas can't increment auth db revision.
-    if not is_primary() and state.primary_id:
-      raise ValueError('Can\'t modify Auth DB on Replica')
-    state.auth_db_rev += 1
-    state.modified_ts = utils.utcnow()
-    state.put()
-    # Only Primary does active replication.
-    if is_primary():
-      _replication_callback(state)
+  assert ndb.in_transaction()
+  txn = _get_pending_auth_db_transaction()
+  txn.commit()
+  if is_primary():
+    _replication_callback(txn.replication_state)
 
-  # If not in a transaction, start a new one.
-  if not ndb.in_transaction():
-    ndb.transaction(increment_revision_and_update_replicas)
-    return
 
-  # If in a transaction, use transaction context to store "already did this"
-  # flag. Note that each transaction retry gets its own new transaction context,
+################################################################################
+## Auth DB transaction details (used for historical log of changes).
+
+
+def _get_pending_auth_db_transaction():
+  """Used internally to keep track of changes done in the transaction.
+
+  Returns:
+    Instance of _AuthDBTransaction (stored in the transaction context).
+  """
+  # Use transaction context to store the object. Note that each transaction
+  # retry gets its own new transaction context which is what we need,
   # see ndb/context.py, 'transaction' tasklet, around line 982 (for SDK 1.9.6).
+  assert ndb.in_transaction()
   ctx = ndb.get_context()
-  if not getattr(ctx, '_auth_db_inc_called', False):
-    increment_revision_and_update_replicas()
-    ctx._auth_db_inc_called = True
+  txn = getattr(ctx, '_auth_db_transaction', None)
+  if txn:
+    return txn
+
+  # Prepare next AuthReplicationState (auth_db_rev +1).
+  state = replication_state_key().get()
+  if not state:
+    primary_id = app_identity.get_application_id() if is_primary() else None
+    state = AuthReplicationState(
+        key=replication_state_key(),
+        primary_id=primary_id,
+        auth_db_rev=0)
+  # Assert Primary or Standalone. Replicas can't increment auth db revision.
+  if not is_primary() and state.primary_id:
+    raise ValueError('Can\'t modify Auth DB on Replica')
+  state.auth_db_rev += 1
+  state.modified_ts = utils.utcnow()
+
+  # Store the state in the transaction context. Used in replicate_auth_db(...)
+  # later.
+  txn = _AuthDBTransaction(state)
+  ctx._auth_db_transaction = txn
+  return txn
+
+
+class _AuthDBTransaction(object):
+  """Keeps track of entities updated or removed in current transaction."""
+
+  _Change = collections.namedtuple('_Change', 'entity deletion comment')
+
+  def __init__(self, replication_state):
+    self.replication_state = replication_state
+    self.changes = [] # list of _Change tuples
+    self.committed = False
+
+  def record_change(self, entity, deletion, modified_by, modified_ts, comment):
+    assert not self.committed
+    assert isinstance(entity, AuthVersionedEntityMixin)
+    assert all(entity.key != c.entity.key for c in self.changes)
+
+    # Mutate the main entity (the one used to serve online requests).
+    entity.modified_by = modified_by
+    entity.modified_ts = modified_ts
+    entity.auth_db_prev_rev = entity.auth_db_rev # can be None for new entities
+    entity.auth_db_rev = self.replication_state.auth_db_rev
+
+    # Keep a historical copy. Delay make_historical_copy call until the commit.
+    # Here (in 'record_change') entity may not have all the fields updated yet.
+    self.changes.append(self._Change(entity, deletion, comment))
+
+  def commit(self):
+    assert not self.committed
+    puts = [
+      c.entity.make_historical_copy(c.deletion, c.comment)
+      for c in self.changes
+    ]
+    ndb.put_multi(puts + [self.replication_state])
+    self.committed = True
+
+
+class _AuthDBHistoricalEntity(ndb.Model):
+  """Base class for *History magic class in AuthVersionedEntityMixin.
+
+  In addition to properties defined here the child classes (*History) also
+  always inherit (for some definition of "inherit") properties from
+  AuthVersionedEntityMixin.
+
+  See get_historical_copy_class().
+  """
+  # Historical entities are not intended to be read often, and updating the
+  # cache will make AuthDB transactions only slower.
+  _use_cache = False
+  _use_memcache = False
+
+  # True if entity was deleted in the given revision.
+  auth_db_deleted = ndb.BooleanProperty(indexed=False)
+  # Comment string passed to record_revision or record_deletion.
+  auth_db_change_comment = ndb.StringProperty(indexed=False)
+  # A GAE module version that committed the change.
+  auth_db_app_version = ndb.StringProperty(indexed=False)
+
+  def get_previous_historical_copy_key(self):
+    """Returns ndb.Key of *History entity matching auth_db_prev_rev revision."""
+    if self.auth_db_prev_rev is None:
+      return None
+    return ndb.Key(
+        self.__class__, self.key.id(),
+        parent=historical_revision_key(self.auth_db_prev_rev))
 
 
 ################################################################################
 ## Groups.
 
 
-class AuthGroup(ndb.Model, datastore_utils.SerializableModelMixin):
+class AuthGroup(
+    ndb.Model,
+    AuthVersionedEntityMixin,
+    datastore_utils.SerializableModelMixin):
   """A group of identities, entity id is a group name.
 
   Parent is AuthGlobalConfig entity keyed at root_key().
@@ -486,19 +741,9 @@ class AuthGroup(ndb.Model, datastore_utils.SerializableModelMixin):
   description = ndb.TextProperty(default='')
 
   # When the group was created.
-  created_ts = ndb.DateTimeProperty(auto_now_add=True)
+  created_ts = ndb.DateTimeProperty()
   # Who created the group.
   created_by = IdentityProperty()
-
-  # When the group was modified last time. Do not use 'auto_now' property since
-  # such property overrides any explicitly set value with now() during put. It's
-  # undesired when storing a copy of entity received from Primary (Replica
-  # should  have modified_ts be same as on Primary). Still use auto_now_add to
-  # ensure this property is always non None (and to simplify tests that create
-  # a lot of one off entities).
-  modified_ts = ndb.DateTimeProperty(auto_now_add=True)
-  # Who modified the group last time.
-  modified_by = IdentityProperty()
 
 
 def group_key(group):
@@ -532,16 +777,20 @@ def bootstrap_group(group, identities, description=''):
   entity = key.get()
   if entity and all(i in entity.members for i in identities):
     return False
+  now = utils.utcnow()
   if not entity:
     entity = AuthGroup(
         key=key,
         description=description,
-        created_by=get_service_self_identity(),
-        modified_by=get_service_self_identity())
+        created_ts=now,
+        created_by=get_service_self_identity())
   for i in identities:
     if i not in entity.members:
       entity.members.append(i)
-  entity.modified_by = get_service_self_identity()
+  entity.record_revision(
+      modified_by=get_service_self_identity(),
+      modified_ts=now,
+      comment='Bootstrap')
   entity.put()
   replicate_auth_db()
   return True
@@ -729,7 +978,7 @@ class AuthSecret(ndb.Model):
 ## IP whitelist.
 
 
-class AuthIPWhitelistAssignments(ndb.Model):
+class AuthIPWhitelistAssignments(ndb.Model, AuthVersionedEntityMixin):
   """A singleton entity with "identity -> AuthIPWhitelist to use" mapping.
 
   Entity key is ip_whitelist_assignments_key(). Parent entity is root_key().
@@ -744,7 +993,7 @@ class AuthIPWhitelistAssignments(ndb.Model):
     # Why the assignment was created.
     comment = ndb.StringProperty()
     # When the assignment was created.
-    created_ts = ndb.DateTimeProperty(auto_now_add=True)
+    created_ts = ndb.DateTimeProperty()
     # Who created the assignment.
     created_by = IdentityProperty()
 
@@ -752,7 +1001,10 @@ class AuthIPWhitelistAssignments(ndb.Model):
   assignments = ndb.LocalStructuredProperty(Assignment, repeated=True)
 
 
-class AuthIPWhitelist(ndb.Model, datastore_utils.SerializableModelMixin):
+class AuthIPWhitelist(
+    ndb.Model,
+    AuthVersionedEntityMixin,
+    datastore_utils.SerializableModelMixin):
   """A named set of whitelisted IPv4 and IPv6 subnets.
 
   Can be assigned to individual user accounts to forcibly limit them only to
@@ -786,14 +1038,9 @@ class AuthIPWhitelist(ndb.Model, datastore_utils.SerializableModelMixin):
   description = ndb.TextProperty(default='')
 
   # When the list was created.
-  created_ts = ndb.DateTimeProperty(auto_now_add=True)
+  created_ts = ndb.DateTimeProperty()
   # Who created the list.
   created_by = IdentityProperty()
-
-  # When the list was modified.
-  modified_ts = ndb.DateTimeProperty(auto_now_add=True)
-  # Who modified the list the last time.
-  modified_by = IdentityProperty()
 
   def is_ip_whitelisted(self, ip):
     """Returns True if ipaddr.IP is in the whitelist."""
@@ -838,16 +1085,20 @@ def bootstrap_ip_whitelist(name, subnets, description=''):
   entity = key.get()
   if entity and all(s in entity.subnets for s in subnets):
     return False
+  now = utils.utcnow()
   if not entity:
     entity = AuthIPWhitelist(
         key=key,
         description=description,
-        created_by=get_service_self_identity(),
-        modified_by=get_service_self_identity())
+        created_ts=now,
+        created_by=get_service_self_identity())
   for s in subnets:
     if s not in entity.subnets:
       entity.subnets.append(s)
-  entity.modified_by = get_service_self_identity()
+  entity.record_revision(
+      modified_by=get_service_self_identity(),
+      modified_ts=now,
+      comment='Bootstrap')
   entity.put()
   replicate_auth_db()
   return True
@@ -899,14 +1150,20 @@ def bootstrap_ip_whitelist_assignment(identity, ip_whitelist, comment=''):
       found = True
       break
 
+  now = utils.utcnow()
   if not found:
     entity.assignments.append(
         AuthIPWhitelistAssignments.Assignment(
             identity=identity,
             ip_whitelist=ip_whitelist,
             comment=comment,
+            created_ts=now,
             created_by=get_service_self_identity()))
 
+  entity.record_revision(
+      modified_by=get_service_self_identity(),
+      modified_ts=now,
+      comment='Bootstrap')
   entity.put()
   replicate_auth_db()
   return True

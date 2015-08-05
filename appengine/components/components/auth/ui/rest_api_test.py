@@ -17,6 +17,8 @@ test_env.setup_test_env()
 import webapp2
 import webtest
 
+from google.appengine.ext import ndb
+
 from components import utils
 from components.auth import api
 from components.auth import handler
@@ -75,6 +77,26 @@ def mock_replication_state(primary_url):
         primary_id='mocked-primary',
         primary_url=primary_url).put()
     assert model.is_replica()
+
+
+def make_group(name, **kwargs):
+  group = model.AuthGroup(
+      key=model.group_key(name),
+      created_ts=utils.utcnow(),
+      modified_ts=utils.utcnow(),
+      **kwargs)
+  group.put()
+  return group
+
+
+def make_ip_whitelist(name, **kwargs):
+  ip_whitelist = model.AuthIPWhitelist(
+      key=model.ip_whitelist_key(name),
+      created_ts=utils.utcnow(),
+      modified_ts=utils.utcnow(),
+      **kwargs)
+  ip_whitelist.put()
+  return ip_whitelist
 
 
 class ApiHandlerClassTest(test_case.TestCase):
@@ -489,14 +511,13 @@ class GroupsHandlerTest(RestAPITestCase):
 
     # Create a bunch of groups with all kinds of members.
     for i in xrange(0, 5):
-      group = model.AuthGroup(
-          key=model.group_key('Test group %d' % i),
+      make_group(
+          name='Test group %d' % i,
           created_by=model.Identity.from_bytes('user:creator@example.com'),
           description='Group for testing, #%d' % i,
           modified_by=model.Identity.from_bytes('user:modifier@example.com'),
           members=[model.Identity.from_bytes('user:joe@example.com')],
           globs=[model.IdentityGlob.from_bytes('user:*@example.com')])
-      group.put()
 
     # Group Listing should return all groups. Member lists should be omitted.
     # Order is alphabetical by name,
@@ -531,14 +552,13 @@ class GroupHandlerTest(RestAPITestCase):
     self.mock_now(utils.timestamp_to_datetime(1300000000000000))
 
     # Create a group with all kinds of members.
-    group = model.AuthGroup(
-        key=model.group_key('A Group'),
+    make_group(
+        name='A Group',
         created_by=model.Identity.from_bytes('user:creator@example.com'),
         description='Group for testing',
         modified_by=model.Identity.from_bytes('user:modifier@example.com'),
         members=[model.Identity.from_bytes('user:joe@example.com')],
         globs=[model.IdentityGlob.from_bytes('user:*@example.com')])
-    group.put()
 
     # Fetch it via API call.
     status, body, headers = self.get(
@@ -571,9 +591,9 @@ class GroupHandlerTest(RestAPITestCase):
     self.assertEqual({'text': 'Access is denied.'}, body)
 
   def test_delete_existing(self):
-    # Create a group.
-    group = model.AuthGroup(key=model.group_key('A Group'))
-    group.put()
+    self.mock_now(utils.timestamp_to_datetime(1300000000000000))
+
+    group = make_group('A Group')
 
     # Delete it via API.
     self.expect_auth_db_rev_change()
@@ -587,10 +607,24 @@ class GroupHandlerTest(RestAPITestCase):
     # It is gone.
     self.assertFalse(model.group_key('A Group').get())
 
+    # There's an entry in historical log.
+    copy_in_history = ndb.Key(
+        'AuthGroupHistory', 'A Group',
+        parent=model.historical_revision_key(1))
+    expected = group.to_dict()
+    expected.update({
+      'auth_db_prev_rev': None,
+      'auth_db_rev': 1,
+      'auth_db_app_version': u'v1a',
+      'auth_db_deleted': True,
+      'auth_db_change_comment': u'REST API',
+      'modified_by': model.Identity(kind='anonymous', name='anonymous'),
+      'modified_ts': utils.timestamp_to_datetime(1300000000000000),
+    })
+    self.assertEqual(expected, copy_in_history.get().to_dict())
+
   def test_delete_existing_with_condition_ok(self):
-    # Create a group.
-    group = model.AuthGroup(key=model.group_key('A Group'))
-    group.put()
+    group = make_group('A Group')
 
     # Delete it via API using passing If-Unmodified-Since condition.
     self.expect_auth_db_rev_change()
@@ -608,9 +642,7 @@ class GroupHandlerTest(RestAPITestCase):
     self.assertFalse(model.group_key('A Group').get())
 
   def test_delete_existing_with_condition_fail(self):
-    # Create a group.
-    group = model.AuthGroup(key=model.group_key('A Group'))
-    group.put()
+    make_group('A Group')
 
     # Try to delete it via API using failing If-Unmodified-Since condition.
     status, body, _ = self.delete(
@@ -628,15 +660,8 @@ class GroupHandlerTest(RestAPITestCase):
     self.assertTrue(model.group_key('A Group').get())
 
   def test_delete_referenced_group(self):
-    # Create a group.
-    group = model.AuthGroup(key=model.group_key('A Group'))
-    group.put()
-
-    # Create another group that includes first one as nested.
-    another = model.AuthGroup(
-        key=model.group_key('Another group'),
-        nested=['A Group'])
-    another.put()
+    make_group('A Group')
+    make_group('Another group', nested=['A Group'])
 
     # Try to delete it via API.
     status, body, _ = self.delete(
@@ -695,9 +720,7 @@ class GroupHandlerTest(RestAPITestCase):
     # get_current_identity is used for 'created_by' and 'modified_by'.
     self.mock_current_identity(creator_identity)
 
-    # Create a group to act as a nested one.
-    group = model.AuthGroup(key=model.group_key('Nested Group'))
-    group.put()
+    make_group('Nested Group')
 
     # Create the group using REST API.
     self.expect_auth_db_rev_change()
@@ -723,6 +746,8 @@ class GroupHandlerTest(RestAPITestCase):
     entity = model.group_key('A Group').get()
     self.assertTrue(entity)
     expected = {
+      'auth_db_rev': 1,
+      'auth_db_prev_rev': None,
       'created_by': model.Identity(kind='user', name='creator@example.com'),
       'created_ts': frozen_time,
       'description': 'Test group',
@@ -736,6 +761,17 @@ class GroupHandlerTest(RestAPITestCase):
       'nested': ['Nested Group']
     }
     self.assertEqual(expected, entity.to_dict())
+
+    # Ensure it's in the revision log.
+    copy_in_history = ndb.Key(
+        'AuthGroupHistory', 'A Group', parent=model.historical_revision_key(1))
+    expected = {
+      'auth_db_app_version': u'v1a',
+      'auth_db_change_comment': u'REST API',
+      'auth_db_deleted': False,
+    }
+    expected.update(entity.to_dict())
+    self.assertEqual(expected, copy_in_history.get().to_dict())
 
   def test_post_minimal_body(self):
     # Posting just a name is enough to create an empty group.
@@ -786,9 +822,7 @@ class GroupHandlerTest(RestAPITestCase):
         body)
 
   def test_post_already_exists(self):
-    # Make a group first.
-    group = model.AuthGroup(key=model.group_key('A Group'))
-    group.put()
+    make_group('A Group')
 
     # Now try to recreate it again via API. Should fail with HTTP 409.
     status, body, _ = self.post(
@@ -845,13 +879,8 @@ class GroupHandlerTest(RestAPITestCase):
     # get_current_identity is used for 'created_by' and 'modified_by'.
     self.mock_current_identity(creator_identity)
 
-    # Create a group to act as a nested one.
-    nested = model.AuthGroup(key=model.group_key('Nested Group'))
-    nested.put()
-
-    # Create a group.
-    group = model.AuthGroup(key=model.group_key('A Group'))
-    group.put()
+    make_group('Nested Group')
+    make_group('A Group')
 
     # Update it via API.
     self.expect_auth_db_rev_change()
@@ -875,6 +904,8 @@ class GroupHandlerTest(RestAPITestCase):
     entity = model.group_key('A Group').get()
     self.assertTrue(entity)
     expected = {
+      'auth_db_rev': 1,
+      'auth_db_prev_rev': None,
       'created_by': None,
       'created_ts': frozen_time,
       'description': 'Test group',
@@ -889,10 +920,19 @@ class GroupHandlerTest(RestAPITestCase):
     }
     self.assertEqual(expected, entity.to_dict())
 
+    # Ensure it's in the revision log.
+    copy_in_history = ndb.Key(
+        'AuthGroupHistory', 'A Group', parent=model.historical_revision_key(1))
+    expected = {
+      'auth_db_app_version': u'v1a',
+      'auth_db_change_comment': u'REST API',
+      'auth_db_deleted': False,
+    }
+    expected.update(entity.to_dict())
+    self.assertEqual(expected, copy_in_history.get().to_dict())
+
   def test_put_mismatching_name(self):
-    # Create a group.
-    group = model.AuthGroup(key=model.group_key('A Group'))
-    group.put()
+    make_group('A Group')
 
     # Update it via API, pass bad name.
     status, body, _ = self.put(
@@ -911,9 +951,7 @@ class GroupHandlerTest(RestAPITestCase):
         {'text': 'Missing or mismatching name in request body'}, body)
 
   def test_put_bad_body(self):
-    # Create a group.
-    group = model.AuthGroup(key=model.group_key('A Group'))
-    group.put()
+    make_group('A Group')
 
     # Update it via API, pass a bad body ('globs' should be a list, not a dict).
     status, body, _ = self.put(
@@ -955,9 +993,7 @@ class GroupHandlerTest(RestAPITestCase):
     # Freeze time in NDB's |auto_now| properties.
     self.mock_now(utils.timestamp_to_datetime(1300000000000000))
 
-    # Create a group.
-    group = model.AuthGroup(key=model.group_key('A Group'))
-    group.put()
+    make_group('A Group')
 
     # Try to update it. Pass incorrect If-Modified-Since header.
     status, body, _ = self.put(
@@ -979,9 +1015,7 @@ class GroupHandlerTest(RestAPITestCase):
     self.assertEqual({'text': 'Group was modified by someone else'}, body)
 
   def test_put_missing_nested(self):
-    # Create a group.
-    group = model.AuthGroup(key=model.group_key('A Group'))
-    group.put()
+    make_group('A Group')
 
     # Try to update it. Pass missing group as a nested group.
     status, body, _ = self.put(
@@ -1004,9 +1038,7 @@ class GroupHandlerTest(RestAPITestCase):
         }, body)
 
   def test_put_dependency_cycle(self):
-    # Create a group.
-    group = model.AuthGroup(key=model.group_key('A Group'))
-    group.put()
+    make_group('A Group')
 
     # Try to update it. Reference itself as a nested group.
     status, body, _ = self.put(
@@ -1063,21 +1095,19 @@ class IPWhitelistsHandlerTest(RestAPITestCase):
   def test_non_empty_list(self):
     self.mock_now(utils.timestamp_to_datetime(1300000000000000))
 
-    ent = model.AuthIPWhitelist(
-        key=model.ip_whitelist_key('bots'),
+    make_ip_whitelist(
+        name='bots',
         created_by=model.Identity.from_bytes('user:creator@example.com'),
         description='Bots whitelist',
         modified_by=model.Identity.from_bytes('user:modifier@example.com'),
         subnets=['127.0.0.1/32', '::1/128'])
-    ent.put()
 
-    ent = model.AuthIPWhitelist(
-        key=model.ip_whitelist_key('another whitelist'),
+    make_ip_whitelist(
+        name='another whitelist',
         created_by=model.Identity.from_bytes('user:creator@example.com'),
         description='Another whitelist',
         modified_by=model.Identity.from_bytes('user:modifier@example.com'),
         subnets=[])
-    ent.put()
 
     # Sorted by name. Subnets are normalized.
     status, body, _ = self.get(
@@ -1185,13 +1215,12 @@ class IPWhitelistHandlerTest(RestAPITestCase):
     self.mock(rest_api, 'is_config_locked', lambda: True)
     self.mock_now(utils.timestamp_to_datetime(1300000000000000))
 
-    ent = model.AuthIPWhitelist(
-        key=model.ip_whitelist_key('bots'),
+    make_ip_whitelist(
+        name='bots',
         created_by=model.Identity.from_bytes('user:creator@example.com'),
         description='Bots whitelist',
         modified_by=model.Identity.from_bytes('user:modifier@example.com'),
         subnets=['127.0.0.1/32', '::1/128'])
-    ent.put()
 
     status, body, headers = self.get(
         path='/auth/api/v1/ip_whitelists/bots',
@@ -1221,7 +1250,9 @@ class IPWhitelistHandlerTest(RestAPITestCase):
     self.assertEqual({'text': 'Access is denied.'}, body)
 
   def test_delete_existing(self):
-    model.AuthIPWhitelist(key=model.ip_whitelist_key('A whitelist')).put()
+    frozen_time = utils.timestamp_to_datetime(1300000000000000)
+    self.mock_now(frozen_time)
+    ent = make_ip_whitelist('A whitelist')
     self.expect_auth_db_rev_change()
     status, body, _ = self.delete(
         path='/auth/api/v1/ip_whitelists/A%20whitelist',
@@ -1230,10 +1261,22 @@ class IPWhitelistHandlerTest(RestAPITestCase):
     self.assertEqual(200, status)
     self.assertEqual({'ok': True}, body)
     self.assertFalse(model.ip_whitelist_key('A whitelist').get())
+    copy_in_history = ndb.Key(
+        'AuthIPWhitelistHistory', 'A whitelist',
+        parent=model.historical_revision_key(1))
+    expected = ent.to_dict()
+    expected.update({
+      'auth_db_rev': 1,
+      'auth_db_app_version': u'v1a',
+      'auth_db_change_comment': u'REST API',
+      'auth_db_deleted': True,
+      'modified_by': model.Identity(kind='anonymous', name='anonymous'),
+      'modified_ts': frozen_time,
+    })
+    self.assertEqual(expected, copy_in_history.get().to_dict())
 
   def test_delete_existing_with_condition_ok(self):
-    ent = model.AuthIPWhitelist(key=model.ip_whitelist_key('A whitelist'))
-    ent.put()
+    ent = make_ip_whitelist('A whitelist')
     self.expect_auth_db_rev_change()
     status, body, _ = self.delete(
         path='/auth/api/v1/ip_whitelists/A%20whitelist',
@@ -1247,7 +1290,7 @@ class IPWhitelistHandlerTest(RestAPITestCase):
     self.assertFalse(model.ip_whitelist_key('A whitelist').get())
 
   def test_delete_existing_with_condition_fail(self):
-    model.AuthIPWhitelist(key=model.ip_whitelist_key('A whitelist')).put()
+    make_ip_whitelist('A whitelist')
     status, body, _ = self.delete(
         path='/auth/api/v1/ip_whitelists/A%20whitelist',
         headers={
@@ -1332,6 +1375,8 @@ class IPWhitelistHandlerTest(RestAPITestCase):
     entity = model.ip_whitelist_key('A whitelist').get()
     self.assertTrue(entity)
     self.assertEqual({
+      'auth_db_rev': 1,
+      'auth_db_prev_rev': None,
       'created_by': model.Identity(kind='user', name='creator@example.com'),
       'created_ts': frozen_time,
       'description': 'Test whitelist',
@@ -1339,6 +1384,17 @@ class IPWhitelistHandlerTest(RestAPITestCase):
       'modified_ts': frozen_time,
       'subnets': ['127.0.0.1/32'],
     }, entity.to_dict())
+
+    copy_in_history = ndb.Key(
+        'AuthIPWhitelistHistory', 'A whitelist',
+        parent=model.historical_revision_key(1))
+    expected = {
+      'auth_db_app_version': u'v1a',
+      'auth_db_change_comment': u'REST API',
+      'auth_db_deleted': False,
+    }
+    expected.update(entity.to_dict())
+    self.assertEqual(expected, copy_in_history.get().to_dict())
 
   def test_post_minimal_body(self):
     self.expect_auth_db_rev_change()
@@ -1377,7 +1433,7 @@ class IPWhitelistHandlerTest(RestAPITestCase):
         }, body)
 
   def test_post_already_exists(self):
-    model.AuthIPWhitelist(key=model.ip_whitelist_key('A whitelist')).put()
+    make_ip_whitelist('A whitelist')
     status, body, _ = self.post(
         path='/auth/api/v1/ip_whitelists/A%20whitelist',
         body={'name': 'A whitelist'},
@@ -1414,7 +1470,7 @@ class IPWhitelistHandlerTest(RestAPITestCase):
     creator_identity = model.Identity.from_bytes('user:creator@example.com')
     self.mock_current_identity(creator_identity)
 
-    model.AuthIPWhitelist(key=model.ip_whitelist_key('A whitelist')).put()
+    make_ip_whitelist('A whitelist')
 
     self.expect_auth_db_rev_change()
     status, body, headers = self.put(
@@ -1434,6 +1490,8 @@ class IPWhitelistHandlerTest(RestAPITestCase):
     entity = model.ip_whitelist_key('A whitelist').get()
     self.assertTrue(entity)
     self.assertEqual({
+      'auth_db_rev': 1,
+      'auth_db_prev_rev': None,
       'created_by': None,
       'created_ts': frozen_time,
       'description': 'Test whitelist',
@@ -1442,8 +1500,19 @@ class IPWhitelistHandlerTest(RestAPITestCase):
       'subnets': ['127.0.0.1/32'],
     }, entity.to_dict())
 
+    copy_in_history = ndb.Key(
+        'AuthIPWhitelistHistory', 'A whitelist',
+        parent=model.historical_revision_key(1))
+    expected = {
+      'auth_db_app_version': u'v1a',
+      'auth_db_change_comment': u'REST API',
+      'auth_db_deleted': False,
+    }
+    expected.update(entity.to_dict())
+    self.assertEqual(expected, copy_in_history.get().to_dict())
+
   def test_put_mismatching_name(self):
-    model.AuthIPWhitelist(key=model.ip_whitelist_key('A whitelist')).put()
+    make_ip_whitelist('A whitelist')
     status, body, _ = self.put(
         path='/auth/api/v1/groups/A%20whitelist',
         body={
@@ -1459,7 +1528,7 @@ class IPWhitelistHandlerTest(RestAPITestCase):
         {'text': 'Missing or mismatching name in request body'}, body)
 
   def test_put_bad_body(self):
-    model.AuthIPWhitelist(key=model.ip_whitelist_key('A whitelist')).put()
+    make_ip_whitelist('A whitelist')
     status, body, _ = self.put(
         path='/auth/api/v1/ip_whitelists/A%20whitelist',
         body={
@@ -1491,7 +1560,7 @@ class IPWhitelistHandlerTest(RestAPITestCase):
   def test_put_bad_precondition(self):
     self.mock_now(utils.timestamp_to_datetime(1300000000000000))
 
-    model.AuthIPWhitelist(key=model.ip_whitelist_key('A whitelist')).put()
+    make_ip_whitelist('A whitelist')
     status, body, _ = self.put(
         path='/auth/api/v1/ip_whitelists/A%20whitelist',
         body={
@@ -1522,7 +1591,6 @@ class IPWhitelistHandlerTest(RestAPITestCase):
     self.assertEqual(409, status)
     self.assertEqual(
         {'text': 'The configuration is managed elsewhere'}, body)
-
 
 
 class CertificatesHandlerTest(RestAPITestCase):
@@ -1643,6 +1711,18 @@ class OAuthConfigHandlerTest(RestAPITestCase):
     self.assertEqual('some-client-id', config.oauth_client_id)
     self.assertEqual('some-secret', config.oauth_client_secret)
     self.assertEqual(['1', '2', '3'], config.oauth_additional_client_ids)
+
+    # Created a copy in the historical log.
+    copy_in_history = ndb.Key(
+        'AuthGlobalConfigHistory', 'root',
+        parent=model.historical_revision_key(1))
+    expected = {
+      'auth_db_app_version': u'v1a',
+      'auth_db_change_comment': u'REST API',
+      'auth_db_deleted': False,
+    }
+    expected.update(config.to_dict())
+    self.assertEqual(expected, copy_in_history.get().to_dict())
 
   def test_post_requires_admin(self):
     status, response, _ = self.post(

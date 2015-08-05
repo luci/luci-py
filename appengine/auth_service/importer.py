@@ -298,18 +298,27 @@ def import_external_groups():
     return auth.get_auth_db_revision(), groups.get_result()
 
   @ndb.transactional
-  def apply_import(revision, entities_to_put, keys_to_delete):
+  def apply_import(revision, entities_to_put, entities_to_delete, ts):
     """Transactionally puts and deletes a bunch of entities."""
     # DB changed between transactions, retry.
     if auth.get_auth_db_revision() != revision:
       return False
     # Apply mutations, bump revision number.
+    for e in entities_to_put:
+      e.record_revision(
+          modified_by=model.get_service_self_identity(),
+          modified_ts=ts,
+          comment='External group import')
+    for e in entities_to_delete:
+      e.record_deletion(
+          modified_by=model.get_service_self_identity(),
+          modified_ts=ts,
+          comment='External group import')
     futures = []
     futures.extend(ndb.put_multi_async(entities_to_put))
-    futures.extend(ndb.delete_multi_async(keys_to_delete))
-    ndb.Future.wait_all(futures)
-    if any(f.get_exception() for f in futures):
-      raise ndb.Rollback()
+    futures.extend(ndb.delete_multi_async(e.key for e in entities_to_delete))
+    for f in futures:
+      f.check_success()
     auth.replicate_auth_db()
     return True
 
@@ -322,17 +331,18 @@ def import_external_groups():
     # atomically within a single transaction.
     ts = utils.utcnow()
     entities_to_put = []
-    keys_to_delete = []
+    entities_to_delete = []
     revision, existing_groups = snapshot_groups()
     for system, groups in bundles.iteritems():
       to_put, to_delete = prepare_import(system, existing_groups, groups, ts)
       entities_to_put.extend(to_put)
-      keys_to_delete.extend(to_delete)
-    if not entities_to_put and not keys_to_delete:
+      entities_to_delete.extend(to_delete)
+    if not entities_to_put and not entities_to_delete:
       break
-    if apply_import(revision, entities_to_put, keys_to_delete):
+    if apply_import(revision, entities_to_put, entities_to_delete, ts):
       break
-  logging.info('Groups updated: %d', len(entities_to_put) + len(keys_to_delete))
+  logging.info(
+      'Groups updated: %d', len(entities_to_put) + len(entities_to_delete))
 
 
 def load_tarball(content, systems, groups, domain):
@@ -436,7 +446,7 @@ def prepare_import(system_name, existing_groups, imported_groups, timestamp):
     timestamp: modification timestamp to set on all touched entities.
 
   Returns:
-    (List of entities to put, list of keys to delete).
+    (List of entities to put, list of entities to delete).
   """
   # Return values of this function.
   to_put = []
@@ -457,7 +467,7 @@ def prepare_import(system_name, existing_groups, imported_groups, timestamp):
       to_put.append(ent)
 
   def delete_group(group_name):
-    to_delete.append(system_groups[group_name].key)
+    to_delete.append(system_groups[group_name])
 
   def create_group(group_name):
     ent = model.AuthGroup(

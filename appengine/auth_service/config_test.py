@@ -177,7 +177,8 @@ class ConfigTest(test_case.TestCase):
   def test_update_ip_whitelist_config(self):
     @ndb.transactional
     def run(conf):
-      return config._update_ip_whitelist_config(None, conf)
+      return config._update_ip_whitelist_config(
+          config.Revision('ip_whitelist_cfg_rev', 'http://url'), conf)
     # Pushing empty config to empty DB -> no changes.
     self.assertFalse(run(config_pb2.IPWhitelistConfig()))
 
@@ -231,6 +232,10 @@ class ConfigTest(test_case.TestCase):
           'ip_whitelist': u'bots',
         },
       ],
+      'auth_db_rev': 1,
+      'auth_db_prev_rev': None,
+      'modified_by': model.get_service_self_identity(),
+      'modified_ts': datetime.datetime(2014, 1, 2, 3, 4, 5),
     }, model.ip_whitelist_assignments_key().get().to_dict())
     self.assertEqual(
         {
@@ -318,6 +323,10 @@ class ConfigTest(test_case.TestCase):
           'ip_whitelist': u'bots',
         },
       ],
+      'auth_db_rev': 1,
+      'auth_db_prev_rev': 1, # replicate_auth_db is mocked, so no version bump
+      'modified_by': model.get_service_self_identity(),
+      'modified_ts': datetime.datetime(2014, 3, 2, 3, 4, 5),
     }, model.ip_whitelist_assignments_key().get().to_dict())
     self.assertEqual(
         {
@@ -352,9 +361,11 @@ class ConfigTest(test_case.TestCase):
         })
 
   def test_update_oauth_config(self):
+    self.mock_now(datetime.datetime(2014, 1, 2, 3, 4, 5))
     @ndb.transactional
     def run(conf):
-      return config._update_oauth_config(None, conf)
+      return config._update_oauth_config(
+          config.Revision('oauth_cfg_rev', 'http://url'), conf)
     model.AuthGlobalConfig(key=model.root_key()).put()
     # Pushing empty config to empty state -> no changes.
     self.assertFalse(run(config_pb2.OAuthConfig()))
@@ -364,6 +375,10 @@ class ConfigTest(test_case.TestCase):
         primary_client_secret='b',
         client_ids=['c', 'd'])))
     self.assertEqual({
+      'auth_db_rev': 1,
+      'auth_db_prev_rev': None,
+      'modified_by': model.get_service_self_identity(),
+      'modified_ts': datetime.datetime(2014, 1, 2, 3, 4, 5),
       'oauth_additional_client_ids': ['c', 'd'],
       'oauth_client_id': 'a',
       'oauth_client_secret': 'b',

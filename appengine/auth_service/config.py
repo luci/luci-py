@@ -239,7 +239,7 @@ def _validate_ip_whitelist_config(conf):
     idents.append(ident)
 
 
-def _update_ip_whitelist_config(_rev, conf):
+def _update_ip_whitelist_config(rev, conf):
   assert ndb.in_transaction(), 'Must be called in AuthDB transaction'
   now = utils.utcnow()
 
@@ -277,7 +277,7 @@ def _update_ip_whitelist_config(_rev, conf):
   # Removed IP whitelists.
   for wl in existing_ip_whitelists.itervalues():
     if wl.key.id() not in imported_ip_whitelists:
-      to_delete.append(wl.key)
+      to_delete.append(wl)
 
   # Update assignments. Don't touch created_ts and created_by for existing ones.
   ip_whitelist_assignments = (
@@ -313,9 +313,20 @@ def _update_ip_whitelist_config(_rev, conf):
 
   if not to_put and not to_delete:
     return False
+  comment = 'Importing ip_whitelist.cfg at rev %s' % rev.revision
+  for e in to_put:
+    e.record_revision(
+        modified_by=model.get_service_self_identity(),
+        modified_ts=now,
+        comment=comment)
+  for e in to_delete:
+    e.record_deletion(
+        modified_by=model.get_service_self_identity(),
+        modified_ts=now,
+        comment=comment)
   futures = []
   futures.extend(ndb.put_multi_async(to_put))
-  futures.extend(ndb.delete_multi_async(to_delete))
+  futures.extend(ndb.delete_multi_async(e.key for e in to_delete))
   for f in futures:
     f.check_success()
   return True
@@ -327,7 +338,7 @@ def _validate_oauth_config(conf):
     raise ValueError('Wrong message type')
 
 
-def _update_oauth_config(_rev, conf):
+def _update_oauth_config(rev, conf):
   assert ndb.in_transaction(), 'Must be called in AuthDB transaction'
   existing = model.root_key().get()
   existing_as_dict = {
@@ -343,6 +354,10 @@ def _update_oauth_config(_rev, conf):
   if new_as_dict == existing_as_dict:
     return False
   existing.populate(**new_as_dict)
+  existing.record_revision(
+      modified_by=model.get_service_self_identity(),
+      modified_ts=utils.utcnow(),
+      comment='Importing oauth.cfg at rev %s' % rev.revision)
   existing.put()
   return True
 

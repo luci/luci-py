@@ -68,6 +68,10 @@ class NewAuthDBSnapshotTest(test_case.TestCase):
       'global_config': {
         '__id__': 'root',
         '__parent__': None,
+        'auth_db_rev': None,
+        'auth_db_prev_rev': None,
+        'modified_by': None,
+        'modified_ts': None,
         'oauth_additional_client_ids': [],
         'oauth_client_id': '',
         'oauth_client_secret': ''
@@ -79,6 +83,10 @@ class NewAuthDBSnapshotTest(test_case.TestCase):
         '__id__': 'default',
         '__parent__': ndb.Key('AuthGlobalConfig', 'root'),
         'assignments': [],
+        'auth_db_rev': None,
+        'auth_db_prev_rev': None,
+        'modified_by': None,
+        'modified_ts': None,
       },
     }
     self.assertEqual(expected_snapshot, snapshot_to_dict(snapshot))
@@ -95,6 +103,8 @@ class NewAuthDBSnapshotTest(test_case.TestCase):
 
     global_config = model.AuthGlobalConfig(
         key=model.root_key(),
+        modified_ts=utils.utcnow(),
+        modified_by=model.Identity.from_bytes('user:modifier@example.com'),
         oauth_client_id='oauth_client_id',
         oauth_client_secret='oauth_client_secret',
         oauth_additional_client_ids=['a', 'b'])
@@ -106,7 +116,9 @@ class NewAuthDBSnapshotTest(test_case.TestCase):
         globs=[model.IdentityGlob.from_bytes('user:*@example.com')],
         nested=[],
         description='Some description',
+        created_ts=utils.utcnow(),
         created_by=model.Identity.from_bytes('user:creator@example.com'),
+        modified_ts=utils.utcnow(),
         modified_by=model.Identity.from_bytes('user:modifier@example.com'))
     group.put()
 
@@ -119,6 +131,7 @@ class NewAuthDBSnapshotTest(test_case.TestCase):
         id='global_secret',
         parent=model.secret_scope_key('global'),
         values=['1234', '5678'],
+        modified_ts=utils.utcnow(),
         modified_by=model.Identity.from_bytes('user:modifier@example.com'))
     global_secret.put()
 
@@ -127,6 +140,7 @@ class NewAuthDBSnapshotTest(test_case.TestCase):
         id='local_secret',
         parent=model.secret_scope_key('local'),
         values=['1234', '5678'],
+        modified_ts=utils.utcnow(),
         modified_by=model.Identity.from_bytes('user:modifier@example.com'))
     local_secret.put()
 
@@ -134,17 +148,22 @@ class NewAuthDBSnapshotTest(test_case.TestCase):
         key=model.ip_whitelist_key('bots'),
         subnets=['127.0.0.1/32'],
         description='Some description',
+        created_ts=utils.utcnow(),
         created_by=model.Identity.from_bytes('user:creator@example.com'),
+        modified_ts=utils.utcnow(),
         modified_by=model.Identity.from_bytes('user:modifier@example.com'))
     ip_whitelist.put()
 
     ip_whitelist_assignments = model.AuthIPWhitelistAssignments(
         key=model.ip_whitelist_assignments_key(),
+        modified_ts=utils.utcnow(),
+        modified_by=model.Identity.from_bytes('user:modifier@example.com'),
         assignments=[
           model.AuthIPWhitelistAssignments.Assignment(
             identity=model.Identity.from_bytes('user:bot_account@example.com'),
             ip_whitelist='bots',
             comment='some comment',
+            created_ts=utils.utcnow(),
             created_by=model.Identity.from_bytes('user:creator@example.com')),
         ])
     ip_whitelist_assignments.put()
@@ -163,6 +182,10 @@ class NewAuthDBSnapshotTest(test_case.TestCase):
       'global_config': {
         '__id__': 'root',
         '__parent__': None,
+        'auth_db_rev': None,
+        'auth_db_prev_rev': None,
+        'modified_by': model.Identity(kind='user', name='modifier@example.com'),
+        'modified_ts': datetime.datetime(2014, 1, 1, 1, 1, 1),
         'oauth_additional_client_ids': [u'a', u'b'],
         'oauth_client_id': u'oauth_client_id',
         'oauth_client_secret': u'oauth_client_secret',
@@ -171,18 +194,22 @@ class NewAuthDBSnapshotTest(test_case.TestCase):
         {
           '__id__': 'Another group',
           '__parent__': ndb.Key('AuthGlobalConfig', 'root'),
+          'auth_db_rev': None,
+          'auth_db_prev_rev': None,
           'created_by': None,
-          'created_ts': datetime.datetime(2014, 1, 1, 1, 1, 1),
+          'created_ts': None,
           'description': '',
           'globs': [],
           'members': [],
           'modified_by': None,
-          'modified_ts': datetime.datetime(2014, 1, 1, 1, 1, 1),
+          'modified_ts': None,
           'nested': [u'Some group'],
         },
         {
           '__id__': 'Some group',
           '__parent__': ndb.Key('AuthGlobalConfig', 'root'),
+          'auth_db_rev': None,
+          'auth_db_prev_rev': None,
           'created_by': model.Identity(kind='user', name='creator@example.com'),
           'created_ts': datetime.datetime(2014, 1, 1, 1, 1, 1),
           'description': u'Some description',
@@ -209,6 +236,8 @@ class NewAuthDBSnapshotTest(test_case.TestCase):
         {
           '__id__': 'bots',
           '__parent__': ndb.Key('AuthGlobalConfig', 'root'),
+          'auth_db_rev': None,
+          'auth_db_prev_rev': None,
           'created_by': model.Identity(kind='user', name='creator@example.com'),
           'created_ts': datetime.datetime(2014, 1, 1, 1, 1, 1),
           'description': u'Some description',
@@ -232,6 +261,10 @@ class NewAuthDBSnapshotTest(test_case.TestCase):
             'ip_whitelist': 'bots',
           },
         ],
+        'auth_db_rev': None,
+        'auth_db_prev_rev': None,
+        'modified_by': model.Identity(kind='user', name='modifier@example.com'),
+        'modified_ts': datetime.datetime(2014, 1, 1, 1, 1, 1),
       },
     }
     self.assertEqual(expected_snapshot, snapshot_to_dict(snapshot))
@@ -343,12 +376,17 @@ class ReplaceAuthDbTest(test_case.TestCase):
     # Prepare auth db state.
     model.AuthGlobalConfig(
         key=model.root_key(),
+        modified_ts=utils.utcnow(),
         oauth_client_id='oauth_client_id',
         oauth_client_secret='oauth_client_secret',
         oauth_additional_client_ids=['a', 'b']).put()
 
     def group(name, **kwargs):
-      return model.AuthGroup(key=model.group_key(name), **kwargs)
+      return model.AuthGroup(
+          key=model.group_key(name),
+          created_ts=utils.utcnow(),
+          modified_ts=utils.utcnow(),
+          **kwargs)
     group('Modify').put()
     group('Delete').put()
     group('Keep').put()
@@ -362,7 +400,11 @@ class ReplaceAuthDbTest(test_case.TestCase):
     secret('local', 'local').put()
 
     def ip_whitelist(name, **kwargs):
-      return model.AuthIPWhitelist(key=model.ip_whitelist_key(name), **kwargs)
+      return model.AuthIPWhitelist(
+          key=model.ip_whitelist_key(name),
+          created_ts=utils.utcnow(),
+          modified_ts=utils.utcnow(),
+          **kwargs)
     ip_whitelist('modify').put()
     ip_whitelist('delete').put()
     ip_whitelist('keep').put()
@@ -371,9 +413,11 @@ class ReplaceAuthDbTest(test_case.TestCase):
       return model.AuthIPWhitelistAssignments.Assignment(
           identity=model.Identity.from_bytes(ident),
           ip_whitelist=ip_whitelist,
+          created_ts=utils.utcnow(),
           comment='comment')
     model.AuthIPWhitelistAssignments(
         key=model.ip_whitelist_assignments_key(),
+        modified_ts=utils.utcnow(),
         assignments=[
           assignment('user:1@example.com', 'modify'),
           assignment('user:2@example.com', 'delete'),
@@ -384,6 +428,7 @@ class ReplaceAuthDbTest(test_case.TestCase):
     snapshot = replication.AuthDBSnapshot(
         global_config=model.AuthGlobalConfig(
             key=model.root_key(),
+            modified_ts=utils.utcnow(),
             oauth_client_id='another_oauth_client_id',
             oauth_client_secret='another_oauth_client_secret',
             oauth_additional_client_ids=[]),
@@ -434,6 +479,10 @@ class ReplaceAuthDbTest(test_case.TestCase):
       'global_config': {
         '__id__': 'root',
         '__parent__': None,
+        'auth_db_rev': None,
+        'auth_db_prev_rev': None,
+        'modified_by': None,
+        'modified_ts': datetime.datetime(2014, 1, 1, 1, 1, 1),
         'oauth_additional_client_ids': [],
         'oauth_client_id': u'another_oauth_client_id',
         'oauth_client_secret': u'another_oauth_client_secret'},
@@ -441,6 +490,8 @@ class ReplaceAuthDbTest(test_case.TestCase):
         {
           '__id__': 'Keep',
           '__parent__': ndb.Key('AuthGlobalConfig', 'root'),
+          'auth_db_rev': None,
+          'auth_db_prev_rev': None,
           'created_by': None,
           'created_ts': datetime.datetime(2014, 1, 1, 1, 1, 1),
           'description': '',
@@ -453,6 +504,8 @@ class ReplaceAuthDbTest(test_case.TestCase):
         {
           '__id__': 'Modify',
           '__parent__': ndb.Key('AuthGlobalConfig', 'root'),
+          'auth_db_rev': None,
+          'auth_db_prev_rev': None,
           'created_by': None,
           'created_ts': datetime.datetime(2014, 1, 1, 1, 1, 1),
           'description': u'blah',
@@ -465,6 +518,8 @@ class ReplaceAuthDbTest(test_case.TestCase):
         {
           '__id__': 'New',
           '__parent__': ndb.Key('AuthGlobalConfig', 'root'),
+          'auth_db_rev': None,
+          'auth_db_prev_rev': None,
           'created_by': None,
           'created_ts': datetime.datetime(2014, 1, 1, 1, 1, 1),
           'description': '',
@@ -505,6 +560,8 @@ class ReplaceAuthDbTest(test_case.TestCase):
         {
           '__id__': 'keep',
           '__parent__': ndb.Key('AuthGlobalConfig', 'root'),
+          'auth_db_rev': None,
+          'auth_db_prev_rev': None,
           'created_by': None,
           'created_ts': datetime.datetime(2014, 1, 1, 1, 1, 1),
           'description': '',
@@ -515,6 +572,8 @@ class ReplaceAuthDbTest(test_case.TestCase):
         {
           '__id__': 'modify',
           '__parent__': ndb.Key('AuthGlobalConfig', 'root'),
+          'auth_db_rev': None,
+          'auth_db_prev_rev': None,
           'created_by': None,
           'created_ts': datetime.datetime(2014, 1, 1, 1, 1, 1),
           'description': '',
@@ -525,6 +584,8 @@ class ReplaceAuthDbTest(test_case.TestCase):
         {
           '__id__': 'new',
           '__parent__': ndb.Key('AuthGlobalConfig', 'root'),
+          'auth_db_rev': None,
+          'auth_db_prev_rev': None,
           'created_by': None,
           'created_ts': datetime.datetime(2014, 1, 1, 1, 1, 1),
           'description': '',
@@ -559,6 +620,10 @@ class ReplaceAuthDbTest(test_case.TestCase):
             'ip_whitelist': 'keep',
           },
         ],
+        'auth_db_rev': None,
+        'auth_db_prev_rev': None,
+        'modified_by': None,
+        'modified_ts': None, # not transfered currently in proto
       },
     }
     self.assertEqual(expected_auth_db, snapshot_to_dict(current_snapshot))

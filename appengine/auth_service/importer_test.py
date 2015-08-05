@@ -130,9 +130,6 @@ class ImporterTest(test_case.TestCase):
       importer.load_group_file(body, 'example.com')
 
   def test_prepare_import(self):
-    service_id = auth.Identity.from_bytes('service:some-service')
-    self.mock(auth, 'get_service_self_identity', lambda: service_id)
-
     existing_groups = [
       group('normal-group', [], ['ldap/cleared']),
       group('not-ldap/some', []),
@@ -154,38 +151,45 @@ class ImporterTest(test_case.TestCase):
 
     expected_to_put = {
       'ldap/cleared': {
+        'auth_db_rev': None,
+        'auth_db_prev_rev': None,
         'created_by': ident('admin'),
         'created_ts': datetime.datetime(1999, 1, 2, 3, 4, 5, 6),
         'description': '',
         'globs': [],
         'members': [],
-        'modified_by': service_id,
+        'modified_by': model.get_service_self_identity(),
         'modified_ts': datetime.datetime(2010, 1, 2, 3, 4, 5, 6),
         'nested': [],
       },
       'ldap/new': {
-        'created_by': service_id,
+        'auth_db_rev': None,
+        'auth_db_prev_rev': None,
+        'created_by': model.get_service_self_identity(),
         'created_ts': datetime.datetime(2010, 1, 2, 3, 4, 5, 6),
         'description': '',
         'globs': [],
         'members': [ident('a')],
-        'modified_by': service_id,
+        'modified_by': model.get_service_self_identity(),
         'modified_ts': datetime.datetime(2010, 1, 2, 3, 4, 5, 6),
         'nested': [],
       },
       'ldap/updated': {
+        'auth_db_rev': None,
+        'auth_db_prev_rev': None,
         'created_by': ident('admin'),
         'created_ts': datetime.datetime(1999, 1, 2, 3, 4, 5, 6),
         'description': '',
         'globs': [],
         'members': [ident('a'), ident('b')],
-        'modified_by': service_id,
+        'modified_by': model.get_service_self_identity(),
         'modified_ts': datetime.datetime(2010, 1, 2, 3, 4, 5, 6),
         'nested': [],
       },
     }
     self.assertEqual(expected_to_put, {x.key.id(): x.to_dict() for x in to_put})
-    self.assertEqual([model.group_key('ldap/deleted')], to_delete)
+    self.assertEqual(
+        [model.group_key('ldap/deleted')], [x.key for x in to_delete])
 
   def test_load_tarball(self):
     bundle = build_tar_gz({
@@ -232,9 +236,6 @@ class ImporterTest(test_case.TestCase):
   def test_import_external_groups(self):
     self.mock_now(datetime.datetime(2010, 1, 2, 3, 4, 5, 6))
 
-    service_id = auth.Identity.from_bytes('service:some-service')
-    self.mock(auth, 'get_service_self_identity', lambda: service_id)
-
     importer.write_config("""
       tarball {
         domain: "example.com"
@@ -279,32 +280,38 @@ class ImporterTest(test_case.TestCase):
     # Verify final state.
     expected_groups = {
       'ldap/new': {
-        'created_by': service_id,
+        'auth_db_rev': 1,
+        'auth_db_prev_rev': None,
+        'created_by': model.get_service_self_identity(),
         'created_ts': datetime.datetime(2010, 1, 2, 3, 4, 5, 6),
         'description': u'',
         'globs': [],
         'members': [ident('a'), ident('b')],
-        'modified_by': service_id,
+        'modified_by': model.get_service_self_identity(),
         'modified_ts': datetime.datetime(2010, 1, 2, 3, 4, 5, 6),
         'nested': [],
       },
       'external/external_1': {
+        'auth_db_rev': 1,
+        'auth_db_prev_rev': None,
         'created_by': ident('admin'),
         'created_ts': datetime.datetime(1999, 1, 2, 3, 4, 5, 6),
         'description': u'',
         'globs': [],
         'members': [ident('abc@test.com'), ident('def@test.com')],
-        'modified_by': service_id,
+        'modified_by': model.get_service_self_identity(),
         'modified_ts': datetime.datetime(2010, 1, 2, 3, 4, 5, 6),
         'nested': [],
       },
       'external/external_2': {
-        'created_by': service_id,
+        'auth_db_rev': 1,
+        'auth_db_prev_rev': None,
+        'created_by': model.get_service_self_identity(),
         'created_ts': datetime.datetime(2010, 1, 2, 3, 4, 5, 6),
         'description': u'',
         'globs': [],
         'members': [ident('123'), ident('456')],
-        'modified_by': service_id,
+        'modified_by': model.get_service_self_identity(),
         'modified_ts': datetime.datetime(2010, 1, 2, 3, 4, 5, 6),
         'nested': [],
       },

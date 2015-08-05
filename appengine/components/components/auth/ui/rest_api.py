@@ -126,8 +126,8 @@ class EntityHandlerBase(handler.ApiHandler):
   Implements optimistic concurrency control based on Last-Modified header.
 
   Subclasses must override class methods (see below). Entities being manipulated
-  should implement datastore_utils.SerializableModelMixin and have following
-  properties:
+  should implement datastore_utils.SerializableModelMixin and
+  model.AuthVersionedEntityMixin and have following properties:
     created_by
     created_ts
     modified_by
@@ -174,7 +174,7 @@ class EntityHandlerBase(handler.ApiHandler):
     raise NotImplementedError()
 
   @classmethod
-  def do_update(cls, entity, params, modified_by):
+  def do_update(cls, entity, params):
     """Called in transaction to update existing entity.
 
     Raises:
@@ -221,8 +221,8 @@ class EntityHandlerBase(handler.ApiHandler):
       entity = self.entity_kind.from_serializable_dict(
           serializable_dict=body,
           key=self.get_entity_key(name),
-          created_by=api.get_current_identity(),
-          modified_by=api.get_current_identity())
+          created_ts=utils.utcnow(),
+          created_by=api.get_current_identity())
     except (TypeError, ValueError) as e:
       self.abort_with_error(400, text=str(e))
 
@@ -233,6 +233,10 @@ class EntityHandlerBase(handler.ApiHandler):
           'http_code': 409,
           'text': 'Such %s already exists' % self.entity_kind_title,
         }
+      entity.record_revision(
+          modified_by=api.get_current_identity(),
+          modified_ts=utils.utcnow(),
+          comment='REST API')
       try:
         self.do_create(entity)
       except EntityOperationError as exc:
@@ -246,6 +250,7 @@ class EntityHandlerBase(handler.ApiHandler):
           'http_code': 400,
           'text': str(exc),
         }
+      model.replicate_auth_db()
       return True, None
 
     success, error_details = create(entity)
@@ -278,7 +283,7 @@ class EntityHandlerBase(handler.ApiHandler):
       self.abort_with_error(400, text=str(e))
 
     @ndb.transactional
-    def update(params, modified_by, expected_ts):
+    def update(params, expected_ts):
       entity = self.get_entity_key(name).get()
       if not entity:
         return None, {
@@ -293,8 +298,12 @@ class EntityHandlerBase(handler.ApiHandler):
               '%s was modified by someone else' %
               self.entity_kind_title.capitalize(),
         }
+      entity.record_revision(
+          modified_by=api.get_current_identity(),
+          modified_ts=utils.utcnow(),
+          comment='REST API')
       try:
-        self.do_update(entity, params, modified_by)
+        self.do_update(entity, params)
       except EntityOperationError as exc:
         return None, {
           'http_code': 409,
@@ -306,12 +315,11 @@ class EntityHandlerBase(handler.ApiHandler):
           'http_code': 400,
           'text': str(exc),
         }
+      model.replicate_auth_db()
       return entity, None
 
     entity, error_details = update(
-        entity_params,
-        api.get_current_identity(),
-        self.request.headers.get('If-Unmodified-Since'))
+        entity_params, self.request.headers.get('If-Unmodified-Since'))
     if not entity:
       self.abort_with_error(**error_details)
     self.send_response(
@@ -353,6 +361,10 @@ class EntityHandlerBase(handler.ApiHandler):
               '%s was modified by someone else' %
               self.entity_kind_title.capitalize(),
         }
+      entity.record_deletion(
+          modified_by=api.get_current_identity(),
+          modified_ts=utils.utcnow(),
+          comment='REST API')
       try:
         self.do_delete(entity)
       except EntityOperationError as exc:
@@ -361,6 +373,7 @@ class EntityHandlerBase(handler.ApiHandler):
           'text': exc.message,
           'details': exc.details,
         }
+      model.replicate_auth_db()
       return True, None
 
     success, error_details = delete(
@@ -459,10 +472,9 @@ class GroupHandler(EntityHandlerBase):
           message='Referencing a nested group that doesn\'t exist',
           details={'missing': missing})
     entity.put()
-    model.replicate_auth_db()
 
   @classmethod
-  def do_update(cls, entity, params, modified_by):
+  def do_update(cls, entity, params):
     # If adding new nested groups, need to ensure they exist.
     added_nested_groups = set(params['nested']) - set(entity.nested)
     if added_nested_groups:
@@ -480,10 +492,7 @@ class GroupHandler(EntityHandlerBase):
             message='Groups can not have cyclic dependencies',
             details={'cycle': cycle})
     # Good enough.
-    entity.modified_ts = utils.utcnow()
-    entity.modified_by = modified_by
     entity.put()
-    model.replicate_auth_db()
 
   @classmethod
   def do_delete(cls, entity):
@@ -493,7 +502,6 @@ class GroupHandler(EntityHandlerBase):
           message='Group is being referenced in other groups',
           details={'groups': list(referencing_groups)})
     entity.key.delete()
-    model.replicate_auth_db()
 
 
 class HostTokenHandler(handler.ApiHandler):
@@ -659,21 +667,16 @@ class IPWhitelistHandler(EntityHandlerBase):
   @classmethod
   def do_create(cls, entity):
     entity.put()
-    model.replicate_auth_db()
 
   @classmethod
-  def do_update(cls, entity, params, modified_by):
+  def do_update(cls, entity, params):
     entity.populate(**params)
-    entity.modified_ts = utils.utcnow()
-    entity.modified_by = modified_by
     entity.put()
-    model.replicate_auth_db()
 
   @classmethod
   def do_delete(cls, entity):
     # TODO(vadimsh): Verify it isn't being referenced by whitelist assigments.
     entity.key.delete()
-    model.replicate_auth_db()
 
 
 class CertificatesHandler(handler.ApiHandler):
@@ -744,6 +747,10 @@ class OAuthConfigHandler(handler.ApiHandler):
           oauth_client_id=client_id,
           oauth_client_secret=client_secret,
           oauth_additional_client_ids=additional_client_ids)
+      config.record_revision(
+          modified_by=api.get_current_identity(),
+          modified_ts=utils.utcnow(),
+          comment='REST API')
       config.put()
       model.replicate_auth_db()
 

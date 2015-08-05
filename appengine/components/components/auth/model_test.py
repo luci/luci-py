@@ -10,6 +10,8 @@ import unittest
 from test_support import test_env
 test_env.setup_test_env()
 
+from google.appengine.ext import ndb
+
 from components import utils
 from components.auth import ipaddr
 from components.auth import model
@@ -216,6 +218,8 @@ class GroupBootstrapTest(test_case.TestCase):
     ent = model.group_key('some-group').get()
     self.assertEqual(
         {
+          'auth_db_rev': 1,
+          'auth_db_prev_rev': None,
           'created_by': model.get_service_self_identity(),
           'created_ts': mocked_now,
           'description': 'Blah description',
@@ -241,6 +245,8 @@ class GroupBootstrapTest(test_case.TestCase):
     ent = model.group_key('some-group').get()
     self.assertEqual(
         {
+          'auth_db_rev': 1,
+          'auth_db_prev_rev': None,
           'created_by': model.get_service_self_identity(),
           'created_ts': mocked_now,
           'description': 'Blah description',
@@ -349,6 +355,8 @@ class IpWhitelistTest(test_case.TestCase):
     ent = model.ip_whitelist_key('list').get()
     self.assertTrue(ent)
     self.assertEqual({
+      'auth_db_rev': 1,
+      'auth_db_prev_rev': None,
       'created_by': model.get_service_self_identity(),
       'created_ts': mocked_now,
       'description': u'comment',
@@ -370,6 +378,8 @@ class IpWhitelistTest(test_case.TestCase):
     ent = model.ip_whitelist_key('list').get()
     self.assertTrue(ent)
     self.assertEqual({
+      'auth_db_rev': 1,
+      'auth_db_prev_rev': None,
       'created_by': model.get_service_self_identity(),
       'created_ts': mocked_now,
       'description': u'comment',
@@ -395,11 +405,15 @@ class IpWhitelistTest(test_case.TestCase):
           {
             'comment': 'some comment',
             'created_by': model.get_service_self_identity(),
-            'created_ts': datetime.datetime(2014, 01, 01),
+            'created_ts': datetime.datetime(2014, 1, 1),
             'identity': model.Identity(model.IDENTITY_USER, 'a@example.com'),
             'ip_whitelist': 'some ip whitelist',
           },
         ],
+        'auth_db_rev': 1,
+        'auth_db_prev_rev': None,
+        'modified_by': model.get_service_self_identity(),
+        'modified_ts': datetime.datetime(2014, 1, 1),
       }, model.ip_whitelist_assignments_key().get().to_dict())
 
   def test_bootstrap_ip_whitelist_assignment_modify(self):
@@ -421,11 +435,15 @@ class IpWhitelistTest(test_case.TestCase):
           {
             'comment': 'another comment',
             'created_by': model.get_service_self_identity(),
-            'created_ts': datetime.datetime(2014, 01, 01),
+            'created_ts': datetime.datetime(2014, 1, 1),
             'identity': model.Identity(model.IDENTITY_USER, 'a@example.com'),
             'ip_whitelist': 'another ip whitelist',
           },
         ],
+        'auth_db_rev': 2,
+        'auth_db_prev_rev': 1,
+        'modified_by': model.get_service_self_identity(),
+        'modified_ts': datetime.datetime(2014, 1, 1),
       }, model.ip_whitelist_assignments_key().get().to_dict())
 
   def test_is_ip_whitelisted(self):
@@ -467,6 +485,449 @@ class IpWhitelistTest(test_case.TestCase):
     assignments, whitelists = model.fetch_ip_whitelists()
     self.assertEqual(ent.to_dict(), assignments.to_dict())
     self.assertEqual(['A', 'B', 'bots'], [e.key.id() for e in whitelists])
+
+
+class AuditLogTest(test_case.TestCase):
+  """Tests to verify replicate_auth_db() keeps historical copies of entities."""
+
+  def grab_log(self, original_cls):
+    copies = original_cls.get_historical_copy_class().query(
+        ancestor=model.root_key()).fetch()
+    # All keys under correct historical_revision_key().
+    for c in copies:
+      self.assertEqual(
+          ndb.Key('Rev', c.auth_db_rev, parent=model.root_key()),
+          c.key.parent())
+    return {x.key: x.to_dict() for x in copies}
+
+  def setUp(self):
+    super(AuditLogTest, self).setUp()
+    self.mock_now(datetime.datetime(2015, 1, 1, 1, 1))
+
+  def test_global_config_log(self):
+    @ndb.transactional
+    def modify(**kwargs):
+      e = model.root_key().get() or model.AuthGlobalConfig(key=model.root_key())
+      e.populate(**kwargs)
+      e.record_revision(
+          modified_by=model.Identity.from_bytes('user:a@example.com'),
+          modified_ts=utils.utcnow(),
+          comment='Comment')
+      e.put()
+      model.replicate_auth_db()
+
+    # Global config is never deleted, so test only modifications.
+    modify(oauth_client_id='1', oauth_additional_client_ids=[])
+    modify(oauth_client_id='2', oauth_additional_client_ids=['a'])
+    modify(oauth_client_id='3', oauth_additional_client_ids=['a', 'b'])
+    modify(oauth_client_id='4', oauth_additional_client_ids=[])
+
+    # Final state.
+    self.assertEqual({
+      'auth_db_rev': 4,
+      'auth_db_prev_rev': 3,
+      'oauth_additional_client_ids': [],
+      'oauth_client_id': u'4',
+      'oauth_client_secret': u'',
+      'modified_by': model.Identity.from_bytes('user:a@example.com'),
+      'modified_ts': datetime.datetime(2015, 1, 1, 1, 1),
+    }, model.root_key().get().to_dict())
+
+    # Copies in the history.
+    cpy = lambda rev: ndb.Key(
+        'Rev', rev, 'AuthGlobalConfigHistory', 'root', parent=model.root_key())
+    self.assertEqual({
+      cpy(1): {
+        'auth_db_rev': 1,
+        'auth_db_prev_rev': None,
+        'auth_db_app_version': u'v1a',
+        'auth_db_deleted': False,
+        'auth_db_change_comment': u'Comment',
+        'oauth_additional_client_ids': [],
+        'oauth_client_id': u'1',
+        'oauth_client_secret': u'',
+        'modified_by': model.Identity.from_bytes('user:a@example.com'),
+        'modified_ts': datetime.datetime(2015, 1, 1, 1, 1),
+      },
+      cpy(2): {
+        'auth_db_rev': 2,
+        'auth_db_prev_rev': 1,
+        'auth_db_app_version': u'v1a',
+        'auth_db_deleted': False,
+        'auth_db_change_comment': u'Comment',
+        'oauth_additional_client_ids': [u'a'],
+        'oauth_client_id': u'2',
+        'oauth_client_secret': u'',
+        'modified_by': model.Identity.from_bytes('user:a@example.com'),
+        'modified_ts': datetime.datetime(2015, 1, 1, 1, 1),
+      },
+      cpy(3): {
+        'auth_db_rev': 3,
+        'auth_db_prev_rev': 2,
+        'auth_db_app_version': u'v1a',
+        'auth_db_deleted': False,
+        'auth_db_change_comment': u'Comment',
+        'oauth_additional_client_ids': [u'a', u'b'],
+        'oauth_client_id': u'3',
+        'oauth_client_secret': u'',
+        'modified_by': model.Identity.from_bytes('user:a@example.com'),
+        'modified_ts': datetime.datetime(2015, 1, 1, 1, 1),
+      },
+      cpy(4): {
+        'auth_db_rev': 4,
+        'auth_db_prev_rev': 3,
+        'auth_db_app_version': u'v1a',
+        'auth_db_deleted': False,
+        'auth_db_change_comment': u'Comment',
+        'oauth_additional_client_ids': [],
+        'oauth_client_id': u'4',
+        'oauth_client_secret': u'',
+        'modified_by': model.Identity.from_bytes('user:a@example.com'),
+        'modified_ts': datetime.datetime(2015, 1, 1, 1, 1),
+      },
+    }, self.grab_log(model.AuthGlobalConfig))
+
+  def test_groups_log(self):
+    ident_a = model.Identity.from_bytes('user:a@example.com')
+    ident_b = model.Identity.from_bytes('user:b@example.com')
+
+    glob_a = model.IdentityGlob.from_bytes('user:*@a.com')
+    glob_b = model.IdentityGlob.from_bytes('user:*@b.com')
+
+    @ndb.transactional
+    def modify(name, commit=True, **kwargs):
+      k = model.group_key(name)
+      e = k.get()
+      if not e:
+        e = model.AuthGroup(
+            key=k,
+            created_by=ident_a,
+            created_ts=utils.utcnow())
+      e.record_revision(
+          modified_by=ident_a,
+          modified_ts=utils.utcnow(),
+          comment='Comment')
+      e.populate(**kwargs)
+      e.put()
+      if commit:
+        model.replicate_auth_db()
+
+    @ndb.transactional
+    def remove(name, commit=True):
+      e = model.group_key(name).get()
+      if e:
+        e.record_deletion(
+            modified_by=model.Identity.from_bytes('user:a@example.com'),
+            modified_ts=utils.utcnow(),
+            comment='Comment')
+        e.key.delete()
+      if commit:
+        model.replicate_auth_db()
+
+    modify('A', members=[])
+    modify('A', members=[ident_a], globs=[glob_a])
+    modify('B', members=[ident_b], globs=[glob_b])
+    modify('A', nested=['B'])
+    @ndb.transactional
+    def batch():
+      modify('B', commit=False, description='Blah')
+      remove('A', commit=True)
+    batch()
+    modify('B', members=[ident_a, ident_b], globs=[glob_a, glob_b])
+
+    # Final state.
+    self.assertIsNone(model.group_key('A').get())
+    self.assertEqual({
+      'auth_db_rev': 6,
+      'auth_db_prev_rev': 5,
+      'created_by': model.Identity(kind='user', name='a@example.com'),
+      'created_ts': datetime.datetime(2015, 1, 1, 1, 1),
+      'description': u'Blah',
+      'globs': [
+        model.IdentityGlob(kind='user', pattern='*@a.com'),
+        model.IdentityGlob(kind='user', pattern='*@b.com'),
+      ],
+      'members': [
+        model.Identity(kind='user', name='a@example.com'),
+        model.Identity(kind='user', name='b@example.com'),
+      ],
+      'modified_by': model.Identity(kind='user', name='a@example.com'),
+      'modified_ts': datetime.datetime(2015, 1, 1, 1, 1),
+      'nested': [],
+    }, model.group_key('B').get().to_dict())
+
+    # Copies in the history.
+    cpy = lambda name, rev: ndb.Key(
+        'Rev', rev, 'AuthGroupHistory', name, parent=model.root_key())
+    self.assertEqual({
+      cpy('A', 1): {
+        'auth_db_rev': 1,
+        'auth_db_prev_rev': None,
+        'auth_db_app_version': u'v1a',
+        'auth_db_deleted': False,
+        'auth_db_change_comment': u'Comment',
+        'created_by': model.Identity(kind='user', name='a@example.com'),
+        'created_ts': datetime.datetime(2015, 1, 1, 1, 1),
+        'description': u'',
+        'globs': [],
+        'members': [],
+        'modified_by': model.Identity(kind='user', name='a@example.com'),
+        'modified_ts': datetime.datetime(2015, 1, 1, 1, 1),
+        'nested': [],
+      },
+      cpy('A', 2): {
+        'auth_db_rev': 2,
+        'auth_db_prev_rev': 1,
+        'auth_db_app_version': u'v1a',
+        'auth_db_deleted': False,
+        'auth_db_change_comment': u'Comment',
+        'created_by': model.Identity(kind='user', name='a@example.com'),
+        'created_ts': datetime.datetime(2015, 1, 1, 1, 1),
+        'description': u'',
+        'globs': [glob_a],
+        'members': [ident_a],
+        'modified_by': model.Identity(kind='user', name='a@example.com'),
+        'modified_ts': datetime.datetime(2015, 1, 1, 1, 1),
+        'nested': [],
+      },
+      cpy('B', 3): {
+        'auth_db_rev': 3,
+        'auth_db_prev_rev': None,
+        'auth_db_app_version': u'v1a',
+        'auth_db_deleted': False,
+        'auth_db_change_comment': u'Comment',
+        'created_by': model.Identity(kind='user', name='a@example.com'),
+        'created_ts': datetime.datetime(2015, 1, 1, 1, 1),
+        'description': u'',
+        'globs': [glob_b],
+        'members': [ident_b],
+        'modified_by': model.Identity(kind='user', name='a@example.com'),
+        'modified_ts': datetime.datetime(2015, 1, 1, 1, 1),
+        'nested': [],
+      },
+      cpy('A', 4): {
+        'auth_db_rev': 4,
+        'auth_db_prev_rev': 2,
+        'auth_db_app_version': u'v1a',
+        'auth_db_deleted': False,
+        'auth_db_change_comment': u'Comment',
+        'created_by': model.Identity(kind='user', name='a@example.com'),
+        'created_ts': datetime.datetime(2015, 1, 1, 1, 1),
+        'description': u'',
+        'globs': [glob_a],
+        'members': [ident_a],
+        'modified_by': model.Identity(kind='user', name='a@example.com'),
+        'modified_ts': datetime.datetime(2015, 1, 1, 1, 1),
+        'nested': [u'B'],
+      },
+      # Batch revision.
+      cpy('A', 5): {
+        'auth_db_rev': 5,
+        'auth_db_prev_rev': 4,
+        'auth_db_app_version': u'v1a',
+        'auth_db_deleted': True,
+        'auth_db_change_comment': u'Comment',
+        'created_by': model.Identity(kind='user', name='a@example.com'),
+        'created_ts': datetime.datetime(2015, 1, 1, 1, 1),
+        'description': u'',
+        'globs': [glob_a],
+        'members': [ident_a],
+        'modified_by': model.Identity(kind='user', name='a@example.com'),
+        'modified_ts': datetime.datetime(2015, 1, 1, 1, 1),
+        'nested': [u'B'],
+      },
+      cpy('B', 5): {
+        'auth_db_rev': 5,
+        'auth_db_prev_rev': 3,
+        'auth_db_app_version': u'v1a',
+        'auth_db_deleted': False,
+        'auth_db_change_comment': u'Comment',
+        'created_by': model.Identity(kind='user', name='a@example.com'),
+        'created_ts': datetime.datetime(2015, 1, 1, 1, 1),
+        'description': u'Blah',
+        'globs': [glob_b],
+        'members': [ident_b],
+        'modified_by': model.Identity(kind='user', name='a@example.com'),
+        'modified_ts': datetime.datetime(2015, 1, 1, 1, 1),
+        'nested': [],
+      },
+      # /end of batch revision
+      cpy('B', 6): {
+        'auth_db_rev': 6,
+        'auth_db_prev_rev': 5,
+        'auth_db_app_version': u'v1a',
+        'auth_db_deleted': False,
+        'auth_db_change_comment': u'Comment',
+        'created_by': model.Identity(kind='user', name='a@example.com'),
+        'created_ts': datetime.datetime(2015, 1, 1, 1, 1),
+        'description': u'Blah',
+        'globs': [glob_a, glob_b],
+        'members': [ident_a, ident_b],
+        'modified_by': model.Identity(kind='user', name='a@example.com'),
+        'modified_ts': datetime.datetime(2015, 1, 1, 1, 1),
+        'nested': [],
+      },
+    }, self.grab_log(model.AuthGroup))
+
+  def test_ip_whitelist_log(self):
+    @ndb.transactional
+    def modify(name, **kwargs):
+      k = model.ip_whitelist_key(name)
+      e = k.get()
+      if not e:
+        e = model.AuthIPWhitelist(
+            key=k,
+            created_by=model.Identity.from_bytes('user:a@example.com'),
+            created_ts=utils.utcnow())
+      e.record_revision(
+          modified_by=model.Identity.from_bytes('user:a@example.com'),
+          modified_ts=utils.utcnow(),
+          comment='Comment')
+      e.populate(**kwargs)
+      e.put()
+      model.replicate_auth_db()
+
+    @ndb.transactional
+    def remove(name):
+      e = model.ip_whitelist_key(name).get()
+      if e:
+        e.record_deletion(
+            modified_by=model.Identity.from_bytes('user:a@example.com'),
+            modified_ts=utils.utcnow(),
+            comment='Comment')
+        e.key.delete()
+      model.replicate_auth_db()
+
+    # Very similar to test_groups_log, so do less test cases.
+    modify('A', subnets=['127.0.0.1/32'])
+    modify('A', description='Blah')
+    modify('A', subnets=['1.0.0.0/32'])
+    remove('A')
+
+    # Copies in the history.
+    cpy = lambda name, rev: ndb.Key(
+        'Rev', rev, 'AuthIPWhitelistHistory', name, parent=model.root_key())
+    self.assertEqual({
+      cpy('A', 1): {
+        'auth_db_rev': 1,
+        'auth_db_prev_rev': None,
+        'auth_db_app_version': u'v1a',
+        'auth_db_deleted': False,
+        'auth_db_change_comment': u'Comment',
+        'created_by': model.Identity(kind='user', name='a@example.com'),
+        'created_ts': datetime.datetime(2015, 1, 1, 1, 1),
+        'description': u'',
+        'modified_by': model.Identity(kind='user', name='a@example.com'),
+        'modified_ts': datetime.datetime(2015, 1, 1, 1, 1),
+        'subnets': [u'127.0.0.1/32'],
+      },
+      cpy('A', 2): {
+        'auth_db_rev': 2,
+        'auth_db_prev_rev': 1,
+        'auth_db_app_version': u'v1a',
+        'auth_db_deleted': False,
+        'auth_db_change_comment': u'Comment',
+        'created_by': model.Identity(kind='user', name='a@example.com'),
+        'created_ts': datetime.datetime(2015, 1, 1, 1, 1),
+        'description': u'Blah',
+        'modified_by': model.Identity(kind='user', name='a@example.com'),
+        'modified_ts': datetime.datetime(2015, 1, 1, 1, 1),
+        'subnets': [u'127.0.0.1/32'],
+      },
+      cpy('A', 3): {
+        'auth_db_rev': 3,
+        'auth_db_prev_rev': 2,
+        'auth_db_app_version': u'v1a',
+        'auth_db_deleted': False,
+        'auth_db_change_comment': u'Comment',
+        'created_by': model.Identity(kind='user', name='a@example.com'),
+        'created_ts': datetime.datetime(2015, 1, 1, 1, 1),
+        'description': u'Blah',
+        'modified_by': model.Identity(kind='user', name='a@example.com'),
+        'modified_ts': datetime.datetime(2015, 1, 1, 1, 1),
+        'subnets': [u'1.0.0.0/32'],
+      },
+      cpy('A', 4): {
+        'auth_db_rev': 4,
+        'auth_db_prev_rev': 3,
+        'auth_db_app_version': u'v1a',
+        'auth_db_deleted': True,
+        'auth_db_change_comment': u'Comment',
+        'created_by': model.Identity(kind='user', name='a@example.com'),
+        'created_ts': datetime.datetime(2015, 1, 1, 1, 1),
+        'description': u'Blah',
+        'modified_by': model.Identity(kind='user', name='a@example.com'),
+        'modified_ts': datetime.datetime(2015, 1, 1, 1, 1),
+        'subnets': [u'1.0.0.0/32'],
+      },
+    }, self.grab_log(model.AuthIPWhitelist))
+
+  def test_ip_whitelist_assignment_log(self):
+    # AuthIPWhitelistAssignments is special, it has LocalStructuredProperty.
+
+    @ndb.transactional
+    def modify(assignments):
+      key = model.ip_whitelist_assignments_key()
+      e = key.get() or model.AuthIPWhitelistAssignments(key=key)
+      e.record_revision(
+          modified_by=model.Identity.from_bytes('user:a@example.com'),
+          modified_ts=datetime.datetime(2015, 1, 1, 1, 1),
+          comment='Comment')
+      e.assignments = assignments
+      e.put()
+      model.replicate_auth_db()
+
+    Assignment = model.AuthIPWhitelistAssignments.Assignment
+    modify([])
+    modify([
+      Assignment(
+          identity=model.Identity.from_bytes('user:a@example.com'),
+          ip_whitelist='bots',
+          comment='Blah'),
+    ])
+    modify([])
+
+    cpy = lambda rev: ndb.Key(
+        'Rev', rev, 'AuthIPWhitelistAssignmentsHistory', 'default',
+        parent=model.root_key())
+    self.assertEqual({
+      cpy(1): {
+        'assignments': [],
+        'auth_db_rev': 1,
+        'auth_db_prev_rev': None,
+        'auth_db_app_version': u'v1a',
+        'auth_db_deleted': False,
+        'auth_db_change_comment': u'Comment',
+        'modified_by': model.Identity.from_bytes('user:a@example.com'),
+        'modified_ts': datetime.datetime(2015, 1, 1, 1, 1),
+      },
+      cpy(2): {
+        'assignments': [{
+          'comment': u'Blah',
+          'created_by': None,
+          'created_ts': None,
+          'identity': model.Identity(kind='user', name='a@example.com'),
+          'ip_whitelist': u'bots',
+        }],
+        'auth_db_rev': 2,
+        'auth_db_prev_rev': 1,
+        'auth_db_app_version': u'v1a',
+        'auth_db_deleted': False,
+        'auth_db_change_comment': u'Comment',
+        'modified_by': model.Identity.from_bytes('user:a@example.com'),
+        'modified_ts': datetime.datetime(2015, 1, 1, 1, 1),
+      },
+      cpy(3): {
+        'assignments': [],
+        'auth_db_rev': 3,
+        'auth_db_prev_rev': 2,
+        'auth_db_app_version': u'v1a',
+        'auth_db_deleted': False,
+        'auth_db_change_comment': u'Comment',
+        'modified_by': model.Identity.from_bytes('user:a@example.com'),
+        'modified_ts': datetime.datetime(2015, 1, 1, 1, 1),
+      },
+    }, self.grab_log(model.AuthIPWhitelistAssignments))
 
 
 if __name__ == '__main__':
