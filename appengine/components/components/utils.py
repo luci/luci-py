@@ -17,6 +17,7 @@ import json
 import logging
 import os
 import re
+import sys
 import threading
 import time
 
@@ -45,7 +46,7 @@ _task_queue_module = 'backend'
 
 
 def is_local_dev_server():
-  """Returns True if running on local development server.
+  """Returns True if running on local development server or in unit tests.
 
   This function is safe to run outside the scope of a HTTP request.
   """
@@ -61,6 +62,22 @@ def is_canary():
   This function is safe to run outside the scope of a HTTP request.
   """
   return os.environ['APPLICATION_ID'].endswith('-dev')
+
+
+def is_unit_test():
+  """Returns True if running in a unit test.
+
+  Don't abuse it, use only if really desperate. For example, in a component that
+  is included by many-many projects across many repos, when mocking some
+  component behavior in all unit tests that indirectly invoke it is infeasible.
+  """
+  if not is_local_dev_server():
+    return False
+  # devappserver2 sets up some sort of a sandbox that is not activated for
+  # unit tests. So differentiate based on that.
+  return all(
+      'google.appengine.tools.devappserver2' not in str(p)
+      for p in sys.meta_path)
 
 
 def get_module_version_list(module_list, tainted):

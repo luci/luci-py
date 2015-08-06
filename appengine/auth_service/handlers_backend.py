@@ -7,6 +7,7 @@
 import webapp2
 
 from components import decorators
+from components.auth import change_log
 
 import config
 import importer
@@ -33,7 +34,11 @@ class InternalReplicationTaskHandler(webapp2.RequestHandler):
 
 
 def get_routes():
-  return [
+  # Backend routes exposed by auth components.
+  routes = []
+  routes.extend(change_log.get_backend_routes())
+  # Auth service's own routes.
+  routes.extend([
     webapp2.Route(
         r'/internal/cron/update_config',
         InternalUpdateConfigCronHandler),
@@ -43,7 +48,8 @@ def get_routes():
     webapp2.Route(
         r'/internal/taskqueue/replication/<auth_db_rev:\d+>',
         InternalReplicationTaskHandler),
-  ]
+  ])
+  return routes
 
 
 def create_application(debug):

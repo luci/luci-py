@@ -602,6 +602,22 @@ def replicate_auth_db():
 ## Auth DB transaction details (used for historical log of changes).
 
 
+_commit_callbacks = []
+
+
+def commit_callback(cb):
+  """Adds a callback that's called before AuthDB transaction is committed.
+
+  Can be used as decorator. Adding a callback second time is noop.
+
+  Args:
+    cb: function that takes single auth_db_rev argument as input.
+  """
+  if cb not in _commit_callbacks:
+    _commit_callbacks.append(cb)
+  return cb
+
+
 def _get_pending_auth_db_transaction():
   """Used internally to keep track of changes done in the transaction.
 
@@ -670,6 +686,8 @@ class _AuthDBTransaction(object):
       for c in self.changes
     ]
     ndb.put_multi(puts + [self.replication_state])
+    for cb in _commit_callbacks:
+      cb(self.replication_state.auth_db_rev)
     self.committed = True
 
 

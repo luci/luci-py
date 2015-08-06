@@ -36,6 +36,10 @@ _config = lib_config.register(
       'UI_APP_NAME': 'Auth',
       # True if application is calling 'configure_ui' manually.
       'UI_CUSTOM_CONFIG': False,
+      # Module name to use for task queue tasks.
+      'BACKEND_MODULE': 'default',
+      # Name of the task queue that processes AuthDB diffs (see change_log.py).
+      'PROCESS_CHANGE_TASK_QUEUE': 'default',
     })
 
 
@@ -62,3 +66,4 @@ def ensure_configured():
         ui.configure_ui(_config.UI_APP_NAME)
       # Mark as successfully completed.
       _config_called = True
+  return _config
