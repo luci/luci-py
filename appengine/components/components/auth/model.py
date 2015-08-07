@@ -590,12 +590,16 @@ def replicate_auth_db():
   For that reason _post_put_hook is NOT used and replicate_auth_db() should be
   called explicitly whenever relevant part of root_key() entity group is
   updated.
+
+  Returns:
+    New AuthDB revision number.
   """
   assert ndb.in_transaction()
   txn = _get_pending_auth_db_transaction()
   txn.commit()
   if is_primary():
     _replication_callback(txn.replication_state)
+  return txn.replication_state.auth_db_rev
 
 
 ################################################################################
