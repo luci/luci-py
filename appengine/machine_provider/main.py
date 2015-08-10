@@ -4,9 +4,15 @@
 
 """Handlers for HTTP requests."""
 
-import handlers_backend
-import handlers_endpoints
+from components import utils
 
+import handlers_cron
+import handlers_endpoints
+import handlers_queues
+
+
+utils.set_task_queue_module('default')
 
 endpoints_app = handlers_endpoints.create_endpoints_app()
-backend_app = handlers_backend.create_backend_app()
+cron_app = handlers_cron.create_cron_app()
+queue_app = handlers_queues.create_queues_app()

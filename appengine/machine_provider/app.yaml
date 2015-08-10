@@ -9,9 +9,13 @@ handlers:
 - url: /_ah/spi/.*
   script: main.endpoints_app
   secure: always
-- url: /internal/.*
+- url: /internal/cron/.*
   login: admin
-  script: main.backend_app
+  script: main.cron_app
+  secure: always
+- url: /internal/queues/.*
+  login: admin
+  script: main.queue_app
   secure: always
 
 includes:

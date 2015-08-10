@@ -85,6 +85,8 @@ class LeaseRequest(messages.Message):
   dimensions = messages.MessageField(Dimensions, 2, required=True)
   # Desired length of the lease in seconds.
   duration = messages.IntegerField(3, required=True)
+  # Cloud Pub/Sub topic name to communicate on regarding this request.
+  pubsub_topic = messages.StringField(4)
 
 
 class LeaseRequestError(messages.Enum):
@@ -92,6 +94,8 @@ class LeaseRequestError(messages.Enum):
   # Request IDs are intended to be unique.
   # Reusing a request ID in a different request is an error.
   REQUEST_ID_REUSE = 1
+  # Proposed Cloud Pub/Sub topic was invalid.
+  INVALID_TOPIC = 2
 
 
 class LeaseResponse(messages.Message):

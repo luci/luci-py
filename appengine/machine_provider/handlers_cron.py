@@ -6,13 +6,25 @@
 
 import logging
 
+from google.appengine.api import taskqueue
 from google.appengine.ext import ndb
 import webapp2
 
 from components import decorators
+from components import utils
 
 import models
 import rpc_messages
+
+
+class Error(Exception):
+  pass
+
+
+class TaskEnqueuingError(Error):
+  def __init__(self, queue_name):
+    super(TaskEnqueuingError, self).__init__()
+    self.queue_name = queue_name
 
 
 def can_fulfill(entry, request):
@@ -90,8 +102,18 @@ def lease_machine(machine_key, lease):
   machine.put()
   lease.state = models.LeaseRequestStates.FULFILLED
   lease.put()
+  if not utils.enqueue_task(
+      '/internal/queues/fulfill-lease-request',
+      'fulfill-lease-request',
+      params={
+          'lease_id': lease.key.id(),
+          'machine_id': machine.key.id(),
+          'topic': lease.request.pubsub_topic,
+      },
+      transactional=True,
+  ):
+    raise TaskEnqueuingError('fulfill-lease-request')
   return True
-  # TODO: Notify the user his machine has been provided.
 
 
 @ndb.transactional(xg=True)
@@ -156,7 +178,7 @@ class LeaseRequestProcessor(webapp2.RequestHandler):
           break
 
 
-def create_backend_app():
+def create_cron_app():
   return webapp2.WSGIApplication([
       ('/internal/cron/process-lease-requests', LeaseRequestProcessor),
   ])

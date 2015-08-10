@@ -18,6 +18,7 @@ from components import auth
 
 import acl
 import models
+import pubsub
 import rpc_messages
 
 
@@ -170,6 +171,15 @@ class MachineProviderEndpoints(remote.Service):
         request_hash,
         request,
     )
+    if request.pubsub_topic:
+      if not pubsub.validate_topic(request.pubsub_topic):
+        logging.warning(
+            'Invalid topic for Cloud Pub/Sub: %s',
+            request.pubsub_topic,
+        )
+        return rpc_messages.LeaseResponse(
+            error=rpc_messages.LeaseRequestError.INVALID_TOPIC,
+        )
     duplicate = models.LeaseRequest.get_by_id(request_hash)
     deduplication_checksum = models.LeaseRequest.compute_deduplication_checksum(
         request,
@@ -189,7 +199,7 @@ class MachineProviderEndpoints(remote.Service):
             duplicate.request
         )
         return rpc_messages.LeaseResponse(
-            error=rpc_messages.LeaseRequestError.REQUEST_ID_REUSE
+            error=rpc_messages.LeaseRequestError.REQUEST_ID_REUSE,
         )
     else:
       logging.info('Storing LeaseRequest')

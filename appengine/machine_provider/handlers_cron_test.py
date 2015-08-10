@@ -3,7 +3,7 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
-"""Unit tests for handlers_backend.py."""
+"""Unit tests for handlers_cron.py."""
 
 import json
 import unittest
@@ -17,17 +17,17 @@ import webtest
 from components import auth_testing
 from test_support import test_case
 
-import handlers_backend
+import handlers_cron
 import models
 import rpc_messages
 
 
 class LeaseRequestProcessorTest(test_case.TestCase):
-  """Tests for handlers_backend.LeaseRequestProcessor."""
+  """Tests for handlers_cron.LeaseRequestProcessor."""
 
   def setUp(self):
     super(LeaseRequestProcessorTest, self).setUp()
-    app = handlers_backend.create_backend_app()
+    app = handlers_cron.create_cron_app()
     self.app = webtest.TestApp(app)
 
   def test_one_request_one_matching_machine_entry(self):

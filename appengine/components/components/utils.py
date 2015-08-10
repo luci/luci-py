@@ -473,6 +473,7 @@ def set_task_queue_module(module):
 def enqueue_task(
     url,
     queue_name,
+    params=None,
     payload=None,
     name=None,
     countdown=None,
@@ -500,6 +501,7 @@ def enqueue_task(
     taskqueue.add(
         url=url,
         queue_name=queue_name,
+        params=params,
         payload=payload,
         name=name,
         countdown=countdown,

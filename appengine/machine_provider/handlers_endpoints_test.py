@@ -298,6 +298,26 @@ class MachineProviderLeaseTest(test_case.EndpointsTestCase):
         lease_response_2.request_hash,
     )
 
+  def test_invalid_topic(self):
+    lease_request = rpc_to_json(rpc_messages.LeaseRequest(
+        dimensions=rpc_messages.Dimensions(
+            os_family=rpc_messages.OSFamily.WINDOWS,
+        ),
+        duration=9,
+        pubsub_topic='../../a-different-project/topics/my-topic',
+        request_id='123',
+    ))
+    auth_testing.mock_get_current_identity(self)
+
+    lease_response = jsonish_dict_to_rpc(
+        self.call_api('lease', lease_request).json,
+        rpc_messages.LeaseResponse,
+    )
+    self.assertEqual(
+        lease_response.error,
+        rpc_messages.LeaseRequestError.INVALID_TOPIC,
+    )
+
 
 if __name__ == '__main__':
   unittest.main()
