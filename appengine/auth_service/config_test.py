@@ -211,21 +211,24 @@ class ConfigTest(test_case.TestCase):
     self.assertEqual({
       'assignments': [
         {
-          'comment': u'Imported from ip_whitelist.cfg',
+          'comment':
+              u'Imported from ip_whitelist.cfg at rev ip_whitelist_cfg_rev',
           'created_by': model.Identity(kind='service', name='sample-app'),
           'created_ts': datetime.datetime(2014, 1, 2, 3, 4, 5),
           'identity': model.Identity(kind='user', name='abc@example.com'),
           'ip_whitelist': u'abc',
         },
         {
-          'comment': u'Imported from ip_whitelist.cfg',
+          'comment':
+              u'Imported from ip_whitelist.cfg at rev ip_whitelist_cfg_rev',
           'created_by': model.Identity(kind='service', name='sample-app'),
           'created_ts': datetime.datetime(2014, 1, 2, 3, 4, 5),
           'identity': model.Identity(kind='user', name='def@example.com'),
           'ip_whitelist': u'bots',
         },
         {
-          'comment': u'Imported from ip_whitelist.cfg',
+          'comment':
+              u'Imported from ip_whitelist.cfg at rev ip_whitelist_cfg_rev',
           'created_by': model.Identity(kind='service', name='sample-app'),
           'created_ts': datetime.datetime(2014, 1, 2, 3, 4, 5),
           'identity': model.Identity(kind='user', name='xyz@example.com'),
@@ -242,7 +245,8 @@ class ConfigTest(test_case.TestCase):
           'abc': {
             'created_by': 'service:sample-app',
             'created_ts': 1388631845000000,
-            'description': u'Imported from ip_whitelist.cfg',
+            'description':
+                u'Imported from ip_whitelist.cfg at rev ip_whitelist_cfg_rev',
             'modified_by': 'service:sample-app',
             'modified_ts': 1388631845000000,
             'subnets': [u'0.0.0.1/32'],
@@ -250,7 +254,8 @@ class ConfigTest(test_case.TestCase):
           'bots': {
             'created_by': 'service:sample-app',
             'created_ts': 1388631845000000,
-            'description': u'Imported from ip_whitelist.cfg',
+            'description':
+                u'Imported from ip_whitelist.cfg at rev ip_whitelist_cfg_rev',
             'modified_by': 'service:sample-app',
             'modified_ts': 1388631845000000,
             'subnets': [u'0.0.0.2/32'],
@@ -258,7 +263,8 @@ class ConfigTest(test_case.TestCase):
           'empty': {
             'created_by': 'service:sample-app',
             'created_ts': 1388631845000000,
-            'description': u'Imported from ip_whitelist.cfg',
+            'description':
+                u'Imported from ip_whitelist.cfg at rev ip_whitelist_cfg_rev',
             'modified_by': 'service:sample-app',
             'modified_ts': 1388631845000000,
             'subnets': [],
@@ -302,21 +308,24 @@ class ConfigTest(test_case.TestCase):
     self.assertEqual({
       'assignments': [
         {
-          'comment': u'Imported from ip_whitelist.cfg',
+          'comment':
+              u'Imported from ip_whitelist.cfg at rev ip_whitelist_cfg_rev',
           'created_by': model.Identity(kind='service', name='sample-app'),
           'created_ts': datetime.datetime(2014, 1, 2, 3, 4, 5),
           'identity': model.Identity(kind='user', name='abc@example.com'),
           'ip_whitelist': u'abc',
         },
         {
-          'comment': u'Imported from ip_whitelist.cfg',
+          'comment':
+              u'Imported from ip_whitelist.cfg at rev ip_whitelist_cfg_rev',
           'created_by': model.Identity(kind='service', name='sample-app'),
           'created_ts': datetime.datetime(2014, 3, 2, 3, 4, 5),
           'identity': model.Identity(kind='user', name='def@example.com'),
           'ip_whitelist': u'another',
         },
         {
-          'comment': u'Imported from ip_whitelist.cfg',
+          'comment':
+              u'Imported from ip_whitelist.cfg at rev ip_whitelist_cfg_rev',
           'created_by': model.Identity(kind='service', name='sample-app'),
           'created_ts': datetime.datetime(2014, 3, 2, 3, 4, 5),
           'identity': model.Identity(kind='user', name='zzz@example.com'),
@@ -333,7 +342,8 @@ class ConfigTest(test_case.TestCase):
           'abc': {
             'created_by': 'service:sample-app',
             'created_ts': 1388631845000000,
-            'description': u'Imported from ip_whitelist.cfg',
+            'description':
+                u'Imported from ip_whitelist.cfg at rev ip_whitelist_cfg_rev',
             'modified_by': 'service:sample-app',
             'modified_ts': 1393729445000000,
             'subnets': [u'0.0.0.3/32'],
@@ -341,7 +351,8 @@ class ConfigTest(test_case.TestCase):
           'bots': {
             'created_by': 'service:sample-app',
             'created_ts': 1388631845000000,
-            'description': u'Imported from ip_whitelist.cfg',
+            'description':
+                u'Imported from ip_whitelist.cfg at rev ip_whitelist_cfg_rev',
             'modified_by': 'service:sample-app',
             'modified_ts': 1388631845000000,
             'subnets': [u'0.0.0.2/32'],
@@ -349,7 +360,8 @@ class ConfigTest(test_case.TestCase):
           'another': {
             'created_by': 'service:sample-app',
             'created_ts': 1393729445000000,
-            'description': u'Imported from ip_whitelist.cfg',
+            'description':
+                u'Imported from ip_whitelist.cfg at rev ip_whitelist_cfg_rev',
             'modified_by': 'service:sample-app',
             'modified_ts': 1393729445000000,
             'subnets': [],

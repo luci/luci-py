@@ -249,30 +249,29 @@ def _update_ip_whitelist_config(rev, conf):
     for e in model.AuthIPWhitelist.query(ancestor=model.root_key())
   }
 
-  # Entities being imported.
-  imported_ip_whitelists = {
-    msg.name: model.AuthIPWhitelist(
-        key=model.ip_whitelist_key(msg.name),
-        subnets=list(msg.subnets),
-        description='Imported from ip_whitelist.cfg',
-        created_ts=now,
-        created_by=model.get_service_self_identity(),
-        modified_ts=now,
-        modified_by=model.get_service_self_identity())
-    for msg in conf.ip_whitelists
-  }
+  # Whitelists being imported (name => IPWhitelist proto msg).
+  imported_ip_whitelists = {msg.name: msg for msg in conf.ip_whitelists}
 
   to_put = []
   to_delete = []
 
   # New or modified IP whitelists.
-  for wl in imported_ip_whitelists.itervalues():
-    existing_wl = existing_ip_whitelists.get(wl.key.id())
-    if not existing_wl or existing_wl.subnets != wl.subnets:
-      if existing_wl:
-        wl.created_ts = existing_wl.created_ts
-        wl.created_by = existing_wl.created_by
-      to_put.append(wl)
+  for wl_proto in imported_ip_whitelists.itervalues():
+    # Convert proto magic list to a regular list.
+    subnets = list(wl_proto.subnets)
+    # Existing whitelist and it hasn't changed?
+    wl = existing_ip_whitelists.get(wl_proto.name)
+    if wl and wl.subnets == subnets:
+      continue
+    # Update existing (to preserve auth_db_prev_rev) or create a new one.
+    if not wl:
+      wl = model.AuthIPWhitelist(
+          key=model.ip_whitelist_key(wl_proto.name),
+          created_ts=now,
+          created_by=model.get_service_self_identity())
+    wl.subnets = subnets
+    wl.description = 'Imported from ip_whitelist.cfg at rev %s' % rev.revision
+    to_put.append(wl)
 
   # Removed IP whitelists.
   for wl in existing_ip_whitelists.itervalues():
@@ -297,7 +296,7 @@ def _update_ip_whitelist_config(rev, conf):
       new_one = model.AuthIPWhitelistAssignments.Assignment(
           identity=model.Identity.from_bytes(a.identity),
           ip_whitelist=a.ip_whitelist_name,
-          comment='Imported from ip_whitelist.cfg',
+          comment='Imported from ip_whitelist.cfg at rev %s' % rev.revision,
           created_ts=now,
           created_by=model.get_service_self_identity())
       updated.append(new_one)
