@@ -1523,14 +1523,14 @@ def restart(message=None, timeout=None):
     restart_and_return(message)
     # Sleep for 300 seconds to ensure we don't try to do anymore work while the
     # OS is preparing to shutdown.
-    if deadline:
-      delay = deadline - time.time()
-      if delay > 0.:
-        time.sleep(min(300, delay))
-      if time.time() >= deadline:
-        return False
-    else:
-      time.sleep(300)
+    duration = min(300, deadline - time.time()) if timeout else 300
+    if duration > 0:
+      logging.info('Sleeping for %s', duration)
+      time.sleep(duration)
+    if timeout and time.time() >= deadline:
+      logging.warning(
+          'Waited for host to restart for too long (%s); aborting', timeout)
+      return False
 
 
 def restart_and_return(message=None):
@@ -1564,6 +1564,7 @@ def restart_and_return(message=None):
         'Restarting machine with command %s (%s)', ' '.join(cmd), message)
     try:
       subprocess.check_call(cmd)
+      logging.info('Restart command exited successfully')
     except (OSError, subprocess.CalledProcessError) as e:
       logging.error('Failed to run %s: %s', ' '.join(cmd), e)
     else:
