@@ -53,6 +53,10 @@ def _gen_request_data(properties=None, **kwargs):
   return base_data
 
 
+class Prop(object):
+  _name = 'foo'
+
+
 class TestCase(test_case.TestCase):
   def setUp(self):
     super(TestCase, self).setUp()
@@ -121,14 +125,29 @@ class TaskRequestPrivateTest(TestCase):
     self.assertEqual('0x7ffffffffff77661', '0x%016x' % key_id)
 
   def test_validate_task_run_id(self):
-    class P(object):
-      _name = 'foo'
     self.assertEqual(
         '1d69b9f088008811',
-        task_request._validate_task_run_id(P(), '1d69b9f088008811'))
-    self.assertEqual(None, task_request._validate_task_run_id(P(), ''))
+        task_request._validate_task_run_id(Prop(), '1d69b9f088008811'))
+    self.assertEqual(None, task_request._validate_task_run_id(Prop(), ''))
     with self.assertRaises(ValueError):
-      task_request._validate_task_run_id(P(), '1')
+      task_request._validate_task_run_id(Prop(), '1')
+
+  def test_validate_command(self):
+    task_request._validate_command(Prop(), [[u'a', u'b']])
+    with self.assertRaises(datastore_errors.BadValueError):
+      task_request._validate_command(Prop(), [[u'a', u'b'], [u'c']])
+
+  def test_validate_isolated(self):
+    task_request._validate_isolated(
+        Prop(), '0123456789012345678901234567890123456789')
+    task_request._validate_isolated(
+        Prop(), '0123456789012345678901234567890123abcdef')
+    with self.assertRaises(datastore_errors.BadValueError):
+      task_request._validate_isolated(
+          Prop(), '123456789012345678901234567890123456789')
+    with self.assertRaises(datastore_errors.BadValueError):
+      task_request._validate_isolated(
+          Prop(), 'g123456789012345678901234567890123456789')
 
 
 class TaskRequestApiTest(TestCase):
@@ -177,10 +196,8 @@ class TaskRequestApiTest(TestCase):
       'execution_timeout_secs': 30,
       'grace_period_secs': 30,
       'idempotent': True,
+      'inputs_ref': None,
       'io_timeout_secs': None,
-      'isolated': None,
-      'isolatedserver': None,
-      'namespace': None,
     }
     expected_request = {
       'authenticated': auth_testing.DEFAULT_MOCKED_IDENTITY,
@@ -188,7 +205,7 @@ class TaskRequestApiTest(TestCase):
       'parent_task_id': unicode(parent_id),
       'priority': 49,
       'properties': expected_properties,
-      'properties_hash': 'e7276ca9999756de386d26d39ae648e641ae1eac',
+      'properties_hash': '1bfafe595dd8b17def8f4dccfc60b597fdee0f28',
       'tags': [
         u'OS:Windows-3.1.1',
         u'hostname:localhost',
@@ -230,7 +247,7 @@ class TaskRequestApiTest(TestCase):
     self.assertEqual(True, as_dict['properties']['idempotent'])
     # Ensure the algorithm is deterministic.
     self.assertEqual(
-        'e7276ca9999756de386d26d39ae648e641ae1eac', as_dict['properties_hash'])
+        '1bfafe595dd8b17def8f4dccfc60b597fdee0f28', as_dict['properties_hash'])
 
   def test_duped(self):
     # Two TestRequest with the same properties.
@@ -353,10 +370,8 @@ class TaskRequestApiTest(TestCase):
       'extra_args': None,
       'grace_period_secs': 30,
       'idempotent': False,
+      'inputs_ref': None,
       'io_timeout_secs': None,
-      'isolated': None,
-      'isolatedserver': None,
-      'namespace': None,
     }
     # Differences from make_request() are:
     # - parent_task_id was reset to None.

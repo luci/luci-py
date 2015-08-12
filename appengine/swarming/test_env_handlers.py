@@ -172,7 +172,7 @@ class AppTestBase(test_case.TestCase):
         params=params).json
     return response['xsrf_token'].encode('ascii')
 
-  def client_create_task(self, properties=None, **kwargs):
+  def client_create_task_raw(self, properties=None, **kwargs):
     """Creates a TaskRequest via the client API."""
     token = self.get_client_token()
     params = {

@@ -178,7 +178,7 @@ class FrontendTest(AppTestBase):
   def test_add_task_and_list_user(self):
     # Add a task via the API as a user, then assert it can be viewed.
     self.set_as_user()
-    _, task_id = self.client_create_task()
+    _, task_id = self.client_create_task_raw()
 
     self.set_as_privileged_user()
     self.app.get('/user/tasks', status=200)
@@ -196,7 +196,7 @@ class FrontendTest(AppTestBase):
 
   def test_task_deduped(self):
     self.set_as_user()
-    _, task_id_1 = self.client_create_task(properties=dict(idempotent=True))
+    _, task_id_1 = self.client_create_task_raw(properties=dict(idempotent=True))
 
     self.set_as_bot()
     task_id_bot = self.bot_run_task()
@@ -206,7 +206,7 @@ class FrontendTest(AppTestBase):
     # Create a second task. Results will be returned immediately without the bot
     # running anything.
     self.set_as_user()
-    _, task_id_2 = self.client_create_task(
+    _, task_id_2 = self.client_create_task_raw(
         name='ho', properties=dict(idempotent=True))
 
     self.set_as_bot()
@@ -225,7 +225,7 @@ class FrontendTest(AppTestBase):
     # Add a task via the API as a user, then assert it can't be viewed by
     # anonymous user.
     self.set_as_user()
-    _, task_id = self.client_create_task()
+    _, task_id = self.client_create_task_raw()
 
     self.set_as_anonymous()
     self.app.get('/user/tasks', status=403)
@@ -243,7 +243,7 @@ class FrontendTest(AppTestBase):
   def test_task_list_query(self):
     # Try all the combinations of task queries to ensure the index exist.
     self.set_as_privileged_user()
-    self.client_create_task()
+    self.client_create_task_raw()
     for sort, state in self._sort_state_product():
       url = '/user/tasks?sort=%s&state=%s' % (sort, state)
       # See require_index in ../components/support/test_case.py in case of
@@ -258,7 +258,7 @@ class FrontendTest(AppTestBase):
   def test_task_search_task_name(self):
     # Try all the combinations of task queries to ensure the index exist.
     self.set_as_privileged_user()
-    self.client_create_task()
+    self.client_create_task_raw()
     self.app.get('/user/tasks?task_name=hi', status=200)
     for sort, state in self._sort_state_product():
       url = '/user/tasks?sort=%s&state=%s' % (sort, state)
@@ -267,7 +267,7 @@ class FrontendTest(AppTestBase):
   def test_task_search_task_tag(self):
     # Try all the combinations of task queries to ensure the index exist.
     self.set_as_privileged_user()
-    self.client_create_task()
+    self.client_create_task_raw()
     self.set_as_bot()
     token, _ = self.get_bot_token()
     reaped = self.bot_poll()
@@ -280,7 +280,7 @@ class FrontendTest(AppTestBase):
 
   def test_task_cancel(self):
     self.set_as_privileged_user()
-    _, task_id = self.client_create_task()
+    _, task_id = self.client_create_task_raw()
 
     self.set_as_admin()
     # Just ensure it doesn't crash when it shows the 'Cancel' button.
@@ -297,7 +297,7 @@ class FrontendTest(AppTestBase):
 
   def test_task_retry(self):
     self.set_as_privileged_user()
-    _, task_id = self.client_create_task()
+    _, task_id = self.client_create_task_raw()
     xsrf_token = self.get_xsrf_token()
     resp = self.app.post(
         '/user/task/%s/retry' % task_id, {'xsrf_token': xsrf_token})
@@ -325,7 +325,7 @@ class FrontendTest(AppTestBase):
   def test_bot_listing(self):
     # Create a task, create 2 bots, one with a task assigned, the other without.
     self.set_as_admin()
-    self.client_create_task()
+    self.client_create_task_raw()
     self.bot_poll('bot1')
     self.bot_poll('bot2')
 

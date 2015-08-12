@@ -29,6 +29,10 @@ Graph of schema:
                           |
                   +-----------------+
                   |TaskResultSummary|
+                  |  +--------+     |
+                  |  |FilesRef|     |
+                  |  +--------+     |
+                  |                 |
                   |id=1             |
                   +-----------------+
                        ^          ^
@@ -36,6 +40,9 @@ Graph of schema:
                        |          |
                +-------------+  +-------------+
                |TaskRunResult|  |TaskRunResult|
+               |  +--------+ |  |  +--------+ |
+               |  |FilesRef| |  |  |FilesRef| |
+               |  +--------+ |  |  +--------+ |
                |id=1 <try #> |  |id=2         |
                +-------------+  +-------------+
                 ^           ^           ...
@@ -263,6 +270,7 @@ class _TaskResultCommon(ndb.Model):
   stdout_chunks = ndb.IntegerProperty(repeated=True, indexed=False)
 
   # Aggregated exit codes. Ordered by command.
+  # TODO(maruel): Replace with only one result.
   exit_codes = ndb.IntegerProperty(repeated=True, indexed=False)
 
   # Aggregated durations in seconds. Ordered by command.
@@ -282,6 +290,10 @@ class _TaskResultCommon(ndb.Model):
   # TaskResultSummary.
   children_task_ids = ndb.StringProperty(
       validator=_validate_task_summary_id, repeated=True)
+
+  # File outputs of the task. Only set if TaskRequest.properties.sources_ref is
+  # set. The isolateserver and namespace should match.
+  outputs_ref = ndb.LocalStructuredProperty(task_request.FilesRef)
 
   @property
   def can_be_canceled(self):

@@ -29,7 +29,12 @@ Graph of the schema:
     |TaskRequest          |
     |    +--------------+ |
     |    |TaskProperties| |
+    |    |              | |
+    |    |   +--------+ | |
+    |    |   |FilesRef| | |
+    |    |   +--------+ | |
     |    +--------------+ |
+    |                     |
     |id=<based on epoch>  |
     +---------------------+
                ^
@@ -46,6 +51,7 @@ import hashlib
 import logging
 import random
 import re
+import urlparse
 
 from google.appengine.api import datastore_errors
 from google.appengine.ext import ndb
@@ -95,15 +101,51 @@ _EXPECTED_PROPERTIES_KEYS = frozenset(
      'grace_period_secs', 'idempotent', 'io_timeout_secs'])
 
 
+# Used for isolated files.
+_HASH_CHARS = frozenset('0123456789abcdef')
+_NAMESPACE_RE = re.compile(r'[a-z0-9A-Z\-._]+')
+
+
 ### Properties validators must come before the models.
+
+
+def _validate_isolated(prop, value):
+  if value:
+    if not _HASH_CHARS.issuperset(value) or len(value) != 40:
+      raise datastore_errors.BadValueError(
+          '%s must be lowercase hex, not %s' % (prop._name, value))
+
+
+def _validate_hostname(prop, value):
+  # pylint: disable=unused-argument
+  if value:
+    # It must be https://*.appspot.com or https?://*
+    parsed = urlparse.urlparse(value)
+    if not parsed.netloc:
+      raise datastore_errors.BadValueError(
+          '%s must be valid hostname, not %s' % (prop._name, value))
+    if parsed.netloc.endswith('appspot.com'):
+      if parsed.scheme != 'https':
+        raise datastore_errors.BadValueError(
+            '%s must be https://, not %s' % (prop._name, value))
+    elif parsed.scheme not in ('http', 'https'):
+        raise datastore_errors.BadValueError(
+            '%s must be https:// or http://, not %s' % (prop._name, value))
+
+
+def _validate_namespace(prop, value):
+  if not _NAMESPACE_RE.match(value):
+    raise datastore_errors.BadValueError('malformed %s' % prop._name)
 
 
 def _validate_command(prop, value):
   """Validates TaskProperties.command."""
   # pylint: disable=W0212
   if not value:
-    # required=True would still accept [].
-    raise datastore_errors.BadValueError('%s is required' % prop._name)
+    return []
+  if len(value) != 1:
+    raise datastore_errors.BadValueError(
+        '%s must be a list of one item' % prop._name)
   def check(line):
     return isinstance(line, list) and all(isinstance(j, unicode) for j in line)
 
@@ -192,22 +234,23 @@ def _validate_args(prop, value):
         '%s must be a list of unicode strings, not %r' % (prop._name, value))
 
 
-def _validate_isolated(prop, value):
-  if value and not frozenset(value).issubset('0123456789abcdef'):
-    raise datastore_errors.BadValueError(
-        '%s must be lowercase hex, not %s' % (prop._name, value))
-
-
-def _validate_hostname(prop, value):
-  labels = value.split('.')
-  if not (
-      all(re.match(r'[a-zA-Z\d\-]{1,63}$', label) for label in labels)
-      and 0 < len(value) < 254):
-    raise datastore_errors.BadValueError(
-        '%s must be valid hostname, not %s' % (prop._name, value))
-
-
 ### Models.
+
+
+class FilesRef(ndb.Model):
+  """Defines a data tree reference, normally a reference to a .isolated file."""
+  # The hash of an isolated archive.
+  isolated = ndb.StringProperty(validator=_validate_isolated, indexed=False)
+  # The hostname of the isolated server to use.
+  isolatedserver = ndb.StringProperty(
+      validator=_validate_hostname, indexed=False)
+  # Namespace on the isolate server.
+  namespace = ndb.StringProperty(validator=_validate_namespace, indexed=False)
+
+  def _pre_put_hook(self):
+    if not self.isolated or not self.isolatedserver or not self.namespace:
+      raise datastore_errors.BadValueError(
+          'isolated requires server and namespace')
 
 
 class TaskProperties(ndb.Model):
@@ -230,54 +273,50 @@ class TaskProperties(ndb.Model):
   # Commands to run. It is a list of lists. Each command is run one after the
   # other. Encoded json.
   commands = datastore_utils.DeterministicJsonProperty(
-      validator=_validate_command, json_type=list)
+      validator=_validate_command, json_type=list, indexed=False)
 
   # List of (URLs, local file) for the bot to download. Encoded as json. Must be
   # sorted by URLs. Optional.
   data = datastore_utils.DeterministicJsonProperty(
-      validator=_validate_data, json_type=list)
+      validator=_validate_data, json_type=list, indexed=False)
+
+  # File inputs of the task. Only inputs_ref or command&data can be specified.
+  inputs_ref = ndb.LocalStructuredProperty(FilesRef)
 
   # Filter to use to determine the required properties on the bot to run on. For
   # example, Windows or hostname. Encoded as json. Optional but highly
   # recommended.
   dimensions = datastore_utils.DeterministicJsonProperty(
-      validator=_validate_dict_of_strings, json_type=dict)
+      validator=_validate_dict_of_strings, json_type=dict, indexed=False)
 
   # Environment variables. Encoded as json. Optional.
   env = datastore_utils.DeterministicJsonProperty(
-      validator=_validate_dict_of_strings, json_type=dict)
+      validator=_validate_dict_of_strings, json_type=dict, indexed=False)
 
   # Maximum duration the bot can take to run this task. It's named hard_timeout
   # in the bot.
   execution_timeout_secs = ndb.IntegerProperty(
-      validator=_validate_timeout, required=True)
+      validator=_validate_timeout, required=True, indexed=False)
 
   # Extra arguments to supply to the command `python run_isolated ... .`
   extra_args = datastore_utils.DeterministicJsonProperty(
-      validator=_validate_args, json_type=list)
+      validator=_validate_args, json_type=list, indexed=False)
 
   # Grace period is the time between signaling the task it timed out and killing
   # the process. During this time the process should clean up itself as quickly
   # as possible, potentially uploading partial results back.
-  grace_period_secs = ndb.IntegerProperty(validator=_validate_grace, default=30)
+  grace_period_secs = ndb.IntegerProperty(
+      validator=_validate_grace, default=30, indexed=False)
 
   # Bot controlled timeout for new bytes from the subprocess. If a subprocess
   # doesn't output new data to stdout for .io_timeout_secs, consider the command
   # timed out. Optional.
-  io_timeout_secs = ndb.IntegerProperty(validator=_validate_timeout)
+  io_timeout_secs = ndb.IntegerProperty(
+      validator=_validate_timeout, indexed=False)
 
   # If True, the task can safely be served results from a previously succeeded
   # task.
-  idempotent = ndb.BooleanProperty(default=False)
-
-  # The hash of an isolated archive.
-  isolated = ndb.StringProperty(validator=_validate_isolated)
-
-  # The hostname of the isolated server to use.
-  isolatedserver = ndb.StringProperty(validator=_validate_hostname)
-
-  # Namespace on the isolate server.
-  namespace = ndb.StringProperty()
+  idempotent = ndb.BooleanProperty(default=False, indexed=False)
 
   @property
   def properties_hash(self):
@@ -292,6 +331,15 @@ class TaskProperties(ndb.Model):
     if not self.idempotent:
       return None
     return self.HASHING_ALGO(utils.encode_to_json(self)).digest()
+
+  def _pre_put_hook(self):
+    if not self.commands:
+      # TODO(maruel): Remove once supported.
+      raise datastore_errors.BadValueError('commands is required')
+    if bool(self.commands) == bool(self.inputs_ref):
+      raise datastore_errors.BadValueError('use one of command or inputs_ref')
+    if self.data and not self.commands:
+      raise datastore_errors.BadValueError('data requires command')
 
 
 class TaskRequest(ndb.Model):
@@ -360,6 +408,7 @@ class TaskRequest(ndb.Model):
   def _pre_put_hook(self):
     """Adds automatic tags."""
     super(TaskRequest, self)._pre_put_hook()
+    self.properties._pre_put_hook()
     self.tags.append('priority:%s' % self.priority)
     self.tags.append('user:%s' % self.user)
     for key, value in self.properties.dimensions.iteritems():

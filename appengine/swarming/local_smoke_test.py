@@ -140,8 +140,9 @@ def gen_expected(**kwargs):
     u'internal_failure': False,
     u'isolated_out': None,
     u'name': u'',
-    u'properties_hash': None,
     u'outputs': [u'hi\n'],
+    u'outputs_ref': None,
+    u'properties_hash': None,
     u'server_versions': [u'1'],
     u'state': 0x70,  # task_result.State.COMPLETED.
     u'tags': [u'cpu:x86', u'priority:100', u'user:joe@localhost'],

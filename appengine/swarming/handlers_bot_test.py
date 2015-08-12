@@ -225,7 +225,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
     # A bot polls, gets a task, updates it, completes it.
     token, params = self.get_bot_token()
     # Enqueue a task.
-    _, task_id = self.client_create_task()
+    _, task_id = self.client_create_task_raw()
     self.assertEqual('0', task_id[-1])
     # Convert TaskResultSummary reference to TaskRunResult.
     task_id = task_id[:-1] + '1'
@@ -260,6 +260,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
       u'id': u'5cee488008811',
       u'internal_failure': False,
       u'modified_ts': str_now,
+      u'outputs_ref': None,
       u'server_versions': [u'v1a'],
       u'started_ts': str_now,
       u'state': task_result.State.RUNNING,
@@ -355,7 +356,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
     self.mock_now(now)
     str_now = unicode(now.strftime(utils.DATETIME_FORMAT))
     token, params = self.get_bot_token()
-    self.client_create_task(
+    self.client_create_task_raw(
         properties=dict(commands=[['python', 'runtest.py']]))
 
     def _params(**kwargs):
@@ -385,6 +386,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
         u'id': u'5cee488008811',
         u'internal_failure': False,
         u'modified_ts': str_now,
+        u'outputs_ref': None,
         u'server_versions': [u'v1a'],
         u'started_ts': str_now,
         u'state': task_result.State.RUNNING,
@@ -433,7 +435,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
 
   def test_task_update_db_failure(self):
     # The error is caught in task_scheduler.bot_update_task().
-    self.client_create_task(
+    self.client_create_task_raw(
         properties=dict(commands=[['python', 'runtest.py']]))
 
     token, params = self.get_bot_token()
@@ -464,7 +466,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
 
   def test_task_update_failure(self):
     # The error is caught in handlers_api.BotTaskUpdateHandler.post().
-    self.client_create_task(
+    self.client_create_task_raw(
         properties=dict(commands=[['python', 'runtest.py']]))
 
     token, params = self.get_bot_token()
@@ -497,7 +499,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
     self.mock_now(now)
     str_now = unicode(now.strftime(utils.DATETIME_FORMAT))
     token, params = self.get_bot_token()
-    self.client_create_task()
+    self.client_create_task_raw()
     response = self.post_with_token(
         '/swarming/api/v1/bot/poll', params, token)
     task_id = response['manifest']['task_id']
@@ -527,6 +529,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
       u'id': u'5cee488008811',
       u'internal_failure': False,
       u'modified_ts': str_now,
+      u'outputs_ref': None,
       u'server_versions': [u'v1a'],
       u'started_ts': str_now,
       u'state': task_result.State.COMPLETED,
@@ -545,7 +548,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
         ereporter2, 'log_request',
         lambda *args, **kwargs: errors.append((args, kwargs)))
     token, params = self.get_bot_token()
-    self.client_create_task()
+    self.client_create_task_raw()
     response = self.post_with_token(
         '/swarming/api/v1/bot/poll', params, token)
     task_id = response['manifest']['task_id']
@@ -575,6 +578,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
       u'id': u'5cee488008811',
       u'internal_failure': True,
       u'modified_ts': str_now,
+      u'outputs_ref': None,
       u'server_versions': [u'v1a'],
       u'started_ts': str_now,
       u'state': task_result.State.BOT_DIED,

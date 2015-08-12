@@ -195,10 +195,8 @@ class ClientApiTest(test_env_handlers.AppTestBase):
           u'extra_args': None,
           u'grace_period_secs': 30,
           u'idempotent': False,
+          u'inputs_ref': None,
           u'io_timeout_secs': 30,
-          u'isolated': None,
-          u'isolatedserver': None,
-          u'namespace': None,
         },
         u'properties_hash': None,
         u'tags': [
@@ -219,7 +217,7 @@ class ClientApiTest(test_env_handlers.AppTestBase):
     str_now = unicode(now.strftime(utils.DATETIME_FORMAT))
     self.set_as_admin()
     token = self.get_client_token()
-    _, task_id = self.client_create_task()
+    _, task_id = self.client_create_task_raw()
     params = {
       'task_id': task_id,
     }
@@ -249,6 +247,7 @@ class ClientApiTest(test_env_handlers.AppTestBase):
       u'internal_failure': False,
       u'modified_ts': str_now,
       u'name': u'hi',
+      u'outputs_ref': None,
       u'properties_hash': None,
       u'server_versions': [],
       u'started_ts': None,
@@ -269,7 +268,7 @@ class ClientApiTest(test_env_handlers.AppTestBase):
     now = datetime.datetime(2010, 1, 2, 3, 4, 5)
     self.mock_now(now)
     str_now = unicode(now.strftime(utils.DATETIME_FORMAT))
-    _, task_id = self.client_create_task()
+    _, task_id = self.client_create_task_raw()
     response = self.app.get(
         '/swarming/api/v1/client/task/' + task_id).json
     expected = {
@@ -289,6 +288,7 @@ class ClientApiTest(test_env_handlers.AppTestBase):
       u'internal_failure': False,
       u'modified_ts': str_now,
       u'name': u'hi',
+      u'outputs_ref': None,
       u'properties_hash': None,
       u'server_versions': [],
       u'started_ts': None,
@@ -325,6 +325,7 @@ class ClientApiTest(test_env_handlers.AppTestBase):
       u'id': u'5cee488008811',
       u'internal_failure': False,
       u'modified_ts': str_now,
+      u'outputs_ref': None,
       u'server_versions': [u'v1a'],
       u'started_ts': str_now,
       u'state': task_result.State.RUNNING,
@@ -334,14 +335,14 @@ class ClientApiTest(test_env_handlers.AppTestBase):
 
   def test_get_task_metadata_denied(self):
     # Asserts that a non-public task can not be seen by an anonymous user.
-    _, task_id = self.client_create_task()
+    _, task_id = self.client_create_task_raw()
 
     self.set_as_anonymous()
     self.app.get('/swarming/api/v1/client/task/' + task_id, status=403)
     self.assertEqual('0', task_id[-1])
 
   def test_get_task_output(self):
-    self.client_create_task()
+    self.client_create_task_raw()
 
     self.set_as_bot()
     task_id = self.bot_run_task()
@@ -363,7 +364,7 @@ class ClientApiTest(test_env_handlers.AppTestBase):
     self.assertEqual({'output': None}, response)
 
   def test_get_task_output_empty(self):
-    _, task_id = self.client_create_task()
+    _, task_id = self.client_create_task_raw()
     response = self.app.get(
         '/swarming/api/v1/client/task/%s/output/0' % task_id).json
     self.assertEqual({'output': None}, response)
@@ -374,7 +375,7 @@ class ClientApiTest(test_env_handlers.AppTestBase):
     self.assertEqual({u'error': u'Task not found'}, response)
 
   def test_task_deduped(self):
-    _, task_id_1 = self.client_create_task(properties=dict(idempotent=True))
+    _, task_id_1 = self.client_create_task_raw(properties=dict(idempotent=True))
 
     self.set_as_bot()
     task_id_bot = self.bot_run_task()
@@ -384,7 +385,7 @@ class ClientApiTest(test_env_handlers.AppTestBase):
     # Create a second task. Results will be returned immediately without the bot
     # running anything.
     self.set_as_user()
-    _, task_id_2 = self.client_create_task(
+    _, task_id_2 = self.client_create_task_raw(
          name='second', user='jack@localhost', properties=dict(idempotent=True))
 
     self.set_as_bot()
@@ -399,7 +400,7 @@ class ClientApiTest(test_env_handlers.AppTestBase):
     self.assertEqual({'outputs': [u'rÉsult string']}, response)
 
   def test_get_task_output_all(self):
-    self.client_create_task()
+    self.client_create_task_raw()
 
     self.set_as_bot()
     token, _ = self.get_bot_token()
@@ -428,7 +429,7 @@ class ClientApiTest(test_env_handlers.AppTestBase):
     self.assertEqual({'outputs': [u'result string']}, response)
 
   def test_get_task_output_all_empty(self):
-    _, task_id = self.client_create_task()
+    _, task_id = self.client_create_task_raw()
     response = self.app.get(
         '/swarming/api/v1/client/task/%s/output/all' % task_id).json
     self.assertEqual({'outputs': []}, response)
@@ -441,7 +442,7 @@ class ClientApiTest(test_env_handlers.AppTestBase):
   def test_get_task_request(self):
     now = datetime.datetime(2010, 1, 2, 3, 4, 5, 6)
     self.mock_now(now)
-    _, task_id = self.client_create_task()
+    _, task_id = self.client_create_task_raw()
     response = self.app.get(
         '/swarming/api/v1/client/task/%s/request' % task_id).json
     expected = {
@@ -461,10 +462,8 @@ class ClientApiTest(test_env_handlers.AppTestBase):
         u'extra_args': None,
         u'grace_period_secs': 30,
         u'idempotent': False,
+        u'inputs_ref': None,
         u'io_timeout_secs': 1200,
-        u'isolated': None,
-        u'isolatedserver': None,
-        u'namespace': None,
       },
       u'properties_hash': None,
       u'tags': [u'os:Amiga', u'priority:100', u'user:joe@localhost'],
@@ -478,7 +477,7 @@ class ClientApiTest(test_env_handlers.AppTestBase):
     now = datetime.datetime(2010, 1, 2, 3, 4, 5, 6)
     now_str = unicode(now.strftime(utils.DATETIME_FORMAT))
     self.mock_now(now)
-    self.client_create_task(
+    self.client_create_task_raw(
         name='first', tags=['project:yay', 'commit:post', 'os:Win'],
         properties=dict(idempotent=True))
     self.set_as_bot()
@@ -488,7 +487,7 @@ class ClientApiTest(test_env_handlers.AppTestBase):
     self.mock(random, 'getrandbits', lambda _: 0x88)
     now_60 = self.mock_now(now, 60)
     now_60_str = unicode(now_60.strftime(utils.DATETIME_FORMAT))
-    self.client_create_task(
+    self.client_create_task_raw(
         name='second', user='jack@localhost',
         tags=['project:yay', 'commit:pre', 'os:Win'],
         properties=dict(idempotent=True))
@@ -511,7 +510,8 @@ class ClientApiTest(test_env_handlers.AppTestBase):
       u'internal_failure': False,
       u'modified_ts': now_str,
       u'name': u'first',
-      u'properties_hash': u'96b8a018ec635176af0f04265b1e724d84d8a2af',
+      u'outputs_ref': None,
+      u'properties_hash': u'6123129861fcb53c979a9247ebd7cc3743d3f550',
       u'server_versions': [u'v1a'],
       u'started_ts': now_str,
       u'state': task_result.State.COMPLETED,
@@ -543,6 +543,7 @@ class ClientApiTest(test_env_handlers.AppTestBase):
       u'internal_failure': False,
       u'modified_ts': now_60_str,
       u'name': u'second',
+      u'outputs_ref': None,
       u'properties_hash': None,
       u'server_versions': [u'v1a'],
       u'started_ts': now_str,
@@ -617,7 +618,7 @@ class ClientApiTest(test_env_handlers.AppTestBase):
     # Task in completed state.
     self.set_as_user()
     self.mock_now(now)
-    self.client_create_task(
+    self.client_create_task_raw(
         name='first', tags=['project:yay', 'commit:post', 'os:Win'],
         properties=dict(idempotent=False))
     self.set_as_bot()
@@ -626,7 +627,7 @@ class ClientApiTest(test_env_handlers.AppTestBase):
     # Task in pending state.
     self.set_as_user()
     self.mock_now(now, 60)
-    self.client_create_task(
+    self.client_create_task_raw(
         name='second', user='jack@localhost',
         tags=['project:yay', 'commit:pre', 'os:Win'],
         properties=dict(idempotent=False))
@@ -826,7 +827,7 @@ class ClientApiTest(test_env_handlers.AppTestBase):
     self.mock_now(now)
 
     self.set_as_bot()
-    self.client_create_task()
+    self.client_create_task_raw()
     token, _ = self.get_bot_token()
     res = self.bot_poll()
     self.bot_complete_task(token, task_id=res['manifest']['task_id'])
@@ -834,7 +835,7 @@ class ClientApiTest(test_env_handlers.AppTestBase):
     now_1 = self.mock_now(now, 1)
     now_1_str = unicode(now_1.strftime(utils.DATETIME_FORMAT))
     self.mock(random, 'getrandbits', lambda _: 0x55)
-    self.client_create_task(name='ho')
+    self.client_create_task_raw(name='ho')
     token, _ = self.get_bot_token()
     res = self.bot_poll()
     self.bot_complete_task(
@@ -859,6 +860,7 @@ class ClientApiTest(test_env_handlers.AppTestBase):
           u'id': u'5cee870005511',
           u'internal_failure': False,
           u'modified_ts': now_1_str,
+          u'outputs_ref': None,
           u'server_versions': [u'v1a'],
           u'started_ts': now_1_str,
           u'state': task_result.State.COMPLETED,
@@ -889,6 +891,7 @@ class ClientApiTest(test_env_handlers.AppTestBase):
           u'id': u'5cee488008811',
           u'internal_failure': False,
           u'modified_ts': now_str,
+          u'outputs_ref': None,
           u'server_versions': [u'v1a'],
           u'started_ts': now_str,
           u'state': task_result.State.COMPLETED,

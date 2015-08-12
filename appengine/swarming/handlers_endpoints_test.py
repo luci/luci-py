@@ -126,7 +126,7 @@ class TaskApiTest(BaseTest):
     self.mock_now(now)
     str_now = unicode(now.strftime(self.DATETIME_NO_MICRO))
     self.set_as_admin()
-    _, task_id = self.client_create_task()
+    _, task_id = self.client_create_task_raw()
     request = swarming_rpcs.TaskId(task_id=task_id)
     expected = {u'ok': True, u'was_running': False}
     response = self.call_api('cancel', message_to_dict(request), 200)
@@ -162,7 +162,7 @@ class TaskApiTest(BaseTest):
     now = datetime.datetime(2010, 1, 2, 3, 4, 5)
     self.mock_now(now)
     str_now = unicode(now.strftime(self.DATETIME_NO_MICRO))
-    _, task_id = self.client_create_task()
+    _, task_id = self.client_create_task_raw()
     request = swarming_rpcs.TaskId(task_id=task_id)
     response = self.call_api('result', message_to_dict(request), 200)
     expected = {
@@ -202,7 +202,7 @@ class TaskApiTest(BaseTest):
 
   def test_result_completed_task(self):
     """Tests that completed tasks are correctly reported."""
-    self.client_create_task()
+    self.client_create_task_raw()
     self.set_as_bot()
     now = datetime.datetime(2010, 1, 2, 3, 4, 5, 6)
     str_now = unicode(now.strftime(self.DATETIME_NO_MICRO))
@@ -227,7 +227,7 @@ class TaskApiTest(BaseTest):
 
   def test_result_output_ok(self):
     """Asserts that result_output reports a task's output."""
-    self.client_create_task()
+    self.client_create_task_raw()
 
     # task_id determined by bot run
     self.set_as_bot()
@@ -245,7 +245,7 @@ class TaskApiTest(BaseTest):
 
   def test_result_output_empty(self):
     """Asserts that incipient tasks produce no output."""
-    _, task_id = self.client_create_task()
+    _, task_id = self.client_create_task_raw()
     request = swarming_rpcs.TaskId(task_id=task_id)
     response = self.call_api(
         'result_output', message_to_dict(request), 200)
@@ -257,7 +257,7 @@ class TaskApiTest(BaseTest):
 
   def test_result_run_not_found(self):
     """Asserts that getting results from incipient tasks raises 404."""
-    _, task_id = self.client_create_task()
+    _, task_id = self.client_create_task_raw()
     run_id = task_id[:-1] + '1'
     request = swarming_rpcs.TaskId(task_id=run_id)
     with self.call_should_fail('404'):
@@ -266,7 +266,7 @@ class TaskApiTest(BaseTest):
 
   def test_task_deduped(self):
     """Asserts that task deduplication works as expected."""
-    _, task_id_1 = self.client_create_task(properties=dict(idempotent=True))
+    _, task_id_1 = self.client_create_task_raw(properties=dict(idempotent=True))
 
     self.set_as_bot()
     task_id_bot = self.bot_run_task()
@@ -275,7 +275,7 @@ class TaskApiTest(BaseTest):
 
     # second task; this one's results should be returned immediately
     self.set_as_user()
-    _, task_id_2 = self.client_create_task(
+    _, task_id_2 = self.client_create_task_raw(
         name='second', user='jack@localhost', properties=dict(idempotent=True))
 
     self.set_as_bot()
@@ -299,7 +299,7 @@ class TaskApiTest(BaseTest):
     """Asserts that request produces a task request."""
     now = datetime.datetime(2010, 1, 2, 3, 4, 5, 6)
     self.mock_now(now)
-    _, task_id = self.client_create_task()
+    _, task_id = self.client_create_task_raw()
     self.set_as_bot()
     request = swarming_rpcs.TaskId(task_id=task_id)
     response = self.call_api('request', message_to_dict(request), 200)
@@ -330,7 +330,7 @@ class TaskApiTest(BaseTest):
     str_now = unicode(now.strftime(self.DATETIME_NO_MICRO))
     self.mock_now(now)
     self.mock(random, 'getrandbits', lambda _: 0x66)
-    self.client_create_task(
+    self.client_create_task_raw(
         name='first', tags=['project:yay', 'commit:post', 'os:Win'],
         properties=dict(idempotent=True))
     self.set_as_bot()
@@ -341,7 +341,7 @@ class TaskApiTest(BaseTest):
     self.mock(random, 'getrandbits', lambda _: 0x88)
     now_60 = self.mock_now(now, 60)
     str_now_60 = unicode(now_60.strftime(self.DATETIME_NO_MICRO))
-    self.client_create_task(
+    self.client_create_task_raw(
         name='second', user='jack@localhost',
         tags=['project:yay', 'commit:pre', 'os:Win'],
         properties=dict(idempotent=True))
@@ -511,7 +511,7 @@ class BotApiTest(BaseTest):
     self.mock_now(now)
 
     self.set_as_bot()
-    self.client_create_task()
+    self.client_create_task_raw()
     token, _ = self.get_bot_token()
     res = self.bot_poll()
     self.bot_complete_task(token, task_id=res['manifest']['task_id'])
@@ -519,7 +519,7 @@ class BotApiTest(BaseTest):
     now_1 = self.mock_now(now, 1)
     now_1_str = unicode(now_1.strftime(self.DATETIME_NO_MICRO))
     self.mock(random, 'getrandbits', lambda _: 0x55)
-    self.client_create_task(name='philbert')
+    self.client_create_task_raw(name='philbert')
     token, _ = self.get_bot_token()
     res = self.bot_poll()
     self.bot_complete_task(
