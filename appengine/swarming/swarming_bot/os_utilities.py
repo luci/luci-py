@@ -1463,7 +1463,8 @@ def setup_auto_startup_osx(command, cwd, plistname):
   launchd_dir = os.path.expanduser('~/Library/LaunchAgents')
   if not os.path.isdir(launchd_dir):
     # This directory doesn't exist by default.
-    os.mkdir(launchd_dir)
+    # Sometimes ~/Library gets deleted.
+    os.makedirs(launchd_dir)
   filepath = os.path.join(launchd_dir, plistname)
   return _write(filepath, _generate_launchd_plist(command, cwd, plistname))
 
