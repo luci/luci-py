@@ -157,6 +157,24 @@ FILES = (
     'xsrf_client.py',
 )
 
+def resolve_symlink(path):
+  """Processes path containing symlink on Windows.
+
+  This is needed to make ../swarming_bot/main_test.py pass on Windows because
+  git on Windows renders symlinks as normal files.
+  """
+  if sys.platform != 'win32' or os.path.isfile(path):
+    return path
+  parts = os.path.normpath(path).split(os.path.sep)
+  for i in xrange(2, len(parts)):
+    partial = os.path.sep.join(parts[:i])
+    if os.path.isfile(partial):
+      with open(partial) as f:
+        link = f.read()
+      assert '\n' not in link and link, link
+      parts[i-1] = link
+  return os.path.normpath(os.path.sep.join(parts))
+
 
 def yield_swarming_bot_files(root_dir, host, additionals):
   """Yields all the files to map as tuple(filename, content).
@@ -174,7 +192,7 @@ def yield_swarming_bot_files(root_dir, host, additionals):
     if content is not None:
       yield item, content
     else:
-      with open(os.path.join(root_dir, item), 'rb') as f:
+      with open(resolve_symlink(os.path.join(root_dir, item)), 'rb') as f:
         yield item, f.read()
 
 

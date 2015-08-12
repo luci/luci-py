@@ -11,8 +11,8 @@ import sys
 import time
 import unittest
 
-import test_env
-test_env.setup_test_env()
+import test_env_bot
+test_env_bot.setup_test_env()
 
 from depot_tools import auto_stub
 

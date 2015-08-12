@@ -10,9 +10,12 @@ import sys
 import unittest
 import threading
 
-import bot
-
 THIS_FILE = os.path.abspath(__file__)
+
+import test_env_bot
+test_env_bot.setup_test_env()
+
+import bot
 
 
 class TestBot(unittest.TestCase):

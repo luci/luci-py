@@ -18,8 +18,8 @@ import time
 import unittest
 import zipfile
 
-import test_env
-test_env.setup_test_env()
+import test_env_bot
+test_env_bot.setup_test_env()
 
 # Creates a server mock for functions in net.py.
 import net_utils
@@ -48,7 +48,7 @@ class TestTaskRunnerBase(net_utils.TestCase):
     os.mkdir(self.work_dir)
 
   def tearDown(self):
-    os.chdir(test_env.BOT_DIR)
+    os.chdir(test_env_bot.BOT_DIR)
     file_path.rmtree(self.root_dir)
     super(TestTaskRunnerBase, self).tearDown()
 
@@ -727,7 +727,10 @@ class TestTaskRunnerNoTimeMock(TestTaskRunnerBase):
     finally:
       for k in to_kill:
         try:
-          os.kill(k, signal.SIGKILL)
+          if sys.platform == 'win32':
+            os.kill(k, signal.SIGTERM)
+          else:
+            os.kill(k, signal.SIGKILL)
         except OSError:
           pass
 

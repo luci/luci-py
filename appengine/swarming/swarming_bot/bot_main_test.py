@@ -14,8 +14,8 @@ import unittest
 
 THIS_FILE = os.path.abspath(__file__)
 
-import test_env
-test_env.setup_test_env()
+import test_env_bot
+test_env_bot.setup_test_env()
 
 # Creates a server mock for functions in net.py.
 import net_utils
