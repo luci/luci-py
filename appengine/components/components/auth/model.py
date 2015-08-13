@@ -411,7 +411,7 @@ class AuthVersionedEntityMixin(object):
     """Marks entity as being deleted in the current transaction.
 
     Stages the entity to be copied to historical log (with 'auth_db_deleted'
-    flag set).
+    flag set). The entity must not be mutated between 'get' and AuthDB commit.
 
     Must be called sometime before 'delete' (not necessary right before it).
     Note that NDB hooks are not used because they are buggy. See docstring for
