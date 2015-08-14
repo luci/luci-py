@@ -10,6 +10,7 @@ import logging
 import urllib
 import webapp2
 
+from google.appengine.api import memcache
 from google.appengine.ext import ndb
 
 from components import utils
@@ -426,22 +427,40 @@ class GroupsHandler(handler.ApiHandler):
   Available in Standalone, Primary and Replica modes.
   """
 
+  @staticmethod
+  def cache_key(auth_db_rev):
+    return 'api:v1:GroupsHandler/%d' % auth_db_rev
+
   @api.require(has_read_access)
   def get(self):
+    # Try to find a cached response for the current revision.
+    auth_db_rev = model.get_auth_db_revision()
+    cached_response = memcache.get(self.cache_key(auth_db_rev))
+    if cached_response is not None:
+      self.send_response(cached_response)
+      return
+
+    # Grab a list of groups and corresponding revision for cache key.
+    def run():
+      fut = model.AuthGroup.query(ancestor=model.root_key()).fetch_async()
+      return model.get_auth_db_revision(), fut.get_result()
+    auth_db_rev, group_list = ndb.transaction(run)
+
     # Currently AuthGroup entity contains a list of group members in the entity
     # body. It's an implementation detail that should not be relied upon.
     # Generally speaking, fetching a list of group members can be an expensive
     # operation, and group listing call shouldn't do it all the time. So throw
     # away all fields that enumerate group members.
-    group_list = model.AuthGroup.query(ancestor=model.root_key())
-    self.send_response({
+    response = {
       'groups': [
         g.to_serializable_dict(
             with_id_as='name',
             exclude=('globs', 'members', 'nested'))
         for g in sorted(group_list, key=lambda x: x.key.string_id())
       ],
-    })
+    }
+    memcache.set(self.cache_key(auth_db_rev), response, time=24*3600)
+    self.send_response(response)
 
 
 class GroupHandler(EntityHandlerBase):
