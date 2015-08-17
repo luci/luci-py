@@ -90,7 +90,7 @@ def _expire_task(to_run_key, request):
   return success
 
 
-def _reap_task(to_run_key, request, bot_id, bot_version):
+def _reap_task(to_run_key, request, bot_id, bot_version, bot_dimensions):
   """Reaps a task and insert the results entity.
 
   Returns:
@@ -118,7 +118,8 @@ def _reap_task(to_run_key, request, bot_id, bot_version):
       return None
     to_run.queue_number = None
     run_result = task_result.new_run_result(
-        request, (result_summary.try_number or 0) + 1, bot_id, bot_version)
+        request, (result_summary.try_number or 0) + 1, bot_id, bot_version,
+        bot_dimensions)
     run_result.modified_ts = now
     result_summary.set_from_run_result(run_result, request)
     ndb.put_multi([to_run, run_result, result_summary])
@@ -418,7 +419,8 @@ def bot_reap_task(dimensions, bot_id, bot_version):
       total_skipped += 1
       continue
 
-    run_result = _reap_task(to_run.key, request, bot_id, bot_version)
+    run_result = _reap_task(
+        to_run.key, request, bot_id, bot_version, dimensions)
     if not run_result:
       failures += 1
       # Every 3 failures starting on the very first one, jump randomly ahead of

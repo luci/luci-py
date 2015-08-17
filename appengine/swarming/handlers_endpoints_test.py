@@ -189,6 +189,10 @@ class TaskApiTest(BaseTest):
     self.set_as_user()
     response = self.call_api('result', message_to_dict(request), 200)
     expected = {
+      u'bot_dimensions': [
+        {u'key': u'id', u'value': [u'bot1']},
+        {u'key': u'os', u'value': [u'Amiga']},
+      ],
       u'bot_id': u'bot1',
       u'costs_usd': [0.0],
       u'created_ts': str_now,
@@ -214,6 +218,10 @@ class TaskApiTest(BaseTest):
     request = swarming_rpcs.TaskId(task_id=task_id)
     response = self.call_api('result', message_to_dict(request), 200)
     expected = {
+      u'bot_dimensions': [
+        {u'key': u'id', u'value': [u'bot1']},
+        {u'key': u'os', u'value': [u'Amiga']},
+      ],
       u'bot_id': u'bot1',
       u'costs_usd': [0.1],
       u'created_ts': str_now,
@@ -361,6 +369,10 @@ class TaskApiTest(BaseTest):
     # we expect [second, first]
     task_results = [
       {
+        u'bot_dimensions': [
+          {u'key': u'id', u'value': [u'bot1']},
+          {u'key': u'os', u'value': [u'Amiga']},
+        ],
         u'bot_id': u'bot1',
         u'cost_saved_usd': 0.1,
         u'created_ts': str_now_60,
@@ -379,6 +391,10 @@ class TaskApiTest(BaseTest):
         u'user': u'jack@localhost',
       },
       {
+        u'bot_dimensions': [
+          {u'key': u'id', u'value': [u'bot1']},
+          {u'key': u'os', u'value': [u'Amiga']},
+        ],
         u'bot_id': u'bot1',
         u'costs_usd': [0.1],
         u'created_ts': str_now,
@@ -547,6 +563,10 @@ class BotApiTest(BaseTest):
     expected = {
       u'items': [
         {
+          u'bot_dimensions': [
+            {u'key': u'id', u'value': [u'bot1']},
+            {u'key': u'os', u'value': [u'Amiga']},
+          ],
           u'bot_id': u'bot1',
           u'completed_ts': now_1_str,
           u'costs_usd': [0.1],

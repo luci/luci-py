@@ -109,7 +109,7 @@ class TaskOutput(messages.Message):
 class TaskResult(messages.Message):
   """Representation of the TaskResultSummary or TaskRunResult ndb model."""
   abandoned_ts = message_types.DateTimeField(1)
-  # bot_dimensions = messages.MessageField(StringListPair, 2, repeated=True)
+  bot_dimensions = messages.MessageField(StringListPair, 2, repeated=True)
   bot_id = messages.StringField(3)
   children_task_ids = messages.StringField(4, repeated=True)
   completed_ts = message_types.DateTimeField(5)

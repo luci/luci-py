@@ -68,6 +68,7 @@ from google.appengine.api import search
 from google.appengine.datastore import datastore_query
 from google.appengine.ext import ndb
 
+from components import datastore_utils
 from components import utils
 from server import task_pack
 from server import task_request
@@ -240,12 +241,19 @@ class _TaskResultCommon(ndb.Model):
   TaskResultSummary.
 
   It is not meant to be instantiated on its own.
+
+  TODO(maruel):
+  - Back fill bot_dimensions with bot dimensions when possible.
   """
   # Bot that ran this task.
   bot_id = ndb.StringProperty()
 
   # Bot version (as a hash) of the code running the task.
   bot_version = ndb.StringProperty()
+
+  # Bot dimensions at the moment the bot reaped the task. Not set for old tasks.
+  bot_dimensions = datastore_utils.DeterministicJsonProperty(
+      json_type=dict, compressed=True)
 
   # Active server version(s). Note that during execution, the active server
   # version may have changed, this list will list all versions seen as the task
@@ -862,7 +870,7 @@ def new_result_summary(request):
       tags=request.tags)
 
 
-def new_run_result(request, try_number, bot_id, bot_version):
+def new_run_result(request, try_number, bot_id, bot_version, bot_dimensions):
   """Returns a new TaskRunResult for a TaskRequest.
 
   The caller must save it in the DB.
@@ -872,6 +880,7 @@ def new_run_result(request, try_number, bot_id, bot_version):
   return TaskRunResult(
       key=task_pack.result_summary_key_to_run_result_key(
           summary_key, try_number),
+      bot_dimensions=bot_dimensions,
       bot_id=bot_id,
       started_ts=utils.utcnow(),
       bot_version=bot_version,

@@ -215,6 +215,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
     result_summary_duped, run_results_duped = get_results(request.key)
     expected = {
       'abandoned_ts': None,
+      'bot_dimensions': bot_dimensions,
       'bot_id': u'localhost',
       'bot_version': u'abc',
       'children_task_ids': [],
@@ -350,6 +351,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
     result_summary, run_results = get_results(request.key)
     expected = {
       'abandoned_ts': None,
+      'bot_dimensions': None,
       'bot_id': None,
       'bot_version': None,
       'children_task_ids': [],
@@ -380,13 +382,15 @@ class TaskSchedulerApiTest(test_case.TestCase):
     # A bot reaps the TaskToRun.
     reaped_ts = self.now + datetime.timedelta(seconds=60)
     self.mock_now(reaped_ts)
+    bot_dimensions = {'OS': 'Windows-3.1.1'}
     reaped_request, run_result = task_scheduler.bot_reap_task(
-        {'OS': 'Windows-3.1.1'}, 'localhost', 'abc')
+        bot_dimensions, 'localhost', 'abc')
     self.assertEqual(request, reaped_request)
     self.assertTrue(run_result)
     result_summary, run_results = get_results(request.key)
     expected = {
       'abandoned_ts': None,
+      'bot_dimensions': bot_dimensions,
       'bot_id': u'localhost',
       'bot_version': u'abc',
       'children_task_ids': [],
@@ -415,6 +419,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
     expected = [
       {
         'abandoned_ts': None,
+        'bot_dimensions': bot_dimensions,
         'bot_id': u'localhost',
         'bot_version': u'abc',
         'children_task_ids': [],
@@ -450,6 +455,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
     result_summary, run_results = get_results(request.key)
     expected = {
       'abandoned_ts': None,
+      'bot_dimensions': bot_dimensions,
       'bot_id': u'localhost',
       'bot_version': u'abc',
       'children_task_ids': [],
@@ -478,6 +484,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
     expected = [
       {
         'abandoned_ts': None,
+        'bot_dimensions': bot_dimensions,
         'bot_id': u'localhost',
         'bot_version': u'abc',
         'children_task_ids': [],
@@ -504,8 +511,9 @@ class TaskSchedulerApiTest(test_case.TestCase):
         properties=dict(dimensions={u'OS': u'Windows-3.1.1'}))
     request = task_request.make_request(data, True)
     _result_summary = task_scheduler.schedule_request(request)
+    bot_dimensions = {'OS': 'Windows-3.1.1'}
     reaped_request, run_result = task_scheduler.bot_reap_task(
-        {'OS': 'Windows-3.1.1'}, 'localhost', 'abc')
+        bot_dimensions, 'localhost', 'abc')
     self.assertEqual(request, reaped_request)
     self.assertEqual(
         (True, True),
@@ -515,6 +523,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
 
     expected = {
       'abandoned_ts': None,
+      'bot_dimensions': bot_dimensions,
       'bot_id': u'localhost',
       'bot_version': u'abc',
       'children_task_ids': [],
@@ -544,6 +553,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
     expected = [
       {
         'abandoned_ts': None,
+        'bot_dimensions': bot_dimensions,
         'bot_id': u'localhost',
         'bot_version': u'abc',
         'children_task_ids': [],
@@ -615,14 +625,16 @@ class TaskSchedulerApiTest(test_case.TestCase):
         properties=dict(dimensions={u'OS': u'Windows-3.1.1'}))
     request = task_request.make_request(data, True)
     result_summary = task_scheduler.schedule_request(request)
+    bot_dimensions = {'OS': 'Windows-3.1.1'}
     reaped_request, run_result = task_scheduler.bot_reap_task(
-        {'OS': 'Windows-3.1.1'}, 'localhost', 'abc')
+        bot_dimensions, 'localhost', 'abc')
     self.assertEqual(
         (True, True),
         task_scheduler.bot_update_task(
             run_result.key, 'localhost', 'hi', 0, 0, 0.1, hard, io, 0.1))
     expected = {
       'abandoned_ts': None,
+      'bot_dimensions': bot_dimensions,
       'bot_id': u'localhost',
       'bot_version': u'abc',
       'children_task_ids': [],
@@ -651,6 +663,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
 
     expected = {
       'abandoned_ts': None,
+      'bot_dimensions': bot_dimensions,
       'bot_id': u'localhost',
       'bot_version': u'abc',
       'children_task_ids': [],
@@ -678,9 +691,9 @@ class TaskSchedulerApiTest(test_case.TestCase):
 
   def test_bot_kill_task(self):
     self.mock(random, 'getrandbits', lambda _: 0x88)
-    data = _gen_request(
-        properties=dict(dimensions={u'OS': u'Windows-3.1.1'}))
-    request = task_request.make_request(data, True)
+    dimensions = {u'OS': u'Windows-3.1.1'}
+    request = task_request.make_request(
+        _gen_request(properties={'dimensions': dimensions}), True)
     result_summary = task_scheduler.schedule_request(request)
     reaped_request, run_result = task_scheduler.bot_reap_task(
         {'OS': 'Windows-3.1.1'}, 'localhost', 'abc')
@@ -689,6 +702,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
         None, task_scheduler.bot_kill_task(run_result.key, 'localhost'))
     expected = {
       'abandoned_ts': self.now,
+      'bot_dimensions': dimensions,
       'bot_id': u'localhost',
       'bot_version': u'abc',
       'children_task_ids': [],
@@ -716,6 +730,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
     self.assertEqual(expected, result_summary.key.get().to_dict())
     expected = {
       'abandoned_ts': self.now,
+      'bot_dimensions': dimensions,
       'bot_id': u'localhost',
       'bot_version': u'abc',
       'children_task_ids': [],
@@ -775,15 +790,16 @@ class TaskSchedulerApiTest(test_case.TestCase):
 
   def test_cron_abort_expired_task_to_run(self):
     self.mock(random, 'getrandbits', lambda _: 0x88)
-    data = _gen_request(
-        properties=dict(dimensions={u'OS': u'Windows-3.1.1'}))
-    request = task_request.make_request(data, True)
+    request = task_request.make_request(
+        _gen_request(properties={'dimensions': {u'OS': u'Windows-3.1.1'}}),
+        True)
     result_summary = task_scheduler.schedule_request(request)
     abandoned_ts = self.mock_now(self.now, request.expiration_secs+1)
     self.assertEqual(1, task_scheduler.cron_abort_expired_task_to_run())
     self.assertEqual([], task_result.TaskRunResult.query().fetch())
     expected = {
       'abandoned_ts': abandoned_ts,
+      'bot_dimensions': None,
       'bot_id': None,
       'bot_version': None,
       'children_task_ids': [],
@@ -840,6 +856,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
     self.assertEqual(1, len(task_result.TaskRunResult.query().fetch()))
     expected = {
       'abandoned_ts': abandoned_ts,
+      'bot_dimensions': bot_dimensions,
       'bot_id': u'localhost',
       'bot_version': u'abc',
       'children_task_ids': [],
@@ -891,6 +908,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
     # Refresh and compare:
     expected = {
       'abandoned_ts': now_1,
+      'bot_dimensions': bot_dimensions,
       'bot_id': u'localhost',
       'bot_version': u'abc',
       'children_task_ids': [],
@@ -911,6 +929,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
     self.assertEqual(expected, run_result.key.get().to_dict())
     expected = {
       'abandoned_ts': None,
+      'bot_dimensions': bot_dimensions,
       'bot_id': u'localhost',
       'bot_version': u'abc',
       'children_task_ids': [],
@@ -950,6 +969,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
             0.1))
     expected = {
       'abandoned_ts': None,
+      'bot_dimensions': bot_dimensions,
       'bot_id': u'localhost-second',
       'bot_version': u'abc',
       'children_task_ids': [],
@@ -1002,6 +1022,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
     # Refresh and compare:
     expected = {
       'abandoned_ts': now_1,
+      'bot_dimensions': bot_dimensions,
       'bot_id': u'localhost',
       'bot_version': u'abc',
       'children_task_ids': [],
@@ -1022,6 +1043,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
     self.assertEqual(expected, run_result.key.get().to_dict())
     expected = {
       'abandoned_ts': None,
+      'bot_dimensions': bot_dimensions,
       'bot_id': u'localhost',
       'bot_version': u'abc',
       'children_task_ids': [],
@@ -1086,6 +1108,7 @@ class TaskSchedulerApiTest(test_case.TestCase):
     self.assertEqual((0, 0, 0), task_scheduler.cron_handle_bot_died())
     expected = {
       'abandoned_ts': now_2,
+      'bot_dimensions': bot_dimensions,
       'bot_id': u'localhost-second',
       'bot_version': u'abc',
       'children_task_ids': [],

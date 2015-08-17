@@ -237,6 +237,7 @@ class ClientApiTest(test_env_handlers.AppTestBase):
         '/swarming/api/v1/client/task/' + task_id).json
     expected = {
       u'abandoned_ts': str_now,
+      u'bot_dimensions': None,
       u'bot_id': None,
       u'bot_version': None,
       u'children_task_ids': [],
@@ -278,6 +279,7 @@ class ClientApiTest(test_env_handlers.AppTestBase):
         '/swarming/api/v1/client/task/' + task_id).json
     expected = {
       u'abandoned_ts': None,
+      u'bot_dimensions': None,
       u'bot_id': None,
       u'bot_version': None,
       u'children_task_ids': [],
@@ -319,6 +321,7 @@ class ClientApiTest(test_env_handlers.AppTestBase):
         '/swarming/api/v1/client/task/' + run_id).json
     expected = {
       u'abandoned_ts': None,
+      u'bot_dimensions': {u'id': [u'bot1'], u'os': [u'Amiga']},
       u'bot_id': u'bot1',
       u'bot_version': self.bot_version,
       u'children_task_ids': [],
@@ -500,6 +503,7 @@ class ClientApiTest(test_env_handlers.AppTestBase):
     self.set_as_privileged_user()
     expected_first = {
       u'abandoned_ts': None,
+      u'bot_dimensions': {u'id': [u'bot1'], u'os': [u'Amiga']},
       u'bot_id': u'bot1',
       u'bot_version': self.bot_version,
       u'children_task_ids': [],
@@ -533,6 +537,7 @@ class ClientApiTest(test_env_handlers.AppTestBase):
     }
     expected_second = {
       u'abandoned_ts': None,
+      u'bot_dimensions': {u'id': [u'bot1'], u'os': [u'Amiga']},
       u'bot_id': u'bot1',
       u'bot_version': self.bot_version,
       u'children_task_ids': [],
@@ -854,6 +859,7 @@ class ClientApiTest(test_env_handlers.AppTestBase):
       u'items': [
         {
           u'abandoned_ts': None,
+          u'bot_dimensions': {u'id': [u'bot1'], u'os': [u'Amiga']},
           u'bot_id': u'bot1',
           u'bot_version': self.bot_version,
           u'children_task_ids': [],
@@ -885,6 +891,7 @@ class ClientApiTest(test_env_handlers.AppTestBase):
       u'items': [
         {
           u'abandoned_ts': None,
+          u'bot_dimensions': {u'id': [u'bot1'], u'os': [u'Amiga']},
           u'bot_id': u'bot1',
           u'bot_version': self.bot_version,
           u'children_task_ids': [],

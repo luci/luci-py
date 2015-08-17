@@ -249,6 +249,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
     response = self.client_get_results(task_id)
     expected = {
       u'abandoned_ts': None,
+      u'bot_dimensions': {u'id': [u'bot1'], u'os': [u'Amiga']},
       u'bot_id': u'bot1',
       u'bot_version': self.bot_version,
       u'children_task_ids': [],
@@ -375,6 +376,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
     def _expected(**kwargs):
       out = {
         u'abandoned_ts': None,
+        u'bot_dimensions': {u'id': [u'bot1'], u'os': [u'Amiga']},
         u'bot_id': u'bot1',
         u'bot_version': self.bot_version,
         u'children_task_ids': [],
@@ -518,6 +520,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
     response = self.client_get_results(task_id)
     expected = {
       u'abandoned_ts': None,
+      u'bot_dimensions': {u'id': [u'bot1'], u'os': [u'Amiga']},
       u'bot_id': u'bot1',
       u'bot_version': self.bot_version,
       u'children_task_ids': [],
@@ -567,6 +570,7 @@ class BotApiTest(test_env_handlers.AppTestBase):
     response = self.client_get_results(task_id)
     expected = {
       u'abandoned_ts': str_now,
+      u'bot_dimensions': {u'id': [u'bot1'], u'os': [u'Amiga']},
       u'bot_id': u'bot1',
       u'bot_version': self.bot_version,
       u'children_task_ids': [],

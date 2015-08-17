@@ -30,6 +30,10 @@ CLIENT_DIR = os.path.join(APP_DIR, '..', '..', 'client')
 from tools import start_bot
 from tools import start_servers
 
+sys.path.insert(0, BOT_DIR)
+
+import os_utilities
+
 
 class SwarmingClient(object):
   def __init__(self, swarming_server):
@@ -100,6 +104,7 @@ class SwarmingClient(object):
 def gen_expected(**kwargs):
   expected = {
     u'abandoned_ts': None,
+    u'bot_dimensions': None,
     u'bot_id': unicode(socket.getfqdn().split('.', 1)[0]),
     u'children_task_ids': [],
     u'cost_saved_usd': None,
@@ -192,20 +197,25 @@ class SwarmingTestCase(unittest.TestCase):
       ]
 
     # tuple(task_request, expectation)
+    dimensions = os_utilities.get_dimensions()
     tasks = [
       (
         ['-T', 'simple_success', '--'] + cmd(),
-        gen_expected(name=u'simple_success'),
+        gen_expected(name=u'simple_success', bot_dimensions=dimensions),
       ),
       (
         ['-T', 'simple_failure', '--'] + cmd(1),
         gen_expected(
-          name=u'simple_failure', exit_codes=[1], failure=True),
+          name=u'simple_failure',
+          bot_dimensions=dimensions,
+          exit_codes=[1],
+          failure=True),
       ),
       (
         ['-T', 'invalid', '--', 'unknown_invalid_command'],
         gen_expected(
             name=u'invalid',
+            bot_dimensions=dimensions,
             exit_codes=[1],
             failure=True,
             outputs=[
@@ -223,6 +233,7 @@ class SwarmingTestCase(unittest.TestCase):
         ],
         gen_expected(
             name=u'hard_timeout',
+            bot_dimensions=dimensions,
             exit_codes=[-signal.SIGTERM],
             failure=True,
             state=0x40),  # task_result.State.TIMED_OUT
@@ -237,13 +248,14 @@ class SwarmingTestCase(unittest.TestCase):
         ],
         gen_expected(
             name=u'io_timeout',
+            bot_dimensions=dimensions,
             exit_codes=[-signal.SIGTERM],
             failure=True,
             state=0x40),  # task_result.State.TIMED_OUT
       ),
       (
         ['-T', 'ending_simple_success', '--'] + cmd(),
-        gen_expected(name=u'ending_simple_success'),
+        gen_expected(name=u'ending_simple_success', bot_dimensions=dimensions),
       ),
     ]
 

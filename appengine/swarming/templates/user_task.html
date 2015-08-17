@@ -266,7 +266,13 @@
       </tr>
       <tr title="Current bot dimensions. TODO(maruel): List dimensions at time of task reaping.">
         <td>Bot dimensions</td>
-        <td>{{bot_view.bot_dimensions(bot)}}</td>
+        <td>
+          {% if task.bot_dimensions %}
+            {{bot_view.render_dict(task.bot_dimensions)}}
+          {% else %}
+            {{bot_view.bot_dimensions(bot)}}
+          {% endif %}
+        </td>
       </tr>
       <tr title="Current bot version. TODO(maruel): List bot version at time of task reaping.">
         <td>Bot version</td>
