@@ -26,61 +26,15 @@ import urllib
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 BOT_DIR = os.path.join(APP_DIR, 'swarming_bot')
 CLIENT_DIR = os.path.join(APP_DIR, '..', '..', 'client')
-sys.path.insert(0, APP_DIR)
 
-from tool_support import gae_sdk_utils
-gae_sdk_utils.setup_gae_env()
-
-from tool_support import local_app
-
-from server import bot_archive
-
-
-class LocalBot(object):
-  """A local running Swarming bot."""
-  def __init__(self, swarming_server, log_dir):
-    self.tmpdir = tempfile.mkdtemp(prefix='swarming_bot')
-    self._swarming_server = swarming_server
-    self._log_dir = log_dir
-    self._bot_zip = os.path.join(self.tmpdir, 'swarming_bot.zip')
-    self._proc = None
-    urllib.urlretrieve(swarming_server + '/bot_code', self._bot_zip)
-
-  def start(self):
-    """Starts the local Swarming bot."""
-    assert not self._proc
-    cmd = [sys.executable, self._bot_zip, 'start_slave']
-    env = os.environ.copy()
-    with open(os.path.join(self._log_dir, 'bot_config_stdout.log'), 'wb') as f:
-      f.write('Running: %s\n' % cmd)
-      f.flush()
-      self._proc = subprocess.Popen(
-          cmd, cwd=self.tmpdir, preexec_fn=os.setsid, stdout=f, env=env,
-          stderr=subprocess.STDOUT)
-
-  def stop(self):
-    """Stops the local Swarming bot."""
-    if not self._proc:
-      return
-    if self._proc.poll() is None:
-      try:
-        # TODO(maruel): os.killpg() doesn't exist on Windows.
-        os.killpg(self._proc.pid, signal.SIGKILL)
-        self._proc.wait()
-      except OSError:
-        pass
-    else:
-      # The bot should have quit normally when it self-updates.
-      assert not self._proc.returncode
-
-  def cleanup(self):
-    shutil.rmtree(self.tmpdir)
+from tools import start_bot
+from tools import start_servers
 
 
 class SwarmingClient(object):
-  def __init__(self, swarming_server, log_dir):
+  def __init__(self, swarming_server):
     self._swarming_server = swarming_server
-    self._log_dir = log_dir
+    self._tmpdir = tempfile.mkdtemp(prefix='swarming_client')
     self._index = 0
 
   def task_trigger(self, args):
@@ -112,15 +66,30 @@ class SwarmingClient(object):
     finally:
       os.remove(tmp)
 
+  def cleanup(self):
+    if self._tmpdir:
+      shutil.rmtree(self._tmpdir)
+      self._tmpdir = None
+
+  def dump_log(self):
+    print >> sys.stderr, '-' * 60
+    print >> sys.stderr, 'Client calls'
+    print >> sys.stderr, '-' * 60
+    for i in xrange(self._index):
+      with open(os.path.join(self._tmpdir, 'client_%d.log' % i), 'rb') as f:
+        log = f.read().strip('\n')
+      for l in log.splitlines():
+        sys.stderr.write('  %s\n' % l)
+
   def _run(self, command, args):
-    name = os.path.join(self._log_dir, '%s_%d.log' % (command, self._index))
+    name = os.path.join(self._tmpdir, 'client_%d.log' % self._index)
     self._index += 1
     cmd = [
       sys.executable, 'swarming.py', command, '-S', self._swarming_server,
       '--verbose',
     ] + args
     with open(name, 'wb') as f:
-      f.write('%s\n' % ' '.join(cmd))
+      f.write('\nRunning: %s\n' % ' '.join(cmd))
       f.flush()
       p = subprocess.Popen(
           cmd, stdout=f, stderr=subprocess.STDOUT, cwd=CLIENT_DIR)
@@ -154,29 +123,13 @@ def gen_expected(**kwargs):
   return expected
 
 
-def dump_logs(log_dir, swarming_bot_dir):
-  """Prints tou stderr all logs found in the temporary directory."""
-  files = [os.path.join(log_dir, i) for i in os.listdir(log_dir)]
-  files.extend(glob.glob(os.path.join(swarming_bot_dir, '*.log')))
-  files.sort()
-  for i in files:
-    sys.stderr.write('\n%s:\n' % i)
-    with open(i, 'rb') as f:
-      for l in f:
-        sys.stderr.write('  ' + l)
-
-
 class SwarmingTestCase(unittest.TestCase):
   """Test case class for Swarming integration tests."""
   def setUp(self):
     super(SwarmingTestCase, self).setUp()
     self._bot = None
-    self._raw_client = None
-    self._remote = None
-    self._server = None
-    self._tmpdir = tempfile.mkdtemp(prefix='swarming_smoke')
-    self._log_dir = os.path.join(self._tmpdir, 'logs')
-    os.mkdir(self._log_dir)
+    self._client = None
+    self._servers = None
 
   def tearDown(self):
     # Kill bot, kill server, print logs if failed, delete tmpdir, call super.
@@ -184,20 +137,23 @@ class SwarmingTestCase(unittest.TestCase):
       try:
         try:
           try:
-            try:
+            if self._bot:
               self._bot.stop()
-            finally:
-              self._server.stop()
           finally:
-            if self.has_failed():
-              # Print out the logs before deleting them.
-              dump_logs(self._log_dir, self._bot.tmpdir)
-              self._server.dump_log()
+            if self._servers:
+              self._servers.stop()
         finally:
-          self._bot.cleanup()
+          if self.has_failed() or is_verbose():
+            # Print out the logs before deleting them.
+            if self._bot:
+              self._bot.dump_log()
+            if self._servers:
+              self._servers.dump_log()
+            if self._client:
+              self._client.dump_log()
       finally:
-        # In the end, delete the temporary directory.
-        shutil.rmtree(self._tmpdir)
+        if self._client:
+          self._client.cleanup()
     finally:
       super(SwarmingTestCase, self).tearDown()
 
@@ -208,24 +164,20 @@ class SwarmingTestCase(unittest.TestCase):
     tearDown is not getting called (and finish_setup can fail because it uses
     various server endpoints).
     """
-    self._server = local_app.LocalApplication(APP_DIR, 9050)
-    self._server.start()
-    self._server.ensure_serving()
-    self._raw_client = self._server.client
-    self._bot = LocalBot(self._server.url, self._log_dir)
+    self._servers = start_servers.LocalServers(False)
+    self._servers.start()
+    self._bot = start_bot.LocalBot(self._servers.swarming_server.url)
     self._bot.start()
 
     # Replace bot_config.py.
-    self._raw_client.login_as_admin('smoke-test@example.com')
-    self._raw_client.url_opener.addheaders.append(
-        ('X-XSRF-Token', self._server.client.xsrf_token))
     with open(os.path.join(BOT_DIR, 'bot_config.py'), 'rb') as f:
       bot_config_content = f.read() + '\n'
     # This will restart the bot.
-    res = self._raw_client.request(
+    res = self._servers.http_client.request(
         '/restricted/upload/bot_config',
         body=urllib.urlencode({'script': bot_config_content}))
-    self.assertTrue(res)
+    if not res:
+      raise Exception('Failed to upload bot_config')
 
   def has_failed(self):
     # pylint: disable=E1101
@@ -296,13 +248,13 @@ class SwarmingTestCase(unittest.TestCase):
     ]
 
     # tuple(task_id, expectation)
-    client = SwarmingClient(self._server.url, self._log_dir)
+    self._client = SwarmingClient(self._servers.swarming_server.url)
     running_tasks = [
-      (client.task_trigger(args), expected) for args, expected in tasks
+      (self._client.task_trigger(args), expected) for args, expected in tasks
     ]
 
     for task_id, expectation in running_tasks:
-      self.assertResults(expectation, client.task_collect(task_id))
+      self.assertResults(expectation, self._client.task_collect(task_id))
 
   def assertResults(self, expected, result):
     self.assertEqual(['shards'], result.keys())
@@ -320,8 +272,12 @@ class SwarmingTestCase(unittest.TestCase):
     self.assertEqual(expected, result)
 
 
+def is_verbose():
+  return '-v' in sys.argv
+
+
 if __name__ == '__main__':
-  if '-v' in sys.argv:
+  if is_verbose():
     logging.basicConfig(level=logging.INFO)
     unittest.TestCase.maxDiff = None
   else:

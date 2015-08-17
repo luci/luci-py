@@ -66,16 +66,16 @@ def find_free_ports(host, base_port, count):
 class LocalApplication(object):
   """GAE application running locally via dev_appserver.py."""
 
-  def __init__(self, app_dir, base_port):
+  def __init__(self, app_dir, base_port, listen_all=False):
     self._app = gae_sdk_utils.Application(app_dir)
     self._base_port = base_port
     self._client = None
-    self._exit_code = None
     self._log = None
     self._port = None
     self._proc = None
     self._serving = False
     self._temp_root = None
+    self._listen_all = listen_all
 
   @property
   def app_id(self):
@@ -100,13 +100,17 @@ class LocalApplication(object):
     """HttpClient that can be used to make requests to the instance."""
     return self._client
 
+  @property
+  def log(self):
+    """Returns the log output. Only set after calling stop()."""
+    return self._log
+
   def start(self):
     """Starts dev_appserver process."""
     assert not self._proc, 'Already running'
 
     # Clear state.
     self._client = None
-    self._exit_code = None
     self._log = None
     self._serving = False
 
@@ -123,18 +127,22 @@ class LocalApplication(object):
     log_file = os.path.join(self._temp_root, 'dev_appserver.log')
     logging.info(
         'Launching %s at %s, log is %s', self.app_id, self.url, log_file)
+    cmd = [
+      '--port', str(self._port),
+      '--admin_port', str(free_ports[-1]),
+      '--storage_path', os.path.join(self._temp_root, 'storage'),
+      '--automatic_restart', 'no',
+      # Note: The random policy will provide the same consistency every
+      # time the test is run because the random generator is always given
+      # the same seed.
+      '--datastore_consistency_policy', 'random',
+    ]
+    if self._listen_all:
+      cmd.extend(('--host', '0.0.0.0'))
+
     with open(log_file, 'wb') as f:
       self._proc = self._app.spawn_dev_appserver(
-          [
-            '--port', str(self._port),
-            '--admin_port', str(free_ports[-1]),
-            '--storage_path', os.path.join(self._temp_root, 'storage'),
-            '--automatic_restart', 'no',
-            # Note: The random policy will provide the same consistency every
-            # time the test is run because the random generator is always given
-            # the same seed.
-            '--datastore_consistency_policy', 'random',
-          ],
+          cmd,
           stdout=f,
           stderr=subprocess.STDOUT,
           preexec_fn=terminate_with_parent)
@@ -170,22 +178,26 @@ class LocalApplication(object):
     self._serving = True
 
   def stop(self):
-    """Stops dev_appserver, collects its log."""
+    """Stops dev_appserver, collects its log.
+
+    Returns the process error code if applicable.
+    """
     if not self._proc:
-      return
-    self._exit_code = self._proc.poll()
+      return None
+    exit_code = self._proc.poll()
     try:
       logging.info('Stopping %s', self.app_id)
       if self._proc.poll() is None:
         try:
+          # Send SIGTERM.
           self._proc.terminate()
         except OSError:
           pass
         deadline = time.time() + 5
         while self._proc.poll() is None and time.time() < deadline:
           time.sleep(0.05)
-        self._exit_code = self._proc.poll()
-        if self._exit_code is None:
+        exit_code = self._proc.poll()
+        if exit_code is None:
           logging.error('Leaking PID %d', self._proc.pid)
     finally:
       with open(os.path.join(self._temp_root, 'dev_appserver.log'), 'r') as f:
@@ -196,14 +208,19 @@ class LocalApplication(object):
       self._proc = None
       self._serving = False
       self._temp_root = None
+    return exit_code
+
+  def wait(self):
+    """Waits for the process to exit."""
+    self._proc.wait()
 
   def dump_log(self):
     """Prints dev_appserver log to stderr, works only if app is stopped."""
-    assert self._log is not None
     print >> sys.stderr, '-' * 60
     print >> sys.stderr, 'dev_appserver.py log for %s' % self.app_id
     print >> sys.stderr, '-' * 60
-    print >> sys.stderr, self._log
+    for l in self._log.strip('\n').splitlines():
+      sys.stderr.write('  %s\n' % l)
     print >> sys.stderr, '-' * 60
 
 
