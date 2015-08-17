@@ -141,7 +141,7 @@ class BotEvent(_BotCommon):
   This entity is created on each bot state transition.
   """
   ALLOWED_EVENTS = {
-    'bot_connected', 'bot_error', 'bot_rebooting',
+    'bot_connected', 'bot_error', 'bot_rebooting', 'bot_shutdown',
     'request_restart', 'request_update', 'request_sleep', 'request_task',
     'task_completed', 'task_error', 'task_update',
   }
@@ -149,7 +149,8 @@ class BotEvent(_BotCommon):
   ts = ndb.DateTimeProperty(auto_now_add=True)
   event_type = ndb.StringProperty(choices=ALLOWED_EVENTS)
 
-  # event_type == 'bot_error', 'request_restart' or 'bot_rebooting'
+  # event_type == 'bot_error', 'request_restart', 'bot_rebooting' or
+  # 'bot_shutdown'.
   message = ndb.TextProperty()
 
   @property

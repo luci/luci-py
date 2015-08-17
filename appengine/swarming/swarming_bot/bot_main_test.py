@@ -9,6 +9,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import unittest
 
@@ -147,7 +148,7 @@ class TestBotMain(net_utils.TestCase):
     class Foo(Exception):
       pass
 
-    def poll_server(botobj):
+    def poll_server(botobj, _):
       sleep_streak = botobj.state['sleep_streak']
       self.assertEqual(botobj.remote, self.server)
       if sleep_streak == 5:
@@ -180,7 +181,8 @@ class TestBotMain(net_utils.TestCase):
 
   def test_poll_server_sleep(self):
     slept = []
-    self.mock(time, 'sleep', slept.append)
+    bit = threading.Event()
+    self.mock(bit, 'wait', slept.append)
     self.mock(bot_main, 'run_manifest', self.fail)
     self.mock(bot_main, 'update_bot', self.fail)
 
@@ -203,12 +205,13 @@ class TestBotMain(net_utils.TestCase):
             },
           ),
         ])
-    self.assertFalse(bot_main.poll_server(self.bot))
+    self.assertFalse(bot_main.poll_server(self.bot, bit))
     self.assertEqual([1.24], slept)
 
   def test_poll_server_run(self):
     manifest = []
-    self.mock(time, 'sleep', self.fail)
+    bit = threading.Event()
+    self.mock(bit, 'wait', self.fail)
     self.mock(bot_main, 'run_manifest', lambda *args: manifest.append(args))
     self.mock(bot_main, 'update_bot', self.fail)
 
@@ -231,13 +234,14 @@ class TestBotMain(net_utils.TestCase):
             },
           ),
         ])
-    self.assertTrue(bot_main.poll_server(self.bot))
+    self.assertTrue(bot_main.poll_server(self.bot, bit))
     expected = [(self.bot, {'foo': 'bar'}, time.time())]
     self.assertEqual(expected, manifest)
 
   def test_poll_server_update(self):
     update = []
-    self.mock(time, 'sleep', self.fail)
+    bit = threading.Event()
+    self.mock(bit, 'wait', self.fail)
     self.mock(bot_main, 'run_manifest', self.fail)
     self.mock(bot_main, 'update_bot', lambda *args: update.append(args))
 
@@ -260,12 +264,13 @@ class TestBotMain(net_utils.TestCase):
             },
           ),
         ])
-    self.assertTrue(bot_main.poll_server(self.bot))
+    self.assertTrue(bot_main.poll_server(self.bot, bit))
     self.assertEqual([(self.bot, '123')], update)
 
   def test_poll_server_restart(self):
     restart = []
-    self.mock(time, 'sleep', self.fail)
+    bit = threading.Event()
+    self.mock(bit, 'wait', self.fail)
     self.mock(bot_main, 'run_manifest', self.fail)
     self.mock(bot_main, 'update_bot', self.fail)
     self.mock(self.bot, 'restart', lambda *args: restart.append(args))
@@ -289,12 +294,13 @@ class TestBotMain(net_utils.TestCase):
             },
           ),
         ])
-    self.assertTrue(bot_main.poll_server(self.bot))
+    self.assertTrue(bot_main.poll_server(self.bot, bit))
     self.assertEqual([('Please die now',)], restart)
 
   def test_poll_server_restart_load_test(self):
     os.environ['SWARMING_LOAD_TEST'] = '1'
-    self.mock(time, 'sleep', self.fail)
+    bit = threading.Event()
+    self.mock(bit, 'wait', self.fail)
     self.mock(bot_main, 'run_manifest', self.fail)
     self.mock(bot_main, 'update_bot', self.fail)
     self.mock(self.bot, 'restart', self.fail)
@@ -318,7 +324,7 @@ class TestBotMain(net_utils.TestCase):
             },
           ),
         ])
-    self.assertTrue(bot_main.poll_server(self.bot))
+    self.assertTrue(bot_main.poll_server(self.bot, bit))
 
   def _mock_popen(self, returncode, url='https://localhost:1'):
     # Method should have "self" as first argument - pylint: disable=E0213
@@ -422,9 +428,7 @@ class TestBotMain(net_utils.TestCase):
     expected = [(self.bot, 'Internal exception occured: Dang', '24')]
     self.assertEqual(expected, posted)
 
-  def test_update_bot_linux(self):
-    self.mock(sys, 'platform', 'linux2')
-
+  def test_update_bot(self):
     # In a real case 'update_bot' never exits and doesn't call 'post_error'.
     # Under the test however forever-blocking calls finish, and post_error is
     # called.
@@ -433,30 +437,17 @@ class TestBotMain(net_utils.TestCase):
     self.mock(net, 'url_retrieve', lambda *_: True)
 
     calls = []
-    cmd = [sys.executable, 'swarming_bot.2.zip', 'start_slave', '--survive']
-    self.mock(subprocess, 'Popen', self.fail)
-    self.mock(os, 'execv', lambda *args: calls.append(args))
+    def exec_python(args):
+      calls.append(args)
+      return 23
+    self.mock(bot_main.common, 'exec_python', exec_python)
 
-    bot_main.update_bot(self.bot, '123')
-    self.assertEqual([(sys.executable, cmd)], calls)
-
-  def test_update_bot_win(self):
-    self.mock(sys, 'platform', 'win32')
-
-    # In a real case 'update_bot' never exists and doesn't call 'post_error'.
-    # Under the test forever blocking calls
-    self.mock(self.bot, 'post_error', lambda *_: None)
-    self.mock(bot_main, 'THIS_FILE', 'swarming_bot.1.zip')
-    self.mock(net, 'url_retrieve', lambda *_: True)
-
-    calls = []
-    cmd = [sys.executable, 'swarming_bot.2.zip', 'start_slave', '--survive']
-    self.mock(subprocess, 'Popen', lambda *args: calls.append(args))
-    self.mock(os, 'execv', self.fail)
-
-    with self.assertRaises(SystemExit):
+    with self.assertRaises(SystemExit) as e:
       bot_main.update_bot(self.bot, '123')
-    self.assertEqual([(cmd,)], calls)
+    self.assertEqual(23, e.exception.code)
+
+    cmd = ['swarming_bot.2.zip', 'start_slave', '--survive']
+    self.assertEqual([cmd], calls)
 
   def test_get_config(self):
     expected = {

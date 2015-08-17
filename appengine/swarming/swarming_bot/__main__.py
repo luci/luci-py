@@ -15,9 +15,12 @@ import logging
 import os
 import optparse
 import shutil
+import signal
 import subprocess
 import sys
 import zipfile
+
+import common
 
 from utils import logging_utils
 from utils import zip_package
@@ -90,16 +93,7 @@ def CMDstart_slave(args):
     logging.exception('bot_config.py is invalid.')
 
   logging.info('Starting the bot: %s', THIS_FILE)
-  cmd = [sys.executable, THIS_FILE, 'start_bot']
-  if sys.platform in ('cygwin', 'win32'):
-    try:
-      subprocess.Popen(cmd)
-      return 0
-    except Exception as e:
-      logging.exception('failed to start: %s', e)
-      return 1
-  else:
-    os.execv(cmd[0], cmd)
+  return common.exec_python([THIS_FILE, 'start_bot'])
 
 
 def CMDrestart(_args):
@@ -132,17 +126,9 @@ def main():
     if os.path.isfile('swarming_bot.1.zip'):
       os.remove('swarming_bot.1.zip')
     shutil.copyfile('swarming_bot.zip', 'swarming_bot.1.zip')
-    cmd = [sys.executable, 'swarming_bot.1.zip'] + sys.argv[1:]
+    cmd = ['swarming_bot.1.zip'] + sys.argv[1:]
     print >> sys.stderr, 'cmd: %s' % cmd
-    if sys.platform in ('cygwin', 'win32'):
-      try:
-        subprocess.Popen(cmd)
-        return 0
-      except Exception as e:
-        logging.exception('failed to start: %s', e)
-        return 1
-    else:
-      os.execv(cmd[0], cmd)
+    return common.exec_python(cmd)
 
   # sys.argv[0] is the zip file itself.
   cmd = 'start_slave'

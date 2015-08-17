@@ -16,7 +16,6 @@ def init_symlinks(root):
   """
   if sys.platform != 'win32':
     return
-  print root
   for i in os.listdir(root):
     if '.' in i:
       continue

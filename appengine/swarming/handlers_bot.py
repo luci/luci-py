@@ -437,7 +437,7 @@ class BotEventHandler(_BotBaseHandler):
     (request, bot_id, version, state,
         dimensions, quarantined_msg) = self._process()
     event = request.get('event')
-    if event not in ('bot_error', 'bot_rebooting'):
+    if event not in ('bot_error', 'bot_rebooting', 'bot_shutdown'):
       self.abort_with_error(400, error='Unsupported event type')
     message = request.get('message')
     bot_management.bot_event(

@@ -20,16 +20,20 @@ import logging
 import optparse
 import os
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import traceback
 import zipfile
 
 import bot
+import common
 import os_utilities
 import xsrf_client
+from utils import subprocess42
 from utils import logging_utils
 from utils import net
 from utils import on_error
@@ -255,49 +259,74 @@ def get_bot():
 
 
 def run_bot(arg_error):
-  """Runs the bot until it reboots or self-update."""
-  try:
-    # First thing is to get an arbitrary url. This also ensures the network is
-    # up and running, which is necessary before trying to get the FQDN below.
-    resp = get_remote().url_read('/swarming/api/v1/bot/server_ping')
-    if resp is None:
-      logging.error('No response from server_ping')
-  except Exception as e:
-    # url_read() already traps pretty much every exceptions. This except clause
-    # is kept there "just in case".
-    logging.exception('server_ping threw')
+  """Runs the bot until it reboots or self-update or a signal is received.
 
-  # If this fails, there's hardly anything that can be done, the bot can't even
-  # get to the point to be able to self-update.
-  botobj = get_bot()
-  if arg_error:
-    botobj.post_error('Argument error: %s' % arg_error)
+  When a signal is received, simply exit.
+  """
+  quit_bit = threading.Event()
+  def handler(sig, _):
+    logging.info('Got signal %s', sig)
+    quit_bit.set()
 
-  call_hook(botobj, 'on_bot_startup')
+  # TODO(maruel): Set quit_bit when stdin is closed on Windows.
 
-  # This environment variable is accessible to the tasks executed by this bot.
-  os.environ['SWARMING_BOT_ID'] = botobj.id.encode('utf-8')
-
-  # TODO(maruel): Run 'health check' on startup.
-  # https://code.google.com/p/swarming/issues/detail?id=112
-  consecutive_sleeps = 0
-  while True:
+  with subprocess42.set_signal_handler(subprocess42.STOP_SIGNALS, handler):
     try:
-      botobj.update_dimensions(get_dimensions())
-      botobj.update_state(get_state(consecutive_sleeps))
-      did_something = poll_server(botobj)
-      if did_something:
-        consecutive_sleeps = 0
-      else:
-        consecutive_sleeps += 1
+      # First thing is to get an arbitrary url. This also ensures the network is
+      # up and running, which is necessary before trying to get the FQDN below.
+      resp = get_remote().url_read('/swarming/api/v1/bot/server_ping')
+      if resp is None:
+        logging.error('No response from server_ping')
     except Exception as e:
-      logging.exception('poll_server failed')
-      msg = '%s\n%s' % (e, traceback.format_exc()[-2048:])
-      botobj.post_error(msg)
-      consecutive_sleeps = 0
+      # url_read() already traps pretty much every exceptions. This except
+      # clause is kept there "just in case".
+      logging.exception('server_ping threw')
+
+    if quit_bit.is_set():
+      return 0
+
+    # If this fails, there's hardly anything that can be done, the bot can't
+    # even get to the point to be able to self-update.
+    botobj = get_bot()
+    if arg_error:
+      botobj.post_error('Argument error: %s' % arg_error)
+
+    if quit_bit.is_set():
+      return 0
+
+    call_hook(botobj, 'on_bot_startup')
+
+    if quit_bit.is_set():
+      return 0
+
+    # This environment variable is accessible to the tasks executed by this bot.
+    os.environ['SWARMING_BOT_ID'] = botobj.id.encode('utf-8')
+
+    # TODO(maruel): Run 'health check' on startup.
+    # https://code.google.com/p/swarming/issues/detail?id=112
+    consecutive_sleeps = 0
+    while not quit_bit.is_set():
+      try:
+        botobj.update_dimensions(get_dimensions())
+        botobj.update_state(get_state(consecutive_sleeps))
+        did_something = poll_server(botobj, quit_bit)
+        if did_something:
+          consecutive_sleeps = 0
+        else:
+          consecutive_sleeps += 1
+      except Exception as e:
+        logging.exception('poll_server failed')
+        msg = '%s\n%s' % (e, traceback.format_exc()[-2048:])
+        botobj.post_error(msg)
+        consecutive_sleeps = 0
+
+  # Tell the server we are going away.
+  botobj.post_event('bot_shutdown', 'Signal was received')
+  botobj.cancel_all_timers()
+  return 0
 
 
-def poll_server(botobj):
+def poll_server(botobj, quit_bit):
   """Polls the server to run one loop.
 
   Returns True if executed some action, False if server asked the bot to sleep.
@@ -310,7 +339,7 @@ def poll_server(botobj):
 
   cmd = resp['cmd']
   if cmd == 'sleep':
-    time.sleep(resp['duration'])
+    quit_bit.wait(resp['duration'])
     return False
 
   if cmd == 'run':
@@ -451,28 +480,16 @@ def update_bot(botobj, version):
   sys.stdout.flush()
   sys.stderr.flush()
 
-  cmd = [sys.executable, new_zip, 'start_slave', '--survive']
   # Do not call on_bot_shutdown.
-  if sys.platform in ('cygwin', 'win32'):
-    # (Tentative) It is expected that subprocess.Popen() behaves a tad better
-    # on Windows than os.exec*(), which has to be emulated since there's no OS
-    # provided implementation. This means processes will accumulate as the bot
-    # is restarted, which could be a problem long term.
-    try:
-      subprocess.Popen(cmd)
-    except Exception as e:
-      logging.exception('failed to respawn: %s', e)
-    else:
-      sys.exit(0)
-  else:
-    # On OSX, launchd will be unhappy if we quit so the old code bot process
-    # has to outlive the new code child process. Launchd really wants the main
-    # process to survive, and it'll restart it if it disappears. os.exec*()
-    # replaces the process so this is fine.
-    os.execv(sys.executable, cmd)
+  # On OSX, launchd will be unhappy if we quit so the old code bot process has
+  # to outlive the new code child process. Launchd really wants the main process
+  # to survive, and it'll restart it if it disappears. os.exec*() replaces the
+  # process so this is fine.
+  ret = common.exec_python([new_zip, 'start_slave', '--survive'])
 
   # This code runs only if bot failed to respawn itself.
   botobj.post_error('Bot failed to respawn after update')
+  sys.exit(ret)
 
 
 def update_lkgbc():

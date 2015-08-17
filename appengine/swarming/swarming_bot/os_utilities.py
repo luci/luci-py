@@ -578,7 +578,7 @@ def _get_metadata_gce():
     return json.load(
         urllib2.urlopen(urllib2.Request(url, headers=headers), timeout=5))
   except IOError as e:
-    logging.error('GCE metadata not available: %s', e)
+    logging.info('GCE metadata not available: %s', e)
     return None
 
 
@@ -964,7 +964,7 @@ def get_machine_type():
   ram_gb = get_physical_ram() / 1024.
   cores = get_num_processors()
   ram_gb_per_core = ram_gb / cores
-  logging.info('RAM GB/core = %s', ram_gb_per_core)
+  logging.info('RAM GB/core = %.3f', ram_gb_per_core)
   best_fit = None
   for ratio, prefix in GCE_RAM_GB_PER_CORE_RATIOS.iteritems():
     delta = (ram_gb_per_core-ratio)**2

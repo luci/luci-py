@@ -36,6 +36,7 @@ FILES = (
     'client/isolated_format.py',
     'client/isolateserver.py',
     'client/run_isolated.py',
+    'common.py',
     'os_utilities.py',
     'task_runner.py',
     'third_party/__init__.py',
