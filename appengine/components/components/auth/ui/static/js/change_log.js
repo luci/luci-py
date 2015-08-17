@@ -331,7 +331,7 @@ ChangeLogTable.prototype.updatePagerButtons = function() {
   var hasPrev = this.prevCursor.length > 0;
   $('#next', this.$pager).parent().toggleClass('disabled', !this.nextCursor);
   $('#prev', this.$pager).parent().toggleClass('disabled', !hasPrev);
-  this.$pager.toggle(this.nextCursor || hasPrev);
+  this.$pager.toggleClass('hide', !this.nextCursor && !hasPrev);
 };
 
 
