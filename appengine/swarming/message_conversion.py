@@ -24,172 +24,110 @@ from protorpc import remote
 import swarming_rpcs
 
 from components import utils
+from server import task_request
+from server import task_result
 
 
-def _parse_date(date):
-  if isinstance(date, datetime.datetime):
-    return date
-  for f in utils.VALID_DATETIME_FORMATS:
-    try:
-      return datetime.datetime.strptime(date, f)
-    except ValueError:
-      continue
-  return None
-
-
-def _populate_rpc(message_class, entity_dict, field_map, name=None):
-  if name is None:
-    name = message_class.__name__
-  result = message_class()
-  for field, (functor, required) in field_map.iteritems():
-    # "normal" case: fields match and all is well
-    if field in entity_dict:
-
-      # just pass the argument if no functor is supplied
-      if functor is None:
-        functor = lambda x: x
-      value = entity_dict[field]
-
-      # values of None are to be omitted
-      if value is not None:
-        value = functor(value)
-        setattr(result, field, value)
-
-    # ignore optional absent fields; raise exception for required absent fields
-    elif required:
-      raise endpoints.BadRequestException(
-          '%s is missing required field %s.' % (name, field))
-  return result
-
-
-def _data_from_dict(pair_list):
+def _string_pairs_from_list(pair_list):
   return [swarming_rpcs.StringPair(key=k, value=v) for k, v in pair_list]
 
 
 def _string_pairs_from_dict(dictionary):
-  return [swarming_rpcs.StringPair(
-      key=k, value=v) for k, v in sorted(dictionary.iteritems())]
+  return [
+    swarming_rpcs.StringPair(key=k, value=v)
+    for k, v in sorted(dictionary.iteritems())
+  ]
 
 
 def _string_list_pairs_from_dict(dictionary):
-  return [swarming_rpcs.StringListPair(
-      key=k, value=v) for k, v in sorted(dictionary.iteritems())]
+  return [
+    swarming_rpcs.StringListPair(key=k, value=v)
+    for k, v in sorted(dictionary.iteritems())
+  ]
 
 
-def _timestamp_to_secs(start, finish):
-  start = _parse_date(start)
-  finish = _parse_date(finish)
-  return int((finish - start).total_seconds())
+def _ndb_to_rpc(cls, entity, **overrides):
+  members = (f.name for f in cls.all_fields())
+  kwargs = {m: getattr(entity, m) for m in members if not m in overrides}
+  kwargs.update(overrides)
+  return cls(**kwargs)
 
 
-def _wrap_in_list(item):
-  if isinstance(item, (list, tuple)):
-    return item
-  return [item]
-
-
-def properties_from_dict(entity_dict):
-  entity_dict = entity_dict.copy()
-  entity_dict['command'] = entity_dict['commands'][0]
-  field_map = {
-    'command': (None, False),
-    'data': (_data_from_dict, False),
-    'dimensions': (_string_pairs_from_dict, False),
-    'env': (_string_pairs_from_dict, False),
-    'execution_timeout_secs': (None, False),
-    'extra_args': (None, False),
-    'grace_period_secs': (None, False),
-    'idempotent': (None, False),
-    'io_timeout_secs': (None, False),
-    'isolated': (None, False),
-    'isolatedserver': (None, False),
-    'namespace': (None, False),
+def _rpc_to_ndb(cls, entity, **overrides):
+  kwargs = {
+    m: getattr(entity, m) for m in cls._properties if not m in overrides
   }
-  return _populate_rpc(swarming_rpcs.TaskProperty, entity_dict, field_map)
+  kwargs.update(overrides)
+  return cls(**kwargs)
 
 
-def bot_info_from_dict(entity_dict):
-  field_map = {
-    'dimensions': (_string_list_pairs_from_dict, False),
-    'external_ip': (None, False),
-    'first_seen_ts': (_parse_date, False),
-    'id': (None, False),
-    'is_busy': (None, False),
-    'last_seen_ts': (_parse_date, False),
-    'quarantined': (None, False),
-    'task_id': (None, False),
-    'task_name': (None, False),
-    'version': (None, False)}
-  return _populate_rpc(swarming_rpcs.BotInfo, entity_dict, field_map)
+def bot_info_to_rpc(entity, now):
+  """"Returns a swarming_rpcs.BotInfo from a bot.BotInfo."""
+  return _ndb_to_rpc(
+      swarming_rpcs.BotInfo,
+      entity,
+      dimensions=_string_list_pairs_from_dict(entity.dimensions),
+      is_dead=entity.is_dead(now),
+      bot_id=entity.id)
 
 
-def task_request_from_dict(entity_dict):
-  entity_dict = entity_dict.copy()
-  for field in ['created_ts', 'expiration_ts']:
-    if entity_dict.get(field) is None:
-      raise endpoints.BadRequestException(
-          'TaskRequest is missing required field %s.' % field)
-  entity_dict['expiration_secs'] = _timestamp_to_secs(
-      entity_dict['created_ts'], entity_dict['expiration_ts'])
-  entity_dict['tag'] = entity_dict.pop('tags', [])
-  field_map = {
-    'authenticated': (
-      lambda x: '='.join(x) if isinstance(x, (list, tuple)) else x, False),
-    'created_ts': (_parse_date, False),
-    'expiration_secs': (None, True),
-    'name': (None, True),
-    'parent_task_id': (None, False),
-    'properties': (properties_from_dict, True),
-    'priority': (None, False),
-    'tag': (None, False),
-    'user': (None, False)}
-  return _populate_rpc(swarming_rpcs.TaskRequest, entity_dict, field_map)
+def task_request_to_rpc(entity):
+  """"Returns a swarming_rpcs.TaskRequest from a task_request.TaskRequest."""
+  assert entity.__class__ is task_request.TaskRequest
+  props = entity.properties
+  properties = _ndb_to_rpc(
+      swarming_rpcs.TaskProperties,
+      props,
+      command=(props.commands or [[]])[0],
+      dimensions=_string_pairs_from_dict(props.dimensions),
+      data=_string_pairs_from_list(props.data),
+      extra_args=props.extra_args or [],
+      env=_string_pairs_from_dict(props.env))
+
+  return _ndb_to_rpc(
+      swarming_rpcs.TaskRequest,
+      entity,
+      authenticated=entity.authenticated.to_bytes(),
+      properties=properties)
 
 
-def _task_result_common_from_dict(
-    entity_dict, entity_type, additional_fields):
-  entity_dict = entity_dict.copy()
-  durations = entity_dict.get('durations')
-  exit_codes = entity_dict.get('exit_codes')
-  if durations:
-    entity_dict['duration'] = durations[0]
-  if exit_codes:
-    entity_dict['exit_code'] = exit_codes[0]
+def task_request_from_rpc(msg):
+  """"Returns a task_request.TaskRequest from a swarming_rpcs.TaskRequest."""
+  assert msg.__class__ is swarming_rpcs.TaskRequest
+  props = msg.properties
+  properties = _rpc_to_ndb(
+      task_request.TaskProperties,
+      props,
+      commands=[props.command],
+      dimensions=dict(props.dimensions),
+      data=[[d.key, d.value] for d in props.data],
+      env=dict(props.env),
+      inputs_ref=None)
 
-  # field map of shared attributes
-  field_map = {
-    'abandoned_ts': (_parse_date, False),
-    'bot_id': (None, False),
-    'children_task_ids': (None, False),
-    'completed_ts': (_parse_date, False),
-    'cost_saved_usd': (None, False),
-    'created_ts': (_parse_date, False),
-    'deduped_from': (None, False),
-    'duration': (None, False),
-    'exit_code': (None, False),
-    'failure': (None, False),
-    'id': (None, False),
-    'internal_failure': (None, False),
-    'modified_ts': (_parse_date, False),
-    'started_ts': (_parse_date, False),
-    'state': (swarming_rpcs.StateField, False),
-    'try_number': (None, False)}
-
-  # add any additional attributes
-  field_map.update(additional_fields)
-  return _populate_rpc(entity_type, entity_dict, field_map)
+  expiration_ts = msg.created_ts+datetime.timedelta(seconds=msg.expiration_secs)
+  return _rpc_to_ndb(
+      task_request.TaskRequest,
+      msg,
+      expiration_ts=expiration_ts,
+      # It is set in task_request.make_request().
+      authenticated=None,
+      properties=properties)
 
 
-def task_result_summary_from_dict(entity_dict):
-  field_map = {
-    'costs_usd': (_wrap_in_list, False),
-    'name': (None, False),
-    'user': (None, False)}
-  return _task_result_common_from_dict(
-      entity_dict, swarming_rpcs.TaskResultSummary, field_map)
-
-
-def task_run_result_from_dict(entity_dict):
-  field_map = {'cost_usd': (None, False)}
-  return _task_result_common_from_dict(
-      entity_dict, swarming_rpcs.TaskRunResult, field_map)
+def task_result_to_rpc(entity):
+  """"Returns a swarming_rpcs.TaskResult from a task_result.TaskResultSummary or
+  task_result.TaskRunResult.
+  """
+  kwargs = {
+    'duration': (entity.durations or [None])[0],
+    'exit_code': (entity.exit_codes or [None])[0],
+    'state': swarming_rpcs.StateField(entity.state),
+  }
+  if entity.__class__ is task_result.TaskRunResult:
+    kwargs['costs_usd'] = []
+    if entity.cost_usd is not None:
+      kwargs['costs_usd'].append(entity.cost_usd)
+    kwargs['user'] = None
+  else:
+    assert entity.__class__ is task_result.TaskResultSummary, entity
+  return _ndb_to_rpc(swarming_rpcs.TaskResult, entity, **kwargs)

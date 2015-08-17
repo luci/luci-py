@@ -82,18 +82,18 @@ class TaskApiTest(BaseTest):
         expiration_secs=30,
         name='job1',
         priority=200,
-        properties=swarming_rpcs.TaskProperty(
+        properties=swarming_rpcs.TaskProperties(
             command=['rm', '-rf', '/'],
             data=[swarming_rpcs.StringPair(key='foo', value='bar')],
             dimensions=[],
             env=[],
             execution_timeout_secs=30,
             io_timeout_secs=30),
-        tag=['foo:bar'],
+        tags=['foo:bar'],
         user='joe@localhost')
     expected = {
       u'request': {
-        u'authenticated': u'anonymous=anonymous',
+        u'authenticated': u'anonymous:anonymous',
         u'created_ts': str_now,
         u'expiration_secs': u'30',
         u'name': u'job1',
@@ -106,7 +106,7 @@ class TaskApiTest(BaseTest):
           u'idempotent': False,
           u'io_timeout_secs': u'30',
         },
-        u'tag': [
+        u'tags': [
           u'foo:bar',
           u'priority:200',
           u'user:joe@localhost',
@@ -138,11 +138,11 @@ class TaskApiTest(BaseTest):
       u'abandoned_ts': str_now,
       u'created_ts': str_now,
       u'failure': False,
-      u'id': task_id,
       u'internal_failure': False,
       u'modified_ts': str_now,
       u'name': u'hi',
       u'state': u'CANCELED',
+      u'task_id': task_id,
       u'user': u'joe@localhost',
     }
     response = self.call_api('result', message_to_dict(request), 200)
@@ -168,11 +168,11 @@ class TaskApiTest(BaseTest):
     expected = {
       u'created_ts': str_now,
       u'failure': False,
-      u'id': u'5cee488008810',
       u'internal_failure': False,
       u'modified_ts': str_now,
       u'name': u'hi',
       u'state': u'PENDING',
+      u'task_id': u'5cee488008810',
       u'user': u'joe@localhost',
     }
     self.assertEqual(expected, response.json)
@@ -190,37 +190,43 @@ class TaskApiTest(BaseTest):
     response = self.call_api('result', message_to_dict(request), 200)
     expected = {
       u'bot_id': u'bot1',
+      u'costs_usd': [0.0],
+      u'created_ts': str_now,
       u'failure': False,
-      u'id': u'5cee488008811',
       u'internal_failure': False,
       u'modified_ts': str_now,
+      u'name': u'hi',
       u'started_ts': str_now,
       u'state': u'RUNNING',
+      u'task_id': u'5cee488008811',
       u'try_number': u'1',
     }
     self.assertEqual(expected, response.json)
 
   def test_result_completed_task(self):
     """Tests that completed tasks are correctly reported."""
+    now = datetime.datetime(2010, 1, 2, 3, 4, 5, 6)
+    str_now = unicode(now.strftime(self.DATETIME_FORMAT))
+    self.mock_now(now)
     self.client_create_task_raw()
     self.set_as_bot()
-    now = datetime.datetime(2010, 1, 2, 3, 4, 5, 6)
-    str_now = unicode(now.strftime(self.DATETIME_NO_MICRO))
-    self.mock_now(now)
     task_id = self.bot_run_task()
     request = swarming_rpcs.TaskId(task_id=task_id)
     response = self.call_api('result', message_to_dict(request), 200)
     expected = {
       u'bot_id': u'bot1',
+      u'costs_usd': [0.1],
+      u'created_ts': str_now,
       u'completed_ts': str_now,
       u'duration': 0.1,
       u'exit_code': u'0',
       u'failure': False,
-      u'id': task_id,
       u'internal_failure': False,
       u'modified_ts': str_now,
+      u'name': u'hi',
       u'started_ts': str_now,
       u'state': u'COMPLETED',
+      u'task_id': task_id,
       u'try_number': u'1',
     }
     self.assertEqual(expected, response.json)
@@ -304,8 +310,8 @@ class TaskApiTest(BaseTest):
     request = swarming_rpcs.TaskId(task_id=task_id)
     response = self.call_api('request', message_to_dict(request), 200)
     expected = {
-      u'authenticated': u'user=user@example.com',
-      u'created_ts': unicode(now.strftime(self.DATETIME_NO_MICRO)),
+      u'authenticated': u'user:user@example.com',
+      u'created_ts': unicode(now.strftime(self.DATETIME_FORMAT)),
       u'expiration_secs': unicode(24 * 60 * 60),
       u'name': u'hi',
       u'priority': u'10',
@@ -317,7 +323,7 @@ class TaskApiTest(BaseTest):
         u'idempotent': False,
         u'io_timeout_secs': u'1200',
       },
-      u'tag': [u'os:Amiga', u'priority:10', u'user:joe@localhost'],
+      u'tags': [u'os:Amiga', u'priority:10', u'user:joe@localhost'],
       u'user': u'joe@localhost',
     }
     self.assertEqual(expected, response.json)
@@ -363,14 +369,15 @@ class TaskApiTest(BaseTest):
         u'duration': 0.1,
         u'exit_code': u'0',
         u'failure': False,
-        u'id': u'5cfcee8008810',
         u'internal_failure': False,
         u'modified_ts': str_now_60,
         u'name': u'second',
         u'started_ts': str_now,
         u'state': u'COMPLETED',
+        u'task_id': u'5cfcee8008810',
         u'try_number': u'0',
-        u'user': u'jack@localhost'},
+        u'user': u'jack@localhost',
+      },
       {
         u'bot_id': u'bot1',
         u'costs_usd': [0.1],
@@ -379,14 +386,16 @@ class TaskApiTest(BaseTest):
         u'duration': 0.1,
         u'exit_code': u'0',
         u'failure': False,
-        u'id': u'5cee488006610',
         u'internal_failure': False,
         u'modified_ts': str_now,
         u'name': u'first',
         u'started_ts': str_now,
         u'state': u'COMPLETED',
+        u'task_id': u'5cee488006610',
         u'try_number': u'1',
-        u'user': u'joe@localhost'}]
+        u'user': u'joe@localhost'
+      },
+    ]
     second, _ = task_results
     expected = {
       u'items': task_results}
@@ -395,19 +404,19 @@ class TaskApiTest(BaseTest):
 
     # try with a tag: should still only contain second
     request = swarming_rpcs.TasksRequest(
-        end=end, start=start, tag=['project:yay', 'commit:pre'])
+        end=end, start=start, tags=['project:yay', 'commit:pre'])
     response = self.call_api('list', message_to_dict(request), 200)
     self.assertEqual({u'items': [second]}, response.json)
 
     # try with a spurious tag: items should be empty
-    request = swarming_rpcs.TasksRequest(end=end, start=start, tag=['foo:bar'])
+    request = swarming_rpcs.TasksRequest(end=end, start=start, tags=['foo:bar'])
     expected.pop('items')
     response = self.call_api('list', message_to_dict(request), 200)
     self.assertEqual(expected, response.json)
 
     # try with multiple sort/filter options
     request = swarming_rpcs.TasksRequest(
-        end=end, start=start, tag=['foo:bar'],
+        end=end, start=start, tags=['foo:bar'],
         state=swarming_rpcs.TaskState.PENDING)
     with self.call_should_fail('400'):
       self.call_api('list', message_to_dict(request), 200)
@@ -430,12 +439,14 @@ class BotApiTest(BaseTest):
     expected = {
       u'items': [
         {
+          u'bot_id': u'id1',
           u'dimensions': [
             {u'key': u'foo', u'value': [u'bar']},
-            {u'key': u'id', u'value': [u'id1']}],
+            {u'key': u'id', u'value': [u'id1']},
+          ],
           u'external_ip': u'8.8.4.4',
           u'first_seen_ts': now_str,
-          u'id': u'id1',
+          u'is_dead': False,
           u'last_seen_ts': now_str,
           u'quarantined': False,
           u'version': u'123456789',
@@ -460,12 +471,14 @@ class BotApiTest(BaseTest):
         version='123456789', quarantined=False, task_id=None, task_name=None)
 
     expected = {
+      u'bot_id': u'id1',
       u'dimensions': [
         {u'key': u'foo', u'value': [u'bar']},
-        {u'key': u'id', u'value': [u'id1']}],
+        {u'key': u'id', u'value': [u'id1']},
+      ],
       u'external_ip': u'8.8.4.4',
       u'first_seen_ts': now_str,
-      u'id': u'id1',
+      u'is_dead': False,
       u'last_seen_ts': now_str,
       u'quarantined': False,
       u'version': u'123456789',
@@ -517,7 +530,7 @@ class BotApiTest(BaseTest):
     self.bot_complete_task(token, task_id=res['manifest']['task_id'])
 
     now_1 = self.mock_now(now, 1)
-    now_1_str = unicode(now_1.strftime(self.DATETIME_NO_MICRO))
+    now_1_str = unicode(now_1.strftime(self.DATETIME_FORMAT))
     self.mock(random, 'getrandbits', lambda _: 0x55)
     self.client_create_task_raw(name='philbert')
     token, _ = self.get_bot_token()
@@ -532,19 +545,24 @@ class BotApiTest(BaseTest):
     self.set_as_privileged_user()
     response = self.call_api('tasks', message_to_dict(request), 200)
     expected = {
-      u'items': [{
-        u'bot_id': u'bot1',
-        u'completed_ts': now_1_str,
-        u'cost_usd': 0.1,
-        u'duration': 0.1,
-        u'exit_code': u'1',
-        u'failure': True,
-        u'id': u'5cee870005511',
-        u'internal_failure': False,
-        u'modified_ts': now_1_str,
-        u'started_ts': now_1_str,
-        u'state': u'COMPLETED',
-        u'try_number': u'1'}],
+      u'items': [
+        {
+          u'bot_id': u'bot1',
+          u'completed_ts': now_1_str,
+          u'costs_usd': [0.1],
+          u'created_ts': now_1_str,
+          u'duration': 0.1,
+          u'exit_code': u'1',
+          u'failure': True,
+          u'internal_failure': False,
+          u'modified_ts': now_1_str,
+          u'name': u'philbert',
+          u'started_ts': now_1_str,
+          u'state': u'COMPLETED',
+          u'task_id': u'5cee870005511',
+          u'try_number': u'1',
+        },
+      ],
       u'now': unicode(now_1.strftime(self.DATETIME_FORMAT)),
     }
     json_version = response.json

@@ -126,7 +126,7 @@
         <td>Parent task</td>
         <td>
           {% if parent_task %}
-            <a href="/user/task/{{parent_task.key_packed}}">{{parent_task.name}}</a>
+            <a href="/user/task/{{parent_task.task_id}}">{{parent_task.name}}</a>
           {% else %}
             &#8209;&#8209;
           {% endif %}
@@ -140,7 +140,7 @@
   <div class="spaced">
     <h2 class="inline">Request properties</h2>
     {% if is_privileged_user %}
-      <form method="POST" action="/user/task/{{task.key_packed}}/retry" style="display:inline">
+      <form method="POST" action="/user/task/{{task.task_id}}/retry" style="display:inline">
         <input type="submit" value="Retry" style="display:inline"></input>
         <input type="hidden" name="xsrf_token" value="{{xsrf_token}}" />
       </form>
@@ -188,7 +188,7 @@
         <td>Previous task</td>
         <td>
           {% if previous_task %}
-          <a href="/user/task/{{previous_task.key_packed}}">
+          <a href="/user/task/{{previous_task.task_id}}">
             &#x2190; {{previous_task.name}}
           </a>
           {% else %}
@@ -200,7 +200,7 @@
         <td>Following task</td>
         <td>
           {% if following_task %}
-          <a href="/user/task/{{following_task.key_packed}}">
+          <a href="/user/task/{{following_task.task_id}}">
             {{following_task.name}} &#x2192;
           </a>
           {% else %}
@@ -254,7 +254,7 @@
           {% if task.can_be_canceled and is_admin %}
             <form id="cancel" method="post" action="/user/tasks/cancel">
               <input type="hidden" name="xsrf_token" value="{{xsrf_token}}" />
-              <input type="hidden" name="task_id" value="{{task.key_packed}}" />
+              <input type="hidden" name="task_id" value="{{task.task_id}}" />
               <input type="submit" value="Cancel" />
             </form>
           {% endif %}
@@ -303,7 +303,7 @@
         <td>
           {% if children_tasks %}
             {% for children in children_tasks %}
-              <a href="/user/task/{{children.key_packed}}">{{children.name}}</a>
+              <a href="/user/task/{{children.task_id}}">{{children.name}}</a>
               <br>
             {% endfor %}
           {% else %}
@@ -349,9 +349,9 @@
 <div class=help_text>
 <h2>Help</h2>
 <span style="margin-bottom:0">To run this task locally, execute:</span>
-<pre style="margin-top:0">  python swarming.py reproduce -S {{host_url}} {{task.key_packed}}</pre>
+<pre style="margin-top:0">  python swarming.py reproduce -S {{host_url}} {{task.task_id}}</pre>
 <span style="margin-bottom:0">Download task output results from ISOLATED_OUTDIR into directory "foo":</span>
-<pre style="margin-top:0">  python swarming.py collect -S {{host_url}} --task-output-dir=foo {{task.key_packed}}</pre>
+<pre style="margin-top:0">  python swarming.py collect -S {{host_url}} --task-output-dir=foo {{task.task_id}}</pre>
 <span style="margin-bottom:0">Looking for swarming.py?</span>
 <pre style="margin-top:0">  git clone https://code.google.com/p/swarming.client.git</pre>
 </div>

@@ -27,30 +27,34 @@ from server import task_request
 # pylint: disable=W0212
 
 
-def _gen_request_data(properties=None, **kwargs):
-  base_data = {
+def _gen_request(properties=None, **kwargs):
+  """Creates a TaskRequest."""
+  props = {
+    'commands': [[u'command1', u'arg1']],
+    'data': [
+      [u'http://localhost/foo', u'foo.zip'],
+      [u'http://localhost/bar', u'bar.zip'],
+    ],
+    'dimensions': {u'OS': u'Windows-3.1.1', u'hostname': u'localhost'},
+    'env': {u'foo': u'bar', u'joe': u'2'},
+    'execution_timeout_secs': 30,
+    'grace_period_secs': 30,
+    'idempotent': False,
+    'io_timeout_secs': None,
+  }
+  props.update(properties or {})
+  now = utils.utcnow()
+  args = {
+    'created_ts': now,
     'name': 'Request name',
-    'properties': {
-      'commands': [[u'command1', u'arg1']],
-      'data': [
-        [u'http://localhost/foo', u'foo.zip'],
-        [u'http://localhost/bar', u'bar.zip'],
-      ],
-      'dimensions': {u'OS': u'Windows-3.1.1', u'hostname': u'localhost'},
-      'env': {u'foo': u'bar', u'joe': u'2'},
-      'execution_timeout_secs': 30,
-      'grace_period_secs': 30,
-      'idempotent': False,
-      'io_timeout_secs': None,
-    },
     'priority': 50,
-    'scheduling_expiration_secs': 30,
+    'properties': task_request.TaskProperties(**props),
+    'expiration_ts': now + datetime.timedelta(seconds=30),
     'tags': [u'tag:1'],
     'user': 'Jesus',
   }
-  base_data.update(kwargs)
-  base_data['properties'].update(properties or {})
-  return base_data
+  args.update(kwargs)
+  return task_request.TaskRequest(**args)
 
 
 class Prop(object):
@@ -177,12 +181,12 @@ class TaskRequestApiTest(TestCase):
 
   def test_make_request(self):
     # Compare with test_make_request_clone().
-    parent = task_request.make_request(_gen_request_data())
+    parent = task_request.make_request(_gen_request(), True)
     # Hack: Would need to know about TaskResultSummary.
     parent_id = task_pack.pack_request_key(parent.key) + '1'
-    data = _gen_request_data(
+    r = _gen_request(
         properties=dict(idempotent=True), parent_task_id=parent_id)
-    request = task_request.make_request(data)
+    request = task_request.make_request(r, True)
     expected_properties = {
       'commands': [[u'command1', u'arg1']],
       'data': [
@@ -217,32 +221,27 @@ class TaskRequestApiTest(TestCase):
     }
     actual = request.to_dict()
     # expiration_ts - created_ts == scheduling_expiration_secs.
-    created = actual.pop('created_ts')
-    expiration = actual.pop('expiration_ts')
-    self.assertEqual(
-        int(round((expiration - created).total_seconds())),
-        data['scheduling_expiration_secs'])
+    actual.pop('created_ts')
+    actual.pop('expiration_ts')
     self.assertEqual(expected_request, actual)
-    self.assertEqual(
-        data['scheduling_expiration_secs'], request.scheduling_expiration_secs)
+    self.assertEqual(30, request.expiration_secs)
 
   def test_make_request_parent(self):
-    parent = task_request.make_request(_gen_request_data())
+    parent = task_request.make_request(_gen_request(), True)
     # Hack: Would need to know about TaskResultSummary.
     parent_id = task_pack.pack_request_key(parent.key) + '1'
     child = task_request.make_request(
-        _gen_request_data(parent_task_id=parent_id))
+        _gen_request(parent_task_id=parent_id), True)
     self.assertEqual(parent_id, child.parent_task_id)
 
   def test_make_request_invalid_parent_id(self):
     # Must ends with '1' or '2', not '0'
-    data = _gen_request_data(parent_task_id='1d69b9f088008810')
     with self.assertRaises(ValueError):
-      task_request.make_request(data)
+      _gen_request(parent_task_id='1d69b9f088008810')
 
   def test_make_request_idempotent(self):
     request = task_request.make_request(
-        _gen_request_data(properties=dict(idempotent=True)))
+        _gen_request(properties=dict(idempotent=True)), True)
     as_dict = request.to_dict()
     self.assertEqual(True, as_dict['properties']['idempotent'])
     # Ensure the algorithm is deterministic.
@@ -252,12 +251,18 @@ class TaskRequestApiTest(TestCase):
   def test_duped(self):
     # Two TestRequest with the same properties.
     request_1 = task_request.make_request(
-        _gen_request_data(properties=dict(idempotent=True)))
+        _gen_request(properties=dict(idempotent=True)), True)
+    now = utils.utcnow()
     request_2 = task_request.make_request(
-        _gen_request_data(
-            name='Other', user='Other', priority=201,
-            scheduling_expiration_secs=129, tags=['tag:2'],
-            properties=dict(idempotent=True)))
+        _gen_request(
+            name='Other',
+            user='Other',
+            priority=201,
+            created_ts=now,
+            expiration_ts=now + datetime.timedelta(seconds=129),
+            tags=['tag:2'],
+            properties=dict(idempotent=True)),
+        True)
     self.assertEqual(
         request_1.properties.properties_hash,
         request_2.properties.properties_hash)
@@ -266,94 +271,109 @@ class TaskRequestApiTest(TestCase):
   def test_different(self):
     # Two TestRequest with different properties.
     request_1 = task_request.make_request(
-        _gen_request_data(
-          properties=dict(execution_timeout_secs=30, idempotent=True)))
+        _gen_request(
+          properties=dict(execution_timeout_secs=30, idempotent=True)), True)
     request_2 = task_request.make_request(
-        _gen_request_data(
-          properties=dict(execution_timeout_secs=129, idempotent=True)))
+        _gen_request(
+          properties=dict(execution_timeout_secs=129, idempotent=True)), True)
     self.assertNotEqual(
         request_1.properties.properties_hash,
         request_2.properties.properties_hash)
 
   def test_bad_values(self):
-    with self.assertRaises(ValueError):
-      task_request.make_request({})
-    with self.assertRaises(ValueError):
-      task_request.make_request(_gen_request_data(properties={'foo': 'bar'}))
-    task_request.make_request(_gen_request_data())
+    with self.assertRaises(AssertionError):
+      task_request.make_request(None, True)
+    with self.assertRaises(AssertionError):
+      task_request.make_request({}, True)
+    with self.assertRaises(AttributeError):
+      task_request.make_request(_gen_request(properties={'foo': 'bar'}), True)
+    task_request.make_request(_gen_request(), True)
 
     with self.assertRaises(datastore_errors.BadValueError):
       task_request.make_request(
-          _gen_request_data(properties=dict(commands=[])))
+          _gen_request(properties=dict(commands=[])), True)
     with self.assertRaises(TypeError):
       task_request.make_request(
-          _gen_request_data(properties=dict(commands={'a': 'b'})))
+          _gen_request(properties=dict(commands={'a': 'b'})), True)
     with self.assertRaises(TypeError):
       task_request.make_request(
-          _gen_request_data(properties=dict(commands=['python'])))
+          _gen_request(properties=dict(commands=['python'])), True)
     with self.assertRaises(TypeError):
       task_request.make_request(
-          _gen_request_data(properties=dict(commands=[['python']])))
+          _gen_request(properties=dict(commands=[['python']])), True)
     task_request.make_request(
-        _gen_request_data(properties=dict(commands=[[u'python']])))
+        _gen_request(properties=dict(commands=[[u'python']])), True)
 
     with self.assertRaises(TypeError):
       task_request.make_request(
-          _gen_request_data(properties=dict(env=[])))
+          _gen_request(properties=dict(env=[])), True)
     with self.assertRaises(TypeError):
       task_request.make_request(
-          _gen_request_data(properties=dict(env={u'a': 1})))
-    task_request.make_request(_gen_request_data(properties=dict(env={})))
+          _gen_request(properties=dict(env={u'a': 1})), True)
+    task_request.make_request(_gen_request(properties=dict(env={})), True)
 
     with self.assertRaises(TypeError):
       task_request.make_request(
-          _gen_request_data(properties=dict(data=[['a',]])))
+          _gen_request(properties=dict(data=[['a',]])), True)
     with self.assertRaises(TypeError):
       task_request.make_request(
-          _gen_request_data(properties=dict(data=[('a', '1')])))
+          _gen_request(properties=dict(data=[('a', '1')])), True)
     with self.assertRaises(TypeError):
       task_request.make_request(
-          _gen_request_data(properties=dict(data=[(u'a', u'1')])))
+          _gen_request(properties=dict(data=[(u'a', u'1')])), True)
     task_request.make_request(
-        _gen_request_data(properties=dict(data=[[u'a', u'1']])))
+        _gen_request(properties=dict(data=[[u'a', u'1']])), True)
 
     with self.assertRaises(datastore_errors.BadValueError):
       task_request.make_request(
-          _gen_request_data(priority=task_request.MAXIMUM_PRIORITY+1))
+          _gen_request(priority=task_request.MAXIMUM_PRIORITY+1), True)
     task_request.make_request(
-        _gen_request_data(priority=task_request.MAXIMUM_PRIORITY))
+        _gen_request(priority=task_request.MAXIMUM_PRIORITY), True)
 
     with self.assertRaises(datastore_errors.BadValueError):
       task_request.make_request(
-          _gen_request_data(
+          _gen_request(
               properties=dict(
-                  execution_timeout_secs=task_request._ONE_DAY_SECS+1)))
+                  execution_timeout_secs=task_request._ONE_DAY_SECS+1)),
+              True)
     task_request.make_request(
-        _gen_request_data(
-            properties=dict(execution_timeout_secs=task_request._ONE_DAY_SECS)))
+        _gen_request(
+            properties=dict(execution_timeout_secs=task_request._ONE_DAY_SECS)),
+        True)
 
+    now = utils.utcnow()
     with self.assertRaises(datastore_errors.BadValueError):
       task_request.make_request(
-          _gen_request_data(
-              scheduling_expiration_secs=task_request._MIN_TIMEOUT_SECS-1))
+          _gen_request(
+              created_ts=now,
+              expiration_ts=
+                  now+datetime.timedelta(
+                      seconds=task_request._MIN_TIMEOUT_SECS-1)),
+          True)
     task_request.make_request(
-        _gen_request_data(
-            scheduling_expiration_secs=task_request._MIN_TIMEOUT_SECS))
+        _gen_request(
+              created_ts=now,
+              expiration_ts=
+                  now+datetime.timedelta(
+                      seconds=task_request._MIN_TIMEOUT_SECS)),
+        True)
 
     # Try with isolated/isolatedserver/namespace.
-    with self.assertRaises(ValueError):
+    with self.assertRaises(datastore_errors.BadValueError):
       task_request.make_request(
-          _gen_request_data(properties=dict(
-              commands=['see', 'spot', 'run'], isolated='something.isolated')))
+          _gen_request(properties=dict(
+              commands=['see', 'spot', 'run'], isolated='something.isolated')),
+          True)
 
   def test_make_request_clone(self):
     # Compare with test_make_request().
-    parent = task_request.make_request(_gen_request_data())
+    parent = task_request.make_request(_gen_request(), True)
     # Hack: Would need to know about TaskResultSummary.
     parent_id = task_pack.pack_request_key(parent.key) + '1'
-    data = _gen_request_data(
+    data = _gen_request(
         properties=dict(idempotent=True), parent_task_id=parent_id)
-    request = task_request.make_request_clone(task_request.make_request(data))
+    request = task_request.make_request_clone(
+        task_request.make_request(data, True))
     # Differences from make_request() are:
     # - idempotent was reset to False.
     # - parent_task_id was reset to None.
@@ -395,14 +415,10 @@ class TaskRequestApiTest(TestCase):
     }
     actual = request.to_dict()
     # expiration_ts - created_ts == deadline_to_run.
-    created = actual.pop('created_ts')
-    expiration = actual.pop('expiration_ts')
-    self.assertEqual(
-        int(round((expiration - created).total_seconds())),
-        data['scheduling_expiration_secs'])
+    actual.pop('created_ts')
+    actual.pop('expiration_ts')
     self.assertEqual(expected_request, actual)
-    self.assertEqual(
-        data['scheduling_expiration_secs'], request.scheduling_expiration_secs)
+    self.assertEqual(30, request.expiration_secs)
 
   def test_validate_priority(self):
     with self.assertRaises(TypeError):

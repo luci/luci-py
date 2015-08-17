@@ -672,7 +672,7 @@ class TaskRetryHandler(auth.AuthenticatingHandler):
       self.abort(404, 'Invalid request key.')
     new_request = task_request.make_request_clone(original_request)
     result_summary = task_scheduler.schedule_request(new_request)
-    self.redirect('/user/task/%s' % result_summary.key_packed)
+    self.redirect('/user/task/%s' % result_summary.task_id)
 
 
 ### Public pages.

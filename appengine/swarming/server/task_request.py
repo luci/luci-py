@@ -82,25 +82,6 @@ _MIN_TIMEOUT_SECS = 1 if utils.is_local_dev_server() else 30
 _BEGINING_OF_THE_WORLD = datetime.datetime(2010, 1, 1, 0, 0, 0, 0)
 
 
-# Parameters for make_request().
-# The content of the 'data' parameter. This relates to the context of the
-# request, e.g. who wants to run a task.
-_REQUIRED_DATA_KEYS = frozenset(
-    ['name', 'priority', 'properties', 'scheduling_expiration_secs', 'tags',
-     'user'])
-_EXPECTED_DATA_KEYS = frozenset(
-    ['name', 'parent_task_id', 'priority', 'properties',
-      'scheduling_expiration_secs', 'tags', 'user'])
-# The content of 'properties' inside the 'data' parameter. This relates to the
-# task itself, e.g. what to run.
-_REQUIRED_PROPERTIES_KEYS= frozenset(
-    ['commands', 'data', 'dimensions', 'env', 'execution_timeout_secs',
-     'io_timeout_secs'])
-_EXPECTED_PROPERTIES_KEYS = frozenset(
-    ['commands', 'data', 'dimensions', 'env', 'execution_timeout_secs',
-     'grace_period_secs', 'idempotent', 'io_timeout_secs'])
-
-
 # Used for isolated files.
 _HASH_CHARS = frozenset('0123456789abcdef')
 _NAMESPACE_RE = re.compile(r'[a-z0-9A-Z\-._]+')
@@ -248,6 +229,7 @@ class FilesRef(ndb.Model):
   namespace = ndb.StringProperty(validator=_validate_namespace, indexed=False)
 
   def _pre_put_hook(self):
+    super(FilesRef, self)._pre_put_hook()
     if not self.isolated or not self.isolatedserver or not self.namespace:
       raise datastore_errors.BadValueError(
           'isolated requires server and namespace')
@@ -333,9 +315,12 @@ class TaskProperties(ndb.Model):
     return self.HASHING_ALGO(utils.encode_to_json(self)).digest()
 
   def _pre_put_hook(self):
+    super(TaskProperties, self)._pre_put_hook()
     if not self.commands:
       # TODO(maruel): Remove once supported.
       raise datastore_errors.BadValueError('commands is required')
+    if len(self.commands) > 1:
+      raise datastore_errors.BadValueError('Only one command is supported')
     if bool(self.commands) == bool(self.inputs_ref):
       raise datastore_errors.BadValueError('use one of command or inputs_ref')
     if self.data and not self.commands:
@@ -393,9 +378,15 @@ class TaskRequest(ndb.Model):
   parent_task_id = ndb.StringProperty(validator=_validate_task_run_id)
 
   @property
-  def scheduling_expiration_secs(self):
-    """Reconstructs this value from expiration_ts and created_ts."""
-    return (self.expiration_ts - self.created_ts).total_seconds()
+  def task_id(self):
+    """Returns the TaskResultSummary packed id, not the task request key."""
+    return task_pack.pack_result_summary_key(
+        task_pack.request_key_to_result_summary_key(self.key))
+
+  @property
+  def expiration_secs(self):
+    """Reconstructs this value from expiration_ts and created_ts. Integer."""
+    return int((self.expiration_ts - self.created_ts).total_seconds())
 
   def to_dict(self):
     """Converts properties_hash to hex so it is json serializable."""
@@ -456,22 +447,6 @@ def _put_request(request):
   assert not request.key
   request.key = _new_request_key()
   return datastore_utils.insert(request, _new_request_key)
-
-
-def _assert_keys(expected_keys, minimum_keys, actual_keys, name):
-  """Raise an exception if expected keys are not present."""
-  actual_keys = frozenset(actual_keys)
-  superfluous = actual_keys - expected_keys
-  missing = minimum_keys - actual_keys
-  if superfluous or missing:
-    msg_missing = (
-        ('Missing: %s\n' % ', '.join(sorted(missing))) if missing else '')
-    msg_superfluous = (
-        ('Superfluous: %s\n' % ', '.join(sorted(superfluous)))
-        if superfluous else '')
-    message = 'Unexpected %s; did you make a typo?\n%s%s' % (
-        name, msg_missing, msg_superfluous)
-    raise ValueError(message)
 
 
 ### Public API.
@@ -546,46 +521,19 @@ def validate_request_key(request_key):
             root_entity_shard_id))
 
 
-def make_request(data):
-  """Constructs a TaskRequest out of a yet-to-be-specified API.
+def make_request(request, is_bot_or_admin):
+  """Registers the request in the DB.
 
-  Argument:
-  - data: dict with:
-    - name
-    - parent_task_id*
-    - properties
-      - commands
-      - data
-      - dimensions
-      - env
-      - execution_timeout_secs
-      - grace_period_secs*
-      - idempotent*
-      - io_timeout_secs
-    - priority
-    - scheduling_expiration_secs
-    - tags
-    - user
-
-  * are optional.
+  Fills up some values.
 
   If parent_task_id is set, properties for the parent are used:
   - priority: defaults to parent.priority - 1
   - user: overriden by parent.user
 
-  Returns:
-    The newly created TaskRequest.
   """
-  # Save ourself headaches with typos and refuses unexpected values.
-  _assert_keys(_EXPECTED_DATA_KEYS, _REQUIRED_DATA_KEYS, data, 'request keys')
-  data_properties = data['properties']
-  _assert_keys(_EXPECTED_PROPERTIES_KEYS, _REQUIRED_PROPERTIES_KEYS,
-               data_properties, 'request properties keys')
-
-  parent_task_id = data.get('parent_task_id') or None
-  if parent_task_id:
-    data = data.copy()
-    run_result_key = task_pack.unpack_run_result_key(parent_task_id)
+  assert request.__class__ is TaskRequest
+  if request.parent_task_id:
+    run_result_key = task_pack.unpack_run_result_key(request.parent_task_id)
     result_summary_key = task_pack.run_result_key_to_result_summary_key(
         run_result_key)
     request_key = task_pack.result_summary_key_to_request_key(
@@ -593,41 +541,20 @@ def make_request(data):
     parent = request_key.get()
     if not parent:
       raise ValueError('parent_task_id is not a valid task')
-    data['priority'] = max(min(data['priority'], parent.priority - 1), 0)
+    request.priority = max(min(request.priority, parent.priority - 1), 0)
     # Drop the previous user.
-    data['user'] = parent.user
+    request.user = parent.user
 
-  # Can't be a validator yet as we wouldn't be able to load previous task
-  # requests.
-  if len(data_properties.get('commands') or []) > 1:
-    raise datastore_errors.BadValueError('Only one command is supported')
+  # If the priority is below 100, make sure the user has right to do so.
+  if request.priority < 100 and not is_bot_or_admin:
+    # Silently drop the priority of normal users.
+    request.priority = 100
 
-  # Class TaskProperties takes care of making everything deterministic.
-  # TODO(cmassaro): New API must add support for run_isolate information.
-  properties = TaskProperties(
-      commands=data_properties['commands'],
-      data=data_properties['data'],
-      dimensions=data_properties['dimensions'],
-      env=data_properties['env'],
-      execution_timeout_secs=data_properties['execution_timeout_secs'],
-      grace_period_secs=data_properties.get('grace_period_secs', 30),
-      idempotent=data_properties.get('idempotent', False),
-      io_timeout_secs=data_properties['io_timeout_secs'])
-
-  now = utils.utcnow()
-  expiration_ts = now + datetime.timedelta(
-      seconds=data['scheduling_expiration_secs'])
-
-  request = TaskRequest(
-      authenticated=auth.get_current_identity(),
-      created_ts=now,
-      expiration_ts=expiration_ts,
-      name=data['name'],
-      parent_task_id=parent_task_id,
-      priority=data['priority'],
-      properties=properties,
-      tags=data['tags'],
-      user=data['user'] or '')
+  request.authenticated = auth.get_current_identity()
+  if request.properties.grace_period_secs is None:
+    request.properties.grace_period_secs = 30
+  if request.properties.idempotent is None:
+    request.properties.idempotent = False
   _put_request(request)
   return request
 

@@ -28,25 +28,29 @@ from server import task_to_run
 # Method could be a function - pylint: disable=R0201
 
 
-def _gen_request_data(properties=None, **kwargs):
-  base_data = {
-    'name': 'Request name',
-    'user': 'Jesus',
-    'properties': {
-      'commands': [[u'command1']],
-      'data': [],
-      'dimensions': {},
-      'env': {},
-      'execution_timeout_secs': 24*60*60,
-      'io_timeout_secs': None,
-    },
-    'priority': 50,
-    'scheduling_expiration_secs': 60,
-    'tags': [u'tag:1'],
+def _gen_request(properties=None, **kwargs):
+  """Creates a TaskRequest."""
+  props = {
+    'commands': [[u'command1']],
+    'data': [],
+    'dimensions': {},
+    'env': {},
+    'execution_timeout_secs': 24*60*60,
+    'io_timeout_secs': None,
   }
-  base_data.update(kwargs)
-  base_data['properties'].update(properties or {})
-  return base_data
+  props.update(properties or {})
+  now = utils.utcnow()
+  args = {
+    'created_ts': now,
+    'name': 'Request name',
+    'priority': 50,
+    'properties': task_request.TaskProperties(**props),
+    'expiration_ts': now + datetime.timedelta(seconds=60),
+    'tags': [u'tag:1'],
+    'user': 'Jesus',
+  }
+  args.update(kwargs)
+  return task_request.TaskRequest(**args)
 
 
 def _task_to_run_to_dict(i):
@@ -67,8 +71,8 @@ def _yield_next_available_task_to_dispatch(bot_dimensions):
 
 def _gen_new_task_to_run(**kwargs):
   """Returns a TaskToRun saved in the DB."""
-  data = _gen_request_data(**kwargs)
-  to_run = task_to_run.new_task_to_run(task_request.make_request(data))
+  request = task_request.make_request(_gen_request(**kwargs), True)
+  to_run = task_to_run.new_task_to_run(request)
   to_run.put()
   return to_run
 
@@ -250,7 +254,7 @@ class TaskToRunApiTest(TestCase):
     super(TaskToRunApiTest, self).setUp()
     self.now = datetime.datetime(2014, 01, 02, 03, 04, 05, 06)
     self.mock_now(self.now)
-    # The default scheduling_expiration_secs for _gen_request_data().
+    # The default expiration_secs for _gen_request().
     self.expiration_ts = self.now + datetime.timedelta(seconds=60)
 
   def test_all_apis_are_tested(self):
@@ -263,20 +267,20 @@ class TaskToRunApiTest(TestCase):
     self.assertFalse(missing)
 
   def test_task_to_run_key_to_request_key(self):
-    request = task_request.make_request(_gen_request_data())
+    request = task_request.make_request(_gen_request(), True)
     task_key = task_to_run.request_to_task_to_run_key(request)
     actual = task_to_run.task_to_run_key_to_request_key(task_key)
     self.assertEqual(request.key, actual)
 
   def test_request_to_task_to_run_key(self):
     self.mock(random, 'getrandbits', lambda _: 0x88)
-    request = task_request.make_request(_gen_request_data())
+    request = task_request.make_request(_gen_request(), True)
     self.assertEqual(
         ndb.Key('TaskRequest', 0x7e296460f77ff77e, 'TaskToRun', 2471203225),
         task_to_run.request_to_task_to_run_key(request))
 
   def test_validate_to_run_key(self):
-    request = task_request.make_request(_gen_request_data())
+    request = task_request.make_request(_gen_request(), True)
     task_key = task_to_run.request_to_task_to_run_key(request)
     task_to_run.validate_to_run_key(task_key)
     with self.assertRaises(ValueError):
@@ -310,7 +314,8 @@ class TaskToRunApiTest(TestCase):
   def test_new_task_to_run(self):
     self.mock(random, 'getrandbits', lambda _: 0x12)
     request_dimensions = {u'OS': u'Windows-3.1.1'}
-    data = _gen_request_data(
+    now = utils.utcnow()
+    data = _gen_request(
         properties={
           'commands': [[u'command1', u'arg1']],
           'data': [[u'http://localhost/foo', u'foo.zip']],
@@ -319,12 +324,13 @@ class TaskToRunApiTest(TestCase):
           'execution_timeout_secs': 30,
         },
         priority=20,
-        scheduling_expiration_secs=31)
-    task_to_run.new_task_to_run(task_request.make_request(data)).put()
+        created_ts=now,
+        expiration_ts=now+datetime.timedelta(seconds=31))
+    task_to_run.new_task_to_run(task_request.make_request(data, True)).put()
 
     # Create a second with higher priority.
     self.mock(random, 'getrandbits', lambda _: 0x23)
-    data = _gen_request_data(
+    data = _gen_request(
         properties={
           'commands': [[u'command1', u'arg1']],
           'data': [[u'http://localhost/foo', u'foo.zip']],
@@ -333,8 +339,9 @@ class TaskToRunApiTest(TestCase):
           'execution_timeout_secs': 30,
         },
         priority=10,
-        scheduling_expiration_secs=31)
-    task_to_run.new_task_to_run(task_request.make_request(data)).put()
+        created_ts=now,
+        expiration_ts=now+datetime.timedelta(seconds=31))
+    task_to_run.new_task_to_run(task_request.make_request(data, True)).put()
 
     expected = [
       {
@@ -572,7 +579,10 @@ class TaskToRunApiTest(TestCase):
     self.assertEqual(expected, actual)
 
   def test_yield_expired_task_to_run(self):
-    _gen_new_task_to_run(scheduling_expiration_secs=60)
+    now = utils.utcnow()
+    _gen_new_task_to_run(
+        created_ts=now,
+        expiration_ts=now+datetime.timedelta(seconds=60))
     self.assertEqual(1, len(_yield_next_available_task_to_dispatch({})))
     self.assertEqual(
         0, len(list(task_to_run.yield_expired_task_to_run())))

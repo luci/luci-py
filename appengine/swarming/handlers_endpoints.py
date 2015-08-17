@@ -61,27 +61,6 @@ def get_result_entity(task_id):
   return get_or_raise(key)
 
 
-def _transform_request(request_dict):
-  """Makes a task request compatible with the "old" API."""
-  exp_secs = request_dict.pop('expiration_secs', None)
-  if exp_secs is not None:
-    request_dict['scheduling_expiration_secs'] = exp_secs
-  request_dict.setdefault('properties', {})
-  command = request_dict['properties'].pop('command', None)
-  if command is not None:
-    request_dict['properties']['commands'] = [command]
-  data = request_dict['properties'].pop('data', None)
-  if data is not None:
-    request_dict['properties']['data'] = [
-      [pair['key'], pair['value']] for pair in data]
-  for key in ['dimensions', 'env']:
-    old_list = request_dict['properties'].get(key, [])
-    request_dict['properties'][key] = {
-      pair['key']: pair['value'] for pair in old_list}
-  request_dict['properties'].setdefault('data', [])
-  request_dict['tags'] = request_dict.pop('tag', [])
-
-
 def _get_range(request):
   """Get (start, end) as keys from request types that specify date ranges."""
   end = request.end or utils.utcnow()
@@ -106,13 +85,12 @@ class SwarmingTaskService(remote.Service):
     """Returns information about the server."""
     return swarming_rpcs.ServerDetails(server_version=utils.get_app_version())
 
-  @auth.endpoints_method(swarming_rpcs.TaskId, swarming_rpcs.TaskResultSummary)
+  @auth.endpoints_method(swarming_rpcs.TaskId, swarming_rpcs.TaskResult)
   @auth.require(acl.is_bot_or_user)
   def result(self, request):
     """Reports the result of the task corresponding to a task ID."""
-    entity = get_result_entity(request.task_id)
-    return message_conversion.task_result_summary_from_dict(
-        utils.to_json_encodable(entity))
+    return message_conversion.task_result_to_rpc(
+        get_result_entity(request.task_id))
 
   @auth.endpoints_method(swarming_rpcs.TaskId, swarming_rpcs.TaskRequest)
   @auth.require(acl.is_bot_or_user)
@@ -120,9 +98,7 @@ class SwarmingTaskService(remote.Service):
     """Returns the task request corresponding to a task ID."""
     _, summary_key = get_result_key(request.task_id)
     request_key = task_pack.result_summary_key_to_request_key(summary_key)
-    entity = get_or_raise(request_key)
-    return message_conversion.task_request_from_dict(
-        utils.to_json_encodable(entity))
+    return message_conversion.task_request_to_rpc(get_or_raise(request_key))
 
   @auth.endpoints_method(swarming_rpcs.TaskId, swarming_rpcs.CancelResponse)
   @auth.require(acl.is_admin)
@@ -146,24 +122,19 @@ class SwarmingTaskService(remote.Service):
       swarming_rpcs.TaskRequest, swarming_rpcs.TaskRequestMetadata)
   @auth.require(acl.is_bot_or_user)
   def new(self, request):
-    """Provides a TaskRequest and receives its metadata."""
-    request_dict = json.loads(remote.protojson.encode_message(request))
-    _transform_request(request_dict)
-
-    # If the priority is below 100, make the the user has right to do so.
-    if request_dict.get('priority', 255) < 100 and not acl.is_bot_or_admin():
-      # Silently drop the priority of normal users.
-      request_dict['priority'] = 100
-
+    """Creates a new task."""
+    # Convert from swarming_rpcs.TaskRequest to task_request.TaskRequest.
+    # Override created_ts.
+    request.created_ts = utils.utcnow()
+    request = message_conversion.task_request_from_rpc(request)
     try:
-      posted_request = task_request.make_request(request_dict)
+      posted_request = task_request.make_request(request, acl.is_bot_or_admin())
     except (datastore_errors.BadValueError, TypeError, ValueError) as e:
       raise endpoints.BadRequestException(e.message)
 
     result_summary = task_scheduler.schedule_request(posted_request)
-    posted_dict = utils.to_json_encodable(posted_request)
     return swarming_rpcs.TaskRequestMetadata(
-        request=message_conversion.task_request_from_dict(posted_dict),
+        request=message_conversion.task_request_to_rpc(posted_request),
         task_id=task_pack.pack_result_summary_key(result_summary.key))
 
   @auth.endpoints_method(swarming_rpcs.TasksRequest, swarming_rpcs.TaskList)
@@ -171,7 +142,7 @@ class SwarmingTaskService(remote.Service):
   def list(self, request):
     """Provides a list of available tasks."""
     state = request.state.name.lower()
-    uses = sum([bool(request.tag), state != 'all'])
+    uses = sum([bool(request.tags), state != 'all'])
     if state != 'all':
       raise endpoints.BadRequestException(
           'Querying by state is not yet supported. '
@@ -184,11 +155,10 @@ class SwarmingTaskService(remote.Service):
     try:
       start, end = _get_range(request)
       items, cursor_str, state = task_result.get_result_summaries(
-          request.tag, request.cursor, start, end, state, request.batch_size)
+          request.tags, request.cursor, start, end, state, request.batch_size)
       return swarming_rpcs.TaskList(
           cursor=cursor_str,
-          items=[message_conversion.task_result_summary_from_dict(
-              utils.to_json_encodable(item)) for item in items])
+          items=[message_conversion.task_result_to_rpc(i) for i in items])
     except ValueError as e:
       raise endpoints.BadRequestException(
           'Inappropriate batch_size for tasks/list: %s' % e)
@@ -203,8 +173,7 @@ class SwarmingBotService(remote.Service):
   def get(self, request):
     """Provides BotInfo corresponding to a provided bot_id."""
     bot = get_or_raise(bot_management.get_info_key(request.bot_id))
-    entity_dict = bot.to_dict_with_now(utils.utcnow())
-    return message_conversion.bot_info_from_dict(entity_dict)
+    return message_conversion.bot_info_to_rpc(bot, utils.utcnow())
 
   @auth.endpoints_method(
       swarming_rpcs.BotId, swarming_rpcs.DeletedResponse, http_method='DELETE')
@@ -227,13 +196,10 @@ class SwarmingBotService(remote.Service):
     except ValueError as e:
       raise endpoints.BadRequestException(
           'Inappropriate batch_size for bots/list: %s' % e)
-    result_list = [message_conversion.task_run_result_from_dict(
-        utils.to_json_encodable(run_result)) for run_result in run_results]
-    response = swarming_rpcs.BotTasks(
+    return swarming_rpcs.BotTasks(
         cursor=cursor.urlsafe() if cursor and more else None,
-        items=result_list,
+        items=[message_conversion.task_result_to_rpc(r) for r in run_results],
         now=utils.utcnow())
-    return response
 
   @auth.endpoints_method(swarming_rpcs.BotsRequest, swarming_rpcs.BotList)
   @auth.require(acl.is_privileged_user)
@@ -246,6 +212,5 @@ class SwarmingBotService(remote.Service):
     return swarming_rpcs.BotList(
         cursor=cursor.urlsafe() if cursor and more else None,
         death_timeout=config.settings().bot_death_timeout_secs,
-        items=[message_conversion.bot_info_from_dict(bot.to_dict_with_now(
-            now)) for bot in bots],
+        items=[message_conversion.bot_info_to_rpc(bot, now) for bot in bots],
         now=now)

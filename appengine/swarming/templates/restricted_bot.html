@@ -178,7 +178,7 @@
         {% for run_result in run_results %}
           <tr class="request {% if run_result.failure %}failed_test{% endif%}">
             <td>
-              <a href="/user/task/{{run_result.key_packed}}">
+              <a href="/user/task/{{run_result.task_id}}">
                 {{run_result.name}}</a>
             </td>
             <td nowrap>{{run_result.started_ts|succinctdatetimeformat}}</td>

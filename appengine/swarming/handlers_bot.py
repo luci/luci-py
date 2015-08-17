@@ -337,7 +337,7 @@ class BotPollHandler(_BotBaseHandler):
         # This one is tricky since it intentionally runs a transaction after
         # another one.
         bot_event(
-            'request_task', task_id=run_result.key_packed,
+            'request_task', task_id=run_result.task_id,
             task_name=request.name)
         self._cmd_run(request, run_result.key, bot_id)
       except:

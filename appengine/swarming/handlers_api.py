@@ -435,18 +435,90 @@ class ClientApiServer(auth.ApiHandler):
 
 
 class ClientRequestHandler(auth.ApiHandler):
-  """Creates a new request, returns all the meta data about the request."""
+  """Creates a new request, returns the task id.
+
+  Argument:
+  - data: dict with:
+    - name
+    - parent_task_id*
+    - properties
+      - commands
+      - data
+      - dimensions
+      - env
+      - execution_timeout_secs
+      - grace_period_secs*
+      - idempotent*
+      - io_timeout_secs
+    - priority
+    - scheduling_expiration_secs
+    - tags
+    - user
+
+  * are optional.
+  """
+  # Parameters for make_request().
+  # The content of the 'data' parameter. This relates to the context of the
+  # request, e.g. who wants to run a task.
+  _REQUIRED_DATA_KEYS = frozenset(
+      ['name', 'priority', 'properties', 'scheduling_expiration_secs', 'tags',
+      'user'])
+  _EXPECTED_DATA_KEYS = frozenset(
+      ['name', 'parent_task_id', 'priority', 'properties',
+        'scheduling_expiration_secs', 'tags', 'user'])
+  # The content of 'properties' inside the 'data' parameter. This relates to the
+  # task itself, e.g. what to run.
+  _REQUIRED_PROPERTIES_KEYS= frozenset(
+      ['commands', 'data', 'dimensions', 'env', 'execution_timeout_secs',
+      'io_timeout_secs'])
+  _EXPECTED_PROPERTIES_KEYS = frozenset(
+      ['commands', 'data', 'dimensions', 'env', 'execution_timeout_secs',
+      'grace_period_secs', 'idempotent', 'io_timeout_secs'])
+
   @auth.require(acl.is_bot_or_user)
   def post(self):
-    request_data = self.parse_body()
-    # If the priority is below 100, make the the user has right to do so.
-    if request_data.get('priority', 255) < 100 and not acl.is_bot_or_admin():
-      # Silently drop the priority of normal users.
-      request_data['priority'] = 100
+    data = self.parse_body()
+    msg = log_unexpected_subset_keys(
+        self._EXPECTED_DATA_KEYS, self._REQUIRED_DATA_KEYS, data, self.request,
+        'client', 'request keys')
+    if msg:
+      self.abort_with_error(400, error=msg)
+    data_properties = data['properties']
+    msg = log_unexpected_subset_keys(
+        self._EXPECTED_PROPERTIES_KEYS, self._REQUIRED_PROPERTIES_KEYS,
+        data_properties, self.request, 'client', 'request properties keys')
+    if msg:
+      self.abort_with_error(400, error=msg)
+
+    # Class TaskProperties takes care of making everything deterministic.
+    properties = task_request.TaskProperties(
+        commands=data_properties['commands'],
+        data=data_properties['data'],
+        dimensions=data_properties['dimensions'],
+        env=data_properties['env'],
+        execution_timeout_secs=data_properties['execution_timeout_secs'],
+        grace_period_secs=data_properties.get('grace_period_secs', 30),
+        idempotent=data_properties.get('idempotent', False),
+        io_timeout_secs=data_properties['io_timeout_secs'])
+
+    now = utils.utcnow()
+    expiration_ts = now + datetime.timedelta(
+        seconds=data['scheduling_expiration_secs'])
+    request = task_request.TaskRequest(
+        created_ts=now,
+        expiration_ts=expiration_ts,
+        name=data['name'],
+        parent_task_id=data.get('parent_task_id'),
+        priority=data['priority'],
+        properties=properties,
+        tags=data['tags'],
+        user=data['user'] or '')
 
     try:
-      request = task_request.make_request(request_data)
-    except (datastore_errors.BadValueError, TypeError, ValueError) as e:
+      request = task_request.make_request(request, acl.is_bot_or_admin())
+    except (
+        AttributeError, datastore_errors.BadValueError, TypeError,
+        ValueError) as e:
       self.abort_with_error(400, error=str(e))
 
     result_summary = task_scheduler.schedule_request(request)

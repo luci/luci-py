@@ -104,6 +104,10 @@ class ClientApiTest(test_env_handlers.AppTestBase):
     self.assertEqual(expected, errors)
 
   def test_request_invalid(self):
+    record = []
+    self.mock(
+        ereporter2, 'log_request',
+        lambda *args, **kwargs: record.append((args, kwargs)))
     headers = {'X-XSRF-Token-Request': '1'}
     response = self.app.post_json(
         '/swarming/api/v1/client/handshake', headers=headers, params={}).json
@@ -119,8 +123,9 @@ class ClientApiTest(test_env_handlers.AppTestBase):
         headers=headers, params=params, status=400).json
     expected = {
       u'error':
-          u'Unexpected request keys; did you make a typo?\n'
-            u'Missing: name, priority, user\nSuperfluous: foo\n',
+        u'Unexpected request keys missing: '
+          u'[\'name\', \'priority\', \'user\'] superfluous: [u\'foo\']; '
+          u'did you make a typo?',
     }
     self.assertEqual(expected, response)
 

@@ -384,7 +384,7 @@ class _TaskResultCommon(ndb.Model):
     out = super(_TaskResultCommon, self).to_dict()
     # stdout_chunks is an implementation detail.
     out.pop('stdout_chunks')
-    out['id'] = self.key_packed
+    out['id'] = self.task_id
     return out
 
   def signal_server_version(self, server_version):
@@ -477,7 +477,7 @@ class TaskRunResult(_TaskResultCommon):
   deduped_from = None
 
   @property
-  def key_packed(self):
+  def task_id(self):
     return task_pack.pack_run_result_key(self.key)
 
   @property
@@ -598,7 +598,7 @@ class TaskResultSummary(_TaskResultCommon):
     return sum(self.costs_usd) if self.costs_usd else 0.
 
   @property
-  def key_packed(self):
+  def task_id(self):
     return task_pack.pack_result_summary_key(self.key)
 
   @property
