@@ -755,6 +755,119 @@ class GenerateChangesTest(test_case.TestCase):
     }, changes)
 
 
+class AuthDBChangeTest(test_case.TestCase):
+  # Test to_jsonins for AuthDBGroupChange and AuthDBIPWhitelistAssignmentChange,
+  # the rest are trivial.
+
+  def test_group_change_to_jsonish(self):
+    c = change_log.AuthDBGroupChange(
+        change_type=change_log.AuthDBChange.CHANGE_GROUP_MEMBERS_ADDED,
+        target='AuthGroup$abc',
+        auth_db_rev=123,
+        who=ident('a@example.com'),
+        when=datetime.datetime(2015, 1, 2, 3, 4, 5),
+        comment='A comment',
+        app_version='v123',
+        description='abc',
+        members=[ident('a@a.com')],
+        globs=[glob('*@a.com')],
+        nested=['A'])
+    self.assertEqual({
+      'app_version': 'v123',
+      'auth_db_rev': 123,
+      'change_type': 'GROUP_MEMBERS_ADDED',
+      'comment': 'A comment',
+      'description': 'abc',
+      'globs': ['user:*@a.com'],
+      'members': ['user:a@a.com'],
+      'nested': ['A'],
+      'old_description': None,
+      'target': 'AuthGroup$abc',
+      'when': 1420167845000000,
+      'who': 'user:a@example.com',
+    }, c.to_jsonish())
+
+  def test_wl_assignment_to_jsonish(self):
+    c = change_log.AuthDBIPWhitelistAssignmentChange(
+        change_type=change_log.AuthDBChange.CHANGE_GROUP_MEMBERS_ADDED,
+        target='AuthIPWhitelistAssignments$default',
+        auth_db_rev=123,
+        who=ident('a@example.com'),
+        when=datetime.datetime(2015, 1, 2, 3, 4, 5),
+        comment='A comment',
+        app_version='v123',
+        identity=ident('b@example.com'),
+        ip_whitelist='whitelist')
+    self.assertEqual({
+      'app_version': 'v123',
+      'auth_db_rev': 123,
+      'change_type': 'GROUP_MEMBERS_ADDED',
+      'comment': 'A comment',
+      'identity': 'user:b@example.com',
+      'ip_whitelist': 'whitelist',
+      'target': 'AuthIPWhitelistAssignments$default',
+      'when': 1420167845000000,
+      'who': 'user:a@example.com',
+    }, c.to_jsonish())
+
+
+class ChangeLogQueryTest(test_case.TestCase):
+  # We know that some indexes are required. But component can't declare them,
+  # so don't check them.
+  SKIP_INDEX_YAML_CHECK = True
+
+  def test_is_changle_log_indexed(self):
+    self.assertTrue(change_log.is_changle_log_indexed())
+
+  def test_make_change_log_query(self):
+    def mk_ch(tp, rev, target):
+      ch = change_log.AuthDBChange(
+          change_type=getattr(change_log.AuthDBChange, 'CHANGE_%s' % tp),
+          auth_db_rev=rev,
+          target=target)
+      ch.key = change_log.make_change_key(ch)
+      ch.put()
+
+    def key(c):
+      return '%s/%s' % (c.key.parent().id(), c.key.id())
+
+    mk_ch('GROUP_CREATED', 1, 'AuthGroup$abc')
+    mk_ch('GROUP_MEMBERS_ADDED', 1, 'AuthGroup$abc')
+    mk_ch('GROUP_CREATED', 1, 'AuthGroup$another')
+    mk_ch('GROUP_DELETED', 2, 'AuthGroup$abc')
+    mk_ch('GROUP_MEMBERS_ADDED', 2, 'AuthGroup$another')
+
+    # All. Most recent first. Largest even types first.
+    q = change_log.make_change_log_query()
+    self.assertEqual([
+      '2/AuthGroup$another!1200',
+      '2/AuthGroup$abc!1800',
+      '1/AuthGroup$another!1000',
+      '1/AuthGroup$abc!1200',
+      '1/AuthGroup$abc!1000',
+    ], map(key, q.fetch()))
+
+    # Single revision only.
+    q = change_log.make_change_log_query(auth_db_rev=1)
+    self.assertEqual([
+      '1/AuthGroup$another!1000',
+      '1/AuthGroup$abc!1200',
+      '1/AuthGroup$abc!1000',
+    ], map(key, q.fetch()))
+
+    # Single target only.
+    q = change_log.make_change_log_query(target='AuthGroup$another')
+    self.assertEqual([
+      '2/AuthGroup$another!1200',
+      '1/AuthGroup$another!1000',
+    ], map(key, q.fetch()))
+
+    # Single revision and single target.
+    q = change_log.make_change_log_query(
+        auth_db_rev=1, target='AuthGroup$another')
+    self.assertEqual(['1/AuthGroup$another!1000'], map(key, q.fetch()))
+
+
 if __name__ == '__main__':
   if '-v' in sys.argv:
     unittest.TestCase.maxDiff = None

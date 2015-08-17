@@ -16,6 +16,7 @@ from components import template
 from components import utils
 
 from .. import api
+from .. import change_log
 from .. import handler
 from .. import model
 from .. import replication
@@ -63,7 +64,6 @@ def get_ui_routes():
     webapp2.Route(r'/auth', MainHandler),
     webapp2.Route(r'/auth/bootstrap', BootstrapHandler, name='bootstrap'),
     webapp2.Route(r'/auth/link', LinkToPrimaryHandler),
-    webapp2.Route(r'/auth/groups/log', ChangeLogHandler),
   ])
   return routes
 
@@ -155,7 +155,7 @@ class UIHandler(handler.AuthenticatingHandler):
     js_config.update(common)
 
     # Prepare URL to explore app API.
-    schema, netloc, _, _, _, _ = urlparse.urlparse(self.request.url)
+    schema, netloc = urlparse.urlparse(self.request.url)[:2]
     api_url = (
         'https://apis-explorer.appspot.com/apis-explorer/?'
         'base=%s://%s/_ah/api' % (schema, netloc))
@@ -172,6 +172,7 @@ class UIHandler(handler.AuthenticatingHandler):
       'navbar': [
         (cls.navbar_tab_id, cls.navbar_tab_title, cls.navbar_tab_url)
         for cls in _ui_navbar_tabs
+        if cls.is_visible()
       ],
     }
     full_env.update(common)
@@ -299,19 +300,6 @@ class LinkToPrimaryHandler(UIHandler):
     self.reply('auth/linking_done.html', env)
 
 
-class ChangeLogHandler(UIHandler):
-  """Page with a log of changes to some groups."""
-  @redirect_ui_on_replica
-  @api.require(api.is_admin)
-  def get(self):
-    env = {
-      'js_file': '/auth/static/js/change_log.js',
-      'navbar_tab_id': 'groups',
-      'page_title': 'Chanage Log',
-    }
-    self.reply('auth/change_log.html', env)
-
-
 class UINavbarTabHandler(UIHandler):
   """Handler for a navbar tab page."""
   # URL to the tab (relative to site root).
@@ -339,6 +327,11 @@ class UINavbarTabHandler(UIHandler):
     }
     self.reply(self.template_file, env)
 
+  @classmethod
+  def is_visible(cls):
+    """Subclasses may return False to hide the tab from tab bar."""
+    return True
+
 
 ################################################################################
 ## Default tabs.
@@ -352,6 +345,24 @@ class GroupsHandler(UINavbarTabHandler):
   css_file = '/auth/static/css/groups.css'
   js_file_url = '/auth/static/js/groups.js'
   template_file = 'auth/groups.html'
+
+
+class ChangeLogHandler(UINavbarTabHandler):
+  """Page with a log of changes to some groups."""
+  navbar_tab_url = '/auth/change_log'
+  navbar_tab_id = 'change_log'
+  navbar_tab_title = 'Change Log'
+  js_file_url = '/auth/static/js/change_log.js'
+  template_file = 'auth/change_log.html'
+
+  @classmethod
+  def is_visible(cls):
+    # Hide 'Change Log' tab if there are no change log indexes in the datastore.
+    # It happens on services that use components.auth, but do not modify
+    # index.yaml. Don't try too hard to hide the log though. If user happes to
+    # stumble on Change log page (e.g. by using direct URL), it handles
+    # NeedIndexError gracefully (explaining how to configure indexes).
+    return change_log.is_changle_log_indexed()
 
 
 class OAuthConfigHandler(UINavbarTabHandler):
@@ -373,4 +384,5 @@ class IPWhitelistsHandler(UINavbarTabHandler):
 
 
 # Register them as default tabs.
-_ui_navbar_tabs = (GroupsHandler, OAuthConfigHandler, IPWhitelistsHandler)
+_ui_navbar_tabs = (
+    GroupsHandler, ChangeLogHandler, OAuthConfigHandler, IPWhitelistsHandler)

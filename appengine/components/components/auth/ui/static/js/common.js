@@ -27,6 +27,18 @@ exports.utcTimestampToString = function(utc) {
 };
 
 
+// Returns URL to a change log page for a given target.
+exports.getChangeLogURL = function(kind, name) {
+  return '/auth/change_log?target=' + encodeURIComponent(kind + '$' + name);
+};
+
+
+// Returns URL to a change log page for a given revision.
+exports.getChangeLogRevisionURL = function(rev) {
+  return '/auth/change_log?auth_db_rev=' + encodeURIComponent('' + rev);
+};
+
+
 // Appends '<prefix>:' to a string if it doesn't have a prefix.
 exports.addPrefix = function(prefix, str) {
   if (str.indexOf(':') == -1) {

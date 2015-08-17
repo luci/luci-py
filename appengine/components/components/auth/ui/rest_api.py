@@ -7,15 +7,19 @@
 import base64
 import functools
 import logging
+import textwrap
 import urllib
 import webapp2
 
+from google.appengine.api import datastore_errors
 from google.appengine.api import memcache
+from google.appengine.datastore import datastore_query
 from google.appengine.ext import ndb
 
 from components import utils
 
 from .. import api
+from .. import change_log
 from .. import handler
 from .. import host_token
 from .. import ipaddr
@@ -39,6 +43,7 @@ def get_rest_api_routes():
   return [
     webapp2.Route('/auth/api/v1/accounts/self', SelfHandler),
     webapp2.Route('/auth/api/v1/accounts/self/xsrf_token', XSRFHandler),
+    webapp2.Route('/auth/api/v1/change_log', ChangeLogHandler),
     webapp2.Route('/auth/api/v1/groups', GroupsHandler),
     webapp2.Route('/auth/api/v1/groups/<name:%s>' % group_re, GroupHandler),
     webapp2.Route('/auth/api/v1/host_token', HostTokenHandler),
@@ -415,6 +420,80 @@ class XSRFHandler(handler.ApiHandler):
   @api.public
   def post(self):
     self.send_response({'xsrf_token': self.generate_xsrf_token()})
+
+
+class ChangeLogHandler(handler.ApiHandler):
+  """Returns AuthDBChange log entries matching some query.
+
+  Supported query parameters (with example):
+    target='AuthGroup$A group' - limit changes to given target only (if given).
+    auth_db_rev=123 - limit changes to given revision only (if given).
+    limit=50 - how many changes to return in a single page (default: 50).
+    cursor=.... - urlsafe datastore cursor for pagination.
+  """
+
+  # The list of indexes here is synchronized with auth_service/index.yaml.
+  NEED_INDEX_ERROR_MESSAGE = textwrap.dedent(r"""
+  Your GAE app doesn't have indexes required for "Change log" functionality.
+
+  If you need this feature, add following indexes to index.yaml. You can do it
+  any time: changes are collected, they are just not queriable until indexed.
+
+  - kind: AuthDBChange
+    ancestor: yes
+    properties:
+    - name: target
+    - name: __key__
+      direction: desc
+
+  - kind: AuthDBChange
+    ancestor: yes
+    properties:
+    - name: __key__
+      direction: desc
+  """).strip()
+
+  @forbid_api_on_replica
+  @api.require(api.is_admin)
+  def get(self):
+    target = self.request.get('target')
+    if target and not change_log.TARGET_RE.match(target):
+      self.abort_with_error(400, text='Invalid \'target\' param')
+
+    auth_db_rev = self.request.get('auth_db_rev')
+    if auth_db_rev:
+      try:
+        auth_db_rev = int(auth_db_rev)
+        if auth_db_rev <= 0:
+          raise ValueError('Outside of allowed range')
+      except ValueError as exc:
+        self.abort_with_error(
+            400, text='Invalid \'auth_db_rev\' param: %s' % exc)
+
+    try:
+      limit = int(self.request.get('limit', 50))
+      if limit <= 0 or limit > 1000:
+        raise ValueError('Outside of allowed range')
+    except ValueError as exc:
+      self.abort_with_error(400, text='Invalid \'limit\' param: %s' % exc)
+
+    try:
+      cursor = datastore_query.Cursor(urlsafe=self.request.get('cursor'))
+    except (datastore_errors.BadValueError, ValueError) as exc:
+      self.abort_with_error(400, text='Invalid \'cursor\' param: %s' % exc)
+
+    q = change_log.make_change_log_query(target=target, auth_db_rev=auth_db_rev)
+    try:
+      changes, cursor, more = q.fetch_page(limit, start_cursor=cursor)
+    except datastore_errors.NeedIndexError:
+      # This is expected for users of components.auth that did not update
+      # index.yaml. Return a friendlier message pointing them to instructions.
+      self.abort_with_error(500, text=self.NEED_INDEX_ERROR_MESSAGE)
+
+    self.send_response({
+      'changes': [c.to_jsonish() for c in changes],
+      'cursor': cursor.urlsafe() if cursor and more else None,
+    })
 
 
 class GroupsHandler(handler.ApiHandler):

@@ -523,7 +523,7 @@ EditGroupForm.prototype.load = function() {
 EditGroupForm.prototype.buildForm = function(group, lastModified) {
   // Prepare environment for template.
   group = _.clone(group);
-  group.nameUrlEncoding = encodeURIComponent(group.name);
+  group.changeLogUrl = common.getChangeLogURL('AuthGroup', group.name);
 
   // Join members and globs list into single UI list.
   var members = common.stripPrefixFromItems('user', group.members || []);

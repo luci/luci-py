@@ -4,15 +4,21 @@
 
 """Models and functions to build and query Auth DB change log."""
 
+import datetime
 import logging
+import re
 import webapp2
 
+from google.appengine.api import datastore_errors
 from google.appengine.api import modules
 from google.appengine.api import taskqueue
+from google.appengine.datastore import datastore_query
 from google.appengine.ext import ndb
 from google.appengine.ext.ndb import polymodel
 
+from components import datastore_utils
 from components import decorators
+from components import utils
 
 from . import config
 from . import model
@@ -32,6 +38,13 @@ def process_change(auth_db_rev):
 
 
 ### Code to generate a change log for AuthDB commits.
+
+
+# Regexp for valid values of AuthDBChange.target property.
+TARGET_RE = re.compile(
+    r'^[0-9a-zA-Z_]{1,40}\$' +               # entity kind
+    r'[0-9a-zA-Z_\-\./ ]{1,300}' +           # entity ID (group, IP whitelist)
+    r'(\$[0-9a-zA-Z_@\-\./\:\* ]{1,200})?$') # optional subentity ID
 
 
 class AuthDBLogRev(ndb.Model):
@@ -123,6 +136,31 @@ class AuthDBChange(polymodel.PolyModel):
   comment = ndb.StringProperty()
   # GAE application version at which the change was made.
   app_version = ndb.StringProperty()
+
+  def to_jsonish(self):
+    """Returns JSON-serializable dict with entity properties."""
+    def simplify(v):
+      if isinstance(v, list):
+        return [simplify(i) for i in v]
+      elif isinstance(v, datastore_utils.BytesSerializable):
+        return v.to_bytes()
+      elif isinstance(v, datastore_utils.JsonSerializable):
+        return v.to_jsonish()
+      elif isinstance(v, datetime.datetime):
+        return utils.datetime_to_timestamp(v)
+      return v
+    as_dict = self.to_dict(exclude=['class_'])
+    for k, v in as_dict.iteritems():
+      as_dict[k] = simplify(v)
+    as_dict['change_type'] = _CHANGE_TYPE_TO_STRING[self.change_type]
+    return as_dict
+
+
+# Integer CHANGE_* => string for UI.
+_CHANGE_TYPE_TO_STRING = {
+  v: k[len('CHANGE_'):] for k, v in AuthDBChange.__dict__.iteritems()
+  if k.startswith('CHANGE_')
+}
 
 
 def change_log_root_key():
@@ -234,7 +272,7 @@ def diff_entity_by_key(cur_key):
   changes = list(diff_callback(target, prev_ver, cur_ver))
   for ch in changes:
     assert ch.change_type
-    assert ch.target
+    assert ch.target and TARGET_RE.match(ch.target), ch.target
     ch.auth_db_rev = cur_ver.auth_db_rev
     ch.who = cur_ver.modified_by
     ch.when = cur_ver.modified_ts
@@ -473,6 +511,42 @@ KNOWN_HISTORICAL_ENTITIES = {
       model.AuthIPWhitelistAssignments, diff_ip_whitelist_assignments),
   'AuthGlobalConfigHistory': (model.AuthGlobalConfig, diff_global_config),
 }
+
+
+### Code to query change log.
+
+
+@utils.cache_with_expiration(expiration_sec=300)
+def is_changle_log_indexed():
+  """True if required Datastore composite indexes exist.
+
+  May be False for GAE apps that use components.auth, but did not update
+  index.yaml. It is fine, mostly, since apps in Standalone mode are discouraged
+  and central Auth service has necessary indexes.
+
+  UI of apps without indexes hide "Change log" tab.
+  """
+  try:
+    q = make_change_log_query(target='bogus$bogus')
+    q.fetch_page(1)
+    return True
+  except datastore_errors.NeedIndexError:
+    return False
+
+
+def make_change_log_query(target=None, auth_db_rev=None):
+  """Returns ndb.Query over AuthDBChange entities."""
+  if auth_db_rev:
+    ancestor = change_log_revision_key(auth_db_rev)
+  else:
+    ancestor = change_log_root_key()
+  q = AuthDBChange.query(ancestor=ancestor)
+  if target:
+    if not TARGET_RE.match(target):
+      raise ValueError('Invalid target: %r' % target)
+    q = q.filter(AuthDBChange.target == target)
+  q = q.order(-AuthDBChange.key)
+  return q
 
 
 ### Code to snapshot initial state of AuthDB into *History.

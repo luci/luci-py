@@ -277,6 +277,7 @@ def create_application(debug):
       app_name='Auth Service',
       ui_tabs=[
         ui.GroupsHandler,
+        ui.ChangeLogHandler,
         ServicesHandler,
         ui.OAuthConfigHandler,
         ui.IPWhitelistsHandler,

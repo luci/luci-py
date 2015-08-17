@@ -277,5 +277,24 @@ exports.ipWhitelistUpdate = function(ipWhitelist, lastModified) {
 };
 
 
+// Grabs changes matching a query.
+exports.queryChangeLog = function(target, revision, limit, cursor) {
+  var q = {};
+  if (target) {
+    q['target'] = target;
+  }
+  if (revision) {
+    q['auth_db_rev'] = revision;
+  }
+  if (limit) {
+    q['limit'] = limit;
+  }
+  if (cursor) {
+    q['cursor'] = cursor;
+  }
+  return call('GET', '/auth/api/v1/change_log?' + $.param(q));
+};
+
+
 return exports;
 }());

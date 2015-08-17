@@ -37,7 +37,7 @@ javascript library and not jinja2. #}
         {{#if isExternal}}
         <span style="color: gray">(external)</span>
         {{/if}}
-        <a href="/auth/groups/log?group={{nameUrlEncoding}}"
+        <a href="{{changeLogUrl}}"
            id="change-log-button"
            style="float: right"
            title="View change log"

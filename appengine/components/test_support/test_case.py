@@ -46,6 +46,13 @@ class TestCase(auto_stub.TestCase):
   # can be left to None if no index or task queue is used for the test case.
   APP_DIR = None
 
+  # A test can explicitly acknowledge it depends on composite indexes that may
+  # not be defined in index.yaml by setting this to True. It is valid only for
+  # components unit tests that are running outside of a context of some app
+  # (APP_DIR is None in this case). If APP_DIR is provided, GAE testbed silently
+  # overwrite index.yaml, and it's not what we want.
+  SKIP_INDEX_YAML_CHECK = False
+
   # If taskqueues are enqueued during the unit test, self.app must be set to a
   # webtest.Test instance. It will be used to do the HTTP post when executing
   # the enqueued tasks via the taskqueue module.
@@ -62,15 +69,20 @@ class TestCase(auto_stub.TestCase):
     self.testbed = testbed.Testbed()
     self.testbed.activate()
 
-    # If you have a NeedIndexError, here is the switch you need to make to make
+    # If you have a NeedIndexError, here is the switch you need to flip to make
     # the new required indexes to be automatically added. Change
     # train_index_yaml to True to have index.yaml automatically updated, then
     # run your test case. Do not forget to put it back to False.
     train_index_yaml = False
 
+    if self.SKIP_INDEX_YAML_CHECK:
+      # See comment for skip_index_yaml_check above.
+      self.assertIsNone(self.APP_DIR)
+
     self.testbed.init_app_identity_stub()
     self.testbed.init_datastore_v3_stub(
-        require_indexes=not train_index_yaml, root_path=self.APP_DIR,
+        require_indexes=not train_index_yaml and not self.SKIP_INDEX_YAML_CHECK,
+        root_path=self.APP_DIR,
         consistency_policy=datastore_stub_util.PseudoRandomHRConsistencyPolicy(
             probability=1))
     self.testbed.init_logservice_stub()
