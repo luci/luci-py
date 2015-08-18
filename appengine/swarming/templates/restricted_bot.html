@@ -66,7 +66,7 @@
         <td>Last contact</td>
         <td nowrap {% if bot.is_dead(now) %}class="dead_bot"{% endif %}>
           {{(now-bot.last_seen_ts)|timedeltaformat}} ago
-          {% if is_admin and bot.is_dead(now) %}
+          {% if is_admin and bot.is_dead(now) and bot.first_seen_ts %}
           &nbsp;&nbsp;
           <form id="form_delete" method="post"
               action="/restricted/bot/{{bot.id}}/delete">

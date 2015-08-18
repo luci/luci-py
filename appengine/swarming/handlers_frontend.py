@@ -249,19 +249,19 @@ class BotHandler(auth.AuthenticatingHandler):
     # pagination is currently for tasks, not events.
     limit = int(self.request.get('limit', 100))
     cursor = datastore_query.Cursor(urlsafe=self.request.get('cursor'))
-    bot_future = bot_management.get_info_key(bot_id).get_async()
-    run_results, cursor, more = task_result.TaskRunResult.query(
+    run_results_future = task_result.TaskRunResult.query(
         task_result.TaskRunResult.bot_id == bot_id).order(
-            -task_result.TaskRunResult.started_ts).fetch_page(
+            -task_result.TaskRunResult.started_ts).fetch_page_async(
                 limit, start_cursor=cursor)
-
+    bot_future = bot_management.get_info_key(bot_id).get_async()
     events_future = bot_management.get_events_query(bot_id).fetch_async(100)
 
     now = utils.utcnow()
-    bot = bot_future.get_result()
+
     # Calculate the time this bot was idle.
     idle_time = datetime.timedelta()
     run_time = datetime.timedelta()
+    run_results, cursor, more = run_results_future.get_result()
     if run_results:
       run_time = run_results[0].duration_now(now) or datetime.timedelta()
       if not cursor and run_results[0].state != task_result.State.RUNNING:
@@ -283,12 +283,29 @@ class BotHandler(auth.AuthenticatingHandler):
           if duration:
             run_time += duration
 
+    events = events_future.get_result()
+    bot = bot_future.get_result()
+    if not bot and events:
+      # If there is not BotInfo, look if there are BotEvent child of this
+      # entity. If this is the case, it means the bot was deleted but it's
+      # useful to show information about it to the user even if the bot was
+      # deleted. For example, it could be an auto-scaled bot.
+      bot = bot_management.BotInfo(
+          key=bot_management.get_info_key(bot_id),
+          dimensions=events[0].dimensions,
+          state=events[0].state,
+          external_ip=events[0].external_ip,
+          version=events[0].version,
+          quarantined=events[0].quarantined,
+          task_id=events[0].task_id,
+          last_seen_ts=events[0].ts)
+
     params = {
       'bot': bot,
       'bot_id': bot_id,
       'current_version': bot_code.get_bot_version(self.request.host_url),
       'cursor': cursor.urlsafe() if cursor and more else None,
-      'events': events_future.get_result(),
+      'events': events,
       'idle_time': idle_time,
       'is_admin': acl.is_admin(),
       'limit': limit,
