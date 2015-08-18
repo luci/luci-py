@@ -88,8 +88,13 @@ class Bot(object):
 
   @property
   def swarming_bot_zip(self):
-    """Absolute path to the swarming_bot.zip file."""
-    return THIS_FILE
+    """Absolute path to the swarming_bot.zip file.
+
+    The bot itself is run as swarming_bot.1.zip or swarming_bot.2.zip. Always
+    return swarming_bot.zip since this is the script that must be used when
+    starting up.
+    """
+    return os.path.join(os.path.dirname(THIS_FILE), 'swarming_bot.zip')
 
   def post_event(self, event_type, message):
     """Posts an event to the server."""
