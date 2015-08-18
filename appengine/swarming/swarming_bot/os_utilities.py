@@ -371,7 +371,7 @@ def _generate_autostart_destkop(command, name):
     'Exec=%(cmd)s\n'
     'Hidden=false\n'
     'NoDisplay=false\n'
-    'Comment=Created by os_utilties.py\n'
+    'Comment=Created by os_utilities.py in swarming_bot.zip\n'
     'X-GNOME-Autostart-enabled=true\n') % {
       'cmd': ' '.join(pipes.quote(c) for c in command),
       'name': name,
