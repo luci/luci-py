@@ -409,9 +409,9 @@ def _get_gpu_linux():
       vendor = re_id.match(line[2])
       device = re_id.match(line[3])
       ven_id = vendor.group(2)
-      dimensions.add(ven_id)
-      dimensions.add('%s:%s' % (ven_id, device.group(2)))
-      state.add('%s %s' % (vendor.group(1), device.group(1)))
+      dimensions.add(unicode(ven_id))
+      dimensions.add(u'%s:%s' % (ven_id, device.group(2)))
+      state.add(u'%s %s' % (vendor.group(1), device.group(1)))
   return sorted(dimensions), sorted(state)
 
 
@@ -431,7 +431,7 @@ def _get_gpu_osx():
   for card in _get_SPDisplaysDataType_osx():
     # Warning: the value provided depends on the driver manufacturer.
     # Other interesting values: spdisplays_vram, spdisplays_revision-id
-    ven_id = 'UNKNOWN'
+    ven_id = u'UNKNOWN'
     if 'spdisplays_vendor-id' in card:
       # NVidia
       ven_id = card['spdisplays_vendor-id'][2:]
@@ -441,12 +441,12 @@ def _get_gpu_osx():
       if match:
         ven_id = match.group(1)
     dev_id = card['spdisplays_device-id'][2:]
-    dimensions.add(ven_id)
-    dimensions.add('%s:%s' % (ven_id, dev_id))
+    dimensions.add(unicode(ven_id))
+    dimensions.add(u'%s:%s' % (ven_id, dev_id))
 
     # VMWare doesn't set it.
     if 'sppci_model' in card:
-      state.add(card['sppci_model'])
+      state.add(unicode(card['sppci_model']))
   return sorted(dimensions), sorted(state)
 
 
@@ -484,16 +484,16 @@ def _get_gpu_win():
     # The string looks like:
     #  PCI\VEN_15AD&DEV_0405&SUBSYS_040515AD&REV_00\3&2B8E0B4B&0&78
     pnp_string = device.PNPDeviceID
-    ven_id = 'UNKNOWN'
-    dev_id = 'UNKNOWN'
+    ven_id = u'UNKNOWN'
+    dev_id = u'UNKNOWN'
     match = re.search(r'VEN_([0-9A-F]{4})', pnp_string)
     if match:
       ven_id = match.group(1).lower()
     match = re.search(r'DEV_([0-9A-F]{4})', pnp_string)
     if match:
       dev_id = match.group(1).lower()
-    dimensions.add(ven_id)
-    dimensions.add('%s:%s' % (ven_id, dev_id))
+    dimensions.add(unicode(ven_id))
+    dimensions.add(u'%s:%s' % (ven_id, dev_id))
   return sorted(dimensions), sorted(state)
 
 
