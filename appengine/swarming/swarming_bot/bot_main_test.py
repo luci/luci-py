@@ -104,7 +104,9 @@ class TestBotMain(net_utils.TestCase):
     self.assertEqual(
         [(('Starting new swarming bot: %s' % THIS_FILE,), {'timeout': 900})],
         restarts)
-    self.assertEqual([1], setup_bots)
+    # It is called twice, one as part of setup_bot(False), another as part of
+    # on_shutdown_hook().
+    self.assertEqual([1, 1], setup_bots)
     expected = [
       'Starting new swarming bot: %s' % THIS_FILE,
       'Bot is stuck restarting for: Starting new swarming bot: %s' % THIS_FILE,

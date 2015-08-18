@@ -233,6 +233,15 @@ def post_error_task(botobj, error, task_id):
       '/swarming/api/v1/bot/task_error/%s' % task_id, data=data)
 
 
+def on_shutdown_hook(b):
+  """Called when the bot is restarting."""
+  call_hook(b, 'on_bot_shutdown')
+  # Aggressively set itself up so we ensure the auto-reboot configuration is
+  # fine before restarting the host. This is important as some tasks delete the
+  # autorestart script (!)
+  setup_bot(True)
+
+
 def get_bot():
   """Returns a valid Bot instance.
 
@@ -255,7 +264,7 @@ def get_bot():
   config = get_config()
   return bot.Bot(
       remote, attributes, config['server'], config['server_version'], ROOT_DIR,
-      lambda b: call_hook(b, 'on_bot_shutdown'))
+      on_shutdown_hook)
 
 
 def run_bot(arg_error):
