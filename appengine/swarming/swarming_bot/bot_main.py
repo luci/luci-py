@@ -354,7 +354,7 @@ def poll_server(botobj, quit_bit):
   if cmd == 'run':
     if run_manifest(botobj, resp['manifest'], start):
       # Completed a task successfully so update swarming_bot.zip if necessary.
-      update_lkgbc()
+      update_lkgbc(botobj)
   elif cmd == 'update':
     update_bot(botobj, resp['version'])
   elif cmd == 'restart':
@@ -501,15 +501,24 @@ def update_bot(botobj, version):
   sys.exit(ret)
 
 
-def update_lkgbc():
+def update_lkgbc(botobj):
   """Updates the Last Known Good Bot Code if necessary."""
   try:
-    org = os.stat('swarming_bot.zip')
-    cur = os.stat(THIS_FILE)
-    if org.st_size != org.st_size or org.st_mtime < cur.st_mtime:
-      shutil.copy(THIS_FILE, 'swarming_bot.zip')
+    if not os.path.isfile(THIS_FILE):
+      botobj.post_error('Missing file %s for LKGBC' % THIS_FILE)
+      return
+
+    golden = os.path.join(ROOT_DIR, 'swarming_bot.zip')
+    if os.path.isfile(golden):
+      org = os.stat(golden)
+      cur = os.stat(THIS_FILE)
+      if org.st_size == org.st_size and org.st_mtime >= cur.st_mtime:
+        return
+
+    # Copy the file back.
+    shutil.copy(THIS_FILE, golden)
   except Exception as e:
-    logging.exception('failed to update lkgbc: %s', e)
+    botobj.post_error('Failed to update LKGBC: %s' % e)
 
 
 def get_config():
