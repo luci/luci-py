@@ -495,9 +495,8 @@ def update_bot(botobj, version):
   # to survive, and it'll restart it if it disappears. os.exec*() replaces the
   # process so this is fine.
   ret = common.exec_python([new_zip, 'start_slave', '--survive'])
-
-  # This code runs only if bot failed to respawn itself.
-  botobj.post_error('Bot failed to respawn after update')
+  if ret:
+    botobj.post_error('Bot failed to respawn after update: %s' % ret)
   sys.exit(ret)
 
 
