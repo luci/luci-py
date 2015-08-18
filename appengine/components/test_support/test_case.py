@@ -7,6 +7,7 @@ import contextlib
 import datetime
 import logging
 import time
+import urllib
 
 import endpoints
 import webtest
@@ -159,6 +160,24 @@ class TestCase(auto_stub.TestCase):
       ran_total += ran
 
 
+class Endpoints(object):
+  """Handles endpoints API calls."""
+  def __init__(self, api_service_cls):
+    super(Endpoints, self).__init__()
+    self._api_service_cls = api_service_cls
+    self._api_app = webtest.TestApp(
+        endpoints.api_server([self._api_service_cls], restricted=False),
+        extra_environ={'REMOTE_ADDR': '127.0.0.1'})
+
+  def call_api(self, method, body=None, status=200):
+    """Calls endpoints API method identified by its name."""
+    assert hasattr(self._api_service_cls, method), method
+    return self._api_app.post_json(
+        '/_ah/spi/%s.%s' % (self._api_service_cls.__name__, method),
+        body or {},
+        status=status)
+
+
 class EndpointsTestCase(TestCase):
   """Base class for a test case that tests Cloud Endpoint Service.
 
@@ -177,24 +196,14 @@ class EndpointsTestCase(TestCase):
   # Should be set in subclasses to a subclass of remote.Service.
   api_service_cls = None
 
-  _api_app = None
+  _endpoints = None
 
-  @property
-  def api_app(self):
-    """Returns instance of webtest.TestApp that wraps Endpoints API service."""
-    if self._api_app is None:
-      self._api_app = webtest.TestApp(
-          endpoints.api_server([self.api_service_cls], restricted=False),
-          extra_environ={'REMOTE_ADDR': '127.0.0.1'})
-    return self._api_app
+  def setUp(self):
+    super(EndpointsTestCase, self).setUp()
+    self._endpoints = Endpoints(self.api_service_cls)
 
-  def call_api(self, method, body=None, status=None):
-    """Calls endpoints API method identified by its name."""
-    self.assertTrue(hasattr(self.api_service_cls, method))
-    return self.api_app.post_json(
-        '/_ah/spi/%s.%s' % (self.api_service_cls.__name__, method),
-        body or {},
-        status=status)
+  def call_api(self, method, body=None, status=200):
+    return self._endpoints.call_api(method, body, status)
 
   @contextlib.contextmanager
   def call_should_fail(self, _status):

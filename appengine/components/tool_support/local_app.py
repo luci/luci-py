@@ -139,6 +139,7 @@ class LocalApplication(object):
     ]
     if self._listen_all:
       cmd.extend(('--host', '0.0.0.0'))
+      cmd.extend(('--admin_host', '0.0.0.0'))
 
     with open(log_file, 'wb') as f:
       self._proc = self._app.spawn_dev_appserver(

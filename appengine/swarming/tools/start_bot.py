@@ -20,16 +20,17 @@ class LocalBot(object):
   It creates its own temporary directory to download the zip and run tasks
   locally.
   """
-  def __init__(self, swarming_server_url):
+  def __init__(self, swarming_server_url, redirect=True):
     self._tmpdir = tempfile.mkdtemp(prefix='swarming_bot')
     self._swarming_server_url = swarming_server_url
     self._proc = None
-    self._log = None
+    self._logs = {}
+    self._redirect = redirect
 
   @property
   def log(self):
     """Returns the log output. Only set after calling stop()."""
-    return self._log
+    return '\n'.join(self._logs.itervalues()) if self._logs else None
 
   def start(self):
     """Starts the local Swarming bot."""
@@ -38,10 +39,14 @@ class LocalBot(object):
     urllib.urlretrieve(self._swarming_server_url + '/bot_code', bot_zip)
     cmd = [sys.executable, bot_zip, 'start_slave']
     env = os.environ.copy()
-    with open(os.path.join(self._tmpdir, 'bot_config_stdout.log'), 'wb') as f:
+    if self._redirect:
+      with open(os.path.join(self._tmpdir, 'bot_config_stdout.log'), 'wb') as f:
+        self._proc = subprocess.Popen(
+            cmd, cwd=self._tmpdir, preexec_fn=os.setsid, stdout=f, env=env,
+            stderr=f)
+    else:
       self._proc = subprocess.Popen(
-          cmd, cwd=self._tmpdir, preexec_fn=os.setsid, stdout=f, env=env,
-          stderr=f)
+          cmd, cwd=self._tmpdir, preexec_fn=os.setsid, env=env)
 
   def stop(self):
     """Stops the local Swarming bot. Returns the process exit code."""
@@ -50,37 +55,57 @@ class LocalBot(object):
     if self._proc.poll() is None:
       try:
         os.killpg(self._proc.pid, signal.SIGTERM)
+        # TODO(maruel): SIGKILL after N seconds.
         self._proc.wait()
       except OSError:
         pass
     exit_code = self._proc.returncode
     if self._tmpdir:
-      with open(os.path.join(self._tmpdir, 'bot_config_stdout.log'), 'rb') as f:
-        self._log = f.read()
+      self._read_log('bot_config.log')
+      self._read_log('bot_config_stdout.log')
+      self._read_log('swarming_bot.log')
+      self._read_log('task_runner.log')
       shutil.rmtree(self._tmpdir)
       self._tmpdir = None
     self._proc = None
     return exit_code
 
   def wait(self):
-    """Wait for the process to normally exit."""
+    """Waits for the process to normally exit."""
     self._proc.wait()
+
+  def kill(self):
+    """Kills the child forcibly."""
+    if self._proc:
+      self._proc.kill()
 
   def dump_log(self):
     """Prints dev_appserver log to stderr, works only if app is stopped."""
     print >> sys.stderr, '-' * 60
     print >> sys.stderr, 'swarming_bot log'
     print >> sys.stderr, '-' * 60
-    for l in self._log.strip('\n').splitlines():
-      sys.stderr.write('  %s\n' % l)
+    if not self._logs:
+      print >> sys.stderr, '<N/A>'
+    else:
+      for name, content in sorted(self._logs.iteritems()):
+        sys.stderr.write(name + ':\n')
+        for l in content.strip('\n').splitlines():
+          sys.stderr.write('  %s\n' % l)
     print >> sys.stderr, '-' * 60
+
+  def _read_log(self, name):
+    try:
+      with open(os.path.join(self._tmpdir, name), 'rb') as f:
+        self._logs[name] = f.read()
+    except (IOError, OSError):
+      pass
 
 
 def main():
   if len(sys.argv) != 2:
     print >> sys.stderr, 'Specify url to Swarming server'
     return 1
-  bot = LocalBot(sys.argv[1])
+  bot = LocalBot(sys.argv[1], False)
   try:
     bot.start()
     bot.wait()

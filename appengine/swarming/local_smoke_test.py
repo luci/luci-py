@@ -128,6 +128,18 @@ def gen_expected(**kwargs):
   return expected
 
 
+def handle_interrupt(fn):
+  """Makes a unittest.TestCase test handle Ctrl-C properly."""
+  def hook(self):
+    try:
+      fn(self)
+    except KeyboardInterrupt:
+      self.fail('<Ctrl-C>')
+      if self._bot:
+        self._bot.kill()
+  return hook
+
+
 class SwarmingTestCase(unittest.TestCase):
   """Test case class for Swarming integration tests."""
   def setUp(self):
@@ -188,6 +200,7 @@ class SwarmingTestCase(unittest.TestCase):
     # pylint: disable=E1101
     return not self._resultForDoCleanups.wasSuccessful()
 
+  @handle_interrupt
   def test_integration(self):
     """Runs a few task requests and wait for results."""
     self.finish_setup()
