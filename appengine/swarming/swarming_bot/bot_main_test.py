@@ -70,6 +70,7 @@ class TestBotMain(net_utils.TestCase):
   def test_get_dimensions(self):
     dimensions = set(bot_main.get_dimensions())
     dimensions.discard('hidpi')
+    dimensions.discard('zone')  # Only set on GCE bots.
     expected = {'cores', 'cpu', 'gpu', 'id', 'machine_type', 'os'}
     self.assertEqual(expected, dimensions)
 
