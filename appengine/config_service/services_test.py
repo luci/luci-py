@@ -10,9 +10,9 @@ test_env.setup_test_env()
 import mock
 
 from components import net
+from components.config.proto import service_config_pb2
 from test_support import test_case
 
-from proto import service_config_pb2
 import common
 import services
 import storage

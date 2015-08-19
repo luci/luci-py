@@ -9,11 +9,11 @@ test_env.setup_test_env()
 
 from google.appengine.ext import ndb
 
-import mock
+from components.config.proto import service_config_pb2
+from components.config.proto import project_config_pb2
 from test_support import test_case
+import mock
 
-from proto import service_config_pb2
-from proto import project_config_pb2
 import projects
 import storage
 

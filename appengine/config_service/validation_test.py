@@ -18,9 +18,9 @@ import mock
 from components import config
 from components import net
 from components.config import validation_context
+from components.config.proto import project_config_pb2
+from components.config.proto import service_config_pb2
 
-from proto import project_config_pb2
-from proto import service_config_pb2
 import services
 import storage
 import validation

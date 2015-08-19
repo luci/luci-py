@@ -6,14 +6,14 @@
 
 import logging
 
-from components import utils
-
 from google.appengine.ext import ndb
 from google.appengine.ext.ndb import msgprop
 from protorpc import messages
 
-from proto import project_config_pb2
-from proto import service_config_pb2
+from components import utils
+from components.config.proto import project_config_pb2
+from components.config.proto import service_config_pb2
+
 import common
 import storage
 

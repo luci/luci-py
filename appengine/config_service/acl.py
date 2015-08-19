@@ -7,8 +7,8 @@ import re
 from components import auth
 from components import config
 from components import utils
+from components.config.proto import service_config_pb2
 
-from proto import service_config_pb2
 import common
 import projects
 import services
@@ -19,20 +19,6 @@ import storage
 def read_acl_cfg():
   return storage.get_self_config_async(
       common.ACL_FILENAME, service_config_pb2.AclCfg).get_result()
-
-def _has_access(access_list):
-  cur_ident = auth.get_current_identity().to_bytes()
-  for ac in access_list:
-    if ac.startswith('group:'):
-      if auth.is_group_member(ac.split(':', 2)[1]):
-        return True
-    else:
-      identity_str = ac
-      if ':' not in identity_str:
-        identity_str = 'user:%s' % identity_str
-      if cur_ident == identity_str:
-        return True
-  return False
 
 
 def can_read_config_set(config_set):
@@ -77,7 +63,7 @@ def has_service_access(service_id):
     return True
 
   service_cfg = services.get_service_async(service_id).get_result()
-  return service_cfg and _has_access(service_cfg.access)
+  return service_cfg and config.api._has_access(service_cfg.access)
 
 
 def has_project_access(project_id):
@@ -86,5 +72,5 @@ def has_project_access(project_id):
   return (
       auth.is_admin() or
       super_group and auth.is_group_member(super_group) or
-      metadata and _has_access(metadata.access)
+      metadata and config.api._has_access(metadata.access)
   )

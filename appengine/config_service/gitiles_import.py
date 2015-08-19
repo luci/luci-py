@@ -28,8 +28,8 @@ from components import config
 from components import gitiles
 from components import net
 from components.datastore_utils import txn
+from components.config.proto import service_config_pb2
 
-from proto import service_config_pb2
 import admin
 import common
 import projects

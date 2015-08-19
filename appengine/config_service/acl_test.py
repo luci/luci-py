@@ -11,9 +11,9 @@ from test_support import test_case
 import mock
 
 from components import auth
+from components.config.proto import project_config_pb2
+from components.config.proto import service_config_pb2
 
-from proto import project_config_pb2
-from proto import service_config_pb2
 import acl
 import projects
 import services

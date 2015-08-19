@@ -10,9 +10,9 @@ test_env.setup_test_env()
 import mock
 import webtest
 
+from components.config.proto import service_config_pb2
 from test_support import test_case
 
-from proto import service_config_pb2
 import main
 import storage
 

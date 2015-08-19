@@ -5,7 +5,7 @@
 build: compile-proto
 
 compile-proto:
-	tools/compile_proto.py .
+	cd components/config/proto && make
 
 test: build
 	tools/run_coverage.py

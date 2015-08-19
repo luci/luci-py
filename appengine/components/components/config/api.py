@@ -16,9 +16,12 @@ import logging
 
 from google.appengine.ext import ndb
 
+from components import auth
+
 from . import common
 from . import fs
 from . import remote
+from .proto import project_config_pb2
 
 
 Project = collections.namedtuple('Project', [
@@ -254,3 +257,40 @@ def get_config_set_location_async(config_set):  # pragma: no cover
 def get_config_set_location(config_set):  # pragma: no cover
   """Blocking version of get_config_set_location_async."""
   return get_config_set_location_async(config_set).get_result()
+
+
+def _has_access(access_list, identity=None):
+  identity = identity or auth.get_current_identity()
+  identity_str = identity.to_bytes()
+  for ac in access_list:
+    if ac.startswith('group:'):
+      group = ac.split(':', 2)[1]
+      if auth.is_group_member(group, identity):
+        return True
+    else:
+      ac_identity_str = ac
+      if ':' not in ac_identity_str:
+        ac_identity_str = 'user:%s' % ac_identity_str
+      if identity_str == ac_identity_str:
+        return True
+  return False
+
+
+@ndb.tasklet
+def has_project_access_async(project_id, identity=None):
+  """Returns True if |identity| has access to project |project_id|.
+
+  The ACL is defined in project.cfg in the project repo, using "access" field.
+  See Project message in proto/service_config.proto for more details.
+
+  This function does not do RPC to config service.
+  """
+  cfg = yield get_project_config_async(
+      project_id, 'project.cfg', project_config_pb2.ProjectCfg,
+      store_last_good=True)
+  raise ndb.Return(cfg and _has_access(cfg.access, identity))
+
+
+def has_project_access(*args, **kwargs):
+  """Blocking version of has_project_access_async."""
+  return has_project_access_async(*args, **kwargs).get_result()

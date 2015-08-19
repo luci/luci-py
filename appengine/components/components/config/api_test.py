@@ -17,8 +17,10 @@ from google.appengine.ext import ndb
 
 from components import auth
 from components import config
+from components.config import api
 from components.config import remote
 from components.config import test_config_pb2
+from components.config.proto import project_config_pb2
 from test_support import test_case
 
 
@@ -122,6 +124,54 @@ class ApiTestCase(test_case.TestCase):
     }
     actual = config.get_ref_configs('bar.cfg', test_config_pb2.Config)
     self.assertEqual(expected, actual)
+
+  def set_up_identity(self):
+    self.mock(auth, 'is_group_member', mock.Mock())
+    auth.is_group_member.side_effect = lambda group, *_: group == 'all'
+    self.mock(auth, 'get_current_identity', mock.Mock())
+    auth.get_current_identity.return_value = auth.Anonymous
+
+  def test_has_project_access_public_group(self):
+    self.set_up_identity()
+
+    self.mock(api, 'get_project_config_async', mock.Mock())
+    api.get_project_config_async.return_value = ndb.Future()
+    api.get_project_config_async.return_value.set_result(
+        project_config_pb2.ProjectCfg(
+            access=['group:all'],
+        )
+    )
+
+    self.assertTrue(config.has_project_access('chromium'))
+
+    api.get_project_config_async.assert_called_once('chromium')
+
+  def test_has_project_access_anon_identity(self):
+    self.set_up_identity()
+
+    self.mock(api, 'get_project_config_async', mock.Mock())
+    api.get_project_config_async.return_value = ndb.Future()
+    api.get_project_config_async.return_value.set_result(
+        project_config_pb2.ProjectCfg(
+            access=['anonymous:anonymous'],
+        )
+    )
+
+    self.assertTrue(config.has_project_access('chromium'))
+
+    api.get_project_config_async.assert_called_once('chromium')
+
+  def test_has_project_access_no_access(self):
+    self.set_up_identity()
+
+    self.mock(api, 'get_project_config_async', mock.Mock())
+    api.get_project_config_async.return_value = ndb.Future()
+    api.get_project_config_async.return_value.set_result(
+        project_config_pb2.ProjectCfg(),  # access not configured => internal
+    )
+
+    self.assertFalse(config.has_project_access('chromium'))
+
 
 
 if __name__ == '__main__':

@@ -4,13 +4,13 @@
 
 """Provides info about registered luci services."""
 
+from google.appengine.ext import ndb
+
 from components import config
 from components import net
 from components import utils
+from components.config.proto import service_config_pb2
 
-from google.appengine.ext import ndb
-
-from proto import service_config_pb2
 import common
 import storage
 import validation

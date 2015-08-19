@@ -17,10 +17,10 @@ import mock
 from components import auth
 from components import gitiles
 from components import net
+from components.config.proto import project_config_pb2
+from components.config.proto import service_config_pb2
 from test_support import test_case
 
-from proto import project_config_pb2
-from proto import service_config_pb2
 import gitiles_import
 import projects
 import storage

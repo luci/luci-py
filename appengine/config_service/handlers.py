@@ -7,8 +7,8 @@ import httplib
 import webapp2
 
 from components import decorators
+from components.config.proto import service_config_pb2
 
-from proto import service_config_pb2
 import common
 import gitiles_import
 import storage
