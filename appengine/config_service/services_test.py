@@ -37,6 +37,7 @@ class ProjectsTestCase(test_case.TestCase):
 
     self.assertEqual(
       services._dict_to_dynamic_metadata({
+        'version': '1.0',
         'validation': {
           'url': 'https://a.com/validate',
           'patterns': [
@@ -70,6 +71,7 @@ class ProjectsTestCase(test_case.TestCase):
 
     self.mock(net, 'json_request_async', mock.Mock())
     net.json_request_async.return_value = future({
+        'version': '1.0',
         'validation': {
           'url': 'https://a.com/validate',
           'patterns': [
