@@ -1,0 +1,3 @@
+cron:
+- url: /internal/cron/process-instance-templates
+  schedule: every 1 minutes

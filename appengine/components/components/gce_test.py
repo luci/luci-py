@@ -271,10 +271,10 @@ class GceTest(test_case.TestCase):
     self.assertEqual('A B', op.error)
 
   def test_is_valid_project_id(self):
+    self.assertTrue(gce.is_valid_project_id('project'))
     self.assertTrue(gce.is_valid_project_id('1234567'))
     self.assertFalse(gce.is_valid_project_id(''))
     self.assertFalse(gce.is_valid_project_id('12345/67'))
-    self.assertFalse(gce.is_valid_project_id('project'))
 
   def test_is_valid_region(self):
     self.assertTrue(gce.is_valid_region('us-central1'))

@@ -33,7 +33,9 @@ class Project(object):
       method='GET',
       payload=None,
       params=None,
-      deadline=None):
+      deadline=None,
+      version='v1',
+      service='compute'):
     """Sends JSON request (with retries) to GCE API endpoint.
 
     Args:
@@ -42,6 +44,8 @@ class Project(object):
       payload: object to serialize to JSON and put in request body.
       params: dict with query GET parameters (i.e. ?key=value&key=value).
       deadline: deadline for a single call attempt.
+      version: API version to use.
+      service: API service to call (compute or replicapool).
 
     Returns:
       Deserialized JSON response.
@@ -49,9 +53,11 @@ class Project(object):
     Raises:
       net.Error on errors.
     """
+    # GCE Instance Groups API service name is replicapool.
+    assert service in ('compute', 'replicapool')
     assert endpoint.startswith('/'), endpoint
-    url = 'https://www.googleapis.com/compute/v1/projects/%s%s' % (
-        self._project_id, endpoint)
+    url = 'https://www.googleapis.com/%s/%s/projects/%s%s' % (
+        service, version, self._project_id, endpoint)
     return net.json_request(
         url=url,
         method=method,
@@ -177,6 +183,59 @@ class Project(object):
       if not page_token:
         break
 
+  def create_instance_group(self, template, size, zone):
+    """Creates an instance group from the given template.
+
+    Args:
+     template: A dict describing a GCE instance template.
+     size: Number of instances the group should contain.
+     zone: Zone to create the instance group in.
+
+    Returns:
+      A replicapool#operation dict.
+    """
+    return self.call_api(
+        '/zones/%s/instanceGroupManagers' % zone,
+        method='POST',
+        params={
+            'size': size,
+        },
+        payload={
+            'baseInstanceName': template['name'],
+            'description': template['description'],
+            'name': template['name'],
+            'instanceTemplate': template['selfLink'],
+        },
+        service='replicapool',
+        version='v1beta2',
+    )
+
+  def get_instance_groups(self, zone):
+    """Returns a list of GCE instance groups associated with this project.
+
+    Args:
+      zone: Zone to list the instance groups in.
+
+    Returns:
+      A dict mapping instance group names to replicapool#instanceGroupManager
+      dicts.
+    """
+    response = self.call_api(
+        '/zones/%s/instanceGroupManagers' % zone,
+        service='replicapool',
+        version='v1beta2',
+    )
+    return {group['name']: group for group in response.get('items', [])}
+
+  def get_instance_templates(self):
+    """Returns a list of GCE instance templates associated with this project.
+
+    Returns:
+      A dict mapping instance template names to compute#instanceTemplate dicts.
+    """
+    response = self.call_api('/global/instanceTemplates')
+    return {template['name']: template for template in response.get('items', [])}
+
 
 class ZoneOperation(object):
   """Asynchronous GCE operation returned by some Project methods.
@@ -221,8 +280,8 @@ class ZoneOperation(object):
 
 
 def is_valid_project_id(project_id):
-  """True if string looks like a valid numeric Cloud Project id."""
-  return re.match(r'^[0-9]+$', project_id)
+  """True if string looks like a valid Cloud Project id."""
+  return re.match(r'^[a-z0-9\-]+$', project_id)
 
 
 def is_valid_region(region):
