@@ -26,6 +26,7 @@ import pipes
 import platform
 import re
 import shlex
+import signal
 import socket
 import string
 import subprocess
@@ -1518,6 +1519,10 @@ def restart(message=None, timeout=None):
   not return on successful restart, or returns False if machine wasn't
   restarted within |timeout| seconds.
   """
+  # The shutdown process sends SIGTERM and waits for processes to exit. It's
+  # important to not handle SIGTERM and die when needed.
+  signal.signal(signal.SIGTERM, signal.SIG_DFL)
+
   deadline = time.time() + timeout if timeout else None
   while True:
     restart_and_return(message)
