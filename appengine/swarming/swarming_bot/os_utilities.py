@@ -1353,13 +1353,15 @@ def get_state(threshold_mb=2*1024, skip=None):
   # TODO(vadimsh): Send 'uptime', number of open file descriptors, processes or
   # any other leaky resources. So that the server can decided to reboot the bot
   # to clean up.
+  nb_files_in_temp = len(os.listdir(tempfile.gettempdir()))
   state = {
     u'cost_usd_hour': get_cost_hour(),
     u'cwd': os.getcwd(),
     u'disks': get_disks_info(),
     u'gpu': get_gpu()[1],
-    u'ip': get_ip(),
     u'hostname': get_hostname(),
+    u'ip': get_ip(),
+    u'nb_files_in_temp': nb_files_in_temp,
     u'ram': get_physical_ram(),
     u'running_time': int(round(time.time() - _STARTED_TS)),
     u'started_ts': int(round(_STARTED_TS)),
@@ -1371,6 +1373,12 @@ def get_state(threshold_mb=2*1024, skip=None):
     integrity = get_integrity_level_win()
     if integrity is not None:
       state[u'integrity'] = [integrity]
+
+  # TODO(maruel): Put an arbitrary limit on the amount of junk that can stay in
+  # TEMP dir once we eyeballed that not the whole fleet will instantly
+  # self-quarantine.
+  #if nb_files_in_temp > 1024:
+  #  state[u'quarantined'] = '> 1024 files in TEMP'
   auto_quarantine_on_low_space(state, threshold_mb, skip)
   return state
 
