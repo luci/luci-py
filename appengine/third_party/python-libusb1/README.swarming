@@ -1,0 +1,12 @@
+Name: Python ctype-based wrapper around libusb1
+Short Name: python-libusb1
+URL: https://github.com/vpelletier/python-libusb1
+Revision: 08f438ad6a3f4f4ccdd56ab86bb2c1fd3f2dd1f0
+License: GPL v2.0
+
+Description:
+Pure-python wrapper for libusb-1.0
+
+Local Modifications:
+- rm *.sh *.in setup.py stdeb.cfg testUSB1.py .gitignore .travis.yml
+- rm -rf examples

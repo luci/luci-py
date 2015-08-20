@@ -1,0 +1,76 @@
+--- a/adb/adb_commands.py
++++ b/adb/adb_commands.py
+@@ -26,8 +26,6 @@ import cStringIO
+ import os
+ import socket
+ 
+-from M2Crypto import RSA
+-
+ import adb_protocol
+ import common
+ import filesync_protocol
+@@ -40,22 +38,6 @@ PROTOCOL = 0x01
+ DeviceIsAvailable = common.InterfaceMatcher(CLASS, SUBCLASS, PROTOCOL)
+ 
+ 
+-class M2CryptoSigner(adb_protocol.AuthSigner):
+-  """AuthSigner using M2Crypto."""
+-
+-  def __init__(self, rsa_key_path):
+-    with open(rsa_key_path + '.pub') as rsa_pub_file:
+-      self.public_key = rsa_pub_file.read()
+-
+-    self.rsa_key = RSA.load_key(rsa_key_path)
+-
+-  def Sign(self, data):
+-    return self.rsa_key.sign(data, 'sha1')
+-
+-  def GetPublicKey(self):
+-    return self.public_key
+-
+-
+ class AdbCommands(object):
+   """Exposes adb-like methods for use.
+ 
+--- a/adb/fastboot.py
++++ b/adb/fastboot.py
+@@ -20,16 +20,12 @@ import logging
+ import os
+ import struct
+ 
+-import gflags
+-
+ import common
+ import usb_exceptions
+ 
+-FLAGS = gflags.FLAGS
+-gflags.DEFINE_integer('fastboot_write_chunk_size_kb', 4,
+-                      'The size of packets to write to usb, this is set to 4 '
+-                      "for legacy reasons.  We've had success with 1MB "
+-                      'DRASTICALLY decreasing flashing times.')
++# The size of packets to write to usb, this is set to 4 for legacy reasons.
++# We've had success with 1MB DRASTICALLY decreasing flashing times.
++fastboot_write_chunk_size_kb = 1024,
+ 
+ _LOG = logging.getLogger('fastboot')
+ 
+@@ -195,7 +191,7 @@ class FastbootProtocol(object):
+       progress = self._HandleProgress(length, progress_callback)
+       progress.next()
+     while length:
+-      tmp = data.read(FLAGS.fastboot_write_chunk_size_kb * 1024)
++      tmp = data.read(fastboot_write_chunk_size_kb * 1024)
+       length -= len(tmp)
+       self.usb.BulkWrite(tmp)
+ 
+--- a/adb/adb_protocol.py
++++ b/adb/adb_protocol.py
+@@ -295,7 +295,7 @@ class AdbMessage(object):
+       try:
+         cmd, arg0, unused_arg1, banner = cls.Read(
+             usb, ['CNXN'], timeout_ms=auth_timeout_ms)
+-      except usb_exceptions.BulkReadFailedError as e:
++      except usb_exceptions.ReadFailedError as e:
+         if e.usb_error.value == -7:  # Timeout.
+           raise usb_exceptions.DeviceAuthError(
+               'Accept auth key on device, then retry.')

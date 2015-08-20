@@ -1,0 +1,15 @@
+Name: Python ADB + Fastboot implementation
+Short Name: python-adb
+URL: https://github.com/google/python-adb
+Revision: 05339fb17f973b7748bb57ee4da13bd22f9b2ff7
+License: Apache License, Version 2.0
+
+Description:
+This repository contains a pure-python implementation of the ADB and Fastboot
+protocols, using libusb1 for USB communications.
+
+
+Local Modifications:
+- rm *.py adb/*_debug.py adb/common_cli.py
+- Applied patch PATCH.swarming to remove dependency on gflags, M2Crypto and fix
+  a bug.
