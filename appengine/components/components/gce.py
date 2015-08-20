@@ -234,7 +234,9 @@ class Project(object):
       A dict mapping instance template names to compute#instanceTemplate dicts.
     """
     response = self.call_api('/global/instanceTemplates')
-    return {template['name']: template for template in response.get('items', [])}
+    return {
+        template['name']: template for template in response.get('items', [])
+    }
 
 
 class ZoneOperation(object):
