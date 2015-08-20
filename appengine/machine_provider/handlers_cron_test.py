@@ -5,6 +5,7 @@
 
 """Unit tests for handlers_cron.py."""
 
+import datetime
 import json
 import unittest
 
@@ -15,6 +16,7 @@ from protorpc.remote import protojson
 import webtest
 
 from components import auth_testing
+from components import utils
 from test_support import test_case
 
 import handlers_cron
@@ -29,6 +31,7 @@ class LeaseRequestProcessorTest(test_case.TestCase):
     super(LeaseRequestProcessorTest, self).setUp()
     app = handlers_cron.create_cron_app()
     self.app = webtest.TestApp(app)
+    self.mock(utils, 'enqueue_task', lambda *args, **kwargs: True)
 
   def test_one_request_one_matching_machine_entry(self):
     request = rpc_messages.LeaseRequest(
@@ -62,6 +65,57 @@ class LeaseRequestProcessorTest(test_case.TestCase):
 
     self.app.get(
         '/internal/cron/process-lease-requests',
+        headers={'X-AppEngine-Cron': 'true'},
+    )
+
+
+class MachineReclamationProcessorTest(test_case.TestCase):
+  """Tests for handlers_cron.MachineReclamationProcessor."""
+
+  def setUp(self):
+    super(MachineReclamationProcessorTest, self).setUp()
+    app = handlers_cron.create_cron_app()
+    self.app = webtest.TestApp(app)
+    self.mock(utils, 'enqueue_task', lambda *args, **kwargs: True)
+
+  def test_reclaim_immediately(self):
+    request = rpc_messages.LeaseRequest(
+        dimensions=rpc_messages.Dimensions(
+            os_family=rpc_messages.OSFamily.LINUX,
+        ),
+        duration=0,
+        request_id='fake-id',
+    )
+    lease = models.LeaseRequest(
+        deduplication_checksum=models.LeaseRequest.compute_deduplication_checksum(
+            request,
+        ),
+        key=models.LeaseRequest.generate_key(
+            auth_testing.DEFAULT_MOCKED_IDENTITY.to_bytes(),
+            request,
+        ),
+        owner=auth_testing.DEFAULT_MOCKED_IDENTITY,
+        request=request,
+        response=rpc_messages.LeaseResponse(),
+        state=models.LeaseRequestStates.UNTRIAGED,
+    )
+    dimensions = rpc_messages.Dimensions(
+        backend=rpc_messages.Backend.DUMMY,
+        hostname='fake-host',
+        os_family=rpc_messages.OSFamily.LINUX,
+    )
+    machine = models.CatalogMachineEntry(
+        dimensions=dimensions,
+        key=models.CatalogMachineEntry.generate_key(dimensions),
+        lease_id=lease.key.id(),
+        lease_expiration_ts=datetime.datetime.fromtimestamp(0),
+        state=models.CatalogMachineEntryStates.AVAILABLE,
+    ).put()
+    lease.machine_id = machine.id()
+    lease.put()
+
+    self.app.get(
+        '/internal/cron/process-machine-reclamations',
         headers={'X-AppEngine-Cron': 'true'},
     )
 

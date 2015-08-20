@@ -4,6 +4,7 @@
 
 """Cron jobs for processing lease requests."""
 
+import datetime
 import logging
 
 from google.appengine.api import taskqueue
@@ -98,10 +99,15 @@ def lease_machine(machine_key, lease):
     return False
 
   logging.info('Leasing CatalogMachineEntry:\n%s', machine)
-  machine.state = models.CatalogMachineEntryStates.LEASED
-  machine.put()
+  lease.leased_ts = utils.utcnow()
+  lease.machine_id = machine.key.id()
   lease.state = models.LeaseRequestStates.FULFILLED
-  lease.put()
+  machine.lease_id = lease.key.id()
+  machine.lease_expiration_ts = lease.leased_ts + datetime.timedelta(
+      seconds=lease.request.duration,
+  )
+  machine.state = models.CatalogMachineEntryStates.LEASED
+  ndb.put_multi([lease, machine])
   if not utils.enqueue_task(
       '/internal/queues/fulfill-lease-request',
       'fulfill-lease-request',
@@ -178,7 +184,72 @@ class LeaseRequestProcessor(webapp2.RequestHandler):
           break
 
 
+@ndb.transactional(xg=True)
+def reclaim_machine(machine_key, reclamation_ts):
+  """Attempts to reclaim the given machine.
+
+  Args:
+    machine_key: ndb.Key for a model.CatalogMachineEntry instance.
+    reclamation_ts: datetime.datetime instance indicating when the machine was
+      reclaimed.
+
+  Returns:
+    True if the machine was reclaimed, else False.
+  """
+  machine = machine_key.get()
+  logging.info('Attempting to reclaim CatalogMachineEntry:\n%s', machine)
+
+  if machine.lease_expiration_ts is None:
+    # This can reasonably happen if e.g. the lease was voluntarily given up.
+    logging.warning('CatalogMachineEntry no longer leased:\n%s', machine)
+    return False
+
+  if reclamation_ts < machine.lease_expiration_ts:
+    # This can reasonably happen if e.g. the lease duration was extended.
+    logging.warning('CatalogMachineEntry no longer overdue:\n%s', machine)
+    return False
+
+  logging.info('Reclaiming CatalogMachineEntry:\n%s', machine)
+  lease = models.LeaseRequest.get_by_id(machine.lease_id)
+  lease.machine_id = None
+  machine.lease_id = None
+  machine.lease_expiration_ts = None
+  # TODO(smut): Maybe wipe the machine before marking available.
+  machine.state = models.CatalogMachineEntryStates.AVAILABLE
+  ndb.put_multi([lease, machine])
+  if not utils.enqueue_task(
+      '/internal/queues/reclaim-machine',
+      'reclaim-machine',
+      params={
+          'lease_id': lease.key.id(),
+          'machine_id': machine.key.id(),
+          'topic': lease.request.pubsub_topic,
+      },
+      transactional=True,
+  ):
+    raise TaskEnqueuingError('reclaim-machine')
+  return True
+
+
+class MachineReclamationProcessor(webapp2.RequestHandler):
+  """Worker for processing machine reclamation."""
+
+  @decorators.require_cronjob
+  def get(self):
+    min_ts = utils.timestamp_to_datetime(0)
+    now = utils.utcnow()
+
+    for machine in models.CatalogMachineEntry.query(
+        models.CatalogMachineEntry.lease_expiration_ts < now,
+        # Also filter out unassigned machines, i.e. CatalogMachineEntries
+        # where lease_expiration_ts is None. None sorts before min_ts.
+        models.CatalogMachineEntry.lease_expiration_ts > min_ts,
+    ).fetch(keys_only=True):
+      reclaim_machine(machine, now)
+
+
 def create_cron_app():
   return webapp2.WSGIApplication([
       ('/internal/cron/process-lease-requests', LeaseRequestProcessor),
+      ('/internal/cron/process-machine-reclamations', MachineReclamationProcessor),
   ])

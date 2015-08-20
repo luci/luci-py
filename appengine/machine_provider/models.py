@@ -37,9 +37,13 @@ class LeaseRequest(ndb.Model):
       original rpc_messages.LeaseRequest instance. Used for easy deduplication.
     kind: LeaseRequest. This root entity does not reference any parents.
   """
+  # DateTime indicating original datastore write time.
+  created_ts = ndb.DateTimeProperty(auto_now_add=True)
   # Checksum of the rpc_messages.LeaseRequest instance. Used to compare incoming
   # LeaseRequets for deduplication.
   deduplication_checksum = ndb.StringProperty(required=True, indexed=False)
+  # ID of the CatalogMachineEntry provided for this lease.
+  machine_id = ndb.StringProperty()
   # auth.model.Identity of the issuer of the original request.
   owner = auth.IdentityProperty(required=True)
   # Element of LeaseRequestStates giving the state of this request.
@@ -49,8 +53,6 @@ class LeaseRequest(ndb.Model):
   # rpc_messages.LeaseResponse instance representing the current response.
   # This field will be updated as the request is being processed.
   response = msgprop.MessageProperty(rpc_messages.LeaseResponse)
-  # DateTime indicating original datastore write time.
-  created_ts = ndb.DateTimeProperty(auto_now_add=True)
 
   @classmethod
   def compute_deduplication_checksum(cls, request):
@@ -174,6 +176,10 @@ class CatalogMachineEntry(CatalogEntry):
       hostname uniqueness.
     kind: CatalogMachineEntry. This root entity does not reference any parents.
   """
+  # ID of the LeaseRequest this machine is provided for.
+  lease_id = ndb.StringProperty()
+  # DateTime indicating lease expiration time.
+  lease_expiration_ts = ndb.DateTimeProperty()
   # Element of CatalogMachineEntryStates giving the state of this entry.
   state = ndb.StringProperty(
       choices=CatalogMachineEntryStates,

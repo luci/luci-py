@@ -17,17 +17,18 @@ import pubsub
 import rpc_messages
 
 
-def publish_fulfillment(topic, lease_id, machine_id):
-  """Publish a message announcing that a lease has been fulfilled.
+def publish(topic, message, lease_id, machine_id):
+  """Publish a message about a lease and machine.
 
   Args:
-    topic: Topic that the lease fulfillment should be published to.
-    lease_id: ID of the LeaseRequest being uflfilled.
-    machine_id: ID of the CatalogMachineEntry fulfilling the LeaseRequest.
+    topic: Topic that the message should be published to.
+    message: Content of the message to publish.
+    lease_id: ID of the LeaseRequest associated with this message.
+    machine_id: ID of the CatalogMachineEntry associated with this message.
   """
   pubsub.publish(
       topic,
-      'FULFILLED',
+      message,
       request_hash=lease_id,
       machine_id=machine_id,
   )
@@ -51,10 +52,32 @@ class LeaseRequestFulfiller(webapp2.RequestHandler):
     topic = self.request.get('topic')
 
     if topic:
-      publish_fulfillment(topic, lease_id, machine_id)
+      publish(topic, 'FULFILLED', lease_id, machine_id)
+
+
+class MachineReclaimer(webapp2.RequestHandler):
+  """Worker for reclaiming machines."""
+
+  @decorators.require_taskqueue('reclaim-machine')
+  def post(self):
+    """Reclaim a machine.
+
+    Params:
+      lease_id: ID of the LeaseRequest the machine was leased for.
+      machine_id: ID of the CatalogMachineEntry being reclaimed.
+      topic: If specified, topic that the machine reclamation should be
+        published to.
+    """
+    lease_id = self.request.get('lease_id')
+    machine_id = self.request.get('machine_id')
+    topic = self.request.get('topic')
+
+    if topic:
+      publish(topic, 'RECLAIMED', lease_id, machine_id)
 
 
 def create_queues_app():
   return webapp2.WSGIApplication([
       ('/internal/queues/fulfill-lease-request', LeaseRequestFulfiller),
+      ('/internal/queues/reclaim-machine', MachineReclaimer),
   ])
