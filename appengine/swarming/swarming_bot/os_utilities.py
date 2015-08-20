@@ -37,35 +37,11 @@ import time
 import urllib
 import urllib2
 
-try:
-  # The reason for this try/except is so someone can copy this single file on a
-  # new machine and execute it as-is to get the dimensions that would be set.
-  from utils import file_path
-  from utils import tools
-  from utils import zip_package
+from utils import file_path
+from utils import tools
+from utils import zip_package
 
-  THIS_FILE = os.path.abspath(zip_package.get_main_script_path() or __file__)
-except ImportError as e:
-  THIS_FILE = os.path.abspath(__file__)
-  tools = None
-  print >> sys.stderr, 'Failed to import tools: %s' % e
-
-
-# Properties from an android device that should be kept as dimension.
-ANDROID_DETAILS = frozenset(
-    [
-      # Hardware details.
-      u'ro.board.platform',
-      u'ro.product.board',  # or ro.product.device?
-      u'ro.product.cpu.abi',
-      u'ro.product.cpu.abi2',
-
-      # OS details.
-      u'ro.build.id',
-      u'ro.build.tags',
-      u'ro.build.type',
-      u'ro.build.version.sdk',
-    ])
+THIS_FILE = os.path.abspath(zip_package.get_main_script_path() or __file__)
 
 
 # https://cloud.google.com/compute/pricing#machinetype
@@ -127,20 +103,13 @@ GCE_WINDOWS_COST_CORE_HOUR = 0.04
 ### Private stuff.
 
 
+# Used to calculated Swarming bot uptime.
 _STARTED_TS = time.time()
 
+
+# Cache of GCE OAuth2 token.
 _CACHED_OAUTH2_TOKEN_GCE = {}
 _CACHED_OAUTH2_TOKEN_GCE_LOCK = threading.Lock()
-
-_MONITORING_SCOPE = 'https://www.googleapis.com/auth/monitoring'
-
-
-# Make cached a no-op when client/utils/tools.py is unavailable.
-if not tools:
-  def cached(func):
-    return func
-else:
-  cached = tools.cached
 
 
 def _write(filepath, content):
@@ -417,7 +386,7 @@ def _get_gpu_linux():
   return sorted(dimensions), sorted(state)
 
 
-@cached
+@tools.cached
 def _get_SPDisplaysDataType_osx():
   """Returns an XML about the system display properties."""
   import plistlib
@@ -499,7 +468,7 @@ def _get_gpu_win():
   return sorted(dimensions), sorted(state)
 
 
-@cached
+@tools.cached
 def _get_mount_points_win():
   """Returns the list of 'fixed' drives in format 'X:\\'."""
   ctypes.windll.kernel32.GetDriveTypeW.argtypes = (ctypes.c_wchar_p,)
@@ -561,7 +530,7 @@ def _get_disks_info_posix():
       ) for items in _run_df())
 
 
-@cached
+@tools.cached
 def _get_metadata_gce():
   """Returns the GCE metadata as a dict.
 
@@ -664,7 +633,7 @@ def _safe_read(filepath):
 ### Public API.
 
 
-@cached
+@tools.cached
 def get_os_version_number():
   """Returns the normalized OS version number as a string.
 
@@ -704,7 +673,7 @@ def get_os_version_number():
   return None
 
 
-@cached
+@tools.cached
 def get_os_version_name():
   """Returns the marketing name on Windows.
 
@@ -716,7 +685,7 @@ def get_os_version_name():
   return None
 
 
-@cached
+@tools.cached
 def get_os_name():
   """Returns standardized OS name.
 
@@ -747,7 +716,7 @@ def get_os_name():
   return unicode(sys.platform)
 
 
-@cached
+@tools.cached
 def get_cpu_type():
   """Returns the type of processor: arm or x86."""
   machine = platform.machine().lower()
@@ -756,7 +725,7 @@ def get_cpu_type():
   return unicode(machine)
 
 
-@cached
+@tools.cached
 def get_cpu_bitness():
   """Returns the number of bits in the CPU architecture as a str: 32 or 64.
 
@@ -812,7 +781,7 @@ def get_hostname_short():
   return get_hostname().split(u'.', 1)[0]
 
 
-@cached
+@tools.cached
 def get_num_processors():
   """Returns the number of processors.
 
@@ -834,7 +803,7 @@ def get_num_processors():
       return 5
 
 
-@cached
+@tools.cached
 def get_physical_ram():
   """Returns the amount of installed RAM in Mb, rounded to the nearest number.
   """
@@ -893,7 +862,7 @@ def get_disks_info():
   return _get_disks_info_posix()
 
 
-@cached
+@tools.cached
 def get_gpu():
   """Returns the installed video card(s) name.
 
@@ -918,7 +887,7 @@ def get_gpu():
   return dimensions, state
 
 
-@cached
+@tools.cached
 def get_monitor_hidpi():
   """Returns True if there is an hidpi monitor detected."""
   if sys.platform == 'darwin':
@@ -926,7 +895,7 @@ def get_monitor_hidpi():
   return None
 
 
-@cached
+@tools.cached
 def get_cost_hour():
   """Returns the cost in $USD/h as a floating point value if applicable."""
   if _get_metadata_gce():
@@ -953,7 +922,7 @@ def get_cost_hour():
   return machine_cost + os_cost + disk_gb_cost
 
 
-@cached
+@tools.cached
 def get_machine_type():
   """Returns a GCE-equivalent machine type.
 
@@ -998,11 +967,13 @@ def get_machine_type():
   return machine_type
 
 
-@cached
+@tools.cached
 def can_send_metric():
   """True if 'send_metric' really does something."""
   if _get_metadata_gce():
-    return _MONITORING_SCOPE in _oauth2_available_scopes_gce()
+    # Scope to use Cloud Monitoring.
+    scope = 'https://www.googleapis.com/auth/monitoring'
+    return scope in _oauth2_available_scopes_gce()
   return False
 
 
@@ -1015,7 +986,7 @@ def send_metric(name, value):
 ### Google Cloud Compute Engine.
 
 
-@cached
+@tools.cached
 def get_zone_gce():
   """Returns the zone containing the GCE VM."""
   metadata = _get_metadata_gce()
@@ -1025,7 +996,7 @@ def get_zone_gce():
   return unicode(metadata['instance']['zone'].rsplit('/', 1)[-1])
 
 
-@cached
+@tools.cached
 def get_machine_type_gce():
   """Returns the GCE machine type."""
   metadata = _get_metadata_gce()
@@ -1035,7 +1006,7 @@ def get_machine_type_gce():
   return unicode(metadata['instance']['machineType'].rsplit('/', 1)[-1])
 
 
-@cached
+@tools.cached
 def get_tags_gce():
   """Returns a list of instance tags or empty list if not GCE VM."""
   metadata = _get_metadata_gce()
@@ -1111,7 +1082,7 @@ service-accounts/default/scopes" -H "Metadata-Flavor: Google"
 ### Windows.
 
 
-@cached
+@tools.cached
 def get_integrity_level_win():
   """Returns the integrity level of the current process as a string.
 
@@ -1235,57 +1206,6 @@ def get_integrity_level_win():
 ### Android.
 
 
-def get_adb_list_devices(adb_path='adb'):
-  """Returns the list of devices available. This includes emulators."""
-  output = subprocess.check_output([adb_path, 'devices'])
-  devices = []
-  for line in output.splitlines():
-    if line.startswith(('*', 'List of')) or not line:
-      continue
-    # TODO(maruel): Handle 'offline', 'device', 'no device' and
-    # 'unauthorized'.
-    devices.append(line.split()[0])
-  return devices
-
-
-def get_adb_device_properties_raw(device_id, adb_path='adb'):
-  """Returns the system properties for a device."""
-  output = subprocess.check_output(
-      [adb_path, '-s', device_id, 'shell', 'cat', '/system/build.prop'])
-  properties = {}
-  for line in output.splitlines():
-    if line.startswith('#') or not line:
-      continue
-    key, value = line.split('=', 1)
-    properties[key] = value
-  return properties
-
-
-def get_dimensions_android(device_id, adb_path='adb'):
-  """Returns the default dimensions for an android device.
-
-  In this case, details are about the device, not about the host.
-  """
-  properties = get_adb_device_properties_raw(device_id, adb_path)
-  out = dict(
-      (k, [v]) for k, v in properties.iteritems() if k in ANDROID_DETAILS)
-  out[u'id'] = [device_id]
-  return out
-
-
-def get_state_android(device_id, adb_path='adb'):
-  """Returns state information about the device.
-
-  It's a big speculating TODO. Would be temperature, device uptime, partition
-  space, etc.
-  """
-  # Unused argument - pylint: disable=W0613
-  return {
-    u'device': {
-      # TODO(maruel): Fill me.
-    },
-    u'host': get_state(),
-  }
 
 
 ###
