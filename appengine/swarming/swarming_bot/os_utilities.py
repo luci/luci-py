@@ -45,9 +45,10 @@ try:
   from utils import zip_package
 
   THIS_FILE = os.path.abspath(zip_package.get_main_script_path() or __file__)
-except ImportError:
+except ImportError as e:
   THIS_FILE = os.path.abspath(__file__)
   tools = None
+  print >> sys.stderr, 'Failed to import tools: %s' % e
 
 
 # Properties from an android device that should be kept as dimension.
@@ -520,8 +521,8 @@ def _get_disk_info_win(mount_point):
       ctypes.c_wchar_p(mount_point), None, ctypes.pointer(total_bytes),
       ctypes.pointer(free_bytes))
   return {
-    'free_mb': int(round(free_bytes.value / 1024. / 1024.)),
-    'size_mb': int(round(total_bytes.value / 1024. / 1024.)),
+    'free_mb': round(free_bytes.value / 1024. / 1024., 1),
+    'size_mb': round(total_bytes.value / 1024. / 1024., 1),
   }
 
 
@@ -554,8 +555,8 @@ def _get_disks_info_posix():
       (
         items[5],
         {
-          'free_mb': int(round(int(items[3]) / 1024.)),
-          'size_mb': int(round(int(items[1]) / 1024.)),
+          'free_mb': round(float(items[3]) / 1024., 1),
+          'size_mb': round(float(items[1]) / 1024., 1),
         }
       ) for items in _run_df())
 

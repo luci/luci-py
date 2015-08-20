@@ -85,6 +85,7 @@ def get_dimensions():
       raise ValueError('Unexpected type %s' % out.__class__)
     return out
   except Exception as e:
+    logging.exception('get_dimensions() failed')
     try:
       out = os_utilities.get_dimensions()
       out['error'] = [str(e)]
@@ -115,6 +116,7 @@ def get_state(sleep_streak):
       if not isinstance(state, dict):
         state = {'error': state}
   except Exception as e:
+    logging.exception('get_state() failed')
     state = {
       'error': '%s\n%s' % (e, traceback.format_exc()[-2048:]),
       'quarantined': True,
