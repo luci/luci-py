@@ -1,6 +1,7 @@
 {% extends 'auth/base.html' %}
 {% block content %}
 
+{% set is_readonly = auth_service_config_locked or not is_admin %}
 <div class="row">
   <div class="col-md-12">
     <div class="panel panel-default">
@@ -12,7 +13,7 @@
             <label class="control-label">Primary client_id</label>
             <div style="font-family:monospace;">
               <input type="text" class="form-control"
-                     {% if auth_service_config_locked %}readonly{% endif %}
+                     {% if is_readonly %}readonly{% endif %}
                      name="client_id" placeholder="Not set">
             </div>
           </div>
@@ -20,7 +21,7 @@
             <label class="control-label">Client not-so-secret</label>
             <div style="font-family:monospace;">
               <input type="text" class="form-control"
-                     {% if auth_service_config_locked %}readonly{% endif %}
+                     {% if is_readonly %}readonly{% endif %}
                      name="client_secret" placeholder="Not set">
             </div>
           </div>
@@ -29,7 +30,7 @@
             <div style="font-family:monospace;">
               <textarea class="form-control"
                         rows="5" name="more_ids"
-                        {% if auth_service_config_locked %}readonly{% endif %}
+                        {% if is_readonly %}readonly{% endif %}
                         wrap="off"></textarea>
             </div>
           </div>
@@ -37,7 +38,9 @@
             {% if auth_service_config_locked %}
               {{ render_config_locked() }}
             {% else %}
-              <button type="submit" class="btn btn-primary">Submit</button>
+              {% if is_admin %}
+                <button type="submit" class="btn btn-primary">Submit</button>
+              {% endif %}
             {% endif %}
           </div>
         </form>

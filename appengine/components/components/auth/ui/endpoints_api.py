@@ -11,6 +11,7 @@ import endpoints
 from protorpc import messages
 from protorpc import remote
 
+from . import acl
 from .. import api
 from .. import endpoints_support
 from .. import model
@@ -28,25 +29,6 @@ class MembershipResponse(messages.Message):
   is_member = messages.BooleanField(1)
 
 
-### Authorization
-
-
-def has_read_access():
-  """Returns True if current caller can read groups and other auth data.
-
-  Used in @require(...) decorators of API handlers.
-  """
-  return api.is_admin() or api.is_group_member('groups-readonly-access')
-
-
-def has_write_access():
-  """Returns True if current caller can modify groups and other auth data.
-
-  Used in @require(...) decorators of API handlers.
-  """
-  return api.is_admin()
-
-
 ### API
 
 
@@ -57,7 +39,7 @@ class AuthService(remote.Service):
   @endpoints_support.endpoints_method(
       MembershipRequest, MembershipResponse, http_method='GET',
       path='/membership')
-  @api.require(has_read_access)
+  @api.require(acl.has_access)
   def membership(self, request):
     identity = request.identity
     if ':' not in identity:

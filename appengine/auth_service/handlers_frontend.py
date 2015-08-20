@@ -19,6 +19,7 @@ from components.auth import model
 from components.auth import tokens
 from components.auth import version
 from components.auth.proto import replication_pb2
+from components.auth.ui import acl
 from components.auth.ui import rest_api
 from components.auth.ui import ui
 
@@ -102,7 +103,7 @@ class LinkTicketToken(auth.TokenKind):
 class ImporterConfigHandler(auth.ApiHandler):
   """Reads and sets configuration of the group importer."""
 
-  @auth.require(auth.is_admin)
+  @auth.require(acl.has_access)
   def get(self):
     self.send_response({'config': importer.read_config()})
 
@@ -122,7 +123,7 @@ class ImporterConfigHandler(auth.ApiHandler):
 class ServiceListingHandler(auth.ApiHandler):
   """Lists registered replicas with their state."""
 
-  @auth.require(auth.is_admin)
+  @auth.require(acl.has_access)
   def get(self):
     services = sorted(
         replication.AuthReplicaState.query(

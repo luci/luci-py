@@ -18,6 +18,7 @@ from google.appengine.ext import ndb
 
 from components import utils
 
+from . import acl
 from .. import api
 from .. import change_log
 from .. import handler
@@ -81,22 +82,6 @@ def forbid_api_on_replica(method):
   return wrapper
 
 
-def has_read_access():
-  """Returns True if current caller can read groups and other auth data.
-
-  Used in @require(...) decorators of API handlers.
-  """
-  return api.is_admin() or api.is_group_member('groups-readonly-access')
-
-
-def has_write_access():
-  """Returns True if current caller can modify groups and other auth data.
-
-  Used in @require(...) decorators of API handlers.
-  """
-  return api.is_admin()
-
-
 def is_config_locked():
   """Returns True to forbid configuration changing API calls.
 
@@ -153,12 +138,27 @@ class EntityHandlerBase(handler.ApiHandler):
   # Will show up in error messages, e.g. 'Failed to delete <title>'.
   entity_kind_title = None
 
-  def check_preconditions(self):
-    """Called after ACL checks, but before actual handling.
+  def check_write_access(self, action, name):
+    """Raises an error if caller isn't allowed to do the action.
+
+    By default only admins can perform modifications. Subclasses may override
+    this.
+
+    Args:
+      action: one of 'create', 'update' or 'delete'.
+      name: name of the entity being created, updated or deleted.
 
     Raises:
-      webapp2.HTTPException (via self.abort) to abort the request.
+      AuthorizationError on ACL check failures.
+      webapp2.HTTPException on other kind of failures.
     """
+    assert action in ('create', 'update', 'delete'), action
+    ident = api.get_current_identity()
+    if not api.is_admin(ident):
+      # E.g. "user:abc@example.com" has no permission to update group "name".
+      raise api.AuthorizationError(
+          '"%s" has no permission to %s %s "%s"' %
+          (ident.to_bytes(), action, self.entity_kind_title, name))
 
   @classmethod
   def get_entity_key(cls, name):
@@ -167,7 +167,7 @@ class EntityHandlerBase(handler.ApiHandler):
 
   @classmethod
   def is_entity_writable(cls, _name):
-    """Returns True to allow POST\PUT\DELETE."""
+    """Returns True if entity can be modified (e.g. not an external group)."""
     return True
 
   @classmethod
@@ -199,10 +199,9 @@ class EntityHandlerBase(handler.ApiHandler):
 
   # Actual handlers implemented in terms of do_* calls.
 
-  @api.require(has_read_access)
+  @api.require(acl.has_access)
   def get(self, name):
     """Fetches entity give its name."""
-    self.check_preconditions()
     obj = self.get_entity_key(name).get()
     if not obj:
       self.abort_with_error(404, text='No such %s' % self.entity_kind_title)
@@ -213,10 +212,10 @@ class EntityHandlerBase(handler.ApiHandler):
         headers={'Last-Modified': utils.datetime_to_rfc2822(obj.modified_ts)})
 
   @forbid_api_on_replica
-  @api.require(has_write_access)
+  @api.require(acl.has_access)
   def post(self, name):
     """Creates a new entity, ensuring it's indeed new (no overwrites)."""
-    self.check_preconditions()
+    self.check_write_access('create', name)
     try:
       body = self.parse_body()
       name_in_body = body.pop('name', None)
@@ -273,10 +272,10 @@ class EntityHandlerBase(handler.ApiHandler):
     )
 
   @forbid_api_on_replica
-  @api.require(has_write_access)
+  @api.require(acl.has_access)
   def put(self, name):
     """Updates an existing entity."""
-    self.check_preconditions()
+    self.check_write_access('update', name)
     try:
       body = self.parse_body()
       name_in_body = body.pop('name', None)
@@ -337,10 +336,10 @@ class EntityHandlerBase(handler.ApiHandler):
     )
 
   @forbid_api_on_replica
-  @api.require(has_write_access)
+  @api.require(acl.has_access)
   def delete(self, name):
     """Deletes an entity."""
-    self.check_preconditions()
+    self.check_write_access('delete', name)
     if not self.is_entity_writable(name):
       self.abort_with_error(
           400, text='This %s is not writable' % self.entity_kind_title)
@@ -454,7 +453,7 @@ class ChangeLogHandler(handler.ApiHandler):
   """).strip()
 
   @forbid_api_on_replica
-  @api.require(api.is_admin)
+  @api.require(acl.has_access)
   def get(self):
     target = self.request.get('target')
     if target and not change_log.TARGET_RE.match(target):
@@ -510,7 +509,7 @@ class GroupsHandler(handler.ApiHandler):
   def cache_key(auth_db_rev):
     return 'api:v1:GroupsHandler/%d' % auth_db_rev
 
-  @api.require(has_read_access)
+  @api.require(acl.has_access)
   def get(self):
     # Try to find a cached response for the current revision.
     auth_db_rev = model.get_auth_db_revision()
@@ -731,7 +730,7 @@ class IPWhitelistsHandler(handler.ApiHandler):
   whitelists referenced in "account -> IP whitelist" mapping.
   """
 
-  @api.require(has_read_access)
+  @api.require(acl.has_access)
   def get(self):
     entities = model.AuthIPWhitelist.query(ancestor=model.root_key())
     self.send_response({
@@ -753,8 +752,9 @@ class IPWhitelistHandler(EntityHandlerBase):
   entity_kind_name = 'ip_whitelist'
   entity_kind_title = 'ip whitelist'
 
-  def check_preconditions(self):
-    if self.request.method != 'GET' and is_config_locked():
+  def check_write_access(self, action, name):
+    super(IPWhitelistHandler, self).check_write_access(action, name)
+    if is_config_locked():
       self.abort_with_error(409, text='The configuration is managed elsewhere')
 
   @classmethod
@@ -828,7 +828,7 @@ class OAuthConfigHandler(handler.ApiHandler):
     })
 
   @forbid_api_on_replica
-  @api.require(has_write_access)
+  @api.require(api.is_admin)
   def post(self):
     if is_config_locked():
       self.abort_with_error(409, text='The configuration is managed elsewhere')
@@ -859,7 +859,7 @@ class OAuthConfigHandler(handler.ApiHandler):
 class ServerStateHandler(handler.ApiHandler):
   """Reports replication state of a service."""
 
-  @api.require(has_read_access)
+  @api.require(acl.has_access)
   def get(self):
     if model.is_primary():
       mode = 'primary'

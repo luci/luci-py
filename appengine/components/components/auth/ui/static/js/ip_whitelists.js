@@ -254,7 +254,7 @@ var reloadWhitelists = function(selector, selection) {
 
 // Called when HTML body of a page is loaded.
 exports.onContentLoaded = function() {
-  var readonly = config.auth_service_config_locked;
+  var readonly = config.auth_service_config_locked || !config.is_admin;
   var selector = new Selector($('#ip-whitelists-selector'), readonly);
   var newListDialog = new NewWhitelistDialog($('#create-ip-whitelist'));
   var whitelistPane = new WhitelistPane($('#selected-ip-whitelist'));

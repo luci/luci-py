@@ -15,6 +15,7 @@ from google.appengine.api import users
 from components import template
 from components import utils
 
+from . import acl
 from .. import api
 from .. import change_log
 from .. import handler
@@ -135,6 +136,7 @@ class UIHandler(handler.AuthenticatingHandler):
     # This goes to both Jinja2 env and Javascript config object.
     common = {
       'auth_service_config_locked': False, # overridden in auth_service
+      'is_admin': api.is_admin(),
       'login_url': users.create_login_url(self.request.path),
       'logout_url': users.create_logout_url('/'),
       'xsrf_token': self.generate_xsrf_token(),
@@ -216,7 +218,7 @@ class UIHandler(handler.AuthenticatingHandler):
 class MainHandler(UIHandler):
   """Redirects to first navbar tab."""
   @redirect_ui_on_replica
-  @api.require(api.is_admin)
+  @api.require(acl.has_access)
   def get(self):
     assert _ui_navbar_tabs
     self.redirect(_ui_navbar_tabs[0].navbar_tab_url)
@@ -316,7 +318,7 @@ class UINavbarTabHandler(UIHandler):
   template_file = None
 
   @redirect_ui_on_replica
-  @api.require(api.is_admin)
+  @api.require(acl.has_access)
   def get(self):
     """Renders page HTML to HTTP response stream."""
     env = {

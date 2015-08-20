@@ -148,7 +148,11 @@ var initAddServiceForm = function() {
 // Called when HTML body of a page is loaded.
 exports.onContentLoaded = function() {
   api.setXSRFTokenAutoupdate(true);
-  initAddServiceForm();
+  if (config.is_admin) {
+    initAddServiceForm();
+  } else {
+    $('#add-service-row').hide();
+  }
   updateServiceListing();
 };
 

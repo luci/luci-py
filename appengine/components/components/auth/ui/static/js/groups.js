@@ -77,9 +77,11 @@ function longestMatch(items, text) {
 // Group chooser UI element: list of groups + 'Create new group' button.
 
 
-var GroupChooser = function($element) {
+var GroupChooser = function($element, allowCreateGroup) {
   // Root jquery DOM element.
   this.$element = $element;
+  // True to show "Create a new group" item.
+  this.allowCreateGroup = allowCreateGroup;
   // Currently known list of groups as shown in UI.
   this.groupList = [];
   // Just names. To avoid building this list for use in search all the time.
@@ -152,8 +154,10 @@ GroupChooser.prototype.setGroupList = function(groups) {
     self.groupToItemMap[group.name] = addElement(
         common.render('group-chooser-item-template', group), group.name);
   });
-  self.groupToItemMap[null] = addElement(
-      common.render('group-chooser-button-template'), null);
+  if (this.allowCreateGroup) {
+    self.groupToItemMap[null] = addElement(
+        common.render('group-chooser-button-template'), null);
+  }
 
   // Setup click event handlers. Clicks change selection.
   $('.chooser-element', self.$element).click(function() {
@@ -677,7 +681,7 @@ var registerFormValidators = function() {
 
 exports.onContentLoaded = function() {
   // Setup global UI elements.
-  var groupChooser = new GroupChooser($('#group-chooser'));
+  var groupChooser = new GroupChooser($('#group-chooser'), config.is_admin);
   var searchBox = new SearchBox($('#search-box'));
   var mainFrame = new ContentFrame($('#main-content-pane'));
 
