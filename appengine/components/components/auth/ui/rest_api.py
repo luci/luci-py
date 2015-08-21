@@ -105,7 +105,7 @@ def set_config_locked(locked_callback):
 
 class EntityOperationError(Exception):
   """Raised by do_* methods in EntityHandlerBase to indicate a conflict."""
-  def __init__(self, message, details):
+  def __init__(self, message, details=None):
     super(EntityOperationError, self).__init__(message)
     self.message = message
     self.details = details
@@ -563,41 +563,77 @@ class GroupHandler(EntityHandlerBase):
 
   @classmethod
   def do_create(cls, entity):
-    missing = model.get_missing_groups(entity.nested)
+    # Admin group is created during bootstrap, see ui.py BootstrapHandler.
+    assert entity.key.id() != model.ADMIN_GROUP
+    # Check that all references group (owning group, nested groups) exist. It is
+    # ok for a new group to have itself as an owner.
+    entity.owners = entity.owners or model.ADMIN_GROUP
+    to_check = list(entity.nested)
+    if entity.owners != entity.key.id() and entity.owners not in to_check:
+      to_check.append(entity.owners)
+    missing = model.get_missing_groups(to_check)
     if missing:
       raise EntityOperationError(
-          message='Referencing a nested group that doesn\'t exist',
+          message=
+              'Some referenced groups don\'t exist: %s.' % ', '.join(missing),
           details={'missing': missing})
     entity.put()
 
   @classmethod
   def do_update(cls, entity, params):
+    # If changing an owner, ensure new owner exists. No need to do it if
+    # the group owns itself (we know it exists).
+    new_owners = params.get('owners', entity.owners)
+    if new_owners != entity.owners and new_owners != entity.key.id():
+      ent = model.group_key(new_owners).get()
+      if not ent:
+        raise EntityOperationError(
+            message='Owners groups (%s) doesn\'t exist.' % new_owners,
+            details={'missing': [new_owners]})
+    # Admin group must be owned by itself.
+    if entity.key.id() == model.ADMIN_GROUP and new_owners != model.ADMIN_GROUP:
+      raise EntityOperationError(
+          message='Can\'t change owner of \'%s\' group.' % model.ADMIN_GROUP)
     # If adding new nested groups, need to ensure they exist.
     added_nested_groups = set(params['nested']) - set(entity.nested)
     if added_nested_groups:
       missing = model.get_missing_groups(added_nested_groups)
       if missing:
         raise EntityOperationError(
-            message='Referencing a nested group that doesn\'t exist',
+            message=
+                'Some referenced groups don\'t exist: %s.' % ', '.join(missing),
             details={'missing': missing})
     # Now make sure updated group is not a part of new group dependency cycle.
     entity.populate(**params)
     if added_nested_groups:
       cycle = model.find_group_dependency_cycle(entity)
       if cycle:
+        # Make it clear that cycle starts from the group being modified.
+        cycle = [entity.key.id()] + cycle
+        as_str = ' -> '.join(cycle)
         raise EntityOperationError(
-            message='Groups can not have cyclic dependencies',
+            message='Groups can not have cyclic dependencies: %s.' % as_str,
             details={'cycle': cycle})
     # Good enough.
     entity.put()
 
   @classmethod
   def do_delete(cls, entity):
-    referencing_groups = model.find_referencing_groups(entity.key.id())
-    if referencing_groups:
+    # Admin group is special, deleting it would be bad.
+    if entity.key.id() == model.ADMIN_GROUP:
       raise EntityOperationError(
-          message='Group is being referenced in other groups',
-          details={'groups': list(referencing_groups)})
+          message='Can\'t delete \'%s\' group.' % model.ADMIN_GROUP)
+    # A group can be its own owner (but it can not "nest" itself, as checked by
+    # find_group_dependency_cycle). It is OK to delete a self-owning group.
+    referencing_groups = model.find_referencing_groups(entity.key.id())
+    referencing_groups.discard(entity.key.id())
+    if referencing_groups:
+      grs = sorted(referencing_groups)
+      raise EntityOperationError(
+          message=(
+              'This group is being referenced by other groups: %s.' %
+                  ', '.join(grs)),
+          details={'groups': grs})
     entity.key.delete()
 
 

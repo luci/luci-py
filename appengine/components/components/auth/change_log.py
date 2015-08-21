@@ -98,6 +98,7 @@ class AuthDBChange(polymodel.PolyModel):
   # AuthDBGroupChange change types.
   CHANGE_GROUP_CREATED             = 1000
   CHANGE_GROUP_DESCRIPTION_CHANGED = 1100
+  CHANGE_GROUP_OWNERS_CHANGED      = 1150
   CHANGE_GROUP_MEMBERS_ADDED       = 1200
   CHANGE_GROUP_MEMBERS_REMOVED     = 1300
   CHANGE_GROUP_GLOBS_ADDED         = 1400
@@ -290,6 +291,10 @@ class AuthDBGroupChange(AuthDBChange):
   description = ndb.TextProperty()
   # Valid for CHANGE_GROUP_DESCRIPTION_CHANGED, CHANGE_GROUP_DELETED.
   old_description = ndb.TextProperty()
+  # Valid for CHANGE_GROUP_CREATED and CHANGE_GROUP_OWNERS_CHANGED.
+  owners = ndb.StringProperty()
+  # Valid for CHANGE_GROUP_OWNERS_CHANGES and CHANGE_GROUP_DELETED.
+  old_owners = ndb.StringProperty()
   # Valid for CHANGE_GROUP_MEMBERS_ADDED and CHANGE_GROUP_MEMBERS_REMOVED.
   members = model.IdentityProperty(repeated=True)
   # Valid for CHANGE_GROUP_GLOBS_ADDED and CHANGE_GROUP_GLOBS_REMOVED.
@@ -314,12 +319,15 @@ def diff_groups(target, old, new):
       yield change('GLOBS_REMOVED', globs=new.globs)
     if new.nested:
       yield change('NESTED_REMOVED', nested=new.nested)
-    yield change('DELETED', old_description=new.description)
+    yield change(
+        'DELETED',
+        old_description=new.description,
+        old_owners=new.owners or model.ADMIN_GROUP)
     return
 
   # A group was just added (or at least it's first its appearance in the log).
   if old is None:
-    yield change('CREATED', description=new.description)
+    yield change('CREATED', description=new.description, owners=new.owners)
     if new.members:
       yield change('MEMBERS_ADDED', members=new.members)
     if new.globs:
@@ -333,6 +341,11 @@ def diff_groups(target, old, new):
         'DESCRIPTION_CHANGED',
         description=new.description,
         old_description=old.description)
+
+  # Old entities have no 'owners' field, they are implicitly owned by admins.
+  old_owners = old.owners or model.ADMIN_GROUP
+  if old_owners != new.owners:
+    yield change('OWNERS_CHANGED', owners=new.owners, old_owners=old_owners)
 
   added, removed = diff_lists(old.members, new.members)
   if added:

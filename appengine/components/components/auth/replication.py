@@ -172,6 +172,7 @@ def auth_db_snapshot_to_proto(snapshot, auth_db_proto=None):
     msg.created_by = ent.created_by.to_bytes()
     msg.modified_ts = utils.datetime_to_timestamp(ent.modified_ts)
     msg.modified_by = ent.modified_by.to_bytes()
+    msg.owners = ent.owners
 
   for ent in snapshot.secrets:
     msg = auth_db_proto.secrets.add()
@@ -219,6 +220,7 @@ def proto_to_auth_db_snapshot(auth_db_proto):
         globs=[model.IdentityGlob.from_bytes(x) for x in msg.globs],
         nested=list(msg.nested),
         description=msg.description,
+        owners=msg.owners or model.ADMIN_GROUP,
         created_ts=utils.timestamp_to_datetime(msg.created_ts),
         created_by=model.Identity.from_bytes(msg.created_by),
         modified_ts=utils.timestamp_to_datetime(msg.modified_ts),

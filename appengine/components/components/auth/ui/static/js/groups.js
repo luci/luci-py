@@ -430,6 +430,7 @@ GroupForm.prototype.setupSubmitHandler = function(submitCallback) {
       // Extract data from the form.
       var name = $('input[name=name]', $form).val();
       var description = $('textarea[name=description]', $form).val();
+      var owners = $('input[name=owners]', $form).val();
       var membersAndGlobs = $('textarea[name=membersAndGlobs]', $form).val();
       var nested = $('textarea[name=nested]', $form).val();
 
@@ -462,6 +463,7 @@ GroupForm.prototype.setupSubmitHandler = function(submitCallback) {
         submitCallback({
           name: name.trim(),
           description: description.trim(),
+          owners: owners,
           members: common.addPrefixToItems('user', members),
           globs: common.addPrefixToItems('user', globs),
           nested: splitItemList(nested)
@@ -478,6 +480,9 @@ GroupForm.prototype.setupSubmitHandler = function(submitCallback) {
       },
       'description': {
         required: true
+      },
+      'owners': {
+        groupNameOrEmpty: true
       },
       'membersAndGlobs': {
         membersAndGlobsList: true
@@ -660,6 +665,10 @@ var registerFormValidators = function() {
   var validators = {
     'groupName': [
       function(value, element) { return groupRe.test(value); },
+      'Invalid group name'
+    ],
+    'groupNameOrEmpty': [
+      function(value, element) { return !value || groupRe.test(value); },
       'Invalid group name'
     ],
     'membersAndGlobsList': [

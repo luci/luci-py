@@ -191,6 +191,7 @@ class GenerateChangesTest(test_case.TestCase):
         'class_': [u'AuthDBChange', u'AuthDBGroupChange'],
         'comment': u'New group',
         'description': u'Blah',
+        'owners': u'administrators',
         'target': u'AuthGroup$A group',
         'when': datetime.datetime(2015, 1, 2, 3, 4, 5),
         'who': model.Identity(kind='user', name='me@example.com'),
@@ -264,6 +265,7 @@ class GenerateChangesTest(test_case.TestCase):
         'class_': [u'AuthDBChange', u'AuthDBGroupChange'],
         'comment': u'New group',
         'description': u'Blah',
+        'owners': u'administrators',
         'target': u'AuthGroup$A group',
         'when': datetime.datetime(2015, 1, 2, 3, 4, 5),
         'who': model.Identity(kind='user', name='me@example.com'),
@@ -315,6 +317,7 @@ class GenerateChangesTest(test_case.TestCase):
       g.globs = [glob('*@example.com'), glob('*@blah.com')]
       g.nested = ['A', 'C']
       g.description = 'Another blah'
+      g.owners = 'another-owners'
       g.record_revision(
           modified_by=ident('me@example.com'),
           modified_ts=utils.utcnow(),
@@ -330,6 +333,18 @@ class GenerateChangesTest(test_case.TestCase):
         'comment': u'Changed',
         'description': u'Another blah',
         'old_description': u'Blah',
+        'target': u'AuthGroup$A group',
+        'when': datetime.datetime(2015, 1, 2, 3, 4, 5),
+        'who': model.Identity(kind='user', name='me@example.com'),
+      },
+      'AuthDBChange:AuthGroup$A group!1150': {
+        'app_version': u'v1a',
+        'auth_db_rev': 2,
+        'change_type': change_log.AuthDBChange.CHANGE_GROUP_OWNERS_CHANGED,
+        'class_': [u'AuthDBChange', u'AuthDBGroupChange'],
+        'comment': u'Changed',
+        'old_owners': u'administrators',
+        'owners': u'another-owners',
         'target': u'AuthGroup$A group',
         'when': datetime.datetime(2015, 1, 2, 3, 4, 5),
         'who': model.Identity(kind='user', name='me@example.com'),
@@ -457,6 +472,7 @@ class GenerateChangesTest(test_case.TestCase):
         'class_': [u'AuthDBChange', u'AuthDBGroupChange'],
         'comment': u'Deleted',
         'old_description': u'Another blah',
+        'old_owners': u'another-owners',
         'target': u'AuthGroup$A group',
         'when': datetime.datetime(2015, 1, 2, 3, 4, 5),
         'who': model.Identity(kind='user', name='me@example.com'),
@@ -771,7 +787,9 @@ class AuthDBChangeTest(test_case.TestCase):
         description='abc',
         members=[ident('a@a.com')],
         globs=[glob('*@a.com')],
-        nested=['A'])
+        nested=['A'],
+        owners='abc',
+        old_owners='def')
     self.assertEqual({
       'app_version': 'v123',
       'auth_db_rev': 123,
@@ -782,6 +800,8 @@ class AuthDBChangeTest(test_case.TestCase):
       'members': ['user:a@a.com'],
       'nested': ['A'],
       'old_description': None,
+      'old_owners': 'def',
+      'owners': 'abc',
       'target': 'AuthGroup$abc',
       'when': 1420167845000000,
       'who': 'user:a@example.com',

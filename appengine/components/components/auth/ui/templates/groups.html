@@ -58,13 +58,19 @@ javascript library and not jinja2. #}
             <textarea class="form-control" rows="3" name="description">{{description}}</textarea>
           </div>
         </div>
+        <div class="form-group">
+          <label class="col-sm-2 control-label">Owners</label>
+          <div class="col-sm-10">
+            <input type="text" class="form-control" name="owners" value="{{owners}}">
+          </div>
+        </div>
         <hr>
         {{/unless}}
         <div class="form-group">
           <label class="col-sm-2 control-label">Members</label>
           <div class="col-sm-10" style="font-family:monospace;">
             <textarea class="form-control"
-                      rows="{{#if isExternal}}30{{else}}15{{/if}}"
+                      rows="{{#if isExternal}}30{{else}}12{{/if}}"
                       name="membersAndGlobs">{{membersAndGlobs}}</textarea>
           </div>
         </div>
@@ -99,15 +105,22 @@ javascript library and not jinja2. #}
       <div id="alerts"></div>
       <form class="form-horizontal" role="form">
         <div class="form-group">
-          <label class="col-sm-2">Group name</label>
+          <label class="col-sm-2 control-label">Group name</label>
           <div class="col-sm-10">
             <input type="text" class="form-control" name="name">
           </div>
         </div>
         <div class="form-group">
-          <label class="col-sm-2">Description</label>
+          <label class="col-sm-2 control-label">Description</label>
           <div class="col-sm-10">
             <textarea class="form-control" rows="3" name="description"></textarea>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="col-sm-2 control-label">Owners</label>
+          <div class="col-sm-10">
+            <input type="text" class="form-control"
+                   placeholder="administrators" name="owners">
           </div>
         </div>
         <hr>

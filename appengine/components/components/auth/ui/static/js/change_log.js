@@ -147,6 +147,9 @@ var TOOLTIP_FORMATTERS = {
   'GROUP_DESCRIPTION_CHANGED': function(c) {
     return _.escape(c.description);
   },
+  'GROUP_OWNERS_CHANGED': function(c) {
+    return _.escape(c.old_owners) + ' &rarr; ' + _.escape(c.owners);
+  },
   'GROUP_CREATED': function(c) {
     return _.escape(c.description);
   }

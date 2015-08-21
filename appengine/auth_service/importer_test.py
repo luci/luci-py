@@ -161,6 +161,7 @@ class ImporterTest(test_case.TestCase):
         'modified_by': model.get_service_self_identity(),
         'modified_ts': datetime.datetime(2010, 1, 2, 3, 4, 5, 6),
         'nested': [],
+        'owners': u'administrators',
       },
       'ldap/new': {
         'auth_db_rev': None,
@@ -173,6 +174,7 @@ class ImporterTest(test_case.TestCase):
         'modified_by': model.get_service_self_identity(),
         'modified_ts': datetime.datetime(2010, 1, 2, 3, 4, 5, 6),
         'nested': [],
+        'owners': u'administrators',
       },
       'ldap/updated': {
         'auth_db_rev': None,
@@ -185,6 +187,7 @@ class ImporterTest(test_case.TestCase):
         'modified_by': model.get_service_self_identity(),
         'modified_ts': datetime.datetime(2010, 1, 2, 3, 4, 5, 6),
         'nested': [],
+        'owners': u'administrators',
       },
     }
     self.assertEqual(expected_to_put, {x.key.id(): x.to_dict() for x in to_put})
@@ -290,6 +293,7 @@ class ImporterTest(test_case.TestCase):
         'modified_by': model.get_service_self_identity(),
         'modified_ts': datetime.datetime(2010, 1, 2, 3, 4, 5, 6),
         'nested': [],
+        'owners': u'administrators',
       },
       'external/external_1': {
         'auth_db_rev': 1,
@@ -302,6 +306,7 @@ class ImporterTest(test_case.TestCase):
         'modified_by': model.get_service_self_identity(),
         'modified_ts': datetime.datetime(2010, 1, 2, 3, 4, 5, 6),
         'nested': [],
+        'owners': u'administrators',
       },
       'external/external_2': {
         'auth_db_rev': 1,
@@ -314,6 +319,7 @@ class ImporterTest(test_case.TestCase):
         'modified_by': model.get_service_self_identity(),
         'modified_ts': datetime.datetime(2010, 1, 2, 3, 4, 5, 6),
         'nested': [],
+        'owners': u'administrators',
       },
     }
     self.assertEqual(expected_groups, fetch_groups())

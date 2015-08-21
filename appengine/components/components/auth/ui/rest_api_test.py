@@ -527,18 +527,24 @@ class GroupsHandlerTest(RestAPITestCase):
       {
         'groups': [
           {
-            'created_by': 'user:creator@example.com',
-            'created_ts': 1300000000000000,
-            'description': 'Group for testing, #%d' % i,
-            'modified_by': 'user:modifier@example.com',
-            'modified_ts': 1300000000000000,
-            'name': 'Test group %d' % i,
+            u'created_by': u'user:creator@example.com',
+            u'created_ts': 1300000000000000,
+            u'description': u'Group for testing, #%d' % i,
+            u'modified_by': u'user:modifier@example.com',
+            u'modified_ts': 1300000000000000,
+            u'name': u'Test group %d' % i,
+            u'owners': u'administrators',
           } for i in xrange(0, 5)
         ],
       }, body)
 
 
 class GroupHandlerTest(RestAPITestCase):
+  def setUp(self):
+    super(GroupHandlerTest, self).setUp()
+    # Admin group is referenced as owning group by default, and thus must exist.
+    make_group(model.ADMIN_GROUP)
+
   def test_get_missing(self):
     status, body, _ = self.get(
         path='/auth/api/v1/groups/a%20group',
@@ -577,6 +583,7 @@ class GroupHandlerTest(RestAPITestCase):
           'modified_ts': 1300000000000000,
           'name': 'A Group',
           'nested': [],
+          'owners': 'administrators',
         },
       }, body)
     self.assertEqual(
@@ -672,9 +679,10 @@ class GroupHandlerTest(RestAPITestCase):
     self.assertEqual(409, status)
     self.assertEqual(
         {
-          'text': 'Group is being referenced in other groups',
-          'details': {
-            'groups': ['Another group'],
+          u'text':
+              u'This group is being referenced by other groups: Another group.',
+          u'details': {
+            u'groups': [u'Another group'],
           },
         }, body)
 
@@ -711,6 +719,44 @@ class GroupHandlerTest(RestAPITestCase):
     self.assertEqual(403, status)
     self.assertEqual({'text': 'Access is denied.'}, body)
 
+  def test_delete_external_fails(self):
+    status, body, _ = self.delete(
+        path='/auth/api/v1/groups/prefix/name',
+        expect_errors=True,
+        expect_xsrf_token_check=True,
+        expect_admin_check=True)
+    self.assertEqual(400, status)
+    self.assertEqual({'text': 'This group is not writable'}, body)
+
+  def test_delete_selfowned_group(self):
+    # It is ok to delete self-owned group.
+    make_group('A Group', owners='A Group')
+
+    # Delete it via API.
+    self.expect_auth_db_rev_change()
+    status, body, _ = self.delete(
+        path='/auth/api/v1/groups/A%20Group',
+        expect_xsrf_token_check=True,
+        expect_admin_check=True)
+    self.assertEqual(200, status)
+    self.assertEqual({'ok': True}, body)
+
+    # It is gone.
+    self.assertFalse(model.group_key('A Group').get())
+
+  def test_delete_admins_fails(self):
+    status, body, _ = self.delete(
+        path='/auth/api/v1/groups/' + model.ADMIN_GROUP,
+        expect_errors=True,
+        expect_xsrf_token_check=True,
+        expect_admin_check=True)
+    self.assertEqual(409, status)
+    self.assertEqual(
+      {
+        u'text': u'Can\'t delete \'administrators\' group.',
+        u'details': None,
+      }, body)
+
   def test_post_success(self):
     frozen_time = utils.timestamp_to_datetime(1300000000000000)
     creator_identity = model.Identity.from_bytes('user:creator@example.com')
@@ -721,6 +767,7 @@ class GroupHandlerTest(RestAPITestCase):
     self.mock_current_identity(creator_identity)
 
     make_group('Nested Group')
+    make_group('Owning Group')
 
     # Create the group using REST API.
     self.expect_auth_db_rev_change()
@@ -732,6 +779,7 @@ class GroupHandlerTest(RestAPITestCase):
           'members': ['bot:some-bot', 'user:some@example.com'],
           'name': 'A Group',
           'nested': ['Nested Group'],
+          'owners': 'Owning Group',
         },
         expect_xsrf_token_check=True,
         expect_admin_check=True)
@@ -758,7 +806,8 @@ class GroupHandlerTest(RestAPITestCase):
       ],
       'modified_by': model.Identity(kind='user', name='creator@example.com'),
       'modified_ts': frozen_time,
-      'nested': ['Nested Group']
+      'nested': [u'Nested Group'],
+      'owners': u'Owning Group',
     }
     self.assertEqual(expected, entity.to_dict())
 
@@ -783,15 +832,6 @@ class GroupHandlerTest(RestAPITestCase):
         expect_admin_check=True)
     self.assertEqual(201, status)
     self.assertEqual({'ok': True}, body)
-
-  def test_delete_external_fails(self):
-    status, body, _ = self.delete(
-        path='/auth/api/v1/groups/prefix/name',
-        expect_errors=True,
-        expect_xsrf_token_check=True,
-        expect_admin_check=True)
-    self.assertEqual(400, status)
-    self.assertEqual({'text': 'This group is not writable'}, body)
 
   def test_post_mismatching_name(self):
     # 'name' key and name in URL should match.
@@ -845,9 +885,26 @@ class GroupHandlerTest(RestAPITestCase):
     self.assertEqual(409, status)
     self.assertEqual(
       {
-        'text': 'Referencing a nested group that doesn\'t exist',
-        'details': {
-          'missing': ['Missing group'],
+        u'text': u'Some referenced groups don\'t exist: Missing group.',
+        u'details': {
+          u'missing': [u'Missing group'],
+        }
+      }, body)
+
+  def test_post_missing_owners(self):
+    # Try to create a group that references non-existing owners group.
+    status, body, _ = self.post(
+        path='/auth/api/v1/groups/A%20Group',
+        body={'name': 'A Group', 'owners': 'Missing group'},
+        expect_errors=True,
+        expect_xsrf_token_check=True,
+        expect_admin_check=True)
+    self.assertEqual(409, status)
+    self.assertEqual(
+      {
+        u'text': u'Some referenced groups don\'t exist: Missing group.',
+        u'details': {
+          u'missing': [u'Missing group'],
         }
       }, body)
 
@@ -870,6 +927,17 @@ class GroupHandlerTest(RestAPITestCase):
     self.assertEqual(400, status)
     self.assertEqual({'text': 'This group is not writable'}, body)
 
+  def test_post_selfowned_group(self):
+    # A group can be created to own itself.
+    self.expect_auth_db_rev_change()
+    status, body, _ = self.post(
+        path='/auth/api/v1/groups/A%20Group',
+        body={'name': 'A Group', 'owners': 'A Group'},
+        expect_xsrf_token_check=True,
+        expect_admin_check=True)
+    self.assertEqual(201, status)
+    self.assertEqual({'ok': True}, body)
+
   def test_put_success(self):
     frozen_time = utils.timestamp_to_datetime(1300000000000000)
     creator_identity = model.Identity.from_bytes('user:creator@example.com')
@@ -881,6 +949,7 @@ class GroupHandlerTest(RestAPITestCase):
 
     make_group('Nested Group')
     make_group('A Group')
+    make_group('Owning Group')
 
     # Update it via API.
     self.expect_auth_db_rev_change()
@@ -892,6 +961,7 @@ class GroupHandlerTest(RestAPITestCase):
           'members': ['bot:some-bot', 'user:some@example.com'],
           'name': 'A Group',
           'nested': ['Nested Group'],
+          'owners': 'Owning Group',
         },
         expect_xsrf_token_check=True,
         expect_admin_check=True)
@@ -908,7 +978,7 @@ class GroupHandlerTest(RestAPITestCase):
       'auth_db_prev_rev': None,
       'created_by': None,
       'created_ts': frozen_time,
-      'description': 'Test group',
+      'description': u'Test group',
       'globs': [model.IdentityGlob(kind='user', pattern='*@example.com')],
       'members': [
         model.Identity(kind='bot', name='some-bot'),
@@ -916,7 +986,8 @@ class GroupHandlerTest(RestAPITestCase):
       ],
       'modified_by': model.Identity(kind='user', name='creator@example.com'),
       'modified_ts': frozen_time,
-      'nested': ['Nested Group']
+      'nested': [u'Nested Group'],
+      'owners': u'Owning Group',
     }
     self.assertEqual(expected, entity.to_dict())
 
@@ -1033,9 +1104,53 @@ class GroupHandlerTest(RestAPITestCase):
     self.assertEqual(409, status)
     self.assertEqual(
         {
-          'text': 'Referencing a nested group that doesn\'t exist',
-          'details': {'missing': ['Missing group']},
+          u'text': u'Some referenced groups don\'t exist: Missing group.',
+          u'details': {u'missing': [u'Missing group']},
         }, body)
+
+  def test_put_missing_owners(self):
+    make_group('A Group')
+
+    # Try to update it. Pass missing group as an owning group.
+    status, body, _ = self.put(
+        path='/auth/api/v1/groups/A%20Group',
+        body={
+          'description': 'Test group',
+          'globs': [],
+          'members': [],
+          'name': 'A Group',
+          'owners': 'Missing group',
+        },
+        expect_errors=True,
+        expect_xsrf_token_check=True,
+        expect_admin_check=True)
+    self.assertEqual(409, status)
+    self.assertEqual(
+        {
+          u'text': u'Owners groups (Missing group) doesn\'t exist.',
+          u'details': {u'missing': [u'Missing group']},
+        }, body)
+
+  def test_put_changing_admin_owners(self):
+    make_group('Another group')
+    status, body, _ = self.put(
+        path='/auth/api/v1/groups/' + model.ADMIN_GROUP,
+        body={
+          'description': 'Test group',
+          'globs': [],
+          'members': [],
+          'name': model.ADMIN_GROUP,
+          'owners': 'Another group',
+        },
+        expect_errors=True,
+        expect_xsrf_token_check=True,
+        expect_admin_check=True)
+    self.assertEqual(409, status)
+    self.assertEqual(
+      {
+        u'text': u'Can\'t change owner of \'administrators\' group.',
+        u'details': None
+      }, body)
 
   def test_put_dependency_cycle(self):
     make_group('A Group')
@@ -1056,8 +1171,9 @@ class GroupHandlerTest(RestAPITestCase):
     self.assertEqual(409, status)
     self.assertEqual(
         {
-          'text': 'Groups can not have cyclic dependencies',
-          'details': {'cycle': ['A Group']},
+          u'text':
+              u'Groups can not have cyclic dependencies: A Group -> A Group.',
+          u'details': {u'cycle': [u'A Group', u'A Group']},
         }, body)
 
   def test_put_requires_admin(self):

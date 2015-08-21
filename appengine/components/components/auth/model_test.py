@@ -197,9 +197,10 @@ class AuthSecretTest(test_case.TestCase):
       model.AuthSecret.bootstrap('test_secret', 'bad-scope')
 
 
-def make_group(group_id, nested=(), store=True):
+def make_group(group_id, nested=(), owners=model.ADMIN_GROUP, store=True):
   """Makes a new AuthGroup to use in test, puts it in datastore."""
-  entity = model.AuthGroup(key=model.group_key(group_id), nested=nested)
+  entity = model.AuthGroup(
+      key=model.group_key(group_id), nested=nested, owners=owners)
   if store:
     entity.put()
   return entity
@@ -227,7 +228,8 @@ class GroupBootstrapTest(test_case.TestCase):
           'members': [],
           'modified_by': model.get_service_self_identity(),
           'modified_ts': mocked_now,
-          'nested': []
+          'nested': [],
+          'owners': u'administrators',
         },
         ent.to_dict())
 
@@ -254,7 +256,8 @@ class GroupBootstrapTest(test_case.TestCase):
           'members': [ident1, ident2],
           'modified_by': model.get_service_self_identity(),
           'modified_ts': mocked_now,
-          'nested': []
+          'nested': [],
+          'owners': u'administrators',
         },
         ent.to_dict())
 
@@ -292,6 +295,16 @@ class FindGroupReferencesTest(test_case.TestCase):
     # Only direct references are returned.
     self.assertEqual(
         set(['Group 2', 'Group 4']),
+        model.find_referencing_groups('Referenced'))
+
+  def test_referenced_as_owner(self):
+    """If a group owns another group, it is referenced."""
+    make_group('Referenced')
+    make_group('Group 1', owners='Referenced')
+    make_group('Group 2', owners='Referenced')
+    make_group('Group 3', owners='Group 1')
+    self.assertEqual(
+        set(['Group 1', 'Group 2']),
         model.find_referencing_groups('Referenced'))
 
 
@@ -654,6 +667,7 @@ class AuditLogTest(test_case.TestCase):
       'modified_by': model.Identity(kind='user', name='a@example.com'),
       'modified_ts': datetime.datetime(2015, 1, 1, 1, 1),
       'nested': [],
+      'owners': u'administrators',
     }, model.group_key('B').get().to_dict())
 
     # Copies in the history.
@@ -674,6 +688,7 @@ class AuditLogTest(test_case.TestCase):
         'modified_by': model.Identity(kind='user', name='a@example.com'),
         'modified_ts': datetime.datetime(2015, 1, 1, 1, 1),
         'nested': [],
+        'owners': u'administrators',
       },
       cpy('A', 2): {
         'auth_db_rev': 2,
@@ -689,6 +704,7 @@ class AuditLogTest(test_case.TestCase):
         'modified_by': model.Identity(kind='user', name='a@example.com'),
         'modified_ts': datetime.datetime(2015, 1, 1, 1, 1),
         'nested': [],
+        'owners': u'administrators',
       },
       cpy('B', 3): {
         'auth_db_rev': 3,
@@ -704,6 +720,7 @@ class AuditLogTest(test_case.TestCase):
         'modified_by': model.Identity(kind='user', name='a@example.com'),
         'modified_ts': datetime.datetime(2015, 1, 1, 1, 1),
         'nested': [],
+        'owners': u'administrators',
       },
       cpy('A', 4): {
         'auth_db_rev': 4,
@@ -719,6 +736,7 @@ class AuditLogTest(test_case.TestCase):
         'modified_by': model.Identity(kind='user', name='a@example.com'),
         'modified_ts': datetime.datetime(2015, 1, 1, 1, 1),
         'nested': [u'B'],
+        'owners': u'administrators',
       },
       # Batch revision.
       cpy('A', 5): {
@@ -735,6 +753,7 @@ class AuditLogTest(test_case.TestCase):
         'modified_by': model.Identity(kind='user', name='a@example.com'),
         'modified_ts': datetime.datetime(2015, 1, 1, 1, 1),
         'nested': [u'B'],
+        'owners': u'administrators',
       },
       cpy('B', 5): {
         'auth_db_rev': 5,
@@ -750,6 +769,7 @@ class AuditLogTest(test_case.TestCase):
         'modified_by': model.Identity(kind='user', name='a@example.com'),
         'modified_ts': datetime.datetime(2015, 1, 1, 1, 1),
         'nested': [],
+        'owners': u'administrators',
       },
       # /end of batch revision
       cpy('B', 6): {
@@ -766,6 +786,7 @@ class AuditLogTest(test_case.TestCase):
         'modified_by': model.Identity(kind='user', name='a@example.com'),
         'modified_ts': datetime.datetime(2015, 1, 1, 1, 1),
         'nested': [],
+        'owners': u'administrators',
       },
     }, self.grab_log(model.AuthGroup))
 

@@ -101,6 +101,9 @@ message AuthGroup {
   required int64 modified_ts = 8;
   // Who modified the group last time.
   required string modified_by = 9;
+
+  // A name of the group that can modify or delete this group.
+  optional string owners = 10;
 }
 
 

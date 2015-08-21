@@ -115,6 +115,7 @@ var normalizeGroupObj = function(group) {
   return {
     name: group.name,
     description: group.description,
+    owners: group.owners,
     members: group.members || [],
     globs: group.globs || [],
     nested: group.nested || []

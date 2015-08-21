@@ -746,6 +746,7 @@ class AuthGroup(
     'globs': datastore_utils.READABLE | datastore_utils.WRITABLE,
     'nested': datastore_utils.READABLE | datastore_utils.WRITABLE,
     'description': datastore_utils.READABLE | datastore_utils.WRITABLE,
+    'owners': datastore_utils.READABLE | datastore_utils.WRITABLE,
     'created_ts': datastore_utils.READABLE,
     'created_by': datastore_utils.READABLE,
     'modified_ts': datastore_utils.READABLE,
@@ -761,6 +762,8 @@ class AuthGroup(
 
   # Human readable description.
   description = ndb.TextProperty(default='')
+  # A name of the group that can modify or delete this group.
+  owners = ndb.StringProperty(default=ADMIN_GROUP)
 
   # When the group was created.
   created_ts = ndb.DateTimeProperty()
@@ -819,7 +822,7 @@ def bootstrap_group(group, identities, description=''):
 
 
 def find_referencing_groups(group):
-  """Finds groups that reference the specified group as nested group.
+  """Finds groups that reference the specified group as nested group or owner.
 
   Used to verify that |group| is safe to delete, i.e. no other group is
   depending on it.
@@ -827,9 +830,16 @@ def find_referencing_groups(group):
   Returns:
     Set of names of referencing groups.
   """
-  referencing_groups = AuthGroup.query(
-      AuthGroup.nested == group, ancestor=root_key()).fetch(keys_only=True)
-  return set(key.id() for key in referencing_groups)
+  nesting_groups = AuthGroup.query(
+      AuthGroup.nested == group,
+      ancestor=root_key()).fetch_async(keys_only=True)
+  owned_groups = AuthGroup.query(
+      AuthGroup.owners == group,
+      ancestor=root_key()).fetch_async(keys_only=True)
+  refs = set()
+  refs.update(key.id() for key in nesting_groups.get_result())
+  refs.update(key.id() for key in owned_groups.get_result())
+  return refs
 
 
 def get_missing_groups(groups):
