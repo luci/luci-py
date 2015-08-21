@@ -7,6 +7,7 @@
 import logging
 import os
 import threading
+import time
 
 import os_utilities
 from utils import zip_package
@@ -133,7 +134,16 @@ class Bot(object):
     # os_utilities.restart should never return, unless restart is not happening.
     # If restart is taking longer than N minutes, it probably not going to
     # finish at all. Report this to the server.
-    os_utilities.restart(message, timeout=15*60)
+    try:
+      os_utilities.restart(message, timeout=15*60)
+    except LookupError:
+      # This is a special case where OSX is deeply hosed. In that case the disk
+      # is likely in read-only mode and there isn't much that can be done. This
+      # exception is deep inside pickle.py. So notify the server then hang in
+      # there.
+      self.post_error('This host partition is bad; please fix the host')
+      while True:
+        time.sleep(1)
     self.post_error('Bot is stuck restarting for: %s' % message)
 
   def call_later(self, delay_sec, callback):
