@@ -18,41 +18,6 @@ from depot_tools import auto_stub
 
 import os_utilities
 
-VERBOSE = '-v' in sys.argv
-
-
-# Access to a protected member _XXX of a client class
-# pylint: disable=W0212
-
-
-class TestOsUtilitiesPrivate(auto_stub.TestCase):
-  def setUp(self):
-    super(TestOsUtilitiesPrivate, self).setUp()
-    if not VERBOSE:
-      self.mock(logging, 'error', lambda *_: None)
-
-  def test_from_cygwin_path(self):
-    data = [
-      ('foo', None),
-      ('x:\\foo$', None),
-      ('X:\\foo$', None),
-      ('/cygdrive/x/foo$', 'x:\\foo$'),
-    ]
-    for i, (inputs, expected) in enumerate(data):
-      actual = os_utilities._from_cygwin_path(inputs)
-      self.assertEqual(expected, actual, (inputs, expected, actual, i))
-
-  def test_to_cygwin_path(self):
-    data = [
-      ('foo', None),
-      ('x:\\foo$', '/cygdrive/x/foo$'),
-      ('X:\\foo$', '/cygdrive/x/foo$'),
-      ('/cygdrive/x/foo$', None),
-    ]
-    for i, (inputs, expected) in enumerate(data):
-      actual = os_utilities._to_cygwin_path(inputs)
-      self.assertEqual(expected, actual, (inputs, expected, actual, i))
-
 
 class TestOsUtilities(auto_stub.TestCase):
   def test_get_os_version(self):

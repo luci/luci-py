@@ -14,7 +14,6 @@ This file serves as an API to bot_config.py. bot_config.py can be replaced on
 the server to allow additional server-specific functionality.
 """
 
-import cgi
 import ctypes
 import getpass
 import glob
@@ -25,21 +24,22 @@ import os
 import pipes
 import platform
 import re
-import shlex
 import signal
 import socket
 import string
 import subprocess
 import sys
 import tempfile
-import threading
 import time
-import urllib
 import urllib2
 
 from utils import file_path
 from utils import tools
 from utils import zip_package
+
+
+import platforms
+
 
 THIS_FILE = os.path.abspath(zip_package.get_main_script_path() or __file__)
 
@@ -107,10 +107,6 @@ GCE_WINDOWS_COST_CORE_HOUR = 0.04
 _STARTED_TS = time.time()
 
 
-# Cache of GCE OAuth2 token.
-_CACHED_OAUTH2_TOKEN_GCE = {}
-_CACHED_OAUTH2_TOKEN_GCE_LOCK = threading.Lock()
-
 
 def _write(filepath, content):
   """Writes out a file and returns True on success."""
@@ -122,435 +118,6 @@ def _write(filepath, content):
   except IOError as e:
     logging.error('Failed to write %s: %s', filepath, e)
     return False
-
-
-def _from_cygwin_path(path):
-  """Converts an absolute cygwin path to a standard Windows path."""
-  if not path.startswith('/cygdrive/'):
-    logging.error('%s is not a cygwin path', path)
-    return None
-
-  # Remove the cygwin path identifier.
-  path = path[len('/cygdrive/'):]
-
-  # Add : after the drive letter.
-  path = path[:1] + ':' + path[1:]
-  return path.replace('/', '\\')
-
-
-def _to_cygwin_path(path):
-  """Converts an absolute standard Windows path to a cygwin path."""
-  if len(path) < 2 or path[1] != ':':
-    # TODO(maruel): Accept \\?\ and \??\ if necessary.
-    logging.error('%s is not a win32 path', path)
-    return None
-  return '/cygdrive/%s/%s' % (path[0].lower(), path[3:].replace('\\', '/'))
-
-
-def _get_startup_dir_win():
-  # Do not use environment variables since it wouldn't work reliably on cygwin.
-  # TODO(maruel): Stop hardcoding the values and use the proper function
-  # described below. Postponed to a later CL since I'll have to spend quality
-  # time on Windows to ensure it works well.
-  # https://msdn.microsoft.com/library/windows/desktop/bb762494.aspx
-  # CSIDL_STARTUP = 7
-  # https://msdn.microsoft.com/library/windows/desktop/bb762180.aspx
-  # shell.SHGetFolderLocation(NULL, CSIDL_STARTUP, NULL, NULL, string)
-  if get_os_version_number() == u'5.1':
-    startup = 'Start Menu\\Programs\\Startup'
-  else:
-    # Vista+
-    startup = (
-        'AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs\\Startup')
-
-  # On cygwin 1.5, which is still used on some bots, '~' points inside
-  # c:\\cygwin\\home so use USERPROFILE.
-  return '%s\\%s\\' % (
-    os.environ.get('USERPROFILE', 'DUMMY, ONLY USED IN TESTS'), startup)
-
-
-def _generate_launchd_plist(command, cwd, plistname):
-  """Generates a plist content with the corresponding command for launchd."""
-  # The documentation is available at:
-  # https://developer.apple.com/library/mac/documentation/Darwin/Reference/ \
-  #    ManPages/man5/launchd.plist.5.html
-  escaped_plist = cgi.escape(plistname)
-  entries = [
-    '<key>Label</key><string>%s</string>' % escaped_plist,
-    '<key>StandardOutPath</key><string>%s.log</string>' % escaped_plist,
-    '<key>StandardErrorPath</key><string>%s-err.log</string>' % escaped_plist,
-    '<key>LimitLoadToSessionType</key><array><string>Aqua</string></array>',
-    '<key>RunAtLoad</key><true/>',
-    '<key>Umask</key><integer>18</integer>',
-
-    '<key>EnvironmentVariables</key>',
-    '<dict>',
-    '  <key>PATH</key>',
-    # TODO(maruel): Makes it configurable if necessary.
-    '  <string>/opt/local/bin:/opt/local/sbin:/usr/local/sbin:/usr/local/bin'
-      ':/usr/sbin:/usr/bin:/sbin:/bin</string>',
-    '</dict>',
-
-    '<key>SoftResourceLimits</key>',
-    '<dict>',
-    '  <key>NumberOfFiles</key>',
-    '  <integer>8000</integer>',
-    '</dict>',
-  ]
-  entries.append(
-      '<key>Program</key><string>%s</string>' % cgi.escape(command[0]))
-  entries.append('<key>ProgramArguments</key>')
-  entries.append('<array>')
-  # Command[0] must be passed as an argument.
-  entries.extend('  <string>%s</string>' % cgi.escape(i) for i in command)
-  entries.append('</array>')
-  entries.append(
-      '<key>WorkingDirectory</key><string>%s</string>' % cgi.escape(cwd))
-  header = (
-    '<?xml version="1.0" encoding="UTF-8"?>\n'
-    '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" '
-    '"http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n'
-    '<plist version="1.0">\n'
-    '  <dict>\n'
-    + ''.join('    %s\n' % l for l in entries) +
-    '  </dict>\n'
-    '</plist>\n')
-  return header
-
-
-def _generate_initd(command, cwd, user):
-  """Returns a valid init.d script for use for Swarming.
-
-  Author is lazy so he copy-pasted.
-  Source: https://github.com/fhd/init-script-template
-
-  Copyright (C) 2012-2014 Felix H. Dahlke
-  This is open source software, licensed under the MIT License. See the file
-  LICENSE for details.
-
-  LICENSE is at https://github.com/fhd/init-script-template/blob/master/LICENSE
-  """
-  return """#!/bin/sh
-### BEGIN INIT INFO
-# Provides:
-# Required-Start:    $remote_fs $syslog
-# Required-Stop:     $remote_fs $syslog
-# Default-Start:     2 3 4 5
-# Default-Stop:      0 1 6
-# Short-Description: Start daemon at boot time
-# Description:       Enable service provided by daemon.
-### END INIT INFO
-
-dir='%(cwd)s'
-user='%(user)s'
-cmd='%(cmd)s'
-
-name=`basename $0`
-pid_file="/var/run/$name.pid"
-stdout_log="/var/log/$name.log"
-stderr_log="/var/log/$name.err"
-
-get_pid() {
-  cat "$pid_file"
-}
-
-is_running() {
-  [ -f "$pid_file" ] && ps `get_pid` > /dev/null 2>&1
-}
-
-case "$1" in
-  start)
-  if is_running; then
-    echo "Already started"
-  else
-    echo "Starting $name"
-    cd "$dir"
-    sudo -u "$user" $cmd >> "$stdout_log" 2>> "$stderr_log" &
-    echo $! > "$pid_file"
-    if ! is_running; then
-      echo "Unable to start, see $stdout_log and $stderr_log"
-      exit 1
-    fi
-  fi
-  ;;
-  stop)
-  if is_running; then
-    echo -n "Stopping $name.."
-    kill `get_pid`
-    for i in {1..10}
-    do
-      if ! is_running; then
-        break
-      fi
-
-      echo -n "."
-      sleep 1
-    done
-    echo
-
-    if is_running; then
-      echo "Not stopped; may still be shutting down or shutdown may have failed"
-      exit 1
-    else
-      echo "Stopped"
-      if [ -f "$pid_file" ]; then
-        rm "$pid_file"
-      fi
-    fi
-  else
-    echo "Not running"
-  fi
-  ;;
-  restart)
-  $0 stop
-  if is_running; then
-    echo "Unable to stop, will not attempt to start"
-    exit 1
-  fi
-  $0 start
-  ;;
-  status)
-  if is_running; then
-    echo "Running"
-  else
-    echo "Stopped"
-    exit 1
-  fi
-  ;;
-  *)
-  echo "Usage: $0 {start|stop|restart|status}"
-  exit 1
-  ;;
-esac
-
-exit 0
-""" % {
-      'cmd': ' '.join(pipes.quote(c) for c in command),
-      'cwd': pipes.quote(cwd),
-      'user': pipes.quote(user),
-    }
-
-def _generate_autostart_destkop(command, name):
-  """Returns a valid .desktop for use with Swarming bot.
-
-  http://standards.freedesktop.org/desktop-entry-spec/desktop-entry-spec-latest.html
-  """
-  return (
-    '[Desktop Entry]\n'
-    'Type=Application\n'
-    'Name=%(name)s\n'
-    'Exec=%(cmd)s\n'
-    'Hidden=false\n'
-    'NoDisplay=false\n'
-    'Comment=Created by os_utilities.py in swarming_bot.zip\n'
-    'X-GNOME-Autostart-enabled=true\n') % {
-      'cmd': ' '.join(pipes.quote(c) for c in command),
-      'name': name,
-    }
-
-
-def _get_os_version_name_win():
-  """Returns the marketing name of the OS including the service pack."""
-  marketing_name = platform.uname()[2]
-  service_pack = platform.win32_ver()[2] or 'SP0'
-  return '%s-%s' % (marketing_name, service_pack)
-
-
-def _get_gpu_linux():
-  """Returns video device as listed by 'lspci'. See get_gpu().
-  """
-  try:
-    pci_devices = subprocess.check_output(
-        ['lspci', '-mm', '-nn'], stderr=subprocess.PIPE).splitlines()
-  except (OSError, subprocess.CalledProcessError):
-    # It normally happens on Google Compute Engine as lspci is not installed by
-    # default and on ARM since they do not have a PCI bus. In either case, we
-    # don't care about the GPU.
-    return None, None
-
-  dimensions = set()
-  state = set()
-  re_id = re.compile(r'^(.+?) \[([0-9a-f]{4})\]$')
-  for pci_device in pci_devices:
-    # Bus, Type, Vendor [ID], Device [ID], extra...
-    line = shlex.split(pci_device)
-    # Look for display class as noted at http://wiki.osdev.org/PCI
-    dev_type = re_id.match(line[1]).group(2)
-    if dev_type.startswith('03'):
-      vendor = re_id.match(line[2])
-      device = re_id.match(line[3])
-      ven_id = vendor.group(2)
-      dimensions.add(unicode(ven_id))
-      dimensions.add(u'%s:%s' % (ven_id, device.group(2)))
-      state.add(u'%s %s' % (vendor.group(1), device.group(1)))
-  return sorted(dimensions), sorted(state)
-
-
-@tools.cached
-def _get_SPDisplaysDataType_osx():
-  """Returns an XML about the system display properties."""
-  import plistlib
-  sp = subprocess.check_output(
-      ['system_profiler', 'SPDisplaysDataType', '-xml'])
-  return plistlib.readPlistFromString(sp)[0]['_items']
-
-
-def _get_gpu_osx():
-  """Returns video device as listed by 'system_profiler'. See get_gpu()."""
-  dimensions = set()
-  state = set()
-  for card in _get_SPDisplaysDataType_osx():
-    # Warning: the value provided depends on the driver manufacturer.
-    # Other interesting values: spdisplays_vram, spdisplays_revision-id
-    ven_id = u'UNKNOWN'
-    if 'spdisplays_vendor-id' in card:
-      # NVidia
-      ven_id = card['spdisplays_vendor-id'][2:]
-    elif 'spdisplays_vendor' in card:
-      # Intel and ATI
-      match = re.search(r'\(0x([0-9a-f]{4})\)', card['spdisplays_vendor'])
-      if match:
-        ven_id = match.group(1)
-    dev_id = card['spdisplays_device-id'][2:]
-    dimensions.add(unicode(ven_id))
-    dimensions.add(u'%s:%s' % (ven_id, dev_id))
-
-    # VMWare doesn't set it.
-    if 'sppci_model' in card:
-      state.add(unicode(card['sppci_model']))
-  return sorted(dimensions), sorted(state)
-
-
-def _get_monitor_hidpi_osx():
-  """Returns True if the monitor is hidpi."""
-  hidpi = any(
-    any(m.get('spdisplays_retina') == 'spdisplays_yes'
-        for m in card['spdisplays_ndrvs'])
-    for card in _get_SPDisplaysDataType_osx()
-    if 'spdisplays_ndrvs' in card)
-  return str(int(hidpi))
-
-
-def _get_gpu_win():
-  """Returns video device as listed by WMI. See get_gpu()."""
-  try:
-    import win32com.client  # pylint: disable=F0401
-  except ImportError:
-    # win32com is included in pywin32, which is an optional package that is
-    # installed by Swarming devs. If you find yourself needing it to run without
-    # pywin32, for example in cygwin, please send us a CL with the
-    # implementation that doesn't use pywin32.
-    return None, None
-
-  wmi_service = win32com.client.Dispatch('WbemScripting.SWbemLocator')
-  wbem = wmi_service.ConnectServer('.', 'root\\cimv2')
-  dimensions = set()
-  state = set()
-  # https://msdn.microsoft.com/library/aa394512.aspx
-  for device in wbem.ExecQuery('SELECT * FROM Win32_VideoController'):
-    vp = device.VideoProcessor
-    if vp:
-      state.add(vp)
-
-    # The string looks like:
-    #  PCI\VEN_15AD&DEV_0405&SUBSYS_040515AD&REV_00\3&2B8E0B4B&0&78
-    pnp_string = device.PNPDeviceID
-    ven_id = u'UNKNOWN'
-    dev_id = u'UNKNOWN'
-    match = re.search(r'VEN_([0-9A-F]{4})', pnp_string)
-    if match:
-      ven_id = match.group(1).lower()
-    match = re.search(r'DEV_([0-9A-F]{4})', pnp_string)
-    if match:
-      dev_id = match.group(1).lower()
-    dimensions.add(unicode(ven_id))
-    dimensions.add(u'%s:%s' % (ven_id, dev_id))
-  return sorted(dimensions), sorted(state)
-
-
-@tools.cached
-def _get_mount_points_win():
-  """Returns the list of 'fixed' drives in format 'X:\\'."""
-  ctypes.windll.kernel32.GetDriveTypeW.argtypes = (ctypes.c_wchar_p,)
-  ctypes.windll.kernel32.GetDriveTypeW.restype = ctypes.c_ulong
-  DRIVE_FIXED = 3
-  # https://msdn.microsoft.com/library/windows/desktop/aa364939.aspx
-  return [
-    letter + ':\\'
-    for letter in string.lowercase
-    if ctypes.windll.kernel32.GetDriveTypeW(letter + ':\\') == DRIVE_FIXED
-  ]
-
-
-def _get_disk_info_win(mount_point):
-  """Returns total and free space on a mount point in Mb."""
-  total_bytes = ctypes.c_ulonglong(0)
-  free_bytes = ctypes.c_ulonglong(0)
-  ctypes.windll.kernel32.GetDiskFreeSpaceExW(
-      ctypes.c_wchar_p(mount_point), None, ctypes.pointer(total_bytes),
-      ctypes.pointer(free_bytes))
-  return {
-    'free_mb': round(free_bytes.value / 1024. / 1024., 1),
-    'size_mb': round(total_bytes.value / 1024. / 1024., 1),
-  }
-
-
-def _get_disks_info_win():
-  """Returns disk infos on all mount point in Mb."""
-  return dict((p, _get_disk_info_win(p)) for p in _get_mount_points_win())
-
-
-def _run_df():
-  """Runs df and returns the output."""
-  proc = subprocess.Popen(
-      ['/bin/df', '-k', '-P'], env={'LANG': 'C'},
-      stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-  for l in proc.communicate()[0].splitlines():
-    if l.startswith('/dev/'):
-      items = l.split()
-      if (sys.platform == 'darwin' and
-          items[5].startswith('/Volumes/firmwaresyncd.')):
-        # There's an issue on OSX where sometimes a small volume is mounted
-        # during boot time and may be caught here by accident. Just ignore it as
-        # it could trigger the low free disk space check and cause an unexpected
-        # bot self-quarantine.
-        continue
-      yield items
-
-
-def _get_disks_info_posix():
-  """Returns disks info on all mount point in Mb."""
-  return dict(
-      (
-        items[5],
-        {
-          'free_mb': round(float(items[3]) / 1024., 1),
-          'size_mb': round(float(items[1]) / 1024., 1),
-        }
-      ) for items in _run_df())
-
-
-@tools.cached
-def _get_metadata_gce():
-  """Returns the GCE metadata as a dict.
-
-  Refs:
-    https://cloud.google.com/compute/docs/metadata
-    https://cloud.google.com/compute/docs/machine-types
-
-  To get the at the command line from a GCE VM, use:
-    curl --silent \
-      http://metadata.google.internal/computeMetadata/v1/?recursive=true \
-      -H "Metadata-Flavor: Google" | python -m json.tool | less
-  """
-  url = 'http://metadata.google.internal/computeMetadata/v1/?recursive=true'
-  headers = {'Metadata-Flavor': 'Google'}
-  try:
-    return json.load(
-        urllib2.urlopen(urllib2.Request(url, headers=headers), timeout=5))
-  except IOError as e:
-    logging.info('GCE metadata not available: %s', e)
-    return None
 
 
 def _get_cost_hour_gce():
@@ -584,43 +151,6 @@ def _get_cost_hour_gce():
   return machine_cost + os_cost + disk_gb_cost
 
 
-def _oauth2_access_token_gce(account='default'):
-  """Returns a value of oauth2 access token."""
-  # TODO(maruel): Move GCE VM authentication logic into client/utils/net.py.
-  # As seen in google-api-python-client/oauth2client/gce.py
-  with _CACHED_OAUTH2_TOKEN_GCE_LOCK:
-    cached_tok = _CACHED_OAUTH2_TOKEN_GCE.get(account)
-    # Cached and expires in more than 5 min from now.
-    if cached_tok and cached_tok['expiresAt'] >= time.time() + 5*60:
-      return cached_tok['accessToken']
-    # Grab the token.
-    url = (
-        'http://metadata.google.internal/computeMetadata/v1/instance'
-        '/service-accounts/%s/token' % account)
-    headers = {'Metadata-Flavor': 'Google'}
-    try:
-      resp = json.load(
-          urllib2.urlopen(urllib2.Request(url, headers=headers), timeout=20))
-    except IOError as e:
-      logging.error('Failed to grab GCE access token: %s', e)
-      raise
-    tok = {
-      'accessToken': resp['access_token'],
-      'expiresAt': time.time() + resp['expires_in'],
-    }
-    _CACHED_OAUTH2_TOKEN_GCE[account] = tok
-    return tok['accessToken']
-
-
-def _oauth2_available_scopes_gce(account='default'):
-  """Returns a list of OAuth2 scopes granted to GCE service account."""
-  metadata = _get_metadata_gce()
-  if not metadata:
-    return []
-  accounts = metadata['instance']['serviceAccounts']
-  return accounts.get(account, {}).get('scopes') or []
-
-
 def _safe_read(filepath):
   """Returns the content of the file if possible, None otherwise."""
   try:
@@ -646,28 +176,11 @@ def get_os_version_number():
     Others will return None.
   """
   if sys.platform in ('cygwin', 'win32'):
-    if sys.platform == 'win32':
-      version_raw = platform.version()
-      version_parts = version_raw.split('.')
-    else:
-      # This handles 'CYGWIN_NT-5.1' and 'CYGWIN_NT-6.1-WOW64'.
-      version_raw = platform.system()
-      version_parts = version_raw.split('-')[1].split('.')
-    assert len(version_parts) >= 2,  (
-        'Unable to determine Windows version: %s' % version_raw)
-    if version_parts[0] < 5 or (version_parts[0] == 5 and version_parts[1] < 1):
-      assert False, 'Version before XP are unsupported: %s' % version_parts
-    return u'.'.join(version_parts[:2])
-
+    return platforms.win.get_os_version_number()
   if sys.platform == 'darwin':
-    version_parts = platform.mac_ver()[0].split('.')
-    assert len(version_parts) >= 2, 'Unable to determine Mac version'
-    return u'.'.join(version_parts[:2])
-
+    return platforms.osx.get_os_version_number()
   if sys.platform == 'linux2':
-    # On Ubuntu it will return a string like '12.04'. On Raspbian, it will look
-    # like '7.6'.
-    return unicode(platform.linux_distribution()[1])
+    return platforms.linux.get_os_version_number()
 
   logging.error('Unable to determine platform version')
   return None
@@ -681,7 +194,7 @@ def get_os_version_name():
   dimensions like Trusty or Snow Leopard is not useful.
   """
   if sys.platform == 'win32':
-    return _get_os_version_name_win()
+    return platforms.win.get_os_version_name()
   return None
 
 
@@ -858,8 +371,9 @@ def get_physical_ram():
 def get_disks_info():
   """Returns a dict of dict of free and total disk space."""
   if sys.platform == 'win32':
-    return _get_disks_info_win()
-  return _get_disks_info_posix()
+    return platforms.win.get_disks_info()
+  else:
+    return platforms.posix.get_disks_info()
 
 
 @tools.cached
@@ -871,11 +385,11 @@ def get_gpu():
     tuple(list(dimensions), list(state)).
   """
   if sys.platform == 'darwin':
-    dimensions, state = _get_gpu_osx()
+    dimensions, state = platforms.osx.get_gpu()
   elif sys.platform == 'linux2':
-    dimensions, state = _get_gpu_linux()
+    dimensions, state = platforms.linux.get_gpu()
   elif sys.platform == 'win32':
-    dimensions, state = _get_gpu_win()
+    dimensions, state = platforms.win.get_gpu()
   else:
     dimensions, state = None, None
 
@@ -891,14 +405,14 @@ def get_gpu():
 def get_monitor_hidpi():
   """Returns True if there is an hidpi monitor detected."""
   if sys.platform == 'darwin':
-    return [_get_monitor_hidpi_osx()]
+    return [platforms.osx.get_monitor_hidpi()]
   return None
 
 
 @tools.cached
 def get_cost_hour():
   """Returns the cost in $USD/h as a floating point value if applicable."""
-  if _get_metadata_gce():
+  if platforms.is_gce():
     return _get_cost_hour_gce()
 
   # Get an approximate cost trying to emulate GCE equivalent cost.
@@ -929,7 +443,7 @@ def get_machine_type():
   If running on GCE, returns the right machine type. Otherwise tries to find the
   'closest' one.
   """
-  if _get_metadata_gce():
+  if platforms.is_gce():
     return get_machine_type_gce()
 
   ram_gb = get_physical_ram() / 1024.
@@ -970,15 +484,15 @@ def get_machine_type():
 @tools.cached
 def can_send_metric():
   """True if 'send_metric' really does something."""
-  if _get_metadata_gce():
+  if platforms.is_gce():
     # Scope to use Cloud Monitoring.
     scope = 'https://www.googleapis.com/auth/monitoring'
-    return scope in _oauth2_available_scopes_gce()
+    return scope in platforms.oauth2_available_scopes()
   return False
 
 
 def send_metric(name, value):
-  if _get_metadata_gce():
+  if platforms.is_gce():
     return send_metric_gce(name, value)
   # Ignore on other platforms for now.
 
@@ -989,30 +503,29 @@ def send_metric(name, value):
 @tools.cached
 def get_zone_gce():
   """Returns the zone containing the GCE VM."""
-  metadata = _get_metadata_gce()
-  if not metadata:
+  if not platforms.is_gce():
     return None
   # Format is projects/<id>/zones/<zone>
+  metadata = platforms.gce.get_metadata()
   return unicode(metadata['instance']['zone'].rsplit('/', 1)[-1])
 
 
 @tools.cached
 def get_machine_type_gce():
   """Returns the GCE machine type."""
-  metadata = _get_metadata_gce()
-  if not metadata:
+  if not platforms.is_gce():
     return None
   # Format is projects/<id>/machineTypes/<machine_type>
+  metadata = platforms.gce.get_metadata()
   return unicode(metadata['instance']['machineType'].rsplit('/', 1)[-1])
 
 
 @tools.cached
 def get_tags_gce():
   """Returns a list of instance tags or empty list if not GCE VM."""
-  metadata = _get_metadata_gce()
-  if not metadata:
+  if not platforms.is_gce():
     return []
-  return metadata['instance']['tags']
+  return platforms.gce.get_metadata()['instance']['tags']
 
 
 def send_metric_gce(name, value):
@@ -1035,7 +548,7 @@ service-accounts/default/scopes" -H "Metadata-Flavor: Google"
   assert isinstance(name, str), repr(name)
   assert isinstance(value, float), repr(value)
 
-  metadata = _get_metadata_gce()
+  metadata = platforms.gce.get_metadata()
   project_id = metadata['project']['numericProjectId']
 
   url = (
@@ -1064,7 +577,7 @@ service-accounts/default/scopes" -H "Metadata-Flavor: Google"
     ],
   }
   headers = {
-    'Authorization': 'Bearer ' + _oauth2_access_token_gce(),
+    'Authorization': 'Bearer ' + platforms.gce.oauth2_access_token(),
     'Content-Type': 'application/json',
   }
   logging.info('%s', json.dumps(body, indent=2, sort_keys=True))
@@ -1347,28 +860,28 @@ def setup_auto_startup_win(command, cwd, batch_name):
   if not os.path.isabs(cwd):
     raise ValueError('Refusing relative path')
   assert batch_name.endswith('.bat'), batch_name
-  batch_path = _get_startup_dir_win() + batch_name
+  batch_path = platforms.win.get_startup_dir() + batch_name
 
   # If we are running through cygwin, the path to write to must be changed to be
   # in the cywgin format, but we also need to change the commands to be in
   # non-cygwin format (since they will execute in a batch file).
   if sys.platform == 'cygwin':
-    batch_path = _to_cygwin_path(batch_path)
+    batch_path = platforms.win.to_cygwin_path(batch_path)
     assert batch_path
-    cwd = _from_cygwin_path(cwd)
+    cwd = platforms.win.from_cygwin_path(cwd)
     assert cwd
 
     # Convert all the cygwin paths in the command.
     for i in range(len(command)):
       if '/cygdrive/' in command[i]:
-        command[i] = _from_cygwin_path(command[i])
+        command[i] = platforms.win.from_cygwin_path(command[i])
 
   # TODO(maruel): Shell escape! Sadly shlex.quote() is only available starting
   # python 3.3 and it's tricky on Windows with '^'.
   # Don't forget the CRLF, otherwise cmd.exe won't process it.
   content = (
       '@echo off\r\n'
-      ':: This file was generated automatically by os_utilities.py.\r\n'
+      ':: This file was generated automatically by os_platforms.py.\r\n'
       'cd /d %s\r\n'
       '%s 1>> swarming_bot_out.log 2>&1\r\n') % (cwd, ' '.join(command))
   success = _write(batch_path, content)
@@ -1396,7 +909,8 @@ def setup_auto_startup_osx(command, cwd, plistname):
     # Sometimes ~/Library gets deleted.
     os.makedirs(launchd_dir)
   filepath = os.path.join(launchd_dir, plistname)
-  return _write(filepath, _generate_launchd_plist(command, cwd, plistname))
+  return _write(
+      filepath, platforms.osx.generate_launchd_plist(command, cwd, plistname))
 
 
 def setup_auto_startup_initd_linux(command, cwd, user=None, name='swarming'):
@@ -1408,7 +922,7 @@ def setup_auto_startup_initd_linux(command, cwd, user=None, name='swarming'):
       command, cwd, user, name)
   if not os.path.isabs(cwd):
     raise ValueError('Refusing relative path')
-  script = _generate_initd(command, cwd, user)
+  script = platforms.linux.generate_initd(command, cwd, user)
   filepath = pipes.quote(os.path.join('/etc/init.d', name))
   with tempfile.NamedTemporaryFile() as f:
     if not _write(f.name, script):
@@ -1438,7 +952,8 @@ def setup_auto_startup_autostart_desktop_linux(command, name='swarming'):
   if not os.path.isdir(basedir):
     os.makedirs(basedir)
   filepath = os.path.join(basedir, '%s.desktop' % name)
-  return _write(filepath, _generate_autostart_destkop(command, name))
+  return _write(
+      filepath, platforms.linux.generate_autostart_destkop(command, name))
 
 
 def restart(message=None, timeout=None):
