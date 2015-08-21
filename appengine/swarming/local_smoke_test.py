@@ -211,6 +211,10 @@ class SwarmingTestCase(unittest.TestCase):
 
     # tuple(task_request, expectation)
     dimensions = os_utilities.get_dimensions()
+    # A string of a letter 'A', UTF-8 BOM then UTF-16 BOM then UTF-EDBCDIC then
+    # invalid UTF-8 and the letter 'B'. It is double escaped so it can be passed
+    # down the shell.
+    invalid_bytes = 'A\\xEF\\xBB\\xBF\\xFE\\xFF\\xDD\\x73\\x66\\x73\\xc3\\x28B'
     tasks = [
       (
         ['-T', 'simple_success', '--'] + cmd(),
@@ -265,6 +269,16 @@ class SwarmingTestCase(unittest.TestCase):
             exit_codes=[-signal.SIGTERM],
             failure=True,
             state=0x40),  # task_result.State.TIMED_OUT
+      ),
+      (
+        [
+          '-T', 'non_utf8', '--',
+          'python', '-c', 'print(\'' + invalid_bytes + '\')',
+        ],
+        gen_expected(
+            name=u'non_utf8', bot_dimensions=dimensions,
+            # The string is mostly converted to 'Replacement Character'.
+            outputs=[u'A\ufeff\ufffd\ufffd\ufffdsfs\ufffd(B\n']),
       ),
       (
         ['-T', 'ending_simple_success', '--'] + cmd(),
