@@ -5,6 +5,7 @@
 """OSX specific utility functions."""
 
 import cgi
+import os
 import platform
 import re
 import subprocess
@@ -120,3 +121,47 @@ def get_monitor_hidpi():
     for card in _get_SPDisplaysDataType()
     if 'spdisplays_ndrvs' in card)
   return str(int(hidpi))
+
+
+@tools.cached
+def _get_xcode_version(xcode_app):
+  """Returns the version of Xcode installed at the given path.
+
+  Args:
+    xcode_app: Absolute path to the Xcode app directory, e.g
+               /Applications/Xcode.app.
+
+  Returns:
+    A tuple of (Xcode version, Xcode build version), or None if
+    this is not an Xcode installation.
+  """
+  xcodebuild = os.path.join(
+      xcode_app, 'Contents', 'Developer', 'usr', 'bin', 'xcodebuild')
+  if os.path.exists(xcodebuild):
+    try:
+      out = subprocess.check_output([xcodebuild, '-version']).splitlines()
+    except subprocess.CalledProcessError:
+      return None
+    return out[0].split()[-1], out[1].split()[-1]
+
+
+def get_xcode_state():
+  """Returns the state of Xcode installations on this machine."""
+  state = {}
+  applications_dir = os.path.join('/Applications')
+  for app in os.listdir(applications_dir):
+    name, ext = os.path.splitext(app)
+    if name.startswith('Xcode') and ext == '.app':
+      xcode_app = os.path.join(applications_dir, app)
+      version = _get_xcode_version(xcode_app)
+      if version:
+        state[xcode_app] = {
+          'version': version[0],
+          'build version': version[1],
+        }
+  return state
+
+
+def get_xcode_versions():
+  """Returns all Xcode versions installed."""
+  return sorted(xcode['version'] for xcode in get_xcode_state().itervalues())
