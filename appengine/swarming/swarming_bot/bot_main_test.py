@@ -85,7 +85,14 @@ class TestBotMain(net_utils.TestCase):
     self.mock(time, 'time', lambda: 126.0)
     expected = os_utilities.get_state()
     expected['sleep_streak'] = 12
-    self.assertEqual(expected, bot_main.get_state(12))
+    # During the execution of this test case, the free disk space could have
+    # changed.
+    for disk in expected['disks'].itervalues():
+      self.assertGreater(disk.pop('free_mb'), 1.)
+    actual = bot_main.get_state(12)
+    for disk in actual['disks'].itervalues():
+      self.assertGreater(disk.pop('free_mb'), 1.)
+    self.assertEqual(expected, actual)
 
   def test_setup_bot(self):
     self.mock(bot_main, 'get_remote', lambda: self.server)
