@@ -487,7 +487,7 @@ def can_send_metric():
   if platforms.is_gce():
     # Scope to use Cloud Monitoring.
     scope = 'https://www.googleapis.com/auth/monitoring'
-    return scope in platforms.get.oauth2_available_scopes()
+    return scope in platforms.gce.oauth2_available_scopes()
   return False
 
 
