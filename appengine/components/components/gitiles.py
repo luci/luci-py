@@ -9,6 +9,7 @@ import collections
 import datetime
 import posixpath
 import re
+import urllib
 import urlparse
 
 from google.appengine.ext import ndb
@@ -144,9 +145,9 @@ class Location(LocationTuple):
     path = (self.path or '').strip('/')
 
     if self.treeish or path:
-      result += '/+/%s' % self.treeish_safe
+      result += '/+/%s' % urllib.quote(self.treeish_safe)
     if path:
-      result += '/%s' % path
+      result += '/%s' % urllib.quote(path)
     return result
 
   @property
@@ -252,7 +253,8 @@ def get_commit_async(hostname, project, treeish):
     Commit object, or None if the commit was not found.
   """
   _validate_args(hostname, project, treeish)
-  data = yield gerrit.fetch_json_async(hostname, '%s/+/%s' % (project, treeish))
+  data = yield gerrit.fetch_json_async(
+      hostname, '%s/+/%s' % _quote_all(project, treeish))
   raise ndb.Return(_parse_commit(data) if data is not None else None)
 
 
@@ -270,7 +272,7 @@ def get_tree_async(hostname, project, treeish, path=None):
   """
   _validate_args(hostname, project, treeish, path)
   data = yield gerrit.fetch_json_async(
-      hostname, '%s/+/%s%s' % (project, treeish, path))
+      hostname, '%s/+/%s%s' % _quote_all(project, treeish, path))
   if data is None:
     raise ndb.Return(None)
 
@@ -316,7 +318,7 @@ def get_log_async(
     revision = '%s..%s' % (from_treeish, treeish)
   data = yield gerrit.fetch_json_async(
       hostname,
-      '%s/+log/%s/%s' % (project, revision, path),
+      '%s/+log/%s/%s' % _quote_all(project, revision, path),
       params=query_params,
       **fetch_kwargs)
   if data is None:
@@ -343,7 +345,7 @@ def get_file_content_async(
   _validate_args(hostname, project, treeish, path, path_required=True)
   data = yield gerrit.fetch_async(
       hostname,
-      '%s/+%s/%s%s' % (project, cmd, treeish, path),
+      '%s/+%s/%s%s' % _quote_all(project, cmd, treeish, path),
       headers={'Accept': 'text/plain'},
       **fetch_kwargs)
   raise ndb.Return(base64.b64decode(data) if data is not None else None)
@@ -362,7 +364,8 @@ def get_archive_async(
   if dir_path:
     dir_path = '/%s' % dir_path
   return gerrit.fetch_async(
-      hostname, '%s/+archive/%s%s.tar.gz' % (project, treeish, dir_path),
+      hostname,
+      '%s/+archive/%s%s.tar.gz' % _quote_all(project, treeish, dir_path),
       **fetch_kwargs)
 
 
@@ -380,7 +383,7 @@ def get_refs_async(hostname, project, **fetch_kwargs):
   """
   _validate_args(hostname, project)
   res = yield gerrit.fetch_json_async(
-      hostname, '%s/+refs' % project, **fetch_kwargs)
+      hostname, '%s/+refs' % urllib.quote(project), **fetch_kwargs)
   if res is None:
     raise ndb.Return(None)
   raise ndb.Return({k: v['value'] for k, v in res.iteritems()})
@@ -404,7 +407,7 @@ def get_diff_async(
   path = (path or '').strip('/')
   data = yield gerrit.fetch_async(
       hostname,
-      '%s/+/%s..%s/%s' % (project, from_commit, to_commit, path),
+      '%s/+/%s..%s/%s' % _quote_all(project, from_commit, to_commit, path),
       headers={'Accept': 'text/plain'},
       **fetch_kwargs)
   raise ndb.Return(base64.b64decode(data) if data is not None else None)
@@ -436,3 +439,7 @@ def _validate_args(
   if path is not None:
     assert_non_empty_string(path)
     assert path.startswith(path), path
+
+
+def _quote_all(*args):
+  return tuple(map(urllib.quote, args))

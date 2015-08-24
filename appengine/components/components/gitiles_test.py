@@ -236,6 +236,14 @@ class GitilesTestCase(test_case.TestCase):
     gerrit.fetch_json_async.assert_called_once_with(
         HOSTNAME, req_path, params={'n': 2})
 
+  def test_get_log_with_path_with_space(self):
+    req_path = 'project/+log/master/x%20y'
+    self.mock_fetch_json(None)
+
+    gitiles.get_log(HOSTNAME, 'project', 'master', path='x y')
+    gerrit.fetch_json_async.assert_called_once_with(
+        HOSTNAME, req_path, params={})
+
   def test_get_file_content(self):
     req_path = 'project/+/master/a.txt'
     self.mock_fetch(base64.b64encode('content'))
