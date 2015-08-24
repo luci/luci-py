@@ -144,6 +144,7 @@ FILES = (
     'third_party/rsa/rsa/util.py',
     'third_party/rsa/rsa/varblock.py',
     'platforms/__init__.py',
+    'platforms/android.py',
     'platforms/gce.py',
     'platforms/linux.py',
     'platforms/osx.py',
@@ -162,6 +163,19 @@ FILES = (
     'utils/tools.py',
     'utils/zip_package.py',
     'xsrf_client.py',
+
+    # TODO(maruel): Find a way to only include these on linux platforms but it's
+    # not that large so it is not a big deal.
+    'adb/__init__.py',
+    'adb/adb_commands.py',
+    'adb/adb_protocol.py',
+    'adb/common.py',
+    'adb/fastboot.py',
+    'adb/filesync_protocol.py',
+    'adb/usb_exceptions.py',
+    'python_libusb1/__init__.py',
+    'python_libusb1/libusb1.py',
+    'python_libusb1/usb1.py',
 )
 
 def resolve_symlink(path):

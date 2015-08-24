@@ -74,3 +74,27 @@
          if e.usb_error.value == -7:  # Timeout.
            raise usb_exceptions.DeviceAuthError(
                'Accept auth key on device, then retry.')
+--- a/adb/common.py
++++ b/adb/common.py
+@@ -20,8 +20,8 @@ import socket
+ import threading
+ import weakref
+ 
+-import libusb1
+-import usb1
++from python_libusb1 import libusb1
++from python_libusb1 import usb1
+ 
+ import usb_exceptions
+ 
+--- a/adb/filesync_protocol.py
++++ b/adb/filesync_protocol.py
+@@ -22,7 +22,7 @@ import stat
+ import struct
+ import time
+ 
+-import libusb1
++from python_libusb1 import libusb1
+ 
+ import adb_protocol
+ import usb_exceptions

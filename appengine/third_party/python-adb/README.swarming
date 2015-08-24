@@ -11,5 +11,7 @@ protocols, using libusb1 for USB communications.
 
 Local Modifications:
 - rm *.py adb/*_debug.py adb/common_cli.py
-- Applied patch PATCH.swarming to remove dependency on gflags, M2Crypto and fix
-  a bug.
+- Applied patch PATCH.swarming to:
+  - Remove dependency on gflags and M2Crypto
+  - Fix a bug.
+  - Rename import path of libusb1 for easier packaging.

@@ -20,8 +20,8 @@ import socket
 import threading
 import weakref
 
-import libusb1
-import usb1
+from python_libusb1 import libusb1
+from python_libusb1 import usb1
 
 import usb_exceptions
 

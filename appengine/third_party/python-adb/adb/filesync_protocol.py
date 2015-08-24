@@ -22,7 +22,7 @@ import stat
 import struct
 import time
 
-import libusb1
+from python_libusb1 import libusb1
 
 import adb_protocol
 import usb_exceptions

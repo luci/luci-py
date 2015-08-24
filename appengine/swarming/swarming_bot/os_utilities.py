@@ -17,6 +17,7 @@ the server to allow additional server-specific functionality.
 import ctypes
 import getpass
 import glob
+import hashlib
 import json
 import logging
 import multiprocessing
@@ -33,15 +34,9 @@ import tempfile
 import time
 import urllib2
 
+import platforms
 from utils import file_path
 from utils import tools
-from utils import zip_package
-
-
-import platforms
-
-
-THIS_FILE = os.path.abspath(zip_package.get_main_script_path() or __file__)
 
 
 # https://cloud.google.com/compute/pricing#machinetype
@@ -719,6 +714,90 @@ def get_integrity_level_win():
 ### Android.
 
 
+def initialize_android(pub, priv):
+  # TODO(maruel): Remove.
+  return platforms.android.initialize(pub, priv)
+
+
+def get_dimensions_all_devices_android(devices):
+  """Returns the default dimensions for an host with multiple android devices.
+  """
+  dimensions = get_dimensions()
+  if not devices:
+    return dimensions
+
+  # Pop a few dimensions otherwise there will be too many dimensions.
+  del dimensions[u'cpu']
+  del dimensions[u'cores']
+  del dimensions[u'gpu']
+  dimensions.pop(u'machine_type')
+
+  # Make sure all the devices use the same board.
+  keys = (u'build.id', u'product.board')
+  for key in keys:
+    dimensions[key] = set()
+  dimensions[u'android'] = []
+  for serial_number, cmd in devices.iteritems():
+    if cmd:
+      properties = platforms.android.get_build_prop(cmd)
+      if properties:
+        for key in keys:
+          dimensions[key].add(properties[u'ro.' + key])
+    dimensions[u'android'].append(serial_number)
+  dimensions[u'android'].sort()
+  for key in keys:
+    if not dimensions[key]:
+      del dimensions[key]
+    else:
+      dimensions[key] = sorted(dimensions[key])
+  nb_android = len(dimensions[u'android'])
+  dimensions[u'android_devices'] = map(
+      str, range(nb_android, max(0, nb_android-2), -1))
+  return dimensions
+
+
+def get_state_all_devices_android(devices):
+  """Returns state information about all the devices connected to the host.
+  """
+  state = get_state()
+  if not devices:
+    return state
+
+  # Add a few values that were poped from dimensions.
+  cpu_type = get_cpu_type()
+  cpu_bitness = get_cpu_bitness()
+  state[u'cpu'] = [
+    cpu_type,
+    cpu_type + u'-' + cpu_bitness,
+  ]
+  state[u'cores'] = [unicode(get_num_processors())]
+  state[u'gpu'] = get_gpu()[0]
+  machine_type = get_machine_type()
+  if machine_type:
+    state[u'machine_type'] = [machine_type]
+
+  keys = (
+    u'board.platform', u'product.cpu.abi', u'build.tags', u'build.type',
+    u'build.version.sdk')
+  state['devices'] = {}
+  for serial_number, cmd in devices.iteritems():
+    if cmd:
+      properties = platforms.android.get_build_prop(cmd)
+      if properties:
+        # TODO(maruel): uptime, diskstats, wifi, power, throttle, etc.
+        device = {
+          u'build': {key: properties[u'ro.'+key] for key in keys},
+          u'disk': platforms.android.get_disk(cmd),
+          u'battery': platforms.android.get_battery(cmd),
+          u'state': u'available',
+          u'temp': platforms.android.get_temp(cmd),
+        }
+      else:
+        device = {u'state': u'unavailable'}
+    else:
+      device = {u'state': 'unauthenticated'}
+    state[u'devices'][serial_number] = device
+  return state
 
 
 ###
@@ -1051,10 +1130,23 @@ def trim_rolled_log(name):
 def main():
   """Prints out the output of get_dimensions() and get_state()."""
   # Pass an empty tag, so pop it up since it has no significance.
-  data = {
-    u'dimensions': get_dimensions(),
-    u'state': get_state(),
-  }
+  devices = None
+  if sys.platform == 'linux2':
+    devices = platforms.android.get_devices()
+    if devices:
+      try:
+        data = {
+          u'dimensions': get_dimensions_all_devices_android(devices),
+          u'state': get_state_all_devices_android(devices),
+        }
+      finally:
+        platforms.android.close_devices(devices)
+  if not devices:
+    data = {
+      u'dimensions': get_dimensions(),
+      u'state': get_state(),
+    }
+
   json.dump(data, sys.stdout, indent=2, sort_keys=True, separators=(',', ': '))
   print('')
   return 0

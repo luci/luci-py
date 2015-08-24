@@ -10,3 +10,4 @@ Pure-python wrapper for libusb-1.0
 Local Modifications:
 - rm *.sh *.in setup.py stdeb.cfg testUSB1.py .gitignore .travis.yml
 - rm -rf examples
+- touch __init__.py
