@@ -7,6 +7,7 @@
 import webapp2
 from google.appengine.api import datastore_errors
 from google.appengine.api import taskqueue
+from google.appengine.ext import db
 
 import mapreduce_jobs
 from components import decorators
@@ -17,7 +18,15 @@ from server import task_scheduler
 class CronBotDiedHandler(webapp2.RequestHandler):
   @decorators.require_cronjob
   def get(self):
-    task_scheduler.cron_handle_bot_died()
+    try:
+      task_scheduler.cron_handle_bot_died()
+    except db.NeedIndexError as e:
+      # When a fresh new instance is deployed, it takes a few minutes for the
+      # composite indexes to be created even if they are empty. Ignore the case
+      # where the index is defined but still being created by AppEngine.
+      if not str(e).startswith(
+          'NeedIndexError: The index for this query is not ready to serve.'):
+        raise
     self.response.headers['Content-Type'] = 'text/plain; charset=utf-8'
     self.response.out.write('Success.')
 
