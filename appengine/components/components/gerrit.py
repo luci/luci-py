@@ -10,6 +10,8 @@ import logging
 import urllib
 import urlparse
 
+from google.appengine.ext import ndb
+
 from components import auth
 from components import net
 from components import utils
@@ -128,10 +130,11 @@ def set_review(
   fetch_json(hostname, path, method='POST', payload=body)
 
 
-def fetch(hostname, path, **kwargs):
+@ndb.tasklet
+def fetch_async(hostname, path, **kwargs):
   """Sends request to Gerrit, returns raw response.
 
-  See 'net.request' for list of accepted kwargs.
+  See 'net.request_async' for list of accepted kwargs.
 
   Returns:
     Response body on success.
@@ -144,12 +147,19 @@ def fetch(hostname, path, **kwargs):
   assert 'scopes' not in kwargs, kwargs['scopes']
   try:
     url = urlparse.urljoin('https://' + hostname, 'a/' + path)
-    return net.request(url, scopes=[AUTH_SCOPE], **kwargs)
+    result = yield net.request_async(url, scopes=[AUTH_SCOPE], **kwargs)
+    raise ndb.Return(result)
   except net.NotFoundError:
-    return None
+    raise ndb.Return(None)
 
 
-def fetch_json(hostname, path, payload=None, headers=None, **kwargs):
+def fetch(*args, **kwargs):
+  """Blockng version of fetch_async."""
+  return fetch_async(*args, **kwargs).get_result()
+
+
+@ndb.tasklet
+def fetch_json_async(hostname, path, payload=None, headers=None, **kwargs):
   """Sends JSON request to Gerrit, parses prefixed JSON response.
 
   See 'fetch' for the list of arguments.
@@ -165,17 +175,22 @@ def fetch_json(hostname, path, payload=None, headers=None, **kwargs):
   headers['Accept'] = 'application/json'
   if payload is not None:
     headers['Content-Type'] = 'application/json; charset=utf-8'
-  content = fetch(
+  content = yield fetch_async(
       hostname=hostname,
       path=path,
       payload=utils.encode_to_json(payload) if payload is not None else None,
       headers=headers,
       **kwargs)
   if content is None:
-    return None
+    raise ndb.Return(None)
   if not content.startswith(RESPONSE_PREFIX):
     msg = (
         'Unexpected response format. Expected prefix %s. Received: %s' %
         (RESPONSE_PREFIX, content))
     raise net.Error(msg, status_code=200, response=content)
-  return json.loads(content[len(RESPONSE_PREFIX):])
+  raise ndb.Return(json.loads(content[len(RESPONSE_PREFIX):]))
+
+
+def fetch_json(*args, **kwargs):
+  """Blocking version of fetch_json_async."""
+  return fetch_json_async(*args, **kwargs).get_result()
