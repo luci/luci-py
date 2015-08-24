@@ -21,8 +21,44 @@ GCE_PROJECT_ID = app_identity.get_application_id()
 # Minimum number of instances to keep in each instance group.
 MIN_INSTANCE_GROUP_SIZE = 4
 
-# TODO(smut): Support othre zones.
+# TODO(smut): Support other zones.
 ZONE = 'us-central1-f'
+
+
+def filter_templates(templates):
+  """Filters out misconfigured templates.
+
+  Args:
+    templates: A dict mapping instance template names to
+      compute#instanceTemplate dicts.
+
+  Yields:
+    (instance template name, compute#instanceTemplate dict) pairs.
+  """
+  for template_name, template in templates.iteritems():
+    logging.info('Proessing instance template: %s', template_name)
+    properties = template.get('properties', {})
+    # For now, enforce only one disk.
+    if len(properties.get('disks', [])) == 1:
+      # For now, require the template to give the OS family in its metadata.
+      os_family_count = sum(
+          1 for metadatum in properties['metadata'].get('items', [])
+          if metadatum['key'] == 'os_family'
+      )
+      if os_family_count == 1:
+        yield template_name, template
+      else:
+        logging.warning(
+            'Skipping %s due to metadata errors:\n%s',
+            template_name,
+            json.dumps(properties.get('metadata', {}), indent=2),
+        )
+    else:
+      logging.warning(
+          'Skipping %s due to unsupported number of disks:\n%s',
+          template_name,
+          json.dumps(properties.get('disks', []), indent=2),
+      )
 
 
 class InstanceTemplateProcessor(webapp2.RequestHandler):
@@ -33,29 +69,67 @@ class InstanceTemplateProcessor(webapp2.RequestHandler):
     api = gce.Project(GCE_PROJECT_ID)
     logging.info('Retrieving instance templates')
     templates = api.get_instance_templates()
-    logging.info('Retrieving instance groups')
-    groups = api.get_instance_groups(ZONE)
+    logging.info('Retrieving instance group managers')
+    managers = api.get_instance_group_managers(ZONE)
 
-    # For each template, ensure there exists a group implementing it.
-    for template_name, template in templates.iteritems():
-      logging.info(
-          'Processing instance template:\n%s',
-          json.dumps(template, indent=2),
-      )
-      if template_name not in groups:
+    # For each template, ensure there exists a group manager managing it.
+    for template_name, template in filter_templates(templates):
+      if template_name not in managers:
         logging.info(
-          'Creating instance group from instance template:\n%s',
-          json.dumps(template, indent=2),
+          'Creating instance group manager from instance template: %s',
+          template_name,
         )
-        api.create_instance_group(template, MIN_INSTANCE_GROUP_SIZE, ZONE)
+        api.create_instance_group_manager(
+            template, MIN_INSTANCE_GROUP_SIZE, ZONE,
+        )
       else:
-        logging.info(
-            'Instance group already exists:\n%s',
-            json.dumps(groups[template_name], indent=2),
-        )
+        logging.info('Instance group manager already exists: %s', template_name)
+
+
+class InstanceProcessor(webapp2.RequestHandler):
+  """Worker for processing instances."""
+
+  @decorators.require_cronjob
+  def get(self):
+    api = gce.Project(GCE_PROJECT_ID)
+    logging.info('Retrieving instance templates')
+    templates = api.get_instance_templates()
+    logging.info('Retrieving instance group managers')
+    managers = api.get_instance_group_managers(ZONE)
+
+    instances = {}
+
+    # For each group manager, tell the Machine Provider about its instances.
+    for manager_name, manager in managers.iteritems():
+      logging.info('Processing instance group manager: %s', manager_name)
+      # Extract template name from a link to the template.
+      template_name = manager['instanceTemplate'].split('/')[-1]
+      # Property-related verification was done by InstanceTemplateProcessor,
+      # so we can be sure all the properties we need have been supplied.
+      properties = templates[template_name]['properties']
+      os_family = [
+          metadatum['value'] for metadatum in properties['metadata']['items']
+          if metadatum['key'] == 'os_family'
+      ][0]
+      group_dimensions = {
+          'cpus': gce.machine_type_to_num_cpus(properties['machineType']),
+          'disk': properties['disks'][0]['initializeParams']['diskSizeGb'],
+          'memory': gce.machine_type_to_memory(properties['machineType']),
+          'os_family': os_family,
+      }
+
+      instances = api.get_managed_instances(manager_name, ZONE)
+      for instance_name, instance in instances.iteritems():
+        logging.info('Processing instance: %s', instance_name)
+        if instance['instanceStatus'] == 'RUNNING':
+          instances[instance_name] = group_dimensions
+
+    # TODO(smut): Static IP assignment, then tell Machine Provider.
+    logging.info('instances:\n%s', json.dumps(instances, indent=2))
 
 
 def create_cron_app():
   return webapp2.WSGIApplication([
       ('/internal/cron/process-instance-templates', InstanceTemplateProcessor),
+      ('/internal/cron/process-instances', InstanceProcessor),
   ])

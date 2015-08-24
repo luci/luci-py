@@ -9,6 +9,28 @@ import re
 from components import net
 
 
+MACHINE_TYPES = {
+    'f1-micro':       {'cpus': 1,  'memory': 0.6},
+    'g1-small':       {'cpus': 1,  'memory': 1.7},
+    'n1-standard-1':  {'cpus': 1,  'memory': 3.75},
+    'n1-standard-2':  {'cpus': 2,  'memory': 7.5},
+    'n1-standard-4':  {'cpus': 4,  'memory': 15},
+    'n1-standard-8':  {'cpus': 8,  'memory': 30},
+    'n1-standard-16': {'cpus': 16, 'memory': 60},
+    'n1-standard-32': {'cpus': 32, 'memory': 120},
+    'n1-highcpu-2':   {'cpus': 2,  'memory': 1.8},
+    'n1-highcpu-4':   {'cpus': 4,  'memory': 3.6},
+    'n1-highcpu-8':   {'cpus': 8,  'memory': 7.2},
+    'n1-highcpu-16':  {'cpus': 16, 'memory': 12.4},
+    'n1-highcpu-32':  {'cpus': 32, 'memory': 28.8},
+    'n1-highmem-2':   {'cpus': 2,  'memory': 13},
+    'n1-highmem-4':   {'cpus': 4,  'memory': 26},
+    'n1-highmem-8':   {'cpus': 8,  'memory': 52},
+    'n1-highmem-16':  {'cpus': 16, 'memory': 104},
+    'n1-highmem-32':  {'cpus': 32, 'memory': 208},
+}
+
+
 class Project(object):
   """Wrapper around GCE REST API endpoints for some project."""
 
@@ -53,7 +75,6 @@ class Project(object):
     Raises:
       net.Error on errors.
     """
-    # GCE Instance Groups API service name is replicapool.
     assert service in ('compute', 'replicapool')
     assert endpoint.startswith('/'), endpoint
     url = 'https://www.googleapis.com/%s/%s/projects/%s%s' % (
@@ -183,52 +204,44 @@ class Project(object):
       if not page_token:
         break
 
-  def create_instance_group(self, template, size, zone):
-    """Creates an instance group from the given template.
+  def create_instance_group_manager(self, template, size, zone):
+    """Creates an instance group manager from the given template.
 
     Args:
      template: A dict describing a GCE instance template.
-     size: Number of instances the group should contain.
+     size: Number of instances the group manager should maintain.
      zone: Zone to create the instance group in.
 
     Returns:
-      A replicapool#operation dict.
+      A compute#operation dict.
     """
     return self.call_api(
         '/zones/%s/instanceGroupManagers' % zone,
         method='POST',
-        params={
-            'size': size,
-        },
         payload={
             'baseInstanceName': template['name'],
             'description': template['description'],
-            'name': template['name'],
             'instanceTemplate': template['selfLink'],
+            'name': template['name'],
+            'targetSize': size,
         },
-        service='replicapool',
-        version='v1beta2',
     )
 
-  def get_instance_groups(self, zone):
-    """Returns a list of GCE instance groups associated with this project.
+  def get_instance_group_managers(self, zone):
+    """Returns the GCE instance group managers associated with this project.
 
     Args:
-      zone: Zone to list the instance groups in.
+      zone: Zone to list the instance group managers in.
 
     Returns:
-      A dict mapping instance group names to replicapool#instanceGroupManager
-      dicts.
+      A dict mapping instance group manager names to
+      compute#instanceGroupManager dicts.
     """
-    response = self.call_api(
-        '/zones/%s/instanceGroupManagers' % zone,
-        service='replicapool',
-        version='v1beta2',
-    )
-    return {group['name']: group for group in response.get('items', [])}
+    response = self.call_api('/zones/%s/instanceGroupManagers' % zone)
+    return {manager['name']: manager for manager in response.get('items', [])}
 
   def get_instance_templates(self):
-    """Returns a list of GCE instance templates associated with this project.
+    """Returns the GCE instance templates associated with this project.
 
     Returns:
       A dict mapping instance template names to compute#instanceTemplate dicts.
@@ -236,6 +249,29 @@ class Project(object):
     response = self.call_api('/global/instanceTemplates')
     return {
         template['name']: template for template in response.get('items', [])
+    }
+
+  def get_managed_instances(self, manager, zone):
+    """Returns the GCE instances managed by the given instance group manager.
+
+    Args:
+      manager: Name of the instance group manager.
+      zone: Zone to list the managed instances in.
+
+    Returns:
+      A dict mapping instance names to dicts describing those managed instances.
+    """
+    response = self.call_api(
+        '/zones/%s/instanceGroupManagers/%s/listManagedInstances' % (
+            zone,
+            manager,
+        ),
+        method='POST',
+    )
+    return {
+        # Extract instance name from a link to the instance.
+        instance['instance'].split('/')[-1]: instance
+        for instance in response.get('managedInstances', [])
     }
 
 
@@ -335,3 +371,15 @@ def region_from_zone(zone):
   """Given a zone name returns a region: us-central1-a -> us-central1."""
   assert is_valid_zone(zone), zone
   return zone[:zone.rfind('-')]
+
+
+def machine_type_to_num_cpus(machine_type):
+  """Given a machine type returns its number of CPUs."""
+  assert machine_type in MACHINE_TYPES, machine_type
+  return MACHINE_TYPES[machine_type]['cpus']
+
+
+def machine_type_to_memory(machine_type):
+  """Given a machine type returns its memory in GB."""
+  assert machine_type in MACHINE_TYPES, machine_type
+  return MACHINE_TYPES[machine_type]['memory']
