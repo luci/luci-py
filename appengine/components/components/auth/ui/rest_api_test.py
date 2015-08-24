@@ -25,6 +25,7 @@ from components.auth import handler
 from components.auth import host_token
 from components.auth import model
 from components.auth import version
+from components.auth.ui import acl
 from components.auth.ui import rest_api
 from components.auth.ui import ui
 from test_support import test_case
@@ -277,6 +278,11 @@ class ApiHandlerClassTest(test_case.TestCase):
         status=400)
 
 
+# To be used from inside mocks.
+_original_is_group_member = api.is_group_member
+_original_XSRFToken_validate = handler.XSRFToken.validate
+
+
 class RestAPITestCase(test_case.TestCase):
   """Test case for some concrete Auth REST API handler.
 
@@ -293,6 +299,13 @@ class RestAPITestCase(test_case.TestCase):
     handler.configure([])
     api.reset_local_state()
     self.mocked_identity = model.Anonymous
+    # Mock is_group_member checks.
+    self.mocked_groups = {}
+    def is_group_member_mock(group, identity=None):
+      if group in self.mocked_groups:
+        return self.mocked_groups[group]
+      return _original_is_group_member(group, identity)
+    self.mock(api, 'is_group_member', is_group_member_mock)
     # Catch errors in log.
     self.errors = []
     self.mock(handler.logging, 'error',
@@ -319,6 +332,18 @@ class RestAPITestCase(test_case.TestCase):
     self.mocked_identity = identity
     self.mock(api, 'get_current_identity', lambda: identity)
 
+  def mock_is_group_member(self, group, value):
+    """Mocks return value of is_group_member(group, _) call."""
+    self.mocked_groups[group] = value
+
+  def mock_is_admin(self, value):
+    """Mocks value of is_admin check."""
+    self.mock_is_group_member(model.ADMIN_GROUP, value)
+
+  def mock_has_access(self, value):
+    """Mocks value of has_access check."""
+    self.mock_is_group_member(acl.ACCESS_GROUP_NAME, value)
+
   def make_request(
       self,
       method,
@@ -327,8 +352,7 @@ class RestAPITestCase(test_case.TestCase):
       headers=None,
       extra_environ=None,
       expect_errors=False,
-      expect_xsrf_token_check=False,
-      expect_admin_check=False):
+      expect_xsrf_token_check=False):
     """Sends a request to the app via webtest framework.
 
     Args:
@@ -340,7 +364,6 @@ class RestAPITestCase(test_case.TestCase):
       expect_errors: True if call is expected to end with some HTTP error code.
       expect_xsrf_token_check: if True, will append X-XSRF-Token header to the
           request and will verify that request handler checked it.
-      expect_admin_check: if True, auth.is_admin is mocked to return True.
 
     Returns:
       Tuple (status code, deserialized JSON response, response headers).
@@ -352,19 +375,11 @@ class RestAPITestCase(test_case.TestCase):
       headers['X-XSRF-Token'] = make_xsrf_token(self.mocked_identity)
 
     # Hook XSRF token check to verify it's called.
-    original_validate = handler.XSRFToken.validate
     xsrf_token_validate_calls = []
     def mocked_validate(*args, **kwargs):
       xsrf_token_validate_calls.append((args, kwargs))
-      return original_validate(*args, **kwargs)
+      return _original_XSRFToken_validate(*args, **kwargs)
     self.mock(handler.XSRFToken, 'validate', staticmethod(mocked_validate))
-
-    # Mock is_admin to return True.
-    if expect_admin_check:
-      original = api.is_group_member
-      def is_group_member_mock(group, identity=None):
-        return group == model.ADMIN_GROUP or original(group, identity)
-      self.mock(api, 'is_group_member', is_group_member_mock)
 
     # Do the call. Pass |params| only if not None, otherwise use whatever
     # webtest method uses by default (for 'DELETE' it's something called
@@ -501,13 +516,21 @@ class GroupsHandlerTest(RestAPITestCase):
     self.assertEqual({'text': 'Access is denied.'}, body)
 
   def test_empty_list(self):
-    status, body, _ = self.get('/auth/api/v1/groups', expect_admin_check=True)
+    self.mock_is_admin(True)
+    status, body, _ = self.get('/auth/api/v1/groups')
     self.assertEqual(200, status)
     self.assertEqual({'groups': []}, body)
 
   def test_non_empty_list(self):
     # Freeze time in NDB's |auto_now| properties.
     self.mock_now(utils.timestamp_to_datetime(1300000000000000))
+
+    owner = model.Identity.from_bytes('user:owner@example.com')
+    make_group(
+        name='owners-check',
+        members=[owner],
+        owners='owners-check')
+    make_group(name='z-external/group')
 
     # Create a bunch of groups with all kinds of members.
     for i in xrange(0, 5):
@@ -521,12 +544,14 @@ class GroupsHandlerTest(RestAPITestCase):
 
     # Group Listing should return all groups. Member lists should be omitted.
     # Order is alphabetical by name,
-    status, body, _ = self.get('/auth/api/v1/groups', expect_admin_check=True)
+    self.mock_is_admin(True)
+    status, body, _ = self.get('/auth/api/v1/groups')
     self.assertEqual(200, status)
     self.assertEqual(
       {
-        'groups': [
+        u'groups': [
           {
+            u'caller_can_modify': True,
             u'created_by': u'user:creator@example.com',
             u'created_ts': 1300000000000000,
             u'description': u'Group for testing, #%d' % i,
@@ -535,8 +560,39 @@ class GroupsHandlerTest(RestAPITestCase):
             u'name': u'Test group %d' % i,
             u'owners': u'administrators',
           } for i in xrange(0, 5)
+        ] + [
+          {
+            u'caller_can_modify': True,
+            u'created_by': None,
+            u'created_ts': 1300000000000000,
+            u'description': u'',
+            u'modified_by': None,
+            u'modified_ts': 1300000000000000,
+            u'name': u'owners-check',
+            u'owners': u'owners-check',
+          },
+          {
+            u'caller_can_modify': False,
+            u'created_by': None,
+            u'created_ts': 1300000000000000,
+            u'description': u'',
+            u'modified_by': None,
+            u'modified_ts': 1300000000000000,
+            u'name': u'z-external/group',
+            u'owners': u'administrators',
+          },
         ],
       }, body)
+
+    # Check caller_can_modify for non-admin.
+    self.mock_current_identity(owner)
+    self.mock_is_admin(False)
+    self.mock_has_access(True)
+    status, body, _ = self.get('/auth/api/v1/groups')
+    self.assertEqual(200, status)
+    self.assertEqual(
+        ['owners-check'],
+        [g['name'] for g in body['groups'] if g['caller_can_modify']])
 
 
 class GroupHandlerTest(RestAPITestCase):
@@ -544,12 +600,12 @@ class GroupHandlerTest(RestAPITestCase):
     super(GroupHandlerTest, self).setUp()
     # Admin group is referenced as owning group by default, and thus must exist.
     make_group(model.ADMIN_GROUP)
+    self.mock_is_admin(True)
 
   def test_get_missing(self):
     status, body, _ = self.get(
         path='/auth/api/v1/groups/a%20group',
-        expect_errors=True,
-        expect_admin_check=True)
+        expect_errors=True)
     self.assertEqual(404, status)
     self.assertEqual({'text': 'No such group'}, body)
 
@@ -567,13 +623,12 @@ class GroupHandlerTest(RestAPITestCase):
         globs=[model.IdentityGlob.from_bytes('user:*@example.com')])
 
     # Fetch it via API call.
-    status, body, headers = self.get(
-        path='/auth/api/v1/groups/A%20Group',
-        expect_admin_check=True)
+    status, body, headers = self.get(path='/auth/api/v1/groups/A%20Group')
     self.assertEqual(200, status)
     self.assertEqual(
       {
         'group': {
+          'caller_can_modify': True,
           'created_by': 'user:creator@example.com',
           'created_ts': 1300000000000000,
           'description': 'Group for testing',
@@ -590,12 +645,21 @@ class GroupHandlerTest(RestAPITestCase):
         'Sun, 13 Mar 2011 07:06:40 -0000',
         headers['Last-Modified'])
 
-  def test_get_requires_admin(self):
+  def test_get_requires_admin_or_access(self):
+    make_group('a group')
+
+    # Not admin and no access => 403.
+    self.mock_is_admin(False)
     status, body, _ = self.get(
         path='/auth/api/v1/groups/a%20group',
         expect_errors=True)
     self.assertEqual(403, status)
     self.assertEqual({'text': 'Access is denied.'}, body)
+
+    # Has access => 200.
+    self.mock_has_access(True)
+    status, _, _ = self.get(path='/auth/api/v1/groups/a%20group')
+    self.assertEqual(200, status)
 
   def test_delete_existing(self):
     self.mock_now(utils.timestamp_to_datetime(1300000000000000))
@@ -606,8 +670,7 @@ class GroupHandlerTest(RestAPITestCase):
     self.expect_auth_db_rev_change()
     status, body, _ = self.delete(
         path='/auth/api/v1/groups/A%20Group',
-        expect_xsrf_token_check=True,
-        expect_admin_check=True)
+        expect_xsrf_token_check=True)
     self.assertEqual(200, status)
     self.assertEqual({'ok': True}, body)
 
@@ -640,8 +703,7 @@ class GroupHandlerTest(RestAPITestCase):
         headers={
           'If-Unmodified-Since': utils.datetime_to_rfc2822(group.modified_ts),
         },
-        expect_xsrf_token_check=True,
-        expect_admin_check=True)
+        expect_xsrf_token_check=True)
     self.assertEqual(200, status)
     self.assertEqual({'ok': True}, body)
 
@@ -658,8 +720,7 @@ class GroupHandlerTest(RestAPITestCase):
           'If-Unmodified-Since': 'Sun, 1 Mar 1990 00:00:00 -0000',
         },
         expect_errors=True,
-        expect_xsrf_token_check=True,
-        expect_admin_check=True)
+        expect_xsrf_token_check=True)
     self.assertEqual(412, status)
     self.assertEqual({'text': 'Group was modified by someone else'}, body)
 
@@ -674,8 +735,7 @@ class GroupHandlerTest(RestAPITestCase):
     status, body, _ = self.delete(
         path='/auth/api/v1/groups/A%20Group',
         expect_errors=True,
-        expect_xsrf_token_check=True,
-        expect_admin_check=True)
+        expect_xsrf_token_check=True)
     self.assertEqual(409, status)
     self.assertEqual(
         {
@@ -693,8 +753,7 @@ class GroupHandlerTest(RestAPITestCase):
     # Unconditionally deleting a group that's not there is ok.
     status, body, _ = self.delete(
         path='/auth/api/v1/groups/A Group',
-        expect_xsrf_token_check=True,
-        expect_admin_check=True)
+        expect_xsrf_token_check=True)
     self.assertEqual(200, status)
     self.assertEqual({'ok': True}, body)
 
@@ -706,12 +765,12 @@ class GroupHandlerTest(RestAPITestCase):
           'If-Unmodified-Since': 'Sun, 1 Mar 1990 00:00:00 -0000',
         },
         expect_errors=True,
-        expect_xsrf_token_check=True,
-        expect_admin_check=True)
+        expect_xsrf_token_check=True)
     self.assertEqual(412, status)
     self.assertEqual({'text': 'Group was deleted by someone else'}, body)
 
   def test_delete_requires_admin(self):
+    self.mock_is_admin(False)
     status, body, _ = self.delete(
         path='/auth/api/v1/groups/A Group',
         expect_errors=True,
@@ -719,12 +778,35 @@ class GroupHandlerTest(RestAPITestCase):
     self.assertEqual(403, status)
     self.assertEqual({'text': 'Access is denied.'}, body)
 
+  def test_delete_by_owner(self):
+    self.mock_current_identity(model.Identity.from_bytes('user:a@a.com'))
+    self.mock_is_admin(False)
+    self.mock_has_access(True)
+    make_group('A Group', owners='owners')
+
+    # Not an owner => error.
+    status, body, _ = self.delete(
+        path='/auth/api/v1/groups/A Group',
+        expect_errors=True,
+        expect_xsrf_token_check=True)
+    self.assertEqual(403, status)
+    self.assertEqual(
+        body,
+        {'text': u'"user:a@a.com" has no permission to delete group "A Group"'})
+
+    # Owner => works.
+    self.mock_is_group_member('owners', True)
+    self.expect_auth_db_rev_change()
+    status, _, _ = self.delete(
+        path='/auth/api/v1/groups/A Group',
+        expect_xsrf_token_check=True)
+    self.assertEqual(200, status)
+
   def test_delete_external_fails(self):
     status, body, _ = self.delete(
         path='/auth/api/v1/groups/prefix/name',
         expect_errors=True,
-        expect_xsrf_token_check=True,
-        expect_admin_check=True)
+        expect_xsrf_token_check=True)
     self.assertEqual(400, status)
     self.assertEqual({'text': 'This group is not writable'}, body)
 
@@ -736,8 +818,7 @@ class GroupHandlerTest(RestAPITestCase):
     self.expect_auth_db_rev_change()
     status, body, _ = self.delete(
         path='/auth/api/v1/groups/A%20Group',
-        expect_xsrf_token_check=True,
-        expect_admin_check=True)
+        expect_xsrf_token_check=True)
     self.assertEqual(200, status)
     self.assertEqual({'ok': True}, body)
 
@@ -748,8 +829,7 @@ class GroupHandlerTest(RestAPITestCase):
     status, body, _ = self.delete(
         path='/auth/api/v1/groups/' + model.ADMIN_GROUP,
         expect_errors=True,
-        expect_xsrf_token_check=True,
-        expect_admin_check=True)
+        expect_xsrf_token_check=True)
     self.assertEqual(409, status)
     self.assertEqual(
       {
@@ -781,8 +861,7 @@ class GroupHandlerTest(RestAPITestCase):
           'nested': ['Nested Group'],
           'owners': 'Owning Group',
         },
-        expect_xsrf_token_check=True,
-        expect_admin_check=True)
+        expect_xsrf_token_check=True)
     self.assertEqual(201, status)
     self.assertEqual({'ok': True}, body)
     self.assertEqual(
@@ -828,8 +907,7 @@ class GroupHandlerTest(RestAPITestCase):
     status, body, _ = self.post(
         path='/auth/api/v1/groups/A%20Group',
         body={'name': 'A Group'},
-        expect_xsrf_token_check=True,
-        expect_admin_check=True)
+        expect_xsrf_token_check=True)
     self.assertEqual(201, status)
     self.assertEqual({'ok': True}, body)
 
@@ -839,8 +917,7 @@ class GroupHandlerTest(RestAPITestCase):
         path='/auth/api/v1/groups/A%20Group',
         body={'name': 'Another name here'},
         expect_errors=True,
-        expect_xsrf_token_check=True,
-        expect_admin_check=True)
+        expect_xsrf_token_check=True)
     self.assertEqual(400, status)
     self.assertEqual(
         {'text': 'Missing or mismatching name in request body'}, body)
@@ -851,8 +928,7 @@ class GroupHandlerTest(RestAPITestCase):
         path='/auth/api/v1/groups/A%20Group',
         body={'name': 'A Group', 'members': {}},
         expect_errors=True,
-        expect_xsrf_token_check=True,
-        expect_admin_check=True)
+        expect_xsrf_token_check=True)
     self.assertEqual(400, status)
     self.assertEqual(
         {
@@ -869,8 +945,7 @@ class GroupHandlerTest(RestAPITestCase):
         path='/auth/api/v1/groups/A%20Group',
         body={'name': 'A Group'},
         expect_errors=True,
-        expect_xsrf_token_check=True,
-        expect_admin_check=True)
+        expect_xsrf_token_check=True)
     self.assertEqual(409, status)
     self.assertEqual({'text': 'Such group already exists'}, body)
 
@@ -880,8 +955,7 @@ class GroupHandlerTest(RestAPITestCase):
         path='/auth/api/v1/groups/A%20Group',
         body={'name': 'A Group', 'nested': ['Missing group']},
         expect_errors=True,
-        expect_xsrf_token_check=True,
-        expect_admin_check=True)
+        expect_xsrf_token_check=True)
     self.assertEqual(409, status)
     self.assertEqual(
       {
@@ -897,8 +971,7 @@ class GroupHandlerTest(RestAPITestCase):
         path='/auth/api/v1/groups/A%20Group',
         body={'name': 'A Group', 'owners': 'Missing group'},
         expect_errors=True,
-        expect_xsrf_token_check=True,
-        expect_admin_check=True)
+        expect_xsrf_token_check=True)
     self.assertEqual(409, status)
     self.assertEqual(
       {
@@ -909,6 +982,7 @@ class GroupHandlerTest(RestAPITestCase):
       }, body)
 
   def test_post_requires_admin(self):
+    self.mock_is_admin(False)
     status, body, _ = self.post(
         path='/auth/api/v1/groups/A%20Group',
         body={'name': 'A Group'},
@@ -917,13 +991,26 @@ class GroupHandlerTest(RestAPITestCase):
     self.assertEqual(403, status)
     self.assertEqual({'text': 'Access is denied.'}, body)
 
+  def test_post_by_non_admin_with_access(self):
+    self.mock_current_identity(model.Identity.from_bytes('user:a@a.com'))
+    self.mock_is_admin(False)
+    self.mock_has_access(True)
+    status, body, _ = self.post(
+        path='/auth/api/v1/groups/A%20Group',
+        body={'name': 'A Group'},
+        expect_errors=True,
+        expect_xsrf_token_check=True)
+    self.assertEqual(403, status)
+    self.assertEqual(
+        body,
+        {'text': u'"user:a@a.com" has no permission to create a group'})
+
   def test_post_external_fails(self):
     status, body, _ = self.post(
         path='/auth/api/v1/groups/prefix/name',
         body={'name': 'prefix/name'},
         expect_errors=True,
-        expect_xsrf_token_check=True,
-        expect_admin_check=True)
+        expect_xsrf_token_check=True)
     self.assertEqual(400, status)
     self.assertEqual({'text': 'This group is not writable'}, body)
 
@@ -933,8 +1020,7 @@ class GroupHandlerTest(RestAPITestCase):
     status, body, _ = self.post(
         path='/auth/api/v1/groups/A%20Group',
         body={'name': 'A Group', 'owners': 'A Group'},
-        expect_xsrf_token_check=True,
-        expect_admin_check=True)
+        expect_xsrf_token_check=True)
     self.assertEqual(201, status)
     self.assertEqual({'ok': True}, body)
 
@@ -963,8 +1049,7 @@ class GroupHandlerTest(RestAPITestCase):
           'nested': ['Nested Group'],
           'owners': 'Owning Group',
         },
-        expect_xsrf_token_check=True,
-        expect_admin_check=True)
+        expect_xsrf_token_check=True)
     self.assertEqual(200, status)
     self.assertEqual({'ok': True}, body)
     self.assertEqual(
@@ -1015,8 +1100,7 @@ class GroupHandlerTest(RestAPITestCase):
           'name': 'Bad group name',
         },
         expect_errors=True,
-        expect_xsrf_token_check=True,
-        expect_admin_check=True)
+        expect_xsrf_token_check=True)
     self.assertEqual(400, status)
     self.assertEqual(
         {'text': 'Missing or mismatching name in request body'}, body)
@@ -1034,8 +1118,7 @@ class GroupHandlerTest(RestAPITestCase):
           'name': 'A Group',
         },
         expect_errors=True,
-        expect_xsrf_token_check=True,
-        expect_admin_check=True)
+        expect_xsrf_token_check=True)
     self.assertEqual(400, status)
     self.assertEqual(
         {
@@ -1055,8 +1138,7 @@ class GroupHandlerTest(RestAPITestCase):
           'nested': [],
         },
         expect_errors=True,
-        expect_xsrf_token_check=True,
-        expect_admin_check=True)
+        expect_xsrf_token_check=True)
     self.assertEqual(404, status)
     self.assertEqual({'text': 'No such group'}, body)
 
@@ -1080,8 +1162,7 @@ class GroupHandlerTest(RestAPITestCase):
           'If-Unmodified-Since': 'Sun, 1 Mar 1990 00:00:00 -0000',
         },
         expect_errors=True,
-        expect_xsrf_token_check=True,
-        expect_admin_check=True)
+        expect_xsrf_token_check=True)
     self.assertEqual(412, status)
     self.assertEqual({'text': 'Group was modified by someone else'}, body)
 
@@ -1099,8 +1180,7 @@ class GroupHandlerTest(RestAPITestCase):
           'nested': ['Missing group'],
         },
         expect_errors=True,
-        expect_xsrf_token_check=True,
-        expect_admin_check=True)
+        expect_xsrf_token_check=True)
     self.assertEqual(409, status)
     self.assertEqual(
         {
@@ -1122,8 +1202,7 @@ class GroupHandlerTest(RestAPITestCase):
           'owners': 'Missing group',
         },
         expect_errors=True,
-        expect_xsrf_token_check=True,
-        expect_admin_check=True)
+        expect_xsrf_token_check=True)
     self.assertEqual(409, status)
     self.assertEqual(
         {
@@ -1143,8 +1222,7 @@ class GroupHandlerTest(RestAPITestCase):
           'owners': 'Another group',
         },
         expect_errors=True,
-        expect_xsrf_token_check=True,
-        expect_admin_check=True)
+        expect_xsrf_token_check=True)
     self.assertEqual(409, status)
     self.assertEqual(
       {
@@ -1166,8 +1244,7 @@ class GroupHandlerTest(RestAPITestCase):
           'nested': ['A Group'],
         },
         expect_errors=True,
-        expect_xsrf_token_check=True,
-        expect_admin_check=True)
+        expect_xsrf_token_check=True)
     self.assertEqual(409, status)
     self.assertEqual(
         {
@@ -1177,6 +1254,7 @@ class GroupHandlerTest(RestAPITestCase):
         }, body)
 
   def test_put_requires_admin(self):
+    self.mock_is_admin(False)
     status, body, _ = self.put(
         path='/auth/api/v1/groups/A%20Group',
         body={},
@@ -1185,26 +1263,55 @@ class GroupHandlerTest(RestAPITestCase):
     self.assertEqual(403, status)
     self.assertEqual({'text': 'Access is denied.'}, body)
 
+  def test_put_by_owner(self):
+    self.mock_current_identity(model.Identity.from_bytes('user:a@a.com'))
+    self.mock_is_admin(False)
+    self.mock_has_access(True)
+    make_group('A Group', owners='owners')
+
+    # Not an owner => error.
+    status, body, _ = self.put(
+        path='/auth/api/v1/groups/A%20Group',
+        body={'name': 'A Group'},
+        expect_errors=True,
+        expect_xsrf_token_check=True)
+    self.assertEqual(403, status)
+    self.assertEqual(
+        body,
+        {'text': u'"user:a@a.com" has no permission to update group "A Group"'})
+
+    # Owner => works.
+    self.mock_is_group_member('owners', True)
+    self.expect_auth_db_rev_change()
+    status, _, _ = self.put(
+        path='/auth/api/v1/groups/A%20Group',
+        body={'name': 'A Group'},
+        expect_xsrf_token_check=True)
+    self.assertEqual(200, status)
+
   def test_put_external_fails(self):
     status, body, _ = self.post(
         path='/auth/api/v1/groups/prefix/name',
         body={'name': 'prefix/name'},
         expect_errors=True,
-        expect_xsrf_token_check=True,
-        expect_admin_check=True)
+        expect_xsrf_token_check=True)
     self.assertEqual(400, status)
     self.assertEqual({'text': 'This group is not writable'}, body)
 
 
 class IPWhitelistsHandlerTest(RestAPITestCase):
+  def setUp(self):
+    super(IPWhitelistsHandlerTest, self).setUp()
+    self.mock_is_admin(True)
+
   def test_requires_admin(self):
+    self.mock_is_admin(False)
     status, body, _ = self.get('/auth/api/v1/ip_whitelists', expect_errors=True)
     self.assertEqual(403, status)
     self.assertEqual({'text': 'Access is denied.'}, body)
 
   def test_empty_list(self):
-    status, body, _ = self.get(
-        '/auth/api/v1/ip_whitelists', expect_admin_check=True)
+    status, body, _ = self.get('/auth/api/v1/ip_whitelists')
     self.assertEqual(200, status)
     self.assertEqual({'ip_whitelists': []}, body)
 
@@ -1226,8 +1333,7 @@ class IPWhitelistsHandlerTest(RestAPITestCase):
         subnets=[])
 
     # Sorted by name. Subnets are normalized.
-    status, body, _ = self.get(
-        '/auth/api/v1/ip_whitelists', expect_admin_check=True)
+    status, body, _ = self.get('/auth/api/v1/ip_whitelists')
     self.assertEqual(200, status)
     self.assertEqual(
       {
@@ -1260,6 +1366,7 @@ class HostTokenHandlerTest(RestAPITestCase):
   def setUp(self):
     super(HostTokenHandlerTest, self).setUp()
     self.mock(host_token, 'create_host_token', lambda *_: 'hosttoken')
+    self.mock_is_admin(True)
 
   def call(self, host, expiration_sec, expect_errors=False):
     body = {}
@@ -1271,7 +1378,6 @@ class HostTokenHandlerTest(RestAPITestCase):
         path='/auth/api/v1/host_token',
         body=body,
         expect_xsrf_token_check=True,
-        expect_admin_check=True,
         expect_errors=expect_errors)
     return status, response
 
@@ -1318,11 +1424,14 @@ class IPWhitelistHandlerTest(RestAPITestCase):
   # cryptic, look up corresponding test in GroupHandlerTest, it is usually more
   # commented.
 
+  def setUp(self):
+    super(IPWhitelistHandlerTest, self).setUp()
+    self.mock_is_admin(True)
+
   def test_get_missing(self):
     status, body, _ = self.get(
         path='/auth/api/v1/ip_whitelists/some_whitelist',
-        expect_errors=True,
-        expect_admin_check=True)
+        expect_errors=True)
     self.assertEqual(404, status)
     self.assertEqual({'text': 'No such ip whitelist'}, body)
 
@@ -1338,9 +1447,7 @@ class IPWhitelistHandlerTest(RestAPITestCase):
         modified_by=model.Identity.from_bytes('user:modifier@example.com'),
         subnets=['127.0.0.1/32', '::1/128'])
 
-    status, body, headers = self.get(
-        path='/auth/api/v1/ip_whitelists/bots',
-        expect_admin_check=True)
+    status, body, headers = self.get(path='/auth/api/v1/ip_whitelists/bots')
     self.assertEqual(200, status)
     self.assertEqual(
       {
@@ -1359,6 +1466,7 @@ class IPWhitelistHandlerTest(RestAPITestCase):
         headers['Last-Modified'])
 
   def test_get_requires_admin(self):
+    self.mock_is_admin(False)
     status, body, _ = self.get(
         path='/auth/api/v1/ip_whitelists/bots',
         expect_errors=True)
@@ -1372,8 +1480,7 @@ class IPWhitelistHandlerTest(RestAPITestCase):
     self.expect_auth_db_rev_change()
     status, body, _ = self.delete(
         path='/auth/api/v1/ip_whitelists/A%20whitelist',
-        expect_xsrf_token_check=True,
-        expect_admin_check=True)
+        expect_xsrf_token_check=True)
     self.assertEqual(200, status)
     self.assertEqual({'ok': True}, body)
     self.assertFalse(model.ip_whitelist_key('A whitelist').get())
@@ -1399,8 +1506,7 @@ class IPWhitelistHandlerTest(RestAPITestCase):
         headers={
           'If-Unmodified-Since': utils.datetime_to_rfc2822(ent.modified_ts),
         },
-        expect_xsrf_token_check=True,
-        expect_admin_check=True)
+        expect_xsrf_token_check=True)
     self.assertEqual(200, status)
     self.assertEqual({'ok': True}, body)
     self.assertFalse(model.ip_whitelist_key('A whitelist').get())
@@ -1413,8 +1519,7 @@ class IPWhitelistHandlerTest(RestAPITestCase):
           'If-Unmodified-Since': 'Sun, 1 Mar 1990 00:00:00 -0000',
         },
         expect_errors=True,
-        expect_xsrf_token_check=True,
-        expect_admin_check=True)
+        expect_xsrf_token_check=True)
     self.assertEqual(412, status)
     self.assertEqual(
         {'text': 'Ip whitelist was modified by someone else'}, body)
@@ -1423,8 +1528,7 @@ class IPWhitelistHandlerTest(RestAPITestCase):
   def test_delete_missing(self):
     status, body, _ = self.delete(
         path='/auth/api/v1/ip_whitelists/A%20whitelist',
-        expect_xsrf_token_check=True,
-        expect_admin_check=True)
+        expect_xsrf_token_check=True)
     self.assertEqual(200, status)
     self.assertEqual({'ok': True}, body)
 
@@ -1435,12 +1539,12 @@ class IPWhitelistHandlerTest(RestAPITestCase):
           'If-Unmodified-Since': 'Sun, 1 Mar 1990 00:00:00 -0000',
         },
         expect_errors=True,
-        expect_xsrf_token_check=True,
-        expect_admin_check=True)
+        expect_xsrf_token_check=True)
     self.assertEqual(412, status)
     self.assertEqual({'text': 'Ip whitelist was deleted by someone else'}, body)
 
   def test_delete_requires_admin(self):
+    self.mock_is_admin(False)
     status, body, _ = self.delete(
         path='/auth/api/v1/ip_whitelists/A%20whitelist',
         expect_errors=True,
@@ -1458,8 +1562,7 @@ class IPWhitelistHandlerTest(RestAPITestCase):
     status, body, _ = self.delete(
         path='/auth/api/v1/ip_whitelists/A%20whitelist',
         expect_errors=True,
-        expect_xsrf_token_check=True,
-        expect_admin_check=True)
+        expect_xsrf_token_check=True)
     self.assertEqual(409, status)
     self.assertEqual(
         {'text': 'The configuration is managed elsewhere'}, body)
@@ -1478,8 +1581,7 @@ class IPWhitelistHandlerTest(RestAPITestCase):
           'subnets': ['127.0.0.1/32'],
           'name': 'A whitelist',
         },
-        expect_xsrf_token_check=True,
-        expect_admin_check=True)
+        expect_xsrf_token_check=True)
     self.assertEqual(201, status)
     self.assertEqual({'ok': True}, body)
     self.assertEqual(
@@ -1517,8 +1619,7 @@ class IPWhitelistHandlerTest(RestAPITestCase):
     status, body, _ = self.post(
         path='/auth/api/v1/ip_whitelists/A%20whitelist',
         body={'name': 'A whitelist'},
-        expect_xsrf_token_check=True,
-        expect_admin_check=True)
+        expect_xsrf_token_check=True)
     self.assertEqual(201, status)
     self.assertEqual({'ok': True}, body)
 
@@ -1528,8 +1629,7 @@ class IPWhitelistHandlerTest(RestAPITestCase):
         path='/auth/api/v1/ip_whitelists/A%20whitelist',
         body={'name': 'Another name here'},
         expect_errors=True,
-        expect_xsrf_token_check=True,
-        expect_admin_check=True)
+        expect_xsrf_token_check=True)
     self.assertEqual(400, status)
     self.assertEqual(
         {'text': 'Missing or mismatching name in request body'}, body)
@@ -1540,8 +1640,7 @@ class IPWhitelistHandlerTest(RestAPITestCase):
         path='/auth/api/v1/ip_whitelists/A%20whitelist',
         body={'name': 'A whitelist', 'subnets': ['not a subnet']},
         expect_errors=True,
-        expect_xsrf_token_check=True,
-        expect_admin_check=True)
+        expect_xsrf_token_check=True)
     self.assertEqual(400, status)
     self.assertEqual({
         'text':
@@ -1554,12 +1653,12 @@ class IPWhitelistHandlerTest(RestAPITestCase):
         path='/auth/api/v1/ip_whitelists/A%20whitelist',
         body={'name': 'A whitelist'},
         expect_errors=True,
-        expect_xsrf_token_check=True,
-        expect_admin_check=True)
+        expect_xsrf_token_check=True)
     self.assertEqual(409, status)
     self.assertEqual({'text': 'Such ip whitelist already exists'}, body)
 
   def test_post_requires_admin(self):
+    self.mock_is_admin(False)
     status, body, _ = self.post(
         path='/auth/api/v1/ip_whitelists/A%20whitelist',
         body={'name': 'A whitelist'},
@@ -1574,8 +1673,7 @@ class IPWhitelistHandlerTest(RestAPITestCase):
         path='/auth/api/v1/ip_whitelists/A%20whitelist',
         body={'name': 'A whitelist'},
         expect_errors=True,
-        expect_xsrf_token_check=True,
-        expect_admin_check=True)
+        expect_xsrf_token_check=True)
     self.assertEqual(409, status)
     self.assertEqual(
         {'text': 'The configuration is managed elsewhere'}, body)
@@ -1596,8 +1694,7 @@ class IPWhitelistHandlerTest(RestAPITestCase):
           'name': 'A whitelist',
           'subnets': ['127.0.0.1/32'],
         },
-        expect_xsrf_token_check=True,
-        expect_admin_check=True)
+        expect_xsrf_token_check=True)
     self.assertEqual(200, status)
     self.assertEqual({'ok': True}, body)
     self.assertEqual(
@@ -1637,8 +1734,7 @@ class IPWhitelistHandlerTest(RestAPITestCase):
           'name': 'Bad group name',
         },
         expect_errors=True,
-        expect_xsrf_token_check=True,
-        expect_admin_check=True)
+        expect_xsrf_token_check=True)
     self.assertEqual(400, status)
     self.assertEqual(
         {'text': 'Missing or mismatching name in request body'}, body)
@@ -1652,8 +1748,7 @@ class IPWhitelistHandlerTest(RestAPITestCase):
           'subnets': ['not a subnet'],
         },
         expect_errors=True,
-        expect_xsrf_token_check=True,
-        expect_admin_check=True)
+        expect_xsrf_token_check=True)
     self.assertEqual(400, status)
     self.assertEqual({
         'text':
@@ -1668,8 +1763,7 @@ class IPWhitelistHandlerTest(RestAPITestCase):
           'name': 'A whitelist',
         },
         expect_errors=True,
-        expect_xsrf_token_check=True,
-        expect_admin_check=True)
+        expect_xsrf_token_check=True)
     self.assertEqual(404, status)
     self.assertEqual({'text': 'No such ip whitelist'}, body)
 
@@ -1687,8 +1781,7 @@ class IPWhitelistHandlerTest(RestAPITestCase):
           'If-Unmodified-Since': 'Sun, 1 Mar 1990 00:00:00 -0000',
         },
         expect_errors=True,
-        expect_xsrf_token_check=True,
-        expect_admin_check=True)
+        expect_xsrf_token_check=True)
     self.assertEqual(412, status)
     self.assertEqual(
         {'text': 'Ip whitelist was modified by someone else'}, body)
@@ -1702,8 +1795,7 @@ class IPWhitelistHandlerTest(RestAPITestCase):
           'name': 'A whitelist',
         },
         expect_errors=True,
-        expect_xsrf_token_check=True,
-        expect_admin_check=True)
+        expect_xsrf_token_check=True)
     self.assertEqual(409, status)
     self.assertEqual(
         {'text': 'The configuration is managed elsewhere'}, body)
@@ -1723,6 +1815,10 @@ class CertificatesHandlerTest(RestAPITestCase):
 
 
 class OAuthConfigHandlerTest(RestAPITestCase):
+  def setUp(self):
+    super(OAuthConfigHandlerTest, self).setUp()
+    self.mock_is_admin(True)
+
   def test_non_configured_works(self):
     expected = {
       'additional_client_ids': [],
@@ -1817,8 +1913,7 @@ class OAuthConfigHandlerTest(RestAPITestCase):
     status, response, _ = self.post(
         path='/auth/api/v1/server/oauth_config',
         body=request_body,
-        headers={'X-XSRF-Token': make_xsrf_token()},
-        expect_admin_check=True)
+        headers={'X-XSRF-Token': make_xsrf_token()})
     self.assertEqual(200, status)
     self.assertEqual({'ok': True}, response)
 
@@ -1841,6 +1936,7 @@ class OAuthConfigHandlerTest(RestAPITestCase):
     self.assertEqual(expected, copy_in_history.get().to_dict())
 
   def test_post_requires_admin(self):
+    self.mock_is_admin(False)
     status, response, _ = self.post(
         path='/auth/api/v1/server/oauth_config',
         body={},
@@ -1860,7 +1956,6 @@ class OAuthConfigHandlerTest(RestAPITestCase):
         path='/auth/api/v1/server/oauth_config',
         body=request_body,
         headers={'X-XSRF-Token': make_xsrf_token()},
-        expect_admin_check=True,
         expect_errors=True)
     self.assertEqual(409, status)
     self.assertEqual(
@@ -1885,8 +1980,8 @@ class ServerStateHandlerTest(RestAPITestCase):
         'primary_url': None,
       }
     }
-    status, body, _ = self.get(
-        '/auth/api/v1/server/state', expect_admin_check=True)
+    self.mock_is_admin(True)
+    status, body, _ = self.get('/auth/api/v1/server/state')
     self.assertEqual(200, status)
     self.assertEqual(expected, body)
 

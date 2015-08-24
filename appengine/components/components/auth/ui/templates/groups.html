@@ -1,19 +1,41 @@
 {% extends 'auth/base.html' %}
 {% block content %}
 
+<style>
+.list-group-item.readonly-group,
+.list-group-item.readonly-group:hover {
+  background-color: #eeeeee;
+}
+.list-group-item {
+  position: relative;
+}
+{# Vertically align glyphicon icon #}
+.list-item-lock-box {
+  position: absolute;
+  right: 10px;
+  min-height: 30px;
+  line-height: 30px;
+  top: 50%;
+  margin-top: -15px;
+}
+</style>
+
 {# BEWARE: The following templates in 'raw' section are handled by handlebars
 javascript library and not jinja2. #}
 
 {% raw %}
 
 <script id="group-chooser-item-template" type="text/x-handlebars-template">
-  <a href="#{{name}}" class="list-group-item">
+  <a href="#{{name}}" class="list-group-item {{#unless caller_can_modify}}readonly-group{{/unless}}">
     <h5 class="list-group-item-heading">{{name}}</h5>
     {{#if isExternal}}
     <small class="list-group-item-text">External</small>
     {{else}}
     <small class="list-group-item-text">{{descriptionTrimmed}}</small>
     {{/if}}
+    {{#unless caller_can_modify}}
+    <span class="glyphicon glyphicon-lock list-item-lock-box"></span>
+    {{/unless}}
   </a>
 </script>
 
@@ -85,12 +107,18 @@ javascript library and not jinja2. #}
         <hr>
         <div class="form-group">
           <div class="col-sm-12">
-            <button type="submit" class="btn btn-primary">
-              Update group
-            </button>
-            <button id="delete-btn" type="button" class="btn btn-danger">
-              Delete group
-            </button>
+            {{#if caller_can_modify}}
+              <button type="submit" class="btn btn-primary">
+                Update group
+              </button>
+              <button id="delete-btn" type="button" class="btn btn-danger">
+                Delete group
+              </button>
+            {{else}}
+              <div style="text-align: center">
+                <i>You do not have sufficient permissions to modify this group.</i>
+              </div>
+            {{/if}}
           </div>
         </div>
         {{/unless}}

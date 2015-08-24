@@ -138,27 +138,8 @@ class EntityHandlerBase(handler.ApiHandler):
   # Will show up in error messages, e.g. 'Failed to delete <title>'.
   entity_kind_title = None
 
-  def check_write_access(self, action, name):
-    """Raises an error if caller isn't allowed to do the action.
-
-    By default only admins can perform modifications. Subclasses may override
-    this.
-
-    Args:
-      action: one of 'create', 'update' or 'delete'.
-      name: name of the entity being created, updated or deleted.
-
-    Raises:
-      AuthorizationError on ACL check failures.
-      webapp2.HTTPException on other kind of failures.
-    """
-    assert action in ('create', 'update', 'delete'), action
-    ident = api.get_current_identity()
-    if not api.is_admin(ident):
-      # E.g. "user:abc@example.com" has no permission to update group "name".
-      raise api.AuthorizationError(
-          '"%s" has no permission to %s %s "%s"' %
-          (ident.to_bytes(), action, self.entity_kind_title, name))
+  def check_preconditions(self):
+    """Called after initial has_access checks, but before actual handling."""
 
   @classmethod
   def get_entity_key(cls, name):
@@ -171,6 +152,16 @@ class EntityHandlerBase(handler.ApiHandler):
     return True
 
   @classmethod
+  def entity_to_dict(cls, entity):
+    """Converts an entity to a serializable dictionary."""
+    return entity.to_serializable_dict(with_id_as='name')
+
+  @classmethod
+  def can_create(cls):
+    """True if caller is allowed to create a new entity."""
+    return api.is_admin()
+
+  @classmethod
   def do_create(cls, entity):
     """Called in transaction to validate and put a new entity.
 
@@ -180,6 +171,11 @@ class EntityHandlerBase(handler.ApiHandler):
     raise NotImplementedError()
 
   @classmethod
+  def can_update(cls, entity):  # pylint: disable=unused-argument
+    """True if caller is allowed to update a given entity."""
+    return api.is_admin()
+
+  @classmethod
   def do_update(cls, entity, params):
     """Called in transaction to update existing entity.
 
@@ -187,6 +183,11 @@ class EntityHandlerBase(handler.ApiHandler):
       EntityOperationError in case of a conflict.
     """
     raise NotImplementedError()
+
+  @classmethod
+  def can_delete(cls, entity):  # pylint: disable=unused-argument
+    """True if caller is allowed to delete a given entity."""
+    return api.is_admin()
 
   @classmethod
   def do_delete(cls, entity):
@@ -202,20 +203,19 @@ class EntityHandlerBase(handler.ApiHandler):
   @api.require(acl.has_access)
   def get(self, name):
     """Fetches entity give its name."""
+    self.check_preconditions()
     obj = self.get_entity_key(name).get()
     if not obj:
       self.abort_with_error(404, text='No such %s' % self.entity_kind_title)
     self.send_response(
-        response={
-          self.entity_kind_name: obj.to_serializable_dict(with_id_as='name'),
-        },
+        response={self.entity_kind_name: self.entity_to_dict(obj)},
         headers={'Last-Modified': utils.datetime_to_rfc2822(obj.modified_ts)})
 
   @forbid_api_on_replica
   @api.require(acl.has_access)
   def post(self, name):
     """Creates a new entity, ensuring it's indeed new (no overwrites)."""
-    self.check_write_access('create', name)
+    self.check_preconditions()
     try:
       body = self.parse_body()
       name_in_body = body.pop('name', None)
@@ -230,6 +230,12 @@ class EntityHandlerBase(handler.ApiHandler):
           created_by=api.get_current_identity())
     except (TypeError, ValueError) as e:
       self.abort_with_error(400, text=str(e))
+
+    # No need to enter a transaction (like in do_update) to check this.
+    if not self.can_create():
+      raise api.AuthorizationError(
+          '"%s" has no permission to create a %s' %
+          (api.get_current_identity().to_bytes(), self.entity_kind_title))
 
     @ndb.transactional
     def create(entity):
@@ -275,7 +281,7 @@ class EntityHandlerBase(handler.ApiHandler):
   @api.require(acl.has_access)
   def put(self, name):
     """Updates an existing entity."""
-    self.check_write_access('update', name)
+    self.check_preconditions()
     try:
       body = self.parse_body()
       name_in_body = body.pop('name', None)
@@ -291,18 +297,26 @@ class EntityHandlerBase(handler.ApiHandler):
     def update(params, expected_ts):
       entity = self.get_entity_key(name).get()
       if not entity:
-        return None, {
+        return None, None, {
           'http_code': 404,
           'text': 'No such %s' % self.entity_kind_title,
         }
       if (expected_ts and
           utils.datetime_to_rfc2822(entity.modified_ts) != expected_ts):
-        return None, {
+        return None, None, {
           'http_code': 412,
           'text':
               '%s was modified by someone else' %
               self.entity_kind_title.capitalize(),
         }
+      if not self.can_update(entity):
+        # Raising from inside a transaction produces ugly logs. Just return the
+        # exception to be raised outside.
+        ident = api.get_current_identity()
+        exc = api.AuthorizationError(
+            '"%s" has no permission to update %s "%s"' %
+            (ident.to_bytes(), self.entity_kind_title, name))
+        return None, exc, None
       entity.record_revision(
           modified_by=api.get_current_identity(),
           modified_ts=utils.utcnow(),
@@ -310,21 +324,23 @@ class EntityHandlerBase(handler.ApiHandler):
       try:
         self.do_update(entity, params)
       except EntityOperationError as exc:
-        return None, {
+        return None, None, {
           'http_code': 409,
           'text': exc.message,
           'details': exc.details,
         }
       except ValueError as exc:
-        return False, {
+        return None, None, {
           'http_code': 400,
           'text': str(exc),
         }
       model.replicate_auth_db()
-      return entity, None
+      return entity, None, None
 
-    entity, error_details = update(
+    entity, exc, error_details = update(
         entity_params, self.request.headers.get('If-Unmodified-Since'))
+    if exc:
+      raise exc  # pylint: disable=raising-bad-type
     if not entity:
       self.abort_with_error(**error_details)
     self.send_response(
@@ -339,7 +355,7 @@ class EntityHandlerBase(handler.ApiHandler):
   @api.require(acl.has_access)
   def delete(self, name):
     """Deletes an entity."""
-    self.check_write_access('delete', name)
+    self.check_preconditions()
     if not self.is_entity_writable(name):
       self.abort_with_error(
           400, text='This %s is not writable' % self.entity_kind_title)
@@ -349,7 +365,7 @@ class EntityHandlerBase(handler.ApiHandler):
       entity = self.get_entity_key(name).get()
       if not entity:
         if expected_ts:
-          return False, {
+          return None, {
             'http_code': 412,
             'text':
                 '%s was deleted by someone else' %
@@ -357,15 +373,23 @@ class EntityHandlerBase(handler.ApiHandler):
           }
         else:
           # Unconditionally deleting it, and it's already gone -> success.
-          return True, None
+          return None, None
       if (expected_ts and
           utils.datetime_to_rfc2822(entity.modified_ts) != expected_ts):
-        return False, {
+        return None, {
           'http_code': 412,
           'text':
               '%s was modified by someone else' %
               self.entity_kind_title.capitalize(),
         }
+      if not self.can_delete(entity):
+        # Raising from inside a transaction produces ugly logs. Just return the
+        # exception to be raised outside.
+        ident = api.get_current_identity()
+        exc = api.AuthorizationError(
+            '"%s" has no permission to delete %s "%s"' %
+            (ident.to_bytes(), self.entity_kind_title, name))
+        return exc, None
       entity.record_deletion(
           modified_by=api.get_current_identity(),
           modified_ts=utils.utcnow(),
@@ -373,17 +397,18 @@ class EntityHandlerBase(handler.ApiHandler):
       try:
         self.do_delete(entity)
       except EntityOperationError as exc:
-        return False, {
+        return None, {
           'http_code': 409,
           'text': exc.message,
           'details': exc.details,
         }
       model.replicate_auth_db()
-      return True, None
+      return None, None
 
-    success, error_details = delete(
-        self.request.headers.get('If-Unmodified-Since'))
-    if not success:
+    exc, error_details = delete(self.request.headers.get('If-Unmodified-Since'))
+    if exc:
+      raise exc  # pylint: disable=raising-bad-type
+    if error_details:
       self.abort_with_error(**error_details)
     self.send_response({'ok': True})
 
@@ -495,6 +520,13 @@ class ChangeLogHandler(handler.ApiHandler):
     })
 
 
+def caller_can_modify(group_dict):
+  """True if given group (presented as dict) is modifiable by a caller."""
+  if model.is_external_group_name(group_dict['name']):
+    return False
+  return api.is_admin() or api.is_group_member(group_dict['owners'])
+
+
 class GroupsHandler(handler.ApiHandler):
   """Lists all registered groups.
 
@@ -509,12 +541,19 @@ class GroupsHandler(handler.ApiHandler):
   def cache_key(auth_db_rev):
     return 'api:v1:GroupsHandler/%d' % auth_db_rev
 
+  @staticmethod
+  def adjust_response_for_user(response):
+    """Modifies response (in place) based on user ACLs."""
+    for g in response['groups']:
+      g['caller_can_modify'] = caller_can_modify(g)
+
   @api.require(acl.has_access)
   def get(self):
     # Try to find a cached response for the current revision.
     auth_db_rev = model.get_auth_db_revision()
     cached_response = memcache.get(self.cache_key(auth_db_rev))
     if cached_response is not None:
+      self.adjust_response_for_user(cached_response)
       self.send_response(cached_response)
       return
 
@@ -538,6 +577,7 @@ class GroupsHandler(handler.ApiHandler):
       ],
     }
     memcache.set(self.cache_key(auth_db_rev), response, time=24*3600)
+    self.adjust_response_for_user(response)
     self.send_response(response)
 
 
@@ -562,6 +602,17 @@ class GroupHandler(EntityHandlerBase):
     return not model.is_external_group_name(name)
 
   @classmethod
+  def entity_to_dict(cls, entity):
+    g = super(GroupHandler, cls).entity_to_dict(entity)
+    g['caller_can_modify'] = caller_can_modify(g)
+    return g
+
+  # Same as in the base class, repeated here just for clarity.
+  @classmethod
+  def can_create(cls):
+    return api.is_admin()
+
+  @classmethod
   def do_create(cls, entity):
     # Admin group is created during bootstrap, see ui.py BootstrapHandler.
     assert entity.key.id() != model.ADMIN_GROUP
@@ -580,6 +631,10 @@ class GroupHandler(EntityHandlerBase):
     entity.put()
 
   @classmethod
+  def can_update(cls, entity):
+    return api.is_admin() or api.is_group_member(entity.owners)
+
+  @classmethod
   def do_update(cls, entity, params):
     # If changing an owner, ensure new owner exists. No need to do it if
     # the group owns itself (we know it exists).
@@ -595,14 +650,17 @@ class GroupHandler(EntityHandlerBase):
       raise EntityOperationError(
           message='Can\'t change owner of \'%s\' group.' % model.ADMIN_GROUP)
     # If adding new nested groups, need to ensure they exist.
-    added_nested_groups = set(params['nested']) - set(entity.nested)
-    if added_nested_groups:
-      missing = model.get_missing_groups(added_nested_groups)
-      if missing:
-        raise EntityOperationError(
-            message=
-                'Some referenced groups don\'t exist: %s.' % ', '.join(missing),
-            details={'missing': missing})
+    added_nested_groups = None
+    if 'nested' in params:
+      added_nested_groups = set(params['nested']) - set(entity.nested)
+      if added_nested_groups:
+        missing = model.get_missing_groups(added_nested_groups)
+        if missing:
+          raise EntityOperationError(
+              message=
+                  'Some referenced groups don\'t exist: %s.'
+                  % ', '.join(missing),
+              details={'missing': missing})
     # Now make sure updated group is not a part of new group dependency cycle.
     entity.populate(**params)
     if added_nested_groups:
@@ -616,6 +674,10 @@ class GroupHandler(EntityHandlerBase):
             details={'cycle': cycle})
     # Good enough.
     entity.put()
+
+  @classmethod
+  def can_delete(cls, entity):
+    return api.is_admin() or api.is_group_member(entity.owners)
 
   @classmethod
   def do_delete(cls, entity):
@@ -788,9 +850,8 @@ class IPWhitelistHandler(EntityHandlerBase):
   entity_kind_name = 'ip_whitelist'
   entity_kind_title = 'ip whitelist'
 
-  def check_write_access(self, action, name):
-    super(IPWhitelistHandler, self).check_write_access(action, name)
-    if is_config_locked():
+  def check_preconditions(self):
+    if self.request.method != 'GET' and is_config_locked():
       self.abort_with_error(409, text='The configuration is managed elsewhere')
 
   @classmethod

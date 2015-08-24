@@ -521,6 +521,10 @@ def fetch_auth_db(known_version=None):
     if known_version is not None and current_version == known_version:
       return None
 
+    # TODO(vadimsh): Use auth_db_rev instead of entity group version. It is less
+    # likely to change without any apparent reason (like entity group version
+    # does).
+
     # TODO(vadimsh): Add memcache keyed at |current_version| so only one
     # frontend instance have to pay the cost of fetching AuthDB from Datastore
     # via multiple RPCs. All other instances will fetch it via single

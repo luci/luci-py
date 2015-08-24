@@ -114,16 +114,18 @@ GroupChooser.prototype.refetchGroups = function() {
 GroupChooser.prototype.setGroupList = function(groups) {
   var self = this;
 
-  // Groups without '-' or '/' come first, then groups with '-'.
+  // Groups without '-' or '/' come first, then groups with '-'. Groups that can
+  // be modified by a caller always come before read-only groups.
   var sortKeyFunc = function(group) {
+    var prefix = group.caller_can_modify ? 'A' : 'B';
     var name = group.name;
     if (name.indexOf('/') != -1) {
-      return 'C-' + name;
+      return prefix + 'C' + name;
     }
     if (name.indexOf('-') != -1) {
-      return 'B-' + name;
+      return prefix + 'B' + name;
     }
-    return 'A-' + name;
+    return prefix + 'A' + name;
   };
 
   // Remember new sorted list.

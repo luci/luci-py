@@ -7,6 +7,9 @@
 from .. import api
 
 
+ACCESS_GROUP_NAME = 'auth-service-access'
+
+
 def has_access(identity=None):
   """Returns True if current caller can access groups and other auth data.
 
@@ -23,5 +26,5 @@ def has_access(identity=None):
   identity = identity or api.get_current_identity()
   return (
       api.is_admin(identity) or
-      api.is_group_member('auth-service-access', identity) or
+      api.is_group_member(ACCESS_GROUP_NAME, identity) or
       api.is_group_member('groups-readonly-access', identity))
