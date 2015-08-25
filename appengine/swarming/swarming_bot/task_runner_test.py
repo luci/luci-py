@@ -425,9 +425,11 @@ class TestTaskRunner(TestTaskRunnerBase):
 
     self.mock(task_runner, 'load_and_run', load_and_run)
     cmd = [
-      '--swarming-server', 'http://localhost', '--file', 'foo',
-      '--cost-usd-hour', '3600', '--start', str(time.time()),
-      '--json-file', 'task_summary.json',
+      '--swarming-server', 'http://localhost',
+      '--in-file', 'foo',
+      '--out-file', 'task_summary.json',
+      '--cost-usd-hour', '3600',
+      '--start', str(time.time()),
     ]
     self.assertEqual(0, task_runner.main(cmd))
 
@@ -443,9 +445,11 @@ class TestTaskRunner(TestTaskRunnerBase):
 
     self.mock(task_runner, 'load_and_run', load_and_run)
     cmd = [
-      '--swarming-server', 'http://localhost', '--file', 'foo',
-      '--cost-usd-hour', '3600', '--start', str(time.time()),
-      '--json-file', 'task_summary.json',
+      '--swarming-server', 'http://localhost',
+      '--in-file', 'foo',
+      '--out-file', 'task_summary.json',
+      '--cost-usd-hour', '3600',
+      '--start', str(time.time()),
     ]
     self.assertEqual(task_runner.TASK_FAILED, task_runner.main(cmd))
 

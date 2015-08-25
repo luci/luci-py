@@ -5,6 +5,7 @@
 
 """Starts a local bot to connect to a local server."""
 
+import glob
 import os
 import signal
 import shutil
@@ -61,10 +62,8 @@ class LocalBot(object):
         pass
     exit_code = self._proc.returncode
     if self._tmpdir:
-      self._read_log('bot_config.log')
-      self._read_log('bot_config_stdout.log')
-      self._read_log('swarming_bot.log')
-      self._read_log('task_runner.log')
+      for i in sorted(glob.glob(os.path.join(self._tmpdir, '*.log'))):
+        self._read_log(i)
       shutil.rmtree(self._tmpdir)
       self._tmpdir = None
     self._proc = None
@@ -93,10 +92,10 @@ class LocalBot(object):
           sys.stderr.write('  %s\n' % l)
     print >> sys.stderr, '-' * 60
 
-  def _read_log(self, name):
+  def _read_log(self, path):
     try:
-      with open(os.path.join(self._tmpdir, name), 'rb') as f:
-        self._logs[name] = f.read()
+      with open(path, 'rb') as f:
+        self._logs[os.path.basename(path)] = f.read()
     except (IOError, OSError):
       pass
 

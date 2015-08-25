@@ -385,10 +385,11 @@ def run_manifest(botobj, manifest, start):
   # before any I/O is done, like writting the manifest to disk.
   task_id = manifest['task_id']
   # Sets an hard timeout of task's hard_time + 5 minutes to notify the server.
+  # TODO(maruel): Add grace period.
   hard_timeout = manifest['hard_timeout'] + 5*60.
   url = manifest.get('host', botobj.remote.url)
   task_dimensions = manifest['dimensions']
-  task_summary = {}
+  task_result = {}
 
   failure = False
   internal_failure = False
@@ -408,24 +409,28 @@ def run_manifest(botobj, manifest, start):
     # variables.
     env['SWARMING_TASK_ID'] = task_id.encode('ascii')
 
-    path = os.path.join(work_dir, 'task_run.json')
-    with open(path, 'wb') as f:
+    task_in_file = os.path.join(work_dir, 'task_runner_in.json')
+    with open(task_in_file, 'wb') as f:
       f.write(json.dumps(manifest))
     call_hook(botobj, 'on_before_task')
-    task_summary_file = os.path.join(work_dir, 'task_summary.json')
-    if os.path.exists(task_summary_file):
-      os.remove(task_summary_file)
+    task_result_file = os.path.join(work_dir, 'task_runner_out.json')
+    if os.path.exists(task_result_file):
+      os.remove(task_result_file)
     command = [
       sys.executable, THIS_FILE, 'task_runner',
       '--swarming-server', url,
-      '--file', path,
+      '--in-file', task_in_file,
+      '--out-file', task_result_file,
       '--cost-usd-hour', str(botobj.state.get('cost_usd_hour') or 0.),
       # Include the time taken to poll the task in the cost.
       '--start', str(start),
-      '--json-file', task_summary_file,
     ]
     logging.debug('Running command: %s', command)
-    proc = subprocess.Popen(command, cwd=ROOT_DIR, env=env)
+    # Put the output file into the current working directory, which should be
+    # the one containing swarming_bot.zip.
+    with open('task_runner_stdout.log', 'wb') as f:
+      proc = subprocess.Popen(
+          command, cwd=ROOT_DIR, env=env, stdout=f, stderr=subprocess.STDOUT)
     while proc.poll() is None:
       if time.time() - start >= hard_timeout:
         proc.kill()
@@ -440,9 +445,9 @@ def run_manifest(botobj, manifest, start):
     internal_failure = not failure and bool(proc.returncode)
     if internal_failure:
       msg = 'Execution failed, internal error.'
-    if os.path.exists(task_summary_file):
-      with open(task_summary_file) as fd:
-        task_summary = json.load(fd)
+    if os.path.exists(task_result_file):
+      with open(task_result_file, 'rb') as f:
+        task_result = json.load(f)
     return not bool(proc.returncode)
   except Exception as e:
     # Failures include IOError when writing if the disk is full, OSError if
@@ -455,8 +460,8 @@ def run_manifest(botobj, manifest, start):
     if internal_failure:
       post_error_task(botobj, msg, task_id)
     call_hook(
-      botobj, 'on_after_task', failure, internal_failure, task_dimensions,
-      task_summary)
+        botobj, 'on_after_task', failure, internal_failure, task_dimensions,
+        task_result)
 
 
 def update_bot(botobj, version):
@@ -474,6 +479,7 @@ def update_bot(botobj, version):
   new_zip = 'swarming_bot.1.zip'
   if os.path.basename(THIS_FILE) == new_zip:
     new_zip = 'swarming_bot.2.zip'
+  new_zip = os.path.join(ROOT_DIR, new_zip)
 
   # Download as a new file.
   url = botobj.remote.url + '/swarming/api/v1/bot/bot_code/%s' % version
@@ -532,9 +538,9 @@ def get_config():
     # Can't use with statement here as it has to work with python 2.6 due to
     # obscure reasons relating to old cygwin installs.
     with contextlib.closing(zipfile.ZipFile(THIS_FILE, 'r')) as f:
-      return json.load(f.open('config.json'))
+      return json.load(f.open('config.json', 'r'))
 
-  with open(os.path.join(ROOT_DIR, 'config.json'), 'r') as f:
+  with open(os.path.join(ROOT_DIR, 'config.json'), 'rb') as f:
     return json.load(f)
 
 

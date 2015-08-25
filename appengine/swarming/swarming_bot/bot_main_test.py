@@ -35,6 +35,8 @@ import xsrf_client
 
 
 class TestBotMain(net_utils.TestCase):
+  maxDiff = 2000
+
   def setUp(self):
     super(TestBotMain, self).setUp()
     os.environ.pop('SWARMING_LOAD_TEST', None)
@@ -125,6 +127,9 @@ class TestBotMain(net_utils.TestCase):
     self.mock(time, 'time', lambda: 126.0)
     self.mock(logging, 'error', lambda *_: None)
     self.mock(bot_main, 'get_remote', lambda: self.server)
+    # get_state() return value changes over time. Hardcode its value for the
+    # duration of this test.
+    self.mock(os_utilities, 'get_state', lambda: {'foo': 'bar'})
     expected_attribs = bot_main.get_attributes()
     self.expected_requests(
         [
@@ -339,19 +344,22 @@ class TestBotMain(net_utils.TestCase):
   def _mock_popen(self, returncode, url='https://localhost:1'):
     # Method should have "self" as first argument - pylint: disable=E0213
     class Popen(object):
-      def __init__(self2, cmd, cwd, env):
+      def __init__(self2, cmd, cwd, env, stdout, stderr):
         self2.returncode = None
         expected = [
           sys.executable, THIS_FILE, 'task_runner',
           '--swarming-server', url,
-          '--file', os.path.join(self.root_dir, 'work', 'task_run.json'),
+          '--in-file',
+          os.path.join(self.root_dir, 'work', 'task_runner_in.json'),
+          '--out-file',
+          os.path.join(self.root_dir, 'work', 'task_runner_out.json'),
           '--cost-usd-hour', '3600.0', '--start', '100.0',
-          '--json-file',
-          os.path.join(self.root_dir, 'work', 'task_summary.json'),
         ]
         self.assertEqual(expected, cmd)
         self.assertEqual(bot_main.ROOT_DIR, cwd)
         self.assertEqual('24', env['SWARMING_TASK_ID'])
+        self.assertTrue(stdout)
+        self.assertEqual(subprocess.STDOUT, stderr)
 
       def poll(self2):
         self2.returncode = returncode
@@ -456,7 +464,10 @@ class TestBotMain(net_utils.TestCase):
       bot_main.update_bot(self.bot, '123')
     self.assertEqual(23, e.exception.code)
 
-    cmd = ['swarming_bot.2.zip', 'start_slave', '--survive']
+    cmd = [
+      os.path.join(bot_main.ROOT_DIR, 'swarming_bot.2.zip'), 'start_slave',
+      '--survive',
+    ]
     self.assertEqual([cmd], calls)
 
   def test_get_config(self):

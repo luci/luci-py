@@ -46,7 +46,6 @@ def CMDattributes(_args):
 
 def CMDrun_isolated(args):
   """Internal command to run an isolated command."""
-  logging_utils.prepare_logging('run_isolated_bot.log')
   sys.path.insert(0, os.path.join(THIS_FILE, 'client'))
   import run_isolated
   return run_isolated.main(args)

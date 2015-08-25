@@ -14,8 +14,6 @@ up to the calling process (bot_main.py) to signal that there was an internal
 failure and to cancel this task run and ask the server to retry it.
 """
 
-__version__ = '0.4'
-
 import StringIO
 import base64
 import json
@@ -337,23 +335,19 @@ def run_command(
 
 
 def main(args):
-  parser = optparse.OptionParser(
-      description=sys.modules[__name__].__doc__,
-      version=__version__)
-  parser.add_option('--file', help='Name of the request file')
+  parser = optparse.OptionParser(description=sys.modules[__name__].__doc__)
+  parser.add_option('--in-file', help='Name of the request file')
+  parser.add_option(
+      '--out-file', help='Name of the JSON file to write a task summary to')
   parser.add_option(
       '--swarming-server', help='Swarming server to send data back')
   parser.add_option(
       '--cost-usd-hour', type='float', help='Cost of this VM in $/h')
   parser.add_option('--start', type='float', help='Time this task was started')
-  parser.add_option(
-      '--json-file', help='Name of the JSON file to write a task summary to')
 
   options, args = parser.parse_args(args)
-  if not options.file:
-    parser.error('You must provide the request file name.')
-  if args:
-    parser.error('Unknown args: %s' % args)
+  if not options.in_file or not options.out_file or args:
+    parser.error('task_runner is meant to be used by swarming_bot.')
 
   on_error.report_on_exception_exit(options.swarming_server)
 
@@ -366,8 +360,8 @@ def main(args):
 
   try:
     if not load_and_run(
-        options.file, remote, options.cost_usd_hour, options.start,
-        options.json_file):
+        options.in_file, remote, options.cost_usd_hour, options.start,
+        options.out_file):
       return TASK_FAILED
     return 0
   finally:

@@ -142,6 +142,8 @@ def handle_interrupt(fn):
 
 class SwarmingTestCase(unittest.TestCase):
   """Test case class for Swarming integration tests."""
+  maxDiff = 2000
+
   def setUp(self):
     super(SwarmingTestCase, self).setUp()
     self._bot = None
