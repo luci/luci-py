@@ -43,13 +43,6 @@ MAX_PACKET_INTERVAL = 30
 MIN_PACKET_INTERNAL = 10
 
 
-# Exit code used to indicate the task failed. Keep in sync with bot_main.py. The
-# reason for its existance is that if an exception occurs, task_runner's exit
-# code will be 1. If the process is killed, it'll likely be -9. In these cases,
-# we want the task to be marked as internal_failure, not as a failure.
-TASK_FAILED = 89
-
-
 # Used to implement monotonic_time for a clock that never goes backward.
 _last_now = 0
 
@@ -104,33 +97,31 @@ class TaskDetails(object):
     self.task_id = data['task_id']
 
 
-def load_and_run(filename, swarming_server, cost_usd_hour, start, json_file):
+def load_and_run(in_file, swarming_server, cost_usd_hour, start, out_file):
   """Loads the task's metadata and execute it.
 
   This may throw all sorts of exceptions in case of failure. It's up to the
   caller to trap them. These shall be considered 'internal_failure' instead of
   'failure' from a TaskRunResult standpoint.
-
-  Return:
-    True on success, False if the task failed.
   """
   # The work directory is guaranteed to exist since it was created by
   # bot_main.py and contains the manifest. Temporary files will be downloaded
   # there. It's bot_main.py that will delete the directory afterward. Tests are
   # not run from there.
-  root_dir = os.path.abspath('work')
-  if not os.path.isdir(root_dir):
-    raise ValueError('%s expected to exist' % root_dir)
+  work_dir = os.path.abspath('work')
+  if not os.path.isdir(work_dir):
+    raise ValueError('%s expected to exist' % work_dir)
 
-  with open(filename, 'rb') as f:
+  with open(in_file, 'rb') as f:
     task_details = TaskDetails(json.load(f))
 
   # Download the script to run in the temporary directory.
-  download_data(root_dir, task_details.data)
+  download_data(work_dir, task_details.data)
 
-  exit_code = run_command(
-      swarming_server, task_details, root_dir, cost_usd_hour, start, json_file)
-  return not bool(exit_code)
+  task_result = run_command(
+      swarming_server, task_details, work_dir, cost_usd_hour, start)
+  with open(out_file, 'wb') as f:
+    json.dump(task_result, f)
 
 
 def post_update(swarming_server, params, exit_code, stdout, output_chunk_start):
@@ -191,15 +182,14 @@ def calc_yield_wait(task_details, start, last_io, timed_out, stdout):
 
 
 def run_command(
-    swarming_server, task_details, root_dir, cost_usd_hour, task_start,
-    json_file):
+    swarming_server, task_details, root_dir, cost_usd_hour, task_start):
   """Runs a command and sends packets to the server to stream results back.
 
   Implements both I/O and hard timeouts. Sends the packets numbered, so the
   server can ensure they are processed in order.
 
   Returns:
-    Child process exit code.
+    Metadata about the command.
   """
   # Signal the command is about to be started.
   last_packet = start = now = monotonic_time()
@@ -234,7 +224,12 @@ def run_command(
     params['io_timeout'] = False
     params['hard_timeout'] = False
     post_update(swarming_server, params, 1, stdout, 0)
-    return 1
+    return {
+      u'exit_code': 255,
+      u'hard_timeout': False,
+      u'io_timeout': False,
+      u'version': 2,
+    }
 
   output_chunk_start = 0
   stdout = ''
@@ -269,12 +264,18 @@ def run_command(
         if now - last_io > task_details.io_timeout:
           had_io_timeout = True
           logging.warning('I/O timeout')
-          proc.terminate()
+          try:
+            proc.terminate()
+          except OSError:
+            pass
           timed_out = monotonic_time()
         elif now - start > task_details.hard_timeout:
           had_hard_timeout = True
           logging.warning('Hard timeout')
-          proc.terminate()
+          try:
+            proc.terminate()
+          except OSError:
+            pass
           timed_out = monotonic_time()
       else:
         # During grace period.
@@ -292,46 +293,34 @@ def run_command(
             pass
     logging.info('Waiting for proces exit')
     exit_code = proc.wait()
-    logging.info('Waiting for proces exit - done')
-  finally:
+  except (IOError, OSError):
     # Something wrong happened, try to kill the child process.
-    if exit_code is None:
-      had_hard_timeout = True
-      try:
-        logging.warning('proc.kill() in finally')
-        proc.kill()
-      except OSError:
-        # The process has already exited.
-        pass
+    had_hard_timeout = True
+    try:
+      logging.warning('proc.kill() in finally')
+      proc.kill()
+    except OSError:
+      # The process has already exited.
+      pass
 
-      # TODO(maruel): We'd wait only for X seconds.
-      logging.info('Waiting for proces exit in finally')
-      exit_code = proc.wait()
-      logging.info('Waiting for proces exit in finally - done')
+    # TODO(maruel): We'd wait only for X seconds.
+    logging.info('Waiting for proces exit in finally')
+    exit_code = proc.wait()
+    logging.info('Waiting for proces exit in finally - done')
 
-    # This is the very last packet for this command.
-    now = monotonic_time()
-    params['cost_usd'] = cost_usd_hour * (now - task_start) / 60. / 60.
-    params['duration'] = now - start
-    params['io_timeout'] = had_io_timeout
-    params['hard_timeout'] = had_hard_timeout
-    # At worst, it'll re-throw, which will be caught by bot_main.py.
-    post_update(swarming_server, params, exit_code, stdout, output_chunk_start)
-    output_chunk_start += len(stdout)
-    stdout = ''
-
-    summary = {
-        'exit_code': exit_code,
-        'hard_timeout': had_hard_timeout,
-        'io_timeout': had_io_timeout,
-        'version': 2,
-    }
-    with open(json_file, 'w') as fd:
-      json.dump(summary, fd)
-
-  logging.info('run_command() = %s', exit_code)
-  assert not stdout
-  return exit_code
+  # This is the very last packet for this command.
+  now = monotonic_time()
+  params['cost_usd'] = cost_usd_hour * (now - task_start) / 60. / 60.
+  params['duration'] = now - start
+  params['io_timeout'] = had_io_timeout
+  params['hard_timeout'] = had_hard_timeout
+  post_update(swarming_server, params, exit_code, stdout, output_chunk_start)
+  return {
+    u'exit_code': exit_code,
+    u'hard_timeout': had_hard_timeout,
+    u'io_timeout': had_io_timeout,
+    u'version': 2,
+  }
 
 
 def main(args):
@@ -359,10 +348,9 @@ def main(args):
     options.start = now
 
   try:
-    if not load_and_run(
+    load_and_run(
         options.in_file, remote, options.cost_usd_hour, options.start,
-        options.out_file):
-      return TASK_FAILED
+        options.out_file)
     return 0
   finally:
     logging.info('quitting')

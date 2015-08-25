@@ -47,10 +47,6 @@ THIS_FILE = os.path.abspath(zip_package.get_main_script_path())
 ROOT_DIR = os.path.dirname(THIS_FILE)
 
 
-# See task_runner.py for documentation.
-TASK_FAILED = 89
-
-
 _ERROR_HANDLER_WAS_REGISTERED = False
 
 
@@ -434,21 +430,27 @@ def run_manifest(botobj, manifest, start):
     while proc.poll() is None:
       if time.time() - start >= hard_timeout:
         proc.kill()
-        failure = False
         internal_failure = True
         msg = 'task_runner hung'
         return False
       # Busy loop.
       time.sleep(0.5)
 
-    failure = proc.returncode == TASK_FAILED
-    internal_failure = not failure and bool(proc.returncode)
-    if internal_failure:
-      msg = 'Execution failed, internal error.'
     if os.path.exists(task_result_file):
-      with open(task_result_file, 'rb') as f:
-        task_result = json.load(f)
-    return not bool(proc.returncode)
+      with open(task_result_file, 'rb') as fd:
+        task_result = json.load(fd)
+
+    if proc.returncode:
+      logging.warning('task_runner died')
+      msg = 'Execution failed, internal error (%d).' % proc.returncode
+      internal_failure = True
+    elif not task_result:
+      logging.warning('task_runner failed to write metadata')
+      msg = 'Execution failed, internal error (no metadata).'
+      internal_failure = True
+
+    failure = bool(task_result.get('exit_code')) if task_result else False
+    return not internal_failure and not failure
   except Exception as e:
     # Failures include IOError when writing if the disk is full, OSError if
     # swarming_bot.zip doesn't exist anymore, etc.

@@ -3,6 +3,7 @@
 # Use of this source code is governed by the Apache v2.0 license that can be
 # found in the LICENSE file.
 
+import json
 import logging
 import os
 import shutil
@@ -341,18 +342,19 @@ class TestBotMain(net_utils.TestCase):
         ])
     self.assertTrue(bot_main.poll_server(self.bot, bit))
 
-  def _mock_popen(self, returncode, url='https://localhost:1'):
+  def _mock_popen(self, returncode=0, exit_code=0, url='https://localhost:1'):
     # Method should have "self" as first argument - pylint: disable=E0213
     class Popen(object):
       def __init__(self2, cmd, cwd, env, stdout, stderr):
         self2.returncode = None
+        self2._out_file = os.path.join(
+            self.root_dir, 'work', 'task_runner_out.json')
         expected = [
           sys.executable, THIS_FILE, 'task_runner',
           '--swarming-server', url,
           '--in-file',
           os.path.join(self.root_dir, 'work', 'task_runner_in.json'),
-          '--out-file',
-          os.path.join(self.root_dir, 'work', 'task_runner_out.json'),
+          '--out-file', self2._out_file,
           '--cost-usd-hour', '3600.0', '--start', '100.0',
         ]
         self.assertEqual(expected, cmd)
@@ -363,11 +365,9 @@ class TestBotMain(net_utils.TestCase):
 
       def poll(self2):
         self2.returncode = returncode
-        return returncode
-
-      def communicate(self2):
-        self2.returncode = returncode
-        return 'foo', None
+        with open(self2._out_file, 'wb') as f:
+          json.dump({'exit_code': exit_code}, f)
+        return 0
     self.mock(subprocess, 'Popen', Popen)
 
   def test_run_manifest(self):
@@ -379,9 +379,9 @@ class TestBotMain(net_utils.TestCase):
         self.assertEqual(False, failure)
         self.assertEqual(False, internal_failure)
         self.assertEqual({'os': 'Amiga'}, dimensions)
-        self.assertEqual({}, summary)
+        self.assertEqual({u'exit_code': 0}, summary)
     self.mock(bot_main, 'call_hook', call_hook)
-    self._mock_popen(0, url='https://localhost:3')
+    self._mock_popen(url='https://localhost:3')
 
     manifest = {
       'dimensions': {'os': 'Amiga'},
@@ -392,16 +392,16 @@ class TestBotMain(net_utils.TestCase):
     bot_main.run_manifest(self.bot, manifest, time.time())
 
   def test_run_manifest_task_failure(self):
-    self.mock(bot_main, 'post_error_task', self.fail)
+    self.mock(bot_main, 'post_error_task', lambda *args: self.fail(args))
     def call_hook(_botobj, name, *args):
       if name == 'on_after_task':
         failure, internal_failure, dimensions, summary = args
         self.assertEqual(True, failure)
         self.assertEqual(False, internal_failure)
         self.assertEqual({}, dimensions)
-        self.assertEqual({}, summary)
+        self.assertEqual({u'exit_code': 1}, summary)
     self.mock(bot_main, 'call_hook', call_hook)
-    self._mock_popen(bot_main.TASK_FAILED)
+    self._mock_popen(exit_code=1)
 
     manifest = {'dimensions': {}, 'hard_timeout': 60, 'task_id': '24'}
     bot_main.run_manifest(self.bot, manifest, time.time())
@@ -415,13 +415,13 @@ class TestBotMain(net_utils.TestCase):
         self.assertEqual(False, failure)
         self.assertEqual(True, internal_failure)
         self.assertEqual({}, dimensions)
-        self.assertEqual({}, summary)
+        self.assertEqual({u'exit_code': 0}, summary)
     self.mock(bot_main, 'call_hook', call_hook)
-    self._mock_popen(1)
+    self._mock_popen(returncode=1)
 
     manifest = {'dimensions': {}, 'hard_timeout': 60, 'task_id': '24'}
     bot_main.run_manifest(self.bot, manifest, time.time())
-    expected = [(self.bot, 'Execution failed, internal error.', '24')]
+    expected = [(self.bot, 'Execution failed, internal error (1).', '24')]
     self.assertEqual(expected, posted)
 
   def test_run_manifest_exception(self):
