@@ -421,7 +421,7 @@ def fetch_file_async(url, oauth_scopes):
     data = yield net.request_async(url, scopes=oauth_scopes, deadline=60)
     raise ndb.Return(data)
   except net.Error as e:
-    raise BundleFetchError(url, e.status_code, e.content)
+    raise BundleFetchError(url, e.status_code, e.response)
 
 
 def extract_tar_archive(content):
