@@ -147,7 +147,7 @@ def initialize_oauth(method):
   Used to retry deadlines in GetOAuthUser RPCs before diving into Endpoints code
   that doesn't care about retries.
 
-  TODO(vadimsh): This call is unneccessary if id_token is used instead of
+  TODO(vadimsh): This call is unnecessary if id_token is used instead of
   access_token. We do not use id_tokens currently.
   """
   @functools.wraps(method)
@@ -158,6 +158,12 @@ def initialize_oauth(method):
           method.method_info.scopes
           if method.method_info.scopes is not None
           else service.api_info.scopes)
+      # GAE OAuth module uses internal cache for OAuth RCP responses. The cache
+      # key, unfortunately, is basically str(scopes), and a single scope passed
+      # as a string (Endpoints lib does that) and a list with one scope only
+      # have different cache keys (even though RCPs are identical). So do what
+      # Endpoints lib does to warm the cache for it.
+      scopes = scopes[0] if len(scopes) == 1 else scopes
       api.attempt_oauth_initialization(scopes)
     return method(service, *args, **kwargs)
   return wrapper
